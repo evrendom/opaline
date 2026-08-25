@@ -83,15 +83,19 @@ describe("R2 ingest materialization gate", () => {
 		await expect(active).resolves.toBe("active");
 	});
 
-	test("cancels a hung operation and admits the next job", async () => {
+	test("retains capacity when cancellation cannot settle the operation", async () => {
+		const recycleRequested = Promise.withResolvers<Error>();
 		const gate = createR2IngestMaterializationGate({
 			maxBytes: 128 * MEBIBYTE,
 			maxJobs: 1,
 			maxQueuedJobs: 1,
 			operationTimeoutMs: 20,
-			queueTimeoutMs: 5_000,
+			queueTimeoutMs: 50,
+			recycleUnsettledOperation: recycleRequested.resolve,
+			unsettledOperationTimeoutMs: 10,
 		});
 		let observedCancellation = false;
+		let nextStarted = false;
 		const hung = gate.run(1, async (signal) => {
 			signal.addEventListener(
 				"abort",
@@ -103,16 +107,32 @@ describe("R2 ingest materialization gate", () => {
 			return new Promise<never>(() => {});
 		});
 		await Promise.resolve();
-		const next = gate.run(1, async () => "next");
+		const next = gate.run(1, async () => {
+			nextStarted = true;
+			return "next";
+		});
 
 		await expect(hung).rejects.toMatchObject({
 			code: "R2_INGEST_GATE_OPERATION_TIMEOUT",
 		});
 		expect(observedCancellation).toBe(true);
-		await expect(next).resolves.toBe("next");
+		await expect(recycleRequested.promise).resolves.toMatchObject({
+			code: "R2_INGEST_GATE_OPERATION_TIMEOUT",
+		});
+		expect(nextStarted).toBe(false);
 		expect(gate.getStats()).toEqual({
-			activeBytes: 0,
-			activeJobs: 0,
+			activeBytes: 1,
+			activeJobs: 1,
+			queuedBytes: 1,
+			queuedJobs: 1,
+		});
+		await expect(next).rejects.toMatchObject({
+			code: "R2_INGEST_GATE_QUEUE_TIMEOUT",
+		});
+		expect(nextStarted).toBe(false);
+		expect(gate.getStats()).toEqual({
+			activeBytes: 1,
+			activeJobs: 1,
 			queuedBytes: 0,
 			queuedJobs: 0,
 		});

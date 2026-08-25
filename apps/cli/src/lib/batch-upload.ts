@@ -1,4 +1,7 @@
-import { MissingTranscriptTimestampError } from "@rudel/agent-adapters";
+import {
+	InvalidTranscriptTimestampError,
+	MissingTranscriptTimestampError,
+} from "@rudel/agent-adapters";
 import type { Source } from "@rudel/api-routes";
 import {
 	mergeRedactionCounts,
@@ -137,6 +140,7 @@ export async function batchUpload<T extends BatchUploadItem>(
 			} catch (err) {
 				const error = err instanceof Error ? err.message : String(err);
 				if (
+					err instanceof InvalidTranscriptTimestampError ||
 					err instanceof MissingTranscriptTimestampError ||
 					err instanceof SecretFilterJsonIntegrityError
 				) {

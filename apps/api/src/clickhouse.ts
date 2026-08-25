@@ -176,6 +176,8 @@ export function createClickHouseExecutor(config: {
 		database: config.database,
 		request_timeout: 120_000,
 		clickhouse_settings: {
+			max_execution_time: 60,
+			timeout_before_checking_execution_speed: 0,
 			wait_end_of_query: 1,
 			output_format_json_quote_64bit_integers: 0,
 		},

@@ -34,6 +34,7 @@ import {
 import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
 import type {
 	R2MultipartUploadClient,
+	R2MultipartUploadInitClient,
 	R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
 
@@ -189,7 +190,7 @@ describe("R2 ingest commit lifecycle", () => {
 	test("aborts every upload created during partial initialization failure", async () => {
 		const mainPresigned = Promise.withResolvers<void>();
 		const abortedUploads: string[] = [];
-		const partialFailureClient: R2MultipartUploadClient = {
+		const partialFailureClient: R2MultipartUploadInitClient = {
 			async abortMultipartUpload(input) {
 				abortedUploads.push(input.uploadId);
 			},
@@ -542,6 +543,45 @@ describe("R2 ingest commit lifecycle", () => {
 		);
 	});
 
+	test("caps lease heartbeats at the job absolute expiry", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"lease heartbeat expiry cap transcript",
+		);
+		const baseTime = new Date("2030-01-01T00:00:00.000Z");
+		const absoluteExpiry = new Date(baseTime.getTime() + 325);
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = ${absoluteExpiry.toISOString()}
+			WHERE id = ${initialized.jobId}
+		`;
+		let nowCall = 0;
+
+		const completed = await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			leaseDurationMs: 200,
+			now: () => new Date(baseTime.getTime() + Math.min(nowCall++ * 50, 300)),
+			process: async (input) => {
+				await Bun.sleep(230);
+				const [running] = await sqlClient<
+					Array<{ leaseExpiresAt: Date | string | null }>
+				>`
+					SELECT lease_expires_at AS "leaseExpiresAt"
+					FROM ingest_job
+					WHERE id = ${initialized.jobId}
+				`;
+				expect(new Date(String(running?.leaseExpiresAt)).toISOString()).toBe(
+					absoluteExpiry.toISOString(),
+				);
+				return processorResult(input.sessionId);
+			},
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+
+		expect(completed.status).toBe("completed");
+	});
+
 	test("sweeps abandoned pending jobs independently of retry recovery", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
@@ -568,6 +608,40 @@ describe("R2 ingest commit lifecycle", () => {
 			attempts: 0,
 			error: { code: "R2_INGEST_JOB_EXPIRED" },
 			status: "failed",
+		});
+	});
+
+	test("does not sweep an expired running job with an active lease", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"active lease past absolute expiry transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET
+				status = 'running',
+				attempts = 1,
+				expires_at = '2030-01-01T09:00:00.000Z',
+				lease_token = 'active-expired-job-lease',
+				lease_expires_at = '2030-01-01T11:00:00.000Z'
+			WHERE id = ${initialized.jobId}
+		`;
+
+		await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: new Date("2030-01-01T10:00:00.000Z"),
+			r2: fakeR2,
+		});
+
+		expect(fakeR2.objects.has(objectKey)).toBe(true);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			leaseExpiresAt: "2030-01-01T11:00:00.000Z",
+			status: "running",
 		});
 	});
 

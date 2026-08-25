@@ -166,8 +166,11 @@ export async function sweepExpiredR2IngestJobs(input: {
 		`WITH candidates AS (
 			SELECT id
 			FROM ingest_job
-			WHERE status IN ('pending', 'running')
-				AND expires_at <= $1
+			WHERE expires_at <= $1
+				AND (
+					status = 'pending'
+					OR (status = 'running' AND lease_expires_at <= $1)
+				)
 			ORDER BY expires_at ASC, id ASC
 			FOR UPDATE SKIP LOCKED
 			LIMIT $2
@@ -233,7 +236,7 @@ export async function getNextR2IngestWorkDueAt(
 
 			SELECT expires_at AS due_at
 			FROM ingest_job
-			WHERE status IN ('pending', 'running')
+			WHERE status = 'pending'
 		 ) AS due_work`,
 	);
 	if (!row?.nextDueAt) return null;

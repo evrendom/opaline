@@ -1,4 +1,7 @@
+import { getLogger } from "@logtape/logtape";
 import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
+
+const logger = getLogger(["rudel", "api", "r2-ingest-materialization-gate"]);
 
 export type R2IngestMaterializationGateErrorCode =
 	| "R2_INGEST_GATE_ABORTED"
@@ -44,12 +47,24 @@ export function createR2IngestMaterializationGate(input: {
 	readonly maxQueuedJobs: number;
 	readonly operationTimeoutMs: number;
 	readonly queueTimeoutMs: number;
+	readonly recycleUnsettledOperation?: (error: Error) => void;
+	readonly unsettledOperationTimeoutMs?: number;
 }): R2IngestMaterializationGate {
 	assertPositiveInteger(input.maxBytes, "maxBytes");
 	assertPositiveInteger(input.maxJobs, "maxJobs");
 	assertPositiveInteger(input.maxQueuedJobs, "maxQueuedJobs");
 	assertPositiveInteger(input.operationTimeoutMs, "operationTimeoutMs");
 	assertPositiveInteger(input.queueTimeoutMs, "queueTimeoutMs");
+	if (input.recycleUnsettledOperation) {
+		assertPositiveInteger(
+			input.unsettledOperationTimeoutMs ?? 0,
+			"unsettledOperationTimeoutMs",
+		);
+	} else if (input.unsettledOperationTimeoutMs !== undefined) {
+		throw new Error(
+			"R2 materialization recycleUnsettledOperation is required with unsettledOperationTimeoutMs",
+		);
+	}
 
 	let activeBytes = 0;
 	let activeJobs = 0;
@@ -166,25 +181,60 @@ export function createR2IngestMaterializationGate(input: {
 							"R2 materialization exceeded its operation timeout",
 						);
 						let operationTimer: ReturnType<typeof setTimeout> | undefined;
-						const timeout = new Promise<never>((_resolve, rejectTimeout) => {
-							operationTimer = setTimeout(() => {
-								controller.abort(timeoutError);
-								rejectTimeout(timeoutError);
-							}, input.operationTimeoutMs);
-							operationTimer.unref();
-						});
+						let recycleTimer: ReturnType<typeof setTimeout> | undefined;
+						let callerSettled = false;
+						let operationSettled = false;
+						const resolveCaller = (result: TResult): void => {
+							if (callerSettled) return;
+							callerSettled = true;
+							resolve(result);
+						};
+						const rejectCaller = (error: unknown): void => {
+							if (callerSettled) return;
+							callerSettled = true;
+							reject(error);
+						};
+						operationTimer = setTimeout(() => {
+							controller.abort(timeoutError);
+							rejectCaller(timeoutError);
+							if (
+								input.recycleUnsettledOperation &&
+								input.unsettledOperationTimeoutMs
+							) {
+								recycleTimer = setTimeout(() => {
+									if (!operationSettled) {
+										input.recycleUnsettledOperation?.(timeoutError);
+									}
+								}, input.unsettledOperationTimeoutMs);
+								recycleTimer.unref();
+							}
+						}, input.operationTimeoutMs);
+						operationTimer.unref();
 						const activeOperation = Promise.resolve().then(() =>
 							operation(controller.signal),
 						);
-						void Promise.race([activeOperation, timeout])
-							.then(resolve, reject)
-							.finally(() => {
+						void activeOperation.then(
+							(result) => {
+								resolveCaller(result);
+								operationSettled = true;
 								if (operationTimer) clearTimeout(operationTimer);
+								if (recycleTimer) clearTimeout(recycleTimer);
 								externalSignal?.removeEventListener("abort", abortActive);
 								activeBytes -= bytes;
 								activeJobs -= 1;
 								dispatch();
-							});
+							},
+							(error) => {
+								rejectCaller(error);
+								operationSettled = true;
+								if (operationTimer) clearTimeout(operationTimer);
+								if (recycleTimer) clearTimeout(recycleTimer);
+								externalSignal?.removeEventListener("abort", abortActive);
+								activeBytes -= bytes;
+								activeJobs -= 1;
+								dispatch();
+							},
+						);
 					},
 				};
 
@@ -214,6 +264,14 @@ const r2IngestMaterializationGate = createR2IngestMaterializationGate({
 	maxQueuedJobs: 8,
 	operationTimeoutMs: 20 * 60_000,
 	queueTimeoutMs: 30_000,
+	recycleUnsettledOperation(error) {
+		logger.error(
+			"R2 materialization did not settle after cancellation; recycling the process (error={error})",
+			{ error: error.message },
+		);
+		process.exit(1);
+	},
+	unsettledOperationTimeoutMs: 30_000,
 });
 
 export function runWithR2IngestMaterializationSlot<TResult>(

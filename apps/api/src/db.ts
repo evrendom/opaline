@@ -10,6 +10,11 @@ const requiredConnectionString = connectionString;
 
 const postgresClientOptions = {
 	connect_timeout: 10,
+	connection: {
+		idle_in_transaction_session_timeout: 120_000,
+		lock_timeout: 30_000,
+		statement_timeout: 120_000,
+	},
 	idle_timeout: 20,
 	max: 5,
 	max_lifetime: 60 * 30,

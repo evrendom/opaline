@@ -28,7 +28,13 @@ import {
 	R2IngestMaterializationGateError,
 	runWithR2IngestMaterializationSlot,
 } from "./r2-ingest-materialization-gate.js";
+import {
+	isRetryableProcessingError,
+	R2IngestCommitError,
+} from "./r2-ingest-processing-error.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
+
+export { R2IngestCommitError } from "./r2-ingest-processing-error.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-commit"]);
 const DEFAULT_LEASE_DURATION_MS = 30 * 60_000;
@@ -112,18 +118,6 @@ export interface CommitR2IngestJobOptions {
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
 	signal?: AbortSignal;
 	userId: string;
-}
-
-export class R2IngestCommitError extends Error {
-	readonly code: string;
-	readonly retryable: boolean;
-
-	constructor(code: string, message: string, retryable: boolean) {
-		super(message);
-		this.code = code;
-		this.name = "R2IngestCommitError";
-		this.retryable = retryable;
-	}
 }
 
 export async function commitR2IngestJob(
@@ -1095,11 +1089,12 @@ async function renewR2IngestJobLease(input: {
 	const renewed = await input.database.unsafe<Array<{ id: string }>>(
 		`UPDATE ingest_job
 		 SET
-			lease_expires_at = $1,
+			lease_expires_at = LEAST($1, expires_at),
 			updated_at = $2
 		 WHERE id = $3
 			AND status = 'running'
 			AND lease_token = $4
+			AND expires_at > $2
 		 RETURNING id`,
 		[
 			new Date(renewedAt.getTime() + input.leaseDurationMs).toISOString(),
@@ -1242,69 +1237,6 @@ function getSafeErrorMessage(error: unknown): string {
 	return isRetryableProcessingError(error)
 		? "Ingest processing temporarily failed and may be retried"
 		: "Ingest processing was rejected and will not be retried";
-}
-
-function isRetryableProcessingError(error: unknown): boolean {
-	if (error instanceof R2IngestCommitError) return error.retryable;
-	if (error instanceof R2IngestMaterializationGateError) return true;
-	if (error instanceof ORPCError) {
-		return new Set([
-			"CLIENT_CLOSED_REQUEST",
-			"GATEWAY_TIMEOUT",
-			"SERVICE_UNAVAILABLE",
-			"TOO_MANY_REQUESTS",
-		]).has(error.code);
-	}
-	const code = getErrorString(error, "code");
-	if (
-		code &&
-		(new Set([
-			"ECONNABORTED",
-			"ECONNREFUSED",
-			"ECONNRESET",
-			"EHOSTUNREACH",
-			"ENETUNREACH",
-			"ETIMEDOUT",
-			"40001",
-			"40P01",
-			"55P03",
-			"57014",
-			"57P01",
-			"57P02",
-			"57P03",
-		]).has(code) ||
-			code.startsWith("08") ||
-			code.startsWith("53"))
-	) {
-		return true;
-	}
-	const name = getErrorString(error, "name");
-	if (name && new Set(["AbortError", "TimeoutError"]).has(name)) return true;
-	const httpStatusCode = getHttpStatusCode(error);
-	return (
-		httpStatusCode === 408 ||
-		httpStatusCode === 425 ||
-		httpStatusCode === 429 ||
-		(httpStatusCode !== null && httpStatusCode >= 500)
-	);
-}
-
-function getErrorString(error: unknown, key: string): string | null {
-	if (typeof error !== "object" || error === null) return null;
-	const value = Reflect.get(error, key);
-	return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function getHttpStatusCode(error: unknown): number | null {
-	if (typeof error !== "object" || error === null) return null;
-	for (const key of ["status", "statusCode"] as const) {
-		const value = Reflect.get(error, key);
-		if (typeof value === "number") return value;
-	}
-	const metadata = Reflect.get(error, "$metadata");
-	if (typeof metadata !== "object" || metadata === null) return null;
-	const value = Reflect.get(metadata, "httpStatusCode");
-	return typeof value === "number" ? value : null;
 }
 
 function willExpireBeforeLeaseEnds(

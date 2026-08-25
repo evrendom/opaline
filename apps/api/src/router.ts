@@ -3,6 +3,8 @@ import { ORPCError, type Router } from "@orpc/server";
 import {
 	getAdapter,
 	getMissingTranscriptTimestampMessage,
+	InvalidTranscriptTimestampError,
+	type SessionTimestamps,
 } from "@rudel/agent-adapters";
 import {
 	type contract,
@@ -511,7 +513,15 @@ export async function processIngestSession({
 		filter_version: FILTER_VERSION,
 	};
 	const adapter = getAdapter(filteredInput.source);
-	const timestamps = adapter.extractTimestamps(filteredInput.content);
+	let timestamps: SessionTimestamps | null;
+	try {
+		timestamps = adapter.extractTimestamps(filteredInput.content);
+	} catch (error) {
+		if (error instanceof InvalidTranscriptTimestampError) {
+			throw new ORPCError("BAD_REQUEST", { message: error.message });
+		}
+		throw error;
+	}
 
 	if (!timestamps) {
 		throw new ORPCError("BAD_REQUEST", {
