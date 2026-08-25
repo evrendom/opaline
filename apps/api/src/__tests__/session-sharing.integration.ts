@@ -207,7 +207,7 @@ describe("organization session ownership", () => {
 
 		const memberRead = await callRpc(
 			member.token,
-			"analytics/sessions/detail",
+			"analytics/sessions/detailOverview",
 			{ sessionId: SHARED_SESSION_ID },
 		);
 		expect(memberRead.status).toBe(403);
@@ -298,11 +298,13 @@ describe("organization session ownership", () => {
 		);
 		await waitForAnalyticsSession(CODEX_UPLOAD_SESSION_ID);
 
-		const codexRead = await callRpc(owner.token, "analytics/sessions/detail", {
-			sessionId: CODEX_UPLOAD_SESSION_ID,
-		});
+		const codexRead = await callRpc(
+			owner.token,
+			"analytics/sessions/detailOverview",
+			{ sessionId: CODEX_UPLOAD_SESSION_ID },
+		);
 		expect(codexRead.status).toBe(200);
-		expect(readRpcJsonProperty(codexRead.body, "user_id")).toBe(owner.userId);
+		expect(readSessionDetailOverviewUserId(codexRead.body)).toBe(owner.userId);
 	}, 60_000);
 
 	test("catches up a late legacy owner and is safe to replay", async () => {
@@ -424,14 +426,24 @@ describe("organization session ownership", () => {
 		await waitForAnalyticsOwners(AMBIGUOUS_LEGACY_SESSION_ID, 2);
 		const resolvedLegacyRead = await callRpc(
 			owner.token,
-			"analytics/sessions/detail",
+			"analytics/sessions/detailOverview",
 			{ sessionId: AMBIGUOUS_LEGACY_SESSION_ID },
 		);
 		expect(resolvedLegacyRead.status).toBe(200);
-		expect(readRpcJsonProperty(resolvedLegacyRead.body, "user_id")).toBe(
+		expect(readSessionDetailOverviewUserId(resolvedLegacyRead.body)).toBe(
 			owner.userId,
 		);
-		expect(readRpcJsonProperty(resolvedLegacyRead.body, "content")).toContain(
+		const resolvedLegacyWindow = await callRpc(
+			owner.token,
+			"analytics/sessions/detailWindow",
+			{
+				includeBodies: true,
+				mode: "initial",
+				sessionId: AMBIGUOUS_LEGACY_SESSION_ID,
+			},
+		);
+		expect(resolvedLegacyWindow.status).toBe(200);
+		expect(JSON.stringify(resolvedLegacyWindow.body)).toContain(
 			"ambiguous-owner",
 		);
 
@@ -535,23 +547,32 @@ describe("organization session ownership", () => {
 
 		const memberRead = await callRpc(
 			member.token,
-			"analytics/sessions/detail",
+			"analytics/sessions/detailOverview",
 			{ sessionId: LEGACY_SHADOW_SESSION_ID },
 		);
 		expect(memberRead.status).toBe(200);
-		expect(readRpcJsonProperty(memberRead.body, "user_id")).toBe(member.userId);
-		expect(readRpcJsonProperty(memberRead.body, "content")).toContain(
-			"legacy-member-owner",
+		expect(readSessionDetailOverviewUserId(memberRead.body)).toBe(
+			member.userId,
 		);
 
-		const adminRead = await callRpc(owner.token, "analytics/sessions/detail", {
-			sessionId: LEGACY_SHADOW_SESSION_ID,
-		});
-		expect(adminRead.status).toBe(200);
-		expect(readRpcJsonProperty(adminRead.body, "user_id")).toBe(member.userId);
-		expect(readRpcJsonProperty(adminRead.body, "content")).toContain(
-			"legacy-member-owner",
+		const adminRead = await callRpc(
+			owner.token,
+			"analytics/sessions/detailOverview",
+			{ sessionId: LEGACY_SHADOW_SESSION_ID },
 		);
+		expect(adminRead.status).toBe(200);
+		expect(readSessionDetailOverviewUserId(adminRead.body)).toBe(member.userId);
+		const adminWindow = await callRpc(
+			owner.token,
+			"analytics/sessions/detailWindow",
+			{
+				includeBodies: true,
+				mode: "initial",
+				sessionId: LEGACY_SHADOW_SESSION_ID,
+			},
+		);
+		expect(adminWindow.status).toBe(200);
+		expect(JSON.stringify(adminWindow.body)).toContain("legacy-member-owner");
 	}, 60_000);
 
 	test("scopes ownership to one organization", async () => {
@@ -1010,4 +1031,23 @@ function readRpcJsonProperty(
 	}
 
 	throw new Error(`RPC response json.${property} was not a string`);
+}
+
+function readSessionDetailOverviewUserId(value: unknown): string {
+	if (
+		typeof value === "object" &&
+		value !== null &&
+		"json" in value &&
+		typeof value.json === "object" &&
+		value.json !== null &&
+		"session" in value.json &&
+		typeof value.json.session === "object" &&
+		value.json.session !== null &&
+		"userId" in value.json.session &&
+		typeof value.json.session.userId === "string"
+	) {
+		return value.json.session.userId;
+	}
+
+	throw new Error("RPC response did not include json.session.userId");
 }

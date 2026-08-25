@@ -68,7 +68,7 @@ describe("historical skills API guardrails", () => {
 		);
 		expect(serviceSource).toContain("any(content) AS content");
 		expect(serviceSource).toContain(
-			"byteSize(content) <= {contentByteLimit:UInt32}",
+			"length(content) <= {contentByteLimit:UInt32}",
 		);
 		expect(persistenceSource).toContain("rudel.skill_receipts");
 		expect(persistenceSource).toContain("rudel.skill_uses");

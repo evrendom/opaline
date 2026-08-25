@@ -148,7 +148,7 @@ export async function getHistoricalSkillDetail(
 				WHERE organization_id = {organizationId:String}
 					AND skill_name = {skillName:String}
 					AND content_sha256 IN {contentHashes:Array(String)}
-					AND byteSize(content) <= {contentByteLimit:UInt32}
+					AND length(content) <= {contentByteLimit:UInt32}
 				GROUP BY organization_id, skill_name, content_sha256
 			`,
 					query_params: {
