@@ -9,6 +9,10 @@ import {
 	buildLatestRawSessionContentSql,
 	getClickhouse,
 } from "../clickhouse.js";
+import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import {
 	buildSessionLanguageSignalRow,
@@ -223,15 +227,17 @@ export async function reconcileSessionLanguageSignalsOnce(
 		return { failed: 0, remainingLag: 0, rescanned: 0 };
 	}
 
-	const batch = await reconcileStaleRows(staleRows, env);
+	const { failed, rescanned } = await reconcileStaleRows(staleRows, env);
 	const remainingLag = await env.queryLagCount(SCAN_VERSION);
-	return { ...batch, remainingLag };
+	return { failed, remainingLag, rescanned };
 }
 
 export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 	batchSize: number,
 	env: LanguageSignalReconciliationEnvironment = createDefaultEnvironment(),
+	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<LanguageSignalReconciliationResult> {
+	let deadlineStopped = false;
 	let failed = 0;
 	let failedRowOffset = 0;
 	let remainingLag = 0;
@@ -244,6 +250,11 @@ export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 		batchIndex < DEFAULT_MAX_BATCHES_PER_RUN;
 		batchIndex += 1
 	) {
+		if (!hasMaintenanceTimeRemaining(deadline)) {
+			deadlineStopped = true;
+			remainingLag = Math.max(1, remainingLag);
+			break;
+		}
 		const staleRows = await env.queryStaleRows(
 			SCAN_VERSION,
 			batchSize,
@@ -264,22 +275,30 @@ export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 		if (processedBatches.has(batchIdentity)) break;
 		processedBatches.add(batchIdentity);
 
-		const batch = await reconcileStaleRows(staleRows, env);
+		const batch = await reconcileStaleRows(staleRows, env, deadline);
 		failed += batch.failed;
 		// Acknowledged successful inserts leave the stale prefix. Failed rows do
 		// not, so page past only those rows for the rest of this bounded run.
 		failedRowOffset += batch.failed;
 		rescanned += batch.rescanned;
+		if (batch.unfinished > 0) {
+			deadlineStopped = true;
+			remainingLag = Math.max(1, batch.unfinished);
+			break;
+		}
 	}
 
-	if (discoveredRows) {
+	if (discoveredRows && hasMaintenanceTimeRemaining(deadline)) {
 		remainingLag = await env.queryLagCount(SCAN_VERSION);
+	} else if (!hasMaintenanceTimeRemaining(deadline)) {
+		deadlineStopped = true;
+		remainingLag = Math.max(1, remainingLag);
 	}
 
-	if (rescanned > 0 || failed > 0) {
+	if (rescanned > 0 || failed > 0 || deadlineStopped) {
 		logger.info(
-			"Language-signal reconciliation completed (sessions_rescanned={rescanned} sessions_failed={failed} remaining_lag={remainingLag})",
-			{ failed, remainingLag, rescanned },
+			"Language-signal reconciliation completed (sessions_rescanned={rescanned} sessions_failed={failed} remaining_lag={remainingLag} deadline_stopped={deadlineStopped})",
+			{ deadlineStopped, failed, remainingLag, rescanned },
 		);
 	}
 
@@ -344,11 +363,21 @@ export function startSessionLanguageSignalReconciliationWorker(input?: {
 async function reconcileStaleRows(
 	staleRows: readonly StaleSessionLanguageSignalRow[],
 	env: LanguageSignalReconciliationEnvironment,
-): Promise<Omit<LanguageSignalReconciliationResult, "remainingLag">> {
+	deadline: MaintenanceDeadline | undefined = undefined,
+): Promise<
+	Omit<LanguageSignalReconciliationResult, "remainingLag"> & {
+		readonly unfinished: number;
+	}
+> {
 	const rowsToInsert: RudelSessionLanguageSignalsRow[] = [];
 	let failed = 0;
+	let processed = 0;
 
 	for (const row of staleRows) {
+		if (!hasMaintenanceTimeRemaining(deadline)) {
+			break;
+		}
+		processed += 1;
 		try {
 			const raw = await env.queryLatestRawContent(row);
 			if (!raw) {
@@ -376,5 +405,9 @@ async function reconcileStaleRows(
 	}
 
 	await env.insertRows(rowsToInsert);
-	return { failed, rescanned: rowsToInsert.length };
+	return {
+		failed,
+		rescanned: rowsToInsert.length,
+		unfinished: staleRows.length - processed,
+	};
 }

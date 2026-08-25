@@ -1,5 +1,9 @@
 import { sqlClient } from "../db.js";
 import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
+import {
 	createBackgroundIngestErrorFactories,
 	processIngestSession,
 } from "../router.js";
@@ -20,37 +24,54 @@ export interface R2IngestRepairPassResult {
 
 export async function runR2IngestRepairPass(
 	r2: R2MultipartUploadClient,
+	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<R2IngestRepairPassResult> {
-	const expired = await sweepExpiredR2IngestJobs({
-		database: sqlClient,
-		r2,
-	});
-	const recovered = await repairRecoverableR2IngestJobs({
-		database: sqlClient,
-		process: (sessionInput, identity, signal) =>
-			processIngestSession({
-				awaitLanguageSignals: true,
-				context: {
-					session: null,
-					user: { id: identity.userId },
-				},
-				durableProcessing: { failpoint: undefined },
-				enforceRateLimits: false,
-				errorFactories: createBackgroundIngestErrorFactories(),
-				input: sessionInput,
-				signal,
-			}),
-		r2,
-	});
-	const cleanup = await repairR2IngestCleanupJobs({
-		database: sqlClient,
-		r2,
-	});
+	const expired = hasMaintenanceTimeRemaining(deadline)
+		? await sweepExpiredR2IngestJobs({
+				database: sqlClient,
+				deadline,
+				r2,
+			})
+		: { attempted: 0, completed: 0, hasMore: true };
+	const recovered = hasMaintenanceTimeRemaining(deadline)
+		? await repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				deadline,
+				process: (sessionInput, identity, signal) =>
+					processIngestSession({
+						awaitLanguageSignals: true,
+						context: {
+							session: null,
+							user: { id: identity.userId },
+						},
+						durableProcessing: { failpoint: undefined },
+						enforceRateLimits: false,
+						errorFactories: createBackgroundIngestErrorFactories(),
+						input: sessionInput,
+						signal,
+					}),
+				r2,
+			})
+		: { attempted: 0, completed: 0, hasMore: true };
+	const cleanup = hasMaintenanceTimeRemaining(deadline)
+		? await repairR2IngestCleanupJobs({
+				database: sqlClient,
+				deadline,
+				r2,
+			})
+		: { attempted: 0, completed: 0, hasMore: true };
+	const deadlineReached = !hasMaintenanceTimeRemaining(deadline);
 
 	return {
 		attempted: expired.attempted + recovered.attempted + cleanup.attempted,
 		completed: expired.completed + recovered.completed + cleanup.completed,
-		hasMore: expired.hasMore || recovered.hasMore || cleanup.hasMore,
-		nextDueAt: await getNextR2IngestWorkDueAt(sqlClient),
+		hasMore:
+			deadlineReached ||
+			expired.hasMore ||
+			recovered.hasMore ||
+			cleanup.hasMore,
+		nextDueAt: deadlineReached
+			? null
+			: await getNextR2IngestWorkDueAt(sqlClient),
 	};
 }
