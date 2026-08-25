@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID as createRandomUUID } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import {
 	type IngestSessionInput,
@@ -105,7 +105,7 @@ export async function commitR2IngestJob(
 ): Promise<R2IngestCommitOutput> {
 	const database = options.database ?? sqlClient;
 	const now = options.now ?? (() => new Date());
-	const randomUUID = options.randomUUID ?? crypto.randomUUID;
+	const randomUUID = options.randomUUID ?? createRandomUUID;
 	const claims = await claimRequestedAndOrphanedJob({
 		database,
 		input: options.input,
