@@ -1,6 +1,10 @@
 import {
 	AbortMultipartUploadCommand,
+	CompleteMultipartUploadCommand,
 	CreateMultipartUploadCommand,
+	DeleteObjectsCommand,
+	GetObjectCommand,
+	HeadObjectCommand,
 	S3Client,
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -26,7 +30,7 @@ export type R2IngestAvailability =
 	| { enabled: true; configuration: R2IngestConfiguration }
 	| { enabled: false; missingVariables: readonly string[] };
 
-export interface R2MultipartUploadClient {
+export interface R2MultipartUploadInitClient {
 	abortMultipartUpload: (input: {
 		objectKey: string;
 		uploadId: string;
@@ -41,6 +45,22 @@ export interface R2MultipartUploadClient {
 		partNumber: number;
 		uploadId: string;
 	}) => Promise<string>;
+}
+
+export interface R2ObjectMetadata {
+	byteLength: number;
+	metadata: Readonly<Record<string, string>>;
+}
+
+export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
+	completeMultipartUpload: (input: {
+		objectKey: string;
+		parts: readonly { etag: string; partNumber: number }[];
+		uploadId: string;
+	}) => Promise<void>;
+	deleteObjects: (objectKeys: readonly string[]) => Promise<void>;
+	getObject: (objectKey: string) => Promise<Uint8Array>;
+	headObject: (objectKey: string) => Promise<R2ObjectMetadata | null>;
 }
 
 export function readR2IngestAvailability(
@@ -111,6 +131,70 @@ export function createR2MultipartUploadClient(
 			}
 			return { uploadId: result.UploadId };
 		},
+		async completeMultipartUpload(input) {
+			await client.send(
+				new CompleteMultipartUploadCommand({
+					Bucket: configuration.bucket,
+					Key: input.objectKey,
+					MultipartUpload: {
+						Parts: input.parts.map((part) => ({
+							ETag: part.etag,
+							PartNumber: part.partNumber,
+						})),
+					},
+					UploadId: input.uploadId,
+				}),
+			);
+		},
+		async deleteObjects(objectKeys) {
+			if (objectKeys.length === 0) return;
+			const result = await client.send(
+				new DeleteObjectsCommand({
+					Bucket: configuration.bucket,
+					Delete: {
+						Objects: objectKeys.map((objectKey) => ({ Key: objectKey })),
+						Quiet: true,
+					},
+				}),
+			);
+			if (result.Errors && result.Errors.length > 0) {
+				throw new Error(
+					`R2 failed to delete ${result.Errors.length} ingest object(s)`,
+				);
+			}
+		},
+		async getObject(objectKey) {
+			const result = await client.send(
+				new GetObjectCommand({
+					Bucket: configuration.bucket,
+					Key: objectKey,
+				}),
+			);
+			if (!result.Body) {
+				throw new Error("R2 returned an ingest object without a body");
+			}
+			return result.Body.transformToByteArray();
+		},
+		async headObject(objectKey) {
+			try {
+				const result = await client.send(
+					new HeadObjectCommand({
+						Bucket: configuration.bucket,
+						Key: objectKey,
+					}),
+				);
+				if (result.ContentLength === undefined) {
+					throw new Error("R2 object is missing its content length");
+				}
+				return {
+					byteLength: result.ContentLength,
+					metadata: result.Metadata ?? {},
+				};
+			} catch (error) {
+				if (isNotFoundError(error)) return null;
+				throw error;
+			}
+		},
 		presignUploadPart(input) {
 			return getSignedUrl(
 				client,
@@ -128,4 +212,22 @@ export function createR2MultipartUploadClient(
 			);
 		},
 	};
+}
+
+function isNotFoundError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null) return false;
+	if (
+		"name" in error &&
+		(error.name === "NotFound" || error.name === "NoSuchKey")
+	) {
+		return true;
+	}
+	if (!("$metadata" in error)) return false;
+	const metadata = error.$metadata;
+	return (
+		typeof metadata === "object" &&
+		metadata !== null &&
+		"httpStatusCode" in metadata &&
+		metadata.httpStatusCode === 404
+	);
 }

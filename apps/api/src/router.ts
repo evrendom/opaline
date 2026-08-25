@@ -83,11 +83,19 @@ import {
 	hasOrgUploadsInLastDays,
 } from "./services/org-session.service.js";
 import {
+	commitR2IngestJob,
+	R2IngestCommitError,
+	type R2IngestProcessorResult,
+} from "./services/r2-ingest-commit.service.js";
+import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
 } from "./services/r2-ingest-storage.service.js";
 import { hasRawSessionRow } from "./services/raw-session.service.js";
-import { persistSessionLanguageSignalsBestEffort } from "./services/session-language-signal-persistence.service.js";
+import {
+	persistSessionLanguageSignals,
+	persistSessionLanguageSignalsBestEffort,
+} from "./services/session-language-signal-persistence.service.js";
 import {
 	claimSessionIngestOwnership,
 	recordSessionIngestContent,
@@ -295,458 +303,544 @@ function getActiveOrganizationId(session: unknown): string | null {
 		: null;
 }
 
-const ingestSessionHandler = os.ingestSession
-	.use(ingestAuthMiddleware)
-	.handler(async ({ input, context, errors, signal }) => {
-		if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "session_ingest_quiesced" },
-				message:
-					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
-			});
-		}
-		checkIngestRequestRateLimit(context.user.id);
-		const aggregateBytes = enforceIngestAggregateSize(
-			input,
-			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-		);
-		checkIngestByteRateLimit(context.user.id, aggregateBytes);
-		const filteredText = await filterSessionTextFieldsOffThread({
-			bytes: aggregateBytes,
-			fields: {
-				content: input.content,
-				subagents: input.subagents,
-			},
-			signal,
-			userId: context.user.id,
-		}).catch((error: unknown) => {
-			if (error instanceof SecretFilterConvergenceError) {
-				throw errors[REDACTION_DID_NOT_CONVERGE_CODE]({
-					data: { maxPasses: error.maxPasses },
-				});
-			}
-			if (error instanceof SecretFilterJsonIntegrityError) {
-				throw errors[SECRET_FILTER_JSON_INTEGRITY_CODE]();
-			}
-			if (error instanceof IngestFilterQueueFullError) {
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: {
-						reason: "ingest_filter_queue_full",
-						limit: error.limit,
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof IngestFilterQueueClosedError) {
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: {
-						reason: "ingest_filter_queue_closed",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof IngestFilterQueueTimeoutError) {
-				throw new ORPCError("GATEWAY_TIMEOUT", {
-					data: {
-						reason: "ingest_filter_queue_timeout",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof IngestFilterQueueAbortedError) {
-				throw new ORPCError("CLIENT_CLOSED_REQUEST", {
-					message: error.message,
-				});
-			}
-			throw error;
-		});
-		const redactionBudgetAnomaly = getRedactionBudgetAnomaly(
-			filteredText.redactedBytes,
-			aggregateBytes,
-			filteredText.counts,
-		);
-		if (redactionBudgetAnomaly) {
-			throw errors[REDACTION_BUDGET_EXCEEDED_CODE]({
-				data: {
-					...redactionBudgetAnomaly,
-					ruleIds: [...redactionBudgetAnomaly.ruleIds],
-				},
-			});
-		}
-		const filteredInput: IngestSessionInput = {
-			...input,
-			content: filteredText.content,
-			subagents: filteredText.subagents
-				? [...filteredText.subagents]
-				: undefined,
-			filter_version: FILTER_VERSION,
+interface IngestErrorFactories {
+	redactionBudgetExceeded: (data: {
+		inputBytes: number;
+		redactedBytes: number;
+		ruleIds: string[];
+	}) => unknown;
+	redactionDidNotConverge: (maxPasses: number) => unknown;
+	secretFilterJsonIntegrity: () => unknown;
+	sessionOwnershipConflict: () => unknown;
+	sessionUploadShrinkRejected: (data: {
+		currentAssistantLineCount: number;
+		currentContentBytes: number;
+		previousAssistantLineCount: number;
+		previousContentBytes: number;
+	}) => unknown;
+}
+
+interface IngestContractErrors {
+	[REDACTION_BUDGET_EXCEEDED_CODE]: (input: {
+		data: {
+			inputBytes: number;
+			redactedBytes: number;
+			ruleIds: string[];
 		};
-		const adapter = getAdapter(filteredInput.source);
-		const timestamps = adapter.extractTimestamps(filteredInput.content);
+	}) => unknown;
+	[REDACTION_DID_NOT_CONVERGE_CODE]: (input: {
+		data: { maxPasses: number };
+	}) => unknown;
+	[SECRET_FILTER_JSON_INTEGRITY_CODE]: () => unknown;
+	[SESSION_OWNERSHIP_CONFLICT_CODE]: () => unknown;
+	[SESSION_UPLOAD_SHRINK_REJECTED_CODE]: (input: {
+		data: {
+			currentAssistantLineCount: number;
+			currentContentBytes: number;
+			previousAssistantLineCount: number;
+			previousContentBytes: number;
+		};
+	}) => unknown;
+}
 
-		if (!timestamps) {
-			throw new ORPCError("BAD_REQUEST", {
-				message: getMissingTranscriptTimestampMessage(filteredInput.source),
+function createIngestErrorFactories(
+	errors: IngestContractErrors,
+): IngestErrorFactories {
+	return {
+		redactionBudgetExceeded: (data) =>
+			errors[REDACTION_BUDGET_EXCEEDED_CODE]({ data }),
+		redactionDidNotConverge: (maxPasses) =>
+			errors[REDACTION_DID_NOT_CONVERGE_CODE]({ data: { maxPasses } }),
+		secretFilterJsonIntegrity: () =>
+			errors[SECRET_FILTER_JSON_INTEGRITY_CODE](),
+		sessionOwnershipConflict: () => errors[SESSION_OWNERSHIP_CONFLICT_CODE](),
+		sessionUploadShrinkRejected: (data) =>
+			errors[SESSION_UPLOAD_SHRINK_REJECTED_CODE]({ data }),
+	};
+}
+
+async function processIngestSession({
+	awaitLanguageSignals,
+	context,
+	enforceRateLimits,
+	errorFactories,
+	input,
+	signal,
+}: {
+	awaitLanguageSignals: boolean;
+	context: {
+		session: AppContext["session"];
+		user: NonNullable<AppContext["user"]>;
+	};
+	enforceRateLimits: boolean;
+	errorFactories: IngestErrorFactories;
+	input: IngestSessionInput;
+	signal?: AbortSignal;
+}): Promise<R2IngestProcessorResult> {
+	if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+		throw new ORPCError("SERVICE_UNAVAILABLE", {
+			data: { reason: "session_ingest_quiesced" },
+			message:
+				"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
+		});
+	}
+	if (enforceRateLimits) checkIngestRequestRateLimit(context.user.id);
+	const aggregateBytes = enforceIngestAggregateSize(
+		input,
+		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	);
+	if (enforceRateLimits) {
+		checkIngestByteRateLimit(context.user.id, aggregateBytes);
+	}
+	const filteredText = await filterSessionTextFieldsOffThread({
+		bytes: aggregateBytes,
+		fields: {
+			content: input.content,
+			subagents: input.subagents,
+		},
+		signal,
+		userId: context.user.id,
+	}).catch((error: unknown) => {
+		if (error instanceof SecretFilterConvergenceError) {
+			throw errorFactories.redactionDidNotConverge(error.maxPasses);
+		}
+		if (error instanceof SecretFilterJsonIntegrityError) {
+			throw errorFactories.secretFilterJsonIntegrity();
+		}
+		if (error instanceof IngestFilterQueueFullError) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: {
+					reason: "ingest_filter_queue_full",
+					limit: error.limit,
+					retryAfterMs: error.retryAfterMs,
+				},
+				message: error.message,
 			});
 		}
+		if (error instanceof IngestFilterQueueClosedError) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: {
+					reason: "ingest_filter_queue_closed",
+					retryAfterMs: error.retryAfterMs,
+				},
+				message: error.message,
+			});
+		}
+		if (error instanceof IngestFilterQueueTimeoutError) {
+			throw new ORPCError("GATEWAY_TIMEOUT", {
+				data: {
+					reason: "ingest_filter_queue_timeout",
+					retryAfterMs: error.retryAfterMs,
+				},
+				message: error.message,
+			});
+		}
+		if (error instanceof IngestFilterQueueAbortedError) {
+			throw new ORPCError("CLIENT_CLOSED_REQUEST", {
+				message: error.message,
+			});
+		}
+		throw error;
+	});
+	const redactionBudgetAnomaly = getRedactionBudgetAnomaly(
+		filteredText.redactedBytes,
+		aggregateBytes,
+		filteredText.counts,
+	);
+	if (redactionBudgetAnomaly) {
+		throw errorFactories.redactionBudgetExceeded({
+			...redactionBudgetAnomaly,
+			ruleIds: [...redactionBudgetAnomaly.ruleIds],
+		});
+	}
+	const filteredInput: IngestSessionInput = {
+		...input,
+		content: filteredText.content,
+		subagents: filteredText.subagents ? [...filteredText.subagents] : undefined,
+		filter_version: FILTER_VERSION,
+	};
+	const adapter = getAdapter(filteredInput.source);
+	const timestamps = adapter.extractTimestamps(filteredInput.content);
 
-		const activeOrgId = getActiveOrganizationId(context.session);
+	if (!timestamps) {
+		throw new ORPCError("BAD_REQUEST", {
+			message: getMissingTranscriptTimestampMessage(filteredInput.source),
+		});
+	}
 
+	const activeOrgId = getActiveOrganizationId(context.session);
+
+	if (enforceRateLimits) {
 		if (input.upload_mode === "manual" || input.upload_mode === "retry") {
 			checkManualIngestRateLimit(context.user.id, input.sessionId);
 		} else {
 			checkHookIngestRateLimit(context.user.id, input.sessionId);
 		}
+	}
 
-		const orgId = await resolveIngestOrganizationId(
-			input.organizationId ?? activeOrgId,
-			context.user.id,
-		);
+	const orgId = await resolveIngestOrganizationId(
+		input.organizationId ?? activeOrgId,
+		context.user.id,
+	);
 
-		const ownership = await claimSessionIngestOwnership(
-			orgId,
-			input.sessionId,
-			context.user.id,
+	const ownership = await claimSessionIngestOwnership(
+		orgId,
+		input.sessionId,
+		context.user.id,
+	);
+	if (!ownership.owned) {
+		throw errorFactories.sessionOwnershipConflict();
+	}
+	const contentShape = getIngestContentShape(filteredInput);
+	const previousContentShape = resolvePreviousIngestContentShape(ownership);
+	if (
+		!input.force_replace &&
+		(ownership.lastFilterVersion === null ||
+			ownership.lastFilterVersion === FILTER_VERSION) &&
+		previousContentShape !== null &&
+		isUnexpectedIngestShrink(previousContentShape, contentShape, {
+			compareTotalsOnly: ownership.lastContentShape === null,
+		})
+	) {
+		logger.warn(
+			"Refusing smaller session re-upload (organization_id={organizationId} session_id={sessionId} previous_content_bytes={previousContentBytes} current_content_bytes={currentContentBytes} previous_assistant_lines={previousAssistantLineCount} current_assistant_lines={currentAssistantLineCount})",
+			{
+				currentAssistantLineCount: contentShape.assistantLineCount,
+				currentContentBytes: contentShape.contentBytes,
+				organizationId: orgId,
+				previousAssistantLineCount: previousContentShape.assistantLineCount,
+				previousContentBytes: previousContentShape.contentBytes,
+				sessionId: input.sessionId,
+			},
 		);
-		if (!ownership.owned) {
-			throw errors[SESSION_OWNERSHIP_CONFLICT_CODE]();
-		}
-		const contentShape = getIngestContentShape(filteredInput);
-		const previousContentShape = resolvePreviousIngestContentShape(ownership);
-		if (
-			!input.force_replace &&
-			(ownership.lastFilterVersion === null ||
-				ownership.lastFilterVersion === FILTER_VERSION) &&
-			previousContentShape !== null &&
-			isUnexpectedIngestShrink(previousContentShape, contentShape, {
-				compareTotalsOnly: ownership.lastContentShape === null,
-			})
-		) {
-			logger.warn(
-				"Refusing smaller session re-upload (organization_id={organizationId} session_id={sessionId} previous_content_bytes={previousContentBytes} current_content_bytes={currentContentBytes} previous_assistant_lines={previousAssistantLineCount} current_assistant_lines={currentAssistantLineCount})",
-				{
-					currentAssistantLineCount: contentShape.assistantLineCount,
-					currentContentBytes: contentShape.contentBytes,
+		throw errorFactories.sessionUploadShrinkRejected({
+			currentAssistantLineCount: contentShape.assistantLineCount,
+			currentContentBytes: contentShape.contentBytes,
+			previousAssistantLineCount: previousContentShape.assistantLineCount,
+			previousContentBytes: previousContentShape.contentBytes,
+		});
+	}
+
+	// Hash the exact bytes and filter version stored by the server. This makes
+	// an old unfiltered CLI upload and a current pre-filtered CLI upload
+	// converge after server filtering instead of creating duplicate rows.
+	const contentHash = computeIngestContentHash(filteredInput);
+	const usageExtractionEnabled = readBooleanEnv(
+		"USAGE_EVENT_EXTRACTION_ENABLED",
+		true,
+	);
+	const skillExtractionEnabled = readBooleanEnv(
+		"SKILL_EXTRACTION_ENABLED",
+		true,
+	);
+	const response = {
+		success: true as const,
+		sessionId: input.sessionId,
+		...(readR2IngestAvailability().enabled
+			? { upgradeHint: { protocol: R2_INGEST_PROTOCOL } }
+			: {}),
+		redacted: filteredText.counts,
+		redactedBytes: filteredText.redactedBytes,
+		usageChecksum: hasMatchingUsageExtractionReceipt(ownership, contentHash)
+			? (ownership.lastUsageChecksum ?? undefined)
+			: undefined,
+	};
+
+	// This is a best-effort cost optimization, not a cross-instance
+	// security control. Concurrent identical requests can both reach the
+	// ClickHouse insert before either records its successful hash.
+	if (
+		ownership.lastContentSha256 === contentHash &&
+		hasMatchingUsageExtractionReceipt(ownership, contentHash) &&
+		(await hasRawSessionRow({
+			organizationId: orgId,
+			sessionDate: ownership.lastSessionDate,
+			sessionId: input.sessionId,
+			table: adapter.rawTableName,
+			userId: context.user.id,
+		}))
+	) {
+		const skillReceiptMatches =
+			!skillExtractionEnabled ||
+			hasMatchingSkillExtractionReceipt(
+				await readSkillExtractionReceipt(getClickhouse(), {
+					agent: filteredInput.source === "claude_code" ? "claude" : "codex",
 					organizationId: orgId,
-					previousAssistantLineCount: previousContentShape.assistantLineCount,
-					previousContentBytes: previousContentShape.contentBytes,
 					sessionId: input.sessionId,
+					userId: context.user.id,
+				}),
+				{
+					parserVersion: SKILL_PARSER_VERSION,
+					sourceContentSha256: hashSkillSourceContent(filteredInput.content),
 				},
 			);
-			throw errors[SESSION_UPLOAD_SHRINK_REJECTED_CODE]({
-				data: {
-					currentAssistantLineCount: contentShape.assistantLineCount,
-					currentContentBytes: contentShape.contentBytes,
-					previousAssistantLineCount: previousContentShape.assistantLineCount,
-					previousContentBytes: previousContentShape.contentBytes,
-				},
-			});
-		}
-
-		// Hash the exact bytes and filter version stored by the server. This makes
-		// an old unfiltered CLI upload and a current pre-filtered CLI upload
-		// converge after server filtering instead of creating duplicate rows.
-		const contentHash = computeIngestContentHash(filteredInput);
-		const usageExtractionEnabled = readBooleanEnv(
-			"USAGE_EVENT_EXTRACTION_ENABLED",
-			true,
-		);
-		const skillExtractionEnabled = readBooleanEnv(
-			"SKILL_EXTRACTION_ENABLED",
-			true,
-		);
-		const response = {
-			success: true as const,
-			sessionId: input.sessionId,
-			...(readR2IngestAvailability().enabled
-				? { upgradeHint: { protocol: R2_INGEST_PROTOCOL } }
-				: {}),
-			redacted: filteredText.counts,
-			redactedBytes: filteredText.redactedBytes,
-			usageChecksum: hasMatchingUsageExtractionReceipt(ownership, contentHash)
-				? (ownership.lastUsageChecksum ?? undefined)
-				: undefined,
-		};
-
-		// This is a best-effort cost optimization, not a cross-instance
-		// security control. Concurrent identical requests can both reach the
-		// ClickHouse insert before either records its successful hash.
-		if (
-			ownership.lastContentSha256 === contentHash &&
-			hasMatchingUsageExtractionReceipt(ownership, contentHash) &&
-			(await hasRawSessionRow({
-				organizationId: orgId,
-				sessionDate: ownership.lastSessionDate,
-				sessionId: input.sessionId,
-				table: adapter.rawTableName,
-				userId: context.user.id,
-			}))
-		) {
-			const skillReceiptMatches =
-				!skillExtractionEnabled ||
-				hasMatchingSkillExtractionReceipt(
-					await readSkillExtractionReceipt(getClickhouse(), {
-						agent: filteredInput.source === "claude_code" ? "claude" : "codex",
-						organizationId: orgId,
-						sessionId: input.sessionId,
-						userId: context.user.id,
-					}),
-					{
-						parserVersion: SKILL_PARSER_VERSION,
-						sourceContentSha256: hashSkillSourceContent(filteredInput.content),
-					},
-				);
-			if (!skillReceiptMatches) {
-				logger.info(
-					"Reprocessing duplicate session with a missing or stale skill receipt (organization_id={organizationId} session_id={sessionId})",
-					{ organizationId: orgId, sessionId: input.sessionId },
-				);
-			} else {
-				logger.info(
-					"Skipping duplicate session ingest (organization_id={organizationId} session_id={sessionId})",
-					{ organizationId: orgId, sessionId: input.sessionId },
-				);
-				return response;
-			}
-		}
-
-		// Acknowledged async inserts can batch concurrent requests into one part.
-		// Give each request a distinct millisecond RMT version even when the
-		// process clock has not advanced, so FINAL and hash bookkeeping agree.
-		const ingestedAt = getNextIngestedAt();
-		await adapter.ingest(getClickhouse(), filteredInput, {
-			ingestedAt,
-			userId: context.user.id,
-			organizationId: orgId,
-			timestamps,
-		});
-		await recordSessionIngestContent(
-			orgId,
-			input.sessionId,
-			contentHash,
-			contentShape,
-			FILTER_VERSION,
-			new Date(timestamps.sessionDate),
-			ingestedAt,
-		);
-		void persistSessionLanguageSignalsBestEffort({
-			content: filteredInput.content,
-			organizationId: orgId,
-			rawIngestedAt: ingestedAt,
-			sessionDate: timestamps.sessionDate,
-			sessionId: input.sessionId,
-			source: filteredInput.source,
-			userId: context.user.id,
-		});
-
-		if (!usageExtractionEnabled && !skillExtractionEnabled) {
-			logger.warn(
-				"Session fact extraction bypassed after raw ingest (organization_id={organizationId} session_id={sessionId})",
+		if (!skillReceiptMatches) {
+			logger.info(
+				"Reprocessing duplicate session with a missing or stale skill receipt (organization_id={organizationId} session_id={sessionId})",
 				{ organizationId: orgId, sessionId: input.sessionId },
 			);
-			return response;
+		} else {
+			logger.info(
+				"Skipping duplicate session ingest (organization_id={organizationId} session_id={sessionId})",
+				{ organizationId: orgId, sessionId: input.sessionId },
+			);
+			return { contentSha256: contentHash, result: response };
 		}
+	}
 
-		const usageGeneration = usageExtractionEnabled
-			? await reserveUsageExtractionGeneration(
-					orgId,
-					input.sessionId,
-					context.user.id,
-				)
-			: null;
-		const subagents: Record<string, string> = {};
-		for (const subagent of filteredInput.subagents ?? []) {
-			subagents[subagent.agentId] = subagent.content;
-		}
-		let usageExtraction: UsageExtractionResult;
-		let skillExtraction: SkillExtractionResult | null;
-		try {
-			const extraction = await extractSessionFactsOffThread({
-				bytes: contentShape.contentBytes,
-				extractSkills: skillExtractionEnabled,
-				input: {
-					organizationId: orgId,
-					userId: context.user.id,
-					sessionId: input.sessionId,
-					source: filteredInput.source,
-					content: filteredInput.content,
-					subagents,
-				},
-				signal,
-				skillSessionDate: timestamps.sessionDate,
-				userId: context.user.id,
-			});
-			usageExtraction = extraction.usage;
-			skillExtraction = extraction.skills;
-		} catch (error) {
-			if (error instanceof UsageExtractionExecutionError) {
-				if (
-					usageExtractionEnabled &&
-					usageGeneration !== null &&
-					error.shouldPersistReceipt
-				) {
-					await writeUsageExtraction(getClickhouse(), {
-						contentSha256: contentHash,
-						extraction: error.extraction,
-						filterVersion: FILTER_VERSION,
-						generation: usageGeneration,
-						ingestedAt,
-						organizationId: orgId,
-						sessionDate: new Date(timestamps.sessionDate),
-						sessionId: input.sessionId,
-						source: filteredInput.source,
-						userId: context.user.id,
-					});
-				}
-				logger.error(
-					"Usage-event extraction crashed after raw ingest (organization_id={organizationId} session_id={sessionId} error={error})",
-					{
-						error: String(error.cause),
-						organizationId: orgId,
-						sessionId: input.sessionId,
-					},
-				);
-				if (error instanceof UsageExtractionQueueFullError) {
-					throw new ORPCError("SERVICE_UNAVAILABLE", {
-						data: {
-							limit: error.limit,
-							reason: "usage_extraction_queue_full",
-							retryAfterMs: error.retryAfterMs,
-						},
-						message: error.message,
-					});
-				}
-				if (error instanceof UsageExtractionQueueClosedError) {
-					throw new ORPCError("SERVICE_UNAVAILABLE", {
-						data: {
-							reason: "usage_extraction_queue_closed",
-							retryAfterMs: error.retryAfterMs,
-						},
-						message: error.message,
-					});
-				}
-				if (error instanceof UsageExtractionQueueTimeoutError) {
-					throw new ORPCError("GATEWAY_TIMEOUT", {
-						data: {
-							reason: "usage_extraction_timeout",
-							retryAfterMs: error.retryAfterMs,
-						},
-						message: error.message,
-					});
-				}
-				if (error instanceof UsageExtractionQueueAbortedError) {
-					throw new ORPCError("CLIENT_CLOSED_REQUEST", {
-						data: {
-							reason: "usage_extraction_aborted",
-							retryAfterMs: error.retryAfterMs,
-						},
-						message: error.message,
-					});
-				}
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: { reason: "usage_extraction_execution_failed" },
-					message:
-						"Raw session data was stored, but usage extraction failed. Retry the upload.",
-				});
-			}
-			throw error;
-		}
-		if (skillExtractionEnabled && skillExtraction) {
-			await writeSkillExtraction(getClickhouse(), {
-				extractedAt: getNextIngestedAt(),
-				extraction: skillExtraction,
+	// Acknowledged async inserts can batch concurrent requests into one part.
+	// Give each request a distinct millisecond RMT version even when the
+	// process clock has not advanced, so FINAL and hash bookkeeping agree.
+	const ingestedAt = getNextIngestedAt();
+	await adapter.ingest(getClickhouse(), filteredInput, {
+		ingestedAt,
+		userId: context.user.id,
+		organizationId: orgId,
+		timestamps,
+	});
+	await recordSessionIngestContent(
+		orgId,
+		input.sessionId,
+		contentHash,
+		contentShape,
+		FILTER_VERSION,
+		new Date(timestamps.sessionDate),
+		ingestedAt,
+	);
+	const languageSignalInput = {
+		content: filteredInput.content,
+		organizationId: orgId,
+		rawIngestedAt: ingestedAt,
+		sessionDate: timestamps.sessionDate,
+		sessionId: input.sessionId,
+		source: filteredInput.source,
+		userId: context.user.id,
+	};
+	if (awaitLanguageSignals) {
+		await persistSessionLanguageSignals(languageSignalInput);
+	} else {
+		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
+	}
+
+	if (!usageExtractionEnabled && !skillExtractionEnabled) {
+		logger.warn(
+			"Session fact extraction bypassed after raw ingest (organization_id={organizationId} session_id={sessionId})",
+			{ organizationId: orgId, sessionId: input.sessionId },
+		);
+		return { contentSha256: contentHash, result: response };
+	}
+
+	const usageGeneration = usageExtractionEnabled
+		? await reserveUsageExtractionGeneration(
+				orgId,
+				input.sessionId,
+				context.user.id,
+			)
+		: null;
+	const subagents: Record<string, string> = {};
+	for (const subagent of filteredInput.subagents ?? []) {
+		subagents[subagent.agentId] = subagent.content;
+	}
+	let usageExtraction: UsageExtractionResult;
+	let skillExtraction: SkillExtractionResult | null;
+	try {
+		const extraction = await extractSessionFactsOffThread({
+			bytes: contentShape.contentBytes,
+			extractSkills: skillExtractionEnabled,
+			input: {
 				organizationId: orgId,
-				rawRevisionIngestedAt: ingestedAt,
-				sessionDate: new Date(timestamps.sessionDate),
-				sessionId: input.sessionId,
 				userId: context.user.id,
-			});
-		}
-		if (!usageExtractionEnabled || usageGeneration === null) {
-			return response;
-		}
-		await writeUsageExtraction(getClickhouse(), {
-			contentSha256: contentHash,
-			extraction: usageExtraction,
-			filterVersion: FILTER_VERSION,
-			generation: usageGeneration,
-			ingestedAt,
-			organizationId: orgId,
-			replaceAbsentEvents:
-				input.force_replace === true ||
-				shouldReplaceUsageEventsForVersion(ownership),
-			sessionDate: new Date(timestamps.sessionDate),
-			sessionId: input.sessionId,
-			source: filteredInput.source,
+				sessionId: input.sessionId,
+				source: filteredInput.source,
+				content: filteredInput.content,
+				subagents,
+			},
+			signal,
+			skillSessionDate: timestamps.sessionDate,
 			userId: context.user.id,
 		});
-		if (usageExtraction.status === "incomplete") {
-			logger.warn(
-				"Usage extraction incomplete after raw ingest (organization_id={organizationId} session_id={sessionId} diagnostics={diagnostics})",
+		usageExtraction = extraction.usage;
+		skillExtraction = extraction.skills;
+	} catch (error) {
+		if (error instanceof UsageExtractionExecutionError) {
+			if (
+				usageExtractionEnabled &&
+				usageGeneration !== null &&
+				error.shouldPersistReceipt
+			) {
+				await writeUsageExtraction(getClickhouse(), {
+					contentSha256: contentHash,
+					extraction: error.extraction,
+					filterVersion: FILTER_VERSION,
+					generation: usageGeneration,
+					ingestedAt,
+					organizationId: orgId,
+					sessionDate: new Date(timestamps.sessionDate),
+					sessionId: input.sessionId,
+					source: filteredInput.source,
+					userId: context.user.id,
+				});
+			}
+			logger.error(
+				"Usage-event extraction crashed after raw ingest (organization_id={organizationId} session_id={sessionId} error={error})",
 				{
-					diagnostics: JSON.stringify(usageExtraction.diagnostics),
+					error: String(error.cause),
 					organizationId: orgId,
 					sessionId: input.sessionId,
 				},
 			);
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: {
-					reason: "usage_extraction_incomplete",
-					retryAfterMs: 1_000,
-				},
-				message:
-					"Raw session data was stored, but usage telemetry is malformed or contradictory. Retry after the transcript writer finishes.",
-			});
-		}
-
-		await recordSessionIngestContent(
-			orgId,
-			input.sessionId,
-			contentHash,
-			contentShape,
-			FILTER_VERSION,
-			new Date(timestamps.sessionDate),
-			ingestedAt,
-			{
-				checksum: usageExtraction.receipt.checksum,
-				diagnostics: JSON.stringify(usageExtraction.diagnostics),
-				eventCount: usageExtraction.receipt.eventCount,
-				extractionVersion: usageExtraction.receipt.extractionVersion,
-				eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
-				generation: usageGeneration,
-				modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
-			},
-		).catch((error: unknown) => {
-			if (error instanceof UsageExtractionSupersededError) {
+			if (error instanceof UsageExtractionQueueFullError) {
 				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: { reason: "usage_extraction_superseded" },
+					data: {
+						limit: error.limit,
+						reason: "usage_extraction_queue_full",
+						retryAfterMs: error.retryAfterMs,
+					},
 					message: error.message,
 				});
 			}
-			throw error;
-		});
-		response.usageChecksum = usageExtraction.receipt.checksum;
-
-		const uploadCompletedPayload = getSessionUploadCompletedPayload(
-			filteredInput,
-			orgId,
-			context.user.id,
-		);
-
-		if (!uploadCompletedPayload) {
-			return response;
+			if (error instanceof UsageExtractionQueueClosedError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: "usage_extraction_queue_closed",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			if (error instanceof UsageExtractionQueueTimeoutError) {
+				throw new ORPCError("GATEWAY_TIMEOUT", {
+					data: {
+						reason: "usage_extraction_timeout",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			if (error instanceof UsageExtractionQueueAbortedError) {
+				throw new ORPCError("CLIENT_CLOSED_REQUEST", {
+					data: {
+						reason: "usage_extraction_aborted",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "usage_extraction_execution_failed" },
+				message:
+					"Raw session data was stored, but usage extraction failed. Retry the upload.",
+			});
 		}
-
-		captureApiProductAnalyticsEvent({
-			distinctId: context.user.id,
-			event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
-			payload: uploadCompletedPayload,
+		throw error;
+	}
+	if (skillExtractionEnabled && skillExtraction) {
+		await writeSkillExtraction(getClickhouse(), {
+			extractedAt: getNextIngestedAt(),
+			extraction: skillExtraction,
+			organizationId: orgId,
+			rawRevisionIngestedAt: ingestedAt,
+			sessionDate: new Date(timestamps.sessionDate),
+			sessionId: input.sessionId,
+			userId: context.user.id,
 		});
+	}
+	if (!usageExtractionEnabled || usageGeneration === null) {
+		return { contentSha256: contentHash, result: response };
+	}
+	await writeUsageExtraction(getClickhouse(), {
+		contentSha256: contentHash,
+		extraction: usageExtraction,
+		filterVersion: FILTER_VERSION,
+		generation: usageGeneration,
+		ingestedAt,
+		organizationId: orgId,
+		replaceAbsentEvents:
+			input.force_replace === true ||
+			shouldReplaceUsageEventsForVersion(ownership),
+		sessionDate: new Date(timestamps.sessionDate),
+		sessionId: input.sessionId,
+		source: filteredInput.source,
+		userId: context.user.id,
+	});
+	if (usageExtraction.status === "incomplete") {
+		logger.warn(
+			"Usage extraction incomplete after raw ingest (organization_id={organizationId} session_id={sessionId} diagnostics={diagnostics})",
+			{
+				diagnostics: JSON.stringify(usageExtraction.diagnostics),
+				organizationId: orgId,
+				sessionId: input.sessionId,
+			},
+		);
+		throw new ORPCError("SERVICE_UNAVAILABLE", {
+			data: {
+				reason: "usage_extraction_incomplete",
+				retryAfterMs: 1_000,
+			},
+			message:
+				"Raw session data was stored, but usage telemetry is malformed or contradictory. Retry after the transcript writer finishes.",
+		});
+	}
 
-		return response;
+	await recordSessionIngestContent(
+		orgId,
+		input.sessionId,
+		contentHash,
+		contentShape,
+		FILTER_VERSION,
+		new Date(timestamps.sessionDate),
+		ingestedAt,
+		{
+			checksum: usageExtraction.receipt.checksum,
+			diagnostics: JSON.stringify(usageExtraction.diagnostics),
+			eventCount: usageExtraction.receipt.eventCount,
+			extractionVersion: usageExtraction.receipt.extractionVersion,
+			eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
+			generation: usageGeneration,
+			modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
+		},
+	).catch((error: unknown) => {
+		if (error instanceof UsageExtractionSupersededError) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "usage_extraction_superseded" },
+				message: error.message,
+			});
+		}
+		throw error;
+	});
+	response.usageChecksum = usageExtraction.receipt.checksum;
+
+	const uploadCompletedPayload = getSessionUploadCompletedPayload(
+		filteredInput,
+		orgId,
+		context.user.id,
+	);
+
+	if (!uploadCompletedPayload) {
+		return { contentSha256: contentHash, result: response };
+	}
+
+	captureApiProductAnalyticsEvent({
+		distinctId: context.user.id,
+		event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
+		payload: uploadCompletedPayload,
+	});
+
+	return { contentSha256: contentHash, result: response };
+}
+
+const ingestSessionHandler = os.ingestSession
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, errors, signal }) => {
+		const processed = await processIngestSession({
+			awaitLanguageSignals: false,
+			context,
+			enforceRateLimits: true,
+			errorFactories: createIngestErrorFactories(errors),
+			input,
+			signal,
+		});
+		return processed.result;
 	});
 
 const r2IngestInit = os.ingest.init
@@ -813,6 +907,79 @@ const r2IngestInit = os.ingest.init
 				data: { reason: "r2_ingest_initialization_failed" },
 				message:
 					"Could not initialize direct upload. Retry or use direct ingest.",
+			});
+		}
+	});
+
+const r2IngestCommit = os.ingest.commit
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, errors, signal }) => {
+		if (!context.apiKeyId) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "An ingest API key is required",
+			});
+		}
+		const availability = readR2IngestAvailability();
+		if (!availability.enabled) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "r2_ingest_disabled" },
+				message: "Direct-to-R2 ingest is not configured on this API host.",
+			});
+		}
+
+		try {
+			return await commitR2IngestJob({
+				input,
+				process: (sessionInput, identity) =>
+					processIngestSession({
+						awaitLanguageSignals: true,
+						context: {
+							session: null,
+							user: { ...context.user, id: identity.userId },
+						},
+						enforceRateLimits: false,
+						errorFactories: createIngestErrorFactories(errors),
+						input: sessionInput,
+						signal,
+					}),
+				r2: createR2MultipartUploadClient(availability.configuration),
+				userId: context.user.id,
+			});
+		} catch (error) {
+			if (error instanceof ORPCError) throw error;
+			if (error instanceof R2IngestCommitError) {
+				if (error.code === "R2_INGEST_JOB_NOT_FOUND") {
+					throw new ORPCError("NOT_FOUND", { message: error.message });
+				}
+				if (
+					error.code === "R2_INGEST_JOB_BUSY" ||
+					error.code === "R2_INGEST_JOB_RETRY_LATER" ||
+					error.code === "R2_INGEST_LEASE_LOST"
+				) {
+					throw new ORPCError("SERVICE_UNAVAILABLE", {
+						data: { reason: error.code, retryAfterMs: 1_000 },
+						message: error.message,
+					});
+				}
+				if (error.code === "R2_INGEST_JOB_FAILED") {
+					throw new ORPCError("CONFLICT", { message: error.message });
+				}
+				throw new ORPCError("BAD_REQUEST", {
+					data: { reason: error.code },
+					message: error.message,
+				});
+			}
+			logger.error(
+				"R2 ingest commit failed (user_id={userId} job_id={jobId} error={error})",
+				{
+					error: error instanceof Error ? error.name : "unknown",
+					jobId: input.jobId,
+					userId: context.user.id,
+				},
+			);
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "r2_ingest_processing_failed" },
+				message: "Could not process the uploaded transcript. Retry shortly.",
 			});
 		}
 	});
@@ -1052,6 +1219,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	listMyOrganizations,
 	ingestSession: ingestSessionHandler,
 	ingest: {
+		commit: r2IngestCommit,
 		init: r2IngestInit,
 		status: r2IngestStatus,
 	},

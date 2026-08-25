@@ -385,7 +385,7 @@ export const R2IngestObjectInputSchema = z.discriminatedUnion("kind", [
 		kind: z.literal("subagent"),
 	}),
 ]);
-const R2IngestMetadataSchema = IngestSessionInputSchema.omit({
+export const R2IngestMetadataSchema = IngestSessionInputSchema.omit({
 	content: true,
 	subagents: true,
 });
@@ -471,7 +471,60 @@ export const R2IngestStatusOutputSchema = z.object({
 	updatedAt: z.string().datetime(),
 });
 
+export const R2IngestCompletedPartSchema = z.object({
+	etag: z.string().trim().min(1).max(512),
+	partNumber: z.number().int().min(1).max(10_000),
+});
+export const R2IngestCompletedObjectSchema = z.object({
+	objectKey: z.string().trim().min(1).max(1_024),
+	parts: z.array(R2IngestCompletedPartSchema).min(1).max(10_000),
+	uploadId: z.string().trim().min(1).max(1_024),
+});
+export const R2IngestCommitInputSchema = z
+	.object({
+		jobId: R2IngestJobIdSchema,
+		objects: z
+			.array(R2IngestCompletedObjectSchema)
+			.min(1)
+			.max(INGEST_MAX_SUBAGENT_COUNT + 1),
+	})
+	.superRefine((input, context) => {
+		if (
+			new Set(input.objects.map((object) => object.objectKey)).size !==
+			input.objects.length
+		) {
+			context.addIssue({
+				code: "custom",
+				message: "Completed object keys must be unique",
+				path: ["objects"],
+			});
+		}
+		for (const [objectIndex, object] of input.objects.entries()) {
+			if (
+				new Set(object.parts.map((part) => part.partNumber)).size !==
+				object.parts.length
+			) {
+				context.addIssue({
+					code: "custom",
+					message: "Completed part numbers must be unique per object",
+					path: ["objects", objectIndex, "parts"],
+				});
+			}
+		}
+	});
+export const R2IngestCommitOutputSchema = z.object({
+	jobId: R2IngestJobIdSchema,
+	protocol: z.literal(R2_INGEST_PROTOCOL),
+	result: IngestSessionOutputSchema,
+	status: z.literal("completed"),
+});
+
+export type IngestSessionOutput = z.infer<typeof IngestSessionOutputSchema>;
+export type R2IngestCommitInput = z.infer<typeof R2IngestCommitInputSchema>;
+export type R2IngestCommitOutput = z.infer<typeof R2IngestCommitOutputSchema>;
 export type R2IngestInitInput = z.infer<typeof R2IngestInitInputSchema>;
+export type R2IngestInitOutput = z.infer<typeof R2IngestInitOutputSchema>;
+export type R2IngestMetadata = z.infer<typeof R2IngestMetadataSchema>;
 export type R2IngestObjectInput = z.infer<typeof R2IngestObjectInputSchema>;
 export type R2IngestStatusOutput = z.infer<typeof R2IngestStatusOutputSchema>;
 export type R2IngestUploadObject = z.infer<typeof R2IngestUploadObjectSchema>;
@@ -515,6 +568,41 @@ const ProductAnalyticsCaptureResultSchema = z.object({
 	success: z.literal(true),
 });
 
+const IngestSessionErrors = {
+	[REDACTION_BUDGET_EXCEEDED_CODE]: {
+		status: 422,
+		message: REDACTION_BUDGET_EXCEEDED_MESSAGE,
+		data: z.object({
+			inputBytes: z.number().int().nonnegative(),
+			redactedBytes: z.number().int().nonnegative(),
+			ruleIds: z.array(z.string()),
+		}),
+	},
+	[REDACTION_DID_NOT_CONVERGE_CODE]: {
+		status: 422,
+		message: REDACTION_DID_NOT_CONVERGE_MESSAGE,
+		data: z.object({ maxPasses: z.number().int().positive() }),
+	},
+	[SECRET_FILTER_JSON_INTEGRITY_CODE]: {
+		status: 422,
+		message: SECRET_FILTER_JSON_INTEGRITY_MESSAGE,
+	},
+	[SESSION_OWNERSHIP_CONFLICT_CODE]: {
+		status: 409,
+		message: SESSION_OWNERSHIP_CONFLICT_MESSAGE,
+	},
+	[SESSION_UPLOAD_SHRINK_REJECTED_CODE]: {
+		status: 409,
+		message: SESSION_UPLOAD_SHRINK_REJECTED_MESSAGE,
+		data: z.object({
+			currentAssistantLineCount: z.number().int().nonnegative(),
+			currentContentBytes: z.number().int().nonnegative(),
+			previousAssistantLineCount: z.number().int().nonnegative(),
+			previousContentBytes: z.number().int().nonnegative(),
+		}),
+	},
+} as const;
+
 export const contract = {
 	health: oc.output(HealthSchema),
 	me: oc.output(UserSchema),
@@ -534,42 +622,7 @@ export const contract = {
 	ingestSession: oc
 		.input(IngestSessionInputSchema)
 		.output(IngestSessionOutputSchema)
-		.errors({
-			[REDACTION_BUDGET_EXCEEDED_CODE]: {
-				status: 422,
-				message: REDACTION_BUDGET_EXCEEDED_MESSAGE,
-				data: z.object({
-					inputBytes: z.number().int().nonnegative(),
-					redactedBytes: z.number().int().nonnegative(),
-					ruleIds: z.array(z.string()),
-				}),
-			},
-			[REDACTION_DID_NOT_CONVERGE_CODE]: {
-				status: 422,
-				message: REDACTION_DID_NOT_CONVERGE_MESSAGE,
-				data: z.object({
-					maxPasses: z.number().int().positive(),
-				}),
-			},
-			[SECRET_FILTER_JSON_INTEGRITY_CODE]: {
-				status: 422,
-				message: SECRET_FILTER_JSON_INTEGRITY_MESSAGE,
-			},
-			[SESSION_OWNERSHIP_CONFLICT_CODE]: {
-				status: 409,
-				message: SESSION_OWNERSHIP_CONFLICT_MESSAGE,
-			},
-			[SESSION_UPLOAD_SHRINK_REJECTED_CODE]: {
-				status: 409,
-				message: SESSION_UPLOAD_SHRINK_REJECTED_MESSAGE,
-				data: z.object({
-					currentAssistantLineCount: z.number().int().nonnegative(),
-					currentContentBytes: z.number().int().nonnegative(),
-					previousAssistantLineCount: z.number().int().nonnegative(),
-					previousContentBytes: z.number().int().nonnegative(),
-				}),
-			},
-		}),
+		.errors(IngestSessionErrors),
 	ingest: {
 		init: oc
 			.input(R2IngestInitInputSchema)
@@ -583,6 +636,10 @@ export const contract = {
 					}),
 				},
 			}),
+		commit: oc
+			.input(R2IngestCommitInputSchema)
+			.output(R2IngestCommitOutputSchema)
+			.errors(IngestSessionErrors),
 		status: oc
 			.input(R2IngestStatusInputSchema)
 			.output(R2IngestStatusOutputSchema),

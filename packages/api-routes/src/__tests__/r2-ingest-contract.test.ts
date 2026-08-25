@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	R2IngestCommitInputSchema,
 	R2IngestInitInputSchema,
 } from "../index.js";
 
@@ -69,5 +70,20 @@ describe("R2 ingest contract", () => {
 		});
 
 		expect(result.success).toBe(false);
+	});
+
+	test("accepts bounded multipart completion receipts", () => {
+		expect(
+			R2IngestCommitInputSchema.parse({
+				jobId: "00000000-0000-4000-8000-000000000001",
+				objects: [
+					{
+						objectKey: "ingest/job/main.jsonl",
+						parts: [{ etag: '"etag-1"', partNumber: 1 }],
+						uploadId: "upload-1",
+					},
+				],
+			}),
+		).toMatchObject({ jobId: "00000000-0000-4000-8000-000000000001" });
 	});
 });
