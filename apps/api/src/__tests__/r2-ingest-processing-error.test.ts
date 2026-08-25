@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { parseError } from "@clickhouse/client-web";
 import { isRetryableProcessingError } from "../services/r2-ingest-processing-error.js";
 
 describe("R2 ingest processing error classification", () => {
@@ -56,6 +57,38 @@ describe("R2 ingest processing error classification", () => {
 
 	test("recognizes the ClickHouse web client timeout shape", () => {
 		expect(isRetryableProcessingError(new Error("Timeout error."))).toBe(true);
+	});
+
+	test.each([
+		["159", "TIMEOUT_EXCEEDED"],
+		["202", "TOO_MANY_SIMULTANEOUS_QUERIES"],
+		["203", "NO_FREE_CONNECTION"],
+		["209", "SOCKET_TIMEOUT"],
+		["210", "NETWORK_ERROR"],
+		["242", "TABLE_IS_READ_ONLY"],
+		["252", "TOO_MANY_PARTS"],
+		["285", "TOO_FEW_LIVE_REPLICAS"],
+		["319", "UNKNOWN_STATUS_OF_INSERT"],
+		["999", "KEEPER_EXCEPTION"],
+	])("recognizes ClickHouse server error %s/%s", (code, type) => {
+		const error = parseError(
+			`Code: ${code}. DB::Exception: synthetic transient failure. (${type})`,
+		);
+
+		expect(error).toMatchObject({ code, type });
+		expect(isRetryableProcessingError(error)).toBe(true);
+	});
+
+	test.each([
+		["53", "TYPE_MISMATCH"],
+		["62", "SYNTAX_ERROR"],
+	])("keeps ClickHouse server error %s/%s terminal", (code, type) => {
+		const error = parseError(
+			`Code: ${code}. DB::Exception: synthetic deterministic failure. (${type})`,
+		);
+
+		expect(error).toMatchObject({ code, type });
+		expect(isRetryableProcessingError(error)).toBe(false);
 	});
 
 	test("keeps unknown validation failures terminal", () => {

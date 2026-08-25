@@ -2,6 +2,23 @@ import { ORPCError } from "@orpc/server";
 import { R2IngestMaterializationGateError } from "./r2-ingest-materialization-gate.js";
 
 const MAX_ERROR_GRAPH_NODES = 64;
+// Conservative subset of ClickHouse's documented connector retry list. Query,
+// parse, type, per-query memory, and generic server errors stay terminal.
+const RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE = new Map([
+	["159", "TIMEOUT_EXCEEDED"],
+	["202", "TOO_MANY_SIMULTANEOUS_QUERIES"],
+	["203", "NO_FREE_CONNECTION"],
+	["209", "SOCKET_TIMEOUT"],
+	["210", "NETWORK_ERROR"],
+	["242", "TABLE_IS_READ_ONLY"],
+	["252", "TOO_MANY_PARTS"],
+	["285", "TOO_FEW_LIVE_REPLICAS"],
+	["319", "UNKNOWN_STATUS_OF_INSERT"],
+	["999", "KEEPER_EXCEPTION"],
+]);
+const RETRYABLE_CLICKHOUSE_ERROR_TYPES = new Set(
+	RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.values(),
+);
 const RETRYABLE_ERROR_CODES = new Set([
 	"40001",
 	"40P01",
@@ -86,12 +103,12 @@ function isRetryableErrorNode(error: object): boolean {
 	if (error instanceof ORPCError && RETRYABLE_ORPC_CODES.has(error.code)) {
 		return true;
 	}
+	if (isRetryableClickHouseError(error)) return true;
 	const code = getErrorString(error, "code");
 	if (
 		code &&
 		(RETRYABLE_ERROR_CODES.has(code) ||
-			code.startsWith("08") ||
-			code.startsWith("53"))
+			(code.length === 5 && (code.startsWith("08") || code.startsWith("53"))))
 	) {
 		return true;
 	}
@@ -106,6 +123,16 @@ function isRetryableErrorNode(error: object): boolean {
 		httpStatusCode === 429 ||
 		(httpStatusCode !== null && httpStatusCode >= 500)
 	);
+}
+
+function isRetryableClickHouseError(error: object): boolean {
+	const code = getErrorString(error, "code");
+	const type = getErrorString(error, "type");
+	if (code && type) {
+		return RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.get(code) === type;
+	}
+	if (code && RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.has(code)) return true;
+	return type !== null && RETRYABLE_CLICKHOUSE_ERROR_TYPES.has(type);
 }
 
 function getErrorString(error: object, key: string): string | null {

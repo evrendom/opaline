@@ -10,6 +10,7 @@ import {
 	buildDateFilter,
 	buildLatestRawSessionContentSql,
 	buildSessionAnalyticsRepairStatement,
+	createClickHouseExecutor,
 	createClickHouseInsertDeduplicationSettings,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
@@ -90,6 +91,38 @@ describe("clickhouse helpers", () => {
 			deduplicate_blocks_in_dependent_materialized_views: 1,
 			insert_deduplication_token: "ledger-1:rudel.claude_sessions",
 		});
+	});
+
+	test("preserves proxy status without replacing ClickHouse server errors", async () => {
+		let responseKind: "clickhouse" | "proxy" = "proxy";
+		const server = Bun.serve({
+			fetch: () =>
+				responseKind === "proxy"
+					? new Response("upstream unavailable", { status: 503 })
+					: new Response(
+							"Code: 159. DB::Exception: Timeout exceeded. (TIMEOUT_EXCEEDED)",
+							{ status: 500 },
+						),
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const executor = createClickHouseExecutor({ url: server.url.toString() });
+
+		await expect(executor.execute({ query: "SELECT 1" })).rejects.toMatchObject(
+			{
+				status: 503,
+			},
+		);
+		responseKind = "clickhouse";
+		await expect(executor.execute({ query: "SELECT 1" })).rejects.toMatchObject(
+			{
+				code: "159",
+				type: "TIMEOUT_EXCEEDED",
+			},
+		);
+
+		await executor.close();
+		await server.stop(true);
 	});
 
 	test("builds exact-revision session analytics repairs from both canonical MVs", () => {

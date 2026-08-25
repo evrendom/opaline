@@ -1,12 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { parseError } from "@clickhouse/client-web";
 import type {
 	IngestSessionInput,
 	R2IngestCommitInput,
 	R2IngestInitOutput,
 } from "@rudel/api-routes";
 import postgres from "postgres";
-import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
+import {
+	createClickHouseExecutor,
+	getClickhouse,
+	getSafeClickHouseTable,
+} from "../clickhouse.js";
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import {
@@ -312,27 +317,35 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(processCalls).toBe(1);
 	});
 
-	test("leaves objects intact on failure and succeeds after the retry window", async () => {
+	test("leaves objects intact on a proxy 503 and succeeds after the retry window", async () => {
 		const initialized = await initializeUploadedJob(
 			"00000000-0000-4000-8000-000000000012",
 			"retry transcript",
 		);
 		const completion = buildCompletionInput(initialized);
 		const firstAttemptAt = new Date("2030-01-01T00:00:00.000Z");
+		const proxy = Bun.serve({
+			fetch: () => new Response("upstream unavailable", { status: 503 }),
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const proxyClickHouse = createClickHouseExecutor({
+			url: proxy.url.toString(),
+		});
 		await expect(
 			commitR2IngestJob({
 				input: completion,
 				now: () => firstAttemptAt,
 				process: async () => {
-					throw Object.assign(new Error("synthetic processor failure"), {
-						$metadata: { httpStatusCode: 503 },
-						name: "ServiceUnavailable",
-					});
+					await proxyClickHouse.execute({ query: "SELECT 1" });
+					return processorResult("unexpected-proxy-success");
 				},
 				r2: fakeR2,
 				userId: USER_ID,
 			}),
-		).rejects.toThrow("synthetic processor failure");
+		).rejects.toMatchObject({ status: 503 });
+		await proxyClickHouse.close();
+		await proxy.stop(true);
 		expect(
 			await getR2IngestJobStatus(initialized.jobId, USER_ID),
 		).toMatchObject({
@@ -349,6 +362,52 @@ describe("R2 ingest commit lifecycle", () => {
 		const retried = await commitR2IngestJob({
 			input: completion,
 			now: () => new Date("2030-01-01T00:00:02.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(retried.status).toBe("completed");
+	});
+
+	test("leaves objects intact on a ClickHouse code 159 timeout", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"server timeout transcript",
+		);
+		const timeoutError = parseError(
+			"Code: 159. DB::Exception: Timeout exceeded. (TIMEOUT_EXCEEDED)",
+		);
+		expect(timeoutError).toMatchObject({
+			code: "159",
+			type: "TIMEOUT_EXCEEDED",
+		});
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async () => {
+					throw timeoutError;
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBe(timeoutError);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+			status: "pending",
+		});
+		expect(
+			initialized.objects.every((object) =>
+				fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		const retried = await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
 			process: async (input) => processorResult(input.sessionId),
 			r2: fakeR2,
 			userId: USER_ID,
@@ -416,24 +475,28 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 	});
 
-	test("terminal processor errors clean completed objects immediately", async () => {
+	test("terminal ClickHouse errors clean completed objects immediately", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
 			"terminal processor transcript",
 		);
 		const objectKey = initialized.objects[0]?.objectKey;
 		if (!objectKey) throw new Error("missing initialized main object");
+		const syntaxError = parseError(
+			"Code: 62. DB::Exception: Syntax error. (SYNTAX_ERROR)",
+		);
+		expect(syntaxError).toMatchObject({ code: "62", type: "SYNTAX_ERROR" });
 
 		await expect(
 			commitR2IngestJob({
 				input: buildCompletionInput(initialized),
 				process: async () => {
-					throw new Error("deterministic schema rejection");
+					throw syntaxError;
 				},
 				r2: fakeR2,
 				userId: USER_ID,
 			}),
-		).rejects.toThrow("deterministic schema rejection");
+		).rejects.toBe(syntaxError);
 		expect(fakeR2.completedKeys).toContain(objectKey);
 		expect(fakeR2.objects.has(objectKey)).toBe(false);
 		expect(

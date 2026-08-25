@@ -1,6 +1,8 @@
 import {
+	ClickHouseError,
 	type ClickHouseSettings,
 	createClient,
+	parseError,
 	TupleParam,
 } from "@clickhouse/client-web";
 import { getLogger } from "@logtape/logtape";
@@ -12,6 +14,32 @@ import {
 } from "@rudel/ch-schema/session-analytics-mv";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
+
+class ClickHouseHttpResponseError extends Error {
+	readonly status: number;
+
+	constructor(status: number, statusText: string) {
+		super(
+			`ClickHouse request failed with HTTP ${status}${statusText ? ` ${statusText}` : ""}`,
+		);
+		this.name = "ClickHouseHttpResponseError";
+		this.status = status;
+	}
+}
+
+const fetchWithClickHouseHttpStatus = Object.assign(
+	async (
+		input: Parameters<typeof fetch>[0],
+		init?: Parameters<typeof fetch>[1],
+	): Promise<Response> => {
+		const response = await fetch(input, init);
+		if (response.ok) return response;
+		const parsedError = parseError(await response.clone().text());
+		if (parsedError instanceof ClickHouseError) return response;
+		throw new ClickHouseHttpResponseError(response.status, response.statusText);
+	},
+	{ preconnect: fetch.preconnect },
+);
 
 const INGEST_RECOVERY_QUERY_SETTINGS = {
 	max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
@@ -174,6 +202,7 @@ export function createClickHouseExecutor(config: {
 		username: config.username,
 		password: config.password,
 		database: config.database,
+		fetch: fetchWithClickHouseHttpStatus,
 		request_timeout: 120_000,
 		clickhouse_settings: {
 			max_execution_time: 60,
