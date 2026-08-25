@@ -797,7 +797,7 @@ const r2IngestInit = os.ingest.init
 				now: () => new Date(),
 				organizationId,
 				r2: createR2MultipartUploadClient(availability.configuration),
-				randomUUID: crypto.randomUUID,
+				randomUUID: () => crypto.randomUUID(),
 				userId: context.user.id,
 			});
 		} catch (error) {
