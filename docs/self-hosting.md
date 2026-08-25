@@ -116,6 +116,28 @@ Set the OAuth callback URL to `https://your-domain.com/api/auth/callback/github`
 
 Without these, users can still sign up and log in with email/password.
 
+## Direct-to-R2 Ingest Lifecycle Backstop
+
+When direct-to-R2 ingest is enabled, configure an object lifecycle rule on the
+ingest bucket with the prefix `ingest/` and a seven-day object expiration. The
+application job sweeper and terminal-state cleanup are the primary deletion
+mechanisms; this lifecycle rule is defense in depth for completed objects that
+survive an application or database outage. Cloudflare's default seven-day rule
+only aborts incomplete multipart uploads and does not delete completed objects.
+
+In the Cloudflare dashboard, open the bucket's **Settings** page and add an
+enabled Object Lifecycle Rule with these values:
+
+- Rule name: `expire-abandoned-ingest-objects`
+- Prefix: `ingest/`
+- Delete objects after: `7 days`
+
+Verify the rule after provisioning with:
+
+```bash
+npx wrangler r2 bucket lifecycle list <bucket-name>
+```
+
 ## Environment Variables Reference
 
 | Variable | Required | Description |

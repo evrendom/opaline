@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0025_TIMESTAMP = "1787636737198";
+const MIGRATION_0026_TIMESTAMP = "1787666400000";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0025 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0026 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0025 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0025] = await migrationSql<MigrationState[]>`
+			const [after0026] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,9 +61,9 @@ test("applies migrations 0020-0025 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0025).toEqual({
-				count: 26,
-				latestTimestamp: MIGRATION_0025_TIMESTAMP,
+			expect(after0026).toEqual({
+				count: 27,
+				latestTimestamp: MIGRATION_0026_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [ingestJobTable] = await migrationSql<TableState[]>`
@@ -79,11 +79,27 @@ test("applies migrations 0020-0025 to a database already migrated through 0019",
 			`;
 			expect([...ingestJobIndexes]).toEqual([
 				{ name: "ingest_job_cleanup_idx" },
+				{ name: "ingest_job_expiry_idx" },
 				{ name: "ingest_job_pending_available_idx" },
 				{ name: "ingest_job_pkey" },
 				{ name: "ingest_job_running_lease_expiry_idx" },
 				{ name: "ingest_job_session_idx" },
 			]);
+			const [expiresAtColumn] = await migrationSql<
+				Array<{ defaultValue: string | null; nullable: string }>
+			>`
+				SELECT
+					column_default AS "defaultValue",
+					is_nullable AS nullable
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'ingest_job'
+					AND column_name = 'expires_at'
+			`;
+			expect(expiresAtColumn).toEqual({
+				defaultValue: "(now() + '24:00:00'::interval)",
+				nullable: "NO",
+			});
 			const ingestJobChecks = await migrationSql<Array<{ name: string }>>`
 				SELECT conname AS name
 				FROM pg_constraint

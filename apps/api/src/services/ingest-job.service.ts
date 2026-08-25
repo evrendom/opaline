@@ -21,6 +21,8 @@ interface CreatedMultipartUpload {
 	uploadId: string;
 }
 
+const R2_INGEST_JOB_TTL_MS = 24 * 60 * 60_000;
+
 interface IngestJobStatusRow {
 	attempts: number;
 	availableAt: Date | string;
@@ -53,6 +55,8 @@ export async function initR2IngestJob(
 	protocol: typeof R2_INGEST_PROTOCOL;
 }> {
 	const jobId = options.randomUUID();
+	const initializedAt = options.now();
+	const jobExpiresAt = new Date(initializedAt.getTime() + R2_INGEST_JOB_TTL_MS);
 	const sortedObjects = sortR2IngestObjects(options.input.objects);
 	const createdUploads: CreatedMultipartUpload[] = [];
 	let uploadObjects: R2IngestUploadObject[];
@@ -105,9 +109,10 @@ export async function initR2IngestJob(
 					expected_sizes,
 					expected_total_bytes,
 					client_hashes,
-					ingest_metadata
+					ingest_metadata,
+					expires_at
 				)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			`,
 			[
 				jobId,
@@ -120,6 +125,7 @@ export async function initR2IngestJob(
 				expectedTotalBytes,
 				JSON.stringify(clientHashes),
 				JSON.stringify(ingestMetadata),
+				jobExpiresAt.toISOString(),
 			],
 		);
 	} catch (error) {
@@ -129,7 +135,7 @@ export async function initR2IngestJob(
 
 	return {
 		expiresAt: new Date(
-			options.now().getTime() + R2_INGEST_UPLOAD_URL_TTL_SECONDS * 1000,
+			initializedAt.getTime() + R2_INGEST_UPLOAD_URL_TTL_SECONDS * 1000,
 		).toISOString(),
 		jobId,
 		objects: uploadObjects,
