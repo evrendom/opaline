@@ -7,6 +7,7 @@ import {
 	buildAbsoluteDateFilter,
 	buildDateFilter,
 	buildLatestRawSessionContentSql,
+	createClickHouseInsertDeduplicationSettings,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 
@@ -68,6 +69,24 @@ describe("clickhouse helpers", () => {
 		expect(() => getSafeClickHouseTable("rudel.unknown_table")).toThrow(
 			"Unsupported ClickHouse table",
 		);
+	});
+
+	test("distinguishes independent inserts while preserving durable tokens", () => {
+		const first = createClickHouseInsertDeduplicationSettings();
+		const second = createClickHouseInsertDeduplicationSettings();
+		const durable = createClickHouseInsertDeduplicationSettings(
+			"ledger-1:rudel.claude_sessions",
+		);
+
+		expect(first.insert_deduplication_token).toBeString();
+		expect(second.insert_deduplication_token).not.toBe(
+			first.insert_deduplication_token,
+		);
+		expect(durable).toEqual({
+			async_insert_deduplicate: 1,
+			deduplicate_blocks_in_dependent_materialized_views: 1,
+			insert_deduplication_token: "ledger-1:rudel.claude_sessions",
+		});
 	});
 
 	test("requires pushed-down filters for raw transcript scans", () => {

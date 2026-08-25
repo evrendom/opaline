@@ -35,6 +35,16 @@ export interface ClickHouseExecutor {
 	}): Promise<void>;
 }
 
+export function createClickHouseInsertDeduplicationSettings(
+	deduplicationToken: string = crypto.randomUUID(),
+): ClickHouseSettings {
+	return {
+		async_insert_deduplicate: 1,
+		deduplicate_blocks_in_dependent_materialized_views: 1,
+		insert_deduplication_token: deduplicationToken,
+	};
+}
+
 interface LatestRawSessionContentFilters {
 	sessionDate?: boolean;
 	sessionId?: boolean;
@@ -175,13 +185,9 @@ export function createClickHouseExecutor(config: {
 					? "async_insert=0, input_format_parallel_parsing=0"
 					: "async_insert=1, wait_for_async_insert=1, input_format_parallel_parsing=0";
 			await client.command({
-				clickhouse_settings: params.deduplicationToken
-					? {
-							async_insert_deduplicate: 1,
-							deduplicate_blocks_in_dependent_materialized_views: 1,
-							insert_deduplication_token: params.deduplicationToken,
-						}
-					: undefined,
+				clickhouse_settings: createClickHouseInsertDeduplicationSettings(
+					params.deduplicationToken,
+				),
 				query: `INSERT INTO ${table} SETTINGS ${insertSettings} FORMAT JSONEachRow ${rows}`,
 			});
 		},
@@ -222,13 +228,17 @@ export function getClickhouse(): ClickHouseExecutor {
 		_clickhouse = {
 			...executor,
 			async insert(params) {
-				// Retries reuse the byte-identical rows (including ingested_at), so
-				// duplicate attempts converge under ReplacingMergeTree. Do not enable
-				// async_insert_deduplicate here: these inserts feed dependent materialized
-				// views, whose deduplication behavior varies by ClickHouse version.
+				// Explicit tokens distinguish independent byte-identical inserts while
+				// remaining stable across an acknowledgement-loss retry. Crash-recovery
+				// callers provide their durable token instead of using this generated one.
+				const deduplicationToken =
+					params.deduplicationToken ?? crypto.randomUUID();
 				for (let attempt = 0; attempt < maxRetries; attempt++) {
 					try {
-						return await executor.insert(params);
+						return await executor.insert({
+							...params,
+							deduplicationToken,
+						});
 					} catch (error) {
 						if (attempt === maxRetries - 1) {
 							logger.error(
