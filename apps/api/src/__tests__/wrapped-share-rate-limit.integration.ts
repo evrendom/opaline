@@ -200,7 +200,7 @@ describe("wrapped share source trust over HTTP", () => {
 		await flyApi?.stop();
 	});
 
-	test("ignores forwarded addresses when no proxy is trusted", async () => {
+	test("uses the rightmost forwarded client without a socket peer", async () => {
 		expect(
 			await callPublicRpc(
 				directProxy.baseUrl,
@@ -213,6 +213,13 @@ describe("wrapped share source trust over HTTP", () => {
 				directProxy.baseUrl,
 				"198.51.100.61",
 				`direct-second-${crypto.randomUUID()}`,
+			),
+		).toBe(404);
+		expect(
+			await callPublicRpc(
+				directProxy.baseUrl,
+				"198.51.100.60",
+				`direct-first-limited-${crypto.randomUUID()}`,
 			),
 		).toBe(429);
 	});

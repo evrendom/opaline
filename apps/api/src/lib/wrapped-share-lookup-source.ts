@@ -24,7 +24,10 @@ export function resolveWrappedShareLookupSource(input: {
 		forwardedIps.push(peerIp);
 	}
 
-	const sourceIndex = forwardedIps.length - input.trustedProxyHops - 1;
+	// A socket/Fly peer is appended to the chain above; a Web-standard runtime
+	// has no socket peer, so its X-Forwarded-For chain has no extra slot to skip.
+	const peerOffset = peerIp ? 1 : 0;
+	const sourceIndex = forwardedIps.length - input.trustedProxyHops - peerOffset;
 	return (
 		forwardedIps[sourceIndex] ?? peerIp ?? forwardedIps.at(-1) ?? "unknown"
 	);
