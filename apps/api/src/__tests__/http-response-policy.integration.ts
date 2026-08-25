@@ -109,9 +109,13 @@ describe("production HTTP response policy", () => {
 		expect(
 			trustedResponse.headers.get("Access-Control-Allow-Credentials"),
 		).toBe("true");
+		expect(trustedResponse.headers.get("Vary")?.split(/,\s*/u)).toContain(
+			"Origin",
+		);
 		expect(
 			untrustedResponse.headers.get("Access-Control-Allow-Origin"),
 		).toBeNull();
+		expect(untrustedResponse.headers.get("Vary")).toBeNull();
 		expect(
 			untrustedResponse.headers.get("Access-Control-Allow-Credentials"),
 		).toBeNull();
