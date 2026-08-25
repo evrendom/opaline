@@ -1,6 +1,10 @@
 import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { z } from "zod";
+import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
 import type { IngestProcessingFailpoint } from "./ingest-processing-boundary.js";
 import { passIngestProcessingBoundary } from "./ingest-processing-boundary.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
@@ -111,6 +115,7 @@ export async function cleanupIngestJobObjects(
 
 export async function repairR2IngestCleanupJobs(input: {
 	database: postgres.Sql;
+	deadline?: MaintenanceDeadline;
 	limit?: number;
 	r2: R2MultipartUploadClient;
 }): Promise<R2IngestCleanupRepairResult> {
@@ -130,8 +135,15 @@ export async function repairR2IngestCleanupJobs(input: {
 		 LIMIT $1`,
 		[limit],
 	);
+	let attempted = 0;
 	let completed = 0;
+	let deadlineReached = false;
 	for (const candidate of candidates) {
+		if (!hasMaintenanceTimeRemaining(input.deadline)) {
+			deadlineReached = true;
+			break;
+		}
+		attempted += 1;
 		if (
 			await cleanupIngestJobObjects(
 				candidate,
@@ -145,14 +157,17 @@ export async function repairR2IngestCleanupJobs(input: {
 		}
 	}
 	return {
-		attempted: candidates.length,
+		attempted,
 		completed,
-		hasMore: candidates.length === limit && completed === candidates.length,
+		hasMore:
+			deadlineReached ||
+			(candidates.length === limit && completed === candidates.length),
 	};
 }
 
 export async function sweepExpiredR2IngestJobs(input: {
 	database: postgres.Sql;
+	deadline?: MaintenanceDeadline;
 	limit?: number;
 	now?: Date;
 	r2: R2MultipartUploadClient;
@@ -195,8 +210,15 @@ export async function sweepExpiredR2IngestJobs(input: {
 		FROM terminalized`,
 		[now.toISOString(), limit],
 	);
+	let attempted = 0;
 	let completed = 0;
+	let deadlineReached = false;
 	for (const job of expired) {
+		if (!hasMaintenanceTimeRemaining(input.deadline)) {
+			deadlineReached = true;
+			break;
+		}
+		attempted += 1;
 		if (
 			await cleanupIngestJobObjects(
 				job,
@@ -210,9 +232,11 @@ export async function sweepExpiredR2IngestJobs(input: {
 		}
 	}
 	return {
-		attempted: expired.length,
+		attempted,
 		completed,
-		hasMore: expired.length === limit && completed === expired.length,
+		hasMore:
+			deadlineReached ||
+			(expired.length === limit && completed === expired.length),
 	};
 }
 

@@ -2,6 +2,11 @@ export interface MaintenancePassResult {
 	readonly hasMore: boolean;
 }
 
+export interface MaintenanceDeadline {
+	readonly deadlineAt: number;
+	readonly now: () => number;
+}
+
 export type MaintenanceDrainStopReason =
 	| "complete"
 	| "deadline"
@@ -14,12 +19,35 @@ export interface MaintenanceDrainResult<TResult extends MaintenancePassResult> {
 	readonly stopReason: MaintenanceDrainStopReason;
 }
 
+export function hasMaintenanceTimeRemaining(
+	deadline: MaintenanceDeadline | undefined,
+): boolean {
+	return deadline === undefined || deadline.now() < deadline.deadlineAt;
+}
+
+export function createMaintenanceQueueDeadline(
+	invocationDeadline: MaintenanceDeadline,
+	queueBudgetMs: number,
+): MaintenanceDeadline {
+	if (!Number.isSafeInteger(queueBudgetMs) || queueBudgetMs < 1) {
+		throw new Error("queueBudgetMs must be a positive safe integer");
+	}
+
+	return {
+		deadlineAt: Math.min(
+			invocationDeadline.deadlineAt,
+			invocationDeadline.now() + queueBudgetMs,
+		),
+		now: invocationDeadline.now,
+	};
+}
+
 export async function drainMaintenancePasses<
 	TResult extends MaintenancePassResult,
 >(input: {
-	readonly deadlineAt: number;
+	readonly deadline: MaintenanceDeadline;
 	readonly maxIterations: number;
-	readonly now: () => number;
+	readonly onIncomplete?: (result: MaintenanceDrainResult<TResult>) => void;
 	readonly runPass: () => Promise<TResult>;
 }): Promise<MaintenanceDrainResult<TResult>> {
 	if (!Number.isSafeInteger(input.maxIterations) || input.maxIterations < 1) {
@@ -31,7 +59,7 @@ export async function drainMaintenancePasses<
 	while (
 		hasMore &&
 		results.length < input.maxIterations &&
-		input.now() < input.deadlineAt
+		hasMaintenanceTimeRemaining(input.deadline)
 	) {
 		const result = await input.runPass();
 		results.push(result);
@@ -44,10 +72,14 @@ export async function drainMaintenancePasses<
 			? "max-iterations"
 			: "deadline";
 
-	return {
+	const drain: MaintenanceDrainResult<TResult> = {
 		hasMore,
 		iterations: results.length,
 		results,
 		stopReason,
 	};
+	if (drain.hasMore) {
+		input.onIncomplete?.(drain);
+	}
+	return drain;
 }

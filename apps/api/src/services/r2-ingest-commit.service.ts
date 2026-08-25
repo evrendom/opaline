@@ -15,6 +15,10 @@ import type postgres from "postgres";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
 import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
+import {
 	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
@@ -519,6 +523,7 @@ export interface R2IngestRecoveryRepairResult {
 
 export async function repairRecoverableR2IngestJobs(input: {
 	database: postgres.Sql;
+	deadline?: MaintenanceDeadline;
 	gate?: R2IngestMaterializationGate;
 	leaseDurationMs?: number;
 	limit?: number;
@@ -555,8 +560,15 @@ export async function repairRecoverableR2IngestJobs(input: {
 	const run = input.gate
 		? input.gate.run.bind(input.gate)
 		: runWithR2IngestMaterializationSlot;
+	let attempted = 0;
 	let completed = 0;
+	let deadlineReached = false;
 	for (const candidate of candidates) {
+		if (!hasMaintenanceTimeRemaining(input.deadline)) {
+			deadlineReached = true;
+			break;
+		}
+		attempted += 1;
 		let manifest: readonly StoredObject[];
 		try {
 			manifest = StoredManifestSchema.parse(candidate.objectManifest);
@@ -620,9 +632,9 @@ export async function repairRecoverableR2IngestJobs(input: {
 		}
 	}
 	return {
-		attempted: candidates.length,
+		attempted,
 		completed,
-		hasMore: candidates.length === limit,
+		hasMore: deadlineReached || candidates.length === limit,
 	};
 }
 

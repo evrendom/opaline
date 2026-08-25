@@ -1,6 +1,9 @@
 import { getLogger } from "@logtape/logtape";
 import {
+	createMaintenanceQueueDeadline,
 	drainMaintenancePasses,
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
 	type MaintenanceDrainResult,
 	type MaintenancePassResult,
 } from "../lib/bounded-maintenance.js";
@@ -18,9 +21,12 @@ import { reconcileSessionLanguageSignalsUntilCaughtUp } from "../services/sessio
 const logger = getLogger(["rudel", "api", "maintenance"]);
 const DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE = 25;
 const MAINTENANCE_MAX_PASSES_PER_STEP = 50;
-// Two sequential 90-second repair windows leave at least two minutes of the
-// 300-second function duration for language reconciliation and shutdown.
-const MAINTENANCE_STEP_DEADLINE_MS = 90_000;
+// Keep the invocation deadline 30 seconds below the configured 300-second
+// Vercel Function maximum so deadline logging and the HTTP response can flush.
+const MAINTENANCE_INVOCATION_BUDGET_MS = 270_000;
+const CLICKHOUSE_PURGE_BUDGET_MS = 90_000;
+const R2_INGEST_BUDGET_MS = 90_000;
+const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 
 export async function handleApiMaintenanceRequest(
 	request: Request,
@@ -41,19 +47,24 @@ export async function handleApiMaintenanceRequest(
 }
 
 async function runApiMaintenance() {
-	const clickHousePurge = await runMaintenanceStep(
-		"clickhouse-purge",
-		runClickHouseMaintenance,
+	const invocationDeadline: MaintenanceDeadline = {
+		deadlineAt: Date.now() + MAINTENANCE_INVOCATION_BUDGET_MS,
+		now: Date.now,
+	};
+	const clickHousePurge = await runMaintenanceStep("clickhouse-purge", () =>
+		runClickHouseMaintenance(invocationDeadline),
 	);
-	const r2Ingest = await runMaintenanceStep("r2-ingest", runR2Maintenance);
+	const r2Ingest = await runMaintenanceStep("r2-ingest", () =>
+		runR2Maintenance(invocationDeadline),
+	);
 	const languageSignals = await runMaintenanceStep("language-signals", () =>
-		reconcileSessionLanguageSignalsUntilCaughtUp(
-			readPositiveSafeIntegerEnv(
-				"LANGUAGE_SIGNAL_RECONCILE_BATCH_SIZE",
-				DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE,
-			),
-		),
+		runLanguageSignalMaintenance(invocationDeadline),
 	);
+	if (!hasMaintenanceTimeRemaining(invocationDeadline)) {
+		logger.warn(
+			"Daily API maintenance reached its invocation deadline; returning with queued work left for the next cron",
+		);
+	}
 
 	return {
 		clickHousePurge,
@@ -66,10 +77,16 @@ async function runApiMaintenance() {
 	};
 }
 
-async function runClickHouseMaintenance() {
+async function runClickHouseMaintenance(
+	invocationDeadline: MaintenanceDeadline,
+) {
+	const deadline = createMaintenanceQueueDeadline(
+		invocationDeadline,
+		CLICKHOUSE_PURGE_BUDGET_MS,
+	);
 	const resend = readResendConfig();
-	const drain = await runMaintenancePassLoop("clickhouse-purge", () =>
-		runClickHousePurgeWorkerPass({ resend }),
+	const drain = await runMaintenancePassLoop("clickhouse-purge", deadline, () =>
+		runClickHousePurgeWorkerPass({ resend }, deadline),
 	);
 
 	return {
@@ -101,7 +118,7 @@ async function runMaintenanceStep<TResult>(
 	}
 }
 
-async function runR2Maintenance() {
+async function runR2Maintenance(invocationDeadline: MaintenanceDeadline) {
 	const availability = readR2IngestAvailability();
 	if (!availability.enabled) {
 		return {
@@ -115,9 +132,13 @@ async function runR2Maintenance() {
 		};
 	}
 
+	const deadline = createMaintenanceQueueDeadline(
+		invocationDeadline,
+		R2_INGEST_BUDGET_MS,
+	);
 	const r2 = createR2MultipartUploadClient(availability.configuration);
-	const drain = await runMaintenancePassLoop("r2-ingest", () =>
-		runR2IngestRepairPass(r2),
+	const drain = await runMaintenancePassLoop("r2-ingest", deadline, () =>
+		runR2IngestRepairPass(r2, deadline),
 	);
 
 	return {
@@ -137,27 +158,59 @@ async function runR2Maintenance() {
 	};
 }
 
+async function runLanguageSignalMaintenance(
+	invocationDeadline: MaintenanceDeadline,
+) {
+	const deadline = createMaintenanceQueueDeadline(
+		invocationDeadline,
+		LANGUAGE_SIGNAL_BUDGET_MS,
+	);
+	const result = await reconcileSessionLanguageSignalsUntilCaughtUp(
+		readPositiveSafeIntegerEnv(
+			"LANGUAGE_SIGNAL_RECONCILE_BATCH_SIZE",
+			DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE,
+		),
+		undefined,
+		deadline,
+	);
+	const hasMore = result.remainingLag > 0;
+	if (hasMore) {
+		logger.warn(
+			"Daily API maintenance left queued work (language-signals) after reconciliation; the next cron will continue",
+			{ remainingLag: result.remainingLag },
+		);
+	}
+	return {
+		...result,
+		hasMore,
+		stopReason: hasMore
+			? hasMaintenanceTimeRemaining(deadline)
+				? "max-iterations"
+				: "deadline"
+			: "complete",
+	};
+}
+
 async function runMaintenancePassLoop<TResult extends MaintenancePassResult>(
 	name: string,
+	deadline: MaintenanceDeadline,
 	runPass: () => Promise<TResult>,
 ): Promise<MaintenanceDrainResult<TResult>> {
 	const drain = await drainMaintenancePasses({
-		deadlineAt: Date.now() + MAINTENANCE_STEP_DEADLINE_MS,
+		deadline,
 		maxIterations: MAINTENANCE_MAX_PASSES_PER_STEP,
-		now: Date.now,
+		onIncomplete: (incomplete) => {
+			logger.warn(
+				"Daily API maintenance left queued work ({name}) after {iterations} passes ({stopReason}); the next cron will continue",
+				{
+					iterations: incomplete.iterations,
+					name,
+					stopReason: incomplete.stopReason,
+				},
+			);
+		},
 		runPass,
 	});
-
-	if (drain.hasMore) {
-		logger.warn(
-			"Daily API maintenance left queued work ({name}) after {iterations} passes ({stopReason}); the next cron will continue",
-			{
-				iterations: drain.iterations,
-				name,
-				stopReason: drain.stopReason,
-			},
-		);
-	}
 
 	return drain;
 }

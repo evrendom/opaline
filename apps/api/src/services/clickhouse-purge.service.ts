@@ -7,6 +7,10 @@ import {
 	sendClickHousePurgeFailureAlert,
 } from "../email.js";
 import { isVercelRuntime } from "../lib/api-runtime.js";
+import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import {
@@ -344,22 +348,31 @@ export function startClickHousePurgeWorker(
 
 export async function runClickHousePurgeWorkerPass(
 	options: StartClickHousePurgeWorkerOptions,
+	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<{ readonly hasMore: boolean; readonly processed: number }> {
 	if (options.enabled === false) {
 		return { hasMore: false, processed: 0 };
+	}
+	if (!hasMaintenanceTimeRemaining(deadline)) {
+		return { hasMore: true, processed: 0 };
 	}
 
 	const env = createClickHousePurgeProcessorEnv(options);
 	await deleteExpiredSucceededPurgeJobs(env.sqlClient);
 	let processed = 0;
 	for (; processed < MAX_WORK_ITEMS_PER_PASS; processed += 1) {
-		if (!(await runClickHousePurgeWorkerOnce(env))) {
+		if (
+			!hasMaintenanceTimeRemaining(deadline) ||
+			!(await runClickHousePurgeWorkerOnce(env, deadline))
+		) {
 			break;
 		}
 	}
 
 	return {
-		hasMore: processed === MAX_WORK_ITEMS_PER_PASS,
+		hasMore:
+			!hasMaintenanceTimeRemaining(deadline) ||
+			processed === MAX_WORK_ITEMS_PER_PASS,
 		processed,
 	};
 }
@@ -396,7 +409,11 @@ function getEarlierDate(first: Date | null, second: Date | null): Date | null {
 
 export async function runClickHousePurgeWorkerOnce(
 	env: ClickHousePurgeProcessorEnv,
+	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<boolean> {
+	if (!hasMaintenanceTimeRemaining(deadline)) {
+		return false;
+	}
 	const purgeJobClaim = await claimNextPurgeJob(env);
 	if (purgeJobClaim.status === "claimed") {
 		await processClaimedPurgeJob(purgeJobClaim.job, env);
@@ -404,7 +421,7 @@ export async function runClickHousePurgeWorkerOnce(
 	const handledPurgeWork = purgeJobClaim.status !== "empty";
 
 	const sendFailureAlert = env.sendFailureAlert;
-	if (!sendFailureAlert) {
+	if (!sendFailureAlert || !hasMaintenanceTimeRemaining(deadline)) {
 		return handledPurgeWork;
 	}
 
