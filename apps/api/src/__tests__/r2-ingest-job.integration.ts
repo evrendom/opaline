@@ -713,6 +713,7 @@ describe("R2 ingest real processor crash recovery", () => {
 				},
 			});
 			if (!rawRow) throw new Error("missing acknowledged raw row");
+			const rawIngestedAt = await readRawIngestedAt(jobId);
 			for (const fillerIndex of [1, 2]) {
 				await clickhouse.insert({
 					asyncInsert: false,
@@ -727,9 +728,10 @@ describe("R2 ingest real processor crash recovery", () => {
 					],
 				});
 			}
-			expect(
-				await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
-			).toEqual({ analytics: 1, raw: 1 });
+			expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
+				analytics: 1,
+				raw: 1,
+			});
 
 			const [crashedJob] = await sqlClient<
 				Array<{ leaseExpiresAt: Date | string | null; status: string }>
@@ -758,9 +760,10 @@ describe("R2 ingest real processor crash recovery", () => {
 				WHERE id = ${jobId}
 			`;
 			expect(job?.attempts).toBe(2);
-			expect(
-				await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
-			).toEqual({ analytics: 1, raw: 1 });
+			expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
+				analytics: 1,
+				raw: 1,
+			});
 			await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 		} finally {
 			await clickhouse.execute({
@@ -804,9 +807,11 @@ describe("R2 ingest real processor crash recovery", () => {
 			}),
 		).rejects.toThrow("simulated process death");
 		expect(crashedAfterRawAcknowledgement).toBe(true);
-		expect(
-			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
-		).toEqual({ analytics: 1, raw: 1 });
+		const rawIngestedAt = await readRawIngestedAt(jobId);
+		expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
+			analytics: 1,
+			raw: 1,
+		});
 
 		await clickhouse.execute({
 			query: `DELETE FROM rudel.session_analytics
@@ -817,15 +822,16 @@ describe("R2 ingest real processor crash recovery", () => {
 					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')
 				SETTINGS lightweight_deletes_sync = 3`,
 			query_params: {
-				ingestedAt: "2030-01-01 00:00:00.000",
+				ingestedAt: rawIngestedAt,
 				organizationId: ORGANIZATION_ID,
 				sessionId: jobId,
 				userId: USER_ID,
 			},
 		});
-		expect(
-			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
-		).toEqual({ analytics: 0, raw: 1 });
+		expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
+			analytics: 0,
+			raw: 1,
+		});
 
 		const recovered = await commitR2IngestJob({
 			input: completion,
@@ -835,9 +841,10 @@ describe("R2 ingest real processor crash recovery", () => {
 			userId: USER_ID,
 		});
 		expect(recovered.status).toBe("completed");
-		expect(
-			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
-		).toEqual({ analytics: 1, raw: 1 });
+		expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
+			analytics: 1,
+			raw: 1,
+		});
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
@@ -1026,6 +1033,27 @@ function buildRealClaudeTranscript(skillName: string): string {
 			type: "user",
 		}),
 	].join("\n");
+}
+
+async function readRawIngestedAt(sessionId: string): Promise<string> {
+	const [raw] = await getClickhouse().query<{ ingested_at: string }>({
+		query: `SELECT ingested_at
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+				AND session_id = {sessionId:String}
+				AND user_id = {userId:String}
+			ORDER BY ingested_at DESC
+			LIMIT 1`,
+		query_params: {
+			organizationId: ORGANIZATION_ID,
+			sessionDate: REAL_CLAUDE_SESSION_DATE,
+			sessionId,
+			userId: USER_ID,
+		},
+	});
+	if (!raw) throw new Error("missing raw ingest revision");
+	return raw.ingested_at;
 }
 
 async function countRawAndAnalyticsRevision(
