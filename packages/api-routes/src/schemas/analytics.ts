@@ -6,6 +6,10 @@ import { SourceSchema } from "./source.js";
 
 const MAX_DAYS = 365;
 const MAX_LIMIT = 1000;
+export const HISTORICAL_SKILL_CONTENT_MAX_BYTES = 256 * 1024;
+export const HISTORICAL_SKILL_VERSION_LIMIT = 10;
+export const LEARNINGS_FEED_LIMIT = 100;
+export const LEARNING_CONTENT_MAX_CODE_UNITS = 5_000;
 
 export const DaysInputSchema = z.object({
 	days: z.number().int().positive().max(MAX_DAYS).default(7),
@@ -13,6 +17,11 @@ export const DaysInputSchema = z.object({
 
 export const PaginatedDaysInputSchema = DaysInputSchema.extend({
 	limit: z.number().int().positive().max(MAX_LIMIT).default(100),
+	offset: z.number().int().nonnegative().default(0),
+});
+
+export const LearningsListInputSchema = DaysInputSchema.extend({
+	limit: z.number().int().positive().max(LEARNINGS_FEED_LIMIT).default(50),
 	offset: z.number().int().nonnegative().default(0),
 });
 
@@ -385,7 +394,8 @@ export const HistoricalSkillSummarySchema = z.object({
 export const HistoricalSkillVersionSchema = z.object({
 	sourceAgent: HistoricalSkillAgentSchema,
 	contentSha256: z.string().length(64),
-	content: z.string(),
+	// The server also enforces this as an exact UTF-8 byte ceiling.
+	content: z.string().max(HISTORICAL_SKILL_CONTENT_MAX_BYTES),
 	sessionCount: z.number().int().positive(),
 	firstUsedAt: z.string(),
 	lastUsedAt: z.string(),
@@ -397,7 +407,9 @@ export const HistoricalSkillDetailSchema = z.object({
 	claudeSessionCount: z.number().int().nonnegative(),
 	codexSessionCount: z.number().int().nonnegative(),
 	sourceAgents: z.array(HistoricalSkillAgentSchema),
-	versions: z.array(HistoricalSkillVersionSchema),
+	versions: z
+		.array(HistoricalSkillVersionSchema)
+		.max(HISTORICAL_SKILL_VERSION_LIMIT),
 	unavailableSessionCount: z.number().int().nonnegative(),
 });
 
@@ -463,34 +475,6 @@ export const DimensionAnalysisDataPointSchema = z.object({
 	dimension_value: z.string(),
 	metric_value: z.number().optional(),
 	split_values: z.record(z.string(), z.number()).optional(),
-});
-
-export const SessionDetailSchema = z.object({
-	session_id: z.string(),
-	user_id: z.string(),
-	session_date: z.string(),
-	last_interaction_date: z.string(),
-	project_path: z.string(),
-	repository: z.string().nullable(),
-	content: z.string(),
-	subagents: z.record(z.string(), z.string()),
-	skills: z.array(z.string()),
-	slash_commands: z.array(z.string()),
-	git_branch: z.string().nullable(),
-	git_sha: z.string().nullable(),
-	total_tokens: z.number(),
-	input_tokens: z.number(),
-	output_tokens: z.number(),
-	estimated_cost: z.number().nullable().optional(),
-	success_score: z.number().optional(),
-	duration_min: z.number().optional(),
-	total_interactions: z.number().optional(),
-	model_used: z.string().optional(),
-	source: SourceSchema.optional(),
-});
-
-export const SessionDetailInputSchema = z.object({
-	sessionId: z.string().max(MAX_ID_FILTER_LENGTH),
 });
 
 // ── ROI ────────────────────────────────────────────────────────────
@@ -661,7 +645,7 @@ export const LearningEntrySchema = z.object({
 	user_id: z.string(),
 	created_at: z.string(),
 	type: z.string(),
-	content: z.string(),
+	content: z.string().max(LEARNING_CONTENT_MAX_CODE_UNITS),
 	scope: z.string(),
 	tags: z.array(z.string()),
 	project_path: z.string(),
@@ -820,7 +804,6 @@ export type HistoricalSkillVersion = z.infer<
 	typeof HistoricalSkillVersionSchema
 >;
 export type HistoricalSkillDetail = z.infer<typeof HistoricalSkillDetailSchema>;
-export type SessionDetail = z.infer<typeof SessionDetailSchema>;
 export type DimensionAnalysisDataPoint = z.infer<
 	typeof DimensionAnalysisDataPointSchema
 >;

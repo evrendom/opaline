@@ -1,8 +1,10 @@
-import type {
-	HistoricalSkillAgent,
-	HistoricalSkillDetail,
-	HistoricalSkillSummary,
-	HistoricalSkillVersion,
+import {
+	HISTORICAL_SKILL_CONTENT_MAX_BYTES,
+	HISTORICAL_SKILL_VERSION_LIMIT,
+	type HistoricalSkillAgent,
+	type HistoricalSkillDetail,
+	type HistoricalSkillSummary,
+	type HistoricalSkillVersion,
 } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
@@ -33,7 +35,6 @@ export interface HistoricalSkillContentRow {
 	content_sha256: string;
 }
 
-const HISTORICAL_SKILL_VERSION_LIMIT = 100;
 const HISTORICAL_SKILL_QUERY_SETTINGS = {
 	max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
 	max_execution_time: 30,
@@ -48,7 +49,7 @@ const HISTORICAL_SKILL_QUERY_SETTINGS = {
 
 const HISTORICAL_SKILL_CONTENT_QUERY_SETTINGS = {
 	...HISTORICAL_SKILL_QUERY_SETTINGS,
-	max_result_bytes: String(256 * 1024 * 1024),
+	max_result_bytes: String(3 * 1024 * 1024),
 	max_result_rows: String(HISTORICAL_SKILL_VERSION_LIMIT),
 } as const;
 
@@ -147,9 +148,11 @@ export async function getHistoricalSkillDetail(
 				WHERE organization_id = {organizationId:String}
 					AND skill_name = {skillName:String}
 					AND content_sha256 IN {contentHashes:Array(String)}
+					AND byteSize(content) <= {contentByteLimit:UInt32}
 				GROUP BY organization_id, skill_name, content_sha256
 			`,
 					query_params: {
+						contentByteLimit: HISTORICAL_SKILL_CONTENT_MAX_BYTES,
 						contentHashes,
 						organizationId,
 						skillName: name,
@@ -191,7 +194,10 @@ export function resolveHistoricalSkillVersions(
 	const versions: HistoricalSkillVersion[] = [];
 	for (const row of versionRows.slice(0, HISTORICAL_SKILL_VERSION_LIMIT)) {
 		const content = contentByHash.get(row.content_sha256);
-		if (content === undefined) {
+		if (
+			content === undefined ||
+			Buffer.byteLength(content, "utf8") > HISTORICAL_SKILL_CONTENT_MAX_BYTES
+		) {
 			unavailableSessionCount += Number(row.session_count);
 			continue;
 		}

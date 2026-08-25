@@ -4,3 +4,10 @@ export type SessionDetailNavigation = {
 	hasPreviousSession: boolean;
 	hasNextSession: boolean;
 };
+
+export type SessionDetailViewProps = {
+	sessionId: string;
+	trackView?: boolean;
+	navigation?: SessionDetailNavigation;
+	onClose?: () => void;
+};

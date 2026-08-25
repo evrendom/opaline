@@ -11,10 +11,8 @@ import { getDeveloperErrors } from "../services/developer.service.js";
 import { getTopRecurringErrors } from "../services/error.service.js";
 import { getLearningsFeed } from "../services/learnings.service.js";
 import { getProjectErrors } from "../services/project.service.js";
-import {
-	getSessionAnalytics,
-	getSessionDetail,
-} from "../services/session-analytics.service.js";
+import { getSessionAnalytics } from "../services/session-analytics.service.js";
+import { getSessionDetailRawSnapshot } from "../services/session-detail-snapshot.service.js";
 
 /**
  * Value assertions for the session_analytics materialized views.
@@ -676,7 +674,11 @@ describe("session_analytics computed values", () => {
 		});
 		await readAnalytics(sessionId);
 
-		const detail = await getSessionDetail(ORG_ID, sessionId, USER_ID);
+		const detail = await getSessionDetailRawSnapshot(
+			ORG_ID,
+			sessionId,
+			USER_ID,
+		);
 		expect(detail?.content).toBe(content);
 		expect(detail?.subagents).toEqual({
 			"retention-agent": "retained only with the raw session",
@@ -727,7 +729,9 @@ describe("session_analytics computed values", () => {
 		const analyticsRows = await readAnalytics(sessionId);
 		expect(analyticsRows).toHaveLength(1);
 		expect(analyticsRows[0]?.error_pattern).toBe("TypeError");
-		expect(await getSessionDetail(ORG_ID, sessionId, USER_ID)).toBeNull();
+		expect(
+			await getSessionDetailRawSnapshot(ORG_ID, sessionId, USER_ID),
+		).toBeNull();
 		expect(
 			(await getDeveloperErrors(ORG_ID, USER_ID)).map(
 				(error) => error.error_pattern,

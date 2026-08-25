@@ -272,12 +272,12 @@ describe("analytics service guardrails", () => {
 	});
 
 	test("keeps ownership reads duplicate-safe and backfill scans bounded", async () => {
-		const sessionAnalyticsSource = await readFile(
+		const sessionDetailSource = await readFile(
 			resolve(
 				import.meta.dir,
 				"..",
 				"services",
-				"session-analytics.service.ts",
+				"session-detail-snapshot.service.ts",
 			),
 			"utf8",
 		);
@@ -299,19 +299,9 @@ describe("analytics service guardrails", () => {
 			),
 			"utf8",
 		);
-		const sessionDetailStart = sessionAnalyticsSource.indexOf(
-			"export async function getSessionDetail",
-		);
-		expect(sessionDetailStart).toBeGreaterThan(-1);
-		expect(sessionAnalyticsSource.slice(sessionDetailStart)).not.toContain(
-			"FINAL",
-		);
-		const sessionDetailSource =
-			sessionAnalyticsSource.slice(sessionDetailStart);
-		expect(sessionDetailSource).toContain("sessionDate: true");
-		expect(sessionDetailSource).not.toContain(
-			"INNER ANY JOIN latest_raw_session_content",
-		);
+		expect(sessionDetailSource).not.toContain(" FINAL");
+		expect(sessionDetailSource).toContain("argMax(");
+		expect(sessionDetailSource).toContain("LEFT ANY JOIN latest_analytics");
 		expect(backfillSource).toContain("max_bytes_to_read");
 		expect(backfillSource).toContain("max_execution_time");
 		expect(

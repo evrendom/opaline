@@ -1,7 +1,8 @@
-import type {
-	LearningEntry as LearningEntryBase,
-	LearningsFeedStats,
-	LearningsTrendDataPoint,
+import {
+	LEARNINGS_FEED_LIMIT,
+	type LearningEntry as LearningEntryBase,
+	type LearningsFeedStats,
+	type LearningsTrendDataPoint,
 } from "@rudel/api-routes";
 import {
 	addOptionalStringEqFilter,
@@ -30,11 +31,15 @@ export async function getLearningsFeed(
 	} = {},
 ): Promise<LearningEntry[]> {
 	const { days = 30, user_id, project_path, limit = 50, offset = 0 } = params;
+	const requestedLimit = Math.trunc(limit);
+	const boundedLimit = Number.isSafeInteger(requestedLimit)
+		? Math.min(LEARNINGS_FEED_LIMIT, Math.max(1, requestedLimit))
+		: 50;
 
 	const d = Number(days);
 	const query_params: Record<string, unknown> = {
 		days: d,
-		limit: Number(limit),
+		limit: boundedLimit,
 		offset: Number(offset),
 		orgId,
 	};

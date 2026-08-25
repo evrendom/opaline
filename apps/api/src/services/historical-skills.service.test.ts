@@ -6,9 +6,9 @@ import {
 } from "./historical-skills.service.js";
 
 describe("historical skill detail version guardrails", () => {
-	test("caps newest-first versions at 100 and never returns one without content", () => {
+	test("caps newest-first versions at 10 and rejects missing or oversized content", () => {
 		const versionRows = Array.from(
-			{ length: 101 },
+			{ length: 11 },
 			(_, index): HistoricalSkillVersionUseRow => ({
 				agent: index % 2 === 0 ? "claude" : "codex",
 				content_sha256: String(index).padStart(64, "0"),
@@ -20,17 +20,20 @@ describe("historical skill detail version guardrails", () => {
 			}),
 		);
 		const contentRows: HistoricalSkillContentRow[] = versionRows
-			.slice(0, 100)
-			.filter((_, index) => index !== 50)
+			.slice(0, 10)
+			.filter((_, index) => index !== 5)
 			.map((row) => ({
-				content: `content-${row.content_sha256}`,
+				content:
+					row === versionRows[7]
+						? "🙂".repeat(128 * 1024)
+						: `content-${row.content_sha256}`,
 				content_sha256: row.content_sha256,
 			}));
 
 		const resolved = resolveHistoricalSkillVersions(versionRows, contentRows);
 
-		expect(resolved.versions).toHaveLength(99);
-		expect(resolved.unavailableSessionCount).toBe(1);
+		expect(resolved.versions).toHaveLength(8);
+		expect(resolved.unavailableSessionCount).toBe(2);
 		expect(
 			resolved.versions.every((version) =>
 				contentRows.some(
@@ -40,7 +43,7 @@ describe("historical skill detail version guardrails", () => {
 		).toBe(true);
 		expect(
 			resolved.versions.some(
-				(version) => version.contentSha256 === versionRows[100]?.content_sha256,
+				(version) => version.contentSha256 === versionRows[10]?.content_sha256,
 			),
 		).toBe(false);
 	});
