@@ -24,6 +24,10 @@ import {
 	readPositiveSafeIntegerEnv,
 } from "./lib/env.js";
 import { maybeCompressSessionDetailRpcResponse } from "./lib/http-compression.js";
+import {
+	appendVaryHeader,
+	PRODUCTION_SECURITY_HEADERS,
+} from "./lib/http-response-policy.js";
 import { shutdownApiProductAnalytics } from "./lib/product-analytics.js";
 import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
 import { setupLogging } from "./logging.js";
@@ -210,31 +214,6 @@ const WRAPPED_SHARE_CARD_IMAGE_PATH_PATTERN = new RegExp(
 	`^/wrapped/${WRAPPED_PUBLIC_SHARE_ID_SEGMENT}/x-card\\.png$`,
 	"u",
 );
-const CONTENT_SECURITY_POLICY = [
-	"default-src 'self'",
-	"base-uri 'self'",
-	"connect-src 'self' https://*.posthog.com https://*.chatwoot.com wss://*.chatwoot.com",
-	"font-src 'self' data:",
-	"form-action 'self'",
-	"frame-ancestors 'none'",
-	"frame-src https://*.chatwoot.com",
-	"img-src 'self' data: blob: https:",
-	"media-src 'self' blob: https:",
-	"object-src 'none'",
-	"script-src 'self' https://*.posthog.com https://*.chatwoot.com",
-	"style-src 'self' 'unsafe-inline'",
-	"worker-src 'self' blob:",
-].join("; ");
-const PRODUCTION_SECURITY_HEADERS = {
-	"Content-Security-Policy": CONTENT_SECURITY_POLICY,
-	"Permissions-Policy":
-		"accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
-	"Referrer-Policy": "strict-origin-when-cross-origin",
-	"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-	"X-Content-Type-Options": "nosniff",
-	"X-Frame-Options": "DENY",
-} as const;
-
 function corsHeaders(origin: string | null): Record<string, string> {
 	if (!origin || !trustedOrigins.includes(origin)) return {};
 	return {
@@ -253,6 +232,9 @@ function applyHttpResponsePolicy(
 	},
 ) {
 	response.headers.set("X-Request-ID", input.requestId);
+	if (response.headers.has("Access-Control-Allow-Origin")) {
+		appendVaryHeader(response.headers, "Origin");
+	}
 
 	if (!response.headers.has("Cache-Control")) {
 		const isImmutableAsset =

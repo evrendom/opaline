@@ -1,5 +1,6 @@
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
+import { appendVaryHeader } from "./http-response-policy.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -40,17 +41,6 @@ export function requestAcceptsGzip(headers: Headers) {
 	);
 }
 
-function appendVary(headers: Headers, value: string) {
-	const values = (headers.get("Vary") ?? "")
-		.split(",")
-		.map((entry) => entry.trim())
-		.filter(Boolean);
-	if (!values.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
-		values.push(value);
-	}
-	headers.set("Vary", values.join(", "));
-}
-
 export async function maybeCompressSessionDetailRpcResponse(input: {
 	pathname: string;
 	requestHeaders: Headers;
@@ -65,7 +55,7 @@ export async function maybeCompressSessionDetailRpcResponse(input: {
 	) {
 		return response;
 	}
-	appendVary(response.headers, "Accept-Encoding");
+	appendVaryHeader(response.headers, "Accept-Encoding");
 	if (
 		response.headers.has("Content-Encoding") ||
 		!requestAcceptsGzip(requestHeaders)
