@@ -1,11 +1,12 @@
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { getApiBaseUrl } from "./api-base-url";
 import { resetChatwoot } from "./chatwoot";
 import { resetProductAnalytics } from "./product-analytics";
 import { queryClient } from "./query-client";
 
 export const authClient = createAuthClient({
-	baseURL: "",
+	baseURL: getApiBaseUrl(),
 	plugins: [organizationClient(), emailOTPClient()],
 });
 
