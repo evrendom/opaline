@@ -64,11 +64,11 @@ describe("historical skills API guardrails", () => {
 		expect(serviceSource).toContain("HISTORICAL_SKILL_CONTENT_MAX_BYTES");
 		expect(serviceSource).toContain("LIMIT {versionLimit:UInt32}");
 		expect(serviceSource).toContain(
-			"content_sha256 IN {contentHashes:Array(String)}",
+			"contents.content_sha256 IN {contentHashes:Array(String)}",
 		);
-		expect(serviceSource).toContain("any(content) AS content");
+		expect(serviceSource).toContain("any(contents.content) AS content");
 		expect(serviceSource).toContain(
-			"length(content) <= {contentByteLimit:UInt32}",
+			"length(contents.content) <= {contentByteLimit:UInt32}",
 		);
 		expect(persistenceSource).toContain("rudel.skill_receipts");
 		expect(persistenceSource).toContain("rudel.skill_uses");

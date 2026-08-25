@@ -143,13 +143,16 @@ export async function getHistoricalSkillDetail(
 			: await queryClickhouse<HistoricalSkillContentRow>({
 					clickhouse_settings: HISTORICAL_SKILL_CONTENT_QUERY_SETTINGS,
 					query: `
-				SELECT content_sha256, any(content) AS content
-				FROM rudel.skill_version_contents
-				WHERE organization_id = {organizationId:String}
-					AND skill_name = {skillName:String}
-					AND content_sha256 IN {contentHashes:Array(String)}
-					AND length(content) <= {contentByteLimit:UInt32}
-				GROUP BY organization_id, skill_name, content_sha256
+				SELECT content_sha256, any(contents.content) AS content
+				FROM rudel.skill_version_contents AS contents
+				WHERE contents.organization_id = {organizationId:String}
+					AND contents.skill_name = {skillName:String}
+					AND contents.content_sha256 IN {contentHashes:Array(String)}
+					AND length(contents.content) <= {contentByteLimit:UInt32}
+				GROUP BY
+					contents.organization_id,
+					contents.skill_name,
+					contents.content_sha256
 			`,
 					query_params: {
 						contentByteLimit: HISTORICAL_SKILL_CONTENT_MAX_BYTES,
