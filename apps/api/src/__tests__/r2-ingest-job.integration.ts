@@ -421,13 +421,13 @@ describe("R2 ingest commit lifecycle", () => {
 			}),
 		).rejects.toThrow("integrity verification failed");
 		const [afterRetry] = await sqlClient<
-			Array<{ objectsDeletedAt: Date | null }>
+			Array<{ objectsDeletedAt: Date | string | null }>
 		>`
 			SELECT objects_deleted_at AS "objectsDeletedAt"
 			FROM ingest_job
 			WHERE id = ${initialized.jobId}
 		`;
-		expect(afterRetry?.objectsDeletedAt).toBeInstanceOf(Date);
+		expect(Date.parse(String(afterRetry?.objectsDeletedAt))).not.toBeNaN();
 	});
 
 	test("deletes a completed object after invalid UTF-8 is detected", async () => {
@@ -450,7 +450,7 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(fakeR2.completedKeys).toContain(objectKey);
 		expect(fakeR2.objects.has(objectKey)).toBe(false);
 		const [failed] = await sqlClient<
-			Array<{ objectsDeletedAt: Date | null; status: string }>
+			Array<{ objectsDeletedAt: Date | string | null; status: string }>
 		>`
 			SELECT
 				objects_deleted_at AS "objectsDeletedAt",
@@ -459,7 +459,7 @@ describe("R2 ingest commit lifecycle", () => {
 			WHERE id = ${initialized.jobId}
 		`;
 		expect(failed?.status).toBe("failed");
-		expect(failed?.objectsDeletedAt).toBeInstanceOf(Date);
+		expect(Date.parse(String(failed?.objectsDeletedAt))).not.toBeNaN();
 	});
 });
 

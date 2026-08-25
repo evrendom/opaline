@@ -208,12 +208,12 @@ async function readLedgerRow(
 }
 
 function buildLockIdentity(identity: IngestProcessingIdentity): string {
-	return [
+	return JSON.stringify([
 		identity.organizationId,
 		identity.sessionId,
 		identity.filteredContentSha256,
-		identity.filterVersion.toString(),
-	].join("\u0000");
+		identity.filterVersion,
+	]);
 }
 
 function toDate(value: Date | string): Date {
