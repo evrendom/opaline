@@ -26,6 +26,7 @@ const rudel_session_language_signals = table({
 	ttl: "toDate(session_date) + toIntervalDay(365)",
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 });

@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"generatedAt": "2026-08-20T17:03:52.065Z",
+	"generatedAt": "2026-08-25T09:31:33.326Z",
 	"definitions": [
 		{
 			"database": "rudel",
@@ -89,6 +89,7 @@
 			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"kind": "table"
@@ -175,6 +176,7 @@
 			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"kind": "table"
@@ -380,6 +382,7 @@
 			"orderBy": ["source", "organization_id", "user_id", "session_id"],
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"kind": "table"
@@ -452,6 +455,7 @@
 			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"kind": "table"
@@ -498,6 +502,7 @@
 			"orderBy": ["organization_id", "agent", "user_id", "session_id"],
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"comment": "Latest completed skill extraction run per workspace, user, agent, and session.",
@@ -570,6 +575,7 @@
 			],
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"comment": "Versioned session skill uses bound to an exact completed extraction receipt. Mutable usage timestamps and content hashes are excluded from the replacing key.",
@@ -622,6 +628,7 @@
 			"orderBy": ["organization_id", "skill_name", "content_sha256", "user_id"],
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"comment": "User-erasable product-readable SKILL.md bodies keyed by workspace, exact skill name, SHA-256, and uploader.",
@@ -832,6 +839,7 @@
 			],
 			"settings": {
 				"index_granularity": "8192",
+				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
 			"comment": "Versioned request-level usage facts and per-generation extraction receipts. Mutable timestamp/model fields are deliberately excluded from the replacing key.",

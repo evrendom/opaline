@@ -37,6 +37,7 @@ export const baseSessionTableConfig = {
 	ttl: "toDate(session_date) + toIntervalDay(365)",
 	settings: {
 		index_granularity: "8192" as const,
+		non_replicated_deduplication_window: "1000" as const,
 		storage_policy: "'s3'" as const,
 	},
 };

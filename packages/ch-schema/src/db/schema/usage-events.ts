@@ -80,6 +80,7 @@ const rudel_usage_events = table({
 	// all-time usage facts must not silently inherit the raw transcript's TTL.
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 	comment:
