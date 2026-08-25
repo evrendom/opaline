@@ -6,13 +6,15 @@ import {
 	DeveloperSummarySchema,
 	DeveloperTeamCardSchema,
 	DimensionAnalysisInputSchema,
+	HistoricalSkillDetailSchema,
+	LearningEntrySchema,
+	LearningsListInputSchema,
 	ProjectDetailDataSchema,
 	ProjectInvestmentSchema,
 	RecurringErrorsInputSchema,
 	ROIDashboardSchema,
 	ROIMetricsSchema,
 	SessionAnalyticsSchema,
-	SessionDetailInputSchema,
 	SessionListInputSchema,
 	UserTokenUsageDataSchema,
 	WrappedV1MetricsSchema,
@@ -32,11 +34,51 @@ describe("analytics input schemas", () => {
 				projectPath: "a".repeat(4097),
 			}),
 		).toThrow();
-		expect(() =>
-			SessionDetailInputSchema.parse({
-				sessionId: "a".repeat(513),
-			}),
-		).toThrow();
+	});
+
+	test("bounds learning pages and content", () => {
+		expect(LearningsListInputSchema.parse({})).toMatchObject({ limit: 50 });
+		expect(LearningsListInputSchema.safeParse({ limit: 100 }).success).toBe(
+			true,
+		);
+		expect(LearningsListInputSchema.safeParse({ limit: 101 }).success).toBe(
+			false,
+		);
+		expect(
+			LearningEntrySchema.safeParse({
+				content: "a".repeat(5_001),
+				created_at: "2026-08-25T00:00:00Z",
+				project_path: "/repo",
+				repository: null,
+				scope: "project",
+				session_id: "session-1",
+				tags: [],
+				type: "feedback",
+				user_id: "user-1",
+			}).success,
+		).toBe(false);
+	});
+
+	test("bounds historical skill version bodies", () => {
+		const version = {
+			content: "a".repeat(256 * 1024 + 1),
+			contentSha256: "0".repeat(64),
+			firstUsedAt: "2026-08-25T00:00:00Z",
+			lastUsedAt: "2026-08-25T00:00:00Z",
+			sessionCount: 1,
+			sourceAgent: "claude",
+		};
+		expect(
+			HistoricalSkillDetailSchema.safeParse({
+				claudeSessionCount: 1,
+				codexSessionCount: 0,
+				name: "large-skill",
+				sessionCount: 1,
+				sourceAgents: ["claude"],
+				unavailableSessionCount: 0,
+				versions: [version],
+			}).success,
+		).toBe(false);
 	});
 
 	test("days capped at 365", () => {

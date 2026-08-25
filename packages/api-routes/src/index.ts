@@ -34,11 +34,11 @@ import {
 	InsightSchema,
 	LearningEntrySchema,
 	LearningsFeedStatsSchema,
+	LearningsListInputSchema,
 	LearningsTrendDataPointSchema,
 	LearningsTrendInputSchema,
 	ModelTokensTrendDataSchema,
 	OverviewKPIsSchema,
-	PaginatedDaysInputSchema,
 	ProjectContributorSchema,
 	ProjectCostBreakdownSchema,
 	ProjectDetailDataSchema,
@@ -56,8 +56,6 @@ import {
 	SessionAnalyticsSchema,
 	SessionAnalyticsSummaryComparisonSchema,
 	SessionAnalyticsSummarySchema,
-	SessionDetailInputSchema,
-	SessionDetailSchema,
 	SessionListInputSchema,
 	SuccessRateSchema,
 	TeamSummaryComparisonSchema,
@@ -98,6 +96,7 @@ export {
 	SESSION_DETAIL_ACTIVITY_POINT_LIMIT,
 	SESSION_DETAIL_ANCHOR_NOT_FOUND_CODE,
 	SESSION_DETAIL_ANCHOR_NOT_FOUND_MESSAGE,
+	SESSION_DETAIL_BODY_MAX_RAW_BYTES,
 	SESSION_DETAIL_CONTEXT_ERROR_LIMIT,
 	SESSION_DETAIL_CONTEXT_FILE_LIMIT,
 	SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT,
@@ -802,7 +801,6 @@ export const contract = {
 			dimensionAnalysis: oc
 				.input(DimensionAnalysisInputSchema)
 				.output(z.array(DimensionAnalysisDataPointSchema)),
-			detail: oc.input(SessionDetailInputSchema).output(SessionDetailSchema),
 		},
 		skills: {
 			list: oc.output(z.array(HistoricalSkillSummarySchema)),
@@ -832,7 +830,7 @@ export const contract = {
 		},
 		learnings: {
 			list: oc
-				.input(PaginatedDaysInputSchema)
+				.input(LearningsListInputSchema)
 				.output(z.array(LearningEntrySchema)),
 			stats: oc.input(DaysInputSchema).output(LearningsFeedStatsSchema),
 			users: oc.output(z.array(z.string())),

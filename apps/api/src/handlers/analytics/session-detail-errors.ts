@@ -1,4 +1,4 @@
-import type { ORPCError } from "@orpc/server";
+import { ORPCError } from "@orpc/server";
 import type {
 	SessionDetailAnchorNotFoundData,
 	SessionDetailStaleRevisionData,
@@ -6,6 +6,7 @@ import type {
 import { SessionDetailStaleRevisionError } from "../../services/session-detail.service.js";
 import {
 	SessionDetailAnchorNotFoundError,
+	SessionDetailBodyTooLargeError,
 	StaleSessionDetailCursorError,
 } from "../../services/session-detail-derivation.service.js";
 
@@ -37,6 +38,9 @@ export function throwSessionDetailRevisionError(
 	error: unknown,
 	errors: SessionDetailRevisionErrors,
 ): never {
+	if (error instanceof SessionDetailBodyTooLargeError) {
+		throw new ORPCError("PAYLOAD_TOO_LARGE", { message: error.message });
+	}
 	if (
 		error instanceof StaleSessionDetailCursorError ||
 		error instanceof SessionDetailStaleRevisionError

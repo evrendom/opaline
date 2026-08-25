@@ -4,7 +4,6 @@ import {
 	getSessionAnalytics,
 	getSessionAnalyticsSummary,
 	getSessionAnalyticsSummaryComparison,
-	getSessionDetail,
 	getSessionDimensionAnalysis,
 } from "../../services/session-analytics.service.js";
 import {
@@ -78,29 +77,6 @@ const dimensionAnalysis = os.analytics.sessions.dimensionAnalysis
 			user_id: input.userId,
 			project_path: input.projectPath,
 		});
-	});
-
-const detail = os.analytics.sessions.detail
-	.use(orgMiddleware)
-	.handler(async ({ input, context }) => {
-		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
-		);
-
-		const result = await getSessionDetail(
-			context.organizationId,
-			input.sessionId,
-			ownerId,
-		);
-		if (!result) {
-			throw new ORPCError("NOT_FOUND");
-		}
-
-		return result;
 	});
 
 const detailOverview = os.analytics.sessions.detailOverview
@@ -259,5 +235,4 @@ export const sessionsRouter = os.analytics.sessions.router({
 	summary,
 	summaryComparison,
 	dimensionAnalysis,
-	detail,
 });

@@ -499,27 +499,27 @@ function readProcessOutput(
 async function expectCleanupApiResults(): Promise<void> {
 	const canonicalDetail = await callRpc(
 		owner.token,
-		"analytics/sessions/detail",
+		"analytics/sessions/detailOverview",
 		{ sessionId: CANONICAL_SESSION_ID },
 	);
 	expect(canonicalDetail.status).toBe(200);
-	expect(readRpcJsonProperty(canonicalDetail.body, "user_id")).toBe(
+	expect(readSessionDetailOverviewUserId(canonicalDetail.body)).toBe(
 		owner.userId,
 	);
 
 	const mismatchedDetail = await callRpc(
 		owner.token,
-		"analytics/sessions/detail",
+		"analytics/sessions/detailOverview",
 		{ sessionId: MISMATCHED_SESSION_ID },
 	);
 	expect(mismatchedDetail.status).toBe(200);
-	expect(readRpcJsonProperty(mismatchedDetail.body, "user_id")).toBe(
+	expect(readSessionDetailOverviewUserId(mismatchedDetail.body)).toBe(
 		owner.userId,
 	);
 
 	const nonOwnerDetail = await callRpc(
 		otherUser.token,
-		"analytics/sessions/detail",
+		"analytics/sessions/detailOverview",
 		{ sessionId: MISMATCHED_SESSION_ID },
 	);
 	expect(nonOwnerDetail.status).toBe(403);
@@ -647,6 +647,25 @@ function readRpcJsonProperty(value: unknown, key: string): string | number {
 		}
 	}
 	throw new Error(`RPC response did not include json.${key}`);
+}
+
+function readSessionDetailOverviewUserId(value: unknown): string {
+	if (
+		typeof value === "object" &&
+		value !== null &&
+		"json" in value &&
+		typeof value.json === "object" &&
+		value.json !== null &&
+		"session" in value.json &&
+		typeof value.json.session === "object" &&
+		value.json.session !== null &&
+		"userId" in value.json.session &&
+		typeof value.json.session.userId === "string"
+	) {
+		return value.json.session.userId;
+	}
+
+	throw new Error("RPC response did not include json.session.userId");
 }
 
 function readRpcJsonArray(value: unknown): unknown[] {

@@ -2,14 +2,12 @@ import type {
 	DimensionAnalysisInput,
 	SessionAnalytics,
 	SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
-	SessionDetail,
 	Source,
 } from "@rudel/api-routes";
 import {
 	addOptionalStringEqFilter,
 	buildDateFilter,
 	buildInclusiveDateRangeFilter,
-	buildLatestRawSessionContentSql,
 	queryClickhouse,
 } from "../clickhouse.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
@@ -763,109 +761,4 @@ export async function getSessionDimensionAnalysis(
 		dimension_value: String(row.dimension_value),
 		metric_value: Number(row.metric_value),
 	}));
-}
-
-/**
- * Get detailed session information including conversation content
- */
-export async function getSessionDetail(
-	orgId: string,
-	sessionId: string,
-	ownerId: string,
-): Promise<SessionDetail | null> {
-	const usage = await getUsageAnalyticsQueryContext(orgId, {
-		sessionIdParam: "sessionId",
-		userIdParam: "ownerId",
-	});
-	const estimatedCostSql = "sa.estimated_cost";
-	const metadataQuery = `
-	WITH ${usage.cteDefinitions}
-    SELECT
-      sa.session_id,
-      sa.user_id,
-	  sa.source,
-	  sa.session_date AS raw_session_date,
-      formatDateTime(sa.session_date, '%Y-%m-%dT%H:%i:%SZ') as session_date,
-      formatDateTime(sa.last_interaction_date, '%Y-%m-%dT%H:%i:%SZ') as last_interaction_date,
-      sa.project_path,
-      if(sa.git_remote != '', sa.git_remote, if(sa.package_name != '', sa.package_name, sa.project_path)) as repository,
-      sa.skills,
-      sa.slash_commands,
-      sa.git_branch,
-      sa.git_sha,
-      sa.total_tokens,
-      sa.input_tokens,
-      sa.output_tokens,
-	  ${estimatedCostSql} AS estimated_cost,
-      sa.success_score,
-      dateDiff('second', sa.session_date, sa.last_interaction_date) / 60.0 as duration_min,
-      sa.total_interactions,
-      sa.model_used
-	FROM ${usage.sessionsRelation} AS sa
-    WHERE sa.organization_id = {orgId:String}
-      AND sa.session_id = {sessionId:String}
-      AND sa.user_id = {ownerId:String}
-    ORDER BY sa.ingested_at DESC
-    LIMIT 1
-  `;
-
-	type SessionDetailMetadata = Omit<SessionDetail, "content" | "subagents"> & {
-		raw_session_date: string;
-		source: string;
-	};
-	const metadataResults = await queryClickhouse<SessionDetailMetadata>({
-		query: metadataQuery,
-		query_params: {
-			orgId,
-			ownerId,
-			sessionId,
-			userId: ownerId,
-		},
-	});
-
-	const [metadata] = metadataResults;
-	if (!metadata) {
-		return null;
-	}
-
-	const contentResults = await queryClickhouse<
-		Pick<SessionDetail, "content" | "subagents">
-	>({
-		query: `
-			WITH latest_raw_session_content AS (
-				${buildLatestRawSessionContentSql({
-					sessionDate: true,
-					sessionId: true,
-					source: true,
-					userId: true,
-				})}
-			)
-			SELECT content, subagents
-			FROM latest_raw_session_content
-			WHERE source = {source:String}
-			LIMIT 1
-		`,
-		query_params: {
-			orgId,
-			sessionDate: metadata.raw_session_date,
-			sessionId,
-			source: metadata.source,
-			userId: ownerId,
-		},
-	});
-	const [content] = contentResults;
-	if (!content) return null;
-
-	const {
-		raw_session_date: _rawSessionDate,
-		source: _source,
-		...publicMetadata
-	} = metadata;
-	return {
-		...publicMetadata,
-		...content,
-		repository: metadata.repository || null,
-		git_branch: metadata.git_branch || null,
-		git_sha: metadata.git_sha || null,
-	};
 }

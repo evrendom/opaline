@@ -5,7 +5,10 @@ import {
 	throwSessionDetailWindowError,
 } from "../handlers/analytics/session-detail-errors.js";
 import { SessionDetailStaleRevisionError } from "../services/session-detail.service.js";
-import { SessionDetailAnchorNotFoundError } from "../services/session-detail-derivation.service.js";
+import {
+	SessionDetailAnchorNotFoundError,
+	SessionDetailBodyTooLargeError,
+} from "../services/session-detail-derivation.service.js";
 
 const handlersSource = await Bun.file(
 	new URL("../handlers/analytics/sessions.ts", import.meta.url),
@@ -25,6 +28,30 @@ function handlerSource(
 }
 
 describe("session detail endpoint guardrails", () => {
+	test("removes the legacy full-transcript endpoint and query", async () => {
+		const [contractSource, serviceSource] = await Promise.all([
+			Bun.file(
+				new URL(
+					"../../../../packages/api-routes/src/index.ts",
+					import.meta.url,
+				),
+			).text(),
+			Bun.file(
+				new URL("../services/session-analytics.service.ts", import.meta.url),
+			).text(),
+		]);
+
+		expect(handlersSource).not.toContain(
+			"const detail = os.analytics.sessions.detail",
+		);
+		expect(contractSource).not.toContain(
+			"detail: oc.input(SessionDetailInputSchema)",
+		);
+		expect(serviceSource).not.toContain(
+			"export async function getSessionDetail(",
+		);
+	});
+
 	test("compression wraps the matched RPC response path", async () => {
 		const serverSource = await Bun.file(
 			new URL("../index.ts", import.meta.url),
@@ -148,6 +175,32 @@ describe("session detail endpoint guardrails", () => {
 			expect(rpcError.data).toEqual({
 				currentRevision: "2026-08-16T08:31:00.456Z",
 				requestedRevision: "2026-08-16T08:30:00.123Z",
+			});
+		}
+	});
+
+	test("maps oversized individual bodies to a 413", () => {
+		const errors = {
+			STALE_REVISION: (options: {
+				data: { currentRevision: string; requestedRevision: string };
+			}) =>
+				new ORPCError("STALE_REVISION", {
+					data: options.data,
+					defined: true,
+					status: 409,
+				}),
+		};
+		try {
+			throwSessionDetailRevisionError(
+				new SessionDetailBodyTooLargeError("turn"),
+				errors,
+			);
+			expect.unreachable();
+		} catch (error) {
+			expect(error).toBeInstanceOf(ORPCError);
+			expect(error).toMatchObject({
+				code: "PAYLOAD_TOO_LARGE",
+				status: 413,
 			});
 		}
 	});

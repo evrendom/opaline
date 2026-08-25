@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+	HISTORICAL_SKILL_CONTENT_MAX_BYTES,
+	HISTORICAL_SKILL_VERSION_LIMIT,
+} from "@rudel/api-routes";
 import { extractHistoricalCodexSkillBodies } from "./historical-codex-skill-parser.js";
 
 export interface LegacyHistoricalSkillVersion {
@@ -36,7 +40,6 @@ export function buildHistoricalSkillDetail(
 ): LegacyHistoricalSkillDetail {
 	const versionsByHash = new Map<string, MutableHistoricalSkillVersion>();
 	const allSessionIds = new Set<string>();
-	const availableSessionIds = new Set<string>();
 
 	for (const row of rows) {
 		allSessionIds.add(row.session_id);
@@ -45,18 +48,30 @@ export function buildHistoricalSkillDetail(
 			continue;
 		}
 
-		availableSessionIds.add(row.session_id);
 		for (const body of bodies) {
+			if (
+				Buffer.byteLength(body, "utf8") > HISTORICAL_SKILL_CONTENT_MAX_BYTES
+			) {
+				continue;
+			}
 			addVersionUse(versionsByHash, body, row.session_id, row.used_at);
+		}
+	}
+	const versions = sortHistoricalSkillVersions(
+		[...versionsByHash.values()].map(toHistoricalSkillVersion),
+	).slice(0, HISTORICAL_SKILL_VERSION_LIMIT);
+	const availableSessionIds = new Set<string>();
+	for (const version of versions) {
+		for (const sessionId of versionsByHash.get(version.contentSha256)
+			?.sessionIds ?? []) {
+			availableSessionIds.add(sessionId);
 		}
 	}
 
 	return {
 		name,
 		sessionCount: allSessionIds.size,
-		versions: sortHistoricalSkillVersions(
-			[...versionsByHash.values()].map(toHistoricalSkillVersion),
-		),
+		versions,
 		unavailableSessionCount: allSessionIds.size - availableSessionIds.size,
 	};
 }

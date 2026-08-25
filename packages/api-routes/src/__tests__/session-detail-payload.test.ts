@@ -86,6 +86,7 @@ describe("session detail payload contracts", () => {
 					procedure["~orpc"].errorMap.STALE_REVISION?.status === 409,
 			),
 		).toBe(true);
+		expect("detail" in contract.analytics.sessions).toBe(false);
 		expect(contract.analytics.sessions.detailOverview).toBe(
 			sessionDetailProcedureContracts.detailOverview,
 		);

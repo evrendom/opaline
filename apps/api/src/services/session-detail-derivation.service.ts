@@ -13,6 +13,7 @@ import {
 	resolveRepoIdentity,
 	SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT,
 	SESSION_DETAIL_ACTIVITY_POINT_LIMIT,
+	SESSION_DETAIL_BODY_MAX_RAW_BYTES,
 	SESSION_DETAIL_CONTEXT_ERROR_LIMIT,
 	SESSION_DETAIL_CONTEXT_FILE_LIMIT,
 	SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT,
@@ -141,6 +142,15 @@ export class SessionDetailAnchorNotFoundError extends Error {
 	) {
 		super("The requested session detail turn does not exist");
 		this.name = "SessionDetailAnchorNotFoundError";
+	}
+}
+
+export class SessionDetailBodyTooLargeError extends Error {
+	constructor(readonly itemKind: "subagent" | "turn") {
+		super(
+			`The ${itemKind} body exceeds the ${SESSION_DETAIL_BODY_MAX_RAW_BYTES}-byte response limit`,
+		);
+		this.name = "SessionDetailBodyTooLargeError";
 	}
 }
 
@@ -1250,7 +1260,11 @@ export function getSessionDetailTurn(
 	derivation: SessionDetailDerivation,
 	turnId: string,
 ) {
-	return derivation.turnBodies.get(turnId) ?? null;
+	const turn = derivation.turnBodies.get(turnId) ?? null;
+	if (turn && serializedBytes(turn) > SESSION_DETAIL_BODY_MAX_RAW_BYTES) {
+		throw new SessionDetailBodyTooLargeError("turn");
+	}
+	return turn;
 }
 
 export function getSessionDetailSubagent(
@@ -1258,7 +1272,15 @@ export function getSessionDetailSubagent(
 	subagentId: string,
 ): SessionDetailSubagent | null {
 	const content = derivation.rawSubagents[subagentId];
-	return content === undefined
-		? null
-		: { content, revision: derivation.revision, subagentId };
+	const subagent =
+		content === undefined
+			? null
+			: { content, revision: derivation.revision, subagentId };
+	if (
+		subagent &&
+		serializedBytes(subagent) > SESSION_DETAIL_BODY_MAX_RAW_BYTES
+	) {
+		throw new SessionDetailBodyTooLargeError("subagent");
+	}
+	return subagent;
 }

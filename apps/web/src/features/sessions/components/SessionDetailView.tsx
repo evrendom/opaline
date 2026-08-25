@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import type { SessionDetailWindow } from "@rudel/api-routes";
 import {
 	ArrowDown,
 	ArrowUp,
@@ -15,28 +15,25 @@ import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/ui/popover";
 import { Skeleton } from "@/app/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { ConversationView } from "@/components/conversation/ConversationView";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { DashboardModelIdentity } from "@/features/dashboard/components/DashboardModelBadges";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { DashboardHeader } from "@/features/shell/components/dashboard-header";
 import { shellPressMotionClassName } from "@/features/shell/components/shell-press-motion";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
-import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-import { buildSessionDetailViewModel } from "./session-detail-view-model";
+import {
+	BoundedSessionConversation,
+	type BoundedSessionDetailViewModel,
+	buildBoundedSessionDetailViewModel,
+} from "./bounded-session-detail";
 import { SessionDetailErrorBoundary } from "./session-detail-view-parts";
-import type { SessionDetailNavigation } from "./session-detail-view-types";
+import type {
+	SessionDetailNavigation,
+	SessionDetailViewProps,
+} from "./session-detail-view-types";
 import { isForbiddenError } from "./session-detail-view-utils";
-
-type SessionDetailViewProps = {
-	sessionId: string;
-	trackView?: boolean;
-	navigation?: SessionDetailNavigation;
-	onClose?: () => void;
-};
-
-type SessionDetailViewModel = ReturnType<typeof buildSessionDetailViewModel>;
+import { useBoundedSessionDetail } from "./use-bounded-session-detail";
 
 const sessionNavButtonClassName = cn(
 	"relative inline-flex size-8 shrink-0 items-center justify-center rounded-(--session-controls-inner-radius) border border-black/10 bg-white text-neutral-950 shadow-none outline-none hover:bg-white focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white disabled:active:scale-100",
@@ -100,9 +97,7 @@ function SessionInfoPopover({
 	sessionId,
 }: {
 	gitSha: string | null;
-	metadataBadges: ReturnType<
-		typeof buildSessionDetailViewModel
-	>["metadataBadges"];
+	metadataBadges: BoundedSessionDetailViewModel["metadataBadges"];
 	sessionId: string;
 }) {
 	const informationRows = [
@@ -404,7 +399,7 @@ function SessionMetrics({
 	viewModel,
 }: {
 	avatarMap: Record<string, string>;
-	viewModel: SessionDetailViewModel;
+	viewModel: BoundedSessionDetailViewModel;
 }) {
 	const {
 		conversationSummary,
@@ -536,14 +531,17 @@ function SessionDetailStateMessage({
 }
 
 function SessionDetailLoadedContent({
+	onNavigate,
 	userImageUrl,
 	viewModel,
+	window,
 }: {
+	onNavigate: (mode: "newer" | "older", cursor: string) => void;
 	userImageUrl: string | undefined;
-	viewModel: SessionDetailViewModel;
+	viewModel: BoundedSessionDetailViewModel;
+	window: SessionDetailWindow;
 }) {
 	const {
-		safeContent,
 		safeModelUsed,
 		safeSkills,
 		safeSlashCommands,
@@ -587,14 +585,12 @@ function SessionDetailLoadedContent({
 			<div className="grid gap-5">
 				<SessionCapabilitiesTable rows={capabilityRows} />
 
-				<ConversationView
-					content={safeContent}
-					userLabel={safeUserDisplayName}
+				<BoundedSessionConversation
+					detailWindow={window}
+					onNavigate={onNavigate}
+					safeModelUsed={safeModelUsed}
+					safeUserDisplayName={safeUserDisplayName}
 					userImageUrl={userImageUrl}
-					agentLabel={
-						safeModelUsed ? formatModelDisplayLabel(safeModelUsed) : undefined
-					}
-					agentModel={safeModelUsed}
 				/>
 			</div>
 		</div>
@@ -610,25 +606,17 @@ export function SessionDetailView({
 	const headerRef = useRef<HTMLElement>(null);
 	const transcriptScrollRef = useRef<HTMLDivElement>(null);
 	const { userMap, avatarMap } = useUserMap();
-	const {
-		data: session,
-		error,
-		isLoading,
-	} = useQuery({
-		...orpc.analytics.sessions.detail.queryOptions({
-			input: { sessionId },
-		}),
-		enabled: sessionId.length > 0,
-	});
+	const { detailWindow, error, isLoading, navigate, overview } =
+		useBoundedSessionDetail(sessionId);
 
 	useTrackProductPageView({
 		isLoading: trackView ? isLoading : true,
 		isError: trackView ? Boolean(error) : false,
-		hasData: Boolean(session),
+		hasData: Boolean(overview && detailWindow),
 	});
 
-	const viewModel = session
-		? buildSessionDetailViewModel(session, userMap)
+	const viewModel = overview
+		? buildBoundedSessionDetailViewModel(overview, userMap)
 		: undefined;
 
 	useMountEffect(() => {
@@ -707,14 +695,24 @@ export function SessionDetailView({
 							title="Access Denied"
 						/>
 					) : null}
-					{!isLoading && !isForbiddenError(error) && viewModel ? (
+					{!isLoading &&
+					!isForbiddenError(error) &&
+					viewModel &&
+					detailWindow ? (
 						<SessionDetailLoadedContent
 							key={viewModel.safeSessionId}
+							onNavigate={(mode, cursor) => {
+								navigate(mode, cursor);
+								transcriptScrollRef.current?.scrollTo({ top: 0 });
+							}}
 							userImageUrl={avatarMap[viewModel.safeUserId]}
 							viewModel={viewModel}
+							window={detailWindow}
 						/>
 					) : null}
-					{!isLoading && !isForbiddenError(error) && !viewModel ? (
+					{!isLoading &&
+					!isForbiddenError(error) &&
+					(!viewModel || !detailWindow) ? (
 						<SessionDetailStateMessage
 							description={undefined}
 							title="Session Not Found"
