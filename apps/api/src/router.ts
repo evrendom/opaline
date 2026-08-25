@@ -567,7 +567,7 @@ export async function processIngestSession({
 				database: sqlClient,
 				failpoint: durableProcessing.failpoint,
 				now: getNextIngestedAt,
-				randomUUID: crypto.randomUUID,
+				randomUUID: () => crypto.randomUUID(),
 			},
 		);
 	}
