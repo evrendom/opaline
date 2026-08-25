@@ -63,11 +63,38 @@ describe("Vercel deployment configuration", () => {
 		expect(vercelSecurityHeaders).toEqual(PRODUCTION_SECURITY_HEADERS);
 	});
 
-	test("keeps the hashed asset cache policy immutable", () => {
+	test("keeps missing built assets out of the SPA and immutable cache policy", () => {
+		const spaFallback = vercelConfig.rewrites.find(
+			(rewrite) => rewrite.destination === "/index.html",
+		);
+		expect(spaFallback).toBeDefined();
+		const spaFallbackPattern = new RegExp(
+			`^${spaFallback?.source ?? ""}$`,
+			"u",
+		);
+		for (const missingAssetPath of ["/assets", "/assets/app-missing-hash.js"]) {
+			expect(spaFallbackPattern.test(missingAssetPath)).toBe(false);
+		}
+		expect(spaFallbackPattern.test("/dashboard")).toBe(true);
 		expect(
-			headerRuleBySource
-				.get("/assets/:path*")
-				?.find((header) => header.key === "Cache-Control")?.value,
-		).toBe("public, max-age=31536000, immutable");
+			configuredHeadersForPath("/assets/app-missing-hash.js").filter(
+				(header) =>
+					header.key === "Cache-Control" && header.value.includes("immutable"),
+			),
+		).toEqual([]);
 	});
 });
+
+function configuredHeadersForPath(pathname: string) {
+	return vercelConfig.headers
+		.filter((rule) => headerSourceMatchesPath(rule.source, pathname))
+		.flatMap((rule) => rule.headers);
+}
+
+function headerSourceMatchesPath(source: string, pathname: string): boolean {
+	if (source === "/(.*)") return true;
+	if (source.endsWith(":path*")) {
+		return pathname.startsWith(source.slice(0, -":path*".length));
+	}
+	return source === pathname;
+}
