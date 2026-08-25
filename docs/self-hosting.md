@@ -116,6 +116,28 @@ Set the OAuth callback URL to `https://your-domain.com/api/auth/callback/github`
 
 Without these, users can still sign up and log in with email/password.
 
+## Direct-to-R2 Ingest Lifecycle Backstop
+
+When direct-to-R2 ingest is enabled, configure an object lifecycle rule on the
+ingest bucket with the prefix `ingest/` and a seven-day object expiration. The
+application job sweeper and terminal-state cleanup are the primary deletion
+mechanisms; this lifecycle rule is defense in depth for completed objects that
+survive an application or database outage. Cloudflare's default seven-day rule
+only aborts incomplete multipart uploads and does not delete completed objects.
+
+In the Cloudflare dashboard, open the bucket's **Settings** page and add an
+enabled Object Lifecycle Rule with these values:
+
+- Rule name: `expire-abandoned-ingest-objects`
+- Prefix: `ingest/`
+- Delete objects after: `7 days`
+
+Verify the rule after provisioning with:
+
+```bash
+npx wrangler r2 bucket lifecycle list <bucket-name>
+```
+
 ## Environment Variables Reference
 
 | Variable | Required | Description |
@@ -125,6 +147,9 @@ Without these, users can still sign up and log in with email/password.
 | `CLICKHOUSE_URL` | Yes | ClickHouse HTTPS endpoint |
 | `CLICKHOUSE_USERNAME` | Yes | ClickHouse username |
 | `CLICKHOUSE_PASSWORD` | Yes | ClickHouse password |
+| `R2_ACCOUNT_ID` | No | Cloudflare account ID for optional EU-jurisdiction direct-to-R2 ingest |
+| `R2_ACCESS_KEY_ID` | No | R2 S3 access key ID; all three R2 variables are required to enable the protocol |
+| `R2_SECRET_ACCESS_KEY` | No | R2 S3 secret access key |
 | `APP_URL` | Yes | Public URL of the deployed app |
 | `ALLOWED_ORIGIN` | Yes | CORS origin (same as `APP_URL` for single-domain) |
 | `GITHUB_CLIENT_ID` | No | GitHub OAuth client ID |

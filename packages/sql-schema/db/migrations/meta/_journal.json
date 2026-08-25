@@ -183,6 +183,13 @@
 			"when": 1787636737198,
 			"tag": "0025_ingest_job",
 			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1787666400000,
+			"tag": "0026_ingest_job_expiry",
+			"breakpoints": true
 		}
 	]
 }

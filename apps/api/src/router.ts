@@ -9,6 +9,8 @@ import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
 	PRODUCT_ANALYTICS_EVENTS,
+	R2_INGEST_DISABLED_CODE,
+	R2_INGEST_PROTOCOL,
 	REDACTION_BUDGET_EXCEEDED_CODE,
 	REDACTION_DID_NOT_CONVERGE_CODE,
 	SECRET_FILTER_JSON_INTEGRITY_CODE,
@@ -71,11 +73,19 @@ import {
 	IngestFilterQueueFullError,
 	IngestFilterQueueTimeoutError,
 } from "./services/ingest-filter.service.js";
+import {
+	getR2IngestJobStatus,
+	initR2IngestJob,
+} from "./services/ingest-job.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
 import {
 	getCachedOrgSessionCount,
 	hasOrgUploadsInLastDays,
 } from "./services/org-session.service.js";
+import {
+	createR2MultipartUploadClient,
+	readR2IngestAvailability,
+} from "./services/r2-ingest-storage.service.js";
 import { hasRawSessionRow } from "./services/raw-session.service.js";
 import { persistSessionLanguageSignalsBestEffort } from "./services/session-language-signal-persistence.service.js";
 import {
@@ -273,6 +283,18 @@ async function resolveIngestOrganizationId(
 	});
 }
 
+function getActiveOrganizationId(session: unknown): string | null {
+	if (typeof session !== "object" || session === null) {
+		return null;
+	}
+	if (!("activeOrganizationId" in session)) {
+		return null;
+	}
+	return typeof session.activeOrganizationId === "string"
+		? session.activeOrganizationId
+		: null;
+}
+
 const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors, signal }) => {
@@ -371,13 +393,7 @@ const ingestSessionHandler = os.ingestSession
 			});
 		}
 
-		const activeOrgId =
-			context.session &&
-			typeof (context.session as Record<string, unknown>)
-				.activeOrganizationId === "string"
-				? ((context.session as Record<string, unknown>)
-						.activeOrganizationId as string)
-				: null;
+		const activeOrgId = getActiveOrganizationId(context.session);
 
 		if (input.upload_mode === "manual" || input.upload_mode === "retry") {
 			checkManualIngestRateLimit(context.user.id, input.sessionId);
@@ -445,6 +461,9 @@ const ingestSessionHandler = os.ingestSession
 		const response = {
 			success: true as const,
 			sessionId: input.sessionId,
+			...(readR2IngestAvailability().enabled
+				? { upgradeHint: { protocol: R2_INGEST_PROTOCOL } }
+				: {}),
 			redacted: filteredText.counts,
 			redactedBytes: filteredText.redactedBytes,
 			usageChecksum: hasMatchingUsageExtractionReceipt(ownership, contentHash)
@@ -730,6 +749,92 @@ const ingestSessionHandler = os.ingestSession
 		return response;
 	});
 
+const r2IngestInit = os.ingest.init
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, errors }) => {
+		if (!context.apiKeyId) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "An ingest API key is required",
+			});
+		}
+		if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "session_ingest_quiesced" },
+				message:
+					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
+			});
+		}
+
+		const availability = readR2IngestAvailability();
+		if (!availability.enabled) {
+			throw errors[R2_INGEST_DISABLED_CODE]({
+				data: { missingVariables: [...availability.missingVariables] },
+			});
+		}
+
+		checkIngestRequestRateLimit(context.user.id);
+		const aggregateBytes = input.objects.reduce(
+			(total, object) => total + object.byteLength,
+			0,
+		);
+		checkIngestByteRateLimit(context.user.id, aggregateBytes);
+		if (input.upload_mode === "manual" || input.upload_mode === "retry") {
+			checkManualIngestRateLimit(context.user.id, input.sessionId);
+		} else {
+			checkHookIngestRateLimit(context.user.id, input.sessionId);
+		}
+
+		const activeOrganizationId = getActiveOrganizationId(context.session);
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId ?? activeOrganizationId,
+			context.user.id,
+		);
+
+		try {
+			return await initR2IngestJob({
+				database: sqlClient,
+				input,
+				now: () => new Date(),
+				organizationId,
+				r2: createR2MultipartUploadClient(availability.configuration),
+				randomUUID: () => crypto.randomUUID(),
+				userId: context.user.id,
+			});
+		} catch (error) {
+			logger.error(
+				"R2 ingest initialization failed (user_id={userId} session_id={sessionId} error={error})",
+				{
+					error: error instanceof Error ? error.name : "unknown",
+					sessionId: input.sessionId,
+					userId: context.user.id,
+				},
+			);
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "r2_ingest_initialization_failed" },
+				message:
+					"Could not initialize direct upload. Retry or use direct ingest.",
+			});
+		}
+	});
+
+const r2IngestStatus = os.ingest.status
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context }) => {
+		if (!context.apiKeyId) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "An ingest API key is required",
+			});
+		}
+
+		const status = await getR2IngestJobStatus(input.jobId, context.user.id);
+		if (!status) {
+			throw new ORPCError("NOT_FOUND", {
+				message: "Ingest job not found",
+			});
+		}
+		return status;
+	});
+
 const revokeCliToken = os.cli.revokeToken
 	.use(ingestAuthMiddleware)
 	.handler(async ({ context }) => {
@@ -946,6 +1051,10 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	chatwoot: chatwootRouter,
 	listMyOrganizations,
 	ingestSession: ingestSessionHandler,
+	ingest: {
+		init: r2IngestInit,
+		status: r2IngestStatus,
+	},
 	getOrganizationSessionCount,
 	deleteOrganization,
 	teamInviteLink: teamInviteLinkRouter,
