@@ -431,6 +431,7 @@ export const R2IngestInitInputSchema = R2IngestMetadataSchema.extend({
 });
 export const R2IngestUploadPartSchema = z.object({
 	byteLength: z.number().int().positive(),
+	headers: z.object({ "Content-Length": z.string().regex(/^[1-9][0-9]*$/u) }),
 	partNumber: z.number().int().min(1).max(10_000),
 	uploadUrl: z.string().url(),
 });

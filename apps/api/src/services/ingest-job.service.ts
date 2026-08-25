@@ -233,8 +233,9 @@ async function createUploadObject(input: {
 	input.createdUploads.push({ objectKey, uploadId: created.uploadId });
 	const partByteLengths = getR2IngestPartByteLengths(input.object.byteLength);
 	const uploadUrls = await Promise.all(
-		partByteLengths.map((_, index) =>
+		partByteLengths.map((byteLength, index) =>
 			input.r2.presignUploadPart({
+				byteLength,
 				objectKey,
 				partNumber: index + 1,
 				uploadId: created.uploadId,
@@ -243,6 +244,7 @@ async function createUploadObject(input: {
 	);
 	const parts = partByteLengths.map((byteLength, index) => ({
 		byteLength,
+		headers: { "Content-Length": byteLength.toString() },
 		partNumber: index + 1,
 		uploadUrl: uploadUrls[index] ?? "",
 	}));

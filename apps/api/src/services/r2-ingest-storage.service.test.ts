@@ -4,6 +4,7 @@ import {
 	sortR2IngestObjects,
 } from "../lib/r2-ingest-manifest.js";
 import {
+	createR2MultipartUploadClient,
 	R2_INGEST_BUCKET,
 	readR2IngestAvailability,
 } from "./r2-ingest-storage.service.js";
@@ -35,6 +36,39 @@ describe("R2 ingest storage configuration", () => {
 				secretAccessKey: "secret-key",
 			},
 		});
+	});
+
+	test("rejects a different upload-part byte length at the signed boundary", async () => {
+		const client = createR2MultipartUploadClient({
+			accessKeyId: "test-access-key",
+			accountId: "test-account",
+			bucket: R2_INGEST_BUCKET,
+			endpoint: "https://test-account.example.test",
+			secretAccessKey: "test-secret-key",
+		});
+		const expectedLengthUrl = new URL(
+			await client.presignUploadPart({
+				byteLength: 7,
+				objectKey: "ingest/test/main.jsonl",
+				partNumber: 1,
+				uploadId: "test-upload",
+			}),
+		);
+		const mismatchedLengthUrl = new URL(
+			await client.presignUploadPart({
+				byteLength: 8,
+				objectKey: "ingest/test/main.jsonl",
+				partNumber: 1,
+				uploadId: "test-upload",
+			}),
+		);
+
+		expect(expectedLengthUrl.searchParams.get("X-Amz-SignedHeaders")).toBe(
+			"content-length;host",
+		);
+		expect(expectedLengthUrl.searchParams.get("X-Amz-Signature")).not.toBe(
+			mismatchedLengthUrl.searchParams.get("X-Amz-Signature"),
+		);
 	});
 });
 

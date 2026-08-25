@@ -36,6 +36,7 @@ export interface R2MultipartUploadClient {
 		objectKey: string;
 	}) => Promise<{ uploadId: string }>;
 	presignUploadPart: (input: {
+		byteLength: number;
 		objectKey: string;
 		partNumber: number;
 		uploadId: string;
@@ -115,11 +116,15 @@ export function createR2MultipartUploadClient(
 				client,
 				new UploadPartCommand({
 					Bucket: configuration.bucket,
+					ContentLength: input.byteLength,
 					Key: input.objectKey,
 					PartNumber: input.partNumber,
 					UploadId: input.uploadId,
 				}),
-				{ expiresIn: R2_INGEST_UPLOAD_URL_TTL_SECONDS },
+				{
+					expiresIn: R2_INGEST_UPLOAD_URL_TTL_SECONDS,
+					signableHeaders: new Set(["content-length"]),
+				},
 			);
 		},
 	};

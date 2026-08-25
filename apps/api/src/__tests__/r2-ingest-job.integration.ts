@@ -13,6 +13,7 @@ const JOB_ID = "00000000-0000-4000-8000-000000000001";
 const NOW = new Date("2026-08-25T10:00:00.000Z");
 const createdObjectKeys: string[] = [];
 const abortedObjectKeys: string[] = [];
+const presignedByteLengths: number[] = [];
 
 const fakeR2Client: R2MultipartUploadClient = {
 	async abortMultipartUpload(input) {
@@ -23,6 +24,7 @@ const fakeR2Client: R2MultipartUploadClient = {
 		return { uploadId: `upload-${createdObjectKeys.length}` };
 	},
 	async presignUploadPart(input) {
+		presignedByteLengths.push(input.byteLength);
 		return `https://uploads.example.test/${input.partNumber}?uploadId=${input.uploadId}`;
 	},
 };
@@ -82,6 +84,11 @@ describe("R2 ingest init and status lifecycle", () => {
 		expect(
 			initialized.objects[0]?.parts.map((part) => part.byteLength),
 		).toEqual([R2_INGEST_PART_SIZE_BYTES, 1]);
+		expect(initialized.objects[0]?.parts.map((part) => part.headers)).toEqual([
+			{ "Content-Length": R2_INGEST_PART_SIZE_BYTES.toString() },
+			{ "Content-Length": "1" },
+		]);
+		expect(presignedByteLengths).toEqual([R2_INGEST_PART_SIZE_BYTES, 1, 3]);
 		expect(createdObjectKeys).toEqual([
 			`ingest/${JOB_ID}/main.jsonl`,
 			`ingest/${JOB_ID}/subagent-1.jsonl`,
