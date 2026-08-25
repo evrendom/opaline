@@ -57,14 +57,14 @@ describe("resolveWrappedShareLookupSource", () => {
 		).toBe("198.51.100.20");
 	});
 
-	test("does not trust a forwarded address without a known peer", () => {
+	test("resolves a forwarded address without a socket peer", () => {
 		expect(
 			resolveWrappedShareLookupSource({
 				flyClientIp: null,
-				forwardedFor: "192.0.2.10",
+				forwardedFor: "192.0.2.10, 198.51.100.20",
 				socketIp: null,
 				trustedProxyHops: 1,
 			}),
-		).toBe("unknown");
+		).toBe("192.0.2.10");
 	});
 });

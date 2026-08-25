@@ -54,7 +54,7 @@ describe("session detail endpoint guardrails", () => {
 
 	test("compression wraps the matched RPC response path", async () => {
 		const serverSource = await Bun.file(
-			new URL("../index.ts", import.meta.url),
+			new URL("../handler.ts", import.meta.url),
 		).text();
 		const rpcBranch = serverSource.slice(
 			serverSource.indexOf("rpcHandler.handle(request"),
