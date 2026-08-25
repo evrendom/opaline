@@ -130,25 +130,11 @@ export async function reserveLedgerUsageGeneration(
 	},
 	failpoint: IngestProcessingFailpoint | undefined,
 ): Promise<string> {
-	const generation = await ledger.connection.begin(async (transaction) => {
-		const [existing] = await transaction.unsafe<
-			Array<{ usageGeneration: string | null }>
-		>(
-			`SELECT usage_generation::text AS "usageGeneration"
-			 FROM ingest_processing_ledger
-			 WHERE id = $1
-			 FOR UPDATE`,
-			[ledger.id],
-		);
-		if (!existing) {
-			throw new Error("Ingest processing ledger disappeared");
-		}
-		if (existing.usageGeneration) {
-			return existing.usageGeneration;
-		}
-
-		const [reserved] = await transaction.unsafe<Array<{ generation: string }>>(
-			`UPDATE session_ownership
+	const [reserved] = await ledger.connection.unsafe<
+		Array<{ generation: string | null }>
+	>(
+		`WITH reserved_generation AS (
+			UPDATE session_ownership
 			 SET usage_extraction_generation = GREATEST(
 				usage_extraction_generation + 1,
 				FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
@@ -156,26 +142,32 @@ export async function reserveLedgerUsageGeneration(
 			 WHERE organization_id = $1
 				AND session_id = $2
 				AND user_id = $3
-			 RETURNING usage_extraction_generation::text AS generation`,
-			[identity.organizationId, identity.sessionId, identity.userId],
-		);
-		if (!reserved) {
-			throw new Error("Usage extraction generation reservation failed");
-		}
-
-		await transaction.unsafe(
-			`UPDATE ingest_processing_ledger
-			 SET usage_generation = $1, updated_at = NOW()
-			 WHERE id = $2`,
-			[reserved.generation, ledger.id],
-		);
-		return reserved.generation;
-	});
+				AND EXISTS (
+					SELECT 1
+					FROM ingest_processing_ledger
+					WHERE id = $4 AND usage_generation IS NULL
+				)
+			 RETURNING usage_extraction_generation
+		)
+		UPDATE ingest_processing_ledger
+		SET
+			usage_generation = COALESCE(
+				(SELECT usage_extraction_generation FROM reserved_generation),
+				usage_generation
+			),
+			updated_at = NOW()
+		WHERE id = $4
+		RETURNING usage_generation::text AS generation`,
+		[identity.organizationId, identity.sessionId, identity.userId, ledger.id],
+	);
+	if (!reserved?.generation) {
+		throw new Error("Usage extraction generation reservation failed");
+	}
 	await passIngestProcessingBoundary(failpoint, {
 		store: "postgres",
 		target: "usage-generation",
 	});
-	return generation;
+	return reserved.generation;
 }
 
 async function readLedgerRow(
