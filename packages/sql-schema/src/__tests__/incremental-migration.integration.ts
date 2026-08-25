@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0026_TIMESTAMP = "1787666400000";
+const MIGRATION_0027_TIMESTAMP = "1787666460000";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0026 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0027 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0026 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0026] = await migrationSql<MigrationState[]>`
+			const [after0027] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,15 +61,47 @@ test("applies migrations 0020-0026 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0026).toEqual({
-				count: 27,
-				latestTimestamp: MIGRATION_0026_TIMESTAMP,
+			expect(after0027).toEqual({
+				count: 28,
+				latestTimestamp: MIGRATION_0027_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [ingestJobTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.ingest_job')::text AS name
 			`;
 			expect(ingestJobTable?.name).toBe("ingest_job");
+			const [processingLedgerTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.ingest_processing_ledger')::text AS name
+			`;
+			expect(processingLedgerTable?.name).toBe("ingest_processing_ledger");
+			const [targetReceiptTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.ingest_processing_target_receipt')::text AS name
+			`;
+			expect(targetReceiptTable?.name).toBe("ingest_processing_target_receipt");
+			const targetReceiptChecks = await migrationSql<Array<{ name: string }>>`
+				SELECT conname AS name
+				FROM pg_constraint
+				WHERE conrelid = 'public.ingest_processing_target_receipt'::regclass
+					AND contype = 'c'
+				ORDER BY conname
+			`;
+			expect([...targetReceiptChecks]).toEqual([
+				{ name: "ingest_processing_target_receipt_row_count_check" },
+				{ name: "ingest_processing_target_receipt_target_check" },
+			]);
+			const processingLedgerIndexes = await migrationSql<
+				Array<{ name: string }>
+			>`
+				SELECT indexname AS name
+				FROM pg_indexes
+				WHERE schemaname = 'public'
+					AND tablename = 'ingest_processing_ledger'
+				ORDER BY indexname
+			`;
+			expect([...processingLedgerIndexes]).toEqual([
+				{ name: "ingest_processing_ledger_identity_idx" },
+				{ name: "ingest_processing_ledger_pkey" },
+			]);
 			const ingestJobIndexes = await migrationSql<Array<{ name: string }>>`
 				SELECT indexname AS name
 				FROM pg_indexes

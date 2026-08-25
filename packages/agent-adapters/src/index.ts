@@ -10,7 +10,9 @@ export {
 	readCodexSessionMeta,
 } from "./adapters/codex/index.js";
 export {
+	getInvalidTranscriptTimestampMessage,
 	getMissingTranscriptTimestampMessage,
+	InvalidTranscriptTimestampError,
 	isMissingTranscriptTimestampMessage,
 	MissingTranscriptTimestampError,
 } from "./errors.js";

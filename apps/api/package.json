@@ -40,7 +40,8 @@
 		"drizzle-orm": "0.45.1",
 		"posthog-node": "5.46.1",
 		"postgres": "^3.4.5",
-		"resend": "^6.9.3"
+		"resend": "^6.9.3",
+		"zod": "3.25.76"
 	},
 	"devDependencies": {
 		"@rudel/typescript-config": "workspace:*",

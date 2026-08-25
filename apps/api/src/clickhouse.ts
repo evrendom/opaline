@@ -1,8 +1,55 @@
-import { type ClickHouseSettings, createClient } from "@clickhouse/client-web";
+import {
+	ClickHouseError,
+	type ClickHouseSettings,
+	createClient,
+	parseError,
+	TupleParam,
+} from "@clickhouse/client-web";
 import { getLogger } from "@logtape/logtape";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+import {
+	CLAUDE_SESSION_ANALYTICS_MV_SQL,
+	CODEX_SESSION_ANALYTICS_MV_SQL,
+	SESSION_ANALYTICS_INSERT_COLUMNS,
+} from "@rudel/ch-schema/session-analytics-mv";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
+
+class ClickHouseHttpResponseError extends Error {
+	readonly status: number;
+
+	constructor(status: number, statusText: string) {
+		super(
+			`ClickHouse request failed with HTTP ${status}${statusText ? ` ${statusText}` : ""}`,
+		);
+		this.name = "ClickHouseHttpResponseError";
+		this.status = status;
+	}
+}
+
+const fetchWithClickHouseHttpStatus = Object.assign(
+	async (
+		input: Parameters<typeof fetch>[0],
+		init?: Parameters<typeof fetch>[1],
+	): Promise<Response> => {
+		const response = await fetch(input, init);
+		if (response.ok) return response;
+		const parsedError = parseError(await response.clone().text());
+		if (parsedError instanceof ClickHouseError) return response;
+		throw new ClickHouseHttpResponseError(response.status, response.statusText);
+	},
+	{ preconnect: fetch.preconnect },
+);
+
+const INGEST_RECOVERY_QUERY_SETTINGS = {
+	max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
+	max_execution_time: 60,
+	max_rows_to_read: "10000000",
+	timeout_before_checking_execution_speed: 0,
+} as const;
+
+const SESSION_ANALYTICS_MV_FILTER_MARKER =
+	"WHERE _is_capped OR length(_timestamps) > 0";
 
 const ALLOWED_CLICKHOUSE_TABLES = new Set([
 	"rudel.claude_sessions",
@@ -29,9 +76,27 @@ export interface ClickHouseExecutor {
 	query<T>(statement: ClickHouseStatement): Promise<T[]>;
 	insert(params: {
 		asyncInsert?: boolean;
+		deduplicationToken?: string;
 		table: string;
 		values: object[];
 	}): Promise<void>;
+}
+
+export interface DurableClickHouseInsertRecovery {
+	readonly id: string;
+	readonly recovering: boolean;
+	readReceipt: (target: string) => Promise<{ expectedRowCount: number } | null>;
+	recordReceipt: (target: string, expectedRowCount: number) => Promise<void>;
+}
+
+export function createClickHouseInsertDeduplicationSettings(
+	deduplicationToken: string = crypto.randomUUID(),
+): ClickHouseSettings {
+	return {
+		async_insert_deduplicate: 1,
+		deduplicate_blocks_in_dependent_materialized_views: 1,
+		insert_deduplication_token: deduplicationToken,
+	};
 }
 
 interface LatestRawSessionContentFilters {
@@ -137,8 +202,11 @@ export function createClickHouseExecutor(config: {
 		username: config.username,
 		password: config.password,
 		database: config.database,
+		fetch: fetchWithClickHouseHttpStatus,
 		request_timeout: 120_000,
 		clickhouse_settings: {
+			max_execution_time: 60,
+			timeout_before_checking_execution_speed: 0,
 			wait_end_of_query: 1,
 			output_format_json_quote_64bit_integers: 0,
 		},
@@ -174,10 +242,430 @@ export function createClickHouseExecutor(config: {
 					? "async_insert=0, input_format_parallel_parsing=0"
 					: "async_insert=1, wait_for_async_insert=1, input_format_parallel_parsing=0";
 			await client.command({
+				clickhouse_settings: createClickHouseInsertDeduplicationSettings(
+					params.deduplicationToken,
+				),
 				query: `INSERT INTO ${table} SETTINGS ${insertSettings} FORMAT JSONEachRow ${rows}`,
 			});
 		},
 	};
+}
+
+export function createIdempotentClickHouseExecutor(
+	executor: ClickHouseExecutor,
+	recovery: DurableClickHouseInsertRecovery,
+	onInsertAcknowledged: (table: string) => Promise<void>,
+): ClickHouseExecutor {
+	return {
+		close: () => executor.close(),
+		execute: (statement) => executor.execute(statement),
+		async insert(params) {
+			const expectedRowCount = params.values.length;
+			if (expectedRowCount === 0) {
+				throw new Error(
+					"Durable ClickHouse insert must contain at least one row",
+				);
+			}
+			const receipt = await recovery.readReceipt(params.table);
+			if (receipt) {
+				assertExpectedRecoveryRowCount(
+					params.table,
+					expectedRowCount,
+					receipt.expectedRowCount,
+				);
+				return;
+			}
+			if (recovery.recovering) {
+				const recovered = await recoverAcknowledgedClickHouseInsert(
+					executor,
+					params.table,
+					params.values,
+					recovery.id,
+				);
+				if (recovered) {
+					await recovery.recordReceipt(params.table, expectedRowCount);
+					return;
+				}
+			}
+			await executor.insert({
+				...params,
+				deduplicationToken: `${recovery.id}:${params.table}`,
+			});
+			await onInsertAcknowledged(params.table);
+			await recovery.recordReceipt(params.table, expectedRowCount);
+		},
+		query: <T>(statement: ClickHouseStatement) => executor.query<T>(statement),
+	};
+}
+
+async function recoverAcknowledgedClickHouseInsert(
+	executor: ClickHouseExecutor,
+	target: string,
+	values: readonly object[],
+	recoveryId: string,
+): Promise<boolean> {
+	const expectedRowCount = values.length;
+	const analyticsConfig = getSessionAnalyticsRecoveryConfig(target);
+	const [recoveredRowCount, recoveredAnalyticsRowCount] = await Promise.all([
+		countRecoveredClickHouseRows(executor, target, values, target),
+		analyticsConfig
+			? countRecoveredClickHouseRows(
+					executor,
+					"rudel.session_analytics",
+					values,
+					target,
+				)
+			: Promise.resolve(0),
+	]);
+
+	if (recoveredRowCount === 0) {
+		if (recoveredAnalyticsRowCount !== 0) {
+			throw new Error(
+				`ClickHouse recovery found rudel.session_analytics without ${target}`,
+			);
+		}
+		return false;
+	}
+
+	assertExpectedRecoveryRowCount(target, expectedRowCount, recoveredRowCount);
+	if (!analyticsConfig) return true;
+
+	if (recoveredAnalyticsRowCount === 0) {
+		await executor.execute(
+			buildSessionAnalyticsRepairStatement(
+				target,
+				values,
+				`${recoveryId}:${target}:session-analytics-repair`,
+			),
+		);
+		const repairedRowCount = await countRecoveredClickHouseRows(
+			executor,
+			"rudel.session_analytics",
+			values,
+			target,
+		);
+		assertExpectedRecoveryRowCount(
+			"rudel.session_analytics",
+			expectedRowCount,
+			repairedRowCount,
+		);
+		return true;
+	}
+
+	assertExpectedRecoveryRowCount(
+		"rudel.session_analytics",
+		expectedRowCount,
+		recoveredAnalyticsRowCount,
+	);
+	return true;
+}
+
+async function countRecoveredClickHouseRows(
+	executor: ClickHouseExecutor,
+	target: string,
+	values: readonly object[],
+	sourceTarget: string,
+): Promise<number> {
+	const statement = buildIngestRecoveryCountStatement(
+		target,
+		values,
+		sourceTarget,
+	);
+	const [row] = await executor.query<{ physical: number | string }>(statement);
+	const count = Number(row?.physical ?? 0);
+	if (!Number.isSafeInteger(count) || count < 0) {
+		throw new Error(`Invalid ClickHouse recovery count for ${target}`);
+	}
+	return count;
+}
+
+function buildIngestRecoveryCountStatement(
+	target: string,
+	values: readonly object[],
+	sourceTarget: string,
+): ClickHouseStatement {
+	const first = values[0];
+	if (!first) throw new Error("ClickHouse recovery probe requires rows");
+	const organizationId = readCommonString(values, "organization_id");
+	const commonParams = { organizationId };
+
+	switch (target) {
+		case "rudel.claude_sessions":
+		case "rudel.codex_sessions":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+					AND session_id = {sessionId:String}
+					AND user_id = {userId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+				{
+					...commonParams,
+					...readRawSessionRecoveryParams(values),
+				},
+			);
+		case "rudel.session_analytics": {
+			const analyticsConfig = getSessionAnalyticsRecoveryConfig(sourceTarget);
+			if (!analyticsConfig) {
+				throw new Error(
+					`Unsupported session analytics recovery source: ${sourceTarget}`,
+				);
+			}
+			return recoveryCountStatement(
+				target,
+				`source = {source:String}
+					AND organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+				{
+					...commonParams,
+					...readRawSessionRecoveryParams(values),
+					source: analyticsConfig.source,
+				},
+			);
+		}
+		case "rudel.session_language_signals":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+					AND session_id = {sessionId:String}
+					AND source = {source:String}
+					AND raw_ingested_at = parseDateTime64BestEffort({rawIngestedAt:String}, 3, 'UTC')
+					AND scan_version = {scanVersion:UInt16}`,
+				{
+					...commonParams,
+					rawIngestedAt: readCommonString(values, "raw_ingested_at"),
+					scanVersion: readCommonNumber(values, "scan_version"),
+					sessionDate: readCommonString(values, "session_date"),
+					sessionId: readCommonString(values, "session_id"),
+					source: readCommonString(values, "source"),
+				},
+			);
+		case "rudel.skill_receipts":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND agent = {agent:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND extraction_seq = {extractionSeq:UInt64}`,
+				{
+					...commonParams,
+					agent: readCommonString(values, "agent"),
+					extractionSeq: readCommonString(values, "extraction_seq"),
+					sessionId: readCommonString(values, "session_id"),
+					userId: readCommonString(values, "user_id"),
+				},
+			);
+		case "rudel.skill_uses":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND skill_name IN {skillNames:Array(String)}
+					AND agent = {agent:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND extraction_seq = {extractionSeq:UInt64}`,
+				{
+					...commonParams,
+					agent: readCommonString(values, "agent"),
+					extractionSeq: readCommonString(values, "extraction_seq"),
+					sessionId: readCommonString(values, "session_id"),
+					skillNames: values.map((row) => readString(row, "skill_name")),
+					userId: readCommonString(values, "user_id"),
+				},
+			);
+		case "rudel.skill_version_contents":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND (skill_name, content_sha256, user_id) IN {identities:Array(Tuple(String, FixedString(64), String))}
+					AND extraction_seq = {extractionSeq:UInt64}`,
+				{
+					...commonParams,
+					extractionSeq: readCommonString(values, "extraction_seq"),
+					identities: values.map(
+						(row) =>
+							new TupleParam([
+								readString(row, "skill_name"),
+								readString(row, "content_sha256"),
+								readString(row, "user_id"),
+							]),
+					),
+				},
+			);
+		case "rudel.usage_events":
+			return recoveryCountStatement(
+				target,
+				`organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND source = {source:String}
+					AND session_id = {sessionId:String}
+					AND event_id IN {eventIds:Array(FixedString(64))}
+					AND event_version = {eventVersion:UInt64}`,
+				{
+					...commonParams,
+					eventIds: values.map((row) => readString(row, "event_id")),
+					eventVersion: readCommonString(values, "event_version"),
+					sessionId: readCommonString(values, "session_id"),
+					source: readCommonString(values, "source"),
+					userId: readCommonString(values, "user_id"),
+				},
+			);
+		default:
+			throw new Error(`Unsupported durable ClickHouse target: ${target}`);
+	}
+}
+
+export function buildSessionAnalyticsRepairStatement(
+	sourceTarget: string,
+	values: readonly object[],
+	deduplicationToken: string,
+): ClickHouseStatement {
+	const analyticsConfig = getSessionAnalyticsRecoveryConfig(sourceTarget);
+	if (!analyticsConfig) {
+		throw new Error(
+			`Unsupported session analytics recovery source: ${sourceTarget}`,
+		);
+	}
+	if (!values[0]) {
+		throw new Error("Session analytics repair requires raw rows");
+	}
+
+	const markerParts = analyticsConfig.mvSql.split(
+		SESSION_ANALYTICS_MV_FILTER_MARKER,
+	);
+	if (markerParts.length !== 2) {
+		throw new Error(
+			`Session analytics MV recovery marker count was ${markerParts.length - 1}`,
+		);
+	}
+	const scopedMvSql = markerParts.join(
+		`WHERE cs.organization_id = {organizationId:String}
+			AND cs.session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+			AND cs.session_id = {sessionId:String}
+			AND cs.user_id = {userId:String}
+			AND cs.ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')
+			AND (_is_capped OR length(_timestamps) > 0)`,
+	);
+	const columnList = SESSION_ANALYTICS_INSERT_COLUMNS.map(
+		(column) => `\`${column}\``,
+	).join(",\n\t");
+
+	return {
+		clickhouse_settings:
+			createClickHouseInsertDeduplicationSettings(deduplicationToken),
+		query: `INSERT INTO rudel.session_analytics
+(
+	${columnList}
+)
+SETTINGS async_insert=0
+SELECT
+	${columnList}
+FROM (
+${scopedMvSql}
+)`,
+		query_params: {
+			organizationId: readCommonString(values, "organization_id"),
+			...readRawSessionRecoveryParams(values),
+		},
+	};
+}
+
+interface SessionAnalyticsRecoveryConfig {
+	readonly mvSql: string;
+	readonly source: "claude_code" | "codex";
+}
+
+function getSessionAnalyticsRecoveryConfig(
+	sourceTarget: string,
+): SessionAnalyticsRecoveryConfig | null {
+	switch (sourceTarget) {
+		case "rudel.claude_sessions":
+			return {
+				mvSql: CLAUDE_SESSION_ANALYTICS_MV_SQL,
+				source: "claude_code",
+			};
+		case "rudel.codex_sessions":
+			return { mvSql: CODEX_SESSION_ANALYTICS_MV_SQL, source: "codex" };
+		default:
+			return null;
+	}
+}
+
+function readRawSessionRecoveryParams(
+	values: readonly object[],
+): Record<string, unknown> {
+	return {
+		ingestedAt: readCommonString(values, "ingested_at"),
+		sessionDate: readCommonString(values, "session_date"),
+		sessionId: readCommonString(values, "session_id"),
+		userId: readCommonString(values, "user_id"),
+	};
+}
+
+function recoveryCountStatement(
+	target: string,
+	where: string,
+	queryParams: Record<string, unknown>,
+): ClickHouseStatement {
+	const table = getSafeClickHouseTable(target);
+	return {
+		clickhouse_settings: INGEST_RECOVERY_QUERY_SETTINGS,
+		format: "JSONEachRow",
+		query: `SELECT count() AS physical FROM ${table} WHERE ${where}`,
+		query_params: queryParams,
+	};
+}
+
+function assertExpectedRecoveryRowCount(
+	target: string,
+	expected: number,
+	actual: number,
+): void {
+	if (actual !== expected) {
+		throw new Error(
+			`ClickHouse recovery row count mismatch for ${target}: expected ${expected}, found ${actual}`,
+		);
+	}
+}
+
+function readCommonString(rows: readonly object[], key: string): string {
+	const value = readString(rows[0] ?? {}, key);
+	for (const row of rows.slice(1)) {
+		if (readString(row, key) !== value) {
+			throw new Error(`ClickHouse recovery rows disagree on ${key}`);
+		}
+	}
+	return value;
+}
+
+function readCommonNumber(rows: readonly object[], key: string): number {
+	const value = readNumber(rows[0] ?? {}, key);
+	for (const row of rows.slice(1)) {
+		if (readNumber(row, key) !== value) {
+			throw new Error(`ClickHouse recovery rows disagree on ${key}`);
+		}
+	}
+	return value;
+}
+
+function readString(row: object, key: string): string {
+	const value = Reflect.get(row, key);
+	if (typeof value !== "string") {
+		throw new Error(`ClickHouse recovery row is missing string ${key}`);
+	}
+	return value;
+}
+
+function readNumber(row: object, key: string): number {
+	const value = Reflect.get(row, key);
+	if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+		throw new Error(`ClickHouse recovery row is missing integer ${key}`);
+	}
+	return value;
 }
 
 let _clickhouse: ClickHouseExecutor | null = null;
@@ -195,13 +683,17 @@ export function getClickhouse(): ClickHouseExecutor {
 		_clickhouse = {
 			...executor,
 			async insert(params) {
-				// Retries reuse the byte-identical rows (including ingested_at), so
-				// duplicate attempts converge under ReplacingMergeTree. Do not enable
-				// async_insert_deduplicate here: these inserts feed dependent materialized
-				// views, whose deduplication behavior varies by ClickHouse version.
+				// Explicit tokens distinguish independent byte-identical inserts while
+				// remaining stable across an acknowledgement-loss retry. Crash-recovery
+				// callers provide their durable token instead of using this generated one.
+				const deduplicationToken =
+					params.deduplicationToken ?? crypto.randomUUID();
 				for (let attempt = 0; attempt < maxRetries; attempt++) {
 					try {
-						return await executor.insert(params);
+						return await executor.insert({
+							...params,
+							deduplicationToken,
+						});
 					} catch (error) {
 						if (attempt === maxRetries - 1) {
 							logger.error(

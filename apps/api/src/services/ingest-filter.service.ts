@@ -7,6 +7,7 @@ import type {
 	IngestFilterResult,
 	IngestFilterWorkerResponse,
 } from "./ingest-filter.types.js";
+import { IngestFilterWorkerOperationalError } from "./ingest-worker-operational.error.js";
 
 const logger = getLogger(["rudel", "api", "ingest-filter-queue"]);
 const QUEUE_RETRY_AFTER_MS = 1_000;
@@ -121,7 +122,10 @@ export class IngestFilterQueue {
 	private readonly waitingRequestIds: number[] = [];
 	private waitTimeSampleCount = 0;
 
-	constructor(private readonly config: IngestFilterQueueConfig) {}
+	constructor(
+		private readonly config: IngestFilterQueueConfig,
+		private readonly createWorker: () => Worker = createFilterWorker,
+	) {}
 
 	filter(request: IngestFilterRequest): Promise<IngestFilterResult> {
 		if (this.closed) {
@@ -278,7 +282,7 @@ export class IngestFilterQueue {
 			});
 		} catch (error) {
 			this.stopWorker();
-			this.failActiveRequest(toError(error));
+			this.failActiveRequest(toWorkerOperationalError(error));
 		}
 	}
 
@@ -327,9 +331,7 @@ export class IngestFilterQueue {
 			return this.filterWorker;
 		}
 
-		const worker = new Worker(
-			new URL("./ingest-filter.worker.ts", import.meta.url).href,
-		);
+		const worker = this.createWorker();
 		worker.addEventListener(
 			"message",
 			(event: MessageEvent<IngestFilterWorkerResponse>) => {
@@ -337,12 +339,17 @@ export class IngestFilterQueue {
 			},
 		);
 		worker.addEventListener("error", (event) => {
-			this.handleWorkerFailure(worker, new Error(event.message));
+			this.handleWorkerFailure(
+				worker,
+				new IngestFilterWorkerOperationalError(event.message),
+			);
 		});
 		worker.addEventListener("close", () => {
 			this.handleWorkerFailure(
 				worker,
-				new Error("Transcript filtering worker stopped unexpectedly"),
+				new IngestFilterWorkerOperationalError(
+					"Transcript filtering worker stopped unexpectedly",
+				),
 			);
 		});
 		worker.unref();
@@ -360,7 +367,9 @@ export class IngestFilterQueue {
 		if (response.requestId !== this.activeRequestId) {
 			this.handleWorkerFailure(
 				worker,
-				new Error("Transcript filtering worker returned an unknown request"),
+				new IngestFilterWorkerOperationalError(
+					"Transcript filtering worker returned an unknown request",
+				),
 			);
 			return;
 		}
@@ -369,7 +378,9 @@ export class IngestFilterQueue {
 		if (!pending) {
 			this.handleWorkerFailure(
 				worker,
-				new Error("Transcript filtering worker returned an unknown request"),
+				new IngestFilterWorkerOperationalError(
+					"Transcript filtering worker returned an unknown request",
+				),
 			);
 			return;
 		}
@@ -385,7 +396,10 @@ export class IngestFilterQueue {
 		this.dispatchNextRequest();
 	}
 
-	private handleWorkerFailure(worker: Worker, error: Error): void {
+	private handleWorkerFailure(
+		worker: Worker,
+		error: IngestFilterWorkerOperationalError,
+	): void {
 		if (worker !== this.filterWorker) {
 			return;
 		}
@@ -525,8 +539,18 @@ export function shutdownIngestFilterQueue(): void {
 	ingestFilterQueue.close();
 }
 
-function toError(error: unknown): Error {
-	return error instanceof Error
-		? error
-		: new Error("Transcript filtering worker failed");
+function createFilterWorker(): Worker {
+	return new Worker(new URL("./ingest-filter.worker.ts", import.meta.url).href);
+}
+
+function toWorkerOperationalError(
+	error: unknown,
+): IngestFilterWorkerOperationalError {
+	if (error instanceof IngestFilterWorkerOperationalError) return error;
+	return new IngestFilterWorkerOperationalError(
+		error instanceof Error
+			? error.message
+			: "Transcript filtering worker failed",
+		error,
+	);
 }

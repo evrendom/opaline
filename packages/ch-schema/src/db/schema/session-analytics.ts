@@ -48,6 +48,7 @@ const rudel_session_analytics = table({
 	orderBy: ["source", "organization_id", "user_id", "session_id"],
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 });

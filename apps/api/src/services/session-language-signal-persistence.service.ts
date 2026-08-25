@@ -42,10 +42,7 @@ export async function persistSessionLanguageSignalsBestEffort(
 	env: PersistSessionLanguageSignalsEnvironment = DEFAULT_ENVIRONMENT,
 ): Promise<void> {
 	try {
-		const counts = await env.scan(input.content);
-		await env.insertRows([
-			buildSessionLanguageSignalRow(input, counts, env.now()),
-		]);
+		await persistSessionLanguageSignals(input, env);
 	} catch (error) {
 		logger.error(
 			"Language-signal persistence failed after raw ingest; reconciliation will retry (organization_id={organizationId} session_id={sessionId} error={error})",
@@ -56,6 +53,30 @@ export async function persistSessionLanguageSignalsBestEffort(
 			},
 		);
 	}
+}
+
+export async function persistSessionLanguageSignals(
+	input: SessionLanguageSignalScanInput,
+	env: PersistSessionLanguageSignalsEnvironment = DEFAULT_ENVIRONMENT,
+): Promise<void> {
+	const counts = await env.scan(input.content);
+	await env.insertRows([
+		buildSessionLanguageSignalRow(input, counts, env.now()),
+	]);
+}
+
+export function persistSessionLanguageSignalsWithExecutor(
+	input: SessionLanguageSignalScanInput,
+	executor: ClickHouseExecutor,
+): Promise<void> {
+	return persistSessionLanguageSignals(input, {
+		insertRows: (rows) => insertSessionLanguageSignalRows(executor, rows),
+		now: () =>
+			input.rawIngestedAt instanceof Date
+				? input.rawIngestedAt
+				: new Date(input.rawIngestedAt),
+		scan: scanSessionLanguageSignalsOffThread,
+	});
 }
 
 export function buildSessionLanguageSignalRow(
@@ -83,8 +104,7 @@ export async function insertSessionLanguageSignalRows(
 	if (rows.length === 0) return;
 	await ingestRudelSessionLanguageSignals(
 		{
-			insert: ({ table, values }) =>
-				executor.insert({ asyncInsert: false, table, values }),
+			insert: ({ table, values }) => executor.insert({ table, values }),
 		},
 		[...rows],
 	);

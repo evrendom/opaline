@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { LanguageSignalCounts } from "@rudel/language-signals";
+import type { ClickHouseExecutor } from "../clickhouse.js";
 import {
 	buildSessionLanguageSignalRow,
+	insertSessionLanguageSignalRows,
 	persistSessionLanguageSignalsBestEffort,
 } from "./session-language-signal-persistence.service.js";
 
@@ -77,5 +79,28 @@ describe("session language-signal ingest persistence", () => {
 				scan: async () => ZERO_COUNTS,
 			}),
 		).resolves.toBeUndefined();
+	});
+
+	test("uses the executor's acknowledged async-insert default", async () => {
+		let inserted: Parameters<ClickHouseExecutor["insert"]>[0] | undefined;
+		const executor: ClickHouseExecutor = {
+			close: async () => {},
+			execute: async () => {},
+			insert: async (params) => {
+				inserted = params;
+			},
+			query: async () => [],
+		};
+		await insertSessionLanguageSignalRows(executor, [
+			buildSessionLanguageSignalRow(
+				scanInput,
+				ZERO_COUNTS,
+				"2026-08-19T12:00:02.456Z",
+			),
+		]);
+		expect(inserted).toMatchObject({
+			table: "rudel.session_language_signals",
+		});
+		expect(inserted?.asyncInsert).toBeUndefined();
 	});
 });

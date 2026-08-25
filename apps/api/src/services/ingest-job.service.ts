@@ -14,7 +14,7 @@ import {
 	getR2IngestPartByteLengths,
 	sortR2IngestObjects,
 } from "../lib/r2-ingest-manifest.js";
-import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
+import type { R2MultipartUploadInitClient } from "./r2-ingest-storage.service.js";
 
 interface CreatedMultipartUpload {
 	objectKey: string;
@@ -40,7 +40,7 @@ export interface InitR2IngestJobOptions {
 	input: R2IngestInitInput;
 	now: () => Date;
 	organizationId: string;
-	r2: R2MultipartUploadClient;
+	r2: R2MultipartUploadInitClient;
 	randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
 	userId: string;
 }
@@ -193,7 +193,7 @@ async function createUploadObjects(input: {
 	createdUploads: CreatedMultipartUpload[];
 	jobId: string;
 	objects: readonly R2IngestObjectInput[];
-	r2: R2MultipartUploadClient;
+	r2: R2MultipartUploadInitClient;
 }): Promise<R2IngestUploadObject[]> {
 	const results: R2IngestUploadObject[] = [];
 	const batchSize = 8;
@@ -228,7 +228,7 @@ async function createUploadObject(input: {
 	index: number;
 	jobId: string;
 	object: R2IngestObjectInput;
-	r2: R2MultipartUploadClient;
+	r2: R2MultipartUploadInitClient;
 }): Promise<R2IngestUploadObject> {
 	const suffix =
 		input.object.kind === "main" ? "main" : `subagent-${input.index}`;
@@ -283,7 +283,7 @@ async function createUploadObject(input: {
 
 async function abortCreatedUploads(
 	uploads: readonly CreatedMultipartUpload[],
-	r2: R2MultipartUploadClient,
+	r2: R2MultipartUploadInitClient,
 ): Promise<void> {
 	await Promise.allSettled(
 		uploads.map((upload) => r2.abortMultipartUpload(upload)),

@@ -16,6 +16,17 @@ export function isMissingTranscriptTimestampMessage(
 	return message === getMissingTranscriptTimestampMessage(source);
 }
 
+export function getInvalidTranscriptTimestampMessage(source: Source): string {
+	return `${SOURCE_DISPLAY_NAMES[source]} transcript contains a timestamp outside the supported timezone-explicit RFC3339 format`;
+}
+
+export class InvalidTranscriptTimestampError extends Error {
+	constructor(source: Source) {
+		super(getInvalidTranscriptTimestampMessage(source));
+		this.name = "InvalidTranscriptTimestampError";
+	}
+}
+
 export class MissingTranscriptTimestampError extends Error {
 	constructor(source: Source) {
 		super(getMissingTranscriptTimestampMessage(source));
