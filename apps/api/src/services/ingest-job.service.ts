@@ -199,7 +199,7 @@ async function createUploadObjects(input: {
 	const batchSize = 8;
 	for (let offset = 0; offset < input.objects.length; offset += batchSize) {
 		const batch = input.objects.slice(offset, offset + batchSize);
-		const created = await Promise.all(
+		const created = await Promise.allSettled(
 			batch.map((object, batchIndex) =>
 				createUploadObject({
 					createdUploads: input.createdUploads,
@@ -210,8 +210,14 @@ async function createUploadObjects(input: {
 				}),
 			),
 		);
+		const failed = created.find((result) => result.status === "rejected");
+		if (failed) {
+			throw failed.reason;
+		}
 		for (const item of created) {
-			results.push(item);
+			if (item.status === "fulfilled") {
+				results.push(item.value);
+			}
 		}
 	}
 	return results;

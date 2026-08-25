@@ -48,6 +48,76 @@ afterAll(async () => {
 });
 
 describe("R2 ingest init and status lifecycle", () => {
+	test("aborts every upload created during partial initialization failure", async () => {
+		const mainPresigned = Promise.withResolvers<void>();
+		const abortedUploads: string[] = [];
+		const partialFailureClient: R2MultipartUploadClient = {
+			async abortMultipartUpload(input) {
+				abortedUploads.push(input.uploadId);
+			},
+			async createMultipartUpload(input) {
+				if (input.objectKey.endsWith("subagent-1.jsonl")) {
+					await mainPresigned.promise;
+					throw new Error("multipart initialization failed");
+				}
+				if (input.objectKey.endsWith("subagent-2.jsonl")) {
+					await Bun.sleep(25);
+				}
+				return { uploadId: `upload-${input.objectKey}` };
+			},
+			async presignUploadPart(input) {
+				if (input.objectKey.endsWith("main.jsonl")) {
+					mainPresigned.resolve();
+				}
+				return `https://uploads.example.test/${input.partNumber}?uploadId=${input.uploadId}`;
+			},
+		};
+
+		const initialization = initR2IngestJob({
+			database: sqlClient,
+			input: {
+				objects: [
+					{
+						byteLength: 1,
+						kind: "main",
+						sha256: "a".repeat(64),
+					},
+					{
+						agentId: "agent-a",
+						byteLength: 1,
+						kind: "subagent",
+						sha256: "b".repeat(64),
+					},
+					{
+						agentId: "agent-b",
+						byteLength: 1,
+						kind: "subagent",
+						sha256: "c".repeat(64),
+					},
+				],
+				projectPath: "/test/r2-partial-failure",
+				sessionId: "r2-partial-failure-session",
+				source: "claude_code",
+			},
+			now: () => NOW,
+			organizationId: ORGANIZATION_ID,
+			r2: partialFailureClient,
+			randomUUID: () => "00000000-0000-4000-8000-000000000002",
+			userId: USER_ID,
+		});
+
+		await expect(initialization).rejects.toThrow(
+			"multipart initialization failed",
+		);
+		await Bun.sleep(50);
+		expect(abortedUploads.sort()).toEqual(
+			[
+				"upload-ingest/00000000-0000-4000-8000-000000000002/main.jsonl",
+				"upload-ingest/00000000-0000-4000-8000-000000000002/subagent-2.jsonl",
+			].sort(),
+		);
+	});
+
 	test("persists a sorted multipart manifest and returns a bounded status", async () => {
 		const initialized = await initR2IngestJob({
 			database: sqlClient,
