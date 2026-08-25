@@ -12,6 +12,10 @@ import {
 } from "./handlers/avatar-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
+	API_RESPONSE_MAX_BYTES,
+	enforceApiResponseSize,
+} from "./lib/api-response-size.js";
+import {
 	readBetterAuthSecret,
 	readBooleanEnv,
 	readCliDeviceVerificationUrl,
@@ -359,14 +363,21 @@ const server = Bun.serve({
 					requestId,
 					wrappedShareLookupSource,
 				);
+				const finalResponse =
+					url.pathname === "/rpc" || url.pathname.startsWith("/rpc/")
+						? response
+						: await enforceApiResponseSize({
+								pathname: url.pathname,
+								response,
+							});
 				const duration = Math.round(performance.now() - start);
 				logger.info("{method} {path} {status} {duration}ms", {
 					method: request.method,
 					path: url.pathname,
-					status: response.status,
+					status: finalResponse.status,
 					duration,
 				});
-				return applyHttpResponsePolicy(response, {
+				return applyHttpResponsePolicy(finalResponse, {
 					pathname: url.pathname,
 					requestId,
 				});
@@ -505,6 +516,9 @@ async function handleRequest(
 	requestId: string,
 	wrappedShareLookupSource: string,
 ): Promise<Response> {
+	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
+		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
+	}
 	const wrappedShareCardImageId = getWrappedShareCardImageId(url.pathname);
 	if (wrappedShareCardImageId) {
 		return handleWrappedShareCardImageRequest({
@@ -587,7 +601,10 @@ async function handleRequest(
 		return maybeCompressSessionDetailRpcResponse({
 			pathname: url.pathname,
 			requestHeaders: request.headers,
-			response,
+			response: await enforceApiResponseSize({
+				pathname: url.pathname,
+				response,
+			}),
 		});
 	}
 
