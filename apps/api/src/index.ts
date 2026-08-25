@@ -15,6 +15,7 @@ import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
 } from "./lib/api-response-size.js";
+import { enforceCookieCsrfOrigin } from "./lib/csrf-origin.js";
 import {
 	readBetterAuthSecret,
 	readBooleanEnv,
@@ -301,6 +302,20 @@ const server = Bun.serve({
 					requestId,
 				},
 			);
+		}
+
+		const csrfRejection = enforceCookieCsrfOrigin({
+			allowedOrigins: trustedOrigins,
+			request,
+		});
+		if (csrfRejection) {
+			for (const [name, value] of Object.entries(cors)) {
+				csrfRejection.headers.set(name, value);
+			}
+			return applyHttpResponsePolicy(csrfRejection, {
+				pathname: url.pathname,
+				requestId,
+			});
 		}
 
 		const contentLength = request.headers.get("Content-Length");
