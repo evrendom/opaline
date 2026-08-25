@@ -29,7 +29,7 @@ import {
 	createIdempotentClickHouseExecutor,
 	getClickhouse,
 } from "./clickhouse.js";
-import { sqlClient } from "./db.js";
+import { createIngestProcessingSqlClient, sqlClient } from "./db.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
 import { chatwootRouter } from "./handlers/chatwoot.js";
@@ -87,6 +87,8 @@ import {
 } from "./services/ingest-processing-boundary.js";
 import {
 	type ClaimedIngestProcessingLedger,
+	readIngestProcessingTargetReceipt,
+	recordIngestProcessingTargetReceipt,
 	reserveLedgerUsageGeneration,
 	withIngestProcessingLedger,
 } from "./services/ingest-processing-ledger.service.js";
@@ -564,7 +566,7 @@ export async function processIngestSession({
 					signal,
 				}),
 			{
-				database: sqlClient,
+				disposableDatabase: createIngestProcessingSqlClient(),
 				failpoint: durableProcessing.failpoint,
 				now: getNextIngestedAt,
 				randomUUID: () => crypto.randomUUID(),
@@ -574,7 +576,17 @@ export async function processIngestSession({
 	const clickhouse = claimedLedger
 		? createIdempotentClickHouseExecutor(
 				getClickhouse(),
-				claimedLedger.id,
+				{
+					id: claimedLedger.id,
+					readReceipt: (target) =>
+						readIngestProcessingTargetReceipt(claimedLedger, target),
+					recordReceipt: (target, expectedRowCount) =>
+						recordIngestProcessingTargetReceipt(claimedLedger, {
+							expectedRowCount,
+							target,
+						}),
+					recovering: claimedLedger.recovering,
+				},
 				(table) =>
 					passIngestProcessingBoundary(durableProcessing?.failpoint, {
 						store: "clickhouse",
@@ -814,7 +826,7 @@ export async function processIngestSession({
 	}
 	if (skillExtractionEnabled && skillExtraction) {
 		await writeSkillExtraction(clickhouse, {
-			extractedAt: getNextIngestedAt(),
+			extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
 			extraction: skillExtraction,
 			organizationId: orgId,
 			rawRevisionIngestedAt: ingestedAt,

@@ -14,9 +14,11 @@ import type postgres from "postgres";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
 import {
+	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
 } from "./ingest-processing-boundary.js";
+import { cleanupIngestJobObjects } from "./r2-ingest-cleanup.service.js";
 import { runWithR2IngestMaterializationSlot } from "./r2-ingest-materialization-gate.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 
@@ -452,6 +454,9 @@ async function processClaimedJob(input: {
 			},
 		);
 	} catch (error) {
+		if (error instanceof IngestProcessingCrashSimulationError) {
+			throw error;
+		}
 		const terminal = await recordProcessingFailure(
 			input.job,
 			error,
@@ -743,60 +748,6 @@ async function recordProcessingFailure(
 		],
 	);
 	return terminal;
-}
-
-async function cleanupIngestJobObjects(
-	job: IngestJobRow,
-	database: postgres.Sql,
-	r2: R2MultipartUploadClient,
-	failpoint: IngestProcessingFailpoint | undefined,
-): Promise<void> {
-	if (job.objectsDeletedAt) return;
-	const manifest = StoredManifestSchema.parse(job.objectManifest);
-	try {
-		for (const object of manifest) {
-			try {
-				await r2.abortMultipartUpload({
-					objectKey: object.objectKey,
-					uploadId: object.uploadId,
-				});
-			} catch (error) {
-				logger.debug(
-					"R2 multipart upload was already completed or absent (job_id={jobId} object_key={objectKey} error={error})",
-					{
-						error: getSafeErrorCode(error),
-						jobId: job.id,
-						objectKey: object.objectKey,
-					},
-				);
-			}
-			await passIngestProcessingBoundary(failpoint, {
-				store: "r2",
-				target: "abort-multipart",
-			});
-		}
-		await r2.deleteObjects(manifest.map((object) => object.objectKey));
-		await passIngestProcessingBoundary(failpoint, {
-			store: "r2",
-			target: "delete-objects",
-		});
-		await database.unsafe(
-			`UPDATE ingest_job
-			 SET objects_deleted_at = NOW(), updated_at = NOW()
-			 WHERE id = $1
-				AND status IN ('completed', 'failed')
-				AND objects_deleted_at IS NULL`,
-			[job.id],
-		);
-	} catch (error) {
-		logger.warn(
-			"R2 ingest object cleanup will be retried (job_id={jobId} error={error})",
-			{
-				error: getSafeErrorCode(error),
-				jobId: job.id,
-			},
-		);
-	}
 }
 
 async function terminalizeExhaustedJob(

@@ -5,6 +5,7 @@ import {
 	integer,
 	jsonb,
 	pgTable,
+	primaryKey,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -78,7 +79,47 @@ export const ingestProcessingLedger = pgTable(
 	],
 );
 
+export const ingestProcessingTargetReceipt = pgTable(
+	"ingest_processing_target_receipt",
+	{
+		ledgerId: text("ledger_id")
+			.notNull()
+			.references(() => ingestProcessingLedger.id, { onDelete: "cascade" }),
+		target: text("target").notNull(),
+		expectedRowCount: integer("expected_row_count").notNull(),
+		acknowledgedAt: timestamp("acknowledged_at", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.ledgerId, table.target] }),
+		check(
+			"ingest_processing_target_receipt_target_check",
+			sql`${table.target} IN (
+				'rudel.claude_sessions',
+				'rudel.codex_sessions',
+				'rudel.session_language_signals',
+				'rudel.skill_receipts',
+				'rudel.skill_uses',
+				'rudel.skill_version_contents',
+				'rudel.usage_events'
+			)`,
+		),
+		check(
+			"ingest_processing_target_receipt_row_count_check",
+			sql`${table.expectedRowCount} > 0`,
+		),
+	],
+);
+
 export type IngestProcessingLedgerSelect =
 	typeof ingestProcessingLedger.$inferSelect;
 export type IngestProcessingLedgerInsert =
 	typeof ingestProcessingLedger.$inferInsert;
+export type IngestProcessingTargetReceiptSelect =
+	typeof ingestProcessingTargetReceipt.$inferSelect;
+export type IngestProcessingTargetReceiptInsert =
+	typeof ingestProcessingTargetReceipt.$inferInsert;

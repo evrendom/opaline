@@ -15,6 +15,12 @@ export interface ClaimedIngestProcessingLedger {
 	readonly connection: postgres.ReservedSql;
 	readonly id: string;
 	readonly rawIngestedAt: Date;
+	readonly recovering: boolean;
+}
+
+export interface IngestProcessingTargetReceipt {
+	readonly expectedRowCount: number;
+	readonly target: string;
 }
 
 interface IngestProcessingLedgerRow {
@@ -26,7 +32,7 @@ interface IngestProcessingLedgerRow {
 }
 
 interface IngestProcessingLedgerEnvironment {
-	readonly database: postgres.Sql;
+	readonly disposableDatabase: postgres.Sql;
 	readonly failpoint: IngestProcessingFailpoint | undefined;
 	readonly now: () => Date;
 	readonly randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
@@ -38,7 +44,7 @@ export async function withIngestProcessingLedger<TResult>(
 	operation: (ledger: ClaimedIngestProcessingLedger) => Promise<TResult>,
 	env: IngestProcessingLedgerEnvironment,
 ): Promise<TResult> {
-	const connection = await env.database.reserve();
+	const connection = await env.disposableDatabase.reserve();
 	const lockIdentity = buildLockIdentity(identity);
 	let locked = false;
 	try {
@@ -48,7 +54,7 @@ export async function withIngestProcessingLedger<TResult>(
 		);
 		locked = true;
 
-		await connection.unsafe(
+		const inserted = await connection.unsafe<Array<{ id: string }>>(
 			`INSERT INTO ingest_processing_ledger (
 				id,
 				organization_id,
@@ -63,7 +69,8 @@ export async function withIngestProcessingLedger<TResult>(
 				session_id,
 				filtered_content_sha256,
 				filter_version
-			) DO NOTHING`,
+			) DO NOTHING
+			RETURNING id`,
 			[
 				env.randomUUID(),
 				identity.organizationId,
@@ -89,6 +96,7 @@ export async function withIngestProcessingLedger<TResult>(
 			connection,
 			id: row.id,
 			rawIngestedAt: toDate(row.rawIngestedAt),
+			recovering: inserted.length === 0,
 		});
 		const completed = await connection.unsafe<Array<{ id: string }>>(
 			`UPDATE ingest_processing_ledger
@@ -99,7 +107,7 @@ export async function withIngestProcessingLedger<TResult>(
 				updated_at = NOW()
 			 WHERE id = $2
 			 RETURNING id`,
-			[JSON.stringify(result), row.id],
+			[connection.json(toJsonValue(result)), row.id],
 		);
 		if (completed.length !== 1) {
 			throw new Error("Ingest processing ledger completion failed");
@@ -110,14 +118,72 @@ export async function withIngestProcessingLedger<TResult>(
 		});
 		return result;
 	} finally {
+		let destroyDatabase = false;
 		if (locked) {
-			await connection
-				.unsafe("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [
+			let unlockConfirmed = false;
+			try {
+				await passIngestProcessingBoundary(env.failpoint, {
+					store: "postgres",
+					target: "advisory-unlock",
+				});
+				const [unlocked] = await connection.unsafe<
+					Array<{ unlocked: boolean }>
+				>("SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked", [
 					lockIdentity,
-				])
-				.catch(() => undefined);
+				]);
+				unlockConfirmed = unlocked?.unlocked === true;
+			} catch {}
+			if (!unlockConfirmed) {
+				destroyDatabase = true;
+			}
 		}
-		connection.release();
+		if (destroyDatabase) {
+			await env.disposableDatabase.end({ timeout: 0 });
+		} else {
+			connection.release();
+			await env.disposableDatabase.end();
+		}
+	}
+}
+
+export async function readIngestProcessingTargetReceipt(
+	ledger: ClaimedIngestProcessingLedger,
+	target: string,
+): Promise<IngestProcessingTargetReceipt | null> {
+	const [receipt] = await ledger.connection.unsafe<
+		IngestProcessingTargetReceipt[]
+	>(
+		`SELECT
+			target,
+			expected_row_count AS "expectedRowCount"
+		 FROM ingest_processing_target_receipt
+		 WHERE ledger_id = $1 AND target = $2`,
+		[ledger.id, target],
+	);
+	return receipt ?? null;
+}
+
+export async function recordIngestProcessingTargetReceipt(
+	ledger: ClaimedIngestProcessingLedger,
+	receipt: IngestProcessingTargetReceipt,
+): Promise<void> {
+	const acknowledged = await ledger.connection.unsafe<
+		Array<{ target: string }>
+	>(
+		`INSERT INTO ingest_processing_target_receipt (
+			ledger_id,
+			target,
+			expected_row_count
+		 )
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (ledger_id, target) DO UPDATE
+		 SET acknowledged_at = ingest_processing_target_receipt.acknowledged_at
+		 WHERE ingest_processing_target_receipt.expected_row_count = EXCLUDED.expected_row_count
+		 RETURNING target`,
+		[ledger.id, receipt.target, receipt.expectedRowCount],
+	);
+	if (acknowledged.length !== 1) {
+		throw new Error("Ingest processing target receipt conflicts with recovery");
 	}
 }
 
@@ -210,4 +276,12 @@ function buildLockIdentity(identity: IngestProcessingIdentity): string {
 
 function toDate(value: Date | string): Date {
 	return value instanceof Date ? value : new Date(value);
+}
+
+function toJsonValue(value: unknown): postgres.JSONValue {
+	const serialized = JSON.stringify(value);
+	if (serialized === undefined) {
+		throw new Error("Ingest processing result is not JSON serializable");
+	}
+	return JSON.parse(serialized) as postgres.JSONValue;
 }

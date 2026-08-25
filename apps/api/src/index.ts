@@ -32,6 +32,14 @@ import {
 	getIngestFilterQueueMetrics,
 	shutdownIngestFilterQueue,
 } from "./services/ingest-filter.service.js";
+import {
+	registerR2IngestCleanupWorker,
+	repairR2IngestCleanupJobs,
+} from "./services/r2-ingest-cleanup.service.js";
+import {
+	createR2MultipartUploadClient,
+	readR2IngestAvailability,
+} from "./services/r2-ingest-storage.service.js";
 import { startSessionLanguageSignalReconciliationWorker } from "./services/session-language-signal-reconciliation.service.js";
 import { shutdownSessionLanguageSignalScanner } from "./services/session-language-signal-scanner.service.js";
 import { shutdownUsageExtractionQueue } from "./services/usage-extraction.service.js";
@@ -359,11 +367,23 @@ const server = Bun.serve({
 		);
 	},
 });
+const r2IngestAvailability = readR2IngestAvailability();
+const r2IngestCleanupClient = r2IngestAvailability.enabled
+	? createR2MultipartUploadClient(r2IngestAvailability.configuration)
+	: undefined;
 const clickHousePurgeWorker = startClickHousePurgeWorker({
 	enabled: readBooleanEnv("CLICKHOUSE_PURGE_WORKER_ENABLED", true),
+	repairR2IngestCleanup: r2IngestCleanupClient
+		? () =>
+				repairR2IngestCleanupJobs({
+					database: sqlClient,
+					r2: r2IngestCleanupClient,
+				})
+		: undefined,
 	resend,
 });
 registerClickHousePurgeWorker(clickHousePurgeWorker);
+registerR2IngestCleanupWorker(clickHousePurgeWorker);
 const sessionLanguageSignalReconciliationWorker = IS_TEST
 	? undefined
 	: startSessionLanguageSignalReconciliationWorker();

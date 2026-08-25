@@ -8,6 +8,7 @@ export type IngestProcessingBoundary =
 			target:
 				| "job-completed"
 				| "ledger-completed"
+				| "advisory-unlock"
 				| "raw-receipt"
 				| "usage-generation"
 				| "usage-receipt";
@@ -20,6 +21,13 @@ export type IngestProcessingBoundary =
 export type IngestProcessingFailpoint = (
 	boundary: IngestProcessingBoundary,
 ) => Promise<void>;
+
+export class IngestProcessingCrashSimulationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "IngestProcessingCrashSimulationError";
+	}
+}
 
 export async function passIngestProcessingBoundary(
 	failpoint: IngestProcessingFailpoint | undefined,

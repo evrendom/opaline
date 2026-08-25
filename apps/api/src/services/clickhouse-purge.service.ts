@@ -103,6 +103,11 @@ interface NextPurgeWorkDueRow {
 export interface StartClickHousePurgeWorkerOptions {
 	enabled?: boolean;
 	pollIntervalMs?: number;
+	repairR2IngestCleanup?: () => Promise<{
+		attempted: number;
+		completed: number;
+		hasMore: boolean;
+	}>;
 	resend: ResendConfig;
 	sqlClient?: postgres.Sql;
 }
@@ -241,6 +246,18 @@ export function startClickHousePurgeWorker(
 						"ClickHouse purge job retention cleanup failed: {error}",
 						{ error: sanitizeClickHousePurgeError(error) },
 					);
+				}
+			}
+			if (options.repairR2IngestCleanup) {
+				try {
+					const cleanup = await options.repairR2IngestCleanup();
+					if (cleanup.hasMore) {
+						runAgain = true;
+					}
+				} catch (error) {
+					logger.error("R2 ingest cleanup repair pass failed: {error}", {
+						error: sanitizeClickHousePurgeError(error),
+					});
 				}
 			}
 

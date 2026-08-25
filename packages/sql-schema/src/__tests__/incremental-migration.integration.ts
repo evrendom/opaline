@@ -74,6 +74,21 @@ test("applies migrations 0020-0027 to a database already migrated through 0019",
 				SELECT to_regclass('public.ingest_processing_ledger')::text AS name
 			`;
 			expect(processingLedgerTable?.name).toBe("ingest_processing_ledger");
+			const [targetReceiptTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.ingest_processing_target_receipt')::text AS name
+			`;
+			expect(targetReceiptTable?.name).toBe("ingest_processing_target_receipt");
+			const targetReceiptChecks = await migrationSql<Array<{ name: string }>>`
+				SELECT conname AS name
+				FROM pg_constraint
+				WHERE conrelid = 'public.ingest_processing_target_receipt'::regclass
+					AND contype = 'c'
+				ORDER BY conname
+			`;
+			expect([...targetReceiptChecks]).toEqual([
+				{ name: "ingest_processing_target_receipt_row_count_check" },
+				{ name: "ingest_processing_target_receipt_target_check" },
+			]);
 			const processingLedgerIndexes = await migrationSql<
 				Array<{ name: string }>
 			>`

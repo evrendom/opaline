@@ -6,16 +6,19 @@ import type {
 	R2IngestInitOutput,
 } from "@rudel/api-routes";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
-import { sqlClient } from "../db.js";
+import { createIngestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import {
 	getR2IngestJobStatus,
 	initR2IngestJob,
 } from "../services/ingest-job.service.js";
-import type {
-	IngestProcessingBoundary,
-	IngestProcessingFailpoint,
+import {
+	type IngestProcessingBoundary,
+	IngestProcessingCrashSimulationError,
+	type IngestProcessingFailpoint,
 } from "../services/ingest-processing-boundary.js";
+import { withIngestProcessingLedger } from "../services/ingest-processing-ledger.service.js";
+import { repairR2IngestCleanupJobs } from "../services/r2-ingest-cleanup.service.js";
 import {
 	commitR2IngestJob,
 	type R2IngestProcessorResult,
@@ -41,6 +44,7 @@ interface FakeStoredObject {
 
 class FakeR2Client implements R2MultipartUploadClient {
 	readonly abortedKeys: string[] = [];
+	readonly abortFailures = new Map<string, unknown>();
 	readonly completedKeys: string[] = [];
 	readonly deletedKeys: string[] = [];
 	readonly objects = new Map<string, FakeStoredObject>();
@@ -49,6 +53,11 @@ class FakeR2Client implements R2MultipartUploadClient {
 		objectKey: string;
 		uploadId: string;
 	}): Promise<void> {
+		const abortFailure = this.abortFailures.get(input.objectKey);
+		if (abortFailure) {
+			this.abortFailures.delete(input.objectKey);
+			throw abortFailure;
+		}
 		const object = this.objects.get(input.objectKey);
 		if (!object || object.uploadId !== input.uploadId) return;
 		this.abortedKeys.push(input.objectKey);
@@ -117,6 +126,10 @@ class FakeR2Client implements R2MultipartUploadClient {
 
 	uploadBytes(objectKey: string, bytes: Uint8Array): void {
 		this.requireObject(objectKey).bytes = bytes;
+	}
+
+	failNextAbort(objectKey: string, error: unknown): void {
+		this.abortFailures.set(objectKey, error);
 	}
 
 	private requireObject(objectKey: string): FakeStoredObject {
@@ -461,6 +474,66 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(failed?.status).toBe("failed");
 		expect(Date.parse(String(failed?.objectsDeletedAt))).not.toBeNaN();
 	});
+
+	test("keeps transient multipart abort cleanup pending until the autonomous repair drains it", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"declared transient-abort transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+		fakeR2.uploadText(objectKey, "tampered transient-abort transcript");
+		fakeR2.failNextAbort(
+			objectKey,
+			Object.assign(new Error("temporary R2 abort outage"), {
+				$metadata: { httpStatusCode: 503 },
+				name: "ServiceUnavailable",
+			}),
+		);
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("integrity verification failed");
+		const [cleanupPending] = await sqlClient<
+			Array<{ objectsDeletedAt: Date | string | null; status: string }>
+		>`
+			SELECT
+				objects_deleted_at AS "objectsDeletedAt",
+				status
+			FROM ingest_job
+			WHERE id = ${initialized.jobId}
+		`;
+		expect(cleanupPending).toEqual({
+			objectsDeletedAt: null,
+			status: "failed",
+		});
+		expect(fakeR2.objects.has(objectKey)).toBe(true);
+		expect(fakeR2.deletedKeys).not.toContain(objectKey);
+
+		const repair = await repairR2IngestCleanupJobs({
+			database: sqlClient,
+			r2: fakeR2,
+		});
+		expect(repair.attempted).toBeGreaterThan(0);
+		expect(repair.completed).toBeGreaterThan(0);
+		const [cleanupCompleted] = await sqlClient<
+			Array<{ objectsDeletedAt: Date | string | null }>
+		>`
+			SELECT objects_deleted_at AS "objectsDeletedAt"
+			FROM ingest_job
+			WHERE id = ${initialized.jobId}
+		`;
+		expect(
+			Date.parse(String(cleanupCompleted?.objectsDeletedAt)),
+		).not.toBeNaN();
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		expect(fakeR2.deletedKeys).toContain(objectKey);
+	});
 });
 
 const CRASH_BOUNDARIES: {
@@ -572,6 +645,169 @@ describe("R2 ingest real processor crash recovery", () => {
 		expect(retried.status).toBe("completed");
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
+
+	test("recovers an expired 30-minute lease after ClickHouse evicts the raw insert token", async () => {
+		const clickhouse = getClickhouse();
+		const table = "rudel.claude_sessions";
+		await clickhouse.execute({
+			query: `ALTER TABLE ${table} MODIFY SETTING non_replicated_deduplication_window = 1`,
+		});
+		try {
+			const jobId = crypto.randomUUID();
+			const skillName = `evicted-dedup-skill-${jobId}`;
+			const initialized = await initializeUploadedJob(
+				jobId,
+				buildRealClaudeTranscript(skillName),
+			);
+			const completion = buildCompletionInput(initialized);
+			const leaseStartedAt = new Date("2030-01-01T00:00:00.000Z");
+			let crashedAfterRawAcknowledgement = false;
+			const failpoint: IngestProcessingFailpoint = async (boundary) => {
+				if (
+					!crashedAfterRawAcknowledgement &&
+					boundary.store === "clickhouse" &&
+					boundary.target === table
+				) {
+					crashedAfterRawAcknowledgement = true;
+					throw new IngestProcessingCrashSimulationError(
+						"simulated process death after raw acknowledgement",
+					);
+				}
+			};
+
+			await expect(
+				commitR2IngestJob({
+					failpoint,
+					input: completion,
+					now: () => leaseStartedAt,
+					process: createRealProcessor(failpoint),
+					r2: fakeR2,
+					userId: USER_ID,
+				}),
+			).rejects.toThrow("simulated process death");
+			expect(crashedAfterRawAcknowledgement).toBe(true);
+
+			const [ledger] = await sqlClient<
+				Array<{ id: string; receiptCount: number }>
+			>`
+				SELECT
+					ledger.id,
+					COUNT(receipt.target)::int AS "receiptCount"
+				FROM ingest_processing_ledger AS ledger
+				LEFT JOIN ingest_processing_target_receipt AS receipt
+					ON receipt.ledger_id = ledger.id
+					AND receipt.target = ${table}
+				WHERE ledger.organization_id = ${ORGANIZATION_ID}
+					AND ledger.session_id = ${jobId}
+				GROUP BY ledger.id
+			`;
+			if (!ledger) throw new Error("missing crash-recovery ledger");
+			expect(ledger.receiptCount).toBe(0);
+
+			const [rawRow] = await clickhouse.query<Record<string, unknown>>({
+				query: `SELECT * FROM ${table} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} LIMIT 1`,
+				query_params: {
+					organizationId: ORGANIZATION_ID,
+					sessionId: jobId,
+				},
+			});
+			if (!rawRow) throw new Error("missing acknowledged raw row");
+			for (const fillerIndex of [1, 2]) {
+				await clickhouse.insert({
+					asyncInsert: false,
+					deduplicationToken: `eviction-filler-${jobId}-${fillerIndex}`,
+					table,
+					values: [
+						{
+							...rawRow,
+							ingested_at: `2030-01-01 00:00:0${fillerIndex}.000`,
+							session_id: `${jobId}-eviction-filler-${fillerIndex}`,
+						},
+					],
+				});
+			}
+
+			const [crashedJob] = await sqlClient<
+				Array<{ leaseExpiresAt: Date | string | null; status: string }>
+			>`
+				SELECT
+					lease_expires_at AS "leaseExpiresAt",
+					status
+				FROM ingest_job
+				WHERE id = ${jobId}
+			`;
+			expect(crashedJob?.status).toBe("running");
+			expect(new Date(String(crashedJob?.leaseExpiresAt)).toISOString()).toBe(
+				"2030-01-01T00:30:00.000Z",
+			);
+			const recovered = await commitR2IngestJob({
+				input: completion,
+				now: () => new Date("2030-01-01T00:30:01.000Z"),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			});
+			expect(recovered.status).toBe("completed");
+			const [job] = await sqlClient<Array<{ attempts: number }>>`
+				SELECT attempts
+				FROM ingest_job
+				WHERE id = ${jobId}
+			`;
+			expect(job?.attempts).toBe(2);
+			await expectPhysicalAndLogicalIdempotency(jobId, skillName);
+		} finally {
+			await clickhouse.execute({
+				query: `ALTER TABLE ${table} MODIFY SETTING non_replicated_deduplication_window = 1000`,
+			});
+		}
+	}, 180_000);
+
+	test("terminates the reserved backend when advisory unlock is not confirmed", async () => {
+		const sessionId = `unlock-failure-${crypto.randomUUID()}`;
+		let backendPid: number | undefined;
+		let unlockFailureInjected = false;
+		const result = await withIngestProcessingLedger(
+			{
+				filteredContentSha256: "d".repeat(64),
+				filterVersion: 2,
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+			},
+			(value) => String(value),
+			async (claimedLedger) => {
+				const [backend] = await claimedLedger.connection.unsafe<
+					Array<{ pid: number }>
+				>("SELECT pg_backend_pid()::int AS pid");
+				if (!backend) throw new Error("missing reserved backend pid");
+				backendPid = backend.pid;
+				return "ledger-completed";
+			},
+			{
+				disposableDatabase: createIngestProcessingSqlClient(),
+				failpoint: async (boundary) => {
+					if (
+						boundary.store === "postgres" &&
+						boundary.target === "advisory-unlock"
+					) {
+						unlockFailureInjected = true;
+						throw new Error("simulated advisory unlock failure");
+					}
+				},
+				now: () => new Date("2030-01-02T00:00:00.000Z"),
+				randomUUID: () => crypto.randomUUID(),
+			},
+		);
+		expect(result).toBe("ledger-completed");
+		expect(unlockFailureInjected).toBe(true);
+		if (backendPid === undefined)
+			throw new Error("reserved backend was not used");
+		const [activity] = await sqlClient<Array<{ active: boolean }>>`
+			SELECT EXISTS (
+				SELECT 1 FROM pg_stat_activity WHERE pid = ${backendPid}
+			) AS active
+		`;
+		expect(activity?.active).toBe(false);
+	});
 });
 
 async function initializeUploadedJob(

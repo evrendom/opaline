@@ -40,6 +40,31 @@ CREATE UNIQUE INDEX "ingest_processing_ledger_identity_idx"
 		"filter_version"
 	);
 --> statement-breakpoint
+CREATE TABLE "ingest_processing_target_receipt" (
+	"ledger_id" text NOT NULL,
+	"target" text NOT NULL,
+	"expected_row_count" integer NOT NULL,
+	"acknowledged_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "ingest_processing_target_receipt_pkey"
+		PRIMARY KEY ("ledger_id", "target"),
+	CONSTRAINT "ingest_processing_target_receipt_ledger_id_ingest_processing_ledger_id_fk"
+		FOREIGN KEY ("ledger_id") REFERENCES "ingest_processing_ledger"("id") ON DELETE CASCADE,
+	CONSTRAINT "ingest_processing_target_receipt_target_check"
+		CHECK (
+			"target" IN (
+				'rudel.claude_sessions',
+				'rudel.codex_sessions',
+				'rudel.session_language_signals',
+				'rudel.skill_receipts',
+				'rudel.skill_uses',
+				'rudel.skill_version_contents',
+				'rudel.usage_events'
+			)
+		),
+	CONSTRAINT "ingest_processing_target_receipt_row_count_check"
+		CHECK ("expected_row_count" > 0)
+);
+--> statement-breakpoint
 DROP INDEX "ingest_job_cleanup_idx";
 --> statement-breakpoint
 CREATE INDEX "ingest_job_cleanup_idx"
