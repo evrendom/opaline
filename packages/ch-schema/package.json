@@ -7,6 +7,7 @@
 		".": "./src/index.ts",
 		"./connection": "./src/clickhouse-connection.ts",
 		"./generated": "./src/generated/index.ts",
+		"./session-analytics-mv": "./src/session-analytics-mv.ts",
 		"./wrapped-archetype-centroids": "./src/wrapped-archetype-centroids.ts",
 		"./wrapped-archetype-constants": "./src/wrapped-archetype-constants.ts",
 		"./wrapped-archetype-rebuild": "./src/wrapped-archetype-rebuild.ts"

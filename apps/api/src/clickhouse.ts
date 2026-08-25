@@ -5,6 +5,11 @@ import {
 } from "@clickhouse/client-web";
 import { getLogger } from "@logtape/logtape";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+import {
+	CLAUDE_SESSION_ANALYTICS_MV_SQL,
+	CODEX_SESSION_ANALYTICS_MV_SQL,
+	SESSION_ANALYTICS_INSERT_COLUMNS,
+} from "@rudel/ch-schema/session-analytics-mv";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
 
@@ -14,6 +19,9 @@ const INGEST_RECOVERY_QUERY_SETTINGS = {
 	max_rows_to_read: "10000000",
 	timeout_before_checking_execution_speed: 0,
 } as const;
+
+const SESSION_ANALYTICS_MV_FILTER_MARKER =
+	"WHERE _is_capped OR length(_timestamps) > 0";
 
 const ALLOWED_CLICKHOUSE_TABLES = new Set([
 	"rudel.claude_sessions",
@@ -237,17 +245,13 @@ export function createIdempotentClickHouseExecutor(
 				return;
 			}
 			if (recovery.recovering) {
-				const recoveredRowCount = await countRecoveredClickHouseRows(
+				const recovered = await recoverAcknowledgedClickHouseInsert(
 					executor,
 					params.table,
 					params.values,
+					recovery.id,
 				);
-				if (recoveredRowCount > 0) {
-					assertExpectedRecoveryRowCount(
-						params.table,
-						expectedRowCount,
-						recoveredRowCount,
-					);
+				if (recovered) {
 					await recovery.recordReceipt(params.table, expectedRowCount);
 					return;
 				}
@@ -263,12 +267,79 @@ export function createIdempotentClickHouseExecutor(
 	};
 }
 
+async function recoverAcknowledgedClickHouseInsert(
+	executor: ClickHouseExecutor,
+	target: string,
+	values: readonly object[],
+	recoveryId: string,
+): Promise<boolean> {
+	const expectedRowCount = values.length;
+	const analyticsConfig = getSessionAnalyticsRecoveryConfig(target);
+	const [recoveredRowCount, recoveredAnalyticsRowCount] = await Promise.all([
+		countRecoveredClickHouseRows(executor, target, values, target),
+		analyticsConfig
+			? countRecoveredClickHouseRows(
+					executor,
+					"rudel.session_analytics",
+					values,
+					target,
+				)
+			: Promise.resolve(0),
+	]);
+
+	if (recoveredRowCount === 0) {
+		if (recoveredAnalyticsRowCount !== 0) {
+			throw new Error(
+				`ClickHouse recovery found rudel.session_analytics without ${target}`,
+			);
+		}
+		return false;
+	}
+
+	assertExpectedRecoveryRowCount(target, expectedRowCount, recoveredRowCount);
+	if (!analyticsConfig) return true;
+
+	if (recoveredAnalyticsRowCount === 0) {
+		await executor.execute(
+			buildSessionAnalyticsRepairStatement(
+				target,
+				values,
+				`${recoveryId}:${target}:session-analytics-repair`,
+			),
+		);
+		const repairedRowCount = await countRecoveredClickHouseRows(
+			executor,
+			"rudel.session_analytics",
+			values,
+			target,
+		);
+		assertExpectedRecoveryRowCount(
+			"rudel.session_analytics",
+			expectedRowCount,
+			repairedRowCount,
+		);
+		return true;
+	}
+
+	assertExpectedRecoveryRowCount(
+		"rudel.session_analytics",
+		expectedRowCount,
+		recoveredAnalyticsRowCount,
+	);
+	return true;
+}
+
 async function countRecoveredClickHouseRows(
 	executor: ClickHouseExecutor,
 	target: string,
 	values: readonly object[],
+	sourceTarget: string,
 ): Promise<number> {
-	const statement = buildIngestRecoveryCountStatement(target, values);
+	const statement = buildIngestRecoveryCountStatement(
+		target,
+		values,
+		sourceTarget,
+	);
 	const [row] = await executor.query<{ physical: number | string }>(statement);
 	const count = Number(row?.physical ?? 0);
 	if (!Number.isSafeInteger(count) || count < 0) {
@@ -280,6 +351,7 @@ async function countRecoveredClickHouseRows(
 function buildIngestRecoveryCountStatement(
 	target: string,
 	values: readonly object[],
+	sourceTarget: string,
 ): ClickHouseStatement {
 	const first = values[0];
 	if (!first) throw new Error("ClickHouse recovery probe requires rows");
@@ -298,12 +370,30 @@ function buildIngestRecoveryCountStatement(
 					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
 				{
 					...commonParams,
-					ingestedAt: readCommonString(values, "ingested_at"),
-					sessionDate: readCommonString(values, "session_date"),
-					sessionId: readCommonString(values, "session_id"),
-					userId: readCommonString(values, "user_id"),
+					...readRawSessionRecoveryParams(values),
 				},
 			);
+		case "rudel.session_analytics": {
+			const analyticsConfig = getSessionAnalyticsRecoveryConfig(sourceTarget);
+			if (!analyticsConfig) {
+				throw new Error(
+					`Unsupported session analytics recovery source: ${sourceTarget}`,
+				);
+			}
+			return recoveryCountStatement(
+				target,
+				`source = {source:String}
+					AND organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+				{
+					...commonParams,
+					...readRawSessionRecoveryParams(values),
+					source: analyticsConfig.source,
+				},
+			);
+		}
 		case "rudel.session_language_signals":
 			return recoveryCountStatement(
 				target,
@@ -396,6 +486,93 @@ function buildIngestRecoveryCountStatement(
 		default:
 			throw new Error(`Unsupported durable ClickHouse target: ${target}`);
 	}
+}
+
+export function buildSessionAnalyticsRepairStatement(
+	sourceTarget: string,
+	values: readonly object[],
+	deduplicationToken: string,
+): ClickHouseStatement {
+	const analyticsConfig = getSessionAnalyticsRecoveryConfig(sourceTarget);
+	if (!analyticsConfig) {
+		throw new Error(
+			`Unsupported session analytics recovery source: ${sourceTarget}`,
+		);
+	}
+	if (!values[0]) {
+		throw new Error("Session analytics repair requires raw rows");
+	}
+
+	const markerParts = analyticsConfig.mvSql.split(
+		SESSION_ANALYTICS_MV_FILTER_MARKER,
+	);
+	if (markerParts.length !== 2) {
+		throw new Error(
+			`Session analytics MV recovery marker count was ${markerParts.length - 1}`,
+		);
+	}
+	const scopedMvSql = markerParts.join(
+		`WHERE cs.organization_id = {organizationId:String}
+			AND cs.session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+			AND cs.session_id = {sessionId:String}
+			AND cs.user_id = {userId:String}
+			AND cs.ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')
+			AND (_is_capped OR length(_timestamps) > 0)`,
+	);
+	const columnList = SESSION_ANALYTICS_INSERT_COLUMNS.map(
+		(column) => `\`${column}\``,
+	).join(",\n\t");
+
+	return {
+		clickhouse_settings:
+			createClickHouseInsertDeduplicationSettings(deduplicationToken),
+		query: `INSERT INTO rudel.session_analytics
+(
+	${columnList}
+)
+SETTINGS async_insert=0
+SELECT
+	${columnList}
+FROM (
+${scopedMvSql}
+)`,
+		query_params: {
+			organizationId: readCommonString(values, "organization_id"),
+			...readRawSessionRecoveryParams(values),
+		},
+	};
+}
+
+interface SessionAnalyticsRecoveryConfig {
+	readonly mvSql: string;
+	readonly source: "claude_code" | "codex";
+}
+
+function getSessionAnalyticsRecoveryConfig(
+	sourceTarget: string,
+): SessionAnalyticsRecoveryConfig | null {
+	switch (sourceTarget) {
+		case "rudel.claude_sessions":
+			return {
+				mvSql: CLAUDE_SESSION_ANALYTICS_MV_SQL,
+				source: "claude_code",
+			};
+		case "rudel.codex_sessions":
+			return { mvSql: CODEX_SESSION_ANALYTICS_MV_SQL, source: "codex" };
+		default:
+			return null;
+	}
+}
+
+function readRawSessionRecoveryParams(
+	values: readonly object[],
+): Record<string, unknown> {
+	return {
+		ingestedAt: readCommonString(values, "ingested_at"),
+		sessionDate: readCommonString(values, "session_date"),
+		sessionId: readCommonString(values, "session_id"),
+		userId: readCommonString(values, "user_id"),
+	};
 }
 
 function recoveryCountStatement(

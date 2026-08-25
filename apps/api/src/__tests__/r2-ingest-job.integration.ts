@@ -34,6 +34,7 @@ const USER_ID = `r2-ingest-user-${crypto.randomUUID()}`;
 const ORGANIZATION_ID = `r2-ingest-org-${crypto.randomUUID()}`;
 const HASH_AFTER_FILTERING = "c".repeat(64);
 const MEMBER_ID = `r2-ingest-member-${crypto.randomUUID()}`;
+const REAL_CLAUDE_SESSION_DATE = "2026-08-25 10:00:00.000";
 
 interface FakeStoredObject {
 	bytes: Uint8Array | null;
@@ -646,7 +647,7 @@ describe("R2 ingest real processor crash recovery", () => {
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
-	test("recovers an expired 30-minute lease after ClickHouse evicts the raw insert token", async () => {
+	test("recovers an expired lease without duplicating an already-consistent MV target", async () => {
 		const clickhouse = getClickhouse();
 		const table = "rudel.claude_sessions";
 		await clickhouse.execute({
@@ -726,6 +727,9 @@ describe("R2 ingest real processor crash recovery", () => {
 					],
 				});
 			}
+			expect(
+				await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
+			).toEqual({ analytics: 1, raw: 1 });
 
 			const [crashedJob] = await sqlClient<
 				Array<{ leaseExpiresAt: Date | string | null; status: string }>
@@ -754,12 +758,87 @@ describe("R2 ingest real processor crash recovery", () => {
 				WHERE id = ${jobId}
 			`;
 			expect(job?.attempts).toBe(2);
+			expect(
+				await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
+			).toEqual({ analytics: 1, raw: 1 });
 			await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 		} finally {
 			await clickhouse.execute({
 				query: `ALTER TABLE ${table} MODIFY SETTING non_replicated_deduplication_window = 1000`,
 			});
 		}
+	}, 180_000);
+
+	test("repairs a missing session analytics target before receipting raw recovery", async () => {
+		const clickhouse = getClickhouse();
+		const rawTable = "rudel.claude_sessions";
+		const jobId = crypto.randomUUID();
+		const skillName = `torn-mv-skill-${jobId}`;
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(skillName),
+		);
+		const completion = buildCompletionInput(initialized);
+		let crashedAfterRawAcknowledgement = false;
+		const failpoint: IngestProcessingFailpoint = async (boundary) => {
+			if (
+				!crashedAfterRawAcknowledgement &&
+				boundary.store === "clickhouse" &&
+				boundary.target === rawTable
+			) {
+				crashedAfterRawAcknowledgement = true;
+				throw new IngestProcessingCrashSimulationError(
+					"simulated process death after torn raw commit",
+				);
+			}
+		};
+
+		await expect(
+			commitR2IngestJob({
+				failpoint,
+				input: completion,
+				now: () => new Date("2030-01-01T00:00:00.000Z"),
+				process: createRealProcessor(failpoint),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("simulated process death");
+		expect(crashedAfterRawAcknowledgement).toBe(true);
+		expect(
+			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
+		).toEqual({ analytics: 1, raw: 1 });
+
+		await clickhouse.execute({
+			query: `DELETE FROM rudel.session_analytics
+				WHERE source = 'claude_code'
+					AND organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')
+				SETTINGS lightweight_deletes_sync = 3`,
+			query_params: {
+				ingestedAt: "2030-01-01 00:00:00.000",
+				organizationId: ORGANIZATION_ID,
+				sessionId: jobId,
+				userId: USER_ID,
+			},
+		});
+		expect(
+			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
+		).toEqual({ analytics: 0, raw: 1 });
+
+		const recovered = await commitR2IngestJob({
+			input: completion,
+			now: () => new Date("2030-01-01T00:30:01.000Z"),
+			process: createRealProcessor(undefined),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(recovered.status).toBe("completed");
+		expect(
+			await countRawAndAnalyticsRevision(jobId, "2030-01-01 00:00:00.000"),
+		).toEqual({ analytics: 1, raw: 1 });
+		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
 	test("terminates the reserved backend when advisory unlock is not confirmed", async () => {
@@ -947,6 +1026,50 @@ function buildRealClaudeTranscript(skillName: string): string {
 			type: "user",
 		}),
 	].join("\n");
+}
+
+async function countRawAndAnalyticsRevision(
+	sessionId: string,
+	ingestedAt: string,
+): Promise<{ analytics: number; raw: number }> {
+	const clickhouse = getClickhouse();
+	const [[raw], [analytics]] = await Promise.all([
+		clickhouse.query<{ physical: number | string }>({
+			query: `SELECT count() AS physical
+				FROM rudel.claude_sessions
+				WHERE organization_id = {organizationId:String}
+					AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+					AND session_id = {sessionId:String}
+					AND user_id = {userId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+			query_params: {
+				ingestedAt,
+				organizationId: ORGANIZATION_ID,
+				sessionDate: REAL_CLAUDE_SESSION_DATE,
+				sessionId,
+				userId: USER_ID,
+			},
+		}),
+		clickhouse.query<{ physical: number | string }>({
+			query: `SELECT count() AS physical
+				FROM rudel.session_analytics
+				WHERE source = 'claude_code'
+					AND organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+			query_params: {
+				ingestedAt,
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+				userId: USER_ID,
+			},
+		}),
+	]);
+	return {
+		analytics: Number(analytics?.physical ?? 0),
+		raw: Number(raw?.physical ?? 0),
+	};
 }
 
 async function expectPhysicalAndLogicalIdempotency(

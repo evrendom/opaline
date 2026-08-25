@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { RudelSessionAnalyticsRowSchema } from "@rudel/ch-schema/generated";
+import { SESSION_ANALYTICS_INSERT_COLUMNS } from "@rudel/ch-schema/session-analytics-mv";
 import {
 	addOptionalStringEqFilter,
 	addOptionalStringInFilter,
 	buildAbsoluteDateFilter,
 	buildDateFilter,
 	buildLatestRawSessionContentSql,
+	buildSessionAnalyticsRepairStatement,
 	createClickHouseInsertDeduplicationSettings,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
@@ -87,6 +90,61 @@ describe("clickhouse helpers", () => {
 			deduplicate_blocks_in_dependent_materialized_views: 1,
 			insert_deduplication_token: "ledger-1:rudel.claude_sessions",
 		});
+	});
+
+	test("builds exact-revision session analytics repairs from both canonical MVs", () => {
+		const rawValues = [
+			{
+				ingested_at: "2030-01-01 00:00:00.000",
+				organization_id: "org-repair",
+				session_date: "2026-08-25 10:00:00.000",
+				session_id: "session-repair",
+				user_id: "user-repair",
+			},
+		];
+		const statement = buildSessionAnalyticsRepairStatement(
+			"rudel.claude_sessions",
+			rawValues,
+			"ledger-1:rudel.claude_sessions:session-analytics-repair",
+		);
+		const codexStatement = buildSessionAnalyticsRepairStatement(
+			"rudel.codex_sessions",
+			rawValues,
+			"ledger-1:rudel.codex_sessions:session-analytics-repair",
+		);
+
+		expect(Object.keys(RudelSessionAnalyticsRowSchema.shape)).toEqual([
+			...SESSION_ANALYTICS_INSERT_COLUMNS,
+		]);
+		expect(statement.query).toContain("INSERT INTO rudel.session_analytics");
+		expect(statement.query).toContain("SETTINGS async_insert=0");
+		expect(statement.query).toContain("FROM rudel.claude_sessions AS cs");
+		expect(codexStatement.query).toContain("FROM rudel.codex_sessions AS cs");
+		expect(statement.query).toContain(
+			"cs.organization_id = {organizationId:String}",
+		);
+		expect(statement.query).toContain(
+			"cs.session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')",
+		);
+		expect(statement.query).toContain("cs.session_id = {sessionId:String}");
+		expect(statement.query).toContain("cs.user_id = {userId:String}");
+		expect(statement.query).toContain(
+			"cs.ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')",
+		);
+		expect(statement.query_params).toEqual({
+			ingestedAt: "2030-01-01 00:00:00.000",
+			organizationId: "org-repair",
+			sessionDate: "2026-08-25 10:00:00.000",
+			sessionId: "session-repair",
+			userId: "user-repair",
+		});
+		expect(statement.clickhouse_settings?.insert_deduplication_token).toBe(
+			"ledger-1:rudel.claude_sessions:session-analytics-repair",
+		);
+		for (const column of SESSION_ANALYTICS_INSERT_COLUMNS) {
+			const quotedColumn = ["`", column, "`"].join("");
+			expect(statement.query.split(quotedColumn)).toHaveLength(3);
+		}
 	});
 
 	test("requires pushed-down filters for raw transcript scans", () => {
