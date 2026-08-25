@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { S3ServiceException } from "@aws-sdk/client-s3";
 import { parseError } from "@clickhouse/client-web";
 import type {
 	IngestSessionInput,
@@ -14,6 +15,7 @@ import {
 } from "../clickhouse.js";
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
+import { IngestFilterQueue } from "../services/ingest-filter.service.js";
 import {
 	getR2IngestJobStatus,
 	initR2IngestJob,
@@ -27,6 +29,7 @@ import {
 	createIngestProcessingSemaphore,
 	withIngestProcessingLedger,
 } from "../services/ingest-processing-ledger.service.js";
+import { IngestFilterWorkerOperationalError } from "../services/ingest-worker-operational.error.js";
 import {
 	repairR2IngestCleanupJobs,
 	sweepExpiredR2IngestJobs,
@@ -63,6 +66,7 @@ class FakeR2Client implements R2MultipartUploadClient {
 	readonly abortFailures = new Map<string, unknown>();
 	readonly completedKeys: string[] = [];
 	readonly deletedKeys: string[] = [];
+	readonly getObjectFailures = new Map<string, unknown>();
 	readonly objects = new Map<string, FakeStoredObject>();
 
 	async abortMultipartUpload(input: {
@@ -115,6 +119,11 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	async getObject(objectKey: string): Promise<Uint8Array> {
+		const failure = this.getObjectFailures.get(objectKey);
+		if (failure) {
+			this.getObjectFailures.delete(objectKey);
+			throw failure;
+		}
 		const object = this.requireObject(objectKey);
 		if (!object.complete || !object.bytes)
 			throw new Error("object unavailable");
@@ -146,6 +155,10 @@ class FakeR2Client implements R2MultipartUploadClient {
 
 	failNextAbort(objectKey: string, error: unknown): void {
 		this.abortFailures.set(objectKey, error);
+	}
+
+	failNextGetObject(objectKey: string, error: unknown): void {
+		this.getObjectFailures.set(objectKey, error);
 	}
 
 	private requireObject(objectKey: string): FakeStoredObject {
@@ -415,6 +428,147 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(retried.status).toBe("completed");
 	});
 
+	test("leaves objects intact when the transcript filter worker crashes", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"worker crash transcript",
+		);
+		const queue = new IngestFilterQueue(
+			{
+				globalMaxBytes: 1_000,
+				globalMaxJobs: 1,
+				perUserMaxBytes: 1_000,
+				perUserMaxJobs: 1,
+				timeoutMs: 5_000,
+			},
+			() =>
+				new Worker(
+					new URL("./fixtures/crashing-ingest-worker.ts", import.meta.url).href,
+				),
+		);
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async () => {
+					await queue.filter({
+						bytes: 23,
+						fields: {
+							content: "worker crash transcript",
+							subagents: undefined,
+						},
+						signal: new AbortController().signal,
+						userId: USER_ID,
+					});
+					return processorResult("unexpected-worker-success");
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBeInstanceOf(IngestFilterWorkerOperationalError);
+		queue.close();
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+			status: "pending",
+		});
+		expect(
+			initialized.objects.every((object) =>
+				fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+	});
+
+	test("leaves objects intact on an R2 ClientDisconnect service error", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"client disconnect transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+		const clientDisconnect = new S3ServiceException({
+			$fault: "client",
+			$metadata: { httpStatusCode: 400 },
+			message: "Client disconnected before request completed",
+			name: "ClientDisconnect",
+		});
+		fakeR2.failNextGetObject(objectKey, clientDisconnect);
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async (input) => processorResult(input.sessionId),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBe(clientDisconnect);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+			status: "pending",
+		});
+		expect(fakeR2.objects.has(objectKey)).toBe(true);
+
+		await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+	});
+
+	test("preserves objects for an unknown future processing error", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"novel failure transcript",
+		);
+		const novelError = new Error("future operational failure channel");
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async () => {
+					throw novelError;
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBe(novelError);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+			status: "pending",
+		});
+		expect(
+			initialized.objects.every((object) =>
+				fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+	});
+
 	test("repairs expired leases only through the dedicated worker", async () => {
 		const requested = await initializeUploadedJob(
 			"00000000-0000-4000-8000-000000000013",
@@ -508,7 +662,7 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 	});
 
-	test("treats a missing transcript timestamp as terminal and cleans R2", async () => {
+	test("keeps real timestamp validation terminal and cleans R2", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
 			JSON.stringify({ message: "missing timestamp", type: "user" }),

@@ -29,7 +29,7 @@ import {
 	runWithR2IngestMaterializationSlot,
 } from "./r2-ingest-materialization-gate.js";
 import {
-	isRetryableProcessingError,
+	isDefinitelyPermanentProcessingError,
 	R2IngestCommitError,
 } from "./r2-ingest-processing-error.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
@@ -1113,8 +1113,8 @@ async function recordProcessingFailure(
 	now: Date,
 ): Promise<"lease_lost" | "retryable" | "terminal"> {
 	const code = getSafeErrorCode(error);
-	const retryable = isRetryableProcessingError(error);
-	const terminal = !retryable || job.attempts >= job.maxAttempts;
+	const permanent = isDefinitelyPermanentProcessingError(error);
+	const terminal = permanent || job.attempts >= job.maxAttempts;
 	const retryDelayMs = Math.min(
 		RETRY_MAX_DELAY_MS,
 		RETRY_BASE_DELAY_MS * 2 ** Math.max(0, job.attempts - 1),
@@ -1226,17 +1226,17 @@ function getSafeErrorCode(error: unknown): string {
 	if (error instanceof R2IngestMaterializationGateError) return error.code;
 	if (error instanceof ORPCError) return `R2_INGEST_${error.code}`;
 	if (error instanceof z.ZodError) return "R2_INGEST_SCHEMA_VALIDATION_FAILED";
-	return isRetryableProcessingError(error)
-		? "R2_INGEST_TRANSIENT_FAILURE"
-		: "R2_INGEST_PROCESSING_FAILED";
+	return isDefinitelyPermanentProcessingError(error)
+		? "R2_INGEST_PROCESSING_FAILED"
+		: "R2_INGEST_TRANSIENT_FAILURE";
 }
 
 function getSafeErrorMessage(error: unknown): string {
 	if (error instanceof R2IngestCommitError) return error.message;
 	if (error instanceof R2IngestMaterializationGateError) return error.message;
-	return isRetryableProcessingError(error)
-		? "Ingest processing temporarily failed and may be retried"
-		: "Ingest processing was rejected and will not be retried";
+	return isDefinitelyPermanentProcessingError(error)
+		? "Ingest processing was rejected and will not be retried"
+		: "Ingest processing temporarily failed and may be retried";
 }
 
 function willExpireBeforeLeaseEnds(

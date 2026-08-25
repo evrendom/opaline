@@ -1,4 +1,5 @@
 import type { LanguageSignalCounts } from "@rudel/language-signals";
+import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
 import type { SessionLanguageSignalScannerWorkerResponse } from "./session-language-signal-scanner.types.js";
 
 interface PendingLanguageSignalScan {
@@ -28,7 +29,9 @@ export class SessionLanguageSignalScanner {
 	scan(content: string): Promise<LanguageSignalCounts> {
 		if (this.closed) {
 			return Promise.reject(
-				new Error("Language-signal scanner is shutting down"),
+				new SessionLanguageSignalScannerOperationalError(
+					"Language-signal scanner is shutting down",
+				),
 			);
 		}
 		const requestId = this.nextRequestId;
@@ -40,7 +43,7 @@ export class SessionLanguageSignalScanner {
 				const timeout = setTimeout(() => {
 					this.handleWorkerFailure(
 						worker,
-						new Error(
+						new SessionLanguageSignalScannerOperationalError(
 							`Language-signal scan exceeded ${this.scanTimeoutMs}ms deadline`,
 						),
 					);
@@ -52,14 +55,18 @@ export class SessionLanguageSignalScanner {
 				const pending = this.pending.get(requestId);
 				if (pending) clearTimeout(pending.timeout);
 				this.pending.delete(requestId);
-				reject(toError(error));
+				reject(toOperationalError(error));
 			}
 		});
 	}
 
 	close(): void {
 		this.closed = true;
-		this.failAll(new Error("Language-signal scanner is shutting down"));
+		this.failAll(
+			new SessionLanguageSignalScannerOperationalError(
+				"Language-signal scanner is shutting down",
+			),
+		);
 	}
 
 	private getWorker(): Worker {
@@ -72,12 +79,17 @@ export class SessionLanguageSignalScanner {
 			},
 		);
 		worker.addEventListener("error", (event) => {
-			this.handleWorkerFailure(worker, new Error(event.message));
+			this.handleWorkerFailure(
+				worker,
+				new SessionLanguageSignalScannerOperationalError(event.message),
+			);
 		});
 		worker.addEventListener("close", () => {
 			this.handleWorkerFailure(
 				worker,
-				new Error("Language-signal scanner stopped unexpectedly"),
+				new SessionLanguageSignalScannerOperationalError(
+					"Language-signal scanner stopped unexpectedly",
+				),
 			);
 		});
 		worker.unref();
@@ -96,18 +108,23 @@ export class SessionLanguageSignalScanner {
 		clearTimeout(pending.timeout);
 
 		if (response.status === "error") {
-			pending.reject(new Error(response.message));
+			pending.reject(
+				new SessionLanguageSignalScannerOperationalError(response.message),
+			);
 			return;
 		}
 		pending.resolve(response.counts);
 	}
 
-	private handleWorkerFailure(worker: Worker, error: Error): void {
+	private handleWorkerFailure(
+		worker: Worker,
+		error: SessionLanguageSignalScannerOperationalError,
+	): void {
 		if (worker !== this.worker) return;
 		this.failAll(error);
 	}
 
-	private failAll(error: Error): void {
+	private failAll(error: SessionLanguageSignalScannerOperationalError): void {
 		const worker = this.worker;
 		this.worker = undefined;
 		worker?.terminate();
@@ -138,8 +155,14 @@ export function shutdownSessionLanguageSignalScanner(): void {
 	scanner.close();
 }
 
-function toError(error: unknown): Error {
-	return error instanceof Error
-		? error
-		: new Error("Language-signal scanner failed");
+function toOperationalError(
+	error: unknown,
+): SessionLanguageSignalScannerOperationalError {
+	if (error instanceof SessionLanguageSignalScannerOperationalError) {
+		return error;
+	}
+	return new SessionLanguageSignalScannerOperationalError(
+		error instanceof Error ? error.message : "Language-signal scanner failed",
+		error,
+	);
 }

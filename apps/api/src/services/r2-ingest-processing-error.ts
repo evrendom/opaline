@@ -1,4 +1,16 @@
 import { ORPCError } from "@orpc/server";
+import {
+	REDACTION_BUDGET_EXCEEDED_CODE,
+	REDACTION_DID_NOT_CONVERGE_CODE,
+	SECRET_FILTER_JSON_INTEGRITY_CODE,
+	SESSION_OWNERSHIP_CONFLICT_CODE,
+	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+} from "@rudel/api-routes";
+import { ZodError } from "zod";
+import {
+	IngestFilterWorkerOperationalError,
+	SessionLanguageSignalScannerOperationalError,
+} from "./ingest-worker-operational.error.js";
 import { R2IngestMaterializationGateError } from "./r2-ingest-materialization-gate.js";
 
 const MAX_ERROR_GRAPH_NODES = 64;
@@ -48,7 +60,14 @@ const RETRYABLE_ERROR_CODES = new Set([
 	"UND_ERR_CONNECT_TIMEOUT",
 	"UND_ERR_SOCKET",
 ]);
-const RETRYABLE_ERROR_NAMES = new Set(["AbortError", "TimeoutError"]);
+const RETRYABLE_ERROR_NAMES = new Set([
+	"AbortError",
+	"ClientDisconnect",
+	"InternalError",
+	"ServiceUnavailable",
+	"TimeoutError",
+	"TooManyRequests",
+]);
 const RETRYABLE_ORPC_CODES = new Set([
 	"CLIENT_CLOSED_REQUEST",
 	"GATEWAY_TIMEOUT",
@@ -58,6 +77,32 @@ const RETRYABLE_ORPC_CODES = new Set([
 const RETRYABLE_TRANSPORT_MESSAGES = new Set([
 	"The user aborted a request.",
 	"Timeout error.",
+]);
+const DEFINITELY_PERMANENT_ORPC_CODES: ReadonlySet<string> = new Set([
+	"BAD_REQUEST",
+	"CONFLICT",
+	"FORBIDDEN",
+	"PAYLOAD_TOO_LARGE",
+	"UNAUTHORIZED",
+	REDACTION_BUDGET_EXCEEDED_CODE,
+	REDACTION_DID_NOT_CONVERGE_CODE,
+	SECRET_FILTER_JSON_INTEGRITY_CODE,
+	SESSION_OWNERSHIP_CONFLICT_CODE,
+	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+]);
+const DEFINITELY_PERMANENT_R2_INGEST_CODES = new Set([
+	"R2_INGEST_COMPLETION_RECEIPT_INVALID",
+	"R2_INGEST_MANIFEST_INVALID",
+	"R2_INGEST_OBJECT_ENCODING_INVALID",
+	"R2_INGEST_OBJECT_HASH_MISMATCH",
+	"R2_INGEST_OBJECT_METADATA_MISMATCH",
+	"R2_INGEST_OBJECT_MISSING",
+	"R2_INGEST_OBJECT_SIZE_MISMATCH",
+	"R2_INGEST_TOTAL_SIZE_MISMATCH",
+]);
+const DEFINITELY_PERMANENT_CLICKHOUSE_ERROR_TYPES_BY_CODE = new Map([
+	["53", "TYPE_MISMATCH"],
+	["62", "SYNTAX_ERROR"],
 ]);
 
 export class R2IngestCommitError extends Error {
@@ -97,9 +142,38 @@ export function isRetryableProcessingError(error: unknown): boolean {
 	return false;
 }
 
+/**
+ * Closed allowlist for errors that cannot succeed with the same uploaded input.
+ * Unknown errors must stay pending so a future operational failure cannot cause
+ * a verified R2 object to be deleted before retry exhaustion or expiry cleanup.
+ */
+export function isDefinitelyPermanentProcessingError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null) return false;
+	if (
+		error instanceof R2IngestCommitError &&
+		DEFINITELY_PERMANENT_R2_INGEST_CODES.has(error.code)
+	) {
+		return true;
+	}
+	if (
+		error instanceof ORPCError &&
+		DEFINITELY_PERMANENT_ORPC_CODES.has(error.code)
+	) {
+		return true;
+	}
+	if (error instanceof ZodError) return true;
+	return isDefinitelyPermanentClickHouseError(error);
+}
+
 function isRetryableErrorNode(error: object): boolean {
 	if (error instanceof R2IngestCommitError && error.retryable) return true;
 	if (error instanceof R2IngestMaterializationGateError) return true;
+	if (
+		error instanceof IngestFilterWorkerOperationalError ||
+		error instanceof SessionLanguageSignalScannerOperationalError
+	) {
+		return true;
+	}
 	if (error instanceof ORPCError && RETRYABLE_ORPC_CODES.has(error.code)) {
 		return true;
 	}
@@ -122,6 +196,16 @@ function isRetryableErrorNode(error: object): boolean {
 		httpStatusCode === 425 ||
 		httpStatusCode === 429 ||
 		(httpStatusCode !== null && httpStatusCode >= 500)
+	);
+}
+
+function isDefinitelyPermanentClickHouseError(error: object): boolean {
+	const code = getErrorString(error, "code");
+	const type = getErrorString(error, "type");
+	return (
+		code !== null &&
+		type !== null &&
+		DEFINITELY_PERMANENT_CLICKHOUSE_ERROR_TYPES_BY_CODE.get(code) === type
 	);
 }
 

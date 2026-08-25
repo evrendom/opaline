@@ -102,6 +102,10 @@ import {
 	IngestTimestampWindowError,
 } from "./services/ingest-timestamp-window.service.js";
 import {
+	IngestFilterWorkerOperationalError,
+	SessionLanguageSignalScannerOperationalError,
+} from "./services/ingest-worker-operational.error.js";
+import {
 	getCachedOrgSessionCount,
 	hasOrgUploadsInLastDays,
 } from "./services/org-session.service.js";
@@ -493,6 +497,15 @@ export async function processIngestSession({
 				message: error.message,
 			});
 		}
+		if (error instanceof IngestFilterWorkerOperationalError) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: {
+					reason: "ingest_filter_worker_failed",
+					retryAfterMs: error.retryAfterMs,
+				},
+				message: "Transcript filtering temporarily failed. Retry shortly.",
+			});
+		}
 		throw error;
 	});
 	const redactionBudgetAnomaly = getRedactionBudgetAnomaly(
@@ -761,13 +774,27 @@ export async function processIngestSession({
 		userId: context.user.id,
 	};
 	if (awaitLanguageSignals) {
-		if (claimedLedger) {
-			await persistSessionLanguageSignalsWithExecutor(
-				languageSignalInput,
-				clickhouse,
-			);
-		} else {
-			await persistSessionLanguageSignals(languageSignalInput);
+		try {
+			if (claimedLedger) {
+				await persistSessionLanguageSignalsWithExecutor(
+					languageSignalInput,
+					clickhouse,
+				);
+			} else {
+				await persistSessionLanguageSignals(languageSignalInput);
+			}
+		} catch (error) {
+			if (error instanceof SessionLanguageSignalScannerOperationalError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: "language_signal_scanner_failed",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message:
+						"Language-signal scanning temporarily failed. Retry shortly.",
+				});
+			}
+			throw error;
 		}
 	} else {
 		void persistSessionLanguageSignalsBestEffort(languageSignalInput);

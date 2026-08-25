@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
 import { SessionLanguageSignalScanner } from "./session-language-signal-scanner.service.js";
 
 describe("session language-signal scanner", () => {
@@ -23,7 +24,9 @@ describe("session language-signal scanner", () => {
 		});
 
 		try {
-			await expect(scanner.scan("ignored")).rejects.toThrow("deadline");
+			await expect(scanner.scan("ignored")).rejects.toBeInstanceOf(
+				SessionLanguageSignalScannerOperationalError,
+			);
 			await expect(scanner.scan("")).resolves.toEqual({
 				member_apologies: 0,
 				member_positive: 0,
@@ -38,10 +41,33 @@ describe("session language-signal scanner", () => {
 		}
 	});
 
+	test("returns a typed operational error when the worker crashes", async () => {
+		const scanner = new SessionLanguageSignalScanner({
+			createWorker: () =>
+				new Worker(
+					new URL(
+						"../__tests__/fixtures/crashing-ingest-worker.ts",
+						import.meta.url,
+					).href,
+				),
+			scanTimeoutMs: 5_000,
+		});
+
+		try {
+			await expect(scanner.scan("ignored")).rejects.toBeInstanceOf(
+				SessionLanguageSignalScannerOperationalError,
+			);
+		} finally {
+			scanner.close();
+		}
+	});
+
 	test("stays closed after shutdown", async () => {
 		const scanner = new SessionLanguageSignalScanner();
 		scanner.close();
 
-		await expect(scanner.scan("ignored")).rejects.toThrow("shutting down");
+		await expect(scanner.scan("ignored")).rejects.toBeInstanceOf(
+			SessionLanguageSignalScannerOperationalError,
+		);
 	});
 });
