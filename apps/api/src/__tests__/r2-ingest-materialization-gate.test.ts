@@ -10,6 +10,9 @@ describe("R2 ingest materialization gate", () => {
 		const gate = createR2IngestMaterializationGate({
 			maxBytes: 128 * MEBIBYTE,
 			maxJobs: 1,
+			maxQueuedJobs: 2,
+			operationTimeoutMs: 5_000,
+			queueTimeoutMs: 5_000,
 		});
 		let activeJobs = 0;
 		let maxActiveJobs = 0;
@@ -50,4 +53,68 @@ describe("R2 ingest materialization gate", () => {
 			queuedJobs: 0,
 		});
 	}, 30_000);
+
+	test("bounds queued jobs and times out queued work", async () => {
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 128 * MEBIBYTE,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 5_000,
+			queueTimeoutMs: 20,
+		});
+		let releaseActive: () => void = () => {};
+		const activeHold = new Promise<void>((resolve) => {
+			releaseActive = resolve;
+		});
+		const active = gate.run(1, async () => {
+			await activeHold;
+			return "active";
+		});
+		await Promise.resolve();
+		const queued = gate.run(1, async () => "queued");
+		await expect(gate.run(1, async () => "overflow")).rejects.toMatchObject({
+			code: "R2_INGEST_GATE_FULL",
+		});
+		await expect(queued).rejects.toMatchObject({
+			code: "R2_INGEST_GATE_QUEUE_TIMEOUT",
+		});
+		expect(gate.getStats().queuedJobs).toBe(0);
+		releaseActive();
+		await expect(active).resolves.toBe("active");
+	});
+
+	test("cancels a hung operation and admits the next job", async () => {
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 128 * MEBIBYTE,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 20,
+			queueTimeoutMs: 5_000,
+		});
+		let observedCancellation = false;
+		const hung = gate.run(1, async (signal) => {
+			signal.addEventListener(
+				"abort",
+				() => {
+					observedCancellation = true;
+				},
+				{ once: true },
+			);
+			return new Promise<never>(() => {});
+		});
+		await Promise.resolve();
+		const next = gate.run(1, async () => "next");
+
+		await expect(hung).rejects.toMatchObject({
+			code: "R2_INGEST_GATE_OPERATION_TIMEOUT",
+		});
+		expect(observedCancellation).toBe(true);
+		await expect(next).resolves.toBe("next");
+		expect(gate.getStats()).toEqual({
+			activeBytes: 0,
+			activeJobs: 0,
+			queuedBytes: 0,
+			queuedJobs: 0,
+		});
+	});
 });

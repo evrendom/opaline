@@ -26,6 +26,16 @@ export interface R2IngestCleanupRepairResult {
 	readonly hasMore: boolean;
 }
 
+export interface R2IngestExpirySweepResult {
+	readonly attempted: number;
+	readonly completed: number;
+	readonly hasMore: boolean;
+}
+
+interface R2IngestNextWorkDueRow {
+	readonly nextDueAt: Date | string | null;
+}
+
 export interface R2IngestCleanupWorker {
 	wake: () => Promise<void>;
 }
@@ -36,6 +46,10 @@ export function registerR2IngestCleanupWorker(
 	worker: R2IngestCleanupWorker,
 ): void {
 	registeredR2IngestCleanupWorker = worker;
+}
+
+export function wakeR2IngestWorker(): void {
+	void registeredR2IngestCleanupWorker?.wake();
 }
 
 export async function cleanupIngestJobObjects(
@@ -135,6 +149,97 @@ export async function repairR2IngestCleanupJobs(input: {
 		completed,
 		hasMore: candidates.length === limit && completed === candidates.length,
 	};
+}
+
+export async function sweepExpiredR2IngestJobs(input: {
+	database: postgres.Sql;
+	limit?: number;
+	now?: Date;
+	r2: R2MultipartUploadClient;
+}): Promise<R2IngestExpirySweepResult> {
+	const limit = input.limit ?? MAX_CLEANUP_JOBS_PER_REPAIR;
+	if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 100) {
+		throw new Error("R2 ingest expiry sweep limit must be between 1 and 100");
+	}
+	const now = input.now ?? new Date();
+	const expired = await input.database.unsafe<R2IngestCleanupJob[]>(
+		`WITH candidates AS (
+			SELECT id
+			FROM ingest_job
+			WHERE status IN ('pending', 'running')
+				AND expires_at <= $1
+			ORDER BY expires_at ASC, id ASC
+			FOR UPDATE SKIP LOCKED
+			LIMIT $2
+		), terminalized AS (
+			UPDATE ingest_job AS job
+			SET
+				status = 'failed',
+				last_error_code = 'R2_INGEST_JOB_EXPIRED',
+				last_error_message = 'Ingest job expired before completion',
+				failed_at = $1,
+				lease_token = NULL,
+				lease_expires_at = NULL,
+				updated_at = $1
+			FROM candidates
+			WHERE job.id = candidates.id
+			RETURNING
+				job.id,
+				job.object_manifest AS "objectManifest",
+				job.objects_deleted_at AS "objectsDeletedAt"
+		)
+		SELECT id, "objectManifest", "objectsDeletedAt"
+		FROM terminalized`,
+		[now.toISOString(), limit],
+	);
+	let completed = 0;
+	for (const job of expired) {
+		if (
+			await cleanupIngestJobObjects(
+				job,
+				input.database,
+				input.r2,
+				undefined,
+				false,
+			)
+		) {
+			completed += 1;
+		}
+	}
+	return {
+		attempted: expired.length,
+		completed,
+		hasMore: expired.length === limit && completed === expired.length,
+	};
+}
+
+export async function getNextR2IngestWorkDueAt(
+	database: postgres.Sql,
+): Promise<Date | null> {
+	const [row] = await database.unsafe<R2IngestNextWorkDueRow[]>(
+		`SELECT MIN(due_at) AS "nextDueAt"
+		 FROM (
+			SELECT available_at AS due_at
+			FROM ingest_job
+			WHERE status = 'pending' AND attempts > 0
+
+			UNION ALL
+
+			SELECT lease_expires_at AS due_at
+			FROM ingest_job
+			WHERE status = 'running' AND lease_expires_at IS NOT NULL
+
+			UNION ALL
+
+			SELECT expires_at AS due_at
+			FROM ingest_job
+			WHERE status IN ('pending', 'running')
+		 ) AS due_work`,
+	);
+	if (!row?.nextDueAt) return null;
+	const nextDueAt =
+		row.nextDueAt instanceof Date ? row.nextDueAt : new Date(row.nextDueAt);
+	return Number.isNaN(nextDueAt.getTime()) ? null : nextDueAt;
 }
 
 function isNoSuchUploadError(error: unknown): boolean {

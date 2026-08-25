@@ -23,6 +23,29 @@ export interface IngestProcessingTargetReceipt {
 	readonly target: string;
 }
 
+export type IngestProcessingLedgerResult<TResult> =
+	| { readonly status: "already_processing" }
+	| { readonly result: TResult; readonly status: "completed" };
+
+export interface IngestProcessingSemaphore {
+	acquire: (signal?: AbortSignal) => Promise<() => void>;
+}
+
+export class IngestProcessingCapacityError extends Error {
+	readonly code:
+		| "INGEST_PROCESSING_QUEUE_FULL"
+		| "INGEST_PROCESSING_QUEUE_TIMEOUT";
+
+	constructor(
+		code: "INGEST_PROCESSING_QUEUE_FULL" | "INGEST_PROCESSING_QUEUE_TIMEOUT",
+		message: string,
+	) {
+		super(message);
+		this.code = code;
+		this.name = "IngestProcessingCapacityError";
+	}
+}
+
 interface IngestProcessingLedgerRow {
 	id: string;
 	rawIngestedAt: Date | string;
@@ -32,10 +55,12 @@ interface IngestProcessingLedgerRow {
 }
 
 interface IngestProcessingLedgerEnvironment {
-	readonly disposableDatabase: postgres.Sql;
+	readonly database: postgres.Sql;
 	readonly failpoint: IngestProcessingFailpoint | undefined;
 	readonly now: () => Date;
 	readonly randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
+	readonly semaphore: IngestProcessingSemaphore;
+	readonly signal: AbortSignal | undefined;
 }
 
 export async function withIngestProcessingLedger<TResult>(
@@ -43,19 +68,22 @@ export async function withIngestProcessingLedger<TResult>(
 	parseCompletedResult: (value: unknown) => TResult,
 	operation: (ledger: ClaimedIngestProcessingLedger) => Promise<TResult>,
 	env: IngestProcessingLedgerEnvironment,
-): Promise<TResult> {
-	const connection = await env.disposableDatabase.reserve();
+): Promise<IngestProcessingLedgerResult<TResult>> {
+	const releasePermit = await env.semaphore.acquire(env.signal);
 	const lockIdentity = buildLockIdentity(identity);
-	let locked = false;
 	try {
-		await connection.unsafe(
-			"SELECT pg_advisory_lock(hashtextextended($1, 0))",
-			[lockIdentity],
-		);
-		locked = true;
+		const connection = await env.database.reserve();
+		let locked = false;
+		try {
+			const [lock] = await connection.unsafe<Array<{ locked: boolean }>>(
+				"SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked",
+				[lockIdentity],
+			);
+			locked = lock?.locked === true;
+			if (!locked) return { status: "already_processing" };
 
-		const inserted = await connection.unsafe<Array<{ id: string }>>(
-			`INSERT INTO ingest_processing_ledger (
+			const inserted = await connection.unsafe<Array<{ id: string }>>(
+				`INSERT INTO ingest_processing_ledger (
 				id,
 				organization_id,
 				session_id,
@@ -71,35 +99,38 @@ export async function withIngestProcessingLedger<TResult>(
 				filter_version
 			) DO NOTHING
 			RETURNING id`,
-			[
-				env.randomUUID(),
-				identity.organizationId,
-				identity.sessionId,
-				identity.filteredContentSha256,
-				identity.filterVersion,
-				env.now().toISOString(),
-			],
-		);
+				[
+					env.randomUUID(),
+					identity.organizationId,
+					identity.sessionId,
+					identity.filteredContentSha256,
+					identity.filterVersion,
+					env.now().toISOString(),
+				],
+			);
 
-		const row = await readLedgerRow(identity, connection);
-		if (row.status === "completed") {
-			return parseCompletedResult(row.result);
-		}
+			const row = await readLedgerRow(identity, connection);
+			if (row.status === "completed") {
+				return {
+					result: parseCompletedResult(row.result),
+					status: "completed",
+				};
+			}
 
-		await connection.unsafe(
-			`UPDATE ingest_processing_ledger
+			await connection.unsafe(
+				`UPDATE ingest_processing_ledger
 			 SET status = 'processing', updated_at = NOW()
 			 WHERE id = $1`,
-			[row.id],
-		);
-		const result = await operation({
-			connection,
-			id: row.id,
-			rawIngestedAt: toDate(row.rawIngestedAt),
-			recovering: inserted.length === 0,
-		});
-		const completed = await connection.unsafe<Array<{ id: string }>>(
-			`UPDATE ingest_processing_ledger
+				[row.id],
+			);
+			const result = await operation({
+				connection,
+				id: row.id,
+				rawIngestedAt: toDate(row.rawIngestedAt),
+				recovering: inserted.length === 0,
+			});
+			const completed = await connection.unsafe<Array<{ id: string }>>(
+				`UPDATE ingest_processing_ledger
 			 SET
 				status = 'completed',
 				result = $1,
@@ -107,43 +138,46 @@ export async function withIngestProcessingLedger<TResult>(
 				updated_at = NOW()
 			 WHERE id = $2
 			 RETURNING id`,
-			[connection.json(toJsonValue(result)), row.id],
-		);
-		if (completed.length !== 1) {
-			throw new Error("Ingest processing ledger completion failed");
+				[connection.json(toJsonValue(result)), row.id],
+			);
+			if (completed.length !== 1) {
+				throw new Error("Ingest processing ledger completion failed");
+			}
+			await passIngestProcessingBoundary(env.failpoint, {
+				store: "postgres",
+				target: "ledger-completed",
+			});
+			return { result, status: "completed" };
+		} finally {
+			if (locked) await releaseProcessingLock(connection, lockIdentity, env);
+			connection.release();
 		}
+	} finally {
+		releasePermit();
+	}
+}
+
+async function releaseProcessingLock(
+	connection: postgres.ReservedSql,
+	lockIdentity: string,
+	env: IngestProcessingLedgerEnvironment,
+): Promise<void> {
+	let unlockConfirmed = false;
+	try {
 		await passIngestProcessingBoundary(env.failpoint, {
 			store: "postgres",
-			target: "ledger-completed",
+			target: "advisory-unlock",
 		});
-		return result;
-	} finally {
-		let destroyDatabase = false;
-		if (locked) {
-			let unlockConfirmed = false;
-			try {
-				await passIngestProcessingBoundary(env.failpoint, {
-					store: "postgres",
-					target: "advisory-unlock",
-				});
-				const [unlocked] = await connection.unsafe<
-					Array<{ unlocked: boolean }>
-				>("SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked", [
-					lockIdentity,
-				]);
-				unlockConfirmed = unlocked?.unlocked === true;
-			} catch {}
-			if (!unlockConfirmed) {
-				destroyDatabase = true;
-			}
-		}
-		if (destroyDatabase) {
-			await env.disposableDatabase.end({ timeout: 0 });
-		} else {
-			connection.release();
-			await env.disposableDatabase.end();
-		}
-	}
+		const [unlocked] = await connection.unsafe<Array<{ unlocked: boolean }>>(
+			"SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+			[lockIdentity],
+		);
+		unlockConfirmed = unlocked?.unlocked === true;
+	} catch {}
+	if (unlockConfirmed) return;
+	try {
+		await connection.unsafe("SELECT pg_advisory_unlock_all()");
+	} catch {}
 }
 
 export async function readIngestProcessingTargetReceipt(
@@ -264,6 +298,116 @@ async function readLedgerRow(
 	}
 	return row;
 }
+
+interface IngestProcessingWaiter {
+	cancel: (error: Error) => void;
+	start: () => void;
+}
+
+export function createIngestProcessingSemaphore(input: {
+	maxActive: number;
+	maxQueued: number;
+	waitTimeoutMs: number;
+}): IngestProcessingSemaphore {
+	for (const [name, value] of Object.entries(input)) {
+		if (!Number.isSafeInteger(value) || value <= 0) {
+			throw new Error(`Ingest processing semaphore ${name} must be positive`);
+		}
+	}
+	let active = 0;
+	const queued: IngestProcessingWaiter[] = [];
+
+	function createRelease(): () => void {
+		let released = false;
+		return () => {
+			if (released) return;
+			released = true;
+			active -= 1;
+			dispatch();
+		};
+	}
+
+	function dispatch(): void {
+		while (active < input.maxActive) {
+			const next = queued.shift();
+			if (!next) return;
+			active += 1;
+			next.start();
+		}
+	}
+
+	return {
+		acquire(signal?: AbortSignal) {
+			if (signal?.aborted) {
+				return Promise.reject(
+					signal.reason instanceof Error
+						? signal.reason
+						: new Error("Ingest processing was cancelled"),
+				);
+			}
+			if (active < input.maxActive) {
+				active += 1;
+				return Promise.resolve(createRelease());
+			}
+			if (queued.length >= input.maxQueued) {
+				return Promise.reject(
+					new IngestProcessingCapacityError(
+						"INGEST_PROCESSING_QUEUE_FULL",
+						"Ingest processing queue is full",
+					),
+				);
+			}
+			return new Promise<() => void>((resolve, reject) => {
+				let waitTimer: ReturnType<typeof setTimeout> | undefined;
+				let started = false;
+				const abort = (): void => {
+					waiter.cancel(
+						signal?.reason instanceof Error
+							? signal.reason
+							: new Error("Ingest processing was cancelled"),
+					);
+				};
+				function clearWait(): void {
+					if (waitTimer) clearTimeout(waitTimer);
+					waitTimer = undefined;
+					signal?.removeEventListener("abort", abort);
+				}
+				const waiter: IngestProcessingWaiter = {
+					cancel(error) {
+						if (started) return;
+						const index = queued.indexOf(waiter);
+						if (index === -1) return;
+						queued.splice(index, 1);
+						clearWait();
+						reject(error);
+					},
+					start() {
+						started = true;
+						clearWait();
+						resolve(createRelease());
+					},
+				};
+				queued.push(waiter);
+				waitTimer = setTimeout(() => {
+					waiter.cancel(
+						new IngestProcessingCapacityError(
+							"INGEST_PROCESSING_QUEUE_TIMEOUT",
+							"Ingest processing queue wait timed out",
+						),
+					);
+				}, input.waitTimeoutMs);
+				waitTimer.unref();
+				signal?.addEventListener("abort", abort, { once: true });
+			});
+		},
+	};
+}
+
+export const ingestProcessingSemaphore = createIngestProcessingSemaphore({
+	maxActive: 4,
+	maxQueued: 32,
+	waitTimeoutMs: 1_000,
+});
 
 function buildLockIdentity(identity: IngestProcessingIdentity): string {
 	return JSON.stringify([

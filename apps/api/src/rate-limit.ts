@@ -318,14 +318,12 @@ export function checkWrappedDecimalClaimRedeemRateLimit(userId: string) {
 	});
 }
 
-// Ingest caps split by upload mode. Both count distinct session_ids in
-// a rolling window — Codex's per-turn re-uploads of the same session
-// collapse into one slot in either bucket. Hook and manual buckets are
-// independent: a bulk historical import does not affect the live-hook
-// budget, and vice versa.
+// Ingest caps split by upload mode. Every accepted attempt counts, including
+// repeated uploads of the same session. Hook and manual buckets are independent:
+// a bulk historical import does not affect the live-hook budget, and vice versa.
 
 interface SessionIngestEntry {
-	sessions: Map<string, number>;
+	timestamps: number[];
 }
 
 const hookIngestWindows = new Map<string, SessionIngestEntry>();
@@ -419,44 +417,41 @@ function checkSessionIngestRateLimit(input: {
 	userId: string;
 	sessionId: string;
 }): void {
-	const { windows, max, windowMs, label, userId, sessionId } = input;
+	const { windows, max, windowMs, label, userId } = input;
 	const now = Date.now();
 	const cutoff = now - windowMs;
 
 	let entry = windows.get(userId);
 	if (!entry) {
-		entry = { sessions: new Map() };
+		entry = { timestamps: [] };
 		windows.set(userId, entry);
 	}
 
-	for (const [sid, ts] of entry.sessions) {
-		if (ts <= cutoff) entry.sessions.delete(sid);
-	}
+	entry.timestamps = entry.timestamps.filter((timestamp) => timestamp > cutoff);
 
-	const isNew = !entry.sessions.has(sessionId);
-	if (isNew && entry.sessions.size >= max) {
+	if (entry.timestamps.length >= max) {
 		logger.warn(
-			"{label} ingest rate limit exceeded for user {userId}: {count}/{max} unique sessions in {window}s",
+			"{label} ingest rate limit exceeded for user {userId}: {count}/{max} attempts in {window}s",
 			{
 				label,
 				userId,
-				count: entry.sessions.size,
+				count: entry.timestamps.length,
 				max,
 				window: windowMs / 1000,
 			},
 		);
 		throw new ORPCError("TOO_MANY_REQUESTS", {
-			message: `Rate limit exceeded. Maximum ${max} sessions per ${Math.round(windowMs / 60_000)} minutes. Try again later.`,
+			message: `Rate limit exceeded. Maximum ${max} ingest attempts per ${Math.round(windowMs / 60_000)} minutes. Try again later.`,
 			data: {
 				reason: INGEST_LIMIT_REASONS.sessionLimit,
 				limit: max,
 				windowSeconds: windowMs / 1000,
-				current: entry.sessions.size,
+				current: entry.timestamps.length,
 			},
 		});
 	}
 
-	entry.sessions.set(sessionId, now);
+	entry.timestamps.push(now);
 }
 
 export function checkHookIngestRateLimit(

@@ -23,7 +23,11 @@ import { shutdownApiProductAnalytics } from "./lib/product-analytics.js";
 import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
-import { router } from "./router.js";
+import {
+	createBackgroundIngestErrorFactories,
+	processIngestSession,
+	router,
+} from "./router.js";
 import {
 	registerClickHousePurgeWorker,
 	startClickHousePurgeWorker,
@@ -33,9 +37,12 @@ import {
 	shutdownIngestFilterQueue,
 } from "./services/ingest-filter.service.js";
 import {
+	getNextR2IngestWorkDueAt,
 	registerR2IngestCleanupWorker,
 	repairR2IngestCleanupJobs,
+	sweepExpiredR2IngestJobs,
 } from "./services/r2-ingest-cleanup.service.js";
+import { repairRecoverableR2IngestJobs } from "./services/r2-ingest-commit.service.js";
 import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
@@ -374,11 +381,41 @@ const r2IngestCleanupClient = r2IngestAvailability.enabled
 const clickHousePurgeWorker = startClickHousePurgeWorker({
 	enabled: readBooleanEnv("CLICKHOUSE_PURGE_WORKER_ENABLED", true),
 	repairR2IngestCleanup: r2IngestCleanupClient
-		? () =>
-				repairR2IngestCleanupJobs({
+		? async () => {
+				const expired = await sweepExpiredR2IngestJobs({
 					database: sqlClient,
 					r2: r2IngestCleanupClient,
-				})
+				});
+				const recovered = await repairRecoverableR2IngestJobs({
+					database: sqlClient,
+					process: (sessionInput, identity, signal) =>
+						processIngestSession({
+							awaitLanguageSignals: true,
+							context: {
+								session: null,
+								user: { id: identity.userId },
+							},
+							durableProcessing: { failpoint: undefined },
+							enforceRateLimits: false,
+							errorFactories: createBackgroundIngestErrorFactories(),
+							input: sessionInput,
+							signal,
+						}),
+					r2: r2IngestCleanupClient,
+				});
+				const cleanup = await repairR2IngestCleanupJobs({
+					database: sqlClient,
+					r2: r2IngestCleanupClient,
+				});
+				return {
+					attempted:
+						expired.attempted + recovered.attempted + cleanup.attempted,
+					completed:
+						expired.completed + recovered.completed + cleanup.completed,
+					hasMore: expired.hasMore || recovered.hasMore || cleanup.hasMore,
+					nextDueAt: await getNextR2IngestWorkDueAt(sqlClient),
+				};
+			}
 		: undefined,
 	resend,
 });

@@ -78,6 +78,7 @@ export function captureApiProductAnalyticsEvent<
 >(options: {
 	distinctId: string;
 	event: Name;
+	eventId?: string;
 	payload: ApiCapturePayload<Name>;
 }) {
 	const instance = getClient();
@@ -90,6 +91,7 @@ export function captureApiProductAnalyticsEvent<
 			distinctId: options.distinctId,
 			event: options.event,
 			properties: buildPayload(options.event, options.payload),
+			uuid: options.eventId,
 		});
 	} catch {
 		// Analytics must never break the request path.

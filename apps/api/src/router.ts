@@ -29,7 +29,7 @@ import {
 	createIdempotentClickHouseExecutor,
 	getClickhouse,
 } from "./clickhouse.js";
-import { createIngestProcessingSqlClient, sqlClient } from "./db.js";
+import { ingestProcessingSqlClient, sqlClient } from "./db.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
 import { chatwootRouter } from "./handlers/chatwoot.js";
@@ -87,12 +87,18 @@ import {
 } from "./services/ingest-processing-boundary.js";
 import {
 	type ClaimedIngestProcessingLedger,
+	IngestProcessingCapacityError,
+	ingestProcessingSemaphore,
 	readIngestProcessingTargetReceipt,
 	recordIngestProcessingTargetReceipt,
 	reserveLedgerUsageGeneration,
 	withIngestProcessingLedger,
 } from "./services/ingest-processing-ledger.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
+import {
+	assertIngestTimestampWindow,
+	IngestTimestampWindowError,
+} from "./services/ingest-timestamp-window.service.js";
 import {
 	getCachedOrgSessionCount,
 	hasOrgUploadsInLastDays,
@@ -375,6 +381,31 @@ function createIngestErrorFactories(
 	};
 }
 
+export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
+	return {
+		redactionBudgetExceeded: () =>
+			new ORPCError("BAD_REQUEST", {
+				message: "Transcript redaction exceeded the safety budget",
+			}),
+		redactionDidNotConverge: () =>
+			new ORPCError("BAD_REQUEST", {
+				message: "Transcript redaction did not converge",
+			}),
+		secretFilterJsonIntegrity: () =>
+			new ORPCError("BAD_REQUEST", {
+				message: "Transcript redaction changed JSON structure",
+			}),
+		sessionOwnershipConflict: () =>
+			new ORPCError("CONFLICT", {
+				message: "Session belongs to another organization member",
+			}),
+		sessionUploadShrinkRejected: () =>
+			new ORPCError("CONFLICT", {
+				message: "Replacement transcript is unexpectedly smaller",
+			}),
+	};
+}
+
 export async function processIngestSession({
 	awaitLanguageSignals,
 	claimedLedger,
@@ -487,6 +518,14 @@ export async function processIngestSession({
 			message: getMissingTranscriptTimestampMessage(filteredInput.source),
 		});
 	}
+	try {
+		assertIngestTimestampWindow(timestamps);
+	} catch (error) {
+		if (error instanceof IngestTimestampWindowError) {
+			throw new ORPCError("BAD_REQUEST", { message: error.message });
+		}
+		throw error;
+	}
 
 	const activeOrgId = getActiveOrganizationId(context.session);
 
@@ -546,32 +585,54 @@ export async function processIngestSession({
 	// converge after server filtering instead of creating duplicate rows.
 	const contentHash = computeIngestContentHash(filteredInput);
 	if (durableProcessing && !claimedLedger) {
-		return withIngestProcessingLedger(
-			{
-				filteredContentSha256: contentHash,
-				filterVersion: FILTER_VERSION,
-				organizationId: orgId,
-				sessionId: input.sessionId,
-			},
-			parseStoredIngestProcessorResult,
-			(ledger) =>
-				processIngestSession({
-					awaitLanguageSignals,
-					claimedLedger: ledger,
-					context,
-					durableProcessing,
-					enforceRateLimits,
-					errorFactories,
-					input,
+		try {
+			const ledgerResult = await withIngestProcessingLedger(
+				{
+					filteredContentSha256: contentHash,
+					filterVersion: FILTER_VERSION,
+					organizationId: orgId,
+					sessionId: input.sessionId,
+				},
+				parseStoredIngestProcessorResult,
+				(ledger) =>
+					processIngestSession({
+						awaitLanguageSignals,
+						claimedLedger: ledger,
+						context,
+						durableProcessing,
+						enforceRateLimits,
+						errorFactories,
+						input,
+						signal,
+					}),
+				{
+					database: ingestProcessingSqlClient,
+					failpoint: durableProcessing.failpoint,
+					now: getNextIngestedAt,
+					randomUUID: () => crypto.randomUUID(),
+					semaphore: ingestProcessingSemaphore,
 					signal,
-				}),
-			{
-				disposableDatabase: createIngestProcessingSqlClient(),
-				failpoint: durableProcessing.failpoint,
-				now: getNextIngestedAt,
-				randomUUID: () => crypto.randomUUID(),
-			},
-		);
+				},
+			);
+			if (ledgerResult.status === "already_processing") {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: { reason: "ingest_already_processing", retryAfterMs: 1_000 },
+					message: "An identical transcript is already being processed",
+				});
+			}
+			return ledgerResult.result;
+		} catch (error) {
+			if (error instanceof IngestProcessingCapacityError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: error.code.toLowerCase(),
+						retryAfterMs: 1_000,
+					},
+					message: error.message,
+				});
+			}
+			throw error;
+		}
 	}
 	const clickhouse = claimedLedger
 		? createIdempotentClickHouseExecutor(
@@ -916,6 +977,7 @@ export async function processIngestSession({
 
 	captureApiProductAnalyticsEvent({
 		distinctId: context.user.id,
+		eventId: claimedLedger?.id,
 		event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
 		payload: uploadCompletedPayload,
 	});
@@ -1043,7 +1105,7 @@ const r2IngestCommit = os.ingest.commit
 		try {
 			return await commitR2IngestJob({
 				input,
-				process: (sessionInput, identity) =>
+				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
 						awaitLanguageSignals: true,
 						context: {
@@ -1054,9 +1116,10 @@ const r2IngestCommit = os.ingest.commit
 						errorFactories: createIngestErrorFactories(errors),
 						input: sessionInput,
 						durableProcessing: { failpoint: undefined },
-						signal,
+						signal: processingSignal,
 					}),
 				r2: createR2MultipartUploadClient(availability.configuration),
+				signal,
 				userId: context.user.id,
 			});
 		} catch (error) {

@@ -1,5 +1,21 @@
 import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 
+export type R2IngestMaterializationGateErrorCode =
+	| "R2_INGEST_GATE_ABORTED"
+	| "R2_INGEST_GATE_FULL"
+	| "R2_INGEST_GATE_OPERATION_TIMEOUT"
+	| "R2_INGEST_GATE_QUEUE_TIMEOUT";
+
+export class R2IngestMaterializationGateError extends Error {
+	readonly code: R2IngestMaterializationGateErrorCode;
+
+	constructor(code: R2IngestMaterializationGateErrorCode, message: string) {
+		super(message);
+		this.code = code;
+		this.name = "R2IngestMaterializationGateError";
+	}
+}
+
 export interface R2IngestMaterializationGateStats {
 	readonly activeBytes: number;
 	readonly activeJobs: number;
@@ -11,35 +27,51 @@ export interface R2IngestMaterializationGate {
 	getStats: () => R2IngestMaterializationGateStats;
 	run: <TResult>(
 		bytes: number,
-		operation: () => Promise<TResult>,
+		operation: (signal: AbortSignal) => Promise<TResult>,
+		signal?: AbortSignal,
 	) => Promise<TResult>;
 }
 
 interface PendingOperation {
 	readonly bytes: number;
+	readonly cancelWhileQueued: (error: Error) => void;
 	readonly start: () => void;
 }
 
 export function createR2IngestMaterializationGate(input: {
 	readonly maxBytes: number;
 	readonly maxJobs: number;
+	readonly maxQueuedJobs: number;
+	readonly operationTimeoutMs: number;
+	readonly queueTimeoutMs: number;
 }): R2IngestMaterializationGate {
-	if (!Number.isSafeInteger(input.maxBytes) || input.maxBytes <= 0) {
-		throw new Error("R2 materialization maxBytes must be a positive integer");
-	}
-	if (!Number.isSafeInteger(input.maxJobs) || input.maxJobs <= 0) {
-		throw new Error("R2 materialization maxJobs must be a positive integer");
-	}
+	assertPositiveInteger(input.maxBytes, "maxBytes");
+	assertPositiveInteger(input.maxJobs, "maxJobs");
+	assertPositiveInteger(input.maxQueuedJobs, "maxQueuedJobs");
+	assertPositiveInteger(input.operationTimeoutMs, "operationTimeoutMs");
+	assertPositiveInteger(input.queueTimeoutMs, "queueTimeoutMs");
 
 	let activeBytes = 0;
 	let activeJobs = 0;
 	let queuedBytes = 0;
 	const pending: PendingOperation[] = [];
 
+	function canStart(bytes: number): boolean {
+		return activeJobs < input.maxJobs && activeBytes + bytes <= input.maxBytes;
+	}
+
+	function removePending(candidate: PendingOperation): boolean {
+		const index = pending.indexOf(candidate);
+		if (index === -1) return false;
+		pending.splice(index, 1);
+		queuedBytes -= candidate.bytes;
+		return true;
+	}
+
 	function dispatch(): void {
 		while (activeJobs < input.maxJobs) {
-			const nextIndex = pending.findIndex(
-				(candidate) => activeBytes + candidate.bytes <= input.maxBytes,
+			const nextIndex = pending.findIndex((candidate) =>
+				canStart(candidate.bytes),
 			);
 			if (nextIndex === -1) return;
 			const [next] = pending.splice(nextIndex, 1);
@@ -60,31 +92,116 @@ export function createR2IngestMaterializationGate(input: {
 				queuedJobs: pending.length,
 			};
 		},
-		run<TResult>(bytes: number, operation: () => Promise<TResult>) {
+		run<TResult>(
+			bytes: number,
+			operation: (signal: AbortSignal) => Promise<TResult>,
+			externalSignal?: AbortSignal,
+		) {
 			if (
 				!Number.isSafeInteger(bytes) ||
 				bytes <= 0 ||
 				bytes > input.maxBytes
 			) {
 				return Promise.reject(
-					new Error("R2 materialization bytes exceed the process-wide budget"),
+					new R2IngestMaterializationGateError(
+						"R2_INGEST_GATE_FULL",
+						"R2 materialization bytes exceed the process-wide budget",
+					),
+				);
+			}
+			if (externalSignal?.aborted) {
+				return Promise.reject(
+					new R2IngestMaterializationGateError(
+						"R2_INGEST_GATE_ABORTED",
+						"R2 materialization was cancelled before admission",
+					),
+				);
+			}
+			if (!canStart(bytes) && pending.length >= input.maxQueuedJobs) {
+				return Promise.reject(
+					new R2IngestMaterializationGateError(
+						"R2_INGEST_GATE_FULL",
+						"R2 materialization queue is full",
+					),
 				);
 			}
 
 			return new Promise<TResult>((resolve, reject) => {
-				pending.push({
+				let queueTimer: ReturnType<typeof setTimeout> | undefined;
+				let started = false;
+				const abortWhileQueued = (): void => {
+					candidate.cancelWhileQueued(
+						new R2IngestMaterializationGateError(
+							"R2_INGEST_GATE_ABORTED",
+							"R2 materialization was cancelled while queued",
+						),
+					);
+				};
+
+				function clearQueueWait(): void {
+					if (queueTimer) clearTimeout(queueTimer);
+					queueTimer = undefined;
+					externalSignal?.removeEventListener("abort", abortWhileQueued);
+				}
+
+				const candidate: PendingOperation = {
 					bytes,
+					cancelWhileQueued(error) {
+						if (started || !removePending(candidate)) return;
+						clearQueueWait();
+						reject(error);
+						dispatch();
+					},
 					start() {
-						operation()
+						started = true;
+						clearQueueWait();
+						const controller = new AbortController();
+						const abortActive = (): void =>
+							controller.abort(externalSignal?.reason);
+						externalSignal?.addEventListener("abort", abortActive, {
+							once: true,
+						});
+						const timeoutError = new R2IngestMaterializationGateError(
+							"R2_INGEST_GATE_OPERATION_TIMEOUT",
+							"R2 materialization exceeded its operation timeout",
+						);
+						let operationTimer: ReturnType<typeof setTimeout> | undefined;
+						const timeout = new Promise<never>((_resolve, rejectTimeout) => {
+							operationTimer = setTimeout(() => {
+								controller.abort(timeoutError);
+								rejectTimeout(timeoutError);
+							}, input.operationTimeoutMs);
+							operationTimer.unref();
+						});
+						const activeOperation = Promise.resolve().then(() =>
+							operation(controller.signal),
+						);
+						void Promise.race([activeOperation, timeout])
 							.then(resolve, reject)
 							.finally(() => {
+								if (operationTimer) clearTimeout(operationTimer);
+								externalSignal?.removeEventListener("abort", abortActive);
 								activeBytes -= bytes;
 								activeJobs -= 1;
 								dispatch();
 							});
 					},
-				});
+				};
+
+				pending.push(candidate);
 				queuedBytes += bytes;
+				queueTimer = setTimeout(() => {
+					candidate.cancelWhileQueued(
+						new R2IngestMaterializationGateError(
+							"R2_INGEST_GATE_QUEUE_TIMEOUT",
+							"R2 materialization timed out while queued",
+						),
+					);
+				}, input.queueTimeoutMs);
+				queueTimer.unref();
+				externalSignal?.addEventListener("abort", abortWhileQueued, {
+					once: true,
+				});
 				dispatch();
 			});
 		},
@@ -94,11 +211,21 @@ export function createR2IngestMaterializationGate(input: {
 const r2IngestMaterializationGate = createR2IngestMaterializationGate({
 	maxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	maxJobs: 1,
+	maxQueuedJobs: 8,
+	operationTimeoutMs: 20 * 60_000,
+	queueTimeoutMs: 30_000,
 });
 
 export function runWithR2IngestMaterializationSlot<TResult>(
 	bytes: number,
-	operation: () => Promise<TResult>,
+	operation: (signal: AbortSignal) => Promise<TResult>,
+	signal?: AbortSignal,
 ): Promise<TResult> {
-	return r2IngestMaterializationGate.run(bytes, operation);
+	return r2IngestMaterializationGate.run(bytes, operation, signal);
+}
+
+function assertPositiveInteger(value: number, name: string): void {
+	if (!Number.isSafeInteger(value) || value <= 0) {
+		throw new Error(`R2 materialization ${name} must be a positive integer`);
+	}
 }

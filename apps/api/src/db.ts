@@ -19,10 +19,7 @@ const postgresClientOptions = {
 const client = postgres(requiredConnectionString, postgresClientOptions);
 export const sqlClient = client;
 export const db = drizzle(client, { schema });
-
-export function createIngestProcessingSqlClient(): postgres.Sql {
-	return postgres(requiredConnectionString, {
-		...postgresClientOptions,
-		max: 1,
-	});
-}
+export const ingestProcessingSqlClient = postgres(requiredConnectionString, {
+	...postgresClientOptions,
+	max: 4,
+});

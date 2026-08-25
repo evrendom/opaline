@@ -56,11 +56,15 @@ export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
 	completeMultipartUpload: (input: {
 		objectKey: string;
 		parts: readonly { etag: string; partNumber: number }[];
+		signal?: AbortSignal;
 		uploadId: string;
 	}) => Promise<void>;
 	deleteObjects: (objectKeys: readonly string[]) => Promise<void>;
-	getObject: (objectKey: string) => Promise<Uint8Array>;
-	headObject: (objectKey: string) => Promise<R2ObjectMetadata | null>;
+	getObject: (objectKey: string, signal?: AbortSignal) => Promise<Uint8Array>;
+	headObject: (
+		objectKey: string,
+		signal?: AbortSignal,
+	) => Promise<R2ObjectMetadata | null>;
 }
 
 export function readR2IngestAvailability(
@@ -144,6 +148,7 @@ export function createR2MultipartUploadClient(
 					},
 					UploadId: input.uploadId,
 				}),
+				{ abortSignal: input.signal },
 			);
 		},
 		async deleteObjects(objectKeys) {
@@ -163,25 +168,27 @@ export function createR2MultipartUploadClient(
 				);
 			}
 		},
-		async getObject(objectKey) {
+		async getObject(objectKey, signal) {
 			const result = await client.send(
 				new GetObjectCommand({
 					Bucket: configuration.bucket,
 					Key: objectKey,
 				}),
+				{ abortSignal: signal },
 			);
 			if (!result.Body) {
 				throw new Error("R2 returned an ingest object without a body");
 			}
 			return result.Body.transformToByteArray();
 		},
-		async headObject(objectKey) {
+		async headObject(objectKey, signal) {
 			try {
 				const result = await client.send(
 					new HeadObjectCommand({
 						Bucket: configuration.bucket,
 						Key: objectKey,
 					}),
+					{ abortSignal: signal },
 				);
 				if (result.ContentLength === undefined) {
 					throw new Error("R2 object is missing its content length");

@@ -104,8 +104,7 @@ export async function insertSessionLanguageSignalRows(
 	if (rows.length === 0) return;
 	await ingestRudelSessionLanguageSignals(
 		{
-			insert: ({ table, values }) =>
-				executor.insert({ asyncInsert: false, table, values }),
+			insert: ({ table, values }) => executor.insert({ table, values }),
 		},
 		[...rows],
 	);

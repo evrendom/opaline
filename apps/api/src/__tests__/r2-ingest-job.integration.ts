@@ -5,8 +5,9 @@ import type {
 	R2IngestCommitInput,
 	R2IngestInitOutput,
 } from "@rudel/api-routes";
+import postgres from "postgres";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
-import { createIngestProcessingSqlClient, sqlClient } from "../db.js";
+import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import {
 	getR2IngestJobStatus,
@@ -17,12 +18,20 @@ import {
 	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
 } from "../services/ingest-processing-boundary.js";
-import { withIngestProcessingLedger } from "../services/ingest-processing-ledger.service.js";
-import { repairR2IngestCleanupJobs } from "../services/r2-ingest-cleanup.service.js";
+import {
+	createIngestProcessingSemaphore,
+	withIngestProcessingLedger,
+} from "../services/ingest-processing-ledger.service.js";
+import {
+	repairR2IngestCleanupJobs,
+	sweepExpiredR2IngestJobs,
+} from "../services/r2-ingest-cleanup.service.js";
 import {
 	commitR2IngestJob,
 	type R2IngestProcessorResult,
+	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
+import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
 import type {
 	R2MultipartUploadClient,
 	R2ObjectMetadata,
@@ -314,7 +323,10 @@ describe("R2 ingest commit lifecycle", () => {
 				input: completion,
 				now: () => firstAttemptAt,
 				process: async () => {
-					throw new Error("synthetic processor failure");
+					throw Object.assign(new Error("synthetic processor failure"), {
+						$metadata: { httpStatusCode: 503 },
+						name: "ServiceUnavailable",
+					});
 				},
 				r2: fakeR2,
 				userId: USER_ID,
@@ -324,7 +336,7 @@ describe("R2 ingest commit lifecycle", () => {
 			await getR2IngestJobStatus(initialized.jobId, USER_ID),
 		).toMatchObject({
 			attempts: 1,
-			error: { code: "R2_INGEST_PROCESSING_FAILED" },
+			error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
 			status: "pending",
 		});
 		expect(
@@ -343,7 +355,7 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(retried.status).toBe("completed");
 	});
 
-	test("claims and repairs at most one expired lease per commit", async () => {
+	test("repairs expired leases only through the dedicated worker", async () => {
 		const requested = await initializeUploadedJob(
 			"00000000-0000-4000-8000-000000000013",
 			"requested transcript",
@@ -371,6 +383,18 @@ describe("R2 ingest commit lifecycle", () => {
 			userId: USER_ID,
 		});
 
+		expect(processCalls).toBe(1);
+		const recovery = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			limit: 1,
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => {
+				processCalls += 1;
+				return processorResult(input.sessionId);
+			},
+			r2: fakeR2,
+		});
+		expect(recovery).toMatchObject({ attempted: 1, completed: 1 });
 		expect(processCalls).toBe(2);
 		const orphanStatuses = await sqlClient<Array<{ status: string }>>`
 			SELECT status
@@ -382,6 +406,169 @@ describe("R2 ingest commit lifecycle", () => {
 			"completed",
 			"running",
 		]);
+		await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			limit: 1,
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+		});
+	});
+
+	test("terminal processor errors clean completed objects immediately", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"terminal processor transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async () => {
+					throw new Error("deterministic schema rejection");
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("deterministic schema rejection");
+		expect(fakeR2.completedKeys).toContain(objectKey);
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_PROCESSING_FAILED" },
+			status: "failed",
+		});
+	});
+
+	test("treats a missing transcript timestamp as terminal and cleans R2", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			JSON.stringify({ message: "missing timestamp", type: "user" }),
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("timestamp");
+		expect(fakeR2.completedKeys).toContain(objectKey);
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			error: { code: "R2_INGEST_BAD_REQUEST" },
+			status: "failed",
+		});
+	});
+
+	test("does not consume an attempt while waiting beyond a lease duration", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"gate wait transcript",
+		);
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 1_000_000,
+			maxJobs: 1,
+			maxQueuedJobs: 2,
+			operationTimeoutMs: 5_000,
+			queueTimeoutMs: 5_000,
+		});
+		let releaseGate = (): void => {};
+		const occupied = gate.run(
+			1,
+			() =>
+				new Promise<void>((resolve) => {
+					releaseGate = resolve;
+				}),
+		);
+		const committing = commitR2IngestJob({
+			gate,
+			input: buildCompletionInput(initialized),
+			leaseDurationMs: 60,
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		await Bun.sleep(100);
+		const [queued] = await sqlClient<
+			Array<{ attempts: number; status: string }>
+		>`SELECT attempts, status FROM ingest_job WHERE id = ${initialized.jobId}`;
+		expect(queued).toEqual({ attempts: 0, status: "pending" });
+		releaseGate();
+		await occupied;
+		expect((await committing).status).toBe("completed");
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({ attempts: 1, status: "completed" });
+	});
+
+	test("renews the lease while processing is still active", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"lease heartbeat transcript",
+		);
+		let renewedLease: Date | string | null = null;
+		const processingStartedAt = Date.now();
+		const completed = await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			leaseDurationMs: 120,
+			process: async (input) => {
+				await Bun.sleep(180);
+				const [running] = await sqlClient<
+					Array<{ leaseExpiresAt: Date | string | null }>
+				>`
+					SELECT lease_expires_at AS "leaseExpiresAt"
+					FROM ingest_job
+					WHERE id = ${initialized.jobId}
+				`;
+				renewedLease = running?.leaseExpiresAt ?? null;
+				return processorResult(input.sessionId);
+			},
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(completed.status).toBe("completed");
+		expect(new Date(String(renewedLease)).getTime()).toBeGreaterThan(
+			processingStartedAt + 120,
+		);
+	});
+
+	test("sweeps abandoned pending jobs independently of retry recovery", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"abandoned pending transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = '2026-08-25T09:00:00.000Z'
+			WHERE id = ${initialized.jobId}
+		`;
+
+		const swept = await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: new Date("2026-08-25T10:00:00.000Z"),
+			r2: fakeR2,
+		});
+		expect(swept.attempted).toBeGreaterThan(0);
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 0,
+			error: { code: "R2_INGEST_JOB_EXPIRED" },
+			status: "failed",
+		});
 	});
 
 	test("deletes a completed object after hash failure and receipts interrupted cleanup on retry", async () => {
@@ -620,7 +807,9 @@ describe("R2 ingest real processor crash recovery", () => {
 		const failpoint: IngestProcessingFailpoint = async (boundary) => {
 			if (!tripped && matches(boundary)) {
 				tripped = true;
-				throw new Error("simulated process crash after store acknowledgement");
+				throw new IngestProcessingCrashSimulationError(
+					"simulated process crash after store acknowledgement",
+				);
 			}
 		};
 
@@ -628,6 +817,7 @@ describe("R2 ingest real processor crash recovery", () => {
 			commitR2IngestJob({
 				failpoint,
 				input: completion,
+				leaseDurationMs: 1_000,
 				now: () => new Date("2030-01-01T00:00:00.000Z"),
 				process: createRealProcessor(failpoint),
 				r2: fakeR2,
@@ -636,14 +826,31 @@ describe("R2 ingest real processor crash recovery", () => {
 		).rejects.toThrow("simulated process crash");
 		expect(tripped).toBe(true);
 
-		const retried = await commitR2IngestJob({
-			input: completion,
-			now: () => new Date("2030-01-01T00:00:02.000Z"),
-			process: createRealProcessor(undefined),
-			r2: fakeR2,
-			userId: USER_ID,
+		const crashedStatus = await getR2IngestJobStatus(jobId, USER_ID);
+		if (crashedStatus?.status === "completed") {
+			expect(
+				(
+					await commitR2IngestJob({
+						input: completion,
+						process: createRealProcessor(undefined),
+						r2: fakeR2,
+						userId: USER_ID,
+					})
+				).status,
+			).toBe("completed");
+		} else {
+			const repaired = await repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				leaseDurationMs: 1_000,
+				now: () => new Date("2030-01-01T00:00:02.000Z"),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+			});
+			expect(repaired.completed).toBe(1);
+		}
+		expect(await getR2IngestJobStatus(jobId, USER_ID)).toMatchObject({
+			status: "completed",
 		});
-		expect(retried.status).toBe("completed");
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
@@ -746,14 +953,13 @@ describe("R2 ingest real processor crash recovery", () => {
 			expect(new Date(String(crashedJob?.leaseExpiresAt)).toISOString()).toBe(
 				"2030-01-01T00:30:00.000Z",
 			);
-			const recovered = await commitR2IngestJob({
-				input: completion,
+			const recovered = await repairRecoverableR2IngestJobs({
+				database: sqlClient,
 				now: () => new Date("2030-01-01T00:30:01.000Z"),
 				process: createRealProcessor(undefined),
 				r2: fakeR2,
-				userId: USER_ID,
 			});
-			expect(recovered.status).toBe("completed");
+			expect(recovered.completed).toBe(1);
 			const [job] = await sqlClient<Array<{ attempts: number }>>`
 				SELECT attempts
 				FROM ingest_job
@@ -833,14 +1039,13 @@ describe("R2 ingest real processor crash recovery", () => {
 			raw: 1,
 		});
 
-		const recovered = await commitR2IngestJob({
-			input: completion,
+		const recovered = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
 			now: () => new Date("2030-01-01T00:30:01.000Z"),
 			process: createRealProcessor(undefined),
 			r2: fakeR2,
-			userId: USER_ID,
 		});
-		expect(recovered.status).toBe("completed");
+		expect(recovered.completed).toBe(1);
 		expect(await countRawAndAnalyticsRevision(jobId, rawIngestedAt)).toEqual({
 			analytics: 1,
 			raw: 1,
@@ -848,10 +1053,14 @@ describe("R2 ingest real processor crash recovery", () => {
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
-	test("terminates the reserved backend when advisory unlock is not confirmed", async () => {
+	test("releases all advisory locks when the targeted unlock is not confirmed", async () => {
 		const sessionId = `unlock-failure-${crypto.randomUUID()}`;
-		let backendPid: number | undefined;
 		let unlockFailureInjected = false;
+		const semaphore = createIngestProcessingSemaphore({
+			maxActive: 1,
+			maxQueued: 1,
+			waitTimeoutMs: 1_000,
+		});
 		const result = await withIngestProcessingLedger(
 			{
 				filteredContentSha256: "d".repeat(64),
@@ -860,16 +1069,9 @@ describe("R2 ingest real processor crash recovery", () => {
 				sessionId,
 			},
 			(value) => String(value),
-			async (claimedLedger) => {
-				const [backend] = await claimedLedger.connection.unsafe<
-					Array<{ pid: number }>
-				>("SELECT pg_backend_pid()::int AS pid");
-				if (!backend) throw new Error("missing reserved backend pid");
-				backendPid = backend.pid;
-				return "ledger-completed";
-			},
+			async () => "ledger-completed",
 			{
-				disposableDatabase: createIngestProcessingSqlClient(),
+				database: ingestProcessingSqlClient,
 				failpoint: async (boundary) => {
 					if (
 						boundary.store === "postgres" &&
@@ -881,18 +1083,89 @@ describe("R2 ingest real processor crash recovery", () => {
 				},
 				now: () => new Date("2030-01-02T00:00:00.000Z"),
 				randomUUID: () => crypto.randomUUID(),
+				semaphore,
+				signal: undefined,
 			},
 		);
-		expect(result).toBe("ledger-completed");
+		expect(result).toEqual({
+			result: "ledger-completed",
+			status: "completed",
+		});
 		expect(unlockFailureInjected).toBe(true);
-		if (backendPid === undefined)
-			throw new Error("reserved backend was not used");
-		const [activity] = await sqlClient<Array<{ active: boolean }>>`
-			SELECT EXISTS (
-				SELECT 1 FROM pg_stat_activity WHERE pid = ${backendPid}
-			) AS active
+		const lockIdentity = JSON.stringify([
+			ORGANIZATION_ID,
+			sessionId,
+			"d".repeat(64),
+			2,
+		]);
+		const [available] = await sqlClient<Array<{ locked: boolean }>>`
+			SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
 		`;
-		expect(activity?.active).toBe(false);
+		expect(available?.locked).toBe(true);
+		await sqlClient`
+			SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
+		`;
+	});
+
+	test("returns already_processing across independent instances for the same hash", async () => {
+		const connectionString = process.env.PG_CONNECTION_STRING;
+		if (!connectionString)
+			throw new Error("missing Postgres connection string");
+		const firstDatabase = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const secondDatabase = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const identity = {
+			filteredContentSha256: "e".repeat(64),
+			filterVersion: 2,
+			organizationId: ORGANIZATION_ID,
+			sessionId: `cross-instance-${crypto.randomUUID()}`,
+		};
+		let releaseOperation = (): void => {};
+		let markStarted = (): void => {};
+		const started = new Promise<void>((resolve) => {
+			markStarted = resolve;
+		});
+		const first = withIngestProcessingLedger(
+			identity,
+			(value) => String(value),
+			async () => {
+				markStarted();
+				await new Promise<void>((resolve) => {
+					releaseOperation = resolve;
+				});
+				return "first-completed";
+			},
+			createLedgerTestEnvironment(firstDatabase),
+		);
+		try {
+			await started;
+			const waitStartedAt = performance.now();
+			const second = await withIngestProcessingLedger(
+				identity,
+				(value) => String(value),
+				async () => "second-must-not-run",
+				createLedgerTestEnvironment(secondDatabase),
+			);
+			expect(second).toEqual({ status: "already_processing" });
+			expect(performance.now() - waitStartedAt).toBeLessThan(500);
+			releaseOperation();
+			expect(await first).toEqual({
+				result: "first-completed",
+				status: "completed",
+			});
+		} finally {
+			releaseOperation();
+			await first.catch(() => undefined);
+			await Promise.all([
+				firstDatabase.end({ timeout: 1 }),
+				secondDatabase.end({ timeout: 1 }),
+			]);
+		}
 	});
 });
 
@@ -928,6 +1201,7 @@ async function initializeUploadedJob(
 		randomUUID: () => jobId,
 		userId: USER_ID,
 	});
+	await extendTestJobExpiry(initialized.jobId);
 	for (const object of initialized.objects) {
 		if (object.kind === "main") {
 			fakeR2.uploadText(object.objectKey, mainContent);
@@ -966,10 +1240,34 @@ async function initializeUploadedByteJob(
 		randomUUID: () => jobId,
 		userId: USER_ID,
 	});
+	await extendTestJobExpiry(initialized.jobId);
 	const objectKey = initialized.objects[0]?.objectKey;
 	if (!objectKey) throw new Error("missing initialized byte object");
 	fakeR2.uploadBytes(objectKey, bytes);
 	return initialized;
+}
+
+async function extendTestJobExpiry(jobId: string): Promise<void> {
+	await sqlClient`
+		UPDATE ingest_job
+		SET expires_at = '2031-01-01T00:00:00.000Z'
+		WHERE id = ${jobId}
+	`;
+}
+
+function createLedgerTestEnvironment(database: postgres.Sql) {
+	return {
+		database,
+		failpoint: undefined,
+		now: () => new Date("2030-01-02T00:00:00.000Z"),
+		randomUUID: () => crypto.randomUUID(),
+		semaphore: createIngestProcessingSemaphore({
+			maxActive: 1,
+			maxQueued: 1,
+			waitTimeoutMs: 1_000,
+		}),
+		signal: undefined,
+	};
 }
 
 function createRealProcessor(

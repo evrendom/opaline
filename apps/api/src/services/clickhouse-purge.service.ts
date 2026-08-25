@@ -107,6 +107,7 @@ export interface StartClickHousePurgeWorkerOptions {
 		attempted: number;
 		completed: number;
 		hasMore: boolean;
+		nextDueAt?: Date | null;
 	}>;
 	resend: ResendConfig;
 	sqlClient?: postgres.Sql;
@@ -236,6 +237,7 @@ export function startClickHousePurgeWorker(
 
 	async function runWorkerPass(): Promise<number> {
 		try {
+			let nextR2IngestDueAt: Date | null = null;
 			const now = Date.now();
 			if (now >= nextCleanupAt) {
 				nextCleanupAt = now + SUCCEEDED_JOB_CLEANUP_INTERVAL_MS;
@@ -251,6 +253,7 @@ export function startClickHousePurgeWorker(
 			if (options.repairR2IngestCleanup) {
 				try {
 					const cleanup = await options.repairR2IngestCleanup();
+					nextR2IngestDueAt = cleanup.nextDueAt ?? null;
 					if (cleanup.hasMore) {
 						runAgain = true;
 					}
@@ -275,11 +278,14 @@ export function startClickHousePurgeWorker(
 				return pollIntervalMs;
 			}
 
-			const nextDueAt = await getNextClickHousePurgeWorkDueAt(
+			const nextClickHouseDueAt = await getNextClickHousePurgeWorkDueAt(
 				env.sqlClient,
 				env.sendFailureAlert !== undefined,
 			);
-			return calculateNextWorkerDelayMs(nextDueAt, pollIntervalMs);
+			return calculateNextWorkerDelayMs(
+				getEarlierDate(nextClickHouseDueAt, nextR2IngestDueAt),
+				pollIntervalMs,
+			);
 		} catch (error) {
 			logger.error("ClickHouse purge worker pass failed: {error}", {
 				error: sanitizeClickHousePurgeError(error),
@@ -337,6 +343,12 @@ export function startClickHousePurgeWorker(
 			await activeRun;
 		},
 	};
+}
+
+function getEarlierDate(first: Date | null, second: Date | null): Date | null {
+	if (!first) return second;
+	if (!second) return first;
+	return first.getTime() <= second.getTime() ? first : second;
 }
 
 export async function runClickHousePurgeWorkerOnce(
