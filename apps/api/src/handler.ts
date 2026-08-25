@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { getLogger, withContext } from "@logtape/logtape";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -29,15 +28,8 @@ import type { ApiKeyAuthFailure } from "./middleware.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
-import {
-	getPublicWrappedShareForPageMetadata,
-	getPublicWrappedShareWithSocialImage,
-} from "./services/wrapped-share.service.js";
+import { getPublicWrappedShareWithSocialImage } from "./services/wrapped-share.service.js";
 import { getWrappedShareCardImagePng } from "./services/wrapped-share-card-image.js";
-import {
-	buildWrappedSharePageMetadata,
-	injectWrappedSharePageMetadata,
-} from "./services/wrapped-share-page-metadata.js";
 
 await setupLogging();
 
@@ -164,16 +156,7 @@ const rpcHandler = new RPCHandler(router, {
 	],
 });
 
-const STATIC_DIR = join(
-	import.meta.dir,
-	"..",
-	process.env.STATIC_DIR ?? "public",
-);
 const WRAPPED_PUBLIC_SHARE_ID_SEGMENT = "([A-Za-z0-9_-]+)";
-const WRAPPED_PUBLIC_PATH_PATTERN = new RegExp(
-	`^/wrapped/${WRAPPED_PUBLIC_SHARE_ID_SEGMENT}/?$`,
-	"u",
-);
 const WRAPPED_SHARE_CARD_IMAGE_PATH_PATTERN = new RegExp(
 	`^/wrapped/${WRAPPED_PUBLIC_SHARE_ID_SEGMENT}/x-card\\.png$`,
 	"u",
@@ -253,7 +236,24 @@ const TRUSTED_PROXY_HOPS = readNonNegativeSafeIntegerEnv(
 	0,
 );
 
-export async function fetchHandler(request: Request): Promise<Response> {
+export interface FetchHandlerFallbackInput {
+	readonly cors: Readonly<Record<string, string>>;
+	readonly request: Request;
+	readonly requestId: string;
+	readonly url: URL;
+	readonly wrappedShareLookupSource: string;
+}
+
+export interface FetchHandlerOptions {
+	readonly fallback?: (
+		input: FetchHandlerFallbackInput,
+	) => Promise<Response | null>;
+}
+
+export async function fetchHandler(
+	request: Request,
+	options: FetchHandlerOptions = {},
+): Promise<Response> {
 	const origin = request.headers.get("Origin");
 	const cors = corsHeaders(origin);
 	const url = new URL(request.url);
@@ -342,6 +342,7 @@ export async function fetchHandler(request: Request): Promise<Response> {
 				cors,
 				requestId,
 				wrappedShareLookupSource,
+				options.fallback,
 			);
 			const finalResponse =
 				url.pathname === "/rpc" || url.pathname.startsWith("/rpc/")
@@ -411,6 +412,7 @@ async function handleRequest(
 	cors: Record<string, string>,
 	requestId: string,
 	wrappedShareLookupSource: string,
+	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
@@ -512,30 +514,15 @@ async function handleRequest(
 		});
 	}
 
-	// Static file serving (production: frontend assets)
-	const filePath = join(STATIC_DIR, url.pathname);
-	const file = Bun.file(filePath);
-	if (await file.exists()) {
-		return new Response(file);
-	}
-
-	// SPA fallback: serve index.html for non-API routes
-	const indexFile = Bun.file(join(STATIC_DIR, "index.html"));
-	if (await indexFile.exists()) {
-		const wrappedPublicShareId = getWrappedPublicShareId(url.pathname);
-		if (wrappedPublicShareId) {
-			return handleWrappedPublicPageRequest({
-				cors,
-				indexFile,
-				method: request.method,
-				publicOrigin: getPublicRequestOrigin(request, url),
-				requestPathname: url.pathname,
-				shareId: wrappedPublicShareId,
-				source: wrappedShareLookupSource,
-			});
-		}
-
-		return new Response(indexFile);
+	const fallbackResponse = await fallback?.({
+		cors,
+		request,
+		requestId,
+		url,
+		wrappedShareLookupSource,
+	});
+	if (fallbackResponse) {
+		return fallbackResponse;
 	}
 
 	// Dev mode: redirect to frontend dev server for non-API routes
@@ -605,114 +592,6 @@ async function handleWrappedShareCardImageRequest(input: {
 	}
 }
 
-async function handleWrappedPublicPageRequest(input: {
-	cors: Record<string, string>;
-	indexFile: Bun.BunFile;
-	method: string;
-	publicOrigin: string;
-	requestPathname: string;
-	shareId: string;
-	source: string;
-}) {
-	const {
-		cors,
-		indexFile,
-		method,
-		publicOrigin,
-		requestPathname,
-		shareId,
-		source,
-	} = input;
-
-	if (method !== "GET" && method !== "HEAD") {
-		return new Response("Method not allowed", {
-			headers: { ...cors, Allow: "GET, HEAD" },
-			status: 405,
-		});
-	}
-
-	const indexHtml = await indexFile.text();
-
-	try {
-		const share = await getPublicWrappedShareForPageMetadata(shareId, source);
-
-		if (!share) {
-			return new Response(method === "HEAD" ? null : indexHtml, {
-				headers: { ...cors, "Content-Type": "text/html; charset=utf-8" },
-			});
-		}
-
-		const publicUrl = new URL(requestPathname, publicOrigin).toString();
-		const html = injectWrappedSharePageMetadata(
-			indexHtml,
-			buildWrappedSharePageMetadata({
-				...(share.hasSocialImage
-					? {
-							imageUrl: buildWrappedShareCardImageUrl({
-								publicOrigin,
-								requestPathname,
-								share,
-							}),
-						}
-					: {}),
-				publicUrl,
-				share,
-			}),
-		);
-
-		return new Response(method === "HEAD" ? null : html, {
-			headers: { ...cors, "Content-Type": "text/html; charset=utf-8" },
-		});
-	} catch (error) {
-		if (isTooManyRequestsError(error)) {
-			return new Response("Too many requests", {
-				headers: cors,
-				status: 429,
-			});
-		}
-
-		logger.error("Failed to inject wrapped share metadata: {error}", {
-			error: String(error),
-		});
-		return new Response(method === "HEAD" ? null : indexHtml, {
-			headers: { ...cors, "Content-Type": "text/html; charset=utf-8" },
-		});
-	}
-}
-
-function buildWrappedShareCardImageUrl(input: {
-	publicOrigin: string;
-	requestPathname: string;
-	share: { expires_at: string };
-}) {
-	const { publicOrigin, requestPathname, share } = input;
-	const imageUrl = new URL(
-		`${requestPathname.replace(/\/$/u, "")}/x-card.png`,
-		publicOrigin,
-	);
-	const imageVersion = getWrappedShareImageVersion(share.expires_at);
-
-	if (imageVersion) {
-		imageUrl.searchParams.set("v", imageVersion);
-	}
-
-	return imageUrl.toString();
-}
-
-function getWrappedShareImageVersion(expiresAt: string) {
-	const timestamp = Date.parse(expiresAt);
-
-	if (!Number.isFinite(timestamp)) {
-		return undefined;
-	}
-
-	return Math.floor(timestamp / 1000).toString(36);
-}
-
-function getWrappedPublicShareId(pathname: string) {
-	return getFirstPathMatch(pathname, WRAPPED_PUBLIC_PATH_PATTERN);
-}
-
 function getWrappedShareCardImageId(pathname: string) {
 	return getFirstPathMatch(pathname, WRAPPED_SHARE_CARD_IMAGE_PATH_PATTERN);
 }
@@ -726,19 +605,6 @@ function getFirstPathMatch(pathname: string, pattern: RegExp) {
 	}
 
 	return shareId;
-}
-
-function getPublicRequestOrigin(request: Request, url: URL) {
-	const forwardedProto = request.headers.get("x-forwarded-proto");
-	const forwardedHost = request.headers.get("x-forwarded-host");
-	const proto =
-		forwardedProto?.split(",")[0]?.trim() || url.protocol.slice(0, -1);
-	const host =
-		forwardedHost?.split(",")[0]?.trim() ||
-		request.headers.get("host") ||
-		url.host;
-
-	return `${proto}://${host}`;
 }
 
 function isTooManyRequestsError(error: unknown) {

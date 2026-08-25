@@ -1,8 +1,11 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"buildCommand": "bun run --cwd apps/web build",
 	"git": {
 		"deploymentEnabled": false
 	},
+	"framework": "vite",
+	"outputDirectory": "apps/web/dist",
 	"regions": ["fra1"],
 	"functions": {
 		"api/rpc.ts": {
@@ -18,6 +21,7 @@
 			"maxDuration": 300
 		},
 		"api/wrapped.ts": {
+			"includeFiles": "apps/web/dist/index.html",
 			"memory": 2048,
 			"maxDuration": 300
 		}
@@ -26,6 +30,44 @@
 		{
 			"path": "/api/cron/repair",
 			"schedule": "0 3 * * *"
+		}
+	],
+	"rewrites": [
+		{
+			"source": "/wrapped/:shareId/x-card.png",
+			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId/x-card.png"
+		},
+		{
+			"source": "/wrapped/:shareId",
+			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId"
+		},
+		{
+			"source": "/rpc/ingestSession",
+			"destination": "/api/ingest?__opaline_path=/rpc/ingestSession"
+		},
+		{
+			"source": "/rpc/ingest/:routePath*",
+			"destination": "/api/ingest?__opaline_path=/rpc/ingest/:routePath*"
+		},
+		{
+			"source": "/rpc",
+			"destination": "/api/rpc?__opaline_path=/rpc"
+		},
+		{
+			"source": "/rpc/:routePath*",
+			"destination": "/api/rpc?__opaline_path=/rpc/:routePath*"
+		},
+		{
+			"source": "/health",
+			"destination": "/api/rpc?__opaline_path=/health"
+		},
+		{
+			"source": "/api/:routePath((?!cron/repair$).*)",
+			"destination": "/api/rpc?__opaline_path=/api/:routePath"
+		},
+		{
+			"source": "/(.*)",
+			"destination": "/index.html"
 		}
 	]
 }

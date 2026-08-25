@@ -29,6 +29,7 @@
 		"@orpc/client": "^1.13.5",
 		"@orpc/server": "latest",
 		"@resvg/resvg-js": "^2.6.2",
+		"@sentry/node": "10.70.0",
 		"@rudel/agent-adapters": "workspace:*",
 		"@rudel/api-routes": "workspace:*",
 		"@rudel/ch-schema": "workspace:*",

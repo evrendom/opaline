@@ -1,6 +1,10 @@
 import { handleApiMaintenanceRequest } from "../../apps/api/src/handlers/api-maintenance.js";
+import { createVercelFunctionHandler } from "../../apps/api/src/lib/vercel-function-handler.js";
 import { setupLogging } from "../../apps/api/src/logging.js";
 
 await setupLogging();
 
-export const GET = handleApiMaintenanceRequest;
+export const GET = createVercelFunctionHandler({
+	fetch: handleApiMaintenanceRequest,
+	functionGroup: "rpc-auth",
+});

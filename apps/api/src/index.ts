@@ -1,11 +1,13 @@
 import { getLogger } from "@logtape/logtape";
 import { startFlyApiLifecycle } from "./fly-lifecycle.js";
+import { createFlyStaticFallback } from "./fly-static.js";
 import { fetchHandler, MAX_REQUEST_BODY_BYTES } from "./handler.js";
 
 const logger = getLogger(["rudel", "api", "http"]);
 const port = process.env.PORT ?? "4010";
+const staticFallback = createFlyStaticFallback();
 const server = Bun.serve({
-	fetch: fetchHandler,
+	fetch: (request) => fetchHandler(request, { fallback: staticFallback }),
 	maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 	port,
 });
