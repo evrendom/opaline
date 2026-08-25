@@ -5,11 +5,17 @@ import type {
 	R2IngestCommitInput,
 	R2IngestInitOutput,
 } from "@rudel/api-routes";
+import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
+import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import {
 	getR2IngestJobStatus,
 	initR2IngestJob,
 } from "../services/ingest-job.service.js";
+import type {
+	IngestProcessingBoundary,
+	IngestProcessingFailpoint,
+} from "../services/ingest-processing-boundary.js";
 import {
 	commitR2IngestJob,
 	type R2IngestProcessorResult,
@@ -24,6 +30,7 @@ type Uuid = `${string}-${string}-${string}-${string}-${string}`;
 const USER_ID = `r2-ingest-user-${crypto.randomUUID()}`;
 const ORGANIZATION_ID = `r2-ingest-org-${crypto.randomUUID()}`;
 const HASH_AFTER_FILTERING = "c".repeat(64);
+const MEMBER_ID = `r2-ingest-member-${crypto.randomUUID()}`;
 
 interface FakeStoredObject {
 	bytes: Uint8Array | null;
@@ -33,6 +40,7 @@ interface FakeStoredObject {
 }
 
 class FakeR2Client implements R2MultipartUploadClient {
+	readonly abortedKeys: string[] = [];
 	readonly completedKeys: string[] = [];
 	readonly deletedKeys: string[] = [];
 	readonly objects = new Map<string, FakeStoredObject>();
@@ -41,7 +49,10 @@ class FakeR2Client implements R2MultipartUploadClient {
 		objectKey: string;
 		uploadId: string;
 	}): Promise<void> {
-		this.objects.delete(input.objectKey);
+		const object = this.objects.get(input.objectKey);
+		if (!object || object.uploadId !== input.uploadId) return;
+		this.abortedKeys.push(input.objectKey);
+		if (!object.complete) this.objects.delete(input.objectKey);
 	}
 
 	async completeMultipartUpload(input: {
@@ -101,7 +112,11 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	uploadText(objectKey: string, content: string): void {
-		this.requireObject(objectKey).bytes = new TextEncoder().encode(content);
+		this.uploadBytes(objectKey, new TextEncoder().encode(content));
+	}
+
+	uploadBytes(objectKey: string, bytes: Uint8Array): void {
+		this.requireObject(objectKey).bytes = bytes;
 	}
 
 	private requireObject(objectKey: string): FakeStoredObject {
@@ -122,9 +137,27 @@ beforeAll(async () => {
 		INSERT INTO organization (id, name, slug)
 		VALUES (${ORGANIZATION_ID}, 'R2 Ingest Test', ${ORGANIZATION_ID})
 	`;
+	await sqlClient`
+		INSERT INTO member (id, organization_id, user_id, role)
+		VALUES (${MEMBER_ID}, ${ORGANIZATION_ID}, ${USER_ID}, 'owner')
+	`;
 });
 
 afterAll(async () => {
+	for (const table of [
+		"rudel.claude_sessions",
+		"rudel.session_analytics",
+		"rudel.session_language_signals",
+		"rudel.skill_receipts",
+		"rudel.skill_uses",
+		"rudel.skill_version_contents",
+		"rudel.usage_events",
+	]) {
+		await getClickhouse().execute({
+			query: `DELETE FROM ${getSafeClickHouseTable(table)} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+			query_params: { organizationId: ORGANIZATION_ID },
+		});
+	}
 	await sqlClient`DELETE FROM organization WHERE id = ${ORGANIZATION_ID}`;
 	await sqlClient`DELETE FROM "user" WHERE id = ${USER_ID}`;
 });
@@ -336,6 +369,209 @@ describe("R2 ingest commit lifecycle", () => {
 			"running",
 		]);
 	});
+
+	test("deletes a completed object after hash failure and receipts interrupted cleanup on retry", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"declared transcript",
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+		fakeR2.uploadText(objectKey, "tampered transcript");
+		let interrupted = false;
+
+		await expect(
+			commitR2IngestJob({
+				failpoint: async (boundary) => {
+					if (
+						!interrupted &&
+						boundary.store === "r2" &&
+						boundary.target === "delete-objects"
+					) {
+						interrupted = true;
+						throw new Error("simulated cleanup crash after R2 acknowledgement");
+					}
+				},
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("integrity verification failed");
+		expect(interrupted).toBe(true);
+		expect(fakeR2.completedKeys).toContain(objectKey);
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		const [beforeRetry] = await sqlClient<
+			Array<{ objectsDeletedAt: Date | null; status: string }>
+		>`
+			SELECT
+				objects_deleted_at AS "objectsDeletedAt",
+				status
+			FROM ingest_job
+			WHERE id = ${initialized.jobId}
+		`;
+		expect(beforeRetry).toEqual({ objectsDeletedAt: null, status: "failed" });
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("integrity verification failed");
+		const [afterRetry] = await sqlClient<
+			Array<{ objectsDeletedAt: Date | null }>
+		>`
+			SELECT objects_deleted_at AS "objectsDeletedAt"
+			FROM ingest_job
+			WHERE id = ${initialized.jobId}
+		`;
+		expect(afterRetry?.objectsDeletedAt).toBeInstanceOf(Date);
+	});
+
+	test("deletes a completed object after invalid UTF-8 is detected", async () => {
+		const bytes = new Uint8Array([0xff, 0xfe, 0xfd]);
+		const initialized = await initializeUploadedByteJob(
+			crypto.randomUUID(),
+			bytes,
+		);
+		const objectKey = initialized.objects[0]?.objectKey;
+		if (!objectKey) throw new Error("missing initialized main object");
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("integrity verification failed");
+		expect(fakeR2.completedKeys).toContain(objectKey);
+		expect(fakeR2.objects.has(objectKey)).toBe(false);
+		const [failed] = await sqlClient<
+			Array<{ objectsDeletedAt: Date | null; status: string }>
+		>`
+			SELECT
+				objects_deleted_at AS "objectsDeletedAt",
+				status
+			FROM ingest_job
+			WHERE id = ${initialized.jobId}
+		`;
+		expect(failed?.status).toBe("failed");
+		expect(failed?.objectsDeletedAt).toBeInstanceOf(Date);
+	});
+});
+
+const CRASH_BOUNDARIES: {
+	label: string;
+	matches: (boundary: IngestProcessingBoundary) => boolean;
+}[] = [
+	{
+		label: "raw ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.claude_sessions",
+	},
+	{
+		label: "raw Postgres receipt",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "raw-receipt",
+	},
+	{
+		label: "language-signal ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.session_language_signals",
+	},
+	{
+		label: "usage generation",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "usage-generation",
+	},
+	{
+		label: "skill content ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.skill_version_contents",
+	},
+	{
+		label: "skill use ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" && boundary.target === "rudel.skill_uses",
+	},
+	{
+		label: "skill receipt ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.skill_receipts",
+	},
+	{
+		label: "usage ClickHouse",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.usage_events",
+	},
+	{
+		label: "usage Postgres receipt",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "usage-receipt",
+	},
+	{
+		label: "completed processing ledger",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "ledger-completed",
+	},
+	{
+		label: "completed ingest job",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "job-completed",
+	},
+];
+
+describe("R2 ingest real processor crash recovery", () => {
+	test.each(
+		CRASH_BOUNDARIES,
+	)("is physically and logically idempotent after $label acknowledgement", async ({
+		matches,
+	}) => {
+		const jobId = crypto.randomUUID();
+		const skillName = `crash-skill-${jobId}`;
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(skillName),
+		);
+		const completion = buildCompletionInput(initialized);
+		let tripped = false;
+		const failpoint: IngestProcessingFailpoint = async (boundary) => {
+			if (!tripped && matches(boundary)) {
+				tripped = true;
+				throw new Error("simulated process crash after store acknowledgement");
+			}
+		};
+
+		await expect(
+			commitR2IngestJob({
+				failpoint,
+				input: completion,
+				now: () => new Date("2030-01-01T00:00:00.000Z"),
+				process: createRealProcessor(failpoint),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toThrow("simulated process crash");
+		expect(tripped).toBe(true);
+
+		const retried = await commitR2IngestJob({
+			input: completion,
+			now: () => new Date("2030-01-01T00:00:02.000Z"),
+			process: createRealProcessor(undefined),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(retried.status).toBe("completed");
+		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
+	}, 180_000);
 });
 
 async function initializeUploadedJob(
@@ -382,6 +618,151 @@ async function initializeUploadedJob(
 		}
 	}
 	return initialized;
+}
+
+async function initializeUploadedByteJob(
+	jobId: Uuid,
+	bytes: Uint8Array,
+): Promise<R2IngestInitOutput> {
+	const initialized = await initR2IngestJob({
+		database: sqlClient,
+		input: {
+			objects: [
+				{
+					byteLength: bytes.byteLength,
+					kind: "main",
+					sha256: sha256(bytes),
+				},
+			],
+			projectPath: "/test/r2",
+			sessionId: jobId,
+			source: "claude_code",
+		},
+		now: () => new Date("2026-08-25T10:00:00.000Z"),
+		organizationId: ORGANIZATION_ID,
+		r2: fakeR2,
+		randomUUID: () => jobId,
+		userId: USER_ID,
+	});
+	const objectKey = initialized.objects[0]?.objectKey;
+	if (!objectKey) throw new Error("missing initialized byte object");
+	fakeR2.uploadBytes(objectKey, bytes);
+	return initialized;
+}
+
+function createRealProcessor(
+	failpoint: IngestProcessingFailpoint | undefined,
+): (
+	input: IngestSessionInput,
+	identity: { organizationId: string; userId: string },
+) => Promise<R2IngestProcessorResult> {
+	return (input, identity) =>
+		processIngestSession({
+			awaitLanguageSignals: true,
+			context: { session: null, user: { id: identity.userId } },
+			durableProcessing: { failpoint },
+			enforceRateLimits: false,
+			errorFactories: TEST_ERROR_FACTORIES,
+			input,
+		});
+}
+
+const TEST_ERROR_FACTORIES: IngestErrorFactories = {
+	redactionBudgetExceeded: () => new Error("redaction budget exceeded"),
+	redactionDidNotConverge: () => new Error("redaction did not converge"),
+	secretFilterJsonIntegrity: () => new Error("filter JSON integrity failure"),
+	sessionOwnershipConflict: () => new Error("session ownership conflict"),
+	sessionUploadShrinkRejected: () => new Error("session upload shrank"),
+};
+
+function buildRealClaudeTranscript(skillName: string): string {
+	return [
+		JSON.stringify({
+			message: {
+				content: "Please use the requested skill.",
+				role: "user",
+			},
+			timestamp: "2026-08-25T10:00:00.000Z",
+			type: "user",
+		}),
+		JSON.stringify({
+			message: {
+				content: [
+					{
+						id: `tool-${skillName}`,
+						input: { skill: skillName },
+						name: "Skill",
+						type: "tool_use",
+					},
+				],
+				role: "assistant",
+				usage: { input_tokens: 12, output_tokens: 4 },
+			},
+			timestamp: "2026-08-25T10:00:01.000Z",
+			type: "assistant",
+		}),
+		JSON.stringify({
+			isMeta: true,
+			message: {
+				content: `Base directory for this skill: /tmp/skills/${skillName}\n\n# ${skillName}\n\nCrash recovery body.\n`,
+				role: "user",
+			},
+			timestamp: "2026-08-25T10:00:02.000Z",
+			type: "user",
+		}),
+	].join("\n");
+}
+
+async function expectPhysicalAndLogicalIdempotency(
+	sessionId: string,
+	skillName: string,
+): Promise<void> {
+	for (const table of [
+		"rudel.claude_sessions",
+		"rudel.session_analytics",
+		"rudel.session_language_signals",
+		"rudel.skill_receipts",
+		"rudel.skill_uses",
+	]) {
+		const [row] = await getClickhouse().query<{ physical: number }>({
+			query: `SELECT count() AS physical FROM ${getSafeClickHouseTable(table)} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
+			query_params: { organizationId: ORGANIZATION_ID, sessionId },
+		});
+		expect(Number(row?.physical), `${table} physical rows`).toBe(1);
+	}
+
+	const [skillContent] = await getClickhouse().query<{ physical: number }>({
+		query: `SELECT count() AS physical FROM rudel.skill_version_contents WHERE organization_id = {organizationId:String} AND skill_name = {skillName:String}`,
+		query_params: { organizationId: ORGANIZATION_ID, skillName },
+	});
+	expect(Number(skillContent?.physical)).toBe(1);
+
+	const [usage] = await getClickhouse().query<{
+		logical: number;
+		physical: number;
+	}>({
+		query: `
+			SELECT
+				count() AS physical,
+				uniqExact(tuple(event_id, event_version, record_kind)) AS logical
+			FROM rudel.usage_events
+			WHERE organization_id = {organizationId:String}
+				AND session_id = {sessionId:String}
+		`,
+		query_params: { organizationId: ORGANIZATION_ID, sessionId },
+	});
+	expect(Number(usage?.physical)).toBeGreaterThan(0);
+	expect(Number(usage?.physical)).toBe(Number(usage?.logical));
+
+	const [ledger] = await sqlClient<
+		Array<{ ledgerCount: number; status: string }>
+	>`
+		SELECT count(*)::int AS "ledgerCount", max(status) AS status
+		FROM ingest_processing_ledger
+		WHERE organization_id = ${ORGANIZATION_ID}
+			AND session_id = ${sessionId}
+	`;
+	expect(ledger).toEqual({ ledgerCount: 1, status: "completed" });
 }
 
 function buildCompletionInput(
@@ -452,6 +833,6 @@ function byteLength(content: string): number {
 	return new TextEncoder().encode(content).byteLength;
 }
 
-function sha256(content: string): string {
+function sha256(content: string | Uint8Array): string {
 	return createHash("sha256").update(content).digest("hex");
 }

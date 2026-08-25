@@ -13,6 +13,11 @@ import {
 import type postgres from "postgres";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
+import {
+	type IngestProcessingFailpoint,
+	passIngestProcessingBoundary,
+} from "./ingest-processing-boundary.js";
+import { runWithR2IngestMaterializationSlot } from "./r2-ingest-materialization-gate.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-commit"]);
@@ -49,6 +54,8 @@ interface IngestJobRow {
 	expectedTotalBytes: number;
 	id: string;
 	ingestMetadata: unknown;
+	lastErrorCode: string | null;
+	lastErrorMessage: string | null;
 	leaseExpiresAt: Date | string | null;
 	leaseToken: string | null;
 	maxAttempts: number;
@@ -68,7 +75,8 @@ interface ClaimedIngestJob extends IngestJobRow {
 
 type RequestedJobClaim =
 	| { kind: "claimed"; job: ClaimedIngestJob }
-	| { kind: "completed"; job: IngestJobRow; result: IngestSessionOutput };
+	| { kind: "completed"; job: IngestJobRow; result: IngestSessionOutput }
+	| { kind: "failed"; job: IngestJobRow };
 
 export interface R2IngestProcessorResult {
 	contentSha256: string;
@@ -77,6 +85,7 @@ export interface R2IngestProcessorResult {
 
 export interface CommitR2IngestJobOptions {
 	database?: postgres.Sql;
+	failpoint?: IngestProcessingFailpoint;
 	input: R2IngestCommitInput;
 	now?: () => Date;
 	process: (
@@ -115,13 +124,40 @@ export async function commitR2IngestJob(
 	});
 
 	if (claims.requested.kind === "completed") {
-		await cleanupCompletedJob(claims.requested.job, database, options.r2);
+		await cleanupIngestJobObjects(
+			claims.requested.job,
+			database,
+			options.r2,
+			options.failpoint,
+		);
 		return {
 			jobId: claims.requested.job.id,
 			protocol: R2_INGEST_PROTOCOL,
 			result: claims.requested.result,
 			status: "completed",
 		};
+	}
+	if (claims.requested.kind === "failed") {
+		await cleanupIngestJobObjects(
+			claims.requested.job,
+			database,
+			options.r2,
+			options.failpoint,
+		);
+		throw new R2IngestCommitError(
+			claims.requested.job.lastErrorCode ?? "R2_INGEST_JOB_FAILED",
+			claims.requested.job.lastErrorMessage ??
+				"Ingest job has exhausted its recovery attempts",
+			false,
+		);
+	}
+	if (claims.terminalized) {
+		await cleanupIngestJobObjects(
+			claims.terminalized,
+			database,
+			options.r2,
+			options.failpoint,
+		);
 	}
 
 	let requestedResult: R2IngestCommitOutput | undefined;
@@ -133,6 +169,7 @@ export async function commitR2IngestJob(
 			now,
 			process: options.process,
 			r2: options.r2,
+			failpoint: options.failpoint,
 		});
 	} catch (error) {
 		requestedError = error;
@@ -146,6 +183,7 @@ export async function commitR2IngestJob(
 				now,
 				process: options.process,
 				r2: options.r2,
+				failpoint: options.failpoint,
 			});
 		} catch (error) {
 			logger.warn(
@@ -174,6 +212,7 @@ async function claimRequestedAndOrphanedJob(input: {
 }): Promise<{
 	orphaned: ClaimedIngestJob | null;
 	requested: RequestedJobClaim;
+	terminalized: IngestJobRow | null;
 }> {
 	return input.database.begin(async (transaction) => {
 		const [requestedRow] = await transaction.unsafe<IngestJobRow[]>(
@@ -201,6 +240,27 @@ async function claimRequestedAndOrphanedJob(input: {
 					kind: "completed",
 					result: result.data,
 				},
+				terminalized: null,
+			};
+		}
+		if (requestedRow.status === "failed") {
+			return {
+				orphaned: null,
+				requested: { job: requestedRow, kind: "failed" },
+				terminalized: null,
+			};
+		}
+		if (requestedRow.attempts >= requestedRow.maxAttempts) {
+			await terminalizeExhaustedJob(requestedRow.id, input.now, transaction);
+			const [failed] = await transaction.unsafe<IngestJobRow[]>(
+				`${selectIngestJobSql()} WHERE id = $1`,
+				[requestedRow.id],
+			);
+			if (!failed) throw new Error("Terminal R2 ingest job disappeared");
+			return {
+				orphaned: null,
+				requested: { job: failed, kind: "failed" },
+				terminalized: null,
 			};
 		}
 		assertRequestedJobCanBeClaimed(requestedRow, input.now);
@@ -227,6 +287,7 @@ async function claimRequestedAndOrphanedJob(input: {
 			[input.input.jobId, input.now.toISOString()],
 		);
 		let orphaned: ClaimedIngestJob | null = null;
+		let terminalized: IngestJobRow | null = null;
 		if (orphanCandidate) {
 			if (orphanCandidate.attempts >= orphanCandidate.maxAttempts) {
 				await terminalizeExhaustedJob(
@@ -234,6 +295,11 @@ async function claimRequestedAndOrphanedJob(input: {
 					input.now,
 					transaction,
 				);
+				const [failed] = await transaction.unsafe<IngestJobRow[]>(
+					`${selectIngestJobSql()} WHERE id = $1`,
+					[orphanCandidate.id],
+				);
+				terminalized = failed ?? null;
 			} else {
 				orphaned = await claimLockedJob({
 					job: orphanCandidate,
@@ -244,20 +310,30 @@ async function claimRequestedAndOrphanedJob(input: {
 				});
 			}
 		}
+		if (!terminalized) {
+			const [cleanupCandidate] = await transaction.unsafe<IngestJobRow[]>(
+				`${selectIngestJobSql()}
+				 WHERE id <> $1
+					AND status IN ('completed', 'failed')
+					AND objects_deleted_at IS NULL
+				 ORDER BY updated_at ASC
+				 FOR UPDATE SKIP LOCKED
+				 LIMIT 1`,
+				[input.input.jobId],
+			);
+			terminalized = cleanupCandidate ?? null;
+		}
 
-		return { orphaned, requested: { job: requested, kind: "claimed" } };
+		return {
+			orphaned,
+			requested: { job: requested, kind: "claimed" },
+			terminalized,
+		};
 	});
 }
 
 function assertRequestedJobCanBeClaimed(job: IngestJobRow, now: Date): void {
 	if (job.status === "failed") {
-		throw new R2IngestCommitError(
-			"R2_INGEST_JOB_FAILED",
-			"Ingest job has exhausted its recovery attempts",
-			false,
-		);
-	}
-	if (job.attempts >= job.maxAttempts) {
 		throw new R2IngestCommitError(
 			"R2_INGEST_JOB_FAILED",
 			"Ingest job has exhausted its recovery attempts",
@@ -340,6 +416,7 @@ async function claimLockedJob(input: {
 
 async function processClaimedJob(input: {
 	database: postgres.Sql;
+	failpoint: IngestProcessingFailpoint | undefined;
 	job: ClaimedIngestJob;
 	now: () => Date;
 	process: (
@@ -350,27 +427,54 @@ async function processClaimedJob(input: {
 }): Promise<R2IngestCommitOutput> {
 	let processed: R2IngestProcessorResult;
 	try {
-		const session = await materializeIngestSession(input.job, input.r2);
-		processed = await input.process(session, {
-			organizationId: input.job.organizationId,
-			userId: input.job.userId,
-		});
-		if (!/^[a-f0-9]{64}$/u.test(processed.contentSha256)) {
-			throw new Error("Ingest processor returned an invalid content hash");
-		}
-		IngestSessionOutputSchema.parse(processed.result);
-		await markJobCompleted(input.job, processed, input.database, input.now());
+		processed = await runWithR2IngestMaterializationSlot(
+			input.job.expectedTotalBytes,
+			async () => {
+				const session = await materializeIngestSession(
+					input.job,
+					input.r2,
+					input.failpoint,
+				);
+				const result = await input.process(session, {
+					organizationId: input.job.organizationId,
+					userId: input.job.userId,
+				});
+				if (!/^[a-f0-9]{64}$/u.test(result.contentSha256)) {
+					throw new Error("Ingest processor returned an invalid content hash");
+				}
+				IngestSessionOutputSchema.parse(result.result);
+				await markJobCompleted(input.job, result, input.database, input.now());
+				await passIngestProcessingBoundary(input.failpoint, {
+					store: "postgres",
+					target: "job-completed",
+				});
+				return result;
+			},
+		);
 	} catch (error) {
-		await recordProcessingFailure(
+		const terminal = await recordProcessingFailure(
 			input.job,
 			error,
 			input.database,
 			input.now(),
 		);
+		if (terminal) {
+			await cleanupIngestJobObjects(
+				input.job,
+				input.database,
+				input.r2,
+				input.failpoint,
+			);
+		}
 		throw error;
 	}
 
-	await cleanupCompletedJob(input.job, input.database, input.r2);
+	await cleanupIngestJobObjects(
+		input.job,
+		input.database,
+		input.r2,
+		input.failpoint,
+	);
 	return {
 		jobId: input.job.id,
 		protocol: R2_INGEST_PROTOCOL,
@@ -382,6 +486,7 @@ async function processClaimedJob(input: {
 async function materializeIngestSession(
 	job: IngestJobRow,
 	r2: R2MultipartUploadClient,
+	failpoint: IngestProcessingFailpoint | undefined,
 ): Promise<IngestSessionInput> {
 	const manifest = StoredManifestSchema.parse(job.objectManifest);
 	const expectedSizes = ExpectedSizesSchema.parse(job.expectedSizes);
@@ -398,6 +503,7 @@ async function materializeIngestSession(
 				loadVerifiedObject({
 					expectedBytes: expectedSizes[object.objectKey],
 					expectedHash: clientHashes[object.objectKey],
+					failpoint,
 					jobId: job.id,
 					object,
 					r2,
@@ -438,6 +544,7 @@ async function materializeIngestSession(
 async function loadVerifiedObject(input: {
 	expectedBytes: number | undefined;
 	expectedHash: string | undefined;
+	failpoint: IngestProcessingFailpoint | undefined;
 	jobId: string;
 	object: StoredObject;
 	r2: R2MultipartUploadClient;
@@ -456,6 +563,10 @@ async function loadVerifiedObject(input: {
 			objectKey: input.object.objectKey,
 			parts,
 			uploadId: input.object.uploadId,
+		});
+		await passIngestProcessingBoundary(input.failpoint, {
+			store: "r2",
+			target: "multipart-complete",
 		});
 		head = await input.r2.headObject(input.object.objectKey);
 	}
@@ -600,7 +711,7 @@ async function recordProcessingFailure(
 	error: unknown,
 	database: postgres.Sql,
 	now: Date,
-): Promise<void> {
+): Promise<boolean> {
 	const code = getSafeErrorCode(error);
 	const retryable = !(error instanceof R2IngestCommitError) || error.retryable;
 	const terminal = !retryable || job.attempts >= job.maxAttempts;
@@ -631,21 +742,50 @@ async function recordProcessingFailure(
 			job.leaseToken,
 		],
 	);
+	return terminal;
 }
 
-async function cleanupCompletedJob(
+async function cleanupIngestJobObjects(
 	job: IngestJobRow,
 	database: postgres.Sql,
 	r2: R2MultipartUploadClient,
+	failpoint: IngestProcessingFailpoint | undefined,
 ): Promise<void> {
 	if (job.objectsDeletedAt) return;
 	const manifest = StoredManifestSchema.parse(job.objectManifest);
 	try {
+		for (const object of manifest) {
+			try {
+				await r2.abortMultipartUpload({
+					objectKey: object.objectKey,
+					uploadId: object.uploadId,
+				});
+			} catch (error) {
+				logger.debug(
+					"R2 multipart upload was already completed or absent (job_id={jobId} object_key={objectKey} error={error})",
+					{
+						error: getSafeErrorCode(error),
+						jobId: job.id,
+						objectKey: object.objectKey,
+					},
+				);
+			}
+			await passIngestProcessingBoundary(failpoint, {
+				store: "r2",
+				target: "abort-multipart",
+			});
+		}
 		await r2.deleteObjects(manifest.map((object) => object.objectKey));
+		await passIngestProcessingBoundary(failpoint, {
+			store: "r2",
+			target: "delete-objects",
+		});
 		await database.unsafe(
 			`UPDATE ingest_job
 			 SET objects_deleted_at = NOW(), updated_at = NOW()
-			 WHERE id = $1 AND status = 'completed' AND objects_deleted_at IS NULL`,
+			 WHERE id = $1
+				AND status IN ('completed', 'failed')
+				AND objects_deleted_at IS NULL`,
 			[job.id],
 		);
 	} catch (error) {
@@ -696,6 +836,8 @@ function selectIngestJobSql(): string {
 		expected_total_bytes AS "expectedTotalBytes",
 		client_hashes AS "clientHashes",
 		ingest_metadata AS "ingestMetadata",
+		last_error_code AS "lastErrorCode",
+		last_error_message AS "lastErrorMessage",
 		result,
 		objects_deleted_at AS "objectsDeletedAt"
 	FROM ingest_job`;

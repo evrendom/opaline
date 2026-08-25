@@ -87,9 +87,9 @@ export const ingestJob = pgTable(
 			.on(table.expiresAt)
 			.where(sql`${table.status} IN ('pending', 'running')`),
 		index("ingest_job_cleanup_idx")
-			.on(table.completedAt)
+			.on(table.updatedAt)
 			.where(
-				sql`${table.status} = 'completed' AND ${table.objectsDeletedAt} IS NULL`,
+				sql`${table.status} IN ('completed', 'failed') AND ${table.objectsDeletedAt} IS NULL`,
 			),
 		index("ingest_job_session_idx").on(table.organizationId, table.sessionId),
 		check(

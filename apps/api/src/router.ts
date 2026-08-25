@@ -8,6 +8,7 @@ import {
 	type contract,
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
+	IngestSessionOutputSchema,
 	PRODUCT_ANALYTICS_EVENTS,
 	R2_INGEST_DISABLED_CODE,
 	R2_INGEST_PROTOCOL,
@@ -24,7 +25,10 @@ import {
 	SecretFilterJsonIntegrityError,
 } from "@rudel/secret-filter";
 import type { UsageExtractionResult } from "@rudel/usage-events";
-import { getClickhouse } from "./clickhouse.js";
+import {
+	createIdempotentClickHouseExecutor,
+	getClickhouse,
+} from "./clickhouse.js";
 import { sqlClient } from "./db.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
@@ -77,6 +81,15 @@ import {
 	getR2IngestJobStatus,
 	initR2IngestJob,
 } from "./services/ingest-job.service.js";
+import {
+	type IngestProcessingFailpoint,
+	passIngestProcessingBoundary,
+} from "./services/ingest-processing-boundary.js";
+import {
+	type ClaimedIngestProcessingLedger,
+	reserveLedgerUsageGeneration,
+	withIngestProcessingLedger,
+} from "./services/ingest-processing-ledger.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
 import {
 	getCachedOrgSessionCount,
@@ -95,6 +108,7 @@ import { hasRawSessionRow } from "./services/raw-session.service.js";
 import {
 	persistSessionLanguageSignals,
 	persistSessionLanguageSignalsBestEffort,
+	persistSessionLanguageSignalsWithExecutor,
 } from "./services/session-language-signal-persistence.service.js";
 import {
 	claimSessionIngestOwnership,
@@ -303,7 +317,7 @@ function getActiveOrganizationId(session: unknown): string | null {
 		: null;
 }
 
-interface IngestErrorFactories {
+export interface IngestErrorFactories {
 	redactionBudgetExceeded: (data: {
 		inputBytes: number;
 		redactedBytes: number;
@@ -359,19 +373,23 @@ function createIngestErrorFactories(
 	};
 }
 
-async function processIngestSession({
+export async function processIngestSession({
 	awaitLanguageSignals,
+	claimedLedger,
 	context,
+	durableProcessing,
 	enforceRateLimits,
 	errorFactories,
 	input,
 	signal,
 }: {
 	awaitLanguageSignals: boolean;
+	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
 		session: AppContext["session"];
-		user: NonNullable<AppContext["user"]>;
+		user: { id: string };
 	};
+	durableProcessing?: { failpoint: IngestProcessingFailpoint | undefined };
 	enforceRateLimits: boolean;
 	errorFactories: IngestErrorFactories;
 	input: IngestSessionInput;
@@ -525,6 +543,45 @@ async function processIngestSession({
 	// an old unfiltered CLI upload and a current pre-filtered CLI upload
 	// converge after server filtering instead of creating duplicate rows.
 	const contentHash = computeIngestContentHash(filteredInput);
+	if (durableProcessing && !claimedLedger) {
+		return withIngestProcessingLedger(
+			{
+				filteredContentSha256: contentHash,
+				filterVersion: FILTER_VERSION,
+				organizationId: orgId,
+				sessionId: input.sessionId,
+			},
+			parseStoredIngestProcessorResult,
+			(ledger) =>
+				processIngestSession({
+					awaitLanguageSignals,
+					claimedLedger: ledger,
+					context,
+					durableProcessing,
+					enforceRateLimits,
+					errorFactories,
+					input,
+					signal,
+				}),
+			{
+				database: sqlClient,
+				failpoint: durableProcessing.failpoint,
+				now: getNextIngestedAt,
+				randomUUID: crypto.randomUUID,
+			},
+		);
+	}
+	const clickhouse = claimedLedger
+		? createIdempotentClickHouseExecutor(
+				getClickhouse(),
+				claimedLedger.id,
+				(table) =>
+					passIngestProcessingBoundary(durableProcessing?.failpoint, {
+						store: "clickhouse",
+						target: table,
+					}),
+			)
+		: getClickhouse();
 	const usageExtractionEnabled = readBooleanEnv(
 		"USAGE_EVENT_EXTRACTION_ENABLED",
 		true,
@@ -563,7 +620,7 @@ async function processIngestSession({
 		const skillReceiptMatches =
 			!skillExtractionEnabled ||
 			hasMatchingSkillExtractionReceipt(
-				await readSkillExtractionReceipt(getClickhouse(), {
+				await readSkillExtractionReceipt(clickhouse, {
 					agent: filteredInput.source === "claude_code" ? "claude" : "codex",
 					organizationId: orgId,
 					sessionId: input.sessionId,
@@ -591,8 +648,8 @@ async function processIngestSession({
 	// Acknowledged async inserts can batch concurrent requests into one part.
 	// Give each request a distinct millisecond RMT version even when the
 	// process clock has not advanced, so FINAL and hash bookkeeping agree.
-	const ingestedAt = getNextIngestedAt();
-	await adapter.ingest(getClickhouse(), filteredInput, {
+	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
+	await adapter.ingest(clickhouse, filteredInput, {
 		ingestedAt,
 		userId: context.user.id,
 		organizationId: orgId,
@@ -607,6 +664,10 @@ async function processIngestSession({
 		new Date(timestamps.sessionDate),
 		ingestedAt,
 	);
+	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
+		store: "postgres",
+		target: "raw-receipt",
+	});
 	const languageSignalInput = {
 		content: filteredInput.content,
 		organizationId: orgId,
@@ -617,7 +678,14 @@ async function processIngestSession({
 		userId: context.user.id,
 	};
 	if (awaitLanguageSignals) {
-		await persistSessionLanguageSignals(languageSignalInput);
+		if (claimedLedger) {
+			await persistSessionLanguageSignalsWithExecutor(
+				languageSignalInput,
+				clickhouse,
+			);
+		} else {
+			await persistSessionLanguageSignals(languageSignalInput);
+		}
 	} else {
 		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
 	}
@@ -631,11 +699,21 @@ async function processIngestSession({
 	}
 
 	const usageGeneration = usageExtractionEnabled
-		? await reserveUsageExtractionGeneration(
-				orgId,
-				input.sessionId,
-				context.user.id,
-			)
+		? claimedLedger
+			? await reserveLedgerUsageGeneration(
+					claimedLedger,
+					{
+						organizationId: orgId,
+						sessionId: input.sessionId,
+						userId: context.user.id,
+					},
+					durableProcessing?.failpoint,
+				)
+			: await reserveUsageExtractionGeneration(
+					orgId,
+					input.sessionId,
+					context.user.id,
+				)
 		: null;
 	const subagents: Record<string, string> = {};
 	for (const subagent of filteredInput.subagents ?? []) {
@@ -668,7 +746,7 @@ async function processIngestSession({
 				usageGeneration !== null &&
 				error.shouldPersistReceipt
 			) {
-				await writeUsageExtraction(getClickhouse(), {
+				await writeUsageExtraction(clickhouse, {
 					contentSha256: contentHash,
 					extraction: error.extraction,
 					filterVersion: FILTER_VERSION,
@@ -735,7 +813,7 @@ async function processIngestSession({
 		throw error;
 	}
 	if (skillExtractionEnabled && skillExtraction) {
-		await writeSkillExtraction(getClickhouse(), {
+		await writeSkillExtraction(clickhouse, {
 			extractedAt: getNextIngestedAt(),
 			extraction: skillExtraction,
 			organizationId: orgId,
@@ -748,7 +826,7 @@ async function processIngestSession({
 	if (!usageExtractionEnabled || usageGeneration === null) {
 		return { contentSha256: contentHash, result: response };
 	}
-	await writeUsageExtraction(getClickhouse(), {
+	await writeUsageExtraction(clickhouse, {
 		contentSha256: contentHash,
 		extraction: usageExtraction,
 		filterVersion: FILTER_VERSION,
@@ -808,6 +886,10 @@ async function processIngestSession({
 		}
 		throw error;
 	});
+	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
+		store: "postgres",
+		target: "usage-receipt",
+	});
 	response.usageChecksum = usageExtraction.receipt.checksum;
 
 	const uploadCompletedPayload = getSessionUploadCompletedPayload(
@@ -827,6 +909,25 @@ async function processIngestSession({
 	});
 
 	return { contentSha256: contentHash, result: response };
+}
+
+function parseStoredIngestProcessorResult(
+	value: unknown,
+): R2IngestProcessorResult {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("contentSha256" in value) ||
+		typeof value.contentSha256 !== "string" ||
+		!/^[a-f0-9]{64}$/u.test(value.contentSha256) ||
+		!("result" in value)
+	) {
+		throw new Error("Completed ingest processing ledger has an invalid result");
+	}
+	return {
+		contentSha256: value.contentSha256,
+		result: IngestSessionOutputSchema.parse(value.result),
+	};
 }
 
 const ingestSessionHandler = os.ingestSession
@@ -940,6 +1041,7 @@ const r2IngestCommit = os.ingest.commit
 						enforceRateLimits: false,
 						errorFactories: createIngestErrorFactories(errors),
 						input: sessionInput,
+						durableProcessing: { failpoint: undefined },
 						signal,
 					}),
 				r2: createR2MultipartUploadClient(availability.configuration),

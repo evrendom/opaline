@@ -29,6 +29,7 @@ export interface ClickHouseExecutor {
 	query<T>(statement: ClickHouseStatement): Promise<T[]>;
 	insert(params: {
 		asyncInsert?: boolean;
+		deduplicationToken?: string;
 		table: string;
 		values: object[];
 	}): Promise<void>;
@@ -174,9 +175,35 @@ export function createClickHouseExecutor(config: {
 					? "async_insert=0, input_format_parallel_parsing=0"
 					: "async_insert=1, wait_for_async_insert=1, input_format_parallel_parsing=0";
 			await client.command({
+				clickhouse_settings: params.deduplicationToken
+					? {
+							async_insert_deduplicate: 1,
+							deduplicate_blocks_in_dependent_materialized_views: 1,
+							insert_deduplication_token: params.deduplicationToken,
+						}
+					: undefined,
 				query: `INSERT INTO ${table} SETTINGS ${insertSettings} FORMAT JSONEachRow ${rows}`,
 			});
 		},
+	};
+}
+
+export function createIdempotentClickHouseExecutor(
+	executor: ClickHouseExecutor,
+	deduplicationToken: string,
+	onInsertAcknowledged: (table: string) => Promise<void>,
+): ClickHouseExecutor {
+	return {
+		close: () => executor.close(),
+		execute: (statement) => executor.execute(statement),
+		async insert(params) {
+			await executor.insert({
+				...params,
+				deduplicationToken: `${deduplicationToken}:${params.table}`,
+			});
+			await onInsertAcknowledged(params.table);
+		},
+		query: <T>(statement: ClickHouseStatement) => executor.query<T>(statement),
 	};
 }
 

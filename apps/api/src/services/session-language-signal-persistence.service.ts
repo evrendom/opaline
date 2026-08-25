@@ -65,6 +65,20 @@ export async function persistSessionLanguageSignals(
 	]);
 }
 
+export function persistSessionLanguageSignalsWithExecutor(
+	input: SessionLanguageSignalScanInput,
+	executor: ClickHouseExecutor,
+): Promise<void> {
+	return persistSessionLanguageSignals(input, {
+		insertRows: (rows) => insertSessionLanguageSignalRows(executor, rows),
+		now: () =>
+			input.rawIngestedAt instanceof Date
+				? input.rawIngestedAt
+				: new Date(input.rawIngestedAt),
+		scan: scanSessionLanguageSignalsOffThread,
+	});
+}
+
 export function buildSessionLanguageSignalRow(
 	input: Omit<SessionLanguageSignalScanInput, "content">,
 	counts: LanguageSignalCounts,
