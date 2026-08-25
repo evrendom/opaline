@@ -125,6 +125,9 @@ Without these, users can still sign up and log in with email/password.
 | `CLICKHOUSE_URL` | Yes | ClickHouse HTTPS endpoint |
 | `CLICKHOUSE_USERNAME` | Yes | ClickHouse username |
 | `CLICKHOUSE_PASSWORD` | Yes | ClickHouse password |
+| `R2_ACCOUNT_ID` | No | Cloudflare account ID for optional EU-jurisdiction direct-to-R2 ingest |
+| `R2_ACCESS_KEY_ID` | No | R2 S3 access key ID; all three R2 variables are required to enable the protocol |
+| `R2_SECRET_ACCESS_KEY` | No | R2 S3 secret access key |
 | `APP_URL` | Yes | Public URL of the deployed app |
 | `ALLOWED_ORIGIN` | Yes | CORS origin (same as `APP_URL` for single-domain) |
 | `GITHUB_CLIENT_ID` | No | GitHub OAuth client ID |

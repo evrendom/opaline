@@ -44,6 +44,9 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `CLICKHOUSE_USERNAME` | Remote only | ClickHouse username; local endpoints may use `default` |
 | `CLICKHOUSE_PASSWORD` | No | ClickHouse password |
 | `CLICKHOUSE_DB` | No | ClickHouse database name |
+| `R2_ACCOUNT_ID` | No | Cloudflare account ID for the EU-jurisdiction `opaline-ingest-prod` bucket. Direct-to-R2 ingest is disabled unless all three R2 variables are set. |
+| `R2_ACCESS_KEY_ID` | No | Bucket-scoped R2 S3 access key ID. |
+| `R2_SECRET_ACCESS_KEY` | No | Bucket-scoped R2 S3 secret access key. |
 | `CLICKHOUSE_PURGE_POLL_INTERVAL_MS` | No | Crash-recovery ceiling for durable ClickHouse purge jobs; enqueue paths and scheduled retries wake the in-process worker sooner (default: 3,600,000 / 60 min) |
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |
 | `ALLOWED_ORIGIN` | No | CORS origin (default: `http://localhost:4011`) |
