@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0024_TIMESTAMP = "1785780000000";
+const MIGRATION_0025_TIMESTAMP = "1787636737198";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0024 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0025 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0024 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0024] = await migrationSql<MigrationState[]>`
+			const [after0025] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,11 +61,48 @@ test("applies migrations 0020-0024 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0024).toEqual({
-				count: 25,
-				latestTimestamp: MIGRATION_0024_TIMESTAMP,
+			expect(after0025).toEqual({
+				count: 26,
+				latestTimestamp: MIGRATION_0025_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
+			const [ingestJobTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.ingest_job')::text AS name
+			`;
+			expect(ingestJobTable?.name).toBe("ingest_job");
+			const ingestJobIndexes = await migrationSql<Array<{ name: string }>>`
+				SELECT indexname AS name
+				FROM pg_indexes
+				WHERE schemaname = 'public'
+					AND tablename = 'ingest_job'
+				ORDER BY indexname
+			`;
+			expect([...ingestJobIndexes]).toEqual([
+				{ name: "ingest_job_cleanup_idx" },
+				{ name: "ingest_job_pending_available_idx" },
+				{ name: "ingest_job_pkey" },
+				{ name: "ingest_job_running_lease_expiry_idx" },
+				{ name: "ingest_job_session_idx" },
+			]);
+			const ingestJobChecks = await migrationSql<Array<{ name: string }>>`
+				SELECT conname AS name
+				FROM pg_constraint
+				WHERE conrelid = 'public.ingest_job'::regclass
+					AND contype = 'c'
+				ORDER BY conname
+			`;
+			expect([...ingestJobChecks]).toEqual([
+				{ name: "ingest_job_attempts_check" },
+				{ name: "ingest_job_content_sha256_check" },
+				{ name: "ingest_job_error_check" },
+				{ name: "ingest_job_expected_total_bytes_check" },
+				{ name: "ingest_job_json_shape_check" },
+				{ name: "ingest_job_lease_check" },
+				{ name: "ingest_job_max_attempts_check" },
+				{ name: "ingest_job_source_check" },
+				{ name: "ingest_job_status_check" },
+				{ name: "ingest_job_terminal_state_check" },
+			]);
 			const shapeColumns = await migrationSql<Array<{ name: string }>>`
 				SELECT column_name AS name
 				FROM information_schema.columns
