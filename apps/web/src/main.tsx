@@ -8,6 +8,7 @@ import { useIsMobile } from "./app/hooks/use-mobile";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
 import "dialkit/styles.css";
+import { initErrorMonitoring } from "./lib/error-monitoring";
 import { initProductAnalytics } from "./lib/product-analytics";
 
 const DevTools = import.meta.env.DEV
@@ -68,6 +69,8 @@ function deferProductAnalyticsInit() {
 		initProductAnalytics();
 	}, 0);
 }
+
+initErrorMonitoring();
 
 // biome-ignore lint/style/noNonNullAssertion: root element always exists
 createRoot(document.getElementById("root")!).render(
