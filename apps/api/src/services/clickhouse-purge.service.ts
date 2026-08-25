@@ -6,7 +6,9 @@ import {
 	type ResendConfig,
 	sendClickHousePurgeFailureAlert,
 } from "../email.js";
+import { isVercelRuntime } from "../lib/api-runtime.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { readResendConfig } from "../resend-config.js";
 import {
 	deleteOrgSessions,
 	deleteUserSessions,
@@ -121,8 +123,21 @@ export function registerClickHousePurgeWorker(
 	registeredClickHousePurgeWorker = worker;
 }
 
-export function wakeClickHousePurgeWorker(): void {
-	void registeredClickHousePurgeWorker?.wake();
+export async function wakeClickHousePurgeWorker(): Promise<void> {
+	if (registeredClickHousePurgeWorker) {
+		void registeredClickHousePurgeWorker.wake();
+		return;
+	}
+	if (isVercelRuntime()) {
+		try {
+			await runClickHousePurgeWorkerPass({ resend: readResendConfig() });
+		} catch (error) {
+			logger.error(
+				"Inline ClickHouse purge pass failed; the daily repair will retry: {error}",
+				{ error: sanitizeClickHousePurgeError(error) },
+			);
+		}
+	}
 }
 
 export async function enqueueClickHousePurge(
@@ -189,25 +204,7 @@ export function startClickHousePurgeWorker(
 		);
 	}
 
-	const env: ClickHousePurgeProcessorEnv = {
-		executePurge: async (target) => {
-			if (target.targetType === "organization") {
-				await deleteOrgSessions(target.targetId);
-				return;
-			}
-			await deleteUserSessions(target.targetId);
-		},
-		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
-		now: () => new Date(),
-		random: Math.random,
-		sendFailureAlert:
-			options.resend.apiKey &&
-			options.resend.fromEmail &&
-			options.resend.clickHousePurgeAlertRecipient
-				? (alert) => sendClickHousePurgeFailureAlert(options.resend, alert)
-				: undefined,
-		sqlClient: options.sqlClient ?? sqlClient,
-	};
+	const env = createClickHousePurgeProcessorEnv(options);
 
 	let activeRun = Promise.resolve();
 	let isRunning = false;
@@ -342,6 +339,52 @@ export function startClickHousePurgeWorker(
 			}
 			await activeRun;
 		},
+	};
+}
+
+export async function runClickHousePurgeWorkerPass(
+	options: StartClickHousePurgeWorkerOptions,
+): Promise<{ readonly hasMore: boolean; readonly processed: number }> {
+	if (options.enabled === false) {
+		return { hasMore: false, processed: 0 };
+	}
+
+	const env = createClickHousePurgeProcessorEnv(options);
+	await deleteExpiredSucceededPurgeJobs(env.sqlClient);
+	let processed = 0;
+	for (; processed < MAX_WORK_ITEMS_PER_PASS; processed += 1) {
+		if (!(await runClickHousePurgeWorkerOnce(env))) {
+			break;
+		}
+	}
+
+	return {
+		hasMore: processed === MAX_WORK_ITEMS_PER_PASS,
+		processed,
+	};
+}
+
+function createClickHousePurgeProcessorEnv(
+	options: StartClickHousePurgeWorkerOptions,
+): ClickHousePurgeProcessorEnv {
+	return {
+		executePurge: async (target) => {
+			if (target.targetType === "organization") {
+				await deleteOrgSessions(target.targetId);
+				return;
+			}
+			await deleteUserSessions(target.targetId);
+		},
+		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
+		now: () => new Date(),
+		random: Math.random,
+		sendFailureAlert:
+			options.resend.apiKey &&
+			options.resend.fromEmail &&
+			options.resend.clickHousePurgeAlertRecipient
+				? (alert) => sendClickHousePurgeFailureAlert(options.resend, alert)
+				: undefined,
+		sqlClient: options.sqlClient ?? sqlClient,
 	};
 }
 

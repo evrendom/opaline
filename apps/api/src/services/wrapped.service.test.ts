@@ -74,7 +74,7 @@ const rebuildService = await import("./wrapped-archetype-rebuild.service.js");
 const enqueueWrappedArchetypeSnapshotRebuild = spyOn(
 	rebuildService,
 	"enqueueWrappedArchetypeSnapshotRebuild",
-).mockImplementation(() => {});
+).mockImplementation(() => Promise.resolve());
 const { getWrappedV1Data } = await import("./wrapped.service.js");
 
 describe("wrapped service archetype gate", () => {

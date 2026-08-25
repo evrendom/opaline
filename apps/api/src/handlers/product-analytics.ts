@@ -4,8 +4,8 @@ import { orgMiddleware, os } from "../middleware.js";
 
 const dashboardViewed = os.productAnalytics.dashboardViewed
 	.use(orgMiddleware)
-	.handler(({ context, input }) => {
-		captureApiProductAnalyticsEvent({
+	.handler(async ({ context, input }) => {
+		await captureApiProductAnalyticsEvent({
 			distinctId: context.user.id,
 			event: PRODUCT_ANALYTICS_EVENTS.DASHBOARD_VIEWED,
 			payload: {
@@ -20,8 +20,8 @@ const dashboardViewed = os.productAnalytics.dashboardViewed
 
 const dashboardFilterChanged = os.productAnalytics.dashboardFilterChanged
 	.use(orgMiddleware)
-	.handler(({ context, input }) => {
-		captureApiProductAnalyticsEvent({
+	.handler(async ({ context, input }) => {
+		await captureApiProductAnalyticsEvent({
 			distinctId: context.user.id,
 			event: PRODUCT_ANALYTICS_EVENTS.DASHBOARD_FILTER_CHANGED,
 			payload: {
@@ -36,8 +36,8 @@ const dashboardFilterChanged = os.productAnalytics.dashboardFilterChanged
 
 const dashboardDrilldownOpened = os.productAnalytics.dashboardDrilldownOpened
 	.use(orgMiddleware)
-	.handler(({ context, input }) => {
-		captureApiProductAnalyticsEvent({
+	.handler(async ({ context, input }) => {
+		await captureApiProductAnalyticsEvent({
 			distinctId: context.user.id,
 			event: PRODUCT_ANALYTICS_EVENTS.DASHBOARD_DRILLDOWN_OPENED,
 			payload: {

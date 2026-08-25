@@ -41,6 +41,7 @@ import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
 import { wrappedDecimalClaimRouter } from "./handlers/wrapped-decimal-claim.js";
 import { wrappedResumeRouter } from "./handlers/wrapped-resume.js";
 import { wrappedShareRouter } from "./handlers/wrapped-share.js";
+import { isVercelRuntime } from "./lib/api-runtime.js";
 import { readBooleanEnv } from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
@@ -1012,7 +1013,7 @@ export async function processIngestSession({
 		return { contentSha256: contentHash, result: response };
 	}
 
-	captureApiProductAnalyticsEvent({
+	await captureApiProductAnalyticsEvent({
 		distinctId: context.user.id,
 		eventId: claimedLedger?.id,
 		event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
@@ -1045,7 +1046,7 @@ const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors, signal }) => {
 		const processed = await processIngestSession({
-			awaitLanguageSignals: false,
+			awaitLanguageSignals: isVercelRuntime(),
 			context,
 			enforceRateLimits: true,
 			errorFactories: createIngestErrorFactories(errors),
@@ -1391,9 +1392,9 @@ const deleteOrganization = os.deleteOrganization
 					[orgId],
 				);
 			});
-			wakeClickHousePurgeWorker();
+			await wakeClickHousePurgeWorker();
 
-			captureApiProductAnalyticsEvent({
+			await captureApiProductAnalyticsEvent({
 				distinctId: userId,
 				event: PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_DELETED,
 				payload: {

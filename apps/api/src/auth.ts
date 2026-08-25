@@ -131,7 +131,7 @@ export function createAuth(db: object, config: AuthConfig) {
 		emailAndPassword: {
 			enabled: true,
 			sendResetPassword: async ({ user, url }) => {
-				void sendPasswordResetEmail(resend, {
+				await sendPasswordResetEmail(resend, {
 					email: user.email,
 					resetUrl: url,
 				});
@@ -236,7 +236,7 @@ export function createAuth(db: object, config: AuthConfig) {
 							);
 						}
 
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: user.id,
 							event: PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP,
 							payload: {
@@ -292,7 +292,7 @@ export function createAuth(db: object, config: AuthConfig) {
 						role: string;
 						email: string;
 					}) => {
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: invitation.inviterId,
 							event: PRODUCT_ANALYTICS_EVENTS.INVITE_SENT,
 							payload: {
@@ -346,7 +346,7 @@ export function createAuth(db: object, config: AuthConfig) {
 								})) as Array<{ id: string }>)
 							: [];
 
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: createdMember.userId,
 							event: PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED,
 							payload: {

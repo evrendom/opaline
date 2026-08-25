@@ -18,43 +18,17 @@ import {
 import { enforceCookieCsrfOrigin } from "./lib/csrf-origin.js";
 import {
 	readBetterAuthSecret,
-	readBooleanEnv,
 	readCliDeviceVerificationUrl,
 	readNonNegativeSafeIntegerEnv,
 	readPositiveSafeIntegerEnv,
 } from "./lib/env.js";
 import { maybeCompressSessionDetailRpcResponse } from "./lib/http-compression.js";
-import { shutdownApiProductAnalytics } from "./lib/product-analytics.js";
 import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
-import {
-	createBackgroundIngestErrorFactories,
-	processIngestSession,
-	router,
-} from "./router.js";
-import {
-	registerClickHousePurgeWorker,
-	startClickHousePurgeWorker,
-} from "./services/clickhouse-purge.service.js";
-import {
-	getIngestFilterQueueMetrics,
-	shutdownIngestFilterQueue,
-} from "./services/ingest-filter.service.js";
-import {
-	getNextR2IngestWorkDueAt,
-	registerR2IngestCleanupWorker,
-	repairR2IngestCleanupJobs,
-	sweepExpiredR2IngestJobs,
-} from "./services/r2-ingest-cleanup.service.js";
-import { repairRecoverableR2IngestJobs } from "./services/r2-ingest-commit.service.js";
-import {
-	createR2MultipartUploadClient,
-	readR2IngestAvailability,
-} from "./services/r2-ingest-storage.service.js";
-import { startSessionLanguageSignalReconciliationWorker } from "./services/session-language-signal-reconciliation.service.js";
-import { shutdownSessionLanguageSignalScanner } from "./services/session-language-signal-scanner.service.js";
-import { shutdownUsageExtractionQueue } from "./services/usage-extraction.service.js";
+import { readResendConfig } from "./resend-config.js";
+import { router } from "./router.js";
+import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
 import {
 	getPublicWrappedShareForPageMetadata,
 	getPublicWrappedShareWithSocialImage,
@@ -125,13 +99,7 @@ const trustedOrigins = [
 		...DEFAULT_DEV_ORIGINS,
 	]),
 ];
-const resend = {
-	apiKey: process.env.RESEND_API_KEY,
-	audienceId: process.env.RESEND_AUDIENCE_ID,
-	clickHousePurgeAlertRecipient:
-		process.env.CLICKHOUSE_PURGE_ALERT_RECIPIENT?.trim() || undefined,
-	fromEmail: process.env.RESEND_FROM_EMAIL,
-};
+const resend = readResendConfig();
 
 if (appURL !== rawAppURL) {
 	logger.warn(
@@ -396,57 +364,6 @@ export async function fetchHandler(request: Request): Promise<Response> {
 		},
 	);
 }
-const r2IngestAvailability = readR2IngestAvailability();
-const r2IngestCleanupClient = r2IngestAvailability.enabled
-	? createR2MultipartUploadClient(r2IngestAvailability.configuration)
-	: undefined;
-const clickHousePurgeWorker = startClickHousePurgeWorker({
-	enabled: readBooleanEnv("CLICKHOUSE_PURGE_WORKER_ENABLED", true),
-	repairR2IngestCleanup: r2IngestCleanupClient
-		? async () => {
-				const expired = await sweepExpiredR2IngestJobs({
-					database: sqlClient,
-					r2: r2IngestCleanupClient,
-				});
-				const recovered = await repairRecoverableR2IngestJobs({
-					database: sqlClient,
-					process: (sessionInput, identity, signal) =>
-						processIngestSession({
-							awaitLanguageSignals: true,
-							context: {
-								session: null,
-								user: { id: identity.userId },
-							},
-							durableProcessing: { failpoint: undefined },
-							enforceRateLimits: false,
-							errorFactories: createBackgroundIngestErrorFactories(),
-							input: sessionInput,
-							signal,
-						}),
-					r2: r2IngestCleanupClient,
-				});
-				const cleanup = await repairR2IngestCleanupJobs({
-					database: sqlClient,
-					r2: r2IngestCleanupClient,
-				});
-				return {
-					attempted:
-						expired.attempted + recovered.attempted + cleanup.attempted,
-					completed:
-						expired.completed + recovered.completed + cleanup.completed,
-					hasMore: expired.hasMore || recovered.hasMore || cleanup.hasMore,
-					nextDueAt: await getNextR2IngestWorkDueAt(sqlClient),
-				};
-			}
-		: undefined,
-	resend,
-});
-registerClickHousePurgeWorker(clickHousePurgeWorker);
-registerR2IngestCleanupWorker(clickHousePurgeWorker);
-const sessionLanguageSignalReconciliationWorker = IS_TEST
-	? undefined
-	: startSessionLanguageSignalReconciliationWorker();
-
 function resolveAuthAppURL(input: {
 	defaultDevApiOrigin: string;
 	preferredFrontendOrigin: string;
@@ -486,24 +403,6 @@ function sameOrigin(left: string, right: string) {
 	} catch {
 		return false;
 	}
-}
-
-let isShuttingDown = false;
-
-export async function shutdownApi(): Promise<void> {
-	if (isShuttingDown) {
-		return;
-	}
-	isShuttingDown = true;
-
-	shutdownIngestFilterQueue();
-	shutdownUsageExtractionQueue();
-	shutdownSessionLanguageSignalScanner();
-	await Promise.all([
-		shutdownApiProductAnalytics(),
-		clickHousePurgeWorker.stop(),
-		sessionLanguageSignalReconciliationWorker?.stop(),
-	]);
 }
 
 async function handleRequest(

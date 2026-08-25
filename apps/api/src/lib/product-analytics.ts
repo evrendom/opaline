@@ -73,7 +73,7 @@ function buildPayload<Name extends ProductAnalyticsEventName>(
 	});
 }
 
-export function captureApiProductAnalyticsEvent<
+export async function captureApiProductAnalyticsEvent<
 	Name extends ProductAnalyticsEventName,
 >(options: {
 	distinctId: string;
@@ -87,7 +87,7 @@ export function captureApiProductAnalyticsEvent<
 	}
 
 	try {
-		instance.capture({
+		await instance.captureImmediate({
 			distinctId: options.distinctId,
 			event: options.event,
 			properties: buildPayload(options.event, options.payload),

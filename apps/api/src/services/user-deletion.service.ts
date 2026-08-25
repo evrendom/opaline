@@ -112,6 +112,6 @@ export async function deleteUserPostgresData(
 
 		return { deletedOrganizationIds };
 	});
-	wakeClickHousePurgeWorker();
+	await wakeClickHousePurgeWorker();
 	return deletedData;
 }
