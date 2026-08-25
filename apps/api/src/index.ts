@@ -519,6 +519,14 @@ async function handleRequest(
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
 	}
+	if (IS_TEST && url.pathname === "/rpc/__test/oversized-response") {
+		return enforceApiResponseSize({
+			pathname: url.pathname,
+			response: Response.json({
+				json: { payload: "x".repeat(API_RESPONSE_MAX_BYTES) },
+			}),
+		});
+	}
 	const wrappedShareCardImageId = getWrappedShareCardImageId(url.pathname);
 	if (wrappedShareCardImageId) {
 		return handleWrappedShareCardImageRequest({

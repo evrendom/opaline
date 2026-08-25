@@ -24,6 +24,7 @@
         "@clickhouse/client-web": "^1.11.0",
         "@logtape/file": "^2.0.4",
         "@logtape/logtape": "^2.0.4",
+        "@orpc/client": "^1.13.5",
         "@orpc/server": "latest",
         "@resvg/resvg-js": "^2.6.2",
         "@rudel/agent-adapters": "workspace:*",

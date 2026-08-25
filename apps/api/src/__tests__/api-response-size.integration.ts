@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { RPCLink } from "@orpc/client/fetch";
 import { API_RESPONSE_TOO_LARGE_CODE } from "../lib/api-response-size.js";
 import {
 	type ApiTestServer,
@@ -41,5 +42,28 @@ describe("final API response byte guard", () => {
 		const response = await fetch(`${server?.baseUrl}/health`);
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ status: "ok" });
+	});
+
+	test("returns client-visible code and data through RPCLink for a gzip-capable /rpc request", async () => {
+		const sentAcceptEncodings: (string | null)[] = [];
+		const link = new RPCLink({
+			fetch: (request, init) => {
+				sentAcceptEncodings.push(request.headers.get("Accept-Encoding"));
+				return fetch(request, init);
+			},
+			headers: { "Accept-Encoding": "gzip" },
+			url: `${server?.baseUrl}/rpc`,
+		});
+
+		await expect(
+			link.call(["__test", "oversized-response"], undefined, { context: {} }),
+		).rejects.toMatchObject({
+			code: API_RESPONSE_TOO_LARGE_CODE,
+			data: { maxBytes: 3_750_000 },
+			defined: false,
+			message: "The serialized API response exceeds the supported size limit.",
+			status: 413,
+		});
+		expect(sentAcceptEncodings).toEqual(["gzip"]);
 	});
 });
