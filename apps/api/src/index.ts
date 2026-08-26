@@ -5,7 +5,11 @@ import { fetchHandler, MAX_REQUEST_BODY_BYTES } from "./handler.js";
 const logger = getLogger(["rudel", "api", "http"]);
 const port = process.env.PORT ?? "4010";
 const server = Bun.serve({
-	fetch: fetchHandler,
+	fetch(request, server) {
+		return fetchHandler(request, {
+			socketIp: server.requestIP(request)?.address ?? null,
+		});
+	},
 	maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 	port,
 });
