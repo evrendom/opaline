@@ -113,7 +113,43 @@ export function buildDefaultOrganizationSlug(
 	if (validateOrgSlug(candidate)) {
 		return candidate;
 	}
+	return buildFallbackOrganizationSlug();
+}
+
+function buildFallbackOrganizationSlug(): string {
 	return `workspace-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+export interface DefaultOrganizationData {
+	readonly createdAt: Date;
+	readonly id: string;
+	readonly name: string;
+	readonly slug: string;
+}
+
+export async function createDefaultOrganizationWithRetry<Org>(input: {
+	readonly create: (data: DefaultOrganizationData) => Promise<Org>;
+	readonly email: string;
+	readonly name: string;
+	readonly userId: string;
+}): Promise<Org> {
+	const data = {
+		createdAt: new Date(),
+		id: input.userId,
+		name: input.name,
+		slug: buildDefaultOrganizationSlug(input.email, input.userId),
+	};
+	try {
+		return await input.create(data);
+	} catch {
+		// Distinct users can normalize to the same default slug and hit the
+		// unique constraint; retry once with the random fallback instead of
+		// leaving the signup without a workspace. A second failure propagates.
+		return await input.create({
+			...data,
+			slug: buildFallbackOrganizationSlug(),
+		});
+	}
 }
 
 export function createOrganizationPlugin(config: AuthConfig) {
@@ -243,16 +279,16 @@ export function createAuth(db: object, config: AuthConfig) {
 									where: [{ field: "userId", value: user.id }],
 								})) as Array<{ providerId: string; accountId: string }>;
 
-								const slug = buildDefaultOrganizationSlug(user.email, user.id);
-								const org = await adapter.create({
-									model: "organization",
-									data: {
-										id: user.id,
-										name: `${displayName}'s Workspace`,
-										slug,
-										createdAt: new Date(),
-									},
-									forceAllowId: true,
+								const org = await createDefaultOrganizationWithRetry({
+									create: (data) =>
+										adapter.create({
+											model: "organization",
+											data,
+											forceAllowId: true,
+										}),
+									email: user.email,
+									name: `${displayName}'s Workspace`,
+									userId: user.id,
 								});
 
 								if (org) {

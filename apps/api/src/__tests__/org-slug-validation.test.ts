@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import {
 	buildDefaultOrganizationSlug,
+	createDefaultOrganizationWithRetry,
 	createOrganizationPlugin,
 } from "../auth.js";
 
@@ -116,5 +117,44 @@ describe("buildDefaultOrganizationSlug", () => {
 		);
 		expect(slug).toBe("dashboard-12345678");
 		expect(validateOrgSlug(slug)).toBe(true);
+	});
+});
+
+describe("createDefaultOrganizationWithRetry", () => {
+	test("retries a colliding slug with a fallback and returns the result", async () => {
+		const attempts: string[] = [];
+		const org = await createDefaultOrganizationWithRetry({
+			create: async (data) => {
+				attempts.push(data.slug);
+				if (attempts.length === 1) {
+					throw new Error("duplicate key value violates unique constraint");
+				}
+				return { id: data.id, slug: data.slug };
+			},
+			email: "a.b@example.com",
+			name: "Test Workspace",
+			userId: "AbCdEf12rest",
+		});
+
+		expect(attempts).toHaveLength(2);
+		expect(attempts[0]).toBe("a-b-abcdef12");
+		expect(attempts[1]).toMatch(/^workspace-[0-9a-f]{8}$/);
+		expect(org.slug).toBe(attempts[1] ?? "");
+	});
+
+	test("uses the sanitized slug when the first insert succeeds", async () => {
+		const attempts: string[] = [];
+		const org = await createDefaultOrganizationWithRetry({
+			create: async (data) => {
+				attempts.push(data.slug);
+				return { id: data.id, slug: data.slug };
+			},
+			email: "jane@example.com",
+			name: "Test Workspace",
+			userId: "12345678rest",
+		});
+
+		expect(attempts).toEqual(["jane-12345678"]);
+		expect(org.slug).toBe("jane-12345678");
 	});
 });
