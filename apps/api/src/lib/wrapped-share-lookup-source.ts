@@ -7,9 +7,6 @@ export function resolveWrappedShareLookupSource(input: {
 	const flyClientIp = input.flyClientIp?.trim() || null;
 	const socketIp = input.socketIp?.trim() || null;
 	const peerIp = flyClientIp ?? socketIp;
-	if (!peerIp) {
-		return "unknown";
-	}
 
 	const forwardedIps =
 		input.forwardedFor
@@ -23,10 +20,15 @@ export function resolveWrappedShareLookupSource(input: {
 		forwardedIps.pop();
 	}
 
-	if (forwardedIps.at(-1) !== peerIp) {
+	if (peerIp && forwardedIps.at(-1) !== peerIp) {
 		forwardedIps.push(peerIp);
 	}
 
-	const sourceIndex = forwardedIps.length - input.trustedProxyHops - 1;
-	return forwardedIps[sourceIndex] ?? peerIp;
+	// A socket/Fly peer is appended to the chain above; a Web-standard runtime
+	// has no socket peer, so its X-Forwarded-For chain has no extra slot to skip.
+	const peerOffset = peerIp ? 1 : 0;
+	const sourceIndex = forwardedIps.length - input.trustedProxyHops - peerOffset;
+	return (
+		forwardedIps[sourceIndex] ?? peerIp ?? forwardedIps.at(-1) ?? "unknown"
+	);
 }

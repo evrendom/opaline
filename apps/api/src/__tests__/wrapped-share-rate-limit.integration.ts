@@ -200,7 +200,11 @@ describe("wrapped share source trust over HTTP", () => {
 		await flyApi?.stop();
 	});
 
-	test("ignores forwarded addresses when no proxy is trusted", async () => {
+	test("keys direct Bun traffic on the socket peer, not spoofable headers", async () => {
+		// With no trusted proxies configured, forwarded headers must not mint
+		// independent rate-limit buckets: every request through the direct
+		// proxy shares its socket peer, so the second request is throttled
+		// even though it advertises a different forwarded client.
 		expect(
 			await callPublicRpc(
 				directProxy.baseUrl,
@@ -212,7 +216,7 @@ describe("wrapped share source trust over HTTP", () => {
 			await callPublicRpc(
 				directProxy.baseUrl,
 				"198.51.100.61",
-				`direct-second-${crypto.randomUUID()}`,
+				`direct-spoofed-${crypto.randomUUID()}`,
 			),
 		).toBe(429);
 	});
