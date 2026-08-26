@@ -214,8 +214,12 @@ final failures are not.
 
 Schedules 600 operation starts open-loop at fixed offsets from one epoch,
 targeting 10 unique sessions/second regardless of when earlier operations
-complete. Paced runs are bounded only by `--max-in-flight`; `--concurrency`
-applies to unpaced and commit-barrier runs, not to this arrival schedule. Each
+complete. Paced runs are bounded only by `--max-in-flight` (hard-capped at 512
+simultaneous jobs so one remote confirmation cannot authorize an unbounded
+concurrent blast); `--concurrency` applies to unpaced and commit-barrier runs,
+not to this arrival schedule. `--rate-per-second` is rejected in combination
+with `--barrier-before-commit` or `--same-session-hash`: barrier runs are
+closed-loop and cannot honor an arrival schedule. Each
 upload records its planned start offset, actual start offset, and schedule drift.
 The summary divides starts by the interval from the epoch through one nominal
 spacing after the last actual start, and fails if either arrival-rate or drift

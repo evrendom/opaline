@@ -17,6 +17,10 @@ const DEFAULT_MAX_IN_FLIGHT = 512;
 const DEFAULT_SUMMARY_PATH = "/tmp/opaline-r2-load-test-summary.json";
 const DEFAULT_TIMESTAMP_START = "2026-08-25T12:00:00.000Z";
 const MAX_UPLOADS = 10_000;
+// One remote-target confirmation must not authorize an arbitrarily large
+// concurrent blast: total uploads may reach MAX_UPLOADS, but simultaneous
+// in-flight jobs stay hard-capped.
+const MAX_IN_FLIGHT_CEILING = 512;
 const MEBIBYTE = 1024 * 1024;
 
 interface ParsedArguments {
@@ -172,6 +176,19 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 		arguments_,
 		"--max-peak-rss-mib",
 	);
+	const barrierMode =
+		arguments_.flags.has("--barrier-before-commit") ||
+		arguments_.flags.has("--same-session-hash");
+	if (
+		barrierMode &&
+		parseOptionalPositiveNumber(arguments_, "--rate-per-second") !== null
+	) {
+		// Barrier modes run closed-loop and would silently ignore pacing while
+		// the summary still reports the configured rate as if it applied.
+		throw new Error(
+			"--rate-per-second cannot be combined with --barrier-before-commit or --same-session-hash",
+		);
+	}
 	const passed = await executeLoadTest({
 		apiKey: await readSecretFile(
 			getRequiredValue(arguments_, "--api-key-file"),
@@ -204,7 +221,7 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 				DEFAULT_MAX_IN_FLIGHT.toString(),
 			"--max-in-flight",
 			1,
-			MAX_UPLOADS,
+			MAX_IN_FLIGHT_CEILING,
 		),
 		organizationId: getOptionalValue(arguments_, "--organization-id"),
 		partConcurrency: parseInteger(
