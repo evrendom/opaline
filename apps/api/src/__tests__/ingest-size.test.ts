@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/server";
-import { INGEST_LIMIT_REASONS } from "@rudel/api-routes";
-import { enforceIngestAggregateSize } from "../lib/ingest-size.js";
+import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_LIMIT_REASONS,
+} from "@rudel/api-routes";
+import {
+	clampIngestAggregateContentMaxBytes,
+	enforceIngestAggregateSize,
+} from "../lib/ingest-size.js";
 
 const validBase = {
 	source: "claude_code" as const,
@@ -10,6 +16,24 @@ const validBase = {
 };
 
 describe("enforceIngestAggregateSize", () => {
+	test("clamps overrides to the production aggregate ceiling", () => {
+		expect(clampIngestAggregateContentMaxBytes(1)).toBe(1);
+		expect(
+			clampIngestAggregateContentMaxBytes(
+				INGEST_AGGREGATE_CONTENT_MAX_BYTES + 1,
+			),
+		).toBe(INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+		expect(clampIngestAggregateContentMaxBytes(Number.POSITIVE_INFINITY)).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
+		expect(clampIngestAggregateContentMaxBytes(Number.NaN)).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
+		expect(clampIngestAggregateContentMaxBytes(-1)).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
+	});
+
 	test("returns the exact UTF-8 byte count at the limit", () => {
 		expect(
 			enforceIngestAggregateSize({ ...validBase, content: "abcd" }, 4),

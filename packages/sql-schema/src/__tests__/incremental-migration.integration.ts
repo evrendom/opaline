@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0028_TIMESTAMP = "1787735109151";
+const MIGRATION_0029_TIMESTAMP = "1787735109151";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0028 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0029 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -63,7 +63,7 @@ test("applies migrations 0020-0028 to a database already migrated through 0019",
 			`;
 			expect(after0028).toEqual({
 				count: 29,
-				latestTimestamp: MIGRATION_0028_TIMESTAMP,
+				latestTimestamp: MIGRATION_0029_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [ingestJobTable] = await migrationSql<TableState[]>`
@@ -96,6 +96,22 @@ test("applies migrations 0020-0028 to a database already migrated through 0019",
 				SELECT to_regclass('public.ingest_processing_target_receipt')::text AS name
 			`;
 			expect(targetReceiptTable?.name).toBe("ingest_processing_target_receipt");
+			const [ingestRateLimitTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.ingest_rate_limit_counter')::text AS name
+			`;
+			expect(ingestRateLimitTable?.name).toBe("ingest_rate_limit_counter");
+			const ingestRateLimitChecks = await migrationSql<Array<{ name: string }>>`
+				SELECT conname AS name
+				FROM pg_constraint
+				WHERE conrelid = 'public.ingest_rate_limit_counter'::regclass
+					AND contype = 'c'
+				ORDER BY conname
+			`;
+			expect([...ingestRateLimitChecks]).toEqual([
+				{ name: "ingest_rate_limit_counter_decision_check" },
+				{ name: "ingest_rate_limit_counter_subject_check" },
+				{ name: "ingest_rate_limit_counter_value_check" },
+			]);
 			const targetReceiptChecks = await migrationSql<Array<{ name: string }>>`
 				SELECT conname AS name
 				FROM pg_constraint

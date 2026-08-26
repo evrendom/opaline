@@ -13,7 +13,7 @@ Logical-session reads must group by immutable
 
 ## Artifacts and rollout order
 
-- PostgreSQL: `packages/sql-schema/db/migrations/0028_tidy_human_fly.sql`
+- PostgreSQL: `packages/sql-schema/db/migrations/0029_tidy_human_fly.sql`
 - ClickHouse DDL: `20260826090551_auto.sql`
 - ClickHouse backfill: `20260826090600_f16_backfill.sql`
 - Application: PostgreSQL allocates and commits a decimal revision before that

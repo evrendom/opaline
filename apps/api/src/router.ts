@@ -8,7 +8,6 @@ import {
 } from "@rudel/agent-adapters";
 import {
 	type contract,
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
 	IngestSessionOutputSchema,
 	PRODUCT_ANALYTICS_EVENTS,
@@ -49,7 +48,11 @@ import {
 	isUnexpectedIngestShrink,
 	resolvePreviousIngestContentShape,
 } from "./lib/ingest-content-shape.js";
-import { enforceIngestAggregateSize } from "./lib/ingest-size.js";
+import {
+	clampIngestAggregateContentMaxBytes,
+	enforceMeasuredIngestAggregateSize,
+	measureIngestAggregateSize,
+} from "./lib/ingest-size.js";
 import {
 	bucketContentSize,
 	captureApiProductAnalyticsEvent,
@@ -64,8 +67,6 @@ import {
 } from "./middleware.js";
 import {
 	checkHookIngestRateLimit,
-	checkIngestByteRateLimit,
-	checkIngestRequestRateLimit,
 	checkManualIngestRateLimit,
 	checkOrganizationSessionCountRateLimit,
 } from "./rate-limit.js";
@@ -97,6 +98,13 @@ import {
 	reserveLedgerUsageGeneration,
 	withIngestProcessingLedger,
 } from "./services/ingest-processing-ledger.service.js";
+import {
+	checkIngestRateLimit,
+	createPostgresIngestRateLimitEnvironment,
+	INGEST_RATE_LIMIT_CONFIG,
+	type IngestRateLimitEnvironment,
+	resolveIngestRateLimitSubject,
+} from "./services/ingest-rate-limit.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
 import {
 	assertIngestTimestampWindow,
@@ -161,6 +169,19 @@ import {
 } from "./services/usage-extraction.service.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
+let ingestRateLimitEnvironment =
+	createPostgresIngestRateLimitEnvironment(sqlClient);
+
+export function setIngestRateLimitEnvironmentForTests(
+	environment: IngestRateLimitEnvironment,
+): void {
+	if (process.env.NODE_ENV !== "test") {
+		throw new Error(
+			"The ingest rate-limit environment can only change in tests",
+		);
+	}
+	ingestRateLimitEnvironment = environment;
+}
 
 function getSessionUploadCompletedPayload(
 	input: IngestSessionInput,
@@ -419,6 +440,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 }
 
 export async function processIngestSession({
+	aggregateContentMaxBytes,
 	allowQuiescedIngest = false,
 	awaitLanguageSignals,
 	claimedLedger,
@@ -429,10 +451,12 @@ export async function processIngestSession({
 	input,
 	signal,
 }: {
+	aggregateContentMaxBytes?: number;
 	allowQuiescedIngest?: boolean;
 	awaitLanguageSignals: boolean;
 	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
+		apiKeyId: string | null;
 		session: AppContext["session"];
 		user: { id: string };
 	};
@@ -455,14 +479,22 @@ export async function processIngestSession({
 				"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
 		});
 	}
-	if (enforceRateLimits) checkIngestRequestRateLimit(context.user.id);
-	const aggregateBytes = enforceIngestAggregateSize(
-		input,
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	const effectiveAggregateContentMaxBytes = clampIngestAggregateContentMaxBytes(
+		aggregateContentMaxBytes,
 	);
+	const aggregateBytes = measureIngestAggregateSize(input);
 	if (enforceRateLimits) {
-		checkIngestByteRateLimit(context.user.id, aggregateBytes);
+		await checkIngestRateLimit(
+			resolveIngestRateLimitSubject(context.user.id),
+			aggregateBytes > effectiveAggregateContentMaxBytes ? 0 : aggregateBytes,
+			INGEST_RATE_LIMIT_CONFIG,
+			ingestRateLimitEnvironment,
+		);
 	}
+	enforceMeasuredIngestAggregateSize(
+		aggregateBytes,
+		effectiveAggregateContentMaxBytes,
+	);
 	const filteredText = await filterSessionTextFieldsOffThread({
 		bytes: aggregateBytes,
 		fields: {
@@ -1089,7 +1121,11 @@ const ingestSessionHandler = os.ingestSession
 		const processed = await processIngestSession({
 			allowQuiescedIngest: context.ingestOperatorAuthorized,
 			awaitLanguageSignals: isVercelRuntime(),
-			context,
+			context: {
+				apiKeyId: context.apiKeyId,
+				session: context.session,
+				user: context.user,
+			},
 			enforceRateLimits: true,
 			errorFactories: createIngestErrorFactories(errors),
 			input,
@@ -1124,12 +1160,16 @@ const r2IngestInit = os.ingest.init
 			});
 		}
 
-		checkIngestRequestRateLimit(context.user.id);
 		const aggregateBytes = input.objects.reduce(
 			(total, object) => total + object.byteLength,
 			0,
 		);
-		checkIngestByteRateLimit(context.user.id, aggregateBytes);
+		await checkIngestRateLimit(
+			resolveIngestRateLimitSubject(context.user.id),
+			aggregateBytes,
+			INGEST_RATE_LIMIT_CONFIG,
+			ingestRateLimitEnvironment,
+		);
 		if (input.upload_mode === "manual" || input.upload_mode === "retry") {
 			checkManualIngestRateLimit(context.user.id, input.sessionId);
 		} else {
@@ -1196,6 +1236,8 @@ const r2IngestCommit = os.ingest.commit
 			});
 		}
 
+		// Init reserves both quotas. Commit retries reuse that durable job and must
+		// not charge the same upload again.
 		try {
 			return await commitR2IngestJob({
 				input,
@@ -1204,6 +1246,7 @@ const r2IngestCommit = os.ingest.commit
 						allowQuiescedIngest: context.ingestOperatorAuthorized,
 						awaitLanguageSignals: true,
 						context: {
+							apiKeyId: context.apiKeyId,
 							session: null,
 							user: { ...context.user, id: identity.userId },
 						},

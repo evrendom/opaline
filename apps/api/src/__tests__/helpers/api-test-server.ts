@@ -11,6 +11,7 @@ export interface ApiTestServer {
 
 export async function startApiTestServer(
 	environmentOverrides: Record<string, string | undefined> = {},
+	entrypoint = "apps/api/src/index.ts",
 ): Promise<ApiTestServer> {
 	const environment = {
 		...process.env,
@@ -22,7 +23,7 @@ export async function startApiTestServer(
 		PORT: "0",
 		...environmentOverrides,
 	};
-	const processHandle = Bun.spawn(["bun", "apps/api/src/index.ts"], {
+	const processHandle = Bun.spawn(["bun", entrypoint], {
 		cwd: MONOREPO_ROOT,
 		env: environment,
 		stderr: "pipe",

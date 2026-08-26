@@ -2399,7 +2399,11 @@ function createRealProcessor(
 	return (input, identity) =>
 		processIngestSession({
 			awaitLanguageSignals: true,
-			context: { session: null, user: { id: identity.userId } },
+			context: {
+				apiKeyId: null,
+				session: null,
+				user: { id: identity.userId },
+			},
 			durableProcessing: {
 				failpoint,
 				operationId: identity.operationId,

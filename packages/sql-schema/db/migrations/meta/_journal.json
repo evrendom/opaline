@@ -201,8 +201,15 @@
 		{
 			"idx": 28,
 			"version": "7",
+			"when": 1787731200000,
+			"tag": "0028_postgres_ingest_rate_limit",
+			"breakpoints": true
+		},
+		{
+			"idx": 29,
+			"version": "7",
 			"when": 1787735109151,
-			"tag": "0028_tidy_human_fly",
+			"tag": "0029_tidy_human_fly",
 			"breakpoints": true
 		}
 	]

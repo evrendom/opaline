@@ -25,7 +25,7 @@ const REQUIRED_OWNERSHIP_MIGRATIONS = [
 	},
 	{
 		createdAt: "1787735109151",
-		tag: "0028_tidy_human_fly",
+		tag: "0029_tidy_human_fly",
 	},
 ] as const;
 

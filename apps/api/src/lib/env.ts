@@ -185,14 +185,16 @@ export function shouldUsePersistentSkillAnalytics(
 export function readPositiveSafeIntegerEnv(
 	name: string,
 	defaultValue: number,
+	minimumValue = 1,
 ): number {
 	const rawValue = process.env[name];
-	if (rawValue === undefined) {
-		return defaultValue;
-	}
-
-	const parsedValue = Number(rawValue);
-	if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+	const parsedValue = rawValue === undefined ? defaultValue : Number(rawValue);
+	if (!Number.isSafeInteger(parsedValue) || parsedValue < minimumValue) {
+		if (minimumValue > 1) {
+			throw new Error(
+				`${name} must be a safe integer greater than or equal to ${minimumValue}`,
+			);
+		}
 		throw new Error(`${name} must be a positive safe integer`);
 	}
 
