@@ -266,6 +266,23 @@ jobs:
         env:
           RUDEL_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/rudel/dist/cli.js
 
+      - name: Register a URL handler for the opener test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # Blacksmith's Windows image ships no default browser, so ShellExecute
+        # has no http/https handler and the opener test times out. The test's
+        # property is that the URL reaches the OS handler byte-intact, so a
+        # curl handler is a valid stand-in. On images where a real browser owns
+        # the UserChoice association (GitHub-hosted), this registration is
+        # inert: UserChoice takes precedence over HKCU\Software\Classes.
+        run: |
+          foreach ($scheme in @("http", "https")) {
+            $base = "HKCU:\Software\Classes\$scheme"
+            New-Item -Path "$base\shell\open\command" -Force | Out-Null
+            New-ItemProperty -Path $base -Name "URL Protocol" -Value "" -PropertyType String -Force | Out-Null
+            Set-Item -Path "$base\shell\open\command" -Value 'C:\Windows\System32\curl.exe --silent --output NUL "%1"'
+          }
+
       - name: Verify the Windows opener delivers the complete URL
         if: runner.os == 'Windows'
         shell: bash
