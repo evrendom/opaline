@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import assert from "node:assert/strict";
-import { createOrganizationPlugin } from "../auth.js";
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
+import {
+	buildDefaultOrganizationSlug,
+	createOrganizationPlugin,
+} from "../auth.js";
 
 const organizationHooks = createOrganizationPlugin({
 	appURL: "http://localhost:4010",
@@ -86,5 +90,31 @@ describe("organization slug validation hooks", () => {
 				user,
 			}),
 		).resolves.toBeUndefined();
+	});
+});
+
+describe("buildDefaultOrganizationSlug", () => {
+	test("sanitizes email local parts into valid slugs", () => {
+		const slug = buildDefaultOrganizationSlug(
+			"Jane.Doe+work@example.com",
+			"AbCdEf12rest",
+		);
+		expect(slug).toBe("jane-doe-work-abcdef12");
+		expect(validateOrgSlug(slug)).toBe(true);
+	});
+
+	test("falls back to a generated slug when nothing is salvageable", () => {
+		const slug = buildDefaultOrganizationSlug("..@example.com", "________");
+		expect(slug).toMatch(/^workspace-[0-9a-f-]{8}$/);
+		expect(validateOrgSlug(slug)).toBe(true);
+	});
+
+	test("never produces a reserved slug", () => {
+		const slug = buildDefaultOrganizationSlug(
+			"dashboard@example.com",
+			"12345678rest",
+		);
+		expect(slug).toBe("dashboard-12345678");
+		expect(validateOrgSlug(slug)).toBe(true);
 	});
 });

@@ -97,6 +97,25 @@ function assertValidOrganizationSlug(slug: string) {
 	}
 }
 
+export function buildDefaultOrganizationSlug(
+	email: string,
+	userId: string,
+): string {
+	// Default-organization creation writes through the raw adapter, so the
+	// organization plugin hooks never see this slug. Sanitize to the same
+	// DNS-label shape validateOrgSlug enforces and fall back to a random
+	// slug when the email local part cannot be salvaged.
+	const candidate = `${email.split("@")[0] ?? ""}-${userId.slice(0, 8)}`
+		.toLowerCase()
+		.replace(/[^a-z0-9-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (validateOrgSlug(candidate)) {
+		return candidate;
+	}
+	return `workspace-${crypto.randomUUID().slice(0, 8)}`;
+}
+
 export function createOrganizationPlugin(config: AuthConfig) {
 	const resend = config.resend ?? {};
 
@@ -224,7 +243,7 @@ export function createAuth(db: object, config: AuthConfig) {
 									where: [{ field: "userId", value: user.id }],
 								})) as Array<{ providerId: string; accountId: string }>;
 
-								const slug = `${user.email.split("@")[0]}-${user.id.slice(0, 8)}`;
+								const slug = buildDefaultOrganizationSlug(user.email, user.id);
 								const org = await adapter.create({
 									model: "organization",
 									data: {
