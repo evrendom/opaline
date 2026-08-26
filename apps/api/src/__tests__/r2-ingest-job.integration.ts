@@ -2598,10 +2598,12 @@ async function interruptFinalIngestClaim(
 	leaseStartedAt: Date,
 	userId: string,
 ): Promise<void> {
+	// The commit below runs on the injected fixed clock, so the retry window
+	// must be rewound relative to that clock, not the database clock.
 	await sqlClient`
 		UPDATE ingest_job
 		SET attempts = max_attempts - 1,
-			available_at = now() - interval '1 hour'
+			available_at = ${new Date(leaseStartedAt.getTime() - 3_600_000)}
 		WHERE id = ${initialized.jobId}
 	`;
 	let interrupted = false;

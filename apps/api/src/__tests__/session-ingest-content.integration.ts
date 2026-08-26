@@ -16,7 +16,7 @@ import {
 	USAGE_EVENT_IDENTITY_VERSION,
 	USAGE_EVENT_MODEL_RATE_CARD_VERSION,
 } from "@rudel/usage-events";
-import type postgres from "postgres";
+import postgres from "postgres";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { getIngestContentShape } from "../lib/ingest-content-shape.js";
@@ -151,10 +151,19 @@ describe("session ingest content bookkeeping", () => {
 			sessionId: CONCURRENT_RECEIPT_SESSION_ID,
 			userId,
 		};
-		const [firstConnection, secondConnection] = await Promise.all([
-			sqlClient.reserve(),
-			sqlClient.reserve(),
-		]);
+		// Reserved connections do not expose begin(); dedicated single-slot
+		// clients give the allocator real transactions on truly separate
+		// connections.
+		const connectionString = process.env.PG_CONNECTION_STRING;
+		assert(connectionString);
+		const firstConnection = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const secondConnection = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
 		try {
 			const [first, second] = await Promise.all([
 				allocateSessionRevision(
@@ -176,8 +185,10 @@ describe("session ingest content bookkeeping", () => {
 			`;
 			expect(receipt?.count).toBe("1");
 		} finally {
-			firstConnection.release();
-			secondConnection.release();
+			await Promise.allSettled([
+				firstConnection.end({ timeout: 5 }),
+				secondConnection.end({ timeout: 5 }),
+			]);
 		}
 	});
 
@@ -661,7 +672,7 @@ async function createTestUser(
 	return { bearerToken: body.token, userId: meBody.json.id };
 }
 
-function createRevisionEnvironment(connection: postgres.ReservedSql): {
+function createRevisionEnvironment(connection: postgres.Sql): {
 	transactions: SessionRevisionTransactionRunner;
 } {
 	return {
