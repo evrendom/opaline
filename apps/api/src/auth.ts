@@ -1,8 +1,9 @@
 import { apiKey } from "@better-auth/api-key";
 import { getLogger } from "@logtape/logtape";
 import { PRODUCT_ANALYTICS_EVENTS } from "@rudel/api-routes";
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import * as schema from "@rudel/sql-schema";
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
 	bearer,
@@ -21,6 +22,8 @@ import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
 const logger = getLogger(["rudel", "api", "auth"]);
+const INVALID_ORGANIZATION_SLUG_MESSAGE =
+	"Organization slug is invalid or reserved";
 
 function inferSignupMethod(
 	accounts: Array<{ providerId?: string | null }>,
@@ -86,13 +89,31 @@ export interface AuthConfig {
 	slackWebhookUrl?: string;
 }
 
-function createOrganizationPlugin(config: AuthConfig) {
+function assertValidOrganizationSlug(slug: string) {
+	if (!validateOrgSlug(slug)) {
+		throw new APIError("BAD_REQUEST", {
+			message: INVALID_ORGANIZATION_SLUG_MESSAGE,
+		});
+	}
+}
+
+export function createOrganizationPlugin(config: AuthConfig) {
 	const resend = config.resend ?? {};
 
 	return organization({
 		allowUserToCreateOrganization: true,
 		creatorRole: "owner",
 		disableOrganizationDeletion: true,
+		organizationHooks: {
+			async beforeCreateOrganization({ organization: organizationData }) {
+				assertValidOrganizationSlug(organizationData.slug ?? "");
+			},
+			async beforeUpdateOrganization({ organization: organizationData }) {
+				if (organizationData.slug !== undefined) {
+					assertValidOrganizationSlug(organizationData.slug);
+				}
+			},
+		},
 		async sendInvitationEmail(data) {
 			await sendOrganizationInvitationEmail(resend, {
 				frontendURL: config.frontendURL,

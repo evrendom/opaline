@@ -5,9 +5,8 @@
  * reservation before shipping any new top-level marketing path so organization
  * URLs can never collide with product or platform routes.
  *
- * Enforcement in organization creation is intentionally deferred until the
- * current API stack lands. `apps/api` is out of scope for this conflict-free
- * foundation PR; wire `validateOrgSlug` into creation in the post-stack change.
+ * Organization creation and slug updates enforce this list at the server
+ * boundary through the Better Auth organization plugin hooks in `apps/api`.
  */
 export const RESERVED_ORG_SLUGS: readonly string[] = [
 	".well-known",
