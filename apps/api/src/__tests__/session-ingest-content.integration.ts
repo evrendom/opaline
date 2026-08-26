@@ -130,7 +130,10 @@ describe("session ingest content bookkeeping", () => {
 		assert(lower !== undefined && higher !== undefined);
 
 		expect(first).not.toBe(second);
-		expect(higher).toBe(lower + 1n);
+		// The allocator guarantees strict per-session monotonicity, not dense
+		// adjacency: GREATEST(head + 1, epoch_ms << 16) jumps to the epoch
+		// floor whenever the clock advances between allocations.
+		expect(higher).toBeGreaterThan(lower);
 		expect(retry).toBe(first);
 	});
 

@@ -2600,7 +2600,8 @@ async function interruptFinalIngestClaim(
 ): Promise<void> {
 	await sqlClient`
 		UPDATE ingest_job
-		SET attempts = max_attempts - 1
+		SET attempts = max_attempts - 1,
+			available_at = now() - interval '1 hour'
 		WHERE id = ${initialized.jobId}
 	`;
 	let interrupted = false;
