@@ -276,11 +276,30 @@ jobs:
         # the UserChoice association (GitHub-hosted), this registration is
         # inert: UserChoice takes precedence over HKCU\Software\Classes.
         run: |
+          $handler = 'curl.exe --silent --output NUL "%1"'
           foreach ($scheme in @("http", "https")) {
-            $base = "HKCU:\Software\Classes\$scheme"
-            New-Item -Path "$base\shell\open\command" -Force | Out-Null
-            New-ItemProperty -Path $base -Name "URL Protocol" -Value "" -PropertyType String -Force | Out-Null
-            Set-Item -Path "$base\shell\open\command" -Value 'C:\Windows\System32\curl.exe --silent --output NUL "%1"'
+            foreach ($hive in @("HKCU:\Software\Classes", "HKLM:\Software\Classes")) {
+              $base = "$hive\$scheme"
+              New-Item -Path "$base\shell\open\command" -Force | Out-Null
+              New-ItemProperty -Path $base -Name "URL Protocol" -Value "" -PropertyType String -Force | Out-Null
+              Set-Item -Path "$base\shell\open\command" -Value $handler
+            }
+            # http/https are UserChoice-protected schemes: a stale or broken
+            # UserChoice (for example an Edge ProgID on a browserless image)
+            # shadows the Classes registration above, so drop it.
+            $userChoice = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$scheme\UserChoice"
+            if (Test-Path $userChoice) {
+              try { Remove-Item -Path $userChoice -Force } catch { Write-Host "UserChoice removal failed for ${scheme}: $_" }
+            }
+          }
+          foreach ($scheme in @("http", "https")) {
+            Write-Host "--- $scheme diagnostics ---"
+            $userChoice = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$scheme\UserChoice"
+            if (Test-Path $userChoice) { Get-ItemProperty $userChoice | Out-String | Write-Host } else { Write-Host "no UserChoice" }
+            Get-Item "Registry::HKEY_CLASSES_ROOT\$scheme\shell\open\command" -ErrorAction SilentlyContinue | ForEach-Object { $_.GetValue("") } | Write-Host
+          }
+          foreach ($browser in @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe")) {
+            Write-Host "$browser exists: $(Test-Path $browser)"
           }
 
       - name: Verify the Windows opener delivers the complete URL
