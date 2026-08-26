@@ -1124,6 +1124,123 @@
 			},
 			"isRLSEnabled": false
 		},
+		"public.ingest_rate_limit_counter": {
+			"name": "ingest_rate_limit_counter",
+			"schema": "",
+			"columns": {
+				"limiter_key": {
+					"name": "limiter_key",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"api_key_id": {
+					"name": "api_key_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"request_window_started_at": {
+					"name": "request_window_started_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"request_count": {
+					"name": "request_count",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"byte_window_started_at": {
+					"name": "byte_window_started_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"byte_count": {
+					"name": "byte_count",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"last_request_allowed": {
+					"name": "last_request_allowed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"last_byte_allowed": {
+					"name": "last_byte_allowed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"ingest_rate_limit_counter_api_key_id_apikey_id_fk": {
+					"name": "ingest_rate_limit_counter_api_key_id_apikey_id_fk",
+					"tableFrom": "ingest_rate_limit_counter",
+					"tableTo": "apikey",
+					"columnsFrom": ["api_key_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"ingest_rate_limit_counter_user_id_user_id_fk": {
+					"name": "ingest_rate_limit_counter_user_id_user_id_fk",
+					"tableFrom": "ingest_rate_limit_counter",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"ingest_rate_limit_counter_api_key_id_unique": {
+					"name": "ingest_rate_limit_counter_api_key_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["api_key_id"]
+				},
+				"ingest_rate_limit_counter_user_id_unique": {
+					"name": "ingest_rate_limit_counter_user_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["user_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {
+				"ingest_rate_limit_counter_subject_check": {
+					"name": "ingest_rate_limit_counter_subject_check",
+					"value": "(\"ingest_rate_limit_counter\".\"api_key_id\" IS NOT NULL AND \"ingest_rate_limit_counter\".\"user_id\" IS NULL) OR (\"ingest_rate_limit_counter\".\"api_key_id\" IS NULL AND \"ingest_rate_limit_counter\".\"user_id\" IS NOT NULL)"
+				},
+				"ingest_rate_limit_counter_value_check": {
+					"name": "ingest_rate_limit_counter_value_check",
+					"value": "\"ingest_rate_limit_counter\".\"request_count\" >= 0 AND \"ingest_rate_limit_counter\".\"byte_count\" >= 0"
+				},
+				"ingest_rate_limit_counter_decision_check": {
+					"name": "ingest_rate_limit_counter_decision_check",
+					"value": "\"ingest_rate_limit_counter\".\"last_byte_allowed\" = false OR \"ingest_rate_limit_counter\".\"last_request_allowed\" = true"
+				}
+			},
+			"isRLSEnabled": false
+		},
 		"public.invitation": {
 			"name": "invitation",
 			"schema": "",

@@ -52,7 +52,7 @@ test("applies migrations 0020-0029 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0028] = await migrationSql<MigrationState[]>`
+			const [after0029] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,8 +61,8 @@ test("applies migrations 0020-0029 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0028).toEqual({
-				count: 29,
+			expect(after0029).toEqual({
+				count: 30,
 				latestTimestamp: MIGRATION_0029_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
