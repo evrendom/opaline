@@ -216,8 +216,14 @@ describe("persistent skill extraction through the real API", () => {
 		const sessionId = `skill_raw_order_${RUN_ID}`;
 		const olderRawRevision = new Date("2026-08-20T11:00:00.000Z");
 		const newerRawRevision = new Date("2026-08-20T11:01:00.000Z");
-		const olderSeq = buildSkillExtractionSeq(olderRawRevision, 1);
-		const newerSeq = buildSkillExtractionSeq(newerRawRevision, 1);
+		const olderSeq = buildSkillExtractionSeq(
+			revisionForDate(olderRawRevision),
+			1,
+		);
+		const newerSeq = buildSkillExtractionSeq(
+			revisionForDate(newerRawRevision),
+			1,
+		);
 		const olderContentHash = "1".repeat(64);
 		const newerContentHash = "2".repeat(64);
 		await clickhouse.insert({
@@ -335,7 +341,7 @@ describe("persistent skill extraction through the real API", () => {
 			contentSha256: committedHash,
 			extractedAt: "2026-08-20 11:11:00.000",
 			extractionSeq: buildSkillExtractionSeq(
-				new Date("2026-08-20T11:10:00.000Z"),
+				revisionForDate(new Date("2026-08-20T11:10:00.000Z")),
 				1,
 			),
 			parserVersion: 1,
@@ -344,7 +350,7 @@ describe("persistent skill extraction through the real API", () => {
 			sourceContentSha256: "8".repeat(64),
 		});
 		const orphanSeq = buildSkillExtractionSeq(
-			new Date("2026-08-20T11:12:00.000Z"),
+			revisionForDate(new Date("2026-08-20T11:12:00.000Z")),
 			1,
 		);
 		await clickhouse.insert({
@@ -406,7 +412,7 @@ describe("persistent skill extraction through the real API", () => {
 			content: "parser one body",
 			contentSha256: "3".repeat(64),
 			extractedAt: "2026-08-20 11:21:00.000",
-			extractionSeq: buildSkillExtractionSeq(rawRevision, 1),
+			extractionSeq: buildSkillExtractionSeq(revisionForDate(rawRevision), 1),
 			parserVersion: 1,
 			sessionId,
 			skillName: "parser-replay-skill",
@@ -416,7 +422,7 @@ describe("persistent skill extraction through the real API", () => {
 			content: "parser two body",
 			contentSha256: "4".repeat(64),
 			extractedAt: "2026-08-20 11:22:00.000",
-			extractionSeq: buildSkillExtractionSeq(rawRevision, 2),
+			extractionSeq: buildSkillExtractionSeq(revisionForDate(rawRevision), 2),
 			parserVersion: 2,
 			sessionId,
 			skillName: "parser-replay-skill",
@@ -452,7 +458,7 @@ describe("persistent skill extraction through the real API", () => {
 				source: "claude_code" as const,
 			}),
 			organizationId: userId,
-			rawRevisionIngestedAt: rawRevision,
+			rawRevision: revisionForDate(rawRevision),
 			sessionDate: rawRevision,
 			sessionId,
 			userId,
@@ -529,7 +535,7 @@ describe("persistent skill extraction through the real API", () => {
 						source: "claude_code",
 					}),
 					organizationId,
-					rawRevisionIngestedAt: newerIngestedAt,
+					rawRevision: revisionForDate(newerIngestedAt),
 					sessionDate,
 					sessionId,
 					userId: backfillUserId,
@@ -688,7 +694,7 @@ describe("persistent skill extraction through the real API", () => {
 			extractedAt: new Date(),
 			extraction,
 			organizationId,
-			rawRevisionIngestedAt: ingestedAt,
+			rawRevision: revisionForDate(ingestedAt),
 			sessionDate,
 			sessionId,
 			userId: backfillUserId,
@@ -981,6 +987,7 @@ function buildRawClaudeRow(input: {
 		package_name: "",
 		package_type: "",
 		project_path: "/tmp/skill-persistence-batch",
+		revision: revisionForDate(input.ingestedAt),
 		session_date: sessionDate,
 		session_id: input.sessionId,
 		subagents: {},
@@ -1082,6 +1089,10 @@ async function countBatchRows(
 
 function toClickHouseTimestamp(value: Date): string {
 	return value.toISOString().replace("T", " ").replace("Z", "");
+}
+
+function revisionForDate(value: Date): string {
+	return (BigInt(value.getTime()) << 16n).toString();
 }
 
 function claudeInput(): IngestSessionInput {

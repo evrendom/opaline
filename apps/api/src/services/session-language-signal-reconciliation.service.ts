@@ -43,6 +43,7 @@ const CONTENT_QUERY_SETTINGS = {
 export interface StaleSessionLanguageSignalRow {
 	readonly organization_id: string;
 	readonly raw_ingested_at: string;
+	readonly raw_revision: string;
 	readonly session_date: string;
 	readonly session_id: string;
 	readonly source: Source;
@@ -51,6 +52,7 @@ export interface StaleSessionLanguageSignalRow {
 
 export interface LatestRawSessionContentRow {
 	readonly content: string;
+	readonly ingested_at: string;
 	readonly revision: string;
 }
 
@@ -90,10 +92,11 @@ const STALE_SESSION_CTES = `
 		SELECT
 			source,
 			organization_id,
-			argMax(session_date, ingested_at) AS session_date,
+			argMax(session_date, revision) AS session_date,
 			session_id,
-			argMax(user_id, ingested_at) AS user_id,
-			max(ingested_at) AS raw_ingested_at
+			argMax(user_id, revision) AS user_id,
+			argMax(ingested_at, revision) AS raw_ingested_at,
+			max(revision) AS raw_revision
 		FROM (
 			SELECT
 				'claude_code' AS source,
@@ -101,6 +104,7 @@ const STALE_SESSION_CTES = `
 				session_date,
 				session_id,
 				user_id,
+				revision,
 				ingested_at
 			FROM rudel.claude_sessions
 
@@ -112,6 +116,7 @@ const STALE_SESSION_CTES = `
 				session_date,
 				session_id,
 				user_id,
+				revision,
 				ingested_at
 			FROM rudel.codex_sessions
 		)
@@ -124,7 +129,7 @@ const STALE_SESSION_CTES = `
 			session_id,
 			source,
 			argMax(scan_version, scanned_at) AS latest_scan_version,
-			argMax(raw_ingested_at, scanned_at) AS latest_raw_ingested_at
+			argMax(raw_revision, scanned_at) AS latest_raw_revision
 		FROM rudel.session_language_signals
 		GROUP BY organization_id, session_date, session_id, source
 	),
@@ -135,7 +140,8 @@ const STALE_SESSION_CTES = `
 			raw.session_date AS session_date,
 			raw.session_id AS session_id,
 			raw.user_id AS user_id,
-			raw.raw_ingested_at AS raw_ingested_at
+			raw.raw_ingested_at AS raw_ingested_at,
+			raw.raw_revision AS raw_revision
 		FROM raw_sessions AS raw
 		LEFT ANY JOIN latest_signals AS signals
 			ON signals.organization_id = raw.organization_id
@@ -144,7 +150,7 @@ const STALE_SESSION_CTES = `
 			AND signals.source = raw.source
 		WHERE signals.latest_scan_version = 0
 			OR signals.latest_scan_version < {scanVersion:UInt16}
-			OR signals.latest_raw_ingested_at < raw.raw_ingested_at
+			OR signals.latest_raw_revision < raw.raw_revision
 	)`;
 
 export function buildStaleSessionLanguageSignalQuery(): string {
@@ -156,10 +162,11 @@ export function buildStaleSessionLanguageSignalQuery(): string {
 			formatDateTime(session_date, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS session_date,
 			session_id,
 			user_id,
+			toString(raw_revision) AS raw_revision,
 			formatDateTime(raw_ingested_at, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS raw_ingested_at
 		FROM stale_sessions
 		ORDER BY
-			raw_ingested_at DESC,
+			raw_revision DESC,
 			organization_id ASC,
 			session_id ASC,
 			source ASC
@@ -269,7 +276,7 @@ export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 		const batchIdentity = staleRows
 			.map(
 				(row) =>
-					`${row.organization_id}\u0000${row.session_id}\u0000${row.source}\u0000${row.raw_ingested_at}`,
+					`${row.organization_id}\u0000${row.session_id}\u0000${row.source}\u0000${row.raw_revision}`,
 			)
 			.join("\u0001");
 		if (processedBatches.has(batchIdentity)) break;
@@ -389,7 +396,8 @@ async function reconcileStaleRows(
 				buildSessionLanguageSignalRow(
 					{
 						organizationId: row.organization_id,
-						rawIngestedAt: raw.revision,
+						rawIngestedAt: raw.ingested_at,
+						rawRevision: raw.revision,
 						sessionDate: row.session_date,
 						sessionId: row.session_id,
 						source: row.source,

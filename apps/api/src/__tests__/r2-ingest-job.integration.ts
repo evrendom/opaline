@@ -1565,13 +1565,16 @@ function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
 ): (
 	input: IngestSessionInput,
-	identity: { organizationId: string; userId: string },
+	identity: { operationId: string; organizationId: string; userId: string },
 ) => Promise<R2IngestProcessorResult> {
 	return (input, identity) =>
 		processIngestSession({
 			awaitLanguageSignals: true,
 			context: { session: null, user: { id: identity.userId } },
-			durableProcessing: { failpoint },
+			durableProcessing: {
+				failpoint,
+				operationId: identity.operationId,
+			},
 			enforceRateLimits: false,
 			errorFactories: TEST_ERROR_FACTORIES,
 			input,
@@ -1632,7 +1635,7 @@ async function readRawIngestedAt(sessionId: string): Promise<string> {
 				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 				AND session_id = {sessionId:String}
 				AND user_id = {userId:String}
-			ORDER BY ingested_at DESC
+			ORDER BY revision DESC
 			LIMIT 1`,
 		query_params: {
 			organizationId: ORGANIZATION_ID,

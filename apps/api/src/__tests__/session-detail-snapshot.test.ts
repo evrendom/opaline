@@ -10,7 +10,7 @@ describe("session detail ClickHouse snapshot", () => {
 		const compact = sql.replace(/\s+/gu, " ");
 
 		expect(compact).toContain(
-			"SELECT argMax( tuple( source, organization_id, user_id, session_id, content, subagents, ingested_at",
+			"SELECT argMax( tuple( source, organization_id, user_id, session_id, content, subagents, revision, ingested_at",
 		);
 		expect(sql).not.toMatch(/argMax\s*\(\s*content/iu);
 		expect(sql).not.toMatch(/argMax\s*\(\s*subagents/iu);
@@ -39,7 +39,7 @@ describe("session detail ClickHouse snapshot", () => {
 	test("reads the current source and revision as one tuple", () => {
 		const sql = buildSessionDetailCurrentRevisionSql().replace(/\s+/gu, " ");
 		expect(sql).toContain(
-			"argMax(tuple(source, ingested_at), ingested_at) AS snapshot",
+			"argMax(tuple(source, revision), revision) AS snapshot",
 		);
 	});
 });

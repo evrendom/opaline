@@ -10,6 +10,7 @@ const rudel_session_language_signals = table({
 		{ name: "session_id", type: "String" },
 		{ name: "user_id", type: "String" },
 		{ name: "source", type: "LowCardinality(String)" },
+		{ name: "raw_revision", type: "UInt64", default: "fn:0" },
 		{ name: "raw_ingested_at", type: "DateTime64(3, 'UTC')" },
 		{ name: "scan_version", type: "UInt16" },
 		{ name: "member_swears", type: "UInt32" },

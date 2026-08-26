@@ -319,6 +319,7 @@ describe("organization session ownership", () => {
 		await getAdapter(legacyInput.source).ingest(getClickhouse(), legacyInput, {
 			ingestedAt: new Date("2026-07-23T11:00:00.000Z"),
 			organizationId,
+			revision: "1",
 			userId: owner.userId,
 		});
 
@@ -335,6 +336,7 @@ describe("organization session ownership", () => {
 			{
 				ingestedAt: new Date("2026-07-23T11:10:00.000Z"),
 				organizationId,
+				revision: "1",
 				userId: owner.userId,
 			},
 		);
@@ -351,6 +353,7 @@ describe("organization session ownership", () => {
 			{
 				ingestedAt: new Date("2026-07-23T11:20:00.000Z"),
 				organizationId,
+				revision: "1",
 				userId: member.userId,
 			},
 		);
@@ -407,6 +410,7 @@ describe("organization session ownership", () => {
 			{
 				ingestedAt: new Date("2026-07-23T13:00:00.000Z"),
 				organizationId,
+				revision: "1",
 				userId: owner.userId,
 			},
 		);
@@ -480,6 +484,7 @@ describe("organization session ownership", () => {
 			{
 				ingestedAt: new Date("2026-07-23T15:00:00.000Z"),
 				organizationId,
+				revision: "1",
 				userId: owner.userId,
 			},
 		);
@@ -512,6 +517,7 @@ describe("organization session ownership", () => {
 		await getAdapter(memberInput.source).ingest(getClickhouse(), memberInput, {
 			ingestedAt: new Date(),
 			organizationId,
+			revision: "1",
 			userId: member.userId,
 		});
 		await sqlClient`
@@ -540,6 +546,7 @@ describe("organization session ownership", () => {
 			{
 				ingestedAt: new Date(),
 				organizationId,
+				revision: "1",
 				userId: owner.userId,
 			},
 		);

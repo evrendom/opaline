@@ -459,11 +459,11 @@ async function listSourceCandidates(
 					SELECT
 						organization_id,
 						session_id,
-						argMax(user_id, ingested_at) AS latest_user_id,
-						toString(argMax(session_date, ingested_at)) AS latest_session_date,
-						toString(max(ingested_at)) AS latest_ingested_at,
-						argMax(length(content) ${subagentBytes}, ingested_at) AS latest_content_bytes,
-						argMax(toUInt8(${hasUsage}), ingested_at) AS has_usage
+						argMax(user_id, revision) AS latest_user_id,
+						toString(argMax(session_date, revision)) AS latest_session_date,
+						toString(argMax(ingested_at, revision)) AS latest_ingested_at,
+						argMax(length(content) ${subagentBytes}, revision) AS latest_content_bytes,
+						argMax(toUInt8(${hasUsage}), revision) AS has_usage
 					FROM ${table}
 					WHERE ingested_at <= {cutoff:DateTime64(3, 'UTC')}
 						${organizationFilter}
@@ -651,7 +651,7 @@ async function readRawSessions(
 				AND session_date < {monthEnd:DateTime64(3, 'UTC')}
 				AND session_id IN {sessionIds:Array(String)}
 				AND ingested_at <= {cutoff:DateTime64(3, 'UTC')}
-			ORDER BY organization_id, session_id, ingested_at DESC
+			ORDER BY organization_id, session_id, revision DESC
 			LIMIT 1 BY organization_id, session_id
 			LIMIT {batchLimit:UInt32}
 		`,

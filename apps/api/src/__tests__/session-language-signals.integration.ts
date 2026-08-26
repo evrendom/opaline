@@ -93,16 +93,19 @@ async function ingestRawSession(input: {
 	const adapter = getAdapter(sessionInput.source);
 	const timestamps = adapter.extractTimestamps(sessionInput.content);
 	if (!timestamps) throw new Error("integration transcript has no timestamps");
+	const rawRevision = (BigInt(input.ingestedAt.getTime()) << 16n).toString();
 
 	await adapter.ingest(ch, sessionInput, {
 		ingestedAt: input.ingestedAt,
 		organizationId,
+		revision: rawRevision,
 		timestamps,
 		userId: ingestUserId,
 	});
 
 	return {
 		organizationId,
+		rawRevision,
 		sessionDate: timestamps.sessionDate,
 	};
 }
@@ -198,6 +201,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content,
 			organizationId: orgId,
 			rawIngestedAt: ingestedAt,
+			rawRevision: raw.rawRevision,
 			sessionDate: raw.sessionDate,
 			sessionId,
 			source: "claude_code",
@@ -279,6 +283,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 				{
 					organizationId: orgId,
 					rawIngestedAt: ingestedAt,
+					rawRevision: raw.rawRevision,
 					sessionDate: raw.sessionDate,
 					sessionId,
 					source: "claude_code",
@@ -322,6 +327,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content: firstContent,
 			organizationId: orgId,
 			rawIngestedAt: firstIngestedAt,
+			rawRevision: raw.rawRevision,
 			sessionDate: raw.sessionDate,
 			sessionId,
 			source: "claude_code",
@@ -377,6 +383,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content: countedContent,
 			organizationId: orgId,
 			rawIngestedAt: new Date("2099-01-01T00:00:10.000Z"),
+			rawRevision: countedRaw.rawRevision,
 			sessionDate: countedRaw.sessionDate,
 			sessionId: countedSessionId,
 			source: "claude_code",
@@ -386,6 +393,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content: zeroContent,
 			organizationId: orgId,
 			rawIngestedAt: new Date("2099-01-01T00:00:11.000Z"),
+			rawRevision: zeroRaw.rawRevision,
 			sessionDate: zeroRaw.sessionDate,
 			sessionId: zeroSessionId,
 			source: "claude_code",
@@ -395,6 +403,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content: filteredContent,
 			organizationId: orgId,
 			rawIngestedAt: new Date("2099-01-01T00:00:12.500Z"),
+			rawRevision: filteredRaw.rawRevision,
 			sessionDate: filteredRaw.sessionDate,
 			sessionId: filteredSessionId,
 			source: "claude_code",
@@ -466,6 +475,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			content,
 			organizationId: purgeOrgId,
 			rawIngestedAt: ingestedAt,
+			rawRevision: raw.rawRevision,
 			sessionDate: raw.sessionDate,
 			sessionId,
 			source: "claude_code",

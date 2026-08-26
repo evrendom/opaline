@@ -133,6 +133,7 @@ function buildClaudeRow(
 		tag: "fv-migration-rehearsal",
 		subagents: {},
 		...overrides,
+		revision: overrides.revision ?? "1",
 	};
 }
 
@@ -158,6 +159,7 @@ function buildCodexRow(
 		git_sha: null,
 		tag: "fv-migration-rehearsal",
 		...overrides,
+		revision: overrides.revision ?? "1",
 	};
 }
 
@@ -207,6 +209,7 @@ function buildAnalyticsRow(
 		inference_duration_sec: 30,
 		human_duration_sec: 90,
 		...overrides,
+		revision: overrides.revision ?? "1",
 	};
 }
 
@@ -436,25 +439,31 @@ describe("filter_version migration rehearsal", () => {
 		expect(rows[0]?.filter_version).toBe(0);
 	}, 120_000);
 
-	test("ReplacingMergeTree(ingested_at): a later current-version row supersedes the 0 row under FINAL", async () => {
+	test("ReplacingMergeTree(revision): a higher revision supersedes the 0 row under FINAL", async () => {
 		const sessionId = `${testPrefix}_rmt_upgrade`;
 		// session_analytics orders by (organization_id, session_date, session_id)
 		// and session_date is content-derived, so a re-filtered upload of the same
 		// session lands on the exact same sorting-key tuple. Hold every column
-		// equal except the RMT version column (ingested_at) and filter_version.
+		// equal except the RMT version column and filter_version.
 		const sessionDate = "2026-07-20T09:00:00.000";
 		const base = buildAnalyticsRow(sessionId, {
 			session_date: sessionDate,
 			last_interaction_date: "2026-07-20T09:02:00.000",
 		});
 		await ingestRudelSessionAnalytics(executor, [
-			{ ...base, filter_version: 0, ingested_at: "2026-07-20T09:05:00.000" },
+			{
+				...base,
+				filter_version: 0,
+				ingested_at: "2026-07-20T09:05:00.000",
+				revision: "1",
+			},
 		]);
 		await ingestRudelSessionAnalytics(executor, [
 			{
 				...base,
 				filter_version: CURRENT_FILTER_VERSION,
 				ingested_at: "2026-07-20T09:06:00.000",
+				revision: "2",
 			},
 		]);
 
@@ -467,18 +476,19 @@ describe("filter_version migration rehearsal", () => {
 		expect(rows[0]?.filter_version).toBe(CURRENT_FILTER_VERSION);
 	}, 120_000);
 
-	test("analytics MV ROW_NUMBER dedupe keeps exactly the latest-ingested_at source row", async () => {
+	test("analytics MV ROW_NUMBER dedupe keeps exactly the highest-revision source row", async () => {
 		const sessionId = `${testPrefix}_rownum`;
 		// Distinct session_date values put the two source rows on distinct
 		// sorting keys, so claude_sessions' ReplacingMergeTree can never
 		// background-collapse them: the single winner below can only come from
 		// the MV's own ROW_NUMBER() over the full session identity, ordered by
-		// ingested_at DESC.
+		// revision DESC.
 		await ingestRudelClaudeSessions(executor, [
 			buildClaudeRow(sessionId, {
 				session_date: "2026-07-21T08:00:00.000",
 				ingested_at: "2026-07-21T08:10:00.000",
 				filter_version: 0,
+				revision: "1",
 			}),
 		]);
 		await ingestRudelClaudeSessions(executor, [
@@ -486,6 +496,7 @@ describe("filter_version migration rehearsal", () => {
 				session_date: "2026-07-21T09:00:00.000",
 				ingested_at: "2026-07-21T09:10:00.000",
 				filter_version: CURRENT_FILTER_VERSION,
+				revision: "2",
 			}),
 		]);
 

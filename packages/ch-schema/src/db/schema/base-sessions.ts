@@ -20,6 +20,12 @@ export const baseSessionColumns: ColumnDefinition[] = [
 	{ name: "content", type: "String" },
 	{ name: "filter_version", type: "UInt8", default: "fn:0" },
 	{
+		name: "revision",
+		type: "UInt64",
+		default:
+			"fn:bitShiftLeft(toUInt64(toUnixTimestamp64Milli(ingested_at)), 16)",
+	},
+	{
 		name: "ingested_at",
 		type: "DateTime64(3, 'UTC')",
 		default: "fn:now64(3)",

@@ -35,7 +35,7 @@ Use the existing `rudel.session_analytics` table as the source of truth for sess
 
 Instead:
 
-1. Deduplicate session facts by the natural key `(source, organization_id, user_id, session_id)` using `argMax(..., ingested_at)`.
+1. Deduplicate session facts by the natural key `(source, organization_id, user_id, session_id)` using `argMax(..., revision)`.
 2. Rebuild a versioned global archetype snapshot after each upload.
 3. Read Wrapped archetypes only from the latest successful snapshot.
 4. Freeze a specific snapshot id for a Wrapped campaign.
@@ -91,7 +91,7 @@ The setting is still `async_insert=0`, and it should stay that way until someone
 
 Local schema definitions and production are not identical today. Example:
 
-- local `claude_sessions` definition expects `SharedReplacingMergeTree(ingested_at)` plus TTL
+- local `claude_sessions` definition expects `SharedReplacingMergeTree(revision)` plus TTL
 - the deployed `claude_sessions` table is still `SharedMergeTree`
 
 Do not design the archetype system assuming raw-table dedupe or TTL behavior that only exists in source control.
@@ -219,7 +219,7 @@ Deduplicate session facts by:
 
 For every derived session field, keep the latest version by:
 
-`argMax(field, ingested_at)`
+`argMax(field, revision)`
 
 ### Repo identity for breadth
 

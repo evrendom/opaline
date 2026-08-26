@@ -8,6 +8,10 @@ const migration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260730180016_auto.sql"),
 	"utf8",
 );
+const revisionMigration = readFileSync(
+	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
+	"utf8",
+);
 
 function normalizeSql(sql: string): string {
 	return sql.replace(/\s+/g, " ").trim();
@@ -18,8 +22,8 @@ function countOccurrences(value: string, search: string): number {
 }
 
 describe("session_analytics identity migration", () => {
-	test("keeps deployed MVs synchronized and rebuild deduplication narrow", () => {
-		const normalizedMigration = normalizeSql(migration);
+	test("keeps the F16 deployed MVs synchronized on revision ordering", () => {
+		const normalizedMigration = normalizeSql(revisionMigration);
 
 		expect(
 			countOccurrences(
@@ -35,29 +39,10 @@ describe("session_analytics identity migration", () => {
 		).toBe(1);
 
 		expect(countOccurrences(normalizedMigration, "ROW_NUMBER() OVER")).toBe(2);
-		expect(countOccurrences(normalizedMigration, "INNER ANY JOIN")).toBe(32);
-		expect(normalizedMigration).toContain(
-			normalizeSql(`
-FROM rudel.claude_sessions AS cs
-INNER ANY JOIN
-(
-  SELECT organization_id, user_id, session_id, max(ingested_at) AS ingested_at
-  FROM rudel.claude_sessions
-  GROUP BY organization_id, user_id, session_id
-) AS latest
-USING (organization_id, user_id, session_id, ingested_at)`),
-		);
-		expect(normalizedMigration).toContain(
-			normalizeSql(`
-FROM rudel.codex_sessions AS cs
-INNER ANY JOIN
-(
-  SELECT organization_id, user_id, session_id, max(ingested_at) AS ingested_at
-  FROM rudel.codex_sessions
-  GROUP BY organization_id, user_id, session_id
-) AS latest
-USING (organization_id, user_id, session_id, ingested_at)`),
-		);
+		expect(
+			countOccurrences(normalizedMigration, "ORDER BY cs.revision DESC"),
+		).toBe(2);
+		expect(normalizedMigration).not.toContain("ORDER BY cs.ingested_at DESC");
 	});
 
 	test("rebuilds in resumable session-month chunks", () => {

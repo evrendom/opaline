@@ -5,9 +5,11 @@ import {
 } from "../../services/session-language-signal-reconciliation.service.js";
 
 const sourceRevision = "2026-08-19T12:00:01.123Z";
+const rawRevision = "115807295561596928";
 const staleRow: StaleSessionLanguageSignalRow = {
 	organization_id: "timezone-org",
 	raw_ingested_at: sourceRevision,
+	raw_revision: rawRevision,
 	session_date: "2026-08-19T11:59:00.000Z",
 	session_id: "timezone-session",
 	source: "codex",
@@ -31,7 +33,8 @@ const result = await reconcileSessionLanguageSignalsOnce(1, {
 	queryLagCount: async () => 0,
 	queryLatestRawContent: async () => ({
 		content: "plain prompt",
-		revision: sourceRevision,
+		ingested_at: sourceRevision,
+		revision: rawRevision,
 	}),
 	queryStaleRows: async () => [staleRow],
 	scan: async () => zeroCounts,

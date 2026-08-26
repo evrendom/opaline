@@ -132,6 +132,11 @@ import {
 	UsageExtractionSupersededError,
 } from "./services/session-ownership.service.js";
 import {
+	allocateSessionRevision,
+	buildSessionRevisionDeduplicationToken,
+	buildSessionRevisionOperationId,
+} from "./services/session-revision.service.js";
+import {
 	hashSkillSourceContent,
 	SKILL_PARSER_VERSION,
 } from "./services/skill-extraction.js";
@@ -429,7 +434,10 @@ export async function processIngestSession({
 		session: AppContext["session"];
 		user: { id: string };
 	};
-	durableProcessing?: { failpoint: IngestProcessingFailpoint | undefined };
+	durableProcessing?: {
+		failpoint: IngestProcessingFailpoint | undefined;
+		operationId: string;
+	};
 	enforceRateLimits: boolean;
 	errorFactories: IngestErrorFactories;
 	input: IngestSessionInput;
@@ -742,16 +750,40 @@ export async function processIngestSession({
 		}
 	}
 
-	// Acknowledged async inserts can batch concurrent requests into one part.
-	// Give each request a distinct millisecond RMT version even when the
-	// process clock has not advanced, so FINAL and hash bookkeeping agree.
-	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
-	await adapter.ingest(clickhouse, filteredInput, {
-		ingestedAt,
-		userId: context.user.id,
+	const revisionIdentity = {
+		contentSha256: contentHash,
+		operationId: buildSessionRevisionOperationId(
+			filteredInput.source,
+			durableProcessing?.operationId,
+		),
 		organizationId: orgId,
-		timestamps,
-	});
+		sessionId: input.sessionId,
+		userId: context.user.id,
+	};
+	const revision = await allocateSessionRevision(revisionIdentity);
+	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
+	await adapter.ingest(
+		{
+			insert: ({ table, values }) =>
+				clickhouse.insert({
+					deduplicationToken: buildSessionRevisionDeduplicationToken(
+						revisionIdentity,
+						revision,
+						table,
+					),
+					table,
+					values,
+				}),
+		},
+		filteredInput,
+		{
+			ingestedAt,
+			organizationId: orgId,
+			revision,
+			timestamps,
+			userId: context.user.id,
+		},
+	);
 	await recordSessionIngestContent(
 		orgId,
 		input.sessionId,
@@ -760,6 +792,7 @@ export async function processIngestSession({
 		FILTER_VERSION,
 		new Date(timestamps.sessionDate),
 		ingestedAt,
+		revision,
 	);
 	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
 		store: "postgres",
@@ -769,6 +802,7 @@ export async function processIngestSession({
 		content: filteredInput.content,
 		organizationId: orgId,
 		rawIngestedAt: ingestedAt,
+		rawRevision: revision,
 		sessionDate: timestamps.sessionDate,
 		sessionId: input.sessionId,
 		source: filteredInput.source,
@@ -928,7 +962,7 @@ export async function processIngestSession({
 			extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
 			extraction: skillExtraction,
 			organizationId: orgId,
-			rawRevisionIngestedAt: ingestedAt,
+			rawRevision: revision,
 			sessionDate: new Date(timestamps.sessionDate),
 			sessionId: input.sessionId,
 			userId: context.user.id,
@@ -979,6 +1013,7 @@ export async function processIngestSession({
 		FILTER_VERSION,
 		new Date(timestamps.sessionDate),
 		ingestedAt,
+		revision,
 		{
 			checksum: usageExtraction.receipt.checksum,
 			diagnostics: JSON.stringify(usageExtraction.diagnostics),
@@ -1153,7 +1188,10 @@ const r2IngestCommit = os.ingest.commit
 						enforceRateLimits: false,
 						errorFactories: createIngestErrorFactories(errors),
 						input: sessionInput,
-						durableProcessing: { failpoint: undefined },
+						durableProcessing: {
+							failpoint: undefined,
+							operationId: identity.operationId,
+						},
 						signal: processingSignal,
 					}),
 				r2: createR2MultipartUploadClient(availability.configuration),

@@ -11,6 +11,7 @@ import type { RudelClaudeSessionsRow } from "../generated/chkit-types.js";
 import { createTestExecutor, waitForQuery } from "./helpers/executor.js";
 
 const testId = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const revisionTestId = `${testId}_revision`;
 
 const executor = createTestExecutor();
 
@@ -39,7 +40,7 @@ async function insertWithRetry(
 afterAll(async () => {
 	await executor
 		.execute(
-			`DELETE FROM rudel.claude_sessions WHERE session_id = '${testId}' SETTINGS lightweight_deletes_sync = 0`,
+			`DELETE FROM rudel.claude_sessions WHERE session_id IN ('${testId}', '${revisionTestId}') SETTINGS lightweight_deletes_sync = 0`,
 		)
 		.catch(() => {});
 });
@@ -57,6 +58,7 @@ describe("ingestRudelClaudeSessions", () => {
 		package_type: "",
 		content: "test session content",
 		filter_version: 0,
+		revision: "1",
 		subagents: {},
 		ingested_at: now,
 		user_id: "user_test",
@@ -78,6 +80,32 @@ describe("ingestRudelClaudeSessions", () => {
 		expect(results).toHaveLength(1);
 		expect(results[0]?.session_id).toBe(testId);
 		expect(results[0]?.tag).toBe("integration-test");
+	}, 120000);
+
+	test("argMax deterministically selects the higher same-millisecond revision", async () => {
+		const newer = {
+			...row,
+			content: "newer revision",
+			revision: "115807295561596930",
+			session_id: revisionTestId,
+		};
+		const older = {
+			...row,
+			content: "older revision inserted last",
+			revision: "115807295561596929",
+			session_id: revisionTestId,
+		};
+		await ingestRudelClaudeSessions(executor, [newer]);
+		await ingestRudelClaudeSessions(executor, [older]);
+
+		const results = await waitForQuery<{ content: string; revision: string }>(
+			executor,
+			`SELECT argMax(content, revision) AS content, toString(max(revision)) AS revision FROM rudel.claude_sessions WHERE session_id = '${revisionTestId}' GROUP BY session_id HAVING count() = 2`,
+		);
+
+		expect(results).toEqual([
+			{ content: "newer revision", revision: "115807295561596930" },
+		]);
 	}, 120000);
 
 	it("rejects invalid data with validate option", async () => {

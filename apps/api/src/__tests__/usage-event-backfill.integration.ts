@@ -252,6 +252,7 @@ function rawSessionRow(): RudelClaudeSessionsRow {
 		package_name: "",
 		package_type: "",
 		project_path: "/tmp/usage-backfill",
+		revision: "1",
 		session_date: sessionDate,
 		session_id: sessionId,
 		subagents: {},

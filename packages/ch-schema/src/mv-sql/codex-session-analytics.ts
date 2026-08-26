@@ -167,7 +167,7 @@ export const CODEX_SESSION_ANALYTICS_MV_SQL = `
     ${SESSION_SUCCESS_SCORE_SQL} as success_score,
     ROW_NUMBER() OVER (
       PARTITION BY cs.organization_id, cs.user_id, cs.session_id
-      ORDER BY cs.ingested_at DESC
+      ORDER BY cs.revision DESC
     ) AS _dedupe_rank
 
   FROM rudel.codex_sessions AS cs

@@ -310,6 +310,7 @@ class ClaudeCodeAdapter implements AgentAdapter {
 			package_type: input.packageType ?? "",
 			content: input.content,
 			filter_version: input.filter_version ?? 0,
+			revision: context.revision,
 			subagents,
 			ingested_at: now,
 			user_id: context.userId,

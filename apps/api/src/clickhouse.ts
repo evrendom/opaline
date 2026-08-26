@@ -152,9 +152,10 @@ export function buildLatestRawSessionContentSql(
     organization_id,
     user_id,
     session_id,
-	argMax(content, ingested_at) AS content,
-	argMax(subagents, ingested_at) AS subagents,
-	formatDateTime(max(ingested_at), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS revision
+    argMax(content, revision) AS content,
+    argMax(subagents, revision) AS subagents,
+    formatDateTime(argMax(ingested_at, revision), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ingested_at,
+    toString(max(revision)) AS revision
   FROM (
     SELECT
       'claude_code' AS source,
@@ -163,6 +164,7 @@ export function buildLatestRawSessionContentSql(
       session_id,
       content,
       subagents,
+      revision,
       ingested_at
     FROM rudel.claude_sessions
     WHERE ${claudeWhere}
@@ -176,6 +178,7 @@ export function buildLatestRawSessionContentSql(
       session_id,
       content,
       CAST(map(), 'Map(String, String)') AS subagents,
+      revision,
       ingested_at
     FROM rudel.codex_sessions
     WHERE ${codexWhere}
@@ -398,7 +401,7 @@ function buildIngestRecoveryCountStatement(
 					AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 					AND session_id = {sessionId:String}
 					AND user_id = {userId:String}
-					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+					AND revision = {revision:UInt64}`,
 				{
 					...commonParams,
 					...readRawSessionRecoveryParams(values),
@@ -417,7 +420,7 @@ function buildIngestRecoveryCountStatement(
 					AND organization_id = {organizationId:String}
 					AND user_id = {userId:String}
 					AND session_id = {sessionId:String}
-					AND ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')`,
+					AND revision = {revision:UInt64}`,
 				{
 					...commonParams,
 					...readRawSessionRecoveryParams(values),
@@ -432,11 +435,13 @@ function buildIngestRecoveryCountStatement(
 					AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 					AND session_id = {sessionId:String}
 					AND source = {source:String}
+					AND raw_revision = {rawRevision:UInt64}
 					AND raw_ingested_at = parseDateTime64BestEffort({rawIngestedAt:String}, 3, 'UTC')
 					AND scan_version = {scanVersion:UInt16}`,
 				{
 					...commonParams,
 					rawIngestedAt: readCommonString(values, "raw_ingested_at"),
+					rawRevision: readCommonString(values, "raw_revision"),
 					scanVersion: readCommonNumber(values, "scan_version"),
 					sessionDate: readCommonString(values, "session_date"),
 					sessionId: readCommonString(values, "session_id"),
@@ -450,7 +455,7 @@ function buildIngestRecoveryCountStatement(
 					AND agent = {agent:String}
 					AND user_id = {userId:String}
 					AND session_id = {sessionId:String}
-					AND extraction_seq = {extractionSeq:UInt64}`,
+					AND extraction_seq = {extractionSeq:UInt128}`,
 				{
 					...commonParams,
 					agent: readCommonString(values, "agent"),
@@ -467,7 +472,7 @@ function buildIngestRecoveryCountStatement(
 					AND agent = {agent:String}
 					AND user_id = {userId:String}
 					AND session_id = {sessionId:String}
-					AND extraction_seq = {extractionSeq:UInt64}`,
+					AND extraction_seq = {extractionSeq:UInt128}`,
 				{
 					...commonParams,
 					agent: readCommonString(values, "agent"),
@@ -482,7 +487,7 @@ function buildIngestRecoveryCountStatement(
 				target,
 				`organization_id = {organizationId:String}
 					AND (skill_name, content_sha256, user_id) IN {identities:Array(Tuple(String, FixedString(64), String))}
-					AND extraction_seq = {extractionSeq:UInt64}`,
+					AND extraction_seq = {extractionSeq:UInt128}`,
 				{
 					...commonParams,
 					extractionSeq: readCommonString(values, "extraction_seq"),
@@ -547,7 +552,7 @@ export function buildSessionAnalyticsRepairStatement(
 			AND cs.session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 			AND cs.session_id = {sessionId:String}
 			AND cs.user_id = {userId:String}
-			AND cs.ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')
+			AND cs.revision = {revision:UInt64}
 			AND (_is_capped OR length(_timestamps) > 0)`,
 	);
 	const columnList = SESSION_ANALYTICS_INSERT_COLUMNS.map(
@@ -600,6 +605,7 @@ function readRawSessionRecoveryParams(
 ): Record<string, unknown> {
 	return {
 		ingestedAt: readCommonString(values, "ingested_at"),
+		revision: readCommonString(values, "revision"),
 		sessionDate: readCommonString(values, "session_date"),
 		sessionId: readCommonString(values, "session_id"),
 		userId: readCommonString(values, "user_id"),

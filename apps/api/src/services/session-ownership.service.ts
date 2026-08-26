@@ -106,11 +106,11 @@ export async function recordSessionIngestContent(
 	filterVersion: number,
 	sessionDate: Date,
 	ingestedAt: Date,
+	revision: string,
 	usageReceipt?: UsageExtractionReceiptRecord,
 ): Promise<void> {
-	// Raw bookkeeping follows ingested_at ordering. The usage receipt uses the
-	// separately reserved generation as a compare-and-set, so an older writer
-	// cannot certify a newer session snapshot.
+	// Raw bookkeeping follows the shared revision ordering. Usage extraction is
+	// guarded independently by its reserved generation.
 	const ingestedAtIso = ingestedAt.toISOString();
 	return sqlClient.begin(async (transaction) => {
 		await transaction.unsafe(
@@ -123,12 +123,13 @@ export async function recordSessionIngestContent(
 				last_content_shape_json = $4,
 				last_filter_version = $5,
 				last_session_date = $6,
-				last_ingested_at = $7
-			WHERE organization_id = $8
-				AND session_id = $9
+				last_ingested_at = $7,
+				last_revision = $8::bigint
+			WHERE organization_id = $9
+				AND session_id = $10
 				AND (
-					last_ingested_at IS NULL
-					OR last_ingested_at <= $7
+					last_revision IS NULL
+					OR last_revision <= $8::bigint
 				)
 			`,
 			[
@@ -139,6 +140,7 @@ export async function recordSessionIngestContent(
 				filterVersion,
 				sessionDate.toISOString(),
 				ingestedAtIso,
+				revision,
 				organizationId,
 				sessionId,
 			],

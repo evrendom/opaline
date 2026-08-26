@@ -9,7 +9,7 @@ const analyticsSourceColumns = baseSessionColumns.filter(
 const rudel_session_analytics = table({
 	database: "rudel",
 	name: "session_analytics",
-	engine: "SharedReplacingMergeTree(ingested_at)",
+	engine: "SharedReplacingMergeTree(revision)",
 	columns: [
 		...analyticsSourceColumns,
 		{

@@ -26,6 +26,7 @@ import {
 	reserveUsageExtractionGeneration,
 	UsageExtractionSupersededError,
 } from "../services/session-ownership.service.js";
+import { allocateSessionRevision } from "../services/session-revision.service.js";
 import { buildActiveUsageEventsCte } from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
@@ -45,6 +46,7 @@ const RAW_FIRST_FAILURE_SESSION_ID = `${TEST_RUN_ID}_raw_first_failure`;
 const EXTRACTION_BYPASS_SESSION_ID = `${TEST_RUN_ID}_extraction_bypass`;
 const GENERATION_HEDGE_SESSION_ID = `${TEST_RUN_ID}_generation_hedge`;
 const BACKFILL_GENERATION_SESSION_ID = `${TEST_RUN_ID}_backfill_generation`;
+const REVISION_SESSION_ID = `${TEST_RUN_ID}_revision`;
 
 let server: ApiTestServer;
 let userId: string;
@@ -72,6 +74,42 @@ afterAll(async () => {
 });
 
 describe("session ingest content bookkeeping", () => {
+	test("serializes concurrent revisions and reuses an exact retry", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			REVISION_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const firstInput = {
+			contentSha256: "1".repeat(64),
+			operationId: "r2:concurrent-1",
+			organizationId: userId,
+			sessionId: REVISION_SESSION_ID,
+			userId,
+		};
+		const secondInput = {
+			...firstInput,
+			contentSha256: "2".repeat(64),
+			operationId: "r2:concurrent-2",
+		};
+
+		const [first, second] = await Promise.all([
+			allocateSessionRevision(firstInput),
+			allocateSessionRevision(secondInput),
+		]);
+		const retry = await allocateSessionRevision(firstInput);
+		const ordered = [BigInt(first), BigInt(second)].sort((left, right) =>
+			left < right ? -1 : left > right ? 1 : 0,
+		);
+		const [lower, higher] = ordered;
+		assert(lower !== undefined && higher !== undefined);
+
+		expect(first).not.toBe(second);
+		expect(higher).toBe(lower + 1n);
+		expect(retry).toBe(first);
+	});
+
 	test("returns a null hash, records it, then returns the stored hash", async () => {
 		const initialClaim = await claimSessionIngestOwnership(
 			userId,
@@ -90,6 +128,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			new Date("2026-07-24T10:00:00.000Z"),
+			"1",
 		);
 
 		const repeatedClaim = await claimSessionIngestOwnership(
@@ -123,6 +162,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			newerIngestedAt,
+			"2",
 		);
 		await recordSessionIngestContent(
 			userId,
@@ -132,6 +172,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			new Date("2026-07-24T11:00:00.000Z"),
+			"1",
 		);
 
 		const [row] = await sqlClient<
@@ -193,6 +234,7 @@ describe("session ingest content bookkeeping", () => {
 				5,
 				new Date("2026-08-03T09:30:00.000Z"),
 				new Date("2026-08-03T10:00:00.000Z"),
+				"1",
 				{ ...receipt, generation: olderGeneration },
 			),
 		).rejects.toBeInstanceOf(UsageExtractionSupersededError);
@@ -213,6 +255,7 @@ describe("session ingest content bookkeeping", () => {
 				5,
 				new Date("2026-08-03T09:30:00.000Z"),
 				new Date("2026-08-03T10:00:01.000Z"),
+				"2",
 				{ ...receipt, generation: latestGeneration },
 			),
 		).resolves.toBeUndefined();
@@ -287,6 +330,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-08-03T10:00:00.000Z"),
 			new Date("2026-08-03T10:01:00.000Z"),
+			"1",
 		);
 
 		expect(

@@ -5,7 +5,7 @@ import { baseSessionColumns, baseSessionTableConfig } from "./base-sessions.js";
 const rudel_codex_sessions = table({
 	database: "rudel",
 	name: "codex_sessions",
-	engine: "SharedReplacingMergeTree(ingested_at)",
+	engine: "SharedReplacingMergeTree(revision)",
 	columns: [...baseSessionColumns],
 	...baseSessionTableConfig,
 });

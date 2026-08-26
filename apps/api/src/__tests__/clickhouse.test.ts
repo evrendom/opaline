@@ -130,6 +130,7 @@ describe("clickhouse helpers", () => {
 			{
 				ingested_at: "2030-01-01 00:00:00.000",
 				organization_id: "org-repair",
+				revision: "115807295561596928",
 				session_date: "2026-08-25 10:00:00.000",
 				session_id: "session-repair",
 				user_id: "user-repair",
@@ -161,12 +162,11 @@ describe("clickhouse helpers", () => {
 		);
 		expect(statement.query).toContain("cs.session_id = {sessionId:String}");
 		expect(statement.query).toContain("cs.user_id = {userId:String}");
-		expect(statement.query).toContain(
-			"cs.ingested_at = parseDateTime64BestEffort({ingestedAt:String}, 3, 'UTC')",
-		);
+		expect(statement.query).toContain("cs.revision = {revision:UInt64}");
 		expect(statement.query_params).toEqual({
 			ingestedAt: "2030-01-01 00:00:00.000",
 			organizationId: "org-repair",
+			revision: "115807295561596928",
 			sessionDate: "2026-08-25 10:00:00.000",
 			sessionId: "session-repair",
 			userId: "user-repair",
@@ -198,11 +198,8 @@ describe("clickhouse helpers", () => {
 				/session_date = parseDateTime64BestEffort\(\{sessionDate:String\}, 3, 'UTC'\)/g,
 			),
 		).toHaveLength(2);
-		expect(sql).toContain("argMax(content, ingested_at)");
-		expect(sql).toContain(
-			"formatDateTime(max(ingested_at), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS revision",
-		);
-		expect(sql).not.toContain("toString(max(ingested_at)) AS revision");
+		expect(sql).toContain("argMax(content, revision)");
+		expect(sql).toContain("toString(max(revision)) AS revision");
 		expect(sql).toContain(
 			"GROUP BY source, organization_id, user_id, session_id",
 		);

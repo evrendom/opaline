@@ -47,7 +47,7 @@ export interface SkillExtractionWriteInput {
 	readonly extractedAt: Date;
 	readonly extraction: SkillExtractionResult;
 	readonly organizationId: string;
-	readonly rawRevisionIngestedAt: Date;
+	readonly rawRevision: string;
 	readonly sessionDate: Date;
 	readonly sessionId: string;
 	readonly userId: string;
@@ -212,12 +212,11 @@ export function buildActiveSkillUsesCte(options?: {
 }
 
 export function buildSkillExtractionSeq(
-	rawRevisionIngestedAt: Date,
+	rawRevision: string,
 	parserVersion: number,
 ): string {
-	const epochMilliseconds = rawRevisionIngestedAt.getTime();
-	if (!Number.isSafeInteger(epochMilliseconds) || epochMilliseconds < 0) {
-		throw new Error("Skill raw revision timestamp must be a valid epoch date");
+	if (!/^[1-9]\d*$/u.test(rawRevision)) {
+		throw new Error("Skill raw revision must be an unsigned integer");
 	}
 	if (
 		!Number.isSafeInteger(parserVersion) ||
@@ -227,7 +226,7 @@ export function buildSkillExtractionSeq(
 		throw new Error("Skill parser version is out of range");
 	}
 	return (
-		(BigInt(epochMilliseconds) << EXTRACTION_PARSER_BIT_COUNT) |
+		(BigInt(rawRevision) << EXTRACTION_PARSER_BIT_COUNT) |
 		BigInt(parserVersion & 0xffff)
 	).toString();
 }
@@ -239,7 +238,7 @@ export function createSkillExtractionRun(
 	return {
 		...input,
 		extractionSeq: buildSkillExtractionSeq(
-			input.rawRevisionIngestedAt,
+			input.rawRevision,
 			input.extraction.parserVersion,
 		),
 	};
@@ -542,8 +541,8 @@ function validateWriteInput(input: SkillExtractionWriteInput): void {
 	if (Number.isNaN(input.extractedAt.getTime())) {
 		throw new Error("Skill extraction timestamp must be valid");
 	}
-	if (Number.isNaN(input.rawRevisionIngestedAt.getTime())) {
-		throw new Error("Skill raw revision timestamp must be valid");
+	if (!/^[1-9]\d*$/u.test(input.rawRevision)) {
+		throw new Error("Skill raw revision must be an unsigned integer");
 	}
 	if (Number.isNaN(input.sessionDate.getTime())) {
 		throw new Error("Skill extraction session date must be valid");

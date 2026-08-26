@@ -316,6 +316,7 @@ async function ingestSession(
 	await getAdapter(input.source).ingest(getClickhouse(), input, {
 		ingestedAt: new Date(ingestedAt),
 		organizationId,
+		revision: "1",
 		userId,
 	});
 }

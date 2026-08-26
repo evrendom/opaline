@@ -29,6 +29,10 @@ const EXTRACTION = {
 	],
 };
 
+function revisionForDate(value: Date): string {
+	return (BigInt(value.getTime()) << 16n).toString();
+}
+
 describe("skill extraction persistence rows", () => {
 	test("selects the committed generation before collapsing identical retries", () => {
 		const cte = buildActiveSkillUsesCte({ filterSkillName: true });
@@ -55,7 +59,7 @@ describe("skill extraction persistence rows", () => {
 			extractedAt: new Date("2026-08-20T10:05:00.000Z"),
 			extraction: EXTRACTION,
 			organizationId: "org-1",
-			rawRevisionIngestedAt: new Date("2026-08-20T10:04:00.000Z"),
+			rawRevision: revisionForDate(new Date("2026-08-20T10:04:00.000Z")),
 			sessionDate: new Date("2026-08-20T09:00:00.000Z"),
 			sessionId: "session-1",
 			userId: "user-1",
@@ -86,8 +90,8 @@ describe("skill extraction persistence rows", () => {
 	});
 
 	test("a newer raw revision wins even when its extraction finishes first", () => {
-		const olderRevision = new Date("2026-08-20T10:04:00.000Z");
-		const newerRevision = new Date("2026-08-20T10:05:00.000Z");
+		const olderRevision = revisionForDate(new Date("2026-08-20T10:04:00.000Z"));
+		const newerRevision = revisionForDate(new Date("2026-08-20T10:05:00.000Z"));
 		const olderSeq = buildSkillExtractionSeq(olderRevision, 1);
 		const newerSeq = buildSkillExtractionSeq(newerRevision, 1);
 		const base = {
@@ -106,7 +110,7 @@ describe("skill extraction persistence rows", () => {
 					uses: [{ ...READABLE_USE, content: "older" }],
 				},
 				extractionSeq: olderSeq,
-				rawRevisionIngestedAt: olderRevision,
+				rawRevision: olderRevision,
 			},
 			[],
 		);
@@ -120,7 +124,7 @@ describe("skill extraction persistence rows", () => {
 					uses: [{ ...READABLE_USE, content: "newer" }],
 				},
 				extractionSeq: newerSeq,
-				rawRevisionIngestedAt: newerRevision,
+				rawRevision: newerRevision,
 			},
 			[],
 		);
@@ -134,15 +138,13 @@ describe("skill extraction persistence rows", () => {
 	});
 
 	test("a higher parser replay wins for the same raw revision", () => {
-		const rawRevision = new Date("2026-08-20T10:05:00.000Z");
+		const rawRevision = revisionForDate(new Date("2026-08-20T10:05:00.000Z"));
 		const parserOne = buildSkillExtractionSeq(rawRevision, 1);
 		const parserTwo = buildSkillExtractionSeq(rawRevision, 2);
 
 		expect(BigInt(parserTwo)).toBeGreaterThan(BigInt(parserOne));
-		expect(BigInt(parserTwo)).toBeLessThanOrEqual(2n ** 64n - 1n);
-		expect(parserTwo).toBe(
-			((BigInt(rawRevision.getTime()) << 16n) | 2n).toString(),
-		);
+		expect(BigInt(parserTwo)).toBeLessThanOrEqual(2n ** 128n - 1n);
+		expect(parserTwo).toBe(((BigInt(rawRevision) << 16n) | 2n).toString());
 	});
 
 	test("fresh attempts for the same revision and parser have identical sequences", () => {
@@ -150,7 +152,7 @@ describe("skill extraction persistence rows", () => {
 			extractedAt: new Date("2026-08-20T10:06:00.000Z"),
 			extraction: EXTRACTION,
 			organizationId: "org-1",
-			rawRevisionIngestedAt: new Date("2026-08-20T10:05:00.000Z"),
+			rawRevision: revisionForDate(new Date("2026-08-20T10:05:00.000Z")),
 			sessionDate: new Date("2026-08-20T09:00:00.000Z"),
 			sessionId: "session-1",
 			userId: "user-1",

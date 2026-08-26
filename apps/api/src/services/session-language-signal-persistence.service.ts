@@ -17,6 +17,7 @@ export interface SessionLanguageSignalScanInput {
 	readonly content: string;
 	readonly organizationId: string;
 	readonly rawIngestedAt: Date | string;
+	readonly rawRevision: string;
 	readonly sessionDate: Date | string;
 	readonly sessionId: string;
 	readonly source: Source;
@@ -90,6 +91,7 @@ export function buildSessionLanguageSignalRow(
 		session_id: input.sessionId,
 		user_id: input.userId,
 		source: input.source,
+		raw_revision: input.rawRevision,
 		raw_ingested_at: toClickHouseDateTime(input.rawIngestedAt),
 		scan_version: SCAN_VERSION,
 		...counts,

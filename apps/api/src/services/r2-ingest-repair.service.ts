@@ -44,7 +44,10 @@ export async function runR2IngestRepairPass(
 							session: null,
 							user: { id: identity.userId },
 						},
-						durableProcessing: { failpoint: undefined },
+						durableProcessing: {
+							failpoint: undefined,
+							operationId: identity.operationId,
+						},
 						enforceRateLimits: false,
 						errorFactories: createBackgroundIngestErrorFactories(),
 						input: sessionInput,

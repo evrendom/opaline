@@ -105,6 +105,7 @@ async function ingestSession(
 	const adapter = getAdapter(input.source);
 	await adapter.ingest(ch, input, {
 		ingestedAt: new Date(),
+		revision: "1",
 		userId,
 		organizationId: targetOrgId,
 	});

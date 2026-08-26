@@ -106,7 +106,7 @@ export interface R2IngestProcessorResult {
 
 export type R2IngestProcessor = (
 	input: IngestSessionInput,
-	identity: { organizationId: string; userId: string },
+	identity: { operationId: string; organizationId: string; userId: string },
 	signal: AbortSignal,
 ) => Promise<R2IngestProcessorResult>;
 
@@ -732,6 +732,7 @@ async function processClaimedJob(input: {
 		processed = await input.process(
 			session,
 			{
+				operationId: input.job.id,
 				organizationId: input.job.organizationId,
 				userId: input.job.userId,
 			},
