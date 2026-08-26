@@ -267,33 +267,17 @@ jobs:
         env:
           RUDEL_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/rudel/dist/cli.js
 
-      # The Windows opener integration test runs in the dedicated
-      # windows-opener job below: Blacksmith's Windows image has no default
-      # browser and http/https are UserChoice-protected, so ShellExecute
-      # cannot dispatch a URL headlessly on this runner.
-
-  windows-opener:
-    if: needs.changes.outputs.cli == 'true'
-    needs: changes
-    runs-on: windows-2025
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Bun
-        uses: ./.github/actions/setup
-
-      - name: Verify the Windows opener delivers the complete URL
-        shell: bash
-        run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
+      # The Windows opener integration test is not runnable here: Blacksmith's
+      # Windows image ships Chrome but registers no default browser, and
+      # http/https are UserChoice-protected, so ShellExecute cannot dispatch a
+      # URL headlessly. Opener coverage lives in the canonical opalinehq/cli
+      # repo; restore a job here if Blacksmith registers a default browser.
 
   cli-smoke-required:
     if: always()
     needs:
       - changes
       - cli-smoke
-      - windows-opener
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     steps:
@@ -302,7 +286,6 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           CLI_CHANGED: ${{ needs.changes.outputs.cli }}
           CLI_SMOKE_RESULT: ${{ needs.cli-smoke.result }}
-          WINDOWS_OPENER_RESULT: ${{ needs.windows-opener.result }}
         run: |
           if [[ "${CHANGES_RESULT}" != "success" ]]; then
             echo "CLI change detection failed."
@@ -314,10 +297,6 @@ jobs:
             exit 1
           fi
 
-          if [[ "${CLI_CHANGED}" == "true" && "${WINDOWS_OPENER_RESULT}" != "success" ]]; then
-            echo "Windows opener verification did not succeed: ${WINDOWS_OPENER_RESULT}"
-            exit 1
-          fi
 
   deploy:
     if: >-
