@@ -40,21 +40,79 @@ describe("R2 ingest storage configuration", () => {
 		});
 	});
 
-	test("uses path-style addressing for an explicit local endpoint", () => {
+	test("ignores a production endpoint override with a startup warning", () => {
+		const warnings: string[] = [];
 		expect(
-			readR2IngestAvailability({
-				R2_ACCESS_KEY_ID: "access-key",
-				R2_ACCOUNT_ID: "account-id",
-				R2_ENDPOINT: "http://127.0.0.1:9000",
-				R2_SECRET_ACCESS_KEY: "secret-key",
-			}),
+			readR2IngestAvailability(
+				{
+					NODE_ENV: "production",
+					R2_ACCESS_KEY_ID: "access-key",
+					R2_ACCOUNT_ID: "account-id",
+					R2_ENDPOINT: "http://127.0.0.1:9000",
+					R2_SECRET_ACCESS_KEY: "secret-key",
+				},
+				(reason) => warnings.push(reason),
+			),
 		).toMatchObject({
 			enabled: true,
 			configuration: {
-				endpoint: "http://127.0.0.1:9000",
-				forcePathStyle: true,
+				endpoint: "https://account-id.eu.r2.cloudflarestorage.com",
+				forcePathStyle: false,
 			},
 		});
+		expect(warnings).toEqual(["non-test-environment"]);
+	});
+
+	test("uses path-style addressing for test-only loopback endpoints", () => {
+		const warnings: string[] = [];
+		for (const endpoint of [
+			"http://127.0.0.1:9000",
+			"http://localhost:9000",
+			"http://[::1]:9000",
+		]) {
+			expect(
+				readR2IngestAvailability(
+					{
+						NODE_ENV: "test",
+						R2_ACCESS_KEY_ID: "access-key",
+						R2_ACCOUNT_ID: "account-id",
+						R2_ENDPOINT: endpoint,
+						R2_SECRET_ACCESS_KEY: "secret-key",
+					},
+					(reason) => warnings.push(reason),
+				),
+			).toMatchObject({
+				enabled: true,
+				configuration: {
+					endpoint,
+					forcePathStyle: true,
+				},
+			});
+		}
+		expect(warnings).toEqual([]);
+	});
+
+	test("ignores a non-loopback test endpoint with a startup warning", () => {
+		const warnings: string[] = [];
+		expect(
+			readR2IngestAvailability(
+				{
+					NODE_ENV: "test",
+					R2_ACCESS_KEY_ID: "access-key",
+					R2_ACCOUNT_ID: "account-id",
+					R2_ENDPOINT: "http://r2-fake.example.test:9000",
+					R2_SECRET_ACCESS_KEY: "secret-key",
+				},
+				(reason) => warnings.push(reason),
+			),
+		).toMatchObject({
+			enabled: true,
+			configuration: {
+				endpoint: "https://account-id.eu.r2.cloudflarestorage.com",
+				forcePathStyle: false,
+			},
+		});
+		expect(warnings).toEqual(["non-loopback-hostname"]);
 	});
 
 	test("rejects a different upload-part byte length at the signed boundary", async () => {

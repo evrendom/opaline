@@ -18,6 +18,7 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { readBooleanEnv } from "../lib/env.js";
 import {
 	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
@@ -48,6 +49,10 @@ const INTERRUPTED_FINAL_CLAIM_RESCUE_CODE =
 	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE =
 	"Recovering one interrupted final ingest claim";
+const INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_CODE =
+	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED";
+const INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_MESSAGE =
+	"Interrupted final-claim rescue is paused while session ingest is quiesced. Lift the barrier, then retry this commit.";
 
 const StoredPartSchema = z.object({
 	byteLength: z.number().int().positive(),
@@ -125,6 +130,7 @@ export interface CommitR2IngestJobOptions {
 	process: R2IngestProcessor;
 	r2: R2MultipartUploadClient;
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced?: boolean;
 	signal?: AbortSignal;
 	userId: string;
 }
@@ -136,6 +142,9 @@ export async function commitR2IngestJob(
 	const now = options.now ?? (() => new Date());
 	const randomUUID = options.randomUUID ?? createRandomUUID;
 	const leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+	const sessionIngestQuiesced =
+		options.sessionIngestQuiesced ??
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false);
 	assertPositiveLeaseDuration(leaseDurationMs);
 	const admissionNow = now();
 	const admission = await readRequestedJob(
@@ -158,9 +167,15 @@ export async function commitR2IngestJob(
 	);
 	if (terminalAdmission) return terminalAdmission;
 	assertRequestedJobCanBeClaimed(admission, admissionNow);
+	assertInterruptedFinalClaimRescueAllowed(
+		admission,
+		admissionNow,
+		sessionIngestQuiesced,
+	);
 	const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
 		admission,
 		admissionNow,
+		sessionIngestQuiesced,
 	);
 	if (
 		(admission.attempts >= admission.maxAttempts &&
@@ -234,6 +249,7 @@ export async function commitR2IngestJob(
 					manifest,
 					now: now(),
 					randomUUID,
+					sessionIngestQuiesced,
 					userId: options.userId,
 				});
 				if (claim.kind === "completed") {
@@ -383,6 +399,7 @@ async function claimRequestedJob(input: {
 	manifest: readonly StoredObject[];
 	now: Date;
 	randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced: boolean;
 	userId: string;
 }): Promise<RequestedJobClaim> {
 	return input.database.begin(async (transaction) => {
@@ -410,9 +427,15 @@ async function claimRequestedJob(input: {
 			return { job: requestedRow, kind: "failed" };
 		}
 		assertRequestedJobCanBeClaimed(requestedRow, input.now);
+		assertInterruptedFinalClaimRescueAllowed(
+			requestedRow,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
 		const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
 			requestedRow,
 			input.now,
+			input.sessionIngestQuiesced,
 		);
 		if (
 			requestedRow.attempts >= requestedRow.maxAttempts &&
@@ -566,6 +589,7 @@ export async function repairRecoverableR2IngestJobs(input: {
 	process: R2IngestProcessor;
 	r2: R2MultipartUploadClient;
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced?: boolean;
 }): Promise<R2IngestRecoveryRepairResult> {
 	const leaseDurationMs = input.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
 	assertPositiveLeaseDuration(leaseDurationMs);
@@ -574,6 +598,9 @@ export async function repairRecoverableR2IngestJobs(input: {
 		throw new Error("R2 ingest recovery limit must be between 1 and 20");
 	}
 	const now = input.now ?? (() => new Date());
+	const sessionIngestQuiesced =
+		input.sessionIngestQuiesced ??
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false);
 	const repairNow = now();
 	const candidates = await input.database.unsafe<IngestJobRow[]>(
 		`${selectIngestJobSql()}
@@ -636,6 +663,7 @@ export async function repairRecoverableR2IngestJobs(input: {
 					manifest,
 					now: now(),
 					randomUUID: input.randomUUID ?? createRandomUUID,
+					sessionIngestQuiesced,
 				});
 				if (!claim) return;
 				if (claim.kind === "completed" || claim.kind === "failed") {
@@ -680,6 +708,7 @@ async function claimRecoverableJob(input: {
 	manifest: readonly StoredObject[];
 	now: Date;
 	randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced: boolean;
 }): Promise<RequestedJobClaim | null> {
 	return input.database.begin(async (transaction) => {
 		const [candidate] = await transaction.unsafe<IngestJobRow[]>(
@@ -704,9 +733,15 @@ async function claimRecoverableJob(input: {
 			(candidate.status === "running" &&
 				toDate(candidate.leaseExpiresAt).getTime() <= input.now.getTime());
 		if (!eligible) return null;
+		assertInterruptedFinalClaimRescueAllowed(
+			candidate,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
 		const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
 			candidate,
 			input.now,
+			input.sessionIngestQuiesced,
 		);
 		if (
 			candidate.attempts >= candidate.maxAttempts &&
@@ -748,7 +783,37 @@ async function claimRecoverableJob(input: {
 	});
 }
 
-function canRescueInterruptedFinalClaim(job: IngestJobRow, now: Date): boolean {
+function assertInterruptedFinalClaimRescueAllowed(
+	job: IngestJobRow,
+	now: Date,
+	sessionIngestQuiesced: boolean,
+): void {
+	if (
+		sessionIngestQuiesced &&
+		isInterruptedFinalClaimRescueCandidate(job, now)
+	) {
+		throw new R2IngestCommitError(
+			INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_CODE,
+			INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_MESSAGE,
+			true,
+		);
+	}
+}
+
+function canRescueInterruptedFinalClaim(
+	job: IngestJobRow,
+	now: Date,
+	sessionIngestQuiesced: boolean,
+): boolean {
+	return (
+		!sessionIngestQuiesced && isInterruptedFinalClaimRescueCandidate(job, now)
+	);
+}
+
+function isInterruptedFinalClaimRescueCandidate(
+	job: IngestJobRow,
+	now: Date,
+): boolean {
 	return (
 		job.status === "running" &&
 		job.attempts >= job.maxAttempts &&

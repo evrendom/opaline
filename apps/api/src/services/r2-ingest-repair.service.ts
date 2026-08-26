@@ -27,7 +27,11 @@ export async function runR2IngestRepairPass(
 	r2: R2MultipartUploadClient,
 	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<R2IngestRepairPassResult> {
-	if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+	const sessionIngestQuiesced = readBooleanEnv(
+		"SESSION_INGEST_QUIESCED",
+		false,
+	);
+	if (sessionIngestQuiesced) {
 		return {
 			attempted: 0,
 			completed: 0,
@@ -63,6 +67,7 @@ export async function runR2IngestRepairPass(
 						signal,
 					}),
 				r2,
+				sessionIngestQuiesced,
 			})
 		: { attempted: 0, completed: 0, hasMore: true };
 	const cleanup = hasMaintenanceTimeRemaining(deadline)

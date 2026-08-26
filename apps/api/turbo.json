@@ -38,7 +38,6 @@
 				"SENTRY_ENVIRONMENT",
 				"R2_ACCOUNT_ID",
 				"R2_ACCESS_KEY_ID",
-				"R2_ENDPOINT",
 				"R2_SECRET_ACCESS_KEY"
 			]
 		},

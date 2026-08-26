@@ -88,8 +88,24 @@ function assertMigrationUsesSupportedGrammar(
 			);
 		}
 	}
+	for (const line of sql.split("\n")) {
+		const lineCommentIndex = line.indexOf("--");
+		if (
+			lineCommentIndex >= 0 &&
+			line.slice(0, lineCommentIndex).trim().length > 0
+		) {
+			throw new Error(
+				`${migrationName} contains an unsupported inline line comment`,
+			);
+		}
+	}
 	for (const literal of sql.matchAll(/'(?:\\.|''|[^'])*'/gu)) {
 		const value = literal[0];
+		if (value.includes("\\'")) {
+			throw new Error(
+				`${migrationName} contains an unsupported backslash-escaped quote`,
+			);
+		}
 		if (
 			value.slice(1, -1).includes("''") &&
 			!VERIFIED_GENERATED_DOUBLED_QUOTE_LITERALS.has(value)
@@ -617,6 +633,8 @@ describe("F16 destructive migration execution rehearsal", () => {
 			["SELECT * FROM RUDEL.table", "cased or spaced rudel qualifier"],
 			["SELECT 1 /* unsupported; split */", "block comment"],
 			["SELECT 'it''s rudel.literal'", "doubled-quote string"],
+			[String.raw`SELECT 'it\'s;still one literal'`, "backslash-escaped quote"],
+			["SELECT 1 -- unsupported; split", "inline line comment"],
 		] as const) {
 			expect(() =>
 				assertMigrationUsesSupportedGrammar(

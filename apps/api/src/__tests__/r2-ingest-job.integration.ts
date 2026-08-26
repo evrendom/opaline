@@ -48,7 +48,10 @@ import {
 	type R2MultipartUploadInitClient,
 	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
-import { startApiTestServer } from "./helpers/api-test-server.js";
+import {
+	type ApiTestServer,
+	startApiTestServer,
+} from "./helpers/api-test-server.js";
 
 type Uuid = `${string}-${string}-${string}-${string}-${string}`;
 
@@ -326,8 +329,10 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 		let identity: QuiescedTestIdentity | undefined;
 		let commitJob: R2IngestInitOutput | undefined;
+		let rescueJob: R2IngestInitOutput | undefined;
 		let repairJob: R2IngestInitOutput | undefined;
 		let terminalJob: R2IngestInitOutput | undefined;
+		let resumedServer: ApiTestServer | undefined;
 		try {
 			identity = await createQuiescedTestIdentity(server.baseUrl);
 			const operatorSkillName = `quiesced-operator-${crypto.randomUUID()}`;
@@ -359,6 +364,8 @@ describe("R2 ingest commit lifecycle", () => {
 			expect(response.status).toBe(503);
 			expect(await readRpcErrorShape(response)).toEqual({
 				code: "SERVICE_UNAVAILABLE",
+				message:
+					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
 				reason: "session_ingest_quiesced",
 			});
 			expect(await readIngestJobRowSnapshot(commitJob.jobId)).toEqual(
@@ -396,6 +403,91 @@ describe("R2 ingest commit lifecycle", () => {
 			expect(
 				await getR2IngestJobStatus(commitJob.jobId, identity.userId),
 			).toMatchObject({ attempts: 1, status: "completed" });
+
+			const rescueSkillName = `post-barrier-rescue-${crypto.randomUUID()}`;
+			rescueJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				buildRealClaudeTranscript(rescueSkillName),
+				identity,
+			);
+			await interruptFinalIngestClaim(
+				rescueJob,
+				new Date("2026-08-25T10:00:00.000Z"),
+				identity.userId,
+			);
+			const rescueRowBefore = await readIngestJobRowSnapshot(rescueJob.jobId);
+			const rescueObjectsBefore = snapshotFakeR2Objects(rescueJob);
+			const rescueEffectsBefore = snapshotFakeR2Effects();
+			expect(rescueRowBefore).toMatchObject({
+				lastErrorCode: null,
+				status: "running",
+			});
+
+			const refusedRescueResponse = await fetch(
+				`${server.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(rescueJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(refusedRescueResponse.status).toBe(503);
+			expect(await readRpcErrorShape(refusedRescueResponse)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				message:
+					"Interrupted final-claim rescue is paused while session ingest is quiesced. Lift the barrier, then retry this commit.",
+				reason: "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED",
+			});
+			expect(await readIngestJobRowSnapshot(rescueJob.jobId)).toEqual(
+				rescueRowBefore,
+			);
+			expect(snapshotFakeR2Objects(rescueJob)).toEqual(rescueObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(rescueEffectsBefore);
+
+			resumedServer = await startApiTestServer({
+				R2_ACCESS_KEY_ID: "test-access-key",
+				R2_ACCOUNT_ID: "test-account",
+				R2_ENDPOINT: fakeR2Endpoint.url.origin,
+				R2_SECRET_ACCESS_KEY: "test-secret-key",
+				SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
+				SESSION_INGEST_QUIESCED: "false",
+				SKILL_EXTRACTION_ENABLED: "false",
+				USAGE_EVENT_EXTRACTION_ENABLED: "false",
+			});
+			const rescuedResponse = await fetch(
+				`${resumedServer.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(rescueJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(rescuedResponse.status).toBe(200);
+			expect(await rescuedResponse.json()).toMatchObject({
+				json: {
+					jobId: rescueJob.jobId,
+					result: { sessionId: rescueJob.jobId, success: true },
+					status: "completed",
+				},
+			});
+			expect(await countQuiescedCanonicalRaw(identity, rescueJob.jobId)).toBe(
+				1,
+			);
+			expect(
+				await getR2IngestJobStatus(rescueJob.jobId, identity.userId),
+			).toMatchObject({
+				attempts: rescueRowBefore.maxAttempts,
+				error: null,
+				status: "completed",
+			});
 
 			repairJob = await initializeUploadedJobForIdentity(
 				crypto.randomUUID(),
@@ -464,16 +556,23 @@ describe("R2 ingest commit lifecycle", () => {
 			expect(snapshotFakeR2Effects()).toEqual(repairEffectsBefore);
 		} finally {
 			await server.stop();
+			if (resumedServer) await resumedServer.stop();
 			await fakeR2Endpoint.stop(true);
 			const jobIds = [
 				commitJob?.jobId,
+				rescueJob?.jobId,
 				repairJob?.jobId,
 				terminalJob?.jobId,
 			].filter((jobId): jobId is string => jobId !== undefined);
 			for (const jobId of jobIds) {
 				await sqlClient`DELETE FROM ingest_job WHERE id = ${jobId}`;
 			}
-			for (const initialized of [commitJob, repairJob, terminalJob]) {
+			for (const initialized of [
+				commitJob,
+				rescueJob,
+				repairJob,
+				terminalJob,
+			]) {
 				for (const object of initialized?.objects ?? []) {
 					fakeR2.objects.delete(object.objectKey);
 				}
@@ -496,7 +595,7 @@ describe("R2 ingest commit lifecycle", () => {
 		const recoveredObjectKey = recoveredJob.objects[0]?.objectKey;
 		if (!recoveredObjectKey)
 			throw new Error("missing interrupted claim object");
-		await interruptFinalIngestClaim(recoveredJob, leaseStartedAt);
+		await interruptFinalIngestClaim(recoveredJob, leaseStartedAt, USER_ID);
 		const [interrupted] = await sqlClient<
 			Array<{
 				attempts: number;
@@ -533,6 +632,33 @@ describe("R2 ingest commit lifecycle", () => {
 			restoreEnvironmentVariable("SESSION_INGEST_QUIESCED", previousQuiescence);
 		}
 		expect(fakeR2.objects.has(recoveredObjectKey)).toBe(true);
+		const quiescedRepairRowBefore = await readIngestJobRowSnapshot(
+			recoveredJob.jobId,
+		);
+		const quiescedRepairObjectsBefore = snapshotFakeR2Objects(recoveredJob);
+		const quiescedRepairEffectsBefore = snapshotFakeR2Effects();
+		let quiescedRepairProcessCalls = 0;
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				leaseDurationMs: 1_000,
+				now: () => recoveryAt,
+				process: async (input) => {
+					quiescedRepairProcessCalls += 1;
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+				sessionIngestQuiesced: true,
+			}),
+		).resolves.toMatchObject({ attempted: 1, completed: 0 });
+		expect(quiescedRepairProcessCalls).toBe(0);
+		expect(await readIngestJobRowSnapshot(recoveredJob.jobId)).toEqual(
+			quiescedRepairRowBefore,
+		);
+		expect(snapshotFakeR2Objects(recoveredJob)).toEqual(
+			quiescedRepairObjectsBefore,
+		);
+		expect(snapshotFakeR2Effects()).toEqual(quiescedRepairEffectsBefore);
 
 		let recoveryProcessCalls = 0;
 		const recovered = await repairRecoverableR2IngestJobs({
@@ -575,7 +701,7 @@ describe("R2 ingest commit lifecycle", () => {
 		);
 		const boundedObjectKey = boundedJob.objects[0]?.objectKey;
 		if (!boundedObjectKey) throw new Error("missing bounded rescue object");
-		await interruptFinalIngestClaim(boundedJob, leaseStartedAt);
+		await interruptFinalIngestClaim(boundedJob, leaseStartedAt, USER_ID);
 		const processingFailure = new Error("simulated rescue processing failure");
 		const bounded = await repairRecoverableR2IngestJobs({
 			database: sqlClient,
@@ -2075,26 +2201,30 @@ async function initializeUploadedJobForIdentity(
 
 async function readRpcErrorShape(
 	response: Response,
-): Promise<{ code: string; reason: string | undefined }> {
+): Promise<{ code: string; message: string; reason: string | undefined }> {
 	const body: unknown = await response.json();
 	if (
 		!isRecord(body) ||
 		!isRecord(body.json) ||
-		typeof body.json.code !== "string"
+		typeof body.json.code !== "string" ||
+		typeof body.json.message !== "string"
 	) {
 		throw new Error("Quiesced commit returned an invalid RPC error");
 	}
 	const data = isRecord(body.json.data) ? body.json.data : {};
 	return {
 		code: body.json.code,
+		message: body.json.message,
 		reason: typeof data.reason === "string" ? data.reason : undefined,
 	};
 }
 
 interface IngestJobRowSnapshot {
 	attempts: number;
+	lastErrorCode: string | null;
 	leaseExpiresAt: string | null;
 	leaseToken: string | null;
+	maxAttempts: number;
 	snapshot: string;
 	status: string;
 }
@@ -2105,8 +2235,10 @@ async function readIngestJobRowSnapshot(
 	const [row] = await sqlClient<IngestJobRowSnapshot[]>`
 		SELECT
 			attempts,
+			last_error_code AS "lastErrorCode",
 			lease_expires_at::text AS "leaseExpiresAt",
 			lease_token AS "leaseToken",
+			max_attempts AS "maxAttempts",
 			to_jsonb(job)::text AS snapshot,
 			status
 		FROM ingest_job AS job
@@ -2460,6 +2592,7 @@ function buildCompletionInput(
 async function interruptFinalIngestClaim(
 	initialized: R2IngestInitOutput,
 	leaseStartedAt: Date,
+	userId: string,
 ): Promise<void> {
 	await sqlClient`
 		UPDATE ingest_job
@@ -2490,7 +2623,7 @@ async function interruptFinalIngestClaim(
 				);
 			},
 			r2: fakeR2,
-			userId: USER_ID,
+			userId,
 		}),
 	).rejects.toThrow("simulated interruption after the final claim");
 	expect(interrupted).toBe(true);

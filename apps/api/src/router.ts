@@ -1177,10 +1177,11 @@ const r2IngestCommit = os.ingest.commit
 				message: "An ingest API key is required",
 			});
 		}
-		if (
-			readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
-			!context.ingestOperatorAuthorized
-		) {
+		const sessionIngestQuiesced = readBooleanEnv(
+			"SESSION_INGEST_QUIESCED",
+			false,
+		);
+		if (sessionIngestQuiesced && !context.ingestOperatorAuthorized) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
 				data: { reason: "session_ingest_quiesced" },
 				message:
@@ -1216,6 +1217,7 @@ const r2IngestCommit = os.ingest.commit
 						signal: processingSignal,
 					}),
 				r2: createR2MultipartUploadClient(availability.configuration),
+				sessionIngestQuiesced,
 				signal,
 				userId: context.user.id,
 			});
@@ -1228,6 +1230,7 @@ const r2IngestCommit = os.ingest.commit
 				if (
 					error.code === "R2_INGEST_JOB_BUSY" ||
 					error.code === "R2_INGEST_JOB_RETRY_LATER" ||
+					error.code === "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED" ||
 					error.code === "R2_INGEST_LEASE_LOST"
 				) {
 					throw new ORPCError("SERVICE_UNAVAILABLE", {

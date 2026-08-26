@@ -9,7 +9,19 @@ import {
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getLogger } from "@logtape/logtape";
 import { R2_INGEST_UPLOAD_URL_TTL_SECONDS } from "@rudel/api-routes";
+
+const logger = getLogger(["rudel", "api", "r2-ingest-storage"]);
+const LOOPBACK_R2_ENDPOINT_HOSTNAMES = new Set([
+	"127.0.0.1",
+	"localhost",
+	"[::1]",
+]);
+type IgnoredR2EndpointOverrideReason =
+	| "invalid-url"
+	| "non-loopback-hostname"
+	| "non-test-environment";
 
 export const R2_INGEST_BUCKET = "opaline-ingest-prod";
 export const R2_INGEST_ENVIRONMENT_VARIABLES = [
@@ -70,6 +82,9 @@ export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
 
 export function readR2IngestAvailability(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
+	warnIgnoredEndpoint: (
+		reason: IgnoredR2EndpointOverrideReason,
+	) => void = warnIgnoredR2Endpoint,
 ): R2IngestAvailability {
 	const missingVariables = R2_INGEST_ENVIRONMENT_VARIABLES.filter(
 		(name) => !environment[name]?.trim(),
@@ -87,6 +102,10 @@ export function readR2IngestAvailability(
 			missingVariables: [...R2_INGEST_ENVIRONMENT_VARIABLES],
 		};
 	}
+	const endpointOverride = readTestR2EndpointOverride(
+		environment,
+		warnIgnoredEndpoint,
+	);
 
 	return {
 		enabled: true,
@@ -95,12 +114,43 @@ export function readR2IngestAvailability(
 			accountId,
 			bucket: R2_INGEST_BUCKET,
 			endpoint:
-				environment.R2_ENDPOINT?.trim() ||
-				`https://${accountId}.eu.r2.cloudflarestorage.com`,
-			forcePathStyle: Boolean(environment.R2_ENDPOINT?.trim()),
+				endpointOverride || `https://${accountId}.eu.r2.cloudflarestorage.com`,
+			forcePathStyle: endpointOverride !== null,
 			secretAccessKey,
 		},
 	};
+}
+
+function readTestR2EndpointOverride(
+	environment: Readonly<Record<string, string | undefined>>,
+	warnIgnoredEndpoint: (reason: IgnoredR2EndpointOverrideReason) => void,
+): string | null {
+	const endpointOverride = environment.R2_ENDPOINT?.trim();
+	if (!endpointOverride) return null;
+	if (environment.NODE_ENV !== "test") {
+		warnIgnoredEndpoint("non-test-environment");
+		return null;
+	}
+
+	let endpointUrl: URL;
+	try {
+		endpointUrl = new URL(endpointOverride);
+	} catch {
+		warnIgnoredEndpoint("invalid-url");
+		return null;
+	}
+	if (!LOOPBACK_R2_ENDPOINT_HOSTNAMES.has(endpointUrl.hostname)) {
+		warnIgnoredEndpoint("non-loopback-hostname");
+		return null;
+	}
+	return endpointOverride;
+}
+
+function warnIgnoredR2Endpoint(reason: IgnoredR2EndpointOverrideReason): void {
+	logger.warn(
+		"Ignoring R2_ENDPOINT override ({reason}); the pinned Cloudflare EU endpoint remains active",
+		{ reason },
+	);
 }
 
 export function createR2MultipartUploadClient(

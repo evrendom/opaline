@@ -224,9 +224,13 @@ watermark, and smoke-session ID in the incident artifact.
    beyond `max_attempts`; it writes
    `R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE` while that rescue is active. A
    processing failure or a second interruption is therefore terminal and
-   cannot loop. If canonical-write evidence or any prior outcome marker exists,
-   stop for owner review rather than treating the row as the cutover rescue.
-   An expired lease alone is not evidence of an active writer.
+   cannot loop. The application refuses this rescue while
+   `SESSION_INGEST_QUIESCED=true`, including operator-token commits: preserve the
+   job and its objects throughout the barrier, and let repair rescue it only
+   after section 7 lifts quiescence. If canonical-write evidence or any prior
+   outcome marker exists, stop for owner review rather than treating the row as
+   the cutover rescue. An expired lease alone is not evidence of an active
+   writer.
 
 6. Classify **every** processing-ledger row by the exact advisory-lock identity
    used by the application. Run this on a dedicated PostgreSQL connection and
