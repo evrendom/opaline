@@ -409,6 +409,13 @@ Do not run `OPTIMIZE FINAL`. If execution fails after a rename, do not rerun
 blindly. Keep ingest quiesced, inspect the migration journal and exact table
 names, and choose forward completion or rollback.
 
+Before its first propagation wait, the DDL clones all four source tables to
+`*_f16_backfill_source_20260826` with plain `MergeTree` engines. These are the
+stable, non-replacing inputs used to content-order equal historical versions.
+The completed backfill drops them; after a failure, preserve and inventory them
+alongside the canonical and `*_f16_backup_20260826` tables. Do not delete them
+while forward completion remains an option.
+
 The backfill uses the fixed staging table
 `rudel.session_analytics_f16_rebuilt_identities_20260826`. A failed statement
 can leave it behind. In the failure-handling session, first record its exact

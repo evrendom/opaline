@@ -48,9 +48,20 @@ describe("F16 revision ordering schema", () => {
 			"CREATE TABLE IF NOT EXISTS rudel.session_analytics",
 		);
 		const firstView = ddlMigration.indexOf("CREATE MATERIALIZED VIEW");
+		const firstWait = ddlMigration.indexOf("SELECT sleepEachRow(1)");
 
 		expect(lastTable).toBeGreaterThan(-1);
 		expect(firstView).toBeGreaterThan(lastTable);
+		for (const table of [
+			"claude_sessions",
+			"codex_sessions",
+			"session_analytics",
+			"session_language_signals",
+		]) {
+			const clone = `CREATE TABLE rudel.${table}_f16_backfill_source_20260826\nCLONE AS rudel.${table}\nENGINE = MergeTree;`;
+			expect(ddlMigration).toContain(clone);
+			expect(ddlMigration.indexOf(clone)).toBeLessThan(firstWait);
+		}
 		// ClickHouse caps a single sleep() call at three seconds (TOO_SLOW), so
 		// each propagation boundary sleeps one second per row across eight rows.
 		// The three-second sleep cap applies per block, so each boundary sleeps
@@ -102,12 +113,39 @@ describe("F16 revision ordering schema", () => {
 		expect(backfillMigration).not.toContain(
 			"FROM rudel.claude_sessions_f16_backup_20260826\n\tGROUP BY `source`",
 		);
-		// Historical ties order by the bare full-column tuple: hashing the tuple
-		// first proved nondeterministic across insertion orders in CI.
+		// Historical ties rank filter output first, then every remaining stored
+		// value. Hashing the tuple first proved nondeterministic in CI.
 		expect(backfillMigration).not.toContain("SHA256");
-		expect(backfillMigration.match(/ORDER BY\n\t\t\t\ttuple\(/gu)).toHaveLength(
-			2,
+		expect(
+			backfillMigration.match(
+				/ORDER BY\n\t+`filter_version` ASC,\n\t+tuple\(/gu,
+			),
+		).toHaveLength(3);
+		expect(backfillMigration).toContain(
+			"`content`,\n\t\t\t\t\t`ingested_at`,\n\t\t\t\t\t`user_id`,\n\t\t\t\t\t`git_branch`,\n\t\t\t\t\t`git_sha`,\n\t\t\t\t\t`tag`",
 		);
+		expect(backfillMigration).toContain(
+			"FROM rudel.claude_sessions_f16_backfill_source_20260826",
+		);
+		expect(backfillMigration).toContain(
+			"FROM rudel.codex_sessions_f16_backfill_source_20260826",
+		);
+		expect(backfillMigration).toContain(
+			"FROM rudel.session_analytics_f16_backfill_source_20260826",
+		);
+		expect(backfillMigration).toContain(
+			"FROM rudel.session_language_signals_f16_backfill_source_20260826",
+		);
+		expect(backfillMigration).not.toContain("_f16_backup_20260826");
+		expect(backfillMigration).toContain(
+			"ORDER BY tuple(\n\t\t\t\t`user_id`,\n\t\t\t\t`raw_ingested_at`,\n\t\t\t\t`member_swears`,\n\t\t\t\t`member_apologies`,\n\t\t\t\t`member_positive`,\n\t\t\t\t`model_swears`,\n\t\t\t\t`model_apologies`,\n\t\t\t\t`model_positive`\n\t\t\t) DESC",
+		);
+		expect(backfillMigration).toContain("WHERE signals.`dedupe_rank` = 1");
+		expect(
+			backfillMigration.match(
+				/DROP TABLE rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/gu,
+			),
+		).toHaveLength(4);
 		expect(backfillMigration).toContain("`revision`,\n\t`ingested_at`");
 		expect(backfillMigration).toContain(
 			"bitShiftLeft(toUInt64(toUnixTimestamp64Milli(`ingested_at`)), 16)",

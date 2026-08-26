@@ -658,6 +658,15 @@ describe("F16 destructive migration execution rehearsal", () => {
 
 		expect(first.winners).toHaveLength(2);
 		expect(first.winners).toEqual(second.winners);
+		expect(
+			first.winners.map(({ filter_version, tag }) => ({
+				filter_version,
+				tag,
+			})),
+		).toEqual([
+			{ filter_version: 5, tag: "tag-b" },
+			{ filter_version: 5, tag: "tag-b" },
+		]);
 		expect(first.analyticsCoverage).toBe(1);
 		expect(second.analyticsCoverage).toBe(1);
 		expect(first.invalidSuffixes).toBe(0);

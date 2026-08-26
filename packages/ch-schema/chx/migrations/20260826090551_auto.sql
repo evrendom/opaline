@@ -6,6 +6,26 @@
 -- rename-suggestion-count: 0
 -- risk-summary: safe=4, caution=7, danger=3
 
+-- Snapshot every active source part before any propagation wait. The old
+-- ReplacingMergeTree version columns can tie and then fall back to insertion
+-- order during a background merge. Plain MergeTree clones preserve every row
+-- until the backfill can apply a total, content-derived ordering.
+CREATE TABLE rudel.claude_sessions_f16_backfill_source_20260826
+CLONE AS rudel.claude_sessions
+ENGINE = MergeTree;
+
+CREATE TABLE rudel.codex_sessions_f16_backfill_source_20260826
+CLONE AS rudel.codex_sessions
+ENGINE = MergeTree;
+
+CREATE TABLE rudel.session_analytics_f16_backfill_source_20260826
+CLONE AS rudel.session_analytics
+ENGINE = MergeTree;
+
+CREATE TABLE rudel.session_language_signals_f16_backfill_source_20260826
+CLONE AS rudel.session_language_signals
+ENGINE = MergeTree;
+
 -- operation: drop_materialized_view key=materialized_view:rudel.codex_session_analytics_mv risk=caution
 DROP TABLE IF EXISTS rudel.codex_session_analytics_mv SYNC;
 
