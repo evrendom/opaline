@@ -51,6 +51,30 @@ PG_CONNECTION_STRING="postgres://user:pass@host/rudel?sslmode=require" \
 
 This creates the auth tables (users, sessions, accounts, verification tokens) used by `better-auth`.
 
+### Ingest rate-limiter deployment contract
+
+Postgres migration `0028_postgres_ingest_rate_limit.sql` must be applied before
+deploying API code that uses the Postgres-backed ingest limiter. The Fly CI
+workflow already runs Postgres migrations before `flyctl deploy`; manual,
+Vercel, and other self-hosted deployment processes must preserve that order.
+
+The limiter fails closed. If Postgres is unavailable, ingest returns HTTP 503
+with the `SERVICE_UNAVAILABLE` code and does not continue to downstream
+storage. The current CLI treats 503 as retryable and makes at most three total
+attempts, waiting 1 second and then 2 seconds between attempts.
+
+Request and byte budgets are per authenticated user and are shared by all API
+keys owned by that user. Rejection caches are local to each API instance, so
+their database-shedding effectiveness and cached 429 responses are likewise
+per instance rather than globally shared. Cache deadlines are bounded by the
+configured window duration. If the Postgres wall clock is corrected forward
+after a deadline is cached, an instance can continue returning that cached 429
+until its monotonic deadline passes even though a fresh database statement
+would already roll the window. When changing rate-limit window or cap
+configuration, restart or drain all API instances together: an instance running
+old configuration can serve cached rejections computed under the old windows
+until its cached deadlines pass.
+
 ## 3. Deploy to Fly.io
 
 1. Install the Fly CLI: `curl -L https://fly.io/install.sh | sh`

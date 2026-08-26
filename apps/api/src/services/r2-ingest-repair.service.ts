@@ -41,6 +41,7 @@ export async function runR2IngestRepairPass(
 					processIngestSession({
 						awaitLanguageSignals: true,
 						context: {
+							apiKeyId: null,
 							session: null,
 							user: { id: identity.userId },
 						},
