@@ -100,7 +100,7 @@ describe("ingestRudelClaudeSessions", () => {
 
 		const results = await waitForQuery<{ content: string; revision: string }>(
 			executor,
-			`SELECT argMax(content, revision) AS content, toString(max(revision)) AS revision FROM rudel.claude_sessions WHERE session_id = '${revisionTestId}' GROUP BY session_id HAVING count() = 2`,
+			`SELECT argMax(content, raw.revision) AS content, toString(max(raw.revision)) AS revision FROM rudel.claude_sessions AS raw WHERE session_id = '${revisionTestId}' GROUP BY session_id HAVING count() = 2`,
 		);
 
 		expect(results).toEqual([

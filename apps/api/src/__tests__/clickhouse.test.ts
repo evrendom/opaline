@@ -198,8 +198,8 @@ describe("clickhouse helpers", () => {
 				/session_date = parseDateTime64BestEffort\(\{sessionDate:String\}, 3, 'UTC'\)/g,
 			),
 		).toHaveLength(2);
-		expect(sql).toContain("argMax(content, revision)");
-		expect(sql).toContain("toString(max(revision)) AS revision");
+		expect(sql).toContain("argMax(content, raw.revision)");
+		expect(sql).toContain("toString(max(raw.revision)) AS revision");
 		expect(sql).toContain(
 			"GROUP BY source, organization_id, user_id, session_id",
 		);

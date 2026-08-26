@@ -544,9 +544,9 @@ async function runRehearsal(
 	const winners = await executor.query<WinnerRow>(`
 		SELECT
 			session_id,
-			argMax(filter_version, revision) AS filter_version,
-			argMax(tag, revision) AS tag,
-			toString(max(revision)) AS revision
+			argMax(filter_version, raw.revision) AS filter_version,
+			argMax(tag, raw.revision) AS tag,
+			toString(max(raw.revision)) AS revision
 		FROM (
 			SELECT session_id, filter_version, tag, revision
 			FROM ${database}.claude_sessions
@@ -555,7 +555,7 @@ async function runRehearsal(
 			SELECT session_id, filter_version, tag, revision
 			FROM ${database}.codex_sessions
 			WHERE session_id = '${CODEX_TIE_SESSION_ID}'
-		)
+		) AS raw
 		GROUP BY session_id
 		ORDER BY session_id
 	`);

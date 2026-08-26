@@ -749,9 +749,9 @@ async function readLatestRawSession(
 	}>({
 		query: `
 			SELECT
-				argMax(content, revision) AS content,
-				toString(max(revision)) AS revision
-			FROM rudel.claude_sessions
+				argMax(content, raw.revision) AS content,
+				toString(max(raw.revision)) AS revision
+			FROM rudel.claude_sessions AS raw
 			WHERE organization_id = {organizationId:String}
 				AND user_id = {userId:String}
 				AND session_id = {sessionId:String}

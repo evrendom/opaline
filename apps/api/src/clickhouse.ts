@@ -152,10 +152,10 @@ export function buildLatestRawSessionContentSql(
     organization_id,
     user_id,
     session_id,
-    argMax(content, revision) AS content,
-    argMax(subagents, revision) AS subagents,
-    formatDateTime(argMax(ingested_at, revision), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ingested_at,
-    toString(max(revision)) AS revision
+    argMax(content, raw.revision) AS content,
+    argMax(subagents, raw.revision) AS subagents,
+    formatDateTime(argMax(ingested_at, raw.revision), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ingested_at,
+    toString(max(raw.revision)) AS revision
   FROM (
     SELECT
       'claude_code' AS source,
@@ -182,7 +182,7 @@ export function buildLatestRawSessionContentSql(
       ingested_at
     FROM rudel.codex_sessions
     WHERE ${codexWhere}
-  )
+  ) AS raw
   GROUP BY source, organization_id, user_id, session_id
 `;
 }
