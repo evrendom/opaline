@@ -24,6 +24,9 @@ const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const DATABASE_PREFIX = `rudel_f16_rehearsal_${RUN_ID}`;
 const INGESTED_AT = "2026-08-20T10:00:00.123";
 const SESSION_DATE = "2026-08-20T09:00:00.000";
+// session_date is part of the old RMT key, so durable historical revisions
+// need distinct content-derived dates to coexist before the migration starts.
+const NEWER_TIE_SESSION_DATE = "2026-08-20T09:00:00.001";
 const FILTERED_SESSION_ID = `filtered_${RUN_ID}`;
 const CLAUDE_TIE_SESSION_ID = `claude_tie_${RUN_ID}`;
 const CODEX_TIE_SESSION_ID = `codex_tie_${RUN_ID}`;
@@ -42,12 +45,21 @@ interface WinnerRow {
 	tag: string | null;
 }
 
+interface TieRow {
+	filter_version: number;
+	session_date_ms: string;
+	source: string;
+	tag: string | null;
+}
+
 interface RehearsalResult {
 	analyticsCoverage: number;
 	invalidSuffixes: number;
 	minimumRevision: string;
 	signalEngine: string;
 	signalRawRevision: string;
+	snapshotTies: TieRow[];
+	sourceTies: TieRow[];
 	winners: WinnerRow[];
 }
 
@@ -404,6 +416,7 @@ function rawRow(
 	content: string,
 	filterVersion: number,
 	tag: string,
+	sessionDate = SESSION_DATE,
 ) {
 	return {
 		content,
@@ -417,7 +430,7 @@ function rawRow(
 		package_name: "rehearsal",
 		package_type: "package.json",
 		project_path: "/tmp/rehearsal",
-		session_date: SESSION_DATE,
+		session_date: sessionDate,
 		session_id: sessionId,
 		tag,
 		user_id: "user-f16",
@@ -475,13 +488,25 @@ async function seedFixtures(database: string, reverse: boolean): Promise<void> {
 			subagents: {},
 		},
 		{
-			...rawRow(CLAUDE_TIE_SESSION_ID, claudeContent(), 5, "tag-b"),
+			...rawRow(
+				CLAUDE_TIE_SESSION_ID,
+				claudeContent(),
+				5,
+				"tag-b",
+				NEWER_TIE_SESSION_DATE,
+			),
 			subagents: {},
 		},
 	];
 	const codexTies = [
 		rawRow(CODEX_TIE_SESSION_ID, CODEX_CONTENT, 4, "tag-a"),
-		rawRow(CODEX_TIE_SESSION_ID, CODEX_CONTENT, 5, "tag-b"),
+		rawRow(
+			CODEX_TIE_SESSION_ID,
+			CODEX_CONTENT,
+			5,
+			"tag-b",
+			NEWER_TIE_SESSION_DATE,
+		),
 	];
 	await executor.insert({
 		table: `${database}.claude_sessions`,
@@ -532,13 +557,47 @@ async function seedFixtures(database: string, reverse: boolean): Promise<void> {
 	});
 }
 
+async function readTieRows(
+	database: string,
+	fromSnapshot: boolean,
+): Promise<TieRow[]> {
+	const suffix = fromSnapshot ? "_f16_backfill_source_20260826" : "";
+	return executor.query<TieRow>(`
+		SELECT
+			source,
+			filter_version,
+			tag,
+			toString(toUnixTimestamp64Milli(session_date)) AS session_date_ms
+		FROM (
+			SELECT
+				'claude' AS source,
+				filter_version,
+				tag,
+				session_date
+			FROM ${database}.claude_sessions${suffix}
+			WHERE session_id = '${CLAUDE_TIE_SESSION_ID}'
+			UNION ALL
+			SELECT
+				'codex' AS source,
+				filter_version,
+				tag,
+				session_date
+			FROM ${database}.codex_sessions${suffix}
+			WHERE session_id = '${CODEX_TIE_SESSION_ID}'
+		)
+		ORDER BY source, filter_version
+	`);
+}
+
 async function runRehearsal(
 	database: string,
 	reverse: boolean,
 ): Promise<RehearsalResult> {
 	await createPreF16Tables(database);
 	await seedFixtures(database, reverse);
+	const sourceTies = await readTieRows(database, false);
 	await executeMigration(DDL_MIGRATION, database);
+	const snapshotTies = await readTieRows(database, true);
 	await executeMigration(BACKFILL_MIGRATION, database);
 
 	const winners = await executor.query<WinnerRow>(`
@@ -610,6 +669,8 @@ async function runRehearsal(
 		minimumRevision: minimum?.revision ?? "0",
 		signalEngine: signal?.engine_full ?? "",
 		signalRawRevision: signal?.raw_revision ?? "missing",
+		snapshotTies,
+		sourceTies,
 		winners,
 	};
 }
@@ -655,7 +716,37 @@ describe("F16 destructive migration execution rehearsal", () => {
 		);
 		const first = await runRehearsal(databaseName("forward"), false);
 		const second = await runRehearsal(databaseName("reverse"), true);
+		const expectedTies: TieRow[] = [
+			{
+				filter_version: 4,
+				session_date_ms: "1787216400000",
+				source: "claude",
+				tag: "tag-a",
+			},
+			{
+				filter_version: 5,
+				session_date_ms: "1787216400001",
+				source: "claude",
+				tag: "tag-b",
+			},
+			{
+				filter_version: 4,
+				session_date_ms: "1787216400000",
+				source: "codex",
+				tag: "tag-a",
+			},
+			{
+				filter_version: 5,
+				session_date_ms: "1787216400001",
+				source: "codex",
+				tag: "tag-b",
+			},
+		];
 
+		expect(first.sourceTies).toEqual(expectedTies);
+		expect(second.sourceTies).toEqual(expectedTies);
+		expect(first.snapshotTies).toEqual(expectedTies);
+		expect(second.snapshotTies).toEqual(expectedTies);
 		expect(first.winners).toHaveLength(2);
 		expect(first.winners).toEqual(second.winners);
 		expect(
