@@ -1,8 +1,9 @@
 import { apiKey } from "@better-auth/api-key";
 import { getLogger } from "@logtape/logtape";
 import { PRODUCT_ANALYTICS_EVENTS } from "@rudel/api-routes";
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import * as schema from "@rudel/sql-schema";
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
 	bearer,
@@ -21,6 +22,8 @@ import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
 const logger = getLogger(["rudel", "api", "auth"]);
+const INVALID_ORGANIZATION_SLUG_MESSAGE =
+	"Organization slug is invalid or reserved";
 
 function inferSignupMethod(
 	accounts: Array<{ providerId?: string | null }>,
@@ -86,13 +89,110 @@ export interface AuthConfig {
 	slackWebhookUrl?: string;
 }
 
-function createOrganizationPlugin(config: AuthConfig) {
+function assertValidOrganizationSlug(slug: string) {
+	if (!validateOrgSlug(slug)) {
+		throw new APIError("BAD_REQUEST", {
+			message: INVALID_ORGANIZATION_SLUG_MESSAGE,
+		});
+	}
+}
+
+export function buildDefaultOrganizationSlug(
+	email: string,
+	userId: string,
+): string {
+	// Default-organization creation writes through the raw adapter, so the
+	// organization plugin hooks never see this slug. Sanitize to the same
+	// DNS-label shape validateOrgSlug enforces and fall back to a random
+	// slug when the email local part cannot be salvaged.
+	const candidate = `${email.split("@")[0] ?? ""}-${userId.slice(0, 8)}`
+		.toLowerCase()
+		.replace(/[^a-z0-9-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (validateOrgSlug(candidate)) {
+		return candidate;
+	}
+	return buildFallbackOrganizationSlug();
+}
+
+function buildFallbackOrganizationSlug(): string {
+	return `workspace-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+export interface DefaultOrganizationData {
+	readonly createdAt: Date;
+	readonly id: string;
+	readonly name: string;
+	readonly slug: string;
+}
+
+function describesSlugUniqueViolation(error: unknown): boolean {
+	let current: unknown = error;
+	for (let depth = 0; depth < 5 && current !== undefined; depth++) {
+		const message =
+			current instanceof Error
+				? current.message
+				: typeof current === "string"
+					? current
+					: "";
+		if (
+			/duplicate key|unique constraint/i.test(message) &&
+			/slug/i.test(message)
+		) {
+			return true;
+		}
+		current = current instanceof Error ? current.cause : undefined;
+	}
+	return false;
+}
+
+export async function createDefaultOrganizationWithRetry<Org>(input: {
+	readonly create: (data: DefaultOrganizationData) => Promise<Org>;
+	readonly email: string;
+	readonly name: string;
+	readonly userId: string;
+}): Promise<Org> {
+	const data = {
+		createdAt: new Date(),
+		id: input.userId,
+		name: input.name,
+		slug: buildDefaultOrganizationSlug(input.email, input.userId),
+	};
+	try {
+		return await input.create(data);
+	} catch (error) {
+		// Distinct users can normalize to the same default slug and hit the
+		// unique constraint; retry once with the random fallback instead of
+		// leaving the signup without a workspace. Only a slug collision is
+		// corrected by changing the slug — every other failure propagates.
+		if (!describesSlugUniqueViolation(error)) {
+			throw error;
+		}
+		return await input.create({
+			...data,
+			slug: buildFallbackOrganizationSlug(),
+		});
+	}
+}
+
+export function createOrganizationPlugin(config: AuthConfig) {
 	const resend = config.resend ?? {};
 
 	return organization({
 		allowUserToCreateOrganization: true,
 		creatorRole: "owner",
 		disableOrganizationDeletion: true,
+		organizationHooks: {
+			async beforeCreateOrganization({ organization: organizationData }) {
+				assertValidOrganizationSlug(organizationData.slug ?? "");
+			},
+			async beforeUpdateOrganization({ organization: organizationData }) {
+				if (organizationData.slug !== undefined) {
+					assertValidOrganizationSlug(organizationData.slug);
+				}
+			},
+		},
 		async sendInvitationEmail(data) {
 			await sendOrganizationInvitationEmail(resend, {
 				frontendURL: config.frontendURL,
@@ -203,16 +303,16 @@ export function createAuth(db: object, config: AuthConfig) {
 									where: [{ field: "userId", value: user.id }],
 								})) as Array<{ providerId: string; accountId: string }>;
 
-								const slug = `${user.email.split("@")[0]}-${user.id.slice(0, 8)}`;
-								const org = await adapter.create({
-									model: "organization",
-									data: {
-										id: user.id,
-										name: `${displayName}'s Workspace`,
-										slug,
-										createdAt: new Date(),
-									},
-									forceAllowId: true,
+								const org = await createDefaultOrganizationWithRetry({
+									create: (data) =>
+										adapter.create({
+											model: "organization",
+											data,
+											forceAllowId: true,
+										}),
+									email: user.email,
+									name: `${displayName}'s Workspace`,
+									userId: user.id,
 								});
 
 								if (org) {
