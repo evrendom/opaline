@@ -116,13 +116,11 @@ describe("WrappedTeamCardOnboarding model step", () => {
 });
 
 async function findEnabledContinueButton() {
-	const continueButton = screen.getByRole("button", { name: "Continue" });
-
 	await waitFor(() => {
-		expect(continueButton).not.toBeDisabled();
+		expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled();
 	});
 
-	return continueButton;
+	return screen.getByRole("button", { name: "Continue" });
 }
 
 function renderWrappedTeamCardOnboarding(

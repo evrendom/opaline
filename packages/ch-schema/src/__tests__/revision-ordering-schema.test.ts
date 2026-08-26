@@ -52,16 +52,76 @@ describe("F16 revision ordering schema", () => {
 
 		expect(lastTable).toBeGreaterThan(-1);
 		expect(firstView).toBeGreaterThan(lastTable);
-		for (const table of [
-			"claude_sessions",
-			"codex_sessions",
-			"session_analytics",
-			"session_language_signals",
+		for (const snapshot of [
+			{
+				keyClauses:
+					"PARTITION BY toYYYYMM(toDate(session_date))\nPRIMARY KEY (`organization_id`, `session_date`, `session_id`)\nORDER BY (`organization_id`, `session_date`, `session_id`)",
+				table: "claude_sessions",
+			},
+			{
+				keyClauses:
+					"PARTITION BY toYYYYMM(toDate(session_date))\nPRIMARY KEY (`organization_id`, `session_date`, `session_id`)\nORDER BY (`organization_id`, `session_date`, `session_id`)",
+				table: "codex_sessions",
+			},
+			{
+				keyClauses:
+					"PRIMARY KEY (`source`, `organization_id`, `user_id`, `session_id`)\nORDER BY (`source`, `organization_id`, `user_id`, `session_id`)",
+				table: "session_analytics",
+			},
+			{
+				keyClauses:
+					"PARTITION BY toYYYYMM(toDate(session_date))\nPRIMARY KEY ()\nORDER BY (`organization_id`, `session_date`, `session_id`, `source`)",
+				table: "session_language_signals",
+			},
 		]) {
-			const clone = `CREATE TABLE rudel.${table}_f16_backfill_source_20260826\nCLONE AS rudel.${table}\nENGINE = MergeTree;`;
-			expect(ddlMigration).toContain(clone);
-			expect(ddlMigration.indexOf(clone)).toBeLessThan(firstWait);
+			const create = `CREATE TABLE rudel.${snapshot.table}_f16_backfill_source_20260826\n(`;
+			const insert = `INSERT INTO rudel.${snapshot.table}_f16_backfill_source_20260826\n(`;
+			const source = `FROM rudel.${snapshot.table};`;
+			const createIndex = ddlMigration.indexOf(create);
+			const insertIndex = ddlMigration.indexOf(insert, createIndex);
+			const sourceEnd =
+				ddlMigration.indexOf(source, insertIndex) + source.length;
+			const snapshotSql = ddlMigration.slice(createIndex, sourceEnd);
+			const createColumnsEnd = ddlMigration.indexOf(
+				"\n) ENGINE = MergeTree",
+				createIndex,
+			);
+			const insertColumnsEnd = ddlMigration.indexOf(
+				"\n)\nSETTINGS async_insert=0",
+				insertIndex,
+			);
+			const selectColumnsStart =
+				ddlMigration.indexOf("\nSELECT\n", insertColumnsEnd) +
+				"\nSELECT\n".length;
+			const selectColumnsEnd = ddlMigration.indexOf(
+				`\n${source}`,
+				selectColumnsStart,
+			);
+			const extractColumns = (sql: string) =>
+				[...sql.matchAll(/`([^`]+)`/gu)].map((match) => match[1]);
+			const createColumns = extractColumns(
+				ddlMigration.slice(createIndex + create.length, createColumnsEnd),
+			);
+			const insertColumns = extractColumns(
+				ddlMigration.slice(insertIndex + insert.length, insertColumnsEnd),
+			);
+			const selectColumns = extractColumns(
+				ddlMigration.slice(selectColumnsStart, selectColumnsEnd),
+			);
+
+			expect(createIndex).toBeGreaterThan(-1);
+			expect(insertIndex).toBeGreaterThan(createIndex);
+			expect(sourceEnd).toBeGreaterThan(insertIndex);
+			expect(sourceEnd).toBeLessThan(firstWait);
+			expect(snapshotSql).toContain(") ENGINE = MergeTree\n");
+			expect(snapshotSql).toContain(snapshot.keyClauses);
+			expect(snapshotSql).toContain("SETTINGS async_insert=0\nSELECT\n");
+			expect(snapshotSql).not.toContain("SELECT *");
+			expect(insertColumns).toEqual(createColumns);
+			expect(selectColumns).toEqual(insertColumns);
 		}
+		expect(ddlMigration).not.toContain("CLONE AS");
+		expect(ddlMigration.match(/SETTINGS async_insert=0/gu)).toHaveLength(4);
 		// ClickHouse caps a single sleep() call at three seconds (TOO_SLOW), so
 		// each propagation boundary sleeps one second per row across eight rows.
 		// The three-second sleep cap applies per block, so each boundary sleeps

@@ -392,8 +392,8 @@ all of these properties:
 - raw and analytics use `ReplacingMergeTree(revision)`;
 - language signals use `ReplacingMergeTree(signal_version)`, where
   `signal_version` orders by raw revision before scan recency/version;
-- every `INSERT ... SELECT` has explicit source/target columns and
-  `SETTINGS async_insert=0`;
+- every preservation and backfill `INSERT ... SELECT` has explicit source/target
+  columns and `SETTINGS async_insert=0`;
 - neither MV AS-clause contains `--` comments;
 - old tables are renamed, never dropped.
 
@@ -409,12 +409,25 @@ Do not run `OPTIMIZE FINAL`. If execution fails after a rename, do not rerun
 blindly. Keep ingest quiesced, inspect the migration journal and exact table
 names, and choose forward completion or rollback.
 
-Before its first propagation wait, the DDL clones all four source tables to
-`*_f16_backfill_source_20260826` with plain `MergeTree` engines. These are the
-stable, non-replacing inputs used to content-order equal historical versions.
-The completed backfill drops them; after a failure, preserve and inventory them
-alongside the canonical and `*_f16_backup_20260826` tables. Do not delete them
-while forward completion remains an option.
+Before its first propagation wait, the DDL creates explicit plain `MergeTree`
+copies of all four source tables at `*_f16_backfill_source_20260826`, then fills
+them with synchronous, explicit-column `INSERT ... SELECT` statements. ClickHouse
+Cloud transparently maps those MergeTree declarations to SharedMergeTree. These
+are the stable, non-replacing inputs used to content-order equal historical
+versions. The completed backfill drops them; after a failure, preserve and
+inventory them alongside the canonical and `*_f16_backup_20260826` tables. Do
+not delete them while forward completion remains an option.
+
+There is one acknowledged preservation residual. Quiescence prevents new
+inserts, but a source `ReplacingMergeTree` background merge that finishes before
+its snapshot SELECT begins can already have collapsed equal-version rows. Do not
+treat `SYSTEM STOP MERGES` as a portable barrier here: the documented command
+targets a server/table unless it is issued `ON CLUSTER`, and the documentation
+does not guarantee a service-wide barrier for separate Cloud HTTP statements
+across SharedMergeTree replicas. The backfill's full content ordering remains
+deterministic for every row that survives into the non-replacing copy. Record
+pre-cutover physical row counts and each copy's physical row count in the
+incident artifact; any decrease requires owner review before continuing.
 
 The backfill uses the fixed staging table
 `rudel.session_analytics_f16_rebuilt_identities_20260826`. A failed statement

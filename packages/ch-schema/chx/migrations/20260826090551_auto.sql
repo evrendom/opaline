@@ -6,25 +6,322 @@
 -- rename-suggestion-count: 0
 -- risk-summary: safe=4, caution=7, danger=3
 
--- Snapshot every active source part before any propagation wait. The old
+-- Snapshot every source row visible before any propagation wait. The old
 -- ReplacingMergeTree version columns can tie and then fall back to insertion
--- order during a background merge. Plain MergeTree clones preserve every row
--- until the backfill can apply a total, content-derived ordering.
+-- order during a background merge. Plain MergeTree copies preserve every row
+-- selected until the backfill can apply a total, content-derived ordering.
+-- Keep the deployed source keys but omit TTL so the preservation copies cannot
+-- age out during the owner-operated cutover.
 CREATE TABLE rudel.claude_sessions_f16_backfill_source_20260826
-CLONE AS rudel.claude_sessions
-ENGINE = MergeTree;
+(
+  `session_date` DateTime64(3, 'UTC'),
+  `last_interaction_date` DateTime64(3, 'UTC'),
+  `session_id` String,
+  `organization_id` String,
+  `project_path` String,
+  `git_remote` String,
+  `package_name` String,
+  `package_type` String,
+  `content` String,
+  `ingested_at` DateTime64(3, 'UTC'),
+  `user_id` String,
+  `git_branch` Nullable(String),
+  `git_sha` Nullable(String),
+  `tag` Nullable(String),
+  `subagents` Map(String, String),
+  `filter_version` UInt8
+) ENGINE = MergeTree
+PARTITION BY toYYYYMM(toDate(session_date))
+PRIMARY KEY (`organization_id`, `session_date`, `session_id`)
+ORDER BY (`organization_id`, `session_date`, `session_id`)
+SETTINGS index_granularity = 8192;
+
+INSERT INTO rudel.claude_sessions_f16_backfill_source_20260826
+(
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `content`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `subagents`,
+  `filter_version`
+)
+SETTINGS async_insert=0
+SELECT
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `content`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `subagents`,
+  `filter_version`
+FROM rudel.claude_sessions;
 
 CREATE TABLE rudel.codex_sessions_f16_backfill_source_20260826
-CLONE AS rudel.codex_sessions
-ENGINE = MergeTree;
+(
+  `session_date` DateTime64(3, 'UTC'),
+  `last_interaction_date` DateTime64(3, 'UTC'),
+  `session_id` String,
+  `organization_id` String,
+  `project_path` String,
+  `git_remote` String,
+  `package_name` String,
+  `package_type` String,
+  `content` String,
+  `ingested_at` DateTime64(3, 'UTC'),
+  `user_id` String,
+  `git_branch` Nullable(String),
+  `git_sha` Nullable(String),
+  `tag` Nullable(String),
+  `filter_version` UInt8
+) ENGINE = MergeTree
+PARTITION BY toYYYYMM(toDate(session_date))
+PRIMARY KEY (`organization_id`, `session_date`, `session_id`)
+ORDER BY (`organization_id`, `session_date`, `session_id`)
+SETTINGS index_granularity = 8192;
+
+INSERT INTO rudel.codex_sessions_f16_backfill_source_20260826
+(
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `content`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `filter_version`
+)
+SETTINGS async_insert=0
+SELECT
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `content`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `filter_version`
+FROM rudel.codex_sessions;
 
 CREATE TABLE rudel.session_analytics_f16_backfill_source_20260826
-CLONE AS rudel.session_analytics
-ENGINE = MergeTree;
+(
+  `session_date` DateTime64(3, 'UTC'),
+  `last_interaction_date` DateTime64(3, 'UTC'),
+  `session_id` String,
+  `organization_id` String,
+  `project_path` String,
+  `git_remote` String,
+  `package_name` String,
+  `package_type` String,
+  `filter_version` UInt8,
+  `ingested_at` DateTime64(3, 'UTC'),
+  `user_id` String,
+  `git_branch` Nullable(String),
+  `git_sha` Nullable(String),
+  `tag` Nullable(String),
+  `source` LowCardinality(String),
+  `skills` Array(String),
+  `slash_commands` Array(String),
+  `subagent_types` Array(String),
+  `input_tokens` UInt64,
+  `output_tokens` UInt64,
+  `cache_read_input_tokens` UInt64,
+  `cache_creation_input_tokens` UInt64,
+  `total_tokens` UInt64,
+  `total_interactions` UInt32,
+  `actual_duration_min` UInt32,
+  `avg_period_sec` Float64,
+  `median_period_sec` Float64,
+  `quick_responses` UInt32,
+  `normal_responses` UInt32,
+  `long_pauses` UInt32,
+  `error_count` UInt32,
+  `error_pattern` LowCardinality(String),
+  `model_used` String,
+  `has_commit` UInt8,
+  `session_archetype` String,
+  `success_score` UInt8,
+  `used_plan_mode` UInt8,
+  `inference_duration_sec` UInt32,
+  `human_duration_sec` UInt32
+) ENGINE = MergeTree
+PRIMARY KEY (`source`, `organization_id`, `user_id`, `session_id`)
+ORDER BY (`source`, `organization_id`, `user_id`, `session_id`)
+SETTINGS index_granularity = 8192;
+
+INSERT INTO rudel.session_analytics_f16_backfill_source_20260826
+(
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `filter_version`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `source`,
+  `skills`,
+  `slash_commands`,
+  `subagent_types`,
+  `input_tokens`,
+  `output_tokens`,
+  `cache_read_input_tokens`,
+  `cache_creation_input_tokens`,
+  `total_tokens`,
+  `total_interactions`,
+  `actual_duration_min`,
+  `avg_period_sec`,
+  `median_period_sec`,
+  `quick_responses`,
+  `normal_responses`,
+  `long_pauses`,
+  `error_count`,
+  `error_pattern`,
+  `model_used`,
+  `has_commit`,
+  `session_archetype`,
+  `success_score`,
+  `used_plan_mode`,
+  `inference_duration_sec`,
+  `human_duration_sec`
+)
+SETTINGS async_insert=0
+SELECT
+  `session_date`,
+  `last_interaction_date`,
+  `session_id`,
+  `organization_id`,
+  `project_path`,
+  `git_remote`,
+  `package_name`,
+  `package_type`,
+  `filter_version`,
+  `ingested_at`,
+  `user_id`,
+  `git_branch`,
+  `git_sha`,
+  `tag`,
+  `source`,
+  `skills`,
+  `slash_commands`,
+  `subagent_types`,
+  `input_tokens`,
+  `output_tokens`,
+  `cache_read_input_tokens`,
+  `cache_creation_input_tokens`,
+  `total_tokens`,
+  `total_interactions`,
+  `actual_duration_min`,
+  `avg_period_sec`,
+  `median_period_sec`,
+  `quick_responses`,
+  `normal_responses`,
+  `long_pauses`,
+  `error_count`,
+  `error_pattern`,
+  `model_used`,
+  `has_commit`,
+  `session_archetype`,
+  `success_score`,
+  `used_plan_mode`,
+  `inference_duration_sec`,
+  `human_duration_sec`
+FROM rudel.session_analytics;
 
 CREATE TABLE rudel.session_language_signals_f16_backfill_source_20260826
-CLONE AS rudel.session_language_signals
-ENGINE = MergeTree;
+(
+  `organization_id` String,
+  `session_date` DateTime64(3, 'UTC'),
+  `session_id` String,
+  `user_id` String,
+  `source` LowCardinality(String),
+  `raw_ingested_at` DateTime64(3, 'UTC'),
+  `scan_version` UInt16,
+  `member_swears` UInt32,
+  `member_apologies` UInt32,
+  `member_positive` UInt32,
+  `model_swears` UInt32,
+  `model_apologies` UInt32,
+  `model_positive` UInt32,
+  `scanned_at` DateTime64(3, 'UTC')
+) ENGINE = MergeTree
+PARTITION BY toYYYYMM(toDate(session_date))
+PRIMARY KEY ()
+ORDER BY (`organization_id`, `session_date`, `session_id`, `source`)
+SETTINGS index_granularity = 8192;
+
+INSERT INTO rudel.session_language_signals_f16_backfill_source_20260826
+(
+  `organization_id`,
+  `session_date`,
+  `session_id`,
+  `user_id`,
+  `source`,
+  `raw_ingested_at`,
+  `scan_version`,
+  `member_swears`,
+  `member_apologies`,
+  `member_positive`,
+  `model_swears`,
+  `model_apologies`,
+  `model_positive`,
+  `scanned_at`
+)
+SETTINGS async_insert=0
+SELECT
+  `organization_id`,
+  `session_date`,
+  `session_id`,
+  `user_id`,
+  `source`,
+  `raw_ingested_at`,
+  `scan_version`,
+  `member_swears`,
+  `member_apologies`,
+  `member_positive`,
+  `model_swears`,
+  `model_apologies`,
+  `model_positive`,
+  `scanned_at`
+FROM rudel.session_language_signals;
 
 -- operation: drop_materialized_view key=materialized_view:rudel.codex_session_analytics_mv risk=caution
 DROP TABLE IF EXISTS rudel.codex_session_analytics_mv SYNC;
