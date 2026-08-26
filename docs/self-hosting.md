@@ -51,6 +51,18 @@ PG_CONNECTION_STRING="postgres://user:pass@host/rudel?sslmode=require" \
 
 This creates the auth tables (users, sessions, accounts, verification tokens) used by `better-auth`.
 
+### Ingest rate-limiter deployment contract
+
+Postgres migration `0028_postgres_ingest_rate_limit.sql` must be applied before
+deploying API code that uses the Postgres-backed ingest limiter. The Fly CI
+workflow already runs Postgres migrations before `flyctl deploy`; manual,
+Vercel, and other self-hosted deployment processes must preserve that order.
+
+The limiter fails closed. If Postgres is unavailable, ingest returns HTTP 503
+with the `SERVICE_UNAVAILABLE` code and does not continue to downstream
+storage. The current CLI treats 503 as retryable and makes at most three total
+attempts, waiting 1 second and then 2 seconds between attempts.
+
 ## 3. Deploy to Fly.io
 
 1. Install the Fly CLI: `curl -L https://fly.io/install.sh | sh`

@@ -49,7 +49,10 @@ import {
 	isUnexpectedIngestShrink,
 	resolvePreviousIngestContentShape,
 } from "./lib/ingest-content-shape.js";
-import { enforceIngestAggregateSize } from "./lib/ingest-size.js";
+import {
+	enforceMeasuredIngestAggregateSize,
+	measureIngestAggregateSize,
+} from "./lib/ingest-size.js";
 import {
 	bucketContentSize,
 	captureApiProductAnalyticsEvent,
@@ -99,6 +102,7 @@ import {
 	checkIngestRateLimit,
 	createPostgresIngestRateLimitEnvironment,
 	INGEST_RATE_LIMIT_CONFIG,
+	type IngestRateLimitEnvironment,
 	resolveIngestRateLimitSubject,
 } from "./services/ingest-rate-limit.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
@@ -160,8 +164,19 @@ import {
 } from "./services/usage-extraction.service.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
-const ingestRateLimitEnvironment =
+let ingestRateLimitEnvironment =
 	createPostgresIngestRateLimitEnvironment(sqlClient);
+
+export function setIngestRateLimitEnvironmentForTests(
+	environment: IngestRateLimitEnvironment,
+): void {
+	if (process.env.NODE_ENV !== "test") {
+		throw new Error(
+			"The ingest rate-limit environment can only change in tests",
+		);
+	}
+	ingestRateLimitEnvironment = environment;
+}
 
 function getSessionUploadCompletedPayload(
 	input: IngestSessionInput,
@@ -420,6 +435,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 }
 
 export async function processIngestSession({
+	aggregateContentMaxBytes = INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
@@ -429,6 +445,7 @@ export async function processIngestSession({
 	input,
 	signal,
 }: {
+	aggregateContentMaxBytes?: number;
 	awaitLanguageSignals: boolean;
 	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
@@ -449,18 +466,16 @@ export async function processIngestSession({
 				"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
 		});
 	}
-	const aggregateBytes = enforceIngestAggregateSize(
-		input,
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-	);
+	const aggregateBytes = measureIngestAggregateSize(input);
 	if (enforceRateLimits) {
 		await checkIngestRateLimit(
 			resolveIngestRateLimitSubject(context.apiKeyId, context.user.id),
-			aggregateBytes,
+			aggregateBytes > aggregateContentMaxBytes ? 0 : aggregateBytes,
 			INGEST_RATE_LIMIT_CONFIG,
 			ingestRateLimitEnvironment,
 		);
 	}
+	enforceMeasuredIngestAggregateSize(aggregateBytes, aggregateContentMaxBytes);
 	const filteredText = await filterSessionTextFieldsOffThread({
 		bytes: aggregateBytes,
 		fields: {

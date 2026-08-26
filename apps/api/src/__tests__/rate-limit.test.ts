@@ -123,6 +123,16 @@ describe("readPositiveSafeIntegerEnv", () => {
 		expect(readPositiveSafeIntegerEnv("TEST_LIMIT", 42)).toBe(123);
 	});
 
+	test("enforces a caller-specified minimum", () => {
+		process.env.TEST_LIMIT = "59";
+		expect(() => readPositiveSafeIntegerEnv("TEST_LIMIT", 60, 60)).toThrow(
+			"TEST_LIMIT must be a safe integer greater than or equal to 60",
+		);
+
+		process.env.TEST_LIMIT = "60";
+		expect(readPositiveSafeIntegerEnv("TEST_LIMIT", 60, 60)).toBe(60);
+	});
+
 	test("fails closed for invalid values", () => {
 		for (const invalidValue of [
 			"",

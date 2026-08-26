@@ -8,13 +8,25 @@ export function enforceIngestAggregateSize(
 	input: IngestSessionInput,
 	maxBytes: number,
 ): number {
-	const actualBytes =
+	const actualBytes = measureIngestAggregateSize(input);
+	enforceMeasuredIngestAggregateSize(actualBytes, maxBytes);
+	return actualBytes;
+}
+
+export function measureIngestAggregateSize(input: IngestSessionInput): number {
+	return (
 		Buffer.byteLength(input.content, "utf8") +
 		(input.subagents ?? []).reduce(
 			(total, subagent) => total + Buffer.byteLength(subagent.content, "utf8"),
 			0,
-		);
+		)
+	);
+}
 
+export function enforceMeasuredIngestAggregateSize(
+	actualBytes: number,
+	maxBytes: number,
+): void {
 	if (actualBytes > maxBytes) {
 		throw new ORPCError("PAYLOAD_TOO_LARGE", {
 			data: {
@@ -24,6 +36,4 @@ export function enforceIngestAggregateSize(
 			},
 		});
 	}
-
-	return actualBytes;
 }

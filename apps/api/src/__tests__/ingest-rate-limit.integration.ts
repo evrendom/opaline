@@ -13,9 +13,14 @@ import {
 } from "@rudel/api-routes";
 import postgres from "postgres";
 import {
+	createBackgroundIngestErrorFactories,
+	processIngestSession,
+} from "../router.js";
+import {
 	checkIngestRateLimit,
 	createPostgresIngestRateLimitEnvironment,
 	type IngestRateLimitConfig,
+	type IngestRateLimitEnvironment,
 } from "../services/ingest-rate-limit.service.js";
 import {
 	type ApiTestServer,
@@ -59,6 +64,10 @@ afterAll(async () => {
 		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
 			OR id = ${apiKey?.id ?? ""}
 	`;
+	await firstDatabase`
+		DELETE FROM "user"
+		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
+	`;
 	await Promise.all([
 		server?.stop(),
 		firstDatabase.end(),
@@ -67,43 +76,26 @@ afterAll(async () => {
 });
 
 describe("atomic Postgres ingest rate limiting", () => {
-	test("enforces one API-key cap across two service instances", async () => {
-		const apiKeyId = await createCounterApiKey("two-instances");
-		const config = { ...DEFAULT_TEST_CONFIG, requestsMax: 1 };
+	test("serializes simultaneous first inserts from separate clients", async () => {
+		const apiKeyId = await createCounterApiKey("concurrent-first-insert");
+		const subject = { id: apiKeyId, kind: "api_key" } as const;
 
-		await checkIngestRateLimit(
-			{ id: apiKeyId, kind: "api_key" },
-			10,
-			config,
-			firstInstance,
-		);
-		await expect(
-			checkIngestRateLimit(
-				{ id: apiKeyId, kind: "api_key" },
-				10,
-				config,
-				secondInstance,
-			),
-		).rejects.toMatchObject({
-			code: "TOO_MANY_REQUESTS",
-			data: { reason: INGEST_LIMIT_REASONS.requestLimit },
+		await Promise.all([
+			checkIngestRateLimit(subject, 4, DEFAULT_TEST_CONFIG, firstInstance),
+			checkIngestRateLimit(subject, 6, DEFAULT_TEST_CONFIG, secondInstance),
+		]);
+
+		expect(await readCounter(apiKeyId)).toMatchObject({
+			byteCount: 10,
+			requestCount: 2,
 		});
 	});
 
-	test("rolls both fixed windows in SQL", async () => {
-		const apiKeyId = await createCounterApiKey("rollover");
-		const config = {
-			...DEFAULT_TEST_CONFIG,
-			bytesMax: 10,
-			requestsMax: 1,
-		};
+	test("serializes simultaneous rollover of one expired row", async () => {
+		const apiKeyId = await createCounterApiKey("concurrent-rollover");
+		const subject = { id: apiKeyId, kind: "api_key" } as const;
 
-		await checkIngestRateLimit(
-			{ id: apiKeyId, kind: "api_key" },
-			10,
-			config,
-			firstInstance,
-		);
+		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance);
 		await firstDatabase`
 			UPDATE ingest_rate_limit_counter
 			SET
@@ -112,81 +104,290 @@ describe("atomic Postgres ingest rate limiting", () => {
 			WHERE api_key_id = ${apiKeyId}
 		`;
 
-		await expect(
-			checkIngestRateLimit(
-				{ id: apiKeyId, kind: "api_key" },
-				1,
-				config,
-				secondInstance,
-			),
-		).resolves.toBeUndefined();
+		await Promise.all([
+			checkIngestRateLimit(subject, 3, DEFAULT_TEST_CONFIG, firstInstance),
+			checkIngestRateLimit(subject, 4, DEFAULT_TEST_CONFIG, secondInstance),
+		]);
+
 		expect(await readCounter(apiKeyId)).toMatchObject({
-			byteCount: 1,
-			requestCount: 1,
-		});
-	});
-
-	test("enforces the request and byte caps independently", async () => {
-		const requestLimitedKey = await createCounterApiKey("request-independent");
-		const byteLimitedKey = await createCounterApiKey("byte-independent");
-		const requestConfig = { ...DEFAULT_TEST_CONFIG, requestsMax: 1 };
-		const byteConfig = { ...DEFAULT_TEST_CONFIG, bytesMax: 10 };
-
-		await checkIngestRateLimit(
-			{ id: requestLimitedKey, kind: "api_key" },
-			10,
-			requestConfig,
-			firstInstance,
-		);
-		await expect(
-			checkIngestRateLimit(
-				{ id: requestLimitedKey, kind: "api_key" },
-				10,
-				requestConfig,
-				secondInstance,
-			),
-		).rejects.toMatchObject({
-			data: { reason: INGEST_LIMIT_REASONS.requestLimit },
-		});
-		expect(await readCounter(requestLimitedKey)).toMatchObject({
-			byteCount: 10,
-			requestCount: 1,
-		});
-
-		await checkIngestRateLimit(
-			{ id: byteLimitedKey, kind: "api_key" },
-			6,
-			byteConfig,
-			firstInstance,
-		);
-		await expect(
-			checkIngestRateLimit(
-				{ id: byteLimitedKey, kind: "api_key" },
-				5,
-				byteConfig,
-				secondInstance,
-			),
-		).rejects.toMatchObject({
-			data: { reason: INGEST_LIMIT_REASONS.byteLimit },
-		});
-		expect(await readCounter(byteLimitedKey)).toMatchObject({
-			byteCount: 6,
+			byteCount: 7,
 			requestCount: 2,
 		});
 	});
 
-	test("counts a retried ingest request as another attempt", async () => {
-		const apiKeyId = await createCounterApiKey("retry");
-		const config = { ...DEFAULT_TEST_CONFIG, requestsMax: 1 };
+	test("request rejection cannot re-anchor an expired byte window", async () => {
+		const apiKeyId = await createCounterApiKey("mixed-window-regression");
 		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const config: IngestRateLimitConfig = {
+			bytesMax: 100,
+			bytesWindowSeconds: 150,
+			requestsMax: 2,
+			requestsWindowSeconds: 200,
+		};
 
-		await checkIngestRateLimit(subject, 10, config, firstInstance);
+		await checkIngestRateLimit(subject, 100, config, freshEnvironment());
+		await checkIngestRateLimit(subject, 0, config, freshEnvironment());
+		await firstDatabase`
+			UPDATE ingest_rate_limit_counter
+			SET
+				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '151 seconds',
+				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '151 seconds'
+			WHERE api_key_id = ${apiKeyId}
+		`;
+		const beforeRequestRejection = await readCounter(apiKeyId);
+
 		await expect(
-			checkIngestRateLimit(subject, 10, config, firstInstance),
+			checkIngestRateLimit(subject, 100, config, freshEnvironment()),
 		).rejects.toMatchObject({
 			code: "TOO_MANY_REQUESTS",
 			data: { reason: INGEST_LIMIT_REASONS.requestLimit },
 		});
+		const afterRequestRejection = await readCounter(apiKeyId);
+		expect(afterRequestRejection.byteWindowStartedAt.getTime()).toBe(
+			beforeRequestRejection.byteWindowStartedAt.getTime(),
+		);
+		expect(afterRequestRejection).toMatchObject({
+			byteCount: 100,
+			requestCount: 2,
+		});
+
+		await firstDatabase`
+			UPDATE ingest_rate_limit_counter
+			SET
+				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '200 seconds',
+				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '200 seconds'
+			WHERE api_key_id = ${apiKeyId}
+		`;
+		await checkIngestRateLimit(subject, 100, config, freshEnvironment());
+
+		await firstDatabase`
+			UPDATE ingest_rate_limit_counter
+			SET
+				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '101 seconds',
+				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '101 seconds'
+			WHERE api_key_id = ${apiKeyId}
+		`;
+		await expect(
+			checkIngestRateLimit(subject, 100, config, freshEnvironment()),
+		).rejects.toMatchObject({
+			code: "TOO_MANY_REQUESTS",
+			data: {
+				current: 200,
+				limit: 100,
+				reason: INGEST_LIMIT_REASONS.byteLimit,
+				windowSeconds: 150,
+			},
+		});
+		expect(await readCounter(apiKeyId)).toMatchObject({
+			byteCount: 100,
+			requestCount: 2,
+		});
+	});
+
+	test("accepts the exact request and byte caps before rejecting the excess", async () => {
+		const requestKeyId = await createCounterApiKey("exact-request-cap");
+		const requestSubject = { id: requestKeyId, kind: "api_key" } as const;
+		const requestConfig = {
+			...DEFAULT_TEST_CONFIG,
+			requestsMax: 3,
+		};
+		for (let attempt = 0; attempt < requestConfig.requestsMax; attempt += 1) {
+			await checkIngestRateLimit(
+				requestSubject,
+				0,
+				requestConfig,
+				firstInstance,
+			);
+		}
+		await expect(
+			checkIngestRateLimit(requestSubject, 0, requestConfig, firstInstance),
+		).rejects.toMatchObject({
+			data: {
+				current: 4,
+				limit: 3,
+				reason: INGEST_LIMIT_REASONS.requestLimit,
+			},
+		});
+
+		const byteKeyId = await createCounterApiKey("exact-byte-cap");
+		const byteSubject = { id: byteKeyId, kind: "api_key" } as const;
+		const byteConfig = { ...DEFAULT_TEST_CONFIG, bytesMax: 10 };
+		await checkIngestRateLimit(byteSubject, 4, byteConfig, firstInstance);
+		await checkIngestRateLimit(byteSubject, 6, byteConfig, firstInstance);
+		await expect(
+			checkIngestRateLimit(byteSubject, 1, byteConfig, firstInstance),
+		).rejects.toMatchObject({
+			data: {
+				current: 11,
+				limit: 10,
+				reason: INGEST_LIMIT_REASONS.byteLimit,
+			},
+		});
+		expect(await readCounter(byteKeyId)).toMatchObject({
+			byteCount: 10,
+			requestCount: 3,
+		});
+	});
+
+	test("expires both counters at the exact fixed-window boundary", async () => {
+		const apiKeyId = await createCounterApiKey("exact-boundary");
+		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const config: IngestRateLimitConfig = {
+			bytesMax: 10,
+			bytesWindowSeconds: 60,
+			requestsMax: 1,
+			requestsWindowSeconds: 60,
+		};
+		await checkIngestRateLimit(subject, 10, config, freshEnvironment());
+
+		await firstDatabase.begin(async (transaction) => {
+			await transaction.unsafe(
+				`UPDATE ingest_rate_limit_counter
+				SET
+					request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '60 seconds',
+					byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+				WHERE api_key_id = $1`,
+				[apiKeyId],
+			);
+			const transactionEnvironment: IngestRateLimitEnvironment = {
+				execute: (statement, parameters) =>
+					transaction.unsafe(statement, [...parameters]),
+			};
+			await checkIngestRateLimit(subject, 3, config, transactionEnvironment);
+		});
+
+		expect(await readCounter(apiKeyId)).toMatchObject({
+			byteCount: 3,
+			requestCount: 1,
+		});
+	});
+
+	test("deleting an API key cascades its counter row", async () => {
+		const apiKeyId = await createCounterApiKey("cascade");
+		await checkIngestRateLimit(
+			{ id: apiKeyId, kind: "api_key" },
+			1,
+			DEFAULT_TEST_CONFIG,
+			firstInstance,
+		);
+		expect(await countCounters("api_key_id", apiKeyId)).toBe(1);
+
+		await firstDatabase`DELETE FROM apikey WHERE id = ${apiKeyId}`;
+
+		expect(await countCounters("api_key_id", apiKeyId)).toBe(0);
+	});
+
+	test("enforces one unique counter for each legacy user subject", async () => {
+		const userId = await createLegacyCounterUser("legacy-unique");
+		const subject = { id: userId, kind: "legacy_user" } as const;
+		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance);
+		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance);
+		expect(await countCounters("user_id", userId)).toBe(1);
+
+		await expect(firstDatabase`
+			INSERT INTO ingest_rate_limit_counter (
+				limiter_key,
+				user_id,
+				request_window_started_at,
+				request_count,
+				byte_window_started_at,
+				byte_count,
+				last_request_allowed,
+				last_byte_allowed
+			)
+			VALUES (
+				${`legacy_user_duplicate:${userId}`},
+				${userId},
+				CURRENT_TIMESTAMP,
+				0,
+				CURRENT_TIMESTAMP,
+				0,
+				true,
+				true
+			)
+		`).rejects.toThrow();
+	});
+
+	test("charges an oversized direct ingest request without touching byte count", async () => {
+		const apiKeyId = await createCounterApiKey("oversized-request-charge");
+		await checkIngestRateLimit(
+			{ id: apiKeyId, kind: "api_key" },
+			1,
+			DEFAULT_TEST_CONFIG,
+			freshEnvironment(),
+		);
+		const beforeOversizedAttempt = await readCounter(apiKeyId);
+		await expect(
+			processIngestSession({
+				aggregateContentMaxBytes: 1,
+				awaitLanguageSignals: false,
+				context: {
+					apiKeyId,
+					session: null,
+					user: { id: `user-${TEST_KEY_PREFIX}` },
+				},
+				enforceRateLimits: true,
+				errorFactories: createBackgroundIngestErrorFactories(),
+				input: {
+					content: "ab",
+					projectPath: "/test/rate-limit",
+					sessionId: `oversized-${crypto.randomUUID()}`,
+					source: "claude_code",
+				},
+			}),
+		).rejects.toMatchObject({
+			code: "PAYLOAD_TOO_LARGE",
+			data: {
+				actualBytes: 2,
+				maxBytes: 1,
+				reason: INGEST_LIMIT_REASONS.transcriptTooLarge,
+			},
+		});
+		const afterOversizedAttempt = await readCounter(apiKeyId);
+		expect(afterOversizedAttempt).toMatchObject({
+			byteCount: 1,
+			requestCount: 2,
+		});
+		expect(afterOversizedAttempt.byteWindowStartedAt.getTime()).toBe(
+			beforeOversizedAttempt.byteWindowStartedAt.getTime(),
+		);
+	});
+
+	test("short-circuits repeated request rejection without another statement", async () => {
+		const apiKeyId = await createCounterApiKey("negative-cache");
+		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const config = {
+			...DEFAULT_TEST_CONFIG,
+			requestsMax: 1,
+			requestsWindowSeconds: 60,
+		};
+		const statementCounter = { count: 0 };
+		const countingEnvironment: IngestRateLimitEnvironment = {
+			execute(statement, parameters) {
+				statementCounter.count += 1;
+				return firstInstance.execute(statement, parameters);
+			},
+		};
+		const expectedRejection = {
+			code: "TOO_MANY_REQUESTS",
+			data: {
+				current: 2,
+				limit: 1,
+				reason: INGEST_LIMIT_REASONS.requestLimit,
+				windowSeconds: 60,
+			},
+		};
+
+		await checkIngestRateLimit(subject, 0, config, countingEnvironment);
+		await expect(
+			checkIngestRateLimit(subject, 0, config, countingEnvironment),
+		).rejects.toMatchObject(expectedRejection);
+		expect(statementCounter.count).toBe(2);
+
+		await expect(
+			checkIngestRateLimit(subject, 0, config, countingEnvironment),
+		).rejects.toMatchObject(expectedRejection);
+		expect(statementCounter.count).toBe(2);
 	});
 });
 
@@ -220,6 +421,30 @@ describe("ingest rate-limit oRPC errors", () => {
 			windowSeconds: 3600,
 		});
 	});
+
+	test("fails closed with the SERVICE_UNAVAILABLE shape over HTTP", async () => {
+		const unavailableServer = await startApiTestServer(
+			{},
+			"apps/api/src/__tests__/fixtures/unavailable-ingest-rate-limit-server.ts",
+		);
+		const unavailable = await callIngest(
+			{
+				content: "a",
+				projectPath: "/test/rate-limit",
+				sessionId: `database-unavailable-${crypto.randomUUID()}`,
+				source: "claude_code",
+			},
+			unavailableServer.baseUrl,
+		);
+
+		expect(unavailable.status).toBe(503);
+		expect(readRpcError(unavailable.body)).toEqual({
+			code: "SERVICE_UNAVAILABLE",
+			reason: "ingest_rate_limit_unavailable",
+			retryAfterMs: 1_000,
+		});
+		await unavailableServer.stop();
+	});
 });
 
 async function createCounterApiKey(label: string): Promise<string> {
@@ -231,18 +456,61 @@ async function createCounterApiKey(label: string): Promise<string> {
 	return id;
 }
 
+async function createLegacyCounterUser(label: string): Promise<string> {
+	const id = `${TEST_KEY_PREFIX}-${label}`;
+	await firstDatabase`
+		INSERT INTO "user" (id, name, email)
+		VALUES (
+			${id},
+			${`Ingest rate-limit ${label}`},
+			${`${id}@example.com`}
+		)
+	`;
+	return id;
+}
+
+function freshEnvironment(): IngestRateLimitEnvironment {
+	return createPostgresIngestRateLimitEnvironment(firstDatabase);
+}
+
 async function readCounter(apiKeyId: string) {
 	const [row] = await firstDatabase<
-		Array<{ byteCount: number; requestCount: number }>
+		Array<{
+			byteCount: number;
+			byteWindowStartedAt: Date;
+			requestCount: number;
+			requestWindowStartedAt: Date;
+		}>
 	>`
 		SELECT
 			byte_count::int AS "byteCount",
-			request_count::int AS "requestCount"
+			byte_window_started_at AS "byteWindowStartedAt",
+			request_count::int AS "requestCount",
+			request_window_started_at AS "requestWindowStartedAt"
 		FROM ingest_rate_limit_counter
 		WHERE api_key_id = ${apiKeyId}
 	`;
 	assert(row);
 	return row;
+}
+
+async function countCounters(
+	subjectColumn: "api_key_id" | "user_id",
+	subjectId: string,
+): Promise<number> {
+	const rows =
+		subjectColumn === "api_key_id"
+			? await firstDatabase<Array<{ count: number }>>`
+				SELECT COUNT(*)::int AS count
+				FROM ingest_rate_limit_counter
+				WHERE api_key_id = ${subjectId}
+			`
+			: await firstDatabase<Array<{ count: number }>>`
+				SELECT COUNT(*)::int AS count
+				FROM ingest_rate_limit_counter
+				WHERE user_id = ${subjectId}
+			`;
+	return rows[0]?.count ?? 0;
 }
 
 async function signUpTestUser(baseUrl: string): Promise<string> {
@@ -284,8 +552,8 @@ async function createIngestApiKey(
 	return body;
 }
 
-async function callIngest(input: IngestSessionInput) {
-	const response = await fetch(`${server.baseUrl}/rpc/ingestSession`, {
+async function callIngest(input: IngestSessionInput, baseUrl = server.baseUrl) {
+	const response = await fetch(`${baseUrl}/rpc/ingestSession`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -298,6 +566,41 @@ async function callIngest(input: IngestSessionInput) {
 		body: await response.json(),
 		status: response.status,
 	};
+}
+
+function readRpcError(value: unknown): {
+	code: string;
+	reason: string | undefined;
+	retryAfterMs: number | undefined;
+} {
+	if (
+		typeof value === "object" &&
+		value !== null &&
+		"json" in value &&
+		typeof value.json === "object" &&
+		value.json !== null &&
+		"code" in value.json &&
+		typeof value.json.code === "string"
+	) {
+		const data =
+			"data" in value.json &&
+			typeof value.json.data === "object" &&
+			value.json.data !== null
+				? value.json.data
+				: null;
+		return {
+			code: value.json.code,
+			reason:
+				data && "reason" in data && typeof data.reason === "string"
+					? data.reason
+					: undefined,
+			retryAfterMs:
+				data && "retryAfterMs" in data && typeof data.retryAfterMs === "number"
+					? data.retryAfterMs
+					: undefined,
+		};
+	}
+	throw new Error("RPC response did not include an error envelope");
 }
 
 function readRpcErrorData(value: unknown): {
