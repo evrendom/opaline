@@ -1,0 +1,21 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"git": {
+		"deploymentEnabled": false
+	},
+	"regions": ["fra1"],
+	"functions": {
+		"api/rpc.ts": {
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/ingest.ts": {
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/wrapped.ts": {
+			"memory": 2048,
+			"maxDuration": 300
+		}
+	}
+}
