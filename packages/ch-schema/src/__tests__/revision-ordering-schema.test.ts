@@ -53,9 +53,11 @@ describe("F16 revision ordering schema", () => {
 		expect(firstView).toBeGreaterThan(lastTable);
 		// ClickHouse caps a single sleep() call at three seconds (TOO_SLOW), so
 		// each propagation boundary sleeps one second per row across eight rows.
+		// The three-second sleep cap applies per block, so each boundary sleeps
+		// one second per single-row block across eight blocks.
 		expect(
 			ddlMigration.match(
-				/SELECT sleepEachRow\(1\) FROM numbers\(8\) FORMAT Null;/gu,
+				/SELECT sleepEachRow\(1\) FROM numbers\(8\) SETTINGS max_block_size = 1 FORMAT Null;/gu,
 			),
 		).toHaveLength(3);
 		expect(ddlMigration).not.toContain("SELECT sleep(");
