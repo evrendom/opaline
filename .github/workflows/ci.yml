@@ -222,8 +222,8 @@ jobs:
       matrix:
         os:
           - blacksmith-4vcpu-ubuntu-2404
-          - macos-15
-          - windows-2025
+          - blacksmith-6vcpu-macos-15
+          - blacksmith-2vcpu-windows-2025
         node:
           - 20
         include:
