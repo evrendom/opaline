@@ -146,6 +146,15 @@ async function createPreMigrationTables(database: string): Promise<void> {
 	await executor.execute(
 		`CREATE TABLE ${database}.codex_sessions AS rudel.codex_sessions`,
 	);
+	// This rehearsal reproduces the pre-F16 world the 20260730 migration ran
+	// in: its frozen SELECT * materialized views must not see the revision
+	// column that exists on the live post-F16 raw tables the clones copy.
+	await executor.execute(
+		`ALTER TABLE ${database}.claude_sessions DROP COLUMN revision`,
+	);
+	await executor.execute(
+		`ALTER TABLE ${database}.codex_sessions DROP COLUMN revision`,
+	);
 	await executor.execute(`
 		CREATE TABLE ${database}.session_analytics
 		(
@@ -211,7 +220,7 @@ function buildClaudeRow(
 	sessionDate: string,
 	ingestedAt: string,
 	content: string,
-): RudelClaudeSessionsRow {
+): Omit<RudelClaudeSessionsRow, "revision"> {
 	return {
 		session_date: sessionDate,
 		last_interaction_date: sessionDate,
@@ -223,7 +232,6 @@ function buildClaudeRow(
 		package_type: "package.json",
 		content,
 		filter_version: 5,
-		revision: "1",
 		ingested_at: ingestedAt,
 		user_id: userId,
 		git_branch: "main",
@@ -239,7 +247,7 @@ function buildCodexRow(
 	userId: string,
 	content = CODEX_CONTENT,
 	ingestedAt = "2026-03-02T06:37:00.000",
-): RudelCodexSessionsRow {
+): Omit<RudelCodexSessionsRow, "revision"> {
 	return {
 		session_date: "2026-03-02T04:29:38.576",
 		last_interaction_date: "2026-03-02T06:36:38.201",
@@ -251,7 +259,6 @@ function buildCodexRow(
 		package_type: "package.json",
 		content,
 		filter_version: 5,
-		revision: "1",
 		ingested_at: ingestedAt,
 		user_id: userId,
 		git_branch: "main",

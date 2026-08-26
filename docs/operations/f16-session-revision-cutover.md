@@ -387,7 +387,7 @@ Review both checked-in migrations immediately before execution. They must keep
 all of these properties:
 
 - both analytics MVs are dropped before any source or target rename;
-- every propagation boundary uses `SELECT sleepEachRow(1) FROM numbers(8) SETTINGS max_block_size = 1 FORMAT Null` (a single `sleep()` call is capped at three seconds by ClickHouse);
+- every propagation boundary uses `SELECT sleepEachRow(1) FROM numbers(8) SETTINGS max_block_size = 1` (a single `sleep()` call is capped at three seconds by ClickHouse);
 - all canonical tables are created before materialized views;
 - raw and analytics use `ReplacingMergeTree(revision)`;
 - language signals use `ReplacingMergeTree(signal_version)`, where

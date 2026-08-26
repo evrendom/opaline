@@ -57,7 +57,7 @@ describe("F16 revision ordering schema", () => {
 		// one second per single-row block across eight blocks.
 		expect(
 			ddlMigration.match(
-				/SELECT sleepEachRow\(1\) FROM numbers\(8\) SETTINGS max_block_size = 1 FORMAT Null;/gu,
+				/SELECT sleepEachRow\(1\) FROM numbers\(8\) SETTINGS max_block_size = 1;/gu,
 			),
 		).toHaveLength(3);
 		expect(ddlMigration).not.toContain("SELECT sleep(");
