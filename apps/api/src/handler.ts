@@ -267,7 +267,10 @@ const TRUSTED_PROXY_HOPS = readNonNegativeSafeIntegerEnv(
 	0,
 );
 
-export async function fetchHandler(request: Request): Promise<Response> {
+export async function fetchHandler(
+	request: Request,
+	options: { readonly socketIp: string | null } = { socketIp: null },
+): Promise<Response> {
 	const origin = request.headers.get("Origin");
 	const cors = corsHeaders(origin);
 	const url = new URL(request.url);
@@ -343,7 +346,7 @@ export async function fetchHandler(request: Request): Promise<Response> {
 			? request.headers.get("fly-client-ip")
 			: null,
 		forwardedFor: request.headers.get("x-forwarded-for"),
-		socketIp: null,
+		socketIp: options.socketIp,
 		trustedProxyHops: TRUSTED_PROXY_HOPS,
 	});
 
