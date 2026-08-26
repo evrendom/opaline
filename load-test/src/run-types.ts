@@ -11,9 +11,11 @@ export interface RunThresholds {
 	readonly maxE2eP95Ms: number | null;
 	readonly maxFailures: number;
 	readonly maxFirstCommitP95Ms: number | null;
-	readonly maxOrphaned: number;
+	readonly maxNonTerminalJobs: number;
 	readonly maxPeakRssBytes: number | null;
+	readonly maxScheduleDriftMs: number | null;
 	readonly maxTransportFailures: number;
+	readonly minAchievedStartRate: number | null;
 }
 
 export interface RunOptions {
@@ -25,6 +27,7 @@ export interface RunOptions {
 	readonly commitAttempts: number;
 	readonly concurrency: number;
 	readonly manifest: LoadedTranscriptManifest;
+	readonly maxInFlight: number;
 	readonly organizationId: string | undefined;
 	readonly partConcurrency: number;
 	readonly processingPids: readonly number[];
@@ -62,17 +65,21 @@ export interface UploadResult {
 	readonly initMs: number;
 	readonly jobId: string | null;
 	readonly multipartMs: number;
-	readonly orphanReason: string | null;
-	readonly orphaned: boolean;
+	readonly nonTerminal: boolean;
+	readonly nonTerminalReason: string | null;
+	readonly plannedStartOffsetMs: number | null;
+	readonly scheduleDriftMs: number | null;
 	readonly sessionId: string;
+	readonly startedOffsetMs: number;
 }
 
 export interface ThresholdResult {
+	readonly comparison: "at_least" | "at_most";
 	readonly limit: number;
 	readonly name: string;
 	readonly observed: number | null;
 	readonly passed: boolean;
-	readonly unit: "bytes" | "count" | "milliseconds";
+	readonly unit: "bytes" | "count" | "milliseconds" | "starts/second";
 }
 
 export interface LoadTestSummary {
@@ -88,6 +95,7 @@ export interface LoadTestSummary {
 		readonly commitAttempts: number;
 		readonly concurrency: number;
 		readonly entropy: string;
+		readonly maxInFlight: number;
 		readonly partConcurrency: number;
 		readonly ratePerSecond: number | null;
 		readonly sameSessionHash: boolean;
@@ -97,16 +105,20 @@ export interface LoadTestSummary {
 		readonly uploads: number;
 	};
 	readonly durationMs: number;
-	readonly formatVersion: 1;
+	readonly formatVersion: 2;
 	readonly passed: boolean;
 	readonly requestMeasurements: readonly RequestMeasurement[];
 	readonly rss: RssSummary;
 	readonly scenarioName: string;
+	readonly startSchedule: {
+		readonly achievedStartRate: number | null;
+		readonly maxScheduleDriftMs: number | null;
+	};
 	readonly thresholdResults: readonly ThresholdResult[];
 	readonly totals: {
 		readonly completed: number;
 		readonly failed: number;
-		readonly orphaned: number;
+		readonly nonTerminalJobs: number;
 		readonly requests: number;
 		readonly uploadedBytes: number;
 	};

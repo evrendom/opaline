@@ -54,18 +54,42 @@ PID whose resident memory should be included. The monitor samples and sums the
 listed processes. Remote runs use platform memory metrics instead and should
 omit the RSS assertion flag from the command.
 
-An upload is conservatively marked orphaned when multipart state has been
-created but the final status is pending, running, or unreadable. A terminal
-`completed` or `failed` status is treated as non-orphaned because terminal
-cleanup is part of the server contract. The pre-cutover threshold is always
-zero orphaned uploads.
+The `nonTerminalJobs` metric counts jobs for which multipart state was created
+but the harness did not observe a terminal `completed` or `failed` status. The
+pre-cutover threshold is always zero non-terminal jobs.
+
+This metric does **not** verify R2 object cleanup. The status API does not expose
+`objects_deleted_at`, so a completed job can pass this harness even if R2 abort
+or delete keeps failing. An operator must verify cleanup after each run against
+the isolated deployment: record the bucket object count/listing before the run,
+then confirm that no `ingest/<job-id>/` objects from the run remain after the
+cleanup worker has settled. As a database-side check, query the real
+`ingest_job` fields `id`, `organization_id`, `session_id`, `status`,
+`created_at`, and `objects_deleted_at`; scope rows to the test organization,
+the manifest session-ID prefix, and the run time window, and require zero rows
+with `objects_deleted_at IS NULL`. Preserve the bucket comparison or query
+output with the JSON summary. The database marker is useful operational
+evidence; a bucket listing is the direct physical-object check.
+
+```sql
+SELECT id, organization_id, session_id, status, created_at, objects_deleted_at
+FROM ingest_job
+WHERE organization_id = '<test-organization-id>'
+  AND session_id LIKE '<manifest-session-id>%'
+  AND created_at >= TIMESTAMPTZ '<run-start>'
+  AND created_at <= TIMESTAMPTZ '<cleanup-check-time>'
+  AND objects_deleted_at IS NULL;
+```
+
+After the cleanup worker settles, this query must return zero rows for the run.
 
 ## A. Single 128 MiB, high entropy, maximum subagents
 
 Validates exact-limit admission, 513-object initialization, presigning and R2
 PUT fan-out, one-job materialization, filtering, ClickHouse writes, extraction,
-cleanup, and status. Run it once with `--source claude_code`, then generate a
-second corpus with `--source codex` to cover both adapters.
+and terminal status. Verify cleanup separately using the operator check above.
+Run it once with `--source claude_code`, then generate a second corpus with
+`--source codex` to cover both adapters.
 
 ```bash
 bun load-test/src/cli.ts generate \
@@ -85,16 +109,17 @@ bun load-test/src/cli.ts run \
   --scenario-name single-128m-claude \
   --processing-pid '<api-pid>' \
   --max-failures 0 \
-  --max-orphaned 0 \
+  --max-non-terminal-jobs 0 \
   --max-first-commit-p95-ms 180000 \
   --max-e2e-p95-ms 240000 \
   --max-peak-rss-mib 1536 \
   --summary-json /tmp/opaline-load-a-claude-summary.json
 ```
 
-PASS: 100% completes, zero orphans, commit ≤180 seconds, end-to-end ≤240
-seconds, and processing peak RSS ≤1.5 GiB. The memory limit preserves at least
-512 MiB of headroom on a 2 GiB process.
+PASS: 100% completes, zero non-terminal jobs, commit ≤180 seconds, end-to-end
+≤240 seconds, and processing peak RSS ≤1.5 GiB. The memory limit preserves at
+least 512 MiB of headroom on a 2 GiB process. R2 cleanup is a separate operator
+check and is not part of this PASS result.
 
 ## B. Four concurrent 128 MiB worst-case uploads
 
@@ -125,15 +150,15 @@ bun load-test/src/cli.ts run \
   --status-wait-ms 120000 \
   --processing-pid '<api-pid>' \
   --max-failures 0 \
-  --max-orphaned 0 \
+  --max-non-terminal-jobs 0 \
   --max-first-commit-p95-ms 240000 \
   --max-e2e-p95-ms 720000 \
   --max-peak-rss-mib 1536 \
   --summary-json /tmp/opaline-load-b-summary.json
 ```
 
-PASS: all four complete with zero orphans, p95 first-commit wall time ≤240
-seconds, p95 end-to-end wall time ≤720 seconds, and peak RSS stays ≤1.5 GiB.
+PASS: all four complete with zero non-terminal jobs, p95 first-commit wall time
+≤240 seconds, p95 end-to-end wall time ≤720 seconds, and peak RSS stays ≤1.5 GiB.
 Transient gate-full/queue-timeout responses may appear in request measurements,
 but none may remain as a final upload failure.
 
@@ -146,7 +171,8 @@ Validates cross-instance same-hash serialization and the bounded advisory-lock
 path. All jobs use the identical transcript and session ID, all multipart PUTs
 finish first, and 32 initial commits are released together. Retries allow jobs
 that receive the expected `already processing` or gate-capacity response to
-converge without leaving objects behind.
+converge to terminal statuses. Verify that their objects were deleted using the
+separate operator check above.
 
 ```bash
 bun load-test/src/cli.ts generate \
@@ -171,25 +197,31 @@ bun load-test/src/cli.ts run \
   --status-wait-ms 120000 \
   --processing-pid '<api-pid>' \
   --max-failures 0 \
-  --max-orphaned 0 \
+  --max-non-terminal-jobs 0 \
   --max-first-commit-p95-ms 35000 \
   --max-e2e-p95-ms 180000 \
   --max-peak-rss-mib 1536 \
   --summary-json /tmp/opaline-load-c-summary.json
 ```
 
-PASS: all 32 jobs converge to completed with zero orphans, p95 initial commit
-returns within 35 seconds (the 30-second bounded queue plus margin), p95
-end-to-end is ≤180 seconds, and peak RSS is ≤1.5 GiB. HTTP 503 is acceptable
-only on retryable intermediate requests; indefinite waits, connection failures,
-or final failures are not.
+PASS: all 32 jobs converge to completed with zero non-terminal jobs, p95 initial
+commit returns within 35 seconds (the 30-second bounded queue plus margin), p95
+end-to-end is ≤180 seconds, and peak RSS is ≤1.5 GiB. HTTP 503 is acceptable only
+on retryable intermediate requests; indefinite waits, connection failures, or
+final failures are not.
 
 ## D. Sustained small-session / ClickHouse small-parts probe
 
-Validates steady ingest at 10 unique sessions/second and observes whether 600
-one-row language-signal inserts amplify into active parts. The optional observer
-uses ClickHouse's HTTPS interface with a read-only query against `system.parts`,
-an exact database/table filter, `LIMIT 1`, and explicit scan/result/time caps.
+Schedules 600 operation starts open-loop at fixed offsets from one epoch,
+targeting 10 unique sessions/second regardless of when earlier operations
+complete. Paced runs are bounded only by `--max-in-flight`; `--concurrency`
+applies to unpaced and commit-barrier runs, not to this arrival schedule. Each
+upload records its planned start offset, actual start offset, and schedule drift.
+The summary divides starts by the interval from the epoch through one nominal
+spacing after the last actual start, and fails if either arrival-rate or drift
+thresholds are missed. The optional observer uses ClickHouse's HTTPS interface
+with a read-only query against `system.parts`, an exact database/table filter,
+`LIMIT 1`, and explicit scan/result/time caps.
 
 Per `insert-batch-size`, synchronous one-row inserts are unsafe; per
 `insert-async-small-batches`, frequent small inserts should be buffered with
@@ -214,8 +246,8 @@ bun load-test/src/cli.ts run \
   --organization-id '<test-organization-id>' \
   --scenario-name sustained-small-10rps \
   --uploads 600 \
-  --concurrency 16 \
   --rate-per-second 10 \
+  --max-in-flight 512 \
   --commit-attempts 10 \
   --clickhouse-url 'https://<test-clickhouse-origin>' \
   --clickhouse-user '<read-only-user>' \
@@ -225,7 +257,9 @@ bun load-test/src/cli.ts run \
   --clickhouse-settle-ms 30000 \
   --processing-pid '<api-pid>' \
   --max-failures 0 \
-  --max-orphaned 0 \
+  --max-non-terminal-jobs 0 \
+  --min-achieved-start-rate 9.5 \
+  --max-schedule-drift-ms 1000 \
   --max-first-commit-p95-ms 10000 \
   --max-e2e-p95-ms 15000 \
   --max-peak-rss-mib 1024 \
@@ -233,11 +267,13 @@ bun load-test/src/cli.ts run \
   --summary-json /tmp/opaline-load-d-summary.json
 ```
 
-PASS: 600/600 complete, zero orphans, first-commit p95 ≤10 seconds,
-end-to-end p95 ≤15 seconds, peak RSS ≤1 GiB, and the active
-`rudel.session_language_signals` part count grows by no more than 20 after a
-30-second merge/flush settling interval. Any `TOO_MANY_PARTS` response is a
-failure even if later requests recover.
+PASS: 600/600 complete with zero non-terminal jobs, achieved start rate is at
+least 9.5 starts/second, maximum schedule drift is ≤1 second, first-commit p95
+is ≤10 seconds, end-to-end p95 is ≤15 seconds, peak RSS is ≤1 GiB, and the
+active `rudel.session_language_signals` part count grows by no more than 20
+after a 30-second merge/flush settling interval. Any `TOO_MANY_PARTS` response
+is a failure even if later requests recover. R2 cleanup still requires the
+separate operator verification documented above.
 
 ## Manual pre-cutover matrix
 

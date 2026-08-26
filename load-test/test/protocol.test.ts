@@ -41,6 +41,7 @@ describe("R2 ingest protocol driver", () => {
 				commitAttempts: 2,
 				concurrency: 2,
 				manifest,
+				maxInFlight: 512,
 				organizationId: "test-organization",
 				partConcurrency: 2,
 				processingPids: [],
@@ -55,9 +56,11 @@ describe("R2 ingest protocol driver", () => {
 					maxE2eP95Ms: null,
 					maxFailures: 0,
 					maxFirstCommitP95Ms: null,
-					maxOrphaned: 0,
+					maxNonTerminalJobs: 0,
 					maxPeakRssBytes: null,
+					maxScheduleDriftMs: null,
 					maxTransportFailures: 0,
+					minAchievedStartRate: null,
 				},
 				uploads: 2,
 			});
@@ -72,7 +75,7 @@ describe("R2 ingest protocol driver", () => {
 				await Bun.file(join(root, "summary.json")).text(),
 			);
 			expect(readNestedNumber(summary, "totals", "completed")).toBe(2);
-			expect(readNestedNumber(summary, "totals", "orphaned")).toBe(0);
+			expect(readNestedNumber(summary, "totals", "nonTerminalJobs")).toBe(0);
 			expect(readNestedNumber(summary, "totals", "uploadedBytes")).toBe(
 				manifest.manifest.aggregateBytes * 2,
 			);

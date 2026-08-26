@@ -16,6 +16,7 @@ import type {
 import { startRssMonitor } from "./rss.ts";
 import type { RunOptions, UploadResult } from "./run-types.ts";
 import { isLoopbackHostname } from "./safety.ts";
+import { type ScheduledStart, scheduleOpenLoop } from "./scheduler.ts";
 import { buildLoadTestSummary, printLoadTestTables } from "./summary.ts";
 
 interface InitPart {
@@ -68,9 +69,16 @@ type PreparedJob =
 			readonly kind: "prepared";
 			readonly multipartMs: number;
 			readonly sessionId: string;
-			readonly startedAt: number;
+			readonly start: UploadStart;
 	  }
 	| { readonly kind: "finished"; readonly result: UploadResult };
+
+interface UploadStart {
+	readonly actualStartMs: number;
+	readonly plannedStartOffsetMs: number | null;
+	readonly scheduleDriftMs: number | null;
+	readonly startedOffsetMs: number;
+}
 
 export async function executeLoadTest(options: RunOptions): Promise<boolean> {
 	const runStartedAt = performance.now();
@@ -123,9 +131,10 @@ async function runWithCommitBarrier(
 	runStartedAt: number,
 ): Promise<readonly UploadResult[]> {
 	const indices = Array.from({ length: options.uploads }, (_, index) => index);
-	const prepared = await mapBounded(indices, options.concurrency, (index) =>
-		prepareJob(index, options, measurements, runStartedAt),
-	);
+	const prepared = await mapBounded(indices, options.concurrency, (index) => {
+		const start = createUnscheduledStart(runStartedAt);
+		return prepareJob(index, options, measurements, runStartedAt, start);
+	});
 	return mapBounded(prepared, options.concurrency, (job) =>
 		job.kind === "finished"
 			? Promise.resolve(job.result)
@@ -139,23 +148,52 @@ async function runStreaming(
 	runStartedAt: number,
 ): Promise<readonly UploadResult[]> {
 	const indices = Array.from({ length: options.uploads }, (_, index) => index);
-	return mapBounded(indices, options.concurrency, async (index) => {
-		if (options.ratePerSecond !== null) {
-			const targetStart =
-				runStartedAt + (index * 1_000) / options.ratePerSecond;
-			const waitMs = targetStart - performance.now();
-			if (waitMs > 0) await Bun.sleep(waitMs);
-		}
-		const prepared = await prepareJob(
-			index,
-			options,
-			measurements,
-			runStartedAt,
+	if (options.ratePerSecond === null) {
+		return mapBounded(indices, options.concurrency, (index) =>
+			runJob(
+				index,
+				options,
+				measurements,
+				runStartedAt,
+				createUnscheduledStart(runStartedAt),
+			),
 		);
-		return prepared.kind === "finished"
-			? prepared.result
-			: commitPreparedJob(prepared, options, measurements, runStartedAt);
-	});
+	}
+	const scheduled = await scheduleOpenLoop(
+		{
+			maxInFlight: options.maxInFlight,
+			operationCount: options.uploads,
+			ratePerSecond: options.ratePerSecond,
+		},
+		(start) =>
+			runJob(
+				start.index,
+				options,
+				measurements,
+				runStartedAt,
+				createScheduledStart(start, runStartedAt),
+			),
+	);
+	return scheduled.map((operation) => operation.value);
+}
+
+async function runJob(
+	index: number,
+	options: RunOptions,
+	measurements: RequestMeasurement[],
+	runStartedAt: number,
+	start: UploadStart,
+): Promise<UploadResult> {
+	const prepared = await prepareJob(
+		index,
+		options,
+		measurements,
+		runStartedAt,
+		start,
+	);
+	return prepared.kind === "finished"
+		? prepared.result
+		: commitPreparedJob(prepared, options, measurements, runStartedAt);
 }
 
 async function prepareJob(
@@ -163,8 +201,8 @@ async function prepareJob(
 	options: RunOptions,
 	measurements: RequestMeasurement[],
 	runStartedAt: number,
+	start: UploadStart,
 ): Promise<PreparedJob> {
-	const startedAt = performance.now();
 	const sessionId = resolveSessionId(options, index);
 	const context = createRequestContext(
 		index,
@@ -196,10 +234,10 @@ async function prepareJob(
 				initMs: init.durationMs,
 				jobId: null,
 				multipartMs: 0,
-				orphanReason: null,
-				orphaned: false,
+				nonTerminal: false,
+				nonTerminalReason: null,
 				sessionId,
-				startedAt,
+				start,
 			}),
 		};
 	}
@@ -225,13 +263,12 @@ async function prepareJob(
 				initMs: init.durationMs,
 				jobId: init.data.jobId,
 				multipartMs,
-				orphanReason:
-					status?.status === "failed"
-						? null
-						: "Multipart state exists but the job did not reach a terminal status",
-				orphaned: status?.status !== "failed",
+				nonTerminal: !isTerminalStatus(status?.status),
+				nonTerminalReason: isTerminalStatus(status?.status)
+					? null
+					: "Multipart state exists but the job was not observed in a terminal status",
 				sessionId,
-				startedAt,
+				start,
 			}),
 		};
 	}
@@ -244,7 +281,7 @@ async function prepareJob(
 		kind: "prepared",
 		multipartMs,
 		sessionId,
-		startedAt,
+		start,
 	};
 }
 
@@ -503,7 +540,7 @@ function createCompletedResult(
 	return {
 		classification: "completed",
 		commitAttempts,
-		e2eMs: performance.now() - job.startedAt,
+		e2eMs: performance.now() - job.start.actualStartMs,
 		errorCode: null,
 		errorMessage: null,
 		finalStatus: "completed",
@@ -512,9 +549,12 @@ function createCompletedResult(
 		initMs: job.initMs,
 		jobId: job.jobId,
 		multipartMs: job.multipartMs,
-		orphanReason: null,
-		orphaned: false,
+		nonTerminal: false,
+		nonTerminalReason: null,
+		plannedStartOffsetMs: job.start.plannedStartOffsetMs,
+		scheduleDriftMs: job.start.scheduleDriftMs,
 		sessionId: job.sessionId,
+		startedOffsetMs: job.start.startedOffsetMs,
 	};
 }
 
@@ -527,11 +567,11 @@ function createCommitFailureResult(input: {
 	readonly job: Extract<PreparedJob, { kind: "prepared" }>;
 	readonly status: StatusOutput["status"] | undefined;
 }): UploadResult {
-	const terminal = input.status === "completed" || input.status === "failed";
+	const terminal = isTerminalStatus(input.status);
 	return {
 		classification: input.classification,
 		commitAttempts: input.attempt,
-		e2eMs: performance.now() - input.job.startedAt,
+		e2eMs: performance.now() - input.job.start.actualStartMs,
 		errorCode: input.errorCode,
 		errorMessage: input.errorMessage,
 		finalStatus: input.status ?? "unavailable",
@@ -540,11 +580,14 @@ function createCommitFailureResult(input: {
 		initMs: input.job.initMs,
 		jobId: input.job.jobId,
 		multipartMs: input.job.multipartMs,
-		orphanReason: terminal
+		nonTerminal: !terminal,
+		nonTerminalReason: terminal
 			? null
-			: "Uploaded multipart objects remain attached to a non-terminal or unreadable job",
-		orphaned: !terminal,
+			: "Uploaded multipart objects belong to a job that was not observed in a terminal status",
+		plannedStartOffsetMs: input.job.start.plannedStartOffsetMs,
+		scheduleDriftMs: input.job.start.scheduleDriftMs,
 		sessionId: input.job.sessionId,
+		startedOffsetMs: input.job.start.startedOffsetMs,
 	};
 }
 
@@ -557,15 +600,15 @@ function createEarlyFailure(input: {
 	readonly initMs: number;
 	readonly jobId: string | null;
 	readonly multipartMs: number;
-	readonly orphanReason: string | null;
-	readonly orphaned: boolean;
+	readonly nonTerminal: boolean;
+	readonly nonTerminalReason: string | null;
 	readonly sessionId: string;
-	readonly startedAt: number;
+	readonly start: UploadStart;
 }): UploadResult {
 	return {
 		classification: input.classification,
 		commitAttempts: 0,
-		e2eMs: performance.now() - input.startedAt,
+		e2eMs: performance.now() - input.start.actualStartMs,
 		errorCode: input.errorCode,
 		errorMessage: input.errorMessage,
 		finalStatus: input.finalStatus ?? "unavailable",
@@ -574,10 +617,39 @@ function createEarlyFailure(input: {
 		initMs: input.initMs,
 		jobId: input.jobId,
 		multipartMs: input.multipartMs,
-		orphanReason: input.orphanReason,
-		orphaned: input.orphaned,
+		nonTerminal: input.nonTerminal,
+		nonTerminalReason: input.nonTerminalReason,
+		plannedStartOffsetMs: input.start.plannedStartOffsetMs,
+		scheduleDriftMs: input.start.scheduleDriftMs,
 		sessionId: input.sessionId,
+		startedOffsetMs: input.start.startedOffsetMs,
 	};
+}
+
+function createUnscheduledStart(runStartedAt: number): UploadStart {
+	const actualStartMs = performance.now();
+	return {
+		actualStartMs,
+		plannedStartOffsetMs: null,
+		scheduleDriftMs: null,
+		startedOffsetMs: actualStartMs - runStartedAt,
+	};
+}
+
+function createScheduledStart(
+	start: ScheduledStart,
+	runStartedAt: number,
+): UploadStart {
+	return {
+		actualStartMs: start.actualStartMs,
+		plannedStartOffsetMs: start.plannedStartMs - runStartedAt,
+		scheduleDriftMs: start.scheduleDriftMs,
+		startedOffsetMs: start.actualStartMs - runStartedAt,
+	};
+}
+
+function isTerminalStatus(status: StatusOutput["status"] | undefined): boolean {
+	return status === "completed" || status === "failed";
 }
 
 function createRequestContext(

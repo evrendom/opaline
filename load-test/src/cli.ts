@@ -13,8 +13,10 @@ import {
 } from "./types.ts";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:4010";
+const DEFAULT_MAX_IN_FLIGHT = 512;
 const DEFAULT_SUMMARY_PATH = "/tmp/opaline-r2-load-test-summary.json";
 const DEFAULT_TIMESTAMP_START = "2026-08-25T12:00:00.000Z";
+const MAX_UPLOADS = 10_000;
 const MEBIBYTE = 1024 * 1024;
 
 interface ParsedArguments {
@@ -135,9 +137,12 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 		"--max-e2e-p95-ms",
 		"--max-failures",
 		"--max-first-commit-p95-ms",
-		"--max-orphaned",
+		"--max-in-flight",
+		"--max-non-terminal-jobs",
 		"--max-peak-rss-mib",
+		"--max-schedule-drift-ms",
 		"--max-transport-failures",
+		"--min-achieved-start-rate",
 		"--organization-id",
 		"--part-concurrency",
 		"--processing-pid",
@@ -194,6 +199,13 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 			512,
 		),
 		manifest,
+		maxInFlight: parseInteger(
+			getOptionalValue(arguments_, "--max-in-flight") ??
+				DEFAULT_MAX_IN_FLIGHT.toString(),
+			"--max-in-flight",
+			1,
+			MAX_UPLOADS,
+		),
 		organizationId: getOptionalValue(arguments_, "--organization-id"),
 		partConcurrency: parseInteger(
 			getOptionalValue(arguments_, "--part-concurrency") ?? "4",
@@ -235,32 +247,40 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 				getOptionalValue(arguments_, "--max-failures") ?? "0",
 				"--max-failures",
 				0,
-				512,
+				MAX_UPLOADS,
 			),
 			maxFirstCommitP95Ms: parseOptionalNonNegativeNumber(
 				arguments_,
 				"--max-first-commit-p95-ms",
 			),
-			maxOrphaned: parseInteger(
-				getOptionalValue(arguments_, "--max-orphaned") ?? "0",
-				"--max-orphaned",
+			maxNonTerminalJobs: parseInteger(
+				getOptionalValue(arguments_, "--max-non-terminal-jobs") ?? "0",
+				"--max-non-terminal-jobs",
 				0,
-				512,
+				MAX_UPLOADS,
 			),
 			maxPeakRssBytes:
 				maxPeakRssMib === null ? null : Math.round(maxPeakRssMib * MEBIBYTE),
+			maxScheduleDriftMs: parseOptionalNonNegativeNumber(
+				arguments_,
+				"--max-schedule-drift-ms",
+			),
 			maxTransportFailures: parseInteger(
 				getOptionalValue(arguments_, "--max-transport-failures") ?? "0",
 				"--max-transport-failures",
 				0,
 				Number.MAX_SAFE_INTEGER,
 			),
+			minAchievedStartRate: parseOptionalPositiveNumber(
+				arguments_,
+				"--min-achieved-start-rate",
+			),
 		},
 		uploads: parseInteger(
 			getOptionalValue(arguments_, "--uploads") ?? "1",
 			"--uploads",
 			1,
-			512,
+			MAX_UPLOADS,
 		),
 	});
 	return passed ? 0 : 1;
@@ -469,18 +489,21 @@ Target safety:
   --confirm-target <exact-origin>  second confirmation for a remote API
 
 Load shape:
-  --uploads <N>                    default: 1
+  --uploads <N>                    default: 1; maximum: ${MAX_UPLOADS}
   --concurrency <N>                default: 1
   --part-concurrency <N>           default: 4
   --barrier-before-commit
   --same-session-hash
   --rate-per-second <number>
+  --max-in-flight <N>              open-loop safety cap; default: ${DEFAULT_MAX_IN_FLIGHT}
   --commit-attempts <N>            default: 10
   --processing-pid <PID>           repeat to sum API + worker RSS
 
 Assertions:
   --max-failures <N>               default: 0
-  --max-orphaned <N>               default: 0
+  --max-non-terminal-jobs <N>      default: 0
+  --min-achieved-start-rate <rate>
+  --max-schedule-drift-ms <number>
   --max-e2e-p95-ms <number>
   --max-first-commit-p95-ms <number>
   --max-peak-rss-mib <number>
