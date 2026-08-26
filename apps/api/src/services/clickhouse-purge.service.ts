@@ -6,7 +6,13 @@ import {
 	type ResendConfig,
 	sendClickHousePurgeFailureAlert,
 } from "../email.js";
+import { isVercelRuntime } from "../lib/api-runtime.js";
+import {
+	hasMaintenanceTimeRemaining,
+	type MaintenanceDeadline,
+} from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { readResendConfig } from "../resend-config.js";
 import {
 	deleteOrgSessions,
 	deleteUserSessions,
@@ -121,8 +127,21 @@ export function registerClickHousePurgeWorker(
 	registeredClickHousePurgeWorker = worker;
 }
 
-export function wakeClickHousePurgeWorker(): void {
-	void registeredClickHousePurgeWorker?.wake();
+export async function wakeClickHousePurgeWorker(): Promise<void> {
+	if (registeredClickHousePurgeWorker) {
+		void registeredClickHousePurgeWorker.wake();
+		return;
+	}
+	if (isVercelRuntime()) {
+		try {
+			await runClickHousePurgeWorkerPass({ resend: readResendConfig() });
+		} catch (error) {
+			logger.error(
+				"Inline ClickHouse purge pass failed; the daily repair will retry: {error}",
+				{ error: sanitizeClickHousePurgeError(error) },
+			);
+		}
+	}
 }
 
 export async function enqueueClickHousePurge(
@@ -189,25 +208,7 @@ export function startClickHousePurgeWorker(
 		);
 	}
 
-	const env: ClickHousePurgeProcessorEnv = {
-		executePurge: async (target) => {
-			if (target.targetType === "organization") {
-				await deleteOrgSessions(target.targetId);
-				return;
-			}
-			await deleteUserSessions(target.targetId);
-		},
-		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
-		now: () => new Date(),
-		random: Math.random,
-		sendFailureAlert:
-			options.resend.apiKey &&
-			options.resend.fromEmail &&
-			options.resend.clickHousePurgeAlertRecipient
-				? (alert) => sendClickHousePurgeFailureAlert(options.resend, alert)
-				: undefined,
-		sqlClient: options.sqlClient ?? sqlClient,
-	};
+	const env = createClickHousePurgeProcessorEnv(options);
 
 	let activeRun = Promise.resolve();
 	let isRunning = false;
@@ -345,6 +346,61 @@ export function startClickHousePurgeWorker(
 	};
 }
 
+export async function runClickHousePurgeWorkerPass(
+	options: StartClickHousePurgeWorkerOptions,
+	deadline: MaintenanceDeadline | undefined = undefined,
+): Promise<{ readonly hasMore: boolean; readonly processed: number }> {
+	if (options.enabled === false) {
+		return { hasMore: false, processed: 0 };
+	}
+	if (!hasMaintenanceTimeRemaining(deadline)) {
+		return { hasMore: true, processed: 0 };
+	}
+
+	const env = createClickHousePurgeProcessorEnv(options);
+	await deleteExpiredSucceededPurgeJobs(env.sqlClient);
+	let processed = 0;
+	for (; processed < MAX_WORK_ITEMS_PER_PASS; processed += 1) {
+		if (
+			!hasMaintenanceTimeRemaining(deadline) ||
+			!(await runClickHousePurgeWorkerOnce(env, deadline))
+		) {
+			break;
+		}
+	}
+
+	return {
+		hasMore:
+			!hasMaintenanceTimeRemaining(deadline) ||
+			processed === MAX_WORK_ITEMS_PER_PASS,
+		processed,
+	};
+}
+
+function createClickHousePurgeProcessorEnv(
+	options: StartClickHousePurgeWorkerOptions,
+): ClickHousePurgeProcessorEnv {
+	return {
+		executePurge: async (target) => {
+			if (target.targetType === "organization") {
+				await deleteOrgSessions(target.targetId);
+				return;
+			}
+			await deleteUserSessions(target.targetId);
+		},
+		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
+		now: () => new Date(),
+		random: Math.random,
+		sendFailureAlert:
+			options.resend.apiKey &&
+			options.resend.fromEmail &&
+			options.resend.clickHousePurgeAlertRecipient
+				? (alert) => sendClickHousePurgeFailureAlert(options.resend, alert)
+				: undefined,
+		sqlClient: options.sqlClient ?? sqlClient,
+	};
+}
+
 function getEarlierDate(first: Date | null, second: Date | null): Date | null {
 	if (!first) return second;
 	if (!second) return first;
@@ -353,7 +409,11 @@ function getEarlierDate(first: Date | null, second: Date | null): Date | null {
 
 export async function runClickHousePurgeWorkerOnce(
 	env: ClickHousePurgeProcessorEnv,
+	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<boolean> {
+	if (!hasMaintenanceTimeRemaining(deadline)) {
+		return false;
+	}
 	const purgeJobClaim = await claimNextPurgeJob(env);
 	if (purgeJobClaim.status === "claimed") {
 		await processClaimedPurgeJob(purgeJobClaim.job, env);
@@ -361,7 +421,7 @@ export async function runClickHousePurgeWorkerOnce(
 	const handledPurgeWork = purgeJobClaim.status !== "empty";
 
 	const sendFailureAlert = env.sendFailureAlert;
-	if (!sendFailureAlert) {
+	if (!sendFailureAlert || !hasMaintenanceTimeRemaining(deadline)) {
 		return handledPurgeWork;
 	}
 

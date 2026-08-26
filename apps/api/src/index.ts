@@ -1,9 +1,6 @@
 import { getLogger } from "@logtape/logtape";
-import {
-	fetchHandler,
-	MAX_REQUEST_BODY_BYTES,
-	shutdownApi,
-} from "./handler.js";
+import { startFlyApiLifecycle } from "./fly-lifecycle.js";
+import { fetchHandler, MAX_REQUEST_BODY_BYTES } from "./handler.js";
 
 const logger = getLogger(["rudel", "api", "http"]);
 const port = process.env.PORT ?? "4010";
@@ -16,6 +13,7 @@ const server = Bun.serve({
 	maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 	port,
 });
+const lifecycle = startFlyApiLifecycle();
 let isShuttingDown = false;
 
 async function shutdown(signal?: string): Promise<void> {
@@ -24,7 +22,7 @@ async function shutdown(signal?: string): Promise<void> {
 	}
 	isShuttingDown = true;
 
-	await shutdownApi();
+	await lifecycle.shutdown();
 	if (signal) {
 		server.stop(true);
 		process.exit(0);

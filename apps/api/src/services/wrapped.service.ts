@@ -89,7 +89,7 @@ export async function getWrappedV1Data(
 		topTwoMargin: archetypeCandidate?.topTwoMargin ?? null,
 	});
 	if (archetypeGate.reason === "processing_archetype") {
-		enqueueWrappedArchetypeSnapshotRebuild({
+		await enqueueWrappedArchetypeSnapshotRebuild({
 			triggerReason: "wrapped_processing_gate",
 			triggerSessionId: null,
 			triggerSource: "wrapped_v1",

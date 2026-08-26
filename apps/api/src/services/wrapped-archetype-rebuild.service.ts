@@ -6,6 +6,7 @@ import {
 	type WrappedArchetypeRebuildTriggerReason,
 } from "@rudel/ch-schema/wrapped-archetype-rebuild";
 import { getClickhouse } from "../clickhouse.js";
+import { isVercelRuntime } from "../lib/api-runtime.js";
 
 interface WrappedArchetypeSnapshotRebuildTrigger {
 	triggerReason: WrappedArchetypeRebuildTriggerReason;
@@ -20,10 +21,20 @@ let isRebuildRunning = false;
 let queuedTrigger: WrappedArchetypeSnapshotRebuildTrigger | null = null;
 let lastProcessingGateQueuedAt = 0;
 
-export function enqueueWrappedArchetypeSnapshotRebuild(
+export async function enqueueWrappedArchetypeSnapshotRebuild(
 	trigger: WrappedArchetypeSnapshotRebuildTrigger,
-): void {
+): Promise<void> {
 	if (isProcessingGateCoolingDown(trigger)) {
+		return;
+	}
+	if (isVercelRuntime()) {
+		try {
+			await runWrappedArchetypeSnapshotRebuild(trigger);
+		} catch (error) {
+			logger.error("Wrapped archetype rebuild failed: {error}", {
+				error,
+			});
+		}
 		return;
 	}
 

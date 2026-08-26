@@ -8,6 +8,7 @@ import {
 	parseProductAnalyticsEvent,
 } from "@rudel/api-routes";
 import { PostHog } from "posthog-node";
+import { isVercelRuntime } from "./api-runtime.js";
 
 type ApiAutoProps = "event_version" | "surface" | "environment";
 type ApiCapturePayload<Name extends ProductAnalyticsEventName> = Omit<
@@ -73,7 +74,7 @@ function buildPayload<Name extends ProductAnalyticsEventName>(
 	});
 }
 
-export function captureApiProductAnalyticsEvent<
+export async function captureApiProductAnalyticsEvent<
 	Name extends ProductAnalyticsEventName,
 >(options: {
 	distinctId: string;
@@ -87,12 +88,20 @@ export function captureApiProductAnalyticsEvent<
 	}
 
 	try {
-		instance.capture({
+		const message = {
 			distinctId: options.distinctId,
 			event: options.event,
 			properties: buildPayload(options.event, options.payload),
 			uuid: options.eventId,
-		});
+		};
+		// Vercel functions may freeze right after the response, so the event
+		// must be delivered before returning. Fly keeps the queued client to
+		// stay off the request path.
+		if (isVercelRuntime()) {
+			await instance.captureImmediate(message);
+		} else {
+			instance.capture(message);
+		}
 	} catch {
 		// Analytics must never break the request path.
 	}

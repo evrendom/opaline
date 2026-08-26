@@ -18,6 +18,7 @@ import {
 	sendPasswordResetEmail,
 	syncSignupContact,
 } from "./email.js";
+import { isVercelRuntime } from "./lib/api-runtime.js";
 import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
@@ -231,10 +232,20 @@ export function createAuth(db: object, config: AuthConfig) {
 		emailAndPassword: {
 			enabled: true,
 			sendResetPassword: async ({ user, url }) => {
-				void sendPasswordResetEmail(resend, {
-					email: user.email,
-					resetUrl: url,
-				});
+				// Vercel functions may freeze after the response, so delivery
+				// must complete first. Fly keeps the reset request fast and
+				// lets the email send in the background.
+				if (isVercelRuntime()) {
+					await sendPasswordResetEmail(resend, {
+						email: user.email,
+						resetUrl: url,
+					});
+				} else {
+					void sendPasswordResetEmail(resend, {
+						email: user.email,
+						resetUrl: url,
+					});
+				}
 			},
 		},
 		socialProviders: config.socialProviders,
@@ -336,7 +347,7 @@ export function createAuth(db: object, config: AuthConfig) {
 							);
 						}
 
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: user.id,
 							event: PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP,
 							payload: {
@@ -392,7 +403,7 @@ export function createAuth(db: object, config: AuthConfig) {
 						role: string;
 						email: string;
 					}) => {
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: invitation.inviterId,
 							event: PRODUCT_ANALYTICS_EVENTS.INVITE_SENT,
 							payload: {
@@ -446,7 +457,7 @@ export function createAuth(db: object, config: AuthConfig) {
 								})) as Array<{ id: string }>)
 							: [];
 
-						captureApiProductAnalyticsEvent({
+						await captureApiProductAnalyticsEvent({
 							distinctId: createdMember.userId,
 							event: PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED,
 							payload: {

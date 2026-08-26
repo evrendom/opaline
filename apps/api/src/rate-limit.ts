@@ -1,6 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import { ORPCError } from "@orpc/server";
 import { INGEST_LIMIT_REASONS } from "@rudel/api-routes";
+import { isVercelRuntime } from "./lib/api-runtime.js";
 import { readPositiveSafeIntegerEnv } from "./lib/env.js";
 
 const logger = getLogger(["rudel", "api", "rate-limit"]);
@@ -147,15 +148,17 @@ export function checkWrappedShareCreateRateLimit(userId: string) {
 let wrappedShareLookupEvictions = 0;
 let wrappedShareLookupRejectedTraffic = 0;
 
-const wrappedShareLookupCleanupTimer = setInterval(
-	() => {
-		const now = Date.now();
-		evictExpiredWrappedShareLookupWindows(now);
-		evictExpiredWrappedShareLookupSourceWindows(now);
-	},
-	Math.min(WRAPPED_SHARE_LOOKUP_WINDOW_MS, 60_000),
-);
-wrappedShareLookupCleanupTimer.unref();
+if (!isVercelRuntime()) {
+	const wrappedShareLookupCleanupTimer = setInterval(
+		() => {
+			const now = Date.now();
+			evictExpiredWrappedShareLookupWindows(now);
+			evictExpiredWrappedShareLookupSourceWindows(now);
+		},
+		Math.min(WRAPPED_SHARE_LOOKUP_WINDOW_MS, 60_000),
+	);
+	wrappedShareLookupCleanupTimer.unref();
+}
 
 export function checkWrappedShareLookupRateLimit(
 	shareId: string,
