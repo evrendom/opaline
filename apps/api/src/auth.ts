@@ -127,6 +127,26 @@ export interface DefaultOrganizationData {
 	readonly slug: string;
 }
 
+function describesSlugUniqueViolation(error: unknown): boolean {
+	let current: unknown = error;
+	for (let depth = 0; depth < 5 && current !== undefined; depth++) {
+		const message =
+			current instanceof Error
+				? current.message
+				: typeof current === "string"
+					? current
+					: "";
+		if (
+			/duplicate key|unique constraint/i.test(message) &&
+			/slug/i.test(message)
+		) {
+			return true;
+		}
+		current = current instanceof Error ? current.cause : undefined;
+	}
+	return false;
+}
+
 export async function createDefaultOrganizationWithRetry<Org>(input: {
 	readonly create: (data: DefaultOrganizationData) => Promise<Org>;
 	readonly email: string;
@@ -141,10 +161,14 @@ export async function createDefaultOrganizationWithRetry<Org>(input: {
 	};
 	try {
 		return await input.create(data);
-	} catch {
+	} catch (error) {
 		// Distinct users can normalize to the same default slug and hit the
 		// unique constraint; retry once with the random fallback instead of
-		// leaving the signup without a workspace. A second failure propagates.
+		// leaving the signup without a workspace. Only a slug collision is
+		// corrected by changing the slug — every other failure propagates.
+		if (!describesSlugUniqueViolation(error)) {
+			throw error;
+		}
 		return await input.create({
 			...data,
 			slug: buildFallbackOrganizationSlug(),

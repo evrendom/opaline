@@ -127,7 +127,9 @@ describe("createDefaultOrganizationWithRetry", () => {
 			create: async (data) => {
 				attempts.push(data.slug);
 				if (attempts.length === 1) {
-					throw new Error("duplicate key value violates unique constraint");
+					throw new Error(
+						'duplicate key value violates unique constraint "organization_slug_unique"',
+					);
 				}
 				return { id: data.id, slug: data.slug };
 			},
@@ -140,6 +142,22 @@ describe("createDefaultOrganizationWithRetry", () => {
 		expect(attempts[0]).toBe("a-b-abcdef12");
 		expect(attempts[1]).toMatch(/^workspace-[0-9a-f]{8}$/);
 		expect(org.slug).toBe(attempts[1] ?? "");
+	});
+
+	test("propagates non-collision failures without a second insert", async () => {
+		const attempts: string[] = [];
+		await expect(
+			createDefaultOrganizationWithRetry({
+				create: async (data) => {
+					attempts.push(data.slug);
+					throw new Error("Connection terminated unexpectedly");
+				},
+				email: "jane@example.com",
+				name: "Test Workspace",
+				userId: "12345678rest",
+			}),
+		).rejects.toThrow("Connection terminated unexpectedly");
+		expect(attempts).toEqual(["jane-12345678"]);
 	});
 
 	test("uses the sanitized slug when the first insert succeeds", async () => {
