@@ -51,8 +51,14 @@ describe("F16 revision ordering schema", () => {
 
 		expect(lastTable).toBeGreaterThan(-1);
 		expect(firstView).toBeGreaterThan(lastTable);
-		expect(ddlMigration.match(/SELECT sleep\(8\);/gu)).toHaveLength(3);
-		expect(ddlMigration).not.toContain("SELECT sleep(3)");
+		// ClickHouse caps a single sleep() call at three seconds (TOO_SLOW), so
+		// each propagation boundary sleeps one second per row across eight rows.
+		expect(
+			ddlMigration.match(
+				/SELECT sleepEachRow\(1\) FROM numbers\(8\) FORMAT Null;/gu,
+			),
+		).toHaveLength(3);
+		expect(ddlMigration).not.toContain("SELECT sleep(");
 		expect(ddlMigration).toContain(
 			"rudel.claude_sessions TO rudel.claude_sessions_f16_backup_20260826",
 		);
