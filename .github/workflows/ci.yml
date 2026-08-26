@@ -292,15 +292,40 @@ jobs:
               try { Remove-Item -Path $userChoice -Force } catch { Write-Host "UserChoice removal failed for ${scheme}: $_" }
             }
           }
-          foreach ($scheme in @("http", "https")) {
-            Write-Host "--- $scheme diagnostics ---"
-            $userChoice = "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$scheme\UserChoice"
-            if (Test-Path $userChoice) { Get-ItemProperty $userChoice | Out-String | Write-Host } else { Write-Host "no UserChoice" }
-            Get-Item "Registry::HKEY_CLASSES_ROOT\$scheme\shell\open\command" -ErrorAction SilentlyContinue | ForEach-Object { $_.GetValue("") } | Write-Host
+          Write-Host "user: $(whoami)"
+          $listener = [System.Net.HttpListener]::new()
+          $listener.Prefixes.Add("http://127.0.0.1:47831/")
+          $listener.Start()
+          $hits = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
+          $pump = Start-ThreadJob -ScriptBlock {
+            param($l, $q)
+            while ($l.IsListening) {
+              try {
+                $ctx = $l.GetContext()
+                $q.Enqueue($ctx.Request.Url.ToString())
+                $ctx.Response.StatusCode = 200
+                $ctx.Response.Close()
+              } catch { break }
+            }
+          } -ArgumentList $listener, $hits
+          $variants = @(
+            @{ name = "start-process-url"; run = { Start-Process -FilePath "http://127.0.0.1:47831/start-process" -ErrorAction Stop } },
+            @{ name = "cmd-start"; run = { cmd /c start "" "http://127.0.0.1:47831/cmd-start" } },
+            @{ name = "direct-curl"; run = { curl.exe --silent --output NUL "http://127.0.0.1:47831/direct-curl" } }
+          )
+          foreach ($variant in $variants) {
+            try {
+              & $variant.run
+              Write-Host "$($variant.name): launched"
+            } catch {
+              Write-Host "$($variant.name) FAILED: $_"
+            }
           }
-          foreach ($browser in @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe")) {
-            Write-Host "$browser exists: $(Test-Path $browser)"
-          }
+          Start-Sleep -Seconds 5
+          $listener.Stop()
+          $seen = @($hits)
+          Write-Host "listener hits: $($seen -join ', ')"
+          if ($seen.Count -eq 0) { Write-Host "NO variant reached the listener" }
 
       - name: Verify the Windows opener delivers the complete URL
         if: runner.os == 'Windows'
