@@ -12,6 +12,11 @@ import {
 } from "./handlers/avatar-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
+	API_RESPONSE_MAX_BYTES,
+	enforceApiResponseSize,
+} from "./lib/api-response-size.js";
+import { enforceCookieCsrfOrigin } from "./lib/csrf-origin.js";
+import {
 	readBetterAuthSecret,
 	readBooleanEnv,
 	readCliDeviceVerificationUrl,
@@ -23,7 +28,11 @@ import { shutdownApiProductAnalytics } from "./lib/product-analytics.js";
 import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
-import { router } from "./router.js";
+import {
+	createBackgroundIngestErrorFactories,
+	processIngestSession,
+	router,
+} from "./router.js";
 import {
 	registerClickHousePurgeWorker,
 	startClickHousePurgeWorker,
@@ -32,6 +41,17 @@ import {
 	getIngestFilterQueueMetrics,
 	shutdownIngestFilterQueue,
 } from "./services/ingest-filter.service.js";
+import {
+	getNextR2IngestWorkDueAt,
+	registerR2IngestCleanupWorker,
+	repairR2IngestCleanupJobs,
+	sweepExpiredR2IngestJobs,
+} from "./services/r2-ingest-cleanup.service.js";
+import { repairRecoverableR2IngestJobs } from "./services/r2-ingest-commit.service.js";
+import {
+	createR2MultipartUploadClient,
+	readR2IngestAvailability,
+} from "./services/r2-ingest-storage.service.js";
 import { startSessionLanguageSignalReconciliationWorker } from "./services/session-language-signal-reconciliation.service.js";
 import { shutdownSessionLanguageSignalScanner } from "./services/session-language-signal-scanner.service.js";
 import { shutdownUsageExtractionQueue } from "./services/usage-extraction.service.js";
@@ -284,6 +304,20 @@ const server = Bun.serve({
 			);
 		}
 
+		const csrfRejection = enforceCookieCsrfOrigin({
+			allowedOrigins: trustedOrigins,
+			request,
+		});
+		if (csrfRejection) {
+			for (const [name, value] of Object.entries(cors)) {
+				csrfRejection.headers.set(name, value);
+			}
+			return applyHttpResponsePolicy(csrfRejection, {
+				pathname: url.pathname,
+				requestId,
+			});
+		}
+
 		const contentLength = request.headers.get("Content-Length");
 		if (contentLength && Number(contentLength) > MAX_REQUEST_BODY_BYTES) {
 			return applyHttpResponsePolicy(
@@ -344,14 +378,21 @@ const server = Bun.serve({
 					requestId,
 					wrappedShareLookupSource,
 				);
+				const finalResponse =
+					url.pathname === "/rpc" || url.pathname.startsWith("/rpc/")
+						? response
+						: await enforceApiResponseSize({
+								pathname: url.pathname,
+								response,
+							});
 				const duration = Math.round(performance.now() - start);
 				logger.info("{method} {path} {status} {duration}ms", {
 					method: request.method,
 					path: url.pathname,
-					status: response.status,
+					status: finalResponse.status,
 					duration,
 				});
-				return applyHttpResponsePolicy(response, {
+				return applyHttpResponsePolicy(finalResponse, {
 					pathname: url.pathname,
 					requestId,
 				});
@@ -359,11 +400,53 @@ const server = Bun.serve({
 		);
 	},
 });
+const r2IngestAvailability = readR2IngestAvailability();
+const r2IngestCleanupClient = r2IngestAvailability.enabled
+	? createR2MultipartUploadClient(r2IngestAvailability.configuration)
+	: undefined;
 const clickHousePurgeWorker = startClickHousePurgeWorker({
 	enabled: readBooleanEnv("CLICKHOUSE_PURGE_WORKER_ENABLED", true),
+	repairR2IngestCleanup: r2IngestCleanupClient
+		? async () => {
+				const expired = await sweepExpiredR2IngestJobs({
+					database: sqlClient,
+					r2: r2IngestCleanupClient,
+				});
+				const recovered = await repairRecoverableR2IngestJobs({
+					database: sqlClient,
+					process: (sessionInput, identity, signal) =>
+						processIngestSession({
+							awaitLanguageSignals: true,
+							context: {
+								session: null,
+								user: { id: identity.userId },
+							},
+							durableProcessing: { failpoint: undefined },
+							enforceRateLimits: false,
+							errorFactories: createBackgroundIngestErrorFactories(),
+							input: sessionInput,
+							signal,
+						}),
+					r2: r2IngestCleanupClient,
+				});
+				const cleanup = await repairR2IngestCleanupJobs({
+					database: sqlClient,
+					r2: r2IngestCleanupClient,
+				});
+				return {
+					attempted:
+						expired.attempted + recovered.attempted + cleanup.attempted,
+					completed:
+						expired.completed + recovered.completed + cleanup.completed,
+					hasMore: expired.hasMore || recovered.hasMore || cleanup.hasMore,
+					nextDueAt: await getNextR2IngestWorkDueAt(sqlClient),
+				};
+			}
+		: undefined,
 	resend,
 });
 registerClickHousePurgeWorker(clickHousePurgeWorker);
+registerR2IngestCleanupWorker(clickHousePurgeWorker);
 const sessionLanguageSignalReconciliationWorker = IS_TEST
 	? undefined
 	: startSessionLanguageSignalReconciliationWorker();
@@ -448,6 +531,17 @@ async function handleRequest(
 	requestId: string,
 	wrappedShareLookupSource: string,
 ): Promise<Response> {
+	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
+		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
+	}
+	if (IS_TEST && url.pathname === "/rpc/__test/oversized-response") {
+		return enforceApiResponseSize({
+			pathname: url.pathname,
+			response: Response.json({
+				json: { payload: "x".repeat(API_RESPONSE_MAX_BYTES) },
+			}),
+		});
+	}
 	const wrappedShareCardImageId = getWrappedShareCardImageId(url.pathname);
 	if (wrappedShareCardImageId) {
 		return handleWrappedShareCardImageRequest({
@@ -530,7 +624,10 @@ async function handleRequest(
 		return maybeCompressSessionDetailRpcResponse({
 			pathname: url.pathname,
 			requestHeaders: request.headers,
-			response,
+			response: await enforceApiResponseSize({
+				pathname: url.pathname,
+				response,
+			}),
 		});
 	}
 

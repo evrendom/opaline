@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 import {
 	claudeCodeAdapter,
 	codexAdapter,
+	InvalidTranscriptTimestampError,
 	toClickHouseDateTime,
 } from "@rudel/agent-adapters";
 
@@ -67,12 +69,74 @@ describe("extractTimestamps", () => {
 		});
 	});
 
-	test("Codex also rejects invalid timestamp values", () => {
-		expect(
+	test("Codex rejects invalid timestamp values", () => {
+		expect(() =>
 			codexAdapter.extractTimestamps(
 				'{"type":"session_meta","timestamp":"not-a-date"}',
 			),
-		).toBeNull();
+		).toThrow(InvalidTranscriptTimestampError);
+	});
+
+	test.each([
+		{ adapter: claudeCodeAdapter, type: "user" },
+		{ adapter: codexAdapter, type: "event_msg" },
+	])("rejects Unix-seconds strings for $adapter.name", ({ adapter, type }) => {
+		expect(() =>
+			adapter.extractTimestamps(
+				JSON.stringify({ timestamp: "2147483647", type }),
+			),
+		).toThrow(InvalidTranscriptTimestampError);
+	});
+
+	test.each([
+		{ adapter: claudeCodeAdapter, type: "user" },
+		{ adapter: codexAdapter, type: "event_msg" },
+	])("rejects unzoned timestamps for $adapter.name", ({ adapter, type }) => {
+		expect(() =>
+			adapter.extractTimestamps(
+				JSON.stringify({ timestamp: "2026-02-15T10:00:00", type }),
+			),
+		).toThrow(InvalidTranscriptTimestampError);
+	});
+
+	test.each([
+		{ adapter: claudeCodeAdapter, type: "user" },
+		{ adapter: codexAdapter, type: "event_msg" },
+	])("rejects mixed-validity timestamps for $adapter.name", ({
+		adapter,
+		type,
+	}) => {
+		const content = [
+			JSON.stringify({ timestamp: "2026-02-15T10:00:00Z", type }),
+			JSON.stringify({ timestamp: "2147483647", type }),
+		].join("\n");
+
+		expect(() => adapter.extractTimestamps(content)).toThrow(
+			InvalidTranscriptTimestampError,
+		);
+	});
+
+	test("is invariant in a non-UTC process timezone", async () => {
+		const fixturePath = fileURLToPath(
+			new URL("./fixtures/strict-timestamp-timezone.ts", import.meta.url),
+		);
+		const subprocess = Bun.spawn([process.execPath, fixturePath], {
+			env: { ...process.env, TZ: "America/New_York" },
+			stderr: "pipe",
+			stdout: "pipe",
+		});
+		const [exitCode, stderr, stdout] = await Promise.all([
+			subprocess.exited,
+			new Response(subprocess.stderr).text(),
+			new Response(subprocess.stdout).text(),
+		]);
+
+		expect(stderr).toBe("");
+		expect(exitCode).toBe(0);
+		expect(JSON.parse(stdout)).toEqual({
+			lastInteractionDate: "2026-02-15T15:05:00.000Z",
+			sessionDate: "2026-02-15T15:00:00.000Z",
+		});
 	});
 
 	test.each([

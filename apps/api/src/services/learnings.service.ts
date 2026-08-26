@@ -1,7 +1,9 @@
-import type {
-	LearningEntry as LearningEntryBase,
-	LearningsFeedStats,
-	LearningsTrendDataPoint,
+import {
+	LEARNING_CONTENT_MAX_CODE_UNITS,
+	LEARNINGS_FEED_LIMIT,
+	type LearningEntry as LearningEntryBase,
+	type LearningsFeedStats,
+	type LearningsTrendDataPoint,
 } from "@rudel/api-routes";
 import {
 	addOptionalStringEqFilter,
@@ -30,11 +32,16 @@ export async function getLearningsFeed(
 	} = {},
 ): Promise<LearningEntry[]> {
 	const { days = 30, user_id, project_path, limit = 50, offset = 0 } = params;
+	const requestedLimit = Math.trunc(limit);
+	const boundedLimit = Number.isSafeInteger(requestedLimit)
+		? Math.min(LEARNINGS_FEED_LIMIT, Math.max(1, requestedLimit))
+		: 50;
 
 	const d = Number(days);
 	const query_params: Record<string, unknown> = {
+		contentMaxCodePoints: LEARNING_CONTENT_MAX_CODE_UNITS,
 		days: d,
-		limit: Number(limit),
+		limit: boundedLimit,
 		offset: Number(offset),
 		orgId,
 	};
@@ -93,18 +100,18 @@ export async function getLearningsFeed(
       formatDateTime(last_interaction_date, '%Y-%m-%dT%H:%i:%SZ') as created_at,
       'feedback' as type,
       if(
-        position(content, '<command-name>/compound:feedback</command-name>') > 0
-        AND position(content, '<command-args>', position(content, '<command-name>/compound:feedback</command-name>')) > 0
-        AND position(content, '</command-args>', position(content, '<command-name>/compound:feedback</command-name>')) > 0,
+        positionUTF8(content, '<command-name>/compound:feedback</command-name>') > 0
+        AND positionUTF8(content, '<command-args>', positionUTF8(content, '<command-name>/compound:feedback</command-name>')) > 0
+        AND positionUTF8(content, '</command-args>', positionUTF8(content, '<command-name>/compound:feedback</command-name>')) > 0,
         trimBoth(
-          substring(
+          substringUTF8(
             content,
-            position(content, '<command-args>', position(content, '<command-name>/compound:feedback</command-name>')) + 14,
+            positionUTF8(content, '<command-args>', positionUTF8(content, '<command-name>/compound:feedback</command-name>')) + 14,
             least(
-              position(content, '</command-args>', position(content, '<command-name>/compound:feedback</command-name>'))
-              - position(content, '<command-args>', position(content, '<command-name>/compound:feedback</command-name>'))
+              positionUTF8(content, '</command-args>', positionUTF8(content, '<command-name>/compound:feedback</command-name>'))
+              - positionUTF8(content, '<command-args>', positionUTF8(content, '<command-name>/compound:feedback</command-name>'))
               - 14,
-              5000
+              {contentMaxCodePoints:UInt32}
             )
           )
         ),
@@ -124,7 +131,32 @@ export async function getLearningsFeed(
     OFFSET {offset:UInt32}
   `;
 
-	return queryClickhouse<LearningEntry>({ query, query_params });
+	const rows = await queryClickhouse<LearningEntry>({ query, query_params });
+	return rows.map((row) => ({
+		...row,
+		content: clampLearningContent(row.content),
+	}));
+}
+
+export function clampLearningContent(
+	value: string,
+	maxCodeUnits = LEARNING_CONTENT_MAX_CODE_UNITS,
+): string {
+	if (!Number.isSafeInteger(maxCodeUnits) || maxCodeUnits < 0) {
+		throw new Error(
+			"Learning content limit must be a non-negative safe integer",
+		);
+	}
+	if (value.length <= maxCodeUnits) return value;
+	if (maxCodeUnits === 0) return "";
+	const lastIncluded = value.charCodeAt(maxCodeUnits - 1);
+	const firstExcluded = value.charCodeAt(maxCodeUnits);
+	const splitsSurrogatePair =
+		lastIncluded >= 0xd800 &&
+		lastIncluded <= 0xdbff &&
+		firstExcluded >= 0xdc00 &&
+		firstExcluded <= 0xdfff;
+	return value.slice(0, splitsSurrogatePair ? maxCodeUnits - 1 : maxCodeUnits);
 }
 
 /**

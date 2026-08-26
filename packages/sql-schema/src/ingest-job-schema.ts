@@ -36,6 +36,12 @@ export const ingestJob = pgTable(
 			withTimezone: true,
 			mode: "date",
 		}),
+		expiresAt: timestamp("expires_at", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.default(sql`NOW() + INTERVAL '24 hours'`)
+			.notNull(),
 		objectManifest: jsonb("object_manifest").notNull(),
 		expectedSizes: jsonb("expected_sizes").notNull(),
 		expectedTotalBytes: integer("expected_total_bytes").notNull(),
@@ -77,10 +83,13 @@ export const ingestJob = pgTable(
 		index("ingest_job_running_lease_expiry_idx")
 			.on(table.leaseExpiresAt)
 			.where(sql`${table.status} = 'running'`),
+		index("ingest_job_expiry_idx")
+			.on(table.expiresAt)
+			.where(sql`${table.status} IN ('pending', 'running')`),
 		index("ingest_job_cleanup_idx")
-			.on(table.completedAt)
+			.on(table.updatedAt)
 			.where(
-				sql`${table.status} = 'completed' AND ${table.objectsDeletedAt} IS NULL`,
+				sql`${table.status} IN ('completed', 'failed') AND ${table.objectsDeletedAt} IS NULL`,
 			),
 		index("ingest_job_session_idx").on(table.organizationId, table.sessionId),
 		check(

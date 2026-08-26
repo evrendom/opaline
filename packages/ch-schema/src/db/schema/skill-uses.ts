@@ -34,6 +34,7 @@ const rudel_skill_uses = table({
 	],
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 	comment:
@@ -58,6 +59,7 @@ const rudel_skill_receipts = table({
 	orderBy: ["organization_id", "agent", "user_id", "session_id"],
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 	comment:
@@ -82,6 +84,7 @@ const rudel_skill_version_contents = table({
 	orderBy: ["organization_id", "skill_name", "content_sha256", "user_id"],
 	settings: {
 		index_granularity: "8192",
+		non_replicated_deduplication_window: "1000",
 		storage_policy: "'s3'",
 	},
 	comment:

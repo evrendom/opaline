@@ -15,6 +15,7 @@ import {
 	IngestFilterQueueClosedError,
 	IngestFilterQueueTimeoutError,
 } from "../services/ingest-filter.service.js";
+import { IngestFilterWorkerOperationalError } from "../services/ingest-worker-operational.error.js";
 
 const PRIVATE_KEY = [
 	"-----BEGIN PRIVATE KEY-----",
@@ -268,6 +269,33 @@ describe("IngestFilterQueue limits", () => {
 });
 
 describe("IngestFilterQueue cleanup and fairness", () => {
+	test("returns a typed operational error when the worker crashes", async () => {
+		const queue = new IngestFilterQueue(
+			{
+				globalMaxBytes: 100,
+				globalMaxJobs: 1,
+				perUserMaxBytes: 100,
+				perUserMaxJobs: 1,
+				timeoutMs: 5_000,
+			},
+			() =>
+				new Worker(
+					new URL("./fixtures/crashing-ingest-worker.ts", import.meta.url).href,
+				),
+		);
+		const failed = queue.filter({
+			bytes: 7,
+			fields: { content: "crash", subagents: undefined },
+			signal: new AbortController().signal,
+			userId: "worker-crash-user",
+		});
+
+		await expect(failed).rejects.toBeInstanceOf(
+			IngestFilterWorkerOperationalError,
+		);
+		queue.close();
+	});
+
 	test("restarts the worker after dispatch rejects an uncloneable request", async () => {
 		const queue = new IngestFilterQueue({
 			globalMaxBytes: 100,

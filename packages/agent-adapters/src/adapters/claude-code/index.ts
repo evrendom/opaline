@@ -8,6 +8,7 @@ import {
 	type RudelClaudeSessionsRow,
 } from "@rudel/ch-schema/generated";
 import { MissingTranscriptTimestampError } from "../../errors.js";
+import { extractStrictTranscriptTimestamps } from "../../timestamps.js";
 import type {
 	AgentAdapter,
 	IngestContext,
@@ -260,39 +261,12 @@ class ClaudeCodeAdapter implements AgentAdapter {
 	}
 
 	extractTimestamps(content: string): SessionTimestamps | null {
-		let min: string | null = null;
-		let max: string | null = null;
-		let minTime = Number.POSITIVE_INFINITY;
-		let maxTime = Number.NEGATIVE_INFINITY;
-
-		for (const line of content.split("\n")) {
-			if (!line) continue;
-			let parsed: unknown;
-			try {
-				parsed = JSON.parse(line);
-			} catch {
-				continue;
-			}
-			if (!isRecord(parsed)) continue;
-			if (parsed.type !== "user" && parsed.type !== "assistant") continue;
-			if (typeof parsed.timestamp !== "string") continue;
-			const timestampTime = Date.parse(parsed.timestamp);
-			if (!Number.isFinite(timestampTime)) continue;
-
-			const timestamp = new Date(timestampTime).toISOString();
-			if (timestampTime < minTime) {
-				min = timestamp;
-				minTime = timestampTime;
-			}
-			if (timestampTime > maxTime) {
-				max = timestamp;
-				maxTime = timestampTime;
-			}
-		}
-
-		if (!min || !max) return null;
-
-		return { sessionDate: min, lastInteractionDate: max };
+		return extractStrictTranscriptTimestamps({
+			content,
+			isTimestampRecord: (record) =>
+				record.type === "user" || record.type === "assistant",
+			source: this.source,
+		});
 	}
 
 	async ingest(

@@ -440,20 +440,14 @@ describe("checkHookIngestRateLimit", () => {
 		expect(() => checkHookIngestRateLimit(userId, "session-1")).not.toThrow();
 	});
 
-	test("repeated uploads of an existing session_id do not exhaust the cap", () => {
+	test("repeated uploads of an existing session_id exhaust the cap", () => {
 		const userId = `test-hook-dedup-${Date.now()}`;
-		// Fill the limiter to the cap with distinct session_ids.
 		for (let i = 0; i < 500; i++) {
-			checkHookIngestRateLimit(userId, `session-${i}`);
+			checkHookIngestRateLimit(userId, "session-1");
 		}
-		// At cap. Hammering an existing id (Codex turn-complete pattern) must
-		// not throw — repeats don't claim new slots. If this regresses, every
-		// 501st turn would 429 even though it's the same session.
-		expect(() => {
-			for (let i = 0; i < 1000; i++) {
-				checkHookIngestRateLimit(userId, "session-1");
-			}
-		}).not.toThrow();
+		expect(() => checkHookIngestRateLimit(userId, "session-1")).toThrow(
+			"Rate limit exceeded",
+		);
 	});
 
 	test("throws once distinct session_ids exceed the limit", () => {

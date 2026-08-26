@@ -2,6 +2,7 @@ import * as p from "@clack/prompts";
 import {
 	claudeCodeAdapter,
 	getAdapter,
+	InvalidTranscriptTimestampError,
 	MissingTranscriptTimestampError,
 	type ScannedProject,
 	type SessionFile,
@@ -262,6 +263,11 @@ async function runSingleUpload(
 		if (error instanceof MissingTranscriptTimestampError) {
 			return new Error(
 				"This transcript has no timestamped user/assistant messages, so it cannot be uploaded.",
+			);
+		}
+		if (error instanceof InvalidTranscriptTimestampError) {
+			return new Error(
+				"This transcript contains a timestamp that is not timezone-explicit RFC3339, so it cannot be uploaded.",
 			);
 		}
 		throw error;

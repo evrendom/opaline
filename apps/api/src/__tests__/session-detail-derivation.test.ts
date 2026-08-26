@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	SESSION_DETAIL_BODY_MAX_RAW_BYTES,
 	SESSION_DETAIL_WINDOW_INITIAL_TURNS,
 	SESSION_DETAIL_WINDOW_MAX_RAW_BYTES,
 	SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
@@ -19,6 +20,7 @@ import {
 	getSessionDetailTurn,
 	SESSION_DETAIL_OVERVIEW_MAX_BYTES,
 	SessionDetailAnchorNotFoundError,
+	SessionDetailBodyTooLargeError,
 	type SessionDetailRawSnapshot,
 	StaleSessionDetailCursorError,
 	truncateSessionDetailPreview,
@@ -961,5 +963,31 @@ describe("session detail derivation", () => {
 			revision: input.revision,
 			subagentId: "agent-1",
 		});
+	});
+
+	test("rejects individual turn and subagent bodies above the byte cap", () => {
+		const input = snapshot(
+			line({
+				message: {
+					content: "a".repeat(SESSION_DETAIL_BODY_MAX_RAW_BYTES + 1),
+					role: "user",
+				},
+				sessionId: "session-1",
+				timestamp: "2026-08-16T08:00:00.000Z",
+				type: "user",
+				uuid: "large-user",
+			}),
+		);
+		input.subagents = {
+			"large-agent": "🙂".repeat(SESSION_DETAIL_BODY_MAX_RAW_BYTES),
+		};
+		const derivation = deriveSessionDetail(input);
+
+		expect(() => getSessionDetailTurn(derivation, "large-user")).toThrow(
+			SessionDetailBodyTooLargeError,
+		);
+		expect(() => getSessionDetailSubagent(derivation, "large-agent")).toThrow(
+			SessionDetailBodyTooLargeError,
+		);
 	});
 });
