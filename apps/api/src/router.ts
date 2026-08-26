@@ -1177,6 +1177,16 @@ const r2IngestCommit = os.ingest.commit
 				message: "An ingest API key is required",
 			});
 		}
+		if (
+			readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+			!context.ingestOperatorAuthorized
+		) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "session_ingest_quiesced" },
+				message:
+					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
+			});
+		}
 		const availability = readR2IngestAvailability();
 		if (!availability.enabled) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {

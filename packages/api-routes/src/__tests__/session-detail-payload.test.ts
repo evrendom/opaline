@@ -103,8 +103,12 @@ describe("session detail payload contracts", () => {
 	});
 
 	test("accepts canonical decimal UInt64 revisions above JavaScript's safe range", () => {
-		expect(SessionDetailRevisionSchema.parse("9007199254740992")).toBe(
-			"9007199254740992",
+		const nonRepresentableRevision = "117158864486400001";
+		expect(Number(nonRepresentableRevision).toString()).not.toBe(
+			nonRepresentableRevision,
+		);
+		expect(SessionDetailRevisionSchema.parse(nonRepresentableRevision)).toBe(
+			nonRepresentableRevision,
 		);
 		for (const invalid of [
 			"",

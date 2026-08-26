@@ -40,11 +40,13 @@ import {
 	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
 import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
+import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import type {
 	R2MultipartUploadClient,
 	R2MultipartUploadInitClient,
 	R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
+import { startApiTestServer } from "./helpers/api-test-server.js";
 
 type Uuid = `${string}-${string}-${string}-${string}-${string}`;
 
@@ -66,7 +68,9 @@ class FakeR2Client implements R2MultipartUploadClient {
 	readonly abortFailures = new Map<string, unknown>();
 	readonly completedKeys: string[] = [];
 	readonly deletedKeys: string[] = [];
+	readonly getObjectKeys: string[] = [];
 	readonly getObjectFailures = new Map<string, unknown>();
+	readonly headObjectKeys: string[] = [];
 	readonly objects = new Map<string, FakeStoredObject>();
 
 	async abortMultipartUpload(input: {
@@ -119,6 +123,7 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	async getObject(objectKey: string): Promise<Uint8Array> {
+		this.getObjectKeys.push(objectKey);
 		const failure = this.getObjectFailures.get(objectKey);
 		if (failure) {
 			this.getObjectFailures.delete(objectKey);
@@ -131,6 +136,7 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	async headObject(objectKey: string): Promise<R2ObjectMetadata | null> {
+		this.headObjectKeys.push(objectKey);
 		const object = this.objects.get(objectKey);
 		if (!object?.complete || !object.bytes) return null;
 		return { byteLength: object.bytes.byteLength, metadata: object.metadata };
@@ -205,6 +211,152 @@ afterAll(async () => {
 });
 
 describe("R2 ingest commit lifecycle", () => {
+	test("quiescence freezes commit and repair before durable state or R2 access", async () => {
+		const operatorToken = `operator-${crypto.randomUUID()}`;
+		const server = await startApiTestServer({
+			R2_ACCESS_KEY_ID: "",
+			R2_ACCOUNT_ID: "",
+			R2_SECRET_ACCESS_KEY: "",
+			SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
+			SESSION_INGEST_QUIESCED: "true",
+		});
+		let identity: QuiescedTestIdentity | undefined;
+		let commitJob: R2IngestInitOutput | undefined;
+		let terminalJob: R2IngestInitOutput | undefined;
+		try {
+			identity = await createQuiescedTestIdentity(server.baseUrl);
+			commitJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				"quiesced commit transcript bytes",
+				identity,
+			);
+			const commitObjectsBefore = snapshotFakeR2Objects(commitJob);
+			const commitEffectsBefore = snapshotFakeR2Effects();
+			const commitRowBefore = await readIngestJobRowSnapshot(commitJob.jobId);
+			expect(commitRowBefore).toMatchObject({
+				attempts: 0,
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+
+			const response = await fetch(`${server.baseUrl}/rpc/ingest/commit`, {
+				body: JSON.stringify({ json: buildCompletionInput(commitJob) }),
+				headers: {
+					"Content-Type": "application/json",
+					"x-api-key": identity.apiKey,
+				},
+				method: "POST",
+			});
+
+			expect(response.status).toBe(503);
+			expect(await readRpcErrorShape(response)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				reason: "session_ingest_quiesced",
+			});
+			const operatorResponse = await fetch(
+				`${server.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(commitJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(operatorResponse.status).toBe(503);
+			expect(await readRpcErrorShape(operatorResponse)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				reason: "r2_ingest_disabled",
+			});
+			expect(await readIngestJobRowSnapshot(commitJob.jobId)).toEqual(
+				commitRowBefore,
+			);
+			expect(snapshotFakeR2Objects(commitJob)).toEqual(commitObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(commitEffectsBefore);
+
+			terminalJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				"quiesced terminal cleanup bytes",
+				identity,
+			);
+			await sqlClient`
+				UPDATE ingest_job
+				SET
+					attempts = CASE WHEN id = ${commitJob.jobId} THEN 1 ELSE max_attempts END,
+					available_at = clock_timestamp() - interval '1 minute',
+					expires_at = clock_timestamp() + interval '2 days'
+				WHERE id IN (${commitJob.jobId}, ${terminalJob.jobId})
+			`;
+			const repairRowsBefore = await Promise.all([
+				readIngestJobRowSnapshot(commitJob.jobId),
+				readIngestJobRowSnapshot(terminalJob.jobId),
+			]);
+			expect(repairRowsBefore[0]).toMatchObject({
+				attempts: 1,
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+			expect(repairRowsBefore[1]).toMatchObject({
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+			expect(repairRowsBefore[1]?.attempts).toBeGreaterThan(1);
+			const repairObjectsBefore = [
+				...snapshotFakeR2Objects(commitJob),
+				...snapshotFakeR2Objects(terminalJob),
+			];
+			const repairEffectsBefore = snapshotFakeR2Effects();
+			const previousQuiescence = process.env.SESSION_INGEST_QUIESCED;
+			process.env.SESSION_INGEST_QUIESCED = "true";
+			try {
+				await expect(runR2IngestRepairPass(fakeR2)).resolves.toEqual({
+					attempted: 0,
+					completed: 0,
+					hasMore: false,
+					nextDueAt: null,
+				});
+			} finally {
+				restoreEnvironmentVariable(
+					"SESSION_INGEST_QUIESCED",
+					previousQuiescence,
+				);
+			}
+			expect(
+				await Promise.all([
+					readIngestJobRowSnapshot(commitJob.jobId),
+					readIngestJobRowSnapshot(terminalJob.jobId),
+				]),
+			).toEqual(repairRowsBefore);
+			expect([
+				...snapshotFakeR2Objects(commitJob),
+				...snapshotFakeR2Objects(terminalJob),
+			]).toEqual(repairObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(repairEffectsBefore);
+		} finally {
+			await server.stop();
+			const jobIds = [commitJob?.jobId, terminalJob?.jobId].filter(
+				(jobId): jobId is string => jobId !== undefined,
+			);
+			for (const jobId of jobIds) {
+				await sqlClient`DELETE FROM ingest_job WHERE id = ${jobId}`;
+			}
+			for (const initialized of [commitJob, terminalJob]) {
+				for (const object of initialized?.objects ?? []) {
+					fakeR2.objects.delete(object.objectKey);
+				}
+			}
+			if (identity) {
+				await sqlClient`DELETE FROM organization WHERE id = ${identity.organizationId}`;
+				await sqlClient`DELETE FROM "user" WHERE id = ${identity.userId}`;
+			}
+		}
+	}, 60_000);
+
 	test("aborts every upload created during partial initialization failure", async () => {
 		const mainPresigned = Promise.withResolvers<void>();
 		const abortedUploads: string[] = [];
@@ -1459,6 +1611,181 @@ describe("R2 ingest real processor crash recovery", () => {
 		}
 	});
 });
+
+interface QuiescedTestIdentity {
+	apiKey: string;
+	organizationId: string;
+	userId: string;
+}
+
+async function createQuiescedTestIdentity(
+	baseUrl: string,
+): Promise<QuiescedTestIdentity> {
+	const signupResponse = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
+		body: JSON.stringify({
+			email: `r2-quiescence-${crypto.randomUUID()}@example.com`,
+			name: "R2 Quiescence Test",
+			password: "r2-quiescence-test-password",
+		}),
+		headers: { "Content-Type": "application/json" },
+		method: "POST",
+	});
+	expect(signupResponse.ok).toBe(true);
+	const signup: unknown = await signupResponse.json();
+	if (!isRecord(signup) || typeof signup.token !== "string") {
+		throw new Error("Quiescence test signup returned no bearer token");
+	}
+
+	const meResponse = await fetch(`${baseUrl}/rpc/me`, {
+		body: "{}",
+		headers: {
+			Authorization: `Bearer ${signup.token}`,
+			"Content-Type": "application/json",
+		},
+		method: "POST",
+	});
+	expect(meResponse.ok).toBe(true);
+	const me: unknown = await meResponse.json();
+	if (!isRecord(me) || !isRecord(me.json) || typeof me.json.id !== "string") {
+		throw new Error("Quiescence test user lookup returned no user ID");
+	}
+
+	const apiKeyResponse = await fetch(`${baseUrl}/api/auth/api-key/create`, {
+		body: JSON.stringify({ expiresIn: null, name: "r2-quiescence-test" }),
+		headers: {
+			Authorization: `Bearer ${signup.token}`,
+			"Content-Type": "application/json",
+		},
+		method: "POST",
+	});
+	expect(apiKeyResponse.ok).toBe(true);
+	const apiKey: unknown = await apiKeyResponse.json();
+	if (!isRecord(apiKey) || typeof apiKey.key !== "string") {
+		throw new Error("Quiescence test API key creation returned no key");
+	}
+
+	return {
+		apiKey: apiKey.key,
+		organizationId: me.json.id,
+		userId: me.json.id,
+	};
+}
+
+async function initializeUploadedJobForIdentity(
+	jobId: Uuid,
+	mainContent: string,
+	identity: QuiescedTestIdentity,
+): Promise<R2IngestInitOutput> {
+	const initialized = await initR2IngestJob({
+		database: sqlClient,
+		input: {
+			objects: [
+				{
+					byteLength: byteLength(mainContent),
+					kind: "main",
+					sha256: sha256(mainContent),
+				},
+			],
+			projectPath: "/test/r2-quiescence",
+			sessionId: jobId,
+			source: "claude_code",
+		},
+		now: () => new Date("2026-08-25T10:00:00.000Z"),
+		organizationId: identity.organizationId,
+		r2: fakeR2,
+		randomUUID: () => jobId,
+		userId: identity.userId,
+	});
+	await extendTestJobExpiry(initialized.jobId);
+	const objectKey = initialized.objects[0]?.objectKey;
+	if (!objectKey) throw new Error("Quiescence test job has no main object");
+	fakeR2.uploadText(objectKey, mainContent);
+	return initialized;
+}
+
+async function readRpcErrorShape(
+	response: Response,
+): Promise<{ code: string; reason: string | undefined }> {
+	const body: unknown = await response.json();
+	if (
+		!isRecord(body) ||
+		!isRecord(body.json) ||
+		typeof body.json.code !== "string"
+	) {
+		throw new Error("Quiesced commit returned an invalid RPC error");
+	}
+	const data = isRecord(body.json.data) ? body.json.data : {};
+	return {
+		code: body.json.code,
+		reason: typeof data.reason === "string" ? data.reason : undefined,
+	};
+}
+
+interface IngestJobRowSnapshot {
+	attempts: number;
+	leaseExpiresAt: string | null;
+	leaseToken: string | null;
+	snapshot: string;
+	status: string;
+}
+
+async function readIngestJobRowSnapshot(
+	jobId: string,
+): Promise<IngestJobRowSnapshot> {
+	const [row] = await sqlClient<IngestJobRowSnapshot[]>`
+		SELECT
+			attempts,
+			lease_expires_at::text AS "leaseExpiresAt",
+			lease_token AS "leaseToken",
+			to_jsonb(job)::text AS snapshot,
+			status
+		FROM ingest_job AS job
+		WHERE id = ${jobId}
+	`;
+	if (!row) throw new Error("Quiescence test ingest job disappeared");
+	return row;
+}
+
+function snapshotFakeR2Objects(initialized: R2IngestInitOutput) {
+	return initialized.objects.map((initializedObject) => {
+		const stored = fakeR2.objects.get(initializedObject.objectKey);
+		if (!stored) throw new Error("Quiescence test R2 object disappeared");
+		return {
+			bytes: stored.bytes ? Array.from(stored.bytes) : null,
+			complete: stored.complete,
+			metadata: Object.entries(stored.metadata).sort(([left], [right]) =>
+				left.localeCompare(right),
+			),
+			objectKey: initializedObject.objectKey,
+			uploadId: stored.uploadId,
+		};
+	});
+}
+
+function snapshotFakeR2Effects() {
+	return {
+		abortedKeys: [...fakeR2.abortedKeys],
+		completedKeys: [...fakeR2.completedKeys],
+		deletedKeys: [...fakeR2.deletedKeys],
+		getObjectKeys: [...fakeR2.getObjectKeys],
+		headObjectKeys: [...fakeR2.headObjectKeys],
+	};
+}
+
+function restoreEnvironmentVariable(
+	name: string,
+	previousValue: string | undefined,
+): void {
+	if (previousValue === undefined) {
+		delete process.env[name];
+	} else {
+		process.env[name] = previousValue;
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
 
 async function initializeUploadedJob(
 	jobId: Uuid,

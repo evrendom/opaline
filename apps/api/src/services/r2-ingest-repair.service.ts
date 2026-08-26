@@ -3,6 +3,7 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { readBooleanEnv } from "../lib/env.js";
 import {
 	createBackgroundIngestErrorFactories,
 	processIngestSession,
@@ -26,6 +27,14 @@ export async function runR2IngestRepairPass(
 	r2: R2MultipartUploadClient,
 	deadline: MaintenanceDeadline | undefined = undefined,
 ): Promise<R2IngestRepairPassResult> {
+	if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+		return {
+			attempted: 0,
+			completed: 0,
+			hasMore: false,
+			nextDueAt: null,
+		};
+	}
 	const expired = hasMaintenanceTimeRemaining(deadline)
 		? await sweepExpiredR2IngestJobs({
 				database: sqlClient,

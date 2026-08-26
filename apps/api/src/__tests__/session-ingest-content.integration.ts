@@ -31,6 +31,7 @@ import {
 	allocateSessionRevision,
 	type SessionRevisionTransactionRunner,
 } from "../services/session-revision.service.js";
+import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
 import { buildActiveUsageEventsCte } from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
@@ -54,6 +55,8 @@ const REVISION_SESSION_ID = `${TEST_RUN_ID}_revision`;
 const CONCURRENT_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_concurrent_receipt`;
 const OWNERSHIP_RACE_SESSION_ID = `${TEST_RUN_ID}_ownership_race`;
 const RECURRING_CONTENT_SESSION_ID = `${TEST_RUN_ID}_recurring_content`;
+const EXPIRED_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_expired_revision_receipt`;
+const FRESH_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_fresh_revision_receipt`;
 
 let server: ApiTestServer;
 let userId: string;
@@ -205,6 +208,75 @@ describe("session ingest content bookkeeping", () => {
 			firstConnection.release();
 			secondConnection.release();
 		}
+	});
+
+	test("measures revision receipt retention against the PostgreSQL clock", async () => {
+		const expiredOperationId = `r2:${crypto.randomUUID()}`;
+		const freshOperationId = `r2:${crypto.randomUUID()}`;
+		for (const sessionId of [
+			EXPIRED_REVISION_RECEIPT_SESSION_ID,
+			FRESH_REVISION_RECEIPT_SESSION_ID,
+		]) {
+			const claim = await claimSessionIngestOwnership(
+				userId,
+				sessionId,
+				userId,
+			);
+			assert(claim.owned);
+		}
+		await allocateSessionRevision({
+			contentSha256: "8".repeat(64),
+			operationId: expiredOperationId,
+			organizationId: userId,
+			sessionId: EXPIRED_REVISION_RECEIPT_SESSION_ID,
+			userId,
+		});
+		await allocateSessionRevision({
+			contentSha256: "9".repeat(64),
+			operationId: freshOperationId,
+			organizationId: userId,
+			sessionId: FRESH_REVISION_RECEIPT_SESSION_ID,
+			userId,
+		});
+		await sqlClient`
+			UPDATE session_ingest_revision
+			SET created_at = CASE
+				WHEN operation_id = ${expiredOperationId}
+					THEN clock_timestamp() - interval '31 days'
+				ELSE clock_timestamp() - interval '29 days'
+			END
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+		`;
+		const clockClassifications = await sqlClient<
+			Array<{ expired: boolean; operationId: string }>
+		>`
+			SELECT
+				operation_id AS "operationId",
+				created_at < clock_timestamp() - interval '30 days' AS expired
+			FROM session_ingest_revision
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+			ORDER BY operation_id
+		`;
+		expect([...clockClassifications]).toEqual(
+			[
+				{ expired: true, operationId: expiredOperationId },
+				{ expired: false, operationId: freshOperationId },
+			].sort((left, right) =>
+				left.operationId.localeCompare(right.operationId),
+			),
+		);
+
+		const cleanup = await runSessionRevisionReceiptCleanupPass(sqlClient);
+		expect(cleanup.deleted).toBeGreaterThanOrEqual(1);
+		const remaining = await sqlClient<Array<{ operationId: string }>>`
+			SELECT operation_id AS "operationId"
+			FROM session_ingest_revision
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+		`;
+		expect([...remaining]).toEqual([{ operationId: freshOperationId }]);
 	});
 
 	test("returns a null hash, records it, then returns the stored hash", async () => {

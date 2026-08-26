@@ -12,21 +12,9 @@ export interface SessionRevisionReceiptCleanupPassResult {
 	readonly hasMore: boolean;
 }
 
-export function getSessionRevisionReceiptCutoff(now: Date): Date {
-	if (Number.isNaN(now.getTime())) {
-		throw new Error("Session revision receipt cleanup clock is invalid");
-	}
-	return new Date(
-		now.getTime() -
-			SESSION_REVISION_RECEIPT_RETENTION_DAYS * 24 * 60 * 60 * 1_000,
-	);
-}
-
 export async function runSessionRevisionReceiptCleanupPass(
-	now: Date = new Date(),
 	database?: postgres.Sql | postgres.ReservedSql,
 ): Promise<SessionRevisionReceiptCleanupPassResult> {
-	const cutoff = getSessionRevisionReceiptCutoff(now);
 	const activeDatabase = database ?? (await import("../db.js")).sqlClient;
 	const [row] = await activeDatabase.unsafe<DeletedReceiptCountRow[]>(
 		`
@@ -37,9 +25,9 @@ export async function runSessionRevisionReceiptCleanupPass(
 				operation_id,
 				content_sha256
 			FROM session_ingest_revision
-			WHERE created_at < $1::timestamptz
+			WHERE created_at < clock_timestamp() - interval '30 days'
 			ORDER BY created_at
-			LIMIT $2
+			LIMIT $1
 			FOR UPDATE SKIP LOCKED
 		), deleted AS (
 			DELETE FROM session_ingest_revision AS receipt
@@ -53,7 +41,7 @@ export async function runSessionRevisionReceiptCleanupPass(
 		SELECT count(*)::text AS "deletedCount"
 		FROM deleted
 		`,
-		[cutoff.toISOString(), SESSION_REVISION_RECEIPT_DELETE_BATCH_SIZE],
+		[SESSION_REVISION_RECEIPT_DELETE_BATCH_SIZE],
 	);
 	const deleted = Number(row?.deletedCount ?? 0);
 	if (!Number.isSafeInteger(deleted) || deleted < 0) {

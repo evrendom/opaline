@@ -283,6 +283,95 @@ Do not run `OPTIMIZE FINAL`. If execution fails after a rename, do not rerun
 blindly. Keep ingest quiesced, inspect the migration journal and exact table
 names, and choose forward completion or rollback.
 
+The backfill uses the fixed staging table
+`rudel.session_analytics_f16_rebuilt_identities_20260826`. A failed statement
+can leave it behind. In the failure-handling session, first record its exact
+metadata and contents:
+
+Run the `system.tables` query first. If it returns no row, record that absence,
+skip the stage-content queries, and use the migration journal and canonical or
+backup table names to locate the failed boundary.
+
+```sql
+SELECT
+  database,
+  name,
+  engine,
+  sorting_key,
+  total_rows,
+  total_bytes,
+  metadata_modification_time,
+  create_table_query
+FROM system.tables
+WHERE database = 'rudel'
+  AND name = 'session_analytics_f16_rebuilt_identities_20260826';
+
+SELECT
+  count() AS physical_rows,
+  uniqExact(tuple(source, organization_id, user_id, session_id))
+    AS unique_identities
+FROM rudel.session_analytics_f16_rebuilt_identities_20260826;
+
+WITH raw_emitted_identities AS
+(
+  SELECT 'claude_code' AS source, organization_id, user_id, session_id
+  FROM rudel.claude_sessions
+  WHERE length(content) > 120000000
+    OR countSubstrings(content, '\n') > 8000
+    OR arrayExists(
+      line -> JSONExtractString(line, 'type') IN ('user', 'assistant')
+        AND JSONHas(line, 'timestamp'),
+      splitByChar('\n', content)
+    )
+  GROUP BY source, organization_id, user_id, session_id
+
+  UNION DISTINCT
+
+  SELECT 'codex' AS source, organization_id, user_id, session_id
+  FROM rudel.codex_sessions
+  WHERE length(content) > 120000000
+    OR countSubstrings(content, '\n') > 8000
+    OR arrayExists(line -> JSONHas(line, 'timestamp'), splitByChar('\n', content))
+  GROUP BY source, organization_id, user_id, session_id
+)
+SELECT 'raw_identity_missing_from_stage' AS failure, count() AS failures
+FROM raw_emitted_identities AS raw
+LEFT ANTI JOIN rudel.session_analytics_f16_rebuilt_identities_20260826 AS stage
+  USING (source, organization_id, user_id, session_id)
+
+UNION ALL
+
+SELECT 'unexpected_identity_in_stage' AS failure, count() AS failures
+FROM rudel.session_analytics_f16_rebuilt_identities_20260826 AS stage
+LEFT ANTI JOIN raw_emitted_identities AS raw
+  USING (source, organization_id, user_id, session_id);
+```
+
+The table is reusable only when its schema and creation time match this
+incident, `physical_rows = unique_identities`, and both failure counts are
+zero. With that recorded proof, forward completion may reuse the stage for the
+remaining historical-analytics insert, verify section 6, drop it with
+`DROP TABLE rudel.session_analytics_f16_rebuilt_identities_20260826 SYNC`, and
+continue with the language-signal insert. If any check fails, preserve the bad
+table under an incident-specific evidence name and choose rollback or a
+reviewed reconstruction from `raw_emitted_identities`; do not reuse it.
+
+Before a controlled migration-command rerun, reconcile every previously
+acknowledged insert, record the checks above, then execute and record:
+
+```sql
+DROP TABLE rudel.session_analytics_f16_rebuilt_identities_20260826 SYNC;
+
+SELECT count() AS stage_table_present
+FROM system.tables
+WHERE database = 'rudel'
+  AND name = 'session_analytics_f16_rebuilt_identities_20260826';
+```
+
+`stage_table_present` must be zero before the rerun. Never add or rely on a bare
+`IF NOT EXISTS`: silently accepting an unverified stage can suppress historical
+analytics from a different or partial run.
+
 ## 5. Seed and verify PostgreSQL revision heads
 
 Before deploying F16, export the greatest historical revision for every
@@ -404,23 +493,63 @@ the wall clock; JavaScript clocks are not used for revision allocation.
    The values must match. This deliberately does not use `FINAL` and does not
    include mutable `session_date` in logical identity.
 
-3. Check the suffix directly for all three revision-bearing tables. Both
-   results must be zero:
+3. Check the suffix range and source parity separately. All four results must
+   be zero:
 
    ```sql
-   SELECT count() AS invalid_suffixes
+   SELECT count() AS invalid_claude_suffixes
    FROM
    (
-     SELECT revision, ingested_at FROM rudel.claude_sessions
-     UNION ALL
-     SELECT revision, ingested_at FROM rudel.codex_sessions
-     UNION ALL
-     SELECT revision, ingested_at FROM rudel.session_analytics
+     SELECT
+       toInt128(revision)
+         - bitShiftLeft(toInt128(toUnixTimestamp64Milli(ingested_at)), 16)
+         AS suffix
+     FROM rudel.claude_sessions
    )
-   WHERE
-     toInt128(revision)
-       - bitShiftLeft(toInt128(toUnixTimestamp64Milli(ingested_at)), 16)
-     NOT BETWEEN 0 AND 65535;
+   WHERE suffix NOT BETWEEN 0 AND 65534 OR modulo(suffix, 2) != 0;
+
+   SELECT count() AS invalid_codex_suffixes
+   FROM
+   (
+     SELECT
+       toInt128(revision)
+         - bitShiftLeft(toInt128(toUnixTimestamp64Milli(ingested_at)), 16)
+         AS suffix
+     FROM rudel.codex_sessions
+   )
+   WHERE suffix NOT BETWEEN 1 AND 65535 OR modulo(suffix, 2) != 1;
+
+   WITH raw_revisions AS
+   (
+     SELECT
+       'claude_code' AS source,
+       organization_id,
+       user_id,
+       session_id,
+       revision
+     FROM rudel.claude_sessions
+     UNION ALL
+     SELECT
+       'codex' AS source,
+       organization_id,
+       user_id,
+       session_id,
+       revision
+     FROM rudel.codex_sessions
+   )
+   SELECT count() AS invalid_analytics_only_suffixes
+   FROM
+   (
+     SELECT
+       toInt128(analytics.revision)
+         - bitShiftLeft(
+           toInt128(toUnixTimestamp64Milli(analytics.ingested_at)), 16
+         ) AS suffix
+     FROM rudel.session_analytics AS analytics
+     LEFT ANTI JOIN raw_revisions AS raw
+       USING (source, organization_id, user_id, session_id, revision)
+   )
+   WHERE suffix NOT BETWEEN 0 AND 65535;
 
    SELECT count() AS duplicate_session_revisions
    FROM
@@ -569,6 +698,16 @@ PostgreSQL changes and F16 ClickHouse schema in place.
 
 ### Full rollback without replay
 
+**Hard precondition:** attach recorded evidence that the section-2 global
+PostgreSQL clock floor was strictly above every reported historical maximum and
+that the section-5 `heads_not_above_history` result was zero for the protected
+head export used in this cutover. If either gate was waived, failed, or cannot
+be proven from the incident artifact, stop and produce a reviewed full-history
+reconstruction plan. Watermark replay is invalid without both gates: a new raw
+row can be above its raw watermark but below an analytics-only historical
+watermark, so raw replay restores it while analytics replay omits its MV-derived
+analytics row with the old MVs still absent.
+
 This is permitted **only before the first operator smoke request and before
 global resume**. Prove no accepted write crossed any watermark:
 
@@ -588,6 +727,17 @@ restore all four backups, wait eight seconds, and recreate the captured pre-F16
 MVs. Never use this shortcut after smoke or resume.
 
 ### Full rollback after any accepted post-watermark write
+
+**Hard precondition:** attach recorded evidence that the section-2 global
+PostgreSQL clock floor was strictly above every reported historical maximum and
+that the section-5 `heads_not_above_history` result was zero for the protected
+head export used in this cutover. If either gate was waived, failed, or cannot
+be proven from the incident artifact, do not run the replay below; produce a
+reviewed replay boundary or full-history reconstruction plan instead. Watermark
+replay is invalid without both gates: a new raw row can be above its raw
+watermark but below an analytics-only historical watermark, causing raw replay
+to restore it while analytics replay omits its MV-derived analytics row with
+the old MVs deliberately absent.
 
 1. Set quiescence and repeat the complete Fly/Vercel/job/ledger drain from
    section 1.

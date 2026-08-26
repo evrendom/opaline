@@ -453,12 +453,13 @@ function sumPageActivity(
 
 describe("session detail derivation", () => {
 	test("preserves an opaque revision above JavaScript's safe integer range", () => {
-		const revision = "117158864486400000";
+		const revision = "117158864486400001";
 		const derivation = deriveSessionDetail(
 			snapshot(createTranscript(1), revision),
 		);
 
 		expect(BigInt(revision)).toBeGreaterThan(BigInt(Number.MAX_SAFE_INTEGER));
+		expect(Number(revision).toString()).not.toBe(revision);
 		expect(derivation.revision).toBe(revision);
 		expect(derivation.turnBodies.values().next().value?.revision).toBe(
 			revision,

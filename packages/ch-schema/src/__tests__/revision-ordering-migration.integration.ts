@@ -56,11 +56,112 @@ function databaseName(suffix: string): string {
 }
 
 function scopeMigration(sql: string, database: string): string {
-	const scoped = sql.replaceAll("rudel.", `${database}.`);
-	if (scoped.includes("rudel.")) {
-		throw new Error("F16 migration still references the shared database");
+	let scoped = "";
+	let state:
+		| "backtick-identifier"
+		| "block-comment"
+		| "code"
+		| "double-quoted-identifier"
+		| "line-comment"
+		| "single-quoted-string" = "code";
+	for (let index = 0; index < sql.length; index += 1) {
+		const character = sql[index] ?? "";
+		const nextCharacter = sql[index + 1] ?? "";
+		if (state === "code") {
+			if (character === "-" && nextCharacter === "-") {
+				scoped += "--";
+				index += 1;
+				state = "line-comment";
+				continue;
+			}
+			if (character === "#") {
+				scoped += character;
+				state = "line-comment";
+				continue;
+			}
+			if (character === "/" && nextCharacter === "*") {
+				scoped += "/*";
+				index += 1;
+				state = "block-comment";
+				continue;
+			}
+			if (character === "'") {
+				scoped += character;
+				state = "single-quoted-string";
+				continue;
+			}
+			if (sql.startsWith('"rudel".', index)) {
+				scoped += `"${database}".`;
+				index += '"rudel".'.length - 1;
+				continue;
+			}
+			if (sql.startsWith("`rudel`.", index)) {
+				scoped += `\`${database}\`.`;
+				index += "`rudel`.".length - 1;
+				continue;
+			}
+			if (character === '"') {
+				scoped += character;
+				state = "double-quoted-identifier";
+				continue;
+			}
+			if (character === "`") {
+				scoped += character;
+				state = "backtick-identifier";
+				continue;
+			}
+			if (
+				sql.startsWith("rudel.", index) &&
+				!isSqlIdentifierCharacter(sql[index - 1])
+			) {
+				scoped += `${database}.`;
+				index += "rudel.".length - 1;
+				continue;
+			}
+			scoped += character;
+			continue;
+		}
+
+		scoped += character;
+		if (state === "line-comment") {
+			if (character === "\n") state = "code";
+			continue;
+		}
+		if (state === "block-comment") {
+			if (character === "*" && nextCharacter === "/") {
+				scoped += "/";
+				index += 1;
+				state = "code";
+			}
+			continue;
+		}
+		if (character === "\\" && nextCharacter) {
+			scoped += nextCharacter;
+			index += 1;
+			continue;
+		}
+		const closingCharacter =
+			state === "single-quoted-string"
+				? "'"
+				: state === "double-quoted-identifier"
+					? '"'
+					: "`";
+		if (character !== closingCharacter) continue;
+		if (nextCharacter === closingCharacter) {
+			scoped += nextCharacter;
+			index += 1;
+			continue;
+		}
+		state = "code";
+	}
+	if (state !== "code" && state !== "line-comment") {
+		throw new Error(`F16 migration ended inside ${state}`);
 	}
 	return scoped;
+}
+
+function isSqlIdentifierCharacter(character: string | undefined): boolean {
+	return character !== undefined && /[a-zA-Z0-9_]/u.test(character);
 }
 
 function parseStatements(sql: string): string[] {
@@ -459,6 +560,16 @@ afterAll(async () => {
 
 describe("F16 destructive migration execution rehearsal", () => {
 	test("executes both checked-in migrations deterministically on adversarial history", async () => {
+		expect(
+			scopeMigration(
+				`SELECT 'rudel.literal', rudel.table, \`rudel\`.backtick_table, "rudel".double_quoted_table -- rudel.comment
+/* rudel.block */`,
+				"isolated_database",
+			),
+		).toBe(
+			`SELECT 'rudel.literal', isolated_database.table, \`isolated_database\`.backtick_table, "isolated_database".double_quoted_table -- rudel.comment
+/* rudel.block */`,
+		);
 		const first = await runRehearsal(databaseName("forward"), false);
 		const second = await runRehearsal(databaseName("reverse"), true);
 

@@ -16,6 +16,10 @@ describe("session ingest operator gate", () => {
 		expect(isAuthorizedIngestOperatorRequest(headers, "wrong-secret")).toBe(
 			false,
 		);
+		expect(isAuthorizedIngestOperatorRequest(headers, "short")).toBe(false);
+		expect(
+			isAuthorizedIngestOperatorRequest(headers, "much-longer-operator-secret"),
+		).toBe(false);
 		expect(isAuthorizedIngestOperatorRequest(headers, "")).toBe(false);
 	});
 
