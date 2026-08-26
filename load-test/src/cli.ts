@@ -18,9 +18,13 @@ const DEFAULT_SUMMARY_PATH = "/tmp/opaline-r2-load-test-summary.json";
 const DEFAULT_TIMESTAMP_START = "2026-08-25T12:00:00.000Z";
 const MAX_UPLOADS = 10_000;
 // One remote-target confirmation must not authorize an arbitrarily large
-// concurrent blast: total uploads may reach MAX_UPLOADS, but simultaneous
-// in-flight jobs stay hard-capped.
-const MAX_IN_FLIGHT_CEILING = 512;
+// blast: total uploads may reach MAX_UPLOADS, but simultaneous work and the
+// aggregate payload a single run may stage stay hard-capped. Exceptional runs
+// require editing these ceilings in source, deliberately.
+export const MAX_IN_FLIGHT_CEILING = 512;
+export const MAX_CONCURRENCY_CEILING = 64;
+export const MAX_PART_CONCURRENCY_CEILING = 64;
+export const MAX_TOTAL_PLANNED_BYTES = 64 * 1024 * 1024 * 1024;
 const MEBIBYTE = 1024 * 1024;
 
 interface ParsedArguments {
@@ -176,19 +180,23 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 		arguments_,
 		"--max-peak-rss-mib",
 	);
-	const barrierMode =
-		arguments_.flags.has("--barrier-before-commit") ||
-		arguments_.flags.has("--same-session-hash");
-	if (
-		barrierMode &&
-		parseOptionalPositiveNumber(arguments_, "--rate-per-second") !== null
-	) {
-		// Barrier modes run closed-loop and would silently ignore pacing while
-		// the summary still reports the configured rate as if it applied.
-		throw new Error(
-			"--rate-per-second cannot be combined with --barrier-before-commit or --same-session-hash",
-		);
-	}
+	assertCompatibleRunModes({
+		barrierMode:
+			arguments_.flags.has("--barrier-before-commit") ||
+			arguments_.flags.has("--same-session-hash"),
+		ratePerSecond: parseOptionalPositiveNumber(arguments_, "--rate-per-second"),
+	});
+	const concurrencyOptions = parseRunConcurrencyOptions(arguments_);
+	const uploads = parseInteger(
+		getOptionalValue(arguments_, "--uploads") ?? "1",
+		"--uploads",
+		1,
+		MAX_UPLOADS,
+	);
+	assertRunPayloadBudget({
+		manifestTotalBytes: manifest.manifest.aggregateBytes,
+		uploads,
+	});
 	const passed = await executeLoadTest({
 		apiKey: await readSecretFile(
 			getRequiredValue(arguments_, "--api-key-file"),
@@ -209,27 +217,11 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 			1,
 			100,
 		),
-		concurrency: parseInteger(
-			getOptionalValue(arguments_, "--concurrency") ?? "1",
-			"--concurrency",
-			1,
-			512,
-		),
+		concurrency: concurrencyOptions.concurrency,
 		manifest,
-		maxInFlight: parseInteger(
-			getOptionalValue(arguments_, "--max-in-flight") ??
-				DEFAULT_MAX_IN_FLIGHT.toString(),
-			"--max-in-flight",
-			1,
-			MAX_IN_FLIGHT_CEILING,
-		),
+		maxInFlight: concurrencyOptions.maxInFlight,
 		organizationId: getOptionalValue(arguments_, "--organization-id"),
-		partConcurrency: parseInteger(
-			getOptionalValue(arguments_, "--part-concurrency") ?? "4",
-			"--part-concurrency",
-			1,
-			512,
-		),
+		partConcurrency: concurrencyOptions.partConcurrency,
 		processingPids: getValues(arguments_, "--processing-pid").map((value) =>
 			parseInteger(value, "--processing-pid", 1, Number.MAX_SAFE_INTEGER),
 		),
@@ -293,14 +285,62 @@ async function runDriverCommand(arguments_: ParsedArguments): Promise<number> {
 				"--min-achieved-start-rate",
 			),
 		},
-		uploads: parseInteger(
-			getOptionalValue(arguments_, "--uploads") ?? "1",
-			"--uploads",
-			1,
-			MAX_UPLOADS,
-		),
+		uploads,
 	});
 	return passed ? 0 : 1;
+}
+
+export function assertCompatibleRunModes(input: {
+	readonly barrierMode: boolean;
+	readonly ratePerSecond: number | null;
+}): void {
+	if (input.barrierMode && input.ratePerSecond !== null) {
+		// Barrier modes run closed-loop and would silently ignore pacing while
+		// the summary still reports the configured rate as if it applied.
+		throw new Error(
+			"--rate-per-second cannot be combined with --barrier-before-commit or --same-session-hash",
+		);
+	}
+}
+
+export function parseRunConcurrencyOptions(arguments_: ParsedArguments): {
+	readonly concurrency: number;
+	readonly maxInFlight: number;
+	readonly partConcurrency: number;
+} {
+	return {
+		concurrency: parseInteger(
+			getOptionalValue(arguments_, "--concurrency") ?? "1",
+			"--concurrency",
+			1,
+			MAX_CONCURRENCY_CEILING,
+		),
+		maxInFlight: parseInteger(
+			getOptionalValue(arguments_, "--max-in-flight") ??
+				DEFAULT_MAX_IN_FLIGHT.toString(),
+			"--max-in-flight",
+			1,
+			MAX_IN_FLIGHT_CEILING,
+		),
+		partConcurrency: parseInteger(
+			getOptionalValue(arguments_, "--part-concurrency") ?? "4",
+			"--part-concurrency",
+			1,
+			MAX_PART_CONCURRENCY_CEILING,
+		),
+	};
+}
+
+export function assertRunPayloadBudget(input: {
+	readonly manifestTotalBytes: number;
+	readonly uploads: number;
+}): void {
+	const plannedBytes = input.uploads * input.manifestTotalBytes;
+	if (plannedBytes > MAX_TOTAL_PLANNED_BYTES) {
+		throw new Error(
+			`Run would stage ${plannedBytes} bytes (${input.uploads} uploads x ${input.manifestTotalBytes} manifest bytes), above the ${MAX_TOTAL_PLANNED_BYTES} ceiling; reduce --uploads or regenerate a smaller manifest`,
+		);
+	}
 }
 
 async function parseClickHouseObserver(
@@ -337,7 +377,7 @@ async function parseClickHouseObserver(
 	};
 }
 
-function parseArguments(
+export function parseArguments(
 	arguments_: readonly string[],
 	booleanFlags: readonly string[],
 ): ParsedArguments {

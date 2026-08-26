@@ -215,9 +215,12 @@ final failures are not.
 Schedules 600 operation starts open-loop at fixed offsets from one epoch,
 targeting 10 unique sessions/second regardless of when earlier operations
 complete. Paced runs are bounded only by `--max-in-flight` (hard-capped at 512
-simultaneous jobs so one remote confirmation cannot authorize an unbounded
-concurrent blast); `--concurrency` applies to unpaced and commit-barrier runs,
-not to this arrival schedule. `--rate-per-second` is rejected in combination
+simultaneous jobs); `--concurrency` applies to unpaced and commit-barrier runs
+(hard-capped at 64), not to this arrival schedule. `--part-concurrency` is
+hard-capped at 64, and a run may stage at most 64 GiB in total
+(`--uploads` x manifest bytes) — together these bound what one remote-target
+confirmation can authorize; exceptional runs require deliberately editing the
+ceilings in `src/cli.ts`. `--rate-per-second` is rejected in combination
 with `--barrier-before-commit` or `--same-session-hash`: barrier runs are
 closed-loop and cannot honor an arrival schedule. Each
 upload records its planned start offset, actual start offset, and schedule drift.
