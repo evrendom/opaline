@@ -48,8 +48,20 @@ let sameUserApiKey: { id: string; key: string };
 let otherUserApiKey: { id: string; key: string };
 let primaryUserId: string;
 let otherUserId: string;
-const firstDatabase = postgres(connectionString, { max: 1, prepare: false });
-const secondDatabase = postgres(connectionString, { max: 1, prepare: false });
+// Fail fast instead of wedging the single-connection pools: a stuck lock or
+// statement must surface as a diagnosable error, not strand afterAll behind a
+// busy connection until the CI job timeout kills the run silently.
+const FAIL_FAST_OPTIONS = {
+	connect_timeout: 10,
+	connection: {
+		lock_timeout: 10_000,
+		statement_timeout: 20_000,
+	},
+	max: 1,
+	prepare: false,
+} as const;
+const firstDatabase = postgres(connectionString, FAIL_FAST_OPTIONS);
+const secondDatabase = postgres(connectionString, FAIL_FAST_OPTIONS);
 const firstInstance = createPostgresIngestRateLimitEnvironment(firstDatabase);
 const secondInstance = createPostgresIngestRateLimitEnvironment(secondDatabase);
 
@@ -68,24 +80,29 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await firstDatabase`
-		DELETE FROM apikey
-		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
-			OR id = ${apiKey?.id ?? ""}
-			OR id = ${sameUserApiKey?.id ?? ""}
-			OR id = ${otherUserApiKey?.id ?? ""}
-	`;
-	await firstDatabase`
-		DELETE FROM "user"
-		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
-			OR id = ${primaryUserId ?? ""}
-			OR id = ${otherUserId ?? ""}
-	`;
-	await Promise.all([
-		server?.stop(),
-		firstDatabase.end(),
-		secondDatabase.end(),
-	]);
+	const cleanupClient = postgres(connectionString, FAIL_FAST_OPTIONS);
+	try {
+		await cleanupClient`
+			DELETE FROM apikey
+			WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
+				OR id = ${apiKey?.id ?? ""}
+				OR id = ${sameUserApiKey?.id ?? ""}
+				OR id = ${otherUserApiKey?.id ?? ""}
+		`;
+		await cleanupClient`
+			DELETE FROM "user"
+			WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
+				OR id = ${primaryUserId ?? ""}
+				OR id = ${otherUserId ?? ""}
+		`;
+	} finally {
+		await Promise.allSettled([
+			server?.stop(),
+			cleanupClient.end({ timeout: 5 }),
+			firstDatabase.end({ timeout: 5 }),
+			secondDatabase.end({ timeout: 5 }),
+		]);
+	}
 });
 
 describe("atomic Postgres ingest rate limiting", () => {
@@ -297,7 +314,9 @@ describe("atomic Postgres ingest rate limiting", () => {
 		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance);
 		expect(await countUserCounters(userId)).toBe(1);
 
-		await expect(firstDatabase`
+		const duplicateClient = postgres(connectionString, FAIL_FAST_OPTIONS);
+		try {
+			await expect(duplicateClient`
 			INSERT INTO ingest_rate_limit_counter (
 				limiter_key,
 				user_id,
@@ -318,7 +337,10 @@ describe("atomic Postgres ingest rate limiting", () => {
 				true,
 				true
 			)
-		`).rejects.toThrow();
+		`).rejects.toThrow(/duplicate key|unique/i);
+		} finally {
+			await duplicateClient.end();
+		}
 	});
 
 	test("fresh oversized request leaves no byte anchor before the first positive charge", async () => {
@@ -618,24 +640,27 @@ describe("ingest rate-limit oRPC errors", () => {
 			{},
 			"apps/api/src/__tests__/fixtures/unavailable-ingest-rate-limit-server.ts",
 		);
-		const unavailable = await callIngest(
-			{
-				content: "a",
-				projectPath: "/test/rate-limit",
-				sessionId: `database-unavailable-${crypto.randomUUID()}`,
-				source: "claude_code",
-			},
-			apiKey.key,
-			unavailableServer.baseUrl,
-		);
+		try {
+			const unavailable = await callIngest(
+				{
+					content: "a",
+					projectPath: "/test/rate-limit",
+					sessionId: `database-unavailable-${crypto.randomUUID()}`,
+					source: "claude_code",
+				},
+				apiKey.key,
+				unavailableServer.baseUrl,
+			);
 
-		expect(unavailable.status).toBe(503);
-		expect(readRpcError(unavailable.body)).toEqual({
-			code: "SERVICE_UNAVAILABLE",
-			reason: "ingest_rate_limit_unavailable",
-			retryAfterMs: 1_000,
-		});
-		await unavailableServer.stop();
+			expect(unavailable.status).toBe(503);
+			expect(readRpcError(unavailable.body)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				reason: "ingest_rate_limit_unavailable",
+				retryAfterMs: 1_000,
+			});
+		} finally {
+			await unavailableServer.stop();
+		}
 	});
 });
 
