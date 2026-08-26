@@ -70,7 +70,10 @@ per instance rather than globally shared. Cache deadlines are bounded by the
 configured window duration. If the Postgres wall clock is corrected forward
 after a deadline is cached, an instance can continue returning that cached 429
 until its monotonic deadline passes even though a fresh database statement
-would already roll the window.
+would already roll the window. When changing rate-limit window or cap
+configuration, restart or drain all API instances together: an instance running
+old configuration can serve cached rejections computed under the old windows
+until its cached deadlines pass.
 
 ## 3. Deploy to Fly.io
 

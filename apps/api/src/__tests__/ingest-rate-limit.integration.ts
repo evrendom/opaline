@@ -443,7 +443,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 		expect(statementCounter.count).toBe(2);
 	});
 
-	test("sends a byte attempt below cached headroom to Postgres", async () => {
+	test("sends a smaller byte attempt after a rejection to Postgres", async () => {
 		const userId = await createCounterUser("byte-cache-smaller-attempt");
 		const subject = { id: userId, kind: "user" } as const;
 		const config = {
@@ -471,7 +471,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 		});
 	});
 
-	test("does not let a byte-cache hit skip a real request charge", async () => {
+	test("charges the request for a known-too-large byte retry", async () => {
 		const userId = await createCounterUser("byte-cache-request-charge");
 		const subject = { id: userId, kind: "user" } as const;
 		const config = {
@@ -502,7 +502,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 		});
 	});
 
-	test("sheds known-too-large retries after both rejection caches are armed", async () => {
+	test("sheds repeat rejections once the request cache is armed", async () => {
 		const userId = await createCounterUser("byte-and-request-cache");
 		const subject = { id: userId, kind: "user" } as const;
 		const config = {

@@ -8,10 +8,16 @@ import {
 export function clampIngestAggregateContentMaxBytes(
 	override: number | undefined,
 ): number {
-	return Math.min(
-		override ?? INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-	);
+	// NaN defeats Math.min and every downstream comparison, so only a
+	// nonnegative safe integer may lower the production ceiling.
+	if (
+		override === undefined ||
+		!Number.isSafeInteger(override) ||
+		override < 0
+	) {
+		return INGEST_AGGREGATE_CONTENT_MAX_BYTES;
+	}
+	return Math.min(override, INGEST_AGGREGATE_CONTENT_MAX_BYTES);
 }
 
 export function enforceIngestAggregateSize(

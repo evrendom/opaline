@@ -26,6 +26,12 @@ describe("enforceIngestAggregateSize", () => {
 		expect(clampIngestAggregateContentMaxBytes(Number.POSITIVE_INFINITY)).toBe(
 			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 		);
+		expect(clampIngestAggregateContentMaxBytes(Number.NaN)).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
+		expect(clampIngestAggregateContentMaxBytes(-1)).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
 	});
 
 	test("returns the exact UTF-8 byte count at the limit", () => {

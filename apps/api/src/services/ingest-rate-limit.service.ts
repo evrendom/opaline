@@ -161,13 +161,6 @@ interface RequestRejectionCacheEntry {
 	readonly windowSeconds: number;
 }
 
-interface ByteRejectionCacheEntry {
-	readonly bytesMax: number;
-	readonly byteWindowEndsAtMonotonicMs: number;
-	readonly remainingHeadroom: number;
-	readonly windowSeconds: number;
-}
-
 // These bounded caches are per environment, and therefore per API instance in
 // production. They are not authorities for admissions; expired or absent
 // entries fall through to the locked row. Durations returned by Postgres are
@@ -178,10 +171,6 @@ interface ByteRejectionCacheEntry {
 const requestRejectionCaches = new WeakMap<
 	IngestRateLimitEnvironment,
 	Map<string, RequestRejectionCacheEntry>
->();
-const byteRejectionCaches = new WeakMap<
-	IngestRateLimitEnvironment,
-	Map<string, ByteRejectionCacheEntry>
 >();
 
 export const INGEST_RATE_LIMIT_CONFIG: IngestRateLimitConfig = {
@@ -213,34 +202,16 @@ export async function checkIngestRateLimit(
 ): Promise<void> {
 	assertValidBytes(bytes);
 	const requestCacheKey = `${subject.kind}:${subject.id}:request`;
-	const byteCacheKey = `${subject.kind}:${subject.id}:byte`;
 	const cachedRequestRejection = readCachedRequestRejection(
 		env,
 		requestCacheKey,
 		config,
 	);
-	const cachedByteRejection = readCachedByteRejection(
-		env,
-		byteCacheKey,
-		config,
-	);
-	// A byte-cache shortcut is exact only while this instance also knows the
-	// request bucket is rejected. The real statement would then return the
-	// request 429 without incrementing request_count or changing byte state.
-	if (
-		cachedRequestRejection &&
-		cachedByteRejection &&
-		bytes > cachedByteRejection.remainingHeadroom
-	) {
-		throwLimitExceeded({
-			current: cachedRequestRejection.current,
-			limit: cachedRequestRejection.limit,
-			reason: INGEST_LIMIT_REASONS.requestLimit,
-			subject,
-			unit: "requests",
-			windowSeconds: cachedRequestRejection.windowSeconds,
-		});
-	}
+	// Statement shedding is request-cache-only by design: a byte-side cache
+	// cannot short-circuit exactly without also proving the request bucket's
+	// state, and whenever this instance holds a valid request rejection the
+	// branch below already skips the statement. Byte rejections therefore stay
+	// database-backed, bounded by the request cap per window.
 	if (cachedRequestRejection) {
 		throwLimitExceeded({
 			current: cachedRequestRejection.current,
@@ -283,13 +254,6 @@ export async function checkIngestRateLimit(
 	}
 
 	if (!decision.byteAllowed) {
-		cacheByteRejection(env, byteCacheKey, {
-			bytesMax: config.bytesMax,
-			byteWindowEndsAtMonotonicMs:
-				queryStartedAtMonotonicMs + decision.byteResetAfterSeconds * 1000,
-			remainingHeadroom: config.bytesMax - decision.byteCount,
-			windowSeconds: config.bytesWindowSeconds,
-		});
 		throwLimitExceeded({
 			current: decision.byteCount + bytes,
 			limit: config.bytesMax,
@@ -299,8 +263,6 @@ export async function checkIngestRateLimit(
 			windowSeconds: config.bytesWindowSeconds,
 		});
 	}
-
-	clearCachedByteRejection(env, byteCacheKey);
 }
 
 export function createPostgresIngestRateLimitEnvironment(
@@ -424,59 +386,6 @@ function cacheRequestRejection(
 		cache.delete(oldestKey);
 	}
 	cache.set(cacheKey, entry);
-}
-
-function readCachedByteRejection(
-	env: IngestRateLimitEnvironment,
-	cacheKey: string,
-	config: IngestRateLimitConfig,
-): ByteRejectionCacheEntry | null {
-	const cache = byteRejectionCaches.get(env);
-	const entry = cache?.get(cacheKey);
-	if (!entry) {
-		return null;
-	}
-	if (
-		entry.bytesMax !== config.bytesMax ||
-		entry.windowSeconds !== config.bytesWindowSeconds ||
-		entry.byteWindowEndsAtMonotonicMs <= performance.now()
-	) {
-		cache?.delete(cacheKey);
-		return null;
-	}
-	return entry;
-}
-
-function cacheByteRejection(
-	env: IngestRateLimitEnvironment,
-	cacheKey: string,
-	entry: ByteRejectionCacheEntry,
-): void {
-	if (entry.byteWindowEndsAtMonotonicMs <= performance.now()) {
-		return;
-	}
-
-	let cache = byteRejectionCaches.get(env);
-	if (!cache) {
-		cache = new Map();
-		byteRejectionCaches.set(env, cache);
-	}
-	cache.delete(cacheKey);
-	while (cache.size >= MAX_REJECTION_CACHE_ENTRIES) {
-		const oldestKey = cache.keys().next().value;
-		if (typeof oldestKey !== "string") {
-			break;
-		}
-		cache.delete(oldestKey);
-	}
-	cache.set(cacheKey, entry);
-}
-
-function clearCachedByteRejection(
-	env: IngestRateLimitEnvironment,
-	cacheKey: string,
-): void {
-	byteRejectionCaches.get(env)?.delete(cacheKey);
 }
 
 function readCounter(value: unknown, name: string): number {
