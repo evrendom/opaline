@@ -1,8 +1,18 @@
 import { ORPCError } from "@orpc/server";
 import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
 } from "@rudel/api-routes";
+
+export function clampIngestAggregateContentMaxBytes(
+	override: number | undefined,
+): number {
+	return Math.min(
+		override ?? INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	);
+}
 
 export function enforceIngestAggregateSize(
 	input: IngestSessionInput,

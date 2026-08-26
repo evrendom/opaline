@@ -63,6 +63,15 @@ with the `SERVICE_UNAVAILABLE` code and does not continue to downstream
 storage. The current CLI treats 503 as retryable and makes at most three total
 attempts, waiting 1 second and then 2 seconds between attempts.
 
+Request and byte budgets are per authenticated user and are shared by all API
+keys owned by that user. Rejection caches are local to each API instance, so
+their database-shedding effectiveness and cached 429 responses are likewise
+per instance rather than globally shared. Cache deadlines are bounded by the
+configured window duration. If the Postgres wall clock is corrected forward
+after a deadline is cached, an instance can continue returning that cached 429
+until its monotonic deadline passes even though a fresh database statement
+would already roll the window.
+
 ## 3. Deploy to Fly.io
 
 1. Install the Fly CLI: `curl -L https://fly.io/install.sh | sh`

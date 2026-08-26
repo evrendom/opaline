@@ -71,10 +71,10 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `SKILL_BACKFILL_BATCH_MAX_BYTES` | No | Target raw transcript bytes per skill-backfill batch (default: 128 MiB). |
 | `LANGUAGE_SIGNAL_RECONCILE_INTERVAL_MS` | No | Delay between per-process language-signal reconciliation passes in milliseconds (default: 60,000). |
 | `LANGUAGE_SIGNAL_RECONCILE_BATCH_SIZE` | No | Maximum stale or missing sessions scanned per language-signal reconciliation batch (default: 25). |
-| `RATE_LIMIT_INGEST_REQUESTS_MAX` | No | Positive integer per-API-key Postgres-backed ingest request cap (default: 15,000) |
-| `RATE_LIMIT_INGEST_REQUESTS_WINDOW` | No | Fixed ingest request window in seconds; minimum 60 (default: 3,600) |
-| `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-API-key Postgres-backed ingest byte cap (default: 10 GiB) |
-| `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
+| `RATE_LIMIT_INGEST_REQUESTS_MAX` | No | Positive integer per-user Postgres-backed ingest request cap shared by all of the user's API keys (default: 15,000) |
+| `RATE_LIMIT_INGEST_REQUESTS_WINDOW` | No | Per-user fixed ingest request window in seconds; minimum 60 (default: 3,600) |
+| `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-user Postgres-backed ingest byte cap shared by all of the user's API keys (default: 10 GiB) |
+| `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Per-user fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
 | `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_MAX` | No | Positive integer per-share Wrapped lookup cap per API process (default: 180) |
 | `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_WINDOW` | No | Positive integer Wrapped lookup window in seconds (default: 60) |
 | `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_CAPACITY` | No | Positive integer maximum retained Wrapped share limiter entries per API process (default: 5,000) |

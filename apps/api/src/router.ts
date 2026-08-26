@@ -8,7 +8,6 @@ import {
 } from "@rudel/agent-adapters";
 import {
 	type contract,
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
 	IngestSessionOutputSchema,
 	PRODUCT_ANALYTICS_EVENTS,
@@ -50,6 +49,7 @@ import {
 	resolvePreviousIngestContentShape,
 } from "./lib/ingest-content-shape.js";
 import {
+	clampIngestAggregateContentMaxBytes,
 	enforceMeasuredIngestAggregateSize,
 	measureIngestAggregateSize,
 } from "./lib/ingest-size.js";
@@ -435,7 +435,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 }
 
 export async function processIngestSession({
-	aggregateContentMaxBytes = INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	aggregateContentMaxBytes,
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
@@ -466,16 +466,22 @@ export async function processIngestSession({
 				"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
 		});
 	}
+	const effectiveAggregateContentMaxBytes = clampIngestAggregateContentMaxBytes(
+		aggregateContentMaxBytes,
+	);
 	const aggregateBytes = measureIngestAggregateSize(input);
 	if (enforceRateLimits) {
 		await checkIngestRateLimit(
-			resolveIngestRateLimitSubject(context.apiKeyId, context.user.id),
-			aggregateBytes > aggregateContentMaxBytes ? 0 : aggregateBytes,
+			resolveIngestRateLimitSubject(context.user.id),
+			aggregateBytes > effectiveAggregateContentMaxBytes ? 0 : aggregateBytes,
 			INGEST_RATE_LIMIT_CONFIG,
 			ingestRateLimitEnvironment,
 		);
 	}
-	enforceMeasuredIngestAggregateSize(aggregateBytes, aggregateContentMaxBytes);
+	enforceMeasuredIngestAggregateSize(
+		aggregateBytes,
+		effectiveAggregateContentMaxBytes,
+	);
 	const filteredText = await filterSessionTextFieldsOffThread({
 		bytes: aggregateBytes,
 		fields: {
@@ -1114,7 +1120,7 @@ const r2IngestInit = os.ingest.init
 			0,
 		);
 		await checkIngestRateLimit(
-			{ id: context.apiKeyId, kind: "api_key" },
+			resolveIngestRateLimitSubject(context.user.id),
 			aggregateBytes,
 			INGEST_RATE_LIMIT_CONFIG,
 			ingestRateLimitEnvironment,

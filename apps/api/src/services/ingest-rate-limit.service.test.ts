@@ -29,12 +29,9 @@ describe("Postgres ingest rate-limit service", () => {
 		);
 
 		await expect(
-			checkIngestRateLimit(
-				{ id: "api-key-2", kind: "api_key" },
-				20,
-				TEST_CONFIG,
-				{ execute },
-			),
+			checkIngestRateLimit({ id: "user-2", kind: "user" }, 20, TEST_CONFIG, {
+				execute,
+			}),
 		).rejects.toMatchObject({
 			code: "TOO_MANY_REQUESTS",
 			data: {
@@ -61,12 +58,9 @@ describe("Postgres ingest rate-limit service", () => {
 		);
 
 		await expect(
-			checkIngestRateLimit(
-				{ id: "api-key-3", kind: "api_key" },
-				20,
-				TEST_CONFIG,
-				{ execute },
-			),
+			checkIngestRateLimit({ id: "user-3", kind: "user" }, 20, TEST_CONFIG, {
+				execute,
+			}),
 		).rejects.toMatchObject({
 			code: "TOO_MANY_REQUESTS",
 			data: {
@@ -82,12 +76,9 @@ describe("Postgres ingest rate-limit service", () => {
 		const execute = mock(() => Promise.reject(new Error("database offline")));
 
 		await expect(
-			checkIngestRateLimit(
-				{ id: "api-key-4", kind: "api_key" },
-				1,
-				TEST_CONFIG,
-				{ execute },
-			),
+			checkIngestRateLimit({ id: "user-4", kind: "user" }, 1, TEST_CONFIG, {
+				execute,
+			}),
 		).rejects.toMatchObject({
 			code: "SERVICE_UNAVAILABLE",
 			data: {
@@ -101,26 +92,19 @@ describe("Postgres ingest rate-limit service", () => {
 		const execute = mock(() => Promise.resolve([]));
 
 		await expect(
-			checkIngestRateLimit(
-				{ id: "api-key-5", kind: "api_key" },
-				1,
-				TEST_CONFIG,
-				{ execute },
-			),
+			checkIngestRateLimit({ id: "user-5", kind: "user" }, 1, TEST_CONFIG, {
+				execute,
+			}),
 		).rejects.toMatchObject({
 			code: "SERVICE_UNAVAILABLE",
 			data: { reason: "ingest_rate_limit_unavailable" },
 		});
 	});
 
-	test("uses a separate durable bucket for legacy bearer users", () => {
-		expect(resolveIngestRateLimitSubject("api-key-6", "user-1")).toEqual({
-			id: "api-key-6",
-			kind: "api_key",
-		});
-		expect(resolveIngestRateLimitSubject(null, "user-1")).toEqual({
+	test("uses the owning user as the authoritative limiter subject", () => {
+		expect(resolveIngestRateLimitSubject("user-1")).toEqual({
 			id: "user-1",
-			kind: "legacy_user",
+			kind: "user",
 		});
 	});
 });

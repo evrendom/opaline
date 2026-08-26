@@ -15,6 +15,8 @@ export const ingestRateLimitCounter = pgTable(
 	"ingest_rate_limit_counter",
 	{
 		limiterKey: text("limiter_key").primaryKey(),
+		// Dormant until a future per-key secondary throttle is introduced. The
+		// authoritative ingest limiter writes user-subject rows only.
 		apiKeyId: text("api_key_id")
 			.unique()
 			.references(() => apikey.id, { onDelete: "cascade" }),

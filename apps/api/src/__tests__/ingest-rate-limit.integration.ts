@@ -44,6 +44,10 @@ const DEFAULT_TEST_CONFIG: IngestRateLimitConfig = {
 
 let server: ApiTestServer;
 let apiKey: { id: string; key: string };
+let sameUserApiKey: { id: string; key: string };
+let otherUserApiKey: { id: string; key: string };
+let primaryUserId: string;
+let otherUserId: string;
 const firstDatabase = postgres(connectionString, { max: 1, prepare: false });
 const secondDatabase = postgres(connectionString, { max: 1, prepare: false });
 const firstInstance = createPostgresIngestRateLimitEnvironment(firstDatabase);
@@ -54,8 +58,13 @@ beforeAll(async () => {
 		RATE_LIMIT_INGEST_BYTES_MAX: "1",
 		RATE_LIMIT_INGEST_REQUESTS_MAX: "1",
 	});
-	const bearerToken = await signUpTestUser(server.baseUrl);
-	apiKey = await createIngestApiKey(server.baseUrl, bearerToken);
+	const primaryToken = await signUpTestUser(server.baseUrl);
+	apiKey = await createIngestApiKey(server.baseUrl, primaryToken);
+	sameUserApiKey = await createIngestApiKey(server.baseUrl, primaryToken);
+	primaryUserId = await readApiKeyOwner(apiKey.id);
+	const otherToken = await signUpTestUser(server.baseUrl);
+	otherUserApiKey = await createIngestApiKey(server.baseUrl, otherToken);
+	otherUserId = await readApiKeyOwner(otherUserApiKey.id);
 });
 
 afterAll(async () => {
@@ -63,10 +72,14 @@ afterAll(async () => {
 		DELETE FROM apikey
 		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
 			OR id = ${apiKey?.id ?? ""}
+			OR id = ${sameUserApiKey?.id ?? ""}
+			OR id = ${otherUserApiKey?.id ?? ""}
 	`;
 	await firstDatabase`
 		DELETE FROM "user"
 		WHERE id LIKE ${`${TEST_KEY_PREFIX}%`}
+			OR id = ${primaryUserId ?? ""}
+			OR id = ${otherUserId ?? ""}
 	`;
 	await Promise.all([
 		server?.stop(),
@@ -77,23 +90,23 @@ afterAll(async () => {
 
 describe("atomic Postgres ingest rate limiting", () => {
 	test("serializes simultaneous first inserts from separate clients", async () => {
-		const apiKeyId = await createCounterApiKey("concurrent-first-insert");
-		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const userId = await createCounterUser("concurrent-first-insert");
+		const subject = { id: userId, kind: "user" } as const;
 
 		await Promise.all([
 			checkIngestRateLimit(subject, 4, DEFAULT_TEST_CONFIG, firstInstance),
 			checkIngestRateLimit(subject, 6, DEFAULT_TEST_CONFIG, secondInstance),
 		]);
 
-		expect(await readCounter(apiKeyId)).toMatchObject({
+		expect(await readCounter(userId)).toMatchObject({
 			byteCount: 10,
 			requestCount: 2,
 		});
 	});
 
 	test("serializes simultaneous rollover of one expired row", async () => {
-		const apiKeyId = await createCounterApiKey("concurrent-rollover");
-		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const userId = await createCounterUser("concurrent-rollover");
+		const subject = { id: userId, kind: "user" } as const;
 
 		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance);
 		await firstDatabase`
@@ -101,7 +114,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 			SET
 				request_window_started_at = NOW() - INTERVAL '2 hours',
 				byte_window_started_at = NOW() - INTERVAL '2 hours'
-			WHERE api_key_id = ${apiKeyId}
+			WHERE user_id = ${userId}
 		`;
 
 		await Promise.all([
@@ -109,15 +122,15 @@ describe("atomic Postgres ingest rate limiting", () => {
 			checkIngestRateLimit(subject, 4, DEFAULT_TEST_CONFIG, secondInstance),
 		]);
 
-		expect(await readCounter(apiKeyId)).toMatchObject({
+		expect(await readCounter(userId)).toMatchObject({
 			byteCount: 7,
 			requestCount: 2,
 		});
 	});
 
 	test("request rejection cannot re-anchor an expired byte window", async () => {
-		const apiKeyId = await createCounterApiKey("mixed-window-regression");
-		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const userId = await createCounterUser("mixed-window-regression");
+		const subject = { id: userId, kind: "user" } as const;
 		const config: IngestRateLimitConfig = {
 			bytesMax: 100,
 			bytesWindowSeconds: 150,
@@ -132,9 +145,9 @@ describe("atomic Postgres ingest rate limiting", () => {
 			SET
 				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '151 seconds',
 				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '151 seconds'
-			WHERE api_key_id = ${apiKeyId}
+			WHERE user_id = ${userId}
 		`;
-		const beforeRequestRejection = await readCounter(apiKeyId);
+		const beforeRequestRejection = await readCounter(userId);
 
 		await expect(
 			checkIngestRateLimit(subject, 100, config, freshEnvironment()),
@@ -142,7 +155,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 			code: "TOO_MANY_REQUESTS",
 			data: { reason: INGEST_LIMIT_REASONS.requestLimit },
 		});
-		const afterRequestRejection = await readCounter(apiKeyId);
+		const afterRequestRejection = await readCounter(userId);
 		expect(afterRequestRejection.byteWindowStartedAt.getTime()).toBe(
 			beforeRequestRejection.byteWindowStartedAt.getTime(),
 		);
@@ -156,7 +169,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 			SET
 				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '200 seconds',
 				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '200 seconds'
-			WHERE api_key_id = ${apiKeyId}
+			WHERE user_id = ${userId}
 		`;
 		await checkIngestRateLimit(subject, 100, config, freshEnvironment());
 
@@ -165,7 +178,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 			SET
 				request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '101 seconds',
 				byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '101 seconds'
-			WHERE api_key_id = ${apiKeyId}
+			WHERE user_id = ${userId}
 		`;
 		await expect(
 			checkIngestRateLimit(subject, 100, config, freshEnvironment()),
@@ -178,15 +191,15 @@ describe("atomic Postgres ingest rate limiting", () => {
 				windowSeconds: 150,
 			},
 		});
-		expect(await readCounter(apiKeyId)).toMatchObject({
+		expect(await readCounter(userId)).toMatchObject({
 			byteCount: 100,
 			requestCount: 2,
 		});
 	});
 
 	test("accepts the exact request and byte caps before rejecting the excess", async () => {
-		const requestKeyId = await createCounterApiKey("exact-request-cap");
-		const requestSubject = { id: requestKeyId, kind: "api_key" } as const;
+		const requestUserId = await createCounterUser("exact-request-cap");
+		const requestSubject = { id: requestUserId, kind: "user" } as const;
 		const requestConfig = {
 			...DEFAULT_TEST_CONFIG,
 			requestsMax: 3,
@@ -209,8 +222,8 @@ describe("atomic Postgres ingest rate limiting", () => {
 			},
 		});
 
-		const byteKeyId = await createCounterApiKey("exact-byte-cap");
-		const byteSubject = { id: byteKeyId, kind: "api_key" } as const;
+		const byteUserId = await createCounterUser("exact-byte-cap");
+		const byteSubject = { id: byteUserId, kind: "user" } as const;
 		const byteConfig = { ...DEFAULT_TEST_CONFIG, bytesMax: 10 };
 		await checkIngestRateLimit(byteSubject, 4, byteConfig, firstInstance);
 		await checkIngestRateLimit(byteSubject, 6, byteConfig, firstInstance);
@@ -223,15 +236,15 @@ describe("atomic Postgres ingest rate limiting", () => {
 				reason: INGEST_LIMIT_REASONS.byteLimit,
 			},
 		});
-		expect(await readCounter(byteKeyId)).toMatchObject({
+		expect(await readCounter(byteUserId)).toMatchObject({
 			byteCount: 10,
 			requestCount: 3,
 		});
 	});
 
 	test("expires both counters at the exact fixed-window boundary", async () => {
-		const apiKeyId = await createCounterApiKey("exact-boundary");
-		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const userId = await createCounterUser("exact-boundary");
+		const subject = { id: userId, kind: "user" } as const;
 		const config: IngestRateLimitConfig = {
 			bytesMax: 10,
 			bytesWindowSeconds: 60,
@@ -246,8 +259,8 @@ describe("atomic Postgres ingest rate limiting", () => {
 				SET
 					request_window_started_at = CURRENT_TIMESTAMP - INTERVAL '60 seconds',
 					byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '60 seconds'
-				WHERE api_key_id = $1`,
-				[apiKeyId],
+				WHERE user_id = $1`,
+				[userId],
 			);
 			const transactionEnvironment: IngestRateLimitEnvironment = {
 				execute: (statement, parameters) =>
@@ -256,33 +269,33 @@ describe("atomic Postgres ingest rate limiting", () => {
 			await checkIngestRateLimit(subject, 3, config, transactionEnvironment);
 		});
 
-		expect(await readCounter(apiKeyId)).toMatchObject({
+		expect(await readCounter(userId)).toMatchObject({
 			byteCount: 3,
 			requestCount: 1,
 		});
 	});
 
-	test("deleting an API key cascades its counter row", async () => {
-		const apiKeyId = await createCounterApiKey("cascade");
+	test("deleting a user cascades its authoritative counter row", async () => {
+		const userId = await createCounterUser("cascade");
 		await checkIngestRateLimit(
-			{ id: apiKeyId, kind: "api_key" },
+			{ id: userId, kind: "user" },
 			1,
 			DEFAULT_TEST_CONFIG,
 			firstInstance,
 		);
-		expect(await countCounters("api_key_id", apiKeyId)).toBe(1);
+		expect(await countUserCounters(userId)).toBe(1);
 
-		await firstDatabase`DELETE FROM apikey WHERE id = ${apiKeyId}`;
+		await firstDatabase`DELETE FROM "user" WHERE id = ${userId}`;
 
-		expect(await countCounters("api_key_id", apiKeyId)).toBe(0);
+		expect(await countUserCounters(userId)).toBe(0);
 	});
 
-	test("enforces one unique counter for each legacy user subject", async () => {
-		const userId = await createLegacyCounterUser("legacy-unique");
-		const subject = { id: userId, kind: "legacy_user" } as const;
+	test("enforces one unique counter for each user subject", async () => {
+		const userId = await createCounterUser("user-unique");
+		const subject = { id: userId, kind: "user" } as const;
 		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance);
 		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance);
-		expect(await countCounters("user_id", userId)).toBe(1);
+		expect(await countUserCounters(userId)).toBe(1);
 
 		await expect(firstDatabase`
 			INSERT INTO ingest_rate_limit_counter (
@@ -296,7 +309,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 				last_byte_allowed
 			)
 			VALUES (
-				${`legacy_user_duplicate:${userId}`},
+				${`user_duplicate:${userId}`},
 				${userId},
 				CURRENT_TIMESTAMP,
 				0,
@@ -308,15 +321,12 @@ describe("atomic Postgres ingest rate limiting", () => {
 		`).rejects.toThrow();
 	});
 
-	test("charges an oversized direct ingest request without touching byte count", async () => {
-		const apiKeyId = await createCounterApiKey("oversized-request-charge");
-		await checkIngestRateLimit(
-			{ id: apiKeyId, kind: "api_key" },
-			1,
-			DEFAULT_TEST_CONFIG,
-			freshEnvironment(),
+	test("fresh oversized request leaves no byte anchor before the first positive charge", async () => {
+		const userId = await createCounterUser("fresh-oversized-request");
+		const apiKeyId = await createCounterApiKey(
+			userId,
+			"fresh-oversized-request",
 		);
-		const beforeOversizedAttempt = await readCounter(apiKeyId);
 		await expect(
 			processIngestSession({
 				aggregateContentMaxBytes: 1,
@@ -324,7 +334,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 				context: {
 					apiKeyId,
 					session: null,
-					user: { id: `user-${TEST_KEY_PREFIX}` },
+					user: { id: userId },
 				},
 				enforceRateLimits: true,
 				errorFactories: createBackgroundIngestErrorFactories(),
@@ -343,19 +353,62 @@ describe("atomic Postgres ingest rate limiting", () => {
 				reason: INGEST_LIMIT_REASONS.transcriptTooLarge,
 			},
 		});
-		const afterOversizedAttempt = await readCounter(apiKeyId);
+		const afterOversizedAttempt = await readCounter(userId);
 		expect(afterOversizedAttempt).toMatchObject({
-			byteCount: 1,
+			byteCount: 0,
+			requestCount: 1,
+		});
+
+		await firstDatabase`
+			UPDATE ingest_rate_limit_counter
+			SET byte_window_started_at = CURRENT_TIMESTAMP - INTERVAL '58 seconds'
+			WHERE user_id = ${userId}
+		`;
+		const zeroCountState = await readCounter(userId);
+		const config: IngestRateLimitConfig = {
+			bytesMax: 10,
+			bytesWindowSeconds: 60,
+			requestsMax: 10,
+			requestsWindowSeconds: 60,
+		};
+		const subject = { id: userId, kind: "user" } as const;
+		await checkIngestRateLimit(subject, 10, config, freshEnvironment());
+		const firstPositiveCharge = await readCounter(userId);
+		expect(firstPositiveCharge.byteWindowStartedAt.getTime()).toBeGreaterThan(
+			zeroCountState.byteWindowStartedAt.getTime(),
+		);
+		expect(firstPositiveCharge).toMatchObject({
+			byteCount: 10,
 			requestCount: 2,
 		});
-		expect(afterOversizedAttempt.byteWindowStartedAt.getTime()).toBe(
-			beforeOversizedAttempt.byteWindowStartedAt.getTime(),
-		);
+
+		// Simulate the two-second epsilon around the old boundary. A preserved
+		// zero-count anchor would expire; the first positive charge's anchor does not.
+		await firstDatabase`
+			UPDATE ingest_rate_limit_counter
+			SET byte_window_started_at = byte_window_started_at - INTERVAL '2 seconds'
+			WHERE user_id = ${userId}
+		`;
+		await expect(
+			checkIngestRateLimit(subject, 10, config, freshEnvironment()),
+		).rejects.toMatchObject({
+			code: "TOO_MANY_REQUESTS",
+			data: {
+				current: 20,
+				limit: 10,
+				reason: INGEST_LIMIT_REASONS.byteLimit,
+				windowSeconds: 60,
+			},
+		});
+		expect(await readCounter(userId)).toMatchObject({
+			byteCount: 10,
+			requestCount: 3,
+		});
 	});
 
 	test("short-circuits repeated request rejection without another statement", async () => {
-		const apiKeyId = await createCounterApiKey("negative-cache");
-		const subject = { id: apiKeyId, kind: "api_key" } as const;
+		const userId = await createCounterUser("negative-cache");
+		const subject = { id: userId, kind: "user" } as const;
 		const config = {
 			...DEFAULT_TEST_CONFIG,
 			requestsMax: 1,
@@ -389,10 +442,128 @@ describe("atomic Postgres ingest rate limiting", () => {
 		).rejects.toMatchObject(expectedRejection);
 		expect(statementCounter.count).toBe(2);
 	});
+
+	test("sends a byte attempt below cached headroom to Postgres", async () => {
+		const userId = await createCounterUser("byte-cache-smaller-attempt");
+		const subject = { id: userId, kind: "user" } as const;
+		const config = {
+			...DEFAULT_TEST_CONFIG,
+			bytesMax: 10,
+			bytesWindowSeconds: 60,
+			requestsWindowSeconds: 60,
+		};
+		const statementCounter = { count: 0 };
+		const environment = countingEnvironment(statementCounter);
+
+		await checkIngestRateLimit(subject, 6, config, environment);
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject({
+			data: { current: 11, reason: INGEST_LIMIT_REASONS.byteLimit },
+		});
+		expect(statementCounter.count).toBe(2);
+
+		await checkIngestRateLimit(subject, 3, config, environment);
+		expect(statementCounter.count).toBe(3);
+		expect(await readCounter(userId)).toMatchObject({
+			byteCount: 9,
+			requestCount: 3,
+		});
+	});
+
+	test("does not let a byte-cache hit skip a real request charge", async () => {
+		const userId = await createCounterUser("byte-cache-request-charge");
+		const subject = { id: userId, kind: "user" } as const;
+		const config = {
+			...DEFAULT_TEST_CONFIG,
+			bytesMax: 10,
+			bytesWindowSeconds: 60,
+			requestsWindowSeconds: 60,
+		};
+		const statementCounter = { count: 0 };
+		const environment = countingEnvironment(statementCounter);
+
+		await checkIngestRateLimit(subject, 6, config, environment);
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject({
+			data: { current: 11, reason: INGEST_LIMIT_REASONS.byteLimit },
+		});
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject({
+			data: { current: 11, reason: INGEST_LIMIT_REASONS.byteLimit },
+		});
+
+		expect(statementCounter.count).toBe(3);
+		expect(await readCounter(userId)).toMatchObject({
+			byteCount: 6,
+			requestCount: 3,
+		});
+	});
+
+	test("sheds known-too-large retries after both rejection caches are armed", async () => {
+		const userId = await createCounterUser("byte-and-request-cache");
+		const subject = { id: userId, kind: "user" } as const;
+		const config = {
+			...DEFAULT_TEST_CONFIG,
+			bytesMax: 10,
+			bytesWindowSeconds: 60,
+			requestsMax: 3,
+			requestsWindowSeconds: 60,
+		};
+		const statementCounter = { count: 0 };
+		const environment = countingEnvironment(statementCounter);
+		const byteRejection = {
+			code: "TOO_MANY_REQUESTS",
+			data: {
+				current: 11,
+				limit: 10,
+				reason: INGEST_LIMIT_REASONS.byteLimit,
+				windowSeconds: 60,
+			},
+		};
+
+		await checkIngestRateLimit(subject, 6, config, environment);
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject(byteRejection);
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject(byteRejection);
+		await expect(
+			checkIngestRateLimit(subject, 5, config, environment),
+		).rejects.toMatchObject({
+			code: "TOO_MANY_REQUESTS",
+			data: {
+				current: 4,
+				limit: 3,
+				reason: INGEST_LIMIT_REASONS.requestLimit,
+				windowSeconds: 60,
+			},
+		});
+		expect(statementCounter.count).toBe(4);
+
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			await expect(
+				checkIngestRateLimit(subject, 5, config, environment),
+			).rejects.toMatchObject({
+				data: {
+					current: 4,
+					reason: INGEST_LIMIT_REASONS.requestLimit,
+				},
+			});
+		}
+		expect(statementCounter.count).toBe(4);
+		expect(await readCounter(userId)).toMatchObject({
+			byteCount: 6,
+			requestCount: 3,
+		});
+	});
 });
 
 describe("ingest rate-limit oRPC errors", () => {
-	test("preserves byte and request 429 reason discriminators over HTTP", async () => {
+	test("shares one user's keys while keeping different users isolated", async () => {
 		const byteLimited = await callIngest({
 			content: "ab",
 			projectPath: "/test/rate-limit",
@@ -407,17 +578,37 @@ describe("ingest rate-limit oRPC errors", () => {
 			windowSeconds: 3600,
 		});
 
-		const requestLimited = await callIngest({
-			content: "",
-			projectPath: "/test/rate-limit",
-			sessionId: `request-limit-${crypto.randomUUID()}`,
-			source: "claude_code",
-		});
+		const requestLimited = await callIngest(
+			{
+				content: "",
+				projectPath: "/test/rate-limit",
+				sessionId: `request-limit-${crypto.randomUUID()}`,
+				source: "claude_code",
+			},
+			sameUserApiKey.key,
+		);
 		expect(requestLimited.status).toBe(429);
 		expect(readRpcErrorData(requestLimited.body)).toEqual({
 			current: 2,
 			limit: 1,
 			reason: INGEST_LIMIT_REASONS.requestLimit,
+			windowSeconds: 3600,
+		});
+
+		const isolatedUser = await callIngest(
+			{
+				content: "ab",
+				projectPath: "/test/rate-limit",
+				sessionId: `isolated-user-${crypto.randomUUID()}`,
+				source: "claude_code",
+			},
+			otherUserApiKey.key,
+		);
+		expect(isolatedUser.status).toBe(429);
+		expect(readRpcErrorData(isolatedUser.body)).toEqual({
+			current: 2,
+			limit: 1,
+			reason: INGEST_LIMIT_REASONS.byteLimit,
 			windowSeconds: 3600,
 		});
 	});
@@ -434,6 +625,7 @@ describe("ingest rate-limit oRPC errors", () => {
 				sessionId: `database-unavailable-${crypto.randomUUID()}`,
 				source: "claude_code",
 			},
+			apiKey.key,
 			unavailableServer.baseUrl,
 		);
 
@@ -447,16 +639,19 @@ describe("ingest rate-limit oRPC errors", () => {
 	});
 });
 
-async function createCounterApiKey(label: string): Promise<string> {
-	const id = `${TEST_KEY_PREFIX}-${label}`;
+async function createCounterApiKey(
+	userId: string,
+	label: string,
+): Promise<string> {
+	const id = `${TEST_KEY_PREFIX}-key-${label}`;
 	await firstDatabase`
 		INSERT INTO apikey (id, key, reference_id)
-		VALUES (${id}, ${crypto.randomUUID()}, ${`user-${TEST_KEY_PREFIX}`})
+		VALUES (${id}, ${crypto.randomUUID()}, ${userId})
 	`;
 	return id;
 }
 
-async function createLegacyCounterUser(label: string): Promise<string> {
+async function createCounterUser(label: string): Promise<string> {
 	const id = `${TEST_KEY_PREFIX}-${label}`;
 	await firstDatabase`
 		INSERT INTO "user" (id, name, email)
@@ -473,7 +668,18 @@ function freshEnvironment(): IngestRateLimitEnvironment {
 	return createPostgresIngestRateLimitEnvironment(firstDatabase);
 }
 
-async function readCounter(apiKeyId: string) {
+function countingEnvironment(statementCounter: {
+	count: number;
+}): IngestRateLimitEnvironment {
+	return {
+		execute(statement, parameters) {
+			statementCounter.count += 1;
+			return firstInstance.execute(statement, parameters);
+		},
+	};
+}
+
+async function readCounter(userId: string) {
 	const [row] = await firstDatabase<
 		Array<{
 			byteCount: number;
@@ -488,29 +694,29 @@ async function readCounter(apiKeyId: string) {
 			request_count::int AS "requestCount",
 			request_window_started_at AS "requestWindowStartedAt"
 		FROM ingest_rate_limit_counter
-		WHERE api_key_id = ${apiKeyId}
+		WHERE user_id = ${userId}
 	`;
 	assert(row);
 	return row;
 }
 
-async function countCounters(
-	subjectColumn: "api_key_id" | "user_id",
-	subjectId: string,
-): Promise<number> {
-	const rows =
-		subjectColumn === "api_key_id"
-			? await firstDatabase<Array<{ count: number }>>`
-				SELECT COUNT(*)::int AS count
-				FROM ingest_rate_limit_counter
-				WHERE api_key_id = ${subjectId}
-			`
-			: await firstDatabase<Array<{ count: number }>>`
-				SELECT COUNT(*)::int AS count
-				FROM ingest_rate_limit_counter
-				WHERE user_id = ${subjectId}
-			`;
+async function countUserCounters(userId: string): Promise<number> {
+	const rows = await firstDatabase<Array<{ count: number }>>`
+		SELECT COUNT(*)::int AS count
+		FROM ingest_rate_limit_counter
+		WHERE user_id = ${userId}
+	`;
 	return rows[0]?.count ?? 0;
+}
+
+async function readApiKeyOwner(apiKeyId: string): Promise<string> {
+	const [row] = await firstDatabase<Array<{ userId: string }>>`
+		SELECT reference_id AS "userId"
+		FROM apikey
+		WHERE id = ${apiKeyId}
+	`;
+	assert(row);
+	return row.userId;
 }
 
 async function signUpTestUser(baseUrl: string): Promise<string> {
@@ -552,12 +758,16 @@ async function createIngestApiKey(
 	return body;
 }
 
-async function callIngest(input: IngestSessionInput, baseUrl = server.baseUrl) {
+async function callIngest(
+	input: IngestSessionInput,
+	apiKeyValue = apiKey.key,
+	baseUrl = server.baseUrl,
+) {
 	const response = await fetch(`${baseUrl}/rpc/ingestSession`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			"x-api-key": apiKey.key,
+			"x-api-key": apiKeyValue,
 		},
 		body: JSON.stringify({ json: input }),
 	});

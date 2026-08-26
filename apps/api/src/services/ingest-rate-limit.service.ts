@@ -11,6 +11,8 @@ const logger = getLogger(["rudel", "api", "ingest-rate-limit"]);
 const MINIMUM_INGEST_WINDOW_SECONDS = 60;
 const MAX_REJECTION_CACHE_ENTRIES = 10_000;
 
+// A zero byte_count is the durable "no byte history" marker. The timestamp is
+// still required by the schema, but the first positive charge must replace it.
 const CONSUME_INGEST_RATE_LIMIT_SQL = `
 INSERT INTO ingest_rate_limit_counter AS counter (
 	limiter_key,
@@ -59,8 +61,11 @@ SET
 			OR counter.request_count + 1 <= $5::bigint
 		)
 			AND $4::bigint > 0
-			AND counter.byte_window_started_at
-				+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
+			AND (
+				counter.byte_count = 0
+				OR counter.byte_window_started_at
+					+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
+			)
 			THEN CURRENT_TIMESTAMP
 		ELSE counter.byte_window_started_at
 	END,
@@ -70,8 +75,9 @@ SET
 				+ ($7::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
 			OR counter.request_count + 1 <= $5::bigint
 		) OR $4::bigint = 0 THEN counter.byte_count
-		WHEN counter.byte_window_started_at
-			+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
+		WHEN counter.byte_count = 0
+			OR counter.byte_window_started_at
+				+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
 			THEN CASE WHEN $4::bigint <= $6::bigint THEN $4::bigint ELSE 0 END
 		WHEN counter.byte_count + $4::bigint <= $6::bigint
 			THEN counter.byte_count + $4::bigint
@@ -88,8 +94,9 @@ SET
 		OR counter.request_count + 1 <= $5::bigint
 	) AND CASE
 		WHEN $4::bigint = 0 THEN true
-		WHEN counter.byte_window_started_at
-			+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
+		WHEN counter.byte_count = 0
+			OR counter.byte_window_started_at
+				+ ($8::double precision * INTERVAL '1 second') <= CURRENT_TIMESTAMP
 			THEN $4::bigint <= $6::bigint
 		ELSE counter.byte_count + $4::bigint <= $6::bigint
 	END,
@@ -124,9 +131,10 @@ export interface IngestRateLimitConfig {
 	readonly requestsWindowSeconds: number;
 }
 
-export type IngestRateLimitSubject =
-	| { readonly id: string; readonly kind: "api_key" }
-	| { readonly id: string; readonly kind: "legacy_user" };
+export interface IngestRateLimitSubject {
+	readonly id: string;
+	readonly kind: "user";
+}
 
 type IngestRateLimitParameter = number | string | null;
 
@@ -153,14 +161,27 @@ interface RequestRejectionCacheEntry {
 	readonly windowSeconds: number;
 }
 
-// This bounded, per-environment cache protects Postgres from repeated known
-// request rejections. It is not an authority for admissions; expired or absent
-// entries always fall through to the locked database row.
-// Byte rejections still reach Postgres because each one must atomically charge
-// the shared request bucket; bypassing that write would weaken the request cap.
+interface ByteRejectionCacheEntry {
+	readonly bytesMax: number;
+	readonly byteWindowEndsAtMonotonicMs: number;
+	readonly remainingHeadroom: number;
+	readonly windowSeconds: number;
+}
+
+// These bounded caches are per environment, and therefore per API instance in
+// production. They are not authorities for admissions; expired or absent
+// entries fall through to the locked row. Durations returned by Postgres are
+// anchored to a monotonic timestamp sampled before the query, so ordinary
+// query/lock delay expires entries conservatively early. A later forward
+// database wall-clock correction can extend a cached 429 until this deadline,
+// bounded by the configured window duration.
 const requestRejectionCaches = new WeakMap<
 	IngestRateLimitEnvironment,
 	Map<string, RequestRejectionCacheEntry>
+>();
+const byteRejectionCaches = new WeakMap<
+	IngestRateLimitEnvironment,
+	Map<string, ByteRejectionCacheEntry>
 >();
 
 export const INGEST_RATE_LIMIT_CONFIG: IngestRateLimitConfig = {
@@ -191,12 +212,35 @@ export async function checkIngestRateLimit(
 	env: IngestRateLimitEnvironment,
 ): Promise<void> {
 	assertValidBytes(bytes);
-	const cacheKey = `${subject.kind}:${subject.id}:request`;
+	const requestCacheKey = `${subject.kind}:${subject.id}:request`;
+	const byteCacheKey = `${subject.kind}:${subject.id}:byte`;
 	const cachedRequestRejection = readCachedRequestRejection(
 		env,
-		cacheKey,
+		requestCacheKey,
 		config,
 	);
+	const cachedByteRejection = readCachedByteRejection(
+		env,
+		byteCacheKey,
+		config,
+	);
+	// A byte-cache shortcut is exact only while this instance also knows the
+	// request bucket is rejected. The real statement would then return the
+	// request 429 without incrementing request_count or changing byte state.
+	if (
+		cachedRequestRejection &&
+		cachedByteRejection &&
+		bytes > cachedByteRejection.remainingHeadroom
+	) {
+		throwLimitExceeded({
+			current: cachedRequestRejection.current,
+			limit: cachedRequestRejection.limit,
+			reason: INGEST_LIMIT_REASONS.requestLimit,
+			subject,
+			unit: "requests",
+			windowSeconds: cachedRequestRejection.windowSeconds,
+		});
+	}
 	if (cachedRequestRejection) {
 		throwLimitExceeded({
 			current: cachedRequestRejection.current,
@@ -221,7 +265,7 @@ export async function checkIngestRateLimit(
 	}
 
 	if (!decision.requestAllowed) {
-		cacheRequestRejection(env, cacheKey, {
+		cacheRequestRejection(env, requestCacheKey, {
 			current: decision.requestCount + 1,
 			limit: config.requestsMax,
 			rejectUntilMonotonicMs:
@@ -239,6 +283,13 @@ export async function checkIngestRateLimit(
 	}
 
 	if (!decision.byteAllowed) {
+		cacheByteRejection(env, byteCacheKey, {
+			bytesMax: config.bytesMax,
+			byteWindowEndsAtMonotonicMs:
+				queryStartedAtMonotonicMs + decision.byteResetAfterSeconds * 1000,
+			remainingHeadroom: config.bytesMax - decision.byteCount,
+			windowSeconds: config.bytesWindowSeconds,
+		});
 		throwLimitExceeded({
 			current: decision.byteCount + bytes,
 			limit: config.bytesMax,
@@ -248,6 +299,8 @@ export async function checkIngestRateLimit(
 			windowSeconds: config.bytesWindowSeconds,
 		});
 	}
+
+	clearCachedByteRejection(env, byteCacheKey);
 }
 
 export function createPostgresIngestRateLimitEnvironment(
@@ -260,12 +313,9 @@ export function createPostgresIngestRateLimitEnvironment(
 }
 
 export function resolveIngestRateLimitSubject(
-	apiKeyId: string | null,
 	userId: string,
 ): IngestRateLimitSubject {
-	return apiKeyId
-		? { id: apiKeyId, kind: "api_key" }
-		: { id: userId, kind: "legacy_user" };
+	return { id: userId, kind: "user" };
 }
 
 function buildQueryParameters(
@@ -273,12 +323,10 @@ function buildQueryParameters(
 	bytes: number,
 	config: IngestRateLimitConfig,
 ): readonly IngestRateLimitParameter[] {
-	const apiKeyId = subject.kind === "api_key" ? subject.id : null;
-	const userId = subject.kind === "legacy_user" ? subject.id : null;
 	return [
 		`${subject.kind}:${subject.id}`,
-		apiKeyId,
-		userId,
+		null,
+		subject.id,
 		bytes,
 		config.requestsMax,
 		config.bytesMax,
@@ -376,6 +424,59 @@ function cacheRequestRejection(
 		cache.delete(oldestKey);
 	}
 	cache.set(cacheKey, entry);
+}
+
+function readCachedByteRejection(
+	env: IngestRateLimitEnvironment,
+	cacheKey: string,
+	config: IngestRateLimitConfig,
+): ByteRejectionCacheEntry | null {
+	const cache = byteRejectionCaches.get(env);
+	const entry = cache?.get(cacheKey);
+	if (!entry) {
+		return null;
+	}
+	if (
+		entry.bytesMax !== config.bytesMax ||
+		entry.windowSeconds !== config.bytesWindowSeconds ||
+		entry.byteWindowEndsAtMonotonicMs <= performance.now()
+	) {
+		cache?.delete(cacheKey);
+		return null;
+	}
+	return entry;
+}
+
+function cacheByteRejection(
+	env: IngestRateLimitEnvironment,
+	cacheKey: string,
+	entry: ByteRejectionCacheEntry,
+): void {
+	if (entry.byteWindowEndsAtMonotonicMs <= performance.now()) {
+		return;
+	}
+
+	let cache = byteRejectionCaches.get(env);
+	if (!cache) {
+		cache = new Map();
+		byteRejectionCaches.set(env, cache);
+	}
+	cache.delete(cacheKey);
+	while (cache.size >= MAX_REJECTION_CACHE_ENTRIES) {
+		const oldestKey = cache.keys().next().value;
+		if (typeof oldestKey !== "string") {
+			break;
+		}
+		cache.delete(oldestKey);
+	}
+	cache.set(cacheKey, entry);
+}
+
+function clearCachedByteRejection(
+	env: IngestRateLimitEnvironment,
+	cacheKey: string,
+): void {
+	byteRejectionCaches.get(env)?.delete(cacheKey);
 }
 
 function readCounter(value: unknown, name: string): number {
