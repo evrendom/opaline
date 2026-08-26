@@ -29,6 +29,11 @@ const CLAUDE_TIE_SESSION_ID = `claude_tie_${RUN_ID}`;
 const CODEX_TIE_SESSION_ID = `codex_tie_${RUN_ID}`;
 const executor = createTestExecutor();
 const databases: string[] = [];
+const VERIFIED_GENERATED_DOUBLED_QUOTE_LITERALS = new Set([
+	"''''''",
+	"'''claude_code'''",
+	"'''standard'''",
+]);
 
 interface WinnerRow {
 	filter_version: number;
@@ -53,6 +58,47 @@ function databaseName(suffix: string): string {
 	}
 	databases.push(database);
 	return database;
+}
+
+function assertMigrationUsesSupportedGrammar(
+	sql: string,
+	migrationName: string,
+): void {
+	if (/\$[a-zA-Z0-9_]*\$/u.test(sql)) {
+		throw new Error(
+			`${migrationName} contains an unsupported heredoc delimiter`,
+		);
+	}
+	if (/["`]rudel["`]\s*\./iu.test(sql)) {
+		throw new Error(
+			`${migrationName} contains an unsupported quoted rudel qualifier`,
+		);
+	}
+	for (const qualifier of sql.matchAll(/\brudel\s*\./giu)) {
+		if (qualifier[0] !== "rudel.") {
+			throw new Error(
+				`${migrationName} contains an unsupported cased or spaced rudel qualifier`,
+			);
+		}
+	}
+	for (const blockComment of sql.matchAll(/\/\*[\s\S]*?\*\//gu)) {
+		if (blockComment[0].includes(";")) {
+			throw new Error(
+				`${migrationName} contains a semicolon inside a block comment`,
+			);
+		}
+	}
+	for (const literal of sql.matchAll(/'(?:\\.|''|[^'])*'/gu)) {
+		const value = literal[0];
+		if (
+			value.slice(1, -1).includes("''") &&
+			!VERIFIED_GENERATED_DOUBLED_QUOTE_LITERALS.has(value)
+		) {
+			throw new Error(
+				`${migrationName} contains an unsupported doubled-quote string`,
+			);
+		}
+	}
 }
 
 function scopeMigration(sql: string, database: string): string {
@@ -560,6 +606,25 @@ afterAll(async () => {
 
 describe("F16 destructive migration execution rehearsal", () => {
 	test("executes both checked-in migrations deterministically on adversarial history", async () => {
+		assertMigrationUsesSupportedGrammar(DDL_MIGRATION, "F16 DDL migration");
+		assertMigrationUsesSupportedGrammar(
+			BACKFILL_MIGRATION,
+			"F16 backfill migration",
+		);
+		for (const [unsupportedSql, expectedFailure] of [
+			["SELECT $$rudel.literal$$", "heredoc"],
+			['SELECT * FROM "rudel" .table', "quoted rudel qualifier"],
+			["SELECT * FROM RUDEL.table", "cased or spaced rudel qualifier"],
+			["SELECT 1 /* unsupported; split */", "block comment"],
+			["SELECT 'it''s rudel.literal'", "doubled-quote string"],
+		] as const) {
+			expect(() =>
+				assertMigrationUsesSupportedGrammar(
+					unsupportedSql,
+					"synthetic migration",
+				),
+			).toThrow(expectedFailure);
+		}
 		expect(
 			scopeMigration(
 				`SELECT 'rudel.literal', rudel.table, \`rudel\`.backtick_table, "rudel".double_quoted_table -- rudel.comment

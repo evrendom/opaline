@@ -17,6 +17,7 @@ import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import { IngestFilterQueue } from "../services/ingest-filter.service.js";
 import {
+	extendNonterminalR2IngestJobExpiries,
 	getR2IngestJobStatus,
 	initR2IngestJob,
 } from "../services/ingest-job.service.js";
@@ -41,10 +42,11 @@ import {
 } from "../services/r2-ingest-commit.service.js";
 import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
-import type {
-	R2MultipartUploadClient,
-	R2MultipartUploadInitClient,
-	R2ObjectMetadata,
+import {
+	R2_INGEST_BUCKET,
+	type R2MultipartUploadClient,
+	type R2MultipartUploadInitClient,
+	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
 import { startApiTestServer } from "./helpers/api-test-server.js";
 
@@ -176,6 +178,104 @@ class FakeR2Client implements R2MultipartUploadClient {
 
 const fakeR2 = new FakeR2Client();
 
+function createFakeR2S3Endpoint(): Bun.Server<undefined> {
+	return Bun.serve({
+		async fetch(request) {
+			const url = new URL(request.url);
+			const objectKey = readFakeR2ObjectKey(url);
+			if (
+				request.method === "POST" &&
+				url.searchParams.has("delete") &&
+				objectKey === null
+			) {
+				const body = await request.text();
+				const objectKeys = [...body.matchAll(/<Key>([^<]+)<\/Key>/gu)].map(
+					(match) => decodeXmlText(match[1] ?? ""),
+				);
+				await fakeR2.deleteObjects(objectKeys);
+				return xmlResponse(
+					'<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/" />',
+				);
+			}
+			if (objectKey === null) return new Response(null, { status: 404 });
+			const uploadId = url.searchParams.get("uploadId");
+			if (request.method === "DELETE" && uploadId) {
+				await fakeR2.abortMultipartUpload({ objectKey, uploadId });
+				return new Response(null, { status: 204 });
+			}
+			if (request.method === "POST" && uploadId) {
+				await fakeR2.completeMultipartUpload({
+					objectKey,
+					parts: [{ etag: '"fake-etag"', partNumber: 1 }],
+					uploadId,
+				});
+				return xmlResponse(
+					`<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>${R2_INGEST_BUCKET}</Bucket><Key>${objectKey}</Key><ETag>"fake-etag"</ETag></CompleteMultipartUploadResult>`,
+				);
+			}
+			if (request.method === "HEAD") {
+				const metadata = await fakeR2.headObject(objectKey);
+				if (!metadata) return new Response(null, { status: 404 });
+				return new Response(null, {
+					headers: buildFakeR2Headers(metadata),
+					status: 200,
+				});
+			}
+			if (request.method === "GET") {
+				const bytes = await fakeR2.getObject(objectKey);
+				const stored = fakeR2.objects.get(objectKey);
+				if (!stored) return new Response(null, { status: 404 });
+				return new Response(bytes, {
+					headers: buildFakeR2Headers({
+						byteLength: bytes.byteLength,
+						metadata: stored.metadata,
+					}),
+					status: 200,
+				});
+			}
+			return new Response(null, { status: 405 });
+		},
+		hostname: "127.0.0.1",
+		port: 0,
+	});
+}
+
+function readFakeR2ObjectKey(url: URL): string | null {
+	const bucketPath = `/${R2_INGEST_BUCKET}`;
+	if (url.pathname === bucketPath || url.pathname === `${bucketPath}/`) {
+		return null;
+	}
+	if (!url.pathname.startsWith(`${bucketPath}/`)) return null;
+	return decodeURIComponent(url.pathname.slice(bucketPath.length + 1));
+}
+
+function buildFakeR2Headers(metadata: R2ObjectMetadata): Headers {
+	const headers = new Headers({
+		"Content-Length": metadata.byteLength.toString(),
+		ETag: '"fake-etag"',
+	});
+	for (const [name, value] of Object.entries(metadata.metadata)) {
+		headers.set(`x-amz-meta-${name}`, value);
+	}
+	return headers;
+}
+
+function decodeXmlText(value: string): string {
+	return value
+		.replaceAll("&amp;", "&")
+		.replaceAll("&lt;", "<")
+		.replaceAll("&gt;", ">")
+		.replaceAll("&quot;", '"')
+		.replaceAll("&apos;", "'");
+}
+
+function xmlResponse(body: string): Response {
+	return new Response(body, {
+		headers: { "Content-Type": "application/xml" },
+		status: 200,
+	});
+}
+
 beforeAll(async () => {
 	await sqlClient`
 		INSERT INTO "user" (id, name, email)
@@ -211,28 +311,35 @@ afterAll(async () => {
 });
 
 describe("R2 ingest commit lifecycle", () => {
-	test("quiescence freezes commit and repair before durable state or R2 access", async () => {
+	test("quiescence blocks ingest-state PostgreSQL writes and R2 access after authentication while allowing operator commit", async () => {
 		const operatorToken = `operator-${crypto.randomUUID()}`;
+		const fakeR2Endpoint = createFakeR2S3Endpoint();
 		const server = await startApiTestServer({
-			R2_ACCESS_KEY_ID: "",
-			R2_ACCOUNT_ID: "",
-			R2_SECRET_ACCESS_KEY: "",
+			R2_ACCESS_KEY_ID: "test-access-key",
+			R2_ACCOUNT_ID: "test-account",
+			R2_ENDPOINT: fakeR2Endpoint.url.origin,
+			R2_SECRET_ACCESS_KEY: "test-secret-key",
 			SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
 			SESSION_INGEST_QUIESCED: "true",
+			SKILL_EXTRACTION_ENABLED: "false",
+			USAGE_EVENT_EXTRACTION_ENABLED: "false",
 		});
 		let identity: QuiescedTestIdentity | undefined;
 		let commitJob: R2IngestInitOutput | undefined;
+		let repairJob: R2IngestInitOutput | undefined;
 		let terminalJob: R2IngestInitOutput | undefined;
 		try {
 			identity = await createQuiescedTestIdentity(server.baseUrl);
+			const operatorSkillName = `quiesced-operator-${crypto.randomUUID()}`;
 			commitJob = await initializeUploadedJobForIdentity(
 				crypto.randomUUID(),
-				"quiesced commit transcript bytes",
+				buildRealClaudeTranscript(operatorSkillName),
 				identity,
 			);
 			const commitObjectsBefore = snapshotFakeR2Objects(commitJob);
 			const commitEffectsBefore = snapshotFakeR2Effects();
 			const commitRowBefore = await readIngestJobRowSnapshot(commitJob.jobId);
+			const apiKeyBefore = await readApiKeySnapshot(identity.apiKeyId);
 			expect(commitRowBefore).toMatchObject({
 				attempts: 0,
 				leaseExpiresAt: null,
@@ -254,6 +361,15 @@ describe("R2 ingest commit lifecycle", () => {
 				code: "SERVICE_UNAVAILABLE",
 				reason: "session_ingest_quiesced",
 			});
+			expect(await readIngestJobRowSnapshot(commitJob.jobId)).toEqual(
+				commitRowBefore,
+			);
+			expect(snapshotFakeR2Objects(commitJob)).toEqual(commitObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(commitEffectsBefore);
+			// Better Auth records last_request/updated_at while authenticating the API
+			// key. Every other API-key field must remain unchanged after rejection.
+			expect(await readApiKeySnapshot(identity.apiKeyId)).toBe(apiKeyBefore);
+
 			const operatorResponse = await fetch(
 				`${server.baseUrl}/rpc/ingest/commit`,
 				{
@@ -266,17 +382,26 @@ describe("R2 ingest commit lifecycle", () => {
 					method: "POST",
 				},
 			);
-			expect(operatorResponse.status).toBe(503);
-			expect(await readRpcErrorShape(operatorResponse)).toEqual({
-				code: "SERVICE_UNAVAILABLE",
-				reason: "r2_ingest_disabled",
+			expect(operatorResponse.status).toBe(200);
+			expect(await operatorResponse.json()).toMatchObject({
+				json: {
+					jobId: commitJob.jobId,
+					result: { sessionId: commitJob.jobId, success: true },
+					status: "completed",
+				},
 			});
-			expect(await readIngestJobRowSnapshot(commitJob.jobId)).toEqual(
-				commitRowBefore,
+			expect(await countQuiescedCanonicalRaw(identity, commitJob.jobId)).toBe(
+				1,
 			);
-			expect(snapshotFakeR2Objects(commitJob)).toEqual(commitObjectsBefore);
-			expect(snapshotFakeR2Effects()).toEqual(commitEffectsBefore);
+			expect(
+				await getR2IngestJobStatus(commitJob.jobId, identity.userId),
+			).toMatchObject({ attempts: 1, status: "completed" });
 
+			repairJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				"quiesced repair transcript bytes",
+				identity,
+			);
 			terminalJob = await initializeUploadedJobForIdentity(
 				crypto.randomUUID(),
 				"quiesced terminal cleanup bytes",
@@ -285,13 +410,13 @@ describe("R2 ingest commit lifecycle", () => {
 			await sqlClient`
 				UPDATE ingest_job
 				SET
-					attempts = CASE WHEN id = ${commitJob.jobId} THEN 1 ELSE max_attempts END,
+					attempts = CASE WHEN id = ${repairJob.jobId} THEN 1 ELSE max_attempts END,
 					available_at = clock_timestamp() - interval '1 minute',
 					expires_at = clock_timestamp() + interval '2 days'
-				WHERE id IN (${commitJob.jobId}, ${terminalJob.jobId})
+				WHERE id IN (${repairJob.jobId}, ${terminalJob.jobId})
 			`;
 			const repairRowsBefore = await Promise.all([
-				readIngestJobRowSnapshot(commitJob.jobId),
+				readIngestJobRowSnapshot(repairJob.jobId),
 				readIngestJobRowSnapshot(terminalJob.jobId),
 			]);
 			expect(repairRowsBefore[0]).toMatchObject({
@@ -307,7 +432,7 @@ describe("R2 ingest commit lifecycle", () => {
 			});
 			expect(repairRowsBefore[1]?.attempts).toBeGreaterThan(1);
 			const repairObjectsBefore = [
-				...snapshotFakeR2Objects(commitJob),
+				...snapshotFakeR2Objects(repairJob),
 				...snapshotFakeR2Objects(terminalJob),
 			];
 			const repairEffectsBefore = snapshotFakeR2Effects();
@@ -328,34 +453,223 @@ describe("R2 ingest commit lifecycle", () => {
 			}
 			expect(
 				await Promise.all([
-					readIngestJobRowSnapshot(commitJob.jobId),
+					readIngestJobRowSnapshot(repairJob.jobId),
 					readIngestJobRowSnapshot(terminalJob.jobId),
 				]),
 			).toEqual(repairRowsBefore);
 			expect([
-				...snapshotFakeR2Objects(commitJob),
+				...snapshotFakeR2Objects(repairJob),
 				...snapshotFakeR2Objects(terminalJob),
 			]).toEqual(repairObjectsBefore);
 			expect(snapshotFakeR2Effects()).toEqual(repairEffectsBefore);
 		} finally {
 			await server.stop();
-			const jobIds = [commitJob?.jobId, terminalJob?.jobId].filter(
-				(jobId): jobId is string => jobId !== undefined,
-			);
+			await fakeR2Endpoint.stop(true);
+			const jobIds = [
+				commitJob?.jobId,
+				repairJob?.jobId,
+				terminalJob?.jobId,
+			].filter((jobId): jobId is string => jobId !== undefined);
 			for (const jobId of jobIds) {
 				await sqlClient`DELETE FROM ingest_job WHERE id = ${jobId}`;
 			}
-			for (const initialized of [commitJob, terminalJob]) {
+			for (const initialized of [commitJob, repairJob, terminalJob]) {
 				for (const object of initialized?.objects ?? []) {
 					fakeR2.objects.delete(object.objectKey);
 				}
 			}
 			if (identity) {
+				await deleteQuiescedClickHouseRows(identity.organizationId);
 				await sqlClient`DELETE FROM organization WHERE id = ${identity.organizationId}`;
 				await sqlClient`DELETE FROM "user" WHERE id = ${identity.userId}`;
 			}
 		}
 	}, 60_000);
+
+	test("recovers one interrupted final claim and bounds a failed rescue", async () => {
+		const leaseStartedAt = new Date("2030-01-01T00:00:00.000Z");
+		const recoveryAt = new Date("2030-01-01T00:00:02.000Z");
+		const recoveredJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"interrupted final claim transcript",
+		);
+		const recoveredObjectKey = recoveredJob.objects[0]?.objectKey;
+		if (!recoveredObjectKey)
+			throw new Error("missing interrupted claim object");
+		await interruptFinalIngestClaim(recoveredJob, leaseStartedAt);
+		const [interrupted] = await sqlClient<
+			Array<{
+				attempts: number;
+				lastErrorCode: string | null;
+				maxAttempts: number;
+				status: string;
+			}>
+		>`
+			SELECT
+				attempts,
+				last_error_code AS "lastErrorCode",
+				max_attempts AS "maxAttempts",
+				status
+			FROM ingest_job
+			WHERE id = ${recoveredJob.jobId}
+		`;
+		expect(interrupted).toMatchObject({
+			lastErrorCode: null,
+			status: "running",
+		});
+		if (!interrupted) throw new Error("interrupted final claim disappeared");
+		expect(interrupted?.attempts).toBe(interrupted?.maxAttempts);
+
+		const previousQuiescence = process.env.SESSION_INGEST_QUIESCED;
+		process.env.SESSION_INGEST_QUIESCED = "true";
+		try {
+			await expect(runR2IngestRepairPass(fakeR2)).resolves.toEqual({
+				attempted: 0,
+				completed: 0,
+				hasMore: false,
+				nextDueAt: null,
+			});
+		} finally {
+			restoreEnvironmentVariable("SESSION_INGEST_QUIESCED", previousQuiescence);
+		}
+		expect(fakeR2.objects.has(recoveredObjectKey)).toBe(true);
+
+		let recoveryProcessCalls = 0;
+		const recovered = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			leaseDurationMs: 1_000,
+			now: () => recoveryAt,
+			process: async (input) => {
+				recoveryProcessCalls += 1;
+				const [running] = await sqlClient<
+					Array<{ attempts: number; lastErrorCode: string | null }>
+				>`
+					SELECT
+						attempts,
+						last_error_code AS "lastErrorCode"
+					FROM ingest_job
+					WHERE id = ${recoveredJob.jobId}
+				`;
+				expect(running).toEqual({
+					attempts: interrupted.maxAttempts,
+					lastErrorCode: "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE",
+				});
+				expect(fakeR2.objects.has(recoveredObjectKey)).toBe(true);
+				return processorResult(input.sessionId);
+			},
+			r2: fakeR2,
+		});
+		expect(recovered).toMatchObject({ attempted: 1, completed: 1 });
+		expect(recoveryProcessCalls).toBe(1);
+		expect(
+			await getR2IngestJobStatus(recoveredJob.jobId, USER_ID),
+		).toMatchObject({
+			attempts: interrupted.maxAttempts,
+			error: null,
+			status: "completed",
+		});
+
+		const boundedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"bounded interrupted final claim transcript",
+		);
+		const boundedObjectKey = boundedJob.objects[0]?.objectKey;
+		if (!boundedObjectKey) throw new Error("missing bounded rescue object");
+		await interruptFinalIngestClaim(boundedJob, leaseStartedAt);
+		const processingFailure = new Error("simulated rescue processing failure");
+		const bounded = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			leaseDurationMs: 1_000,
+			now: () => recoveryAt,
+			process: async () => {
+				throw processingFailure;
+			},
+			r2: fakeR2,
+		});
+		expect(bounded).toMatchObject({ attempted: 1, completed: 0 });
+		expect(await getR2IngestJobStatus(boundedJob.jobId, USER_ID)).toMatchObject(
+			{
+				error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+				status: "failed",
+			},
+		);
+		expect(fakeR2.objects.has(boundedObjectKey)).toBe(false);
+	});
+
+	test("extends pending expiry by the actual barrier duration before resume", async () => {
+		const barrierStartedAt = new Date("2030-01-01T00:00:00.000Z");
+		const originalExpiry = new Date("2030-01-01T00:00:01.000Z");
+		const resumedAt = new Date("2030-01-01T00:10:00.000Z");
+		const unextendedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"unextended barrier expiry transcript",
+		);
+		const unextendedObjectKey = unextendedJob.objects[0]?.objectKey;
+		if (!unextendedObjectKey)
+			throw new Error("missing unextended expiry object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = ${originalExpiry.toISOString()}
+			WHERE id = ${unextendedJob.jobId}
+		`;
+		await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: resumedAt,
+			r2: fakeR2,
+		});
+		expect(
+			await getR2IngestJobStatus(unextendedJob.jobId, USER_ID),
+		).toMatchObject({
+			error: { code: "R2_INGEST_JOB_EXPIRED" },
+			status: "failed",
+		});
+		expect(fakeR2.objects.has(unextendedObjectKey)).toBe(false);
+
+		const extendedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"extended barrier expiry transcript",
+		);
+		const extendedObjectKey = extendedJob.objects[0]?.objectKey;
+		if (!extendedObjectKey) throw new Error("missing extended expiry object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = ${originalExpiry.toISOString()}
+			WHERE id = ${extendedJob.jobId}
+		`;
+		const extendedCount = await extendNonterminalR2IngestJobExpiries(
+			barrierStartedAt,
+			resumedAt,
+			sqlClient,
+		);
+		expect(extendedCount).toBe(1);
+		const [extendedExpiry] = await sqlClient<Array<{ expiresAt: string }>>`
+			SELECT expires_at::text AS "expiresAt"
+			FROM ingest_job
+			WHERE id = ${extendedJob.jobId}
+		`;
+		expect(new Date(extendedExpiry?.expiresAt ?? "").toISOString()).toBe(
+			"2030-01-01T00:10:01.000Z",
+		);
+
+		await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: resumedAt,
+			r2: fakeR2,
+		});
+		expect(fakeR2.objects.has(extendedObjectKey)).toBe(true);
+		expect(
+			await getR2IngestJobStatus(extendedJob.jobId, USER_ID),
+		).toMatchObject({ attempts: 0, status: "pending" });
+		const completed = await commitR2IngestJob({
+			input: buildCompletionInput(extendedJob),
+			leaseDurationMs: 500,
+			now: () => resumedAt,
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(completed.status).toBe("completed");
+	});
 
 	test("aborts every upload created during partial initialization failure", async () => {
 		const mainPresigned = Promise.withResolvers<void>();
@@ -1614,6 +1928,7 @@ describe("R2 ingest real processor crash recovery", () => {
 
 interface QuiescedTestIdentity {
 	apiKey: string;
+	apiKeyId: string;
 	organizationId: string;
 	userId: string;
 }
@@ -1660,15 +1975,70 @@ async function createQuiescedTestIdentity(
 	});
 	expect(apiKeyResponse.ok).toBe(true);
 	const apiKey: unknown = await apiKeyResponse.json();
-	if (!isRecord(apiKey) || typeof apiKey.key !== "string") {
+	if (
+		!isRecord(apiKey) ||
+		typeof apiKey.id !== "string" ||
+		typeof apiKey.key !== "string"
+	) {
 		throw new Error("Quiescence test API key creation returned no key");
 	}
 
 	return {
 		apiKey: apiKey.key,
+		apiKeyId: apiKey.id,
 		organizationId: me.json.id,
 		userId: me.json.id,
 	};
+}
+
+async function readApiKeySnapshot(apiKeyId: string): Promise<string> {
+	const [row] = await sqlClient<Array<{ snapshot: string }>>`
+		SELECT (
+			to_jsonb(api_key) - 'last_request' - 'updated_at'
+		)::text AS snapshot
+		FROM apikey AS api_key
+		WHERE id = ${apiKeyId}
+	`;
+	if (!row) throw new Error("Quiescence test API key disappeared");
+	return row.snapshot;
+}
+
+async function countQuiescedCanonicalRaw(
+	identity: QuiescedTestIdentity,
+	sessionId: string,
+): Promise<number> {
+	const [row] = await getClickhouse().query<{ count: number | string }>({
+		query: `SELECT count() AS count
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND session_id = {sessionId:String}
+				AND user_id = {userId:String}`,
+		query_params: {
+			organizationId: identity.organizationId,
+			sessionId,
+			userId: identity.userId,
+		},
+	});
+	return Number(row?.count ?? 0);
+}
+
+async function deleteQuiescedClickHouseRows(
+	organizationId: string,
+): Promise<void> {
+	for (const table of [
+		"rudel.claude_sessions",
+		"rudel.session_analytics",
+		"rudel.session_language_signals",
+		"rudel.skill_receipts",
+		"rudel.skill_uses",
+		"rudel.skill_version_contents",
+		"rudel.usage_events",
+	]) {
+		await getClickhouse().execute({
+			query: `DELETE FROM ${getSafeClickHouseTable(table)} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+			query_params: { organizationId },
+		});
+	}
 }
 
 async function initializeUploadedJobForIdentity(
@@ -2085,6 +2455,45 @@ function buildCompletionInput(
 			uploadId: object.uploadId,
 		})),
 	};
+}
+
+async function interruptFinalIngestClaim(
+	initialized: R2IngestInitOutput,
+	leaseStartedAt: Date,
+): Promise<void> {
+	await sqlClient`
+		UPDATE ingest_job
+		SET attempts = max_attempts - 1
+		WHERE id = ${initialized.jobId}
+	`;
+	let interrupted = false;
+	await expect(
+		commitR2IngestJob({
+			failpoint: async (boundary) => {
+				if (
+					!interrupted &&
+					boundary.store === "r2" &&
+					boundary.target === "multipart-complete"
+				) {
+					interrupted = true;
+					throw new IngestProcessingCrashSimulationError(
+						"simulated interruption after the final claim",
+					);
+				}
+			},
+			input: buildCompletionInput(initialized),
+			leaseDurationMs: 1_000,
+			now: () => leaseStartedAt,
+			process: async () => {
+				throw new Error(
+					"interrupted final claim unexpectedly reached processing",
+				);
+			},
+			r2: fakeR2,
+			userId: USER_ID,
+		}),
+	).rejects.toThrow("simulated interruption after the final claim");
+	expect(interrupted).toBe(true);
 }
 
 async function expireJobWithReceipt(

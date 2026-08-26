@@ -34,7 +34,25 @@ describe("R2 ingest storage configuration", () => {
 				accountId: "account-id",
 				bucket: R2_INGEST_BUCKET,
 				endpoint: "https://account-id.eu.r2.cloudflarestorage.com",
+				forcePathStyle: false,
 				secretAccessKey: "secret-key",
+			},
+		});
+	});
+
+	test("uses path-style addressing for an explicit local endpoint", () => {
+		expect(
+			readR2IngestAvailability({
+				R2_ACCESS_KEY_ID: "access-key",
+				R2_ACCOUNT_ID: "account-id",
+				R2_ENDPOINT: "http://127.0.0.1:9000",
+				R2_SECRET_ACCESS_KEY: "secret-key",
+			}),
+		).toMatchObject({
+			enabled: true,
+			configuration: {
+				endpoint: "http://127.0.0.1:9000",
+				forcePathStyle: true,
 			},
 		});
 	});
@@ -48,6 +66,7 @@ describe("R2 ingest storage configuration", () => {
 			accountId: "test-account",
 			bucket: R2_INGEST_BUCKET,
 			endpoint: server.url.origin,
+			forcePathStyle: true,
 			secretAccessKey,
 		});
 		const uploadUrl = new URL(

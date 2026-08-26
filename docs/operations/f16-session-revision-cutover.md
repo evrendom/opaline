@@ -49,6 +49,46 @@ watermark, and smoke-session ID in the incident artifact.
    `SESSION_INGEST_QUIESCED=true` on both Fly and Vercel. Do not send the token
    to clients or put it in the incident artifact.
 
+   Immediately after the final production runtime accepts the flag, record the
+   PostgreSQL clock as `<BARRIER_STARTED_AT_UTC>` and inventory the expiry
+   margin of **every** nonterminal R2 job:
+
+   ```sql
+   SELECT clock_timestamp() AS barrier_started_at_utc;
+
+   SELECT
+     id,
+     status,
+     attempts,
+     max_attempts,
+     available_at,
+     lease_expires_at,
+     expires_at,
+     expires_at - clock_timestamp() AS expiry_margin,
+     expires_at - interval '30 minutes' AS rescue_deadline
+   FROM ingest_job
+   WHERE status IN ('pending', 'running')
+   ORDER BY expires_at, id;
+
+   SELECT
+     count(*) AS nonterminal_jobs,
+     min(expires_at) AS earliest_expires_at,
+     min(expires_at - interval '30 minutes') AS earliest_rescue_deadline,
+     min(expires_at - clock_timestamp()) AS minimum_expiry_margin
+   FROM ingest_job
+   WHERE status IN ('pending', 'running');
+   ```
+
+   Save every row and the exact barrier-start timestamp in the incident
+   artifact. The earliest `rescue_deadline` is a hard stop, not an observation:
+   choose an operational abort time before it, and do not start a migration
+   command that could cross it. If the deadline is already reached or the
+   remaining cutover cannot finish before it, keep quiescence enabled, stop new
+   migration commands, and enter the expiry-extension rescue in section 7.
+   Commit an extension before the deadline, then either safely resume/recover
+   (if ClickHouse is untouched) or obtain owner review of forward completion or
+   rollback. Never allow the barrier to silently cross the deadline.
+
 3. Drain Fly processes, including legacy requests which have no ledger row:
 
    - Record every currently running Fly machine ID before deploying the flag.
@@ -73,38 +113,120 @@ watermark, and smoke-session ID in the incident artifact.
      the configured 300-second `maxDuration` plus a 30-second margin. Restart
      the wait if any alias changes.
 
-5. Classify every R2 job marked `running`; do not filter by age:
+5. Classify every R2 job marked `running`; do not filter by age. This inventory
+   includes attempts, the lease, the current claim outcome marker, and durable
+   canonical-raw-write evidence:
 
    ```sql
+   WITH running_inventory AS (
+     SELECT
+       job.id,
+       job.organization_id,
+       job.session_id,
+       job.source,
+       job.attempts,
+       job.max_attempts,
+       job.lease_token,
+       job.lease_expires_at,
+       job.last_error_code,
+       job.last_error_message,
+       EXISTS (
+         SELECT 1
+         FROM session_ingest_revision AS revision
+         JOIN ingest_processing_ledger AS ledger
+           ON ledger.organization_id = revision.organization_id
+          AND ledger.session_id = revision.session_id
+          AND ledger.filtered_content_sha256 = revision.content_sha256
+         JOIN ingest_processing_target_receipt AS receipt
+           ON receipt.ledger_id = ledger.id
+          AND receipt.target = CASE job.source
+            WHEN 'claude_code' THEN 'rudel.claude_sessions'
+            ELSE 'rudel.codex_sessions'
+          END
+         WHERE revision.organization_id = job.organization_id
+           AND revision.session_id = job.session_id
+           AND revision.operation_id = 'r2:' || job.id
+       ) AS canonical_raw_write_recorded,
+       clock_timestamp() AS database_now
+     FROM ingest_job AS job
+     WHERE job.status = 'running'
+   )
    SELECT
-     id,
-     organization_id,
-     session_id,
-     lease_token,
-     lease_expires_at,
-     clock_timestamp() AS database_now,
+     *,
      CASE
-       WHEN lease_expires_at > clock_timestamp() THEN 'active_lease'
-       ELSE 'stale_lease'
+       WHEN lease_expires_at > database_now THEN 'active_lease'
+       WHEN attempts < max_attempts THEN 'stale_retryable_lease'
+       WHEN last_error_code IS NULL
+        AND last_error_message IS NULL
+        AND NOT canonical_raw_write_recorded
+         THEN 'stale_interrupted_final_claim_rescue'
+       ELSE 'stale_final_claim_requires_review'
      END AS drain_state
-   FROM ingest_job
-   WHERE status = 'running'
+   FROM running_inventory
    ORDER BY lease_expires_at, id;
 
+   WITH running_inventory AS (
+     SELECT
+       job.*,
+       EXISTS (
+         SELECT 1
+         FROM session_ingest_revision AS revision
+         JOIN ingest_processing_ledger AS ledger
+           ON ledger.organization_id = revision.organization_id
+          AND ledger.session_id = revision.session_id
+          AND ledger.filtered_content_sha256 = revision.content_sha256
+         JOIN ingest_processing_target_receipt AS receipt
+           ON receipt.ledger_id = ledger.id
+          AND receipt.target = CASE job.source
+            WHEN 'claude_code' THEN 'rudel.claude_sessions'
+            ELSE 'rudel.codex_sessions'
+          END
+         WHERE revision.organization_id = job.organization_id
+           AND revision.session_id = job.session_id
+           AND revision.operation_id = 'r2:' || job.id
+       ) AS canonical_raw_write_recorded,
+       clock_timestamp() AS database_now
+     FROM ingest_job AS job
+     WHERE job.status = 'running'
+   )
    SELECT
      count(*) FILTER (
-       WHERE lease_expires_at > clock_timestamp()
+       WHERE lease_expires_at > database_now
      ) AS active_running_jobs,
      count(*) FILTER (
-       WHERE lease_expires_at <= clock_timestamp()
-     ) AS stale_running_jobs,
+       WHERE lease_expires_at <= database_now
+         AND attempts < max_attempts
+     ) AS stale_retryable_jobs,
+     count(*) FILTER (
+       WHERE lease_expires_at <= database_now
+         AND attempts >= max_attempts
+         AND last_error_code IS NULL
+         AND last_error_message IS NULL
+         AND NOT canonical_raw_write_recorded
+     ) AS stale_interrupted_final_claim_rescues,
+     count(*) FILTER (
+       WHERE lease_expires_at <= database_now
+         AND attempts >= max_attempts
+         AND (
+           last_error_code IS NOT NULL
+           OR last_error_message IS NOT NULL
+           OR canonical_raw_write_recorded
+         )
+     ) AS stale_final_claims_requiring_review,
      count(*) AS every_running_job
-   FROM ingest_job
-   WHERE status = 'running';
+   FROM running_inventory;
    ```
 
-   `active_running_jobs` must be zero. Preserve stale job IDs for repair after
-   resume; an expired lease is not evidence of an active writer.
+   `active_running_jobs` and `stale_final_claims_requiring_review` must both be
+   zero. Preserve every stale ID and its evidence for repair after resume. A
+   `stale_interrupted_final_claim_rescue` is accepted only because the F16
+   recovery code reuses the consumed final attempt once without incrementing
+   beyond `max_attempts`; it writes
+   `R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE` while that rescue is active. A
+   processing failure or a second interruption is therefore terminal and
+   cannot loop. If canonical-write evidence or any prior outcome marker exists,
+   stop for owner review rather than treating the row as the cutover rescue.
+   An expired lease alone is not evidence of an active writer.
 
 6. Classify **every** processing-ledger row by the exact advisory-lock identity
    used by the application. Run this on a dedicated PostgreSQL connection and
@@ -683,11 +805,69 @@ FROM rudel.session_analytics;
    revision, exact-retry revision reuse, a larger revision for a distinct
    operation, revision-first language signals, and session detail at the
    greatest decimal revision.
-4. Set `SESSION_INGEST_QUIESCED=false`, remove
+4. Before quiescence lifts, extend every pending/running R2 job by the actual
+   elapsed barrier interval. Normally
+   `<EXPIRY_EXTENSION_CHECKPOINT_AT>` is the recorded
+   `<BARRIER_STARTED_AT_UTC>`. If the section-1 expiry rescue already committed
+   an extension, use that extension's recorded database timestamp as the new
+   checkpoint so every elapsed interval is applied exactly once and the sum of
+   the intervals equals the full barrier duration.
+
+   Run this as one PostgreSQL transaction and attach every returned row:
+
+   ```sql
+   BEGIN;
+
+   WITH extension_clock AS MATERIALIZED (
+     SELECT clock_timestamp() AS extended_at
+   ), extended AS (
+     UPDATE ingest_job AS job
+     SET
+       expires_at = job.expires_at + (
+         extension_clock.extended_at
+         - timestamptz '<EXPIRY_EXTENSION_CHECKPOINT_AT>'
+       ),
+       updated_at = extension_clock.extended_at
+     FROM extension_clock
+     WHERE job.status IN ('pending', 'running')
+     RETURNING
+       job.id,
+       job.status,
+       job.attempts,
+       job.max_attempts,
+       job.expires_at,
+       extension_clock.extended_at AS expiry_extension_checkpoint_at
+   )
+   SELECT * FROM extended ORDER BY expires_at, id;
+
+   COMMIT;
+   ```
+
+   Immediately verify the new lease-safe margin:
+
+   ```sql
+   SELECT
+     count(*) AS nonterminal_jobs,
+     min(expires_at) AS earliest_expires_at,
+     min(expires_at - clock_timestamp()) AS minimum_expiry_margin,
+     count(*) FILTER (
+       WHERE expires_at <= clock_timestamp() + interval '30 minutes'
+     ) AS jobs_without_full_lease_margin
+   FROM ingest_job
+   WHERE status IN ('pending', 'running');
+   ```
+
+   `jobs_without_full_lease_margin` must be zero. Record the committed
+   `expiry_extension_checkpoint_at`. If deployment or review delays lifting
+   quiescence, repeat this step once for the new interval using that checkpoint;
+   never rerun an already recorded interval. The application helper
+   `extendNonterminalR2IngestJobExpiries` performs the same bounded update for
+   operator tooling and integration verification.
+5. Set `SESSION_INGEST_QUIESCED=false`, remove
    `SESSION_INGEST_OPERATOR_TOKEN`, deploy/promote both platforms, and monitor
    allocation latency, ClickHouse failures, receipt cleanup, stale R2 repair,
    and language-signal reconciliation lag.
-5. Keep all four backup tables and the three watermarks until the owner approves
+6. Keep all four backup tables and the three watermarks until the owner approves
    cleanup after the observation window.
 
 ## Rollback posture

@@ -23,6 +23,7 @@ export interface R2IngestConfiguration {
 	accountId: string;
 	bucket: typeof R2_INGEST_BUCKET;
 	endpoint: string;
+	forcePathStyle: boolean;
 	secretAccessKey: string;
 }
 
@@ -93,7 +94,10 @@ export function readR2IngestAvailability(
 			accessKeyId,
 			accountId,
 			bucket: R2_INGEST_BUCKET,
-			endpoint: `https://${accountId}.eu.r2.cloudflarestorage.com`,
+			endpoint:
+				environment.R2_ENDPOINT?.trim() ||
+				`https://${accountId}.eu.r2.cloudflarestorage.com`,
+			forcePathStyle: Boolean(environment.R2_ENDPOINT?.trim()),
 			secretAccessKey,
 		},
 	};
@@ -108,6 +112,7 @@ export function createR2MultipartUploadClient(
 			secretAccessKey: configuration.secretAccessKey,
 		},
 		endpoint: configuration.endpoint,
+		forcePathStyle: configuration.forcePathStyle,
 		region: "auto",
 	});
 

@@ -189,6 +189,34 @@ export async function getR2IngestJobStatus(
 	};
 }
 
+export async function extendNonterminalR2IngestJobExpiries(
+	barrierStartedAt: Date,
+	resumedAt: Date,
+	database: postgres.Sql = sqlClient,
+): Promise<number> {
+	const barrierDurationMs = resumedAt.getTime() - barrierStartedAt.getTime();
+	if (
+		Number.isNaN(barrierStartedAt.getTime()) ||
+		Number.isNaN(resumedAt.getTime()) ||
+		!Number.isSafeInteger(barrierDurationMs) ||
+		barrierDurationMs < 0
+	) {
+		throw new Error(
+			"R2 ingest barrier duration must be a non-negative integer",
+		);
+	}
+	const extended = await database.unsafe<Array<{ id: string }>>(
+		`UPDATE ingest_job
+		 SET
+			expires_at = expires_at + ($1::bigint * interval '1 millisecond'),
+			updated_at = GREATEST(updated_at, $2)
+		 WHERE status IN ('pending', 'running')
+		 RETURNING id`,
+		[barrierDurationMs, resumedAt.toISOString()],
+	);
+	return extended.length;
+}
+
 async function createUploadObjects(input: {
 	createdUploads: CreatedMultipartUpload[];
 	jobId: string;
