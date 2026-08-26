@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import { createHash } from "node:crypto";
 import { S3ServiceException } from "@aws-sdk/client-s3";
 import { parseError } from "@clickhouse/client-web";
@@ -172,6 +179,17 @@ class FakeR2Client implements R2MultipartUploadClient {
 		this.getObjectFailures.set(objectKey, error);
 	}
 
+	reset(): void {
+		this.abortedKeys.length = 0;
+		this.abortFailures.clear();
+		this.completedKeys.length = 0;
+		this.deletedKeys.length = 0;
+		this.getObjectKeys.length = 0;
+		this.getObjectFailures.clear();
+		this.headObjectKeys.length = 0;
+		this.objects.clear();
+	}
+
 	private requireObject(objectKey: string): FakeStoredObject {
 		const object = this.objects.get(objectKey);
 		if (!object) throw new Error("unknown fake R2 object");
@@ -314,6 +332,11 @@ afterAll(async () => {
 });
 
 describe("R2 ingest commit lifecycle", () => {
+	beforeEach(async () => {
+		await sqlClient`DELETE FROM ingest_job WHERE user_id = ${USER_ID}`;
+		fakeR2.reset();
+	});
+
 	test("quiescence blocks ingest-state PostgreSQL writes and R2 access after authentication while allowing operator commit", async () => {
 		const operatorToken = `operator-${crypto.randomUUID()}`;
 		const fakeR2Endpoint = createFakeR2S3Endpoint();
@@ -1981,13 +2004,25 @@ describe("R2 ingest real processor crash recovery", () => {
 			"d".repeat(64),
 			2,
 		]);
-		const [available] = await sqlClient<Array<{ locked: boolean }>>`
-			SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
-		`;
-		expect(available?.locked).toBe(true);
-		await sqlClient`
-			SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
-		`;
+		const lockConnection = await sqlClient.reserve();
+		let locked = false;
+		try {
+			const [available] = await lockConnection<Array<{ locked: boolean }>>`
+				SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
+			`;
+			locked = available?.locked === true;
+			expect(locked).toBe(true);
+		} finally {
+			try {
+				if (locked) {
+					await lockConnection`
+						SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
+					`;
+				}
+			} finally {
+				lockConnection.release();
+			}
+		}
 	});
 
 	test("returns already_processing across independent instances for the same hash", async () => {
@@ -2603,7 +2638,9 @@ async function interruptFinalIngestClaim(
 	await sqlClient`
 		UPDATE ingest_job
 		SET attempts = max_attempts - 1,
-			available_at = ${new Date(leaseStartedAt.getTime() - 3_600_000)}
+			available_at = ${new Date(
+				leaseStartedAt.getTime() - 3_600_000,
+			).toISOString()}
 		WHERE id = ${initialized.jobId}
 	`;
 	let interrupted = false;
