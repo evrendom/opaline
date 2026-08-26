@@ -42,6 +42,29 @@ const DEFAULT_TEST_CONFIG: IngestRateLimitConfig = {
 	requestsWindowSeconds: 3600,
 };
 
+// CI diagnosis: a pending promise that ignores every database-side timeout
+// (for example a pool-queue wait) hits bun's opaque per-test ceiling. Label
+// each await so a hang names its exact step in the failure message.
+async function step<T>(
+	label: string,
+	promise: Promise<T>,
+	milliseconds = 15_000,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => {
+					reject(new Error(`step "${label}" exceeded ${milliseconds}ms`));
+				}, milliseconds);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 let server: ApiTestServer;
 let apiKey: { id: string; key: string };
 let sameUserApiKey: { id: string; key: string };
@@ -308,15 +331,24 @@ describe("atomic Postgres ingest rate limiting", () => {
 	});
 
 	test("enforces one unique counter for each user subject", async () => {
-		const userId = await createCounterUser("user-unique");
+		const userId = await step("create user", createCounterUser("user-unique"));
 		const subject = { id: userId, kind: "user" } as const;
-		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance);
-		await checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance);
-		expect(await countUserCounters(userId)).toBe(1);
+		await step(
+			"first instance check",
+			checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, firstInstance),
+		);
+		await step(
+			"second instance check",
+			checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance),
+		);
+		expect(await step("count counters", countUserCounters(userId))).toBe(1);
 
 		const duplicateClient = postgres(connectionString, FAIL_FAST_OPTIONS);
 		try {
-			await expect(duplicateClient`
+			await expect(
+				step(
+					"duplicate insert",
+					Promise.resolve(duplicateClient`
 			INSERT INTO ingest_rate_limit_counter (
 				limiter_key,
 				user_id,
@@ -337,9 +369,11 @@ describe("atomic Postgres ingest rate limiting", () => {
 				true,
 				true
 			)
-		`).rejects.toThrow(/duplicate key|unique/i);
+		`),
+				),
+			).rejects.toThrow(/duplicate key|unique/i);
 		} finally {
-			await duplicateClient.end();
+			await duplicateClient.end({ timeout: 5 });
 		}
 	});
 
@@ -586,6 +620,15 @@ describe("atomic Postgres ingest rate limiting", () => {
 
 describe("ingest rate-limit oRPC errors", () => {
 	test("shares one user's keys while keeping different users isolated", async () => {
+		// If the shared server died earlier in the run, surface its last output
+		// instead of a bare ConnectionRefused.
+		try {
+			await fetch(`${server.baseUrl}/health`);
+		} catch (error) {
+			throw new Error(
+				`shared API server unreachable before test: ${String(error)}\n--- server output tail ---\n${server.readOutput().slice(-4000)}`,
+			);
+		}
 		const byteLimited = await callIngest({
 			content: "ab",
 			projectPath: "/test/rate-limit",
