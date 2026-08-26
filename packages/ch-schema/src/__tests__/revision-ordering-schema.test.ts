@@ -102,7 +102,12 @@ describe("F16 revision ordering schema", () => {
 		expect(backfillMigration).not.toContain(
 			"FROM rudel.claude_sessions_f16_backup_20260826\n\tGROUP BY `source`",
 		);
-		expect(backfillMigration.match(/toJSONString\(tuple\(/gu)).toHaveLength(2);
+		// Historical ties order by the bare full-column tuple: hashing the tuple
+		// first proved nondeterministic across insertion orders in CI.
+		expect(backfillMigration).not.toContain("SHA256");
+		expect(backfillMigration.match(/ORDER BY\n\t\t\t\ttuple\(/gu)).toHaveLength(
+			2,
+		);
 		expect(backfillMigration).toContain("`revision`,\n\t`ingested_at`");
 		expect(backfillMigration).toContain(
 			"bitShiftLeft(toUInt64(toUnixTimestamp64Milli(`ingested_at`)), 16)",

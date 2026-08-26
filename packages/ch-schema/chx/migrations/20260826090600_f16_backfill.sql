@@ -76,24 +76,6 @@ FROM
 				`session_id`,
 				toUnixTimestamp64Milli(`ingested_at`)
 			ORDER BY
-				hex(SHA256(toJSONString(tuple(
-					`session_date`,
-					`last_interaction_date`,
-					`session_id`,
-					`organization_id`,
-					`project_path`,
-					`git_remote`,
-					`package_name`,
-					`package_type`,
-					`content`,
-					`filter_version`,
-					`ingested_at`,
-					`user_id`,
-					`git_branch`,
-					`git_sha`,
-					`tag`,
-					toJSONString(`subagents`)
-				)))) ASC,
 				tuple(
 					`session_date`,
 					`last_interaction_date`,
@@ -180,23 +162,6 @@ FROM
 				`session_id`,
 				toUnixTimestamp64Milli(`ingested_at`)
 			ORDER BY
-				hex(SHA256(toJSONString(tuple(
-					`session_date`,
-					`last_interaction_date`,
-					`session_id`,
-					`organization_id`,
-					`project_path`,
-					`git_remote`,
-					`package_name`,
-					`package_type`,
-					`content`,
-					`filter_version`,
-					`ingested_at`,
-					`user_id`,
-					`git_branch`,
-					`git_sha`,
-					`tag`
-				)))) ASC,
 				tuple(
 					`session_date`,
 					`last_interaction_date`,
