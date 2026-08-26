@@ -7,7 +7,12 @@ const logger = getLogger(["rudel", "api", "http"]);
 const port = process.env.PORT ?? "4010";
 const staticFallback = createFlyStaticFallback();
 const server = Bun.serve({
-	fetch: (request) => fetchHandler(request, { fallback: staticFallback }),
+	fetch(request, server) {
+		return fetchHandler(request, {
+			fallback: staticFallback,
+			socketIp: server.requestIP(request)?.address ?? null,
+		});
+	},
 	maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 	port,
 });

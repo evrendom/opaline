@@ -230,6 +230,7 @@ export interface FetchHandlerOptions {
 	readonly fallback?: (
 		input: FetchHandlerFallbackInput,
 	) => Promise<Response | null>;
+	readonly socketIp?: string | null;
 }
 
 export async function fetchHandler(
@@ -311,7 +312,7 @@ export async function fetchHandler(
 			? request.headers.get("fly-client-ip")
 			: null,
 		forwardedFor: request.headers.get("x-forwarded-for"),
-		socketIp: null,
+		socketIp: options.socketIp ?? null,
 		trustedProxyHops: TRUSTED_PROXY_HOPS,
 	});
 
