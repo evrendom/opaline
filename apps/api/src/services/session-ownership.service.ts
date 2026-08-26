@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
 
@@ -89,11 +90,13 @@ export async function claimSessionIngestOwnership(
 	organizationId: string,
 	sessionId: string,
 	userId: string,
+	database: postgres.Sql | postgres.ReservedSql = sqlClient,
 ): Promise<SessionOwnershipClaim> {
 	const reservedOwner = await reserveSessionOwner(
 		organizationId,
 		sessionId,
 		userId,
+		database,
 	);
 	return getOwnershipClaim(reservedOwner, organizationId, sessionId, userId);
 }
@@ -338,9 +341,10 @@ async function reserveSessionOwner(
 	organizationId: string,
 	sessionId: string,
 	candidateOwner: string,
+	database: postgres.Sql | postgres.ReservedSql,
 ): Promise<ReservedSessionOwner> {
 	// The no-op update returns the winning row when a concurrent insert wins.
-	const [row] = await sqlClient<
+	const [row] = await database.unsafe<
 		Array<{
 			last_assistant_line_count: number | null;
 			last_content_bytes: number | null;
@@ -355,16 +359,17 @@ async function reserveSessionOwner(
 			last_usage_model_rate_card_version: string | null;
 			user_id: string;
 		}>
-	>`
+	>(
+		`
 		INSERT INTO session_ownership AS ownership (
 			organization_id,
 			session_id,
 			user_id
 		)
 		VALUES (
-			${organizationId},
-			${sessionId},
-			${candidateOwner}
+			$1,
+			$2,
+			$3
 		)
 		ON CONFLICT (organization_id, session_id) DO UPDATE
 		SET user_id = ownership.user_id
@@ -381,7 +386,9 @@ async function reserveSessionOwner(
 			last_usage_extraction_version,
 			last_usage_event_identity_version,
 			last_usage_model_rate_card_version
-	`;
+		`,
+		[organizationId, sessionId, candidateOwner],
+	);
 	if (!row) {
 		throw new Error("Session ownership reservation did not return an owner");
 	}

@@ -78,6 +78,10 @@ describe("session list date range", () => {
 		expect(query).toContain(
 			"FROM rudel.session_language_signals AS signal_rows",
 		);
+		expect(query).toContain("signal_version");
+		expect(query).toContain("AS signal_state");
+		expect(query).toContain("tupleElement(signals.signal_state, 2)");
+		expect(query).not.toContain("argMax(member_swears, scanned_at)");
 		expect(query).toContain("LEFT ANY JOIN language_signal_counts AS signals");
 		expect(query).toContain("signal_rows.organization_id = {orgId:String}");
 		expect(query).toContain(

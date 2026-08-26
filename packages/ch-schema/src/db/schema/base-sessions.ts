@@ -36,6 +36,11 @@ export const baseSessionColumns: ColumnDefinition[] = [
 	{ name: "tag", type: "String", nullable: true },
 ];
 
+// Raw session tables intentionally store revision history. session_date is
+// content-derived and may change between revisions, so consumers must select
+// the max-revision winner grouped by immutable
+// (organization_id, user_id, session_id) identity; FINAL is not a logical-
+// session boundary for these tables.
 export const baseSessionTableConfig = {
 	primaryKey: ["organization_id", "session_date", "session_id"],
 	orderBy: ["organization_id", "session_date", "session_id"],

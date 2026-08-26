@@ -388,7 +388,7 @@ function createContextTranscript() {
 
 function snapshot(
 	content: string,
-	revision = "2026-08-16T08:30:00.123Z",
+	revision = "117158864486400000",
 ): SessionDetailRawSnapshot {
 	return {
 		content,
@@ -452,6 +452,19 @@ function sumPageActivity(
 }
 
 describe("session detail derivation", () => {
+	test("preserves an opaque revision above JavaScript's safe integer range", () => {
+		const revision = "117158864486400000";
+		const derivation = deriveSessionDetail(
+			snapshot(createTranscript(1), revision),
+		);
+
+		expect(BigInt(revision)).toBeGreaterThan(BigInt(Number.MAX_SAFE_INTEGER));
+		expect(derivation.revision).toBe(revision);
+		expect(derivation.turnBodies.values().next().value?.revision).toBe(
+			revision,
+		);
+	});
+
 	test("derives member occurrences and model counts from one server authority", () => {
 		const derivation = deriveSessionDetail(
 			snapshot(createSignalAuthorityTranscript()),
@@ -669,7 +682,7 @@ describe("session detail derivation", () => {
 		);
 
 		const changed = deriveSessionDetail(
-			snapshot(createTranscript(500), "2026-08-16T08:31:00.456Z"),
+			snapshot(createTranscript(500), "117158864486400001"),
 		);
 		expect(() =>
 			getSessionDetailOverviewPage({
@@ -832,7 +845,7 @@ describe("session detail derivation", () => {
 					anchorTurnId,
 					includeBodies: true,
 					mode: "anchor",
-					revision: "2026-08-16T08:31:00.456Z",
+					revision: "117158864486400001",
 					sessionId: "session-1",
 				},
 			}),

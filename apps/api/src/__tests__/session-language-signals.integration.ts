@@ -37,6 +37,7 @@ interface LatestSignalRow {
 	model_positive: number;
 	model_swears: number;
 	raw_ingested_at_ms: number | string;
+	raw_revision: string;
 	scan_version: number;
 	session_id: string;
 }
@@ -118,18 +119,37 @@ async function latestSignal(
 		query: `
 			SELECT
 				session_id,
-				argMax(scan_version, scanned_at) AS scan_version,
-				argMax(member_swears, scanned_at) AS member_swears,
-				argMax(member_apologies, scanned_at) AS member_apologies,
-				argMax(member_positive, scanned_at) AS member_positive,
-				argMax(model_swears, scanned_at) AS model_swears,
-				argMax(model_apologies, scanned_at) AS model_apologies,
-				argMax(model_positive, scanned_at) AS model_positive,
-				toUnixTimestamp64Milli(argMax(raw_ingested_at, scanned_at)) AS raw_ingested_at_ms
-			FROM ${getSafeClickHouseTable("rudel.session_language_signals")}
-			WHERE organization_id = {organizationId:String}
-				AND session_id = {sessionId:String}
-			GROUP BY session_id
+				tupleElement(state, 1) AS scan_version,
+				tupleElement(state, 2) AS member_swears,
+				tupleElement(state, 3) AS member_apologies,
+				tupleElement(state, 4) AS member_positive,
+				tupleElement(state, 5) AS model_swears,
+				tupleElement(state, 6) AS model_apologies,
+				tupleElement(state, 7) AS model_positive,
+				toUnixTimestamp64Milli(tupleElement(state, 8)) AS raw_ingested_at_ms,
+				toString(tupleElement(state, 9)) AS raw_revision
+			FROM (
+				SELECT
+					session_id,
+					argMax(
+						tuple(
+							scan_version,
+							member_swears,
+							member_apologies,
+							member_positive,
+							model_swears,
+							model_apologies,
+							model_positive,
+							raw_ingested_at,
+							raw_revision
+						),
+						signal_version
+					) AS state
+				FROM ${getSafeClickHouseTable("rudel.session_language_signals")}
+				WHERE organization_id = {organizationId:String}
+					AND session_id = {sessionId:String}
+				GROUP BY session_id
+			)
 		`,
 		query_params: { organizationId, sessionId },
 	});
@@ -217,6 +237,60 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			model_swears: 1,
 			scan_version: SCAN_VERSION,
 		});
+	});
+
+	test("same-timestamp scans collapse and read by raw revision first", async () => {
+		const sessionId = `same_timestamp_${runId}`;
+		const scannedAt = new Date("2099-01-01T00:00:20.000Z");
+		const sessionDate = sessionTimestamp;
+		const lowerRevision = "9007199254740992";
+		const higherRevision = "9007199254740993";
+		const buildRow = (rawRevision: string, memberSwears: number) =>
+			buildSessionLanguageSignalRow(
+				{
+					organizationId: orgId,
+					rawIngestedAt: scannedAt,
+					rawRevision,
+					sessionDate,
+					sessionId,
+					source: "claude_code",
+					userId,
+				},
+				{
+					member_apologies: 0,
+					member_positive: 0,
+					member_swears: memberSwears,
+					model_apologies: 0,
+					model_positive: 0,
+					model_swears: 0,
+				},
+				scannedAt,
+			);
+
+		await insertSessionLanguageSignalRows(ch, [
+			buildRow(higherRevision, 2),
+			buildRow(lowerRevision, 1),
+		]);
+
+		expect(await latestSignal(sessionId)).toMatchObject({
+			member_swears: 2,
+			raw_revision: higherRevision,
+		});
+		const collapsed = await ch.query<{
+			member_swears: number;
+			raw_revision: string;
+		}>({
+			query: `
+				SELECT member_swears, toString(raw_revision) AS raw_revision
+				FROM ${getSafeClickHouseTable("rudel.session_language_signals")} FINAL
+				WHERE organization_id = {organizationId:String}
+					AND session_id = {sessionId:String}
+			`,
+			query_params: { organizationId: orgId, sessionId },
+		});
+		expect(collapsed).toEqual([
+			{ member_swears: 2, raw_revision: higherRevision },
+		]);
 	});
 
 	test("the janitor fills missing rows newest-first and duplicate passes converge", async () => {

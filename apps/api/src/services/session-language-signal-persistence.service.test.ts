@@ -3,6 +3,7 @@ import type { LanguageSignalCounts } from "@rudel/language-signals";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import {
 	buildSessionLanguageSignalRow,
+	buildSessionLanguageSignalVersion,
 	insertSessionLanguageSignalRows,
 	persistSessionLanguageSignalsBestEffort,
 } from "./session-language-signal-persistence.service.js";
@@ -47,11 +48,32 @@ describe("session language-signal ingest persistence", () => {
 			raw_revision: "115807295561596928",
 			scan_version: 1,
 			scanned_at: "2026-08-19 12:00:02.456",
+			signal_version: buildSessionLanguageSignalVersion(
+				"115807295561596928",
+				1,
+				"2026-08-19T12:00:02.456Z",
+			),
 			session_date: "2026-08-19 12:00:00.000",
 			session_id: "session-1",
 			source: "codex",
 			user_id: "user-1",
 		});
+	});
+
+	test("orders the same scan timestamp by raw revision first", () => {
+		const scannedAt = "2026-08-19T12:00:02.456Z";
+		const lower = buildSessionLanguageSignalVersion(
+			"9007199254740992",
+			1,
+			scannedAt,
+		);
+		const higher = buildSessionLanguageSignalVersion(
+			"9007199254740993",
+			1,
+			scannedAt,
+		);
+
+		expect(BigInt(higher)).toBeGreaterThan(BigInt(lower));
 	});
 
 	test("does not reject the upload hook when the scanner throws", async () => {

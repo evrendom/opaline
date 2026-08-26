@@ -27,3 +27,6 @@ CREATE UNIQUE INDEX "session_ingest_revision_value_idx"
 		"session_id",
 		"revision"
 	);
+--> statement-breakpoint
+CREATE INDEX "session_ingest_revision_created_at_idx"
+	ON "session_ingest_revision" USING btree ("created_at");

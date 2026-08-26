@@ -405,7 +405,7 @@
 		{
 			"database": "rudel",
 			"name": "session_language_signals",
-			"engine": "ReplacingMergeTree(scanned_at)",
+			"engine": "ReplacingMergeTree(signal_version)",
 			"columns": [
 				{
 					"name": "organization_id",
@@ -430,7 +430,7 @@
 				{
 					"name": "raw_revision",
 					"type": "UInt64",
-					"default": "fn:0"
+					"default": "fn:bitShiftLeft(toUInt64(toUnixTimestamp64Milli(raw_ingested_at)), 16)"
 				},
 				{
 					"name": "raw_ingested_at",
@@ -467,6 +467,11 @@
 				{
 					"name": "scanned_at",
 					"type": "DateTime64(3, 'UTC')"
+				},
+				{
+					"name": "signal_version",
+					"type": "UInt128",
+					"default": "fn:bitShiftLeft(toUInt128(raw_revision), 64) + bitShiftLeft(toUInt128(toUnixTimestamp64Milli(scanned_at)), 16) + toUInt128(scan_version)"
 				}
 			],
 			"primaryKey": [],

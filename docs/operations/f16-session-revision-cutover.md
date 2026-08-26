@@ -2,96 +2,246 @@
 
 This runbook applies cross-instance revision ordering to session ingest. The
 ClickHouse portion is a destructive, owner-operated migration. Never run it in
-CI, a release hook, or while either Fly or Vercel can accept session uploads.
+CI, a release hook, or while either Fly or Vercel can accept ordinary uploads.
 
-The checked-in migration preserves the old raw and analytics tables as
-`*_f16_backup_20260826`. Do not remove those backups during this cutover.
+The checked-in migration retains the old tables as
+`*_f16_backup_20260826`. Raw session tables are intentionally version-history
+tables after F16: their sorting key still contains mutable `session_date`.
+Logical-session reads must group by immutable
+`(organization_id, user_id, session_id)` identity and select the greatest
+`revision`; `FINAL` is not a logical-session boundary.
 
 ## Artifacts and rollout order
 
 - PostgreSQL: `packages/sql-schema/db/migrations/0028_tidy_human_fly.sql`
 - ClickHouse DDL: `20260826090551_auto.sql`
 - ClickHouse backfill: `20260826090600_f16_backfill.sql`
-- Application: a revision is allocated in PostgreSQL, its transaction commits,
-  and only then is that exact revision inserted into ClickHouse.
+- Application: PostgreSQL allocates and commits a decimal revision before that
+  exact revision is sent to ClickHouse.
+- Vercel maximum function duration: 300 seconds in `vercel.json`. The drain
+  below waits 330 seconds: 300 seconds plus a 30-second safety margin.
+- R2 job lease duration: 30 minutes. Lease evidence, not row age, determines
+  whether a `running` job is active.
 
-Apply PostgreSQL first, then ClickHouse, then the application. The new
-ClickHouse column has an `ingested_at`-derived default, so the previous
-application remains write-compatible during rollback. The new application is
-not compatible with ClickHouse before the DDL migration.
+Apply PostgreSQL first, then ClickHouse, then the application. The new raw and
+analytics revision columns and language-signal raw revision have
+ingest-timestamp-derived defaults, so the previous application remains
+write-compatible with the F16 ClickHouse schema. The F16 application is not
+compatible with ClickHouse before the DDL migration.
 
-No concrete deferred retention/partition rebuild specification exists in
-`.context/plans`. F16 therefore preserves the current monthly raw partitions
-and 365-day TTL. A future rebuild needs a separate reviewed specification.
+Store every command result, timestamp, table count, restore identifier,
+watermark, and smoke-session ID in the incident artifact.
 
-## 1. Prepare and quiesce ingest
+## 1. Back up and establish the ingest barrier
 
 1. Take provider backups and record restore identifiers for PostgreSQL and
-   ClickHouse. Capture `SHOW CREATE TABLE` output for the three tables and two
-   materialized views changed by F16.
-2. Set `SESSION_INGEST_QUIESCED=true` in both Fly and Vercel and complete the
-   required deployments. Confirm both legacy ingest and R2 init return
-   `session_ingest_quiesced`.
-3. Wait for in-flight work to drain. Both queries must return zero before DDL:
+   ClickHouse. Capture `SHOW CREATE TABLE` for these four tables and both
+   analytics materialized views:
+
+   - `claude_sessions`
+   - `codex_sessions`
+   - `session_analytics`
+   - `session_language_signals`
+   - `session_analytics_mv`
+   - `codex_session_analytics_mv`
+
+2. Generate a high-entropy `SESSION_INGEST_OPERATOR_TOKEN`. Set it and
+   `SESSION_INGEST_QUIESCED=true` on both Fly and Vercel. Do not send the token
+   to clients or put it in the incident artifact.
+
+3. Drain Fly processes, including legacy requests which have no ledger row:
+
+   - Record every currently running Fly machine ID before deploying the flag.
+   - Deploy the flagged release and confirm its health check and environment.
+   - Stop every pre-flag machine explicitly with
+     `fly machine stop <OLD_MACHINE_ID> --app <FLY_APP>`.
+   - `fly machines list --app <FLY_APP>` must show every recorded pre-flag
+     machine as `stopped` or destroyed and only flagged-release machines as
+     running.
+   - Confirm an authenticated legacy upload without the operator header returns
+     `session_ingest_quiesced`.
+
+   Stopping the old machines is the active-request barrier for otherwise
+   invisible legacy requests. A rolling-deploy completion alone is not proof.
+
+4. Drain Vercel invocations:
+
+   - Deploy the flagged release and promote it to every production alias.
+   - Record the alias-promotion timestamp and confirm an authenticated R2 init
+     without the operator header returns `session_ingest_quiesced`.
+   - Wait **330 seconds after the final alias promotion**. This is derived from
+     the configured 300-second `maxDuration` plus a 30-second margin. Restart
+     the wait if any alias changes.
+
+5. Classify every R2 job marked `running`; do not filter by age:
 
    ```sql
-   SELECT count(*)
+   SELECT
+     id,
+     organization_id,
+     session_id,
+     lease_token,
+     lease_expires_at,
+     clock_timestamp() AS database_now,
+     CASE
+       WHEN lease_expires_at > clock_timestamp() THEN 'active_lease'
+       ELSE 'stale_lease'
+     END AS drain_state
+   FROM ingest_job
+   WHERE status = 'running'
+   ORDER BY lease_expires_at, id;
+
+   SELECT
+     count(*) FILTER (
+       WHERE lease_expires_at > clock_timestamp()
+     ) AS active_running_jobs,
+     count(*) FILTER (
+       WHERE lease_expires_at <= clock_timestamp()
+     ) AS stale_running_jobs,
+     count(*) AS every_running_job
    FROM ingest_job
    WHERE status = 'running';
+   ```
 
-   SELECT count(*)
+   `active_running_jobs` must be zero. Preserve stale job IDs for repair after
+   resume; an expired lease is not evidence of an active writer.
+
+6. Classify **every** processing-ledger row by the exact advisory-lock identity
+   used by the application. Run this on a dedicated PostgreSQL connection and
+   always reach `ROLLBACK`, which releases the diagnostic transaction locks:
+
+   ```sql
+   BEGIN;
+
+   CREATE TEMP TABLE f16_processing_drain_evidence ON COMMIT DROP AS
+   SELECT
+     id,
+     organization_id,
+     session_id,
+     filtered_content_sha256,
+     filter_version,
+     created_at,
+     updated_at,
+     pg_try_advisory_xact_lock(
+       hashtextextended(
+         concat(
+           '[',
+           to_json(organization_id)::text, ',',
+           to_json(session_id)::text, ',',
+           to_json(filtered_content_sha256)::text, ',',
+           filter_version::text,
+           ']'
+         ),
+         0
+       )
+     ) AS lock_was_available
    FROM ingest_processing_ledger
-   WHERE status = 'processing'
-     AND updated_at > now() - interval '15 minutes';
+   WHERE status = 'processing';
+
+   SELECT
+     *,
+     CASE
+       WHEN lock_was_available THEN 'stale_no_lock_holder'
+       ELSE 'active_lock_holder'
+     END AS drain_state
+   FROM f16_processing_drain_evidence
+   ORDER BY created_at, id;
+
+   SELECT
+     count(*) FILTER (WHERE NOT lock_was_available) AS active_processing,
+     count(*) FILTER (WHERE lock_was_available) AS stale_processing,
+     count(*) AS every_processing_row
+   FROM f16_processing_drain_evidence;
+
+   ROLLBACK;
    ```
 
-4. Record pre-cutover ClickHouse counts for `claude_sessions`,
-   `codex_sessions`, and `session_analytics`. Confirm the backup table names do
-   not already exist.
-5. Verify the deterministic tie space. Each result must be at most 32,768:
+   `active_processing` must be zero. The JSON construction intentionally has no
+   spaces and matches `JSON.stringify([organizationId, sessionId,
+   filteredHash, filterVersion])`. Stale rows may remain for retry; after the
+   Fly stop and Vercel wait they cannot be active writers.
 
-   ```sql
-   SELECT source, max(rows_per_session_millisecond) AS maximum
-   FROM
-   (
-     SELECT
-       'claude_code' AS source,
-       count() AS rows_per_session_millisecond
-     FROM rudel.claude_sessions
-     GROUP BY organization_id, session_id,
-       toUnixTimestamp64Milli(ingested_at)
+Do not begin ClickHouse DDL unless steps 3 through 6 all pass.
 
-     UNION ALL
+## 2. Historical revision preflight
 
-     SELECT
-       'codex' AS source,
-       count() AS rows_per_session_millisecond
-     FROM rudel.codex_sessions
-     GROUP BY organization_id, session_id,
-       toUnixTimestamp64Milli(ingested_at)
-   )
-   GROUP BY source;
-   ```
+Confirm backup names do not exist. Record physical counts for all four source
+tables. Then run the executable future-clock/max-revision gate below. It covers
+both raw tables and all analytics backup history, which is a conservative
+superset of analytics-only and raw-present/MV-filtered history. `future_rows`
+must be zero in every scope.
 
-   The analytics-only history backfill has a full 16-bit suffix. This query
-   must return at most 65,536:
+```sql
+WITH history AS
+(
+  SELECT 'claude_raw' AS scope, ingested_at
+  FROM rudel.claude_sessions
+  UNION ALL
+  SELECT 'codex_raw' AS scope, ingested_at
+  FROM rudel.codex_sessions
+  UNION ALL
+  SELECT 'analytics_history' AS scope, ingested_at
+  FROM rudel.session_analytics
+)
+SELECT
+  scope,
+  countIf(ingested_at > now64(3)) AS future_rows,
+  max(ingested_at) AS maximum_ingested_at,
+  toString(max(
+    bitShiftLeft(toUInt64(toUnixTimestamp64Milli(ingested_at)), 16) + 65535
+  )) AS conservative_maximum_revision
+FROM history
+GROUP BY scope
+ORDER BY scope;
+```
 
-   ```sql
-   SELECT max(rows_per_session_millisecond) AS maximum
-   FROM
-   (
-     SELECT count() AS rows_per_session_millisecond
-     FROM rudel.session_analytics
-     GROUP BY source, organization_id, user_id, session_id,
-       toUnixTimestamp64Milli(ingested_at)
-   );
-   ```
+The current PostgreSQL allocator floor must also exceed the reported global
+maximum. This uses the database clock, which is the clock used by the F16
+allocator:
 
-   Also stop if any retained `ingested_at` is in the future. Live allocations
-   start at the current epoch millisecond shifted left by 16 bits and must be
-   above the historical backfill range.
+```sql
+SELECT
+  (FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::numeric * 65536)
+    AS postgres_revision_floor;
+```
 
-## 2. Apply PostgreSQL
+Stop if the PostgreSQL floor is not greater than every conservative maximum.
+The head-seeding step below is still mandatory; this clock gate does not prove
+that a restored or pre-existing head is high enough.
+
+Verify raw tie capacity. Results must be at most 32,768 (even Claude suffixes
+and odd Codex suffixes share the 16-bit space):
+
+```sql
+SELECT source, max(rows_per_session_millisecond) AS maximum
+FROM
+(
+  SELECT 'claude_code' AS source, count() AS rows_per_session_millisecond
+  FROM rudel.claude_sessions
+  GROUP BY organization_id, session_id, toUnixTimestamp64Milli(ingested_at)
+  UNION ALL
+  SELECT 'codex' AS source, count() AS rows_per_session_millisecond
+  FROM rudel.codex_sessions
+  GROUP BY organization_id, session_id, toUnixTimestamp64Milli(ingested_at)
+)
+GROUP BY source;
+```
+
+Analytics-only history must have at most 65,536 rows per immutable identity and
+millisecond:
+
+```sql
+SELECT max(rows_per_session_millisecond) AS maximum
+FROM
+(
+  SELECT count() AS rows_per_session_millisecond
+  FROM rudel.session_analytics
+  GROUP BY source, organization_id, user_id, session_id,
+    toUnixTimestamp64Milli(ingested_at)
+);
+```
+
+## 3. Apply PostgreSQL
 
 From the reviewed production operator environment:
 
@@ -100,25 +250,28 @@ bun run --cwd packages/sql-schema migrate
 ```
 
 Verify `session_ownership.revision_head`,
-`session_ownership.last_revision`, and `session_ingest_revision` exist. The new
-table must be empty while ingest remains quiesced. This migration is additive;
-do not roll it back during an application rollback.
+`session_ownership.last_revision`, `session_ingest_revision`, and
+`session_ingest_revision_created_at_idx` exist. The receipt table must be empty
+while ingest remains quiesced. These changes are additive; do not roll them
+back during an application rollback.
 
-## 3. Apply ClickHouse manually
+## 4. Apply ClickHouse manually
 
-Review the two checked-in migration files immediately before execution. They
-must retain all of these properties:
+Review both checked-in migrations immediately before execution. They must keep
+all of these properties:
 
-- materialized views are dropped before their source/target tables are renamed;
-- each propagation boundary uses `SELECT sleep(8)`;
-- canonical tables are created before materialized views;
-- raw and analytics engines are `ReplacingMergeTree(revision)`;
-- every `INSERT ... SELECT` has an explicit target and source column list and
+- both analytics MVs are dropped before any source or target rename;
+- every propagation boundary uses `SELECT sleep(8)`;
+- all canonical tables are created before materialized views;
+- raw and analytics use `ReplacingMergeTree(revision)`;
+- language signals use `ReplacingMergeTree(signal_version)`, where
+  `signal_version` orders by raw revision before scan recency/version;
+- every `INSERT ... SELECT` has explicit source/target columns and
   `SETTINGS async_insert=0`;
-- no migration statement uses positional `SELECT *` for backfill;
-- the old tables are renamed, not dropped.
+- neither MV AS-clause contains `--` comments;
+- old tables are renamed, never dropped.
 
-Apply from `packages/ch-schema` with production ClickHouse credentials:
+Apply from `packages/ch-schema` with production credentials:
 
 ```bash
 bun run ch:status
@@ -126,125 +279,482 @@ bun run ch:migrate
 bun run ch:status
 ```
 
-`ch:migrate` applies the DDL and backfill files in order. It includes the
-required eight-second waits before rename, before materialized-view creation,
-and before backfill. Do not run `OPTIMIZE FINAL` as part of the cutover.
+Do not run `OPTIMIZE FINAL`. If execution fails after a rename, do not rerun
+blindly. Keep ingest quiesced, inspect the migration journal and exact table
+names, and choose forward completion or rollback.
 
-If the command fails after a rename, do not blindly rerun it. Keep ingest
-quiesced, inspect the migration journal and exact table names, and choose
-forward completion or the rollback below.
+## 5. Seed and verify PostgreSQL revision heads
 
-## 4. Verify before application deploy
+Before deploying F16, export the greatest historical revision for every
+ownership identity from the rebuilt tables. The analytics table is included so
+analytics-only history also raises the head:
 
-1. `SHOW CREATE TABLE` must report `ReplacingMergeTree(revision)` for both raw
-   tables and `session_analytics`. Confirm `revision UInt64` exists in all
-   three, `raw_revision UInt64` exists in `session_language_signals`, and the
-   three skill tables use `extraction_seq UInt128`.
-2. Confirm raw logical cardinality survived the rebuild. Run the matching query
-   for Claude and Codex; both values on each row must match:
+```sql
+SELECT
+  organization_id,
+  session_id,
+  argMax(user_id, revision) AS user_id,
+  toString(max(revision)) AS historical_max_revision
+FROM
+(
+  SELECT organization_id, session_id, user_id, revision
+  FROM rudel.claude_sessions
+  UNION ALL
+  SELECT organization_id, session_id, user_id, revision
+  FROM rudel.codex_sessions
+  UNION ALL
+  SELECT organization_id, session_id, user_id, revision
+  FROM rudel.session_analytics
+)
+GROUP BY organization_id, session_id
+FORMAT TSV;
+```
+
+Save that output as a protected `f16_session_revision_heads.tsv`, then load it
+on PostgreSQL. `\copy` is a `psql` command:
+
+```sql
+BEGIN;
+
+CREATE TEMP TABLE f16_session_revision_heads
+(
+  organization_id text NOT NULL,
+  session_id text NOT NULL,
+  user_id text NOT NULL,
+  historical_max_revision numeric(20, 0) NOT NULL
+) ON COMMIT DROP;
+
+\copy f16_session_revision_heads FROM 'f16_session_revision_heads.tsv' WITH (FORMAT text)
+
+SELECT count(*) AS invalid_or_unseedable_heads
+FROM f16_session_revision_heads AS seed
+LEFT JOIN organization AS org ON org.id = seed.organization_id
+LEFT JOIN "user" AS owner ON owner.id = seed.user_id
+LEFT JOIN session_ownership AS existing
+  ON existing.organization_id = seed.organization_id
+  AND existing.session_id = seed.session_id
+WHERE seed.historical_max_revision < 0
+  OR seed.historical_max_revision >= 9223372036854775807
+  OR org.id IS NULL
+  OR owner.id IS NULL
+  OR (existing.user_id IS NOT NULL AND existing.user_id <> seed.user_id);
+
+-- Stop and ROLLBACK unless invalid_or_unseedable_heads = 0.
+INSERT INTO session_ownership
+  (organization_id, session_id, user_id, revision_head)
+SELECT
+  organization_id,
+  session_id,
+  user_id,
+  (historical_max_revision + 1)::bigint
+FROM f16_session_revision_heads
+ON CONFLICT (organization_id, session_id) DO UPDATE
+SET revision_head = GREATEST(
+  session_ownership.revision_head,
+  EXCLUDED.revision_head
+)
+WHERE session_ownership.user_id = EXCLUDED.user_id;
+
+SELECT count(*) AS heads_not_above_history
+FROM f16_session_revision_heads AS seed
+LEFT JOIN session_ownership AS ownership
+  ON ownership.organization_id = seed.organization_id
+  AND ownership.session_id = seed.session_id
+  AND ownership.user_id = seed.user_id
+WHERE ownership.revision_head IS NULL
+  OR ownership.revision_head::numeric <= seed.historical_max_revision;
+
+-- Stop and ROLLBACK unless heads_not_above_history = 0.
+COMMIT;
+```
+
+The live allocator uses PostgreSQL `clock_timestamp()` and
+`GREATEST(revision_head + 1, database_clock_floor)`. The seed is the guarantee
+that a first post-cutover allocation wins even if retained history is ahead of
+the wall clock; JavaScript clocks are not used for revision allocation.
+
+## 6. Verify the rebuilt tables
+
+1. `SHOW CREATE TABLE` must show `ReplacingMergeTree(revision)` and
+   `revision UInt64` for both raw tables and analytics. It must show
+   `ReplacingMergeTree(signal_version)`, `raw_revision UInt64`, and
+   `signal_version UInt128` for language signals. The three skill tables must
+   use `extraction_seq UInt128`.
+
+2. Verify logical raw cardinality by immutable identity. Run once for Claude
+   and once with the two table names changed to Codex:
 
    ```sql
    SELECT
-     (SELECT count() FROM rudel.claude_sessions FINAL) AS rebuilt_rows,
-     (SELECT uniqExact(tuple(organization_id, session_date, session_id))
-      FROM rudel.claude_sessions_f16_backup_20260826) AS expected_rows;
+     (
+       SELECT count()
+       FROM
+       (
+         SELECT organization_id, user_id, session_id
+         FROM rudel.claude_sessions
+         GROUP BY organization_id, user_id, session_id
+       )
+     ) AS rebuilt_logical_sessions,
+     (
+       SELECT uniqExact(tuple(organization_id, user_id, session_id))
+       FROM rudel.claude_sessions_f16_backup_20260826
+     ) AS expected_logical_sessions;
    ```
 
-3. Confirm revision derivation stayed inside its allocated 16-bit suffix and
-   produced no duplicate per-session revisions:
+   The values must match. This deliberately does not use `FINAL` and does not
+   include mutable `session_date` in logical identity.
+
+3. Check the suffix directly for all three revision-bearing tables. Both
+   results must be zero:
 
    ```sql
-   SELECT count() AS invalid_revisions
+   SELECT count() AS invalid_suffixes
    FROM
    (
-     SELECT organization_id, session_id, revision, count() AS copies
+     SELECT revision, ingested_at FROM rudel.claude_sessions
+     UNION ALL
+     SELECT revision, ingested_at FROM rudel.codex_sessions
+     UNION ALL
+     SELECT revision, ingested_at FROM rudel.session_analytics
+   )
+   WHERE
+     toInt128(revision)
+       - bitShiftLeft(toInt128(toUnixTimestamp64Milli(ingested_at)), 16)
+     NOT BETWEEN 0 AND 65535;
+
+   SELECT count() AS duplicate_session_revisions
+   FROM
+   (
+     SELECT source, organization_id, user_id, session_id, revision, count() copies
      FROM
      (
-       SELECT organization_id, session_id, revision
+       SELECT 'claude_code' source, organization_id, user_id, session_id, revision
        FROM rudel.claude_sessions
        UNION ALL
-       SELECT organization_id, session_id, revision
+       SELECT 'codex' source, organization_id, user_id, session_id, revision
        FROM rudel.codex_sessions
      )
-     GROUP BY organization_id, session_id, revision
+     GROUP BY source, organization_id, user_id, session_id, revision
      HAVING copies > 1
    );
    ```
 
-   `invalid_revisions` must be zero.
-4. Raw-retained analytics must use the exact corresponding raw revision.
-   Analytics-only identities are expected when their raw transcript expired;
-   the migration preserves those directly from the analytics backup.
+4. Run bidirectional analytics completeness. The expected side combines every
+   historical analytics identity with every raw identity that the current MV
+   predicate can actually emit. This catches both a missing raw-derived row and
+   a raw-present/MV-filtered historical identity lost by a bad anti-join.
 
    ```sql
-   WITH raw AS
+   WITH
+   raw_emitted AS
    (
-     SELECT 'claude_code' AS source, organization_id, user_id, session_id, revision
+     SELECT
+       'claude_code' AS source,
+       organization_id,
+       user_id,
+       session_id,
+       revision
      FROM rudel.claude_sessions
+     WHERE length(content) > 120000000
+       OR countSubstrings(content, '\n') > 8000
+       OR arrayExists(
+         line -> JSONExtractString(line, 'type') IN ('user', 'assistant')
+           AND JSONHas(line, 'timestamp'),
+         splitByChar('\n', content)
+       )
+
      UNION ALL
-     SELECT 'codex' AS source, organization_id, user_id, session_id, revision
+
+     SELECT
+       'codex' AS source,
+       organization_id,
+       user_id,
+       session_id,
+       revision
      FROM rudel.codex_sessions
+     WHERE length(content) > 120000000
+       OR countSubstrings(content, '\n') > 8000
+       OR arrayExists(line -> JSONHas(line, 'timestamp'), splitByChar('\n', content))
    ),
-   raw_identities AS
+   raw_emitted_winners AS
+   (
+     SELECT source, organization_id, user_id, session_id, max(revision) revision
+     FROM raw_emitted
+     GROUP BY source, organization_id, user_id, session_id
+   ),
+   expected_identities AS
    (
      SELECT source, organization_id, user_id, session_id
-     FROM raw
+     FROM rudel.session_analytics_f16_backup_20260826
+     UNION DISTINCT
+     SELECT source, organization_id, user_id, session_id
+     FROM raw_emitted_winners
+   ),
+   actual_winners AS
+   (
+     SELECT source, organization_id, user_id, session_id, max(revision) revision
+     FROM rudel.session_analytics
      GROUP BY source, organization_id, user_id, session_id
    )
-   SELECT count() AS mismatched_raw_backed_analytics_rows
-   FROM rudel.session_analytics AS analytics
-   INNER JOIN raw_identities AS identity
+   SELECT 'expected_missing_from_rebuilt' AS failure, count() AS failures
+   FROM expected_identities AS expected
+   LEFT ANTI JOIN actual_winners AS actual
      USING (source, organization_id, user_id, session_id)
-   LEFT JOIN raw
-     USING (source, organization_id, user_id, session_id, revision)
-   WHERE raw.revision IS NULL
-   SETTINGS join_use_nulls=1;
+
+   UNION ALL
+
+   SELECT 'unexpected_rebuilt_identity' AS failure, count() AS failures
+   FROM actual_winners AS actual
+   LEFT ANTI JOIN expected_identities AS expected
+     USING (source, organization_id, user_id, session_id)
+
+   UNION ALL
+
+   SELECT 'raw_emitted_revision_mismatch' AS failure, count() AS failures
+   FROM raw_emitted_winners AS raw
+   LEFT ANTI JOIN actual_winners AS actual
+     USING (source, organization_id, user_id, session_id, revision);
    ```
 
-   `mismatched_raw_backed_analytics_rows` must be zero. Also verify
-   `session_analytics FINAL` has the same distinct
-   `(source, organization_id, user_id, session_id)` count as the union of the
-   analytics backup and rebuilt raw identities. Then compare representative
-   Claude, Codex, analytics-only, and same-millisecond sessions using
-   `argMax(..., revision)`.
-5. Confirm the application queries contain no winner selection ordered by
-   `ingested_at`; it is observability-only after F16.
+   Every `failures` value must be zero. Inspect representative Claude, Codex,
+   analytics-only, MV-filtered-with-history, and same-millisecond identities
+   with `argMax(tuple(...), revision)`.
 
-## 5. Deploy and resume
+5. Repeat the future/max query from section 2 against the rebuilt tables and
+   verify PostgreSQL heads remain strictly above each per-session historical
+   maximum. Confirm product and reconciliation queries use one composite
+   language-signal state weighted by `signal_version`, never independent
+   `scanned_at` aggregates.
 
-1. Deploy the F16 application to Fly and Vercel while ingest remains quiesced.
-2. Upload one Claude and one Codex session from each runtime. Temporarily clear
-   quiescence only for the controlled smoke test if the platform cannot route
-   an operator-only request.
-3. For each smoke session, verify:
-   - `session_ingest_revision` has one receipt;
-   - the raw and analytics rows carry that same revision;
-   - retrying the same R2 job and content hash reuses the receipt and revision;
-   - a distinct operation receives a larger revision;
-   - session detail returns the content at the largest revision.
-4. Restore `SESSION_INGEST_QUIESCED=false` in both runtimes and monitor ingest
-   failures, revision allocation latency, ClickHouse insert failures, and
-   language-signal reconciliation lag.
-5. Retain all three backup tables until the owner approves a separate cleanup
-   migration after the observation window.
+## 7. Record cutover watermarks, smoke, and resume
+
+Before the first operator smoke request, record a watermark for **all three**
+revision-bearing tables. Save the exact decimal strings in the incident
+artifact; rollback uses them as replay boundaries.
+
+```sql
+SELECT 'claude_sessions' AS table_name, toString(maxOrDefault(revision)) watermark
+FROM rudel.claude_sessions
+UNION ALL
+SELECT 'codex_sessions', toString(maxOrDefault(revision))
+FROM rudel.codex_sessions
+UNION ALL
+SELECT 'session_analytics', toString(maxOrDefault(revision))
+FROM rudel.session_analytics;
+```
+
+1. Deploy the F16 application to flagged Fly and Vercel runtimes. Keep
+   `SESSION_INGEST_QUIESCED=true` globally.
+2. Use an authenticated operator request with
+   `x-rudel-session-ingest-operator-token: <SESSION_INGEST_OPERATOR_TOKEN>`.
+   Smoke one Claude and one Codex session through Fly legacy ingest. Smoke the
+   Vercel R2 route by sending the header on both `/rpc/ingest/init` and
+   `/rpc/ingest/commit`. Ordinary requests remain closed throughout.
+3. For every smoke session verify one receipt, identical raw/analytics
+   revision, exact-retry revision reuse, a larger revision for a distinct
+   operation, revision-first language signals, and session detail at the
+   greatest decimal revision.
+4. Set `SESSION_INGEST_QUIESCED=false`, remove
+   `SESSION_INGEST_OPERATOR_TOKEN`, deploy/promote both platforms, and monitor
+   allocation latency, ClickHouse failures, receipt cleanup, stale R2 repair,
+   and language-signal reconciliation lag.
+5. Keep all four backup tables and the three watermarks until the owner approves
+   cleanup after the observation window.
 
 ## Rollback posture
 
-If only the application fails, set `SESSION_INGEST_QUIESCED=true`, deploy the
-previous application, and leave both additive PostgreSQL changes and the F16
-ClickHouse schema in place. The revision defaults keep old writers compatible.
+If only the application fails, re-enable quiescence, repeat the full platform
+drain in section 1, deploy the previous application, and leave the additive
+PostgreSQL changes and F16 ClickHouse schema in place.
 
-For a ClickHouse data or DDL failure, keep ingest quiesced:
+### Full rollback without replay
 
-1. Drop both new materialized views with `SYNC`, then wait eight seconds.
-2. Rename the three new canonical tables to unique `*_f16_failed_*` names; do
-   not drop them.
-3. Rename the three `*_f16_backup_20260826` tables back to their canonical
-   names, then wait eight seconds.
-4. Recreate the two pre-F16 materialized views from the captured `SHOW CREATE`
-   output, never from an unreviewed historical migration replay.
-5. Deploy the previous application and verify representative sessions before
-   clearing quiescence.
+This is permitted **only before the first operator smoke request and before
+global resume**. Prove no accepted write crossed any watermark:
 
-PostgreSQL revision receipts may remain. They are additive and harmless to the
-old application. Never delete them as part of emergency rollback.
+```sql
+SELECT
+  (SELECT count() FROM rudel.claude_sessions
+   WHERE revision > toUInt64('<CLAUDE_WATERMARK>')) AS claude_post_cutover,
+  (SELECT count() FROM rudel.codex_sessions
+   WHERE revision > toUInt64('<CODEX_WATERMARK>')) AS codex_post_cutover,
+  (SELECT count() FROM rudel.session_analytics
+   WHERE revision > toUInt64('<ANALYTICS_WATERMARK>')) AS analytics_post_cutover;
+```
+
+All three values must be zero. Then drop the new MVs, wait eight seconds,
+rename all four canonical tables to unique `*_f16_failed_<timestamp>` names,
+restore all four backups, wait eight seconds, and recreate the captured pre-F16
+MVs. Never use this shortcut after smoke or resume.
+
+### Full rollback after any accepted post-watermark write
+
+1. Set quiescence and repeat the complete Fly/Vercel/job/ledger drain from
+   section 1.
+2. Drop both F16 MVs with `SYNC`; wait eight seconds.
+3. Rename all four canonical tables to unique `*_f16_failed_<timestamp>` names.
+4. Restore all four `*_f16_backup_20260826` tables to canonical names. Do **not**
+   recreate the old MVs yet; raw replay must not generate duplicate analytics.
+5. Replay every row above its table watermark with explicit columns and
+   synchronous inserts. Replace the failed-table suffix and watermark strings
+   below with the recorded values.
+
+   ```sql
+   INSERT INTO rudel.claude_sessions
+   (
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, content,
+     filter_version, ingested_at, user_id, git_branch, git_sha, tag, subagents
+   )
+   SETTINGS async_insert=0
+   SELECT
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, content,
+     filter_version, ingested_at, user_id, git_branch, git_sha, tag, subagents
+   FROM rudel.claude_sessions_f16_failed_<timestamp>
+   WHERE revision > toUInt64('<CLAUDE_WATERMARK>');
+
+   INSERT INTO rudel.codex_sessions
+   (
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, content,
+     filter_version, ingested_at, user_id, git_branch, git_sha, tag
+   )
+   SETTINGS async_insert=0
+   SELECT
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, content,
+     filter_version, ingested_at, user_id, git_branch, git_sha, tag
+   FROM rudel.codex_sessions_f16_failed_<timestamp>
+   WHERE revision > toUInt64('<CODEX_WATERMARK>');
+
+   INSERT INTO rudel.session_analytics
+   (
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, filter_version,
+     ingested_at, user_id, git_branch, git_sha, tag, source, skills,
+     slash_commands, subagent_types, input_tokens, output_tokens,
+     cache_read_input_tokens, cache_creation_input_tokens, total_tokens,
+     total_interactions, actual_duration_min, avg_period_sec, median_period_sec,
+     quick_responses, normal_responses, long_pauses, error_count, error_pattern,
+     model_used, has_commit, session_archetype, success_score, used_plan_mode,
+     inference_duration_sec, human_duration_sec
+   )
+   SETTINGS async_insert=0
+   SELECT
+     session_date, last_interaction_date, session_id, organization_id,
+     project_path, git_remote, package_name, package_type, filter_version,
+     ingested_at, user_id, git_branch, git_sha, tag, source, skills,
+     slash_commands, subagent_types, input_tokens, output_tokens,
+     cache_read_input_tokens, cache_creation_input_tokens, total_tokens,
+     total_interactions, actual_duration_min, avg_period_sec, median_period_sec,
+     quick_responses, normal_responses, long_pauses, error_count, error_pattern,
+     model_used, has_commit, session_archetype, success_score, used_plan_mode,
+     inference_duration_sec, human_duration_sec
+   FROM rudel.session_analytics_f16_failed_<timestamp>
+   WHERE revision > toUInt64('<ANALYTICS_WATERMARK>');
+   ```
+
+6. Replay derived language-signal rows whose raw revision crossed the matching
+   raw-table watermark. The restored pre-F16 table has neither `raw_revision`
+   nor `signal_version`, so omit both explicitly:
+
+   ```sql
+   INSERT INTO rudel.session_language_signals
+   (
+     organization_id, session_date, session_id, user_id, source,
+     raw_ingested_at, scan_version, member_swears, member_apologies,
+     member_positive, model_swears, model_apologies, model_positive, scanned_at
+   )
+   SETTINGS async_insert=0
+   SELECT
+     organization_id, session_date, session_id, user_id, source,
+     raw_ingested_at, scan_version, member_swears, member_apologies,
+     member_positive, model_swears, model_apologies, model_positive, scanned_at
+   FROM rudel.session_language_signals_f16_failed_<timestamp>
+   WHERE (source = 'claude_code'
+       AND raw_revision > toUInt64('<CLAUDE_WATERMARK>'))
+     OR (source = 'codex'
+       AND raw_revision > toUInt64('<CODEX_WATERMARK>'));
+   ```
+
+7. Verify every post-watermark failed-table projection is present in the
+   restored table. These are one-way replay-completeness checks because restored
+   tables legitimately also contain pre-cutover history:
+
+   ```sql
+   SELECT count() AS missing_claude_replay
+   FROM
+   (
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, content,
+       filter_version, ingested_at, user_id, git_branch, git_sha, tag, subagents
+     FROM rudel.claude_sessions_f16_failed_<timestamp>
+     WHERE revision > toUInt64('<CLAUDE_WATERMARK>')
+     EXCEPT DISTINCT
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, content,
+       filter_version, ingested_at, user_id, git_branch, git_sha, tag, subagents
+     FROM rudel.claude_sessions
+   );
+
+   SELECT count() AS missing_codex_replay
+   FROM
+   (
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, content,
+       filter_version, ingested_at, user_id, git_branch, git_sha, tag
+     FROM rudel.codex_sessions_f16_failed_<timestamp>
+     WHERE revision > toUInt64('<CODEX_WATERMARK>')
+     EXCEPT DISTINCT
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, content,
+       filter_version, ingested_at, user_id, git_branch, git_sha, tag
+     FROM rudel.codex_sessions
+   );
+
+   SELECT count() AS missing_analytics_replay
+   FROM
+   (
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, filter_version,
+       ingested_at, user_id, git_branch, git_sha, tag, source, skills,
+       slash_commands, subagent_types, input_tokens, output_tokens,
+       cache_read_input_tokens, cache_creation_input_tokens, total_tokens,
+       total_interactions, actual_duration_min, avg_period_sec,
+       median_period_sec, quick_responses, normal_responses, long_pauses,
+       error_count, error_pattern, model_used, has_commit, session_archetype,
+       success_score, used_plan_mode, inference_duration_sec, human_duration_sec
+     FROM rudel.session_analytics_f16_failed_<timestamp>
+     WHERE revision > toUInt64('<ANALYTICS_WATERMARK>')
+     EXCEPT DISTINCT
+     SELECT
+       session_date, last_interaction_date, session_id, organization_id,
+       project_path, git_remote, package_name, package_type, filter_version,
+       ingested_at, user_id, git_branch, git_sha, tag, source, skills,
+       slash_commands, subagent_types, input_tokens, output_tokens,
+       cache_read_input_tokens, cache_creation_input_tokens, total_tokens,
+       total_interactions, actual_duration_min, avg_period_sec,
+       median_period_sec, quick_responses, normal_responses, long_pauses,
+       error_count, error_pattern, model_used, has_commit, session_archetype,
+       success_score, used_plan_mode, inference_duration_sec, human_duration_sec
+     FROM rudel.session_analytics
+   );
+   ```
+
+   All three counts must be zero. Also compare logical winner counts and inspect
+   every smoke-session ID.
+
+8. Recreate the two captured pre-F16 MVs only after replay verification. Deploy
+   the previous application, run language-signal reconciliation, verify
+   representative sessions, then resume.
+
+Keep the failed tables until the owner separately approves deletion.
+PostgreSQL heads and receipts are additive and must never be deleted during
+emergency rollback. The daily bounded maintenance pass deletes receipts older
+than 30 days during normal operation.

@@ -109,7 +109,19 @@ export async function getOrgSessionCount(
 	const results = await Promise.all(
 		tables.map((table) =>
 			querySessionCount({
-				query: `SELECT count() as count FROM ${getSafeClickHouseTable(table)} FINAL WHERE organization_id = {orgId:String}`,
+				query: `
+					SELECT count() AS count
+					FROM (
+						SELECT
+							organization_id,
+							user_id,
+							session_id,
+							max(revision) AS latest_revision
+						FROM ${getSafeClickHouseTable(table)}
+						WHERE organization_id = {orgId:String}
+						GROUP BY organization_id, user_id, session_id
+					)
+				`,
 				query_params: {
 					orgId,
 				},

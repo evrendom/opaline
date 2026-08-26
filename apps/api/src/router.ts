@@ -419,6 +419,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 }
 
 export async function processIngestSession({
+	allowQuiescedIngest = false,
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
@@ -428,6 +429,7 @@ export async function processIngestSession({
 	input,
 	signal,
 }: {
+	allowQuiescedIngest?: boolean;
 	awaitLanguageSignals: boolean;
 	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
@@ -443,7 +445,10 @@ export async function processIngestSession({
 	input: IngestSessionInput;
 	signal?: AbortSignal;
 }): Promise<R2IngestProcessorResult> {
-	if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+	if (
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+		!allowQuiescedIngest
+	) {
 		throw new ORPCError("SERVICE_UNAVAILABLE", {
 			data: { reason: "session_ingest_quiesced" },
 			message:
@@ -628,6 +633,7 @@ export async function processIngestSession({
 				parseStoredIngestProcessorResult,
 				(ledger) =>
 					processIngestSession({
+						allowQuiescedIngest,
 						awaitLanguageSignals,
 						claimedLedger: ledger,
 						context,
@@ -1081,6 +1087,7 @@ const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors, signal }) => {
 		const processed = await processIngestSession({
+			allowQuiescedIngest: context.ingestOperatorAuthorized,
 			awaitLanguageSignals: isVercelRuntime(),
 			context,
 			enforceRateLimits: true,
@@ -1099,7 +1106,10 @@ const r2IngestInit = os.ingest.init
 				message: "An ingest API key is required",
 			});
 		}
-		if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+		if (
+			readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+			!context.ingestOperatorAuthorized
+		) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
 				data: { reason: "session_ingest_quiesced" },
 				message:
@@ -1180,6 +1190,7 @@ const r2IngestCommit = os.ingest.commit
 				input,
 				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
+						allowQuiescedIngest: context.ingestOperatorAuthorized,
 						awaitLanguageSignals: true,
 						context: {
 							session: null,

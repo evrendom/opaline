@@ -85,6 +85,7 @@ export function buildSessionLanguageSignalRow(
 	counts: LanguageSignalCounts,
 	scannedAt: Date | string,
 ): RudelSessionLanguageSignalsRow {
+	const persistedScannedAt = toClickHouseDateTime(scannedAt);
 	return {
 		organization_id: input.organizationId,
 		session_date: toClickHouseDateTime(input.sessionDate),
@@ -95,8 +96,42 @@ export function buildSessionLanguageSignalRow(
 		raw_ingested_at: toClickHouseDateTime(input.rawIngestedAt),
 		scan_version: SCAN_VERSION,
 		...counts,
-		scanned_at: toClickHouseDateTime(scannedAt),
+		scanned_at: persistedScannedAt,
+		signal_version: buildSessionLanguageSignalVersion(
+			input.rawRevision,
+			SCAN_VERSION,
+			scannedAt,
+		),
 	};
+}
+
+export function buildSessionLanguageSignalVersion(
+	rawRevision: string,
+	scanVersion: number,
+	scannedAt: Date | string,
+): string {
+	if (!/^(?:0|[1-9]\d*)$/u.test(rawRevision)) {
+		throw new Error("Language-signal raw revision is invalid");
+	}
+	if (
+		!Number.isSafeInteger(scanVersion) ||
+		scanVersion < 0 ||
+		scanVersion > 65_535
+	) {
+		throw new Error("Language-signal scan version is invalid");
+	}
+	const scannedAtMilliseconds = new Date(scannedAt).getTime();
+	if (
+		!Number.isSafeInteger(scannedAtMilliseconds) ||
+		scannedAtMilliseconds < 0
+	) {
+		throw new Error("Language-signal scan timestamp is invalid");
+	}
+	return (
+		(BigInt(rawRevision) << 64n) +
+		(BigInt(scannedAtMilliseconds) << 16n) +
+		BigInt(scanVersion)
+	).toString();
 }
 
 export async function insertSessionLanguageSignalRows(

@@ -56,11 +56,14 @@ describe("session language-signal reconciliation", () => {
 		const query = buildStaleSessionLanguageSignalQuery();
 		const lagQuery = buildSessionLanguageSignalLagCountQuery();
 
-		expect(query).toContain("signals.latest_scan_version = 0");
+		expect(query).toContain("tupleElement(signals.latest_state, 1) = 0");
 		expect(query).toContain(
-			"signals.latest_scan_version < {scanVersion:UInt16}",
+			"tupleElement(signals.latest_state, 1) < {scanVersion:UInt16}",
 		);
-		expect(query).toContain("signals.latest_raw_revision < raw.raw_revision");
+		expect(query).toContain(
+			"tupleElement(signals.latest_state, 2) < raw.raw_revision",
+		);
+		expect(query).toContain("signal_version");
 		expect(query).toContain("raw_revision DESC");
 		expect(query).toContain("organization_id ASC");
 		expect(query).toContain("LIMIT {batchSize:UInt32}");

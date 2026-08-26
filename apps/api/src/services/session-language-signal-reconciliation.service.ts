@@ -128,8 +128,10 @@ const STALE_SESSION_CTES = `
 			session_date,
 			session_id,
 			source,
-			argMax(scan_version, scanned_at) AS latest_scan_version,
-			argMax(raw_revision, scanned_at) AS latest_raw_revision
+			argMax(
+				tuple(scan_version, raw_revision),
+				signal_version
+			) AS latest_state
 		FROM rudel.session_language_signals
 		GROUP BY organization_id, session_date, session_id, source
 	),
@@ -148,9 +150,9 @@ const STALE_SESSION_CTES = `
 			AND signals.session_date = raw.session_date
 			AND signals.session_id = raw.session_id
 			AND signals.source = raw.source
-		WHERE signals.latest_scan_version = 0
-			OR signals.latest_scan_version < {scanVersion:UInt16}
-			OR signals.latest_raw_revision < raw.raw_revision
+		WHERE tupleElement(signals.latest_state, 1) = 0
+			OR tupleElement(signals.latest_state, 1) < {scanVersion:UInt16}
+			OR tupleElement(signals.latest_state, 2) < raw.raw_revision
 	)`;
 
 export function buildStaleSessionLanguageSignalQuery(): string {

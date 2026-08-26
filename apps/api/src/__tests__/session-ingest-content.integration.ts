@@ -16,6 +16,7 @@ import {
 	USAGE_EVENT_IDENTITY_VERSION,
 	USAGE_EVENT_MODEL_RATE_CARD_VERSION,
 } from "@rudel/usage-events";
+import type postgres from "postgres";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { getIngestContentShape } from "../lib/ingest-content-shape.js";
@@ -26,7 +27,10 @@ import {
 	reserveUsageExtractionGeneration,
 	UsageExtractionSupersededError,
 } from "../services/session-ownership.service.js";
-import { allocateSessionRevision } from "../services/session-revision.service.js";
+import {
+	allocateSessionRevision,
+	type SessionRevisionTransactionRunner,
+} from "../services/session-revision.service.js";
 import { buildActiveUsageEventsCte } from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
@@ -47,14 +51,31 @@ const EXTRACTION_BYPASS_SESSION_ID = `${TEST_RUN_ID}_extraction_bypass`;
 const GENERATION_HEDGE_SESSION_ID = `${TEST_RUN_ID}_generation_hedge`;
 const BACKFILL_GENERATION_SESSION_ID = `${TEST_RUN_ID}_backfill_generation`;
 const REVISION_SESSION_ID = `${TEST_RUN_ID}_revision`;
+const CONCURRENT_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_concurrent_receipt`;
+const OWNERSHIP_RACE_SESSION_ID = `${TEST_RUN_ID}_ownership_race`;
+const RECURRING_CONTENT_SESSION_ID = `${TEST_RUN_ID}_recurring_content`;
 
 let server: ApiTestServer;
 let userId: string;
 let bearerToken: string;
+let competingUserId: string;
 
 beforeAll(async () => {
 	server = await startApiTestServer();
 	({ bearerToken, userId } = await createTestUser(server.baseUrl));
+	({ userId: competingUserId } = await createTestUser(
+		server.baseUrl,
+		"competitor",
+	));
+	await sqlClient`
+		INSERT INTO member (id, organization_id, user_id, role)
+		VALUES (
+			${crypto.randomUUID()},
+			${userId},
+			${competingUserId},
+			'member'
+		)
+	`;
 });
 
 afterAll(async () => {
@@ -65,11 +86,11 @@ afterAll(async () => {
 	});
 	await sqlClient`
 		DELETE FROM organization
-		WHERE id = ${userId}
+		WHERE id IN (${userId}, ${competingUserId})
 	`;
 	await sqlClient`
 		DELETE FROM "user"
-		WHERE id = ${userId}
+		WHERE id IN (${userId}, ${competingUserId})
 	`;
 });
 
@@ -108,6 +129,82 @@ describe("session ingest content bookkeeping", () => {
 		expect(first).not.toBe(second);
 		expect(higher).toBe(lower + 1n);
 		expect(retry).toBe(first);
+	});
+
+	test("serializes a concurrent same-operation first-receipt race on separate connections", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			CONCURRENT_RECEIPT_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const input = {
+			contentSha256: "3".repeat(64),
+			operationId: "r2:concurrent-same-operation",
+			organizationId: userId,
+			sessionId: CONCURRENT_RECEIPT_SESSION_ID,
+			userId,
+		};
+		const [firstConnection, secondConnection] = await Promise.all([
+			sqlClient.reserve(),
+			sqlClient.reserve(),
+		]);
+		try {
+			const [first, second] = await Promise.all([
+				allocateSessionRevision(
+					input,
+					createRevisionEnvironment(firstConnection),
+				),
+				allocateSessionRevision(
+					input,
+					createRevisionEnvironment(secondConnection),
+				),
+			]);
+
+			expect(second).toBe(first);
+			const [receipt] = await sqlClient<Array<{ count: string }>>`
+				SELECT count(*)::text AS count
+				FROM session_ingest_revision
+				WHERE organization_id = ${userId}
+					AND session_id = ${CONCURRENT_RECEIPT_SESSION_ID}
+			`;
+			expect(receipt?.count).toBe("1");
+		} finally {
+			firstConnection.release();
+			secondConnection.release();
+		}
+	});
+
+	test("serializes a concurrent first-upload ownership race on separate connections", async () => {
+		const [firstConnection, secondConnection] = await Promise.all([
+			sqlClient.reserve(),
+			sqlClient.reserve(),
+		]);
+		try {
+			const [first, second] = await Promise.all([
+				claimSessionIngestOwnership(
+					userId,
+					OWNERSHIP_RACE_SESSION_ID,
+					userId,
+					firstConnection,
+				),
+				claimSessionIngestOwnership(
+					userId,
+					OWNERSHIP_RACE_SESSION_ID,
+					competingUserId,
+					secondConnection,
+				),
+			]);
+
+			expect([first.owned, second.owned].filter(Boolean)).toHaveLength(1);
+			const winnerId = first.owned ? userId : competingUserId;
+			const loser = first.owned ? second : first;
+			assert(!loser.owned);
+			expect(loser.ownerId).toBe(winnerId);
+		} finally {
+			firstConnection.release();
+			secondConnection.release();
+		}
 	});
 
 	test("returns a null hash, records it, then returns the stored hash", async () => {
@@ -382,6 +479,34 @@ describe("session ingest content bookkeeping", () => {
 		expect(await readActiveUsageEventCount(FORCE_REPLACE_SESSION_ID)).toBe(1);
 	});
 
+	test("C to D to force-replace C allocates a fresh winning legacy revision", async () => {
+		const contentC = makeClaudeInput(RECURRING_CONTENT_SESSION_ID, 0);
+		const contentD = {
+			...contentC,
+			content: contentC.content.replace("Session content", "Changed content"),
+		};
+
+		expect((await callIngest(contentC)).status).toBe(200);
+		const first = await readLatestRawSession(RECURRING_CONTENT_SESSION_ID);
+		expect((await callIngest(contentD)).status).toBe(200);
+		const intervening = await readLatestRawSession(
+			RECURRING_CONTENT_SESSION_ID,
+		);
+		expect(
+			(await callIngest({ ...contentC, force_replace: true })).status,
+		).toBe(200);
+		const recurrence = await readLatestRawSession(RECURRING_CONTENT_SESSION_ID);
+
+		assert(first && intervening && recurrence);
+		expect(BigInt(intervening.revision)).toBeGreaterThan(
+			BigInt(first.revision),
+		);
+		expect(BigInt(recurrence.revision)).toBeGreaterThan(
+			BigInt(intervening.revision),
+		);
+		expect(recurrence.content).toBe(contentC.content);
+	});
+
 	test("stores raw before rejecting genuinely usage-bearing malformed telemetry", async () => {
 		const malformedInput = makeClaudeInput(RAW_FIRST_FAILURE_SESSION_ID, 0);
 		malformedInput.content += '\n{"type":"assistant","message":{"usage":';
@@ -432,12 +557,13 @@ function contentShape(contentBytes: number, assistantLineCount: number) {
 
 async function createTestUser(
 	baseUrl: string,
+	suffix = "owner",
 ): Promise<{ bearerToken: string; userId: string }> {
 	const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
-			email: `${TEST_RUN_ID}@example.com`,
+			email: `${TEST_RUN_ID}_${suffix}@example.com`,
 			name: "Session Ingest Content Test",
 			password: "session-ingest-content-test-password",
 		}),
@@ -458,6 +584,21 @@ async function createTestUser(
 	const meBody: unknown = await meResponse.json();
 	assert(isMeResponse(meBody));
 	return { bearerToken: body.token, userId: meBody.json.id };
+}
+
+function createRevisionEnvironment(connection: postgres.ReservedSql): {
+	transactions: SessionRevisionTransactionRunner;
+} {
+	return {
+		transactions: {
+			run: (operation) =>
+				connection.begin((transaction) =>
+					operation((query, parameters) =>
+						transaction.unsafe(query, [...parameters]),
+					),
+				),
+		},
+	};
 }
 
 async function seedLegacyContentShape(
@@ -525,6 +666,28 @@ async function rawClaudeSessionExists(sessionId: string): Promise<boolean> {
 		query_params: { organizationId: userId, sessionId, userId },
 	});
 	return row?.present === 1;
+}
+
+async function readLatestRawSession(
+	sessionId: string,
+): Promise<{ content: string; revision: string } | undefined> {
+	const [row] = await getClickhouse().query<{
+		content: string;
+		revision: string;
+	}>({
+		query: `
+			SELECT
+				argMax(content, revision) AS content,
+				toString(max(revision)) AS revision
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			HAVING count() > 0
+		`,
+		query_params: { organizationId: userId, sessionId, userId },
+	});
+	return row;
 }
 
 async function readLatestReceiptCompleteness(

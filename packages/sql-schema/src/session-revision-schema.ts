@@ -3,6 +3,7 @@ import {
 	bigint,
 	check,
 	foreignKey,
+	index,
 	pgTable,
 	primaryKey,
 	text,
@@ -49,6 +50,7 @@ export const sessionIngestRevision = pgTable(
 			table.sessionId,
 			table.revision,
 		),
+		index("session_ingest_revision_created_at_idx").on(table.createdAt),
 		check(
 			"session_ingest_revision_hash_check",
 			sql`${table.contentSha256} ~ '^[0-9a-f]{64}$'`,

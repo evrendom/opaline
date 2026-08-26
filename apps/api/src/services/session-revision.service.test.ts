@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
 	ALLOCATE_SESSION_REVISION_SQL,
 	allocateSessionRevision,
-	buildMinimumSessionRevision,
 	buildSessionRevisionDeduplicationToken,
 	buildSessionRevisionOperationId,
 	LOCK_SESSION_REVISION_HEAD_SQL,
@@ -13,7 +12,10 @@ import {
 
 const CONTENT_HASH = "a".repeat(64);
 
-function createFakeTransactions(initialHead = 0n): {
+function createFakeTransactions(
+	initialHead = 0n,
+	databaseFloor = 100n,
+): {
 	readonly allocationCount: () => number;
 	readonly transactions: SessionRevisionTransactionRunner;
 } {
@@ -31,17 +33,14 @@ function createFakeTransactions(initialHead = 0n): {
 					return revision ? [{ revision }] : [];
 				}
 				if (query === ALLOCATE_SESSION_REVISION_SQL) {
-					const minimum = BigInt(readStringParameter(parameters, 3));
-					head = head + 1n > minimum ? head + 1n : minimum;
+					head = head + 1n > databaseFloor ? head + 1n : databaseFloor;
 					allocationCount += 1;
 					return [{ revision: head.toString() }];
 				}
 				if (query === RECORD_SESSION_OPERATION_REVISION_SQL) {
-					receipts.set(
-						receiptKey(parameters),
-						readStringParameter(parameters, 4),
-					);
-					return [];
+					const revision = readStringParameter(parameters, 4);
+					receipts.set(receiptKey(parameters), revision);
+					return [{ revision }];
 				}
 				throw new Error("Unexpected session revision query");
 			}),
@@ -80,10 +79,7 @@ function allocationInput(operationId: string, contentSha256 = CONTENT_HASH) {
 describe("session revision allocation", () => {
 	test("allocates distinct increasing revisions for distinct operations", async () => {
 		const fake = createFakeTransactions();
-		const environment = {
-			now: () => new Date("2026-08-26T10:00:00.000Z"),
-			transactions: fake.transactions,
-		};
+		const environment = { transactions: fake.transactions };
 
 		const first = await allocateSessionRevision(
 			allocationInput("job-1"),
@@ -100,12 +96,10 @@ describe("session revision allocation", () => {
 
 	test("reuses the receipt for an exact operation retry", async () => {
 		const fake = createFakeTransactions();
-		let now = new Date("2026-08-26T10:00:00.000Z");
-		const environment = { now: () => now, transactions: fake.transactions };
+		const environment = { transactions: fake.transactions };
 		const input = allocationInput("job-retry");
 
 		const first = await allocateSessionRevision(input, environment);
-		now = new Date("2026-08-26T10:05:00.000Z");
 		const retry = await allocateSessionRevision(input, environment);
 
 		expect(retry).toBe(first);
@@ -114,10 +108,7 @@ describe("session revision allocation", () => {
 
 	test("includes the content hash in operation identity", async () => {
 		const fake = createFakeTransactions();
-		const environment = {
-			now: () => new Date("2026-08-26T10:00:00.000Z"),
-			transactions: fake.transactions,
-		};
+		const environment = { transactions: fake.transactions };
 
 		const first = await allocateSessionRevision(
 			allocationInput("job-1", "a".repeat(64)),
@@ -131,6 +122,25 @@ describe("session revision allocation", () => {
 		expect(BigInt(changed)).toBeGreaterThan(BigInt(first));
 	});
 
+	test("allocates a fresh legacy revision when the same content recurs", async () => {
+		const fake = createFakeTransactions();
+		const environment = { transactions: fake.transactions };
+		const recurring = allocationInput("legacy:claude_code", "a".repeat(64));
+
+		const first = await allocateSessionRevision(recurring, environment);
+		const exactRetry = await allocateSessionRevision(recurring, environment);
+		const intervening = await allocateSessionRevision(
+			allocationInput("legacy:claude_code", "b".repeat(64)),
+			environment,
+		);
+		const recurrence = await allocateSessionRevision(recurring, environment);
+
+		expect(exactRetry).toBe(first);
+		expect(BigInt(intervening)).toBe(BigInt(first) + 1n);
+		expect(BigInt(recurrence)).toBe(BigInt(intervening) + 1n);
+		expect(fake.allocationCount()).toBe(3);
+	});
+
 	test("uses a short row-lock transaction and an atomic head update", () => {
 		expect(LOCK_SESSION_REVISION_HEAD_SQL).toContain("FOR UPDATE");
 		expect(READ_SESSION_OPERATION_REVISION_SQL).toContain("operation_id = $3");
@@ -138,14 +148,12 @@ describe("session revision allocation", () => {
 			"content_sha256 = $4",
 		);
 		expect(ALLOCATE_SESSION_REVISION_SQL).toContain(
-			"GREATEST(revision_head + 1, $4::bigint)",
+			"EXTRACT(EPOCH FROM clock_timestamp())",
 		);
 		expect(ALLOCATE_SESSION_REVISION_SQL).toContain("RETURNING");
-	});
-
-	test("seeds revisions above historical millisecond backfills", () => {
-		expect(buildMinimumSessionRevision(new Date(1_000))).toBe(
-			(1_000n << 16n).toString(),
+		expect(RECORD_SESSION_OPERATION_REVISION_SQL).toContain("ON CONFLICT");
+		expect(RECORD_SESSION_OPERATION_REVISION_SQL).toContain(
+			"revision = EXCLUDED.revision",
 		);
 	});
 

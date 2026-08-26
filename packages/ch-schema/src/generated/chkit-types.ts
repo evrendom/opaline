@@ -192,6 +192,7 @@ export type RudelSessionLanguageSignalsRow = {
   model_apologies: number
   model_positive: number
   scanned_at: string
+  signal_version: string
 }
 
 export const RudelSessionLanguageSignalsRowSchema = z.object({
@@ -210,6 +211,7 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   model_apologies: z.number(),
   model_positive: z.number(),
   scanned_at: z.string(),
+  signal_version: z.string(),
 })
 
 export type RudelSessionLanguageSignalsRowInput = z.input<typeof RudelSessionLanguageSignalsRowSchema>

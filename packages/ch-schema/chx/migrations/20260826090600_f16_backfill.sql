@@ -2,9 +2,9 @@
 -- generated-at: 2026-08-26T09:06:00.000Z
 -- cli-version: 0.1.0-beta.16
 -- definition-count: 12
--- operation-count: 3
+-- operation-count: 6
 -- rename-suggestion-count: 0
--- risk-summary: safe=0, caution=3, danger=0
+-- risk-summary: safe=1, caution=5, danger=0
 
 -- operation: data_backfill key=table:rudel.claude_sessions:revision risk=caution
 -- Backfill after both materialized views exist so session_analytics receives
@@ -75,13 +75,43 @@ FROM
 				`organization_id`,
 				`session_id`,
 				toUnixTimestamp64Milli(`ingested_at`)
-			ORDER BY hex(SHA256(concat(
-				`content`,
-				'\0', `user_id`,
-				'\0', `project_path`,
-				'\0', ifNull(`git_sha`, ''),
-				'\0', toJSONString(`subagents`)
-			))) ASC
+			ORDER BY
+				hex(SHA256(toJSONString(tuple(
+					`session_date`,
+					`last_interaction_date`,
+					`session_id`,
+					`organization_id`,
+					`project_path`,
+					`git_remote`,
+					`package_name`,
+					`package_type`,
+					`content`,
+					`filter_version`,
+					`ingested_at`,
+					`user_id`,
+					`git_branch`,
+					`git_sha`,
+					`tag`,
+					toJSONString(`subagents`)
+				)))) ASC,
+				tuple(
+					`session_date`,
+					`last_interaction_date`,
+					`session_id`,
+					`organization_id`,
+					`project_path`,
+					`git_remote`,
+					`package_name`,
+					`package_type`,
+					`content`,
+					`filter_version`,
+					`ingested_at`,
+					`user_id`,
+					`git_branch`,
+					`git_sha`,
+					`tag`,
+					toJSONString(`subagents`)
+				) ASC
 		) - 1 AS `tie_ordinal`
 	FROM rudel.claude_sessions_f16_backup_20260826
 );
@@ -149,15 +179,60 @@ FROM
 				`organization_id`,
 				`session_id`,
 				toUnixTimestamp64Milli(`ingested_at`)
-			ORDER BY hex(SHA256(concat(
-				`content`,
-				'\0', `user_id`,
-				'\0', `project_path`,
-				'\0', ifNull(`git_sha`, '')
-			))) ASC
+			ORDER BY
+				hex(SHA256(toJSONString(tuple(
+					`session_date`,
+					`last_interaction_date`,
+					`session_id`,
+					`organization_id`,
+					`project_path`,
+					`git_remote`,
+					`package_name`,
+					`package_type`,
+					`content`,
+					`filter_version`,
+					`ingested_at`,
+					`user_id`,
+					`git_branch`,
+					`git_sha`,
+					`tag`
+				)))) ASC,
+				tuple(
+					`session_date`,
+					`last_interaction_date`,
+					`session_id`,
+					`organization_id`,
+					`project_path`,
+					`git_remote`,
+					`package_name`,
+					`package_type`,
+					`content`,
+					`filter_version`,
+					`ingested_at`,
+					`user_id`,
+					`git_branch`,
+					`git_sha`,
+					`tag`
+				) ASC
 		) - 1 AS `tie_ordinal`
 	FROM rudel.codex_sessions_f16_backup_20260826
 );
+
+-- operation: create_table key=table:rudel.session_analytics_f16_rebuilt_identities_20260826 risk=safe
+-- Stage the identities actually emitted by the rebuilt MVs. Raw existence is
+-- insufficient because the current MV predicate intentionally filters some
+-- raw rows.
+CREATE TABLE rudel.session_analytics_f16_rebuilt_identities_20260826
+ENGINE = MergeTree
+ORDER BY (`source`, `organization_id`, `user_id`, `session_id`)
+AS
+SELECT
+	`source`,
+	`organization_id`,
+	`user_id`,
+	`session_id`
+FROM rudel.session_analytics
+GROUP BY `source`, `organization_id`, `user_id`, `session_id`;
 
 -- operation: data_backfill key=table:rudel.session_analytics:revision risk=caution
 -- Raw-backed analytics were recreated above by the materialized views with the
@@ -339,26 +414,51 @@ FROM
 	FROM rudel.session_analytics_f16_backup_20260826
 ) AS analytics
 LEFT ANTI JOIN
+rudel.session_analytics_f16_rebuilt_identities_20260826 AS rebuilt
+ON rebuilt.`source` = analytics.`source`
+	AND rebuilt.`organization_id` = analytics.`organization_id`
+	AND rebuilt.`user_id` = analytics.`user_id`
+	AND rebuilt.`session_id` = analytics.`session_id`;
+
+-- operation: drop_table key=table:rudel.session_analytics_f16_rebuilt_identities_20260826 risk=caution
+DROP TABLE rudel.session_analytics_f16_rebuilt_identities_20260826 SYNC;
+
+-- operation: data_backfill key=table:rudel.session_language_signals:signal_version risk=caution
+-- Existing scans predate raw revisions. Version zero makes them lose to every
+-- post-F16 revision while preserving them until reconciliation rescans.
+INSERT INTO rudel.session_language_signals
 (
-	SELECT
-		'claude_code' AS `source`,
-		`organization_id`,
-		`user_id`,
-		`session_id`
-	FROM rudel.claude_sessions_f16_backup_20260826
-	GROUP BY `source`, `organization_id`, `user_id`, `session_id`
-
-	UNION ALL
-
-	SELECT
-		'codex' AS `source`,
-		`organization_id`,
-		`user_id`,
-		`session_id`
-	FROM rudel.codex_sessions_f16_backup_20260826
-	GROUP BY `source`, `organization_id`, `user_id`, `session_id`
-) AS raw
-ON raw.`source` = analytics.`source`
-	AND raw.`organization_id` = analytics.`organization_id`
-	AND raw.`user_id` = analytics.`user_id`
-	AND raw.`session_id` = analytics.`session_id`;
+	`organization_id`,
+	`session_date`,
+	`session_id`,
+	`user_id`,
+	`source`,
+	`raw_revision`,
+	`raw_ingested_at`,
+	`scan_version`,
+	`member_swears`,
+	`member_apologies`,
+	`member_positive`,
+	`model_swears`,
+	`model_apologies`,
+	`model_positive`,
+	`scanned_at`
+)
+SETTINGS async_insert=0
+SELECT
+	`organization_id`,
+	`session_date`,
+	`session_id`,
+	`user_id`,
+	`source`,
+	toUInt64(0) AS `raw_revision`,
+	`raw_ingested_at`,
+	`scan_version`,
+	`member_swears`,
+	`member_apologies`,
+	`member_positive`,
+	`model_swears`,
+	`model_apologies`,
+	`model_positive`,
+	`scanned_at`
+FROM rudel.session_language_signals_f16_backup_20260826;

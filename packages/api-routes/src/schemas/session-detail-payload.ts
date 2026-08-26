@@ -31,9 +31,18 @@ export const SESSION_DETAIL_ANCHOR_NOT_FOUND_CODE = "ANCHOR_NOT_FOUND";
 export const SESSION_DETAIL_ANCHOR_NOT_FOUND_MESSAGE =
 	"The requested turn does not exist in this session revision.";
 
+const MAX_UINT64_DECIMAL = "18446744073709551615";
+
 export const SessionDetailRevisionSchema = z
 	.string()
-	.datetime({ offset: true });
+	.regex(/^(?:0|[1-9]\d*)$/u, "Revision must be a canonical decimal UInt64")
+	.refine(
+		(value) =>
+			value.length < MAX_UINT64_DECIMAL.length ||
+			(value.length === MAX_UINT64_DECIMAL.length &&
+				value <= MAX_UINT64_DECIMAL),
+		"Revision must fit in UInt64",
+	);
 export const SessionDetailWindowCursorSchema = z
 	.string()
 	.min(1)

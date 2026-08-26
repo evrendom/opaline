@@ -11,7 +11,7 @@ describe("session detail HTTP compression", () => {
 		const body = JSON.stringify({
 			json: {
 				content: "repeated subagent transcript line\n".repeat(20_000),
-				revision: "2026-08-16T08:30:00.123Z",
+				revision: "117158864486400000",
 				subagentId: "agent-1",
 			},
 		});
@@ -56,7 +56,7 @@ describe("session detail HTTP compression", () => {
 			json: {
 				newerCursor: null,
 				olderCursor: null,
-				revision: "2026-08-16T08:30:00.123Z",
+				revision: "117158864486400000",
 				turns: [{ body: "repeated body\n".repeat(10_000) }],
 			},
 		});
@@ -77,7 +77,7 @@ describe("session detail HTTP compression", () => {
 	test("compresses the repeated identifiers in a full session spine", async () => {
 		const body = JSON.stringify({
 			json: {
-				revision: "2026-08-16T08:30:00.123Z",
+				revision: "117158864486400000",
 				turns: Array.from({ length: 500 }, (_, index) => ({
 					eventCount: 12,
 					responseBytes: 4_096,

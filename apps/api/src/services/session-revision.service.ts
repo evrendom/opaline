@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
 
-const REVISION_SEQUENCE_BITS = 16n;
-const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
-
 export const LOCK_SESSION_REVISION_HEAD_SQL = `
 	SELECT revision_head::text AS "revisionHead"
 	FROM session_ownership
@@ -23,7 +20,10 @@ export const READ_SESSION_OPERATION_REVISION_SQL = `
 
 export const ALLOCATE_SESSION_REVISION_SQL = `
 	UPDATE session_ownership
-	SET revision_head = GREATEST(revision_head + 1, $4::bigint)
+	SET revision_head = GREATEST(
+		revision_head + 1,
+		FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint * 65536
+	)
 	WHERE organization_id = $1
 		AND session_id = $2
 		AND user_id = $3
@@ -39,6 +39,17 @@ export const RECORD_SESSION_OPERATION_REVISION_SQL = `
 		revision
 	)
 	VALUES ($1, $2, $3, $4, $5::bigint)
+	ON CONFLICT (
+		organization_id,
+		session_id,
+		operation_id,
+		content_sha256
+	) DO UPDATE
+	SET
+		revision = EXCLUDED.revision,
+		created_at = NOW()
+	WHERE session_ingest_revision.revision < EXCLUDED.revision
+	RETURNING revision::text AS revision
 `;
 
 interface SessionRevisionRow {
@@ -65,12 +76,10 @@ export interface AllocateSessionRevisionInput {
 }
 
 export interface AllocateSessionRevisionEnvironment {
-	readonly now: () => Date;
 	readonly transactions: SessionRevisionTransactionRunner;
 }
 
 const DEFAULT_ENVIRONMENT: AllocateSessionRevisionEnvironment = {
-	now: () => new Date(),
 	transactions: {
 		run: async (operation) => {
 			const { sqlClient } = await import("../db.js");
@@ -88,7 +97,6 @@ export async function allocateSessionRevision(
 	environment: AllocateSessionRevisionEnvironment = DEFAULT_ENVIRONMENT,
 ): Promise<string> {
 	validateAllocationInput(input);
-	const minimumRevision = buildMinimumSessionRevision(environment.now());
 
 	return environment.transactions.run(async (execute) => {
 		const lockedHead = await execute(LOCK_SESSION_REVISION_HEAD_SQL, [
@@ -99,6 +107,7 @@ export async function allocateSessionRevision(
 		if (lockedHead.length !== 1) {
 			throw new Error("Session revision head was not found for its owner");
 		}
+		const revisionHead = readRevisionHead(lockedHead[0]);
 
 		const existing = await execute(READ_SESSION_OPERATION_REVISION_SQL, [
 			input.organizationId,
@@ -109,25 +118,42 @@ export async function allocateSessionRevision(
 		if (existing.length > 1) {
 			throw new Error("Session operation has multiple revision receipts");
 		}
-		if (existing[0]) return readRevision(existing[0]);
+		if (existing[0]) {
+			const existingRevision = readRevision(existing[0]);
+			if (BigInt(existingRevision) > BigInt(revisionHead)) {
+				throw new Error("Session revision receipt is ahead of its head");
+			}
+			if (
+				!isCurrentHeadScopedOperation(input.operationId) ||
+				existingRevision === revisionHead
+			) {
+				return existingRevision;
+			}
+		}
 
 		const allocated = await execute(ALLOCATE_SESSION_REVISION_SQL, [
 			input.organizationId,
 			input.sessionId,
 			input.userId,
-			minimumRevision,
 		]);
 		if (allocated.length !== 1 || !allocated[0]) {
 			throw new Error("Session revision allocation failed");
 		}
 		const revision = readRevision(allocated[0]);
-		await execute(RECORD_SESSION_OPERATION_REVISION_SQL, [
+		const recorded = await execute(RECORD_SESSION_OPERATION_REVISION_SQL, [
 			input.organizationId,
 			input.sessionId,
 			input.operationId,
 			input.contentSha256,
 			revision,
 		]);
+		if (
+			recorded.length !== 1 ||
+			!recorded[0] ||
+			readRevision(recorded[0]) !== revision
+		) {
+			throw new Error("Session revision receipt recording failed");
+		}
 		return revision;
 	});
 }
@@ -158,18 +184,6 @@ export function buildSessionRevisionDeduplicationToken(
 		.digest("hex")}`;
 }
 
-export function buildMinimumSessionRevision(now: Date): string {
-	const epochMilliseconds = now.getTime();
-	if (!Number.isSafeInteger(epochMilliseconds) || epochMilliseconds < 0) {
-		throw new Error("Session revision clock must return a valid epoch date");
-	}
-	const revision = BigInt(epochMilliseconds) << REVISION_SEQUENCE_BITS;
-	if (revision > MAX_POSTGRES_BIGINT) {
-		throw new Error("Session revision exceeds the Postgres bigint range");
-	}
-	return revision.toString();
-}
-
 function validateAllocationInput(input: AllocateSessionRevisionInput): void {
 	if (!/^[a-f0-9]{64}$/u.test(input.contentSha256)) {
 		throw new Error("Session revision content hash must be lowercase SHA-256");
@@ -184,6 +198,21 @@ function validateAllocationInput(input: AllocateSessionRevisionInput): void {
 			throw new Error(`Session revision ${name} must not be empty`);
 		}
 	}
+}
+
+function isCurrentHeadScopedOperation(operationId: string): boolean {
+	return operationId.startsWith("legacy:");
+}
+
+function readRevisionHead(row: SessionRevisionRow | undefined): string {
+	const revisionHead = row && Reflect.get(row, "revisionHead");
+	if (
+		typeof revisionHead !== "string" ||
+		!/^(?:0|[1-9]\d*)$/u.test(revisionHead)
+	) {
+		throw new Error("Session revision query returned an invalid head");
+	}
+	return revisionHead;
 }
 
 function readRevision(row: SessionRevisionRow): string {

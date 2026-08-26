@@ -19,10 +19,8 @@ SELECT sleep(8);
 RENAME TABLE
 	rudel.claude_sessions TO rudel.claude_sessions_f16_backup_20260826,
 	rudel.codex_sessions TO rudel.codex_sessions_f16_backup_20260826,
-	rudel.session_analytics TO rudel.session_analytics_f16_backup_20260826;
-
--- operation: alter_table_add_column key=table:rudel.session_language_signals:column:raw_revision risk=safe
-ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `raw_revision` UInt64 DEFAULT 0;
+	rudel.session_analytics TO rudel.session_analytics_f16_backup_20260826,
+	rudel.session_language_signals TO rudel.session_language_signals_f16_backup_20260826;
 
 -- operation: alter_table_modify_column key=table:rudel.skill_receipts:column:extraction_seq risk=caution
 ALTER TABLE rudel.skill_receipts MODIFY COLUMN `extraction_seq` UInt128;
@@ -132,6 +130,32 @@ CREATE TABLE IF NOT EXISTS rudel.session_analytics
 ) ENGINE = ReplacingMergeTree(revision)
 PRIMARY KEY (`source`, `organization_id`, `user_id`, `session_id`)
 ORDER BY (`source`, `organization_id`, `user_id`, `session_id`)
+SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 1000, storage_policy = 's3';
+
+-- operation: create_table key=table:rudel.session_language_signals risk=safe
+CREATE TABLE IF NOT EXISTS rudel.session_language_signals
+(
+  `organization_id` String,
+  `session_date` DateTime64(3, 'UTC'),
+  `session_id` String,
+  `user_id` String,
+  `source` LowCardinality(String),
+  `raw_revision` UInt64 DEFAULT bitShiftLeft(toUInt64(toUnixTimestamp64Milli(raw_ingested_at)), 16),
+  `raw_ingested_at` DateTime64(3, 'UTC'),
+  `scan_version` UInt16,
+  `member_swears` UInt32,
+  `member_apologies` UInt32,
+  `member_positive` UInt32,
+  `model_swears` UInt32,
+  `model_apologies` UInt32,
+  `model_positive` UInt32,
+  `scanned_at` DateTime64(3, 'UTC'),
+  `signal_version` UInt128 DEFAULT bitShiftLeft(toUInt128(raw_revision), 64) + bitShiftLeft(toUInt128(toUnixTimestamp64Milli(scanned_at)), 16) + toUInt128(scan_version)
+) ENGINE = ReplacingMergeTree(signal_version)
+PARTITION BY toYYYYMM(toDate(session_date))
+PRIMARY KEY (`organization_id`, `session_date`, `session_id`, `source`)
+ORDER BY (`organization_id`, `session_date`, `session_id`, `source`)
+TTL toDate(session_date) + toIntervalDay(365)
 SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 1000, storage_policy = 's3';
 
 -- ClickHouse Cloud can lag table visibility after destructive DDL. Keep the

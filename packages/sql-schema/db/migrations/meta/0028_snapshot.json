@@ -1460,6 +1460,21 @@
 				}
 			},
 			"indexes": {
+				"session_ingest_revision_created_at_idx": {
+					"name": "session_ingest_revision_created_at_idx",
+					"columns": [
+						{
+							"expression": "created_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
 				"session_ingest_revision_value_idx": {
 					"name": "session_ingest_revision_value_idx",
 					"columns": [
