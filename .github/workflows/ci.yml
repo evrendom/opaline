@@ -47,7 +47,9 @@ jobs:
               - ".github/workflows/ci.yml"
 
   verify:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
+    # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 20
     steps:
       - name: Checkout
