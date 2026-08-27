@@ -5,7 +5,7 @@ function key(sessionId: string) {
 	return {
 		organizationId: "org-1",
 		ownerId: "owner-1",
-		revision: "2026-08-16T08:30:00.123Z",
+		revision: "117158864486400000",
 		sessionId,
 		source: "claude_code",
 	};

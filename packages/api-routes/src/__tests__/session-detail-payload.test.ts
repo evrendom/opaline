@@ -6,6 +6,7 @@ import {
 	SESSION_DETAIL_WINDOW_ERRORS,
 	SessionDetailOverviewInputSchema,
 	SessionDetailOverviewSchema,
+	SessionDetailRevisionSchema,
 	SessionDetailSpineInputSchema,
 	SessionDetailSpineSchema,
 	SessionDetailStaleRevisionDataSchema,
@@ -36,7 +37,7 @@ describe("session detail payload contracts", () => {
 
 	test("binds body requests and stale errors to explicit revisions", () => {
 		const input = {
-			revision: "2026-08-16T08:30:00.123Z",
+			revision: "117158864486400000",
 			sessionId: "session-1",
 		};
 
@@ -72,11 +73,11 @@ describe("session detail payload contracts", () => {
 		).toBe(false);
 		expect(
 			SessionDetailStaleRevisionDataSchema.parse({
-				currentRevision: "2026-08-16T08:31:00.456Z",
+				currentRevision: "117158864486400001",
 				requestedRevision: input.revision,
 			}),
 		).toEqual({
-			currentRevision: "2026-08-16T08:31:00.456Z",
+			currentRevision: "117158864486400001",
 			requestedRevision: input.revision,
 		});
 		expect(SESSION_DETAIL_REVISION_ERRORS.STALE_REVISION.status).toBe(409);
@@ -101,9 +102,35 @@ describe("session detail payload contracts", () => {
 		);
 	});
 
+	test("accepts canonical decimal UInt64 revisions above JavaScript's safe range", () => {
+		const nonRepresentableRevision = "117158864486400001";
+		expect(Number(nonRepresentableRevision).toString()).not.toBe(
+			nonRepresentableRevision,
+		);
+		expect(SessionDetailRevisionSchema.parse(nonRepresentableRevision)).toBe(
+			nonRepresentableRevision,
+		);
+		for (const invalid of [
+			"",
+			"00",
+			"01",
+			"-1",
+			"1.0",
+			"18446744073709551616",
+			"2026-08-16T08:30:00.123Z",
+		]) {
+			expect(SessionDetailRevisionSchema.safeParse(invalid).success).toBe(
+				false,
+			);
+		}
+		expect(SessionDetailRevisionSchema.parse("18446744073709551615")).toBe(
+			"18446744073709551615",
+		);
+	});
+
 	test("validates an ordered, lean session spine", () => {
 		const spine = SessionDetailSpineSchema.parse({
-			revision: "2026-08-16T08:30:00.123Z",
+			revision: "117158864486400000",
 			turns: [
 				{ eventCount: 12, responseBytes: 4_096, turnId: "turn-1" },
 				{ eventCount: 3, responseBytes: 512, turnId: "turn-2" },
@@ -118,7 +145,7 @@ describe("session detail payload contracts", () => {
 
 	test("accepts only the strict session detail window request variants", () => {
 		const base = { includeBodies: true as const, sessionId: "session-1" };
-		const revision = "2026-08-16T08:30:00.123Z";
+		const revision = "117158864486400000";
 		const requests = [
 			{ ...base, mode: "initial" as const },
 			{
@@ -180,7 +207,7 @@ describe("session detail payload contracts", () => {
 					{ operation: "edited", path: "src/b.ts" },
 				],
 			},
-			revision: "2026-08-16T08:30:00.123Z",
+			revision: "117158864486400000",
 			session: {
 				durationMinutes: 1,
 				estimatedCost: 0.42,
@@ -323,7 +350,7 @@ describe("session detail payload contracts", () => {
 	});
 
 	test("validates normalized turn items and a revision-keyed subagent body", () => {
-		const revision = "2026-08-16T08:30:00.123Z";
+		const revision = "117158864486400000";
 		const turn = {
 			responseItems: [
 				{
@@ -440,7 +467,7 @@ describe("session detail payload contracts", () => {
 		const parsed = SessionDetailWindowSchema.parse({
 			newerCursor: "next",
 			olderCursor: null,
-			revision: "2026-08-16T08:30:00.123Z",
+			revision: "117158864486400000",
 			total: 3,
 			turns: [
 				{

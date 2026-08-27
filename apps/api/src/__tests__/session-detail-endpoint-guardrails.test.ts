@@ -120,7 +120,7 @@ describe("session detail endpoint guardrails", () => {
 			throwSessionDetailWindowError(
 				new SessionDetailAnchorNotFoundError(
 					"removed-turn",
-					"2026-08-16T08:30:00.123Z",
+					"117158864486400000",
 				),
 				errors,
 			),
@@ -128,7 +128,7 @@ describe("session detail endpoint guardrails", () => {
 			expect.objectContaining({
 				code: "ANCHOR_NOT_FOUND",
 				data: {
-					revision: "2026-08-16T08:30:00.123Z",
+					revision: "117158864486400000",
 					turnId: "removed-turn",
 				},
 				status: 404,
@@ -155,8 +155,8 @@ describe("session detail endpoint guardrails", () => {
 		try {
 			throwSessionDetailRevisionError(
 				new SessionDetailStaleRevisionError(
-					"2026-08-16T08:30:00.123Z",
-					"2026-08-16T08:31:00.456Z",
+					"117158864486400000",
+					"117158864486400001",
 				),
 				errors,
 			);
@@ -173,8 +173,8 @@ describe("session detail endpoint guardrails", () => {
 			expect(rpcError.status).toBe(409);
 			expect(rpcError.defined).toBe(true);
 			expect(rpcError.data).toEqual({
-				currentRevision: "2026-08-16T08:31:00.456Z",
-				requestedRevision: "2026-08-16T08:30:00.123Z",
+				currentRevision: "117158864486400001",
+				requestedRevision: "117158864486400000",
 			});
 		}
 	});

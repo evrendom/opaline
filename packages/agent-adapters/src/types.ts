@@ -41,6 +41,7 @@ export interface IngestContext {
 	userId: string;
 	organizationId: string;
 	ingestedAt: Date;
+	revision: string;
 	timestamps?: SessionTimestamps;
 }
 

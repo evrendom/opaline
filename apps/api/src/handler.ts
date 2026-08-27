@@ -26,6 +26,7 @@ import {
 	appendVaryHeader,
 	PRODUCTION_SECURITY_HEADERS,
 } from "./lib/http-response-policy.js";
+import { isAuthorizedIngestOperatorRequest } from "./lib/ingest-quiescence.js";
 import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
@@ -678,6 +679,9 @@ async function getContext(
 		session: session?.session ?? null,
 		apiKeyId,
 		authFailure,
+		ingestOperatorAuthorized: isAuthorizedIngestOperatorRequest(
+			request.headers,
+		),
 		requestId,
 		wrappedShareLookupSource,
 	};

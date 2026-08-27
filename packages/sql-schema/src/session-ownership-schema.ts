@@ -32,6 +32,10 @@ export const sessionOwnership = pgTable(
 			withTimezone: true,
 			mode: "date",
 		}),
+		revisionHead: bigint("revision_head", { mode: "bigint" })
+			.default(0n)
+			.notNull(),
+		lastRevision: bigint("last_revision", { mode: "bigint" }),
 		usageExtractionGeneration: bigint("usage_extraction_generation", {
 			mode: "number",
 		})

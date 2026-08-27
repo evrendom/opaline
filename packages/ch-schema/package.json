@@ -15,10 +15,12 @@
 	"scripts": {
 		"check-types": "tsc --noEmit",
 		"test": "bun test",
-		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/codex-mv.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts",
+		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/codex-mv.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts ./src/__tests__/revision-ordering-migration.integration.ts",
 		"ch:generate": "bun --bun chkit generate",
 		"ch:generate:dryrun": "bun --bun chkit generate --dryrun",
 		"ch:migrate": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit migrate --apply'",
+		"ch:migrate:f16:ci-prerequisites": "CLICKHOUSE_DB=default bun scripts/migrate-f16-ci-prerequisites.ts",
+		"ch:migrate:f16": "CLICKHOUSE_DB=default bun scripts/migrate-f16.ts",
 		"ch:status": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit status'",
 		"ch:codegen": "bun --bun chkit codegen",
 		"ch:drift": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit drift'",

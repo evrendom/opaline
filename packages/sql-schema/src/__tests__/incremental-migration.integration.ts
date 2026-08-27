@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0028_TIMESTAMP = "1787731200000";
+const MIGRATION_0029_TIMESTAMP = "1787735109151";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0028 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0029 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0028 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0028] = await migrationSql<MigrationState[]>`
+			const [after0029] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,9 +61,9 @@ test("applies migrations 0020-0028 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0028).toEqual({
-				count: 29,
-				latestTimestamp: MIGRATION_0028_TIMESTAMP,
+			expect(after0029).toEqual({
+				count: 30,
+				latestTimestamp: MIGRATION_0029_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [ingestJobTable] = await migrationSql<TableState[]>`
@@ -74,6 +74,24 @@ test("applies migrations 0020-0028 to a database already migrated through 0019",
 				SELECT to_regclass('public.ingest_processing_ledger')::text AS name
 			`;
 			expect(processingLedgerTable?.name).toBe("ingest_processing_ledger");
+			const [sessionRevisionTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.session_ingest_revision')::text AS name
+			`;
+			expect(sessionRevisionTable?.name).toBe("session_ingest_revision");
+			const sessionRevisionIndexes = await migrationSql<
+				Array<{ name: string }>
+			>`
+				SELECT indexname AS name
+				FROM pg_indexes
+				WHERE schemaname = 'public'
+					AND tablename = 'session_ingest_revision'
+				ORDER BY indexname
+			`;
+			expect([...sessionRevisionIndexes]).toEqual([
+				{ name: "session_ingest_revision_created_at_idx" },
+				{ name: "session_ingest_revision_pkey" },
+				{ name: "session_ingest_revision_value_idx" },
+			]);
 			const [targetReceiptTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.ingest_processing_target_receipt')::text AS name
 			`;

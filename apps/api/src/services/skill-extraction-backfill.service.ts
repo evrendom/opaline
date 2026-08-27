@@ -109,7 +109,7 @@ export interface SkillExtractionBackfillResult {
 
 interface RawSessionCandidate {
 	readonly contentBytes: number;
-	readonly ingestedAt: string;
+	readonly revision: string;
 	readonly organizationId: string;
 	readonly sessionDate: string;
 	readonly sessionId: string;
@@ -119,7 +119,7 @@ interface RawSessionCandidate {
 
 interface RawSessionCandidateRow {
 	latest_content_bytes: number;
-	latest_ingested_at: string;
+	latest_revision: string;
 	latest_session_date: string;
 	latest_user_id: string;
 	organization_id: string;
@@ -135,6 +135,7 @@ interface CandidateCensus {
 interface RawSessionRow {
 	content: string;
 	raw_ingested_at: string;
+	raw_revision: string;
 	raw_session_date: string;
 	organization_id: string;
 	session_id: string;
@@ -156,7 +157,7 @@ interface ReceiptRow {
 }
 
 interface RevisionRow {
-	latest_ingested_at: string;
+	latest_revision: string;
 	session_id: string;
 	user_id: string;
 }
@@ -261,7 +262,7 @@ async function runSkillExtractionBackfill(
 		const revisionByIdentity = new Map(
 			revisions.map((row) => [
 				rawIdentity(row.user_id, row.session_id),
-				row.latest_ingested_at,
+				row.latest_revision,
 			]),
 		);
 		const prepared: PreparedCandidate[] = [];
@@ -338,7 +339,7 @@ function prepareCandidate(
 	candidate: RawSessionCandidate,
 	raw: RawSessionRow | undefined,
 	receipt: SkillExtractionReceiptState | undefined,
-	latestIngestedAt: string | undefined,
+	latestRevision: string | undefined,
 	parserVersion: number,
 	execute: boolean,
 	dependencies: SkillExtractionBackfillDependencies,
@@ -349,11 +350,7 @@ function prepareCandidate(
 			issue: issue(candidate, "missing_raw_snapshot", "snapshot missing"),
 		};
 	}
-	if (
-		latestIngestedAt === undefined ||
-		normalizeTimestamp(latestIngestedAt) !==
-			normalizeTimestamp(candidate.ingestedAt)
-	) {
+	if (latestRevision === undefined || latestRevision !== candidate.revision) {
 		return {
 			status: "superseded",
 			issue: issue(
@@ -379,7 +376,7 @@ function prepareCandidate(
 			extractedAt: getNextIngestedAt(),
 			extraction,
 			organizationId: candidate.organizationId,
-			rawRevisionIngestedAt: parseClickHouseUtc(raw.raw_ingested_at),
+			rawRevision: raw.raw_revision,
 			sessionDate: parseClickHouseUtc(raw.raw_session_date),
 			sessionId: candidate.sessionId,
 			userId: candidate.userId,
@@ -686,11 +683,11 @@ async function listSourceCandidates(
 				SELECT
 					organization_id,
 					session_id,
-					argMax(user_id, ingested_at) AS latest_user_id,
-					toString(argMax(session_date, ingested_at)) AS latest_session_date,
-					toString(max(ingested_at)) AS latest_ingested_at,
-					argMax(length(content), ingested_at) AS latest_content_bytes,
-					argMax(toUInt8(${marker}), ingested_at) AS has_skill_marker,
+					argMax(user_id, revision) AS latest_user_id,
+					toString(argMax(session_date, revision)) AS latest_session_date,
+					toString(max(revision)) AS latest_revision,
+					argMax(length(content), revision) AS latest_content_bytes,
+					argMax(toUInt8(${marker}), revision) AS has_skill_marker,
 					count() OVER () AS raw_session_count
 				FROM ${table}
 				WHERE ingested_at <= {cutoff:DateTime64(3, 'UTC')}
@@ -711,7 +708,7 @@ async function listSourceCandidates(
 	return {
 		candidates: rows.map((row) => ({
 			contentBytes: Number(row.latest_content_bytes),
-			ingestedAt: row.latest_ingested_at,
+			revision: row.latest_revision,
 			organizationId: row.organization_id,
 			sessionDate: row.latest_session_date,
 			sessionId: row.session_id,
@@ -825,6 +822,7 @@ async function readRawSessions(
 				session_id,
 				content,
 				toString(session_date) AS raw_session_date,
+				toString(revision) AS raw_revision,
 				toString(ingested_at) AS raw_ingested_at
 			FROM ${getRawTable(first.source)}
 			WHERE organization_id = {organizationId:String}
@@ -832,7 +830,7 @@ async function readRawSessions(
 				AND session_date < {monthEnd:DateTime64(3, 'UTC')}
 				AND session_id IN {sessionIds:Array(String)}
 				AND ingested_at <= {cutoff:DateTime64(3, 'UTC')}
-			ORDER BY organization_id, user_id, session_id, ingested_at DESC
+			ORDER BY organization_id, user_id, session_id, revision DESC
 			LIMIT 1 BY organization_id, user_id, session_id
 			LIMIT {batchLimit:UInt32}
 		`,
@@ -947,7 +945,7 @@ async function readCurrentRevisions(
 			SELECT
 				user_id,
 				session_id,
-				toString(max(ingested_at)) AS latest_ingested_at
+				toString(max(revision)) AS latest_revision
 			FROM ${getRawTable(first.source)}
 			WHERE organization_id = {organizationId:String}
 				AND session_date IN {sessionDates:Array(DateTime64(3, 'UTC'))}
@@ -1140,10 +1138,6 @@ function parseClickHouseUtc(value: string): Date {
 		throw new Error(`ClickHouse returned an invalid UTC timestamp: ${value}`);
 	}
 	return parsed;
-}
-
-function normalizeTimestamp(value: string): string {
-	return parseClickHouseUtc(value).toISOString();
 }
 
 function toClickHouseTimestamp(value: Date): string {

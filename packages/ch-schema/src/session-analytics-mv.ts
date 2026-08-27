@@ -13,6 +13,7 @@ export const SESSION_ANALYTICS_INSERT_COLUMNS = [
 	"package_name",
 	"package_type",
 	"filter_version",
+	"revision",
 	"ingested_at",
 	"user_id",
 	"git_branch",

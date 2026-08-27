@@ -48,6 +48,7 @@ function rawSessionUnionSql() {
       session_id,
       content,
       subagents,
+      revision,
       ingested_at,
       session_date,
       last_interaction_date,
@@ -70,6 +71,7 @@ function rawSessionUnionSql() {
       session_id,
       content,
       CAST(map(), 'Map(String, String)') AS subagents,
+      revision,
       ingested_at,
       session_date,
       last_interaction_date,
@@ -90,7 +92,7 @@ export function buildSessionDetailCurrentRevisionSql() {
     tupleElement(snapshot, 1) AS source,
     toString(tupleElement(snapshot, 2)) AS revision
   FROM (
-    SELECT argMax(tuple(source, ingested_at), ingested_at) AS snapshot
+    SELECT argMax(tuple(source, revision), revision) AS snapshot
     FROM (${rawSessionUnionSql()})
     HAVING count() > 0
   )`;
@@ -108,6 +110,7 @@ export function buildSessionDetailRawSnapshotSql() {
           session_id,
           content,
           subagents,
+          revision,
           ingested_at,
           session_date,
           last_interaction_date,
@@ -117,7 +120,7 @@ export function buildSessionDetailRawSnapshotSql() {
           git_branch,
           git_sha
         ),
-        ingested_at
+        revision
       ) AS snapshot
       FROM (${rawSessionUnionSql()})
       HAVING count() > 0
@@ -125,6 +128,7 @@ export function buildSessionDetailRawSnapshotSql() {
     latest_analytics AS (
       SELECT argMax(
         tuple(
+          revision,
           ingested_at,
           input_tokens,
           output_tokens,
@@ -134,7 +138,7 @@ export function buildSessionDetailRawSnapshotSql() {
           skills,
           slash_commands
         ),
-        ingested_at
+        revision
       ) AS snapshot
       FROM rudel.session_analytics
       WHERE organization_id = {orgId:String}
@@ -150,20 +154,20 @@ export function buildSessionDetailRawSnapshotSql() {
     tupleElement(raw.snapshot, 5) AS content,
     tupleElement(raw.snapshot, 6) AS subagents,
     toString(tupleElement(raw.snapshot, 7)) AS revision,
-    toString(tupleElement(raw.snapshot, 8)) AS session_date,
-    toString(tupleElement(raw.snapshot, 9)) AS last_interaction_date,
-    tupleElement(raw.snapshot, 10) AS project_path,
-    tupleElement(raw.snapshot, 11) AS git_remote,
-    tupleElement(raw.snapshot, 12) AS package_name,
-    tupleElement(raw.snapshot, 13) AS git_branch,
-    tupleElement(raw.snapshot, 14) AS git_sha,
-    tupleElement(analytics.snapshot, 2) AS input_tokens,
-    tupleElement(analytics.snapshot, 3) AS output_tokens,
-    tupleElement(analytics.snapshot, 4) AS total_tokens,
-    tupleElement(analytics.snapshot, 5) AS duration_minutes,
-    tupleElement(analytics.snapshot, 6) AS model_used,
-    tupleElement(analytics.snapshot, 7) AS skills,
-    tupleElement(analytics.snapshot, 8) AS slash_commands
+    toString(tupleElement(raw.snapshot, 9)) AS session_date,
+    toString(tupleElement(raw.snapshot, 10)) AS last_interaction_date,
+    tupleElement(raw.snapshot, 11) AS project_path,
+    tupleElement(raw.snapshot, 12) AS git_remote,
+    tupleElement(raw.snapshot, 13) AS package_name,
+    tupleElement(raw.snapshot, 14) AS git_branch,
+    tupleElement(raw.snapshot, 15) AS git_sha,
+    tupleElement(analytics.snapshot, 3) AS input_tokens,
+    tupleElement(analytics.snapshot, 4) AS output_tokens,
+    tupleElement(analytics.snapshot, 5) AS total_tokens,
+    tupleElement(analytics.snapshot, 6) AS duration_minutes,
+    tupleElement(analytics.snapshot, 7) AS model_used,
+    tupleElement(analytics.snapshot, 8) AS skills,
+    tupleElement(analytics.snapshot, 9) AS slash_commands
   FROM latest_raw AS raw
   LEFT ANY JOIN latest_analytics AS analytics
     ON tupleElement(analytics.snapshot, 1) = tupleElement(raw.snapshot, 7)`;
@@ -195,9 +199,7 @@ export async function getSessionDetailCurrentRevision(
 		query: buildSessionDetailCurrentRevisionSql(),
 		query_params: queryParams(organizationId, sessionId, ownerId),
 	});
-	return row
-		? { revision: normalizeDateTime64(row.revision), source: row.source }
-		: null;
+	return row ? { revision: row.revision, source: row.source } : null;
 }
 
 export async function getSessionDetailRawSnapshot(
@@ -227,7 +229,7 @@ export async function getSessionDetailRawSnapshot(
 		ownerId: row.user_id,
 		packageName: row.package_name,
 		projectPath: row.project_path,
-		revision: normalizeDateTime64(row.revision),
+		revision: row.revision,
 		sessionDate: normalizeDateTime64(row.session_date),
 		sessionId: row.session_id,
 		skills: row.skills,

@@ -140,6 +140,11 @@ import {
 	UsageExtractionSupersededError,
 } from "./services/session-ownership.service.js";
 import {
+	allocateSessionRevision,
+	buildSessionRevisionDeduplicationToken,
+	buildSessionRevisionOperationId,
+} from "./services/session-revision.service.js";
+import {
 	hashSkillSourceContent,
 	SKILL_PARSER_VERSION,
 } from "./services/skill-extraction.js";
@@ -436,6 +441,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 
 export async function processIngestSession({
 	aggregateContentMaxBytes,
+	allowQuiescedIngest = false,
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
@@ -446,6 +452,7 @@ export async function processIngestSession({
 	signal,
 }: {
 	aggregateContentMaxBytes?: number;
+	allowQuiescedIngest?: boolean;
 	awaitLanguageSignals: boolean;
 	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
@@ -453,13 +460,19 @@ export async function processIngestSession({
 		session: AppContext["session"];
 		user: { id: string };
 	};
-	durableProcessing?: { failpoint: IngestProcessingFailpoint | undefined };
+	durableProcessing?: {
+		failpoint: IngestProcessingFailpoint | undefined;
+		operationId: string;
+	};
 	enforceRateLimits: boolean;
 	errorFactories: IngestErrorFactories;
 	input: IngestSessionInput;
 	signal?: AbortSignal;
 }): Promise<R2IngestProcessorResult> {
-	if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+	if (
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+		!allowQuiescedIngest
+	) {
 		throw new ORPCError("SERVICE_UNAVAILABLE", {
 			data: { reason: "session_ingest_quiesced" },
 			message:
@@ -652,6 +665,7 @@ export async function processIngestSession({
 				parseStoredIngestProcessorResult,
 				(ledger) =>
 					processIngestSession({
+						allowQuiescedIngest,
 						awaitLanguageSignals,
 						claimedLedger: ledger,
 						context,
@@ -774,16 +788,45 @@ export async function processIngestSession({
 		}
 	}
 
-	// Acknowledged async inserts can batch concurrent requests into one part.
-	// Give each request a distinct millisecond RMT version even when the
-	// process clock has not advanced, so FINAL and hash bookkeeping agree.
-	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
-	await adapter.ingest(clickhouse, filteredInput, {
-		ingestedAt,
-		userId: context.user.id,
+	const revisionIdentity = {
+		allowReceiptPromotion:
+			input.force_replace === true &&
+			input.operationId === undefined &&
+			durableProcessing === undefined,
+		contentSha256: contentHash,
+		operationId: buildSessionRevisionOperationId(
+			filteredInput.source,
+			durableProcessing?.operationId,
+			input.operationId,
+		),
 		organizationId: orgId,
-		timestamps,
-	});
+		sessionId: input.sessionId,
+		userId: context.user.id,
+	};
+	const revision = await allocateSessionRevision(revisionIdentity);
+	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
+	await adapter.ingest(
+		{
+			insert: ({ table, values }) =>
+				clickhouse.insert({
+					deduplicationToken: buildSessionRevisionDeduplicationToken(
+						revisionIdentity,
+						revision,
+						table,
+					),
+					table,
+					values,
+				}),
+		},
+		filteredInput,
+		{
+			ingestedAt,
+			organizationId: orgId,
+			revision,
+			timestamps,
+			userId: context.user.id,
+		},
+	);
 	await recordSessionIngestContent(
 		orgId,
 		input.sessionId,
@@ -792,6 +835,7 @@ export async function processIngestSession({
 		FILTER_VERSION,
 		new Date(timestamps.sessionDate),
 		ingestedAt,
+		revision,
 	);
 	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
 		store: "postgres",
@@ -801,6 +845,7 @@ export async function processIngestSession({
 		content: filteredInput.content,
 		organizationId: orgId,
 		rawIngestedAt: ingestedAt,
+		rawRevision: revision,
 		sessionDate: timestamps.sessionDate,
 		sessionId: input.sessionId,
 		source: filteredInput.source,
@@ -841,23 +886,38 @@ export async function processIngestSession({
 		return { contentSha256: contentHash, result: response };
 	}
 
-	const usageGeneration = usageExtractionEnabled
-		? claimedLedger
-			? await reserveLedgerUsageGeneration(
-					claimedLedger,
-					{
-						organizationId: orgId,
-						sessionId: input.sessionId,
-						userId: context.user.id,
-					},
-					durableProcessing?.failpoint,
-				)
-			: await reserveUsageExtractionGeneration(
-					orgId,
-					input.sessionId,
-					context.user.id,
-				)
-		: null;
+	let usageGeneration: string | null = null;
+	try {
+		usageGeneration = usageExtractionEnabled
+			? claimedLedger
+				? await reserveLedgerUsageGeneration(
+						claimedLedger,
+						{
+							expectedRevision: revision,
+							organizationId: orgId,
+							sessionId: input.sessionId,
+							userId: context.user.id,
+						},
+						durableProcessing?.failpoint,
+					)
+				: await reserveUsageExtractionGeneration(
+						orgId,
+						input.sessionId,
+						context.user.id,
+						revision,
+					)
+			: null;
+	} catch (error) {
+		if (error instanceof UsageExtractionSupersededError) {
+			logger.info(
+				"Usage extraction converged as superseded before reservation (organization_id={organizationId} session_id={sessionId} revision={revision})",
+				{ organizationId: orgId, revision, sessionId: input.sessionId },
+			);
+			response.usageChecksum = undefined;
+			return { contentSha256: contentHash, result: response };
+		}
+		throw error;
+	}
 	const subagents: Record<string, string> = {};
 	for (const subagent of filteredInput.subagents ?? []) {
 		subagents[subagent.agentId] = subagent.content;
@@ -960,7 +1020,7 @@ export async function processIngestSession({
 			extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
 			extraction: skillExtraction,
 			organizationId: orgId,
-			rawRevisionIngestedAt: ingestedAt,
+			rawRevision: revision,
 			sessionDate: new Date(timestamps.sessionDate),
 			sessionId: input.sessionId,
 			userId: context.user.id,
@@ -1003,32 +1063,37 @@ export async function processIngestSession({
 		});
 	}
 
-	await recordSessionIngestContent(
-		orgId,
-		input.sessionId,
-		contentHash,
-		contentShape,
-		FILTER_VERSION,
-		new Date(timestamps.sessionDate),
-		ingestedAt,
-		{
-			checksum: usageExtraction.receipt.checksum,
-			diagnostics: JSON.stringify(usageExtraction.diagnostics),
-			eventCount: usageExtraction.receipt.eventCount,
-			extractionVersion: usageExtraction.receipt.extractionVersion,
-			eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
-			generation: usageGeneration,
-			modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
-		},
-	).catch((error: unknown) => {
+	try {
+		await recordSessionIngestContent(
+			orgId,
+			input.sessionId,
+			contentHash,
+			contentShape,
+			FILTER_VERSION,
+			new Date(timestamps.sessionDate),
+			ingestedAt,
+			revision,
+			{
+				checksum: usageExtraction.receipt.checksum,
+				diagnostics: JSON.stringify(usageExtraction.diagnostics),
+				eventCount: usageExtraction.receipt.eventCount,
+				extractionVersion: usageExtraction.receipt.extractionVersion,
+				eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
+				generation: usageGeneration,
+				modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
+			},
+		);
+	} catch (error) {
 		if (error instanceof UsageExtractionSupersededError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "usage_extraction_superseded" },
-				message: error.message,
-			});
+			logger.info(
+				"Usage extraction converged as superseded before receipt (organization_id={organizationId} session_id={sessionId} revision={revision})",
+				{ organizationId: orgId, revision, sessionId: input.sessionId },
+			);
+			response.usageChecksum = undefined;
+			return { contentSha256: contentHash, result: response };
 		}
 		throw error;
-	});
+	}
 	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
 		store: "postgres",
 		target: "usage-receipt",
@@ -1078,6 +1143,7 @@ const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors, signal }) => {
 		const processed = await processIngestSession({
+			allowQuiescedIngest: context.ingestOperatorAuthorized,
 			awaitLanguageSignals: isVercelRuntime(),
 			context: {
 				apiKeyId: context.apiKeyId,
@@ -1100,7 +1166,10 @@ const r2IngestInit = os.ingest.init
 				message: "An ingest API key is required",
 			});
 		}
-		if (readBooleanEnv("SESSION_INGEST_QUIESCED", false)) {
+		if (
+			readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+			!context.ingestOperatorAuthorized
+		) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
 				data: { reason: "session_ingest_quiesced" },
 				message:
@@ -1172,6 +1241,17 @@ const r2IngestCommit = os.ingest.commit
 				message: "An ingest API key is required",
 			});
 		}
+		const sessionIngestQuiesced = readBooleanEnv(
+			"SESSION_INGEST_QUIESCED",
+			false,
+		);
+		if (sessionIngestQuiesced && !context.ingestOperatorAuthorized) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "session_ingest_quiesced" },
+				message:
+					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
+			});
+		}
 		const availability = readR2IngestAvailability();
 		if (!availability.enabled) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
@@ -1187,6 +1267,7 @@ const r2IngestCommit = os.ingest.commit
 				input,
 				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
+						allowQuiescedIngest: context.ingestOperatorAuthorized,
 						awaitLanguageSignals: true,
 						context: {
 							apiKeyId: context.apiKeyId,
@@ -1196,10 +1277,14 @@ const r2IngestCommit = os.ingest.commit
 						enforceRateLimits: false,
 						errorFactories: createIngestErrorFactories(errors),
 						input: sessionInput,
-						durableProcessing: { failpoint: undefined },
+						durableProcessing: {
+							failpoint: undefined,
+							operationId: identity.operationId,
+						},
 						signal: processingSignal,
 					}),
 				r2: createR2MultipartUploadClient(availability.configuration),
+				sessionIngestQuiesced,
 				signal,
 				userId: context.user.id,
 			});
@@ -1212,6 +1297,7 @@ const r2IngestCommit = os.ingest.commit
 				if (
 					error.code === "R2_INGEST_JOB_BUSY" ||
 					error.code === "R2_INGEST_JOB_RETRY_LATER" ||
+					error.code === "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED" ||
 					error.code === "R2_INGEST_LEASE_LOST"
 				) {
 					throw new ORPCError("SERVICE_UNAVAILABLE", {

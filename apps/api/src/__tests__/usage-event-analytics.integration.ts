@@ -553,6 +553,7 @@ function buildSessionAnalyticsRow(sessionId: string): RudelSessionAnalyticsRow {
 		package_type: "bun",
 		project_path: "/workspace/rudel",
 		quick_responses: 0,
+		revision: "1",
 		session_archetype: "standard",
 		session_date: "2026-08-04 08:00:00.000",
 		session_id: sessionId,

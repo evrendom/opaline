@@ -17,6 +17,7 @@ import {
 	readR2IngestAvailability,
 } from "../services/r2-ingest-storage.service.js";
 import { reconcileSessionLanguageSignalsUntilCaughtUp } from "../services/session-language-signal-reconciliation.service.js";
+import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
 
 const logger = getLogger(["rudel", "api", "maintenance"]);
 const DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE = 25;
@@ -26,6 +27,7 @@ const MAINTENANCE_MAX_PASSES_PER_STEP = 50;
 const MAINTENANCE_INVOCATION_BUDGET_MS = 270_000;
 const CLICKHOUSE_PURGE_BUDGET_MS = 90_000;
 const R2_INGEST_BUDGET_MS = 90_000;
+const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 
 export async function handleApiMaintenanceRequest(
@@ -57,6 +59,10 @@ async function runApiMaintenance() {
 	const r2Ingest = await runMaintenanceStep("r2-ingest", () =>
 		runR2Maintenance(invocationDeadline),
 	);
+	const sessionRevisionReceipts = await runMaintenanceStep(
+		"session-revision-receipts",
+		() => runSessionRevisionReceiptMaintenance(invocationDeadline),
+	);
 	const languageSignals = await runMaintenanceStep("language-signals", () =>
 		runLanguageSignalMaintenance(invocationDeadline),
 	);
@@ -72,8 +78,30 @@ async function runApiMaintenance() {
 		ok:
 			clickHousePurge.status === "ok" &&
 			r2Ingest.status === "ok" &&
+			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok",
 		r2Ingest,
+		sessionRevisionReceipts,
+	};
+}
+
+async function runSessionRevisionReceiptMaintenance(
+	invocationDeadline: MaintenanceDeadline,
+) {
+	const deadline = createMaintenanceQueueDeadline(
+		invocationDeadline,
+		SESSION_REVISION_RECEIPT_BUDGET_MS,
+	);
+	const drain = await runMaintenancePassLoop(
+		"session-revision-receipts",
+		deadline,
+		() => runSessionRevisionReceiptCleanupPass(),
+	);
+	return {
+		deleted: drain.results.reduce((total, result) => total + result.deleted, 0),
+		hasMore: drain.hasMore,
+		iterations: drain.iterations,
+		stopReason: drain.stopReason,
 	};
 }
 

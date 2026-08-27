@@ -3,6 +3,7 @@ import {
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
 } from "./ingest-processing-boundary.js";
+import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
 export interface IngestProcessingIdentity {
 	readonly filteredContentSha256: string;
@@ -224,6 +225,7 @@ export async function recordIngestProcessingTargetReceipt(
 export async function reserveLedgerUsageGeneration(
 	ledger: ClaimedIngestProcessingLedger,
 	identity: {
+		readonly expectedRevision: string;
 		readonly organizationId: string;
 		readonly sessionId: string;
 		readonly userId: string;
@@ -239,14 +241,15 @@ export async function reserveLedgerUsageGeneration(
 				usage_extraction_generation + 1,
 				FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
 			 )
-			 WHERE organization_id = $1
-				AND session_id = $2
-				AND user_id = $3
-				AND EXISTS (
-					SELECT 1
-					FROM ingest_processing_ledger
-					WHERE id = $4 AND usage_generation IS NULL
-				)
+				 WHERE organization_id = $1
+					AND session_id = $2
+					AND user_id = $3
+					AND last_revision = $4::bigint
+					AND EXISTS (
+						SELECT 1
+						FROM ingest_processing_ledger
+						WHERE id = $5 AND usage_generation IS NULL
+					)
 			 RETURNING usage_extraction_generation
 		)
 		UPDATE ingest_processing_ledger
@@ -256,12 +259,26 @@ export async function reserveLedgerUsageGeneration(
 				usage_generation
 			),
 			updated_at = NOW()
-		WHERE id = $4
-		RETURNING usage_generation::text AS generation`,
-		[identity.organizationId, identity.sessionId, identity.userId, ledger.id],
+			WHERE id = $5
+				AND EXISTS (
+					SELECT 1
+					FROM session_ownership
+					WHERE organization_id = $1
+						AND session_id = $2
+						AND user_id = $3
+						AND last_revision = $4::bigint
+				)
+			RETURNING usage_generation::text AS generation`,
+		[
+			identity.organizationId,
+			identity.sessionId,
+			identity.userId,
+			identity.expectedRevision,
+			ledger.id,
+		],
 	);
 	if (!reserved?.generation) {
-		throw new Error("Usage extraction generation reservation failed");
+		throw new UsageExtractionSupersededError();
 	}
 	await passIngestProcessingBoundary(failpoint, {
 		store: "postgres",

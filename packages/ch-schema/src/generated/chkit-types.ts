@@ -14,6 +14,7 @@ export type RudelClaudeSessionsRow = {
   package_type: string
   content: string
   filter_version: number
+  revision: string
   ingested_at: string
   user_id: string
   git_branch: string | null
@@ -33,6 +34,7 @@ export const RudelClaudeSessionsRowSchema = z.object({
   package_type: z.string(),
   content: z.string(),
   filter_version: z.number(),
+  revision: z.string(),
   ingested_at: z.string(),
   user_id: z.string(),
   git_branch: z.string().nullable(),
@@ -55,6 +57,7 @@ export type RudelCodexSessionsRow = {
   package_type: string
   content: string
   filter_version: number
+  revision: string
   ingested_at: string
   user_id: string
   git_branch: string | null
@@ -73,6 +76,7 @@ export const RudelCodexSessionsRowSchema = z.object({
   package_type: z.string(),
   content: z.string(),
   filter_version: z.number(),
+  revision: z.string(),
   ingested_at: z.string(),
   user_id: z.string(),
   git_branch: z.string().nullable(),
@@ -93,6 +97,7 @@ export type RudelSessionAnalyticsRow = {
   package_name: string
   package_type: string
   filter_version: number
+  revision: string
   ingested_at: string
   user_id: string
   git_branch: string | null
@@ -135,6 +140,7 @@ export const RudelSessionAnalyticsRowSchema = z.object({
   package_name: z.string(),
   package_type: z.string(),
   filter_version: z.number(),
+  revision: z.string(),
   ingested_at: z.string(),
   user_id: z.string(),
   git_branch: z.string().nullable(),
@@ -176,6 +182,7 @@ export type RudelSessionLanguageSignalsRow = {
   session_id: string
   user_id: string
   source: string
+  raw_revision: string
   raw_ingested_at: string
   scan_version: number
   member_swears: number
@@ -185,6 +192,7 @@ export type RudelSessionLanguageSignalsRow = {
   model_apologies: number
   model_positive: number
   scanned_at: string
+  signal_version: string
 }
 
 export const RudelSessionLanguageSignalsRowSchema = z.object({
@@ -193,6 +201,7 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   session_id: z.string(),
   user_id: z.string(),
   source: z.string(),
+  raw_revision: z.string(),
   raw_ingested_at: z.string(),
   scan_version: z.number(),
   member_swears: z.number(),
@@ -202,6 +211,7 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   model_apologies: z.number(),
   model_positive: z.number(),
   scanned_at: z.string(),
+  signal_version: z.string(),
 })
 
 export type RudelSessionLanguageSignalsRowInput = z.input<typeof RudelSessionLanguageSignalsRowSchema>

@@ -1,6 +1,10 @@
 import { getLogger } from "@logtape/logtape";
+import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
+import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
+
+export { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
 const logger = getLogger(["rudel", "api", "session-ownership"]);
 
@@ -76,24 +80,17 @@ interface UsageBackfillOwnershipDatabaseRow {
 	user_id: string;
 }
 
-export class UsageExtractionSupersededError extends Error {
-	constructor() {
-		super(
-			"Usage extraction was superseded before its receipt was confirmed; retry the upload",
-		);
-		this.name = "UsageExtractionSupersededError";
-	}
-}
-
 export async function claimSessionIngestOwnership(
 	organizationId: string,
 	sessionId: string,
 	userId: string,
+	database: postgres.Sql | postgres.ReservedSql = sqlClient,
 ): Promise<SessionOwnershipClaim> {
 	const reservedOwner = await reserveSessionOwner(
 		organizationId,
 		sessionId,
 		userId,
+		database,
 	);
 	return getOwnershipClaim(reservedOwner, organizationId, sessionId, userId);
 }
@@ -106,11 +103,11 @@ export async function recordSessionIngestContent(
 	filterVersion: number,
 	sessionDate: Date,
 	ingestedAt: Date,
+	revision: string,
 	usageReceipt?: UsageExtractionReceiptRecord,
 ): Promise<void> {
-	// Raw bookkeeping follows ingested_at ordering. The usage receipt uses the
-	// separately reserved generation as a compare-and-set, so an older writer
-	// cannot certify a newer session snapshot.
+	// Raw bookkeeping follows the shared revision ordering. Usage extraction must
+	// match both its reserved generation and the raw revision it describes.
 	const ingestedAtIso = ingestedAt.toISOString();
 	return sqlClient.begin(async (transaction) => {
 		await transaction.unsafe(
@@ -123,12 +120,13 @@ export async function recordSessionIngestContent(
 				last_content_shape_json = $4,
 				last_filter_version = $5,
 				last_session_date = $6,
-				last_ingested_at = $7
-			WHERE organization_id = $8
-				AND session_id = $9
+				last_ingested_at = $7,
+				last_revision = $8::bigint
+			WHERE organization_id = $9
+				AND session_id = $10
 				AND (
-					last_ingested_at IS NULL
-					OR last_ingested_at <= $7
+					last_revision IS NULL
+					OR last_revision <= $8::bigint
 				)
 			`,
 			[
@@ -139,6 +137,7 @@ export async function recordSessionIngestContent(
 				filterVersion,
 				sessionDate.toISOString(),
 				ingestedAtIso,
+				revision,
 				organizationId,
 				sessionId,
 			],
@@ -158,10 +157,11 @@ export async function recordSessionIngestContent(
 				last_usage_diagnostics_json = $7,
 				last_usage_completed_generation = $8,
 				last_usage_completed_at = NOW()
-			WHERE organization_id = $9
-				AND session_id = $10
-				AND usage_extraction_generation = $8
-			RETURNING usage_extraction_generation::text AS generation
+				WHERE organization_id = $9
+					AND session_id = $10
+					AND usage_extraction_generation = $8
+					AND last_revision = $11::bigint
+				RETURNING usage_extraction_generation::text AS generation
 			`,
 			[
 				contentSha256,
@@ -174,6 +174,7 @@ export async function recordSessionIngestContent(
 				usageReceipt.generation,
 				organizationId,
 				sessionId,
+				revision,
 			],
 		);
 		if (completed.length !== 1) {
@@ -186,20 +187,26 @@ export async function reserveUsageExtractionGeneration(
 	organizationId: string,
 	sessionId: string,
 	userId: string,
+	expectedRevision: string,
+	database: postgres.Sql | postgres.ReservedSql = sqlClient,
 ): Promise<string> {
-	const [row] = await sqlClient<Array<{ generation: string }>>`
-		UPDATE session_ownership
-		SET usage_extraction_generation = GREATEST(
-			usage_extraction_generation + 1,
-			FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
-		)
-		WHERE organization_id = ${organizationId}
-			AND session_id = ${sessionId}
-			AND user_id = ${userId}
-		RETURNING usage_extraction_generation::text AS generation
-	`;
+	const [row] = await database.unsafe<Array<{ generation: string }>>(
+		`
+			UPDATE session_ownership
+			SET usage_extraction_generation = GREATEST(
+				usage_extraction_generation + 1,
+				FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+			)
+			WHERE organization_id = $1
+				AND session_id = $2
+				AND user_id = $3
+				AND last_revision = $4::bigint
+			RETURNING usage_extraction_generation::text AS generation
+		`,
+		[organizationId, sessionId, userId, expectedRevision],
+	);
 	if (!row) {
-		throw new Error("Usage extraction generation reservation failed");
+		throw new UsageExtractionSupersededError();
 	}
 	return row.generation;
 }
@@ -336,9 +343,10 @@ async function reserveSessionOwner(
 	organizationId: string,
 	sessionId: string,
 	candidateOwner: string,
+	database: postgres.Sql | postgres.ReservedSql,
 ): Promise<ReservedSessionOwner> {
 	// The no-op update returns the winning row when a concurrent insert wins.
-	const [row] = await sqlClient<
+	const [row] = await database.unsafe<
 		Array<{
 			last_assistant_line_count: number | null;
 			last_content_bytes: number | null;
@@ -353,16 +361,17 @@ async function reserveSessionOwner(
 			last_usage_model_rate_card_version: string | null;
 			user_id: string;
 		}>
-	>`
+	>(
+		`
 		INSERT INTO session_ownership AS ownership (
 			organization_id,
 			session_id,
 			user_id
 		)
 		VALUES (
-			${organizationId},
-			${sessionId},
-			${candidateOwner}
+			$1,
+			$2,
+			$3
 		)
 		ON CONFLICT (organization_id, session_id) DO UPDATE
 		SET user_id = ownership.user_id
@@ -379,7 +388,9 @@ async function reserveSessionOwner(
 			last_usage_extraction_version,
 			last_usage_event_identity_version,
 			last_usage_model_rate_card_version
-	`;
+		`,
+		[organizationId, sessionId, candidateOwner],
+	);
 	if (!row) {
 		throw new Error("Session ownership reservation did not return an owner");
 	}

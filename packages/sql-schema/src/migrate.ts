@@ -23,6 +23,10 @@ const REQUIRED_OWNERSHIP_MIGRATIONS = [
 		createdAt: "1785686400000",
 		tag: "0021_session_ownership_ingest_shape",
 	},
+	{
+		createdAt: "1787735109151",
+		tag: "0029_tidy_human_fly",
+	},
 ] as const;
 
 try {
@@ -43,6 +47,7 @@ async function assertOwnershipSchemaDoesNotLeadMigrationHistory(): Promise<void>
 			ownership_content_hash_column: boolean;
 			ownership_content_shape_columns: boolean;
 			ownership_backfill_state_table: boolean;
+			ownership_revision_artifacts: boolean;
 			ownership_table: boolean;
 			ownership_user_index: boolean;
 			yc_review_column: boolean;
@@ -72,6 +77,16 @@ async function assertOwnershipSchemaDoesNotLeadMigrationHistory(): Promise<void>
 						'last_assistant_line_count'
 					)
 			) AS ownership_content_shape_columns,
+			(
+				to_regclass('public.session_ingest_revision') IS NOT NULL
+				AND (
+					SELECT COUNT(*) = 2
+					FROM information_schema.columns
+					WHERE table_schema = 'public'
+						AND table_name = 'session_ownership'
+						AND column_name IN ('revision_head', 'last_revision')
+				)
+			) AS ownership_revision_artifacts,
 			EXISTS (
 				SELECT 1
 				FROM information_schema.columns
@@ -108,6 +123,10 @@ async function assertOwnershipSchemaDoesNotLeadMigrationHistory(): Promise<void>
 		{
 			artifactExists: artifacts.ownership_content_shape_columns,
 			migration: REQUIRED_OWNERSHIP_MIGRATIONS[6],
+		},
+		{
+			artifactExists: artifacts.ownership_revision_artifacts,
+			migration: REQUIRED_OWNERSHIP_MIGRATIONS[7],
 		},
 	];
 

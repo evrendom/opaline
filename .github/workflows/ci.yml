@@ -47,7 +47,9 @@ jobs:
               - ".github/workflows/ci.yml"
 
   verify:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
+    # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -196,9 +198,26 @@ jobs:
       - name: Run Postgres migrations
         run: bun run --cwd packages/sql-schema migrate
 
-      - name: Run ClickHouse migrations
+      - name: Apply pre-F16 ClickHouse prerequisites (disposable CI only)
         working-directory: packages/ch-schema
-        run: bun --bun chkit migrate --apply --allow-destructive
+        env:
+          F16_NONPROD_APPLY_PREREQUISITES: ci-only
+        run: bun run ch:migrate:f16:ci-prerequisites
+
+      - name: Run controlled F16 ClickHouse migration (evidence-backed CI auto-approval)
+        working-directory: packages/ch-schema
+        env:
+          F16_BACKFILL_BUCKET_COUNT: "2"
+          F16_CATALOG_BARRIER_TIMEOUT_MS: "120000"
+          F16_CLICKHOUSE_TOPOLOGY: single-node
+          F16_DDL_TASK_TIMEOUT_SECONDS: "180"
+          F16_MAX_BYTES_BEFORE_EXTERNAL_GROUP_BY: "268435456"
+          F16_MAX_BYTES_BEFORE_EXTERNAL_SORT: "268435456"
+          F16_MAX_MEMORY_USAGE_BYTES: "2147483648"
+          F16_MAX_TEMPORARY_DATA_ON_DISK_BYTES: "4294967296"
+          F16_MIGRATION_REQUEST_TIMEOUT_MS: "600000"
+          F16_NONPROD_AUTO_APPROVE_CHECKPOINTS: ci-only
+        run: bun run ch:migrate:f16
 
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream

@@ -328,6 +328,7 @@ export async function uploadSession(
 	const filteredRequest: IngestSessionInput = {
 		...request,
 		content: filteredText.content,
+		operationId: request.operationId ?? crypto.randomUUID(),
 		subagents: filteredText.subagents ? [...filteredText.subagents] : undefined,
 		filter_version: FILTER_VERSION,
 	};

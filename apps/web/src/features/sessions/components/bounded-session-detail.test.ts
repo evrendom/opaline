@@ -16,7 +16,7 @@ describe("bounded session detail view model", () => {
 					write: 0,
 				},
 				context: { errors: [], files: [] },
-				revision: "2026-08-25T08:00:00.000Z",
+				revision: "117158864486400000",
 				session: {
 					durationMinutes: 2,
 					estimatedCost: 0.05,

@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import { createHash } from "node:crypto";
 import { S3ServiceException } from "@aws-sdk/client-s3";
 import { parseError } from "@clickhouse/client-web";
@@ -17,6 +24,7 @@ import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { type IngestErrorFactories, processIngestSession } from "../router.js";
 import { IngestFilterQueue } from "../services/ingest-filter.service.js";
 import {
+	extendNonterminalR2IngestJobExpiries,
 	getR2IngestJobStatus,
 	initR2IngestJob,
 } from "../services/ingest-job.service.js";
@@ -40,11 +48,17 @@ import {
 	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
 import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
-import type {
-	R2MultipartUploadClient,
-	R2MultipartUploadInitClient,
-	R2ObjectMetadata,
+import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
+import {
+	R2_INGEST_BUCKET,
+	type R2MultipartUploadClient,
+	type R2MultipartUploadInitClient,
+	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
+import {
+	type ApiTestServer,
+	startApiTestServer,
+} from "./helpers/api-test-server.js";
 
 type Uuid = `${string}-${string}-${string}-${string}-${string}`;
 
@@ -66,7 +80,9 @@ class FakeR2Client implements R2MultipartUploadClient {
 	readonly abortFailures = new Map<string, unknown>();
 	readonly completedKeys: string[] = [];
 	readonly deletedKeys: string[] = [];
+	readonly getObjectKeys: string[] = [];
 	readonly getObjectFailures = new Map<string, unknown>();
+	readonly headObjectKeys: string[] = [];
 	readonly objects = new Map<string, FakeStoredObject>();
 
 	async abortMultipartUpload(input: {
@@ -119,6 +135,7 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	async getObject(objectKey: string): Promise<Uint8Array> {
+		this.getObjectKeys.push(objectKey);
 		const failure = this.getObjectFailures.get(objectKey);
 		if (failure) {
 			this.getObjectFailures.delete(objectKey);
@@ -131,6 +148,7 @@ class FakeR2Client implements R2MultipartUploadClient {
 	}
 
 	async headObject(objectKey: string): Promise<R2ObjectMetadata | null> {
+		this.headObjectKeys.push(objectKey);
 		const object = this.objects.get(objectKey);
 		if (!object?.complete || !object.bytes) return null;
 		return { byteLength: object.bytes.byteLength, metadata: object.metadata };
@@ -161,6 +179,17 @@ class FakeR2Client implements R2MultipartUploadClient {
 		this.getObjectFailures.set(objectKey, error);
 	}
 
+	reset(): void {
+		this.abortedKeys.length = 0;
+		this.abortFailures.clear();
+		this.completedKeys.length = 0;
+		this.deletedKeys.length = 0;
+		this.getObjectKeys.length = 0;
+		this.getObjectFailures.clear();
+		this.headObjectKeys.length = 0;
+		this.objects.clear();
+	}
+
 	private requireObject(objectKey: string): FakeStoredObject {
 		const object = this.objects.get(objectKey);
 		if (!object) throw new Error("unknown fake R2 object");
@@ -169,6 +198,104 @@ class FakeR2Client implements R2MultipartUploadClient {
 }
 
 const fakeR2 = new FakeR2Client();
+
+function createFakeR2S3Endpoint(): Bun.Server<undefined> {
+	return Bun.serve({
+		async fetch(request) {
+			const url = new URL(request.url);
+			const objectKey = readFakeR2ObjectKey(url);
+			if (
+				request.method === "POST" &&
+				url.searchParams.has("delete") &&
+				objectKey === null
+			) {
+				const body = await request.text();
+				const objectKeys = [...body.matchAll(/<Key>([^<]+)<\/Key>/gu)].map(
+					(match) => decodeXmlText(match[1] ?? ""),
+				);
+				await fakeR2.deleteObjects(objectKeys);
+				return xmlResponse(
+					'<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/" />',
+				);
+			}
+			if (objectKey === null) return new Response(null, { status: 404 });
+			const uploadId = url.searchParams.get("uploadId");
+			if (request.method === "DELETE" && uploadId) {
+				await fakeR2.abortMultipartUpload({ objectKey, uploadId });
+				return new Response(null, { status: 204 });
+			}
+			if (request.method === "POST" && uploadId) {
+				await fakeR2.completeMultipartUpload({
+					objectKey,
+					parts: [{ etag: '"fake-etag"', partNumber: 1 }],
+					uploadId,
+				});
+				return xmlResponse(
+					`<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>${R2_INGEST_BUCKET}</Bucket><Key>${objectKey}</Key><ETag>"fake-etag"</ETag></CompleteMultipartUploadResult>`,
+				);
+			}
+			if (request.method === "HEAD") {
+				const metadata = await fakeR2.headObject(objectKey);
+				if (!metadata) return new Response(null, { status: 404 });
+				return new Response(null, {
+					headers: buildFakeR2Headers(metadata),
+					status: 200,
+				});
+			}
+			if (request.method === "GET") {
+				const bytes = await fakeR2.getObject(objectKey);
+				const stored = fakeR2.objects.get(objectKey);
+				if (!stored) return new Response(null, { status: 404 });
+				return new Response(bytes, {
+					headers: buildFakeR2Headers({
+						byteLength: bytes.byteLength,
+						metadata: stored.metadata,
+					}),
+					status: 200,
+				});
+			}
+			return new Response(null, { status: 405 });
+		},
+		hostname: "127.0.0.1",
+		port: 0,
+	});
+}
+
+function readFakeR2ObjectKey(url: URL): string | null {
+	const bucketPath = `/${R2_INGEST_BUCKET}`;
+	if (url.pathname === bucketPath || url.pathname === `${bucketPath}/`) {
+		return null;
+	}
+	if (!url.pathname.startsWith(`${bucketPath}/`)) return null;
+	return decodeURIComponent(url.pathname.slice(bucketPath.length + 1));
+}
+
+function buildFakeR2Headers(metadata: R2ObjectMetadata): Headers {
+	const headers = new Headers({
+		"Content-Length": metadata.byteLength.toString(),
+		ETag: '"fake-etag"',
+	});
+	for (const [name, value] of Object.entries(metadata.metadata)) {
+		headers.set(`x-amz-meta-${name}`, value);
+	}
+	return headers;
+}
+
+function decodeXmlText(value: string): string {
+	return value
+		.replaceAll("&amp;", "&")
+		.replaceAll("&lt;", "<")
+		.replaceAll("&gt;", ">")
+		.replaceAll("&quot;", '"')
+		.replaceAll("&apos;", "'");
+}
+
+function xmlResponse(body: string): Response {
+	return new Response(body, {
+		headers: { "Content-Type": "application/xml" },
+		status: 200,
+	});
+}
 
 beforeAll(async () => {
 	await sqlClient`
@@ -205,6 +332,494 @@ afterAll(async () => {
 });
 
 describe("R2 ingest commit lifecycle", () => {
+	beforeEach(async () => {
+		await sqlClient`DELETE FROM ingest_job WHERE user_id = ${USER_ID}`;
+		fakeR2.reset();
+	});
+
+	test("quiescence blocks ingest-state PostgreSQL writes and R2 access after authentication while allowing operator commit", async () => {
+		const operatorToken = `operator-${crypto.randomUUID()}`;
+		const fakeR2Endpoint = createFakeR2S3Endpoint();
+		const server = await startApiTestServer({
+			R2_ACCESS_KEY_ID: "test-access-key",
+			R2_ACCOUNT_ID: "test-account",
+			R2_ENDPOINT: fakeR2Endpoint.url.origin,
+			R2_SECRET_ACCESS_KEY: "test-secret-key",
+			SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
+			SESSION_INGEST_QUIESCED: "true",
+			SKILL_EXTRACTION_ENABLED: "false",
+			USAGE_EVENT_EXTRACTION_ENABLED: "false",
+		});
+		let identity: QuiescedTestIdentity | undefined;
+		let commitJob: R2IngestInitOutput | undefined;
+		let rescueJob: R2IngestInitOutput | undefined;
+		let repairJob: R2IngestInitOutput | undefined;
+		let terminalJob: R2IngestInitOutput | undefined;
+		let resumedServer: ApiTestServer | undefined;
+		try {
+			identity = await createQuiescedTestIdentity(server.baseUrl);
+			const operatorSkillName = `quiesced-operator-${crypto.randomUUID()}`;
+			commitJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				buildRealClaudeTranscript(operatorSkillName),
+				identity,
+			);
+			const commitObjectsBefore = snapshotFakeR2Objects(commitJob);
+			const commitEffectsBefore = snapshotFakeR2Effects();
+			const commitRowBefore = await readIngestJobRowSnapshot(commitJob.jobId);
+			const apiKeyBefore = await readApiKeySnapshot(identity.apiKeyId);
+			expect(commitRowBefore).toMatchObject({
+				attempts: 0,
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+
+			const response = await fetch(`${server.baseUrl}/rpc/ingest/commit`, {
+				body: JSON.stringify({ json: buildCompletionInput(commitJob) }),
+				headers: {
+					"Content-Type": "application/json",
+					"x-api-key": identity.apiKey,
+				},
+				method: "POST",
+			});
+
+			expect(response.status).toBe(503);
+			expect(await readRpcErrorShape(response)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				message:
+					"Session uploads are temporarily paused for an analytics rebuild. Retry shortly.",
+				reason: "session_ingest_quiesced",
+			});
+			expect(await readIngestJobRowSnapshot(commitJob.jobId)).toEqual(
+				commitRowBefore,
+			);
+			expect(snapshotFakeR2Objects(commitJob)).toEqual(commitObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(commitEffectsBefore);
+			// Better Auth records last_request/updated_at while authenticating the API
+			// key. Every other API-key field must remain unchanged after rejection.
+			expect(await readApiKeySnapshot(identity.apiKeyId)).toBe(apiKeyBefore);
+
+			const operatorResponse = await fetch(
+				`${server.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(commitJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(operatorResponse.status).toBe(200);
+			expect(await operatorResponse.json()).toMatchObject({
+				json: {
+					jobId: commitJob.jobId,
+					result: { sessionId: commitJob.jobId, success: true },
+					status: "completed",
+				},
+			});
+			expect(await countQuiescedCanonicalRaw(identity, commitJob.jobId)).toBe(
+				1,
+			);
+			expect(
+				await getR2IngestJobStatus(commitJob.jobId, identity.userId),
+			).toMatchObject({ attempts: 1, status: "completed" });
+
+			const rescueSkillName = `post-barrier-rescue-${crypto.randomUUID()}`;
+			rescueJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				buildRealClaudeTranscript(rescueSkillName),
+				identity,
+			);
+			await interruptFinalIngestClaim(
+				rescueJob,
+				new Date("2026-08-25T10:00:00.000Z"),
+				identity.userId,
+			);
+			const rescueRowBefore = await readIngestJobRowSnapshot(rescueJob.jobId);
+			const rescueObjectsBefore = snapshotFakeR2Objects(rescueJob);
+			const rescueEffectsBefore = snapshotFakeR2Effects();
+			expect(rescueRowBefore).toMatchObject({
+				lastErrorCode: null,
+				status: "running",
+			});
+
+			const refusedRescueResponse = await fetch(
+				`${server.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(rescueJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(refusedRescueResponse.status).toBe(503);
+			expect(await readRpcErrorShape(refusedRescueResponse)).toEqual({
+				code: "SERVICE_UNAVAILABLE",
+				message:
+					"Interrupted final-claim rescue is paused while session ingest is quiesced. Lift the barrier, then retry this commit.",
+				reason: "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED",
+			});
+			expect(await readIngestJobRowSnapshot(rescueJob.jobId)).toEqual(
+				rescueRowBefore,
+			);
+			expect(snapshotFakeR2Objects(rescueJob)).toEqual(rescueObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(rescueEffectsBefore);
+
+			resumedServer = await startApiTestServer({
+				R2_ACCESS_KEY_ID: "test-access-key",
+				R2_ACCOUNT_ID: "test-account",
+				R2_ENDPOINT: fakeR2Endpoint.url.origin,
+				R2_SECRET_ACCESS_KEY: "test-secret-key",
+				SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
+				SESSION_INGEST_QUIESCED: "false",
+				SKILL_EXTRACTION_ENABLED: "false",
+				USAGE_EVENT_EXTRACTION_ENABLED: "false",
+			});
+			const rescuedResponse = await fetch(
+				`${resumedServer.baseUrl}/rpc/ingest/commit`,
+				{
+					body: JSON.stringify({ json: buildCompletionInput(rescueJob) }),
+					headers: {
+						"Content-Type": "application/json",
+						"x-api-key": identity.apiKey,
+						"x-rudel-session-ingest-operator-token": operatorToken,
+					},
+					method: "POST",
+				},
+			);
+			expect(rescuedResponse.status).toBe(200);
+			expect(await rescuedResponse.json()).toMatchObject({
+				json: {
+					jobId: rescueJob.jobId,
+					result: { sessionId: rescueJob.jobId, success: true },
+					status: "completed",
+				},
+			});
+			expect(await countQuiescedCanonicalRaw(identity, rescueJob.jobId)).toBe(
+				1,
+			);
+			expect(
+				await getR2IngestJobStatus(rescueJob.jobId, identity.userId),
+			).toMatchObject({
+				attempts: rescueRowBefore.maxAttempts,
+				error: null,
+				status: "completed",
+			});
+
+			repairJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				"quiesced repair transcript bytes",
+				identity,
+			);
+			terminalJob = await initializeUploadedJobForIdentity(
+				crypto.randomUUID(),
+				"quiesced terminal cleanup bytes",
+				identity,
+			);
+			await sqlClient`
+				UPDATE ingest_job
+				SET
+					attempts = CASE WHEN id = ${repairJob.jobId} THEN 1 ELSE max_attempts END,
+					available_at = clock_timestamp() - interval '1 minute',
+					expires_at = clock_timestamp() + interval '2 days'
+				WHERE id IN (${repairJob.jobId}, ${terminalJob.jobId})
+			`;
+			const repairRowsBefore = await Promise.all([
+				readIngestJobRowSnapshot(repairJob.jobId),
+				readIngestJobRowSnapshot(terminalJob.jobId),
+			]);
+			expect(repairRowsBefore[0]).toMatchObject({
+				attempts: 1,
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+			expect(repairRowsBefore[1]).toMatchObject({
+				leaseExpiresAt: null,
+				leaseToken: null,
+				status: "pending",
+			});
+			expect(repairRowsBefore[1]?.attempts).toBeGreaterThan(1);
+			const repairObjectsBefore = [
+				...snapshotFakeR2Objects(repairJob),
+				...snapshotFakeR2Objects(terminalJob),
+			];
+			const repairEffectsBefore = snapshotFakeR2Effects();
+			const previousQuiescence = process.env.SESSION_INGEST_QUIESCED;
+			process.env.SESSION_INGEST_QUIESCED = "true";
+			try {
+				await expect(runR2IngestRepairPass(fakeR2)).resolves.toEqual({
+					attempted: 0,
+					completed: 0,
+					hasMore: false,
+					nextDueAt: null,
+				});
+			} finally {
+				restoreEnvironmentVariable(
+					"SESSION_INGEST_QUIESCED",
+					previousQuiescence,
+				);
+			}
+			expect(
+				await Promise.all([
+					readIngestJobRowSnapshot(repairJob.jobId),
+					readIngestJobRowSnapshot(terminalJob.jobId),
+				]),
+			).toEqual(repairRowsBefore);
+			expect([
+				...snapshotFakeR2Objects(repairJob),
+				...snapshotFakeR2Objects(terminalJob),
+			]).toEqual(repairObjectsBefore);
+			expect(snapshotFakeR2Effects()).toEqual(repairEffectsBefore);
+		} finally {
+			await server.stop();
+			if (resumedServer) await resumedServer.stop();
+			await fakeR2Endpoint.stop(true);
+			const jobIds = [
+				commitJob?.jobId,
+				rescueJob?.jobId,
+				repairJob?.jobId,
+				terminalJob?.jobId,
+			].filter((jobId): jobId is string => jobId !== undefined);
+			for (const jobId of jobIds) {
+				await sqlClient`DELETE FROM ingest_job WHERE id = ${jobId}`;
+			}
+			for (const initialized of [
+				commitJob,
+				rescueJob,
+				repairJob,
+				terminalJob,
+			]) {
+				for (const object of initialized?.objects ?? []) {
+					fakeR2.objects.delete(object.objectKey);
+				}
+			}
+			if (identity) {
+				await deleteQuiescedClickHouseRows(identity.organizationId);
+				await sqlClient`DELETE FROM organization WHERE id = ${identity.organizationId}`;
+				await sqlClient`DELETE FROM "user" WHERE id = ${identity.userId}`;
+			}
+		}
+	}, 60_000);
+
+	test("recovers one interrupted final claim and bounds a failed rescue", async () => {
+		const leaseStartedAt = new Date("2030-01-01T00:00:00.000Z");
+		const recoveryAt = new Date("2030-01-01T00:00:02.000Z");
+		const recoveredJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"interrupted final claim transcript",
+		);
+		const recoveredObjectKey = recoveredJob.objects[0]?.objectKey;
+		if (!recoveredObjectKey)
+			throw new Error("missing interrupted claim object");
+		await interruptFinalIngestClaim(recoveredJob, leaseStartedAt, USER_ID);
+		const [interrupted] = await sqlClient<
+			Array<{
+				attempts: number;
+				lastErrorCode: string | null;
+				maxAttempts: number;
+				status: string;
+			}>
+		>`
+			SELECT
+				attempts,
+				last_error_code AS "lastErrorCode",
+				max_attempts AS "maxAttempts",
+				status
+			FROM ingest_job
+			WHERE id = ${recoveredJob.jobId}
+		`;
+		expect(interrupted).toMatchObject({
+			lastErrorCode: null,
+			status: "running",
+		});
+		if (!interrupted) throw new Error("interrupted final claim disappeared");
+		expect(interrupted?.attempts).toBe(interrupted?.maxAttempts);
+
+		const previousQuiescence = process.env.SESSION_INGEST_QUIESCED;
+		process.env.SESSION_INGEST_QUIESCED = "true";
+		try {
+			await expect(runR2IngestRepairPass(fakeR2)).resolves.toEqual({
+				attempted: 0,
+				completed: 0,
+				hasMore: false,
+				nextDueAt: null,
+			});
+		} finally {
+			restoreEnvironmentVariable("SESSION_INGEST_QUIESCED", previousQuiescence);
+		}
+		expect(fakeR2.objects.has(recoveredObjectKey)).toBe(true);
+		const quiescedRepairRowBefore = await readIngestJobRowSnapshot(
+			recoveredJob.jobId,
+		);
+		const quiescedRepairObjectsBefore = snapshotFakeR2Objects(recoveredJob);
+		const quiescedRepairEffectsBefore = snapshotFakeR2Effects();
+		let quiescedRepairProcessCalls = 0;
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				leaseDurationMs: 1_000,
+				now: () => recoveryAt,
+				process: async (input) => {
+					quiescedRepairProcessCalls += 1;
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+				sessionIngestQuiesced: true,
+			}),
+		).resolves.toMatchObject({ attempted: 1, completed: 0 });
+		expect(quiescedRepairProcessCalls).toBe(0);
+		expect(await readIngestJobRowSnapshot(recoveredJob.jobId)).toEqual(
+			quiescedRepairRowBefore,
+		);
+		expect(snapshotFakeR2Objects(recoveredJob)).toEqual(
+			quiescedRepairObjectsBefore,
+		);
+		expect(snapshotFakeR2Effects()).toEqual(quiescedRepairEffectsBefore);
+
+		let recoveryProcessCalls = 0;
+		const recovered = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			leaseDurationMs: 1_000,
+			now: () => recoveryAt,
+			process: async (input) => {
+				recoveryProcessCalls += 1;
+				const [running] = await sqlClient<
+					Array<{ attempts: number; lastErrorCode: string | null }>
+				>`
+					SELECT
+						attempts,
+						last_error_code AS "lastErrorCode"
+					FROM ingest_job
+					WHERE id = ${recoveredJob.jobId}
+				`;
+				expect(running).toEqual({
+					attempts: interrupted.maxAttempts,
+					lastErrorCode: "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE",
+				});
+				expect(fakeR2.objects.has(recoveredObjectKey)).toBe(true);
+				return processorResult(input.sessionId);
+			},
+			r2: fakeR2,
+		});
+		expect(recovered).toMatchObject({ attempted: 1, completed: 1 });
+		expect(recoveryProcessCalls).toBe(1);
+		expect(
+			await getR2IngestJobStatus(recoveredJob.jobId, USER_ID),
+		).toMatchObject({
+			attempts: interrupted.maxAttempts,
+			error: null,
+			status: "completed",
+		});
+
+		const boundedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"bounded interrupted final claim transcript",
+		);
+		const boundedObjectKey = boundedJob.objects[0]?.objectKey;
+		if (!boundedObjectKey) throw new Error("missing bounded rescue object");
+		await interruptFinalIngestClaim(boundedJob, leaseStartedAt, USER_ID);
+		const processingFailure = new Error("simulated rescue processing failure");
+		const bounded = await repairRecoverableR2IngestJobs({
+			database: sqlClient,
+			leaseDurationMs: 1_000,
+			now: () => recoveryAt,
+			process: async () => {
+				throw processingFailure;
+			},
+			r2: fakeR2,
+		});
+		expect(bounded).toMatchObject({ attempted: 1, completed: 0 });
+		expect(await getR2IngestJobStatus(boundedJob.jobId, USER_ID)).toMatchObject(
+			{
+				error: { code: "R2_INGEST_TRANSIENT_FAILURE" },
+				status: "failed",
+			},
+		);
+		expect(fakeR2.objects.has(boundedObjectKey)).toBe(false);
+	});
+
+	test("extends pending expiry by the actual barrier duration before resume", async () => {
+		const barrierStartedAt = new Date("2030-01-01T00:00:00.000Z");
+		const originalExpiry = new Date("2030-01-01T00:00:01.000Z");
+		const resumedAt = new Date("2030-01-01T00:10:00.000Z");
+		const unextendedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"unextended barrier expiry transcript",
+		);
+		const unextendedObjectKey = unextendedJob.objects[0]?.objectKey;
+		if (!unextendedObjectKey)
+			throw new Error("missing unextended expiry object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = ${originalExpiry.toISOString()}
+			WHERE id = ${unextendedJob.jobId}
+		`;
+		await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: resumedAt,
+			r2: fakeR2,
+		});
+		expect(
+			await getR2IngestJobStatus(unextendedJob.jobId, USER_ID),
+		).toMatchObject({
+			error: { code: "R2_INGEST_JOB_EXPIRED" },
+			status: "failed",
+		});
+		expect(fakeR2.objects.has(unextendedObjectKey)).toBe(false);
+
+		const extendedJob = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"extended barrier expiry transcript",
+		);
+		const extendedObjectKey = extendedJob.objects[0]?.objectKey;
+		if (!extendedObjectKey) throw new Error("missing extended expiry object");
+		await sqlClient`
+			UPDATE ingest_job
+			SET expires_at = ${originalExpiry.toISOString()}
+			WHERE id = ${extendedJob.jobId}
+		`;
+		const extendedCount = await extendNonterminalR2IngestJobExpiries(
+			barrierStartedAt,
+			resumedAt,
+			sqlClient,
+		);
+		expect(extendedCount).toBe(1);
+		const [extendedExpiry] = await sqlClient<Array<{ expiresAt: string }>>`
+			SELECT expires_at::text AS "expiresAt"
+			FROM ingest_job
+			WHERE id = ${extendedJob.jobId}
+		`;
+		expect(new Date(extendedExpiry?.expiresAt ?? "").toISOString()).toBe(
+			"2030-01-01T00:10:01.000Z",
+		);
+
+		await sweepExpiredR2IngestJobs({
+			database: sqlClient,
+			now: resumedAt,
+			r2: fakeR2,
+		});
+		expect(fakeR2.objects.has(extendedObjectKey)).toBe(true);
+		expect(
+			await getR2IngestJobStatus(extendedJob.jobId, USER_ID),
+		).toMatchObject({ attempts: 0, status: "pending" });
+		const completed = await commitR2IngestJob({
+			input: buildCompletionInput(extendedJob),
+			leaseDurationMs: 500,
+			now: () => resumedAt,
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(completed.status).toBe("completed");
+	});
+
 	test("aborts every upload created during partial initialization failure", async () => {
 		const mainPresigned = Promise.withResolvers<void>();
 		const abortedUploads: string[] = [];
@@ -1081,6 +1696,23 @@ const CRASH_BOUNDARIES: {
 	},
 ];
 
+const SUPERSESSION_BOUNDARIES: {
+	label: string;
+	matches: (boundary: IngestProcessingBoundary) => boolean;
+}[] = [
+	{
+		label: "before usage reservation",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "raw-receipt",
+	},
+	{
+		label: "before the final usage receipt",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.usage_events",
+	},
+];
+
 describe("R2 ingest real processor crash recovery", () => {
 	test.each(
 		CRASH_BOUNDARIES,
@@ -1143,6 +1775,177 @@ describe("R2 ingest real processor crash recovery", () => {
 			status: "completed",
 		});
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
+	}, 180_000);
+
+	test.each(
+		SUPERSESSION_BOUNDARIES,
+	)("terminally converges an older job superseded $label", async ({
+		matches,
+	}) => {
+		const sessionId = `superseded-${crypto.randomUUID()}`;
+		const olderJobId = crypto.randomUUID();
+		const newerJobId = crypto.randomUUID();
+		const olderContent = buildRealClaudeTranscript(`superseded-${sessionId}`);
+		const newerContent = olderContent.replace(
+			"Please use the requested skill.",
+			"Please run the requested skill.",
+		);
+		const olderInitialized = await initializeUploadedJob(
+			olderJobId,
+			olderContent,
+			[],
+			sessionId,
+		);
+		const newerInitialized = await initializeUploadedJob(
+			newerJobId,
+			newerContent,
+			[],
+			sessionId,
+		);
+		const paused = createDeferred();
+		const resume = createDeferred();
+		let pauseObserved = false;
+		const failpoint: IngestProcessingFailpoint = async (boundary) => {
+			if (!pauseObserved && matches(boundary)) {
+				pauseObserved = true;
+				paused.resolve();
+				await resume.promise;
+			}
+		};
+
+		// Each commit gets its own gate: the two jobs model two API instances,
+		// and the materialization gate is per-process. A shared gate would
+		// deadlock here (older pauses inside the gate, newer queues behind it,
+		// older resumes only after newer finishes) — a topology production
+		// cannot produce.
+		const instanceGate = () =>
+			createR2IngestMaterializationGate({
+				maxBytes: 1_000_000_000,
+				maxJobs: 1,
+				maxQueuedJobs: 8,
+				operationTimeoutMs: 120_000,
+				queueTimeoutMs: 30_000,
+			});
+		const olderCommit = commitR2IngestJob({
+			failpoint,
+			gate: instanceGate(),
+			input: buildCompletionInput(olderInitialized),
+			process: createRealProcessor(failpoint),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		await paused.promise;
+		const newerResult = await commitR2IngestJob({
+			gate: instanceGate(),
+			input: buildCompletionInput(newerInitialized),
+			process: createRealProcessor(undefined),
+			r2: fakeR2,
+			userId: USER_ID,
+		}).finally(resume.resolve);
+		const olderResult = await olderCommit;
+
+		expect(pauseObserved).toBe(true);
+		expect(newerResult.status).toBe("completed");
+		expect(olderResult.status).toBe("completed");
+		expect(olderResult.result.usageChecksum).toBeUndefined();
+		expect(
+			await getR2IngestJobStatus(olderInitialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: null,
+			status: "completed",
+		});
+		const [ledger] = await sqlClient<
+			Array<{ completed: number; processing: number }>
+		>`
+			SELECT
+				count(*) FILTER (WHERE status = 'completed')::int AS completed,
+				count(*) FILTER (WHERE status = 'processing')::int AS processing
+			FROM ingest_processing_ledger
+			WHERE organization_id = ${ORGANIZATION_ID}
+				AND session_id = ${sessionId}
+		`;
+		expect(ledger).toEqual({ completed: 2, processing: 0 });
+		expect(
+			olderInitialized.objects.every(
+				(object) => !fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		const receipts = await sqlClient<
+			Array<{ contentSha256: string; operationId: string; revision: string }>
+		>`
+			SELECT
+				content_sha256 AS "contentSha256",
+				operation_id AS "operationId",
+				revision::text AS revision
+			FROM session_ingest_revision
+			WHERE organization_id = ${ORGANIZATION_ID}
+				AND session_id = ${sessionId}
+		`;
+		const olderReceipt = receipts.find(
+			(receipt) => receipt.operationId === `r2:${olderJobId}`,
+		);
+		const newerReceipt = receipts.find(
+			(receipt) => receipt.operationId === `r2:${newerJobId}`,
+		);
+		if (!olderReceipt || !newerReceipt) {
+			throw new Error("Supersession revision receipts were not recorded");
+		}
+		expect(BigInt(olderReceipt.revision)).toBeLessThan(
+			BigInt(newerReceipt.revision),
+		);
+		// Result aliases must not shadow the revision column: ClickHouse's
+		// analyzer resolves the alias inside argMax/max and rejects the query
+		// with ILLEGAL_AGGREGATION.
+		const [rawWinner] = await getClickhouse().query<{
+			content: string;
+			winner_revision: string;
+		}>({
+			query: `SELECT
+				argMax(content, revision) AS content,
+				toString(max(revision)) AS winner_revision
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			HAVING count() > 0`,
+			query_params: {
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+				userId: USER_ID,
+			},
+		});
+		expect(rawWinner).toEqual({
+			content: newerContent,
+			winner_revision: newerReceipt.revision,
+		});
+		const [analyticsWinner] = await getClickhouse().query<{
+			winner_revision: string;
+		}>({
+			query: `SELECT toString(max(revision)) AS winner_revision
+			FROM rudel.session_analytics
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND source = 'claude_code'
+				AND session_id = {sessionId:String}
+			HAVING count() > 0`,
+			query_params: {
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+				userId: USER_ID,
+			},
+		});
+		expect(analyticsWinner?.winner_revision).toBe(newerReceipt.revision);
+		const latestUsage = await readLatestUsageState(sessionId);
+		expect(latestUsage.length).toBeGreaterThan(1);
+		expect(
+			latestUsage.every(
+				(row) =>
+					row.contentSha256 === newerReceipt.contentSha256 &&
+					row.isDeleted === 0,
+			),
+		).toBe(true);
 	}, 180_000);
 
 	test("recovers an expired lease without duplicating an already-consistent MV target", async () => {
@@ -1389,13 +2192,25 @@ describe("R2 ingest real processor crash recovery", () => {
 			"d".repeat(64),
 			2,
 		]);
-		const [available] = await sqlClient<Array<{ locked: boolean }>>`
-			SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
-		`;
-		expect(available?.locked).toBe(true);
-		await sqlClient`
-			SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
-		`;
+		const lockConnection = await sqlClient.reserve();
+		let locked = false;
+		try {
+			const [available] = await lockConnection<Array<{ locked: boolean }>>`
+				SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
+			`;
+			locked = available?.locked === true;
+			expect(locked).toBe(true);
+		} finally {
+			try {
+				if (locked) {
+					await lockConnection`
+						SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
+					`;
+				}
+			} finally {
+				lockConnection.release();
+			}
+		}
 	});
 
 	test("returns already_processing across independent instances for the same hash", async () => {
@@ -1460,10 +2275,248 @@ describe("R2 ingest real processor crash recovery", () => {
 	});
 });
 
+interface QuiescedTestIdentity {
+	apiKey: string;
+	apiKeyId: string;
+	organizationId: string;
+	userId: string;
+}
+
+async function createQuiescedTestIdentity(
+	baseUrl: string,
+): Promise<QuiescedTestIdentity> {
+	const signupResponse = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
+		body: JSON.stringify({
+			email: `r2-quiescence-${crypto.randomUUID()}@example.com`,
+			name: "R2 Quiescence Test",
+			password: "r2-quiescence-test-password",
+		}),
+		headers: { "Content-Type": "application/json" },
+		method: "POST",
+	});
+	expect(signupResponse.ok).toBe(true);
+	const signup: unknown = await signupResponse.json();
+	if (!isRecord(signup) || typeof signup.token !== "string") {
+		throw new Error("Quiescence test signup returned no bearer token");
+	}
+
+	const meResponse = await fetch(`${baseUrl}/rpc/me`, {
+		body: "{}",
+		headers: {
+			Authorization: `Bearer ${signup.token}`,
+			"Content-Type": "application/json",
+		},
+		method: "POST",
+	});
+	expect(meResponse.ok).toBe(true);
+	const me: unknown = await meResponse.json();
+	if (!isRecord(me) || !isRecord(me.json) || typeof me.json.id !== "string") {
+		throw new Error("Quiescence test user lookup returned no user ID");
+	}
+
+	const apiKeyResponse = await fetch(`${baseUrl}/api/auth/api-key/create`, {
+		body: JSON.stringify({ expiresIn: null, name: "r2-quiescence-test" }),
+		headers: {
+			Authorization: `Bearer ${signup.token}`,
+			"Content-Type": "application/json",
+		},
+		method: "POST",
+	});
+	expect(apiKeyResponse.ok).toBe(true);
+	const apiKey: unknown = await apiKeyResponse.json();
+	if (
+		!isRecord(apiKey) ||
+		typeof apiKey.id !== "string" ||
+		typeof apiKey.key !== "string"
+	) {
+		throw new Error("Quiescence test API key creation returned no key");
+	}
+
+	return {
+		apiKey: apiKey.key,
+		apiKeyId: apiKey.id,
+		organizationId: me.json.id,
+		userId: me.json.id,
+	};
+}
+
+async function readApiKeySnapshot(apiKeyId: string): Promise<string> {
+	const [row] = await sqlClient<Array<{ snapshot: string }>>`
+		SELECT (
+			to_jsonb(api_key) - 'last_request' - 'updated_at'
+		)::text AS snapshot
+		FROM apikey AS api_key
+		WHERE id = ${apiKeyId}
+	`;
+	if (!row) throw new Error("Quiescence test API key disappeared");
+	return row.snapshot;
+}
+
+async function countQuiescedCanonicalRaw(
+	identity: QuiescedTestIdentity,
+	sessionId: string,
+): Promise<number> {
+	const [row] = await getClickhouse().query<{ count: number | string }>({
+		query: `SELECT count() AS count
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND session_id = {sessionId:String}
+				AND user_id = {userId:String}`,
+		query_params: {
+			organizationId: identity.organizationId,
+			sessionId,
+			userId: identity.userId,
+		},
+	});
+	return Number(row?.count ?? 0);
+}
+
+async function deleteQuiescedClickHouseRows(
+	organizationId: string,
+): Promise<void> {
+	for (const table of [
+		"rudel.claude_sessions",
+		"rudel.session_analytics",
+		"rudel.session_language_signals",
+		"rudel.skill_receipts",
+		"rudel.skill_uses",
+		"rudel.skill_version_contents",
+		"rudel.usage_events",
+	]) {
+		await getClickhouse().execute({
+			query: `DELETE FROM ${getSafeClickHouseTable(table)} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+			query_params: { organizationId },
+		});
+	}
+}
+
+async function initializeUploadedJobForIdentity(
+	jobId: Uuid,
+	mainContent: string,
+	identity: QuiescedTestIdentity,
+): Promise<R2IngestInitOutput> {
+	const initialized = await initR2IngestJob({
+		database: sqlClient,
+		input: {
+			objects: [
+				{
+					byteLength: byteLength(mainContent),
+					kind: "main",
+					sha256: sha256(mainContent),
+				},
+			],
+			projectPath: "/test/r2-quiescence",
+			sessionId: jobId,
+			source: "claude_code",
+		},
+		now: () => new Date("2026-08-25T10:00:00.000Z"),
+		organizationId: identity.organizationId,
+		r2: fakeR2,
+		randomUUID: () => jobId,
+		userId: identity.userId,
+	});
+	await extendTestJobExpiry(initialized.jobId);
+	const objectKey = initialized.objects[0]?.objectKey;
+	if (!objectKey) throw new Error("Quiescence test job has no main object");
+	fakeR2.uploadText(objectKey, mainContent);
+	return initialized;
+}
+
+async function readRpcErrorShape(
+	response: Response,
+): Promise<{ code: string; message: string; reason: string | undefined }> {
+	const body: unknown = await response.json();
+	if (
+		!isRecord(body) ||
+		!isRecord(body.json) ||
+		typeof body.json.code !== "string" ||
+		typeof body.json.message !== "string"
+	) {
+		throw new Error("Quiesced commit returned an invalid RPC error");
+	}
+	const data = isRecord(body.json.data) ? body.json.data : {};
+	return {
+		code: body.json.code,
+		message: body.json.message,
+		reason: typeof data.reason === "string" ? data.reason : undefined,
+	};
+}
+
+interface IngestJobRowSnapshot {
+	attempts: number;
+	lastErrorCode: string | null;
+	leaseExpiresAt: string | null;
+	leaseToken: string | null;
+	maxAttempts: number;
+	snapshot: string;
+	status: string;
+}
+
+async function readIngestJobRowSnapshot(
+	jobId: string,
+): Promise<IngestJobRowSnapshot> {
+	const [row] = await sqlClient<IngestJobRowSnapshot[]>`
+		SELECT
+			attempts,
+			last_error_code AS "lastErrorCode",
+			lease_expires_at::text AS "leaseExpiresAt",
+			lease_token AS "leaseToken",
+			max_attempts AS "maxAttempts",
+			to_jsonb(job)::text AS snapshot,
+			status
+		FROM ingest_job AS job
+		WHERE id = ${jobId}
+	`;
+	if (!row) throw new Error("Quiescence test ingest job disappeared");
+	return row;
+}
+
+function snapshotFakeR2Objects(initialized: R2IngestInitOutput) {
+	return initialized.objects.map((initializedObject) => {
+		const stored = fakeR2.objects.get(initializedObject.objectKey);
+		if (!stored) throw new Error("Quiescence test R2 object disappeared");
+		return {
+			bytes: stored.bytes ? Array.from(stored.bytes) : null,
+			complete: stored.complete,
+			metadata: Object.entries(stored.metadata).sort(([left], [right]) =>
+				left.localeCompare(right),
+			),
+			objectKey: initializedObject.objectKey,
+			uploadId: stored.uploadId,
+		};
+	});
+}
+
+function snapshotFakeR2Effects() {
+	return {
+		abortedKeys: [...fakeR2.abortedKeys],
+		completedKeys: [...fakeR2.completedKeys],
+		deletedKeys: [...fakeR2.deletedKeys],
+		getObjectKeys: [...fakeR2.getObjectKeys],
+		headObjectKeys: [...fakeR2.headObjectKeys],
+	};
+}
+
+function restoreEnvironmentVariable(
+	name: string,
+	previousValue: string | undefined,
+): void {
+	if (previousValue === undefined) {
+		delete process.env[name];
+	} else {
+		process.env[name] = previousValue;
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
 async function initializeUploadedJob(
 	jobId: Uuid,
 	mainContent: string,
 	subagents: readonly { agentId: string; content: string }[] = [],
+	sessionId: string = jobId,
 ): Promise<R2IngestInitOutput> {
 	const objects = [
 		{
@@ -1483,7 +2536,7 @@ async function initializeUploadedJob(
 		input: {
 			objects,
 			projectPath: "/test/r2",
-			sessionId: jobId,
+			sessionId,
 			source: "claude_code",
 		},
 		now: () => new Date("2026-08-25T10:00:00.000Z"),
@@ -1505,6 +2558,45 @@ async function initializeUploadedJob(
 		}
 	}
 	return initialized;
+}
+
+async function readLatestUsageState(
+	sessionId: string,
+): Promise<Array<{ contentSha256: string; isDeleted: number }>> {
+	return getClickhouse().query({
+		query: `SELECT
+			content_sha256 AS "contentSha256",
+			is_deleted AS "isDeleted"
+		FROM (
+			SELECT *
+			FROM rudel.usage_events
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			ORDER BY event_version DESC
+			LIMIT 1 BY event_id
+		)`,
+		query_params: {
+			organizationId: ORGANIZATION_ID,
+			sessionId,
+			userId: USER_ID,
+		},
+	});
+}
+
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+	let resolvePromise: (() => void) | undefined;
+	const promise = new Promise<void>((resolve) => {
+		resolvePromise = resolve;
+	});
+	return {
+		promise,
+		resolve() {
+			if (!resolvePromise)
+				throw new Error("Deferred promise was not initialized");
+			resolvePromise();
+		},
+	};
 }
 
 async function initializeUploadedByteJob(
@@ -1565,7 +2657,7 @@ function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
 ): (
 	input: IngestSessionInput,
-	identity: { organizationId: string; userId: string },
+	identity: { operationId: string; organizationId: string; userId: string },
 ) => Promise<R2IngestProcessorResult> {
 	return (input, identity) =>
 		processIngestSession({
@@ -1575,7 +2667,10 @@ function createRealProcessor(
 				session: null,
 				user: { id: identity.userId },
 			},
-			durableProcessing: { failpoint },
+			durableProcessing: {
+				failpoint,
+				operationId: identity.operationId,
+			},
 			enforceRateLimits: false,
 			errorFactories: TEST_ERROR_FACTORIES,
 			input,
@@ -1636,7 +2731,7 @@ async function readRawIngestedAt(sessionId: string): Promise<string> {
 				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 				AND session_id = {sessionId:String}
 				AND user_id = {userId:String}
-			ORDER BY ingested_at DESC
+			ORDER BY revision DESC
 			LIMIT 1`,
 		query_params: {
 			organizationId: ORGANIZATION_ID,
@@ -1759,6 +2854,51 @@ function buildCompletionInput(
 			uploadId: object.uploadId,
 		})),
 	};
+}
+
+async function interruptFinalIngestClaim(
+	initialized: R2IngestInitOutput,
+	leaseStartedAt: Date,
+	userId: string,
+): Promise<void> {
+	// The commit below runs on the injected fixed clock, so the retry window
+	// must be rewound relative to that clock, not the database clock.
+	await sqlClient`
+		UPDATE ingest_job
+		SET attempts = max_attempts - 1,
+			available_at = ${new Date(
+				leaseStartedAt.getTime() - 3_600_000,
+			).toISOString()}
+		WHERE id = ${initialized.jobId}
+	`;
+	let interrupted = false;
+	await expect(
+		commitR2IngestJob({
+			failpoint: async (boundary) => {
+				if (
+					!interrupted &&
+					boundary.store === "r2" &&
+					boundary.target === "multipart-complete"
+				) {
+					interrupted = true;
+					throw new IngestProcessingCrashSimulationError(
+						"simulated interruption after the final claim",
+					);
+				}
+			},
+			input: buildCompletionInput(initialized),
+			leaseDurationMs: 1_000,
+			now: () => leaseStartedAt,
+			process: async () => {
+				throw new Error(
+					"interrupted final claim unexpectedly reached processing",
+				);
+			},
+			r2: fakeR2,
+			userId,
+		}),
+	).rejects.toThrow("simulated interruption after the final claim");
+	expect(interrupted).toBe(true);
 }
 
 async function expireJobWithReceipt(

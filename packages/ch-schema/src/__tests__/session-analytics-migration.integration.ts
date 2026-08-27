@@ -140,12 +140,38 @@ function requireStatement(
 
 async function createPreMigrationTables(database: string): Promise<void> {
 	await executor.execute(`CREATE DATABASE ${database}`);
-	await executor.execute(
-		`CREATE TABLE ${database}.claude_sessions AS rudel.claude_sessions`,
-	);
-	await executor.execute(
-		`CREATE TABLE ${database}.codex_sessions AS rudel.codex_sessions`,
-	);
+	// This rehearsal reproduces the pre-F16 world the 20260730 migration ran
+	// in: its frozen SELECT * materialized views must not see the revision
+	// column, and revision cannot be dropped from a clone of the live tables
+	// because it is their ReplacingMergeTree version column. Create the
+	// pre-F16 raw shape explicitly instead.
+	const preF16RawColumns = `
+		session_date DateTime64(3, 'UTC') DEFAULT now64(3),
+		last_interaction_date DateTime64(3, 'UTC') DEFAULT now64(3),
+		session_id String,
+		organization_id String,
+		project_path String,
+		git_remote String DEFAULT '',
+		package_name String DEFAULT '',
+		package_type String DEFAULT '',
+		content String,
+		filter_version UInt8 DEFAULT 0,
+		ingested_at DateTime64(3, 'UTC') DEFAULT now64(3),
+		user_id String,
+		git_branch Nullable(String),
+		git_sha Nullable(String),
+		tag Nullable(String)`;
+	for (const [table, extra] of [
+		["claude_sessions", ", subagents Map(String, String) DEFAULT map()"],
+		["codex_sessions", ""],
+	] as const) {
+		await executor.execute(`
+			CREATE TABLE ${database}.${table} (${preF16RawColumns}${extra})
+			ENGINE = ReplacingMergeTree(ingested_at)
+			PARTITION BY toYYYYMM(toDate(session_date))
+			ORDER BY (organization_id, session_date, session_id)
+		`);
+	}
 	await executor.execute(`
 		CREATE TABLE ${database}.session_analytics
 		(
@@ -211,7 +237,7 @@ function buildClaudeRow(
 	sessionDate: string,
 	ingestedAt: string,
 	content: string,
-): RudelClaudeSessionsRow {
+): Omit<RudelClaudeSessionsRow, "revision"> {
 	return {
 		session_date: sessionDate,
 		last_interaction_date: sessionDate,
@@ -238,7 +264,7 @@ function buildCodexRow(
 	userId: string,
 	content = CODEX_CONTENT,
 	ingestedAt = "2026-03-02T06:37:00.000",
-): RudelCodexSessionsRow {
+): Omit<RudelCodexSessionsRow, "revision"> {
 	return {
 		session_date: "2026-03-02T04:29:38.576",
 		last_interaction_date: "2026-03-02T06:36:38.201",

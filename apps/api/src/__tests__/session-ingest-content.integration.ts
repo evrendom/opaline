@@ -12,10 +12,12 @@ import {
 	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
 } from "@rudel/api-routes";
 import {
+	extractUsageEvents,
 	USAGE_EVENT_EXTRACTION_VERSION,
 	USAGE_EVENT_IDENTITY_VERSION,
 	USAGE_EVENT_MODEL_RATE_CARD_VERSION,
 } from "@rudel/usage-events";
+import postgres from "postgres";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { getIngestContentShape } from "../lib/ingest-content-shape.js";
@@ -26,7 +28,15 @@ import {
 	reserveUsageExtractionGeneration,
 	UsageExtractionSupersededError,
 } from "../services/session-ownership.service.js";
-import { buildActiveUsageEventsCte } from "../services/usage-event-ingest.service.js";
+import {
+	allocateSessionRevision,
+	type SessionRevisionTransactionRunner,
+} from "../services/session-revision.service.js";
+import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
+import {
+	buildActiveUsageEventsCte,
+	writeUsageExtraction,
+} from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -45,14 +55,37 @@ const RAW_FIRST_FAILURE_SESSION_ID = `${TEST_RUN_ID}_raw_first_failure`;
 const EXTRACTION_BYPASS_SESSION_ID = `${TEST_RUN_ID}_extraction_bypass`;
 const GENERATION_HEDGE_SESSION_ID = `${TEST_RUN_ID}_generation_hedge`;
 const BACKFILL_GENERATION_SESSION_ID = `${TEST_RUN_ID}_backfill_generation`;
+const REVISION_SESSION_ID = `${TEST_RUN_ID}_revision`;
+const CONCURRENT_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_concurrent_receipt`;
+const OWNERSHIP_RACE_SESSION_ID = `${TEST_RUN_ID}_ownership_race`;
+const RECURRING_CONTENT_SESSION_ID = `${TEST_RUN_ID}_recurring_content`;
+const EXPIRED_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_expired_revision_receipt`;
+const FRESH_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_fresh_revision_receipt`;
+const INVERTED_USAGE_REVISION_SESSION_ID = `${TEST_RUN_ID}_inverted_usage_revision`;
+const KEYED_RETRY_SESSION_ID = `${TEST_RUN_ID}_keyed_retry`;
+const LEGACY_RETRY_SESSION_ID = `${TEST_RUN_ID}_legacy_retry`;
 
 let server: ApiTestServer;
 let userId: string;
 let bearerToken: string;
+let competingUserId: string;
 
 beforeAll(async () => {
 	server = await startApiTestServer();
 	({ bearerToken, userId } = await createTestUser(server.baseUrl));
+	({ userId: competingUserId } = await createTestUser(
+		server.baseUrl,
+		"competitor",
+	));
+	await sqlClient`
+		INSERT INTO member (id, organization_id, user_id, role)
+		VALUES (
+			${crypto.randomUUID()},
+			${userId},
+			${competingUserId},
+			'member'
+		)
+	`;
 });
 
 afterAll(async () => {
@@ -63,15 +96,214 @@ afterAll(async () => {
 	});
 	await sqlClient`
 		DELETE FROM organization
-		WHERE id = ${userId}
+		WHERE id IN (${userId}, ${competingUserId})
 	`;
 	await sqlClient`
 		DELETE FROM "user"
-		WHERE id = ${userId}
+		WHERE id IN (${userId}, ${competingUserId})
 	`;
 });
 
 describe("session ingest content bookkeeping", () => {
+	test("serializes concurrent revisions and reuses an exact retry", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			REVISION_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const firstInput = {
+			allowReceiptPromotion: false,
+			contentSha256: "1".repeat(64),
+			operationId: "r2:concurrent-1",
+			organizationId: userId,
+			sessionId: REVISION_SESSION_ID,
+			userId,
+		};
+		const secondInput = {
+			...firstInput,
+			contentSha256: "2".repeat(64),
+			operationId: "r2:concurrent-2",
+		};
+
+		const [first, second] = await Promise.all([
+			allocateSessionRevision(firstInput),
+			allocateSessionRevision(secondInput),
+		]);
+		const retry = await allocateSessionRevision(firstInput);
+		const ordered = [BigInt(first), BigInt(second)].sort((left, right) =>
+			left < right ? -1 : left > right ? 1 : 0,
+		);
+		const [lower, higher] = ordered;
+		assert(lower !== undefined && higher !== undefined);
+
+		expect(first).not.toBe(second);
+		// The allocator guarantees strict per-session monotonicity, not dense
+		// adjacency: GREATEST(head + 1, epoch_ms << 16) jumps to the epoch
+		// floor whenever the clock advances between allocations.
+		expect(higher).toBeGreaterThan(lower);
+		expect(retry).toBe(first);
+	});
+
+	test("serializes a concurrent same-operation first-receipt race on separate connections", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			CONCURRENT_RECEIPT_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const input = {
+			allowReceiptPromotion: false,
+			contentSha256: "3".repeat(64),
+			operationId: "r2:concurrent-same-operation",
+			organizationId: userId,
+			sessionId: CONCURRENT_RECEIPT_SESSION_ID,
+			userId,
+		};
+		// Reserved connections do not expose begin(); dedicated single-slot
+		// clients give the allocator real transactions on truly separate
+		// connections.
+		const connectionString = process.env.PG_CONNECTION_STRING;
+		assert(connectionString);
+		const firstConnection = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const secondConnection = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		try {
+			const [first, second] = await Promise.all([
+				allocateSessionRevision(
+					input,
+					createRevisionEnvironment(firstConnection),
+				),
+				allocateSessionRevision(
+					input,
+					createRevisionEnvironment(secondConnection),
+				),
+			]);
+
+			expect(second).toBe(first);
+			const [receipt] = await sqlClient<Array<{ count: string }>>`
+				SELECT count(*)::text AS count
+				FROM session_ingest_revision
+				WHERE organization_id = ${userId}
+					AND session_id = ${CONCURRENT_RECEIPT_SESSION_ID}
+			`;
+			expect(receipt?.count).toBe("1");
+		} finally {
+			await Promise.allSettled([
+				firstConnection.end({ timeout: 5 }),
+				secondConnection.end({ timeout: 5 }),
+			]);
+		}
+	});
+
+	test("serializes a concurrent first-upload ownership race on separate connections", async () => {
+		const [firstConnection, secondConnection] = await Promise.all([
+			sqlClient.reserve(),
+			sqlClient.reserve(),
+		]);
+		try {
+			const [first, second] = await Promise.all([
+				claimSessionIngestOwnership(
+					userId,
+					OWNERSHIP_RACE_SESSION_ID,
+					userId,
+					firstConnection,
+				),
+				claimSessionIngestOwnership(
+					userId,
+					OWNERSHIP_RACE_SESSION_ID,
+					competingUserId,
+					secondConnection,
+				),
+			]);
+
+			expect([first.owned, second.owned].filter(Boolean)).toHaveLength(1);
+			const winnerId = first.owned ? userId : competingUserId;
+			const loser = first.owned ? second : first;
+			assert(!loser.owned);
+			expect(loser.ownerId).toBe(winnerId);
+		} finally {
+			firstConnection.release();
+			secondConnection.release();
+		}
+	});
+
+	test("measures revision receipt retention against the PostgreSQL clock", async () => {
+		const expiredOperationId = `r2:${crypto.randomUUID()}`;
+		const freshOperationId = `r2:${crypto.randomUUID()}`;
+		for (const sessionId of [
+			EXPIRED_REVISION_RECEIPT_SESSION_ID,
+			FRESH_REVISION_RECEIPT_SESSION_ID,
+		]) {
+			const claim = await claimSessionIngestOwnership(
+				userId,
+				sessionId,
+				userId,
+			);
+			assert(claim.owned);
+		}
+		await allocateSessionRevision({
+			allowReceiptPromotion: false,
+			contentSha256: "8".repeat(64),
+			operationId: expiredOperationId,
+			organizationId: userId,
+			sessionId: EXPIRED_REVISION_RECEIPT_SESSION_ID,
+			userId,
+		});
+		await allocateSessionRevision({
+			allowReceiptPromotion: false,
+			contentSha256: "9".repeat(64),
+			operationId: freshOperationId,
+			organizationId: userId,
+			sessionId: FRESH_REVISION_RECEIPT_SESSION_ID,
+			userId,
+		});
+		await sqlClient`
+			UPDATE session_ingest_revision
+			SET created_at = CASE
+				WHEN operation_id = ${expiredOperationId}
+					THEN clock_timestamp() - interval '31 days'
+				ELSE clock_timestamp() - interval '29 days'
+			END
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+		`;
+		const clockClassifications = await sqlClient<
+			Array<{ expired: boolean; operationId: string }>
+		>`
+			SELECT
+				operation_id AS "operationId",
+				created_at < clock_timestamp() - interval '30 days' AS expired
+			FROM session_ingest_revision
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+			ORDER BY operation_id
+		`;
+		expect([...clockClassifications]).toEqual(
+			[
+				{ expired: true, operationId: expiredOperationId },
+				{ expired: false, operationId: freshOperationId },
+			].sort((left, right) =>
+				left.operationId.localeCompare(right.operationId),
+			),
+		);
+
+		const cleanup = await runSessionRevisionReceiptCleanupPass(sqlClient);
+		expect(cleanup.deleted).toBeGreaterThanOrEqual(1);
+		const remaining = await sqlClient<Array<{ operationId: string }>>`
+			SELECT operation_id AS "operationId"
+			FROM session_ingest_revision
+			WHERE organization_id = ${userId}
+				AND operation_id IN (${expiredOperationId}, ${freshOperationId})
+		`;
+		expect([...remaining]).toEqual([{ operationId: freshOperationId }]);
+	});
+
 	test("returns a null hash, records it, then returns the stored hash", async () => {
 		const initialClaim = await claimSessionIngestOwnership(
 			userId,
@@ -90,6 +322,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			new Date("2026-07-24T10:00:00.000Z"),
+			"1",
 		);
 
 		const repeatedClaim = await claimSessionIngestOwnership(
@@ -123,6 +356,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			newerIngestedAt,
+			"2",
 		);
 		await recordSessionIngestContent(
 			userId,
@@ -132,6 +366,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-07-24T09:30:00.000Z"),
 			new Date("2026-07-24T11:00:00.000Z"),
+			"1",
 		);
 
 		const [row] = await sqlClient<
@@ -164,17 +399,29 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(initialClaim.owned);
+		const contentHash = "d".repeat(64);
+		await recordSessionIngestContent(
+			userId,
+			RECEIPT_SESSION_ID,
+			contentHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			"1",
+		);
 		const olderGeneration = await reserveUsageExtractionGeneration(
 			userId,
 			RECEIPT_SESSION_ID,
 			userId,
+			"1",
 		);
 		const latestGeneration = await reserveUsageExtractionGeneration(
 			userId,
 			RECEIPT_SESSION_ID,
 			userId,
+			"1",
 		);
-		const contentHash = "d".repeat(64);
 		const receipt = {
 			checksum: "e".repeat(64),
 			diagnostics: "[]",
@@ -193,6 +440,7 @@ describe("session ingest content bookkeeping", () => {
 				5,
 				new Date("2026-08-03T09:30:00.000Z"),
 				new Date("2026-08-03T10:00:00.000Z"),
+				"1",
 				{ ...receipt, generation: olderGeneration },
 			),
 		).rejects.toBeInstanceOf(UsageExtractionSupersededError);
@@ -202,7 +450,7 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(afterRejectedGeneration.owned);
-		expect(afterRejectedGeneration.lastContentSha256).toBeNull();
+		expect(afterRejectedGeneration.lastContentSha256).toBe(contentHash);
 		expect(afterRejectedGeneration.lastUsageContentSha256).toBeNull();
 		await expect(
 			recordSessionIngestContent(
@@ -212,7 +460,8 @@ describe("session ingest content bookkeeping", () => {
 				contentShape(2_000, 2),
 				5,
 				new Date("2026-08-03T09:30:00.000Z"),
-				new Date("2026-08-03T10:00:01.000Z"),
+				new Date("2026-08-03T10:00:00.000Z"),
+				"1",
 				{ ...receipt, generation: latestGeneration },
 			),
 		).resolves.toBeUndefined();
@@ -243,6 +492,16 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(claim.owned);
+		await recordSessionIngestContent(
+			userId,
+			GENERATION_HEDGE_SESSION_ID,
+			"7".repeat(64),
+			contentShape(1_000, 1),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			"1",
+		);
 		const [beforeReservation] = await sqlClient<Array<{ epoch_ms: string }>>`
 			SELECT FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint::text AS epoch_ms
 		`;
@@ -252,6 +511,7 @@ describe("session ingest content bookkeeping", () => {
 				userId,
 				GENERATION_HEDGE_SESSION_ID,
 				userId,
+				"1",
 			),
 		);
 		const second = BigInt(
@@ -259,6 +519,7 @@ describe("session ingest content bookkeeping", () => {
 				userId,
 				GENERATION_HEDGE_SESSION_ID,
 				userId,
+				"1",
 			),
 		);
 		const [afterReservation] = await sqlClient<Array<{ epoch_ms: string }>>`
@@ -269,6 +530,144 @@ describe("session ingest content bookkeeping", () => {
 		expect(first).toBeGreaterThanOrEqual(BigInt(beforeReservation.epoch_ms));
 		expect(first).toBeLessThanOrEqual(BigInt(afterReservation.epoch_ms));
 		expect(second).toBeGreaterThan(first);
+	});
+
+	test("rejects an older extraction that reserves after a newer raw revision on another instance", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const connectionString = process.env.PG_CONNECTION_STRING;
+		assert(connectionString);
+		const olderInstance = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const newerInstance = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const olderHash = "4".repeat(64);
+		const newerHash = "5".repeat(64);
+		const olderRevision = "100";
+		const newerRevision = "101";
+
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			olderHash,
+			contentShape(1_000, 1),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			olderRevision,
+		);
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			newerHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:31:00.000Z"),
+			new Date("2026-08-03T10:01:00.000Z"),
+			newerRevision,
+		);
+
+		const newerInput = makeClaudeInput(INVERTED_USAGE_REVISION_SESSION_ID, 1);
+		const newerExtraction = extractUsageEvents({
+			content: newerInput.content,
+			organizationId: userId,
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			subagents: { worker: newerInput.subagents?.[0]?.content ?? "" },
+			userId,
+		});
+		if (newerExtraction.status !== "complete") {
+			throw new Error("Expected the newer usage extraction to complete");
+		}
+		const newerGeneration = await reserveUsageExtractionGeneration(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			userId,
+			newerRevision,
+			newerInstance,
+		);
+		await writeUsageExtraction(getClickhouse(), {
+			contentSha256: newerHash,
+			extraction: newerExtraction,
+			filterVersion: 5,
+			generation: newerGeneration,
+			ingestedAt: new Date("2026-08-03T10:01:00.000Z"),
+			organizationId: userId,
+			replaceAbsentEvents: true,
+			sessionDate: new Date("2026-08-03T09:31:00.000Z"),
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			userId,
+		});
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			newerHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:31:00.000Z"),
+			new Date("2026-08-03T10:01:00.000Z"),
+			newerRevision,
+			{
+				checksum: newerExtraction.receipt.checksum,
+				diagnostics: JSON.stringify(newerExtraction.diagnostics),
+				eventCount: newerExtraction.receipt.eventCount,
+				extractionVersion: newerExtraction.receipt.extractionVersion,
+				eventIdentityVersion: newerExtraction.receipt.eventIdentityVersion,
+				generation: newerGeneration,
+				modelRateCardVersion: newerExtraction.receipt.modelRateCardVersion,
+			},
+		);
+
+		// The older instance finishes its scan only after the newer generation and
+		// receipt are durable, then tries to reserve in the inverted order.
+		const olderInput = makeClaudeInput(INVERTED_USAGE_REVISION_SESSION_ID, 0);
+		const olderExtraction = extractUsageEvents({
+			content: olderInput.content,
+			organizationId: userId,
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			subagents: {},
+			userId,
+		});
+		expect(olderExtraction.status).toBe("complete");
+		await expect(
+			reserveUsageExtractionGeneration(
+				userId,
+				INVERTED_USAGE_REVISION_SESSION_ID,
+				userId,
+				olderRevision,
+				olderInstance,
+			),
+		).rejects.toBeInstanceOf(UsageExtractionSupersededError);
+
+		const latestRows = await readLatestUsageRows(
+			INVERTED_USAGE_REVISION_SESSION_ID,
+		);
+		expect(latestRows.length).toBeGreaterThan(1);
+		expect(latestRows.every((row) => row.content_sha256 === newerHash)).toBe(
+			true,
+		);
+		expect(latestRows.some((row) => row.is_deleted === 1)).toBe(false);
+		expect(
+			latestRows.some(
+				(row) =>
+					row.record_kind === "receipt" &&
+					row.event_version === newerGeneration,
+			),
+		).toBe(true);
+		await Promise.all([
+			olderInstance.end({ timeout: 5 }),
+			newerInstance.end({ timeout: 5 }),
+		]);
 	});
 
 	test("backfill generation reservation loses to a newer live snapshot", async () => {
@@ -287,6 +686,7 @@ describe("session ingest content bookkeeping", () => {
 			5,
 			new Date("2026-08-03T10:00:00.000Z"),
 			new Date("2026-08-03T10:01:00.000Z"),
+			"1",
 		);
 
 		expect(
@@ -336,6 +736,93 @@ describe("session ingest content bookkeeping", () => {
 		replacementInput.force_replace = true;
 		expect((await callIngest(replacementInput)).status).toBe(200);
 		expect(await readActiveUsageEventCount(FORCE_REPLACE_SESSION_ID)).toBe(1);
+	});
+
+	test("C to D to force-replace C allocates a fresh winning legacy revision", async () => {
+		const contentC = makeClaudeInput(RECURRING_CONTENT_SESSION_ID, 0);
+		const contentD = {
+			...contentC,
+			content: contentC.content.replace("Session content", "Changed content"),
+		};
+
+		expect((await callIngest(contentC)).status).toBe(200);
+		const first = await readLatestRawSession(RECURRING_CONTENT_SESSION_ID);
+		expect((await callIngest(contentD)).status).toBe(200);
+		const intervening = await readLatestRawSession(
+			RECURRING_CONTENT_SESSION_ID,
+		);
+		expect(
+			(await callIngest({ ...contentC, force_replace: true })).status,
+		).toBe(200);
+		const recurrence = await readLatestRawSession(RECURRING_CONTENT_SESSION_ID);
+
+		assert(first && intervening && recurrence);
+		expect(BigInt(intervening.revision)).toBeGreaterThan(
+			BigInt(first.revision),
+		);
+		expect(BigInt(recurrence.revision)).toBeGreaterThan(
+			BigInt(intervening.revision),
+		);
+		expect(recurrence.content).toBe(contentC.content);
+	});
+
+	test("reuses a client operation revision without promoting its stale payload", async () => {
+		const operationId = crypto.randomUUID();
+		const older = {
+			...makeClaudeInput(KEYED_RETRY_SESSION_ID, 0),
+			operationId,
+		};
+		const newer = {
+			...older,
+			content: older.content.replace("Session content", "Content session"),
+			operationId: crypto.randomUUID(),
+		};
+
+		expect((await callIngest(older)).status).toBe(200);
+		expect((await callIngest(newer)).status).toBe(200);
+		const winnerBeforeRetry = await readLatestRawSession(
+			KEYED_RETRY_SESSION_ID,
+		);
+		expect((await callIngest(older)).status).toBe(200);
+		const winnerAfterRetry = await readLatestRawSession(KEYED_RETRY_SESSION_ID);
+
+		assert(winnerBeforeRetry && winnerAfterRetry);
+		expect(winnerAfterRetry).toEqual(winnerBeforeRetry);
+		expect(winnerAfterRetry.content).toBe(newer.content);
+		expect(await readLatestAnalyticsRevision(KEYED_RETRY_SESSION_ID)).toBe(
+			winnerAfterRetry.revision,
+		);
+		expect(
+			await readOperationRevision(KEYED_RETRY_SESSION_ID, `op:${operationId}`),
+		).toBeLessThan(BigInt(winnerAfterRetry.revision));
+	});
+
+	test("reuses an exact no-UUID legacy receipt without promoting stale content", async () => {
+		const older = makeClaudeInput(LEGACY_RETRY_SESSION_ID, 0);
+		const newer = {
+			...older,
+			content: older.content.replace("Session content", "Content session"),
+		};
+
+		expect((await callIngest(older)).status).toBe(200);
+		expect((await callIngest(newer)).status).toBe(200);
+		const winnerBeforeRetry = await readLatestRawSession(
+			LEGACY_RETRY_SESSION_ID,
+		);
+		expect((await callIngest(older)).status).toBe(200);
+		const winnerAfterRetry = await readLatestRawSession(
+			LEGACY_RETRY_SESSION_ID,
+		);
+
+		assert(winnerBeforeRetry && winnerAfterRetry);
+		expect(winnerAfterRetry).toEqual(winnerBeforeRetry);
+		expect(winnerAfterRetry.content).toBe(newer.content);
+		expect(await readLatestAnalyticsRevision(LEGACY_RETRY_SESSION_ID)).toBe(
+			winnerAfterRetry.revision,
+		);
+		const latestUsageRows = await readLatestUsageRows(LEGACY_RETRY_SESSION_ID);
+		expect(latestUsageRows.length).toBeGreaterThan(1);
+		expect(latestUsageRows.some((row) => row.is_deleted === 1)).toBe(false);
 	});
 
 	test("stores raw before rejecting genuinely usage-bearing malformed telemetry", async () => {
@@ -388,12 +875,13 @@ function contentShape(contentBytes: number, assistantLineCount: number) {
 
 async function createTestUser(
 	baseUrl: string,
+	suffix = "owner",
 ): Promise<{ bearerToken: string; userId: string }> {
 	const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
-			email: `${TEST_RUN_ID}@example.com`,
+			email: `${TEST_RUN_ID}_${suffix}@example.com`,
 			name: "Session Ingest Content Test",
 			password: "session-ingest-content-test-password",
 		}),
@@ -414,6 +902,21 @@ async function createTestUser(
 	const meBody: unknown = await meResponse.json();
 	assert(isMeResponse(meBody));
 	return { bearerToken: body.token, userId: meBody.json.id };
+}
+
+function createRevisionEnvironment(connection: postgres.Sql): {
+	transactions: SessionRevisionTransactionRunner;
+} {
+	return {
+		transactions: {
+			run: (operation) =>
+				connection.begin((transaction) =>
+					operation((query, parameters) =>
+						transaction.unsafe(query, [...parameters]),
+					),
+				),
+		},
+	};
 }
 
 async function seedLegacyContentShape(
@@ -468,6 +971,37 @@ async function readActiveUsageEventCount(sessionId: string): Promise<number> {
 	return row?.event_count ?? 0;
 }
 
+async function readLatestUsageRows(sessionId: string): Promise<
+	Array<{
+		content_sha256: string;
+		event_version: string;
+		is_deleted: number;
+		record_kind: string;
+	}>
+> {
+	return getClickhouse().query({
+		query: `
+			SELECT
+				content_sha256,
+				toString(event_version) AS event_version,
+				is_deleted,
+				record_kind
+			FROM (
+				SELECT *
+				FROM rudel.usage_events
+				WHERE organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND source = 'claude_code'
+					AND session_id = {sessionId:String}
+				ORDER BY event_version DESC
+				LIMIT 1 BY event_id
+			)
+			ORDER BY record_kind, event_version
+		`,
+		query_params: { organizationId: userId, sessionId, userId },
+	});
+}
+
 async function rawClaudeSessionExists(sessionId: string): Promise<boolean> {
 	const [row] = await getClickhouse().query<{ present: number }>({
 		query: `
@@ -481,6 +1015,58 @@ async function rawClaudeSessionExists(sessionId: string): Promise<boolean> {
 		query_params: { organizationId: userId, sessionId, userId },
 	});
 	return row?.present === 1;
+}
+
+async function readLatestRawSession(
+	sessionId: string,
+): Promise<{ content: string; revision: string } | undefined> {
+	const [row] = await getClickhouse().query<{
+		content: string;
+		revision: string;
+	}>({
+		query: `
+			SELECT
+				argMax(content, raw.revision) AS content,
+				toString(max(raw.revision)) AS revision
+			FROM rudel.claude_sessions AS raw
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			HAVING count() > 0
+		`,
+		query_params: { organizationId: userId, sessionId, userId },
+	});
+	return row;
+}
+
+async function readOperationRevision(
+	sessionId: string,
+	operationId: string,
+): Promise<bigint> {
+	const [row] = await sqlClient<Array<{ revision: string }>>`
+		SELECT revision::text AS revision
+		FROM session_ingest_revision
+		WHERE organization_id = ${userId}
+			AND session_id = ${sessionId}
+			AND operation_id = ${operationId}
+	`;
+	if (!row) throw new Error("Session operation revision was not recorded");
+	return BigInt(row.revision);
+}
+
+async function readLatestAnalyticsRevision(sessionId: string): Promise<string> {
+	const [row] = await getClickhouse().query<{ revision: string }>({
+		query: `SELECT toString(max(revision)) AS revision
+		FROM rudel.session_analytics
+		WHERE organization_id = {organizationId:String}
+			AND user_id = {userId:String}
+			AND source = 'claude_code'
+			AND session_id = {sessionId:String}
+		HAVING count() > 0`,
+		query_params: { organizationId: userId, sessionId, userId },
+	});
+	if (!row) throw new Error("Session analytics revision was not recorded");
+	return row.revision;
 }
 
 async function readLatestReceiptCompleteness(

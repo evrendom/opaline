@@ -183,18 +183,23 @@ export async function getSessionAnalytics(
 				organization_id,
 				session_date,
 				session_id,
-				user_id,
 				source,
-				argMax(member_swears, scanned_at) AS member_swears,
-				argMax(member_apologies, scanned_at) AS member_apologies,
-				argMax(member_positive, scanned_at) AS member_positive,
-				argMax(model_swears, scanned_at) AS model_swears,
-				argMax(model_apologies, scanned_at) AS model_apologies,
-				argMax(model_positive, scanned_at) AS model_positive
+				argMax(
+					tuple(
+						user_id,
+						member_swears,
+						member_apologies,
+						member_positive,
+						model_swears,
+						model_apologies,
+						model_positive
+					),
+					signal_version
+				) AS signal_state
 			FROM rudel.session_language_signals AS signal_rows
 			WHERE signal_rows.organization_id = {orgId:String}
 				AND ${signalDateFilter}
-			GROUP BY organization_id, session_date, session_id, user_id, source
+			GROUP BY organization_id, session_date, session_id, source
 		)
 	    SELECT
 	      sa.source AS source,
@@ -227,18 +232,18 @@ export async function getSessionAnalytics(
       error_count,
       model_used,
 	      used_plan_mode,
-	      signals.member_swears AS member_swears,
-	      signals.member_apologies AS member_apologies,
-	      signals.member_positive AS member_positive,
-	      signals.model_swears AS model_swears,
-	      signals.model_apologies AS model_apologies,
-	      signals.model_positive AS model_positive
+	      tupleElement(signals.signal_state, 2) AS member_swears,
+	      tupleElement(signals.signal_state, 3) AS member_apologies,
+	      tupleElement(signals.signal_state, 4) AS member_positive,
+	      tupleElement(signals.signal_state, 5) AS model_swears,
+	      tupleElement(signals.signal_state, 6) AS model_apologies,
+	      tupleElement(signals.signal_state, 7) AS model_positive
 	    FROM ${usage.sessionsRelation} AS sa
 		LEFT ANY JOIN language_signal_counts AS signals
 			ON signals.organization_id = sa.organization_id
 			AND signals.session_date = sa.session_date
 			AND signals.session_id = sa.session_id
-			AND signals.user_id = sa.user_id
+			AND tupleElement(signals.signal_state, 1) = sa.user_id
 			AND signals.source = sa.source
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}

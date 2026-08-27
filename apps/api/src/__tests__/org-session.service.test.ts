@@ -63,8 +63,16 @@ describe("getOrgSessionCount", () => {
 		expect(queryCalls).toHaveLength(2);
 		expect(queryCalls[0]?.query).toContain("FROM rudel.claude_sessions");
 		expect(queryCalls[1]?.query).toContain("FROM rudel.codex_sessions");
-		expect(queryCalls[0]?.query).toContain("rudel.claude_sessions FINAL");
-		expect(queryCalls[1]?.query).toContain("rudel.codex_sessions FINAL");
+		expect(queryCalls[0]?.query).not.toContain("FINAL");
+		expect(queryCalls[1]?.query).not.toContain("FINAL");
+		expect(queryCalls[0]?.query).toContain("max(revision) AS latest_revision");
+		expect(queryCalls[1]?.query).toContain("max(revision) AS latest_revision");
+		expect(queryCalls[0]?.query).toContain(
+			"GROUP BY organization_id, user_id, session_id",
+		);
+		expect(queryCalls[1]?.query).toContain(
+			"GROUP BY organization_id, user_id, session_id",
+		);
 		expect(queryCalls[0]?.query).not.toContain("user_id = {userId:String}");
 		expect(queryCalls[1]?.query).not.toContain("user_id = {userId:String}");
 	});

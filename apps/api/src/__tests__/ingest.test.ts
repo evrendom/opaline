@@ -189,6 +189,7 @@ describe("extractTimestamps", () => {
 			{
 				ingestedAt: new Date("2026-02-15T12:00:00.000Z"),
 				organizationId: "test-organization",
+				revision: "1",
 				userId: "test-user",
 				timestamps: {
 					sessionDate: "2026-02-15T10:00:00.000Z",

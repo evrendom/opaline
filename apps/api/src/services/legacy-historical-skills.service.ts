@@ -29,7 +29,7 @@ export async function listLegacyHistoricalCodexSkills(
 					session_id,
 					arrayDistinct(
 						extractAll(
-							argMax(content, ingested_at),
+							argMax(content, revision),
 							{skillNamePattern:String}
 						)
 					) AS distinct_skills
@@ -65,8 +65,8 @@ export async function getLegacyHistoricalCodexSkillDetail(
 			FROM (
 				SELECT
 					session_id,
-					argMax(content, ingested_at) AS content,
-					argMax(session_date, ingested_at) AS session_date
+					argMax(content, revision) AS content,
+					argMax(session_date, revision) AS session_date
 				FROM rudel.codex_sessions
 				PREWHERE organization_id = {orgId:String}
 				GROUP BY session_id

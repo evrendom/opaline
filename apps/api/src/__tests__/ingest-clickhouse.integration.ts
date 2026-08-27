@@ -90,6 +90,7 @@ describe("ingestSession", () => {
 				const adapter = getAdapter(input.source);
 				await adapter.ingest(executor, input, {
 					ingestedAt: new Date(),
+					revision: "1",
 					userId: "test_user",
 					organizationId: "test_org",
 				});
@@ -126,6 +127,7 @@ describe("ingestSession", () => {
 		await expect(
 			adapter.ingest(executor, input, {
 				ingestedAt: new Date("2026-07-29T10:00:00.000Z"),
+				revision: "1",
 				userId: "test_user",
 				organizationId: "test_org",
 			}),

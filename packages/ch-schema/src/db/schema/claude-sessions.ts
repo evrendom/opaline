@@ -4,7 +4,7 @@ import { baseSessionColumns, baseSessionTableConfig } from "./base-sessions.js";
 const rudel_claude_sessions = table({
 	database: "rudel",
 	name: "claude_sessions",
-	engine: "SharedReplacingMergeTree(ingested_at)",
+	engine: "SharedReplacingMergeTree(revision)",
 	columns: [
 		...baseSessionColumns,
 		{ name: "subagents", type: "Map(String, String)", default: "fn:map()" },

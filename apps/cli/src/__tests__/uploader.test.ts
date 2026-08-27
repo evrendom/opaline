@@ -295,6 +295,40 @@ describe("uploadSession transient transport handling", () => {
 		}
 	}, 10_000);
 
+	test("reuses one operation UUID across retries and rotates it for a new upload invocation", async () => {
+		const stub = startIngestStub({ failFirstN: { n: 1, status: 503 } });
+		const request: IngestSessionInput = {
+			content: '{"type":"user","timestamp":"2026-08-03T10:00:00.000Z"}',
+			projectPath: "/test/project",
+			sessionId: "stable-operation-retry",
+			source: "claude_code",
+		};
+		try {
+			const retried = await uploadSession(request, {
+				allowInsecureEndpoint: false,
+				endpoint: `${stub.loopbackBase}/rpc`,
+				token: INGEST_STUB_TEST_TOKEN,
+			});
+			const nextInvocation = await uploadSession(request, {
+				allowInsecureEndpoint: false,
+				endpoint: `${stub.loopbackBase}/rpc`,
+				token: INGEST_STUB_TEST_TOKEN,
+			});
+
+			expect(retried).toMatchObject({ attempts: 2, success: true });
+			expect(nextInvocation).toMatchObject({ attempts: 1, success: true });
+			const operationIds = stub.bodies.map(readWireOperationId);
+			expect(operationIds).toHaveLength(3);
+			expect(operationIds[0]).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+			);
+			expect(operationIds[1]).toBe(operationIds[0]);
+			expect(operationIds[2]).not.toBe(operationIds[0]);
+		} finally {
+			await stub.server.stop(true);
+		}
+	}, 10_000);
+
 	test("retains Bun connection-refused failures for retry", async () => {
 		const retries: number[] = [];
 		const result = await uploadSession(
@@ -321,6 +355,12 @@ describe("uploadSession transient transport handling", () => {
 		expect(retries).toEqual([1, 2]);
 	}, 10_000);
 });
+
+function readWireOperationId(body: string): string {
+	const match = /"operationId":"([^"]+)"/u.exec(body);
+	if (!match?.[1]) throw new Error("Upload body did not include operationId");
+	return match[1];
+}
 
 describe("uploadSession timestamp validation", () => {
 	test.each([

@@ -271,6 +271,7 @@ async function ingest(
 			await adapter.ingest(executor, input, {
 				ingestedAt: new Date(),
 				organizationId: identity.organizationId,
+				revision: "1",
 				userId: identity.userId,
 			});
 			return;

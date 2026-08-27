@@ -18,6 +18,7 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { readBooleanEnv } from "../lib/env.js";
 import {
 	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
@@ -44,6 +45,14 @@ const logger = getLogger(["rudel", "api", "r2-ingest-commit"]);
 const DEFAULT_LEASE_DURATION_MS = 30 * 60_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const RETRY_MAX_DELAY_MS = 60_000;
+const INTERRUPTED_FINAL_CLAIM_RESCUE_CODE =
+	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE";
+const INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE =
+	"Recovering one interrupted final ingest claim";
+const INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_CODE =
+	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED";
+const INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_MESSAGE =
+	"Interrupted final-claim rescue is paused while session ingest is quiesced. Lift the barrier, then retry this commit.";
 
 const StoredPartSchema = z.object({
 	byteLength: z.number().int().positive(),
@@ -69,6 +78,7 @@ type StoredObject = z.infer<typeof StoredObjectSchema>;
 interface IngestJobRow {
 	attempts: number;
 	availableAt: Date | string;
+	canonicalWriteRecorded: boolean;
 	clientHashes: unknown;
 	expectedSizes: unknown;
 	expectedTotalBytes: number;
@@ -106,7 +116,7 @@ export interface R2IngestProcessorResult {
 
 export type R2IngestProcessor = (
 	input: IngestSessionInput,
-	identity: { organizationId: string; userId: string },
+	identity: { operationId: string; organizationId: string; userId: string },
 	signal: AbortSignal,
 ) => Promise<R2IngestProcessorResult>;
 
@@ -120,6 +130,7 @@ export interface CommitR2IngestJobOptions {
 	process: R2IngestProcessor;
 	r2: R2MultipartUploadClient;
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced?: boolean;
 	signal?: AbortSignal;
 	userId: string;
 }
@@ -131,6 +142,9 @@ export async function commitR2IngestJob(
 	const now = options.now ?? (() => new Date());
 	const randomUUID = options.randomUUID ?? createRandomUUID;
 	const leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+	const sessionIngestQuiesced =
+		options.sessionIngestQuiesced ??
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false);
 	assertPositiveLeaseDuration(leaseDurationMs);
 	const admissionNow = now();
 	const admission = await readRequestedJob(
@@ -153,12 +167,24 @@ export async function commitR2IngestJob(
 	);
 	if (terminalAdmission) return terminalAdmission;
 	assertRequestedJobCanBeClaimed(admission, admissionNow);
+	assertInterruptedFinalClaimRescueAllowed(
+		admission,
+		admissionNow,
+		sessionIngestQuiesced,
+	);
+	const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
+		admission,
+		admissionNow,
+		sessionIngestQuiesced,
+	);
 	if (
-		admission.attempts >= admission.maxAttempts ||
+		(admission.attempts >= admission.maxAttempts &&
+			!rescueInterruptedFinalClaim) ||
 		willExpireBeforeLeaseEnds(admission, admissionNow, leaseDurationMs)
 	) {
 		const admissionError =
-			admission.attempts >= admission.maxAttempts
+			admission.attempts >= admission.maxAttempts &&
+			!rescueInterruptedFinalClaim
 				? new R2IngestCommitError(
 						"R2_INGEST_ATTEMPTS_EXHAUSTED",
 						"Ingest job recovery attempts were exhausted",
@@ -223,6 +249,7 @@ export async function commitR2IngestJob(
 					manifest,
 					now: now(),
 					randomUUID,
+					sessionIngestQuiesced,
 					userId: options.userId,
 				});
 				if (claim.kind === "completed") {
@@ -372,6 +399,7 @@ async function claimRequestedJob(input: {
 	manifest: readonly StoredObject[];
 	now: Date;
 	randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced: boolean;
 	userId: string;
 }): Promise<RequestedJobClaim> {
 	return input.database.begin(async (transaction) => {
@@ -398,7 +426,21 @@ async function claimRequestedJob(input: {
 		if (requestedRow.status === "failed") {
 			return { job: requestedRow, kind: "failed" };
 		}
-		if (requestedRow.attempts >= requestedRow.maxAttempts) {
+		assertRequestedJobCanBeClaimed(requestedRow, input.now);
+		assertInterruptedFinalClaimRescueAllowed(
+			requestedRow,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
+		const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
+			requestedRow,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
+		if (
+			requestedRow.attempts >= requestedRow.maxAttempts &&
+			!rescueInterruptedFinalClaim
+		) {
 			await terminalizeExhaustedJob(requestedRow.id, input.now, transaction);
 			const [failed] = await transaction.unsafe<IngestJobRow[]>(
 				`${selectIngestJobSql()} WHERE id = $1`,
@@ -407,7 +449,6 @@ async function claimRequestedJob(input: {
 			if (!failed) throw new Error("Terminal R2 ingest job disappeared");
 			return { job: failed, kind: "failed" };
 		}
-		assertRequestedJobCanBeClaimed(requestedRow, input.now);
 		if (
 			willExpireBeforeLeaseEnds(requestedRow, input.now, input.leaseDurationMs)
 		) {
@@ -420,6 +461,9 @@ async function claimRequestedJob(input: {
 			return { job: failed, kind: "failed" };
 		}
 		const requested = await claimLockedJob({
+			claimMode: rescueInterruptedFinalClaim
+				? "interrupted_final_rescue"
+				: "standard",
 			job: requestedRow,
 			leaseDurationMs: input.leaseDurationMs,
 			leaseToken: input.randomUUID(),
@@ -462,6 +506,7 @@ function assertRequestedJobCanBeClaimed(job: IngestJobRow, now: Date): void {
 }
 
 async function claimLockedJob(input: {
+	claimMode: "interrupted_final_rescue" | "standard";
 	job: IngestJobRow;
 	leaseDurationMs: number;
 	leaseToken: string;
@@ -470,18 +515,27 @@ async function claimLockedJob(input: {
 	transaction: postgres.TransactionSql;
 }): Promise<ClaimedIngestJob> {
 	const leaseExpiresAt = new Date(input.now.getTime() + input.leaseDurationMs);
+	const attemptIncrement = input.claimMode === "standard" ? 1 : 0;
+	const claimErrorCode =
+		input.claimMode === "interrupted_final_rescue"
+			? INTERRUPTED_FINAL_CLAIM_RESCUE_CODE
+			: null;
+	const claimErrorMessage =
+		input.claimMode === "interrupted_final_rescue"
+			? INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE
+			: null;
 	const [claimed] = await input.transaction.unsafe<IngestJobRow[]>(
 		`UPDATE ingest_job
 		 SET
 			status = 'running',
-			attempts = attempts + 1,
-			object_manifest = $1,
-			lease_token = $2,
-			lease_expires_at = $3,
-			last_error_code = NULL,
-			last_error_message = NULL,
-			updated_at = $4
-		 WHERE id = $5
+			attempts = attempts + $1,
+			object_manifest = $2,
+			lease_token = $3,
+			lease_expires_at = $4,
+			last_error_code = $5,
+			last_error_message = $6,
+			updated_at = $7
+		 WHERE id = $8
 		 RETURNING
 			id,
 			organization_id AS "organizationId",
@@ -499,12 +553,16 @@ async function claimLockedJob(input: {
 			expected_total_bytes AS "expectedTotalBytes",
 			client_hashes AS "clientHashes",
 			ingest_metadata AS "ingestMetadata",
+			FALSE AS "canonicalWriteRecorded",
 			result,
 			objects_deleted_at AS "objectsDeletedAt"`,
 		[
+			attemptIncrement,
 			JSON.stringify(input.manifest),
 			input.leaseToken,
 			leaseExpiresAt.toISOString(),
+			claimErrorCode,
+			claimErrorMessage,
 			input.now.toISOString(),
 			input.job.id,
 		],
@@ -531,6 +589,7 @@ export async function repairRecoverableR2IngestJobs(input: {
 	process: R2IngestProcessor;
 	r2: R2MultipartUploadClient;
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced?: boolean;
 }): Promise<R2IngestRecoveryRepairResult> {
 	const leaseDurationMs = input.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
 	assertPositiveLeaseDuration(leaseDurationMs);
@@ -539,6 +598,9 @@ export async function repairRecoverableR2IngestJobs(input: {
 		throw new Error("R2 ingest recovery limit must be between 1 and 20");
 	}
 	const now = input.now ?? (() => new Date());
+	const sessionIngestQuiesced =
+		input.sessionIngestQuiesced ??
+		readBooleanEnv("SESSION_INGEST_QUIESCED", false);
 	const repairNow = now();
 	const candidates = await input.database.unsafe<IngestJobRow[]>(
 		`${selectIngestJobSql()}
@@ -601,6 +663,7 @@ export async function repairRecoverableR2IngestJobs(input: {
 					manifest,
 					now: now(),
 					randomUUID: input.randomUUID ?? createRandomUUID,
+					sessionIngestQuiesced,
 				});
 				if (!claim) return;
 				if (claim.kind === "completed" || claim.kind === "failed") {
@@ -645,6 +708,7 @@ async function claimRecoverableJob(input: {
 	manifest: readonly StoredObject[];
 	now: Date;
 	randomUUID: () => `${string}-${string}-${string}-${string}-${string}`;
+	sessionIngestQuiesced: boolean;
 }): Promise<RequestedJobClaim | null> {
 	return input.database.begin(async (transaction) => {
 		const [candidate] = await transaction.unsafe<IngestJobRow[]>(
@@ -669,7 +733,20 @@ async function claimRecoverableJob(input: {
 			(candidate.status === "running" &&
 				toDate(candidate.leaseExpiresAt).getTime() <= input.now.getTime());
 		if (!eligible) return null;
-		if (candidate.attempts >= candidate.maxAttempts) {
+		assertInterruptedFinalClaimRescueAllowed(
+			candidate,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
+		const rescueInterruptedFinalClaim = canRescueInterruptedFinalClaim(
+			candidate,
+			input.now,
+			input.sessionIngestQuiesced,
+		);
+		if (
+			candidate.attempts >= candidate.maxAttempts &&
+			!rescueInterruptedFinalClaim
+		) {
 			await terminalizeExhaustedJob(candidate.id, input.now, transaction);
 			const [failed] = await transaction.unsafe<IngestJobRow[]>(
 				`${selectIngestJobSql()} WHERE id = $1`,
@@ -691,6 +768,9 @@ async function claimRecoverableJob(input: {
 		}
 		return {
 			job: await claimLockedJob({
+				claimMode: rescueInterruptedFinalClaim
+					? "interrupted_final_rescue"
+					: "standard",
 				job: candidate,
 				leaseDurationMs: input.leaseDurationMs,
 				leaseToken: input.randomUUID(),
@@ -701,6 +781,47 @@ async function claimRecoverableJob(input: {
 			kind: "claimed",
 		};
 	});
+}
+
+function assertInterruptedFinalClaimRescueAllowed(
+	job: IngestJobRow,
+	now: Date,
+	sessionIngestQuiesced: boolean,
+): void {
+	if (
+		sessionIngestQuiesced &&
+		isInterruptedFinalClaimRescueCandidate(job, now)
+	) {
+		throw new R2IngestCommitError(
+			INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_CODE,
+			INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED_MESSAGE,
+			true,
+		);
+	}
+}
+
+function canRescueInterruptedFinalClaim(
+	job: IngestJobRow,
+	now: Date,
+	sessionIngestQuiesced: boolean,
+): boolean {
+	return (
+		!sessionIngestQuiesced && isInterruptedFinalClaimRescueCandidate(job, now)
+	);
+}
+
+function isInterruptedFinalClaimRescueCandidate(
+	job: IngestJobRow,
+	now: Date,
+): boolean {
+	return (
+		job.status === "running" &&
+		job.attempts >= job.maxAttempts &&
+		toDate(job.leaseExpiresAt).getTime() <= now.getTime() &&
+		!job.canonicalWriteRecorded &&
+		job.lastErrorCode === null &&
+		job.lastErrorMessage === null
+	);
 }
 
 async function processClaimedJob(input: {
@@ -732,6 +853,7 @@ async function processClaimedJob(input: {
 		processed = await input.process(
 			session,
 			{
+				operationId: input.job.id,
 				organizationId: input.job.organizationId,
 				userId: input.job.userId,
 			},
@@ -1220,6 +1342,23 @@ function selectIngestJobSql(): string {
 		ingest_metadata AS "ingestMetadata",
 		last_error_code AS "lastErrorCode",
 		last_error_message AS "lastErrorMessage",
+		EXISTS (
+			SELECT 1
+			FROM session_ingest_revision AS revision
+			JOIN ingest_processing_ledger AS ledger
+				ON ledger.organization_id = revision.organization_id
+				AND ledger.session_id = revision.session_id
+				AND ledger.filtered_content_sha256 = revision.content_sha256
+			JOIN ingest_processing_target_receipt AS receipt
+				ON receipt.ledger_id = ledger.id
+				AND receipt.target = CASE ingest_job.source
+					WHEN 'claude_code' THEN 'rudel.claude_sessions'
+					ELSE 'rudel.codex_sessions'
+				END
+			WHERE revision.organization_id = ingest_job.organization_id
+				AND revision.session_id = ingest_job.session_id
+				AND revision.operation_id = 'r2:' || ingest_job.id
+		) AS "canonicalWriteRecorded",
 		result,
 		objects_deleted_at AS "objectsDeletedAt"
 	FROM ingest_job`;

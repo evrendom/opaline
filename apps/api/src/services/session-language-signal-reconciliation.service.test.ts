@@ -26,6 +26,7 @@ function staleRow(
 	return {
 		organization_id: "org-1",
 		raw_ingested_at: rawIngestedAt,
+		raw_revision: (BigInt(new Date(rawIngestedAt).getTime()) << 16n).toString(),
 		session_date: "2026-08-19T12:00:00.000Z",
 		session_id: sessionId,
 		source: "codex",
@@ -34,7 +35,11 @@ function staleRow(
 }
 
 function latestRawContent(row: StaleSessionLanguageSignalRow) {
-	return { content: row.session_id, revision: row.raw_ingested_at };
+	return {
+		content: row.session_id,
+		ingested_at: row.raw_ingested_at,
+		revision: row.raw_revision,
+	};
 }
 
 function readProcessOutput(
@@ -51,14 +56,15 @@ describe("session language-signal reconciliation", () => {
 		const query = buildStaleSessionLanguageSignalQuery();
 		const lagQuery = buildSessionLanguageSignalLagCountQuery();
 
-		expect(query).toContain("signals.latest_scan_version = 0");
+		expect(query).toContain("tupleElement(signals.latest_state, 1) = 0");
 		expect(query).toContain(
-			"signals.latest_scan_version < {scanVersion:UInt16}",
+			"tupleElement(signals.latest_state, 1) < {scanVersion:UInt16}",
 		);
 		expect(query).toContain(
-			"signals.latest_raw_ingested_at < raw.raw_ingested_at",
+			"tupleElement(signals.latest_state, 2) < raw.raw_revision",
 		);
-		expect(query).toContain("raw_ingested_at DESC");
+		expect(query).toContain("signal_version");
+		expect(query).toContain("raw_revision DESC");
 		expect(query).toContain("organization_id ASC");
 		expect(query).toContain("LIMIT {batchSize:UInt32}");
 		expect(query).toContain("OFFSET {offset:UInt32}");

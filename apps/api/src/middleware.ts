@@ -9,6 +9,7 @@ export interface AppContext {
 	session: Session["session"] | null;
 	apiKeyId: string | null;
 	authFailure: ApiKeyAuthFailure | null;
+	ingestOperatorAuthorized: boolean;
 	requestId: string;
 	wrappedShareLookupSource: string;
 }
@@ -30,6 +31,7 @@ export const authMiddleware = os.middleware(async ({ context, next }) => {
 			session: context.session,
 			apiKeyId: context.apiKeyId,
 			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
 		},
 	});
 });
@@ -130,6 +132,7 @@ export const adminMiddleware = os.middleware(async ({ context, next }) => {
 			session: context.session,
 			apiKeyId: context.apiKeyId,
 			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
 		},
 	});
 });
@@ -171,6 +174,7 @@ export const ingestAuthMiddleware = os.middleware(async ({ context, next }) => {
 			session: context.session,
 			apiKeyId: context.apiKeyId,
 			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
 		},
 	});
 });

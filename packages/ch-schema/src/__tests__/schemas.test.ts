@@ -13,6 +13,7 @@ describe("RudelClaudeSessionsRowSchema", () => {
 		package_type: "package.json",
 		content: "session transcript content",
 		filter_version: 1,
+		revision: "115807295561596928",
 		subagents: { agent1: "result1" },
 		ingested_at: "2026-02-13T09:24:27.180Z",
 		user_id: "user_123",

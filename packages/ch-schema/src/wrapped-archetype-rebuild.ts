@@ -70,17 +70,17 @@ WITH
       organization_id,
       user_id,
       session_id,
-      argMax(session_date, ingested_at) AS session_date,
-      argMax(actual_duration_min, ingested_at) AS actual_duration_min,
-      argMax(ifNull(input_tokens, 0), ingested_at) AS input_tokens,
-      argMax(ifNull(output_tokens, 0), ingested_at) AS output_tokens,
-      argMax(ifNull(cache_read_input_tokens, 0), ingested_at) AS cache_read_input_tokens,
-      argMax(ifNull(cache_creation_input_tokens, 0), ingested_at) AS cache_creation_input_tokens,
-      argMax(ifNull(total_tokens, 0), ingested_at) AS total_tokens,
-      argMax(model_used, ingested_at) AS model_used,
-      argMax(has_commit, ingested_at) AS has_commit,
-      argMax(git_remote, ingested_at) AS git_remote,
-      argMax(package_name, ingested_at) AS package_name
+      argMax(session_date, revision) AS session_date,
+      argMax(actual_duration_min, revision) AS actual_duration_min,
+      argMax(ifNull(input_tokens, 0), revision) AS input_tokens,
+      argMax(ifNull(output_tokens, 0), revision) AS output_tokens,
+      argMax(ifNull(cache_read_input_tokens, 0), revision) AS cache_read_input_tokens,
+      argMax(ifNull(cache_creation_input_tokens, 0), revision) AS cache_creation_input_tokens,
+      argMax(ifNull(total_tokens, 0), revision) AS total_tokens,
+      argMax(model_used, revision) AS model_used,
+      argMax(has_commit, revision) AS has_commit,
+      argMax(git_remote, revision) AS git_remote,
+      argMax(package_name, revision) AS package_name
     FROM rudel.session_analytics
     GROUP BY source, organization_id, user_id, session_id
   ),
