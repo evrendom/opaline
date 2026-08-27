@@ -173,15 +173,21 @@ SELECT throwIf(
 	OR countIf(
 		name IN ('claude_sessions', 'codex_sessions', 'session_analytics')
 		AND (
-			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-			OR NOT startsWith(engine_full, concat(engine, '(revision)'))
+			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+			OR NOT (
+				startsWith(engine_full, 'ReplacingMergeTree(revision)')
+				OR startsWith(engine_full, 'SharedReplacingMergeTree(revision)')
+			)
 		)
 	) > 0
 	OR countIf(
 		name = 'session_language_signals'
 		AND (
-			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-			OR NOT startsWith(engine_full, concat(engine, '(signal_version)'))
+			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+			OR NOT (
+				startsWith(engine_full, 'ReplacingMergeTree(signal_version)')
+				OR startsWith(engine_full, 'SharedReplacingMergeTree(signal_version)')
+			)
 		)
 	) > 0
 	OR countIf(name = 'f16_revision_cutover_postbackfill_verification_20260826') > 0
@@ -377,20 +383,29 @@ SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 1000, s
 SELECT throwIf(
 	countIf(
 		name IN ('claude_sessions', 'codex_sessions')
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(revision)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(revision)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(revision)')
+		)
 		AND sorting_key = 'organization_id, session_date, session_id'
 	) != 2
 	OR countIf(
 		name = 'session_analytics'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(revision)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(revision)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(revision)')
+		)
 		AND sorting_key = 'source, organization_id, user_id, session_id'
 	) != 1
 	OR countIf(
 		name = 'session_language_signals'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(signal_version)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(signal_version)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(signal_version)')
+		)
 		AND sorting_key = 'organization_id, session_date, session_id, source'
 	) != 1
 	OR (

@@ -23,20 +23,29 @@ FROM rudel.f16_revision_cutover_control_20260826 FINAL;
 SELECT throwIf(
 	countIf(
 		name IN ('claude_sessions', 'codex_sessions')
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(revision)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(revision)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(revision)')
+		)
 		AND sorting_key = 'organization_id, session_date, session_id'
 	) != 2
 	OR countIf(
 		name = 'session_analytics'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(revision)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(revision)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(revision)')
+		)
 		AND sorting_key = 'source, organization_id, user_id, session_id'
 	) != 1
 	OR countIf(
 		name = 'session_language_signals'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(signal_version)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(signal_version)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(signal_version)')
+		)
 		AND sorting_key = 'organization_id, session_date, session_id, source'
 	) != 1
 	OR countIf(

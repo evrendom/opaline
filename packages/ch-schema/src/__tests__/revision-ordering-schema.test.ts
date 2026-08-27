@@ -222,6 +222,51 @@ describe("F16 revision ordering schema", () => {
 		expect(ddlMigration).toContain("`signal_version` UInt128 DEFAULT");
 	});
 
+	test("accepts provider-normalized SharedMergeTree metadata only for exact replacing engines", () => {
+		const guardedMigrations = [
+			...skillRebuildMigrations,
+			ddlMigration,
+			backfillMigration,
+		];
+
+		for (const migration of guardedMigrations) {
+			expect(migration).not.toContain("startsWith(engine_full, concat(engine,");
+			expect(migration).not.toContain(
+				"engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')",
+			);
+			expect(migration).not.toContain(
+				"engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')",
+			);
+		}
+
+		for (const migration of skillRebuildMigrations) {
+			expect(migration).toContain(
+				"engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')",
+			);
+			expect(migration).toContain(
+				"startsWith(engine_full, 'ReplacingMergeTree(extraction_seq)')",
+			);
+			expect(migration).toContain(
+				"startsWith(engine_full, 'SharedReplacingMergeTree(extraction_seq)')",
+			);
+		}
+
+		for (const migration of [ddlMigration, backfillMigration]) {
+			expect(migration).toContain(
+				"startsWith(engine_full, 'ReplacingMergeTree(revision)')",
+			);
+			expect(migration).toContain(
+				"startsWith(engine_full, 'SharedReplacingMergeTree(revision)')",
+			);
+			expect(migration).toContain(
+				"startsWith(engine_full, 'ReplacingMergeTree(signal_version)')",
+			);
+			expect(migration).toContain(
+				"startsWith(engine_full, 'SharedReplacingMergeTree(signal_version)')",
+			);
+		}
+	});
+
 	test("backfills with explicit columns and synchronous INSERT SELECT", () => {
 		expect(backfillMigration.match(/SETTINGS async_insert=0/gu)).toHaveLength(
 			4,
