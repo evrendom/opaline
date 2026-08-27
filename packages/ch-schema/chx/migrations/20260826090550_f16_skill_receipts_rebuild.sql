@@ -12,7 +12,7 @@ SELECT throwIf(
 	'F16 skill_receipts rebuild requires bun run ch:migrate:f16'
 );
 
--- F16-SR02: The normal/retry path must still have the exact UInt64 source.
+-- F16-SR02: Require the exact UInt64 source and deterministic equal-version rows.
 SELECT throwIf(
 	countIf(
 		name = 'skill_receipts'
@@ -35,7 +35,26 @@ SELECT throwIf(
 			AND name = 'extraction_seq'
 			AND type = 'UInt64'
 	) != 1
-	OR countIf(name = 'skill_receipts_f16_uint64_backup_20260826') > 1,
+	OR countIf(name = 'skill_receipts_f16_uint64_backup_20260826') > 1
+	OR (
+		SELECT count()
+		FROM
+		(
+			SELECT 1
+			FROM rudel.skill_receipts
+			GROUP BY
+				organization_id,
+				agent,
+				user_id,
+				session_id,
+				extraction_seq
+			HAVING uniqExact(tuple(
+				source_content_sha256,
+				parser_version,
+				extracted_at
+			)) > 1
+		)
+	) != 0,
 	'F16 skill_receipts rebuild source or retry artifact has an unexpected definition'
 )
 FROM system.tables
@@ -64,7 +83,7 @@ SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 1000, s
 COMMENT 'Latest completed skill extraction run per workspace, user, agent, and session.';
 
 -- operation: data_backfill key=table:rudel.skill_receipts_f16_uint64_backup_20260826:extraction_seq risk=caution
--- F16-SR05: One synchronous explicit-column copy preserves every visible row.
+-- F16-SR05: Copy the stable ReplacingMergeTree winners without forcing a merge.
 INSERT INTO rudel.skill_receipts_f16_uint64_backup_20260826
 (
 	`organization_id`,
@@ -86,23 +105,64 @@ SELECT
 	`parser_version`,
 	toUInt128(`extraction_seq`),
 	`extracted_at`
-FROM rudel.skill_receipts;
+FROM rudel.skill_receipts FINAL;
 
--- F16-SR06: Verify physical rows and versioned logical identities before swap.
+-- F16-SR06: Exact logical rows must match despite lawful background compaction.
 SELECT throwIf(
-	(SELECT count() FROM rudel.skill_receipts)
-		!= (SELECT count() FROM rudel.skill_receipts_f16_uint64_backup_20260826)
+	(
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts_f16_uint64_backup_20260826 FINAL
+		)
+	) != 0
 	OR (
-		SELECT uniqExact(tuple(
-			organization_id, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_receipts
-	) != (
-		SELECT uniqExact(tuple(
-			organization_id, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_receipts_f16_uint64_backup_20260826
-	),
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts_f16_uint64_backup_20260826 FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts FINAL
+		)
+	) != 0,
 	'F16 skill_receipts rebuild copy verification failed'
 );
 
@@ -158,18 +218,61 @@ SELECT throwIf(
 FROM system.tables
 WHERE database = 'rudel';
 
--- F16-SR09: Versioned identity coverage survives an ambiguous exchange response.
+-- F16-SR09: Exact logical rows survive an ambiguous exchange response.
 SELECT throwIf(
 	(
-		SELECT uniqExact(tuple(
-			organization_id, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_receipts
-	) != (
-		SELECT uniqExact(tuple(
-			organization_id, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_receipts_f16_uint64_backup_20260826
-	),
-	'F16 skill_receipts rebuild post-exchange identity verification failed'
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts_f16_uint64_backup_20260826 FINAL
+		)
+	) != 0
+	OR (
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts_f16_uint64_backup_20260826 FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				user_id,
+				agent,
+				session_id,
+				source_content_sha256,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_receipts FINAL
+		)
+	) != 0,
+	'F16 skill_receipts rebuild post-exchange logical verification failed'
 );

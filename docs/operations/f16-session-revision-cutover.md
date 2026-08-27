@@ -586,9 +586,10 @@ bun run ch:migrate:f16
 The expected result is:
 
 1. `20260826090550_f16_preservation.sql` succeeds and is journaled.
-2. The three skill-table rebuild files copy every visible pre-F16 row, verify
-   physical and versioned-identity counts, atomically exchange each UInt128
-   replacement with its UInt64 source, and are journaled.
+2. The three skill-table rebuild files reject divergent equal-key/equal-version
+   ties, copy the stable pre-F16 `ReplacingMergeTree` winners with `SELECT
+   ... FINAL`, verify the exact logical row set in both directions, atomically
+   exchange each UInt128 replacement with its UInt64 source, and are journaled.
 3. `20260826090551_auto.sql` aborts at F16-C02 because
    `preservation_verified` is absent.
 4. No canonical session table has been renamed. The three UInt64 skill backups
@@ -758,6 +759,17 @@ plus the subsequent `20260825093133_auto.sql`
 `non_replicated_deduplication_window = 1000` setting, with only
 `extraction_seq` widened to `UInt128`.
 
+`ReplacingMergeTree` removes older rows during nondeterministically scheduled
+background merges. Therefore physical-count equality between the UInt64 source
+and a newly inserted UInt128 replacement is not a valid safety invariant: one
+side can legally compact first. Each rebuild instead rejects divergent rows at
+the same sorting key and version, copies the query-time `FINAL` winners, and
+uses bidirectional `EXCEPT DISTINCT` checks over every column before and after
+the exchange. The old UInt64 source becomes the retained rollback backup, so
+any physical versions still present at exchange time remain available there
+until ordinary background merging or approved cleanup. The migration never
+uses `OPTIMIZE TABLE ... FINAL`.
+
 ClickHouse's [ALTER COLUMN rules](https://clickhouse.com/docs/reference/statements/alter/column)
 require data conversion when types are not binary compatible. The rebuild uses
 an explicit-column synchronous copy and pre/post identity checks instead. The
@@ -774,14 +786,14 @@ mutating a production key in place.
 | Statement suffix | If the client failed after server commit | Recovery |
 | --- | --- | --- |
 | 01 controlled-executor guard | No object changed. | Set the reviewed executor environment and rerun. |
-| 02 exact UInt64 source guard | No object changed. | Reconcile the canonical/backup definitions; do not copy from an unexpected engine, key, or type. |
+| 02 exact UInt64 source and equal-version guard | No object changed. | Reconcile the canonical/backup definitions; do not copy from an unexpected engine, key, or type, and resolve any divergent rows sharing one sorting key and version. |
 | 03 drop incomplete replacement | A pre-exchange UInt128 copy is absent. | Rerun; only the incomplete pre-exchange copy can be dropped on this path. |
 | 04 create UInt128 replacement | The exact empty replacement may exist. | Rerun; 03 resets it first and 04 has no `IF NOT EXISTS`. |
-| 05 explicit synchronous copy | The replacement may contain partial or complete parts. | Rerun; 03 clears it before a new copy. |
-| 06 count and versioned-identity guard | No names changed. | Diagnose any mismatch; do not exchange. |
+| 05 explicit synchronous logical-winner copy | The replacement may contain partial or complete parts. | Rerun; 03 clears it before a new `FINAL` copy. |
+| 06 bidirectional logical-row guard | No names changed. | Diagnose any exact row-set mismatch; do not exchange. Physical counts may differ because either ReplacingMergeTree can compact first. |
 | 07 pairwise atomic exchange | Either the names are unchanged or canonical is UInt128 and backup is UInt64. | Rerun; the executor inspects both column types and resumes after `F16-SKILL-REBUILD-AFTER-EXCHANGE` only for the exact exchanged pair. |
 | 08 exchange visibility poll | One writer has not observed the exact pair. | Repair convergence and rerun; do not drop the UInt64 backup. |
-| 09 post-exchange identity guard | Both tables remain. | Reconcile the count/identity mismatch before continuing. |
+| 09 post-exchange logical-row guard | Both tables remain. | Reconcile the bidirectional logical row-set mismatch before continuing. |
 
 #### Rename, recreate, and MV statements
 

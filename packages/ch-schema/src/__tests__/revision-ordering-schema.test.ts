@@ -19,13 +19,15 @@ const ddlMigration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
 	"utf8",
 );
+const readSkillRebuildMigration = (name: string) =>
+	readFileSync(resolve(import.meta.dir, "../../chx/migrations", name), "utf8");
 const skillRebuildMigrations = [
-	"20260826090550_f16_skill_receipts_rebuild.sql",
-	"20260826090550_f16_skill_uses_rebuild.sql",
-	"20260826090550_f16_skill_version_contents_rebuild.sql",
-].map((name) =>
-	readFileSync(resolve(import.meta.dir, "../../chx/migrations", name), "utf8"),
-);
+	readSkillRebuildMigration("20260826090550_f16_skill_receipts_rebuild.sql"),
+	readSkillRebuildMigration("20260826090550_f16_skill_uses_rebuild.sql"),
+	readSkillRebuildMigration(
+		"20260826090550_f16_skill_version_contents_rebuild.sql",
+	),
+] as const;
 const backfillMigration = readFileSync(
 	resolve(
 		import.meta.dir,
@@ -204,7 +206,11 @@ describe("F16 revision ordering schema", () => {
 		expect(
 			ddlMigration.match(/MODIFY COLUMN `extraction_seq` UInt128/gu),
 		).toBeNull();
-		for (const rebuildMigration of skillRebuildMigrations) {
+		for (const [table, rebuildMigration] of [
+			["skill_receipts", skillRebuildMigrations[0]],
+			["skill_uses", skillRebuildMigrations[1]],
+			["skill_version_contents", skillRebuildMigrations[2]],
+		] as const) {
 			expect(rebuildMigration).toContain("`extraction_seq` UInt128");
 			expect(rebuildMigration).toContain(
 				"non_replicated_deduplication_window = 1000",
@@ -214,7 +220,11 @@ describe("F16 revision ordering schema", () => {
 			expect(rebuildMigration).toContain(
 				"RECOVERY: F16-SKILL-REBUILD-AFTER-EXCHANGE",
 			);
+			expect(rebuildMigration).toContain(`FROM rudel.${table} FINAL;`);
+			expect(rebuildMigration).toContain("HAVING uniqExact(tuple(");
+			expect(rebuildMigration.match(/EXCEPT DISTINCT/gu)).toHaveLength(4);
 			expect(rebuildMigration).not.toContain("ALTER TABLE");
+			expect(rebuildMigration).not.toContain("OPTIMIZE TABLE");
 		}
 		expect(ddlMigration).toContain(
 			"`raw_revision` UInt64 DEFAULT bitShiftLeft(toUInt64(toUnixTimestamp64Milli(raw_ingested_at)), 16)",
