@@ -24,19 +24,19 @@ SELECT throwIf(
 	countIf(
 		name IN ('claude_sessions', 'codex_sessions')
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'revision)')
+		AND startsWith(engine_full, concat(engine, '(revision)'))
 		AND sorting_key = 'organization_id, session_date, session_id'
 	) != 2
 	OR countIf(
 		name = 'session_analytics'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'revision)')
+		AND startsWith(engine_full, concat(engine, '(revision)'))
 		AND sorting_key = 'source, organization_id, user_id, session_id'
 	) != 1
 	OR countIf(
 		name = 'session_language_signals'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'signal_version)')
+		AND startsWith(engine_full, concat(engine, '(signal_version)'))
 		AND sorting_key = 'organization_id, session_date, session_id, source'
 	) != 1
 	OR countIf(
@@ -44,14 +44,14 @@ SELECT throwIf(
 		AND engine = 'MaterializedView'
 		AND position(create_table_query, 'codex_sessions') > 0
 		AND position(create_table_query, 'session_analytics') > 0
-		AND position(create_table_query, 'ORDER BY cs.revision DESC') > 0
+		AND (position(create_table_query, 'ORDER BY cs.revision DESC') > 0 OR position(create_table_query, 'ORDER BY revision DESC') > 0)
 	) != 1
 	OR countIf(
 		name = 'session_analytics_mv'
 		AND engine = 'MaterializedView'
 		AND position(create_table_query, 'claude_sessions') > 0
 		AND position(create_table_query, 'session_analytics') > 0
-		AND position(create_table_query, 'ORDER BY cs.revision DESC') > 0
+		AND (position(create_table_query, 'ORDER BY cs.revision DESC') > 0 OR position(create_table_query, 'ORDER BY revision DESC') > 0)
 	) != 1
 	OR countIf(name IN (
 		'claude_sessions_f16_backup_20260826',

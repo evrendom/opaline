@@ -174,14 +174,14 @@ SELECT throwIf(
 		name IN ('claude_sessions', 'codex_sessions', 'session_analytics')
 		AND (
 			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-			OR NOT endsWith(engine_full, 'revision)')
+			OR NOT startsWith(engine_full, concat(engine, '(revision)'))
 		)
 	) > 0
 	OR countIf(
 		name = 'session_language_signals'
 		AND (
 			engine NOT IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-			OR NOT endsWith(engine_full, 'signal_version)')
+			OR NOT startsWith(engine_full, concat(engine, '(signal_version)'))
 		)
 	) > 0
 	OR countIf(name = 'f16_revision_cutover_postbackfill_verification_20260826') > 0
@@ -378,19 +378,19 @@ SELECT throwIf(
 	countIf(
 		name IN ('claude_sessions', 'codex_sessions')
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'revision)')
+		AND startsWith(engine_full, concat(engine, '(revision)'))
 		AND sorting_key = 'organization_id, session_date, session_id'
 	) != 2
 	OR countIf(
 		name = 'session_analytics'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'revision)')
+		AND startsWith(engine_full, concat(engine, '(revision)'))
 		AND sorting_key = 'source, organization_id, user_id, session_id'
 	) != 1
 	OR countIf(
 		name = 'session_language_signals'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'signal_version)')
+		AND startsWith(engine_full, concat(engine, '(signal_version)'))
 		AND sorting_key = 'organization_id, session_date, session_id, source'
 	) != 1
 	OR (
@@ -433,14 +433,14 @@ SELECT throwIf(
 		AND engine = 'MaterializedView'
 		AND position(create_table_query, 'codex_sessions') > 0
 		AND position(create_table_query, 'session_analytics') > 0
-		AND position(create_table_query, 'ORDER BY cs.revision DESC') > 0
+		AND (position(create_table_query, 'ORDER BY cs.revision DESC') > 0 OR position(create_table_query, 'ORDER BY revision DESC') > 0)
 	) != 1
 	OR countIf(
 		name = 'session_analytics_mv'
 		AND engine = 'MaterializedView'
 		AND position(create_table_query, 'claude_sessions') > 0
 		AND position(create_table_query, 'session_analytics') > 0
-		AND position(create_table_query, 'ORDER BY cs.revision DESC') > 0
+		AND (position(create_table_query, 'ORDER BY cs.revision DESC') > 0 OR position(create_table_query, 'ORDER BY revision DESC') > 0)
 	) != 1,
 	'F16 cutover visibility barrier: canonical analytics materialized views are not visible with the expected dependencies'
 ) AS f16_poll_materialized_views_visible
