@@ -101,6 +101,10 @@ interface RehearsalResult {
 	minimumRevision: string;
 	signalEngine: string;
 	signalRawRevision: string;
+	skillReceiptBackupPhysicalRows: number;
+	skillReceiptCanonicalLogicalRows: number;
+	skillReceiptCanonicalPhysicalRows: number;
+	skillReceiptMaxExtractionSeq: string;
 	skillTables: SkillTableState[];
 	snapshotTies: TieRow[];
 	sourceTies: TieRow[];
@@ -574,7 +578,7 @@ async function seedFixtures(
 	reverse: boolean,
 	stoppedTables: string[],
 ): Promise<void> {
-	for (const table of ["claude_sessions", "codex_sessions"]) {
+	for (const table of ["claude_sessions", "codex_sessions", "skill_receipts"]) {
 		await executor.execute(`SYSTEM STOP MERGES ${database}.${table}`);
 		stoppedTables.push(table);
 	}
@@ -644,21 +648,36 @@ async function seedFixtures(
 		],
 	});
 	const sourceSha = "a".repeat(64);
-	await executor.insert({
-		table: `${database}.skill_receipts`,
-		values: [
-			{
-				agent: "claude_code",
-				extracted_at: "2026-08-20T10:00:02.000",
-				extraction_seq: "42",
-				organization_id: "org-f16",
-				parser_version: 1,
-				session_id: "skill-session",
-				source_content_sha256: sourceSha,
-				user_id: "user-f16",
-			},
-		],
-	});
+	const skillReceiptVersions = [
+		{
+			agent: "claude_code",
+			extracted_at: "2026-08-20T10:00:01.000",
+			extraction_seq: "41",
+			organization_id: "org-f16",
+			parser_version: 1,
+			session_id: "skill-session",
+			source_content_sha256: "d".repeat(64),
+			user_id: "user-f16",
+		},
+		{
+			agent: "claude_code",
+			extracted_at: "2026-08-20T10:00:02.000",
+			extraction_seq: "42",
+			organization_id: "org-f16",
+			parser_version: 1,
+			session_id: "skill-session",
+			source_content_sha256: sourceSha,
+			user_id: "user-f16",
+		},
+	];
+	for (const row of reverse
+		? [...skillReceiptVersions].reverse()
+		: skillReceiptVersions) {
+		await executor.insert({
+			table: `${database}.skill_receipts`,
+			values: [row],
+		});
+	}
 	await executor.insert({
 		table: `${database}.skill_uses`,
 		values: [
@@ -773,6 +792,24 @@ async function runRehearsal(
 		await executeMigration(SKILL_RECEIPTS_REBUILD_MIGRATION, database);
 		await executeMigration(SKILL_USES_REBUILD_MIGRATION, database);
 		await executeMigration(SKILL_VERSION_CONTENTS_REBUILD_MIGRATION, database);
+		const [skillReceiptRebuild] = await executor.query<{
+			backup_physical_rows: number | string;
+			canonical_logical_rows: number | string;
+			canonical_physical_rows: number | string;
+			max_extraction_seq: string;
+		}>(`
+			SELECT
+				(SELECT count()
+				 FROM ${database}.skill_receipts_f16_uint64_backup_20260826)
+					AS backup_physical_rows,
+				(SELECT count() FROM ${database}.skill_receipts FINAL)
+					AS canonical_logical_rows,
+				(SELECT count() FROM ${database}.skill_receipts)
+					AS canonical_physical_rows,
+				(SELECT toString(max(extraction_seq))
+				 FROM ${database}.skill_receipts FINAL)
+					AS max_extraction_seq
+		`);
 		await executeMigration(DDL_MIGRATION, database);
 		await executeMigration(BACKFILL_MIGRATION, database);
 
@@ -894,6 +931,17 @@ async function runRehearsal(
 			minimumRevision: minimum?.revision ?? "0",
 			signalEngine: signal?.engine_full ?? "",
 			signalRawRevision: signal?.raw_revision ?? "missing",
+			skillReceiptBackupPhysicalRows: Number(
+				skillReceiptRebuild?.backup_physical_rows ?? 0,
+			),
+			skillReceiptCanonicalLogicalRows: Number(
+				skillReceiptRebuild?.canonical_logical_rows ?? 0,
+			),
+			skillReceiptCanonicalPhysicalRows: Number(
+				skillReceiptRebuild?.canonical_physical_rows ?? 0,
+			),
+			skillReceiptMaxExtractionSeq:
+				skillReceiptRebuild?.max_extraction_seq ?? "missing",
 			skillTables,
 			snapshotTies,
 			sourceTies,
@@ -908,7 +956,9 @@ async function runRehearsal(
 		const mergeStarts: PromiseSettledResult<void>[] = [];
 		for (const table of stoppedTables) {
 			try {
-				const backupTable = `${table}_f16_backup_20260826`;
+				const backupTable = table.startsWith("skill_")
+					? `${table}_f16_uint64_backup_20260826`
+					: `${table}_f16_backup_20260826`;
 				const existingTables = await executor.query<{ name: string }>(`
 					SELECT name
 					FROM system.tables
@@ -1104,6 +1154,12 @@ describe("F16 destructive migration execution rehearsal", () => {
 		expect(second.signalEngine).toBe(first.signalEngine);
 		expect(first.signalRawRevision).toBe("0");
 		expect(second.signalRawRevision).toBe("0");
+		for (const rehearsal of [first, second]) {
+			expect(rehearsal.skillReceiptBackupPhysicalRows).toBe(2);
+			expect(rehearsal.skillReceiptCanonicalLogicalRows).toBe(1);
+			expect(rehearsal.skillReceiptCanonicalPhysicalRows).toBe(1);
+			expect(rehearsal.skillReceiptMaxExtractionSeq).toBe("42");
+		}
 		const skillTableShape = (tables: SkillTableState[]) =>
 			tables.map(
 				({ create_table_query: _createTableQuery, ...table }) => table,

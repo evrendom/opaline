@@ -12,7 +12,7 @@ SELECT throwIf(
 	'F16 skill_uses rebuild requires bun run ch:migrate:f16'
 );
 
--- F16-SU02: Validate the exact keyed/versioned UInt64 source before copying.
+-- F16-SU02: Require the exact UInt64 source and deterministic equal-version rows.
 SELECT throwIf(
 	countIf(
 		name = 'skill_uses'
@@ -35,7 +35,29 @@ SELECT throwIf(
 			AND name = 'extraction_seq'
 			AND type = 'UInt64'
 	) != 1
-	OR countIf(name = 'skill_uses_f16_uint64_backup_20260826') > 1,
+	OR countIf(name = 'skill_uses_f16_uint64_backup_20260826') > 1
+	OR (
+		SELECT count()
+		FROM
+		(
+			SELECT 1
+			FROM rudel.skill_uses
+			GROUP BY
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				extraction_seq
+			HAVING uniqExact(tuple(
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				extracted_at
+			)) > 1
+		)
+	) != 0,
 	'F16 skill_uses rebuild source or retry artifact has an unexpected definition'
 )
 FROM system.tables
@@ -67,7 +89,7 @@ SETTINGS index_granularity = 8192, non_replicated_deduplication_window = 1000, s
 COMMENT 'Versioned session skill uses bound to an exact completed extraction receipt. Mutable usage timestamps and content hashes are excluded from the replacing key.';
 
 -- operation: data_backfill key=table:rudel.skill_uses_f16_uint64_backup_20260826:extraction_seq risk=caution
--- F16-SU05: One synchronous explicit-column copy widens without a key mutation.
+-- F16-SU05: Copy the stable ReplacingMergeTree winners without forcing a merge.
 INSERT INTO rudel.skill_uses_f16_uint64_backup_20260826
 (
 	`organization_id`,
@@ -95,23 +117,76 @@ SELECT
 	`parser_version`,
 	toUInt128(`extraction_seq`),
 	`extracted_at`
-FROM rudel.skill_uses;
+FROM rudel.skill_uses FINAL;
 
--- F16-SU06: Verify all physical rows and keyed versions before the swap.
+-- F16-SU06: Exact logical rows must match despite lawful background compaction.
 SELECT throwIf(
-	(SELECT count() FROM rudel.skill_uses)
-		!= (SELECT count() FROM rudel.skill_uses_f16_uint64_backup_20260826)
+	(
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses_f16_uint64_backup_20260826 FINAL
+		)
+	) != 0
 	OR (
-		SELECT uniqExact(tuple(
-			organization_id, skill_name, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_uses
-	) != (
-		SELECT uniqExact(tuple(
-			organization_id, skill_name, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_uses_f16_uint64_backup_20260826
-	),
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses_f16_uint64_backup_20260826 FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses FINAL
+		)
+	) != 0,
 	'F16 skill_uses rebuild copy verification failed'
 );
 
@@ -167,18 +242,73 @@ SELECT throwIf(
 FROM system.tables
 WHERE database = 'rudel';
 
--- F16-SU09: Every key/version identity remains present after recovery.
+-- F16-SU09: Exact logical rows survive an ambiguous exchange response.
 SELECT throwIf(
 	(
-		SELECT uniqExact(tuple(
-			organization_id, skill_name, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_uses
-	) != (
-		SELECT uniqExact(tuple(
-			organization_id, skill_name, agent, user_id, session_id, extraction_seq
-		))
-		FROM rudel.skill_uses_f16_uint64_backup_20260826
-	),
-	'F16 skill_uses rebuild post-exchange identity verification failed'
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses_f16_uint64_backup_20260826 FINAL
+		)
+	) != 0
+	OR (
+		SELECT count()
+		FROM
+		(
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				toUInt128(extraction_seq) AS extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses_f16_uint64_backup_20260826 FINAL
+			EXCEPT DISTINCT
+			SELECT
+				organization_id,
+				skill_name,
+				agent,
+				user_id,
+				session_id,
+				content_sha256,
+				source_content_sha256,
+				used_at,
+				parser_version,
+				extraction_seq,
+				extracted_at
+			FROM rudel.skill_uses FINAL
+		)
+	) != 0,
+	'F16 skill_uses rebuild post-exchange logical verification failed'
 );
