@@ -16,8 +16,11 @@ SELECT throwIf(
 SELECT throwIf(
 	countIf(
 		name = 'skill_receipts'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(extraction_seq)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(extraction_seq)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(extraction_seq)')
+		)
 		AND primary_key = 'organization_id, agent, user_id, session_id'
 		AND sorting_key = 'organization_id, agent, user_id, session_id'
 		AND position(create_table_query, 'index_granularity = 8192') > 0
@@ -114,8 +117,11 @@ EXCHANGE TABLES
 SELECT throwIf(
 	countIf(
 		name = 'skill_receipts'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND startsWith(engine_full, concat(engine, '(extraction_seq)'))
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(extraction_seq)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(extraction_seq)')
+		)
 		AND primary_key = 'organization_id, agent, user_id, session_id'
 		AND sorting_key = 'organization_id, agent, user_id, session_id'
 		AND position(create_table_query, 'index_granularity = 8192') > 0
@@ -125,7 +131,11 @@ SELECT throwIf(
 	) != 1
 	OR countIf(
 		name = 'skill_receipts_f16_uint64_backup_20260826'
-		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
+		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree', 'SharedMergeTree')
+		AND (
+			startsWith(engine_full, 'ReplacingMergeTree(extraction_seq)')
+			OR startsWith(engine_full, 'SharedReplacingMergeTree(extraction_seq)')
+		)
 		AND position(create_table_query, 'index_granularity = 8192') > 0
 		AND position(create_table_query, 'storage_policy') > 0
 		AND position(create_table_query, 's3') > 0
