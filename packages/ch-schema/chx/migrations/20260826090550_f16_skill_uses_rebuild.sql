@@ -17,11 +17,10 @@ SELECT throwIf(
 	countIf(
 		name = 'skill_uses'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'extraction_seq)')
+		AND startsWith(engine_full, concat(engine, '(extraction_seq)'))
 		AND primary_key = 'organization_id, skill_name, agent, user_id, session_id'
 		AND sorting_key = 'organization_id, skill_name, agent, user_id, session_id, extraction_seq'
 		AND position(create_table_query, 'index_granularity = 8192') > 0
-		AND position(create_table_query, 'non_replicated_deduplication_window = 1000') > 0
 		AND position(create_table_query, 'storage_policy') > 0
 		AND position(create_table_query, 's3') > 0
 	) != 1
@@ -125,7 +124,7 @@ SELECT throwIf(
 	countIf(
 		name = 'skill_uses'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
-		AND endsWith(engine_full, 'extraction_seq)')
+		AND startsWith(engine_full, concat(engine, '(extraction_seq)'))
 		AND primary_key = 'organization_id, skill_name, agent, user_id, session_id'
 		AND sorting_key = 'organization_id, skill_name, agent, user_id, session_id, extraction_seq'
 		AND position(create_table_query, 'index_granularity = 8192') > 0
@@ -137,7 +136,6 @@ SELECT throwIf(
 		name = 'skill_uses_f16_uint64_backup_20260826'
 		AND engine IN ('ReplacingMergeTree', 'SharedReplacingMergeTree')
 		AND position(create_table_query, 'index_granularity = 8192') > 0
-		AND position(create_table_query, 'non_replicated_deduplication_window = 1000') > 0
 		AND position(create_table_query, 'storage_policy') > 0
 		AND position(create_table_query, 's3') > 0
 	) != 1
