@@ -1813,8 +1813,22 @@ describe("R2 ingest real processor crash recovery", () => {
 			}
 		};
 
+		// Each commit gets its own gate: the two jobs model two API instances,
+		// and the materialization gate is per-process. A shared gate would
+		// deadlock here (older pauses inside the gate, newer queues behind it,
+		// older resumes only after newer finishes) — a topology production
+		// cannot produce.
+		const instanceGate = () =>
+			createR2IngestMaterializationGate({
+				maxBytes: 1_000_000_000,
+				maxJobs: 1,
+				maxQueuedJobs: 8,
+				operationTimeoutMs: 120_000,
+				queueTimeoutMs: 30_000,
+			});
 		const olderCommit = commitR2IngestJob({
 			failpoint,
+			gate: instanceGate(),
 			input: buildCompletionInput(olderInitialized),
 			process: createRealProcessor(failpoint),
 			r2: fakeR2,
@@ -1822,6 +1836,7 @@ describe("R2 ingest real processor crash recovery", () => {
 		});
 		await paused.promise;
 		const newerResult = await commitR2IngestJob({
+			gate: instanceGate(),
 			input: buildCompletionInput(newerInitialized),
 			process: createRealProcessor(undefined),
 			r2: fakeR2,
