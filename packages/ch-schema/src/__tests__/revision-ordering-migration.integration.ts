@@ -903,8 +903,11 @@ async function runRehearsal(
 		rehearsalFailed = true;
 		rehearsalError = error;
 	} finally {
-		const mergeStarts = await Promise.allSettled(
-			stoppedTables.map(async (table) => {
+		// Sequential on purpose: the shared executor pins one ClickHouse HTTP
+		// session, and concurrent queries on it fail with SESSION_IS_LOCKED.
+		const mergeStarts: PromiseSettledResult<void>[] = [];
+		for (const table of stoppedTables) {
+			try {
 				const backupTable = `${table}_f16_backup_20260826`;
 				const existingTables = await executor.query<{ name: string }>(`
 					SELECT name
@@ -920,15 +923,22 @@ async function runRehearsal(
 						? table
 						: undefined;
 				if (!stoppedTableName) {
-					throw new Error(
-						`Could not resolve stopped table ${database}.${table} after rename`,
-					);
+					mergeStarts.push({
+						reason: new Error(
+							`Could not resolve stopped table ${database}.${table} after rename`,
+						),
+						status: "rejected",
+					});
+					continue;
 				}
 				await executor.execute(
 					`SYSTEM START MERGES ${database}.${stoppedTableName}`,
 				);
-			}),
-		);
+				mergeStarts.push({ status: "fulfilled", value: undefined });
+			} catch (reason) {
+				mergeStarts.push({ status: "rejected", reason });
+			}
+		}
 		mergeFailures = mergeStarts.filter(
 			(result): result is PromiseRejectedResult => result.status === "rejected",
 		);
@@ -949,11 +959,17 @@ async function runRehearsal(
 }
 
 afterAll(async () => {
-	const cleanups = await Promise.allSettled(
-		databases.map((database) =>
-			executor.execute(`DROP DATABASE IF EXISTS ${database} SYNC`),
-		),
-	);
+	// Sequential on purpose: parallel drops share one session-pinned executor
+	// and collide with SESSION_IS_LOCKED.
+	const cleanups: PromiseSettledResult<void>[] = [];
+	for (const database of databases) {
+		try {
+			await executor.execute(`DROP DATABASE IF EXISTS ${database} SYNC`);
+			cleanups.push({ status: "fulfilled", value: undefined });
+		} catch (reason) {
+			cleanups.push({ status: "rejected", reason });
+		}
+	}
 	const failures = cleanups.filter(
 		(result): result is PromiseRejectedResult => result.status === "rejected",
 	);
