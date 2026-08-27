@@ -881,23 +881,36 @@ export async function processIngestSession({
 		return { contentSha256: contentHash, result: response };
 	}
 
-	const usageGeneration = usageExtractionEnabled
-		? claimedLedger
-			? await reserveLedgerUsageGeneration(
-					claimedLedger,
-					{
-						organizationId: orgId,
-						sessionId: input.sessionId,
-						userId: context.user.id,
-					},
-					durableProcessing?.failpoint,
-				)
-			: await reserveUsageExtractionGeneration(
-					orgId,
-					input.sessionId,
-					context.user.id,
-				)
-		: null;
+	let usageGeneration: string | null = null;
+	try {
+		usageGeneration = usageExtractionEnabled
+			? claimedLedger
+				? await reserveLedgerUsageGeneration(
+						claimedLedger,
+						{
+							expectedRevision: revision,
+							organizationId: orgId,
+							sessionId: input.sessionId,
+							userId: context.user.id,
+						},
+						durableProcessing?.failpoint,
+					)
+				: await reserveUsageExtractionGeneration(
+						orgId,
+						input.sessionId,
+						context.user.id,
+						revision,
+					)
+			: null;
+	} catch (error) {
+		if (error instanceof UsageExtractionSupersededError) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { reason: "usage_extraction_superseded" },
+				message: error.message,
+			});
+		}
+		throw error;
+	}
 	const subagents: Record<string, string> = {};
 	for (const subagent of filteredInput.subagents ?? []) {
 		subagents[subagent.agentId] = subagent.content;

@@ -14,8 +14,11 @@ Logical-session reads must group by immutable
 ## Artifacts and rollout order
 
 - PostgreSQL: `packages/sql-schema/db/migrations/0029_tidy_human_fly.sql`
-- ClickHouse DDL: `20260826090551_auto.sql`
+- ClickHouse preservation: `20260826090550_f16_preservation.sql`
+- ClickHouse cutover DDL: `20260826090551_auto.sql`
 - ClickHouse backfill: `20260826090600_f16_backfill.sql`
+- ClickHouse cleanup: `20260826090610_f16_cleanup.sql`
+- Controlled executor: `packages/ch-schema/scripts/migrate-f16.ts`
 - Application: PostgreSQL allocates and commits a decimal revision before that
   exact revision is sent to ClickHouse.
 - Vercel maximum function duration: 300 seconds in `vercel.json`. The drain
@@ -291,11 +294,35 @@ Do not begin ClickHouse DDL unless steps 3 through 6 all pass.
 
 ## 2. Historical revision preflight
 
-Confirm backup names do not exist. Record physical counts for all four source
-tables. Then run the executable future-clock/max-revision gate below. It covers
-both raw tables and all analytics backup history, which is a conservative
-superset of analytics-only and raw-present/MV-filtered history. `future_rows`
-must be zero in every scope.
+Confirm that every F16 operational name is unused before the first preservation
+run. This count must be zero; after the first run, use the recovery matrix
+instead of this preflight:
+
+```sql
+SELECT count() AS preexisting_f16_names
+FROM system.tables
+WHERE database = 'rudel'
+  AND name IN (
+    'claude_sessions_f16_backup_20260826',
+    'codex_sessions_f16_backup_20260826',
+    'session_analytics_f16_backup_20260826',
+    'session_language_signals_f16_backup_20260826',
+    'claude_sessions_f16_backfill_source_20260826',
+    'codex_sessions_f16_backfill_source_20260826',
+    'session_analytics_f16_backfill_source_20260826',
+    'session_language_signals_f16_backfill_source_20260826',
+    'f16_revision_cutover_control_20260826',
+    'f16_revision_cutover_verification_20260826',
+    'f16_revision_cutover_postbackfill_verification_20260826',
+    'session_analytics_f16_rebuilt_identities_20260826',
+    'session_analytics_f16_expected_rows_20260826'
+  );
+```
+
+Record physical counts for all four source tables. Then run the executable
+future-clock/max-revision gate below. It covers both raw tables and all
+analytics backup history, which is a conservative superset of analytics-only
+and raw-present/MV-filtered history. `future_rows` must be zero in every scope.
 
 ```sql
 WITH history AS
@@ -381,142 +408,309 @@ Verify `session_ownership.revision_head`,
 while ingest remains quiesced. These changes are additive; do not roll them
 back during an application rollback.
 
-## 4. Apply ClickHouse manually
+## 4. Apply ClickHouse in journaled phases
 
-Review both checked-in migrations immediately before execution. They must keep
-all of these properties:
+Review all four checked-in phase files and the controlled executor immediately
+before execution. Stock `bun run ch:migrate` is forbidden for F16. Installed
+chkit `0.1.0-beta.16` exposes no client `request_timeout` or distributed-DDL
+configuration and hard-codes the ClickHouse client's 30-second default. No
+ClickHouse server setting can lengthen a timeout enforced by that client. Each
+phase therefore checks `log_comment` and aborts unless it is run by
+`bun run ch:migrate:f16`.
 
-- both analytics MVs are dropped before any source or target rename;
-- every propagation boundary uses `SELECT sleepEachRow(1) FROM numbers(8) SETTINGS max_block_size = 1` (a single `sleep()` call is capped at three seconds by ClickHouse);
-- all canonical tables are created before materialized views;
-- raw and analytics use `ReplacingMergeTree(revision)`;
-- language signals use `ReplacingMergeTree(signal_version)`, where
-  `signal_version` orders by raw revision before scan recency/version;
-- every preservation and backfill `INSERT ... SELECT` has explicit source/target
-  columns and `SETTINGS async_insert=0`;
-- neither MV AS-clause contains `--` comments;
-- old tables are renamed, never dropped.
+The controlled executor sends `wait_end_of_query=1`, `async_insert=0`,
+`distributed_ddl_output_mode=throw`, and an explicit
+`distributed_ddl_task_timeout`. It polls every configured production writer URL
+for each named `f16_poll_*` assertion. Failed polls wait with
+`SELECT sleepEachRow(1) FROM numbers(1) SETTINGS max_block_size = 1`; the wait is
+one second in a one-row block and is below ClickHouse Cloud's per-block sleep
+cap. Canonical table and MV `CREATE` statements deliberately omit
+`IF NOT EXISTS`, so stale metadata fails instead of silently accepting an old
+object. Every executor request has a `rudel-f16-<UUID>` query ID. Before reading
+the journal or replaying any phase, the executor polls `system.processes` on
+every writer path until no earlier F16 query remains active. This prevents a
+timed-out `INSERT ... SELECT` from racing its retry's `TRUNCATE`.
 
-Apply from `packages/ch-schema` with production credentials:
+### 4.1 Size and configure the executor
+
+Measure the longest preservation/backfill `INSERT ... SELECT` on a current
+production-volume rehearsal clone. Record every duration and set
+`F16_MIGRATION_REQUEST_TIMEOUT_MS` to at least twice the longest measured
+statement, and at least 60 seconds greater than the distributed-DDL timeout.
+The executor rejects a missing, nonnumeric, or undersized value. Do not choose a
+timeout from CI fixture timings.
+
+List every independently routed production writer endpoint in
+`F16_CLICKHOUSE_WRITER_URLS` as a comma-separated list. For a remote endpoint the
+executor refuses to start without this list. If the service exposes one
+load-balanced writer URL, list that URL and retain the provider's
+`distributed_ddl_output_mode=throw` acknowledgement as the all-active-host DDL
+proof.
 
 ```bash
-bun run ch:status
-bun run ch:migrate
+cd packages/ch-schema
+
+export F16_MIGRATION_REQUEST_TIMEOUT_MS='<2x_LONGEST_REHEARSAL_MS>'
+export F16_DDL_TASK_TIMEOUT_SECONDS='900'
+export F16_CATALOG_BARRIER_TIMEOUT_MS='120000'
+export F16_CLICKHOUSE_WRITER_URLS='<WRITER_URL_1>,<WRITER_URL_2>'
+
 bun run ch:status
 ```
 
-Do not run `OPTIMIZE FINAL`. If execution fails after a rename, do not rerun
-blindly. Keep ingest quiesced, inspect the migration journal and exact table
-names, and choose forward completion or rollback.
+`ch:status` must show every earlier migration applied and only the four named
+F16 phase files pending. Stop if any unrelated or prerequisite migration is
+pending; the controlled executor intentionally applies only these four files.
 
-Before its first propagation wait, the DDL creates explicit plain `MergeTree`
-copies of all four source tables at `*_f16_backfill_source_20260826`, then fills
-them with synchronous, explicit-column `INSERT ... SELECT` statements. ClickHouse
-Cloud transparently maps those MergeTree declarations to SharedMergeTree. These
-are the stable, non-replacing inputs used to content-order equal historical
-versions. The completed backfill drops them; after a failure, preserve and
-inventory them alongside the canonical and `*_f16_backup_20260826` tables. Do
-not delete them while forward completion remains an option.
+The request timeout is an absolute client deadline. Abort the cutover plan if a
+rehearsed statement cannot fit inside a reviewed bounded deadline; split that
+statement by an owner-reviewed source boundary before production. Do not make
+the deadline infinite and do not run `OPTIMIZE FINAL`.
 
-There is one acknowledged preservation residual. Quiescence prevents new
-inserts, but a source `ReplacingMergeTree` background merge that finishes before
-its snapshot SELECT begins can already have collapsed equal-version rows. Do not
-treat `SYSTEM STOP MERGES` as a portable barrier here: the documented command
-targets a server/table unless it is issued `ON CLUSTER`, and the documentation
-does not guarantee a service-wide barrier for separate Cloud HTTP statements
-across SharedMergeTree replicas. The backfill's full content ordering remains
-deterministic for every row that survives into the non-replacing copy. Record
-pre-cutover physical row counts and each copy's physical row count in the
-incident artifact; any decrease requires owner review before continuing.
+### 4.2 Preservation phase and first checkpoint
 
-The backfill uses the fixed staging table
-`rudel.session_analytics_f16_rebuilt_identities_20260826`. A failed statement
-can leave it behind. In the failure-handling session, first record its exact
-metadata and contents:
+Run the controlled executor once:
 
-Run the `system.tables` query first. If it returns no row, record that absence,
-skip the stage-content queries, and use the migration journal and canonical or
-backup table names to locate the failed boundary.
+```bash
+bun run ch:migrate:f16
+```
+
+The expected result is:
+
+1. `20260826090550_f16_preservation.sql` succeeds and is journaled.
+2. `20260826090551_auto.sql` aborts at F16-C02 because
+   `preservation_verified` is absent.
+3. No canonical table has been renamed.
+
+The preservation file creates plain `MergeTree` copies at
+`*_f16_backfill_source_20260826`, resets each copy before its synchronous
+explicit-column copy, and records source/snapshot physical counts plus
+equal-complete-key/equal-version group counts in
+`f16_revision_cutover_verification_20260826`. It aborts before journaling unless
+all four copies contain at least the source rows and tie groups still visible
+when verification runs. A larger copy count is retained and owner-reviewed: it
+can mean a source background merge completed after the copy started.
+
+Save these exact queries and all rows in the incident artifact:
 
 ```sql
-SELECT
-  database,
-  name,
-  engine,
-  sorting_key,
-  total_rows,
-  total_bytes,
-  metadata_modification_time,
-  create_table_query
-FROM system.tables
-WHERE database = 'rudel'
-  AND name = 'session_analytics_f16_rebuilt_identities_20260826';
+SELECT *
+FROM rudel.f16_revision_cutover_verification_20260826 FINAL
+WHERE phase = 'preservation'
+ORDER BY table_name;
 
-SELECT
-  count() AS physical_rows,
-  uniqExact(tuple(source, organization_id, user_id, session_id))
-    AS unique_identities
-FROM rudel.session_analytics_f16_rebuilt_identities_20260826;
-
-WITH raw_emitted_identities AS
-(
-  SELECT 'claude_code' AS source, organization_id, user_id, session_id
-  FROM rudel.claude_sessions
-  WHERE length(content) > 120000000
-    OR countSubstrings(content, '\n') > 8000
-    OR arrayExists(
-      line -> JSONExtractString(line, 'type') IN ('user', 'assistant')
-        AND JSONHas(line, 'timestamp'),
-      splitByChar('\n', content)
-    )
-  GROUP BY source, organization_id, user_id, session_id
-
-  UNION DISTINCT
-
-  SELECT 'codex' AS source, organization_id, user_id, session_id
-  FROM rudel.codex_sessions
-  WHERE length(content) > 120000000
-    OR countSubstrings(content, '\n') > 8000
-    OR arrayExists(line -> JSONHas(line, 'timestamp'), splitByChar('\n', content))
-  GROUP BY source, organization_id, user_id, session_id
+SELECT name, applied_at, checksum
+FROM _chkit_migrations
+WHERE name IN (
+  '20260826090550_f16_preservation.sql',
+  '20260826090551_auto.sql',
+  '20260826090600_f16_backfill.sql',
+  '20260826090610_f16_cleanup.sql'
 )
-SELECT 'raw_identity_missing_from_stage' AS failure, count() AS failures
-FROM raw_emitted_identities AS raw
-LEFT ANTI JOIN rudel.session_analytics_f16_rebuilt_identities_20260826 AS stage
-  USING (source, organization_id, user_id, session_id)
-
-UNION ALL
-
-SELECT 'unexpected_identity_in_stage' AS failure, count() AS failures
-FROM rudel.session_analytics_f16_rebuilt_identities_20260826 AS stage
-LEFT ANTI JOIN raw_emitted_identities AS raw
-  USING (source, organization_id, user_id, session_id);
+ORDER BY name;
 ```
 
-The table is reusable only when its schema and creation time match this
-incident, `physical_rows = unique_identities`, and both failure counts are
-zero. With that recorded proof, forward completion may reuse the stage for the
-remaining historical-analytics insert, verify section 6, drop it with
-`DROP TABLE rudel.session_analytics_f16_rebuilt_identities_20260826 SYNC`, and
-continue with the language-signal insert. If any check fails, preserve the bad
-table under an incident-specific evidence name and choose rollback or a
-reviewed reconstruction from `raw_emitted_identities`; do not reuse it.
+There is an unavoidable historical limitation: an equal-full-key/equal-version
+row already discarded by a pre-snapshot `ReplacingMergeTree` background merge
+is physically unrecoverable. The directional source/snapshot check proves that
+the preservation copy lost nothing still visible when verification ran; it
+cannot reconstruct or even count a row already removed before its copy started.
+If a source merge completes after copying, the snapshot can correctly contain
+more physical rows or tie groups than the later source count; never discard
+those extra preserved rows to force equality. `SYSTEM STOP MERGES` is used only
+in the single-node CI rehearsal to prove separate parts coexist and is not
+claimed as a service-wide ClickHouse Cloud barrier. The owner must explicitly
+accept this limitation in the incident artifact. Do not state that F16
+deterministically reconstructs discarded rows.
 
-Before a controlled migration-command rerun, reconcile every previously
-acknowledged insert, record the checks above, then execute and record:
+Only after the directional no-loss counts, any snapshot-greater-than-source
+differences, the historical limitation, restore identifiers, and quiescence
+evidence are owner-approved, insert exactly this checkpoint with real values:
 
 ```sql
-DROP TABLE rudel.session_analytics_f16_rebuilt_identities_20260826 SYNC;
-
-SELECT count() AS stage_table_present
-FROM system.tables
-WHERE database = 'rudel'
-  AND name = 'session_analytics_f16_rebuilt_identities_20260826';
+INSERT INTO rudel.f16_revision_cutover_control_20260826
+  (checkpoint, approved, approved_by, approved_at, evidence_reference)
+VALUES
+  ('preservation_verified', 1, '<OWNER>', now64(3), '<INCIDENT_ARTIFACT>');
 ```
 
-`stage_table_present` must be zero before the rerun. Never add or rely on a bare
-`IF NOT EXISTS`: silently accepting an unverified stage can suppress historical
-analytics from a different or partial run.
+The checkpoint is valid only when its `approved_at` is later than every current
+preservation receipt row. If an unjournaled preservation phase replays, its new
+receipt automatically makes the old approval stale and C02 pauses again.
+
+### 4.3 Cutover and restart-safe backfill
+
+Run the same command again:
+
+```bash
+bun run ch:migrate:f16
+```
+
+The expected result is:
+
+1. preservation is skipped from the journal;
+2. cutover DDL completes and is journaled;
+3. backfill resets all four new canonical targets, replays all four preservation
+   copies, verifies physical counts, and is journaled;
+4. cleanup aborts at F16-X02 because `post_backfill_verified` is absent;
+5. all four preservation copies and all four rollback backups still exist.
+
+The target resets are safe only while the complete section-1 ingest barrier is
+still active. Never resume writers between the cutover and cleanup checkpoints.
+The post-backfill durable count receipt is
+`rudel.f16_revision_cutover_postbackfill_verification_20260826`.
+
+### 4.4 Exact failure/recovery and journal reconciliation
+
+Every statement has an `F16-<phase><number>` marker in the SQL. Record the last
+marker reported by the executor, the error, and these inventories before a
+rerun:
+
+```sql
+SELECT name, engine, sorting_key, metadata_modification_time, create_table_query
+FROM system.tables
+WHERE database = 'rudel'
+  AND (
+    name IN (
+      'claude_sessions', 'codex_sessions', 'session_analytics',
+      'session_language_signals', 'session_analytics_mv',
+      'codex_session_analytics_mv',
+      'f16_revision_cutover_control_20260826',
+      'f16_revision_cutover_verification_20260826',
+      'f16_revision_cutover_postbackfill_verification_20260826'
+    )
+    OR name LIKE '%_f16_backup_20260826'
+    OR name LIKE '%_f16_backfill_source_20260826'
+    OR name LIKE '%_f16_%_20260826'
+  )
+ORDER BY name;
+
+SELECT name, applied_at, checksum
+FROM _chkit_migrations
+WHERE name LIKE '2026082609%'
+ORDER BY name;
+```
+
+Use this exact matrix. “Rerun” always means rerun `bun run ch:migrate:f16`
+with the original reviewed environment and with ingest still quiesced. Its
+initial orphan-query barrier must pass; never issue manual recovery DDL while a
+`rudel-f16-*` query is still active. If the barrier times out, preserve the
+inventory, wait for cancellation/completion, and rerun the executor.
+
+#### Preservation statements
+
+| Statement | If the client failed after server commit | Recovery |
+| --- | --- | --- |
+| P01 controlled-executor guard | No object changed. | Set the reviewed executor environment and rerun. |
+| P02 pre-cutover-state guard | No object changed. | If any backup exists, stop and use cutover recovery; otherwise rerun. |
+| P03 create control table | The compatible control table may exist. | Rerun; `IF NOT EXISTS` accepts only the table created by this phase. |
+| P04 create preservation receipt | The compatible receipt table may exist. | Rerun; `IF NOT EXISTS` accepts only the table created by this phase. |
+| P05 create Claude copy | The empty Claude copy may exist. | Rerun; P06 validates it before P07 changes data. |
+| P06 poll Claude copy | A writer has stale metadata. | Repair routing/convergence and rerun; never bypass the poll. |
+| P07 truncate Claude copy | The Claude copy is empty. | Rerun; P08 repopulates it. |
+| P08 copy Claude rows | The copy may contain partial or complete parts. | Rerun; P07 clears them before a synchronous recopy. |
+| P09 create Codex copy | The empty Codex copy may exist. | Rerun; P10 validates it before P11 changes data. |
+| P10 poll Codex copy | A writer has stale metadata. | Repair routing/convergence and rerun. |
+| P11 truncate Codex copy | The Codex copy is empty. | Rerun; P12 repopulates it. |
+| P12 copy Codex rows | The copy may contain partial or complete parts. | Rerun; P11 clears them first. |
+| P13 create analytics copy | The empty analytics copy may exist. | Rerun; P14 validates it before P15 changes data. |
+| P14 poll analytics copy | A writer has stale metadata. | Repair routing/convergence and rerun. |
+| P15 truncate analytics copy | The analytics copy is empty. | Rerun; P16 repopulates it. |
+| P16 copy analytics rows | The copy may contain partial or complete parts. | Rerun; P15 clears them first. |
+| P17 create signal copy | The empty signal copy may exist. | Rerun; P18 validates it before P19 changes data. |
+| P18 poll signal copy | A writer has stale metadata. | Repair routing/convergence and rerun. |
+| P19 truncate signal copy | The signal copy is empty. | Rerun; P20 repopulates it. |
+| P20 copy signal rows | The copy may contain partial or complete parts. | Rerun; P19 clears them first. |
+| P21 truncate preservation receipt | The receipt is empty. | Rerun; P22 recreates all four rows. |
+| P22 write preservation receipt | The receipt may contain partial or complete parts. | Rerun; P21 clears it first. |
+| P23 no-loss guard | All copies and receipt rows exist, but a source count or tie-group count exceeds its snapshot count. | Do not approve preservation. Diagnose the loss; rerun rebuilds all copies and the receipt. A larger snapshot is preserved for owner review and is not a failure. |
+
+#### Rename, recreate, and MV statements
+
+| Statement | If the client failed after server commit | Recovery |
+| --- | --- | --- |
+| C01 controlled-executor guard | No object changed. | Set the reviewed executor environment and rerun. |
+| C02 preservation checkpoint guard | No object changed. | Complete section 4.2 and append owner approval newer than the current receipt, then rerun. An unjournaled preservation replay makes any older approval stale. |
+| C03 preservation receipt guard | No object changed. | Correct the preservation mismatch; approval cannot override it. |
+| C04 initial-state guard | No object changed. | Zero backups means restore the four-canonical state; four backups means the executor must use the recovery suffix; one to three is a hard stop. |
+| C05 drop old Codex MV | The Codex MV may be absent. | Rerun; C05 is `IF EXISTS`. |
+| C06 drop old Claude MV | Both old MVs may be absent. | Rerun; C05-C06 are `IF EXISTS`. |
+| C07 poll old-MV absence | A writer still sees an old MV. | Repair convergence and rerun; C05-C06 remain replay-safe. |
+| C08 atomic four-table rename | Either four canonicals/zero backups or zero old canonicals/four backups exist. | With zero backups rerun from C01. With four backups rerun: the executor resumes after `F16-CUTOVER-AFTER-RENAME`. One to three backups is a hard stop. |
+| C09 poll safe rename recovery | Four backups exist; a writer is stale, a visible canonical is not an F16 target, an F16 target has active data parts, or the post-backfill receipt table proves B04 was reached. | Repair convergence and rerun. C10-C15 cannot run until this passes. Any evidence that backfill started means journal/state reconciliation, never automatic deletion. |
+| C10 drop partial Codex MV | The MV is absent. | Rerun; the recovery drop is `IF EXISTS`. |
+| C11 drop partial Claude MV | Both MVs are absent. | Rerun; the recovery drop is `IF EXISTS`. |
+| C12 drop partial Claude target | The empty F16 Claude target is absent. | Rerun; C09 already proved it was not the old source. |
+| C13 drop partial Codex target | The empty F16 Codex target is absent. | Rerun; the recovery drop is `IF EXISTS`. |
+| C14 drop partial analytics target | The empty F16 analytics target is absent. | Rerun; the recovery drop is `IF EXISTS`. |
+| C15 drop partial signal target | All canonical names are absent. | Rerun; the recovery drop is `IF EXISTS`. |
+| C16 poll rename visibility | Some writer has not converged to four backups and no canonicals/MVs. | Repair convergence and rerun. No canonical CREATE can run until this passes. |
+| C17 alter `skill_receipts` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
+| C18 alter `skill_uses` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
+| C19 alter `skill_version_contents` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
+| C20 create Claude target | The empty F16 Claude target may exist. | Rerun; C09 validates it, C12 removes it, and C20 recreates without `IF NOT EXISTS`. |
+| C21 create Codex target | Empty F16 Claude/Codex targets may exist. | Rerun; C09-C15 validate and clear all partial targets. |
+| C22 create analytics target | Three empty F16 targets may exist. | Rerun; C09-C15 validate and clear all partial targets. |
+| C23 create signal target | Four empty F16 targets may exist. | Rerun; C09-C15 validate and clear all partial targets. |
+| C24 poll canonical definitions | A writer lacks an exact F16 engine definition. | Repair convergence and rerun; partial targets are safely reconstructed. |
+| C25 create Codex MV | The new Codex MV may exist. | Rerun; C09 accepts only F16 canonicals and C10 clears the partial MV before recreation. |
+| C26 create Claude MV | Both new MVs may exist. | Rerun; C10-C11 clear and recreate both without `IF NOT EXISTS`. |
+| C27 poll MV definitions | A writer lacks an expected MV/dependency. | Repair convergence and rerun. Backfill cannot start and cutover cannot journal until this passes. |
+
+#### Backfill statements
+
+| Statement | If the client failed after server commit | Recovery |
+| --- | --- | --- |
+| B01 controlled-executor guard | No object changed. | Set the reviewed executor environment and rerun. |
+| B02 preservation checkpoint guard | No object changed. | Restore the approved checkpoint; do not backfill without it. |
+| B03 target/backup/MV poll | A writer has incomplete target, backup, or MV metadata. | Repair convergence and rerun; no target data has been reset. |
+| B04 create post-backfill receipt | The compatible empty receipt table may exist. | Rerun; `IF NOT EXISTS` accepts the phase-created table. |
+| B05 truncate post-backfill receipt | The receipt is empty. | Rerun; B20 recreates all four rows. |
+| B06 truncate Claude target | Claude is empty; earlier targets are not applicable. | Rerun; B06-B09 reset all targets before DML. |
+| B07 truncate Codex target | Claude and Codex are empty. | Rerun; B06-B09 reset all targets. |
+| B08 truncate analytics target | Both raw targets and analytics are empty. | Rerun; B06-B09 reset all targets. |
+| B09 truncate signal target | All four targets are empty. | Rerun; the full replay starts from preservation copies. |
+| B10 drop rebuilt-identity stage | That stage is absent. | Rerun; the drop is `IF EXISTS`. |
+| B11 drop expected-count stage | Both stages are absent. | Rerun; the drop is `IF EXISTS`. |
+| B12 insert Claude history | Claude and its MV-derived analytics may be partial or complete. | Rerun; B06-B09 clear both targets before replay. |
+| B13 insert Codex history | Both raw targets and MV-derived analytics may be partial or complete. | Rerun; B06-B09 clear them before replay. |
+| B14 create rebuilt-identity stage | The stage may exist or be partially populated. | Rerun; B10 drops it before recreation. |
+| B15 create expected-count stage | Either stage may exist or be partial. | Rerun; B10-B11 drop both before recreation. |
+| B16 insert historical analytics | Analytics may contain a partial or complete anti-join replay. | Rerun; B08 clears analytics, raw replay rebuilds MV rows, and both stages are recreated. |
+| B17 analytics logical-count guard | Analytics identities do not equal the frozen union. | Do not continue. Diagnose; rerun reconstructs targets and stages from preservation copies. |
+| B18 insert historical signals | Signals may be partial or complete. | Rerun; B09 clears signals before deterministic replay. |
+| B19 all-target logical-count guard | At least one canonical sorting-key identity is missing or unexpected. | Do not continue. Diagnose; rerun reconstructs every target. Physical row counts may legitimately shrink under background merges and are not equality gates. |
+| B20 write post-backfill receipt | The receipt may contain partial or complete parts. | Rerun; B05 clears it before rebuilding all four rows. |
+| B21 post-backfill receipt guard | Four durable logical-count rows are not present and equal. | Do not approve cleanup. Diagnose; rerun rebuilds targets and the receipt. |
+| B22 drop rebuilt-identity stage | That stage may be absent. | Rerun; the terminal drop is `IF EXISTS`. |
+| B23 drop expected-count stage | Both stages may be absent. | Rerun; the terminal drop is `IF EXISTS`; preservation copies remain. |
+
+#### Cleanup statements
+
+| Statement | If the client failed after server commit | Recovery |
+| --- | --- | --- |
+| X01 controlled-executor guard | No copy changed. | Set the reviewed executor environment and rerun. |
+| X02 post-backfill checkpoint guard | No copy changed. | Complete section 6 and append owner approval newer than the current post-backfill receipt, then rerun. An unjournaled backfill replay makes any older approval stale. |
+| X03 preservation receipt guard | No copy changed. | Correct the preservation receipt mismatch; approval cannot override it. |
+| X04 post-backfill receipt guard | No copy changed. | Correct the logical-count mismatch; approval cannot override it. |
+| X05 drop Claude copy | The Claude copy may be absent. | Rerun; X05 is `IF EXISTS`. |
+| X06 drop Codex copy | Claude/Codex copies may be absent. | Rerun; X05-X06 are `IF EXISTS`. |
+| X07 drop analytics copy | Three copies may be absent. | Rerun; X05-X07 are `IF EXISTS`. |
+| X08 drop signal copy | All four copies may be absent. | Rerun; every drop is `IF EXISTS`. |
+| X09 poll cleanup visibility | A writer still sees one or more copy names. | Repair convergence and rerun until every configured writer observes absence. |
+
+The stock chkit journal records a file only after its last statement succeeds;
+it has no statement journal. Never manually insert, update, or delete an
+`_chkit_migrations` row. The controlled executor supplies the missing recovery
+semantics: preservation and backfill reset their mutable outputs, cutover has a
+single atomic recovery marker with strict zero-or-four-backup validation, and
+cleanup uses guarded idempotent drops. It appends the normal chkit checksum only
+after a phase completes. The executor rejects an applied later F16 phase after
+an unapplied earlier phase. A journal row with a different checksum, an
+out-of-order phase, or a cutover state outside the matrix is a hard stop for
+owner review. After any unjournaled preservation or backfill replay, discard
+the old approval operationally: the SQL rejects it by timestamp, and the owner
+must review the new receipt and append a newer checkpoint.
 
 ## 5. Seed and verify PostgreSQL revision heads
 
@@ -801,6 +995,51 @@ the wall clock; JavaScript clocks are not used for revision allocation.
    language-signal state weighted by `signal_version`, never independent
    `scanned_at` aggregates.
 
+6. Verify both durable receipts before authorizing evidence cleanup. Save these
+   results in the incident artifact:
+
+   ```sql
+   SELECT *
+   FROM rudel.f16_revision_cutover_verification_20260826 FINAL
+   WHERE phase = 'preservation'
+     AND (
+       source_physical_rows > snapshot_physical_rows
+       OR source_equal_key_version_groups > snapshot_equal_key_version_groups
+     )
+   ORDER BY table_name;
+
+   SELECT *
+   FROM rudel.f16_revision_cutover_postbackfill_verification_20260826 FINAL
+   WHERE expected_logical_rows != canonical_logical_rows
+   ORDER BY table_name;
+   ```
+
+   Both mismatch queries must return zero rows. Query each table again without
+   the mismatch predicate and confirm exactly four receipt rows exist. The
+   post-backfill receipt also records `canonical_physical_rows` for diagnosis,
+   but does not compare it for equality: background `ReplacingMergeTree`
+   merges can validly collapse historical physical versions while this check
+   runs.
+
+7. Only after steps 1-6 pass and the owner approves the recorded evidence,
+   append the cleanup checkpoint:
+
+   ```sql
+   INSERT INTO rudel.f16_revision_cutover_control_20260826
+     (checkpoint, approved, approved_by, approved_at, evidence_reference)
+   VALUES
+     ('post_backfill_verified', 1, '<OWNER>', now64(3), '<INCIDENT_ARTIFACT>');
+   ```
+
+   X02 requires this checkpoint timestamp to be later than every current
+   post-backfill receipt row. A replayed backfill always requires fresh review.
+
+   Run `bun run ch:migrate:f16` a third time. Only cleanup should run; it drops
+   the four preservation copies, polls every configured writer for their
+   absence, and then journals cleanup. The durable receipts, control table, and
+   four rollback backups remain. Finish with `bun run ch:status` and attach its
+   output.
+
 ## 7. Record cutover watermarks, smoke, and resume
 
 Before the first operator smoke request, record a watermark for **all three**
@@ -925,10 +1164,15 @@ SELECT
    WHERE revision > toUInt64('<ANALYTICS_WATERMARK>')) AS analytics_post_cutover;
 ```
 
-All three values must be zero. Then drop the new MVs, wait eight seconds,
-rename all four canonical tables to unique `*_f16_failed_<timestamp>` names,
-restore all four backups, wait eight seconds, and recreate the captured pre-F16
-MVs. Never use this shortcut after smoke or resume.
+All three values must be zero. Then drop the new MVs and poll `system.tables`
+through every configured writer URL until both names are absent. Rename all
+four canonical tables to unique `*_f16_failed_<timestamp>` names, restore all
+four backups, and poll every writer until all canonical names resolve to the
+captured pre-F16 engine and sorting-key definitions. Only then recreate the
+captured pre-F16 MVs and poll their `create_table_query` and dependencies.
+Apply the same bounded one-second retry and overall barrier timeout from
+section 4.1; a timeout aborts rollback. Never use this shortcut after smoke or
+resume.
 
 ### Full rollback after any accepted post-watermark write
 
@@ -945,7 +1189,9 @@ the old MVs deliberately absent.
 
 1. Set quiescence and repeat the complete Fly/Vercel/job/ledger drain from
    section 1.
-2. Drop both F16 MVs with `SYNC`; wait eight seconds.
+2. Drop both F16 MVs with `SYNC`, then poll `system.tables` through every
+   configured writer URL until both names are absent. Use the bounded barrier
+   from section 4.1 and abort rollback on timeout.
 3. Rename all four canonical tables to unique `*_f16_failed_<timestamp>` names.
 4. Restore all four `*_f16_backup_20260826` tables to canonical names. Do **not**
    recreate the old MVs yet; raw replay must not generate duplicate analytics.

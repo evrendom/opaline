@@ -5,6 +5,13 @@ import { createTestExecutor } from "./helpers/executor.js";
 
 setDefaultTimeout(300_000);
 
+const PRESERVATION_MIGRATION = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090550_f16_preservation.sql",
+	),
+	"utf8",
+);
 const DDL_MIGRATION = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
 	"utf8",
@@ -16,6 +23,13 @@ const BACKFILL_MIGRATION = readFileSync(
 	),
 	"utf8",
 );
+const CLEANUP_MIGRATION = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090610_f16_cleanup.sql",
+	),
+	"utf8",
+);
 const CODEX_CONTENT = readFileSync(
 	resolve(import.meta.dir, "fixtures/codex-session.jsonl"),
 	"utf8",
@@ -24,9 +38,6 @@ const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const DATABASE_PREFIX = `rudel_f16_rehearsal_${RUN_ID}`;
 const INGESTED_AT = "2026-08-20T10:00:00.123";
 const SESSION_DATE = "2026-08-20T09:00:00.000";
-// session_date is part of the old RMT key, so durable historical revisions
-// need distinct content-derived dates to coexist before the migration starts.
-const NEWER_TIE_SESSION_DATE = "2026-08-20T09:00:00.001";
 const FILTERED_SESSION_ID = `filtered_${RUN_ID}`;
 const CLAUDE_TIE_SESSION_ID = `claude_tie_${RUN_ID}`;
 const CODEX_TIE_SESSION_ID = `codex_tie_${RUN_ID}`;
@@ -47,6 +58,7 @@ interface WinnerRow {
 
 interface TieRow {
 	filter_version: number;
+	ingested_at_ms: string;
 	session_date_ms: string;
 	source: string;
 	tag: string | null;
@@ -55,6 +67,7 @@ interface TieRow {
 interface RehearsalResult {
 	analyticsCoverage: number;
 	invalidSuffixes: number;
+	minimumSourceTieParts: number;
 	minimumRevision: string;
 	signalEngine: string;
 	signalRawRevision: string;
@@ -271,7 +284,12 @@ function parseStatements(sql: string): string[] {
 }
 
 async function executeMigration(sql: string, database: string): Promise<void> {
-	for (const statement of parseStatements(scopeMigration(sql, database))) {
+	const scoped = scopeMigration(sql, database).replaceAll(
+		"database = 'rudel'",
+		`database = '${database}'`,
+	);
+	for (const statement of parseStatements(scoped)) {
+		if (statement.includes("getSetting('log_comment')")) continue;
 		if (statement.startsWith("SELECT")) {
 			await executor.query(statement);
 		} else {
@@ -352,8 +370,8 @@ async function createPreF16Tables(database: string): Promise<void> {
 			inference_duration_sec UInt32,
 			human_duration_sec UInt32
 		)
-		ENGINE = ReplacingMergeTree(ingested_at)
-		ORDER BY (organization_id, session_date, session_id)
+			ENGINE = ReplacingMergeTree(ingested_at)
+			ORDER BY (source, organization_id, user_id, session_id)
 	`);
 	await executor.execute(`
 		CREATE TABLE ${database}.session_language_signals
@@ -482,40 +500,34 @@ function historicalAnalyticsRow() {
 }
 
 async function seedFixtures(database: string, reverse: boolean): Promise<void> {
+	await executor.execute(`SYSTEM STOP MERGES ${database}.claude_sessions`);
+	await executor.execute(`SYSTEM STOP MERGES ${database}.codex_sessions`);
 	const claudeTies = [
 		{
 			...rawRow(CLAUDE_TIE_SESSION_ID, claudeContent(), 4, "tag-a"),
 			subagents: {},
 		},
 		{
-			...rawRow(
-				CLAUDE_TIE_SESSION_ID,
-				claudeContent(),
-				5,
-				"tag-b",
-				NEWER_TIE_SESSION_DATE,
-			),
+			...rawRow(CLAUDE_TIE_SESSION_ID, claudeContent(), 5, "tag-b"),
 			subagents: {},
 		},
 	];
 	const codexTies = [
 		rawRow(CODEX_TIE_SESSION_ID, CODEX_CONTENT, 4, "tag-a"),
-		rawRow(
-			CODEX_TIE_SESSION_ID,
-			CODEX_CONTENT,
-			5,
-			"tag-b",
-			NEWER_TIE_SESSION_DATE,
-		),
+		rawRow(CODEX_TIE_SESSION_ID, CODEX_CONTENT, 5, "tag-b"),
 	];
-	await executor.insert({
-		table: `${database}.claude_sessions`,
-		values: reverse ? [...claudeTies].reverse() : claudeTies,
-	});
-	await executor.insert({
-		table: `${database}.codex_sessions`,
-		values: reverse ? [...codexTies].reverse() : codexTies,
-	});
+	for (const row of reverse ? [...claudeTies].reverse() : claudeTies) {
+		await executor.insert({
+			table: `${database}.claude_sessions`,
+			values: [row],
+		});
+	}
+	for (const row of reverse ? [...codexTies].reverse() : codexTies) {
+		await executor.insert({
+			table: `${database}.codex_sessions`,
+			values: [row],
+		});
+	}
 	await executor.insert({
 		table: `${database}.claude_sessions`,
 		values: [
@@ -563,25 +575,28 @@ async function readTieRows(
 ): Promise<TieRow[]> {
 	const suffix = fromSnapshot ? "_f16_backfill_source_20260826" : "";
 	return executor.query<TieRow>(`
-		SELECT
-			source,
-			filter_version,
-			tag,
-			toString(toUnixTimestamp64Milli(session_date)) AS session_date_ms
-		FROM (
 			SELECT
-				'claude' AS source,
+				source,
 				filter_version,
 				tag,
-				session_date
+				toString(toUnixTimestamp64Milli(ingested_at)) AS ingested_at_ms,
+				toString(toUnixTimestamp64Milli(session_date)) AS session_date_ms
+			FROM (
+			SELECT
+				'claude' AS source,
+					filter_version,
+					tag,
+					ingested_at,
+					session_date
 			FROM ${database}.claude_sessions${suffix}
 			WHERE session_id = '${CLAUDE_TIE_SESSION_ID}'
 			UNION ALL
 			SELECT
 				'codex' AS source,
-				filter_version,
-				tag,
-				session_date
+					filter_version,
+					tag,
+					ingested_at,
+					session_date
 			FROM ${database}.codex_sessions${suffix}
 			WHERE session_id = '${CODEX_TIE_SESSION_ID}'
 		)
@@ -596,8 +611,25 @@ async function runRehearsal(
 	await createPreF16Tables(database);
 	await seedFixtures(database, reverse);
 	const sourceTies = await readTieRows(database, false);
-	await executeMigration(DDL_MIGRATION, database);
+	const [sourceTieParts] = await executor.query<{ minimum_parts: number }>(`
+		SELECT min(parts) AS minimum_parts
+		FROM (
+			SELECT countDistinct(_part) AS parts
+			FROM ${database}.claude_sessions
+			WHERE session_id = '${CLAUDE_TIE_SESSION_ID}'
+			UNION ALL
+			SELECT countDistinct(_part) AS parts
+			FROM ${database}.codex_sessions
+			WHERE session_id = '${CODEX_TIE_SESSION_ID}'
+		)
+	`);
+	await executeMigration(PRESERVATION_MIGRATION, database);
 	const snapshotTies = await readTieRows(database, true);
+	await executor.execute(`
+		INSERT INTO ${database}.f16_revision_cutover_control_20260826
+		VALUES ('preservation_verified', 1, 'rehearsal', now64(3), 'integration-test')
+	`);
+	await executeMigration(DDL_MIGRATION, database);
 	await executeMigration(BACKFILL_MIGRATION, database);
 
 	const winners = await executor.query<WinnerRow>(`
@@ -662,10 +694,16 @@ async function runRehearsal(
 		CROSS JOIN system.tables AS system_tables
 		WHERE system_tables.database = '${database}'
 			AND system_tables.name = 'session_language_signals'
+		`);
+	await executor.execute(`
+		INSERT INTO ${database}.f16_revision_cutover_control_20260826
+		VALUES ('post_backfill_verified', 1, 'rehearsal', now64(3), 'integration-test')
 	`);
+	await executeMigration(CLEANUP_MIGRATION, database);
 	return {
 		analyticsCoverage: Number(coverage?.count ?? 0),
 		invalidSuffixes: Number(suffixes?.count ?? 0),
+		minimumSourceTieParts: Number(sourceTieParts?.minimum_parts ?? 0),
 		minimumRevision: minimum?.revision ?? "0",
 		signalEngine: signal?.engine_full ?? "",
 		signalRawRevision: signal?.raw_revision ?? "missing",
@@ -682,11 +720,19 @@ afterAll(async () => {
 });
 
 describe("F16 destructive migration execution rehearsal", () => {
-	test("executes both checked-in migrations deterministically on adversarial history", async () => {
+	test("executes all checked-in phases deterministically on separate-part equal-key history", async () => {
+		assertMigrationUsesSupportedGrammar(
+			PRESERVATION_MIGRATION,
+			"F16 preservation migration",
+		);
 		assertMigrationUsesSupportedGrammar(DDL_MIGRATION, "F16 DDL migration");
 		assertMigrationUsesSupportedGrammar(
 			BACKFILL_MIGRATION,
 			"F16 backfill migration",
+		);
+		assertMigrationUsesSupportedGrammar(
+			CLEANUP_MIGRATION,
+			"F16 cleanup migration",
 		);
 		for (const [unsupportedSql, expectedFailure] of [
 			["SELECT $$rudel.literal$$", "heredoc"],
@@ -719,25 +765,29 @@ describe("F16 destructive migration execution rehearsal", () => {
 		const expectedTies: TieRow[] = [
 			{
 				filter_version: 4,
+				ingested_at_ms: "1787220000123",
 				session_date_ms: "1787216400000",
 				source: "claude",
 				tag: "tag-a",
 			},
 			{
 				filter_version: 5,
-				session_date_ms: "1787216400001",
+				ingested_at_ms: "1787220000123",
+				session_date_ms: "1787216400000",
 				source: "claude",
 				tag: "tag-b",
 			},
 			{
 				filter_version: 4,
+				ingested_at_ms: "1787220000123",
 				session_date_ms: "1787216400000",
 				source: "codex",
 				tag: "tag-a",
 			},
 			{
 				filter_version: 5,
-				session_date_ms: "1787216400001",
+				ingested_at_ms: "1787220000123",
+				session_date_ms: "1787216400000",
 				source: "codex",
 				tag: "tag-b",
 			},
@@ -747,6 +797,8 @@ describe("F16 destructive migration execution rehearsal", () => {
 		expect(second.sourceTies).toEqual(expectedTies);
 		expect(first.snapshotTies).toEqual(expectedTies);
 		expect(second.snapshotTies).toEqual(expectedTies);
+		expect(first.minimumSourceTieParts).toBeGreaterThanOrEqual(2);
+		expect(second.minimumSourceTieParts).toBeGreaterThanOrEqual(2);
 		expect(first.winners).toHaveLength(2);
 		expect(first.winners).toEqual(second.winners);
 		expect(

@@ -24,6 +24,11 @@ function countOccurrences(value: string, search: string): number {
 describe("session_analytics identity migration", () => {
 	test("keeps the F16 deployed MVs synchronized on revision ordering", () => {
 		const normalizedMigration = normalizeSql(revisionMigration);
+		const mvBarrierIndex = revisionMigration.indexOf("-- F16-C27");
+		expect(mvBarrierIndex).toBeGreaterThan(-1);
+		const deployedMvMigration = normalizeSql(
+			revisionMigration.slice(0, mvBarrierIndex),
+		);
 
 		expect(
 			countOccurrences(
@@ -38,9 +43,9 @@ describe("session_analytics identity migration", () => {
 			),
 		).toBe(1);
 
-		expect(countOccurrences(normalizedMigration, "ROW_NUMBER() OVER")).toBe(2);
+		expect(countOccurrences(deployedMvMigration, "ROW_NUMBER() OVER")).toBe(2);
 		expect(
-			countOccurrences(normalizedMigration, "ORDER BY cs.revision DESC"),
+			countOccurrences(deployedMvMigration, "ORDER BY cs.revision DESC"),
 		).toBe(2);
 		expect(normalizedMigration).not.toContain("ORDER BY cs.ingested_at DESC");
 	});

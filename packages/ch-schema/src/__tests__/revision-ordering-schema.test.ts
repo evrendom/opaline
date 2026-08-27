@@ -8,6 +8,13 @@ import sessionLanguageSignals from "../db/schema/session-language-signals.js";
 import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/claude-session-analytics.js";
 import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
 
+const preservationMigration = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090550_f16_preservation.sql",
+	),
+	"utf8",
+);
 const ddlMigration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
 	"utf8",
@@ -17,6 +24,17 @@ const backfillMigration = readFileSync(
 		import.meta.dir,
 		"../../chx/migrations/20260826090600_f16_backfill.sql",
 	),
+	"utf8",
+);
+const cleanupMigration = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090610_f16_cleanup.sql",
+	),
+	"utf8",
+);
+const migrationExecutor = readFileSync(
+	resolve(import.meta.dir, "../../scripts/migrate-f16.ts"),
 	"utf8",
 );
 
@@ -43,12 +61,14 @@ describe("F16 revision ordering schema", () => {
 		}
 	});
 
-	test("keeps tables before MVs with exact propagation waits", () => {
+	test("preserves rows before a fail-closed cutover with polled visibility barriers", () => {
 		const lastTable = ddlMigration.lastIndexOf(
-			"CREATE TABLE IF NOT EXISTS rudel.session_analytics",
+			"CREATE TABLE rudel.session_analytics",
 		);
 		const firstView = ddlMigration.indexOf("CREATE MATERIALIZED VIEW");
-		const firstWait = ddlMigration.indexOf("SELECT sleepEachRow(1)");
+		const verificationReceipt = preservationMigration.indexOf(
+			"INSERT INTO rudel.f16_revision_cutover_verification_20260826",
+		);
 
 		expect(lastTable).toBeGreaterThan(-1);
 		expect(firstView).toBeGreaterThan(lastTable);
@@ -74,45 +94,51 @@ describe("F16 revision ordering schema", () => {
 				table: "session_language_signals",
 			},
 		]) {
-			const create = `CREATE TABLE rudel.${snapshot.table}_f16_backfill_source_20260826\n(`;
+			const create = `CREATE TABLE IF NOT EXISTS rudel.${snapshot.table}_f16_backfill_source_20260826\n(`;
 			const insert = `INSERT INTO rudel.${snapshot.table}_f16_backfill_source_20260826\n(`;
 			const source = `FROM rudel.${snapshot.table};`;
-			const createIndex = ddlMigration.indexOf(create);
-			const insertIndex = ddlMigration.indexOf(insert, createIndex);
+			const createIndex = preservationMigration.indexOf(create);
+			const insertIndex = preservationMigration.indexOf(insert, createIndex);
 			const sourceEnd =
-				ddlMigration.indexOf(source, insertIndex) + source.length;
-			const snapshotSql = ddlMigration.slice(createIndex, sourceEnd);
-			const createColumnsEnd = ddlMigration.indexOf(
+				preservationMigration.indexOf(source, insertIndex) + source.length;
+			const snapshotSql = preservationMigration.slice(createIndex, sourceEnd);
+			const createColumnsEnd = preservationMigration.indexOf(
 				"\n) ENGINE = MergeTree",
 				createIndex,
 			);
-			const insertColumnsEnd = ddlMigration.indexOf(
+			const insertColumnsEnd = preservationMigration.indexOf(
 				"\n)\nSETTINGS async_insert=0",
 				insertIndex,
 			);
 			const selectColumnsStart =
-				ddlMigration.indexOf("\nSELECT\n", insertColumnsEnd) +
+				preservationMigration.indexOf("\nSELECT\n", insertColumnsEnd) +
 				"\nSELECT\n".length;
-			const selectColumnsEnd = ddlMigration.indexOf(
+			const selectColumnsEnd = preservationMigration.indexOf(
 				`\n${source}`,
 				selectColumnsStart,
 			);
 			const extractColumns = (sql: string) =>
 				[...sql.matchAll(/`([^`]+)`/gu)].map((match) => match[1]);
 			const createColumns = extractColumns(
-				ddlMigration.slice(createIndex + create.length, createColumnsEnd),
+				preservationMigration.slice(
+					createIndex + create.length,
+					createColumnsEnd,
+				),
 			);
 			const insertColumns = extractColumns(
-				ddlMigration.slice(insertIndex + insert.length, insertColumnsEnd),
+				preservationMigration.slice(
+					insertIndex + insert.length,
+					insertColumnsEnd,
+				),
 			);
 			const selectColumns = extractColumns(
-				ddlMigration.slice(selectColumnsStart, selectColumnsEnd),
+				preservationMigration.slice(selectColumnsStart, selectColumnsEnd),
 			);
 
 			expect(createIndex).toBeGreaterThan(-1);
 			expect(insertIndex).toBeGreaterThan(createIndex);
 			expect(sourceEnd).toBeGreaterThan(insertIndex);
-			expect(sourceEnd).toBeLessThan(firstWait);
+			expect(sourceEnd).toBeLessThan(verificationReceipt);
 			expect(snapshotSql).toContain(") ENGINE = MergeTree\n");
 			expect(snapshotSql).toContain(snapshot.keyClauses);
 			expect(snapshotSql).toContain("SETTINGS async_insert=0\nSELECT\n");
@@ -120,27 +146,52 @@ describe("F16 revision ordering schema", () => {
 			expect(insertColumns).toEqual(createColumns);
 			expect(selectColumns).toEqual(insertColumns);
 		}
-		expect(ddlMigration).not.toContain("CLONE AS");
-		expect(ddlMigration.match(/SETTINGS async_insert=0/gu)).toHaveLength(4);
-		// ClickHouse caps a single sleep() call at three seconds (TOO_SLOW), so
-		// each propagation boundary sleeps one second per row across eight rows.
-		// The three-second sleep cap applies per block, so each boundary sleeps
-		// one second per single-row block across eight blocks.
+		expect(preservationMigration).not.toContain("CLONE AS");
 		expect(
-			ddlMigration.match(
-				/SELECT sleepEachRow\(1\) FROM numbers\(8\) SETTINGS max_block_size = 1;/gu,
-			),
-		).toHaveLength(3);
+			preservationMigration.match(/SETTINGS async_insert=0/gu),
+		).toHaveLength(4);
+		expect(preservationMigration).toContain("source_equal_key_version_groups");
+		expect(preservationMigration).toContain(
+			"source_physical_rows > snapshot_physical_rows",
+		);
+		expect(ddlMigration).toContain("AS f16_poll_rename_visible");
+		expect(ddlMigration).toContain("AS f16_poll_canonical_tables_visible");
+		expect(ddlMigration).toContain("AS f16_poll_materialized_views_visible");
+		expect(ddlMigration).toContain("RECOVERY: F16-CUTOVER-AFTER-RENAME");
+		expect(ddlMigration).toContain(
+			"maxIf(approved_at, checkpoint = 'preservation_verified')",
+		);
 		expect(ddlMigration).not.toContain("SELECT sleep(");
+		expect(ddlMigration).not.toContain("SELECT sleepEachRow(");
+		expect(ddlMigration).not.toMatch(
+			/CREATE TABLE IF NOT EXISTS rudel\.(?:claude_sessions|codex_sessions|session_analytics|session_language_signals)\b/u,
+		);
+		expect(ddlMigration).not.toMatch(
+			/CREATE MATERIALIZED VIEW IF NOT EXISTS rudel\./u,
+		);
+		expect(migrationExecutor).toContain("timeoutMs = input.requestTimeoutMs");
+		expect(migrationExecutor).toContain("AbortSignal.timeout(timeoutMs)");
+		expect(migrationExecutor).toContain(
+			'endpoint.searchParams.set("distributed_ddl_output_mode", "throw")',
+		);
+		expect(migrationExecutor).toContain('"distributed_ddl_task_timeout"');
+		expect(migrationExecutor).toContain(
+			'"SELECT sleepEachRow(1) FROM numbers(1) SETTINGS max_block_size = 1"',
+		);
+		expect(migrationExecutor).toContain("rudel-f16-");
+		expect(migrationExecutor).toContain("crypto.randomUUID()");
+		expect(migrationExecutor).toContain("f16_poll_no_orphaned_queries");
+		expect(migrationExecutor).toContain("deadline - Date.now()");
+		expect(migrationExecutor).toContain("F16 journal is out of order");
 		expect(ddlMigration).toContain(
 			"rudel.claude_sessions TO rudel.claude_sessions_f16_backup_20260826",
 		);
 		expect(ddlMigration).toContain(
 			"rudel.session_language_signals TO rudel.session_language_signals_f16_backup_20260826",
 		);
-		expect(ddlMigration.match(/ReplacingMergeTree\(revision\)/gu)).toHaveLength(
-			3,
-		);
+		expect(
+			ddlMigration.match(/\) ENGINE = ReplacingMergeTree\(revision\)/gu),
+		).toHaveLength(3);
 		expect(ddlMigration).toContain("ReplacingMergeTree(signal_version)");
 		expect(
 			ddlMigration.match(/MODIFY COLUMN `extraction_seq` UInt128/gu),
@@ -155,6 +206,11 @@ describe("F16 revision ordering schema", () => {
 		expect(backfillMigration.match(/SETTINGS async_insert=0/gu)).toHaveLength(
 			4,
 		);
+		expect(
+			backfillMigration.match(
+				/TRUNCATE TABLE rudel\.(?:claude_sessions|codex_sessions|session_analytics|session_language_signals);/gu,
+			),
+		).toHaveLength(4);
 		expect(backfillMigration).not.toMatch(/SELECT\s+\*/u);
 		expect(backfillMigration).toContain("INSERT INTO rudel.claude_sessions\n(");
 		expect(backfillMigration).toContain("INSERT INTO rudel.codex_sessions\n(");
@@ -196,14 +252,35 @@ describe("F16 revision ordering schema", () => {
 		expect(backfillMigration).toContain(
 			"FROM rudel.session_language_signals_f16_backfill_source_20260826",
 		);
-		expect(backfillMigration).not.toContain("_f16_backup_20260826");
+		expect(backfillMigration).not.toMatch(
+			/FROM rudel\.[a-z_]+_f16_backup_20260826/u,
+		);
 		expect(backfillMigration).toContain(
 			"ORDER BY tuple(\n\t\t\t\t`user_id`,\n\t\t\t\t`raw_ingested_at`,\n\t\t\t\t`member_swears`,\n\t\t\t\t`member_apologies`,\n\t\t\t\t`member_positive`,\n\t\t\t\t`model_swears`,\n\t\t\t\t`model_apologies`,\n\t\t\t\t`model_positive`\n\t\t\t) DESC",
 		);
 		expect(backfillMigration).toContain("WHERE signals.`dedupe_rank` = 1");
+		expect(backfillMigration).not.toMatch(
+			/DROP TABLE (?:IF EXISTS )?rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/u,
+		);
+		expect(backfillMigration).toContain(
+			"f16_revision_cutover_postbackfill_verification_20260826",
+		);
+		expect(backfillMigration).toContain("`expected_logical_rows` UInt64");
+		expect(backfillMigration).toContain("`canonical_logical_rows` UInt64");
+		expect(backfillMigration).toContain("`canonical_physical_rows` UInt64");
+		expect(backfillMigration).toContain(
+			"expected_logical_rows != canonical_logical_rows",
+		);
+		expect(cleanupMigration).toContain(
+			"expected_logical_rows != canonical_logical_rows",
+		);
+		expect(cleanupMigration).toContain("post_backfill_verified");
+		expect(cleanupMigration).toContain(
+			"maxIf(approved_at, checkpoint = 'post_backfill_verified')",
+		);
 		expect(
-			backfillMigration.match(
-				/DROP TABLE rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/gu,
+			cleanupMigration.match(
+				/DROP TABLE IF EXISTS rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/gu,
 			),
 		).toHaveLength(4);
 		expect(backfillMigration).toContain("`revision`,\n\t`ingested_at`");

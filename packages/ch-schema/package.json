@@ -19,6 +19,7 @@
 		"ch:generate": "bun --bun chkit generate",
 		"ch:generate:dryrun": "bun --bun chkit generate --dryrun",
 		"ch:migrate": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit migrate --apply'",
+		"ch:migrate:f16": "CLICKHOUSE_DB=default bun scripts/migrate-f16.ts",
 		"ch:status": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit status'",
 		"ch:codegen": "bun --bun chkit codegen",
 		"ch:drift": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit drift'",

@@ -4,6 +4,6 @@
 		"noEmit": true,
 		"types": ["bun-types"]
 	},
-	"include": ["src", "scripts/chcli-connect.ts"],
+	"include": ["src", "scripts/chcli-connect.ts", "scripts/migrate-f16.ts"],
 	"exclude": ["src/generated"]
 }

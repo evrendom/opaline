@@ -2,6 +2,9 @@ import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
+import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
+
+export { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
 const logger = getLogger(["rudel", "api", "session-ownership"]);
 
@@ -77,15 +80,6 @@ interface UsageBackfillOwnershipDatabaseRow {
 	user_id: string;
 }
 
-export class UsageExtractionSupersededError extends Error {
-	constructor() {
-		super(
-			"Usage extraction was superseded before its receipt was confirmed; retry the upload",
-		);
-		this.name = "UsageExtractionSupersededError";
-	}
-}
-
 export async function claimSessionIngestOwnership(
 	organizationId: string,
 	sessionId: string,
@@ -112,8 +106,8 @@ export async function recordSessionIngestContent(
 	revision: string,
 	usageReceipt?: UsageExtractionReceiptRecord,
 ): Promise<void> {
-	// Raw bookkeeping follows the shared revision ordering. Usage extraction is
-	// guarded independently by its reserved generation.
+	// Raw bookkeeping follows the shared revision ordering. Usage extraction must
+	// match both its reserved generation and the raw revision it describes.
 	const ingestedAtIso = ingestedAt.toISOString();
 	return sqlClient.begin(async (transaction) => {
 		await transaction.unsafe(
@@ -163,10 +157,11 @@ export async function recordSessionIngestContent(
 				last_usage_diagnostics_json = $7,
 				last_usage_completed_generation = $8,
 				last_usage_completed_at = NOW()
-			WHERE organization_id = $9
-				AND session_id = $10
-				AND usage_extraction_generation = $8
-			RETURNING usage_extraction_generation::text AS generation
+				WHERE organization_id = $9
+					AND session_id = $10
+					AND usage_extraction_generation = $8
+					AND last_revision = $11::bigint
+				RETURNING usage_extraction_generation::text AS generation
 			`,
 			[
 				contentSha256,
@@ -179,6 +174,7 @@ export async function recordSessionIngestContent(
 				usageReceipt.generation,
 				organizationId,
 				sessionId,
+				revision,
 			],
 		);
 		if (completed.length !== 1) {
@@ -191,20 +187,26 @@ export async function reserveUsageExtractionGeneration(
 	organizationId: string,
 	sessionId: string,
 	userId: string,
+	expectedRevision: string,
+	database: postgres.Sql | postgres.ReservedSql = sqlClient,
 ): Promise<string> {
-	const [row] = await sqlClient<Array<{ generation: string }>>`
-		UPDATE session_ownership
-		SET usage_extraction_generation = GREATEST(
-			usage_extraction_generation + 1,
-			FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
-		)
-		WHERE organization_id = ${organizationId}
-			AND session_id = ${sessionId}
-			AND user_id = ${userId}
-		RETURNING usage_extraction_generation::text AS generation
-	`;
+	const [row] = await database.unsafe<Array<{ generation: string }>>(
+		`
+			UPDATE session_ownership
+			SET usage_extraction_generation = GREATEST(
+				usage_extraction_generation + 1,
+				FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+			)
+			WHERE organization_id = $1
+				AND session_id = $2
+				AND user_id = $3
+				AND last_revision = $4::bigint
+			RETURNING usage_extraction_generation::text AS generation
+		`,
+		[organizationId, sessionId, userId, expectedRevision],
+	);
 	if (!row) {
-		throw new Error("Usage extraction generation reservation failed");
+		throw new UsageExtractionSupersededError();
 	}
 	return row.generation;
 }

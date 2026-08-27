@@ -12,6 +12,7 @@ import {
 	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
 } from "@rudel/api-routes";
 import {
+	extractUsageEvents,
 	USAGE_EVENT_EXTRACTION_VERSION,
 	USAGE_EVENT_IDENTITY_VERSION,
 	USAGE_EVENT_MODEL_RATE_CARD_VERSION,
@@ -32,7 +33,10 @@ import {
 	type SessionRevisionTransactionRunner,
 } from "../services/session-revision.service.js";
 import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
-import { buildActiveUsageEventsCte } from "../services/usage-event-ingest.service.js";
+import {
+	buildActiveUsageEventsCte,
+	writeUsageExtraction,
+} from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -57,6 +61,7 @@ const OWNERSHIP_RACE_SESSION_ID = `${TEST_RUN_ID}_ownership_race`;
 const RECURRING_CONTENT_SESSION_ID = `${TEST_RUN_ID}_recurring_content`;
 const EXPIRED_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_expired_revision_receipt`;
 const FRESH_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_fresh_revision_receipt`;
+const INVERTED_USAGE_REVISION_SESSION_ID = `${TEST_RUN_ID}_inverted_usage_revision`;
 
 let server: ApiTestServer;
 let userId: string;
@@ -388,17 +393,29 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(initialClaim.owned);
+		const contentHash = "d".repeat(64);
+		await recordSessionIngestContent(
+			userId,
+			RECEIPT_SESSION_ID,
+			contentHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			"1",
+		);
 		const olderGeneration = await reserveUsageExtractionGeneration(
 			userId,
 			RECEIPT_SESSION_ID,
 			userId,
+			"1",
 		);
 		const latestGeneration = await reserveUsageExtractionGeneration(
 			userId,
 			RECEIPT_SESSION_ID,
 			userId,
+			"1",
 		);
-		const contentHash = "d".repeat(64);
 		const receipt = {
 			checksum: "e".repeat(64),
 			diagnostics: "[]",
@@ -427,7 +444,7 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(afterRejectedGeneration.owned);
-		expect(afterRejectedGeneration.lastContentSha256).toBeNull();
+		expect(afterRejectedGeneration.lastContentSha256).toBe(contentHash);
 		expect(afterRejectedGeneration.lastUsageContentSha256).toBeNull();
 		await expect(
 			recordSessionIngestContent(
@@ -437,8 +454,8 @@ describe("session ingest content bookkeeping", () => {
 				contentShape(2_000, 2),
 				5,
 				new Date("2026-08-03T09:30:00.000Z"),
-				new Date("2026-08-03T10:00:01.000Z"),
-				"2",
+				new Date("2026-08-03T10:00:00.000Z"),
+				"1",
 				{ ...receipt, generation: latestGeneration },
 			),
 		).resolves.toBeUndefined();
@@ -469,6 +486,16 @@ describe("session ingest content bookkeeping", () => {
 			userId,
 		);
 		assert(claim.owned);
+		await recordSessionIngestContent(
+			userId,
+			GENERATION_HEDGE_SESSION_ID,
+			"7".repeat(64),
+			contentShape(1_000, 1),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			"1",
+		);
 		const [beforeReservation] = await sqlClient<Array<{ epoch_ms: string }>>`
 			SELECT FLOOR(EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint::text AS epoch_ms
 		`;
@@ -478,6 +505,7 @@ describe("session ingest content bookkeeping", () => {
 				userId,
 				GENERATION_HEDGE_SESSION_ID,
 				userId,
+				"1",
 			),
 		);
 		const second = BigInt(
@@ -485,6 +513,7 @@ describe("session ingest content bookkeeping", () => {
 				userId,
 				GENERATION_HEDGE_SESSION_ID,
 				userId,
+				"1",
 			),
 		);
 		const [afterReservation] = await sqlClient<Array<{ epoch_ms: string }>>`
@@ -495,6 +524,144 @@ describe("session ingest content bookkeeping", () => {
 		expect(first).toBeGreaterThanOrEqual(BigInt(beforeReservation.epoch_ms));
 		expect(first).toBeLessThanOrEqual(BigInt(afterReservation.epoch_ms));
 		expect(second).toBeGreaterThan(first);
+	});
+
+	test("rejects an older extraction that reserves after a newer raw revision on another instance", async () => {
+		const claim = await claimSessionIngestOwnership(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			userId,
+		);
+		assert(claim.owned);
+		const connectionString = process.env.PG_CONNECTION_STRING;
+		assert(connectionString);
+		const olderInstance = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const newerInstance = postgres(connectionString, {
+			max: 1,
+			prepare: false,
+		});
+		const olderHash = "4".repeat(64);
+		const newerHash = "5".repeat(64);
+		const olderRevision = "100";
+		const newerRevision = "101";
+
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			olderHash,
+			contentShape(1_000, 1),
+			5,
+			new Date("2026-08-03T09:30:00.000Z"),
+			new Date("2026-08-03T10:00:00.000Z"),
+			olderRevision,
+		);
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			newerHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:31:00.000Z"),
+			new Date("2026-08-03T10:01:00.000Z"),
+			newerRevision,
+		);
+
+		const newerInput = makeClaudeInput(INVERTED_USAGE_REVISION_SESSION_ID, 1);
+		const newerExtraction = extractUsageEvents({
+			content: newerInput.content,
+			organizationId: userId,
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			subagents: { worker: newerInput.subagents?.[0]?.content ?? "" },
+			userId,
+		});
+		if (newerExtraction.status !== "complete") {
+			throw new Error("Expected the newer usage extraction to complete");
+		}
+		const newerGeneration = await reserveUsageExtractionGeneration(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			userId,
+			newerRevision,
+			newerInstance,
+		);
+		await writeUsageExtraction(getClickhouse(), {
+			contentSha256: newerHash,
+			extraction: newerExtraction,
+			filterVersion: 5,
+			generation: newerGeneration,
+			ingestedAt: new Date("2026-08-03T10:01:00.000Z"),
+			organizationId: userId,
+			replaceAbsentEvents: true,
+			sessionDate: new Date("2026-08-03T09:31:00.000Z"),
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			userId,
+		});
+		await recordSessionIngestContent(
+			userId,
+			INVERTED_USAGE_REVISION_SESSION_ID,
+			newerHash,
+			contentShape(2_000, 2),
+			5,
+			new Date("2026-08-03T09:31:00.000Z"),
+			new Date("2026-08-03T10:01:00.000Z"),
+			newerRevision,
+			{
+				checksum: newerExtraction.receipt.checksum,
+				diagnostics: JSON.stringify(newerExtraction.diagnostics),
+				eventCount: newerExtraction.receipt.eventCount,
+				extractionVersion: newerExtraction.receipt.extractionVersion,
+				eventIdentityVersion: newerExtraction.receipt.eventIdentityVersion,
+				generation: newerGeneration,
+				modelRateCardVersion: newerExtraction.receipt.modelRateCardVersion,
+			},
+		);
+
+		// The older instance finishes its scan only after the newer generation and
+		// receipt are durable, then tries to reserve in the inverted order.
+		const olderInput = makeClaudeInput(INVERTED_USAGE_REVISION_SESSION_ID, 0);
+		const olderExtraction = extractUsageEvents({
+			content: olderInput.content,
+			organizationId: userId,
+			sessionId: INVERTED_USAGE_REVISION_SESSION_ID,
+			source: "claude_code",
+			subagents: {},
+			userId,
+		});
+		expect(olderExtraction.status).toBe("complete");
+		await expect(
+			reserveUsageExtractionGeneration(
+				userId,
+				INVERTED_USAGE_REVISION_SESSION_ID,
+				userId,
+				olderRevision,
+				olderInstance,
+			),
+		).rejects.toBeInstanceOf(UsageExtractionSupersededError);
+
+		const latestRows = await readLatestUsageRows(
+			INVERTED_USAGE_REVISION_SESSION_ID,
+		);
+		expect(latestRows.length).toBeGreaterThan(1);
+		expect(latestRows.every((row) => row.content_sha256 === newerHash)).toBe(
+			true,
+		);
+		expect(latestRows.some((row) => row.is_deleted === 1)).toBe(false);
+		expect(
+			latestRows.some(
+				(row) =>
+					row.record_kind === "receipt" &&
+					row.event_version === newerGeneration,
+			),
+		).toBe(true);
+		await Promise.all([
+			olderInstance.end({ timeout: 5 }),
+			newerInstance.end({ timeout: 5 }),
+		]);
 	});
 
 	test("backfill generation reservation loses to a newer live snapshot", async () => {
@@ -737,6 +904,37 @@ async function readActiveUsageEventCount(sessionId: string): Promise<number> {
 		},
 	});
 	return row?.event_count ?? 0;
+}
+
+async function readLatestUsageRows(sessionId: string): Promise<
+	Array<{
+		content_sha256: string;
+		event_version: string;
+		is_deleted: number;
+		record_kind: string;
+	}>
+> {
+	return getClickhouse().query({
+		query: `
+			SELECT
+				content_sha256,
+				toString(event_version) AS event_version,
+				is_deleted,
+				record_kind
+			FROM (
+				SELECT *
+				FROM rudel.usage_events
+				WHERE organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND source = 'claude_code'
+					AND session_id = {sessionId:String}
+				ORDER BY event_version DESC
+				LIMIT 1 BY event_id
+			)
+			ORDER BY record_kind, event_version
+		`,
+		query_params: { organizationId: userId, sessionId, userId },
+	});
 }
 
 async function rawClaudeSessionExists(sessionId: string): Promise<boolean> {
