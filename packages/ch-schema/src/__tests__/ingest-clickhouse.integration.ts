@@ -98,9 +98,14 @@ describe("ingestRudelClaudeSessions", () => {
 		await ingestRudelClaudeSessions(executor, [newer]);
 		await ingestRudelClaudeSessions(executor, [older]);
 
+		// Do not require both physical rows: the ReplacingMergeTree background
+		// merge may collapse the same-key pair to the winner at any time, which
+		// made a `count() = 2` gate racy. argMax must return the higher
+		// revision in either physical state; the both-parts-coexist case is
+		// covered by the migration rehearsal with merges stopped.
 		const results = await waitForQuery<{ content: string; revision: string }>(
 			executor,
-			`SELECT argMax(content, raw.revision) AS content, toString(max(raw.revision)) AS revision FROM rudel.claude_sessions AS raw WHERE session_id = '${revisionTestId}' GROUP BY session_id HAVING count() = 2`,
+			`SELECT argMax(content, raw.revision) AS content, toString(max(raw.revision)) AS revision FROM rudel.claude_sessions AS raw WHERE session_id = '${revisionTestId}' GROUP BY session_id HAVING count() >= 1`,
 		);
 
 		expect(results).toEqual([
