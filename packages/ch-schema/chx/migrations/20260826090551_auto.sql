@@ -2,9 +2,9 @@
 -- generated-at: 2026-08-26T09:05:51.426Z
 -- cli-version: 0.1.0-beta.16
 -- definition-count: 12
--- operation-count: 14
+-- operation-count: 11
 -- rename-suggestion-count: 0
--- risk-summary: safe=4, caution=7, danger=3
+-- risk-summary: safe=4, caution=4, danger=3
 
 -- F16-C01: Enforce the controlled executor with timeout and DDL settings.
 SELECT throwIf(
@@ -33,8 +33,80 @@ SELECT throwIf(
 	OR countIf(source_physical_rows > snapshot_physical_rows) > 0
 	OR countIf(
 		source_equal_key_version_groups > snapshot_equal_key_version_groups
+	) > 0
+	OR countIf(
+		table_name = 'claude_sessions'
+		AND snapshot_physical_rows
+			!= (SELECT count() FROM rudel.claude_sessions_f16_backfill_source_20260826)
+	) > 0
+	OR countIf(
+		table_name = 'codex_sessions'
+		AND snapshot_physical_rows
+			!= (SELECT count() FROM rudel.codex_sessions_f16_backfill_source_20260826)
+	) > 0
+	OR countIf(
+		table_name = 'session_analytics'
+		AND snapshot_physical_rows
+			!= (SELECT count() FROM rudel.session_analytics_f16_backfill_source_20260826)
+	) > 0
+	OR countIf(
+		table_name = 'session_language_signals'
+		AND snapshot_physical_rows
+			!= (SELECT count() FROM rudel.session_language_signals_f16_backfill_source_20260826)
+	) > 0
+	OR countIf(
+		table_name = 'claude_sessions'
+		AND snapshot_equal_key_version_groups != (
+			SELECT count()
+			FROM
+			(
+				SELECT 1
+				FROM rudel.claude_sessions_f16_backfill_source_20260826
+				GROUP BY organization_id, session_date, session_id, ingested_at
+				HAVING count() > 1
+			)
+		)
+	) > 0
+	OR countIf(
+		table_name = 'codex_sessions'
+		AND snapshot_equal_key_version_groups != (
+			SELECT count()
+			FROM
+			(
+				SELECT 1
+				FROM rudel.codex_sessions_f16_backfill_source_20260826
+				GROUP BY organization_id, session_date, session_id, ingested_at
+				HAVING count() > 1
+			)
+		)
+	) > 0
+	OR countIf(
+		table_name = 'session_analytics'
+		AND snapshot_equal_key_version_groups != (
+			SELECT count()
+			FROM
+			(
+				SELECT 1
+				FROM rudel.session_analytics_f16_backfill_source_20260826
+				GROUP BY source, organization_id, user_id, session_id, ingested_at
+				HAVING count() > 1
+			)
+		)
+	) > 0
+	OR countIf(
+		table_name = 'session_language_signals'
+		AND snapshot_equal_key_version_groups != (
+			SELECT count()
+			FROM
+			(
+				SELECT 1
+				FROM rudel.session_language_signals_f16_backfill_source_20260826
+				GROUP BY organization_id, session_date, session_id, source, scanned_at
+				HAVING count() > 1
+			)
+		)
 	) > 0,
-	'F16 cutover aborted: durable preservation verification is incomplete or reports loss'
+	'F16 cutover aborted: preservation receipt is incomplete, lossy, or stale versus the live snapshots'
 )
 FROM rudel.f16_revision_cutover_verification_20260826 FINAL
 WHERE phase = 'preservation';
@@ -76,7 +148,8 @@ WHERE database = 'rudel';
 
 -- operation: drop_table key=table:rudel.claude_sessions risk=danger
 -- Preserve the pre-F16 tables for verified backfill and owner-controlled rollback.
--- F16-C08: This four-table rename is atomic.
+-- F16-C08: Multi-entity RENAME is non-atomic. C04 and recovery fail closed on
+-- a partial one-to-three backup state for explicit owner reconciliation.
 RENAME TABLE
 	rudel.claude_sessions TO rudel.claude_sessions_f16_backup_20260826,
 	rudel.codex_sessions TO rudel.codex_sessions_f16_backup_20260826,
@@ -168,18 +241,6 @@ SELECT throwIf(
 ) AS f16_poll_rename_visible
 FROM system.tables
 WHERE database = 'rudel';
-
--- operation: alter_table_modify_column key=table:rudel.skill_receipts:column:extraction_seq risk=caution
--- F16-C17
-ALTER TABLE rudel.skill_receipts MODIFY COLUMN `extraction_seq` UInt128;
-
--- operation: alter_table_modify_column key=table:rudel.skill_uses:column:extraction_seq risk=caution
--- F16-C18
-ALTER TABLE rudel.skill_uses MODIFY COLUMN `extraction_seq` UInt128;
-
--- operation: alter_table_modify_column key=table:rudel.skill_version_contents:column:extraction_seq risk=caution
--- F16-C19
-ALTER TABLE rudel.skill_version_contents MODIFY COLUMN `extraction_seq` UInt128;
 
 -- operation: create_table key=table:rudel.claude_sessions risk=safe
 -- F16-C20: No IF NOT EXISTS; stale old metadata must fail loudly.

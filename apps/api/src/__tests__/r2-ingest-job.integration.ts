@@ -1696,6 +1696,23 @@ const CRASH_BOUNDARIES: {
 	},
 ];
 
+const SUPERSESSION_BOUNDARIES: {
+	label: string;
+	matches: (boundary: IngestProcessingBoundary) => boolean;
+}[] = [
+	{
+		label: "before usage reservation",
+		matches: (boundary) =>
+			boundary.store === "postgres" && boundary.target === "raw-receipt",
+	},
+	{
+		label: "before the final usage receipt",
+		matches: (boundary) =>
+			boundary.store === "clickhouse" &&
+			boundary.target === "rudel.usage_events",
+	},
+];
+
 describe("R2 ingest real processor crash recovery", () => {
 	test.each(
 		CRASH_BOUNDARIES,
@@ -1758,6 +1775,159 @@ describe("R2 ingest real processor crash recovery", () => {
 			status: "completed",
 		});
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
+	}, 180_000);
+
+	test.each(
+		SUPERSESSION_BOUNDARIES,
+	)("terminally converges an older job superseded $label", async ({
+		matches,
+	}) => {
+		const sessionId = `superseded-${crypto.randomUUID()}`;
+		const olderJobId = crypto.randomUUID();
+		const newerJobId = crypto.randomUUID();
+		const olderContent = buildRealClaudeTranscript(`superseded-${sessionId}`);
+		const newerContent = olderContent.replace(
+			"Please use the requested skill.",
+			"Please run the requested skill.",
+		);
+		const olderInitialized = await initializeUploadedJob(
+			olderJobId,
+			olderContent,
+			[],
+			sessionId,
+		);
+		const newerInitialized = await initializeUploadedJob(
+			newerJobId,
+			newerContent,
+			[],
+			sessionId,
+		);
+		const paused = createDeferred();
+		const resume = createDeferred();
+		let pauseObserved = false;
+		const failpoint: IngestProcessingFailpoint = async (boundary) => {
+			if (!pauseObserved && matches(boundary)) {
+				pauseObserved = true;
+				paused.resolve();
+				await resume.promise;
+			}
+		};
+
+		const olderCommit = commitR2IngestJob({
+			failpoint,
+			input: buildCompletionInput(olderInitialized),
+			process: createRealProcessor(failpoint),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		await paused.promise;
+		const newerResult = await commitR2IngestJob({
+			input: buildCompletionInput(newerInitialized),
+			process: createRealProcessor(undefined),
+			r2: fakeR2,
+			userId: USER_ID,
+		}).finally(resume.resolve);
+		const olderResult = await olderCommit;
+
+		expect(pauseObserved).toBe(true);
+		expect(newerResult.status).toBe("completed");
+		expect(olderResult.status).toBe("completed");
+		expect(olderResult.result.usageChecksum).toBeUndefined();
+		expect(
+			await getR2IngestJobStatus(olderInitialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: null,
+			status: "completed",
+		});
+		const [ledger] = await sqlClient<
+			Array<{ completed: number; processing: number }>
+		>`
+			SELECT
+				count(*) FILTER (WHERE status = 'completed')::int AS completed,
+				count(*) FILTER (WHERE status = 'processing')::int AS processing
+			FROM ingest_processing_ledger
+			WHERE organization_id = ${ORGANIZATION_ID}
+				AND session_id = ${sessionId}
+		`;
+		expect(ledger).toEqual({ completed: 2, processing: 0 });
+		expect(
+			olderInitialized.objects.every(
+				(object) => !fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		const receipts = await sqlClient<
+			Array<{ contentSha256: string; operationId: string; revision: string }>
+		>`
+			SELECT
+				content_sha256 AS "contentSha256",
+				operation_id AS "operationId",
+				revision::text AS revision
+			FROM session_ingest_revision
+			WHERE organization_id = ${ORGANIZATION_ID}
+				AND session_id = ${sessionId}
+		`;
+		const olderReceipt = receipts.find(
+			(receipt) => receipt.operationId === `r2:${olderJobId}`,
+		);
+		const newerReceipt = receipts.find(
+			(receipt) => receipt.operationId === `r2:${newerJobId}`,
+		);
+		if (!olderReceipt || !newerReceipt) {
+			throw new Error("Supersession revision receipts were not recorded");
+		}
+		expect(BigInt(olderReceipt.revision)).toBeLessThan(
+			BigInt(newerReceipt.revision),
+		);
+		const [rawWinner] = await getClickhouse().query<{
+			content: string;
+			revision: string;
+		}>({
+			query: `SELECT
+				argMax(content, revision) AS content,
+				toString(max(revision)) AS revision
+			FROM rudel.claude_sessions
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			HAVING count() > 0`,
+			query_params: {
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+				userId: USER_ID,
+			},
+		});
+		expect(rawWinner).toEqual({
+			content: newerContent,
+			revision: newerReceipt.revision,
+		});
+		const [analyticsWinner] = await getClickhouse().query<{ revision: string }>(
+			{
+				query: `SELECT toString(max(revision)) AS revision
+			FROM rudel.session_analytics
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND source = 'claude_code'
+				AND session_id = {sessionId:String}
+			HAVING count() > 0`,
+				query_params: {
+					organizationId: ORGANIZATION_ID,
+					sessionId,
+					userId: USER_ID,
+				},
+			},
+		);
+		expect(analyticsWinner?.revision).toBe(newerReceipt.revision);
+		const latestUsage = await readLatestUsageState(sessionId);
+		expect(latestUsage.length).toBeGreaterThan(1);
+		expect(
+			latestUsage.every(
+				(row) =>
+					row.contentSha256 === newerReceipt.contentSha256 &&
+					row.isDeleted === 0,
+			),
+		).toBe(true);
 	}, 180_000);
 
 	test("recovers an expired lease without duplicating an already-consistent MV target", async () => {
@@ -2328,6 +2498,7 @@ async function initializeUploadedJob(
 	jobId: Uuid,
 	mainContent: string,
 	subagents: readonly { agentId: string; content: string }[] = [],
+	sessionId: string = jobId,
 ): Promise<R2IngestInitOutput> {
 	const objects = [
 		{
@@ -2347,7 +2518,7 @@ async function initializeUploadedJob(
 		input: {
 			objects,
 			projectPath: "/test/r2",
-			sessionId: jobId,
+			sessionId,
 			source: "claude_code",
 		},
 		now: () => new Date("2026-08-25T10:00:00.000Z"),
@@ -2369,6 +2540,45 @@ async function initializeUploadedJob(
 		}
 	}
 	return initialized;
+}
+
+async function readLatestUsageState(
+	sessionId: string,
+): Promise<Array<{ contentSha256: string; isDeleted: number }>> {
+	return getClickhouse().query({
+		query: `SELECT
+			content_sha256 AS "contentSha256",
+			is_deleted AS "isDeleted"
+		FROM (
+			SELECT *
+			FROM rudel.usage_events
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			ORDER BY event_version DESC
+			LIMIT 1 BY event_id
+		)`,
+		query_params: {
+			organizationId: ORGANIZATION_ID,
+			sessionId,
+			userId: USER_ID,
+		},
+	});
+}
+
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+	let resolvePromise: (() => void) | undefined;
+	const promise = new Promise<void>((resolve) => {
+		resolvePromise = resolve;
+	});
+	return {
+		promise,
+		resolve() {
+			if (!resolvePromise)
+				throw new Error("Deferred promise was not initialized");
+			resolvePromise();
+		},
+	};
 }
 
 async function initializeUploadedByteJob(

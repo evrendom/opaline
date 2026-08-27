@@ -9,6 +9,13 @@ import {
 import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
 describe("ingest processing semaphore", () => {
+	test("describes supersession as terminal convergence", () => {
+		const error = new UsageExtractionSupersededError();
+
+		expect(error.message).toContain("newer raw session revision");
+		expect(error.message.toLowerCase()).not.toContain("retry");
+	});
+
 	test("bounds queued work and admits it after active work releases", async () => {
 		const semaphore = createIngestProcessingSemaphore({
 			maxActive: 1,

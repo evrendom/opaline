@@ -1,8 +1,11 @@
 # F16 session revision cutover
 
 This runbook applies cross-instance revision ordering to session ingest. The
-ClickHouse portion is a destructive, owner-operated migration. Never run it in
-CI, a release hook, or while either Fly or Vercel can accept ordinary uploads.
+production ClickHouse portion is a destructive, owner-operated migration.
+Never run the production protocol from CI or a release hook, or while either
+Fly or Vercel can accept ordinary uploads. The repository CI workflow has a
+separately gated disposable-database rehearsal described in section 4; it is
+not a production approval mechanism.
 
 The checked-in migration retains the old tables as
 `*_f16_backup_20260826`. Raw session tables are intentionally version-history
@@ -15,6 +18,12 @@ Logical-session reads must group by immutable
 
 - PostgreSQL: `packages/sql-schema/db/migrations/0029_tidy_human_fly.sql`
 - ClickHouse preservation: `20260826090550_f16_preservation.sql`
+- ClickHouse `skill_receipts` rebuild:
+  `20260826090550_f16_skill_receipts_rebuild.sql`
+- ClickHouse `skill_uses` rebuild:
+  `20260826090550_f16_skill_uses_rebuild.sql`
+- ClickHouse `skill_version_contents` rebuild:
+  `20260826090550_f16_skill_version_contents_rebuild.sql`
 - ClickHouse cutover DDL: `20260826090551_auto.sql`
 - ClickHouse backfill: `20260826090600_f16_backfill.sql`
 - ClickHouse cleanup: `20260826090610_f16_cleanup.sql`
@@ -311,6 +320,10 @@ WHERE database = 'rudel'
     'codex_sessions_f16_backfill_source_20260826',
     'session_analytics_f16_backfill_source_20260826',
     'session_language_signals_f16_backfill_source_20260826',
+    'skill_receipts_f16_uint64_backup_20260826',
+    'skill_uses_f16_uint64_backup_20260826',
+    'skill_version_contents_f16_uint64_backup_20260826',
+    'f16_revision_cutover_lease_20260826',
     'f16_revision_cutover_control_20260826',
     'f16_revision_cutover_verification_20260826',
     'f16_revision_cutover_postbackfill_verification_20260826',
@@ -410,7 +423,7 @@ back during an application rollback.
 
 ## 4. Apply ClickHouse in journaled phases
 
-Review all four checked-in phase files and the controlled executor immediately
+Review all seven checked-in phase files and the controlled executor immediately
 before execution. Stock `bun run ch:migrate` is forbidden for F16. Installed
 chkit `0.1.0-beta.16` exposes no client `request_timeout` or distributed-DDL
 configuration and hard-codes the ClickHouse client's 30-second default. No
@@ -420,16 +433,32 @@ phase therefore checks `log_comment` and aborts unless it is run by
 
 The controlled executor sends `wait_end_of_query=1`, `async_insert=0`,
 `distributed_ddl_output_mode=throw`, and an explicit
-`distributed_ddl_task_timeout`. It polls every configured production writer URL
-for each named `f16_poll_*` assertion. Failed polls wait with
-`SELECT sleepEachRow(1) FROM numbers(1) SETTINGS max_block_size = 1`; the wait is
-one second in a one-row block and is below ClickHouse Cloud's per-block sleep
-cap. Canonical table and MV `CREATE` statements deliberately omit
+`distributed_ddl_task_timeout`. It also fixes `max_memory_usage`, external-sort
+and external-group-by spill thresholds, and the per-query temporary-disk cap.
+It polls every configured production writer URL for each named `f16_poll_*`
+catalog assertion. Canonical table and MV `CREATE` statements deliberately omit
 `IF NOT EXISTS`, so stale metadata fails instead of silently accepting an old
-object. Every executor request has a `rudel-f16-<UUID>` query ID. Before reading
-the journal or replaying any phase, the executor polls `system.processes` on
-every writer path until no earlier F16 query remains active. This prevents a
-timed-out `INSERT ... SELECT` from racing its retry's `TRUNCATE`.
+object.
+
+Before topology discovery, journal access, or migration SQL, the executor
+creates the fixed table
+`rudel.f16_revision_cutover_lease_20260826` without `IF NOT EXISTS`. Its comment
+and single data row contain the owner run UUID and acquisition timestamp. The
+table remains after a process crash, so another runner fails closed. While
+holding the lease, a Cloud run validates the configured replica count with
+[`clusterAllReplicas`](https://clickhouse.com/docs/sql-reference/table-functions/cluster)
+over `system.one`, then searches
+`clusterAllReplicas(<cluster>, system.processes)` for both `query_id` and
+`initial_query_id` from older `rudel-f16-*` runs with
+`skip_unavailable_shards=0`. If cluster functions are unavailable or any
+expected replica is missing, a `cloud-multi-node` run stops. Only the explicitly
+local `single-node` mode uses local system tables; ClickHouse documents
+[`system.processes`](https://clickhouse.com/docs/operations/system-tables/processes)
+as local to one Cloud node. After that wait and before
+honoring a preservation approval, the executor recomputes physical and
+equal-key/version counts from all four live snapshot tables and compares them
+with the durable receipt. A late `TRUNCATE` therefore invalidates the approval
+instead of turning an empty snapshot into an accepted baseline.
 
 ### 4.1 Size and configure the executor
 
@@ -454,18 +483,97 @@ export F16_MIGRATION_REQUEST_TIMEOUT_MS='<2x_LONGEST_REHEARSAL_MS>'
 export F16_DDL_TASK_TIMEOUT_SECONDS='900'
 export F16_CATALOG_BARRIER_TIMEOUT_MS='120000'
 export F16_CLICKHOUSE_WRITER_URLS='<WRITER_URL_1>,<WRITER_URL_2>'
+export F16_CLICKHOUSE_TOPOLOGY='cloud-multi-node'
+export F16_CLUSTER_NAME='default'
+export F16_EXPECTED_REPLICA_COUNT='<REVIEWED_ACTIVE_REPLICA_COUNT>'
+export F16_MAX_MEMORY_USAGE_BYTES='2147483648'
+export F16_MAX_BYTES_BEFORE_EXTERNAL_SORT='268435456'
+export F16_MAX_BYTES_BEFORE_EXTERNAL_GROUP_BY='268435456'
+export F16_MAX_TEMPORARY_DATA_ON_DISK_BYTES='4294967296'
+export F16_BACKFILL_BUCKET_COUNT='1'
 
 bun run ch:status
 ```
 
-`ch:status` must show every earlier migration applied and only the four named
+`ch:status` must show every earlier migration applied and only the seven named
 F16 phase files pending. Stop if any unrelated or prerequisite migration is
-pending; the controlled executor intentionally applies only these four files.
+pending; the controlled executor intentionally applies only these seven files.
 
 The request timeout is an absolute client deadline. Abort the cutover plan if a
-rehearsed statement cannot fit inside a reviewed bounded deadline; split that
-statement by an owner-reviewed source boundary before production. Do not make
-the deadline infinite and do not run `OPTIMIZE FINAL`.
+rehearsed statement cannot fit inside a reviewed bounded deadline. The checked-in
+fallback is `F16_BACKFILL_BUCKET_COUNT=N`, with `N` from 1 through 4096. The
+executor expands B12, B13, B16, and B18 into buckets selected by
+`cityHash64(organization_id, session_id) % N`; every row in an immutable-session
+tie partition stays in one bucket. `N=1` is the default current behavior. Choose
+and rehearse one `N`, record it in the incident artifact, and keep that value on
+every retry. A failed backfill reruns from B05-B11 and clears all partial bucket
+output before replay. Do not improvise a source split, make the deadline
+infinite, or run `OPTIMIZE FINAL`.
+
+The memory and spill settings above are query limits, not capacity promises.
+Size them from a production-width rehearsal and verify the service has enough
+temporary disk. ClickHouse documents `max_memory_usage`,
+`max_bytes_before_external_sort`, `max_bytes_before_external_group_by`, and
+`max_temporary_data_on_disk_size_for_query` as
+[bounded query controls](https://clickhouse.com/docs/operations/settings/query-complexity).
+An unsupported setting is an HTTP error and stops the executor.
+
+### 4.1.1 Stale lease takeover
+
+On a normal return, including a human-checkpoint pause, the owner-verified lease
+is dropped in `finally`. If a crash leaves it behind, do not drop it merely
+because it is old. Preserve this inventory:
+
+```sql
+SELECT name, comment, metadata_modification_time, create_table_query
+FROM system.tables
+WHERE database = 'rudel'
+  AND name = 'f16_revision_cutover_lease_20260826';
+
+SELECT owner_run_id, acquired_at
+FROM rudel.f16_revision_cutover_lease_20260826;
+
+SELECT hostName() AS host_name
+FROM clusterAllReplicas('<F16_CLUSTER_NAME>', system.one)
+SETTINGS skip_unavailable_shards=0;
+
+SELECT hostName(), query_id, initial_query_id, elapsed, query
+FROM clusterAllReplicas('<F16_CLUSTER_NAME>', system.processes)
+WHERE startsWith(query_id, 'rudel-f16-')
+   OR startsWith(initial_query_id, 'rudel-f16-')
+SETTINGS skip_unavailable_shards=0;
+```
+
+The topology query must return exactly `F16_EXPECTED_REPLICA_COUNT` rows and
+distinct hosts; the process query must return no old F16 query. Also prove the
+run UUID in the lease comment has no live operator, ingest remains quiesced,
+and the journal/state inventories in section 4.4 agree. Attach all evidence to
+the incident artifact and obtain a second owner approval. Only then execute:
+
+```sql
+DROP TABLE rudel.f16_revision_cutover_lease_20260826 SYNC;
+```
+
+Rerun the controlled executor; it reacquires a new lease and repeats the census
+and live snapshot validation. There is no automatic TTL or force-takeover flag.
+
+### 4.1.2 Disposable CI protocol
+
+The integration job is the only automated exception to the production
+operator protocol. It first runs `ch:migrate:f16:ci-prerequisites`, which applies
+and journals every migration strictly before F16 without masking failures. That
+script requires the exact literal
+`F16_NONPROD_APPLY_PREREQUISITES=ci-only`, `CI=true`, and a local endpoint. It
+then runs the normal controlled executor with local single-node topology and
+`F16_NONPROD_AUTO_APPROVE_CHECKPOINTS=ci-only`. Each CI checkpoint is created
+only after the same live preservation or post-backfill verification used by an
+operator succeeds, and its evidence string is explicitly CI-only.
+
+Never set either `F16_NONPROD_*` variable in production, staging against
+production data, a release hook, or an operator shell. The executor additionally
+rejects auto-approval unless `CI=true`, the endpoint is local, and topology is
+`single-node`; these checks are defense in depth, not authorization to relax
+this prohibition.
 
 ### 4.2 Preservation phase and first checkpoint
 
@@ -478,9 +586,13 @@ bun run ch:migrate:f16
 The expected result is:
 
 1. `20260826090550_f16_preservation.sql` succeeds and is journaled.
-2. `20260826090551_auto.sql` aborts at F16-C02 because
+2. The three skill-table rebuild files copy every visible pre-F16 row, verify
+   physical and versioned-identity counts, atomically exchange each UInt128
+   replacement with its UInt64 source, and are journaled.
+3. `20260826090551_auto.sql` aborts at F16-C02 because
    `preservation_verified` is absent.
-3. No canonical table has been renamed.
+4. No canonical session table has been renamed. The three UInt64 skill backups
+   remain until independently approved cleanup.
 
 The preservation file creates plain `MergeTree` copies at
 `*_f16_backfill_source_20260826`, resets each copy before its synchronous
@@ -503,6 +615,9 @@ SELECT name, applied_at, checksum
 FROM _chkit_migrations
 WHERE name IN (
   '20260826090550_f16_preservation.sql',
+  '20260826090550_f16_skill_receipts_rebuild.sql',
+  '20260826090550_f16_skill_uses_rebuild.sql',
+  '20260826090550_f16_skill_version_contents_rebuild.sql',
   '20260826090551_auto.sql',
   '20260826090600_f16_backfill.sql',
   '20260826090610_f16_cleanup.sql'
@@ -537,6 +652,8 @@ VALUES
 The checkpoint is valid only when its `approved_at` is later than every current
 preservation receipt row. If an unjournaled preservation phase replays, its new
 receipt automatically makes the old approval stale and C02 pauses again.
+Every runner restart also rereads the live snapshot tables and rejects a receipt
+whose stored snapshot counts no longer match them.
 
 ### 4.3 Cutover and restart-safe backfill
 
@@ -549,11 +666,13 @@ bun run ch:migrate:f16
 The expected result is:
 
 1. preservation is skipped from the journal;
-2. cutover DDL completes and is journaled;
-3. backfill resets all four new canonical targets, replays all four preservation
+2. the three skill rebuilds are skipped from the journal;
+3. cutover DDL completes and is journaled;
+4. backfill resets all four new canonical targets, replays all four preservation
    copies, verifies physical counts, and is journaled;
-4. cleanup aborts at F16-X02 because `post_backfill_verified` is absent;
-5. all four preservation copies and all four rollback backups still exist.
+5. cleanup aborts at F16-X02 because `post_backfill_verified` is absent;
+6. all four preservation copies, all four rollback backups, and all three UInt64
+   skill backups still exist.
 
 The target resets are safe only while the complete section-1 ingest barrier is
 still active. Never resume writers between the cutover and cleanup checkpoints.
@@ -593,9 +712,12 @@ ORDER BY name;
 
 Use this exact matrix. “Rerun” always means rerun `bun run ch:migrate:f16`
 with the original reviewed environment and with ingest still quiesced. Its
-initial orphan-query barrier must pass; never issue manual recovery DDL while a
-`rudel-f16-*` query is still active. If the barrier times out, preserve the
-inventory, wait for cancellation/completion, and rerun the executor.
+exclusive lease, topology census, and cluster-wide orphan-query barrier must
+pass; never issue manual recovery DDL while a `rudel-f16-*` query is still
+active. If the barrier times out, preserve the inventory, wait for
+cancellation/completion, and rerun the executor. Before C02/C03 is accepted,
+the executor re-derives counts from the live preservation tables rather than
+trusting the durable receipt alone.
 
 #### Preservation statements
 
@@ -625,6 +747,42 @@ inventory, wait for cancellation/completion, and rerun the executor.
 | P22 write preservation receipt | The receipt may contain partial or complete parts. | Rerun; P21 clears it first. |
 | P23 no-loss guard | All copies and receipt rows exist, but a source count or tie-group count exceeds its snapshot count. | Do not approve preservation. Diagnose the loss; rerun rebuilds all copies and the receipt. A larger snapshot is preserved for owner review and is not a failure. |
 
+#### Skill-table rebuild statements
+
+The three files use the same SR/SU/SV suffixes below. They deliberately avoid
+`ALTER ... MODIFY COLUMN`: `skill_uses.extraction_seq` is both an ordering-key
+column and the `ReplacingMergeTree` version, and a non-empty Shared engine is
+the unverified production case. Each file recreates the exact
+`20260820170352_auto.sql` engine, primary key, sorting key, settings, and comment
+plus the subsequent `20260825093133_auto.sql`
+`non_replicated_deduplication_window = 1000` setting, with only
+`extraction_seq` widened to `UInt128`.
+
+ClickHouse's [ALTER COLUMN rules](https://clickhouse.com/docs/reference/statements/alter/column)
+require data conversion when types are not binary compatible. The rebuild uses
+an explicit-column synchronous copy and pre/post identity checks instead. The
+[EXCHANGE statement](https://clickhouse.com/docs/reference/statements/exchange)
+atomically swaps one pair of names on both Atomic and Shared database engines;
+the migration uses exactly one pair per statement. This also avoids the
+documented non-atomic behavior of a multi-entity
+[RENAME](https://clickhouse.com/docs/reference/statements/rename).
+This implements the ClickHouse review rules `schema-pk-plan-before-creation`,
+`schema-types-minimize-bitwidth`, and `insert-mutation-avoid-update`: plan a key
+transition explicitly, retain the required width, and rebuild rather than
+mutating a production key in place.
+
+| Statement suffix | If the client failed after server commit | Recovery |
+| --- | --- | --- |
+| 01 controlled-executor guard | No object changed. | Set the reviewed executor environment and rerun. |
+| 02 exact UInt64 source guard | No object changed. | Reconcile the canonical/backup definitions; do not copy from an unexpected engine, key, or type. |
+| 03 drop incomplete replacement | A pre-exchange UInt128 copy is absent. | Rerun; only the incomplete pre-exchange copy can be dropped on this path. |
+| 04 create UInt128 replacement | The exact empty replacement may exist. | Rerun; 03 resets it first and 04 has no `IF NOT EXISTS`. |
+| 05 explicit synchronous copy | The replacement may contain partial or complete parts. | Rerun; 03 clears it before a new copy. |
+| 06 count and versioned-identity guard | No names changed. | Diagnose any mismatch; do not exchange. |
+| 07 pairwise atomic exchange | Either the names are unchanged or canonical is UInt128 and backup is UInt64. | Rerun; the executor inspects both column types and resumes after `F16-SKILL-REBUILD-AFTER-EXCHANGE` only for the exact exchanged pair. |
+| 08 exchange visibility poll | One writer has not observed the exact pair. | Repair convergence and rerun; do not drop the UInt64 backup. |
+| 09 post-exchange identity guard | Both tables remain. | Reconcile the count/identity mismatch before continuing. |
+
 #### Rename, recreate, and MV statements
 
 | Statement | If the client failed after server commit | Recovery |
@@ -636,7 +794,7 @@ inventory, wait for cancellation/completion, and rerun the executor.
 | C05 drop old Codex MV | The Codex MV may be absent. | Rerun; C05 is `IF EXISTS`. |
 | C06 drop old Claude MV | Both old MVs may be absent. | Rerun; C05-C06 are `IF EXISTS`. |
 | C07 poll old-MV absence | A writer still sees an old MV. | Repair convergence and rerun; C05-C06 remain replay-safe. |
-| C08 atomic four-table rename | Either four canonicals/zero backups or zero old canonicals/four backups exist. | With zero backups rerun from C01. With four backups rerun: the executor resumes after `F16-CUTOVER-AFTER-RENAME`. One to three backups is a hard stop. |
+| C08 four-table rename | The multi-entity statement may stop after a partial rename. | With zero backups rerun from C01. With four backups rerun: the executor resumes after `F16-CUTOVER-AFTER-RENAME`. One to three backups is a documented hard stop for owner reconciliation because ClickHouse multi-entity `RENAME` is non-atomic. |
 | C09 poll safe rename recovery | Four backups exist; a writer is stale, a visible canonical is not an F16 target, an F16 target has active data parts, or the post-backfill receipt table proves B04 was reached. | Repair convergence and rerun. C10-C15 cannot run until this passes. Any evidence that backfill started means journal/state reconciliation, never automatic deletion. |
 | C10 drop partial Codex MV | The MV is absent. | Rerun; the recovery drop is `IF EXISTS`. |
 | C11 drop partial Claude MV | Both MVs are absent. | Rerun; the recovery drop is `IF EXISTS`. |
@@ -645,9 +803,6 @@ inventory, wait for cancellation/completion, and rerun the executor.
 | C14 drop partial analytics target | The empty F16 analytics target is absent. | Rerun; the recovery drop is `IF EXISTS`. |
 | C15 drop partial signal target | All canonical names are absent. | Rerun; the recovery drop is `IF EXISTS`. |
 | C16 poll rename visibility | Some writer has not converged to four backups and no canonicals/MVs. | Repair convergence and rerun. No canonical CREATE can run until this passes. |
-| C17 alter `skill_receipts` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
-| C18 alter `skill_uses` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
-| C19 alter `skill_version_contents` | Its column may already be `UInt128`. | Rerun; reapplying the same `MODIFY COLUMN` is idempotent. |
 | C20 create Claude target | The empty F16 Claude target may exist. | Rerun; C09 validates it, C12 removes it, and C20 recreates without `IF NOT EXISTS`. |
 | C21 create Codex target | Empty F16 Claude/Codex targets may exist. | Rerun; C09-C15 validate and clear all partial targets. |
 | C22 create analytics target | Three empty F16 targets may exist. | Rerun; C09-C15 validate and clear all partial targets. |
@@ -697,20 +852,24 @@ inventory, wait for cancellation/completion, and rerun the executor.
 | X06 drop Codex copy | Claude/Codex copies may be absent. | Rerun; X05-X06 are `IF EXISTS`. |
 | X07 drop analytics copy | Three copies may be absent. | Rerun; X05-X07 are `IF EXISTS`. |
 | X08 drop signal copy | All four copies may be absent. | Rerun; every drop is `IF EXISTS`. |
-| X09 poll cleanup visibility | A writer still sees one or more copy names. | Repair convergence and rerun until every configured writer observes absence. |
+| X08A drop `skill_receipts` UInt64 backup | The backup may be absent. | Rerun; the drop is `IF EXISTS`. |
+| X08B drop `skill_uses` UInt64 backup | Two skill backups may be absent. | Rerun; the drops are `IF EXISTS`. |
+| X08C drop `skill_version_contents` UInt64 backup | All three skill backups may be absent. | Rerun; the drops are `IF EXISTS`. |
+| X09 poll cleanup visibility | A writer still sees one or more preservation or skill-backup names. | Repair convergence and rerun until every configured writer observes absence. |
 
 The stock chkit journal records a file only after its last statement succeeds;
 it has no statement journal. Never manually insert, update, or delete an
 `_chkit_migrations` row. The controlled executor supplies the missing recovery
 semantics: preservation and backfill reset their mutable outputs, cutover has a
-single atomic recovery marker with strict zero-or-four-backup validation, and
-cleanup uses guarded idempotent drops. It appends the normal chkit checksum only
-after a phase completes. The executor rejects an applied later F16 phase after
-an unapplied earlier phase. A journal row with a different checksum, an
-out-of-order phase, or a cutover state outside the matrix is a hard stop for
-owner review. After any unjournaled preservation or backfill replay, discard
-the old approval operationally: the SQL rejects it by timestamp, and the owner
-must review the new receipt and append a newer checkpoint.
+single recovery marker with strict zero-or-four-backup validation, each skill
+rebuild has a type-validated post-EXCHANGE marker, and cleanup uses guarded
+idempotent drops. It appends the normal chkit checksum only after a phase
+completes. The executor rejects an applied later F16 phase after an unapplied
+earlier phase. A journal row with a different checksum, an out-of-order phase,
+or a migration state outside the matrix is a hard stop for owner review. After
+any unjournaled preservation or backfill replay, discard the old approval
+operationally: the SQL rejects it by timestamp, and the owner must review the
+new receipt and append a newer checkpoint.
 
 ## 5. Seed and verify PostgreSQL revision heads
 
@@ -1035,10 +1194,10 @@ the wall clock; JavaScript clocks are not used for revision allocation.
    post-backfill receipt row. A replayed backfill always requires fresh review.
 
    Run `bun run ch:migrate:f16` a third time. Only cleanup should run; it drops
-   the four preservation copies, polls every configured writer for their
-   absence, and then journals cleanup. The durable receipts, control table, and
-   four rollback backups remain. Finish with `bun run ch:status` and attach its
-   output.
+   the four preservation copies and three UInt64 skill backups, polls every
+   configured writer for their absence, and then journals cleanup. The durable
+   receipts, control table, and four session rollback backups remain. Finish
+   with `bun run ch:status` and attach its output.
 
 ## 7. Record cutover watermarks, smoke, and resume
 

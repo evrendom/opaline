@@ -118,6 +118,10 @@ DROP TABLE IF EXISTS rudel.session_analytics_f16_expected_rows_20260826 SYNC;
 -- Ascending filter_version gives newer filter output the higher ordinal and
 -- therefore the winning revision. The remaining full-row tuple is the final
 -- deterministic tie-break, so payload-distinct rows never compare equal.
+-- The controlled executor expands the two typed placeholders once per
+-- F16_BACKFILL_BUCKET_COUNT bucket. organization_id/session_id is immutable
+-- and contains every row in a tie partition. N=1 therefore preserves the
+-- original whole-source behavior.
 -- F16-B12
 INSERT INTO rudel.claude_sessions
 (
@@ -205,6 +209,10 @@ FROM
 				) ASC
 		) - 1 AS `tie_ordinal`
 	FROM rudel.claude_sessions_f16_backfill_source_20260826
+	WHERE modulo(
+		cityHash64(`organization_id`, `session_id`),
+		{f16_bucket_count:UInt64}
+	) = {f16_bucket_id:UInt64}
 );
 
 -- operation: data_backfill key=table:rudel.codex_sessions:revision risk=caution
@@ -293,6 +301,10 @@ FROM
 				) ASC
 		) - 1 AS `tie_ordinal`
 	FROM rudel.codex_sessions_f16_backfill_source_20260826
+	WHERE modulo(
+		cityHash64(`organization_id`, `session_id`),
+		{f16_bucket_count:UInt64}
+	) = {f16_bucket_id:UInt64}
 );
 
 -- operation: create_table key=table:rudel.session_analytics_f16_rebuilt_identities_20260826 risk=safe
@@ -511,6 +523,10 @@ FROM
 				) ASC
 		) - 1 AS `tie_ordinal`
 	FROM rudel.session_analytics_f16_backfill_source_20260826
+	WHERE modulo(
+		cityHash64(`organization_id`, `session_id`),
+		{f16_bucket_count:UInt64}
+	) = {f16_bucket_id:UInt64}
 ) AS analytics
 LEFT ANTI JOIN
 rudel.session_analytics_f16_rebuilt_identities_20260826 AS rebuilt
@@ -614,6 +630,10 @@ FROM
 			) DESC
 		) AS `dedupe_rank`
 	FROM rudel.session_language_signals_f16_backfill_source_20260826
+	WHERE modulo(
+		cityHash64(`organization_id`, `session_id`),
+		{f16_bucket_count:UInt64}
+	) = {f16_bucket_id:UInt64}
 ) AS signals
 WHERE signals.`dedupe_rank` = 1;
 

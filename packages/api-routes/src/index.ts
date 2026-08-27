@@ -331,6 +331,7 @@ export const IngestSessionInputSchema = z.object({
 		)
 		.optional(),
 	organizationId: z.string().max(200).optional(),
+	operationId: z.string().uuid().optional(),
 	client_surface: ProductAnalyticsClientSurfaceSchema.optional(),
 	upload_mode: ProductAnalyticsUploadModeSchema.optional(),
 	cli_version: z.string().max(200).optional(),

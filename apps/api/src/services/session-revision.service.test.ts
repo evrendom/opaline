@@ -17,6 +17,7 @@ function createFakeTransactions(
 	databaseFloor = 100n,
 ): {
 	readonly allocationCount: () => number;
+	readonly revisionHead: () => string;
 	readonly transactions: SessionRevisionTransactionRunner;
 } {
 	let allocationCount = 0;
@@ -45,7 +46,11 @@ function createFakeTransactions(
 				throw new Error("Unexpected session revision query");
 			}),
 	};
-	return { allocationCount: () => allocationCount, transactions };
+	return {
+		allocationCount: () => allocationCount,
+		revisionHead: () => head.toString(),
+		transactions,
+	};
 }
 
 function readStringParameter(
@@ -68,6 +73,7 @@ function receiptKey(parameters: readonly (number | string)[]): string {
 
 function allocationInput(operationId: string, contentSha256 = CONTENT_HASH) {
 	return {
+		allowReceiptPromotion: false,
 		contentSha256,
 		operationId,
 		organizationId: "org-1",
@@ -122,7 +128,7 @@ describe("session revision allocation", () => {
 		expect(BigInt(changed)).toBeGreaterThan(BigInt(first));
 	});
 
-	test("allocates a fresh legacy revision when the same content recurs", async () => {
+	test("does not promote an exact legacy receipt over an intervening head", async () => {
 		const fake = createFakeTransactions();
 		const environment = { transactions: fake.transactions };
 		const recurring = allocationInput("legacy:claude_code", "a".repeat(64));
@@ -137,7 +143,51 @@ describe("session revision allocation", () => {
 
 		expect(exactRetry).toBe(first);
 		expect(BigInt(intervening)).toBe(BigInt(first) + 1n);
-		expect(BigInt(recurrence)).toBe(BigInt(intervening) + 1n);
+		expect(recurrence).toBe(first);
+		expect(fake.revisionHead()).toBe(intervening);
+		expect(fake.allocationCount()).toBe(2);
+	});
+
+	test("reuses a client operation receipt after an intervening upload", async () => {
+		const fake = createFakeTransactions(9n, 10n);
+		const environment = { transactions: fake.transactions };
+		const operationId = "op:00000000-0000-4000-8000-000000000010";
+		const firstInput = allocationInput(operationId, "a".repeat(64));
+
+		const first = await allocateSessionRevision(firstInput, environment);
+		const intervening = await allocateSessionRevision(
+			allocationInput(
+				"op:00000000-0000-4000-8000-000000000011",
+				"b".repeat(64),
+			),
+			environment,
+		);
+		const retry = await allocateSessionRevision(firstInput, environment);
+
+		expect(first).toBe("10");
+		expect(intervening).toBe("11");
+		expect(retry).toBe("10");
+		expect(fake.revisionHead()).toBe("11");
+		expect(fake.allocationCount()).toBe(2);
+	});
+
+	test("allows explicit legacy replacement to promote an old receipt", async () => {
+		const fake = createFakeTransactions();
+		const environment = { transactions: fake.transactions };
+		const recurring = allocationInput("legacy:claude_code", "a".repeat(64));
+
+		const first = await allocateSessionRevision(recurring, environment);
+		const intervening = await allocateSessionRevision(
+			allocationInput("legacy:claude_code", "b".repeat(64)),
+			environment,
+		);
+		const replacement = await allocateSessionRevision(
+			{ ...recurring, allowReceiptPromotion: true },
+			environment,
+		);
+
+		expect(BigInt(replacement)).toBe(BigInt(intervening) + 1n);
+		expect(BigInt(replacement)).toBeGreaterThan(BigInt(first));
 		expect(fake.allocationCount()).toBe(3);
 	});
 
@@ -177,8 +227,21 @@ describe("session revision allocation", () => {
 
 		expect(first).toBe(retry);
 		expect(analytics).not.toBe(first);
-		expect(buildSessionRevisionOperationId("codex", "job-1")).toBe("r2:job-1");
-		expect(buildSessionRevisionOperationId("codex", undefined)).toBe(
+		expect(
+			buildSessionRevisionOperationId(
+				"codex",
+				"job-1",
+				"00000000-0000-4000-8000-000000000010",
+			),
+		).toBe("r2:job-1");
+		expect(
+			buildSessionRevisionOperationId(
+				"codex",
+				undefined,
+				"00000000-0000-4000-8000-000000000010",
+			),
+		).toBe("op:00000000-0000-4000-8000-000000000010");
+		expect(buildSessionRevisionOperationId("codex", undefined, undefined)).toBe(
 			"legacy:codex",
 		);
 	});

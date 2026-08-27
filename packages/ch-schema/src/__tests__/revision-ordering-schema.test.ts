@@ -19,6 +19,13 @@ const ddlMigration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
 	"utf8",
 );
+const skillRebuildMigrations = [
+	"20260826090550_f16_skill_receipts_rebuild.sql",
+	"20260826090550_f16_skill_uses_rebuild.sql",
+	"20260826090550_f16_skill_version_contents_rebuild.sql",
+].map((name) =>
+	readFileSync(resolve(import.meta.dir, "../../chx/migrations", name), "utf8"),
+);
 const backfillMigration = readFileSync(
 	resolve(
 		import.meta.dir,
@@ -175,13 +182,14 @@ describe("F16 revision ordering schema", () => {
 			'endpoint.searchParams.set("distributed_ddl_output_mode", "throw")',
 		);
 		expect(migrationExecutor).toContain('"distributed_ddl_task_timeout"');
-		expect(migrationExecutor).toContain(
-			'"SELECT sleepEachRow(1) FROM numbers(1) SETTINGS max_block_size = 1"',
-		);
 		expect(migrationExecutor).toContain("rudel-f16-");
 		expect(migrationExecutor).toContain("crypto.randomUUID()");
 		expect(migrationExecutor).toContain("f16_poll_no_orphaned_queries");
-		expect(migrationExecutor).toContain("deadline - Date.now()");
+		expect(migrationExecutor).toContain("deadline - runtime.timeNow()");
+		expect(migrationExecutor).toContain("clusterAllReplicas");
+		expect(migrationExecutor).toContain("F16_EXPECTED_REPLICA_COUNT");
+		expect(migrationExecutor).toContain("f16_revision_cutover_lease_20260826");
+		expect(migrationExecutor).toContain("F16_NONPROD_AUTO_APPROVE_CHECKPOINTS");
 		expect(migrationExecutor).toContain("F16 journal is out of order");
 		expect(ddlMigration).toContain(
 			"rudel.claude_sessions TO rudel.claude_sessions_f16_backup_20260826",
@@ -195,7 +203,19 @@ describe("F16 revision ordering schema", () => {
 		expect(ddlMigration).toContain("ReplacingMergeTree(signal_version)");
 		expect(
 			ddlMigration.match(/MODIFY COLUMN `extraction_seq` UInt128/gu),
-		).toHaveLength(3);
+		).toBeNull();
+		for (const rebuildMigration of skillRebuildMigrations) {
+			expect(rebuildMigration).toContain("`extraction_seq` UInt128");
+			expect(rebuildMigration).toContain(
+				"non_replicated_deduplication_window = 1000",
+			);
+			expect(rebuildMigration).toContain("SETTINGS async_insert=0");
+			expect(rebuildMigration).toContain("EXCHANGE TABLES");
+			expect(rebuildMigration).toContain(
+				"RECOVERY: F16-SKILL-REBUILD-AFTER-EXCHANGE",
+			);
+			expect(rebuildMigration).not.toContain("ALTER TABLE");
+		}
 		expect(ddlMigration).toContain(
 			"`raw_revision` UInt64 DEFAULT bitShiftLeft(toUInt64(toUnixTimestamp64Milli(raw_ingested_at)), 16)",
 		);
@@ -259,6 +279,17 @@ describe("F16 revision ordering schema", () => {
 			"ORDER BY tuple(\n\t\t\t\t`user_id`,\n\t\t\t\t`raw_ingested_at`,\n\t\t\t\t`member_swears`,\n\t\t\t\t`member_apologies`,\n\t\t\t\t`member_positive`,\n\t\t\t\t`model_swears`,\n\t\t\t\t`model_apologies`,\n\t\t\t\t`model_positive`\n\t\t\t) DESC",
 		);
 		expect(backfillMigration).toContain("WHERE signals.`dedupe_rank` = 1");
+		expect(
+			backfillMigration.match(
+				/cityHash64\(`organization_id`, `session_id`\)/gu,
+			),
+		).toHaveLength(4);
+		expect(
+			backfillMigration.match(/\{f16_bucket_count:UInt64\}/gu),
+		).toHaveLength(4);
+		expect(backfillMigration.match(/\{f16_bucket_id:UInt64\}/gu)).toHaveLength(
+			4,
+		);
 		expect(backfillMigration).not.toMatch(
 			/DROP TABLE (?:IF EXISTS )?rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/u,
 		);
@@ -283,6 +314,11 @@ describe("F16 revision ordering schema", () => {
 				/DROP TABLE IF EXISTS rudel\.[a-z_]+_f16_backfill_source_20260826 SYNC;/gu,
 			),
 		).toHaveLength(4);
+		expect(
+			cleanupMigration.match(
+				/DROP TABLE IF EXISTS rudel\.[a-z_]+_f16_uint64_backup_20260826 SYNC;/gu,
+			),
+		).toHaveLength(3);
 		expect(backfillMigration).toContain("`revision`,\n\t`ingested_at`");
 		expect(backfillMigration).toContain(
 			"bitShiftLeft(toUInt64(toUnixTimestamp64Milli(`ingested_at`)), 16)",

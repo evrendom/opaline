@@ -68,6 +68,8 @@ export interface SessionRevisionTransactionRunner {
 }
 
 export interface AllocateSessionRevisionInput {
+	/** Only an explicit keyless legacy replacement may supersede an intervening head. */
+	readonly allowReceiptPromotion: boolean;
 	readonly contentSha256: string;
 	readonly operationId: string;
 	readonly organizationId: string;
@@ -123,10 +125,7 @@ export async function allocateSessionRevision(
 			if (BigInt(existingRevision) > BigInt(revisionHead)) {
 				throw new Error("Session revision receipt is ahead of its head");
 			}
-			if (
-				!isCurrentHeadScopedOperation(input.operationId) ||
-				existingRevision === revisionHead
-			) {
+			if (!input.allowReceiptPromotion || existingRevision === revisionHead) {
 				return existingRevision;
 			}
 		}
@@ -161,8 +160,10 @@ export async function allocateSessionRevision(
 export function buildSessionRevisionOperationId(
 	source: "claude_code" | "codex",
 	durableOperationId: string | undefined,
+	clientOperationId: string | undefined,
 ): string {
-	return durableOperationId ? `r2:${durableOperationId}` : `legacy:${source}`;
+	if (durableOperationId) return `r2:${durableOperationId}`;
+	return clientOperationId ? `op:${clientOperationId}` : `legacy:${source}`;
 }
 
 export function buildSessionRevisionDeduplicationToken(
@@ -198,10 +199,6 @@ function validateAllocationInput(input: AllocateSessionRevisionInput): void {
 			throw new Error(`Session revision ${name} must not be empty`);
 		}
 	}
-}
-
-function isCurrentHeadScopedOperation(operationId: string): boolean {
-	return operationId.startsWith("legacy:");
 }
 
 function readRevisionHead(row: SessionRevisionRow | undefined): string {

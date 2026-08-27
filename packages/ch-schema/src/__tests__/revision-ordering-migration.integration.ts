@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { expandBucketedStatement } from "../../scripts/migrate-f16.js";
 import { createTestExecutor } from "./helpers/executor.js";
 
 setDefaultTimeout(300_000);
@@ -9,6 +10,35 @@ const PRESERVATION_MIGRATION = readFileSync(
 	resolve(
 		import.meta.dir,
 		"../../chx/migrations/20260826090550_f16_preservation.sql",
+	),
+	"utf8",
+);
+const PRE_F16_SKILL_SCHEMA_MIGRATION = readFileSync(
+	resolve(import.meta.dir, "../../chx/migrations/20260820170352_auto.sql"),
+	"utf8",
+);
+const PRE_F16_DEDUPLICATION_SETTINGS_MIGRATION = readFileSync(
+	resolve(import.meta.dir, "../../chx/migrations/20260825093133_auto.sql"),
+	"utf8",
+);
+const SKILL_RECEIPTS_REBUILD_MIGRATION = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090550_f16_skill_receipts_rebuild.sql",
+	),
+	"utf8",
+);
+const SKILL_USES_REBUILD_MIGRATION = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090550_f16_skill_uses_rebuild.sql",
+	),
+	"utf8",
+);
+const SKILL_VERSION_CONTENTS_REBUILD_MIGRATION = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260826090550_f16_skill_version_contents_rebuild.sql",
 	),
 	"utf8",
 );
@@ -71,9 +101,22 @@ interface RehearsalResult {
 	minimumRevision: string;
 	signalEngine: string;
 	signalRawRevision: string;
+	skillTables: SkillTableState[];
 	snapshotTies: TieRow[];
 	sourceTies: TieRow[];
 	winners: WinnerRow[];
+}
+
+interface SkillTableState {
+	comment: string;
+	create_table_query: string;
+	engine_full: string;
+	extraction_seq: string;
+	extraction_seq_type: string;
+	primary_key: string;
+	row_count: number | string;
+	sorting_key: string;
+	table_name: string;
 }
 
 function databaseName(suffix: string): string {
@@ -290,11 +333,48 @@ async function executeMigration(sql: string, database: string): Promise<void> {
 	);
 	for (const statement of parseStatements(scoped)) {
 		if (statement.includes("getSetting('log_comment')")) continue;
-		if (statement.startsWith("SELECT")) {
-			await executor.query(statement);
-		} else {
-			await executor.execute(statement);
+		for (const bucketedStatement of expandBucketedStatement(statement, 2)) {
+			if (bucketedStatement.startsWith("SELECT")) {
+				await executor.query(bucketedStatement);
+			} else {
+				await executor.execute(bucketedStatement);
+			}
 		}
+	}
+}
+
+async function createExactPreF16SkillTables(database: string): Promise<void> {
+	const scoped = scopeMigration(
+		PRE_F16_SKILL_SCHEMA_MIGRATION,
+		database,
+	).replaceAll("database = 'rudel'", `database = '${database}'`);
+	const createStatements = parseStatements(scoped).filter((statement) =>
+		statement.startsWith("CREATE TABLE IF NOT EXISTS"),
+	);
+	if (createStatements.length !== 3) {
+		throw new Error(
+			`Expected three exact pre-F16 skill-table definitions; found ${createStatements.length}`,
+		);
+	}
+	for (const statement of createStatements) {
+		await executor.execute(statement);
+	}
+	const scopedSettings = scopeMigration(
+		PRE_F16_DEDUPLICATION_SETTINGS_MIGRATION,
+		database,
+	);
+	const skillSettingStatements = parseStatements(scopedSettings).filter(
+		(statement) =>
+			statement.startsWith(`ALTER TABLE ${database}.skill_`) &&
+			statement.endsWith("non_replicated_deduplication_window = 1000"),
+	);
+	if (skillSettingStatements.length !== 3) {
+		throw new Error(
+			`Expected three exact pre-F16 skill-table setting changes; found ${skillSettingStatements.length}`,
+		);
+	}
+	for (const statement of skillSettingStatements) {
+		await executor.execute(statement);
 	}
 }
 
@@ -395,17 +475,7 @@ async function createPreF16Tables(database: string): Promise<void> {
 		PARTITION BY toYYYYMM(toDate(session_date))
 		ORDER BY (organization_id, session_date, session_id, source)
 	`);
-	for (const table of [
-		"skill_receipts",
-		"skill_uses",
-		"skill_version_contents",
-	]) {
-		await executor.execute(`
-			CREATE TABLE ${database}.${table} (extraction_seq UInt64)
-			ENGINE = MergeTree
-			ORDER BY tuple()
-		`);
-	}
+	await createExactPreF16SkillTables(database);
 }
 
 function claudeContent(): string {
@@ -499,9 +569,15 @@ function historicalAnalyticsRow() {
 	};
 }
 
-async function seedFixtures(database: string, reverse: boolean): Promise<void> {
-	await executor.execute(`SYSTEM STOP MERGES ${database}.claude_sessions`);
-	await executor.execute(`SYSTEM STOP MERGES ${database}.codex_sessions`);
+async function seedFixtures(
+	database: string,
+	reverse: boolean,
+	stoppedTables: string[],
+): Promise<void> {
+	for (const table of ["claude_sessions", "codex_sessions"]) {
+		await executor.execute(`SYSTEM STOP MERGES ${database}.${table}`);
+		stoppedTables.push(table);
+	}
 	const claudeTies = [
 		{
 			...rawRow(CLAUDE_TIE_SESSION_ID, claudeContent(), 4, "tag-a"),
@@ -567,6 +643,55 @@ async function seedFixtures(database: string, reverse: boolean): Promise<void> {
 			},
 		],
 	});
+	const sourceSha = "a".repeat(64);
+	await executor.insert({
+		table: `${database}.skill_receipts`,
+		values: [
+			{
+				agent: "claude_code",
+				extracted_at: "2026-08-20T10:00:02.000",
+				extraction_seq: "42",
+				organization_id: "org-f16",
+				parser_version: 1,
+				session_id: "skill-session",
+				source_content_sha256: sourceSha,
+				user_id: "user-f16",
+			},
+		],
+	});
+	await executor.insert({
+		table: `${database}.skill_uses`,
+		values: [
+			{
+				agent: "claude_code",
+				content_sha256: "b".repeat(64),
+				extracted_at: "2026-08-20T10:00:02.000",
+				extraction_seq: "42",
+				organization_id: "org-f16",
+				parser_version: 1,
+				session_id: "skill-session",
+				skill_name: "rehearsal-skill",
+				source_content_sha256: sourceSha,
+				used_at: "2026-08-20T10:00:01.000",
+				user_id: "user-f16",
+			},
+		],
+	});
+	await executor.insert({
+		table: `${database}.skill_version_contents`,
+		values: [
+			{
+				content: "# Rehearsal skill",
+				content_sha256: "c".repeat(64),
+				extracted_at: "2026-08-20T10:00:02.000",
+				extraction_seq: "42",
+				organization_id: "org-f16",
+				parser_version: 1,
+				skill_name: "rehearsal-skill",
+				user_id: "user-f16",
+			},
+		],
+	});
 }
 
 async function readTieRows(
@@ -609,9 +734,15 @@ async function runRehearsal(
 	reverse: boolean,
 ): Promise<RehearsalResult> {
 	await createPreF16Tables(database);
-	await seedFixtures(database, reverse);
-	const sourceTies = await readTieRows(database, false);
-	const [sourceTieParts] = await executor.query<{ minimum_parts: number }>(`
+	const stoppedTables: string[] = [];
+	let rehearsalResult: RehearsalResult | undefined;
+	let rehearsalError: unknown;
+	let rehearsalFailed = false;
+	let mergeFailures: PromiseRejectedResult[] = [];
+	try {
+		await seedFixtures(database, reverse, stoppedTables);
+		const sourceTies = await readTieRows(database, false);
+		const [sourceTieParts] = await executor.query<{ minimum_parts: number }>(`
 		SELECT min(parts) AS minimum_parts
 		FROM (
 			SELECT countDistinct(_part) AS parts
@@ -622,17 +753,30 @@ async function runRehearsal(
 			FROM ${database}.codex_sessions
 			WHERE session_id = '${CODEX_TIE_SESSION_ID}'
 		)
-	`);
-	await executeMigration(PRESERVATION_MIGRATION, database);
-	const snapshotTies = await readTieRows(database, true);
-	await executor.execute(`
+		`);
+		await executeMigration(PRESERVATION_MIGRATION, database);
+		const snapshotTies = await readTieRows(database, true);
+		await executor.execute(`
 		INSERT INTO ${database}.f16_revision_cutover_control_20260826
-		VALUES ('preservation_verified', 1, 'rehearsal', now64(3), 'integration-test')
-	`);
-	await executeMigration(DDL_MIGRATION, database);
-	await executeMigration(BACKFILL_MIGRATION, database);
+		SELECT
+			'preservation_verified',
+			1,
+			'rehearsal',
+			greatest(
+				now64(3),
+				(SELECT max(verified_at) + toIntervalMillisecond(1)
+				 FROM ${database}.f16_revision_cutover_verification_20260826 FINAL
+				 WHERE phase = 'preservation')
+			),
+			'integration-test'
+		`);
+		await executeMigration(SKILL_RECEIPTS_REBUILD_MIGRATION, database);
+		await executeMigration(SKILL_USES_REBUILD_MIGRATION, database);
+		await executeMigration(SKILL_VERSION_CONTENTS_REBUILD_MIGRATION, database);
+		await executeMigration(DDL_MIGRATION, database);
+		await executeMigration(BACKFILL_MIGRATION, database);
 
-	const winners = await executor.query<WinnerRow>(`
+		const winners = await executor.query<WinnerRow>(`
 		SELECT
 			session_id,
 			argMax(filter_version, raw.revision) AS filter_version,
@@ -649,8 +793,8 @@ async function runRehearsal(
 		) AS raw
 		GROUP BY session_id
 		ORDER BY session_id
-	`);
-	const [coverage] = await executor.query<{ count: string | number }>(`
+		`);
+		const [coverage] = await executor.query<{ count: string | number }>(`
 		SELECT count() AS count
 		FROM ${database}.session_analytics
 		WHERE source = 'claude_code'
@@ -658,8 +802,8 @@ async function runRehearsal(
 			AND user_id = 'user-f16'
 			AND session_id = '${FILTERED_SESSION_ID}'
 			AND project_path = '/historical-analytics-survives'
-	`);
-	const [suffixes] = await executor.query<{ count: string | number }>(`
+		`);
+		const [suffixes] = await executor.query<{ count: string | number }>(`
 		SELECT count() AS count
 		FROM (
 			SELECT revision, ingested_at FROM ${database}.claude_sessions
@@ -672,8 +816,8 @@ async function runRehearsal(
 			toInt128(revision)
 				- bitShiftLeft(toInt128(toUnixTimestamp64Milli(ingested_at)), 16)
 			NOT BETWEEN 0 AND 65535
-	`);
-	const [minimum] = await executor.query<{ revision: string }>(`
+		`);
+		const [minimum] = await executor.query<{ revision: string }>(`
 		SELECT toString(min(revision)) AS revision
 		FROM (
 			SELECT revision FROM ${database}.claude_sessions
@@ -682,11 +826,11 @@ async function runRehearsal(
 			UNION ALL
 			SELECT revision FROM ${database}.session_analytics
 		)
-	`);
-	const [signal] = await executor.query<{
-		engine_full: string;
-		raw_revision: string;
-	}>(`
+		`);
+		const [signal] = await executor.query<{
+			engine_full: string;
+			raw_revision: string;
+		}>(`
 		SELECT
 			any(system_tables.engine_full) AS engine_full,
 			toString(max(signals.raw_revision)) AS raw_revision
@@ -694,36 +838,158 @@ async function runRehearsal(
 		CROSS JOIN system.tables AS system_tables
 		WHERE system_tables.database = '${database}'
 			AND system_tables.name = 'session_language_signals'
+			`);
+		const skillTables = await executor.query<SkillTableState>(`
+			SELECT
+				tables.name AS table_name,
+				tables.engine_full AS engine_full,
+				tables.primary_key AS primary_key,
+				tables.sorting_key AS sorting_key,
+				tables.comment AS comment,
+				tables.create_table_query AS create_table_query,
+				columns.type AS extraction_seq_type,
+				counts.row_count AS row_count,
+				counts.extraction_seq AS extraction_seq
+			FROM system.tables AS tables
+			INNER JOIN system.columns AS columns
+				ON columns.database = tables.database
+				AND columns.table = tables.name
+				AND columns.name = 'extraction_seq'
+			INNER JOIN
+			(
+				SELECT 'skill_receipts' AS table_name, count() AS row_count,
+					toString(max(extraction_seq)) AS extraction_seq
+				FROM ${database}.skill_receipts
+				UNION ALL
+				SELECT 'skill_uses', count(), toString(max(extraction_seq))
+				FROM ${database}.skill_uses
+				UNION ALL
+				SELECT 'skill_version_contents', count(), toString(max(extraction_seq))
+				FROM ${database}.skill_version_contents
+			) AS counts ON counts.table_name = tables.name
+			WHERE tables.database = '${database}'
+				AND tables.name IN (
+					'skill_receipts', 'skill_uses', 'skill_version_contents'
+				)
+			ORDER BY tables.name
 		`);
-	await executor.execute(`
+		await executor.execute(`
 		INSERT INTO ${database}.f16_revision_cutover_control_20260826
-		VALUES ('post_backfill_verified', 1, 'rehearsal', now64(3), 'integration-test')
-	`);
-	await executeMigration(CLEANUP_MIGRATION, database);
-	return {
-		analyticsCoverage: Number(coverage?.count ?? 0),
-		invalidSuffixes: Number(suffixes?.count ?? 0),
-		minimumSourceTieParts: Number(sourceTieParts?.minimum_parts ?? 0),
-		minimumRevision: minimum?.revision ?? "0",
-		signalEngine: signal?.engine_full ?? "",
-		signalRawRevision: signal?.raw_revision ?? "missing",
-		snapshotTies,
-		sourceTies,
-		winners,
-	};
+		SELECT
+			'post_backfill_verified',
+			1,
+			'rehearsal',
+			greatest(
+				now64(3),
+				(SELECT max(verified_at) + toIntervalMillisecond(1)
+				 FROM ${database}.f16_revision_cutover_postbackfill_verification_20260826 FINAL)
+			),
+			'integration-test'
+		`);
+		await executeMigration(CLEANUP_MIGRATION, database);
+		rehearsalResult = {
+			analyticsCoverage: Number(coverage?.count ?? 0),
+			invalidSuffixes: Number(suffixes?.count ?? 0),
+			minimumSourceTieParts: Number(sourceTieParts?.minimum_parts ?? 0),
+			minimumRevision: minimum?.revision ?? "0",
+			signalEngine: signal?.engine_full ?? "",
+			signalRawRevision: signal?.raw_revision ?? "missing",
+			skillTables,
+			snapshotTies,
+			sourceTies,
+			winners,
+		};
+	} catch (error) {
+		rehearsalFailed = true;
+		rehearsalError = error;
+	} finally {
+		const mergeStarts = await Promise.allSettled(
+			stoppedTables.map(async (table) => {
+				const backupTable = `${table}_f16_backup_20260826`;
+				const existingTables = await executor.query<{ name: string }>(`
+					SELECT name
+					FROM system.tables
+					WHERE database = '${database}'
+						AND name IN ('${table}', '${backupTable}')
+				`);
+				const stoppedTableName = existingTables.some(
+					(existing) => existing.name === backupTable,
+				)
+					? backupTable
+					: existingTables.some((existing) => existing.name === table)
+						? table
+						: undefined;
+				if (!stoppedTableName) {
+					throw new Error(
+						`Could not resolve stopped table ${database}.${table} after rename`,
+					);
+				}
+				await executor.execute(
+					`SYSTEM START MERGES ${database}.${stoppedTableName}`,
+				);
+			}),
+		);
+		mergeFailures = mergeStarts.filter(
+			(result): result is PromiseRejectedResult => result.status === "rejected",
+		);
+	}
+	if (rehearsalFailed || mergeFailures.length > 0) {
+		throw new AggregateError(
+			[
+				...(rehearsalFailed ? [rehearsalError] : []),
+				...mergeFailures.map((failure) => failure.reason),
+			],
+			`F16 rehearsal or merge restart failed for ${database}`,
+		);
+	}
+	if (!rehearsalResult) {
+		throw new Error(`F16 rehearsal produced no result for ${database}`);
+	}
+	return rehearsalResult;
 }
 
 afterAll(async () => {
-	for (const database of databases) {
-		await executor.execute(`DROP DATABASE IF EXISTS ${database} SYNC`);
+	const cleanups = await Promise.allSettled(
+		databases.map((database) =>
+			executor.execute(`DROP DATABASE IF EXISTS ${database} SYNC`),
+		),
+	);
+	const failures = cleanups.filter(
+		(result): result is PromiseRejectedResult => result.status === "rejected",
+	);
+	if (failures.length > 0) {
+		throw new AggregateError(
+			failures.map((failure) => failure.reason),
+			"One or more F16 rehearsal databases could not be dropped",
+		);
 	}
 });
 
 describe("F16 destructive migration execution rehearsal", () => {
 	test("executes all checked-in phases deterministically on separate-part equal-key history", async () => {
 		assertMigrationUsesSupportedGrammar(
+			PRE_F16_SKILL_SCHEMA_MIGRATION,
+			"pre-F16 skill-table migration",
+		);
+		assertMigrationUsesSupportedGrammar(
+			PRE_F16_DEDUPLICATION_SETTINGS_MIGRATION,
+			"pre-F16 deduplication-settings migration",
+		);
+		assertMigrationUsesSupportedGrammar(
 			PRESERVATION_MIGRATION,
 			"F16 preservation migration",
+		);
+		assertMigrationUsesSupportedGrammar(
+			SKILL_RECEIPTS_REBUILD_MIGRATION,
+			"F16 skill_receipts rebuild migration",
+		);
+		assertMigrationUsesSupportedGrammar(
+			SKILL_USES_REBUILD_MIGRATION,
+			"F16 skill_uses rebuild migration",
+		);
+		assertMigrationUsesSupportedGrammar(
+			SKILL_VERSION_CONTENTS_REBUILD_MIGRATION,
+			"F16 skill_version_contents rebuild migration",
 		);
 		assertMigrationUsesSupportedGrammar(DDL_MIGRATION, "F16 DDL migration");
 		assertMigrationUsesSupportedGrammar(
@@ -822,5 +1088,59 @@ describe("F16 destructive migration execution rehearsal", () => {
 		expect(second.signalEngine).toBe(first.signalEngine);
 		expect(first.signalRawRevision).toBe("0");
 		expect(second.signalRawRevision).toBe("0");
+		const skillTableShape = (tables: SkillTableState[]) =>
+			tables.map(
+				({ create_table_query: _createTableQuery, ...table }) => table,
+			);
+		expect(skillTableShape(first.skillTables)).toEqual(
+			skillTableShape(second.skillTables),
+		);
+		expect(
+			first.skillTables.map((table) => ({
+				extraction_seq: table.extraction_seq,
+				extraction_seq_type: table.extraction_seq_type,
+				row_count: Number(table.row_count),
+				table_name: table.table_name,
+			})),
+		).toEqual([
+			{
+				extraction_seq: "42",
+				extraction_seq_type: "UInt128",
+				row_count: 1,
+				table_name: "skill_receipts",
+			},
+			{
+				extraction_seq: "42",
+				extraction_seq_type: "UInt128",
+				row_count: 1,
+				table_name: "skill_uses",
+			},
+			{
+				extraction_seq: "42",
+				extraction_seq_type: "UInt128",
+				row_count: 1,
+				table_name: "skill_version_contents",
+			},
+		]);
+		const skillUses = first.skillTables.find(
+			(table) => table.table_name === "skill_uses",
+		);
+		expect(skillUses?.engine_full).toContain(
+			"ReplacingMergeTree(extraction_seq)",
+		);
+		expect(skillUses?.primary_key).toBe(
+			"organization_id, skill_name, agent, user_id, session_id",
+		);
+		expect(skillUses?.sorting_key).toBe(
+			"organization_id, skill_name, agent, user_id, session_id, extraction_seq",
+		);
+		expect(skillUses?.create_table_query).toContain("index_granularity = 8192");
+		expect(skillUses?.create_table_query).toContain(
+			"non_replicated_deduplication_window = 1000",
+		);
+		expect(skillUses?.create_table_query).toContain("storage_policy = 's3'");
+		expect(skillUses?.comment).toBe(
+			"Versioned session skill uses bound to an exact completed extraction receipt. Mutable usage timestamps and content hashes are excluded from the replacing key.",
+		);
 	}, 300_000);
 });

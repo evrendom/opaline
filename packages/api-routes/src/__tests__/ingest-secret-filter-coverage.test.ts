@@ -10,6 +10,7 @@ const NON_TRANSCRIPT_STRING_PATHS: readonly string[] = [
 	"gitRemote",
 	"gitSha",
 	"organizationId",
+	"operationId",
 	"packageName",
 	"packageType",
 	"platform_os",

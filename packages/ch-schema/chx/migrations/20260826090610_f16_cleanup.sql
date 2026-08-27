@@ -2,9 +2,9 @@
 -- generated-at: 2026-08-26T09:06:10.000Z
 -- cli-version: 0.1.0-beta.16
 -- definition-count: 12
--- operation-count: 4
+-- operation-count: 7
 -- rename-suggestion-count: 0
--- risk-summary: safe=0, caution=4, danger=0
+-- risk-summary: safe=0, caution=7, danger=0
 
 -- F16-X01: Enforce the controlled executor with an explicit request timeout.
 SELECT throwIf(
@@ -55,15 +55,30 @@ DROP TABLE IF EXISTS rudel.session_analytics_f16_backfill_source_20260826 SYNC;
 -- F16-X08
 DROP TABLE IF EXISTS rudel.session_language_signals_f16_backfill_source_20260826 SYNC;
 
+-- The UInt64 skill-table backups are retained through post-backfill proof and
+-- removed only by this independently approved cleanup phase.
+-- operation: drop_table key=table:rudel.skill_receipts_f16_uint64_backup_20260826 risk=caution
+-- F16-X08A
+DROP TABLE IF EXISTS rudel.skill_receipts_f16_uint64_backup_20260826 SYNC;
+-- operation: drop_table key=table:rudel.skill_uses_f16_uint64_backup_20260826 risk=caution
+-- F16-X08B
+DROP TABLE IF EXISTS rudel.skill_uses_f16_uint64_backup_20260826 SYNC;
+-- operation: drop_table key=table:rudel.skill_version_contents_f16_uint64_backup_20260826 risk=caution
+-- F16-X08C
+DROP TABLE IF EXISTS rudel.skill_version_contents_f16_uint64_backup_20260826 SYNC;
+
 -- F16-X09: Journal only after every writer path observes cleanup completion.
 SELECT throwIf(
 	countIf(name IN (
 		'claude_sessions_f16_backfill_source_20260826',
 		'codex_sessions_f16_backfill_source_20260826',
 		'session_analytics_f16_backfill_source_20260826',
-		'session_language_signals_f16_backfill_source_20260826'
+		'session_language_signals_f16_backfill_source_20260826',
+		'skill_receipts_f16_uint64_backup_20260826',
+		'skill_uses_f16_uint64_backup_20260826',
+		'skill_version_contents_f16_uint64_backup_20260826'
 	)) != 0,
-	'F16 cleanup visibility barrier: one or more preservation copies remain visible'
+	'F16 cleanup visibility barrier: one or more preservation or UInt64 skill backups remain visible'
 ) AS f16_poll_cleanup_visible
 FROM system.tables
 WHERE database = 'rudel';

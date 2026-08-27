@@ -789,10 +789,15 @@ export async function processIngestSession({
 	}
 
 	const revisionIdentity = {
+		allowReceiptPromotion:
+			input.force_replace === true &&
+			input.operationId === undefined &&
+			durableProcessing === undefined,
 		contentSha256: contentHash,
 		operationId: buildSessionRevisionOperationId(
 			filteredInput.source,
 			durableProcessing?.operationId,
+			input.operationId,
 		),
 		organizationId: orgId,
 		sessionId: input.sessionId,
@@ -904,10 +909,12 @@ export async function processIngestSession({
 			: null;
 	} catch (error) {
 		if (error instanceof UsageExtractionSupersededError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "usage_extraction_superseded" },
-				message: error.message,
-			});
+			logger.info(
+				"Usage extraction converged as superseded before reservation (organization_id={organizationId} session_id={sessionId} revision={revision})",
+				{ organizationId: orgId, revision, sessionId: input.sessionId },
+			);
+			response.usageChecksum = undefined;
+			return { contentSha256: contentHash, result: response };
 		}
 		throw error;
 	}
@@ -1056,33 +1063,37 @@ export async function processIngestSession({
 		});
 	}
 
-	await recordSessionIngestContent(
-		orgId,
-		input.sessionId,
-		contentHash,
-		contentShape,
-		FILTER_VERSION,
-		new Date(timestamps.sessionDate),
-		ingestedAt,
-		revision,
-		{
-			checksum: usageExtraction.receipt.checksum,
-			diagnostics: JSON.stringify(usageExtraction.diagnostics),
-			eventCount: usageExtraction.receipt.eventCount,
-			extractionVersion: usageExtraction.receipt.extractionVersion,
-			eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
-			generation: usageGeneration,
-			modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
-		},
-	).catch((error: unknown) => {
+	try {
+		await recordSessionIngestContent(
+			orgId,
+			input.sessionId,
+			contentHash,
+			contentShape,
+			FILTER_VERSION,
+			new Date(timestamps.sessionDate),
+			ingestedAt,
+			revision,
+			{
+				checksum: usageExtraction.receipt.checksum,
+				diagnostics: JSON.stringify(usageExtraction.diagnostics),
+				eventCount: usageExtraction.receipt.eventCount,
+				extractionVersion: usageExtraction.receipt.extractionVersion,
+				eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
+				generation: usageGeneration,
+				modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
+			},
+		);
+	} catch (error) {
 		if (error instanceof UsageExtractionSupersededError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "usage_extraction_superseded" },
-				message: error.message,
-			});
+			logger.info(
+				"Usage extraction converged as superseded before receipt (organization_id={organizationId} session_id={sessionId} revision={revision})",
+				{ organizationId: orgId, revision, sessionId: input.sessionId },
+			);
+			response.usageChecksum = undefined;
+			return { contentSha256: contentHash, result: response };
 		}
 		throw error;
-	});
+	}
 	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
 		store: "postgres",
 		target: "usage-receipt",
