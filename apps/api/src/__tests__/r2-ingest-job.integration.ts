@@ -1895,13 +1895,16 @@ describe("R2 ingest real processor crash recovery", () => {
 		expect(BigInt(olderReceipt.revision)).toBeLessThan(
 			BigInt(newerReceipt.revision),
 		);
+		// Result aliases must not shadow the revision column: ClickHouse's
+		// analyzer resolves the alias inside argMax/max and rejects the query
+		// with ILLEGAL_AGGREGATION.
 		const [rawWinner] = await getClickhouse().query<{
 			content: string;
-			revision: string;
+			winner_revision: string;
 		}>({
 			query: `SELECT
 				argMax(content, revision) AS content,
-				toString(max(revision)) AS revision
+				toString(max(revision)) AS winner_revision
 			FROM rudel.claude_sessions
 			WHERE organization_id = {organizationId:String}
 				AND user_id = {userId:String}
@@ -1915,25 +1918,25 @@ describe("R2 ingest real processor crash recovery", () => {
 		});
 		expect(rawWinner).toEqual({
 			content: newerContent,
-			revision: newerReceipt.revision,
+			winner_revision: newerReceipt.revision,
 		});
-		const [analyticsWinner] = await getClickhouse().query<{ revision: string }>(
-			{
-				query: `SELECT toString(max(revision)) AS revision
+		const [analyticsWinner] = await getClickhouse().query<{
+			winner_revision: string;
+		}>({
+			query: `SELECT toString(max(revision)) AS winner_revision
 			FROM rudel.session_analytics
 			WHERE organization_id = {organizationId:String}
 				AND user_id = {userId:String}
 				AND source = 'claude_code'
 				AND session_id = {sessionId:String}
 			HAVING count() > 0`,
-				query_params: {
-					organizationId: ORGANIZATION_ID,
-					sessionId,
-					userId: USER_ID,
-				},
+			query_params: {
+				organizationId: ORGANIZATION_ID,
+				sessionId,
+				userId: USER_ID,
 			},
-		);
-		expect(analyticsWinner?.revision).toBe(newerReceipt.revision);
+		});
+		expect(analyticsWinner?.winner_revision).toBe(newerReceipt.revision);
 		const latestUsage = await readLatestUsageState(sessionId);
 		expect(latestUsage.length).toBeGreaterThan(1);
 		expect(
