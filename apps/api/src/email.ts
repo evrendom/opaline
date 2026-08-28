@@ -125,10 +125,10 @@ export function buildInvitationEmailContent(
 
 	return {
 		inviteLink,
-		subject: `${inviterName} invited you to ${organizationName} on Rudel`,
+		subject: `${inviterName} invited you to ${organizationName} on Opaline`,
 		html: `
 <p>Hi,</p>
-<p><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(organizationName)}</strong> on Rudel.</p>
+<p><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(organizationName)}</strong> on Opaline.</p>
 <p>
   <a href="${escapeHtml(inviteLink)}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
     Accept Invitation
@@ -137,7 +137,7 @@ export function buildInvitationEmailContent(
 <p>Or copy this link into your browser:</p>
 <p>${escapeHtml(inviteLink)}</p>
 `,
-		text: `${inviterName} invited you to join ${organizationName} on Rudel.\n\nAccept the invitation here: ${inviteLink}`,
+		text: `${inviterName} invited you to join ${organizationName} on Opaline.\n\nAccept the invitation here: ${inviteLink}`,
 	};
 }
 
@@ -147,9 +147,9 @@ export function buildPasswordResetEmailContent(
 	const safeUrl = normalizeText(resetUrl);
 
 	return {
-		subject: "Reset your Rudel password",
+		subject: "Reset your Opaline password",
 		html: `
-<p>We received a request to reset your Rudel password.</p>
+<p>We received a request to reset your Opaline password.</p>
 <p>
   <a href="${escapeHtml(safeUrl)}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
     Reset Password
@@ -158,24 +158,24 @@ export function buildPasswordResetEmailContent(
 <p>Or copy this link into your browser:</p>
 <p>${escapeHtml(safeUrl)}</p>
 `,
-		text: `We received a request to reset your Rudel password.\n\nReset your password here: ${safeUrl}`,
+		text: `We received a request to reset your Opaline password.\n\nReset your password here: ${safeUrl}`,
 	};
 }
 
 function getEmailVerificationOtpSubject(type: EmailVerificationOtpType) {
 	if (type === "change-email") {
-		return "Verify your new Rudel email";
+		return "Verify your new Opaline email";
 	}
 
 	if (type === "forget-password") {
-		return "Reset your Rudel password";
+		return "Reset your Opaline password";
 	}
 
 	if (type === "email-verification") {
-		return "Verify your Rudel email";
+		return "Verify your Opaline email";
 	}
 
-	return "Your Rudel sign-in code";
+	return "Your Opaline sign-in code";
 }
 
 export function buildEmailVerificationOtpEmailContent(data: {
@@ -188,11 +188,11 @@ export function buildEmailVerificationOtpEmailContent(data: {
 	return {
 		subject,
 		html: `
-<p>Your Rudel code is:</p>
+<p>Your Opaline code is:</p>
 <p style="font-size:28px;letter-spacing:6px;font-weight:700;">${escapeHtml(safeOtp)}</p>
 <p>This code expires in 5 minutes. If you did not request it, you can ignore this email.</p>
 `,
-		text: `Your Rudel code is: ${safeOtp}\n\nThis code expires in 5 minutes. If you did not request it, you can ignore this email.`,
+		text: `Your Opaline code is: ${safeOtp}\n\nThis code expires in 5 minutes. If you did not request it, you can ignore this email.`,
 	};
 }
 
@@ -208,9 +208,9 @@ export function buildClickHousePurgeFailureAlertContent(
 	const failedAt = data.failedAt.toISOString();
 
 	return {
-		subject: `Rudel ClickHouse purge failed: ${targetLabel}`,
+		subject: `Opaline ClickHouse purge failed: ${targetLabel}`,
 		html: `
-<p>A Rudel ClickHouse ${escapeHtml(targetLabel)} purge exhausted all retry attempts.</p>
+<p>An Opaline ClickHouse ${escapeHtml(targetLabel)} purge exhausted all retry attempts.</p>
 <dl>
   <dt>Job ID</dt><dd>${escapeHtml(data.id)}</dd>
   <dt>Target</dt><dd>${escapeHtml(targetLabel)} ${escapeHtml(targetId)}</dd>
@@ -222,7 +222,7 @@ export function buildClickHousePurgeFailureAlertContent(
 </dl>
 `,
 		text: [
-			`A Rudel ClickHouse ${targetLabel} purge exhausted all retry attempts.`,
+			`An Opaline ClickHouse ${targetLabel} purge exhausted all retry attempts.`,
 			`Job ID: ${data.id}`,
 			`Target: ${targetLabel} ${targetId}`,
 			`Attempts: ${data.attemptCount}`,
@@ -257,9 +257,9 @@ export function buildWrappedDesktopResumeEmailContent(
 	const safeUrl = normalizeText(resumeUrl);
 
 	return {
-		subject: "Continue your Rudel setup on desktop",
+		subject: "Continue your Opaline setup on desktop",
 		html: `
-<p>You can keep viewing Rudel Wrapped on your phone, but uploading sessions still needs desktop.</p>
+<p>You can keep viewing Opaline Wrapped on your phone, but uploading sessions still needs desktop.</p>
 <p>
   <a href="${escapeHtml(safeUrl)}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
     Continue on Desktop
@@ -268,7 +268,7 @@ export function buildWrappedDesktopResumeEmailContent(
 <p>Or copy this link into your browser on your desktop:</p>
 <p>${escapeHtml(safeUrl)}</p>
 `,
-		text: `You can keep viewing Rudel Wrapped on your phone, but uploading sessions still needs desktop.\n\nContinue on desktop here: ${safeUrl}`,
+		text: `You can keep viewing Opaline Wrapped on your phone, but uploading sessions still needs desktop.\n\nContinue on desktop here: ${safeUrl}`,
 	};
 }
 

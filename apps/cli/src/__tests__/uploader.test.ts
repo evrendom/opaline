@@ -158,7 +158,7 @@ describe("formatUploadError", () => {
 		const error = new ORPCError("BAD_GATEWAY");
 
 		expect(formatUploadError(error)).toBe(
-			"Temporary Rudel server/proxy error (502 Bad Gateway). The CLI retries these automatically; retry remaining failed uploads with: rudel upload --retry",
+			"Temporary Opaline server/proxy error (502 Bad Gateway). The CLI retries these automatically; retry remaining failed uploads with: rudel upload --retry",
 		);
 	});
 
@@ -166,7 +166,7 @@ describe("formatUploadError", () => {
 		const error = new ORPCError("INTERNAL_SERVER_ERROR");
 
 		expect(formatUploadError(error)).toBe(
-			"Rudel server error (500 Internal Server Error). This is not an auth problem. Retry later with: rudel upload --retry; if it repeats, share this status with the Rudel team.",
+			"Opaline server error (500 Internal Server Error). This is not an auth problem. Retry later with: rudel upload --retry; if it repeats, share this status with the Opaline team.",
 		);
 	});
 
@@ -174,7 +174,7 @@ describe("formatUploadError", () => {
 		const error = new TypeError("fetch failed");
 
 		expect(formatUploadError(error)).toBe(
-			"Network error while contacting Rudel API: fetch failed. Check your connection and retry with: rudel upload --retry",
+			"Network error while contacting Opaline API: fetch failed. Check your connection and retry with: rudel upload --retry",
 		);
 	});
 });
@@ -351,7 +351,9 @@ describe("uploadSession transient transport handling", () => {
 			attempts: 3,
 			retryable: true,
 		});
-		expect(result.error).toContain("Network error while contacting Rudel API");
+		expect(result.error).toContain(
+			"Network error while contacting Opaline API",
+		);
 		expect(retries).toEqual([1, 2]);
 	}, 10_000);
 });

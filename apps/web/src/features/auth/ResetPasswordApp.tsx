@@ -8,7 +8,7 @@ export function ResetPasswordApp() {
 
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center gap-6">
-			<img src={logoSrc} alt="Rudel" className="h-10 w-10" />
+			<img src={logoSrc} alt="Opaline" className="h-10 w-10" />
 			<ResetPasswordForm onBackToLogin={() => (window.location.href = "/")} />
 		</div>
 	);

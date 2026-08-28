@@ -55,10 +55,10 @@ describe("WrappedSetupPage", () => {
 		);
 
 		expect(
-			screen.getByRole("heading", { name: "Set up Rudel" }),
+			screen.getByRole("heading", { name: "Set up Opaline" }),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText("Start sending sessions to Rudel."),
+			screen.getByText("Start sending sessions to Opaline."),
 		).toBeInTheDocument();
 		expect(
 			screen.getByRole("navigation", { name: "Wrapped onboarding progress" }),
@@ -67,17 +67,17 @@ describe("WrappedSetupPage", () => {
 		expect(
 			screen.queryByRole("button", { name: "I installed and logged in" }),
 		).toBeNull();
-		expect(screen.getAllByText("Set up Rudel in your terminal")).toHaveLength(
+		expect(screen.getAllByText("Set up Opaline in your terminal")).toHaveLength(
 			1,
 		);
 		expect(
 			screen.queryByText(
-				"Install the CLI and connect it to the right Rudel account.",
+				"Install the CLI and connect it to the right Opaline account.",
 			),
 		).toBeNull();
 		expect(
 			screen.getByText(
-				hasExactTextContent("npm install -g rudel && rudel login"),
+				hasExactTextContent("npm install -g @opalinehq/cli && opaline login"),
 				{ selector: "code" },
 			),
 		).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.queryByText(hasExactTextContent("rudel upload"), {
+			screen.queryByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeNull();
@@ -119,10 +119,10 @@ describe("WrappedSetupPage", () => {
 		);
 
 		expect(
-			screen.getByRole("heading", { name: "Set up Rudel" }),
+			screen.getByRole("heading", { name: "Set up Opaline" }),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText("Start sending sessions to Rudel."),
+			screen.getByText("Start sending sessions to Opaline."),
 		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: "I enabled auto-upload" }),
@@ -134,7 +134,7 @@ describe("WrappedSetupPage", () => {
 		expect(screen.queryByText("Now")).toBeNull();
 		expect(screen.queryByText("Later")).toBeNull();
 		expect(
-			screen.getByText(hasExactTextContent("rudel enable"), {
+			screen.getByText(hasExactTextContent("opaline enable"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.queryByText(hasExactTextContent("rudel upload"), {
+			screen.queryByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeNull();
@@ -165,7 +165,7 @@ describe("WrappedSetupPage", () => {
 		);
 
 		expect(
-			screen.getByText(hasExactTextContent("rudel upload"), {
+			screen.getByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
@@ -188,14 +188,14 @@ describe("WrappedSetupPage", () => {
 		);
 
 		expect(
-			screen.getByRole("heading", { name: "Set up Rudel" }),
+			screen.getByRole("heading", { name: "Set up Opaline" }),
 		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: "I enabled auto-upload" }),
 		).toBeNull();
 		expect(screen.queryByText("Done")).toBeNull();
 		expect(
-			screen.getByText("Start sending sessions to Rudel."),
+			screen.getByText("Start sending sessions to Opaline."),
 		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: "I installed and logged in" }),
@@ -206,7 +206,7 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.getByText(hasExactTextContent("rudel enable"), {
+			screen.getByText(hasExactTextContent("opaline enable"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
@@ -222,7 +222,7 @@ describe("WrappedSetupPage", () => {
 			),
 		).toBeInTheDocument();
 		expect(
-			screen.queryByText(hasExactTextContent("rudel upload"), {
+			screen.queryByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeNull();

@@ -279,7 +279,7 @@ describe("createWrappedTeamCardShareActions", () => {
 		expect(intentUrl.searchParams.get("text")).toBe(
 			[
 				"My Codex usage says I'm a Maniac. Active 12 out of 180 days, 6 repos, 18.3 sessions per active day. Yeah, you should be a little scared.",
-				"#RudelWrapped",
+				"#OpalineWrapped",
 				"Check my profile out here https://opaline.so/wrapped/public-card",
 				"[Your image is in your clipboard, pls paste and dont forget]",
 			].join("\n\n"),

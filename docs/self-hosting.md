@@ -1,8 +1,8 @@
-# Self-Hosting Rudel
+# Self-Hosting Opaline
 
-This guide walks through deploying Rudel using **ObsessionDB** (ClickHouse), **Neon** (Postgres), and **Fly.io** (app server). This is the same stack we use in production.
+This guide walks through deploying Opaline using **ObsessionDB** (ClickHouse), **Neon** (Postgres), and **Fly.io** (app server). It is one supported self-hosting stack; production infrastructure may differ.
 
-> **This is an opinionated guide.** Rudel is a Bun server that needs Postgres and ClickHouse — it can run anywhere those are available. You don't have to use these specific providers. Any Postgres instance, any ClickHouse instance (that supports `SharedReplacingMergeTree` or `ReplacingMergeTree`), and any platform that can run a Bun/Node.js server will work. We use ObsessionDB, Neon, and Fly.io because they all have free tiers and are easy to set up.
+> **This is an opinionated guide.** Opaline is a Bun server that needs Postgres and ClickHouse — it can run anywhere those are available. You don't have to use these specific providers. Any Postgres instance, any ClickHouse instance (that supports `SharedReplacingMergeTree` or `ReplacingMergeTree`), and any platform that can run a Bun/Node.js server will work. This example uses ObsessionDB, Neon, and Fly.io because they all have free tiers and are easy to set up.
 
 ## Services
 

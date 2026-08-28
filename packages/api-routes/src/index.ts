@@ -544,7 +544,7 @@ export const SESSION_OWNERSHIP_CONFLICT_MESSAGE =
 export const SESSION_UPLOAD_SHRINK_REJECTED_CODE =
 	"SESSION_UPLOAD_SHRINK_REJECTED";
 export const SESSION_UPLOAD_SHRINK_REJECTED_MESSAGE =
-	"This upload is smaller than the stored session and was refused to protect existing data. Inspect the transcript, then use `rudel upload --force-replace` only if the replacement is intentional. If your CLI does not recognize the flag, upgrade rudel first.";
+	"This upload is smaller than the stored session and was refused to protect existing data. Inspect the transcript, then use `opaline upload --force-replace` only if the replacement is intentional. If your CLI does not recognize the flag, upgrade @opalinehq/cli first.";
 
 export type IngestSessionInput = z.infer<typeof IngestSessionInputSchema>;
 

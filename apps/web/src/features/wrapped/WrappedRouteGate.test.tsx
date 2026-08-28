@@ -406,7 +406,7 @@ describe("WrappedRouteGate", () => {
 		);
 
 		expect(screen.getByText("Loading wrapped")).toBeInTheDocument();
-		expect(screen.getByRole("img", { name: "Rudel" })).toBeInTheDocument();
+		expect(screen.getByRole("img", { name: "Opaline" })).toBeInTheDocument();
 		expect(
 			screen.getByText("Checking your account before loading wrapped..."),
 		).toBeInTheDocument();

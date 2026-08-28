@@ -1407,7 +1407,7 @@ describe("WrappedTeamCardRevealStage", () => {
 				.getByTestId("wrapped-team-card-back")
 				.querySelector(".rudel-wrapped-team-card-back__content"),
 		).not.toBeNull();
-		expect(screen.getByRole("img", { name: "Rudel" })).toBeInTheDocument();
+		expect(screen.getByRole("img", { name: "Opaline" })).toBeInTheDocument();
 		expect(screen.queryByText("Last 365 days")).toBeNull();
 		expect(screen.queryByText("Smooth Operator")).toBeNull();
 		expect(screen.queryByText("Project: geneva")).toBeNull();

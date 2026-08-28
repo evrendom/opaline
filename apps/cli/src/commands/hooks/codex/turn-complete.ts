@@ -54,7 +54,7 @@ async function runTurnComplete(
 		const credentials = loadCredentials();
 		if (!credentials) {
 			process.stderr.write(
-				`Rudel hook upload skipped for session ${input.threadId}: not authenticated; run \`rudel login\`.\n`,
+				`Opaline hook upload skipped for session ${input.threadId}: not authenticated; run \`rudel login\`.\n`,
 			);
 			return;
 		}
@@ -62,7 +62,7 @@ async function runTurnComplete(
 		const transcriptPath = await findActiveRolloutFile(input.threadId);
 		if (!transcriptPath) {
 			process.stderr.write(
-				`Rudel hook upload skipped for session ${input.threadId}: transcript file was not found.\n`,
+				`Opaline hook upload skipped for session ${input.threadId}: transcript file was not found.\n`,
 			);
 			return;
 		}
@@ -113,7 +113,7 @@ async function runTurnComplete(
 	} catch (error) {
 		logger.error("Codex turn-complete hook failed: {error}", { error });
 		process.stderr.write(
-			`Rudel Codex hook failed: ${error instanceof Error ? error.message : String(error)}\n`,
+			`Opaline Codex hook failed: ${error instanceof Error ? error.message : String(error)}\n`,
 		);
 	} finally {
 		await disposeLogging();

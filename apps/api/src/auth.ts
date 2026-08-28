@@ -51,7 +51,7 @@ function getEmailDomain(email: string) {
 function formatFallbackName(email: string) {
 	const localPart = email.split("@")[0]?.trim();
 	if (!localPart) {
-		return "Rudel User";
+		return "Opaline User";
 	}
 
 	const words = localPart

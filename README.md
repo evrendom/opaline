@@ -1,8 +1,8 @@
-# Rudel
+# Opaline
 
 **Try the hosted version for free at [opaline.so](https://opaline.so)**
 
-Analytics for Claude Code and Codex. Rudel gives you a dashboard with insights on your coding sessions — token usage, session duration, activity patterns, model usage, and more.
+Analytics for Claude Code and Codex. Opaline gives you a dashboard with insights on your coding sessions — token usage, session duration, activity patterns, model usage, and more.
 
 ## Prerequisites
 
@@ -14,10 +14,10 @@ Analytics for Claude Code and Codex. Rudel gives you a dashboard with insights o
 2. Install the CLI and connect it to your account:
 
 ```bash
-npm install -g rudel
+npm install --global @opalinehq/cli
 
-rudel login     # authenticate via your browser
-rudel enable    # auto-upload sessions when Claude Code / Codex exits
+opaline login     # authenticate via your browser
+opaline enable    # auto-upload sessions when Claude Code / Codex exits
 ```
 
 3. Invite teammates (optional): go to **Settings → Organization** in the dashboard, enter their email, and share the generated invite link with them.
@@ -27,16 +27,16 @@ That's it. Your Claude Code / Codex sessions will now be uploaded automatically.
 Already have past sessions? Upload them in one go:
 
 ```bash
-rudel upload    # interactive picker for batch upload
+opaline upload    # interactive picker for batch upload
 ```
 
-See the [CLI documentation](apps/cli/README.md) for all available commands.
+See the [Opaline CLI documentation](https://github.com/opalinehq/cli#readme) for all available commands.
 
 ## How It Works
 
-1. You install the CLI and run `rudel enable`
+1. You install the CLI and run `opaline enable`
 2. This registers Claude Code / Codex hooks that run when a session ends
-3. The hook redacts known secret patterns and uploads the session transcript to Rudel
+3. The hook redacts known secret patterns and uploads the session transcript to Opaline
 4. Transcripts are stored in ClickHouse and processed into analytics
 
 ## What Data Is Collected
@@ -52,11 +52,11 @@ Each uploaded session includes:
 
 ## Security & Privacy Disclaimer
 
-Rudel is designed to ingest full coding-agent session data for analytics. That means uploaded transcripts and related metadata may contain sensitive material, including source code, prompts, tool output, file contents, command output, URLs, and secrets that appeared during a session.
+Opaline is designed to ingest full coding-agent session data for analytics. That means uploaded transcripts and related metadata may contain sensitive material, including source code, prompts, tool output, file contents, command output, URLs, and secrets that appeared during a session.
 
 The current CLI redacts known secret patterns from the main transcript and sub-agent transcripts before upload, and the API reapplies the same deterministic filter before storage. Matched values are removed in full; uploads are stopped if known-pattern redaction exceeds 20% of the transcript or the bounded filter cannot establish a stable result. This reduces exposure but does not catch `DB_PASSWORD=hunter2`, bare custom tokens without a distinguishing prefix, secrets split across lines, base64-encoded or paraphrased secrets, credentials in screenshots, or double-escaped JSON embedded inside another JSON string. Seven of the 18 selected rules also require a restricted trailing delimiter, so ordinary punctuation immediately after a secret can prevent a match. Do not treat the filter as a substitute for keeping secrets out of coding-agent sessions.
 
-Only enable Rudel on projects and environments where you are comfortable uploading that data. Review the [Rudel Privacy Policy](https://opaline.so/privacy) before enabling uploads for yourself or your team.
+Only enable Opaline on projects and environments where you are comfortable uploading that data. Review the [Opaline Privacy Policy](https://opaline.so/privacy) before enabling uploads for yourself or your team.
 
 We also use limited product analytics on the hosted service to understand whether core workflows work, diagnose failures, and improve the product. This is explicit event tracking for account and authentication flows, CLI login and enable flows, session upload outcomes, dashboard views and interactions, organization management actions, and a small set of utility interactions such as theme toggle or sidebar collapse.
 

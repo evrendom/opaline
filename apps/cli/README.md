@@ -1,6 +1,6 @@
 # rudel
 
-CLI for uploading Claude Code / Codex session transcripts to [Rudel](https://opaline.so) for analytics.
+Compatibility CLI for uploading Claude Code / Codex session transcripts to [Opaline](https://opaline.so) for analytics.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ rudel enable
 
 ### `rudel login`
 
-Authenticate with Rudel. Opens your browser to [opaline.so](https://opaline.so) where you sign in, then the CLI receives a token automatically.
+Authenticate with Opaline. Opens your browser to [opaline.so](https://opaline.so) where you sign in, then the CLI receives a token automatically.
 
 Flags:
 
@@ -44,7 +44,7 @@ Self-hosting over plain HTTP therefore needs `--allow-insecure-api-base` on ever
 
 ### `rudel enable`
 
-Registers the available Claude Code / Codex hooks so your session transcript uploads automatically when a session ends. This is the recommended way to use Rudel -- set it and forget it.
+Registers the available Claude Code / Codex hooks so your session transcript uploads automatically when a session ends. This is the recommended way to use Opaline -- set it and forget it.
 
 ### `rudel disable`
 
@@ -110,11 +110,11 @@ Each uploaded session includes:
 
 ## Known-secret Redaction
 
-Before upload, the CLI redacts known secret patterns in both the main transcript and every sub-agent transcript. The Rudel API reapplies the same deterministic filter before storage and reports counts by pattern; matched values are removed in full and never included in the summary. Uploads are stopped if known-pattern redaction exceeds 20% of the transcript or the bounded filter cannot establish a stable result.
+Before upload, the CLI redacts known secret patterns in both the main transcript and every sub-agent transcript. The Opaline API reapplies the same deterministic filter before storage and reports counts by pattern; matched values are removed in full and never included in the summary. Uploads are stopped if known-pattern redaction exceeds 20% of the transcript or the bounded filter cannot establish a stable result.
 
 This substantially reduces exposure, but it does not catch `DB_PASSWORD=hunter2`, bare custom tokens without a distinguishing prefix, secrets split across lines, base64-encoded or paraphrased secrets, credentials in screenshots, or double-escaped JSON embedded inside another JSON string. Seven of the 18 selected rules also require a restricted trailing delimiter, so ordinary punctuation immediately after a secret can prevent a match. Keep secrets out of coding-agent sessions whenever possible.
 
 ## Links
 
 - **Web App**: [opaline.so](https://opaline.so)
-- **Issues**: [GitHub Issues](https://github.com/evrendom/rudel/issues)
+- **Issues**: [GitHub Issues](https://github.com/opalinehq/cli/issues)

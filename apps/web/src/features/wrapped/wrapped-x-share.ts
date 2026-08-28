@@ -26,7 +26,7 @@ interface WrappedXShareCopy {
 }
 
 const WRAPPED_X_INTENT_URL = "https://twitter.com/intent/tweet";
-const WRAPPED_X_SHARE_HASHTAG = "#RudelWrapped";
+const WRAPPED_X_SHARE_HASHTAG = "#OpalineWrapped";
 
 const WRAPPED_X_SHARE_COPY_BY_ARCHETYPE: Record<string, WrappedXShareCopy> = {
 	decimal: {

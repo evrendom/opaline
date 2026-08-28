@@ -35,7 +35,7 @@ export function buildWrappedSharePageMetadata(input: {
 	} = input;
 	const { snapshot } = share;
 	const displayName = snapshot.row.displayName;
-	const title = `${displayName}'s Rudel Wrapped`;
+	const title = `${displayName}'s Opaline Wrapped`;
 	const description = `${displayName} is a ${snapshot.archetypeLabel}. ${formatCompactMetric(snapshot.row.totalTokens)} tokens across ${formatCompactMetric(snapshot.row.totalSessions)} sessions. Make yours.`;
 	const baseMetadata = {
 		description,
@@ -51,7 +51,7 @@ export function buildWrappedSharePageMetadata(input: {
 
 	return {
 		...baseMetadata,
-		imageAlt: `${displayName}'s Rudel Wrapped card`,
+		imageAlt: `${displayName}'s Opaline Wrapped card`,
 		imageHeight,
 		imageType: imageType || WRAPPED_SHARE_IMAGE_TYPE,
 		imageUrl,
@@ -120,7 +120,7 @@ function buildWrappedShareMetadataTags(metadata: WrappedSharePageMetadata) {
 	const publicUrl = escapeHtmlAttribute(metadata.publicUrl);
 	const baseTags = [
 		`    <meta property="og:type" content="website" />`,
-		`    <meta property="og:site_name" content="Rudel" />`,
+		`    <meta property="og:site_name" content="Opaline" />`,
 		`    <meta property="og:locale" content="en_US" />`,
 		`    <meta property="og:title" content="${title}" />`,
 		`    <meta property="og:description" content="${description}" />`,

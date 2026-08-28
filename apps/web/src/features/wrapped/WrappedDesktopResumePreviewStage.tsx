@@ -9,7 +9,7 @@ import { WrappedDesktopResumePromptStage } from "./WrappedDesktopResumePromptSta
 
 const DEFAULT_WRAPPED_DESKTOP_SETUP_URL = "opaline.so/wrapped";
 const DEFAULT_WRAPPED_DESKTOP_SETUP_DESCRIPTION =
-	"The next step will be to enable Rudel within the terminal on your desktop.";
+	"The next step will be to enable Opaline within the terminal on your desktop.";
 const COPY_FEEDBACK_DURATION_MS = 1800;
 const PRIMARY_BUTTON_LAUNCH_HOLD_MS = 180;
 const PREVIEW_PRIMARY_ACTION_DURATION_MS = 820;

@@ -4,7 +4,7 @@ import {
 	buildWrappedXShareText,
 } from "@/features/wrapped/wrapped-x-share";
 
-const WRAPPED_X_SHARE_HASHTAG = "#RudelWrapped";
+const WRAPPED_X_SHARE_HASHTAG = "#OpalineWrapped";
 
 function withWrappedHashtag(text: string) {
 	return [text, WRAPPED_X_SHARE_HASHTAG].join("\n\n");

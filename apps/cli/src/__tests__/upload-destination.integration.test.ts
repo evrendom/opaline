@@ -266,7 +266,7 @@ test.each(
 		});
 
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("Rudel hook upload refused");
+		expect(result.stderr).toContain("Opaline hook upload refused");
 		expect(result.stderr).toContain('plaintext http: to "0.0.0.0"');
 		expect(result.stderr).not.toContain(TEST_TOKEN);
 		expect(stub.requests).toHaveLength(0);
@@ -349,7 +349,7 @@ test.each(
 		});
 
 		expect(result.exitCode).toBe(0);
-		expect(result.stderr).toContain("Rudel hook upload failed");
+		expect(result.stderr).toContain("Opaline hook upload failed");
 		expect(result.stderr).toContain("[permanent]");
 		expect(result.stderr).toContain(message);
 

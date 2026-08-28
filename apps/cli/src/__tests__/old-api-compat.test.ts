@@ -364,7 +364,7 @@ describe("built CLI against an old-API ingest stub", () => {
 			expect(result.exitCode).toBe(1);
 			expect(result.stderr).toContain("Upload failed:");
 			expect(result.stderr).toContain(
-				"Network error while contacting Rudel API",
+				"Network error while contacting Opaline API",
 			);
 			expect(result.stderr).toContain("rudel upload --retry");
 			expect(containsAnyCanary(result.stderr, CLAUDE_SECRETS)).toBe(false);

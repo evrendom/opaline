@@ -161,7 +161,7 @@ export function formatUploadError(error: unknown): string {
 		error instanceof ORPCError &&
 		error.code === SESSION_UPLOAD_SHRINK_REJECTED_CODE
 	) {
-		return "Rudel refused this upload because it is smaller than the stored session. Check that the transcript is complete, then run `rudel upload <session> --force-replace` only if the replacement is intentional. If this CLI does not recognize the flag, upgrade rudel first.";
+		return "Opaline refused this upload because it is smaller than the stored session. Check that the transcript is complete, then run `rudel upload <session> --force-replace` only if the replacement is intentional. If this CLI does not recognize the flag, upgrade the CLI first.";
 	}
 	if (
 		error instanceof ORPCError &&
@@ -198,7 +198,7 @@ export function formatUploadError(error: unknown): string {
 		return `${error.status} ${error.message}`;
 	}
 	const message = error instanceof Error ? error.message : "connection failed";
-	return `Network error while contacting Rudel API: ${message}. Check your connection and retry with: rudel upload --retry`;
+	return `Network error while contacting Opaline API: ${message}. Check your connection and retry with: rudel upload --retry`;
 }
 
 function formatPayloadTooLargeError(error: ORPCError<string, unknown>): string {
@@ -211,10 +211,10 @@ function formatPayloadTooLargeError(error: ORPCError<string, unknown>): string {
 function formatServerUploadError(error: ORPCError<string, unknown>): string {
 	const status = `${error.status} ${error.message}`;
 	if (RETRYABLE_STATUS_CODES.has(error.status)) {
-		return `Temporary Rudel server/proxy error (${status}). The CLI retries these automatically; retry remaining failed uploads with: rudel upload --retry`;
+		return `Temporary Opaline server/proxy error (${status}). The CLI retries these automatically; retry remaining failed uploads with: rudel upload --retry`;
 	}
 
-	return `Rudel server error (${status}). This is not an auth problem. Retry later with: rudel upload --retry; if it repeats, share this status with the Rudel team.`;
+	return `Opaline server error (${status}). This is not an auth problem. Retry later with: rudel upload --retry; if it repeats, share this status with the Opaline team.`;
 }
 
 function getPayloadTooLargeDetail(
@@ -536,7 +536,7 @@ function isIngestSessionResponse(
 }
 
 function formatUnrecognizedResponseError(): string {
-	return "Rudel API returned an unrecognized response instead of an ingest confirmation, so this upload cannot be verified and was treated as failed. This usually means a proxy, SSO gateway, or wrong endpoint URL answered instead of the Rudel API. Check the endpoint and retry with: rudel upload --retry";
+	return "Opaline API returned an unrecognized response instead of an ingest confirmation, so this upload cannot be verified and was treated as failed. This usually means a proxy, SSO gateway, or wrong endpoint URL answered instead of the Opaline API. Check the endpoint and retry with: rudel upload --retry";
 }
 
 function getUploadAggregateBytes(request: IngestSessionInput): number {

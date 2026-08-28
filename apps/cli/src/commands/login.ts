@@ -397,6 +397,6 @@ export const loginCommand = buildCommand({
 		},
 	},
 	docs: {
-		brief: "Authenticate with the Rudel API via browser login",
+		brief: "Authenticate with the Opaline API via browser login",
 	},
 });

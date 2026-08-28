@@ -163,7 +163,7 @@ function WrappedTeamMemberCardBackLogo(props: { className?: string }) {
 
 	return (
 		<svg
-			aria-label="Rudel"
+			aria-label="Opaline"
 			className={className}
 			fill="none"
 			role="img"
