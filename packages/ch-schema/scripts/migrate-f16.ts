@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { resolve } from "node:path";
 import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
@@ -22,6 +24,8 @@ const SKILL_VERSION_CONTENTS_MIGRATION =
 const CUTOVER_MIGRATION = "20260826090551_auto.sql";
 const BACKFILL_MIGRATION = "20260826090600_f16_backfill.sql";
 const CLEANUP_MIGRATION = "20260826090610_f16_cleanup.sql";
+const CODEX_BACKFILL_MAX_BLOCK_SIZE = 4;
+const VERIFICATION_MAX_BLOCK_SIZE = 8;
 const CUTOVER_RECOVERY_MARKER = "-- RECOVERY: F16-CUTOVER-AFTER-RENAME";
 const SKILL_REBUILD_RECOVERY_MARKER =
 	"-- RECOVERY: F16-SKILL-REBUILD-AFTER-EXCHANGE";
@@ -223,6 +227,14 @@ interface TopologyHostRow {
 	host_name: string;
 }
 
+interface DetachedCommandStatusRow {
+	detached_active: number | string;
+	detached_exception_code: number | string;
+	detached_failed: number | string;
+	detached_finished: number | string;
+	detached_started: number | string;
+}
+
 interface F16TopologySingleNode {
 	mode: "single-node";
 }
@@ -380,8 +392,10 @@ function quoteSqlString(value: string): string {
 	return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
-function createMigrationClient(input: {
+export function createMigrationClient(input: {
 	database: string;
+	detachedNoEvidenceTimeoutMs?: number;
+	detachedStatusPollIntervalMs?: number;
 	ddlTimeoutSeconds: number;
 	maxBytesBeforeExternalGroupBy: number;
 	maxBytesBeforeExternalSort: number;
@@ -390,6 +404,7 @@ function createMigrationClient(input: {
 	password: string;
 	requestTimeoutMs: number;
 	runQueryPrefix: string;
+	topology: F16Topology;
 	url: string;
 	username: string;
 }): MigrationHttpClient {
@@ -422,34 +437,223 @@ function createMigrationClient(input: {
 		`${input.username}:${input.password}`,
 	).toString("base64")}`;
 
+	function sendRequest(
+		requestEndpoint: URL,
+		query: string,
+		timeoutMs: number,
+	): Promise<{ body: string; statusCode: number }> {
+		const requestTransport =
+			requestEndpoint.protocol === "https:" ? httpsRequest : httpRequest;
+		return new Promise((resolveRequest, rejectRequest) => {
+			let settled = false;
+			const finish = (
+				result: { body: string; statusCode: number } | Error,
+			): void => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(deadline);
+				if (result instanceof Error) {
+					rejectRequest(result);
+					return;
+				}
+				resolveRequest(result);
+			};
+			const request = requestTransport(
+				requestEndpoint,
+				{
+					headers: {
+						Authorization: authorization,
+						"Content-Length": Buffer.byteLength(query),
+						"Content-Type": "text/plain; charset=utf-8",
+					},
+					method: "POST",
+				},
+				(response) => {
+					let body = "";
+					response.setEncoding("utf8");
+					response.on("data", (chunk: string) => {
+						body += chunk;
+					});
+					response.once("aborted", () => {
+						finish(new Error("ClickHouse migration response was aborted"));
+					});
+					response.once("error", finish);
+					response.once("end", () => {
+						finish({ body, statusCode: response.statusCode ?? 0 });
+					});
+				},
+			);
+			const deadline = setTimeout(() => {
+				finish(new Error("The operation timed out."));
+				request.destroy();
+			}, timeoutMs);
+			request.once("error", finish);
+			request.end(query);
+		});
+	}
+
+	function readDetachedCount(
+		row: DetachedCommandStatusRow,
+		key: keyof DetachedCommandStatusRow,
+	): number {
+		const value = Number(row[key]);
+		if (!Number.isSafeInteger(value) || value < 0) {
+			throw new Error(`Invalid detached command status field ${key}`);
+		}
+		return value;
+	}
+
+	async function reconcileDetachedCommand(
+		detachedQueryId: string,
+		absoluteDeadlineMs: number,
+	): Promise<void> {
+		const processSource =
+			input.topology.mode === "cloud-multi-node"
+				? `clusterAllReplicas(${quoteSqlString(
+						input.topology.clusterName,
+					)}, system.processes)`
+				: "system.processes";
+		const queryLogSource =
+			input.topology.mode === "cloud-multi-node"
+				? `clusterAllReplicas(${quoteSqlString(
+						input.topology.clusterName,
+					)}, system.query_log)`
+				: "system.query_log";
+		const quotedQueryId = quoteSqlString(detachedQueryId);
+		const noEvidenceDeadlineMs = Math.min(
+			absoluteDeadlineMs,
+			Date.now() + (input.detachedNoEvidenceTimeoutMs ?? 60_000),
+		);
+		let observedQuery = false;
+		let lastStatus = "no terminal status observed";
+		while (Date.now() < absoluteDeadlineMs) {
+			const remainingMs = absoluteDeadlineMs - Date.now();
+			const statusEndpoint = new URL(endpoint);
+			statusEndpoint.searchParams.set(
+				"query_id",
+				`${input.runQueryPrefix}-reconcile-${crypto.randomUUID()}`,
+			);
+			const statusQuery = `
+				SELECT
+					(SELECT count() FROM ${processSource}
+					 WHERE query_id = ${quotedQueryId}
+						OR initial_query_id = ${quotedQueryId}) AS detached_active,
+					(SELECT countIf(type = 'QueryStart') FROM ${queryLogSource}
+					 WHERE event_date >= today() - 1 AND query_id = ${quotedQueryId}) AS detached_started,
+					(SELECT countIf(type = 'QueryFinish') FROM ${queryLogSource}
+					 WHERE event_date >= today() - 1 AND query_id = ${quotedQueryId}) AS detached_finished,
+					(SELECT countIf(type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing'))
+					 FROM ${queryLogSource}
+					 WHERE event_date >= today() - 1 AND query_id = ${quotedQueryId}) AS detached_failed,
+					(SELECT maxIf(exception_code, type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing'))
+					 FROM ${queryLogSource}
+					 WHERE event_date >= today() - 1 AND query_id = ${quotedQueryId}) AS detached_exception_code
+				SETTINGS skip_unavailable_shards=0
+				FORMAT JSONEachRow`;
+			let response: { body: string; statusCode: number } | undefined;
+			try {
+				response = await sendRequest(
+					statusEndpoint,
+					statusQuery,
+					Math.max(1, Math.min(30_000, remainingMs)),
+				);
+			} catch (error) {
+				lastStatus = String(error);
+			}
+			if (response) {
+				if (response.statusCode < 200 || response.statusCode >= 300) {
+					lastStatus = `status census HTTP ${response.statusCode}`;
+				} else {
+					let validZeroCensus = false;
+					try {
+						const line = response.body
+							.split("\n")
+							.find((candidate) => candidate.trim().length > 0);
+						if (!line) throw new Error("empty detached command status");
+						const row = JSON.parse(line) as DetachedCommandStatusRow;
+						const active = readDetachedCount(row, "detached_active");
+						const started = readDetachedCount(row, "detached_started");
+						const finished = readDetachedCount(row, "detached_finished");
+						const failed = readDetachedCount(row, "detached_failed");
+						const exceptionCode = readDetachedCount(
+							row,
+							"detached_exception_code",
+						);
+						observedQuery ||=
+							active > 0 || started > 0 || finished > 0 || failed > 0;
+						validZeroCensus =
+							active === 0 && started === 0 && finished === 0 && failed === 0;
+						lastStatus = `active=${active} started=${started} finished=${finished} failed=${failed}`;
+						if (active === 0 && failed > 0) {
+							throw new Error(
+								`Detached ClickHouse command failed with exception code ${exceptionCode}`,
+							);
+						}
+						if (active === 0 && finished > 0) return;
+					} catch (error) {
+						if (
+							error instanceof Error &&
+							error.message.startsWith("Detached ClickHouse command failed")
+						) {
+							throw error;
+						}
+						lastStatus = String(error);
+					}
+					if (
+						validZeroCensus &&
+						!observedQuery &&
+						Date.now() >= noEvidenceDeadlineMs
+					) {
+						throw new Error(
+							`Detached ClickHouse command has no server-side evidence after HTTP 504: ${lastStatus}`,
+						);
+					}
+				}
+			}
+			const sleepMs = Math.min(
+				input.detachedStatusPollIntervalMs ?? 1_000,
+				absoluteDeadlineMs - Date.now(),
+			);
+			if (sleepMs > 0) {
+				await new Promise<void>((resolveSleep) => {
+					setTimeout(resolveSleep, sleepMs);
+				});
+			}
+		}
+		throw new Error(
+			`Detached ClickHouse command did not reach a terminal state before the request deadline: ${lastStatus}`,
+		);
+	}
+
 	async function request(
 		query: string,
 		timeoutMs = input.requestTimeoutMs,
+		acceptDetachedCommandSuccess = false,
 	): Promise<string> {
+		const absoluteDeadlineMs = Date.now() + timeoutMs;
 		const requestEndpoint = new URL(endpoint);
-		requestEndpoint.searchParams.set(
-			"query_id",
-			`${input.runQueryPrefix}-${crypto.randomUUID()}`,
-		);
-		const response = await fetch(requestEndpoint, {
-			body: query,
-			headers: { Authorization: authorization },
-			method: "POST",
-			signal: AbortSignal.timeout(timeoutMs),
-		});
-		const body = await response.text();
-		if (!response.ok) {
+		const queryId = `${input.runQueryPrefix}-${crypto.randomUUID()}`;
+		requestEndpoint.searchParams.set("query_id", queryId);
+		const response = await sendRequest(requestEndpoint, query, timeoutMs);
+		if (response.statusCode === 504) {
+			await reconcileDetachedCommand(queryId, absoluteDeadlineMs);
+			if (acceptDetachedCommandSuccess) return "";
 			throw new Error(
-				`ClickHouse migration request failed (${response.status}): ${body}`,
+				"Detached ClickHouse query finished after HTTP 504, but its response body is unavailable",
 			);
 		}
-		return body;
+		if (response.statusCode < 200 || response.statusCode >= 300) {
+			throw new Error(
+				`ClickHouse migration request failed (${response.statusCode}): ${response.body}`,
+			);
+		}
+		return response.body;
 	}
 
 	return {
 		close: () => Promise.resolve(),
 		async command(query, timeoutMs) {
-			await request(query, timeoutMs);
+			await request(query, timeoutMs, true);
 		},
 		async query<TRow>(query: string, timeoutMs?: number) {
 			const body = await request(query, timeoutMs);
@@ -553,6 +757,7 @@ function createRuntime(): MigrationRuntime {
 			password,
 			requestTimeoutMs,
 			runQueryPrefix,
+			topology,
 			url,
 			username,
 		}),
@@ -632,6 +837,22 @@ export function expandBucketedStatement(
 	return statements;
 }
 
+export function applyBackfillExecutionProfile(statement: string): string {
+	if (!/^\s*INSERT\s+INTO\s+rudel\.codex_sessions\s*\(/u.test(statement)) {
+		return statement;
+	}
+	const settingsMarker = "SETTINGS async_insert=0";
+	if (statement.split(settingsMarker).length !== 2) {
+		throw new Error(
+			"F16 Codex backfill must contain exactly one synchronous insert settings marker",
+		);
+	}
+	return statement.replace(
+		settingsMarker,
+		`${settingsMarker}, max_block_size=${CODEX_BACKFILL_MAX_BLOCK_SIZE}, max_insert_block_size=${CODEX_BACKFILL_MAX_BLOCK_SIZE}, min_insert_block_size_rows=1, min_insert_block_size_bytes=1`,
+	);
+}
+
 async function executeMigrationSql(
 	sql: string,
 	runtime: MigrationRuntime,
@@ -645,7 +866,9 @@ async function executeMigrationSql(
 			if (executableStatement.includes(" AS f16_poll_")) {
 				await runBarrier(executableStatement, runtime);
 			} else {
-				await runtime.executor.execute(executableStatement);
+				await runtime.executor.execute(
+					applyBackfillExecutionProfile(executableStatement),
+				);
 			}
 		}
 	}
@@ -747,6 +970,29 @@ export async function acquireMigrationLease(
 		SETTINGS index_granularity = 1
 		COMMENT ${quoteSqlString(leaseComment(runtime))}
 	`);
+	const tableSource =
+		runtime.topology.mode === "cloud-multi-node"
+			? `clusterAllReplicas(${quoteSqlString(
+					runtime.topology.clusterName,
+				)}, system.tables)`
+			: "system.tables";
+	const expectedReplicaCount =
+		runtime.topology.mode === "cloud-multi-node"
+			? runtime.topology.expectedReplicaCount
+			: 1;
+	await runBarrier(
+		`SELECT throwIf(
+			count() != ${expectedReplicaCount}
+			OR countIf(comment = ${quoteSqlString(leaseComment(runtime))})
+				!= ${expectedReplicaCount},
+			'F16 lease acquisition barrier: lease table is not visible with exact owner metadata on every replica'
+		) AS f16_poll_lease_created
+		FROM ${tableSource}
+		WHERE database = 'rudel'
+			AND name = 'f16_revision_cutover_lease_20260826'
+		SETTINGS skip_unavailable_shards=0`,
+		runtime,
+	);
 	await runtime.primaryClient.command(`
 		INSERT INTO ${LEASE_TABLE} (owner_run_id, acquired_at)
 		SELECT
@@ -913,11 +1159,15 @@ export async function appendJournalEntryWithReconciliation(
 async function verifyPreservationSnapshots(
 	runtime: MigrationRuntime,
 ): Promise<void> {
-	await runtime.primaryClient.command(PRESERVATION_LIVE_VERIFICATION_SQL);
+	await runtime.primaryClient.command(
+		`${PRESERVATION_LIVE_VERIFICATION_SQL}\nSETTINGS max_block_size=${VERIFICATION_MAX_BLOCK_SIZE}`,
+	);
 }
 
 async function verifyPostBackfill(runtime: MigrationRuntime): Promise<void> {
-	await runtime.primaryClient.command(POST_BACKFILL_LIVE_VERIFICATION_SQL);
+	await runtime.primaryClient.command(
+		`${POST_BACKFILL_LIVE_VERIFICATION_SQL}\nSETTINGS max_block_size=${VERIFICATION_MAX_BLOCK_SIZE}`,
+	);
 }
 
 async function autoApprovePreservation(
