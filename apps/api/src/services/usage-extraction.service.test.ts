@@ -239,15 +239,17 @@ describe("usage extraction worker boundary", () => {
 		expect(error.shouldPersistReceipt).toBe(true);
 	});
 
-	test("never-started outcomes stay distinct and never claim an incomplete receipt", () => {
+	test("retryable outcomes without a final extraction never claim an incomplete receipt", () => {
 		const outcomes = [
 			new UsageExtractionQueueFullError("per-user-jobs"),
+			new UsageExtractionQueueTimeoutError(),
 			new UsageExtractionQueueAbortedError(),
 			new UsageExtractionQueueClosedError(),
 		];
 
 		expect(outcomes.map((error) => error.name)).toEqual([
 			"UsageExtractionQueueFullError",
+			"UsageExtractionQueueTimeoutError",
 			"UsageExtractionQueueAbortedError",
 			"UsageExtractionQueueClosedError",
 		]);

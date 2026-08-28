@@ -97,6 +97,7 @@ export class UsageExtractionQueueFullError extends UsageExtractionExecutionError
 
 export class UsageExtractionQueueTimeoutError extends UsageExtractionExecutionError {
 	readonly retryAfterMs = QUEUE_RETRY_AFTER_MS;
+	readonly shouldPersistReceipt: boolean = false;
 
 	constructor() {
 		super(undefined, "Usage extraction timed out. Retry shortly.");
