@@ -55,6 +55,7 @@ import {
 	type R2MultipartUploadInitClient,
 	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
+import { UsageExtractionQueueTimeoutError } from "../services/usage-extraction.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -1039,6 +1040,130 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 		expect(retried.status).toBe("completed");
 	});
+
+	test("recovers a durable usage timeout without poisoning its target receipt", async () => {
+		const jobId = crypto.randomUUID();
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(`usage-timeout-${jobId}`),
+		);
+		const completion = buildCompletionInput(initialized);
+		const firstAttemptAt = new Date("2030-01-01T00:00:00.000Z");
+
+		await expect(
+			commitR2IngestJob({
+				input: completion,
+				now: () => firstAttemptAt,
+				process: createRealProcessor(undefined, {
+					awaitLanguageSignals: false,
+					extractSessionFacts: async () => {
+						throw new UsageExtractionQueueTimeoutError();
+					},
+				}),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toMatchObject({ code: "GATEWAY_TIMEOUT" });
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: { code: "R2_INGEST_GATEWAY_TIMEOUT" },
+			status: "pending",
+		});
+
+		const [beforeRetry] = await sqlClient<
+			Array<{
+				expectedRowCount: number | null;
+				status: string;
+				usageGeneration: string | null;
+			}>
+		>`
+			SELECT
+				ledger.status,
+				ledger.usage_generation::text AS "usageGeneration",
+				receipt.expected_row_count AS "expectedRowCount"
+			FROM ingest_processing_ledger AS ledger
+			LEFT JOIN ingest_processing_target_receipt AS receipt
+				ON receipt.ledger_id = ledger.id
+				AND receipt.target = 'rudel.usage_events'
+			WHERE ledger.organization_id = ${ORGANIZATION_ID}
+				AND ledger.session_id = ${jobId}
+		`;
+		expect(beforeRetry).toEqual({
+			expectedRowCount: null,
+			status: "processing",
+			usageGeneration: expect.any(String),
+		});
+		const usageGeneration = beforeRetry?.usageGeneration;
+		if (!usageGeneration) {
+			throw new Error("durable timeout did not reserve a usage generation");
+		}
+		const [usageBeforeRetry] = await getClickhouse().query<{
+			row_count: number | string;
+		}>({
+			query: `SELECT count() AS row_count
+				FROM rudel.usage_events
+				WHERE organization_id = {organizationId:String}
+					AND session_id = {sessionId:String}`,
+			query_params: { organizationId: ORGANIZATION_ID, sessionId: jobId },
+		});
+		expect(Number(usageBeforeRetry?.row_count ?? 0)).toBe(0);
+
+		const retried = await commitR2IngestJob({
+			input: completion,
+			now: () => new Date(firstAttemptAt.getTime() + 2_000),
+			process: createRealProcessor(undefined, {
+				awaitLanguageSignals: false,
+			}),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(retried.status).toBe("completed");
+
+		const [afterRetry] = await sqlClient<
+			Array<{
+				expectedRowCount: number | null;
+				status: string;
+				usageGeneration: string | null;
+			}>
+		>`
+			SELECT
+				ledger.status,
+				ledger.usage_generation::text AS "usageGeneration",
+				receipt.expected_row_count AS "expectedRowCount"
+			FROM ingest_processing_ledger AS ledger
+			LEFT JOIN ingest_processing_target_receipt AS receipt
+				ON receipt.ledger_id = ledger.id
+				AND receipt.target = 'rudel.usage_events'
+			WHERE ledger.organization_id = ${ORGANIZATION_ID}
+				AND ledger.session_id = ${jobId}
+		`;
+		expect(afterRetry).toEqual({
+			expectedRowCount: 2,
+			status: "completed",
+			usageGeneration,
+		});
+		const [usageAfterRetry] = await getClickhouse().query<{
+			event_count: number | string;
+			receipt_count: number | string;
+		}>({
+			query: `SELECT
+					countIf(record_kind = 'event') AS event_count,
+					countIf(record_kind = 'receipt' AND receipt_is_complete = 1) AS receipt_count
+				FROM rudel.usage_events FINAL
+				WHERE organization_id = {organizationId:String}
+					AND session_id = {sessionId:String}
+					AND event_version = {generation:UInt64}`,
+			query_params: {
+				generation: usageGeneration,
+				organizationId: ORGANIZATION_ID,
+				sessionId: jobId,
+			},
+		});
+		expect(Number(usageAfterRetry?.event_count ?? 0)).toBe(1);
+		expect(Number(usageAfterRetry?.receipt_count ?? 0)).toBe(1);
+	}, 180_000);
 
 	test("leaves objects intact on a ClickHouse code 159 timeout", async () => {
 		const initialized = await initializeUploadedJob(
@@ -2698,13 +2823,19 @@ function createLedgerTestEnvironment(database: postgres.Sql) {
 
 function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
+	options: {
+		awaitLanguageSignals?: boolean;
+		extractSessionFacts?: NonNullable<
+			Parameters<typeof processIngestSession>[0]["extractSessionFacts"]
+		>;
+	} = {},
 ): (
 	input: IngestSessionInput,
 	identity: { operationId: string; organizationId: string; userId: string },
 ) => Promise<R2IngestProcessorResult> {
 	return (input, identity) =>
 		processIngestSession({
-			awaitLanguageSignals: true,
+			awaitLanguageSignals: options.awaitLanguageSignals ?? true,
 			context: {
 				apiKeyId: null,
 				session: null,
@@ -2716,6 +2847,7 @@ function createRealProcessor(
 			},
 			enforceRateLimits: false,
 			errorFactories: TEST_ERROR_FACTORIES,
+			extractSessionFacts: options.extractSessionFacts,
 			input,
 		});
 }

@@ -20,7 +20,7 @@ import {
 } from "../services/r2-ingest-processing-error.js";
 
 describe("R2 ingest processing error classification", () => {
-	test("keeps derived language signals off both durable R2 processing paths", async () => {
+	test("defers derived language signals on both durable R2 processing paths", async () => {
 		const [routerSource, repairSource] = await Promise.all([
 			Bun.file(new URL("../router.ts", import.meta.url)).text(),
 			Bun.file(
@@ -33,6 +33,12 @@ describe("R2 ingest processing error classification", () => {
 		);
 		expect(repairSource).toMatch(
 			/repairRecoverableR2IngestJobs\([\s\S]*?awaitLanguageSignals: false,/u,
+		);
+		expect(routerSource).toMatch(
+			/shouldStartBestEffortLanguageSignals\(\{[\s\S]*?durableProcessing: durableProcessing !== undefined,/u,
+		);
+		expect(routerSource).toMatch(
+			/shouldPersistUsageExtractionFailureReceipt\(\{[\s\S]*?durableProcessing: claimedLedger !== undefined,/u,
 		);
 	});
 

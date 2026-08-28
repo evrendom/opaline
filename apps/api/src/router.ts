@@ -76,6 +76,10 @@ import {
 	wakeClickHousePurgeWorker,
 } from "./services/clickhouse-purge.service.js";
 import {
+	shouldPersistUsageExtractionFailureReceipt,
+	shouldStartBestEffortLanguageSignals,
+} from "./services/ingest-derived-fact-policy.js";
+import {
 	filterSessionTextFieldsOffThread,
 	IngestFilterQueueAbortedError,
 	IngestFilterQueueClosedError,
@@ -450,6 +454,7 @@ export async function processIngestSession({
 	durableProcessing,
 	enforceRateLimits,
 	errorFactories,
+	extractSessionFacts = extractSessionFactsOffThread,
 	input,
 	signal,
 }: {
@@ -467,6 +472,7 @@ export async function processIngestSession({
 	};
 	enforceRateLimits: boolean;
 	errorFactories: IngestErrorFactories;
+	extractSessionFacts?: typeof extractSessionFactsOffThread;
 	input: IngestSessionInput;
 	signal?: AbortSignal;
 }): Promise<R2IngestProcessorResult> {
@@ -658,6 +664,7 @@ export async function processIngestSession({
 		awaitLanguageSignals,
 		context,
 		durableProcessing,
+		extractSessionFacts,
 		input,
 		prepared: {
 			adapter,
@@ -692,6 +699,7 @@ async function processPreparedIngestSession({
 	claimedLedger,
 	context,
 	durableProcessing,
+	extractSessionFacts,
 	input,
 	prepared,
 	signal,
@@ -707,6 +715,7 @@ async function processPreparedIngestSession({
 		failpoint: IngestProcessingFailpoint | undefined;
 		operationId: string;
 	};
+	extractSessionFacts: typeof extractSessionFactsOffThread;
 	input: IngestSessionInput;
 	prepared: PreparedIngestSession;
 	signal?: AbortSignal;
@@ -737,6 +746,7 @@ async function processPreparedIngestSession({
 						claimedLedger: ledger,
 						context,
 						durableProcessing,
+						extractSessionFacts,
 						input,
 						prepared,
 						signal,
@@ -940,7 +950,12 @@ async function processPreparedIngestSession({
 			}
 			throw error;
 		}
-	} else {
+	} else if (
+		shouldStartBestEffortLanguageSignals({
+			awaitLanguageSignals,
+			durableProcessing: durableProcessing !== undefined,
+		})
+	) {
 		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
 	}
 
@@ -991,7 +1006,7 @@ async function processPreparedIngestSession({
 	let usageExtraction: UsageExtractionResult;
 	let skillExtraction: SkillExtractionResult | null;
 	try {
-		const extraction = await extractSessionFactsOffThread({
+		const extraction = await extractSessionFacts({
 			bytes: contentShape.contentBytes,
 			extractSkills: skillExtractionEnabled,
 			input: {
@@ -1013,7 +1028,10 @@ async function processPreparedIngestSession({
 			if (
 				usageExtractionEnabled &&
 				usageGeneration !== null &&
-				error.shouldPersistReceipt
+				shouldPersistUsageExtractionFailureReceipt({
+					durableProcessing: claimedLedger !== undefined,
+					extractionAllowsReceipt: error.shouldPersistReceipt,
+				})
 			) {
 				await writeUsageExtraction(clickhouse, {
 					contentSha256: contentHash,
