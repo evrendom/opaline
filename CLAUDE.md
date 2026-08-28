@@ -4,7 +4,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 
 **Stack**: Bun, Turborepo, Biome, TypeScript
 **Deployment**: Bun server + Postgres (Neon) + ClickHouse
-**Domain**: `app.rudel.ai`
+**Domain**: `opaline.so`
 
 ## Monorepo Structure
 

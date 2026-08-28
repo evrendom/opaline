@@ -9,7 +9,7 @@ import {
 const validDeviceCode = {
 	device_code: "dc",
 	user_code: "ABCD1234",
-	verification_uri: "https://app.rudel.ai/device",
+	verification_uri: "https://opaline.so/device",
 	expires_in: 600,
 	interval: 5,
 };

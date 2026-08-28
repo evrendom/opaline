@@ -36,4 +36,4 @@ export interface UploadResult {
 	usageChecksum?: string;
 }
 
-export const DEFAULT_ENDPOINT = "https://app.rudel.ai/rpc";
+export const DEFAULT_ENDPOINT = "https://opaline.so/rpc";

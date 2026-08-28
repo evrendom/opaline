@@ -2,12 +2,12 @@
 	"name": "rudel",
 	"version": "0.3.0",
 	"type": "module",
-	"description": "CLI for the Coding Agent Analytics Platform rudel.ai",
+	"description": "CLI for the Coding Agent Analytics Platform opaline.so",
 	"license": "MIT",
 	"engines": {
 		"node": ">=20"
 	},
-	"homepage": "https://app.rudel.ai",
+	"homepage": "https://opaline.so",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/evrendom/rudel.git",

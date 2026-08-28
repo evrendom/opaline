@@ -489,7 +489,7 @@ export function SignupForm(props: SignupFormProps) {
 				<p className="text-center text-xs text-muted-foreground">
 					By signing up, you agree to our{" "}
 					<a
-						href="https://rudel.ai/terms"
+						href="https://opaline.so/terms"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="underline underline-offset-4 hover:text-primary"
@@ -498,7 +498,7 @@ export function SignupForm(props: SignupFormProps) {
 					</a>{" "}
 					and{" "}
 					<a
-						href="https://rudel.ai/privacy"
+						href="https://opaline.so/privacy"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="underline underline-offset-4 hover:text-primary"

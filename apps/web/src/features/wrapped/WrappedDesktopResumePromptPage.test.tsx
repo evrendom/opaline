@@ -51,7 +51,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 			screen.getByRole("button", { name: "Send link to my mail" }),
 		).toBeInTheDocument();
 		expect(screen.getByText("OR")).toBeInTheDocument();
-		expect(screen.getByText("app.rudel.ai/wrapped")).toBeInTheDocument();
+		expect(screen.getByText("opaline.so/wrapped")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
 		expect(screen.queryByText("ada@example.com")).toBeNull();
 	});
@@ -72,7 +72,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		await user.click(screen.getByRole("button", { name: "Copy" }));
 
 		expect(mockCopyTextToClipboardWithResult).toHaveBeenCalledWith(
-			"app.rudel.ai/wrapped",
+			"opaline.so/wrapped",
 			expect.objectContaining({
 				allowPromptFallback: true,
 				preferSelectionCopy: true,
@@ -118,7 +118,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		const createResumeLink = vi.fn().mockResolvedValue({
 			email_sent: true,
 			expires_at: "2026-04-24T12:00:00.000Z",
-			resume_url: "https://app.rudel.ai/resume/test-token",
+			resume_url: "https://opaline.so/resume/test-token",
 		});
 		const user = userEvent.setup();
 
@@ -149,7 +149,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		expect(
 			screen.getByRole("button", { name: "Email sent!" }),
 		).toBeInTheDocument();
-		expect(screen.getByText("app.rudel.ai/wrapped")).toBeInTheDocument();
+		expect(screen.getByText("opaline.so/wrapped")).toBeInTheDocument();
 		expect(mockTrackUtilityUsed).toHaveBeenCalledWith(
 			expect.objectContaining({
 				utilityName: "desktopLinkSent",
@@ -162,7 +162,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		const createResumeLink = vi.fn().mockResolvedValue({
 			email_sent: true,
 			expires_at: "2026-04-24T12:00:00.000Z",
-			resume_url: "https://app.rudel.ai/resume/test-token",
+			resume_url: "https://opaline.so/resume/test-token",
 		});
 		const user = userEvent.setup();
 
@@ -187,7 +187,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		await user.click(screen.getByRole("button", { name: "Copy" }));
 
 		expect(mockCopyTextToClipboardWithResult).toHaveBeenCalledWith(
-			"https://app.rudel.ai/resume/test-token",
+			"https://opaline.so/resume/test-token",
 			expect.objectContaining({
 				allowPromptFallback: true,
 				preferSelectionCopy: true,
@@ -199,7 +199,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		const createResumeLink = vi.fn().mockResolvedValue({
 			email_sent: false,
 			expires_at: "2026-04-24T12:00:00.000Z",
-			resume_url: "https://app.rudel.ai/resume/test-token",
+			resume_url: "https://opaline.so/resume/test-token",
 		});
 		const user = userEvent.setup();
 
@@ -226,7 +226,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		await user.click(screen.getByRole("button", { name: "Copy" }));
 
 		expect(mockCopyTextToClipboardWithResult).toHaveBeenCalledWith(
-			"https://app.rudel.ai/resume/test-token",
+			"https://opaline.so/resume/test-token",
 			expect.any(Object),
 		);
 		expect(mockTrackUtilityUsed).toHaveBeenCalledWith(

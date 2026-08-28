@@ -26,7 +26,7 @@ async function runSetOrg(): Promise<undefined | Error> {
 	}
 
 	if (orgs.length === 0) {
-		p.outro("Create one at app.rudel.ai first.");
+		p.outro("Create one at opaline.so first.");
 		return new Error("No organizations found.");
 	}
 

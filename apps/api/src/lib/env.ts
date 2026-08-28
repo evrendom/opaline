@@ -27,8 +27,8 @@ export interface CliDeviceVerificationUrlConfig {
  * query or fragment.
  *
  * String-concatenating a non-bare origin corrupts the result rather than failing
- * — `https://app.rudel.ai?tenant=acme` would become
- * `https://app.rudel.ai/?tenant=acme/device`, and a fragment swallows `/device`
+ * — `https://opaline.so?tenant=acme` would become
+ * `https://opaline.so/?tenant=acme/device`, and a fragment swallows `/device`
  * entirely. Reject at boot instead, consistent with this file's fail-fast
  * doctrine, and build the path with the URL API rather than by concatenation.
  */

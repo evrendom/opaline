@@ -949,7 +949,7 @@ function WrappedAuthIntroTerms() {
 		<p className="rudel-wrapped-auth-form__terms">
 			By continuing, you agree to our{" "}
 			<a
-				href="https://rudel.ai/terms"
+				href="https://opaline.so/terms"
 				target="_blank"
 				rel="noopener noreferrer"
 				className="rudel-wrapped-auth-form__terms-link"

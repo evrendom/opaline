@@ -1,6 +1,6 @@
 # Rudel
 
-**Try the hosted version for free at [rudel.ai](https://rudel.ai)**
+**Try the hosted version for free at [opaline.so](https://opaline.so)**
 
 Analytics for Claude Code and Codex. Rudel gives you a dashboard with insights on your coding sessions — token usage, session duration, activity patterns, model usage, and more.
 
@@ -10,7 +10,7 @@ Analytics for Claude Code and Codex. Rudel gives you a dashboard with insights o
 
 ## Getting Started
 
-1. Create an account at [app.rudel.ai](https://app.rudel.ai)
+1. Create an account at [opaline.so](https://opaline.so)
 2. Install the CLI and connect it to your account:
 
 ```bash
@@ -56,7 +56,7 @@ Rudel is designed to ingest full coding-agent session data for analytics. That m
 
 The current CLI redacts known secret patterns from the main transcript and sub-agent transcripts before upload, and the API reapplies the same deterministic filter before storage. Matched values are removed in full; uploads are stopped if known-pattern redaction exceeds 20% of the transcript or the bounded filter cannot establish a stable result. This reduces exposure but does not catch `DB_PASSWORD=hunter2`, bare custom tokens without a distinguishing prefix, secrets split across lines, base64-encoded or paraphrased secrets, credentials in screenshots, or double-escaped JSON embedded inside another JSON string. Seven of the 18 selected rules also require a restricted trailing delimiter, so ordinary punctuation immediately after a secret can prevent a match. Do not treat the filter as a substitute for keeping secrets out of coding-agent sessions.
 
-Only enable Rudel on projects and environments where you are comfortable uploading that data. Review the [Rudel Privacy Policy](https://rudel.ai/privacy) before enabling uploads for yourself or your team.
+Only enable Rudel on projects and environments where you are comfortable uploading that data. Review the [Rudel Privacy Policy](https://opaline.so/privacy) before enabling uploads for yourself or your team.
 
 We also use limited product analytics on the hosted service to understand whether core workflows work, diagnose failures, and improve the product. This is explicit event tracking for account and authentication flows, CLI login and enable flows, session upload outcomes, dashboard views and interactions, organization management actions, and a small set of utility interactions such as theme toggle or sidebar collapse.
 

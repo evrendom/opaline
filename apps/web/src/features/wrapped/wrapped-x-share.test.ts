@@ -371,7 +371,7 @@ describe("wrapped X share copy", () => {
 		const intentUrl = new URL(
 			buildWrappedXIntentUrl({
 				text: "Share text",
-				url: "https://rudel.ai/wrapped",
+				url: "https://opaline.so/wrapped",
 			}),
 		);
 
@@ -381,7 +381,7 @@ describe("wrapped X share copy", () => {
 		expect(intentUrl.searchParams.get("text")).toBe(
 			[
 				"Share text",
-				"Check my profile out here https://rudel.ai/wrapped",
+				"Check my profile out here https://opaline.so/wrapped",
 				"[Your image is in your clipboard, pls paste and dont forget]",
 			].join("\n\n"),
 		);

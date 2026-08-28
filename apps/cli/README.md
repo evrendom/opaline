@@ -1,6 +1,6 @@
 # rudel
 
-CLI for uploading Claude Code / Codex session transcripts to [Rudel](https://app.rudel.ai) for analytics.
+CLI for uploading Claude Code / Codex session transcripts to [Rudel](https://opaline.so) for analytics.
 
 ## Prerequisites
 
@@ -28,13 +28,13 @@ rudel enable
 
 ### `rudel login`
 
-Authenticate with Rudel. Opens your browser to [app.rudel.ai](https://app.rudel.ai) where you sign in, then the CLI receives a token automatically.
+Authenticate with Rudel. Opens your browser to [opaline.so](https://opaline.so) where you sign in, then the CLI receives a token automatically.
 
 Flags:
 
 | Flag | Description |
 |---|---|
-| `--api-base <url>` | API server to authenticate against. Defaults to `RUDEL_API_BASE`, else `https://app.rudel.ai`. Must be `https://`, or `http://` on a loopback host. |
+| `--api-base <url>` | API server to authenticate against. Defaults to `RUDEL_API_BASE`, else `https://opaline.so`. Must be `https://`, or `http://` on a loopback host. |
 | `--allow-insecure-api-base` | Permit plaintext `http://` on a non-loopback host, for **both** the API base and the browser verification URL it returns. Your access token and ingest API key are then sent unencrypted, so only use this on a trusted network. Also settable as `RUDEL_ALLOW_INSECURE_API_BASE=1`. |
 | `--no-browser` | Print the verification URL instead of opening a browser. |
 
@@ -116,5 +116,5 @@ This substantially reduces exposure, but it does not catch `DB_PASSWORD=hunter2`
 
 ## Links
 
-- **Web App**: [app.rudel.ai](https://app.rudel.ai)
+- **Web App**: [opaline.so](https://opaline.so)
 - **Issues**: [GitHub Issues](https://github.com/evrendom/rudel/issues)

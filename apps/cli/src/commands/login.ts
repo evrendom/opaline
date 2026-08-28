@@ -29,7 +29,7 @@ import {
 	shouldDisableCliPersonProfile,
 } from "../lib/product-analytics.js";
 
-const PRODUCTION_APP_URL = "https://app.rudel.ai";
+const PRODUCTION_APP_URL = "https://opaline.so";
 const DEVICE_CLIENT_ID = "rudel-cli";
 const POLL_SAFETY_TIMEOUT_MS = 120_000;
 

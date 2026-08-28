@@ -82,7 +82,7 @@ describe("createWrappedTeamCardShareActions", () => {
 			displayName: "Jane Doe",
 			row: buildTeamPageMemberRow(),
 			sharePostRef,
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleDownloadPost();
@@ -145,7 +145,7 @@ describe("createWrappedTeamCardShareActions", () => {
 		const onShareActionTriggered = vi.fn();
 		const resolveShareUrl = vi
 			.fn()
-			.mockResolvedValue("https://rudel.ai/wrapped/public-card");
+			.mockResolvedValue("https://opaline.so/wrapped/public-card");
 		const sharePostRef = { current: document.createElement("div") };
 		vi.mocked(copyTextToClipboardWithResult).mockResolvedValue("copied");
 
@@ -156,7 +156,7 @@ describe("createWrappedTeamCardShareActions", () => {
 			resolveShareUrl,
 			row: buildTeamPageMemberRow(),
 			sharePostRef,
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await expect(actions.handleCopyProfileUrl()).resolves.toBe(true);
@@ -164,7 +164,7 @@ describe("createWrappedTeamCardShareActions", () => {
 		expect(onShareActionTriggered).toHaveBeenCalledWith("copy_profile_url");
 		expect(resolveShareUrl).toHaveBeenCalledTimes(1);
 		expect(copyTextToClipboardWithResult).toHaveBeenCalledWith(
-			"https://rudel.ai/wrapped/public-card",
+			"https://opaline.so/wrapped/public-card",
 			{
 				allowPromptFallback: true,
 				preferSelectionCopy: true,
@@ -182,7 +182,7 @@ describe("createWrappedTeamCardShareActions", () => {
 		const open = vi.fn().mockReturnValue({ opener: null });
 		const resolveShareUrl = vi
 			.fn()
-			.mockResolvedValue("https://rudel.ai/wrapped/public-card");
+			.mockResolvedValue("https://opaline.so/wrapped/public-card");
 		const sharePostRef = { current: document.createElement("div") };
 		Object.defineProperty(window, "open", {
 			configurable: true,
@@ -209,7 +209,7 @@ describe("createWrappedTeamCardShareActions", () => {
 				totalTokens: 1_920_000,
 			}),
 			sharePostRef,
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 			sourceSplit: [
 				{ session_count: 0, session_share_percent: 0, source: "claude_code" },
 				{ session_count: 219, session_share_percent: 100, source: "codex" },
@@ -280,7 +280,7 @@ describe("createWrappedTeamCardShareActions", () => {
 			[
 				"My Codex usage says I'm a Maniac. Active 12 out of 180 days, 6 repos, 18.3 sessions per active day. Yeah, you should be a little scared.",
 				"#RudelWrapped",
-				"Check my profile out here https://rudel.ai/wrapped/public-card",
+				"Check my profile out here https://opaline.so/wrapped/public-card",
 				"[Your image is in your clipboard, pls paste and dont forget]",
 			].join("\n\n"),
 		);
