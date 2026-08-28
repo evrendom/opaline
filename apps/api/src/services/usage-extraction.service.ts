@@ -296,7 +296,7 @@ export class UsageExtractionQueue {
 	private getWorker(): Worker {
 		if (this.extractionWorker) return this.extractionWorker;
 		const worker = new Worker(
-			new URL("./usage-extraction.worker.ts", import.meta.url).href,
+			new URL("./usage-extraction.worker.js", import.meta.url).href,
 		);
 		worker.addEventListener(
 			"message",

@@ -7,6 +7,21 @@ export function shouldStartBestEffortLanguageSignals(input: {
 	return !input.awaitLanguageSignals && !input.durableProcessing;
 }
 
+export function shouldAwaitBestEffortLanguageSignals(input: {
+	awaitBestEffortLanguageSignals: boolean;
+	awaitLanguageSignals: boolean;
+	durableProcessing: boolean;
+}): boolean {
+	// Vercel has no resident reconciliation worker, and Hobby cron jobs can run
+	// only daily. Run durable-upload signals after the other derived facts while
+	// keeping scanner failure outside the upload's success contract.
+	return (
+		input.awaitBestEffortLanguageSignals &&
+		!input.awaitLanguageSignals &&
+		input.durableProcessing
+	);
+}
+
 export function shouldPersistUsageExtractionFailureReceipt(input: {
 	durableProcessing: boolean;
 	extractionAllowsReceipt: boolean;

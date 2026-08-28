@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
 	shouldStartBestEffortLanguageSignals,
 } from "./ingest-derived-fact-policy.js";
@@ -18,6 +19,37 @@ describe("ingest derived-fact policy", () => {
 				durableProcessing: false,
 			}),
 		).toBe(true);
+	});
+
+	test("awaits best-effort durable signals only on an explicitly enabled host", () => {
+		expect(
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals: true,
+				awaitLanguageSignals: false,
+				durableProcessing: true,
+			}),
+		).toBe(true);
+		expect(
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals: false,
+				awaitLanguageSignals: false,
+				durableProcessing: true,
+			}),
+		).toBe(false);
+		expect(
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals: true,
+				awaitLanguageSignals: true,
+				durableProcessing: true,
+			}),
+		).toBe(false);
+		expect(
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals: true,
+				awaitLanguageSignals: false,
+				durableProcessing: false,
+			}),
+		).toBe(false);
 	});
 
 	test("never consumes a durable target receipt for diagnostic usage output", () => {

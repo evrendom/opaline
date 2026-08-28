@@ -76,6 +76,7 @@ import {
 	wakeClickHousePurgeWorker,
 } from "./services/clickhouse-purge.service.js";
 import {
+	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
 	shouldStartBestEffortLanguageSignals,
 } from "./services/ingest-derived-fact-policy.js";
@@ -449,6 +450,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 export async function processIngestSession({
 	aggregateContentMaxBytes,
 	allowQuiescedIngest = false,
+	awaitBestEffortLanguageSignals = false,
 	awaitLanguageSignals,
 	context,
 	durableProcessing,
@@ -460,6 +462,7 @@ export async function processIngestSession({
 }: {
 	aggregateContentMaxBytes?: number;
 	allowQuiescedIngest?: boolean;
+	awaitBestEffortLanguageSignals?: boolean;
 	awaitLanguageSignals: boolean;
 	context: {
 		apiKeyId: string | null;
@@ -661,6 +664,7 @@ export async function processIngestSession({
 	// converge after server filtering instead of creating duplicate rows.
 	const contentHash = computeIngestContentHash(filteredInput);
 	return processPreparedIngestSession({
+		awaitBestEffortLanguageSignals,
 		awaitLanguageSignals,
 		context,
 		durableProcessing,
@@ -695,6 +699,7 @@ interface PreparedIngestSession {
 }
 
 async function processPreparedIngestSession({
+	awaitBestEffortLanguageSignals,
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
@@ -704,6 +709,7 @@ async function processPreparedIngestSession({
 	prepared,
 	signal,
 }: {
+	awaitBestEffortLanguageSignals: boolean;
 	awaitLanguageSignals: boolean;
 	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
@@ -742,6 +748,7 @@ async function processPreparedIngestSession({
 				parseStoredIngestProcessorResult,
 				(ledger) =>
 					processPreparedIngestSession({
+						awaitBestEffortLanguageSignals,
 						awaitLanguageSignals,
 						claimedLedger: ledger,
 						context,
@@ -959,249 +966,261 @@ async function processPreparedIngestSession({
 		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
 	}
 
-	if (!usageExtractionEnabled && !skillExtractionEnabled) {
-		logger.warn(
-			"Session fact extraction bypassed after raw ingest (organization_id={organizationId} session_id={sessionId})",
-			{ organizationId: orgId, sessionId: input.sessionId },
-		);
-		return { contentSha256: contentHash, result: response };
-	}
-
-	let usageGeneration: string | null = null;
 	try {
-		usageGeneration = usageExtractionEnabled
-			? claimedLedger
-				? await reserveLedgerUsageGeneration(
-						claimedLedger,
-						{
-							expectedRevision: revision,
-							organizationId: orgId,
-							sessionId: input.sessionId,
-							userId: context.user.id,
-						},
-						durableProcessing?.failpoint,
-					)
-				: await reserveUsageExtractionGeneration(
-						orgId,
-						input.sessionId,
-						context.user.id,
-						revision,
-					)
-			: null;
-	} catch (error) {
-		if (error instanceof UsageExtractionSupersededError) {
-			logger.info(
-				"Usage extraction converged as superseded before reservation (organization_id={organizationId} session_id={sessionId} revision={revision})",
-				{ organizationId: orgId, revision, sessionId: input.sessionId },
+		if (!usageExtractionEnabled && !skillExtractionEnabled) {
+			logger.warn(
+				"Session fact extraction bypassed after raw ingest (organization_id={organizationId} session_id={sessionId})",
+				{ organizationId: orgId, sessionId: input.sessionId },
 			);
-			response.usageChecksum = undefined;
 			return { contentSha256: contentHash, result: response };
 		}
-		throw error;
-	}
-	const subagents: Record<string, string> = {};
-	for (const subagent of filteredInput.subagents ?? []) {
-		subagents[subagent.agentId] = subagent.content;
-	}
-	let usageExtraction: UsageExtractionResult;
-	let skillExtraction: SkillExtractionResult | null;
-	try {
-		const extraction = await extractSessionFacts({
-			bytes: contentShape.contentBytes,
-			extractSkills: skillExtractionEnabled,
-			input: {
-				organizationId: orgId,
-				userId: context.user.id,
-				sessionId: input.sessionId,
-				source: filteredInput.source,
-				content: filteredInput.content,
-				subagents,
-			},
-			signal,
-			skillSessionDate: timestamps.sessionDate,
-			userId: context.user.id,
-		});
-		usageExtraction = extraction.usage;
-		skillExtraction = extraction.skills;
-	} catch (error) {
-		if (error instanceof UsageExtractionExecutionError) {
-			if (
-				usageExtractionEnabled &&
-				usageGeneration !== null &&
-				shouldPersistUsageExtractionFailureReceipt({
-					durableProcessing: claimedLedger !== undefined,
-					extractionAllowsReceipt: error.shouldPersistReceipt,
-				})
-			) {
-				await writeUsageExtraction(clickhouse, {
-					contentSha256: contentHash,
-					extraction: error.extraction,
-					filterVersion: FILTER_VERSION,
-					generation: usageGeneration,
-					ingestedAt,
+
+		let usageGeneration: string | null = null;
+		try {
+			usageGeneration = usageExtractionEnabled
+				? claimedLedger
+					? await reserveLedgerUsageGeneration(
+							claimedLedger,
+							{
+								expectedRevision: revision,
+								organizationId: orgId,
+								sessionId: input.sessionId,
+								userId: context.user.id,
+							},
+							durableProcessing?.failpoint,
+						)
+					: await reserveUsageExtractionGeneration(
+							orgId,
+							input.sessionId,
+							context.user.id,
+							revision,
+						)
+				: null;
+		} catch (error) {
+			if (error instanceof UsageExtractionSupersededError) {
+				logger.info(
+					"Usage extraction converged as superseded before reservation (organization_id={organizationId} session_id={sessionId} revision={revision})",
+					{ organizationId: orgId, revision, sessionId: input.sessionId },
+				);
+				response.usageChecksum = undefined;
+				return { contentSha256: contentHash, result: response };
+			}
+			throw error;
+		}
+		const subagents: Record<string, string> = {};
+		for (const subagent of filteredInput.subagents ?? []) {
+			subagents[subagent.agentId] = subagent.content;
+		}
+		let usageExtraction: UsageExtractionResult;
+		let skillExtraction: SkillExtractionResult | null;
+		try {
+			const extraction = await extractSessionFacts({
+				bytes: contentShape.contentBytes,
+				extractSkills: skillExtractionEnabled,
+				input: {
 					organizationId: orgId,
-					sessionDate: new Date(timestamps.sessionDate),
+					userId: context.user.id,
 					sessionId: input.sessionId,
 					source: filteredInput.source,
-					userId: context.user.id,
+					content: filteredInput.content,
+					subagents,
+				},
+				signal,
+				skillSessionDate: timestamps.sessionDate,
+				userId: context.user.id,
+			});
+			usageExtraction = extraction.usage;
+			skillExtraction = extraction.skills;
+		} catch (error) {
+			if (error instanceof UsageExtractionExecutionError) {
+				if (
+					usageExtractionEnabled &&
+					usageGeneration !== null &&
+					shouldPersistUsageExtractionFailureReceipt({
+						durableProcessing: claimedLedger !== undefined,
+						extractionAllowsReceipt: error.shouldPersistReceipt,
+					})
+				) {
+					await writeUsageExtraction(clickhouse, {
+						contentSha256: contentHash,
+						extraction: error.extraction,
+						filterVersion: FILTER_VERSION,
+						generation: usageGeneration,
+						ingestedAt,
+						organizationId: orgId,
+						sessionDate: new Date(timestamps.sessionDate),
+						sessionId: input.sessionId,
+						source: filteredInput.source,
+						userId: context.user.id,
+					});
+				}
+				logger.error(
+					"Usage-event extraction crashed after raw ingest (organization_id={organizationId} session_id={sessionId} error={error})",
+					{
+						error: String(error.cause),
+						organizationId: orgId,
+						sessionId: input.sessionId,
+					},
+				);
+				if (error instanceof UsageExtractionQueueFullError) {
+					throw new ORPCError("SERVICE_UNAVAILABLE", {
+						data: {
+							limit: error.limit,
+							reason: "usage_extraction_queue_full",
+							retryAfterMs: error.retryAfterMs,
+						},
+						message: error.message,
+					});
+				}
+				if (error instanceof UsageExtractionQueueClosedError) {
+					throw new ORPCError("SERVICE_UNAVAILABLE", {
+						data: {
+							reason: "usage_extraction_queue_closed",
+							retryAfterMs: error.retryAfterMs,
+						},
+						message: error.message,
+					});
+				}
+				if (error instanceof UsageExtractionQueueTimeoutError) {
+					throw new ORPCError("GATEWAY_TIMEOUT", {
+						data: {
+							reason: "usage_extraction_timeout",
+							retryAfterMs: error.retryAfterMs,
+						},
+						message: error.message,
+					});
+				}
+				if (error instanceof UsageExtractionQueueAbortedError) {
+					throw new ORPCError("CLIENT_CLOSED_REQUEST", {
+						data: {
+							reason: "usage_extraction_aborted",
+							retryAfterMs: error.retryAfterMs,
+						},
+						message: error.message,
+					});
+				}
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: { reason: "usage_extraction_execution_failed" },
+					message:
+						"Raw session data was stored, but usage extraction failed. Retry the upload.",
 				});
 			}
-			logger.error(
-				"Usage-event extraction crashed after raw ingest (organization_id={organizationId} session_id={sessionId} error={error})",
+			throw error;
+		}
+		if (skillExtractionEnabled && skillExtraction) {
+			await writeSkillExtraction(clickhouse, {
+				extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
+				extraction: skillExtraction,
+				organizationId: orgId,
+				rawRevision: revision,
+				sessionDate: new Date(timestamps.sessionDate),
+				sessionId: input.sessionId,
+				userId: context.user.id,
+			});
+		}
+		if (!usageExtractionEnabled || usageGeneration === null) {
+			return { contentSha256: contentHash, result: response };
+		}
+		await writeUsageExtraction(clickhouse, {
+			contentSha256: contentHash,
+			extraction: usageExtraction,
+			filterVersion: FILTER_VERSION,
+			generation: usageGeneration,
+			ingestedAt,
+			organizationId: orgId,
+			replaceAbsentEvents:
+				input.force_replace === true ||
+				shouldReplaceUsageEventsForVersion(ownership),
+			sessionDate: new Date(timestamps.sessionDate),
+			sessionId: input.sessionId,
+			source: filteredInput.source,
+			userId: context.user.id,
+		});
+		if (usageExtraction.status === "incomplete") {
+			logger.warn(
+				"Usage extraction incomplete after raw ingest (organization_id={organizationId} session_id={sessionId} diagnostics={diagnostics})",
 				{
-					error: String(error.cause),
+					diagnostics: JSON.stringify(usageExtraction.diagnostics),
 					organizationId: orgId,
 					sessionId: input.sessionId,
 				},
 			);
-			if (error instanceof UsageExtractionQueueFullError) {
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: {
-						limit: error.limit,
-						reason: "usage_extraction_queue_full",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof UsageExtractionQueueClosedError) {
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					data: {
-						reason: "usage_extraction_queue_closed",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof UsageExtractionQueueTimeoutError) {
-				throw new ORPCError("GATEWAY_TIMEOUT", {
-					data: {
-						reason: "usage_extraction_timeout",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
-			if (error instanceof UsageExtractionQueueAbortedError) {
-				throw new ORPCError("CLIENT_CLOSED_REQUEST", {
-					data: {
-						reason: "usage_extraction_aborted",
-						retryAfterMs: error.retryAfterMs,
-					},
-					message: error.message,
-				});
-			}
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "usage_extraction_execution_failed" },
+				data: {
+					reason: "usage_extraction_incomplete",
+					retryAfterMs: 1_000,
+				},
 				message:
-					"Raw session data was stored, but usage extraction failed. Retry the upload.",
+					"Raw session data was stored, but usage telemetry is malformed or contradictory. Retry after the transcript writer finishes.",
 			});
 		}
-		throw error;
-	}
-	if (skillExtractionEnabled && skillExtraction) {
-		await writeSkillExtraction(clickhouse, {
-			extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
-			extraction: skillExtraction,
-			organizationId: orgId,
-			rawRevision: revision,
-			sessionDate: new Date(timestamps.sessionDate),
-			sessionId: input.sessionId,
-			userId: context.user.id,
-		});
-	}
-	if (!usageExtractionEnabled || usageGeneration === null) {
-		return { contentSha256: contentHash, result: response };
-	}
-	await writeUsageExtraction(clickhouse, {
-		contentSha256: contentHash,
-		extraction: usageExtraction,
-		filterVersion: FILTER_VERSION,
-		generation: usageGeneration,
-		ingestedAt,
-		organizationId: orgId,
-		replaceAbsentEvents:
-			input.force_replace === true ||
-			shouldReplaceUsageEventsForVersion(ownership),
-		sessionDate: new Date(timestamps.sessionDate),
-		sessionId: input.sessionId,
-		source: filteredInput.source,
-		userId: context.user.id,
-	});
-	if (usageExtraction.status === "incomplete") {
-		logger.warn(
-			"Usage extraction incomplete after raw ingest (organization_id={organizationId} session_id={sessionId} diagnostics={diagnostics})",
-			{
-				diagnostics: JSON.stringify(usageExtraction.diagnostics),
-				organizationId: orgId,
-				sessionId: input.sessionId,
-			},
-		);
-		throw new ORPCError("SERVICE_UNAVAILABLE", {
-			data: {
-				reason: "usage_extraction_incomplete",
-				retryAfterMs: 1_000,
-			},
-			message:
-				"Raw session data was stored, but usage telemetry is malformed or contradictory. Retry after the transcript writer finishes.",
-		});
-	}
 
-	try {
-		await recordSessionIngestContent(
-			orgId,
-			input.sessionId,
-			contentHash,
-			contentShape,
-			FILTER_VERSION,
-			new Date(timestamps.sessionDate),
-			ingestedAt,
-			revision,
-			{
-				checksum: usageExtraction.receipt.checksum,
-				diagnostics: JSON.stringify(usageExtraction.diagnostics),
-				eventCount: usageExtraction.receipt.eventCount,
-				extractionVersion: usageExtraction.receipt.extractionVersion,
-				eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
-				generation: usageGeneration,
-				modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
-			},
-		);
-	} catch (error) {
-		if (error instanceof UsageExtractionSupersededError) {
-			logger.info(
-				"Usage extraction converged as superseded before receipt (organization_id={organizationId} session_id={sessionId} revision={revision})",
-				{ organizationId: orgId, revision, sessionId: input.sessionId },
+		try {
+			await recordSessionIngestContent(
+				orgId,
+				input.sessionId,
+				contentHash,
+				contentShape,
+				FILTER_VERSION,
+				new Date(timestamps.sessionDate),
+				ingestedAt,
+				revision,
+				{
+					checksum: usageExtraction.receipt.checksum,
+					diagnostics: JSON.stringify(usageExtraction.diagnostics),
+					eventCount: usageExtraction.receipt.eventCount,
+					extractionVersion: usageExtraction.receipt.extractionVersion,
+					eventIdentityVersion: usageExtraction.receipt.eventIdentityVersion,
+					generation: usageGeneration,
+					modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
+				},
 			);
-			response.usageChecksum = undefined;
+		} catch (error) {
+			if (error instanceof UsageExtractionSupersededError) {
+				logger.info(
+					"Usage extraction converged as superseded before receipt (organization_id={organizationId} session_id={sessionId} revision={revision})",
+					{ organizationId: orgId, revision, sessionId: input.sessionId },
+				);
+				response.usageChecksum = undefined;
+				return { contentSha256: contentHash, result: response };
+			}
+			throw error;
+		}
+		await passIngestProcessingBoundary(durableProcessing?.failpoint, {
+			store: "postgres",
+			target: "usage-receipt",
+		});
+		response.usageChecksum = usageExtraction.receipt.checksum;
+
+		const uploadCompletedPayload = getSessionUploadCompletedPayload(
+			filteredInput,
+			orgId,
+			context.user.id,
+		);
+
+		if (!uploadCompletedPayload) {
 			return { contentSha256: contentHash, result: response };
 		}
-		throw error;
-	}
-	await passIngestProcessingBoundary(durableProcessing?.failpoint, {
-		store: "postgres",
-		target: "usage-receipt",
-	});
-	response.usageChecksum = usageExtraction.receipt.checksum;
 
-	const uploadCompletedPayload = getSessionUploadCompletedPayload(
-		filteredInput,
-		orgId,
-		context.user.id,
-	);
+		await captureApiProductAnalyticsEvent({
+			distinctId: context.user.id,
+			eventId: claimedLedger?.id,
+			event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
+			payload: uploadCompletedPayload,
+		});
 
-	if (!uploadCompletedPayload) {
 		return { contentSha256: contentHash, result: response };
+	} finally {
+		if (
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals,
+				awaitLanguageSignals,
+				durableProcessing: durableProcessing !== undefined,
+			})
+		) {
+			await persistSessionLanguageSignalsBestEffort(languageSignalInput);
+		}
 	}
-
-	await captureApiProductAnalyticsEvent({
-		distinctId: context.user.id,
-		eventId: claimedLedger?.id,
-		event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
-		payload: uploadCompletedPayload,
-	});
-
-	return { contentSha256: contentHash, result: response };
 }
 
 function parseStoredIngestProcessorResult(
@@ -1352,9 +1371,10 @@ const r2IngestCommit = os.ingest.commit
 				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
 						allowQuiescedIngest: context.ingestOperatorAuthorized,
-						// Language signals are derived and repaired durably. Keeping them
-						// off the commit path prevents a scanner outage from failing an
-						// otherwise durable transcript upload.
+						awaitBestEffortLanguageSignals: isVercelRuntime(),
+						// Signals are derived and durably repairable. Vercel awaits their
+						// best-effort scan after the required facts; Fly leaves them to its
+						// resident reconciler. Scanner failure never fails this upload.
 						awaitLanguageSignals: false,
 						context: {
 							apiKeyId: context.apiKeyId,

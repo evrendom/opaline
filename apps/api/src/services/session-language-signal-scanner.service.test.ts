@@ -15,7 +15,7 @@ describe("session language-signal scanner", () => {
 								import.meta.url,
 							).href
 						: new URL(
-								"./session-language-signal-scanner.worker.ts",
+								"./session-language-signal-scanner.worker.js",
 								import.meta.url,
 							).href,
 				);

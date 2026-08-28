@@ -138,7 +138,7 @@ export class SessionLanguageSignalScanner {
 
 function createScannerWorker(): Worker {
 	return new Worker(
-		new URL("./session-language-signal-scanner.worker.ts", import.meta.url)
+		new URL("./session-language-signal-scanner.worker.js", import.meta.url)
 			.href,
 	);
 }
