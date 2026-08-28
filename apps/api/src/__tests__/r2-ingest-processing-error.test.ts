@@ -20,6 +20,22 @@ import {
 } from "../services/r2-ingest-processing-error.js";
 
 describe("R2 ingest processing error classification", () => {
+	test("keeps derived language signals off both durable R2 processing paths", async () => {
+		const [routerSource, repairSource] = await Promise.all([
+			Bun.file(new URL("../router.ts", import.meta.url)).text(),
+			Bun.file(
+				new URL("../services/r2-ingest-repair.service.ts", import.meta.url),
+			).text(),
+		]);
+
+		expect(routerSource).toMatch(
+			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitLanguageSignals: false,/u,
+		);
+		expect(repairSource).toMatch(
+			/repairRecoverableR2IngestJobs\([\s\S]*?awaitLanguageSignals: false,/u,
+		);
+	});
+
 	test("finds a real Bun connection-refused fetch error through nested causes", async () => {
 		const server = Bun.serve({
 			fetch: () => new Response("unused"),
