@@ -45,6 +45,7 @@ import { readBooleanEnv } from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
 	getIngestContentShape,
+	type IngestContentShape,
 	isUnexpectedIngestShrink,
 	resolvePreviousIngestContentShape,
 } from "./lib/ingest-content-shape.js";
@@ -81,6 +82,7 @@ import {
 	IngestFilterQueueFullError,
 	IngestFilterQueueTimeoutError,
 } from "./services/ingest-filter.service.js";
+import type { IngestFilterResult } from "./services/ingest-filter.types.js";
 import {
 	getR2IngestJobStatus,
 	initR2IngestJob,
@@ -444,7 +446,6 @@ export async function processIngestSession({
 	aggregateContentMaxBytes,
 	allowQuiescedIngest = false,
 	awaitLanguageSignals,
-	claimedLedger,
 	context,
 	durableProcessing,
 	enforceRateLimits,
@@ -455,7 +456,6 @@ export async function processIngestSession({
 	aggregateContentMaxBytes?: number;
 	allowQuiescedIngest?: boolean;
 	awaitLanguageSignals: boolean;
-	claimedLedger?: ClaimedIngestProcessingLedger;
 	context: {
 		apiKeyId: string | null;
 		session: AppContext["session"];
@@ -654,6 +654,73 @@ export async function processIngestSession({
 	// an old unfiltered CLI upload and a current pre-filtered CLI upload
 	// converge after server filtering instead of creating duplicate rows.
 	const contentHash = computeIngestContentHash(filteredInput);
+	return processPreparedIngestSession({
+		awaitLanguageSignals,
+		context,
+		durableProcessing,
+		input,
+		prepared: {
+			adapter,
+			contentHash,
+			contentShape,
+			filteredInput,
+			filteredText,
+			orgId,
+			ownership,
+			timestamps,
+		},
+		signal,
+	});
+}
+
+interface PreparedIngestSession {
+	readonly adapter: ReturnType<typeof getAdapter>;
+	readonly contentHash: string;
+	readonly contentShape: IngestContentShape;
+	readonly filteredInput: IngestSessionInput;
+	readonly filteredText: IngestFilterResult;
+	readonly orgId: string;
+	readonly ownership: Extract<
+		Awaited<ReturnType<typeof claimSessionIngestOwnership>>,
+		{ owned: true }
+	>;
+	readonly timestamps: SessionTimestamps;
+}
+
+async function processPreparedIngestSession({
+	awaitLanguageSignals,
+	claimedLedger,
+	context,
+	durableProcessing,
+	input,
+	prepared,
+	signal,
+}: {
+	awaitLanguageSignals: boolean;
+	claimedLedger?: ClaimedIngestProcessingLedger;
+	context: {
+		apiKeyId: string | null;
+		session: AppContext["session"];
+		user: { id: string };
+	};
+	durableProcessing?: {
+		failpoint: IngestProcessingFailpoint | undefined;
+		operationId: string;
+	};
+	input: IngestSessionInput;
+	prepared: PreparedIngestSession;
+	signal?: AbortSignal;
+}): Promise<R2IngestProcessorResult> {
+	const {
+		adapter,
+		contentHash,
+		contentShape,
+		filteredInput,
+		filteredText,
+		orgId,
+		ownership,
+		timestamps,
+	} = prepared;
 	if (durableProcessing && !claimedLedger) {
 		try {
 			const ledgerResult = await withIngestProcessingLedger(
@@ -665,15 +732,13 @@ export async function processIngestSession({
 				},
 				parseStoredIngestProcessorResult,
 				(ledger) =>
-					processIngestSession({
-						allowQuiescedIngest,
+					processPreparedIngestSession({
 						awaitLanguageSignals,
 						claimedLedger: ledger,
 						context,
 						durableProcessing,
-						enforceRateLimits,
-						errorFactories,
 						input,
+						prepared,
 						signal,
 					}),
 				{

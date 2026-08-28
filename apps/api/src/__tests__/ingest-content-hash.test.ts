@@ -125,7 +125,12 @@ describe("computeIngestContentHash", () => {
 		expect(routerSource).toContain("contentShape.contentBytes,");
 		expect(routerSource).toContain("contentShape.assistantLineCount,");
 		expect(routerSource).toContain("await hasRawSessionRow({");
-		expect(routerSource).toContain("await filterSessionTextFieldsOffThread({");
+		expect(
+			routerSource.match(/await filterSessionTextFieldsOffThread\(\{/gu),
+		).toHaveLength(1);
+		expect(routerSource).toMatch(
+			/\(ledger\)\s*=>\s*processPreparedIngestSession\(\{/u,
+		);
 		expect(routerSource).not.toContain("filterSessionTextFields({");
 	});
 });
