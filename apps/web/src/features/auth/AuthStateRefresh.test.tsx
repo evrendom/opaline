@@ -14,6 +14,7 @@ import {
 	getValidRedirect,
 	isGetStartedPath,
 	primePendingSignupRedirect,
+	resolvePostAuthDestinationForOrganization,
 } from "./auth-route-utils";
 import {
 	readPendingEmailLoginCodeDraft,
@@ -170,6 +171,45 @@ describe("auth state refresh", () => {
 
 	it("routes homepage email logins back to the app root", () => {
 		expect(getEmailLoginSuccessDestination("/", "")).toBe("/");
+	});
+
+	it("resolves generic and legacy shell continuations after the active org is known", () => {
+		expect(resolvePostAuthDestinationForOrganization("acme", "/")).toBe(
+			"/acme",
+		);
+		expect(
+			resolvePostAuthDestinationForOrganization("acme", "/dashboard"),
+		).toBe("/acme");
+		expect(
+			resolvePostAuthDestinationForOrganization(
+				"acme",
+				"/dashboard/sessions/session-1?tab=events",
+			),
+		).toBe("/acme/sessions/session-1?tab=events");
+		expect(
+			resolvePostAuthDestinationForOrganization(
+				"acme",
+				"/settings/account#profile",
+			),
+		).toBe("/acme/settings/account#profile");
+	});
+
+	it("keeps global post-auth continuations unscoped", () => {
+		expect(
+			resolvePostAuthDestinationForOrganization("acme", "/wrapped/share-1"),
+		).toBe("/wrapped/share-1");
+		expect(
+			resolvePostAuthDestinationForOrganization("acme", "/invitation/invite-1"),
+		).toBe("/invitation/invite-1");
+		expect(
+			resolvePostAuthDestinationForOrganization("acme", "/resume/token-1"),
+		).toBe("/resume/token-1");
+	});
+
+	it("falls back to the active org root for an unsafe continuation", () => {
+		expect(
+			resolvePostAuthDestinationForOrganization("acme", "//evil.example"),
+		).toBe("/acme");
 	});
 
 	it("preserves explicit redirect destinations for email login", () => {
