@@ -123,8 +123,39 @@ describe("session resolver", () => {
 		const result = await resolveSession(sessionFile);
 
 		expect(result.transcriptPath).toBe(sessionFile);
+		expect(result.source).toBe("claude_code");
 		expect(result.sessionId).toBe(sessionId);
 		expect(result.sessionDir).toBe(tempDir);
+	});
+
+	test("resolves a Codex rollout path from its session metadata", async () => {
+		const sessionId = "019c9f86-37b1-7003-a746-44e6b0d930e5";
+		const projectPath = join(tempDir, "codex-project");
+		const sessionFile = join(tempDir, "rollout-2026-08-28T09-00-00-test.jsonl");
+		await mkdir(projectPath, { recursive: true });
+		await writeFile(
+			sessionFile,
+			[
+				JSON.stringify({
+					type: "session_meta",
+					payload: { id: sessionId, cwd: projectPath },
+				}),
+				JSON.stringify({
+					type: "event_msg",
+					timestamp: "2026-08-28T09:00:00.000Z",
+					payload: { type: "user_message", message: "hello" },
+				}),
+			].join("\n"),
+		);
+
+		const result = await resolveSession(sessionFile);
+
+		expect(result).toMatchObject({
+			projectPath,
+			sessionId,
+			source: "codex",
+			transcriptPath: sessionFile,
+		});
 	});
 
 	test.skipIf(!hasClaudeProjects)(
@@ -476,5 +507,41 @@ describe("full upload pipeline (dry-run)", () => {
 		expect(stdout).toContain("Dry run - would upload:");
 		expect(stdout).toContain('"sessionId": "cli-test-session"');
 		expect(stdout).toContain('"subagents"');
+	});
+
+	test("full CLI dry-run selects the Codex adapter for a rollout path", async () => {
+		const sessionId = "019c9f86-37b1-7003-a746-44e6b0d930e6";
+		const projectPath = join(tempDir, "codex-cli-project");
+		const sessionFile = join(tempDir, "rollout-2026-08-28T09-01-00-test.jsonl");
+		await mkdir(projectPath, { recursive: true });
+		await writeFile(
+			sessionFile,
+			[
+				JSON.stringify({
+					type: "session_meta",
+					payload: { id: sessionId, cwd: projectPath },
+				}),
+				JSON.stringify({
+					type: "event_msg",
+					timestamp: "2026-08-28T09:01:00.000Z",
+					payload: { type: "user_message", message: "hello" },
+				}),
+			].join("\n"),
+		);
+
+		const cliPath = join(import.meta.dir, "..", "bin", "cli.ts");
+		const proc = Bun.spawn(
+			["bun", cliPath, "upload", sessionFile, "--dry-run"],
+			{ stdout: "pipe", stderr: "pipe" },
+		);
+		const exitCode = await proc.exited;
+		const stdout = await new Response(proc.stdout).text();
+		const stderr = await new Response(proc.stderr).text();
+
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain(`"source": "codex"`);
+		expect(stdout).toContain(`"sessionId": "${sessionId}"`);
+		expect(stdout).toContain(`"projectPath": "${projectPath}"`);
+		expect(stderr).toBe("");
 	});
 });

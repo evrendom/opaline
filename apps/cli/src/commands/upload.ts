@@ -250,10 +250,11 @@ async function runSingleUpload(
 		transcriptPath: sessionInfo.transcriptPath,
 		projectPath: sessionInfo.projectPath,
 	};
+	const adapter = getAdapter(sessionInfo.source);
 
 	let request: IngestSessionInput;
 	try {
-		request = await claudeCodeAdapter.buildUploadRequest(sessionFile, {
+		request = await adapter.buildUploadRequest(sessionFile, {
 			tag: flags.tag,
 			gitInfo,
 			organizationId,

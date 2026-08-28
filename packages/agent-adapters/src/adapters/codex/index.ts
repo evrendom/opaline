@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { IngestSessionInput } from "@rudel/api-routes";
 import {
 	type Ingestor,
@@ -75,8 +75,13 @@ export async function findActiveRolloutFile(
 	threadId: string,
 ): Promise<string | null> {
 	const files = await walkJsonlFiles(SESSIONS_BASE_DIR);
+	const exactFileName = `${threadId}.jsonl`;
+	const rolloutSuffix = `-${exactFileName}`;
 
-	for (const filePath of files) {
+	for (const filePath of files.filter((candidate) => {
+		const fileName = basename(candidate);
+		return fileName === exactFileName || fileName.endsWith(rolloutSuffix);
+	})) {
 		const meta = await readCodexSessionMeta(filePath);
 		if (meta?.id === threadId) {
 			return filePath;
