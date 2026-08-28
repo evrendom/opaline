@@ -16,6 +16,7 @@ import {
 	getUtilityRailLabelClassName,
 	type SidebarRowMode,
 } from "@/features/shell/components/shell-rail-utils";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { authClient, signOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export function UserRailButton({
 }: {
 	mode?: SidebarRowMode;
 }) {
+	const orgSlug = useWorkspaceSlug();
 	const navigate = useNavigate();
 	const { data: session } = authClient.useSession();
 
@@ -91,7 +93,9 @@ export function UserRailButton({
 				</span>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent className="min-w-48" side="right" align="end">
-				<DropdownMenuItem onClick={() => navigate(appRoutes.settingsAccount())}>
+				<DropdownMenuItem
+					onClick={() => navigate(appRoutes.settingsAccount(orgSlug))}
+				>
 					<Settings2Icon />
 					Account settings
 				</DropdownMenuItem>

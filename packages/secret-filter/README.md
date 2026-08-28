@@ -1,6 +1,6 @@
 # @rudel/secret-filter
 
-Deterministic redaction of known secret patterns in Rudel session transcripts.
+Deterministic redaction of known secret patterns in Opaline session transcripts.
 The runtime package has no dependencies.
 
 The generated rules are sourced from the high-confidence, prefixed rules in

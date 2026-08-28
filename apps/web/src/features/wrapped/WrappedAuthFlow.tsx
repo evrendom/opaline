@@ -53,15 +53,14 @@ type WrappedAuthCardFlight = {
 };
 
 const WRAPPED_AUTH_INTRO_TITLE_LABEL = "Your Claude Wrapped";
-const WRAPPED_AUTH_GITHUB_URL = "https://github.com/evrendom/rudel";
+const WRAPPED_AUTH_GITHUB_URL = "https://github.com/opalinehq/cli";
 const WRAPPED_AUTH_HACKER_NEWS_URL =
 	"https://news.ycombinator.com/item?id=47350416";
 const WRAPPED_AUTH_PRODUCT_HUNT_URL =
-	"https://www.producthunt.com/products/rudel?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-claude-code-codex-usage-trading-cards-by-rudel";
+	"https://www.producthunt.com/products/rudel?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=opaline";
 const WRAPPED_AUTH_PRODUCT_HUNT_BADGE_SRC =
 	"https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135782&theme=light&t=1777898459345";
-const WRAPPED_AUTH_PRODUCT_HUNT_BADGE_ALT =
-	"Claude Code & Codex Usage Trading Cards by Rudel - Get your trading card based on your CC & codex usage | Product Hunt";
+const WRAPPED_AUTH_PRODUCT_HUNT_BADGE_ALT = "Opaline on Product Hunt";
 const WRAPPED_AUTH_INTRO_EASE = [0.22, 1, 0.36, 1] as const;
 const WRAPPED_AUTH_EXIT_EASE = [0.4, 0, 0.2, 1] as const;
 const WRAPPED_AUTH_LAYOUT_EASE = [0.32, 0.72, 0, 1] as const;
@@ -878,11 +877,11 @@ function getWrappedAuthTitleText(mode: WrappedAuthMode) {
 function WrappedAuthIntroLaunchLinks() {
 	return (
 		<nav
-			aria-label="Rudel launch links"
+			aria-label="Opaline launch links"
 			className="rudel-wrapped-auth-launch-links"
 		>
 			<a
-				aria-label="View Rudel on GitHub"
+				aria-label="View the Opaline CLI on GitHub"
 				className="rudel-wrapped-auth-launch-link rudel-wrapped-auth-launch-link--github"
 				href={WRAPPED_AUTH_GITHUB_URL}
 				target="_blank"
@@ -902,7 +901,7 @@ function WrappedAuthIntroLaunchLinks() {
 				</span>
 			</a>
 			<a
-				aria-label="View Rudel on Hacker News"
+				aria-label="View Opaline's original launch on Hacker News"
 				className="rudel-wrapped-auth-launch-link rudel-wrapped-auth-launch-link--hacker-news"
 				href={WRAPPED_AUTH_HACKER_NEWS_URL}
 				target="_blank"
@@ -920,7 +919,7 @@ function WrappedAuthIntroLaunchLinks() {
 				</span>
 			</a>
 			<a
-				aria-label="View Rudel on Product Hunt"
+				aria-label="View Opaline on Product Hunt"
 				className="rudel-wrapped-auth-launch-link rudel-wrapped-auth-launch-link--product-hunt"
 				href={WRAPPED_AUTH_PRODUCT_HUNT_URL}
 				target="_blank"
@@ -958,7 +957,7 @@ function WrappedAuthIntroTerms() {
 			</a>{" "}
 			and{" "}
 			<a
-				href="https://obsessiondb.com/privacy"
+				href="https://opaline.so/privacy"
 				target="_blank"
 				rel="noopener noreferrer"
 				className="rudel-wrapped-auth-form__terms-link"

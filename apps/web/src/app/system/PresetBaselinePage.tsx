@@ -213,7 +213,7 @@ export function PresetBaselinePage() {
 										</FieldLabel>
 										<Input
 											id="baseline-name"
-											defaultValue="Rudel Studio"
+											defaultValue="Opaline Studio"
 											placeholder="Enter a name"
 										/>
 										<FieldDescription>

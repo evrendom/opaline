@@ -373,7 +373,7 @@ export function WrappedTeamMemberCard(props: {
 								{hideHeaderLogo ? null : (
 									<img
 										src={rudelLogoSrc}
-										alt="Rudel"
+										alt="Opaline"
 										className="shrink-0"
 										style={rudelLogoStyle}
 									/>

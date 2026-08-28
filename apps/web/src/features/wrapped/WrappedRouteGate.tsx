@@ -810,7 +810,7 @@ function WrappedRouteLoadingState(props: { body: string }) {
 				>
 					<h1 className="sr-only">Loading wrapped</h1>
 					<img
-						alt="Rudel"
+						alt="Opaline"
 						className="rudel-wrapped-route-loading__logo"
 						src="/favicon-light.svg"
 					/>

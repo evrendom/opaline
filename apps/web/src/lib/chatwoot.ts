@@ -244,8 +244,8 @@ export async function syncChatwootUser(user: {
 			company_name: user.organizationName?.trim() || undefined,
 			identifier_hash: user.identifier_hash,
 			description: user.organizationName?.trim()
-				? `Rudel dashboard user from ${user.organizationName}`
-				: "Rudel dashboard user",
+				? `Opaline dashboard user from ${user.organizationName}`
+				: "Opaline dashboard user",
 		};
 
 		if (!contact.email && !contact.name && !contact.avatar_url) {

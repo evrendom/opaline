@@ -76,8 +76,8 @@ describe("WrappedSetupCompletePage", () => {
 		expect(screen.getByText("@acme/design-system")).toBeInTheDocument();
 		expect(screen.getByText("8 sessions")).toBeInTheDocument();
 		expect(screen.getByText("3 sessions")).toBeInTheDocument();
-		expect(screen.queryByText("rudel enable")).toBeNull();
-		expect(screen.queryByText("rudel upload")).toBeNull();
+		expect(screen.queryByText("opaline enable")).toBeNull();
+		expect(screen.queryByText("opaline upload")).toBeNull();
 
 		await user.click(
 			screen.getByRole("button", {
@@ -96,12 +96,12 @@ describe("WrappedSetupCompletePage", () => {
 			),
 		).toBeInTheDocument();
 		expect(
-			await screen.findByText(hasExactTextContent("rudel enable"), {
+			await screen.findByText(hasExactTextContent("opaline enable"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
 		expect(
-			await screen.findByText(hasExactTextContent("rudel upload"), {
+			await screen.findByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();

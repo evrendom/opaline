@@ -11,6 +11,7 @@ import {
 	emailOTP,
 	organization,
 } from "better-auth/plugins";
+import { AUTH_BASE_PATH, normalizeAuthBaseURL } from "./auth-url.js";
 import type { ResendConfig } from "./email.js";
 import {
 	sendEmailVerificationOtpEmail,
@@ -50,7 +51,7 @@ function getEmailDomain(email: string) {
 function formatFallbackName(email: string) {
 	const localPart = email.split("@")[0]?.trim();
 	if (!localPart) {
-		return "Rudel User";
+		return "Opaline User";
 	}
 
 	const words = localPart
@@ -208,14 +209,16 @@ export function createOrganizationPlugin(config: AuthConfig) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzleAdapter accepts { [key: string]: any }
 export function createAuth(db: object, config: AuthConfig) {
+	const authBaseURL = normalizeAuthBaseURL(config.appURL);
 	const trustedOrigins = config.trustedOrigins ?? [];
 	const resend = config.resend ?? {};
-	if (!trustedOrigins.includes(config.appURL)) {
-		trustedOrigins.push(config.appURL);
+	if (!trustedOrigins.includes(authBaseURL)) {
+		trustedOrigins.push(authBaseURL);
 	}
 
 	return betterAuth({
-		baseURL: config.appURL,
+		basePath: AUTH_BASE_PATH,
+		baseURL: authBaseURL,
 		secret: config.secret,
 		database: drizzleAdapter(db as Parameters<typeof drizzleAdapter>[0], {
 			provider: "pg",

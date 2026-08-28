@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./model-pricing": "./src/model-pricing.ts",
+		"./organization-paths": "./src/organization-paths.ts",
 		"./reserved-slugs": "./src/reserved-slugs.ts"
 	},
 	"scripts": {

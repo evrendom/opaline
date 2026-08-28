@@ -114,25 +114,23 @@ describe("WrappedGuestPage", () => {
 			}),
 		).toBeInTheDocument();
 		expect(
-			screen.getByRole("navigation", { name: "Rudel launch links" }),
+			screen.getByRole("navigation", { name: "Opaline launch links" }),
 		).toBeInTheDocument();
 		expect(
-			screen.getByRole("link", { name: "View Rudel on GitHub" }),
-		).toHaveAttribute("href", "https://github.com/evrendom/rudel");
+			screen.getByRole("link", { name: "View the Opaline CLI on GitHub" }),
+		).toHaveAttribute("href", "https://github.com/opalinehq/cli");
 		expect(
-			screen.getByRole("link", { name: "View Rudel on Hacker News" }),
+			screen.getByRole("link", {
+				name: "View Opaline's original launch on Hacker News",
+			}),
 		).toHaveAttribute("href", "https://news.ycombinator.com/item?id=47350416");
 		expect(
-			screen.getByRole("link", { name: "View Rudel on Product Hunt" }),
+			screen.getByRole("link", { name: "View Opaline on Product Hunt" }),
 		).toHaveAttribute(
 			"href",
-			"https://www.producthunt.com/products/rudel?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-claude-code-codex-usage-trading-cards-by-rudel",
+			"https://www.producthunt.com/products/rudel?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=opaline",
 		);
-		expect(
-			screen.getByAltText(
-				"Claude Code & Codex Usage Trading Cards by Rudel - Get your trading card based on your CC & codex usage | Product Hunt",
-			),
-		).toHaveAttribute(
+		expect(screen.getByAltText("Opaline on Product Hunt")).toHaveAttribute(
 			"src",
 			"https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135782&theme=light&t=1777898459345",
 		);
@@ -147,6 +145,9 @@ describe("WrappedGuestPage", () => {
 			screen.getByRole("button", { name: "Create account" }),
 		).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
+		expect(
+			screen.getByRole("link", { name: "Privacy Policy" }),
+		).toHaveAttribute("href", "https://opaline.so/privacy");
 		expect(screen.queryByLabelText("Go back")).toBeNull();
 	});
 

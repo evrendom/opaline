@@ -1,8 +1,8 @@
 ---
 name: api-testing
-description: Test the local Rudel API with authenticated requests. Use when the user wants to test API endpoints, debug RPC calls, verify auth flows, or inspect API responses against the local dev server.
+description: Test the local Opaline API with authenticated requests. Use when the user wants to test API endpoints, debug RPC calls, verify auth flows, or inspect API responses against the local dev server.
 metadata:
-  author: rudel
+  author: opaline
   version: "1.1"
 compatibility: Requires curl, jq, and a running local API server (bun run dev:local or bun run --cwd apps/api dev).
 allowed-tools: Bash(curl:*) Bash(source:*) Bash(mkdir:*) Read
@@ -10,7 +10,7 @@ allowed-tools: Bash(curl:*) Bash(source:*) Bash(mkdir:*) Read
 
 # API Testing
 
-Test authenticated requests against the local Rudel API (`http://localhost:4010`).
+Test authenticated requests against the local Opaline API (`http://localhost:4010`).
 
 ## Prerequisites
 

@@ -350,7 +350,7 @@ async function resolveIngestOrganizationId(
 	}
 
 	throw new ORPCError("BAD_REQUEST", {
-		message: "Choose an organization with --org or rudel set-org",
+		message: "Choose an organization with --org or opaline set-org",
 	});
 }
 

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { beforeEach, expect, it, vi } from "vitest";
 import {
 	OrganizationProvider,
 	useOrganization,
@@ -8,11 +10,13 @@ import {
 
 const {
 	mockSetActive,
+	mockGetFullOrganization,
 	mockUseActiveMember,
 	mockUseActiveOrganization,
 	mockUseListOrganizations,
 } = vi.hoisted(() => ({
 	mockSetActive: vi.fn(),
+	mockGetFullOrganization: vi.fn(),
 	mockUseActiveMember: vi.fn(),
 	mockUseActiveOrganization: vi.fn(),
 	mockUseListOrganizations: vi.fn(),
@@ -21,6 +25,7 @@ const {
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {
 		organization: {
+			getFullOrganization: mockGetFullOrganization,
 			setActive: mockSetActive,
 		},
 		useActiveMember: mockUseActiveMember,
@@ -36,6 +41,10 @@ const organization = {
 	slug: "rudel",
 };
 
+beforeEach(() => {
+	vi.clearAllMocks();
+});
+
 function OrganizationStateProbe() {
 	const { state } = useOrganization();
 
@@ -44,6 +53,31 @@ function OrganizationStateProbe() {
 			{state.activeOrg?.id ?? "no-organization"}:
 			{state.isLoading ? "pending" : "ready"}
 		</output>
+	);
+}
+
+function OrganizationSwitchProbe({
+	destination,
+	organizationId,
+}: {
+	destination?: "preserve" | "team";
+	organizationId: string;
+}) {
+	const { actions } = useOrganization();
+	const location = useLocation();
+
+	return (
+		<>
+			<button
+				type="button"
+				onClick={() =>
+					void actions.switchOrganization(organizationId, { destination })
+				}
+			>
+				Switch
+			</button>
+			<output>{`${location.pathname}${location.search}${location.hash}`}</output>
+		</>
 	);
 }
 
@@ -72,9 +106,11 @@ it("recovers after full-organization is rate limited and auto-select succeeds", 
 	mockSetActive.mockReturnValue(setActivePromise);
 
 	render(
-		<OrganizationProvider>
-			<OrganizationStateProbe />
-		</OrganizationProvider>,
+		<MemoryRouter>
+			<OrganizationProvider>
+				<OrganizationStateProbe />
+			</OrganizationProvider>
+		</MemoryRouter>,
 	);
 
 	await waitFor(() => {
@@ -91,5 +127,110 @@ it("recovers after full-organization is rate limited and auto-select succeeds", 
 
 	await waitFor(() => {
 		expect(screen.getByText("org-1:ready")).toBeInTheDocument();
+	});
+});
+
+it("rewrites the workspace prefix and preserves route state when switching", async () => {
+	const secondOrganization = {
+		id: "org-2",
+		logo: null,
+		name: "Opaline",
+		slug: "opaline",
+	};
+	mockUseActiveOrganization.mockReturnValue({
+		data: organization,
+		isPending: false,
+	});
+	mockUseListOrganizations.mockReturnValue({
+		data: [organization, secondOrganization],
+		isPending: false,
+	});
+	mockUseActiveMember.mockReturnValue({ data: { role: "owner" } });
+	mockSetActive.mockResolvedValue({ data: secondOrganization, error: null });
+
+	render(
+		<MemoryRouter initialEntries={["/rudel/settings/members?tab=all#people"]}>
+			<OrganizationProvider>
+				<OrganizationSwitchProbe organizationId="org-2" />
+			</OrganizationProvider>
+		</MemoryRouter>,
+	);
+
+	await userEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+	await waitFor(() => {
+		expect(
+			screen.getByText("/opaline/settings/members?tab=all#people"),
+		).toBeInTheDocument();
+	});
+});
+
+it("resolves a newly joined organization before canonical navigation", async () => {
+	const invitedOrganization = {
+		id: "org-2",
+		logo: null,
+		name: "Opaline",
+		slug: "opaline",
+	};
+	mockUseActiveOrganization.mockReturnValue({
+		data: organization,
+		isPending: false,
+	});
+	mockUseListOrganizations.mockReturnValue({
+		data: [organization],
+		isPending: false,
+	});
+	mockUseActiveMember.mockReturnValue({ data: { role: "owner" } });
+	mockSetActive.mockResolvedValue({ data: invitedOrganization, error: null });
+	mockGetFullOrganization.mockResolvedValue({
+		data: invitedOrganization,
+		error: null,
+	});
+
+	render(
+		<MemoryRouter initialEntries={["/invitation/invite-1"]}>
+			<OrganizationProvider>
+				<OrganizationSwitchProbe organizationId="org-2" />
+			</OrganizationProvider>
+		</MemoryRouter>,
+	);
+
+	await userEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+	await waitFor(() => {
+		expect(screen.getByText("/opaline")).toBeInTheDocument();
+	});
+});
+
+it("supports an explicit canonical team destination", async () => {
+	const secondOrganization = {
+		id: "org-2",
+		logo: null,
+		name: "Opaline",
+		slug: "opaline",
+	};
+	mockUseActiveOrganization.mockReturnValue({
+		data: organization,
+		isPending: false,
+	});
+	mockUseListOrganizations.mockReturnValue({
+		data: [organization, secondOrganization],
+		isPending: false,
+	});
+	mockUseActiveMember.mockReturnValue({ data: { role: "owner" } });
+	mockSetActive.mockResolvedValue({ data: secondOrganization, error: null });
+
+	render(
+		<MemoryRouter initialEntries={["/team/invite/token-1"]}>
+			<OrganizationProvider>
+				<OrganizationSwitchProbe destination="team" organizationId="org-2" />
+			</OrganizationProvider>
+		</MemoryRouter>,
+	);
+
+	await userEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+	await waitFor(() => {
+		expect(screen.getByText("/opaline/team")).toBeInTheDocument();
 	});
 });

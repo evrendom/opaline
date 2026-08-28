@@ -191,7 +191,7 @@ function PublicShareLoadingState() {
 		<section className="min-h-screen bg-[#f8f4ef] text-[#22201f]">
 			<div className="mx-auto flex min-h-screen w-full max-w-[28rem] flex-col items-center justify-center px-6 py-10 text-center">
 				<p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-[#8f887f]">
-					Rudel Wrapped
+					Opaline Wrapped
 				</p>
 				<h1 className="mt-3 max-w-[13ch] text-balance font-[var(--app-font-heading)] text-[2.4rem] font-semibold tracking-[-0.07em] text-[#22201f]">
 					Loading card…
@@ -214,7 +214,7 @@ function PublicShareErrorState(props: { makeYoursHref: string }) {
 		<section className="min-h-screen bg-[#f8f4ef] text-[#22201f]">
 			<div className="mx-auto flex min-h-screen w-full max-w-[28rem] flex-col items-center justify-center px-6 py-10 text-center">
 				<p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-[#8f887f]">
-					Rudel Wrapped
+					Opaline Wrapped
 				</p>
 				<h1 className="mt-3 max-w-[12ch] text-balance font-[var(--app-font-heading)] text-[2.4rem] font-semibold tracking-[-0.07em] text-[#22201f]">
 					This card link expired or never existed.

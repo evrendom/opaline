@@ -16,6 +16,7 @@ import {
 	buildSessionListDateInput,
 	resolveActiveSessionDateRangeOptionId,
 } from "@/features/sessions/session-date-ranges";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { orpc } from "@/lib/orpc";
 
 export function DashboardSessionsView({
@@ -31,6 +32,7 @@ export function DashboardSessionsView({
 	repositoryDailyTrend: RepositoryDailyTrendData[] | undefined;
 	sessionSummaryComparison: SessionAnalyticsSummaryComparison | undefined;
 }) {
+	const orgSlug = useWorkspaceSlug();
 	const {
 		meta,
 		state: { endDate, startDate },
@@ -71,7 +73,7 @@ export function DashboardSessionsView({
 		<section className="@container/sessions-view flex flex-col gap-8">
 			<div className="flex justify-end px-1">
 				<Link
-					to={appRoutes.dashboardSessions()}
+					to={appRoutes.dashboardSessions(orgSlug)}
 					className="dashboardy-action-button inline-flex h-8 items-center rounded-full border border-[color:var(--dashboardy-border)] bg-transparent px-3 text-[13px] font-medium text-[color:var(--dashboardy-heading)] shadow-none"
 				>
 					Open full sessions view

@@ -200,7 +200,7 @@ export function WrappedPrintedCardFlip(props: WrappedPrintedCardFlipProps) {
 					<div className="rudel-wrapped-printed-card-flip__plane rudel-wrapped-printed-card-flip__plane--back">
 						{backUrl ? (
 							<img
-								alt="Rudel"
+								alt="Opaline"
 								className="rudel-wrapped-printed-card-flip__image"
 								draggable={false}
 								src={backUrl}
@@ -211,7 +211,7 @@ export function WrappedPrintedCardFlip(props: WrappedPrintedCardFlipProps) {
 							</div>
 						) : (
 							<div
-								aria-label="Rudel"
+								aria-label="Opaline"
 								className="rudel-wrapped-printed-card-flip__placeholder"
 								data-card-face="back"
 								role="img"

@@ -70,4 +70,21 @@ describe("validateOrgSlug", () => {
 			expect(validateOrgSlug(slug)).toBe(false);
 		}
 	});
+
+	test("reserves every unscoped application route", () => {
+		for (const slug of [
+			"api",
+			"device",
+			"get-started",
+			"health",
+			"invitation",
+			"reset-password",
+			"resume",
+			"rpc",
+			"wrapped",
+		]) {
+			expect(RESERVED_ORG_SLUGS).toContain(slug);
+			expect(validateOrgSlug(slug)).toBe(false);
+		}
+	});
 });

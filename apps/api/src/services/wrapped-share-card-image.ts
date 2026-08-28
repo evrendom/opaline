@@ -166,7 +166,7 @@ export function buildWrappedShareCardSvg(snapshot: WrappedShareSnapshot) {
 	const primaryStats = buildPrimaryStats(snapshot);
 	const headlineLines = wrapSvgText(snapshot.archetypeLabel, 16, 3);
 	const nameLines = wrapSvgText(row.displayName, 18, 2);
-	const cardSubtitle = row.role || "Rudel user";
+	const cardSubtitle = row.role || "Opaline user";
 	const supportingCopy = buildSupportingCopy(snapshot);
 	const supportingLines = wrapSvgText(supportingCopy, 42, 3);
 	const avatarFallback = getInitials(row.displayName);
@@ -181,7 +181,7 @@ export function buildWrappedShareCardSvg(snapshot: WrappedShareSnapshot) {
 		`<circle cx="1040" cy="92" r="180" fill="${palette.accent}" opacity="0.2"/>`,
 		`<circle cx="106" cy="578" r="230" fill="${palette.accent}" opacity="0.12"/>`,
 		`<rect x="56" y="48" width="1088" height="534" rx="54" fill="rgba(255,255,255,0.46)" stroke="${palette.stroke}"/>`,
-		`<text x="96" y="116" fill="#1F242D" opacity="0.58" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="4">RUDEL WRAPPED</text>`,
+		`<text x="96" y="116" fill="#1F242D" opacity="0.58" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="4">OPALINE WRAPPED</text>`,
 		`<text x="962" y="116" fill="#1F242D" opacity="0.46" font-family="Arial, sans-serif" font-size="18" font-weight="700" text-anchor="end">${escapeSvgText(appearance.layoutMode === "front_back" ? "FRONT + BACK" : "FRONT")}</text>`,
 		renderCardPanel({
 			avatarFallback,
@@ -238,7 +238,7 @@ function renderCardPanel(input: {
 	} = input;
 	const archetypeText = showArchetypeLabel
 		? snapshot.archetypeLabel
-		: "Rudel Wrapped";
+		: "Opaline Wrapped";
 	const archetypeLines = wrapSvgText(archetypeText, 18, 2);
 
 	return [

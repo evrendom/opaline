@@ -420,7 +420,7 @@ async function handleRequest(
 	}
 
 	// Defense in depth: block Better Auth's built-in org deletion route.
-	// Rudel has its own guarded deletion path via the RPC router.
+	// Opaline has its own guarded deletion path via the RPC router.
 	if (url.pathname === "/api/auth/organization/delete") {
 		return new Response("Not Found", { status: 404, headers: cors });
 	}

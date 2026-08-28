@@ -1,4 +1,4 @@
-# Rudel
+# Opaline
 
 A platform for ingesting, storing, and analyzing Claude Code / Codex session transcripts. Users authenticate via the web app, use the CLI to upload `.jsonl` session transcripts, which are stored in ClickHouse for analytics.
 

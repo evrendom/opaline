@@ -41,7 +41,7 @@ describe("email helpers", () => {
 
 		expect(message.inviteLink).toBe("https://opaline.so/invitation/invite_123");
 		expect(message.subject).toBe(
-			'Alice <script>alert("x")</script> Doe invited you to Team & "Co" on Rudel',
+			'Alice <script>alert("x")</script> Doe invited you to Team & "Co" on Opaline',
 		);
 		expect(message.html).toContain(
 			"Alice &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; Doe",
@@ -56,7 +56,7 @@ describe("email helpers", () => {
 			type: "sign-in",
 		});
 
-		expect(message.subject).toBe("Your Rudel sign-in code");
+		expect(message.subject).toBe("Your Opaline sign-in code");
 		expect(message.html).toContain("123&lt;45&quot;");
 		expect(message.html).not.toContain('123<45"');
 		expect(message.text).toContain('123<45"');
@@ -74,7 +74,7 @@ describe("email helpers", () => {
 			targetType: "organization",
 		});
 
-		expect(message.subject).toBe("Rudel ClickHouse purge failed: workspace");
+		expect(message.subject).toBe("Opaline ClickHouse purge failed: workspace");
 		expect(message.text).toContain("Attempts: 5");
 		expect(message.text).toContain("2026-07-28T08:15:00.000Z");
 		expect(message.html).toContain(
@@ -96,7 +96,7 @@ describe("email helpers", () => {
 		expect(
 			getResendConfigWarnings({
 				apiKey: "test-key",
-				fromEmail: "Rudel <noreply@example.com>",
+				fromEmail: "Opaline <noreply@example.com>",
 			}),
 		).toEqual([
 			"ClickHouse purge failure alerts are disabled because CLICKHOUSE_PURGE_ALERT_RECIPIENT is not set.",
@@ -105,7 +105,7 @@ describe("email helpers", () => {
 			getResendConfigWarnings({
 				apiKey: "test-key",
 				clickHousePurgeAlertRecipient: "operator@example.com",
-				fromEmail: "Rudel <noreply@example.com>",
+				fromEmail: "Opaline <noreply@example.com>",
 			}),
 		).toEqual([]);
 	});

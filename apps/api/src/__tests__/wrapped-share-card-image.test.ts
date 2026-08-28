@@ -75,6 +75,8 @@ describe("wrapped share card image", () => {
 		expect(svg).toContain(SAMPLE_DATA_IMAGE);
 		expect(svg).toContain("Evren &lt;Dombak&gt;");
 		expect(svg).toContain("Maniac");
+		expect(svg).toContain("OPALINE WRAPPED");
+		expect(svg).not.toContain("RUDEL WRAPPED");
 	});
 
 	test("serves only the browser-captured social image for OG cards", () => {
@@ -113,7 +115,7 @@ describe("wrapped share page metadata", () => {
 				"<html>",
 				"<head>",
 				'<meta name="description" content="generic" />',
-				"<title>Rudel</title>",
+				"<title>Opaline</title>",
 				"</head>",
 				"<body></body>",
 				"</html>",
@@ -122,8 +124,9 @@ describe("wrapped share page metadata", () => {
 		);
 
 		expect(html).toContain(
-			"<title>Evren &lt;Dombak&gt;'s Rudel Wrapped</title>",
+			"<title>Evren &lt;Dombak&gt;'s Opaline Wrapped</title>",
 		);
+		expect(html).toContain('property="og:site_name" content="Opaline"');
 		expect(html).toContain('name="twitter:card" content="summary_large_image"');
 		expect(html).toContain(
 			'name="twitter:image" content="https://opaline.so/wrapped/11111111-1111-4111-8111-111111111111/x-card.png"',
@@ -142,7 +145,7 @@ describe("wrapped share page metadata", () => {
 				"<html>",
 				"<head>",
 				'<meta name="description" content="generic" />',
-				"<title>Rudel</title>",
+				"<title>Opaline</title>",
 				"</head>",
 				"<body></body>",
 				"</html>",

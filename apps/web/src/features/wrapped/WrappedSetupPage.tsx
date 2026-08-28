@@ -68,7 +68,7 @@ export function WrappedSetupPage(props: WrappedSetupPageProps) {
 				backLabel={backLabel}
 				description={
 					<>
-						<p>Start sending sessions to Rudel.</p>
+						<p>Start sending sessions to Opaline.</p>
 						{debugControls ? (
 							<WrappedDebugControlStack>
 								{debugControls}
@@ -92,7 +92,7 @@ export function WrappedSetupPage(props: WrappedSetupPageProps) {
 						/>
 					</div>
 				}
-				title="Set up Rudel"
+				title="Set up Opaline"
 				footer={
 					onContinue ? (
 						<WrappedPrimaryAction

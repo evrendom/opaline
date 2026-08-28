@@ -87,7 +87,7 @@ export function createWrappedTeamCardShareActions(
 		shareUrlLabel,
 		sourceSplit,
 	} = params;
-	const shareTitle = `${displayName}'s Rudel post`;
+	const shareTitle = `${displayName}'s Opaline post`;
 	const shareText = buildWrappedXShareText({
 		activeDays: row.activeDays,
 		archetypeLabel,

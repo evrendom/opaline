@@ -9,11 +9,12 @@ import "@/features/dashboard/dashboard-theme.css";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
 import {
-	shellRouteMap,
-	shellRoutes,
+	getShellRouteMap,
+	getShellRoutes,
 } from "@/features/shell/config/shell-routes";
 import { SHOW_SIDEBAR_NEWS_MODE } from "@/features/shell/config/sidebar-news";
 import { getDefaultSidebarShellTuningState } from "@/features/shell/config/sidebar-shell-debug";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 
 const defaultDashboardChromeValues = {
 	turbulence: {
@@ -64,17 +65,6 @@ const defaultChromeStyle = {
 	"--dashboard-01-window-shadow": `${defaultDashboardChromeValues.shadow.x}px ${defaultDashboardChromeValues.shadow.y}px ${defaultDashboardChromeValues.shadow.blur}px ${defaultDashboardChromeValues.shadow.spread}px ${hexToRgba(defaultDashboardChromeValues.shadow.color, defaultDashboardChromeValues.shadow.opacity)}`,
 } as CSSProperties;
 
-const shellShortcutRouteByKey = shellRoutes.reduce<Record<string, string>>(
-	(shortcutRouteMap, route) => {
-		if (route.shortcut) {
-			shortcutRouteMap[route.shortcut.toLowerCase()] = route.path;
-		}
-
-		return shortcutRouteMap;
-	},
-	{},
-);
-
 function isEditableTarget(target: EventTarget | null) {
 	if (!(target instanceof HTMLElement)) {
 		return false;
@@ -91,8 +81,27 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function AppShellLayout() {
+	const orgSlug = useWorkspaceSlug();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const shellRouteMap = React.useMemo(
+		() => getShellRouteMap(orgSlug),
+		[orgSlug],
+	);
+	const shellShortcutRouteByKey = React.useMemo(
+		() =>
+			getShellRoutes(orgSlug).reduce<Record<string, string>>(
+				(shortcutRouteMap, route) => {
+					if (route.shortcut) {
+						shortcutRouteMap[route.shortcut.toLowerCase()] = route.path;
+					}
+
+					return shortcutRouteMap;
+				},
+				{},
+			),
+		[orgSlug],
+	);
 	const isSidebarNewsModeEnabled = SHOW_SIDEBAR_NEWS_MODE;
 	const isSettingsShellRoute =
 		location.pathname === shellRouteMap.settings.path ||
@@ -125,7 +134,7 @@ export function AppShellLayout() {
 		window.addEventListener("keydown", handleShellShortcutKeyDown);
 		return () =>
 			window.removeEventListener("keydown", handleShellShortcutKeyDown);
-	}, [location.pathname, navigate]);
+	}, [location.pathname, navigate, shellShortcutRouteByKey]);
 
 	return (
 		<TooltipProvider>

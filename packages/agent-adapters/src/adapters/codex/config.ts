@@ -35,7 +35,7 @@ export function installHook(configPath: string = CONFIG_PATH): void {
 	const notify = config.notify;
 	if (notify !== undefined && !Array.isArray(notify)) {
 		throw new Error(
-			`Codex notify is already configured in ${configPath}. Rudel left it unchanged.`,
+			`Codex notify is already configured in ${configPath}. Opaline left it unchanged.`,
 		);
 	}
 	const current = notify ?? [];
@@ -55,12 +55,12 @@ export function installHook(configPath: string = CONFIG_PATH): void {
 		config.notify = withoutLegacy;
 		writeConfig(configPath, config);
 		throw new Error(
-			`Removed Rudel's invalid legacy notify entry from ${configPath}, restoring the previous command. Codex supports only one notify command, so Rudel was not installed.`,
+			`Removed the invalid legacy Rudel notify entry from ${configPath}, restoring the previous command. Codex supports only one notify command, so Opaline was not installed.`,
 		);
 	}
 
 	throw new Error(
-		`Codex notify is already configured in ${configPath}. Codex supports only one notify command, so Rudel left the existing command unchanged.`,
+		`Codex notify is already configured in ${configPath}. Codex supports only one notify command, so Opaline left the existing command unchanged.`,
 	);
 }
 

@@ -1,3 +1,8 @@
-export function getSessionDetailPath(sessionId: string): string {
-	return `/dashboard/sessions/${encodeURIComponent(sessionId)}`;
+import { appRoutes } from "@/app/routes";
+
+export function getSessionDetailPath(
+	orgSlug: string,
+	sessionId: string,
+): string {
+	return appRoutes.dashboardSession(orgSlug, sessionId);
 }

@@ -208,7 +208,7 @@ export function WrappedTeamCardPage(props: {
 	);
 	const handleContinueToDashboard = () => {
 		markWrappedCompleted(completionUserId);
-		navigate(appRoutes.dashboard());
+		navigate(appRoutes.legacyDashboard());
 	};
 	const headerLeftMetric = useMemo<WrappedTeamMemberCardHeaderMetric>(
 		() => ({
@@ -654,7 +654,7 @@ function WrappedTeamCardPageContent(props: {
 		trackNavigation({
 			navType: "wrappedContinueToDashboard",
 			sourceComponent,
-			targetPath: appRoutes.dashboard(),
+			targetPath: appRoutes.legacyDashboard(),
 			targetType: "route",
 			toPageName: "overview",
 		});

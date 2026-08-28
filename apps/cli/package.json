@@ -10,11 +10,11 @@
 	"homepage": "https://opaline.so",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/evrendom/rudel.git",
+		"url": "https://github.com/opalinehq/cli.git",
 		"directory": "apps/cli"
 	},
 	"bugs": {
-		"url": "https://github.com/evrendom/rudel/issues"
+		"url": "https://github.com/opalinehq/cli/issues"
 	},
 	"keywords": [
 		"claude",
@@ -24,7 +24,7 @@
 		"transcript",
 		"coding-agent"
 	],
-	"author": "ObsessionDB",
+	"author": "Opaline",
 	"bin": {
 		"rudel": "./dist/cli.js"
 	},

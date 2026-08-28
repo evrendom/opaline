@@ -62,7 +62,7 @@ vi.mock("@/features/dashboard/components/DashboardRepositoryPanel", () => ({
 
 function renderSessionsView() {
 	render(
-		<MemoryRouter>
+		<MemoryRouter initialEntries={["/farmerville"]}>
 			<DashboardSessionsView
 				isRepositoryChartPending={false}
 				repositories={[]}
@@ -99,7 +99,7 @@ describe("DashboardSessionsView", () => {
 		});
 		expect(
 			screen.getByRole("link", { name: "Open full sessions view" }),
-		).toHaveAttribute("href", "/dashboard/sessions");
+		).toHaveAttribute("href", "/farmerville/sessions");
 	});
 
 	it("over-fetches without a window for the rolling 24-hour range", () => {

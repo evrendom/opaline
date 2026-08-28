@@ -29,7 +29,7 @@ describe("WrappedTeamMemberCardBack", () => {
 		).toHaveAttribute("title", "extremely-long-favorite-skill-name");
 	});
 
-	it("replaces the Rudel logo with the Decimal edition lockup", () => {
+	it("replaces the Opaline logo with the Decimal edition lockup", () => {
 		render(<WrappedTeamMemberCardBack edition="decimal" metrics={[]} />);
 
 		expect(screen.getByText("MEMBER")).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe("WrappedTeamMemberCardBack", () => {
 		expect(decimalsText).toHaveClass("sr-only");
 		expect(badge).not.toHaveTextContent("MEMBER");
 		expect(badge?.querySelectorAll("img")).toHaveLength(2);
-		expect(screen.queryByLabelText("Rudel")).toBeNull();
+		expect(screen.queryByLabelText("Opaline")).toBeNull();
 	});
 
 	it("marks the favorite skill metric for start truncation", () => {

@@ -44,7 +44,7 @@ describe("WrappedDesktopResumePromptPage", () => {
 		).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"The next step will be to enable Rudel within the terminal on your desktop.",
+				"The next step will be to enable Opaline within the terminal on your desktop.",
 			),
 		).toBeInTheDocument();
 		expect(

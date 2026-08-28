@@ -1,17 +1,13 @@
+import {
+	buildOrganizationPath,
+	getOrganizationSlugFromPath,
+} from "@rudel/api-routes/organization-paths";
 import { appendWebAcquisitionSearchParams } from "@/lib/acquisition-attribution";
 
-const DASHBOARD_PATH = "/dashboard";
-const DASHBOARD_SESSIONS_PATH = `${DASHBOARD_PATH}/sessions`;
-const DASHBOARD_GET_STARTED_LEGACY_PATH = `${DASHBOARD_PATH}/get-started`;
+const DASHBOARD_GET_STARTED_LEGACY_PATH = "/dashboard/get-started";
+const LEGACY_DASHBOARD_PATH = "/dashboard";
 const GET_STARTED_PATH = "/get-started";
-const TEAM_PATH = "/team";
-const TEAM_INVITE_PATH = `${TEAM_PATH}/invite`;
-const SETTINGS_ROOT_PATH = "/settings";
-const SETTINGS_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/workspace`;
-const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
-const SETTINGS_INVITATIONS_PATH = `${SETTINGS_ROOT_PATH}/invitations`;
-const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
-const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
+const TEAM_INVITE_PATH = "/team/invite";
 const PRESET_BASELINE_PATH = "/__preset-baseline";
 const WRAPPED_TEAM_CARD_PATH = "/wrapped";
 const DEV_WRAPPED_PATH = "/dev/wrapped";
@@ -42,16 +38,20 @@ export type WrappedVariant =
 // We keep them centralized so design, auth, analytics, and public sharing all
 // talk about the same URLs instead of rebuilding strings in multiple places.
 export const appRoutes = {
-	home: () => DASHBOARD_PATH,
-	dashboard: () => DASHBOARD_PATH,
-	dashboardSessions: () => DASHBOARD_SESSIONS_PATH,
+	home: (orgSlug: string) => getWorkspacePath(orgSlug),
+	dashboard: (orgSlug: string) => getWorkspacePath(orgSlug),
+	legacyDashboard: () => LEGACY_DASHBOARD_PATH,
+	legacyDashboardSessions: () => `${LEGACY_DASHBOARD_PATH}/sessions`,
+	dashboardSessions: (orgSlug: string) => getWorkspacePath(orgSlug, "sessions"),
+	dashboardSession: (orgSlug: string, sessionId: string) =>
+		`${getWorkspacePath(orgSlug, "sessions")}/${encodeURIComponent(sessionId)}`,
 	getStarted: () => GET_STARTED_PATH,
 	dashboardGetStartedLegacy: () => DASHBOARD_GET_STARTED_LEGACY_PATH,
-	team: () => TEAM_PATH,
+	team: (orgSlug: string) => getWorkspacePath(orgSlug, "team"),
 	teamInvite: (token: string) =>
 		`${TEAM_INVITE_PATH}/${encodeURIComponent(token)}`,
-	settings: () => SETTINGS_ROOT_PATH,
-	settingsRoot: () => SETTINGS_ROOT_PATH,
+	settings: (orgSlug: string) => getWorkspacePath(orgSlug, "settings"),
+	settingsRoot: (orgSlug: string) => getWorkspacePath(orgSlug, "settings"),
 	presetBaseline: () => PRESET_BASELINE_PATH,
 	wrappedTeamCard: () => WRAPPED_TEAM_CARD_PATH,
 	wrappedTeamCardShare: () => getWrappedTeamCardSharePath(),
@@ -70,12 +70,51 @@ export const appRoutes = {
 		sourceSearch?: string,
 		referrerDomain?: string | null,
 	) => getWrappedTeamCardFromSharePath(shareId, sourceSearch, referrerDomain),
-	settingsWorkspace: () => SETTINGS_WORKSPACE_PATH,
-	settingsMembers: () => SETTINGS_MEMBERS_PATH,
-	settingsInvitations: () => SETTINGS_INVITATIONS_PATH,
-	settingsAccount: () => SETTINGS_ACCOUNT_PATH,
-	settingsCreateWorkspace: () => SETTINGS_CREATE_WORKSPACE_PATH,
+	settingsWorkspace: (orgSlug: string) =>
+		getWorkspacePath(orgSlug, "settings/workspace"),
+	settingsMembers: (orgSlug: string) =>
+		getWorkspacePath(orgSlug, "settings/members"),
+	settingsInvitations: (orgSlug: string) =>
+		getWorkspacePath(orgSlug, "settings/invitations"),
+	settingsAccount: (orgSlug: string) =>
+		getWorkspacePath(orgSlug, "settings/account"),
+	settingsCreateWorkspace: (orgSlug: string) =>
+		getWorkspacePath(orgSlug, "settings/create-workspace"),
 };
+
+export function getWorkspaceSlugFromPath(pathname: string): string | null {
+	return getOrganizationSlugFromPath(pathname);
+}
+
+export function getWorkspaceRouteSuffix(pathname: string): string | null {
+	const orgSlug = getWorkspaceSlugFromPath(pathname);
+	if (!orgSlug) {
+		return null;
+	}
+
+	const prefix = `/${orgSlug}`;
+	if (pathname === prefix || pathname === `${prefix}/`) {
+		return "/";
+	}
+
+	return pathname.slice(prefix.length);
+}
+
+export function getWorkspacePathAfterOrganizationSwitch(
+	pathname: string,
+	orgSlug: string,
+): string | null {
+	try {
+		const suffix = getWorkspaceRouteSuffix(pathname);
+		if (!suffix || suffix === "/") {
+			return buildOrganizationPath(orgSlug);
+		}
+
+		return buildOrganizationPath(orgSlug, suffix.slice(1));
+	} catch {
+		return null;
+	}
+}
 
 function getWrappedTeamCardFromSharePath(
 	shareId: string,
@@ -87,6 +126,10 @@ function getWrappedTeamCardFromSharePath(
 	appendWebAcquisitionSearchParams(searchParams, sourceSearch, referrerDomain);
 
 	return `${WRAPPED_TEAM_CARD_PATH}?${searchParams.toString()}`;
+}
+
+function getWorkspacePath(orgSlug: string, suffix?: string): string {
+	return buildOrganizationPath(orgSlug, suffix);
 }
 
 export function getWrappedCardProfilePath(search?: string) {

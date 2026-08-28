@@ -399,7 +399,7 @@ function WrappedUploadedReposStage(props: {
 			>
 				<div className="rudel-wrapped-entry-card__status-dot" />
 				<p className="rudel-wrapped-entry-card__status-copy">
-					Loading the repos that already sent sessions to Rudel.
+					Loading the repos that already sent sessions to Opaline.
 				</p>
 			</motion.div>
 		);

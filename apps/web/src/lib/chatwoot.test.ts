@@ -68,16 +68,16 @@ describe("chatwoot", () => {
 			identifier: "user-123",
 			identifier_hash: identifierHash,
 			email: "user@example.com",
-			name: "Rudel User",
+			name: "Opaline User",
 		});
 
 		expect(window.$chatwoot?.setUser).toHaveBeenCalledWith("user-123", {
 			avatar_url: undefined,
 			company_name: undefined,
-			description: "Rudel dashboard user",
+			description: "Opaline dashboard user",
 			email: "user@example.com",
 			identifier_hash: identifierHash,
-			name: "Rudel User",
+			name: "Opaline User",
 		});
 	});
 });

@@ -1,7 +1,7 @@
 export function getInitialSignupName(email: string): string {
 	const localPart = email.split("@")[0]?.trim();
 	if (!localPart) {
-		return "Rudel User";
+		return "Opaline User";
 	}
 
 	const words = localPart

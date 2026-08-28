@@ -12,11 +12,11 @@ const { version } = JSON.parse(
 
 async function getLatestGitHubVersion() {
 	const response = await fetch(
-		"https://api.github.com/repos/evrendom/rudel/releases/latest",
+		"https://api.github.com/repos/opalinehq/cli/releases/latest",
 		{
 			headers: {
 				Accept: "application/vnd.github+json",
-				"User-Agent": "rudel-web-build",
+				"User-Agent": "opaline-web-build",
 			},
 		},
 	);
@@ -31,7 +31,11 @@ async function getLatestGitHubVersion() {
 		throw new Error("GitHub release response did not include a tag");
 	}
 
-	return data.tag_name.replace(/^rudel@/, "");
+	return normalizeCliReleaseTag(data.tag_name);
+}
+
+function normalizeCliReleaseTag(tag: string) {
+	return tag.replace(/^(?:opaline-cli|rudel)@/u, "");
 }
 
 function getLatestLocalTagVersion() {
@@ -49,7 +53,7 @@ function getLatestLocalTagVersion() {
 		throw new Error("No git tags found");
 	}
 
-	return tag.replace(/^rudel@/, "");
+	return normalizeCliReleaseTag(tag);
 }
 
 async function resolveAppVersion() {

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { appRoutes } from "@/app/routes";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { authClient } from "@/lib/auth-client";
 import { client } from "@/lib/orpc";
 
@@ -12,11 +13,11 @@ type TeamInviteState =
 
 export function TeamInviteAcceptPage() {
 	const { token } = useParams<{ token: string }>();
-	const navigate = useNavigate();
+	const { actions } = useOrganization();
 	const { data: session, isPending: isSessionPending } =
 		authClient.useSession();
 	const [state, setState] = useState<TeamInviteState>({ status: "idle" });
-	const invitePath = token ? appRoutes.teamInvite(token) : appRoutes.team();
+	const invitePath = token ? appRoutes.teamInvite(token) : "/";
 
 	useEffectOnceWhen({
 		effect: () => {
@@ -29,8 +30,8 @@ export function TeamInviteAcceptPage() {
 			}
 
 			void acceptTeamInvite({
-				navigateToTeam: () => navigate(appRoutes.team(), { replace: true }),
 				setState,
+				switchOrganization: actions.switchOrganization,
 				token,
 			});
 		},
@@ -49,7 +50,7 @@ export function TeamInviteAcceptPage() {
 	}
 
 	if (state.status === "ready") {
-		return <Navigate replace to={appRoutes.team()} />;
+		return <TeamInviteStateScreen body="Opening the workspace..." />;
 	}
 
 	if (state.status === "error") {
@@ -64,22 +65,29 @@ export function TeamInviteAcceptPage() {
 	return <TeamInviteStateScreen body="Joining the workspace..." />;
 }
 
-async function acceptTeamInvite(input: {
-	navigateToTeam: () => void;
+export async function acceptTeamInvite(input: {
 	setState: (state: TeamInviteState) => void;
+	switchOrganization: (
+		organizationId: string,
+		options?: { destination?: "preserve" | "team" },
+	) => Promise<boolean>;
 	token: string;
 }) {
-	const { navigateToTeam, setState, token } = input;
+	const { setState, switchOrganization, token } = input;
 
 	setState({ status: "pending" });
 
 	try {
 		const result = await client.teamInviteLink.accept({ token });
-		await authClient.organization.setActive({
-			organizationId: result.organization_id,
+		const didSwitch = await switchOrganization(result.organization_id, {
+			destination: "team",
 		});
+		if (!didSwitch) {
+			throw new Error(
+				"You joined the workspace, but it could not be opened. Refresh and try again.",
+			);
+		}
 		setState({ status: "ready" });
-		navigateToTeam();
 	} catch (error) {
 		setState({
 			message: getTeamInviteErrorMessage(error),
@@ -95,7 +103,7 @@ function TeamInviteStateScreen(props: { body: string; title?: string }) {
 		<section className="flex min-h-svh items-center justify-center bg-background px-4 py-6 sm:px-6 lg:px-8">
 			<div className="mx-auto w-full max-w-xl space-y-3 text-center">
 				<p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-					Rudel team
+					Opaline team
 				</p>
 				<h1 className="text-3xl font-semibold text-foreground">{title}</h1>
 				<p className="text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">

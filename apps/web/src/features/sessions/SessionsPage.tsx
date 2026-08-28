@@ -13,6 +13,7 @@ import {
 } from "@/features/sessions/session-date-ranges";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { orpc } from "@/lib/orpc";
 import { getSessionDetailPath } from "@/lib/session-paths";
 
@@ -27,6 +28,7 @@ const closedSessionDetailState: SessionDetailState = {
 };
 
 export function SessionsPage() {
+	const orgSlug = useWorkspaceSlug();
 	const {
 		meta,
 		state: { endDate, startDate },
@@ -190,7 +192,7 @@ export function SessionsPage() {
 			sourceComponent: "sessions_snapshot_table",
 			targetType: "session",
 			targetId: session.session_id,
-			targetPath: getSessionDetailPath(session.session_id),
+			targetPath: getSessionDetailPath(orgSlug, session.session_id),
 		});
 		setSessionDetailState({
 			status: "open",
