@@ -8,6 +8,7 @@ import {
 	addOptionalStringInFilter,
 	buildAbsoluteDateFilter,
 	buildDateFilter,
+	buildIngestRecoveryCountStatement,
 	buildLatestRawSessionContentSql,
 	buildSessionAnalyticsRepairStatement,
 	createClickHouseExecutor,
@@ -178,6 +179,38 @@ describe("clickhouse helpers", () => {
 			const quotedColumn = ["`", column, "`"].join("");
 			expect(statement.query.split(quotedColumn)).toHaveLength(3);
 		}
+	});
+
+	test("keeps large usage-event recovery probes constant-size", () => {
+		const values = Array.from({ length: 3_600 }, (_, index) => ({
+			event_id: index.toString().padStart(64, "0"),
+			event_version: "1787900000000",
+			organization_id: "org-recovery",
+			session_id: "session-recovery",
+			source: "codex",
+			user_id: "user-recovery",
+		}));
+		const statement = buildIngestRecoveryCountStatement(
+			"rudel.usage_events",
+			values,
+			"rudel.usage_events",
+		);
+
+		expect(statement.query).toContain(
+			"organization_id = {organizationId:String}",
+		);
+		expect(statement.query).toContain("user_id = {userId:String}");
+		expect(statement.query).toContain("source = {source:String}");
+		expect(statement.query).toContain("session_id = {sessionId:String}");
+		expect(statement.query).toContain("event_version = {eventVersion:UInt64}");
+		expect(statement.query).not.toContain("event_id IN");
+		expect(statement.query_params).toEqual({
+			eventVersion: "1787900000000",
+			organizationId: "org-recovery",
+			sessionId: "session-recovery",
+			source: "codex",
+			userId: "user-recovery",
+		});
 	});
 
 	test("requires pushed-down filters for raw transcript scans", () => {

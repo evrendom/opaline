@@ -382,7 +382,7 @@ async function countRecoveredClickHouseRows(
 	return count;
 }
 
-function buildIngestRecoveryCountStatement(
+export function buildIngestRecoveryCountStatement(
 	target: string,
 	values: readonly object[],
 	sourceTarget: string,
@@ -502,17 +502,18 @@ function buildIngestRecoveryCountStatement(
 				},
 			);
 		case "rudel.usage_events":
+			// event_version is reserved once per durable session ingest, so this
+			// full ORDER BY prefix identifies exactly that generation without
+			// sending thousands of event IDs back through the recovery probe.
 			return recoveryCountStatement(
 				target,
 				`organization_id = {organizationId:String}
 					AND user_id = {userId:String}
 					AND source = {source:String}
 					AND session_id = {sessionId:String}
-					AND event_id IN {eventIds:Array(FixedString(64))}
 					AND event_version = {eventVersion:UInt64}`,
 				{
 					...commonParams,
-					eventIds: values.map((row) => readString(row, "event_id")),
 					eventVersion: readCommonString(values, "event_version"),
 					sessionId: readCommonString(values, "session_id"),
 					source: readCommonString(values, "source"),
