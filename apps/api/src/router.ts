@@ -1334,7 +1334,10 @@ const r2IngestCommit = os.ingest.commit
 				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
 						allowQuiescedIngest: context.ingestOperatorAuthorized,
-						awaitLanguageSignals: true,
+						// Language signals are derived and repaired durably. Keeping them
+						// off the commit path prevents a scanner outage from failing an
+						// otherwise durable transcript upload.
+						awaitLanguageSignals: false,
 						context: {
 							apiKeyId: context.apiKeyId,
 							session: null,

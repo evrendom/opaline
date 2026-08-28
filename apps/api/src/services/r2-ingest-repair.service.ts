@@ -52,7 +52,10 @@ export async function runR2IngestRepairPass(
 				deadline,
 				process: (sessionInput, identity, signal) =>
 					processIngestSession({
-						awaitLanguageSignals: true,
+						// Repair raw ingest and durable bookkeeping without coupling job
+						// recovery to derived language-signal availability. The dedicated
+						// language-signal reconciler fills any missing row independently.
+						awaitLanguageSignals: false,
 						context: {
 							apiKeyId: null,
 							session: null,

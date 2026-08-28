@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LanguageSignalCounts } from "@rudel/language-signals";
 import type { ClickHouseExecutor } from "../clickhouse.js";
+import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
 import {
 	buildSessionLanguageSignalRow,
 	buildSessionLanguageSignalVersion,
@@ -76,7 +77,7 @@ describe("session language-signal ingest persistence", () => {
 		expect(BigInt(higher)).toBeGreaterThan(BigInt(lower));
 	});
 
-	test("does not reject the upload hook when the scanner throws", async () => {
+	test("does not reject ingest when the scanner has an operational failure", async () => {
 		let insertCalls = 0;
 
 		await expect(
@@ -86,7 +87,9 @@ describe("session language-signal ingest persistence", () => {
 				},
 				now: () => new Date("2026-08-19T12:00:02.456Z"),
 				scan: async () => {
-					throw new Error("scanner unavailable");
+					throw new SessionLanguageSignalScannerOperationalError(
+						"scanner unavailable",
+					);
 				},
 			}),
 		).resolves.toBeUndefined();
