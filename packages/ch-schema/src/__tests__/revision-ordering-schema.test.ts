@@ -179,7 +179,39 @@ describe("F16 revision ordering schema", () => {
 			/CREATE MATERIALIZED VIEW IF NOT EXISTS rudel\./u,
 		);
 		expect(migrationExecutor).toContain("timeoutMs = input.requestTimeoutMs");
-		expect(migrationExecutor).toContain("AbortSignal.timeout(timeoutMs)");
+		expect(migrationExecutor).toContain('from "node:http"');
+		expect(migrationExecutor).toContain('from "node:https"');
+		expect(migrationExecutor).toContain("const deadline = setTimeout");
+		expect(migrationExecutor).toContain(
+			'finish(new Error("The operation timed out."))',
+		);
+		expect(migrationExecutor).toContain("request.destroy();");
+		expect(migrationExecutor).toContain("reconcileDetachedCommand");
+		expect(migrationExecutor).toContain("response.statusCode === 504");
+		expect(migrationExecutor).toContain(
+			"Detached ClickHouse command failed with exception code",
+		);
+		expect(migrationExecutor).toContain(
+			"Detached ClickHouse query finished after HTTP 504",
+		);
+		expect(migrationExecutor).toContain("AS f16_poll_lease_created");
+		expect(migrationExecutor).toContain(
+			"lease table is not visible with exact owner metadata on every replica",
+		);
+		expect(migrationExecutor).not.toContain("await fetch(");
+		expect(migrationExecutor).not.toContain("AbortSignal.timeout");
+		expect(migrationExecutor).toContain(
+			"const VERIFICATION_MAX_BLOCK_SIZE = 8",
+		);
+		expect(migrationExecutor).toContain(
+			"const CODEX_BACKFILL_MAX_BLOCK_SIZE = 4",
+		);
+		expect(migrationExecutor).toContain(
+			"SETTINGS max_block_size=$" + "{VERIFICATION_MAX_BLOCK_SIZE}",
+		);
+		expect(migrationExecutor).toContain(
+			"applyBackfillExecutionProfile(executableStatement)",
+		);
 		expect(migrationExecutor).toContain(
 			'endpoint.searchParams.set("distributed_ddl_output_mode", "throw")',
 		);

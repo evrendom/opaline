@@ -3,6 +3,8 @@ import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	acquireMigrationLease,
 	appendJournalEntryWithReconciliation,
+	applyBackfillExecutionProfile,
+	createMigrationClient,
 	expandBucketedStatement,
 	type F16Topology,
 	type MigrationHttpClient,
@@ -333,6 +335,147 @@ describe("F16 controlled migration runner core", () => {
 		expect(() =>
 			expandBucketedStatement("SELECT {f16_bucket_id:UInt64}", 2),
 		).toThrow("incomplete placeholder pair");
+	});
+
+	test("scopes the four-row execution profile to Codex backfill inserts", () => {
+		const codexStatement =
+			"INSERT INTO rudel.codex_sessions (session_id) SETTINGS async_insert=0 SELECT session_id FROM source";
+		expect(applyBackfillExecutionProfile(codexStatement)).toContain(
+			"SETTINGS async_insert=0, max_block_size=4, max_insert_block_size=4, min_insert_block_size_rows=1, min_insert_block_size_bytes=1",
+		);
+		const claudeStatement =
+			"INSERT INTO rudel.claude_sessions (session_id) SETTINGS async_insert=0 SELECT session_id FROM source";
+		expect(applyBackfillExecutionProfile(claudeStatement)).toBe(
+			claudeStatement,
+		);
+		const preservationStatement =
+			"INSERT INTO rudel.codex_sessions_f16_backfill_source_20260826 (session_id) SETTINGS async_insert=0 SELECT session_id FROM source";
+		expect(applyBackfillExecutionProfile(preservationStatement)).toBe(
+			preservationStatement,
+		);
+		expect(() =>
+			applyBackfillExecutionProfile(
+				"INSERT INTO rudel.codex_sessions (session_id) SELECT session_id FROM source",
+			),
+		).toThrow("exactly one synchronous insert settings marker");
+	});
+
+	test("reconciles detached HTTP 504 commands by exact query id", async () => {
+		let terminal: "failed" | "finished" = "finished";
+		const originalQueryIds: string[] = [];
+		const statusQueries: string[] = [];
+		const server = Bun.serve({
+			port: 0,
+			async fetch(request) {
+				const body = await request.text();
+				if (body.includes("AS detached_active")) {
+					statusQueries.push(body);
+					return new Response(
+						`${JSON.stringify({
+							detached_active: 0,
+							detached_exception_code: terminal === "failed" ? 241 : 0,
+							detached_failed: terminal === "failed" ? 1 : 0,
+							detached_finished: terminal === "finished" ? 1 : 0,
+							detached_started: 1,
+						})}\n`,
+					);
+				}
+				const queryId = new URL(request.url).searchParams.get("query_id");
+				if (queryId) originalQueryIds.push(queryId);
+				return new Response("gateway timeout", { status: 504 });
+			},
+		});
+		const client = createMigrationClient({
+			database: "default",
+			ddlTimeoutSeconds: 60,
+			maxBytesBeforeExternalGroupBy: 1024,
+			maxBytesBeforeExternalSort: 1024,
+			maxMemoryUsage: 4096,
+			maxTemporaryDataOnDiskBytes: 8192,
+			password: "test-password",
+			requestTimeoutMs: 5_000,
+			runQueryPrefix: "rudel-f16-test",
+			topology: { mode: "single-node" },
+			url: `http://127.0.0.1:${server.port}`,
+			username: "test-user",
+		});
+		try {
+			await expect(
+				client.command("SELECT detached_success"),
+			).resolves.toBeUndefined();
+			await expect(client.query("SELECT detached_query")).rejects.toThrow(
+				"response body is unavailable",
+			);
+			terminal = "failed";
+			await expect(client.command("SELECT detached_failure")).rejects.toThrow(
+				"Detached ClickHouse command failed with exception code 241",
+			);
+			expect(originalQueryIds).toHaveLength(3);
+			for (const queryId of originalQueryIds) {
+				expect(
+					statusQueries.some((query) =>
+						query.includes(`query_id = '${queryId}'`),
+					),
+				).toBe(true);
+			}
+		} finally {
+			await client.close();
+			server.stop(true);
+		}
+	});
+
+	test("requires a valid zero census before declaring no detached evidence", async () => {
+		let censusAttempts = 0;
+		const server = Bun.serve({
+			port: 0,
+			async fetch(request) {
+				const body = await request.text();
+				if (!body.includes("AS detached_active")) {
+					return new Response("gateway timeout", { status: 504 });
+				}
+				censusAttempts += 1;
+				if (censusAttempts === 1) {
+					return new Response("census unavailable", { status: 503 });
+				}
+				if (censusAttempts === 2) {
+					return new Response("not-json");
+				}
+				return new Response(
+					`${JSON.stringify({
+						detached_active: 0,
+						detached_exception_code: 0,
+						detached_failed: 0,
+						detached_finished: 0,
+						detached_started: 0,
+					})}\n`,
+				);
+			},
+		});
+		const client = createMigrationClient({
+			database: "default",
+			detachedNoEvidenceTimeoutMs: 1,
+			detachedStatusPollIntervalMs: 5,
+			ddlTimeoutSeconds: 60,
+			maxBytesBeforeExternalGroupBy: 1024,
+			maxBytesBeforeExternalSort: 1024,
+			maxMemoryUsage: 4096,
+			maxTemporaryDataOnDiskBytes: 8192,
+			password: "test-password",
+			requestTimeoutMs: 1_000,
+			runQueryPrefix: "rudel-f16-test",
+			topology: { mode: "single-node" },
+			url: `http://127.0.0.1:${server.port}`,
+			username: "test-user",
+		});
+		try {
+			await expect(client.command("SELECT detached_missing")).rejects.toThrow(
+				"no server-side evidence",
+			);
+			expect(censusAttempts).toBe(3);
+		} finally {
+			await client.close();
+			server.stop(true);
+		}
 	});
 
 	test("a directly acquired lease remains fail-closed until explicit release", async () => {
