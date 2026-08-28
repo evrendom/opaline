@@ -65,15 +65,6 @@
 					"value": "DENY"
 				}
 			]
-		},
-		{
-			"source": "/rpc/ingestSession",
-			"headers": [
-				{
-					"key": "X-Opaline-Ingest-Cutover-Gate",
-					"value": "legacy-fly-until-cli-r2-adoption"
-				}
-			]
 		}
 	],
 	"rewrites": [
@@ -84,10 +75,6 @@
 		{
 			"source": "/wrapped/:shareId",
 			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId"
-		},
-		{
-			"source": "/rpc/ingestSession",
-			"destination": "https://rudel.fly.dev/rpc/ingestSession"
 		},
 		{
 			"source": "/rpc/ingest/init",
