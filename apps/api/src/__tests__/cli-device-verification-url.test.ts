@@ -15,9 +15,9 @@ afterEach(() => {
 describe("readCliDeviceVerificationUrl: derived from ALLOWED_ORIGIN", () => {
 	test("accepts an https origin without a warning", () => {
 		delete process.env[ENV_VAR];
-		const config = readCliDeviceVerificationUrl("https://app.rudel.ai");
+		const config = readCliDeviceVerificationUrl("https://opaline.so");
 
-		expect(config.url).toBe("https://app.rudel.ai/device");
+		expect(config.url).toBe("https://opaline.so/device");
 		expect(config.warning).toBeUndefined();
 	});
 
@@ -47,12 +47,12 @@ describe("readCliDeviceVerificationUrl: derived from ALLOWED_ORIGIN", () => {
 
 describe("readCliDeviceVerificationUrl: ALLOWED_ORIGIN must be a bare origin", () => {
 	test.each([
-		"https://app.rudel.ai?tenant=acme",
-		"https://app.rudel.ai#frag",
-		"https://app.rudel.ai/nested",
+		"https://opaline.so?tenant=acme",
+		"https://opaline.so#frag",
+		"https://opaline.so/nested",
 	])("throws at boot for non-bare origin %p", (origin) => {
 		// Concatenating `/device` onto these silently corrupts the result:
-		// `https://app.rudel.ai/?tenant=acme/device`, or a fragment that swallows
+		// `https://opaline.so/?tenant=acme/device`, or a fragment that swallows
 		// the path entirely.
 		delete process.env[ENV_VAR];
 
@@ -64,7 +64,7 @@ describe("readCliDeviceVerificationUrl: ALLOWED_ORIGIN must be a bare origin", (
 	test("throws at boot when ALLOWED_ORIGIN is not an absolute URL", () => {
 		delete process.env[ENV_VAR];
 
-		expect(() => readCliDeviceVerificationUrl("app.rudel.ai")).toThrow(
+		expect(() => readCliDeviceVerificationUrl("opaline.so")).toThrow(
 			/ALLOWED_ORIGIN must be an absolute URL/,
 		);
 	});
@@ -72,34 +72,34 @@ describe("readCliDeviceVerificationUrl: ALLOWED_ORIGIN must be a bare origin", (
 	test("accepts a bare origin with a trailing slash", () => {
 		delete process.env[ENV_VAR];
 
-		expect(readCliDeviceVerificationUrl("https://app.rudel.ai/").url).toBe(
-			"https://app.rudel.ai/device",
+		expect(readCliDeviceVerificationUrl("https://opaline.so/").url).toBe(
+			"https://opaline.so/device",
 		);
 	});
 
 	test("still allows an explicit verification URL to carry a query string", () => {
 		// Only the derived fallback must be a bare origin; an explicitly configured
 		// device page may legitimately need parameters.
-		process.env[ENV_VAR] = "https://app.rudel.ai/device?tenant=acme";
+		process.env[ENV_VAR] = "https://opaline.so/device?tenant=acme";
 
-		expect(readCliDeviceVerificationUrl("https://app.rudel.ai").url).toBe(
-			"https://app.rudel.ai/device?tenant=acme",
+		expect(readCliDeviceVerificationUrl("https://opaline.so").url).toBe(
+			"https://opaline.so/device?tenant=acme",
 		);
 	});
 });
 
 describe("readCliDeviceVerificationUrl: explicit env var", () => {
 	test("prefers the explicit value over the fallback origin", () => {
-		process.env[ENV_VAR] = "https://login.rudel.ai/device";
+		process.env[ENV_VAR] = "https://login.example.com/device";
 
-		expect(readCliDeviceVerificationUrl("https://app.rudel.ai").url).toBe(
-			"https://login.rudel.ai/device",
+		expect(readCliDeviceVerificationUrl("https://opaline.so").url).toBe(
+			"https://login.example.com/device",
 		);
 	});
 
 	test("names the explicit variable in the plaintext warning", () => {
 		process.env[ENV_VAR] = "http://rudel.internal/device";
-		const config = readCliDeviceVerificationUrl("https://app.rudel.ai");
+		const config = readCliDeviceVerificationUrl("https://opaline.so");
 
 		expect(config.warning).toContain(ENV_VAR);
 	});
@@ -112,7 +112,7 @@ describe("readCliDeviceVerificationUrl: explicit env var", () => {
 	])("throws at boot for %p", (value) => {
 		process.env[ENV_VAR] = value;
 
-		expect(() => readCliDeviceVerificationUrl("https://app.rudel.ai")).toThrow(
+		expect(() => readCliDeviceVerificationUrl("https://opaline.so")).toThrow(
 			/CLI device verification URL/,
 		);
 	});

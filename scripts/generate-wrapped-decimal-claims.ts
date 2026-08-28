@@ -26,13 +26,13 @@ interface ParsedArgs {
 const USAGE = `Generate single-use Decimal Wrapped claim links.
 
 Usage:
-  bun run scripts/generate-wrapped-decimal-claims.ts --count 223 --out ./decimal-links.csv [--app-url https://app.rudel.ai]
+  bun run scripts/generate-wrapped-decimal-claims.ts --count 223 --out ./decimal-links.csv [--app-url https://opaline.so]
   bun run scripts/generate-wrapped-decimal-claims.ts --inspect
 
 Flags:
   --count <N>     Number of links to generate. Required unless --inspect is passed.
   --out <path>    CSV output path. Use '-' for stdout. Required unless --inspect.
-  --app-url <url> Base URL for the claim link. Defaults to APP_URL env or https://app.rudel.ai.
+  --app-url <url> Base URL for the claim link. Defaults to APP_URL env or https://opaline.so.
   --inspect       Print counts of total/claimed/unclaimed rows and exit. Read-only.
   --force         Allow overwriting an existing --out file.
   --help          Show this message.
@@ -47,7 +47,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
 	const args: ParsedArgs = {
 		count: null,
 		outPath: null,
-		appUrl: process.env.APP_URL ?? "https://app.rudel.ai",
+		appUrl: process.env.APP_URL ?? "https://opaline.so",
 		inspect: false,
 		force: false,
 		help: false,

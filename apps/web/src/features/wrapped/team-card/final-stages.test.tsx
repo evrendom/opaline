@@ -385,7 +385,7 @@ describe("WrappedTeamCardShareStage", () => {
 				onCopyProfileUrl={vi.fn()}
 				onDownload={vi.fn()}
 				onShare={vi.fn()}
-				profileUrlLabel="rudel.ai/wrapped/public-card"
+				profileUrlLabel="opaline.so/wrapped/public-card"
 				row={row}
 				shareCardCreatedAtLabel="04/24/2026"
 				sharePostRef={{ current: null }}
@@ -439,7 +439,7 @@ describe("WrappedTeamCardShareStage", () => {
 				onCopyProfileUrl={vi.fn()}
 				onDownload={vi.fn()}
 				onShare={vi.fn()}
-				profileUrlLabel="rudel.ai/wrapped/public-card"
+				profileUrlLabel="opaline.so/wrapped/public-card"
 				row={row}
 				shareCardCreatedAtLabel="04/24/2026"
 				sharePostRef={{ current: null }}
@@ -499,7 +499,7 @@ describe("WrappedTeamCardShareStage", () => {
 				onCopyProfileUrl={vi.fn()}
 				onDownload={vi.fn()}
 				onShare={vi.fn()}
-				profileUrlLabel="rudel.ai/wrapped/public-card"
+				profileUrlLabel="opaline.so/wrapped/public-card"
 				row={row}
 				shareCardCreatedAtLabel="04/24/2026"
 				sharePostRef={{ current: null }}
@@ -549,7 +549,7 @@ describe("WrappedTeamCardShareStage", () => {
 				onCopyProfileUrl={vi.fn()}
 				onDownload={vi.fn()}
 				onShare={vi.fn()}
-				profileUrlLabel="rudel.ai/wrapped/public-card"
+				profileUrlLabel="opaline.so/wrapped/public-card"
 				row={row}
 				shareCardCreatedAtLabel="04/24/2026"
 				sharePostRef={{ current: null }}
@@ -599,7 +599,7 @@ describe("WrappedTeamCardShareStage", () => {
 				onCopyProfileUrl={onCopyProfileUrl}
 				onDownload={vi.fn()}
 				onShare={vi.fn()}
-				profileUrlLabel="rudel.ai/wrapped/public-card"
+				profileUrlLabel="opaline.so/wrapped/public-card"
 				row={row}
 				shareCardCreatedAtLabel="04/24/2026"
 				sharePostRef={{ current: null }}
@@ -627,7 +627,7 @@ describe("WrappedTeamCardShareStage", () => {
 		});
 
 		expect(
-			screen.getByText("rudel.ai/wrapped/public-card"),
+			screen.getByText("opaline.so/wrapped/public-card"),
 		).toBeInTheDocument();
 		expect(shareButton).toHaveTextContent(/^Share on$/);
 		expect(shareButton.querySelector("svg")).not.toBeNull();

@@ -63,7 +63,7 @@ describe("createWrappedImageShareActions", () => {
 			imageRef,
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleDownloadImage();
@@ -97,8 +97,8 @@ describe("createWrappedImageShareActions", () => {
 			imageRef,
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrl: "https://rudel.ai/wrapped",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrl: "https://opaline.so/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleShareImage();
@@ -110,7 +110,7 @@ describe("createWrappedImageShareActions", () => {
 			files: [expect.any(File)],
 			text: "Share text",
 			title: "Share title",
-			url: "https://rudel.ai/wrapped",
+			url: "https://opaline.so/wrapped",
 		});
 		expect(copyToClipboard).not.toHaveBeenCalled();
 		expect(downloadAsImage).not.toHaveBeenCalled();
@@ -141,8 +141,8 @@ describe("createWrappedImageShareActions", () => {
 			shareTarget: "x",
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrl: "https://rudel.ai/wrapped",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrl: "https://opaline.so/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleShareImage();
@@ -160,7 +160,7 @@ describe("createWrappedImageShareActions", () => {
 		expect(intentUrl.searchParams.get("text")).toBe(
 			[
 				"Share text",
-				"Check my profile out here https://rudel.ai/wrapped",
+				"Check my profile out here https://opaline.so/wrapped",
 				"[Your image is in your clipboard, pls paste and dont forget]",
 			].join("\n\n"),
 		);
@@ -196,8 +196,8 @@ describe("createWrappedImageShareActions", () => {
 			shareTarget: "x",
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrl: "https://rudel.ai/wrapped",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrl: "https://opaline.so/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleShareImage();
@@ -230,7 +230,7 @@ describe("createWrappedImageShareActions", () => {
 			imageRef,
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleShareImage();
@@ -251,7 +251,7 @@ describe("createWrappedImageShareActions", () => {
 			imageRef,
 			shareText: "Share text",
 			shareTitle: "Share title",
-			shareUrlLabel: "rudel.ai/wrapped",
+			shareUrlLabel: "opaline.so/wrapped",
 		});
 
 		await actions.handleDownloadImage();

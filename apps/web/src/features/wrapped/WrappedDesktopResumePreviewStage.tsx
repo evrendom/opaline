@@ -7,7 +7,7 @@ import { Button } from "@/app/ui/button";
 import { copyTextToClipboardWithResult } from "@/lib/clipboard";
 import { WrappedDesktopResumePromptStage } from "./WrappedDesktopResumePromptStage";
 
-const DEFAULT_WRAPPED_DESKTOP_SETUP_URL = "app.rudel.ai/wrapped";
+const DEFAULT_WRAPPED_DESKTOP_SETUP_URL = "opaline.so/wrapped";
 const DEFAULT_WRAPPED_DESKTOP_SETUP_DESCRIPTION =
 	"The next step will be to enable Rudel within the terminal on your desktop.";
 const COPY_FEEDBACK_DURATION_MS = 1800;

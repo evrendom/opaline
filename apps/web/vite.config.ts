@@ -64,7 +64,7 @@ async function resolveAppVersion() {
 	}
 }
 
-// Point the dev proxy at a remote API (e.g. RUDEL_API_TARGET=https://app.rudel.ai)
+// Point the dev proxy at a remote API (e.g. RUDEL_API_TARGET=https://opaline.so)
 // instead of the default local API server. For https targets the proxy rewrites
 // the Host/Origin headers and cookie domain so the remote server's origin checks
 // pass and its session cookie sticks to localhost.

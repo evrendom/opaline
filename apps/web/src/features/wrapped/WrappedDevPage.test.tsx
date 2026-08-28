@@ -145,7 +145,7 @@ describe("WrappedDevPage", () => {
 		expect(stageObject?.querySelector("ol")).toBeNull();
 		expect(stageObject?.querySelectorAll("svg")).toHaveLength(2);
 		expect(screen.getByText("OR")).toBeInTheDocument();
-		expect(screen.getByText("app.rudel.ai/wrapped")).toBeInTheDocument();
+		expect(screen.getByText("opaline.so/wrapped")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Story" })).toBeInTheDocument();
 		expect(stageObject?.querySelector("a")).toBeNull();
@@ -178,7 +178,7 @@ describe("WrappedDevPage", () => {
 			screen.getByText("Dev preview archetype: Smooth Operator"),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText("Dev preview email: e.k.dombak@gmail.com"),
+			screen.getByText("Dev preview email: 158852680+evrendom@users.noreply.github.com"),
 		).toBeInTheDocument();
 		expect(
 			screen.getByText("Dev preview public id: evren"),

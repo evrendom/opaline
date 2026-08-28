@@ -95,7 +95,7 @@ async function runEnable(): Promise<undefined | Error> {
 			error: new Error("No organizations found"),
 			userId: auth.user.id,
 		});
-		p.outro("Create one at app.rudel.ai first.");
+		p.outro("Create one at opaline.so first.");
 		return new Error("No organizations found.");
 	}
 

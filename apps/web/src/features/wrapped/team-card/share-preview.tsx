@@ -88,7 +88,7 @@ export function WrappedTeamCardSharePreview(
 				>
 					<img
 						src="/assets/wordmark-dark-BeVDO32X.svg"
-						alt="rudel.ai"
+						alt="opaline.so"
 						className="h-4 w-auto"
 					/>
 					<div className="flex items-center gap-2.5">
@@ -182,10 +182,10 @@ export function WrappedTeamCardSharePreview(
 						{shareCardCreatedAtLabel}
 					</span>
 					<a
-						href="https://rudel.ai/wrapped"
+						href="https://opaline.so/wrapped"
 						className="rudel-wrapped-share-preview__link"
 					>
-						rudel.ai/wrapped
+						opaline.so/wrapped
 					</a>
 				</WrappedSharePreviewChrome>
 			</div>
