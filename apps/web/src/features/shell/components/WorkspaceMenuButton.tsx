@@ -16,6 +16,7 @@ import {
 	type SidebarRowMode,
 } from "@/features/shell/components/shell-rail-utils";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { cn } from "@/lib/utils";
 
 function WorkspaceMark({ className }: { className?: string }) {
@@ -49,6 +50,7 @@ export function WorkspaceMenuButton({
 }: {
 	mode?: SidebarRowMode;
 }) {
+	const orgSlug = useWorkspaceSlug();
 	const navigate = useNavigate();
 	const { state, actions } = useOrganization();
 	const workspaceName = state.activeOrg?.name ?? "Workspace";
@@ -102,14 +104,14 @@ export function WorkspaceMenuButton({
 				)}
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
-					onClick={() => navigate(appRoutes.settingsWorkspace())}
+					onClick={() => navigate(appRoutes.settingsWorkspace(orgSlug))}
 				>
 					<Settings2Icon />
 					Workspace settings
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					onClick={() =>
-						navigate(`${appRoutes.settingsWorkspace()}#new-workspace`)
+						navigate(`${appRoutes.settingsWorkspace(orgSlug)}#new-workspace`)
 					}
 				>
 					<CommandIcon />

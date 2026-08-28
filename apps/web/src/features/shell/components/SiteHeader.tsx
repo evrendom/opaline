@@ -3,17 +3,21 @@ import { Separator } from "@/app/ui/separator";
 import { SidebarTrigger } from "@/app/ui/sidebar";
 import {
 	getActiveSettingsRouteId,
-	settingsRouteMap,
+	getSettingsRouteMap,
 } from "@/features/settings/config/settings-routes";
 import { DashboardHeader } from "@/features/shell/components/dashboard-header";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 
 export function SiteHeader() {
+	const orgSlug = useWorkspaceSlug();
 	const location = useLocation();
 	const currentShellRoute = useCurrentShellRoute();
+	const settingsRouteMap = getSettingsRouteMap(orgSlug);
 	const title =
 		currentShellRoute.id === "settings"
-			? settingsRouteMap[getActiveSettingsRouteId(location.pathname)].label
+			? settingsRouteMap[getActiveSettingsRouteId(location.pathname, orgSlug)]
+					.label
 			: currentShellRoute.title;
 
 	return (

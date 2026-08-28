@@ -99,7 +99,7 @@ describe("auth state refresh", () => {
 	it("matches both canonical and legacy get-started paths", () => {
 		expect(isGetStartedPath(appRoutes.getStarted())).toBe(true);
 		expect(isGetStartedPath(appRoutes.dashboardGetStartedLegacy())).toBe(true);
-		expect(isGetStartedPath(appRoutes.dashboard())).toBe(false);
+		expect(isGetStartedPath(appRoutes.legacyDashboard())).toBe(false);
 	});
 
 	it("stores a pending homepage signup redirect in the URL", () => {

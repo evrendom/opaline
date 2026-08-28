@@ -14,9 +14,11 @@ import { useInvitationsSettingsData } from "@/features/settings/invitations/use-
 import { buildAccountSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { WorkspaceIncomingInvitationsCard } from "@/features/settings/workspace/components/WorkspaceIncomingInvitationsCard";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { authClient, signOut } from "@/lib/auth-client";
 
 export function AccountSettingsSection() {
+	const orgSlug = useWorkspaceSlug();
 	const navigate = useNavigate();
 	const data = useAccountSettingsData();
 	const invitationsData = useInvitationsSettingsData();
@@ -38,7 +40,7 @@ export function AccountSettingsSection() {
 		setLinkingProvider(provider);
 		authClient.linkSocial({
 			provider,
-			callbackURL: `${window.location.origin}${appRoutes.settingsAccount()}`,
+			callbackURL: `${window.location.origin}${appRoutes.settingsAccount(orgSlug)}`,
 		});
 	};
 

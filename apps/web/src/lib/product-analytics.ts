@@ -19,7 +19,10 @@ import {
 	type UiUtilityUsedEvent,
 	type WrappedGrowthLoopEvent,
 } from "@rudel/api-routes";
-import { getWrappedPublicIdFromPath } from "@/app/routes";
+import {
+	getWorkspaceRouteSuffix,
+	getWrappedPublicIdFromPath,
+} from "@/app/routes";
 import { client } from "@/lib/orpc";
 
 const EVENT_VERSION = PRODUCT_ANALYTICS_EVENT_VERSION;
@@ -432,7 +435,11 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 		pageName: "wrapped_team_card",
 		matches: (pathname) => pathname === "/wrapped",
 	},
-	{ pageName: "overview", matches: (pathname) => pathname === "/dashboard" },
+	{
+		pageName: "overview",
+		matches: (pathname) =>
+			pathname === "/dashboard" || getWorkspaceRouteSuffix(pathname) === "/",
+	},
 	{
 		pageName: "developer_detail",
 		matches: (pathname) =>
@@ -457,14 +464,21 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 	},
 	{
 		pageName: "session_detail",
-		matches: (pathname) =>
-			pathname.startsWith("/legacy/sessions/") ||
-			pathname.startsWith("/dashboard/sessions/"),
+		matches: (pathname) => {
+			const workspaceSuffix = getWorkspaceRouteSuffix(pathname);
+			return (
+				pathname.startsWith("/legacy/sessions/") ||
+				pathname.startsWith("/dashboard/sessions/") ||
+				workspaceSuffix?.startsWith("/sessions/") === true
+			);
+		},
 	},
 	{
 		pageName: "sessions",
 		matches: (pathname) =>
-			pathname === "/legacy/sessions" || pathname === "/dashboard/sessions",
+			pathname === "/legacy/sessions" ||
+			pathname === "/dashboard/sessions" ||
+			getWorkspaceRouteSuffix(pathname) === "/sessions",
 	},
 	{
 		pageName: "errors",

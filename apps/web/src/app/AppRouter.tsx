@@ -1,11 +1,16 @@
 import { type ComponentType, lazy, type ReactNode, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
-import { settingsRouteMap } from "@/features/settings/config/settings-routes";
+import { settingsRouteSegments } from "@/features/settings/config/settings-routes";
 import { SettingsIndexRedirect } from "@/features/settings/SettingsIndexRedirect";
 import { AppShellLayout } from "@/features/shell/AppShellLayout";
-import { shellRouteMap } from "@/features/shell/config/shell-routes";
+import {
+	LegacyWorkspaceRedirect,
+	RootWorkspaceRedirect,
+	WorkspaceRouteBoundary,
+	WorkspaceSettingsAliasRedirect,
+} from "@/features/workspace/routing/workspace-routes";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
 	loader: () => Promise<TModule>,
@@ -99,13 +104,12 @@ export function AppRouter({
 }: {
 	rootRedirectTarget: string | null;
 }) {
-	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
-	const canonicalWorkspaceSettingsPath = settingsRouteMap.workspace.path;
-	const canonicalAccountSettingsPath = settingsRouteMap.account.path;
-
 	return (
 		<Routes>
-			<Route path="/" element={<Navigate to={rootRedirect} replace />} />
+			<Route
+				path="/"
+				element={<RootWorkspaceRedirect target={rootRedirectTarget} />}
+			/>
 			<Route
 				path="/invitation/:invitationId"
 				element={<AcceptInvitationPage />}
@@ -118,62 +122,95 @@ export function AppRouter({
 				path="/__preset-baseline"
 				element={<LazyRoute Component={PresetBaselinePage} />}
 			/>
-			<Route element={<AppShellLayout />}>
-				<Route
-					path={shellRouteMap.dashboard.path}
-					element={<LazyRoute Component={DashboardPage} />}
-				/>
-				<Route
-					path={`${shellRouteMap.dashboard.path}/sessions`}
-					element={<LazyRoute Component={SessionsListPage} />}
-				/>
-				<Route
-					path={`${shellRouteMap.dashboard.path}/sessions/:sessionId`}
-					element={<LazyRoute Component={SessionDetailPage} />}
-				/>
-				<Route
-					path={LEGACY_DASHBOARDY_PATH}
-					element={<Navigate to={shellRouteMap.dashboard.path} replace />}
-				/>
-				<Route
-					path={shellRouteMap.team.path}
-					element={<LazyRoute Component={TeamPage} />}
-				/>
-				<Route
-					path={shellRouteMap.settings.path}
-					element={<LazyRoute Component={SettingsLayout} />}
-				>
-					<Route index element={<SettingsIndexRedirect />} />
+			<Route
+				path="/dashboard"
+				element={<LegacyWorkspaceRedirect route="dashboard" />}
+			/>
+			<Route
+				path="/dashboard/sessions"
+				element={<LegacyWorkspaceRedirect route="sessions" />}
+			/>
+			<Route
+				path="/dashboard/sessions/:sessionId"
+				element={<LegacyWorkspaceRedirect route="session-detail" />}
+			/>
+			<Route
+				path={LEGACY_DASHBOARDY_PATH}
+				element={<LegacyWorkspaceRedirect route="dashboard" />}
+			/>
+			<Route path="/team" element={<LegacyWorkspaceRedirect route="team" />} />
+			<Route
+				path="/settings"
+				element={<LegacyWorkspaceRedirect route="settings" />}
+			/>
+			<Route
+				path="/settings/workspace"
+				element={<LegacyWorkspaceRedirect route="settings-workspace" />}
+			/>
+			<Route
+				path="/settings/members"
+				element={<LegacyWorkspaceRedirect route="settings-members" />}
+			/>
+			<Route
+				path="/settings/invitations"
+				element={<LegacyWorkspaceRedirect route="settings-invitations" />}
+			/>
+			<Route
+				path="/settings/account"
+				element={<LegacyWorkspaceRedirect route="settings-account" />}
+			/>
+			<Route
+				path="/settings/create-workspace"
+				element={<LegacyWorkspaceRedirect route="settings-create-workspace" />}
+			/>
+			<Route path="/:orgSlug" element={<WorkspaceRouteBoundary />}>
+				<Route element={<AppShellLayout />}>
+					<Route index element={<LazyRoute Component={DashboardPage} />} />
 					<Route
-						path={settingsRouteMap.workspace.segment}
-						element={<LazyRoute Component={WorkspaceSettingsPage} />}
+						path="sessions"
+						element={<LazyRoute Component={SessionsListPage} />}
 					/>
 					<Route
-						path={settingsRouteMap.members.segment}
-						element={<LazyRoute Component={MembersSettingsPage} />}
+						path="sessions/:sessionId"
+						element={<LazyRoute Component={SessionDetailPage} />}
 					/>
+					<Route path="team" element={<LazyRoute Component={TeamPage} />} />
 					<Route
-						path={settingsRouteMap.invitations.segment}
-						element={
-							<Navigate
-								replace
-								to={`${canonicalAccountSettingsPath}#workspace-invitations`}
-							/>
-						}
-					/>
-					<Route
-						path={settingsRouteMap.account.segment}
-						element={<LazyRoute Component={AccountSettingsPage} />}
-					/>
-					<Route
-						path={settingsRouteMap["create-workspace"].segment}
-						element={
-							<Navigate
-								replace
-								to={`${canonicalWorkspaceSettingsPath}#new-workspace`}
-							/>
-						}
-					/>
+						path="settings"
+						element={<LazyRoute Component={SettingsLayout} />}
+					>
+						<Route index element={<SettingsIndexRedirect />} />
+						<Route
+							path={settingsRouteSegments.workspace}
+							element={<LazyRoute Component={WorkspaceSettingsPage} />}
+						/>
+						<Route
+							path={settingsRouteSegments.members}
+							element={<LazyRoute Component={MembersSettingsPage} />}
+						/>
+						<Route
+							path={settingsRouteSegments.invitations}
+							element={
+								<WorkspaceSettingsAliasRedirect
+									target="account"
+									defaultHash="#workspace-invitations"
+								/>
+							}
+						/>
+						<Route
+							path={settingsRouteSegments.account}
+							element={<LazyRoute Component={AccountSettingsPage} />}
+						/>
+						<Route
+							path={settingsRouteSegments["create-workspace"]}
+							element={
+								<WorkspaceSettingsAliasRedirect
+									target="workspace"
+									defaultHash="#new-workspace"
+								/>
+							}
+						/>
+					</Route>
 				</Route>
 			</Route>
 			<Route path="*" element={<NotFoundPage />} />

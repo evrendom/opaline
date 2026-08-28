@@ -3,9 +3,11 @@ import { Building2, Check, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { USER_INVITATIONS_KEY } from "@/features/workspace/hooks/useUserInvitations";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { authClient } from "@/lib/auth-client";
 
 function InvitationLoginRedirectMount({
@@ -24,6 +26,7 @@ function InvitationLoginRedirectMount({
 export function AcceptInvitationPage() {
 	const { invitationId } = useParams<{ invitationId: string }>();
 	const navigate = useNavigate();
+	const { actions, state: organizationState } = useOrganization();
 	const queryClient = useQueryClient();
 	const { data: session, isPending: sessionLoading } = authClient.useSession();
 	const { trackAuthenticationAction } = useAnalyticsTracking({
@@ -60,14 +63,20 @@ export function AcceptInvitationPage() {
 		}
 
 		if (res.data) {
-			await authClient.organization.setActive({
-				organizationId: res.data.member.organizationId,
-			});
+			const didSwitch = await actions.switchOrganization(
+				res.data.member.organizationId,
+			);
+			if (!didSwitch) {
+				setError(
+					"Invitation accepted, but the workspace could not be opened. Refresh and try again.",
+				);
+				setStatus("error");
+				return;
+			}
 		}
 
 		setStatus("accepted");
 		queryClient.invalidateQueries({ queryKey: USER_INVITATIONS_KEY });
-		setTimeout(() => navigate("/dashboard"), 1500);
 	};
 
 	const handleReject = async () => {
@@ -83,7 +92,11 @@ export function AcceptInvitationPage() {
 					: undefined,
 		});
 		await authClient.organization.rejectInvitation({ invitationId });
-		navigate("/dashboard");
+		navigate(
+			organizationState.activeOrg
+				? appRoutes.dashboard(organizationState.activeOrg.slug)
+				: "/",
+		);
 	};
 
 	if (sessionLoading) {

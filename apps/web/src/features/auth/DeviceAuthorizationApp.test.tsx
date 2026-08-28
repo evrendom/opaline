@@ -115,7 +115,10 @@ describe("DeviceAuthorizationApp", () => {
 						path={appRoutes.wrappedTeamCard()}
 						element={<WrappedLocation />}
 					/>
-					<Route path={appRoutes.dashboard()} element={<div>Dashboard</div>} />
+					<Route
+						path={appRoutes.legacyDashboard()}
+						element={<div>Dashboard</div>}
+					/>
 				</Routes>
 			</MemoryRouter>,
 		);

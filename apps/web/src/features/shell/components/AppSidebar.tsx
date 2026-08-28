@@ -16,7 +16,7 @@ import {
 } from "@/app/ui/sidebar";
 import {
 	getActiveSettingsRouteId,
-	primarySettingsRoutes,
+	getPrimarySettingsRoutes,
 } from "@/features/settings/config/settings-routes";
 import { SidebarNewsCard } from "@/features/shell/components/SidebarNewsCard";
 import { SidebarNewsPopover } from "@/features/shell/components/SidebarNewsPopover";
@@ -27,14 +27,15 @@ import {
 import { UserRailButton } from "@/features/shell/components/UserRailButton";
 import { WorkspaceMenuButton } from "@/features/shell/components/WorkspaceMenuButton";
 import {
-	shellRouteMap,
-	shellRoutes,
+	getShellRouteMap,
+	getShellRoutes,
 } from "@/features/shell/config/shell-routes";
 import {
 	SHOW_SIDEBAR_NEWS_MODE,
 	SIDEBAR_NEWS_ITEM_ID,
 } from "@/features/shell/config/sidebar-news";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
+import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
 import { cn } from "@/lib/utils";
 
 type SidebarDisplayMode = SidebarRowMode;
@@ -150,9 +151,15 @@ function SidebarNavigation({
 	mode: SidebarDisplayMode;
 	navigationMode: SidebarNavigationMode;
 }) {
+	const orgSlug = useWorkspaceSlug();
 	const currentShellRoute = useCurrentShellRoute();
 	const location = useLocation();
-	const activeSettingsRouteId = getActiveSettingsRouteId(location.pathname);
+	const activeSettingsRouteId = getActiveSettingsRouteId(
+		location.pathname,
+		orgSlug,
+	);
+	const primarySettingsRoutes = getPrimarySettingsRoutes(orgSlug);
+	const shellRoutes = getShellRoutes(orgSlug);
 
 	if (navigationMode === "settings") {
 		return (
@@ -199,6 +206,11 @@ export function AppSidebar({
 }: {
 	navigationMode?: SidebarNavigationMode;
 }) {
+	const orgSlug = useWorkspaceSlug();
+	const shellRouteMap = React.useMemo(
+		() => getShellRouteMap(orgSlug),
+		[orgSlug],
+	);
 	const { state, isMobile, openMobile, toggleSidebar } = useSidebar();
 	const isSidebarExpanded = isMobile ? openMobile : state === "expanded";
 	const [displayMode, setDisplayMode] = React.useState<SidebarDisplayMode>(

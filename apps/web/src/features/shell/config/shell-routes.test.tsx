@@ -1,25 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
 	getCurrentShellRoute,
-	shellRouteMap,
-	shellRoutes,
+	getShellRouteMap,
+	getShellRoutes,
 } from "@/features/shell/config/shell-routes";
 
 describe("getCurrentShellRoute", () => {
-	it("matches the dashboard route for /dashboard", () => {
-		expect(getCurrentShellRoute("/dashboard")).toBe(shellRouteMap.dashboard);
+	const orgSlug = "farmerville";
+	const shellRouteMap = getShellRouteMap(orgSlug);
+	const shellRoutes = getShellRoutes(orgSlug);
+
+	it("matches the dashboard route for the workspace root", () => {
+		expect(getCurrentShellRoute("/farmerville", orgSlug)).toStrictEqual(
+			shellRouteMap.dashboard,
+		);
 	});
 
-	it("prefers the sessions route for /dashboard/sessions", () => {
-		expect(getCurrentShellRoute("/dashboard/sessions")).toBe(
-			shellRouteMap.sessions,
-		);
+	it("prefers the workspace sessions route", () => {
+		expect(
+			getCurrentShellRoute("/farmerville/sessions", orgSlug),
+		).toStrictEqual(shellRouteMap.sessions);
 	});
 
 	it("prefers the sessions route for nested session detail paths", () => {
-		expect(getCurrentShellRoute("/dashboard/sessions/session-123")).toBe(
-			shellRouteMap.sessions,
-		);
+		expect(
+			getCurrentShellRoute("/farmerville/sessions/session-123", orgSlug),
+		).toStrictEqual(shellRouteMap.sessions);
 	});
 
 	it("uses history as the sessions shortcut", () => {

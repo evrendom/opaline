@@ -12,7 +12,10 @@ export interface WorkspaceState {
 }
 
 export interface WorkspaceActions {
-	switchOrganization: (orgId: string) => Promise<void>;
+	switchOrganization: (
+		orgId: string,
+		options?: { destination?: "preserve" | "team" },
+	) => Promise<boolean>;
 }
 
 export interface WorkspaceMeta {

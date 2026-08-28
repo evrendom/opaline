@@ -1,6 +1,4 @@
 import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import {
 	Card,
@@ -33,7 +31,6 @@ export function CreateWorkspaceCard({
 	submitLabel?: string;
 	title?: string;
 }) {
-	const navigate = useNavigate();
 	const { actions } = useOrganization();
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization_create",
@@ -73,7 +70,6 @@ export function CreateWorkspaceCard({
 
 		if (response.data) {
 			await actions.switchOrganization(response.data.id);
-			navigate(appRoutes.settingsWorkspace());
 		}
 
 		setIsCreating(false);

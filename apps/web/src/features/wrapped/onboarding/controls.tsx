@@ -260,7 +260,10 @@ export function WrappedOnboardingFooter(props: WrappedOnboardingFooterProps) {
 					>
 						{activeStep.kind === "final" ? (
 							(finalFooter ?? (
-								<WrappedPrimaryAction kind="link" to={appRoutes.dashboard()}>
+								<WrappedPrimaryAction
+									kind="link"
+									to={appRoutes.legacyDashboard()}
+								>
 									Done
 								</WrappedPrimaryAction>
 							))

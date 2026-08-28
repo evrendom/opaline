@@ -1,8 +1,16 @@
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { buttonVariants } from "@/app/ui/button";
+import { useOptionalOrganization } from "@/features/workspace/organization/OrganizationProvider";
 
 export function NotFoundPage() {
+	const organization = useOptionalOrganization();
+	const activeSlug = organization?.state.activeOrg?.slug;
+	const dashboardPath =
+		activeSlug && validateOrgSlug(activeSlug)
+			? appRoutes.dashboard(activeSlug)
+			: "/";
 	return (
 		<div className="flex min-h-screen items-center justify-center px-6 py-12">
 			<div className="flex max-w-md flex-col items-center gap-4 text-center">
@@ -15,7 +23,7 @@ export function NotFoundPage() {
 				<p className="text-sm leading-6 text-muted-foreground">
 					This route is no longer part of the reduced redesign surface.
 				</p>
-				<Link to={appRoutes.dashboard()} className={buttonVariants()}>
+				<Link to={dashboardPath} className={buttonVariants()}>
 					Go to dashboard
 				</Link>
 			</div>

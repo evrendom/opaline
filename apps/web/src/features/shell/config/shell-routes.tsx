@@ -14,49 +14,60 @@ export type ShellRouteDefinition = {
 	icon: ShellRouteIcon;
 };
 
-export const shellRoutes = [
-	{
-		id: "dashboard",
-		path: appRoutes.dashboard(),
-		title: "Dashboard",
-		navLabel: "Dashboard",
-		shortcut: "D",
-		icon: <StarIcon />,
-	},
-	{
-		id: "sessions",
-		path: appRoutes.dashboardSessions(),
-		title: "Sessions",
-		navLabel: "Sessions",
-		shortcut: "H",
-		icon: <Clock3Icon />,
-	},
-	{
-		id: "team",
-		path: appRoutes.team(),
-		title: "Team",
-		navLabel: "Team",
-		shortcut: "T",
-		icon: <UsersIcon />,
-	},
-	{
-		id: "settings",
-		path: appRoutes.settings(),
-		title: "Settings",
-		navLabel: "Settings",
-		shortcut: "S",
-		icon: <Settings2Icon />,
-	},
-] satisfies readonly ShellRouteDefinition[];
+export function getShellRoutes(orgSlug: string) {
+	return [
+		{
+			id: "dashboard",
+			path: appRoutes.dashboard(orgSlug),
+			title: "Dashboard",
+			navLabel: "Dashboard",
+			shortcut: "D",
+			icon: <StarIcon />,
+		},
+		{
+			id: "sessions",
+			path: appRoutes.dashboardSessions(orgSlug),
+			title: "Sessions",
+			navLabel: "Sessions",
+			shortcut: "H",
+			icon: <Clock3Icon />,
+		},
+		{
+			id: "team",
+			path: appRoutes.team(orgSlug),
+			title: "Team",
+			navLabel: "Team",
+			shortcut: "T",
+			icon: <UsersIcon />,
+		},
+		{
+			id: "settings",
+			path: appRoutes.settings(orgSlug),
+			title: "Settings",
+			navLabel: "Settings",
+			shortcut: "S",
+			icon: <Settings2Icon />,
+		},
+	] as const satisfies readonly ShellRouteDefinition[];
+}
 
-export const shellRouteMap = {
-	dashboard: shellRoutes[0],
-	sessions: shellRoutes[1],
-	team: shellRoutes[2],
-	settings: shellRoutes[3],
-} as const;
+export function getShellRouteMap(orgSlug: string) {
+	const shellRoutes = getShellRoutes(orgSlug);
 
-export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {
+	return {
+		dashboard: shellRoutes[0],
+		sessions: shellRoutes[1],
+		team: shellRoutes[2],
+		settings: shellRoutes[3],
+	} as const;
+}
+
+export function getCurrentShellRoute(
+	pathname: string,
+	orgSlug: string,
+): ShellRouteDefinition {
+	const shellRoutes = getShellRoutes(orgSlug);
+
 	return (
 		[...shellRoutes]
 			.sort(
@@ -66,6 +77,6 @@ export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {
 			.find(
 				(route) =>
 					pathname === route.path || pathname.startsWith(`${route.path}/`),
-			) ?? shellRouteMap.dashboard
+			) ?? shellRoutes[0]
 	);
 }
