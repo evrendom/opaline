@@ -15,24 +15,20 @@ const headerRuleBySource = new Map(
 );
 
 describe("Vercel deployment configuration", () => {
-	test("keeps legacy large-body ingest on Fly until the CLI R2 cutover", () => {
-		expect(rewriteBySource.get("/rpc/ingestSession")).toBe(
-			"https://rudel.fly.dev/rpc/ingestSession",
-		);
-		expect(
-			headerRuleBySource
-				.get("/rpc/ingestSession")
-				?.find((header) => header.key === "X-Opaline-Ingest-Cutover-Gate")
-				?.value,
-		).toBe("legacy-fly-until-cli-r2-adoption");
+	test("routes legacy ingest through the Vercel RPC function", () => {
+		expect(rewriteBySource.has("/rpc/ingestSession")).toBe(false);
+		expect(headerRuleBySource.has("/rpc/ingestSession")).toBe(false);
 		expect(VERCEL_INGEST_PUBLIC_PATH_PATTERN.test("/rpc/ingestSession")).toBe(
 			false,
 		);
 		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/rpc/ingestSession")).toBe(
-			false,
+			true,
 		);
-		expect(rewriteSources.indexOf("/rpc/ingestSession")).toBeLessThan(
-			rewriteSources.indexOf("/rpc/:routePath*"),
+		expect(rewriteBySource.get("/rpc/:routePath*")).toBe(
+			"/api/rpc?__opaline_path=/rpc/:routePath*",
+		);
+		expect(rewriteSources.indexOf("/rpc/:routePath*")).toBeLessThan(
+			rewriteSources.indexOf("/((?!assets(?:/|$)).*)"),
 		);
 	});
 
