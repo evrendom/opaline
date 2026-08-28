@@ -544,7 +544,7 @@ export function shutdownIngestFilterQueue(): void {
 }
 
 function createFilterWorker(): Worker {
-	return new Worker(new URL("./ingest-filter.worker.ts", import.meta.url).href);
+	return new Worker(new URL("./ingest-filter.worker.js", import.meta.url).href);
 }
 
 function toWorkerOperationalError(
