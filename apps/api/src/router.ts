@@ -123,6 +123,7 @@ import {
 	R2IngestCommitError,
 	type R2IngestProcessorResult,
 } from "./services/r2-ingest-commit.service.js";
+import { toR2IngestCommitOrpcError } from "./services/r2-ingest-http-error.js";
 import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
@@ -1291,27 +1292,7 @@ const r2IngestCommit = os.ingest.commit
 		} catch (error) {
 			if (error instanceof ORPCError) throw error;
 			if (error instanceof R2IngestCommitError) {
-				if (error.code === "R2_INGEST_JOB_NOT_FOUND") {
-					throw new ORPCError("NOT_FOUND", { message: error.message });
-				}
-				if (
-					error.code === "R2_INGEST_JOB_BUSY" ||
-					error.code === "R2_INGEST_JOB_RETRY_LATER" ||
-					error.code === "R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE_QUIESCED" ||
-					error.code === "R2_INGEST_LEASE_LOST"
-				) {
-					throw new ORPCError("SERVICE_UNAVAILABLE", {
-						data: { reason: error.code, retryAfterMs: 1_000 },
-						message: error.message,
-					});
-				}
-				if (error.code === "R2_INGEST_JOB_FAILED") {
-					throw new ORPCError("CONFLICT", { message: error.message });
-				}
-				throw new ORPCError("BAD_REQUEST", {
-					data: { reason: error.code },
-					message: error.message,
-				});
+				throw toR2IngestCommitOrpcError(error);
 			}
 			logger.error(
 				"R2 ingest commit failed (user_id={userId} job_id={jobId} error={error})",

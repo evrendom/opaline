@@ -337,6 +337,49 @@ describe("R2 ingest commit lifecycle", () => {
 		fakeR2.reset();
 	});
 
+	test("keeps a materialization queue timeout retryable without claiming the job", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"queued materialization transcript",
+		);
+		let releaseBlocker: (() => void) | undefined;
+		const blocker = new Promise<void>((resolve) => {
+			releaseBlocker = resolve;
+		});
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 128 * 1024 * 1024,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 1_000,
+			queueTimeoutMs: 10,
+		});
+		const active = gate.run(1, async () => blocker);
+		expect(gate.getStats().activeJobs).toBe(1);
+
+		try {
+			await expect(
+				commitR2IngestJob({
+					gate,
+					input: buildCompletionInput(initialized),
+					process: async () => {
+						throw new Error("queued job unexpectedly started");
+					},
+					r2: fakeR2,
+					userId: USER_ID,
+				}),
+			).rejects.toMatchObject({
+				code: "R2_INGEST_GATE_QUEUE_TIMEOUT",
+				retryable: true,
+			});
+			expect(
+				await getR2IngestJobStatus(initialized.jobId, USER_ID),
+			).toMatchObject({ attempts: 0, status: "pending" });
+		} finally {
+			releaseBlocker?.();
+			await active;
+		}
+	});
+
 	test("quiescence blocks ingest-state PostgreSQL writes and R2 access after authentication while allowing operator commit", async () => {
 		const operatorToken = `operator-${crypto.randomUUID()}`;
 		const fakeR2Endpoint = createFakeR2S3Endpoint();

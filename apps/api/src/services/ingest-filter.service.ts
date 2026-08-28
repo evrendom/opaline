@@ -11,6 +11,10 @@ import { IngestFilterWorkerOperationalError } from "./ingest-worker-operational.
 
 const logger = getLogger(["rudel", "api", "ingest-filter-queue"]);
 const QUEUE_RETRY_AFTER_MS = 1_000;
+// Production transcripts around 32 MiB can exceed 30 seconds when the shared
+// Fly CPU is contended. Keep enough headroom for the 128 MiB ingest limit while
+// staying well inside the API's 300-second request envelope.
+const DEFAULT_FILTER_TIMEOUT_MS = 120_000;
 
 export interface IngestFilterQueueConfig {
 	readonly globalMaxBytes: number;
@@ -521,7 +525,7 @@ const ingestFilterQueue = new IngestFilterQueue({
 	),
 	timeoutMs: readPositiveSafeIntegerEnv(
 		"INGEST_FILTER_QUEUE_TIMEOUT_MS",
-		30_000,
+		DEFAULT_FILTER_TIMEOUT_MS,
 	),
 });
 
