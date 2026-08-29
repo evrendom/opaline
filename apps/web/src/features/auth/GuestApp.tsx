@@ -16,7 +16,7 @@ interface GuestAppProps {
 export function GuestApp(props: GuestAppProps = {}) {
 	const { description, eyebrow, showLogo = true, title } = props;
 	const [page, setPage] = useState<Page>(
-		() => readPendingEmailCodeDraft()?.mode ?? "signup",
+		() => readPendingEmailCodeDraft()?.mode ?? "login",
 	);
 
 	return (
