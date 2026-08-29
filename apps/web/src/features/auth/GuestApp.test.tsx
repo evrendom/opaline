@@ -20,11 +20,11 @@ describe("GuestApp", () => {
 		window.sessionStorage.clear();
 	});
 
-	it("shows sign up first", () => {
+	it("shows login first for a clean signed-out visit", () => {
 		render(<GuestApp />);
 
-		expect(screen.getByText("Signup form")).toBeInTheDocument();
-		expect(screen.queryByText("Login form")).not.toBeInTheDocument();
+		expect(screen.getByText("Login form")).toBeInTheDocument();
+		expect(screen.queryByText("Signup form")).not.toBeInTheDocument();
 	});
 
 	it("shows login first when an email login code is pending", () => {
