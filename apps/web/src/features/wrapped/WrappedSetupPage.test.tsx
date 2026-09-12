@@ -77,14 +77,16 @@ describe("WrappedSetupPage", () => {
 		).toBeNull();
 		expect(
 			screen.getByText(
-				hasExactTextContent("npm install -g @opalinehq/cli && opaline login"),
+				hasExactTextContent(
+					"npm install -g @opalinehq/cli@latest && opaline login --api-base https://opaline.so",
+				),
 				{ selector: "code" },
 			),
 		).toBeInTheDocument();
 		expect(screen.getByText("Upload sessions")).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"Auto upload + upload historical sessions in a given repo",
+				"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 			),
 		).toBeInTheDocument();
 		expect(
@@ -96,9 +98,12 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.queryByText(hasExactTextContent("opaline upload"), {
-				selector: "code",
-			}),
+			screen.queryByText(
+				hasExactTextContent("opaline upload /path/to/session.jsonl"),
+				{
+					selector: "code",
+				},
+			),
 		).toBeNull();
 		expect(screen.queryByText("Now")).toBeNull();
 		expect(screen.queryByText("Later")).toBeNull();
@@ -134,14 +139,14 @@ describe("WrappedSetupPage", () => {
 		expect(screen.queryByText("Now")).toBeNull();
 		expect(screen.queryByText("Later")).toBeNull();
 		expect(
-			screen.getByText(hasExactTextContent("opaline enable"), {
+			screen.getByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
 		expect(screen.getByText("Upload sessions")).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"Auto upload + upload historical sessions in a given repo",
+				"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 			),
 		).toBeInTheDocument();
 		expect(
@@ -153,9 +158,12 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.queryByText(hasExactTextContent("opaline upload"), {
-				selector: "code",
-			}),
+			screen.queryByText(
+				hasExactTextContent("opaline upload /path/to/session.jsonl"),
+				{
+					selector: "code",
+				},
+			),
 		).toBeNull();
 
 		await user.click(
@@ -165,13 +173,16 @@ describe("WrappedSetupPage", () => {
 		);
 
 		expect(
-			screen.getByText(hasExactTextContent("opaline upload"), {
-				selector: "code",
-			}),
+			screen.getByText(
+				hasExactTextContent("opaline upload /path/to/session.jsonl"),
+				{
+					selector: "code",
+				},
+			),
 		).toBeInTheDocument();
 		expect(
 			screen.queryByText(
-				"Manually select sessions in a given repo with no auto upload in the future",
+				"Upload one session without enabling automatic uploads",
 			),
 		).toBeNull();
 		expect(
@@ -206,14 +217,14 @@ describe("WrappedSetupPage", () => {
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),
 		).toHaveLength(2);
 		expect(
-			screen.getByText(hasExactTextContent("opaline enable"), {
+			screen.getByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
 		).toBeInTheDocument();
 		expect(screen.getByText("Upload sessions")).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"Auto upload + upload historical sessions in a given repo",
+				"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 			),
 		).toBeInTheDocument();
 		expect(
@@ -222,9 +233,12 @@ describe("WrappedSetupPage", () => {
 			),
 		).toBeInTheDocument();
 		expect(
-			screen.queryByText(hasExactTextContent("opaline upload"), {
-				selector: "code",
-			}),
+			screen.queryByText(
+				hasExactTextContent("opaline upload /path/to/session.jsonl"),
+				{
+					selector: "code",
+				},
+			),
 		).toBeNull();
 		expect(
 			screen.getAllByRole("button", { name: "Copy to clipboard" }),

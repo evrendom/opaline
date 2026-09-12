@@ -71,6 +71,7 @@ import {
 	checkManualIngestRateLimit,
 	checkOrganizationSessionCountRateLimit,
 } from "./rate-limit.js";
+import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
 import {
 	enqueueClickHousePurge,
 	wakeClickHousePurgeWorker,
@@ -1242,6 +1243,22 @@ function parseStoredIngestProcessorResult(
 	};
 }
 
+const cliSessionUploadStatus = os.cli.sessionUploadStatus
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context }) => {
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId ?? getActiveOrganizationId(context.session),
+			context.user.id,
+		);
+		const uploadedSessionIds = await findUploadedSessionIds(
+			organizationId,
+			context.user.id,
+			input.sessionIds,
+		);
+
+		return { organizationId, uploadedSessionIds };
+	});
+
 const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors, signal }) => {
@@ -1645,6 +1662,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		authStatus: cliAuthStatus,
 		revokeToken: revokeCliToken,
 		setupStatus: cliSetupStatus,
+		sessionUploadStatus: cliSessionUploadStatus,
 	},
 	chatwoot: chatwootRouter,
 	listMyOrganizations,

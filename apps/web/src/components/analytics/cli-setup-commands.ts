@@ -3,7 +3,8 @@ export const cliSetupCommands = [
 		alternateCommand: undefined,
 		alternateCommandCaption: undefined,
 		advanceLabel: "I installed and logged in",
-		command: "npm install -g @opalinehq/cli && opaline login",
+		command:
+			"npm install -g @opalinehq/cli@latest && opaline login --api-base https://opaline.so",
 		commandCaption: "Install globally + log in on this machine",
 		description: undefined,
 		id: "install-and-login",
@@ -11,11 +12,12 @@ export const cliSetupCommands = [
 	},
 	{
 		advanceLabel: "I enabled auto-upload",
-		alternateCommand: "opaline upload",
+		alternateCommand: "opaline upload /path/to/session.jsonl",
 		alternateCommandCaption:
-			"Manually select sessions in a given repo with no auto upload in the future",
-		command: "opaline enable",
-		commandCaption: "Auto upload + upload historical sessions in a given repo",
+			"Upload one session without enabling automatic uploads",
+		command: "opaline upload",
+		commandCaption:
+			"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 		description: undefined,
 		id: "enable-auto-upload",
 		title: "Upload sessions",

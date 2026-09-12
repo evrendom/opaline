@@ -690,7 +690,7 @@ function getUploadMoreCommands() {
 
 	return {
 		primary: {
-			caption: "Auto upload future and historical sessions in the given repo",
+			caption: uploadStep.commandCaption,
 			command: uploadStep.command,
 		},
 		secondary: {

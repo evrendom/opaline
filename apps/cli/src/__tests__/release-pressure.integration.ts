@@ -1020,106 +1020,78 @@ describe("release pressure: E2E integration", () => {
 	// ── Test 12 ── concurrent divergent same-session uploads: the FINAL row is
 	// exactly one candidate and session_ownership points at that same candidate.
 	test("concurrent divergent uploads leave one FINAL winner matching last_content_sha256", async () => {
-		// Two observations here are racy and warrant a reroll with a fresh
-		// session id rather than a hard assertion:
-		//  - recordSessionIngestContent only orders bookkeeping for DISTINCT
-		//    ingested_at values (the API allocator prevents same-process ties,
-		//    while cross-instance ties remain best-effort);
-		//  - both rows share one sorting key by design, so a background
-		//    ReplacingMergeTree merge (or delayed row visibility on the shared
-		//    cluster) can leave fewer than 2 physical rows in the poll window.
-		let scenario:
-			| {
-					sessionId: string;
-					contentA: string;
-					contentB: string;
-					hashA: string;
-					hashB: string;
-					rows: Array<{ content: string; ingested_at: string }>;
-			  }
-			| undefined;
-		for (let attempt = 0; attempt < 5 && !scenario; attempt++) {
-			const sessionId = `rp_divergent_${crypto.randomUUID()}`;
-			const buildRequest = (marker: string): IngestSessionInput => ({
-				content: JSON.stringify({
-					message: { content: `Divergent payload ${marker}`, role: "user" },
-					// Identical first timestamp keeps both rows on the same
-					// (organization_id, session_date, session_id) sorting key so
-					// ReplacingMergeTree FINAL collapses them.
-					timestamp: "2026-07-24T19:00:00.000Z",
-					type: "user",
-				}),
-				projectPath: "/test/rp-divergent",
-				sessionId,
-				source: "claude_code",
-				upload_mode: "manual",
-			});
-			const requestA = buildRequest("alpha");
-			const requestB = buildRequest("bravo");
-
-			const [resultA, resultB] = await Promise.all([
-				uploadSession(requestA, {
+		const sessionId = `rp_divergent_${crypto.randomUUID()}`;
+		const buildRequest = (marker: string): IngestSessionInput => ({
+			content: JSON.stringify({
+				message: { content: `Divergent payload ${marker}`, role: "user" },
+				timestamp: "2026-07-24T19:00:00.000Z",
+				type: "user",
+			}),
+			projectPath: "/test/rp-divergent",
+			sessionId,
+			source: "claude_code",
+			upload_mode: "manual",
+		});
+		const requestA = buildRequest("alpha");
+		const requestB = buildRequest("bravo");
+		const results = await Promise.all(
+			[requestA, requestB].map((request) =>
+				uploadSession(request, {
 					endpoint: sharedRelay.rpcUrl,
 					token: bearerToken,
 					allowInsecureEndpoint: false,
 				}),
-				uploadSession(requestB, {
-					endpoint: sharedRelay.rpcUrl,
-					token: bearerToken,
-					allowInsecureEndpoint: false,
-				}),
-			]);
-			expect(resultA.success).toBe(true);
-			expect(resultB.success).toBe(true);
-
-			// Divergent hashes can never trip the dedupe short-circuit, so both
-			// uploads inserted; observing both rows before they merge is the
-			// racy part.
-			const rows = await pollPhysicalRows(userId, sessionId, 2);
-			const [firstRow, secondRow] = rows;
-			if (
-				rows.length === 2 &&
-				firstRow &&
-				secondRow &&
-				firstRow.ingested_at !== secondRow.ingested_at
-			) {
-				scenario = {
-					sessionId,
-					contentA: requestA.content,
-					contentB: requestB.content,
-					hashA: computeExpectedServerContentHash(requestA),
-					hashB: computeExpectedServerContentHash(requestB),
-					rows,
-				};
-			}
-		}
-		assert(
-			scenario,
-			"five consecutive attempts raced the observation window (equal-millisecond ingested_at tie or pre-poll ReplacingMergeTree merge) — with fresh sessions each time, that points at a real ingest problem",
+			),
 		);
+		for (const result of results) expect(result.success).toBe(true);
 
-		const storedSha = await getStoredContentHash(userId, scenario.sessionId);
-		assert(storedSha);
-		expect(scenario.hashA).not.toBe(scenario.hashB);
-		expect([scenario.hashA, scenario.hashB]).toContain(storedSha);
+		// F16 orders replacements by revision; ingested_at stays fixed for the
+		// session. Background merges may already have collapsed the two writes.
+		const rows = await getPhysicalRowContents(userId, sessionId);
+		expect(rows.length).toBeGreaterThanOrEqual(1);
+		expect(rows.length).toBeLessThanOrEqual(2);
+		for (const row of rows) {
+			expect([requestA.content, requestB.content]).toContain(row.content);
+		}
+		expect(new Set(rows.map((row) => row.revision)).size).toBe(rows.length);
+
+		const [receipt] = await sqlClient<
+			Array<{
+				last_content_sha256: string;
+				last_revision: string;
+			}>
+		>`
+			SELECT last_content_sha256, last_revision::text
+			FROM session_ownership
+			WHERE organization_id = ${userId} AND session_id = ${sessionId}
+		`;
+		assert(receipt);
+		const hashA = computeExpectedServerContentHash(requestA);
+		const hashB = computeExpectedServerContentHash(requestB);
+		expect(hashA).not.toBe(hashB);
+		expect([hashA, hashB]).toContain(receipt.last_content_sha256);
 		const winnerContent =
-			storedSha === scenario.hashA ? scenario.contentA : scenario.contentB;
+			receipt.last_content_sha256 === hashA
+				? requestA.content
+				: requestB.content;
 
-		const finalRows = await getClickhouse().query<{ content: string }>({
-			query: `SELECT content FROM ${getSafeClickHouseTable("rudel.claude_sessions")} FINAL WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
-			query_params: { organizationId: userId, sessionId: scenario.sessionId },
+		const finalRows = await getClickhouse().query<{
+			content: string;
+			revision: string;
+		}>({
+			query: `SELECT content, toString(revision) AS revision FROM ${getSafeClickHouseTable("rudel.claude_sessions")} FINAL WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} LIMIT 2 SETTINGS max_execution_time = 10, max_rows_to_read = 100000`,
+			query_params: { organizationId: userId, sessionId },
 		});
 		expect(finalRows).toHaveLength(1);
 		const finalRow = finalRows[0];
 		assert(finalRow);
-		// Byte-identical to exactly the candidate the ownership hash points at —
-		// no torn or merged row, and Postgres bookkeeping agrees with FINAL.
 		expect(finalRow.content).toBe(winnerContent);
-		const newestRow = [...scenario.rows].sort((left, right) =>
-			left.ingested_at < right.ingested_at ? 1 : -1,
+		expect(finalRow.revision).toBe(receipt.last_revision);
+		const newestRow = [...rows].sort((left, right) =>
+			BigInt(left.revision) < BigInt(right.revision) ? 1 : -1,
 		)[0];
 		assert(newestRow);
-		expect(finalRow.content).toBe(newestRow.content);
+		expect(finalRow).toEqual(newestRow);
 	}, 120_000);
 
 	// ── Test 13 ── whole-file invariant: the shared relay saw real traffic and
@@ -1180,27 +1152,11 @@ function computeExpectedServerContentHash(request: IngestSessionInput): string {
 async function getPhysicalRowContents(
 	organizationId: string,
 	sessionId: string,
-): Promise<Array<{ content: string; ingested_at: string }>> {
-	return getClickhouse().query<{ content: string; ingested_at: string }>({
-		query: `SELECT content, ingested_at FROM ${getSafeClickHouseTable("rudel.claude_sessions")} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} ORDER BY ingested_at, content`,
+): Promise<Array<{ content: string; revision: string }>> {
+	return getClickhouse().query<{ content: string; revision: string }>({
+		query: `SELECT content, toString(revision) AS revision FROM ${getSafeClickHouseTable("rudel.claude_sessions")} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} ORDER BY revision, content LIMIT 5 SETTINGS max_execution_time = 10, max_rows_to_read = 100000`,
 		query_params: { organizationId, sessionId },
 	});
-}
-
-async function pollPhysicalRows(
-	organizationId: string,
-	sessionId: string,
-	minimumRows: number,
-): Promise<Array<{ content: string; ingested_at: string }>> {
-	let rows: Array<{ content: string; ingested_at: string }> = [];
-	for (let attempt = 0; attempt < 20; attempt += 1) {
-		rows = await getPhysicalRowContents(organizationId, sessionId);
-		if (rows.length >= minimumRows) {
-			return rows;
-		}
-		await Bun.sleep(250);
-	}
-	return rows;
 }
 
 /** Bind a loopback port, note it, and free it: a guaranteed-dead endpoint. */

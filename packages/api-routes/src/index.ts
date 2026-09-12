@@ -248,6 +248,24 @@ export const CliSetupStatusSchema = z.object({
 	hasCliLogin: z.boolean(),
 });
 
+export const CLI_SESSION_UPLOAD_STATUS_MAX_IDS = 64;
+
+export const CliSessionUploadStatusInputSchema = z.object({
+	organizationId: z.string().min(1).max(200).optional(),
+	sessionIds: z
+		.array(z.string().min(1).max(200))
+		.min(1)
+		.max(CLI_SESSION_UPLOAD_STATUS_MAX_IDS)
+		.refine((sessionIds) => new Set(sessionIds).size === sessionIds.length, {
+			message: "Session IDs must be unique",
+		}),
+});
+
+export const CliSessionUploadStatusOutputSchema = z.object({
+	organizationId: z.string(),
+	uploadedSessionIds: z.array(z.string()),
+});
+
 export const ChatwootIdentitySchema = z.object({
 	identifier: z.string(),
 	identifier_hash: z.string().regex(/^[a-f0-9]{64}$/u),
@@ -614,6 +632,9 @@ export const contract = {
 		authStatus: oc.output(CliUserSchema),
 		revokeToken: oc.output(z.object({ success: z.literal(true) })),
 		setupStatus: oc.output(CliSetupStatusSchema),
+		sessionUploadStatus: oc
+			.input(CliSessionUploadStatusInputSchema)
+			.output(CliSessionUploadStatusOutputSchema),
 	},
 	chatwoot: {
 		identity: oc.output(ChatwootIdentitySchema.nullable()),

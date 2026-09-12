@@ -87,23 +87,24 @@ describe("WrappedSetupCompletePage", () => {
 
 		expect(
 			screen.getByText(
-				"Auto upload future and historical sessions in the given repo",
+				"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 			),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText(
-				"Manually select sessions in a given repo with no auto upload in the future",
-			),
-		).toBeInTheDocument();
-		expect(
-			await screen.findByText(hasExactTextContent("opaline enable"), {
-				selector: "code",
-			}),
+			screen.getByText("Upload one session without enabling automatic uploads"),
 		).toBeInTheDocument();
 		expect(
 			await screen.findByText(hasExactTextContent("opaline upload"), {
 				selector: "code",
 			}),
+		).toBeInTheDocument();
+		expect(
+			await screen.findByText(
+				hasExactTextContent("opaline upload /path/to/session.jsonl"),
+				{
+					selector: "code",
+				},
+			),
 		).toBeInTheDocument();
 
 		await user.click(
@@ -279,13 +280,11 @@ describe("WrappedSetupCompletePage", () => {
 		expect(screen.getByText("99 sessions across 1 repo")).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"Auto upload future and historical sessions in the given repo",
+				"Run from any directory; choose repositories to upload past sessions and enable automatic uploads",
 			),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText(
-				"Manually select sessions in a given repo with no auto upload in the future",
-			),
+			screen.getByText("Upload one session without enabling automatic uploads"),
 		).toBeInTheDocument();
 
 		const continueButton = screen.getByRole("button", {
