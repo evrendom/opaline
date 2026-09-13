@@ -15,6 +15,10 @@ import {
 import { createClickHouseExecutor } from "../clickhouse.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import {
+	buildSessionLanguageSignalRow,
+	insertSessionLanguageSignalRows,
+} from "../services/session-language-signal-persistence.service.js";
+import {
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
 } from "../services/usage-event-analytics.service.js";
@@ -295,6 +299,128 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			if (previousMode === undefined)
 				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
 			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+		}
+	});
+
+	test("loads all 1,000 sessions and their signals without oversized HTTP URLs", async () => {
+		const pageOrganizationId = `usage_analytics_page_${runId}`;
+		const pageRows = Array.from({ length: 1_000 }, (_, index) => ({
+			...buildSessionAnalyticsRow(
+				crypto.randomUUID() +
+					(index < 800 ? "" : (index % 2 === 0 ? "界" : "'").repeat(164)),
+			),
+			organization_id: pageOrganizationId,
+			source: index % 2 === 0 ? "claude_code" : "codex",
+		}));
+		const signalRows = pageRows.map((row, index) =>
+			buildSessionLanguageSignalRow(
+				{
+					organizationId: pageOrganizationId,
+					sessionDate: "2026-08-04T08:00:00.000Z",
+					sessionId: row.session_id,
+					source: index % 2 === 0 ? "claude_code" : "codex",
+					userId: index === 0 ? isolatedUserId : userId,
+					rawIngestedAt: "2026-08-04T08:01:00.000Z",
+					rawRevision: "1",
+				},
+				{
+					member_swears: 0,
+					member_apologies: 1,
+					member_positive: index % 7,
+					model_swears: 0,
+					model_apologies: 2,
+					model_positive: 0,
+				},
+				"2026-08-04T08:02:00.000Z",
+			),
+		);
+		const previousMode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+		const originalFetch = globalThis.fetch;
+		const metadataUrlLengths: number[] = [];
+		try {
+			await ingestRudelSessionAnalytics(executor, pageRows, { validate: true });
+			await ingestRudelUsageEvents(
+				executor,
+				pageRows.flatMap((row, index) => [
+					buildEventRow(row.session_id, "1", {
+						organization_id: pageOrganizationId,
+						source: row.source,
+					}),
+					{
+						...buildReceiptRow(
+							row.session_id,
+							"1",
+							1,
+							true,
+							index % 2 === 0 ? "claude_code" : "codex",
+						),
+						organization_id: pageOrganizationId,
+					},
+				]),
+				{ validate: true },
+			);
+			await insertSessionLanguageSignalRows(executor, signalRows);
+			process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+			// Observe actual requests to real ClickHouse; no responses are mocked.
+			globalThis.fetch = Object.assign(
+				async (
+					input: Parameters<typeof fetch>[0],
+					init?: Parameters<typeof fetch>[1],
+				) => {
+					const url = new URL(
+						input instanceof Request ? input.url : input.toString(),
+					);
+					if (
+						url.searchParams.get("param_orgId") === pageOrganizationId &&
+						url.searchParams.has("param_signalKeys")
+					) {
+						metadataUrlLengths.push(url.toString().length);
+					}
+					return originalFetch(input, init);
+				},
+				{ preconnect: originalFetch.preconnect },
+			);
+			const rows = await getSessionAnalytics(pageOrganizationId, {
+				start_date: "2026-08-04",
+				end_date: "2026-08-04",
+				limit: 1_000,
+			});
+			expect(rows).toHaveLength(1_000);
+			const signalsById = new Map(
+				signalRows.map((row) => [row.session_id, row]),
+			);
+			for (const row of rows) {
+				const signals = signalsById.get(row.session_id);
+				expect(signals).toBeDefined();
+				const matchesUser = signals?.user_id === row.user_id;
+				expect(row.member_apologies).toBe(matchesUser ? 1 : 0);
+				expect(row.model_apologies).toBe(matchesUser ? 2 : 0);
+				expect(row.member_positive).toBe(
+					matchesUser ? signals?.member_positive : 0,
+				);
+			}
+			expect(metadataUrlLengths.length).toBeGreaterThan(0);
+			expect(Math.max(...metadataUrlLengths)).toBeLessThan(8_192);
+		} finally {
+			globalThis.fetch = originalFetch;
+			if (previousMode === undefined)
+				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+			await executor.execute({
+				query:
+					"DELETE FROM rudel.usage_events WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3",
+				query_params: { orgId: pageOrganizationId },
+			});
+			await executor.execute({
+				query:
+					"DELETE FROM rudel.session_language_signals WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3",
+				query_params: { orgId: pageOrganizationId },
+			});
+			await executor.execute({
+				query:
+					"DELETE FROM rudel.session_analytics WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3",
+				query_params: { orgId: pageOrganizationId },
+			});
 		}
 	});
 
