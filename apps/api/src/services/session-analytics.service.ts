@@ -112,6 +112,7 @@ interface SessionAnalyticsListRow
 }
 const SIGNAL_LOOKUP_BATCH_SIZE = 32;
 const SIGNAL_LOOKUP_CONCURRENCY = 4;
+const SIGNAL_LOOKUP_PARAMETER_BUDGET = 6_000;
 
 const EMPTY_SESSION_LANGUAGE_SIGNALS: PersistedSessionLanguageSignals = {
 	member_swears: 0,
@@ -360,14 +361,30 @@ export async function getSessionAnalytics(
 			"source" | "session_id" | "signal_session_date"
 		>,
 	) => [row.source, row.session_id, row.signal_session_date].join("\u0000");
+	// JSON escaping plus URL encoding conservatively sizes ClickHouse string
+	// parameters; ClickHouse also escapes single quotes, so account for those.
+	const parameterSize = (value: string) =>
+		new URLSearchParams({ value: JSON.stringify(value) }).toString().length +
+		value.split("'").length * 3;
 	const batches: SessionAnalyticsListRow[][] = [];
-	for (
-		let offset = 0;
-		offset < raw.length;
-		offset += SIGNAL_LOOKUP_BATCH_SIZE
-	) {
-		batches.push(raw.slice(offset, offset + SIGNAL_LOOKUP_BATCH_SIZE));
+	let batch: SessionAnalyticsListRow[] = [];
+	let batchSize = 0;
+	for (const row of raw) {
+		const rowSize =
+			parameterSize(row.session_id) + parameterSize(signalKey(row));
+		if (
+			batch.length > 0 &&
+			(batch.length >= SIGNAL_LOOKUP_BATCH_SIZE ||
+				batchSize + rowSize > SIGNAL_LOOKUP_PARAMETER_BUDGET)
+		) {
+			batches.push(batch);
+			batch = [];
+			batchSize = 0;
+		}
+		batch.push(row);
+		batchSize += rowSize;
 	}
+	if (batch.length > 0) batches.push(batch);
 	type SignalRow = PersistedSessionLanguageSignals &
 		Pick<
 			SessionAnalyticsListRow,

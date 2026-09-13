@@ -305,7 +305,10 @@ describe("usage-event analytics ClickHouse rollups", () => {
 	test("loads all 1,000 sessions and their signals without oversized HTTP URLs", async () => {
 		const pageOrganizationId = `usage_analytics_page_${runId}`;
 		const pageRows = Array.from({ length: 1_000 }, (_, index) => ({
-			...buildSessionAnalyticsRow(crypto.randomUUID()),
+			...buildSessionAnalyticsRow(
+				crypto.randomUUID() +
+					(index < 800 ? "" : (index % 2 === 0 ? "界" : "'").repeat(164)),
+			),
 			organization_id: pageOrganizationId,
 			source: index % 2 === 0 ? "claude_code" : "codex",
 		}));
