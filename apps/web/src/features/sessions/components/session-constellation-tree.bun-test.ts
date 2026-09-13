@@ -94,9 +94,6 @@ describe("session constellation tree tokens", () => {
 		expect(css).toContain("font-variant-numeric: tabular-nums");
 		expect(css).toContain("letter-spacing: normal");
 		expect(css).toContain("[data-trace-model-label]");
-		expect(css).toContain("[data-session-turn-metadata-tags]");
-		expect(css).toContain("+ span::before");
-		expect(css).toContain('content: "·"');
 	});
 
 	test("uses the reference rail and content arrangement by default", () => {

@@ -1,12 +1,13 @@
 # Retired product UI
 
 These are source snapshots of finished or developed UI variants that no longer
-have a route or import path in the live product. Original paths below this folder
+have a route or import path in the live product. Original component paths below this folder
 mirror `apps/web/src/` at commit `15ec529e`.
 
 - `features/dashboard/`: previous cost, errors, performance and repository charts.
 - `features/team/`: member cards and the roster gallery.
 - `features/sessions/`: older summary, search, metadata and footer controls.
+  Metadata-tag CSS was extracted from the otherwise active constellation styles.
 - `features/shell/`: sidebar news card and popover designs.
 - `features/settings/`, `features/get-started/`, `features/wrapped/`: retired
   settings and onboarding variants.
