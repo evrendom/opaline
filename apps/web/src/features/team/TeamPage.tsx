@@ -319,15 +319,6 @@ export function TeamPage() {
 			rows={teamMemberRows}
 		/>
 	);
-	/*
-	 * Legacy agent-card overview retained for rollback:
-	 * <TeamMembersCardGrid
-	 *   canInviteTeamMembers={canInviteTeamMembers}
-	 *   currentUserId={currentUserId}
-	 *   organizationId={diagnostics.organizationId}
-	 *   rows={teamMemberRows}
-	 * />
-	 */
 
 	if (isPending) {
 		content = <TeamPageSkeleton />;

@@ -1,5 +1,5 @@
+import { parseCodexConversations } from "@rudel/api-routes";
 import { describe, expect, test } from "vitest";
-import { parseCodexConversations } from "./codex-conversation-parser";
 
 function codexLine(type: string, payload: unknown, timestamp: string) {
 	return JSON.stringify({ payload, timestamp, type });

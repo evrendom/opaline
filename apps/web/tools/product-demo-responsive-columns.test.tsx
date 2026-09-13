@@ -6,7 +6,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TooltipProvider } from "../src/app/ui/tooltip";
 import { getModelBadgeTone } from "../src/features/dashboard/components/dashboard-model-brand";
 import seed from "../src/features/demo/seed.json";
-import { SessionsOverviewFooter } from "../src/features/sessions/components/sessions-overview-footer";
 import { SessionsOverviewHeader } from "../src/features/sessions/components/sessions-overview-header";
 import { SessionsOverviewRow } from "../src/features/sessions/components/sessions-overview-row";
 import { SessionsOverviewSkeleton } from "../src/features/sessions/components/sessions-overview-skeleton";
@@ -570,7 +569,6 @@ for (const { name, browserType, channel } of [
 							))}
 						</ul>
 						<SessionsOverviewSkeleton />
-						<SessionsOverviewFooter sessionCountLabel={counts.length} />
 					</div>
 				</div>
 			</TooltipProvider>,
@@ -614,7 +612,7 @@ for (const { name, browserType, channel } of [
 							(element) => getComputedStyle(element).gridTemplateColumns,
 						),
 					);
-				expect(grids).toHaveLength(counts.length + 12); // header, footer, ten skeleton rows
+				expect(grids).toHaveLength(counts.length + 11); // header and ten skeleton rows
 				for (const grid of grids) {
 					const columns = grid.split(" ").map(Number.parseFloat);
 					expect(columns).toHaveLength(expectedGrid.length);

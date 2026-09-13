@@ -8,6 +8,8 @@ const retiredOutputPaths = [
 	"vendor/crm-dashboard",
 	"vendor/lens-content",
 	"fonts/crm",
+	"wrapped-skills-issue-emoji.jpg",
+	"favicon.svg",
 	"vendor/lens-canvas/hero-poster.png",
 ];
 

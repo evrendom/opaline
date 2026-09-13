@@ -12,13 +12,6 @@ interface SlidingWindowEntry {
 	timestamps: number[];
 }
 
-type WeightedSample = { ts: number; weight: number };
-
-interface WeightedWindowEntry {
-	samples: WeightedSample[];
-	total: number;
-}
-
 const organizationSessionCountWindows = new Map<string, SlidingWindowEntry>();
 const wrappedShareCreateWindows = new Map<string, SlidingWindowEntry>();
 const wrappedShareLookupWindows = new Map<string, SlidingWindowEntry>();
@@ -64,19 +57,6 @@ const WRAPPED_DECIMAL_CLAIM_REDEEM_MAX_REQUESTS = Number(
 const WRAPPED_DECIMAL_CLAIM_REDEEM_WINDOW_MS =
 	Number(process.env.RATE_LIMIT_WRAPPED_DECIMAL_CLAIM_REDEEM_WINDOW ?? 60) *
 	1000;
-export const INGEST_REQUESTS_MAX = readPositiveSafeIntegerEnv(
-	"RATE_LIMIT_INGEST_REQUESTS_MAX",
-	15_000,
-);
-export const INGEST_REQUESTS_WINDOW_MS =
-	readPositiveSafeIntegerEnv("RATE_LIMIT_INGEST_REQUESTS_WINDOW", 3600) * 1000;
-export const INGEST_BYTES_MAX = readPositiveSafeIntegerEnv(
-	"RATE_LIMIT_INGEST_BYTES_MAX",
-	10 * 1024 * 1024 * 1024,
-);
-export const INGEST_BYTES_WINDOW_MS =
-	readPositiveSafeIntegerEnv("RATE_LIMIT_INGEST_BYTES_WINDOW", 3600) * 1000;
-
 export function checkOrganizationSessionCountRateLimit(
 	userId: string,
 	organizationId: string,

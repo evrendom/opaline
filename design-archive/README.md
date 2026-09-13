@@ -7,6 +7,9 @@ public route, package workspace, or production build input.
   former `__DO_NOT_MERGE__inspiration` collection, with their runtime assets.
 - `reference-assets/`: the original images and fonts kept from the reference
   replications, outside the app public folders.
+- `product-ui/`: disconnected dashboard, team, session and settings designs,
+  with the component styles and helpers needed to understand the snapshots.
+  Their obsolete tests are omitted; current product tests stay with the app.
 - `product-shells/`: the original experimental shell layouts, navigation
   components, styling, and routing source before the canonical shell was kept.
 

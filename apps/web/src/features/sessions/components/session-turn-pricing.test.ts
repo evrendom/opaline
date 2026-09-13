@@ -1,6 +1,6 @@
+import { sumSessionRequestCosts } from "@rudel/api-routes";
 import { describe, expect, test } from "vitest";
 import type { TraceItem } from "@/components/conversation/conversation-trace";
-import { getSessionEstimatedCost } from "../session-cost";
 import {
 	extractSessionTurnMetrics,
 	extractTranscriptUsageMetrics,
@@ -135,6 +135,13 @@ describe("session turn pricing", () => {
 			1, 10,
 		]);
 		expect(subagent.estimatedCost).toBe(1);
-		expect(getSessionEstimatedCost([...turnMetrics, subagent])).toBe(12);
+		expect(
+			sumSessionRequestCosts(
+				[...turnMetrics, subagent].map((metrics) => ({
+					estimatedCost: metrics.estimatedCost ?? null,
+					usageEventCount: metrics.usageEvents.length,
+				})),
+			),
+		).toBe(12);
 	});
 });

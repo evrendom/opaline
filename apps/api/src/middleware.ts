@@ -2,10 +2,6 @@ import { implement, ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import type { Session } from "./auth.js";
 import { sqlClient } from "./db.js";
-import {
-	IngestShuttingDownError,
-	ingestLifecycle,
-} from "./services/ingest-lifecycle.service.js";
 
 export interface AppContext {
 	user: Session["user"] | null;
@@ -179,18 +175,4 @@ export const ingestAuthMiddleware = os.middleware(async ({ context, next }) => {
 			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
 		},
 	});
-});
-
-export const ingestLifecycleMiddleware = os.middleware(async ({ next }) => {
-	try {
-		return await ingestLifecycle.run(next);
-	} catch (error) {
-		if (error instanceof IngestShuttingDownError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: { reason: "session_ingest_shutting_down", retryAfterMs: 1_000 },
-				message: "Session ingestion is shutting down. Retry shortly.",
-			});
-		}
-		throw error;
-	}
 });
