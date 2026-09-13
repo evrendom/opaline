@@ -15,6 +15,8 @@ import { captureSessionLanguageSignals } from "../services/session-language-sign
 const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	1: "6125da80b0cf03ca5fd644bcb6d0c461831c077ff8e4ba1383279dce6715c166",
 	2: "538139f31d5549b2ac8c191f3eacc55f20ae95a568c400058af47281a3c9af45",
+	// Same scanner semantics; reprocess legacy version-2 count-only records.
+	3: "538139f31d5549b2ac8c191f3eacc55f20ae95a568c400058af47281a3c9af45",
 };
 
 describe("persisted language-signal semantics", () => {

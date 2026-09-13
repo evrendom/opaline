@@ -24,4 +24,5 @@ export type {
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
-export const SCAN_VERSION = 2;
+// Version 3 also repairs version-2 rows persisted without matched-word arrays.
+export const SCAN_VERSION = 3;

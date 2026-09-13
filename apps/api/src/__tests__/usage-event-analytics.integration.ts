@@ -295,6 +295,27 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			});
 			expect(rows.length).toBeGreaterThan(0);
 			expect(rows.every((row) => row.total_interactions === 1)).toBe(true);
+			expect(
+				rows.find((row) => row.session_id === unavailableGeoSessionId),
+			).toMatchObject({
+				estimated_cost: 46.75,
+				cost_uses_default_region: true,
+			});
+			expect(
+				rows.find((row) => row.session_id === claudeFastUsSessionId),
+			).toMatchObject({
+				estimated_cost: 102.85,
+				cost_uses_default_region: false,
+			});
+			for (const sessionId of [
+				unresolvedSessionId,
+				partialSessionId,
+				unsupportedTierSessionId,
+			]) {
+				expect(rows.find((row) => row.session_id === sessionId)).toMatchObject({
+					estimated_cost: null,
+				});
+			}
 		} finally {
 			if (previousMode === undefined)
 				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
@@ -443,6 +464,32 @@ describe("usage-event analytics ClickHouse rollups", () => {
 		expect(rows).toEqual([{ total_interactions: 1 }]);
 	});
 
+	test("preserves the standard-region estimate and its provenance in daily rollups", async () => {
+		const rows = await executor.query<{
+			estimated_cost: number;
+			cost_is_complete: number;
+			cost_uses_default_region: number;
+		}>({
+			query: `WITH ${buildUsageEventAnalyticsCte()}
+				SELECT estimated_cost, cost_is_complete, cost_uses_default_region
+				FROM usage_analytics_daily_sessions
+				WHERE session_id = {sessionId:String}
+					AND usage_date = toDate('2026-08-04')
+				LIMIT 1`,
+			query_params: {
+				orgId: organizationId,
+				sessionId: unavailableGeoSessionId,
+			},
+		});
+		expect(rows).toEqual([
+			{
+				estimated_cost: 46.75,
+				cost_is_complete: 1,
+				cost_uses_default_region: 1,
+			},
+		]);
+	});
+
 	test("resolves replacement generations, receipt consistency, pricing, and metadata joins", async () => {
 		const rows = await readAnalyticsRows();
 
@@ -529,7 +576,7 @@ describe("usage-event analytics ClickHouse rollups", () => {
 				total_tokens: "0",
 			},
 			{
-				cost_is_complete: 0,
+				cost_is_complete: 1,
 				estimated_cost: 46.75,
 				input_tokens: "4000000",
 				model_used: "claude-opus-4-8",
@@ -609,7 +656,7 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			query_params: { orgId: organizationId },
 		});
 
-		expect(rows).toEqual([{ cost: 338.22, incomplete_sessions: 5 }]);
+		expect(rows).toEqual([{ cost: 338.22, incomplete_sessions: 4 }]);
 	});
 
 	test("keeps bounded key prefixes visible across the shared query families", async () => {
