@@ -1,6 +1,15 @@
 import { getLogger } from "@logtape/logtape";
-import type { SessionDetailWindowRequest } from "@rudel/api-routes";
+import type {
+	SessionDetailBodyChunkInput,
+	SessionDetailWindowRequest,
+} from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import {
+	createSessionDetailBodyChunk,
+	getSessionDetailBodyForChunk,
+	type SerializedSessionDetailBody,
+	serializeSessionDetailBody,
+} from "./session-detail-body-chunks.js";
 import {
 	assembleSessionDetailWindow,
 	decodeSessionDetailWindowCursor,
@@ -47,6 +56,61 @@ const cache = createSessionDetailDerivationCache<SessionDetailDerivation>({
 const derivationSemaphore = createSessionDetailDerivationSemaphore(
 	SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY,
 );
+// Separate, byte-bounded serialization cache: subsequent chunks must not
+// repeatedly normalize/stringify the entire transcript. Never bypass revision
+// or access checks on a cache hit. Keys include tenant, owner and body identity.
+const bodyCache =
+	createSessionDetailDerivationCache<SerializedSessionDetailBody>({
+		maxBytes: 64 * 1024 * 1024,
+		maxEntryBytes: 64 * 1024 * 1024,
+	});
+
+export async function getSessionDetailBodyChunk(
+	input: SessionDetailBodyChunkInput & {
+		organizationId: string;
+		ownerId: string;
+	},
+) {
+	const current = await getSessionDetailCurrentRevision(
+		input.organizationId,
+		input.sessionId,
+		input.ownerId,
+	);
+	if (!current) return null;
+	if (current.revision !== input.revision) {
+		throw new SessionDetailStaleRevisionError(input.revision, current.revision);
+	}
+	const key = createKey({
+		...input,
+		source: JSON.stringify([current.source, input.kind, input.targetId]),
+	});
+	try {
+		const body = await bodyCache.getOrLoad(key, async () => {
+			const derivation = await loadDerivation(
+				createKey({ ...input, source: current.source }),
+			);
+			// Single-response body getters enforce the old response byte ceiling.
+			// Chunk delivery reads the complete derived body instead; the chunk
+			// serializer, not the whole transcript, defines this response's budget.
+			const value = derivation
+				? getSessionDetailBodyForChunk(derivation, input)
+				: null;
+			if (!value) throw new SessionDetailSnapshotNotFoundError();
+			const serialized = serializeSessionDetailBody(value);
+			return { bytes: serialized.json.length * 2, value: serialized };
+		});
+		return createSessionDetailBodyChunk(body, {
+			kind: input.kind,
+			offset: input.offset,
+			revision: input.revision,
+			sessionId: input.sessionId,
+			targetId: input.targetId,
+		});
+	} catch (error) {
+		if (error instanceof SessionDetailSnapshotNotFoundError) return null;
+		throw error;
+	}
+}
 
 export class SessionDetailStaleRevisionError extends Error {
 	constructor(

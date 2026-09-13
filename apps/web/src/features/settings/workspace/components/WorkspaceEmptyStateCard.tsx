@@ -2,16 +2,16 @@ import { PlusIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buttonVariants } from "@/app/ui/button";
 import {
-	Card,
 	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/app/ui/card";
+import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 
 export function WorkspaceEmptyStateCard() {
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
+		<SettingsSectionCard>
 			<CardHeader>
 				<CardTitle>No workspace selected</CardTitle>
 				<CardDescription>
@@ -25,6 +25,6 @@ export function WorkspaceEmptyStateCard() {
 					Create workspace
 				</Link>
 			</CardContent>
-		</Card>
+		</SettingsSectionCard>
 	);
 }

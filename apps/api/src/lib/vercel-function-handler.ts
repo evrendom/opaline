@@ -8,6 +8,7 @@ type FetchHandler = (request: Request) => Promise<Response>;
 export function createVercelFunctionHandler(input: {
 	readonly fetch: FetchHandler;
 	readonly functionGroup: string;
+	readonly streaming?: boolean;
 	readonly publicPathPattern?: RegExp;
 }): FetchHandler {
 	return async (request) => {
@@ -31,6 +32,11 @@ export function createVercelFunctionHandler(input: {
 					status: response.status,
 				});
 			}
+			if (
+				input.streaming &&
+				response.headers.get("Content-Type")?.startsWith("text/event-stream")
+			)
+				return response;
 			return materializeVercelResponse(response, routedRequest.method);
 		} catch (error) {
 			await captureApiServerError({

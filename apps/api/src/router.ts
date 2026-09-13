@@ -1561,32 +1561,6 @@ const deleteOrganization = os.deleteOrganization
 					[userId],
 				);
 
-				const [membershipSummary] = await transaction.unsafe<
-					Array<{ count: number }>
-				>(
-					`
-						SELECT COUNT(*)::int AS count
-						FROM member
-						WHERE user_id = $1
-					`,
-					[userId],
-				);
-				const membershipCount = membershipSummary?.count ?? 0;
-
-				if (membershipCount <= 1) {
-					logger.info(
-						"Rejected organization deletion because it is the user's only organization (user_id={userId} organization_id={organizationId} membership_count={membershipCount})",
-						{
-							membershipCount,
-							organizationId: orgId,
-							userId,
-						},
-					);
-					throw new ORPCError("BAD_REQUEST", {
-						message: "Cannot delete your only organization",
-					});
-				}
-
 				const ownership = await transaction.unsafe<Array<{ id: string }>>(
 					`
 						SELECT id

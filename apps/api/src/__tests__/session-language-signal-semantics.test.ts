@@ -8,12 +8,13 @@ import {
 	scanMemberLanguageSignals,
 	scanModelLanguageSignalSegments,
 } from "@rudel/language-signals";
-import { summarizeSessionLanguageSignals } from "../services/session-language-signal-summary.js";
+import { captureSessionLanguageSignals } from "../services/session-language-signal-summary.js";
 
 // Append-only history: semantic changes get a new version and a new entry.
 // Never rewrite a fingerprint already assigned to a persisted scan version.
 const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	1: "6125da80b0cf03ca5fd644bcb6d0c461831c077ff8e4ba1383279dce6715c166",
+	2: "538139f31d5549b2ac8c191f3eacc55f20ae95a568c400058af47281a3c9af45",
 };
 
 describe("persisted language-signal semantics", () => {
@@ -48,7 +49,7 @@ function buildSemanticGoldenCorpusOutput() {
 			"fuck??",
 		]),
 		memberPreprocessing: scanMemberLanguageSignals(memberText),
-		persistedSummary: summarizeSessionLanguageSignals(
+		persistedSummary: captureSessionLanguageSignals(
 			buildSemanticTranscript(memberText),
 		),
 		ruleSurfaceOutputs: LANGUAGE_SIGNAL_RULES.flatMap((rule) =>

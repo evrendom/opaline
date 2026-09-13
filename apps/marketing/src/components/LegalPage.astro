@@ -1,0 +1,896 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CompanyStrip from "./CompanyStrip.astro";
+import InstantV2Nav from "./InstantV2Nav.astro";
+
+interface TocItem {
+	id: string;
+	label: string;
+}
+
+interface Props {
+	title: string;
+	description: string;
+	lastUpdated: string;
+	lastUpdatedDate: string;
+	dateLabel?: string;
+	active: "privacy" | "terms";
+	toc: TocItem[];
+	contentHtml?: string;
+}
+
+const {
+	title,
+	description,
+	lastUpdated,
+	lastUpdatedDate,
+	dateLabel = "Last updated on",
+	active,
+	toc,
+	contentHtml,
+} = Astro.props;
+---
+
+<Layout
+	title={`${title} — Opaline`}
+	description={description}
+	dateModified={lastUpdatedDate}
+>
+	<InstantV2Nav enableDemo={false} productHref="/home" />
+	<main class="legal-page" id="main" data-legal-page={active}>
+		<div class="legal-mobile-toc">
+			<button
+				class="legal-mobile-toc-trigger"
+				type="button"
+				aria-haspopup="dialog"
+				aria-controls="legal-toc-dialog"
+				data-legal-toc-open
+			>
+				<span>Table of Contents</span>
+				<svg aria-hidden="true" viewBox="0 0 16 16">
+					<path
+						d="M8.35356 10.8533C8.1583 11.0485 7.84172 11.0485 7.64645 10.8533L4.00002 7.20682C3.80476 7.01156 3.80476 6.69498 4.00002 6.49972C4.19529 6.30446 4.51187 6.30446 4.70713 6.49972L8.00001 9.79261L11.2929 6.49976C11.4882 6.30449 11.8048 6.30449 12 6.49976C12.1953 6.69502 12.1953 7.0116 12 7.20686L8.35356 10.8533Z"
+					></path>
+				</svg>
+			</button>
+			<div class="legal-mobile-divider" role="separator"></div>
+		</div>
+
+		<section class="legal-content-section">
+			<div class="legal-layout">
+				<article class="legal-article">
+					<h1>{title}</h1>
+					<div class="legal-meta">
+						<time datetime={lastUpdatedDate}>{dateLabel} {lastUpdated}</time>
+						<div class="legal-article-divider" role="separator"></div>
+					</div>
+					<div class="legal-prose" data-legal-prose>
+						{
+							contentHtml ? (
+								<Fragment set:html={contentHtml} />
+							) : (
+								<slot />
+							)
+						}
+					</div>
+				</article>
+
+				<aside class="legal-sidebar" aria-label={`${title} table of contents`}>
+					<p>Table of Contents</p>
+					<nav class="legal-toc-list" data-legal-toc-list>
+						<div class="legal-toc-highlight" aria-hidden="true"></div>
+						{
+							toc.map((item, index) => (
+								<button
+									type="button"
+									data-legal-toc-button={item.id}
+									aria-current={index === 0 ? "location" : undefined}
+								>
+									{item.label}
+								</button>
+							))
+						}
+					</nav>
+				</aside>
+			</div>
+		</section>
+	</main>
+
+	<div class="legal-footer-shell">
+		<CompanyStrip active={active} />
+	</div>
+
+	<dialog
+		class="legal-toc-dialog"
+		id="legal-toc-dialog"
+		aria-labelledby="legal-toc-dialog-title"
+		data-legal-toc-dialog
+	>
+		<button
+			class="legal-toc-dialog-overlay"
+			type="button"
+			aria-label="Close table of contents"
+			data-legal-toc-close
+		></button>
+		<div class="legal-toc-dialog-panel">
+			<div class="legal-toc-dialog-handle" aria-hidden="true"></div>
+			<header>
+				<h2 id="legal-toc-dialog-title">Table of Contents</h2>
+				<button
+					class="legal-toc-dialog-close"
+					type="button"
+					aria-label="Close table of contents"
+					data-legal-toc-close
+				>
+					<svg aria-hidden="true" viewBox="0 0 16 16">
+						<path
+							d="M3.64645 3.64645C3.84171 3.45118 4.15829 3.45118 4.35355 3.64645L8 7.29289L11.6464 3.64645C11.8417 3.45118 12.1583 3.45118 12.3536 3.64645C12.5488 3.84171 12.5488 4.15829 12.3536 4.35355L8.70711 8L12.3536 11.6464C12.5488 11.8417 12.5488 12.1583 12.3536 12.3536C12.1583 12.5488 11.8417 12.5488 11.6464 12.3536L8 8.70711L4.35355 12.3536C4.15829 12.5488 3.84171 12.5488 3.64645 12.3536C3.45118 12.1583 3.45118 11.8417 3.64645 11.6464L7.29289 8L3.64645 4.35355C3.45118 4.15829 3.45118 3.84171 3.64645 3.64645Z"
+						></path>
+					</svg>
+				</button>
+			</header>
+			<nav aria-label={`${title} mobile table of contents`}>
+				{
+					toc.map((item, index) => (
+						<button
+							type="button"
+							data-legal-toc-button={item.id}
+							aria-current={index === 0 ? "location" : undefined}
+						>
+							{item.label}
+						</button>
+					))
+				}
+			</nav>
+		</div>
+	</dialog>
+</Layout>
+
+<style is:global>
+	html,
+	body {
+		background: #fff;
+		overscroll-behavior: none;
+	}
+
+	.legal-page {
+		isolation: isolate;
+		min-height: calc(100svh - 42px - 52px);
+		background: #fff;
+		color: rgba(0, 0, 0, 0.875);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
+	}
+
+	.legal-mobile-toc {
+		display: block;
+	}
+
+	.legal-mobile-toc-trigger {
+		display: flex;
+		width: 100%;
+		height: 56px;
+		align-items: center;
+		justify-content: space-between;
+		padding-inline: 24px;
+		border: 0;
+		background: transparent;
+		color: rgba(0, 0, 0, 0.875);
+		font-size: 15px;
+		font-weight: 500;
+		line-height: 24px;
+		cursor: pointer;
+	}
+
+	.legal-mobile-toc-trigger svg,
+	.legal-toc-dialog-close svg {
+		width: 20px;
+		height: 20px;
+		flex: none;
+		fill: currentColor;
+	}
+
+	.legal-mobile-divider,
+	.legal-article-divider {
+		height: 1px;
+		background: rgba(0, 0, 0, 0.06);
+	}
+
+	.legal-content-section {
+		padding-block: 32px;
+	}
+
+	.legal-layout {
+		display: grid;
+		width: 100%;
+		max-width: 1248px;
+		grid-template-columns: minmax(0, 1fr);
+		align-items: start;
+		padding-inline: 24px;
+		margin-inline: auto;
+	}
+
+	.legal-article {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.legal-article h1 {
+		margin: 0 0 40px;
+		color: rgba(0, 0, 0, 0.875);
+		font-size: 28px;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+		line-height: 36px;
+		text-wrap: pretty;
+	}
+
+	.legal-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.legal-meta time {
+		color: rgba(0, 0, 0, 0.447);
+		font-size: 13px;
+		font-weight: 400;
+		line-height: 20px;
+	}
+
+	.legal-prose {
+		max-width: 100%;
+		color: rgba(0, 0, 0, 0.875);
+		font-size: 15px;
+		font-weight: 400;
+		line-height: 24px;
+	}
+
+	.legal-prose > :first-child {
+		margin-top: 0;
+	}
+
+	.legal-prose > :last-child {
+		margin-bottom: 0;
+	}
+
+	.legal-prose p {
+		margin: 0 0 24px;
+		text-wrap: pretty;
+	}
+
+	.legal-prose h1,
+	.legal-prose h2,
+	.legal-prose h3,
+	.legal-prose h4,
+	.legal-prose h5,
+	.legal-prose h6 {
+		scroll-margin-top: 66px;
+		margin: 64px 0 12px;
+		color: rgba(0, 0, 0, 0.875);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-size: 18px;
+		font-weight: 500;
+		letter-spacing: normal;
+		line-height: 24px;
+		text-wrap: pretty;
+	}
+
+	.legal-prose ul,
+	.legal-prose ol {
+		padding-left: 18px;
+		margin: 24px 0;
+	}
+
+	.legal-prose li {
+		padding-left: 6px;
+		margin-block: 9.6px;
+	}
+
+	.legal-prose a {
+		color: rgba(0, 0, 0, 0.875);
+		font-weight: 500;
+		text-decoration: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 2px;
+	}
+
+	.legal-prose strong {
+		color: rgba(0, 0, 0, 0.875);
+		font-weight: 500;
+	}
+
+	.legal-prose address {
+		margin: 0 0 24px;
+		font-style: normal;
+	}
+
+	.legal-prose address p {
+		margin: 0;
+	}
+
+	.legal-prose hr {
+		height: 1px;
+		border: 0;
+		margin: 64px 0;
+		background: rgba(0, 0, 0, 0.08);
+	}
+
+	.legal-prose > div:has(table) {
+		max-width: 100%;
+		margin: 24px 0;
+		overflow-x: auto;
+	}
+
+	.legal-prose table {
+		width: 100%;
+		min-width: 620px;
+		border-collapse: collapse;
+		font-size: 13px;
+		line-height: 20px;
+	}
+
+	.legal-prose th,
+	.legal-prose td {
+		padding: 10px 16px 10px 0;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		text-align: left;
+		vertical-align: top;
+	}
+
+	.legal-prose th {
+		font-weight: 500;
+	}
+
+	.legal-prose blockquote {
+		padding-left: 16px;
+		margin: 24px 0;
+		border-left: 2px solid rgba(0, 0, 0, 0.12);
+	}
+
+	.legal-prose code {
+		padding: 2px 4px;
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		border-radius: 4px;
+		background: rgba(0, 0, 0, 0.03);
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.legal-prose pre {
+		padding: 16px;
+		margin: 24px 0;
+		overflow: auto;
+		border-radius: 8px;
+		background: rgba(0, 0, 0, 0.04);
+	}
+
+	.legal-prose img {
+		max-width: 100%;
+		height: auto;
+		margin-block: 24px;
+	}
+
+	.legal-sidebar {
+		display: none;
+	}
+
+	.legal-footer-shell {
+		width: 100%;
+		max-width: none;
+		margin-inline: auto;
+		border-top: 1px solid rgba(0, 0, 0, 0.06);
+	}
+
+	.legal-toc-dialog {
+		position: fixed;
+		z-index: 100;
+		inset: 0;
+		width: 100%;
+		max-width: none;
+		height: 100%;
+		max-height: none;
+		padding: 0;
+		border: 0;
+		margin: 0;
+		background: transparent;
+		overflow: hidden;
+	}
+
+	.legal-toc-dialog:not([open]) {
+		display: none;
+	}
+
+	.legal-toc-dialog::backdrop {
+		background: transparent;
+	}
+
+	.legal-toc-dialog-overlay {
+		position: fixed;
+		z-index: 0;
+		inset: 0;
+		border: 0;
+		background: rgba(0, 0, 0, 0.4);
+		cursor: pointer;
+		animation: legal-overlay-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.legal-toc-dialog-panel {
+		position: fixed;
+		z-index: 1;
+		inset: auto 0 0;
+		display: flex;
+		height: 80dvh;
+		max-height: 80dvh;
+		flex-direction: column;
+		border-radius: 20px 20px 0 0;
+		background: #fff;
+		overflow: hidden;
+		animation: legal-drawer-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.legal-toc-dialog[data-closing] .legal-toc-dialog-overlay {
+		animation: legal-overlay-out 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.legal-toc-dialog[data-closing] .legal-toc-dialog-panel {
+		animation: legal-drawer-out 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.legal-toc-dialog-handle {
+		width: 36px;
+		height: 5px;
+		flex: none;
+		border-radius: 999px;
+		margin: 5px auto 8px;
+		background: rgba(0, 0, 0, 0.12);
+	}
+
+	.legal-toc-dialog header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 4px 20px;
+	}
+
+	.legal-toc-dialog h2 {
+		margin: 0;
+		color: rgba(0, 0, 0, 0.875);
+		font-size: 18px;
+		font-weight: 500;
+		line-height: 24px;
+	}
+
+	.legal-toc-dialog-close {
+		display: grid;
+		width: 40px;
+		height: 40px;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: rgba(0, 0, 0, 0.608);
+		cursor: pointer;
+	}
+
+	.legal-toc-dialog nav {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+		padding-block: 8px 24px;
+		overflow: auto;
+		overscroll-behavior: contain;
+	}
+
+	.legal-toc-dialog nav button {
+		min-height: 44px;
+		flex: none;
+		padding: 8px 22px;
+		border: 0;
+		background: transparent;
+		color: rgba(0, 0, 0, 0.608);
+		font-size: 15px;
+		font-weight: 500;
+		line-height: 24px;
+		text-align: left;
+		cursor: pointer;
+		opacity: 0.8;
+	}
+
+	.legal-toc-dialog nav button[aria-current="location"] {
+		color: rgba(0, 0, 0, 0.875);
+		opacity: 1;
+	}
+
+	@keyframes legal-drawer-in {
+		from {
+			transform: translate3d(0, 100%, 0);
+		}
+		to {
+			transform: translate3d(0, 0, 0);
+		}
+	}
+
+	@keyframes legal-drawer-out {
+		from {
+			transform: translate3d(0, 0, 0);
+		}
+		to {
+			transform: translate3d(0, 100%, 0);
+		}
+	}
+
+	@keyframes legal-overlay-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes legal-overlay-out {
+		from {
+			opacity: 1;
+		}
+		to {
+			opacity: 0;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.legal-content-section {
+			padding-block: 64px;
+		}
+
+		.legal-layout {
+			max-width: 1244px;
+			padding-inline: 22px;
+		}
+
+		.legal-article {
+			width: min(100%, 640px);
+			gap: 24px;
+			margin-inline: auto;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.legal-mobile-toc,
+		.legal-toc-dialog {
+			display: none;
+		}
+
+		.legal-content-section {
+			padding-block: 80px;
+		}
+
+		.legal-layout {
+			grid-template-columns: minmax(0, 1fr) 320px;
+			column-gap: 64px;
+		}
+
+		.legal-article {
+			margin-inline: 0;
+		}
+
+		.legal-article h1 {
+			font-size: 36px;
+			line-height: 44px;
+		}
+
+		.legal-sidebar {
+			position: sticky;
+			top: 96px;
+			display: block;
+			height: fit-content;
+			margin-top: -26px;
+			max-height: none;
+			overflow: visible;
+			overscroll-behavior: auto;
+		}
+
+		.legal-sidebar > p {
+			padding-inline: 8px;
+			margin: 0 0 16px;
+			color: rgba(0, 0, 0, 0.875);
+			font-size: 13px;
+			font-weight: 500;
+			line-height: 20px;
+		}
+
+		.legal-toc-list {
+			position: relative;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.legal-toc-highlight {
+			position: absolute;
+			z-index: 0;
+			inset: 0 0 auto;
+			height: 32px;
+			border-radius: 6px;
+			background: rgba(0, 0, 0, 0.06);
+			pointer-events: none;
+			will-change: transform, height;
+		}
+
+		.legal-toc-list button {
+			position: relative;
+			z-index: 1;
+			display: flex;
+			width: 100%;
+			min-height: 32px;
+			align-items: center;
+			justify-content: flex-start;
+			padding: 4px 8px;
+			border: 0;
+			border-radius: 6px;
+			background: transparent;
+			color: rgba(0, 0, 0, 0.608);
+			font-size: 13px;
+			font-weight: 500;
+			line-height: 20px;
+			text-align: left;
+			cursor: pointer;
+			opacity: 0.8;
+		}
+
+		.legal-toc-list button:hover,
+		.legal-toc-list button[data-in-view],
+		.legal-toc-list button[aria-current="location"] {
+			color: rgba(0, 0, 0, 0.875);
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.legal-toc-dialog-overlay,
+		.legal-toc-dialog-panel,
+		.legal-toc-dialog[data-closing] .legal-toc-dialog-overlay,
+		.legal-toc-dialog[data-closing] .legal-toc-dialog-panel {
+			animation-duration: 0.01ms;
+		}
+	}
+</style>
+
+<script>
+	const tocButtons = Array.from(
+		document.querySelectorAll<HTMLButtonElement>("[data-legal-toc-button]"),
+	);
+	const desktopTocButtons = Array.from(
+		document.querySelectorAll<HTMLButtonElement>(
+			"[data-legal-toc-list] [data-legal-toc-button]",
+		),
+	);
+	const headings = Array.from(
+		document.querySelectorAll<HTMLElement>("[data-legal-prose] [id]"),
+	).filter((heading) =>
+		tocButtons.some(
+			(button) => button.dataset.legalTocButton === heading.id,
+		),
+	);
+	const tocList = document.querySelector<HTMLElement>("[data-legal-toc-list]");
+	const tocHighlight = document.querySelector<HTMLElement>(
+		".legal-toc-highlight",
+	);
+	const dialog = document.querySelector<HTMLDialogElement>(
+		"[data-legal-toc-dialog]",
+	);
+	const openDialogButton = document.querySelector<HTMLButtonElement>(
+		"[data-legal-toc-open]",
+	);
+	const closeDialogButtons = document.querySelectorAll<HTMLButtonElement>(
+		"[data-legal-toc-close]",
+	);
+	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+	const desktopLayout = window.matchMedia("(min-width: 1024px)");
+
+	const getHeadingLine = () => {
+		if (desktopLayout.matches) {
+			const sidebar = document.querySelector<HTMLElement>(".legal-sidebar");
+			const stickyTop = sidebar
+				? Number.parseFloat(window.getComputedStyle(sidebar).top)
+				: Number.NaN;
+			if (Number.isFinite(stickyTop)) return stickyTop;
+		}
+		const nav = document.querySelector<HTMLElement>("[data-instant-v2-nav]");
+		return (nav?.getBoundingClientRect().height ?? 42) + 24;
+	};
+
+	const setCurrentSection = (id: string) => {
+		for (const button of tocButtons) {
+			if (button.dataset.legalTocButton === id) {
+				button.setAttribute("aria-current", "location");
+			} else {
+				button.removeAttribute("aria-current");
+			}
+		}
+	};
+
+	let springFrame = 0;
+	let springLastTime = 0;
+	let highlightTop = 0;
+	let highlightHeight = 32;
+	let highlightTopVelocity = 0;
+	let highlightHeightVelocity = 0;
+	let targetTop = 0;
+	let targetHeight = 32;
+
+	const renderHighlight = () => {
+		if (!tocHighlight) return;
+		tocHighlight.style.transform = `translate3d(0, ${highlightTop.toFixed(3)}px, 0)`;
+		tocHighlight.style.height = `${highlightHeight.toFixed(3)}px`;
+	};
+
+	const tickHighlightSpring = (time: number) => {
+		const rawDelta = springLastTime ? (time - springLastTime) / 1000 : 1 / 60;
+		springLastTime = time;
+		const delta = Math.min(rawDelta, 1 / 30);
+		const steps = Math.max(1, Math.ceil(delta / (1 / 120)));
+		const step = delta / steps;
+
+		for (let index = 0; index < steps; index += 1) {
+			const topAcceleration =
+				(-800 * (highlightTop - targetTop) - 80 * highlightTopVelocity) / 2;
+			const heightAcceleration =
+				(-800 * (highlightHeight - targetHeight) -
+					80 * highlightHeightVelocity) /
+				2;
+			highlightTopVelocity += topAcceleration * step;
+			highlightHeightVelocity += heightAcceleration * step;
+			highlightTop += highlightTopVelocity * step;
+			highlightHeight += highlightHeightVelocity * step;
+		}
+
+		renderHighlight();
+		const settled =
+			Math.abs(highlightTop - targetTop) < 0.02 &&
+			Math.abs(highlightHeight - targetHeight) < 0.02 &&
+			Math.abs(highlightTopVelocity) < 0.02 &&
+			Math.abs(highlightHeightVelocity) < 0.02;
+
+		if (settled) {
+			highlightTop = targetTop;
+			highlightHeight = targetHeight;
+			highlightTopVelocity = 0;
+			highlightHeightVelocity = 0;
+			springFrame = 0;
+			renderHighlight();
+			return;
+		}
+
+		springFrame = requestAnimationFrame(tickHighlightSpring);
+	};
+
+	const moveHighlight = (firstId: string, lastId = firstId) => {
+		if (!tocList || !tocHighlight) return;
+		const firstButton = desktopTocButtons.find(
+			(button) => button.dataset.legalTocButton === firstId,
+		);
+		const lastButton = desktopTocButtons.find(
+			(button) => button.dataset.legalTocButton === lastId,
+		);
+		if (!firstButton || !lastButton) return;
+
+		const listRect = tocList.getBoundingClientRect();
+		const firstRect = firstButton.getBoundingClientRect();
+		const lastRect = lastButton.getBoundingClientRect();
+		targetTop = firstRect.top - listRect.top;
+		targetHeight = lastRect.bottom - firstRect.top;
+
+		if (reducedMotion.matches) {
+			cancelAnimationFrame(springFrame);
+			springFrame = 0;
+			highlightTop = targetTop;
+			highlightHeight = targetHeight;
+			renderHighlight();
+			return;
+		}
+
+		if (!springFrame) {
+			springLastTime = 0;
+			springFrame = requestAnimationFrame(tickHighlightSpring);
+		}
+	};
+
+	let scrollFrame = 0;
+	const updateScrollState = () => {
+		scrollFrame = 0;
+		if (!headings.length) return;
+
+		const headingLine = getHeadingLine();
+		const atPageBottom =
+			window.scrollY + window.innerHeight >=
+			document.documentElement.scrollHeight - 2;
+		let activeHeading = headings[0];
+
+		for (const heading of headings) {
+			if (heading.getBoundingClientRect().top <= headingLine + 0.5) {
+				activeHeading = heading;
+			} else {
+				break;
+			}
+		}
+
+		if (atPageBottom) activeHeading = headings.at(-1) ?? activeHeading;
+		setCurrentSection(activeHeading.id);
+
+		for (const button of desktopTocButtons) {
+			button.toggleAttribute(
+				"data-in-view",
+				button.dataset.legalTocButton === activeHeading.id,
+			);
+		}
+		moveHighlight(activeHeading.id);
+	};
+
+	const queueScrollState = () => {
+		if (scrollFrame) return;
+		scrollFrame = requestAnimationFrame(updateScrollState);
+	};
+
+	const closeDialog = () => {
+		if (!dialog?.open || dialog.hasAttribute("data-closing")) return;
+		dialog.setAttribute("data-closing", "");
+		window.setTimeout(
+			() => {
+				dialog.close();
+				dialog.removeAttribute("data-closing");
+				openDialogButton?.focus({ preventScroll: true });
+			},
+			reducedMotion.matches ? 0 : 500,
+		);
+	};
+
+	openDialogButton?.addEventListener("click", () => {
+		if (!dialog) return;
+		dialog.showModal();
+	});
+
+	for (const closeButton of closeDialogButtons) {
+		closeButton.addEventListener("click", closeDialog);
+	}
+
+	dialog?.addEventListener("cancel", (event) => {
+		event.preventDefault();
+		closeDialog();
+	});
+
+	for (const button of tocButtons) {
+		button.addEventListener("click", () => {
+			const id = button.dataset.legalTocButton;
+			const heading = id ? document.getElementById(id) : null;
+			if (!heading || !id) return;
+			setCurrentSection(id);
+			moveHighlight(id);
+			if (dialog?.open) closeDialog();
+			window.setTimeout(
+				() => {
+					const top =
+						window.scrollY +
+						heading.getBoundingClientRect().top -
+						getHeadingLine();
+					window.scrollTo({
+						top,
+						behavior: reducedMotion.matches ? "auto" : "smooth",
+					});
+				},
+				dialog?.open ? (reducedMotion.matches ? 0 : 550) : 0,
+			);
+		});
+	}
+
+	updateScrollState();
+	window.addEventListener("scroll", queueScrollState, { passive: true });
+	window.addEventListener("resize", queueScrollState, { passive: true });
+	window.addEventListener("pageshow", queueScrollState, { passive: true });
+	reducedMotion.addEventListener("change", queueScrollState);
+	desktopLayout.addEventListener("change", queueScrollState);
+</script>

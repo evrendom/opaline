@@ -1,3 +1,4 @@
+export { cliConnection } from "./cli-connection-schema.js";
 export type {
 	AccountInsert,
 	AccountSelect,

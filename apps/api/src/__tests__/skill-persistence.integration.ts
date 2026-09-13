@@ -107,12 +107,19 @@ describe("persistent skill extraction through the real API", () => {
 		const initialList = HistoricalSkillSummarySchema.array().parse(
 			readJsonEnvelope((await callRpc("analytics/skills/list")).body),
 		);
-		expect(initialList).toEqual([
+		expect(initialList).toMatchObject([
 			{
 				name: "shared-skill",
 				sessionCount: 1,
 				claudeSessionCount: 1,
 				codexSessionCount: 0,
+				contentPreview: CLAUDE_BODY,
+				attribution: {
+					userCount: 1,
+					topUsers: [{ userId, sessionCount: 1 }],
+					repoCount: 1,
+					topRepos: [{ repoLabel: "No repository", sessionCount: 1 }],
+				},
 			},
 		]);
 
@@ -159,18 +166,32 @@ describe("persistent skill extraction through the real API", () => {
 		const afterReplacement = HistoricalSkillSummarySchema.array().parse(
 			readJsonEnvelope((await callRpc("analytics/skills/list")).body),
 		);
-		expect(afterReplacement).toEqual([
+		expect(afterReplacement).toMatchObject([
 			{
 				name: "removed-skill",
 				sessionCount: 1,
 				claudeSessionCount: 1,
 				codexSessionCount: 0,
+				contentPreview: "# Removed\n",
+				attribution: {
+					userCount: 1,
+					topUsers: [{ userId, sessionCount: 1 }],
+					repoCount: 1,
+					topRepos: [{ repoLabel: "No repository", sessionCount: 1 }],
+				},
 			},
 			{
 				name: "shared-skill",
 				sessionCount: 1,
 				claudeSessionCount: 0,
 				codexSessionCount: 1,
+				contentPreview: CODEX_BODY,
+				attribution: {
+					userCount: 1,
+					topUsers: [{ userId, sessionCount: 1 }],
+					repoCount: 1,
+					topRepos: [{ repoLabel: "No repository", sessionCount: 1 }],
+				},
 			},
 		]);
 

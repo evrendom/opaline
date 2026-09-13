@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { LanguageSignalCounts } from "@rudel/language-signals";
+import type {
+	LanguageSignalCounts,
+	LanguageSignalSummary,
+} from "@rudel/language-signals";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
 import {
@@ -18,6 +21,16 @@ const ZERO_COUNTS: LanguageSignalCounts = {
 	model_swears: 0,
 };
 
+const ZERO_SUMMARY: LanguageSignalSummary = {
+	...ZERO_COUNTS,
+	member_apology_matches: [],
+	member_positive_matches: [],
+	member_swear_matches: [],
+	model_apology_matches: [],
+	model_positive_matches: [],
+	model_swear_matches: [],
+};
+
 const scanInput = {
 	content: "transcript",
 	organizationId: "org-1",
@@ -34,24 +47,34 @@ describe("session language-signal ingest persistence", () => {
 		expect(
 			buildSessionLanguageSignalRow(
 				scanInput,
-				{ ...ZERO_COUNTS, member_swears: 2 },
+				{
+					...ZERO_SUMMARY,
+					member_swear_matches: ["fuck", "shit"],
+					member_swears: 2,
+				},
 				"2026-08-19T12:00:02.456Z",
 			),
 		).toEqual({
 			member_apologies: 0,
+			member_apology_matches: [],
 			member_positive: 0,
+			member_positive_matches: [],
 			member_swears: 2,
+			member_swear_matches: ["fuck", "shit"],
 			model_apologies: 0,
+			model_apology_matches: [],
 			model_positive: 0,
+			model_positive_matches: [],
 			model_swears: 0,
+			model_swear_matches: [],
 			organization_id: "org-1",
 			raw_ingested_at: "2026-08-19 12:00:01.123",
 			raw_revision: "115807295561596928",
-			scan_version: 1,
+			scan_version: 2,
 			scanned_at: "2026-08-19 12:00:02.456",
 			signal_version: buildSessionLanguageSignalVersion(
 				"115807295561596928",
-				1,
+				2,
 				"2026-08-19T12:00:02.456Z",
 			),
 			session_date: "2026-08-19 12:00:00.000",

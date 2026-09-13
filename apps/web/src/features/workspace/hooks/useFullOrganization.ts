@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { authClient } from "@/lib/auth-client";
 
 export interface FullOrganization {
@@ -22,6 +23,7 @@ export interface FullOrganization {
 }
 
 export function useFullOrganization(orgId: string | undefined) {
+	const demo = useDemoRuntime();
 	const queryClient = useQueryClient();
 	const queryKey = ["full-organization", orgId] as const;
 
@@ -33,7 +35,7 @@ export function useFullOrganization(orgId: string | undefined) {
 			});
 			return (res.data as unknown as FullOrganization) ?? null;
 		},
-		enabled: !!orgId,
+		enabled: !!orgId && demo?.live !== false,
 	});
 
 	const invalidate = useCallback(() => {

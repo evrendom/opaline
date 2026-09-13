@@ -9,6 +9,7 @@ import {
 	SessionDetailOverviewSchema,
 	SessionDetailWindowSchema,
 } from "@rudel/api-routes";
+import { SCAN_VERSION } from "@rudel/language-signals";
 import {
 	assembleSessionDetailWindow,
 	bucketSessionDetailUsageCalls,
@@ -184,6 +185,11 @@ function createCodexTranscript() {
 			payload: { id: "codex-session-1" },
 			timestamp: "2026-08-16T11:00:00.000Z",
 			type: "session_meta",
+		}),
+		line({
+			payload: { model: "gpt-5.6-sol" },
+			timestamp: "2026-08-16T11:00:00.500Z",
+			type: "turn_context",
 		}),
 		line({
 			payload: { collaboration_mode_kind: "default", type: "task_started" },
@@ -415,6 +421,163 @@ function snapshot(
 	};
 }
 
+function createCodexActivityTranscript() {
+	return [
+		line({
+			payload: { id: "codex-activity" },
+			timestamp: "2026-08-16T08:00:00.000Z",
+			type: "session_meta",
+		}),
+		line({
+			payload: {
+				content: [{ text: "Inspect activity", type: "input_text" }],
+				role: "user",
+				type: "message",
+			},
+			timestamp: "2026-08-16T08:00:00.500Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				arguments: '{"cmd":"cat src/read.ts"}',
+				call_id: "read",
+				name: "exec_command",
+				type: "function_call",
+			},
+			timestamp: "2026-08-16T08:00:01.000Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "read",
+				output: "Process exited with code 0\nsource",
+				type: "function_call_output",
+			},
+			timestamp: "2026-08-16T08:00:01.100Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				arguments: '{"path":"art/shot.png"}',
+				call_id: "view",
+				name: "view_image",
+				type: "function_call",
+			},
+			timestamp: "2026-08-16T08:00:01.200Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "patch",
+				input: "*** Begin Patch\n*** Add File: guessed.ts\n+x\n*** End Patch",
+				name: "apply_patch",
+				type: "custom_tool_call",
+			},
+			timestamp: "2026-08-16T08:00:02.000Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "patch",
+				changes: {
+					"/repo/src/created.ts": {
+						move_path: null,
+						type: "add",
+						unified_diff: "+created",
+					},
+					"/repo/src/deleted.ts": {
+						move_path: null,
+						type: "delete",
+						unified_diff: "-deleted",
+					},
+					"/repo/src/edited.ts": {
+						move_path: null,
+						type: "update",
+						unified_diff: "-old\n+new",
+					},
+				},
+				success: true,
+				type: "patch_apply_end",
+			},
+			timestamp: "2026-08-16T08:00:02.100Z",
+			type: "event_msg",
+		}),
+		line({
+			payload: {
+				call_id: "patch",
+				output: "Success",
+				type: "custom_tool_call_output",
+			},
+			timestamp: "2026-08-16T08:00:02.200Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "failed-patch",
+				input: "*** Begin Patch\n*** Add File: failed.ts\n+x\n*** End Patch",
+				name: "apply_patch",
+				type: "custom_tool_call",
+			},
+			timestamp: "2026-08-16T08:00:03.000Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "failed-patch",
+				changes: {
+					"/repo/src/failed.ts": {
+						move_path: null,
+						type: "add",
+						unified_diff: "+failed",
+					},
+				},
+				success: false,
+				type: "patch_apply_end",
+			},
+			timestamp: "2026-08-16T08:00:03.100Z",
+			type: "event_msg",
+		}),
+		line({
+			payload: {
+				call_id: "failed-patch",
+				output: "verification failed",
+				type: "custom_tool_call_output",
+			},
+			timestamp: "2026-08-16T08:00:03.200Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				arguments: '{"cmd":"missing"}',
+				call_id: "failed-command",
+				name: "exec_command",
+				type: "function_call",
+			},
+			timestamp: "2026-08-16T08:00:04.000Z",
+			type: "response_item",
+		}),
+		line({
+			payload: {
+				call_id: "failed-command",
+				exit_code: 127,
+				parsed_cmd: [{ cmd: "missing", type: "unknown" }],
+				type: "exec_command_end",
+			},
+			timestamp: "2026-08-16T08:00:04.100Z",
+			type: "event_msg",
+		}),
+		line({
+			payload: {
+				call_id: "failed-command",
+				output: [{ text: "command not found", type: "input_text" }],
+				type: "function_call_output",
+			},
+			timestamp: "2026-08-16T08:00:04.200Z",
+			type: "response_item",
+		}),
+	].join("\n");
+}
+
 function responseBytes(value: unknown) {
 	return Buffer.byteLength(JSON.stringify(value), "utf8");
 }
@@ -464,6 +627,49 @@ describe("session detail derivation", () => {
 		expect(derivation.turnBodies.values().next().value?.revision).toBe(
 			revision,
 		);
+	});
+
+	test("derives Codex cards and server activity totals from the same file facts", () => {
+		const derivation = deriveSessionDetail(
+			snapshot(createCodexActivityTranscript()),
+		);
+
+		expect(derivation.overviewBase.activityTotals).toMatchObject({
+			edit: 2,
+			error: 2,
+			read: 1,
+			write: 1,
+		});
+		expect(derivation.turnSummaries[0]?.fileEvents).toEqual([
+			{
+				at: "2026-08-16T08:00:01.000Z",
+				count: 1,
+				eventId: expect.any(String),
+				operation: "read",
+				path: "src/read.ts",
+			},
+			{
+				at: "2026-08-16T08:00:02.000Z",
+				count: 1,
+				eventId: expect.any(String),
+				operation: "created",
+				path: "/repo/src/created.ts",
+			},
+			{
+				at: "2026-08-16T08:00:02.000Z",
+				count: 1,
+				eventId: expect.any(String),
+				operation: "edited",
+				path: "/repo/src/deleted.ts",
+			},
+			{
+				at: "2026-08-16T08:00:02.000Z",
+				count: 1,
+				eventId: expect.any(String),
+				operation: "edited",
+				path: "/repo/src/edited.ts",
+			},
+		]);
 	});
 
 	test("derives member occurrences and model counts from one server authority", () => {
@@ -643,6 +849,34 @@ describe("session detail derivation", () => {
 		);
 	}, 15_000);
 
+	test("recovers missing analytics model metadata from recorded primary usage", () => {
+		for (const [content, expectedModel] of [
+			[createTranscript(2), "claude-opus-5"],
+			[createCodexTranscript(), "gpt-5.6-sol"],
+		]) {
+			if (!content || !expectedModel)
+				throw new Error("Missing transcript fixture");
+			const input = snapshot(content);
+			input.modelUsed = "";
+			input.subagents = {
+				reviewer: createTranscript(1).replaceAll(
+					"claude-opus-5",
+					"claude-haiku-4",
+				),
+			};
+			const derivation = deriveSessionDetail(input);
+			expect(derivation.overviewBase.session.modelUsed).toBe(expectedModel);
+		}
+	});
+
+	test("keeps missing model identity unknown when there is no recorded usage", () => {
+		const input = snapshot(createTranscript(1, 0));
+		input.modelUsed = "";
+		expect(
+			deriveSessionDetail(input).overviewBase.session.modelUsed,
+		).toBeNull();
+	});
+
 	test("derives the additive overview and stable body lookup for a Codex session", () => {
 		const input = snapshot(createCodexTranscript());
 		input.source = "codex";
@@ -716,7 +950,7 @@ describe("session detail derivation", () => {
 			error: 3,
 			read: 3,
 			signal: 1,
-			signalScanVersion: 1,
+			signalScanVersion: SCAN_VERSION,
 			skill: 3,
 			subagent: 3,
 			write: 3,
@@ -734,6 +968,43 @@ describe("session detail derivation", () => {
 			subagent: first.activityTotals.subagent,
 			write: first.activityTotals.write,
 		});
+	});
+
+	test("excludes Claude legacy-marker collisions from server file context", () => {
+		const content = [
+			line({
+				message: { content: "Inspect the collision", role: "user" },
+				sessionId: "session-1",
+				timestamp: "2026-08-16T08:00:00.000Z",
+				type: "user",
+				uuid: "collision-user",
+			}),
+			line({
+				message: {
+					content: [
+						{
+							id: "collision-patch",
+							input: {
+								__rudel_codex_correlation: { success: true },
+								input:
+									"*** Begin Patch\n*** Add File: collision.ts\n+x\n*** End Patch",
+							},
+							name: "apply_patch",
+							type: "tool_use",
+						},
+					],
+					role: "assistant",
+				},
+				sessionId: "session-1",
+				timestamp: "2026-08-16T08:00:01.000Z",
+				type: "assistant",
+				uuid: "collision-assistant",
+			}),
+		].join("\n");
+		const derivation = deriveSessionDetail(snapshot(content));
+
+		expect(derivation.overviewBase.context.files).toEqual([]);
+		expect(derivation.turnSummaries[0]?.fileEvents).toEqual([]);
 	});
 
 	test("returns a normal-sized session in one byte-bounded initial window", () => {

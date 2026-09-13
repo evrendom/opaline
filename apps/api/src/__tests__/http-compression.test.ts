@@ -7,6 +7,20 @@ import {
 } from "../lib/http-compression.js";
 
 describe("session detail HTTP compression", () => {
+	test("compresses bounded body chunks without changing their contents", async () => {
+		const body = JSON.stringify({
+			json: { data: "large body content\n".repeat(10_000) },
+		});
+		const response = await maybeCompressSessionDetailRpcResponse({
+			pathname: "/rpc/analytics/sessions/detailBodyChunk",
+			requestHeaders: new Headers({ "Accept-Encoding": "gzip" }),
+			response: new Response(body),
+		});
+		expect(response.headers.get("Content-Encoding")).toBe("gzip");
+		expect(gunzipSync(await response.arrayBuffer()).toString("utf8")).toBe(
+			body,
+		);
+	});
 	test("serves a body endpoint with gzip headers and a measured byte reduction", async () => {
 		const body = JSON.stringify({
 			json: {

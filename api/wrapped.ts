@@ -7,7 +7,7 @@ const handler = createVercelFunctionHandler({
 		fetchHandler(request, { fallback: handleVercelWrappedFallback }),
 	functionGroup: "wrapped",
 	publicPathPattern:
-		/^\/wrapped\/[A-Za-z0-9_-]+(?:\/x-card\.png|\/?)$/u,
+		/^\/(?:wrapped\/[A-Za-z0-9_-]+(?:\/x-card\.png|\/?)|(?:[^/]+\/join|team\/invite)\/[A-Za-z0-9_-]+(?:\/og\.png)?\/?)$/u,
 });
 
 export {

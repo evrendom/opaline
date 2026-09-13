@@ -1,35 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
 	getCurrentShellRoute,
-	getShellRouteMap,
-	getShellRoutes,
+	shellRouteMap,
+	shellRoutes,
 } from "@/features/shell/config/shell-routes";
 
 describe("getCurrentShellRoute", () => {
-	const orgSlug = "farmerville";
-	const shellRouteMap = getShellRouteMap(orgSlug);
-	const shellRoutes = getShellRoutes(orgSlug);
-
-	it("matches the dashboard route for the workspace root", () => {
-		expect(getCurrentShellRoute("/farmerville", orgSlug)).toStrictEqual(
-			shellRouteMap.dashboard,
-		);
+	it("matches the dashboard route for /home", () => {
+		expect(getCurrentShellRoute("/home")).toBe(shellRouteMap.dashboard);
 	});
 
-	it("prefers the workspace sessions route", () => {
-		expect(
-			getCurrentShellRoute("/farmerville/sessions", orgSlug),
-		).toStrictEqual(shellRouteMap.sessions);
+	it("prefers the sessions route for /session", () => {
+		expect(getCurrentShellRoute("/session")).toBe(shellRouteMap.sessions);
 	});
 
 	it("prefers the sessions route for nested session detail paths", () => {
-		expect(
-			getCurrentShellRoute("/farmerville/sessions/session-123", orgSlug),
-		).toStrictEqual(shellRouteMap.sessions);
+		expect(getCurrentShellRoute("/session/session-123")).toBe(
+			shellRouteMap.sessions,
+		);
+	});
+
+	it("keeps the newsesh experiment in the sessions shell", () => {
+		expect(getCurrentShellRoute("/newsesh")).toBe(shellRouteMap.sessions);
+		expect(getCurrentShellRoute("/newsesh/session-123")).toBe(
+			shellRouteMap.sessions,
+		);
 	});
 
 	it("uses history as the sessions shortcut", () => {
 		expect(shellRouteMap.sessions.shortcut).toBe("H");
+	});
+
+	it("matches the skills route and uses its unique shortcut", () => {
+		expect(getCurrentShellRoute("/skills")).toBe(shellRouteMap.skills);
+		expect(shellRouteMap.skills.shortcut).toBe("K");
+		expect(shellRoutes.findIndex((route) => route.id === "skills")).toBe(
+			shellRoutes.findIndex((route) => route.id === "sessions") + 1,
+		);
 	});
 
 	it("keeps primary shell shortcuts unique", () => {

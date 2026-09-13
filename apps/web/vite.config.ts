@@ -72,16 +72,27 @@ async function resolveAppVersion() {
 // instead of the default local API server. For https targets the proxy rewrites
 // the Host/Origin headers and cookie domain so the remote server's origin checks
 // pass and its session cookie sticks to localhost.
-function buildApiProxy(target: string) {
-	if (!target.startsWith("https://")) {
-		return { "/api": target, "/rpc": target };
+function buildApiProxy(target: string, bearerToken?: string) {
+	const headers: Record<string, string> = {};
+	if (target.startsWith("https://")) {
+		headers.origin = target;
+	}
+	if (bearerToken) {
+		headers.authorization = `Bearer ${bearerToken}`;
+		// Better Auth's bearer plugin appends its session cookie. Strip any stale
+		// browser cookie so the server-side bearer identity wins deterministically.
+		headers.cookie = "";
 	}
 
 	const options = {
 		target,
-		changeOrigin: true,
-		cookieDomainRewrite: "localhost",
-		headers: { origin: target },
+		...(target.startsWith("https://")
+			? {
+					changeOrigin: true,
+					cookieDomainRewrite: "localhost",
+				}
+			: {}),
+		...(Object.keys(headers).length > 0 ? { headers } : {}),
 	};
 
 	return { "/api": options, "/rpc": options };
@@ -94,6 +105,8 @@ export default defineConfig(async ({ mode }) => {
 		env.RUDEL_API_TARGET ??
 		process.env.RUDEL_API_TARGET ??
 		"http://localhost:4010";
+	const apiBearerToken =
+		env.RUDEL_API_BEARER_TOKEN ?? process.env.RUDEL_API_BEARER_TOKEN;
 
 	return {
 		define: {
@@ -102,7 +115,7 @@ export default defineConfig(async ({ mode }) => {
 		plugins: [react(), tailwindcss()],
 		server: {
 			port: 4011,
-			proxy: buildApiProxy(apiTarget),
+			proxy: buildApiProxy(apiTarget, apiBearerToken),
 		},
 		resolve: {
 			alias: {
@@ -111,12 +124,18 @@ export default defineConfig(async ({ mode }) => {
 		},
 		test: {
 			environment: "jsdom",
+			exclude: [
+				...configDefaults.exclude,
+				"e2e/**",
+				"tools/**",
+				"**/*.bun-test.ts",
+				"**/*.bun-test.tsx",
+			],
 			environmentOptions: {
 				jsdom: {
 					url: "http://localhost:4011",
 				},
 			},
-			exclude: [...configDefaults.exclude, "e2e/**"],
 			setupFiles: ["./src/test/setup.ts"],
 		},
 	};

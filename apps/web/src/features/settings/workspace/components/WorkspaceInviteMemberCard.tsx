@@ -1,31 +1,19 @@
-import {
-	CheckIcon,
-	CopyIcon,
-	MailIcon,
-	UserPlusIcon,
-	XIcon,
-} from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/app/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
-import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import {
 	Select,
 	SelectContent,
-	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import {
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
 export function WorkspaceInviteMemberCard({
@@ -38,6 +26,8 @@ export function WorkspaceInviteMemberCard({
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization",
 	});
+	const emailId = useId();
+	const roleId = useId();
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
 	const [isInviting, setIsInviting] = useState(false);
@@ -45,7 +35,7 @@ export function WorkspaceInviteMemberCard({
 	const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
 	const [copiedInviteLink, setCopiedInviteLink] = useState(false);
 
-	const inviteMember = async (event: React.FormEvent) => {
+	const inviteMember = async (event: FormEvent) => {
 		event.preventDefault();
 		const email = inviteEmail.trim();
 		if (!email) {
@@ -100,131 +90,102 @@ export function WorkspaceInviteMemberCard({
 	};
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<div className="flex items-start gap-3">
-					<div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-						<UserPlusIcon />
-					</div>
-					<div className="flex min-w-0 flex-1 flex-col gap-1">
-						<CardTitle>Invite member</CardTitle>
-						<CardDescription>
-							Send a role-scoped invitation link to a teammate.
-						</CardDescription>
-					</div>
-				</div>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
+		<form onSubmit={inviteMember}>
+			<WorkspaceSettingsGroup
+				title="Invite member"
+				description="Invite a teammate by email and choose their workspace role."
+			>
 				{!canManage ? (
-					<p className="text-sm text-muted-foreground">
+					<p className="workspace-settings-empty">
 						Only admins and owners can invite new members.
 					</p>
 				) : null}
-				<form onSubmit={inviteMember} className="flex flex-col gap-3">
-					<Field className="gap-2">
-						<FieldLabel htmlFor="invite-email">Email</FieldLabel>
-						<Input
-							id="invite-email"
-							type="email"
-							value={inviteEmail}
-							onChange={(event) => {
-								setInviteEmail(event.target.value);
-								if (inviteLink) {
-									setInviteLink(null);
-									setInvitedEmail(null);
-								}
-							}}
-							placeholder="teammate@company.com"
-							disabled={!canManage || isInviting}
-						/>
-					</Field>
-					<Field className="gap-2">
-						<FieldLabel htmlFor="invite-role">Role</FieldLabel>
-						<Select
-							value={inviteRole}
-							onValueChange={(value) => {
-								if (value === "member" || value === "admin") {
-									setInviteRole(value);
-								}
-							}}
-							disabled={!canManage || isInviting}
-						>
-							<SelectTrigger
-								id="invite-role"
-								className="w-full justify-between"
-							>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectGroup>
-									<SelectItem value="member">Member</SelectItem>
-									<SelectItem value="admin">Admin</SelectItem>
-								</SelectGroup>
-							</SelectContent>
-						</Select>
-					</Field>
+				<WorkspaceSettingsRow label="Email" controlId={emailId}>
+					<Input
+						id={emailId}
+						type="email"
+						value={inviteEmail}
+						onChange={(event) => {
+							setInviteEmail(event.target.value);
+							if (inviteLink) {
+								setInviteLink(null);
+								setInvitedEmail(null);
+							}
+						}}
+						placeholder="teammate@company.com"
+						disabled={!canManage || isInviting}
+						required
+					/>
+				</WorkspaceSettingsRow>
+				<WorkspaceSettingsRow label="Role" controlId={roleId}>
+					<Select
+						value={inviteRole}
+						onValueChange={(value) => {
+							if (value === "member" || value === "admin") setInviteRole(value);
+						}}
+						disabled={!canManage || isInviting}
+					>
+						<SelectTrigger id={roleId}>
+							<SelectValue>
+								{inviteRole === "admin" ? "Admin" : "Member"}
+							</SelectValue>
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="member">Member</SelectItem>
+							<SelectItem value="admin">Admin</SelectItem>
+						</SelectContent>
+					</Select>
+				</WorkspaceSettingsRow>
+				<div className="workspace-settings-actions">
 					<Button
 						type="submit"
+						size="sm"
 						disabled={
 							!canManage || isInviting || inviteEmail.trim().length === 0
 						}
 					>
-						<MailIcon data-icon="inline-start" />
 						{isInviting ? "Sending invite…" : "Send invite"}
 					</Button>
-				</form>
-
+				</div>
 				{inviteLink ? (
-					<Card
-						size="sm"
-						className="bg-muted/20 shadow-none ring-1 ring-border/60"
-					>
-						<CardContent className="flex flex-col gap-3">
-							<div className="flex flex-col gap-1">
-								<span className="font-medium text-foreground">
-									Invite ready
-								</span>
-								<span className="text-sm text-muted-foreground">
-									{invitedEmail
-										? `Share this link with ${invitedEmail}.`
-										: "Share this link with the invited member."}
-								</span>
-							</div>
-							<div className="rounded-lg bg-background px-3 py-2 text-sm text-muted-foreground ring-1 ring-border/60">
-								{inviteLink}
-							</div>
-							<div className="flex flex-wrap gap-2">
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => void copyInviteLink()}
-								>
-									{copiedInviteLink ? (
-										<CheckIcon data-icon="inline-start" />
-									) : (
-										<CopyIcon data-icon="inline-start" />
-									)}
-									{copiedInviteLink ? "Copied" : "Copy link"}
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => {
-										setInviteLink(null);
-										setInvitedEmail(null);
-										setCopiedInviteLink(false);
-									}}
-								>
-									<XIcon data-icon="inline-start" />
-									Dismiss
-								</Button>
-							</div>
-						</CardContent>
-					</Card>
+					<div className="workspace-settings-link-surface">
+						<p className="workspace-settings-status">
+							{invitedEmail
+								? `Share this link with ${invitedEmail}.`
+								: "Share this link with the invited member."}
+						</p>
+						<div className="workspace-settings-link-value">
+							<Input
+								aria-label="Email invitation link"
+								value={inviteLink}
+								readOnly
+							/>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => void copyInviteLink()}
+							>
+								{copiedInviteLink ? "Copied" : "Copy link"}
+							</Button>
+						</div>
+						<div className="workspace-settings-link-actions">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => {
+									setInviteLink(null);
+									setInvitedEmail(null);
+									setCopiedInviteLink(false);
+								}}
+							>
+								Dismiss
+							</Button>
+						</div>
+					</div>
 				) : null}
-			</CardContent>
-		</Card>
+			</WorkspaceSettingsGroup>
+		</form>
 	);
 }

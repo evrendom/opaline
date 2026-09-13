@@ -117,7 +117,6 @@ describe("session detail payload contracts", () => {
 			"-1",
 			"1.0",
 			"18446744073709551616",
-			"2026-08-16T08:30:00.123Z",
 		]) {
 			expect(SessionDetailRevisionSchema.safeParse(invalid).success).toBe(
 				false,
@@ -359,25 +358,46 @@ describe("session detail payload contracts", () => {
 						{
 							id: "reasoning-1",
 							kind: "reasoning",
+							provider: "codex",
 							text: "Think",
 							timestamp: "2026-08-16T08:30:01.123Z",
 						},
 						{
 							id: "tool-1",
-							input: { description: "Run the tests" },
+							input: {
+								__rudel_codex_operation: {
+									operationId: "operation-1",
+									provider: "codex",
+								},
+								description: "Run the tests",
+							},
 							kind: "tool",
 							result: {
-								content: "ok",
+								content: [
+									{ rawType: "input_text", text: "ok", type: "text" },
+									{
+										rawType: "input_image",
+										source: { type: "url", url: "data:image/png;base64,AAAA" },
+										type: "image",
+									},
+									{
+										rawType: "object",
+										type: "structured",
+										value: { ok: true },
+									},
+								],
 								isError: false,
 								subagentId: "agent-nested",
 							},
 							timestamp: "2026-08-16T08:30:02.123Z",
 							toolName: "Agent",
+							provider: "codex",
 						},
 					],
 					executionMode: "default",
 					id: "agent-1",
 					kind: "agent",
+					provider: "codex",
 					timestamp: "2026-08-16T08:30:01.123Z",
 				},
 			],

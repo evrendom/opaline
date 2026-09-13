@@ -6,9 +6,9 @@ import type {
 	RudelCodexSessionsRow,
 	RudelSessionAnalyticsRow,
 } from "../generated/chkit-types.js";
+import { withSessionFilter } from "../mv-session-filter.js";
 import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
 import { createTestExecutor, waitForQuery } from "./helpers/executor.js";
-import { withSessionFilter } from "./mv-session-filter.js";
 
 setDefaultTimeout(120_000);
 
@@ -18,6 +18,9 @@ const errorTestId = `${testPrefix}_errors`;
 const skillTestId = `${testPrefix}_skills`;
 const underflowTestId = `${testPrefix}_underflow`;
 const identityTestId = `${testPrefix}_identity`;
+const modernSubagentTestId = `${testPrefix}_modern_subagents`;
+const cappedSubagentTestId = `${testPrefix}_capped_subagents`;
+const failedSubagentTestId = `${testPrefix}_failed_subagent`;
 // Unique per run. All fixtures share it, so afterAll can clean by organization.
 const orgId = `org_${testPrefix}`;
 
@@ -98,7 +101,183 @@ function codexUnderflowTranscript(): string {
 		.join("\n");
 }
 
+function codexSubagentTranscript(input: {
+	capped?: boolean;
+	failedOnly?: boolean;
+	modernCount?: number;
+}): string {
+	const lines: unknown[] = [
+		{
+			timestamp: "2026-08-21T10:00:00.000Z",
+			type: "session_meta",
+			payload: { model_provider: "openai" },
+		},
+	];
+	if (input.capped) {
+		for (let index = 0; index < 8_005; index += 1) {
+			lines.push({ type: "event_msg", payload: { type: "noise", index } });
+		}
+	}
+
+	const modernCount = input.modernCount ?? 0;
+	for (let index = 0; index < modernCount; index += 1) {
+		const callId = `modern_spawn_${index}`;
+		lines.push({
+			timestamp: `2026-08-21T10:00:${String(index + 1).padStart(2, "0")}.000Z`,
+			type: "response_item",
+			payload: {
+				type: "function_call",
+				name: "spawn_agent",
+				arguments: JSON.stringify({
+					task_name: `review_${index}`,
+					...(index === 0 ? { model: "gpt-5.6-sol" } : {}),
+				}),
+				call_id: callId,
+			},
+		});
+		lines.push({
+			timestamp: `2026-08-21T10:01:${String(index + 1).padStart(2, "0")}.000Z`,
+			type: "response_item",
+			payload: {
+				type: "function_call_output",
+				id: `output_${index}`,
+				call_id: callId,
+				output: JSON.stringify({ task_name: `/root/review_${index}` }),
+			},
+		});
+	}
+
+	const oldCallId = input.failedOnly ? "failed_explorer" : "old_explorer";
+	if (input.capped || input.failedOnly) {
+		lines.push({
+			timestamp: "2026-08-21T10:02:00.000Z",
+			type: "response_item",
+			payload: {
+				type: "function_call",
+				name: "spawn_agent",
+				arguments: JSON.stringify({
+					agent_type: "explorer",
+					message: "inspect",
+				}),
+				call_id: oldCallId,
+			},
+		});
+		lines.push({
+			timestamp: "2026-08-21T10:02:01.000Z",
+			type: "response_item",
+			payload: {
+				type: "function_call_output",
+				call_id: oldCallId,
+				output: input.failedOnly
+					? "Cannot spawn another agent"
+					: JSON.stringify({ agent_id: "agent-old" }),
+			},
+		});
+	}
+
+	lines.push(
+		{
+			timestamp: "2026-08-21T10:03:00.000Z",
+			type: "response_item",
+			payload: {
+				type: "message",
+				role: "assistant",
+				content: [{ type: "output_text", text: '{"name":"spawn_agent"}' }],
+			},
+		},
+		{
+			timestamp: "2026-08-21T10:03:01.000Z",
+			type: "response_item",
+			payload: {
+				type: "function_call_output",
+				call_id: "wait_agent_call",
+				output: JSON.stringify({ task_name: "/root/not-a-spawn" }),
+			},
+		},
+		{
+			timestamp: "2026-08-21T10:03:02.000Z",
+			type: "event_msg",
+			payload: { type: "sub_agent_activity", agent_id: "decoy" },
+		},
+	);
+	return lines.map((line) => JSON.stringify(line)).join("\n");
+}
+
+async function readSubagentAnalytics(
+	sessionId: string,
+	content: string,
+): Promise<RudelSessionAnalyticsRow> {
+	const now = new Date().toISOString().replace("Z", "");
+	await ingestRudelCodexSessions(executor, [
+		{
+			content,
+			filter_version: 0,
+			git_branch: "main",
+			git_remote: "github.com/testorg/testproject",
+			git_sha: null,
+			ingested_at: now,
+			revision: (BigInt(Date.now()) << 16n).toString(),
+			last_interaction_date: now,
+			organization_id: orgId,
+			package_name: "myapp",
+			package_type: "package.json",
+			project_path: "/Users/testuser/projects/myapp",
+			session_date: now,
+			session_id: sessionId,
+			tag: "codex-subagent-test",
+			user_id: "user_subagent",
+		},
+	]);
+	const results = await waitForQuery<RudelSessionAnalyticsRow>(
+		executor,
+		withSessionFilter(CODEX_SESSION_ANALYTICS_MV_SQL, {
+			organizationId: orgId,
+			sessionId,
+		}),
+	);
+	const analytics = results[0];
+	if (!analytics) throw new Error("no subagent analytics row produced");
+	return analytics;
+}
+
 describe("codex_session_analytics_mv", () => {
+	test("counts successful modern spawns and ignores non-spawn task envelopes", async () => {
+		const analytics = await readSubagentAnalytics(
+			modernSubagentTestId,
+			codexSubagentTranscript({ modernCount: 9 }),
+		);
+
+		expect(analytics.subagent_count).toBe(9);
+		expect(analytics.subagent_types).toEqual([]);
+		expect(analytics.native_subagents).toEqual(
+			Array.from({ length: 9 }, (_, index) => [
+				`call:modern_spawn_${index}`,
+				index === 0 ? "gpt-5.6-sol" : "",
+			]),
+		);
+	}, 120_000);
+
+	test("extracts an old successful role beyond the line cap", async () => {
+		const analytics = await readSubagentAnalytics(
+			cappedSubagentTestId,
+			codexSubagentTranscript({ capped: true }),
+		);
+
+		expect(analytics.subagent_count).toBe(1);
+		expect(analytics.subagent_types).toEqual(["explorer"]);
+	}, 120_000);
+
+	test("does not count a failed spawn attempt or expose its requested role", async () => {
+		const analytics = await readSubagentAnalytics(
+			failedSubagentTestId,
+			codexSubagentTranscript({ failedOnly: true }),
+		);
+
+		expect(analytics.subagent_count).toBe(0);
+		expect(analytics.subagent_types).toEqual([]);
+		expect(analytics.native_subagents).toEqual([]);
+	}, 120_000);
+
 	test("derives correct token counts from Codex token_count events", async () => {
 		const fixtureContent = await readFile(
 			resolve(import.meta.dir, "fixtures", "codex-session.jsonl"),

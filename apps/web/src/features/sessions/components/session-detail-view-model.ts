@@ -50,29 +50,35 @@ type ClaudeAssistantLine = {
 	usage: z.infer<typeof subagentTokenUsageSchema> | undefined;
 };
 
-export interface SessionSubagentSummary {
+type SessionDetailViewModelSource = Partial<
+	Record<
+		| "content"
+		| "duration_min"
+		| "git_branch"
+		| "git_sha"
+		| "input_tokens"
+		| "last_interaction_date"
+		| "model_used"
+		| "output_tokens"
+		| "project_path"
+		| "repository"
+		| "session_date"
+		| "session_id"
+		| "skills"
+		| "slash_commands"
+		| "source"
+		| "subagents"
+		| "success_score"
+		| "total_tokens"
+		| "user_id",
+		unknown
+	>
+>;
+
+interface SessionSubagentSummary {
 	id: string;
 	model: string | undefined;
 	totalTokens: number | undefined;
-}
-
-export interface SessionDetailViewModelSource {
-	content?: unknown;
-	duration_min?: unknown;
-	estimated_cost?: unknown;
-	git_branch?: unknown;
-	git_sha?: unknown;
-	input_tokens?: unknown;
-	model_used?: unknown;
-	output_tokens?: unknown;
-	repository?: unknown;
-	session_date?: unknown;
-	session_id?: unknown;
-	skills?: unknown;
-	slash_commands?: unknown;
-	subagents?: unknown;
-	total_interactions?: unknown;
-	user_id?: unknown;
 }
 
 function parseSubagentTranscriptLine(
@@ -182,7 +188,7 @@ function summarizeSubagentTranscript(
 	};
 }
 
-export function summarizeSessionSubagents(
+function summarizeSessionSubagents(
 	subagents: Readonly<Record<string, string>>,
 ) {
 	return Object.entries(subagents).map(([id, content]) =>
@@ -190,11 +196,14 @@ export function summarizeSessionSubagents(
 	);
 }
 
-function formatSessionCost(value: number | null) {
-	const resolvedValue = value ?? 0;
-	const fractionDigits = resolvedValue >= 100 ? 0 : 2;
+export function formatSessionCost(value: number | null | undefined) {
+	if (value === undefined || value === null) {
+		return "—";
+	}
 
-	return resolvedValue.toLocaleString("en-US", {
+	const fractionDigits = value >= 100 ? 0 : 2;
+
+	return value.toLocaleString("en-US", {
 		style: "currency",
 		currency: "USD",
 		minimumFractionDigits: fractionDigits,
@@ -216,25 +225,14 @@ export function buildSessionDetailViewModel(
 			: formatUsername(safeUserId, userMap);
 	const safeInputTokens = toNumber(session.input_tokens);
 	const safeOutputTokens = toNumber(session.output_tokens);
+	const safeTotalTokens =
+		session.total_tokens === undefined
+			? safeInputTokens + safeOutputTokens
+			: toNumber(session.total_tokens);
 	const safeDurationMin =
 		session.duration_min === undefined
 			? undefined
 			: toNumber(session.duration_min);
-	const parsedEstimatedCost =
-		typeof session.estimated_cost === "number"
-			? session.estimated_cost
-			: typeof session.estimated_cost === "string" &&
-					session.estimated_cost.trim() !== ""
-				? Number(session.estimated_cost)
-				: Number.NaN;
-	const safeEstimatedCost =
-		Number.isFinite(parsedEstimatedCost) && parsedEstimatedCost >= 0
-			? parsedEstimatedCost
-			: null;
-	const safeTotalInteractions =
-		session.total_interactions === undefined
-			? undefined
-			: toNumber(session.total_interactions);
 	const safeSkills = toStringArray(session.skills);
 	const safeSlashCommands = toStringArray(session.slash_commands);
 	const safeSubagents = toSubagentMap(session.subagents);
@@ -242,6 +240,14 @@ export function buildSessionDetailViewModel(
 	const safeGitBranch = toOptionalString(session.git_branch);
 	const safeGitSha = toOptionalString(session.git_sha);
 	const safeModelUsed = toOptionalString(session.model_used) ?? undefined;
+	const safeLastInteractionDate =
+		toOptionalString(session.last_interaction_date) ?? undefined;
+	const safeProjectPath = toOptionalString(session.project_path) ?? undefined;
+	const safeSource = toOptionalString(session.source) ?? undefined;
+	const safeSuccessScore =
+		session.success_score === undefined
+			? undefined
+			: toNumber(session.success_score);
 	const safeContent = toContentString(session.content);
 	const metadataBadges = createSessionMetadataBadges({
 		gitBranch: safeGitBranch,
@@ -251,7 +257,7 @@ export function buildSessionDetailViewModel(
 	const subagentSummaries = summarizeSessionSubagents(safeSubagents);
 	const subagentNames = subagentSummaries.map((subagent) => subagent.id);
 	const tokenUsageLabel = `${safeInputTokens.toLocaleString()} / ${safeOutputTokens.toLocaleString()}`;
-	const costLabel = formatSessionCost(safeEstimatedCost);
+	const costLabel = formatSessionCost(undefined);
 
 	return {
 		conversationSummary,
@@ -259,16 +265,22 @@ export function buildSessionDetailViewModel(
 		metadataBadges,
 		safeContent,
 		safeDurationMin,
+		safeGitBranch,
 		safeGitSha,
 		safeInputTokens,
+		safeLastInteractionDate,
 		safeModelUsed,
 		safeOutputTokens,
+		safeProjectPath,
+		safeRepository,
 		safeSessionDate,
 		safeSessionId,
 		safeSkills,
 		safeSlashCommands,
+		safeSource,
 		safeSubagents,
-		safeTotalInteractions,
+		safeSuccessScore,
+		safeTotalTokens,
 		safeUserDisplayName,
 		safeUserId,
 		subagentNames,

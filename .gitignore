@@ -75,3 +75,8 @@ coverage/
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/learnings/
+
+# Combined marketing and product build
+dist-site/
+dist-demo/
+.demo-ssr/

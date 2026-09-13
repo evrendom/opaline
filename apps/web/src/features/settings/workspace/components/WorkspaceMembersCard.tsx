@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
+import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
 export function WorkspaceMembersCard({
@@ -78,22 +72,14 @@ export function WorkspaceMembersCard({
 	};
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<CardTitle>Members</CardTitle>
-				<CardDescription>
-					Everyone who currently has access to this workspace.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<WorkspaceMembersTable
-					members={members}
-					canEdit={canManage}
-					pendingKey={pendingMemberKey}
-					onRoleChange={(memberId, role) => void updateRole(memberId, role)}
-					onRemove={(memberId) => void removeMember(memberId)}
-				/>
-			</CardContent>
-		</Card>
+		<WorkspaceSettingsGroup title="Members" hideTitle>
+			<WorkspaceMembersTable
+				members={members}
+				canEdit={canManage}
+				pendingKey={pendingMemberKey}
+				onRoleChange={(memberId, role) => void updateRole(memberId, role)}
+				onRemove={(memberId) => void removeMember(memberId)}
+			/>
+		</WorkspaceSettingsGroup>
 	);
 }

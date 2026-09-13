@@ -1,6 +1,9 @@
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { getAdapter } from "@rudel/agent-adapters";
-import type { IngestSessionInput } from "@rudel/api-routes";
+import {
+	type IngestSessionInput,
+	SessionOverviewAnalyticsSchema,
+} from "@rudel/api-routes";
 import { SCAN_VERSION } from "@rudel/language-signals";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { deleteOrgSessions } from "../services/org-session.service.js";
@@ -82,11 +85,13 @@ async function ingestRawSession(input: {
 	organizationId?: string;
 	sessionId: string;
 	userId?: string;
+	subagents?: IngestSessionInput["subagents"];
 }) {
 	const organizationId = input.organizationId ?? orgId;
 	const ingestUserId = input.userId ?? userId;
 	const sessionInput: IngestSessionInput = {
 		content: input.content,
+		subagents: input.subagents,
 		projectPath: "/test/session-language-signals",
 		sessionId: input.sessionId,
 		source: "claude_code",
@@ -428,12 +433,24 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		const filteredUserId = `language_signals_filtered_user_${runId}`;
 		const zeroSessionId = `list_zero_${runId}`;
 		const noRowSessionId = `list_no_row_${runId}`;
-		const countedContent = transcript("shit sorry excellent");
+		const countedContent = transcript(
+			"shit sorry excellent",
+			"fuck sorry great work",
+		);
 		const filteredContent = transcript("shit shit sorry");
 		const zeroContent = transcript("plain prompt");
 
 		const countedRaw = await ingestRawSession({
 			content: countedContent,
+			subagents: [
+				{
+					agentId: "child-haiku",
+					content: transcript("inspect", "done").replaceAll(
+						"claude-sonnet-4-5",
+						"claude-haiku-4-5",
+					),
+				},
+			],
 			ingestedAt: new Date("2099-01-01T00:00:10.000Z"),
 			sessionId: countedSessionId,
 		});
@@ -499,10 +516,25 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		const byId = new Map(
 			sessions.map((session) => [session.session_id, session]),
 		);
+		expect(
+			SessionOverviewAnalyticsSchema.array().safeParse(sessions).success,
+		).toBe(true);
 		expect(byId.get(countedSessionId)).toMatchObject({
 			member_apologies: 1,
 			member_positive: 1,
 			member_swears: 1,
+			member_apology_matches: ["sorry"],
+			member_positive_matches: ["excellent"],
+			member_swear_matches: ["shit"],
+			model_apology_matches: ["sorry"],
+			// The shared ledger scanner deliberately excludes model praise.
+			model_positive_matches: [],
+			model_swear_matches: ["fuck"],
+			error_count: 0,
+			subagent_count: 1,
+			native_subagents: [
+				{ subagent_id: "child-haiku", model: "claude-haiku-4-5" },
+			],
 		});
 		expect(byId.get(zeroSessionId)).toMatchObject({
 			member_apologies: 0,
@@ -516,7 +548,26 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			model_apologies: 0,
 			model_positive: 0,
 			model_swears: 0,
+			member_apology_matches: [],
+			member_positive_matches: [],
+			member_swear_matches: [],
+			model_apology_matches: [],
+			model_positive_matches: [],
+			model_swear_matches: [],
 		});
+
+		// Repeat the real absolute-range read: the deployed nested pricing/signal
+		// query intermittently returned zero counts despite persisted matches.
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const repeated = await getSessionAnalytics(orgId, {
+				end_date: day,
+				limit: 100,
+				start_date: day,
+			});
+			expect(
+				repeated.find((session) => session.session_id === countedSessionId),
+			).toEqual(byId.get(countedSessionId));
+		}
 
 		const filteredSessions = await getSessionAnalytics(orgId, {
 			end_date: day,

@@ -4,6 +4,7 @@
 		"dev": {
 			"passThroughEnv": [
 				"$TURBO_EXTENDS$",
+				"PG_DIRECT_CONNECTION_STRING",
 				"TRUSTED_PROXY_HOPS",
 				"CRON_SECRET",
 				"RATE_LIMIT_WRAPPED_SHARE_LOOKUP_MAX",
@@ -49,6 +50,7 @@
 		"test:integration": {
 			"passThroughEnv": [
 				"PG_CONNECTION_STRING",
+				"PG_DIRECT_CONNECTION_STRING",
 				"CLICKHOUSE_URL",
 				"CLICKHOUSE_USER",
 				"CLICKHOUSE_USERNAME",

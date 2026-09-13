@@ -47,6 +47,26 @@ describe("historical skills API guardrails", () => {
 		expect(serviceSource).toContain("uniqExact(tuple(");
 		expect(serviceSource).toContain("{skillName:String}");
 		expect(serviceSource).toContain("ORDER BY session_count DESC, name ASC");
+		expect(serviceSource).toContain(
+			"HISTORICAL_SKILL_PREVIEW_CHARACTER_LIMIT = 1_600",
+		);
+		expect(serviceSource).toContain("LEFT ANY JOIN");
+		expect(serviceSource).toContain("FROM rudel.session_analytics FINAL");
+		expect(serviceSource).toContain("FROM active_skill_uses AS su");
+		expect(serviceSource).toContain("LEFT JOIN (");
+		expect(serviceSource).toContain("su.agent = 'claude'");
+		expect(serviceSource).toContain("sa.source = 'claude_code'");
+		expect(serviceSource).toContain("su.agent = 'codex'");
+		expect(serviceSource).toContain("sa.source = 'codex'");
+		expect(serviceSource).toContain("coalesce(sa.project_path, '')");
+		expect(serviceSource).toContain('repoIdentity.repoName ?? "No repository"');
+		expect(serviceSource).toContain("HISTORICAL_SKILL_ATTRIBUTION_LIMIT = 3");
+		expect(serviceSource).toContain("{attributionLimit:UInt64}");
+		expect(serviceSource).toContain("resolveRepoIdentity({");
+		expect(serviceSource).toContain("substringUTF8(");
+		expect(serviceSource).toContain(
+			"PREWHERE organization_id = {organizationId:String}",
+		);
 		expect(serviceSource).toContain("max_execution_time: 30");
 		expect(serviceSource).toContain(
 			"max_bytes_to_read: String(2 * 1024 * 1024 * 1024)",
@@ -73,8 +93,9 @@ describe("historical skills API guardrails", () => {
 		expect(persistenceSource).toContain("rudel.skill_receipts");
 		expect(persistenceSource).toContain("rudel.skill_uses");
 		expect(persistenceSource).not.toContain("JOIN latest_skill_receipts");
-		expect(persistenceSource).toContain("skill_filtered_use_identities");
 		expect(persistenceSource).toContain("FROM latest_skill_receipts");
+		expect(persistenceSource).toContain("skill_filtered_use_identities");
+
 		expect(serviceSource).toContain("max(used_at) AS last_used_at_raw");
 		expect(serviceSource).toContain("ORDER BY last_used_at_raw DESC");
 		expect(

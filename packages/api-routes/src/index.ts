@@ -1,3 +1,5 @@
+export { CliConnectionIdSchema } from "./cli-connection.js";
+
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import {
@@ -53,10 +55,10 @@ import {
 	ROIDashboardSchema,
 	ROIMetricsSchema,
 	ROITrendSchema,
-	SessionAnalyticsSchema,
 	SessionAnalyticsSummaryComparisonSchema,
 	SessionAnalyticsSummarySchema,
 	SessionListInputSchema,
+	SessionOverviewAnalyticsSchema,
 	SuccessRateSchema,
 	TeamSummaryComparisonSchema,
 	UsageTrendDataSchema,
@@ -96,6 +98,7 @@ export {
 	SESSION_DETAIL_ACTIVITY_POINT_LIMIT,
 	SESSION_DETAIL_ANCHOR_NOT_FOUND_CODE,
 	SESSION_DETAIL_ANCHOR_NOT_FOUND_MESSAGE,
+	SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
 	SESSION_DETAIL_BODY_MAX_RAW_BYTES,
 	SESSION_DETAIL_CONTEXT_ERROR_LIMIT,
 	SESSION_DETAIL_CONTEXT_FILE_LIMIT,
@@ -112,6 +115,10 @@ export {
 	SESSION_DETAIL_WINDOW_PAGE_TURNS,
 	type SessionDetailAnchorNotFoundData,
 	SessionDetailAnchorNotFoundDataSchema,
+	type SessionDetailBodyChunk,
+	type SessionDetailBodyChunkInput,
+	SessionDetailBodyChunkInputSchema,
+	SessionDetailBodyChunkSchema,
 	type SessionDetailOverview,
 	type SessionDetailOverviewInput,
 	SessionDetailOverviewInputSchema,
@@ -152,6 +159,7 @@ export * from "./schemas/wrapped-decimal-claim.js";
 export * from "./schemas/wrapped-resume.js";
 export * from "./schemas/wrapped-share.js";
 export { sessionDetailProcedureContracts } from "./session-detail-contract.js";
+export * from "./session-lineage/index.js";
 export {
 	calculateSessionRequestCost,
 	type SessionRequestCostEntry,
@@ -166,13 +174,33 @@ export {
 	AssistantMessageSchema,
 	addUniqueEditedFiles,
 	assignCompactionsBeforeTurns,
+	attachCodexCorrelation,
+	attachCodexOperationMetadata,
+	buildCodexActivityGraph,
 	buildConversationTrace,
+	type CodexActivity,
+	type CodexActivityGraph,
+	type CodexCarrier,
+	type CodexCorrelationConfidence,
+	type CodexLifecycleRecord,
+	type CodexNormalizedOperation,
+	type CodexOperationMetadata,
+	type CodexOrphanOutput,
+	type CodexOutputBlock,
+	type CodexPatchFile,
+	type CodexPatchOperation,
+	type CodexPlanStep,
+	type CodexToolTranslation,
 	type Conversation,
 	type ConversationExecutionMode,
 	ConversationExecutionModeSchema,
 	ConversationSchema,
+	classifySimpleShellCommand,
 	compactPreview,
+	type ExtractedCodexInvocation,
 	extractCodexTokenData,
+	extractCustomExecInvocation,
+	extractCustomExecInvocations,
 	extractSessionCompactionMetadata,
 	extractSessionTurnMetricBreakdown,
 	extractSessionTurnMetrics,
@@ -180,18 +208,26 @@ export {
 	formatClockTime,
 	formatTimeDelta,
 	getClaudeMutationFiles,
-	getCodexMutationFiles,
+	getCodexOperationMetadata,
+	getCodexRawOperationInput,
+	getRawToolInput,
 	getSessionTurnId,
 	getSessionTurnMemberCharacterCount,
 	getSessionTurnMemberPreview,
 	getSessionTurnMemberText,
 	getSessionTurnPreview,
 	getSessionTurnTiming,
+	getTranscriptToolFileActivities,
 	groupTraceIntoTurns,
 	isCodexFormat,
+	isCodexOperationInput,
+	isCodexToolFailure,
+	isCodexToolInput,
+	isRasterImagePath,
 	isSlashCommandMessage,
 	type ParsedSlashCommand,
 	parseCodexConversations,
+	parseCodexPatch,
 	parseConversations,
 	parseSlashCommand,
 	type SessionCompaction,
@@ -204,6 +240,7 @@ export {
 	SummaryEntrySchema,
 	type SystemEntry,
 	SystemEntrySchema,
+	stripCodexInjectedBlocks,
 	type TextContent,
 	TextContentSchema,
 	type ThinkingContent,
@@ -211,6 +248,12 @@ export {
 	type TokenUsageEvent,
 	type ToolResultContent,
 	ToolResultContentSchema,
+	type ToolResultImageContent,
+	ToolResultImageContentSchema,
+	type ToolResultStructuredContent,
+	ToolResultStructuredContentSchema,
+	type ToolResultTextContent,
+	ToolResultTextContentSchema,
 	type ToolUseContent,
 	ToolUseContentSchema,
 	type TraceEvent,
@@ -218,7 +261,10 @@ export {
 	type TraceSkillContent,
 	type TraceSystemType,
 	type TraceToolResult,
+	type TranscriptFileActivity,
+	toConversationResultContent,
 	toolResultText,
+	translateCodexToolCall,
 	type UserContent,
 	type UserEntry,
 	UserEntrySchema,
@@ -235,6 +281,7 @@ export const UserSchema = z.object({
 	email: z.string(),
 	name: z.string(),
 	image: z.string().nullable(),
+	jobTitle: z.string().nullable().optional(),
 	activeOrganizationId: z.string().nullable(),
 });
 
@@ -562,7 +609,7 @@ export const SESSION_OWNERSHIP_CONFLICT_MESSAGE =
 export const SESSION_UPLOAD_SHRINK_REJECTED_CODE =
 	"SESSION_UPLOAD_SHRINK_REJECTED";
 export const SESSION_UPLOAD_SHRINK_REJECTED_MESSAGE =
-	"This upload is smaller than the stored session and was refused to protect existing data. Inspect the transcript, then use `opaline upload --force-replace` only if the replacement is intentional. If your CLI does not recognize the flag, upgrade @opalinehq/cli first.";
+	"This upload is smaller than the stored session and was refused to protect existing data. Inspect the transcript, then use `opaline upload --force-replace` only if the replacement is intentional. If your CLI does not recognize the flag, upgrade opaline first.";
 
 export type IngestSessionInput = z.infer<typeof IngestSessionInputSchema>;
 
@@ -578,6 +625,7 @@ export const AdminUserSchema = z.object({
 export const UpdateProfileInputSchema = z.object({
 	name: z.string().trim().min(1).max(100),
 	image: z.string().nullable(),
+	jobTitle: z.string().trim().max(100).nullable().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileInputSchema>;
@@ -808,6 +856,7 @@ export const contract = {
 				.output(z.array(ProjectErrorSchema)),
 		},
 		sessions: {
+			detailBodyChunk: sessionDetailProcedureContracts.detailBodyChunk,
 			detailOverview: sessionDetailProcedureContracts.detailOverview,
 			detailSpine: sessionDetailProcedureContracts.detailSpine,
 			detailSubagent: sessionDetailProcedureContracts.detailSubagent,
@@ -815,7 +864,7 @@ export const contract = {
 			detailWindow: sessionDetailProcedureContracts.detailWindow,
 			list: oc
 				.input(SessionListInputSchema)
-				.output(z.array(SessionAnalyticsSchema)),
+				.output(z.array(SessionOverviewAnalyticsSchema)),
 			summary: oc.input(DaysInputSchema).output(SessionAnalyticsSummarySchema),
 			summaryComparison: oc
 				.input(DaysInputSchema)
@@ -866,3 +915,24 @@ export const contract = {
 		},
 	},
 };
+export {
+	CLI_CONNECTION_CODE_TTL_MS,
+	CLI_CONNECTION_PATH,
+	CLI_CONNECTION_TTL_MS,
+	CliConnectionAuthorizeSchema,
+	CliConnectionCreateResponseSchema,
+	CliConnectionRedeemSchema,
+	CliConnectionSecretSchema,
+	type CliConnectionSnapshot,
+	CliConnectionSnapshotSchema,
+	type CliConnectionUpdate,
+	CliConnectionUpdateSchema,
+	isCliConnectionTerminal,
+} from "./cli-connection.js";
+
+export {
+	deriveTranscriptToolActivity,
+	type TranscriptToolActivity,
+	TranscriptToolActivitySchema,
+} from "./session-transcript/transcript-tool-activity.js";
+export { readTranscriptToolOutputText } from "./session-transcript/transcript-tool-output.js";

@@ -1,0 +1,281 @@
+.rich-skill-document {
+	--skill-document-code-background: #f6f8fa;
+	--skill-document-code-border: rgba(31, 35, 40, 0.08);
+	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
+	--skill-document-inline-code-background: rgba(135, 131, 120, 0.15);
+	--skill-document-border: rgba(15, 23, 42, 0.12);
+	--skill-document-table-background: rgba(242, 241, 238, 0.62);
+	min-width: 0;
+	color: var(--dashboardy-heading);
+	font-family: Georgia, ui-serif, serif;
+	font-size: 15px;
+	font-weight: 400;
+	line-height: 24px;
+	overflow-wrap: anywhere;
+}
+
+.dark .rich-skill-document {
+	--skill-document-code-background: #f6f8fa;
+	--skill-document-code-border: rgba(255, 255, 255, 0.12);
+	--skill-document-code-highlight: rgba(255, 255, 255, 0.18);
+	--skill-document-inline-code-background: rgba(255, 255, 255, 0.09);
+	--skill-document-border: rgba(255, 255, 255, 0.16);
+	--skill-document-table-background: rgba(255, 255, 255, 0.055);
+}
+
+.rich-skill-document > :first-child {
+	margin-top: 0;
+}
+
+.rich-skill-document > :last-child {
+	margin-bottom: 0;
+}
+
+.rich-skill-document p {
+	min-height: 24px;
+	margin: 0 0 8px;
+	color: var(--dashboardy-heading);
+	font: inherit;
+}
+
+.rich-skill-document h1,
+.rich-skill-document h2,
+.rich-skill-document h3,
+.rich-skill-document h4 {
+	position: relative;
+	color: var(--dashboardy-heading);
+	font-family: "Libre Baskerville", Baskerville, "Times New Roman", serif;
+	letter-spacing: 0;
+}
+
+.rich-skill-document h1,
+.rich-skill-document h2 {
+	margin: 32px 0 0;
+	font-size: 19px;
+	font-weight: 700;
+	line-height: 28px;
+}
+
+.rich-skill-document h3 {
+	margin: 24px 0 6px;
+	font-size: 17px;
+	font-weight: 600;
+	line-height: 24px;
+}
+
+.rich-skill-document h4 {
+	margin: 18px 0 0;
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 24px;
+}
+
+.rich-skill-document blockquote {
+	margin: 10px 0 8px;
+	padding: 4px 14px;
+	border-left: 3px solid var(--skill-document-border);
+	color: var(--dashboardy-muted);
+}
+
+.rich-skill-document blockquote p {
+	padding-block: 2px;
+	color: inherit;
+}
+
+.rich-skill-document ul,
+.rich-skill-document ol {
+	margin: 5px 0;
+	padding-left: 28px;
+	color: var(--dashboardy-heading);
+	font: inherit;
+}
+
+.rich-skill-document ul {
+	list-style: disc;
+}
+
+.rich-skill-document ol {
+	list-style: decimal;
+}
+
+.rich-skill-document li {
+	padding-left: 2px;
+}
+
+.rich-skill-document li > p {
+	min-height: 0;
+	margin: 0;
+}
+
+.rich-skill-document code:not(.rich-skill-document__code) {
+	padding: 2px 4px;
+	border-radius: 4px;
+	background: var(--skill-document-inline-code-background);
+	color: #c43c4b;
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: 0.85em;
+}
+
+.rich-skill-document__code-block {
+	overscroll-behavior: none;
+	white-space: pre;
+}
+
+.rich-skill-document__plain-code-block {
+	margin: 12px 0 14px;
+	padding: 14px 16px;
+	overflow: auto;
+	border: 0.5px solid var(--skill-document-code-border);
+	border-radius: 8px;
+	background: var(--skill-document-code-background);
+	box-shadow: inset 0 0 0 1px var(--skill-document-code-highlight);
+	color: #1f2328;
+	font-family:
+		"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: inherit;
+	line-height: inherit;
+	tab-size: 2;
+}
+
+.rich-skill-document[data-variant="preview"]
+	.rich-skill-document__plain-code-block {
+	margin: 8px 0 10px;
+	padding: 9px 10px;
+	border-radius: 6px;
+}
+
+.rich-skill-document__code {
+	display: block;
+	font: inherit;
+}
+
+.rich-skill-document hr {
+	height: 1px;
+	margin: 20px 2px;
+	border: 0;
+	background: var(--skill-document-border);
+}
+
+.rich-skill-document__table-scroll {
+	width: 100%;
+	margin: 12px 0;
+	overflow-x: auto;
+}
+
+.rich-skill-document table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+	color: var(--dashboardy-heading);
+	font-family: var(
+		--font-sans,
+		Inter,
+		-apple-system,
+		BlinkMacSystemFont,
+		"Segoe UI",
+		sans-serif
+	);
+	font-size: 14px;
+	line-height: 21px;
+}
+
+.rich-skill-document th,
+.rich-skill-document td {
+	min-width: 92px;
+	padding: 7px 9px;
+	border: 1px solid var(--skill-document-border);
+	vertical-align: top;
+}
+
+.rich-skill-document th {
+	background: var(--skill-document-table-background);
+	font-weight: 650;
+	text-align: left;
+}
+
+.rich-skill-document th p,
+.rich-skill-document td p {
+	min-height: 21px;
+	margin: 0;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.rich-skill-document a {
+	color: var(--dashboardy-accent);
+	text-decoration: underline;
+	text-decoration-color: color-mix(in srgb, currentcolor 34%, transparent);
+	text-underline-offset: 3px;
+}
+
+.rich-skill-document strong {
+	font-weight: 650;
+}
+
+.rich-skill-document[data-variant="preview"] {
+	font-size: 10.5px;
+	line-height: 16px;
+}
+
+.rich-skill-document[data-variant="preview"] p {
+	min-height: 16px;
+	margin-bottom: 5px;
+}
+
+.rich-skill-document[data-variant="preview"] h1,
+.rich-skill-document[data-variant="preview"] h2 {
+	margin-top: 17px;
+	font-size: 14px;
+	line-height: 19px;
+}
+
+.rich-skill-document[data-variant="preview"] h3 {
+	margin: 13px 0 3px;
+	font-size: 12px;
+	line-height: 17px;
+}
+
+.rich-skill-document[data-variant="preview"] h4 {
+	margin-top: 10px;
+	font-size: 11px;
+	line-height: 16px;
+}
+
+.rich-skill-document[data-variant="preview"] blockquote {
+	margin: 6px 0;
+	padding: 2px 8px;
+	border-left-width: 2px;
+}
+
+.rich-skill-document[data-variant="preview"] ul,
+.rich-skill-document[data-variant="preview"] ol {
+	margin: 3px 0;
+	padding-left: 17px;
+}
+
+.rich-skill-document[data-variant="preview"]
+	code:not(.rich-skill-document__code) {
+	padding: 1px 3px;
+	border-radius: 3px;
+}
+
+.rich-skill-document[data-variant="preview"] hr {
+	margin: 10px 1px;
+}
+
+.rich-skill-document[data-variant="preview"]
+	.rich-skill-document__table-scroll {
+	margin: 7px 0;
+}
+
+.rich-skill-document[data-variant="preview"] table {
+	font-size: 9px;
+	line-height: 13px;
+}
+
+.rich-skill-document[data-variant="preview"] th,
+.rich-skill-document[data-variant="preview"] td {
+	min-width: 58px;
+	padding: 4px 5px;
+}

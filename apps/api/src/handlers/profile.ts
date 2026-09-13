@@ -43,15 +43,23 @@ const updateMine = os.profile.updateMine
 				UPDATE "user"
 				SET name = ${trimmedName},
 					image = ${validatedImage},
+					job_title = CASE WHEN ${input.jobTitle !== undefined}
+						THEN ${input.jobTitle?.trim() || null} ELSE job_title END,
 					updated_at = NOW()
 				WHERE id = ${context.user.id}
 			`;
 		});
 
 		const [row] = await sqlClient<
-			Array<{ email: string; id: string; image: string | null; name: string }>
+			Array<{
+				email: string;
+				id: string;
+				image: string | null;
+				name: string;
+				jobTitle: string | null;
+			}>
 		>`
-			SELECT id, email, name, image
+			SELECT id, email, name, image, job_title AS "jobTitle"
 			FROM "user"
 			WHERE id = ${context.user.id}
 			LIMIT 1
@@ -71,6 +79,7 @@ const updateMine = os.profile.updateMine
 			email: row.email,
 			name: row.name,
 			image: row.image ?? null,
+			jobTitle: row.jobTitle,
 			activeOrganizationId,
 		};
 	});

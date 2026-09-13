@@ -11,9 +11,9 @@ import type {
 	RudelCodexSessionsRow,
 	RudelSessionAnalyticsRow,
 } from "../generated/chkit-types.js";
+import { withSessionFilter } from "../mv-session-filter.js";
 import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/claude-session-analytics.js";
 import { createTestExecutor, waitForQuery } from "./helpers/executor.js";
-import { withSessionFilter } from "./mv-session-filter.js";
 
 setDefaultTimeout(120_000);
 
@@ -180,6 +180,8 @@ function buildAnalyticsRow(
 		filter_version: 0,
 		skills: [],
 		slash_commands: [],
+		subagent_count: 0,
+		native_subagents: [],
 		subagent_types: [],
 		ingested_at: now,
 		user_id: "user_test",

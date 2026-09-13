@@ -11,6 +11,18 @@ class ResizeObserverMock implements ResizeObserver {
 }
 
 globalThis.ResizeObserver = ResizeObserverMock;
+window.matchMedia = (query: string): MediaQueryList => ({
+	matches: false,
+	media: query,
+	onchange: null,
+	addListener() {},
+	removeListener() {},
+	addEventListener() {},
+	removeEventListener() {},
+	dispatchEvent() {
+		return true;
+	},
+});
 
 afterEach(() => {
 	cleanup();

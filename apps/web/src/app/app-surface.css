@@ -15,7 +15,7 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-font-heading: var(--app-font-heading);
 	--dashboard-01-font-roster-display: var(--app-font-heading);
 	--dashboard-01-font-roster-mono: "Geist Mono", ui-monospace, monospace;
-	--dashboard-01-content-background: #fefefe;
+	--dashboard-01-content-background: #fcfcfc;
 	--dashboard-01-rail-icon: #a4a7a7;
 	--dashboard-01-rail-icon-active: #121517;
 	--dashboard-01-rail-hover: rgba(0, 0, 0, 0.02);
@@ -327,14 +327,17 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-chrome-turbulence-contrast: 190%;
 	--dashboard-01-chrome-turbulence-darkness: 0.8;
 	--dashboard-01-chrome-highlight-opacity: 0.15;
-	--dashboard-01-chrome-surface: #ffffff;
+	--dashboard-01-chrome-backdrop-fill: var(--dashboard-01-content-background);
+	--dashboard-01-chrome-surface: rgba(235, 235, 235, 0.72);
 	--dashboard-01-chrome-noise-texture:
 		url("/shell/team-lineup-stats-panel-noise.svg"),
 		url("/shell/team-lineup-stats-panel-noise.svg");
-	--dashboard-01-header-height: 3rem;
-	--dashboard-01-window-inset: 0.5rem;
-	--dashboard-01-window-radius: 0.75rem;
-	--dashboard-01-window-shadow: 0 0 4px rgb(0 0 0 / 0.13);
+	--dashboard-01-header-height: 2.75rem;
+	--dashboard-01-window-inset: 0.25rem;
+	--dashboard-01-window-radius: 0.5rem;
+	--dashboard-01-window-shadow:
+		0 1px 2px rgb(17 24 39 / 0.08), 0 16px 40px -28px rgb(17 24 39 / 0.32),
+		0 0 0 1px rgb(17 24 39 / 0.04);
 	--sidebar: var(--dashboard-01-chrome-surface);
 	--sidebar-foreground: oklch(0.145 0 0);
 	--sidebar-primary: oklch(0.205 0 0);
@@ -349,9 +352,9 @@ body:has(.dashboard-01-preview),
 .dashboard-01-preview {
 	position: relative;
 	isolation: isolate;
-	background: var(--sidebar);
+	background: transparent;
 	color: var(--foreground);
-	min-height: 100vh;
+	min-height: 100dvh;
 }
 
 .dark .dashboard-01-theme,
@@ -403,7 +406,8 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-chrome-turbulence-contrast: 190%;
 	--dashboard-01-chrome-turbulence-darkness: 0.8;
 	--dashboard-01-chrome-highlight-opacity: 0.15;
-	--dashboard-01-chrome-surface: oklch(0.205 0 0);
+	--dashboard-01-chrome-backdrop-fill: var(--dashboard-01-content-background);
+	--dashboard-01-chrome-surface: rgba(32, 32, 35, 0.76);
 	--dashboard-01-window-shadow: 0 0 4px rgb(0 0 0 / 0.13);
 	--sidebar: var(--dashboard-01-chrome-surface);
 	--sidebar-foreground: oklch(0.985 0 0);
@@ -417,7 +421,7 @@ body:has(.dashboard-01-preview),
 
 html:has(.dashboard-01-preview),
 body:has(.dashboard-01-preview) {
-	background: var(--dashboard-01-chrome-surface);
+	background-color: var(--dashboard-01-chrome-backdrop-fill);
 }
 
 body:has(.dashboard-01-preview) {
@@ -426,7 +430,7 @@ body:has(.dashboard-01-preview) {
 }
 
 .dark .dashboard-01-preview {
-	background: var(--dashboard-01-chrome-surface);
+	background: transparent;
 	color: var(--foreground);
 }
 
@@ -435,12 +439,19 @@ body:has(.dashboard-01-preview) {
 .dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] {
 	position: relative;
 	isolation: isolate;
+}
+
+.dashboard-01-chrome-frame {
 	background: var(--dashboard-01-chrome-surface);
+	box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
+	backdrop-filter: blur(20px) saturate(1.12);
+	-webkit-backdrop-filter: blur(20px) saturate(1.12);
 }
 
 .dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] {
 	overflow: hidden;
 	border-right-width: 0;
+	background: transparent;
 }
 
 body:has(.dashboard-01-preview)::before,
@@ -453,7 +464,296 @@ body:has(.dashboard-01-preview)::after {
 }
 
 .dashboard-01-window {
-	box-shadow: var(--dashboard-01-window-shadow);
+	box-shadow:
+		0 1px 2px rgb(17 24 39 / 0.08),
+		0 16px 40px -28px rgb(17 24 39 / 0.32),
+		0 0 0 1px rgb(17 24 39 / 0.04);
+}
+
+.dark .dashboard-01-window {
+	box-shadow:
+		0 18px 44px -30px rgb(0 0 0 / 0.72),
+		0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-slot="session-list-header-pane"],
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-slot="sessions-list-pane"],
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-slot="session-workspace-resize-handle"] {
+	display: none;
+}
+
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-slot="session-detail-header-pane"] {
+	border-left: 0;
+	box-shadow: none;
+}
+
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-slot="session-detail-pane"] {
+	box-shadow: none;
+}
+
+/* The split changes only the scroll viewport. Keep the table's query container
+   sized to the full workspace so columns and skill tiers survive pane motion. */
+@container session-workspace (min-width: 0px) {
+	[data-slot="sessions-overview-canvas"] {
+		width: 100cqw;
+	}
+}
+
+/* Keep the real overview behind the moving detail instead of revealing an
+   empty flex-layout slot. Restore the split's normal sizing once it lands. */
+[data-slot="session-workspace"][data-session-pane-moving],
+[data-slot="dashboard-header"][data-session-pane-moving] {
+	position: relative;
+}
+
+.dashboard-01-window
+	[data-session-pane-moving]
+	> [data-slot="sessions-list-pane"],
+.dashboard-01-window
+	[data-session-pane-moving]
+	[data-slot="session-list-header-pane"] {
+	display: flex;
+	flex: 1;
+	width: 100%;
+}
+
+.dashboard-01-window
+	[data-session-pane-moving]
+	> [data-slot="session-detail-pane"],
+.dashboard-01-window
+	[data-session-pane-moving]
+	[data-slot="session-detail-header-pane"] {
+	position: absolute;
+	inset: 0;
+	@media (min-width: 640px) {
+		left: var(
+			--session-pane-motion-left,
+			var(--session-list-pane-width, clamp(20rem, 34vw, 40rem))
+		);
+	}
+}
+
+.dashboard-01-window
+	[data-session-pane-moving]
+	> [data-slot="session-workspace-resize-handle"] {
+	visibility: hidden;
+	position: absolute;
+}
+
+.dashboard-01-window:has([data-session-detail-fullscreen])
+	[data-session-pane-moving] {
+	--session-pane-motion-left: 0px;
+}
+
+.dashboard-01-window [data-session-pane-moving] [data-session-pane-resizing] {
+	left: auto;
+	width: var(--session-pane-resize-width);
+}
+
+/* The pane and its portaled header share Fluid Functionalism's large-surface
+   spring entrance and faster, non-bouncing exit. */
+@media (prefers-reduced-motion: no-preference) {
+	[data-slot="session-detail-pane"],
+	[data-slot="session-detail-header-pane"] {
+		transition: transform var(--session-pane-enter);
+	}
+
+	[data-slot="session-detail-pane"][data-session-pane-closing],
+	[data-slot="session-detail-header-pane"][data-session-pane-closing] {
+		transition: transform var(--session-pane-exit);
+		transform: translateX(100%);
+	}
+
+	@starting-style {
+		[data-slot="session-detail-pane"],
+		[data-slot="session-detail-header-pane"] {
+			transform: translateX(100%);
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-slot="session-detail-pane"],
+	[data-slot="session-detail-header-pane"] {
+		transition: opacity var(--session-pane-fade-enter);
+	}
+
+	[data-slot="session-detail-pane"][data-session-pane-closing],
+	[data-slot="session-detail-header-pane"][data-session-pane-closing] {
+		opacity: 0;
+		transition: opacity var(--session-pane-exit);
+	}
+
+	@starting-style {
+		[data-slot="session-detail-pane"],
+		[data-slot="session-detail-header-pane"] {
+			opacity: 0;
+		}
+	}
+}
+
+.dashboard-01-chrome-sidebar [data-sidebar-nav-icon-lane] svg {
+	stroke-width: 1.75;
+}
+
+.dashboard-01-chrome-sidebar [data-sidebar-nav-row][data-active="true"] {
+	box-shadow:
+		inset 0 0 0 1px rgb(255 255 255 / 0.48),
+		0 1px 2px rgb(17 24 39 / 0.08);
+}
+
+.dark .dashboard-01-chrome-sidebar [data-sidebar-nav-row][data-active="true"] {
+	box-shadow:
+		inset 0 0 0 1px rgb(255 255 255 / 0.08),
+		0 1px 2px rgb(0 0 0 / 0.24);
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"] {
+	isolation: isolate;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::before {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--sidebar-row-hover-bg);
+	content: "";
+	opacity: 0;
+	transition:
+		background-color 160ms cubic-bezier(0.23, 1, 0.32, 1),
+		opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::after {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: rgb(255 255 255 / 0.48);
+	content: "";
+	opacity: 0;
+	-webkit-mask:
+		url("/opaline-trace-fill.svg") center / contain no-repeat,
+		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
+		no-repeat;
+	-webkit-mask-composite: xor;
+	mask:
+		url("/opaline-trace-fill.svg") center / contain no-repeat,
+		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
+		no-repeat;
+	mask-composite: exclude;
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]:hover::before,
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]:active::before {
+	opacity: 1;
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::before {
+	background: var(--sidebar-row-active-bg);
+	filter: drop-shadow(0 1px 2px rgb(17 24 39 / 0.08));
+	opacity: 1;
+}
+
+.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::after {
+	opacity: 1;
+}
+
+.dark
+	.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::before {
+	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.24));
+}
+
+.dark
+	.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::after {
+	background: rgb(255 255 255 / 0.08);
+}
+
+:where(
+		.dashboard-01-chrome-sidebar
+			[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]
+	)
+	[data-sidebar-nav-icon-lane] {
+	position: relative;
+	z-index: 1;
+}
+
+.shell-bottom-navigation {
+	view-transition-name: shell-bottom-navigation;
+}
+
+/* Floating pill navigation: sizes and colors match the reference floating
+   bottom row (44px pill, 40px item pitch, 18px icons, dark-slate glyphs on a
+   light neutral capsule), while hover/active fills reuse the opaline trace
+   shape via the shared [data-sidebar-nav-row] rules below. The pill's
+   corners stay concentric with the trace fill: the opaline shape's corner
+   curvature at 36px reads as ~15px, items get a uniform 4px gap on every
+   side, so the capsule corner radius is 15px + 4px = 19px on a 44px-tall
+   surface. */
+
+/* The account avatar fills its 36px lane and takes the opaline silhouette,
+   concentric inside the 44px capsule like the nav items' trace fills. */
+
+/* Row states mirror the collapsed left-sidebar rows
+   (.dashboard-01-chrome-sidebar [data-sidebar-row-mode="collapsed"]),
+   with faster hover-in and pointer-down scale feedback on top. */
+
+/* Deepens the press scale from shellPressMotionClassName's 0.98; the 160ms
+   release transition it defines stays, so the scale-back runs in the same
+   window as the active fill's fade-in. */
+
+/* Near-instant hover-in; the 160ms base transition still eases hover-out. */
+
+.shell-dock-content {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	transition:
+		opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+		transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@starting-style {
+	.shell-dock-content {
+		opacity: 0;
+		transform: translateY(0.25rem) scale(0.99);
+	}
+}
+
+::view-transition-group(shell-bottom-navigation) {
+	animation-duration: 240ms;
+	animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(shell-bottom-navigation),
+::view-transition-new(shell-bottom-navigation) {
+	mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.shell-dock-content {
+		transition: none;
+	}
+
+	::view-transition-group(shell-bottom-navigation) {
+		animation-duration: 1ms;
+	}
 }
 
 .team-lineup-metric-button {
@@ -568,22 +868,7 @@ body:has(.dashboard-01-preview)::after {
 	}
 }
 
-.dashboard-01-preview::before,
-.dashboard-01-preview::after,
-.dashboard-01-chrome-frame::before,
-.dashboard-01-chrome-frame::after,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"]::before,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"]::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-}
-
-body:has(.dashboard-01-preview)::before,
-.dashboard-01-preview::before,
-.dashboard-01-chrome-frame::before,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"]::before {
+body:has(.dashboard-01-preview)::before {
 	background-image: var(--dashboard-01-chrome-noise-texture);
 	background-position:
 		0 0,
@@ -594,16 +879,13 @@ body:has(.dashboard-01-preview)::before,
 		var(--dashboard-01-chrome-noise-large-size),
 		var(--dashboard-01-chrome-noise-small-size)
 		var(--dashboard-01-chrome-noise-small-size);
-	opacity: var(--dashboard-01-chrome-turbulence-opacity);
+	opacity: 0.04;
 	mix-blend-mode: multiply;
 	filter: contrast(var(--dashboard-01-chrome-turbulence-contrast))
 		brightness(var(--dashboard-01-chrome-turbulence-darkness));
 }
 
-body:has(.dashboard-01-preview)::after,
-.dashboard-01-preview::after,
-.dashboard-01-chrome-frame::after,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"]::after {
+body:has(.dashboard-01-preview)::after {
 	background-image: var(--dashboard-01-chrome-noise-texture);
 	background-position:
 		0 0,
@@ -614,7 +896,7 @@ body:has(.dashboard-01-preview)::after,
 		var(--dashboard-01-chrome-noise-large-size),
 		var(--dashboard-01-chrome-noise-small-size)
 		var(--dashboard-01-chrome-noise-small-size);
-	opacity: var(--dashboard-01-chrome-highlight-opacity);
+	opacity: 0.025;
 	mix-blend-mode: screen;
 	filter: contrast(calc(var(--dashboard-01-chrome-turbulence-contrast) * 0.75))
 		brightness(1.22);
@@ -625,6 +907,12 @@ body:has(.dashboard-01-preview)::after,
 .dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] > * {
 	position: relative;
 	z-index: 1;
+}
+
+@media (pointer: coarse) {
+	.dashboard-01-chrome-sidebar [data-sidebar-interactive] {
+		min-height: 2.75rem;
+	}
 }
 
 .team-lineup-featured-card::before {

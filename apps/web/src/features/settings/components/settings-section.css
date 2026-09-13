@@ -1,0 +1,35 @@
+.settings-page-content {
+	--settings-section-fill: #fefeff;
+	--settings-section-border: #00000016;
+	--settings-section-shadow: 0 3px 6px -2px #00000005, 0 1px 1px #0000000a;
+	width: 100%;
+	max-width: 640px;
+	min-width: 0;
+	margin-inline: auto;
+}
+
+.settings-page-title {
+	margin: 0;
+	padding-block: 24px 32px;
+	font-size: 24px;
+	font-weight: 600;
+	line-height: 32px;
+	letter-spacing: -0.025em;
+}
+
+.settings-section-surface {
+	border: 1px solid var(--settings-section-border, #00000016);
+	border-radius: 10px;
+	background: var(--settings-section-fill, #fefeff);
+	box-shadow: var(
+		--settings-section-shadow,
+		0 3px 6px -2px #00000005,
+		0 1px 1px #0000000a
+	);
+}
+
+.dark .settings-page-content {
+	--settings-section-fill: #1c1c1d;
+	--settings-section-border: #ffffff22;
+	--settings-section-shadow: 0 4px 4px -1px #0000000a, 0 1px 1px #00000014;
+}

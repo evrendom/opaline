@@ -1,21 +1,15 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
-interface DashboardHeaderProps extends ComponentProps<"header"> {
-	showDivider: boolean;
-}
-
 export function DashboardHeader({
 	className,
-	showDivider,
 	...props
-}: DashboardHeaderProps) {
+}: ComponentProps<"header">) {
 	return (
 		<header
 			data-slot="dashboard-header"
 			className={cn(
-				"flex min-h-[calc(var(--dashboard-01-header-height)-var(--dashboard-header-inset))] shrink-0 items-center bg-[var(--dashboard-01-content-background)] [--dashboard-header-inset:0px]",
-				showDivider && "border-b",
+				"flex h-(--dashboard-01-header-height) shrink-0 items-center border-b-[0.5px] border-black/6 bg-[var(--dashboard-01-content-background)] font-sans dark:border-white/8",
 				className,
 			)}
 			{...props}

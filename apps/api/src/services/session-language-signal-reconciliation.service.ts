@@ -3,6 +3,7 @@ import type { Source } from "@rudel/api-routes";
 import type { RudelSessionLanguageSignalsRow } from "@rudel/ch-schema/generated";
 import {
 	type LanguageSignalCounts,
+	type LanguageSignalSummary,
 	SCAN_VERSION,
 } from "@rudel/language-signals";
 import {
@@ -74,7 +75,9 @@ export interface LanguageSignalReconciliationEnvironment {
 		batchSize: number,
 		offset: number,
 	) => Promise<readonly StaleSessionLanguageSignalRow[]>;
-	readonly scan: (content: string) => Promise<LanguageSignalCounts>;
+	readonly scan: (
+		content: string,
+	) => Promise<LanguageSignalCounts | LanguageSignalSummary>;
 }
 
 export interface LanguageSignalReconciliationResult {
@@ -393,7 +396,7 @@ async function reconcileStaleRows(
 				failed += 1;
 				continue;
 			}
-			const counts = await env.scan(raw.content);
+			const summary = await env.scan(raw.content);
 			rowsToInsert.push(
 				buildSessionLanguageSignalRow(
 					{
@@ -405,7 +408,7 @@ async function reconcileStaleRows(
 						source: row.source,
 						userId: row.user_id,
 					},
-					counts,
+					summary,
 					env.now(),
 				),
 			);

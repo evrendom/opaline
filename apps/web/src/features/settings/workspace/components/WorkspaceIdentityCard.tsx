@@ -1,16 +1,19 @@
-import { Building2Icon, CheckIcon, PencilIcon, XIcon } from "lucide-react";
+import { ORG_SLUG_MAX_LENGTH } from "@rudel/api-routes/reserved-slugs";
 import { useState } from "react";
-import { Button } from "@/app/ui/button";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
-import { Field, FieldLabel } from "@/app/ui/field";
+	getCanonicalAppPath,
+	getWorkspaceAppPath,
+	getWorkspaceSlugFromPath,
+} from "@/app/routes";
+import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import {
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
+import { useWorkspaceSlugAvailability } from "@/features/workspace/organization/use-workspace-slug";
 import { authClient } from "@/lib/auth-client";
 
 export function WorkspaceIdentityCard({
@@ -22,13 +25,24 @@ export function WorkspaceIdentityCard({
 	canManage: boolean;
 	onInvalidate: () => void;
 }) {
+	const navigate = useNavigate();
+	const { pathname, search, hash } = useLocation();
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization",
 	});
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editedName, setEditedName] = useState("");
+	const [editedSlug, setEditedSlug] = useState("");
 	const [isSavingName, setIsSavingName] = useState(false);
 	const [renameError, setRenameError] = useState<string | null>(null);
+	const slugAvailability = useWorkspaceSlugAvailability(
+		isEditingName ? editedSlug : organization.slug,
+		organization.slug,
+		isEditingName,
+	);
+	const invalidSlug = ["invalid", "taken", "checking"].includes(
+		slugAvailability.status,
+	);
 
 	const startEditing = () => {
 		trackOrganizationAction({
@@ -38,6 +52,7 @@ export function WorkspaceIdentityCard({
 			targetId: organization.id,
 		});
 		setEditedName(organization.name);
+		setEditedSlug(organization.slug);
 		setRenameError(null);
 		setIsEditingName(true);
 	};
@@ -55,11 +70,11 @@ export function WorkspaceIdentityCard({
 
 	const saveName = async () => {
 		const trimmedName = editedName.trim();
-		if (!trimmedName) {
+		if (!trimmedName || invalidSlug || isSavingName) {
 			return;
 		}
 
-		if (trimmedName === organization.name) {
+		if (trimmedName === organization.name && editedSlug === organization.slug) {
 			setIsEditingName(false);
 			return;
 		}
@@ -73,107 +88,146 @@ export function WorkspaceIdentityCard({
 		setIsSavingName(true);
 		setRenameError(null);
 
-		const response = await authClient.organization.update({
-			data: { name: trimmedName },
-			organizationId: organization.id,
-		});
-
-		if (response.error) {
-			setRenameError(response.error.message ?? "Failed to rename workspace");
+		try {
+			const response = await authClient.organization.update({
+				data: { name: trimmedName, slug: editedSlug },
+				organizationId: organization.id,
+			});
+			if (response.error) {
+				setRenameError(
+					response.error.message ?? "Could not save your workspace.",
+				);
+				return;
+			}
+			if (
+				editedSlug !== organization.slug &&
+				getWorkspaceSlugFromPath(pathname)
+			) {
+				navigate(
+					getWorkspaceAppPath(
+						editedSlug,
+						`${getCanonicalAppPath(pathname)}${search}${hash}`,
+					),
+					{ replace: true },
+				);
+			}
+			onInvalidate();
+			setIsEditingName(false);
+		} catch {
+			setRenameError("Could not save your workspace. Please try again.");
+		} finally {
 			setIsSavingName(false);
-			return;
 		}
-
-		onInvalidate();
-		setIsEditingName(false);
-		setIsSavingName(false);
 	};
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<div className="flex items-start gap-3">
-					<div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-						<Building2Icon />
-					</div>
-					<div className="flex min-w-0 flex-1 flex-col gap-1">
-						<CardTitle>Workspace identity</CardTitle>
-						<CardDescription>
-							Rename the active workspace and review its slug.
-						</CardDescription>
-					</div>
+		<WorkspaceSettingsGroup title="Workspace" hideTitle>
+			<WorkspaceSettingsRow label="Name" controlId="workspace-name">
+				<Input
+					id="workspace-name"
+					value={isEditingName ? editedName : organization.name}
+					onFocus={() => {
+						if (canManage && !isEditingName) startEditing();
+					}}
+					onChange={(event) => {
+						if (!isEditingName) startEditing();
+						setEditedName(event.target.value);
+					}}
+					onKeyDown={(event) => {
+						if (!canManage || !isEditingName || event.nativeEvent.isComposing)
+							return;
+						if (event.key === "Enter") {
+							event.preventDefault();
+							void saveName();
+						}
+						if (event.key === "Escape") {
+							event.preventDefault();
+							cancelEditing();
+						}
+					}}
+					readOnly={!canManage}
+					disabled={isSavingName}
+					aria-invalid={Boolean(renameError)}
+					aria-describedby={renameError ? "workspace-name-error" : undefined}
+				/>
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
+				<div className="min-w-0 space-y-2">
+					<Input
+						id="workspace-slug"
+						value={isEditingName ? editedSlug : organization.slug}
+						onFocus={() => {
+							if (canManage && !isEditingName) startEditing();
+						}}
+						onChange={(event) => {
+							if (!isEditingName) startEditing();
+							setEditedSlug(event.target.value.toLowerCase());
+						}}
+						onKeyDown={(event) => {
+							if (!canManage || !isEditingName || event.nativeEvent.isComposing)
+								return;
+							if (event.key === "Enter") {
+								event.preventDefault();
+								void saveName();
+							}
+							if (event.key === "Escape") {
+								event.preventDefault();
+								cancelEditing();
+							}
+						}}
+						autoComplete="off"
+						autoCapitalize="none"
+						spellCheck={false}
+						maxLength={ORG_SLUG_MAX_LENGTH}
+						readOnly={!canManage}
+						disabled={isSavingName}
+						aria-invalid={["invalid", "taken"].includes(
+							slugAvailability.status,
+						)}
+						aria-describedby="workspace-slug-status"
+					/>
+					<output
+						id="workspace-slug-status"
+						className="text-muted-foreground block text-xs"
+					>
+						{isEditingName
+							? slugAvailability.message
+							: `opaline.so/${organization.slug}`}
+					</output>
 				</div>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
-				{isEditingName ? (
-					<Field className="gap-2">
-						<FieldLabel htmlFor="workspace-name">Workspace name</FieldLabel>
-						<div className="flex flex-col gap-2 sm:flex-row">
-							<Input
-								id="workspace-name"
-								value={editedName}
-								onChange={(event) => setEditedName(event.target.value)}
-								onKeyDown={(event) => {
-									if (event.key === "Enter") {
-										void saveName();
-									}
-									if (event.key === "Escape") {
-										cancelEditing();
-									}
-								}}
-								disabled={isSavingName}
-								autoFocus
-							/>
-							<div className="flex gap-2">
-								<Button
-									type="button"
-									size="sm"
-									onClick={() => void saveName()}
-									disabled={isSavingName || editedName.trim().length === 0}
-								>
-									<CheckIcon data-icon="inline-start" />
-									{isSavingName ? "Saving…" : "Save"}
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={cancelEditing}
-									disabled={isSavingName}
-								>
-									<XIcon data-icon="inline-start" />
-									Cancel
-								</Button>
-							</div>
-						</div>
-						{renameError ? (
-							<p className="text-sm text-destructive">{renameError}</p>
-						) : null}
-					</Field>
-				) : (
-					<div className="flex items-start justify-between gap-3">
-						<div className="flex min-w-0 flex-col gap-1">
-							<span className="truncate text-lg font-semibold text-foreground">
-								{organization.name}
-							</span>
-							<span className="text-sm text-muted-foreground">
-								/{organization.slug}
-							</span>
-						</div>
-						{canManage ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={startEditing}
-							>
-								<PencilIcon data-icon="inline-start" />
-								Rename
-							</Button>
-						) : null}
-					</div>
-				)}
-			</CardContent>
-		</Card>
+			</WorkspaceSettingsRow>
+			{isEditingName ? (
+				<div className="workspace-settings-actions">
+					{renameError ? (
+						<p
+							id="workspace-name-error"
+							role="alert"
+							className="workspace-settings-error"
+						>
+							{renameError}
+						</p>
+					) : null}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={cancelEditing}
+						disabled={isSavingName}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						onClick={() => void saveName()}
+						disabled={
+							isSavingName || editedName.trim().length === 0 || invalidSlug
+						}
+					>
+						{isSavingName ? "Saving…" : "Save"}
+					</Button>
+				</div>
+			) : null}
+		</WorkspaceSettingsGroup>
 	);
 }

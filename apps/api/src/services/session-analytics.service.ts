@@ -1,8 +1,9 @@
-import type {
-	DimensionAnalysisInput,
-	SessionAnalytics,
-	SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
-	Source,
+import {
+	type DimensionAnalysisInput,
+	resolveRepoIdentity,
+	type SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
+	type SessionOverviewAnalytics,
+	type Source,
 } from "@rudel/api-routes";
 import {
 	addOptionalStringEqFilter,
@@ -10,6 +11,7 @@ import {
 	buildInclusiveDateRangeFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
+import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
 
 export interface SessionAnalyticsRaw {
@@ -39,6 +41,7 @@ export interface SessionAnalyticsRaw {
 	input_tokens: number;
 	output_tokens: number;
 	estimated_cost: number | null;
+	cost_is_complete: number;
 
 	// Git activity
 	git_sha: string;
@@ -47,6 +50,18 @@ export interface SessionAnalyticsRaw {
 
 	// Feature arrays
 	subagent_types: string[];
+	subagent_count: number;
+	native_subagents?: Array<readonly [string, string]>;
+	linked_subagent_count?: number;
+	linked_subagents?: Array<
+		readonly [
+			string,
+			"claude" | "codex",
+			"claude" | "openai",
+			string,
+			"id_echo" | "prompt_echo" | "attested_temporal",
+		]
+	>;
 	skills: string[];
 	slash_commands: string[];
 
@@ -65,7 +80,50 @@ export interface SessionAnalyticsRaw {
 	model_swears: number;
 	model_apologies: number;
 	model_positive: number;
+	member_swear_matches: string[];
+	member_apology_matches: string[];
+	member_positive_matches: string[];
+	model_swear_matches: string[];
+	model_apology_matches: string[];
+	model_positive_matches: string[];
 }
+
+const PERSISTED_SIGNAL_FIELDS = [
+	"member_swears",
+	"member_apologies",
+	"member_positive",
+	"model_swears",
+	"model_apologies",
+	"model_positive",
+	"member_swear_matches",
+	"member_apology_matches",
+	"member_positive_matches",
+	"model_swear_matches",
+	"model_apology_matches",
+	"model_positive_matches",
+] as const;
+type PersistedSessionLanguageSignals = Pick<
+	SessionAnalyticsRaw,
+	(typeof PERSISTED_SIGNAL_FIELDS)[number]
+>;
+interface SessionAnalyticsListRow
+	extends Omit<SessionAnalyticsRaw, keyof PersistedSessionLanguageSignals> {
+	signal_session_date: string;
+}
+const EMPTY_SESSION_LANGUAGE_SIGNALS: PersistedSessionLanguageSignals = {
+	member_swears: 0,
+	member_apologies: 0,
+	member_positive: 0,
+	model_swears: 0,
+	model_apologies: 0,
+	model_positive: 0,
+	member_swear_matches: [],
+	member_apology_matches: [],
+	member_positive_matches: [],
+	model_swear_matches: [],
+	model_apology_matches: [],
+	model_positive_matches: [],
+};
 
 export interface SessionAnalyticsSummary extends SessionAnalyticsSummaryBase {
 	total_interactions: number;
@@ -73,6 +131,73 @@ export interface SessionAnalyticsSummary extends SessionAnalyticsSummaryBase {
 	median_response_time_sec: number;
 	quick_response_rate: number;
 	long_pause_rate: number;
+}
+
+export function mapSessionAnalyticsRow(
+	row: SessionAnalyticsRaw,
+): SessionOverviewAnalytics {
+	const repositoryIdentity = resolveRepoIdentity({
+		gitRemote: row.git_remote || null,
+		packageName: row.package_name || null,
+		projectPath: row.project_path,
+	});
+
+	return {
+		source: row.source,
+		session_id: row.session_id,
+		user_id: row.user_id,
+		session_date: row.session_date,
+		project_path: row.project_path,
+		repository: repositoryIdentity.repoLabel,
+		repository_identity: repositoryIdentity,
+		worktree: repositoryIdentity.worktree,
+		git_remote: row.git_remote || undefined,
+		git_branch: row.git_branch || null,
+		duration_min: row.actual_duration_min,
+		total_tokens: row.total_tokens,
+		input_tokens: row.input_tokens,
+		output_tokens: row.output_tokens,
+		estimated_cost: row.cost_is_complete > 0 ? row.estimated_cost : null,
+		success_score: row.success_score,
+		total_interactions: row.total_interactions,
+		avg_period_sec: row.avg_period_sec,
+		subagent_types: row.subagent_types,
+		subagent_count: row.subagent_count,
+		native_subagents: (row.native_subagents ?? []).map(
+			([subagent_id, model]) => ({
+				subagent_id,
+				model: model || null,
+			}),
+		),
+		linked_subagent_count: row.linked_subagent_count ?? 0,
+		linked_subagents: (row.linked_subagents ?? []).map(
+			([session_id, source, provider, model, confidence]) => ({
+				confidence,
+				model,
+				provider,
+				session_id,
+				source,
+			}),
+		),
+		skills: row.skills,
+		slash_commands: row.slash_commands,
+		has_commit: row.has_commit > 0,
+		error_count: row.error_count,
+		model_used: row.model_used,
+		used_plan_mode: row.used_plan_mode > 0,
+		member_swears: row.member_swears,
+		member_apologies: row.member_apologies,
+		member_positive: row.member_positive,
+		model_swears: row.model_swears,
+		model_apologies: row.model_apologies,
+		model_positive: row.model_positive,
+		member_swear_matches: row.member_swear_matches,
+		member_apology_matches: row.member_apology_matches,
+		member_positive_matches: row.member_positive_matches,
+		model_swear_matches: row.model_swear_matches,
+		model_apology_matches: row.model_apology_matches,
+		model_positive_matches: row.model_positive_matches,
+	};
 }
 
 /**
@@ -93,7 +218,7 @@ export async function getSessionAnalytics(
 		sort_by?: "date" | "duration" | "interactions";
 		sort_order?: "asc" | "desc";
 	} = {},
-): Promise<SessionAnalytics[]> {
+): Promise<SessionOverviewAnalytics[]> {
 	const {
 		days = 30,
 		start_date,
@@ -127,13 +252,6 @@ export async function getSessionAnalytics(
 	const dateFilter = hasAbsoluteRange
 		? buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")
 		: buildDateFilter("days", "sa.session_date");
-	const signalDateFilter = hasAbsoluteRange
-		? buildInclusiveDateRangeFilter(
-				"startDate",
-				"endDate",
-				"signal_rows.session_date",
-			)
-		: buildDateFilter("days", "signal_rows.session_date");
 	const filters: string[] = [];
 	addOptionalStringEqFilter(
 		filters,
@@ -177,35 +295,13 @@ export async function getSessionAnalytics(
 	const estimatedCostSql = "sa.estimated_cost";
 
 	const query = `
-		WITH ${usage.cteDefinitions},
-		language_signal_counts AS (
-			SELECT
-				organization_id,
-				session_date,
-				session_id,
-				source,
-				argMax(
-					tuple(
-						user_id,
-						member_swears,
-						member_apologies,
-						member_positive,
-						model_swears,
-						model_apologies,
-						model_positive
-					),
-					signal_version
-				) AS signal_state
-			FROM rudel.session_language_signals AS signal_rows
-			WHERE signal_rows.organization_id = {orgId:String}
-				AND ${signalDateFilter}
-			GROUP BY organization_id, session_date, session_id, source
-		)
+		WITH ${usage.cteDefinitions}
 	    SELECT
 	      sa.source AS source,
 	      sa.session_id AS session_id,
 	      sa.user_id AS user_id,
       formatDateTime(sa.session_date, '%Y-%m-%dT%H:%i:%SZ') as session_date,
+      toString(sa.session_date) AS signal_session_date,
       project_path,
       sa.organization_id AS organization_id,
       git_remote,
@@ -222,29 +318,22 @@ export async function getSessionAnalytics(
       input_tokens,
       output_tokens,
 	  ${estimatedCostSql} AS estimated_cost,
+	  sa.cost_is_complete AS cost_is_complete,
       git_sha,
       git_branch,
-      has_commit,
-      subagent_types,
-      skills,
+	      has_commit,
+	      subagent_types,
+	      subagent_count,
+	      native_subagents,
+	      linked_subagent_count,
+	      linked_subagents,
+	      skills,
       slash_commands,
       success_score,
       error_count,
       model_used,
-	      used_plan_mode,
-	      tupleElement(signals.signal_state, 2) AS member_swears,
-	      tupleElement(signals.signal_state, 3) AS member_apologies,
-	      tupleElement(signals.signal_state, 4) AS member_positive,
-	      tupleElement(signals.signal_state, 5) AS model_swears,
-	      tupleElement(signals.signal_state, 6) AS model_apologies,
-	      tupleElement(signals.signal_state, 7) AS model_positive
+	      used_plan_mode
 	    FROM ${usage.sessionsRelation} AS sa
-		LEFT ANY JOIN language_signal_counts AS signals
-			ON signals.organization_id = sa.organization_id
-			AND signals.session_date = sa.session_date
-			AND signals.session_id = sa.session_id
-			AND tupleElement(signals.signal_state, 1) = sa.user_id
-			AND signals.source = sa.source
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
       ${filters.length > 0 ? `AND ${filters.join("\n      AND ")}` : ""}
@@ -253,44 +342,65 @@ export async function getSessionAnalytics(
     OFFSET {offset:UInt32}
   `;
 
-	const raw = await queryClickhouse<SessionAnalyticsRaw>({
+	const raw = await queryClickhouse<SessionAnalyticsListRow>({
 		clickhouse_settings: { join_use_nulls: 0 },
 		query,
 		query_params,
 	});
 
-	return raw.map(
-		(row): SessionAnalytics => ({
-			source: row.source,
-			session_id: row.session_id,
-			user_id: row.user_id,
-			session_date: row.session_date,
-			project_path: row.project_path,
-			repository:
-				row.git_remote || row.package_name || row.project_path || null,
-			git_remote: row.git_remote || undefined,
-			duration_min: row.actual_duration_min,
-			total_tokens: row.total_tokens,
-			input_tokens: row.input_tokens,
-			output_tokens: row.output_tokens,
-			estimated_cost: row.estimated_cost,
-			success_score: row.success_score,
-			total_interactions: row.total_interactions,
-			avg_period_sec: row.avg_period_sec,
-			subagent_types: row.subagent_types,
-			skills: row.skills,
-			slash_commands: row.slash_commands,
-			has_commit: row.has_commit > 0,
-			model_used: row.model_used,
-			used_plan_mode: row.used_plan_mode > 0,
-			member_swears: row.member_swears,
-			member_apologies: row.member_apologies,
-			member_positive: row.member_positive,
-			model_swears: row.model_swears,
-			model_apologies: row.model_apologies,
-			model_positive: row.model_positive,
-		}),
-	);
+	// Fetch one bounded metadata batch for the actual page. Keeping this small
+	// lookup separate from usage pricing avoids ClickHouse's nested JOIN/alias
+	// filter propagation and never loads per-session transcripts.
+	const signalKey = (
+		row: Pick<
+			SessionAnalyticsListRow,
+			"source" | "session_id" | "signal_session_date"
+		>,
+	) => [row.source, row.session_id, row.signal_session_date].join("\u0000");
+	const signalRows =
+		raw.length === 0
+			? []
+			: await queryClickhouse<
+					PersistedSessionLanguageSignals &
+						Pick<
+							SessionAnalyticsListRow,
+							"source" | "session_id" | "user_id" | "signal_session_date"
+						>
+				>({
+					query: `
+			SELECT source, session_id, user_id,
+				toString(session_date) AS signal_session_date,
+				${PERSISTED_SIGNAL_FIELDS.join(", ")}
+			FROM rudel.session_language_signals FINAL
+			PREWHERE organization_id = {orgId:String}
+				AND session_date >= toDateTime64({signalFrom:String}, 3, 'UTC')
+				AND session_date <= toDateTime64({signalTo:String}, 3, 'UTC')
+				AND session_id IN ({signalIds:Array(String)})
+			WHERE concat(source, '\\0', session_id, '\\0', toString(session_date)) IN ({signalKeys:Array(String)})
+			LIMIT {signalLimit:UInt32}
+		`,
+					query_params: {
+						orgId,
+						signalFrom: raw.map((row) => row.signal_session_date).sort()[0],
+						signalTo: raw
+							.map((row) => row.signal_session_date)
+							.sort()
+							.at(-1),
+						signalIds: raw.map((row) => row.session_id),
+						signalKeys: raw.map(signalKey),
+						signalLimit: raw.length,
+					},
+				});
+	const signalsByKey = new Map(signalRows.map((row) => [signalKey(row), row]));
+
+	return raw.map((baseRow) => {
+		const storedSignals = signalsByKey.get(signalKey(baseRow));
+		const signals =
+			storedSignals?.user_id === baseRow.user_id
+				? storedSignals
+				: EMPTY_SESSION_LANGUAGE_SIGNALS;
+		return mapSessionAnalyticsRow({ ...baseRow, ...signals });
+	});
 }
 
 /**
@@ -325,9 +435,13 @@ export async function getSessionAnalyticsSummary(
 		"projectPath",
 		project_path,
 	);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		userIdParam: user_id ? "userId" : undefined,
+	});
 
 	const query = `
-    WITH totals AS (
+	    WITH ${usage.cteDefinitions},
+	    totals AS (
       SELECT
         COUNT(*) as cnt_sessions,
         SUM(total_interactions) as sum_interactions,
@@ -337,10 +451,10 @@ export async function getSessionAnalyticsSummary(
         ifNull(AVG(total_interactions), 0) as avg_interactions,
         ifNull(AVG(avg_period_sec), 0) as avg_response,
         ifNull(AVG(median_period_sec), 0) as med_response,
-        countIf(length(subagent_types) > 0) as cnt_subagents,
+	        countIf(${SESSION_HAS_SUBAGENTS_SQL}) as cnt_subagents,
         countIf(length(skills) > 0) as cnt_skills,
         countIf(length(slash_commands) > 0) as cnt_slash
-      FROM rudel.session_analytics FINAL
+	      FROM ${usage.sessionsRelation}
       WHERE ${buildDateFilter("days")}
         AND organization_id = {orgId:String}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
@@ -421,17 +535,21 @@ export async function getSessionAnalyticsSummaryComparison(
 		"projectPath",
 		project_path,
 	);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		userIdParam: user_id ? "userId" : undefined,
+	});
 
 	const summarySQL = (dateCondition: string) => `
-    WITH totals AS (
+	    WITH ${usage.cteDefinitions},
+	    totals AS (
       SELECT
         COUNT(*) as cnt_sessions,
         ifNull(AVG(actual_duration_min), 0) as avg_duration,
         ifNull(AVG(avg_period_sec), 0) as avg_response,
-        countIf(length(subagent_types) > 0) as cnt_subagents,
+	        countIf(${SESSION_HAS_SUBAGENTS_SQL}) as cnt_subagents,
         countIf(length(skills) > 0) as cnt_skills,
         countIf(length(slash_commands) > 0) as cnt_slash
-      FROM rudel.session_analytics FINAL
+	      FROM ${usage.sessionsRelation}
       WHERE ${dateCondition}
         AND organization_id = {orgId:String}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
@@ -629,7 +747,7 @@ const DIMENSION_EXPRESSIONS: Record<
 	used_plan_mode: "used_plan_mode",
 	used_skills: "if(length(skills) > 0, 1, 0)",
 	used_slash_commands: "if(length(slash_commands) > 0, 1, 0)",
-	used_subagents: "if(length(subagent_types) > 0, 1, 0)",
+	used_subagents: `if(${SESSION_HAS_SUBAGENTS_SQL}, 1, 0)`,
 };
 
 export async function getSessionDimensionAnalysis(

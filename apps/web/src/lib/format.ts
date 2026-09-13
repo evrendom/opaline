@@ -1,16 +1,22 @@
-const numberFormatter = new Intl.NumberFormat();
+import { calculateEstimatedCost as calculateEstimatedModelCost } from "@rudel/api-routes";
 
-const compactNumberFormatter = new Intl.NumberFormat(undefined, {
+// The static English demo must format identically at build time and hydration.
+// Normal product builds continue to use the visitor's locale.
+const displayLocale =
+	import.meta.env.MODE === "product-demo" ? "en-US" : undefined;
+const numberFormatter = new Intl.NumberFormat(displayLocale);
+
+const compactNumberFormatter = new Intl.NumberFormat(displayLocale, {
 	notation: "compact",
 	maximumFractionDigits: 1,
 });
 
-const compactWholeNumberFormatter = new Intl.NumberFormat(undefined, {
+const compactWholeNumberFormatter = new Intl.NumberFormat(displayLocale, {
 	notation: "compact",
 	maximumFractionDigits: 0,
 });
 
-const decimalFormatter = new Intl.NumberFormat(undefined, {
+const decimalFormatter = new Intl.NumberFormat(displayLocale, {
 	maximumFractionDigits: 2,
 });
 
@@ -19,6 +25,10 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 	currency: "USD",
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2,
+});
+
+const centFormatter = new Intl.NumberFormat("en-US", {
+	maximumFractionDigits: 0,
 });
 
 const wholeCurrencyFormatter = new Intl.NumberFormat("en-US", {
@@ -51,20 +61,20 @@ const compactWholeCurrencyFormatter = new Intl.NumberFormat("en-US", {
 	maximumFractionDigits: 0,
 });
 
-const minuteFormatter = new Intl.NumberFormat(undefined, {
+const minuteFormatter = new Intl.NumberFormat(displayLocale, {
 	maximumFractionDigits: 1,
 });
 
-const percentFormatter = new Intl.NumberFormat(undefined, {
+const percentFormatter = new Intl.NumberFormat(displayLocale, {
 	maximumFractionDigits: 1,
 });
 
-const shortDateFormatter = new Intl.DateTimeFormat(undefined, {
+const shortDateFormatter = new Intl.DateTimeFormat(displayLocale, {
 	month: "short",
 	day: "numeric",
 });
 
-const fullDateFormatter = new Intl.DateTimeFormat(undefined, {
+const fullDateFormatter = new Intl.DateTimeFormat(displayLocale, {
 	month: "short",
 	day: "numeric",
 	year: "numeric",
@@ -107,6 +117,16 @@ export function formatCurrency(value: number | null | undefined) {
 	return currencyFormatter.format(value);
 }
 
+export function formatApiCost(value: number | null | undefined) {
+	if (value === null || value === undefined || !Number.isFinite(value)) {
+		return "0¢";
+	}
+
+	return Math.abs(value) >= 1
+		? wholeCurrencyFormatter.format(value)
+		: `${centFormatter.format(value * 100)}¢`;
+}
+
 export function formatCompactCurrency(value: number | null | undefined) {
 	if (value === null || value === undefined || !Number.isFinite(value)) {
 		return currencyFormatter.format(0);
@@ -141,6 +161,35 @@ export function formatCompactWholeCurrency(value: number | null | undefined) {
 
 export function formatMinutes(value: number) {
 	return `${minuteFormatter.format(value)} min`;
+}
+
+export function formatRoundedDuration(minutes: number | undefined) {
+	if (minutes === undefined) {
+		return "—";
+	}
+
+	const safeMinutes = Math.max(0, minutes);
+	if (safeMinutes < 1) {
+		return `${Math.round(safeMinutes * 60)}s`;
+	}
+
+	if (safeMinutes > 10 * 60) {
+		return `${Math.round(safeMinutes / 60)}h`;
+	}
+
+	const roundedMinutes = Math.round(safeMinutes);
+	const hours = Math.floor(roundedMinutes / 60);
+	const remainingMinutes = roundedMinutes % 60;
+
+	if (hours === 0) {
+		return `${roundedMinutes}m`;
+	}
+
+	if (remainingMinutes === 0) {
+		return `${hours}h`;
+	}
+
+	return `${hours}h ${remainingMinutes}m`;
 }
 
 export function formatPercent(value: number) {
@@ -188,6 +237,28 @@ export function formatUsername(
 	}
 
 	return userId;
+}
+
+export function calculateCost(
+	inputTokens: number,
+	outputTokens: number,
+	options: {
+		at: Date | string;
+		model?: string | null;
+		cacheReadInputTokens?: number;
+		cacheCreationInputTokens?: number;
+	},
+) {
+	return (
+		calculateEstimatedModelCost({
+			at: options.at,
+			model: options.model ?? null,
+			inputTokens,
+			outputTokens,
+			cacheReadInputTokens: options.cacheReadInputTokens ?? 0,
+			cacheCreationInputTokens: options.cacheCreationInputTokens ?? 0,
+		}) ?? 0
+	);
 }
 
 export function encodeProjectPath(projectPath: string) {

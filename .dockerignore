@@ -9,3 +9,6 @@ dist
 Dockerfile
 docker-compose.yml
 scripts/
+
+# Design references never belong in production images.
+design-archive

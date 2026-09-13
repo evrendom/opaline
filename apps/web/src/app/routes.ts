@@ -1,14 +1,22 @@
-import {
-	buildOrganizationPath,
-	getOrganizationSlugFromPath,
-} from "@rudel/api-routes/organization-paths";
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import { appendWebAcquisitionSearchParams } from "@/lib/acquisition-attribution";
 
-const DASHBOARD_GET_STARTED_LEGACY_PATH = "/dashboard/get-started";
+const HOME_PATH = "/home";
 const LEGACY_DASHBOARD_PATH = "/dashboard";
+const LEGACY_DASHBOARD_SESSIONS_PATH = `${LEGACY_DASHBOARD_PATH}/sessions`;
+const SESSION_PATH = "/session";
+const NEW_SESSION_PATH = "/newsesh";
+const SKILLS_PATH = "/skills";
+const DASHBOARD_GET_STARTED_LEGACY_PATH = `${LEGACY_DASHBOARD_PATH}/get-started`;
 const GET_STARTED_PATH = "/get-started";
-const TEAM_INVITE_PATH = "/team/invite";
-const PRESET_BASELINE_PATH = "/__preset-baseline";
+const TEAM_PATH = "/team";
+const TEAM_INVITE_PATH = `${TEAM_PATH}/invite`;
+const SETTINGS_ROOT_PATH = "/settings";
+const SETTINGS_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/workspace`;
+const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
+const SETTINGS_INVITATIONS_PATH = `${SETTINGS_ROOT_PATH}/invitations`;
+const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
+const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
 const WRAPPED_TEAM_CARD_PATH = "/wrapped";
 const DEV_WRAPPED_PATH = "/dev/wrapped";
 const WRAPPED_RESUME_PATH = "/resume";
@@ -38,21 +46,28 @@ export type WrappedVariant =
 // We keep them centralized so design, auth, analytics, and public sharing all
 // talk about the same URLs instead of rebuilding strings in multiple places.
 export const appRoutes = {
-	home: (orgSlug: string) => getWorkspacePath(orgSlug),
-	dashboard: (orgSlug: string) => getWorkspacePath(orgSlug),
+	home: () => HOME_PATH,
+	dashboard: () => HOME_PATH,
+	dashboardSessions: () => LEGACY_DASHBOARD_SESSIONS_PATH,
 	legacyDashboard: () => LEGACY_DASHBOARD_PATH,
-	legacyDashboardSessions: () => `${LEGACY_DASHBOARD_PATH}/sessions`,
-	dashboardSessions: (orgSlug: string) => getWorkspacePath(orgSlug, "sessions"),
-	dashboardSession: (orgSlug: string, sessionId: string) =>
-		`${getWorkspacePath(orgSlug, "sessions")}/${encodeURIComponent(sessionId)}`,
+	session: () => SESSION_PATH,
+	workspaceSessions: (workspaceSlug: string) =>
+		`/${encodeURIComponent(workspaceSlug)}/sessions`,
+	sessionDetail: (sessionId: string) =>
+		`${SESSION_PATH}/${encodeURIComponent(sessionId)}`,
+	newSession: () => NEW_SESSION_PATH,
+	newSessionDetail: (sessionId: string) =>
+		`${NEW_SESSION_PATH}/${encodeURIComponent(sessionId)}`,
+	skills: () => SKILLS_PATH,
 	getStarted: () => GET_STARTED_PATH,
 	dashboardGetStartedLegacy: () => DASHBOARD_GET_STARTED_LEGACY_PATH,
-	team: (orgSlug: string) => getWorkspacePath(orgSlug, "team"),
-	teamInvite: (token: string) =>
-		`${TEAM_INVITE_PATH}/${encodeURIComponent(token)}`,
-	settings: (orgSlug: string) => getWorkspacePath(orgSlug, "settings"),
-	settingsRoot: (orgSlug: string) => getWorkspacePath(orgSlug, "settings"),
-	presetBaseline: () => PRESET_BASELINE_PATH,
+	team: () => TEAM_PATH,
+	teamInvite: (token: string, workspaceSlug?: string) =>
+		workspaceSlug
+			? `/${encodeURIComponent(workspaceSlug)}/join/${encodeURIComponent(token)}`
+			: `${TEAM_INVITE_PATH}/${encodeURIComponent(token)}`,
+	settings: () => SETTINGS_ROOT_PATH,
+	settingsRoot: () => SETTINGS_ROOT_PATH,
 	wrappedTeamCard: () => WRAPPED_TEAM_CARD_PATH,
 	wrappedTeamCardShare: () => getWrappedTeamCardSharePath(),
 	wrappedCardProfile: (search?: string) => getWrappedCardProfilePath(search),
@@ -70,50 +85,111 @@ export const appRoutes = {
 		sourceSearch?: string,
 		referrerDomain?: string | null,
 	) => getWrappedTeamCardFromSharePath(shareId, sourceSearch, referrerDomain),
-	settingsWorkspace: (orgSlug: string) =>
-		getWorkspacePath(orgSlug, "settings/workspace"),
-	settingsMembers: (orgSlug: string) =>
-		getWorkspacePath(orgSlug, "settings/members"),
-	settingsInvitations: (orgSlug: string) =>
-		getWorkspacePath(orgSlug, "settings/invitations"),
-	settingsAccount: (orgSlug: string) =>
-		getWorkspacePath(orgSlug, "settings/account"),
-	settingsCreateWorkspace: (orgSlug: string) =>
-		getWorkspacePath(orgSlug, "settings/create-workspace"),
+	settingsWorkspace: () => SETTINGS_WORKSPACE_PATH,
+	settingsMembers: () => SETTINGS_MEMBERS_PATH,
+	settingsInvitations: () => SETTINGS_INVITATIONS_PATH,
+	settingsAccount: () => SETTINGS_ACCOUNT_PATH,
+	settingsCreateWorkspace: () => SETTINGS_CREATE_WORKSPACE_PATH,
 };
 
+export function isSessionDetailPath(pathname: string) {
+	const canonicalPathname = getCanonicalAppPath(pathname);
+	const normalizedPathname =
+		canonicalPathname.length > 1 && canonicalPathname.endsWith("/")
+			? canonicalPathname.slice(0, -1)
+			: canonicalPathname;
+	if (normalizedPathname === NEW_SESSION_PATH) {
+		return true;
+	}
+
+	const match = normalizedPathname.match(
+		/^\/(?:session|newsesh)\/([^/]+)(?:\/v2)?$/u,
+	);
+	const sessionId = match?.[1];
+	return (
+		sessionId !== undefined && sessionId !== "full" && sessionId !== "split"
+	);
+}
+
+export function isNewSessionPath(pathname: string) {
+	const canonicalPathname = getCanonicalAppPath(pathname);
+	const normalizedPathname =
+		canonicalPathname.length > 1 && canonicalPathname.endsWith("/")
+			? canonicalPathname.slice(0, -1)
+			: canonicalPathname;
+
+	return (
+		normalizedPathname === NEW_SESSION_PATH ||
+		normalizedPathname.startsWith(`${NEW_SESSION_PATH}/`)
+	);
+}
+
+export function getCanonicalAppPath(pathname: string) {
+	const workspaceSlug = getWorkspaceSlugFromPath(pathname);
+	if (workspaceSlug) {
+		const suffix = pathname.slice(workspaceSlug.length + 1) || "/";
+		if (suffix === "/") return SESSION_PATH;
+		if (suffix === "/dashboard") return HOME_PATH;
+		if (/^\/sessions(?:\/|$)/u.test(suffix))
+			return SESSION_PATH + suffix.slice("/sessions".length);
+		return suffix;
+	}
+
+	return pathname;
+}
+
+// Route definitions use workspace-independent paths; navigation resolves them
+// through this helper (or useShellRoutePath for the demo).
+export function getWorkspaceAppPath(
+	workspaceSlug: string,
+	path: string,
+): string {
+	const relativePath = getWorkspaceRelativePath(path);
+	if (relativePath === null) return path;
+	return `/${encodeURIComponent(workspaceSlug)}${relativePath}`;
+}
+
 export function getWorkspaceSlugFromPath(pathname: string): string | null {
-	return getOrganizationSlugFromPath(pathname);
+	const segment = /^\/([^/?#]+)(?:\/|[?#]|$)/u.exec(pathname)?.[1];
+	return segment && validateOrgSlug(segment) ? segment : null;
 }
 
-export function getWorkspaceRouteSuffix(pathname: string): string | null {
-	const orgSlug = getWorkspaceSlugFromPath(pathname);
-	if (!orgSlug) {
-		return null;
-	}
-
-	const prefix = `/${orgSlug}`;
-	if (pathname === prefix || pathname === `${prefix}/`) {
-		return "/";
-	}
-
-	return pathname.slice(prefix.length);
+export function getWorkspacePathAfterSwitch(
+	workspaceSlug: string,
+	path: string,
+): string {
+	const previousSlug = getWorkspaceSlugFromPath(path);
+	const destination = previousSlug
+		? `/${encodeURIComponent(workspaceSlug)}${path.slice(previousSlug.length + 1)}`
+		: getWorkspaceAppPath(workspaceSlug, path);
+	// Session IDs belong to the previous workspace. Keep filters, reset selection.
+	return destination.replace(/^(\/[^/]+\/(?:sessions|newsesh))\/[^?#]+/u, "$1");
 }
 
-export function getWorkspacePathAfterOrganizationSwitch(
-	pathname: string,
-	orgSlug: string,
-): string | null {
-	try {
-		const suffix = getWorkspaceRouteSuffix(pathname);
-		if (!suffix || suffix === "/") {
-			return buildOrganizationPath(orgSlug);
-		}
-
-		return buildOrganizationPath(orgSlug, suffix.slice(1));
-	} catch {
-		return null;
-	}
+export function getWorkspaceRelativePath(path: string): string | null {
+	const pathname = path.split(/[?#]/u, 1)[0] ?? path;
+	const suffix = path.slice(pathname.length);
+	if (pathname === "/" || pathname === "/dashboardy")
+		return `/sessions${suffix}`;
+	if ([HOME_PATH, LEGACY_DASHBOARD_PATH].includes(pathname))
+		return `/dashboard${suffix}`;
+	if (/^\/(?:dashboard\/)?developers(?:\/|$)/u.test(pathname))
+		return `/team${suffix}`;
+	if (
+		/^\/(?:dashboard\/)?(?:projects|errors|roi|analytics)(?:\/|$)/u.test(
+			pathname,
+		)
+	)
+		return `/sessions${suffix}`;
+	if (/^\/dashboard\/sessions(?:\/|$)/u.test(pathname))
+		return `${pathname.slice("/dashboard".length)}${suffix}`;
+	if (/^\/session\/(?:full|split)(?:\/|$)/u.test(pathname))
+		return `${pathname.replace(/^\/session\/(?:full|split)/u, "/sessions")}${suffix}`;
+	if (/^\/(?:session|sessions)(?:\/|$)/u.test(pathname))
+		return `${pathname.replace(/^\/session(?=\/|$)/u, "/sessions")}${suffix}`;
+	if (pathname === TEAM_PATH || pathname === `${TEAM_PATH}/`) return path;
+	if (/^\/(?:settings|skills|newsesh)(?:\/|$)/u.test(pathname)) return path;
+	return null;
 }
 
 function getWrappedTeamCardFromSharePath(
@@ -126,10 +202,6 @@ function getWrappedTeamCardFromSharePath(
 	appendWebAcquisitionSearchParams(searchParams, sourceSearch, referrerDomain);
 
 	return `${WRAPPED_TEAM_CARD_PATH}?${searchParams.toString()}`;
-}
-
-function getWorkspacePath(orgSlug: string, suffix?: string): string {
-	return buildOrganizationPath(orgSlug, suffix);
 }
 
 export function getWrappedCardProfilePath(search?: string) {

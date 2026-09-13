@@ -88,6 +88,7 @@ export const UserDailyTrendDataSchema = z.object({
 	total_tokens: z.number(),
 	input_tokens: z.number(),
 	output_tokens: z.number(),
+	cost: z.number().optional(),
 	avg_success_rate: z.number(),
 	distinct_skills: z.number(),
 	distinct_slash_commands: z.number(),
@@ -100,6 +101,10 @@ export const RepositoryDailyTrendDataSchema = z.object({
 	repository: z.string(),
 	sessions: z.number(),
 	total_commits: z.number(),
+	total_tokens: z.number().optional(),
+	input_tokens: z.number().optional(),
+	output_tokens: z.number().optional(),
+	cost: z.number().optional(),
 });
 
 export const InsightSchema = z.object({
@@ -277,6 +282,10 @@ export const ProjectInvestmentSchema = z.object({
 	success_rate: z.number(),
 	cost: z.number().nullable(),
 	success_rate_trend: z.number(),
+	automated_sessions: z.number(),
+	manual_sessions: z.number(),
+	unclassified_sessions: z.number(),
+	last_session_at: z.string(),
 });
 
 export const ProjectDetailDataSchema = z.object({
@@ -333,13 +342,32 @@ export const ProjectDetailsInputSchema = DaysInputSchema.extend({
 
 // ── Sessions ───────────────────────────────────────────────────────
 
+export const RepoIdentitySchema = z.object({
+	repoKey: z.string(),
+	repoLabel: z.string(),
+	repoName: z.string().nullable(),
+	source: z.enum(["worktree", "remote", "package", "unresolved"]),
+	worktree: z.string().nullable(),
+});
+
+export const LinkedSubagentSchema = z.object({
+	session_id: z.string(),
+	source: z.enum(["claude", "codex"]),
+	provider: z.enum(["claude", "openai"]),
+	model: z.string(),
+	confidence: z.enum(["id_echo", "prompt_echo", "attested_temporal"]),
+});
+
 export const SessionAnalyticsSchema = z.object({
 	session_id: z.string(),
 	user_id: z.string(),
 	session_date: z.string(),
 	project_path: z.string(),
 	repository: z.string().nullable(),
+	repository_identity: RepoIdentitySchema.optional(),
+	worktree: z.string().nullable().optional(),
 	git_remote: z.string().optional(),
+	git_branch: z.string().nullable().optional(),
 	duration_min: z.number(),
 	total_tokens: z.number(),
 	input_tokens: z.number(),
@@ -349,9 +377,21 @@ export const SessionAnalyticsSchema = z.object({
 	total_interactions: z.number(),
 	avg_period_sec: z.number(),
 	subagent_types: z.array(z.string()),
+	subagent_count: z.number().int().nonnegative().optional(),
+	native_subagents: z
+		.array(
+			z.object({
+				subagent_id: z.string(),
+				model: z.string().nullable(),
+			}),
+		)
+		.optional(),
+	linked_subagent_count: z.number().int().nonnegative().optional(),
+	linked_subagents: z.array(LinkedSubagentSchema).optional(),
 	skills: z.array(z.string()),
 	slash_commands: z.array(z.string()),
 	has_commit: z.boolean(),
+	error_count: z.number().int().nonnegative().optional(),
 	model_used: z.string(),
 	used_plan_mode: z.boolean(),
 	source: SourceSchema.optional(),
@@ -361,7 +401,39 @@ export const SessionAnalyticsSchema = z.object({
 	model_swears: z.number().int().nonnegative().default(0),
 	model_apologies: z.number().int().nonnegative().default(0),
 	model_positive: z.number().int().nonnegative().default(0),
+	member_swear_matches: z.array(z.string()).optional(),
+	member_apology_matches: z.array(z.string()).optional(),
+	member_positive_matches: z.array(z.string()).optional(),
+	model_swear_matches: z.array(z.string()).optional(),
+	model_apology_matches: z.array(z.string()).optional(),
+	model_positive_matches: z.array(z.string()).optional(),
 });
+
+// New list writers and release checks require complete enrichment. Readers also
+// accept the base schema during rolling deployments; absent metadata stays
+// absent instead of becoming convincing zeroes or empty word lists.
+export const SessionOverviewAnalyticsSchema = SessionAnalyticsSchema.extend({
+	repository_identity:
+		SessionAnalyticsSchema.shape.repository_identity.unwrap(),
+	error_count: SessionAnalyticsSchema.shape.error_count.unwrap(),
+	subagent_count: SessionAnalyticsSchema.shape.subagent_count.unwrap(),
+	native_subagents: SessionAnalyticsSchema.shape.native_subagents.unwrap(),
+	member_swear_matches:
+		SessionAnalyticsSchema.shape.member_swear_matches.unwrap(),
+	member_apology_matches:
+		SessionAnalyticsSchema.shape.member_apology_matches.unwrap(),
+	member_positive_matches:
+		SessionAnalyticsSchema.shape.member_positive_matches.unwrap(),
+	model_swear_matches:
+		SessionAnalyticsSchema.shape.model_swear_matches.unwrap(),
+	model_apology_matches:
+		SessionAnalyticsSchema.shape.model_apology_matches.unwrap(),
+	model_positive_matches:
+		SessionAnalyticsSchema.shape.model_positive_matches.unwrap(),
+});
+export type SessionOverviewAnalytics = z.infer<
+	typeof SessionOverviewAnalyticsSchema
+>;
 
 export const SessionAnalyticsSummarySchema = z.object({
 	total_sessions: z.number(),
@@ -384,11 +456,31 @@ export const SessionAnalyticsSummaryComparisonSchema = z.object({
 
 export const HistoricalSkillAgentSchema = z.enum(["claude", "codex"]);
 
+const HistoricalSkillUserAttributionSchema = z.object({
+	userId: z.string(),
+	sessionCount: z.number().int().nonnegative(),
+});
+
+const HistoricalSkillRepoAttributionSchema = z.object({
+	repoKey: z.string(),
+	repoLabel: z.string(),
+	sessionCount: z.number().int().nonnegative(),
+});
+
+const HistoricalSkillAttributionSchema = z.object({
+	userCount: z.number().int().nonnegative().default(0),
+	topUsers: z.array(HistoricalSkillUserAttributionSchema).max(3).default([]),
+	repoCount: z.number().int().nonnegative().default(0),
+	topRepos: z.array(HistoricalSkillRepoAttributionSchema).max(3).default([]),
+});
+
 export const HistoricalSkillSummarySchema = z.object({
 	name: z.string(),
 	sessionCount: z.number().int().nonnegative(),
 	claudeSessionCount: z.number().int().nonnegative(),
 	codexSessionCount: z.number().int().nonnegative(),
+	contentPreview: z.string().nullable().default(null),
+	attribution: HistoricalSkillAttributionSchema.optional(),
 });
 
 export const HistoricalSkillVersionSchema = z.object({
@@ -451,6 +543,7 @@ const VALID_METRICS = [
 	"session_count",
 	"avg_duration",
 	"total_duration",
+	// Retained for older deployed clients that still send interaction metrics.
 	"avg_interactions",
 	"total_interactions",
 	"avg_response_time",
@@ -475,6 +568,33 @@ export const DimensionAnalysisDataPointSchema = z.object({
 	dimension_value: z.string(),
 	metric_value: z.number().optional(),
 	split_values: z.record(z.string(), z.number()).optional(),
+});
+
+export const SessionDetailSchema = z.object({
+	session_id: z.string(),
+	user_id: z.string(),
+	session_date: z.string(),
+	last_interaction_date: z.string(),
+	project_path: z.string(),
+	repository: z.string().nullable(),
+	content: z.string(),
+	subagents: z.record(z.string(), z.string()),
+	skills: z.array(z.string()),
+	slash_commands: z.array(z.string()),
+	git_branch: z.string().nullable(),
+	git_sha: z.string().nullable(),
+	total_tokens: z.number(),
+	input_tokens: z.number(),
+	output_tokens: z.number(),
+	estimated_cost: z.number().nullable().optional(),
+	success_score: z.number().optional(),
+	duration_min: z.number().optional(),
+	model_used: z.string().optional(),
+	source: SourceSchema.optional(),
+});
+
+export const SessionDetailInputSchema = z.object({
+	sessionId: z.string().max(MAX_ID_FILTER_LENGTH),
 });
 
 // ── ROI ────────────────────────────────────────────────────────────
@@ -780,21 +900,26 @@ export type ProjectInvestment = z.infer<typeof ProjectInvestmentSchema>;
 export type ProjectDetailData = z.infer<typeof ProjectDetailDataSchema>;
 export type ProjectContributor = z.infer<typeof ProjectContributorSchema>;
 export type ProjectTrendDataPoint = z.infer<typeof ProjectTrendDataPointSchema>;
+export type RepoIdentity = z.infer<typeof RepoIdentitySchema>;
 type ParsedSessionAnalytics = z.infer<typeof SessionAnalyticsSchema>;
 type SessionLanguageSignalCountKey = `${string}_${
 	| "swears"
 	| "apologies"
 	| "positive"}`;
+type SessionLanguageSignalMatchKey = `${"member" | "model"}_${
+	| "swear"
+	| "apology"
+	| "positive"}_matches`;
 
-// Older clients construct SessionAnalytics fixtures without persisted count
-// fields. The response schema still defaults every known field to zero, while
-// this patterned index keeps reads strongly numeric for newer clients.
+// Historical clients can omit persisted matches. Counts keep their established
+// defaults; missing matches remain unavailable. Patterned indexes preserve the
+// existing count-reader contract without inventing matched words.
 export type SessionAnalytics = Omit<
 	ParsedSessionAnalytics,
-	SessionLanguageSignalCountKey
+	SessionLanguageSignalCountKey | SessionLanguageSignalMatchKey
 > & {
 	readonly [key: SessionLanguageSignalCountKey]: number;
-};
+} & Partial<Readonly<Record<SessionLanguageSignalMatchKey, string[]>>>;
 export type SessionListInput = z.input<typeof SessionListInputSchema>;
 export type HistoricalSkillSummary = z.infer<
 	typeof HistoricalSkillSummarySchema

@@ -107,6 +107,8 @@ export type RudelSessionAnalyticsRow = {
   skills: string[]
   slash_commands: string[]
   subagent_types: string[]
+  subagent_count: number
+  native_subagents: [string, string][]
   input_tokens: string
   output_tokens: string
   cache_read_input_tokens: string
@@ -150,6 +152,8 @@ export const RudelSessionAnalyticsRowSchema = z.object({
   skills: z.array(z.string()),
   slash_commands: z.array(z.string()),
   subagent_types: z.array(z.string()),
+  subagent_count: z.number(),
+  native_subagents: z.array(z.tuple([z.string(), z.string()])),
   input_tokens: z.string(),
   output_tokens: z.string(),
   cache_read_input_tokens: z.string(),
@@ -191,6 +195,12 @@ export type RudelSessionLanguageSignalsRow = {
   model_swears: number
   model_apologies: number
   model_positive: number
+  member_swear_matches: string[]
+  member_apology_matches: string[]
+  member_positive_matches: string[]
+  model_swear_matches: string[]
+  model_apology_matches: string[]
+  model_positive_matches: string[]
   scanned_at: string
   signal_version: string
 }
@@ -210,12 +220,81 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   model_swears: z.number(),
   model_apologies: z.number(),
   model_positive: z.number(),
+  member_swear_matches: z.array(z.string()),
+  member_apology_matches: z.array(z.string()),
+  member_positive_matches: z.array(z.string()),
+  model_swear_matches: z.array(z.string()),
+  model_apology_matches: z.array(z.string()),
+  model_positive_matches: z.array(z.string()),
   scanned_at: z.string(),
   signal_version: z.string(),
 })
 
 export type RudelSessionLanguageSignalsRowInput = z.input<typeof RudelSessionLanguageSignalsRowSchema>
 export type RudelSessionLanguageSignalsRowOutput = z.output<typeof RudelSessionLanguageSignalsRowSchema>
+
+export type RudelSessionLineageRow = {
+  organization_id: string
+  user_id: string
+  child_source: string
+  child_session_id: string
+  child_session_date: string
+  child_first_ingested_at: string
+  child_start_ts: string
+  child_model: string
+  child_originator: string
+  child_entrypoint: string
+  parent_source: string
+  parent_session_id: string
+  parent_session_date: string
+  anchor_ts: string
+  anchor_tool_use_id: string
+  anchor_operation_ordinal: number
+  carrier: string
+  outcome: string
+  confidence: string
+  countable: number
+  reason: string
+  workdir: string
+  prompt_fingerprint: string
+  derivation_version: number
+  input_sequence: string
+  replacement_version: string
+  derived_at: string
+}
+
+export const RudelSessionLineageRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  child_source: z.string(),
+  child_session_id: z.string(),
+  child_session_date: z.string(),
+  child_first_ingested_at: z.string(),
+  child_start_ts: z.string(),
+  child_model: z.string(),
+  child_originator: z.string(),
+  child_entrypoint: z.string(),
+  parent_source: z.string(),
+  parent_session_id: z.string(),
+  parent_session_date: z.string(),
+  anchor_ts: z.string(),
+  anchor_tool_use_id: z.string(),
+  anchor_operation_ordinal: z.number(),
+  carrier: z.string(),
+  outcome: z.string(),
+  confidence: z.string(),
+  countable: z.number(),
+  reason: z.string(),
+  workdir: z.string(),
+  prompt_fingerprint: z.string(),
+  derivation_version: z.number(),
+  input_sequence: z.string(),
+  replacement_version: z.string(),
+  derived_at: z.string(),
+})
+
+export type RudelSessionLineageRowInput = z.input<typeof RudelSessionLineageRowSchema>
+export type RudelSessionLineageRowOutput = z.output<typeof RudelSessionLineageRowSchema>
 
 export type RudelSkillReceiptsRow = {
   organization_id: string

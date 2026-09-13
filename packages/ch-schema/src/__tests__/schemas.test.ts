@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { RudelClaudeSessionsRowSchema } from "../generated/chkit-types.js";
+import {
+	RudelClaudeSessionsRowSchema,
+	RudelSessionAnalyticsRowSchema,
+} from "../generated/chkit-types.js";
+import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/claude-session-analytics.js";
+import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
 
 describe("RudelClaudeSessionsRowSchema", () => {
 	const validRow = {
@@ -52,5 +57,13 @@ describe("RudelClaudeSessionsRowSchema", () => {
 		expect(() =>
 			RudelClaudeSessionsRowSchema.parse({ ...validRow, session_id: 1000 }),
 		).toThrow();
+	});
+});
+
+describe("session analytics subagent schema", () => {
+	it("requires the persisted subagent count and both MVs emit it", () => {
+		expect(RudelSessionAnalyticsRowSchema.shape.subagent_count).toBeDefined();
+		expect(CLAUDE_SESSION_ANALYTICS_MV_SQL).toContain("as subagent_count");
+		expect(CODEX_SESSION_ANALYTICS_MV_SQL).toContain("as subagent_count");
 	});
 });

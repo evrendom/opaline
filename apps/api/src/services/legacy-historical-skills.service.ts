@@ -49,6 +49,7 @@ export async function listLegacyHistoricalCodexSkills(
 		sessionCount: Number(row.session_count),
 		claudeSessionCount: 0,
 		codexSessionCount: Number(row.session_count),
+		contentPreview: null,
 	}));
 }
 

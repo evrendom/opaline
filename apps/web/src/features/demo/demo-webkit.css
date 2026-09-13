@@ -1,0 +1,6 @@
+/* WebKit otherwise repaints these masks and filters repeatedly while the
+   containing iframe moves. Prepare their layers before Explore, preserving
+   the existing masks, shadows, colors and transforms. This is demo-only. */
+html[data-demo-webkit] :is([class*="mask:"], [class*="drop-shadow"]) {
+	will-change: transform;
+}

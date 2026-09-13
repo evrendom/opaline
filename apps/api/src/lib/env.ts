@@ -235,3 +235,35 @@ export function readRequiredSecretEnv(
 
 	return value;
 }
+
+export function shouldDeriveSessionLineage(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return readBooleanFromEnvironment(
+		environment,
+		"SESSION_LINEAGE_ENABLED",
+		false,
+	);
+}
+
+export function shouldReadSessionLineage(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return readBooleanFromEnvironment(
+		environment,
+		"SESSION_LINEAGE_CONSUMERS_ENABLED",
+		false,
+	);
+}
+
+function readBooleanFromEnvironment(
+	environment: Readonly<Record<string, string | undefined>>,
+	name: string,
+	defaultValue: boolean,
+): boolean {
+	const rawValue = environment[name];
+	if (rawValue === undefined) return defaultValue;
+	if (rawValue === "true") return true;
+	if (rawValue === "false") return false;
+	throw new Error(`${name} must be either "true" or "false"`);
+}

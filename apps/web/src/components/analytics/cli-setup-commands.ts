@@ -4,7 +4,7 @@ export const cliSetupCommands = [
 		alternateCommandCaption: undefined,
 		advanceLabel: "I installed and logged in",
 		command:
-			"npm install -g @opalinehq/cli@latest && opaline login --api-base https://opaline.so",
+			"npm install -g opaline@latest && opaline login --api-base https://opaline.so",
 		commandCaption: "Install globally + log in on this machine",
 		description: undefined,
 		id: "install-and-login",

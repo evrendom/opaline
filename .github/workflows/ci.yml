@@ -2,6 +2,11 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      migrate_only:
+        description: Apply Postgres migrations without deploying the legacy Fly app
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -60,7 +65,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
           package-manager-cache: false
 
       - name: Setup Bun
@@ -89,6 +94,9 @@ jobs:
       - name: Verify
         run: bun run turbo run lint check-types test build --concurrency=1
 
+      - name: Build combined marketing, demo, and product
+        run: bun run build:site
+
       - name: Verify browser resource budgets in Chrome
         run: bun run --cwd apps/web test:resource-budgets:chrome
 
@@ -112,6 +120,7 @@ jobs:
     # These credentials are only for the disposable services created above.
     env:
       PG_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/rudel
+      PG_DIRECT_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/rudel
       CLICKHOUSE_URL: http://localhost:8123
       CLICKHOUSE_USER: rudel
       CLICKHOUSE_USERNAME: rudel
@@ -135,7 +144,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
           package-manager-cache: false
 
       - name: Setup Bun
@@ -218,6 +227,9 @@ jobs:
           F16_MIGRATION_REQUEST_TIMEOUT_MS: "600000"
           F16_NONPROD_AUTO_APPROVE_CHECKPOINTS: ci-only
         run: bun run ch:migrate:f16
+
+      - name: Apply product launch ClickHouse metadata
+        run: bun run --cwd packages/ch-schema ch:migrate:product-launch
 
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream
@@ -341,9 +353,11 @@ jobs:
           PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
 
       - name: Setup Fly.io
+        if: ${{ !inputs.migrate_only }}
         uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       - name: Deploy
+        if: ${{ !inputs.migrate_only }}
         run: |
           flyctl deploy --remote-only \
             --build-arg "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" \

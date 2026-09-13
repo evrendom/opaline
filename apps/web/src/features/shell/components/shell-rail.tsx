@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/app/ui/badge";
 import { Kbd } from "@/app/ui/kbd";
@@ -7,37 +7,54 @@ import { cn } from "@/lib/utils";
 import {
 	getRailLabelClassName,
 	getUtilityRailItemClassName,
-	type SidebarRowMode,
 } from "./shell-rail-utils";
-
-export type { SidebarRowMode } from "./shell-rail-utils";
 
 export function RailLink({
 	to,
 	label,
 	shortcut,
+	comingSoon = false,
 	active,
 	badgeLabel,
 	children,
-	mode = "collapsed",
+	placement = "sidebar",
 }: {
 	to: string;
 	label: string;
 	shortcut?: string;
+	comingSoon?: boolean;
 	active?: boolean;
 	badgeLabel?: string;
 	children: ReactNode;
-	mode?: SidebarRowMode;
+	placement?: "bottom-rail" | "floating-row" | "olivetti-rail" | "sidebar";
 }) {
+	const isOlivettiRailPlacement = placement === "olivetti-rail";
+	const isFloatingRowPlacement = placement === "floating-row";
+	const isBottomRailPlacement =
+		placement === "bottom-rail" ||
+		isOlivettiRailPlacement ||
+		isFloatingRowPlacement;
+	const isCollapsedSidebarPlacement = placement === "sidebar";
 	const link = (
-		<Link
+		<ShellNavigationLink
+			comingSoon={comingSoon}
 			to={to}
 			aria-label={label}
+			aria-current={active ? "page" : undefined}
+			data-active={active ? "true" : undefined}
 			data-sidebar-interactive
 			data-sidebar-nav-row
+			data-sidebar-row-mode="collapsed"
 			className={cn(
-				getUtilityRailItemClassName(mode),
-				active && "bg-white text-[color:var(--dashboard-01-rail-icon-active)]",
+				getUtilityRailItemClassName(),
+				isBottomRailPlacement &&
+					"!size-9 !w-9 self-auto overflow-visible rounded-lg",
+				isCollapsedSidebarPlacement &&
+					"overflow-visible rounded-none !bg-transparent hover:!bg-transparent active:!bg-transparent data-[active=true]:!bg-transparent",
+				isOlivettiRailPlacement &&
+					"rounded-none !bg-transparent hover:!bg-transparent active:!bg-transparent data-[active=true]:!bg-transparent",
+				isFloatingRowPlacement &&
+					"rounded-full !bg-transparent hover:!bg-transparent active:!bg-transparent data-[active=true]:!bg-transparent",
 			)}
 		>
 			<span
@@ -50,7 +67,7 @@ export function RailLink({
 			<span
 				aria-hidden="true"
 				data-sidebar-nav-label
-				className={getRailLabelClassName(mode)}
+				className={getRailLabelClassName()}
 			>
 				{label}
 			</span>
@@ -64,33 +81,60 @@ export function RailLink({
 					{badgeLabel}
 				</Badge>
 			) : null}
-		</Link>
+			{isBottomRailPlacement ? (
+				<span
+					aria-hidden="true"
+					className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
+				/>
+			) : null}
+		</ShellNavigationLink>
 	);
 
 	return (
-		<li>
-			{mode === "collapsed" ? (
-				<Tooltip>
-					<TooltipTrigger asChild>{link}</TooltipTrigger>
-					<TooltipContent
-						side="right"
-						className="[&>[aria-hidden='true']]:hidden"
-					>
-						{shortcut ? (
-							<div className="flex items-center gap-2">
-								<span>{label}</span>
-								<Kbd className="size-5 min-w-0 rounded-full border-0 p-0 text-[10px]">
-									{shortcut}
-								</Kbd>
-							</div>
-						) : (
-							label
-						)}
-					</TooltipContent>
-				</Tooltip>
-			) : (
-				link
-			)}
+		<li
+			className={
+				isBottomRailPlacement
+					? "flex size-12 items-center justify-center"
+					: undefined
+			}
+		>
+			<Tooltip>
+				<TooltipTrigger asChild>{link}</TooltipTrigger>
+				<TooltipContent
+					side={isBottomRailPlacement ? "top" : "right"}
+					sideOffset={isBottomRailPlacement ? 8 : 0}
+					className="[&>[aria-hidden='true']]:hidden"
+				>
+					{comingSoon ? (
+						<>
+							<span>{label}</span>
+							<span className="text-background/60">Coming soon</span>
+						</>
+					) : shortcut ? (
+						<div className="flex items-center gap-2">
+							<span>{label}</span>
+							<Kbd className="size-5 min-w-0 rounded-full border-0 p-0 text-[10px]">
+								{shortcut}
+							</Kbd>
+						</div>
+					) : (
+						label
+					)}
+				</TooltipContent>
+			</Tooltip>
 		</li>
 	);
+}
+
+// No href or keyboard focus target for unreleased destinations.
+// Keep a hover target so the tooltip can explain why navigation is unavailable.
+export function ShellNavigationLink({
+	comingSoon,
+	to,
+	...props
+}: ComponentPropsWithRef<typeof Link> & { comingSoon: boolean }) {
+	if (comingSoon) {
+		return <a {...props} aria-disabled="true" tabIndex={-1} />;
+	}
+	return <Link {...props} to={to} />;
 }

@@ -1,5 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import type {
 	TextContent,
 	ThinkingContent,
@@ -8,7 +7,12 @@ import type {
 } from "@/lib/conversation-schema";
 import { cn } from "@/lib/utils";
 import { SignalText } from "../signal-text";
-import { CodeBlock } from "./CodeBlock";
+import { CodeBlock, InlineCode } from "./CodeBlock";
+import { formatShellOutput } from "./conversation-tools";
+import {
+	TraceChevronDownIcon,
+	TraceChevronRightIcon,
+} from "./conversation-trace-hugeicons";
 import {
 	parseMessageTextBlocks,
 	type TextPart,
@@ -99,9 +103,9 @@ function XmlBlock({
 			>
 				<div className="mt-0.5 shrink-0 text-[color:var(--dashboardy-muted)]">
 					{isOpen ? (
-						<ChevronDown className="size-4" />
+						<TraceChevronDownIcon className="size-4" />
 					) : (
-						<ChevronRight className="size-4" />
+						<TraceChevronRightIcon className="size-4" />
 					)}
 				</div>
 				<div className="grid min-w-0 flex-1 gap-0.5">
@@ -152,6 +156,7 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 							code={part.content}
 							language={part.language}
 							highlight={part.highlight}
+							showLineNumbers
 						/>
 					);
 				}
@@ -181,16 +186,110 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 					<div
 						// biome-ignore lint/suspicious/noArrayIndexKey: static parsed content blocks
 						key={partIdx}
-						className="max-w-none"
+						className="max-w-[65ch]"
 					>
 						<p className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-heading)] text-pretty [overflow-wrap:anywhere]">
-							<SignalText text={part.content} />
+							{renderInlineCode(part.content)}
 						</p>
 					</div>
 				);
 			})}
 		</div>
 	);
+}
+
+function renderStrongText(text: string, keyPrefix: string): ReactNode[] {
+	const strongPattern = /\*\*([^*\n]+?)\*\*/g;
+	const content: ReactNode[] = [];
+	let lastIndex = 0;
+	let match = strongPattern.exec(text);
+
+	while (match !== null) {
+		if (match.index > lastIndex) {
+			const plainText = text.slice(lastIndex, match.index);
+			content.push(
+				<span key={`${keyPrefix}-text-${lastIndex}`}>
+					<SignalText text={plainText} />
+				</span>,
+			);
+		}
+
+		const strongText = match[1];
+		if (strongText?.trim()) {
+			content.push(
+				<strong
+					key={`${keyPrefix}-strong-${match.index}`}
+					className="font-semibold"
+				>
+					<SignalText text={strongText} />
+				</strong>,
+			);
+		} else {
+			content.push(
+				<span key={`${keyPrefix}-text-${match.index}`}>{match[0]}</span>,
+			);
+		}
+
+		lastIndex = match.index + match[0].length;
+		match = strongPattern.exec(text);
+	}
+
+	if (lastIndex === 0) {
+		return [
+			<span key={`${keyPrefix}-text`}>
+				<SignalText text={text} />
+			</span>,
+		];
+	}
+
+	if (lastIndex < text.length) {
+		const trailingText = text.slice(lastIndex);
+		content.push(
+			<span key={`${keyPrefix}-text-${lastIndex}`}>
+				<SignalText text={trailingText} />
+			</span>,
+		);
+	}
+
+	return content;
+}
+
+function renderInlineCode(text: string): ReactNode {
+	const inlineCodePattern = /(`+)([^`\n]+?)\1/g;
+	const content: ReactNode[] = [];
+	let lastIndex = 0;
+	let match = inlineCodePattern.exec(text);
+
+	while (match !== null) {
+		if (match.index > lastIndex) {
+			content.push(
+				...renderStrongText(
+					text.slice(lastIndex, match.index),
+					`inline-${lastIndex}`,
+				),
+			);
+		}
+
+		const code = match[2];
+		if (code !== undefined) {
+			content.push(<InlineCode key={`code-${match.index}`}>{code}</InlineCode>);
+		}
+
+		lastIndex = match.index + match[0].length;
+		match = inlineCodePattern.exec(text);
+	}
+
+	if (lastIndex === 0) {
+		return renderStrongText(text, "plain");
+	}
+
+	if (lastIndex < text.length) {
+		content.push(
+			...renderStrongText(text.slice(lastIndex), `inline-${lastIndex}`),
+		);
+	}
+
+	return content;
 }
 
 function getMessageBlockText(block: MessageBlock): string | null {
@@ -338,6 +437,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 												: JSON.stringify(item),
 										)
 										.join("\n");
+						const output = formatShellOutput(resultContent);
 
 						return (
 							<div
@@ -359,7 +459,12 @@ export function MessageContent({ content, className }: MessageContentProps) {
 								>
 									{block.is_error ? "Tool Error" : "Tool Result"}
 								</p>
-								<CodeBlock code={resultContent} language="text" />
+								<CodeBlock
+									code={output.text}
+									filename={block.is_error ? "Error Output" : "Output"}
+									language={output.language}
+									showLineNumbers
+								/>
 							</div>
 						);
 					}

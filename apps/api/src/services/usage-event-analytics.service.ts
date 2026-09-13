@@ -11,6 +11,10 @@ import {
 	getModelPricingModifierCatalog,
 	MODEL_LONG_CONTEXT_THRESHOLD_TOKENS,
 } from "./pricing.service.js";
+import {
+	buildLineageEnrichedMetadataCte,
+	buildSessionLineageCteDefinitions,
+} from "./session-lineage-analytics.service.js";
 
 const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
@@ -236,10 +240,13 @@ const SESSION_METADATA_COLUMNS = `
 	sa.tag AS tag,
 	sa.source AS source,
 	sa.skills AS skills,
-	sa.slash_commands AS slash_commands,
-	sa.subagent_types AS subagent_types,
-	sa.total_interactions AS total_interactions,
-	sa.actual_duration_min AS actual_duration_min,
+		sa.slash_commands AS slash_commands,
+		sa.subagent_types AS subagent_types,
+		sa.subagent_count AS subagent_count,
+		sa.native_subagents AS native_subagents,
+		sa.linked_subagent_count AS linked_subagent_count,
+		sa.linked_subagents AS linked_subagents,
+		sa.actual_duration_min AS actual_duration_min,
 	sa.avg_period_sec AS avg_period_sec,
 	sa.median_period_sec AS median_period_sec,
 	sa.quick_responses AS quick_responses,
@@ -357,12 +364,14 @@ function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
 
 export function buildUsageEventAnalyticsCte(
 	scope: UsageAnalyticsScope = {},
+	lineageEnabled?: boolean,
 ): string {
 	const usageEventFilters = buildUsageEventFilters(scope);
 	// The organization/key filters follow the table's primary-key prefix, so FINAL
 	// resolves exact ReplacingMergeTree state without scanning unrelated tenants.
 	// Keep this pipeline single-pass: ClickHouse inlines repeated CTE references.
 	return `
+		${buildSessionLineageCteDefinitions(lineageEnabled)},
 		latest_usage_records AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
@@ -542,11 +551,15 @@ export function buildUsageEventAnalyticsCte(
 			WHERE p.record_kind = 'event'
 			GROUP BY p.organization_id, p.user_id, p.source, p.session_id, p.usage_date
 		),
-		usage_analytics_metadata AS (
+		usage_analytics_metadata_base AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} FINAL
 			WHERE ${usageEventFilters}
 		),
+		${buildLineageEnrichedMetadataCte({
+			baseRelation: "usage_analytics_metadata_base",
+			outputRelation: "usage_analytics_metadata",
+		})},
 		usage_analytics_sessions AS (
 			SELECT
 				${SESSION_METADATA_COLUMNS},
@@ -587,15 +600,24 @@ export function buildUsageEventAnalyticsCte(
 	`;
 }
 
-export function buildLegacyUsageAnalyticsCte(): string {
+export function buildLegacyUsageAnalyticsCte(lineageEnabled?: boolean): string {
 	return `
+		${buildSessionLineageCteDefinitions(lineageEnabled)},
+		usage_analytics_metadata_base AS (
+			SELECT *
+			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} FINAL
+			WHERE organization_id = {orgId:String}
+		),
+		${buildLineageEnrichedMetadataCte({
+			baseRelation: "usage_analytics_metadata_base",
+			outputRelation: "usage_analytics_metadata",
+		})},
 		usage_analytics_sessions AS (
 			SELECT
 				sa.*,
 				ifNull(${LEGACY_SESSION_COST_SQL}, 0) AS estimated_cost,
 				toUInt8(1) AS cost_is_complete
-			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} AS sa FINAL
-			WHERE sa.organization_id = {orgId:String}
+			FROM usage_analytics_metadata AS sa
 		),
 		usage_analytics_daily_sessions AS (
 			SELECT *, toDate(session_date) AS usage_date

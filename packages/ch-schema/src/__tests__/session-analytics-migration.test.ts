@@ -8,10 +8,15 @@ const migration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260730180016_auto.sql"),
 	"utf8",
 );
-const revisionMigration = readFileSync(
-	resolve(import.meta.dir, "../../chx/migrations/20260826090551_auto.sql"),
+const currentMvMigration = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20260913190000_product_launch.sql",
+	),
 	"utf8",
 );
+
+const deployedMvMigration = currentMvMigration;
 
 function normalizeSql(sql: string): string {
 	return sql.replace(/\s+/g, " ").trim();
@@ -22,23 +27,18 @@ function countOccurrences(value: string, search: string): number {
 }
 
 describe("session_analytics identity migration", () => {
-	test("keeps the F16 deployed MVs synchronized on revision ordering", () => {
-		const normalizedMigration = normalizeSql(revisionMigration);
-		const mvBarrierIndex = revisionMigration.indexOf("-- F16-C27");
-		expect(mvBarrierIndex).toBeGreaterThan(-1);
-		const deployedMvMigration = normalizeSql(
-			revisionMigration.slice(0, mvBarrierIndex),
-		);
+	test("keeps deployed MVs synchronized and rebuild deduplication narrow", () => {
+		const normalizedCurrentMvMigration = normalizeSql(currentMvMigration);
 
 		expect(
 			countOccurrences(
-				normalizedMigration,
+				normalizedCurrentMvMigration,
 				normalizeSql(CLAUDE_SESSION_ANALYTICS_MV_SQL),
 			),
 		).toBe(1);
 		expect(
 			countOccurrences(
-				normalizedMigration,
+				normalizedCurrentMvMigration,
 				normalizeSql(CODEX_SESSION_ANALYTICS_MV_SQL),
 			),
 		).toBe(1);
@@ -47,7 +47,9 @@ describe("session_analytics identity migration", () => {
 		expect(
 			countOccurrences(deployedMvMigration, "ORDER BY cs.revision DESC"),
 		).toBe(2);
-		expect(normalizedMigration).not.toContain("ORDER BY cs.ingested_at DESC");
+		expect(normalizedCurrentMvMigration).not.toContain(
+			"ORDER BY cs.ingested_at DESC",
+		);
 	});
 
 	test("rebuilds in resumable session-month chunks", () => {

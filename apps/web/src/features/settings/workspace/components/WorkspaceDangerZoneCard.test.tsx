@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceDangerZoneCard } from "./WorkspaceDangerZoneCard";
 
@@ -48,6 +49,17 @@ vi.mock("@/lib/orpc", () => ({
 
 vi.mock("@/lib/auth-client", () => ({
 	refreshAuthClientState: mockRefreshAuthClientState,
+	authClient: {
+		useListOrganizations: () => ({
+			refetch: async () => ({
+				data: mockUseOrganizationState.state.organizations,
+			}),
+		}),
+		organization: {
+			setActive: async ({ organizationId }: { organizationId: string }) =>
+				mockSwitchOrganization(organizationId),
+		},
+	},
 }));
 
 vi.mock("sonner", () => ({
@@ -67,13 +79,15 @@ function renderCard(
 		defaultOptions: { queries: { retry: false } },
 	});
 	return render(
-		<QueryClientProvider client={queryClient}>
-			<WorkspaceDangerZoneCard
-				canManage={true}
-				organization={{ id: "org-1", name: "Workspace One" }}
-				{...props}
-			/>
-		</QueryClientProvider>,
+		<MemoryRouter>
+			<QueryClientProvider client={queryClient}>
+				<WorkspaceDangerZoneCard
+					canManage={true}
+					organization={{ id: "org-1", name: "Workspace One" }}
+					{...props}
+				/>
+			</QueryClientProvider>
+		</MemoryRouter>,
 	);
 }
 

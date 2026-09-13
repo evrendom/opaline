@@ -9,6 +9,7 @@
 		"check:disclosure": "bun scripts/check-disclosure.ts",
 		"check-types:decimal-e2e": "tsc --project scripts/tsconfig.decimal-e2e.json",
 		"dev": "turbo run dev",
+		"dev:real": "bun scripts/dev-real-app.ts",
 		"lint:wrapped:hig": "bun ./scripts/lint-wrapped-apple-hig.ts",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
@@ -17,7 +18,7 @@
 		"qa:pr223:api": "bash ./scripts/qa/pr-223/run-api-smoke.sh",
 		"qa:pr223:ci": "bash ./scripts/qa/pr-223/run-ci-parity.sh",
 		"qa:pr223:static": "bash ./scripts/qa/pr-223/run-static.sh",
-		"check-types": "turbo run check-types && bun run check-types:decimal-e2e",
+		"check-types": "turbo run check-types && bun run check-types:decimal-e2e && bun run check-types:vercel",
 		"test": "turbo run test",
 		"test:integration": "turbo run test:integration --concurrency=1",
 		"verify": "bun scripts/check-disclosure.ts && bun run check-types && turbo run lint test build",
@@ -27,7 +28,9 @@
 		"infra:up": "docker compose up -d",
 		"infra:down": "docker compose down",
 		"chkit:link": "bun scripts/chkit-link.ts link",
-		"chkit:unlink": "bun scripts/chkit-link.ts unlink"
+		"chkit:unlink": "bun scripts/chkit-link.ts unlink",
+		"build:site": "bun scripts/build-site.ts",
+		"check-types:vercel": "tsc --project tsconfig.json"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.0",
@@ -40,7 +43,7 @@
 		"bun": "1.x",
 		"node": ">=18"
 	},
-	"packageManager": "bun@1.3.9",
+	"packageManager": "bun@1.3.14",
 	"workspaces": [
 		"apps/*",
 		"packages/*"
@@ -53,9 +56,13 @@
 		"@chkit/plugin-backfill": "0.1.0-beta.16",
 		"@chkit/plugin-codegen": "0.1.0-beta.16",
 		"@chkit/plugin-obsessiondb": "0.1.0-beta.16",
-		"@chkit/plugin-pull": "0.1.0-beta.16"
+		"@chkit/plugin-pull": "0.1.0-beta.16",
+		"bun-types": "1.3.10"
 	},
 	"dependencies": {
 		"postgres": "^3.4.8"
+	},
+	"patchedDependencies": {
+		"agentation@2.3.3": "patches/agentation@2.3.3.patch"
 	}
 }

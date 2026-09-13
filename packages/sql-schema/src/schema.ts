@@ -1,5 +1,6 @@
 export * from "./auth-schema.js";
 export * from "./avatar-schema.js";
+export * from "./cli-connection-schema.js";
 export * from "./clickhouse-purge-schema.js";
 export * from "./ingest-job-schema.js";
 export * from "./ingest-processing-schema.js";

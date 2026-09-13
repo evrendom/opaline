@@ -16,6 +16,7 @@ const handlersSource = await Bun.file(
 
 function handlerSource(
 	name:
+		| "detailBodyChunk"
 		| "detailOverview"
 		| "detailSpine"
 		| "detailSubagent"
@@ -69,6 +70,7 @@ describe("session detail endpoint guardrails", () => {
 	});
 
 	for (const name of [
+		"detailBodyChunk",
 		"detailOverview",
 		"detailSpine",
 		"detailSubagent",
@@ -85,6 +87,7 @@ describe("session detail endpoint guardrails", () => {
 
 	test("each body endpoint forwards the caller-bound revision", () => {
 		for (const name of [
+			"detailBodyChunk",
 			"detailSpine",
 			"detailSubagent",
 			"detailTurn",

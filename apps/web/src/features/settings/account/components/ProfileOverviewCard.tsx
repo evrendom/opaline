@@ -1,15 +1,10 @@
-"use client";
-
-import { LogOutIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
 
 function getInitials(name: string, email: string) {
 	const source = name.trim() || email.trim() || "R";
@@ -35,43 +30,33 @@ export function ProfileOverviewCard({
 	onSignOut: () => void;
 }) {
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<CardTitle>Profile</CardTitle>
-				<CardDescription>
-					Your account identity and session access for this browser.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-6">
-				<div className="flex items-center gap-4">
-					<Avatar size="lg">
-						{image ? <AvatarImage src={image} alt={name} /> : null}
-						<AvatarFallback>{getInitials(name, email)}</AvatarFallback>
-					</Avatar>
-					<div className="min-w-0">
-						<p className="truncate font-medium text-foreground">{name}</p>
-						<p className="truncate text-sm text-muted-foreground">{email}</p>
-					</div>
-				</div>
-
-				<div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
-					<div className="flex flex-col gap-1">
-						<p className="font-medium text-foreground">Session</p>
-						<p className="text-sm text-muted-foreground">
-							Sign out from this device without affecting other sessions.
-						</p>
-					</div>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={onSignOut}
-						disabled={isSigningOut}
-					>
-						<LogOutIcon data-icon="inline-start" />
-						{isSigningOut ? "Signing out…" : "Sign out"}
-					</Button>
-				</div>
-			</CardContent>
-		</Card>
+		<WorkspaceSettingsGroup title="Profile">
+			<WorkspaceSettingsRow label="Profile photo">
+				<Avatar>
+					{image ? <AvatarImage src={image} alt={name} /> : null}
+					<AvatarFallback>{getInitials(name, email)}</AvatarFallback>
+				</Avatar>
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow label="Name" controlId="account-name">
+				<Input id="account-name" value={name} readOnly />
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow label="Email" controlId="account-email">
+				<Input id="account-email" type="email" value={email} readOnly />
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow
+				label="Session"
+				description="Sign out from this device without affecting other sessions."
+			>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={onSignOut}
+					disabled={isSigningOut}
+				>
+					{isSigningOut ? "Signing out…" : "Sign out"}
+				</Button>
+			</WorkspaceSettingsRow>
+		</WorkspaceSettingsGroup>
 	);
 }

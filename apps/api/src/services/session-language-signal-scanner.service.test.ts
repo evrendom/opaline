@@ -29,11 +29,17 @@ describe("session language-signal scanner", () => {
 			);
 			await expect(scanner.scan("")).resolves.toEqual({
 				member_apologies: 0,
+				member_apology_matches: [],
 				member_positive: 0,
+				member_positive_matches: [],
 				member_swears: 0,
+				member_swear_matches: [],
 				model_apologies: 0,
+				model_apology_matches: [],
 				model_positive: 0,
+				model_positive_matches: [],
 				model_swears: 0,
+				model_swear_matches: [],
 			});
 			expect(workersCreated).toBe(2);
 		} finally {

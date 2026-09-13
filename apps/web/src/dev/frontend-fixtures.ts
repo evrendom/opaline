@@ -7,6 +7,7 @@ import {
 	getModelPricingCatalog,
 	type ModelTokensTrendData,
 	type OverviewKPIs,
+	type ProjectInvestment,
 	type RepositoryDailyTrendData,
 	type ROIDashboard,
 	type SessionAnalyticsSummaryComparison,
@@ -35,9 +36,11 @@ export interface FrontendFixtureMember {
 export interface DashboardFrontendFixtureData {
 	errorDashboard: ErrorsDashboard;
 	errorDeveloperTrend: ErrorTrendDataPoint[];
+	errorModelTrend: ErrorTrendDataPoint[];
 	errorProjectTrend: ErrorTrendDataPoint[];
 	modelTokensTrend: ModelTokensTrendData[];
 	overviewKpis: OverviewKPIs;
+	projectInvestment: ProjectInvestment[];
 	repositoriesDailyTrend: RepositoryDailyTrendData[];
 	roiDashboard: ROIDashboard;
 	sessionSummaryComparison: SessionAnalyticsSummaryComparison;
@@ -48,6 +51,7 @@ export interface DashboardFrontendFixtureData {
 export interface TeamAnalyticsFixtures {
 	developerSummaries: DeveloperSummary[];
 	teamCards: DeveloperTeamCard[];
+	usersDailyTrend: UserDailyTrendData[];
 }
 
 const defaultFixtureMembers = [
@@ -107,6 +111,7 @@ export function buildDashboardFixtureData(input: {
 	return {
 		errorDashboard: buildErrorsDashboard(input.startDate, input.endDate),
 		errorDeveloperTrend: buildDeveloperErrorTrend(members, dates),
+		errorModelTrend: buildModelErrorTrend(dates),
 		errorProjectTrend: buildProjectErrorTrend(dates),
 		modelTokensTrend: buildModelTokensTrend(dates),
 		overviewKpis: {
@@ -118,6 +123,7 @@ export function buildDashboardFixtureData(input: {
 			distinct_users: members.length,
 			total_sessions: totalSessions,
 		},
+		projectInvestment: buildProjectInvestment(input.endDate, dates.length),
 		repositoriesDailyTrend: buildRepositoryDailyTrend(dates),
 		roiDashboard: buildRoiDashboard({
 			activeDevelopers: members.length,
@@ -134,10 +140,12 @@ export function buildDashboardFixtureData(input: {
 	};
 }
 
-export function buildTeamAnalyticsFixtures(
-	membersInput: readonly FrontendFixtureMember[],
-): TeamAnalyticsFixtures {
-	const members = getFixtureMembers(membersInput);
+export function buildTeamAnalyticsFixtures(input: {
+	endDate: string;
+	members: readonly FrontendFixtureMember[];
+	startDate: string;
+}): TeamAnalyticsFixtures {
+	const members = getFixtureMembers(input.members);
 	const teamCards = members.map((member, index) =>
 		buildDeveloperTeamCard(member, index),
 	);
@@ -159,6 +167,10 @@ export function buildTeamAnalyticsFixtures(
 			user_id: teamCard.user_id,
 		})),
 		teamCards,
+		usersDailyTrend: buildUserDailyTrend(
+			members,
+			getFixtureDates(input.startDate, input.endDate),
+		),
 	};
 }
 
@@ -246,6 +258,9 @@ function buildUserDailyTrend(
 
 			return {
 				avg_success_rate: 86 - memberIndex * 4,
+				cost: Number(
+					(inputTokens * 0.000003 + outputTokens * 0.000015).toFixed(2),
+				),
 				date,
 				distinct_skills: 3,
 				distinct_slash_commands: 2,
@@ -292,13 +307,52 @@ function buildRepositoryDailyTrend(
 	dates: readonly string[],
 ): RepositoryDailyTrendData[] {
 	return dates.flatMap((date, dayIndex) =>
-		FIXTURE_REPOSITORIES.map((repository, repositoryIndex) => ({
-			date,
-			repository,
-			sessions: 4 + ((dayIndex + repositoryIndex) % 4),
-			total_commits: 2 + ((dayIndex + repositoryIndex) % 3),
-		})),
+		FIXTURE_REPOSITORIES.map((repository, repositoryIndex) => {
+			const sessions = 4 + ((dayIndex + repositoryIndex) % 4);
+			const inputTokens = sessions * (18_000 + repositoryIndex * 2_000);
+			const outputTokens = sessions * (4_500 + repositoryIndex * 700);
+
+			return {
+				cost: Number(
+					(inputTokens * 0.000003 + outputTokens * 0.000015).toFixed(2),
+				),
+				date,
+				input_tokens: inputTokens,
+				output_tokens: outputTokens,
+				repository,
+				sessions,
+				total_commits: 2 + ((dayIndex + repositoryIndex) % 3),
+				total_tokens: inputTokens + outputTokens,
+			};
+		}),
 	);
+}
+
+function buildProjectInvestment(
+	endDate: string,
+	dayCount: number,
+): ProjectInvestment[] {
+	return FIXTURE_REPOSITORIES.map((repository, index) => {
+		const sessions = Math.max(1, dayCount * (index === 0 ? 6 : 4));
+		const automatedSessions = index === 0 ? sessions : 0;
+
+		return {
+			automated_sessions: automatedSessions,
+			cost: index === 0 ? 38.42 : 21.16,
+			git_remote: `https://github.com/${repository}.git`,
+			last_session_at: `${endDate} 16:24:00.000`,
+			manual_sessions: index === 0 ? 0 : sessions,
+			project_path: `/fixture/${repository.split("/").at(-1)}`,
+			repository,
+			sessions,
+			success_rate: index === 0 ? 88 : 82,
+			success_rate_trend: index === 0 ? 4 : -1,
+			total_duration_min: sessions * 38,
+			total_tokens: sessions * (index === 0 ? 142_000 : 96_000),
+			unclassified_sessions: 0,
+			unique_users: index === 0 ? 4 : 2,
+		};
+	});
 }
 
 function buildRoiDashboard(input: {
@@ -407,6 +461,22 @@ function buildProjectErrorTrend(
 		error_types: ["FixtureError"],
 		total_errors: 1 + (index % 3),
 	}));
+}
+
+function buildModelErrorTrend(dates: readonly string[]): ErrorTrendDataPoint[] {
+	return dates.flatMap((date, dateIndex) =>
+		FIXTURE_MODELS.map((model, modelIndex) => ({
+			avg_errors_per_interaction: Number(
+				(0.01 + modelIndex * 0.005).toFixed(3),
+			),
+			avg_errors_per_session: Number((0.08 + modelIndex * 0.03).toFixed(2)),
+			date,
+			dimension: model,
+			error_type_occurrences: [dateIndex + modelIndex + 1],
+			error_types: ["FixtureError"],
+			total_errors: (dateIndex + modelIndex) % 3,
+		})),
+	);
 }
 
 function buildDeveloperErrorTrend(

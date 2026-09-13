@@ -1,6 +1,10 @@
 import { join } from "node:path";
 import type { FetchHandlerFallbackInput } from "./handler.js";
 import {
+	getTeamInviteRoute,
+	handleTeamInvitePageRequest,
+} from "./handlers/team-invite-page-http.js";
+import {
 	getWrappedPublicShareId,
 	handleWrappedPublicPageRequest,
 } from "./handlers/wrapped-share-page-http.js";
@@ -28,6 +32,14 @@ export function createFlyStaticFallback(): FlyStaticFallback {
 		}
 
 		const shareId = getWrappedPublicShareId(url.pathname);
+		const invite = getTeamInviteRoute(url.pathname);
+		if (invite && !invite.image) {
+			return handleTeamInvitePageRequest({
+				request,
+				token: invite.token,
+				indexHtml: await indexFile.text(),
+			});
+		}
 		if (!shareId) {
 			return new Response(indexFile);
 		}

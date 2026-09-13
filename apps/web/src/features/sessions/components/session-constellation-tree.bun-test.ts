@@ -1,0 +1,288 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import {
+	getConversationTraceTreeBranchPath,
+	getConversationTraceTreeX,
+} from "@/components/conversation/conversation-trace-tree-geometry";
+
+describe("session constellation tree tokens", () => {
+	test("uses reference rails and typography without changing tree geometry", () => {
+		const css = readFileSync(
+			new URL("./session-constellation-tree.css", import.meta.url),
+			"utf8",
+		);
+		const opalineTraceFill = readFileSync(
+			new URL("../../../../public/opaline-trace-fill.svg", import.meta.url),
+			"utf8",
+		);
+
+		expect(css).toContain("--conversation-trace-connector-width: 0.5");
+		expect(css).toContain(
+			"--active-turn-rail-width: var(--conversation-trace-connector-width)",
+		);
+		expect(css).toContain("--active-turn-rail: #f9233b");
+		expect(css).toContain('[data-active-rail-position="middle"]');
+		expect(css).toContain("stroke-width: var(--active-turn-rail-width)");
+		expect(css).toContain("transform: scale(1.5)");
+		expect(css).toContain("color(display-p3 0 0 0 / 60.8%)");
+		expect(css).toContain('font-family: "Inter Variable"');
+		expect(css).toContain(
+			"[data-trace-preview]:not([data-trace-shell-command-preview])",
+		);
+		expect(css).toContain("font-size: 12px");
+		expect(css).toContain("line-height: 16px");
+		expect(css).toContain("width: 20px");
+		expect(css).toContain("width: 14px");
+		expect(css).toContain("border-radius: 0");
+		expect(css).toContain("--trace-icon-grass-bg: oklch(0.94 0.045 145)");
+		expect(css).toContain("--trace-icon-violet-fg: oklch(0.72 0.14 295)");
+		expect(css).toContain("--trace-icon-claude-fg: oklch(0.72 0.13 45)");
+		expect(css).toContain("--trace-icon-openai-fg: #111111");
+		expect(css).toContain('data-trace-icon-tone="claude"');
+		expect(css).toContain('data-trace-icon-tone="openai"');
+		expect(css).toContain('data-trace-icon-tone="tomato"');
+		expect(css).toContain(".session-turn-table-model-icon-shell");
+		expect(css).toContain("filter: drop-shadow(0 0 0.75px rgb(0 0 0 / 14%))");
+		expect(css).not.toContain("box-shadow: inset 0 0 0 1px rgb(0 0 0 / 5%)");
+		for (const toolIcon of [
+			"bot",
+			"file",
+			"file-add",
+			"globe",
+			"list",
+			"pencil",
+			"search",
+			"sparkle",
+			"terminal",
+			"wrench",
+		]) {
+			expect(css).toContain(`data-trace-tool-icon="${toolIcon}"`);
+		}
+		expect(css).toContain("0.72 var(--trace-tool-icon-light-chroma)");
+		expect(css).toContain("0.82 var(--trace-tool-icon-dark-chroma)");
+		expect(css).toContain(
+			"0.94 var(--trace-tool-icon-pastel-chroma) var(--trace-tool-icon-hue)",
+		);
+		expect(css).toContain(
+			"0.31 var(--trace-tool-icon-pastel-chroma) var(--trace-tool-icon-hue)",
+		);
+		const iconBackgrounds = [
+			...css.matchAll(/--trace-icon(?:-[a-z]+)?-bg:\s*([^;]+);/g),
+		].map((match) => match[1]?.trim() ?? "");
+		expect(iconBackgrounds.length).toBeGreaterThan(0);
+		for (const background of iconBackgrounds) {
+			expect(background).not.toMatch(/\/[\s\d.]+%?\)?$/);
+			expect(background).not.toMatch(/#[\da-f]{4}(?:[\da-f]{4})?$/i);
+		}
+		expect(css).toContain('url("/opaline-trace-fill.svg")');
+		expect(css).not.toContain('data-trace-icon-tone="opaline"');
+		expect(opalineTraceFill.match(/<path\b/g)).toHaveLength(1);
+		expect(opalineTraceFill).not.toContain("M524.518 229.469");
+		expect(css).not.toContain("--conversation-trace-tree-padding");
+		expect(css).not.toContain("position: sticky");
+	});
+
+	test("uses the hero metadata hierarchy for request token rows", () => {
+		const css = readFileSync(
+			new URL("./session-constellation-tree.css", import.meta.url),
+			"utf8",
+		);
+
+		expect(css).toContain("[data-trace-request-metadata]");
+		expect(css).toContain("[data-trace-request-separator]");
+		expect(css).toContain("color: var(--constellation-tree-disabled)");
+		expect(css).toContain("font-variant-numeric: tabular-nums");
+		expect(css).toContain("letter-spacing: normal");
+		expect(css).toContain("[data-trace-model-label]");
+	});
+
+	test("uses the reference rail and content arrangement by default", () => {
+		const css = readFileSync(
+			new URL("./session-constellation-tree.css", import.meta.url),
+			"utf8",
+		);
+		const responsePane = readFileSync(
+			new URL("./session-detail-fast-response-pane.tsx", import.meta.url),
+			"utf8",
+		);
+		const stickyHeaders = readFileSync(
+			new URL("./use-transcript-sticky-header-wrappers.tsx", import.meta.url),
+			"utf8",
+		);
+
+		expect(css).toContain(".session-constellation-tree-v2");
+		expect(css).toContain("--constellation-tree-v2-content-shift: 21px");
+		expect(css).toContain("--constellation-tree-v2-icon-shift: 23px");
+		expect(css).toContain("--constellation-tree-v2-body-shift: 7px");
+		expect(css).toContain("--constellation-tree-v2-body-lift: 8px");
+		expect(css).toContain("[data-trace-tree-junction-dot]");
+		expect(css).toContain(
+			"translateX(calc(0px - var(--constellation-tree-v2-content-shift)))",
+		);
+		expect(css).toContain("var(--constellation-tree-v2-content-shift) -");
+		expect(css).toContain("var(--constellation-tree-v2-icon-shift)");
+		expect(css).toContain(
+			"margin-bottom: calc(0px - var(--constellation-tree-v2-body-lift))",
+		);
+		expect(css).toContain(
+			"transform: translateY(calc(0px - var(--constellation-tree-v2-body-lift)))",
+		);
+		expect(css).not.toContain(
+			"margin-top: calc(0px - var(--constellation-tree-v2-body-lift))",
+		);
+		expect(css).toContain(
+			"transform: translateX(var(--constellation-tree-v2-body-shift))",
+		);
+		expect(css).toContain('[data-trace-tree-marker-geometry="dot"]');
+		expect(css).toContain('[data-trace-tree-marker-geometry="icon"]');
+		expect(css).toContain("[data-trace-tree-entry-rail]");
+		expect(css).toContain("[data-trace-tree-child-entry-rail]");
+		expect(css).toContain("display: inline");
+		expect(css).not.toContain("&::after");
+		expect(stickyHeaders).toContain("<ConversationTraceTreeItem");
+		expect(stickyHeaders).not.toContain("<ConversationTraceTreeNode");
+		expect(responsePane).toContain(
+			"session-constellation-tree session-constellation-tree-v2 session-transcript-mask",
+		);
+		expect(responsePane).toContain('data-session-constellation-version="v2"');
+		expect(responsePane).not.toContain("usesConstellationV2");
+	});
+
+	test("does not paint hover fills behind trace rows", () => {
+		const css = readFileSync(
+			new URL("./session-constellation-tree.css", import.meta.url),
+			"utf8",
+		);
+		const responsePane = readFileSync(
+			new URL("./session-detail-fast-response-pane.tsx", import.meta.url),
+			"utf8",
+		);
+
+		expect(css).not.toContain("--constellation-tree-hover");
+		expect(css).not.toContain("[data-trace-hover-row]::before");
+		expect(css).not.toContain("data-trace-prose-hover");
+		expect(css).not.toContain("[data-trace-hover-row] {\n\theight:");
+		expect(responsePane).toContain("overflow-x-hidden overflow-y-auto");
+	});
+
+	test("preserves the hero code-card surfaces inside sticky trace rows", () => {
+		const css = readFileSync(
+			new URL("./session-constellation-tree.css", import.meta.url),
+			"utf8",
+		);
+		const traceClassNames = readFileSync(
+			new URL(
+				"../../../components/conversation/conversation-trace-class-names.ts",
+				import.meta.url,
+			),
+			"utf8",
+		);
+
+		expect(css).toContain("[data-trace-code-github-icon]");
+		expect(css).toContain("background: #000 !important");
+		expect(css).toContain("border-color: rgba(0, 0, 0, 0.06) !important");
+		expect(css).toContain('[data-trace-code-line-kind="deletion"]');
+		expect(css).toContain('[data-trace-code-line-kind="addition"]');
+		expect(traceClassNames).toContain(":not([data-trace-code-block]_*)");
+	});
+
+	test("uses the reference design's split vertical rail with no branch elbow", () => {
+		const continuingPath = getConversationTraceTreeBranchPath({
+			continues: true,
+			currentX: 37,
+			elbowY: 20,
+			style: "split-rail",
+			width: 29,
+		});
+		const terminalPath = getConversationTraceTreeBranchPath({
+			continues: false,
+			currentX: 37,
+			elbowY: 20,
+			style: "split-rail",
+			width: 29,
+		});
+		const originalPath = getConversationTraceTreeBranchPath({
+			continues: true,
+			currentX: 16,
+			elbowY: 20,
+			style: "curved",
+			width: 29,
+		});
+
+		expect(getConversationTraceTreeX(1, "split-rail")).toBe(37);
+		expect(getConversationTraceTreeX(2, "split-rail")).toBe(60);
+		expect(continuingPath).toBeUndefined();
+		expect(terminalPath).toBe("M 37 0 V 8");
+		expect(terminalPath).not.toContain("H");
+		expect(terminalPath).not.toContain("Q");
+		expect(originalPath).toContain("Q");
+	});
+
+	test("uses the screenshot's original tree indentation with straight reference rails", () => {
+		const continuingPath = getConversationTraceTreeBranchPath({
+			continues: true,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch",
+			width: 29,
+		});
+		const terminalPath = getConversationTraceTreeBranchPath({
+			continues: false,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch",
+			width: 29,
+		});
+
+		expect(getConversationTraceTreeX(1, "split-rail-branch")).toBe(16);
+		expect(getConversationTraceTreeX(2, "split-rail-branch")).toBe(39);
+		expect(continuingPath).toBe("M 16 20 H 28");
+		expect(terminalPath).toBe("M 16 0 V 20 H 28");
+	});
+
+	test("uses the hero marker slot above and below each four-pixel dot", () => {
+		const continuingPath = getConversationTraceTreeBranchPath({
+			continues: true,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch-dots",
+			width: 29,
+		});
+		const terminalPath = getConversationTraceTreeBranchPath({
+			continues: false,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch-dots",
+			width: 29,
+		});
+
+		expect(continuingPath).toBe("M 22 20 H 28");
+		expect(terminalPath).toBe("M 16 0 V 14 M 22 20 H 28");
+		expect(getConversationTraceTreeX(1, "split-rail-branch-dots")).toBe(16);
+		expect(getConversationTraceTreeX(2, "split-rail-branch-dots")).toBe(39);
+		expect(getConversationTraceTreeX(3, "split-rail-branch-dots")).toBe(62);
+	});
+
+	test("removes only the horizontal branch segment in the comparison style", () => {
+		const continuingPath = getConversationTraceTreeBranchPath({
+			continues: true,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch-dots-no-horizontal",
+			width: 29,
+		});
+		const terminalPath = getConversationTraceTreeBranchPath({
+			continues: false,
+			currentX: 16,
+			elbowY: 20,
+			style: "split-rail-branch-dots-no-horizontal",
+			width: 29,
+		});
+
+		expect(continuingPath).toBeUndefined();
+		expect(terminalPath).toBe("M 16 0 V 14");
+		expect(
+			getConversationTraceTreeX(2, "split-rail-branch-dots-no-horizontal"),
+		).toBe(39);
+	});
+});

@@ -21,6 +21,7 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
+import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
 import {
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
@@ -557,7 +558,7 @@ export async function getDeveloperSessions(
       ifNull(input_tokens, 0) as input_tokens,
       ifNull(output_tokens, 0) as output_tokens,
       ifNull(input_tokens, 0) + ifNull(output_tokens, 0) as total_tokens,
-      length(subagent_types) > 0 as has_subagents,
+	      ${SESSION_HAS_SUBAGENTS_SQL} as has_subagents,
       length(skills) > 0 as has_skills,
       length(slash_commands) > 0 as has_slash_commands,
       error_count > 0 as has_errors,
@@ -729,14 +730,18 @@ export async function getDeveloperFeatureUsage(
 		orgId,
 		userId,
 	};
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		userIdParam: "userId",
+	});
 
 	const adoptionQuery = `
-    SELECT
+	WITH ${usage.cteDefinitions}
+	    SELECT
       COUNT(*) as total_sessions,
-      countIf(length(subagent_types) > 0) as subagents_sessions,
+	      countIf(${SESSION_HAS_SUBAGENTS_SQL}) as subagents_sessions,
       countIf(length(skills) > 0) as skills_sessions,
       countIf(length(slash_commands) > 0) as slash_commands_sessions
-    FROM rudel.session_analytics FINAL
+	    FROM ${usage.sessionsRelation}
     WHERE user_id = {userId:String}
       AND ${buildDateFilter("days")}
       AND organization_id = {orgId:String}

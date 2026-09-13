@@ -1,0 +1,141 @@
+import { describe, expect, test } from "bun:test";
+import { SessionDetailOverviewSchema } from "@rudel/api-routes";
+import {
+	buildSessionDetailOverviewTurnOptions,
+	buildSessionDetailOverviewViewModel,
+} from "./session-detail-overview-model";
+
+function overviewFixture() {
+	return SessionDetailOverviewSchema.parse({
+		activityTotals: {
+			edit: 0,
+			error: 1,
+			read: 0,
+			signal: 0,
+			signalScanVersion: 1,
+			skill: 1,
+			subagent: 0,
+			write: 0,
+		},
+		revision: "2026-08-16T08:30:00.123Z",
+		session: {
+			durationMinutes: 90,
+			estimatedCost: 470.945,
+			gitBranch: "main",
+			gitSha: "abc",
+			inputTokens: 1_000,
+			lastInteractionDate: "2026-08-16T09:30:00.123Z",
+			modelUsed: "gpt-5.6-sol",
+			outputTokens: 200,
+			projectPath: "/src/rudel",
+			repository: "rudel/rudel",
+			sessionDate: "2026-08-16T08:00:00.123Z",
+			sessionId: "codex-session",
+			skills: [],
+			slashCommands: [],
+			source: "codex",
+			totalTokens: 1_200,
+			userId: "owner-1",
+		},
+		subagents: [],
+		turnPage: {
+			items: [
+				{
+					activityResolution: "exact",
+					durationSeconds: 60,
+					editedFiles: ["src/index.ts"],
+					endedAt: "2026-08-16T08:01:00.123Z",
+					errorCount: 1,
+					errorEvents: [{ at: "2026-08-16T08:00:40.123Z" }],
+					estimatedCost: 11.6278,
+					hasBody: true,
+					index: 0,
+					inputTokens: 900,
+					modelSignalCount: 2,
+					outputTokens: 50,
+					responsePreview: "Done",
+					signalCount: 1,
+					signalOccurrences: [{ category: "positive", matchedText: "Great" }],
+					signalOccurrencesOmittedCount: 0,
+					signalOccurrencesTruncated: false,
+					skills: ["testing-bun"],
+					skillCount: 1,
+					skillEvents: [
+						{ at: "2026-08-16T08:00:30.123Z", skill: "testing-bun" },
+					],
+					slashCommands: ["review"],
+					startedAt: "2026-08-16T08:00:00.123Z",
+					toolCallCount: 2,
+					turnId: "codex-stable-turn",
+					usageCalls: [
+						{
+							at: "2026-08-16T08:00:20.123Z",
+							cacheCreationInputTokens: 0,
+							cacheReadInputTokens: 100,
+							contextWindow: 300_000,
+							freshInputTokens: 900,
+							model: "gpt-5.6-sol",
+							outputTokens: 50,
+						},
+					],
+					userPreview: "x".repeat(140),
+				},
+			],
+			nextCursor: null,
+			total: 1,
+		},
+	});
+}
+
+describe("session detail overview client model", () => {
+	test("maps a Codex overview into the existing ledger without pricing again", () => {
+		const overview = overviewFixture();
+		const viewModel = buildSessionDetailOverviewViewModel(overview, {
+			"owner-1": "Owner",
+		});
+		const options = buildSessionDetailOverviewTurnOptions(
+			overview.turnPage.items,
+		);
+
+		expect(viewModel.costLabel).toBe("$471");
+		expect(viewModel.safeSource).toBe("codex");
+		expect(options[0]?.metrics.estimatedCost).toBe(11.6278);
+		expect(options[0]?.metrics.usageEvents[0]).toEqual({
+			at: "2026-08-16T08:00:20.123Z",
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 100,
+			inputTokens: 900,
+			model: "gpt-5.6-sol",
+			modelContextWindow: 300_000,
+			outputTokens: 50,
+		});
+		expect(options[0]?.turn).toBeUndefined();
+		expect(options[0]?.turnId).toBe("codex-stable-turn");
+		expect(options[0]?.signalCount).toBe(1);
+		expect(options[0]?.signalOccurrences).toEqual([
+			{ category: "positive", matchedText: "Great" },
+		]);
+		expect(options[0]?.modelSignalCount).toBe(2);
+	});
+
+	test("retains recorded model identity when detail metadata is missing", () => {
+		const overview = overviewFixture();
+		overview.session.modelUsed = null;
+		expect(
+			buildSessionDetailOverviewViewModel(overview, {}).safeModelUsed,
+		).toBe("gpt-5.6-sol");
+	});
+
+	test("preserves explicit session identity and never guesses a missing model", () => {
+		const overview = overviewFixture();
+		overview.session.modelUsed = "gpt-5.6-terra";
+		expect(
+			buildSessionDetailOverviewViewModel(overview, {}).safeModelUsed,
+		).toBe("gpt-5.6-terra");
+		overview.session.modelUsed = null;
+		overview.turnPage.items = [];
+		expect(
+			buildSessionDetailOverviewViewModel(overview, {}).safeModelUsed,
+		).toBeUndefined();
+	});
+});

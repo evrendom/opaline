@@ -24,6 +24,28 @@ const rudel_session_language_signals = table({
 		{ name: "model_swears", type: "UInt32" },
 		{ name: "model_apologies", type: "UInt32" },
 		{ name: "model_positive", type: "UInt32" },
+		{ name: "member_swear_matches", type: "Array(String)", default: "fn:[]" },
+		{
+			name: "member_apology_matches",
+			type: "Array(String)",
+			default: "fn:[]",
+		},
+		{
+			name: "member_positive_matches",
+			type: "Array(String)",
+			default: "fn:[]",
+		},
+		{ name: "model_swear_matches", type: "Array(String)", default: "fn:[]" },
+		{
+			name: "model_apology_matches",
+			type: "Array(String)",
+			default: "fn:[]",
+		},
+		{
+			name: "model_positive_matches",
+			type: "Array(String)",
+			default: "fn:[]",
+		},
 		{ name: "scanned_at", type: "DateTime64(3, 'UTC')" },
 		{
 			name: "signal_version",

@@ -1,3 +1,14 @@
+import {
+	attachCodexOperationMetadata,
+	buildCodexActivityGraph,
+	type CodexCarrier,
+	type CodexNormalizedOperation,
+	toConversationResultContent,
+} from "./codex-activity-graph.js";
+import {
+	isCodexToolFailure,
+	stripCodexInjectedBlocks,
+} from "./codex-tool-translation.js";
 import type {
 	AssistantEntry,
 	Conversation,
@@ -66,6 +77,13 @@ interface CodexMultiAgentOutputPayload extends CodexAgentAttribution {
 	action?: string;
 	call_id?: string;
 	output?: unknown;
+}
+
+interface CodexWebSearchPayload extends CodexAgentAttribution {
+	action?: unknown;
+	call_id?: string;
+	status?: string;
+	type: "web_search_call";
 }
 
 function hashCodexEntryContent(value: string) {
@@ -146,76 +164,45 @@ function readAgentName(payload: CodexAgentAttribution) {
 
 function isDelegationToolName(toolName: string | undefined) {
 	const normalizedName = toolName?.split(/\.|__/u).at(-1)?.toLowerCase();
-	return (
-		normalizedName === "agent" ||
-		normalizedName === "task" ||
-		normalizedName === "spawn_agent"
-	);
+	return normalizedName
+		? [
+				"agent",
+				"close_agent",
+				"followup_task",
+				"interrupt_agent",
+				"list_agents",
+				"resume_agent",
+				"send_message",
+				"spawn_agent",
+				"task",
+				"wait_agent",
+			].includes(normalizedName)
+		: false;
 }
 
-// Same failure heuristic the turn metadata extractor applies to Codex tool
-// outputs, so trace-level error marks agree with turn-level error counts.
-const CODEX_TOOL_FAILURE_PATTERN =
-	/(?:Error|Exception):|apply_patch verification failed:/iu;
-
-function parseArguments(argumentsValue: unknown): Record<string, unknown> {
-	if (
-		typeof argumentsValue === "object" &&
-		argumentsValue !== null &&
-		!Array.isArray(argumentsValue)
-	) {
-		return argumentsValue as Record<string, unknown>;
-	}
-	if (typeof argumentsValue !== "string" || !argumentsValue) {
-		return {};
-	}
-	try {
-		const parsed = JSON.parse(argumentsValue) as unknown;
-		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>;
+function getCodexSystemEventMessage(
+	payload: Readonly<Record<string, unknown>>,
+): string | undefined {
+	switch (payload.type) {
+		case "turn_aborted":
+			return "Turn aborted";
+		case "context_compacted":
+		case "compacted":
+			return "Context compacted";
+		case "thread_rolled_back":
+			return "Thread rolled back";
+		case "error": {
+			for (const key of ["message", "error", "detail"] as const) {
+				const value = payload[key];
+				if (typeof value === "string" && value.trim()) {
+					return `Error: ${value.trim()}`;
+				}
+			}
+			return "Error";
 		}
-	} catch {
-		// Fall through to the raw-string wrapper.
+		default:
+			return undefined;
 	}
-	return { arguments: argumentsValue };
-}
-
-function toToolInput(payload: CodexToolCallPayload): Record<string, unknown> {
-	if (payload.type === "custom_tool_call") {
-		return { input: payload.input ?? "" };
-	}
-	return parseArguments(payload.arguments);
-}
-
-// Tool outputs arrive as plain strings, block arrays, or JSON-encoded block
-// arrays; normalize them to the display string tool_result carriers expect.
-function toToolOutputText(output: unknown): string {
-	let blocks: unknown = output;
-	if (typeof output === "string") {
-		if (!output.startsWith("[") && !output.startsWith("{")) {
-			return output;
-		}
-		try {
-			blocks = JSON.parse(output);
-		} catch {
-			return output;
-		}
-	}
-	if (Array.isArray(blocks)) {
-		const texts = blocks
-			.map((block) =>
-				block &&
-				typeof block === "object" &&
-				typeof (block as { text?: unknown }).text === "string"
-					? (block as { text: string }).text
-					: "",
-			)
-			.filter(Boolean);
-		if (texts.length > 0) {
-			return texts.join("\n");
-		}
-	}
-	return typeof output === "string" ? output : JSON.stringify(output ?? "");
 }
 
 function extractSubagentId(outputText: string): string | undefined {
@@ -236,6 +223,62 @@ function extractSubagentId(outputText: string): string | undefined {
 		return undefined;
 	}
 	return undefined;
+}
+
+function toOperationToolUse(
+	operation: CodexNormalizedOperation,
+	carrier: CodexCarrier | undefined,
+): ToolUseContent {
+	return {
+		type: "tool_use",
+		id: operation.id,
+		input: attachCodexOperationMetadata(operation.input, operation, carrier),
+		name: operation.name,
+	};
+}
+
+function toOperationToolResult(
+	operation: CodexNormalizedOperation,
+	carrier?: CodexCarrier,
+): ToolResultContent | undefined {
+	// Batch output is shared evidence, not the result of an arbitrary nested call.
+	const outputBlocks =
+		carrier && carrier.operations.length > 1
+			? (operation.lifecycle?.outputBlocks ?? [])
+			: operation.outputBlocks;
+	if (outputBlocks.length === 0 && operation.lifecycle === undefined) {
+		return undefined;
+	}
+	const text = outputBlocks
+		.flatMap((block) => {
+			if (block.type === "text") {
+				return [block.text];
+			}
+			if (block.type === "structured") {
+				try {
+					return [JSON.stringify(block.value) ?? ""];
+				} catch {
+					return [];
+				}
+			}
+			return [];
+		})
+		.filter(Boolean)
+		.join("\n");
+	return {
+		type: "tool_result",
+		tool_use_id: operation.id,
+		content: toConversationResultContent(outputBlocks),
+		is_error: isCodexToolFailure(text, operation.lifecycle?.payload)
+			? true
+			: undefined,
+	};
+}
+
+function operationResultText(operation: CodexNormalizedOperation) {
+	return operation.outputBlocks
+		.flatMap((block) => (block.type === "text" ? [block.text] : []))
+		.join("\n");
 }
 
 /**
@@ -263,13 +306,40 @@ export function isCodexFormat(content: string): boolean {
  */
 export function parseCodexConversations(content: string): Array<Conversation> {
 	const conversations: Array<Conversation> = [];
-	const lines = content.split("\n").filter(Boolean);
+	const lines = content.split("\n");
+	const activityGraph = buildCodexActivityGraph(content);
+	const carriersByLineIndex = new Map(
+		activityGraph.carriers.map((carrier) => [carrier.callLineIndex, carrier]),
+	);
+	const carriersByCallId = new Map(
+		activityGraph.carriers.map((carrier) => [carrier.callId, carrier]),
+	);
+	const orphanOutputsByLineIndex = new Map(
+		activityGraph.orphanOutputs.map((output) => [output.lineIndex, output]),
+	);
+	const standaloneOperationsByLineIndex = new Map<
+		number,
+		CodexNormalizedOperation[]
+	>();
+	const ambiguousLifecycleRecordsByLineIndex = new Map(
+		activityGraph.lifecycleRecords
+			.filter((record) => record.confidence === "ambiguous-positional")
+			.map((record) => [record.lineIndex, record]),
+	);
+	for (const operation of activityGraph.standaloneOperations) {
+		const lineIndex = operation.lifecycle?.lineIndex;
+		if (lineIndex === undefined) {
+			continue;
+		}
+		const operations = standaloneOperationsByLineIndex.get(lineIndex) ?? [];
+		operations.push(operation);
+		standaloneOperationsByLineIndex.set(lineIndex, operations);
+	}
 
 	let sessionId = "";
 	let executionMode: ConversationExecutionMode = "unknown";
 	let rootModelSetting: string | undefined;
 	const modelSettingsByAgent = new Map<string, string>();
-	const pendingToolNames = new Map<string, string>();
 
 	function getModelSetting(payload: CodexAgentAttribution) {
 		const agentName = readAgentName(payload);
@@ -279,7 +349,11 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 		return modelSettingsByAgent.get(agentName);
 	}
 
-	for (const line of lines) {
+	for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		const line = lines[lineIndex] ?? "";
+		if (!line.trim()) {
+			continue;
+		}
 		let parsed: CodexLine;
 		try {
 			parsed = JSON.parse(line) as CodexLine;
@@ -306,16 +380,119 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 			}
 		}
 
-		if (parsed.type === "event_msg" && parsed.payload.type === "turn_aborted") {
+		const systemEventMessage =
+			parsed.type === "event_msg"
+				? getCodexSystemEventMessage(parsed.payload)
+				: parsed.type === "compacted"
+					? "Context compacted"
+					: undefined;
+		if (systemEventMessage) {
 			const entry: SystemEntry = {
+				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
 				sessionId,
 				type: "system",
-				message: { content: "Turn aborted" },
+				message: { content: systemEventMessage },
 			};
 			conversations.push(entry);
 			continue;
+		}
+
+		const standaloneOperations = standaloneOperationsByLineIndex.get(lineIndex);
+		if (standaloneOperations && standaloneOperations.length > 0) {
+			const entryId = getCodexEntryId(line);
+			const toolUses = standaloneOperations.map((operation) =>
+				toOperationToolUse(operation, undefined),
+			);
+			conversations.push({
+				executionMode,
+				message: { content: toolUses, role: "assistant" },
+				provider: "codex",
+				sessionId,
+				timestamp: parsed.timestamp,
+				type: "assistant",
+				uuid: entryId,
+			});
+			const results = standaloneOperations.flatMap((operation) => {
+				const result = toOperationToolResult(operation);
+				return result ? [result] : [];
+			});
+			if (results.length > 0) {
+				conversations.push({
+					message: { content: results, role: "user" },
+					provider: "codex",
+					sessionId,
+					timestamp: parsed.timestamp,
+					type: "user",
+					uuid: `${entryId}-result`,
+				});
+			}
+			continue;
+		}
+
+		const ambiguousLifecycle =
+			ambiguousLifecycleRecordsByLineIndex.get(lineIndex);
+		if (ambiguousLifecycle) {
+			const payloadText = JSON.stringify(ambiguousLifecycle.payload) ?? "";
+			const evidenceContent =
+				ambiguousLifecycle.outputBlocks.length > 0
+					? toConversationResultContent(ambiguousLifecycle.outputBlocks)
+					: [
+							{
+								rawType: ambiguousLifecycle.type,
+								type: "structured" as const,
+								value: {
+									call_id: ambiguousLifecycle.callId,
+									confidence: ambiguousLifecycle.confidence,
+									type: ambiguousLifecycle.type,
+								},
+							},
+						];
+			conversations.push({
+				message: {
+					content: [
+						{
+							content: evidenceContent,
+							is_error: isCodexToolFailure(
+								payloadText,
+								ambiguousLifecycle.payload,
+							)
+								? true
+								: undefined,
+							tool_use_id: `ambiguous-lifecycle:${ambiguousLifecycle.id}`,
+							type: "tool_result",
+						},
+					],
+					role: "user",
+				},
+				provider: "codex",
+				sessionId,
+				timestamp: parsed.timestamp,
+				type: "user",
+				uuid: `${getCodexEntryId(line)}-ambiguous`,
+			});
+			continue;
+		}
+
+		if (parsed.type === "event_msg") {
+			if (
+				parsed.payload.type === "exec_command_end" ||
+				parsed.payload.type === "patch_apply_end" ||
+				parsed.payload.type === "web_search_end"
+			) {
+				// These enrich their matching response_item and are never duplicate rows.
+				continue;
+			}
+			if (
+				parsed.payload.type === "item_completed" ||
+				parsed.payload.type === "sub_agent_activity" ||
+				parsed.payload.type === "image_generation_end"
+			) {
+				// These are completion/lifecycle mirrors without a stable standalone
+				// transcript presentation. Their originating item remains visible.
+				continue;
+			}
 		}
 
 		if (parsed.type !== "response_item") continue;
@@ -326,7 +503,8 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 			| CodexMultiAgentOutputPayload
 			| CodexReasoningPayload
 			| CodexToolCallPayload
-			| CodexToolOutputPayload;
+			| CodexToolOutputPayload
+			| CodexWebSearchPayload;
 
 		// Handle reasoning blocks — map to assistant entry with thinking content
 		if (payload.type === "reasoning") {
@@ -347,6 +525,7 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 				agentName: readAgentName(reasoning),
 				executionMode,
 				...(modelSetting ? { modelSetting } : {}),
+				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
 				sessionId,
@@ -367,38 +546,32 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 			payload.type === "function_call" ||
 			payload.type === "custom_tool_call" ||
 			payload.type === "tool_search_call" ||
-			payload.type === "multi_agent_call"
+			payload.type === "multi_agent_call" ||
+			payload.type === "web_search_call"
 		) {
-			const call = payload as CodexMultiAgentCallPayload | CodexToolCallPayload;
+			const call = payload as
+				| CodexMultiAgentCallPayload
+				| CodexToolCallPayload
+				| CodexWebSearchPayload;
 			const modelSetting = getModelSetting(call);
 			const entryId = getCodexEntryId(line);
-			const toolName =
-				call.type === "multi_agent_call"
-					? (call.action ?? "multi_agent")
-					: call.type === "tool_search_call"
-						? "tool_search"
-						: (call.name ?? "tool");
-			const toolInput =
-				call.type === "multi_agent_call"
-					? parseArguments(call.arguments)
-					: toToolInput(call);
-			const callId = call.call_id ?? `${entryId}-call`;
-			const toolUse: ToolUseContent = {
-				type: "tool_use",
-				id: callId,
-				name: toolName,
-				input: toolInput,
-			};
-			pendingToolNames.set(callId, toolName);
+			const carrier = carriersByLineIndex.get(lineIndex);
+			if (!carrier) {
+				continue;
+			}
+			const toolUses = carrier.operations.map((operation) =>
+				toOperationToolUse(operation, carrier),
+			);
 			const entry: AssistantEntry = {
 				agentName: readAgentName(call),
 				executionMode,
 				...(modelSetting ? { modelSetting } : {}),
+				provider: "codex",
 				uuid: entryId,
 				timestamp: parsed.timestamp,
 				sessionId,
 				type: "assistant",
-				message: { role: "assistant", content: [toolUse] },
+				message: { role: "assistant", content: toolUses },
 			};
 			conversations.push(entry);
 			continue;
@@ -414,34 +587,81 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 				| CodexMultiAgentOutputPayload
 				| CodexToolOutputPayload;
 			if (!output.call_id) continue;
-			const text =
-				output.type === "tool_search_output"
-					? toToolOutputText(output.tools)
-					: toToolOutputText(output.output);
-			const toolName =
-				output.type === "multi_agent_call_output"
-					? (output.action ?? pendingToolNames.get(output.call_id))
-					: pendingToolNames.get(output.call_id);
-			const resultBlock: ToolResultContent = {
-				type: "tool_result",
-				tool_use_id: output.call_id,
-				content: text,
-				is_error: CODEX_TOOL_FAILURE_PATTERN.test(text) ? true : undefined,
-			};
+			const carrier = carriersByCallId.get(output.call_id);
+			if (!carrier) {
+				const blocks =
+					orphanOutputsByLineIndex.get(lineIndex)?.outputBlocks ?? [];
+				const content = toConversationResultContent(blocks);
+				const text = blocks
+					.flatMap((block) => (block.type === "text" ? [block.text] : []))
+					.join("\n");
+				conversations.push({
+					agentName: readAgentName(output),
+					message: {
+						content: [
+							{
+								content,
+								is_error: isCodexToolFailure(text, undefined)
+									? true
+									: undefined,
+								tool_use_id: output.call_id,
+								type: "tool_result",
+							},
+						],
+						role: "user",
+					},
+					provider: "codex",
+					sessionId,
+					timestamp: parsed.timestamp,
+					type: "user",
+					uuid: getCodexEntryId(line),
+				});
+				continue;
+			}
+			if (lineIndex !== carrier.outputLineIndex) {
+				// A few carriers stream more than one output record. The graph aggregates
+				// every block onto the carrier, so emit that aggregate exactly once at the
+				// final record instead of replaying the growing aggregate for each record.
+				continue;
+			}
+			const resultBlocks = carrier.operations.flatMap((operation) => {
+				const result = toOperationToolResult(operation, carrier);
+				return result ? [result] : [];
+			});
+			if (carrier.operations.length > 1 && carrier.outputBlocks.length > 0) {
+				const id = `batch:${carrier.callId}`;
+				resultBlocks.push({
+					type: "tool_result",
+					tool_use_id: id,
+					batch: {
+						id,
+						toolIds: carrier.operations.map((operation) => operation.id),
+					},
+					content: toConversationResultContent(carrier.outputBlocks),
+				});
+			}
+			if (resultBlocks.length === 0) {
+				continue;
+			}
+			const resultText = carrier.operations.map(operationResultText).join("\n");
+			const isDelegation = carrier.operations.some((operation) =>
+				isDelegationToolName(operation.name),
+			);
 			const entry: UserEntry = {
 				agentName: readAgentName(output),
+				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
 				sessionId,
 				type: "user",
-				...(isDelegationToolName(toolName)
+				...(isDelegation
 					? {
 							toolUseResult: {
-								agentId: extractSubagentId(text),
+								agentId: extractSubagentId(resultText),
 							},
 						}
 					: {}),
-				message: { role: "user", content: [resultBlock] },
+				message: { role: "user", content: resultBlocks },
 			};
 			conversations.push(entry);
 			continue;
@@ -464,15 +684,20 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 		if (textParts.length === 0) continue;
 
 		if (msg.role === "user") {
+			const userText = stripCodexInjectedBlocks(textParts.join("\n"));
+			if (!userText) {
+				continue;
+			}
 			const entry: UserEntry = {
 				agentName: readAgentName(msg),
+				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
 				sessionId,
 				type: "user",
 				message: {
 					role: "user",
-					content: textParts.join("\n"),
+					content: userText,
 				},
 			};
 			conversations.push(entry);
@@ -487,6 +712,7 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 				agentName: readAgentName(msg),
 				executionMode,
 				...(modelSetting ? { modelSetting } : {}),
+				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
 				sessionId,

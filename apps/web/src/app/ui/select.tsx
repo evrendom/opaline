@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
+import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { cn } from "@/lib/utils";
 
 const Select = SelectPrimitive.Root;
@@ -99,7 +100,10 @@ function SelectContent({
 					{...props}
 				>
 					<SelectScrollUpButton />
-					<SelectPrimitive.List>{children}</SelectPrimitive.List>
+					<SelectPrimitive.List data-fluid-menu-root="">
+						<FluidMenuHover items='[role="option"]' />
+						{children}
+					</SelectPrimitive.List>
 					<SelectScrollDownButton />
 				</SelectPrimitive.Popup>
 			</SelectPrimitive.Positioner>

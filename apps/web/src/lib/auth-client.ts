@@ -7,14 +7,22 @@ import { queryClient } from "./query-client";
 
 export const authClient = createAuthClient({
 	baseURL: getApiBaseUrl(),
+	basePath:
+		import.meta.env.MODE === "product-demo" ? "/api/demo/auth" : "/api/auth",
 	plugins: [organizationClient(), emailOTPClient()],
 });
 
 export function refreshAuthClientState() {
-	for (const key of Object.keys(authClient.$store.atoms)) {
-		if (key.startsWith("$")) {
-			authClient.$store.notify(key);
-		}
+	// Better Auth exposes its store through a proxy: Object.keys(atoms) is empty.
+	// Notify the signals registered by the session and organization plugins.
+	for (const signal of [
+		"$sessionSignal",
+		"$listOrg",
+		"$activeOrgSignal",
+		"$activeMemberSignal",
+		"$activeMemberRoleSignal",
+	]) {
+		authClient.$store.notify(signal);
 	}
 }
 

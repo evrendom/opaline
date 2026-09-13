@@ -82,6 +82,7 @@ function toTrackedOrganizationRole(
 
 export interface AuthConfig {
 	appURL: string;
+	cookiePrefix?: string;
 	frontendURL: string;
 	secret: string;
 	resend?: ResendConfig;
@@ -217,6 +218,9 @@ export function createAuth(db: object, config: AuthConfig) {
 	}
 
 	return betterAuth({
+		advanced: config.cookiePrefix
+			? { cookiePrefix: config.cookiePrefix }
+			: undefined,
 		basePath: AUTH_BASE_PATH,
 		baseURL: authBaseURL,
 		secret: config.secret,
@@ -293,6 +297,11 @@ export function createAuth(db: object, config: AuthConfig) {
 			}),
 			createOrganizationPlugin(config),
 		],
+		user: {
+			additionalFields: {
+				jobTitle: { type: "string", required: false, input: false },
+			},
+		},
 		session: {
 			expiresIn: 60 * 60 * 24 * 365,
 		},

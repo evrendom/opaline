@@ -12,6 +12,7 @@ import {
 	type Locale,
 } from "react-day-picker";
 import { Button, buttonVariants } from "@/app/ui/button";
+import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { cn } from "@/lib/utils";
 
 function Calendar({
@@ -136,14 +137,18 @@ function Calendar({
 				...classNames,
 			}}
 			components={{
-				Root: ({ className, rootRef, ...props }) => {
+				Root: ({ className, rootRef, children, ...props }) => {
 					return (
 						<div
 							data-slot="calendar"
+							data-fluid-menu-root=""
 							ref={rootRef}
 							className={cn(className)}
 							{...props}
-						/>
+						>
+							<FluidMenuHover items="button" />
+							{children}
+						</div>
 					);
 				},
 				Chevron: ({ className, orientation, ...props }) => {

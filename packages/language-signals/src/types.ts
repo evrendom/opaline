@@ -43,6 +43,15 @@ export interface LanguageSignalCounts {
 	readonly model_positive: number;
 }
 
+export interface LanguageSignalSummary extends LanguageSignalCounts {
+	readonly member_swear_matches: readonly string[];
+	readonly member_apology_matches: readonly string[];
+	readonly member_positive_matches: readonly string[];
+	readonly model_swear_matches: readonly string[];
+	readonly model_apology_matches: readonly string[];
+	readonly model_positive_matches: readonly string[];
+}
+
 export type DisplayTextPart =
 	| { readonly type: "text"; readonly content: string }
 	| { readonly type: "strong"; readonly content: string }

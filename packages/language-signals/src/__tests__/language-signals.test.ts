@@ -8,6 +8,7 @@ import {
 	scanModelLanguageSignals,
 	splitDisplayTextParts,
 	summarize,
+	summarizeWithMatches,
 } from "../index.js";
 import { LANGUAGE_SIGNAL_RULES } from "../rules.js";
 
@@ -414,6 +415,28 @@ describe("language signal rules", () => {
 });
 
 describe("language signal summaries", () => {
+	test("retains the exact first-seen matched phrases for persistence", () => {
+		expect(
+			summarizeWithMatches({
+				memberText: ["Great work, sorry. GREAT WORK. This is shit."],
+				modelText: ["My bad. Damn."],
+			}),
+		).toEqual({
+			member_apologies: 1,
+			member_positive: 2,
+			member_swears: 1,
+			model_apologies: 1,
+			model_positive: 0,
+			model_swears: 1,
+			member_apology_matches: ["sorry"],
+			member_positive_matches: ["Great work"],
+			member_swear_matches: ["shit"],
+			model_apology_matches: ["My bad"],
+			model_positive_matches: [],
+			model_swear_matches: ["Damn"],
+		});
+	});
+
 	test("returns only persisted member and model counts", () => {
 		expect(
 			summarize({

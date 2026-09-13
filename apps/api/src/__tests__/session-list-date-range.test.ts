@@ -75,22 +75,9 @@ describe("session list date range", () => {
 			startDate: "2026-03-01",
 			endDate: "2026-03-31",
 		});
-		expect(query).toContain(
-			"FROM rudel.session_language_signals AS signal_rows",
-		);
-		expect(query).toContain("signal_version");
-		expect(query).toContain("AS signal_state");
-		expect(query).toContain("tupleElement(signals.signal_state, 2)");
-		expect(query).not.toContain("argMax(member_swears, scanned_at)");
-		expect(query).toContain("LEFT ANY JOIN language_signal_counts AS signals");
-		expect(query).toContain("signal_rows.organization_id = {orgId:String}");
-		expect(query).toContain(
-			"toDate(signal_rows.session_date) >= toDate({startDate:String})",
-		);
-		expect(query).toContain(
-			"toDate(signal_rows.session_date) <= toDate({endDate:String})",
-		);
+		expect(queryCalls).toHaveLength(1); // Empty pages need no metadata lookup.
 		expect(lastQuery().clickhouse_settings?.join_use_nulls).toBe(0);
+		expect(query).toContain("sa.cost_is_complete AS cost_is_complete");
 	});
 
 	test("preserves the production ClickHouse table allowlist in the module mock", () => {
@@ -109,9 +96,7 @@ describe("session list date range", () => {
 
 		expect(query).toContain("toIntervalDay({days:UInt32})");
 		expect(query).not.toContain("{startDate:String}");
-		expect(query).toContain(
-			"signal_rows.session_date >= now64(3) - toIntervalDay({days:UInt32})",
-		);
+
 		expect(query_params).toMatchObject({ days: 7 });
 	});
 

@@ -5,6 +5,7 @@ import { appendVaryHeader } from "./http-response-policy.js";
 const gzipAsync = promisify(gzip);
 
 const GZIP_SESSION_DETAIL_PATHS = new Set([
+	"/rpc/analytics/sessions/detailBodyChunk",
 	"/rpc/analytics/sessions/detailSpine",
 	"/rpc/analytics/sessions/detailSubagent",
 	"/rpc/analytics/sessions/detailTurn",

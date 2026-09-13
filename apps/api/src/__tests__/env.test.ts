@@ -5,6 +5,8 @@ import {
 	readRequiredSecretEnv,
 	readSkillAnalyticsCutoverConfig,
 	readUsageEventAnalyticsCutoverConfig,
+	shouldDeriveSessionLineage,
+	shouldReadSessionLineage,
 	shouldUsePersistentSkillAnalytics,
 	shouldUseUsageEventAnalytics,
 } from "../lib/env.js";
@@ -95,6 +97,29 @@ describe("readBooleanEnv", () => {
 				`${TEST_BOOLEAN_ENV_NAME} must be either "true" or "false"`,
 			);
 		}
+	});
+});
+
+describe("session-lineage kill switches", () => {
+	test("keeps derivation and consumers independently off by default", () => {
+		expect(shouldDeriveSessionLineage({})).toBe(false);
+		expect(shouldReadSessionLineage({})).toBe(false);
+	});
+
+	test("requires both explicit switches for derived edges to affect reads", () => {
+		expect(
+			shouldDeriveSessionLineage({ SESSION_LINEAGE_ENABLED: "true" }),
+		).toBe(true);
+		expect(
+			shouldReadSessionLineage({
+				SESSION_LINEAGE_CONSUMERS_ENABLED: "true",
+			}),
+		).toBe(true);
+		expect(() =>
+			shouldReadSessionLineage({
+				SESSION_LINEAGE_CONSUMERS_ENABLED: "1",
+			}),
+		).toThrow('must be either "true" or "false"');
 	});
 });
 

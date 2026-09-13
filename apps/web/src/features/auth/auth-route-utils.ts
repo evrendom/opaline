@@ -1,13 +1,10 @@
-import {
-	buildOrganizationPath,
-	resolveOrganizationPostAuthPath,
-} from "@rudel/api-routes/organization-paths";
+import { CliConnectionIdSchema } from "@rudel/api-routes";
 import { appRoutes } from "@/app/routes";
 import type { authClient } from "@/lib/auth-client";
 
 export type AppSession = ReturnType<typeof authClient.useSession>["data"];
 const PENDING_SIGNUP_REDIRECT_PARAM = "signup_redirect";
-const RELATIVE_URL_BASE = "https://opaline.local";
+const RELATIVE_URL_BASE = "https://rudel.local";
 const RELATIVE_URL_ORIGIN = new URL(RELATIVE_URL_BASE).origin;
 const REDIRECT_ENCODED_AMBIGUOUS_CHARACTER_PATTERN =
 	/%(?:2f|5c|[01][0-9a-f]|7f)/i;
@@ -113,16 +110,6 @@ export function getPendingSignupRedirect(search?: string): string | null {
 	);
 }
 
-export function resolvePostAuthDestinationForOrganization(
-	organizationSlug: string,
-	destination: string,
-): string {
-	return (
-		resolveOrganizationPostAuthPath(organizationSlug, destination) ??
-		buildOrganizationPath(organizationSlug)
-	);
-}
-
 function getDirectAuthDestination(
 	pathname = window.location.pathname,
 	search = window.location.search,
@@ -130,7 +117,8 @@ function getDirectAuthDestination(
 ): string | null {
 	const userCode = getDeviceUserCode(search);
 	if (userCode) {
-		return `/?user_code=${encodeURIComponent(userCode)}`;
+		const connectionId = getCliConnectionId(search);
+		return `/?user_code=${encodeURIComponent(userCode)}${connectionId ? `&connect=${encodeURIComponent(connectionId)}` : ""}`;
 	}
 
 	const redirect = getValidRedirect(search, wrappedFlow);
@@ -143,6 +131,15 @@ function getDirectAuthDestination(
 	}
 
 	return null;
+}
+
+export function getCliConnectionId(
+	search = window.location.search,
+): string | null {
+	const parsed = CliConnectionIdSchema.safeParse(
+		new URLSearchParams(search).get("connect"),
+	);
+	return parsed.success ? parsed.data : null;
 }
 
 export function getEmailSignupSuccessDestination(

@@ -1,17 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { z } from "zod";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
 	type AppSession,
+	getCliConnectionId,
 	getSessionUserId,
 } from "@/features/auth/auth-route-utils";
 import { GuestApp } from "@/features/auth/GuestApp";
+import { cliSetupUrl } from "@/features/cli-onboarding/cli-authorization";
 
 function ApprovedDeviceSetupPage() {
 	return <Navigate replace to={appRoutes.wrappedDesktopReady()} />;
+}
+
+function PairedDeviceLogin({
+	connectionId,
+	userCode,
+}: {
+	connectionId: string;
+	userCode: string;
+}) {
+	useEffect(() => {
+		window.location.replace(
+			cliSetupUrl(connectionId, window.location.origin, userCode),
+		);
+	}, [connectionId, userCode]);
+	return <AppLoadingScreen message="Opening your session setup…" />;
 }
 
 export function DeviceAuthorizationApp({
@@ -45,6 +63,26 @@ export function DeviceAuthorizationApp({
 		setDeviceError(null);
 
 		try {
+			let connectionReturnUrl: string | undefined;
+			const connectionId = getCliConnectionId();
+			if (connectionId && action === "approve") {
+				const authorization = await fetch(
+					`/api/cli/connections/${connectionId}/authorize`,
+					{
+						method: "POST",
+						credentials: "include",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ userCode: deviceUserCode }),
+					},
+				);
+				if (!authorization.ok)
+					throw new Error(
+						"Open this login link in the same browser where you copied the CLI command.",
+					);
+				connectionReturnUrl = z
+					.object({ returnUrl: z.string().url() })
+					.parse(await authorization.json()).returnUrl;
+			}
 			const response = await fetch(`/api/auth/device/${action}`, {
 				method: "POST",
 				credentials: "include",
@@ -66,6 +104,10 @@ export function DeviceAuthorizationApp({
 			}
 
 			if (action === "approve") {
+				if (connectionReturnUrl) {
+					window.location.assign(connectionReturnUrl);
+					return;
+				}
 				setDeviceApproved(true);
 			} else {
 				setDeviceDenied(true);
@@ -78,6 +120,15 @@ export function DeviceAuthorizationApp({
 			setDeviceProcessing(false);
 		}
 	}
+
+	const connectionId = getCliConnectionId();
+	if (connectionId)
+		return (
+			<PairedDeviceLogin
+				connectionId={connectionId}
+				userCode={deviceUserCode}
+			/>
+		);
 
 	if (!session) {
 		return <GuestApp />;

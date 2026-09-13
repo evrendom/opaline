@@ -1,0 +1,556 @@
+-- Opaline product launch: additive metadata and revision-preserving views.
+-- Update the existing TO views in place without interrupting ingestion.
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `member_apology_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `member_positive_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `member_swear_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `model_apology_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `model_positive_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_language_signals ADD COLUMN IF NOT EXISTS `model_swear_matches` Array(String) DEFAULT [];
+ALTER TABLE rudel.session_analytics ADD COLUMN IF NOT EXISTS subagent_count UInt32 DEFAULT 0;
+ALTER TABLE rudel.session_analytics ADD COLUMN IF NOT EXISTS native_subagents Array(Tuple(String, String)) DEFAULT [];
+CREATE TABLE IF NOT EXISTS rudel.session_lineage
+(
+  `organization_id` String,
+  `user_id` String,
+  `child_source` LowCardinality(String),
+  `child_session_id` String,
+  `child_session_date` DateTime64(3, 'UTC'),
+  `child_first_ingested_at` DateTime64(3, 'UTC'),
+  `child_start_ts` DateTime64(3, 'UTC'),
+  `child_model` String,
+  `child_originator` LowCardinality(String) DEFAULT '',
+  `child_entrypoint` LowCardinality(String) DEFAULT '',
+  `parent_source` LowCardinality(String),
+  `parent_session_id` String,
+  `parent_session_date` DateTime64(3, 'UTC'),
+  `anchor_ts` DateTime64(3, 'UTC'),
+  `anchor_tool_use_id` String,
+  `anchor_operation_ordinal` UInt16,
+  `carrier` LowCardinality(String),
+  `outcome` LowCardinality(String),
+  `confidence` LowCardinality(String),
+  `countable` UInt8,
+  `reason` String,
+  `workdir` String DEFAULT '',
+  `prompt_fingerprint` FixedString(64),
+  `derivation_version` UInt16,
+  `input_sequence` UInt64,
+  `replacement_version` UInt64,
+  `derived_at` DateTime64(3, 'UTC')
+) ENGINE = ReplacingMergeTree(replacement_version)
+PRIMARY KEY (`organization_id`, `user_id`, `child_source`, `child_session_id`)
+ORDER BY (`organization_id`, `user_id`, `child_source`, `child_session_id`)
+TTL toDate(child_session_date) + toIntervalDay(365)
+SETTINGS index_granularity = 8192, storage_policy = 's3';
+
+ALTER TABLE rudel.codex_session_analytics_mv MODIFY QUERY SELECT * EXCEPT (_dedupe_rank)
+  FROM (
+  WITH
+    (
+      length(cs.content) > 120000000
+      OR countSubstrings(cs.content, '\n') > 8000
+    ) AS _is_capped,
+
+    if(_is_capped, '', cs.content) AS _line_safe_content,
+    substring(cs.content, 1, 20000000) AS _error_sample_content,
+
+    arrayFilter(
+      x -> x != '',
+      splitByChar('\n', _line_safe_content)
+    ) AS _all_lines,
+
+    arrayFilter(x -> JSONHas(x, 'timestamp'), _all_lines) AS _ts_lines,
+
+    arrayMap(
+      x -> parseDateTime64BestEffort(JSONExtractString(x, 'timestamp')),
+      _ts_lines
+    ) AS _timestamps,
+
+    if(length(_timestamps) > 1,
+      arrayMap(i -> dateDiff('second', _timestamps[i], _timestamps[i+1]), range(1, length(_timestamps))),
+      []
+    ) AS _prompt_periods_sec,
+
+    if(length(_timestamps) > 1,
+      arrayMap(i -> if(i < length(_timestamps),
+        dateDiff('second', _timestamps[i], _timestamps[i+1]), 0), range(1, length(_timestamps))),
+      []
+    ) AS _inference_gaps,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') = 'response_item' OR JSONExtractString(x, 'type') = 'event_msg',
+      _all_lines
+    ) AS _interaction_lines,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') = 'response_item'
+        AND JSONExtractString(JSONExtractRaw(x, 'payload'), 'type') = 'function_call_output',
+      _all_lines
+    ) AS _tool_output_lines,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') = 'event_msg'
+        AND JSONExtractString(JSONExtractRaw(x, 'payload'), 'type') = 'token_count'
+        AND JSONExtractRaw(JSONExtractRaw(x, 'payload'), 'info') IS NOT NULL
+        AND JSONExtractRaw(JSONExtractRaw(x, 'payload'), 'info') != 'null',
+      _all_lines
+    ) AS _token_count_lines,
+
+    if(length(_token_count_lines) > 0,
+      JSONExtractRaw(JSONExtractRaw(JSONExtractRaw(arrayElement(_token_count_lines, -1), 'payload'), 'info'), 'total_token_usage'),
+      '{}'
+    ) AS _final_usage,
+
+    toUInt64OrZero(JSONExtractRaw(_final_usage, 'input_tokens')) AS _input_tokens,
+    toUInt64OrZero(JSONExtractRaw(_final_usage, 'output_tokens')) AS _output_tokens,
+    toUInt64OrZero(JSONExtractRaw(_final_usage, 'cached_input_tokens')) AS _cache_read_input_tokens,
+
+    if(_is_capped, cs.session_date, arrayMin(_timestamps)) AS _session_date,
+    if(_is_capped, cs.last_interaction_date, arrayMax(_timestamps)) AS _last_interaction_date,
+    dateDiff('minute', _session_date, _last_interaction_date) AS _duration_min,
+
+    arrayFilter(x -> JSONExtractString(x, 'type') = 'session_meta', _all_lines) AS _meta_lines,
+
+    JSONExtractString(
+      JSONExtractRaw(arrayElement(_meta_lines, 1), 'payload'),
+      'model_provider'
+    ) AS _model_provider,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') = 'turn_context',
+      _all_lines
+    ) AS _turn_context_lines,
+
+    if(length(_turn_context_lines) > 0,
+      JSONExtractString(JSONExtractRaw(arrayElement(_turn_context_lines, 1), 'payload'), 'model'),
+      ''
+    ) AS _model_from_turn_context,
+
+	    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"exec_command"[^}]*skills/([a-zA-Z0-9_-]+)/SKILL'))) AS _skills,
+
+	    arrayMap(
+	      x -> JSONExtractRaw(x, 'payload'),
+	      extractAll(cs.content, '([^\n]*"name":"spawn_agent"[^\n]*)')
+	    ) AS _spawn_candidate_payloads,
+
+	    arrayFilter(
+	      payload -> JSONExtractString(payload, 'type') = 'function_call'
+	        AND JSONExtractString(payload, 'name') = 'spawn_agent',
+	      _spawn_candidate_payloads
+	    ) AS _spawn_payloads,
+
+	    arrayDistinct(arrayFilter(
+	      call_id -> call_id != '',
+	      arrayMap(payload -> JSONExtractString(payload, 'call_id'), _spawn_payloads)
+	    )) AS _spawn_call_ids,
+
+	    arrayDistinct(arrayFilter(
+	      call_id -> call_id != '',
+	      extractAll(
+	        cs.content,
+	        '"type":"function_call_output"[^\n]*?"call_id":"([^"]+)"[^\n]*?"output":"\\{\\\\"(?:task_name|agent_name|agentId|agent_id)\\\\":'
+	      )
+	    )) AS _identifier_output_call_ids,
+
+	    arrayDistinct(arrayFilter(
+	      role -> role != '',
+	      arrayMap(
+	        payload -> if(
+	          has(_identifier_output_call_ids, JSONExtractString(payload, 'call_id')),
+	          multiIf(
+	            JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent_type') != '',
+	              JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent_type'),
+	            JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent') != '',
+	              JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent'),
+	            ''
+	          ),
+	          ''
+	        ),
+	        _spawn_payloads
+	      )
+	    )) AS _subagent_types,
+
+	    toUInt32(length(arrayIntersect(
+	      _spawn_call_ids,
+	      _identifier_output_call_ids
+	    ))) AS _subagent_count,
+
+    arrayMap(call_id -> tuple(
+      concat('call:', call_id),
+      JSONExtractString(JSONExtractString(arrayElement(arrayFilter(
+        payload -> JSONExtractString(payload, 'call_id') = call_id,
+        _spawn_payloads
+      ), -1), 'arguments'), 'model')
+    ), arraySort(arrayIntersect(_spawn_call_ids, _identifier_output_call_ids))) AS _native_subagents,
+
+	    toUInt32(
+      length(extractAll(_error_sample_content, '\\\\"exit_code\\\\":[1-9][0-9]*'))
+      + if(
+          _is_capped,
+          length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):'))
+            + length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):')),
+          arrayCount(
+            x -> x ILIKE '%Error:%' OR x ILIKE '%Exception:%',
+            _tool_output_lines
+          )
+        )
+    ) AS _error_count
+
+  SELECT
+    * EXCEPT (session_date, last_interaction_date, content),
+    _session_date as session_date,
+    _last_interaction_date as last_interaction_date,
+    'codex' as source,
+    _input_tokens as input_tokens,
+    _output_tokens as output_tokens,
+    _cache_read_input_tokens as cache_read_input_tokens,
+    toUInt64(0) as cache_creation_input_tokens,
+    _input_tokens + _output_tokens as total_tokens,
+	    _skills as skills,
+	    [] :: Array(String) as slash_commands,
+	    _subagent_types as subagent_types,
+	    _subagent_count as subagent_count,
+	    _native_subagents as native_subagents,
+	    toUInt32(length(_interaction_lines)) as total_interactions,
+    toUInt32(_duration_min) as actual_duration_min,
+    if(length(_prompt_periods_sec) > 0, round(arrayAvg(_prompt_periods_sec), 2), 0) as avg_period_sec,
+    if(
+      length(_prompt_periods_sec) > 0,
+      toFloat64(arrayElement(
+        arraySort(_prompt_periods_sec),
+        toUInt64(ceil(length(_prompt_periods_sec) / 2))
+      )),
+      0
+    ) as median_period_sec,
+    toUInt32(arrayCount(x -> x < 5, _prompt_periods_sec)) as quick_responses,
+    toUInt32(arrayCount(x -> x >= 5 AND x <= 60, _prompt_periods_sec)) as normal_responses,
+    toUInt32(arrayCount(x -> x > 300, _prompt_periods_sec)) as long_pauses,
+    _error_count as error_count,
+
+    if(
+      _error_count = 0,
+      '',
+      multiIf(
+        _error_sample_content ILIKE '%OperationFailed%', 'OperationFailed',
+        _error_sample_content ILIKE '%UnknownError%', 'UnknownError',
+        _error_sample_content ILIKE '%ORPCError%', 'ORPCError',
+        _error_sample_content ILIKE '%TimeoutError%', 'TimeoutError',
+        _error_sample_content ILIKE '%TypeError%', 'TypeError',
+        _error_sample_content ILIKE '%ReferenceError%', 'ReferenceError',
+        _error_sample_content ILIKE '%Error:%',
+          if(
+            length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):')) > 0,
+            arrayElement(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):'), 1),
+            'GenericError'
+          ),
+        _error_sample_content ILIKE '%Exception:%',
+          if(
+            length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):')) > 0,
+            arrayElement(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):'), 1),
+            'Exception'
+          ),
+        _error_sample_content ILIKE '%error:%', 'GenericError',
+        _error_sample_content ILIKE '%failed%', 'OperationFailed',
+        _error_sample_content ILIKE '%timeout%', 'Timeout',
+        _error_sample_content ILIKE '%not found%', 'NotFound',
+        'UnknownError'
+      )
+    ) as error_pattern,
+    multiIf(
+      _model_from_turn_context != '', _model_from_turn_context,
+      _model_provider != '', _model_provider,
+      'unknown'
+    ) as model_used,
+    toUInt8(if(cs.git_sha IS NOT NULL AND cs.git_sha != '', 1, 0)) as has_commit,
+    toUInt8(0) as used_plan_mode,
+    toUInt32(arraySum(_inference_gaps)) as inference_duration_sec,
+    toUInt32(0) as human_duration_sec,
+    CASE
+      WHEN _duration_min <= 10
+          AND (_input_tokens + _output_tokens) < 500000
+          AND _output_tokens > 1000
+      THEN 'quick_win'
+      WHEN _duration_min > 30
+          AND _output_tokens > 50000
+          AND cs.git_sha IS NOT NULL AND cs.git_sha != ''
+      THEN 'deep_work'
+      WHEN (_input_tokens + _output_tokens) > 1000000
+          AND (_output_tokens / nullif(_input_tokens, 0)) < 0.3
+          AND _duration_min > 20
+      THEN 'struggle'
+      WHEN length(_skills) >= 3
+          AND (cs.git_sha IS NULL OR cs.git_sha = '')
+          AND (_input_tokens + _output_tokens) > 200000
+      THEN 'exploration'
+      WHEN _duration_min < 3
+          AND _output_tokens < 500
+      THEN 'abandoned'
+      ELSE 'standard'
+    END as session_archetype,
+
+toUInt8(
+  greatest(
+    toFloat64(0),
+    least(
+      toFloat64(100),
+      round(
+        toFloat64(50)
+        + if(cs.git_sha IS NOT NULL AND cs.git_sha != '', 20, 0)
+        + if((_output_tokens / nullif(_input_tokens, 0)) > 0.5, 15, 0)
+        + (least(toUInt32(length(_skills)), 3) * 5)
+        - if(
+            (_input_tokens + _output_tokens) > 1500000
+              AND (cs.git_sha IS NULL OR cs.git_sha = ''),
+            20,
+            0
+          )
+        - if(_duration_min < 2 AND _output_tokens < 200, 30, 0)
+        - (least(_error_count, toUInt32(10)) * 2)
+      )
+    )
+  )
+) as success_score,
+    ROW_NUMBER() OVER (
+      PARTITION BY cs.organization_id, cs.user_id, cs.session_id
+      ORDER BY cs.revision DESC
+    ) AS _dedupe_rank
+
+  FROM rudel.codex_sessions AS cs
+  WHERE _is_capped OR length(_timestamps) > 0
+  )
+  WHERE _dedupe_rank = 1;
+ALTER TABLE rudel.session_analytics_mv MODIFY QUERY SELECT * EXCEPT (_dedupe_rank)
+  FROM (
+  WITH
+    (
+      length(cs.content) > 120000000
+      OR countSubstrings(cs.content, '\n') > 8000
+    ) AS _is_capped,
+
+    if(_is_capped, '', cs.content) AS _line_safe_content,
+    substring(cs.content, 1, 20000000) AS _error_sample_content,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') IN ('user', 'assistant'),
+      splitByChar('\n', _line_safe_content)
+    ) AS _interaction_lines,
+
+    arrayFilter(x -> JSONHas(x, 'timestamp'), _interaction_lines) AS _ts_lines,
+
+    arrayMap(
+      x -> parseDateTime64BestEffort(JSONExtractString(x, 'timestamp')),
+      _ts_lines
+    ) AS _timestamps,
+
+    arrayMap(
+      x -> JSONExtractString(x, 'type'),
+      _ts_lines
+    ) AS _msg_types,
+
+    if(length(_timestamps) > 1,
+      arrayMap(i -> dateDiff('second', _timestamps[i], _timestamps[i+1]), range(1, length(_timestamps))),
+      []
+    ) AS _prompt_periods_sec,
+
+    if(length(_timestamps) > 1,
+      arrayMap(i -> if(_msg_types[i] = 'user' AND _msg_types[i+1] = 'assistant',
+        dateDiff('second', _timestamps[i], _timestamps[i+1]), 0), range(1, length(_timestamps))),
+      []
+    ) AS _inference_gaps,
+
+    if(length(_timestamps) > 1,
+      arrayMap(i -> if(_msg_types[i] = 'assistant' AND _msg_types[i+1] = 'user',
+        dateDiff('second', _timestamps[i], _timestamps[i+1]), 0), range(1, length(_timestamps))),
+      []
+    ) AS _human_gaps,
+
+    arrayFilter(
+      x -> JSONExtractString(x, 'type') = 'assistant' AND JSONHas(x, 'message'),
+      splitByChar('\n', _line_safe_content)
+    ) AS _assistant_lines,
+
+    arrayMap(
+      x -> JSONExtractString(JSONExtractRaw(x, 'message'), 'id'),
+      _assistant_lines
+    ) AS _assistant_ids,
+
+    arrayFilter(
+      (x, i) -> i = length(_assistant_ids) OR
+        _assistant_ids[i] != _assistant_ids[i + 1],
+      _assistant_lines,
+      arrayEnumerate(_assistant_lines)
+    ) AS _deduped_assistant_lines,
+
+    arraySum(arrayMap(x -> toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'input_tokens'))
+      + toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'cache_read_input_tokens'))
+      + toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'cache_creation_input_tokens')), _deduped_assistant_lines)) AS _input_tokens,
+    arraySum(arrayMap(x -> toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'output_tokens')), _deduped_assistant_lines)) AS _output_tokens,
+    arraySum(arrayMap(x -> toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'cache_read_input_tokens')), _deduped_assistant_lines)) AS _cache_read,
+    arraySum(arrayMap(x -> toUInt64OrZero(JSONExtractRaw(JSONExtractRaw(x, 'message'), 'usage', 'cache_creation_input_tokens')), _deduped_assistant_lines)) AS _cache_creation,
+
+    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"Skill"[^}]*"skill":"([^"]+)"'))) AS _skills,
+    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"Task"[^}]*"subagent_type":"([^"]+)"'))) AS _subagent_types,
+    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '<command-name>/([^<]+)</command-name>'))) AS _slash_commands,
+
+    arraySort(agent -> tupleElement(agent, 1), arrayMap(
+      (agent_id, transcript) -> tuple(
+        agent_id,
+        arrayElement(arrayMap(
+          line -> JSONExtractString(line, 'message', 'model'),
+          arrayFilter(
+            line -> JSONExtractString(line, 'type') = 'assistant'
+              AND JSONExtractString(line, 'message', 'model') != '',
+            splitByChar('\n', if(
+              length(transcript) > 120000000 OR countSubstrings(transcript, '\n') > 8000,
+              '', transcript
+            ))
+          )
+        ), -1)
+      ),
+      mapKeys(cs.subagents), mapValues(cs.subagents)
+    )) AS _native_subagents,
+
+    toUInt32(
+      length(extractAll(_error_sample_content, '"isApiErrorMessage":true'))
+      + length(extractAll(_error_sample_content, '"is_error":true'))
+    ) AS _error_count,
+
+    if(_is_capped, cs.session_date, arrayMin(_timestamps)) AS _session_date,
+    if(_is_capped, cs.last_interaction_date, arrayMax(_timestamps)) AS _last_interaction_date,
+    dateDiff('minute', _session_date, _last_interaction_date) AS _duration_min
+
+  SELECT
+    * EXCEPT (session_date, last_interaction_date, content, subagents),
+    _session_date as session_date,
+    _last_interaction_date as last_interaction_date,
+    'claude_code' as source,
+    _input_tokens as input_tokens,
+    _output_tokens as output_tokens,
+    _cache_read as cache_read_input_tokens,
+    _cache_creation as cache_creation_input_tokens,
+    _input_tokens + _output_tokens as total_tokens,
+	    _skills as skills,
+	    _slash_commands as slash_commands,
+	    _subagent_types as subagent_types,
+	    toUInt32(length(cs.subagents)) as subagent_count,
+	    _native_subagents as native_subagents,
+	    toUInt32(length(_timestamps)) as total_interactions,
+    toUInt32(_duration_min) as actual_duration_min,
+    if(length(_prompt_periods_sec) > 0, round(arrayAvg(_prompt_periods_sec), 2), 0) as avg_period_sec,
+    if(
+      length(_prompt_periods_sec) > 0,
+      toFloat64(arrayElement(
+        arraySort(_prompt_periods_sec),
+        toUInt64(ceil(length(_prompt_periods_sec) / 2))
+      )),
+      0
+    ) as median_period_sec,
+    toUInt32(arrayCount(x -> x < 5, _prompt_periods_sec)) as quick_responses,
+    toUInt32(arrayCount(x -> x >= 5 AND x <= 60, _prompt_periods_sec)) as normal_responses,
+    toUInt32(arrayCount(x -> x > 300, _prompt_periods_sec)) as long_pauses,
+    _error_count as error_count,
+
+    if(
+      _error_count = 0,
+      '',
+      multiIf(
+        _error_sample_content ILIKE '%OperationFailed%', 'OperationFailed',
+        _error_sample_content ILIKE '%UnknownError%', 'UnknownError',
+        _error_sample_content ILIKE '%ORPCError%', 'ORPCError',
+        _error_sample_content ILIKE '%TimeoutError%', 'TimeoutError',
+        _error_sample_content ILIKE '%TypeError%', 'TypeError',
+        _error_sample_content ILIKE '%ReferenceError%', 'ReferenceError',
+        _error_sample_content ILIKE '%Error:%',
+          if(
+            length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):')) > 0,
+            arrayElement(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):'), 1),
+            'GenericError'
+          ),
+        _error_sample_content ILIKE '%Exception:%',
+          if(
+            length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):')) > 0,
+            arrayElement(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):'), 1),
+            'Exception'
+          ),
+        _error_sample_content ILIKE '%error:%', 'GenericError',
+        _error_sample_content ILIKE '%failed%', 'OperationFailed',
+        _error_sample_content ILIKE '%timeout%', 'Timeout',
+        _error_sample_content ILIKE '%not found%', 'NotFound',
+        'UnknownError'
+      )
+    ) as error_pattern,
+    if(
+      _is_capped,
+      '',
+      JSONExtractString(
+        JSONExtractRaw(
+          arrayElement(
+            arrayFilter(
+              x -> JSONExtractString(x, 'type') = 'assistant',
+              splitByChar('\n', _line_safe_content)
+            ),
+            -1
+          ),
+          'message'
+        ),
+        'model'
+      )
+    ) as model_used,
+    toUInt8(if(cs.git_sha IS NOT NULL AND cs.git_sha != '', 1, 0)) as has_commit,
+    toUInt8(if(position(cs.content, '"name":"EnterPlanMode"') > 0, 1, 0)) as used_plan_mode,
+    toUInt32(arraySum(_inference_gaps)) as inference_duration_sec,
+    toUInt32(arraySum(_human_gaps)) as human_duration_sec,
+    CASE
+      WHEN _duration_min <= 10
+          AND (_input_tokens + _output_tokens) < 500000
+          AND _output_tokens > 1000
+      THEN 'quick_win'
+      WHEN _duration_min > 30
+          AND _output_tokens > 50000
+          AND cs.git_sha IS NOT NULL AND cs.git_sha != ''
+      THEN 'deep_work'
+      WHEN (_input_tokens + _output_tokens) > 1000000
+          AND (_output_tokens / nullif(_input_tokens, 0)) < 0.3
+          AND _duration_min > 20
+      THEN 'struggle'
+      WHEN length(_skills) >= 3
+          AND (cs.git_sha IS NULL OR cs.git_sha = '')
+          AND (_input_tokens + _output_tokens) > 200000
+      THEN 'exploration'
+      WHEN _duration_min < 3
+          AND _output_tokens < 500
+      THEN 'abandoned'
+      ELSE 'standard'
+    END as session_archetype,
+
+toUInt8(
+  greatest(
+    toFloat64(0),
+    least(
+      toFloat64(100),
+      round(
+        toFloat64(50)
+        + if(cs.git_sha IS NOT NULL AND cs.git_sha != '', 20, 0)
+        + if((_output_tokens / nullif(_input_tokens, 0)) > 0.5, 15, 0)
+        + (least(toUInt32(length(_skills)), 3) * 5)
+        - if(
+            (_input_tokens + _output_tokens) > 1500000
+              AND (cs.git_sha IS NULL OR cs.git_sha = ''),
+            20,
+            0
+          )
+        - if(_duration_min < 2 AND _output_tokens < 200, 30, 0)
+        - (least(_error_count, toUInt32(10)) * 2)
+      )
+    )
+  )
+) as success_score,
+    ROW_NUMBER() OVER (
+      PARTITION BY cs.organization_id, cs.user_id, cs.session_id
+      ORDER BY cs.revision DESC
+    ) AS _dedupe_rank
+
+  FROM rudel.claude_sessions AS cs
+  WHERE _is_capped OR length(_timestamps) > 0
+  )
+  WHERE _dedupe_rank = 1;

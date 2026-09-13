@@ -1,9 +1,22 @@
-import { Clock3Icon, Settings2Icon, StarIcon, UsersIcon } from "lucide-react";
+import {
+	BookOpen01Icon,
+	Clock03Icon,
+	Settings01Icon,
+	StarIcon,
+	UserGroupIcon,
+} from "@hugeicons/core-free-icons";
 import type { ReactElement } from "react";
-import { appRoutes } from "@/app/routes";
+import { appRoutes, getCanonicalAppPath } from "@/app/routes";
+import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
+import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 
-export type ShellRouteId = "dashboard" | "sessions" | "team" | "settings";
-export type ShellRouteIcon = ReactElement<{ size?: number }>;
+export type ShellRouteId =
+	| "dashboard"
+	| "sessions"
+	| "skills"
+	| "team"
+	| "settings";
+export type ShellRouteIcon = ReactElement;
 
 export type ShellRouteDefinition = {
 	id: ShellRouteId;
@@ -11,62 +24,82 @@ export type ShellRouteDefinition = {
 	title: string;
 	navLabel: string;
 	shortcut: string;
+	comingSoon: boolean;
 	icon: ShellRouteIcon;
 };
 
-export function getShellRoutes(orgSlug: string) {
-	return [
-		{
-			id: "dashboard",
-			path: appRoutes.dashboard(orgSlug),
-			title: "Dashboard",
-			navLabel: "Dashboard",
-			shortcut: "D",
-			icon: <StarIcon />,
-		},
-		{
-			id: "sessions",
-			path: appRoutes.dashboardSessions(orgSlug),
-			title: "Sessions",
-			navLabel: "Sessions",
-			shortcut: "H",
-			icon: <Clock3Icon />,
-		},
-		{
-			id: "team",
-			path: appRoutes.team(orgSlug),
-			title: "Team",
-			navLabel: "Team",
-			shortcut: "T",
-			icon: <UsersIcon />,
-		},
-		{
-			id: "settings",
-			path: appRoutes.settings(orgSlug),
-			title: "Settings",
-			navLabel: "Settings",
-			shortcut: "S",
-			icon: <Settings2Icon />,
-		},
-	] as const satisfies readonly ShellRouteDefinition[];
-}
+export const shellRoutes = [
+	{
+		id: "dashboard",
+		comingSoon: true,
+		path: appRoutes.dashboard(),
+		title: "Dashboard",
+		navLabel: "Dashboard",
+		shortcut: "D",
+		icon: <ShellHugeicon icon={StarIcon} />,
+	},
+	{
+		id: "sessions",
+		comingSoon: false,
+		path: appRoutes.session(),
+		title: "Sessions",
+		navLabel: "Sessions",
+		shortcut: "H",
+		icon: <ShellHugeicon icon={Clock03Icon} />,
+	},
+	{
+		id: "skills",
+		comingSoon: true,
+		path: appRoutes.skills(),
+		title: "Skills",
+		navLabel: "Skills",
+		shortcut: "K",
+		icon: <ShellHugeicon icon={BookOpen01Icon} />,
+	},
+	{
+		id: "team",
+		comingSoon: false,
+		path: appRoutes.team(),
+		title: "Team",
+		navLabel: "Team",
+		shortcut: "T",
+		icon: <ShellHugeicon icon={UserGroupIcon} />,
+	},
+	{
+		id: "settings",
+		comingSoon: false,
+		path: appRoutes.settings(),
+		title: "Settings",
+		navLabel: "Settings",
+		shortcut: "S",
+		icon: <ShellHugeicon icon={Settings01Icon} />,
+	},
+] satisfies readonly ShellRouteDefinition[];
 
-export function getShellRouteMap(orgSlug: string) {
-	const shellRoutes = getShellRoutes(orgSlug);
+export const shellRouteMap = {
+	dashboard: shellRoutes[0],
+	sessions: shellRoutes[1],
+	skills: shellRoutes[2],
+	team: shellRoutes[3],
+	settings: shellRoutes[4],
+} as const;
 
-	return {
-		dashboard: shellRoutes[0],
-		sessions: shellRoutes[1],
-		team: shellRoutes[2],
-		settings: shellRoutes[3],
-	} as const;
-}
+export const shellNavigationRoutes = shellRoutes.filter(
+	(route) => !route.comingSoon,
+);
 
-export function getCurrentShellRoute(
-	pathname: string,
-	orgSlug: string,
-): ShellRouteDefinition {
-	const shellRoutes = getShellRoutes(orgSlug);
+export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {
+	const canonicalPathname = getCanonicalAppPath(pathname);
+
+	if (
+		canonicalPathname === CLI_SETUP_PATH ||
+		canonicalPathname === appRoutes.session() ||
+		canonicalPathname.startsWith(`${appRoutes.session()}/`) ||
+		canonicalPathname === appRoutes.newSession() ||
+		canonicalPathname.startsWith(`${appRoutes.newSession()}/`)
+	) {
+		return shellRouteMap.sessions;
+	}
 
 	return (
 		[...shellRoutes]
@@ -76,7 +109,8 @@ export function getCurrentShellRoute(
 			)
 			.find(
 				(route) =>
-					pathname === route.path || pathname.startsWith(`${route.path}/`),
-			) ?? shellRoutes[0]
+					canonicalPathname === route.path ||
+					canonicalPathname.startsWith(`${route.path}/`),
+			) ?? shellRouteMap.dashboard
 	);
 }

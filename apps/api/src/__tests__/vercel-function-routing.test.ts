@@ -92,4 +92,31 @@ describe("Vercel function routing", () => {
 		expect(response.headers.get("Content-Length")).toBeNull();
 		expect(await response.text()).toBe("");
 	});
+
+	test("returns SSE headers and the first event before the stream completes", async () => {
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(
+					new TextEncoder().encode("event: connection\ndata: ready\n\n"),
+				);
+			},
+		});
+		const handler = createVercelFunctionHandler({
+			fetch: async () =>
+				new Response(body, {
+					headers: { "Content-Type": "text/event-stream" },
+				}),
+			functionGroup: "cli-connection",
+			streaming: true,
+		});
+		const response = await handler(
+			new Request("https://example.test/api/cli/connections/id/events"),
+		);
+		expect(response.headers.get("Content-Length")).toBeNull();
+		const reader = response.body?.getReader();
+		expect(reader).toBeDefined();
+		const first = await reader?.read();
+		expect(new TextDecoder().decode(first?.value)).toContain("data: ready");
+		await reader?.cancel();
+	});
 });

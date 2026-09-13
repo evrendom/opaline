@@ -1,12 +1,12 @@
-import { Card, CardContent } from "@/app/ui/card";
-import { Skeleton } from "@/app/ui/skeleton";
+import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildWorkspaceSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
 import { WorkspaceDangerZoneCard } from "@/features/settings/workspace/components/WorkspaceDangerZoneCard";
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
 import { WorkspaceIdentityCard } from "@/features/settings/workspace/components/WorkspaceIdentityCard";
-import { WorkspaceSummaryStrip } from "@/features/settings/workspace/components/WorkspaceSummaryStrip";
 import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-workspace-settings-data";
 
 export function WorkspaceSettingsSection() {
@@ -24,9 +24,11 @@ export function WorkspaceSettingsSection() {
 		}),
 	);
 
+	if (data.state.isPending) return <SettingsPageSkeleton routeId="workspace" />;
+
 	if (!data.state.hasOrganization) {
 		return (
-			<div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-[19fr_21fr]">
+			<div className="workspace-settings-page">
 				<WorkspaceEmptyStateCard />
 				<div id="new-workspace" className="scroll-mt-24">
 					<CreateWorkspaceCard
@@ -39,69 +41,28 @@ export function WorkspaceSettingsSection() {
 	}
 
 	return (
-		<>
-			<div className="px-4 lg:px-6">
-				<WorkspaceSummaryStrip
-					tiles={data.summaryTiles}
-					isPending={data.state.isPending}
-					isError={Boolean(data.state.isError)}
-				/>
-			</div>
-
-			{data.state.isPending ? (
-				<div className="mt-4 grid gap-4 px-4 lg:px-6 xl:grid-cols-2">
-					{["org-loading-1", "org-loading-2"].map((key) => (
-						<Card
-							key={key}
-							size="sm"
-							className="bg-card/95 shadow-none ring-1 ring-border/60"
-						>
-							<CardContent className="flex flex-col gap-4">
-								<Skeleton className="h-5 w-40 rounded-md" />
-								<div className="flex flex-col gap-2">
-									<Skeleton className="h-8 w-full rounded-md" />
-									<Skeleton className="h-8 w-full rounded-md" />
-								</div>
-							</CardContent>
-						</Card>
-					))}
-				</div>
-			) : null}
-
+		<div className="workspace-settings-page">
 			{!data.state.isPending && data.state.isError ? (
-				<div className="mt-4 px-4 lg:px-6">
-					<Card
-						size="sm"
-						className="bg-card/95 shadow-none ring-1 ring-border/60"
-					>
-						<CardContent className="text-sm text-muted-foreground">
-							Organization data couldn&apos;t be loaded right now.
-						</CardContent>
-					</Card>
-				</div>
+				<SettingsSectionCard>
+					<CardContent className="text-sm text-muted-foreground">
+						Organization data couldn&apos;t be loaded right now.
+					</CardContent>
+				</SettingsSectionCard>
 			) : null}
 
 			{!data.state.isPending && !data.state.isError && data.activeOrg ? (
 				<>
-					<div className="mt-4 grid gap-4 px-4 lg:px-6 xl:grid-cols-[21fr_19fr]">
-						<WorkspaceIdentityCard
-							organization={data.activeOrg}
-							canManage={data.canManage}
-							onInvalidate={data.invalidate}
-						/>
-						<div id="new-workspace" className="scroll-mt-24">
-							<CreateWorkspaceCard title="Create another workspace" />
-						</div>
-					</div>
-
-					<div className="mt-4 px-4 lg:px-6">
-						<WorkspaceDangerZoneCard
-							organization={data.activeOrg}
-							canManage={data.canManage}
-						/>
-					</div>
+					<WorkspaceIdentityCard
+						organization={data.activeOrg}
+						canManage={data.canManage}
+						onInvalidate={data.invalidate}
+					/>
+					<WorkspaceDangerZoneCard
+						organization={data.activeOrg}
+						canManage={data.canManage}
+					/>
 				</>
 			) : null}
-		</>
+		</div>
 	);
 }
