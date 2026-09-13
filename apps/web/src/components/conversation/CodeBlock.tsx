@@ -25,6 +25,7 @@ interface CodeBlockProps {
 	className?: string;
 	filename?: string;
 	language?: string;
+	highlight?: boolean;
 	lineChangeKind?: Exclude<CodeLineKind, "neutral">;
 	lineChangeKinds?: readonly CodeLineKind[];
 	showLineNumbers?: boolean;
@@ -133,6 +134,7 @@ export function CodeBlock({
 	className,
 	filename,
 	language = "text",
+	highlight = true,
 	lineChangeKind,
 	lineChangeKinds,
 	showLineNumbers,
@@ -146,6 +148,7 @@ export function CodeBlock({
 	const lineGutterWidth = lineNumberWidth + 22;
 	const headerIcon = getCodeHeaderIcon(fileLabel, language);
 	const preparedHighlight = usePreparedCodeHighlight({
+		enabled: highlight,
 		code: normalizedCode,
 		language,
 		theme: resolvedTheme === "dark" ? "dark" : "light",
@@ -184,6 +187,8 @@ export function CodeBlock({
 	const highlightedLines = preparedHighlight?.lines;
 	const codeContent = (
 		<pre
+			data-testid="message-code-block"
+			data-highlighted={highlight}
 			data-trace-code-highlight-state={
 				highlightedLines ? "highlighted" : "plain"
 			}
@@ -204,40 +209,42 @@ export function CodeBlock({
 			}}
 		>
 			<code>
-				{codeLines.map((line, index) => {
-					const lineNumber = index + 1;
-					const tokens = highlightedLines?.[index];
-					return (
-						<span key={lineNumber} {...getLineProps(lineNumber)}>
-							{shouldShowLineNumbers ? (
-								<span
-									aria-hidden="true"
-									style={{
-										color: "var(--trace-code-line-number)",
-										display: "inline-block",
-										fontStyle: "normal",
-										marginRight: "16px",
-										minWidth: `${lineNumberWidth}px`,
-										paddingRight: 0,
-										textAlign: "right",
-										width: `${lineNumberWidth}px`,
-									}}
-								>
-									{lineNumber}
+				{highlight
+					? codeLines.map((line, index) => {
+							const lineNumber = index + 1;
+							const tokens = highlightedLines?.[index];
+							return (
+								<span key={lineNumber} {...getLineProps(lineNumber)}>
+									{shouldShowLineNumbers ? (
+										<span
+											aria-hidden="true"
+											style={{
+												color: "var(--trace-code-line-number)",
+												display: "inline-block",
+												fontStyle: "normal",
+												marginRight: "16px",
+												minWidth: `${lineNumberWidth}px`,
+												paddingRight: 0,
+												textAlign: "right",
+												width: `${lineNumberWidth}px`,
+											}}
+										>
+											{lineNumber}
+										</span>
+									) : null}
+									{tokens
+										? tokens.map((token) => (
+												<HighlightedCodeToken
+													key={`${lineNumber}:${token.offset}`}
+													token={token}
+												/>
+											))
+										: line}
+									{index < codeLines.length - 1 ? "\n" : null}
 								</span>
-							) : null}
-							{tokens
-								? tokens.map((token) => (
-										<HighlightedCodeToken
-											key={`${lineNumber}:${token.offset}`}
-											token={token}
-										/>
-									))
-								: line}
-							{index < codeLines.length - 1 ? "\n" : null}
-						</span>
-					);
-				})}
+							);
+						})
+					: normalizedCode}
 			</code>
 		</pre>
 	);

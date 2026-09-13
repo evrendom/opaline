@@ -95,11 +95,12 @@ function subscribeCodeHighlight(key: string, listener: () => void) {
 }
 
 export function usePreparedCodeHighlight(input: {
+	enabled?: boolean;
 	code: string;
 	language: string;
 	theme: CodeHighlightTheme;
 }) {
-	const { code, language, theme } = input;
+	const { code, language, theme, enabled = true } = input;
 	const key = getCodeHighlightKey(input);
 	const subscribe = useCallback(
 		(listener: () => void) => subscribeCodeHighlight(key, listener),
@@ -115,7 +116,7 @@ export function usePreparedCodeHighlight(input: {
 	// This effect is the external-system boundary: rendering stays synchronous
 	// and plain while the module worker prepares tokens off the main thread.
 	useEffect(() => {
-		requestCodeHighlight({ code, key, language, theme });
-	}, [code, key, language, theme]);
-	return highlight;
+		if (enabled) requestCodeHighlight({ code, key, language, theme });
+	}, [code, key, language, theme, enabled]);
+	return enabled ? highlight : null;
 }

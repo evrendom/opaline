@@ -14,7 +14,7 @@ Analytics for Claude Code and Codex. Opaline gives you a dashboard with insights
 2. Install the CLI and connect it to your account:
 
 ```bash
-npm install --global @opalinehq/cli
+npm install --global opaline
 
 opaline login     # authenticate via your browser
 opaline enable    # auto-upload sessions when Claude Code / Codex exits

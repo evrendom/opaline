@@ -20,7 +20,7 @@ import {
 import { copyCliCommand, type PreparedCliCommand } from "./copy-cli-command";
 
 const STORAGE_KEY = "opaline.cli-connection";
-const SETUP_COMMAND = "npx @opalinehq/cli@latest";
+const SETUP_COMMAND = "npx opaline@latest";
 const CONNECTION_ACTIVITY_TIMEOUT_MS = 90_000;
 
 function readLocalCommand(): string | null {

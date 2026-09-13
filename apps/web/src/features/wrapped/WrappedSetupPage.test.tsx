@@ -78,7 +78,7 @@ describe("WrappedSetupPage", () => {
 		expect(
 			screen.getByText(
 				hasExactTextContent(
-					"npm install -g @opalinehq/cli@latest && opaline login --api-base https://opaline.so",
+					"npm install -g opaline@latest && opaline login --api-base https://opaline.so",
 				),
 				{ selector: "code" },
 			),
