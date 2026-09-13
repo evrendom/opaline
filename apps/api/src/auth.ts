@@ -293,6 +293,11 @@ export function createAuth(db: object, config: AuthConfig) {
 			}),
 			createOrganizationPlugin(config),
 		],
+		user: {
+			additionalFields: {
+				jobTitle: { type: "string", required: false, input: false },
+			},
+		},
 		session: {
 			expiresIn: 60 * 60 * 24 * 365,
 		},

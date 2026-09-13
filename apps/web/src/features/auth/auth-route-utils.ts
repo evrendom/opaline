@@ -1,3 +1,4 @@
+import { CliConnectionIdSchema } from "@rudel/api-routes";
 import {
 	buildOrganizationPath,
 	resolveOrganizationPostAuthPath,
@@ -130,7 +131,8 @@ function getDirectAuthDestination(
 ): string | null {
 	const userCode = getDeviceUserCode(search);
 	if (userCode) {
-		return `/?user_code=${encodeURIComponent(userCode)}`;
+		const connectionId = getCliConnectionId(search);
+		return `/?user_code=${encodeURIComponent(userCode)}${connectionId ? `&connect=${encodeURIComponent(connectionId)}` : ""}`;
 	}
 
 	const redirect = getValidRedirect(search, wrappedFlow);
@@ -143,6 +145,15 @@ function getDirectAuthDestination(
 	}
 
 	return null;
+}
+
+export function getCliConnectionId(
+	search = window.location.search,
+): string | null {
+	const parsed = CliConnectionIdSchema.safeParse(
+		new URLSearchParams(search).get("connect"),
+	);
+	return parsed.success ? parsed.data : null;
 }
 
 export function getEmailSignupSuccessDestination(

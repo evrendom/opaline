@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
+import { z } from "zod";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
 	type AppSession,
+	getCliConnectionId,
 	getSessionUserId,
 } from "@/features/auth/auth-route-utils";
 import { GuestApp } from "@/features/auth/GuestApp";
@@ -45,6 +47,26 @@ export function DeviceAuthorizationApp({
 		setDeviceError(null);
 
 		try {
+			let connectionReturnUrl: string | undefined;
+			const connectionId = getCliConnectionId();
+			if (connectionId && action === "approve") {
+				const authorization = await fetch(
+					`/api/cli/connections/${connectionId}/authorize`,
+					{
+						method: "POST",
+						credentials: "include",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ userCode: deviceUserCode }),
+					},
+				);
+				if (!authorization.ok)
+					throw new Error(
+						"Open this login link in the same browser where you copied the CLI command.",
+					);
+				connectionReturnUrl = z
+					.object({ returnUrl: z.string().url() })
+					.parse(await authorization.json()).returnUrl;
+			}
 			const response = await fetch(`/api/auth/device/${action}`, {
 				method: "POST",
 				credentials: "include",
@@ -66,6 +88,10 @@ export function DeviceAuthorizationApp({
 			}
 
 			if (action === "approve") {
+				if (connectionReturnUrl) {
+					window.location.assign(connectionReturnUrl);
+					return;
+				}
 				setDeviceApproved(true);
 			} else {
 				setDeviceDenied(true);

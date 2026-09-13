@@ -235,6 +235,7 @@ export const UserSchema = z.object({
 	email: z.string(),
 	name: z.string(),
 	image: z.string().nullable(),
+	jobTitle: z.string().nullable().optional(),
 	activeOrganizationId: z.string().nullable(),
 });
 
@@ -578,6 +579,7 @@ export const AdminUserSchema = z.object({
 export const UpdateProfileInputSchema = z.object({
 	name: z.string().trim().min(1).max(100),
 	image: z.string().nullable(),
+	jobTitle: z.string().trim().max(100).nullable().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileInputSchema>;
@@ -866,3 +868,18 @@ export const contract = {
 		},
 	},
 };
+export {
+	CLI_CONNECTION_CODE_TTL_MS,
+	CLI_CONNECTION_PATH,
+	CLI_CONNECTION_TTL_MS,
+	CliConnectionAuthorizeSchema,
+	CliConnectionCreateResponseSchema,
+	CliConnectionIdSchema,
+	CliConnectionRedeemSchema,
+	CliConnectionSecretSchema,
+	type CliConnectionSnapshot,
+	CliConnectionSnapshotSchema,
+	type CliConnectionUpdate,
+	CliConnectionUpdateSchema,
+	isCliConnectionTerminal,
+} from "./cli-connection.js";

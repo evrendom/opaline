@@ -9,7 +9,12 @@ import {
 	handleAvatarGetRequest,
 	handleAvatarUploadRequest,
 } from "./handlers/avatar-http.js";
+import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
+import {
+	getTeamInviteRoute,
+	handleTeamInviteImageRequest,
+} from "./handlers/team-invite-page-http.js";
 import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
@@ -59,6 +64,8 @@ const DEFAULT_DEV_ORIGINS = [
 	"http://127.0.0.1:4014",
 	"http://localhost:4015",
 	"http://127.0.0.1:4015",
+	"http://localhost:4600",
+	"http://127.0.0.1:4600",
 ] as const;
 
 const socialProviders: Record<
@@ -329,7 +336,10 @@ export async function fetchHandler(
 				options.fallback,
 			);
 			const finalResponse =
-				url.pathname === "/rpc" || url.pathname.startsWith("/rpc/")
+				url.pathname === "/rpc" ||
+				url.pathname.startsWith("/rpc/") ||
+				(/^\/api\/cli\/connections\/[a-f0-9-]+\/events$/u.test(url.pathname) &&
+					response.headers.get("Content-Type")?.startsWith("text/event-stream"))
 					? response
 					: await enforceApiResponseSize({
 							pathname: url.pathname,
@@ -398,6 +408,23 @@ async function handleRequest(
 	wrappedShareLookupSource: string,
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
+	if (
+		url.pathname === "/api/cli/connections" ||
+		url.pathname.startsWith("/api/cli/connections/")
+	) {
+		const response = await handleCliConnectionRequest(request, {
+			allowedOrigins: trustedOrigins,
+			source: wrappedShareLookupSource,
+			getUserId: async (req) =>
+				(await getContext(req, requestId, wrappedShareLookupSource)).user?.id ??
+				null,
+			getBrowserUserId: async (req) =>
+				(await auth.api.getSession({ headers: req.headers }))?.user.id ?? null,
+		});
+		for (const [key, value] of Object.entries(cors))
+			response.headers.set(key, value);
+		return response;
+	}
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
 	}
@@ -409,6 +436,8 @@ async function handleRequest(
 			}),
 		});
 	}
+	const invite = getTeamInviteRoute(url.pathname);
+	if (invite?.image) return handleTeamInviteImageRequest(request, invite.token);
 	const wrappedShareCardImageId = getWrappedShareCardImageId(url.pathname);
 	if (wrappedShareCardImageId) {
 		return handleWrappedShareCardImageRequest({

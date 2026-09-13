@@ -23,7 +23,7 @@ const create = os.teamInviteLink.create
 
 		return {
 			expires_at: link.expiresAt,
-			invite_url: buildTeamInviteUrl(link.token),
+			invite_url: buildTeamInviteUrl(link.organizationSlug, link.token),
 			organization_id: link.organizationId,
 			organization_name: link.organizationName,
 		};
@@ -73,6 +73,6 @@ export const teamInviteLinkRouter = os.teamInviteLink.router({
 	revoke,
 });
 
-function buildTeamInviteUrl(token: string) {
-	return `${getFrontendOrigin()}/team/invite/${encodeURIComponent(token)}`;
+function buildTeamInviteUrl(workspaceSlug: string, token: string) {
+	return `${getFrontendOrigin()}/${encodeURIComponent(workspaceSlug)}/join/${encodeURIComponent(token)}`;
 }

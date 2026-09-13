@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0029_TIMESTAMP = "1787735109151";
+const MIGRATION_0030_TIMESTAMP = "1789234113357";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0029 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0030 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0029 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0029] = await migrationSql<MigrationState[]>`
+			const [after0030] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,11 +61,28 @@ test("applies migrations 0020-0029 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0029).toEqual({
-				count: 30,
-				latestTimestamp: MIGRATION_0029_TIMESTAMP,
+			expect(after0030).toEqual({
+				count: 31,
+				latestTimestamp: MIGRATION_0030_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
+			const [cliConnectionTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.cli_connection')::text AS name
+			`;
+			expect(cliConnectionTable?.name).toBe("cli_connection");
+			const cliConnectionIndexes = await migrationSql<Array<{ name: string }>>`
+				SELECT indexname AS name FROM pg_indexes
+				WHERE schemaname = 'public' AND tablename = 'cli_connection'
+				ORDER BY indexname
+			`;
+			expect([...cliConnectionIndexes]).toEqual([
+				{ name: "cli_connection_browser_expires_idx" },
+				{ name: "cli_connection_device_user_code_unique" },
+				{ name: "cli_connection_expires_idx" },
+				{ name: "cli_connection_pairing_hash_unique" },
+				{ name: "cli_connection_pkey" },
+				{ name: "cli_connection_source_created_idx" },
+			]);
 			const [ingestJobTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.ingest_job')::text AS name
 			`;

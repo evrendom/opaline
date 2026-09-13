@@ -9,6 +9,11 @@
 	"outputDirectory": "apps/web/dist",
 	"regions": ["fra1"],
 	"functions": {
+		"api/cli-connection.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
 		"api/rpc.ts": {
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 2048,
@@ -68,6 +73,14 @@
 		}
 	],
 	"rewrites": [
+		{
+			"source": "/api/cli/connections",
+			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections"
+		},
+		{
+			"source": "/api/cli/connections/:routePath*",
+			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections/:routePath*"
+		},
 		{
 			"source": "/wrapped/:shareId/x-card.png",
 			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId/x-card.png"

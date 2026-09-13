@@ -16,12 +16,14 @@ export interface TeamInviteLink {
 	expiresAt: string;
 	organizationId: string;
 	organizationName: string;
+	organizationSlug: string;
 	token: string;
 }
 
 interface TeamInviteOrganization {
 	id: string;
 	name: string;
+	slug: string;
 }
 
 const TEAM_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -71,6 +73,7 @@ export async function createTeamInviteLink(input: {
 			expiresAt,
 			organizationId: organization.id,
 			organizationName: organization.name,
+			organizationSlug: organization.slug,
 			token,
 		};
 	});
@@ -94,6 +97,20 @@ export async function revokeTeamInviteLink(input: {
 		);
 		return true;
 	});
+}
+
+export async function getTeamInviteLinkPreview(token: string) {
+	if (!TEAM_INVITE_TOKEN_PATTERN.test(token)) return null;
+	const [organization] = await sqlClient<TeamInviteOrganization[]>`
+		SELECT o.id, o.name, o.slug
+		FROM team_invite_link i
+		INNER JOIN organization o ON o.id = i.organization_id
+		WHERE i.token_hash = ${hashTeamInviteToken(token)}
+			AND i.revoked_at IS NULL
+			AND i.expires_at > ${new Date().toISOString()}
+		LIMIT 1
+	`;
+	return organization ?? null;
 }
 
 export async function acceptTeamInviteLink(input: {
@@ -135,7 +152,7 @@ async function getManageableOrganization(
 ) {
 	const [organization] = await transaction.unsafe<TeamInviteOrganization[]>(
 		`
-		SELECT o.id, o.name
+		SELECT o.id, o.name, o.slug
 		FROM organization o
 		INNER JOIN member m
 			ON m.organization_id = o.id
@@ -174,7 +191,7 @@ async function getOrganizationForTeamInvite(
 ) {
 	const [organization] = await transaction.unsafe<TeamInviteOrganization[]>(
 		`
-		SELECT o.id, o.name
+		SELECT o.id, o.name, o.slug
 		FROM team_invite_link i
 		INNER JOIN organization o
 			ON o.id = i.organization_id

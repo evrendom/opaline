@@ -90,7 +90,7 @@ afterAll(async () => {
 });
 
 describe("deletion data-loss hardening", () => {
-	test("serializes concurrent organization deletions so the user retains an organization", async () => {
+	test("serializes concurrent owned organization deletions and allows no remaining organization", async () => {
 		const identity = await createTestIdentity("org-race");
 		const secondOrganizationId = await createOwnedOrganization(
 			identity.userId,
@@ -130,7 +130,7 @@ describe("deletion data-loss hardening", () => {
 		expect(responses).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ status: 200 }),
-				expect.objectContaining({ status: 400 }),
+				expect.objectContaining({ status: 200 }),
 			]),
 		);
 
@@ -139,7 +139,7 @@ describe("deletion data-loss hardening", () => {
 			FROM member
 			WHERE user_id = ${identity.userId}
 		`;
-		expect(membershipSummary?.count).toBe(1);
+		expect(membershipSummary?.count).toBe(0);
 		const purgeJobs = await sqlClient<
 			Array<{ status: string; targetId: string }>
 		>`
@@ -148,8 +148,65 @@ describe("deletion data-loss hardening", () => {
 			WHERE target_type = 'organization'
 				AND target_id IN (${identity.userId}, ${secondOrganizationId})
 		`;
-		expect(purgeJobs).toHaveLength(1);
-		expect(purgeJobs[0]?.status).toBe("pending");
+		expect(purgeJobs).toHaveLength(2);
+		expect(purgeJobs.every((job) => job.status === "pending")).toBe(true);
+	});
+
+	test("deletes the only owned workspace, keeps the account, and allows creating a replacement", async () => {
+		const identity = await createTestIdentity("only-workspace");
+		const outsider = await createTestIdentity("only-workspace-outsider");
+		await sqlClient`
+			UPDATE session SET active_organization_id = ${identity.userId}
+			WHERE user_id = ${identity.userId}
+		`;
+
+		const denied = await callRpc(outsider.token, "deleteOrganization", {
+			organizationId: identity.userId,
+		});
+		expect(denied.status).toBe(403);
+		expect(await countPurgeJobs("organization", identity.userId)).toBe(0);
+
+		const deleted = await callRpc(identity.token, "deleteOrganization", {
+			organizationId: identity.userId,
+		});
+		expect(deleted.status).toBe(200);
+		expect(await countPurgeJobs("organization", identity.userId)).toBe(1);
+		const memberships = await callRpc(identity.token, "listMyOrganizations");
+		expect(memberships.status).toBe(200);
+		expect(memberships.body).toEqual({ json: [] });
+		expect((await callRpc(identity.token, "me")).status).toBe(200);
+		const sessions = await sqlClient<
+			Array<{ activeOrganizationId: string | null }>
+		>`
+			SELECT active_organization_id AS "activeOrganizationId"
+			FROM session WHERE user_id = ${identity.userId}
+		`;
+		expect(sessions.length).toBeGreaterThan(0);
+		expect(
+			sessions.every((session) => session.activeOrganizationId === null),
+		).toBe(true);
+		const created = await fetch(
+			`${server.baseUrl}/api/auth/organization/create`,
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${identity.token}`,
+					"Content-Type": "application/json",
+					Origin: "http://localhost",
+				},
+				body: JSON.stringify({
+					name: "Replacement workspace",
+					slug: `replacement-${crypto.randomUUID()}`,
+				}),
+			},
+		);
+		expect(created.status).toBe(200);
+		const [replacement] = await sqlClient<Array<{ id: string }>>`
+			SELECT organization_id AS id FROM member WHERE user_id = ${identity.userId}
+		`;
+		assert(replacement);
+		ORGANIZATION_IDS.push(replacement.id);
+		expect(replacement.id).not.toBe(identity.userId);
 	});
 
 	test("preserves a candidate organization that gains another member before account deletion commits", async () => {
