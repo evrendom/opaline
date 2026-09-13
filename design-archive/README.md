@@ -5,14 +5,15 @@ public route, package workspace, or production build input.
 
 - `replications/`: completed website captures and interactive replicas from the
   former `__DO_NOT_MERGE__inspiration` collection, with their runtime assets.
-- `marketing/`: earlier marketing compositions, generated markup, styles,
-  browser interactions, and the reference assets those compositions used.
+- `reference-assets/`: the original images and fonts kept from the reference
+  replications, outside the app public folders.
 - `product-shells/`: the original experimental shell layouts, navigation
   components, styling, and routing source before the canonical shell was kept.
 
 Capture, scraping, extraction, materialization, annotation, and recording tools
-are intentionally omitted. JavaScript required to display or interact with an
-archived replica remains part of that replica.
+are intentionally omitted, as are intermediate generated markup/CSS variants
+and the retired mock-demo implementation. JavaScript required to display or
+interact with an archived replica remains part of that replica.
 
 These are historical snapshots, not supported runnable workspaces. Relative
 imports and root asset URLs describe their original environment; a future design
