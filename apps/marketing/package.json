@@ -16,13 +16,7 @@
 		"test:product-demo-parity": "bun test ../web/tools/product-demo-parity.test.ts",
 		"test:product-demo-explore": "bun test ../web/tools/product-demo-explore.test.ts",
 		"test:cli-onboarding": "bun test tests/cli-authorization.test.ts",
-		"astro": "astro",
-		"export:acme-fixtures": "node tools/export-acme-fixtures.mjs",
-		"capture:reference": "node tools/capture-matrix.mjs --url http://127.0.0.1:4180/lens-crm-lens-aperture --output ../../.context/reference-shots-v2",
-		"gates:g0": "node tests/g0-instrumentation.mjs",
-		"gate:terminal-windows": "OPALINE_TERMINAL_AUDIT_MODE=after node tools/audit-terminal-window-parity.mjs",
-		"test:runtime": "node tests/runtime-verification.mjs",
-		"test:visual": "node tests/visual-reference.mjs"
+		"astro": "astro"
 	},
 	"dependencies": {
 		"@astrojs/react": "6.0.3",

@@ -8,15 +8,7 @@ import {
 	useLocation,
 	useParams,
 } from "react-router-dom";
-import {
-	appRoutes,
-	getBottomRailPreviewPath,
-	getCenteredSidebarPreviewPath,
-	getFloatingRowPreviewPath,
-	getLeftSidebarPreviewPath,
-	getLeftSidebarThreadPreviewPath,
-	getOlivettiRailPreviewPath,
-} from "@/app/routes";
+import { appRoutes } from "@/app/routes";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { CliOnboardingPage } from "@/features/cli-onboarding/cli-onboarding-page";
@@ -25,13 +17,7 @@ import { SettingsPageSkeleton } from "@/features/settings/components/settings-pa
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
 import { SettingsIndexRedirect } from "@/features/settings/SettingsIndexRedirect";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
-import {
-	BottomRailAppShellLayout,
-	CenteredSidebarAppShellLayout,
-	FloatingRowAppShellLayout,
-	LeftSidebarAppShellLayout,
-	OlivettiRailAppShellLayout,
-} from "@/features/shell/AppShellLayout";
+import { LeftSidebarAppShellLayout } from "@/features/shell/AppShellLayout";
 import { shellRouteMap } from "@/features/shell/config/shell-routes";
 import { WorkspaceRoute } from "@/features/workspace/organization/workspace-route";
 
@@ -87,10 +73,6 @@ const TeamInviteAcceptPage = lazyNamed(
 	() => import("@/features/team/TeamInviteAcceptPage"),
 	"TeamInviteAcceptPage",
 );
-const PresetBaselinePage = lazyNamed(
-	() => import("@/app/system/PresetBaselinePage"),
-	"PresetBaselinePage",
-);
 const LEGACY_DASHBOARDY_PATH = "/dashboardy";
 const LEGACY_DASHBOARD_SESSIONS_PATH = "/dashboard/sessions";
 const LEGACY_SESSION_FULL_PATH = "/session/full";
@@ -114,92 +96,6 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 	settings: appRoutes.settings(),
 	settingsAccount: appRoutes.settingsAccount(),
 	settingsWorkspace: appRoutes.settingsWorkspace(),
-};
-
-const bottomRailShellRoutePaths: ShellRoutePaths = {
-	dashboard: getBottomRailPreviewPath(canonicalShellRoutePaths.dashboard),
-	session: getBottomRailPreviewPath(canonicalShellRoutePaths.session),
-	skills: getBottomRailPreviewPath(canonicalShellRoutePaths.skills),
-	team: getBottomRailPreviewPath(canonicalShellRoutePaths.team),
-	settings: getBottomRailPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getBottomRailPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getBottomRailPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
-};
-
-const centeredSidebarShellRoutePaths: ShellRoutePaths = {
-	dashboard: getCenteredSidebarPreviewPath(canonicalShellRoutePaths.dashboard),
-	session: getCenteredSidebarPreviewPath(canonicalShellRoutePaths.session),
-	skills: getCenteredSidebarPreviewPath(canonicalShellRoutePaths.skills),
-	team: getCenteredSidebarPreviewPath(canonicalShellRoutePaths.team),
-	settings: getCenteredSidebarPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getCenteredSidebarPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getCenteredSidebarPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
-};
-
-const olivettiRailShellRoutePaths: ShellRoutePaths = {
-	dashboard: getOlivettiRailPreviewPath(canonicalShellRoutePaths.dashboard),
-	session: getOlivettiRailPreviewPath(canonicalShellRoutePaths.session),
-	skills: getOlivettiRailPreviewPath(canonicalShellRoutePaths.skills),
-	team: getOlivettiRailPreviewPath(canonicalShellRoutePaths.team),
-	settings: getOlivettiRailPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getOlivettiRailPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getOlivettiRailPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
-};
-
-const floatingRowShellRoutePaths: ShellRoutePaths = {
-	dashboard: getFloatingRowPreviewPath(canonicalShellRoutePaths.dashboard),
-	session: getFloatingRowPreviewPath(canonicalShellRoutePaths.session),
-	skills: getFloatingRowPreviewPath(canonicalShellRoutePaths.skills),
-	team: getFloatingRowPreviewPath(canonicalShellRoutePaths.team),
-	settings: getFloatingRowPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getFloatingRowPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getFloatingRowPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
-};
-
-const leftSidebarShellRoutePaths: ShellRoutePaths = {
-	dashboard: getLeftSidebarPreviewPath(canonicalShellRoutePaths.dashboard),
-	session: getLeftSidebarPreviewPath(canonicalShellRoutePaths.session),
-	skills: getLeftSidebarPreviewPath(canonicalShellRoutePaths.skills),
-	team: getLeftSidebarPreviewPath(canonicalShellRoutePaths.team),
-	settings: getLeftSidebarPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getLeftSidebarPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getLeftSidebarPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
-};
-
-const leftSidebarThreadShellRoutePaths: ShellRoutePaths = {
-	dashboard: getLeftSidebarThreadPreviewPath(
-		canonicalShellRoutePaths.dashboard,
-	),
-	session: getLeftSidebarThreadPreviewPath(canonicalShellRoutePaths.session),
-	skills: getLeftSidebarThreadPreviewPath(canonicalShellRoutePaths.skills),
-	team: getLeftSidebarThreadPreviewPath(canonicalShellRoutePaths.team),
-	settings: getLeftSidebarThreadPreviewPath(canonicalShellRoutePaths.settings),
-	settingsAccount: getLeftSidebarThreadPreviewPath(
-		canonicalShellRoutePaths.settingsAccount,
-	),
-	settingsWorkspace: getLeftSidebarThreadPreviewPath(
-		canonicalShellRoutePaths.settingsWorkspace,
-	),
 };
 
 const workspaceShellRoutePaths: ShellRoutePaths = {
@@ -403,26 +299,6 @@ export function AppRouter({
 				path="/:workspaceSlug/join/:token"
 				element={<LazyRoute Component={TeamInviteAcceptPage} />}
 			/>
-			<Route
-				path="/__preset-baseline"
-				element={<LazyRoute Component={PresetBaselinePage} />}
-			/>
-			<Route element={<BottomRailAppShellLayout />}>
-				{getShellRouteElements(bottomRailShellRoutePaths)}
-			</Route>
-			<Route element={<CenteredSidebarAppShellLayout />}>
-				{getShellRouteElements(centeredSidebarShellRoutePaths)}
-			</Route>
-			<Route element={<OlivettiRailAppShellLayout />}>
-				{getShellRouteElements(olivettiRailShellRoutePaths)}
-			</Route>
-			<Route element={<FloatingRowAppShellLayout />}>
-				{getShellRouteElements(floatingRowShellRoutePaths)}
-			</Route>
-			<Route element={<LeftSidebarAppShellLayout />}>
-				{getShellRouteElements(leftSidebarShellRoutePaths)}
-				{getShellRouteElements(leftSidebarThreadShellRoutePaths)}
-			</Route>
 			<Route element={<LeftSidebarAppShellLayout />}>
 				{getShellRouteElements(canonicalShellRoutePaths, sessionComponent)}
 

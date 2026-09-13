@@ -1,3 +1,4 @@
+import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
@@ -6,6 +7,8 @@ import { useOrganization } from "./useOrganization";
 
 export function WorkspaceRoute({ children }: { children: ReactNode }) {
 	const { workspaceSlug } = useParams();
+	if (!workspaceSlug || !validateOrgSlug(workspaceSlug))
+		return <NotFoundPage />;
 	return (
 		<WorkspaceRouteContent key={workspaceSlug} slug={workspaceSlug}>
 			{children}

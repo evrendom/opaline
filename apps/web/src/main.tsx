@@ -42,7 +42,6 @@ function DevControls() {
 	const { pathname } = useLocation();
 	const isMobile = useIsMobile();
 	const isWrappedMobile = isMobile && pathname.startsWith("/wrapped");
-	const isOlivettiRail = pathname.startsWith("/olivetti-rail");
 
 	if (isWrappedMobile) {
 		return null;
@@ -50,7 +49,7 @@ function DevControls() {
 
 	return (
 		<>
-			<DialRoot defaultOpen={isOlivettiRail} position="bottom-right" />
+			<DialRoot position="bottom-right" />
 			{DevTools ? (
 				<Suspense fallback={null}>
 					<DevTools />

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { checkSiteArchive } from "./check-site-archive";
 
 const root = resolve(import.meta.dir, "..");
 const output = join(root, "dist-site");
@@ -36,4 +37,5 @@ async function externalize(directory: string): Promise<void> {
 	}
 }
 await externalize(output);
+await checkSiteArchive(output);
 console.log("Built marketing, live demo, and product into dist-site.");

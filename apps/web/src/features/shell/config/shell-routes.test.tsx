@@ -27,60 +27,6 @@ describe("getCurrentShellRoute", () => {
 		);
 	});
 
-	it("matches routes inside the bottom rail preview namespace", () => {
-		expect(getCurrentShellRoute("/dev/bottom-rail")).toBe(
-			shellRouteMap.dashboard,
-		);
-		expect(getCurrentShellRoute("/dev/bottom-rail/session/session-123")).toBe(
-			shellRouteMap.sessions,
-		);
-		expect(getCurrentShellRoute("/dev/bottom-rail/skills")).toBe(
-			shellRouteMap.skills,
-		);
-		expect(getCurrentShellRoute("/dev/bottom-rail/team")).toBe(
-			shellRouteMap.team,
-		);
-		expect(getCurrentShellRoute("/dev/bottom-rail/settings/account")).toBe(
-			shellRouteMap.settings,
-		);
-	});
-
-	it("matches routes inside the left sidebar preview namespace", () => {
-		expect(getCurrentShellRoute("/dev/left-sidebar")).toBe(
-			shellRouteMap.dashboard,
-		);
-		expect(getCurrentShellRoute("/dev/left-sidebar/session/session-123")).toBe(
-			shellRouteMap.sessions,
-		);
-		expect(getCurrentShellRoute("/dev/left-sidebar/skills")).toBe(
-			shellRouteMap.skills,
-		);
-		expect(getCurrentShellRoute("/dev/left-sidebar/team")).toBe(
-			shellRouteMap.team,
-		);
-		expect(getCurrentShellRoute("/dev/left-sidebar/settings/account")).toBe(
-			shellRouteMap.settings,
-		);
-	});
-
-	it("matches routes inside the left sidebar thread namespace", () => {
-		expect(getCurrentShellRoute("/dev/left-sidebar-thread")).toBe(
-			shellRouteMap.dashboard,
-		);
-		expect(
-			getCurrentShellRoute("/dev/left-sidebar-thread/session/session-123"),
-		).toBe(shellRouteMap.sessions);
-		expect(getCurrentShellRoute("/dev/left-sidebar-thread/skills")).toBe(
-			shellRouteMap.skills,
-		);
-		expect(getCurrentShellRoute("/dev/left-sidebar-thread/team")).toBe(
-			shellRouteMap.team,
-		);
-		expect(
-			getCurrentShellRoute("/dev/left-sidebar-thread/settings/account"),
-		).toBe(shellRouteMap.settings);
-	});
-
 	it("uses history as the sessions shortcut", () => {
 		expect(shellRouteMap.sessions.shortcut).toBe("H");
 	});

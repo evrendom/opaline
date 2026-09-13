@@ -699,69 +699,6 @@ body:has(.dashboard-01-preview)::after {
 	view-transition-name: shell-bottom-navigation;
 }
 
-.dashboard-01-bottom-rail {
-	--sidebar-row-height: 2.25rem;
-	--sidebar-row-gap: 0rem;
-	--sidebar-collapsed-row-padding-left: 0rem;
-	--sidebar-collapsed-row-padding-right: 0rem;
-	--sidebar-icon-lane-size: 2.25rem;
-	--sidebar-icon-size: 1rem;
-	--sidebar-avatar-size: 1.5rem;
-	--sidebar-row-idle-bg: transparent;
-	--sidebar-row-hover-bg: var(--dashboard-01-rail-hover);
-	--sidebar-row-active-bg: rgb(15 23 42 / 0.06);
-	--sidebar-row-fg: var(--dashboard-01-rail-icon);
-	--sidebar-row-active-fg: var(--dashboard-01-rail-icon-active);
-}
-
-.dark .dashboard-01-bottom-rail {
-	--sidebar-row-active-bg: rgb(255 255 255 / 0.1);
-}
-
-.dashboard-01-olivetti-rail {
-	--olivetti-rail-surface: rgb(
-		from var(--dashboard-01-chrome-surface) r g b /
-		1
-	);
-	--olivetti-rail-width: min(17.5rem, calc(100% - 0.75rem));
-	--olivetti-rail-dock-height: 2.75rem;
-	--olivetti-rail-bottom-offset: 0.25rem;
-	--olivetti-rail-shoulder-width: clamp(2.75rem, 13.392857%, 3.75rem);
-	--olivetti-rail-shoulder-overlap: 1rem;
-	--olivetti-rail-controls-inset: calc(
-		var(--olivetti-rail-shoulder-width) -
-		var(--olivetti-rail-shoulder-overlap)
-	);
-	--olivetti-rail-controls-top: -0.125rem;
-	--olivetti-rail-controls-height: 3rem;
-	/* Layer colors derived from the .dashboard-01-window box-shadow (and its
-	   .dark override), with opacities eased down for the rail's small
-	   surface. */
-	--olivetti-rail-cast-contact-color: rgb(17 24 39 / 0.06);
-	--olivetti-rail-cast-ambient-color: rgb(17 24 39 / 0.24);
-	--olivetti-rail-cast-ring-color: rgb(17 24 39 / 0.04);
-	/* Match the collapsed left-sidebar rows (sidebar-shell-debug rowActiveBg). */
-	--sidebar-row-active-bg: rgba(255, 255, 255, 0.72);
-	position: absolute;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	z-index: 40;
-	height: calc(
-		var(--olivetti-rail-dock-height) +
-		var(--olivetti-rail-bottom-offset) +
-		env(safe-area-inset-bottom)
-	);
-	pointer-events: none;
-}
-
-.dark .dashboard-01-olivetti-rail {
-	--olivetti-rail-cast-contact-color: transparent;
-	--olivetti-rail-cast-ambient-color: rgb(0 0 0 / 0.54);
-	--olivetti-rail-cast-ring-color: rgb(255 255 255 / 0.06);
-	--sidebar-row-active-bg: rgb(255 255 255 / 0.1);
-}
-
 /* Floating pill navigation: sizes and colors match the reference floating
    bottom row (44px pill, 40px item pitch, 18px icons, dark-slate glyphs on a
    light neutral capsule), while hover/active fills reuse the opaline trace
@@ -770,151 +707,19 @@ body:has(.dashboard-01-preview)::after {
    curvature at 36px reads as ~15px, items get a uniform 4px gap on every
    side, so the capsule corner radius is 15px + 4px = 19px on a 44px-tall
    surface. */
-.dashboard-01-floating-row {
-	--floating-row-radius: 1.1875rem;
-	--sidebar-row-height: 2.25rem;
-	--sidebar-row-gap: 0rem;
-	--sidebar-collapsed-row-padding-left: 0rem;
-	--sidebar-collapsed-row-padding-right: 0rem;
-	--sidebar-icon-lane-size: 2.25rem;
-	--sidebar-icon-size: 1.125rem;
-	--sidebar-avatar-size: 2.25rem;
-	--sidebar-row-idle-bg: transparent;
-	--sidebar-row-hover-bg: rgb(17 24 39 / 0.05);
-	--sidebar-row-active-bg: rgba(255, 255, 255, 0.9);
-	--sidebar-row-fg: #4b5158;
-	--sidebar-row-active-fg: var(--dashboard-01-rail-icon-active);
-}
-
-.dark .dashboard-01-floating-row {
-	--sidebar-row-hover-bg: rgb(255 255 255 / 0.06);
-	--sidebar-row-active-bg: rgb(255 255 255 / 0.1);
-	--sidebar-row-fg: var(--dashboard-01-rail-icon);
-}
-
-.dashboard-01-floating-row-surface {
-	background: #f2f3f4;
-	border: 1px solid rgb(17 24 39 / 0.06);
-	box-shadow:
-		0 1px 2px rgb(17 24 39 / 0.06),
-		0 12px 32px -20px rgb(17 24 39 / 0.28);
-}
-
-.dark .dashboard-01-floating-row-surface {
-	background: rgb(44 44 47 / 0.96);
-	border-color: rgb(255 255 255 / 0.1);
-	box-shadow:
-		0 1px 2px rgb(0 0 0 / 0.4),
-		0 12px 32px -20px rgb(0 0 0 / 0.6);
-}
 
 /* The account avatar fills its 36px lane and takes the opaline silhouette,
    concentric inside the 44px capsule like the nav items' trace fills. */
-.dashboard-01-floating-row [data-sidebar-user-icon-lane] > div {
-	border-radius: 0;
-	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-}
-
-.dashboard-01-floating-row [data-sidebar-user-icon-lane] img {
-	border-radius: 0;
-}
 
 /* Row states mirror the collapsed left-sidebar rows
    (.dashboard-01-chrome-sidebar [data-sidebar-row-mode="collapsed"]),
    with faster hover-in and pointer-down scale feedback on top. */
-.dashboard-01-olivetti-rail [data-sidebar-nav-row],
-.dashboard-01-floating-row [data-sidebar-nav-row] {
-	isolation: isolate;
-	border-radius: 0;
-	box-shadow: none;
-}
 
 /* Deepens the press scale from shellPressMotionClassName's 0.98; the 160ms
    release transition it defines stays, so the scale-back runs in the same
    window as the active fill's fade-in. */
-.dashboard-01-olivetti-rail [data-sidebar-nav-row]:active,
-.dashboard-01-floating-row [data-sidebar-nav-row]:active {
-	transform: scale(0.92);
-	transition-duration: 70ms;
-}
-
-.dashboard-01-olivetti-rail [data-sidebar-nav-row]::before,
-.dashboard-01-floating-row [data-sidebar-nav-row]::before {
-	position: absolute;
-	inset: 0;
-	z-index: -1;
-	background: var(--sidebar-row-hover-bg);
-	content: "";
-	opacity: 0;
-	transition:
-		background-color 160ms cubic-bezier(0.23, 1, 0.32, 1),
-		opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
-	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-}
-
-.dashboard-01-olivetti-rail [data-sidebar-nav-row]::after,
-.dashboard-01-floating-row [data-sidebar-nav-row]::after {
-	position: absolute;
-	inset: 0;
-	z-index: -1;
-	background: rgb(255 255 255 / 0.48);
-	content: "";
-	opacity: 0;
-	transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
-	-webkit-mask:
-		url("/opaline-trace-fill.svg") center / contain no-repeat,
-		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
-		no-repeat;
-	-webkit-mask-composite: xor;
-	mask:
-		url("/opaline-trace-fill.svg") center / contain no-repeat,
-		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
-		no-repeat;
-	mask-composite: exclude;
-}
 
 /* Near-instant hover-in; the 160ms base transition still eases hover-out. */
-.dashboard-01-olivetti-rail [data-sidebar-nav-row]:hover::before,
-.dashboard-01-floating-row [data-sidebar-nav-row]:hover::before,
-.dashboard-01-olivetti-rail [data-sidebar-nav-row]:active::before,
-.dashboard-01-floating-row [data-sidebar-nav-row]:active::before {
-	opacity: 1;
-	transition-duration: 40ms;
-}
-
-.dashboard-01-olivetti-rail [data-sidebar-nav-row][data-active="true"]::before,
-.dashboard-01-floating-row [data-sidebar-nav-row][data-active="true"]::before {
-	background: var(--sidebar-row-active-bg);
-	filter: drop-shadow(0 1px 2px rgb(17 24 39 / 0.08));
-	opacity: 1;
-}
-
-.dashboard-01-olivetti-rail [data-sidebar-nav-row][data-active="true"]::after,
-.dashboard-01-floating-row [data-sidebar-nav-row][data-active="true"]::after {
-	opacity: 1;
-}
-
-.dark
-	.dashboard-01-olivetti-rail
-	[data-sidebar-nav-row][data-active="true"]::before,
-.dark
-	.dashboard-01-floating-row
-	[data-sidebar-nav-row][data-active="true"]::before {
-	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.24));
-}
-
-.dark .dashboard-01-olivetti-rail [data-sidebar-nav-row]::after,
-.dark .dashboard-01-floating-row [data-sidebar-nav-row]::after {
-	background: rgb(255 255 255 / 0.08);
-}
-
-.dashboard-01-olivetti-rail [data-sidebar-nav-icon-lane],
-.dashboard-01-floating-row [data-sidebar-nav-icon-lane] {
-	position: relative;
-	z-index: 1;
-}
 
 .shell-dock-content {
 	opacity: 1;
@@ -944,18 +749,6 @@ body:has(.dashboard-01-preview)::after {
 @media (prefers-reduced-motion: reduce) {
 	.shell-dock-content {
 		transition: none;
-	}
-
-	.dashboard-01-olivetti-rail [data-sidebar-nav-row]::before,
-	.dashboard-01-floating-row [data-sidebar-nav-row]::before,
-	.dashboard-01-olivetti-rail [data-sidebar-nav-row]::after,
-	.dashboard-01-floating-row [data-sidebar-nav-row]::after {
-		transition: none;
-	}
-
-	.dashboard-01-olivetti-rail [data-sidebar-nav-row]:active,
-	.dashboard-01-floating-row [data-sidebar-nav-row]:active {
-		transform: none;
 	}
 
 	::view-transition-group(shell-bottom-navigation) {

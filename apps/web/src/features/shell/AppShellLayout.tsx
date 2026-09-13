@@ -11,10 +11,6 @@ import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import "./product-window-chrome.css";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
-import { BottomNavigation } from "@/features/shell/components/BottomNavigation";
-import { BottomRailNavigation } from "@/features/shell/components/BottomRailNavigation";
-import { FloatingRowNavigation } from "@/features/shell/components/FloatingRowNavigation";
-import { OlivettiRailNavigation } from "@/features/shell/components/OlivettiRailNavigation";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
 import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
 import { getDefaultSidebarShellTuningState } from "@/features/shell/config/sidebar-shell-debug";
@@ -103,52 +99,11 @@ function isEditableTarget(target: EventTarget | null) {
 	return editableContainer instanceof HTMLElement;
 }
 
-export function AppShellLayout() {
-	return <ShellLayout navigationVariant="floating-dock" />;
-}
-
-export function BottomRailAppShellLayout() {
-	return <ShellLayout navigationVariant="bottom-rail" />;
-}
-
-export function CenteredSidebarAppShellLayout() {
-	return <ShellLayout navigationVariant="centered-sidebar" />;
-}
-
-export function OlivettiRailAppShellLayout() {
-	return <ShellLayout navigationVariant="olivetti-rail" />;
-}
-
-export function FloatingRowAppShellLayout() {
-	return <ShellLayout navigationVariant="floating-row" />;
-}
-
 export function LeftSidebarAppShellLayout() {
-	return <ShellLayout navigationVariant="left-sidebar" />;
-}
-
-function ShellLayout({
-	navigationVariant,
-}: {
-	navigationVariant:
-		| "bottom-rail"
-		| "centered-sidebar"
-		| "floating-dock"
-		| "floating-row"
-		| "left-sidebar"
-		| "olivetti-rail";
-}) {
 	const navigate = useNavigate();
 	const demo = useDemoRuntime();
 	const location = useLocation();
 	const getShellRoutePath = useShellRoutePath();
-	const isBottomRailVariant = navigationVariant === "bottom-rail";
-	const isCenteredSidebarVariant = navigationVariant === "centered-sidebar";
-	const isFloatingDockVariant = navigationVariant === "floating-dock";
-	const isFloatingRowVariant = navigationVariant === "floating-row";
-	const isLeftSidebarVariant =
-		navigationVariant === "left-sidebar" || isCenteredSidebarVariant;
-	const isOlivettiRailVariant = navigationVariant === "olivetti-rail";
 	const canonicalPathname = getCanonicalAppPath(location.pathname);
 	const isWelcome = canonicalPathname === CLI_SETUP_PATH;
 	const [onboardingPanel, setOnboardingPanel] =
@@ -201,8 +156,6 @@ function ShellLayout({
 		React.useState<HTMLElement | null>(null);
 	const [newseshListHeaderPortal, setNewseshListHeaderPortal] =
 		React.useState<HTMLElement | null>(null);
-	const [shellBottomNavigationPortal, setShellBottomNavigationPortal] =
-		React.useState<HTMLElement | null>(null);
 
 	React.useEffect(() => {
 		const handleShellShortcutKeyDown = (event: KeyboardEvent) => {
@@ -245,27 +198,14 @@ function ShellLayout({
 				<SiteHeader
 					setNewseshListPortalHost={setNewseshListHeaderPortal}
 					setPortalHost={setShellHeaderPortal}
-					showWorkspaceMenu={isFloatingDockVariant}
+					showWorkspaceMenu={false}
 				/>
 			)}
 			<div
 				className={cn(
 					"flex min-h-0 flex-1 flex-col overscroll-none",
-					isSettingsWorkspaceRoute &&
-						isFloatingDockVariant &&
-						"pb-[calc(5rem+env(safe-area-inset-bottom))]",
-					isSettingsWorkspaceRoute &&
-						isFloatingRowVariant &&
-						"pb-[calc(4.75rem+env(safe-area-inset-bottom))]",
-					isFixedWorkspaceRoute
-						? "overflow-hidden"
-						: cn(
-								"overflow-auto",
-								isFloatingDockVariant &&
-									"pb-[calc(5rem+env(safe-area-inset-bottom))]",
-								isFloatingRowVariant &&
-									"pb-[calc(4.75rem+env(safe-area-inset-bottom))]",
-							),
+
+					isFixedWorkspaceRoute ? "overflow-hidden" : "overflow-auto",
 				)}
 			>
 				<div
@@ -285,9 +225,6 @@ function ShellLayout({
 					</div>
 				</div>
 			</div>
-			{isFloatingDockVariant ? (
-				<BottomNavigation setPortalHost={setShellBottomNavigationPortal} />
-			) : null}
 		</>
 	);
 
@@ -298,91 +235,42 @@ function ShellLayout({
 					<NewseshListHeaderPortalContext.Provider
 						value={newseshListHeaderPortal}
 					>
-						<ShellBottomNavigationPortalContext.Provider
-							value={shellBottomNavigationPortal}
-						>
-							{isLeftSidebarVariant ? (
+						<ShellBottomNavigationPortalContext.Provider value={null}>
+							<div
+								className={cn(
+									"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-foreground",
+									isWelcome && "cli-welcome-shell",
+									!demo && !isWelcome && "product-app-shell",
+								)}
+								data-cli-setup={
+									canonicalPathname === CLI_SETUP_PATH ? "" : undefined
+								}
+							>
+								{isWelcome ? (
+									<div className="cli-welcome-panel" ref={setOnboardingPanel} />
+								) : null}
 								<div
 									className={cn(
-										"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-foreground",
-										isWelcome && "cli-welcome-shell",
-										!demo && !isWelcome && "product-app-shell",
+										"h-full min-h-0",
+										isWelcome && "product-window-frame",
 									)}
-									data-cli-setup={
-										canonicalPathname === CLI_SETUP_PATH ? "" : undefined
-									}
+									inert={isWelcome || undefined}
 								>
-									{isWelcome ? (
-										<div
-											className="cli-welcome-panel"
-											ref={setOnboardingPanel}
-										/>
-									) : null}
-									<div
-										className={cn(
-											"h-full min-h-0",
-											isWelcome && "product-window-frame",
-										)}
-										inert={isWelcome || undefined}
+									<SidebarProvider
+										defaultOpen={false}
+										open={false}
+										className="dashboard-01-chrome-frame h-full overflow-hidden overscroll-none"
+										style={leftSidebarChromeStyle}
 									>
-										<SidebarProvider
-											defaultOpen={false}
-											open={false}
-											className="dashboard-01-chrome-frame h-full overflow-hidden overscroll-none"
-											style={leftSidebarChromeStyle}
-										>
-											<div className="contents" inert={isWelcome || undefined}>
-												<AppSidebar
-													layout={
-														isCenteredSidebarVariant ? "centered" : "standard"
-													}
-												/>
-											</div>
-											<SidebarInset className="dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] md:m-(--dashboard-01-window-inset) md:ml-0 md:rounded-(--dashboard-01-window-radius) md:shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)]">
-												{shellWindowContent}
-											</SidebarInset>
-										</SidebarProvider>
-									</div>
-								</div>
-							) : (
-								<div
-									className={cn(
-										"dashboard-01-preview dashboard-01-chrome-frame isolate h-dvh overflow-hidden overscroll-none text-foreground antialiased",
-										isOlivettiRailVariant && "!shadow-none",
-										isBottomRailVariant || isOlivettiRailVariant
-											? "p-0"
-											: "p-0 sm:p-(--dashboard-01-window-inset)",
-									)}
-									style={defaultChromeStyle}
-								>
-									{isBottomRailVariant ? (
-										<div className="relative flex h-full min-h-0 flex-col overflow-hidden overscroll-none">
-											<div className="dashboard-01-window relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] sm:mx-(--dashboard-01-window-inset) sm:mt-(--dashboard-01-window-inset) sm:rounded-(--dashboard-01-window-radius) sm:shadow-[var(--dashboard-01-window-shadow)] dark:shadow-none">
-												{shellWindowContent}
-											</div>
-											<BottomRailNavigation />
+										<div className="contents" inert={isWelcome || undefined}>
+											<AppSidebar />
 										</div>
-									) : isOlivettiRailVariant ? (
-										<div className="relative flex h-full min-h-0 flex-col overflow-hidden overscroll-none">
-											<div className="dashboard-01-window relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] !shadow-none">
-												{shellWindowContent}
-											</div>
-											<OlivettiRailNavigation />
-										</div>
-									) : isFloatingRowVariant ? (
-										<div className="relative flex h-full min-h-0 flex-col overflow-hidden overscroll-none">
-											<div className="dashboard-01-window relative flex min-h-0 flex-1 flex-col overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] sm:rounded-(--dashboard-01-window-radius) sm:shadow-[var(--dashboard-01-window-shadow)] dark:shadow-none">
-												{shellWindowContent}
-											</div>
-											<FloatingRowNavigation />
-										</div>
-									) : (
-										<div className="dashboard-01-window relative flex h-full min-h-0 flex-col overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] sm:rounded-(--dashboard-01-window-radius) sm:shadow-[var(--dashboard-01-window-shadow)] dark:shadow-none">
+										<SidebarInset className="dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] md:m-(--dashboard-01-window-inset) md:ml-0 md:rounded-(--dashboard-01-window-radius) md:shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)]">
 											{shellWindowContent}
-										</div>
-									)}
+										</SidebarInset>
+									</SidebarProvider>
 								</div>
-							)}
+							</div>
 						</ShellBottomNavigationPortalContext.Provider>
 					</NewseshListHeaderPortalContext.Provider>
 				</ShellHeaderPortalContext.Provider>

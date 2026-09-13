@@ -21,33 +21,9 @@ vi.mock("@/features/invitations/AcceptInvitationPage", () => ({
 }));
 
 vi.mock("@/features/shell/AppShellLayout", () => ({
-	BottomRailAppShellLayout: () => (
-		<div>
-			Bottom rail shell
-			<Outlet />
-		</div>
-	),
-	CenteredSidebarAppShellLayout: () => (
-		<div>
-			Centered sidebar shell
-			<Outlet />
-		</div>
-	),
-	FloatingRowAppShellLayout: () => (
-		<div>
-			Floating row shell
-			<Outlet />
-		</div>
-	),
 	LeftSidebarAppShellLayout: () => (
 		<div>
 			Left sidebar shell
-			<Outlet />
-		</div>
-	),
-	OlivettiRailAppShellLayout: () => (
-		<div>
-			Olivetti rail shell
 			<Outlet />
 		</div>
 	),
@@ -146,49 +122,28 @@ describe("AppRouter", () => {
 	});
 
 	it.each([
-		["/dev/left-sidebar-thread", "Dashboard page"],
-		["/dev/left-sidebar-thread/session", "Sessions page"],
-		["/dev/left-sidebar-thread/session/session-123", "Sessions page"],
-	])("keeps the surviving %s compatibility route", async (path, pageContent) => {
+		"/__preset-baseline",
+		"/dev/bottom-rail",
+		"/dev/bottom-rail/session",
+		"/centered-sidebar",
+		"/centered-sidebar/session",
+		"/olivetti-rail",
+		"/olivetti-rail/team",
+		"/floating-row",
+		"/floating-row/settings",
+		"/dev/left-sidebar",
+		"/dev/left-sidebar/session",
+		"/dev/left-sidebar-thread",
+		"/dev/left-sidebar-thread/session",
+	])("does not expose archived shell %s", async (path) => {
 		render(
 			<MemoryRouter initialEntries={[path]}>
 				<AppRouter rootRedirectTarget={null} />
 			</MemoryRouter>,
 		);
-
-		await waitFor(() => {
-			expect(screen.getByText("Left sidebar shell")).toBeInTheDocument();
-			expect(screen.getByText(pageContent)).toBeInTheDocument();
-		});
-	});
-
-	it("keeps the bottom rail shell preview independent", async () => {
-		render(
-			<MemoryRouter initialEntries={["/dev/bottom-rail"]}>
-				<AppRouter rootRedirectTarget={null} />
-			</MemoryRouter>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByText("Bottom rail shell")).toBeInTheDocument();
-			expect(screen.getByText("Dashboard page")).toBeInTheDocument();
-		});
-	});
-
-	it.each([
-		["/centered-sidebar", "Dashboard page"],
-		["/centered-sidebar/session", "Sessions page"],
-		["/centered-sidebar/skills", "Historical skills page"],
-	])("routes %s through the centered sidebar shell", async (path, pageContent) => {
-		render(
-			<MemoryRouter initialEntries={[path]}>
-				<AppRouter rootRedirectTarget={null} />
-			</MemoryRouter>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByText("Centered sidebar shell")).toBeInTheDocument();
-			expect(screen.getByText(pageContent)).toBeInTheDocument();
-		});
+		expect(
+			await screen.findByRole("heading", { name: "Page not found" }),
+		).toBeInTheDocument();
+		expect(screen.queryByText("Left sidebar shell")).not.toBeInTheDocument();
 	});
 });

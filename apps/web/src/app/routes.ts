@@ -17,13 +17,6 @@ const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
 const SETTINGS_INVITATIONS_PATH = `${SETTINGS_ROOT_PATH}/invitations`;
 const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
 const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
-const PRESET_BASELINE_PATH = "/__preset-baseline";
-const DEV_BOTTOM_RAIL_PATH = "/dev/bottom-rail";
-const CENTERED_SIDEBAR_PATH = "/centered-sidebar";
-const OLIVETTI_RAIL_PATH = "/olivetti-rail";
-const FLOATING_ROW_PATH = "/floating-row";
-const DEV_LEFT_SIDEBAR_PATH = "/dev/left-sidebar";
-const DEV_LEFT_SIDEBAR_THREAD_PATH = "/dev/left-sidebar-thread";
 const WRAPPED_TEAM_CARD_PATH = "/wrapped";
 const DEV_WRAPPED_PATH = "/dev/wrapped";
 const WRAPPED_RESUME_PATH = "/resume";
@@ -75,13 +68,6 @@ export const appRoutes = {
 			: `${TEAM_INVITE_PATH}/${encodeURIComponent(token)}`,
 	settings: () => SETTINGS_ROOT_PATH,
 	settingsRoot: () => SETTINGS_ROOT_PATH,
-	presetBaseline: () => PRESET_BASELINE_PATH,
-	devBottomRail: () => DEV_BOTTOM_RAIL_PATH,
-	centeredSidebar: () => CENTERED_SIDEBAR_PATH,
-	olivettiRail: () => OLIVETTI_RAIL_PATH,
-	floatingRow: () => FLOATING_ROW_PATH,
-	devLeftSidebar: () => DEV_LEFT_SIDEBAR_PATH,
-	devLeftSidebarThread: () => DEV_LEFT_SIDEBAR_THREAD_PATH,
 	wrappedTeamCard: () => WRAPPED_TEAM_CARD_PATH,
 	wrappedTeamCardShare: () => getWrappedTeamCardSharePath(),
 	wrappedCardProfile: (search?: string) => getWrappedCardProfilePath(search),
@@ -138,54 +124,6 @@ export function isNewSessionPath(pathname: string) {
 	);
 }
 
-export function getBottomRailPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return DEV_BOTTOM_RAIL_PATH;
-	}
-
-	return `${DEV_BOTTOM_RAIL_PATH}${canonicalPath}`;
-}
-
-export function getCenteredSidebarPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return CENTERED_SIDEBAR_PATH;
-	}
-
-	return `${CENTERED_SIDEBAR_PATH}${canonicalPath}`;
-}
-
-export function getOlivettiRailPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return OLIVETTI_RAIL_PATH;
-	}
-
-	return `${OLIVETTI_RAIL_PATH}${canonicalPath}`;
-}
-
-export function getFloatingRowPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return FLOATING_ROW_PATH;
-	}
-
-	return `${FLOATING_ROW_PATH}${canonicalPath}`;
-}
-
-export function getLeftSidebarPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return DEV_LEFT_SIDEBAR_PATH;
-	}
-
-	return `${DEV_LEFT_SIDEBAR_PATH}${canonicalPath}`;
-}
-
-export function getLeftSidebarThreadPreviewPath(canonicalPath: string) {
-	if (canonicalPath === HOME_PATH) {
-		return DEV_LEFT_SIDEBAR_THREAD_PATH;
-	}
-
-	return `${DEV_LEFT_SIDEBAR_THREAD_PATH}${canonicalPath}`;
-}
-
 export function getCanonicalAppPath(pathname: string) {
 	const workspaceSlug = getWorkspaceSlugFromPath(pathname);
 	if (workspaceSlug) {
@@ -196,66 +134,12 @@ export function getCanonicalAppPath(pathname: string) {
 			return SESSION_PATH + suffix.slice("/sessions".length);
 		return suffix;
 	}
-	if (pathname === DEV_BOTTOM_RAIL_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${DEV_BOTTOM_RAIL_PATH}/`)) {
-		return pathname.slice(DEV_BOTTOM_RAIL_PATH.length);
-	}
-
-	if (pathname === CENTERED_SIDEBAR_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${CENTERED_SIDEBAR_PATH}/`)) {
-		return pathname.slice(CENTERED_SIDEBAR_PATH.length);
-	}
-
-	if (pathname === OLIVETTI_RAIL_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${OLIVETTI_RAIL_PATH}/`)) {
-		return pathname.slice(OLIVETTI_RAIL_PATH.length);
-	}
-
-	if (pathname === FLOATING_ROW_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${FLOATING_ROW_PATH}/`)) {
-		return pathname.slice(FLOATING_ROW_PATH.length);
-	}
-
-	if (pathname === DEV_LEFT_SIDEBAR_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${DEV_LEFT_SIDEBAR_PATH}/`)) {
-		return pathname.slice(DEV_LEFT_SIDEBAR_PATH.length);
-	}
-
-	if (pathname === DEV_LEFT_SIDEBAR_THREAD_PATH) {
-		return HOME_PATH;
-	}
-
-	if (pathname.startsWith(`${DEV_LEFT_SIDEBAR_THREAD_PATH}/`)) {
-		return pathname.slice(DEV_LEFT_SIDEBAR_THREAD_PATH.length);
-	}
 
 	return pathname;
 }
 
-export function isBottomRailPreviewPath(pathname: string) {
-	return (
-		pathname === DEV_BOTTOM_RAIL_PATH ||
-		pathname.startsWith(`${DEV_BOTTOM_RAIL_PATH}/`)
-	);
-}
-
 // Route definitions use workspace-independent paths; navigation resolves them
-// through this helper (or useShellRoutePath for shell previews and the demo).
+// through this helper (or useShellRoutePath for the demo).
 export function getWorkspaceAppPath(
 	workspaceSlug: string,
 	path: string,
@@ -306,41 +190,6 @@ export function getWorkspaceRelativePath(path: string): string | null {
 	if (pathname === TEAM_PATH || pathname === `${TEAM_PATH}/`) return path;
 	if (/^\/(?:settings|skills|newsesh)(?:\/|$)/u.test(pathname)) return path;
 	return null;
-}
-
-export function isCenteredSidebarPreviewPath(pathname: string) {
-	return (
-		pathname === CENTERED_SIDEBAR_PATH ||
-		pathname.startsWith(`${CENTERED_SIDEBAR_PATH}/`)
-	);
-}
-
-export function isOlivettiRailPreviewPath(pathname: string) {
-	return (
-		pathname === OLIVETTI_RAIL_PATH ||
-		pathname.startsWith(`${OLIVETTI_RAIL_PATH}/`)
-	);
-}
-
-export function isFloatingRowPreviewPath(pathname: string) {
-	return (
-		pathname === FLOATING_ROW_PATH ||
-		pathname.startsWith(`${FLOATING_ROW_PATH}/`)
-	);
-}
-
-export function isLeftSidebarPreviewPath(pathname: string) {
-	return (
-		pathname === DEV_LEFT_SIDEBAR_PATH ||
-		pathname.startsWith(`${DEV_LEFT_SIDEBAR_PATH}/`)
-	);
-}
-
-export function isLeftSidebarThreadPreviewPath(pathname: string) {
-	return (
-		pathname === DEV_LEFT_SIDEBAR_THREAD_PATH ||
-		pathname.startsWith(`${DEV_LEFT_SIDEBAR_THREAD_PATH}/`)
-	);
 }
 
 function getWrappedTeamCardFromSharePath(
