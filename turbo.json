@@ -33,5 +33,6 @@
 				"SESSION_LINEAGE_RECONCILE_BATCH_SIZE"
 			]
 		}
-	}
+	},
+	"globalDependencies": ["vercel.json"]
 }
