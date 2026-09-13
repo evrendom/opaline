@@ -339,6 +339,26 @@ describe("usage-event analytics ClickHouse rollups", () => {
 		const metadataUrlLengths: number[] = [];
 		try {
 			await ingestRudelSessionAnalytics(executor, pageRows, { validate: true });
+			await ingestRudelUsageEvents(
+				executor,
+				pageRows.flatMap((row, index) => [
+					buildEventRow(row.session_id, "1", {
+						organization_id: pageOrganizationId,
+						source: row.source,
+					}),
+					{
+						...buildReceiptRow(
+							row.session_id,
+							"1",
+							1,
+							true,
+							index % 2 === 0 ? "claude_code" : "codex",
+						),
+						organization_id: pageOrganizationId,
+					},
+				]),
+				{ validate: true },
+			);
 			await insertSessionLanguageSignalRows(executor, signalRows);
 			process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
 			// Observe actual requests to real ClickHouse; no responses are mocked.
@@ -386,6 +406,11 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			if (previousMode === undefined)
 				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
 			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+			await executor.execute({
+				query:
+					"DELETE FROM rudel.usage_events WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3",
+				query_params: { orgId: pageOrganizationId },
+			});
 			await executor.execute({
 				query:
 					"DELETE FROM rudel.session_language_signals WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3",
