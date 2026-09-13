@@ -7,7 +7,9 @@ import {
 	getSessionTurnMemberText,
 	getSessionTurnPreview,
 	getSessionTurnTiming,
+	getTranscriptToolFileActivities,
 	groupTraceIntoTurns,
+	isCodexToolInput,
 	parseConversations,
 	parseSlashCommand,
 	resolveRepoIdentity,
@@ -38,6 +40,7 @@ import {
 	sumSessionRequestCosts,
 	type TokenUsageEvent,
 	type TraceItem,
+	translateCodexToolCall,
 } from "@rudel/api-routes";
 import {
 	SCAN_VERSION,
@@ -294,7 +297,11 @@ function collectTurnActivityEvents(turn: SessionTurn) {
 				continue;
 			}
 
-			for (const file of getToolFileActivities(event.toolName, event.input)) {
+			for (const file of getToolFileActivities(
+				event.toolName,
+				event.input,
+				event.provider,
+			)) {
 				const eventKey = `${event.id}\0${file.operation}\0${file.path}`;
 				if (fileEventKeys.has(eventKey)) {
 					continue;
@@ -564,77 +571,35 @@ function unique(values: readonly string[]) {
 	return [...new Set(values)];
 }
 
-function getToolInputString(
-	input: Readonly<Record<string, unknown>>,
-	keys: readonly string[],
-) {
-	for (const key of keys) {
-		const value = input[key];
-		if (typeof value === "string" && value.trim()) {
-			return value.trim();
-		}
-	}
-	return undefined;
-}
-
-function getApplyPatchFiles(
-	input: Readonly<Record<string, unknown>>,
-): SessionDetailContextFile[] {
-	const patch = getToolInputString(input, ["input", "patch", "arguments"]);
-	if (!patch) {
-		return [];
-	}
-
-	return Array.from(
-		patch.matchAll(/^\*\*\* (Add|Delete|Update) File: (.+)$/gmu),
-	).flatMap((match) => {
-		const directive = match[1];
-		const path = match[2]?.trim();
-		if (!path) {
-			return [];
-		}
-		return [
-			{
-				operation: directive === "Add" ? "created" : "edited",
-				path,
-			},
-		];
-	});
-}
-
 function getToolFileActivities(
 	toolName: string,
 	input: Readonly<Record<string, unknown>>,
+	provider: "claude" | "codex" | undefined,
 ): SessionDetailContextFile[] {
-	const normalizedName = toolName.split(".").at(-1)?.toLowerCase();
-	if (normalizedName === "apply_patch") {
-		return getApplyPatchFiles(input);
-	}
+	return getTranscriptToolFileActivities(toolName, input, provider).flatMap(
+		(file) =>
+			file.operation === "viewed"
+				? []
+				: [
+						{
+							operation:
+								file.operation === "deleted" ? "edited" : file.operation,
+							path: file.path,
+						},
+					],
+	);
+}
 
-	const path = getToolInputString(input, [
-		"file_path",
-		"notebook_path",
-		"path",
-	]);
-	if (!path) {
-		return [];
+function getToolErrorLabel(
+	toolName: string,
+	input: Readonly<Record<string, unknown>>,
+	provider: "claude" | "codex" | undefined,
+) {
+	if (provider !== "codex" || !isCodexToolInput(input, provider)) {
+		return toolName;
 	}
-
-	if (normalizedName === "read" || normalizedName === "view_image") {
-		return [{ operation: "read", path }];
-	}
-	if (normalizedName === "write") {
-		return [{ operation: "created", path }];
-	}
-	if (
-		normalizedName === "edit" ||
-		normalizedName === "multiedit" ||
-		normalizedName === "notebookedit"
-	) {
-		return [{ operation: "edited", path }];
-	}
-
-	return [];
+	const translation = translateCodexToolCall(toolName, input);
+	return translation.mapped ? translation.verb : "Tool";
 }
 
 function collectSessionDetailContext(
@@ -672,10 +637,16 @@ function collectSessionDetailContext(
 		for (const event of item.events) {
 			if (event.kind === "tool") {
 				if (event.result?.isError === true) {
-					addError(event.toolName);
+					addError(
+						getToolErrorLabel(event.toolName, event.input, event.provider),
+					);
 					continue;
 				}
-				for (const file of getToolFileActivities(event.toolName, event.input)) {
+				for (const file of getToolFileActivities(
+					event.toolName,
+					event.input,
+					event.provider,
+				)) {
 					addFile(file);
 				}
 				continue;
@@ -781,6 +752,16 @@ export function deriveSessionDetail(
 		packageName: snapshot.packageName || null,
 		projectPath: snapshot.projectPath,
 	}).repoLabel;
+	let modelUsed = snapshot.modelUsed;
+	if (!modelUsed) {
+		// The analytics join can be absent for this raw revision. Recover the
+		// identity from primary request usage without borrowing a subagent model.
+		for (const metrics of primaryTurnMetrics) {
+			for (const event of metrics.usageEvents) {
+				if (event.model) modelUsed = event.model;
+			}
+		}
+	}
 	const overviewBase: Omit<SessionDetailOverview, "turnPage"> = {
 		activityTotals: buildSessionDetailActivityTotals(turnSummaries),
 		context: collectSessionDetailContext(trace, turnMetrics),
@@ -797,7 +778,7 @@ export function deriveSessionDetail(
 			gitSha: snapshot.gitSha,
 			inputTokens: snapshot.inputTokens,
 			lastInteractionDate: snapshot.lastInteractionDate,
-			modelUsed: snapshot.modelUsed || null,
+			modelUsed: modelUsed || null,
 			outputTokens: snapshot.outputTokens,
 			projectPath: snapshot.projectPath,
 			repository: repository || null,

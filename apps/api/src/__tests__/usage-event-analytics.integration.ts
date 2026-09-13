@@ -563,6 +563,8 @@ function buildSessionAnalyticsRow(sessionId: string): RudelSessionAnalyticsRow {
 			sessionId === longContextSessionId || sessionId === openAiFastSessionId
 				? "codex"
 				: "claude_code",
+		subagent_count: 0,
+		native_subagents: [],
 		subagent_types: [],
 		success_score: 80,
 		tag: null,

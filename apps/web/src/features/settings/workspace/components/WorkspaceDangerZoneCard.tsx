@@ -1,17 +1,16 @@
-import { AlertTriangleIcon } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { Button } from "@/app/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
 import { DeleteWorkspaceDialog } from "@/features/settings/workspace/components/DeleteWorkspaceDialog";
+import {
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
-import { refreshAuthClientState } from "@/lib/auth-client";
+import { authClient, refreshAuthClientState } from "@/lib/auth-client";
+import { queryClient } from "@/lib/query-client";
 
 export function WorkspaceDangerZoneCard({
 	canManage,
@@ -20,45 +19,58 @@ export function WorkspaceDangerZoneCard({
 	canManage: boolean;
 	organization: { id: string; name: string };
 }) {
-	const { state, actions } = useOrganization();
+	const navigate = useNavigate();
+	const { state } = useOrganization();
+	const { refetch: refetchOrganizations } = authClient.useListOrganizations();
 	const [open, setOpen] = useState(false);
 
 	const handleDeleted = async () => {
 		const nextOrg = state.organizations.find((o) => o.id !== organization.id);
+		// Refresh membership before visiting the unscoped entry point. Otherwise
+		// its redirect can briefly resolve to the workspace we just deleted.
+		await refetchOrganizations();
 		if (nextOrg) {
-			await actions.switchOrganization(nextOrg.id);
+			await authClient.organization.setActive({ organizationId: nextOrg.id });
+		} else {
+			await authClient.organization.setActive({ organizationId: null });
 		}
+		await queryClient.cancelQueries();
+		queryClient.clear();
 		refreshAuthClientState();
+		navigate(
+			nextOrg
+				? getWorkspaceAppPath(nextOrg.slug, appRoutes.settingsWorkspace())
+				: appRoutes.settingsWorkspace(),
+			{ replace: true },
+		);
 		setOpen(false);
 		toast.success(`Workspace "${organization.name}" deleted`);
 	};
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<CardTitle className="text-destructive">Delete workspace</CardTitle>
-				<CardDescription>
-					Permanently delete this workspace and remove access for every member.
-					Session data is removed too. This cannot be undone.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<Button
-					type="button"
-					variant="destructive"
-					onClick={() => setOpen(true)}
-					disabled={!canManage}
+		<>
+			<WorkspaceSettingsGroup title="Danger zone">
+				<WorkspaceSettingsRow
+					label="Delete workspace"
+					description="Permanently delete this workspace and its session data for every member. This cannot be undone."
 				>
-					<AlertTriangleIcon data-icon="inline-start" />
-					Delete workspace
-				</Button>
-			</CardContent>
+					<Button
+						type="button"
+						variant="destructive"
+						size="sm"
+						onClick={() => setOpen(true)}
+						disabled={!canManage}
+					>
+						Delete workspace
+					</Button>
+				</WorkspaceSettingsRow>
+			</WorkspaceSettingsGroup>
 			<DeleteWorkspaceDialog
 				open={open}
 				onOpenChange={setOpen}
 				organization={organization}
 				onDeleted={handleDeleted}
 			/>
-		</Card>
+		</>
 	);
 }

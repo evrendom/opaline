@@ -1,5 +1,9 @@
 import type { ErrorMap } from "@orpc/contract";
 import { z } from "zod";
+import {
+	type TranscriptToolActivity,
+	TranscriptToolActivitySchema,
+} from "../session-transcript/transcript-tool-activity.js";
 import { SourceSchema } from "./source.js";
 
 const MAX_SESSION_ID_LENGTH = 512;
@@ -18,6 +22,7 @@ export const SESSION_DETAIL_WINDOW_PAGE_TURNS = 200;
 export const SESSION_DETAIL_WINDOW_MAX_RAW_BYTES = 3_500_000;
 export const SESSION_DETAIL_WINDOW_MAX_TURN_BYTES =
 	SESSION_DETAIL_BODY_MAX_RAW_BYTES;
+export const SESSION_DETAIL_BODY_CHUNK_CODE_UNITS = 256 * 1024;
 export const SESSION_DETAIL_ACTIVITY_POINT_LIMIT = 512;
 export const SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT = 4_096;
 export const SESSION_DETAIL_CONTEXT_ERROR_LIMIT = 64;
@@ -32,10 +37,9 @@ export const SESSION_DETAIL_ANCHOR_NOT_FOUND_MESSAGE =
 	"The requested turn does not exist in this session revision.";
 
 const MAX_UINT64_DECIMAL = "18446744073709551615";
-
-export const SessionDetailRevisionSchema = z
+const DecimalSessionDetailRevisionSchema = z
 	.string()
-	.regex(/^(?:0|[1-9]\d*)$/u, "Revision must be a canonical decimal UInt64")
+	.regex(/^(?:0|[1-9]\d*)$/u)
 	.refine(
 		(value) =>
 			value.length < MAX_UINT64_DECIMAL.length ||
@@ -43,6 +47,13 @@ export const SessionDetailRevisionSchema = z
 				value <= MAX_UINT64_DECIMAL),
 		"Revision must fit in UInt64",
 	);
+
+// The deployed API uses ingestion revisions; older API builds use timestamps.
+// Preserve either opaque identity exactly when requesting subsequent pages.
+export const SessionDetailRevisionSchema = z.union([
+	DecimalSessionDetailRevisionSchema,
+	z.string().datetime({ offset: true }),
+]);
 export const SessionDetailWindowCursorSchema = z
 	.string()
 	.min(1)
@@ -117,6 +128,28 @@ export const SessionDetailSubagentInputSchema =
 	SessionDetailRevisionInputSchema.extend({
 		subagentId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
 	}).strict();
+
+export const SessionDetailBodyChunkInputSchema =
+	SessionDetailRevisionInputSchema.extend({
+		kind: z.enum(["turn", "subagent"]),
+		targetId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
+		offset: z.number().int().nonnegative().safe().default(0),
+	}).strict();
+
+export const SessionDetailBodyChunkSchema =
+	SessionDetailBodyChunkInputSchema.extend({
+		offset: z.number().int().nonnegative().safe(),
+		data: z.string().min(1).max(SESSION_DETAIL_BODY_CHUNK_CODE_UNITS),
+		sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+		totalCodeUnits: z.number().int().positive().safe(),
+	}).strict();
+
+export type SessionDetailBodyChunkInput = z.infer<
+	typeof SessionDetailBodyChunkInputSchema
+>;
+export type SessionDetailBodyChunk = z.infer<
+	typeof SessionDetailBodyChunkSchema
+>;
 
 export const SessionDetailStaleRevisionDataSchema = z
 	.object({
@@ -382,6 +415,111 @@ type SessionDetailJsonValue =
 	| readonly SessionDetailJsonValue[]
 	| { readonly [key: string]: SessionDetailJsonValue };
 
+type SessionDetailTextContent = {
+	rawType?: string;
+	text: string;
+	type: "text";
+};
+
+type SessionDetailResultBlock =
+	| SessionDetailTextContent
+	| {
+			rawType?: string;
+			source: SessionDetailJsonValue;
+			type: "image";
+	  }
+	| {
+			rawType?: string;
+			type: "structured";
+			value: SessionDetailJsonValue;
+	  };
+
+type SessionDetailTraceToolResult = {
+	batch?: { id: string; toolIds: string[] };
+	content: string | SessionDetailResultBlock[];
+	isError: boolean;
+	subagentId?: string;
+};
+
+type SessionDetailToolResultContent = {
+	batch?: { id: string; toolIds: string[] };
+	content: string | SessionDetailResultBlock[];
+	is_error?: boolean;
+	tool_use_id: string;
+	type: "tool_result";
+};
+
+type SessionDetailTraceEvent =
+	| {
+			id: string;
+			kind: "reasoning";
+			provider?: "claude" | "codex";
+			text: string;
+			timestamp: string;
+	  }
+	| {
+			content: string | SessionDetailTextContent[];
+			id: string;
+			kind: "message";
+			provider?: "claude" | "codex";
+			text: string;
+			timestamp: string;
+	  }
+	| {
+			id: string;
+			input: Record<string, SessionDetailJsonValue>;
+			kind: "tool";
+			activity?: TranscriptToolActivity;
+			provider?: "claude" | "codex";
+			result?: SessionDetailTraceToolResult;
+			skillContent?: { baseDirectory: string; content: string };
+			timestamp: string;
+			toolName: string;
+	  }
+	| {
+			id: string;
+			kind: "orphan-result";
+			result: SessionDetailTraceToolResult;
+			timestamp: string;
+	  };
+
+export type SessionDetailTraceItem =
+	| {
+			content:
+				| string
+				| (
+						| string
+						| SessionDetailTextContent
+						| SessionDetailToolResultContent
+				  )[];
+			id: string;
+			kind: "user";
+			timestamp: string;
+	  }
+	| {
+			agentName?: string;
+			events: SessionDetailTraceEvent[];
+			executionMode: "default" | "plan" | "unknown";
+			id: string;
+			kind: "agent";
+			modelSetting?: string;
+			provider?: "claude" | "codex";
+			timestamp: string;
+	  }
+	| {
+			id: string;
+			kind: "system";
+			systemType: "context" | "interruption" | "notification" | "system";
+			text: string;
+			timestamp: string;
+	  }
+	| {
+			id: string;
+			kind: "summary";
+			text: string;
+			timestamp?: undefined;
+	  };
+
 const SessionDetailJsonValueSchema: z.ZodType<SessionDetailJsonValue> = z.lazy(
 	() =>
 		z.union([
@@ -396,6 +534,7 @@ const SessionDetailJsonValueSchema: z.ZodType<SessionDetailJsonValue> = z.lazy(
 
 const SessionDetailTextContentSchema = z
 	.object({
+		rawType: z.string().optional(),
 		text: z.string(),
 		type: z.literal("text"),
 	})
@@ -403,10 +542,21 @@ const SessionDetailTextContentSchema = z
 
 const SessionDetailImageContentSchema = z
 	.object({
+		rawType: z.string().optional(),
 		source: SessionDetailJsonValueSchema,
 		type: z.literal("image"),
 	})
 	.strict();
+
+const SessionDetailStructuredContentSchema = z
+	.object({
+		rawType: z.string().optional(),
+		type: z.literal("structured"),
+		value: SessionDetailJsonValueSchema,
+	})
+	.strict();
+
+const SessionDetailProviderSchema = z.enum(["claude", "codex"]);
 
 const SessionDetailTraceToolResultSchema = z
 	.object({
@@ -416,10 +566,15 @@ const SessionDetailTraceToolResultSchema = z
 				z.discriminatedUnion("type", [
 					SessionDetailTextContentSchema,
 					SessionDetailImageContentSchema,
+					SessionDetailStructuredContentSchema,
 				]),
 			),
 		]),
 		isError: z.boolean(),
+		batch: z
+			.object({ id: z.string(), toolIds: z.array(z.string()) })
+			.strict()
+			.optional(),
 		subagentId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).optional(),
 	})
 	.strict();
@@ -432,10 +587,15 @@ const SessionDetailToolResultContentSchema = z
 				z.discriminatedUnion("type", [
 					SessionDetailTextContentSchema,
 					SessionDetailImageContentSchema,
+					SessionDetailStructuredContentSchema,
 				]),
 			),
 		]),
 		is_error: z.boolean().optional(),
+		batch: z
+			.object({ id: z.string(), toolIds: z.array(z.string()) })
+			.strict()
+			.optional(),
 		tool_use_id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 		type: z.literal("tool_result"),
 	})
@@ -457,6 +617,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 		.object({
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 			kind: z.literal("reasoning"),
+			provider: SessionDetailProviderSchema.optional(),
 			text: z.string(),
 			timestamp: SessionDetailTimestampSchema,
 		})
@@ -466,6 +627,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 			content: z.union([z.string(), z.array(SessionDetailTextContentSchema)]),
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 			kind: z.literal("message"),
+			provider: SessionDetailProviderSchema.optional(),
 			text: z.string(),
 			timestamp: SessionDetailTimestampSchema,
 		})
@@ -475,6 +637,8 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 			input: z.record(SessionDetailJsonValueSchema),
 			kind: z.literal("tool"),
+			activity: TranscriptToolActivitySchema.optional(),
+			provider: SessionDetailProviderSchema.optional(),
 			result: SessionDetailTraceToolResultSchema.optional(),
 			skillContent: z
 				.object({
@@ -497,44 +661,53 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 		.strict(),
 ]);
 
-export const SessionDetailTraceItemSchema = z.discriminatedUnion("kind", [
-	z
-		.object({
-			content: SessionDetailUserContentSchema,
-			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
-			kind: z.literal("user"),
-			timestamp: SessionDetailTimestampSchema,
-		})
-		.strict(),
-	z
-		.object({
-			agentName: z.string().max(MAX_DETAIL_STRING_LENGTH).optional(),
-			events: z.array(SessionDetailTraceEventSchema).max(MAX_TRACE_ITEM_COUNT),
-			executionMode: z.enum(["plan", "default", "unknown"]),
-			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
-			kind: z.literal("agent"),
-			modelSetting: z.string().max(MAX_DETAIL_STRING_LENGTH).optional(),
-			timestamp: SessionDetailTimestampSchema,
-		})
-		.strict(),
-	z
-		.object({
-			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
-			kind: z.literal("system"),
-			systemType: z.enum(["context", "interruption", "notification", "system"]),
-			text: z.string(),
-			timestamp: SessionDetailTimestampSchema,
-		})
-		.strict(),
-	z
-		.object({
-			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
-			kind: z.literal("summary"),
-			text: z.string(),
-			timestamp: z.undefined(),
-		})
-		.strict(),
-]);
+export const SessionDetailTraceItemSchema: z.ZodType<SessionDetailTraceItem> =
+	z.discriminatedUnion("kind", [
+		z
+			.object({
+				content: SessionDetailUserContentSchema,
+				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
+				kind: z.literal("user"),
+				timestamp: SessionDetailTimestampSchema,
+			})
+			.strict(),
+		z
+			.object({
+				agentName: z.string().max(MAX_DETAIL_STRING_LENGTH).optional(),
+				events: z
+					.array(SessionDetailTraceEventSchema)
+					.max(MAX_TRACE_ITEM_COUNT),
+				executionMode: z.enum(["plan", "default", "unknown"]),
+				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
+				kind: z.literal("agent"),
+				modelSetting: z.string().max(MAX_DETAIL_STRING_LENGTH).optional(),
+				provider: SessionDetailProviderSchema.optional(),
+				timestamp: SessionDetailTimestampSchema,
+			})
+			.strict(),
+		z
+			.object({
+				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
+				kind: z.literal("system"),
+				systemType: z.enum([
+					"context",
+					"interruption",
+					"notification",
+					"system",
+				]),
+				text: z.string(),
+				timestamp: SessionDetailTimestampSchema,
+			})
+			.strict(),
+		z
+			.object({
+				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
+				kind: z.literal("summary"),
+				text: z.string(),
+				timestamp: z.undefined(),
+			})
+			.strict(),
+	]);
 
 export const SessionDetailTurnSchema = z
 	.object({
@@ -633,8 +806,5 @@ export type SessionDetailStaleRevisionData = z.infer<
 	typeof SessionDetailStaleRevisionDataSchema
 >;
 export type SessionDetailOverview = z.infer<typeof SessionDetailOverviewSchema>;
-export type SessionDetailTraceItem = z.infer<
-	typeof SessionDetailTraceItemSchema
->;
 export type SessionDetailTurn = z.infer<typeof SessionDetailTurnSchema>;
 export type SessionDetailSubagent = z.infer<typeof SessionDetailSubagentSchema>;

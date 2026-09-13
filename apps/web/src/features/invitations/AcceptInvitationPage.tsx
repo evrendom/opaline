@@ -7,7 +7,7 @@ import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { USER_INVITATIONS_KEY } from "@/features/workspace/hooks/useUserInvitations";
-import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { resolveWorkspaceAppPath } from "@/features/workspace/organization/workspace-navigation";
 import { authClient } from "@/lib/auth-client";
 
 function InvitationLoginRedirectMount({
@@ -26,7 +26,6 @@ function InvitationLoginRedirectMount({
 export function AcceptInvitationPage() {
 	const { invitationId } = useParams<{ invitationId: string }>();
 	const navigate = useNavigate();
-	const { actions, state: organizationState } = useOrganization();
 	const queryClient = useQueryClient();
 	const { data: session, isPending: sessionLoading } = authClient.useSession();
 	const { trackAuthenticationAction } = useAnalyticsTracking({
@@ -62,21 +61,25 @@ export function AcceptInvitationPage() {
 			return;
 		}
 
-		if (res.data) {
-			const didSwitch = await actions.switchOrganization(
-				res.data.member.organizationId,
-			);
-			if (!didSwitch) {
-				setError(
-					"Invitation accepted, but the workspace could not be opened. Refresh and try again.",
+		let destination = appRoutes.session();
+		try {
+			if (res.data)
+				destination = await resolveWorkspaceAppPath(
+					res.data.member.organizationId,
+					appRoutes.session(),
 				);
-				setStatus("error");
-				return;
-			}
+		} catch (cause) {
+			setError(
+				cause instanceof Error
+					? cause.message
+					: "Could not open the workspace.",
+			);
+			setStatus("error");
+			return;
 		}
-
 		setStatus("accepted");
 		queryClient.invalidateQueries({ queryKey: USER_INVITATIONS_KEY });
+		setTimeout(() => navigate(destination, { replace: true }), 1500);
 	};
 
 	const handleReject = async () => {
@@ -92,11 +95,7 @@ export function AcceptInvitationPage() {
 					: undefined,
 		});
 		await authClient.organization.rejectInvitation({ invitationId });
-		navigate(
-			organizationState.activeOrg
-				? appRoutes.dashboard(organizationState.activeOrg.slug)
-				: "/",
-		);
+		navigate(appRoutes.session());
 	};
 
 	if (sessionLoading) {

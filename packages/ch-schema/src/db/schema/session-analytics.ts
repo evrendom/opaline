@@ -20,6 +20,12 @@ const rudel_session_analytics = table({
 		{ name: "skills", type: "Array(String)", default: "fn:[]" },
 		{ name: "slash_commands", type: "Array(String)", default: "fn:[]" },
 		{ name: "subagent_types", type: "Array(String)", default: "fn:[]" },
+		{ name: "subagent_count", type: "UInt32", default: "fn:0" },
+		{
+			name: "native_subagents",
+			type: "Array(Tuple(String, String))",
+			default: "fn:[]",
+		},
 		{ name: "input_tokens", type: "UInt64", default: "fn:0" },
 		{ name: "output_tokens", type: "UInt64", default: "fn:0" },
 		{ name: "cache_read_input_tokens", type: "UInt64", default: "fn:0" },

@@ -89,9 +89,64 @@ export const CODEX_SESSION_ANALYTICS_MV_SQL = `
       ''
     ) AS _model_from_turn_context,
 
-    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"exec_command"[^}]*skills/([a-zA-Z0-9_-]+)/SKILL'))) AS _skills,
+	    arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"exec_command"[^}]*skills/([a-zA-Z0-9_-]+)/SKILL'))) AS _skills,
 
-    toUInt32(
+	    arrayMap(
+	      x -> JSONExtractRaw(x, 'payload'),
+	      extractAll(cs.content, '([^\\n]*"name":"spawn_agent"[^\\n]*)')
+	    ) AS _spawn_candidate_payloads,
+
+	    arrayFilter(
+	      payload -> JSONExtractString(payload, 'type') = 'function_call'
+	        AND JSONExtractString(payload, 'name') = 'spawn_agent',
+	      _spawn_candidate_payloads
+	    ) AS _spawn_payloads,
+
+	    arrayDistinct(arrayFilter(
+	      call_id -> call_id != '',
+	      arrayMap(payload -> JSONExtractString(payload, 'call_id'), _spawn_payloads)
+	    )) AS _spawn_call_ids,
+
+	    arrayDistinct(arrayFilter(
+	      call_id -> call_id != '',
+	      extractAll(
+	        cs.content,
+	        '"type":"function_call_output"[^\\n]*?"call_id":"([^"]+)"[^\\n]*?"output":"\\\\{\\\\\\\\"(?:task_name|agent_name|agentId|agent_id)\\\\\\\\":'
+	      )
+	    )) AS _identifier_output_call_ids,
+
+	    arrayDistinct(arrayFilter(
+	      role -> role != '',
+	      arrayMap(
+	        payload -> if(
+	          has(_identifier_output_call_ids, JSONExtractString(payload, 'call_id')),
+	          multiIf(
+	            JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent_type') != '',
+	              JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent_type'),
+	            JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent') != '',
+	              JSONExtractString(JSONExtractString(payload, 'arguments'), 'agent'),
+	            ''
+	          ),
+	          ''
+	        ),
+	        _spawn_payloads
+	      )
+	    )) AS _subagent_types,
+
+	    toUInt32(length(arrayIntersect(
+	      _spawn_call_ids,
+	      _identifier_output_call_ids
+	    ))) AS _subagent_count,
+
+    arrayMap(call_id -> tuple(
+      concat('call:', call_id),
+      JSONExtractString(JSONExtractString(arrayElement(arrayFilter(
+        payload -> JSONExtractString(payload, 'call_id') = call_id,
+        _spawn_payloads
+      ), -1), 'arguments'), 'model')
+    ), arraySort(arrayIntersect(_spawn_call_ids, _identifier_output_call_ids))) AS _native_subagents,
+
+	    toUInt32(
       length(extractAll(_error_sample_content, '\\\\\\\\"exit_code\\\\\\\\":[1-9][0-9]*'))
       + if(
           _is_capped,
@@ -114,10 +169,12 @@ export const CODEX_SESSION_ANALYTICS_MV_SQL = `
     _cache_read_input_tokens as cache_read_input_tokens,
     toUInt64(0) as cache_creation_input_tokens,
     _input_tokens + _output_tokens as total_tokens,
-    _skills as skills,
-    [] :: Array(String) as slash_commands,
-    [] :: Array(String) as subagent_types,
-    toUInt32(length(_interaction_lines)) as total_interactions,
+	    _skills as skills,
+	    [] :: Array(String) as slash_commands,
+	    _subagent_types as subagent_types,
+	    _subagent_count as subagent_count,
+	    _native_subagents as native_subagents,
+	    toUInt32(length(_interaction_lines)) as total_interactions,
     toUInt32(_duration_min) as actual_duration_min,
     if(length(_prompt_periods_sec) > 0, round(arrayAvg(_prompt_periods_sec), 2), 0) as avg_period_sec,
     if(

@@ -1,7 +1,7 @@
 import { Popover as PopoverPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { cn } from "@/lib/utils";
+import { FluidMenuHover } from "./fluid-menu-hover";
 
 function Popover({
 	...props
@@ -16,6 +16,7 @@ function PopoverTrigger({
 }
 
 function PopoverContent({
+	children,
 	className,
 	align = "center",
 	sideOffset = 4,
@@ -24,6 +25,7 @@ function PopoverContent({
 	return (
 		<PopoverPrimitive.Portal>
 			<PopoverPrimitive.Content
+				data-fluid-menu-root=""
 				data-slot="popover-content"
 				align={align}
 				sideOffset={sideOffset}
@@ -32,7 +34,10 @@ function PopoverContent({
 					className,
 				)}
 				{...props}
-			/>
+			>
+				<FluidMenuHover />
+				{children}
+			</PopoverPrimitive.Content>
 		</PopoverPrimitive.Portal>
 	);
 }

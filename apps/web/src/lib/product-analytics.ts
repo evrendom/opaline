@@ -20,8 +20,10 @@ import {
 	type WrappedGrowthLoopEvent,
 } from "@rudel/api-routes";
 import {
-	getWorkspaceRouteSuffix,
+	appRoutes,
+	getCanonicalAppPath,
 	getWrappedPublicIdFromPath,
+	isSessionDetailPath,
 } from "@/app/routes";
 import { client } from "@/lib/orpc";
 
@@ -438,7 +440,7 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 	{
 		pageName: "overview",
 		matches: (pathname) =>
-			pathname === "/dashboard" || getWorkspaceRouteSuffix(pathname) === "/",
+			pathname === appRoutes.home() || pathname === appRoutes.legacyDashboard(),
 	},
 	{
 		pageName: "developer_detail",
@@ -464,21 +466,17 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 	},
 	{
 		pageName: "session_detail",
-		matches: (pathname) => {
-			const workspaceSuffix = getWorkspaceRouteSuffix(pathname);
-			return (
-				pathname.startsWith("/legacy/sessions/") ||
-				pathname.startsWith("/dashboard/sessions/") ||
-				workspaceSuffix?.startsWith("/sessions/") === true
-			);
-		},
+		matches: (pathname) =>
+			isSessionDetailPath(pathname) ||
+			pathname.startsWith("/legacy/sessions/") ||
+			pathname.startsWith("/dashboard/sessions/"),
 	},
 	{
 		pageName: "sessions",
 		matches: (pathname) =>
+			pathname === "/session" ||
 			pathname === "/legacy/sessions" ||
-			pathname === "/dashboard/sessions" ||
-			getWorkspaceRouteSuffix(pathname) === "/sessions",
+			pathname === "/dashboard/sessions",
 	},
 	{
 		pageName: "errors",
@@ -515,7 +513,8 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 
 export function getAnalyticsPageName(pathname: string): AppPageName | null {
 	return (
-		ANALYTICS_PAGE_MATCHERS.find(({ matches }) => matches(pathname))
-			?.pageName ?? null
+		ANALYTICS_PAGE_MATCHERS.find(({ matches }) =>
+			matches(getCanonicalAppPath(pathname)),
+		)?.pageName ?? null
 	);
 }

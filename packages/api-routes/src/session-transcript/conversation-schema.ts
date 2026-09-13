@@ -23,15 +23,33 @@ export const ToolUseContentSchema = z.object({
 	input: z.record(z.string(), z.unknown()),
 });
 
+export const ToolResultTextContentSchema = TextContentSchema.extend({
+	rawType: z.string().optional(),
+});
+
+export const ToolResultImageContentSchema = z.object({
+	type: z.literal("image"),
+	rawType: z.string().optional(),
+	source: z.unknown(),
+});
+
+export const ToolResultStructuredContentSchema = z.object({
+	type: z.literal("structured"),
+	rawType: z.string().optional(),
+	value: z.unknown(),
+});
+
 export const ToolResultContentSchema = z.object({
 	type: z.literal("tool_result"),
 	tool_use_id: z.string(),
+	batch: z.object({ id: z.string(), toolIds: z.array(z.string()) }).optional(),
 	content: z.union([
 		z.string(),
 		z.array(
 			z.union([
-				TextContentSchema,
-				z.object({ type: z.literal("image"), source: z.unknown() }),
+				ToolResultTextContentSchema,
+				ToolResultImageContentSchema,
+				ToolResultStructuredContentSchema,
 			]),
 		),
 	]),
@@ -65,10 +83,12 @@ export const ConversationExecutionModeSchema = z.enum([
 	"default",
 	"unknown",
 ]);
+export const ConversationProviderSchema = z.enum(["claude", "codex"]);
 
 // Entry schemas
 const BaseEntrySchema = z.object({
 	agentName: z.string().optional(),
+	provider: ConversationProviderSchema.optional(),
 	uuid: z.string(),
 	timestamp: z.string(),
 	sessionId: z.string(),
@@ -113,6 +133,14 @@ export type ToolResultContent = z.infer<typeof ToolResultContentSchema>;
 export type ConversationExecutionMode = z.infer<
 	typeof ConversationExecutionModeSchema
 >;
+export type ConversationProvider = z.infer<typeof ConversationProviderSchema>;
+export type ToolResultImageContent = z.infer<
+	typeof ToolResultImageContentSchema
+>;
+export type ToolResultStructuredContent = z.infer<
+	typeof ToolResultStructuredContentSchema
+>;
+export type ToolResultTextContent = z.infer<typeof ToolResultTextContentSchema>;
 export type UserEntry = z.infer<typeof UserEntrySchema>;
 export type AssistantEntry = z.infer<typeof AssistantEntrySchema>;
 export type SummaryEntry = z.infer<typeof SummaryEntrySchema>;
@@ -180,6 +208,7 @@ export function parseConversations(content: string): Array<Conversation> {
 						...entry,
 						executionMode,
 						...(modelSetting ? { modelSetting } : {}),
+						provider: "claude",
 					});
 					for (const block of entry.message.content) {
 						if (block.type === "tool_use" && block.name === "ExitPlanMode") {
@@ -189,7 +218,9 @@ export function parseConversations(content: string): Array<Conversation> {
 					continue;
 				}
 
-				conversations.push(entry);
+				conversations.push(
+					entry.type === "summary" ? entry : { ...entry, provider: "claude" },
+				);
 				if (entry.type !== "user" || !Array.isArray(entry.message.content)) {
 					continue;
 				}

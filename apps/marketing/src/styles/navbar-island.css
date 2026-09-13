@@ -1,0 +1,299 @@
+.opaline-navbar-scope[data-opaline-navbar-variant="island"] {
+	--island-control-size: 32px;
+	--island-control-half: 16px;
+	--island-control-overlap: 20px;
+	--island-control-curve: 13.333px;
+	--island-shell-inset: 12px;
+	--island-shell-radius: calc(
+		var(--island-control-curve) +
+		var(--island-shell-inset)
+	);
+	--opaline-navbar-proof-radius: 0;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	.opaline-nav-header {
+	inset-inline: auto;
+	top: 12px;
+	left: 50%;
+	width: min(calc(100% - 32px), 960px);
+	margin: 0;
+	transform: translateX(-50%);
+	overflow: clip;
+	border: 0;
+	border-radius: var(--island-shell-radius);
+	/* Temporarily removed: shell fill, stroke, shadow, and backdrop treatment. */
+	background: transparent;
+	box-shadow: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	.opaline-nav-header::before {
+	border-radius: inherit;
+	background: none;
+	box-shadow: none;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"] .opaline-nav-inner {
+	height: 56px;
+	max-width: none;
+	padding-inline: var(--island-shell-inset);
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"] .opaline-nav-list {
+	display: flex;
+	min-height: 56px;
+	justify-content: center;
+	gap: 8px;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	.opaline-nav-logo-item {
+	z-index: 2;
+	justify-content: flex-start;
+	flex: none;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	.opaline-nav-logo-link {
+	width: 32px;
+	height: 32px;
+	margin: 0;
+	padding: 5px;
+	justify-content: center;
+	border-radius: 0;
+	transition: background-color 160ms var(--ease-out-quad);
+}
+
+:where(.opaline-navbar-scope[data-opaline-navbar-variant="island"])
+	.opaline-nav-logo-link:focus-visible {
+	outline: 2px solid rgb(40, 42, 48);
+	outline-offset: 2px;
+}
+
+@media (any-hover: hover) {
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-logo-link:hover {
+		background: rgba(40, 42, 48, 0.07);
+	}
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	:is(
+		.opaline-nav-logo-link,
+		[data-opaline-navbar-proof-link],
+		[data-opaline-navbar-install]
+	) {
+	-webkit-mask:
+		linear-gradient(#000 0 0) center / calc(100% - var(--island-control-size))
+		100% no-repeat,
+		url("/opaline-trace-fill.svg") left center / var(--island-control-size)
+		var(--island-control-size) no-repeat,
+		url("/opaline-trace-fill.svg") right center / var(--island-control-size)
+		var(--island-control-size) no-repeat;
+	mask:
+		linear-gradient(#000 0 0) center / calc(100% - var(--island-control-size))
+		100% no-repeat,
+		url("/opaline-trace-fill.svg") left center / var(--island-control-size)
+		var(--island-control-size) no-repeat,
+		url("/opaline-trace-fill.svg") right center / var(--island-control-size)
+		var(--island-control-size) no-repeat;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-actions] {
+	width: auto;
+	max-width: none;
+	min-width: 0;
+	flex: 0 0 auto;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-install] {
+	--button-corner-radius: 0;
+	position: relative;
+	z-index: 2;
+	min-width: 0;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-command-group] {
+	gap: 0;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-github-extension] {
+	--opaline-navbar-proof-width: auto;
+	--opaline-navbar-proof-min-width: 0;
+	--opaline-navbar-proof-color: rgba(40, 42, 48, 0.5);
+	--opaline-navbar-proof-padding: 0 12px 0
+		calc(8px + var(--island-control-overlap));
+	--opaline-navbar-proof-compact-padding: 0 12px 0
+		calc(8px + var(--island-control-overlap));
+	--opaline-navbar-proof-compact-gap: 6px;
+	position: relative;
+	z-index: 1;
+	margin-left: calc(-1 * var(--island-control-overlap));
+	-webkit-mask:
+		linear-gradient(#000 0 0) left center /
+		calc(100% - var(--island-control-half)) 100% no-repeat,
+		url("/opaline-trace-fill.svg") right center / var(--island-control-size)
+		var(--island-control-size) no-repeat;
+	mask:
+		linear-gradient(#000 0 0) left center /
+		calc(100% - var(--island-control-half)) 100% no-repeat,
+		url("/opaline-trace-fill.svg") right center / var(--island-control-size)
+		var(--island-control-size) no-repeat;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-github-extension]
+	span {
+	width: auto;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	:is([data-opaline-navbar-github-count], [data-opaline-navbar-github-label]) {
+	font-size: 12px;
+	font-weight: 500;
+	letter-spacing: -0.01em;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-github-count] {
+	color: rgba(40, 42, 48, 0.5);
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-install-label] {
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	font-weight: 500;
+	letter-spacing: -0.02em;
+	transition: opacity 120ms ease;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-install]::after {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	content: "Copied";
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-install][data-copied="true"]
+	[data-opaline-install-label] {
+	opacity: 0;
+}
+
+.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+	[data-opaline-navbar-install][data-copied="true"]::after {
+	opacity: 1;
+}
+
+@media (max-width: 768px) {
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"] {
+		--island-control-size: 44px;
+		--island-control-half: 22px;
+		--island-control-overlap: 26px;
+		--island-control-curve: 18.333px;
+		--island-shell-inset: 6px;
+		--opaline-navbar-proof-height: 44px;
+		--opaline-navbar-proof-min-width: 44px;
+		--opaline-navbar-proof-width: 44px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-header {
+		top: 8px;
+		width: calc(100% - 20px);
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-inner {
+		height: 56px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-list {
+		min-height: 56px;
+		gap: 8px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-logo-link {
+		width: 44px;
+		height: 44px;
+		padding: 11px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-install] {
+		--button-height: 44px;
+		--button-padding: 0 6px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-install-label] {
+		font-size: 10px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-extension] {
+		--opaline-navbar-proof-compact-padding: 0 6px 0
+			calc(8px + var(--island-control-overlap));
+		--opaline-navbar-proof-compact-gap: 4px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		:is(
+			[data-opaline-navbar-github-count],
+			[data-opaline-navbar-github-label]
+		) {
+		font-size: 10px;
+	}
+}
+
+@media (max-width: 360px) {
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		.opaline-nav-header {
+		width: calc(100% - 8px);
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-install],
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-extension] {
+		--button-padding: 0 6px;
+		--opaline-navbar-proof-compact-padding: 0 6px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-install-label],
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-count],
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-label] {
+		font-size: 10px;
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-extension] {
+		--opaline-navbar-proof-min-width: 70px;
+		--opaline-navbar-proof-compact-padding: 0 10px 0
+			calc(7px + var(--island-control-overlap));
+	}
+
+	.opaline-navbar-scope[data-opaline-navbar-variant="island"]
+		[data-opaline-navbar-github-label] {
+		display: none;
+	}
+}

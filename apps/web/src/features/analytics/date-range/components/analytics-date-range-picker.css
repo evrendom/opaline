@@ -1,0 +1,210 @@
+.session-date-picker {
+	--ring: var(--session-menu-accent);
+	width: fit-content;
+	max-width: calc(100vw - 32px);
+	max-height: min(var(--available-height, 100svh), calc(100svh - 32px));
+	padding: 0;
+	gap: 0;
+	overflow: hidden;
+	overscroll-behavior: none;
+	transform-origin: var(--transform-origin);
+}
+
+.session-date-picker-presets {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	width: 100%;
+}
+
+.session-date-picker-presets .session-menu-row[aria-pressed="true"]::before {
+	background: var(--session-menu-highlight);
+}
+
+.session-date-picker-divider {
+	flex: none;
+	height: var(--session-menu-hairline);
+	background: var(--session-menu-border);
+}
+
+.session-date-picker-calendar-panel {
+	min-width: 0;
+	padding: 14px;
+}
+
+.session-date-picker-calendar {
+	--cell-radius: 9999px;
+	--cell-size: 32px;
+	width: 100%;
+	padding: 8px 0 0;
+	font-size: 13px;
+	font-weight: 450;
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-month-label {
+	font-size: 13px;
+	font-weight: 450;
+	line-height: 20px;
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-weekday {
+	flex: 1;
+	font-size: 12px;
+	font-weight: 450;
+	line-height: 16px;
+	color: var(--session-menu-icon);
+}
+
+.session-date-picker-calendar .rdp-day_weekends {
+	color: var(--session-menu-icon);
+}
+
+.session-date-picker-nav-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--session-menu-icon);
+	outline: none;
+}
+
+.session-date-picker-calendar button[data-day] {
+	border-radius: 9999px;
+	font-size: 13px;
+	font-weight: 450;
+	box-shadow: none;
+	outline: none;
+}
+
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end),
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end)::after,
+.session-date-picker-calendar button[data-range-middle="true"],
+.session-date-picker-calendar td[data-today="true"] {
+	background: var(--session-menu-highlight);
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-calendar button[data-range-middle="true"] {
+	border-radius: 0;
+}
+
+/* Selected today must keep the same range cap as any other endpoint. */
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end) {
+	border-radius: var(--cell-radius);
+}
+
+/* A single selected day has no range to connect on either side. */
+.session-date-picker-calendar .rdp-range_start.rdp-range_end,
+.session-date-picker-calendar .rdp-range_start.rdp-range_end::after {
+	background: transparent;
+}
+
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"]) {
+	background: transparent;
+}
+
+.session-date-picker-calendar
+	button:is(
+		[data-range-start="true"],
+		[data-range-end="true"],
+		[data-selected-single="true"]
+	) {
+	background: transparent;
+	color: var(--session-menu-check);
+}
+
+.session-date-picker-calendar
+	button:is(
+		[data-range-start="true"],
+		[data-range-end="true"],
+		[data-selected-single="true"]
+	)::before,
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"])
+	button::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--session-menu-accent);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+}
+
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"])
+	button::before {
+	background: var(--session-menu-highlight);
+}
+
+.session-date-picker-actions .fluid-menu-hover-fill::before {
+	inset: 0;
+}
+
+/* Override the menu-wide 8px corners regardless of stylesheet load order. */
+.session-menu-surface .session-date-picker-calendar
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: inherit;
+}
+
+/* Day hover follows the same rounded silhouette as the selected dates. */
+.session-date-picker-calendar:has(button[data-day][data-fluid-hover-active])
+.fluid-menu-hover-fill::before {
+	border-radius: 0;
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+}
+
+.session-date-picker-footer {
+	display: flex;
+	flex: none;
+	justify-content: flex-end;
+	border-top: var(--session-menu-hairline) solid var(--session-menu-border);
+	padding: 6px;
+}
+
+.session-date-picker-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.session-date-picker-action {
+	height: 32px;
+	padding: 0 12px;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 450;
+	box-shadow: none;
+}
+
+.session-date-picker-cancel {
+	color: var(--session-menu-icon);
+}
+
+.session-date-picker-apply,
+.session-date-picker-apply:hover {
+	background: var(--session-menu-accent);
+	color: var(--session-menu-check);
+}
+
+@media (min-width: 768px) {
+	.session-date-picker-presets {
+		width: 175px;
+	}
+	.session-date-picker-divider {
+		width: var(--session-menu-hairline);
+		height: auto;
+	}
+	.session-date-picker-calendar {
+		height: 298px;
+	}
+}

@@ -7,6 +7,7 @@ import {
 	getSessionDimensionAnalysis,
 } from "../../services/session-analytics.service.js";
 import {
+	getSessionDetailBodyChunk,
 	getSessionDetailOverview,
 	getSessionDetailSpine,
 	getSessionDetailSubagent,
@@ -24,7 +25,7 @@ import {
 	throwSessionDetailWindowError,
 } from "./session-detail-errors.js";
 
-const sortByMap: Record<string, "date" | "duration" | "interactions"> = {
+const sortByMap: Record<string, "date" | "duration"> = {
 	session_date: "date",
 	duration_min: "duration",
 	total_tokens: "date",
@@ -77,6 +78,33 @@ const dimensionAnalysis = os.analytics.sessions.dimensionAnalysis
 			user_id: input.userId,
 			project_path: input.projectPath,
 		});
+	});
+
+const detailBodyChunk = os.analytics.sessions.detailBodyChunk
+	.use(orgMiddleware)
+	.handler(async ({ input, context, errors }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			{
+				isOrgAdmin: context.isOrgAdmin,
+				requesterUserId: context.user.id,
+			},
+		);
+		try {
+			const result = await getSessionDetailBodyChunk({
+				...input,
+				revision: input.revision,
+				organizationId: context.organizationId,
+				ownerId,
+			});
+			if (!result) throw new ORPCError("NOT_FOUND");
+			return result;
+		} catch (error) {
+			if (error instanceof RangeError) {
+				throw new ORPCError("BAD_REQUEST", { message: error.message });
+			}
+			return throwSessionDetailRevisionError(error, errors);
+		}
 	});
 
 const detailOverview = os.analytics.sessions.detailOverview
@@ -226,6 +254,7 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 	});
 
 export const sessionsRouter = os.analytics.sessions.router({
+	detailBodyChunk,
 	detailOverview,
 	detailSpine,
 	detailSubagent,

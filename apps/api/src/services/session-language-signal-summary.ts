@@ -5,11 +5,14 @@ import {
 	groupTraceIntoTurns,
 	parseConversations,
 } from "@rudel/api-routes";
-import { type LanguageSignalCounts, summarize } from "@rudel/language-signals";
+import {
+	type LanguageSignalCounts,
+	type LanguageSignalSummary,
+	summarize,
+	summarizeWithMatches,
+} from "@rudel/language-signals";
 
-export function summarizeSessionLanguageSignals(
-	content: string,
-): LanguageSignalCounts {
+function getVisibleSessionLanguageSignalText(content: string) {
 	const compactionMetadata = extractSessionCompactionMetadata(content);
 	const visibleTrace = buildConversationTrace(
 		parseConversations(content),
@@ -25,5 +28,17 @@ export function summarizeSessionLanguageSignals(
 			: [],
 	);
 
-	return summarize({ memberText, modelText });
+	return { memberText, modelText };
+}
+
+export function summarizeSessionLanguageSignals(
+	content: string,
+): LanguageSignalCounts {
+	return summarize(getVisibleSessionLanguageSignalText(content));
+}
+
+export function captureSessionLanguageSignals(
+	content: string,
+): LanguageSignalSummary {
+	return summarizeWithMatches(getVisibleSessionLanguageSignalText(content));
 }

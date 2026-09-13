@@ -7,16 +7,21 @@ export {
 	scanModelLanguageSignals,
 	stripSystemInstructionBlocks,
 } from "./scanner.js";
-export { scanModelLanguageSignalSegments, summarize } from "./summarize.js";
+export {
+	scanModelLanguageSignalSegments,
+	summarize,
+	summarizeWithMatches,
+} from "./summarize.js";
 export type {
 	BuiltInLanguageSignalCategory,
 	DisplayTextPart,
 	LanguageSignalCategory,
 	LanguageSignalCounts,
 	LanguageSignalMatch,
+	LanguageSignalSummary,
 	LanguageSignalSummaryInput,
 	ModelLanguageSignalCategory,
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
-export const SCAN_VERSION = 1;
+export const SCAN_VERSION = 2;

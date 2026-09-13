@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { z } from "zod";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
@@ -11,9 +11,25 @@ import {
 	getSessionUserId,
 } from "@/features/auth/auth-route-utils";
 import { GuestApp } from "@/features/auth/GuestApp";
+import { cliSetupUrl } from "@/features/cli-onboarding/cli-authorization";
 
 function ApprovedDeviceSetupPage() {
 	return <Navigate replace to={appRoutes.wrappedDesktopReady()} />;
+}
+
+function PairedDeviceLogin({
+	connectionId,
+	userCode,
+}: {
+	connectionId: string;
+	userCode: string;
+}) {
+	useEffect(() => {
+		window.location.replace(
+			cliSetupUrl(connectionId, window.location.origin, userCode),
+		);
+	}, [connectionId, userCode]);
+	return <AppLoadingScreen message="Opening your session setup…" />;
 }
 
 export function DeviceAuthorizationApp({
@@ -104,6 +120,15 @@ export function DeviceAuthorizationApp({
 			setDeviceProcessing(false);
 		}
 	}
+
+	const connectionId = getCliConnectionId();
+	if (connectionId)
+		return (
+			<PairedDeviceLogin
+				connectionId={connectionId}
+				userCode={deviceUserCode}
+			/>
+		);
 
 	if (!session) {
 		return <GuestApp />;

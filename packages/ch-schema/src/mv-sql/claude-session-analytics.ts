@@ -79,6 +79,24 @@ export const CLAUDE_SESSION_ANALYTICS_MV_SQL = `
     arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '"name":"Task"[^}]*"subagent_type":"([^"]+)"'))) AS _subagent_types,
     arrayDistinct(arrayFilter(x -> x != '', extractAll(cs.content, '<command-name>/([^<]+)</command-name>'))) AS _slash_commands,
 
+    arraySort(agent -> tupleElement(agent, 1), arrayMap(
+      (agent_id, transcript) -> tuple(
+        agent_id,
+        arrayElement(arrayMap(
+          line -> JSONExtractString(line, 'message', 'model'),
+          arrayFilter(
+            line -> JSONExtractString(line, 'type') = 'assistant'
+              AND JSONExtractString(line, 'message', 'model') != '',
+            splitByChar('\\n', if(
+              length(transcript) > 120000000 OR countSubstrings(transcript, '\\n') > 8000,
+              '', transcript
+            ))
+          )
+        ), -1)
+      ),
+      mapKeys(cs.subagents), mapValues(cs.subagents)
+    )) AS _native_subagents,
+
     toUInt32(
       length(extractAll(_error_sample_content, '"isApiErrorMessage":true'))
       + length(extractAll(_error_sample_content, '"is_error":true'))
@@ -98,10 +116,12 @@ export const CLAUDE_SESSION_ANALYTICS_MV_SQL = `
     _cache_read as cache_read_input_tokens,
     _cache_creation as cache_creation_input_tokens,
     _input_tokens + _output_tokens as total_tokens,
-    _skills as skills,
-    _slash_commands as slash_commands,
-    _subagent_types as subagent_types,
-    toUInt32(length(_timestamps)) as total_interactions,
+	    _skills as skills,
+	    _slash_commands as slash_commands,
+	    _subagent_types as subagent_types,
+	    toUInt32(length(cs.subagents)) as subagent_count,
+	    _native_subagents as native_subagents,
+	    toUInt32(length(_timestamps)) as total_interactions,
     toUInt32(_duration_min) as actual_duration_min,
     if(length(_prompt_periods_sec) > 0, round(arrayAvg(_prompt_periods_sec), 2), 0) as avg_period_sec,
     if(

@@ -1,11 +1,16 @@
 import type {
 	Conversation,
 	ConversationExecutionMode,
+	ConversationProvider,
 	TextContent,
 	ThinkingContent,
 	ToolResultContent,
 	ToolUseContent,
 } from "./conversation-schema.js";
+import {
+	deriveTranscriptToolActivity,
+	type TranscriptToolActivity,
+} from "./transcript-tool-activity.js";
 
 /**
  * Reshapes a parsed transcript into the flat invocation trace the session sheet
@@ -18,6 +23,7 @@ import type {
  */
 
 export type TraceToolResult = {
+	batch?: { id: string; toolIds: string[] };
 	content: ToolResultContent["content"];
 	isError: boolean;
 	subagentId?: string;
@@ -29,20 +35,29 @@ export type TraceSkillContent = {
 };
 
 export type TraceEvent =
-	| { kind: "reasoning"; id: string; timestamp: string; text: string }
+	| {
+			kind: "reasoning";
+			id: string;
+			provider?: ConversationProvider;
+			timestamp: string;
+			text: string;
+	  }
 	| {
 			kind: "message";
 			id: string;
 			timestamp: string;
 			content: TextContent[] | string;
+			provider?: ConversationProvider;
 			text: string;
 	  }
 	| {
 			kind: "tool";
+			activity?: TranscriptToolActivity;
 			id: string;
 			timestamp: string;
 			toolName: string;
 			input: Record<string, unknown>;
+			provider?: ConversationProvider;
 			result: TraceToolResult | undefined;
 			skillContent?: TraceSkillContent;
 	  }
@@ -73,6 +88,7 @@ export type TraceItem =
 			timestamp: string;
 			executionMode: ConversationExecutionMode;
 			modelSetting?: string;
+			provider?: ConversationProvider;
 			events: TraceEvent[];
 	  }
 	| {
@@ -94,11 +110,20 @@ function isToolResult(value: unknown): value is ToolResultContent {
 
 function isDelegationToolName(toolName: string) {
 	const normalizedName = toolName.split(/\.|__/u).at(-1)?.toLowerCase();
-	return (
-		normalizedName === "agent" ||
-		normalizedName === "task" ||
-		normalizedName === "spawn_agent"
-	);
+	return normalizedName
+		? [
+				"agent",
+				"close_agent",
+				"followup_task",
+				"interrupt_agent",
+				"list_agents",
+				"resume_agent",
+				"send_message",
+				"spawn_agent",
+				"task",
+				"wait_agent",
+			].includes(normalizedName)
+		: false;
 }
 
 /**
@@ -146,6 +171,7 @@ function toTraceResult(
 ): TraceToolResult {
 	return {
 		content: result.content,
+		...(result.batch ? { batch: result.batch } : {}),
 		isError: result.is_error === true,
 		...(subagentId ? { subagentId } : {}),
 	};
@@ -258,6 +284,7 @@ export function buildConversationTrace(
 	conversations: Conversation[],
 ): TraceItem[] {
 	const items: TraceItem[] = [];
+	const toolEventIds = new Map<string, string>();
 	// Events for the agent section currently being accumulated.
 	let agentEvents: TraceEvent[] = [];
 	let agentTimestamp: string | undefined;
@@ -265,6 +292,7 @@ export function buildConversationTrace(
 	let agentName: string | undefined;
 	let agentExecutionMode: ConversationExecutionMode = "unknown";
 	let agentModelSetting: string | undefined;
+	let agentProvider: ConversationProvider | undefined;
 	// tool_use_id -> event awaiting its result, for the open section.
 	const pendingToolEvents = new Map<
 		string,
@@ -280,6 +308,7 @@ export function buildConversationTrace(
 				timestamp: agentTimestamp,
 				executionMode: agentExecutionMode,
 				...(agentModelSetting ? { modelSetting: agentModelSetting } : {}),
+				...(agentProvider ? { provider: agentProvider } : {}),
 				events: agentEvents,
 			});
 		}
@@ -290,6 +319,7 @@ export function buildConversationTrace(
 		agentName = undefined;
 		agentExecutionMode = "unknown";
 		agentModelSetting = undefined;
+		agentProvider = undefined;
 		if (clearPendingToolEvents) {
 			pendingToolEvents.clear();
 		}
@@ -333,6 +363,7 @@ export function buildConversationTrace(
 				agentTimestamp = entry.timestamp;
 				agentExecutionMode = entry.executionMode;
 				agentModelSetting = entry.modelSetting;
+				agentProvider = entry.provider;
 			} else if (agentExecutionMode === "unknown") {
 				agentExecutionMode = entry.executionMode;
 			}
@@ -347,6 +378,7 @@ export function buildConversationTrace(
 					agentEvents.push({
 						kind: "reasoning",
 						id,
+						...(entry.provider ? { provider: entry.provider } : {}),
 						timestamp: entry.timestamp,
 						text: (block as ThinkingContent).thinking,
 					});
@@ -361,10 +393,12 @@ export function buildConversationTrace(
 						timestamp: entry.timestamp,
 						toolName: toolBlock.name,
 						input: toolBlock.input,
+						...(entry.provider ? { provider: entry.provider } : {}),
 						result: undefined,
 					};
 					agentEvents.push(event);
 					pendingToolEvents.set(toolBlock.id, event);
+					toolEventIds.set(toolBlock.id, event.id);
 					return;
 				}
 
@@ -372,6 +406,7 @@ export function buildConversationTrace(
 				agentEvents.push({
 					kind: "message",
 					id,
+					...(entry.provider ? { provider: entry.provider } : {}),
 					timestamp: entry.timestamp,
 					content: [textBlock],
 					text: textFromBlocks([textBlock]),
@@ -406,7 +441,20 @@ export function buildConversationTrace(
 						kind: "orphan-result",
 						id: `${entry.uuid}-${resultIndex}`,
 						timestamp: entry.timestamp,
-						result: toTraceResult(result, undefined),
+						result: toTraceResult(
+							result.batch
+								? {
+										...result,
+										batch: {
+											...result.batch,
+											toolIds: result.batch.toolIds.map(
+												(id) => toolEventIds.get(id) ?? id,
+											),
+										},
+									}
+								: result,
+							undefined,
+						),
 					});
 				},
 			);
@@ -452,6 +500,13 @@ export function buildConversationTrace(
 
 	flushAgentSection();
 
+	for (const item of items) {
+		if (item.kind !== "agent") continue;
+		for (const event of item.events) {
+			if (event.kind === "tool")
+				event.activity = deriveTranscriptToolActivity(event);
+		}
+	}
 	return items;
 }
 

@@ -1,5 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import type {
 	TextContent,
 	ThinkingContent,
@@ -8,12 +7,17 @@ import type {
 } from "@/lib/conversation-schema";
 import { cn } from "@/lib/utils";
 import { SignalText } from "../signal-text";
-import { CodeBlock } from "./CodeBlock";
+import { CodeBlock, InlineCode } from "./CodeBlock";
+import { formatShellOutput } from "./conversation-tools";
 import {
-	parseMessageTextBlocks,
-	type TextPart,
-} from "./message-content-parser";
+	TraceChevronDownIcon,
+	TraceChevronRightIcon,
+} from "./conversation-trace-hugeicons";
 import { ToolInvocation } from "./ToolInvocation";
+
+// Keep room for the formatted-part limit plus a plain-text fallback while
+// bounding every message-level loop in this component.
+const MAX_RENDERED_MESSAGE_BLOCKS = 128;
 
 type MessageBlock =
 	| string
@@ -22,18 +26,21 @@ type MessageBlock =
 	| ToolUseContent
 	| ToolResultContent;
 
-// Keep room for the formatted-part limit plus a plain-text fallback while
-// bounding every message-level loop in this component.
-export const MAX_RENDERED_MESSAGE_BLOCKS = 128;
-
-function getMessageBlockKey(block: MessageBlock, blockIndex: number): string {
-	// Parsed transcript blocks are immutable; their position is a bounded key
-	// that does not copy arbitrarily large message text into React's key space.
+function getMessageBlockIdentity(block: MessageBlock): string {
 	if (typeof block === "string") {
-		return `string:${blockIndex}`;
+		return `string:${block}`;
 	}
 
-	return `${block.type}:${blockIndex}`;
+	switch (block.type) {
+		case "text":
+			return `text:${block.text}`;
+		case "thinking":
+			return `thinking:${block.thinking}`;
+		case "tool_use":
+			return `tool-use:${block.id}`;
+		case "tool_result":
+			return `tool-result:${block.tool_use_id}`;
+	}
 }
 
 interface MessageContentProps {
@@ -41,10 +48,14 @@ interface MessageContentProps {
 	className?: string;
 }
 
-interface MessageRenderPlan {
-	readonly visibleBlocks: ReadonlyArray<MessageBlock>;
-	readonly textPartsByBlock: ReadonlyArray<ReadonlyArray<TextPart> | null>;
-}
+type TextPart =
+	| { type: "text"; content: string }
+	| { type: "code"; content: string; language?: string }
+	| {
+			type: "xml";
+			tag: string;
+			entries: Array<{ key: string; value: string }>;
+	  };
 
 /**
  * Format an XML tag name into a human-readable label.
@@ -54,12 +65,92 @@ function formatTagLabel(tag: string): string {
 	return tag.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Parse an XML block's inner content into key-value entries.
+ * Handles simple `<key>value</key>` pairs and produces a fallback
+ * "content" entry for anything that doesn't match.
+ */
+function parseXmlEntries(
+	innerContent: string,
+): Array<{ key: string; value: string }> {
+	const entries: Array<{ key: string; value: string }> = [];
+	const leafTagRegex = /<([\w-]+)>([\s\S]*?)<\/\1>/g;
+	let leafMatch = leafTagRegex.exec(innerContent);
+
+	if (!leafMatch) {
+		const trimmed = innerContent.trim();
+		if (trimmed) {
+			entries.push({ key: "content", value: trimmed });
+		}
+		return entries;
+	}
+
+	while (leafMatch !== null) {
+		entries.push({
+			key: leafMatch[1] as string,
+			value: (leafMatch[2] as string).trim(),
+		});
+		leafMatch = leafTagRegex.exec(innerContent);
+	}
+
+	return entries;
+}
+
+// Parse code blocks and XML blocks from text content
+function parseTextContent(text: string): Array<TextPart> {
+	const parts: Array<TextPart> = [];
+
+	// Combined regex: code blocks OR top-level XML blocks (inline or multiline)
+	const combinedRegex =
+		/```(\w+)?\n([\s\S]*?)```|<([\w-]+)(?:\s[^>]*)?>([\s\S]*?)<\/\3>/g;
+	let lastIndex = 0;
+	let match: RegExpExecArray | null = combinedRegex.exec(text);
+
+	while (match !== null) {
+		if (match.index > lastIndex) {
+			const textContent = text.slice(lastIndex, match.index).trim();
+			if (textContent) {
+				parts.push({ type: "text", content: textContent });
+			}
+		}
+
+		if (match[2] !== undefined) {
+			// Code block match
+			const language = match[1] || "text";
+			parts.push({ type: "code", content: match[2], language });
+		} else if (match[3] !== undefined && match[4] !== undefined) {
+			// XML block match
+			const tag = match[3];
+			const entries = parseXmlEntries(match[4]);
+			if (entries.length > 0) {
+				parts.push({ type: "xml", tag, entries });
+			}
+		}
+
+		lastIndex = match.index + match[0].length;
+		match = combinedRegex.exec(text);
+	}
+
+	if (lastIndex < text.length) {
+		const textContent = text.slice(lastIndex).trim();
+		if (textContent) {
+			parts.push({ type: "text", content: textContent });
+		}
+	}
+
+	if (parts.length === 0 && text.trim()) {
+		parts.push({ type: "text", content: text.trim() });
+	}
+
+	return parts;
+}
+
 function shouldCollapseXmlBlockByDefault(tag: string): boolean {
 	return /instruction|context/i.test(tag);
 }
 
 function formatXmlBlockSummary(
-	entries: ReadonlyArray<{ readonly key: string; readonly value: string }>,
+	entries: Array<{ key: string; value: string }>,
 ): string {
 	const [firstEntry] = entries;
 	if (!firstEntry) {
@@ -80,16 +171,13 @@ function XmlBlock({
 	entries,
 }: {
 	tag: string;
-	entries: ReadonlyArray<{ readonly key: string; readonly value: string }>;
+	entries: Array<{ key: string; value: string }>;
 }) {
 	const [isOpen, setIsOpen] = useState(!shouldCollapseXmlBlockByDefault(tag));
 	const panelId = useId();
 
 	return (
-		<div
-			data-testid="message-xml-block"
-			className="overflow-hidden rounded-[1rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)]"
-		>
+		<div className="overflow-hidden rounded-[1rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)]">
 			<button
 				type="button"
 				onClick={() => setIsOpen((current) => !current)}
@@ -99,9 +187,9 @@ function XmlBlock({
 			>
 				<div className="mt-0.5 shrink-0 text-[color:var(--dashboardy-muted)]">
 					{isOpen ? (
-						<ChevronDown className="size-4" />
+						<TraceChevronDownIcon className="size-4" />
 					) : (
-						<ChevronRight className="size-4" />
+						<TraceChevronRightIcon className="size-4" />
 					)}
 				</div>
 				<div className="grid min-w-0 flex-1 gap-0.5">
@@ -120,12 +208,8 @@ function XmlBlock({
 					id={panelId}
 					className="divide-y divide-[color:var(--dashboardy-divider)]"
 				>
-					{entries.map((entry, entryIndex) => (
-						<div
-							// biome-ignore lint/suspicious/noArrayIndexKey: parsed XML fields are static and may repeat names
-							key={`${entry.key}:${entryIndex}`}
-							className="flex gap-4 px-4 py-3"
-						>
+					{entries.map((entry) => (
+						<div key={entry.key} className="flex gap-4 px-4 py-3">
 							<p className="min-w-[6.5rem] shrink-0 text-[0.8125rem] font-medium text-[color:var(--dashboardy-muted)]">
 								{formatTagLabel(entry.key)}
 							</p>
@@ -140,9 +224,10 @@ function XmlBlock({
 	);
 }
 
-function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
+function renderPlainText(text: string, key: string) {
+	const parts = parseTextContent(text);
 	return (
-		<div key={key} data-testid="message-text-block" className="space-y-3.5">
+		<div key={key} className="space-y-3.5">
 			{parts.map((part, partIdx) => {
 				if (part.type === "code") {
 					return (
@@ -151,7 +236,7 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 							key={partIdx}
 							code={part.content}
 							language={part.language}
-							highlight={part.highlight}
+							showLineNumbers
 						/>
 					);
 				}
@@ -165,64 +250,115 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 						/>
 					);
 				}
-				if (part.type === "notice") {
-					return (
-						<p
-							// biome-ignore lint/suspicious/noArrayIndexKey: static parsed content blocks
-							key={partIdx}
-							data-testid="message-content-notice"
-							className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-muted)] italic [overflow-wrap:anywhere]"
-						>
-							{part.content}
-						</p>
-					);
-				}
 				return (
-					<div
+					<p
 						// biome-ignore lint/suspicious/noArrayIndexKey: static parsed content blocks
 						key={partIdx}
-						className="max-w-none"
+						className="max-w-[65ch] whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-heading)] text-pretty [overflow-wrap:anywhere]"
 					>
-						<p className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-heading)] text-pretty [overflow-wrap:anywhere]">
-							<SignalText text={part.content} />
-						</p>
-					</div>
+						{renderInlineCode(part.content)}
+					</p>
 				);
 			})}
 		</div>
 	);
 }
 
-function getMessageBlockText(block: MessageBlock): string | null {
-	if (typeof block === "string") {
-		return block;
+function renderStrongText(text: string, keyPrefix: string): ReactNode[] {
+	const strongPattern = /\*\*([^*\n]+?)\*\*/g;
+	const content: ReactNode[] = [];
+	let lastIndex = 0;
+	let match = strongPattern.exec(text);
+
+	while (match !== null) {
+		if (match.index > lastIndex) {
+			const plainText = text.slice(lastIndex, match.index);
+			content.push(
+				<span key={`${keyPrefix}-text-${lastIndex}`}>
+					<SignalText text={plainText} />
+				</span>,
+			);
+		}
+
+		const strongText = match[1];
+		if (strongText?.trim()) {
+			content.push(
+				<strong
+					key={`${keyPrefix}-strong-${match.index}`}
+					className="font-semibold"
+				>
+					<SignalText text={strongText} />
+				</strong>,
+			);
+		} else {
+			content.push(
+				<span key={`${keyPrefix}-text-${match.index}`}>{match[0]}</span>,
+			);
+		}
+
+		lastIndex = match.index + match[0].length;
+		match = strongPattern.exec(text);
 	}
 
-	return block.type === "text" ? block.text : null;
+	if (lastIndex === 0) {
+		return [
+			<span key={`${keyPrefix}-text`}>
+				<SignalText text={text} />
+			</span>,
+		];
+	}
+
+	if (lastIndex < text.length) {
+		const trailingText = text.slice(lastIndex);
+		content.push(
+			<span key={`${keyPrefix}-text-${lastIndex}`}>
+				<SignalText text={trailingText} />
+			</span>,
+		);
+	}
+
+	return content;
+}
+
+function renderInlineCode(text: string): ReactNode {
+	const inlineCodePattern = /(`+)([^`\n]+?)\1/g;
+	const content: ReactNode[] = [];
+	let lastIndex = 0;
+	let match = inlineCodePattern.exec(text);
+
+	while (match !== null) {
+		if (match.index > lastIndex) {
+			content.push(
+				...renderStrongText(
+					text.slice(lastIndex, match.index),
+					`inline-${lastIndex}`,
+				),
+			);
+		}
+
+		const code = match[2];
+		if (code !== undefined) {
+			content.push(<InlineCode key={`code-${match.index}`}>{code}</InlineCode>);
+		}
+
+		lastIndex = match.index + match[0].length;
+		match = inlineCodePattern.exec(text);
+	}
+
+	if (lastIndex === 0) {
+		return renderStrongText(text, "plain");
+	}
+
+	if (lastIndex < text.length) {
+		content.push(
+			...renderStrongText(text.slice(lastIndex), `inline-${lastIndex}`),
+		);
+	}
+
+	return content;
 }
 
 export function MessageContent({ content, className }: MessageContentProps) {
-	const renderPlan = useMemo<MessageRenderPlan>(() => {
-		if (typeof content === "string") {
-			return {
-				visibleBlocks: [],
-				textPartsByBlock: parseMessageTextBlocks([content]),
-			};
-		}
-
-		if (!Array.isArray(content)) {
-			return { visibleBlocks: [], textPartsByBlock: [] };
-		}
-
-		const visibleBlocks = content.slice(0, MAX_RENDERED_MESSAGE_BLOCKS);
-		return {
-			visibleBlocks,
-			textPartsByBlock: parseMessageTextBlocks(
-				visibleBlocks.map(getMessageBlockText),
-			),
-		};
-	}, [content]);
-
 	if (!content) {
 		return (
 			<div
@@ -239,7 +375,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 	if (typeof content === "string") {
 		return (
 			<div className={cn("space-y-3.5", className)}>
-				{renderTextParts(renderPlan.textPartsByBlock[0] ?? [], "plain-content")}
+				{renderPlainText(content, "plain-content")}
 			</div>
 		);
 	}
@@ -257,11 +393,12 @@ export function MessageContent({ content, className }: MessageContentProps) {
 		);
 	}
 
+	const visibleBlocks = content.slice(0, MAX_RENDERED_MESSAGE_BLOCKS);
 	const toolUses = new Map<string, ToolUseContent>();
 	const toolResults = new Map<string, ToolResultContent>();
-	const omittedBlockCount = content.length - renderPlan.visibleBlocks.length;
+	const blockIdentityCounts = new Map<string, number>();
 
-	for (const block of renderPlan.visibleBlocks) {
+	for (const block of visibleBlocks) {
 		if (typeof block === "string") continue;
 		if (block.type === "tool_use") {
 			toolUses.set(block.id, block);
@@ -272,22 +409,20 @@ export function MessageContent({ content, className }: MessageContentProps) {
 
 	return (
 		<div className={cn("space-y-3.5", className)}>
-			{renderPlan.visibleBlocks.map((block, blockIndex) => {
-				const blockKey = getMessageBlockKey(block, blockIndex);
+			{visibleBlocks.map((block) => {
+				const blockIdentity = getMessageBlockIdentity(block);
+				const identityOccurrence =
+					(blockIdentityCounts.get(blockIdentity) ?? 0) + 1;
+				blockIdentityCounts.set(blockIdentity, identityOccurrence);
+				const blockKey = `${blockIdentity}:${identityOccurrence}`;
 
 				if (typeof block === "string") {
-					return renderTextParts(
-						renderPlan.textPartsByBlock[blockIndex] ?? [],
-						blockKey,
-					);
+					return renderPlainText(block, blockKey);
 				}
 
 				switch (block.type) {
 					case "text":
-						return renderTextParts(
-							renderPlan.textPartsByBlock[blockIndex] ?? [],
-							blockKey,
-						);
+						return renderPlainText(block.text, blockKey);
 
 					case "thinking":
 						return (
@@ -338,6 +473,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 												: JSON.stringify(item),
 										)
 										.join("\n");
+						const output = formatShellOutput(resultContent);
 
 						return (
 							<div
@@ -359,7 +495,12 @@ export function MessageContent({ content, className }: MessageContentProps) {
 								>
 									{block.is_error ? "Tool Error" : "Tool Result"}
 								</p>
-								<CodeBlock code={resultContent} language="text" />
+								<CodeBlock
+									code={output.text}
+									filename={block.is_error ? "Error Output" : "Output"}
+									language={output.language}
+									showLineNumbers
+								/>
 							</div>
 						);
 					}
@@ -368,15 +509,6 @@ export function MessageContent({ content, className }: MessageContentProps) {
 						return null;
 				}
 			})}
-			{omittedBlockCount > 0 ? (
-				<p
-					data-testid="message-block-limit-notice"
-					className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-muted)] italic [overflow-wrap:anywhere]"
-				>
-					Additional content not shown ({omittedBlockCount}{" "}
-					{omittedBlockCount === 1 ? "block" : "blocks"} omitted).
-				</p>
-			) : null}
 		</div>
 	);
 }

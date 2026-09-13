@@ -1,12 +1,12 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "bun run --cwd apps/web build",
+	"buildCommand": "bun run build:site",
 	"bunVersion": "1.x",
 	"git": {
 		"deploymentEnabled": false
 	},
 	"framework": "vite",
-	"outputDirectory": "apps/web/dist",
+	"outputDirectory": "dist-site",
 	"regions": ["fra1"],
 	"functions": {
 		"api/cli-connection.ts": {
@@ -33,6 +33,11 @@
 			"includeFiles": "{apps/api/src/**,apps/web/dist/index.html,packages/*/src/**}",
 			"memory": 2048,
 			"maxDuration": 300
+		},
+		"api/demo.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
 		}
 	},
 	"crons": [
@@ -45,10 +50,6 @@
 		{
 			"source": "/(.*)",
 			"headers": [
-				{
-					"key": "Content-Security-Policy",
-					"value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.posthog.com https://*.chatwoot.com wss://*.chatwoot.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; frame-src https://*.chatwoot.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; object-src 'none'; script-src 'self' https://*.posthog.com https://*.chatwoot.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
-				},
 				{
 					"key": "Permissions-Policy",
 					"value": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
@@ -64,15 +65,57 @@
 				{
 					"key": "X-Content-Type-Options",
 					"value": "nosniff"
+				}
+			]
+		},
+		{
+			"source": "/((?!product-demo(?:/|$)).*)",
+			"headers": [
+				{
+					"key": "Content-Security-Policy",
+					"value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.posthog.com https://*.chatwoot.com wss://*.chatwoot.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; frame-src 'self' https://*.chatwoot.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; object-src 'none'; script-src 'self' https://*.posthog.com https://*.chatwoot.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
 				},
 				{
 					"key": "X-Frame-Options",
 					"value": "DENY"
 				}
 			]
+		},
+		{
+			"source": "/product-demo/(.*)",
+			"headers": [
+				{
+					"key": "Content-Security-Policy",
+					"value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.posthog.com https://*.chatwoot.com wss://*.chatwoot.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'self'; frame-src 'self' https://*.chatwoot.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; object-src 'none'; script-src 'self' https://*.posthog.com https://*.chatwoot.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
+				},
+				{
+					"key": "X-Frame-Options",
+					"value": "SAMEORIGIN"
+				}
+			]
 		}
 	],
 	"rewrites": [
+		{
+			"source": "/api/demo/:routePath*",
+			"destination": "/api/demo?__opaline_path=/api/demo/:routePath*"
+		},
+		{
+			"source": "/:workspaceSlug/join/:token/og.png",
+			"destination": "/api/wrapped?__opaline_path=/:workspaceSlug/join/:token/og.png"
+		},
+		{
+			"source": "/:workspaceSlug/join/:token",
+			"destination": "/api/wrapped?__opaline_path=/:workspaceSlug/join/:token"
+		},
+		{
+			"source": "/team/invite/:token/og.png",
+			"destination": "/api/wrapped?__opaline_path=/team/invite/:token/og.png"
+		},
+		{
+			"source": "/team/invite/:token",
+			"destination": "/api/wrapped?__opaline_path=/team/invite/:token"
+		},
 		{
 			"source": "/api/cli/connections",
 			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections"
@@ -118,8 +161,68 @@
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},
 		{
-			"source": "/((?!assets(?:/|$)).*)",
-			"destination": "/index.html"
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "redirect"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "user_code"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "error"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/home",
+			"destination": "/home/index.html"
+		},
+		{
+			"source": "/",
+			"destination": "/home/index.html"
+		},
+		{
+			"source": "/((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
+			"destination": "/app.html"
+		}
+	],
+	"redirects": [
+		{
+			"source": "/instant",
+			"destination": "/home",
+			"permanent": true
+		},
+		{
+			"source": "/instantv2",
+			"destination": "/home",
+			"permanent": true
+		},
+		{
+			"source": "/get-started",
+			"destination": "/welcome",
+			"permanent": true
+		},
+		{
+			"source": "/dashboard/get-started",
+			"destination": "/welcome",
+			"permanent": true
 		}
 	]
 }

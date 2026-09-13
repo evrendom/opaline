@@ -1,7 +1,11 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { ArrowUpRightIcon, Minus, XIcon } from "lucide-react";
+import {
+	ArrowUpRight01Icon,
+	Cancel01Icon,
+	MinusSignIcon,
+} from "@hugeicons/core-free-icons";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +16,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/app/ui/dialog";
+import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 import {
 	getDefaultSidebarShellTuningState,
 	SIDEBAR_NEWS_ACTIVE_ATTRIBUTE,
@@ -120,7 +125,10 @@ function NewsCardInner({ expanded = false }: { expanded?: boolean }) {
 				New shell design is live.
 			</p>
 			{expanded ? null : (
-				<ArrowUpRightIcon className="size-4 shrink-0 text-muted-foreground" />
+				<ShellHugeicon
+					className="size-4 shrink-0 text-muted-foreground"
+					icon={ArrowUpRight01Icon}
+				/>
 			)}
 		</div>
 	);
@@ -160,9 +168,15 @@ function NewsChromeCloseButton({
 			aria-label={label}
 		>
 			{icon === "minimize" ? (
-				<Minus className={cn("size-2.5", iconClassName)} />
+				<ShellHugeicon
+					className={cn("size-2.5", iconClassName)}
+					icon={MinusSignIcon}
+				/>
 			) : (
-				<XIcon className={cn("size-2.5", iconClassName)} />
+				<ShellHugeicon
+					className={cn("size-2.5", iconClassName)}
+					icon={Cancel01Icon}
+				/>
 			)}
 			<span className="sr-only">{label}</span>
 		</motion.button>

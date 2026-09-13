@@ -2,27 +2,25 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { appRoutes } from "@/app/routes";
-import { Card, CardContent } from "@/app/ui/card";
-import { Skeleton } from "@/app/ui/skeleton";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { AccountDangerZoneCard } from "@/features/settings/account/components/AccountDangerZoneCard";
 import { ProfileLinkedAccountsCard } from "@/features/settings/account/components/ProfileLinkedAccountsCard";
 import { ProfileOverviewCard } from "@/features/settings/account/components/ProfileOverviewCard";
 import { useAccountSettingsData } from "@/features/settings/account/use-account-settings-data";
+import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { useInvitationsSettingsData } from "@/features/settings/invitations/use-invitations-settings-data";
 import { buildAccountSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { WorkspaceIncomingInvitationsCard } from "@/features/settings/workspace/components/WorkspaceIncomingInvitationsCard";
-import { useOrganization } from "@/features/workspace/organization/useOrganization";
-import { useWorkspaceSlug } from "@/features/workspace/routing/workspace-routes";
+import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { resolveWorkspaceAppPath } from "@/features/workspace/organization/workspace-navigation";
 import { authClient, signOut } from "@/lib/auth-client";
 
 export function AccountSettingsSection() {
-	const orgSlug = useWorkspaceSlug();
 	const navigate = useNavigate();
+	const getShellRoutePath = useShellRoutePath();
 	const data = useAccountSettingsData();
 	const invitationsData = useInvitationsSettingsData();
-	const { actions } = useOrganization();
 	const { trackAuthenticationAction } = useAnalyticsTracking();
 	const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
 	const [processingInvitationId, setProcessingInvitationId] = useState<
@@ -40,7 +38,7 @@ export function AccountSettingsSection() {
 		setLinkingProvider(provider);
 		authClient.linkSocial({
 			provider,
-			callbackURL: `${window.location.origin}${appRoutes.settingsAccount(orgSlug)}`,
+			callbackURL: `${window.location.origin}${getShellRoutePath(appRoutes.settingsAccount())}`,
 		});
 	};
 
@@ -76,7 +74,12 @@ export function AccountSettingsSection() {
 			});
 			if (response.data) {
 				try {
-					await actions.switchOrganization(response.data.member.organizationId);
+					navigate(
+						await resolveWorkspaceAppPath(
+							response.data.member.organizationId,
+							appRoutes.settingsAccount(),
+						),
+					);
 				} catch (cause) {
 					toast.error(
 						cause instanceof Error
@@ -137,64 +140,24 @@ export function AccountSettingsSection() {
 		}),
 	);
 
+	if (data.state.isPending) return <SettingsPageSkeleton routeId="account" />;
+
 	return (
-		<>
-			{data.state.isPending ? (
-				<div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-[1.05fr_1fr]">
-					<Card
-						size="sm"
-						className="bg-card/95 shadow-none ring-1 ring-border/60"
-					>
-						<CardContent className="flex flex-col gap-4">
-							<div className="flex items-center gap-4">
-								<Skeleton className="size-10 rounded-full" />
-								<div className="flex flex-1 flex-col gap-2">
-									<Skeleton className="h-4 w-32 rounded-md" />
-									<Skeleton className="h-3 w-40 rounded-md" />
-								</div>
-							</div>
-							<Skeleton className="h-9 w-full rounded-md" />
-							<Skeleton className="h-8 w-28 rounded-md" />
-						</CardContent>
-					</Card>
-					<Card
-						size="sm"
-						className="bg-card/95 shadow-none ring-1 ring-border/60"
-					>
-						<CardContent className="flex flex-col gap-3">
-							{["provider-1", "provider-2", "provider-3"].map((key) => (
-								<div key={key} className="flex items-center justify-between">
-									<div className="flex flex-col gap-2">
-										<Skeleton className="h-4 w-28 rounded-md" />
-										<Skeleton className="h-3 w-40 rounded-md" />
-									</div>
-									<Skeleton className="h-7 w-20 rounded-md" />
-								</div>
-							))}
-						</CardContent>
-					</Card>
-				</div>
-			) : (
-				<div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-[1.05fr_1fr]">
-					<ProfileOverviewCard
-						name={data.user.name}
-						email={data.user.email}
-						image={data.user.image}
-						isSigningOut={isSigningOut}
-						onSignOut={() => void handleSignOut()}
-					/>
-					<ProfileLinkedAccountsCard
-						isPending={data.state.isPending}
-						linkedProviders={data.linkedProviders}
-						linkingProvider={linkingProvider}
-						onLinkProvider={handleLinkProvider}
-					/>
-				</div>
-			)}
-			<div
-				id="workspace-invitations"
-				className="mt-4 px-4 lg:px-6 scroll-mt-24"
-			>
+		<div className="workspace-settings-page">
+			<ProfileOverviewCard
+				name={data.user.name}
+				email={data.user.email}
+				image={data.user.image}
+				isSigningOut={isSigningOut}
+				onSignOut={() => void handleSignOut()}
+			/>
+			<ProfileLinkedAccountsCard
+				isPending={data.state.isPending}
+				linkedProviders={data.linkedProviders}
+				linkingProvider={linkingProvider}
+				onLinkProvider={handleLinkProvider}
+			/>
+			<div id="workspace-invitations" className="scroll-mt-24">
 				<WorkspaceIncomingInvitationsCard
 					title="Workspace invitations"
 					description="Accept or decline workspace invites sent to your account."
@@ -208,13 +171,13 @@ export function AccountSettingsSection() {
 				/>
 			</div>
 			{data.state.hasData ? (
-				<div id="delete-account" className="mt-4 px-4 lg:px-6 scroll-mt-24">
+				<div id="delete-account" className="scroll-mt-24">
 					<AccountDangerZoneCard
 						user={{ email: data.user.email, name: data.user.name }}
 						onDeleted={handleAccountDeleted}
 					/>
 				</div>
 			) : null}
-		</>
+		</div>
 	);
 }

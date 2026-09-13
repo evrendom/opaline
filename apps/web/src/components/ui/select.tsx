@@ -1,8 +1,8 @@
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Select as SelectPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { cn } from "@/lib/utils";
+import { FluidMenuHover } from "./fluid-menu-hover";
 
 function Select({
 	...props
@@ -71,12 +71,14 @@ function SelectContent({
 			>
 				<SelectScrollUpButton />
 				<SelectPrimitive.Viewport
+					data-fluid-menu-root=""
 					className={cn(
 						"p-1",
 						position === "popper" &&
 							"h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1",
 					)}
 				>
+					<FluidMenuHover items='[role="option"]' />
 					{children}
 				</SelectPrimitive.Viewport>
 				<SelectScrollDownButton />

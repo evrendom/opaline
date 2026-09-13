@@ -16,12 +16,19 @@ const session: SessionAnalytics = {
 	session_date: "2026-05-04T10:00:00.000Z",
 	project_path: "/Users/evren/rudel",
 	repository: "obsessiondb/rudel",
+	repository_identity: {
+		repoKey: "remote:github.com/obsessiondb/rudel",
+		repoLabel: "obsessiondb/rudel",
+		repoName: "rudel",
+		source: "remote",
+		worktree: null,
+	},
 	duration_min: 12,
 	total_tokens: 10_000,
 	input_tokens: 6_000,
 	output_tokens: 4_000,
 	success_score: 80,
-	total_interactions: 7,
+	total_interactions: 6,
 	avg_period_sec: 45,
 	subagent_types: [],
 	skills: [],
@@ -29,6 +36,12 @@ const session: SessionAnalytics = {
 	has_commit: true,
 	model_used: "gpt-5",
 	used_plan_mode: false,
+	member_swears: 0,
+	member_apologies: 0,
+	member_positive: 0,
+	model_swears: 0,
+	model_apologies: 0,
+	model_positive: 0,
 };
 
 const otherSession: SessionAnalytics = {
@@ -53,7 +66,9 @@ describe("DashboardTokenRecentSessionsTable", () => {
 		expect(
 			screen.getByText("Session detail disabled for demo."),
 		).toBeInTheDocument();
-		expect(screen.queryByRole("button")).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { pressed: false }),
+		).not.toBeInTheDocument();
 
 		fireEvent.click(screen.getByText("obsessiondb/rudel"));
 

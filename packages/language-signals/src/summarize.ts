@@ -6,31 +6,65 @@ import {
 import type {
 	LanguageSignalCounts,
 	LanguageSignalMatch,
+	LanguageSignalSummary,
 	LanguageSignalSummaryInput,
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
+const MAX_PERSISTED_MATCHES_PER_CATEGORY = 25;
+
 export function summarize(
 	input: LanguageSignalSummaryInput,
 ): LanguageSignalCounts {
-	const member = countTextSegments(input.memberText, scanMemberLanguageSignals);
-	const model = countTextSegments(input.modelText, scanModelLanguageSignals);
+	const summary = summarizeWithMatches(input);
 
 	return {
-		member_swears: member.swears,
-		member_apologies: member.apologies,
-		member_positive: member.positive,
-		model_swears: model.swears,
-		model_apologies: model.apologies,
-		model_positive: model.positive,
+		member_swears: summary.member_swears,
+		member_apologies: summary.member_apologies,
+		member_positive: summary.member_positive,
+		model_swears: summary.model_swears,
+		model_apologies: summary.model_apologies,
+		model_positive: summary.model_positive,
 	};
 }
 
-function countTextSegments(
-	segments: readonly string[],
-	scan: (text: string) => readonly LanguageSignalMatch[],
-) {
-	return countSignals(scanDisplayTextSegments(segments, scan));
+export function summarizeWithMatches(
+	input: LanguageSignalSummaryInput,
+): LanguageSignalSummary {
+	const memberMatches = scanDisplayTextSegments(
+		input.memberText,
+		scanMemberLanguageSignals,
+	);
+	const modelMatches = scanDisplayTextSegments(
+		input.modelText,
+		scanModelLanguageSignals,
+	);
+	const memberCounts = countSignals(memberMatches);
+	const modelCounts = countSignals(modelMatches);
+
+	return {
+		member_swears: memberCounts.swears,
+		member_apologies: memberCounts.apologies,
+		member_positive: memberCounts.positive,
+		model_swears: modelCounts.swears,
+		model_apologies: modelCounts.apologies,
+		model_positive: modelCounts.positive,
+		member_swear_matches: collectDistinctMatchedText(memberMatches, "swear"),
+		member_apology_matches: collectDistinctMatchedText(
+			memberMatches,
+			"apology",
+		),
+		member_positive_matches: collectDistinctMatchedText(
+			memberMatches,
+			"positive",
+		),
+		model_swear_matches: collectDistinctMatchedText(modelMatches, "swear"),
+		model_apology_matches: collectDistinctMatchedText(modelMatches, "apology"),
+		model_positive_matches: collectDistinctMatchedText(
+			modelMatches,
+			"positive",
+		),
+	};
 }
 
 export function scanModelLanguageSignalSegments(
@@ -77,4 +111,23 @@ function countSignals(signals: readonly LanguageSignalMatch[]) {
 	}
 
 	return { apologies, positive, swears };
+}
+
+function collectDistinctMatchedText(
+	signals: readonly LanguageSignalMatch[],
+	category: "apology" | "positive" | "swear",
+): string[] {
+	const capturedText: string[] = [];
+	const normalizedText = new Set<string>();
+
+	for (const signal of signals) {
+		if (signal.category !== category) continue;
+		const normalized = signal.matchedText.toLocaleLowerCase("en-US");
+		if (normalizedText.has(normalized)) continue;
+		normalizedText.add(normalized);
+		capturedText.push(signal.matchedText);
+		if (capturedText.length >= MAX_PERSISTED_MATCHES_PER_CATEGORY) break;
+	}
+
+	return capturedText;
 }

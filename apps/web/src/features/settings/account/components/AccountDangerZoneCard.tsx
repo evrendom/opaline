@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/app/ui/button";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
 
 export function AccountDangerZoneCard({
@@ -17,28 +14,23 @@ export function AccountDangerZoneCard({
 	onDeleted: () => Promise<void>;
 }) {
 	const [open, setOpen] = useState(false);
-
 	return (
 		<>
-			<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-				<CardHeader>
-					<CardTitle className="text-destructive">Delete account</CardTitle>
-					<CardDescription>
-						Permanently delete your account and all related data from our
-						database. This cannot be undone.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex justify-end">
+			<WorkspaceSettingsGroup title="Danger zone">
+				<WorkspaceSettingsRow
+					label="Delete account"
+					description="Permanently delete your account and all related data. This cannot be undone."
+				>
 					<Button
 						type="button"
 						variant="destructive"
+						size="sm"
 						onClick={() => setOpen(true)}
 					>
 						Delete account
 					</Button>
-				</CardContent>
-			</Card>
-
+				</WorkspaceSettingsRow>
+			</WorkspaceSettingsGroup>
 			<DeleteAccountDialog
 				open={open}
 				onOpenChange={setOpen}

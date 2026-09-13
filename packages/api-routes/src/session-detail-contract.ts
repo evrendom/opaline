@@ -2,6 +2,8 @@ import { oc } from "@orpc/contract";
 import {
 	SESSION_DETAIL_REVISION_ERRORS,
 	SESSION_DETAIL_WINDOW_ERRORS,
+	SessionDetailBodyChunkInputSchema,
+	SessionDetailBodyChunkSchema,
 	SessionDetailOverviewInputSchema,
 	SessionDetailOverviewSchema,
 	SessionDetailSpineInputSchema,
@@ -15,6 +17,10 @@ import {
 } from "./schemas/session-detail-payload.js";
 
 export const sessionDetailProcedureContracts = {
+	detailBodyChunk: oc
+		.input(SessionDetailBodyChunkInputSchema)
+		.output(SessionDetailBodyChunkSchema)
+		.errors(SESSION_DETAIL_REVISION_ERRORS),
 	detailOverview: oc
 		.input(SessionDetailOverviewInputSchema)
 		.output(SessionDetailOverviewSchema)

@@ -1,0 +1,967 @@
+---
+import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
+
+interface Props {
+	active?: "product" | "pricing";
+	productHref?: string;
+	enableDemo?: boolean;
+}
+
+const { active = "product", productHref = "#product" } = Astro.props;
+
+// BETA LAUNCH: Product and Pricing navigation stays hidden until payment
+// management is ready to operate safely after launch.
+const showProductAndPricingLinks = false;
+
+const flatOpalineWordmark = opalineWordmarkSvg
+	.trim()
+	.replace(/^<svg\s/, '<svg aria-hidden="true" focusable="false" ');
+---
+
+<header class="instant-v2-nav" data-instant-v2-nav data-scrolled="true">
+	<div class="instant-v2-nav-inner">
+		<a class="instant-v2-nav-label" href="/home" aria-label="Homepage">
+			<Fragment set:html={flatOpalineWordmark} />
+		</a>
+
+		{
+			showProductAndPricingLinks && (
+				<nav class="instant-v2-nav-links" aria-label="Main navigation">
+					<a
+						class:list={[
+							"instant-v2-nav-link instant-v2-nav-link-product",
+							{ "is-active": active === "product" },
+						]}
+						href={productHref}
+						aria-current={active === "product" ? "page" : undefined}
+						aria-label="Product"
+						data-instant-v2-product-link
+					>
+						<span class="instant-v2-nav-product-pill">Product</span>
+					</a>
+					<a
+						class:list={[
+							"instant-v2-nav-link instant-v2-nav-link-pricing",
+							{ "is-active": active === "pricing" },
+						]}
+						href="/pricing"
+						aria-current={active === "pricing" ? "page" : undefined}
+					>
+						<span>Pricing</span>
+					</a>
+				</nav>
+			)
+		}
+
+		<button
+			class="instant-v2-nav-install"
+			type="button"
+			data-instant-v2-install
+			data-instant-v2-copy
+			data-instant-v2-copy-icon-button
+			data-instant-v2-pointer-glow
+			data-marketing-install-source="navigation"
+			data-install-command="npm i -g @opalinehq/cli"
+			data-copy-feedback-ms="2000"
+			aria-label="copy install command: npm i -g @opalinehq/cli"
+			title="copy install command"
+		>
+			<span
+				class="instant-v2-nav-install-opalescence"
+				data-instant-v2-pointer-glow-effect
+				aria-hidden="true"
+			></span>
+			<span
+				class="instant-v2-nav-install-glass"
+				aria-hidden="true"
+			></span>
+			<span class="instant-v2-copy-content">
+				<svg
+					class="instant-v2-copy-icon"
+					viewBox="0 0 24 24"
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					aria-hidden="true"
+				>
+					<rect
+						class="instant-v2-copy-icon-lower"
+						x="4.75"
+						y="8.75"
+						width="10.5"
+						height="10.5"
+						rx="2"
+						stroke="currentColor"
+						stroke-width="1.5"
+					></rect>
+					<g mask="url(#instant-v2-nav-copy-icon-mask)">
+						<rect
+							class="instant-v2-copy-icon-upper"
+							x="8.75"
+							y="4.75"
+							width="10.5"
+							height="10.5"
+							rx="2"
+							stroke="currentColor"
+							stroke-width="1.5"
+						></rect>
+					</g>
+					<path
+						class="instant-v2-copy-icon-check"
+						d="M9.25 12.25L11 14.25L15 10"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						pathLength="1"
+					></path>
+					<mask
+						id="instant-v2-nav-copy-icon-mask"
+						maskUnits="userSpaceOnUse"
+					>
+						<rect width="24" height="24" fill="#fff"></rect>
+						<rect
+							class="instant-v2-copy-icon-mask-shape"
+							x="4.75"
+							y="8.75"
+							width="10.5"
+							height="10.5"
+							rx="2"
+							fill="#000"
+							stroke="#000"
+							stroke-width="1.5"
+						></rect>
+					</mask>
+				</svg>
+				<span class="instant-v2-copy-label instant-v2-copy-full"
+					>npm i -g @opalinehq/cli</span
+				>
+				<span
+					class="instant-v2-copy-label instant-v2-copy-short"
+					aria-hidden="true">npm i -g…</span
+				>
+			</span>
+		</button>
+
+	</div>
+</header>
+
+<style>
+	.instant-v2-nav {
+		--instant-v2-nav-outgoing-opacity: 1;
+		--instant-v2-nav-outgoing-scale: 1;
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		display: flex;
+		height: 42px;
+		align-items: center;
+		background: transparent;
+	}
+
+	.instant-v2-nav-inner,
+	.instant-v2-nav-demo-layer-inner {
+		position: relative;
+		width: min(calc(100% - clamp(48px, 6.75vw, 136px)), 1920px);
+		margin-inline: auto;
+	}
+
+	.instant-v2-nav-inner {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 48px;
+		opacity: var(--instant-v2-nav-outgoing-opacity);
+		will-change: opacity;
+	}
+
+	.instant-v2-nav-demo-layer {
+		position: fixed;
+		z-index: 60;
+		inset: 0 0 auto;
+		height: 42px;
+		pointer-events: none;
+	}
+
+	.instant-v2-nav-demo-layer-inner {
+		height: 100%;
+	}
+
+	@supports (width: round(nearest, 1px, 1px)) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: min(
+				calc(100% - round(nearest, clamp(48px, 6.75vw, 136px), 2px)),
+				1920px
+			);
+		}
+	}
+
+	.instant-v2-nav-label {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-self: start;
+		color: #1f1f1f;
+		text-decoration: none;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition: color 260ms ease;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-label :global(svg) {
+		display: block;
+		width: 64px;
+		height: 16px;
+	}
+
+	.instant-v2-nav-label :global(svg path) {
+		fill: currentColor;
+	}
+
+	.instant-v2-nav-links {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 4px;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition: gap 260ms ease;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-link {
+		display: inline-flex;
+		flex: none;
+		height: 32px;
+		align-items: center;
+		justify-content: center;
+		border-radius: 6px;
+		color: #525252;
+		font-size: 12px;
+		font-weight: 400;
+		line-height: 16px;
+		text-decoration: none;
+		transition:
+			background-color 150ms ease,
+			color 260ms ease,
+			width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.instant-v2-nav-link:not(.instant-v2-nav-link-product) > span,
+	.instant-v2-nav-product-pill {
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		padding-inline: 14px;
+		border-radius: inherit;
+	}
+
+	.instant-v2-nav-link.is-active {
+		color: #1f1f1f;
+		font-weight: 500;
+	}
+
+	.instant-v2-nav-link.is-active > span {
+		background: #ebebeb;
+	}
+
+	.instant-v2-nav-link-product {
+		width: 73px;
+	}
+
+	.instant-v2-nav-link-pricing {
+		width: 67px;
+		overflow: hidden;
+	}
+
+	.instant-v2-nav-product-pill {
+		position: relative;
+		width: 100%;
+		overflow: hidden;
+		transition:
+			background-color 260ms ease,
+			box-shadow 260ms ease;
+	}
+
+	.instant-v2-nav-demo {
+		--instant-v2-nav-demo-opacity: 0;
+		--instant-v2-nav-demo-y: 5px;
+		--instant-v2-nav-demo-exit-duration: 260ms;
+		position: absolute;
+		top: 50%;
+		left: 0;
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		padding: 0 10px;
+		border-radius: 6px;
+		background: #fff;
+		box-shadow:
+			inset 0 0 0 0.5px transparent,
+			0 0 0 0.5px rgba(0, 0, 0, 0.06),
+			0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		color: rgba(0, 0, 0, 0.87);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 16px;
+		text-decoration: none;
+		opacity: var(--instant-v2-nav-demo-opacity);
+		pointer-events: none;
+		white-space: nowrap;
+		transform: translate3d(0, calc(-50% + var(--instant-v2-nav-demo-y)), 0);
+		transition:
+			background-color 150ms ease-out,
+			box-shadow 150ms ease-out;
+		will-change: opacity, transform;
+	}
+
+	/* ─────────────────────────────────────────────────────────
+	 * NAV DEMO CTA STORYBOARD — click handoff
+	 *
+	 *   0ms   click locks the CTA; dashboard transition begins
+	 * 260ms   CTA fades out at its resting size and position
+	 * ───────────────────────────────────────────────────────── */
+
+	.instant-v2-nav-install {
+		--instant-v2-copy-shape-duration: 120ms;
+		--instant-v2-copy-shape-return-delay: 130ms;
+		--instant-v2-copy-check-duration: 100ms;
+		--instant-v2-copy-check-delay: 90ms;
+		--instant-v2-copy-color-duration: 190ms;
+		--instant-v2-copy-return-duration: 250ms;
+		position: relative;
+		isolation: isolate;
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		margin-left: auto;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 6px;
+		background: #fff;
+		box-shadow:
+			inset 0 0 0 0.5px transparent,
+			0 0 0 0.5px rgba(0, 0, 0, 0.06),
+			0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		color: rgba(0, 0, 0, 0.87);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 16px;
+		overflow: hidden;
+		white-space: nowrap;
+		cursor: pointer;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition:
+			background-color 150ms ease-out,
+			color 150ms ease-out,
+			box-shadow 150ms ease-out;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-install-opalescence {
+		--instant-v2-nav-glow-width: 48px;
+		--instant-v2-nav-glow-height: 20px;
+		--instant-v2-nav-glow-blur: 6px;
+		position: absolute;
+		z-index: 0;
+		top: 50%;
+		left: 50%;
+		width: var(--instant-v2-nav-glow-width);
+		height: var(--instant-v2-nav-glow-height);
+		border-radius: 999px;
+		background-image: linear-gradient(
+			90deg,
+			oklch(var(--instant-v2-glimm-blue) / 0.16) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / 0.196) 40%,
+			oklch(var(--instant-v2-glimm-purple) / 0.19) 60%,
+			oklch(var(--instant-v2-glimm-pink) / 0.196) 80%
+		);
+		filter: blur(var(--instant-v2-nav-glow-blur));
+		opacity: 0;
+		transform: translate3d(
+			calc(-50% + var(--instant-v2-glow-x, 0px)),
+			calc(-50% + var(--instant-v2-glow-y, 0px)),
+			0
+		);
+		pointer-events: none;
+		transition: opacity 200ms ease-out;
+	}
+
+	.instant-v2-nav-install-glass {
+		position: absolute;
+		z-index: 1;
+		inset: 0;
+		border-radius: inherit;
+		background: oklch(1 0 0 / 0.36);
+		-webkit-backdrop-filter: blur(5px) saturate(1.45);
+		backdrop-filter: blur(5px) saturate(1.45);
+		box-shadow:
+			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
+			inset 0 1px 0 oklch(1 0 0 / 0.62);
+		pointer-events: none;
+	}
+
+	/* ─────────────────────────────────────────────────────────
+	 * NAV COPY ICON ANIMATION STORYBOARD
+	 *
+	 *    0ms   squares merge; gradient compresses behind frosted glass
+	 *   90ms   check draws; gradient overshoots behind frosted glass
+	 *  120ms   circle and full gradient settle behind frosted glass
+	 *  190ms   check completes; full gradient holds behind glass
+	 * 2,000ms  check erases; full gradient still holds behind glass
+	 * 2,130ms  icon and gradient begin returning behind glass
+	 * 2,250ms  copy icon and resting gradient scale are restored
+	 * ───────────────────────────────────────────────────────── */
+
+	.instant-v2-nav-install > .instant-v2-copy-content {
+		position: relative;
+		z-index: 2;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.instant-v2-copy-short {
+		display: none;
+	}
+
+	.instant-v2-copy-icon {
+		display: block;
+		width: 16px;
+		height: 16px;
+		flex: 0 0 16px;
+		overflow: visible;
+	}
+
+	.instant-v2-copy-icon-lower,
+	.instant-v2-copy-icon-upper,
+	.instant-v2-copy-icon-mask-shape {
+		width: 10.5px;
+		height: 10.5px;
+		rx: 2px;
+		transition:
+			transform var(--instant-v2-copy-shape-duration) ease-out
+				var(--instant-v2-copy-shape-return-delay),
+			width var(--instant-v2-copy-shape-duration) ease-out
+				var(--instant-v2-copy-shape-return-delay),
+			height var(--instant-v2-copy-shape-duration) ease-out
+				var(--instant-v2-copy-shape-return-delay),
+			rx var(--instant-v2-copy-shape-duration) ease-out
+				var(--instant-v2-copy-shape-return-delay);
+	}
+
+	.instant-v2-copy-icon-lower,
+	.instant-v2-copy-icon-mask-shape {
+		transform-origin: 10px 14px;
+	}
+
+	.instant-v2-copy-icon-upper {
+		transform-origin: 14px 10px;
+	}
+
+	.instant-v2-copy-icon-check {
+		opacity: 0;
+		stroke-dasharray: 0 1;
+		stroke-dashoffset: -1;
+		transition:
+			stroke-dasharray var(--instant-v2-copy-check-duration) ease-out,
+			stroke-dashoffset var(--instant-v2-copy-check-duration) ease-out,
+			opacity 0ms linear var(--instant-v2-copy-check-duration);
+	}
+
+	[data-instant-v2-copy][data-copied="true"]
+		:is(
+			.instant-v2-copy-icon-lower,
+			.instant-v2-copy-icon-upper,
+			.instant-v2-copy-icon-mask-shape
+		) {
+		width: 14.5px;
+		height: 14.5px;
+		rx: 7.25px;
+		transition-delay: 0ms;
+	}
+
+	[data-instant-v2-copy][data-copied="true"]
+		:is(.instant-v2-copy-icon-lower, .instant-v2-copy-icon-mask-shape) {
+		transform: translateY(-4px);
+	}
+
+	[data-instant-v2-copy][data-copied="true"]
+		.instant-v2-copy-icon-upper {
+		transform: translateX(-4px);
+	}
+
+	[data-instant-v2-copy][data-copied="true"]
+		.instant-v2-copy-icon-check {
+		opacity: 1;
+		stroke-dasharray: 1 1;
+		stroke-dashoffset: 0;
+		transition:
+			stroke-dasharray var(--instant-v2-copy-check-duration) ease-out
+				var(--instant-v2-copy-check-delay),
+			stroke-dashoffset 0ms linear,
+			opacity 0ms linear;
+	}
+
+	[data-instant-v2-copy][data-copied="true"]
+		.instant-v2-nav-install-opalescence {
+		z-index: 0;
+		animation: instant-v2-nav-opalescence-expand
+			var(--instant-v2-copy-color-duration) linear both;
+	}
+
+	[data-instant-v2-copy][data-copy-resetting="true"]
+		.instant-v2-nav-install-opalescence {
+		z-index: 0;
+		animation: instant-v2-nav-opalescence-return
+			var(--instant-v2-copy-return-duration) linear both;
+	}
+
+	@keyframes instant-v2-nav-opalescence-expand {
+		0% {
+			width: var(--instant-v2-nav-glow-width);
+			height: var(--instant-v2-nav-glow-height);
+			border-radius: 999px;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(
+				calc(-50% + var(--instant-v2-glow-x, 0px)),
+				calc(-50% + var(--instant-v2-glow-y, 0px)),
+				0
+			);
+		}
+
+		18% {
+			width: 62%;
+			height: 88%;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+		}
+
+		47% {
+			width: 132%;
+			height: 170%;
+			border-radius: 0;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(-50%, -50%, 0) scale(1.08);
+		}
+
+		63%,
+		100% {
+			width: 110%;
+			height: 125%;
+			border-radius: 0;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(-50%, -50%, 0);
+		}
+	}
+
+	@keyframes instant-v2-nav-opalescence-return {
+		0%,
+		52% {
+			width: 110%;
+			height: 125%;
+			border-radius: 0;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(-50%, -50%, 0);
+		}
+
+		52% {
+			animation-timing-function: ease-out;
+		}
+
+		100% {
+			width: var(--instant-v2-nav-glow-width);
+			height: var(--instant-v2-nav-glow-height);
+			border-radius: 999px;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(
+				calc(-50% + var(--instant-v2-glow-x, 0px)),
+				calc(-50% + var(--instant-v2-glow-y, 0px)),
+				0
+			);
+		}
+	}
+
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-label,
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-link,
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-install {
+		pointer-events: none;
+	}
+
+	.instant-v2-nav-demo[data-instant-v2-demo-available] {
+		pointer-events: auto;
+	}
+
+	:global(html[data-instant-v2-demo]:not([data-instant-v2-demo-exiting]))
+		.instant-v2-nav-demo {
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity var(--instant-v2-nav-demo-exit-duration) ease-out;
+	}
+
+	:global(html[data-instant-v2-demo-exiting]) .instant-v2-nav-demo {
+		opacity: var(--instant-v2-nav-demo-opacity);
+		pointer-events: none;
+		transition: opacity 650ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.instant-v2-nav[data-demo-active] {
+		position: fixed;
+		inset: 0 0 auto;
+		width: 100%;
+	}
+
+	.instant-v2-nav-label:focus-visible,
+	.instant-v2-nav-link:focus-visible,
+	.instant-v2-nav-install:focus-visible,
+	.instant-v2-nav-demo:focus-visible {
+		outline: 2px solid #0070f3;
+		outline-offset: 4px;
+	}
+
+	@media (any-hover: hover) {
+		.instant-v2-nav-link:hover {
+			color: #1f1f1f;
+		}
+
+		.instant-v2-nav-install:hover {
+			background: #fff;
+		}
+
+		.instant-v2-nav-demo:hover {
+			background: #fff;
+		}
+
+		.instant-v2-nav-install:hover .instant-v2-nav-install-opalescence {
+			opacity: 1;
+		}
+	}
+
+	.instant-v2-nav-install:focus-visible
+		.instant-v2-nav-install-opalescence {
+		opacity: 1;
+	}
+
+	.instant-v2-nav-install:active {
+		background: #f9f9f9;
+	}
+
+	.instant-v2-nav-demo:active {
+		background: #f9f9f9;
+	}
+
+	@media (max-width: 899px) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: min(calc(100% - 40px), 720px);
+		}
+
+		.instant-v2-nav-inner {
+			gap: 24px;
+		}
+	}
+
+	@media (max-width: 540px) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: calc(100% - 20px);
+		}
+
+		.instant-v2-nav-inner {
+			gap: 20px;
+		}
+
+		.instant-v2-nav-link:not(.instant-v2-nav-link-product) > span {
+			padding-inline: 10px;
+		}
+
+		.instant-v2-nav-link-product {
+			width: 69px;
+		}
+
+		.instant-v2-nav-link-pricing {
+			width: 60px;
+		}
+
+		.instant-v2-nav-install {
+			padding-inline: 10px;
+		}
+
+		.instant-v2-copy-full {
+			display: inline;
+		}
+
+		.instant-v2-copy-short {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.instant-v2-nav,
+		.instant-v2-nav-label,
+		.instant-v2-nav-link,
+		.instant-v2-nav-product-pill,
+		.instant-v2-nav-install,
+		.instant-v2-nav-install-opalescence,
+		.instant-v2-nav-demo {
+			transition-duration: 0.01ms;
+		}
+
+		[data-instant-v2-copy][data-copied="true"]
+			.instant-v2-nav-install-opalescence {
+			animation: none;
+			width: 110%;
+			height: 125%;
+			border-radius: 0;
+			filter: blur(var(--instant-v2-nav-glow-blur));
+			opacity: 1;
+			transform: translate3d(-50%, -50%, 0);
+		}
+
+		[data-instant-v2-copy][data-copy-resetting="true"]
+			.instant-v2-nav-install-opalescence {
+			animation: none;
+		}
+
+		.instant-v2-copy-icon * {
+			transition-delay: 0ms;
+			transition-duration: 0.01ms;
+		}
+	}
+</style>
+
+	<script>
+		import { getInstantV2ScrollContainer } from "../scripts/instant-v2-scroll";
+		const DEMO_ENTER_EVENT = "instant-v2:demo-enter";
+		const COPY_ICON_RESET_MS = 250;
+
+	/* ─────────────────────────────────────────────────────────
+	 * NAV HANDOVER STORYBOARD — distance before dashboard docking
+	 *
+		 * 180px   nav begins fading; gradient begins revealing
+		 *  90px   gradient reaches peak stretch during dashboard travel
+		 *   0px   nav is hidden; gradient lands at full opacity
+	 * ───────────────────────────────────────────────────────── */
+	const NAV_HANDOVER = {
+		distancePx: 180,
+		outgoingEnd: 1,
+		outgoingScaleExtent: 0.1,
+		gradientMaxStretch: 0.12,
+	};
+	const nav = document.querySelector<HTMLElement>("[data-instant-v2-nav]");
+	const dashboard = document.querySelector<HTMLElement>(
+		"[data-instant-v2-product-window]",
+	);
+	const copyButtons = document.querySelectorAll<HTMLButtonElement>(
+		"[data-instant-v2-copy]",
+	);
+	const pointerGlowOwners =
+		document.querySelectorAll<HTMLElement>("[data-instant-v2-pointer-glow]");
+	const demoTriggers = document.querySelectorAll<HTMLElement>(
+		"[data-instant-v2-demo-trigger]",
+	);
+	const fadingControls = nav?.querySelectorAll<HTMLElement>(
+		".instant-v2-nav-label, .instant-v2-nav-link, [data-instant-v2-install]",
+	);
+	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+	let pendingHandoverFrame = 0;
+
+	const clampHandoverProgress = (value: number) =>
+		Math.min(1, Math.max(0, value));
+
+	const remapHandoverProgress = (
+		progress: number,
+		start: number,
+		end: number,
+	) => clampHandoverProgress((progress - start) / (end - start));
+
+	const applyHandoverProgress = (progress: number) => {
+		if (!nav || !dashboard) return;
+
+		const outgoingProgress = remapHandoverProgress(
+			progress,
+			0,
+			NAV_HANDOVER.outgoingEnd,
+		);
+		nav.style.setProperty(
+			"--instant-v2-nav-outgoing-opacity",
+			(1 - outgoingProgress).toFixed(4),
+		);
+		nav.style.setProperty(
+			"--instant-v2-nav-outgoing-scale",
+			(1 - outgoingProgress * NAV_HANDOVER.outgoingScaleExtent).toFixed(4),
+		);
+		dashboard.style.setProperty(
+			"--instant-v2-gradient-reveal-progress",
+			progress.toFixed(4),
+		);
+		const gradientMotionEnvelope = Math.sin(progress * Math.PI);
+		dashboard.style.setProperty(
+			"--instant-v2-gradient-motion-scale",
+			(
+				1 +
+				gradientMotionEnvelope * NAV_HANDOVER.gradientMaxStretch
+			).toFixed(4),
+		);
+	};
+
+	const updateHandoverState = () => {
+		pendingHandoverFrame = 0;
+		if (!nav || !dashboard) return;
+
+		const distanceToDock =
+			dashboard.getBoundingClientRect().top -
+			nav.getBoundingClientRect().bottom;
+		const nextDocked = distanceToDock <= 0.5;
+		const scrollProgress = clampHandoverProgress(
+			1 - distanceToDock / NAV_HANDOVER.distancePx,
+		);
+		const handoverProgress = reducedMotion.matches
+			? nextDocked
+				? 1
+				: 0
+			: scrollProgress;
+		applyHandoverProgress(handoverProgress);
+		const outgoingControlsHidden =
+			handoverProgress >= NAV_HANDOVER.outgoingEnd;
+		for (const control of fadingControls ?? []) {
+			control.inert = control.classList.contains("instant-v2-nav-label")
+				? handoverProgress > 0
+				: outgoingControlsHidden;
+		}
+		nav.toggleAttribute("data-dashboard-docked", nextDocked);
+		document.documentElement.toggleAttribute(
+			"data-instant-v2-dashboard-docked",
+			nextDocked,
+		);
+	};
+
+	const queueHandoverUpdate = () => {
+		if (pendingHandoverFrame) return;
+		pendingHandoverFrame = requestAnimationFrame(updateHandoverState);
+	};
+
+	const refreshHandoverAfterIdle = () => {
+		if (document.visibilityState !== "visible") return;
+		if (pendingHandoverFrame) {
+			cancelAnimationFrame(pendingHandoverFrame);
+			pendingHandoverFrame = 0;
+		}
+		updateHandoverState();
+	};
+
+	updateHandoverState();
+	(getInstantV2ScrollContainer() ?? window).addEventListener(
+		"scroll",
+		queueHandoverUpdate,
+		{ passive: true },
+	);
+	window.addEventListener("resize", queueHandoverUpdate, { passive: true });
+	window.addEventListener("pageshow", queueHandoverUpdate, { passive: true });
+	document.addEventListener("visibilitychange", refreshHandoverAfterIdle);
+	window.visualViewport?.addEventListener("resize", queueHandoverUpdate, {
+		passive: true,
+	});
+	reducedMotion.addEventListener("change", queueHandoverUpdate);
+
+	for (const demoTrigger of demoTriggers) {
+		demoTrigger.addEventListener("click", (event) => {
+			event.preventDefault();
+			window.dispatchEvent(new CustomEvent(DEMO_ENTER_EVENT));
+		});
+	}
+
+	for (const pointerGlowOwner of pointerGlowOwners) {
+		const pointerGlow = pointerGlowOwner.querySelector<HTMLElement>(
+			"[data-instant-v2-pointer-glow-effect]",
+		);
+		if (!pointerGlow) continue;
+
+		pointerGlowOwner.addEventListener(
+			"pointermove",
+			(event) => {
+				const bounds = pointerGlowOwner.getBoundingClientRect();
+				const glowX = event.clientX - (bounds.left + bounds.width / 2);
+				const glowY = event.clientY - (bounds.top + bounds.height / 2);
+				pointerGlow.style.setProperty(
+					"--instant-v2-glow-x",
+					`${glowX}px`,
+				);
+				pointerGlow.style.setProperty(
+					"--instant-v2-glow-y",
+					`${glowY}px`,
+				);
+			},
+			{ passive: true },
+		);
+	}
+
+	const copyFeedbackTimers = new WeakMap<HTMLButtonElement, number>();
+	const copyResetTimers = new WeakMap<HTMLButtonElement, number>();
+
+	for (const copyButton of copyButtons) {
+		copyButton.addEventListener("click", async () => {
+			const command = copyButton.dataset.installCommand;
+			if (!command) return;
+
+			try {
+				await navigator.clipboard.writeText(command);
+			} catch {
+				return;
+			}
+
+			copyButton.dispatchEvent(
+				new CustomEvent("opaline:install-command-copied", { bubbles: true }),
+			);
+
+			window.clearTimeout(copyFeedbackTimers.get(copyButton));
+			window.clearTimeout(copyResetTimers.get(copyButton));
+			delete copyButton.dataset.copyResetting;
+			copyButton.dataset.copied = "true";
+			copyButton.setAttribute("aria-label", `copied: ${command}`);
+			const requestedFeedbackMs = Number(copyButton.dataset.copyFeedbackMs);
+			const feedbackMs =
+				Number.isFinite(requestedFeedbackMs) && requestedFeedbackMs > 0
+					? requestedFeedbackMs
+					: 1400;
+			copyFeedbackTimers.set(
+				copyButton,
+				window.setTimeout(() => {
+					copyButton.setAttribute(
+						"aria-label",
+						`copy install command: ${command}`,
+					);
+
+					if (copyButton.hasAttribute("data-instant-v2-copy-icon-button")) {
+						copyButton.dataset.copyResetting = "true";
+						delete copyButton.dataset.copied;
+						copyResetTimers.set(
+							copyButton,
+							window.setTimeout(() => {
+								delete copyButton.dataset.copyResetting;
+							}, COPY_ICON_RESET_MS),
+						);
+						return;
+					}
+
+					delete copyButton.dataset.copied;
+				}, feedbackMs),
+			);
+		});
+	}
+</script>

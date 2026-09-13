@@ -7,6 +7,7 @@ import {
 	DeveloperTeamCardSchema,
 	DimensionAnalysisInputSchema,
 	HistoricalSkillDetailSchema,
+	HistoricalSkillSummarySchema,
 	LearningEntrySchema,
 	LearningsListInputSchema,
 	ProjectDetailDataSchema,
@@ -105,6 +106,13 @@ describe("analytics input schemas", () => {
 			output_tokens: 0,
 			project_path: "",
 			repository: null,
+			repository_identity: {
+				repoKey: "path-raw:",
+				repoLabel: "Untitled project",
+				repoName: null,
+				source: "unresolved",
+				worktree: null,
+			},
 			session_date: "2026-08-19T00:00:00Z",
 			session_id: "session-1",
 			skills: [],
@@ -119,12 +127,38 @@ describe("analytics input schemas", () => {
 
 		expect(parsed).toMatchObject({
 			member_apologies: 0,
+
 			member_positive: 0,
+
 			member_swears: 0,
+
 			model_apologies: 0,
+
 			model_positive: 0,
+
 			model_swears: 0,
 		});
+	});
+
+	test("accepts additive typed linked subagent metadata", () => {
+		const result = SessionAnalyticsSchema.pick({
+			linked_subagent_count: true,
+			linked_subagents: true,
+		}).parse({
+			linked_subagent_count: 1,
+			linked_subagents: [
+				{
+					confidence: "prompt_echo",
+					model: "gpt-5.5",
+					provider: "openai",
+					session_id: "child-1",
+					source: "codex",
+				},
+			],
+		});
+
+		expect(result.linked_subagent_count).toBe(1);
+		expect(result.linked_subagents?.[0]?.model).toBe("gpt-5.5");
 	});
 
 	test("session list input does not retain view-state enrichment ids", () => {
@@ -133,6 +167,60 @@ describe("analytics input schemas", () => {
 		});
 
 		expect(parsed).not.toHaveProperty("signalSessionIds");
+	});
+
+	test("keeps skill attribution backward compatible and capped", () => {
+		const legacySummary = HistoricalSkillSummarySchema.parse({
+			name: "testing-bun",
+			sessionCount: 3,
+			claudeSessionCount: 2,
+			codexSessionCount: 1,
+		});
+		expect(legacySummary).toEqual({
+			name: "testing-bun",
+			sessionCount: 3,
+			claudeSessionCount: 2,
+			codexSessionCount: 1,
+			contentPreview: null,
+		});
+		expect(
+			HistoricalSkillSummarySchema.parse({
+				...legacySummary,
+				attribution: {},
+			}).attribution,
+		).toEqual({ userCount: 0, topUsers: [], repoCount: 0, topRepos: [] });
+
+		const oversizedAttribution = {
+			...legacySummary,
+			attribution: {
+				userCount: 4,
+				topUsers: ["one", "two", "three", "four"].map((userId) => ({
+					userId,
+					sessionCount: 1,
+				})),
+				repoCount: 0,
+				topRepos: [],
+			},
+		};
+		expect(
+			HistoricalSkillSummarySchema.safeParse(oversizedAttribution).success,
+		).toBe(false);
+
+		expect(
+			HistoricalSkillSummarySchema.safeParse({
+				...legacySummary,
+				attribution: {
+					userCount: 0,
+					topUsers: [],
+					repoCount: 4,
+					topRepos: ["one", "two", "three", "four"].map((repoKey) => ({
+						repoKey,
+						repoLabel: repoKey,
+						sessionCount: 1,
+					})),
+				},
+			}).success,
+		).toBe(false);
 	});
 
 	test("limit capped at 1000 on dimension analysis", () => {

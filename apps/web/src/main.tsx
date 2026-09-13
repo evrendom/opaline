@@ -1,14 +1,13 @@
 import { DialRoot } from "dialkit";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { useLocation } from "react-router-dom";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import { AppProviders } from "@/app/providers/AppProviders";
 import App from "./App.tsx";
 import { useIsMobile } from "./app/hooks/use-mobile";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
 import "dialkit/styles.css";
-import { initErrorMonitoring } from "./lib/error-monitoring";
 import { initProductAnalytics } from "./lib/product-analytics";
 
 const DevTools = import.meta.env.DEV
@@ -24,6 +23,13 @@ function GlobalLumaScope() {
 	useMountEffect(() => {
 		document.body.classList.add("style-luma");
 
+		// Temporary sticky-header diagnostics: append ?debug=colors to any URL
+		// to paint the code-card layers (see the DEBUG COLORS block in
+		// code-block.css). Load without the param for the normal view.
+		if (new URLSearchParams(window.location.search).get("debug") === "colors") {
+			document.documentElement.dataset.debugStickyColors = "";
+		}
+
 		return () => {
 			document.body.classList.remove("style-luma");
 		};
@@ -36,6 +42,7 @@ function DevControls() {
 	const { pathname } = useLocation();
 	const isMobile = useIsMobile();
 	const isWrappedMobile = isMobile && pathname.startsWith("/wrapped");
+	const isOlivettiRail = pathname.startsWith("/olivetti-rail");
 
 	if (isWrappedMobile) {
 		return null;
@@ -43,7 +50,7 @@ function DevControls() {
 
 	return (
 		<>
-			<DialRoot defaultOpen={false} position="bottom-right" />
+			<DialRoot defaultOpen={isOlivettiRail} position="bottom-right" />
 			{DevTools ? (
 				<Suspense fallback={null}>
 					<DevTools />
@@ -70,19 +77,34 @@ function deferProductAnalyticsInit() {
 	}, 0);
 }
 
-initErrorMonitoring();
+const isStandaloneDevRoute =
+	import.meta.env.DEV &&
+	(window.location.pathname === "/dev/trace-tree-fixture" ||
+		window.location.pathname === "/dev/session-detail-fast-integration" ||
+		window.location.pathname === "/dev/transcript-mask");
 
 // biome-ignore lint/style/noNonNullAssertion: root element always exists
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<AppProviders>
-			<GlobalLumaScope />
-			<div className="h-full">
-				<App />
-				{import.meta.env.DEV ? <DevControls /> : null}
-			</div>
-		</AppProviders>
+		{isStandaloneDevRoute ? (
+			<BrowserRouter>
+				<GlobalLumaScope />
+				<div className="h-full">
+					<App />
+				</div>
+			</BrowserRouter>
+		) : (
+			<AppProviders>
+				<GlobalLumaScope />
+				<div className="h-full">
+					<App />
+					{import.meta.env.DEV ? <DevControls /> : null}
+				</div>
+			</AppProviders>
+		)}
 	</StrictMode>,
 );
 
-deferProductAnalyticsInit();
+if (!isStandaloneDevRoute) {
+	deferProductAnalyticsInit();
+}

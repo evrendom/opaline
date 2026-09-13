@@ -2,12 +2,12 @@ import { Building2Icon, CheckIcon, XIcon } from "lucide-react";
 import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
 import {
-	Card,
 	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/app/ui/card";
+import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 
 function formatDate(value: string | Date) {
 	const date = value instanceof Date ? value : new Date(value);
@@ -35,16 +35,12 @@ export function InvitationsCards({
 	onDecline: (invitationId: string) => void;
 }) {
 	return (
-		<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+		<div className="flex flex-col divide-y divide-border/60">
 			{invitations.map((invitation) => {
 				const isProcessing = processingId === invitation.id;
 
 				return (
-					<Card
-						key={invitation.id}
-						size="sm"
-						className="bg-card/95 shadow-none ring-1 ring-border/60"
-					>
+					<SettingsSectionCard key={invitation.id}>
 						<CardHeader className="gap-3">
 							<div className="flex items-start gap-3">
 								<div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -84,7 +80,7 @@ export function InvitationsCards({
 								{isProcessing ? "Working…" : "Accept"}
 							</Button>
 						</CardContent>
-					</Card>
+					</SettingsSectionCard>
 				);
 			})}
 		</div>

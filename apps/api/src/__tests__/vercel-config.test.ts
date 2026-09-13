@@ -28,7 +28,7 @@ describe("Vercel deployment configuration", () => {
 			"/api/rpc?__opaline_path=/rpc/:routePath*",
 		);
 		expect(rewriteSources.indexOf("/rpc/:routePath*")).toBeLessThan(
-			rewriteSources.indexOf("/((?!assets(?:/|$)).*)"),
+			rewriteSources.findIndex((source) => source.startsWith("/((?!assets")),
 		);
 	});
 
@@ -48,27 +48,53 @@ describe("Vercel deployment configuration", () => {
 		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/rpc/health")).toBe(true);
 	});
 
-	test("matches the Fly security headers on SPA responses", () => {
+	test("retains production security headers while allowing the same-origin demo", () => {
 		const vercelSecurityHeaders = Object.fromEntries(
-			(headerRuleBySource.get("/(.*)") ?? []).map((header) => [
+			configuredHeadersForPath("/workspace/sessions").map((header) => [
 				header.key,
 				header.value,
 			]),
 		);
 
-		expect(vercelSecurityHeaders).toEqual(PRODUCTION_SECURITY_HEADERS);
+		expect(vercelSecurityHeaders).toEqual({
+			...PRODUCTION_SECURITY_HEADERS,
+			"Content-Security-Policy": PRODUCTION_SECURITY_HEADERS[
+				"Content-Security-Policy"
+			].replace("frame-src ", "frame-src 'self' "),
+		});
+		const demoHeaders = Object.fromEntries(
+			configuredHeadersForPath("/product-demo/index.html").map((header) => [
+				header.key,
+				header.value,
+			]),
+		);
+		expect(demoHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
+		expect(demoHeaders["Content-Security-Policy"]).toBe(
+			(vercelSecurityHeaders["Content-Security-Policy"] ?? "").replace(
+				"frame-ancestors 'none'",
+				"frame-ancestors 'self'",
+			),
+		);
 	});
 
 	test("keeps missing built assets out of the SPA and immutable cache policy", () => {
 		const spaFallback = vercelConfig.rewrites.find(
-			(rewrite) => rewrite.destination === "/index.html",
+			(rewrite) =>
+				rewrite.destination === "/app.html" &&
+				rewrite.source.startsWith("/((?!"),
 		);
 		expect(spaFallback).toBeDefined();
 		const spaFallbackPattern = new RegExp(
 			`^${spaFallback?.source ?? ""}$`,
 			"u",
 		);
-		for (const missingAssetPath of ["/assets", "/assets/app-missing-hash.js"]) {
+		for (const missingAssetPath of [
+			"/assets",
+			"/assets/app-missing-hash.js",
+			"/_astro/missing.js",
+			"/product-demo/missing.js",
+			"/site-scripts/missing.js",
+		]) {
 			expect(spaFallbackPattern.test(missingAssetPath)).toBe(false);
 		}
 		expect(spaFallbackPattern.test("/dashboard")).toBe(true);
@@ -92,5 +118,5 @@ function headerSourceMatchesPath(source: string, pathname: string): boolean {
 	if (source.endsWith(":path*")) {
 		return pathname.startsWith(source.slice(0, -":path*".length));
 	}
-	return source === pathname;
+	return new RegExp(`^${source}$`, "u").test(pathname);
 }

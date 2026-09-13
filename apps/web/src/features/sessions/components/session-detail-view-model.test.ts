@@ -29,7 +29,6 @@ describe("buildSessionDetailViewModel", () => {
 			{
 				content: `${userEntry}\n${assistantEntry}`,
 				duration_min: "42",
-				estimated_cost: 0.05,
 				git_branch: "main",
 				git_sha: "abcdef123456",
 				input_tokens: "1200",
@@ -45,7 +44,6 @@ describe("buildSessionDetailViewModel", () => {
 					ignored: 42,
 					worker: "patched code",
 				},
-				total_interactions: "7",
 				user_id: "user-1",
 			},
 			{ "user-1": "Ada Lovelace" },
@@ -55,12 +53,11 @@ describe("buildSessionDetailViewModel", () => {
 		expect(model.safeSessionDate).toBe("2026-05-12");
 		expect(model.safeUserDisplayName).toBe("Ada Lovelace");
 		expect(model.safeDurationMin).toBe(42);
-		expect(model.safeTotalInteractions).toBe(7);
 		expect(model.safeSkills).toEqual(["refactor", "tests"]);
 		expect(model.safeSlashCommands).toEqual(["plan", "review"]);
 		expect(model.subagentNames).toEqual(["explorer", "worker"]);
 		expect(model.tokenUsageLabel).toBe("1,200 / 3,400");
-		expect(model.costLabel).toBe("$0.05");
+		expect(model.costLabel).toBe("—");
 		expect(model.conversationSummary).toEqual({
 			assistantMessages: 1,
 			systemMessages: 0,
@@ -85,7 +82,6 @@ describe("buildSessionDetailViewModel", () => {
 					["reviewer", "checked"],
 					["ignored", 100],
 				],
-				total_interactions: undefined,
 				user_id: "",
 			},
 			{},
@@ -95,55 +91,27 @@ describe("buildSessionDetailViewModel", () => {
 		expect(model.safeSessionDate).toBe("");
 		expect(model.safeUserDisplayName).toBe("User");
 		expect(model.safeDurationMin).toBe(0);
-		expect(model.safeTotalInteractions).toBeUndefined();
 		expect(model.safeSkills).toEqual([]);
 		expect(model.safeSlashCommands).toEqual([]);
 		expect(model.subagentNames).toEqual(["reviewer"]);
 		expect(model.tokenUsageLabel).toBe("0 / 0");
-		expect(model.costLabel).toBe("$0.00");
+		expect(model.costLabel).toBe("—");
 		expect(model.conversationSummary).toBeNull();
 		expect(model.metadataBadges).toEqual([]);
 		expect(model.safeContent).toBe('{\n  "unsupported": true\n}');
 	});
 
-	it("uses the event-priced cost instead of recalculating from the session model", () => {
+	it("leaves cost unresolved until request-level usage is available", () => {
 		const model = buildSessionDetailViewModel(
 			{
-				estimated_cost: 300,
 				input_tokens: 100_000_000,
-				model_used: "unresolved-session-display-model",
+				model_used: "claude-sonnet-4-5",
 				output_tokens: 0,
 				session_date: "2026-08-01T00:00:00Z",
 			},
 			{},
 		);
 
-		expect(model.costLabel).toBe("$300");
-	});
-
-	it("does not price an unresolved event from model_used", () => {
-		const model = buildSessionDetailViewModel(
-			{
-				estimated_cost: null,
-				input_tokens: 1_000_000,
-				model_used: "claude-sonnet-4-5",
-				output_tokens: 1_000_000,
-				session_date: "2026-08-01T00:00:00Z",
-			},
-			{},
-		);
-
-		expect(model.costLabel).toBe("$0.00");
-	});
-
-	it("renders malformed server costs as unknown", () => {
-		const model = buildSessionDetailViewModel(
-			{
-				estimated_cost: "not-a-cost",
-			},
-			{},
-		);
-
-		expect(model.costLabel).toBe("$0.00");
+		expect(model.costLabel).toBe("—");
 	});
 });

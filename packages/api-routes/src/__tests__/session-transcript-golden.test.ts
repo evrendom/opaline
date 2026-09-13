@@ -557,14 +557,14 @@ describe("shared session transcript derivation", () => {
 
 	test("pins Claude trace, turn, metric, and pricing bytes", () => {
 		expect(sha256(deriveTranscriptSnapshot(CLAUDE_TRANSCRIPT))).toBe(
-			"f8342dac13b4824748e2be8b1bf2e5ab9e44038025cfeeff3c41a74815fb6053",
+			"be076ea1e54c042cdb48e1e884d605f58986628a15034e743182aeed37c0dd61",
 		);
 	});
 
 	test("pins Codex trace, stable turn ID, metric, and pricing bytes", () => {
 		expect(
 			sha256(deriveTranscriptSnapshot(CODEX_TRANSCRIPT, "gpt-5.6-sol")),
-		).toBe("1f2f3b1a3353ff7cf2bcbd24a1aeff55c8c6012dd87182152cf9f96f9cabaf53");
+		).toBe("423962a4d5ee04f92be14fdcdb307823c9aa7fc4d67ed227a71c6ec80c6b219b");
 	});
 
 	test("keeps a Codex turn ID stable when unrelated lines are inserted", () => {

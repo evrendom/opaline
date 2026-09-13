@@ -12,7 +12,13 @@ interface SlidingWindowEntry {
 	timestamps: number[];
 }
 
-const analyticsWindows = new Map<string, SlidingWindowEntry>();
+type WeightedSample = { ts: number; weight: number };
+
+interface WeightedWindowEntry {
+	samples: WeightedSample[];
+	total: number;
+}
+
 const organizationSessionCountWindows = new Map<string, SlidingWindowEntry>();
 const wrappedShareCreateWindows = new Map<string, SlidingWindowEntry>();
 const wrappedShareLookupWindows = new Map<string, SlidingWindowEntry>();
@@ -20,11 +26,6 @@ const wrappedShareLookupSourceWindows = new Map<string, SlidingWindowEntry>();
 const wrappedResumeCreateWindows = new Map<string, SlidingWindowEntry>();
 const wrappedDecimalClaimRedeemWindows = new Map<string, SlidingWindowEntry>();
 
-const ANALYTICS_MAX_REQUESTS = Number(
-	process.env.RATE_LIMIT_ANALYTICS_MAX ?? 90,
-);
-const ANALYTICS_WINDOW_MS =
-	Number(process.env.RATE_LIMIT_ANALYTICS_WINDOW ?? 60) * 1000;
 const ORGANIZATION_SESSION_COUNT_MAX_REQUESTS = 300;
 const ORGANIZATION_SESSION_COUNT_WINDOW_MS = 60_000;
 const WRAPPED_SHARE_CREATE_MAX_REQUESTS = Number(
@@ -63,36 +64,18 @@ const WRAPPED_DECIMAL_CLAIM_REDEEM_MAX_REQUESTS = Number(
 const WRAPPED_DECIMAL_CLAIM_REDEEM_WINDOW_MS =
 	Number(process.env.RATE_LIMIT_WRAPPED_DECIMAL_CLAIM_REDEEM_WINDOW ?? 60) *
 	1000;
-export function checkAnalyticsRateLimit(userId: string): void {
-	const now = Date.now();
-	const cutoff = now - ANALYTICS_WINDOW_MS;
-
-	let entry = analyticsWindows.get(userId);
-	if (!entry) {
-		entry = { timestamps: [] };
-		analyticsWindows.set(userId, entry);
-	}
-
-	// Evict expired timestamps
-	entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
-
-	if (entry.timestamps.length >= ANALYTICS_MAX_REQUESTS) {
-		logger.warn(
-			"Analytics rate limit exceeded for user {userId}: {count}/{max} in {window}s",
-			{
-				userId,
-				count: entry.timestamps.length,
-				max: ANALYTICS_MAX_REQUESTS,
-				window: ANALYTICS_WINDOW_MS / 1000,
-			},
-		);
-		throw new ORPCError("TOO_MANY_REQUESTS", {
-			message: `Rate limit exceeded. Maximum ${ANALYTICS_MAX_REQUESTS} requests per ${Math.round(ANALYTICS_WINDOW_MS / 1000)} seconds.`,
-		});
-	}
-
-	entry.timestamps.push(now);
-}
+export const INGEST_REQUESTS_MAX = readPositiveSafeIntegerEnv(
+	"RATE_LIMIT_INGEST_REQUESTS_MAX",
+	15_000,
+);
+export const INGEST_REQUESTS_WINDOW_MS =
+	readPositiveSafeIntegerEnv("RATE_LIMIT_INGEST_REQUESTS_WINDOW", 3600) * 1000;
+export const INGEST_BYTES_MAX = readPositiveSafeIntegerEnv(
+	"RATE_LIMIT_INGEST_BYTES_MAX",
+	10 * 1024 * 1024 * 1024,
+);
+export const INGEST_BYTES_WINDOW_MS =
+	readPositiveSafeIntegerEnv("RATE_LIMIT_INGEST_BYTES_WINDOW", 3600) * 1000;
 
 export function checkOrganizationSessionCountRateLimit(
 	userId: string,

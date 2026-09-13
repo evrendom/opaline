@@ -1,0 +1,132 @@
+.root {
+	position: relative;
+	display: flex;
+	padding: 0 var(--blur-root-gutter);
+	margin-inline: calc(var(--blur-root-gutter) * -1);
+	white-space: nowrap;
+}
+
+.host {
+	--blur-bottom-extension: 108px;
+	--blur-bottom-feather: 0px;
+	--blur-debug-opacity: 0;
+	--blur-horizontal-solid: 90%;
+	--blur-layer-opacity: 1;
+	--blur-layer-z: 1;
+	--blur-lead-in: 100px;
+	--blur-root-gutter: 32px;
+	--blur-saturation: 300%;
+	--blur-top-extension: 8px;
+	--blur-top-feather: 8px;
+	--blur-vertical-alignment: start;
+	--blur: 10px;
+	--duration-clip: 2000ms;
+	--duration: 3000ms;
+	position: relative;
+	display: inline-block;
+	vertical-align: baseline;
+	white-space: nowrap;
+}
+
+.banner {
+	display: block;
+	clip-path: inset(0 100% 0 0 round 9999px);
+	animation: unclip var(--duration-clip) ease-in-out forwards;
+}
+
+.effects {
+	position: absolute;
+	z-index: var(--blur-layer-z);
+	inset: 0;
+	display: grid;
+	place-items: center;
+	margin-left: calc(var(--blur-root-gutter) - var(--blur-lead-in));
+	pointer-events: none;
+}
+
+.effects > * {
+	grid-area: 1 / 1;
+}
+
+.blur {
+	width: 100%;
+	height: calc(100% + var(--blur-top-extension) + var(--blur-bottom-extension));
+	align-self: var(--blur-vertical-alignment);
+	margin-top: calc(var(--blur-top-extension) * -1);
+	background: rgb(0 144 255 / var(--blur-debug-opacity));
+	-webkit-mask-image:
+		linear-gradient(
+			to bottom,
+			transparent,
+			#000 var(--blur-top-feather),
+			#000 calc(100% - var(--blur-bottom-feather)),
+			transparent 100%
+		),
+		linear-gradient(270deg, #000 var(--blur-horizontal-solid), transparent);
+	-webkit-mask-composite: source-in;
+	mask-image:
+		linear-gradient(
+			to bottom,
+			transparent,
+			#000 var(--blur-top-feather),
+			#000 calc(100% - var(--blur-bottom-feather)),
+			transparent 100%
+		),
+		linear-gradient(270deg, #000 var(--blur-horizontal-solid), transparent);
+	mask-composite: intersect;
+	opacity: var(--blur-layer-opacity);
+	will-change: transform;
+	animation: reveal var(--duration) ease-in-out forwards;
+	-webkit-backdrop-filter: blur(var(--blur)) saturate(var(--blur-saturation));
+	backdrop-filter: blur(var(--blur)) saturate(var(--blur-saturation));
+}
+
+.host[data-blur-filter-disabled] .blur {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+.host[data-blur-mask-disabled] .blur {
+	-webkit-mask-image: none;
+	mask-image: none;
+}
+
+.host[data-blur-root-clipped] .root {
+	overflow-x: clip;
+}
+
+.screenReader {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	border: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+@keyframes reveal {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes unclip {
+	to {
+		clip-path: inset(0 0 0 0 round 9999px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.banner {
+		clip-path: none;
+		animation: none;
+	}
+
+	.effects {
+		display: none;
+	}
+}

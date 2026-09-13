@@ -1,4 +1,4 @@
-import { appRoutes } from "@/app/routes";
+import { appRoutes, getCanonicalAppPath } from "@/app/routes";
 
 export type SettingsRouteId =
 	| "workspace"
@@ -14,72 +14,61 @@ export type SettingsRouteDefinition = {
 	path: string;
 };
 
+export const settingsRouteMap: Record<
+	SettingsRouteId,
+	SettingsRouteDefinition
+> = {
+	workspace: {
+		id: "workspace",
+		label: "Workspace",
+		segment: "workspace",
+		path: appRoutes.settingsWorkspace(),
+	},
+	members: {
+		id: "members",
+		label: "Members",
+		segment: "members",
+		path: appRoutes.settingsMembers(),
+	},
+	invitations: {
+		id: "invitations",
+		label: "Invitations",
+		segment: "invitations",
+		path: appRoutes.settingsInvitations(),
+	},
+	account: {
+		id: "account",
+		label: "Account",
+		segment: "account",
+		path: appRoutes.settingsAccount(),
+	},
+	"create-workspace": {
+		id: "create-workspace",
+		label: "Create workspace",
+		segment: "create-workspace",
+		path: appRoutes.settingsCreateWorkspace(),
+	},
+};
+
+const settingsRoutes = Object.values(settingsRouteMap);
+
 export type PrimarySettingsRouteId = "workspace" | "members" | "account";
 
-export const settingsRouteSegments = {
-	workspace: "workspace",
-	members: "members",
-	invitations: "invitations",
-	account: "account",
-	"create-workspace": "create-workspace",
-} as const satisfies Record<SettingsRouteId, string>;
-
-export function getSettingsRouteMap(
-	orgSlug: string,
-): Record<SettingsRouteId, SettingsRouteDefinition> {
-	return {
-		workspace: {
-			id: "workspace",
-			label: "Workspace",
-			segment: settingsRouteSegments.workspace,
-			path: appRoutes.settingsWorkspace(orgSlug),
-		},
-		members: {
-			id: "members",
-			label: "Members",
-			segment: settingsRouteSegments.members,
-			path: appRoutes.settingsMembers(orgSlug),
-		},
-		invitations: {
-			id: "invitations",
-			label: "Invitations",
-			segment: settingsRouteSegments.invitations,
-			path: appRoutes.settingsInvitations(orgSlug),
-		},
-		account: {
-			id: "account",
-			label: "Account",
-			segment: settingsRouteSegments.account,
-			path: appRoutes.settingsAccount(orgSlug),
-		},
-		"create-workspace": {
-			id: "create-workspace",
-			label: "Create workspace",
-			segment: settingsRouteSegments["create-workspace"],
-			path: appRoutes.settingsCreateWorkspace(orgSlug),
-		},
-	};
-}
-
-export function getPrimarySettingsRoutes(orgSlug: string) {
-	const settingsRouteMap = getSettingsRouteMap(orgSlug);
-
-	return [
-		settingsRouteMap.workspace,
-		settingsRouteMap.members,
-		settingsRouteMap.account,
-	] as const satisfies readonly SettingsRouteDefinition[];
-}
+export const primarySettingsRoutes = [
+	settingsRouteMap.workspace,
+	settingsRouteMap.members,
+	settingsRouteMap.account,
+] as const satisfies readonly SettingsRouteDefinition[];
 
 export function getActiveSettingsRouteId(
 	pathname: string,
-	orgSlug: string,
 ): PrimarySettingsRouteId {
-	const settingsRoutes = Object.values(getSettingsRouteMap(orgSlug));
+	const canonicalPathname = getCanonicalAppPath(pathname);
 	const matchedRoute =
 		settingsRoutes.find(
 			(route) =>
-				pathname === route.path || pathname.startsWith(`${route.path}/`),
+				canonicalPathname === route.path ||
+				canonicalPathname.startsWith(`${route.path}/`),
 		)?.id ?? "workspace";
 
 	if (matchedRoute === "account" || matchedRoute === "invitations") {
@@ -93,12 +82,7 @@ export function getActiveSettingsRouteId(
 	return "workspace";
 }
 
-export function getSettingsPathFromLegacyTab(
-	tab: string | null,
-	orgSlug: string,
-): string {
-	const settingsRouteMap = getSettingsRouteMap(orgSlug);
-
+export function getSettingsPathFromLegacyTab(tab: string | null): string {
 	if (tab === "account" || tab === "profile") {
 		return settingsRouteMap.account.path;
 	}

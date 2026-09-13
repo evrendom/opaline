@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { loadEnv } from "vite";
+import { loadEnv, type Plugin } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
 
 const { version } = JSON.parse(
@@ -72,19 +72,145 @@ async function resolveAppVersion() {
 // instead of the default local API server. For https targets the proxy rewrites
 // the Host/Origin headers and cookie domain so the remote server's origin checks
 // pass and its session cookie sticks to localhost.
-function buildApiProxy(target: string) {
-	if (!target.startsWith("https://")) {
-		return { "/api": target, "/rpc": target };
+function buildApiProxy(target: string, bearerToken?: string) {
+	const headers: Record<string, string> = {};
+	if (target.startsWith("https://")) {
+		headers.origin = target;
+	}
+	if (bearerToken) {
+		headers.authorization = `Bearer ${bearerToken}`;
+		// Better Auth's bearer plugin appends its session cookie. Strip any stale
+		// browser cookie so the server-side bearer identity wins deterministically.
+		headers.cookie = "";
 	}
 
 	const options = {
 		target,
-		changeOrigin: true,
-		cookieDomainRewrite: "localhost",
-		headers: { origin: target },
+		...(target.startsWith("https://")
+			? {
+					changeOrigin: true,
+					cookieDomainRewrite: "localhost",
+				}
+			: {}),
+		...(Object.keys(headers).length > 0 ? { headers } : {}),
 	};
 
 	return { "/api": options, "/rpc": options };
+}
+
+const designReferenceRoot = path.resolve(
+	__dirname,
+	"../marketing/__DO_NOT_MERGE__inspiration/split-rail-com",
+);
+const designReferenceAssetRoots = new Map([
+	[
+		"/engineers-v2-assets/",
+		path.resolve(designReferenceRoot, "engineers-v2-assets"),
+	],
+	[
+		"/designers-session-assets/",
+		path.resolve(designReferenceRoot, "designers-session-assets"),
+	],
+]);
+const designReferenceRoutes = new Map([
+	["/product/engineers-v2", "split-rail-engineers-v2.capture.html"],
+	["/product/engineers-v2/", "split-rail-engineers-v2.capture.html"],
+	["/product/engineers-v2/hero", "split-rail-engineers-v2-hero.capture.html"],
+	["/product/engineers-v2/hero/", "split-rail-engineers-v2-hero.capture.html"],
+	["/product/designers-v2", "split-rail-designers-session.capture.html"],
+	["/product/designers-v2/", "split-rail-designers-session.capture.html"],
+	[
+		"/product/designers-v2/ship-faster",
+		"split-rail-designers-ship-faster-scroll.capture.html",
+	],
+	[
+		"/product/designers-v2/ship-faster/",
+		"split-rail-designers-ship-faster-scroll.capture.html",
+	],
+	[
+		"/product/designers-v2/ship-faster/state-1",
+		"split-rail-designers-ship-faster-state-1.capture.html",
+	],
+	[
+		"/product/designers-v2/ship-faster/state-2",
+		"split-rail-designers-session-section.capture.html",
+	],
+	[
+		"/product/designers-v2/ship-faster/state-3",
+		"split-rail-designers-ship-faster-state-3.capture.html",
+	],
+]);
+const designReferenceContentTypes: Record<string, string> = {
+	".avif": "image/avif",
+	".css": "text/css; charset=utf-8",
+	".gif": "image/gif",
+	".html": "text/html; charset=utf-8",
+	".jpeg": "image/jpeg",
+	".jpg": "image/jpeg",
+	".js": "text/javascript; charset=utf-8",
+	".png": "image/png",
+	".svg": "image/svg+xml",
+	".webp": "image/webp",
+	".woff2": "font/woff2",
+};
+
+function designReferencePlugin(): Plugin {
+	return {
+		name: "split-rail-reference",
+		apply: "serve",
+		configureServer(server) {
+			server.middlewares.use((request, response, next) => {
+				if (!request.url) {
+					next();
+					return;
+				}
+
+				let requestPath: string;
+				try {
+					requestPath = decodeURIComponent(
+						new URL(request.url, "http://localhost").pathname,
+					);
+				} catch {
+					next();
+					return;
+				}
+
+				const captureName = designReferenceRoutes.get(requestPath);
+				let filePath = captureName
+					? path.resolve(designReferenceRoot, captureName)
+					: null;
+
+				for (const [assetPrefix, assetRoot] of designReferenceAssetRoots) {
+					if (requestPath.startsWith(assetPrefix)) {
+						const assetName = requestPath.slice(assetPrefix.length);
+						if (assetName && path.basename(assetName) === assetName) {
+							filePath = path.resolve(assetRoot, assetName);
+						}
+						break;
+					}
+				}
+
+				if (
+					!filePath ||
+					!existsSync(filePath) ||
+					!statSync(filePath).isFile()
+				) {
+					next();
+					return;
+				}
+
+				response.statusCode = 200;
+				response.setHeader("cache-control", "no-store");
+				response.setHeader(
+					"content-type",
+					designReferenceContentTypes[
+						path.extname(filePath).toLowerCase()
+					] ?? "application/octet-stream",
+				);
+				createReadStream(filePath).pipe(response);
+			});
+		},
+	};
 }
 
 export default defineConfig(async ({ mode }) => {
@@ -94,15 +220,17 @@ export default defineConfig(async ({ mode }) => {
 		env.RUDEL_API_TARGET ??
 		process.env.RUDEL_API_TARGET ??
 		"http://localhost:4010";
+	const apiBearerToken =
+		env.RUDEL_API_BEARER_TOKEN ?? process.env.RUDEL_API_BEARER_TOKEN;
 
 	return {
 		define: {
 			__APP_VERSION__: JSON.stringify(appVersion),
 		},
-		plugins: [react(), tailwindcss()],
+		plugins: [designReferencePlugin(), react(), tailwindcss()],
 		server: {
 			port: 4011,
-			proxy: buildApiProxy(apiTarget),
+			proxy: buildApiProxy(apiTarget, apiBearerToken),
 		},
 		resolve: {
 			alias: {
@@ -111,12 +239,18 @@ export default defineConfig(async ({ mode }) => {
 		},
 		test: {
 			environment: "jsdom",
+			exclude: [
+				...configDefaults.exclude,
+				"e2e/**",
+				"tools/**",
+				"**/*.bun-test.ts",
+				"**/*.bun-test.tsx",
+			],
 			environmentOptions: {
 				jsdom: {
 					url: "http://localhost:4011",
 				},
 			},
-			exclude: [...configDefaults.exclude, "e2e/**"],
 			setupFiles: ["./src/test/setup.ts"],
 		},
 	};

@@ -21,6 +21,7 @@ import { DeviceAuthorizationApp } from "@/features/auth/DeviceAuthorizationApp";
 import { GuestApp } from "@/features/auth/GuestApp";
 import { useOAuthDebugAutoDump } from "@/features/auth/oauth-debug";
 import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
+import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
 import { authClient } from "./lib/auth-client";
 
@@ -38,6 +39,44 @@ const WrappedDevPage = import.meta.env.DEV
 		)
 	: null;
 
+const ConversationTraceFixturePage = import.meta.env.DEV
+	? lazy(() =>
+			import("@/components/conversation/ConversationTraceFixturePage").then(
+				(module) => ({ default: module.ConversationTraceFixturePage }),
+			),
+		)
+	: null;
+
+const SessionContinuousTraceFixturePage = import.meta.env.DEV
+	? lazy(() =>
+			import(
+				"@/features/sessions/components/SessionContinuousTraceFixturePage"
+			).then((module) => ({
+				default: module.SessionContinuousTraceFixturePage,
+			})),
+		)
+	: null;
+
+const SessionDetailFastIntegrationPage = import.meta.env.DEV
+	? lazy(() =>
+			import(
+				"@/features/sessions/components/SessionDetailFastIntegrationPage"
+			).then((module) => ({
+				default: module.SessionDetailFastIntegrationPage,
+			})),
+		)
+	: null;
+
+const TranscriptMaskFixturePage = import.meta.env.DEV
+	? lazy(() =>
+			import(
+				"@/features/sessions/components/transcript-mask-fixture-page"
+			).then((module) => ({
+				default: module.TranscriptMaskFixturePage,
+			})),
+		)
+	: null;
+
 const WrappedDesktopResumePage = lazy(() =>
 	import("@/features/get-started/WrappedDesktopResumePage").then((module) => ({
 		default: module.WrappedDesktopResumePage,
@@ -48,11 +87,12 @@ function FullscreenRouteLoadingScreen() {
 	return <AppLoadingScreen />;
 }
 
-function App() {
+function SessionAwareApp() {
 	const location = useLocation();
 	const { data: session, isPending } = authClient.useSession();
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
+	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
 	const wrappedDevPath = appRoutes.devWrapped();
 	const wrappedTeamCardPath = appRoutes.wrappedTeamCard();
 	const wrappedPublicId = getWrappedPublicIdFromPath(location.pathname);
@@ -72,6 +112,7 @@ function App() {
 			? getPendingSignupRedirect(location.search)
 			: null);
 	const showDesktopOnlyOverlay =
+		!isCliSetupPath &&
 		!deviceUserCode &&
 		!isWrappedDevPath &&
 		!isWrappedTeamCardPath &&
@@ -79,7 +120,7 @@ function App() {
 		!isGetStartedPath(location.pathname) &&
 		!wrappedResumeToken;
 
-	if (deviceUserCode) {
+	if (deviceUserCode && !isCliSetupPath) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
@@ -156,7 +197,7 @@ function App() {
 		);
 	}
 
-	if (isPending) {
+	if (isPending && !isCliSetupPath) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
@@ -166,7 +207,7 @@ function App() {
 		);
 	}
 
-	if (session) {
+	if (session || isCliSetupPath) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
@@ -193,6 +234,48 @@ function App() {
 			{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 		</>
 	);
+}
+
+function App() {
+	const location = useLocation();
+	const isTraceTreeFixturePath =
+		location.pathname === "/dev/trace-tree-fixture";
+	const traceTreeFixtureMode = new URLSearchParams(location.search).get("mode");
+	const TraceTreeFixturePage =
+		traceTreeFixtureMode === "continuous"
+			? SessionContinuousTraceFixturePage
+			: ConversationTraceFixturePage;
+	const isSessionDetailFastIntegrationPath =
+		location.pathname === "/dev/session-detail-fast-integration" ||
+		location.pathname === "/dev/session-detail-fast-integration/v2";
+	const isTranscriptMaskFixturePath =
+		location.pathname === "/dev/transcript-mask";
+
+	if (isTranscriptMaskFixturePath && TranscriptMaskFixturePage) {
+		return (
+			<Suspense fallback={<FullscreenRouteLoadingScreen />}>
+				<TranscriptMaskFixturePage />
+			</Suspense>
+		);
+	}
+
+	if (isSessionDetailFastIntegrationPath && SessionDetailFastIntegrationPage) {
+		return (
+			<Suspense fallback={<FullscreenRouteLoadingScreen />}>
+				<SessionDetailFastIntegrationPage />
+			</Suspense>
+		);
+	}
+
+	if (isTraceTreeFixturePath && TraceTreeFixturePage) {
+		return (
+			<Suspense fallback={<FullscreenRouteLoadingScreen />}>
+				<TraceTreeFixturePage />
+			</Suspense>
+		);
+	}
+
+	return <SessionAwareApp />;
 }
 
 export default App;

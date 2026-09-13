@@ -1,10 +1,15 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { ArrowUpRightIcon, SparklesIcon, XIcon } from "lucide-react";
+import {
+	ArrowUpRight01Icon,
+	Cancel01Icon,
+	SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import * as React from "react";
 import { Button } from "@/app/ui/button";
+import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────
@@ -54,7 +59,7 @@ function NewsCardInner({ expanded = false }: { expanded?: boolean }) {
 					expanded ? "px-1 pt-1" : "px-1 py-1",
 				)}
 			>
-				<SparklesIcon className="size-3.5" />
+				<ShellHugeicon className="size-3.5" icon={SparklesIcon} />
 				What&apos;s new
 			</div>
 			<div className={cn("px-1", expanded ? "pb-1 pt-2" : "pb-1 pt-2")}>
@@ -68,7 +73,10 @@ function NewsCardInner({ expanded = false }: { expanded?: boolean }) {
 						</p>
 					</div>
 					{expanded ? null : (
-						<ArrowUpRightIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+						<ShellHugeicon
+							className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+							icon={ArrowUpRight01Icon}
+						/>
 					)}
 				</div>
 			</div>
@@ -134,7 +142,7 @@ export function SidebarNewsPopover() {
 											/>
 										}
 									>
-										<XIcon className="size-4" />
+										<ShellHugeicon className="size-4" icon={Cancel01Icon} />
 									</DialogPrimitive.Close>
 								</div>
 								<motion.div

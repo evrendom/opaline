@@ -13,9 +13,10 @@
 		"./wrapped-archetype-rebuild": "./src/wrapped-archetype-rebuild.ts"
 	},
 	"scripts": {
+		"backfill:subagent-metrics": "bun scripts/backfill-subagent-metrics.ts",
 		"check-types": "tsc --noEmit",
 		"test": "bun test",
-		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/codex-mv.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts ./src/__tests__/revision-ordering-migration.integration.ts",
+		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/claude-mv.integration.ts ./src/__tests__/codex-mv.integration.ts ./src/__tests__/subagent-metrics-backfill.integration.ts ./src/__tests__/session-lineage.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts ./src/__tests__/revision-ordering-migration.integration.ts",
 		"ch:generate": "bun --bun chkit generate",
 		"ch:generate:dryrun": "bun --bun chkit generate --dryrun",
 		"ch:migrate": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit migrate --apply'",
@@ -27,7 +28,8 @@
 		"ch:backfill:plan": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit backfill plan \"$@\"' --",
 		"ch:backfill:run": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit backfill run \"$@\"' --",
 		"ch:backfill:status": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit backfill status \"$@\"' --",
-		"chcli": "bun scripts/chcli-connect.ts"
+		"chcli": "bun scripts/chcli-connect.ts",
+		"ch:migrate:product-launch": "bun scripts/migrate-product-launch.ts"
 	},
 	"dependencies": {
 		"@chkit/clickhouse": "0.1.0-beta.16",

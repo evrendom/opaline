@@ -6,6 +6,7 @@ import {
 } from "@rudel/ch-schema/generated";
 import {
 	type LanguageSignalCounts,
+	type LanguageSignalSummary,
 	SCAN_VERSION,
 } from "@rudel/language-signals";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
@@ -29,7 +30,9 @@ interface PersistSessionLanguageSignalsEnvironment {
 		rows: readonly RudelSessionLanguageSignalsRow[],
 	) => Promise<void>;
 	readonly now: () => Date;
-	readonly scan: (content: string) => Promise<LanguageSignalCounts>;
+	readonly scan: (
+		content: string,
+	) => Promise<LanguageSignalCounts | LanguageSignalSummary>;
 }
 
 const DEFAULT_ENVIRONMENT: PersistSessionLanguageSignalsEnvironment = {
@@ -82,10 +85,14 @@ export function persistSessionLanguageSignalsWithExecutor(
 
 export function buildSessionLanguageSignalRow(
 	input: Omit<SessionLanguageSignalScanInput, "content">,
-	counts: LanguageSignalCounts,
+	summary: LanguageSignalCounts | LanguageSignalSummary,
 	scannedAt: Date | string,
 ): RudelSessionLanguageSignalsRow {
 	const persistedScannedAt = toClickHouseDateTime(scannedAt);
+	const matches = hasLanguageSignalMatches(summary)
+		? summary
+		: EMPTY_LANGUAGE_SIGNAL_MATCHES;
+
 	return {
 		organization_id: input.organizationId,
 		session_date: toClickHouseDateTime(input.sessionDate),
@@ -95,7 +102,18 @@ export function buildSessionLanguageSignalRow(
 		raw_revision: input.rawRevision,
 		raw_ingested_at: toClickHouseDateTime(input.rawIngestedAt),
 		scan_version: SCAN_VERSION,
-		...counts,
+		member_swears: summary.member_swears,
+		member_apologies: summary.member_apologies,
+		member_positive: summary.member_positive,
+		model_swears: summary.model_swears,
+		model_apologies: summary.model_apologies,
+		model_positive: summary.model_positive,
+		member_swear_matches: [...matches.member_swear_matches],
+		member_apology_matches: [...matches.member_apology_matches],
+		member_positive_matches: [...matches.member_positive_matches],
+		model_swear_matches: [...matches.model_swear_matches],
+		model_apology_matches: [...matches.model_apology_matches],
+		model_positive_matches: [...matches.model_positive_matches],
 		scanned_at: persistedScannedAt,
 		signal_version: buildSessionLanguageSignalVersion(
 			input.rawRevision,
@@ -132,6 +150,21 @@ export function buildSessionLanguageSignalVersion(
 		(BigInt(scannedAtMilliseconds) << 16n) +
 		BigInt(scanVersion)
 	).toString();
+}
+
+const EMPTY_LANGUAGE_SIGNAL_MATCHES = {
+	member_swear_matches: [],
+	member_apology_matches: [],
+	member_positive_matches: [],
+	model_swear_matches: [],
+	model_apology_matches: [],
+	model_positive_matches: [],
+} as const;
+
+function hasLanguageSignalMatches(
+	summary: LanguageSignalCounts | LanguageSignalSummary,
+): summary is LanguageSignalSummary {
+	return "member_swear_matches" in summary;
 }
 
 export async function insertSessionLanguageSignalRows(

@@ -1,4 +1,4 @@
-import type { LanguageSignalCounts } from "@rudel/language-signals";
+import type { LanguageSignalSummary } from "@rudel/language-signals";
 
 export interface SessionLanguageSignalScannerWorkerRequest {
 	readonly content: string;
@@ -7,7 +7,7 @@ export interface SessionLanguageSignalScannerWorkerRequest {
 
 export type SessionLanguageSignalScannerWorkerResponse =
 	| {
-			readonly counts: LanguageSignalCounts;
+			readonly summary: LanguageSignalSummary;
 			readonly requestId: number;
 			readonly status: "success";
 	  }

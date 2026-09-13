@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { WorkspaceOutgoingInvitationsTable } from "@/features/settings/workspace/components/WorkspaceOutgoingInvitationsTable";
+import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
 export function WorkspaceOutgoingInvitationsCard({
@@ -55,21 +49,16 @@ export function WorkspaceOutgoingInvitationsCard({
 	};
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<CardTitle>Outgoing invitations</CardTitle>
-				<CardDescription>
-					Pending invitations that haven&apos;t been accepted yet.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<WorkspaceOutgoingInvitationsTable
-					invitations={invitations}
-					canCancel={canCancel}
-					pendingInvitationId={pendingInvitationId}
-					onCancel={(invitationId) => void cancelInvitation(invitationId)}
-				/>
-			</CardContent>
-		</Card>
+		<WorkspaceSettingsGroup
+			title="Outgoing invitations"
+			description="Pending invitations that haven't been accepted yet."
+		>
+			<WorkspaceOutgoingInvitationsTable
+				invitations={invitations}
+				canCancel={canCancel}
+				pendingInvitationId={pendingInvitationId}
+				onCancel={(invitationId) => void cancelInvitation(invitationId)}
+			/>
+		</WorkspaceSettingsGroup>
 	);
 }

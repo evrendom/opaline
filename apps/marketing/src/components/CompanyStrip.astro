@@ -1,0 +1,145 @@
+---
+interface Props {
+	active?: "privacy" | "terms";
+}
+
+const { active } = Astro.props;
+const currentYear = new Date().getFullYear();
+---
+
+<footer class="company-strip" aria-label="Company information">
+	<div class="company-strip-inner">
+		<p class="company-strip-copyright">
+			Copyright © <time datetime={String(currentYear)}>{currentYear}</time>{" "}
+			Opaline Labs, Inc. All rights reserved.
+		</p>
+		<nav class="company-strip-links" aria-label="Legal">
+			<a
+				href="/legal/privacy-policy"
+				aria-current={active === "privacy" ? "page" : undefined}
+			>
+				Privacy Policy
+			</a>
+			<a
+				href="/legal/terms-of-service"
+				aria-current={active === "terms" ? "page" : undefined}
+			>
+				Terms of Service
+			</a>
+		</nav>
+	</div>
+</footer>
+
+<style>
+	.company-strip {
+		min-height: var(--instant-v2-company-strip-height, 52px);
+		margin-top: var(--instant-v2-company-strip-offset-top, 0px);
+		color: rgba(0, 0, 0, 0.52);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 11px;
+		font-weight: 400;
+		line-height: 16px;
+		opacity: 1;
+	}
+
+	:global(html[data-instant-v2-demo]) .company-strip {
+		position: fixed;
+		z-index: 49;
+		top: var(--instant-v2-demo-company-strip-top);
+		left: 0;
+		width: 100%;
+		height: var(--instant-v2-demo-company-strip-height);
+		margin-top: 0;
+		background: var(--instant-v2-page-bg, #fff);
+		opacity: 1;
+		pointer-events: none;
+	}
+
+	:global(html[data-instant-v2-demo]) .company-strip a {
+		pointer-events: auto;
+	}
+
+	.company-strip-inner {
+		display: flex;
+		width: min(calc(100vw - clamp(48px, 6.75vw, 136px)), 1920px);
+		min-height: inherit;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 24px;
+		margin-inline: auto;
+	}
+
+	@supports (width: round(nearest, 1px, 1px)) {
+		.company-strip-inner {
+			width: min(
+				calc(100vw - round(nearest, clamp(48px, 6.75vw, 136px), 2px)),
+				1920px
+			);
+		}
+	}
+
+	.company-strip-copyright {
+		margin: 0;
+	}
+
+	.company-strip-links {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.company-strip a {
+		color: inherit;
+		font-size: inherit;
+		font-weight: inherit;
+		line-height: inherit;
+		text-decoration: none;
+		text-underline-offset: 3px;
+		transition: color 150ms ease;
+	}
+
+	.company-strip a[aria-current="page"] {
+		color: rgba(0, 0, 0, 0.9);
+	}
+
+	@media (any-hover: hover) {
+		.company-strip a:hover {
+			color: rgba(0, 0, 0, 0.9);
+		}
+	}
+
+	@media (max-width: 899px) {
+		.company-strip-inner {
+			width: min(calc(100vw - 40px), 720px);
+		}
+	}
+
+	@media (max-width: 640px) {
+		.company-strip {
+			min-height: var(--instant-v2-company-strip-height, 84px);
+			font-size: 11px;
+		}
+
+		.company-strip-inner {
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			padding-block: 14px;
+			text-align: center;
+		}
+
+		.company-strip-links {
+			justify-content: center;
+		}
+	}
+
+	@media (max-width: 540px) {
+		.company-strip-inner {
+			width: calc(100vw - 20px);
+		}
+	}
+
+</style>

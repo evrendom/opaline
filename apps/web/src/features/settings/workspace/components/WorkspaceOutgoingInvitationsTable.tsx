@@ -1,26 +1,12 @@
-import { XIcon } from "lucide-react";
-import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/app/ui/table";
+import { WorkspaceSettingsRow } from "@/features/settings/workspace/components/workspace-settings-group";
 
 function formatDate(value?: string) {
-	if (!value) {
-		return "—";
-	}
-
+	if (!value) return "Unknown date";
 	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) {
-		return "—";
-	}
-
-	return date.toLocaleDateString();
+	return Number.isNaN(date.getTime())
+		? "Unknown date"
+		: date.toLocaleDateString();
 }
 
 export function WorkspaceOutgoingInvitationsTable({
@@ -42,61 +28,39 @@ export function WorkspaceOutgoingInvitationsTable({
 }) {
 	if (invitations.length === 0) {
 		return (
-			<p className="text-sm text-muted-foreground">
+			<p className="workspace-settings-empty">
 				No outgoing invitations are pending.
 			</p>
 		);
 	}
 
 	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Email</TableHead>
-					<TableHead>Role</TableHead>
-					<TableHead>Sent</TableHead>
-					<TableHead className="text-right">Action</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{invitations.map((invitation) => {
-					const isPending = pendingInvitationId === invitation.id;
-
-					return (
-						<TableRow key={invitation.id}>
-							<TableCell className="font-medium">{invitation.email}</TableCell>
-							<TableCell>
-								{invitation.role ? (
-									<Badge variant="secondary" className="capitalize">
-										{invitation.role}
-									</Badge>
-								) : (
-									<span className="text-sm text-muted-foreground">—</span>
-								)}
-							</TableCell>
-							<TableCell className="text-muted-foreground">
-								{formatDate(invitation.createdAt)}
-							</TableCell>
-							<TableCell className="text-right">
-								{canCancel ? (
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={() => onCancel(invitation.id)}
-										disabled={pendingInvitationId !== null}
-									>
-										<XIcon data-icon="inline-start" />
-										{isPending ? "Canceling…" : "Cancel"}
-									</Button>
-								) : (
-									<span className="text-sm text-muted-foreground">—</span>
-								)}
-							</TableCell>
-						</TableRow>
-					);
-				})}
-			</TableBody>
-		</Table>
+		<ul className="workspace-settings-list" aria-label="Outgoing invitations">
+			{invitations.map((invitation) => (
+				<li key={invitation.id}>
+					<WorkspaceSettingsRow
+						label={<span className="break-all">{invitation.email}</span>}
+						description={`${invitation.role || "Member"} · Sent ${formatDate(invitation.createdAt)}`}
+					>
+						{canCancel ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								aria-label={`Cancel invitation to ${invitation.email}`}
+								onClick={() => onCancel(invitation.id)}
+								disabled={pendingInvitationId !== null}
+							>
+								{pendingInvitationId === invitation.id
+									? "Canceling…"
+									: "Cancel"}
+							</Button>
+						) : (
+							<span className="workspace-settings-status">Pending</span>
+						)}
+					</WorkspaceSettingsRow>
+				</li>
+			))}
+		</ul>
 	);
 }

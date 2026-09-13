@@ -1,10 +1,10 @@
-import type { LanguageSignalCounts } from "@rudel/language-signals";
+import type { LanguageSignalSummary } from "@rudel/language-signals";
 import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
 import type { SessionLanguageSignalScannerWorkerResponse } from "./session-language-signal-scanner.types.js";
 
 interface PendingLanguageSignalScan {
 	readonly reject: (error: Error) => void;
-	readonly resolve: (counts: LanguageSignalCounts) => void;
+	readonly resolve: (summary: LanguageSignalSummary) => void;
 	readonly timeout: ReturnType<typeof setTimeout>;
 }
 
@@ -26,7 +26,7 @@ export class SessionLanguageSignalScanner {
 		this.scanTimeoutMs = input?.scanTimeoutMs ?? DEFAULT_SCAN_TIMEOUT_MS;
 	}
 
-	scan(content: string): Promise<LanguageSignalCounts> {
+	scan(content: string): Promise<LanguageSignalSummary> {
 		if (this.closed) {
 			return Promise.reject(
 				new SessionLanguageSignalScannerOperationalError(
@@ -113,7 +113,7 @@ export class SessionLanguageSignalScanner {
 			);
 			return;
 		}
-		pending.resolve(response.counts);
+		pending.resolve(response.summary);
 	}
 
 	private handleWorkerFailure(
@@ -147,7 +147,7 @@ const scanner = new SessionLanguageSignalScanner();
 
 export function scanSessionLanguageSignalsOffThread(
 	content: string,
-): Promise<LanguageSignalCounts> {
+): Promise<LanguageSignalSummary> {
 	return scanner.scan(content);
 }
 

@@ -1,7 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
+import { PanelLeftIcon } from "@hugeicons/core-free-icons";
 import { cva, type VariantProps } from "class-variance-authority";
-import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -18,6 +18,7 @@ import {
 } from "@/app/ui/sheet";
 import { Skeleton } from "@/app/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -287,7 +288,7 @@ function SidebarTrigger({
 			}}
 			{...props}
 		>
-			<PanelLeftIcon />
+			<ShellHugeicon icon={PanelLeftIcon} />
 			<span className="sr-only">Toggle Sidebar</span>
 		</Button>
 	);

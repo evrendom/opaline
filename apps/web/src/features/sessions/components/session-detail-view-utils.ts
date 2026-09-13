@@ -1,5 +1,10 @@
 import { FolderGit2, GitBranch, type LucideIcon } from "lucide-react";
 import { parseConversations } from "@/lib/conversation-schema";
+import { SessionDetailFastResponseError } from "./session-detail-fast-response";
+import {
+	hasSessionDetailErrorCode,
+	isSessionDetailTimeoutError,
+} from "./session-detail-response";
 
 export function toNumber(value: unknown, fallback = 0): number {
 	if (typeof value === "number" && Number.isFinite(value)) {
@@ -67,12 +72,56 @@ export function toSubagentMap(value: unknown): Record<string, string> {
 	);
 }
 
-export function isForbiddenError(value: unknown) {
+function isForbiddenError(value: unknown) {
+	return hasSessionDetailErrorCode(value, "FORBIDDEN");
+}
+
+export function getSessionDetailErrorState(value: unknown) {
+	if (!value) {
+		return undefined;
+	}
+
+	if (isForbiddenError(value)) {
+		return {
+			description: "You can only view your own session transcripts.",
+			title: "Access Denied",
+		};
+	}
+
+	if (hasSessionDetailErrorCode(value, "NOT_FOUND")) {
+		return {
+			description: undefined,
+			title: "Session Not Found",
+		};
+	}
+
+	if (isSessionDetailTimeoutError(value)) {
+		return {
+			description:
+				"The server did not respond in time. Check the API and try again.",
+			title: "Session Request Timed Out",
+		};
+	}
+
+	if (value instanceof SessionDetailFastResponseError) {
+		return {
+			description:
+				"The server returned session data in an unsupported format. Try again or check the deployment versions.",
+			title: "Unexpected Session Data",
+		};
+	}
+
+	return {
+		description: "The session could not be loaded. Please try again.",
+		title: "Unable to Load Session",
+	};
+}
+
+export function canRetrySessionDetailError(value: unknown) {
 	return (
-		typeof value === "object" &&
-		value !== null &&
-		"code" in value &&
-		value.code === "FORBIDDEN"
+		Boolean(value) &&
+		!isForbiddenError(value) &&
+		!hasSessionDetailErrorCode(value, "NOT_FOUND")
 	);
 }
 
@@ -119,7 +168,7 @@ export function getConversationSummary(content: string) {
 	}
 }
 
-export function shortenLabelFromLeft(label: string, maxLength: number) {
+function shortenLabelFromLeft(label: string, maxLength: number) {
 	if (label.length <= maxLength) {
 		return label;
 	}

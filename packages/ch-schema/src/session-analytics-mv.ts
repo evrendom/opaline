@@ -23,6 +23,8 @@ export const SESSION_ANALYTICS_INSERT_COLUMNS = [
 	"skills",
 	"slash_commands",
 	"subagent_types",
+	"subagent_count",
+	"native_subagents",
 	"input_tokens",
 	"output_tokens",
 	"cache_read_input_tokens",

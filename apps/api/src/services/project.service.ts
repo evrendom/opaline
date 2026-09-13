@@ -13,6 +13,7 @@ import {
 	buildDateFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
+import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
 import {
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
@@ -151,6 +152,24 @@ export async function getProjectInvestment(
 			project_paths,
 		);
 	}
+	const uploadModeColumnRows = await queryClickhouse<{
+		has_upload_mode: number;
+	}>({
+		query: `
+      SELECT toUInt8(hasColumnInTable('rudel', 'session_analytics', 'upload_mode')) AS has_upload_mode
+    `,
+	});
+	const hasUploadModeColumn =
+		Number(uploadModeColumnRows[0]?.has_upload_mode ?? 0) === 1;
+	const uploadModeAggregates = hasUploadModeColumn
+		? `
+        countIf(upload_mode = 'hook') as automated_sessions,
+        countIf(upload_mode IN ('manual', 'retry')) as manual_sessions,
+        countIf(upload_mode NOT IN ('hook', 'manual', 'retry')) as unclassified_sessions,`
+		: `
+        toUInt64(0) as automated_sessions,
+        toUInt64(0) as manual_sessions,
+        COUNT(*) as unclassified_sessions,`;
 	const usage = await getUsageAnalyticsQueryContext(orgId);
 	const costExpression =
 		usage.mode === "events"
@@ -159,6 +178,18 @@ export async function getProjectInvestment(
 
 	const query = `
 	WITH ${usage.cteDefinitions},
+	project_uploads AS (
+	  SELECT
+		${PROJECT_DISPLAY_EXPR} as project_display,
+		${uploadModeAggregates}
+		max(last_interaction_date) as last_session_at
+	  FROM rudel.session_analytics FINAL
+	  WHERE ${buildDateFilter("currentDays")}
+		AND organization_id = {orgId:String}
+		AND (git_remote != '' OR package_name != '' OR project_path != '')
+		${projectFilters.length > 0 ? `AND ${projectFilters.join("\n        AND ")}` : ""}
+	  GROUP BY ${PROJECT_DISPLAY_EXPR}
+	),
 	current_period AS (
       SELECT
         ${PROJECT_DISPLAY_EXPR} as project_display,
@@ -198,6 +229,10 @@ export async function getProjectInvestment(
       c._project_path as project_path,
       c.sessions,
       c.unique_users,
+	  u.automated_sessions,
+	  u.manual_sessions,
+	  u.unclassified_sessions,
+	  u.last_session_at,
       c.total_tokens,
       c.input_tokens_sum as input_tokens,
       c.output_tokens_sum as output_tokens,
@@ -207,7 +242,8 @@ export async function getProjectInvestment(
 	  ${costExpression} as cost,
       round(c.success_rate - ifNull(p.prev_success_rate, c.success_rate), 2) as success_rate_trend
     FROM current_period c
-    LEFT JOIN previous_period p ON c.project_display = p.project_display
+	LEFT ANY JOIN project_uploads u ON c.project_display = u.project_display
+	LEFT ANY JOIN previous_period p ON c.project_display = p.project_display
     ORDER BY c.total_duration_min DESC
     LIMIT {limit:UInt32}
     OFFSET {offset:UInt32}
@@ -532,14 +568,16 @@ export async function getProjectFeatureUsage(
 		orgId,
 		projectPath,
 	};
+	const usage = await getUsageAnalyticsQueryContext(orgId);
 
 	const adoptionQuery = `
-    SELECT
+	WITH ${usage.cteDefinitions}
+	    SELECT
       COUNT(*) as total_sessions,
-      countIf(length(subagent_types) > 0) as subagents_sessions,
+	      countIf(${SESSION_HAS_SUBAGENTS_SQL}) as subagents_sessions,
       countIf(length(skills) > 0) as skills_sessions,
       countIf(length(slash_commands) > 0) as slash_commands_sessions
-    FROM rudel.session_analytics FINAL
+	    FROM ${usage.sessionsRelation}
     WHERE ${PROJECT_DISPLAY_EXPR} = ${projectDisplaySubquery}
       AND ${buildDateFilter("days")}
       AND organization_id = {orgId:String}

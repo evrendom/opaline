@@ -1,14 +1,10 @@
 import { CliConnectionIdSchema } from "@rudel/api-routes";
-import {
-	buildOrganizationPath,
-	resolveOrganizationPostAuthPath,
-} from "@rudel/api-routes/organization-paths";
 import { appRoutes } from "@/app/routes";
 import type { authClient } from "@/lib/auth-client";
 
 export type AppSession = ReturnType<typeof authClient.useSession>["data"];
 const PENDING_SIGNUP_REDIRECT_PARAM = "signup_redirect";
-const RELATIVE_URL_BASE = "https://opaline.local";
+const RELATIVE_URL_BASE = "https://rudel.local";
 const RELATIVE_URL_ORIGIN = new URL(RELATIVE_URL_BASE).origin;
 const REDIRECT_ENCODED_AMBIGUOUS_CHARACTER_PATTERN =
 	/%(?:2f|5c|[01][0-9a-f]|7f)/i;
@@ -111,16 +107,6 @@ export function getPendingSignupRedirect(search?: string): string | null {
 	const params = new URLSearchParams(search ?? window.location.search);
 	return normalizeValidRelativeRedirect(
 		params.get(PENDING_SIGNUP_REDIRECT_PARAM),
-	);
-}
-
-export function resolvePostAuthDestinationForOrganization(
-	organizationSlug: string,
-	destination: string,
-): string {
-	return (
-		resolveOrganizationPostAuthPath(organizationSlug, destination) ??
-		buildOrganizationPath(organizationSlug)
 	);
 }
 

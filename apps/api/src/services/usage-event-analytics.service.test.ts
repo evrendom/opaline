@@ -24,6 +24,7 @@ describe("usage-event analytics query contract", () => {
 		expect(sql).toContain("ANY INNER JOIN usage_event_session_rollups AS r");
 		expect(sql).toContain("sa.organization_id AS organization_id");
 		expect(sql).toContain("sa.user_id AS user_id");
+		expect(sql).toContain("sa.subagent_count AS subagent_count");
 	});
 
 	test("keeps the tenant prefix and adds available key filters", () => {
@@ -134,10 +135,28 @@ describe("usage-event analytics query contract", () => {
 	test("keeps the legacy branch source-compatible", () => {
 		const sql = buildLegacyUsageAnalyticsCte();
 
-		expect(sql).toContain("FROM rudel.session_analytics AS sa FINAL");
+		expect(sql).toContain("FROM rudel.session_analytics FINAL");
+		expect(sql).toContain("FROM usage_analytics_metadata AS sa");
 		expect(sql).toContain("AS estimated_cost");
 		expect(sql).toContain("toUInt8(1) AS cost_is_complete");
 		expect(sql).toContain("AS usage_date");
+	});
+
+	test("enriches both legacy and events metadata from the same lineage selector", () => {
+		const legacySql = buildLegacyUsageAnalyticsCte(true);
+		const eventsSql = buildUsageEventAnalyticsCte({}, true);
+
+		for (const sql of [legacySql, eventsSql]) {
+			expect(sql).toContain("FROM rudel.session_lineage");
+			expect(sql).toContain(
+				"ifNull(lineage.linked_subagent_count, 0) AS linked_subagent_count",
+			);
+			expect(sql).toContain("lineage.linked_subagents");
+		}
+		expect(eventsSql).toContain(
+			"sa.linked_subagent_count AS linked_subagent_count",
+		);
+		expect(eventsSql).toContain("sa.linked_subagents AS linked_subagents");
 	});
 
 	test("prices legacy cache writes at the 1-hour tier", () => {

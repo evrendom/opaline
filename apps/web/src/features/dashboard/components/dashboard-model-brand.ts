@@ -26,6 +26,13 @@ function formatFallbackModelLabel(model: string) {
 
 export function formatModelDisplayLabel(model: string) {
 	const normalizedModel = model.trim().toLowerCase();
+	const fableVersion = normalizeModelVersion(
+		normalizedModel.match(/fable[-_ ]?([0-9]+(?:[._][0-9]+)?)/)?.[1],
+	);
+	if (normalizedModel.includes("fable")) {
+		return fableVersion ? `Fable ${fableVersion}` : "Fable";
+	}
+
 	const claudeFamilyMatch = normalizedModel.match(/(opus|sonnet|haiku)/);
 
 	if (claudeFamilyMatch) {
@@ -57,7 +64,11 @@ export function formatModelDisplayLabel(model: string) {
 				)?.[1],
 		);
 
-		return version ? `GPT ${version}` : "GPT";
+		const variant = normalizedModel.match(
+			/(?:^|[-_ ])(sol|terra|luna|astra)(?=$|[-_ ])/,
+		)?.[1];
+		const label = version ? `GPT ${version}` : "GPT";
+		return variant ? `${label} ${formatFallbackModelLabel(variant)}` : label;
 	}
 
 	return formatFallbackModelLabel(model);
@@ -66,7 +77,14 @@ export function formatModelDisplayLabel(model: string) {
 export function getModelBadgeTone(model: string): ModelBadgeTone {
 	const normalizedModel = model.toLowerCase();
 
-	if (normalizedModel.includes("claude")) {
+	if (
+		normalizedModel.includes("claude") ||
+		/(?:^|[\s/:_-])(?:sonnet|opus|haiku)(?:$|[\s/:_-])/u.test(
+			normalizedModel,
+		) ||
+		normalizedModel.includes("fable") ||
+		normalizedModel.includes("mythos")
+	) {
 		return {
 			chipClassName:
 				"border-transparent bg-[#CC7D5E] text-[#F9F9F7] shadow-none",
@@ -83,7 +101,11 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 		};
 	}
 
-	if (normalizedModel.includes("chatgpt") || normalizedModel.includes("gpt")) {
+	if (
+		normalizedModel.includes("chatgpt") ||
+		normalizedModel.includes("gpt") ||
+		/(?:^|[\s/:_-])o[134](?:$|[\s/:_-])/u.test(normalizedModel)
+	) {
 		return {
 			chipClassName: "border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none",
 			icon: "codex",

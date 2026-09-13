@@ -14,10 +14,13 @@ export function WorkspaceSummaryStrip({
 	isError: boolean;
 }) {
 	return (
-		<div className="overflow-hidden rounded-4xl border border-border/60 bg-card/95">
-			<div className="grid grid-cols-1 divide-y divide-border/60 md:grid-cols-3 md:divide-x md:divide-y-0">
+		<div className="py-8">
+			<div className="flex flex-col divide-y divide-border/60">
 				{tiles.map((tile) => (
-					<div key={tile.id} className="flex flex-col gap-1 px-4 py-4">
+					<div
+						key={tile.id}
+						className="flex flex-col gap-1 px-4 py-4 first:pt-0 last:pb-0"
+					>
 						<p className="text-sm text-muted-foreground">{tile.label}</p>
 						{isPending ? (
 							<Skeleton className="h-6 w-24 rounded-md" />

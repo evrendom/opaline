@@ -1,7 +1,48 @@
 export {
+	attachCodexOperationMetadata,
+	buildCodexActivityGraph,
+	type CodexActivityGraph,
+	type CodexCarrier,
+	type CodexCorrelationConfidence,
+	type CodexLifecycleRecord,
+	type CodexNormalizedOperation,
+	type CodexOperationMetadata,
+	type CodexOrphanOutput,
+	type CodexOutputBlock,
+	type CodexOutputRecord,
+	getCodexOperationMetadata,
+	getCodexRawOperationInput,
+	isCodexOperationInput,
+	normalizeCodexOutput,
+	toConversationResultContent,
+} from "./codex-activity-graph.js";
+export {
 	extractCodexTokenData,
 	parseCodexConversations,
 } from "./codex-conversation-parser.js";
+export {
+	type ExtractedCodexInvocation,
+	extractCustomExecInvocations,
+} from "./codex-javascript-extractor.js";
+export {
+	attachCodexCorrelation,
+	type CodexActivity,
+	type CodexPatchFile,
+	type CodexPatchOperation,
+	type CodexPlanStep,
+	type CodexToolTranslation,
+	classifySimpleShellCommand,
+	extractCustomExecInvocation,
+	getRawToolInput,
+	getTranscriptToolFileActivities,
+	isCodexToolFailure,
+	isCodexToolInput,
+	isRasterImagePath,
+	parseCodexPatch,
+	stripCodexInjectedBlocks,
+	type TranscriptFileActivity,
+	translateCodexToolCall,
+} from "./codex-tool-translation.js";
 export {
 	type AssistantEntry,
 	AssistantEntrySchema,
@@ -9,6 +50,8 @@ export {
 	type Conversation,
 	type ConversationExecutionMode,
 	ConversationExecutionModeSchema,
+	type ConversationProvider,
+	ConversationProviderSchema,
 	ConversationSchema,
 	isCodexFormat,
 	parseConversations,
@@ -22,6 +65,12 @@ export {
 	ThinkingContentSchema,
 	type ToolResultContent,
 	ToolResultContentSchema,
+	type ToolResultImageContent,
+	ToolResultImageContentSchema,
+	type ToolResultStructuredContent,
+	ToolResultStructuredContentSchema,
+	type ToolResultTextContent,
+	ToolResultTextContentSchema,
 	type ToolUseContent,
 	ToolUseContentSchema,
 	type UserEntry,
@@ -56,7 +105,6 @@ export {
 export {
 	addUniqueEditedFiles,
 	getClaudeMutationFiles,
-	getCodexMutationFiles,
 } from "./session-turn-file-edits.js";
 export {
 	extractSessionTurnMetricBreakdown,

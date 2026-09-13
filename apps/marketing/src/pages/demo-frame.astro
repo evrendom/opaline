@@ -1,0 +1,45 @@
+---
+// Bootstrap the real product on the same dedicated demo origin as its API.
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="robots" content="noindex" />
+		<title>Opaline demo</title>
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				background: #fff;
+			}
+		</style>
+	</head>
+	<body>
+		<main style="padding: 24px; font: 14px system-ui">
+			<p role="status" id="demo-status">Loading the product demo…</p>
+			<button type="button" id="demo-retry" hidden>Try again</button>
+		</main>
+		<script>
+			import { ensureLiveDemoSession, LIVE_DEMO_DESTINATION } from "../scripts/live-demo";
+
+			const status = document.getElementById("demo-status");
+			const retry = document.getElementById("demo-retry");
+			async function loadDemo() {
+				if (retry) retry.hidden = true;
+				if (status) status.textContent = "Loading the product demo…";
+				try {
+					await ensureLiveDemoSession();
+					window.location.replace(LIVE_DEMO_DESTINATION);
+				} catch {
+					if (status) status.textContent = "The demo could not load. Please try again.";
+					if (retry) retry.hidden = false;
+				}
+			}
+			retry?.addEventListener("click", () => void loadDemo());
+			void loadDemo();
+		</script>
+	</body>
+</html>

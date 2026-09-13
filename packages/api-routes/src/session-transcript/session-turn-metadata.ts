@@ -6,13 +6,22 @@ import {
 	summarizeSessionRequestUsage,
 	sumSessionRequestCosts,
 } from "../session-request-pricing.js";
+import {
+	attachCodexOperationMetadata,
+	buildCodexActivityGraph,
+	type CodexNormalizedOperation,
+} from "./codex-activity-graph.js";
+import {
+	getTranscriptToolFileActivities,
+	isCodexToolFailure,
+} from "./codex-tool-translation.js";
 import { isCodexFormat } from "./conversation-schema.js";
 import {
 	addUniqueEditedFiles,
 	getClaudeMutationFiles,
-	getCodexMutationFiles,
 } from "./session-turn-file-edits.js";
 import type { SessionTurn } from "./session-turns.js";
+import { deriveTranscriptToolActivity } from "./transcript-tool-activity.js";
 
 const tokenUsageSchema = z.object({
 	cache_creation: z
@@ -80,29 +89,14 @@ const codexLineSchema = z.object({
 			model: z.string().optional(),
 			name: z.string().optional(),
 			input: z.string().optional(),
-			output: z.string().optional(),
+			output: z.unknown().optional(),
 			type: z.string().optional(),
 		})
+		.passthrough()
 		.optional(),
 	timestamp: z.string().optional(),
 	type: z.string().optional(),
 });
-
-const codexFunctionArgumentsSchema = z.object({
-	cmd: z.string().optional(),
-});
-
-const codexToolOutputSchema = z.object({
-	metadata: z
-		.object({
-			exit_code: z.number().optional(),
-		})
-		.optional(),
-	output: z.string().optional(),
-});
-
-const CODEX_TOOL_FAILURE_PATTERN =
-	/(?:Error|Exception):|apply_patch verification failed:/iu;
 
 type TokenUsage = z.infer<typeof tokenUsageSchema>;
 type ClaudeMessageContent = NonNullable<
@@ -440,58 +434,41 @@ function extractClaudeTurnMetadata(
 	return earliestTimestamp;
 }
 
-function getCodexSkillCommand(argumentsJson: string | undefined) {
-	if (!argumentsJson) {
-		return undefined;
-	}
-
-	const result = codexFunctionArgumentsSchema.safeParse(
-		parseJson(argumentsJson),
-	);
-	return result.success ? result.data.cmd : undefined;
-}
-
-function addCodexSkills(
-	builder: TurnMetricsBuilder,
-	argumentsJson: string | undefined,
-	timestamp: string | undefined,
+function getCodexToolErrors(
+	outputText: string,
+	endEvent: Readonly<Record<string, unknown>> | undefined,
 ) {
-	const command = getCodexSkillCommand(argumentsJson);
-	if (!command) {
-		return;
-	}
-
-	for (const match of command.matchAll(
-		/skills\/([a-zA-Z0-9_-]+)\/SKILL(?:\.md)?/gu,
-	)) {
-		addSkill(builder, match[1], timestamp);
-	}
-}
-
-function getCodexToolErrors(outputEnvelope: string | undefined) {
-	if (!outputEnvelope) {
+	if (!outputText && !endEvent) {
 		return [];
 	}
+	return isCodexToolFailure(outputText, endEvent)
+		? [outputText.trim() || "Tool call failed"]
+		: [];
+}
 
-	const result = codexToolOutputSchema.safeParse(parseJson(outputEnvelope));
-	if (!result.success) {
-		return CODEX_TOOL_FAILURE_PATTERN.test(outputEnvelope)
-			? [outputEnvelope]
-			: [];
-	}
+function getCodexOperationOutputText(operation: CodexNormalizedOperation) {
+	return getCodexOutputBlocksText(operation.outputBlocks);
+}
 
-	const output = result.data.output ?? "";
-	const fallback =
-		result.data.metadata?.exit_code === undefined
-			? "Tool call failed"
-			: `Tool call exited with code ${result.data.metadata.exit_code}`;
-	const content = output.trim() || fallback;
-	return [
-		...(result.data.metadata?.exit_code && result.data.metadata.exit_code !== 0
-			? [content]
-			: []),
-		...(CODEX_TOOL_FAILURE_PATTERN.test(output) ? [content] : []),
-	];
+function getCodexOutputBlocksText(
+	blocks: CodexNormalizedOperation["outputBlocks"],
+) {
+	return blocks
+		.map((block) => {
+			if (block.type === "text") {
+				return block.text;
+			}
+			if (block.type === "image") {
+				return "";
+			}
+			try {
+				return JSON.stringify(block.value) ?? "";
+			} catch {
+				return "";
+			}
+		})
+		.filter(Boolean)
+		.join("\n");
 }
 
 function getTokenUsageSignature(usage: TokenUsage | undefined) {
@@ -514,7 +491,75 @@ function extractCodexTurnMetadata(
 ) {
 	let currentModel = fallbackModel;
 	let previousTokenUsageSignature: string | undefined;
-	const pendingFileEdits = new Map<string, PendingFileEdit>();
+	const graph = buildCodexActivityGraph(content);
+	const graphOperations = [
+		...graph.carriers.flatMap((carrier) =>
+			carrier.operations.map((operation) => ({ carrier, operation })),
+		),
+		...graph.standaloneOperations.map((operation) => ({
+			carrier: undefined,
+			operation,
+		})),
+	];
+
+	for (const { carrier, operation } of graphOperations) {
+		const turnIndex = getTurnIndex(operation.timestamp, anchors);
+		const builder = turnIndex === undefined ? undefined : builders[turnIndex];
+		if (!builder) {
+			continue;
+		}
+		const input = attachCodexOperationMetadata(
+			operation.input,
+			operation,
+			carrier,
+		);
+		const activity = deriveTranscriptToolActivity({
+			toolName: operation.name,
+			input,
+			provider: "codex",
+		});
+		for (const skill of activity.skills)
+			addSkill(builder, skill, operation.timestamp);
+		const outputText = getCodexOperationOutputText(operation);
+		const errors = getCodexToolErrors(outputText, operation.lifecycle?.payload);
+		addErrors(
+			builder,
+			operation.lifecycle?.timestamp ?? operation.timestamp,
+			errors,
+		);
+		if (errors.length > 0) {
+			continue;
+		}
+		const mutationFiles = getTranscriptToolFileActivities(
+			operation.name,
+			input,
+			"codex",
+		)
+			.filter(({ operation: activity }) =>
+				["created", "deleted", "edited"].includes(activity),
+			)
+			.map(({ path }) => path);
+		addUniqueEditedFiles(builder.editedFiles, mutationFiles);
+	}
+
+	for (const lifecycle of graph.lifecycleRecords) {
+		if (lifecycle.confidence !== "ambiguous-positional") {
+			continue;
+		}
+		const turnIndex = getTurnIndex(lifecycle.timestamp, anchors);
+		const builder = turnIndex === undefined ? undefined : builders[turnIndex];
+		if (!builder) {
+			continue;
+		}
+		addErrors(
+			builder,
+			lifecycle.timestamp,
+			getCodexToolErrors(
+				getCodexOutputBlocksText(lifecycle.outputBlocks),
+				lifecycle.payload,
+			),
+		);
+	}
 
 	for (const rawLine of content.split("\n")) {
 		if (!rawLine.trim()) {
@@ -536,51 +581,11 @@ function extractCodexTurnMetadata(
 		if (!builder) {
 			continue;
 		}
-
-		if (
-			line.type === "response_item" &&
-			(line.payload?.type === "function_call" ||
-				line.payload?.type === "custom_tool_call")
-		) {
-			if (line.payload.name === "exec_command") {
-				addCodexSkills(builder, line.payload.arguments, line.timestamp);
-			}
-
-			const mutationFiles = getCodexMutationFiles(
-				line.payload.name,
-				line.payload.arguments,
-				line.payload.input,
-			);
-			if (line.payload.call_id && mutationFiles.length > 0) {
-				pendingFileEdits.set(line.payload.call_id, {
-					builder,
-					files: mutationFiles,
-				});
-			}
-			continue;
-		}
-
-		if (
-			line.type === "response_item" &&
-			(line.payload?.type === "function_call_output" ||
-				line.payload?.type === "custom_tool_call_output")
-		) {
-			const errors = getCodexToolErrors(line.payload.output);
-			const errorCount = errors.length;
-			addErrors(builder, line.timestamp, errors);
-
-			if (line.payload.call_id) {
-				const pendingEdit = pendingFileEdits.get(line.payload.call_id);
-				if (pendingEdit) {
-					if (errorCount === 0) {
-						addUniqueEditedFiles(
-							pendingEdit.builder.editedFiles,
-							pendingEdit.files,
-						);
-					}
-					pendingFileEdits.delete(line.payload.call_id);
-				}
-			}
+		if (line.type === "event_msg" && line.payload?.type === "error") {
+			const message = line.payload.message;
+			addErrors(builder, line.timestamp, [
+				typeof message === "string" ? message : "Codex event error",
+			]);
 			continue;
 		}
 

@@ -1,16 +1,13 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { Button } from "@/app/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/app/ui/card";
-import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
-import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import {
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
 function slugify(value: string) {
@@ -31,13 +28,14 @@ export function CreateWorkspaceCard({
 	submitLabel?: string;
 	title?: string;
 }) {
-	const { actions } = useOrganization();
+	const navigate = useNavigate();
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization_create",
 	});
 	const [name, setName] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const nameId = useId();
 
 	const handleSubmit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -60,6 +58,7 @@ export function CreateWorkspaceCard({
 		const response = await authClient.organization.create({
 			name: trimmedName,
 			slug,
+			keepCurrentActiveOrganization: true,
 		});
 
 		if (response.error) {
@@ -69,7 +68,9 @@ export function CreateWorkspaceCard({
 		}
 
 		if (response.data) {
-			await actions.switchOrganization(response.data.id);
+			navigate(
+				getWorkspaceAppPath(response.data.slug, appRoutes.settingsWorkspace()),
+			);
 		}
 
 		setIsCreating(false);
@@ -78,39 +79,42 @@ export function CreateWorkspaceCard({
 	const slugPreview = slugify(name.trim());
 
 	return (
-		<Card size="sm" className="bg-card/95 shadow-none ring-1 ring-border/60">
-			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-					<Field className="gap-2">
-						<FieldLabel htmlFor="workspace-name">Workspace name</FieldLabel>
-						<Input
-							id="workspace-name"
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							placeholder="Farmerville team"
-							disabled={isCreating}
-						/>
-					</Field>
-
-					<div className="rounded-3xl border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-						<span className="font-medium text-foreground">Slug preview:</span>{" "}
-						{slugPreview ? `/${slugPreview}` : "Generated from the name"}
-					</div>
-
-					{error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-					<Button
-						type="submit"
-						disabled={isCreating || name.trim().length === 0}
-					>
+		<form onSubmit={handleSubmit}>
+			<WorkspaceSettingsGroup title={title} description={description}>
+				<WorkspaceSettingsRow label="Name" controlId={nameId}>
+					<Input
+						id={nameId}
+						value={name}
+						onChange={(event) => setName(event.target.value)}
+						placeholder="Workspace name"
+						disabled={isCreating}
+						aria-invalid={Boolean(error)}
+						aria-describedby={error ? `${nameId}-error` : undefined}
+					/>
+				</WorkspaceSettingsRow>
+				<WorkspaceSettingsRow label="Slug" controlId={`${nameId}-slug`}>
+					<Input
+						id={`${nameId}-slug`}
+						value={slugPreview ? `/${slugPreview}` : ""}
+						placeholder="Generated from name"
+						readOnly
+					/>
+				</WorkspaceSettingsRow>
+				<div className="workspace-settings-actions">
+					{error ? (
+						<p
+							id={`${nameId}-error`}
+							role="alert"
+							className="workspace-settings-error"
+						>
+							{error}
+						</p>
+					) : null}
+					<Button type="submit" size="sm" disabled={isCreating || !slugPreview}>
 						{isCreating ? "Creating workspace…" : submitLabel}
 					</Button>
-				</form>
-			</CardContent>
-		</Card>
+				</div>
+			</WorkspaceSettingsGroup>
+		</form>
 	);
 }
