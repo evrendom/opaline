@@ -226,6 +226,7 @@ function buildModifierDimensionSql(
 const SESSION_METADATA_COLUMNS = `
 	sa.session_date AS session_date,
 	sa.last_interaction_date AS last_interaction_date,
+	sa.total_interactions AS total_interactions,
 	sa.session_id AS session_id,
 	sa.organization_id AS organization_id,
 	sa.project_path AS project_path,

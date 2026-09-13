@@ -179,6 +179,11 @@ export function createDemoHandler(
 			);
 			return Response.json(payload, { headers });
 		}
-		return new Response(response.body, { status: response.status, headers });
+		// Keep the upstream Response alive while consuming its stream. Forwarding
+		// response.body through another Response loses RPC payloads on Vercel/Bun.
+		return new Response(await response.arrayBuffer(), {
+			status: response.status,
+			headers,
+		});
 	};
 }
