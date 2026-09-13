@@ -110,6 +110,9 @@ interface SessionAnalyticsListRow
 	extends Omit<SessionAnalyticsRaw, keyof PersistedSessionLanguageSignals> {
 	signal_session_date: string;
 }
+const SIGNAL_LOOKUP_BATCH_SIZE = 32;
+const SIGNAL_LOOKUP_CONCURRENCY = 4;
+
 const EMPTY_SESSION_LANGUAGE_SIGNALS: PersistedSessionLanguageSignals = {
 	member_swears: 0,
 	member_apologies: 0,
@@ -348,25 +351,38 @@ export async function getSessionAnalytics(
 		query_params,
 	});
 
-	// Fetch one bounded metadata batch for the actual page. Keeping this small
-	// lookup separate from usage pricing avoids ClickHouse's nested JOIN/alias
-	// filter propagation and never loads per-session transcripts.
+	// Query parameters travel in the ClickHouse HTTP URL. Split large pages so
+	// metadata lookups stay below proxy URL limits, with bounded concurrency.
+	// These queries only read signal metadata, never session transcripts.
 	const signalKey = (
 		row: Pick<
 			SessionAnalyticsListRow,
 			"source" | "session_id" | "signal_session_date"
 		>,
 	) => [row.source, row.session_id, row.signal_session_date].join("\u0000");
-	const signalRows =
-		raw.length === 0
-			? []
-			: await queryClickhouse<
-					PersistedSessionLanguageSignals &
-						Pick<
-							SessionAnalyticsListRow,
-							"source" | "session_id" | "user_id" | "signal_session_date"
-						>
-				>({
+	const batches: SessionAnalyticsListRow[][] = [];
+	for (
+		let offset = 0;
+		offset < raw.length;
+		offset += SIGNAL_LOOKUP_BATCH_SIZE
+	) {
+		batches.push(raw.slice(offset, offset + SIGNAL_LOOKUP_BATCH_SIZE));
+	}
+	type SignalRow = PersistedSessionLanguageSignals &
+		Pick<
+			SessionAnalyticsListRow,
+			"source" | "session_id" | "user_id" | "signal_session_date"
+		>;
+	const signalRows: SignalRow[] = [];
+	for (
+		let offset = 0;
+		offset < batches.length;
+		offset += SIGNAL_LOOKUP_CONCURRENCY
+	) {
+		const results = await Promise.all(
+			batches.slice(offset, offset + SIGNAL_LOOKUP_CONCURRENCY).map((batch) => {
+				const dates = batch.map((row) => row.signal_session_date).sort();
+				return queryClickhouse<SignalRow>({
 					query: `
 			SELECT source, session_id, user_id,
 				toString(session_date) AS signal_session_date,
@@ -381,16 +397,17 @@ export async function getSessionAnalytics(
 		`,
 					query_params: {
 						orgId,
-						signalFrom: raw.map((row) => row.signal_session_date).sort()[0],
-						signalTo: raw
-							.map((row) => row.signal_session_date)
-							.sort()
-							.at(-1),
-						signalIds: raw.map((row) => row.session_id),
-						signalKeys: raw.map(signalKey),
-						signalLimit: raw.length,
+						signalFrom: dates[0],
+						signalTo: dates.at(-1),
+						signalIds: batch.map((row) => row.session_id),
+						signalKeys: batch.map(signalKey),
+						signalLimit: batch.length,
 					},
 				});
+			}),
+		);
+		signalRows.push(...results.flat());
+	}
 	const signalsByKey = new Map(signalRows.map((row) => [signalKey(row), row]));
 
 	return raw.map((baseRow) => {

@@ -102,7 +102,7 @@ function TeamInviteStateScreen(props: { body: string; title?: string }) {
 		<section className="flex min-h-svh items-center justify-center bg-background px-4 py-6 sm:px-6 lg:px-8">
 			<div className="mx-auto w-full max-w-xl space-y-3 text-center">
 				<p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-					Rudel team
+					Opaline team
 				</p>
 				<h1 className="text-3xl font-semibold text-foreground">{title}</h1>
 				<p className="text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
