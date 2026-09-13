@@ -167,10 +167,7 @@ describe("wrapped share capacity churn over HTTP", () => {
 		expect(
 			await callPublicRpc(proxy.baseUrl, "198.51.100.51", validShareId),
 		).toBe(429);
-		expect(await readHealth(api.baseUrl)).toEqual({
-			ingested_at_floor_ms: null,
-			status: "ok",
-		});
+		expect(await readHealth(api.baseUrl)).toEqual({ status: "ok" });
 	});
 });
 

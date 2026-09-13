@@ -34,14 +34,11 @@ afterAll(async () => {
 });
 
 describe("production HTTP response policy", () => {
-	test("returns readiness and the configured ingest floor", async () => {
+	test("returns a stable minimal health response", async () => {
 		const response = await fetch(`${baseUrl}/health`);
 
 		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({
-			ingested_at_floor_ms: null,
-			status: "ok",
-		});
+		expect(await response.json()).toEqual({ status: "ok" });
 		expect(response.headers.get("Cache-Control")).toBe("no-store");
 	});
 
