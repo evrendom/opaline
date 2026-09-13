@@ -31,7 +31,7 @@
 		"chkit:link": "bun scripts/chkit-link.ts link",
 		"chkit:unlink": "bun scripts/chkit-link.ts unlink",
 		"build:site": "bun scripts/build-site.ts",
-		"check-types:vercel": "tsc --project api/tsconfig.json"
+		"check-types:vercel": "tsc --project tsconfig.json"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.0",
