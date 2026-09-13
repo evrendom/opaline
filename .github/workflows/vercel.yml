@@ -97,6 +97,15 @@ jobs:
             --yes \
             -- --fail --silent --show-error --output /tmp/opaline-index.html
           test -s /tmp/opaline-index.html
+          vercel curl /api/demo/rpc/analytics/sessions/list \
+            --deployment "${DEPLOYMENT_URL}" \
+            --scope=opalinehq \
+            --yes \
+            -- --fail --silent --show-error \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"json":{"limit":1}}' \
+            | jq --exit-status '.json | type == "array"'
 
       - name: Promote verified production deployment
         if: inputs.target == 'production'

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { z } from "zod";
 import { createDemoHandler } from "../handlers/demo-http.js";
+import { createVercelFunctionHandler } from "../lib/vercel-function-handler.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -104,6 +105,26 @@ test("demo reads use an isolated showcase session and never expose credentials",
 	expect(data.session.token).toBeUndefined();
 	expect(data.session.ipAddress).toBeUndefined();
 	expect(data.session.userAgent).toBeUndefined();
+});
+test("demo RPC bodies survive the Vercel response boundary", async () => {
+	const vercelHandler = createVercelFunctionHandler({
+		fetch: handler,
+		functionGroup: "demo",
+	});
+	const response = await vercelHandler(
+		new Request("http://localhost/api/demo/rpc/me", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ json: {} }),
+		}),
+	);
+	expect(response.status).toBe(200);
+	const body = await response.text();
+	expect(body.length).toBeGreaterThan(0);
+	expect(Number(response.headers.get("content-length"))).toBe(
+		new TextEncoder().encode(body).byteLength,
+	);
+	expect(JSON.parse(body)).toMatchObject({ json: { id: userId } });
 });
 test("demo cannot enumerate or select the account's other workspaces", async () => {
 	for (const path of ["/auth/organization/list", "/rpc/listMyOrganizations"]) {

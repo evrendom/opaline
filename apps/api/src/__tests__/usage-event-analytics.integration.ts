@@ -13,6 +13,7 @@ import {
 	type RudelUsageEventsRow,
 } from "@rudel/ch-schema/generated";
 import { createClickHouseExecutor } from "../clickhouse.js";
+import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import {
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
@@ -278,6 +279,44 @@ afterAll(async () => {
 });
 
 describe("usage-event analytics ClickHouse rollups", () => {
+	test("lists sessions with interaction metrics when usage-event analytics is enabled", async () => {
+		const previousMode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+		try {
+			const rows = await getSessionAnalytics(organizationId, {
+				start_date: "2026-08-04",
+				end_date: "2026-08-04",
+				limit: 30,
+				sort_by: "interactions",
+			});
+			expect(rows.length).toBeGreaterThan(0);
+			expect(rows.every((row) => row.total_interactions === 1)).toBe(true);
+		} finally {
+			if (previousMode === undefined)
+				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+		}
+	});
+
+	test("preserves interaction metrics in daily usage analytics", async () => {
+		const rows = await executor.query<{ total_interactions: number }>({
+			query: `
+				WITH ${buildUsageEventAnalyticsCte()}
+				SELECT total_interactions
+				FROM usage_analytics_daily_sessions
+				WHERE organization_id = {orgId:String}
+					AND session_id = {sessionId:String}
+					AND usage_date = toDate('2026-08-04')
+				LIMIT 1
+			`,
+			query_params: {
+				orgId: organizationId,
+				sessionId: resolvedSessionId,
+			},
+		});
+		expect(rows).toEqual([{ total_interactions: 1 }]);
+	});
+
 	test("resolves replacement generations, receipt consistency, pricing, and metadata joins", async () => {
 		const rows = await readAnalyticsRows();
 
