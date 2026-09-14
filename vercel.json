@@ -191,6 +191,18 @@
 			"destination": "/app.html"
 		},
 		{
+			"source": "/",
+			"has": [
+				{ "type": "cookie", "key": "__Secure-better-auth.session_token" }
+			],
+			"destination": "/api/rpc?__opaline_path=/api/home"
+		},
+		{
+			"source": "/",
+			"has": [{ "type": "cookie", "key": "better-auth.session_token" }],
+			"destination": "/api/rpc?__opaline_path=/api/home"
+		},
+		{
 			"source": "/home",
 			"destination": "/home/index.html"
 		},
