@@ -10,6 +10,7 @@ import { deleteOrgSessions } from "../services/org-session.service.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import {
 	buildSessionLanguageSignalRow,
+	buildSessionLanguageSignalVersion,
 	insertSessionLanguageSignalRows,
 	persistSessionLanguageSignalsBestEffort,
 } from "../services/session-language-signal-persistence.service.js";
@@ -296,6 +297,59 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(collapsed).toEqual([
 			{ member_swears: 2, raw_revision: higherRevision },
 		]);
+	});
+
+	test("upgrades version-two count-only rows into overview word tags", async () => {
+		const sessionId = `legacy_matches_${runId}`;
+		const content = transcript("shit sorry excellent", "fuck sorry");
+		const ingestedAt = new Date("2099-01-01T00:00:01.500Z");
+		const raw = await ingestRawSession({ content, ingestedAt, sessionId });
+		const scannedAt = new Date();
+		await insertSessionLanguageSignalRows(ch, [
+			{
+				...buildSessionLanguageSignalRow(
+					{
+						organizationId: orgId,
+						sessionDate: raw.sessionDate,
+						sessionId,
+						source: "claude_code",
+						userId,
+						rawRevision: raw.rawRevision,
+						rawIngestedAt: ingestedAt,
+					},
+					{
+						member_swears: 1,
+						member_apologies: 1,
+						member_positive: 1,
+						model_swears: 1,
+						model_apologies: 1,
+						model_positive: 0,
+					},
+					scannedAt,
+				),
+				scan_version: 2,
+				signal_version: buildSessionLanguageSignalVersion(
+					raw.rawRevision,
+					2,
+					scannedAt,
+				),
+			},
+		]);
+		await waitForAnalyticsRows([sessionId]);
+		await reconcileSessionLanguageSignalsUntilCaughtUp(25);
+		const day = sessionTimestamp.slice(0, 10);
+		const rows = await getSessionAnalytics(orgId, {
+			start_date: day,
+			end_date: day,
+			limit: 100,
+		});
+		expect(rows.find((row) => row.session_id === sessionId)).toMatchObject({
+			member_swear_matches: ["shit"],
+			member_apology_matches: ["sorry"],
+			member_positive_matches: ["excellent"],
+			model_swear_matches: ["fuck"],
+			model_apology_matches: ["sorry"],
+		});
 	});
 
 	test("the janitor fills missing rows newest-first and duplicate passes converge", async () => {

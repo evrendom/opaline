@@ -10,6 +10,7 @@ const rawSession: SessionAnalyticsRaw = {
 	actual_duration_min: 12,
 	avg_period_sec: 45,
 	cost_is_complete: 1,
+	cost_uses_default_region: 0,
 	error_count: 3,
 	estimated_cost: 1.25,
 	git_branch: "main",

@@ -42,6 +42,7 @@ export interface SessionAnalyticsRaw {
 	output_tokens: number;
 	estimated_cost: number | null;
 	cost_is_complete: number;
+	cost_uses_default_region: number;
 
 	// Git activity
 	git_sha: string;
@@ -162,6 +163,7 @@ export function mapSessionAnalyticsRow(
 		input_tokens: row.input_tokens,
 		output_tokens: row.output_tokens,
 		estimated_cost: row.cost_is_complete > 0 ? row.estimated_cost : null,
+		cost_uses_default_region: row.cost_uses_default_region > 0,
 		success_score: row.success_score,
 		total_interactions: row.total_interactions,
 		avg_period_sec: row.avg_period_sec,
@@ -323,6 +325,7 @@ export async function getSessionAnalytics(
       output_tokens,
 	  ${estimatedCostSql} AS estimated_cost,
 	  sa.cost_is_complete AS cost_is_complete,
+	  sa.cost_uses_default_region AS cost_uses_default_region,
       git_sha,
       git_branch,
 	      has_commit,

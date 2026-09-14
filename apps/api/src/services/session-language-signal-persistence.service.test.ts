@@ -70,11 +70,11 @@ describe("session language-signal ingest persistence", () => {
 			organization_id: "org-1",
 			raw_ingested_at: "2026-08-19 12:00:01.123",
 			raw_revision: "115807295561596928",
-			scan_version: 2,
+			scan_version: 3,
 			scanned_at: "2026-08-19 12:00:02.456",
 			signal_version: buildSessionLanguageSignalVersion(
 				"115807295561596928",
-				2,
+				3,
 				"2026-08-19T12:00:02.456Z",
 			),
 			session_date: "2026-08-19 12:00:00.000",

@@ -61,6 +61,8 @@ const EVENT_PRICING_RATE_CARD_SQL = buildEventPricingRateCardSql();
 const EVENT_CANONICAL_PRICING_MODEL_SQL =
 	buildCanonicalPricingModelSql("c.resolved_model");
 const EVENT_LONG_CONTEXT_AVAILABLE_SQL = buildLongContextAvailableSql();
+// Missing billing geography uses standard-region pricing. Expose that assumption
+// separately from completeness so an otherwise priceable session keeps its estimate.
 const EVENT_GROUP_COST_SQL = buildEventGroupCostSql();
 
 function escapeSqlString(value: string): string {
@@ -519,11 +521,9 @@ export function buildUsageEventAnalyticsCte(
 				toNullable(sum(ifNull(p.group_estimated_cost, 0))) AS estimated_cost,
 				toUInt8(countIf(
 					p.record_kind = 'event'
-					AND (
-						isNull(p.group_estimated_cost)
-						OR p.has_geo_gap = 1
-					)
+					AND isNull(p.group_estimated_cost)
 				) = 0) AS cost_is_complete,
+				toUInt8(countIf(p.record_kind = 'event' AND p.has_geo_gap = 1) > 0) AS cost_uses_default_region,
 				any(p.latest_main_model) AS latest_main_model,
 				any(p.latest_resolved_model) AS latest_resolved_model
 			FROM priced_usage_groups AS p
@@ -544,8 +544,8 @@ export function buildUsageEventAnalyticsCte(
 				toNullable(sum(ifNull(p.group_estimated_cost, 0))) AS estimated_cost,
 				toUInt8(countIf(
 					isNull(p.group_estimated_cost)
-					OR p.has_geo_gap = 1
 				) = 0) AS cost_is_complete,
+				toUInt8(countIf(p.record_kind = 'event' AND p.has_geo_gap = 1) > 0) AS cost_uses_default_region,
 				any(p.latest_main_model) AS latest_main_model,
 				any(p.latest_resolved_model) AS latest_resolved_model
 			FROM priced_usage_groups AS p
@@ -571,7 +571,8 @@ export function buildUsageEventAnalyticsCte(
 				r.cache_creation_input_tokens AS cache_creation_input_tokens,
 				r.total_tokens AS total_tokens,
 				r.estimated_cost AS estimated_cost,
-				r.cost_is_complete AS cost_is_complete
+				r.cost_is_complete AS cost_is_complete,
+				r.cost_uses_default_region AS cost_uses_default_region
 			FROM usage_analytics_metadata AS sa
 			ANY INNER JOIN usage_event_session_rollups AS r
 				ON sa.organization_id = r.organization_id
@@ -590,7 +591,8 @@ export function buildUsageEventAnalyticsCte(
 				r.cache_creation_input_tokens AS cache_creation_input_tokens,
 				r.total_tokens AS total_tokens,
 				r.estimated_cost AS estimated_cost,
-				r.cost_is_complete AS cost_is_complete
+				r.cost_is_complete AS cost_is_complete,
+				r.cost_uses_default_region AS cost_uses_default_region
 			FROM usage_event_daily_rollups AS r
 			ANY INNER JOIN usage_analytics_metadata AS sa
 				ON sa.organization_id = r.organization_id
@@ -617,7 +619,8 @@ export function buildLegacyUsageAnalyticsCte(lineageEnabled?: boolean): string {
 			SELECT
 				sa.*,
 				ifNull(${LEGACY_SESSION_COST_SQL}, 0) AS estimated_cost,
-				toUInt8(1) AS cost_is_complete
+				toUInt8(1) AS cost_is_complete,
+				toUInt8(0) AS cost_uses_default_region
 			FROM usage_analytics_metadata AS sa
 		),
 		usage_analytics_daily_sessions AS (

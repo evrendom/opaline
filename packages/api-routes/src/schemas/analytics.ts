@@ -373,6 +373,7 @@ export const SessionAnalyticsSchema = z.object({
 	input_tokens: z.number(),
 	output_tokens: z.number(),
 	estimated_cost: z.number().nullable().optional(),
+	cost_uses_default_region: z.boolean().optional(),
 	success_score: z.number(),
 	total_interactions: z.number(),
 	avg_period_sec: z.number(),

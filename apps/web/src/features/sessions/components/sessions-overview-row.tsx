@@ -186,6 +186,10 @@ export function SessionsOverviewRow({
 	const durationLabel = formatRoundedDuration(session.duration_min);
 	const dateTooltipLabel = `${clockDateTimeLabel} · ${durationLabel}`;
 	const tokenTooltipLabel = `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
+	const costEstimateLabel =
+		sessionCost !== null && session.cost_uses_default_region
+			? "Estimated at standard region rates; billing region wasn’t recorded."
+			: null;
 	const rowClassName = cn(
 		SESSION_OVERVIEW_ROW_CLASS_NAME,
 		SESSION_OVERVIEW_GRID_CLASS_NAME,
@@ -212,6 +216,9 @@ export function SessionsOverviewRow({
 							data-session-overview-token-tooltip-label={tokenTooltipLabel}
 						>
 							{sessionCost === null ? "—" : formatApiCost(sessionCost)}
+							{costEstimateLabel ? (
+								<span className="sr-only">{costEstimateLabel}</span>
+							) : null}
 							{sessionCost === null ? (
 								<span className="sr-only">API cost unavailable</span>
 							) : null}
@@ -225,6 +232,7 @@ export function SessionsOverviewRow({
 						side="right"
 						sideOffset={8}
 					>
+						{costEstimateLabel ? <p>{costEstimateLabel}</p> : null}
 						{tokenTooltipLabel}
 					</TooltipContent>
 				</Tooltip>

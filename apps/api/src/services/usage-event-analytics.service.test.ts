@@ -126,7 +126,8 @@ describe("usage-event analytics query contract", () => {
 		expect(sql).toContain(
 			"toNullable(sum(ifNull(p.group_estimated_cost, 0))) AS estimated_cost",
 		);
-		expect(sql).toContain("OR p.has_geo_gap = 1");
+		expect(sql).toContain("AS cost_uses_default_region");
+		expect(sql).not.toContain("OR p.has_geo_gap = 1");
 		expect(buildUsageCostSubtotalSql("sa.estimated_cost", 4)).toBe(
 			"toNullable(round(sum(ifNull(sa.estimated_cost, 0)), 4))",
 		);
