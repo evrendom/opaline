@@ -1,7 +1,7 @@
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
@@ -146,7 +146,7 @@ function getSessionClockParts(dateString: string, utc: boolean) {
 	};
 }
 
-export function SessionsOverviewRow({
+export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	index,
 	registerItem,
 	setHoverActiveIndex,
@@ -446,4 +446,4 @@ export function SessionsOverviewRow({
 			)}
 		</li>
 	);
-}
+});
