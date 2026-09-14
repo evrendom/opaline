@@ -4,6 +4,7 @@ import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
 	appRoutes,
 	getLegacyWrappedPublicIdFromPath,
+	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
 	getWrappedPublicIdFromPath,
 	getWrappedResumeTokenFromPath,
@@ -203,7 +204,8 @@ function SessionAwareApp() {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
-				{getWorkspaceSlugFromPath(location.pathname) ? (
+				{getWorkspaceSlugFromPath(location.pathname) ||
+				getWorkspaceRelativePath(location.pathname) !== null ? (
 					<ProductLoadingScreen />
 				) : (
 					<AppLoadingScreen />
