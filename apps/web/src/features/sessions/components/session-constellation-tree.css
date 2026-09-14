@@ -590,6 +590,11 @@
 	box-shadow: none;
 }
 
+.session-constellation-tree
+	.session-turn-table-model-icon[data-trace-icon-tone="claude"] {
+	--trace-icon-fg: #cc7d5e;
+}
+
 .session-constellation-tree [data-trace-tool-icon] {
 	--trace-tool-icon-hue: 250;
 	--trace-tool-icon-light-chroma: 0.006;
