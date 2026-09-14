@@ -1,10 +1,9 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { useLayoutEffect, useRef } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
-import { SessionDetailView } from "@/features/sessions/components/SessionDetailView";
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import {
 	getSessionMotionPanes,
@@ -15,10 +14,18 @@ import { SessionTraceDock } from "@/features/sessions/components/session-trace-d
 import { SessionWorkspaceResizeHandle } from "@/features/sessions/components/session-workspace-resize-handle";
 import { SessionsListSurface } from "@/features/sessions/components/sessions-list-surface";
 import { getSessionNeighbours } from "@/features/sessions/session-navigation";
+import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
+
+const SessionDetailView = lazy(() =>
+	import("@/features/sessions/components/SessionDetailView").then((module) => ({
+		default: module.SessionDetailView,
+	})),
+);
 
 const SESSION_LIST_SCROLL_POSITION_LIMIT = 20;
 const sessionListScrollPositions = new Map<string, number>();
@@ -116,6 +123,11 @@ export function SessionsPage() {
 	const selectedSessionIndex = viewableSessions.findIndex(
 		(session) => session.session_id === activeSessionId,
 	);
+	useLoadSessionPages(
+		selectedSessionIndex >= 0 &&
+			selectedSessionIndex >= viewableSessions.length - 5,
+		data.pagination,
+	);
 	const sessionPosition =
 		selectedSessionIndex === -1 ? undefined : selectedSessionIndex + 1;
 
@@ -188,13 +200,15 @@ export function SessionsPage() {
 			fallbackHref={getShellRoutePath(appRoutes.session())}
 			key={activeSessionId}
 		>
-			<SessionDetailView
-				navigation={sessionNavigation}
-				onClose={closeSession}
-				position={sessionPosition}
-				sessionId={activeSessionId}
-				totalSessions={viewableSessions.length}
-			/>
+			<Suspense fallback={<ProductLoadingIndicator />}>
+				<SessionDetailView
+					navigation={sessionNavigation}
+					onClose={closeSession}
+					position={sessionPosition}
+					sessionId={activeSessionId}
+					totalSessions={viewableSessions.length}
+				/>
+			</Suspense>
 		</SessionDetailErrorBoundary>
 	) : undefined;
 

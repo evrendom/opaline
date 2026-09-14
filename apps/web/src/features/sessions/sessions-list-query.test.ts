@@ -13,7 +13,7 @@ describe("buildSessionsListQueryInput", () => {
 		expect(input).toEqual({
 			days: 30,
 			endDate: "2026-08-19",
-			limit: 1000,
+			limit: 50,
 			sortBy: "session_date",
 			sortOrder: "desc",
 			startDate: "2026-07-21",

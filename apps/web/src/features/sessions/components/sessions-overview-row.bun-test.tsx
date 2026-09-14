@@ -99,6 +99,7 @@ test("hover leaves unchanged rows alone while session data and permissions stay 
 							<SessionsOverviewRow
 								key={session.session_id}
 								index={index}
+								virtualTop={index * 36}
 								registerItem={registerItem}
 								setHoverActiveIndex={setActiveIndex}
 								activeSessionId={undefined}

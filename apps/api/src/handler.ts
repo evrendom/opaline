@@ -415,14 +415,18 @@ async function handleRequest(
 		const session = await auth.api.getSession({ headers: request.headers });
 		let destination = "/home";
 		if (session) {
-			const organizations = await auth.api.listOrganizations({
-				headers: request.headers,
-			});
-			const workspace =
-				organizations.find(
-					(organization) =>
-						organization.id === session.session.activeOrganizationId,
-				) ?? organizations[0];
+			// The session was already authenticated above. Query its memberships
+			// directly instead of re-running auth inside listOrganizations.
+			const [workspace] = await sqlClient<{ slug: string }[]>`
+				SELECT o.slug
+				FROM organization o
+				INNER JOIN member m ON m.organization_id = o.id
+				WHERE m.user_id = ${session.user.id}
+				ORDER BY (o.id = ${session.session.activeOrganizationId ?? ""}) DESC,
+					m.created_at ASC, o.id ASC
+				LIMIT 1
+			`;
+
 			destination = workspace
 				? `/${encodeURIComponent(workspace.slug)}/sessions`
 				: "/settings/workspace";

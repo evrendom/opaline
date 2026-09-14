@@ -331,6 +331,10 @@ describe("usage-event analytics ClickHouse rollups", () => {
 					(index < 800 ? "" : (index % 2 === 0 ? "界" : "'").repeat(164)),
 			),
 			organization_id: pageOrganizationId,
+			git_remote:
+				index < 50
+					? "https://github.com/opalinehq/performance-fixture.git"
+					: "",
 			source: index % 2 === 0 ? "claude_code" : "codex",
 		}));
 		const signalRows = pageRows.map((row, index) =>
@@ -422,6 +426,32 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			}
 			expect(metadataUrlLengths.length).toBeGreaterThan(0);
 			expect(Math.max(...metadataUrlLengths)).toBeLessThan(8_192);
+			// Tied timestamps remain stable across separately requested pages.
+			const pages = [];
+			for (const offset of [0, 50]) {
+				pages.push(
+					...(await getSessionAnalytics(pageOrganizationId, {
+						start_date: "2026-08-04",
+						end_date: "2026-08-04",
+						limit: 50,
+						offset,
+					})),
+				);
+			}
+			expect(pages.map((row) => row.session_id)).toEqual(
+				rows.slice(0, 100).map((row) => row.session_id),
+			);
+			expect(new Set(pages.map((row) => row.session_id)).size).toBe(100);
+			metadataUrlLengths.length = 0;
+			const firstPage = await getSessionAnalytics(pageOrganizationId, {
+				start_date: "2026-08-04",
+				end_date: "2026-08-04",
+				limit: 50,
+				repository: "https://github.com/opalinehq/performance-fixture.git",
+			});
+			expect(firstPage).toHaveLength(50);
+			expect(metadataUrlLengths).toHaveLength(1);
+			expect(metadataUrlLengths[0]).toBeLessThan(8_192);
 		} finally {
 			globalThis.fetch = originalFetch;
 			if (previousMode === undefined)

@@ -1,5 +1,5 @@
-import { keepPreviousData } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
@@ -11,15 +11,23 @@ import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { resolveActiveSessionDateRangeOptionId } from "@/features/sessions/session-date-ranges";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
-import { buildSessionsListQueryInput } from "@/features/sessions/sessions-list-query";
+import {
+	buildSessionsListQueryInput,
+	SESSION_PAGE_SIZE,
+	SESSION_QUERY_STALE_TIME,
+} from "@/features/sessions/sessions-list-query";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
 
 export function useSessionsPageData({
 	trackPageView,
+	paginated = true,
 }: {
+	paginated?: boolean;
 	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
+	const { state: organization } = useOrganization();
 	const {
 		meta,
 		state: { endDate, startDate },
@@ -28,18 +36,6 @@ export function useSessionsPageData({
 		startDate === "2026-08-01" && endDate === "2026-08-31"
 			? demo?.seed
 			: undefined;
-	const selectOverviewRows = useCallback(
-		(rows: unknown) => {
-			// DemoSeedSchema already validated this exact initialData. Retain its
-			// identity so the preview uses the saved full-cohort chart maxima.
-			// Live responses still pass through the normal runtime validation.
-			if (previewSeed && rows === previewSeed.sessions) {
-				return previewSeed.sessions;
-			}
-			return parseSessionOverviewRows(rows);
-		},
-		[previewSeed],
-	);
 	const activeDateRangeOptionId = resolveActiveSessionDateRangeOptionId({
 		endDate,
 		startDate,
@@ -48,10 +44,10 @@ export function useSessionsPageData({
 		...orpc.analytics.overview.kpis.queryOptions({
 			input: { endDate, startDate },
 		}),
-		refetchOnMount: "always",
-		refetchOnReconnect: "always",
-		refetchOnWindowFocus: "always",
-		staleTime: 0,
+		refetchOnMount: true,
+		refetchOnReconnect: true,
+		refetchOnWindowFocus: true,
+		staleTime: SESSION_QUERY_STALE_TIME,
 	});
 
 	const {
@@ -62,32 +58,67 @@ export function useSessionsPageData({
 		...orpc.analytics.sessions.summaryComparison.queryOptions({
 			input: { days: meta.dayCount },
 		}),
-		refetchOnMount: "always",
-		refetchOnReconnect: "always",
-		refetchOnWindowFocus: "always",
-		staleTime: 0,
+		refetchOnMount: true,
+		refetchOnReconnect: true,
+		refetchOnWindowFocus: true,
+		staleTime: SESSION_QUERY_STALE_TIME,
 	});
 
-	const {
-		data: snapshotSessionsData,
-		isPending: isSnapshotSessionsPending,
-		isError: isSnapshotSessionsError,
-	} = useAnalyticsQuery({
-		...orpc.analytics.sessions.list.queryOptions({
-			input: buildSessionsListQueryInput({
-				dayCount: meta.dayCount,
-				endDate,
-				startDate,
-			}),
+	const input = {
+		...buildSessionsListQueryInput({
+			dayCount: meta.dayCount,
+			endDate,
+			startDate,
 		}),
-		refetchOnMount: "always",
-		refetchOnReconnect: "always",
-		refetchOnWindowFocus: "always",
-		placeholderData: keepPreviousData,
-		initialData: previewSeed?.sessions,
-		select: selectOverviewRows,
-		staleTime: 0,
+		limit: paginated ? SESSION_PAGE_SIZE : 1000,
+	};
+	const options = orpc.analytics.sessions.list.infiniteOptions({
+		input: (offset: number) => ({ ...input, offset }),
+		initialPageParam: 0,
+		getNextPageParam: (lastPage, _pages, offset) =>
+			paginated && lastPage.length === SESSION_PAGE_SIZE
+				? offset + lastPage.length
+				: undefined,
 	});
+	const sessionPages = useInfiniteQuery({
+		...options,
+		queryKey: ["org", organization.activeOrg?.id, ...options.queryKey],
+		enabled: !!organization.activeOrg?.id && demo?.live !== false,
+		initialData: previewSeed
+			? { pages: [previewSeed.sessions], pageParams: [0] }
+			: undefined,
+		// Retain rows during date changes, but never carry them to another org.
+		placeholderData: (previous, previousQuery) =>
+			organization.activeOrg?.id &&
+			previousQuery?.queryKey[1] === organization.activeOrg.id
+				? previous
+				: undefined,
+		staleTime: SESSION_QUERY_STALE_TIME,
+		refetchOnWindowFocus: true,
+	});
+	const snapshotSessionsData = useMemo(() => {
+		if (!sessionPages.data) return undefined;
+		// Keep demo seed identities: their preview maxima describe the full cohort.
+		if (previewSeed && sessionPages.data.pages[0] === previewSeed.sessions)
+			return previewSeed.sessions;
+		const rows = sessionPages.data.pages.flatMap(parseSessionOverviewRows);
+		// Concurrent uploads can move an offset boundary. Do not show a row twice.
+		return [
+			...new Map(
+				rows.map((row) => [`${row.source}:${row.session_id}`, row]),
+			).values(),
+		];
+	}, [sessionPages.data, previewSeed]);
+	const isSnapshotSessionsPending = sessionPages.isPending;
+	const isSnapshotSessionsError = sessionPages.isError && !sessionPages.data;
+	const pagination = {
+		hasNextPage: demo?.live !== false && sessionPages.hasNextPage,
+		isFetching: sessionPages.isFetching,
+		isError: sessionPages.isFetchNextPageError,
+		loadMore: () => {
+			void sessionPages.fetchNextPage({ cancelRefetch: false });
+		},
+	};
 
 	const headlineMetrics = useMemo(
 		() => buildDashboardSessionTabMetrics(summaryComparison),
@@ -154,6 +185,8 @@ export function useSessionsPageData({
 	);
 
 	return {
+		organizationId: organization.activeOrg?.id,
+		pagination,
 		dateRangeDays: meta.dayCount,
 		endDate,
 		headlineMetrics,

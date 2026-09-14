@@ -9,9 +9,9 @@ import {
 	useParams,
 } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { loadSessionsPage } from "@/app/session-page-loader";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { CliOnboardingPage } from "@/features/cli-onboarding/cli-onboarding-page";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
@@ -34,14 +34,16 @@ function lazyNamed<TModule extends Record<string, unknown>>(
 	});
 }
 
+const CliOnboardingPage = lazyNamed(
+	() => import("@/features/cli-onboarding/cli-onboarding-page"),
+	"CliOnboardingPage",
+);
+
 const DashboardPage = lazyNamed(
 	() => import("@/features/dashboard/DashboardPage"),
 	"DashboardPage",
 );
-const SessionsPage = lazyNamed(
-	() => import("@/features/sessions/sessions-page"),
-	"SessionsPage",
-);
+const SessionsPage = lazyNamed(loadSessionsPage, "SessionsPage");
 const NewSessionPage = lazyNamed(
 	() => import("@/features/sessions/new-session-page"),
 	"NewSessionPage",
@@ -284,7 +286,10 @@ export function AppRouter({
 			<Route element={<LeftSidebarAppShellLayout />}>
 				{getShellRouteElements(canonicalShellRoutePaths, sessionComponent)}
 
-				<Route path={CLI_SETUP_PATH} element={<CliOnboardingPage />} />
+				<Route
+					path={CLI_SETUP_PATH}
+					element={<LazyRoute Component={CliOnboardingPage} />}
+				/>
 				<Route
 					path={appRoutes.legacyDashboard()}
 					element={<Navigate to={appRoutes.home()} replace />}

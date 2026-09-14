@@ -45,7 +45,9 @@ export function useSessionsOverviewTableState({
 	sessions,
 	totalSessionCount,
 	userMap,
+	onQueryChange,
 }: {
+	onQueryChange?: () => void;
 	sessionCountLabel: number;
 	sessions: readonly SessionAnalytics[] | undefined;
 	totalSessionCount: number;
@@ -165,7 +167,10 @@ export function useSessionsOverviewTableState({
 			Math.min(count + SESSION_ROW_BATCH_SIZE, sortedSessions.length),
 		);
 	}, [sortedSessions.length]);
-	const resetVisibleRows = () => setVisibleRowCount(SESSION_ROW_BATCH_SIZE);
+	const resetVisibleRows = () => {
+		setVisibleRowCount(SESSION_ROW_BATCH_SIZE);
+		onQueryChange?.();
+	};
 
 	function handleSort(sortKey: SessionOverviewColumnKey) {
 		resetVisibleRows();

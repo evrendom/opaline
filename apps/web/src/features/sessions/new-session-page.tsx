@@ -20,6 +20,7 @@ export function NewSessionPage() {
 	const params = useParams<{ sessionId?: string }>();
 	const data = useSessionsPageData({
 		trackPageView: false,
+		paginated: false,
 	});
 	const canViewSession = useCanViewSession();
 	const navigate = useNavigate();

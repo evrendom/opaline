@@ -16,7 +16,9 @@ function isSessionDisabled(element: HTMLElement) {
 
 export function SessionsOverviewFluidList({
 	children,
+	height,
 }: {
+	height?: number;
 	children: (registration: SessionHoverRegistration) => ReactNode;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,11 @@ export function SessionsOverviewFluidList({
 				hover={hover}
 				className="z-0 rounded-none bg-(--session-overview-hover)"
 			/>
-			<ul aria-label="Recent sessions" className="list-none">
+			<ul
+				aria-label="Recent sessions"
+				className="relative list-none"
+				style={{ height }}
+			>
 				{children(hover)}
 			</ul>
 		</div>

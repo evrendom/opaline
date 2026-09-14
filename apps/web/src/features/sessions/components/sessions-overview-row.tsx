@@ -43,6 +43,9 @@ import {
 } from "./session-overview-row-elements";
 
 type SessionsOverviewRowProps = {
+	virtualTop?: number;
+	position?: number;
+	setSize?: number;
 	index: number;
 	registerItem: UseFluidHoverReturn["registerItem"];
 	setHoverActiveIndex: UseFluidHoverReturn["setActiveIndex"];
@@ -148,6 +151,9 @@ function getSessionClockParts(dateString: string, utc: boolean) {
 
 export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	index,
+	position,
+	setSize,
+	virtualTop,
 	registerItem,
 	setHoverActiveIndex,
 	activeSessionId,
@@ -408,6 +414,20 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	);
 	return (
 		<li
+			aria-posinset={position === undefined ? undefined : position + 1}
+			aria-setsize={setSize}
+			data-session-key={`${session.source}:${session.session_id}`}
+			style={
+				virtualTop === undefined
+					? undefined
+					: {
+							position: "absolute",
+							top: virtualTop,
+							left: 0,
+							width: "100%",
+							height: 36,
+						}
+			}
 			ref={itemRef}
 			className="relative z-10"
 			data-session-disabled={!isClickable ? "true" : undefined}
