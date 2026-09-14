@@ -328,6 +328,14 @@ jobs:
             exit 1
           fi
 
+  deploy-vercel:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, integration, cli-smoke-required]
+    uses: ./.github/workflows/vercel.yml
+    with:
+      target: production
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   deploy:
     if: >-
