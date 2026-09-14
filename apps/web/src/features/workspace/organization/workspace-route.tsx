@@ -2,6 +2,7 @@ import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
+import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { authClient } from "@/lib/auth-client";
 import { useOrganization } from "./useOrganization";
 
@@ -63,9 +64,8 @@ function WorkspaceRouteContent({
 			</div>
 		);
 	if (state.isLoading || (!organization && isRefreshingOrganizations))
-		return <output className="p-6">Opening your workspace…</output>;
+		return <ProductLoadingScreen />;
 	if (!organization) return <NotFoundPage />;
-	if (needsSwitch)
-		return <output className="p-6">Opening your workspace…</output>;
+	if (needsSwitch) return <ProductLoadingScreen />;
 	return children;
 }

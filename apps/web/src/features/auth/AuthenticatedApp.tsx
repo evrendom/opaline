@@ -5,6 +5,7 @@ import {
 	getWorkspaceAppPath,
 	getWorkspaceRelativePath,
 } from "@/app/routes";
+import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 
 export function AuthenticatedApp({
@@ -19,8 +20,7 @@ export function AuthenticatedApp({
 			? rootRedirectTarget
 			: `${pathname}${search}${hash}`;
 	if (getWorkspaceRelativePath(destination) !== null) {
-		if (state.isLoading)
-			return <output className="p-6">Opening your workspace…</output>;
+		if (state.isLoading) return <ProductLoadingScreen />;
 		const workspace = state.activeOrg ?? state.organizations[0];
 		if (workspace)
 			return (
