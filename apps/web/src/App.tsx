@@ -4,6 +4,7 @@ import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
 	appRoutes,
 	getLegacyWrappedPublicIdFromPath,
+	getWorkspaceSlugFromPath,
 	getWrappedPublicIdFromPath,
 	getWrappedResumeTokenFromPath,
 } from "@/app/routes";
@@ -23,6 +24,7 @@ import { useOAuthDebugAutoDump } from "@/features/auth/oauth-debug";
 import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
+import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { authClient } from "./lib/auth-client";
 
 const WrappedRouteGate = lazy(() =>
@@ -201,7 +203,11 @@ function SessionAwareApp() {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
-				<AppLoadingScreen />
+				{getWorkspaceSlugFromPath(location.pathname) ? (
+					<ProductLoadingScreen />
+				) : (
+					<AppLoadingScreen />
+				)}
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);
