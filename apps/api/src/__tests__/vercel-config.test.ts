@@ -15,6 +15,28 @@ const headerRuleBySource = new Map(
 );
 
 describe("Vercel deployment configuration", () => {
+	test("checks signed-in root visits before marketing while preserving explicit auth flows", () => {
+		const rootRules = vercelConfig.rewrites.filter(
+			(rule) => rule.source === "/",
+		);
+		const cookies = rootRules.filter((rule) =>
+			rule.has?.some((condition) => condition.type === "cookie"),
+		);
+		expect(cookies.map((rule) => rule.has?.[0]?.key)).toEqual([
+			"__Secure-better-auth.session_token",
+			"better-auth.session_token",
+		]);
+		for (const rule of cookies) {
+			expect(rule.destination).toBe("/api/rpc?__opaline_path=/api/home");
+		}
+		expect(
+			rootRules.slice(0, 3).every((rule) => rule.destination === "/app.html"),
+		).toBe(true);
+		expect(rootRules.at(-1)?.destination).toBe("/home/index.html");
+		expect(rewriteBySource.get("/home")).toBe("/home/index.html");
+		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/api/home")).toBe(true);
+	});
+
 	test("routes legacy ingest through the Vercel RPC function", () => {
 		expect(rewriteBySource.has("/rpc/ingestSession")).toBe(false);
 		expect(headerRuleBySource.has("/rpc/ingestSession")).toBe(false);

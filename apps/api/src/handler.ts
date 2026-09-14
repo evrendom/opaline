@@ -409,6 +409,34 @@ async function handleRequest(
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
 	if (
+		url.pathname === "/api/home" &&
+		(request.method === "GET" || request.method === "HEAD")
+	) {
+		const session = await auth.api.getSession({ headers: request.headers });
+		let destination = "/home";
+		if (session) {
+			const organizations = await auth.api.listOrganizations({
+				headers: request.headers,
+			});
+			const workspace =
+				organizations.find(
+					(organization) =>
+						organization.id === session.session.activeOrganizationId,
+				) ?? organizations[0];
+			destination = workspace
+				? `/${encodeURIComponent(workspace.slug)}/sessions`
+				: "/settings/workspace";
+		}
+		return new Response(null, {
+			status: 302,
+			headers: {
+				"Cache-Control": "private, no-store",
+				Location: destination,
+				Vary: "Cookie",
+			},
+		});
+	}
+	if (
 		url.pathname === "/api/cli/connections" ||
 		url.pathname.startsWith("/api/cli/connections/")
 	) {
