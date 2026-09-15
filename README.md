@@ -68,6 +68,27 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, development commands, an
 
 For self-hosting your own instance, see [docs/self-hosting.md](docs/self-hosting.md).
 
+The hosted development preview uses a stable address:
+[opaline-dev-opalinehq.vercel.app](https://opaline-dev-opalinehq.vercel.app).
+To deploy a branch that includes the current Vercel workflow:
+
+```bash
+gh workflow run vercel.yml --repo opalinehq/athena --ref YOUR_BRANCH -f target=preview
+```
+
+The workflow checks the new deployment before updating that address. Preview
+builds share this address; the latest requested build replaces the previous one.
+Preview authentication uses this same origin for `APP_URL`, `ALLOWED_ORIGIN`,
+and `TRUSTED_ORIGINS`, preserving login across deployments. Vercel deployment
+protection still applies. The hosted preview currently uses the production
+database, so changes to workspace data are real.
+
+Register `https://opaline-dev-opalinehq.vercel.app/api/auth/callback/github`
+as an additional callback on the GitHub OAuth app used by the preview, keeping
+the production callback. Google requires the corresponding `/callback/google`
+URL in its OAuth client settings. Callback registration is a one-time setup for
+each provider; it does not change when the deployment URL changes.
+
 ## Security
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md). Do not open public issues for security concerns.
