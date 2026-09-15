@@ -37,11 +37,12 @@
 
 .workspace-settings-group-rows {
 	min-width: 0;
+	padding-inline: 16px;
 }
 
 .workspace-settings-row,
 .workspace-settings-actions {
-	padding: 12px 16px;
+	padding: 12px 0;
 }
 
 .workspace-settings-row {
@@ -74,7 +75,8 @@
 	gap: 8px;
 }
 
-.workspace-settings-row-control > [data-slot="input"],
+.workspace-settings-group [data-slot="input"],
+.workspace-settings-url-field,
 .workspace-settings-group [data-slot="select-trigger"],
 .workspace-settings-link-value [data-slot="input"] {
 	height: 48px;
@@ -115,7 +117,7 @@
 }
 
 .workspace-settings-empty {
-	padding: 16px;
+	padding: 16px 0;
 }
 
 .workspace-settings-group [data-slot="avatar"] {
@@ -127,7 +129,7 @@
 	min-width: 0;
 	flex-direction: column;
 	gap: 12px;
-	padding: 12px 16px;
+	padding: 12px 0;
 }
 
 .workspace-settings-link-value,
@@ -191,7 +193,7 @@
 
 @container workspace-settings (min-width: 480px) {
 	.workspace-settings-group {
-		font-size: 13px;
+		font-size: 14px;
 	}
 
 	.workspace-settings-row {
@@ -201,12 +203,13 @@
 	}
 
 	.workspace-settings-row-control {
-		width: 200px;
+		width: 256px;
 		flex-shrink: 0;
 		justify-content: flex-end;
 	}
 
 	.workspace-settings-row-control > [data-slot="input"],
+	.workspace-settings-url-field,
 	.workspace-settings-group [data-slot="select-trigger"],
 	.workspace-settings-link-value [data-slot="input"],
 	.workspace-settings-row-control > [data-slot="skeleton"],
@@ -228,7 +231,40 @@
 	.workspace-settings-row-control > [data-slot="skeleton"],
 	.workspace-settings-actions > [data-slot="skeleton"],
 	.workspace-settings-link-actions > [data-slot="skeleton"],
-	.workspace-settings-row-control > [data-slot="input"] {
+	.workspace-settings-row-control > [data-slot="input"],
+	.workspace-settings-url-field {
 		min-height: 48px;
 	}
+}
+
+.workspace-settings-url-control {
+	display: flex;
+	width: 100%;
+	min-width: 0;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.workspace-settings-url-field {
+	display: flex;
+	align-items: center;
+}
+
+.workspace-settings-url-field > span {
+	flex-shrink: 0;
+	color: var(--muted-foreground);
+}
+
+.workspace-settings-url-field:focus-within {
+	border-color: var(--ring);
+	outline: 2px solid color-mix(in oklab, var(--ring) 30%, transparent);
+}
+
+.workspace-settings-url-field [data-slot="input"] {
+	height: 100%;
+	min-height: 0;
+	border: 0;
+	border-radius: 0;
+	padding: 0;
+	box-shadow: none;
 }
