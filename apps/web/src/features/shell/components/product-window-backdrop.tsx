@@ -60,7 +60,6 @@ function ProductWindowBackdrop({
 			className="product-window-backdrop"
 			data-product-window-backdrop
 			data-hero-canvas-stage
-			data-hero-canvas-gradient-only
 			data-hero-canvas-palette={tone}
 			data-hero-canvas-opacity="0.3"
 			aria-hidden="true"

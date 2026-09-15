@@ -909,12 +909,6 @@ body:has(.dashboard-01-preview)::after {
 	z-index: 1;
 }
 
-@media (pointer: coarse) {
-	.dashboard-01-chrome-sidebar [data-sidebar-interactive] {
-		min-height: 2.75rem;
-	}
-}
-
 .team-lineup-featured-card::before {
 	content: "";
 	position: absolute;

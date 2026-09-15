@@ -144,7 +144,6 @@ import Layout from "../layouts/Layout.astro";
 	}
 
 	:global(html) {
-		/* Temporarily disabled: --instant-v2-demo-canvas: #0090ff; */
 		--instant-v2-hero-recede-progress: 0;
 		--instant-v2-page-bg: #fff;
 		background: #fff;
@@ -160,11 +159,6 @@ import Layout from "../layouts/Layout.astro";
 			);
 	}
 
-	/* Temporarily disabled with the blue demo canvas above.
-	:global(html[data-instant-v2-demo]) {
-		--instant-v2-page-bg: var(--instant-v2-demo-canvas);
-	}
-	*/
 
 	:global(html[data-instant-v2-demo-exiting]) {
 		--instant-v2-page-bg: #fff;
@@ -181,6 +175,11 @@ import Layout from "../layouts/Layout.astro";
 		overflow-x: clip;
 		background: transparent;
 		color: var(--color-ink);
+	}
+
+	:global(html:not([data-instant-v2-demo]):not([data-instant-v2-demo-exiting])) .instant-v2 {
+		/* Contain the padded blur without adding a scroll container. */
+		overflow: clip;
 	}
 
 	.instant-v2-container {
@@ -211,10 +210,12 @@ import Layout from "../layouts/Layout.astro";
 		align-items: start;
 		column-gap: 24px;
 		opacity: calc(1 - var(--instant-v2-hero-recede-progress));
-		transform: scale(
+		transform: translateZ(0) scale(
 			calc(1 - var(--instant-v2-hero-recede-progress) * 0.1)
 		);
 		transform-origin: center;
+		/* Prepare the fading text and buttons before the first scroll. */
+		will-change: transform, opacity;
 	}
 
 	.instant-v2 h1 {
@@ -404,14 +405,49 @@ import Layout from "../layouts/Layout.astro";
 	}
 
 	@media (max-width: 540px) {
+		:global(html) {
+			--instant-v2-mobile-footer-height: calc(
+				84px + env(safe-area-inset-bottom, 0px)
+			);
+		}
+
 		.instant-v2-container {
 			width: calc(100% - 32px);
 		}
 
 		.instant-v2-showcase {
 			--instant-v2-showcase-gutter: 4px;
-			--instant-v2-company-strip-height: 84px;
+			--instant-v2-company-strip-height: var(--instant-v2-mobile-footer-height);
 			width: calc(100% - 8px);
+			min-height: calc(100dvh - 42px);
+		}
+
+		.instant-v2-showcase :global(.company-strip) {
+			/* Reserve the end of the stage so the footer never crosses the preview. */
+			position: absolute;
+			z-index: 49;
+			inset: auto calc(-1 * var(--instant-v2-showcase-gutter)) 0;
+			height: var(--instant-v2-mobile-footer-height);
+			min-height: 0;
+			margin: 0;
+			padding: 0 max(10px, env(safe-area-inset-right, 0px))
+				env(safe-area-inset-bottom, 0px) max(10px, env(safe-area-inset-left, 0px));
+			background: var(--instant-v2-page-bg, #fff);
+		}
+
+		.instant-v2-showcase :global(.company-strip-inner) {
+			width: 100%;
+			min-height: 84px;
+			gap: 0;
+			padding-block: 12px 4px;
+		}
+
+		.instant-v2-showcase :global(.company-strip-links a) {
+			display: inline-flex;
+			min-width: 44px;
+			min-height: 44px;
+			align-items: center;
+			-webkit-tap-highlight-color: transparent;
 		}
 
 		.instant-v2-intro {
@@ -425,7 +461,7 @@ import Layout from "../layouts/Layout.astro";
 
 		.instant-v2 h1 {
 			max-width: none;
-			font-size: clamp(32px, 9.25vw, 36px);
+			font-size: clamp(27px, 8.5vw, 36px);
 			letter-spacing: -0.01em;
 			line-height: 1;
 			text-align: center;
@@ -487,54 +523,8 @@ import Layout from "../layouts/Layout.astro";
 </style>
 
 <script>
-	import {
-		getInstantV2ScrollContainer,
-		getInstantV2ScrollPosition,
-	} from "../scripts/instant-v2-scroll";
-	import { initializeInstantV2SmoothScroll } from "../scripts/instant-v2-smooth-scroll";
-
-	initializeInstantV2SmoothScroll();
-
-	const root = document.documentElement;
-	const heroContent = document.querySelector<HTMLElement>(
-		"[data-instant-v2-hero-content]",
-	);
-	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-	let heroMotionFrame = 0;
-
-	const clampHeroProgress = (value: number) =>
-		Math.min(1, Math.max(0, value));
-
-	const updateHeroRecession = () => {
-		heroMotionFrame = 0;
-		if (!heroContent || reducedMotion.matches) {
-			root.style.setProperty("--instant-v2-hero-recede-progress", "0");
-			return;
-		}
-
-		const progress = clampHeroProgress(
-			(getInstantV2ScrollPosition().y - 20) / 180,
-		);
-		root.style.setProperty(
-			"--instant-v2-hero-recede-progress",
-			progress.toFixed(4),
-		);
-	};
-
-	const queueHeroRecession = () => {
-		if (heroMotionFrame) return;
-		heroMotionFrame = window.requestAnimationFrame(updateHeroRecession);
-	};
-
-	updateHeroRecession();
-	(getInstantV2ScrollContainer() ?? window).addEventListener(
-		"scroll",
-		queueHeroRecession,
-		{ passive: true },
-	);
-	window.addEventListener("resize", queueHeroRecession, { passive: true });
-	window.addEventListener("pageshow", queueHeroRecession, { passive: true });
-	reducedMotion.addEventListener("change", queueHeroRecession);
+	import { initializeInstantV2LandingMotion } from "../scripts/instant-v2-landing-motion";
+	initializeInstantV2LandingMotion();
 
 	const githubLink = document.querySelector<HTMLAnchorElement>(
 		"[data-instant-v2-github][data-github-repo]",

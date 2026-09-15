@@ -17,7 +17,6 @@ import {
 	getInstantV2ScrollContainer,
 	getInstantV2ScrollPosition,
 } from "../scripts/instant-v2-scroll";
-import blurRevealSource from "./instant-v2-agent-morph.module.css?raw";
 import {
 	animateSafariDemoWindow,
 	captureSafariDemoLayout,
@@ -40,12 +39,6 @@ import "./InstantV2DemoExperience.css";
  * ───────────────────────────────────────────────────────── */
 
 const DEMO_ENTER_EVENT = "instant-v2:demo-enter";
-// Temporarily parked with the animated heading reveal for launch.
-const SHOW_BLUR_SOURCE_MONITOR = false;
-const BLUR_DIAL_CHANGE_EVENT = "instant-v2:blur-dial-change";
-const BLUR_SOURCE_COOKIE = "opaline_blur_source";
-const BLUR_SOURCE_COOKIE_MAX_AGE_SECONDS = 31_536_000;
-const BLUR_SOURCE_FINGERPRINT = createSourceFingerprint(blurRevealSource);
 const COPY_FEEDBACK_MS = 2_000;
 const COPY_RESET_MS = 250;
 const GLIMM_SWEEP_MS = 800;
@@ -96,7 +89,6 @@ const DEMO_DASHBOARD_PIN_PROPERTIES = {
 
 type DemoStage = "landing" | "entering" | "demo" | "exiting";
 type DemoBarStage = "hidden" | "entering" | "visible" | "exiting";
-type BlurSourceStatus = "checking" | "current" | "updated";
 
 interface DemoDomSnapshot {
 	backgroundRegions: Array<{
@@ -125,12 +117,6 @@ interface DemoDomDeactivation {
 	done: Promise<void>;
 }
 
-interface BlurSourceGeometry {
-	bottomExtension: string;
-	leadIn: string;
-	radius: string;
-}
-
 export function InstantV2DemoExperience() {
 	return (
 		<GlimmProvider
@@ -150,10 +136,6 @@ export function InstantV2DemoExperience() {
 
 function DemoExperienceController() {
 	const { sweep } = useGlimm();
-	const [blurSourceGeometry, setBlurSourceGeometry] =
-		useState<BlurSourceGeometry | null>(null);
-	const [blurSourceStatus, setBlurSourceStatus] =
-		useState<BlurSourceStatus>("checking");
 	const [demoBarStage, setDemoBarStage] = useState<DemoBarStage>("hidden");
 	const onboarding = useCliOnboarding(demoBarStage === "visible", {
 		mode: "demo",
@@ -420,32 +402,6 @@ function DemoExperienceController() {
 	}, [enterDemo]);
 
 	useEffect(() => {
-		const previousFingerprint = getCookieValue(BLUR_SOURCE_COOKIE);
-		setBlurSourceGeometry(getBlurSourceGeometry());
-		setBlurSourceStatus(
-			previousFingerprint === BLUR_SOURCE_FINGERPRINT ? "current" : "updated",
-		);
-		setCookieValue(
-			BLUR_SOURCE_COOKIE,
-			BLUR_SOURCE_FINGERPRINT,
-			BLUR_SOURCE_COOKIE_MAX_AGE_SECONDS,
-		);
-	}, []);
-
-	useEffect(() => {
-		const handleBlurDialChange = (event: Event) => {
-			if (!(event instanceof CustomEvent)) return;
-
-			const detail: unknown = event.detail;
-			if (isBlurSourceGeometry(detail)) setBlurSourceGeometry(detail);
-		};
-
-		window.addEventListener(BLUR_DIAL_CHANGE_EVENT, handleBlurDialChange);
-		return () =>
-			window.removeEventListener(BLUR_DIAL_CHANGE_EVENT, handleBlurDialChange);
-	}, []);
-
-	useEffect(() => {
 		if (demoBarStage === "visible" && !onboarding.personalView) {
 			const frame = document.querySelector<HTMLIFrameElement>(
 				"[data-instant-v2-product-iframe]",
@@ -459,43 +415,7 @@ function DemoExperienceController() {
 		}
 	}, [demoBarStage, onboarding.personalView]);
 
-	const blurSourceIndicator = (
-		<output
-			aria-label={`Loaded blur radius ${blurSourceGeometry?.radius ?? "unknown"} pixels, ${blurSourceGeometry?.leadIn ?? "unknown"} pixels lead-in and ${blurSourceGeometry?.bottomExtension ?? "unknown"} pixels bottom extension, source fingerprint ${BLUR_SOURCE_FINGERPRINT}, ${blurSourceStatus}`}
-			className="instant-v2-blur-source"
-			data-blur-bottom-extension={blurSourceGeometry?.bottomExtension}
-			data-blur-lead-in={blurSourceGeometry?.leadIn}
-			data-blur-radius={blurSourceGeometry?.radius}
-			data-blur-source-fingerprint={BLUR_SOURCE_FINGERPRINT}
-			data-status={blurSourceStatus}
-		>
-			<span>Blur</span>
-			<strong>{blurSourceGeometry?.radius ?? "—"}</strong>
-			<span aria-hidden="true">·</span>
-			<span>
-				{blurSourceGeometry
-					? `${blurSourceGeometry.leadIn}/${blurSourceGeometry.bottomExtension}`
-					: "—/—"}
-			</span>
-			<span aria-hidden="true">·</span>
-			<strong>{BLUR_SOURCE_FINGERPRINT}</strong>
-			<span aria-hidden="true">·</span>
-			<span>{blurSourceStatus}</span>
-		</output>
-	);
-
-	if (demoBarStage === "hidden") {
-		if (!SHOW_BLUR_SOURCE_MONITOR) return null;
-
-		return (
-			<div
-				className="instant-v2-blur-source-monitor"
-				data-instant-v2-blur-source-monitor
-			>
-				{blurSourceIndicator}
-			</div>
-		);
-	}
+	if (demoBarStage === "hidden") return null;
 
 	return (
 		<div
@@ -506,7 +426,6 @@ function DemoExperienceController() {
 		>
 			<div className="instant-v2-demo-status-group">
 				<ProductBrand />
-				{SHOW_BLUR_SOURCE_MONITOR ? blurSourceIndicator : null}
 			</div>
 			{onboarding.setupSnapshot?.repositories.some(
 				(repository) => repository.enabled,
@@ -964,69 +883,6 @@ function animateDashboardBounds(
 
 function getDemoDashboardWindow() {
 	return document.querySelector<HTMLElement>(DEMO_DASHBOARD_SELECTOR);
-}
-
-function createSourceFingerprint(source: string): string {
-	let hash = 2_166_136_261;
-
-	for (let index = 0; index < source.length; index += 1) {
-		hash ^= source.charCodeAt(index);
-		hash = Math.imul(hash, 16_777_619);
-	}
-
-	return String(1_000 + ((hash >>> 0) % 9_000));
-}
-
-function getBlurSourceGeometry(): BlurSourceGeometry | null {
-	const morphRoot = document.querySelector<HTMLElement>(
-		"[data-agent-phrase]",
-	)?.parentElement;
-	if (!morphRoot) return null;
-
-	const styles = getComputedStyle(morphRoot);
-	const bottomExtension = getPixelValue(
-		styles.getPropertyValue("--blur-bottom-extension"),
-	);
-	const leadIn = getPixelValue(styles.getPropertyValue("--blur-lead-in"));
-	const radius = getPixelValue(styles.getPropertyValue("--blur"));
-	if (!bottomExtension || !leadIn || !radius) return null;
-
-	return { bottomExtension, leadIn, radius };
-}
-
-function getPixelValue(value: string): string | null {
-	const trimmedValue = value.trim();
-	if (!/^\d+(?:\.\d+)?px$/.test(trimmedValue)) return null;
-
-	return trimmedValue.slice(0, -2);
-}
-
-function isBlurSourceGeometry(value: unknown): value is BlurSourceGeometry {
-	if (typeof value !== "object" || value === null) return false;
-
-	return (
-		isNumericString(Reflect.get(value, "bottomExtension")) &&
-		isNumericString(Reflect.get(value, "leadIn")) &&
-		isNumericString(Reflect.get(value, "radius"))
-	);
-}
-
-function isNumericString(value: unknown): value is string {
-	return typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value);
-}
-
-function getCookieValue(name: string): string | null {
-	const prefix = `${encodeURIComponent(name)}=`;
-	const matchingCookie = document.cookie
-		.split("; ")
-		.find((cookie) => cookie.startsWith(prefix));
-
-	return matchingCookie?.slice(prefix.length) ?? null;
-}
-
-function setCookieValue(name: string, value: string, maxAgeSeconds: number) {
-	// biome-ignore lint/suspicious/noDocumentCookie: This deliberately verifies a persisted browser cookie against the loaded blur source.
-	document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Lax`;
 }
 
 function setNavDemoState(active: boolean) {
