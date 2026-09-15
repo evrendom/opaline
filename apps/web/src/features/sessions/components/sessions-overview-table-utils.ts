@@ -27,7 +27,7 @@ export const SESSION_OVERVIEW_COLUMNS = [
 	{ align: "left", key: "tokens", label: "Input / Output" },
 	{ align: "left", key: "skills", label: "Skills" },
 	{ align: "right", key: "user", label: "Member" },
-	{ align: "right", key: "time", label: "Time" },
+	{ align: "right", key: "time", label: "Date" },
 	{ align: "left", key: "repository", label: "Repository" },
 	{ align: "left", key: "signals", label: "Signals" },
 	{ align: "left", key: "input", label: "Input" },
@@ -54,7 +54,7 @@ export type SessionOverviewSortKey =
 	| "duration"
 	| "messages";
 export const SESSION_OVERVIEW_SORT_OPTIONS = [
-	{ key: "time", label: "Time" },
+	{ key: "time", label: "Date" },
 	{ key: "cost", label: "Cost" },
 	{ key: "tokens", label: "Tokens" },
 	{ key: "skills", label: "Skills" },
