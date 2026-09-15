@@ -162,33 +162,42 @@ function serializedBytes(value: unknown) {
 }
 
 export function truncateSessionDetailPreview(value: string) {
-	const normalized = value.replace(/\s+/gu, " ").trim();
-	if (!normalized) {
-		return null;
+	// A preview must not normalize or split a multi-megabyte message in full.
+	const limit = SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT;
+	const points: string[] = [];
+	let pendingSpace = false;
+	for (const point of value) {
+		if (/\s/u.test(point)) {
+			pendingSpace = points.length > 0;
+			continue;
+		}
+		if (pendingSpace) {
+			points.push(" ");
+			pendingSpace = false;
+		}
+		points.push(point);
+		if (points.length > limit)
+			return `${points
+				.slice(0, limit - 3)
+				.join("")
+				.trimEnd()}...`;
 	}
-	const codePoints = Array.from(normalized);
-	if (codePoints.length <= SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT) {
-		return normalized;
-	}
-	return `${codePoints
-		.slice(0, SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT - 3)
-		.join("")
-		.trimEnd()}...`;
+	return points.join("") || null;
 }
 
 function truncateSessionDetailActivityDetail(value: string | undefined) {
-	const normalized = value?.trim();
-	if (!normalized) {
-		return undefined;
+	if (!value) return undefined;
+	const points: string[] = [];
+	for (const point of value.trim()) {
+		points.push(point);
+		if (points.length > SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT) {
+			return `${points
+				.slice(0, SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT - 3)
+				.join("")
+				.trimEnd()}...`;
+		}
 	}
-	const codePoints = Array.from(normalized);
-	if (codePoints.length <= SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT) {
-		return normalized;
-	}
-	return `${codePoints
-		.slice(0, SESSION_DETAIL_ACTIVITY_DETAIL_CODE_POINT_LIMIT - 3)
-		.join("")
-		.trimEnd()}...`;
+	return points.join("") || undefined;
 }
 
 function countToolCalls(items: readonly TraceItem[]) {

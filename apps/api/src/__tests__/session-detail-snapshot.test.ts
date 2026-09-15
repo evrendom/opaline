@@ -5,6 +5,12 @@ import {
 } from "../services/session-detail-snapshot.service.js";
 
 describe("session detail ClickHouse snapshot", () => {
+	test("prunes obsolete transcript revisions before reading the content columns", () => {
+		const sql = buildSessionDetailRawSnapshotSql();
+		expect(sql.match(/revision = \{revision:UInt64\}/gu)).toHaveLength(3);
+		expect(sql.match(/PREWHERE organization_id/gu)).toHaveLength(2);
+		expect(sql.match(/source = \{source:String\}/gu)).toHaveLength(3);
+	});
 	test("selects raw revision, content, and subagents in one argMax tuple", () => {
 		const sql = buildSessionDetailRawSnapshotSql();
 		const compact = sql.replace(/\s+/gu, " ");

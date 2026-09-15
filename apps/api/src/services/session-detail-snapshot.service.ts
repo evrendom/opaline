@@ -39,7 +39,7 @@ type SnapshotRow = {
 	user_id: string;
 };
 
-function rawSessionUnionSql() {
+function rawSessionUnionSql(pinRevision = false) {
 	return `
     SELECT
       'claude_code' AS source,
@@ -58,9 +58,10 @@ function rawSessionUnionSql() {
       git_branch,
       git_sha
     FROM rudel.claude_sessions
-    WHERE organization_id = {orgId:String}
+    PREWHERE organization_id = {orgId:String}
       AND user_id = {ownerId:String}
       AND session_id = {sessionId:String}
+      ${pinRevision ? "AND revision = {revision:UInt64} AND source = {source:String}" : ""}
 
     UNION ALL
 
@@ -81,9 +82,10 @@ function rawSessionUnionSql() {
       git_branch,
       git_sha
     FROM rudel.codex_sessions
-    WHERE organization_id = {orgId:String}
+    PREWHERE organization_id = {orgId:String}
       AND user_id = {ownerId:String}
-      AND session_id = {sessionId:String}`;
+      AND session_id = {sessionId:String}
+      ${pinRevision ? "AND revision = {revision:UInt64} AND source = {source:String}" : ""}`;
 }
 
 export function buildSessionDetailCurrentRevisionSql() {
@@ -122,7 +124,7 @@ export function buildSessionDetailRawSnapshotSql() {
         ),
         revision
       ) AS snapshot
-      FROM (${rawSessionUnionSql()})
+      FROM (${rawSessionUnionSql(true)})
       HAVING count() > 0
     ),
     latest_analytics AS (
@@ -144,6 +146,8 @@ export function buildSessionDetailRawSnapshotSql() {
       WHERE organization_id = {orgId:String}
         AND user_id = {ownerId:String}
         AND session_id = {sessionId:String}
+        AND revision = {revision:UInt64}
+        AND source = {source:String}
       HAVING count() > 0
     )
   SELECT
@@ -206,11 +210,21 @@ export async function getSessionDetailRawSnapshot(
 	organizationId: string,
 	sessionId: string,
 	ownerId: string,
+	expected?: CurrentRevisionRow,
 ): Promise<SessionDetailRawSnapshot | null> {
+	// Resolve identity using metadata, then read the payload only for that revision.
+	// Aggregating every uploaded transcript version can read gigabytes for one session.
+	const current =
+		expected ??
+		(await getSessionDetailCurrentRevision(organizationId, sessionId, ownerId));
+	if (!current) return null;
 	const [row] = await queryClickhouse<SnapshotRow>({
 		clickhouse_settings: SESSION_DETAIL_QUERY_SETTINGS,
 		query: buildSessionDetailRawSnapshotSql(),
-		query_params: queryParams(organizationId, sessionId, ownerId),
+		query_params: {
+			...queryParams(organizationId, sessionId, ownerId),
+			...current,
+		},
 	});
 	if (!row) {
 		return null;

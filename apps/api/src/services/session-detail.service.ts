@@ -168,6 +168,10 @@ async function loadDerivation(
 					key.organizationId,
 					key.sessionId,
 					key.ownerId,
+					{
+						source: key.source === "codex" ? "codex" : "claude_code",
+						revision: key.revision,
+					},
 				);
 				const rawFetchDurationMs = Math.round(performance.now() - startedAt);
 				if (!snapshot) {

@@ -1,5 +1,6 @@
+import type { SessionListFilters } from "@rudel/api-routes";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
@@ -27,11 +28,39 @@ export function useSessionsPageData({
 	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
+	const [filterState, setFilterState] = useState<{
+		scope: string;
+		filters: SessionListFilters;
+	} | null>(null);
 	const { state: organization } = useOrganization();
 	const {
 		meta,
 		state: { endDate, startDate },
 	} = useDateRange();
+	const filterScope = JSON.stringify([
+		organization.activeOrg?.id,
+		startDate,
+		endDate,
+	]);
+	const filters =
+		filterState?.scope === filterScope ? filterState.filters : undefined;
+	const setSessionFilters = useCallback(
+		(filters: SessionListFilters) => {
+			const active =
+				Object.values(filters.excluded).some((values) => values.length > 0) ||
+				Object.values(filters.ranges).some(
+					(range) => range.minimum !== null || range.maximum !== null,
+				);
+			setFilterState(active ? { scope: filterScope, filters } : null);
+		},
+		[filterScope],
+	);
+	const catalogQuery = useAnalyticsQuery({
+		...orpc.analytics.sessions.filterCatalog.queryOptions({
+			input: { startDate, endDate, days: meta.dayCount },
+		}),
+		staleTime: SESSION_QUERY_STALE_TIME,
+	});
 	const previewSeed =
 		startDate === "2026-08-01" && endDate === "2026-08-31"
 			? demo?.seed
@@ -70,6 +99,7 @@ export function useSessionsPageData({
 			endDate,
 			startDate,
 		}),
+		filters,
 		limit: paginated ? SESSION_PAGE_SIZE : 1000,
 	};
 	const options = orpc.analytics.sessions.list.infiniteOptions({
@@ -116,6 +146,7 @@ export function useSessionsPageData({
 		isFetching: sessionPages.isFetching,
 		isError: sessionPages.isFetchNextPageError,
 		loadMore: () => {
+			if (sessionPages.isPlaceholderData) return;
 			void sessionPages.fetchNextPage({ cancelRefetch: false });
 		},
 	};
@@ -171,6 +202,7 @@ export function useSessionsPageData({
 
 	const useRolling24Hours = activeDateRangeOptionId === "24-hours";
 	const rangeSessionCount =
+		catalogQuery.data?.sessionCount ??
 		summaryComparison?.current.total_sessions ??
 		previewSeed?.totalSessionCount ??
 		snapshotSessionsData?.length ??
@@ -186,6 +218,13 @@ export function useSessionsPageData({
 
 	return {
 		organizationId: organization.activeOrg?.id,
+		filterCatalog: catalogQuery.data,
+		filterCatalogPending: !demo && catalogQuery.isPending,
+		filterCatalogError: !demo && catalogQuery.isError && !catalogQuery.data,
+		retryFilterCatalog: () => {
+			void catalogQuery.refetch();
+		},
+		setSessionFilters,
 		pagination,
 		dateRangeDays: meta.dayCount,
 		endDate,

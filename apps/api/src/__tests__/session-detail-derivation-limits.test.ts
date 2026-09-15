@@ -13,6 +13,6 @@ describe("session detail derivation limits", () => {
 		expect(SESSION_DETAIL_DERIVATION_CACHE_DEFAULT_MAX_ENTRY_BYTES).toBe(
 			64 * 1024 * 1024,
 		);
-		expect(SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY).toBe(2);
+		expect(SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY).toBe(1);
 	});
 });

@@ -19,6 +19,7 @@ import {
 	InvalidSessionDetailCursorError,
 	InvalidSessionDetailWindowCursorError,
 } from "../../services/session-detail-derivation.service.js";
+import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
 import {
@@ -37,6 +38,7 @@ const list = os.analytics.sessions.list
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => {
 		return getSessionAnalytics(context.organizationId, {
+			filters: input.filters,
 			days: input.days,
 			start_date: input.startDate,
 			end_date: input.endDate,
@@ -50,6 +52,16 @@ const list = os.analytics.sessions.list
 			sort_order: input.sortOrder,
 		});
 	});
+
+const filterCatalog = os.analytics.sessions.filterCatalog
+	.use(orgMiddleware)
+	.handler(({ input, context }) =>
+		getSessionFilterCatalog(context.organizationId, {
+			days: input.days,
+			start_date: input.startDate,
+			end_date: input.endDate,
+		}),
+	);
 
 const summary = os.analytics.sessions.summary
 	.use(orgMiddleware)
@@ -286,6 +298,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	detailTurn,
 	detailWindow,
 	list,
+	filterCatalog,
 	summary,
 	summaryComparison,
 	dimensionAnalysis,

@@ -1,6 +1,12 @@
-import type { SessionAnalytics } from "@rudel/api-routes";
+import type {
+	SessionAnalytics,
+	SessionFilterCatalog,
+	SessionListFilters,
+} from "@rudel/api-routes";
 import { useCallback, useMemo, useState } from "react";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { formatUsername } from "@/lib/format";
+import { useSessionListFilters } from "../use-session-list-filters";
 import {
 	buildSessionOverviewFilterOptions,
 	buildSessionOverviewRangeBounds,
@@ -46,7 +52,17 @@ export function useSessionsOverviewTableState({
 	totalSessionCount,
 	userMap,
 	onQueryChange,
+	filterCatalog,
+	filterCatalogPending,
+	filterCatalogError,
+	onRetryFilterCatalog,
+	onFiltersChange,
 }: {
+	filterCatalog?: SessionFilterCatalog;
+	filterCatalogPending?: boolean;
+	filterCatalogError?: boolean;
+	onRetryFilterCatalog?: () => void;
+	onFiltersChange?: (filters: SessionListFilters) => void;
 	onQueryChange?: () => void;
 	sessionCountLabel: number;
 	sessions: readonly SessionAnalytics[] | undefined;
@@ -66,7 +82,7 @@ export function useSessionsOverviewTableState({
 		SESSION_ROW_BATCH_SIZE,
 	);
 	const recentSessions = sessions ?? EMPTY_SESSIONS;
-	const filterOptions = useMemo(
+	const loadedFilterOptions = useMemo(
 		() => ({
 			model: buildSessionOverviewFilterOptions(
 				recentSessions,
@@ -87,9 +103,22 @@ export function useSessionsOverviewTableState({
 		}),
 		[recentSessions, userMap],
 	);
+	const filterOptions = useMemo(
+		() =>
+			filterCatalog
+				? buildCatalogOptions(filterCatalog, userMap)
+				: loadedFilterOptions,
+		[filterCatalog, userMap, loadedFilterOptions],
+	);
 	const rangeFilterBounds = useMemo(
-		() => buildSessionOverviewRangeBounds(recentSessions),
-		[recentSessions],
+		() =>
+			filterCatalog?.ranges ?? buildSessionOverviewRangeBounds(recentSessions),
+		[filterCatalog, recentSessions],
+	);
+	useSessionListFilters(
+		excludedFilterValues,
+		rangeFilterValues,
+		onFiltersChange,
 	);
 	const hasActiveFilters =
 		SESSION_OVERVIEW_FILTER_KEYS.some(
@@ -200,6 +229,9 @@ export function useSessionsOverviewTableState({
 	}
 
 	return {
+		filterCatalogPending,
+		filterCatalogError,
+		onRetryFilterCatalog,
 		activeSortLabel:
 			SESSION_OVERVIEW_SORT_OPTIONS.find((option) => option.key === sort.key)
 				?.label ??
@@ -262,5 +294,49 @@ export function useSessionsOverviewTableState({
 			? filteredSessions.length
 			: sessionCountLabel,
 		visibleSessions,
+	};
+}
+
+function buildCatalogOptions(
+	catalog: SessionFilterCatalog,
+	userMap: Record<string, string>,
+) {
+	const sort = (options: { value: string; label: string }[]) =>
+		options.sort(
+			(a, b) =>
+				compareSessionLabels(a.label, b.label) ||
+				compareSessionLabels(a.value, b.value),
+		);
+	const nameCounts = new Map<string, number>();
+	for (const repo of catalog.repositories) {
+		const name = repo.repoName ?? "No repository";
+		nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+	}
+	return {
+		repository: sort(
+			catalog.repositories.map((repo) => {
+				const name = repo.repoName ?? "No repository";
+				return {
+					value: repo.repoKey,
+					label:
+						(nameCounts.get(name) ?? 0) > 1
+							? `${name} (${repo.repoLabel})`
+							: name,
+				};
+			}),
+		),
+		model: sort(catalog.models.map((value) => ({ value, label: value }))),
+		user: sort(
+			catalog.users.map((value) => ({
+				value,
+				label: formatUsername(value, userMap),
+			})),
+		),
+		skills: sort(
+			catalog.skills.map((value) => ({
+				value,
+				label: value === "__no_skills_used__" ? "No skills used" : value,
+			})),
+		),
 	};
 }

@@ -207,7 +207,22 @@ export function userContentText(content: UserContent): string {
 }
 
 export function compactPreview(text: string, maxLength = 140): string {
-	const normalized = text.replace(/\s+/g, " ").trim();
+	// Retain only the requested prefix. Normalizing an entire pasted file can
+	// allocate millions of temporary strings just to show a short preview.
+	let normalized = "";
+	let pendingSpace = false;
+	for (const point of text) {
+		if (/\s/u.test(point)) {
+			pendingSpace = normalized.length > 0;
+			continue;
+		}
+		if (pendingSpace) {
+			normalized += " ";
+			pendingSpace = false;
+		}
+		normalized += point;
+		if (normalized.length > maxLength) break;
+	}
 
 	if (normalized.length <= maxLength) {
 		return normalized;
