@@ -4,6 +4,7 @@ import {
 	CLI_SESSION_UPLOAD_STATUS_MAX_IDS,
 	CliApiKeyCreateResponseSchema,
 	CliSessionUploadStatusOutputSchema,
+	CliSetupStatusSchema,
 } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
 import {
@@ -103,6 +104,59 @@ test("requires authentication", async () => {
 	expect(response.status).toBe(401);
 });
 
+test("setup status accepts CLI ingest keys and reports the account's previous uploads", async () => {
+	const response = await fetch(`${server.baseUrl}/rpc/cli/setupStatus`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+		body: "{}",
+	});
+	expect(response.status).toBe(200);
+	expect(await readSetupStatus(response)).toEqual({
+		hasCliLogin: false,
+		hasUploadedSessions: true,
+	});
+});
+
+test("new accounts stay new through pending uploads and become returning across workspaces after ingest", async () => {
+	const fresh = await createUser("first-upload");
+	await sqlClient`INSERT INTO member (id, organization_id, user_id, role, created_at)
+		VALUES (${crypto.randomUUID()}, ${owner.id}, ${fresh.id}, 'member', NOW())`;
+	const lookupSetup = () =>
+		fetch(`${server.baseUrl}/rpc/cli/setupStatus`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${fresh.token}`,
+			},
+			body: "{}",
+		});
+	const before = await lookupSetup();
+	expect(before.status).toBe(200);
+	expect(await readSetupStatus(before)).toEqual({
+		hasCliLogin: false,
+		hasUploadedSessions: false,
+	});
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, last_ingested_at)
+		VALUES (${owner.id}, ${`${runId}-first-upload`}, ${fresh.id}, NULL)`;
+	const pending = await lookupSetup();
+	expect(pending.status).toBe(200);
+	expect((await readSetupStatus(pending)).hasUploadedSessions).toBe(false);
+	await sqlClient`UPDATE session_ownership SET last_ingested_at = NOW()
+		WHERE organization_id = ${owner.id} AND session_id = ${`${runId}-first-upload`}`;
+	const complete = await lookupSetup();
+	expect(complete.status).toBe(200);
+	expect((await readSetupStatus(complete)).hasUploadedSessions).toBe(true);
+});
+
+test("setup status requires authentication", async () => {
+	const response = await fetch(`${server.baseUrl}/rpc/cli/setupStatus`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: "{}",
+	});
+	expect(response.status).toBe(401);
+});
+
 test("returns an empty list for sessions that have never completed ingest", async () => {
 	const response = await lookup(
 		{ sessionIds: ["pending", "unknown"] },
@@ -155,6 +209,12 @@ async function readStatus(response: Response) {
 	const body: unknown = await response.json();
 	assert(typeof body === "object" && body !== null && "json" in body);
 	return CliSessionUploadStatusOutputSchema.parse(body.json);
+}
+
+async function readSetupStatus(response: Response) {
+	const body: unknown = await response.json();
+	assert(typeof body === "object" && body !== null && "json" in body);
+	return CliSetupStatusSchema.parse(body.json);
 }
 
 async function createUser(label: string): Promise<TestUser> {
