@@ -329,7 +329,15 @@ jobs:
           fi
 
   deploy-vercel:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # CLI smoke can be skipped for non-CLI changes. Evaluate the required gates
+    # explicitly so that skip does not propagate to production deployment.
+    if: >-
+      ${{ !cancelled() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.verify.result == 'success' &&
+      needs.integration.result == 'success' &&
+      needs.cli-smoke-required.result == 'success' }}
     needs: [verify, integration, cli-smoke-required]
     uses: ./.github/workflows/vercel.yml
     with:
