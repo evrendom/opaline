@@ -65,7 +65,6 @@ export function SessionsOverviewLoadMoreRow({
 							<LoadingPlaceholder className="h-3 w-18" />
 						</div>
 						<LoadingPlaceholder className="h-5 w-10" />
-						<LoadingPlaceholder className="h-5 w-6" />
 					</div>
 					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-1")}>
 						<LoadingPlaceholder className="h-5 w-20" />
