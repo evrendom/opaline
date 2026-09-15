@@ -1,7 +1,7 @@
-import { LoaderCircleIcon } from "lucide-react";
 import type { Ref } from "react";
 import { Skeleton } from "@/app/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { SessionModelLoadingMark } from "./session-model-mark";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
@@ -51,12 +51,7 @@ export function SessionsOverviewLoadMoreRow({
 						<LoadingPlaceholder className="h-3 w-7" />
 					</div>
 					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-2 px-2")}>
-						<span
-							aria-hidden="true"
-							className="flex size-7 shrink-0 items-center justify-center text-(--session-overview-muted)"
-						>
-							<LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
-						</span>
+						<SessionModelLoadingMark />
 						<div className="flex min-w-0 items-center gap-1.5">
 							<output
 								className={cn(
