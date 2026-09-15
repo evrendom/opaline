@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
+	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
@@ -267,7 +268,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					data-session-overview-model-repository
 				>
 					<p
-						className="min-w-0 max-w-28 truncate text-base/5 font-[450] tracking-normal text-(--session-overview-text) sm:text-[0.8125rem]/5"
+						className={cn(
+							"min-w-0 max-w-28 truncate",
+							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
+						)}
 						title={session.model_used}
 						data-session-overview-model-label
 					>

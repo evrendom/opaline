@@ -12,6 +12,7 @@ import { buildSessionMemberProfileSummaries } from "./session-member-profile-sum
 import { SessionsOverviewControls } from "./sessions-overview-controls";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewHeader } from "./sessions-overview-header";
+import { SessionsOverviewLoadMoreRow } from "./sessions-overview-load-more-row";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
 import { SessionsOverviewSkeleton } from "./sessions-overview-skeleton";
@@ -259,6 +260,7 @@ export function SessionsOverviewTable({
 							</div>
 						) : (
 							<SessionsOverviewFluidList
+								fillHeight={!pagination?.hasNextPage}
 								height={
 									virtualRows.length ? virtualizer.getTotalSize() : undefined
 								}
@@ -297,26 +299,12 @@ export function SessionsOverviewTable({
 							</SessionsOverviewFluidList>
 						)}
 						{pagination?.hasNextPage ? (
-							<div
-								ref={setLoadMoreElement}
-								className="border-b border-(--session-overview-border) px-3 py-3 text-center text-sm text-(--session-overview-muted)"
-							>
-								{pagination.isError ? (
-									<p role="alert">Could not load more sessions.</p>
-								) : null}
-								<button
-									type="button"
-									disabled={pagination.isFetching}
-									onClick={loadMore}
-									className="rounded-md px-3 py-1 hover:bg-(--session-overview-hover)"
-								>
-									{pagination.isFetching
-										? "Loading more sessions…"
-										: pagination.isError
-											? "Retry"
-											: "Load more sessions"}
-								</button>
-							</div>
+							<SessionsOverviewLoadMoreRow
+								rowRef={setLoadMoreElement}
+								isFetching={pagination.isFetching}
+								isError={pagination.isError}
+								loadMore={loadMore}
+							/>
 						) : !pagination && tableState.remainingLoadedSessionCount > 0 ? (
 							<div
 								ref={setLoadMoreElement}
