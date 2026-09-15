@@ -92,3 +92,18 @@ For a production build preview, set `PREVIEW_API_URL` to a local API and run
 port 4602 by default (`PREVIEW_PORT` changes it). Demo credentials may refer to
 a disposable local showcase account. Browser QA tools under `apps/web/tools`
 are separate from the unit test suites and require this running preview.
+
+The landing page's scroll effects are owned by
+`src/scripts/instant-v2-landing-motion.ts` and its stylesheet. Phone browsers
+with scroll timeline support use native CSS motion; desktop, reduced-motion,
+and unsupported browsers retain the JavaScript fallback. The controller also
+owns docking and keyboard focus state, and freezes gradient geometry per width.
+
+`hero-canvas.ts` is shared with the product's CLI setup backdrop. Only the
+marketing caller supplies a blur surface. `hero-canvas-blur.ts` keeps both
+Gaussian passes at low resolution, then upsamples with stationary dithering;
+retain its float-texture fallback and the landing page's overflow clipping.
+
+Run `PREVIEW_PORT=4602 bun run --cwd apps/marketing test:landing` against the
+running production preview. It covers scroll motion, footer layout, blur
+precision, buffer reuse, compatibility fallback, and the shared product renderer.

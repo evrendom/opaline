@@ -746,27 +746,10 @@ const flatOpalineWordmark = opalineWordmarkSvg
 </style>
 
 	<script>
-		import { getInstantV2ScrollContainer } from "../scripts/instant-v2-scroll";
+		import { copyTextToClipboard } from "../../../web/src/lib/clipboard";
 		const DEMO_ENTER_EVENT = "instant-v2:demo-enter";
 		const COPY_ICON_RESET_MS = 250;
 
-	/* ─────────────────────────────────────────────────────────
-	 * NAV HANDOVER STORYBOARD — distance before dashboard docking
-	 *
-		 * 180px   nav begins fading; gradient begins revealing
-		 *  90px   gradient reaches peak stretch during dashboard travel
-		 *   0px   nav is hidden; gradient lands at full opacity
-	 * ───────────────────────────────────────────────────────── */
-	const NAV_HANDOVER = {
-		distancePx: 180,
-		outgoingEnd: 1,
-		outgoingScaleExtent: 0.1,
-		gradientMaxStretch: 0.12,
-	};
-	const nav = document.querySelector<HTMLElement>("[data-instant-v2-nav]");
-	const dashboard = document.querySelector<HTMLElement>(
-		"[data-instant-v2-product-window]",
-	);
 	const copyButtons = document.querySelectorAll<HTMLButtonElement>(
 		"[data-instant-v2-copy]",
 	);
@@ -775,110 +758,6 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	const demoTriggers = document.querySelectorAll<HTMLElement>(
 		"[data-instant-v2-demo-trigger]",
 	);
-	const fadingControls = nav?.querySelectorAll<HTMLElement>(
-		".instant-v2-nav-label, .instant-v2-nav-link, [data-instant-v2-install]",
-	);
-	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-	let pendingHandoverFrame = 0;
-
-	const clampHandoverProgress = (value: number) =>
-		Math.min(1, Math.max(0, value));
-
-	const remapHandoverProgress = (
-		progress: number,
-		start: number,
-		end: number,
-	) => clampHandoverProgress((progress - start) / (end - start));
-
-	const applyHandoverProgress = (progress: number) => {
-		if (!nav || !dashboard) return;
-
-		const outgoingProgress = remapHandoverProgress(
-			progress,
-			0,
-			NAV_HANDOVER.outgoingEnd,
-		);
-		nav.style.setProperty(
-			"--instant-v2-nav-outgoing-opacity",
-			(1 - outgoingProgress).toFixed(4),
-		);
-		nav.style.setProperty(
-			"--instant-v2-nav-outgoing-scale",
-			(1 - outgoingProgress * NAV_HANDOVER.outgoingScaleExtent).toFixed(4),
-		);
-		dashboard.style.setProperty(
-			"--instant-v2-gradient-reveal-progress",
-			progress.toFixed(4),
-		);
-		const gradientMotionEnvelope = Math.sin(progress * Math.PI);
-		dashboard.style.setProperty(
-			"--instant-v2-gradient-motion-scale",
-			(
-				1 +
-				gradientMotionEnvelope * NAV_HANDOVER.gradientMaxStretch
-			).toFixed(4),
-		);
-	};
-
-	const updateHandoverState = () => {
-		pendingHandoverFrame = 0;
-		if (!nav || !dashboard) return;
-
-		const distanceToDock =
-			dashboard.getBoundingClientRect().top -
-			nav.getBoundingClientRect().bottom;
-		const nextDocked = distanceToDock <= 0.5;
-		const scrollProgress = clampHandoverProgress(
-			1 - distanceToDock / NAV_HANDOVER.distancePx,
-		);
-		const handoverProgress = reducedMotion.matches
-			? nextDocked
-				? 1
-				: 0
-			: scrollProgress;
-		applyHandoverProgress(handoverProgress);
-		const outgoingControlsHidden =
-			handoverProgress >= NAV_HANDOVER.outgoingEnd;
-		for (const control of fadingControls ?? []) {
-			control.inert = control.classList.contains("instant-v2-nav-label")
-				? handoverProgress > 0
-				: outgoingControlsHidden;
-		}
-		nav.toggleAttribute("data-dashboard-docked", nextDocked);
-		document.documentElement.toggleAttribute(
-			"data-instant-v2-dashboard-docked",
-			nextDocked,
-		);
-	};
-
-	const queueHandoverUpdate = () => {
-		if (pendingHandoverFrame) return;
-		pendingHandoverFrame = requestAnimationFrame(updateHandoverState);
-	};
-
-	const refreshHandoverAfterIdle = () => {
-		if (document.visibilityState !== "visible") return;
-		if (pendingHandoverFrame) {
-			cancelAnimationFrame(pendingHandoverFrame);
-			pendingHandoverFrame = 0;
-		}
-		updateHandoverState();
-	};
-
-	updateHandoverState();
-	(getInstantV2ScrollContainer() ?? window).addEventListener(
-		"scroll",
-		queueHandoverUpdate,
-		{ passive: true },
-	);
-	window.addEventListener("resize", queueHandoverUpdate, { passive: true });
-	window.addEventListener("pageshow", queueHandoverUpdate, { passive: true });
-	document.addEventListener("visibilitychange", refreshHandoverAfterIdle);
-	window.visualViewport?.addEventListener("resize", queueHandoverUpdate, {
-		passive: true,
-	});
-	reducedMotion.addEventListener("change", queueHandoverUpdate);
-
 	for (const demoTrigger of demoTriggers) {
 		demoTrigger.addEventListener("click", (event) => {
 			event.preventDefault();
@@ -919,11 +798,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 			const command = copyButton.dataset.installCommand;
 			if (!command) return;
 
-			try {
-				await navigator.clipboard.writeText(command);
-			} catch {
-				return;
-			}
+			if (!(await copyTextToClipboard(command))) return;
 
 			copyButton.dispatchEvent(
 				new CustomEvent("opaline:install-command-copied", { bubbles: true }),

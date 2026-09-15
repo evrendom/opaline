@@ -1,64 +1,34 @@
 ---
 interface Props {
-	compact?: boolean;
-	gradientOnly?: boolean;
-	interactionOnly?: boolean;
 	opacity?: number;
 }
-
-const {
-	compact = false,
-	gradientOnly = false,
-	interactionOnly = false,
-	opacity,
-} = Astro.props;
-const Root = compact ? "span" : "div";
-const Viewport = compact ? "span" : "div";
+const { opacity } = Astro.props;
 ---
 
-<Root
+<div
 	class="hero-canvas-stage"
 	data-hero-canvas-stage
-	data-hero-canvas-compact={compact ? "" : undefined}
-	data-hero-canvas-gradient-only={gradientOnly ? "" : undefined}
-	data-hero-canvas-interaction-only={interactionOnly ? "" : undefined}
 	data-hero-canvas-opacity={opacity}
 	aria-hidden="true"
 >
-	<Viewport class="hero-canvas-viewport">
-		{
-			!gradientOnly && (
-				<picture>
-					<source
-						media="(max-width: 767px)"
-						srcset="/vendor/lens-canvas/hero-poster-phone.png"
-					/>
-					<source
-						media="(max-width: 1023px)"
-						srcset="/vendor/lens-canvas/hero-poster-tablet.png"
-					/>
-					<source
-						media="(min-width: 1440px)"
-						srcset="/vendor/lens-canvas/hero-poster-wide.png"
-					/>
-					<img
-						class="hero-canvas-poster"
-						src="/vendor/lens-canvas/hero-poster-desktop.png"
-						alt=""
-						width="1280"
-						height="800"
-						fetchpriority="high"
-						decoding="async"
-					/>
-				</picture>
-			)
-		}
+	<div class="hero-canvas-viewport">
 		<canvas class="hero-canvas" data-hero-canvas></canvas>
-	</Viewport>
-</Root>
+	</div>
+</div>
 
 <script>
-	import "../scripts/hero-canvas";
+	import { initializeHeroCanvas } from "../scripts/hero-canvas";
+
+	if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+		for (const canvas of document.querySelectorAll<HTMLCanvasElement>(
+			"[data-hero-canvas]",
+		)) {
+			initializeHeroCanvas(
+				canvas,
+				canvas.closest<HTMLElement>(".instant-v2-hero-gradient-surface"),
+			);
+		}
+	}
 </script>
 
 <style>
@@ -68,45 +38,18 @@ const Viewport = compact ? "span" : "div";
 		inset: 0;
 		pointer-events: none;
 	}
-
-	.hero-canvas-viewport {
-		position: sticky;
-		top: 0;
-		width: 100%;
-		height: 100svh;
-		overflow: hidden;
-		background: #fff;
-	}
-
-	.hero-canvas-stage[data-hero-canvas-compact] .hero-canvas-viewport {
-		position: absolute;
-		inset: 0;
-		height: 100%;
-	}
-
-	.hero-canvas,
-	.hero-canvas-viewport picture,
-	.hero-canvas-poster {
+	.hero-canvas-viewport,
+	.hero-canvas {
 		position: absolute;
 		inset: 0;
 		display: block;
 		width: 100%;
 		height: 100%;
 	}
-
-	.hero-canvas-poster {
-		object-fit: fill;
-	}
-
 	.hero-canvas {
 		opacity: 0;
 	}
-
 	.hero-canvas-stage[data-canvas-ready] .hero-canvas {
 		opacity: 1;
-	}
-
-	.hero-canvas-stage[data-canvas-ready] .hero-canvas-poster {
-		opacity: 0;
 	}
 </style>

@@ -1,3 +1,5 @@
+import { createHeroCanvasBlur } from "./hero-canvas-blur";
+
 import {
 	INSTANT_V2_GLIMM_PALETTE,
 	INTERRUPTED_GLIMM_PALETTE,
@@ -140,12 +142,8 @@ const vertexSource = `#version 300 es
 const fragmentSource = `#version 300 es
 	precision highp float;
 	uniform float time;
-	uniform float lineFrequency;
-	uniform vec3 meshColor;
-	uniform float lineThickness;
-	uniform float speed;
 	uniform float lineOpacity;
-	uniform float gradientOnly;
+	uniform bool clampColor;
 	uniform vec3 paletteA;
 	uniform vec3 paletteB;
 	uniform vec3 paletteC;
@@ -177,38 +175,28 @@ const fragmentSource = `#version 300 es
 	}
 
 	void main() {
-		float coord = (vPos.y * lineFrequency + time * speed) / 2.0;
-		float grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord) / lineThickness;
-		float line = min(grid, 1.0);
 		float paletteDrift = time * 0.11;
 		float paletteBend = sin(vPos.z * 0.04 + time * 0.32) * 0.09;
 		float palettePhase = paletteDrift + paletteBend + vPos.x * 0.024 + vPos.z * 0.004;
-		vec3 lineColor = glimmPalette(palettePhase);
-		vec3 surfaceColor = gradientOnly > 0.5
-			? lineColor
-			: mix(lineColor, meshColor, line);
-		color = vec4(surfaceColor, lineOpacity);
+		vec3 surfaceColor = glimmPalette(palettePhase);
+		color = vec4(clampColor ? clamp(surfaceColor, 0.0, 1.0) : surfaceColor, lineOpacity);
 	}
 `;
 
-export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
+export function initializeHeroCanvas(
+	canvas: HTMLCanvasElement,
+	blurSurface: HTMLElement | null = null,
+) {
 	const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const lifecycle = new AbortController();
 	let disposed = false;
 	let disposeRenderer = () => {};
 	const stage = canvas.closest<HTMLElement>("[data-hero-canvas-stage]");
-	const gradientOnlyCanvas =
-		stage?.hasAttribute("data-hero-canvas-gradient-only") ?? false;
-	const interactionOnlyCanvas =
-		stage?.hasAttribute("data-hero-canvas-interaction-only") ?? false;
-	const activationRoot = interactionOnlyCanvas
-		? stage?.closest<HTMLElement>("[data-hero-canvas-activation]")
-		: null;
 
-	const start = () => {
+	const start = async () => {
 		if (disposed) return;
 		const gl = canvas.getContext("webgl2", {
-			alpha: false,
+			alpha: blurSurface !== null,
 			antialias: false,
 			depth: true,
 			powerPreference: "low-power",
@@ -217,17 +205,13 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		});
 		if (!gl) return;
 		if ("drawingBufferColorSpace" in gl) gl.drawingBufferColorSpace = "srgb";
+		const parallelCompile = gl.getExtension("KHR_parallel_shader_compile");
 
 		const compile = (type: number, source: string) => {
 			const shader = gl.createShader(type);
 			if (!shader) return null;
 			gl.shaderSource(shader, source);
 			gl.compileShader(shader);
-			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-				console.error(gl.getShaderInfoLog(shader));
-				gl.deleteShader(shader);
-				return null;
-			}
 			return shader;
 		};
 		const vertex = compile(gl.VERTEX_SHADER, vertexSource);
@@ -238,8 +222,28 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		gl.attachShader(program, vertex);
 		gl.attachShader(program, fragment);
 		gl.linkProgram(program);
+		const disposeProgram = () => {
+			gl.deleteProgram(program);
+			gl.deleteShader(vertex);
+			gl.deleteShader(fragment);
+		};
+		disposeRenderer = disposeProgram;
+		// Compile both shaders together, then poll without making Safari wait
+		// for the GPU on the main thread during a fresh load or first scroll.
+		while (
+			!disposed &&
+			parallelCompile &&
+			!gl.getProgramParameter(program, parallelCompile.COMPLETION_STATUS_KHR)
+		) {
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => resolve()),
+			);
+		}
+		if (disposed) return;
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
 			console.error(gl.getProgramInfoLog(program));
+			console.error(gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment));
+			disposeRenderer();
 			return;
 		}
 
@@ -267,10 +271,6 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 				1, 0, 0, 0, 0, 0.0001, 1, 0, 0, -1, 0.0001, 0, 0, -0.01, -100, 1,
 			]),
 		);
-		gl.uniform1f(gl.getUniformLocation(program, "lineFrequency"), 2);
-		gl.uniform3f(gl.getUniformLocation(program, "meshColor"), 1, 1, 1);
-		gl.uniform1f(gl.getUniformLocation(program, "lineThickness"), 1);
-		gl.uniform1f(gl.getUniformLocation(program, "speed"), 0.4);
 		const setPaletteUniform = (
 			name: string,
 			[colorRed, colorGreen, colorBlue]: [number, number, number],
@@ -316,17 +316,14 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		const weights = new Float32Array(4);
 		weights[targetPalette] = 1;
 		const previousWeights = weights.slice();
-		const gradientOnly = gradientOnlyCanvas;
 		const requestedOpacity = Number(stage?.dataset.heroCanvasOpacity);
 		const canvasOpacity = Number.isFinite(requestedOpacity)
 			? Math.min(1, Math.max(0, requestedOpacity))
-			: gradientOnly
-				? 1
-				: 0.3;
+			: 1;
 		gl.uniform1f(gl.getUniformLocation(program, "lineOpacity"), canvasOpacity);
-		gl.uniform1f(
-			gl.getUniformLocation(program, "gradientOnly"),
-			gradientOnly ? 1 : 0,
+		gl.uniform1i(
+			gl.getUniformLocation(program, "clampColor"),
+			blurSurface ? 1 : 0,
 		);
 		gl.enable(gl.BLEND);
 		gl.blendEquation(gl.FUNC_ADD);
@@ -337,10 +334,23 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		gl.enable(gl.DEPTH_TEST);
 		gl.depthFunc(gl.LEQUAL);
 
+		const disposeTerrain = () => {
+			gl.deleteBuffer(positionBuffer);
+			gl.deleteBuffer(indexBuffer);
+			disposeProgram();
+		};
+		disposeRenderer = disposeTerrain;
+		const blur = blurSurface
+			? await createHeroCanvasBlur(gl, canvas, blurSurface, lifecycle.signal)
+			: null;
+		if (disposed) {
+			blur?.dispose();
+			return;
+		}
 		const projection = new Float32Array(16);
 		const resize = () => {
-			const bounds = canvas.getBoundingClientRect();
-			const dpr = Math.min(1.5, devicePixelRatio || 1);
+			const bounds = blur?.bounds() ?? canvas.getBoundingClientRect();
+			const dpr = blur?.pixelRatio() ?? Math.min(1.5, devicePixelRatio || 1);
 			// CSS transforms change presentation, not the drawing resolution.
 			// In particular, the scroll stretch must not reallocate WebGL buffers.
 			const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
@@ -350,7 +360,7 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 				if (canvas.height !== height) canvas.height = height;
 				gl.viewport(0, 0, width, height);
 			}
-			// Preserve the existing framing as the displayed canvas stretches.
+			// The blurred backdrop uses stable layout bounds; the product keeps its framing.
 			const visualWidth = Math.max(1, Math.round(bounds.width * dpr));
 			const visualHeight = Math.max(1, Math.round(bounds.height * dpr));
 			projection.fill(0);
@@ -370,17 +380,9 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		let resumedAt = performance.now();
 		let frame = 0;
 		let visible = true;
-		let pausedByDemoMode =
-			!gradientOnlyCanvas &&
-			document.documentElement.hasAttribute("data-instant-v2-demo");
-		stage?.toggleAttribute("data-canvas-demo-paused", pausedByDemoMode);
-		let active =
-			!interactionOnlyCanvas ||
-			(activationRoot?.matches(":hover") ?? false) ||
-			(activationRoot?.contains(document.activeElement) ?? false);
 		const paint = (now: number) => {
-			if (pausedByDemoMode) return;
 			resize();
+			blur?.begin();
 			gl.clearColor(1, 1, 1, 1);
 			gl.clearDepth(1);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -412,11 +414,12 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 			gl.uniform4fv(paletteWeights, weights);
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 			gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+			blur?.end();
 			stage?.setAttribute("data-canvas-ready", "");
 		};
 		const draw = (now: number) => {
 			frame = 0;
-			if (!visible || !active || pausedByDemoMode || document.hidden) return;
+			if (!visible || document.hidden) return;
 			paint(now);
 			if (!reducedMotion && fixedSeconds === null)
 				frame = requestAnimationFrame(draw);
@@ -429,96 +432,40 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 			frame = 0;
 		};
 		const resume = () => {
-			if (
-				reducedMotion ||
-				frame !== 0 ||
-				!visible ||
-				!active ||
-				pausedByDemoMode ||
-				document.hidden
-			) {
+			if (reducedMotion || frame !== 0 || !visible || document.hidden) {
 				return;
 			}
 			resumedAt = performance.now();
 			frame = requestAnimationFrame(draw);
 		};
-		const setActive = (nextActive: boolean) => {
-			if (active === nextActive) return;
-			active = nextActive;
-			if (active && !pausedByDemoMode) {
-				paint(performance.now());
-				resume();
-			} else {
-				pause();
-			}
-		};
-
-		if (activationRoot) {
-			activationRoot.addEventListener("pointerenter", () => setActive(true), {
-				passive: true,
-				signal: lifecycle.signal,
-			});
-			activationRoot.addEventListener("pointerleave", () => setActive(false), {
-				passive: true,
-				signal: lifecycle.signal,
-			});
-			activationRoot.addEventListener("focus", () => setActive(true), {
-				signal: lifecycle.signal,
-			});
-			activationRoot.addEventListener("blur", () => setActive(false), {
-				signal: lifecycle.signal,
-			});
-		}
-
 		const visibilityObserver = new IntersectionObserver(
 			([entry]) => {
 				visible = entry.isIntersecting;
-				if (visible && active && !pausedByDemoMode) {
+				if (visible) {
 					paint(performance.now());
 					resume();
 				} else {
 					pause();
 				}
 			},
-			{ rootMargin: gradientOnly ? "100% 0px" : "0px" },
+			{ rootMargin: "100% 0px" },
 		);
 		visibilityObserver.observe(canvas);
 		document.addEventListener(
 			"visibilitychange",
 			() => {
 				if (document.hidden) pause();
-				else if (visible && active && !pausedByDemoMode) {
+				else if (visible) {
 					paint(performance.now());
 					resume();
 				}
 			},
 			{ signal: lifecycle.signal },
 		);
-		const demoObserver = new MutationObserver(() => {
-			const nextPausedByDemoMode =
-				!gradientOnlyCanvas &&
-				document.documentElement.hasAttribute("data-instant-v2-demo");
-			if (pausedByDemoMode === nextPausedByDemoMode) return;
-
-			pausedByDemoMode = nextPausedByDemoMode;
-			stage?.toggleAttribute("data-canvas-demo-paused", pausedByDemoMode);
-			if (pausedByDemoMode) {
-				pause();
-				return;
-			}
-			if (visible && active && !document.hidden) {
-				paint(performance.now());
-				resume();
-			}
-		});
-		demoObserver.observe(document.documentElement, {
-			attributeFilter: ["data-instant-v2-demo"],
-			attributes: true,
-		});
 		// Reduced motion still repaints when connection state changes, without
 		// restarting the canvas or running a continuous animation loop.
 		const paletteObserver = new MutationObserver(() => {
-			if (visible && active && !document.hidden) paint(performance.now());
+			if (visible && !document.hidden) paint(performance.now());
 		});
 		if (stage)
 			paletteObserver.observe(stage, {
@@ -532,41 +479,24 @@ export function initializeHeroCanvas(canvas: HTMLCanvasElement) {
 		disposeRenderer = () => {
 			pause();
 			visibilityObserver.disconnect();
-			demoObserver.disconnect();
 			paletteObserver.disconnect();
-			gl.deleteBuffer(positionBuffer);
-			gl.deleteBuffer(indexBuffer);
-			gl.deleteProgram(program);
-			gl.deleteShader(vertex);
-			gl.deleteShader(fragment);
+			blur?.dispose();
+			disposeTerrain();
 		};
 		paint(performance.now());
 		resume();
 	};
 
-	if (gradientOnlyCanvas) {
-		requestAnimationFrame(start);
-	} else if ("requestIdleCallback" in window) {
-		window.requestIdleCallback(start, { timeout: 900 });
-	} else {
-		setTimeout(start, 120);
-	}
+	requestAnimationFrame(() => {
+		void start().catch((error: unknown) => {
+			disposeRenderer();
+			if (!disposed)
+				console.error("Could not initialize gradient canvas", error);
+		});
+	});
 	return () => {
 		disposed = true;
 		lifecycle.abort();
 		disposeRenderer();
 	};
-}
-
-if (
-	typeof window !== "undefined" &&
-	!matchMedia("(prefers-reduced-motion: reduce)").matches
-) {
-	for (const canvas of document.querySelectorAll<HTMLCanvasElement>(
-		"[data-hero-canvas]",
-	)) {
-		if (canvas.hasAttribute("data-hero-canvas-initialized")) continue;
-		canvas.setAttribute("data-hero-canvas-initialized", "");
-		initializeHeroCanvas(canvas);
-	}
 }

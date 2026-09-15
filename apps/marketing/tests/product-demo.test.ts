@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium, webkit } from "@playwright/test";
 import { openDemoPreview } from "./demo-preview";
 
-const LANDING = "http://localhost:4600/home";
+const LANDING = `http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`;
 const FRAME = "[data-instant-v2-product-iframe]";
 
 test("CLI copy never writes a command without a connection code when pairing fails", async () => {
@@ -78,7 +78,7 @@ test("CLI copy retains its code across connection loss and clipboard denial", as
 			})
 			.waitFor();
 		const command = await page.evaluate(() => navigator.clipboard.readText());
-		expect(command).toContain("--api-base http://localhost:4600");
+		expect(command).toContain(`--api-base ${new URL(LANDING).origin}`);
 		expect(command).toMatch(/ --code \S+/);
 		expect(
 			await page.locator(".instant-v2-demo-connection-error").count(),
@@ -224,7 +224,7 @@ test("gradient stretch keeps its drawing buffer stable in Chrome and Safari", as
 			});
 			await openDemoPreview(page, LANDING);
 			await page
-				.locator("[data-hero-canvas-gradient-only][data-canvas-ready]")
+				.locator("[data-hero-canvas-stage][data-canvas-ready]")
 				.waitFor({ state: "attached" });
 			await page
 				.locator(
@@ -243,7 +243,7 @@ test("gradient stretch keeps its drawing buffer stable in Chrome and Safari", as
 			for (const direction of ["down", "up"]) {
 				const capture = page.evaluate(async () => {
 					const canvas = document.querySelector<HTMLCanvasElement>(
-						"[data-hero-canvas-gradient-only] canvas",
+						"[data-hero-canvas-stage] canvas",
 					);
 					const product = document.querySelector<HTMLElement>(
 						"[data-instant-v2-product-window]",
@@ -274,7 +274,7 @@ test("gradient stretch keeps its drawing buffer stable in Chrome and Safari", as
 					await page.mouse.wheel(0, -90);
 					await page.waitForFunction(() => {
 						const canvas = document.querySelector<HTMLCanvasElement>(
-							"[data-hero-canvas-gradient-only] canvas",
+							"[data-hero-canvas-stage] canvas",
 						);
 						return (
 							canvas &&
@@ -304,22 +304,26 @@ test("gradient stretch keeps its drawing buffer stable in Chrome and Safari", as
 				).toBeGreaterThan(1.06);
 				expect(samples.at(-1)?.progress).toBe(direction === "down" ? 1 : 0);
 			}
-			const oldHeight = await page
-				.locator("[data-hero-canvas-gradient-only] canvas")
-				.evaluate((node) => node.getAttribute("height"));
+			const beforeResize = await page
+				.locator("[data-hero-canvas-stage] canvas")
+				.evaluate((node: HTMLCanvasElement) => ({
+					height: node.height,
+					ratio: node.height / node.clientHeight,
+				}));
 			await page.setViewportSize({ width: 1280, height: 900 });
-			await page.waitForFunction((oldHeight) => {
+			await page.waitForFunction((before) => {
 				const canvas = document.querySelector<HTMLCanvasElement>(
-					"[data-hero-canvas-gradient-only] canvas",
+					"[data-hero-canvas-stage] canvas",
 				);
-				const dpr = Math.min(1.5, devicePixelRatio);
+				// A real resize must update both dimensions while preserving the
+				// renderer's chosen resolution, which can be below device DPR.
 				return (
 					canvas &&
-					String(canvas.height) !== oldHeight &&
-					canvas.height === Math.round(canvas.clientHeight * dpr) &&
-					canvas.width === Math.round(canvas.clientWidth * dpr)
+					canvas.height !== before.height &&
+					Math.abs(canvas.height - canvas.clientHeight * before.ratio) <= 1 &&
+					Math.abs(canvas.width - canvas.clientWidth * before.ratio) <= 1
 				);
-			}, oldHeight);
+			}, beforeResize);
 			await page.close();
 		} finally {
 			await browser.close();
