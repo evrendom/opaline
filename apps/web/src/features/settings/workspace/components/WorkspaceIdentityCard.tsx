@@ -125,6 +125,7 @@ export function WorkspaceIdentityCard({
 			<WorkspaceSettingsRow label="Name" controlId="workspace-name">
 				<Input
 					id="workspace-name"
+					name="workspace-name"
 					value={isEditingName ? editedName : organization.name}
 					onFocus={() => {
 						if (canManage && !isEditingName) startEditing();
@@ -152,48 +153,58 @@ export function WorkspaceIdentityCard({
 				/>
 			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
-				<div className="min-w-0 space-y-2">
-					<Input
-						id="workspace-slug"
-						value={isEditingName ? editedSlug : organization.slug}
-						onFocus={() => {
-							if (canManage && !isEditingName) startEditing();
-						}}
-						onChange={(event) => {
-							if (!isEditingName) startEditing();
-							setEditedSlug(event.target.value.toLowerCase());
-						}}
-						onKeyDown={(event) => {
-							if (!canManage || !isEditingName || event.nativeEvent.isComposing)
-								return;
-							if (event.key === "Enter") {
-								event.preventDefault();
-								void saveName();
+				<div className="workspace-settings-url-control">
+					<div className="workspace-settings-url-field">
+						<span aria-hidden="true">opaline.so/</span>
+						<Input
+							id="workspace-slug"
+							name="workspace-slug"
+							value={isEditingName ? editedSlug : organization.slug}
+							onFocus={() => {
+								if (canManage && !isEditingName) startEditing();
+							}}
+							onChange={(event) => {
+								if (!isEditingName) startEditing();
+								setEditedSlug(event.target.value.toLowerCase());
+							}}
+							onKeyDown={(event) => {
+								if (
+									!canManage ||
+									!isEditingName ||
+									event.nativeEvent.isComposing
+								)
+									return;
+								if (event.key === "Enter") {
+									event.preventDefault();
+									void saveName();
+								}
+								if (event.key === "Escape") {
+									event.preventDefault();
+									cancelEditing();
+								}
+							}}
+							autoComplete="off"
+							autoCapitalize="none"
+							spellCheck={false}
+							maxLength={ORG_SLUG_MAX_LENGTH}
+							readOnly={!canManage}
+							disabled={isSavingName}
+							aria-invalid={["invalid", "taken"].includes(
+								slugAvailability.status,
+							)}
+							aria-describedby={
+								isEditingName ? "workspace-slug-status" : undefined
 							}
-							if (event.key === "Escape") {
-								event.preventDefault();
-								cancelEditing();
-							}
-						}}
-						autoComplete="off"
-						autoCapitalize="none"
-						spellCheck={false}
-						maxLength={ORG_SLUG_MAX_LENGTH}
-						readOnly={!canManage}
-						disabled={isSavingName}
-						aria-invalid={["invalid", "taken"].includes(
-							slugAvailability.status,
-						)}
-						aria-describedby="workspace-slug-status"
-					/>
-					<output
-						id="workspace-slug-status"
-						className="text-muted-foreground block text-xs"
-					>
-						{isEditingName
-							? slugAvailability.message
-							: `opaline.so/${organization.slug}`}
-					</output>
+						/>
+					</div>
+					{isEditingName ? (
+						<output
+							id="workspace-slug-status"
+							className="workspace-settings-status"
+						>
+							{slugAvailability.message}
+						</output>
+					) : null}
 				</div>
 			</WorkspaceSettingsRow>
 			{isEditingName ? (
