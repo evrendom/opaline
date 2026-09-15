@@ -25,18 +25,32 @@ export function SessionsOverviewControls({
 				onSortChange={tableState.changeSort}
 				sort={tableState.sort}
 			/>
-			<SessionsOverviewFiltersMenu
-				variant="linear"
-				excludedFilterValues={tableState.excludedFilterValues}
-				filterOptions={tableState.filterOptions}
-				onClearAll={tableState.clearAllFilters}
-				onClearFilter={tableState.clearFilter}
-				onClearRangeFilter={tableState.clearRangeFilter}
-				onFilterOptionChecked={tableState.setFilterOptionChecked}
-				onRangeFilterChange={tableState.setRangeFilter}
-				rangeFilterBounds={tableState.rangeFilterBounds}
-				rangeFilterValues={tableState.rangeFilterValues}
-			/>
+			{tableState.filterCatalogPending ? (
+				<output className="px-2 text-sm text-(--session-overview-subtle)">
+					Loading filters…
+				</output>
+			) : tableState.filterCatalogError ? (
+				<button
+					type="button"
+					onClick={tableState.onRetryFilterCatalog}
+					className="rounded-md px-2 py-1 text-sm hover:bg-(--session-overview-hover)"
+				>
+					Retry filters
+				</button>
+			) : (
+				<SessionsOverviewFiltersMenu
+					variant="linear"
+					excludedFilterValues={tableState.excludedFilterValues}
+					filterOptions={tableState.filterOptions}
+					onClearAll={tableState.clearAllFilters}
+					onClearFilter={tableState.clearFilter}
+					onClearRangeFilter={tableState.clearRangeFilter}
+					onFilterOptionChecked={tableState.setFilterOptionChecked}
+					onRangeFilterChange={tableState.setRangeFilter}
+					rangeFilterBounds={tableState.rangeFilterBounds}
+					rangeFilterValues={tableState.rangeFilterValues}
+				/>
+			)}
 		</div>
 	);
 }

@@ -2,6 +2,7 @@ import {
 	type DimensionAnalysisInput,
 	resolveRepoIdentity,
 	type SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
+	type SessionListFilters,
 	type SessionOverviewAnalytics,
 	type Source,
 } from "@rudel/api-routes";
@@ -12,6 +13,10 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
+import {
+	appendSessionListSqlFilters,
+	getSessionListRepositoryKey,
+} from "./session-list-filters.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
 
 export interface SessionAnalyticsRaw {
@@ -107,7 +112,7 @@ type PersistedSessionLanguageSignals = Pick<
 	SessionAnalyticsRaw,
 	(typeof PERSISTED_SIGNAL_FIELDS)[number]
 >;
-interface SessionAnalyticsListRow
+export interface SessionAnalyticsListRow
 	extends Omit<SessionAnalyticsRaw, keyof PersistedSessionLanguageSignals> {
 	signal_session_date: string;
 }
@@ -209,9 +214,10 @@ export function mapSessionAnalyticsRow(
 /**
  * Get session analytics from the materialized view
  */
-export async function getSessionAnalytics(
+async function getSessionAnalyticsBaseRows(
 	orgId: string,
 	params: {
+		filters?: SessionListFilters;
 		days?: number;
 		start_date?: string;
 		end_date?: string;
@@ -224,8 +230,9 @@ export async function getSessionAnalytics(
 		sort_by?: "date" | "duration" | "interactions";
 		sort_order?: "asc" | "desc";
 	} = {},
-): Promise<SessionOverviewAnalytics[]> {
+): Promise<SessionAnalyticsListRow[]> {
 	const {
+		filters: overviewFilters,
 		days = 30,
 		start_date,
 		end_date,
@@ -287,6 +294,11 @@ export async function getSessionAnalytics(
 		source,
 	);
 
+	if (overviewFilters)
+		appendSessionListSqlFilters(overviewFilters, filters, query_params);
+	const filterRepositories =
+		(overviewFilters?.excluded.repository.length ?? 0) > 0;
+
 	const sortColumn =
 		sort_by === "duration"
 			? "actual_duration_min"
@@ -345,15 +357,30 @@ export async function getSessionAnalytics(
       AND sa.organization_id = {orgId:String}
       ${filters.length > 0 ? `AND ${filters.join("\n      AND ")}` : ""}
     ORDER BY ${sortColumn} ${sortDirection}, sa.source ASC, sa.session_id ASC
-    LIMIT {limit:UInt32}
-    OFFSET {offset:UInt32}
+    ${filterRepositories ? "" : "LIMIT {limit:UInt32} OFFSET {offset:UInt32}"}
   `;
 
-	const raw = await queryClickhouse<SessionAnalyticsListRow>({
+	const rows = await queryClickhouse<SessionAnalyticsListRow>({
 		clickhouse_settings: { join_use_nulls: 0 },
 		query,
 		query_params,
 	});
+
+	const excludedRepositories = new Set(overviewFilters?.excluded.repository);
+	return overviewFilters && filterRepositories
+		? rows
+				.filter(
+					(row) => !excludedRepositories.has(getSessionListRepositoryKey(row)),
+				)
+				.slice(offset, offset + limit)
+		: rows;
+}
+
+export async function getSessionAnalytics(
+	orgId: string,
+	params: Parameters<typeof getSessionAnalyticsBaseRows>[1] = {},
+): Promise<SessionOverviewAnalytics[]> {
+	const raw = await getSessionAnalyticsBaseRows(orgId, params);
 
 	// Query parameters travel in the ClickHouse HTTP URL. Split large pages so
 	// metadata lookups stay below proxy URL limits, with bounded concurrency.

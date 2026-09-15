@@ -510,7 +510,51 @@ export const HistoricalSkillDetailInputSchema = z.object({
 	name: z.string().min(1).max(MAX_ID_FILTER_LENGTH),
 });
 
+const SessionFilterRangeSchema = z.object({
+	minimum: z.number().finite().nullable(),
+	maximum: z.number().finite().nullable(),
+});
+export const SessionListFiltersSchema = z.object({
+	excluded: z.object({
+		model: z.array(z.string().max(MAX_ID_FILTER_LENGTH)).max(10000),
+		repository: z.array(z.string().max(MAX_PATH_FILTER_LENGTH)).max(10000),
+		skills: z.array(z.string().max(MAX_PATH_FILTER_LENGTH)).max(10000),
+		user: z.array(z.string().max(MAX_ID_FILTER_LENGTH)).max(10000),
+	}),
+	ranges: z.object({
+		cost: SessionFilterRangeSchema,
+		duration: SessionFilterRangeSchema,
+		errors: SessionFilterRangeSchema,
+		input: SessionFilterRangeSchema,
+		output: SessionFilterRangeSchema,
+		subagents: SessionFilterRangeSchema,
+	}),
+});
+export type SessionListFilters = z.infer<typeof SessionListFiltersSchema>;
+const SessionFilterBoundsSchema = z.object({
+	minimum: z.number(),
+	maximum: z.number(),
+	step: z.number(),
+});
+export const SessionFilterCatalogSchema = z.object({
+	repositories: z.array(RepoIdentitySchema),
+	models: z.array(z.string()),
+	skills: z.array(z.string()),
+	users: z.array(z.string()),
+	ranges: z.object({
+		cost: SessionFilterBoundsSchema,
+		duration: SessionFilterBoundsSchema,
+		errors: SessionFilterBoundsSchema,
+		input: SessionFilterBoundsSchema,
+		output: SessionFilterBoundsSchema,
+		subagents: SessionFilterBoundsSchema,
+	}),
+	sessionCount: z.number().int().nonnegative(),
+});
+export type SessionFilterCatalog = z.infer<typeof SessionFilterCatalogSchema>;
+
 export const SessionListInputSchema = DaysInputSchema.extend({
+	filters: SessionListFiltersSchema.optional(),
 	// When both are supplied they replace the rolling `days` lookback, so a
 	// range that does not end today (e.g. a past month) returns that window
 	// instead of the last N days.

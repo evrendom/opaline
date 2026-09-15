@@ -1,4 +1,8 @@
-import type { SessionAnalytics } from "@rudel/api-routes";
+import type {
+	SessionAnalytics,
+	SessionFilterCatalog,
+	SessionListFilters,
+} from "@rudel/api-routes";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type Ref, useCallback, useMemo, useRef, useState } from "react";
 import { useLoadMoreIntersectionObserver } from "@/app/hooks/useLoadMoreIntersectionObserver";
@@ -30,6 +34,11 @@ export type SessionListPagination = {
 };
 
 type SessionsOverviewTableProps = {
+	filterCatalog?: SessionFilterCatalog;
+	filterCatalogPending?: boolean;
+	filterCatalogError?: boolean;
+	onRetryFilterCatalog?: () => void;
+	onFiltersChange?: (filters: SessionListFilters) => void;
 	pagination?: SessionListPagination;
 	activeSessionId: string | null | undefined;
 	canOpenSession: ((session: SessionAnalytics) => boolean) | undefined;
@@ -57,6 +66,11 @@ export function SessionsOverviewTable({
 	sessionDetailDisabledNote,
 	totalSessionCount,
 	pagination,
+	filterCatalog,
+	filterCatalogPending,
+	filterCatalogError,
+	onRetryFilterCatalog,
+	onFiltersChange,
 }: SessionsOverviewTableProps) {
 	const tableScrollElementRef = useRef<HTMLDivElement | null>(null);
 	const { avatarMap, userMap } = useUserMap();
@@ -65,6 +79,11 @@ export function SessionsOverviewTable({
 		sessions,
 		totalSessionCount,
 		userMap,
+		filterCatalog,
+		filterCatalogPending,
+		filterCatalogError,
+		onRetryFilterCatalog,
+		onFiltersChange,
 		onQueryChange: () => {
 			if (tableScrollElementRef.current)
 				tableScrollElementRef.current.scrollTop = 0;
@@ -128,7 +147,7 @@ export function SessionsOverviewTable({
 	// Filtering and sorting must keep searching older pages. Never claim the
 	// loaded subset is the full result while those pages are still outstanding.
 	useLoadSessionPages(
-		tableState.hasActiveFilters ||
+		(tableState.hasActiveFilters && !onFiltersChange) ||
 			tableState.sort.key !== "time" ||
 			tableState.sort.direction !== "desc",
 		pagination,

@@ -84,6 +84,11 @@ export function SessionsListSurface({
 							sessionDetailDisabledNote={undefined}
 							totalSessionCount={totalSessionCount}
 							pagination={pagination}
+							filterCatalog={data.filterCatalog}
+							filterCatalogPending={data.filterCatalogPending}
+							filterCatalogError={data.filterCatalogError}
+							onRetryFilterCatalog={data.retryFilterCatalog}
+							onFiltersChange={data.setSessionFilters}
 						/>
 					)}
 				</div>

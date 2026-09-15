@@ -57,6 +57,7 @@ import {
 	ROITrendSchema,
 	SessionAnalyticsSummaryComparisonSchema,
 	SessionAnalyticsSummarySchema,
+	SessionFilterCatalogSchema,
 	SessionListInputSchema,
 	SessionOverviewAnalyticsSchema,
 	SuccessRateSchema,
@@ -865,6 +866,9 @@ export const contract = {
 			detailSubagent: sessionDetailProcedureContracts.detailSubagent,
 			detailTurn: sessionDetailProcedureContracts.detailTurn,
 			detailWindow: sessionDetailProcedureContracts.detailWindow,
+			filterCatalog: oc
+				.input(SessionListInputSchema)
+				.output(SessionFilterCatalogSchema),
 			list: oc
 				.input(SessionListInputSchema)
 				.output(z.array(SessionOverviewAnalyticsSchema)),
