@@ -17,6 +17,7 @@ const handlersSource = await Bun.file(
 function handlerSource(
 	name:
 		| "detailBodyChunk"
+		| "detailInitial"
 		| "detailOverview"
 		| "detailSpine"
 		| "detailSubagent"
@@ -71,6 +72,7 @@ describe("session detail endpoint guardrails", () => {
 
 	for (const name of [
 		"detailBodyChunk",
+		"detailInitial",
 		"detailOverview",
 		"detailSpine",
 		"detailSubagent",

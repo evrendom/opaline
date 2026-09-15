@@ -101,6 +101,7 @@ const EMPTY_PROTECTED_TURN_IDS: ReadonlySet<string> = new Set();
 const SESSION_DETAIL_ACTIVITY_FLYOUTS_ENABLED = false;
 
 export function SessionDetailFastResponsePane({
+	initialWindow,
 	activityTotals,
 	anchorEventId,
 	anchorEventRequestId,
@@ -123,6 +124,7 @@ export function SessionDetailFastResponsePane({
 	transcriptListRef,
 	turnSpine,
 }: {
+	initialWindow?: SessionDetailWindow;
 	activityTotals: SessionDetailOverview["activityTotals"];
 	anchorEventId: string | undefined;
 	anchorEventRequestId: number;
@@ -213,11 +215,13 @@ export function SessionDetailFastResponsePane({
 		[sessionId],
 	);
 	const initialWindowQuery = useQuery({
+		initialData: skeletonDebugMode.kind === "off" ? initialWindow : undefined,
 		gcTime: SESSION_DETAIL_WINDOW_CACHE_TIME_MS,
 		queryFn: ({ signal }) => loadWindow(initialWindowRequest, signal),
 		queryKey: sessionDetailWindowQueryKey(
 			initialWindowRequest,
 			skeletonDebugKey,
+			revision,
 		),
 		retry: shouldRetrySessionDetailFastQuery,
 		staleTime: SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
@@ -481,7 +485,11 @@ function SessionDetailVirtualTranscript({
 	);
 	const fetchWindow = useCallback(
 		async (request: SessionDetailWindowRequest, signal?: AbortSignal) => {
-			const queryKey = sessionDetailWindowQueryKey(request, windowModeKey);
+			const queryKey = sessionDetailWindowQueryKey(
+				request,
+				windowModeKey,
+				initialWindow.revision,
+			);
 			const cancelQuery = () => {
 				void queryClient.cancelQueries({ exact: true, queryKey });
 			};
@@ -500,16 +508,20 @@ function SessionDetailVirtualTranscript({
 				signal?.removeEventListener("abort", cancelQuery);
 			}
 		},
-		[loadWindow, queryClient, windowModeKey],
+		[initialWindow.revision, loadWindow, queryClient, windowModeKey],
 	);
 	const evictWindow = useCallback(
 		(request: SessionDetailWindowRequest) => {
 			queryClient.removeQueries({
 				exact: true,
-				queryKey: sessionDetailWindowQueryKey(request, windowModeKey),
+				queryKey: sessionDetailWindowQueryKey(
+					request,
+					windowModeKey,
+					initialWindow.revision,
+				),
 			});
 		},
-		[queryClient, windowModeKey],
+		[initialWindow.revision, queryClient, windowModeKey],
 	);
 	const windowStore = useMemo(
 		() =>

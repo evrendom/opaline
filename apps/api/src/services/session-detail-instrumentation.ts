@@ -1,4 +1,5 @@
 export type SessionDetailRequestKind =
+	| "initial"
 	| "overview"
 	| "spine"
 	| "subagent"
@@ -38,6 +39,7 @@ export function createSessionDetailInstrumentation(
 	options: SessionDetailInstrumentationOptions,
 ) {
 	const requestSamples: Record<SessionDetailRequestKind, number[]> = {
+		initial: [],
 		overview: [],
 		spine: [],
 		subagent: [],
@@ -94,6 +96,7 @@ export function createSessionDetailInstrumentation(
 				growth: subtractMemoryUsage(currentMemory, baselineMemory),
 			},
 			requests: {
+				initial: summarizeNumericSamples(requestSamples.initial),
 				overview: summarizeNumericSamples(requestSamples.overview),
 				spine: summarizeNumericSamples(requestSamples.spine),
 				subagent: summarizeNumericSamples(requestSamples.subagent),

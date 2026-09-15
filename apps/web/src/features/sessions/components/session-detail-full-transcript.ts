@@ -17,17 +17,24 @@ export async function loadRemainingSessionDetailOverviewPages(input: {
 		}
 		visitedCursors.add(cursor);
 		const page = await input.loadPage(cursor);
-		if (page.revision !== input.first.revision) {
-			throw new Error("Session detail pagination mixed revisions.");
-		}
-		if (!hasSameActivityTotals(page, input.first)) {
-			throw new Error("Session detail pagination mixed activity totals.");
-		}
+		assertSessionDetailOverviewPage(input.first, page);
 		pages.push(page);
 		current = page;
 	}
 
 	return pages;
+}
+
+export function assertSessionDetailOverviewPage(
+	first: NormalizedSessionDetailOverview,
+	page: NormalizedSessionDetailOverview,
+) {
+	if (page.revision !== first.revision) {
+		throw new Error("Session detail pagination mixed revisions.");
+	}
+	if (!hasSameActivityTotals(page, first)) {
+		throw new Error("Session detail pagination mixed activity totals.");
+	}
 }
 
 function hasSameActivityTotals(

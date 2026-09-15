@@ -1,5 +1,6 @@
 import {
 	SESSION_DETAIL_STALE_REVISION_CODE,
+	SessionDetailInitialSchema,
 	type SessionDetailSpine,
 	SessionDetailSpineSchema,
 	type SessionDetailSubagent,
@@ -36,6 +37,34 @@ export const SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS = Number.POSITIVE_INFINITY;
 export const SESSION_DETAIL_BODY_CACHE_TIME_MS = SESSION_DETAIL_BODY_GC_TIME_MS;
 export const SESSION_DETAIL_WINDOW_CACHE_TIME_MS = 10 * 60 * 1_000;
 
+export function sessionDetailInitialQueryKey(sessionId: string) {
+	return [SESSION_DETAIL_FAST_QUERY_PREFIX, "initial", sessionId] as const;
+}
+
+export async function fetchSessionDetailInitial(
+	sessionId: string,
+	signal: AbortSignal,
+) {
+	const response = await runSessionDetailRequest(
+		(requestSignal) =>
+			orpc.analytics.sessions.detailInitial.call(
+				{ sessionId },
+				{ signal: requestSignal },
+			),
+		signal,
+	);
+	const initialDetail = SessionDetailInitialSchema.parse(response);
+	if (initialDetail.overview.session.sessionId !== sessionId) {
+		throw new SessionDetailFastResponseError(
+			"The initial response belongs to another session.",
+		);
+	}
+	return {
+		...parseSessionDetailOverviewResponse(initialDetail.overview, sessionId),
+		initialDetail,
+	};
+}
+
 export function sessionDetailFirstOverviewQueryKey(sessionId: string) {
 	return [
 		SESSION_DETAIL_FAST_QUERY_PREFIX,
@@ -63,6 +92,7 @@ export function sessionDetailOverviewPageQueryKey(input: {
 export function sessionDetailWindowQueryKey(
 	input: SessionDetailWindowRequest,
 	debugModeKey: string,
+	initialRevision?: string,
 ) {
 	return [
 		SESSION_DETAIL_FAST_QUERY_PREFIX,
@@ -70,6 +100,7 @@ export function sessionDetailWindowQueryKey(
 		input.sessionId,
 		debugModeKey,
 		input,
+		...(input.mode === "initial" && initialRevision ? [initialRevision] : []),
 	] as const;
 }
 

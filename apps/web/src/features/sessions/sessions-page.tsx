@@ -21,11 +21,15 @@ import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
 
-const SessionDetailView = lazy(() =>
+const loadSessionDetailView = () =>
 	import("@/features/sessions/components/SessionDetailView").then((module) => ({
 		default: module.SessionDetailView,
-	})),
-);
+	}));
+const SessionDetailView = lazy(loadSessionDetailView);
+function preloadSessionDetail() {
+	// A failed speculative download must not prevent a normal click from retrying.
+	void loadSessionDetailView().catch(() => undefined);
+}
 
 const SESSION_LIST_SCROLL_POSITION_LIMIT = 20;
 const sessionListScrollPositions = new Map<string, number>();
@@ -202,6 +206,9 @@ export function SessionsPage() {
 		>
 			<Suspense fallback={<ProductLoadingIndicator />}>
 				<SessionDetailView
+					initialSession={viewableSessions.find(
+						(session) => session.session_id === activeSessionId,
+					)}
 					navigation={sessionNavigation}
 					onClose={closeSession}
 					position={sessionPosition}
@@ -220,6 +227,8 @@ export function SessionsPage() {
 			>
 				<section
 					aria-label="Sessions"
+					onPointerEnter={preloadSessionDetail}
+					onFocusCapture={preloadSessionDetail}
 					className={
 						activeSessionDetail
 							? "hidden min-h-0 min-w-0 sm:flex sm:w-[var(--session-list-pane-width,clamp(20rem,34vw,40rem))] sm:flex-none"

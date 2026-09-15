@@ -8,6 +8,7 @@ import {
 } from "../../services/session-analytics.service.js";
 import {
 	getSessionDetailBodyChunk,
+	getSessionDetailInitial,
 	getSessionDetailOverview,
 	getSessionDetailSpine,
 	getSessionDetailSubagent,
@@ -103,6 +104,29 @@ const detailBodyChunk = os.analytics.sessions.detailBodyChunk
 			if (error instanceof RangeError) {
 				throw new ORPCError("BAD_REQUEST", { message: error.message });
 			}
+			return throwSessionDetailRevisionError(error, errors);
+		}
+	});
+
+const detailInitial = os.analytics.sessions.detailInitial
+	.use(orgMiddleware)
+	.handler(async ({ input, context, errors }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			{
+				isOrgAdmin: context.isOrgAdmin,
+				requesterUserId: context.user.id,
+			},
+		);
+		try {
+			const result = await getSessionDetailInitial({
+				organizationId: context.organizationId,
+				ownerId,
+				sessionId: input.sessionId,
+			});
+			if (!result) throw new ORPCError("NOT_FOUND");
+			return result;
+		} catch (error) {
 			return throwSessionDetailRevisionError(error, errors);
 		}
 	});
@@ -256,6 +280,7 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 export const sessionsRouter = os.analytics.sessions.router({
 	detailBodyChunk,
 	detailOverview,
+	detailInitial,
 	detailSpine,
 	detailSubagent,
 	detailTurn,

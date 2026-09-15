@@ -1009,6 +1009,7 @@ export function getSessionDetailOverviewPage(input: {
 export function assembleSessionDetailWindow(input: {
 	derivation: SessionDetailDerivation;
 	request: SessionDetailWindowRequest;
+	budget?: { maxBytes: number; maxTurns: number; maxTurnBytes: number };
 }): SessionDetailWindowAssembly {
 	const { derivation, request } = input;
 	const candidateIndices = getWindowCandidateIndices(derivation, request);
@@ -1016,8 +1017,12 @@ export function assembleSessionDetailWindow(input: {
 	let oversizedTurns = 0;
 	let truncatedByBudget = false;
 
-	for (const index of candidateIndices) {
-		const turn = createSessionDetailWindowTurn(derivation, index);
+	for (const index of candidateIndices.slice(0, input.budget?.maxTurns)) {
+		const turn = createSessionDetailWindowTurn(
+			derivation,
+			index,
+			input.budget?.maxTurnBytes,
+		);
 		if (!turn) {
 			continue;
 		}
@@ -1026,7 +1031,10 @@ export function assembleSessionDetailWindow(input: {
 		const nextWindow = createSessionDetailWindowResponse(derivation, [
 			...nextTurns.entries(),
 		]);
-		if (serializedBytes(nextWindow) > SESSION_DETAIL_WINDOW_MAX_RAW_BYTES) {
+		if (
+			serializedBytes(nextWindow) >
+			(input.budget?.maxBytes ?? SESSION_DETAIL_WINDOW_MAX_RAW_BYTES)
+		) {
 			truncatedByBudget = true;
 			break;
 		}
@@ -1158,6 +1166,7 @@ function centeredWindowIndices(
 function createSessionDetailWindowTurn(
 	derivation: SessionDetailDerivation,
 	index: number,
+	maxTurnBytes = SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
 ) {
 	const summary = derivation.turnSummaries[index];
 	if (!summary) {
@@ -1170,9 +1179,7 @@ function createSessionDetailWindowTurn(
 				userItems: cachedTurn.userItems,
 			}
 		: null;
-	const oversized =
-		body !== null &&
-		serializedBytes(body) > SESSION_DETAIL_WINDOW_MAX_TURN_BYTES;
+	const oversized = body !== null && serializedBytes(body) > maxTurnBytes;
 	return {
 		oversized,
 		value: {

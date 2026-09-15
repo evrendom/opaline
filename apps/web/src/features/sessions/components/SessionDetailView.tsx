@@ -1,3 +1,4 @@
+import type { SessionAnalytics } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	useCallback,
@@ -14,10 +15,10 @@ import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
 import {
-	fetchSessionDetailOverview,
+	fetchSessionDetailInitial,
 	SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	sessionDetailBodyQueryPrefix,
-	sessionDetailFirstOverviewQueryKey,
+	sessionDetailInitialQueryKey,
 	sessionDetailOverviewPageQueryKey,
 	sessionDetailRevisionQueryPrefix,
 	sessionDetailWindowQueryPrefix,
@@ -25,6 +26,7 @@ import {
 } from "./session-detail-fast-query";
 import { SessionDetailHeader } from "./session-detail-header";
 import { buildSessionDetailOverviewViewModel } from "./session-detail-overview-model";
+import { buildSessionDetailViewModel } from "./session-detail-view-model";
 import {
 	canRetrySessionDetailError,
 	getSessionDetailErrorState,
@@ -32,6 +34,7 @@ import {
 import { useSessionPaneFullscreen } from "./use-session-pane-fullscreen";
 
 type SessionDetailViewProps = {
+	initialSession?: SessionAnalytics;
 	navigation: SessionNavigation;
 	onClose: (() => void) | undefined;
 	position: number | undefined;
@@ -110,6 +113,7 @@ function SessionDetailStateMessage({
 }
 
 export function SessionDetailView({
+	initialSession,
 	navigation,
 	onClose,
 	position,
@@ -145,7 +149,7 @@ export function SessionDetailView({
 	const overviewQuery = useQuery({
 		enabled: sessionId.length > 0,
 		queryFn: async ({ signal }) => {
-			const parsed = await fetchSessionDetailOverview({ sessionId }, signal);
+			const parsed = await fetchSessionDetailInitial(sessionId, signal);
 			queryClient.setQueryData(
 				sessionDetailOverviewPageQueryKey({
 					revision: parsed.overview.revision,
@@ -156,14 +160,16 @@ export function SessionDetailView({
 			);
 			return parsed;
 		},
-		queryKey: sessionDetailFirstOverviewQueryKey(sessionId),
+		queryKey: sessionDetailInitialQueryKey(sessionId),
 		retry: shouldRetrySessionDetailFastQuery,
 		staleTime: SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	});
 	const overview = overviewQuery.data?.overview;
 	const viewModel = overview
 		? buildSessionDetailOverviewViewModel(overview, userMap)
-		: undefined;
+		: initialSession
+			? buildSessionDetailViewModel(initialSession, userMap)
+			: undefined;
 	const sessionTabTitle = `${
 		viewModel?.safeModelUsed
 			? formatModelDisplayLabel(viewModel.safeModelUsed)
@@ -282,6 +288,7 @@ export function SessionDetailView({
 							<SessionDetailFastContent
 								key={`${sessionId}:${overview.revision}`}
 								firstOverview={overview}
+								initialDetail={overviewQuery.data?.initialDetail}
 								initialSelectedTurnId={preservedTurnIdRef.current}
 								onStaleRevision={handleStaleRevision}
 								responseScrollRef={responseScrollRef}
