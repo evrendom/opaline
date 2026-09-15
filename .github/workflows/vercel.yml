@@ -1,6 +1,15 @@
 name: Vercel
 
 on:
+  workflow_call:
+    inputs:
+      target:
+        description: Vercel deployment environment
+        required: true
+        type: string
+    secrets:
+      VERCEL_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       target:
@@ -16,7 +25,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: vercel-${{ github.event.pull_request.number || github.ref }}-${{ inputs.target || 'preview' }}
+  # Preview builds share one stable OAuth origin, so only the newest build
+  # should replace it. Production keeps its existing branch-scoped lock.
+  group: vercel-${{ inputs.target == 'production' && github.ref || 'development' }}-${{ inputs.target || 'preview' }}
   cancel-in-progress: ${{ (inputs.target || 'preview') != 'production' }}
 
 jobs:
@@ -26,6 +37,7 @@ jobs:
     environment: ${{ inputs.target == 'production' && 'production' || 'preview' }}
     env:
       DEPLOY_ENVIRONMENT: ${{ inputs.target || 'preview' }}
+      PREVIEW_HOST: opaline-dev-opalinehq.vercel.app
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -61,6 +73,12 @@ jobs:
           deploy_args=()
           if [[ "${DEPLOY_ENVIRONMENT}" == "production" ]]; then
             deploy_args+=(--prod --skip-domain)
+          else
+            deploy_args+=(
+              --env "APP_URL=https://${PREVIEW_HOST}"
+              --env "ALLOWED_ORIGIN=https://${PREVIEW_HOST}"
+              --env "TRUSTED_ORIGINS=https://${PREVIEW_HOST}"
+            )
           fi
           deployment_url="$(vercel deploy --archive=tgz --yes "${deploy_args[@]}" --scope=opalinehq)"
           if [[ ! "${deployment_url}" =~ ^https://[a-zA-Z0-9.-]+\.vercel\.app$ ]]; then
@@ -107,11 +125,35 @@ jobs:
             --data '{"json":{"limit":1}}' \
             | jq --exit-status '.json | type == "array"'
 
+      - name: Publish verified development preview
+        if: inputs.target == 'preview'
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          vercel curl /api/auth/sign-in/social \
+            --deployment "${DEPLOYMENT_URL}" \
+            --scope=opalinehq \
+            --yes \
+            -- --fail --silent --show-error \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Origin: https://${PREVIEW_HOST}" \
+            --data '{"provider":"github","callbackURL":"/","disableRedirect":true}' \
+            | jq --exit-status --arg callback "https://${PREVIEW_HOST}/api/auth/callback/github" \
+                '.url | startswith("https://github.com/login/oauth/authorize?") and contains("redirect_uri=" + ($callback | @uri))'
+          vercel alias set "${DEPLOYMENT_URL}" "${PREVIEW_HOST}" --scope=opalinehq
+          echo "Development: https://${PREVIEW_HOST}" >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Promote verified production deployment
         if: inputs.target == 'production'
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
-        run: >-
-          vercel promote "${DEPLOYMENT_URL}"
-          --yes
-          --scope=opalinehq
+        shell: bash
+        run: |
+          latest_main_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "${latest_main_sha}" != "${GITHUB_SHA}" ]]; then
+            echo "Skipping promotion: main has moved past this commit." >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          vercel promote "${DEPLOYMENT_URL}" --yes --scope=opalinehq
