@@ -81,6 +81,9 @@ export const SessionDetailOverviewInputSchema = z
 	})
 	.strict();
 
+export const SessionDetailInitialInputSchema =
+	SessionDetailOverviewInputSchema.pick({ sessionId: true });
+
 export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
@@ -763,6 +766,23 @@ export const SessionDetailSpineSchema = z
 			.max(MAX_SESSION_DETAIL_SPINE_TURNS),
 	})
 	.strict();
+
+export const SessionDetailInitialSchema = z
+	.object({
+		overview: SessionDetailOverviewSchema,
+		spine: SessionDetailSpineSchema.nullable(),
+		window: SessionDetailWindowSchema,
+	})
+	.strict()
+	.refine(
+		(value) =>
+			value.overview.revision === value.window.revision &&
+			(value.spine === null ||
+				value.spine.revision === value.overview.revision),
+		"Initial session detail must use one revision",
+	);
+
+export type SessionDetailInitial = z.infer<typeof SessionDetailInitialSchema>;
 
 export const SessionDetailSubagentSchema = z
 	.object({

@@ -6,8 +6,11 @@ import { useOrganization } from "@/features/workspace/organization/useOrganizati
 export function useUserMap() {
 	const demo = useDemoRuntime();
 	const { state } = useOrganization();
-	const { data: fullOrg, isLoading } = useFullOrganization(state.activeOrg?.id);
+	const { data: fullOrg, isLoading } = useFullOrganization(
+		state.members ? undefined : state.activeOrg?.id,
+	);
 
+	const members = state.members ?? fullOrg?.members;
 	const { userMap, avatarMap } = useMemo(() => {
 		const names: Record<string, string> = {};
 		const avatars: Record<string, string> = {};
@@ -16,7 +19,7 @@ export function useUserMap() {
 			avatars[member.userId] = member.image;
 		}
 
-		for (const member of fullOrg?.members ?? []) {
+		for (const member of members ?? []) {
 			names[member.userId] = member.user.name;
 
 			if (member.user.image && !avatars[member.userId]) {
@@ -25,7 +28,7 @@ export function useUserMap() {
 		}
 
 		return { userMap: names, avatarMap: avatars };
-	}, [fullOrg, demo?.seed.members]);
+	}, [members, demo?.seed.members]);
 
-	return { userMap, avatarMap, isLoading };
+	return { userMap, avatarMap, isLoading: state.members ? false : isLoading };
 }

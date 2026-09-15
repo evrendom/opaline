@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
@@ -9,6 +9,7 @@ import {
 	getWrappedPublicIdFromPath,
 	getWrappedResumeTokenFromPath,
 } from "@/app/routes";
+import { loadSessionsPage } from "@/app/session-page-loader";
 import { DesktopOnlyOverlay } from "@/app/ui/DesktopOnlyOverlay";
 import { ProductAnalyticsSessionSync } from "@/features/analytics/tracking/ProductAnalyticsSessionSync";
 import { AuthenticatedApp } from "@/features/auth/AuthenticatedApp";
@@ -92,6 +93,18 @@ function FullscreenRouteLoadingScreen() {
 
 function SessionAwareApp() {
 	const location = useLocation();
+	useEffect(() => {
+		const path = location.pathname;
+		if (
+			path === "/" ||
+			path === "/session" ||
+			/\/sessions(?:\/|$)/.test(path)
+		) {
+			void loadSessionsPage().catch(() => {
+				/* Navigation retries a failed preload. */
+			});
+		}
+	}, [location.pathname]);
 	const { data: session, isPending } = authClient.useSession();
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);

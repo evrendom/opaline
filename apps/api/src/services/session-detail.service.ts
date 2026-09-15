@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import type {
 	SessionDetailBodyChunkInput,
@@ -30,6 +31,7 @@ import {
 	SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY,
 } from "./session-detail-derivation-limits.js";
 import { createSessionDetailDerivationSemaphore } from "./session-detail-derivation-semaphore.js";
+import { buildSessionDetailInitial } from "./session-detail-initial.js";
 import { createSessionDetailInstrumentation } from "./session-detail-instrumentation.js";
 import {
 	getSessionDetailCurrentRevision,
@@ -38,6 +40,7 @@ import {
 
 const logger = getLogger(["rudel", "api", "session-detail"]);
 const MAX_LATENCY_SAMPLES = 1_024;
+const instanceId = crypto.randomUUID();
 const instrumentation = createSessionDetailInstrumentation({
 	maxSamples: MAX_LATENCY_SAMPLES,
 	readMemoryUsage: () => process.memoryUsage(),
@@ -123,7 +126,7 @@ export class SessionDetailStaleRevisionError extends Error {
 }
 
 function logRequestLatency(
-	kind: "overview" | "spine" | "subagent" | "turn" | "window",
+	kind: "initial" | "overview" | "spine" | "subagent" | "turn" | "window",
 	startedAt: number,
 ) {
 	const durationMs = Math.round(performance.now() - startedAt);
@@ -132,6 +135,7 @@ function logRequestLatency(
 		"Served session detail {kind} in {durationMs}ms (p50={p50Ms}, p95={p95Ms}, p99={p99Ms}, samples={sampleCount})",
 		{
 			...cache.getStats(),
+			instanceId,
 			durationMs,
 			kind,
 			p50Ms: latency.p50,
@@ -165,6 +169,7 @@ async function loadDerivation(
 					key.sessionId,
 					key.ownerId,
 				);
+				const rawFetchDurationMs = Math.round(performance.now() - startedAt);
 				if (!snapshot) {
 					throw new SessionDetailSnapshotNotFoundError();
 				}
@@ -177,7 +182,11 @@ async function loadDerivation(
 						snapshot.revision,
 					);
 				}
+				const derivationStartedAt = performance.now();
 				const value = deriveSessionDetail(snapshot);
+				const derivationDurationMs = Math.round(
+					performance.now() - derivationStartedAt,
+				);
 				const durationMs = Math.round(performance.now() - startedAt);
 				const heapGrowthBytes =
 					process.memoryUsage().heapUsed - memoryBefore.heapUsed;
@@ -198,6 +207,21 @@ async function loadDerivation(
 					{
 						cachedBytes: value.byteSize,
 						durationMs,
+						rawFetchDurationMs,
+						derivationDurationMs,
+						instanceId,
+						snapshotFingerprint: createHash("sha256")
+							.update(
+								JSON.stringify([
+									key.organizationId,
+									key.ownerId,
+									key.source,
+									key.sessionId,
+									key.revision,
+								]),
+							)
+							.digest("hex")
+							.slice(0, 24),
 						heapGrowthBytes,
 						rawBytes,
 					},
@@ -259,6 +283,29 @@ async function getRequestedDerivation(input: {
 		throw new SessionDetailStaleRevisionError(input.revision, current.revision);
 	}
 	return loadDerivation(createKey({ ...input, source: current.source }));
+}
+
+export async function getSessionDetailInitial(input: {
+	organizationId: string;
+	ownerId: string;
+	sessionId: string;
+}) {
+	const startedAt = performance.now();
+	try {
+		const derivation = await getCurrentDerivation(input);
+		if (!derivation) return null;
+		const assemblyStartedAt = performance.now();
+		const response = buildSessionDetailInitial(derivation);
+		logger.info("Assembled initial session detail", {
+			instanceId,
+			assemblyDurationMs: Math.round(performance.now() - assemblyStartedAt),
+			serializedBytes: Buffer.byteLength(JSON.stringify(response), "utf8"),
+			turnsIncluded: response.window.turns.length,
+		});
+		return response;
+	} finally {
+		logRequestLatency("initial", startedAt);
+	}
 }
 
 export async function getSessionDetailOverview(input: {

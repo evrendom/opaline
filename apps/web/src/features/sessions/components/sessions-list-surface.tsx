@@ -1,8 +1,8 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
 import type { Ref } from "react";
-import { DashboardSessionsSnapshotSection } from "@/features/dashboard/components/DashboardSessionsSnapshotSection";
 import type { SessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { cn } from "@/lib/utils";
+import { SessionsOverviewTable } from "./sessions-overview-table";
 
 type SessionsListSurfaceProps = {
 	activeSessionId: string | null;
@@ -26,17 +26,13 @@ export function SessionsListSurface({
 	scrollContainerRef,
 }: SessionsListSurfaceProps) {
 	const {
-		dateRangeDays,
 		endDate,
-		headlineMetrics,
+		startDate,
 		isSnapshotSessionsError,
 		isSnapshotSessionsPending,
-		isSummaryError,
-		isSummaryPending,
-		snapshotSessionsData,
-		startDate,
+		orderedSessions,
 		totalSessionCount,
-		useRolling24Hours,
+		pagination,
 	} = data;
 
 	return (
@@ -63,7 +59,7 @@ export function SessionsListSurface({
 						layout === "workspace" && "min-h-0 flex-1 overflow-hidden",
 					)}
 				>
-					{isSummaryError || isSnapshotSessionsError ? (
+					{isSnapshotSessionsError ? (
 						<div
 							className={cn(
 								"border-b border-black/6 px-6 py-12 text-center text-[color:var(--dashboardy-muted)] dark:border-white/8",
@@ -74,25 +70,20 @@ export function SessionsListSurface({
 							We couldn&apos;t load the session overview for this range.
 						</div>
 					) : (
-						<DashboardSessionsSnapshotSection
+						<SessionsOverviewTable
+							key={`${data.organizationId}:${startDate}:${endDate}`}
 							activeSessionId={activeSessionId}
 							canOpenSession={canOpenSession}
-							dateRangeDays={dateRangeDays}
-							endDate={endDate}
 							getSessionHref={getSessionHref}
 							getSessionLinkState={getSessionLinkState}
-							isMetricsPending={isSummaryPending}
-							isSessionsPending={isSnapshotSessionsPending}
-							metrics={headlineMetrics}
+							isLoading={isSnapshotSessionsPending}
 							onSessionClick={onSessionClick}
-							overviewSessionCount={totalSessionCount}
-							sessions={snapshotSessionsData}
-							showChart={false}
-							startDate={startDate}
-							tableScrollContainerRef={scrollContainerRef}
+							sessionCountLabel={totalSessionCount}
+							sessions={orderedSessions}
+							scrollContainerRef={scrollContainerRef}
+							sessionDetailDisabledNote={undefined}
 							totalSessionCount={totalSessionCount}
-							useRolling24Hours={useRolling24Hours}
-							variant="sessions"
+							pagination={pagination}
 						/>
 					)}
 				</div>

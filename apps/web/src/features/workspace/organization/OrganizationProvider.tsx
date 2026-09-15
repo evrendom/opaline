@@ -1,4 +1,10 @@
-import { createContext, type ReactNode, useContext, useState } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useMemo,
+	useState,
+} from "react";
 import { useLocation } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { getWorkspaceSlugFromPath } from "@/app/routes";
@@ -124,6 +130,14 @@ function AuthenticatedOrganizationProvider({
 		string | null
 	>(null);
 
+	const activeMembers = useMemo(
+		() =>
+			activeOrg?.members.map((member) => ({
+				...member,
+				user: { ...member.user, image: member.user.image ?? null },
+			})),
+		[activeOrg?.members],
+	);
 	const firstOrganizationId = orgs?.[0]?.id ?? null;
 	const optimisticActiveOrg =
 		orgs?.find((organization) => organization.id === optimisticActiveOrgId) ??
@@ -158,6 +172,8 @@ function AuthenticatedOrganizationProvider({
 	const contextValue: WorkspaceContextValue = {
 		state: {
 			activeOrg: resolvedActiveOrg,
+			members:
+				activeOrg?.id === resolvedActiveOrg?.id ? activeMembers : undefined,
 			organizations: orgs ?? [],
 			isLoading: activeLoading || listLoading || switching,
 		},

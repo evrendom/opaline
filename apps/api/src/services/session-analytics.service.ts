@@ -111,7 +111,7 @@ interface SessionAnalyticsListRow
 	extends Omit<SessionAnalyticsRaw, keyof PersistedSessionLanguageSignals> {
 	signal_session_date: string;
 }
-const SIGNAL_LOOKUP_BATCH_SIZE = 32;
+const SIGNAL_LOOKUP_BATCH_SIZE = 64;
 const SIGNAL_LOOKUP_CONCURRENCY = 4;
 const SIGNAL_LOOKUP_PARAMETER_BUDGET = 6_000;
 
@@ -344,7 +344,7 @@ export async function getSessionAnalytics(
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
       ${filters.length > 0 ? `AND ${filters.join("\n      AND ")}` : ""}
-    ORDER BY ${sortColumn} ${sortDirection}
+    ORDER BY ${sortColumn} ${sortDirection}, sa.source ASC, sa.session_id ASC
     LIMIT {limit:UInt32}
     OFFSET {offset:UInt32}
   `;
@@ -357,7 +357,10 @@ export async function getSessionAnalytics(
 
 	// Query parameters travel in the ClickHouse HTTP URL. Split large pages so
 	// metadata lookups stay below proxy URL limits, with bounded concurrency.
-	// These queries only read signal metadata, never session transcripts.
+	// Send each exact identity once instead of repeating the IDs in a second
+	// parameter. A normal 50-session page fits in one metadata request while
+	// long IDs still respect the same proxy-safe byte budget. These queries
+	// only read signal metadata, never session transcripts.
 	const signalKey = (
 		row: Pick<
 			SessionAnalyticsListRow,
@@ -373,8 +376,7 @@ export async function getSessionAnalytics(
 	let batch: SessionAnalyticsListRow[] = [];
 	let batchSize = 0;
 	for (const row of raw) {
-		const rowSize =
-			parameterSize(row.session_id) + parameterSize(signalKey(row));
+		const rowSize = parameterSize(signalKey(row));
 		if (
 			batch.length > 0 &&
 			(batch.length >= SIGNAL_LOOKUP_BATCH_SIZE ||
@@ -411,7 +413,6 @@ export async function getSessionAnalytics(
 			PREWHERE organization_id = {orgId:String}
 				AND session_date >= toDateTime64({signalFrom:String}, 3, 'UTC')
 				AND session_date <= toDateTime64({signalTo:String}, 3, 'UTC')
-				AND session_id IN ({signalIds:Array(String)})
 			WHERE concat(source, '\\0', session_id, '\\0', toString(session_date)) IN ({signalKeys:Array(String)})
 			LIMIT {signalLimit:UInt32}
 		`,
@@ -419,7 +420,6 @@ export async function getSessionAnalytics(
 						orgId,
 						signalFrom: dates[0],
 						signalTo: dates.at(-1),
-						signalIds: batch.map((row) => row.session_id),
 						signalKeys: batch.map(signalKey),
 						signalLimit: batch.length,
 					},

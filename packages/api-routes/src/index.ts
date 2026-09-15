@@ -119,6 +119,8 @@ export {
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkInputSchema,
 	SessionDetailBodyChunkSchema,
+	type SessionDetailInitial,
+	SessionDetailInitialSchema,
 	type SessionDetailOverview,
 	type SessionDetailOverviewInput,
 	SessionDetailOverviewInputSchema,
@@ -858,6 +860,7 @@ export const contract = {
 		sessions: {
 			detailBodyChunk: sessionDetailProcedureContracts.detailBodyChunk,
 			detailOverview: sessionDetailProcedureContracts.detailOverview,
+			detailInitial: sessionDetailProcedureContracts.detailInitial,
 			detailSpine: sessionDetailProcedureContracts.detailSpine,
 			detailSubagent: sessionDetailProcedureContracts.detailSubagent,
 			detailTurn: sessionDetailProcedureContracts.detailTurn,

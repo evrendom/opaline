@@ -5,6 +5,7 @@ import {
 	SESSION_DETAIL_WINDOW_MAX_RAW_BYTES,
 	SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
 	SESSION_DETAIL_WINDOW_PAGE_TURNS,
+	SessionDetailInitialSchema,
 	type SessionDetailOverview,
 	SessionDetailOverviewSchema,
 	SessionDetailWindowSchema,
@@ -26,6 +27,7 @@ import {
 	StaleSessionDetailCursorError,
 	truncateSessionDetailPreview,
 } from "../services/session-detail-derivation.service.js";
+import { buildSessionDetailInitial } from "../services/session-detail-initial.js";
 
 function line(value: unknown) {
 	return JSON.stringify(value);
@@ -615,6 +617,108 @@ function sumPageActivity(
 }
 
 describe("session detail derivation", () => {
+	test("omits oversized initial bodies without losing their turn or continuation", () => {
+		const base = deriveSessionDetail(snapshot(createTranscript(40)));
+		const turnBodies = new Map(base.turnBodies);
+		const firstTurnId = base.turnSummaries[0]?.turnId ?? "";
+		const firstTurn = turnBodies.get(firstTurnId);
+		if (!firstTurn) throw new Error("Expected the first turn body");
+		turnBodies.set(firstTurnId, {
+			...firstTurn,
+			responseItems: [
+				{ id: "large-summary", kind: "summary", text: "🙂".repeat(250_000) },
+			],
+		});
+		const derivation = { ...base, turnBodies };
+		const initial = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial(derivation),
+		);
+		expect(initial.window.turns[0]?.body).toBeNull();
+		expect(initial.window.turns[0]?.bodyOmitted).toBe("oversized");
+		expect(initial.window.turns[1]?.body).not.toBeNull();
+		expect(initial.window.newerCursor).not.toBeNull();
+		expect(
+			derivation.turnBodies.get(initial.window.turns[0]?.turnId ?? "")
+				?.userItems.length,
+		).toBeGreaterThan(0);
+		expect(
+			Buffer.byteLength(JSON.stringify(initial.window), "utf8"),
+		).toBeLessThan(1_000_000);
+	});
+
+	test("defers an exceptionally large spine while retaining a usable initial window", () => {
+		const derivation = deriveSessionDetail(snapshot(createTranscript(30)));
+		const spine = Array.from({ length: 10_000 }, (_, index) => ({
+			eventCount: 1,
+			responseBytes: 100,
+			turnId: `turn-${index}-${"x".repeat(100)}`,
+		}));
+		const initial = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial({ ...derivation, spine }),
+		);
+		expect(initial.spine).toBeNull();
+		expect(initial.window.turns).toHaveLength(20);
+		expect(initial.window.newerCursor).not.toBeNull();
+	});
+	test("opens a long session with one coherent, bounded initial slice and complete pagination", () => {
+		const derivation = deriveSessionDetail(snapshot(createTranscript(240)));
+		const initial = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial(derivation),
+		);
+		expect(initial.overview.revision).toBe(derivation.revision);
+		expect(initial.window.revision).toBe(derivation.revision);
+		expect(initial.spine?.revision).toBe(derivation.revision);
+		expect(initial.spine?.turns).toHaveLength(240);
+		expect(initial.window.turns).toHaveLength(20);
+		expect(initial.window.turns.every((turn) => turn.body !== null)).toBe(true);
+		expect(initial.window.total).toBe(240);
+		expect(Buffer.byteLength(JSON.stringify(initial), "utf8")).toBeLessThan(
+			1_800_000,
+		);
+		const cursor = initial.window.newerCursor;
+		expect(cursor).not.toBeNull();
+		if (cursor === null) throw new Error("Expected a continuation cursor");
+		const next = assembleSessionDetailWindow({
+			derivation,
+			request: {
+				mode: "newer",
+				includeBodies: true,
+				sessionId: "session-1",
+				cursor,
+			},
+		}).window;
+		expect(next.turns[0]?.index).toBe(20);
+		expect(next.turns[0]?.turnId).not.toBe(initial.window.turns.at(-1)?.turnId);
+	});
+
+	test("rejects an initial response that combines different revisions", () => {
+		const initial = buildSessionDetailInitial(
+			deriveSessionDetail(snapshot(createTranscript(2))),
+		);
+		expect(
+			SessionDetailInitialSchema.safeParse({
+				...initial,
+				window: { ...initial.window, revision: "2" },
+			}).success,
+		).toBe(false);
+		expect(
+			SessionDetailInitialSchema.safeParse({
+				...initial,
+				spine: { ...initial.spine, revision: "2" },
+			}).success,
+		).toBe(false);
+	});
+
+	test("keeps an empty initial response coherent", () => {
+		const initial = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial(deriveSessionDetail(snapshot(""))),
+		);
+		expect(initial.window.turns).toEqual([]);
+		expect(initial.window.newerCursor).toBeNull();
+		expect(initial.window.olderCursor).toBeNull();
+		expect(initial.spine?.turns).toEqual([]);
+	});
+
 	test("preserves an opaque revision above JavaScript's safe integer range", () => {
 		const revision = "117158864486400001";
 		const derivation = deriveSessionDetail(

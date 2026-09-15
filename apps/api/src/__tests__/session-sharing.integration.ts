@@ -11,7 +11,9 @@ import { getAdapter } from "@rudel/agent-adapters";
 import {
 	type IngestSessionInput,
 	SESSION_OWNERSHIP_CONFLICT_CODE,
+	SessionDetailInitialSchema,
 } from "@rudel/api-routes";
+import { z } from "zod";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
@@ -205,6 +207,47 @@ describe("organization session ownership", () => {
 
 		await waitForAnalyticsSession(SHARED_SESSION_ID);
 
+		const initialRead = await callRpc(
+			owner.token,
+			"analytics/sessions/detailInitial",
+			{
+				sessionId: SHARED_SESSION_ID,
+			},
+		);
+		expect(
+			initialRead.status,
+			server
+				.readOutput()
+				.split("\n")
+				.filter((line) => line.includes("ERR"))
+				.join("\n"),
+		).toBe(200);
+		const { json: initial } = z
+			.object({ json: SessionDetailInitialSchema })
+			.parse(initialRead.body);
+		expect(initial.overview.session.userId).toBe(owner.userId);
+		expect(initial.overview.session.sessionId).toBe(SHARED_SESSION_ID);
+		expect(initial.window.turns.length).toBeGreaterThan(0);
+		expect(initial.window.turns.some((turn) => turn.body !== null)).toBe(true);
+		expect(initial.window.revision).toBe(initial.overview.revision);
+		expect(initial.spine?.revision).toBe(initial.overview.revision);
+		const deniedInitial = await callRpc(
+			member.token,
+			"analytics/sessions/detailInitial",
+			{
+				sessionId: SHARED_SESSION_ID,
+			},
+		);
+		expect(deniedInitial.status).toBe(403);
+		const missingInitial = await callRpc(
+			owner.token,
+			"analytics/sessions/detailInitial",
+			{
+				sessionId: `${TEST_RUN_ID}_missing`,
+			},
+		);
+		expect(missingInitial.status).toBe(404);
+
 		const memberRead = await callRpc(
 			member.token,
 			"analytics/sessions/detailOverview",
@@ -305,6 +348,21 @@ describe("organization session ownership", () => {
 		);
 		expect(codexRead.status).toBe(200);
 		expect(readSessionDetailOverviewUserId(codexRead.body)).toBe(owner.userId);
+
+		const initialRead = await callRpc(
+			owner.token,
+			"analytics/sessions/detailInitial",
+			{ sessionId: CODEX_UPLOAD_SESSION_ID },
+		);
+		expect(initialRead.status).toBe(200);
+		const initial = z
+			.object({ json: SessionDetailInitialSchema })
+			.parse(initialRead.body).json;
+		expect(initial.overview.session.source).toBe("codex");
+		expect(initial.overview.session.userId).toBe(owner.userId);
+		expect(initial.window.turns.length).toBeGreaterThan(0);
+		expect(initial.window.turns[0]?.body).not.toBeNull();
+		expect(initial.window.revision).toBe(initial.overview.revision);
 	}, 60_000);
 
 	test("catches up a late legacy owner and is safe to replay", async () => {

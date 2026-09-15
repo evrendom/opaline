@@ -1,0 +1,16 @@
+@keyframes session-model-progress-ring-loading {
+	to {
+		stroke-dashoffset: -100;
+	}
+}
+
+/* Move the chart fill along the fixed silhouette instead of rotating its shape. */
+.session-model-progress-ring-loading {
+	animation: session-model-progress-ring-loading 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.session-model-progress-ring-loading {
+		animation: none;
+	}
+}

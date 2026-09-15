@@ -1,3 +1,4 @@
+import type { SessionDetailInitial } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	type RefObject,
@@ -10,13 +11,11 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-	fetchSessionDetailOverview,
 	fetchSessionDetailSpine,
 	fetchSessionDetailWindow,
 	isSessionDetailStaleRevisionError,
 	SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
 	SESSION_DETAIL_WINDOW_CACHE_TIME_MS,
-	sessionDetailOverviewPageQueryKey,
 	sessionDetailSpineQueryKey,
 	sessionDetailTurnQueryKey,
 	sessionDetailWindowQueryKey,
@@ -24,7 +23,6 @@ import {
 } from "./session-detail-fast-query";
 import type { NormalizedSessionDetailOverview } from "./session-detail-fast-response";
 import { SessionDetailFastResponsePane } from "./session-detail-fast-response-pane";
-import { loadRemainingSessionDetailOverviewPages } from "./session-detail-full-transcript";
 import { SessionDetailLayout } from "./session-detail-layout";
 import {
 	buildSessionDetailOverviewTurnOptions,
@@ -39,12 +37,14 @@ import type { SessionTranscriptListHandle } from "./session-transcript-list";
 import type { SessionTurnTableVirtualizerHandle } from "./session-turn-table";
 import type { SessionTurnSelection } from "./session-turn-table-selection";
 import { recordAnchorJournal } from "./transcript-forensics";
+import { useSessionDetailOverviewPages } from "./use-session-detail-overview-pages";
 
 const columnBottomPaddingClassName =
 	"pb-[calc(5rem+env(safe-area-inset-bottom))]";
 
 export function SessionDetailFastContent({
 	firstOverview,
+	initialDetail,
 	initialSelectedTurnId,
 	onStaleRevision,
 	responseScrollRef,
@@ -52,6 +52,7 @@ export function SessionDetailFastContent({
 	userMap,
 }: {
 	firstOverview: NormalizedSessionDetailOverview;
+	initialDetail?: SessionDetailInitial;
 	initialSelectedTurnId: string | undefined;
 	onStaleRevision: (error: unknown, selectedTurnId?: string) => void;
 	responseScrollRef: RefObject<HTMLDivElement | null>;
@@ -98,53 +99,15 @@ export function SessionDetailFastContent({
 		[firstOverview.revision, firstOverview.session.sessionId],
 	);
 	const spineQuery = useQuery({
+		initialData: initialDetail?.spine ?? undefined,
 		queryFn: ({ signal }) => fetchSessionDetailSpine(spineInput, signal),
 		queryKey: sessionDetailSpineQueryKey(spineInput),
 		retry: shouldRetrySessionDetailFastQuery,
 		staleTime: SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
 	});
-	const remainingOverviewPagesQuery = useQuery({
-		queryFn: ({ signal }) =>
-			loadRemainingSessionDetailOverviewPages({
-				first: firstOverview,
-				loadPage: async (cursor) => {
-					const input = {
-						revision: firstOverview.revision,
-						sessionId: firstOverview.session.sessionId,
-						turnCursor: cursor,
-					};
-					const parsed = await queryClient.fetchQuery({
-						queryFn: () =>
-							fetchSessionDetailOverview(
-								{
-									expectedRevision: input.revision,
-									sessionId: input.sessionId,
-									turnCursor: input.turnCursor,
-								},
-								signal,
-							),
-						queryKey: sessionDetailOverviewPageQueryKey(input),
-						retry: shouldRetrySessionDetailFastQuery,
-						staleTime: SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
-					});
-					return parsed.overview;
-				},
-				signal,
-			}),
-		queryKey: [
-			"session-detail",
-			"all-overview-pages",
-			firstOverview.session.sessionId,
-			firstOverview.revision,
-		],
-		retry: shouldRetrySessionDetailFastQuery,
-		staleTime: SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
-	});
-	const additionalPages = remainingOverviewPagesQuery.data ?? [];
-	const pages = useMemo(
-		() => [firstOverview, ...additionalPages],
-		[additionalPages, firstOverview],
-	);
+	const remainingOverviewPagesQuery =
+		useSessionDetailOverviewPages(firstOverview);
+	const pages = remainingOverviewPagesQuery.data.pages;
 	const items = useMemo(
 		() => pages.flatMap((page) => page.turnPage.items),
 		[pages],
@@ -308,6 +271,7 @@ export function SessionDetailFastContent({
 					options={options}
 					responsePane={({ onMinimumWidthChange, viewportStore }) => (
 						<SessionDetailFastResponsePane
+							initialWindow={initialDetail?.window}
 							activityTotals={firstOverview.activityTotals}
 							anchorEventId={selectedActivityAnchor.eventId}
 							anchorEventRequestId={selectedActivityAnchor.requestId}
@@ -323,7 +287,10 @@ export function SessionDetailFastContent({
 							}}
 							onStaleRevision={handleStaleRevision}
 							options={options}
-							overviewLoading={remainingOverviewPagesQuery.isPending}
+							overviewLoading={
+								remainingOverviewPagesQuery.hasNextPage &&
+								!remainingOverviewPagesQuery.isError
+							}
 							responseScrollRef={responseScrollRef}
 							revision={firstOverview.revision}
 							selection={selection}

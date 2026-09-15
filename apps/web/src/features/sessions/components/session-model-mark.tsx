@@ -6,10 +6,37 @@ import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { cn } from "@/lib/utils";
 import { SessionMemberProfilePreview } from "./session-member-profile-preview";
 import type { SessionMemberProfileSummary } from "./session-member-profile-summary";
+import { SessionModelProgressRing } from "./session-model-progress-ring";
 
-// The existing trace silhouette scaled to the center of its 4px background band.
-const MODEL_BAND_PATH =
-	"M14 2.08C17.14 2.18 20.16 2.55 22.37 4.45C24.58 6.27 25.96 9.64 26 13.99C25.96 18.35 24.58 21.71 22.37 23.54C20.16 25.44 17.14 25.8 14 25.9C10.86 25.8 7.84 25.44 5.63 23.54C3.43 21.71 2.04 18.35 2 13.99C2.04 9.64 3.43 6.27 5.63 4.45C7.84 2.55 10.86 2.18 14 2.08Z";
+const MODEL_MARK_CLASS_NAME =
+	"relative flex size-7 shrink-0 items-center justify-center";
+const MODEL_BACKGROUND_CLASS_NAME =
+	"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+const MODEL_ICON_SHELL_CLASS_NAME =
+	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
+const MODEL_ICON_CLASS_NAME =
+	"session-turn-table-model-icon size-5 rounded-none border-0 bg-white shadow-none [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+
+export function SessionModelLoadingMark() {
+	return (
+		<span
+			aria-hidden="true"
+			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
+		>
+			<span
+				className={cn(
+					MODEL_BACKGROUND_CLASS_NAME,
+					"bg-black/4 dark:bg-white/8",
+				)}
+			>
+				<SessionModelProgressRing progress="loading" />
+			</span>
+			<span className={MODEL_ICON_SHELL_CLASS_NAME}>
+				<span className={MODEL_ICON_CLASS_NAME} />
+			</span>
+		</span>
+	);
+}
 
 export function SessionModelMark({
 	avatarUrl,
@@ -82,7 +109,7 @@ export function SessionModelMark({
 	return (
 		<div
 			className={cn(
-				"relative flex size-7 shrink-0 items-center justify-center",
+				MODEL_MARK_CLASS_NAME,
 				tone.icon === "claude" && "text-[#b96949]",
 				tone.icon === "codex" && "text-[#111] dark:text-white",
 				tone.icon === null && "text-(--session-overview-muted)",
@@ -91,7 +118,7 @@ export function SessionModelMark({
 			<span
 				{...iconAccessibility}
 				className={cn(
-					"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]",
+					MODEL_BACKGROUND_CLASS_NAME,
 					tone.icon === "claude" && "bg-[#cc7d5e]/10",
 					tone.icon !== "claude" && "bg-black/4 dark:bg-white/8",
 					progress && tone.identityIconClassName,
@@ -100,27 +127,16 @@ export function SessionModelMark({
 				data-session-model-progress={progress ? "" : undefined}
 			>
 				{magnitude !== null && magnitude > 0 ? (
-					<svg aria-hidden="true" className="size-full" viewBox="0 0 28 28">
-						<path
-							d={MODEL_BAND_PATH}
-							fill="none"
-							pathLength={100}
-							stroke="currentColor"
-							strokeDasharray={magnitude < 100 ? `${magnitude} 100` : undefined}
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							strokeWidth={3}
-						/>
-					</svg>
+					<SessionModelProgressRing progress={magnitude} />
 				) : null}
 			</span>
 			<span
 				aria-hidden="true"
-				className="session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]"
+				className={MODEL_ICON_SHELL_CLASS_NAME}
 				data-session-detail-model-mark
 			>
 				<ModelTraceIcon
-					className="session-turn-table-model-icon size-5 rounded-none border-0 bg-white shadow-none [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
+					className={MODEL_ICON_CLASS_NAME}
 					expandable={false}
 					expanded={false}
 					model={model}

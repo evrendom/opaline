@@ -4,6 +4,7 @@ import {
 	type UseFluidHoverReturn,
 	useFluidHover,
 } from "@/hooks/use-fluid-hover";
+import { cn } from "@/lib/utils";
 
 type SessionHoverRegistration = Pick<
 	UseFluidHoverReturn,
@@ -16,7 +17,11 @@ function isSessionDisabled(element: HTMLElement) {
 
 export function SessionsOverviewFluidList({
 	children,
+	height,
+	fillHeight = true,
 }: {
+	height?: number;
+	fillHeight?: boolean;
 	children: (registration: SessionHoverRegistration) => ReactNode;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -31,7 +36,7 @@ export function SessionsOverviewFluidList({
 		// biome-ignore lint/a11y/noStaticElementInteractions: Delegates hover and focus from the native links/buttons; the wrapper is not a separate control.
 		<div
 			ref={containerRef}
-			className="relative isolate flex-1"
+			className={cn("relative isolate", fillHeight ? "flex-1" : "flex-none")}
 			data-slot="sessions-fluid-hover"
 			{...hover.handlers}
 			onBlur={(event) => {
@@ -44,7 +49,11 @@ export function SessionsOverviewFluidList({
 				hover={hover}
 				className="z-0 rounded-none bg-(--session-overview-hover)"
 			/>
-			<ul aria-label="Recent sessions" className="list-none">
+			<ul
+				aria-label="Recent sessions"
+				className="relative list-none"
+				style={{ height }}
+			>
 				{children(hover)}
 			</ul>
 		</div>

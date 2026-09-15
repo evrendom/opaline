@@ -4,6 +4,8 @@ import {
 	SESSION_DETAIL_WINDOW_ERRORS,
 	SessionDetailBodyChunkInputSchema,
 	SessionDetailBodyChunkSchema,
+	SessionDetailInitialInputSchema,
+	SessionDetailInitialSchema,
 	SessionDetailOverviewInputSchema,
 	SessionDetailOverviewSchema,
 	SessionDetailSpineInputSchema,
@@ -17,6 +19,10 @@ import {
 } from "./schemas/session-detail-payload.js";
 
 export const sessionDetailProcedureContracts = {
+	detailInitial: oc
+		.input(SessionDetailInitialInputSchema)
+		.output(SessionDetailInitialSchema)
+		.errors(SESSION_DETAIL_REVISION_ERRORS),
 	detailBodyChunk: oc
 		.input(SessionDetailBodyChunkInputSchema)
 		.output(SessionDetailBodyChunkSchema)

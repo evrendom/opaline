@@ -1,3 +1,5 @@
+import type { FullOrganization } from "@/features/workspace/hooks/useFullOrganization";
+
 export interface Organization {
 	id: string;
 	name: string;
@@ -6,6 +8,7 @@ export interface Organization {
 }
 
 export interface WorkspaceState {
+	members?: FullOrganization["members"];
 	activeOrg: Organization | null;
 	organizations: readonly Organization[];
 	isLoading: boolean;

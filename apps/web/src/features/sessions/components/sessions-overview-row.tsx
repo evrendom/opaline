@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
+	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
@@ -43,6 +44,9 @@ import {
 } from "./session-overview-row-elements";
 
 type SessionsOverviewRowProps = {
+	virtualTop?: number;
+	position?: number;
+	setSize?: number;
 	index: number;
 	registerItem: UseFluidHoverReturn["registerItem"];
 	setHoverActiveIndex: UseFluidHoverReturn["setActiveIndex"];
@@ -148,6 +152,9 @@ function getSessionClockParts(dateString: string, utc: boolean) {
 
 export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	index,
+	position,
+	setSize,
+	virtualTop,
 	registerItem,
 	setHoverActiveIndex,
 	activeSessionId,
@@ -261,7 +268,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					data-session-overview-model-repository
 				>
 					<p
-						className="min-w-0 max-w-28 truncate text-base/5 font-[450] tracking-normal text-(--session-overview-text) sm:text-[0.8125rem]/5"
+						className={cn(
+							"min-w-0 max-w-28 truncate",
+							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
+						)}
 						title={session.model_used}
 						data-session-overview-model-label
 					>
@@ -408,6 +418,20 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	);
 	return (
 		<li
+			aria-posinset={position === undefined ? undefined : position + 1}
+			aria-setsize={setSize}
+			data-session-key={`${session.source}:${session.session_id}`}
+			style={
+				virtualTop === undefined
+					? undefined
+					: {
+							position: "absolute",
+							top: virtualTop,
+							left: 0,
+							width: "100%",
+							height: 36,
+						}
+			}
 			ref={itemRef}
 			className="relative z-10"
 			data-session-disabled={!isClickable ? "true" : undefined}
