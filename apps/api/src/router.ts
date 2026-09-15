@@ -254,9 +254,11 @@ const cliAuthStatus = os.cli.authStatus
 	});
 
 const cliSetupStatus = os.cli.setupStatus
-	.use(authMiddleware)
+	.use(ingestAuthMiddleware)
 	.handler(async ({ context }) => {
-		const [status] = await sqlClient<Array<{ has_cli_login: boolean }>>`
+		const [status] = await sqlClient<
+			Array<{ has_cli_login: boolean; has_uploaded_sessions: boolean }>
+		>`
 			SELECT EXISTS (
 				SELECT 1
 				FROM apikey
@@ -264,11 +266,17 @@ const cliSetupStatus = os.cli.setupStatus
 					AND name = 'rudel-cli-ingest'
 					AND enabled = true
 					AND (expires_at IS NULL OR expires_at > NOW())
-			) AS has_cli_login
+			) AS has_cli_login,
+            EXISTS (
+                SELECT 1 FROM session_ownership
+                WHERE user_id = ${context.user.id}
+                  AND last_ingested_at IS NOT NULL
+            ) AS has_uploaded_sessions
 		`;
 
 		return {
 			hasCliLogin: status?.has_cli_login === true,
+			hasUploadedSessions: status?.has_uploaded_sessions === true,
 		};
 	});
 

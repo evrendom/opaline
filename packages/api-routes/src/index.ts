@@ -296,6 +296,7 @@ export const CliUserSchema = z.object({
 
 export const CliSetupStatusSchema = z.object({
 	hasCliLogin: z.boolean(),
+	hasUploadedSessions: z.boolean(),
 });
 
 export const CLI_SESSION_UPLOAD_STATUS_MAX_IDS = 64;
