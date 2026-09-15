@@ -201,7 +201,7 @@ for (const engine of ["chrome", "webkit"]) {
 
 			const sort = demo.getByRole("button", { name: /^Sort sessions,/ });
 			for (const label of [
-				"Time",
+				"Date",
 				"Cost",
 				"Tokens",
 				"Skills",

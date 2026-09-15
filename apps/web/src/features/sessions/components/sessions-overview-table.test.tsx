@@ -141,7 +141,7 @@ describe("SessionsOverviewTable", () => {
 		}
 		expect(
 			within(header).getByRole("button", {
-				name: "Sort sessions, Time, descending",
+				name: "Sort sessions, Date, descending",
 			}),
 		).toBeInTheDocument();
 
