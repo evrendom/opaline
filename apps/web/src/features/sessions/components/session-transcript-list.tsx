@@ -804,7 +804,9 @@ export const SessionTranscriptList = forwardRef<
 			);
 			const visibleTurnIds = [
 				...new Set(
-					visibleItems.flatMap((item) => {
+					// Prioritize visible turns, then warm the rendered overscan so
+					// scrolling reaches bodies that are already on their way.
+					[...visibleItems, ...currentVirtualItems].flatMap((item) => {
 						const row = rows[item.index];
 						return row && "turnId" in row ? [row.turnId] : [];
 					}),

@@ -49,14 +49,8 @@ function getObservedInputMaximum(
 	series: SessionOverviewCallSeries,
 	headroom: number,
 ) {
-	return (
-		Math.max(
-			0,
-			...series.turns.flatMap((turn) =>
-				turn.calls.map((call) => call.inputTotal),
-			),
-		) * headroom
-	);
+	// Reuse the aggregate instead of rescanning every call for each event dot.
+	return series.aggregates.largestCallInputTotal * headroom;
 }
 
 function getCallInputMaximum(

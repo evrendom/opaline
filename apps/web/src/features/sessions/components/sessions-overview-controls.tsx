@@ -25,11 +25,7 @@ export function SessionsOverviewControls({
 				onSortChange={tableState.changeSort}
 				sort={tableState.sort}
 			/>
-			{tableState.filterCatalogPending ? (
-				<output className="px-2 text-sm text-(--session-overview-subtle)">
-					Loading filters…
-				</output>
-			) : tableState.filterCatalogError ? (
+			{tableState.filterCatalogError && !tableState.filterCatalogPending ? (
 				<button
 					type="button"
 					onClick={tableState.onRetryFilterCatalog}
@@ -40,6 +36,7 @@ export function SessionsOverviewControls({
 			) : (
 				<SessionsOverviewFiltersMenu
 					variant="linear"
+					isLoading={tableState.filterCatalogPending}
 					excludedFilterValues={tableState.excludedFilterValues}
 					filterOptions={tableState.filterOptions}
 					onClearAll={tableState.clearAllFilters}

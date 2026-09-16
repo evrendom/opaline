@@ -10,6 +10,25 @@ import {
 } from "./session-detail-view-utils";
 
 describe("runSessionDetailRequest", () => {
+	test("cancels immediately when leaving a session with a longer deadline", async () => {
+		const queryController = new AbortController();
+		let requestSignal: AbortSignal | undefined;
+		const request = runSessionDetailRequest(
+			(signal) => {
+				requestSignal = signal;
+				return new Promise<never>(() => {});
+			},
+			queryController.signal,
+			90_000,
+		);
+		const reason = new DOMException("Session closed", "AbortError");
+		queryController.abort(reason);
+
+		await expect(request).rejects.toBe(reason);
+		expect(requestSignal?.aborted).toBe(true);
+		expect(requestSignal?.reason).toBe(reason);
+	});
+
 	test("aborts a request and reports a distinct timeout error", async () => {
 		let requestWasAborted = false;
 		const queryController = new AbortController();

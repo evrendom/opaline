@@ -47,6 +47,7 @@ test("large member and model messages open within a bounded Node heap", async ()
 				.object({
 					turns: z.number(),
 					rawBytes: z.number(),
+					cacheBytes: z.number(),
 					responseBytes: z.number(),
 				})
 				.parse(JSON.parse(stdout));
@@ -55,6 +56,9 @@ test("large member and model messages open within a bounded Node heap", async ()
 				Number(megabytes) * 1024 * 1024,
 			);
 			expect(result.responseBytes).toBeLessThan(1_500_000);
+			// Large transcripts must remain reusable after the first request;
+			// rejecting the entry here forces every window to parse it again.
+			expect(result.cacheBytes).toBeLessThan(64 * 1024 * 1024);
 		}
 	} finally {
 		await rm(directory, { recursive: true, force: true });

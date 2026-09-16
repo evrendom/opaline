@@ -19,10 +19,15 @@ type PulseSeriesLayer = {
 	tone: PulseTone;
 };
 
-function ContextUtilizationGradients({
+export function SessionContextUtilizationGradients({
 	gradientId,
-	signal,
-}: Pick<PulseSeriesLayer, "gradientId" | "signal">) {
+	baselineY,
+	topY,
+}: {
+	gradientId: string;
+	baselineY: number;
+	topY: number;
+}) {
 	return (
 		<>
 			<linearGradient
@@ -30,8 +35,8 @@ function ContextUtilizationGradients({
 				gradientUnits="userSpaceOnUse"
 				x1="0"
 				x2="0"
-				y1={signal.baselineY}
-				y2={signal.topY}
+				y1={baselineY}
+				y2={topY}
 			>
 				<stop
 					className="[stop-color:oklch(0.68_0.16_151)] [stop-opacity:0.3] dark:[stop-color:oklch(0.78_0.15_151)] dark:[stop-opacity:0.26]"
@@ -59,8 +64,8 @@ function ContextUtilizationGradients({
 				gradientUnits="userSpaceOnUse"
 				x1="0"
 				x2="0"
-				y1={signal.baselineY}
-				y2={signal.topY}
+				y1={baselineY}
+				y2={topY}
 			>
 				<stop
 					className="[stop-color:oklch(0.58_0.17_151)] dark:[stop-color:oklch(0.78_0.15_151)]"
@@ -90,7 +95,11 @@ function ContextUtilizationGradients({
 function PulseGradient({ gradientId, signal, tone }: PulseSeriesLayer) {
 	if (tone === "context") {
 		return (
-			<ContextUtilizationGradients gradientId={gradientId} signal={signal} />
+			<SessionContextUtilizationGradients
+				gradientId={gradientId}
+				baselineY={signal.baselineY}
+				topY={signal.topY}
+			/>
 		);
 	}
 

@@ -77,6 +77,7 @@ console.log(
 		mb: megabytes,
 		turns: initial.overview.turnPage.total,
 		rawBytes: Buffer.byteLength(content),
+		cacheBytes: derivation.byteSize,
 		responseBytes: Buffer.byteLength(JSON.stringify(initial)),
 		durationMs: Math.round(performance.now() - started),
 		memory: process.memoryUsage(),

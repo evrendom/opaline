@@ -145,10 +145,12 @@ export function SessionDetailActivityStrip({
 		() =>
 			buildSessionDetailActivityGroups({
 				activityTotals,
-				options,
-				subagents,
+				// Counts come from the server. Avoid formatting thousands of
+				// occurrence rows for flyouts that cannot be opened.
+				options: flyoutsEnabled ? options : [],
+				subagents: flyoutsEnabled ? subagents : [],
 			}).filter((group) => group.totalCount > 0),
-		[activityTotals, options, subagents],
+		[activityTotals, flyoutsEnabled, options, subagents],
 	);
 	const activeKindRef = useRef<SessionDetailActivityKind | undefined>(
 		undefined,

@@ -207,7 +207,7 @@ async function loadDerivation(
 					rawBytes,
 				});
 				logger.info(
-					"Derived session detail snapshot in {durationMs}ms (rawBytes={rawBytes}, cachedBytes={cachedBytes}, heapGrowthBytes={heapGrowthBytes})",
+					"Derived session detail snapshot in {durationMs}ms (fetch={rawFetchDurationMs}ms, prepare={derivationDurationMs}ms, rawBytes={rawBytes}, cachedBytes={cachedBytes}, heapGrowthBytes={heapGrowthBytes})",
 					{
 						cachedBytes: value.byteSize,
 						durationMs,

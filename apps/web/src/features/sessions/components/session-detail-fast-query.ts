@@ -31,6 +31,9 @@ import {
 } from "./session-detail-response";
 
 const SESSION_DETAIL_FAST_QUERY_PREFIX = "session-detail-v2";
+// A cold initial load prepares the whole transcript on the server. Very large
+// sessions can exceed the normal page deadline before that preparation is cached.
+const SESSION_DETAIL_INITIAL_TIMEOUT_MS = 90_000;
 const SESSION_DETAIL_BODY_GC_TIME_MS = 10 * 60 * 1_000;
 export const SESSION_DETAIL_OVERVIEW_STALE_TIME_MS = 60 * 1_000;
 export const SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS = Number.POSITIVE_INFINITY;
@@ -53,6 +56,7 @@ export async function fetchSessionDetailInitial(
 				{ signal: requestSignal },
 			),
 		signal,
+		SESSION_DETAIL_INITIAL_TIMEOUT_MS,
 	);
 	const responseReceivedAt = performance.now();
 	const initialDetail = SessionDetailInitialSchema.parse(response);

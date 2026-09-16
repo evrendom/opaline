@@ -86,6 +86,18 @@ test("hover leaves unchanged rows alone while session data and permissions stay 
 	const mount = document.createElement("div");
 	document.body.append(mount);
 	const root = createRoot(mount);
+	let hoverAttributeChanges = 0;
+	const observer = new MutationObserver((records) => {
+		hoverAttributeChanges += records.length;
+	});
+	observer.observe(mount, {
+		attributes: true,
+		attributeFilter: [
+			"data-fluid-hover-active",
+			"data-fluid-hover-active-index",
+		],
+		subtree: true,
+	});
 	function view(
 		rows: typeof sessions,
 		permission: ComponentProps<typeof SessionsOverviewRow>["canOpenSession"],
@@ -133,11 +145,9 @@ test("hover leaves unchanged rows alone while session data and permissions stay 
 			setActiveIndex(1);
 		});
 		expect(rowEvaluations).toBe(0);
-		expect(
-			mount
-				.querySelector("[data-fluid-hover-active-index]")
-				?.getAttribute("data-fluid-hover-active-index"),
-		).toBe("1");
+		// These attributes trigger ancestor :has() selectors and page-wide
+		// style recalculation even when React leaves the rows alone.
+		expect(hoverAttributeChanges).toBe(0);
 
 		const updated = sessions.map((session, index) =>
 			index === 1 ? { ...session, estimated_cost: 12 } : session,
@@ -172,6 +182,7 @@ test("hover leaves unchanged rows alone while session data and permissions stay 
 		await act(async () => {
 			root.unmount();
 		});
+		observer.disconnect();
 		mount.remove();
 	}
 });

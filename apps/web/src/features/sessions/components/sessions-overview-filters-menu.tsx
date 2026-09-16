@@ -48,6 +48,7 @@ export function SessionsOverviewFiltersMenu({
 	excludedFilterValues,
 	filterOptions,
 	iconOnly = false,
+	isLoading = false,
 	variant = "default",
 	onClearAll,
 	onClearFilter,
@@ -63,6 +64,7 @@ export function SessionsOverviewFiltersMenu({
 		readonly SessionOverviewFilterOption[]
 	>;
 	iconOnly?: boolean;
+	isLoading?: boolean;
 	variant?: "default" | "linear";
 	onClearAll: () => void;
 	onClearFilter: (filterKey: SessionOverviewFilterKey) => void;
@@ -163,6 +165,8 @@ export function SessionsOverviewFiltersMenu({
 		>
 			<PopoverTrigger
 				type="button"
+				disabled={isLoading}
+				aria-busy={isLoading || undefined}
 				aria-label={triggerLabel}
 				title={triggerLabel}
 				className={cn(

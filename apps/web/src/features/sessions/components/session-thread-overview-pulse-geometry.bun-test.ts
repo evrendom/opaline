@@ -48,6 +48,31 @@ const series: SessionOverviewCallSeries = {
 };
 
 describe("nearest Pulse call hover", () => {
+	test("positioning event dots does not rescan every call for each dot", () => {
+		let reads = 0;
+		const measured: SessionOverviewCallSeries = {
+			...series,
+			turns: series.turns.map((turn) => ({
+				...turn,
+				calls: turn.calls.map((call) => ({
+					...call,
+					get inputTotal() {
+						reads += 1;
+						return call.inputTotal;
+					},
+				})),
+			})),
+		};
+		const call = series.turns[0]?.calls[0];
+		if (!call) throw new Error("Expected a call");
+		for (let dot = 0; dot < 100; dot += 1) {
+			expect(
+				getPulseCallInputUtilization(measured, call).maximum,
+			).toBeCloseTo(224);
+		}
+		expect(reads).toBe(0);
+	});
+
 	test("does not attach an isolated activity circle to a distant call", () => {
 		expect(getPulseCallNearX(series, config, 500, 0)).toBeUndefined();
 		expect(getPulseCallNearX(series, config, 104, 0)?.call.model).toBe(
