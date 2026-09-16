@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
@@ -7,38 +13,54 @@ import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProv
 import { SessionsPage } from "@/features/sessions/sessions-page";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { ensureLiveDemoSession } from "../../../../marketing/src/scripts/live-demo";
+import {
+	getDemoActive,
+	getDemoServerActive,
+	subscribeDemoActive,
+} from "./demo-activation";
 import { DemoRuntimeContext, type DemoSeed } from "./demo-runtime";
 
 export function DemoRoot({ seed }: { seed: DemoSeed }) {
+	const active = useSyncExternalStore(
+		subscribeDemoActive,
+		getDemoActive,
+		getDemoServerActive,
+	);
 	const [client] = useState(
 		() =>
 			new QueryClient({
 				defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 			}),
 	);
-	const [live, setLive] = useState(false);
-	const [error, setError] = useState(false);
-	useEffect(() => {
-		if (live && document.hasFocus())
+	const [connection, setConnection] = useState<
+		"idle" | "connecting" | "live" | "error"
+	>("idle");
+	const live = active && connection === "live";
+	useLayoutEffect(() => {
+		// Focus once on entry, never when a later network response arrives.
+		// Preserve a control the visitor has already focused themselves.
+		if (active && document.activeElement === document.body)
 			document
 				.querySelector<HTMLElement>(
 					'[data-slot="sessions-overview-scroll-container"]',
 				)
 				?.focus({ preventScroll: true });
-	}, [live]);
-	async function connect() {
-		setError(false);
+	}, [active]);
+	const connect = useCallback(async () => {
+		setConnection("connecting");
 		try {
 			await ensureLiveDemoSession();
-			setLive(true);
+			setConnection("live");
 			document.documentElement.dataset.demoLive = "";
 		} catch {
-			setError(true);
+			setConnection("error");
 		}
-	}
+	}, []);
+	useEffect(() => {
+		if (active && connection === "idle") void connect();
+	}, [active, connection, connect]);
 	useMountEffect(() => {
 		document.documentElement.dataset.demoHydrated = "";
-		void connect();
 	});
 	return (
 		<DemoRuntimeContext.Provider value={{ seed, live }}>
@@ -62,7 +84,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 						}}
 					>
 						<DateRangeProvider>
-							<div className="h-full" inert={!live} data-demo-surface>
+							<div className="h-full" inert={!active} data-demo-surface>
 								<AppRouter
 									rootRedirectTarget="/session"
 									sessionComponent={SessionsPage}
@@ -72,7 +94,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 					</WorkspaceStateProvider>
 				</MemoryRouter>
 			</QueryClientProvider>
-			{error ? (
+			{active && connection === "error" ? (
 				<div
 					role="alert"
 					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-white p-4 shadow-lg"

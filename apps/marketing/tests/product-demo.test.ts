@@ -331,7 +331,7 @@ test("gradient stretch keeps its drawing buffer stable in Chrome and Safari", as
 	}
 }, 30_000);
 
-test("demo resizes continuously and defers first-use startup until motion finishes", async () => {
+test("demo resizes continuously while the prepared product stays interactive", async () => {
 	const browser = await chromium.launch({ channel: "chrome", headless: true });
 	try {
 		for (const viewport of [
@@ -360,29 +360,11 @@ test("demo resizes continuously and defers first-use startup until motion finish
 				.first()
 				.elementHandle();
 			assert(originalRow);
-			const hydrationKeepsRow = originalRow.evaluate(
-				(node) =>
-					new Promise<boolean>((resolve) => {
-						const observer = new MutationObserver(() => {
-							if (!document.documentElement.hasAttribute("data-demo-hydrated"))
-								return;
-							observer.disconnect();
-							resolve(
-								node ===
-									document.querySelector('[aria-label="Recent sessions"] li'),
-							);
-						});
-						observer.observe(document.documentElement, {
-							attributes: true,
-							attributeFilter: ["data-demo-hydrated"],
-						});
-					}),
-			);
 			const initialStylesheets = await product
 				.locator('link[rel="stylesheet"]')
 				.evaluateAll((links) => links.map((link) => link.getAttribute("href")));
 			expect(initialStylesheets).toHaveLength(1);
-			expect(appRequests).toEqual([]);
+			expect(appRequests.filter(isLiveRequest)).toEqual([]);
 			await page.evaluate(() =>
 				window.scrollTo(0, document.documentElement.scrollHeight),
 			);
@@ -394,7 +376,18 @@ test("demo resizes continuously and defers first-use startup until motion finish
 								? "[data-instant-v2-dashboard-demo]"
 								: "[data-instant-v2-demo-exit]",
 						)
-						.click();
+						.evaluate((button) => {
+							if (!(button instanceof HTMLButtonElement))
+								throw new Error("Missing transition trigger");
+							button.click();
+							const animation = document
+								.querySelector("[data-instant-v2-window]")
+								?.getAnimations()[0];
+							if (!animation) throw new Error("Expected entry/exit animation");
+							// Pause in the click task so a busy browser cannot finish the
+							// transition between the trigger and the geometry samples.
+							animation.pause();
+						});
 					if (cycle === 0 && direction === "enter") {
 						await page.evaluate(async () => {
 							const animation = document
@@ -404,13 +397,12 @@ test("demo resizes continuously and defers first-use startup until motion finish
 							animation.pause();
 							await animation.ready;
 						});
-						// Let the sweep finish while the resize is still paused. Startup
-						// must wait for the actual geometry animation, not just a timer.
+						// Product controls must work even while geometry is paused.
 						await page.waitForTimeout(1300);
-						expect(appRequests).toEqual([]);
+						await product.locator("[data-demo-surface]:not([inert])").waitFor();
 						expect(
 							await product.locator("html[data-demo-hydrated]").count(),
-						).toBe(0);
+						).toBe(1);
 					}
 					const samples = await page.evaluate(
 						async (cancel) => {
@@ -461,7 +453,13 @@ test("demo resizes continuously and defers first-use startup until motion finish
 							: !bar && enter && !enter.disabled;
 					}, direction === "enter");
 					if (direction === "enter") {
-						expect(await hydrationKeepsRow).toBe(true);
+						expect(
+							await originalRow.evaluate(
+								(node) =>
+									node ===
+									document.querySelector('[aria-label="Recent sessions"] li'),
+							),
+						).toBe(true);
 						expect(
 							await product
 								.locator('link[rel="stylesheet"]')
@@ -736,7 +734,7 @@ test("first paint is real product DOM and avatars, even without JavaScript", asy
 	}
 }, 30_000);
 
-test("Explore hydrates existing nodes, loads real data and retains navigation on re-entry", async () => {
+test("Explore activates prepared nodes, loads real data and retains navigation on re-entry", async () => {
 	const browser = await chromium.launch({ channel: "chrome", headless: true });
 	try {
 		const page = await browser.newPage({
@@ -786,9 +784,9 @@ test("Explore hydrates existing nodes, loads real data and retains navigation on
 				new URL(url).pathname.startsWith("/product-demo/") &&
 				url.endsWith(".js"),
 		);
-		expect(scripts).toHaveLength(1);
-		expect(scripts[0]).toContain("/assets/demo-");
-		expect(await frame.locator("html[data-demo-hydrated]").count()).toBe(0);
+		expect(scripts.some((url) => url.includes("/assets/demo-"))).toBe(true);
+		await frame.locator("html[data-demo-hydrated]").waitFor();
+		expect(await frame.locator("[data-demo-surface][inert]").count()).toBe(1);
 		const responsePromise = page.waitForResponse((response) =>
 			response.url().includes("/rpc/analytics/sessions/list"),
 		);
@@ -880,7 +878,7 @@ test("keyboard activation works with reduced motion across locales and timezones
 				.waitFor({ state: "attached" });
 			const frame = page.frameLocator(FRAME);
 			await frame.getByRole("list", { name: "Recent sessions" }).waitFor();
-			expect(await frame.locator("html[data-demo-hydrated]").count()).toBe(0);
+			expect(await frame.locator("[data-demo-surface][inert]").count()).toBe(1);
 			const button = page.locator("[data-instant-v2-dashboard-demo]");
 			await button.focus();
 			await button.press("Enter");

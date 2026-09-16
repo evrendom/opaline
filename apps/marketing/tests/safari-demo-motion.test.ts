@@ -21,7 +21,10 @@ test("Safari overlaps the sweep and resize on entry and exit", async () => {
 			viewport: { width: 2048, height: 1152 },
 			deviceScaleFactor: 2,
 		});
-		await openDemoPreview(page, "http://localhost:4600/home");
+		await openDemoPreview(
+			page,
+			`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+		);
 		await page
 			.locator(
 				'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -54,7 +57,7 @@ test("Safari overlaps the sweep and resize on entry and exit", async () => {
 				await new Promise(requestAnimationFrame);
 				const sweep =
 					document
-						.querySelector("[data-instant-v2-safari-sweep]")
+						.querySelector("[data-instant-v2-demo-sweep]")
 						?.getAnimations() ?? [];
 				const controls = Array.from(
 					document.querySelectorAll(
@@ -107,7 +110,10 @@ test("Safari keeps the root stationary through landing scroll and demo restorati
 		]) {
 			const page = await browser.newPage({ viewport, deviceScaleFactor: 2 });
 			page.setDefaultTimeout(10_000);
-			await openDemoPreview(page, "http://localhost:4600/home");
+			await openDemoPreview(
+				page,
+				`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+			);
 			await page
 				.locator(
 					'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -227,7 +233,10 @@ test("Safari keeps phone scrolling and keyboard navigation inside the landing co
 			viewport: { width: 390, height: 844 },
 			deviceScaleFactor: 2,
 		});
-		await openDemoPreview(page, "http://localhost:4600/home");
+		await openDemoPreview(
+			page,
+			`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+		);
 		await page
 			.locator("[data-instant-v2-scroll].lenis")
 			.waitFor({ state: "attached" });
@@ -301,7 +310,10 @@ test("Safari keeps landing wheel input over the preview and releases it inside t
 			viewport: { width: 2048, height: 1152 },
 			deviceScaleFactor: 2,
 		});
-		await openDemoPreview(page, "http://localhost:4600/home");
+		await openDemoPreview(
+			page,
+			`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+		);
 		await page
 			.locator(
 				'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -391,7 +403,10 @@ test("Safari moves the window without stretching text and releases every transit
 			{ width: 2048, height: 1152 },
 		]) {
 			const page = await browser.newPage({ viewport, deviceScaleFactor: 2 });
-			await openDemoPreview(page, "http://localhost:4600/home");
+			await openDemoPreview(
+				page,
+				`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+			);
 			await page
 				.locator(
 					'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -558,7 +573,7 @@ test("Safari moves the window without stretching text and releases every transit
 							: !bar && enter && !enter.disabled;
 					}, direction === "enter");
 					expect(
-						await page.locator("[data-instant-v2-safari-sweep]").count(),
+						await page.locator("[data-instant-v2-demo-sweep]").count(),
 					).toBe(0);
 					await page.setViewportSize({
 						width: viewport.width - 80,
@@ -594,7 +609,10 @@ test("Safari keeps the inner window and scroll boundaries attached to the resizi
 			{ width: 2560, height: 1440 },
 		]) {
 			const page = await browser.newPage({ viewport, deviceScaleFactor: 2 });
-			await openDemoPreview(page, "http://localhost:4600/home");
+			await openDemoPreview(
+				page,
+				`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+			);
 			await page
 				.locator(
 					'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -799,7 +817,10 @@ test("Safari keeps glyphs unscaled while narrow labels change and cleans up canc
 				viewport: { width: 1380, height: 982 },
 				deviceScaleFactor: 2,
 			});
-			await openDemoPreview(page, "http://localhost:4600/home");
+			await openDemoPreview(
+				page,
+				`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+			);
 			await page
 				.locator(
 					'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -945,7 +966,10 @@ test("Safari reduced motion skips the sweep and still supports Escape", async ()
 	const browser = await webkit.launch({ headless: true });
 	try {
 		const page = await browser.newPage({ reducedMotion: "reduce" });
-		await openDemoPreview(page, "http://localhost:4600/home");
+		await openDemoPreview(
+			page,
+			`http://localhost:${process.env.PREVIEW_PORT ?? 4600}/home`,
+		);
 		await page
 			.locator(
 				'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -953,9 +977,7 @@ test("Safari reduced motion skips the sweep and still supports Escape", async ()
 			.waitFor({ state: "attached" });
 		await page.locator("[data-instant-v2-dashboard-demo]").click();
 		await page.locator('.instant-v2-demo-bar[data-stage="visible"]').waitFor();
-		expect(await page.locator("[data-instant-v2-safari-sweep]").count()).toBe(
-			0,
-		);
+		expect(await page.locator("[data-instant-v2-demo-sweep]").count()).toBe(0);
 		expect(
 			await page.locator("[data-instant-v2-window]").evaluate((element) =>
 				// Existing reduced-motion CSS keeps 0.01ms corner transitions.

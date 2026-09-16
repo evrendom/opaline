@@ -112,7 +112,7 @@ export function animateSafariDemoWindow(
 	return animation;
 }
 
-export function startSafariDemoSweep(
+export function startDemoSweep(
 	direction: "ltr" | "rtl",
 	layoutAnimation: Animation | null = null,
 ): SweepHandle {
@@ -125,7 +125,7 @@ export function startSafariDemoSweep(
 	}
 	const band = document.createElement("div");
 	band.setAttribute("aria-hidden", "true");
-	band.setAttribute("data-instant-v2-safari-sweep", "");
+	band.setAttribute("data-instant-v2-demo-sweep", "");
 	Object.assign(band.style, {
 		position: "fixed",
 		top: "0",
