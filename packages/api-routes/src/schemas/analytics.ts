@@ -838,90 +838,6 @@ export const LearningsTrendInputSchema = DaysInputSchema.extend({
 	splitBy: z.enum(["user_id", "repository"]),
 });
 
-// ── Wrapped ────────────────────────────────────────────────────────
-
-export const WrappedSourceKindSchema = z.enum(["claude_code", "codex"]);
-
-export const WrappedSourceSplitSchema = z.object({
-	source: WrappedSourceKindSchema,
-	session_count: z.number(),
-	session_share_percent: z.number(),
-});
-
-export const WRAPPED_ARCHETYPE_GATE_THRESHOLDS = {
-	min_total_sessions: 100,
-	min_active_days: 14,
-	max_distance_ratio_to_max: 0.25,
-	min_top_two_margin: 0.1,
-} as const;
-
-export const MonthlyModelUsageSchema = z.object({
-	month: z.string(),
-	model: z.string(),
-	session_count: z.number(),
-});
-
-export const WrappedV1MetricsSchema = z.object({
-	first_session_at: z.string().nullable(),
-	last_session_at: z.string().nullable(),
-	days_since_first_session: z.number(),
-	total_sessions: z.number(),
-	active_days: z.number(),
-	favorite_model: z.string().nullable(),
-	total_tokens: z.number(),
-	estimated_spend_usd: z.number().nullable(),
-	longest_session_min: z.number(),
-	source_split: z.array(WrappedSourceSplitSchema),
-	model_by_month: z.array(MonthlyModelUsageSchema),
-});
-
-export const WrappedV1ArchetypeSchema = z.object({
-	key: z.string(),
-	snapshotId: z.string(),
-	computedAt: z.string(),
-});
-
-export const WrappedV1ArchetypeGateReasonSchema = z.enum([
-	"eligible",
-	"needs_more_sessions",
-	"needs_more_active_days",
-	"processing_archetype",
-	"low_confidence",
-]);
-
-export const WrappedV1ArchetypeGateThresholdsSchema = z.object({
-	min_total_sessions: z.number(),
-	min_active_days: z.number(),
-	max_distance_ratio_to_max: z.number(),
-	min_top_two_margin: z.number(),
-});
-
-export const WrappedV1ArchetypeGateValuesSchema = z.object({
-	total_sessions: z.number(),
-	active_days: z.number(),
-	archetype_distance_ratio_to_max: z.number().nullable(),
-	archetype_top_two_margin: z.number().nullable(),
-});
-
-export const WrappedV1ArchetypeGateSchema = z.object({
-	is_eligible: z.boolean(),
-	reason: WrappedV1ArchetypeGateReasonSchema,
-	thresholds: WrappedV1ArchetypeGateThresholdsSchema,
-	values: WrappedV1ArchetypeGateValuesSchema,
-});
-
-export const WrappedV1Schema = z.object({
-	generated_at: z.string(),
-	organization_id: z.string(),
-	pricing_mode: z.literal(ESTIMATED_PRICING_MODE),
-	scope: z.literal("active_organization_all_time"),
-	user_id: z.string(),
-	verified_metric_count: z.literal(8),
-	metrics: WrappedV1MetricsSchema,
-	archetype: WrappedV1ArchetypeSchema.nullable(),
-	archetype_gate: WrappedV1ArchetypeGateSchema,
-});
-
 // ── Type exports ───────────────────────────────────────────────────
 
 export type OverviewKPIs = z.infer<typeof OverviewKPIsSchema>;
@@ -1011,14 +927,3 @@ export type LearningsTrendDataPoint = z.infer<
 export type DimensionAnalysisInput = z.infer<
 	typeof DimensionAnalysisInputSchema
 >;
-export type WrappedSourceSplit = z.infer<typeof WrappedSourceSplitSchema>;
-export type MonthlyModelUsage = z.infer<typeof MonthlyModelUsageSchema>;
-export type WrappedV1Metrics = z.infer<typeof WrappedV1MetricsSchema>;
-export type WrappedV1Archetype = z.infer<typeof WrappedV1ArchetypeSchema>;
-export type WrappedV1ArchetypeGateReason = z.infer<
-	typeof WrappedV1ArchetypeGateReasonSchema
->;
-export type WrappedV1ArchetypeGate = z.infer<
-	typeof WrappedV1ArchetypeGateSchema
->;
-export type WrappedV1 = z.infer<typeof WrappedV1Schema>;

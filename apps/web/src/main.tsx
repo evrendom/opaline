@@ -1,13 +1,10 @@
-import { DialRoot } from "dialkit";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, useLocation } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import { AppProviders } from "@/app/providers/AppProviders";
 import App from "./App.tsx";
-import { useIsMobile } from "./app/hooks/use-mobile";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
-import "dialkit/styles.css";
 import { initProductAnalytics } from "./lib/product-analytics";
 
 const DevTools = import.meta.env.DEV
@@ -39,17 +36,8 @@ function GlobalLumaScope() {
 }
 
 function DevControls() {
-	const { pathname } = useLocation();
-	const isMobile = useIsMobile();
-	const isWrappedMobile = isMobile && pathname.startsWith("/wrapped");
-
-	if (isWrappedMobile) {
-		return null;
-	}
-
 	return (
 		<>
-			<DialRoot position="bottom-right" />
 			{DevTools ? (
 				<Suspense fallback={null}>
 					<DevTools />

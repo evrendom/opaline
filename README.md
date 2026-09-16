@@ -96,3 +96,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). Do not open public is
 ## License
 
 [MIT](LICENSE)
+
+## Retired features
+
+Wrapped is retired. See [the retirement notes](docs/wrapped-retirement.md) for the removed surfaces and retained data infrastructure. Current onboarding starts at `/welcome`.

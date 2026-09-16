@@ -29,7 +29,7 @@
 			"memory": 2048,
 			"maxDuration": 300
 		},
-		"api/wrapped.ts": {
+		"api/invite.ts": {
 			"includeFiles": "{apps/api/src/**,apps/web/dist/index.html,packages/*/src/**}",
 			"memory": 2048,
 			"maxDuration": 300
@@ -102,19 +102,19 @@
 		},
 		{
 			"source": "/:workspaceSlug/join/:token/og.png",
-			"destination": "/api/wrapped?__opaline_path=/:workspaceSlug/join/:token/og.png"
+			"destination": "/api/invite?__opaline_path=/:workspaceSlug/join/:token/og.png"
 		},
 		{
 			"source": "/:workspaceSlug/join/:token",
-			"destination": "/api/wrapped?__opaline_path=/:workspaceSlug/join/:token"
+			"destination": "/api/invite?__opaline_path=/:workspaceSlug/join/:token"
 		},
 		{
 			"source": "/team/invite/:token/og.png",
-			"destination": "/api/wrapped?__opaline_path=/team/invite/:token/og.png"
+			"destination": "/api/invite?__opaline_path=/team/invite/:token/og.png"
 		},
 		{
 			"source": "/team/invite/:token",
-			"destination": "/api/wrapped?__opaline_path=/team/invite/:token"
+			"destination": "/api/invite?__opaline_path=/team/invite/:token"
 		},
 		{
 			"source": "/api/cli/connections",
@@ -123,14 +123,6 @@
 		{
 			"source": "/api/cli/connections/:routePath*",
 			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections/:routePath*"
-		},
-		{
-			"source": "/wrapped/:shareId/x-card.png",
-			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId/x-card.png"
-		},
-		{
-			"source": "/wrapped/:shareId",
-			"destination": "/api/wrapped?__opaline_path=/wrapped/:shareId"
 		},
 		{
 			"source": "/rpc/ingest/init",

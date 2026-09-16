@@ -23,7 +23,7 @@ export function useEffectOnceWhen(options: UseEffectOnceWhenOptions) {
 			return;
 		}
 
-		// The key is the "already did this" identity. For wrapped flows that is a
+		// The key is the "already did this" identity. For setup flows that is a
 		// share id, which makes the helper read naturally at the call site.
 		if (trackedKeyRef.current === key) {
 			return;

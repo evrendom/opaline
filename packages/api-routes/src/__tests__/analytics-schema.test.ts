@@ -18,7 +18,6 @@ import {
 	SessionAnalyticsSchema,
 	SessionListInputSchema,
 	UserTokenUsageDataSchema,
-	WrappedV1MetricsSchema,
 } from "../schemas/analytics.js";
 
 describe("analytics input schemas", () => {
@@ -286,7 +285,6 @@ describe("usage-event cutover output contract", () => {
 			ROIDashboardSchema,
 			ROIMetricsSchema,
 			UserTokenUsageDataSchema,
-			WrappedV1MetricsSchema,
 		].flatMap((schema) => Object.keys(schema.shape));
 
 		for (const internalField of [
@@ -318,8 +316,5 @@ describe("usage-event cutover output contract", () => {
 		expect(UserTokenUsageDataSchema.shape.cost.safeParse(null).success).toBe(
 			true,
 		);
-		expect(
-			WrappedV1MetricsSchema.shape.estimated_spend_usd.safeParse(null).success,
-		).toBe(true);
 	});
 });

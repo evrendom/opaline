@@ -1,8 +1,7 @@
-import { Navigate } from "react-router-dom";
-import { appRoutes } from "@/app/routes";
+import { Navigate, useLocation } from "react-router-dom";
 
-// /get-started now exists only as a compatibility path. Wrapped owns the real
-// onboarding flow, so this route immediately hands off to /wrapped.
+// Preserve pairing query parameters when following the old setup URL.
 export function GetStartedRouteGate() {
-	return <Navigate replace to={appRoutes.wrappedTeamCard()} />;
+	const { search } = useLocation();
+	return <Navigate replace to={`/welcome${search}`} />;
 }

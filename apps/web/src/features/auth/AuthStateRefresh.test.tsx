@@ -4,12 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRoutes } from "@/app/routes";
 import {
 	clearPendingSignupRedirect,
-	getAuthCallbackURL,
 	getEmailLoginSuccessDestination,
 	getEmailSignupSuccessDestination,
 	getEmailSignupVerificationCallbackURL,
 	getPendingSignupRedirect,
-	getSocialLoginRedirectOptions,
 	getSocialSignupRedirectOptions,
 	getValidRedirect,
 	isGetStartedPath,
@@ -83,16 +81,12 @@ describe("auth state refresh", () => {
 		window.sessionStorage.clear();
 	});
 
-	it("routes homepage email signups to the wrapped card profile flow", () => {
-		expect(getEmailSignupSuccessDestination("/", "")).toBe(
-			appRoutes.wrappedCardProfile(),
-		);
+	it("routes homepage email signups to setup", () => {
+		expect(getEmailSignupSuccessDestination("/", "")).toBe("/welcome");
 	});
 
 	it("uses the direct redirect destination for homepage email verification callbacks", () => {
-		expect(getEmailSignupVerificationCallbackURL("/", "")).toBe(
-			appRoutes.wrappedCardProfile(),
-		);
+		expect(getEmailSignupVerificationCallbackURL("/", "")).toBe("/welcome");
 	});
 
 	it("matches both canonical and legacy get-started paths", () => {
@@ -102,19 +96,17 @@ describe("auth state refresh", () => {
 	});
 
 	it("stores a pending homepage signup redirect in the URL", () => {
-		primePendingSignupRedirect(appRoutes.getStarted(), "/", "");
+		primePendingSignupRedirect("/welcome", "/", "");
 
-		expect(getPendingSignupRedirect(window.location.search)).toBe(
-			appRoutes.getStarted(),
-		);
+		expect(getPendingSignupRedirect(window.location.search)).toBe("/welcome");
 		expect(window.location.search).toBe(
-			`?signup_redirect=${encodeURIComponent(appRoutes.getStarted())}`,
+			`?signup_redirect=${encodeURIComponent("/welcome")}`,
 		);
 	});
 
 	it("does not add a pending signup redirect for explicit redirect flows", () => {
 		primePendingSignupRedirect(
-			appRoutes.getStarted(),
+			"/welcome",
 			"/",
 			"?redirect=%2Fdashboard%2Fsessions",
 		);
@@ -126,7 +118,7 @@ describe("auth state refresh", () => {
 		window.history.replaceState(
 			{},
 			"",
-			`/?signup_redirect=${encodeURIComponent(appRoutes.getStarted())}`,
+			`/?signup_redirect=${encodeURIComponent("/welcome")}`,
 		);
 
 		clearPendingSignupRedirect();
@@ -144,12 +136,6 @@ describe("auth state refresh", () => {
 		).toBe("/dashboard/sessions");
 	});
 
-	it("routes explicit wrapped redirects for email signup to the card profile flow", () => {
-		expect(getEmailSignupSuccessDestination("/", "?redirect=%2Fwrapped")).toBe(
-			appRoutes.wrappedCardProfile(),
-		);
-	});
-
 	it("preserves device flow destinations for email signup", () => {
 		expect(getEmailSignupSuccessDestination("/", "?user_code=ABCD")).toBe(
 			"/?user_code=ABCD",
@@ -159,12 +145,6 @@ describe("auth state refresh", () => {
 	it("preserves direct non-root destinations for email signup", () => {
 		expect(getEmailSignupSuccessDestination("/invitation/123", "")).toBe(
 			"/invitation/123",
-		);
-	});
-
-	it("routes direct wrapped email signups to the card profile flow", () => {
-		expect(getEmailSignupSuccessDestination("/wrapped", "")).toBe(
-			appRoutes.wrappedCardProfile(),
 		);
 	});
 
@@ -190,53 +170,10 @@ describe("auth state refresh", () => {
 		expect(getEmailLoginSuccessDestination("/", search)).toBe("/");
 	});
 
-	it("preserves direct wrapped destinations for email login", () => {
-		expect(getEmailLoginSuccessDestination("/wrapped", "")).toBe(
-			appRoutes.wrappedSessionsLanded(),
-		);
-	});
-
-	it("returns wrapped auth redirects to uploaded sessions with share attribution", () => {
-		expect(
-			getEmailLoginSuccessDestination(
-				"/wrapped",
-				"?share_id=share-123&flow=story",
-			),
-		).toBe("/wrapped?share_id=share-123&flow=sessions-landed");
-	});
-
-	it("builds social login callbacks that return wrapped auth to uploaded sessions", () => {
-		expect(getAuthCallbackURL("/wrapped", "?share_id=share-123")).toBe(
-			`/?redirect=${encodeURIComponent(
-				"/wrapped?share_id=share-123&flow=sessions-landed",
-			)}`,
-		);
-	});
-
-	it("uses card profile as the new-user destination for social logins from wrapped", () => {
-		expect(
-			getSocialLoginRedirectOptions("/wrapped", "?share_id=share-123"),
-		).toEqual({
-			callbackURL: `/?redirect=${encodeURIComponent(
-				"/wrapped?share_id=share-123&flow=sessions-landed",
-			)}`,
-			newUserCallbackURL: "/wrapped?share_id=share-123&flow=card-profile",
-		});
-	});
-
-	it("uses card profile as the new-user destination for social signups from wrapped", () => {
-		expect(
-			getSocialSignupRedirectOptions("/wrapped", "?share_id=share-123"),
-		).toEqual({
-			callbackURL: "/wrapped?share_id=share-123&flow=sessions-landed",
-			newUserCallbackURL: "/wrapped?share_id=share-123&flow=card-profile",
-		});
-	});
-
 	it("uses a separate new-user social signup destination on the homepage", () => {
 		expect(getSocialSignupRedirectOptions("/", "")).toEqual({
 			callbackURL: "/",
-			newUserCallbackURL: appRoutes.wrappedCardProfile(),
+			newUserCallbackURL: "/welcome",
 		});
 	});
 
@@ -289,13 +226,11 @@ describe("auth state refresh", () => {
 		});
 
 		await waitFor(() => {
-			expect(mockNavigateToDestination).toHaveBeenCalledWith(
-				appRoutes.wrappedCardProfile(),
-			);
+			expect(mockNavigateToDestination).toHaveBeenCalledWith("/welcome");
 		});
 
 		expect(window.location.search).toBe(
-			`?signup_redirect=${encodeURIComponent(appRoutes.wrappedCardProfile())}`,
+			`?signup_redirect=${encodeURIComponent("/welcome")}`,
 		);
 	});
 
@@ -433,40 +368,16 @@ describe("auth state refresh", () => {
 			expect(mockSignInSocial).toHaveBeenCalledWith({
 				provider: "google",
 				callbackURL: "/",
-				newUserCallbackURL: appRoutes.wrappedCardProfile(),
+				newUserCallbackURL: "/welcome",
 			});
 		});
-	});
-
-	it("uses a local wrapped preview submit for email sign up when requested", async () => {
-		const user = userEvent.setup();
-		const handlePreviewSubmit = vi.fn();
-
-		render(
-			<SignupForm
-				onEmailPasswordPreviewSubmit={handlePreviewSubmit}
-				onSwitchToLogin={vi.fn()}
-				variant="wrapped-story"
-			/>,
-		);
-
-		await user.click(
-			screen.getByRole("button", { name: "Create account with Email" }),
-		);
-		await user.type(await screen.findByLabelText("Email"), "ada@example.com");
-		await user.click(screen.getByRole("button", { name: "Continue" }));
-
-		expect(handlePreviewSubmit).toHaveBeenCalledWith("ada@example.com");
-		expect(mockSendVerificationOtp).not.toHaveBeenCalled();
-		expect(mockNavigateToDestination).not.toHaveBeenCalled();
-		expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
 	});
 
 	it("hard-navigates after a successful email sign in", async () => {
 		window.history.replaceState(
 			{},
 			"",
-			`/?signup_redirect=${encodeURIComponent(appRoutes.getStarted())}`,
+			`/?signup_redirect=${encodeURIComponent("/welcome")}`,
 		);
 		mockSendVerificationOtp.mockResolvedValue({ error: null });
 		mockSignInEmailOtp.mockResolvedValue({ error: null });
@@ -543,50 +454,6 @@ describe("auth state refresh", () => {
 		expect(readPendingEmailLoginCodeDraft()).toBeNull();
 	});
 
-	it("hard-navigates wrapped logins back into wrapped", async () => {
-		window.history.replaceState({}, "", "/wrapped");
-		mockSendVerificationOtp.mockResolvedValue({ error: null });
-		mockSignInEmailOtp.mockResolvedValue({ error: null });
-
-		const user = userEvent.setup();
-		render(<LoginForm onSwitchToSignup={vi.fn()} />);
-
-		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
-		await user.type(screen.getByLabelText("Email"), "ada@example.com");
-		await user.click(screen.getByRole("button", { name: "Send code" }));
-		await user.type(await screen.findByLabelText("Email code"), "123456");
-		await user.click(screen.getByRole("button", { name: "Verify code" }));
-
-		await waitFor(() => {
-			expect(mockNavigateToDestination).toHaveBeenCalledWith(
-				appRoutes.wrappedSessionsLanded(),
-			);
-		});
-		expect(mockRefreshAuthClientState).toHaveBeenCalledTimes(1);
-	});
-
-	it("uses a card profile destination for new users created from social login", async () => {
-		window.history.replaceState({}, "", "/wrapped?share_id=share-123");
-		mockSignInSocial.mockResolvedValue({ error: null });
-
-		const user = userEvent.setup();
-		render(<LoginForm onSwitchToSignup={vi.fn()} />);
-
-		await user.click(
-			screen.getByRole("button", { name: "Log in with Google" }),
-		);
-
-		await waitFor(() => {
-			expect(mockSignInSocial).toHaveBeenCalledWith({
-				provider: "google",
-				callbackURL: `/?redirect=${encodeURIComponent(
-					"/wrapped?share_id=share-123&flow=sessions-landed",
-				)}`,
-				newUserCallbackURL: "/wrapped?share_id=share-123&flow=card-profile",
-			});
-		});
-	});
-
 	it("shows verbose dev details for email sign in failures", async () => {
 		mockSendVerificationOtp.mockResolvedValue({ error: null });
 		mockSignInEmailOtp.mockResolvedValue({
@@ -617,29 +484,5 @@ describe("auth state refresh", () => {
 			"Likely fix: add the request origin to the API trusted origins",
 		);
 		expect(mockNavigateToDestination).not.toHaveBeenCalled();
-	});
-
-	it("uses a local wrapped preview submit for email sign in when requested", async () => {
-		const user = userEvent.setup();
-		const handlePreviewSubmit = vi.fn();
-
-		render(
-			<LoginForm
-				onEmailPasswordPreviewSubmit={handlePreviewSubmit}
-				onSwitchToSignup={vi.fn()}
-				variant="wrapped-story"
-			/>,
-		);
-
-		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
-		await user.type(await screen.findByLabelText("Email"), "ada@example.com");
-		await user.click(screen.getByRole("button", { name: "Continue" }));
-
-		expect(handlePreviewSubmit).toHaveBeenCalledWith("ada@example.com");
-		expect(mockSignInEmailOtp).not.toHaveBeenCalled();
-		expect(mockNavigateToDestination).not.toHaveBeenCalled();
-		expect(
-			screen.queryByRole("button", { name: "Forgot password?" }),
-		).not.toBeInTheDocument();
 	});
 });

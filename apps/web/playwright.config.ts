@@ -15,10 +15,7 @@ export default defineConfig({
 		},
 	],
 	testDir: ".",
-	testMatch: [
-		"e2e/wrapped-resource-budget.spec.ts",
-		"browser-tests/**/*.pw.ts",
-	],
+	testMatch: ["browser-tests/**/*.pw.ts"],
 	use: {
 		baseURL: "http://127.0.0.1:4173",
 		headless: true,
@@ -28,6 +25,6 @@ export default defineConfig({
 		command: "bun run dev --host 127.0.0.1 --port 4173",
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
-		url: "http://127.0.0.1:4173/dev/wrapped?stage=public&overStats=1",
+		url: "http://127.0.0.1:4173/",
 	},
 });

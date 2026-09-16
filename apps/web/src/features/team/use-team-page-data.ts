@@ -14,7 +14,6 @@ import {
 } from "@/dev/frontend-fixtures";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
-import type { TeamRosterMemberSource } from "@/features/team/data/team-roster-data";
 import {
 	type FullOrganization,
 	useFullOrganization,
@@ -27,6 +26,14 @@ import {
 } from "@/lib/analytics-date-range";
 import { authClient } from "@/lib/auth-client";
 import { orpc } from "@/lib/orpc";
+
+interface TeamRosterMemberSource {
+	userId: string;
+	displayName: string;
+	email?: string | null;
+	imageUrl?: string | null;
+	role?: string | null;
+}
 
 export interface TeamPageDiagnostics {
 	endDate: string;

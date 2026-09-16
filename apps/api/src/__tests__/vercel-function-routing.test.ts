@@ -28,11 +28,11 @@ describe("Vercel function routing", () => {
 				return new Response("unexpected");
 			},
 			functionGroup: "test",
-			publicPathPattern: /^\/wrapped\//u,
+			publicPathPattern: /^\/team\/invite\//u,
 		});
 		const response = await handler(
 			new Request(
-				"https://example.test/api/wrapped?__opaline_path=%2Frpc%2Fhealth",
+				"https://example.test/api/invite?__opaline_path=%2Frpc%2Fhealth",
 			),
 		);
 

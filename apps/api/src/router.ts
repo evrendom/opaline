@@ -37,9 +37,6 @@ import { chatwootRouter } from "./handlers/chatwoot.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
-import { wrappedDecimalClaimRouter } from "./handlers/wrapped-decimal-claim.js";
-import { wrappedResumeRouter } from "./handlers/wrapped-resume.js";
-import { wrappedShareRouter } from "./handlers/wrapped-share.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { readBooleanEnv } from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
@@ -1657,9 +1654,6 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	getOrganizationSessionCount,
 	deleteOrganization,
 	teamInviteLink: teamInviteLinkRouter,
-	wrappedDecimalClaim: wrappedDecimalClaimRouter,
-	wrappedResume: wrappedResumeRouter,
-	wrappedShare: wrappedShareRouter,
 	admin: adminRouter,
 	productAnalytics: productAnalyticsRouter,
 	analytics: analyticsRouter,

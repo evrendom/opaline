@@ -37,10 +37,10 @@ const session = {
 	},
 };
 
-function WrappedLocation() {
+function WelcomeLocation() {
 	const location = useLocation();
 
-	return <div>Wrapped: {location.search}</div>;
+	return <div>Welcome: {location.search}</div>;
 }
 
 describe("DeviceAuthorizationApp", () => {
@@ -49,7 +49,7 @@ describe("DeviceAuthorizationApp", () => {
 		mockTrackAuthenticationAction.mockReset();
 	});
 
-	it("redirects to wrapped after approval when sessions are still missing", async () => {
+	it("redirects to welcome after approval when sessions are still missing", async () => {
 		const fetchMock = vi
 			.spyOn(globalThis, "fetch")
 			.mockResolvedValue(new Response(null, { status: 200 }));
@@ -67,10 +67,7 @@ describe("DeviceAuthorizationApp", () => {
 							/>
 						}
 					/>
-					<Route
-						path={appRoutes.wrappedTeamCard()}
-						element={<WrappedLocation />}
-					/>
+					<Route path={"/welcome"} element={<WelcomeLocation />} />
 				</Routes>
 			</MemoryRouter>,
 		);
@@ -78,9 +75,7 @@ describe("DeviceAuthorizationApp", () => {
 		await user.click(screen.getByRole("button", { name: "Approve" }));
 
 		await waitFor(() => {
-			expect(
-				screen.getByText("Wrapped: ?flow=desktop-ready"),
-			).toBeInTheDocument();
+			expect(screen.getByText("Welcome:")).toBeInTheDocument();
 		});
 
 		expect(fetchMock).toHaveBeenCalledWith("/api/auth/device/approve", {
@@ -93,7 +88,7 @@ describe("DeviceAuthorizationApp", () => {
 		expect(screen.queryByText("CLI login approved")).toBeNull();
 	});
 
-	it("keeps users in wrapped after approval instead of sending them to dashboard", async () => {
+	it("keeps users in welcome after approval instead of sending them to dashboard", async () => {
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response(null, { status: 200 }),
 		);
@@ -111,10 +106,7 @@ describe("DeviceAuthorizationApp", () => {
 							/>
 						}
 					/>
-					<Route
-						path={appRoutes.wrappedTeamCard()}
-						element={<WrappedLocation />}
-					/>
+					<Route path={"/welcome"} element={<WelcomeLocation />} />
 					<Route
 						path={appRoutes.legacyDashboard()}
 						element={<div>Dashboard</div>}
@@ -126,9 +118,7 @@ describe("DeviceAuthorizationApp", () => {
 		await user.click(screen.getByRole("button", { name: "Approve" }));
 
 		await waitFor(() => {
-			expect(
-				screen.getByText("Wrapped: ?flow=desktop-ready"),
-			).toBeInTheDocument();
+			expect(screen.getByText("Welcome:")).toBeInTheDocument();
 		});
 		expect(screen.queryByText("Dashboard")).toBeNull();
 	});

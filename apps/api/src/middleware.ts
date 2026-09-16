@@ -10,7 +10,7 @@ export interface AppContext {
 	authFailure: ApiKeyAuthFailure | null;
 	ingestOperatorAuthorized: boolean;
 	requestId: string;
-	wrappedShareLookupSource: string;
+	publicLookupSource: string;
 }
 
 export interface ApiKeyAuthFailure {
