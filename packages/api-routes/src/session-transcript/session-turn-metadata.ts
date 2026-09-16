@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import {
+	type SessionRequestBillingDimensions,
 	type SessionRequestUsageEvent,
 	summarizeSessionRequestUsage,
 	sumSessionRequestCosts,
@@ -23,7 +24,16 @@ import {
 import type { SessionTurn } from "./session-turns.js";
 import { deriveTranscriptToolActivity } from "./transcript-tool-activity.js";
 
+// Keep malformed billing metadata unpriceable instead of dropping the usage
+// record or silently treating an explicit unsupported tier as standard.
+const billingDimensionSchema = z.string().nullish().catch("<invalid>");
+
 const tokenUsageSchema = z.object({
+	service_tier: billingDimensionSchema,
+	speed: billingDimensionSchema,
+	inference_geo: billingDimensionSchema.transform((value) =>
+		value?.trim().toLowerCase() === "not_available" ? undefined : value,
+	),
 	cache_creation: z
 		.object({
 			ephemeral_1h_input_tokens: z.number().nonnegative().optional(),
@@ -81,12 +91,15 @@ const codexLineSchema = z.object({
 			info: z
 				.object({
 					last_token_usage: tokenUsageSchema.optional(),
+					service_tier: billingDimensionSchema,
 					model_context_window: z.number().positive().optional(),
 					total_token_usage: tokenUsageSchema.optional(),
 				})
 				.nullable()
 				.optional(),
 			model: z.string().optional(),
+			model_provider: billingDimensionSchema,
+			service_tier: billingDimensionSchema,
 			name: z.string().optional(),
 			input: z.string().optional(),
 			output: z.unknown().optional(),
@@ -277,6 +290,7 @@ function addUsageEvent(
 	at: string,
 	model: string | undefined,
 	inputIncludesCache: boolean,
+	billing: SessionRequestBillingDimensions,
 	modelContextWindow?: number,
 ) {
 	const cacheReadInputTokens =
@@ -310,6 +324,7 @@ function addUsageEvent(
 	}
 
 	builder.usageEvents.push({
+		...billing,
 		at,
 		cacheCreation1hInputTokens,
 		cacheCreation5mInputTokens,
@@ -427,6 +442,11 @@ function extractClaudeTurnMetadata(
 				line.timestamp,
 				line.message.model ?? fallbackModel,
 				false,
+				{
+					serviceTier: line.message.usage.service_tier,
+					inferenceSpeed: line.message.usage.speed,
+					inferenceGeo: line.message.usage.inference_geo,
+				},
 			);
 		}
 	}
@@ -490,6 +510,7 @@ function extractCodexTurnMetadata(
 	fallbackModel: string | undefined,
 ) {
 	let currentModel = fallbackModel;
+	let modelProvider: string | null | undefined;
 	let previousTokenUsageSignature: string | undefined;
 	const graph = buildCodexActivityGraph(content);
 	const graphOperations = [
@@ -572,6 +593,9 @@ function extractCodexTurnMetadata(
 		}
 
 		const line = result.data;
+		if (line.type === "session_meta") {
+			modelProvider = line.payload?.model_provider;
+		}
 		if (line.type === "turn_context" && line.payload?.model) {
 			currentModel = line.payload.model;
 		}
@@ -615,6 +639,13 @@ function extractCodexTurnMetadata(
 			line.timestamp,
 			currentModel,
 			true,
+			{
+				modelProvider,
+				// The response tier is request-local. A requested Fast setting must not
+				// override a response that actually ran (and was billed) as default.
+				serviceTier:
+					line.payload.info?.service_tier ?? line.payload.service_tier,
+			},
 			line.payload.info?.model_context_window,
 		);
 	}

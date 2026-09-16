@@ -6,12 +6,15 @@ import {
 	setDefaultTimeout,
 	test,
 } from "bun:test";
+import assert from "node:assert";
+import { extractTranscriptUsageMetrics } from "@rudel/api-routes";
 import {
 	ingestRudelSessionAnalytics,
 	ingestRudelUsageEvents,
 	type RudelSessionAnalyticsRow,
 	type RudelUsageEventsRow,
 } from "@rudel/ch-schema/generated";
+import { extractUsageEvents, type UsageEventSource } from "@rudel/usage-events";
 import { createClickHouseExecutor } from "../clickhouse.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import {
@@ -22,6 +25,7 @@ import {
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
 } from "../services/usage-event-analytics.service.js";
+import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
 
 setDefaultTimeout(30_000);
 
@@ -283,6 +287,144 @@ afterAll(async () => {
 });
 
 describe("usage-event analytics ClickHouse rollups", () => {
+	test("matches detail and overview costs from actual Fast and standard transcript records", async () => {
+		const billingOrg = `${organizationId}_billing`;
+		const at = "2026-09-12T12:00:00.000Z";
+		const requests = [
+			{ infoTier: "fast", payloadTier: undefined },
+			{ infoTier: undefined, payloadTier: "priority" },
+			{ infoTier: "default", payloadTier: "fast" },
+			{ infoTier: undefined, payloadTier: undefined },
+		];
+		const cases: {
+			id: string;
+			source: UsageEventSource;
+			content: string;
+			cost: number;
+		}[] = [
+			{
+				id: "codex_mixed_tiers",
+				source: "codex",
+				cost: 9.3,
+				content: [
+					{ type: "session_meta", payload: { model_provider: "openai" } },
+					{
+						type: "turn_context",
+						payload: { model: "gpt-6-astra", service_tier: "fast" },
+					},
+					...requests.map((request, index) => ({
+						type: "event_msg",
+						timestamp: at,
+						payload: {
+							type: "token_count",
+							service_tier: request.payloadTier,
+							info: {
+								service_tier: request.infoTier,
+								last_token_usage: {
+									input_tokens: 150000,
+									cached_input_tokens: 50000,
+									output_tokens: 10000,
+								},
+								total_token_usage: {
+									input_tokens: 150000 * (index + 1),
+									cached_input_tokens: 50000 * (index + 1),
+									output_tokens: 10000 * (index + 1),
+								},
+							},
+						},
+					})),
+				]
+					.map((entry) => JSON.stringify(entry))
+					.join("\n"),
+			},
+			{
+				id: "claude_fast_us",
+				source: "claude_code",
+				cost: 1.65,
+				content: JSON.stringify({
+					type: "assistant",
+					timestamp: at,
+					message: {
+						id: "billing-message",
+						model: "claude-opus-5",
+						usage: {
+							input_tokens: 100000,
+							output_tokens: 10000,
+							service_tier: "priority",
+							speed: "fast",
+							inference_geo: "us",
+						},
+					},
+				}),
+			},
+		];
+		try {
+			for (const entry of cases) {
+				const extraction = extractUsageEvents({
+					content: entry.content,
+					organizationId: billingOrg,
+					userId,
+					sessionId: entry.id,
+					source: entry.source,
+					subagents: {},
+				});
+				assert(
+					extraction.status === "complete",
+					JSON.stringify(extraction.diagnostics),
+				);
+				const rows = buildUsageEventRows(
+					{
+						contentSha256: "a".repeat(64),
+						extraction,
+						filterVersion: 1,
+						generation: "1",
+						ingestedAt: new Date(at),
+						organizationId: billingOrg,
+						sessionDate: new Date(at),
+						sessionId: entry.id,
+						source: entry.source,
+						userId,
+					},
+					[],
+				);
+				await ingestRudelSessionAnalytics(
+					executor,
+					[
+						{
+							...buildSessionAnalyticsRow(entry.id),
+							organization_id: billingOrg,
+							source: entry.source,
+							session_date: "2026-09-12 12:00:00.000",
+						},
+					],
+					{ validate: true },
+				);
+				await ingestRudelUsageEvents(executor, [...rows], { validate: true });
+				const overview = await executor.query<{
+					estimated_cost: number;
+					cost_is_complete: number;
+				}>({
+					query: `WITH ${buildUsageEventAnalyticsCte({ sessionIdParam: "sessionId" }, false)}
+      SELECT estimated_cost, cost_is_complete FROM usage_analytics_sessions
+      LIMIT 1 SETTINGS max_execution_time = 10, max_rows_to_read = 1000000`,
+					query_params: { orgId: billingOrg, sessionId: entry.id },
+				});
+				const detail = extractTranscriptUsageMetrics(entry.content, undefined);
+				expect(overview).toHaveLength(1);
+				expect(overview[0]?.cost_is_complete).toBe(1);
+				expect(overview[0]?.estimated_cost).toBeCloseTo(entry.cost, 8);
+				expect(detail.estimatedCost).toBeCloseTo(entry.cost, 8);
+			}
+		} finally {
+			for (const table of ["usage_events", "session_analytics"]) {
+				await executor.execute({
+					query: `DELETE FROM rudel.${table} WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3`,
+					query_params: { orgId: billingOrg },
+				});
+			}
+		}
+	});
+
 	test("reprices historical unresolved identities at each request date without losing unknown model display", async () => {
 		const pricingOrg = `${organizationId}_pricing`;
 		const cases = [

@@ -27,6 +27,14 @@ Prices are selected by each usage event's date, never the session's start, uploa
 
 To estimate correctly, retain the provider/model ID, timestamp, uncached input, cached input, separate cache-write classes, output tokens (reasoning tokens must not be counted again), full input-context size, processing tier, inference speed, and billing geography. Unsupported rates, conflicting model/provider evidence or unsupported billing dimensions remain unknown, not zero. Missing dimensions retain the existing standard-processing/default-region assumptions; these estimates do not include subscription billing, negotiated discounts or tool fees. Published Batch/Flex discounts and OpenAI regional-processing rules are not added by this scoped update; explicit unsupported dimensions continue to return unknown.
 
+## Request-level Fast billing
+
+Both overview and detail estimates apply the recorded billing dimensions for each request. Codex reads `info.service_tier`, falling back to the token-count payload's `service_tier`; `default` on the response wins over a requested Fast setting. The tier is not carried forward to a later request that lacks it. [OpenAI renamed Priority processing to Fast mode on July 30, 2026](https://developers.openai.com/api/docs/guides/fast-mode); both `priority` and `fast` identify the same premium, applied once. Astra and current Sol Fast rates are 2× standard in each supported context band, with the base rate still selected by the request's UTC date.
+
+Claude uses `usage.speed` to identify Fast mode. Its `service_tier: priority` does not itself apply the OpenAI premium. Detail calculations also preserve Claude's inference geography and Codex's recorded model provider, so those dimensions are no longer silently lost. Unsupported Fast rates (including Fable 5.1), unknown tiers, malformed billing fields and unsupported providers remain unpriced in detail. Claude's documented `not_available` geography sentinel retains the existing default-region estimate.
+
+A transcript without billing metadata still produces a standard-rate estimate. It is not proof that Fast was disabled, and current account settings cannot establish the tier used by old requests. The reported September 12 Astra example contains no recorded tier or speed, so its $791.94 estimate remains based on standard rates.
+
 ## Existing sessions and display
 
 The overview now displays a recorded main model even if its price is unknown. Synthetic, missing and conflicting usage records do not provide a model identity. Detail summaries recover a recorded primary model when analytics metadata contains a blank or `unknown`/`<synthetic>` placeholder.
