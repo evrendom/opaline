@@ -1,5 +1,6 @@
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { waitForDemoActivation } from "@/features/demo/demo-activation";
 import { getApiBaseUrl } from "./api-base-url";
 import { resetChatwoot } from "./chatwoot";
 import { resetProductAnalytics } from "./product-analytics";
@@ -10,6 +11,15 @@ export const authClient = createAuthClient({
 	basePath:
 		import.meta.env.MODE === "product-demo" ? "/api/demo/auth" : "/api/auth",
 	plugins: [organizationClient(), emailOTPClient()],
+	fetchOptions: {
+		onRequest: (context) => {
+			// Shared hooks subscribe during preparation; only Explore may
+			// release their auth reads. The real app has no such gate.
+			if (import.meta.env.MODE === "product-demo") {
+				return waitForDemoActivation(context.signal);
+			}
+		},
+	},
 });
 
 export function refreshAuthClientState() {

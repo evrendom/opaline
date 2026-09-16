@@ -1,4 +1,4 @@
-import { GlimmProvider, type SweepHandle, useGlimm } from "glimm/react";
+import type { SweepHandle } from "glimm";
 import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
@@ -11,28 +11,27 @@ import { getCliConnectionTone } from "../../../web/src/features/cli-onboarding/c
 import { CliConnectionStatus } from "../../../web/src/features/cli-onboarding/cli-connection-status";
 import { useCliOnboarding } from "../../../web/src/features/cli-onboarding/use-cli-onboarding";
 import { ProductBrand } from "../../../web/src/features/shell/components/product-brand";
-import { usesSafariDemoMotion } from "../scripts/demo-browser";
-import { INSTANT_V2_GLIMM_PALETTE } from "../scripts/instant-v2-glimm-palette";
 import {
 	getInstantV2ScrollContainer,
 	getInstantV2ScrollPosition,
 } from "../scripts/instant-v2-scroll";
+import { scheduleProductDemoPreparation } from "../scripts/prepare-product-demo";
 import {
 	animateSafariDemoWindow,
 	captureSafariDemoLayout,
 	type SafariDemoLayout,
-	startSafariDemoSweep,
+	startDemoSweep,
 } from "./instant-v2-safari-motion";
 import "./InstantV2DemoExperience.css";
 
 /* ─────────────────────────────────────────────────────────
- * CHROME STORYBOARD — glimm.dev's documented sweep
+ * DEMO STORYBOARD — compositor sweep, no first-click WebGL setup
  *
- *     0ms   pin the WebGL surface in viewport space; prism band enters
+ *     0ms   pin the sweep in viewport space; prism band enters
  *   180ms   dashboard opens behind the pinned footer copy; top stays anchored
- *   400ms   provider midpoint passes while the dashboard continues opening
+ *   400ms   sweep midpoint passes while the dashboard continues opening
  *   800ms   dashboard reaches the viewport; only then bottom radii square off
- * 1,150ms   provider-owned outro finishes on the settled layout
+ * 1,150ms   sweep outro finishes on the settled layout
  *
  * Safari uses batched content projections with the same 180ms lead-in and
  * 620ms resize curve. Its sweep shares the window's start instant.
@@ -41,15 +40,12 @@ import "./InstantV2DemoExperience.css";
 const DEMO_ENTER_EVENT = "instant-v2:demo-enter";
 const COPY_FEEDBACK_MS = 2_000;
 const COPY_RESET_MS = 250;
-const GLIMM_SWEEP_MS = 800;
-const GLIMM_OUTRO_MS = 350;
-const GLIMM_MIDPOINT = 0.5;
-const GLIMM_PEAK_ALPHA = 0.6;
-const GLIMM_CANVAS_Z_INDEX = 100_000;
-const GLIMM_VISUAL_ENTRY_DELAY_MS = 180;
+const DEMO_SWEEP_MS = 800;
+const DEMO_OUTRO_MS = 350;
+const DEMO_VISUAL_ENTRY_DELAY_MS = 180;
 const DEMO_BAR_HEIGHT_PX = 42;
-const GLIMM_TOTAL_DURATION_MS = GLIMM_SWEEP_MS + GLIMM_OUTRO_MS;
-const DEMO_LAYOUT_DURATION_MS = GLIMM_SWEEP_MS - GLIMM_VISUAL_ENTRY_DELAY_MS;
+const DEMO_TOTAL_DURATION_MS = DEMO_SWEEP_MS + DEMO_OUTRO_MS;
+const DEMO_LAYOUT_DURATION_MS = DEMO_SWEEP_MS - DEMO_VISUAL_ENTRY_DELAY_MS;
 const DEMO_LAYOUT_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const DEMO_LAYOUT_DELAY_CSS_PROPERTY = "--instant-v2-demo-layout-delay";
 const DEMO_LAYOUT_DURATION_CSS_PROPERTY = "--instant-v2-demo-layout-duration";
@@ -118,24 +114,6 @@ interface DemoDomDeactivation {
 }
 
 export function InstantV2DemoExperience() {
-	return (
-		<GlimmProvider
-			easing="easeInOutCubic"
-			midpoint={GLIMM_MIDPOINT}
-			outroMs={GLIMM_OUTRO_MS}
-			palette={INSTANT_V2_GLIMM_PALETTE}
-			peakAlpha={GLIMM_PEAK_ALPHA}
-			reducedMotion="instant"
-			sweepMs={GLIMM_SWEEP_MS}
-			zIndex={GLIMM_CANVAS_Z_INDEX}
-		>
-			<DemoExperienceController />
-		</GlimmProvider>
-	);
-}
-
-function DemoExperienceController() {
-	const { sweep } = useGlimm();
 	const [demoBarStage, setDemoBarStage] = useState<DemoBarStage>("hidden");
 	const onboarding = useCliOnboarding(demoBarStage === "visible", {
 		mode: "demo",
@@ -210,17 +188,14 @@ function DemoExperienceController() {
 		setDemoBarStage("entering");
 		for (const enterButton of getDemoEnterButtons()) enterButton.inert = true;
 
-		const safariMotion = usesSafariDemoMotion(navigator.userAgent);
-		if (safariMotion) activateDemo();
-		const handle = safariMotion
-			? startSafariDemoSweep("ltr", layoutAnimationRef.current)
-			: sweep(() => undefined, { direction: "ltr" });
+		activateDemo();
+		const handle = startDemoSweep("ltr", layoutAnimationRef.current);
 		activeSweepRef.current = handle;
-		if (!safariMotion) activateDemo();
+		setProductDemoActive(true);
 
 		try {
-			// Keep the existing product DOM resizing naturally. First-use React,
-			// authentication and data work starts only after both animations finish.
+			// The app activates independently. Only the bar's presentation waits
+			// for the sweep; product controls can respond during the transition.
 			await Promise.all([
 				handle.done,
 				layoutAnimationRef.current?.finished.catch(() => undefined),
@@ -229,14 +204,13 @@ function DemoExperienceController() {
 			if (!document.documentElement.hasAttribute("data-instant-v2-demo")) {
 				activateDemo();
 			}
-			mountProductDemo();
 			stageRef.current = "demo";
 			setDemoBarStage("visible");
 		} catch (error) {
 			if (activeSweepRef.current !== handle) return;
 			console.error("Unable to enter the instant-v2 product demo", error);
 			if (document.documentElement.hasAttribute("data-instant-v2-demo")) {
-				mountProductDemo();
+				setProductDemoActive(true);
 				stageRef.current = "demo";
 				setDemoBarStage("visible");
 				return;
@@ -247,7 +221,7 @@ function DemoExperienceController() {
 		} finally {
 			if (activeSweepRef.current === handle) activeSweepRef.current = null;
 		}
-	}, [activateDemo, sweep]);
+	}, [activateDemo]);
 
 	const exitDemo = useCallback(async () => {
 		if (
@@ -258,16 +232,13 @@ function DemoExperienceController() {
 		}
 
 		stageRef.current = "exiting";
+		setProductDemoActive(false);
 		setDemoEnterDisabled(true);
 		setDemoBarStage("exiting");
 		setDemoExitBackgroundState(true);
-		const safariMotion = usesSafariDemoMotion(navigator.userAgent);
-		if (safariMotion) deactivateDemo();
-		const handle = safariMotion
-			? startSafariDemoSweep("rtl", layoutAnimationRef.current)
-			: sweep(() => undefined, { direction: "rtl" });
+		deactivateDemo();
+		const handle = startDemoSweep("rtl", layoutAnimationRef.current);
 		activeSweepRef.current = handle;
-		if (!safariMotion) deactivateDemo();
 
 		try {
 			await handle.done;
@@ -280,7 +251,7 @@ function DemoExperienceController() {
 			setDemoEnterDisabled(false);
 			getDemoEnterButton()?.focus({ preventScroll: true });
 		}
-	}, [deactivateDemo, sweep]);
+	}, [deactivateDemo]);
 
 	const requestExit = useCallback(() => {
 		if (
@@ -401,19 +372,7 @@ function DemoExperienceController() {
 		if (window.location.hash === "#demo") void enterDemo();
 	}, [enterDemo]);
 
-	useEffect(() => {
-		if (demoBarStage === "visible" && !onboarding.personalView) {
-			const frame = document.querySelector<HTMLIFrameElement>(
-				"[data-instant-v2-product-iframe]",
-			);
-			if (!frame || frame.getAttribute("src") === "about:blank") return;
-			frame?.focus({ preventScroll: true });
-			frame?.contentWindow?.postMessage(
-				"opaline:focus-demo",
-				new URL(frame.src, window.location.href).origin,
-			);
-		}
-	}, [demoBarStage, onboarding.personalView]);
+	useEffect(() => scheduleProductDemoPreparation(prepareProductDemo), []);
 
 	if (demoBarStage === "hidden") return null;
 
@@ -649,7 +608,7 @@ function applyDemoDom(backgroundRegions: DemoDomSnapshot["backgroundRegions"]) {
 	const root = document.documentElement;
 	root.style.setProperty(
 		DEMO_LAYOUT_DELAY_CSS_PROPERTY,
-		`${GLIMM_VISUAL_ENTRY_DELAY_MS}ms`,
+		`${DEMO_VISUAL_ENTRY_DELAY_MS}ms`,
 	);
 	root.style.setProperty(
 		DEMO_LAYOUT_DURATION_CSS_PROPERTY,
@@ -827,7 +786,7 @@ function setDemoExitBackgroundState(active: boolean) {
 		setDemoLayoutSettled(false);
 		root.style.setProperty(
 			"--instant-v2-demo-exit-duration",
-			`${GLIMM_TOTAL_DURATION_MS}ms`,
+			`${DEMO_TOTAL_DURATION_MS}ms`,
 		);
 		return;
 	}
@@ -853,7 +812,7 @@ function animateDashboardBounds(
 		return null;
 	}
 	const timing: KeyframeAnimationOptions = {
-		delay: GLIMM_VISUAL_ENTRY_DELAY_MS,
+		delay: DEMO_VISUAL_ENTRY_DELAY_MS,
 		duration: DEMO_LAYOUT_DURATION_MS,
 		easing: DEMO_LAYOUT_EASING,
 		fill: "backwards",
@@ -901,27 +860,51 @@ function getDemoEnterButton() {
 	);
 }
 
-function mountProductDemo() {
+function prepareProductDemo() {
 	if (document.documentElement.hasAttribute("data-cli-onboarding")) return;
+	const frame = getProductDemoFrame();
+	if (!frame || frame.dataset.preparationRequested) return;
+	frame.dataset.preparationRequested = "true";
+	postProductDemoMessage(frame, "opaline:prepare-demo");
+}
+
+function setProductDemoActive(active: boolean) {
+	if (document.documentElement.hasAttribute("data-cli-onboarding")) return;
+	const frame = getProductDemoFrame();
+	if (!frame) return;
+	frame.dataset.demoActive = String(active);
+	frame.tabIndex = active ? 0 : -1;
+	postProductDemoMessage(
+		frame,
+		active ? "opaline:activate-demo" : "opaline:deactivate-demo",
+	);
+	if (active) frame.focus({ preventScroll: true });
+}
+
+function getProductDemoFrame() {
 	const frame = document.querySelector<HTMLIFrameElement>(
 		"[data-instant-v2-product-iframe]",
 	);
-	if (!frame || frame.dataset.activationRequested) return;
-	frame.dataset.activationRequested = "true";
-	const activate = () => {
-		if (
-			frame.getAttribute("src") === "about:blank" ||
-			document.documentElement.hasAttribute("data-cli-onboarding")
-		)
-			return;
-		frame.contentWindow?.postMessage(
-			"opaline:activate-demo",
-			new URL(frame.src, window.location.href).origin,
-		);
-	};
-	// If Explore beats the frame's initial load, deliver activation once ready.
-	frame.addEventListener("load", activate, { once: true });
-	activate();
+	if (frame && !frame.dataset.bootListener) {
+		frame.dataset.bootListener = "true";
+		// Preserve the latest intent if entry/exit beats the iframe's load.
+		frame.addEventListener("load", () => {
+			if (document.documentElement.hasAttribute("data-cli-onboarding")) return;
+			if (frame.dataset.demoActive === "true")
+				postProductDemoMessage(frame, "opaline:activate-demo");
+			else if (frame.dataset.preparationRequested)
+				postProductDemoMessage(frame, "opaline:prepare-demo");
+		});
+	}
+	return frame;
+}
+
+function postProductDemoMessage(frame: HTMLIFrameElement, message: string) {
+	if (frame.getAttribute("src") === "about:blank") return;
+	frame.contentWindow?.postMessage(
+		message,
+		new URL(frame.src, window.location.href).origin,
+	);
 }
 
 function getDemoEnterButtons() {
@@ -931,7 +914,7 @@ function getDemoEnterButtons() {
 }
 
 function setDemoEnterDisabled(disabled: boolean) {
-	// The landing geometry finishes before the glimm outro. Don't accept a
+	// The landing geometry finishes before the sweep outro. Don't accept a
 	// re-entry click until the controller is ready to handle it again.
 	for (const button of getDemoEnterButtons()) {
 		if (button instanceof HTMLButtonElement) button.disabled = disabled;
