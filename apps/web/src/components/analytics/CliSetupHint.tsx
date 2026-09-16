@@ -1,75 +1,26 @@
 import { cn } from "@/lib/utils";
 import { type CliSetupStepId, cliSetupCommands } from "./cli-setup-commands";
-import { WrappedCliSetupCommand } from "./WrappedCliSetupCommand";
 
 export { cliSetupCommands };
 export type { CliSetupStepId };
 
 export function CliSetupHint({
 	completedStepIds = [],
-	currentStepId,
-	hideAlternateCommandCaption = false,
-	variant = "default",
 }: {
 	completedStepIds?: readonly CliSetupStepId[];
-	currentStepId?: CliSetupStepId | null;
-	hideAlternateCommandCaption?: boolean;
-	variant?: "default" | "wrapped-story";
 }) {
 	const completedSteps = new Set(completedStepIds);
-	const isWrappedStory = variant === "wrapped-story";
-	const currentStepIndex =
-		currentStepId === undefined || currentStepId === null
-			? null
-			: cliSetupCommands.findIndex((step) => step.id === currentStepId);
-	const containerClassName = cn(
-		isWrappedStory
-			? "rudel-wrapped-setup-steps"
-			: "mt-4 mx-auto grid w-full max-w-xl gap-3",
-	);
-
-	if (!isWrappedStory) {
-		return (
-			<div className={containerClassName}>
-				{cliSetupCommands.map((step) => (
-					<DefaultCliSetupCommand
-						key={step.command}
-						label={step.title}
-						command={step.command}
-						isComplete={completedSteps.has(step.id)}
-					/>
-				))}
-			</div>
-		);
-	}
-
 	return (
-		<ol className={containerClassName}>
-			{cliSetupCommands.map((step, index) => (
-				<WrappedCliSetupCommand
+		<div className="mt-4 mx-auto grid w-full max-w-xl gap-3">
+			{cliSetupCommands.map((step) => (
+				<DefaultCliSetupCommand
 					key={step.command}
 					label={step.title}
-					alternateCommand={step.alternateCommand}
-					alternateCommandCaption={
-						hideAlternateCommandCaption
-							? undefined
-							: step.alternateCommandCaption
-					}
 					command={step.command}
-					commandCaption={step.commandCaption}
-					description={step.description}
-					index={index}
-					isActive={currentStepId === step.id}
 					isComplete={completedSteps.has(step.id)}
-					isUpcoming={
-						currentStepIndex !== null &&
-						currentStepId !== step.id &&
-						index > currentStepIndex &&
-						!completedSteps.has(step.id)
-					}
 				/>
 			))}
-		</ol>
+		</div>
 	);
 }
 

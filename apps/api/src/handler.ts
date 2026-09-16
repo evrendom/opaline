@@ -32,14 +32,12 @@ import {
 	PRODUCTION_SECURITY_HEADERS,
 } from "./lib/http-response-policy.js";
 import { isAuthorizedIngestOperatorRequest } from "./lib/ingest-quiescence.js";
-import { resolveWrappedShareLookupSource } from "./lib/wrapped-share-lookup-source.js";
+import { resolvePublicLookupSource } from "./lib/public-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
-import { getPublicWrappedShareWithSocialImage } from "./services/wrapped-share.service.js";
-import { getWrappedShareCardImagePng } from "./services/wrapped-share-card-image.js";
 
 await setupLogging();
 
@@ -168,11 +166,6 @@ const rpcHandler = new RPCHandler(router, {
 	],
 });
 
-const WRAPPED_PUBLIC_SHARE_ID_SEGMENT = "([A-Za-z0-9_-]+)";
-const WRAPPED_SHARE_CARD_IMAGE_PATH_PATTERN = new RegExp(
-	`^/wrapped/${WRAPPED_PUBLIC_SHARE_ID_SEGMENT}/x-card\\.png$`,
-	"u",
-);
 function corsHeaders(origin: string | null): Record<string, string> {
 	if (!origin || !trustedOrigins.includes(origin)) return {};
 	return {
@@ -231,7 +224,7 @@ export interface FetchHandlerFallbackInput {
 	readonly request: Request;
 	readonly requestId: string;
 	readonly url: URL;
-	readonly wrappedShareLookupSource: string;
+	readonly publicLookupSource: string;
 }
 
 export interface FetchHandlerOptions {
@@ -315,7 +308,7 @@ export async function fetchHandler(
 	}
 
 	const start = performance.now();
-	const wrappedShareLookupSource = resolveWrappedShareLookupSource({
+	const publicLookupSource = resolvePublicLookupSource({
 		flyClientIp: process.env.FLY_APP_NAME
 			? request.headers.get("fly-client-ip")
 			: null,
@@ -332,7 +325,7 @@ export async function fetchHandler(
 				url,
 				cors,
 				requestId,
-				wrappedShareLookupSource,
+				publicLookupSource,
 				options.fallback,
 			);
 			const finalResponse =
@@ -405,9 +398,20 @@ async function handleRequest(
 	url: URL,
 	cors: Record<string, string>,
 	requestId: string,
-	wrappedShareLookupSource: string,
+	publicLookupSource: string,
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
+	if (
+		/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(url.pathname) ||
+		/^\/rpc\/(?:wrappedShare|wrappedResume|wrappedDecimalClaim|analytics\/wrapped)(?:\/|$)/u.test(
+			url.pathname,
+		)
+	) {
+		return new Response("Wrapped has been retired.", {
+			status: 410,
+			headers: cors,
+		});
+	}
 	if (
 		url.pathname === "/api/home" &&
 		(request.method === "GET" || request.method === "HEAD")
@@ -446,10 +450,9 @@ async function handleRequest(
 	) {
 		const response = await handleCliConnectionRequest(request, {
 			allowedOrigins: trustedOrigins,
-			source: wrappedShareLookupSource,
+			source: publicLookupSource,
 			getUserId: async (req) =>
-				(await getContext(req, requestId, wrappedShareLookupSource)).user?.id ??
-				null,
+				(await getContext(req, requestId, publicLookupSource)).user?.id ?? null,
 			getBrowserUserId: async (req) =>
 				(await auth.api.getSession({ headers: req.headers }))?.user.id ?? null,
 		});
@@ -470,15 +473,6 @@ async function handleRequest(
 	}
 	const invite = getTeamInviteRoute(url.pathname);
 	if (invite?.image) return handleTeamInviteImageRequest(request, invite.token);
-	const wrappedShareCardImageId = getWrappedShareCardImageId(url.pathname);
-	if (wrappedShareCardImageId) {
-		return handleWrappedShareCardImageRequest({
-			cors,
-			method: request.method,
-			shareId: wrappedShareCardImageId,
-			source: wrappedShareLookupSource,
-		});
-	}
 
 	// Defense in depth: block Better Auth's built-in org deletion route.
 	// Opaline has its own guarded deletion path via the RPC router.
@@ -534,7 +528,7 @@ async function handleRequest(
 
 	const { matched, response } = await rpcHandler.handle(request, {
 		prefix: "/rpc",
-		context: await getContext(request, requestId, wrappedShareLookupSource),
+		context: await getContext(request, requestId, publicLookupSource),
 	});
 
 	if (matched) {
@@ -564,7 +558,7 @@ async function handleRequest(
 		request,
 		requestId,
 		url,
-		wrappedShareLookupSource,
+		publicLookupSource,
 	});
 	if (fallbackResponse) {
 		return fallbackResponse;
@@ -582,84 +576,10 @@ async function handleRequest(
 	return new Response("Not found", { status: 404, headers: cors });
 }
 
-async function handleWrappedShareCardImageRequest(input: {
-	cors: Record<string, string>;
-	method: string;
-	shareId: string;
-	source: string;
-}) {
-	const { cors, method, shareId, source } = input;
-	if (method !== "GET" && method !== "HEAD") {
-		return new Response("Method not allowed", {
-			headers: { ...cors, Allow: "GET, HEAD" },
-			status: 405,
-		});
-	}
-
-	try {
-		const share = await getPublicWrappedShareWithSocialImage(shareId, source);
-
-		if (!share) {
-			return new Response("Not found", { headers: cors, status: 404 });
-		}
-
-		const image = getWrappedShareCardImagePng(share.socialImageDataUrl);
-		if (!image) {
-			return new Response("Not found", { headers: cors, status: 404 });
-		}
-
-		const headers = {
-			...cors,
-			"Cache-Control": "public, max-age=300, s-maxage=86400",
-			"Content-Length": image.byteLength.toString(),
-			"Content-Type": "image/png",
-		};
-
-		return new Response(method === "HEAD" ? null : image, {
-			headers,
-			status: 200,
-		});
-	} catch (error) {
-		if (isTooManyRequestsError(error)) {
-			return new Response("Too many requests", {
-				headers: cors,
-				status: 429,
-			});
-		}
-
-		logger.error("Failed to render wrapped share card image: {error}", {
-			error: String(error),
-		});
-		return new Response("Could not render image", {
-			headers: cors,
-			status: 500,
-		});
-	}
-}
-
-function getWrappedShareCardImageId(pathname: string) {
-	return getFirstPathMatch(pathname, WRAPPED_SHARE_CARD_IMAGE_PATH_PATTERN);
-}
-
-function getFirstPathMatch(pathname: string, pattern: RegExp) {
-	const match = pathname.match(pattern);
-	const shareId = match?.[1];
-
-	if (!shareId) {
-		return null;
-	}
-
-	return shareId;
-}
-
-function isTooManyRequestsError(error: unknown) {
-	return error instanceof ORPCError && error.code === "TOO_MANY_REQUESTS";
-}
-
 async function getContext(
 	request: Request,
 	requestId: string,
-	wrappedShareLookupSource: string,
+	publicLookupSource: string,
 ) {
 	const session = await auth.api.getSession({
 		headers: request.headers,
@@ -744,7 +664,7 @@ async function getContext(
 			request.headers,
 		),
 		requestId,
-		wrappedShareLookupSource,
+		publicLookupSource,
 	};
 }
 

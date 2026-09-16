@@ -4,10 +4,6 @@ import {
 	getTeamInviteRoute,
 	handleTeamInvitePageRequest,
 } from "./handlers/team-invite-page-http.js";
-import {
-	getWrappedPublicShareId,
-	handleWrappedPublicPageRequest,
-} from "./handlers/wrapped-share-page-http.js";
 
 export type FlyStaticFallback = (
 	input: FetchHandlerFallbackInput,
@@ -20,7 +16,7 @@ export function createFlyStaticFallback(): FlyStaticFallback {
 		process.env.STATIC_DIR ?? "public",
 	);
 
-	return async ({ cors, request, url, wrappedShareLookupSource }) => {
+	return async ({ request, url }) => {
 		const file = Bun.file(join(staticDirectory, url.pathname));
 		if (await file.exists()) {
 			return new Response(file);
@@ -31,7 +27,6 @@ export function createFlyStaticFallback(): FlyStaticFallback {
 			return null;
 		}
 
-		const shareId = getWrappedPublicShareId(url.pathname);
 		const invite = getTeamInviteRoute(url.pathname);
 		if (invite && !invite.image) {
 			return handleTeamInvitePageRequest({
@@ -40,16 +35,6 @@ export function createFlyStaticFallback(): FlyStaticFallback {
 				indexHtml: await indexFile.text(),
 			});
 		}
-		if (!shareId) {
-			return new Response(indexFile);
-		}
-
-		return handleWrappedPublicPageRequest({
-			cors,
-			indexHtml: await indexFile.text(),
-			request,
-			shareId,
-			source: wrappedShareLookupSource,
-		});
+		return new Response(indexFile);
 	};
 }

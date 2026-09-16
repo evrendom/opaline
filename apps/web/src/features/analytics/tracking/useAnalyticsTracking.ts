@@ -1,7 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useOptionalDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
-import { getWebAcquisitionAttribution } from "@/lib/acquisition-attribution";
 import { authClient } from "@/lib/auth-client";
 import {
 	type AppPageName,
@@ -13,15 +12,6 @@ import {
 	captureDashboardNavigationClicked,
 	captureOrganizationActionTriggered,
 	captureUiUtilityUsed,
-	captureWrappedActivationCompleted,
-	captureWrappedOnboardingStarted,
-	captureWrappedProfileCompleted,
-	captureWrappedReferredSignupCompleted,
-	captureWrappedShareActionTriggered,
-	captureWrappedShareCreated,
-	captureWrappedShareCtaClicked,
-	captureWrappedShareViewed,
-	captureWrappedStoryStarted,
 	type DashboardPageName,
 	getAnalyticsPageName,
 	isDashboardPageName,
@@ -33,22 +23,6 @@ export interface UseAnalyticsOptions {
 }
 
 type ProductAnalyticsActionResult = "started" | "succeeded" | "failed";
-
-type WrappedGrowthLoopPhase =
-	| "exposure"
-	| "conversion"
-	| "activation"
-	| "production"
-	| "distribution";
-
-type WrappedGrowthLoopEntrySource =
-	| "public_share"
-	| "share_redirect"
-	| "wrapped_team_card"
-	| "direct";
-
-type WrappedShareAction = "copy" | "copy_profile_url" | "download" | "share";
-type WrappedShareDestination = "clipboard" | "download" | "x";
 
 type AnalyticsOverrides = {
 	dateRangeDays?: number;
@@ -70,55 +44,6 @@ type DashboardAnalyticsPayload = AnalyticsPayload & {
 	organization_id: string;
 	user_id: string;
 };
-
-type WrappedGrowthLoopInput = {
-	sourceComponent: string;
-	entrySource: WrappedGrowthLoopEntrySource;
-	sourceShareId?: string;
-	shareId?: string;
-	redirectTarget?: string;
-	archetypeId?: string;
-	publicPayloadVersion?: number;
-	isAuthenticatedViewer?: boolean;
-	isNewUser?: boolean;
-	launchChannel?: string;
-	referrerDomain?: string;
-	resolvedEntryRoute?: string;
-	activationState?: string;
-	shareAction?: WrappedShareAction;
-	shareDestination?: WrappedShareDestination;
-	utmCampaign?: string;
-	utmContent?: string;
-	utmMedium?: string;
-	utmSource?: string;
-	utmTerm?: string;
-} & AnalyticsOverrides;
-
-type WrappedGrowthLoopPayload = AnalyticsPayload & {
-	growth_loop: "wrapped_profile_wom";
-	loop_phase: WrappedGrowthLoopPhase;
-	entry_source: WrappedGrowthLoopEntrySource;
-	source_share_id?: string;
-	share_id?: string;
-	redirect_target?: string;
-	archetype_id?: string;
-	public_payload_version?: number;
-	is_authenticated_viewer?: boolean;
-	is_new_user?: boolean;
-	launch_channel?: string;
-	referrer_domain?: string;
-	resolved_entry_route?: string;
-	activation_state?: string;
-	share_action?: WrappedShareAction;
-	share_destination?: WrappedShareDestination;
-	utm_campaign?: string;
-	utm_content?: string;
-	utm_medium?: string;
-	utm_source?: string;
-	utm_term?: string;
-};
-
-const WRAPPED_GROWTH_LOOP_NAME = "wrapped_profile_wom";
 
 function normalizeOptionalString(value: string | null | undefined) {
 	if (!value) {
@@ -149,7 +74,6 @@ export function useAnalyticsContext(options?: UseAnalyticsOptions) {
 		pageName,
 		dateRangeDays: dateRange?.meta.dayCount,
 		pathname: location.pathname,
-		wrappedAcquisition: getWebAcquisitionAttribution(location.search),
 	};
 }
 
@@ -198,45 +122,6 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 			page_name: basePayload.page_name,
 			organization_id: basePayload.organization_id,
 			user_id: basePayload.user_id,
-		};
-	}
-
-	function buildWrappedGrowthLoopPayload(
-		input: WrappedGrowthLoopInput,
-		loopPhase: WrappedGrowthLoopPhase,
-	): WrappedGrowthLoopPayload | null {
-		const payload = buildBasePayload(input);
-
-		if (!payload) {
-			return null;
-		}
-
-		return {
-			...payload,
-			growth_loop: WRAPPED_GROWTH_LOOP_NAME,
-			loop_phase: loopPhase,
-			entry_source: input.entrySource,
-			source_share_id: input.sourceShareId,
-			share_id: input.shareId,
-			redirect_target: input.redirectTarget,
-			archetype_id: input.archetypeId,
-			public_payload_version: input.publicPayloadVersion,
-			is_authenticated_viewer: input.isAuthenticatedViewer,
-			is_new_user: input.isNewUser,
-			launch_channel:
-				input.launchChannel ?? analytics.wrappedAcquisition.launch_channel,
-			referrer_domain:
-				input.referrerDomain ?? analytics.wrappedAcquisition.referrer_domain,
-			resolved_entry_route: input.resolvedEntryRoute,
-			activation_state: input.activationState,
-			share_action: input.shareAction,
-			share_destination: input.shareDestination,
-			utm_campaign:
-				input.utmCampaign ?? analytics.wrappedAcquisition.utm_campaign,
-			utm_content: input.utmContent ?? analytics.wrappedAcquisition.utm_content,
-			utm_medium: input.utmMedium ?? analytics.wrappedAcquisition.utm_medium,
-			utm_source: input.utmSource ?? analytics.wrappedAcquisition.utm_source,
-			utm_term: input.utmTerm ?? analytics.wrappedAcquisition.utm_term,
 		};
 	}
 
@@ -499,96 +384,6 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 		});
 	}
 
-	function trackWrappedShareViewed(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "exposure");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedShareViewed(payload);
-	}
-
-	function trackWrappedShareCtaClicked(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "conversion");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedShareCtaClicked(payload);
-	}
-
-	function trackWrappedOnboardingStarted(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "conversion");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedOnboardingStarted(payload);
-	}
-
-	function trackWrappedReferredSignupCompleted(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "conversion");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedReferredSignupCompleted(payload);
-	}
-
-	function trackWrappedProfileCompleted(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "activation");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedProfileCompleted(payload);
-	}
-
-	function trackWrappedActivationCompleted(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "activation");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedActivationCompleted(payload);
-	}
-
-	function trackWrappedStoryStarted(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "production");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedStoryStarted(payload);
-	}
-
-	function trackWrappedShareCreated(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "production");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedShareCreated(payload);
-	}
-
-	function trackWrappedShareActionTriggered(input: WrappedGrowthLoopInput) {
-		const payload = buildWrappedGrowthLoopPayload(input, "distribution");
-
-		if (!payload) {
-			return;
-		}
-
-		captureWrappedShareActionTriggered(payload);
-	}
-
 	return {
 		...analytics,
 		trackAuthenticationAction,
@@ -600,14 +395,5 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 		trackOrganizationAction,
 		trackUtility,
 		trackUtilityUsed,
-		trackWrappedActivationCompleted,
-		trackWrappedOnboardingStarted,
-		trackWrappedProfileCompleted,
-		trackWrappedReferredSignupCompleted,
-		trackWrappedShareActionTriggered,
-		trackWrappedShareCreated,
-		trackWrappedShareCtaClicked,
-		trackWrappedShareViewed,
-		trackWrappedStoryStarted,
 	};
 }

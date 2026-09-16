@@ -65,25 +65,7 @@ import {
 	UsageTrendDataSchema,
 	UserDailyTrendDataSchema,
 	UserTokenUsageDataSchema,
-	WrappedV1Schema,
 } from "./schemas/analytics.js";
-import {
-	RedeemWrappedDecimalClaimInputSchema,
-	RedeemWrappedDecimalClaimResultSchema,
-	WrappedDecimalClaimEntitlementSchema,
-} from "./schemas/wrapped-decimal-claim.js";
-import {
-	ConsumeWrappedResumeInputSchema,
-	CreateWrappedResumeInputSchema,
-	WrappedResumeConsumeResultSchema,
-	WrappedResumeRecordSchema,
-} from "./schemas/wrapped-resume.js";
-import {
-	CreateWrappedShareInputSchema,
-	GetPublicWrappedShareInputSchema,
-	PublicWrappedShareSchema,
-	WrappedShareRecordSchema,
-} from "./schemas/wrapped-share.js";
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
 export * from "./avatar.js";
@@ -158,9 +140,6 @@ export {
 	type SessionDetailWindowTurn,
 	SessionDetailWindowTurnSchema,
 } from "./schemas/session-detail-payload.js";
-export * from "./schemas/wrapped-decimal-claim.js";
-export * from "./schemas/wrapped-resume.js";
-export * from "./schemas/wrapped-share.js";
 export { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 export * from "./session-lineage/index.js";
 export {
@@ -736,28 +715,6 @@ export const contract = {
 			.input(z.object({ token: z.string().min(1) }))
 			.output(TeamInviteAcceptResultSchema),
 	},
-	wrappedShare: {
-		create: oc
-			.input(CreateWrappedShareInputSchema)
-			.output(WrappedShareRecordSchema),
-		getPublic: oc
-			.input(GetPublicWrappedShareInputSchema)
-			.output(PublicWrappedShareSchema),
-	},
-	wrappedResume: {
-		create: oc
-			.input(CreateWrappedResumeInputSchema)
-			.output(WrappedResumeRecordSchema),
-		consume: oc
-			.input(ConsumeWrappedResumeInputSchema)
-			.output(WrappedResumeConsumeResultSchema),
-	},
-	wrappedDecimalClaim: {
-		redeem: oc
-			.input(RedeemWrappedDecimalClaimInputSchema)
-			.output(RedeemWrappedDecimalClaimResultSchema),
-		getMine: oc.output(WrappedDecimalClaimEntitlementSchema),
-	},
 	admin: {
 		listUsers: oc
 			.input(
@@ -917,9 +874,6 @@ export const contract = {
 			trend: oc
 				.input(LearningsTrendInputSchema)
 				.output(z.array(LearningsTrendDataPointSchema)),
-		},
-		wrapped: {
-			v1: oc.output(WrappedV1Schema),
 		},
 	},
 };

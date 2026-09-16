@@ -1,6 +1,8 @@
 # Archetype Taxonomy
 
-This is the active Wrapped archetype taxonomy.
+> Historical Wrapped design notes. Wrapped is retired; the archetype pipeline remains in use by developer analytics.
+
+This taxonomy remains in use by developer analytics. Wrapped is retired.
 
 The product-facing label set is:
 

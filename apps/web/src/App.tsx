@@ -2,12 +2,8 @@ import { lazy, Suspense, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
-	appRoutes,
-	getLegacyWrappedPublicIdFromPath,
 	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
-	getWrappedPublicIdFromPath,
-	getWrappedResumeTokenFromPath,
 } from "@/app/routes";
 import { loadSessionsPage } from "@/app/session-page-loader";
 import { DesktopOnlyOverlay } from "@/app/ui/DesktopOnlyOverlay";
@@ -28,20 +24,6 @@ import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { authClient } from "./lib/auth-client";
-
-const WrappedRouteGate = lazy(() =>
-	import("@/features/wrapped/WrappedRouteGate").then((module) => ({
-		default: module.WrappedRouteGate,
-	})),
-);
-
-const WrappedDevPage = import.meta.env.DEV
-	? lazy(() =>
-			import("@/features/wrapped/WrappedDevPage").then((module) => ({
-				default: module.WrappedDevPage,
-			})),
-		)
-	: null;
 
 const ConversationTraceFixturePage = import.meta.env.DEV
 	? lazy(() =>
@@ -81,12 +63,6 @@ const TranscriptMaskFixturePage = import.meta.env.DEV
 		)
 	: null;
 
-const WrappedDesktopResumePage = lazy(() =>
-	import("@/features/get-started/WrappedDesktopResumePage").then((module) => ({
-		default: module.WrappedDesktopResumePage,
-	})),
-);
-
 function FullscreenRouteLoadingScreen() {
 	return <AppLoadingScreen />;
 }
@@ -109,32 +85,17 @@ function SessionAwareApp() {
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
 	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
-	const wrappedDevPath = appRoutes.devWrapped();
-	const wrappedTeamCardPath = appRoutes.wrappedTeamCard();
-	const wrappedPublicId = getWrappedPublicIdFromPath(location.pathname);
-	const legacyWrappedPublicId = getLegacyWrappedPublicIdFromPath(
-		location.pathname,
-	);
-	const wrappedResumeToken = getWrappedResumeTokenFromPath(location.pathname);
-	const isLegacyWrappedSharePath = legacyWrappedPublicId !== null;
-	const isWrappedDevPath =
-		location.pathname === wrappedDevPath ||
-		location.pathname.startsWith(`${wrappedDevPath}/`);
-	const isWrappedTeamCardPath =
-		location.pathname === wrappedTeamCardPath || wrappedPublicId !== null;
 	const rootRedirectTarget =
 		getValidRedirect(location.search) ??
 		(location.pathname === "/"
 			? getPendingSignupRedirect(location.search)
 			: null);
 	const showDesktopOnlyOverlay =
-		!isCliSetupPath &&
-		!deviceUserCode &&
-		!isWrappedDevPath &&
-		!isWrappedTeamCardPath &&
-		!isLegacyWrappedSharePath &&
-		!isGetStartedPath(location.pathname) &&
-		!wrappedResumeToken;
+		!isCliSetupPath && !deviceUserCode && !isGetStartedPath(location.pathname);
+
+	if (/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(location.pathname)) {
+		return <Navigate replace to="/welcome" />;
+	}
 
 	if (deviceUserCode && !isCliSetupPath) {
 		return (
@@ -154,60 +115,6 @@ function SessionAwareApp() {
 			<>
 				<ProductAnalyticsSessionSync session={session} />
 				<GetStartedRouteGate />
-				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
-			</>
-		);
-	}
-
-	if (wrappedResumeToken) {
-		return (
-			<>
-				<ProductAnalyticsSessionSync session={session} />
-				<Suspense fallback={<FullscreenRouteLoadingScreen />}>
-					<WrappedDesktopResumePage token={wrappedResumeToken} />
-				</Suspense>
-				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
-			</>
-		);
-	}
-
-	if (isWrappedDevPath) {
-		return (
-			<>
-				<ProductAnalyticsSessionSync session={session} />
-				<Suspense fallback={<FullscreenRouteLoadingScreen />}>
-					{WrappedDevPage ? (
-						<WrappedDevPage />
-					) : (
-						<Navigate replace to={appRoutes.wrappedTeamCard()} />
-					)}
-				</Suspense>
-				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
-			</>
-		);
-	}
-
-	if (legacyWrappedPublicId !== null) {
-		return (
-			<>
-				<ProductAnalyticsSessionSync session={session} />
-				<Navigate replace to={appRoutes.wrappedPublic(legacyWrappedPublicId)} />
-				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
-			</>
-		);
-	}
-
-	if (isWrappedTeamCardPath) {
-		return (
-			<>
-				<ProductAnalyticsSessionSync session={session} />
-				<Suspense fallback={<FullscreenRouteLoadingScreen />}>
-					<WrappedRouteGate
-						isPending={isPending}
-						publicId={wrappedPublicId}
-						session={session ?? null}
-					/>
-				</Suspense>
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);

@@ -1,5 +1,7 @@
 # Archetype Pipeline for Wrapped
 
+> Historical Wrapped design notes. Wrapped is retired; the archetype pipeline remains in use by developer analytics.
+
 This document is the implementation plan for keeping a `Claude Code / Codex` archetype up to date for every wrapped user.
 
 It is written for the backend team, not for design. The goal is:

@@ -8,11 +8,6 @@ const RELATIVE_URL_BASE = "https://rudel.local";
 const RELATIVE_URL_ORIGIN = new URL(RELATIVE_URL_BASE).origin;
 const REDIRECT_ENCODED_AMBIGUOUS_CHARACTER_PATTERN =
 	/%(?:2f|5c|[01][0-9a-f]|7f)/i;
-type WrappedAuthRedirectFlow =
-	| "card-profile"
-	| "desktop-ready"
-	| "sessions-landed";
-
 function containsControlCharacter(value: string): boolean {
 	for (const character of value) {
 		const characterCode = character.charCodeAt(0);
@@ -55,25 +50,6 @@ function normalizeValidRelativeRedirect(
 	return redirect;
 }
 
-function normalizeWrappedAuthRedirect(
-	redirect: string,
-	flow: WrappedAuthRedirectFlow = "sessions-landed",
-): string {
-	try {
-		const url = new URL(redirect, RELATIVE_URL_BASE);
-
-		if (url.pathname !== appRoutes.wrappedTeamCard()) {
-			return redirect;
-		}
-
-		const wrappedRoute = getWrappedAuthRedirectRoute(flow, url.search);
-
-		return `${wrappedRoute}${url.hash}`;
-	} catch {
-		return redirect;
-	}
-}
-
 export function getDeviceUserCode(search?: string): string | null {
 	const params = new URLSearchParams(search ?? window.location.search);
 	return params.get("user_code");
@@ -90,17 +66,14 @@ export function isGetStartedPath(pathname = window.location.pathname): boolean {
 	);
 }
 
-export function getValidRedirect(
-	search?: string,
-	wrappedFlow: WrappedAuthRedirectFlow = "sessions-landed",
-): string | null {
+export function getValidRedirect(search?: string): string | null {
 	const params = new URLSearchParams(search ?? window.location.search);
 	const validRedirect = normalizeValidRelativeRedirect(params.get("redirect"));
 	if (!validRedirect) {
 		return null;
 	}
 
-	return normalizeWrappedAuthRedirect(validRedirect, wrappedFlow);
+	return validRedirect;
 }
 
 export function getPendingSignupRedirect(search?: string): string | null {
@@ -113,7 +86,6 @@ export function getPendingSignupRedirect(search?: string): string | null {
 function getDirectAuthDestination(
 	pathname = window.location.pathname,
 	search = window.location.search,
-	wrappedFlow: WrappedAuthRedirectFlow = "sessions-landed",
 ): string | null {
 	const userCode = getDeviceUserCode(search);
 	if (userCode) {
@@ -121,13 +93,13 @@ function getDirectAuthDestination(
 		return `/?user_code=${encodeURIComponent(userCode)}${connectionId ? `&connect=${encodeURIComponent(connectionId)}` : ""}`;
 	}
 
-	const redirect = getValidRedirect(search, wrappedFlow);
+	const redirect = getValidRedirect(search);
 	if (redirect) {
 		return redirect;
 	}
 
 	if (pathname !== "/" && pathname !== "") {
-		return normalizeWrappedAuthRedirect(`${pathname}${search}`, wrappedFlow);
+		return `${pathname}${search}`;
 	}
 
 	return null;
@@ -146,10 +118,7 @@ export function getEmailSignupSuccessDestination(
 	pathname = window.location.pathname,
 	search = window.location.search,
 ): string {
-	return (
-		getDirectAuthDestination(pathname, search, "card-profile") ??
-		appRoutes.wrappedCardProfile()
-	);
+	return getDirectAuthDestination(pathname, search) ?? "/welcome";
 }
 
 export function getEmailLoginSuccessDestination(
@@ -194,15 +163,13 @@ export function getSocialSignupRedirectOptions(
 	if (directDestination) {
 		return {
 			callbackURL: directDestination,
-			newUserCallbackURL:
-				getDirectAuthDestination(pathname, search, "card-profile") ??
-				directDestination,
+			newUserCallbackURL: directDestination,
 		};
 	}
 
 	return {
 		callbackURL: "/",
-		newUserCallbackURL: appRoutes.wrappedCardProfile(),
+		newUserCallbackURL: "/welcome",
 	};
 }
 
@@ -216,24 +183,8 @@ export function getSocialLoginRedirectOptions(
 	return {
 		callbackURL: getAuthCallbackURL(pathname, search),
 		newUserCallbackURL:
-			getDirectAuthDestination(pathname, search, "card-profile") ??
-			appRoutes.wrappedCardProfile(),
+			getDirectAuthDestination(pathname, search) ?? "/welcome",
 	};
-}
-
-function getWrappedAuthRedirectRoute(
-	flow: WrappedAuthRedirectFlow,
-	search: string,
-) {
-	if (flow === "card-profile") {
-		return appRoutes.wrappedCardProfile(search);
-	}
-
-	if (flow === "desktop-ready") {
-		return appRoutes.wrappedDesktopReady(search);
-	}
-
-	return appRoutes.wrappedSessionsLanded(search);
 }
 
 export function primePendingSignupRedirect(

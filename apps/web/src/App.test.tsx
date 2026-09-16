@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
+import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
 
 const { mockUseSession } = vi.hoisted(() => ({
 	mockUseSession: vi.fn(),
@@ -38,28 +39,11 @@ vi.mock("@/features/auth/AuthenticatedApp", () => ({
 	),
 }));
 
-vi.mock("@/features/wrapped/WrappedRouteGate", () => ({
-	WrappedRouteGate: ({ publicId }: { publicId: string | null }) => (
-		<div>
-			<div>Wrapped Route Gate</div>
-			<div>Public id: {publicId ?? "none"}</div>
-		</div>
-	),
-}));
-
-vi.mock("@/features/wrapped/WrappedDevPage", () => ({
-	WrappedDevPage: () => <div>Wrapped Dev Page</div>,
-}));
-
-vi.mock("@/features/get-started/WrappedDesktopResumePage", () => ({
-	WrappedDesktopResumePage: () => <div>Wrapped Desktop Resume</div>,
-}));
-
 vi.mock("@/features/auth/ResetPasswordApp", () => ({
 	ResetPasswordApp: () => <div>Reset Password App</div>,
 }));
 
-describe("App wrapped routing", () => {
+describe("App routing", () => {
 	beforeEach(() => {
 		mockUseSession.mockReset();
 		mockUseSession.mockReturnValue({ data: null, isPending: false });
@@ -79,7 +63,7 @@ describe("App wrapped routing", () => {
 		);
 	});
 
-	it("keeps the device approval route outside the wrapped gate", () => {
+	it("renders device approval outside the guest app", () => {
 		mockUseSession.mockReturnValue({
 			data: { session: { userId: "user-1" }, user: { id: "user-1" } },
 			isPending: false,
@@ -92,72 +76,49 @@ describe("App wrapped routing", () => {
 		);
 
 		expect(screen.getByText("Device App")).toBeInTheDocument();
-		expect(screen.queryByText("Wrapped Route Gate")).toBeNull();
+		expect(screen.queryByText("Guest App")).toBeNull();
 	});
+});
 
-	it("routes /wrapped to the wrapped route gate", async () => {
-		render(
-			<MemoryRouter initialEntries={["/wrapped"]}>
-				<App />
-			</MemoryRouter>,
-		);
+function CurrentLocation() {
+	const { pathname, search } = useLocation();
+	return (
+		<div>
+			{pathname}
+			{search}
+		</div>
+	);
+}
 
-		expect(await screen.findByText("Wrapped Route Gate")).toBeInTheDocument();
-		expect(screen.getByText("Public id: none")).toBeInTheDocument();
-		expect(screen.queryByText("Desktop only")).toBeNull();
-	});
+it.each([
+	"/get-started",
+	"/dashboard/get-started",
+])("preserves CLI pairing parameters when redirecting %s to welcome", async (pathname) => {
+	render(
+		<MemoryRouter
+			initialEntries={[`${pathname}?connect=pairing-id&user_code=ABCD-1234`]}
+		>
+			<GetStartedRouteGate />
+			<CurrentLocation />
+		</MemoryRouter>,
+	);
+	expect(
+		await screen.findByText("/welcome?connect=pairing-id&user_code=ABCD-1234"),
+	).toBeInTheDocument();
+});
 
-	it("routes /wrapped/:id to the public wrapped route gate branch", async () => {
-		render(
-			<MemoryRouter initialEntries={["/wrapped/share-123"]}>
-				<App />
-			</MemoryRouter>,
-		);
-
-		expect(await screen.findByText("Wrapped Route Gate")).toBeInTheDocument();
-		expect(screen.getByText("Public id: share-123")).toBeInTheDocument();
-	});
-
-	it("routes /dev/wrapped to the wrapped dev page in development", async () => {
-		render(
-			<MemoryRouter initialEntries={["/dev/wrapped"]}>
-				<App />
-			</MemoryRouter>,
-		);
-
-		expect(await screen.findByText("Wrapped Dev Page")).toBeInTheDocument();
-	});
-
-	it("redirects /get-started into /wrapped", async () => {
-		render(
-			<MemoryRouter initialEntries={["/get-started"]}>
-				<App />
-			</MemoryRouter>,
-		);
-
-		expect(await screen.findByText("Wrapped Route Gate")).toBeInTheDocument();
-		expect(screen.getByText("Public id: none")).toBeInTheDocument();
-	});
-
-	it("redirects /dashboard/get-started into /wrapped", async () => {
-		render(
-			<MemoryRouter initialEntries={["/dashboard/get-started"]}>
-				<App />
-			</MemoryRouter>,
-		);
-
-		expect(await screen.findByText("Wrapped Route Gate")).toBeInTheDocument();
-		expect(screen.getByText("Public id: none")).toBeInTheDocument();
-	});
-
-	it("redirects the legacy /wrapped/share/:id route to the canonical public page", async () => {
-		render(
-			<MemoryRouter initialEntries={["/wrapped/share/share-123"]}>
-				<App />
-			</MemoryRouter>,
-		);
-
-		expect(await screen.findByText("Wrapped Route Gate")).toBeInTheDocument();
-		expect(screen.getByText("Public id: share-123")).toBeInTheDocument();
-	});
+it.each([
+	"/wrapped",
+	"/wrapped/share-id",
+	"/dev/wrapped",
+	"/resume/old-token",
+])("redirects retired %s links to welcome", async (pathname) => {
+	mockUseSession.mockReturnValue({ data: null, isPending: false });
+	render(
+		<MemoryRouter initialEntries={[pathname]}>
+			<App />
+			<CurrentLocation />
+		</MemoryRouter>,
+	);
+	expect(await screen.findByText("/welcome")).toBeInTheDocument();
 });

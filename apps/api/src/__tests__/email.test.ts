@@ -4,7 +4,6 @@ import {
 	buildEmailVerificationOtpEmailContent,
 	buildInvitationEmailContent,
 	buildInvitationLink,
-	buildWrappedDesktopResumeLink,
 	getClickHousePurgeFailureAlertIdempotencyKey,
 	getResendConfigWarnings,
 	sendEmailVerificationOtpEmail,
@@ -25,15 +24,6 @@ describe("email helpers", () => {
 		expect(buildInvitationLink("https://opaline.so/", "invite_123")).toBe(
 			"https://opaline.so/invitation/invite_123",
 		);
-	});
-
-	test("buildWrappedDesktopResumeLink trims trailing slashes", () => {
-		expect(
-			buildWrappedDesktopResumeLink(
-				"https://opaline.so/",
-				"123e4567-e89b-12d3-a456-426614174000",
-			),
-		).toBe("https://opaline.so/resume/123e4567-e89b-12d3-a456-426614174000");
 	});
 
 	test("buildInvitationEmailContent escapes user-controlled HTML", () => {

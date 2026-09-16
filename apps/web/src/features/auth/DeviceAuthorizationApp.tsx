@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { z } from "zod";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
-import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
@@ -14,7 +13,7 @@ import { GuestApp } from "@/features/auth/GuestApp";
 import { cliSetupUrl } from "@/features/cli-onboarding/cli-authorization";
 
 function ApprovedDeviceSetupPage() {
-	return <Navigate replace to={appRoutes.wrappedDesktopReady()} />;
+	return <Navigate replace to={"/welcome"} />;
 }
 
 function PairedDeviceLogin({

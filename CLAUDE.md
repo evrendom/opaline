@@ -75,10 +75,6 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `RATE_LIMIT_INGEST_REQUESTS_WINDOW` | No | Per-user fixed ingest request window in seconds; minimum 60 (default: 3,600) |
 | `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-user Postgres-backed ingest byte cap shared by all of the user's API keys (default: 10 GiB) |
 | `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Per-user fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
-| `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_MAX` | No | Positive integer per-share Wrapped lookup cap per API process (default: 180) |
-| `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_WINDOW` | No | Positive integer Wrapped lookup window in seconds (default: 60) |
-| `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_CAPACITY` | No | Positive integer maximum retained Wrapped share limiter entries per API process (default: 5,000) |
-| `RATE_LIMIT_WRAPPED_SHARE_LOOKUP_SOURCE_MAX` | No | Positive integer anonymous Wrapped lookup cap per client source and window (default: 600; must not exceed capacity) |
 | `RESEND_API_KEY` | No | Resend API key for email integration |
 | `RESEND_FROM_EMAIL` | No | Sender address for organization invitation emails |
 | `RESEND_AUDIENCE_ID` | No | Resend audience ID for signup contact sync |
@@ -128,14 +124,13 @@ Manage containers separately: `bun run infra:up` / `bun run infra:down`. To wipe
 
 Hosted-service operations live in the core team's private ops repo.
 
-## Wrapped card avatars
+## Profile avatars
 
-Wrapped card profile avatars persist to Postgres in the `user_avatar` sidecar table (one row per user, keyed by `user_id`, with a stable `public_id` UUID and the raw bytes in `image_data` bytea). `user.image` stores a relative URL `/api/avatar/<public_id>`; never absolutize it at write time so hosted shares don't capture localhost from local development.
+Profile avatars persist to Postgres in the `user_avatar` sidecar table (one row per user, keyed by `user_id`, with a stable `public_id` UUID and the raw bytes in `image_data` bytea). `user.image` stores a relative URL `/api/avatar/<public_id>`; never absolutize it at write time so hosted shares don't capture localhost from local development.
 
 - `GET /api/avatar/<publicId>` is public, no auth, served by Bun with `Cache-Control: public, max-age=300` and `ETag` for 304 revalidation. Re-uploading bytes keeps the same `public_id` so the URL stays stable.
 - `POST /api/profile/avatar` accepts a single multipart `file` field (PNG, JPEG, or WEBP), enforces a 2 MB cap, sniffs magic bytes (rejects spoofed types), and atomically upserts the sidecar row + updates `user.image`.
 - `profile.updateMine` (oRPC) accepts `name` + `image`. Image must be `null`, the caller's own `/api/avatar/<id>`, or HTTPS from a trusted OAuth host (`lh3.googleusercontent.com`, `avatars.githubusercontent.com`). Non-avatar images drop the sidecar bytes inside the same transaction.
-- The wrapped public share hydrator rewrites stale `/api/avatar/<old-id>` snapshot URLs to follow the user's current `user.image`. Non-avatar third-party URLs in old snapshots stay frozen.
 - The OG PNG card (`x-card.png`) only embeds `data:` images, so uploaded avatars and Google avatars both render as initials there. Fix is a separate follow-up.
 
 Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `packages/api-routes/src/avatar.ts` and are imported on both API and web.

@@ -84,8 +84,6 @@ export const PRODUCT_ANALYTICS_APP_PAGE_NAMES = [
 	"accept_invitation",
 	"device_login",
 	"get_started",
-	"wrapped_team_card",
-	"wrapped_share",
 ] as const;
 
 export type ProductAnalyticsDashboardPageName =
@@ -113,38 +111,6 @@ export const ProductAnalyticsInviteChannelSchema = z.literal("email");
 export const ProductAnalyticsInviteSourceSchema = z.literal("settings_members");
 
 export const ProductAnalyticsJoinMethodSchema = z.literal("invite_accept");
-
-export const ProductAnalyticsWrappedGrowthLoopNameSchema = z.literal(
-	"wrapped_profile_wom",
-);
-
-export const ProductAnalyticsWrappedGrowthLoopPhaseSchema = z.enum([
-	"exposure",
-	"conversion",
-	"activation",
-	"production",
-	"distribution",
-]);
-
-export const ProductAnalyticsWrappedGrowthLoopEntrySourceSchema = z.enum([
-	"public_share",
-	"share_redirect",
-	"wrapped_team_card",
-	"direct",
-]);
-
-export const ProductAnalyticsWrappedShareActionSchema = z.enum([
-	"copy",
-	"copy_profile_url",
-	"download",
-	"share",
-]);
-
-export const ProductAnalyticsWrappedShareDestinationSchema = z.enum([
-	"clipboard",
-	"download",
-	"x",
-]);
 
 export type ProductAnalyticsEnvironment = z.infer<
 	typeof ProductAnalyticsEnvironmentSchema
@@ -264,15 +230,6 @@ export const PRODUCT_ANALYTICS_EVENTS = {
 	ORGANIZATION_ACTION_TRIGGERED: "Organization Action Triggered",
 	AUTHENTICATION_ACTION_TRIGGERED: "Authentication Action Triggered",
 	UI_UTILITY_USED: "UI Utility Used",
-	WRAPPED_SHARE_VIEWED: "Wrapped Share Viewed",
-	WRAPPED_SHARE_CTA_CLICKED: "Wrapped Share CTA Clicked",
-	WRAPPED_ONBOARDING_STARTED: "Wrapped Onboarding Started",
-	WRAPPED_REFERRED_SIGNUP_COMPLETED: "Wrapped Referred Signup Completed",
-	WRAPPED_PROFILE_COMPLETED: "Wrapped Profile Completed",
-	WRAPPED_ACTIVATION_COMPLETED: "Wrapped Activation Completed",
-	WRAPPED_STORY_STARTED: "Wrapped Story Started",
-	WRAPPED_SHARE_CREATED: "Wrapped Share Created",
-	WRAPPED_SHARE_ACTION_TRIGGERED: "Wrapped Share Action Triggered",
 	INVITE_SENT: "Invite Sent",
 	ORGANIZATION_MEMBER_JOINED: "Organization Member Joined",
 	ORGANIZATION_DELETED: "Organization Deleted",
@@ -522,30 +479,6 @@ export const UiUtilityUsedEventSchema = WebEventSchema.extend({
 	utility_state: nonEmptyStringSchema.optional(),
 }).strict();
 
-export const WrappedGrowthLoopEventSchema = WebEventSchema.extend({
-	growth_loop: ProductAnalyticsWrappedGrowthLoopNameSchema,
-	loop_phase: ProductAnalyticsWrappedGrowthLoopPhaseSchema,
-	entry_source: ProductAnalyticsWrappedGrowthLoopEntrySourceSchema,
-	source_share_id: nonEmptyStringSchema.optional(),
-	share_id: nonEmptyStringSchema.optional(),
-	redirect_target: nonEmptyStringSchema.optional(),
-	archetype_id: nonEmptyStringSchema.optional(),
-	public_payload_version: z.number().int().positive().optional(),
-	is_authenticated_viewer: z.boolean().optional(),
-	is_new_user: z.boolean().optional(),
-	launch_channel: nonEmptyStringSchema.optional(),
-	referrer_domain: nonEmptyStringSchema.optional(),
-	resolved_entry_route: nonEmptyStringSchema.optional(),
-	activation_state: nonEmptyStringSchema.optional(),
-	share_action: ProductAnalyticsWrappedShareActionSchema.optional(),
-	share_destination: ProductAnalyticsWrappedShareDestinationSchema.optional(),
-	utm_campaign: nonEmptyStringSchema.optional(),
-	utm_content: nonEmptyStringSchema.optional(),
-	utm_medium: nonEmptyStringSchema.optional(),
-	utm_source: nonEmptyStringSchema.optional(),
-	utm_term: nonEmptyStringSchema.optional(),
-}).strict();
-
 export const ProductAnalyticsEventSchemas = {
 	[PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP]: AccountSignedUpEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.SIGN_UP_FAILED]: SignUpFailedEventSchema,
@@ -574,23 +507,6 @@ export const ProductAnalyticsEventSchemas = {
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]:
 		AuthenticationActionTriggeredEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED]: UiUtilityUsedEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_VIEWED]: WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CTA_CLICKED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_ONBOARDING_STARTED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_REFERRED_SIGNUP_COMPLETED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_PROFILE_COMPLETED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_ACTIVATION_COMPLETED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_STORY_STARTED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CREATED]:
-		WrappedGrowthLoopEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_ACTION_TRIGGERED]:
-		WrappedGrowthLoopEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]:
 		OrganizationMemberJoinedEventSchema,
@@ -636,9 +552,6 @@ export type AuthenticationActionTriggeredEvent = z.infer<
 	typeof AuthenticationActionTriggeredEventSchema
 >;
 export type UiUtilityUsedEvent = z.infer<typeof UiUtilityUsedEventSchema>;
-export type WrappedGrowthLoopEvent = z.infer<
-	typeof WrappedGrowthLoopEventSchema
->;
 export type InviteSentEvent = z.infer<typeof InviteSentEventSchema>;
 export type OrganizationMemberJoinedEvent = z.infer<
 	typeof OrganizationMemberJoinedEventSchema
@@ -666,15 +579,6 @@ export interface ProductAnalyticsEventPayloadMap {
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_ACTION_TRIGGERED]: OrganizationActionTriggeredEvent;
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]: AuthenticationActionTriggeredEvent;
 	[PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED]: UiUtilityUsedEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_VIEWED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CTA_CLICKED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_ONBOARDING_STARTED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_REFERRED_SIGNUP_COMPLETED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_PROFILE_COMPLETED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_ACTIVATION_COMPLETED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_STORY_STARTED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CREATED]: WrappedGrowthLoopEvent;
-	[PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_ACTION_TRIGGERED]: WrappedGrowthLoopEvent;
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]: OrganizationMemberJoinedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_DELETED]: OrganizationDeletedEvent;

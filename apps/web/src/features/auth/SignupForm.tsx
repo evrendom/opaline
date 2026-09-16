@@ -33,16 +33,8 @@ import {
 	recordOAuthRedirectResult,
 	recordOAuthRedirectStart,
 } from "./oauth-debug";
-import type { WrappedAuthScene } from "./wrapped-auth-motion";
-import { WrappedEmailCodeAuth } from "./wrapped-email-code-auth";
 
 const SIGNUP_CODE_INPUT_ID = "signup-code";
-const WRAPPED_SIGNUP_EMAIL_INPUT_ID = "signup-email";
-const WRAPPED_SIGNUP_AUTH_LABELS = {
-	email: "Create account with Email",
-	github: "Create account with GitHub",
-	google: "Create account with Google",
-};
 
 function getSignupContext() {
 	const params = new URLSearchParams(window.location.search);
@@ -73,18 +65,11 @@ function getSignupContext() {
 
 interface SignupFormProps {
 	hideSwitchPrompt?: boolean;
-	onEmailPasswordPreviewSubmit?: (email: string) => void;
 	onSwitchToLogin: () => void;
-	variant?: "default" | "wrapped-story";
 }
 
 export function SignupForm(props: SignupFormProps) {
-	const {
-		hideSwitchPrompt = false,
-		onEmailPasswordPreviewSubmit,
-		onSwitchToLogin,
-		variant = "default",
-	} = props;
+	const { hideSwitchPrompt = false, onSwitchToLogin } = props;
 	const [initialSignupDraft] = useState(readPendingEmailSignupCodeDraft);
 	const [email, setEmail] = useState(() => initialSignupDraft?.email ?? "");
 	const [emailCode, setEmailCode] = useState("");
@@ -103,15 +88,9 @@ export function SignupForm(props: SignupFormProps) {
 	const [showEmailForm, setShowEmailForm] = useState(
 		() => initialSignupDraft !== null,
 	);
-	const [wrappedScene, setWrappedScene] = useState<WrappedAuthScene>(() =>
-		initialSignupDraft ? "credentials" : "choice",
-	);
 	const { trackAuthenticationAction } = useAnalyticsTracking({
 		pageName: "signup",
 	});
-	const isWrappedStory = variant === "wrapped-story";
-	const usesWrappedEmailPreview =
-		isWrappedStory && onEmailPasswordPreviewSubmit !== undefined;
 	const hasValidEmail = isValidAuthEmail(email);
 	const hasValidEmailCode = isValidEmailCode(emailCode);
 
@@ -119,25 +98,6 @@ export function SignupForm(props: SignupFormProps) {
 		e.preventDefault();
 		setFeedback(null);
 		const signupEmail = normalizeAuthEmail(email);
-
-		if (usesWrappedEmailPreview) {
-			if (!hasValidEmail) {
-				const emailField = document.getElementById(
-					WRAPPED_SIGNUP_EMAIL_INPUT_ID,
-				);
-				if (emailField instanceof HTMLInputElement) {
-					emailField.focus();
-				}
-				setFeedback({
-					kind: "error",
-					message: "Enter a valid email to continue.",
-				});
-				return;
-			}
-
-			onEmailPasswordPreviewSubmit(signupEmail);
-			return;
-		}
 
 		if (emailCodeStage === "email") {
 			await sendEmailCode();
@@ -197,9 +157,7 @@ export function SignupForm(props: SignupFormProps) {
 		const signupEmail = normalizeAuthEmail(email);
 
 		if (!hasValidEmail) {
-			const emailField = document.getElementById(
-				isWrappedStory ? WRAPPED_SIGNUP_EMAIL_INPUT_ID : "email",
-			);
+			const emailField = document.getElementById("email");
 			if (emailField instanceof HTMLInputElement) {
 				emailField.focus();
 			}
@@ -245,7 +203,6 @@ export function SignupForm(props: SignupFormProps) {
 		setEmail(signupEmail);
 		setEmailCode("");
 		setEmailCodeStage("code");
-		setWrappedScene("credentials");
 		writePendingEmailSignupCodeDraft(signupEmail);
 		setFeedback({
 			kind: "success",
@@ -308,66 +265,6 @@ export function SignupForm(props: SignupFormProps) {
 		if (feedback?.kind === "error") {
 			setFeedback(null);
 		}
-	}
-
-	function handleOpenWrappedEmail() {
-		clearPendingEmailCodeDraft();
-		setFeedback(null);
-		setEmailCode("");
-		setEmailCodeStage("email");
-		setWrappedScene("email");
-	}
-
-	function handleContinueWrappedEmail() {
-		setFeedback(null);
-		if (!hasValidEmail) {
-			const emailField = document.getElementById(WRAPPED_SIGNUP_EMAIL_INPUT_ID);
-			if (emailField instanceof HTMLInputElement) {
-				emailField.focus();
-			}
-			setFeedback({
-				kind: "error",
-				message: "Enter a valid email to continue.",
-			});
-			return;
-		}
-		if (usesWrappedEmailPreview) {
-			onEmailPasswordPreviewSubmit?.(normalizeAuthEmail(email));
-			return;
-		}
-		void sendEmailCode();
-	}
-
-	function handleReturnToWrappedChoice() {
-		clearPendingEmailCodeDraft();
-		setFeedback(null);
-		setEmailCode("");
-		setEmailCodeStage("email");
-		setWrappedScene("choice");
-	}
-
-	if (isWrappedStory) {
-		return (
-			<WrappedEmailCodeAuth
-				codeInputId={SIGNUP_CODE_INPUT_ID}
-				email={email}
-				emailCode={emailCode}
-				emailInputId={WRAPPED_SIGNUP_EMAIL_INPUT_ID}
-				feedback={feedback}
-				labels={WRAPPED_SIGNUP_AUTH_LABELS}
-				loading={loading}
-				onCodeChange={handleEmailCodeChange}
-				onContinueEmail={handleContinueWrappedEmail}
-				onEmailChange={handleEmailChange}
-				onOpenEmail={handleOpenWrappedEmail}
-				onReturnToChoice={handleReturnToWrappedChoice}
-				onSocialSignIn={handleSocialSignIn}
-				onSubmit={handleSubmit}
-				onUseDifferentEmail={handleOpenWrappedEmail}
-				scene={wrappedScene}
-				usesPreviewSubmit={usesWrappedEmailPreview}
-			/>
-		);
 	}
 
 	return (

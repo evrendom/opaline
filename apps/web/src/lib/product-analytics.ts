@@ -17,12 +17,10 @@ import {
 	type ProductAnalyticsEventName,
 	type SignUpFailedEvent,
 	type UiUtilityUsedEvent,
-	type WrappedGrowthLoopEvent,
 } from "@rudel/api-routes";
 import {
 	appRoutes,
 	getCanonicalAppPath,
-	getWrappedPublicIdFromPath,
 	isSessionDetailPath,
 } from "@/app/routes";
 import { client } from "@/lib/orpc";
@@ -251,31 +249,6 @@ export function normalizeWebErrorCode(error: unknown) {
 	);
 }
 
-export function getHttpStatusFromError(error: unknown) {
-	if (
-		typeof error === "object" &&
-		error !== null &&
-		"status" in error &&
-		typeof error.status === "number"
-	) {
-		return error.status;
-	}
-
-	if (
-		typeof error === "object" &&
-		error !== null &&
-		"response" in error &&
-		typeof error.response === "object" &&
-		error.response !== null &&
-		"status" in error.response &&
-		typeof error.response.status === "number"
-	) {
-		return error.response.status;
-	}
-
-	return undefined;
-}
-
 function captureEvent(
 	event: ProductAnalyticsEventName,
 	payload: Record<string, unknown>,
@@ -352,66 +325,6 @@ export function captureUiUtilityUsed(
 	captureEvent(PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED, payload);
 }
 
-export function captureWrappedShareViewed(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_VIEWED, payload);
-}
-
-export function captureWrappedShareCtaClicked(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CTA_CLICKED, payload);
-}
-
-export function captureWrappedOnboardingStarted(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_ONBOARDING_STARTED, payload);
-}
-
-export function captureWrappedReferredSignupCompleted(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(
-		PRODUCT_ANALYTICS_EVENTS.WRAPPED_REFERRED_SIGNUP_COMPLETED,
-		payload,
-	);
-}
-
-export function captureWrappedProfileCompleted(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_PROFILE_COMPLETED, payload);
-}
-
-export function captureWrappedActivationCompleted(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_ACTIVATION_COMPLETED, payload);
-}
-
-export function captureWrappedStoryStarted(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_STORY_STARTED, payload);
-}
-
-export function captureWrappedShareCreated(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_CREATED, payload);
-}
-
-export function captureWrappedShareActionTriggered(
-	payload: WebCapturePayload<WrappedGrowthLoopEvent>,
-) {
-	captureEvent(
-		PRODUCT_ANALYTICS_EVENTS.WRAPPED_SHARE_ACTION_TRIGGERED,
-		payload,
-	);
-}
-
 const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 	matches: (pathname: string) => boolean;
 	pageName: AppPageName;
@@ -428,14 +341,6 @@ const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{
 		pageName: "get_started",
 		matches: (pathname) =>
 			pathname === "/get-started" || pathname === "/dashboard/get-started",
-	},
-	{
-		pageName: "wrapped_share",
-		matches: (pathname) => getWrappedPublicIdFromPath(pathname) !== null,
-	},
-	{
-		pageName: "wrapped_team_card",
-		matches: (pathname) => pathname === "/wrapped",
 	},
 	{
 		pageName: "overview",
