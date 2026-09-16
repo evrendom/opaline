@@ -20,7 +20,10 @@ const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const READY_TTL_MS = 60_000;
 const DEGRADED_TTL_MS = 5_000;
-const PROBE_TIMEOUT_MS = 2_000;
+// A development Cloud service can idle and take several seconds to wake. Keep
+// the SQL execution limit short, but allow that connection setup to complete.
+const PROBE_TIMEOUT_MS =
+	process.env.NODE_ENV === "development" ? 30_000 : 2_000;
 
 // session_analytics stores only the undivided cache-write total, so the legacy
 // path must assume a tier. Sampled prod transcripts show ~89% of Claude Code

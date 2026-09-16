@@ -11,6 +11,7 @@ type TranscriptWindowDirection = "newer" | "older";
 type TranscriptWindowEdgeState = "error" | "idle" | "loading";
 
 type SessionTranscriptWindowSnapshot = {
+	failedTurnIds: ReadonlySet<string>;
 	bodyWindowsRetained: number;
 	newerCursor: string | null;
 	newerState: TranscriptWindowEdgeState;
@@ -79,6 +80,7 @@ export function createSessionTranscriptWindowStore(input: {
 	let viewportCenter = getWindowCenter(initialWindow.turns);
 	let windowsLoaded = 1;
 	let snapshot: SessionTranscriptWindowSnapshot = {
+		failedTurnIds: new Set(),
 		bodyWindowsRetained: countRetainedBodyWindows(bodyWindows),
 		newerCursor: initialWindow.newerCursor,
 		newerState: "idle",
@@ -230,12 +232,21 @@ export function createSessionTranscriptWindowStore(input: {
 			};
 			const controller = new AbortController();
 			anchorControllers.set(key, controller);
+			if (snapshot.failedTurnIds.has(turnId)) {
+				const failedTurnIds = new Set(snapshot.failedTurnIds);
+				failedTurnIds.delete(turnId);
+				snapshot = { ...snapshot, failedTurnIds };
+			}
 			const operation = fetchWindow(request, controller.signal)
 				.then((window) => store.mergeWindow(window, "anchor", request))
 				.catch((error: unknown) => {
 					if (controller.signal.aborted) {
 						return false;
 					}
+					snapshot = {
+						...snapshot,
+						failedTurnIds: new Set([...snapshot.failedTurnIds, turnId]),
+					};
 					throw error;
 				})
 				.finally(() => {
@@ -339,9 +350,27 @@ export function createSessionTranscriptWindowStore(input: {
 			if (changed) {
 				publish();
 			}
-			const missingTurnId = turnIds.find((turnId) => !turnById.has(turnId));
+			const missingTurnId = turnIds.find(
+				(turnId) =>
+					!turnById.has(turnId) && !snapshot.failedTurnIds.has(turnId),
+			);
 			if (missingTurnId) {
+				// A neighboring anchor or prefetched page may already contain this
+				// turn. Recheck after it arrives instead of overlapping/cancelling it.
+				const loadingWindow = pending.values().next().value;
+				if (loadingWindow) return loadingWindow;
 				return store.loadAnchor(missingTurnId);
+			}
+			// Warm the next page while the reader is still in the last few loaded
+			// turns. Full-spine transcripts have no visible pagination edge.
+			const lastLoaded = snapshot.turns.at(-1)?.index;
+			if (
+				lastLoaded !== undefined &&
+				indices.some((index) => index >= lastLoaded - 3) &&
+				snapshot.newerCursor &&
+				snapshot.newerState === "idle"
+			) {
+				return store.loadDirection("newer");
 			}
 			return rehydrateVisibleWindow();
 		},

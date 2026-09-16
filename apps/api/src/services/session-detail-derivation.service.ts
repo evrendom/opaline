@@ -47,6 +47,10 @@ import {
 	scanMemberLanguageSignals,
 	scanModelLanguageSignalSegments,
 } from "@rudel/language-signals";
+import {
+	createSessionDetailBodyStore,
+	type SessionDetailBodyStore,
+} from "./session-detail-body-store.js";
 
 export const SESSION_DETAIL_OVERVIEW_MAX_BYTES = 250 * 1024;
 const SESSION_DETAIL_OVERVIEW_TARGET_BYTES = 248 * 1024;
@@ -90,7 +94,7 @@ export interface SessionDetailDerivation {
 	rawSubagents: Readonly<Record<string, string>>;
 	revision: string;
 	spine: SessionDetailSpine["turns"];
-	turnBodies: ReadonlyMap<string, SessionDetailTurn>;
+	turnBodies: SessionDetailBodyStore<SessionDetailTurn>;
 	turnSummaries: readonly TurnSummary[];
 }
 
@@ -737,7 +741,7 @@ export function deriveSessionDetail(
 			index,
 		),
 	);
-	const turnBodies = new Map<string, SessionDetailTurn>(
+	const turnBodies = createSessionDetailBodyStore(
 		turns.map((turn) => {
 			const turnId = getSessionTurnId(turn);
 			return [
@@ -750,6 +754,7 @@ export function deriveSessionDetail(
 				}),
 			] as const;
 		}),
+		(value) => SessionDetailTurnSchema.parse(value),
 	);
 	const spine: SessionDetailSpine["turns"] = turns.map((turn) => ({
 		eventCount: countResponseEvents(turn.responseItems),
@@ -825,21 +830,20 @@ export function deriveSessionDetail(
 	const derivedBytes = serializedBytes({
 		overviewBase,
 		spine,
-		turnBodies: [...turnBodies.values()],
 		turnSummaries,
 	});
-	const rawBytes =
-		Buffer.byteLength(snapshot.content, "utf8") +
-		Object.entries(snapshot.subagents).reduce(
-			(total, [id, content]) =>
-				total +
-				Buffer.byteLength(id, "utf8") +
-				Buffer.byteLength(content, "utf8"),
-			0,
-		);
+	const rawBytes = Object.entries(snapshot.subagents).reduce(
+		(total, [id, content]) =>
+			total +
+			Buffer.byteLength(id, "utf8") +
+			Buffer.byteLength(content, "utf8"),
+		0,
+	);
 
 	return {
-		byteSize: rawBytes + derivedBytes,
+		// The primary raw transcript is not retained. Account for compressed
+		// bodies plus a conservative allowance for metadata and subagent strings.
+		byteSize: turnBodies.byteSize + 2 * (rawBytes + derivedBytes),
 		overviewBase,
 		rawSubagents: snapshot.subagents,
 		revision: snapshot.revision,
@@ -1023,6 +1027,7 @@ export function assembleSessionDetailWindow(input: {
 	const { derivation, request } = input;
 	const candidateIndices = getWindowCandidateIndices(derivation, request);
 	const selectedTurns = new Map<number, SessionDetailWindowTurn>();
+	let selectedTurnBytes = 0;
 	let oversizedTurns = 0;
 	let truncatedByBudget = false;
 
@@ -1040,14 +1045,23 @@ export function assembleSessionDetailWindow(input: {
 		const nextWindow = createSessionDetailWindowResponse(derivation, [
 			...nextTurns.entries(),
 		]);
+		const turnBytes = serializedBytes(turn.value);
+		// Count each body once instead of stringifying the entire growing window
+		// for every candidate. Include commas and the exact cursor envelope.
+		const nextBytes =
+			serializedBytes({ ...nextWindow, turns: [] }) +
+			selectedTurnBytes +
+			turnBytes +
+			selectedTurns.size;
 		if (
-			serializedBytes(nextWindow) >
+			nextBytes >
 			(input.budget?.maxBytes ?? SESSION_DETAIL_WINDOW_MAX_RAW_BYTES)
 		) {
 			truncatedByBudget = true;
 			break;
 		}
 		selectedTurns.set(index, turn.value);
+		selectedTurnBytes += turnBytes;
 		if (turn.oversized) {
 			oversizedTurns += 1;
 		}
@@ -1180,6 +1194,18 @@ function createSessionDetailWindowTurn(
 	const summary = derivation.turnSummaries[index];
 	if (!summary) {
 		return undefined;
+	}
+	// The spine already measures response items. Don't inflate a multi-megabyte
+	// response just to discover again that it needs the chunk endpoint.
+	if ((derivation.spine[index]?.responseBytes ?? 0) > maxTurnBytes) {
+		return {
+			oversized: true,
+			value: {
+				...summary,
+				body: null,
+				bodyOmitted: "oversized",
+			} satisfies SessionDetailWindowTurn,
+		};
 	}
 	const cachedTurn = derivation.turnBodies.get(summary.turnId);
 	const body: SessionDetailTurnBody | null = cachedTurn

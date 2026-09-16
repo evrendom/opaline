@@ -1228,6 +1228,33 @@ describe("session detail derivation", () => {
 		).toThrow(StaleSessionDetailCursorError);
 	});
 
+	test("does not decode a body already known to exceed the window budget", () => {
+		const derivation = deriveSessionDetail(snapshot(createTranscript(2)));
+		let decoded = 0;
+		const assembly = assembleSessionDetailWindow({
+			derivation: {
+				...derivation,
+				spine: derivation.spine.map((turn) => ({
+					...turn,
+					responseBytes: SESSION_DETAIL_WINDOW_MAX_TURN_BYTES + 1,
+				})),
+				turnBodies: {
+					...derivation.turnBodies,
+					get(id) {
+						decoded += 1;
+						return derivation.turnBodies.get(id);
+					},
+				},
+			},
+			request: { includeBodies: true, mode: "initial", sessionId: "session-1" },
+		});
+		expect(decoded).toBe(0);
+		expect(assembly.oversizedTurns).toBe(2);
+		expect(
+			assembly.window.turns.every((turn) => turn.bodyOmitted === "oversized"),
+		).toBe(true);
+	});
+
 	test("omits single oversized bodies and truncates the response before 4 MiB", () => {
 		const derivation = deriveSessionDetail(snapshot(createTranscript(8)));
 		const turnBodies = new Map(derivation.turnBodies);
@@ -1338,14 +1365,14 @@ describe("session detail derivation", () => {
 		expect(preview?.endsWith("...")).toBe(true);
 	});
 
-	test("indexes turn and subagent bodies once for cache reuse", () => {
+	test("recovers identical turn and subagent bodies from the prepared revision", () => {
 		const input = snapshot(createTranscript(2));
 		input.subagents = { "agent-1": "raw subagent jsonl" };
 		const derivation = deriveSessionDetail(input);
 		const turnId = derivation.turnSummaries[0]?.turnId;
 		expect(turnId).toBe("user-0");
 		const first = getSessionDetailTurn(derivation, turnId ?? "");
-		expect(getSessionDetailTurn(derivation, turnId ?? "")).toBe(first);
+		expect(getSessionDetailTurn(derivation, turnId ?? "")).toEqual(first);
 		expect(first?.revision).toBe(input.revision);
 		expect(getSessionDetailSubagent(derivation, "agent-1")).toEqual({
 			content: "raw subagent jsonl",

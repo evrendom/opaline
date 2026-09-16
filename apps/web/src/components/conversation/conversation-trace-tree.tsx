@@ -1626,65 +1626,77 @@ export function AgentTraceTreeSection({
 			expandable={expandable}
 		/>
 	);
-	const sectionPanel = (
+	const sectionContent = (
+		<ol className="list-none">
+			{visibleSections.map((section, sectionIndex) => (
+				<AgentTraceTreeRenderedSectionItem
+					key={section.key}
+					defaultOpen={defaultOpen}
+					hasNextSibling={sectionIndex < visibleSections.length - 1}
+					section={section}
+				/>
+			))}
+		</ol>
+	);
+	// Virtual transcript headers are always open. A Collapsible panel would
+	// synchronously read computed styles for every newly mounted row.
+	const sectionPanel = expandable ? (
 		<Collapsible.Panel id={panelId} className="transition-none">
-			<ol className="list-none">
-				{visibleSections.map((section, sectionIndex) => (
-					<AgentTraceTreeRenderedSectionItem
-						key={section.key}
-						defaultOpen={defaultOpen}
-						hasNextSibling={sectionIndex < visibleSections.length - 1}
-						section={section}
-					/>
-				))}
-			</ol>
+			{sectionContent}
 		</Collapsible.Panel>
+	) : (
+		<div id={panelId}>{sectionContent}</div>
 	);
 
-	return (
-		<Collapsible.Root open={open} onOpenChange={setOpen}>
-			<div
-				id={anchorId}
-				className={cn(
-					"min-w-0 scroll-mt-6",
-					conversationTraceStickyOnlyFillClassName,
-				)}
+	const content = (
+		<div
+			id={anchorId}
+			className={cn(
+				"min-w-0 scroll-mt-6",
+				conversationTraceStickyOnlyFillClassName,
+			)}
+		>
+			<ConversationTraceTreeItem
+				childRailExitLength={open && hasContent ? 2 : 0}
+				continues={continuesAfter}
+				descends={open && hasContent}
+				depth={1}
+				rowHeight={headerHeight}
+				sticky={stickyHeader}
+				subtree={sectionPanel}
 			>
-				<ConversationTraceTreeItem
-					childRailExitLength={open && hasContent ? 2 : 0}
-					continues={continuesAfter}
-					descends={open && hasContent}
-					depth={1}
-					rowHeight={headerHeight}
-					sticky={stickyHeader}
-					subtree={sectionPanel}
+				<div
+					className="@container/model-header flex min-h-10 min-w-0 items-center gap-2 pr-3"
+					data-transcript-model-header-source="row"
+					data-transcript-model-header-terminal={
+						modelHeaderData.terminal || undefined
+					}
+					data-trace-hover-row={expandable || undefined}
+					style={headerHeight ? { minHeight: headerHeight } : undefined}
 				>
-					<div
-						className="@container/model-header flex min-h-10 min-w-0 items-center gap-2 pr-3"
-						data-transcript-model-header-source="row"
-						data-transcript-model-header-terminal={
-							modelHeaderData.terminal || undefined
-						}
-						data-trace-hover-row={expandable || undefined}
-						style={headerHeight ? { minHeight: headerHeight } : undefined}
-					>
-						{expandable ? (
-							<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)">
-								{modelHeader}
-							</Collapsible.Trigger>
-						) : (
-							<div className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left">
-								{modelHeader}
-							</div>
-						)}
-						{headerTrailing ? (
-							<div className="ml-auto min-w-0" data-trace-model-metadata>
-								{headerTrailing}
-							</div>
-						) : null}
-					</div>
-				</ConversationTraceTreeItem>
-			</div>
+					{expandable ? (
+						<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)">
+							{modelHeader}
+						</Collapsible.Trigger>
+					) : (
+						<div className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left">
+							{modelHeader}
+						</div>
+					)}
+					{headerTrailing ? (
+						<div className="ml-auto min-w-0" data-trace-model-metadata>
+							{headerTrailing}
+						</div>
+					) : null}
+				</div>
+			</ConversationTraceTreeItem>
+		</div>
+	);
+	return expandable ? (
+		<Collapsible.Root open={open} onOpenChange={setOpen}>
+			{content}
 		</Collapsible.Root>
+	) : (
+		content
 	);
 }

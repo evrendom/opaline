@@ -25,7 +25,6 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Button } from "@/app/ui/button";
-import { Skeleton } from "@/app/ui/skeleton";
 import {
 	ConversationTrace,
 	TraceExpansionNamespaceProvider,
@@ -50,6 +49,7 @@ import {
 	shouldRetrySessionDetailFastQuery,
 } from "./session-detail-fast-query";
 import type { SessionDetailLevel } from "./session-detail-level";
+import { SessionTranscriptLoading } from "./session-detail-loading";
 import type {
 	buildSessionDetailOverviewViewModel,
 	SessionDetailOverviewTurnOption,
@@ -267,7 +267,7 @@ export function SessionDetailFastResponsePane({
 				data-session-trace-presentation="constellation-tree-branch-dots-no-horizontal"
 			>
 				{initialWindowQuery.isPending || hasStaleInitialWindow ? (
-					<TurnBodySkeleton />
+					<SessionTranscriptLoading />
 				) : null}
 				{initialWindowQuery.error && !hasStaleInitialWindow ? (
 					<PaneMessage
@@ -457,6 +457,8 @@ function SessionDetailVirtualTranscript({
 	const [fallbackStates, setFallbackStates] = useState<
 		ReadonlyMap<string, "error" | "loading">
 	>(() => new Map());
+	const pendingBodyIds = useRef(new Set<string>());
+	const [neededTurnIds, setNeededTurnIds] = useState<readonly string[]>([]);
 	const getCachedTurnBody = useCallback(
 		(body: NonNullable<SessionDetailWindow["turns"][number]["body"]>) => {
 			const existing = normalizedBodyCacheRef.current.get(body);
@@ -677,9 +679,9 @@ function SessionDetailVirtualTranscript({
 						body: normalizedBody,
 						bodyState:
 							fallbackState ??
-							(turn?.bodyOmitted === "oversized" && !normalizedBody
-								? ("error" as const)
-								: ("loading" as const)),
+							(snapshot.failedTurnIds.has(spineTurn.turnId)
+								? "error"
+								: "loading"),
 						estimatedHeight: estimatePendingTurnHeight(spineTurn),
 						option,
 						requestUsagePlacement: "start" as const,
@@ -763,6 +765,12 @@ function SessionDetailVirtualTranscript({
 	);
 	const observeVisibleTurnIds = useCallback(
 		(turnIds: readonly string[]) => {
+			setNeededTurnIds((current) =>
+				current.length === turnIds.length &&
+				current.every((id, index) => id === turnIds[index])
+					? current
+					: turnIds,
+			);
 			void windowStore
 				.observeVisibleTurnIds(turnIds)
 				.catch((error: unknown) => {
@@ -775,6 +783,8 @@ function SessionDetailVirtualTranscript({
 	);
 	const retryTurn = useCallback(
 		(turnId: string) => {
+			if (pendingBodyIds.current.has(turnId)) return;
+			pendingBodyIds.current.add(turnId);
 			const input = { revision: snapshot.revision, sessionId, turnId };
 			setFallbackStates((current) => new Map(current).set(turnId, "loading"));
 			void queryClient
@@ -801,10 +811,60 @@ function SessionDetailVirtualTranscript({
 						return;
 					}
 					setFallbackStates((current) => new Map(current).set(turnId, "error"));
+				})
+				.finally(() => {
+					pendingBodyIds.current.delete(turnId);
 				});
 		},
 		[onStaleRevision, queryClient, sessionId, snapshot.revision],
 	);
+	useEffect(() => {
+		// Omitted bodies are pending, not failed. Load only nearby oversized
+		// turns, with at most two body transfers and no automatic error loop.
+		let available = 2 - pendingBodyIds.current.size;
+		for (const turnId of neededTurnIds) {
+			if (available <= 0) break;
+			if (
+				fallbackBodies.has(turnId) ||
+				fallbackStates.has(turnId) ||
+				snapshot.turns.find((turn) => turn.turnId === turnId)?.bodyOmitted !==
+					"oversized"
+			)
+				continue;
+			retryTurn(turnId);
+			available -= 1;
+		}
+	}, [
+		fallbackBodies,
+		fallbackStates,
+		neededTurnIds,
+		retryTurn,
+		snapshot.turns,
+	]);
+	useEffect(() => {
+		if (fallbackBodies.size <= 8) return;
+		const retained = new Map(fallbackBodies);
+		for (const turnId of retained.keys()) {
+			if (retained.size <= 8) break;
+			if (neededTurnIds.includes(turnId)) continue;
+			retained.delete(turnId);
+			queryClient.removeQueries({
+				exact: true,
+				queryKey: sessionDetailTurnQueryKey({
+					revision: snapshot.revision,
+					sessionId,
+					turnId,
+				}),
+			});
+		}
+		if (retained.size !== fallbackBodies.size) setFallbackBodies(retained);
+	}, [
+		fallbackBodies,
+		neededTurnIds,
+		queryClient,
+		sessionId,
+		snapshot.revision,
+	]);
 	const expandTurn = useCallback((turnId: string) => {
 		setExpandedTurnIds((current) =>
 			current.has(turnId) ? current : new Set([...current, turnId]),
@@ -1250,16 +1310,6 @@ function SessionDetailInlineSubagentBranch({
 					renderEventSubtree={renderEventSubtree}
 				/>
 			</TraceExpansionNamespaceProvider>
-		</div>
-	);
-}
-
-function TurnBodySkeleton() {
-	return (
-		<div aria-busy="true" className="grid gap-3 p-4">
-			<output className="sr-only">Loading selected turn</output>
-			<Skeleton className="h-16 w-full rounded-md" />
-			<Skeleton className="h-32 w-full rounded-md" />
 		</div>
 	);
 }

@@ -8,7 +8,6 @@ import {
 	useState,
 } from "react";
 import { Button } from "@/app/ui/button";
-import { Skeleton } from "@/app/ui/skeleton";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { useSessionOpenTracking } from "@/features/sessions/use-session-open-tracking";
@@ -26,6 +25,7 @@ import {
 	shouldRetrySessionDetailFastQuery,
 } from "./session-detail-fast-query";
 import { SessionDetailHeader } from "./session-detail-header";
+import { SessionDetailContentLoadingView } from "./session-detail-loading";
 import { buildSessionDetailOverviewViewModel } from "./session-detail-overview-model";
 import { buildSessionDetailViewModel } from "./session-detail-view-model";
 import {
@@ -42,39 +42,6 @@ type SessionDetailViewProps = {
 	sessionId: string;
 	totalSessions: number;
 };
-
-const SESSION_LOADING_METRICS = [
-	"turns",
-	"duration",
-	"cost",
-	"input",
-	"output",
-	"tools",
-] as const;
-
-function SessionDetailContentLoadingView() {
-	return (
-		<div
-			aria-busy="true"
-			className="grid h-full min-h-0 min-w-0 grid-rows-[5rem_7rem_minmax(0,1fr)]"
-		>
-			<output className="sr-only">Loading session details</output>
-			<div className="grid grid-cols-6 gap-px border-b border-(--dashboardy-divider) bg-(--dashboardy-divider)">
-				{SESSION_LOADING_METRICS.map((metric) => (
-					<div key={metric} className="bg-(--dashboardy-surface) px-4 py-3">
-						<Skeleton className="mb-2 h-3 w-12 rounded-sm" />
-						<Skeleton className="h-4 w-20 rounded-sm" />
-					</div>
-				))}
-			</div>
-			<Skeleton className="m-3 rounded-sm" />
-			<div className="grid min-h-0 grid-cols-2 gap-px bg-(--dashboardy-divider)">
-				<Skeleton className="rounded-none bg-(--dashboardy-surface)" />
-				<Skeleton className="rounded-none bg-(--dashboardy-surface)" />
-			</div>
-		</div>
-	);
-}
 
 function SessionDetailStateMessage({
 	description,

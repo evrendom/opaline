@@ -27,6 +27,12 @@ export interface UseFluidHoverOptions {
 	 */
 	axis?: "x" | "y" | "xy";
 	/**
+	 * Expose active state as DOM attributes for CSS consumers (default: true).
+	 * Disable when only the highlight needs it, to avoid ancestor :has()
+	 * selectors recalculating page styles on every active-item change.
+	 */
+	reflectActiveState?: boolean;
+	/**
 	 * Makes an item invisible to hit-testing without unregistering it — for
 	 * rows that stay mounted while clipped away (a collapsed sub-tree).
 	 * Unregistering would invalidate every measurement; a skipped item keeps
@@ -220,7 +226,12 @@ export function useFluidHover<T extends HTMLElement>(
 	containerRef: RefObject<T | null>,
 	options: UseFluidHoverOptions = {},
 ): UseFluidHoverReturn {
-	const { axis = "y", isItemDisabled, gapClick = true } = options;
+	const {
+		axis = "y",
+		isItemDisabled,
+		gapClick = true,
+		reflectActiveState = true,
+	} = options;
 	const gapClickMaxDistance =
 		typeof gapClick === "object"
 			? (gapClick.maxDistance ?? Infinity)
@@ -231,11 +242,10 @@ export function useFluidHover<T extends HTMLElement>(
 	const activeIndexRef = useRef<number | null>(null);
 	activeIndexRef.current = activeIndex;
 
-	// The state, in the DOM: `data-fluid-hover-active` on the highlighted item
-	// and `data-fluid-hover-active-index` on the container. Devtools shows it
-	// and a test asserts on it without waiting for a frame. React does not
-	// manage these attributes, so it never clobbers them.
+	// Menus and calendars consume these attributes in CSS. The highlight
+	// itself reads activeIndex directly and does not need DOM reflection.
 	useEffect(() => {
+		if (!reflectActiveState) return;
 		const container = containerRef.current;
 		if (activeIndex === null) container?.removeAttribute(ACTIVE_INDEX_ATTR);
 		else container?.setAttribute(ACTIVE_INDEX_ATTR, String(activeIndex));
@@ -243,6 +253,7 @@ export function useFluidHover<T extends HTMLElement>(
 			activeIndex === null ? undefined : itemsRef.current.get(activeIndex);
 		active?.setAttribute(ACTIVE_ATTR, "");
 		return () => {
+			container?.removeAttribute(ACTIVE_INDEX_ATTR);
 			active?.removeAttribute(ACTIVE_ATTR);
 			// A row that re-registered under this index while it was highlighted
 			// (a remount under a new key) was marked by registerItem, not by this
@@ -250,7 +261,7 @@ export function useFluidHover<T extends HTMLElement>(
 			if (activeIndex !== null)
 				itemsRef.current.get(activeIndex)?.removeAttribute(ACTIVE_ATTR);
 		};
-	}, [activeIndex, containerRef]);
+	}, [activeIndex, containerRef, reflectActiveState]);
 	const [itemRects, setItemRects] = useState<ItemRect[]>([]);
 	const [isMeasured, setIsMeasured] = useState(false);
 	const itemRectsRef = useRef<ItemRect[]>([]);
@@ -390,14 +401,14 @@ export function useFluidHover<T extends HTMLElement>(
 			if (element) {
 				itemsRef.current.set(index, element);
 				getItemRo()?.observe(element);
-				if (index === activeIndexRef.current)
+				if (reflectActiveState && index === activeIndexRef.current)
 					element.setAttribute(ACTIVE_ATTR, "");
 			} else {
 				const previous = itemsRef.current.get(index);
 				if (previous) itemRoRef.current?.unobserve(previous);
 				// The mark leaves with the element: a row that only moved to another
 				// index (a filtering list re-ordering) must not carry it there.
-				previous?.removeAttribute(ACTIVE_ATTR);
+				if (reflectActiveState) previous?.removeAttribute(ACTIVE_ATTR);
 				itemsRef.current.delete(index);
 				// The highlighted row is gone: nothing should stay lit or receive a
 				// routed click until the pointer picks again. Decided when the
@@ -415,7 +426,7 @@ export function useFluidHover<T extends HTMLElement>(
 			// container's children swap.
 			remeasure();
 		},
-		[remeasure, getItemRo],
+		[remeasure, getItemRo, reflectActiveState],
 	);
 
 	const handleMouseMove = useCallback(

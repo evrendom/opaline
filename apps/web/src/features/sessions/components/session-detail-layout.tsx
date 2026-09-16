@@ -23,10 +23,10 @@ import {
 import {
 	DEFAULT_SESSION_TRANSCRIPT_PANE_WIDTH_PX,
 	DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX,
-	MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
+	getSessionTurnTablePaneMaximum,
 	MINIMUM_SESSION_TRANSCRIPT_PANE_WIDTH_PX,
 	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
-	SESSION_DETAIL_RESIZE_HANDLE_WIDTH_PX,
+	SESSION_TURN_TABLE_PANE_STORAGE_KEY,
 } from "./session-detail-pane-sizing";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
 import type { SessionThreadOverviewStripConfig } from "./session-thread-overview-config";
@@ -40,8 +40,6 @@ import type { SessionTurnSelection } from "./session-turn-table-selection";
 import { useStableTranscriptWidthDuringWorkspaceResize } from "./session-workspace-resize-behavior";
 
 type SessionDetailViewModel = ReturnType<typeof buildSessionDetailViewModel>;
-
-const TURN_TABLE_PANE_STORAGE_KEY = "rudel:session-turn-table-pane-width:v2";
 
 // Launch clamp: hide the orange transcript viewport pane that tracks scrolling.
 // Keep the underlying viewport synchronization intact for post-launch restoration.
@@ -110,7 +108,7 @@ export function SessionDetailLayout({
 	const layoutWidth = useElementWidth(layoutRef);
 	const [storedTurnTablePaneWidth, setStoredTurnTablePaneWidth] =
 		useStoredPaneSize(
-			TURN_TABLE_PANE_STORAGE_KEY,
+			SESSION_TURN_TABLE_PANE_STORAGE_KEY,
 			DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX,
 		);
 	const [continuousTurnViewportStore] = useState(
@@ -186,15 +184,10 @@ export function SessionDetailLayout({
 	useLayoutEffect(() => {
 		continuousTurnViewportStore.publishSelection(selection);
 	}, [continuousTurnViewportStore, selection]);
-	const turnTablePaneMaximum =
-		layoutWidth > 0
-			? Math.min(
-					MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
-					layoutWidth -
-						minimumTranscriptPaneWidth -
-						SESSION_DETAIL_RESIZE_HANDLE_WIDTH_PX,
-				)
-			: MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX;
+	const turnTablePaneMaximum = getSessionTurnTablePaneMaximum(
+		layoutWidth,
+		minimumTranscriptPaneWidth,
+	);
 	const turnTablePaneWidth = clampPaneSize(
 		storedTurnTablePaneWidth,
 		MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,

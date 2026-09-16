@@ -58,6 +58,129 @@ function window(input: {
 }
 
 describe("session transcript window store", () => {
+	test("warms the next window before a full-spine reader reaches an unloaded turn", async () => {
+		const requests: string[] = [];
+		const store = createSessionTranscriptWindowStore({
+			initialWindow: window({
+				newerCursor: "next",
+				olderCursor: null,
+				total: 20,
+				turns: Array.from({ length: 10 }, (_, i) => turn(i)),
+			}),
+			sessionId: "session-1",
+			fetchWindow: async (request) => {
+				requests.push(request.mode);
+				return window({
+					newerCursor: null,
+					olderCursor: "previous",
+					total: 20,
+					turns: Array.from({ length: 10 }, (_, i) => turn(i + 10)),
+				});
+			},
+		});
+		await store.observeVisibleTurnIds(["turn-1", "turn-2"]);
+		expect(requests).toEqual([]);
+		await store.observeVisibleTurnIds(["turn-6", "turn-7"]);
+		expect(requests).toEqual(["newer"]);
+		expect(store.getSnapshot().turns.at(-1)?.turnId).toBe("turn-19");
+	});
+
+	test("scrolling through neighboring pending turns shares an in-flight window", async () => {
+		const requests: string[] = [];
+		let resolveWindow!: (value: ReturnType<typeof window>) => void;
+		const store = createSessionTranscriptWindowStore({
+			initialWindow: window({
+				newerCursor: "next",
+				olderCursor: null,
+				turns: [turn(0)],
+			}),
+			sessionId: "session-1",
+			fetchWindow: async (request, signal) => {
+				requests.push(request.mode);
+				const result = await new Promise<ReturnType<typeof window>>(
+					(resolve) => {
+						resolveWindow = resolve;
+					},
+				);
+				expect(signal?.aborted).toBe(false);
+				return result;
+			},
+		});
+		const first = store.observeVisibleTurnIds(["turn-2"]);
+		const second = store.observeVisibleTurnIds(["turn-3"]);
+		resolveWindow(
+			window({
+				newerCursor: null,
+				olderCursor: null,
+				turns: [turn(1), turn(2), turn(3), turn(4)],
+			}),
+		);
+		await Promise.all([first, second]);
+		expect(requests).toEqual(["anchor"]);
+		expect(store.getSnapshot().turns).toHaveLength(5);
+	});
+
+	test("waits for a prefetched page instead of starting an overlapping anchor", async () => {
+		const requests: string[] = [];
+		let resolveWindow!: (value: ReturnType<typeof window>) => void;
+		const store = createSessionTranscriptWindowStore({
+			initialWindow: window({
+				newerCursor: "next",
+				olderCursor: null,
+				turns: [turn(0)],
+			}),
+			sessionId: "session-1",
+			fetchWindow: async (request) => {
+				requests.push(request.mode);
+				return new Promise<ReturnType<typeof window>>((resolve) => {
+					resolveWindow = resolve;
+				});
+			},
+		});
+		const prefetch = store.loadDirection("newer");
+		const visible = store.observeVisibleTurnIds(["turn-1"]);
+		expect(requests).toEqual(["newer"]);
+		resolveWindow(
+			window({
+				newerCursor: null,
+				olderCursor: null,
+				turns: [turn(1), turn(2)],
+			}),
+		);
+		await Promise.all([prefetch, visible]);
+		expect(store.getSnapshot().turns).toHaveLength(3);
+	});
+
+	test("marks a failed anchor once and recovers after an explicit retry", async () => {
+		let requests = 0;
+		const store = createSessionTranscriptWindowStore({
+			initialWindow: window({
+				newerCursor: null,
+				olderCursor: null,
+				turns: [turn(0)],
+			}),
+			sessionId: "session-1",
+			fetchWindow: async () => {
+				requests += 1;
+				if (requests === 1) throw new Error("network");
+				return window({
+					newerCursor: null,
+					olderCursor: null,
+					turns: [turn(1)],
+				});
+			},
+		});
+		await expect(store.observeVisibleTurnIds(["turn-1"])).rejects.toThrow(
+			"network",
+		);
+		expect(store.getSnapshot().failedTurnIds.has("turn-1")).toBe(true);
+		await store.observeVisibleTurnIds(["turn-1"]);
+		expect(requests).toBe(1);
+		await store.loadAnchor("turn-1");
+		expect(store.getSnapshot().failedTurnIds.has("turn-1")).toBe(false);
+		expect(store.getSnapshot().turns[1]?.body).not.toBeNull();
+	});
+
 	test("merges directions chronologically, dedupes, and gates stale epochs", async () => {
 		const requests: string[] = [];
 		const store = createSessionTranscriptWindowStore({

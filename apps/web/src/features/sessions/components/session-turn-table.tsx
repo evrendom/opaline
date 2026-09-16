@@ -376,43 +376,44 @@ export function SessionTurnTable({
 		[],
 	);
 
-	function handleRowKeyDown(
-		event: KeyboardEvent<HTMLTableRowElement>,
-		visibleIndex: number,
-	) {
-		if (event.key === "Enter" || event.key === " ") {
-			event.preventDefault();
-			const row = tableRows[visibleIndex];
-			if (row) {
-				onSelect({ index: row.match.index, speaker: row.speaker });
+	const handleRowKeyDown = useCallback(
+		(event: KeyboardEvent<HTMLTableRowElement>, visibleIndex: number) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				const row = tableRows[visibleIndex];
+				if (row) {
+					onSelect({ index: row.match.index, speaker: row.speaker });
+				}
+				return;
 			}
-			return;
-		}
 
-		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
-			return;
-		}
+			if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+				return;
+			}
 
-		event.preventDefault();
-		const direction = event.key === "ArrowDown" ? 1 : -1;
-		const nextVisibleIndex = Math.min(
-			Math.max(visibleIndex + direction, 0),
-			tableRows.length - 1,
-		);
-		const nextRow = tableRows[nextVisibleIndex];
-		if (!nextRow) {
-			return;
-		}
+			event.preventDefault();
+			const direction = event.key === "ArrowDown" ? 1 : -1;
+			const nextVisibleIndex = Math.min(
+				Math.max(visibleIndex + direction, 0),
+				tableRows.length - 1,
+			);
+			const nextRow = tableRows[nextVisibleIndex];
+			if (!nextRow) {
+				return;
+			}
 
-		onSelect({ index: nextRow.match.index, speaker: nextRow.speaker });
-		const nextRowElement = scrollElementRef.current?.querySelector<HTMLElement>(
-			`[data-visible-index="${nextVisibleIndex}"]`,
-		);
-		nextRowElement?.scrollIntoView({ block: "nearest" });
-		window.requestAnimationFrame(() => {
-			nextRowElement?.focus({ preventScroll: true });
-		});
-	}
+			onSelect({ index: nextRow.match.index, speaker: nextRow.speaker });
+			const nextRowElement =
+				scrollElementRef.current?.querySelector<HTMLElement>(
+					`[data-visible-index="${nextVisibleIndex}"]`,
+				);
+			nextRowElement?.scrollIntoView({ block: "nearest" });
+			window.requestAnimationFrame(() => {
+				nextRowElement?.focus({ preventScroll: true });
+			});
+		},
+		[onSelect, tableRows],
+	);
 
 	return (
 		<div className="relative min-h-0 flex-1">

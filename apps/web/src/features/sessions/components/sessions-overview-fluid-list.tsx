@@ -27,6 +27,7 @@ export function SessionsOverviewFluidList({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const hover = useFluidHover(containerRef, {
 		axis: "y",
+		reflectActiveState: false,
 		isItemDisabled: isSessionDisabled,
 		// The empty area below the table must not open the last session.
 		gapClick: { maxDistance: 4 },

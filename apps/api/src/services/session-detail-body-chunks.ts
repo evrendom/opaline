@@ -16,7 +16,7 @@ export function getSessionDetailBodyForChunk(
 	derivation: {
 		revision: string;
 		rawSubagents: Readonly<Record<string, string>>;
-		turnBodies: ReadonlyMap<string, SessionDetailTurn>;
+		turnBodies: Pick<ReadonlyMap<string, SessionDetailTurn>, "get">;
 	},
 	input: Pick<SessionDetailBodyChunkInput, "kind" | "targetId">,
 ): SessionDetailTurn | SessionDetailSubagent | null {
