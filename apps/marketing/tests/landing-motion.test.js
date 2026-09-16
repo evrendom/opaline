@@ -12,6 +12,7 @@ async function scrollTo(page, y) {
 		scroller.scrollTop = y;
 	}, y);
 	await page.waitForTimeout(150);
+	await page.waitForFunction(() => !document.querySelector(".lenis-scrolling"));
 }
 
 async function motionState(page) {
@@ -29,6 +30,7 @@ async function motionState(page) {
 				"data-instant-v2-native-motion",
 			),
 			hero: Number(getComputedStyle(hero).opacity),
+			heroScale: new DOMMatrixReadOnly(getComputedStyle(hero).transform).a,
 			nav: Number(style(".instant-v2-nav-inner").opacity),
 			gradient: Number(style(".instant-v2-hero-gradient").opacity),
 			hiddenControlsInert: [
@@ -147,6 +149,26 @@ for (const [name, engine] of [
 				const middle = await motionState(page);
 				expect(middle.native).toBe(false);
 				expect(middle.hero).toBeCloseTo(0.5, 2);
+				expect(middle.heroScale).toBeCloseTo(0.95, 3);
+				if (name === "WebKit" && width === 1440)
+					expect(middle.legacyVariables[0]).toBe("");
+				else expect(middle.legacyVariables[0]).toBe("0.5000");
+				await scrollTo(page, 200);
+				const faded = await motionState(page);
+				expect(faded.hero).toBe(0);
+				expect(faded.heroScale).toBeCloseTo(0.9, 3);
+				await scrollTo(page, 20);
+				const restored = await motionState(page);
+				expect(restored.hero).toBe(1);
+				expect(restored.heroScale).toBe(1);
+				await page.emulateMedia({ reducedMotion: "reduce" });
+				await scrollTo(page, 110);
+				const reduced = await motionState(page);
+				expect(reduced.hero).toBe(1);
+				expect(reduced.heroScale).toBe(1);
+				await page.emulateMedia({ reducedMotion: "no-preference" });
+				await scrollTo(page, 110);
+				expect((await motionState(page)).hero).toBeCloseTo(0.5, 2);
 				await scrollTo(page, 10000);
 				const end = await motionState(page);
 				expect(end.nav).toBe(0);

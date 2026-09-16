@@ -97,7 +97,14 @@ html[data-instant-v2-native-motion][data-instant-v2-stable-gradient]:not(
 	height: var(--instant-v2-stable-gradient-height);
 	top: var(--instant-v2-stable-gradient-top);
 }
-html[data-instant-v2-native-motion] [data-instant-v2-hero-content] {
+html[data-instant-v2-safari-hero-motion]:not([data-instant-v2-safari-scroll]),
+html[data-instant-v2-safari-hero-motion][data-instant-v2-safari-scroll]
+	.instant-v2-scroll {
+	scroll-timeline: --instant-v2-landing-scroll block;
+	--instant-v2-scroll-timeline: --instant-v2-landing-scroll;
+}
+html:is([data-instant-v2-native-motion], [data-instant-v2-safari-hero-motion])
+	[data-instant-v2-hero-content] {
 	animation: instant-v2-hero-recede auto linear both;
 	animation-timeline: var(--instant-v2-scroll-timeline);
 	animation-range: 20px 200px;

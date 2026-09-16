@@ -1,3 +1,4 @@
+import { usesSafariDemoMotion } from "./demo-browser";
 import {
 	getInstantV2ScrollContainer,
 	getInstantV2ScrollPosition,
@@ -29,10 +30,12 @@ export function initializeInstantV2LandingMotion() {
 	);
 	const phone = matchMedia("(max-width: 540px)");
 	const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+	const safari = usesSafariDemoMotion(navigator.userAgent);
 	const supportsTimeline =
 		CSS.supports("animation-timeline", "scroll()") &&
 		CSS.supports("animation-range", "0px 180px");
 	let nativeMotion = false;
+	let nativeSafariHero = false;
 	let revealEnd = 0;
 	let measuredWidth = -1;
 	let frame = 0;
@@ -41,13 +44,23 @@ export function initializeInstantV2LandingMotion() {
 	const measure = () => {
 		needsMeasurement = false;
 		const wasNative = nativeMotion;
-		nativeMotion =
+		const wasNativeSafariHero = nativeSafariHero;
+		const canUseNativeMotion =
 			supportsTimeline &&
-			phone.matches &&
 			!reducedMotion.matches &&
 			!root.hasAttribute("data-instant-v2-demo") &&
 			!root.hasAttribute("data-instant-v2-demo-exiting");
+		nativeMotion = canUseNativeMotion && phone.matches;
+		// Safari can composite the hero's scroll animation without per-frame
+		// inherited custom-property writes. Keep the desktop Chrome path intact.
+		nativeSafariHero = canUseNativeMotion && safari;
 		root.toggleAttribute("data-instant-v2-native-motion", nativeMotion);
+		root.toggleAttribute(
+			"data-instant-v2-safari-hero-motion",
+			nativeSafariHero,
+		);
+		if (nativeSafariHero && !wasNativeSafariHero)
+			hero.style.removeProperty("--instant-v2-hero-recede-progress");
 		if (nativeMotion) {
 			revealEnd =
 				dashboard.getBoundingClientRect().top +
@@ -98,7 +111,7 @@ export function initializeInstantV2LandingMotion() {
 				? 1
 				: 0
 			: clamp(1 - distance / HANDOVER_DISTANCE);
-		if (!nativeMotion) {
+		if (!nativeMotion && !nativeSafariHero) {
 			const heroProgress = reducedMotion.matches
 				? 0
 				: clamp((scrollY - HERO_START) / HANDOVER_DISTANCE);
@@ -106,6 +119,8 @@ export function initializeInstantV2LandingMotion() {
 				"--instant-v2-hero-recede-progress",
 				heroProgress.toFixed(4),
 			);
+		}
+		if (!nativeMotion) {
 			nav.style.setProperty(
 				"--instant-v2-nav-outgoing-opacity",
 				(1 - progress).toFixed(4),
