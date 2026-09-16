@@ -2,6 +2,10 @@
 
 import { z } from "zod";
 import {
+	createCodexReplayState,
+	shouldSuppressCodexReplayEvent,
+} from "../codex-usage-replay.js";
+import {
 	type SessionRequestBillingDimensions,
 	type SessionRequestUsageEvent,
 	summarizeSessionRequestUsage,
@@ -45,6 +49,7 @@ const tokenUsageSchema = z.object({
 	cached_input_tokens: z.number().nonnegative().optional(),
 	input_tokens: z.number().nonnegative().optional(),
 	output_tokens: z.number().nonnegative().optional(),
+	reasoning_output_tokens: z.number().nonnegative().optional(),
 });
 
 const claudeErrorContentPartSchema = z
@@ -119,6 +124,7 @@ type ClaudeMessageContent = NonNullable<
 export type TokenUsageEvent = SessionRequestUsageEvent;
 
 type TurnMetricsBuilder = {
+	excludedReplayUsageCount: number;
 	editedFiles: string[];
 	errorCount: number;
 	errorEvents: SessionTurnErrorEvent[];
@@ -133,6 +139,7 @@ type PendingFileEdit = {
 };
 
 export type SessionTurnMetrics = {
+	excludedReplayUsageCount?: number;
 	editedFiles: readonly string[];
 	errorCount: number;
 	errorEvents: readonly SessionTurnErrorEvent[];
@@ -172,6 +179,7 @@ function createTurnMetricsBuilders(turnCount: number): TurnMetricsBuilder[] {
 	return Array.from(
 		{ length: turnCount },
 		(): TurnMetricsBuilder => ({
+			excludedReplayUsageCount: 0,
 			editedFiles: [],
 			errorCount: 0,
 			errorEvents: [],
@@ -509,6 +517,7 @@ function extractCodexTurnMetadata(
 	anchors: readonly (number | undefined)[],
 	fallbackModel: string | undefined,
 ) {
+	const replayState = createCodexReplayState(content);
 	let currentModel = fallbackModel;
 	let modelProvider: string | null | undefined;
 	let previousTokenUsageSignature: string | undefined;
@@ -627,6 +636,23 @@ function extractCodexTurnMetadata(
 		}
 
 		const signature = getTokenUsageSignature(totalUsage);
+		const replayTotalKey = [
+			totalUsage.input_tokens ?? 0,
+			totalUsage.cached_input_tokens ?? totalUsage.cache_read_input_tokens ?? 0,
+			totalUsage.output_tokens ?? 0,
+			totalUsage.reasoning_output_tokens ?? 0,
+		].join(":");
+		if (
+			shouldSuppressCodexReplayEvent(
+				replayState,
+				replayTotalKey,
+				line.timestamp,
+			)
+		) {
+			builder.excludedReplayUsageCount += 1;
+			previousTokenUsageSignature = signature;
+			continue;
+		}
 		if (!signature || signature === previousTokenUsageSignature) {
 			continue;
 		}
@@ -653,14 +679,19 @@ function extractCodexTurnMetadata(
 
 function finalizeTurnMetrics(builder: TurnMetricsBuilder): SessionTurnMetrics {
 	const summary = summarizeSessionRequestUsage(builder.usageEvents);
+	const onlyReplay =
+		builder.excludedReplayUsageCount > 0 && builder.usageEvents.length === 0;
 
 	return {
+		...(builder.excludedReplayUsageCount > 0
+			? { excludedReplayUsageCount: builder.excludedReplayUsageCount }
+			: {}),
 		editedFiles: builder.editedFiles,
 		errorCount: builder.errorCount,
 		errorEvents: builder.errorEvents,
-		estimatedCost: summary.estimatedCost ?? undefined,
-		inputTokens: summary.inputTokens ?? undefined,
-		outputTokens: summary.outputTokens ?? undefined,
+		estimatedCost: onlyReplay ? 0 : (summary.estimatedCost ?? undefined),
+		inputTokens: onlyReplay ? 0 : (summary.inputTokens ?? undefined),
+		outputTokens: onlyReplay ? 0 : (summary.outputTokens ?? undefined),
 		skills: builder.skills,
 		skillEvents: builder.skillEvents,
 		usageEvents: builder.usageEvents,
@@ -672,7 +703,7 @@ function addSubagentUsageTotals(
 	subagentMetrics: readonly SessionTurnMetrics[],
 ) {
 	const usageMetrics = [turnMetrics, ...subagentMetrics].filter(
-		(metrics) => metrics.usageEvents.length > 0,
+		(metrics) => metrics.usageEvents.length > 0 || metrics.estimatedCost === 0,
 	);
 	if (usageMetrics.length === 0) {
 		return turnMetrics;
@@ -715,6 +746,7 @@ export function extractTranscriptUsageMetrics(
 	return builder
 		? finalizeTurnMetrics(builder)
 		: finalizeTurnMetrics({
+				excludedReplayUsageCount: 0,
 				editedFiles: [],
 				errorCount: 0,
 				errorEvents: [],

@@ -139,3 +139,30 @@ describe("session detail overview client model", () => {
 		).toBeUndefined();
 	});
 });
+
+test("failed Claude starts retain provider identity without fabricating a model", () => {
+	const overview = overviewFixture();
+	overview.session.modelUsed = null;
+	overview.session.source = "claude_code";
+	overview.session.totalTokens = 0;
+	overview.session.inputTokens = 0;
+	overview.session.outputTokens = 0;
+	overview.context.errors = [{ label: "Authentication failed", count: 1 }];
+	overview.turnPage.items = [];
+	const result = buildSessionDetailOverviewViewModel(overview, {});
+	expect(result.displayModel).toBe("Claude (failed start)");
+	expect(result.safeModelUsed).toBeUndefined();
+});
+
+test("a replay-only fork displays Codex without claiming its inherited model ran", () => {
+	const overview = overviewFixture();
+	overview.session.modelUsed = null;
+	overview.session.source = "codex";
+	overview.session.totalTokens = 0;
+	overview.session.estimatedCost = 0;
+	overview.turnPage.items = [];
+	const result = buildSessionDetailOverviewViewModel(overview, {});
+	expect(result.displayModel).toBe("Codex");
+	expect(result.safeModelUsed).toBeUndefined();
+	expect(result.costLabel).toBe("$0.00");
+});

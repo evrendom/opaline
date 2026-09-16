@@ -34,6 +34,7 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { markSessionOpenFromClick } from "../session-open-timing";
+import { getSessionModelDisplayValue } from "./session-model-identity";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
@@ -176,6 +177,13 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	const repositoryLabel = getRepositoryLabel(session);
 	const branchLabel = getSessionBranchLabel(session);
 	const sessionCost = getSessionOverviewCost(session);
+	const displayModel =
+		getSessionModelDisplayValue({
+			model: session.model_used,
+			source: session.source,
+			totalTokens: session.total_tokens,
+			errorCount: session.error_count ?? 0,
+		}) ?? "";
 	const errorCount = resolveSessionErrorCount(session.error_count);
 	const skillsTitle = session.skills.join(", ");
 	const renderedSkills = session.skills.slice(
@@ -252,7 +260,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<SessionModelMark
 					avatarUrl={avatarUrl}
 					showMember={false}
-					model={session.model_used}
+					model={displayModel}
 					progress={
 						sessionCost === null
 							? undefined
@@ -270,13 +278,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				>
 					<p
 						className={cn(
-							"min-w-0 max-w-28 truncate",
+							"min-w-0 truncate",
+							displayModel === "Claude (failed start)"
+								? "max-w-40"
+								: "max-w-28",
 							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 						)}
-						title={session.model_used}
+						title={displayModel}
 						data-session-overview-model-label
 					>
-						{formatModelDisplayLabel(session.model_used)}
+						{formatModelDisplayLabel(displayModel)}
 					</p>
 					<p
 						className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#0000009b] dark:text-[#ffffffaf]"

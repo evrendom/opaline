@@ -5,6 +5,7 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./codex-usage-replay": "./src/codex-usage-replay.ts",
 		"./model-pricing": "./src/model-pricing.ts",
 		"./organization-paths": "./src/organization-paths.ts",
 		"./reserved-slugs": "./src/reserved-slugs.ts"

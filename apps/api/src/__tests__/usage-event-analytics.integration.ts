@@ -26,6 +26,7 @@ import {
 	buildUsageEventAnalyticsCte,
 } from "../services/usage-event-analytics.service.js";
 import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
+import { codexForkFixture } from "./helpers/codex-fork-fixture.js";
 
 setDefaultTimeout(30_000);
 
@@ -287,7 +288,7 @@ afterAll(async () => {
 });
 
 describe("usage-event analytics ClickHouse rollups", () => {
-	test("matches detail and overview costs from actual Fast and standard transcript records", async () => {
+	test("matches detail and overview costs for Fast, standard and forked transcripts", async () => {
 		const billingOrg = `${organizationId}_billing`;
 		const at = "2026-09-12T12:00:00.000Z";
 		const requests = [
@@ -356,6 +357,18 @@ describe("usage-event analytics ClickHouse rollups", () => {
 						},
 					},
 				}),
+			},
+			{
+				id: "fork_replay_only",
+				source: "codex",
+				cost: 0,
+				content: codexForkFixture(),
+			},
+			{
+				id: "fork_with_own_usage",
+				source: "codex",
+				cost: 0.312,
+				content: codexForkFixture({ ownUsage: true }),
 			},
 		];
 		try {

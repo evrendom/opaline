@@ -357,7 +357,7 @@ function SessionMetrics({
 		costLabel,
 		safeDurationMin,
 		safeInputTokens,
-		safeModelUsed,
+		displayModel,
 		safeOutputTokens,
 		safeUserDisplayName,
 		safeUserId,
@@ -370,7 +370,7 @@ function SessionMetrics({
 		<div className={sessionMetricsGroupClassName}>
 			<SessionInteractionCounts
 				className={cn(sessionMetricItemClassName, "gap-3")}
-				model={safeModelUsed}
+				model={displayModel}
 				modelMessageCount={conversationSummary?.assistantMessages}
 				userDisplayName={safeUserDisplayName}
 				userImageUrl={avatarMap[safeUserId]}

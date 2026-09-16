@@ -99,7 +99,9 @@ export function calculateSessionRequestCost(
 export function sumSessionRequestCosts(
 	entries: readonly SessionRequestCostEntry[],
 ) {
-	const summaries = entries.filter((entry) => entry.usageEventCount > 0);
+	const summaries = entries.filter(
+		(entry) => entry.usageEventCount > 0 || entry.estimatedCost === 0,
+	);
 	if (
 		summaries.length === 0 ||
 		summaries.some((entry) => entry.estimatedCost === null)

@@ -238,7 +238,7 @@ export function SessionDetailLayout({
 					className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-(--session-turn-table-surface) [--session-turn-table-surface:var(--session-overview-surface)]"
 				>
 					<SessionTurnTablePane
-						model={viewModel.safeModelUsed}
+						model={viewModel.displayModel}
 						onPrefetchTurn={onPrefetchTurn}
 						onSelect={handleSelection}
 						options={options}

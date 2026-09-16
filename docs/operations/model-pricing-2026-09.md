@@ -42,3 +42,11 @@ The overview now displays a recorded main model even if its price is unknown. Sy
 For stored `unresolved` events, the read query resolves the preserved raw model against the current dated catalog, then applies the existing timestamp, provider, billing-quality and receipt-consistency checks. This makes existing Astra and Fable 5.1 events priceable without rewriting transcripts, re-uploading sessions or running a database backfill. New ingestion also recognizes those models through the updated catalog version. An unknown future model still displays its recorded identity and remains unpriced.
 
 The daily rollup uses a left ANY metadata join plus a tenant-match filter. This preserves each usage date on the left while retaining one metadata match; the previous inner ANY join could collapse multiple usage dates for one session. Tests cover the two sides of Sol's price change both in a session total and as separate daily rows.
+
+## Forked history and provider display
+
+Codex forks can replay parent token-count records as a dense burst at snapshot creation. Ingestion and detail parsing now use the same replay detector. Excluded records contribute neither new tokens nor cost; a fork with only replayed usage has a known $0 total. Subsequent child requests still use their recorded tier, model and date. Detail totals for those forks come from the surviving request usage rather than legacy cumulative snapshot totals. A copied parent model is not used as proof that a replay-only child ran that model.
+
+When the model identity is absent, the UI uses the session source for display only: Codex shows the OpenAI/Codex icon and `Codex`; Claude sessions with errors and zero recorded tokens show the Claude icon and `Claude (failed start)`. Other Claude sessions without a model use `Claude Code`. These labels are not written into model metadata or used for pricing.
+
+Verified against the five reported local sessions: the three authentication/access failures have no model usage; both August 28 Codex forks have only copied usage, and now show $0 and zero new tokens in detail as well as overview. Regression coverage also checks a fork that continues with a new Fast request and a normal non-fork with closely spaced usage records.

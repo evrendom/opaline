@@ -9,6 +9,7 @@ import {
 	buildSessionDetailViewModel,
 	formatSessionCost,
 } from "./session-detail-view-model";
+import { getSessionModelDisplayValue } from "./session-model-identity";
 import type { SessionTurnTablePaneOption } from "./session-turn-table-pane";
 import type { SessionTurn } from "./session-turns";
 
@@ -67,6 +68,15 @@ export function buildSessionDetailOverviewViewModel(
 
 	return {
 		...base,
+		displayModel: getSessionModelDisplayValue({
+			model: modelUsed,
+			source: session.source,
+			totalTokens: session.totalTokens,
+			errorCount: overview.context.errors.reduce(
+				(sum, error) => sum + error.count,
+				0,
+			),
+		}),
 		costLabel: formatSessionCost(session.estimatedCost),
 		subagentNames: overview.subagents.map((subagent) => subagent.subagentId),
 		subagentSummaries: overview.subagents.map((subagent) => ({

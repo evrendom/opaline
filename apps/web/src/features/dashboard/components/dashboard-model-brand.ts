@@ -26,6 +26,9 @@ function formatFallbackModelLabel(model: string) {
 
 export function formatModelDisplayLabel(model: string) {
 	const normalizedModel = model.trim().toLowerCase();
+	if (normalizedModel === "codex") return "Codex";
+	if (normalizedModel === "claude (failed start)")
+		return "Claude (failed start)";
 	const fableVersion = normalizeModelVersion(
 		normalizedModel.match(/fable[-_ ]?([0-9]+(?:[._][0-9]+)?)/)?.[1],
 	);

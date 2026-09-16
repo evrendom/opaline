@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+	createCodexReplayState,
+	shouldSuppressCodexReplayEvent,
+} from "@rudel/api-routes/codex-usage-replay";
 import { resolveCanonicalModelIdentity } from "@rudel/api-routes/model-pricing";
 import {
 	USAGE_EVENT_EXTRACTION_VERSION,
@@ -17,7 +21,6 @@ const SYNTHETIC_MODEL = "<synthetic>";
 const MAX_DIAGNOSTIC_DETAILS_PER_CODE = 20;
 const MAX_DIAGNOSTIC_DETAIL_CHARACTERS = 256;
 const DIAGNOSTIC_DETAILS_OVERFLOW = "<additional-details-omitted>";
-const CODEX_REPLAY_BURST_MAX_GAP_MS = 1_000;
 
 interface MutableDiagnostic {
 	count: number;
@@ -59,13 +62,6 @@ interface CodexVector {
 	cacheReadInputTokens: number;
 	outputTokens: number;
 	reasoningOutputTokens: number;
-}
-
-interface CodexReplayState {
-	active: boolean;
-	previousTimestampMs: number;
-	previousTotalKey: string;
-	suppressedTransitionKeys: Set<string>;
 }
 
 interface MutableUsageEvent extends Omit<UsageEvent, "qualityFlags"> {
@@ -928,93 +924,6 @@ function extractCodexEvents(
 	);
 
 	return events;
-}
-
-function createCodexReplayState(content: string): CodexReplayState {
-	const replayStart = hasCodexParentMetadata(content)
-		? detectCodexReplayBurstStart(content)
-		: null;
-	return {
-		active: replayStart !== null,
-		previousTimestampMs: replayStart ?? 0,
-		previousTotalKey: "",
-		suppressedTransitionKeys: new Set<string>(),
-	};
-}
-
-function hasCodexParentMetadata(content: string): boolean {
-	const newline = content.indexOf("\n");
-	const firstLine = content
-		.slice(0, newline === -1 ? content.length : newline)
-		.trim();
-	if (firstLine === "") return false;
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(firstLine);
-	} catch {
-		return false;
-	}
-	const value = readRecord(parsed);
-	const payload = readRecord(value?.payload);
-	if (value?.type !== "session_meta" || !payload) return false;
-	const source = readRecord(payload.source);
-	const subagent = readRecord(source?.subagent);
-	const threadSpawn = readRecord(subagent?.thread_spawn);
-	const parentId =
-		readNonEmptyString(payload.forked_from_id) ??
-		readNonEmptyString(threadSpawn?.parent_thread_id);
-	const sessionId = readNonEmptyString(payload.id);
-	return parentId !== undefined && parentId !== sessionId;
-}
-
-function detectCodexReplayBurstStart(content: string): number | null {
-	const timestamps: number[] = [];
-	visitJsonLines(content, new Map<string, MutableDiagnostic>(), (line) => {
-		const payload = readRecord(line.value.payload);
-		if (line.value.type !== "event_msg" || payload?.type !== "token_count") {
-			return;
-		}
-		const info = readRecord(payload.info);
-		if (
-			!readRecord(info?.last_token_usage) &&
-			!readRecord(info?.total_token_usage)
-		) {
-			return;
-		}
-		const occurredAt = readTimestamp(line.value.timestamp);
-		if (occurredAt === null) return;
-		timestamps.push(Date.parse(occurredAt));
-		return timestamps.length < 2;
-	});
-	const first = timestamps[0];
-	const second = timestamps[1];
-	if (first === undefined || second === undefined) return null;
-	const gap = second - first;
-	return gap >= 0 && gap <= CODEX_REPLAY_BURST_MAX_GAP_MS ? first : null;
-}
-
-function shouldSuppressCodexReplayEvent(
-	state: CodexReplayState,
-	totalKey: string,
-	occurredAt: string | null,
-): boolean {
-	if (!state.active) return false;
-	if (state.previousTotalKey !== "" && state.previousTotalKey === totalKey) {
-		return true;
-	}
-	if (occurredAt === null) {
-		state.active = false;
-		return false;
-	}
-	const timestampMs = Date.parse(occurredAt);
-	const gap = timestampMs - state.previousTimestampMs;
-	if (gap >= 0 && gap <= CODEX_REPLAY_BURST_MAX_GAP_MS) {
-		state.previousTimestampMs = timestampMs;
-		state.previousTotalKey = totalKey;
-		return true;
-	}
-	state.active = false;
-	return false;
 }
 
 function emitCodexTransition(input: {
