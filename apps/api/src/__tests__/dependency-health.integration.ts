@@ -1,5 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createServer, type Socket } from "node:net";
+import { createClient } from "@clickhouse/client-web";
+import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+import postgres from "postgres";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -17,6 +20,104 @@ afterAll(async () => {
 });
 
 describe("database readiness", () => {
+	for (const missingPrivilege of ["INSERT", "SELECT"]) {
+		test(`reports ClickHouse unavailable when SELECT 1 succeeds but storage ${missingPrivilege} is denied`, async () => {
+			const url = process.env.CLICKHOUSE_URL;
+			expect(url).toBeTruthy();
+			const admin = createClient({
+				url,
+				username: resolveClickHouseUsername(process.env, url),
+				password: process.env.CLICKHOUSE_PASSWORD || "",
+			});
+			const username = `health_${crypto.randomUUID().replaceAll("-", "")}`;
+			const restricted = createClient({ url, username, password: "" });
+			await admin.command({
+				query: `CREATE USER ${username} IDENTIFIED WITH no_password`,
+			});
+			try {
+				const allowedPrivilege =
+					missingPrivilege === "INSERT" ? "SELECT" : "INSERT";
+				await admin.command({
+					query: `GRANT ${allowedPrivilege} ON rudel.dependency_health_probes TO ${username}`,
+				});
+				const trivial = await restricted.query({
+					query: "SELECT 1 AS healthy",
+					format: "JSONEachRow",
+				});
+				expect(await trivial.json()).toEqual([{ healthy: 1 }]);
+				const base = await start({
+					CLICKHOUSE_USERNAME: username,
+					CLICKHOUSE_USER: username,
+					CLICKHOUSE_PASSWORD: "",
+				});
+				const response = await fetch(`${base}/health/ready`);
+				expect(response.status).toBe(503);
+				expect(await response.json()).toMatchObject({
+					status: "unavailable",
+					dependencies: {
+						postgres: { status: "ok" },
+						clickhouse: { status: "unavailable" },
+					},
+				});
+				// Granting the missing privilege makes the same real storage probe pass.
+				await admin.command({
+					query: `GRANT ${missingPrivilege} ON rudel.dependency_health_probes TO ${username}`,
+				});
+				const recovered = await start({
+					CLICKHOUSE_USERNAME: username,
+					CLICKHOUSE_USER: username,
+					CLICKHOUSE_PASSWORD: "",
+				});
+				expect((await fetch(`${recovered}/health/ready`)).status).toBe(200);
+			} finally {
+				await restricted.close();
+				await admin.command({ query: `DROP USER ${username}` });
+				await admin.close();
+			}
+		}, 15_000);
+	}
+
+	test("reports Postgres unavailable when SELECT 1 succeeds on a read-only connection", async () => {
+		const url = process.env.PG_CONNECTION_STRING;
+		if (!url) throw new Error("PG_CONNECTION_STRING is required");
+		const admin = postgres(url);
+		const username = `health_${crypto.randomUUID().replaceAll("-", "")}`;
+		const restrictedUrl = new URL(url);
+		restrictedUrl.username = username;
+		restrictedUrl.password = "health-test-only";
+		const restricted = postgres(restrictedUrl.toString());
+		await admin.unsafe(
+			`CREATE ROLE ${username} LOGIN PASSWORD 'health-test-only'`,
+		);
+		try {
+			await admin.unsafe(
+				`GRANT SELECT, INSERT, DELETE ON dependency_health_probe TO ${username}`,
+			);
+			await admin.unsafe(
+				`ALTER ROLE ${username} SET default_transaction_read_only = on`,
+			);
+			expect([...(await restricted`SELECT 1 AS healthy`)]).toEqual([
+				{ healthy: 1 },
+			]);
+			const base = await start({
+				PG_CONNECTION_STRING: restrictedUrl.toString(),
+			});
+			const response = await fetch(`${base}/health/ready`);
+			expect(response.status).toBe(503);
+			expect(await response.json()).toMatchObject({
+				dependencies: {
+					postgres: { status: "unavailable" },
+					clickhouse: { status: "ok" },
+				},
+			});
+		} finally {
+			await restricted.end();
+			await admin.unsafe(`DROP OWNED BY ${username}`);
+			await admin.unsafe(`DROP ROLE ${username}`);
+			await admin.end();
+		}
+	}, 15_000);
+
 	test("runs real queries, supports concurrent probes and HEAD, and rejects mutations", async () => {
 		const base = await start();
 		const responses = await Promise.all(

@@ -3,7 +3,7 @@ import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
 import postgres from "postgres";
 
 const TIMEOUT_MS = 3_000;
-const CACHE_MS = 5_000;
+const CACHE_MS = 30_000;
 
 interface DependencyStatus {
 	status: "ok" | "unavailable";
@@ -82,12 +82,23 @@ async function checkPostgres(): Promise<void> {
 		max: 1,
 		prepare: false,
 		connect_timeout: 2,
-		connection: { statement_timeout: 2_000 },
+		connection: { statement_timeout: 2_000, synchronous_commit: "on" },
 	});
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		await Promise.race([
-			sql`SELECT 1`,
+			(async () => {
+				const probeId = crypto.randomUUID();
+				// These are separate autocommitted statements: a rollback-only test
+				// would not establish that the database can commit a write.
+				await sql`INSERT INTO dependency_health_probe (id) VALUES (${probeId})`;
+				const rows = await sql<{ id: string }[]>`
+					SELECT id FROM dependency_health_probe WHERE id = ${probeId}`;
+				if (rows[0]?.id !== probeId)
+					throw new Error("Postgres storage probe was not readable");
+				await sql`DELETE FROM dependency_health_probe
+					WHERE id = ${probeId} OR created_at < now() - interval '1 day'`;
+			})(),
 			new Promise<never>((_, reject) => {
 				timer = setTimeout(
 					() => reject(new Error("Postgres health timeout")),
@@ -112,14 +123,37 @@ async function checkClickHouse(): Promise<void> {
 		request_timeout: TIMEOUT_MS,
 	});
 	try {
-		const result = await client.query({
-			query: "SELECT 1 AS healthy",
-			format: "JSONEachRow",
-			abort_signal: AbortSignal.timeout(TIMEOUT_MS),
+		// SELECT 1 only exercises the query frontend. Require an acknowledged
+		// storage write and an uncached read of that exact row instead. A fresh ID
+		// prevents old canary data or query-cache hits from masking an outage.
+		const probeId = crypto.randomUUID();
+		const signal = AbortSignal.timeout(TIMEOUT_MS);
+		await client.command({
+			query: `INSERT INTO rudel.dependency_health_probes (probe_id)
+				SETTINGS async_insert = 1, wait_for_async_insert = 1,
+					async_insert_use_adaptive_busy_timeout = 0,
+					async_insert_busy_timeout_ms = 200
+				FORMAT JSONEachRow ${JSON.stringify({ probe_id: probeId })}`,
+			abort_signal: signal,
 			clickhouse_settings: { max_execution_time: 2 },
 		});
-		const rows = await result.json<{ healthy: number }>();
-		if (rows[0]?.healthy !== 1) throw new Error("Unexpected health response");
+		const result = await client.query({
+			query: `SELECT probe_id FROM rudel.dependency_health_probes
+				WHERE probe_id = {probeId:UUID} LIMIT 1`,
+			query_params: { probeId },
+			format: "JSONEachRow",
+			abort_signal: signal,
+			clickhouse_settings: {
+				max_execution_time: 2,
+				timeout_before_checking_execution_speed: 0,
+				max_rows_to_read: "100000",
+				max_bytes_to_read: "1048576",
+				use_query_cache: 0,
+			},
+		});
+		const rows = await result.json<{ probe_id: string }>();
+		if (rows[0]?.probe_id !== probeId)
+			throw new Error("ClickHouse storage probe was not readable");
 	} finally {
 		await client.close();
 	}

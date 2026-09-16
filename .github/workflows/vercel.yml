@@ -115,6 +115,13 @@ jobs:
             --yes \
             -- --fail --silent --show-error --output /tmp/opaline-index.html
           test -s /tmp/opaline-index.html
+
+      - name: Smoke database-backed demo sessions
+        if: vars.SKIP_DATABASE_SMOKE_CHECK != 'true'
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: |
           vercel curl /api/demo/rpc/analytics/sessions/list \
             --deployment "${DEPLOYMENT_URL}" \
             --scope=opalinehq \
@@ -124,6 +131,13 @@ jobs:
             --header 'Content-Type: application/json' \
             --data '{"json":{"limit":1}}' \
             | jq --exit-status '.json | type == "array"'
+
+      - name: Report database smoke check bypass
+        if: vars.SKIP_DATABASE_SMOKE_CHECK == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Database-backed demo smoke check skipped because SKIP_DATABASE_SMOKE_CHECK=true."
+          echo "Database-backed demo smoke check skipped for a known outage. Remove the SKIP_DATABASE_SMOKE_CHECK repository variable after recovery to restore it. Build, tests, liveness and web shell checks remain required." >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish verified development preview
         if: inputs.target == 'preview'
