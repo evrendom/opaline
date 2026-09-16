@@ -223,13 +223,10 @@ export const PRODUCT_ANALYTICS_EVENTS = {
 	SESSION_UPLOAD_COMPLETED: "Session Upload Completed",
 	DASHBOARD_VIEWED: "Dashboard Viewed",
 	DASHBOARD_LOAD_FAILED: "Dashboard Load Failed",
-	DASHBOARD_NAVIGATION_CLICKED: "Dashboard Navigation Clicked",
 	DASHBOARD_FILTER_CHANGED: "Dashboard Filter Changed",
 	DASHBOARD_DRILLDOWN_OPENED: "Dashboard Drilldown Opened",
-	CHART_EXPORT_TRIGGERED: "Chart Export Triggered",
 	ORGANIZATION_ACTION_TRIGGERED: "Organization Action Triggered",
 	AUTHENTICATION_ACTION_TRIGGERED: "Authentication Action Triggered",
-	UI_UTILITY_USED: "UI Utility Used",
 	INVITE_SENT: "Invite Sent",
 	ORGANIZATION_MEMBER_JOINED: "Organization Member Joined",
 	ORGANIZATION_DELETED: "Organization Deleted",
@@ -384,15 +381,12 @@ export const DashboardLoadFailedEventSchema = DashboardWebEventSchema.extend({
 	date_range_days: z.number().int().nonnegative(),
 	is_blocking: z.boolean(),
 	http_status: z.number().int().positive().optional(),
-}).strict();
-
-export const DashboardNavigationClickedEventSchema = WebEventSchema.extend({
-	nav_type: nonEmptyStringSchema,
-	to_page_name: ProductAnalyticsPageNameSchema.optional(),
-	target_path: nonEmptyStringSchema.optional(),
-	target_type: nonEmptyStringSchema.optional(),
-	target_id: nonEmptyStringSchema.optional(),
-	rank: z.number().int().nonnegative().optional(),
+	session_id: idSchema.optional(),
+	load_duration_ms: z.number().finite().nonnegative().optional(),
+	load_start_source: z.enum(["navigation", "mount"]).optional(),
+	load_milestone: z.literal("initial_error_rendered").optional(),
+	cache_hit: z.boolean().optional(),
+	was_backgrounded: z.boolean().optional(),
 }).strict();
 
 export const DashboardFilterChangedCaptureInputSchema =
@@ -431,14 +425,6 @@ export type DashboardDrilldownOpenedCaptureInput = z.infer<
 	typeof DashboardDrilldownOpenedCaptureInputSchema
 >;
 
-export const ChartExportTriggeredEventSchema = DashboardWebEventSchema.extend({
-	chart_id: nonEmptyStringSchema,
-	export_type: z.enum(["copy_image", "download_png", "share_x"]),
-	chart_kind: nonEmptyStringSchema.optional(),
-	share_destination: nonEmptyStringSchema.optional(),
-	visible_series_count: z.number().int().nonnegative().optional(),
-}).strict();
-
 export const OrganizationActionTriggeredEventSchema = WebEventSchema.extend({
 	action_name: nonEmptyStringSchema,
 	target_type: nonEmptyStringSchema,
@@ -460,25 +446,6 @@ export const AuthenticationActionTriggeredEventSchema = WebEventSchema.extend({
 	http_status: z.number().int().positive().optional(),
 }).strict();
 
-export const UiUtilityUsedEventSchema = WebEventSchema.extend({
-	utility_name: nonEmptyStringSchema,
-	component_id: nonEmptyStringSchema,
-	// target_id lets product flows tie a utility event back to a concrete share,
-	// invite, or entity without forcing every UI interaction into a custom event.
-	target_id: nonEmptyStringSchema.optional(),
-	// Feature-specific fields stay optional so low-value UI helpers can remain
-	// generic while core product loops graduate to their own event names.
-	share_id: nonEmptyStringSchema.optional(),
-	entry_source: nonEmptyStringSchema.optional(),
-	redirect_target: nonEmptyStringSchema.optional(),
-	archetype_id: nonEmptyStringSchema.optional(),
-	public_payload_version: z.number().int().positive().optional(),
-	is_authenticated_viewer: z.boolean().optional(),
-	is_new_user: z.boolean().optional(),
-	resolved_entry_route: nonEmptyStringSchema.optional(),
-	utility_state: nonEmptyStringSchema.optional(),
-}).strict();
-
 export const ProductAnalyticsEventSchemas = {
 	[PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP]: AccountSignedUpEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.SIGN_UP_FAILED]: SignUpFailedEventSchema,
@@ -494,19 +461,14 @@ export const ProductAnalyticsEventSchemas = {
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_VIEWED]: DashboardViewedEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_LOAD_FAILED]:
 		DashboardLoadFailedEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_NAVIGATION_CLICKED]:
-		DashboardNavigationClickedEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_FILTER_CHANGED]:
 		DashboardFilterChangedEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_DRILLDOWN_OPENED]:
 		DashboardDrilldownOpenedEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.CHART_EXPORT_TRIGGERED]:
-		ChartExportTriggeredEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_ACTION_TRIGGERED]:
 		OrganizationActionTriggeredEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]:
 		AuthenticationActionTriggeredEventSchema,
-	[PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED]: UiUtilityUsedEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]:
 		OrganizationMemberJoinedEventSchema,
@@ -533,17 +495,11 @@ export type DashboardViewedEvent = z.infer<typeof DashboardViewedEventSchema>;
 export type DashboardLoadFailedEvent = z.infer<
 	typeof DashboardLoadFailedEventSchema
 >;
-export type DashboardNavigationClickedEvent = z.infer<
-	typeof DashboardNavigationClickedEventSchema
->;
 export type DashboardFilterChangedEvent = z.infer<
 	typeof DashboardFilterChangedEventSchema
 >;
 export type DashboardDrilldownOpenedEvent = z.infer<
 	typeof DashboardDrilldownOpenedEventSchema
->;
-export type ChartExportTriggeredEvent = z.infer<
-	typeof ChartExportTriggeredEventSchema
 >;
 export type OrganizationActionTriggeredEvent = z.infer<
 	typeof OrganizationActionTriggeredEventSchema
@@ -551,7 +507,6 @@ export type OrganizationActionTriggeredEvent = z.infer<
 export type AuthenticationActionTriggeredEvent = z.infer<
 	typeof AuthenticationActionTriggeredEventSchema
 >;
-export type UiUtilityUsedEvent = z.infer<typeof UiUtilityUsedEventSchema>;
 export type InviteSentEvent = z.infer<typeof InviteSentEventSchema>;
 export type OrganizationMemberJoinedEvent = z.infer<
 	typeof OrganizationMemberJoinedEventSchema
@@ -572,13 +527,10 @@ export interface ProductAnalyticsEventPayloadMap {
 	[PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED]: SessionUploadCompletedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_VIEWED]: DashboardViewedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_LOAD_FAILED]: DashboardLoadFailedEvent;
-	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_NAVIGATION_CLICKED]: DashboardNavigationClickedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_FILTER_CHANGED]: DashboardFilterChangedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_DRILLDOWN_OPENED]: DashboardDrilldownOpenedEvent;
-	[PRODUCT_ANALYTICS_EVENTS.CHART_EXPORT_TRIGGERED]: ChartExportTriggeredEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_ACTION_TRIGGERED]: OrganizationActionTriggeredEvent;
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]: AuthenticationActionTriggeredEvent;
-	[PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED]: UiUtilityUsedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]: OrganizationMemberJoinedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_DELETED]: OrganizationDeletedEvent;

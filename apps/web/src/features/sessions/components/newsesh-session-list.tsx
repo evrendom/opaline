@@ -30,6 +30,7 @@ import {
 } from "@/lib/format";
 import { formatExactDateTime, formatRelativeTime } from "@/lib/time-utils";
 import { cn } from "@/lib/utils";
+import { markSessionOpenFromClick } from "../session-open-timing";
 import {
 	getNewseshLanguageSignalMatches,
 	type NewseshLanguageSignalMatch,
@@ -305,7 +306,10 @@ function NewseshSessionRow({
 					aria-current={isActive ? "page" : undefined}
 					className={rowClassName}
 					data-selected={isActive ? "true" : undefined}
-					onClick={() => onSessionClick(session)}
+					onClick={(event) => {
+						markSessionOpenFromClick(session.session_id, isActive, event);
+						onSessionClick(session);
+					}}
 					to={getSessionHref(session)}
 					viewTransition
 				>

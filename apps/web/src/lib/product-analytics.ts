@@ -1,11 +1,9 @@
 import {
 	type ProductAnalyticsPageName as AppPageName,
 	type AuthenticationActionTriggeredEvent,
-	type ChartExportTriggeredEvent,
 	type DashboardDrilldownOpenedCaptureInput,
 	type DashboardFilterChangedCaptureInput,
 	type DashboardLoadFailedEvent,
-	type DashboardNavigationClickedEvent,
 	type ProductAnalyticsDashboardPageName as DashboardPageName,
 	type DashboardViewedCaptureInput,
 	type OrganizationActionTriggeredEvent,
@@ -16,7 +14,6 @@ import {
 	type ProductAnalyticsEnvironment,
 	type ProductAnalyticsEventName,
 	type SignUpFailedEvent,
-	type UiUtilityUsedEvent,
 } from "@rudel/api-routes";
 import {
 	appRoutes,
@@ -276,12 +273,6 @@ export function captureDashboardLoadFailed(
 	captureEvent(PRODUCT_ANALYTICS_EVENTS.DASHBOARD_LOAD_FAILED, payload);
 }
 
-export function captureDashboardNavigationClicked(
-	payload: WebCapturePayload<DashboardNavigationClickedEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.DASHBOARD_NAVIGATION_CLICKED, payload);
-}
-
 export function captureDashboardFilterChanged(
 	payload: DashboardFilterChangedCaptureInput,
 ) {
@@ -298,12 +289,6 @@ export function captureDashboardDrilldownOpened(
 	});
 }
 
-export function captureChartExportTriggered(
-	payload: WebCapturePayload<ChartExportTriggeredEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.CHART_EXPORT_TRIGGERED, payload);
-}
-
 export function captureOrganizationActionTriggered(
 	payload: WebCapturePayload<OrganizationActionTriggeredEvent>,
 ) {
@@ -317,12 +302,6 @@ export function captureAuthenticationActionTriggered(
 		PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED,
 		payload,
 	);
-}
-
-export function captureUiUtilityUsed(
-	payload: WebCapturePayload<UiUtilityUsedEvent>,
-) {
-	captureEvent(PRODUCT_ANALYTICS_EVENTS.UI_UTILITY_USED, payload);
 }
 
 const ANALYTICS_PAGE_MATCHERS: ReadonlyArray<{

@@ -20,6 +20,7 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
+import { markSessionOpen } from "./session-open-timing";
 
 const loadSessionDetailView = () =>
 	import("@/features/sessions/components/SessionDetailView").then((module) => ({
@@ -156,6 +157,7 @@ export function SessionsPage() {
 		if (!targetSession) {
 			return;
 		}
+		markSessionOpen(targetSession.session_id);
 
 		navigate(
 			getShellRoutePath(appRoutes.sessionDetail(targetSession.session_id)),
