@@ -87,6 +87,19 @@ export const RudelCodexSessionsRowSchema = z.object({
 export type RudelCodexSessionsRowInput = z.input<typeof RudelCodexSessionsRowSchema>
 export type RudelCodexSessionsRowOutput = z.output<typeof RudelCodexSessionsRowSchema>
 
+export type RudelDependencyHealthProbesRow = {
+  probe_id: string
+  probed_at: string
+}
+
+export const RudelDependencyHealthProbesRowSchema = z.object({
+  probe_id: z.string(),
+  probed_at: z.string(),
+})
+
+export type RudelDependencyHealthProbesRowInput = z.input<typeof RudelDependencyHealthProbesRowSchema>
+export type RudelDependencyHealthProbesRowOutput = z.output<typeof RudelDependencyHealthProbesRowSchema>
+
 export type RudelSessionAnalyticsRow = {
   session_date: string
   last_interaction_date: string

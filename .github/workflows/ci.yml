@@ -228,6 +228,9 @@ jobs:
       - name: Apply product launch ClickHouse metadata
         run: bun run --cwd packages/ch-schema ch:migrate:product-launch
 
+      - name: Apply ClickHouse storage probe table
+        run: bun run --cwd packages/ch-schema ch:migrate:dependency-health
+
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream
 
