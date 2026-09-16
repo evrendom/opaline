@@ -22,6 +22,24 @@ Before deploying this version, apply the additive schemas with `bun run --cwd pa
 
 Verification: real-database regression cases cover a successful `SELECT 1` with ClickHouse INSERT denied, SELECT denied, and Postgres in read-only mode, as well as healthy storage, unavailable databases and stalled TCP connections. ClickHouse permission recovery returns readiness to 200. The new probe was also run against the live configured backend during the insert outage and returned 503 with ClickHouse unavailable.
 
+## Deploying during a known database outage
+
+The Vercel workflow normally requires the database-backed demo sessions request to succeed before promotion. During a known outage, set the GitHub repository variable `SKIP_DATABASE_SMOKE_CHECK` to `true` to bypass only that request:
+
+```sh
+gh variable set SKIP_DATABASE_SMOKE_CHECK --repo opalinehq/athena --body true
+```
+
+The workflow emits a warning and records the bypass in its summary. Builds, CI tests against disposable databases, `/health`, `/rpc/health`, and the web shell checks remain required. This flag does not change `/health/ready` or uptime alerts. It applies to both preview and production deployments and permits promotion while database-backed features are unavailable.
+
+After database recovery, restore the mandatory demo check:
+
+```sh
+gh variable delete SKIP_DATABASE_SMOKE_CHECK --repo opalinehq/athena
+```
+
+With the variable absent or any value other than `true`, the demo check runs normally.
+
 ## Session timing in PostHog
 
 A completed session open reuses **Dashboard Viewed** with `page_name = session_detail`. There is no new success event, per-render event, or custom pageview/click event. The component reports once per mounted session view; background refetches and date filter changes do not generate additional opens. A different session ID remounts the view.
