@@ -223,7 +223,7 @@ export const SessionTranscriptList = forwardRef<
 	const stickyHeaderGroups = useMemo(
 		() =>
 			deriveTranscriptStickyHeaderGroups({
-				agentModel: viewModel.safeModelUsed,
+				agentModel: viewModel.displayModel,
 				headerHeights: stickyHeaderHeights,
 				rows: model.rows,
 				userImageUrl,
@@ -233,7 +233,7 @@ export const SessionTranscriptList = forwardRef<
 			model.rows,
 			stickyHeaderHeights,
 			userImageUrl,
-			viewModel.safeModelUsed,
+			viewModel.displayModel,
 			viewModel.safeUserDisplayName,
 		],
 	);
@@ -1252,11 +1252,11 @@ function TranscriptRowContent({
 				<ConversationTraceDerivedSectionRow
 					agentLabel={
 						modelHeaderData?.agentLabel ??
-						(viewModel.safeModelUsed
-							? formatModelDisplayLabel(viewModel.safeModelUsed)
+						(viewModel.displayModel
+							? formatModelDisplayLabel(viewModel.displayModel)
 							: undefined)
 					}
-					agentModel={modelHeaderData?.agentModel ?? viewModel.safeModelUsed}
+					agentModel={modelHeaderData?.agentModel ?? viewModel.displayModel}
 					allEvents={payload.allEvents.events}
 					continuesAfter={
 						modelHeaderData?.continues ??
@@ -1291,14 +1291,14 @@ function TranscriptRowContent({
 				<ConversationTraceDerivedSectionRow
 					agentLabel={
 						modelHeaderData?.agentLabel ??
-						(viewModel.safeModelUsed
-							? formatModelDisplayLabel(viewModel.safeModelUsed)
+						(viewModel.displayModel
+							? formatModelDisplayLabel(viewModel.displayModel)
 							: undefined)
 					}
 					agentModel={
 						modelHeaderData?.agentModel ??
 						row.agentModel ??
-						viewModel.safeModelUsed
+						viewModel.displayModel
 					}
 					allEvents={row.allEvents}
 					continuesAfter={

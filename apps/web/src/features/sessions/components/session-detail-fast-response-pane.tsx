@@ -587,7 +587,7 @@ function SessionDetailVirtualTranscript({
 				? {
 						content: (
 							<SessionDetailInlineSubagentBranch
-								agentModel={viewModel.safeModelUsed}
+								agentModel={viewModel.displayModel}
 								branch={inlineBranch}
 								branchesByEventId={inlineSubagentBranchesByEventId}
 							/>
@@ -602,7 +602,7 @@ function SessionDetailVirtualTranscript({
 			sessionId,
 			snapshot.revision,
 			subagentsById,
-			viewModel.safeModelUsed,
+			viewModel.displayModel,
 		],
 	);
 	useEffect(() => {

@@ -88,6 +88,114 @@ describe("model rate card", () => {
 		expect(standard?.outputPerMTok).toBe(15);
 	});
 
+	it("uses the August 21 Sol reduction only for requests on or after that UTC date", () => {
+		for (const [at, input, cached, write, output] of [
+			["2026-08-20T23:59:59.999Z", 5, 0.5, 6.25, 30],
+			["2026-08-21T00:00:00.000Z", 4, 0.4, 5, 20],
+			["2026-08-21T01:00:00+02:00", 5, 0.5, 6.25, 30],
+		] as const) {
+			for (const model of ["gpt-5.6-sol", "gpt-5.6"]) {
+				expect(resolveModelPricing(model, { at })).toMatchObject({
+					inputPerMTok: input,
+					cacheReadPerMTok: cached,
+					cacheWrite5mPerMTok: write,
+					outputPerMTok: output,
+				});
+				expect(
+					resolveModelPricing(model, { at, contextInputTokens: 272_001 }),
+				).toMatchObject({
+					inputPerMTok: input * 2,
+					cacheReadPerMTok: cached * 2,
+					cacheWrite5mPerMTok: write * 2,
+					outputPerMTok: output * 1.5,
+				});
+			}
+		}
+	});
+
+	it("prices Astra from September 3 with cache, context and Fast tiers", () => {
+		expect(resolveCanonicalModelIdentity("gpt-6-astra")?.model).toBe(
+			"gpt-6-astra",
+		);
+		expect(
+			resolveModelPricing("gpt-6-astra", { at: "2026-09-02T23:59:59.999Z" }),
+		).toBeNull();
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-03",
+				contextInputTokens: 272_000,
+			}),
+		).toMatchObject({
+			inputPerMTok: 10,
+			cacheReadPerMTok: 1,
+			cacheWrite5mPerMTok: 12.5,
+			cacheWrite1hPerMTok: null,
+			outputPerMTok: 50,
+		});
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-03",
+				contextInputTokens: 272_001,
+			}),
+		).toMatchObject({
+			inputPerMTok: 20,
+			cacheReadPerMTok: 2,
+			cacheWrite5mPerMTok: 25,
+			outputPerMTok: 75,
+		});
+		for (const serviceTier of ["fast", "priority"]) {
+			expect(
+				resolveModelPricing("gpt-6-astra", { at: "2026-09-03", serviceTier }),
+			).toMatchObject({ inputPerMTok: 20, outputPerMTok: 100 });
+			expect(
+				resolveModelPricing("gpt-6-astra", {
+					at: "2026-09-03",
+					serviceTier,
+					contextInputTokens: 272_001,
+				}),
+			).toMatchObject({ inputPerMTok: 40, outputPerMTok: 150 });
+		}
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-03",
+				modelProvider: "anthropic",
+			}),
+		).toBeNull();
+	});
+
+	it("keeps Fable 5 and 5.1 identities and cache rates separate", () => {
+		expect(resolveCanonicalModelIdentity("claude-fable-5-1")?.model).toBe(
+			"claude-fable-5-1",
+		);
+		expect(
+			resolveModelPricing("claude-fable-5-1", {
+				at: "2026-08-31T23:59:59.999Z",
+			}),
+		).toBeNull();
+		expect(
+			resolveModelPricing("claude-fable-5-1", {
+				at: "2026-09-01",
+				contextInputTokens: 300_000,
+			}),
+		).toMatchObject({
+			inputPerMTok: 10,
+			cacheReadPerMTok: 0.25,
+			cacheWrite5mPerMTok: 12.5,
+			cacheWrite1hPerMTok: 20,
+			outputPerMTok: 50,
+		});
+		expect(
+			resolveModelPricing("claude-fable-5", { at: "2026-09-01" })
+				?.cacheReadPerMTok,
+		).toBe(1);
+		expect(
+			resolveModelPricing("claude-fable-5-1", {
+				at: "2026-09-01",
+				inferenceGeo: "us",
+			})?.cacheReadPerMTok,
+		).toBe(0.275);
+	});
+
 	it("selects published context bands explicitly", () => {
 		const base = resolveModelPricing("gpt-5.6-sol", {
 			at: "2026-08-01",

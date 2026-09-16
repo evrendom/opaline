@@ -144,8 +144,8 @@ export function SessionDetailView({
 			? buildSessionDetailViewModel(initialSession, userMap)
 			: undefined;
 	const sessionTabTitle = `${
-		viewModel?.safeModelUsed
-			? formatModelDisplayLabel(viewModel.safeModelUsed)
+		viewModel?.displayModel
+			? formatModelDisplayLabel(viewModel.displayModel)
 			: "Session"
 	} · ${sessionId}`;
 

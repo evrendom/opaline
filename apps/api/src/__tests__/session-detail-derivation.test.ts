@@ -973,6 +973,19 @@ describe("session detail derivation", () => {
 		}
 	});
 
+	test("recovers placeholder model metadata without requiring a known price", () => {
+		for (const placeholder of ["unknown", " UNKNOWN ", "<synthetic>"]) {
+			const input = snapshot(
+				createCodexTranscript().replaceAll("gpt-5.6-sol", "gpt-future-model"),
+			);
+			input.modelUsed = placeholder;
+			input.source = "codex";
+			const result = deriveSessionDetail(input);
+			expect(result.overviewBase.session.modelUsed).toBe("gpt-future-model");
+			expect(result.overviewBase.session.estimatedCost).toBeNull();
+		}
+	});
+
 	test("keeps missing model identity unknown when there is no recorded usage", () => {
 		const input = snapshot(createTranscript(1, 0));
 		input.modelUsed = "";

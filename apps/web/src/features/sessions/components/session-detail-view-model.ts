@@ -9,6 +9,7 @@ import {
 	toStringArray,
 	toSubagentMap,
 } from "./session-detail-view-utils";
+import { getSessionModelDisplayValue } from "./session-model-identity";
 
 const subagentTokenUsageSchema = z.object({
 	cache_creation_input_tokens: z.number().nonnegative().optional(),
@@ -260,6 +261,12 @@ export function buildSessionDetailViewModel(
 	const costLabel = formatSessionCost(undefined);
 
 	return {
+		displayModel: getSessionModelDisplayValue({
+			model: safeModelUsed,
+			source: safeSource,
+			totalTokens: safeTotalTokens,
+			errorCount: 0,
+		}),
 		conversationSummary,
 		costLabel,
 		metadataBadges,

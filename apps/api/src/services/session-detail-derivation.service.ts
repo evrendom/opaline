@@ -766,7 +766,25 @@ export function deriveSessionDetail(
 		packageName: snapshot.packageName || null,
 		projectPath: snapshot.projectPath,
 	}).repoLabel;
-	let modelUsed = snapshot.modelUsed;
+	const hasReplayedUsage = primaryTurnMetrics.some(
+		(metrics) => (metrics.excludedReplayUsageCount ?? 0) > 0,
+	);
+	// Legacy snapshot totals include copied cumulative history. For forks, use
+	// only the request usage that survived the same replay filter as ingestion.
+	const ownMetrics = [
+		...primaryTurnMetrics,
+		...subagentMetrics.map((entry) => entry.metrics),
+	];
+	const inputTokens = hasReplayedUsage
+		? ownMetrics.reduce((sum, metrics) => sum + (metrics.inputTokens ?? 0), 0)
+		: snapshot.inputTokens;
+	const outputTokens = hasReplayedUsage
+		? ownMetrics.reduce((sum, metrics) => sum + (metrics.outputTokens ?? 0), 0)
+		: snapshot.outputTokens;
+	let modelUsed = hasReplayedUsage ? "" : snapshot.modelUsed.trim();
+	if (["unknown", "<synthetic>"].includes(modelUsed.toLowerCase())) {
+		modelUsed = "";
+	}
 	if (!modelUsed) {
 		// The analytics join can be absent for this raw revision. Recover the
 		// identity from primary request usage without borrowing a subagent model.
@@ -790,10 +808,10 @@ export function deriveSessionDetail(
 			),
 			gitBranch: snapshot.gitBranch,
 			gitSha: snapshot.gitSha,
-			inputTokens: snapshot.inputTokens,
+			inputTokens,
 			lastInteractionDate: snapshot.lastInteractionDate,
 			modelUsed: modelUsed || null,
-			outputTokens: snapshot.outputTokens,
+			outputTokens,
 			projectPath: snapshot.projectPath,
 			repository: repository || null,
 			sessionDate: snapshot.sessionDate,
@@ -801,7 +819,9 @@ export function deriveSessionDetail(
 			skills: unique(snapshot.skills),
 			slashCommands: unique(snapshot.slashCommands),
 			source: snapshot.source,
-			totalTokens: snapshot.totalTokens,
+			totalTokens: hasReplayedUsage
+				? inputTokens + outputTokens
+				: snapshot.totalTokens,
 			userId: snapshot.ownerId,
 		},
 		subagents: subagentMetrics.map(({ content, metrics, subagentId }) => {

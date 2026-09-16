@@ -1,6 +1,15 @@
-import { calculateEstimatedCost } from "./model-pricing.js";
+import {
+	calculateEstimatedCost,
+	type ResolveModelPricingOptions,
+} from "./model-pricing.js";
 
-export type SessionRequestUsageEvent = {
+export type SessionRequestBillingDimensions = Pick<
+	ResolveModelPricingOptions,
+	"modelProvider" | "serviceTier" | "inferenceSpeed" | "inferenceGeo"
+>;
+
+export interface SessionRequestUsageEvent
+	extends SessionRequestBillingDimensions {
 	at: string;
 	cacheCreation1hInputTokens?: number;
 	cacheCreation5mInputTokens?: number;
@@ -10,7 +19,7 @@ export type SessionRequestUsageEvent = {
 	model: string | undefined;
 	modelContextWindow?: number;
 	outputTokens: number;
-};
+}
 
 export type SessionRequestUsageSummary = {
 	estimatedCost: number | null;
@@ -37,6 +46,10 @@ export function summarizeSessionRequestUsage(
 	const costs = usageEvents.map((event) =>
 		calculateEstimatedCost({
 			at: event.at,
+			modelProvider: event.modelProvider,
+			serviceTier: event.serviceTier,
+			inferenceSpeed: event.inferenceSpeed,
+			inferenceGeo: event.inferenceGeo,
 			cacheCreation1hInputTokens:
 				event.cacheCreation1hInputTokens ?? event.cacheCreationInputTokens,
 			cacheCreationInputTokens: event.cacheCreation5mInputTokens ?? 0,
@@ -86,7 +99,9 @@ export function calculateSessionRequestCost(
 export function sumSessionRequestCosts(
 	entries: readonly SessionRequestCostEntry[],
 ) {
-	const summaries = entries.filter((entry) => entry.usageEventCount > 0);
+	const summaries = entries.filter(
+		(entry) => entry.usageEventCount > 0 || entry.estimatedCost === 0,
+	);
 	if (
 		summaries.length === 0 ||
 		summaries.some((entry) => entry.estimatedCost === null)

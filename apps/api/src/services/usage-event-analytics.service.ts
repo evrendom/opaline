@@ -42,7 +42,7 @@ const LEGACY_SESSION_COST_SQL = buildEstimatedCostSql({
 });
 
 const PRICEABLE_EVENT_SQL = `
-	e.model_status = 'resolved'
+	e.model_status IN ('resolved', 'unresolved')
 	AND e.has_valid_timestamp = 1
 	AND NOT has(e.quality_flags, 'service_tier_conflict')
 	AND NOT has(e.quality_flags, 'unrecognized_service_tier')
@@ -62,8 +62,11 @@ type PricingModifierDimension =
 
 const EVENT_PRICING_RATE_CARD_SQL = buildEventPricingRateCardSql();
 const EVENT_CANONICAL_PRICING_MODEL_SQL =
-	buildCanonicalPricingModelSql("c.resolved_model");
+	buildCanonicalPricingModelSql("c.pricing_identity");
 const EVENT_LONG_CONTEXT_AVAILABLE_SQL = buildLongContextAvailableSql();
+// Stored unresolved events retain the provider's raw model. Resolve that identity
+// against today's dated catalog at read time; never infer prices from a session
+// label or relax conflicts, provider checks, or receipt consistency.
 // Missing billing geography uses standard-region pricing. Expose that assumption
 // separately from completeness so an otherwise priceable session keeps its estimate.
 const EVENT_GROUP_COST_SQL = buildEventGroupCostSql();
@@ -114,7 +117,7 @@ function buildCanonicalPricingModelSql(modelExpr: string): string {
 
 	const clauses = [...canonicalModelByPattern.entries()].flatMap(
 		([pattern, model]) => [
-			`match(lowerUTF8(${modelExpr}), '${escapeSqlString(pattern)}')`,
+			`match(lowerUTF8(trimBoth(${modelExpr})), '${escapeSqlString(pattern)}')`,
 			`'${escapeSqlString(model)}'`,
 		],
 	);
@@ -168,7 +171,8 @@ function buildEventGroupCostSql(): string {
 		if(
 			g.is_priceable = 1
 				AND r.model != ''
-				AND lowerUTF8(trimBoth(g.model_provider)) IN ('', r.provider),
+				AND lowerUTF8(trimBoth(g.model_provider)) IN ('', r.provider)
+				AND r.provider = if(g.source = 'codex', 'openai', 'anthropic'),
 			round((${components.join(" + ")}) * (${modifierMultiplier}), 12),
 			CAST(NULL, 'Nullable(Float64)')
 		)
@@ -422,20 +426,20 @@ export function buildUsageEventAnalyticsCte(
 			SELECT
 				*,
 				argMaxIf(
-					resolved_model,
+					if(resolved_model != '', resolved_model, trimBoth(raw_model)),
 					tuple(has_valid_timestamp, occurred_at, first_observed_line, event_id),
 					record_kind = 'event'
 						AND agent_id = 'main'
-						AND model_status = 'resolved'
-						AND resolved_model != ''
+						AND model_status IN ('resolved', 'unresolved')
+						AND lowerUTF8(trimBoth(if(resolved_model != '', resolved_model, raw_model))) NOT IN ('', 'unknown', '<synthetic>')
 				) OVER usage_session_window AS latest_main_model,
 				argMaxIf(
-					resolved_model,
+					if(resolved_model != '', resolved_model, trimBoth(raw_model)),
 					tuple(has_valid_timestamp, occurred_at, first_observed_line, event_id),
 					record_kind = 'event'
-						AND model_status = 'resolved'
-						AND resolved_model != ''
-				) OVER usage_session_window AS latest_resolved_model
+						AND model_status IN ('resolved', 'unresolved')
+						AND lowerUTF8(trimBoth(if(resolved_model != '', resolved_model, raw_model))) NOT IN ('', 'unknown', '<synthetic>')
+				) OVER usage_session_window AS latest_event_model
 			FROM consistent_usage_records
 			WINDOW usage_session_window AS (
 				PARTITION BY organization_id, user_id, source, session_id
@@ -449,7 +453,7 @@ export function buildUsageEventAnalyticsCte(
 				e.session_id,
 				e.record_kind,
 				e.usage_date,
-				e.resolved_model,
+				if(e.model_status = 'unresolved', e.raw_model, e.resolved_model) AS pricing_identity,
 				e.model_provider,
 				e.service_tier,
 				e.inference_speed,
@@ -462,7 +466,7 @@ export function buildUsageEventAnalyticsCte(
 				toUInt8(${PRICEABLE_EVENT_SQL}) AS is_priceable,
 				toUInt8(has(e.quality_flags, 'inference_geo_not_available')) AS has_geo_gap,
 				any(e.latest_main_model) AS latest_main_model,
-				any(e.latest_resolved_model) AS latest_resolved_model,
+				any(e.latest_event_model) AS latest_event_model,
 				sum(e.uncached_input_tokens) AS group_uncached_input_tokens,
 				sum(e.cache_read_input_tokens) AS group_cache_read_input_tokens,
 				sum(e.cache_write_5m_input_tokens) AS group_cache_write_5m_input_tokens,
@@ -476,7 +480,7 @@ export function buildUsageEventAnalyticsCte(
 				e.session_id,
 				e.record_kind,
 				e.usage_date,
-				e.resolved_model,
+				pricing_identity,
 				e.model_provider,
 				e.service_tier,
 				e.inference_speed,
@@ -528,7 +532,7 @@ export function buildUsageEventAnalyticsCte(
 				) = 0) AS cost_is_complete,
 				toUInt8(countIf(p.record_kind = 'event' AND p.has_geo_gap = 1) > 0) AS cost_uses_default_region,
 				any(p.latest_main_model) AS latest_main_model,
-				any(p.latest_resolved_model) AS latest_resolved_model
+				any(p.latest_event_model) AS latest_event_model
 			FROM priced_usage_groups AS p
 			GROUP BY p.organization_id, p.user_id, p.source, p.session_id
 		),
@@ -550,7 +554,7 @@ export function buildUsageEventAnalyticsCte(
 				) = 0) AS cost_is_complete,
 				toUInt8(countIf(p.record_kind = 'event' AND p.has_geo_gap = 1) > 0) AS cost_uses_default_region,
 				any(p.latest_main_model) AS latest_main_model,
-				any(p.latest_resolved_model) AS latest_resolved_model
+				any(p.latest_event_model) AS latest_event_model
 			FROM priced_usage_groups AS p
 			WHERE p.record_kind = 'event'
 			GROUP BY p.organization_id, p.user_id, p.source, p.session_id, p.usage_date
@@ -567,7 +571,7 @@ export function buildUsageEventAnalyticsCte(
 		usage_analytics_sessions AS (
 			SELECT
 				${SESSION_METADATA_COLUMNS},
-				if(r.latest_main_model != '', r.latest_main_model, r.latest_resolved_model) AS model_used,
+				if(r.latest_main_model != '', r.latest_main_model, r.latest_event_model) AS model_used,
 				r.input_tokens AS input_tokens,
 				r.output_tokens AS output_tokens,
 				r.cache_read_input_tokens AS cache_read_input_tokens,
@@ -586,7 +590,7 @@ export function buildUsageEventAnalyticsCte(
 		usage_analytics_daily_sessions AS (
 			SELECT
 				${SESSION_METADATA_COLUMNS},
-				if(r.latest_main_model != '', r.latest_main_model, r.latest_resolved_model) AS model_used,
+				if(r.latest_main_model != '', r.latest_main_model, r.latest_event_model) AS model_used,
 				r.usage_date AS usage_date,
 				r.input_tokens AS input_tokens,
 				r.output_tokens AS output_tokens,
@@ -597,11 +601,12 @@ export function buildUsageEventAnalyticsCte(
 				r.cost_is_complete AS cost_is_complete,
 				r.cost_uses_default_region AS cost_uses_default_region
 			FROM usage_event_daily_rollups AS r
-			ANY INNER JOIN usage_analytics_metadata AS sa
+			ANY LEFT JOIN usage_analytics_metadata AS sa
 				ON sa.organization_id = r.organization_id
 				AND sa.user_id = r.user_id
 				AND sa.source = r.source
 				AND sa.session_id = r.session_id
+			WHERE sa.organization_id = {orgId:String}
 		)
 	`;
 }
