@@ -761,7 +761,10 @@ export function deriveSessionDetail(
 		packageName: snapshot.packageName || null,
 		projectPath: snapshot.projectPath,
 	}).repoLabel;
-	let modelUsed = snapshot.modelUsed;
+	let modelUsed = snapshot.modelUsed.trim();
+	if (["unknown", "<synthetic>"].includes(modelUsed.toLowerCase())) {
+		modelUsed = "";
+	}
 	if (!modelUsed) {
 		// The analytics join can be absent for this raw revision. Recover the
 		// identity from primary request usage without borrowing a subagent model.

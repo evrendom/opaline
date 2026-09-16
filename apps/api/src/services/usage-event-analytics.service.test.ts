@@ -67,13 +67,15 @@ describe("usage-event analytics query contract", () => {
 		expect(sql).toContain("usage_event_pricing_candidates AS");
 		expect(sql).toContain("usage_event_pricing_groups AS");
 		expect(sql).toContain("usage_event_pricing_rate_card AS");
-		expect(sql).toContain("match(lowerUTF8(c.resolved_model)");
+		expect(sql).toContain("match(lowerUTF8(trimBoth(c.pricing_identity))");
 		expect(sql).toContain("ON g.pricing_model = r.model");
 		expect(sql).toContain("ANY LEFT JOIN usage_event_pricing_rate_card AS r");
 		expect(sql.indexOf("usage_event_pricing_candidates AS")).toBeLessThan(
-			sql.indexOf("match(lowerUTF8(c.resolved_model)"),
+			sql.indexOf("match(lowerUTF8(trimBoth(c.pricing_identity))"),
 		);
-		expect(sql.indexOf("match(lowerUTF8(c.resolved_model)")).toBeLessThan(
+		expect(
+			sql.indexOf("match(lowerUTF8(trimBoth(c.pricing_identity))"),
+		).toBeLessThan(
 			sql.indexOf("ANY LEFT JOIN usage_event_pricing_rate_card AS r"),
 		);
 		expect(sql).not.toContain("match(lowerUTF8(e.resolved_model)");
@@ -83,20 +85,20 @@ describe("usage-event analytics query contract", () => {
 		const sql = buildUsageEventAnalyticsCte();
 
 		expect(sql).toContain("e.resolved_model");
-		expect(sql).toContain("e.model_status = 'resolved'");
+		expect(sql).toContain("e.model_status IN ('resolved', 'unresolved')");
 		expect(sql).not.toMatch(/match\(lowerUTF8\(sa\.model_used\)/u);
 	});
 
-	test("uses the latest resolved main event as display metadata", () => {
+	test("uses recorded main model identity independently of pricing", () => {
 		const sql = buildUsageEventAnalyticsCte();
 
 		expect(sql).toContain("argMaxIf(");
 		expect(sql).toContain("agent_id = 'main'");
 		expect(sql).toContain("AS latest_main_model");
-		expect(sql).toContain("AS latest_resolved_model");
+		expect(sql).toContain("AS latest_event_model");
 		expect(
 			sql.match(
-				/if\(r\.latest_main_model != '', r\.latest_main_model, r\.latest_resolved_model\) AS model_used/gu,
+				/if\(r\.latest_main_model != '', r\.latest_main_model, r\.latest_event_model\) AS model_used/gu,
 			),
 		).toHaveLength(2);
 		expect(sql).not.toContain("resolved_model_count");

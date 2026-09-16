@@ -283,6 +283,211 @@ afterAll(async () => {
 });
 
 describe("usage-event analytics ClickHouse rollups", () => {
+	test("reprices historical unresolved identities at each request date without losing unknown model display", async () => {
+		const pricingOrg = `${organizationId}_pricing`;
+		const cases = [
+			{
+				id: "astra_before",
+				model: "gpt-6-astra",
+				date: "2026-09-02",
+				source: "codex",
+				cost: null,
+			},
+			{
+				id: "astra_base",
+				model: "gpt-6-astra",
+				date: "2026-09-03",
+				source: "codex",
+				cost: 6.1,
+			},
+			{
+				id: "astra_normalized",
+				model: " GPT-6-ASTRA ",
+				date: "2026-09-03",
+				source: "codex",
+				cost: 6.1,
+			},
+			{
+				id: "astra_long",
+				model: "gpt-6-astra",
+				date: "2026-09-03",
+				source: "codex",
+				cost: 9.7,
+				context: "272001",
+			},
+			{
+				id: "astra_fast",
+				model: "gpt-6-astra",
+				date: "2026-09-03",
+				source: "codex",
+				cost: 12.2,
+				tier: "priority",
+			},
+			{
+				id: "fable_before",
+				model: "claude-fable-5-1",
+				date: "2026-08-31",
+				source: "claude_code",
+				cost: null,
+			},
+			{
+				id: "fable_launch",
+				model: "claude-fable-5-1",
+				date: "2026-09-01",
+				source: "claude_code",
+				cost: 6.025,
+			},
+			{
+				id: "fable_original",
+				model: "claude-fable-5",
+				date: "2026-09-01",
+				source: "claude_code",
+				cost: 6.1,
+			},
+			{
+				id: "sol_old",
+				model: "gpt-5.6-sol",
+				date: "2026-08-20",
+				source: "codex",
+				cost: 3.55,
+			},
+			{
+				id: "sol_new",
+				model: "gpt-5.6-sol",
+				date: "2026-08-21",
+				source: "codex",
+				cost: 2.44,
+			},
+			{
+				id: "sol_crossing",
+				model: "gpt-5.6-sol",
+				date: "2026-08-20",
+				source: "codex",
+				cost: 5.99,
+			},
+			{
+				id: "future",
+				model: "gpt-future-model",
+				date: "2026-09-16",
+				source: "codex",
+				cost: null,
+			},
+			{
+				id: "wrong_provider",
+				model: "gpt-6-astra",
+				date: "2026-09-03",
+				source: "claude_code",
+				cost: null,
+			},
+			{
+				id: "conflict",
+				model: "gpt-6-astra",
+				date: "2026-09-03",
+				source: "codex",
+				cost: null,
+				status: "conflict",
+			},
+		];
+		const events = cases.flatMap((entry) => {
+			const event = buildEventRow(entry.id, "1", {
+				organization_id: pricingOrg,
+				source: entry.source,
+				model_provider: entry.source === "codex" ? "openai" : "anthropic",
+				raw_model: entry.model,
+				resolved_model: "",
+				model_status: entry.status ?? "unresolved",
+				quality_flags: ["unresolved_model"],
+				usage_date: entry.date,
+				occurred_at: `${entry.date} 23:59:59.999`,
+				context_input_tokens: entry.context ?? "200000",
+				service_tier: entry.tier ?? "standard",
+				uncached_input_tokens: "100000",
+				cache_read_input_tokens: "100000",
+				output_tokens: "100000",
+				cache_write_5m_input_tokens: "0",
+				cache_write_1h_input_tokens: "0",
+			});
+			const crossing = entry.id === "sol_crossing";
+			return [
+				event,
+				...(crossing
+					? [
+							{
+								...event,
+								event_id: "f".repeat(64),
+								usage_date: "2026-08-21",
+								occurred_at: "2026-08-21 00:00:00.000",
+							},
+						]
+					: []),
+				{
+					...buildReceiptRow(
+						entry.id,
+						"1",
+						crossing ? 2 : 1,
+						true,
+						entry.source,
+					),
+					organization_id: pricingOrg,
+				},
+			];
+		});
+		try {
+			await ingestRudelSessionAnalytics(
+				executor,
+				cases.map((entry) => ({
+					...buildSessionAnalyticsRow(entry.id),
+					organization_id: pricingOrg,
+					source: entry.source,
+					model_used: "unknown",
+					session_date: `${entry.date} 08:00:00.000`,
+				})),
+				{ validate: true },
+			);
+			await ingestRudelUsageEvents(executor, events, { validate: true });
+			const rows = await executor.query<{
+				session_id: string;
+				model_used: string;
+				cost_is_complete: number;
+				estimated_cost: number;
+			}>({
+				query: `WITH ${buildUsageEventAnalyticsCte({}, false)}
+					SELECT session_id, model_used, cost_is_complete, estimated_cost FROM usage_analytics_sessions
+					LIMIT 20 SETTINGS max_execution_time = 10, max_rows_to_read = 1000000`,
+				query_params: { orgId: pricingOrg },
+			});
+			expect(rows).toHaveLength(cases.length);
+			for (const entry of cases) {
+				const row = rows.find((row) => row.session_id === entry.id);
+				expect(row?.model_used).toBe(
+					entry.status === "conflict" ? "" : entry.model.trim(),
+				);
+				expect(row?.cost_is_complete).toBe(entry.cost === null ? 0 : 1);
+				if (entry.cost !== null)
+					expect(row?.estimated_cost).toBeCloseTo(entry.cost, 8);
+			}
+			const daily = await executor.query<{
+				usage_date: string;
+				estimated_cost: number;
+			}>({
+				query: `WITH ${buildUsageEventAnalyticsCte({ sessionIdParam: "sessionId" }, false)}
+					SELECT toString(usage_date) AS usage_date, estimated_cost FROM usage_analytics_daily_sessions
+					ORDER BY usage_date LIMIT 3 SETTINGS max_execution_time = 10, max_rows_to_read = 1000000`,
+				query_params: { orgId: pricingOrg, sessionId: "sol_crossing" },
+			});
+			expect(daily).toEqual([
+				{ usage_date: "2026-08-20", estimated_cost: 3.55 },
+				{ usage_date: "2026-08-21", estimated_cost: 2.44 },
+			]);
+		} finally {
+			for (const table of ["usage_events", "session_analytics"])
+				await executor.execute({
+					query: `DELETE FROM rudel.${table} WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3`,
+					query_params: { orgId: pricingOrg },
+				});
+		}
+	});
+
 	test("lists sessions with interaction metrics when usage-event analytics is enabled", async () => {
 		const previousMode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
 		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
@@ -564,7 +769,7 @@ describe("usage-event analytics ClickHouse rollups", () => {
 				cost_is_complete: 0,
 				estimated_cost: 28.05,
 				input_tokens: "8000000",
-				model_used: "claude-sonnet-4-5",
+				model_used: "mystery-model",
 				output_tokens: "2000000",
 				session_id: partialSessionId,
 				total_tokens: "10000000",
@@ -636,7 +841,7 @@ describe("usage-event analytics ClickHouse rollups", () => {
 				cost_is_complete: 0,
 				estimated_cost: 0,
 				input_tokens: "4000000",
-				model_used: "",
+				model_used: "mystery-model",
 				output_tokens: "1000000",
 				session_id: unresolvedSessionId,
 				total_tokens: "5000000",

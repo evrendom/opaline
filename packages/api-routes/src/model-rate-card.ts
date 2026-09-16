@@ -51,18 +51,87 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-08-05";
+export const MODEL_RATE_CARD_VERSION = "2026-09-16";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
 export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
+	// OpenAI: GPT-6 Astra
+	{
+		provider: "openai",
+		model: "gpt-6-astra",
+		displayName: "GPT-6 Astra",
+		match: ["^gpt-6-astra$"],
+		effectiveFrom: "2026-09-03",
+		contextBand: "base",
+		inputPerMTok: 10,
+		cacheReadPerMTok: 1,
+		cacheWrite5mPerMTok: 12.5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 50,
+		source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+		verifiedAt: "2026-09-16",
+		notes:
+			"Standard first-party API rates from release; cache token classes are billed separately.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-astra",
+		displayName: "GPT-6 Astra",
+		match: ["^gpt-6-astra$"],
+		effectiveFrom: "2026-09-03",
+		contextBand: "long",
+		inputPerMTok: 20,
+		cacheReadPerMTok: 2,
+		cacheWrite5mPerMTok: 25,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 75,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-16",
+		notes: "Full-request rates above 272k input tokens.",
+	},
+
 	// OpenAI: GPT-5.6
 	{
 		provider: "openai",
 		model: "gpt-5.6-sol",
 		displayName: "GPT-5.6 Sol",
 		match: ["^gpt-5\\.6(?:-sol)?$"],
+		effectiveFrom: "2026-08-21",
+		contextBand: "base",
+		inputPerMTok: 4,
+		cacheReadPerMTok: 0.4,
+		cacheWrite5mPerMTok: 5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 20,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-16",
+		notes:
+			"August 21 promotional rate, available at least through November 21; no announced reversion date.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-sol",
+		displayName: "GPT-5.6 Sol",
+		match: ["^gpt-5\\.6(?:-sol)?$"],
+		effectiveFrom: "2026-08-21",
+		contextBand: "long",
+		inputPerMTok: 8,
+		cacheReadPerMTok: 0.8,
+		cacheWrite5mPerMTok: 10,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 30,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-16",
+		notes: "August 21 promotional rate for requests above 272k input tokens.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-sol",
+		displayName: "GPT-5.6 Sol",
+		match: ["^gpt-5\\.6(?:-sol)?$"],
 		effectiveFrom: "2026-06-26",
+		effectiveTo: "2026-08-20",
 		contextBand: "base",
 		inputPerMTok: 5,
 		cacheReadPerMTok: 0.5,
@@ -79,6 +148,7 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		displayName: "GPT-5.6 Sol",
 		match: ["^gpt-5\\.6(?:-sol)?$"],
 		effectiveFrom: "2026-06-26",
+		effectiveTo: "2026-08-20",
 		contextBand: "long",
 		inputPerMTok: 10,
 		cacheReadPerMTok: 1,
@@ -661,6 +731,23 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 	// Anthropic: Claude 5 and Claude Opus 4.x
 	{
 		provider: "anthropic",
+		model: "claude-fable-5-1",
+		displayName: "Claude Fable 5.1",
+		match: ["^claude-fable-5-1(?:-\\d{8})?$"],
+		effectiveFrom: "2026-09-01",
+		contextBand: "base",
+		inputPerMTok: 10,
+		cacheReadPerMTok: 0.25,
+		cacheWrite5mPerMTok: 12.5,
+		cacheWrite1hPerMTok: 20,
+		outputPerMTok: 50,
+		source: "https://platform.claude.com/docs/en/models/fable-5-1/overview",
+		verifiedAt: "2026-09-16",
+		notes:
+			"Standard first-party API rates from release; cache token classes are billed separately.",
+	},
+	{
+		provider: "anthropic",
 		model: "claude-fable-5",
 		displayName: "Claude Fable 5",
 		match: ["^claude-fable-5(?:-\\d{8})?$"],
@@ -1075,6 +1162,41 @@ export const MODEL_UNPRICED_IDENTITIES: readonly UnpricedModelIdentity[] = [
 // resolver; a non-base value must match one of these dated rules or it is
 // unpriced. Multipliers apply independently to every published token class.
 export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
+	{
+		provider: "openai",
+		model: "gpt-6-astra",
+		dimension: "service_tier",
+		values: ["fast", "priority"],
+		effectiveFrom: "2026-09-03",
+		multiplier: 2,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-16",
+		notes: "Fast/Priority doubles every token class in both context bands.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-sol",
+		dimension: "service_tier",
+		values: ["fast", "priority"],
+		effectiveFrom: "2026-08-21",
+		contextBand: "long",
+		multiplier: 2,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-16",
+		notes: "Fast/Priority long-context promotional rates.",
+	},
+	{
+		provider: "anthropic",
+		model: "claude-fable-5-1",
+		dimension: "inference_geo",
+		values: ["us"],
+		effectiveFrom: "2026-09-01",
+		multiplier: 1.1,
+		source: "https://platform.claude.com/docs/en/about-claude/pricing",
+		verifiedAt: "2026-09-16",
+		notes:
+			"US-only inference premium on all token classes, including cache reads.",
+	},
 	...[
 		["gpt-5.4", "2026-03-05", 2],
 		["gpt-5.4-mini", "2026-03-17", 2],
