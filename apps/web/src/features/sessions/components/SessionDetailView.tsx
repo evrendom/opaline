@@ -5,12 +5,13 @@ import {
 	// biome-ignore lint/style/noRestrictedImports: the tab title must update when async session details reveal the model and when client-side navigation changes the session id.
 	useEffect,
 	useRef,
+	useState,
 } from "react";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
-import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
+import { useSessionOpenTracking } from "@/features/sessions/use-session-open-tracking";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
@@ -127,6 +128,11 @@ export function SessionDetailView({
 	const preservedTurnIdRef = useRef<string | undefined>(undefined);
 	const shellHeaderPortal = useShellHeaderPortal();
 	const queryClient = useQueryClient();
+	const [cacheHit] = useState(
+		() =>
+			queryClient.getQueryData(sessionDetailInitialQueryKey(sessionId)) !==
+			undefined,
+	);
 	const handleHeaderWheel = useCallback((event: WheelEvent) => {
 		if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
 			return;
@@ -184,10 +190,14 @@ export function SessionDetailView({
 		};
 	}, [sessionTabTitle]);
 
-	useTrackProductPageView({
+	useSessionOpenTracking({
+		sessionId,
 		isLoading: overviewQuery.isLoading,
-		isError: Boolean(overviewQuery.error),
+		error: overviewQuery.error,
 		hasData: Boolean(overview),
+		cacheHit,
+		requestTiming: overviewQuery.data?.loadingTiming,
+		turnCount: overview?.turnPage.total,
 	});
 
 	function handleStaleRevision(error: unknown, selectedTurnId?: string) {

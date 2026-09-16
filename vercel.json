@@ -149,6 +149,10 @@
 			"destination": "/api/rpc?__opaline_path=/health"
 		},
 		{
+			"source": "/health/ready",
+			"destination": "/api/rpc?__opaline_path=/health/ready"
+		},
+		{
 			"source": "/api/:routePath((?!cron/repair$).*)",
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},

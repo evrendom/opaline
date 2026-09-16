@@ -15,6 +15,21 @@ const headerRuleBySource = new Map(
 );
 
 describe("Vercel deployment configuration", () => {
+	test("routes database readiness to the API before the SPA fallback", () => {
+		expect(rewriteBySource.get("/health/ready")).toBe(
+			"/api/rpc?__opaline_path=/health/ready",
+		);
+		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/health/ready")).toBe(
+			true,
+		);
+		expect(
+			VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/health/ready/extra"),
+		).toBe(false);
+		expect(rewriteSources.indexOf("/health/ready")).toBeLessThan(
+			rewriteSources.findIndex((source) => source.startsWith("/((?!assets")),
+		);
+	});
+
 	test("checks signed-in root visits before marketing while preserving explicit auth flows", () => {
 		const rootRules = vercelConfig.rewrites.filter(
 			(rule) => rule.source === "/",

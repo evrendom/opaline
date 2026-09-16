@@ -15,6 +15,7 @@ import { useSessionsPageData } from "@/features/sessions/use-sessions-page-data"
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
+import { markSessionOpen } from "./session-open-timing";
 
 export function NewSessionPage() {
 	const params = useParams<{ sessionId?: string }>();
@@ -72,6 +73,7 @@ export function NewSessionPage() {
 
 	function navigateToSession(session: SessionAnalytics | undefined) {
 		if (!session) return;
+		markSessionOpen(session.session_id);
 
 		navigate(getDetailPath(session.session_id), {
 			replace: true,

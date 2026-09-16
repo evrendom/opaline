@@ -5,13 +5,9 @@ import { authClient } from "@/lib/auth-client";
 import {
 	type AppPageName,
 	captureAuthenticationActionTriggered,
-	captureChartExportTriggered,
 	captureDashboardDrilldownOpened,
 	captureDashboardFilterChanged,
-	captureDashboardLoadFailed,
-	captureDashboardNavigationClicked,
 	captureOrganizationActionTriggered,
-	captureUiUtilityUsed,
 	type DashboardPageName,
 	getAnalyticsPageName,
 	isDashboardPageName,
@@ -125,58 +121,6 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 		};
 	}
 
-	function trackNavigation(
-		input: {
-			navType: string;
-			sourceComponent: string;
-			targetPath?: string;
-			targetType?: string;
-			targetId?: string;
-			toPageName?: AppPageName;
-			rank?: number;
-		} & AnalyticsOverrides,
-	) {
-		const payload = buildBasePayload(input);
-
-		if (!payload) {
-			return;
-		}
-
-		captureDashboardNavigationClicked({
-			...payload,
-			nav_type: input.navType,
-			target_path: input.targetPath,
-			target_type: input.targetType,
-			target_id: input.targetId,
-			to_page_name: input.toPageName,
-			rank: input.rank,
-		});
-	}
-
-	function trackDashboardLoadFailed(
-		input: {
-			queryName: string;
-			errorCode: string;
-			isBlocking: boolean;
-			httpStatus?: number;
-		} & AnalyticsOverrides,
-	) {
-		const payload = buildDashboardPayload(input);
-
-		if (!payload || payload.date_range_days == null) {
-			return;
-		}
-
-		captureDashboardLoadFailed({
-			...payload,
-			query_name: input.queryName,
-			error_code: input.errorCode,
-			date_range_days: payload.date_range_days,
-			is_blocking: input.isBlocking,
-			http_status: input.httpStatus,
-		});
-	}
-
 	function trackFilterChange(
 		input: {
 			filterName: string;
@@ -232,32 +176,6 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 			target_path: input.targetPath,
 			target_id: input.targetId,
 			rank: input.rank,
-		});
-	}
-
-	function trackChartExport(
-		input: {
-			chartId: string;
-			exportType: "copy_image" | "download_png" | "share_x";
-			sourceComponent?: string;
-			chartKind?: string;
-			shareDestination?: string;
-			visibleSeriesCount?: number;
-		} & AnalyticsOverrides,
-	) {
-		const payload = buildDashboardPayload(input);
-
-		if (!payload) {
-			return;
-		}
-
-		captureChartExportTriggered({
-			...payload,
-			chart_id: input.chartId,
-			export_type: input.exportType,
-			chart_kind: input.chartKind,
-			share_destination: input.shareDestination,
-			visible_series_count: input.visibleSeriesCount,
 		});
 	}
 
@@ -323,77 +241,11 @@ export function useAnalyticsTracking(options?: UseAnalyticsOptions) {
 		});
 	}
 
-	function trackUtility(
-		input: {
-			utilityName: string;
-			componentId: string;
-			sourceComponent?: string;
-			utilityState?: string;
-		} & AnalyticsOverrides,
-	) {
-		const payload = buildBasePayload(input);
-
-		if (!payload) {
-			return;
-		}
-
-		captureUiUtilityUsed({
-			...payload,
-			utility_name: input.utilityName,
-			component_id: input.componentId,
-			utility_state: input.utilityState,
-		});
-	}
-
-	function trackUtilityUsed(
-		input: {
-			utilityName: string;
-			sourceComponent: string;
-			targetId?: string;
-			shareId?: string;
-			entrySource?: string;
-			redirectTarget?: string;
-			archetypeId?: string;
-			publicPayloadVersion?: number;
-			isAuthenticatedViewer?: boolean;
-			isNewUser?: boolean;
-			resolvedEntryRoute?: string;
-			utilityState?: string;
-		} & AnalyticsOverrides,
-	) {
-		const payload = buildBasePayload(input);
-
-		if (!payload) {
-			return;
-		}
-
-		captureUiUtilityUsed({
-			...payload,
-			utility_name: input.utilityName,
-			component_id: input.sourceComponent,
-			target_id: input.targetId,
-			share_id: input.shareId,
-			entry_source: input.entrySource,
-			redirect_target: input.redirectTarget,
-			archetype_id: input.archetypeId,
-			public_payload_version: input.publicPayloadVersion,
-			is_authenticated_viewer: input.isAuthenticatedViewer,
-			is_new_user: input.isNewUser,
-			resolved_entry_route: input.resolvedEntryRoute,
-			utility_state: input.utilityState,
-		});
-	}
-
 	return {
 		...analytics,
 		trackAuthenticationAction,
-		trackChartExport,
-		trackDashboardLoadFailed,
 		trackDrilldown,
 		trackFilterChange,
-		trackNavigation,
 		trackOrganizationAction,
-		trackUtility,
-		trackUtilityUsed,
 	};
 }

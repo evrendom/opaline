@@ -22,7 +22,12 @@ export function createVercelFunctionHandler(input: {
 
 		try {
 			const response = await input.fetch(routedRequest);
-			if (response.status >= 500) {
+			// Readiness 503s are handled by the uptime monitor. Do not generate
+			// an exception (and wait for telemetry delivery) on every failed probe.
+			const isUnavailableProbe =
+				response.status === 503 &&
+				new URL(routedRequest.url).pathname === "/health/ready";
+			if (response.status >= 500 && !isUnavailableProbe) {
 				await captureApiServerError({
 					error: new Error(
 						`API function returned HTTP ${response.status.toString()}`,

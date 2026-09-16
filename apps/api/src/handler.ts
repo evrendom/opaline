@@ -20,6 +20,7 @@ import {
 	enforceApiResponseSize,
 } from "./lib/api-response-size.js";
 import { enforceCookieCsrfOrigin } from "./lib/csrf-origin.js";
+import { getDependencyHealthResponse } from "./lib/dependency-health.js";
 import {
 	readBetterAuthSecret,
 	readCliDeviceVerificationUrl,
@@ -297,6 +298,20 @@ export async function fetchHandler(
 				requestId,
 			},
 		);
+	}
+
+	if (url.pathname === "/health/ready") {
+		const response =
+			request.method === "GET" || request.method === "HEAD"
+				? await getDependencyHealthResponse()
+				: new Response("Method not allowed", {
+						status: 405,
+						headers: { Allow: "GET, HEAD" },
+					});
+		return applyHttpResponsePolicy(response, {
+			pathname: url.pathname,
+			requestId,
+		});
 	}
 
 	// Health check for Fly.io (must be GET-accessible)

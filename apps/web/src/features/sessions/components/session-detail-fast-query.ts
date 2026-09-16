@@ -45,6 +45,7 @@ export async function fetchSessionDetailInitial(
 	sessionId: string,
 	signal: AbortSignal,
 ) {
+	const startedAt = performance.now();
 	const response = await runSessionDetailRequest(
 		(requestSignal) =>
 			orpc.analytics.sessions.detailInitial.call(
@@ -53,15 +54,26 @@ export async function fetchSessionDetailInitial(
 			),
 		signal,
 	);
+	const responseReceivedAt = performance.now();
 	const initialDetail = SessionDetailInitialSchema.parse(response);
 	if (initialDetail.overview.session.sessionId !== sessionId) {
 		throw new SessionDetailFastResponseError(
 			"The initial response belongs to another session.",
 		);
 	}
+	const parsed = parseSessionDetailOverviewResponse(
+		initialDetail.overview,
+		sessionId,
+	);
 	return {
-		...parseSessionDetailOverviewResponse(initialDetail.overview, sessionId),
+		...parsed,
 		initialDetail,
+		loadingTiming: {
+			request_duration_ms: Math.round(responseReceivedAt - startedAt),
+			response_processing_duration_ms: Math.round(
+				performance.now() - responseReceivedAt,
+			),
+		},
 	};
 }
 

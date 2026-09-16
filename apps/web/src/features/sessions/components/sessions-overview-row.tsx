@@ -33,6 +33,7 @@ import {
 	formatRoundedDuration,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { markSessionOpenFromClick } from "../session-open-timing";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
@@ -445,7 +446,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					className={rowClassName}
 					data-dashboard-grid-row-scope="session"
 					data-selected={isActive ? "true" : undefined}
-					onClick={() => onSessionClick?.(session)}
+					onClick={(event) => {
+						markSessionOpenFromClick(session.session_id, isActive, event);
+						onSessionClick?.(session);
+					}}
 					state={getSessionLinkState?.(session)}
 					to={sessionHref}
 					viewTransition
