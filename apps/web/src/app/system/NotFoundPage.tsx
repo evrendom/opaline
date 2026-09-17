@@ -16,7 +16,7 @@ export function NotFoundPage() {
 					Page not found
 				</h1>
 				<p className="text-sm leading-6 text-muted-foreground">
-					This route is no longer part of the reduced redesign surface.
+					The page you’re looking for does not exist or is no longer available.
 				</p>
 				<Link
 					to={

@@ -112,7 +112,7 @@ it.each([
 	"/wrapped/share-id",
 	"/dev/wrapped",
 	"/resume/old-token",
-])("redirects retired %s links to welcome", async (pathname) => {
+])("shows a missing page for retired %s links without redirecting", (pathname) => {
 	mockUseSession.mockReturnValue({ data: null, isPending: false });
 	render(
 		<MemoryRouter initialEntries={[pathname]}>
@@ -120,5 +120,9 @@ it.each([
 			<CurrentLocation />
 		</MemoryRouter>,
 	);
-	expect(await screen.findByText("/welcome")).toBeInTheDocument();
+	expect(
+		screen.getByRole("heading", { name: "Page not found" }),
+	).toBeInTheDocument();
+	expect(screen.getByText(pathname)).toBeInTheDocument();
+	expect(screen.queryByText("Guest App")).toBeNull();
 });

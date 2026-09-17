@@ -2,16 +2,15 @@
 import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
 
 interface Props {
-	active?: "product" | "pricing";
+	active?: "product";
 	productHref?: string;
 	enableDemo?: boolean;
 }
 
 const { active = "product", productHref = "#product" } = Astro.props;
 
-// BETA LAUNCH: Product and Pricing navigation stays hidden until payment
-// management is ready to operate safely after launch.
-const showProductAndPricingLinks = false;
+// Product navigation stays hidden during the beta launch.
+const showProductLinks = false;
 
 const flatOpalineWordmark = opalineWordmarkSvg
 	.trim()
@@ -20,12 +19,12 @@ const flatOpalineWordmark = opalineWordmarkSvg
 
 <header class="instant-v2-nav" data-instant-v2-nav data-scrolled="true">
 	<div class="instant-v2-nav-inner">
-		<a class="instant-v2-nav-label" href="/home" aria-label="Homepage">
+		<a class="instant-v2-nav-label" href="/" aria-label="Homepage">
 			<Fragment set:html={flatOpalineWordmark} />
 		</a>
 
 		{
-			showProductAndPricingLinks && (
+			showProductLinks && (
 				<nav class="instant-v2-nav-links" aria-label="Main navigation">
 					<a
 						class:list={[
@@ -38,16 +37,6 @@ const flatOpalineWordmark = opalineWordmarkSvg
 						data-instant-v2-product-link
 					>
 						<span class="instant-v2-nav-product-pill">Product</span>
-					</a>
-					<a
-						class:list={[
-							"instant-v2-nav-link instant-v2-nav-link-pricing",
-							{ "is-active": active === "pricing" },
-						]}
-						href="/pricing"
-						aria-current={active === "pricing" ? "page" : undefined}
-					>
-						<span>Pricing</span>
 					</a>
 				</nav>
 			)
@@ -269,11 +258,6 @@ const flatOpalineWordmark = opalineWordmarkSvg
 
 	.instant-v2-nav-link-product {
 		width: 73px;
-	}
-
-	.instant-v2-nav-link-pricing {
-		width: 67px;
-		overflow: hidden;
 	}
 
 	.instant-v2-nav-product-pill {
@@ -692,10 +676,6 @@ const flatOpalineWordmark = opalineWordmarkSvg
 
 		.instant-v2-nav-link-product {
 			width: 69px;
-		}
-
-		.instant-v2-nav-link-pricing {
-			width: 60px;
 		}
 
 		.instant-v2-nav-install {

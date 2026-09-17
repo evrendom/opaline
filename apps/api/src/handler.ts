@@ -432,7 +432,7 @@ async function handleRequest(
 		(request.method === "GET" || request.method === "HEAD")
 	) {
 		const session = await auth.api.getSession({ headers: request.headers });
-		let destination = "/home";
+		let destination = "/";
 		if (session) {
 			// The session was already authenticated above. Query its memberships
 			// directly instead of re-running auth inside listOrganizations.
@@ -456,6 +456,7 @@ async function handleRequest(
 				"Cache-Control": "private, no-store",
 				Location: destination,
 				Vary: "Cookie",
+				"X-Robots-Tag": "noindex, nofollow",
 			},
 		});
 	}

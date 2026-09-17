@@ -15,7 +15,7 @@
 			"maxDuration": 300
 		},
 		"api/rpc.ts": {
-			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"includeFiles": "{apps/api/src/**,dist-site/marketing.html,packages/*/src/**}",
 			"memory": 2048,
 			"maxDuration": 300
 		},
@@ -38,6 +38,11 @@
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 2048,
 			"maxDuration": 300
+		},
+		"api/page.ts": {
+			"includeFiles": "{apps/api/src/**,dist-site/app.html,dist-site/404.html,dist-site/410/index.html,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 30
 		}
 	},
 	"crons": [
@@ -91,6 +96,15 @@
 				{
 					"key": "X-Frame-Options",
 					"value": "SAMEORIGIN"
+				}
+			]
+		},
+		{
+			"source": "/product-demo/:path*",
+			"headers": [
+				{
+					"key": "X-Robots-Tag",
+					"value": "noindex, nofollow"
 				}
 			]
 		}
@@ -189,37 +203,41 @@
 		{
 			"source": "/",
 			"has": [
-				{ "type": "cookie", "key": "__Secure-better-auth.session_token" }
+				{
+					"type": "cookie",
+					"key": "__Secure-better-auth.session_token"
+				}
 			],
 			"destination": "/api/rpc?__opaline_path=/api/home"
 		},
 		{
 			"source": "/",
-			"has": [{ "type": "cookie", "key": "better-auth.session_token" }],
+			"has": [
+				{
+					"type": "cookie",
+					"key": "better-auth.session_token"
+				}
+			],
 			"destination": "/api/rpc?__opaline_path=/api/home"
 		},
 		{
-			"source": "/home",
-			"destination": "/home/index.html"
-		},
-		{
 			"source": "/",
-			"destination": "/home/index.html"
+			"destination": "/marketing.html"
 		},
 		{
-			"source": "/((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
-			"destination": "/app.html"
+			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
+			"destination": "/api/page?__opaline_path=/:path"
 		}
 	],
 	"redirects": [
 		{
 			"source": "/instant",
-			"destination": "/home",
+			"destination": "/",
 			"permanent": true
 		},
 		{
 			"source": "/instantv2",
-			"destination": "/home",
+			"destination": "/",
 			"permanent": true
 		},
 		{
@@ -230,6 +248,21 @@
 		{
 			"source": "/dashboard/get-started",
 			"destination": "/welcome",
+			"permanent": true
+		},
+		{
+			"source": "/privacy",
+			"destination": "/legal/privacy-policy/",
+			"permanent": true
+		},
+		{
+			"source": "/terms",
+			"destination": "/legal/terms-of-service/",
+			"permanent": true
+		},
+		{
+			"source": "/home",
+			"destination": "/",
 			"permanent": true
 		}
 	]

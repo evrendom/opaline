@@ -26,11 +26,16 @@ const {
 	canonical,
 	dateModified,
 	noindex = false,
-	socialImage,
+	socialImage = {
+		src: "/images/opaline-social.png",
+		alt: "Claude Code & Codex Session Analytics",
+		width: 2400,
+		height: 1260,
+	},
 } = Astro.props;
 
 const siteUrl = Astro.site ?? new URL("https://opaline.so");
-const siteHomepageUrl = new URL("/home", siteUrl);
+const siteHomepageUrl = new URL("/", siteUrl);
 const canonicalUrl = canonical
 	? new URL(canonical, siteUrl)
 	: new URL(Astro.url.pathname, siteUrl);
