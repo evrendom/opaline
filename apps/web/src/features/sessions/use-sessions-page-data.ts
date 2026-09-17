@@ -187,7 +187,6 @@ export function useSessionsPageData({
 		);
 	}, [sessionPages.data, failurePages.data, previewSeed]);
 	const isSnapshotSessionsPending =
-		// Failure metadata can arrive first; reveal the initial list together.
 		sessionPages.isPending ||
 		(demo?.live !== false &&
 			failurePages.isPending &&
