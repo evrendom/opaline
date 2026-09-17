@@ -7,6 +7,7 @@ import {
 	buildHistoricalSkillDetail,
 	type HistoricalSkillSessionRow,
 } from "./historical-skills-aggregation.js";
+import { getRepositorySqlFilter } from "./repository-filter.service.js";
 
 const CODEX_SKILL_NAME_PATTERN =
 	'"name":"exec_command"[^}]*skills/([a-zA-Z0-9_-]+)/SKILL';
@@ -18,7 +19,11 @@ interface HistoricalSkillSummaryRow {
 
 export async function listLegacyHistoricalCodexSkills(
 	orgId: string,
+	repoKey?: string,
 ): Promise<HistoricalSkillSummary[]> {
+	const repoFilter = repoKey
+		? await getRepositorySqlFilter(orgId, repoKey)
+		: undefined;
 	const rows = await queryClickhouse<HistoricalSkillSummaryRow>({
 		query: `
 			SELECT
@@ -35,13 +40,18 @@ export async function listLegacyHistoricalCodexSkills(
 					) AS distinct_skills
 				FROM rudel.codex_sessions
 				PREWHERE organization_id = {orgId:String}
+                ${repoFilter ? `AND (user_id, session_id) IN (SELECT sa.user_id, sa.session_id FROM rudel.session_analytics AS sa FINAL WHERE sa.organization_id = {orgId:String} AND sa.source = 'codex' AND ${repoFilter.sql})` : ""}
 				GROUP BY session_id
 			)
 			ARRAY JOIN distinct_skills AS skill
 			GROUP BY skill
 			ORDER BY session_count DESC, name ASC
 		`,
-		query_params: { orgId, skillNamePattern: CODEX_SKILL_NAME_PATTERN },
+		query_params: {
+			orgId,
+			skillNamePattern: CODEX_SKILL_NAME_PATTERN,
+			...repoFilter?.params,
+		},
 	});
 
 	return rows.map((row) => ({

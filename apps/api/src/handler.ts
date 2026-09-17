@@ -447,7 +447,7 @@ async function handleRequest(
 			`;
 
 			destination = workspace
-				? `/${encodeURIComponent(workspace.slug)}/sessions`
+				? `/${encodeURIComponent(workspace.slug)}/dashboard`
 				: "/settings/workspace";
 		}
 		return new Response(null, {

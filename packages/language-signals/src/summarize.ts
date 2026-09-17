@@ -19,6 +19,7 @@ export function summarize(
 	const summary = summarizeWithMatches(input);
 
 	return {
+		member_negative: summary.member_negative,
 		member_swears: summary.member_swears,
 		member_apologies: summary.member_apologies,
 		member_positive: summary.member_positive,
@@ -43,6 +44,10 @@ export function summarizeWithMatches(
 	const modelCounts = countSignals(modelMatches);
 
 	return {
+		model_apology_counts: countMatchedText(modelMatches, "apology"),
+		member_negative_counts: countMatchedText(memberMatches, "negative"),
+		member_positive_counts: countMatchedText(memberMatches, "positive"),
+		member_negative: memberCounts.negative,
 		member_swears: memberCounts.swears,
 		member_apologies: memberCounts.apologies,
 		member_positive: memberCounts.positive,
@@ -90,6 +95,7 @@ function scanDisplayTextSegments<TMatch extends LanguageSignalMatch>(
 }
 
 function countSignals(signals: readonly LanguageSignalMatch[]) {
+	let negative = 0;
 	let swears = 0;
 	let apologies = 0;
 	let positive = 0;
@@ -106,11 +112,12 @@ function countSignals(signals: readonly LanguageSignalMatch[]) {
 				positive += 1;
 				break;
 			case "negative":
+				negative += 1;
 				break;
 		}
 	}
 
-	return { apologies, positive, swears };
+	return { apologies, positive, swears, negative };
 }
 
 function collectDistinctMatchedText(
@@ -130,4 +137,18 @@ function collectDistinctMatchedText(
 	}
 
 	return capturedText;
+}
+
+// Keep every occurrence, including case variants, for exact verbatim filtering.
+// The display-example arrays above remain distinct and capped independently.
+function countMatchedText(
+	signals: readonly LanguageSignalMatch[],
+	category: LanguageSignalMatch["category"],
+): Record<string, number> {
+	const counts = new Map<string, number>();
+	for (const signal of signals) {
+		if (signal.category === category)
+			counts.set(signal.matchedText, (counts.get(signal.matchedText) ?? 0) + 1);
+	}
+	return Object.fromEntries(counts);
 }

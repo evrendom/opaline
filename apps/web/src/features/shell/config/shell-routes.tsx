@@ -1,8 +1,9 @@
 import {
 	BookOpen01Icon,
+	ChartLineData01Icon,
 	Clock03Icon,
+	Folder01Icon,
 	Settings01Icon,
-	StarIcon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import type { ReactElement } from "react";
@@ -14,6 +15,7 @@ export type ShellRouteId =
 	| "dashboard"
 	| "sessions"
 	| "skills"
+	| "repos"
 	| "team"
 	| "settings";
 export type ShellRouteIcon = ReactElement;
@@ -31,12 +33,12 @@ export type ShellRouteDefinition = {
 export const shellRoutes = [
 	{
 		id: "dashboard",
-		comingSoon: true,
+		comingSoon: false,
 		path: appRoutes.dashboard(),
 		title: "Dashboard",
 		navLabel: "Dashboard",
 		shortcut: "D",
-		icon: <ShellHugeicon icon={StarIcon} />,
+		icon: <ShellHugeicon icon={ChartLineData01Icon} />,
 	},
 	{
 		id: "sessions",
@@ -49,12 +51,21 @@ export const shellRoutes = [
 	},
 	{
 		id: "skills",
-		comingSoon: true,
+		comingSoon: false,
 		path: appRoutes.skills(),
 		title: "Skills",
 		navLabel: "Skills",
 		shortcut: "K",
 		icon: <ShellHugeicon icon={BookOpen01Icon} />,
+	},
+	{
+		id: "repos",
+		comingSoon: false,
+		path: appRoutes.repos(),
+		title: "Repos",
+		navLabel: "Repos",
+		shortcut: "R",
+		icon: <ShellHugeicon icon={Folder01Icon} />,
 	},
 	{
 		id: "team",
@@ -80,8 +91,9 @@ export const shellRouteMap = {
 	dashboard: shellRoutes[0],
 	sessions: shellRoutes[1],
 	skills: shellRoutes[2],
-	team: shellRoutes[3],
-	settings: shellRoutes[4],
+	repos: shellRoutes[3],
+	team: shellRoutes[4],
+	settings: shellRoutes[5],
 } as const;
 
 export const shellNavigationRoutes = shellRoutes.filter(

@@ -4,12 +4,12 @@ import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
-import { NewseshSessionList } from "@/features/sessions/components/newsesh-session-list";
 import { SessionDetailView } from "@/features/sessions/components/SessionDetailView";
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { sessionPaneMotionStyle } from "@/features/sessions/components/session-pane-motion";
 import { SessionTraceDock } from "@/features/sessions/components/session-trace-dock";
 import { SessionWorkspaceResizeHandle } from "@/features/sessions/components/session-workspace-resize-handle";
+import { SessionsListSurface } from "@/features/sessions/components/sessions-list-surface";
 import { getSessionNeighbours } from "@/features/sessions/session-navigation";
 import { useSessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -99,15 +99,14 @@ export function NewSessionPage() {
 					className="hidden min-h-0 min-w-0 flex-none overflow-hidden lg:flex lg:w-[var(--session-list-pane-width,29.8125rem)]"
 					data-slot="sessions-list-pane"
 				>
-					<NewseshSessionList
+					<SessionsListSurface
 						activeSessionId={activeSessionId}
 						canOpenSession={(session) => canViewSession(session.user_id)}
 						getSessionHref={(session) => getDetailPath(session.session_id)}
-						isError={data.isSnapshotSessionsError || data.isSummaryError}
-						isPending={data.isSnapshotSessionsPending}
+						data={data}
+						layout="workspace"
 						onSessionClick={handleSessionClick}
 						scrollContainerRef={scrollContainerRef}
-						sessions={viewableSessions}
 					/>
 				</section>
 				<div className="hidden lg:contents">

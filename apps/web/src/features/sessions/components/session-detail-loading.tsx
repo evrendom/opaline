@@ -1,5 +1,6 @@
-import { type CSSProperties, useId, useRef } from "react";
+import { type CSSProperties, useRef } from "react";
 import { Skeleton } from "@/app/ui/skeleton";
+import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import {
 	useElementWidth,
 	useStoredPaneSize,
@@ -13,16 +14,10 @@ import {
 	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
 	SESSION_TURN_TABLE_PANE_STORAGE_KEY,
 } from "./session-detail-pane-sizing";
-import { SessionContextUtilizationGradients } from "./session-thread-overview-token-layer";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "./sessions-overview-table-utils";
-import "./session-detail-loading.css";
 
 const TABLE_COLUMNS = ["Time", "Length", "Input", "Output", "Cost"];
 const LOADING_ROWS = Array.from({ length: 16 }, (_, index) => index);
-// A fixed illustrative wave, independent of session data. One moving mask
-// reveals the line and fill together, keeping their fading edges aligned.
-const CHART_LOADING_LINE =
-	"M 10 47 C 80 47 80 28 150 28 C 220 28 220 10 290 10 C 360 10 360 39 430 39 C 500 39 500 5 570 5 C 640 5 640 32 710 32 C 780 32 780 16 850 16 C 920 16 920 44 990 44";
 
 function Placeholder({ className }: { className?: string }) {
 	return (
@@ -36,71 +31,13 @@ function Placeholder({ className }: { className?: string }) {
 }
 
 function SessionChartLoading() {
-	const fillId = useId();
 	return (
 		<div
 			aria-hidden="true"
 			className="h-[4.07rem] shrink-0 overflow-hidden border-b border-(--session-overview-border) bg-[#fcfcfc] dark:bg-(--session-overview-surface)"
 			data-session-chart-loading
 		>
-			<svg
-				aria-hidden="true"
-				className="h-[2.57rem] w-full"
-				preserveAspectRatio="none"
-				viewBox="0 0 1000 76"
-			>
-				<defs>
-					<SessionContextUtilizationGradients
-						gradientId={fillId}
-						baselineY={50}
-						topY={5}
-					/>
-					<linearGradient id={`${fillId}-fade`} x1="0%" x2="100%">
-						<stop offset="0%" stopColor="white" stopOpacity="0" />
-						<stop offset="35%" stopColor="white" />
-						<stop offset="65%" stopColor="white" />
-						<stop offset="100%" stopColor="white" stopOpacity="0" />
-					</linearGradient>
-					<mask
-						id={`${fillId}-flow`}
-						maskUnits="userSpaceOnUse"
-						x="0"
-						y="0"
-						width="1000"
-						height="76"
-					>
-						<rect
-							className="session-detail-loading-mask"
-							width="300"
-							height="76"
-							fill={`url(#${fillId}-fade)`}
-							data-session-chart-loading-mask
-						/>
-					</mask>
-				</defs>
-				{[16, 27, 39].map((y) => (
-					<path
-						key={y}
-						className="stroke-[color-mix(in_srgb,var(--session-overview-text)_6%,transparent)]"
-						d={`M 10 ${y} H 990`}
-						vectorEffect="non-scaling-stroke"
-					/>
-				))}
-				<g mask={`url(#${fillId}-flow)`} data-session-chart-loading-flow>
-					<path
-						d={`${CHART_LOADING_LINE} L 990 50 L 10 50 Z`}
-						fill={`url(#${fillId})`}
-					/>
-					<path
-						className="fill-none"
-						d={CHART_LOADING_LINE}
-						stroke={`url(#${fillId}-stroke)`}
-						strokeLinecap="round"
-						strokeWidth="2.5"
-						vectorEffect="non-scaling-stroke"
-					/>
-				</g>
-			</svg>
+			<ChartLoadingWave className="h-[2.57rem] w-full" />
 			<div className="flex h-6 items-center justify-between border-t-[0.5px] border-(--session-overview-border) px-3">
 				<Placeholder className="h-2 w-16" />
 				<Placeholder className="h-2 w-16" />
@@ -198,7 +135,11 @@ interface LoadingPaneStyle extends CSSProperties {
 	"--session-turn-table-pane-width": string;
 }
 
-export function SessionDetailContentLoadingView() {
+export function SessionDetailContentLoadingView({
+	showOverviewStrip = true,
+}: {
+	showOverviewStrip?: boolean;
+}) {
 	const layoutRef = useRef<HTMLDivElement>(null);
 	const layoutWidth = useElementWidth(layoutRef);
 	const [storedWidth] = useStoredPaneSize(
@@ -223,7 +164,7 @@ export function SessionDetailContentLoadingView() {
 			data-session-detail-loading
 		>
 			<output className="sr-only">Loading session details</output>
-			<SessionChartLoading />
+			{showOverviewStrip ? <SessionChartLoading /> : null}
 			<div
 				ref={layoutRef}
 				className="grid min-h-0 min-w-0 flex-1 grid-cols-[var(--session-turn-table-pane-width)_2px_minmax(0,1fr)]"

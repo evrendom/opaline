@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	getCurrentShellRoute,
 	shellRouteMap,
@@ -6,7 +6,7 @@ import {
 } from "@/features/shell/config/shell-routes";
 
 describe("getCurrentShellRoute", () => {
-	it("matches the dashboard route for /home", () => {
+	it("matches the home route for /home", () => {
 		expect(getCurrentShellRoute("/home")).toBe(shellRouteMap.dashboard);
 	});
 
@@ -43,5 +43,27 @@ describe("getCurrentShellRoute", () => {
 		const shortcuts = shellRoutes.map((route) => route.shortcut);
 
 		expect(new Set(shortcuts).size).toBe(shortcuts.length);
+	});
+});
+
+describe("Home navigation availability", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	it.each([
+		false,
+		true,
+	])("hides Home with production mode %s", async (production) => {
+		vi.stubEnv("PROD", production);
+		vi.resetModules();
+		const { shellNavigationRoutes } = await import("./shell-routes");
+		expect(shellNavigationRoutes.some((route) => route.path === "/home")).toBe(
+			false,
+		);
+		expect(shellNavigationRoutes.some((route) => route.id === "sessions")).toBe(
+			true,
+		);
 	});
 });

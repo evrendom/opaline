@@ -8,6 +8,7 @@ import {
 	resolveRepoIdentity,
 } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
+import { getRepositorySqlFilter } from "./repository-filter.service.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 
 interface HistoricalSkillSummaryRow {
@@ -71,7 +72,11 @@ const HISTORICAL_SKILL_CONTENT_QUERY_SETTINGS = {
 
 export async function listHistoricalSkills(
 	organizationId: string,
+	repoKey?: string,
 ): Promise<HistoricalSkillSummary[]> {
+	const repoFilter = repoKey
+		? await getRepositorySqlFilter(organizationId, repoKey)
+		: undefined;
 	const rows = await queryClickhouse<HistoricalSkillSummaryRow>({
 		clickhouse_settings: HISTORICAL_SKILL_QUERY_SETTINGS,
 		query: `
@@ -107,6 +112,7 @@ export async function listHistoricalSkills(
 						(su.agent = 'claude' AND sa.source = 'claude_code')
 						OR (su.agent = 'codex' AND sa.source = 'codex')
 					)
+				${repoFilter ? `WHERE ${repoFilter.sql}` : ""}
 			),
 			skill_summaries AS (
 				SELECT
@@ -214,6 +220,7 @@ export async function listHistoricalSkills(
 			ORDER BY session_count DESC, name ASC
 		`,
 		query_params: {
+			...repoFilter?.params,
 			attributionLimit: HISTORICAL_SKILL_ATTRIBUTION_LIMIT,
 			organizationId,
 			previewCharacterLimit: HISTORICAL_SKILL_PREVIEW_CHARACTER_LIMIT,

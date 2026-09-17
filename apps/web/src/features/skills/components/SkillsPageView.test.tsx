@@ -113,18 +113,26 @@ describe("SkillsPageView", () => {
 			}),
 		).toBeInTheDocument();
 		expect(screen.getByText("testing-bun")).toBeInTheDocument();
-		expect(screen.getByText("Used in 12 sessions")).toBeInTheDocument();
+		expect(screen.getByTitle("12 sessions")).toHaveTextContent("12 sessions");
+		expect(screen.getByTitle("1 session")).toHaveTextContent("1 session");
 		expect(
 			screen.getByTitle("Used by Ada Lovelace in 7 sessions"),
 		).toBeInTheDocument();
 		expect(
 			screen.getByTitle("Repository rudel, 8 sessions"),
 		).toBeInTheDocument();
-		expect(screen.getByText("2 users")).toBeInTheDocument();
+		expect(screen.getByRole("group", { name: "2 users" })).toBeInTheDocument();
+		const users = screen.getByRole("group", { name: "4 users" });
+		expect(within(users).getByText("+1")).toBeInTheDocument();
+		expect(
+			within(users).getByTitle("Used by Grace Hopper in 3 sessions"),
+		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("heading", { name: "Testing with Bun" }),
 		).not.toBeInTheDocument();
-		expect(screen.getByText("Run focused tests first.")).toBeInTheDocument();
+		expect(
+			screen.queryByText("Run focused tests first."),
+		).not.toBeInTheDocument();
 		expect(
 			screen.getByText(
 				"a-very-long-skill-name-that-needs-to-wrap-without-breaking-the-row-layout",

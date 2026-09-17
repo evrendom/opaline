@@ -80,7 +80,7 @@ test("valid root sessions open their workspace; expired sessions stay on the pub
 	assert(workspace);
 	const signedIn = await openRoot(cookie);
 	expect(signedIn.status).toBe(302);
-	expect(signedIn.headers.get("Location")).toBe(`/${workspace.slug}/sessions`);
+	expect(signedIn.headers.get("Location")).toBe(`/${workspace.slug}/dashboard`);
 	expect(signedIn.headers.get("Cache-Control")).toBe("private, no-store");
 	await sqlClient`UPDATE session SET expires_at = NOW() - INTERVAL '1 hour' WHERE user_id = ${userId}`;
 	await expectMarketing(cookie);

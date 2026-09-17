@@ -72,7 +72,7 @@ test("opens the active workspace, falls back to a membership, and handles no wor
 	expect(activated.status).toBe(200);
 	const active = await openHome(cookie);
 	expect(active.status).toBe(302);
-	expect(active.headers.get("Location")).toBe(`/${second?.slug}/sessions`);
+	expect(active.headers.get("Location")).toBe(`/${second?.slug}/dashboard`);
 
 	const cleared = await authPost(
 		"organization/set-active",
@@ -89,7 +89,7 @@ test("opens the active workspace, falls back to a membership, and handles no wor
 		.parse(await listed.json());
 	expect(memberships).toHaveLength(2);
 	expect((await openHome(cookie)).headers.get("Location")).toBe(
-		`/${memberships[0]?.slug}/sessions`,
+		`/${memberships[0]?.slug}/dashboard`,
 	);
 });
 

@@ -11,10 +11,12 @@ export function DashboardDateControls({
 	className,
 	sourceComponent = "dashboard_date_picker",
 	variant,
+	calendarControls,
 }: {
 	className?: string;
 	sourceComponent?: string;
 	variant?: AnalyticsDateRangePickerProps["variant"];
+	calendarControls?: AnalyticsDateRangePickerProps["calendarControls"];
 }) {
 	const { state, actions } = useDateRange();
 
@@ -26,6 +28,7 @@ export function DashboardDateControls({
 			align="end"
 			sourceComponent={sourceComponent}
 			variant={variant}
+			calendarControls={calendarControls}
 			triggerClassName={cn(
 				"dashboardy-action-button h-8 px-2.5 text-[13px] sm:h-8",
 				className,

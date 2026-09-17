@@ -20,7 +20,7 @@ const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
 // Canonical routes shared by navigation, authentication, and analytics.
 export const appRoutes = {
 	home: () => HOME_PATH,
-	dashboard: () => HOME_PATH,
+	dashboard: () => LEGACY_DASHBOARD_PATH,
 	dashboardSessions: () => LEGACY_DASHBOARD_SESSIONS_PATH,
 	legacyDashboard: () => LEGACY_DASHBOARD_PATH,
 	session: () => SESSION_PATH,
@@ -31,7 +31,19 @@ export const appRoutes = {
 	newSession: () => NEW_SESSION_PATH,
 	newSessionDetail: (sessionId: string) =>
 		`${NEW_SESSION_PATH}/${encodeURIComponent(sessionId)}`,
+	repos: () => "/repos",
+	repoDetail: (repoKey: string, sessionId?: string) => {
+		const params = new URLSearchParams({ repo: repoKey });
+		if (sessionId) params.set("session", sessionId);
+		return `/repos?${params}`;
+	},
 	skills: () => SKILLS_PATH,
+	skillDetail: (name: string, sessionId?: string, turnId?: string) => {
+		const params = new URLSearchParams({ skill: name });
+		if (sessionId) params.set("session", sessionId);
+		if (sessionId && turnId) params.set("turn", turnId);
+		return `${SKILLS_PATH}?${params}`;
+	},
 	getStarted: () => GET_STARTED_PATH,
 	dashboardGetStartedLegacy: () => DASHBOARD_GET_STARTED_LEGACY_PATH,
 	team: () => TEAM_PATH,
@@ -84,8 +96,7 @@ export function getCanonicalAppPath(pathname: string) {
 	const workspaceSlug = getWorkspaceSlugFromPath(pathname);
 	if (workspaceSlug) {
 		const suffix = pathname.slice(workspaceSlug.length + 1) || "/";
-		if (suffix === "/") return SESSION_PATH;
-		if (suffix === "/dashboard") return HOME_PATH;
+		if (suffix === "/") return LEGACY_DASHBOARD_PATH;
 		if (/^\/sessions(?:\/|$)/u.test(suffix))
 			return SESSION_PATH + suffix.slice("/sessions".length);
 		return suffix;
@@ -119,6 +130,12 @@ export function getWorkspacePathAfterSwitch(
 		? `/${encodeURIComponent(workspaceSlug)}${path.slice(previousSlug.length + 1)}`
 		: getWorkspaceAppPath(workspaceSlug, path);
 	// Session IDs belong to the previous workspace. Keep filters, reset selection.
+	if (/^\/[^/]+\/(?:skills|repos)(?:[?#]|$)/u.test(destination)) {
+		const url = new URL(destination, "http://workspace.local");
+		url.searchParams.delete("session");
+		url.searchParams.delete("turn");
+		return `${url.pathname}${url.search}${url.hash}`;
+	}
 	return destination.replace(/^(\/[^/]+\/(?:sessions|newsesh))\/[^?#]+/u, "$1");
 }
 
@@ -126,9 +143,8 @@ export function getWorkspaceRelativePath(path: string): string | null {
 	const pathname = path.split(/[?#]/u, 1)[0] ?? path;
 	const suffix = path.slice(pathname.length);
 	if (pathname === "/" || pathname === "/dashboardy")
-		return `/sessions${suffix}`;
-	if ([HOME_PATH, LEGACY_DASHBOARD_PATH].includes(pathname))
 		return `/dashboard${suffix}`;
+	if ([HOME_PATH, LEGACY_DASHBOARD_PATH].includes(pathname)) return path;
 	if (/^\/(?:dashboard\/)?developers(?:\/|$)/u.test(pathname))
 		return `/team${suffix}`;
 	if (
@@ -144,6 +160,7 @@ export function getWorkspaceRelativePath(path: string): string | null {
 	if (/^\/(?:session|sessions)(?:\/|$)/u.test(pathname))
 		return `${pathname.replace(/^\/session(?=\/|$)/u, "/sessions")}${suffix}`;
 	if (pathname === TEAM_PATH || pathname === `${TEAM_PATH}/`) return path;
-	if (/^\/(?:settings|skills|newsesh)(?:\/|$)/u.test(pathname)) return path;
+	if (/^\/(?:settings|skills|repos|newsesh)(?:\/|$)/u.test(pathname))
+		return path;
 	return null;
 }

@@ -48,6 +48,10 @@ const NewSessionPage = lazyNamed(
 	() => import("@/features/sessions/new-session-page"),
 	"NewSessionPage",
 );
+const ReposPage = lazyNamed(
+	() => import("@/features/repos/repos-page"),
+	"ReposPage",
+);
 const SkillsPage = lazyNamed(
 	() => import("@/features/skills/SkillsPage"),
 	"SkillsPage",
@@ -82,9 +86,11 @@ const LEGACY_SESSION_FULL_PATH = "/session/full";
 const LEGACY_SESSION_SPLIT_PATH = "/session/split";
 
 type ShellRoutePaths = {
+	home: string;
 	dashboard: string;
 	session: string;
 	skills: string;
+	repos: string;
 	team: string;
 	settings: string;
 	settingsAccount: string;
@@ -92,9 +98,11 @@ type ShellRoutePaths = {
 };
 
 const canonicalShellRoutePaths: ShellRoutePaths = {
+	home: appRoutes.home(),
 	dashboard: appRoutes.dashboard(),
 	session: appRoutes.session(),
 	skills: appRoutes.skills(),
+	repos: appRoutes.repos(),
 	team: appRoutes.team(),
 	settings: appRoutes.settings(),
 	settingsAccount: appRoutes.settingsAccount(),
@@ -102,9 +110,11 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 };
 
 const workspaceShellRoutePaths: ShellRoutePaths = {
+	home: "/:workspaceSlug/home",
 	dashboard: "/:workspaceSlug/dashboard",
 	session: "/:workspaceSlug/sessions",
 	skills: "/:workspaceSlug/skills",
+	repos: "/:workspaceSlug/repos",
 	team: "/:workspaceSlug/team",
 	settings: "/:workspaceSlug/settings",
 	settingsAccount: "/:workspaceSlug/settings/account",
@@ -159,6 +169,10 @@ function getShellRouteElements(
 	return (
 		<>
 			<Route
+				path={routePaths.home}
+				element={<ShellRedirect to={routePaths.dashboard} />}
+			/>
+			<Route
 				path={routePaths.dashboard}
 				element={
 					import.meta.env.PROD && shellRouteMap.dashboard.comingSoon ? (
@@ -175,6 +189,10 @@ function getShellRouteElements(
 			<Route
 				path={`${routePaths.session}/:sessionId/v2`}
 				element={<LazyRoute Component={SessionComponent} />}
+			/>
+			<Route
+				path={routePaths.repos}
+				element={<LazyRoute Component={ReposPage} />}
 			/>
 			<Route
 				path={routePaths.skills}
@@ -263,11 +281,7 @@ export function AppRouter({
 	rootRedirectTarget: string | null;
 	sessionComponent?: ComponentType;
 }) {
-	const rootRedirect =
-		rootRedirectTarget ||
-		(import.meta.env.PROD
-			? shellRouteMap.sessions.path
-			: shellRouteMap.dashboard.path);
+	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
 	return (
 		<Routes>
 			<Route path="/" element={<Navigate to={rootRedirect} replace />} />
@@ -289,10 +303,6 @@ export function AppRouter({
 				<Route
 					path={CLI_SETUP_PATH}
 					element={<LazyRoute Component={CliOnboardingPage} />}
-				/>
-				<Route
-					path={appRoutes.legacyDashboard()}
-					element={<Navigate to={appRoutes.home()} replace />}
 				/>
 				<Route
 					path={`${appRoutes.newSession()}/:sessionId?`}
@@ -334,7 +344,7 @@ export function AppRouter({
 					{getShellRouteElements(workspaceShellRoutePaths, sessionComponent)}
 					<Route
 						path="/:workspaceSlug"
-						element={<ShellRedirect to="/:workspaceSlug/sessions" />}
+						element={<ShellRedirect to="/:workspaceSlug/dashboard" />}
 					/>
 					<Route
 						path="/:workspaceSlug/newsesh/:sessionId?"

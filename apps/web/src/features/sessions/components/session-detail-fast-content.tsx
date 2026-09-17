@@ -43,6 +43,7 @@ const columnBottomPaddingClassName =
 	"pb-[calc(5rem+env(safe-area-inset-bottom))]";
 
 export function SessionDetailFastContent({
+	showOverviewStrip = true,
 	firstOverview,
 	initialDetail,
 	initialSelectedTurnId,
@@ -52,6 +53,7 @@ export function SessionDetailFastContent({
 	userMap,
 }: {
 	firstOverview: NormalizedSessionDetailOverview;
+	showOverviewStrip?: boolean;
 	initialDetail?: SessionDetailInitial;
 	initialSelectedTurnId: string | undefined;
 	onStaleRevision: (error: unknown, selectedTurnId?: string) => void;
@@ -255,6 +257,7 @@ export function SessionDetailFastContent({
 		<div className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden bg-(--session-overview-surface) [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fcfcfc] [--session-overview-text:#101112] [font-family:Inter,sans-serif] dark:[--session-overview-border:rgba(255,255,255,0.08)] dark:[--session-overview-hover:rgba(255,255,255,0.05)] dark:[--session-overview-muted:rgba(255,255,255,0.65)] dark:[--session-overview-subtle:rgba(255,255,255,0.5)] dark:[--session-overview-surface:#111827] dark:[--session-overview-text:#f8fafc]">
 			<div className="flex min-h-0 flex-col">
 				<SessionDetailLayout
+					showOverviewStrip={showOverviewStrip}
 					onPrefetchTurn={handlePrefetchTurn}
 					onSelect={handleSelection}
 					options={options}

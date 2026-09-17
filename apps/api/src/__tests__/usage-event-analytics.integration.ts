@@ -709,6 +709,7 @@ describe("usage-event analytics ClickHouse rollups", () => {
 					rawRevision: "1",
 				},
 				{
+					member_negative: 0,
 					member_swears: 0,
 					member_apologies: 1,
 					member_positive: index % 7,

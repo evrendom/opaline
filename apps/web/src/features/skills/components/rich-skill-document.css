@@ -7,7 +7,7 @@
 	--skill-document-table-background: rgba(242, 241, 238, 0.62);
 	min-width: 0;
 	color: var(--dashboardy-heading);
-	font-family: Georgia, ui-serif, serif;
+	font-family: var(--font-sans);
 	font-size: 15px;
 	font-weight: 400;
 	line-height: 24px;
@@ -44,7 +44,7 @@
 .rich-skill-document h4 {
 	position: relative;
 	color: var(--dashboardy-heading);
-	font-family: "Libre Baskerville", Baskerville, "Times New Roman", serif;
+	font-family: var(--font-sans);
 	letter-spacing: 0;
 }
 
@@ -117,7 +117,8 @@
 }
 
 .rich-skill-document__code-block {
-	overscroll-behavior: none;
+	overscroll-behavior-x: none;
+	overscroll-behavior-y: auto;
 	white-space: pre;
 }
 
@@ -214,32 +215,40 @@
 }
 
 .rich-skill-document[data-variant="preview"] {
-	font-size: 10.5px;
-	line-height: 16px;
+	--skill-document-code-background: var(--session-overview-hover);
+	--skill-document-inline-code-background: var(--session-overview-hover);
+	font-size: 1rem;
+	line-height: 1.5rem;
+	color: var(--session-overview-muted);
 }
 
 .rich-skill-document[data-variant="preview"] p {
-	min-height: 16px;
-	margin-bottom: 5px;
+	min-height: 0;
+	margin-bottom: 0.5rem;
+	color: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] h1,
 .rich-skill-document[data-variant="preview"] h2 {
-	margin-top: 17px;
-	font-size: 14px;
-	line-height: 19px;
+	margin-top: 1rem;
+	font-size: inherit;
+	font-weight: 500;
+	line-height: inherit;
+	color: var(--session-overview-text);
 }
 
 .rich-skill-document[data-variant="preview"] h3 {
-	margin: 13px 0 3px;
-	font-size: 12px;
-	line-height: 17px;
+	margin: 0.75rem 0 0.25rem;
+	font-size: inherit;
+	font-weight: 500;
+	line-height: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] h4 {
-	margin-top: 10px;
-	font-size: 11px;
-	line-height: 16px;
+	margin-top: 0.75rem;
+	font-size: inherit;
+	font-weight: 500;
+	line-height: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] blockquote {
@@ -270,12 +279,31 @@
 }
 
 .rich-skill-document[data-variant="preview"] table {
-	font-size: 9px;
-	line-height: 13px;
+	font-size: inherit;
+	line-height: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] th,
 .rich-skill-document[data-variant="preview"] td {
 	min-width: 58px;
 	padding: 4px 5px;
+}
+
+.rich-skill-document[data-variant="preview"] > :first-child {
+	margin-top: 0;
+}
+
+.rich-skill-document[data-variant="preview"] :is(ul, ol) {
+	color: inherit;
+}
+
+@media (min-width: 40rem) {
+	.rich-skill-document[data-variant="preview"] {
+		font-size: 0.875rem;
+		line-height: 1.375rem;
+	}
+}
+
+.rich-skill-document[data-variant="preview"] :is(pre, code) {
+	color: inherit;
 }

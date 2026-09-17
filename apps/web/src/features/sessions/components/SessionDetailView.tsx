@@ -7,10 +7,13 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
+import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { useSessionOpenTracking } from "@/features/sessions/use-session-open-tracking";
+import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
@@ -35,8 +38,9 @@ import {
 import { useSessionPaneFullscreen } from "./use-session-pane-fullscreen";
 
 type SessionDetailViewProps = {
+	showOverviewStrip?: boolean;
 	initialSession?: SessionAnalytics;
-	navigation: SessionNavigation;
+	navigation: SessionNavigation | undefined;
 	onClose: (() => void) | undefined;
 	position: number | undefined;
 	sessionId: string;
@@ -81,6 +85,7 @@ function SessionDetailStateMessage({
 }
 
 export function SessionDetailView({
+	showOverviewStrip = true,
 	initialSession,
 	navigation,
 	onClose,
@@ -94,6 +99,12 @@ export function SessionDetailView({
 	const responseScrollRef = useRef<HTMLDivElement>(null);
 	const preservedTurnIdRef = useRef<string | undefined>(undefined);
 	const shellHeaderPortal = useShellHeaderPortal();
+	const getShellRoutePath = useShellRoutePath();
+	const getSkillHref = useCallback(
+		(name: string, turnId?: string) =>
+			getShellRoutePath(appRoutes.skillDetail(name, sessionId, turnId)),
+		[getShellRoutePath, sessionId],
+	);
 	const queryClient = useQueryClient();
 	const [cacheHit] = useState(
 		() =>
@@ -210,78 +221,85 @@ export function SessionDetailView({
 		(overviewQuery.data?.shapeIssueFields.length ?? 0) > 0;
 
 	return (
-		<div
-			className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-(--dashboardy-surface) text-(--dashboardy-heading)"
-			ref={contentRef}
-			data-session-detail-fullscreen={isFullscreen ? "" : undefined}
-		>
-			<SessionDetailHeader
-				avatarMap={avatarMap}
-				displayControls={
-					onClose
-						? {
-								isFullscreen,
-								onClose,
-								onToggleFullscreen: toggleFullscreen,
-							}
-						: undefined
-				}
-				headerRef={setHeaderElement}
-				hideMetrics
-				isLoading={overviewQuery.isLoading}
-				navigation={navigation}
-				portalHost={shellHeaderPortal}
-				position={position}
-				sessionId={sessionId}
-				totalSessions={totalSessions}
-				viewModel={viewModel}
-			/>
+		<ConversationSkillLinkContext.Provider value={getSkillHref}>
+			<div
+				className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-(--dashboardy-surface) text-(--dashboardy-heading)"
+				ref={contentRef}
+				data-session-detail-fullscreen={isFullscreen ? "" : undefined}
+			>
+				<SessionDetailHeader
+					avatarMap={avatarMap}
+					displayControls={
+						onClose
+							? {
+									isFullscreen,
+									onClose,
+									onToggleFullscreen: toggleFullscreen,
+								}
+							: undefined
+					}
+					headerRef={setHeaderElement}
+					hideMetrics
+					isLoading={overviewQuery.isLoading}
+					navigation={navigation}
+					portalHost={shellHeaderPortal}
+					position={position}
+					sessionId={sessionId}
+					totalSessions={totalSessions}
+					viewModel={viewModel}
+				/>
 
-			<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-				{overviewQuery.isLoading ? <SessionDetailContentLoadingView /> : null}
-				{!overviewQuery.isLoading && errorState ? (
-					<SessionDetailStateMessage
-						description={errorState.description}
-						isRetrying={overviewQuery.isFetching}
-						onRetry={
-							canRetrySessionDetailError(overviewQuery.error)
-								? () => {
-										void overviewQuery.refetch();
-									}
-								: undefined
-						}
-						title={errorState.title}
-					/>
-				) : null}
-				{!overviewQuery.isLoading && !errorState && overview && viewModel ? (
-					<div className="flex h-full min-h-0 flex-col">
-						{hasShapeWarning ? (
-							<output className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-(--dashboardy-heading)">
-								Some session fields were unavailable. Safe overview values are
-								shown.
-							</output>
-						) : null}
-						<div className="min-h-0 flex-1">
-							<SessionDetailFastContent
-								key={`${sessionId}:${overview.revision}`}
-								firstOverview={overview}
-								initialDetail={overviewQuery.data?.initialDetail}
-								initialSelectedTurnId={preservedTurnIdRef.current}
-								onStaleRevision={handleStaleRevision}
-								responseScrollRef={responseScrollRef}
-								userImageUrl={avatarMap[viewModel.safeUserId]}
-								userMap={userMap}
-							/>
+				<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+					{overviewQuery.isLoading ? (
+						<SessionDetailContentLoadingView
+							showOverviewStrip={showOverviewStrip}
+						/>
+					) : null}
+					{!overviewQuery.isLoading && errorState ? (
+						<SessionDetailStateMessage
+							description={errorState.description}
+							isRetrying={overviewQuery.isFetching}
+							onRetry={
+								canRetrySessionDetailError(overviewQuery.error)
+									? () => {
+											void overviewQuery.refetch();
+										}
+									: undefined
+							}
+							title={errorState.title}
+						/>
+					) : null}
+					{!overviewQuery.isLoading && !errorState && overview && viewModel ? (
+						<div className="flex h-full min-h-0 flex-col">
+							{hasShapeWarning ? (
+								<output className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-(--dashboardy-heading)">
+									Some session fields were unavailable. Safe overview values are
+									shown.
+								</output>
+							) : null}
+							<div className="min-h-0 flex-1">
+								<SessionDetailFastContent
+									showOverviewStrip={showOverviewStrip}
+									key={`${sessionId}:${overview.revision}`}
+									firstOverview={overview}
+									initialDetail={overviewQuery.data?.initialDetail}
+									initialSelectedTurnId={preservedTurnIdRef.current}
+									onStaleRevision={handleStaleRevision}
+									responseScrollRef={responseScrollRef}
+									userImageUrl={avatarMap[viewModel.safeUserId]}
+									userMap={userMap}
+								/>
+							</div>
 						</div>
-					</div>
-				) : null}
-				{!overviewQuery.isLoading && !errorState && !overview ? (
-					<SessionDetailStateMessage
-						description={undefined}
-						title="Session Not Found"
-					/>
-				) : null}
+					) : null}
+					{!overviewQuery.isLoading && !errorState && !overview ? (
+						<SessionDetailStateMessage
+							description={undefined}
+							title="Session Not Found"
+						/>
+					) : null}
+				</div>
 			</div>
-		</div>
+		</ConversationSkillLinkContext.Provider>
 	);
 }

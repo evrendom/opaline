@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import { Skeleton } from "@/app/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
+import { DetailIdentityBreadcrumb } from "@/features/shell/components/detail-identity-breadcrumb";
 import { formatRoundedDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
@@ -34,7 +35,7 @@ type SessionDetailHeaderProps = {
 	headerRef: (element: HTMLElement | null) => void;
 	hideMetrics: boolean;
 	isLoading: boolean;
-	navigation: SessionNavigation;
+	navigation: SessionNavigation | undefined;
 	portalHost: HTMLElement | null;
 	position: number | undefined;
 	sessionId: string;
@@ -188,40 +189,7 @@ function SessionIdentityBreadcrumb({
 		},
 	];
 
-	return (
-		<nav
-			aria-label="Session breadcrumb"
-			className="min-w-0 flex-1 overflow-hidden"
-		>
-			<ol className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain whitespace-nowrap">
-				{items.map((item, index) => (
-					<li
-						key={item.label}
-						className="flex min-w-0 shrink-0 items-center gap-1 text-[0.8125rem]/5 font-medium tracking-normal"
-						title={`${item.label}: ${item.title ?? item.value}`}
-					>
-						<span
-							className={cn(
-								"max-w-80 truncate",
-								index < items.length - 1
-									? "text-black/[0.608] dark:text-white/60"
-									: "text-black/87.5 dark:text-white/90",
-								item.mono && "tabular-nums",
-							)}
-						>
-							{item.value}
-						</span>
-						{index < items.length - 1 ? (
-							<ChevronRight
-								aria-hidden="true"
-								className="size-4 shrink-0 text-black/6 dark:text-white/8"
-							/>
-						) : null}
-					</li>
-				))}
-			</ol>
-		</nav>
-	);
+	return <DetailIdentityBreadcrumb label="Session breadcrumb" items={items} />;
 }
 
 function SessionRecordNavigation({
@@ -452,11 +420,13 @@ export function SessionDetailHeader({
 					) : null}
 				</div>
 			)}
-			<SessionRecordNavigation
-				navigation={navigation}
-				position={position}
-				totalSessions={totalSessions}
-			/>
+			{navigation ? (
+				<SessionRecordNavigation
+					navigation={navigation}
+					position={position}
+					totalSessions={totalSessions}
+				/>
+			) : null}
 		</div>,
 		portalHost,
 	);

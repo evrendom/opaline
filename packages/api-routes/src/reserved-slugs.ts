@@ -86,6 +86,7 @@ export const RESERVED_ORG_SLUGS: readonly string[] = [
 	"public",
 	"register",
 	"releases",
+	"repos",
 	"reset-password",
 	"resources",
 	"resume",

@@ -18,6 +18,7 @@ const rudel_session_language_signals = table({
 		},
 		{ name: "raw_ingested_at", type: "DateTime64(3, 'UTC')" },
 		{ name: "scan_version", type: "UInt16" },
+		{ name: "member_negative", type: "UInt32", default: "fn:0" },
 		{ name: "member_swears", type: "UInt32" },
 		{ name: "member_apologies", type: "UInt32" },
 		{ name: "member_positive", type: "UInt32" },
@@ -45,6 +46,21 @@ const rudel_session_language_signals = table({
 			name: "model_positive_matches",
 			type: "Array(String)",
 			default: "fn:[]",
+		},
+		{
+			name: "model_apology_counts",
+			type: "Map(String, UInt32)",
+			default: "fn:map()",
+		},
+		{
+			name: "member_negative_counts",
+			type: "Map(String, UInt32)",
+			default: "fn:map()",
+		},
+		{
+			name: "member_positive_counts",
+			type: "Map(String, UInt32)",
+			default: "fn:map()",
 		},
 		{ name: "scanned_at", type: "DateTime64(3, 'UTC')" },
 		{

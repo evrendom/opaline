@@ -505,7 +505,7 @@ describe("SessionsOverviewTable", () => {
 		expect(skillTags[1]).toHaveTextContent("typescript-standards");
 		expect(skillTags[2]).toHaveTextContent("ui");
 		expect(skillTags[3]).toHaveTextContent("skill-d");
-		expect(skillTags[3]).toHaveClass(
+		expect(skillTags[3]?.parentElement).toHaveClass(
 			"hidden",
 			"@min-[1800px]/sessions-overview:inline-flex",
 		);

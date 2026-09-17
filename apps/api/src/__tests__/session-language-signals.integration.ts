@@ -237,6 +237,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(await latestSignal(sessionId)).toMatchObject({
 			member_apologies: 1,
 			member_positive: 1,
+			member_negative: 0,
 			member_swears: 1,
 			model_apologies: 1,
 			model_positive: 0,
@@ -265,6 +266,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 				{
 					member_apologies: 0,
 					member_positive: 0,
+					member_negative: 0,
 					member_swears: memberSwears,
 					model_apologies: 0,
 					model_positive: 0,
@@ -279,6 +281,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		]);
 
 		expect(await latestSignal(sessionId)).toMatchObject({
+			member_negative: 0,
 			member_swears: 2,
 			raw_revision: higherRevision,
 		});
@@ -318,6 +321,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 						rawIngestedAt: ingestedAt,
 					},
 					{
+						member_negative: 0,
 						member_swears: 1,
 						member_apologies: 1,
 						member_positive: 1,
@@ -376,6 +380,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 
 		await reconcileSessionLanguageSignalsUntilCaughtUp(25);
 		expect(await latestSignal(olderSessionId)).toMatchObject({
+			member_negative: 0,
 			member_swears: 1,
 		});
 		const rowsBeforeDuplicatePass = await countSignalRows(
@@ -425,6 +430,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 				{
 					member_apologies: 1,
 					member_positive: 0,
+					member_negative: 0,
 					member_swears: 0,
 					model_apologies: 0,
 					model_positive: 0,
@@ -576,6 +582,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(byId.get(countedSessionId)).toMatchObject({
 			member_apologies: 1,
 			member_positive: 1,
+			member_negative: 0,
 			member_swears: 1,
 			member_apology_matches: ["sorry"],
 			member_positive_matches: ["excellent"],
@@ -593,11 +600,13 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(byId.get(zeroSessionId)).toMatchObject({
 			member_apologies: 0,
 			member_positive: 0,
+			member_negative: 0,
 			member_swears: 0,
 		});
 		expect(byId.get(noRowSessionId)).toMatchObject({
 			member_apologies: 0,
 			member_positive: 0,
+			member_negative: 0,
 			member_swears: 0,
 			model_apologies: 0,
 			model_positive: 0,
@@ -635,6 +644,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(filteredSessions[0]).toMatchObject({
 			member_apologies: 1,
 			member_positive: 0,
+			member_negative: 0,
 			member_swears: 2,
 			user_id: filteredUserId,
 		});

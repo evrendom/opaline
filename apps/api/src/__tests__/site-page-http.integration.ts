@@ -41,6 +41,9 @@ test("GET and HEAD return real status codes and never index private or missing p
 		["/device?user_code=ABCD", 200],
 		[`/${slug}`, 200],
 		[`/${slug}/sessions`, 200],
+		[`/${slug}/dashboard`, 200],
+		[`/${slug}/skills`, 200],
+		[`/${slug}/repos`, 200],
 		[`/${slug}/settings/members`, 200],
 	];
 	for (const [path, status] of cases) {

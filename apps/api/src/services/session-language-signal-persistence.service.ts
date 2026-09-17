@@ -93,6 +93,8 @@ export function buildSessionLanguageSignalRow(
 		? summary
 		: EMPTY_LANGUAGE_SIGNAL_MATCHES;
 
+	// Count-only legacy callers cannot claim that exact phrases were indexed.
+	const scanVersion = hasLanguageSignalMatches(summary) ? SCAN_VERSION : 4;
 	return {
 		organization_id: input.organizationId,
 		session_date: toClickHouseDateTime(input.sessionDate),
@@ -101,7 +103,8 @@ export function buildSessionLanguageSignalRow(
 		source: input.source,
 		raw_revision: input.rawRevision,
 		raw_ingested_at: toClickHouseDateTime(input.rawIngestedAt),
-		scan_version: SCAN_VERSION,
+		scan_version: scanVersion,
+		member_negative: summary.member_negative,
 		member_swears: summary.member_swears,
 		member_apologies: summary.member_apologies,
 		member_positive: summary.member_positive,
@@ -114,10 +117,13 @@ export function buildSessionLanguageSignalRow(
 		model_swear_matches: [...matches.model_swear_matches],
 		model_apology_matches: [...matches.model_apology_matches],
 		model_positive_matches: [...matches.model_positive_matches],
+		model_apology_counts: { ...matches.model_apology_counts },
+		member_negative_counts: { ...matches.member_negative_counts },
+		member_positive_counts: { ...matches.member_positive_counts },
 		scanned_at: persistedScannedAt,
 		signal_version: buildSessionLanguageSignalVersion(
 			input.rawRevision,
-			SCAN_VERSION,
+			scanVersion,
 			scannedAt,
 		),
 	};
@@ -153,6 +159,10 @@ export function buildSessionLanguageSignalVersion(
 }
 
 const EMPTY_LANGUAGE_SIGNAL_MATCHES = {
+	model_apology_counts: {},
+	member_negative_counts: {},
+	member_positive_counts: {},
+
 	member_swear_matches: [],
 	member_apology_matches: [],
 	member_positive_matches: [],

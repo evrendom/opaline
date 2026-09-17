@@ -1,6 +1,7 @@
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
+	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 	SESSION_OVERVIEW_VISIBLE_COLUMNS,
 } from "@/features/sessions/components/sessions-overview-table-utils";
 import { cn } from "@/lib/utils";
@@ -18,16 +19,27 @@ const SESSION_OVERVIEW_SKELETON_ROWS = [
 	"overview-session-skeleton-10",
 ] as const;
 
-export function SessionsOverviewSkeleton() {
+export function SessionsOverviewSkeleton({
+	showSkillsColumn = true,
+}: {
+	showSkillsColumn?: boolean;
+}) {
 	return (
 		<div aria-busy="true" className="flex-1">
 			<output className="sr-only">Loading sessions</output>
 			{SESSION_OVERVIEW_SKELETON_ROWS.map((rowId) => (
 				<div
 					key={rowId}
-					className={cn("grid h-9", SESSION_OVERVIEW_GRID_CLASS_NAME)}
+					className={cn(
+						"grid h-9",
+						showSkillsColumn
+							? SESSION_OVERVIEW_GRID_CLASS_NAME
+							: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
+					)}
 				>
-					{SESSION_OVERVIEW_VISIBLE_COLUMNS.map((column) => (
+					{SESSION_OVERVIEW_VISIBLE_COLUMNS.filter(
+						(column) => showSkillsColumn || column.key !== "skills",
+					).map((column) => (
 						<div
 							key={column.key}
 							className={cn(

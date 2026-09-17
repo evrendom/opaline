@@ -82,6 +82,7 @@ function SessionThreadOverviewViewportStrip({
 }
 
 type SessionDetailLayoutProps = {
+	showOverviewStrip?: boolean;
 	onPrefetchTurn?: (turnId: string, immediate: boolean) => void;
 	onSelect: (selection: SessionTurnSelection) => void;
 	options: readonly SessionTurnTablePaneOption[];
@@ -94,6 +95,7 @@ type SessionDetailLayoutProps = {
 };
 
 export function SessionDetailLayout({
+	showOverviewStrip = true,
 	onPrefetchTurn,
 	onSelect,
 	options,
@@ -214,12 +216,14 @@ export function SessionDetailLayout({
 
 	return (
 		<div className="flex h-full min-h-0 min-w-0 flex-col">
-			<SessionThreadOverviewViewportStrip
-				onSelect={handleSelection}
-				options={options}
-				selection={selection}
-				store={continuousTurnViewportStore}
-			/>
+			{showOverviewStrip ? (
+				<SessionThreadOverviewViewportStrip
+					onSelect={handleSelection}
+					options={options}
+					selection={selection}
+					store={continuousTurnViewportStore}
+				/>
+			) : null}
 			<div
 				ref={layoutRef}
 				className="grid min-h-0 min-w-0 flex-1 grid-cols-[var(--session-turn-table-pane-width)_2px_minmax(0,1fr)] data-[workspace-resizing=true]:grid-cols-[minmax(0,1fr)_2px_var(--session-transcript-pane-width)]"

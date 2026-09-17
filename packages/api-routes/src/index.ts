@@ -10,8 +10,34 @@ export {
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
 
+import {
+	RepositoryDetailSchema,
+	RepositoryInputSchema,
+	RepositorySummarySchema,
+} from "./schemas/repositories.js";
+
+export type { RepositorySummary } from "./schemas/repositories.js";
+
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+
+import {
+	CostDashboardInputSchema,
+	CostDashboardSchema,
+} from "./schemas/cost-dashboard.js";
+
+export {
+	type CostBreakdownEntry,
+	type CostDashboard,
+	type CostDashboardInput,
+	CostDashboardInputSchema,
+	CostDashboardSchema,
+	type CostDimension,
+	type DashboardMetric,
+	type DashboardMetricData,
+	type DashboardSignal,
+} from "./schemas/cost-dashboard.js";
+
 import {
 	DashboardDrilldownOpenedCaptureInputSchema,
 	DashboardFilterChangedCaptureInputSchema,
@@ -760,6 +786,7 @@ export const contract = {
 	},
 	analytics: {
 		overview: {
+			costs: oc.input(CostDashboardInputSchema).output(CostDashboardSchema),
 			kpis: oc.input(DateRangeInputSchema).output(OverviewKPIsSchema),
 			usageTrend: oc
 				.input(DateRangeInputSchema)
@@ -858,6 +885,10 @@ export const contract = {
 			dimensionAnalysis: oc
 				.input(DimensionAnalysisInputSchema)
 				.output(z.array(DimensionAnalysisDataPointSchema)),
+		},
+		repositories: {
+			list: oc.output(z.array(RepositorySummarySchema)),
+			detail: oc.input(RepositoryInputSchema).output(RepositoryDetailSchema),
 		},
 		skills: {
 			list: oc.output(z.array(HistoricalSkillSummarySchema)),

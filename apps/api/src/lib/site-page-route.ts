@@ -33,7 +33,7 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 		SETTINGS_PATH.test(path) ||
 		SESSION_PATH.test(path) ||
 		LEGACY_PATH.test(path) ||
-		/^\/(?:skills|team|invitation\/[^/]+)$/u.test(path)
+		/^\/(?:skills|repos|team|invitation\/[^/]+)$/u.test(path)
 	)
 		return { kind: "app" };
 
@@ -43,7 +43,7 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 	if (!slug || !validateOrgSlug(slug)) return { kind: "not-found" };
 	if (
 		suffix === "" ||
-		/^\/(?:dashboard|skills|team)$/u.test(suffix) ||
+		/^\/(?:home|dashboard|skills|repos|team)$/u.test(suffix) ||
 		/^\/(?:sessions|newsesh)(?:\/[^/]+(?:\/v2)?)?$/u.test(suffix) ||
 		SETTINGS_PATH.test(suffix)
 	)

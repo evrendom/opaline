@@ -236,6 +236,9 @@ jobs:
       - name: Apply ClickHouse storage probe table
         run: bun run --cwd packages/ch-schema ch:migrate:dependency-health
 
+      - name: Apply Dashboard language-signal columns
+        run: bun run --cwd packages/ch-schema ch:migrate:language-signals
+
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream
 

@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
 import {
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
+	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 	SESSION_OVERVIEW_VISIBLE_COLUMNS,
 	type SessionOverviewColumnKey,
 	type SessionSortState,
@@ -20,10 +21,12 @@ const INERT_SESSION_OVERVIEW_HEADER_KEYS = new Set<SessionOverviewColumnKey>([
 ]);
 
 export function SessionsOverviewHeader({
+	showSkillsColumn = true,
 	controls,
 	onSort,
 	sort,
 }: {
+	showSkillsColumn?: boolean;
 	controls: ReactNode;
 	onSort: (sortKey: SessionOverviewColumnKey) => void;
 	sort: SessionSortState;
@@ -31,15 +34,19 @@ export function SessionsOverviewHeader({
 	return (
 		<div
 			className={cn(
-				"sticky top-0 z-30 grid h-10 shrink-0 border-b border-(--session-overview-border) bg-(--session-overview-surface)",
-				SESSION_OVERVIEW_GRID_CLASS_NAME,
+				"sticky top-0 left-0 z-30 grid h-10 min-w-0 shrink-0 overflow-hidden border-b border-(--session-overview-border) bg-(--session-overview-surface)",
+				showSkillsColumn
+					? SESSION_OVERVIEW_GRID_CLASS_NAME
+					: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 			)}
 			data-slot="sessions-overview-header"
 		>
 			<div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center px-3">
 				{controls}
 			</div>
-			{SESSION_OVERVIEW_VISIBLE_COLUMNS.map((column) => {
+			{SESSION_OVERVIEW_VISIBLE_COLUMNS.filter(
+				(column) => showSkillsColumn || column.key !== "skills",
+			).map((column) => {
 				const isInert = INERT_SESSION_OVERVIEW_HEADER_KEYS.has(column.key);
 
 				return (

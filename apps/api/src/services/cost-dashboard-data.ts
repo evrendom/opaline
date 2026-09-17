@@ -1,0 +1,216 @@
+import type {
+	CostBreakdownEntry,
+	CostDashboard,
+	CostDashboardInput,
+	CostDimension,
+	DashboardMetric,
+	DashboardMetricData,
+} from "@rudel/api-routes";
+
+export interface CostAggregateRow {
+	metric: Exclude<DashboardMetric, "commits">;
+	date: string;
+	dimension: CostDimension;
+	id: string;
+	value: number;
+	incomplete: number;
+	matched_value: number;
+	matched_rows: number;
+	matched_incomplete: number;
+}
+interface MemberLabel {
+	label: string;
+	image: string | null;
+}
+const DIMENSIONS: CostDimension[] = [
+	"members",
+	"repositories",
+	"models",
+	"signalTypes",
+	"phrases",
+];
+const SIGNAL_LABELS: Record<string, string> = {
+	modelApologies: "Model apologies",
+	userNegative: "Negative user",
+	userPositive: "Positive user",
+};
+const MAX_NAMED_SERIES = 7;
+
+export function buildCostDashboard(
+	rows: CostAggregateRow[],
+	input: CostDashboardInput,
+	members: ReadonlyMap<string, MemberLabel>,
+): CostDashboard {
+	// Signal-only splits do not alter cost/session totals in the metric strip.
+	const baseInput =
+		input.splitBy === "signalTypes" || input.splitBy === "phrases"
+			? { ...input, splitBy: "none" as const }
+			: input;
+	return {
+		splitBy: input.splitBy,
+		metrics: {
+			cost: buildMetric(
+				rows.filter((row) => row.metric === "cost"),
+				baseInput,
+				members,
+				"API Cost",
+			),
+			sessions: buildMetric(
+				rows.filter((row) => row.metric === "sessions"),
+				baseInput,
+				members,
+				"Sessions",
+			),
+			commits: null,
+			signals: buildSignal(rows, input, members),
+		},
+	};
+}
+
+function buildSignal(
+	rows: CostAggregateRow[],
+	input: CostDashboardInput,
+	members: ReadonlyMap<string, MemberLabel>,
+): DashboardMetricData | null {
+	if (
+		rows.some(
+			(row) => row.metric === "signals" && Number(row.matched_incomplete) > 0,
+		)
+	)
+		return null;
+	const result = buildMetric(
+		rows.filter((row) => row.metric === "signals"),
+		input,
+		members,
+		"Language signals",
+	);
+	// Keep the three known categories selectable even when another filter leaves
+	// one at zero. Phrase choices remain limited to actual matched text.
+	for (const [id, label] of Object.entries(SIGNAL_LABELS)) {
+		if (!result.breakdowns.signalTypes.some((entry) => entry.id === id))
+			result.breakdowns.signalTypes.push({
+				id,
+				label,
+				value: 0,
+				incomplete: false,
+				image: null,
+			});
+	}
+	result.breakdowns.signalTypes.sort(
+		(a, b) => b.value - a.value || a.label.localeCompare(b.label),
+	);
+	// An old/unscanned summary is unknown, not a measured zero.
+	return result.incomplete ? null : result;
+}
+
+function buildMetric(
+	rows: CostAggregateRow[],
+	input: CostDashboardInput,
+	members: ReadonlyMap<string, MemberLabel>,
+	label: string,
+): DashboardMetricData {
+	const breakdowns: DashboardMetricData["breakdowns"] = {
+		members: [],
+		repositories: [],
+		models: [],
+		signalTypes: [],
+		phrases: [],
+	};
+	for (const dimension of DIMENSIONS) {
+		const entries = new Map<string, CostBreakdownEntry>();
+		for (const row of rows) {
+			if (row.dimension !== dimension || (dimension === "phrases" && !row.id))
+				continue;
+			const entry = entries.get(row.id) ?? {
+				id: row.id,
+				label: labelFor(dimension, row.id, members),
+				image:
+					dimension === "members" ? (members.get(row.id)?.image ?? null) : null,
+				value: 0,
+				incomplete: false,
+			};
+			entry.value += Number(row.value);
+			entry.incomplete ||= Number(row.incomplete) > 0;
+			entries.set(row.id, entry);
+		}
+		breakdowns[dimension] = [...entries.values()].sort(
+			(a, b) => b.value - a.value || a.label.localeCompare(b.label),
+		);
+	}
+	const splitBy = input.splitBy;
+	const chartDimension = splitBy === "none" ? "members" : splitBy;
+	const chartRows = rows.filter(
+		(row) =>
+			row.dimension === chartDimension &&
+			Number(row.matched_rows) > 0 &&
+			(chartDimension !== "phrases" || Boolean(row.id)),
+	);
+	const totals = new Map<string, number>();
+	for (const row of chartRows)
+		totals.set(row.id, (totals.get(row.id) ?? 0) + Number(row.matched_value));
+	const ranked = [...totals].sort(
+		(a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+	);
+	const named = ranked.slice(0, MAX_NAMED_SERIES);
+	const series =
+		splitBy === "none"
+			? [{ id: "total", label }]
+			: named.map(([id], index) => ({
+					id: `series-${index}`,
+					label: labelFor(chartDimension, id, members),
+				}));
+	if (splitBy !== "none" && ranked.length > MAX_NAMED_SERIES)
+		series.push({ id: "other", label: "Other" });
+	const seriesId = new Map(named.map(([id], index) => [id, `series-${index}`]));
+	const trend: DashboardMetricData["trend"] = [];
+	for (
+		let stamp = Date.parse(input.startDate);
+		stamp <= Date.parse(input.endDate);
+		stamp += 86_400_000
+	) {
+		trend.push({
+			date: new Date(stamp).toISOString().slice(0, 10),
+			total: 0,
+			values: Object.fromEntries(series.map((entry) => [entry.id, 0])),
+		});
+	}
+	const byDate = new Map(trend.map((point) => [point.date, point]));
+	for (const row of chartRows) {
+		const point = byDate.get(row.date);
+		if (!point) continue;
+		const id = splitBy === "none" ? "total" : (seriesId.get(row.id) ?? "other");
+		point.total += Number(row.matched_value);
+		point.values[id] = (point.values[id] ?? 0) + Number(row.matched_value);
+	}
+	return {
+		breakdowns,
+		trend,
+		series,
+		total: trend.reduce((sum, point) => sum + point.total, 0),
+		incomplete: chartRows.some((row) => Number(row.matched_incomplete) > 0),
+		hasUsage: chartRows.length > 0,
+	};
+}
+
+function labelFor(
+	dimension: CostDimension,
+	id: string,
+	members: ReadonlyMap<string, MemberLabel>,
+): string {
+	if (dimension === "members")
+		return (
+			members.get(id)?.label ?? (id ? "Former member" : "Unattributed member")
+		);
+	if (dimension === "repositories")
+		return id
+			? id
+					.replace(/^(?:github\.com|gitlab\.com|bitbucket\.org)\//u, "")
+					.replace(/\/$/u, "")
+					.split("/")
+					.slice(-2)
+					.join("/")
+			: "No repository";
+	if (dimension === "signalTypes") return SIGNAL_LABELS[id] ?? id;
+	if (dimension === "phrases") return id;
+	return id || "Unknown model";
+}

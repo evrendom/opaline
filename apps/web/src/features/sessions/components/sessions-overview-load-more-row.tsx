@@ -7,7 +7,10 @@ import {
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 } from "./session-overview-row-elements";
-import { SESSION_OVERVIEW_GRID_CLASS_NAME } from "./sessions-overview-table-utils";
+import {
+	SESSION_OVERVIEW_GRID_CLASS_NAME,
+	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
+} from "./sessions-overview-table-utils";
 
 function LoadingPlaceholder({ className }: { className: string }) {
 	return (
@@ -19,11 +22,13 @@ function LoadingPlaceholder({ className }: { className: string }) {
 }
 
 export function SessionsOverviewLoadMoreRow({
+	showSkillsColumn = true,
 	isFetching,
 	isError,
 	loadMore,
 	rowRef,
 }: {
+	showSkillsColumn?: boolean;
 	isFetching: boolean;
 	isError: boolean;
 	loadMore: () => void;
@@ -41,7 +46,9 @@ export function SessionsOverviewLoadMoreRow({
 			data-slot="sessions-overview-load-more-row"
 			className={cn(
 				SESSION_OVERVIEW_ROW_CLASS_NAME,
-				SESSION_OVERVIEW_GRID_CLASS_NAME,
+				showSkillsColumn
+					? SESSION_OVERVIEW_GRID_CLASS_NAME
+					: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 				"shrink-0",
 			)}
 		>
@@ -66,11 +73,13 @@ export function SessionsOverviewLoadMoreRow({
 						</div>
 						<LoadingPlaceholder className="h-5 w-10" />
 					</div>
-					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-1")}>
-						<LoadingPlaceholder className="h-5 w-20" />
-						<LoadingPlaceholder className="h-5 w-16" />
-						<LoadingPlaceholder className="h-5 w-12" />
-					</div>
+					{showSkillsColumn ? (
+						<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-1")}>
+							<LoadingPlaceholder className="h-5 w-20" />
+							<LoadingPlaceholder className="h-5 w-16" />
+							<LoadingPlaceholder className="h-5 w-12" />
+						</div>
+					) : null}
 					<div
 						className={cn(
 							SESSION_OVERVIEW_CELL_CLASS_NAME,

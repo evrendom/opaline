@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { getActiveSettingsRouteId } from "@/features/settings/config/settings-routes";
 import { getCurrentShellRoute } from "@/features/shell/config/shell-routes";
 import {
+	appRoutes,
 	getCanonicalAppPath,
 	getWorkspaceAppPath,
 	getWorkspacePathAfterSwitch,
@@ -12,7 +13,7 @@ import {
 describe("Workspace product URLs", () => {
 	test("normalizes every product entry point and preserves deep-link state", () => {
 		for (const [input, expected] of [
-			["/", "/acme/sessions"],
+			["/", "/acme/dashboard"],
 			[
 				"/session/123/v2?from=2026-09-01#message-7",
 				"/acme/sessions/123/v2?from=2026-09-01#message-7",
@@ -21,9 +22,10 @@ describe("Workspace product URLs", () => {
 			["/dashboard/sessions/123", "/acme/sessions/123"],
 			["/session/full/123", "/acme/sessions/123"],
 			["/session/split", "/acme/sessions"],
-			["/home", "/acme/dashboard"],
+			["/home", "/acme/home"],
 			["/dashboard", "/acme/dashboard"],
 			["/skills", "/acme/skills"],
+			["/repos", "/acme/repos"],
 			["/newsesh/123", "/acme/newsesh/123"],
 			["/team", "/acme/team"],
 			["/settings?tab=members", "/acme/settings?tab=members"],
@@ -62,6 +64,7 @@ describe("Workspace product URLs", () => {
 		for (const path of [
 			"/home",
 			"/skills",
+			"/repos",
 			"/newsesh",
 			"/settings/account",
 			"/dev/left-sidebar",
@@ -98,10 +101,40 @@ describe("Workspace product URLs", () => {
 		expect(getCanonicalAppPath("/acme/sessions/123/v2")).toBe(
 			"/session/123/v2",
 		);
-		expect(getCanonicalAppPath("/acme/dashboard")).toBe("/home");
+		expect(getCanonicalAppPath("/acme/dashboard")).toBe("/dashboard");
+		expect(getCanonicalAppPath("/acme")).toBe("/dashboard");
+		expect(getCanonicalAppPath("/acme/home")).toBe("/home");
+		expect(getCurrentShellRoute("/acme/home").id).toBe("dashboard");
+		expect(getCurrentShellRoute("/acme/dashboard").id).toBe("dashboard");
 		expect(getCurrentShellRoute("/acme/sessions/123")?.id).toBe("sessions");
 		expect(getCurrentShellRoute("/acme/team")?.id).toBe("team");
 		expect(getActiveSettingsRouteId("/acme/settings/account")).toBe("account");
 		expect(getActiveSettingsRouteId("/acme/settings/members")).toBe("members");
 	});
+});
+
+test("skill links preserve the session and turn and safely encode skill names", () => {
+	const path = appRoutes.skillDetail(
+		"team:review / C++",
+		"session-123",
+		"turn-7",
+	);
+	const url = new URL(getWorkspaceAppPath("acme", path), "http://localhost");
+	expect(url.pathname).toBe("/acme/skills");
+	expect(url.searchParams.get("skill")).toBe("team:review / C++");
+	expect(url.searchParams.get("session")).toBe("session-123");
+	expect(url.searchParams.get("turn")).toBe("turn-7");
+	expect(appRoutes.skillDetail("review")).toBe("/skills?skill=review");
+	expect(
+		getWorkspacePathAfterSwitch("other", `${url.pathname}${url.search}`),
+	).toBe("/other/skills?skill=team%3Areview+%2F+C%2B%2B");
+});
+
+test("repository deep links stay scoped and drop the old workspace session", () => {
+	const path = appRoutes.repoDetail("remote:github.com/acme/app", "session-1");
+	expect(getWorkspaceAppPath("acme", path)).toBe(`/acme${path}`);
+	expect(getCurrentShellRoute("/acme/repos").id).toBe("repos");
+	expect(getWorkspacePathAfterSwitch("beta", `/acme${path}&turn=turn-1`)).toBe(
+		"/beta/repos?repo=remote%3Agithub.com%2Facme%2Fapp",
+	);
 });
