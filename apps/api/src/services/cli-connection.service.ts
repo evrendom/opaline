@@ -316,7 +316,11 @@ export async function updateCliConnection(
 					requireConnectionState(current, ["ready"]);
 				if (input.update.state === "completed") {
 					requireConnectionState(current, ["ready", "uploading"]);
-					if (!input.update.totals || input.update.totals.failed > 0)
+					if (
+						!input.update.totals ||
+						(input.update.totals.failed > 0 &&
+							input.update.totals.uploaded + input.update.totals.skipped === 0)
+					)
 						throw new ORPCError("BAD_REQUEST");
 				}
 				next = {

@@ -37,6 +37,13 @@ export function WelcomeSessionPreview({
 			0,
 		),
 	);
+	const settledCount =
+		snapshot?.state === "completed" && snapshot.totals
+			? Math.min(
+					previewCount,
+					snapshot.totals.uploaded + snapshot.totals.skipped,
+				)
+			: previewCount;
 	const canReadUploadedSessions = Boolean(
 		repositories.length > 0 &&
 			snapshot?.organizationId &&
@@ -63,7 +70,7 @@ export function WelcomeSessionPreview({
 		refetchInterval: (query) =>
 			snapshot?.state === "uploading" ||
 			(snapshot?.state === "completed" &&
-				(query.state.data?.length ?? 0) < previewCount)
+				(query.state.data?.length ?? 0) < settledCount)
 				? 3000
 				: false,
 	});
@@ -142,15 +149,17 @@ export function WelcomeSessionPreview({
 									userLabel={userMap[session.user_id] ?? ""}
 								/>
 							))}
-							{pendingRows.slice(sessions?.length ?? 0).map((row, index) => (
-								<SessionsOverviewPendingRow
-									key={row.key}
-									index={index + (sessions?.length ?? 0)}
-									repositoryName={row.repositoryName}
-									source={row.source}
-									placeholderOnly={repositories.length === 0}
-								/>
-							))}
+							{pendingRows
+								.slice(sessions?.length ?? 0, settledCount)
+								.map((row, index) => (
+									<SessionsOverviewPendingRow
+										key={row.key}
+										index={index + (sessions?.length ?? 0)}
+										repositoryName={row.repositoryName}
+										source={row.source}
+										placeholderOnly={repositories.length === 0}
+									/>
+								))}
 						</>
 					)}
 				</SessionsOverviewFluidList>
