@@ -187,9 +187,10 @@ export function useSessionsPageData({
 		);
 	}, [sessionPages.data, failurePages.data, previewSeed]);
 	const isSnapshotSessionsPending =
-		(sessionPages.isPending ||
-			(demo?.live !== false && failurePages.isPending)) &&
-		!snapshotSessionsData?.length;
+		sessionPages.isPending ||
+		(demo?.live !== false &&
+			failurePages.isPending &&
+			!snapshotSessionsData?.length);
 	const isSnapshotSessionsError =
 		sessionPages.isError &&
 		!isSnapshotSessionsPending &&
