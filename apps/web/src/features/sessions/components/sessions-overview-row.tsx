@@ -194,14 +194,24 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		(onSessionClick !== undefined || sessionHref !== undefined) &&
 		(canOpenSession?.(session) ?? true);
 	const isActive = activeSessionId === session.session_id;
-	const clock = getSessionClockParts(session.session_date, demo !== null);
+	const failure = session.upload_failure;
+	const clock = getSessionClockParts(
+		failure ? (failure.sessionDate ?? "") : session.session_date,
+		demo !== null,
+	);
 	const clockTimeLabel = `${clock.hour}${clock.minute ? `:${clock.minute}` : ""}${clock.period ? ` ${clock.period}` : ""}`;
 	const clockDateTimeLabel = clock.date
 		? `${clock.date}, ${clockTimeLabel}`
 		: clockTimeLabel;
 	const durationLabel = formatRoundedDuration(session.duration_min);
-	const dateTooltipLabel = `${clockDateTimeLabel} · ${durationLabel}`;
-	const tokenTooltipLabel = `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
+	const dateTooltipLabel = failure
+		? failure.sessionDate
+			? clockDateTimeLabel
+			: `Session date unavailable · Upload failed ${new Date(failure.failedAt).toLocaleString()}`
+		: `${clockDateTimeLabel} · ${durationLabel}`;
+	const tokenTooltipLabel = failure
+		? "Usage unavailable because the upload failed"
+		: `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
 	const costEstimateLabel =
 		sessionCost !== null && session.cost_uses_default_region
 			? "Estimated at standard region rates; billing region wasn’t recorded."
@@ -309,7 +319,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				</div>
 				<SessionOverviewSubagentStack session={session} />
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
-				{errorCount !== 0 ? (
+				{failure ? (
+					<p
+						className="shrink-0 text-base text-red-700 sm:text-xs dark:text-red-400"
+						title={failure.error}
+						data-session-upload-failed
+					>
+						(Upload failed)
+					</p>
+				) : null}
+				{!failure && errorCount !== 0 ? (
 					<span
 						className={cn(
 							SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
@@ -407,11 +426,15 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<time
-							dateTime={session.session_date}
+							dateTime={
+								failure
+									? (failure.sessionDate ?? undefined)
+									: session.session_date
+							}
 							className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
 							data-session-overview-date-tooltip-label={dateTooltipLabel}
 						>
-							{clock.date}
+							{clock.date || "—"}
 						</time>
 					</TooltipTrigger>
 					<TooltipContent

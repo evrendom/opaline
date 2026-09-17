@@ -90,7 +90,10 @@ export function SessionsOverviewTable({
 		},
 	});
 	const memberProfileSummaries = useMemo(
-		() => buildSessionMemberProfileSummaries(tableState.recentSessions),
+		() =>
+			buildSessionMemberProfileSummaries(
+				tableState.recentSessions.filter((session) => !session.upload_failure),
+			),
 		[tableState.recentSessions],
 	);
 	const demo = useDemoRuntime();

@@ -50,7 +50,13 @@ export async function reportUploadFailures(
 export async function listUploadFailures(
 	organizationId: string,
 	userId: string | null,
-	page: { offset: number; limit: number },
+	page: {
+		offset: number;
+		limit: number;
+		sessionId?: string;
+		startDate?: string;
+		endDate?: string;
+	},
 	database: postgres.Sql = sqlClient,
 ) {
 	const rows = await database.unsafe<
@@ -62,31 +68,47 @@ export async function listUploadFailures(
 			metadata: unknown;
 			totalBytes: number;
 			error: string;
+			errorCode: string | null;
 			failedAt: Date | string;
 			attempts: number;
+			totalCount: number;
 		}>
 	>(
 		`
-		SELECT * FROM (
+		SELECT *, count(*) OVER()::integer AS "totalCount" FROM (
 			SELECT DISTINCT ON (j.user_id, j.source, j.session_id)
 				j.id, j.user_id AS "userId", j.session_id AS "sessionId", j.source,
 				j.ingest_metadata AS metadata, j.expected_total_bytes AS "totalBytes",
-				j.last_error_message AS error, j.failed_at AS "failedAt", j.attempts
+				j.last_error_message AS error, j.last_error_code AS "errorCode",
+				j.failed_at AS "failedAt", j.attempts
 			FROM ingest_job j
 			WHERE j.organization_id = $1 AND ($2::text IS NULL OR j.user_id = $2)
 				AND j.status = 'failed'
+				AND ($5::text IS NULL OR j.session_id = $5)
 				AND NOT EXISTS (
 					SELECT 1 FROM session_ownership s
 					WHERE s.organization_id = j.organization_id AND s.session_id = j.session_id
 						AND s.user_id = j.user_id AND s.last_ingested_at >= j.failed_at
 				)
 			ORDER BY j.user_id, j.source, j.session_id, j.failed_at DESC, j.id
-		) latest ORDER BY "failedAt" DESC, id LIMIT $3 OFFSET $4
+		) latest
+		WHERE ($6::date IS NULL OR COALESCE((metadata->>'sessionDate')::timestamptz, "failedAt") >= ($6::date::timestamp AT TIME ZONE 'UTC'))
+			AND ($7::date IS NULL OR COALESCE((metadata->>'sessionDate')::timestamptz, "failedAt") < (($7::date + 1)::timestamp AT TIME ZONE 'UTC'))
+		ORDER BY COALESCE((metadata->>'sessionDate')::timestamptz, "failedAt") DESC, id LIMIT $3 OFFSET $4
 	`,
-		[organizationId, userId, page.limit + 1, page.offset],
+		[
+			organizationId,
+			userId,
+			page.limit + 1,
+			page.offset,
+			page.sessionId ?? null,
+			page.startDate ?? null,
+			page.endDate ?? null,
+		],
 	);
 	return {
 		hasMore: rows.length > page.limit,
+		totalCount: rows[0]?.totalCount ?? 0,
 		failures: rows.slice(0, page.limit).map((row) => {
 			const metadata =
 				typeof row.metadata === "object" && row.metadata !== null
@@ -111,6 +133,7 @@ export async function listUploadFailures(
 				id: row.id,
 				userId: row.userId,
 				failedAt: new Date(row.failedAt).toISOString(),
+				errorCode: row.errorCode ?? undefined,
 			};
 		}),
 	};

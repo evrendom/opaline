@@ -1,6 +1,6 @@
 import type { SessionListFilters } from "@rudel/api-routes";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/features/sessions/sessions-list-query";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
+import { mergeSessionUploadFailures } from "./session-upload-failure";
 
 export function useSessionsPageData({
 	trackPageView,
@@ -126,28 +127,85 @@ export function useSessionsPageData({
 		staleTime: SESSION_QUERY_STALE_TIME,
 		refetchOnWindowFocus: true,
 	});
+	const failureOptions = orpc.analytics.sessions.uploadFailures.infiniteOptions(
+		{
+			input: (offset: number) => ({
+				offset,
+				limit: SESSION_PAGE_SIZE,
+				startDate: input.startDate ?? startDate,
+				endDate: input.endDate ?? endDate,
+			}),
+			initialPageParam: 0,
+			getNextPageParam: (lastPage, _pages, offset) =>
+				lastPage.hasMore ? offset + SESSION_PAGE_SIZE : undefined,
+		},
+	);
+	const failurePages = useInfiniteQuery({
+		...failureOptions,
+		queryKey: ["org", organization.activeOrg?.id, ...failureOptions.queryKey],
+		enabled: !!organization.activeOrg?.id && demo?.live !== false,
+		refetchInterval: 10_000,
+	});
+	const previousFailures = useRef<
+		{ scope: string; ids: Set<string> } | undefined
+	>(undefined);
+	useEffect(() => {
+		if (!failurePages.data) return;
+		const ids = new Set(
+			failurePages.data.pages.flatMap((page) =>
+				page.failures.map((failure) => failure.id),
+			),
+		);
+		const previous = previousFailures.current;
+		if (
+			previous?.scope === filterScope &&
+			[...previous.ids].some((id) => !ids.has(id))
+		) {
+			void sessionPages.refetch();
+		}
+		previousFailures.current = {
+			scope: filterScope,
+			ids,
+		};
+	}, [failurePages.data, filterScope, sessionPages.refetch]);
 	const snapshotSessionsData = useMemo(() => {
-		if (!sessionPages.data) return undefined;
+		if (!sessionPages.data && !failurePages.data) return undefined;
 		// Keep demo seed identities: their preview maxima describe the full cohort.
-		if (previewSeed && sessionPages.data.pages[0] === previewSeed.sessions)
+		if (previewSeed && sessionPages.data?.pages[0] === previewSeed.sessions)
 			return previewSeed.sessions;
-		const rows = sessionPages.data.pages.flatMap(parseSessionOverviewRows);
+		const rows =
+			sessionPages.data?.pages.flatMap(parseSessionOverviewRows) ?? [];
 		// Concurrent uploads can move an offset boundary. Do not show a row twice.
-		return [
-			...new Map(
-				rows.map((row) => [`${row.source}:${row.session_id}`, row]),
-			).values(),
-		];
-	}, [sessionPages.data, previewSeed]);
-	const isSnapshotSessionsPending = sessionPages.isPending;
-	const isSnapshotSessionsError = sessionPages.isError && !sessionPages.data;
+		return mergeSessionUploadFailures(
+			[
+				...new Map(
+					rows.map((row) => [`${row.source}:${row.session_id}`, row]),
+				).values(),
+			],
+			failurePages.data?.pages.flatMap((page) => page.failures) ?? [],
+		);
+	}, [sessionPages.data, failurePages.data, previewSeed]);
+	const isSnapshotSessionsPending =
+		(sessionPages.isPending ||
+			(demo?.live !== false && failurePages.isPending)) &&
+		!snapshotSessionsData?.length;
+	const isSnapshotSessionsError =
+		sessionPages.isError &&
+		!isSnapshotSessionsPending &&
+		!snapshotSessionsData?.length;
 	const pagination = {
-		hasNextPage: demo?.live !== false && sessionPages.hasNextPage,
-		isFetching: sessionPages.isFetching,
-		isError: sessionPages.isFetchNextPageError,
+		hasNextPage:
+			demo?.live !== false &&
+			(sessionPages.hasNextPage || failurePages.hasNextPage),
+		isFetching: sessionPages.isFetching || failurePages.isFetching,
+		isError:
+			sessionPages.isFetchNextPageError || failurePages.isFetchNextPageError,
 		loadMore: () => {
 			if (sessionPages.isPlaceholderData) return;
-			void sessionPages.fetchNextPage({ cancelRefetch: false });
+			if (sessionPages.hasNextPage)
+				void sessionPages.fetchNextPage({ cancelRefetch: false });
+			if (failurePages.hasNextPage)
+				void failurePages.fetchNextPage({ cancelRefetch: false });
 		},
 	};
 
@@ -205,7 +263,7 @@ export function useSessionsPageData({
 		catalogQuery.data?.sessionCount ??
 		summaryComparison?.current.total_sessions ??
 		previewSeed?.totalSessionCount ??
-		snapshotSessionsData?.length ??
+		sessionPages.data?.pages.flat().length ??
 		0;
 	const orderedSessions = useMemo(
 		() =>
@@ -217,6 +275,10 @@ export function useSessionsPageData({
 	);
 
 	return {
+		uploadFailuresError: failurePages.isError,
+		retryUploadFailures: () => {
+			void failurePages.refetch();
+		},
 		organizationId: organization.activeOrg?.id,
 		filterCatalog: catalogQuery.data,
 		filterCatalogPending: !demo && catalogQuery.isPending,
@@ -237,7 +299,8 @@ export function useSessionsPageData({
 		orderedSessions,
 		snapshotSessionsData,
 		startDate,
-		totalSessionCount: rangeSessionCount,
+		totalSessionCount:
+			rangeSessionCount + (failurePages.data?.pages[0]?.totalCount ?? 0),
 		useRolling24Hours,
 	};
 }

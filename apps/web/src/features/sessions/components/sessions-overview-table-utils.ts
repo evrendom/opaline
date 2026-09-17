@@ -115,6 +115,7 @@ export type SessionSortState = {
 export function getSessionOverviewCost(
 	session: SessionAnalytics,
 ): number | null {
+	if (session.upload_failure) return null;
 	if (session.estimated_cost !== undefined) {
 		return session.estimated_cost;
 	}
@@ -395,7 +396,7 @@ function getSessionOverviewFilterLabel(
 		case "user":
 			return formatUsername(session.user_id, userMap);
 		case "model":
-			return session.model_used;
+			return session.model_used || "Model unavailable";
 		case "skills":
 			return value === SESSION_OVERVIEW_NO_SKILLS_FILTER_VALUE
 				? "No skills used"
@@ -444,6 +445,7 @@ function getSessionOverviewRangeValue(
 	session: SessionAnalytics,
 	filterKey: SessionOverviewRangeFilterKey,
 ) {
+	if (session.upload_failure) return null;
 	switch (filterKey) {
 		case "input":
 			return session.input_tokens;

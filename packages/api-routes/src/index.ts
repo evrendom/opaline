@@ -5,6 +5,7 @@ import {
 
 export { CliConnectionIdSchema } from "./cli-connection.js";
 export {
+	type StoredUploadFailure,
 	type UploadFailure,
 	UploadFailureSchema,
 	UploadFailuresPageSchema,
@@ -835,6 +836,9 @@ export const contract = {
 					z.object({
 						offset: z.number().int().nonnegative().default(0),
 						limit: z.number().int().min(1).max(50).default(20),
+						sessionId: z.string().min(1).max(200).optional(),
+						startDate: z.string().date().optional(),
+						endDate: z.string().date().optional(),
 					}),
 				)
 				.output(UploadFailuresPageSchema),

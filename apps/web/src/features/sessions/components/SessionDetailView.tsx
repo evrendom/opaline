@@ -10,9 +10,13 @@ import {
 import { Button } from "@/app/ui/button";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
+import { getSessionUploadFailure } from "@/features/sessions/session-upload-failure";
 import { useSessionOpenTracking } from "@/features/sessions/use-session-open-tracking";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { formatUsername } from "@/lib/format";
+import { client } from "@/lib/orpc";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
 import {
 	fetchSessionDetailInitial,
@@ -32,6 +36,7 @@ import {
 	canRetrySessionDetailError,
 	getSessionDetailErrorState,
 } from "./session-detail-view-utils";
+import { SessionUploadFailureDetail } from "./session-upload-failure-detail";
 import { useSessionPaneFullscreen } from "./use-session-pane-fullscreen";
 
 type SessionDetailViewProps = {
@@ -119,8 +124,35 @@ export function SessionDetailView({
 		[handleHeaderWheel],
 	);
 	const { userMap, avatarMap } = useUserMap();
+	const { state: organization } = useOrganization();
+	const knownFailure = initialSession?.upload_failure;
+	const failureQuery = useQuery({
+		queryKey: ["session-upload-failure", organization.activeOrg?.id, sessionId],
+		enabled:
+			!!organization.activeOrg?.id &&
+			(Boolean(knownFailure) || !initialSession),
+		queryFn: () =>
+			client.analytics.sessions.uploadFailures({
+				sessionId,
+				offset: 0,
+				limit: 1,
+			}),
+		initialData: knownFailure
+			? { failures: [knownFailure], hasMore: false }
+			: undefined,
+		refetchInterval: (query) =>
+			query.state.data?.failures.length ? 10_000 : false,
+	});
+	const failure = getSessionUploadFailure(
+		sessionId,
+		initialSession,
+		failureQuery.data?.failures,
+	);
 	const overviewQuery = useQuery({
-		enabled: sessionId.length > 0,
+		enabled:
+			sessionId.length > 0 &&
+			!failure &&
+			(!knownFailure || failureQuery.isSuccess),
 		queryFn: async ({ signal }) => {
 			const parsed = await fetchSessionDetailInitial(sessionId, signal);
 			queryClient.setQueryData(
@@ -138,15 +170,34 @@ export function SessionDetailView({
 		staleTime: SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	});
 	const overview = overviewQuery.data?.overview;
-	const viewModel = overview
-		? buildSessionDetailOverviewViewModel(overview, userMap)
-		: initialSession
-			? buildSessionDetailViewModel(initialSession, userMap)
-			: undefined;
+	const isDetailLoading =
+		!failure &&
+		(overviewQuery.isLoading || (!overview && failureQuery.isFetching));
+	const viewModel = failure
+		? buildSessionDetailViewModel(
+				{
+					session_id: failure.sessionId,
+					user_id: failure.userId,
+					source: failure.source,
+					repository: failure.repository,
+					project_path: failure.projectPath,
+					git_branch: failure.gitBranch,
+					git_sha: failure.gitSha,
+					session_date: failure.sessionDate,
+				},
+				userMap,
+			)
+		: overview
+			? buildSessionDetailOverviewViewModel(overview, userMap)
+			: initialSession
+				? buildSessionDetailViewModel(initialSession, userMap)
+				: undefined;
 	const sessionTabTitle = `${
-		viewModel?.displayModel
-			? formatModelDisplayLabel(viewModel.displayModel)
-			: "Session"
+		failure
+			? "Upload failed"
+			: viewModel?.displayModel
+				? formatModelDisplayLabel(viewModel.displayModel)
+				: "Session"
 	} · ${sessionId}`;
 
 	useEffect(() => {
@@ -159,9 +210,9 @@ export function SessionDetailView({
 
 	useSessionOpenTracking({
 		sessionId,
-		isLoading: overviewQuery.isLoading,
-		error: overviewQuery.error,
-		hasData: Boolean(overview),
+		isLoading: isDetailLoading,
+		error: failure ? null : overviewQuery.error,
+		hasData: Boolean(failure || overview),
 		cacheHit,
 		requestTiming: overviewQuery.data?.loadingTiming,
 		turnCount: overview?.turnPage.total,
@@ -228,7 +279,7 @@ export function SessionDetailView({
 				}
 				headerRef={setHeaderElement}
 				hideMetrics
-				isLoading={overviewQuery.isLoading}
+				isLoading={isDetailLoading}
 				navigation={navigation}
 				portalHost={shellHeaderPortal}
 				position={position}
@@ -238,8 +289,17 @@ export function SessionDetailView({
 			/>
 
 			<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-				{overviewQuery.isLoading ? <SessionDetailContentLoadingView /> : null}
-				{!overviewQuery.isLoading && errorState ? (
+				{failure ? (
+					<SessionUploadFailureDetail
+						failure={failure}
+						userLabel={formatUsername(failure.userId, userMap)}
+					/>
+				) : null}
+				{isDetailLoading ? <SessionDetailContentLoadingView /> : null}
+				{!failure &&
+				!overviewQuery.isLoading &&
+				!failureQuery.isFetching &&
+				errorState ? (
 					<SessionDetailStateMessage
 						description={errorState.description}
 						isRetrying={overviewQuery.isFetching}
@@ -253,7 +313,11 @@ export function SessionDetailView({
 						title={errorState.title}
 					/>
 				) : null}
-				{!overviewQuery.isLoading && !errorState && overview && viewModel ? (
+				{!failure &&
+				!overviewQuery.isLoading &&
+				!errorState &&
+				overview &&
+				viewModel ? (
 					<div className="flex h-full min-h-0 flex-col">
 						{hasShapeWarning ? (
 							<output className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-(--dashboardy-heading)">
@@ -275,7 +339,11 @@ export function SessionDetailView({
 						</div>
 					</div>
 				) : null}
-				{!overviewQuery.isLoading && !errorState && !overview ? (
+				{!failure &&
+				!overviewQuery.isLoading &&
+				!failureQuery.isFetching &&
+				!errorState &&
+				!overview ? (
 					<SessionDetailStateMessage
 						description={undefined}
 						title="Session Not Found"
