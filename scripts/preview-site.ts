@@ -1,5 +1,6 @@
 import { resolve, extname } from "node:path";
 import { createDemoHandler } from "../apps/api/src/handlers/demo-http.js";
+import { handleSitePageRequest } from "../apps/api/src/handlers/site-page-http.js";
 import config from "../vercel.json";
 
 const root = resolve(import.meta.dir, "../dist-site");
@@ -14,20 +15,26 @@ const demo = createDemoHandler(proxy);
 const server = Bun.serve({ hostname: "localhost", port, idleTimeout: 255, async fetch(request) {
  const url = new URL(request.url);
  if (url.pathname.startsWith("/api/demo/")) return demo(request);
- if (/^\/(?:api|rpc)(?:\/|$)/u.test(url.pathname) || url.pathname === "/health" || /^\/(?:[^/]+\/join|team\/invite)\/[^/]+\/og.png$/u.test(url.pathname)) return proxy(request);
- const redirect = config.redirects.find((entry) => entry.source === url.pathname);
+ if (/^\/(?:api|rpc)(?:\/|$)/u.test(url.pathname) || url.pathname === "/health" || /^\/(?:[^/]+\/join|team\/invite)\/[^/]+(?:\/og\.png)?$/u.test(url.pathname)) return proxy(request);
+ const redirect = config.redirects.find((entry) => entry.source === url.pathname.replace(/\/$/u, ""));
+ if (url.pathname === "/" && !["redirect", "user_code", "error"].some((key) => url.searchParams.has(key)) && /(?:^|;\s*)(?:__Secure-)?better-auth\.session_token=/.test(request.headers.get("Cookie") ?? "")) {
+  url.pathname = "/api/home";
+  const response = await proxy(new Request(url, request));
+  if (response.status !== 302 || response.headers.get("Location") !== "/") return response;
+  url.pathname = "/";
+ }
  if (redirect) return Response.redirect(new URL(redirect.destination + url.search, url.origin).href, 308);
  let filePath = resolve(root, `.${decodeURIComponent(url.pathname)}`);
  if (!filePath.startsWith(`${root}/`) && filePath !== root) return new Response(null, {status:403});
- if (url.pathname === "/" || url.pathname === "/home") filePath = resolve(root, url.pathname === "/" && ["redirect", "user_code", "error"].some((key) => url.searchParams.has(key)) ? "app.html" : "home/index.html");
+ if (url.pathname === "/" || url.pathname === "/home") filePath = resolve(root, url.pathname === "/" && ["redirect", "user_code", "error"].some((key) => url.searchParams.has(key)) ? "app.html" : "marketing.html");
  let file = Bun.file(filePath);
  if (!(await file.exists()) || !extname(filePath)) {
   const index = Bun.file(resolve(filePath, "index.html"));
-  file = await index.exists() ? index : Bun.file(resolve(root, "app.html"));
-  if (/^\/(?:assets|_astro|product-demo|site-scripts|vendor|fonts)(?:\/|$)/u.test(url.pathname) && !(await index.exists())) return new Response(null,{status:404});
+  if (!(await index.exists())) return handleSitePageRequest(request, root);
+  file = index;
  }
  const headers = new Headers();
- for (const rule of config.headers) if (new RegExp(`^${rule.source}$`, "u").test(url.pathname)) for (const header of rule.headers) headers.set(header.key, header.value);
+ for (const rule of config.headers) if (new RegExp(`^${rule.source.replace(":path*", ".*")}$`, "u").test(url.pathname)) for (const header of rule.headers) headers.set(header.key, header.value);
  return new Response(file, {headers});
 }});
 console.log(`Product preview listening on ${server.url}`);

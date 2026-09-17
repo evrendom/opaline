@@ -31,7 +31,7 @@ test("missing and invalid sessions return to marketing without caching a persona
 		for (const method of ["GET", "HEAD"]) {
 			const response = await openHome(cookie, method);
 			expect(response.status).toBe(302);
-			expect(response.headers.get("Location")).toBe("/home");
+			expect(response.headers.get("Location")).toBe("/");
 			expect(response.headers.get("Cache-Control")).toBe("private, no-store");
 			expect(response.headers.get("Vary")).toContain("Cookie");
 		}
@@ -98,7 +98,7 @@ test("an expired but correctly signed cookie does not open a workspace", async (
 	await sqlClient`UPDATE session SET expires_at = NOW() - INTERVAL '1 hour' WHERE user_id = ${userId}`;
 	const response = await openHome(cookie);
 	expect(response.status).toBe(302);
-	expect(response.headers.get("Location")).toBe("/home");
+	expect(response.headers.get("Location")).toBe("/");
 });
 
 function openHome(cookie: string, method = "GET") {

@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 
 const indexablePaths = [
-	"/home",
+	"/",
 	"/legal/privacy-policy/",
 	"/legal/terms-of-service/",
 ] as const;

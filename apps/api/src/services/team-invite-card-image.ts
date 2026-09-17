@@ -35,7 +35,24 @@ export function renderTeamInviteCardPng(workspaceName: string): Buffer {
 }
 
 export function buildTeamInviteCardSvg(workspaceName: string): string {
-	const title = wrapTitle(`Join ${workspaceName}`);
+	return buildBrandCardSvg(wrapTitle(`Join ${workspaceName}`), [
+		"and start learning from",
+		"your agent sessions",
+	]);
+}
+
+export function renderSiteCardPng(): Buffer {
+	return new Resvg(
+		buildBrandCardSvg(["Claude Code & Codex", "Session Analytics"], []),
+		{
+			font: FONT_OPTIONS,
+		},
+	)
+		.render()
+		.asPng();
+}
+
+function buildBrandCardSvg(title: string[], subtitle: string[]): string {
 	const titleFontSize = fitTitleFontSize(title);
 	const firstLineY = 256 - (title.length - 1) * 34;
 	const subtitleY = firstLineY + (title.length - 1) * 74 + 70;
@@ -44,8 +61,7 @@ export function buildTeamInviteCardSvg(workspaceName: string): string {
   <svg x="76" y="68" width="144" height="36" viewBox="0 0 64 16">${WORDMARK}</svg>
   <g font-family="Inter Variable, sans-serif" fill="#171717">
     ${title.map((line, index) => `<text x="76" y="${firstLineY + index * 74}" font-size="${titleFontSize}" font-weight="600" letter-spacing="-2">${escapeSvgText(line)}</text>`).join("\n    ")}
-    <text x="76" y="${subtitleY}" font-size="40" font-weight="400" fill="#737373">and start learning from</text>
-    <text x="76" y="${subtitleY + 52}" font-size="40" font-weight="400" fill="#737373">your agent sessions</text>
+    ${subtitle.map((line, index) => `<text x="76" y="${subtitleY + index * 52}" font-size="40" font-weight="400" fill="#737373">${escapeSvgText(line)}</text>`).join("\n    ")}
     <text x="76" y="562" font-size="23" font-weight="500" fill="#737373">opaline.so</text>
   </g>
 </svg>`;

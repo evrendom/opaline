@@ -15,6 +15,20 @@ const headerRuleBySource = new Map(
 );
 
 describe("Vercel deployment configuration", () => {
+	test("permanently redirects legal aliases and does not resurrect pricing", () => {
+		for (const { source, destination } of [
+			{ source: "/privacy", destination: "/legal/privacy-policy/" },
+			{ source: "/terms", destination: "/legal/terms-of-service/" },
+		]) {
+			expect(
+				vercelConfig.redirects.find((rule) => rule.source === source),
+			).toEqual({ source, destination, permanent: true });
+		}
+		expect(
+			vercelConfig.redirects.some((rule) => rule.source === "/pricing"),
+		).toBe(false);
+	});
+
 	test("routes database readiness to the API before the SPA fallback", () => {
 		expect(rewriteBySource.get("/health/ready")).toBe(
 			"/api/rpc?__opaline_path=/health/ready",
@@ -26,7 +40,9 @@ describe("Vercel deployment configuration", () => {
 			VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/health/ready/extra"),
 		).toBe(false);
 		expect(rewriteSources.indexOf("/health/ready")).toBeLessThan(
-			rewriteSources.findIndex((source) => source.startsWith("/((?!assets")),
+			rewriteSources.findIndex((source) =>
+				source.startsWith("/:path((?!assets"),
+			),
 		);
 	});
 
@@ -47,8 +63,11 @@ describe("Vercel deployment configuration", () => {
 		expect(
 			rootRules.slice(0, 3).every((rule) => rule.destination === "/app.html"),
 		).toBe(true);
-		expect(rootRules.at(-1)?.destination).toBe("/home/index.html");
-		expect(rewriteBySource.get("/home")).toBe("/home/index.html");
+		expect(rootRules.at(-1)?.destination).toBe("/marketing.html");
+		expect(rewriteBySource.has("/home")).toBe(false);
+		expect(
+			vercelConfig.redirects.find((rule) => rule.source === "/home"),
+		).toEqual({ source: "/home", destination: "/", permanent: true });
 		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/api/home")).toBe(true);
 	});
 
@@ -65,7 +84,9 @@ describe("Vercel deployment configuration", () => {
 			"/api/rpc?__opaline_path=/rpc/:routePath*",
 		);
 		expect(rewriteSources.indexOf("/rpc/:routePath*")).toBeLessThan(
-			rewriteSources.findIndex((source) => source.startsWith("/((?!assets")),
+			rewriteSources.findIndex((source) =>
+				source.startsWith("/:path((?!assets"),
+			),
 		);
 	});
 
@@ -122,12 +143,12 @@ describe("Vercel deployment configuration", () => {
 	test("keeps missing built assets out of the SPA and immutable cache policy", () => {
 		const spaFallback = vercelConfig.rewrites.find(
 			(rewrite) =>
-				rewrite.destination === "/app.html" &&
-				rewrite.source.startsWith("/((?!"),
+				rewrite.destination === "/api/page?__opaline_path=/:path" &&
+				rewrite.source.startsWith("/:path((?!"),
 		);
 		expect(spaFallback).toBeDefined();
 		const spaFallbackPattern = new RegExp(
-			`^${spaFallback?.source ?? ""}$`,
+			`^${spaFallback?.source.replace(":path", "") ?? ""}$`,
 			"u",
 		);
 		for (const missingAssetPath of [

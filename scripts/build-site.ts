@@ -14,8 +14,9 @@ await mkdir(output, { recursive: true });
 await cp(join(root, "apps/web/dist"), output, { recursive: true });
 await cp(join(output, "index.html"), join(output, "app.html"));
 await cp(join(root, "apps/marketing/dist"), output, { recursive: true });
-// Static files take precedence over Vercel rewrites. Keep / under the routing
-// rules so Astro's root redirect cannot override signed-in home visits.
+// Static files take precedence over Vercel rewrites. Keep the marketing
+// document behind a rewrite so signed-in root visits can open the app.
+await cp(join(output, "index.html"), join(output, "marketing.html"));
 await rm(join(output, "index.html"));
 await cp(join(root, "apps/web/dist-demo"), join(output, "product-demo"), { recursive: true });
 await mkdir(join(output, "site-scripts"), { recursive: true });

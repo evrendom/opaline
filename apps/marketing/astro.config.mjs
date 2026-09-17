@@ -9,9 +9,9 @@ export default defineConfig({
 	integrations: [react()],
 	output: "static",
 	redirects: {
-		"/": "/home",
-		"/instant": "/home",
-		"/instantv2": "/home",
+		"/home": "/",
+		"/instant": "/",
+		"/instantv2": "/",
 	},
 	site: "https://opaline.so",
 });

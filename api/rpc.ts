@@ -1,12 +1,4 @@
-import { fetchHandler } from "../apps/api/src/handler.js";
-import { createVercelFunctionHandler } from "../apps/api/src/lib/vercel-function-handler.js";
-import { VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN } from "../apps/api/src/lib/vercel-route-patterns.js";
-
-const handler = createVercelFunctionHandler({
-	fetch: fetchHandler,
-	functionGroup: "rpc-auth",
-	publicPathPattern: VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN,
-});
+import { handleVercelRpcRequest as handler } from "../apps/api/src/vercel-rpc-handler.js";
 
 export {
 	handler as DELETE,

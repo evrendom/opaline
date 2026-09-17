@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
 	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
 import { loadSessionsPage } from "@/app/session-page-loader";
+import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { DesktopOnlyOverlay } from "@/app/ui/DesktopOnlyOverlay";
 import { ProductAnalyticsSessionSync } from "@/features/analytics/tracking/ProductAnalyticsSessionSync";
 import { AuthenticatedApp } from "@/features/auth/AuthenticatedApp";
@@ -94,7 +95,7 @@ function SessionAwareApp() {
 		!isCliSetupPath && !deviceUserCode && !isGetStartedPath(location.pathname);
 
 	if (/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(location.pathname)) {
-		return <Navigate replace to="/welcome" />;
+		return <NotFoundPage />;
 	}
 
 	if (deviceUserCode && !isCliSetupPath) {
