@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ESTIMATED_PRICING_MODE } from "../model-pricing.js";
+import { StoredUploadFailureSchema } from "../upload-failure.js";
 import { SourceSchema } from "./source.js";
 
 // ── Common inputs ──────────────────────────────────────────────────
@@ -359,6 +360,8 @@ export const LinkedSubagentSchema = z.object({
 });
 
 export const SessionAnalyticsSchema = z.object({
+	// Present only for a diagnostic row; transcript-derived metrics are unavailable.
+	upload_failure: StoredUploadFailureSchema.optional(),
 	session_id: z.string(),
 	user_id: z.string(),
 	session_date: z.string(),

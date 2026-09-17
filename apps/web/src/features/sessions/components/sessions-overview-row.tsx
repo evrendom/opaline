@@ -194,14 +194,24 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		(onSessionClick !== undefined || sessionHref !== undefined) &&
 		(canOpenSession?.(session) ?? true);
 	const isActive = activeSessionId === session.session_id;
-	const clock = getSessionClockParts(session.session_date, demo !== null);
+	const failure = session.upload_failure;
+	const clock = getSessionClockParts(
+		failure ? (failure.sessionDate ?? "") : session.session_date,
+		demo !== null,
+	);
 	const clockTimeLabel = `${clock.hour}${clock.minute ? `:${clock.minute}` : ""}${clock.period ? ` ${clock.period}` : ""}`;
 	const clockDateTimeLabel = clock.date
 		? `${clock.date}, ${clockTimeLabel}`
 		: clockTimeLabel;
 	const durationLabel = formatRoundedDuration(session.duration_min);
-	const dateTooltipLabel = `${clockDateTimeLabel} · ${durationLabel}`;
-	const tokenTooltipLabel = `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
+	const dateTooltipLabel = failure
+		? failure.sessionDate
+			? clockDateTimeLabel
+			: `Session date unavailable · Upload failed ${new Date(failure.failedAt).toLocaleString()}`
+		: `${clockDateTimeLabel} · ${durationLabel}`;
+	const tokenTooltipLabel = failure
+		? "Usage unavailable because the upload failed"
+		: `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
 	const costEstimateLabel =
 		sessionCost !== null && session.cost_uses_default_region
 			? "Estimated at standard region rates; billing region wasn’t recorded."
@@ -279,15 +289,21 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<p
 						className={cn(
 							"min-w-0 truncate",
-							displayModel === "Claude (failed start)"
+							failure || displayModel === "Claude (failed start)"
 								? "max-w-40"
 								: "max-w-28",
 							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 						)}
-						title={displayModel}
+						title={failure ? `${displayModel} (Upload failed)` : displayModel}
 						data-session-overview-model-label
 					>
 						{formatModelDisplayLabel(displayModel)}
+						{failure ? (
+							<span title={failure.error} data-session-upload-failed>
+								{" "}
+								(Upload failed)
+							</span>
+						) : null}
 					</p>
 					<p
 						className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#0000009b] dark:text-[#ffffffaf]"
@@ -309,7 +325,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				</div>
 				<SessionOverviewSubagentStack session={session} />
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
-				{errorCount !== 0 ? (
+				{!failure && errorCount !== 0 ? (
 					<span
 						className={cn(
 							SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
@@ -407,11 +423,15 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<time
-							dateTime={session.session_date}
+							dateTime={
+								failure
+									? (failure.sessionDate ?? undefined)
+									: session.session_date
+							}
 							className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
 							data-session-overview-date-tooltip-label={dateTooltipLabel}
 						>
-							{clock.date}
+							{clock.date || "—"}
 						</time>
 					</TooltipTrigger>
 					<TooltipContent

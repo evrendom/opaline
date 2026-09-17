@@ -40,8 +40,11 @@ export const StoredUploadFailureSchema = UploadFailureSchema.extend({
 	id: z.string(),
 	failedAt: z.string().datetime(),
 	userId: z.string(),
+	errorCode: z.string().optional(),
 });
+export type StoredUploadFailure = z.infer<typeof StoredUploadFailureSchema>;
 export const UploadFailuresPageSchema = z.object({
 	failures: z.array(StoredUploadFailureSchema),
 	hasMore: z.boolean(),
+	totalCount: z.number().int().nonnegative().optional(),
 });

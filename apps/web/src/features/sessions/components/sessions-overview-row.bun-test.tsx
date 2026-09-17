@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import type { SessionAnalytics } from "@rudel/api-routes";
 import type { ComponentProps } from "react";
 import seed from "@/features/demo/seed.json";
+import { uploadFailureSession } from "../session-upload-failure";
 
 const {
 	JSDOM,
@@ -63,6 +64,77 @@ afterAll(() => {
 		if (descriptor) Object.defineProperty(globalThis, key, descriptor);
 		else Reflect.deleteProperty(globalThis, key);
 	}
+});
+
+test("a failed upload is a clickable session row with unavailable metrics and its normal ID", async () => {
+	const session = uploadFailureSession({
+		id: "failure",
+		sessionId: "failed-session",
+		userId: "member",
+		source: "codex",
+		repository: "github.com/opalinehq/athena",
+		projectPath: "/projects/athena",
+		sessionDate: null,
+		failedAt: "2026-09-17T14:00:00.000Z",
+		totalBytes: 150_000_000,
+		uploadedBytes: 0,
+		stage: "preparing",
+		error: "Session is too large",
+		retryable: false,
+		attempts: 0,
+	});
+	let opened: string | undefined;
+	const mount = document.createElement("div");
+	document.body.append(mount);
+	const root = createRoot(mount);
+	await act(async () => {
+		root.render(
+			<TooltipProvider>
+				<SessionsOverviewFluidList>
+					{({ registerItem, setActiveIndex }) => (
+						<SessionsOverviewRow
+							index={0}
+							registerItem={registerItem}
+							setHoverActiveIndex={setActiveIndex}
+							activeSessionId={undefined}
+							avatarUrl={undefined}
+							canOpenSession={() => true}
+							getSessionHref={undefined}
+							getSessionLinkState={undefined}
+							maximumSessionCost={50}
+							memberProfile={undefined}
+							onSessionClick={(row) => {
+								opened = row.session_id;
+							}}
+							session={session}
+							userLabel="Test member"
+						/>
+					)}
+				</SessionsOverviewFluidList>
+			</TooltipProvider>,
+		);
+	});
+	expect(
+		mount.querySelector("[data-session-overview-model-label]")?.textContent,
+	).toBe("Codex (Upload failed)");
+	expect(
+		mount.querySelector("[data-session-overview-metric-value='cost']")
+			?.textContent,
+	).toContain("—");
+	expect(mount.querySelector("time")?.getAttribute("datetime")).toBeNull();
+	expect(mount.querySelector("[data-session-overview-error-tag]")).toBeNull();
+	const button = mount.querySelector<HTMLButtonElement>(
+		"button[data-dashboard-grid-row-scope='session']",
+	);
+	assert.ok(button);
+	await act(async () => {
+		button.click();
+	});
+	expect(opened).toBe("failed-session");
+	await act(async () => {
+		root.unmount();
+	});
+	mount.remove();
 });
 
 test("hover leaves unchanged rows alone while session data and permissions stay reactive", async () => {

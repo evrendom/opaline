@@ -224,7 +224,7 @@ test("oversize failure diagnostics are durable, scoped, idempotent and clear aft
 	expect((await report(teammate.id, { "x-api-key": apiKey })).status).toBe(403);
 	expect((await report(owner.id, { "x-api-key": apiKey })).status).toBe(200);
 	expect((await report(owner.id, { "x-api-key": apiKey })).status).toBe(200);
-	const list = async (token: string) => {
+	const list = async (token: string, input: Record<string, unknown> = {}) => {
 		const response = await fetch(
 			`${server.baseUrl}/rpc/analytics/sessions/uploadFailures`,
 			{
@@ -233,7 +233,7 @@ test("oversize failure diagnostics are durable, scoped, idempotent and clear aft
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${token}`,
 				},
-				body: JSON.stringify({ json: { offset: 0, limit: 20 } }),
+				body: JSON.stringify({ json: { offset: 0, limit: 20, ...input } }),
 			},
 		);
 		expect(
@@ -251,6 +251,30 @@ test("oversize failure diagnostics are durable, scoped, idempotent and clear aft
 	expect(own.failures.find((row) => row.sessionId === sessionId)).toMatchObject(
 		failure,
 	);
+	expect((await list(owner.token, { sessionId })).failures).toHaveLength(1);
+	expect((await list(owner.token, { sessionId: "missing" })).failures).toEqual(
+		[],
+	);
+	expect((await list(teammate.token, { sessionId })).failures).toEqual([]);
+	expect(
+		(await list(owner.token, { startDate: "2026-09-18" })).failures,
+	).toEqual([]);
+	expect((await list(owner.token, { endDate: "2026-09-16" })).failures).toEqual(
+		[],
+	);
+	const dated = await list(owner.token, {
+		startDate: "2026-09-17",
+		endDate: "2026-09-17",
+		limit: 1,
+	});
+	expect(dated.totalCount).toBe(1);
+	expect(dated.failures[0]).toMatchObject({
+		sessionId,
+		errorCode: "CLI_UPLOAD_FAILED",
+	});
+	expect((await list(owner.token, { offset: 1, limit: 1 })).failures).toEqual(
+		[],
+	);
 	expect((await list(teammate.token)).failures).toEqual([]);
 	expect(
 		(
@@ -266,6 +290,86 @@ test("oversize failure diagnostics are durable, scoped, idempotent and clear aft
 			(row) => row.sessionId === sessionId,
 		),
 	).toBe(false);
+	expect((await list(owner.token, { sessionId })).failures).toEqual([]);
+});
+
+test("failed session pages keep unknown dates, UTC boundaries and member permissions", async () => {
+	const headers = {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${owner.token}`,
+	};
+	const failures = [
+		null,
+		"2020-01-02T23:59:59.000Z",
+		"2020-01-01T00:00:00.000Z",
+	].map((sessionDate, index) => ({
+		sessionId: `${runId}-paged-${index}`,
+		source: "codex",
+		repository: "athena",
+		projectPath: "/projects/athena",
+		sessionDate,
+		totalBytes: 123,
+		uploadedBytes: 0,
+		stage: "uploading",
+		error: "Connection lost",
+		retryable: true,
+		attempts: 1,
+	}));
+	const report = await fetch(`${server.baseUrl}/rpc/cli/reportUploadFailures`, {
+		method: "POST",
+		headers,
+		body: JSON.stringify({ json: { organizationId: owner.id, failures } }),
+	});
+	expect(report.status).toBe(200);
+	const list = async (input: Record<string, unknown>, token = owner.token) => {
+		const response = await fetch(
+			`${server.baseUrl}/rpc/analytics/sessions/uploadFailures`,
+			{
+				method: "POST",
+				headers: { ...headers, Authorization: `Bearer ${token}` },
+				body: JSON.stringify({ json: input }),
+			},
+		);
+		expect(response.status).toBe(200);
+		const body: unknown = await response.json();
+		assert(typeof body === "object" && body !== null && "json" in body);
+		return UploadFailuresPageSchema.parse(body.json);
+	};
+	const first = await list({ limit: 1 });
+	expect(first.totalCount).toBe(3);
+	expect(first.hasMore).toBe(true);
+	expect(first.failures[0]?.sessionDate).toBeNull();
+	expect(first.failures[0]?.sessionId).toBe(failures[0]?.sessionId);
+	const second = await list({ limit: 1, offset: 1 });
+	expect(second.failures[0]?.sessionId).toBe(failures[1]?.sessionId);
+	expect((await list({ limit: 1, offset: 2 })).hasMore).toBe(false);
+	expect(
+		(
+			await list({ startDate: "2020-01-02", endDate: "2020-01-02" })
+		).failures.map((row) => row.sessionId),
+	).toEqual([`${runId}-paged-1`]);
+	const active = await fetch(
+		`${server.baseUrl}/api/auth/organization/set-active`,
+		{
+			method: "POST",
+			headers: { ...headers, Authorization: `Bearer ${teammate.token}` },
+			body: JSON.stringify({ organizationId: owner.id }),
+		},
+	);
+	expect(active.status).toBe(200);
+	expect(
+		(await list({ sessionId: failures[0]?.sessionId }, teammate.token))
+			.failures,
+	).toEqual([]);
+	const reset = await fetch(
+		`${server.baseUrl}/api/auth/organization/set-active`,
+		{
+			method: "POST",
+			headers: { ...headers, Authorization: `Bearer ${teammate.token}` },
+			body: JSON.stringify({ organizationId: teammate.id }),
+		},
+	);
+	expect(reset.status).toBe(200);
 });
 
 async function lookup(input: unknown, headers: Record<string, string> = {}) {

@@ -103,13 +103,23 @@ export function useSessionsOverviewTableState({
 		}),
 		[recentSessions, userMap],
 	);
-	const filterOptions = useMemo(
-		() =>
-			filterCatalog
-				? buildCatalogOptions(filterCatalog, userMap)
-				: loadedFilterOptions,
-		[filterCatalog, userMap, loadedFilterOptions],
-	);
+	const filterOptions = useMemo(() => {
+		if (!filterCatalog) return loadedFilterOptions;
+		const catalogOptions = buildCatalogOptions(filterCatalog, userMap);
+		// Upload diagnostics can contain repositories/members absent from analytics.
+		for (const key of SESSION_OVERVIEW_FILTER_KEYS) {
+			const options = new Map(
+				catalogOptions[key].map((option) => [option.value, option]),
+			);
+			for (const option of loadedFilterOptions[key]) {
+				if (!options.has(option.value)) options.set(option.value, option);
+			}
+			catalogOptions[key] = [...options.values()].sort((a, b) =>
+				compareSessionLabels(a.label, b.label),
+			);
+		}
+		return catalogOptions;
+	}, [filterCatalog, userMap, loadedFilterOptions]);
 	const rangeFilterBounds = useMemo(
 		() =>
 			filterCatalog?.ranges ?? buildSessionOverviewRangeBounds(recentSessions),
