@@ -21,6 +21,7 @@ import {
 } from "../../services/session-detail-derivation.service.js";
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
+import { listUploadFailures } from "../../services/upload-failure.service.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
 import {
 	throwSessionDetailRevisionError,
@@ -33,6 +34,16 @@ const sortByMap: Record<string, "date" | "duration"> = {
 	total_tokens: "date",
 	success_score: "date",
 };
+
+const uploadFailures = os.analytics.sessions.uploadFailures
+	.use(orgMiddleware)
+	.handler(({ input, context }) =>
+		listUploadFailures(
+			context.organizationId,
+			context.isOrgAdmin ? null : context.user.id,
+			input,
+		),
+	);
 
 const list = os.analytics.sessions.list
 	.use(orgMiddleware)
@@ -290,6 +301,7 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 	});
 
 export const sessionsRouter = os.analytics.sessions.router({
+	uploadFailures,
 	detailBodyChunk,
 	detailOverview,
 	detailInitial,

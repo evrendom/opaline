@@ -1,4 +1,14 @@
+import {
+	ReportUploadFailuresInputSchema,
+	UploadFailuresPageSchema,
+} from "./upload-failure.js";
+
 export { CliConnectionIdSchema } from "./cli-connection.js";
+export {
+	type UploadFailure,
+	UploadFailureSchema,
+	UploadFailuresPageSchema,
+} from "./upload-failure.js";
 
 import { oc } from "@orpc/contract";
 import { z } from "zod";
@@ -660,6 +670,9 @@ export const contract = {
 		deleteMine: oc.output(z.object({ success: z.literal(true) })),
 	},
 	cli: {
+		reportUploadFailures: oc
+			.input(ReportUploadFailuresInputSchema)
+			.output(z.object({ success: z.literal(true) })),
 		authStatus: oc.output(CliUserSchema),
 		revokeToken: oc.output(z.object({ success: z.literal(true) })),
 		setupStatus: oc.output(CliSetupStatusSchema),
@@ -817,6 +830,14 @@ export const contract = {
 				.output(z.array(ProjectErrorSchema)),
 		},
 		sessions: {
+			uploadFailures: oc
+				.input(
+					z.object({
+						offset: z.number().int().nonnegative().default(0),
+						limit: z.number().int().min(1).max(50).default(20),
+					}),
+				)
+				.output(UploadFailuresPageSchema),
 			detailBodyChunk: sessionDetailProcedureContracts.detailBodyChunk,
 			detailOverview: sessionDetailProcedureContracts.detailOverview,
 			detailInitial: sessionDetailProcedureContracts.detailInitial,

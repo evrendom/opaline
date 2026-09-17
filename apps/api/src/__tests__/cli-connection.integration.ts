@@ -281,13 +281,22 @@ describe("CLI/browser connection over real HTTP and PostgreSQL", () => {
 				await update(fixture, 5, {
 					kind: "status",
 					state: "completed",
-					totals: { uploaded: 5, skipped: 7, failed: 0 },
+					totals: { uploaded: 0, skipped: 0, failed: 12 },
+				})
+			).status,
+		).toBe(400);
+		expect(
+			(
+				await update(fixture, 5, {
+					kind: "status",
+					state: "completed",
+					totals: { uploaded: 5, skipped: 7, failed: 2 },
 				})
 			).status,
 		).toBe(200);
 		const finished = await streamB.until("completed");
 		expect(finished.organizationId).toBe(organizationId);
-		expect(finished.totals).toEqual({ uploaded: 5, skipped: 7, failed: 0 });
+		expect(finished.totals).toEqual({ uploaded: 5, skipped: 7, failed: 2 });
 		const reloaded = await fetch(
 			`${base(1)}/api/cli/connections/${fixture.id}`,
 			{ headers: { cookie: fixture.cookie, origin } },

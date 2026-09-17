@@ -160,6 +160,7 @@ import {
 	readSkillExtractionReceipt,
 	writeSkillExtraction,
 } from "./services/skill-extraction-ingest.service.js";
+import { reportUploadFailures } from "./services/upload-failure.service.js";
 import {
 	hasMatchingUsageExtractionReceipt,
 	shouldReplaceUsageEventsForVersion,
@@ -1248,6 +1249,17 @@ function parseStoredIngestProcessorResult(
 	};
 }
 
+const cliReportUploadFailures = os.cli.reportUploadFailures
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context }) => {
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId,
+			context.user.id,
+		);
+		await reportUploadFailures(organizationId, context.user.id, input.failures);
+		return { success: true };
+	});
+
 const cliSessionUploadStatus = os.cli.sessionUploadStatus
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context }) => {
@@ -1642,6 +1654,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		revokeToken: revokeCliToken,
 		setupStatus: cliSetupStatus,
 		sessionUploadStatus: cliSessionUploadStatus,
+		reportUploadFailures: cliReportUploadFailures,
 	},
 	chatwoot: chatwootRouter,
 	listMyOrganizations,

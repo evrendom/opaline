@@ -5,6 +5,7 @@ import {
 	CliApiKeyCreateResponseSchema,
 	CliSessionUploadStatusOutputSchema,
 	CliSetupStatusSchema,
+	UploadFailuresPageSchema,
 } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
 import {
@@ -195,6 +196,76 @@ test.each([
 ])("rejects malformed or oversized lookups: %j", async (input) => {
 	const response = await lookup(input, { "x-api-key": apiKey });
 	expect(response.status).toBe(400);
+});
+
+test("oversize failure diagnostics are durable, scoped, idempotent and clear after a successful retry", async () => {
+	const sessionId = `${runId}-oversize`;
+	const failure = {
+		sessionId,
+		source: "codex",
+		repository: "ob-db",
+		projectPath: "/projects/ob-db",
+		sessionDate: "2026-09-17T09:00:00.000Z",
+		totalBytes: 150 * 1024 * 1024,
+		uploadedBytes: 0,
+		maxBytes: 128 * 1024 * 1024,
+		stage: "preparing",
+		error: "Transcript exceeds the 128 MiB limit",
+		retryable: false,
+		attempts: 0,
+	};
+	const report = (organizationId: string, headers: Record<string, string>) =>
+		fetch(`${server.baseUrl}/rpc/cli/reportUploadFailures`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", ...headers },
+			body: JSON.stringify({ json: { organizationId, failures: [failure] } }),
+		});
+	expect((await report(owner.id, {})).status).toBe(401);
+	expect((await report(teammate.id, { "x-api-key": apiKey })).status).toBe(403);
+	expect((await report(owner.id, { "x-api-key": apiKey })).status).toBe(200);
+	expect((await report(owner.id, { "x-api-key": apiKey })).status).toBe(200);
+	const list = async (token: string) => {
+		const response = await fetch(
+			`${server.baseUrl}/rpc/analytics/sessions/uploadFailures`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({ json: { offset: 0, limit: 20 } }),
+			},
+		);
+		expect(
+			response.status,
+			(await response.clone().text()) + server.readOutput().slice(-3000),
+		).toBe(200);
+		const body: unknown = await response.json();
+		assert(typeof body === "object" && body !== null && "json" in body);
+		return UploadFailuresPageSchema.parse(body.json);
+	};
+	const own = await list(owner.token);
+	expect(
+		own.failures.filter((row) => row.sessionId === sessionId),
+	).toHaveLength(1);
+	expect(own.failures.find((row) => row.sessionId === sessionId)).toMatchObject(
+		failure,
+	);
+	expect((await list(teammate.token)).failures).toEqual([]);
+	expect(
+		(
+			await readStatus(
+				await lookup({ sessionIds: [sessionId] }, { "x-api-key": apiKey }),
+			)
+		).uploadedSessionIds,
+	).toEqual([]);
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, last_ingested_at)
+  VALUES (${owner.id}, ${sessionId}, ${owner.id}, NOW())`;
+	expect(
+		(await list(owner.token)).failures.some(
+			(row) => row.sessionId === sessionId,
+		),
+	).toBe(false);
 });
 
 async function lookup(input: unknown, headers: Record<string, string> = {}) {
