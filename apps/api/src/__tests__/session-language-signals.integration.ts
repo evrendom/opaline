@@ -35,9 +35,13 @@ setDefaultTimeout(180_000);
 
 interface LatestSignalRow {
 	member_apologies: number;
+	member_negative: number;
+	member_negative_counts: Record<string, number>;
 	member_positive: number;
+	member_positive_counts: Record<string, number>;
 	member_swears: number;
 	model_apologies: number;
+	model_apology_counts: Record<string, number>;
 	model_positive: number;
 	model_swears: number;
 	raw_ingested_at_ms: number | string;
@@ -133,7 +137,11 @@ async function latestSignal(
 				tupleElement(state, 6) AS model_apologies,
 				tupleElement(state, 7) AS model_positive,
 				toUnixTimestamp64Milli(tupleElement(state, 8)) AS raw_ingested_at_ms,
-				toString(tupleElement(state, 9)) AS raw_revision
+				toString(tupleElement(state, 9)) AS raw_revision,
+				tupleElement(state, 10) AS member_negative,
+				tupleElement(state, 11) AS model_apology_counts,
+				tupleElement(state, 12) AS member_negative_counts,
+				tupleElement(state, 13) AS member_positive_counts
 			FROM (
 				SELECT
 					session_id,
@@ -147,7 +155,11 @@ async function latestSignal(
 							model_apologies,
 							model_positive,
 							raw_ingested_at,
-							raw_revision
+							raw_revision,
+							member_negative,
+							model_apology_counts,
+							member_negative_counts,
+							member_positive_counts
 						),
 						signal_version
 					) AS state
@@ -217,9 +229,12 @@ afterAll(async () => {
 });
 
 describe("persisted session language signals (ClickHouse integration)", () => {
-	test("the upload writer stores counts with the current scan version", async () => {
+	test("the upload writer stores counts and phrase frequencies with the current scan version", async () => {
 		const sessionId = `upload_${runId}`;
-		const content = transcript("shit sorry excellent", "fuck sorry great");
+		const content = transcript(
+			"shit sorry excellent excellent. This did not work. This did not work.",
+			"fuck sorry sorry great",
+		);
 		const ingestedAt = new Date("2099-01-01T00:00:01.000Z");
 		const raw = await ingestRawSession({ content, ingestedAt, sessionId });
 
@@ -236,10 +251,13 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 
 		expect(await latestSignal(sessionId)).toMatchObject({
 			member_apologies: 1,
-			member_positive: 1,
-			member_negative: 0,
+			member_positive: 2,
+			member_positive_counts: { excellent: 2 },
+			member_negative: 2,
+			member_negative_counts: { "did not work": 2 },
 			member_swears: 1,
-			model_apologies: 1,
+			model_apologies: 2,
+			model_apology_counts: { sorry: 2 },
 			model_positive: 0,
 			model_swears: 1,
 			scan_version: SCAN_VERSION,
@@ -582,7 +600,6 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(byId.get(countedSessionId)).toMatchObject({
 			member_apologies: 1,
 			member_positive: 1,
-			member_negative: 0,
 			member_swears: 1,
 			member_apology_matches: ["sorry"],
 			member_positive_matches: ["excellent"],
@@ -600,13 +617,11 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(byId.get(zeroSessionId)).toMatchObject({
 			member_apologies: 0,
 			member_positive: 0,
-			member_negative: 0,
 			member_swears: 0,
 		});
 		expect(byId.get(noRowSessionId)).toMatchObject({
 			member_apologies: 0,
 			member_positive: 0,
-			member_negative: 0,
 			member_swears: 0,
 			model_apologies: 0,
 			model_positive: 0,
@@ -644,7 +659,6 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		expect(filteredSessions[0]).toMatchObject({
 			member_apologies: 1,
 			member_positive: 0,
-			member_negative: 0,
 			member_swears: 2,
 			user_id: filteredUserId,
 		});
