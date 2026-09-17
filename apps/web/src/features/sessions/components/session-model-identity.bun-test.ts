@@ -41,7 +41,7 @@ test("missing model alone is not evidence of a failed start", () => {
 			totalTokens: 0,
 			errorCount: 0,
 		}),
-	).toBe("Claude Code");
+	).toBe("Claude");
 	expect(
 		getSessionModelDisplayValue({
 			model: null,
@@ -49,7 +49,7 @@ test("missing model alone is not evidence of a failed start", () => {
 			totalTokens: 100,
 			errorCount: 1,
 		}),
-	).toBe("Claude Code");
+	).toBe("Claude");
 	expect(
 		getSessionModelDisplayValue({
 			model: "gpt-6-astra",

@@ -114,7 +114,9 @@ test("a failed upload is a clickable session row with unavailable metrics and it
 			</TooltipProvider>,
 		);
 	});
-	expect(mount.textContent).toContain("(Upload failed)");
+	expect(
+		mount.querySelector("[data-session-overview-model-label]")?.textContent,
+	).toBe("Codex (Upload failed)");
 	expect(
 		mount.querySelector("[data-session-overview-metric-value='cost']")
 			?.textContent,

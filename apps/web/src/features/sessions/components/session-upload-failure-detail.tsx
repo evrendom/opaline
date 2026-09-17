@@ -14,7 +14,7 @@ export function SessionUploadFailureDetail({
 			: "Unavailable",
 		Member: userLabel,
 		"Member ID": failure.userId,
-		Source: failure.source === "codex" ? "Codex" : "Claude Code",
+		Source: failure.source === "codex" ? "Codex" : "Claude",
 		Repository: failure.repository,
 		"Git remote": failure.gitRemote,
 		"Project path": failure.projectPath,

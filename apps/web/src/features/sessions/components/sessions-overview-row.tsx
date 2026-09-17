@@ -289,15 +289,21 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<p
 						className={cn(
 							"min-w-0 truncate",
-							displayModel === "Claude (failed start)"
+							failure || displayModel === "Claude (failed start)"
 								? "max-w-40"
 								: "max-w-28",
 							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 						)}
-						title={displayModel}
+						title={failure ? `${displayModel} (Upload failed)` : displayModel}
 						data-session-overview-model-label
 					>
 						{formatModelDisplayLabel(displayModel)}
+						{failure ? (
+							<span title={failure.error} data-session-upload-failed>
+								{" "}
+								(Upload failed)
+							</span>
+						) : null}
 					</p>
 					<p
 						className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#0000009b] dark:text-[#ffffffaf]"
@@ -319,15 +325,6 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				</div>
 				<SessionOverviewSubagentStack session={session} />
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
-				{failure ? (
-					<p
-						className="shrink-0 text-base text-(--dashboardy-heading) sm:text-xs"
-						title={failure.error}
-						data-session-upload-failed
-					>
-						(Upload failed)
-					</p>
-				) : null}
 				{!failure && errorCount !== 0 ? (
 					<span
 						className={cn(
