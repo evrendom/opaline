@@ -29,7 +29,7 @@ export function SettingsLayout() {
 		>
 			<div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden px-6 py-4 sm:px-8 md:py-6 lg:px-10 @min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-8">
 				<aside
-					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-contain pt-6 @min-[640px]/settings:block"
+					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-none pt-6 @min-[640px]/settings:block"
 					data-slot="settings-sidebar"
 				>
 					<nav aria-label="Settings sections" data-fluid-menu-root="">
@@ -84,7 +84,7 @@ export function SettingsLayout() {
 					</Select>
 				</div>
 				<div
-					className="min-h-0 min-w-0 overflow-y-auto overscroll-contain"
+					className="min-h-0 min-w-0 overflow-y-auto overscroll-none"
 					data-slot="settings-content"
 				>
 					<div className="settings-page-content">

@@ -367,6 +367,8 @@ body:has(.dashboard-01-preview),
 html:has(.dashboard-01-preview),
 body:has(.dashboard-01-preview) {
 	background-color: var(--dashboard-01-chrome-backdrop-fill);
+	/* Portaled tooltips bypass the shell's scroll containers. */
+	overscroll-behavior: none;
 }
 
 body:has(.dashboard-01-preview) {
