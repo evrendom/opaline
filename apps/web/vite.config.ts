@@ -95,7 +95,16 @@ function buildApiProxy(target: string, bearerToken?: string) {
 		...(Object.keys(headers).length > 0 ? { headers } : {}),
 	};
 
-	return { "/api": options, "/rpc": options };
+	return {
+		// The showcase uses its public read-only gateway, including in local dev.
+		"/api/demo": {
+			target: "https://opaline.so",
+			changeOrigin: true,
+			headers: { origin: "https://opaline.so", authorization: "", cookie: "" },
+		},
+		"/api": options,
+		"/rpc": options,
+	};
 }
 
 export default defineConfig(async ({ mode }) => {

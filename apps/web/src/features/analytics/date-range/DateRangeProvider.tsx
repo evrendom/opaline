@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import type {
 	DateRangeContextValue,
@@ -44,13 +44,13 @@ function readDateRangeFromSearchParams(
 	return null;
 }
 
-function readStoredDateRange(): StoredDateRange | null {
+function readStoredDateRange(storageKey: string): StoredDateRange | null {
 	if (typeof window === "undefined") {
 		return null;
 	}
 
 	try {
-		const stored = window.localStorage.getItem(STORAGE_KEY);
+		const stored = window.localStorage.getItem(storageKey);
 		if (stored) {
 			const parsed: unknown = JSON.parse(stored);
 			if (isStoredDateRange(parsed)) {
@@ -75,7 +75,10 @@ function isStoredDateRange(value: unknown): value is StoredDateRange {
 	);
 }
 
-function resolveDateRange(searchParams: URLSearchParams): {
+function resolveDateRange(
+	searchParams: URLSearchParams,
+	storageKey: string,
+): {
 	dateRange: StoredDateRange;
 	source: DateRangeSource;
 } {
@@ -84,7 +87,7 @@ function resolveDateRange(searchParams: URLSearchParams): {
 		return { dateRange: searchDateRange, source: "url" };
 	}
 
-	const storedDateRange = readStoredDateRange();
+	const storedDateRange = readStoredDateRange(storageKey);
 	if (storedDateRange) {
 		return { dateRange: storedDateRange, source: "storage" };
 	}
@@ -92,28 +95,43 @@ function resolveDateRange(searchParams: URLSearchParams): {
 	return { dateRange: getDefaultDateRange(), source: "default" };
 }
 
-function writeStoredDateRange(dateRange: StoredDateRange) {
+function writeStoredDateRange(dateRange: StoredDateRange, storageKey: string) {
 	if (typeof window === "undefined") {
 		return;
 	}
 
 	try {
-		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(dateRange));
+		window.localStorage.setItem(storageKey, JSON.stringify(dateRange));
 	} catch {
 		// Ignore localStorage errors
 	}
 }
 
-export function DateRangeProvider({ children }: { children: ReactNode }) {
+export function DateRangeProvider({
+	children,
+	storageKey = STORAGE_KEY,
+}: {
+	children: ReactNode;
+	storageKey?: string;
+}) {
 	const [searchParams, setSearchParams] = useSearchParams();
-	const { dateRange, source } = resolveDateRange(searchParams);
+	const { dateRange, source } = resolveDateRange(searchParams, storageKey);
+
+	// Remember URL ranges before a session link navigates without query parameters.
+	useEffect(() => {
+		const urlRange = readDateRangeFromSearchParams(searchParams);
+		if (urlRange) writeStoredDateRange(urlRange, storageKey);
+	}, [searchParams, storageKey]);
 
 	const updateDateRange = (
 		updater: (currentDateRange: StoredDateRange) => StoredDateRange,
 	) => {
 		setSearchParams(
 			(prev) => {
-				const { dateRange: currentDateRange } = resolveDateRange(prev);
+				const { dateRange: currentDateRange } = resolveDateRange(
+					prev,
+					storageKey,
+				);
 				const nextDateRange = updater(currentDateRange);
 				const normalizedDateRange =
 					normalizeAnalyticsDateRange(nextDateRange.start, nextDateRange.end) ??
@@ -122,7 +140,7 @@ export function DateRangeProvider({ children }: { children: ReactNode }) {
 
 				nextSearchParams.set("from", normalizedDateRange.start);
 				nextSearchParams.set("to", normalizedDateRange.end);
-				writeStoredDateRange(normalizedDateRange);
+				writeStoredDateRange(normalizedDateRange, storageKey);
 
 				return nextSearchParams;
 			},

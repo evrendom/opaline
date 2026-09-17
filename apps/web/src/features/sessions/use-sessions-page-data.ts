@@ -117,6 +117,7 @@ export function useSessionsPageData({
 		initialData: previewSeed
 			? { pages: [previewSeed.sessions], pageParams: [0] }
 			: undefined,
+		initialDataUpdatedAt: previewSeed ? 0 : undefined,
 		// Retain rows during date changes, but never carry them to another org.
 		placeholderData: (previous, previousQuery) =>
 			organization.activeOrg?.id &&

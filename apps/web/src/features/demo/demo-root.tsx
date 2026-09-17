@@ -83,7 +83,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 							},
 						}}
 					>
-						<DateRangeProvider>
+						<DateRangeProvider storageKey="demoDateRange">
 							<div className="h-full" inert={!active} data-demo-surface>
 								<AppRouter
 									rootRedirectTarget="/session"
