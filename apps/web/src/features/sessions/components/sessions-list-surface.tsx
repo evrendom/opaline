@@ -2,7 +2,6 @@ import type { SessionAnalytics } from "@rudel/api-routes";
 import type { Ref } from "react";
 import type { SessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { cn } from "@/lib/utils";
-import { SessionUploadFailures } from "./session-upload-failures";
 import { SessionsOverviewTable } from "./sessions-overview-table";
 
 type SessionsListSurfaceProps = {
@@ -60,10 +59,18 @@ export function SessionsListSurface({
 						layout === "workspace" && "min-h-0 flex-1 overflow-hidden",
 					)}
 				>
-					<SessionUploadFailures
-						key={data.organizationId}
-						organizationId={data.organizationId}
-					/>
+					{data.uploadFailuresError ? (
+						<p className="px-4 py-3 text-base text-(--dashboardy-muted) sm:text-sm">
+							Some upload errors couldn’t be loaded.{" "}
+							<button
+								type="button"
+								className="underline"
+								onClick={data.retryUploadFailures}
+							>
+								Try again
+							</button>
+						</p>
+					) : null}
 					{isSnapshotSessionsError ? (
 						<div
 							className={cn(

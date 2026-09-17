@@ -16,7 +16,7 @@ export function getSessionModelDisplayValue({
 	if (source === "claude_code") {
 		return totalTokens === 0 && errorCount > 0
 			? "Claude (failed start)"
-			: "Claude Code";
+			: "Claude";
 	}
 	if (source === "codex") return "Codex";
 	return undefined;

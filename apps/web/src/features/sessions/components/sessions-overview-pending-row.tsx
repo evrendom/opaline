@@ -60,7 +60,7 @@ export function SessionsOverviewPendingRow({
 	const sourceLabel = placeholderOnly
 		? ""
 		: source === "claude_code"
-			? "Claude Code"
+			? "Claude"
 			: source === "codex"
 				? "Codex"
 				: "";
