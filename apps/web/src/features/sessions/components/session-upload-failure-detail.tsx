@@ -51,6 +51,10 @@ export function SessionUploadFailureDetail({
 							<>
 								Retry this session with <code>opaline upload</code>.
 							</>
+						) : failure.totalBytes !== null &&
+							failure.maxBytes !== undefined &&
+							failure.totalBytes > failure.maxBytes ? (
+							"We don’t support sessions of that size yet."
 						) : (
 							"This session needs attention before retrying. Uploading it unchanged will fail again."
 						)}

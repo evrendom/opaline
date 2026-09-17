@@ -321,7 +321,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
 				{failure ? (
 					<p
-						className="shrink-0 text-base text-red-700 sm:text-xs dark:text-red-400"
+						className="shrink-0 text-base text-(--dashboardy-heading) sm:text-xs"
 						title={failure.error}
 						data-session-upload-failed
 					>
