@@ -50,12 +50,14 @@ const list = os.analytics.sessions.list
 	.handler(async ({ input, context }) => {
 		return getSessionAnalytics(context.organizationId, {
 			filters: input.filters,
+			skill_name: input.skillName,
 			days: input.days,
 			start_date: input.startDate,
 			end_date: input.endDate,
 			user_id: input.userId,
 			project_path: input.projectPath,
 			repository: input.repository,
+			repo_key: input.repoKey,
 			source: input.source,
 			limit: input.limit,
 			offset: input.offset,

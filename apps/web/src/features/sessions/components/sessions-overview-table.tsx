@@ -34,6 +34,8 @@ export type SessionListPagination = {
 };
 
 type SessionsOverviewTableProps = {
+	showSkillsColumn?: boolean;
+	showDateControl?: boolean;
 	filterCatalog?: SessionFilterCatalog;
 	filterCatalogPending?: boolean;
 	filterCatalogError?: boolean;
@@ -54,6 +56,8 @@ type SessionsOverviewTableProps = {
 };
 
 export function SessionsOverviewTable({
+	showSkillsColumn = true,
+	showDateControl = true,
 	activeSessionId,
 	canOpenSession,
 	getSessionHref,
@@ -247,20 +251,28 @@ export function SessionsOverviewTable({
 						});
 					}}
 				>
+					<SessionsOverviewHeader
+						showSkillsColumn={showSkillsColumn}
+						controls={
+							<SessionsOverviewControls
+								tableState={tableState}
+								showDateControl={showDateControl}
+							/>
+						}
+						onSort={tableState.handleSort}
+						sort={tableState.sort}
+					/>
 					<div
 						className={cn(
-							"@container/sessions-overview flex min-h-full flex-col",
-							SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
+							"@container/sessions-overview flex min-h-[calc(100%-2.5rem)] flex-col",
+							showSkillsColumn
+								? SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME
+								: "min-w-[812px]",
 						)}
 						data-slot="sessions-overview-canvas"
 					>
-						<SessionsOverviewHeader
-							controls={<SessionsOverviewControls tableState={tableState} />}
-							onSort={tableState.handleSort}
-							sort={tableState.sort}
-						/>
 						{isLoading ? (
-							<SessionsOverviewSkeleton />
+							<SessionsOverviewSkeleton showSkillsColumn={showSkillsColumn} />
 						) : tableState.recentSessions.length === 0 ? (
 							<div className="flex min-h-64 flex-1 items-center justify-center border-b border-(--session-overview-border) px-6 text-center text-base text-(--session-overview-muted) sm:text-sm">
 								No recent sessions in the selected range.
@@ -291,6 +303,7 @@ export function SessionsOverviewTable({
 									<>
 										{renderedRows.map(({ session, position, start }, index) => (
 											<SessionsOverviewRow
+												showSkillsColumn={showSkillsColumn}
 												key={`${session.source}:${session.session_id}`}
 												virtualTop={start}
 												index={index}
@@ -322,6 +335,7 @@ export function SessionsOverviewTable({
 						)}
 						{pagination?.hasNextPage ? (
 							<SessionsOverviewLoadMoreRow
+								showSkillsColumn={showSkillsColumn}
 								rowRef={setLoadMoreElement}
 								isFetching={pagination.isFetching}
 								isError={pagination.isError}

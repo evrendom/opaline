@@ -2,7 +2,7 @@ import type { HistoricalSkillDetail } from "@rudel/api-routes";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { HistoricalSkillDetailContent } from "@/features/skills/components/HistoricalSkillDetailSheet";
+import { HistoricalSkillDetailContent } from "@/features/skills/components/historical-skill-detail-content";
 
 const detail: HistoricalSkillDetail = {
 	name: "testing-bun",
@@ -33,7 +33,7 @@ const detail: HistoricalSkillDetail = {
 };
 
 describe("HistoricalSkillDetailContent", () => {
-	it("renders Markdown and explains unavailable historical content", () => {
+	it("renders Markdown without usage summaries or recovery notices", () => {
 		render(
 			<HistoricalSkillDetailContent
 				detail={detail}
@@ -50,8 +50,9 @@ describe("HistoricalSkillDetailContent", () => {
 		expect(screen.getByText("Uses Bun")).toBeInTheDocument();
 		expect(screen.queryByText("name: testing-bun")).not.toBeInTheDocument();
 		expect(
-			screen.getByText(/couldn’t be recovered from 1 session/i),
-		).toBeInTheDocument();
+			screen.queryByText(/couldn’t be recovered from 1 session/i),
+		).not.toBeInTheDocument();
+		expect(screen.queryByText("Used in 5 sessions")).not.toBeInTheDocument();
 	});
 
 	it("switches between distinct recovered versions", async () => {
@@ -67,9 +68,10 @@ describe("HistoricalSkillDetailContent", () => {
 			/>,
 		);
 
-		await user.click(screen.getByRole("combobox", { name: "Version" }));
+		screen.getByRole("button", { name: "Skill version, Version 2" }).focus();
+		await user.keyboard("{ArrowDown}");
 		await user.click(
-			screen.getByText(/Version 1 · Codex · Used in 2 sessions/i),
+			await screen.findByRole("menuitemradio", { name: "Version 1" }),
 		);
 
 		expect(

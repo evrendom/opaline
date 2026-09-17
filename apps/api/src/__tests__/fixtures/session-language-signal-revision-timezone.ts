@@ -18,6 +18,7 @@ const staleRow: StaleSessionLanguageSignalRow = {
 const zeroCounts: LanguageSignalCounts = {
 	member_apologies: 0,
 	member_positive: 0,
+	member_negative: 0,
 	member_swears: 0,
 	model_apologies: 0,
 	model_positive: 0,

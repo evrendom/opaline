@@ -557,7 +557,9 @@ export const SessionFilterCatalogSchema = z.object({
 export type SessionFilterCatalog = z.infer<typeof SessionFilterCatalogSchema>;
 
 export const SessionListInputSchema = DaysInputSchema.extend({
+	repoKey: z.string().min(1).max(4096).optional(),
 	filters: SessionListFiltersSchema.optional(),
+	skillName: z.string().min(1).max(MAX_ID_FILTER_LENGTH).optional(),
 	// When both are supplied they replace the rolling `days` lookback, so a
 	// range that does not end today (e.g. a past month) returns that window
 	// instead of the last N days.

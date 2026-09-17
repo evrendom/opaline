@@ -424,10 +424,14 @@ describe("language signal summaries", () => {
 		).toEqual({
 			member_apologies: 1,
 			member_positive: 2,
+			member_negative: 0,
 			member_swears: 1,
 			model_apologies: 1,
 			model_positive: 0,
 			model_swears: 1,
+			model_apology_counts: { "My bad": 1 },
+			member_negative_counts: {},
+			member_positive_counts: { "Great work": 1, "GREAT WORK": 1 },
 			member_apology_matches: ["sorry"],
 			member_positive_matches: ["Great work"],
 			member_swear_matches: ["shit"],
@@ -444,6 +448,7 @@ describe("language signal summaries", () => {
 				modelText: ["Perfect. Sorry. Damn, this did not work."],
 			}),
 		).toEqual({
+			member_negative: 2,
 			member_swears: 1,
 			member_apologies: 1,
 			member_positive: 1,
@@ -463,6 +468,7 @@ describe("language signal summaries", () => {
 				modelText: ["Excellent **sorry**", "damn"],
 			}),
 		).toEqual({
+			member_negative: 0,
 			member_swears: 0,
 			member_apologies: 0,
 			member_positive: 1,
@@ -534,4 +540,27 @@ describe("display boundary splitting", () => {
 	test("returns no parts for empty input", () => {
 		expect(splitDisplayTextParts("")).toEqual([]);
 	});
+});
+
+test("verbatim frequencies retain repetitions and sum to category totals", () => {
+	const summary = summarizeWithMatches({
+		memberText: [
+			"Great work! Great work! GREAT WORK! still fishy?? still fishy??",
+		],
+		modelText: ["Sorry. Sorry. My bad. `Sorry`"],
+	});
+	expect(summary.member_positive_counts).toEqual({
+		"Great work": 2,
+		"GREAT WORK": 1,
+	});
+	expect(summary.model_apology_counts).toEqual({ Sorry: 2, "My bad": 1 });
+	expect(summary.member_negative).toBeGreaterThan(0);
+	for (const [counts, total] of [
+		[summary.model_apology_counts, summary.model_apologies],
+		[summary.member_negative_counts, summary.member_negative],
+		[summary.member_positive_counts, summary.member_positive],
+	] as const)
+		expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
+			total,
+		);
 });

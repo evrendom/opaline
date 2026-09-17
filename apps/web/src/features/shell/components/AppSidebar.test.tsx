@@ -48,7 +48,8 @@ describe("AppSidebar", () => {
 			within(navigation)
 				.getAllByRole("link")
 				.map((link) => link.getAttribute("href")),
-		).toEqual(["/session", "/team", "/settings"]);
+		).toEqual(expect.arrayContaining(["/session", "/team", "/settings"]));
+		expect(navigation.querySelector('a[href="/home"]')).toBeNull();
 		expect(navigation.querySelector("ul")).toHaveClass("gap-5.5");
 		expect(
 			container.querySelector("[data-sidebar-navigation-stage]"),

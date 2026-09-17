@@ -10,6 +10,9 @@ import {
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { calculateCost, formatUsername } from "@/lib/format";
 
+export const SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME =
+	"relative flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-(--session-overview-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--session-overview-text) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent) aria-expanded:bg-(--session-overview-hover) sm:text-sm dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]";
+
 export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
 	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--session-overview-surface) font-sans [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fcfcfc] [--session-overview-text:#101112] dark:[--session-overview-border:rgba(255,255,255,0.08)] dark:[--session-overview-hover:rgba(255,255,255,0.05)] dark:[--session-overview-muted:rgba(255,255,255,0.65)] dark:[--session-overview-subtle:rgba(255,255,255,0.5)] dark:[--session-overview-surface:#111827] dark:[--session-overview-text:#f8fafc]";
 
@@ -20,6 +23,8 @@ export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
 // The empty trailing track provides breathing room without raising the table minimum width.
 export const SESSION_OVERVIEW_GRID_CLASS_NAME =
 	"grid-cols-[56px_clamp(460px,calc(460px_+_(100cqw_-_1112px)_*_0.55),960px)_minmax(284px,1fr)_240px_56px_minmax(0,16px)]";
+export const SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME =
+	"grid-cols-[56px_minmax(460px,1fr)_240px_56px_minmax(0,16px)]";
 export const SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME = "min-w-[1096px]";
 export const SESSION_OVERVIEW_COLUMNS = [
 	{ align: "left", key: "cost", label: "API Cost" },

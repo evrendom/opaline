@@ -1,8 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "date-fns";
-import type { ComponentType } from "react";
+import { type ComponentType, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { ChartInterval } from "@/features/costs/chart-interval";
+import { ChartIntervalPicker } from "@/features/costs/chart-interval-picker";
 import { formatIsoDate } from "@/lib/format";
 import { AnalyticsDateRangePicker } from "./AnalyticsDateRangePicker";
 
@@ -96,6 +98,49 @@ vi.mock("@/app/ui/calendar", () => ({
 }));
 
 describe("AnalyticsDateRangePicker", () => {
+	it("adds Dashboard grouping between presets and calendar without applying draft dates or closing", async () => {
+		const user = userEvent.setup();
+		const onDateRangeApply = vi.fn();
+		function DashboardPicker() {
+			const [interval, setInterval] = useState<ChartInterval>("daily");
+			return (
+				<AnalyticsDateRangePicker
+					startDate="2026-03-01"
+					endDate="2026-03-05"
+					onDateRangeApply={onDateRangeApply}
+					calendarControls={
+						<ChartIntervalPicker value={interval} onChange={setInterval} />
+					}
+				/>
+			);
+		}
+		render(<DashboardPicker />);
+		await user.click(
+			screen.getByRole("button", { name: /Mar 1 - Mar 5, 2026/i }),
+		);
+		await user.click(
+			screen.getByRole("button", { name: "Select mocked range" }),
+		);
+		await user.click(screen.getByRole("radio", { name: "Weekly" }));
+		expect(screen.getByRole("radio", { name: "Weekly" })).toBeChecked();
+		expect(screen.getByRole("dialog", { name: "Date range" })).toBeVisible();
+		expect(onDateRangeApply).not.toHaveBeenCalled();
+		expect(screen.getByTestId("calendar-selection")).toHaveTextContent(
+			"2026-04-01|2026-04-08",
+		);
+		await user.keyboard("{ArrowDown}");
+		expect(screen.getByRole("radio", { name: "Monthly" })).toBeChecked();
+		const controls = screen.getByRole("group", { name: "Chart interval" });
+		expect(controls.previousElementSibling?.previousElementSibling).toHaveClass(
+			"session-date-picker-presets",
+		);
+		expect(controls.nextElementSibling?.nextElementSibling).toHaveClass(
+			"session-date-picker-calendar-panel",
+		);
+		await user.click(screen.getByRole("button", { name: "Apply" }));
+		expect(onDateRangeApply).toHaveBeenCalledWith("2026-04-01", "2026-04-08");
+	});
+
 	it("renders the formatted trigger label", () => {
 		render(
 			<AnalyticsDateRangePicker
@@ -283,6 +328,7 @@ describe("AnalyticsDateRangePicker", () => {
 			screen.getByRole("button", { name: /Mar 1 - Mar 5, 2026/i }),
 		);
 
+		expect(screen.queryByRole("group", { name: "Chart interval" })).toBeNull();
 		expect(screen.queryByText(/UTC/i)).not.toBeInTheDocument();
 		expect(screen.queryByText(/Time zone/i)).not.toBeInTheDocument();
 		expect(screen.queryByText(/Save as Preset/i)).not.toBeInTheDocument();

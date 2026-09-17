@@ -24,5 +24,5 @@ export type {
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
-// Version 3 also repairs version-2 rows persisted without matched-word arrays.
-export const SCAN_VERSION = 3;
+// Version 5 persists exact phrase frequencies for dashboard signal filters.
+export const SCAN_VERSION = 5;

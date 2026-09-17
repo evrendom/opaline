@@ -11,6 +11,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SignalText } from "../signal-text";
 import { CodeBlock, type CodeLineKind } from "./CodeBlock";
+import { ConversationSkillLink } from "./conversation-skill-link";
 import {
 	formatShellOutput,
 	formatToolInputPreview,
@@ -598,18 +599,21 @@ export function ConversationTraceEventRow({
 
 		return (
 			<ExpandableTraceRow
+				disclosureLabel={`Expand ${skillName} invocation`}
 				anchorId={`trace-event-${event.id}`}
 				compact
 				fullPreviewText={undefined}
 				label={
-					<ConversationTraceTag
-						className="max-w-[18rem] shrink-0"
-						data-trace-skill-tag
-						toolIcon={icon}
-						value={skillName}
-					>
-						<span className="truncate">{skillName}</span>
-					</ConversationTraceTag>
+					<ConversationSkillLink name={skillName}>
+						<ConversationTraceTag
+							className="max-w-[18rem] shrink-0"
+							data-trace-skill-tag
+							toolIcon={icon}
+							value={skillName}
+						>
+							<span className="truncate">{skillName}</span>
+						</ConversationTraceTag>
+					</ConversationSkillLink>
 				}
 				leading={
 					<TraceIcon

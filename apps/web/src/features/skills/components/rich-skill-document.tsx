@@ -2,6 +2,7 @@ import { lazy, memo, Suspense } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { getSkillDocumentContent } from "../skill-document-content";
 import "./rich-skill-document.css";
 
 type RichSkillDocumentVariant = "document" | "preview";
@@ -13,7 +14,6 @@ interface RichSkillDocumentProps {
 }
 
 const SKILL_PREVIEW_MAX_CHARACTERS = 1_200;
-const SKILL_FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/u;
 const SKILL_LEADING_HEADING_PATTERN = /^#{1,6}[ \t]+[^\r\n]*(?:\r?\n|$)/u;
 const MARKDOWN_FENCE_PATTERN = /^```/gmu;
 
@@ -51,10 +51,7 @@ function skillDocumentMarkdown(
 	content: string,
 	variant: RichSkillDocumentVariant,
 ): string {
-	const withoutFrontmatter = content
-		.trim()
-		.replace(SKILL_FRONTMATTER_PATTERN, "")
-		.trim();
+	const withoutFrontmatter = getSkillDocumentContent(content);
 	if (variant === "document") {
 		return withoutFrontmatter;
 	}

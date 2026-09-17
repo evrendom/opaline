@@ -3,7 +3,13 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { SessionAnalytics } from "@rudel/api-routes";
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
+import {
+	appRoutes,
+	getWorkspaceAppPath,
+	getWorkspaceSlugFromPath,
+} from "@/app/routes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
@@ -21,6 +27,7 @@ import {
 	getSessionBranchLabel,
 	getSessionOverviewCost,
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
+	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 } from "@/features/sessions/components/sessions-overview-table-utils";
 import {
 	type UseFluidHoverReturn,
@@ -46,6 +53,7 @@ import {
 } from "./session-overview-row-elements";
 
 type SessionsOverviewRowProps = {
+	showSkillsColumn?: boolean;
 	virtualTop?: number;
 	position?: number;
 	setSize?: number;
@@ -153,6 +161,7 @@ function getSessionClockParts(dateString: string, utc: boolean) {
 }
 
 export const SessionsOverviewRow = memo(function SessionsOverviewRow({
+	showSkillsColumn = true,
 	index,
 	position,
 	setSize,
@@ -218,12 +227,81 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			: null;
 	const rowClassName = cn(
 		SESSION_OVERVIEW_ROW_CLASS_NAME,
-		SESSION_OVERVIEW_GRID_CLASS_NAME,
+		showSkillsColumn
+			? SESSION_OVERVIEW_GRID_CLASS_NAME
+			: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
 		isClickable ? "cursor-pointer" : "cursor-default opacity-65",
 	);
 	const cellClassName = cn(
 		SESSION_OVERVIEW_CELL_CLASS_NAME,
 		isActive && "bg-(--session-overview-hover)",
+	);
+	const getSkillHref = (name: string) => {
+		const path = appRoutes.skillDetail(name, session.session_id);
+		const workspaceSlug = sessionHref
+			? getWorkspaceSlugFromPath(sessionHref)
+			: null;
+		return workspaceSlug ? getWorkspaceAppPath(workspaceSlug, path) : path;
+	};
+	const skillsCell = (
+		<div
+			className={cn(cellClassName, "col-start-3 row-start-1 justify-start")}
+			data-session-overview-column="skills"
+		>
+			{renderedSkills.length === 0 ? null : (
+				<div
+					className="flex min-w-0 max-w-full items-center gap-1"
+					title={skillsTitle}
+				>
+					{renderedSkills.map((skill, skillIndex) => (
+						<ConversationSkillLink
+							key={skill}
+							name={skill}
+							href={
+								isClickable && sessionHref ? getSkillHref(skill) : undefined
+							}
+							className={cn(
+								"pointer-events-auto min-w-0 max-w-full shrink",
+								skillIndex >= 5
+									? "hidden @min-[2200px]/sessions-overview:inline-flex"
+									: skillIndex >= 3
+										? "hidden @min-[1800px]/sessions-overview:inline-flex"
+										: undefined,
+							)}
+						>
+							<ConversationTraceTag
+								className="min-w-0 max-w-full shrink"
+								data-session-overview-skill-tag
+								toolIcon="sparkle"
+								value={skill}
+							>
+								<span
+									className="truncate font-sans"
+									data-session-overview-skill-name
+								>
+									{skill}
+								</span>
+							</ConversationTraceTag>
+						</ConversationSkillLink>
+					))}
+					{SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS.map(({ limit, className }) =>
+						session.skills.length > limit ? (
+							<span
+								key={limit}
+								className={cn(
+									"shrink-0 whitespace-nowrap text-[0.625rem] font-normal text-(--session-overview-subtle)",
+									className,
+								)}
+								data-session-overview-skill-overflow-tag
+								title={session.skills.slice(limit).join(", ")}
+							>
+								+{session.skills.length - limit}
+							</span>
+						) : null,
+					)}
+				</div>
+			)}
+		</div>
 	);
 	const rowContents = (
 		<>
@@ -349,57 +427,13 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					</span>
 				) : null}
 			</div>
-			<div
-				className={cn(cellClassName, "justify-start")}
-				data-session-overview-column="skills"
-			>
-				{renderedSkills.length === 0 ? null : (
-					<div
-						className="flex min-w-0 max-w-full items-center gap-1"
-						title={skillsTitle}
-					>
-						{renderedSkills.map((skill, skillIndex) => (
-							<ConversationTraceTag
-								key={skill}
-								className={cn(
-									"min-w-0 max-w-full shrink",
-									skillIndex >= 5
-										? "hidden @min-[2200px]/sessions-overview:inline-flex"
-										: skillIndex >= 3
-											? "hidden @min-[1800px]/sessions-overview:inline-flex"
-											: undefined,
-								)}
-								data-session-overview-skill-tag
-								toolIcon="sparkle"
-								value={skill}
-							>
-								<span
-									className="truncate font-sans"
-									data-session-overview-skill-name
-								>
-									{skill}
-								</span>
-							</ConversationTraceTag>
-						))}
-						{SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS.map(
-							({ limit, className }) =>
-								session.skills.length > limit ? (
-									<span
-										key={limit}
-										className={cn(
-											"shrink-0 whitespace-nowrap text-[0.625rem] font-normal text-(--session-overview-subtle)",
-											className,
-										)}
-										data-session-overview-skill-overflow-tag
-										title={session.skills.slice(limit).join(", ")}
-									>
-										+{session.skills.length - limit}
-									</span>
-								) : null,
-						)}
-					</div>
-				)}
-			</div>
+			{showSkillsColumn ? (
+				isClickable && sessionHref ? (
+					<div className={cellClassName} aria-hidden="true" />
+				) : (
+					skillsCell
+				)
+			) : null}
 			<div
 				className={cn(cellClassName, "justify-end gap-2")}
 				data-session-overview-column="user"
@@ -503,6 +537,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					{rowContents}
 				</div>
 			)}
+			{showSkillsColumn && isClickable && sessionHref ? (
+				<div
+					className={cn(
+						"pointer-events-none absolute inset-0 grid",
+						SESSION_OVERVIEW_GRID_CLASS_NAME,
+					)}
+				>
+					{skillsCell}
+				</div>
+			) : null}
 		</li>
 	);
 });

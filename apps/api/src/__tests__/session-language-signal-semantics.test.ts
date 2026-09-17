@@ -17,6 +17,9 @@ const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	2: "538139f31d5549b2ac8c191f3eacc55f20ae95a568c400058af47281a3c9af45",
 	// Same scanner semantics; reprocess legacy version-2 count-only records.
 	3: "538139f31d5549b2ac8c191f3eacc55f20ae95a568c400058af47281a3c9af45",
+	// Negative member counts, followed by exact per-phrase frequency maps.
+	4: "083a0b78ac8523eff65f0e2f667cf0116241abd1a0c1569e054f0df484da2686",
+	5: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
 };
 
 describe("persisted language-signal semantics", () => {

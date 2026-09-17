@@ -1,13 +1,17 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Outlet } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRouter } from "./AppRouter";
 
 const { mockUseOrganization } = vi.hoisted(() => ({
 	mockUseOrganization: vi.fn(() => ({
 		actions: { switchOrganization: vi.fn() },
 		meta: { isOrgAdmin: true },
-		state: { activeOrg: null, isLoading: false, organizations: [] },
+		state: {
+			activeOrg: { id: "org-acme", name: "Acme", slug: "acme" },
+			isLoading: false,
+			organizations: [{ id: "org-acme", name: "Acme", slug: "acme" }],
+		},
 	})),
 }));
 
@@ -71,6 +75,8 @@ vi.mock("@/features/settings/account/AccountSettingsPage", () => ({
 }));
 
 describe("AppRouter", () => {
+	afterEach(() => vi.unstubAllEnvs());
+
 	it("preserves explicit authenticated root redirects", async () => {
 		render(
 			<MemoryRouter initialEntries={["/"]}>
@@ -84,7 +90,11 @@ describe("AppRouter", () => {
 	});
 
 	it.each([
+		["/", "Dashboard page"],
+		["/acme", "Dashboard page"],
 		["/home", "Dashboard page"],
+		["/acme/home", "Dashboard page"],
+		["/dashboard", "Dashboard page"],
 		["/session", "Sessions page"],
 		["/session/session-123", "Sessions page"],
 		["/session/session-123/v2", "Sessions page"],
@@ -108,7 +118,22 @@ describe("AppRouter", () => {
 		});
 	});
 
-	it("keeps /dashboard as a compatibility redirect to /home", async () => {
+	it.each([
+		"/home",
+		"/acme/home",
+	])("redirects production %s to Dashboard", async (path) => {
+		vi.stubEnv("PROD", true);
+		render(
+			<MemoryRouter initialEntries={[path]}>
+				<AppRouter rootRedirectTarget={null} />
+			</MemoryRouter>,
+		);
+
+		expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+		expect(screen.queryByText("Home chat page")).not.toBeInTheDocument();
+	});
+
+	it("keeps /dashboard available for Token costs", async () => {
 		render(
 			<MemoryRouter initialEntries={["/dashboard"]}>
 				<AppRouter rootRedirectTarget={null} />

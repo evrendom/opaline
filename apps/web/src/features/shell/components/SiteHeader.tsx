@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import { isNewSessionPath, isSessionDetailPath } from "@/app/routes";
 import { Separator } from "@/app/ui/separator";
 import { SidebarTrigger } from "@/app/ui/sidebar";
+import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { sessionPaneMotionStyle } from "@/features/sessions/components/session-pane-motion";
 import {
@@ -59,7 +60,11 @@ export function SiteHeader({
 	const currentShellRoute = useCurrentShellRoute();
 	const isSessionDetail = isSessionDetailPath(location.pathname);
 	const isNewSession = isNewSessionPath(location.pathname);
-	const isSessionsRoute = currentShellRoute.id === "sessions";
+	const isCollectionDetail =
+		(currentShellRoute.id === "skills" &&
+			!!new URLSearchParams(location.search).get("skill")) ||
+		(currentShellRoute.id === "repos" &&
+			!!new URLSearchParams(location.search).get("repo"));
 	const title =
 		location.pathname === CLI_SETUP_PATH
 			? "Sessions"
@@ -68,16 +73,12 @@ export function SiteHeader({
 				: currentShellRoute.title;
 
 	return (
-		<DashboardHeader
-			className={cn(
-				isSessionDetail ? "p-0" : "gap-1 pr-2",
-				!isSessionDetail && (isSessionsRoute ? "pl-4.5" : "pl-2"),
-			)}
-		>
+		<DashboardHeader className={isSessionDetail ? "p-0" : "gap-1 pr-2 pl-4.5"}>
 			{isSessionDetail ? (
 				<div className="flex min-h-0 min-w-0 flex-1 self-stretch">
 					<div
 						data-slot="session-list-header-pane"
+						data-fluid-menu-root=""
 						className={cn(
 							"hidden min-w-0 items-center gap-2",
 							isNewSession
@@ -85,6 +86,7 @@ export function SiteHeader({
 								: "pr-2 pl-4.5 sm:flex sm:w-[var(--session-list-pane-width,clamp(20rem,34vw,40rem))] sm:flex-none",
 						)}
 					>
+						<FluidMenuHover items='button, a[href], [role="button"]' />
 						{isNewSession && showSidebarTrigger ? (
 							<SidebarTrigger className="size-7 shrink-0 rounded-md text-[#5b5c5e] hover:bg-[#ececed] hover:text-[#1b1b1b]" />
 						) : (
@@ -112,6 +114,7 @@ export function SiteHeader({
 					</div>
 					<div
 						data-slot="session-detail-header-pane"
+						data-fluid-menu-root=""
 						style={sessionPaneMotionStyle}
 						className={cn(
 							"relative z-10 flex min-w-0 flex-1 items-center gap-2 border-l border-black/6 bg-[var(--dashboard-01-content-background)] px-2 dark:border-white/8",
@@ -119,6 +122,7 @@ export function SiteHeader({
 								"shadow-[-4px_0_10px_-8px_rgba(0,0,0,0.18)] dark:shadow-[-4px_0_10px_-8px_rgba(0,0,0,0.5)]",
 						)}
 					>
+						<FluidMenuHover items='button, a[href], [role="button"]' />
 						<div
 							className={cn(
 								"flex shrink-0 items-center gap-2",
@@ -142,9 +146,11 @@ export function SiteHeader({
 						showSidebarTrigger={showSidebarTrigger}
 						showWorkspaceMenu={showWorkspaceMenu}
 					/>
-					<h1 className="truncate text-[0.8125rem]/5 font-medium tracking-normal text-balance">
-						{title}
-					</h1>
+					{!isCollectionDetail ? (
+						<h1 className="truncate text-[0.8125rem]/5 font-medium tracking-normal text-balance">
+							{title}
+						</h1>
+					) : null}
 					<div
 						ref={setPortalHost}
 						className="ml-auto flex min-w-0 flex-1 items-center justify-end"

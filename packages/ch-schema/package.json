@@ -30,7 +30,8 @@
 		"ch:backfill:status": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit backfill status \"$@\"' --",
 		"chcli": "bun scripts/chcli-connect.ts",
 		"ch:migrate:dependency-health": "bun scripts/migrate-dependency-health.ts",
-		"ch:migrate:product-launch": "bun scripts/migrate-product-launch.ts"
+		"ch:migrate:product-launch": "bun scripts/migrate-product-launch.ts",
+		"ch:migrate:language-signals": "bun scripts/migrate-language-signals.ts"
 	},
 	"dependencies": {
 		"@chkit/clickhouse": "0.1.0-beta.16",

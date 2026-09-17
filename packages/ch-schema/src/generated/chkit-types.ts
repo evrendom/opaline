@@ -202,6 +202,7 @@ export type RudelSessionLanguageSignalsRow = {
   raw_revision: string
   raw_ingested_at: string
   scan_version: number
+  member_negative: number
   member_swears: number
   member_apologies: number
   member_positive: number
@@ -214,6 +215,9 @@ export type RudelSessionLanguageSignalsRow = {
   model_swear_matches: string[]
   model_apology_matches: string[]
   model_positive_matches: string[]
+  model_apology_counts: Record<string, number>
+  member_negative_counts: Record<string, number>
+  member_positive_counts: Record<string, number>
   scanned_at: string
   signal_version: string
 }
@@ -227,6 +231,7 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   raw_revision: z.string(),
   raw_ingested_at: z.string(),
   scan_version: z.number(),
+  member_negative: z.number(),
   member_swears: z.number(),
   member_apologies: z.number(),
   member_positive: z.number(),
@@ -239,6 +244,9 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   model_swear_matches: z.array(z.string()),
   model_apology_matches: z.array(z.string()),
   model_positive_matches: z.array(z.string()),
+  model_apology_counts: z.record(z.string(), z.number()),
+  member_negative_counts: z.record(z.string(), z.number()),
+  member_positive_counts: z.record(z.string(), z.number()),
   scanned_at: z.string(),
   signal_version: z.string(),
 })

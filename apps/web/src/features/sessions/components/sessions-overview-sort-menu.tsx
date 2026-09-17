@@ -11,6 +11,7 @@ import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import "./session-menu.css";
 import {
 	getInitialSortDirection,
+	SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME,
 	SESSION_OVERVIEW_SORT_OPTIONS,
 	type SessionSortState,
 } from "./sessions-overview-table-utils";
@@ -46,7 +47,7 @@ export function SessionsOverviewSortMenu({
 			<Menu.Trigger
 				ref={triggerRef}
 				aria-label={`Sort sessions, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
-				className="relative flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-(--session-overview-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--session-overview-text) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent) aria-expanded:bg-(--session-overview-hover) sm:text-sm dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]"
+				className={SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME}
 			>
 				<HugeiconsIcon
 					icon={SortByDown01Icon}

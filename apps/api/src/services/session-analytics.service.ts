@@ -12,11 +12,14 @@ import {
 	buildInclusiveDateRangeFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
+import { shouldUsePersistentSkillAnalytics } from "../lib/env.js";
+import { getRepositorySqlFilter } from "./repository-filter.service.js";
 import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
 import {
 	appendSessionListSqlFilters,
 	getSessionListRepositoryKey,
 } from "./session-list-filters.js";
+import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
 
 export interface SessionAnalyticsRaw {
@@ -218,12 +221,14 @@ async function getSessionAnalyticsBaseRows(
 	orgId: string,
 	params: {
 		filters?: SessionListFilters;
+		skill_name?: string;
 		days?: number;
 		start_date?: string;
 		end_date?: string;
 		user_id?: string;
 		project_path?: string;
 		repository?: string;
+		repo_key?: string;
 		source?: string;
 		limit?: number;
 		offset?: number;
@@ -233,12 +238,14 @@ async function getSessionAnalyticsBaseRows(
 ): Promise<SessionAnalyticsListRow[]> {
 	const {
 		filters: overviewFilters,
+		skill_name,
 		days = 30,
 		start_date,
 		end_date,
 		user_id,
 		project_path,
 		repository,
+		repo_key,
 		source,
 		limit = 50,
 		offset = 0,
@@ -266,6 +273,20 @@ async function getSessionAnalyticsBaseRows(
 		? buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")
 		: buildDateFilter("days", "sa.session_date");
 	const filters: string[] = [];
+	const useSkillReceipts =
+		Boolean(skill_name) && shouldUsePersistentSkillAnalytics(orgId);
+	if (skill_name) {
+		query_params.skillName = skill_name;
+		query_params.organizationId = orgId;
+		filters.push(
+			useSkillReceipts
+				? `(sa.user_id, sa.source, sa.session_id) IN (
+				SELECT user_id, if(agent = 'claude', 'claude_code', 'codex'), session_id
+				FROM active_skill_uses
+			)`
+				: "has(sa.skills, {skillName:String})",
+		);
+	}
 	addOptionalStringEqFilter(
 		filters,
 		query_params,
@@ -280,6 +301,11 @@ async function getSessionAnalyticsBaseRows(
 		"projectPath",
 		project_path,
 	);
+	if (repo_key) {
+		const repoFilter = await getRepositorySqlFilter(orgId, repo_key);
+		filters.push(repoFilter.sql);
+		Object.assign(query_params, repoFilter.params);
+	}
 	if (repository) {
 		filters.push(
 			"(git_remote = {repository:String} OR package_name = {repository:String} OR project_path = {repository:String})",
@@ -314,6 +340,7 @@ async function getSessionAnalyticsBaseRows(
 
 	const query = `
 		WITH ${usage.cteDefinitions}
+		${useSkillReceipts ? `, ${buildActiveSkillUsesCte({ filterSkillName: true })}` : ""}
 	    SELECT
 	      sa.source AS source,
 	      sa.session_id AS session_id,

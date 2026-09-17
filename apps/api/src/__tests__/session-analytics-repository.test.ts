@@ -168,6 +168,7 @@ describe("summarizeSessionLanguageSignals", () => {
 		expect(summarizeSessionLanguageSignals(transcript)).toEqual({
 			member_apologies: 1,
 			member_positive: 1,
+			member_negative: 2,
 			member_swears: 1,
 			model_apologies: 1,
 			model_positive: 0,

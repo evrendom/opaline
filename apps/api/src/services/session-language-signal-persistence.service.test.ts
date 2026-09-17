@@ -15,6 +15,7 @@ import {
 const ZERO_COUNTS: LanguageSignalCounts = {
 	member_apologies: 0,
 	member_positive: 0,
+	member_negative: 0,
 	member_swears: 0,
 	model_apologies: 0,
 	model_positive: 0,
@@ -23,6 +24,9 @@ const ZERO_COUNTS: LanguageSignalCounts = {
 
 const ZERO_SUMMARY: LanguageSignalSummary = {
 	...ZERO_COUNTS,
+	model_apology_counts: {},
+	member_negative_counts: {},
+	member_positive_counts: {},
 	member_apology_matches: [],
 	member_positive_matches: [],
 	member_swear_matches: [],
@@ -50,6 +54,7 @@ describe("session language-signal ingest persistence", () => {
 				{
 					...ZERO_SUMMARY,
 					member_swear_matches: ["fuck", "shit"],
+					member_negative: 0,
 					member_swears: 2,
 				},
 				"2026-08-19T12:00:02.456Z",
@@ -59,6 +64,7 @@ describe("session language-signal ingest persistence", () => {
 			member_apology_matches: [],
 			member_positive: 0,
 			member_positive_matches: [],
+			member_negative: 0,
 			member_swears: 2,
 			member_swear_matches: ["fuck", "shit"],
 			model_apologies: 0,
@@ -70,11 +76,14 @@ describe("session language-signal ingest persistence", () => {
 			organization_id: "org-1",
 			raw_ingested_at: "2026-08-19 12:00:01.123",
 			raw_revision: "115807295561596928",
-			scan_version: 3,
+			scan_version: 5,
+			model_apology_counts: {},
+			member_negative_counts: {},
+			member_positive_counts: {},
 			scanned_at: "2026-08-19 12:00:02.456",
 			signal_version: buildSessionLanguageSignalVersion(
 				"115807295561596928",
-				3,
+				5,
 				"2026-08-19T12:00:02.456Z",
 			),
 			session_date: "2026-08-19 12:00:00.000",

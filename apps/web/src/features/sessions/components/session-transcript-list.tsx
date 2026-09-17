@@ -1,4 +1,5 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: Virtualization, row rendering, and fixture diagnostics share one measured-row contract.
+
 import {
 	elementScroll,
 	measureElement as measureVirtualElement,
@@ -31,6 +32,7 @@ import {
 	TraceExpansionNamespaceProvider,
 	TraceExpansionStoreProvider,
 } from "@/components/conversation/ConversationTrace";
+import { ConversationSkillTurnContext } from "@/components/conversation/conversation-skill-link";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { SessionContinuousTurnSkeleton } from "./session-continuous-turn-skeleton";
 import type { SessionContinuousTurnViewportStore } from "./session-continuous-turn-viewport-store";
@@ -1152,22 +1154,26 @@ const TranscriptVirtualRow = memo(function TranscriptVirtualRow({
 					{contentVersion}
 				</span>
 			) : null}
-			<TraceExpansionNamespaceProvider
-				namespace={"turnId" in row ? row.turnId : row.id}
+			<ConversationSkillTurnContext.Provider
+				value={"turnId" in row ? row.turnId : undefined}
 			>
-				<TranscriptRowContent
-					memberHeaderData={memberHeaderData}
-					model={model}
-					modelHeaderData={modelHeaderData}
-					onLoadDirection={onLoadDirection}
-					onRetryTurn={onRetryTurn}
-					onToggleFold={onToggleFold}
-					renderEventSubtree={renderEventSubtree}
-					row={row}
-					userImageUrl={userImageUrl}
-					viewModel={viewModel}
-				/>
-			</TraceExpansionNamespaceProvider>
+				<TraceExpansionNamespaceProvider
+					namespace={"turnId" in row ? row.turnId : row.id}
+				>
+					<TranscriptRowContent
+						memberHeaderData={memberHeaderData}
+						model={model}
+						modelHeaderData={modelHeaderData}
+						onLoadDirection={onLoadDirection}
+						onRetryTurn={onRetryTurn}
+						onToggleFold={onToggleFold}
+						renderEventSubtree={renderEventSubtree}
+						row={row}
+						userImageUrl={userImageUrl}
+						viewModel={viewModel}
+					/>
+				</TraceExpansionNamespaceProvider>
+			</ConversationSkillTurnContext.Provider>
 			{debugEnabled ? (
 				<TranscriptRowDebugBadge
 					estimate={estimateTranscriptRow(row)}

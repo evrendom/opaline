@@ -8,7 +8,7 @@ import {
 	Calendar03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import type { ChevronProps, DateRange } from "react-day-picker";
 import { Button } from "@/app/ui/button";
 import { Calendar } from "@/app/ui/calendar";
@@ -33,6 +33,7 @@ export type AnalyticsDateRangePickerProps = {
 	onDateRangeApply: (startDate: string, endDate: string) => void;
 	triggerClassName?: string;
 	contentClassName?: string;
+	calendarControls?: ReactNode;
 	align?: "start" | "center" | "end";
 	sourceComponent?: string;
 	variant?: "default" | "linear";
@@ -85,6 +86,7 @@ export function AnalyticsDateRangePicker({
 	onDateRangeApply,
 	triggerClassName,
 	contentClassName,
+	calendarControls,
 	align = "end",
 	sourceComponent,
 	variant = "default",
@@ -250,6 +252,15 @@ export function AnalyticsDateRangePicker({
 							})}
 						</div>
 						<div className="session-date-picker-divider" aria-hidden="true" />
+						{calendarControls ? (
+							<>
+								{calendarControls}
+								<div
+									className="session-date-picker-divider"
+									aria-hidden="true"
+								/>
+							</>
+						) : null}
 						<div className="session-date-picker-calendar-panel">
 							{renderCalendar(isLinear)}
 						</div>

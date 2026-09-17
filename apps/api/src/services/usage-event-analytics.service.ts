@@ -101,7 +101,7 @@ function buildEventPricingRateCardSql(): string {
 	`;
 }
 
-function buildCanonicalPricingModelSql(modelExpr: string): string {
+export function buildCanonicalPricingModelSql(modelExpr: string): string {
 	const canonicalModelByPattern = new Map<string, string>();
 	for (const entry of getModelPricingCatalog()) {
 		for (const pattern of entry.match) {

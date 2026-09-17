@@ -35,6 +35,7 @@ export interface LanguageSignalSummaryInput {
 }
 
 export interface LanguageSignalCounts {
+	readonly member_negative: number;
 	readonly member_swears: number;
 	readonly member_apologies: number;
 	readonly member_positive: number;
@@ -44,6 +45,9 @@ export interface LanguageSignalCounts {
 }
 
 export interface LanguageSignalSummary extends LanguageSignalCounts {
+	readonly model_apology_counts: Readonly<Record<string, number>>;
+	readonly member_negative_counts: Readonly<Record<string, number>>;
+	readonly member_positive_counts: Readonly<Record<string, number>>;
 	readonly member_swear_matches: readonly string[];
 	readonly member_apology_matches: readonly string[];
 	readonly member_positive_matches: readonly string[];

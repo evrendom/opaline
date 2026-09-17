@@ -1,4 +1,4 @@
-@keyframes session-detail-chart-flow {
+@keyframes chart-loading-wave-flow {
 	from {
 		transform: translateX(-300px);
 	}
@@ -7,12 +7,12 @@
 	}
 }
 
-.session-detail-loading-mask {
-	animation: session-detail-chart-flow 2.8s linear infinite;
+.chart-loading-wave-mask {
+	animation: chart-loading-wave-flow 2.8s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.session-detail-loading-mask {
+	.chart-loading-wave-mask {
 		animation: none;
 		transform: translateX(350px);
 	}

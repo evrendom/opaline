@@ -21,8 +21,8 @@ export function NotFoundPage() {
 				<Link
 					to={
 						workspace
-							? getWorkspaceAppPath(workspace.slug, appRoutes.session())
-							: appRoutes.session()
+							? getWorkspaceAppPath(workspace.slug, appRoutes.dashboard())
+							: appRoutes.dashboard()
 					}
 					className={buttonVariants()}
 				>

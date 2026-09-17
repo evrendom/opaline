@@ -1,4 +1,5 @@
 import { orgMiddleware, os } from "../../middleware.js";
+import { getCostDashboard } from "../../services/cost-dashboard.service.js";
 import {
 	getModelTokensTrend,
 	getOverviewInsights,
@@ -101,7 +102,14 @@ const successRate = os.analytics.overview.successRate
 		);
 	});
 
+const costs = os.analytics.overview.costs
+	.use(orgMiddleware)
+	.handler(({ input, context }) =>
+		getCostDashboard(context.organizationId, input),
+	);
+
 export const overviewRouter = os.analytics.overview.router({
+	costs,
 	kpis,
 	usageTrend,
 	modelTokensTrend,

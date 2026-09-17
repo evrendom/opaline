@@ -142,12 +142,17 @@ export function LeftSidebarAppShellLayout() {
 		canonicalPathname.startsWith(`${appRoutes.session()}/`) ||
 		isNewSessionPath(canonicalPathname);
 	const isDashboardWorkspaceRoute = canonicalPathname === appRoutes.dashboard();
-	const isSkillsWorkspaceRoute = canonicalPathname === appRoutes.skills();
+	const isHomeWorkspaceRoute = canonicalPathname === appRoutes.home();
+	const isSkillsWorkspaceRoute = [
+		appRoutes.skills(),
+		appRoutes.repos(),
+	].includes(canonicalPathname);
 	const isSettingsWorkspaceRoute =
 		canonicalPathname === appRoutes.settings() ||
 		canonicalPathname.startsWith(`${appRoutes.settings()}/`);
 	const isFixedWorkspaceRoute =
 		isWelcome ||
+		isHomeWorkspaceRoute ||
 		isDashboardWorkspaceRoute ||
 		isSessionWorkspaceRoute ||
 		isSkillsWorkspaceRoute ||
@@ -194,7 +199,7 @@ export function LeftSidebarAppShellLayout() {
 
 	const shellWindowContent = (
 		<>
-			{isDashboardWorkspaceRoute || isSettingsWorkspaceRoute ? null : (
+			{isHomeWorkspaceRoute || isSettingsWorkspaceRoute ? null : (
 				<SiteHeader
 					setNewseshListPortalHost={setNewseshListHeaderPortal}
 					setPortalHost={setShellHeaderPortal}

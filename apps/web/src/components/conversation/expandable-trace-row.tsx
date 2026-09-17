@@ -233,6 +233,7 @@ export function ExpandableTraceRow({
 	trailing,
 	treeBodyClassName,
 	textDisclosure = false,
+	disclosureLabel,
 }: {
 	children?: ReactNode;
 	body?: ReactNode;
@@ -249,6 +250,7 @@ export function ExpandableTraceRow({
 	trailing?: ReactNode;
 	treeBodyClassName?: string;
 	textDisclosure?: boolean;
+	disclosureLabel?: string;
 }) {
 	const generatedId = useId();
 	const contextExpansionId = React.useContext(TraceExpansionIdContext);
@@ -338,16 +340,18 @@ export function ExpandableTraceRow({
 				)}
 			>
 				{leading}
+				{expandable && disclosureLabel ? label : null}
 				{expandable ? (
 					<button
 						type="button"
 						data-trace-content-disclosure
 						onClick={() => setOpen((current) => !current)}
+						aria-label={disclosureLabel}
 						aria-expanded={expanded}
 						aria-controls={panelId}
 						className="group flex min-w-0 flex-1 items-center gap-0 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
 					>
-						{label}
+						{disclosureLabel ? null : label}
 						{children}
 						<TraceTextDisclosureIcon expanded={expanded} />
 					</button>

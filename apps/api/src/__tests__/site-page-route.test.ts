@@ -34,6 +34,9 @@ test("workspace routes require an existence check", () => {
 		"/acme/sessions/session-id/v2",
 		"/acme/settings/members",
 		"/acme/dashboard",
+		"/acme/home",
+		"/acme/skills",
+		"/acme/repos",
 		"/acme/newsesh/session-id",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "workspace", slug: "acme" });
@@ -59,6 +62,7 @@ test("login, pairing, onboarding, and existing app aliases remain available", ()
 		"/invitation/123",
 		"/team",
 		"/skills",
+		"/repos",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "app" });
 	}
