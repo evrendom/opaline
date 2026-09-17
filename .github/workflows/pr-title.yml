@@ -4,14 +4,17 @@ on:
   pull_request_target:
     types:
       - opened
+      - reopened
       - edited
       - synchronize
+      - ready_for_review
 
 permissions:
   pull-requests: read
 
 jobs:
   lint-pr-title:
+    if: github.event.pull_request.draft == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Enforce conventional commit format

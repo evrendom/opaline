@@ -8,6 +8,7 @@ on:
         type: boolean
         default: false
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
     branches:
       - main
@@ -18,11 +19,13 @@ permissions:
 
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}-${{ github.event.pull_request.base.sha || github.sha }}
+  group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Job-level conditions skip drafts before allocating a runner or expanding a matrix.
   changes:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     outputs:
@@ -52,6 +55,7 @@ jobs:
               - ".github/workflows/ci.yml"
 
   verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
     # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -98,6 +102,7 @@ jobs:
         run: bun run --cwd apps/web test:resource-budgets:chrome
 
   integration:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     services:
@@ -247,7 +252,7 @@ jobs:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
 
   cli-smoke:
-    if: needs.changes.outputs.cli == 'true'
+    if: (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.changes.outputs.cli == 'true'
     needs: changes
     strategy:
       fail-fast: false
@@ -305,7 +310,7 @@ jobs:
       # repo; restore a job here if Blacksmith registers a default browser.
 
   cli-smoke-required:
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     needs:
       - changes
       - cli-smoke
