@@ -226,7 +226,7 @@
 		},
 		{
 			"source": "/home",
-			"destination": "/marketing.html"
+			"destination": "/api/rpc?__opaline_path=/api/public-home"
 		},
 		{
 			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",

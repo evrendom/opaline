@@ -39,7 +39,7 @@ test("CLI copy never writes a command without a connection code when pairing fai
 					.count(),
 			).toBe(0);
 		}
-		expect(new URL(page.url()).pathname).toBe("/home");
+		expect(new URL(page.url()).pathname).toBe("/");
 	} finally {
 		await browser.close();
 	}
@@ -136,7 +136,7 @@ test("CLI copy retains its code across connection loss and clipboard denial", as
 			command,
 		);
 		expect(pairings).toBe(1);
-		expect(new URL(page.url()).pathname).toBe("/home");
+		expect(new URL(page.url()).pathname).toBe("/");
 	} finally {
 		await browser.close();
 	}
@@ -169,7 +169,7 @@ test("demo visits ignore saved CLI setup and cross-tab connection changes", asyn
 		await page
 			.locator('[data-instant-v2-demo-bar][data-stage="visible"]')
 			.waitFor();
-		expect(new URL(page.url()).pathname).toBe("/home");
+		expect(new URL(page.url()).pathname).toBe("/");
 		expect(await page.locator(FRAME).count()).toBe(1);
 		expect(await page.locator(".instant-v2-demo-command").isEnabled()).toBe(
 			true,
@@ -198,13 +198,13 @@ test("demo visits ignore saved CLI setup and cross-tab connection changes", asyn
 			);
 		});
 		await storageChanged;
-		expect(new URL(page.url()).pathname).toBe("/home");
+		expect(new URL(page.url()).pathname).toBe("/");
 		expect(connectionRequests).toEqual([]);
 		await page.reload();
 		await page
 			.locator('[data-instant-v2-demo-bar][data-stage="visible"]')
 			.waitFor();
-		expect(new URL(page.url()).pathname).toBe("/home");
+		expect(new URL(page.url()).pathname).toBe("/");
 		expect(connectionRequests).toEqual([]);
 	} finally {
 		await browser.close();

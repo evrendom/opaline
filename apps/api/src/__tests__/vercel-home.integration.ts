@@ -24,17 +24,17 @@ afterAll(async () => {
 	await sqlClient`DELETE FROM "user" WHERE id = ${userId}`;
 });
 
-async function openRoot(cookie = "", method = "GET") {
-	return fetch(new URL("/api/rpc?__opaline_path=/api/home", server.url), {
+async function openPage(cookie = "", method = "GET", path = "/api/home") {
+	return fetch(new URL(`/api/rpc?__opaline_path=${path}`, server.url), {
 		method,
 		headers: { Cookie: cookie },
 		redirect: "manual",
 	});
 }
 
-async function expectMarketing(cookie: string) {
+async function expectMarketing(cookie: string, path = "/api/home") {
 	for (const method of ["GET", "HEAD"]) {
-		const response = await openRoot(cookie, method);
+		const response = await openPage(cookie, method, path);
 		expect(response.status).toBe(200);
 		expect(response.headers.get("Location")).toBeNull();
 		expect(response.headers.get("X-Robots-Tag")).toBeNull();
@@ -42,6 +42,7 @@ async function expectMarketing(cookie: string) {
 		const html = await response.text();
 		if (method === "HEAD") expect(html).toBe("");
 		else {
+			expect(html).not.toMatch(/http-equiv=["']refresh/iu);
 			expect(html).toContain('rel="canonical" href="https://opaline.so/"');
 			expect(html).toContain(
 				'property="og:image" content="https://opaline.so/images/opaline-social.png"',
@@ -55,7 +56,47 @@ test("missing and invalid cookies serve indexable marketing at the root without 
 	await expectMarketing("better-auth.session_token=invalid");
 });
 
-test("valid root sessions open their workspace; expired sessions stay on the public root", async () => {
+async function expectPublicHomeRedirect(cookie: string) {
+	for (const method of ["GET", "HEAD"]) {
+		const response = await openPage(cookie, method, "/api/public-home");
+		expect(response.status).toBe(302);
+		expect(response.headers.get("Location")).toBe("/");
+		expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+		expect(response.headers.get("Vary")).toBe("Cookie");
+		expect(await response.text()).toBe("");
+	}
+}
+
+test("signed-out /home visits redirect to the public root without a redirect HTML page", async () => {
+	await expectPublicHomeRedirect("");
+	await expectPublicHomeRedirect("better-auth.session_token=invalid");
+	const response = await fetch(
+		new URL(
+			"/api/rpc?__opaline_path=/api/public-home&utm_source=qa",
+			server.url,
+		),
+		{ redirect: "manual" },
+	);
+	expect(response.status).toBe(302);
+	expect(response.headers.get("Location")).toBe("/?utm_source=qa");
+	const authQuery = await fetch(
+		new URL(
+			"/api/rpc?__opaline_path=/api/public-home&user_code=ABCD&redirect=signup&error=old&utm_source=qa",
+			server.url,
+		),
+		{ redirect: "manual" },
+	);
+	expect(authQuery.status).toBe(302);
+	expect(authQuery.headers.get("Location")).toBe("/?utm_source=qa");
+});
+
+test("public homepage routes reject writes", async () => {
+	const response = await openPage("", "POST", "/api/public-home");
+	expect(response.status).toBe(405);
+	expect(response.headers.get("Allow")).toBe("GET, HEAD");
+});
+
+test("signed-in users stay on /home, while root visits open the workspace and expired sessions return to /", async () => {
 	const signup = await fetch(new URL("/api/auth/sign-up/email", server.url), {
 		method: "POST",
 		headers: { "Content-Type": "application/json", Origin: "http://localhost" },
@@ -78,10 +119,12 @@ test("valid root sessions open their workspace; expired sessions stay on the pub
 		{ slug: string }[]
 	>`SELECT o.slug FROM organization o INNER JOIN member m ON m.organization_id = o.id WHERE m.user_id = ${userId} LIMIT 1`;
 	assert(workspace);
-	const signedIn = await openRoot(cookie);
+	const signedIn = await openPage(cookie);
 	expect(signedIn.status).toBe(302);
 	expect(signedIn.headers.get("Location")).toBe(`/${workspace.slug}/dashboard`);
 	expect(signedIn.headers.get("Cache-Control")).toBe("private, no-store");
+	await expectMarketing(cookie, "/api/public-home");
 	await sqlClient`UPDATE session SET expires_at = NOW() - INTERVAL '1 hour' WHERE user_id = ${userId}`;
+	await expectPublicHomeRedirect(cookie);
 	await expectMarketing(cookie);
 });
