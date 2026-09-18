@@ -27,9 +27,9 @@ export function SettingsLayout() {
 			className="@container/settings flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
 			data-slot="settings-layout"
 		>
-			<div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden px-6 py-4 sm:px-8 md:py-6 lg:px-10 @min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-8">
+			<div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden px-6 sm:px-8 lg:px-10 @min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-8">
 				<aside
-					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-none pt-6 @min-[640px]/settings:block"
+					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-none pb-4 pt-10 md:pb-6 md:pt-12 @min-[640px]/settings:block"
 					data-slot="settings-sidebar"
 				>
 					<nav aria-label="Settings sections" data-fluid-menu-root="">
@@ -56,7 +56,7 @@ export function SettingsLayout() {
 					</nav>
 				</aside>
 				<div
-					className="min-w-0 @min-[640px]/settings:hidden"
+					className="min-w-0 pt-4 @min-[640px]/settings:hidden"
 					data-slot="settings-mobile-navigation"
 				>
 					<Select
@@ -87,7 +87,7 @@ export function SettingsLayout() {
 					className="min-h-0 min-w-0 overflow-y-auto overscroll-none"
 					data-slot="settings-content"
 				>
-					<div className="settings-page-content">
+					<div className="settings-page-content @min-[640px]/settings:pt-4 md:pt-6">
 						<h1 className="settings-page-title">
 							{settingsRouteMap[activeRouteId].label}
 						</h1>
