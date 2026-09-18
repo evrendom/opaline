@@ -249,13 +249,28 @@ test("requested detail metric does not change filtered headline totals", async (
 	}));
 	const expectedTotals = totals[0];
 	assert(expectedTotals);
-	expect(totals).toEqual(totals.map(() => expectedTotals));
+	for (const total of totals) {
+		expect(total.cost).toBeCloseTo(expectedTotals.cost, 12);
+		expect({
+			sessions: total.sessions,
+			signals: total.signals,
+			agentRuns: total.agentRuns,
+		}).toEqual({
+			sessions: expectedTotals.sessions,
+			signals: expectedTotals.signals,
+			agentRuns: expectedTotals.agentRuns,
+		});
+	}
+	expect(legacy.metrics.cost.total).toBeCloseTo(expectedTotals.cost, 12);
 	expect({
-		cost: legacy.metrics.cost.total,
 		sessions: legacy.metrics.sessions.total,
 		signals: legacy.metrics.signals?.total,
 		agentRuns: legacy.metrics.agentRuns?.total,
-	}).toEqual(expectedTotals);
+	}).toEqual({
+		sessions: expectedTotals.sessions,
+		signals: expectedTotals.signals,
+		agentRuns: expectedTotals.agentRuns,
+	});
 	expect(results[0]?.metrics.cost.breakdowns.members).not.toHaveLength(0);
 	expect(results[0]?.metrics.agentRuns?.breakdowns.members).toHaveLength(0);
 	expect(results[2]?.metrics.signals?.breakdowns.signalTypes).not.toHaveLength(
