@@ -1,5 +1,6 @@
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
+import { ConversationTraceEventRow } from "../src/components/conversation/conversation-trace-event-row";
 import {
 	MAX_RENDERED_MESSAGE_BLOCKS,
 	MessageContent,
@@ -34,7 +35,21 @@ const root = createRoot(messageRoot);
 const renderStartedAt = performance.now();
 
 flushSync(() => {
-	root.render(<MessageContent content={adversarialContent} />);
+	root.render(
+		scenario === "collapsed-model" ? (
+			<ConversationTraceEventRow
+				event={{
+					kind: "message",
+					id: "collapsed-model",
+					text: `${"x".repeat(2_000)} end of model message`,
+					content: `${"x".repeat(2_000)} end of model message`,
+					timestamp: "2026-09-18T08:00:00.000Z",
+				}}
+			/>
+		) : (
+			<MessageContent content={adversarialContent} />
+		),
+	);
 });
 
 requestAnimationFrame(() => {
