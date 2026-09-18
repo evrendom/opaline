@@ -53,7 +53,6 @@ flushSync(() => {
 });
 
 requestAnimationFrame(() => {
-	renderResult.dataset.complete = "true";
 	renderResult.dataset.durationMs = String(performance.now() - renderStartedAt);
 	renderResult.dataset.domNodes = String(
 		messageRoot.querySelectorAll("*").length,
@@ -74,6 +73,7 @@ requestAnimationFrame(() => {
 	);
 	renderResult.dataset.maxMessageBlocks = String(MAX_RENDERED_MESSAGE_BLOCKS);
 	renderResult.textContent = "Rendered";
+	renderResult.dataset.complete = "true";
 });
 
 function createAdversarialArrayContent() {
