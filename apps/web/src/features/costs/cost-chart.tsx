@@ -76,6 +76,9 @@ const SERIES_COLORS = [
 	"oklch(0.60 0.02 260)", // Unknown duration
 ];
 const SIGNAL_COLORS: Record<string, string> = {
+	modelApologies: SERIES_COLORS[3],
+	userPositive: SERIES_COLORS[2],
+	userNegative: SERIES_COLORS[1],
 	positive: SERIES_COLORS[2],
 	negative: SERIES_COLORS[1],
 	mixed: SERIES_COLORS[3],
@@ -87,6 +90,7 @@ type Props = {
 	pending: boolean;
 	metric: DashboardMetric;
 	runSignals: CostDashboardInput["runSignals"];
+	signalTypes: CostDashboardInput["signalTypes"];
 	interval: ChartInterval;
 	onMetricChange: (metric: DashboardMetric) => void;
 	splitBy: CostDashboardInput["splitBy"];
@@ -100,6 +104,7 @@ export function CostChart({
 	onResetSplit,
 	metric,
 	runSignals,
+	signalTypes,
 	onMetricChange,
 	interval,
 }: Props) {
@@ -114,19 +119,20 @@ export function CostChart({
 	const intervalLabel = CHART_INTERVALS.find(
 		(option) => option.value === interval,
 	)?.label;
+	const signalDimension = metric === "signals" ? "signalTypes" : "runSignals";
+	const selectedSignals = metric === "signals" ? signalTypes : runSignals;
+	const isSignalMetric = metric === "signals" || metric === "agentRuns";
 	const series =
 		data?.series.map((entry, index) => {
 			// Series IDs follow ranking; use the breakdown's signal identity so
 			// dates and filters cannot swap the semantic colors.
 			const signalType =
-				metric === "agentRuns" && splitBy === "runSignals"
-					? data.breakdowns.runSignals.find(
+				isSignalMetric && splitBy === signalDimension
+					? data.breakdowns[signalDimension].find(
 							(signal) => signal.label === entry.label,
 						)?.id
-					: metric === "agentRuns" &&
-							splitBy === "none" &&
-							runSignals.length === 1
-						? runSignals[0]
+					: isSignalMetric && splitBy === "none" && selectedSignals.length === 1
+						? selectedSignals[0]
 						: undefined;
 			return {
 				...entry,

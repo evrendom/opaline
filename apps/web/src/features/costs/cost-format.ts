@@ -16,6 +16,7 @@ export const DASHBOARD_METRICS: DashboardMetric[] = [
 	"cost",
 	"sessions",
 	"agentRuns",
+	"signals",
 ];
 export function getMetricData(
 	data: CostDashboard | undefined,

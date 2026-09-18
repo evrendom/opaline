@@ -2,6 +2,7 @@ import type {
 	CostDashboardInput,
 	CostDimension,
 	DashboardMetric,
+	DashboardSignal,
 } from "@rudel/api-routes";
 import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
 import { useSearchParams } from "react-router-dom";
@@ -10,6 +11,7 @@ import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuer
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
+import { DASHBOARD_METRICS } from "./cost-format";
 
 export const COST_DIMENSIONS: CostDimension[] = [
 	"members",
@@ -21,7 +23,12 @@ export const RUN_DIMENSIONS: CostDimension[] = [
 	"durations",
 	"skillsUsed",
 ];
-export const ALL_COST_DIMENSIONS = [...RUN_DIMENSIONS, ...COST_DIMENSIONS];
+export const SIGNAL_DIMENSIONS: CostDimension[] = ["signalTypes", "phrases"];
+export const ALL_COST_DIMENSIONS = [
+	...RUN_DIMENSIONS,
+	...SIGNAL_DIMENSIONS,
+	...COST_DIMENSIONS,
+];
 export const COST_LABELS = {
 	members: "Members",
 	repositories: "Repositories",
@@ -38,17 +45,17 @@ export function useCostDashboard() {
 	const { state: workspace } = useOrganization();
 	const [params, setParams] = useSearchParams();
 	const selectedMetric = params.get("metric");
-	const metric: DashboardMetric =
-		selectedMetric === "sessions"
-			? "sessions"
-			: selectedMetric === "agentRuns" || selectedMetric === "signals"
-				? "agentRuns"
-				: "cost";
+	const metric =
+		DASHBOARD_METRICS.find((value) => value === selectedMetric) ?? "cost";
 	const interval =
 		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
 			?.value ?? "daily";
 	const dimensions =
-		metric === "agentRuns" ? ALL_COST_DIMENSIONS : COST_DIMENSIONS;
+		metric === "agentRuns"
+			? [...RUN_DIMENSIONS, ...COST_DIMENSIONS]
+			: metric === "signals"
+				? [...SIGNAL_DIMENSIONS, ...COST_DIMENSIONS]
+				: COST_DIMENSIONS;
 	const split = params.get("split");
 	const splitBy = dimensions.find((dimension) => dimension === split) ?? "none";
 	const input: CostDashboardInput = {
@@ -59,8 +66,21 @@ export function useCostDashboard() {
 		repositories: params.getAll("repo").slice(0, 100).sort(),
 		models: params.getAll("model").slice(0, 100).sort(),
 
-		signalTypes: [],
-		phrases: [],
+		signalTypes:
+			metric === "signals"
+				? params
+						.getAll("signal")
+						.filter(
+							(value): value is DashboardSignal =>
+								value === "modelApologies" ||
+								value === "userPositive" ||
+								value === "userNegative",
+						)
+						.slice(0, 3)
+						.sort()
+				: [],
+		phrases:
+			metric === "signals" ? params.getAll("phrase").slice(0, 100).sort() : [],
 		runSignals:
 			metric === "agentRuns"
 				? AGENT_RUN_SIGNALS.filter(({ id }) =>
@@ -89,9 +109,9 @@ export function useCostDashboard() {
 				: undefined,
 		refetchOnWindowFocus: false,
 		refetchInterval:
-			metric === "agentRuns"
+			metric === "agentRuns" || metric === "signals"
 				? (query) =>
-						query.state.data && query.state.data.metrics.agentRuns === null
+						query.state.data && query.state.data.metrics[metric] === null
 							? 5_000
 							: false
 				: false,
