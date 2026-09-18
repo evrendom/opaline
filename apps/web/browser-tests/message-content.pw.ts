@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
 	MAX_FORMATTED_MESSAGE_PARTS,
 	MAX_HIGHLIGHTED_CODE_BLOCKS,
@@ -57,19 +57,13 @@ for (const scenario of ["array", "code", "large-code", "xml"]) {
 			await expect(page.getByText(/array-tail-visible/)).toBeVisible();
 		}
 
-		const durationMs = Number(
-			await renderResult.getAttribute("data-duration-ms"),
-		);
-		const domNodes = Number(await renderResult.getAttribute("data-dom-nodes"));
-		const codeBlocks = Number(
-			await renderResult.getAttribute("data-code-blocks"),
-		);
-		const highlightedCodeBlocks = Number(
-			await renderResult.getAttribute("data-highlighted-code-blocks"),
-		);
-		const xmlBlocks = Number(
-			await renderResult.getAttribute("data-xml-blocks"),
-		);
+		const {
+			durationMs,
+			domNodes,
+			codeBlocks,
+			highlightedCodeBlocks,
+			xmlBlocks,
+		} = await readRenderMetrics(page);
 
 		expect(durationMs).toBeLessThan(MAX_BROWSER_RENDER_MS);
 		expect(domNodes).toBeLessThan(MAX_BROWSER_DOM_NODES);
@@ -91,6 +85,25 @@ for (const scenario of ["array", "code", "large-code", "xml"]) {
 	});
 }
 
+test("reads completed metrics when the fixture reloads after its readiness check", async ({
+	page,
+}) => {
+	await page.goto("/browser-tests/message-content.html?scenario=code");
+	await expect(page.locator("#render-result")).toHaveAttribute(
+		"data-complete",
+		"true",
+	);
+	await page.route("**/message-content-harness.tsx", async (route) => {
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		await route.continue();
+	});
+	await page.reload({ waitUntil: "commit" });
+	const metrics = await readRenderMetrics(page);
+	expect(metrics.codeBlocks).toBe(MAX_FORMATTED_MESSAGE_PARTS);
+	expect(metrics.domNodes).toBeGreaterThan(0);
+	expect(metrics.durationMs).toBeGreaterThan(0);
+});
+
 test("caps the outer message block loop", async ({ page }) => {
 	await page.goto("/browser-tests/message-content.html?scenario=blocks");
 
@@ -100,12 +113,7 @@ test("caps the outer message block loop", async ({ page }) => {
 		"Additional content not shown (1 block omitted).",
 	);
 
-	const textBlocks = Number(
-		await renderResult.getAttribute("data-text-blocks"),
-	);
-	const maxMessageBlocks = Number(
-		await renderResult.getAttribute("data-max-message-blocks"),
-	);
+	const { textBlocks, maxMessageBlocks } = await readRenderMetrics(page);
 
 	expect(textBlocks).toBe(maxMessageBlocks);
 });
@@ -131,3 +139,33 @@ test("renders repeated XML fields without duplicate React keys", async ({
 
 	expect(duplicateKeyErrors).toEqual([]);
 });
+
+async function readRenderMetrics(page: Page) {
+	// Vite can reload after a readiness assertion. Resolve a completed result
+	// again and read every measurement in the same browser task.
+	return page
+		.locator('#render-result[data-complete="true"]')
+		.evaluate((result) => {
+			function readMetric(name: string) {
+				const raw = result.getAttribute(name);
+				if (
+					raw === null ||
+					raw.trim() === "" ||
+					!Number.isFinite(Number(raw))
+				) {
+					throw new Error(`Missing or invalid render metric: ${name}`);
+				}
+				return Number(raw);
+			}
+
+			return {
+				durationMs: readMetric("data-duration-ms"),
+				domNodes: readMetric("data-dom-nodes"),
+				codeBlocks: readMetric("data-code-blocks"),
+				highlightedCodeBlocks: readMetric("data-highlighted-code-blocks"),
+				xmlBlocks: readMetric("data-xml-blocks"),
+				textBlocks: readMetric("data-text-blocks"),
+				maxMessageBlocks: readMetric("data-max-message-blocks"),
+			};
+		});
+}
