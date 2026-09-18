@@ -9,6 +9,38 @@ import {
 const MAX_BROWSER_RENDER_MS = 5_000;
 const MAX_BROWSER_DOM_NODES = 20_000;
 
+test("collapsed model text wraps long tokens within its reading width", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto(
+		"/browser-tests/message-content.html?scenario=collapsed-model",
+	);
+	const preview = page.locator("[data-trace-text-preview]");
+	await expect(preview).toBeVisible();
+	const bounds = await preview.evaluate((element) => {
+		const leading = element.querySelector("[data-trace-text-preview-leading]");
+		if (!leading) throw new Error("Collapsed preview text is missing");
+		const range = document.createRange();
+		range.selectNodeContents(leading);
+		return {
+			limit: Number.parseFloat(getComputedStyle(element).maxWidth),
+			textWidth: Math.max(
+				...Array.from(range.getClientRects(), (r) => r.width),
+			),
+		};
+	});
+	expect(bounds.limit).toBeGreaterThan(0);
+	expect(bounds.textWidth).toBeLessThanOrEqual(bounds.limit + 1);
+	await expect(page.locator("[data-trace-text-preview-leading]")).toHaveText(
+		"x".repeat(1_500),
+	);
+	await page.locator("[data-trace-content-disclosure]").click();
+	await expect(page.locator("[data-trace-expanded-content]")).toContainText(
+		`${"x".repeat(2_000)} end of model message`,
+	);
+});
+
 for (const scenario of ["array", "code", "large-code", "xml"]) {
 	test(`bounds maximum-size adversarial ${scenario} rendering`, async ({
 		page,

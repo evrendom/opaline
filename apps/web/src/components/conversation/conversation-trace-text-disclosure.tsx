@@ -101,7 +101,9 @@ export function TraceTextCollapsedPreview({
 	return (
 		<span
 			className={
-				trailingContent ? "inline" : "grid min-w-0 max-w-[65ch] gap-0.5"
+				trailingContent
+					? "inline"
+					: "grid min-w-0 max-w-[65ch] grid-cols-1 gap-0.5"
 			}
 			data-trace-text-preview
 		>
