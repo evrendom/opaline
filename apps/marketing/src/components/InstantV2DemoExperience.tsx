@@ -509,14 +509,10 @@ export function InstantV2DemoExperience() {
 								</mask>
 							</svg>
 							<span className="instant-v2-demo-copy-full">
-								{isCopying
-									? "Copying…"
-									: isCopied
-										? "Copied!"
-										: onboarding.displayCommand}
+								{onboarding.displayCommand}
 							</span>
 							<span aria-hidden="true" className="instant-v2-demo-copy-short">
-								{isCopying ? "Copying…" : isCopied ? "Copied!" : "npx…"}
+								npx…
 							</span>
 						</span>
 					</button>

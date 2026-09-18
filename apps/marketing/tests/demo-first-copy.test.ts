@@ -4,7 +4,7 @@ import { CliConnectionCreateResponseSchema } from "../../../packages/api-routes/
 import { openDemoPreview } from "./demo-preview";
 
 for (const engine of ["chrome", "webkit"]) {
-	test(`${engine}: the first Copy click shows progress and copies its complete pairing command`, async () => {
+	test(`${engine}: the first Copy click preserves the command label and copies its complete pairing command`, async () => {
 		const browser =
 			engine === "chrome"
 				? await chromium.launch({ channel: "chrome", headless: true })
@@ -32,12 +32,13 @@ for (const engine of ["chrome", "webkit"]) {
 					response.request().method() === "POST",
 			);
 			const button = page.locator(".instant-v2-demo-command");
+			const label = await button.innerText();
 			await button.click();
 			await page
 				.getByRole("button", { name: "Copying setup command…" })
 				.waitFor();
 			expect(await button.getAttribute("aria-busy")).toBe("true");
-			expect(await button.innerText()).toContain("Copying…");
+			expect(await button.innerText()).toBe(label);
 			expect(await button.isDisabled()).toBe(true);
 			const pairing = await response;
 			expect(pairing.status()).toBe(200);
@@ -50,7 +51,8 @@ for (const engine of ["chrome", "webkit"]) {
 					exact: true,
 				})
 				.waitFor();
-			expect(await button.innerText()).toContain("Copied!");
+			expect(await button.innerText()).toBe(label);
+			expect(await button.getAttribute("data-copied")).toBe("true");
 			expect(pairings).toBe(1);
 			let command: string;
 			if (engine === "chrome") {
