@@ -1,3 +1,6 @@
 {
-	"extends": "./api/tsconfig.json"
+	"extends": "./api/tsconfig.json",
+	"compilerOptions": {
+		"noCheck": false
+	}
 }

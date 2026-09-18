@@ -1,6 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "bun run build:site",
+	"buildCommand": "bun run check-types:vercel && bun run build:site",
 	"bunVersion": "1.x",
 	"git": {
 		"deploymentEnabled": false
