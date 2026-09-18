@@ -15,12 +15,18 @@ import {
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildSessionLanguageSignalRow,
 	insertSessionLanguageSignalRows,
 } from "./session-language-signal-persistence.service.js";
 import { scanSessionLanguageSignalsOffThread } from "./session-language-signal-scanner.service.js";
+import type { SessionLanguageSignalScan } from "./session-language-signal-summary.js";
 
+const CURRENT_SCAN_VERSION = Math.max(
+	SCAN_VERSION,
+	SESSION_AGENT_RUN_SCAN_VERSION,
+);
 const logger = getLogger([
 	"rudel",
 	"api",
@@ -77,7 +83,9 @@ export interface LanguageSignalReconciliationEnvironment {
 	) => Promise<readonly StaleSessionLanguageSignalRow[]>;
 	readonly scan: (
 		content: string,
-	) => Promise<LanguageSignalCounts | LanguageSignalSummary>;
+	) => Promise<
+		LanguageSignalCounts | LanguageSignalSummary | SessionLanguageSignalScan
+	>;
 }
 
 export interface LanguageSignalReconciliationResult {
@@ -234,13 +242,17 @@ export async function reconcileSessionLanguageSignalsOnce(
 	batchSize: number,
 	env: LanguageSignalReconciliationEnvironment = createDefaultEnvironment(),
 ): Promise<LanguageSignalReconciliationResult> {
-	const staleRows = await env.queryStaleRows(SCAN_VERSION, batchSize, 0);
+	const staleRows = await env.queryStaleRows(
+		CURRENT_SCAN_VERSION,
+		batchSize,
+		0,
+	);
 	if (staleRows.length === 0) {
 		return { failed: 0, remainingLag: 0, rescanned: 0 };
 	}
 
 	const { failed, rescanned } = await reconcileStaleRows(staleRows, env);
-	const remainingLag = await env.queryLagCount(SCAN_VERSION);
+	const remainingLag = await env.queryLagCount(CURRENT_SCAN_VERSION);
 	return { failed, remainingLag, rescanned };
 }
 
@@ -268,7 +280,7 @@ export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 			break;
 		}
 		const staleRows = await env.queryStaleRows(
-			SCAN_VERSION,
+			CURRENT_SCAN_VERSION,
 			batchSize,
 			failedRowOffset,
 		);
@@ -301,7 +313,7 @@ export async function reconcileSessionLanguageSignalsUntilCaughtUp(
 	}
 
 	if (discoveredRows && hasMaintenanceTimeRemaining(deadline)) {
-		remainingLag = await env.queryLagCount(SCAN_VERSION);
+		remainingLag = await env.queryLagCount(CURRENT_SCAN_VERSION);
 	} else if (!hasMaintenanceTimeRemaining(deadline)) {
 		deadlineStopped = true;
 		remainingLag = Math.max(1, remainingLag);

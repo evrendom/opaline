@@ -43,6 +43,16 @@ import {
 } from "./schemas/cost-dashboard.js";
 
 export {
+	AGENT_RUN_DURATIONS,
+	AGENT_RUN_SIGNALS,
+	type AgentRunDuration,
+	AgentRunDurationSchema,
+	type AgentRunSignal,
+	AgentRunSignalSchema,
+	getAgentRunDuration,
+} from "./schemas/agent-runs.js";
+
+export {
 	type CostBreakdownEntry,
 	type CostDashboard,
 	type CostDashboardInput,

@@ -67,7 +67,14 @@ export function CostBreakdown({
 	const [search, setSearch] = useState("");
 	const [menuOpen, setMenuOpen] = useState(false);
 	const label = COST_LABELS[dimension];
-	const countLabel = dimension === "phrases" ? "phrases" : label.toLowerCase();
+	const countLabel =
+		dimension === "durations"
+			? "ranges"
+			: dimension === "runSignals" || dimension === "skillsUsed"
+				? "options"
+				: dimension === "phrases"
+					? "phrases"
+					: label.toLowerCase();
 	const total = entries.reduce((sum, row) => sum + row.value, 0);
 	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
 	const filtered = entries.filter((entry) =>
@@ -84,7 +91,19 @@ export function CostBreakdown({
 				aria-busy={pending}
 			>
 				<div className="cost-breakdown-heading">
-					<h2>{label}</h2>
+					<h2
+						title={
+							dimension === "runSignals"
+								? "Signal in the immediately following user reply. No signal means a reply without detected positive or negative feedback; No reply means no following user message."
+								: dimension === "durations"
+									? "Elapsed time from user prompt to final assistant message, including waits. Unknown duration is counted separately."
+									: dimension === "skillsUsed"
+										? "Whether the run contains a recorded skill invocation."
+										: undefined
+						}
+					>
+						{label}
+					</h2>
 					<div>
 						{metric === "cost" ? (
 							<>
@@ -104,7 +123,7 @@ export function CostBreakdown({
 						<BreakdownSkeleton />
 					) : entries.length ? (
 						entries
-							.slice(0, 7)
+							.slice(0, dimension === "durations" ? entries.length : 7)
 							.map((entry) => (
 								<BreakdownRow
 									key={entry.id}
@@ -120,7 +139,7 @@ export function CostBreakdown({
 					) : (
 						<p className="cost-breakdown-empty">
 							{unavailable
-								? "Not tracked yet"
+								? "Still being indexed…"
 								: `No matching ${label.toLowerCase()}.`}
 						</p>
 					)}
@@ -193,8 +212,8 @@ export function CostBreakdown({
 					<DialogTitle>{label}</DialogTitle>
 					<DialogDescription>
 						Select {label.toLowerCase()} to filter{" "}
-						{metric === "cost" ? "costs" : metric}. Selections combine with your
-						other filters.
+						{metric === "cost" ? "costs" : METRIC_LABELS[metric].toLowerCase()}.
+						Selections combine with your other filters.
 					</DialogDescription>
 					<input
 						type="search"
@@ -346,6 +365,7 @@ function EntryIcon({
 				strokeWidth={1.5}
 			/>
 		);
+	if (dimension !== "models") return null;
 	const tone = getModelBadgeTone(entry.id);
 	if (tone.icon === "claude")
 		return <ClaudeModelIcon className="size-4 shrink-0" />;

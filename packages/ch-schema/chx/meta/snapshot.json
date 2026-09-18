@@ -451,6 +451,11 @@
 					"type": "UInt16"
 				},
 				{
+					"name": "agent_runs",
+					"type": "Array(Tuple(String, DateTime64(3, 'UTC'), Float64, String, UInt8, String))",
+					"default": "fn:[]"
+				},
+				{
 					"name": "member_negative",
 					"type": "UInt32",
 					"default": "fn:0"

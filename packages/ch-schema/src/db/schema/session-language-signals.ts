@@ -18,6 +18,11 @@ const rudel_session_language_signals = table({
 		},
 		{ name: "raw_ingested_at", type: "DateTime64(3, 'UTC')" },
 		{ name: "scan_version", type: "UInt16" },
+		{
+			name: "agent_runs",
+			type: "Array(Tuple(String, DateTime64(3, 'UTC'), Float64, String, UInt8, String))",
+			default: "fn:[]",
+		},
 		{ name: "member_negative", type: "UInt32", default: "fn:0" },
 		{ name: "member_swears", type: "UInt32" },
 		{ name: "member_apologies", type: "UInt32" },

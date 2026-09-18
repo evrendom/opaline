@@ -11,15 +11,22 @@ import {
 	summarize,
 	summarizeWithMatches,
 } from "@rudel/language-signals";
+import {
+	captureSessionAgentRuns,
+	type SessionAgentRun,
+} from "./session-agent-runs.js";
+
+export interface SessionLanguageSignalScan extends LanguageSignalSummary {
+	readonly agentRuns: readonly SessionAgentRun[];
+}
 
 function getVisibleSessionLanguageSignalText(content: string) {
 	const compactionMetadata = extractSessionCompactionMetadata(content);
 	const visibleTrace = buildConversationTrace(
 		parseConversations(content),
 	).filter((item) => !compactionMetadata.hiddenTraceItemIds.has(item.id));
-	const memberText = groupTraceIntoTurns(visibleTrace)
-		.map(getSessionTurnMemberText)
-		.filter(Boolean);
+	const turns = groupTraceIntoTurns(visibleTrace);
+	const memberText = turns.map(getSessionTurnMemberText).filter(Boolean);
 	const modelText = visibleTrace.flatMap((item) =>
 		item.kind === "agent"
 			? item.events.flatMap((event) =>
@@ -28,7 +35,7 @@ function getVisibleSessionLanguageSignalText(content: string) {
 			: [],
 	);
 
-	return { memberText, modelText };
+	return { memberText, modelText, turns };
 }
 
 export function summarizeSessionLanguageSignals(
@@ -41,4 +48,14 @@ export function captureSessionLanguageSignals(
 	content: string,
 ): LanguageSignalSummary {
 	return summarizeWithMatches(getVisibleSessionLanguageSignalText(content));
+}
+
+export function captureSessionLanguageSignalsWithRuns(
+	content: string,
+): SessionLanguageSignalScan {
+	const visible = getVisibleSessionLanguageSignalText(content);
+	return {
+		...summarizeWithMatches(visible),
+		agentRuns: captureSessionAgentRuns(content, visible.turns),
+	};
 }

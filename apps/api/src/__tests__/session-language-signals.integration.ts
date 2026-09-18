@@ -7,6 +7,7 @@ import {
 import { SCAN_VERSION } from "@rudel/language-signals";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { deleteOrgSessions } from "../services/org-session.service.js";
+import { SESSION_AGENT_RUN_SCAN_VERSION } from "../services/session-agent-runs.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import {
 	buildSessionLanguageSignalRow,
@@ -260,7 +261,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 			model_apology_counts: { sorry: 2 },
 			model_positive: 0,
 			model_swears: 1,
-			scan_version: SCAN_VERSION,
+			scan_version: Math.max(SCAN_VERSION, SESSION_AGENT_RUN_SCAN_VERSION),
 		});
 	});
 

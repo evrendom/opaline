@@ -109,9 +109,12 @@ export function CostDashboardPage() {
 						<CostChart
 							data={data}
 							metric={metric}
+							runSignals={input.runSignals}
 							signalTypes={input.signalTypes}
 							interval={interval}
 							onMetricChange={setMetric}
+							onRefresh={() => query.refetch()}
+							refreshing={query.isFetching && !isPending}
 							pending={isPending}
 							splitBy={data?.splitBy ?? input.splitBy}
 							onResetSplit={() => setSplit("none")}

@@ -202,6 +202,7 @@ export type RudelSessionLanguageSignalsRow = {
   raw_revision: string
   raw_ingested_at: string
   scan_version: number
+  agent_runs: [string, string, number, string, number, string][]
   member_negative: number
   member_swears: number
   member_apologies: number
@@ -231,6 +232,7 @@ export const RudelSessionLanguageSignalsRowSchema = z.object({
   raw_revision: z.string(),
   raw_ingested_at: z.string(),
   scan_version: z.number(),
+  agent_runs: z.array(z.tuple([z.string(), z.string(), z.number(), z.string(), z.number(), z.string()])),
   member_negative: z.number(),
   member_swears: z.number(),
   member_apologies: z.number(),

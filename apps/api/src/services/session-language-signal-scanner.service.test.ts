@@ -28,6 +28,7 @@ describe("session language-signal scanner", () => {
 				SessionLanguageSignalScannerOperationalError,
 			);
 			await expect(scanner.scan("")).resolves.toEqual({
+				agentRuns: [],
 				model_apology_counts: {},
 				member_negative_counts: {},
 				member_positive_counts: {},

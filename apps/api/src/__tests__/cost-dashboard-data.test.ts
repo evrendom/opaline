@@ -371,3 +371,133 @@ test("unscanned language remains unknown, including when a verbatim filter has n
 	expect(result.metrics.signals).toBeNull();
 	expect(result.metrics.cost.total).toBe(10);
 });
+
+test("agent runs include no-signal runs once and preserve all fixed duration ranges", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				dimension: "members",
+				id: "alice",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "runSignals",
+				id: "none",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "durations",
+				id: "12hPlus",
+				value: 1,
+				matched_value: 1,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "durations",
+				id: "under1m",
+				value: 3,
+				matched_value: 3,
+			}),
+		],
+		{ ...input, splitBy: "durations" },
+		members,
+	).metrics.agentRuns;
+	expect(result?.total).toBe(4);
+	expect(result?.breakdowns.durations.map((entry) => entry.value)).toEqual([
+		3, 0, 0, 0, 0, 0, 0, 1, 0,
+	]);
+	expect(result?.series.map((entry) => entry.label)).toEqual([
+		"Under 1 minute",
+		"1–5 minutes",
+		"5–15 minutes",
+		"15–30 minutes",
+		"30–60 minutes",
+		"1–3 hours",
+		"3–12 hours",
+		"12 hours+",
+		"Unknown duration",
+	]);
+	expect(
+		result?.breakdowns.runSignals.find((entry) => entry.id === "none")?.value,
+	).toBe(4);
+	expect(result?.breakdowns.skillsUsed.map((entry) => entry.label)).toEqual([
+		"Yes",
+		"No",
+	]);
+});
+
+test("outdated run summaries remain unknown rather than zero", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				value: 0,
+				matched_value: 0,
+				incomplete: 1,
+				matched_incomplete: 1,
+			}),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.agentRuns).toBeNull();
+	expect(buildCostDashboard([], input, members).metrics.agentRuns?.total).toBe(
+		0,
+	);
+});
+
+test("keeps indexed runs visible with session-level indexing coverage", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				dimension: "headline",
+				id: "",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "members",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexed",
+				value: 2,
+				matched_value: 2,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexing",
+				value: 1,
+				matched_value: 1,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "unavailable",
+				value: 1,
+				matched_value: 1,
+			}),
+		],
+		{ ...input, requestedMetric: "agentRuns" },
+		members,
+	).metrics.agentRuns;
+
+	expect(result?.total).toBe(3);
+	expect(result?.incomplete).toBe(true);
+	expect(result?.coverage).toEqual({
+		indexedSessions: 2,
+		indexingSessions: 1,
+		unavailableSessions: 1,
+	});
+});

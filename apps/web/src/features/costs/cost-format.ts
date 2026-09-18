@@ -10,12 +10,14 @@ export const METRIC_LABELS = {
 	sessions: "Sessions",
 	commits: "Commits",
 	signals: "Language signals",
+	agentRuns: "Agent runs",
 };
-export const DASHBOARD_METRICS: DashboardMetric[] = [
+export const DASHBOARD_METRICS = [
 	"cost",
 	"sessions",
+	"agentRuns",
 	"signals",
-];
+] as const satisfies readonly DashboardMetric[];
 export function getMetricData(
 	data: CostDashboard | undefined,
 	metric: DashboardMetric,

@@ -6,11 +6,12 @@ import type {
 	DashboardMetric,
 	DashboardMetricData,
 } from "@rudel/api-routes";
+import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
 
 export interface CostAggregateRow {
-	metric: Exclude<DashboardMetric, "commits">;
+	metric: Exclude<DashboardMetric, "commits"> | "agentRunCoverage";
 	date: string;
-	dimension: CostDimension;
+	dimension: CostDimension | "headline" | "coverage";
 	id: string;
 	value: number;
 	incomplete: number;
@@ -28,6 +29,9 @@ const DIMENSIONS: CostDimension[] = [
 	"models",
 	"signalTypes",
 	"phrases",
+	"runSignals",
+	"durations",
+	"skillsUsed",
 ];
 const SIGNAL_LABELS: Record<string, string> = {
 	modelApologies: "Model apologies",
@@ -42,11 +46,13 @@ export function buildCostDashboard(
 	members: ReadonlyMap<string, MemberLabel>,
 ): CostDashboard {
 	// Signal-only splits do not alter cost/session totals in the metric strip.
-	const baseInput =
-		input.splitBy === "signalTypes" || input.splitBy === "phrases"
-			? { ...input, splitBy: "none" as const }
-			: input;
+	const baseInput = !["none", "members", "repositories", "models"].includes(
+		input.splitBy,
+	)
+		? { ...input, splitBy: "none" as const }
+		: input;
 	return {
+		requestedMetric: input.requestedMetric,
 		splitBy: input.splitBy,
 		metrics: {
 			cost: buildMetric(
@@ -62,9 +68,87 @@ export function buildCostDashboard(
 				"Sessions",
 			),
 			commits: null,
-			signals: buildSignal(rows, input, members),
+			signals: buildSignal(
+				rows,
+				input.splitBy === "runSignals" ||
+					input.splitBy === "durations" ||
+					input.splitBy === "skillsUsed"
+					? baseInput
+					: input,
+				members,
+			),
+			agentRuns: buildAgentRuns(rows, input, members),
 		},
 	};
+}
+
+function buildAgentRuns(
+	rows: CostAggregateRow[],
+	input: CostDashboardInput,
+	members: ReadonlyMap<string, MemberLabel>,
+): DashboardMetricData | null {
+	const runs = rows.filter((row) => row.metric === "agentRuns");
+	const runHeadlineRows = rows.some(
+		(row) => row.metric === "agentRuns" && row.dimension === "headline",
+	)
+		? runs.filter((row) => row.dimension === "headline")
+		: runs;
+	// Preserve the original all-or-nothing contract for deployed clients that do
+	// not send requestedMetric. Current clients can render fresh runs alongside
+	// explicit scan coverage.
+	if (
+		input.requestedMetric === undefined &&
+		runHeadlineRows.some((row) => Number(row.matched_incomplete) > 0)
+	)
+		return null;
+	const result = buildMetric(
+		runs,
+		input.splitBy === "signalTypes" || input.splitBy === "phrases"
+			? { ...input, splitBy: "none" }
+			: input,
+		members,
+		"Agent runs",
+	);
+	const coverageRows = rows.filter(
+		(row) => row.metric === "agentRunCoverage" && row.dimension === "coverage",
+	);
+	if (coverageRows.length > 0) {
+		const coverage = {
+			indexedSessions: 0,
+			indexingSessions: 0,
+			unavailableSessions: 0,
+		};
+		for (const row of coverageRows) {
+			const count = Number(row.matched_value);
+			if (row.id === "indexed") coverage.indexedSessions += count;
+			else if (row.id === "indexing") coverage.indexingSessions += count;
+			else if (row.id === "unavailable") coverage.unavailableSessions += count;
+		}
+		result.coverage = coverage;
+		result.incomplete ||=
+			coverage.indexingSessions > 0 || coverage.unavailableSessions > 0;
+	}
+	const fixed = {
+		runSignals: AGENT_RUN_SIGNALS,
+		durations: AGENT_RUN_DURATIONS,
+		skillsUsed: [
+			{ id: "yes", label: "Yes" },
+			{ id: "no", label: "No" },
+		],
+	};
+	for (const dimension of ["runSignals", "durations", "skillsUsed"] as const) {
+		result.breakdowns[dimension] = fixed[dimension].map(
+			({ id, label }) =>
+				result.breakdowns[dimension].find((entry) => entry.id === id) ?? {
+					id,
+					label,
+					value: 0,
+					incomplete: false,
+					image: null,
+				},
+		);
+	}
+	return result;
 }
 
 function buildSignal(
@@ -72,18 +156,15 @@ function buildSignal(
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
 ): DashboardMetricData | null {
-	if (
-		rows.some(
-			(row) => row.metric === "signals" && Number(row.matched_incomplete) > 0,
-		)
+	const signalRows = rows.filter((row) => row.metric === "signals");
+	const signalHeadlineRows = signalRows.some(
+		(row) => row.dimension === "headline",
 	)
+		? signalRows.filter((row) => row.dimension === "headline")
+		: signalRows;
+	if (signalHeadlineRows.some((row) => Number(row.matched_incomplete) > 0))
 		return null;
-	const result = buildMetric(
-		rows.filter((row) => row.metric === "signals"),
-		input,
-		members,
-		"Language signals",
-	);
+	const result = buildMetric(signalRows, input, members, "Language signals");
 	// Keep the three known categories selectable even when another filter leaves
 	// one at zero. Phrase choices remain limited to actual matched text.
 	for (const [id, label] of Object.entries(SIGNAL_LABELS)) {
@@ -115,6 +196,9 @@ function buildMetric(
 		models: [],
 		signalTypes: [],
 		phrases: [],
+		runSignals: [],
+		durations: [],
+		skillsUsed: [],
 	};
 	for (const dimension of DIMENSIONS) {
 		const entries = new Map<string, CostBreakdownEntry>();
@@ -145,13 +229,21 @@ function buildMetric(
 			Number(row.matched_rows) > 0 &&
 			(chartDimension !== "phrases" || Boolean(row.id)),
 	);
+	const headlineRows = rows.some((row) => row.dimension === "headline")
+		? rows.filter((row) => row.dimension === "headline")
+		: chartRows;
 	const totals = new Map<string, number>();
 	for (const row of chartRows)
 		totals.set(row.id, (totals.get(row.id) ?? 0) + Number(row.matched_value));
-	const ranked = [...totals].sort(
-		(a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
-	);
-	const named = ranked.slice(0, MAX_NAMED_SERIES);
+	const ranked =
+		chartDimension === "durations"
+			? AGENT_RUN_DURATIONS.map(({ id }) => [id, totals.get(id) ?? 0] as const)
+			: [...totals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+	const limit =
+		chartDimension === "durations"
+			? AGENT_RUN_DURATIONS.length
+			: MAX_NAMED_SERIES;
+	const named = ranked.slice(0, limit);
 	const series =
 		splitBy === "none"
 			? [{ id: "total", label }]
@@ -159,7 +251,7 @@ function buildMetric(
 					id: `series-${index}`,
 					label: labelFor(chartDimension, id, members),
 				}));
-	if (splitBy !== "none" && ranked.length > MAX_NAMED_SERIES)
+	if (splitBy !== "none" && ranked.length > limit)
 		series.push({ id: "other", label: "Other" });
 	const seriesId = new Map(named.map(([id], index) => [id, `series-${index}`]));
 	const trend: DashboardMetricData["trend"] = [];
@@ -186,9 +278,12 @@ function buildMetric(
 		breakdowns,
 		trend,
 		series,
-		total: trend.reduce((sum, point) => sum + point.total, 0),
-		incomplete: chartRows.some((row) => Number(row.matched_incomplete) > 0),
-		hasUsage: chartRows.length > 0,
+		total: headlineRows.reduce(
+			(sum, row) => sum + Number(row.matched_value),
+			0,
+		),
+		incomplete: headlineRows.some((row) => Number(row.matched_incomplete) > 0),
+		hasUsage: headlineRows.some((row) => Number(row.matched_rows) > 0),
 	};
 }
 
@@ -212,5 +307,10 @@ function labelFor(
 			: "No repository";
 	if (dimension === "signalTypes") return SIGNAL_LABELS[id] ?? id;
 	if (dimension === "phrases") return id;
+	if (dimension === "runSignals")
+		return AGENT_RUN_SIGNALS.find((entry) => entry.id === id)?.label ?? id;
+	if (dimension === "durations")
+		return AGENT_RUN_DURATIONS.find((entry) => entry.id === id)?.label ?? id;
+	if (dimension === "skillsUsed") return id === "yes" ? "Yes" : "No";
 	return id || "Unknown model";
 }
