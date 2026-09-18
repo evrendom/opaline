@@ -32,6 +32,7 @@ export type AnalyticsDateRangePickerProps = {
 	endDate: string;
 	onDateRangeApply: (startDate: string, endDate: string) => void;
 	triggerClassName?: string;
+	triggerSuffix?: string;
 	contentClassName?: string;
 	calendarControls?: ReactNode;
 	align?: "start" | "center" | "end";
@@ -85,6 +86,7 @@ export function AnalyticsDateRangePicker({
 	endDate,
 	onDateRangeApply,
 	triggerClassName,
+	triggerSuffix,
 	contentClassName,
 	calendarControls,
 	align = "end",
@@ -205,7 +207,7 @@ export function AnalyticsDateRangePicker({
 					icon={Calendar03Icon}
 					strokeWidth={1.75}
 				/>
-				{displayValue}
+				{triggerSuffix ? `${displayValue} · ${triggerSuffix}` : displayValue}
 			</PopoverTrigger>
 			<SessionMenuPopoverContent
 				ref={setPopoverElement}
