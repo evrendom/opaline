@@ -9,6 +9,7 @@ import { getSupportedAnalyticsDateRange } from "@/lib/analytics-date-range";
 import { formatDateRangeLabel, formatIsoDate } from "@/lib/format";
 
 export type AnalyticsDatePresetId =
+	| "today"
 	| "last-7-days"
 	| "last-30-days"
 	| "last-60-days"
@@ -56,6 +57,7 @@ function createRelativeDaysPreset(
 
 export function getAnalyticsDatePresets(): AnalyticsDatePreset[] {
 	return [
+		createRelativeDaysPreset("today", "Today", 0),
 		createRelativeDaysPreset("last-7-days", "Last 7 days", 7),
 		createRelativeDaysPreset("last-30-days", "Last 30 days", 30),
 		createRelativeDaysPreset("last-60-days", "Last 60 days", 60),
