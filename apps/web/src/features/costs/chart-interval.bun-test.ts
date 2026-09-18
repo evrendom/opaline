@@ -4,6 +4,7 @@ import {
 	CHART_INTERVALS,
 	formatChartDate,
 	formatChartPeriod,
+	getChartSeriesValue,
 	groupChartTrend,
 } from "./chart-interval";
 
@@ -104,6 +105,35 @@ describe("Dashboard chart intervals", () => {
 				values,
 			})),
 		).toEqual(points);
+	});
+
+	test("keeps the entire week on the axis but leaves future days unplotted", () => {
+		const week = [2, 0, 5, 0, 0, 0, 0].map((total, index) => ({
+			date: `2026-04-${String(index + 6).padStart(2, "0")}`,
+			total,
+			values: { total },
+		}));
+		const daily = groupChartTrend(week, "daily");
+		expect(daily.map(({ date }) => date)).toEqual([
+			"2026-04-06",
+			"2026-04-07",
+			"2026-04-08",
+			"2026-04-09",
+			"2026-04-10",
+			"2026-04-11",
+			"2026-04-12",
+		]);
+		expect(
+			daily.map((point) => getChartSeriesValue(point, "total", "2026-04-08")),
+		).toEqual([2, 0, 5, null, null, null, null]);
+		expect(
+			daily.map((point) => getChartSeriesValue(point, "total", "2026-04-06")),
+		).toEqual([2, null, null, null, null, null, null]);
+		expect(
+			groupChartTrend(week, "weekly").map((point) =>
+				getChartSeriesValue(point, "total", "2026-04-08"),
+			),
+		).toEqual([7]);
 	});
 
 	test("labels periods in UTC and tooltips show only the included dates", () => {

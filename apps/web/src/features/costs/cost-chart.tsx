@@ -22,11 +22,13 @@ import {
 } from "@/app/ui/tooltip";
 import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { formatIsoDate } from "@/lib/format";
 import {
 	CHART_INTERVALS,
 	type ChartInterval,
 	formatChartDate,
 	formatChartPeriod,
+	getChartSeriesValue,
 	groupChartTrend,
 } from "./chart-interval";
 import {
@@ -108,6 +110,10 @@ export function CostChart({
 		() => groupChartTrend(data?.trend ?? [], interval),
 		[data?.trend, interval],
 	);
+	const today = formatIsoDate(new Date());
+	const visiblePointCount = trend.filter(
+		(point) => point.startDate <= today,
+	).length;
 	const intervalLabel = CHART_INTERVALS.find(
 		(option) => option.value === interval,
 	)?.label;
@@ -280,7 +286,9 @@ export function CostChart({
 							{series.map((entry) => (
 								<Area
 									key={entry.id}
-									dataKey={(point) => point.values[entry.id] ?? 0}
+									dataKey={(point) =>
+										getChartSeriesValue(point, entry.id, today)
+									}
 									name={entry.label}
 									type="linear"
 									stroke={entry.color}
@@ -290,7 +298,7 @@ export function CostChart({
 									fill={
 										series.length === 1 ? `url(#${gradientId})` : "transparent"
 									}
-									dot={trend.length === 1 ? { r: 3 } : false}
+									dot={visiblePointCount === 1 ? { r: 3 } : false}
 									activeDot={{
 										r: 4,
 										stroke: "var(--cost-surface)",

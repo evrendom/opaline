@@ -51,6 +51,14 @@ export function groupChartTrend(
 	return [...buckets.values()];
 }
 
+export function getChartSeriesValue(
+	point: ChartPoint,
+	seriesId: string,
+	today: string,
+) {
+	return point.startDate > today ? null : (point.values[seriesId] ?? 0);
+}
+
 function bucketDate(value: string, interval: ChartInterval): string {
 	const date = new Date(`${value}T00:00:00Z`);
 	if (interval === "weekly") {
