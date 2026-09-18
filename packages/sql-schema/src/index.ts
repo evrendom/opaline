@@ -1,4 +1,5 @@
 export { cliConnection } from "./cli-connection-schema.js";
+export { repositoryUploadReport } from "./repository-upload-schema.js";
 export type {
 	AccountInsert,
 	AccountSelect,

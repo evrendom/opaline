@@ -2,6 +2,7 @@ import { appRoutes, getCanonicalAppPath } from "@/app/routes";
 
 export type SettingsRouteId =
 	| "workspace"
+	| "sessions"
 	| "members"
 	| "invitations"
 	| "account"
@@ -23,6 +24,12 @@ export const settingsRouteMap: Record<
 		label: "Workspace",
 		segment: "workspace",
 		path: appRoutes.settingsWorkspace(),
+	},
+	sessions: {
+		id: "sessions",
+		label: "Sessions",
+		segment: "sessions",
+		path: appRoutes.settingsSessions(),
 	},
 	members: {
 		id: "members",
@@ -52,10 +59,15 @@ export const settingsRouteMap: Record<
 
 const settingsRoutes = Object.values(settingsRouteMap);
 
-export type PrimarySettingsRouteId = "workspace" | "members" | "account";
+export type PrimarySettingsRouteId =
+	| "workspace"
+	| "sessions"
+	| "members"
+	| "account";
 
 export const primarySettingsRoutes = [
 	settingsRouteMap.workspace,
+	settingsRouteMap.sessions,
 	settingsRouteMap.members,
 	settingsRouteMap.account,
 ] as const satisfies readonly SettingsRouteDefinition[];
@@ -75,6 +87,8 @@ export function getActiveSettingsRouteId(
 		return "account";
 	}
 
+	if (matchedRoute === "sessions") return "sessions";
+
 	if (matchedRoute === "members") {
 		return "members";
 	}
@@ -83,6 +97,8 @@ export function getActiveSettingsRouteId(
 }
 
 export function getSettingsPathFromLegacyTab(tab: string | null): string {
+	if (tab === "sessions") return settingsRouteMap.sessions.path;
+
 	if (tab === "account" || tab === "profile") {
 		return settingsRouteMap.account.path;
 	}

@@ -35,7 +35,14 @@ export function SettingsPageSkeleton({
 			data-slot="settings-page-skeleton"
 		>
 			<output className="sr-only">Loading {routeId} settings</output>
-			{routeId === "workspace" ? (
+			{routeId === "sessions" ? (
+				<div className="flex flex-col gap-6">
+					<Skeleton className="h-24 w-full" />
+					{[1, 2, 3].map((key) => (
+						<Skeleton key={key} className="h-12 w-full" />
+					))}
+				</div>
+			) : routeId === "workspace" ? (
 				<>
 					<WorkspaceSettingsGroup title="Workspace" hideTitle>
 						{["Name", "Slug"].map((label) => (
