@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentRunDurationSchema, AgentRunSignalSchema } from "./agent-runs.js";
 import { DateRangeInputSchema } from "./analytics.js";
 
 export const DashboardSignalSchema = z.enum([
@@ -13,6 +14,9 @@ export const CostDimensionSchema = z.enum([
 	"models",
 	"signalTypes",
 	"phrases",
+	"runSignals",
+	"durations",
+	"skillsUsed",
 ]);
 export const CostDashboardInputSchema = DateRangeInputSchema.extend({
 	members: z.array(z.string().max(512)).max(100).default([]),
@@ -20,6 +24,12 @@ export const CostDashboardInputSchema = DateRangeInputSchema.extend({
 	models: z.array(z.string().max(512)).max(100).default([]),
 	signalTypes: z.array(DashboardSignalSchema).max(3).default([]),
 	phrases: z.array(z.string().min(1).max(4096)).max(100).default([]),
+	runSignals: z.array(AgentRunSignalSchema).max(5).default([]),
+	durations: z.array(AgentRunDurationSchema).max(9).default([]),
+	skillsUsed: z
+		.array(z.enum(["yes", "no"]))
+		.max(2)
+		.default([]),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]).default("none"),
 }).refine(
 	(input) => {
@@ -42,6 +52,7 @@ export const DashboardMetricSchema = z.enum([
 	"sessions",
 	"commits",
 	"signals",
+	"agentRuns",
 ]);
 
 export const DashboardMetricDataSchema = z.object({
@@ -62,6 +73,9 @@ export const DashboardMetricDataSchema = z.object({
 		models: z.array(CostBreakdownEntrySchema),
 		signalTypes: z.array(CostBreakdownEntrySchema),
 		phrases: z.array(CostBreakdownEntrySchema),
+		runSignals: z.array(CostBreakdownEntrySchema),
+		durations: z.array(CostBreakdownEntrySchema),
+		skillsUsed: z.array(CostBreakdownEntrySchema),
 	}),
 });
 export const CostDashboardSchema = z.object({
@@ -72,6 +86,7 @@ export const CostDashboardSchema = z.object({
 		// A Git revision on a session does not establish that it created a commit.
 		commits: DashboardMetricDataSchema.nullable(),
 		signals: DashboardMetricDataSchema.nullable(),
+		agentRuns: DashboardMetricDataSchema.nullable(),
 	}),
 });
 export type DashboardSignal = z.infer<typeof DashboardSignalSchema>;

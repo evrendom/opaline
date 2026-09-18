@@ -10,7 +10,9 @@ import {
 	SCAN_VERSION,
 } from "@rudel/language-signals";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
+import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import { scanSessionLanguageSignalsOffThread } from "./session-language-signal-scanner.service.js";
+import type { SessionLanguageSignalScan } from "./session-language-signal-summary.js";
 
 const logger = getLogger(["rudel", "api", "session-language-signals"]);
 
@@ -32,7 +34,9 @@ interface PersistSessionLanguageSignalsEnvironment {
 	readonly now: () => Date;
 	readonly scan: (
 		content: string,
-	) => Promise<LanguageSignalCounts | LanguageSignalSummary>;
+	) => Promise<
+		LanguageSignalCounts | LanguageSignalSummary | SessionLanguageSignalScan
+	>;
 }
 
 const DEFAULT_ENVIRONMENT: PersistSessionLanguageSignalsEnvironment = {
@@ -85,7 +89,10 @@ export function persistSessionLanguageSignalsWithExecutor(
 
 export function buildSessionLanguageSignalRow(
 	input: Omit<SessionLanguageSignalScanInput, "content">,
-	summary: LanguageSignalCounts | LanguageSignalSummary,
+	summary:
+		| LanguageSignalCounts
+		| LanguageSignalSummary
+		| SessionLanguageSignalScan,
 	scannedAt: Date | string,
 ): RudelSessionLanguageSignalsRow {
 	const persistedScannedAt = toClickHouseDateTime(scannedAt);
@@ -94,7 +101,12 @@ export function buildSessionLanguageSignalRow(
 		: EMPTY_LANGUAGE_SIGNAL_MATCHES;
 
 	// Count-only legacy callers cannot claim that exact phrases were indexed.
-	const scanVersion = hasLanguageSignalMatches(summary) ? SCAN_VERSION : 4;
+	const runs = "agentRuns" in summary ? summary.agentRuns : undefined;
+	const scanVersion = runs
+		? Math.max(SCAN_VERSION, SESSION_AGENT_RUN_SCAN_VERSION)
+		: hasLanguageSignalMatches(summary)
+			? SCAN_VERSION
+			: 4;
 	return {
 		organization_id: input.organizationId,
 		session_date: toClickHouseDateTime(input.sessionDate),
@@ -104,6 +116,18 @@ export function buildSessionLanguageSignalRow(
 		raw_revision: input.rawRevision,
 		raw_ingested_at: toClickHouseDateTime(input.rawIngestedAt),
 		scan_version: scanVersion,
+		agent_runs: (runs ?? []).map((run) => [
+			run.id,
+			toClickHouseDateTime(
+				run.startedAt && Number.isFinite(Date.parse(run.startedAt))
+					? run.startedAt
+					: input.sessionDate,
+			),
+			run.elapsedSeconds ?? -1,
+			run.model ?? "",
+			run.hasSkills ? 1 : 0,
+			run.signal,
+		]),
 		member_negative: summary.member_negative,
 		member_swears: summary.member_swears,
 		member_apologies: summary.member_apologies,
@@ -172,7 +196,10 @@ const EMPTY_LANGUAGE_SIGNAL_MATCHES = {
 } as const;
 
 function hasLanguageSignalMatches(
-	summary: LanguageSignalCounts | LanguageSignalSummary,
+	summary:
+		| LanguageSignalCounts
+		| LanguageSignalSummary
+		| SessionLanguageSignalScan,
 ): summary is LanguageSignalSummary {
 	return "member_swear_matches" in summary;
 }

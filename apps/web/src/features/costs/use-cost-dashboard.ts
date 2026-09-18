@@ -2,8 +2,8 @@ import type {
 	CostDashboardInput,
 	CostDimension,
 	DashboardMetric,
-	DashboardSignal,
 } from "@rudel/api-routes";
+import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
 import { useSearchParams } from "react-router-dom";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -16,14 +16,21 @@ export const COST_DIMENSIONS: CostDimension[] = [
 	"repositories",
 	"models",
 ];
-export const SIGNAL_DIMENSIONS: CostDimension[] = ["signalTypes", "phrases"];
-export const ALL_COST_DIMENSIONS = [...SIGNAL_DIMENSIONS, ...COST_DIMENSIONS];
+export const RUN_DIMENSIONS: CostDimension[] = [
+	"runSignals",
+	"durations",
+	"skillsUsed",
+];
+export const ALL_COST_DIMENSIONS = [...RUN_DIMENSIONS, ...COST_DIMENSIONS];
 export const COST_LABELS = {
 	members: "Members",
 	repositories: "Repositories",
 	models: "Models",
 	signalTypes: "Signal types",
 	phrases: "Verbatim",
+	runSignals: "Follow-up signal",
+	durations: "Run duration",
+	skillsUsed: "Skills used",
 };
 
 export function useCostDashboard() {
@@ -32,14 +39,16 @@ export function useCostDashboard() {
 	const [params, setParams] = useSearchParams();
 	const selectedMetric = params.get("metric");
 	const metric: DashboardMetric =
-		selectedMetric === "sessions" || selectedMetric === "signals"
-			? selectedMetric
-			: "cost";
+		selectedMetric === "sessions"
+			? "sessions"
+			: selectedMetric === "agentRuns" || selectedMetric === "signals"
+				? "agentRuns"
+				: "cost";
 	const interval =
 		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
 			?.value ?? "daily";
 	const dimensions =
-		metric === "signals" ? ALL_COST_DIMENSIONS : COST_DIMENSIONS;
+		metric === "agentRuns" ? ALL_COST_DIMENSIONS : COST_DIMENSIONS;
 	const split = params.get("split");
 	const splitBy = dimensions.find((dimension) => dimension === split) ?? "none";
 	const input: CostDashboardInput = {
@@ -49,21 +58,27 @@ export function useCostDashboard() {
 		members: params.getAll("member").slice(0, 100).sort(),
 		repositories: params.getAll("repo").slice(0, 100).sort(),
 		models: params.getAll("model").slice(0, 100).sort(),
-		signalTypes:
-			metric === "signals"
-				? params
-						.getAll("signal")
-						.filter(
-							(value): value is DashboardSignal =>
-								value === "modelApologies" ||
-								value === "userPositive" ||
-								value === "userNegative",
-						)
-						.slice(0, 3)
-						.sort()
+
+		signalTypes: [],
+		phrases: [],
+		runSignals:
+			metric === "agentRuns"
+				? AGENT_RUN_SIGNALS.filter(({ id }) =>
+						params.getAll("feedback").includes(id),
+					).map(({ id }) => id)
 				: [],
-		phrases:
-			metric === "signals" ? params.getAll("phrase").slice(0, 100).sort() : [],
+		durations:
+			metric === "agentRuns"
+				? AGENT_RUN_DURATIONS.filter(({ id }) =>
+						params.getAll("duration").includes(id),
+					).map(({ id }) => id)
+				: [],
+		skillsUsed:
+			metric === "agentRuns"
+				? (["yes", "no"] as const).filter((id) =>
+						params.getAll("skills").includes(id),
+					)
+				: [],
 	};
 	const query = useAnalyticsQuery({
 		...orpc.analytics.overview.costs.queryOptions({ input }),
@@ -74,9 +89,9 @@ export function useCostDashboard() {
 				: undefined,
 		refetchOnWindowFocus: false,
 		refetchInterval:
-			metric === "signals"
+			metric === "agentRuns"
 				? (query) =>
-						query.state.data && query.state.data.metrics.signals === null
+						query.state.data && query.state.data.metrics.agentRuns === null
 							? 5_000
 							: false
 				: false,
@@ -144,6 +159,9 @@ function parameterFor(dimension: CostDimension) {
 		models: "model",
 		signalTypes: "signal",
 		phrases: "phrase",
+		runSignals: "feedback",
+		durations: "duration",
+		skillsUsed: "skills",
 	};
 	return parameters[dimension];
 }

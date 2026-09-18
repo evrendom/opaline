@@ -222,10 +222,6 @@
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 }
-.cost-breakdowns[data-signals="true"]
-	> .cost-breakdown[data-dimension="phrases"] {
-	grid-column: span 2;
-}
 .cost-breakdown {
 	position: relative;
 	border: 1px solid var(--cost-border);
@@ -621,10 +617,6 @@
 	}
 }
 @container (max-width: 850px) {
-	.cost-breakdowns[data-signals="true"]
-		> .cost-breakdown[data-dimension="phrases"] {
-		grid-column: auto;
-	}
 	.cost-breakdowns {
 		grid-template-columns: 1fr;
 	}
@@ -746,4 +738,13 @@
 		width: auto;
 		height: var(--session-menu-hairline);
 	}
+}
+
+.cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-child {
+	border-top: 1px solid var(--cost-border);
+	margin-top: 0.5rem;
+}
+
+.cost-breakdown[data-dimension="durations"] .cost-row-share {
+	display: inline;
 }

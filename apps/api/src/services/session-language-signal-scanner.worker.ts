@@ -2,7 +2,7 @@ import type {
 	SessionLanguageSignalScannerWorkerRequest,
 	SessionLanguageSignalScannerWorkerResponse,
 } from "./session-language-signal-scanner.types.js";
-import { captureSessionLanguageSignals } from "./session-language-signal-summary.js";
+import { captureSessionLanguageSignalsWithRuns } from "./session-language-signal-summary.js";
 
 declare const self: {
 	addEventListener(
@@ -19,7 +19,7 @@ self.addEventListener(
 	(event: MessageEvent<SessionLanguageSignalScannerWorkerRequest>) => {
 		try {
 			self.postMessage({
-				summary: captureSessionLanguageSignals(event.data.content),
+				summary: captureSessionLanguageSignalsWithRuns(event.data.content),
 				requestId: event.data.requestId,
 				status: "success",
 			});

@@ -109,7 +109,7 @@ export function CostDashboardPage() {
 						<CostChart
 							data={data}
 							metric={metric}
-							signalTypes={input.signalTypes}
+							runSignals={input.runSignals}
 							interval={interval}
 							onMetricChange={setMetric}
 							pending={isPending}
@@ -118,10 +118,7 @@ export function CostDashboardPage() {
 						/>
 					)}
 					<div className="cost-breakdowns-container" hidden={isError}>
-						<div
-							className="cost-breakdowns"
-							data-signals={metric === "signals"}
-						>
+						<div className="cost-breakdowns">
 							{dimensions.map((dimension) => (
 								<CostBreakdown
 									key={dimension}

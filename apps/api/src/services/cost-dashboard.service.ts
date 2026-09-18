@@ -1,11 +1,16 @@
 import { ORPCError } from "@orpc/server";
-import type { CostDashboard, CostDashboardInput } from "@rudel/api-routes";
+import {
+	AGENT_RUN_DURATIONS,
+	type CostDashboard,
+	type CostDashboardInput,
+} from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
 	buildCostDashboard,
 	type CostAggregateRow,
 } from "./cost-dashboard-data.js";
+import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildCanonicalPricingModelSql,
 	getUsageAnalyticsQueryContext,
@@ -27,7 +32,7 @@ export async function getCostDashboard(
    ${repositorySql("sa")} AS repository,
    if(p.pricing_model != '', p.pricing_model, p.pricing_identity) AS model,
    ifNull(p.group_estimated_cost, 0) AS value,
-   isNull(p.group_estimated_cost) AS incomplete, '' AS signal_type, '' AS phrase
+   isNull(p.group_estimated_cost) AS incomplete, '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used
   FROM (
    SELECT * FROM priced_usage_groups
    WHERE record_kind = 'event'
@@ -43,7 +48,7 @@ export async function getCostDashboard(
 			: `
   SELECT 'cost' AS metric, toString(usage_date) AS date, user_id AS member,
    ${repositorySql("sa")} AS repository, model_used AS model,
-   ifNull(estimated_cost, 0) AS value, NOT cost_is_complete AS incomplete, '' AS signal_type, '' AS phrase
+   ifNull(estimated_cost, 0) AS value, NOT cost_is_complete AS incomplete, '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used
   FROM ${usage.dailySessionsRelation} AS sa
   WHERE organization_id = {orgId:String}
    AND usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
@@ -60,7 +65,8 @@ export async function getCostDashboard(
    if(${canonicalModel} != '', ${canonicalModel}, sa.model_used) AS model,
    toFloat64(metric_value.4) AS value,
    toUInt8(metric_value.1 = 'signals' AND signals.scan_version < 5) AS incomplete,
-   metric_value.2 AS signal_type, metric_value.3 AS phrase
+   metric_value.2 AS signal_type, metric_value.3 AS phrase,
+   '' AS run_signal, '' AS duration, '' AS skills_used
   FROM (
    SELECT * FROM ${usage.sessionsRelation}
    WHERE organization_id = {orgId:String}
@@ -88,33 +94,81 @@ export async function getCostDashboard(
    arrayMap((phrase, count) -> tuple('signals', 'userPositive', phrase, toUInt64(count)), mapKeys(signals.member_positive_counts), mapValues(signals.member_positive_counts))
   ) AS metric_value
  `;
+	// Run facts are indexed with each raw revision. Start dates belong to runs,
+	// so a long-lived session can contribute on days after it was first opened.
+	const durationCases = AGENT_RUN_DURATIONS.filter((bucket) =>
+		Number.isFinite(bucket.upperSeconds),
+	)
+		.map((bucket) => `run.3 < ${bucket.upperSeconds}, '${bucket.id}'`)
+		.join(", ");
+	const runs = `
+  SELECT 'agentRuns' AS metric,
+   toString(if(incomplete, toDate({startDate:String}), toDate(run.2))) AS date,
+   sa.user_id AS member, ${repositorySql("sa")} AS repository,
+   coalesce(nullIf(${buildCanonicalPricingModelSql("run.4")}, ''), nullIf(run.4, ''), sa.model_used) AS model,
+   toFloat64(NOT incomplete) AS value,
+   toUInt8(signals.scan_version < ${SESSION_AGENT_RUN_SCAN_VERSION} OR signals.raw_revision < sa.revision) AS incomplete,
+   '' AS signal_type, '' AS phrase, run.6 AS run_signal,
+   multiIf(run.3 < 0, 'unknown', ${durationCases}, '12hPlus') AS duration,
+   if(run.5 = 1, 'yes', 'no') AS skills_used
+  FROM (
+   SELECT * FROM usage_analytics_metadata
+   WHERE organization_id = {orgId:String}
+    AND session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+    AND last_interaction_date >= toDateTime({startDate:String}, 'UTC')
+  ) AS sa
+  ANY LEFT JOIN (
+   SELECT organization_id, user_id, source, session_id, session_date, scan_version, raw_revision, agent_runs
+   FROM rudel.session_language_signals FINAL
+   PREWHERE organization_id = {orgId:String}
+    AND session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+  ) AS signals
+   ON sa.organization_id = signals.organization_id AND sa.user_id = signals.user_id
+    AND sa.source = signals.source AND sa.session_id = signals.session_id
+    AND sa.session_date = signals.session_date
+  ARRAY JOIN if(signals.scan_version < ${SESSION_AGENT_RUN_SCAN_VERSION} OR signals.raw_revision < sa.revision,
+   [tuple('', toDateTime64({startDate:String}, 3, 'UTC'), toFloat64(-1), '', toUInt8(0), '')],
+   signals.agent_runs) AS run
+  WHERE incomplete OR (run.2 >= toDateTime({startDate:String}, 'UTC')
+   AND run.2 < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY)
+ `;
+
 	const memberMatch =
 		"(empty({members:Array(String)}) OR has({members:Array(String)}, member))";
 	const repositoryMatch =
 		"(empty({repositories:Array(String)}) OR has({repositories:Array(String)}, repository))";
 	const modelMatch =
-		"(empty({models:Array(String)}) OR has({models:Array(String)}, model))";
+		"(empty({models:Array(String)}) OR has({models:Array(String)}, model) OR (metric = 'agentRuns' AND s.incomplete))";
 	// Each signal row is one exact phrase frequency, not a copy of the category
 	// total. Blank zero rows preserve known-zero categories and indexing state.
 	const typeMatch =
 		"(metric != 'signals' OR empty({signalTypes:Array(String)}) OR has({signalTypes:Array(String)}, signal_type))";
 	const phraseMatch =
 		"(metric != 'signals' OR empty({phrases:Array(String)}) OR s.incomplete OR has({phrases:Array(String)}, phrase))";
-	const matches = `${memberMatch} AND ${repositoryMatch} AND ${modelMatch} AND ${typeMatch} AND ${phraseMatch}`;
+	const runSignalMatch =
+		"(metric != 'agentRuns' OR s.incomplete OR empty({runSignals:Array(String)}) OR has({runSignals:Array(String)}, run_signal))";
+	const durationMatch =
+		"(metric != 'agentRuns' OR s.incomplete OR empty({durations:Array(String)}) OR has({durations:Array(String)}, duration))";
+	const skillsMatch =
+		"(metric != 'agentRuns' OR s.incomplete OR empty({skillsUsed:Array(String)}) OR has({skillsUsed:Array(String)}, skills_used))";
+	const matches = `${memberMatch} AND ${repositoryMatch} AND ${modelMatch} AND ${typeMatch} AND ${phraseMatch} AND ${runSignalMatch} AND ${durationMatch} AND ${skillsMatch}`;
 	const rows = await queryClickhouse<CostAggregateRow>({
-		query: `WITH ${usage.cteDefinitions}, dashboard_source AS (${source} UNION ALL ${sessions})
-   SELECT metric, date, dimension, multiIf(dimension = 'members', member, dimension = 'repositories', repository, dimension = 'models', model, dimension = 'signalTypes', signal_type, phrase) AS id,
+		query: `WITH ${usage.cteDefinitions}, dashboard_source AS (${source} UNION ALL ${sessions} UNION ALL ${runs})
+   SELECT metric, date, dimension, multiIf(dimension = 'members', member, dimension = 'repositories', repository, dimension = 'models', model, dimension = 'signalTypes', signal_type, dimension = 'runSignals', run_signal, dimension = 'durations', duration, dimension = 'skillsUsed', skills_used, phrase) AS id,
     sum(s.value) AS value, countIf(s.incomplete) AS incomplete,
     sumIf(s.value, ${matches}) AS matched_value,
     countIf(${matches}) AS matched_rows,
     countIf(s.incomplete AND ${matches}) AS matched_incomplete
    FROM dashboard_source AS s
-   ARRAY JOIN if(metric = 'signals', ['members', 'repositories', 'models', 'signalTypes', 'phrases'], ['members', 'repositories', 'models']) AS dimension
+   ARRAY JOIN multiIf(metric = 'agentRuns', ['members', 'repositories', 'models', 'runSignals', 'durations', 'skillsUsed'], metric = 'signals', ['members', 'repositories', 'models', 'signalTypes', 'phrases'], ['members', 'repositories', 'models']) AS dimension
    WHERE (dimension = 'members' OR ${memberMatch})
     AND (dimension = 'repositories' OR ${repositoryMatch})
     AND (dimension = 'models' OR ${modelMatch})
     AND (dimension = 'signalTypes' OR ${typeMatch})
     AND (dimension = 'phrases' OR ${phraseMatch})
+    AND (dimension = 'runSignals' OR ${runSignalMatch})
+    AND (dimension = 'durations' OR ${durationMatch})
+    AND (dimension = 'skillsUsed' OR ${skillsMatch})
    GROUP BY metric, date, dimension, id
    ORDER BY metric, date, dimension, id
    LIMIT ${MAX_AGGREGATE_ROWS + 1}`,
@@ -127,6 +181,9 @@ export async function getCostDashboard(
 			models: input.models,
 			signalTypes: input.signalTypes,
 			phrases: input.phrases,
+			runSignals: input.runSignals,
+			durations: input.durations,
+			skillsUsed: input.skillsUsed,
 		},
 		clickhouse_settings: {
 			max_execution_time: 20,

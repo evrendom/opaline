@@ -60,6 +60,7 @@ describe("session language-signal ingest persistence", () => {
 				"2026-08-19T12:00:02.456Z",
 			),
 		).toEqual({
+			agent_runs: [],
 			member_apologies: 0,
 			member_apology_matches: [],
 			member_positive: 0,

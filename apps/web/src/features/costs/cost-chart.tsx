@@ -63,7 +63,7 @@ const DASHBOARD_LOADING_LINE = [
 
 // Pulse's default series palette, converted to OKLCH.
 // https://github.com/benjitaylor/pulse/blob/main/src/theme.ts
-// Eight distinct colors cover the dashboard's seven named series plus Other.
+// Duration splits keep all eight fixed ranges plus Unknown duration.
 const SERIES_COLORS = [
 	"oklch(0.623 0.188 259.815)", // Blue
 	"oklch(0.637 0.208 25.331)", // Red
@@ -73,17 +73,20 @@ const SERIES_COLORS = [
 	"oklch(0.656 0.212 354.308)", // Pink
 	"oklch(0.715 0.126 215.221)", // Cyan
 	"oklch(0.705 0.187 47.604)", // Orange
+	"oklch(0.60 0.02 260)", // Unknown duration
 ];
 const SIGNAL_COLORS: Record<string, string> = {
-	modelApologies: SERIES_COLORS[3],
-	userPositive: SERIES_COLORS[2],
-	userNegative: SERIES_COLORS[1],
+	positive: SERIES_COLORS[2],
+	negative: SERIES_COLORS[1],
+	mixed: SERIES_COLORS[3],
+	none: SERIES_COLORS[0],
+	noReply: SERIES_COLORS[8],
 };
 type Props = {
 	data: CostDashboard | undefined;
 	pending: boolean;
 	metric: DashboardMetric;
-	signalTypes: CostDashboardInput["signalTypes"];
+	runSignals: CostDashboardInput["runSignals"];
 	interval: ChartInterval;
 	onMetricChange: (metric: DashboardMetric) => void;
 	splitBy: CostDashboardInput["splitBy"];
@@ -96,7 +99,7 @@ export function CostChart({
 	splitBy,
 	onResetSplit,
 	metric,
-	signalTypes,
+	runSignals,
 	onMetricChange,
 	interval,
 }: Props) {
@@ -116,14 +119,14 @@ export function CostChart({
 			// Series IDs follow ranking; use the breakdown's signal identity so
 			// dates and filters cannot swap the semantic colors.
 			const signalType =
-				metric === "signals" && splitBy === "signalTypes"
-					? data.breakdowns.signalTypes.find(
+				metric === "agentRuns" && splitBy === "runSignals"
+					? data.breakdowns.runSignals.find(
 							(signal) => signal.label === entry.label,
 						)?.id
-					: metric === "signals" &&
+					: metric === "agentRuns" &&
 							splitBy === "none" &&
-							signalTypes.length === 1
-						? signalTypes[0]
+							runSignals.length === 1
+						? runSignals[0]
 						: undefined;
 			return {
 				...entry,
@@ -156,7 +159,9 @@ export function CostChart({
 							description={
 								value === "cost"
 									? "Estimated cost of this usage at API rates. This does not reflect actual subscription charges."
-									: undefined
+									: value === "agentRuns"
+										? "One response cycle to a user prompt. Duration is elapsed time from prompt to final assistant message, including waits. Feedback comes from the next user reply."
+										: undefined
 							}
 							value={
 								total === undefined
@@ -306,7 +311,7 @@ export function CostChart({
 					<div className="cost-chart-empty">
 						<p>
 							{unavailable
-								? "Language signals are still being indexed"
+								? `${metricLabel} are still being indexed`
 								: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
 						</p>
 						{!unavailable ? (

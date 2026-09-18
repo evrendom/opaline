@@ -14,6 +14,7 @@ import { appendJournalEntryWithReconciliation } from "./migrate-f16.js";
 const names = [
 	"20260916193000_member_negative_signals.sql",
 	"20260916210000_signal_phrase_counts.sql",
+	"20260918120000_agent_run_summaries.sql",
 ];
 const url = process.env.CLICKHOUSE_URL;
 if (!url) throw new Error("CLICKHOUSE_URL is required");
