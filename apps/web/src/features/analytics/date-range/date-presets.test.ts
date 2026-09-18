@@ -36,7 +36,7 @@ describe("date-presets", () => {
 		});
 		expect(presetRanges["this-week"]).toEqual({
 			startDate: "2026-04-06",
-			endDate: "2026-04-08",
+			endDate: "2026-04-12",
 		});
 		expect(presetRanges["this-month"]).toEqual({
 			startDate: "2026-04-01",

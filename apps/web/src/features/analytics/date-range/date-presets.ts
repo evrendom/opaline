@@ -1,5 +1,6 @@
 import {
 	addDays,
+	endOfWeek,
 	startOfMonth,
 	startOfQuarter,
 	startOfWeek,
@@ -58,16 +59,19 @@ function createRelativeDaysPreset(
 export function getAnalyticsDatePresets(): AnalyticsDatePreset[] {
 	return [
 		createRelativeDaysPreset("today", "Today", 0),
-		createRelativeDaysPreset("last-7-days", "Last 7 days", 7),
-		createRelativeDaysPreset("last-30-days", "Last 30 days", 30),
-		createRelativeDaysPreset("last-60-days", "Last 60 days", 60),
-		createRelativeDaysPreset("last-90-days", "Last 90 days", 90),
 		{
 			id: "this-week",
 			label: "This week",
 			resolveRange: (today) =>
-				buildResolvedRange(startOfWeek(today, { weekStartsOn: 1 }), today),
+				buildResolvedRange(
+					startOfWeek(today, { weekStartsOn: 1 }),
+					endOfWeek(today, { weekStartsOn: 1 }),
+				),
 		},
+		createRelativeDaysPreset("last-7-days", "Last 7 days", 7),
+		createRelativeDaysPreset("last-30-days", "Last 30 days", 30),
+		createRelativeDaysPreset("last-60-days", "Last 60 days", 60),
+		createRelativeDaysPreset("last-90-days", "Last 90 days", 90),
 		{
 			id: "this-month",
 			label: "This month",
@@ -130,6 +134,12 @@ export function resolveMatchingAnalyticsPreset(
 export function formatDashboardDateRangeTriggerLabel(
 	startDate: string,
 	endDate: string,
+	today = new Date(),
 ) {
+	const preset = resolveMatchingAnalyticsPreset(startDate, endDate, today);
+	if (preset?.id === "today" || preset?.id === "this-week") {
+		return preset.label;
+	}
+
 	return formatDateRangeLabel(startDate, endDate);
 }

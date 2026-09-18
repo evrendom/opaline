@@ -137,7 +137,7 @@ export function AnalyticsDateRangePicker({
 	const canApplyRange = Boolean(draftDateRange?.from && draftDateRange.to);
 	const displayValue =
 		selectedDateRange?.from && selectedDateRange.to
-			? formatDashboardDateRangeTriggerLabel(startDate, endDate)
+			? formatDashboardDateRangeTriggerLabel(startDate, endDate, today)
 			: "Pick a date";
 	const analyticsSourceComponent =
 		sourceComponent ?? "analytics_date_range_picker";
@@ -310,7 +310,7 @@ export function AnalyticsDateRangePicker({
 				selected={draftDateRange}
 				onSelect={setDraftDateRange}
 				today={today}
-				weekStartsOn={linear ? 1 : undefined}
+				weekStartsOn={1}
 				showOutsideDays={!linear}
 				numberOfMonths={2}
 				fixedWeeks={linear}
