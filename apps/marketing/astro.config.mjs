@@ -9,7 +9,6 @@ export default defineConfig({
 	integrations: [react()],
 	output: "static",
 	redirects: {
-		"/home": "/",
 		"/instant": "/",
 		"/instantv2": "/",
 	},

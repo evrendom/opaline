@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { checkSiteArchive } from "./check-site-archive";
@@ -19,6 +20,14 @@ await cp(join(root, "apps/marketing/dist"), output, { recursive: true });
 await cp(join(output, "index.html"), join(output, "marketing.html"));
 await rm(join(output, "index.html"));
 await cp(join(root, "apps/web/dist-demo"), join(output, "product-demo"), { recursive: true });
+
+// A generated /home page would shadow its Vercel rewrite to marketing.html.
+for (const path of ["home.html", "home/index.html"]) {
+	if (existsSync(join(output, path))) {
+		throw new Error(`Static page shadows the public /home rewrite: ${path}`);
+	}
+}
+
 await mkdir(join(output, "site-scripts"), { recursive: true });
 
 // Astro's island bootstrap and the demo activation listener are emitted inline.
