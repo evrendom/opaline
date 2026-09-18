@@ -424,7 +424,7 @@ export function SessionTurnTable({
 			>
 				<table
 					aria-label="Session turn ledger"
-					className="block min-w-full bg-(--session-turn-table-surface)"
+					className="block w-min min-w-full bg-(--session-turn-table-surface)"
 				>
 					<thead className="sticky top-0 z-10 block min-w-full border-b-[0.5px] border-(--session-overview-border) bg-(--session-turn-table-surface)">
 						<tr
