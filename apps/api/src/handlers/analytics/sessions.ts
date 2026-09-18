@@ -6,6 +6,7 @@ import {
 	getSessionAnalyticsSummaryComparison,
 	getSessionDimensionAnalysis,
 } from "../../services/session-analytics.service.js";
+import { listSessionArrivals } from "../../services/session-arrivals.service.js";
 import {
 	getSessionDetailBodyChunk,
 	getSessionDetailInitial,
@@ -34,6 +35,21 @@ const sortByMap: Record<string, "date" | "duration"> = {
 	total_tokens: "date",
 	success_score: "date",
 };
+
+const arrivals = os.analytics.sessions.arrivals
+	.use(orgMiddleware)
+	.handler(({ input, context }) => {
+		if (input.organizationId !== context.organizationId) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "The active workspace changed",
+			});
+		}
+		return listSessionArrivals(
+			context.organizationId,
+			context.isOrgAdmin ? null : context.user.id,
+			input,
+		);
+	});
 
 const uploadFailures = os.analytics.sessions.uploadFailures
 	.use(orgMiddleware)
@@ -303,6 +319,7 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 	});
 
 export const sessionsRouter = os.analytics.sessions.router({
+	arrivals,
 	uploadFailures,
 	detailBodyChunk,
 	detailOverview,

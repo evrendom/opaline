@@ -1,3 +1,14 @@
+import {
+	SessionArrivalsInputSchema,
+	SessionArrivalsPageSchema,
+} from "./session-arrivals.js";
+
+export {
+	type SessionArrival,
+	SessionArrivalsInputSchema,
+	SessionArrivalsPageSchema,
+} from "./session-arrivals.js";
+
 import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,
@@ -867,6 +878,9 @@ export const contract = {
 				.output(z.array(ProjectErrorSchema)),
 		},
 		sessions: {
+			arrivals: oc
+				.input(SessionArrivalsInputSchema)
+				.output(SessionArrivalsPageSchema),
 			uploadFailures: oc
 				.input(
 					z.object({

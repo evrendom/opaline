@@ -65,6 +65,10 @@ export const sessionOwnership = pgTable(
 			name: "session_ownership_pkey",
 		}),
 		index("session_ownership_user_id_idx").on(table.userId),
+		index("session_ownership_arrivals_idx").on(
+			table.organizationId,
+			table.createdAt,
+		),
 	],
 );
 
