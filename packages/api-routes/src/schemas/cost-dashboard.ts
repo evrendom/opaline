@@ -18,10 +18,18 @@ export const CostDimensionSchema = z.enum([
 	"durations",
 	"skillsUsed",
 ]);
+export const AgentRunDurationIntervalSchema = z.enum([
+	"daily",
+	"weekly",
+	"monthly",
+	"quarterly",
+	"yearly",
+]);
 export const CostDashboardInputSchema = DateRangeInputSchema.extend({
 	requestedMetric: z
 		.enum(["cost", "sessions", "signals", "agentRuns"])
 		.optional(),
+	durationInterval: AgentRunDurationIntervalSchema.optional(),
 	members: z.array(z.string().max(512)).max(100).default([]),
 	repositories: z.array(z.string().max(4096)).max(100).default([]),
 	models: z.array(z.string().max(512)).max(100).default([]),
@@ -58,6 +66,25 @@ export const DashboardMetricSchema = z.enum([
 	"agentRuns",
 ]);
 
+export const AgentRunDurationStatsSchema = z.object({
+	interval: AgentRunDurationIntervalSchema,
+	sampleCount: z.number().int().nonnegative(),
+	unknownCount: z.number().int().nonnegative(),
+	medianSeconds: z.number().nonnegative().nullable(),
+	p95Seconds: z.number().nonnegative().nullable(),
+	trend: z.array(
+		z.object({
+			date: z.string(),
+			startDate: z.string(),
+			endDate: z.string(),
+			sampleCount: z.number().int().nonnegative(),
+			unknownCount: z.number().int().nonnegative(),
+			medianSeconds: z.number().nonnegative().nullable(),
+			p95Seconds: z.number().nonnegative().nullable(),
+		}),
+	),
+});
+
 export const DashboardMetricDataSchema = z.object({
 	total: z.number().nonnegative(),
 	incomplete: z.boolean(),
@@ -87,6 +114,7 @@ export const DashboardMetricDataSchema = z.object({
 			unavailableSessions: z.number().int().nonnegative(),
 		})
 		.optional(),
+	durationStats: AgentRunDurationStatsSchema.optional(),
 });
 export const CostDashboardSchema = z.object({
 	requestedMetric: z

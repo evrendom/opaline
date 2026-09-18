@@ -44,6 +44,7 @@ export function buildCostDashboard(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
+	durationStats?: NonNullable<DashboardMetricData["durationStats"]>,
 ): CostDashboard {
 	// Signal-only splits do not alter cost/session totals in the metric strip.
 	const baseInput = !["none", "members", "repositories", "models"].includes(
@@ -77,7 +78,7 @@ export function buildCostDashboard(
 					: input,
 				members,
 			),
-			agentRuns: buildAgentRuns(rows, input, members),
+			agentRuns: buildAgentRuns(rows, input, members, durationStats),
 		},
 	};
 }
@@ -86,6 +87,7 @@ function buildAgentRuns(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
+	durationStats: NonNullable<DashboardMetricData["durationStats"]> | undefined,
 ): DashboardMetricData | null {
 	const runs = rows.filter((row) => row.metric === "agentRuns");
 	const runHeadlineRows = rows.some(
@@ -109,6 +111,7 @@ function buildAgentRuns(
 		members,
 		"Agent runs",
 	);
+	result.durationStats = durationStats;
 	const coverageRows = rows.filter(
 		(row) => row.metric === "agentRunCoverage" && row.dimension === "coverage",
 	);

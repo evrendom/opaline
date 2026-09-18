@@ -46,6 +46,20 @@ export function formatCost(value: number) {
 		maximumFractionDigits: 2,
 	}).format(value);
 }
+export function formatRunDuration(value: number | null | undefined): string {
+	if (value === null || value === undefined) return "—";
+	if (value < 60) {
+		if (value > 0 && value < 0.1) return "<0.1s";
+		return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)}s`;
+	}
+	const seconds = Math.round(value);
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	const remainder = seconds % 60;
+	return hours > 0
+		? `${hours}h${minutes ? ` ${minutes}m` : ""}`
+		: `${minutes}m${remainder ? ` ${remainder}s` : ""}`;
+}
 export function costLabel(dimension: CostDimension, label: string) {
 	if (dimension === "signalTypes") {
 		const labels: Record<string, string> = {

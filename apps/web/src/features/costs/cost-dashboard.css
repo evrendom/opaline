@@ -6,6 +6,7 @@
 	--cost-soft: rgb(0 0 0 / 3%);
 	--cost-hover: rgb(0 0 0 / 5%);
 	--cost-blue: oklch(0.623 0.188 259.815);
+	--cost-duration-p95: oklch(0.606 0.219 292.717);
 	--cost-chart-fill-opacity: 0.08;
 	display: flex;
 	flex-direction: column;
@@ -187,6 +188,25 @@
 	font-size: 0.6875rem;
 	color: var(--cost-muted);
 	white-space: nowrap;
+}
+.cost-duration-legend i {
+	width: 18px;
+	height: 0;
+	border-top: 2px solid var(--cost-foreground);
+	border-radius: 0;
+}
+.cost-duration-legend[data-percentile="p95"] i {
+	border-top-color: var(--cost-duration-p95);
+	border-top-style: dashed;
+}
+.cost-duration-legend strong {
+	color: var(--cost-foreground);
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+.cost-chart-tooltip .cost-duration-unknown-count {
+	padding-top: 7px;
+	border-top: 1px solid var(--cost-border);
 }
 .cost-chart-canvas {
 	position: relative;

@@ -62,6 +62,7 @@ export function useCostDashboard() {
 		startDate: dates.startDate,
 		endDate: dates.endDate,
 		requestedMetric: metric,
+		durationInterval: metric === "agentRuns" ? interval : undefined,
 		splitBy,
 		members: params.getAll("member").slice(0, 100).sort(),
 		repositories: params.getAll("repo").slice(0, 100).sort(),

@@ -3,6 +3,7 @@ import {
 	AGENT_RUN_DURATIONS,
 	type CostDashboard,
 	type CostDashboardInput,
+	type DashboardMetricData,
 } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
@@ -17,6 +18,18 @@ import {
 } from "./usage-event-analytics.service.js";
 
 const MAX_AGGREGATE_ROWS = 100_000;
+type AgentRunDurationInterval = NonNullable<
+	CostDashboardInput["durationInterval"]
+>;
+type AgentRunDurationStats = NonNullable<DashboardMetricData["durationStats"]>;
+
+interface AgentRunDurationAggregateRow {
+	readonly date: string;
+	readonly is_overall: number;
+	readonly sample_count: number;
+	readonly unknown_count: number;
+	readonly quantiles: readonly (number | null)[];
+}
 
 export async function getCostDashboard(
 	orgId: string,
@@ -127,13 +140,9 @@ export async function getCostDashboard(
 	 `;
 	// Run facts are indexed with each raw revision. Start dates belong to runs,
 	// so a long-lived session can contribute on days after it was first opened.
-	const durationCases = AGENT_RUN_DURATIONS.filter((bucket) =>
-		Number.isFinite(bucket.upperSeconds),
-	)
-		.map((bucket) => `run.3 < ${bucket.upperSeconds}, '${bucket.id}'`)
-		.join(", ");
-	const runModel = `coalesce(nullIf(${buildCanonicalPricingModelSql("run.4")}, ''), nullIf(run.4, ''), sa.model_used)`;
-	const runDuration = `multiIf(run.3 < 0, 'unknown', ${durationCases}, '12hPlus')`;
+	const durationCases = agentRunDurationCasesSql("run");
+	const runModel = agentRunModelSql("run", "sa");
+	const runDuration = agentRunDurationSql("run", durationCases);
 	const sessionMemberMatch =
 		"(empty({members:Array(String)}) OR has({members:Array(String)}, sa.user_id))";
 	const sessionRepositoryMatch = `(empty({repositories:Array(String)}) OR has({repositories:Array(String)}, ${repositorySql("sa")}))`;
@@ -279,7 +288,7 @@ export async function getCostDashboard(
 		input.requestedMetric === "agentRuns"
 			? "toUInt8(raw.raw_revision >= sa.revision)"
 			: "toUInt8(0)";
-	const rows = await queryClickhouse<CostAggregateRow>({
+	const rowsPromise = queryClickhouse<CostAggregateRow>({
 		query: `WITH ${usage.cteDefinitions},
 	 dashboard_sessions AS (
 	  SELECT * FROM ${usage.sessionsRelation}
@@ -353,11 +362,23 @@ export async function getCostDashboard(
 			result_overflow_mode: "throw",
 		},
 	});
+	const durationRowsPromise =
+		input.requestedMetric === "agentRuns"
+			? queryAgentRunDurationStats(orgId, input, usage.cteDefinitions)
+			: Promise.resolve(undefined);
+	const [rows, durationRows] = await Promise.all([
+		rowsPromise,
+		durationRowsPromise,
+	]);
 	// Never present a silently truncated subtotal as the total cost.
 	if (rows.length > MAX_AGGREGATE_ROWS)
 		throw new ORPCError("BAD_REQUEST", {
 			message: "Choose a shorter date range to view this cost breakdown.",
 		});
+	const durationStats =
+		durationRows !== undefined
+			? buildAgentRunDurationStats(durationRows, input)
+			: undefined;
 	const memberIds = [
 		...new Set(
 			rows.filter((row) => row.dimension === "members").map((row) => row.id),
@@ -386,6 +407,7 @@ export async function getCostDashboard(
 				{ label: member.name?.trim() || member.email, image: member.image },
 			]),
 		),
+		durationStats,
 	);
 }
 
@@ -395,4 +417,204 @@ function repositorySql(alias: string): string {
 	return `if(${alias}.git_remote != '',
   replaceRegexpOne(replaceRegexpOne(replaceRegexpOne(${alias}.git_remote, '^(https?://|ssh://)?(git@)?', ''), ':', '/'), '[.]git/?$', ''),
   if(${alias}.project_path != '', ${alias}.project_path, ${alias}.package_name))`;
+}
+
+async function queryAgentRunDurationStats(
+	orgId: string,
+	input: CostDashboardInput,
+	usageCteDefinitions: string,
+): Promise<AgentRunDurationAggregateRow[]> {
+	const interval = input.durationInterval ?? "daily";
+	const period = {
+		daily: "toStartOfInterval(run.2, INTERVAL 1 DAY, 'UTC')",
+		weekly: "toStartOfInterval(run.2, INTERVAL 1 WEEK, 'UTC')",
+		monthly: "toStartOfInterval(run.2, INTERVAL 1 MONTH, 'UTC')",
+		quarterly: "toStartOfInterval(run.2, INTERVAL 1 QUARTER, 'UTC')",
+		yearly: "toStartOfInterval(run.2, INTERVAL 1 YEAR, 'UTC')",
+	} satisfies Record<AgentRunDurationInterval, string>;
+	const runModel = agentRunModelSql("run", "sa");
+	const runDuration = agentRunDurationSql(
+		"run",
+		agentRunDurationCasesSql("run"),
+	);
+	return queryClickhouse<AgentRunDurationAggregateRow>({
+		query: `WITH ${usageCteDefinitions},
+	 dashboard_signals AS (
+	  SELECT organization_id, user_id, source, session_id, session_date,
+	   scan_version, raw_revision, agent_runs
+	  FROM rudel.session_language_signals FINAL
+	  PREWHERE organization_id = {orgId:String}
+	   AND session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+	 ),
+	 agent_run_sessions AS (
+	  SELECT sa.*,
+	   signal_summary.agent_runs AS agent_runs,
+	   toUInt8(signal_summary.scan_version < ${SESSION_AGENT_RUN_SCAN_VERSION}
+	    OR signal_summary.raw_revision < sa.revision) AS incomplete
+	  FROM usage_analytics_metadata AS sa
+	  ANY LEFT JOIN dashboard_signals AS signal_summary
+	   ON sa.organization_id = signal_summary.organization_id
+	    AND sa.user_id = signal_summary.user_id
+	    AND sa.source = signal_summary.source
+	    AND sa.session_id = signal_summary.session_id
+	    AND sa.session_date = signal_summary.session_date
+	  WHERE sa.organization_id = {orgId:String}
+	   AND sa.session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+	   AND sa.last_interaction_date >= toDateTime({startDate:String}, 'UTC')
+	 ),
+	 matched_runs AS (
+	  SELECT ${period[interval]} AS period, run.3 AS elapsed_seconds
+	  FROM agent_run_sessions AS sa
+	  ARRAY JOIN if(sa.incomplete, [], sa.agent_runs) AS run
+	  WHERE run.2 >= toDateTime({startDate:String}, 'UTC')
+	   AND run.2 < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+	   AND (empty({members:Array(String)}) OR has({members:Array(String)}, sa.user_id))
+	   AND (empty({repositories:Array(String)}) OR has({repositories:Array(String)}, ${repositorySql("sa")}))
+	   AND (empty({models:Array(String)}) OR has({models:Array(String)}, ${runModel}))
+	   AND (empty({runSignals:Array(String)}) OR has({runSignals:Array(String)}, run.6))
+	   AND (empty({durations:Array(String)}) OR has({durations:Array(String)}, ${runDuration}))
+	   AND (empty({skillsUsed:Array(String)}) OR has({skillsUsed:Array(String)}, if(run.5 = 1, 'yes', 'no')))
+	 )
+	 SELECT toUInt8(grouping(period)) AS is_overall,
+	  if(grouping(period) = 1, '', toString(period)) AS date,
+	  countIf(elapsed_seconds >= 0) AS sample_count,
+	  countIf(elapsed_seconds < 0) AS unknown_count,
+	  if(countIf(elapsed_seconds >= 0) = 0,
+	   [CAST(NULL AS Nullable(Float64)), CAST(NULL AS Nullable(Float64))],
+	   arrayMap(value -> toNullable(value),
+	    quantilesExactIf(0.5, 0.95)(elapsed_seconds, elapsed_seconds >= 0)
+	   )
+	  ) AS quantiles
+	 FROM matched_runs
+	 GROUP BY GROUPING SETS ((period), ())
+	 ORDER BY is_overall, date`,
+		query_params: {
+			orgId,
+			startDate: input.startDate,
+			endDate: input.endDate,
+			members: input.members,
+			repositories: input.repositories,
+			models: input.models,
+			runSignals: input.runSignals,
+			durations: input.durations,
+			skillsUsed: input.skillsUsed,
+		},
+		clickhouse_settings: {
+			max_execution_time: 20,
+			max_rows_to_read: "100000000",
+			max_bytes_to_read: "10000000000",
+			timeout_before_checking_execution_speed: 0,
+			max_result_rows: "368",
+			result_overflow_mode: "throw",
+		},
+	});
+}
+
+function buildAgentRunDurationStats(
+	rows: readonly AgentRunDurationAggregateRow[],
+	input: CostDashboardInput,
+): AgentRunDurationStats {
+	const interval = input.durationInterval ?? "daily";
+	const trend = buildDurationPeriods(input.startDate, input.endDate, interval);
+	const byDate = new Map(trend.map((point) => [point.date, point]));
+	let sampleCount = 0;
+	let unknownCount = 0;
+	let medianSeconds: number | null = null;
+	let p95Seconds: number | null = null;
+	for (const row of rows) {
+		const quantiles = readDurationQuantiles(row.quantiles);
+		if (Number(row.is_overall) === 1) {
+			sampleCount = Number(row.sample_count);
+			unknownCount = Number(row.unknown_count);
+			[medianSeconds, p95Seconds] = quantiles;
+			continue;
+		}
+		const point = byDate.get(row.date.slice(0, 10));
+		if (!point) continue;
+		point.sampleCount = Number(row.sample_count);
+		point.unknownCount = Number(row.unknown_count);
+		[point.medianSeconds, point.p95Seconds] = quantiles;
+	}
+	return {
+		interval,
+		sampleCount,
+		unknownCount,
+		medianSeconds,
+		p95Seconds,
+		trend,
+	};
+}
+
+function buildDurationPeriods(
+	startDate: string,
+	endDate: string,
+	interval: AgentRunDurationInterval,
+): AgentRunDurationStats["trend"] {
+	const periods = new Map<string, AgentRunDurationStats["trend"][number]>();
+	for (
+		let stamp = Date.parse(startDate);
+		stamp <= Date.parse(endDate);
+		stamp += 86_400_000
+	) {
+		const currentDate = new Date(stamp).toISOString().slice(0, 10);
+		const date = durationPeriodDate(currentDate, interval);
+		const existing = periods.get(date);
+		if (existing) {
+			existing.endDate = currentDate;
+			continue;
+		}
+		periods.set(date, {
+			date,
+			startDate: currentDate,
+			endDate: currentDate,
+			sampleCount: 0,
+			unknownCount: 0,
+			medianSeconds: null,
+			p95Seconds: null,
+		});
+	}
+	return [...periods.values()];
+}
+
+function durationPeriodDate(
+	value: string,
+	interval: AgentRunDurationInterval,
+): string {
+	const date = new Date(`${value}T00:00:00Z`);
+	if (interval === "weekly") {
+		date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+	} else if (interval !== "daily") {
+		date.setUTCDate(1);
+		if (interval === "quarterly")
+			date.setUTCMonth(Math.floor(date.getUTCMonth() / 3) * 3);
+		if (interval === "yearly") date.setUTCMonth(0);
+	}
+	return date.toISOString().slice(0, 10);
+}
+
+function readDurationQuantiles(
+	quantiles: readonly (number | null)[],
+): readonly [number | null, number | null] {
+	const median = quantiles[0];
+	const p95 = quantiles[1];
+	return [
+		typeof median === "number" && Number.isFinite(median) ? median : null,
+		typeof p95 === "number" && Number.isFinite(p95) ? p95 : null,
+	];
+}
+
+function agentRunModelSql(runAlias: string, sessionAlias: string): string {
+	return `coalesce(nullIf(${buildCanonicalPricingModelSql(`${runAlias}.4`)}, ''), nullIf(${runAlias}.4, ''), ${sessionAlias}.model_used)`;
+}
+
+function agentRunDurationCasesSql(runAlias: string): string {
+	return AGENT_RUN_DURATIONS.filter((bucket) =>
+		Number.isFinite(bucket.upperSeconds),
+	)
+		.map((bucket) => `${runAlias}.3 < ${bucket.upperSeconds}, '${bucket.id}'`)
+		.join(", ");
+}
+
+function agentRunDurationSql(runAlias: string, cases: string): string {
+	return `multiIf(${runAlias}.3 < 0, 'unknown', ${cases}, '12hPlus')`;
 }

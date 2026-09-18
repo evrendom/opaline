@@ -123,6 +123,18 @@ function transcript(
 		});
 	return lines.map((line) => JSON.stringify(line)).join("\n");
 }
+
+function unknownDurationTranscript(
+	duration: number,
+	feedback: string,
+	skills = false,
+	begin = start,
+) {
+	return transcript(duration, feedback, skills, begin).replace(
+		`"timestamp":"${new Date(begin + duration * 1000).toISOString()}"`,
+		`"timestamp":"${new Date(begin - 1000).toISOString()}"`,
+	);
+}
 async function ingest(
 	sessionId: string,
 	content: string,
@@ -227,6 +239,203 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect(filtered.metrics.agentRuns?.total).toBe(1);
 	expect(filtered.metrics.agentRuns?.breakdowns.durations).toHaveLength(9);
 	expect((await dashboard({}, 1)).metrics.agentRuns?.total).toBe(1);
+});
+
+test("returns exact median and P95 durations for filtered runs and UTC periods", async () => {
+	const repository = `/test/duration-stats-${run}`;
+	const current = new Date(start);
+	const monthStart = Date.UTC(
+		current.getUTCFullYear(),
+		current.getUTCMonth() - 1,
+		1,
+	);
+	const secondTuesday =
+		monthStart +
+		(((2 - new Date(monthStart).getUTCDay() + 7) % 7) + 7) * 86_400_000;
+	const statsStart = secondTuesday;
+	const statsPreviousStart = secondTuesday - 86_400_000;
+	const statsDay = new Date(statsStart).toISOString().slice(0, 10);
+	const statsPreviousDay = new Date(statsPreviousStart)
+		.toISOString()
+		.slice(0, 10);
+	const statsMonth = `${statsDay.slice(0, 7)}-01`;
+	await ingest(
+		`duration-previous-${run}`,
+		transcript(40, "Great", false, statsPreviousStart),
+		0,
+		true,
+		repository,
+	);
+	for (const [index, duration] of [0, 10, 20, 30, 100].entries())
+		await ingest(
+			`duration-${run}-${index}`,
+			transcript(
+				duration,
+				index < 2 ? "Great" : undefined,
+				index === 1,
+				statsStart,
+			),
+			0,
+			true,
+			repository,
+		);
+	await ingest(
+		`duration-unknown-${run}`,
+		unknownDurationTranscript(50, "Great", true, statsStart),
+		0,
+		true,
+		repository,
+	);
+
+	const stats = (
+		await dashboard({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			durationInterval: "daily",
+			repositories: [repository],
+		})
+	).metrics.agentRuns?.durationStats;
+	expect(stats).toEqual({
+		interval: "daily",
+		sampleCount: 6,
+		unknownCount: 1,
+		medianSeconds: 30,
+		p95Seconds: 100,
+		trend: [
+			{
+				date: statsPreviousDay,
+				startDate: statsPreviousDay,
+				endDate: statsPreviousDay,
+				sampleCount: 1,
+				unknownCount: 0,
+				medianSeconds: 40,
+				p95Seconds: 40,
+			},
+			{
+				date: statsDay,
+				startDate: statsDay,
+				endDate: statsDay,
+				sampleCount: 5,
+				unknownCount: 1,
+				medianSeconds: 20,
+				p95Seconds: 100,
+			},
+		],
+	});
+	const filtered = (
+		await dashboard({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [repository],
+			runSignals: ["positive"],
+			skillsUsed: ["yes"],
+		})
+	).metrics.agentRuns?.durationStats;
+	expect(filtered).toMatchObject({
+		sampleCount: 1,
+		unknownCount: 1,
+		medianSeconds: 10,
+		p95Seconds: 10,
+	});
+	const underOneMinute = (
+		await dashboard({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			repositories: [repository],
+			durations: ["under1m"],
+		})
+	).metrics.agentRuns?.durationStats;
+	expect(underOneMinute).toMatchObject({
+		sampleCount: 5,
+		unknownCount: 0,
+		medianSeconds: 20,
+		p95Seconds: 40,
+	});
+	expect(
+		(
+			await dashboard({
+				startDate: statsPreviousDay,
+				endDate: statsDay,
+				repositories: [repository],
+				durations: ["under1m"],
+				splitBy: "durations",
+			})
+		).metrics.agentRuns?.durationStats,
+	).toEqual(underOneMinute);
+	for (const [durationInterval, date] of [
+		["weekly", statsPreviousDay],
+		["monthly", statsMonth],
+	] as const) {
+		const grouped = (
+			await dashboard({
+				startDate: statsPreviousDay,
+				endDate: statsDay,
+				durationInterval,
+				repositories: [repository],
+			})
+		).metrics.agentRuns?.durationStats;
+		expect(grouped).toMatchObject({
+			interval: durationInterval,
+			sampleCount: 6,
+			unknownCount: 1,
+			medianSeconds: 30,
+			p95Seconds: 100,
+			trend: [
+				{
+					date,
+					startDate: statsPreviousDay,
+					endDate: statsDay,
+					sampleCount: 6,
+					unknownCount: 1,
+					medianSeconds: 30,
+					p95Seconds: 100,
+				},
+			],
+		});
+	}
+	const unknownOnly = (
+		await dashboard({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [repository],
+			durations: ["unknown"],
+		})
+	).metrics.agentRuns?.durationStats;
+	expect(unknownOnly).toMatchObject({
+		sampleCount: 0,
+		unknownCount: 1,
+		medianSeconds: null,
+		p95Seconds: null,
+		trend: [
+			{
+				sampleCount: 0,
+				unknownCount: 1,
+				medianSeconds: null,
+				p95Seconds: null,
+			},
+		],
+	});
+	const empty = (
+		await dashboard({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [`/test/absent-${run}`],
+		})
+	).metrics.agentRuns?.durationStats;
+	expect(empty).toMatchObject({
+		sampleCount: 0,
+		unknownCount: 0,
+		medianSeconds: null,
+		p95Seconds: null,
+		trend: [
+			{
+				sampleCount: 0,
+				unknownCount: 0,
+				medianSeconds: null,
+				p95Seconds: null,
+			},
+		],
+	});
 });
 
 test("requested detail metric does not change filtered headline totals", async () => {
