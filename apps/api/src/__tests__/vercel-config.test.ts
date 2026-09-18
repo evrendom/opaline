@@ -64,11 +64,21 @@ describe("Vercel deployment configuration", () => {
 			rootRules.slice(0, 3).every((rule) => rule.destination === "/app.html"),
 		).toBe(true);
 		expect(rootRules.at(-1)?.destination).toBe("/marketing.html");
-		expect(rewriteBySource.has("/home")).toBe(false);
-		expect(
-			vercelConfig.redirects.find((rule) => rule.source === "/home"),
-		).toEqual({ source: "/home", destination: "/", permanent: true });
 		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/api/home")).toBe(true);
+	});
+
+	test("keeps the public homepage at /home regardless of authentication cookies", () => {
+		expect(vercelConfig.redirects.some((rule) => rule.source === "/home")).toBe(
+			false,
+		);
+		expect(
+			vercelConfig.rewrites.find((rule) => rule.source === "/home"),
+		).toEqual({ source: "/home", destination: "/marketing.html" });
+		expect(rewriteSources.indexOf("/home")).toBeLessThan(
+			rewriteSources.findIndex((source) =>
+				source.startsWith("/:path((?!assets"),
+			),
+		);
 	});
 
 	test("routes legacy ingest through the Vercel RPC function", () => {
