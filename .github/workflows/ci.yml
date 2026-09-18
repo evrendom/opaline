@@ -93,7 +93,13 @@ jobs:
           bun scripts/check-disclosure.ts --pull-request "${{ github.event.pull_request.number }}"
 
       - name: Verify
-        run: bun run turbo run lint check-types test build --concurrency=1
+        run: |
+          bun run turbo run lint check-types test --concurrency=1
+          bun run check-types:vercel
+
+      # build:site below builds the web and marketing workspaces once.
+      - name: Build API and CLI
+        run: bun run turbo run build --filter='!@rudel/web' --filter='!@rudel/marketing' --concurrency=1
 
       - name: Build combined marketing, demo, and product
         run: bun run build:site

@@ -6,7 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"build": "tsc -b && vite build",
+		"build": "vite build",
 		"build:demo": "bun tools/build-demo.mjs",
 		"export:demo-seed": "bun --tsconfig-override tsconfig.app.json tools/export-demo-seed.ts",
 		"check-types": "tsc -b",

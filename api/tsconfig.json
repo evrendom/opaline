@@ -1,7 +1,12 @@
 {
 	"extends": "../packages/typescript-config/node.json",
 	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"noCheck": true,
 		"types": ["bun-types"]
 	},
-	"include": ["*.ts"]
+	"include": ["**/*.ts"]
 }
