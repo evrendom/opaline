@@ -8,8 +8,9 @@ import type {
 import { useId, useMemo } from "react";
 import {
 	Area,
-	AreaChart,
 	CartesianGrid,
+	ComposedChart,
+	Line,
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
@@ -35,6 +36,7 @@ import {
 	costLabel,
 	DASHBOARD_METRICS,
 	formatMetric,
+	formatRunDuration,
 	getMetricData,
 	getMetricTotal,
 	METRIC_LABELS,
@@ -118,24 +120,31 @@ export function CostChart({
 	const metricLabel = METRIC_LABELS[metric];
 	const unavailable = data === null;
 	const coverage = metric === "agentRuns" ? data?.coverage : undefined;
-	const coverageParts = coverage
-		? [
-				`${formatMetric(data?.total ?? 0, "agentRuns")} indexed runs`,
-				`${formatMetric(coverage.indexedSessions, "sessions")} sessions indexed`,
-				coverage.indexingSessions > 0
-					? `${formatMetric(coverage.indexingSessions, "sessions")} still indexing`
-					: undefined,
-				coverage.unavailableSessions > 0
-					? `${formatMetric(coverage.unavailableSessions, "sessions")} unavailable to index`
-					: undefined,
-			].filter((part): part is string => Boolean(part))
-		: [];
+	const durationStats =
+		metric === "agentRuns" ? data?.durationStats : undefined;
 	const gradientId = useId();
-	const trend = useMemo(
-		() => groupChartTrend(data?.trend ?? [], interval),
-		[data?.trend, interval],
-	);
 	const today = formatIsoDate(new Date());
+	const trend = useMemo(() => {
+		// Percentiles are calculated from individual runs for the requested period.
+		// Never regroup daily percentiles by summing or averaging them.
+		const durations = new Map(
+			durationStats?.interval === interval
+				? durationStats.trend.map((point) => [point.date, point])
+				: [],
+		);
+		return groupChartTrend(data?.trend ?? [], interval).map((point) => ({
+			...point,
+			medianSeconds:
+				point.startDate > today
+					? null
+					: (durations.get(point.date)?.medianSeconds ?? null),
+			p95Seconds:
+				point.startDate > today
+					? null
+					: (durations.get(point.date)?.p95Seconds ?? null),
+			unknownDurationCount: durations.get(point.date)?.unknownCount,
+		}));
+	}, [data?.trend, durationStats, interval, today]);
 	const visiblePointCount = trend.filter(
 		(point) => point.startDate <= today,
 	).length;
@@ -170,7 +179,11 @@ export function CostChart({
 	return (
 		<section
 			className="cost-chart-panel"
-			aria-label={`${metricLabel} over time`}
+			aria-label={
+				metric === "agentRuns"
+					? "Agent runs with median and P95 duration over time"
+					: `${metricLabel} over time`
+			}
 			aria-busy={pending}
 		>
 			<fieldset
@@ -189,9 +202,7 @@ export function CostChart({
 							description={
 								value === "cost"
 									? "Estimated cost of this usage at API rates. This does not reflect actual subscription charges."
-									: value === "agentRuns"
-										? "One response cycle to a user prompt. Duration is elapsed time from prompt to final assistant message, including waits. Feedback comes from the next user reply."
-										: undefined
+									: undefined
 							}
 							value={
 								total === undefined
@@ -222,10 +233,33 @@ export function CostChart({
 								{entry.label}
 							</div>
 						))}
+						{metric === "agentRuns" ? (
+							<>
+								<div
+									className="cost-legend-item cost-duration-legend"
+									data-percentile="median"
+								>
+									<i aria-hidden="true" />
+									Median{" "}
+									<strong>
+										{formatRunDuration(durationStats?.medianSeconds)}
+									</strong>
+								</div>
+								<div
+									className="cost-legend-item cost-duration-legend"
+									data-percentile="p95"
+								>
+									<i aria-hidden="true" />
+									P95{" "}
+									<strong>
+										{formatRunDuration(durationStats?.p95Seconds)}
+									</strong>
+								</div>
+							</>
+						) : null}
 					</div>
-					{coverage ? (
+					{coverage && data?.incomplete ? (
 						<output className="cost-chart-coverage">
-							<span>{coverageParts.join(" · ")}</span>
 							<button
 								type="button"
 								className="cost-text-button cost-coverage-refresh"
@@ -269,7 +303,7 @@ export function CostChart({
 					/>
 				) : (
 					<ResponsiveContainer width="100%" height="100%" minWidth={0}>
-						<AreaChart
+						<ComposedChart
 							data={trend}
 							margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
 							accessibilityLayer
@@ -289,6 +323,7 @@ export function CostChart({
 								</linearGradient>
 							</defs>
 							<CartesianGrid
+								yAxisId="count"
 								vertical={false}
 								stroke="var(--cost-border)"
 								strokeDasharray="3 4"
@@ -306,6 +341,7 @@ export function CostChart({
 								tick={{ fill: "var(--cost-muted)", fontSize: 11 }}
 							/>
 							<YAxis
+								yAxisId="count"
 								tickFormatter={(value) =>
 									`${metric === "cost" ? "$" : ""}${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))}`
 								}
@@ -318,6 +354,24 @@ export function CostChart({
 								width={56}
 								tick={{ fill: "var(--cost-muted)", fontSize: 11 }}
 							/>
+							{metric === "agentRuns" ? (
+								<YAxis
+									yAxisId="duration"
+									orientation="right"
+									tickFormatter={(value) => formatRunDuration(Number(value))}
+									domain={[0, "auto"]}
+									axisLine={false}
+									tickLine={false}
+									tickCount={4}
+									tickMargin={10}
+									width={68}
+									tick={
+										durationStats?.sampleCount
+											? { fill: "var(--cost-muted)", fontSize: 11 }
+											: false
+									}
+								/>
+							) : null}
 							<Tooltip
 								cursor={{ stroke: "var(--cost-muted)", strokeDasharray: "3 4" }}
 								content={({ active, payload, label }) => {
@@ -336,16 +390,31 @@ export function CostChart({
 														{item.name}
 													</span>
 													<strong>
-														{formatMetric(Number(item.value), metric)}
+														{item.dataKey === "medianSeconds" ||
+														item.dataKey === "p95Seconds"
+															? formatRunDuration(Number(item.value))
+															: formatMetric(Number(item.value), metric)}
 													</strong>
 												</div>
 											))}
+											{point?.unknownDurationCount !== undefined ? (
+												<div className="cost-duration-unknown-count">
+													<span>Runs without duration</span>
+													<strong>
+														{formatMetric(
+															point.unknownDurationCount,
+															"agentRuns",
+														)}
+													</strong>
+												</div>
+											) : null}
 										</div>
 									) : null;
 								}}
 							/>
 							{series.map((entry) => (
 								<Area
+									yAxisId="count"
 									key={entry.id}
 									dataKey={(point) =>
 										getChartSeriesValue(point, entry.id, today)
@@ -368,7 +437,52 @@ export function CostChart({
 									isAnimationActive={false}
 								/>
 							))}
-						</AreaChart>
+							{metric === "agentRuns" ? (
+								<>
+									<Line
+										yAxisId="duration"
+										dataKey="medianSeconds"
+										name="Median duration"
+										type="linear"
+										stroke="var(--cost-foreground)"
+										strokeWidth={2}
+										dot={{
+											r: 2,
+											strokeWidth: 0,
+											fill: "var(--cost-foreground)",
+										}}
+										activeDot={{
+											r: 4,
+											stroke: "var(--cost-surface)",
+											strokeWidth: 2,
+										}}
+										connectNulls={false}
+										isAnimationActive={false}
+									/>
+									<Line
+										yAxisId="duration"
+										dataKey="p95Seconds"
+										name="P95 duration"
+										type="linear"
+										stroke="var(--cost-duration-p95)"
+										strokeWidth={2}
+										strokeDasharray="6 4"
+										dot={{
+											r: 2,
+											strokeWidth: 0,
+											fill: "var(--cost-duration-p95)",
+										}}
+										activeDot={{
+											r: 4,
+											stroke: "var(--cost-surface)",
+											strokeWidth: 2,
+										}}
+										connectNulls={false}
+										isAnimationActive={false}
+									/>
+								</>
+							) : null}
+						</ComposedChart>
 					</ResponsiveContainer>
 				)}
 				{!pending && (unavailable || (data && !data.hasUsage)) ? (
