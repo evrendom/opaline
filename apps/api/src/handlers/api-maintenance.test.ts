@@ -20,19 +20,9 @@ describe("daily API maintenance", () => {
 		);
 	});
 
-	test("repairs native lineage through a separately budgeted bounded drain", () => {
-		expect(maintenanceSource).toContain(
-			"const NATIVE_LINEAGE_BUDGET_MS = 10_000",
-		);
-		expect(maintenanceSource).toContain(
-			'runMaintenancePassLoop(\n\t\t"native-session-lineage"',
-		);
-		expect(maintenanceSource).toContain(
-			"runNativeMetadataDiscoveryPass(\n\t\t\t\tbatchSize",
-		);
-		expect(maintenanceSource).toContain(
-			"repairNativeSessionLineagePass(\n\t\t\t\tbatchSize",
-		);
-		expect(maintenanceSource).toContain('nativeSessionLineage.status === "ok"');
+	test("keeps native lineage out of heavyweight generic maintenance", () => {
+		expect(maintenanceSource).not.toContain("runNativeMetadataDiscoveryPass");
+		expect(maintenanceSource).not.toContain("repairNativeSessionLineagePass");
+		expect(maintenanceSource).not.toContain("nativeSessionLineage");
 	});
 });

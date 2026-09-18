@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import vercelConfig from "../../../../vercel.json" with { type: "json" };
 import { PRODUCTION_SECURITY_HEADERS } from "../lib/http-response-policy.js";
 import {
@@ -12,6 +14,10 @@ const rewriteBySource = new Map(
 const rewriteSources = vercelConfig.rewrites.map((rewrite) => rewrite.source);
 const headerRuleBySource = new Map(
 	vercelConfig.headers.map((rule) => [rule.source, rule.headers]),
+);
+const nativeLineageEntrypointSource = readFileSync(
+	resolve(import.meta.dir, "../../../../api/cron/native-lineage.ts"),
+	"utf8",
 );
 
 describe("Vercel deployment configuration", () => {
@@ -28,6 +34,30 @@ describe("Vercel deployment configuration", () => {
 			rewriteSources.findIndex((source) =>
 				source.startsWith("/:path((?!assets"),
 			),
+		);
+	});
+
+	test("runs native lineage in an isolated bounded daily cron function", () => {
+		expect(vercelConfig.functions["api/cron/native-lineage.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 2048,
+			maxDuration: 90,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/native-lineage",
+			schedule: "30 3 * * *",
+		});
+		expect(
+			rewriteBySource.get(
+				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$).*)",
+			),
+		).toBe("/api/rpc?__opaline_path=/api/:routePath");
+		expect(nativeLineageEntrypointSource).toContain(
+			'from "../../apps/api/src/handlers/native-session-lineage-maintenance.js"',
+		);
+		expect(nativeLineageEntrypointSource).not.toContain("api-maintenance");
+		expect(nativeLineageEntrypointSource).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/native-lineage$/u",
 		);
 	});
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

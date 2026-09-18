@@ -13,7 +13,7 @@ import {
 } from "@rudel/ch-schema/generated";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
-import { runNativeSessionLineageMaintenance } from "../handlers/api-maintenance.js";
+import { handleNativeSessionLineageMaintenanceRequest } from "../handlers/native-session-lineage-maintenance.js";
 import { getDeveloperFeatureUsage } from "../services/developer.service.js";
 import { getProjectFeatureUsage } from "../services/project.service.js";
 import {
@@ -437,28 +437,45 @@ describe("native Codex lineage", () => {
 		expect(await readCurrentLineage(childId)).toBeUndefined();
 
 		const previousBatchSize = process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE;
+		const previousCronSecret = process.env.CRON_SECRET;
+		const cronSecret = "native-lineage-test-secret";
 		process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE = "2";
-		const maintenance = await runNativeSessionLineageMaintenance({
-			deadlineAt: Date.now() + 60_000,
-			now: Date.now,
-		});
-		if (previousBatchSize === undefined) {
-			delete process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE;
-		} else {
-			process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE = previousBatchSize;
+		process.env.CRON_SECRET = cronSecret;
+		let maintenanceResponse: Response;
+		try {
+			maintenanceResponse = await handleNativeSessionLineageMaintenanceRequest(
+				new Request("https://example.test/api/cron/native-lineage", {
+					headers: { Authorization: `Bearer ${cronSecret}` },
+				}),
+			);
+		} finally {
+			if (previousBatchSize === undefined) {
+				delete process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE;
+			} else {
+				process.env.SESSION_LINEAGE_RECONCILE_BATCH_SIZE = previousBatchSize;
+			}
+			if (previousCronSecret === undefined) {
+				delete process.env.CRON_SECRET;
+			} else {
+				process.env.CRON_SECRET = previousCronSecret;
+			}
 		}
-		expect(maintenance).toEqual({
-			discovered: 1,
-			hasMore: false,
-			iterations: 2,
-			missing: 2,
-			nativeChildren: 0,
-			projected: 1,
-			repaired: 0,
-			rejected: 0,
-			scanned: 3,
-			skipped: 0,
-			stopReason: "complete",
+		expect(maintenanceResponse.status).toBe(200);
+		expect(await maintenanceResponse.json()).toEqual({
+			ok: true,
+			nativeSessionLineage: {
+				discovered: 1,
+				hasMore: false,
+				iterations: 2,
+				missing: 2,
+				nativeChildren: 0,
+				projected: 1,
+				repaired: 0,
+				rejected: 0,
+				scanned: 3,
+				skipped: 0,
+				stopReason: "complete",
+			},
 		});
 		expect(await readCurrentLineage(childId)).toMatchObject({
 			childModel: "gpt-5.6-sol",
