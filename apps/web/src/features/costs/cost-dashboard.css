@@ -189,6 +189,22 @@
 	color: var(--cost-muted);
 	white-space: nowrap;
 }
+.cost-duration-legend {
+	padding: 5px 6px;
+	margin: -5px -6px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.cost-duration-legend:hover {
+	background: var(--cost-hover);
+}
+.cost-duration-legend:focus-visible {
+	outline: 2px solid var(--cost-blue);
+	outline-offset: 2px;
+}
+.cost-duration-legend[aria-pressed="false"] {
+	opacity: 0.45;
+}
 .cost-duration-legend i {
 	width: 18px;
 	height: 0;
@@ -203,10 +219,6 @@
 	color: var(--cost-foreground);
 	font-weight: 500;
 	font-variant-numeric: tabular-nums;
-}
-.cost-chart-tooltip .cost-duration-unknown-count {
-	padding-top: 7px;
-	border-top: 1px solid var(--cost-border);
 }
 .cost-chart-canvas {
 	position: relative;

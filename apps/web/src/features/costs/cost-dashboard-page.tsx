@@ -2,6 +2,7 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { CHART_INTERVALS } from "./chart-interval";
 import { ChartIntervalPicker } from "./chart-interval-picker";
 import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
@@ -40,6 +41,9 @@ export function CostDashboardPage() {
 				<DashboardDateControls
 					className="h-7 shrink-0 gap-1.5 rounded-md border-0 bg-(--cost-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--cost-foreground) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--cost-hover) focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--cost-blue) has-data-[icon=inline-start]:pl-1.5 aria-expanded:bg-(--cost-hover) sm:h-7 sm:text-sm dark:bg-(--cost-surface) dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent] dark:hover:bg-(--cost-hover) [&_svg]:size-4 [&_svg]:h-lh [&_svg]:text-[#5d5d5d] dark:[&_svg]:text-[#acaeb2]"
 					sourceComponent="cost_dashboard_date_picker"
+					triggerSuffix={
+						CHART_INTERVALS.find((option) => option.value === interval)?.label
+					}
 					calendarControls={
 						<ChartIntervalPicker value={interval} onChange={setInterval} />
 					}
