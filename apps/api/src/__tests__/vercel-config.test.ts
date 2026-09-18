@@ -67,13 +67,19 @@ describe("Vercel deployment configuration", () => {
 		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/api/home")).toBe(true);
 	});
 
-	test("keeps the public homepage at /home regardless of authentication cookies", () => {
+	test("checks the session before serving the homepage at /home", () => {
 		expect(vercelConfig.redirects.some((rule) => rule.source === "/home")).toBe(
 			false,
 		);
 		expect(
 			vercelConfig.rewrites.find((rule) => rule.source === "/home"),
-		).toEqual({ source: "/home", destination: "/marketing.html" });
+		).toEqual({
+			source: "/home",
+			destination: "/api/rpc?__opaline_path=/api/public-home",
+		});
+		expect(VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN.test("/api/public-home")).toBe(
+			true,
+		);
 		expect(rewriteSources.indexOf("/home")).toBeLessThan(
 			rewriteSources.findIndex((source) =>
 				source.startsWith("/:path((?!assets"),

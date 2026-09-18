@@ -248,6 +248,18 @@ jobs:
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream
 
+      - name: Verify homepage authentication routing
+        env:
+          APP_URL: http://localhost
+          ALLOWED_ORIGIN: http://localhost
+          BETTER_AUTH_SECRET: test-secret-for-integration-tests
+          NODE_ENV: test
+        run: |
+          bun run --cwd apps/marketing build
+          mkdir -p dist-site
+          cp apps/marketing/dist/index.html dist-site/marketing.html
+          bun test ./apps/api/src/__tests__/vercel-home.integration.ts
+
       - name: Fetch the published rudel@0.1.17 CLI
         run: |
           mkdir -p .tmp/old-cli

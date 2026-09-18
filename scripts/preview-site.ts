@@ -16,6 +16,16 @@ const server = Bun.serve({ hostname: "localhost", port, idleTimeout: 255, async 
  const url = new URL(request.url);
  if (url.pathname.startsWith("/api/demo/")) return demo(request);
  if (/^\/(?:api|rpc)(?:\/|$)/u.test(url.pathname) || url.pathname === "/health" || /^\/(?:[^/]+\/join|team\/invite)\/[^/]+(?:\/og\.png)?$/u.test(url.pathname)) return proxy(request);
+ if (url.pathname === "/home") {
+  const headers = {"Cache-Control": "private, no-store", Vary: "Cookie"};
+  if (!["GET", "HEAD"].includes(request.method)) return new Response(null, {status: 405, headers: {...headers, Allow: "GET, HEAD"}});
+  const session = await proxy(new Request(new URL("/api/auth/get-session", url), {headers: request.headers}));
+  if (!session.ok) return session;
+  if (!(await session.json())) {
+   for (const key of ["redirect", "user_code", "error"]) url.searchParams.delete(key);
+   return new Response(null, {status: 302, headers: {...headers, Location: `/${url.search}`}});
+  }
+ }
  const redirect = config.redirects.find((entry) => entry.source === url.pathname.replace(/\/$/u, ""));
  if (url.pathname === "/" && !["redirect", "user_code", "error"].some((key) => url.searchParams.has(key)) && /(?:^|;\s*)(?:__Secure-)?better-auth\.session_token=/.test(request.headers.get("Cookie") ?? "")) {
   url.pathname = "/api/home";
@@ -34,6 +44,7 @@ const server = Bun.serve({ hostname: "localhost", port, idleTimeout: 255, async 
   file = index;
  }
  const headers = new Headers();
+ if (url.pathname === "/home") { headers.set("Cache-Control", "private, no-store"); headers.set("Vary", "Cookie"); }
  for (const rule of config.headers) if (new RegExp(`^${rule.source.replace(":path*", ".*")}$`, "u").test(url.pathname)) for (const header of rule.headers) headers.set(header.key, header.value);
  return new Response(file, {headers});
 }});

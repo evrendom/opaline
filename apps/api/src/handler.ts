@@ -126,7 +126,7 @@ if (cliDeviceVerification.warning) {
 	logger.warn(cliDeviceVerification.warning);
 }
 
-const auth = createAuth(db, {
+export const auth = createAuth(db, {
 	appURL,
 	frontendURL: preferredFrontendOrigin,
 	secret: betterAuthSecret,
