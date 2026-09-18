@@ -225,6 +225,10 @@
 			"destination": "/marketing.html"
 		},
 		{
+			"source": "/home",
+			"destination": "/marketing.html"
+		},
+		{
 			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
 			"destination": "/api/page?__opaline_path=/:path"
 		}
@@ -258,11 +262,6 @@
 		{
 			"source": "/terms",
 			"destination": "/legal/terms-of-service/",
-			"permanent": true
-		},
-		{
-			"source": "/home",
-			"destination": "/",
 			"permanent": true
 		}
 	]
