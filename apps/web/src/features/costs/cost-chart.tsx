@@ -5,7 +5,7 @@ import type {
 	CostDashboardInput,
 	DashboardMetric,
 } from "@rudel/api-routes";
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import {
 	Area,
 	CartesianGrid,
@@ -116,6 +116,8 @@ export function CostChart({
 	refreshing,
 	interval,
 }: Props) {
+	const [showMedian, setShowMedian] = useState(true);
+	const [showP95, setShowP95] = useState(true);
 	const data = getMetricData(dashboard, metric);
 	const metricLabel = METRIC_LABELS[metric];
 	const unavailable = data === null;
@@ -234,26 +236,34 @@ export function CostChart({
 						))}
 						{metric === "agentRuns" ? (
 							<>
-								<div
+								<button
+									type="button"
 									className="cost-legend-item cost-duration-legend"
 									data-percentile="median"
+									aria-label="Median duration"
+									aria-pressed={showMedian}
+									onClick={() => setShowMedian((visible) => !visible)}
 								>
 									<i aria-hidden="true" />
 									Median{" "}
 									<strong>
 										{formatRunDuration(durationStats?.medianSeconds)}
 									</strong>
-								</div>
-								<div
+								</button>
+								<button
+									type="button"
 									className="cost-legend-item cost-duration-legend"
 									data-percentile="p95"
+									aria-label="P95 duration"
+									aria-pressed={showP95}
+									onClick={() => setShowP95((visible) => !visible)}
 								>
 									<i aria-hidden="true" />
 									P95{" "}
 									<strong>
 										{formatRunDuration(durationStats?.p95Seconds)}
 									</strong>
-								</div>
+								</button>
 							</>
 						) : null}
 					</div>
@@ -356,6 +366,7 @@ export function CostChart({
 							{metric === "agentRuns" ? (
 								<YAxis
 									yAxisId="duration"
+									hide={!showMedian && !showP95}
 									orientation="right"
 									tickFormatter={(value) => formatRunDuration(Number(value))}
 									domain={[0, "auto"]}
@@ -429,6 +440,7 @@ export function CostChart({
 								<>
 									<Line
 										yAxisId="duration"
+										hide={!showMedian}
 										dataKey="medianSeconds"
 										name="Median duration"
 										type="linear"
@@ -449,6 +461,7 @@ export function CostChart({
 									/>
 									<Line
 										yAxisId="duration"
+										hide={!showP95}
 										dataKey="p95Seconds"
 										name="P95 duration"
 										type="linear"
