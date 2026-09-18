@@ -1,3 +1,10 @@
+export {
+	SESSION_ARRIVALS_PATH,
+	type SessionArrival,
+	SessionArrivalsInputSchema,
+	SessionArrivalsPageSchema,
+} from "./session-arrivals.js";
+
 import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,

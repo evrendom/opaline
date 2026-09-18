@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import * as React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppToaster } from "@/app/ui/AppToaster";
+import { SessionArrivalNotifications } from "@/features/sessions/session-arrival-notifications";
 import "@/app/app-surface.css";
 import { appRoutes, getCanonicalAppPath, isNewSessionPath } from "@/app/routes";
 import { SidebarInset, SidebarProvider } from "@/app/ui/sidebar";
@@ -279,6 +280,7 @@ export function LeftSidebarAppShellLayout() {
 						</ShellBottomNavigationPortalContext.Provider>
 					</NewseshListHeaderPortalContext.Provider>
 				</ShellHeaderPortalContext.Provider>
+				{!demo && !isWelcome ? <SessionArrivalNotifications /> : null}
 				<AppToaster richColors position="bottom-right" />
 			</TooltipProvider>
 		</ShellOnboardingPanelContext.Provider>
