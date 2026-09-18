@@ -7,6 +7,7 @@ html[data-demo-webkit] :is([class*="mask:"], [class*="drop-shadow"]) {
 
 /* This is a programmatic scroll target, not a keyboard control. Keep focus
  * for scrolling without drawing a ring around the entire demo window. */
-[data-slot="sessions-overview-scroll-container"]:focus {
+[data-slot="sessions-overview-scroll-container"]:focus,
+.cost-page-scroll:focus {
 	outline: none;
 }

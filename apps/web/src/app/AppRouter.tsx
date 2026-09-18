@@ -169,6 +169,7 @@ function LazyRoute({
 function getShellRouteElements(
 	routePaths: ShellRoutePaths,
 	SessionComponent: ComponentType = SessionsPage,
+	DashboardComponent: ComponentType = DashboardPage,
 ) {
 	return (
 		<>
@@ -182,7 +183,7 @@ function getShellRouteElements(
 					import.meta.env.PROD && shellRouteMap.dashboard.comingSoon ? (
 						<ShellRedirect to={routePaths.session} />
 					) : (
-						<LazyRoute Component={DashboardPage} />
+						<LazyRoute Component={DashboardComponent} />
 					)
 				}
 			/>
@@ -290,9 +291,11 @@ function getShellRouteElements(
 export function AppRouter({
 	rootRedirectTarget,
 	sessionComponent,
+	dashboardComponent,
 }: {
 	rootRedirectTarget: string | null;
 	sessionComponent?: ComponentType;
+	dashboardComponent?: ComponentType;
 }) {
 	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
 	return (
@@ -311,7 +314,11 @@ export function AppRouter({
 				element={<LazyRoute Component={TeamInviteAcceptPage} />}
 			/>
 			<Route element={<LeftSidebarAppShellLayout />}>
-				{getShellRouteElements(canonicalShellRoutePaths, sessionComponent)}
+				{getShellRouteElements(
+					canonicalShellRoutePaths,
+					sessionComponent,
+					dashboardComponent,
+				)}
 
 				<Route
 					path={CLI_SETUP_PATH}
@@ -354,7 +361,11 @@ export function AppRouter({
 				}
 			>
 				<Route element={<LeftSidebarAppShellLayout />}>
-					{getShellRouteElements(workspaceShellRoutePaths, sessionComponent)}
+					{getShellRouteElements(
+						workspaceShellRoutePaths,
+						sessionComponent,
+						dashboardComponent,
+					)}
 					<Route
 						path="/:workspaceSlug"
 						element={<ShellRedirect to="/:workspaceSlug/dashboard" />}

@@ -1,4 +1,8 @@
-import { SessionOverviewAnalyticsSchema } from "@rudel/api-routes";
+import {
+	CostDashboardInputSchema,
+	CostDashboardSchema,
+	SessionOverviewAnalyticsSchema,
+} from "@rudel/api-routes";
 import { createContext, useContext } from "react";
 import { z } from "zod";
 
@@ -13,6 +17,10 @@ export const DemoSeedSchema = z.object({
 	),
 	sessions: z.array(SessionOverviewAnalyticsSchema).max(30),
 	totalSessionCount: z.number(),
+	dashboard: z.object({
+		input: CostDashboardInputSchema,
+		data: CostDashboardSchema,
+	}),
 	maxima: z.object({
 		input: z.number(),
 		output: z.number(),

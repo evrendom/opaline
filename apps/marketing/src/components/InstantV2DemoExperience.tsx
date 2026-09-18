@@ -136,6 +136,8 @@ export function InstantV2DemoExperience() {
 		onboarding.authorization,
 	]);
 	const [isCopied, setIsCopied] = useState(false);
+	const [isCopying, setIsCopying] = useState(false);
+	const [copyError, setCopyError] = useState(false);
 	const [isCopyResetting, setIsCopyResetting] = useState(false);
 	const stageRef = useRef<DemoStage>("landing");
 	const activeSweepRef = useRef<SweepHandle | null>(null);
@@ -270,8 +272,18 @@ export function InstantV2DemoExperience() {
 
 	const copySetupCommand = useCallback(
 		async (copyButton: HTMLButtonElement) => {
+			if (isCopying) return;
+			setIsCopying(true);
 			setIsCopied(false);
-			if (!(await onboarding.copyCommand())) return;
+			setCopyError(false);
+			let success = false;
+			try {
+				success = await onboarding.copyCommand();
+			} finally {
+				setIsCopying(false);
+				setCopyError(!success);
+			}
+			if (!success) return;
 
 			copyButton.dispatchEvent(
 				new CustomEvent("opaline:install-command-copied", { bubbles: true }),
@@ -295,7 +307,7 @@ export function InstantV2DemoExperience() {
 				}, COPY_RESET_MS);
 			}, COPY_FEEDBACK_MS);
 		},
-		[onboarding.copyCommand],
+		[isCopying, onboarding.copyCommand],
 	);
 
 	const moveCommandGlow = useCallback(
@@ -406,16 +418,21 @@ export function InstantV2DemoExperience() {
 						Start with your sessions by pasting
 					</span>
 					<button
+						aria-busy={isCopying}
 						aria-label={
-							isCopied
-								? "Copied — paste into your terminal"
-								: `Copy setup command: ${onboarding.displayCommand}`
+							isCopying
+								? "Copying setup command…"
+								: isCopied
+									? "Copied — paste into your terminal"
+									: `Copy setup command: ${onboarding.displayCommand}`
 						}
 						className="instant-v2-demo-command"
 						data-marketing-install-source="demo_bar"
 						data-copied={isCopied ? "true" : undefined}
 						data-copy-resetting={isCopyResetting ? "true" : undefined}
-						disabled={demoBarStage !== "visible" || !onboarding.ready}
+						disabled={
+							demoBarStage !== "visible" || !onboarding.ready || isCopying
+						}
 						onClick={(event) => void copySetupCommand(event.currentTarget)}
 						onPointerMove={moveCommandGlow}
 						title={
@@ -492,10 +509,14 @@ export function InstantV2DemoExperience() {
 								</mask>
 							</svg>
 							<span className="instant-v2-demo-copy-full">
-								{onboarding.displayCommand}
+								{isCopying
+									? "Copying…"
+									: isCopied
+										? "Copied!"
+										: onboarding.displayCommand}
 							</span>
 							<span aria-hidden="true" className="instant-v2-demo-copy-short">
-								npx…
+								{isCopying ? "Copying…" : isCopied ? "Copied!" : "npx…"}
 							</span>
 						</span>
 					</button>
@@ -504,6 +525,11 @@ export function InstantV2DemoExperience() {
 					</span>
 				</div>
 			)}
+			{copyError && !onboarding.error ? (
+				<p className="instant-v2-demo-connection-error" role="alert">
+					Could not copy the command. Allow clipboard access and try again.
+				</p>
+			) : null}
 			{onboarding.error ? (
 				<output className="instant-v2-demo-connection-error">
 					{onboarding.error}{" "}

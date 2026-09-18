@@ -379,15 +379,15 @@ test("Safari keeps landing wheel input over the preview and releases it inside t
 		await frame
 			.locator("html[data-demo-hydrated]")
 			.waitFor({ state: "attached" });
-		const scroll = frame.locator(
-			'[data-slot="sessions-overview-scroll-container"]',
-		);
+		await page.setViewportSize({ width: 2048, height: 600 });
+		const scroll = frame.locator(".cost-page-scroll");
 		await scroll.hover({ position: { x: 400, y: 240 } });
 		await page.mouse.wheel(0, 100);
 		await page.waitForTimeout(250);
 		expect(await scroll.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
 		await page.getByRole("button", { name: "Exit demo" }).click();
 		await page.locator(".instant-v2-demo-bar").waitFor({ state: "detached" });
+		await page.setViewportSize({ width: 2048, height: 1152 });
 		await checkLandingScroll();
 		await page.close();
 	} finally {
@@ -646,7 +646,7 @@ test("Safari keeps the inner window and scroll boundaries attached to the resizi
 							fixedHeight: false,
 						},
 						{
-							selector: '[data-slot="sessions-overview-scroll-container"]',
+							selector: ".cost-page-scroll",
 							fixedWidth: false,
 							fixedHeight: false,
 						},
@@ -667,7 +667,7 @@ test("Safari keeps the inner window and scroll boundaries attached to the resizi
 							fixedHeight: false,
 						},
 						{
-							selector: '[data-slot="sessions-overview-header"]',
+							selector: ".cost-page-toolbar",
 							fixedWidth: false,
 							fixedHeight: true,
 						},

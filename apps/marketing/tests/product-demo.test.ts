@@ -355,8 +355,8 @@ test("demo resizes continuously while the prepared product stays interactive", a
 				.waitFor({ state: "attached" });
 			const product = page.frameLocator(FRAME);
 			const originalRow = await product
-				.getByRole("list", { name: "Recent sessions" })
-				.locator("li")
+				.locator(".cost-metrics")
+				.locator(".cost-metric")
 				.first()
 				.elementHandle();
 			assert(originalRow);
@@ -455,9 +455,7 @@ test("demo resizes continuously while the prepared product stays interactive", a
 					if (direction === "enter") {
 						expect(
 							await originalRow.evaluate(
-								(node) =>
-									node ===
-									document.querySelector('[aria-label="Recent sessions"] li'),
+								(node) => node === document.querySelector(".cost-metric"),
 							),
 						).toBe(true);
 						expect(
@@ -589,7 +587,7 @@ test("Explore enables scrolling without another click inside the product", async
 	const browser = await chromium.launch({ channel: "chrome", headless: true });
 	try {
 		const page = await browser.newPage({
-			viewport: { width: 1440, height: 1000 },
+			viewport: { width: 1440, height: 600 },
 		});
 		await openDemoPreview(page, LANDING);
 		await page
@@ -601,9 +599,7 @@ test("Explore enables scrolling without another click inside the product", async
 		await page.locator("[data-instant-v2-dashboard-demo]").click();
 		await page.locator("html[data-instant-v2-demo-layout-settled]").waitFor();
 		await frame.locator("html[data-demo-live]").waitFor();
-		const scroll = frame.locator(
-			'[data-slot="sessions-overview-scroll-container"]',
-		);
+		const scroll = frame.locator(".cost-page-scroll");
 		await scroll.hover({ position: { x: 400, y: 240 } });
 		// Leave room for PageDown with the smaller local showcase dataset too.
 		await page.mouse.wheel(0, 100);
@@ -639,17 +635,11 @@ test("connection failure preserves the preview and can be retried in place", asy
 		let failConnection = true;
 		let listRequests = 0;
 		page.on("request", (request) => {
-			if (request.url().includes("/rpc/analytics/sessions/list"))
+			if (request.url().includes("/rpc/analytics/overview/costs"))
 				listRequests++;
 		});
-		await page.route("**/api/auth/organization/set-active", (route) =>
-			failConnection
-				? route.fulfill({
-						status: 503,
-						contentType: "application/json",
-						body: "{}",
-					})
-				: route.continue(),
+		await page.route("**/api/demo/auth/get-session", (route) =>
+			failConnection ? route.abort("failed") : route.continue(),
 		);
 		await openDemoPreview(page, LANDING);
 		await page
@@ -658,7 +648,7 @@ test("connection failure preserves the preview and can be retried in place", asy
 			)
 			.waitFor({ state: "attached" });
 		const frame = page.frameLocator(FRAME);
-		const list = frame.getByRole("list", { name: "Recent sessions" });
+		const list = frame.locator(".cost-metrics");
 		await list.waitFor();
 		const originalList = await list.elementHandle();
 		assert(originalList);
@@ -668,12 +658,12 @@ test("connection failure preserves the preview and can be retried in place", asy
 			.filter({ hasText: "could not connect" })
 			.waitFor();
 		expect(listRequests).toBe(0);
-		expect(await list.locator("li").count()).toBe(30);
+		expect(await list.locator(".cost-metric").count()).toBe(4);
 		expect(await originalList.evaluate((node) => node.isConnected)).toBe(true);
 		failConnection = false;
 		await frame.getByRole("button", { name: "Try again" }).click();
 		await frame.locator("html[data-demo-live]").waitFor();
-		await list.locator("li").nth(49).waitFor();
+		await frame.locator('.cost-page[aria-busy="false"]').waitFor();
 		expect(await originalList.evaluate((node) => node.isConnected)).toBe(true);
 		expect(await frame.locator("html[data-demo-hydration-error]").count()).toBe(
 			0,
@@ -683,7 +673,7 @@ test("connection failure preserves the preview and can be retried in place", asy
 	}
 }, 45_000);
 
-test("first paint is real product DOM and avatars, even without JavaScript", async () => {
+test("first paint shows dashboard numbers, chart and member avatars without JavaScript", async () => {
 	const browser = await chromium.launch({ channel: "chrome", headless: true });
 	try {
 		for (const viewport of [
@@ -700,19 +690,31 @@ test("first paint is real product DOM and avatars, even without JavaScript", asy
 			});
 			await openDemoPreview(page, LANDING);
 			const frame = page.frameLocator(FRAME);
-			const rows = frame
-				.getByRole("list", { name: "Recent sessions" })
-				.locator("li");
+			const rows = frame.locator(".cost-metrics").locator(".cost-metric");
 			await rows.first().waitFor();
-			expect(await rows.count()).toBe(30);
+			expect(await rows.count()).toBe(4);
+			expect(await frame.locator(".cost-page-toolbar").isVisible()).toBe(true);
+			const memberImages = frame.locator(
+				'.cost-breakdown-row img[src^="/product-demo/demo-avatars/"]',
+			);
+			expect(await memberImages.count()).toBe(3);
 			expect(
-				await frame
-					.locator('[data-slot="sessions-overview-controls"]')
-					.isVisible(),
+				await memberImages.evaluateAll((images) =>
+					images.every((image) => {
+						const bounds = image.getBoundingClientRect();
+						const style = getComputedStyle(image);
+						return (
+							bounds.width > 0 &&
+							bounds.height > 0 &&
+							style.visibility === "visible" &&
+							style.opacity === "1"
+						);
+					}),
+				),
 			).toBe(true);
 			expect(
-				await frame.locator('img[src^="/product-demo/demo-avatars/"]').count(),
-			).toBeGreaterThanOrEqual(30);
+				await frame.locator("[data-demo-trend-preview] polyline").count(),
+			).toBe(1);
 			expect(
 				await frame
 					.locator("img")
@@ -754,21 +756,10 @@ test("Explore activates prepared nodes, loads real data and retains navigation o
 		});
 		await openDemoPreview(page, LANDING);
 		const frame = page.frameLocator(FRAME);
-		const list = frame.getByRole("list", { name: "Recent sessions" });
-		await list.waitFor();
-		const originalList = await list.elementHandle();
-		const originalRow = await list.locator("li").first().elementHandle();
-		const originalShell = await frame
-			.locator('[data-slot="session-workspace"]')
-			.elementHandle();
-		assert(originalList && originalRow && originalShell);
-		const originalMagnitudes = await list
-			.locator("li")
-			.first()
-			.getByRole("progressbar")
-			.evaluateAll((nodes) =>
-				nodes.map((node) => node.getAttribute("aria-valuenow")),
-			);
+		const metrics = frame.locator(".cost-metrics");
+		await metrics.waitFor();
+		const originalMetrics = await metrics.elementHandle();
+		assert(originalMetrics);
 		await page
 			.locator(
 				'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
@@ -788,43 +779,30 @@ test("Explore activates prepared nodes, loads real data and retains navigation o
 		await frame.locator("html[data-demo-hydrated]").waitFor();
 		expect(await frame.locator("[data-demo-surface][inert]").count()).toBe(1);
 		const responsePromise = page.waitForResponse((response) =>
-			response.url().includes("/rpc/analytics/sessions/list"),
+			response.url().includes("/rpc/analytics/overview/costs"),
 		);
 		await enter.click();
 		const response = await responsePromise;
 		expect(response.status()).toBe(200);
-		expect((await response.json()).json).toHaveLength(93);
+		expect((await response.json()).json.metrics.sessions.total).toBeGreaterThan(
+			0,
+		);
 		await frame.locator("html[data-demo-live]").waitFor();
-		await list.locator("li").nth(49).waitFor();
 		expect(
-			await originalList.evaluate(
-				(node) =>
-					node === document.querySelector('[aria-label="Recent sessions"]'),
+			await originalMetrics.evaluate(
+				(node) => node === document.querySelector(".cost-metrics"),
 			),
 		).toBe(true);
-		expect(
-			await originalRow.evaluate(
-				(node) =>
-					node === document.querySelector('[aria-label="Recent sessions"] li'),
-			),
-		).toBe(true);
-		expect(await originalShell.evaluate((node) => node.isConnected)).toBe(true);
-		expect(
-			await list
-				.locator("li")
-				.first()
-				.getByRole("progressbar")
-				.evaluateAll((nodes) =>
-					nodes.map((node) => node.getAttribute("aria-valuenow")),
-				),
-		).toEqual(originalMagnitudes);
 		expect(await frame.locator("html[data-demo-hydration-error]").count()).toBe(
 			0,
 		);
+		await frame.getByRole("link", { name: "Sessions", exact: true }).click();
+		const list = frame.locator('[data-dashboard-grid-row-scope="session"]');
+		await list.first().waitFor();
 		const detailResponse = page.waitForResponse((response) =>
 			/\/detail(Window|Turn)$/.test(new URL(response.url()).pathname),
 		);
-		await list.locator("li").first().click();
+		await list.first().click();
 		expect((await detailResponse).status()).toBe(200);
 		const detail = frame.locator('[aria-label="Selected session detail"]');
 		await detail.waitFor();
@@ -877,7 +855,7 @@ test("keyboard activation works with reduced motion across locales and timezones
 				)
 				.waitFor({ state: "attached" });
 			const frame = page.frameLocator(FRAME);
-			await frame.getByRole("list", { name: "Recent sessions" }).waitFor();
+			await frame.locator(".cost-metrics").waitFor();
 			expect(await frame.locator("[data-demo-surface][inert]").count()).toBe(1);
 			const button = page.locator("[data-instant-v2-dashboard-demo]");
 			await button.focus();

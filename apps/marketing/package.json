@@ -12,7 +12,7 @@
 		"preview": "astro preview",
 		"preview:product": "bun ../../scripts/preview-site.ts",
 		"dev:product": "bun run --cwd ../.. build:site && bun ../../scripts/preview-site.ts",
-		"test:product-demo": "bun test tests/product-demo.test.ts tests/safari-demo-motion.test.ts ../web/tools/product-demo-parity.test.ts",
+		"test:product-demo": "bun test tests/demo-first-copy.test.ts tests/product-demo.test.ts tests/safari-demo-motion.test.ts && bun test ../web/tools/product-demo-parity.test.ts",
 		"test:landing": "bun test tests/landing-motion.test.js tests/landing-canvas.test.js tests/landing-canvas-precision.test.js tests/hero-canvas.test.js",
 		"test:product-demo-parity": "bun test ../web/tools/product-demo-parity.test.ts",
 		"test:product-demo-explore": "bun test ../web/tools/product-demo-explore.test.ts",

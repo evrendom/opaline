@@ -2,7 +2,6 @@
 
 import { Sidebar } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { RailLink } from "@/features/shell/components/shell-rail";
 import { UserRailButton } from "@/features/shell/components/UserRailButton";
 import { WorkspaceMenuButton } from "@/features/shell/components/WorkspaceMenuButton";
@@ -20,7 +19,6 @@ const centeredSidebarNavigationGapClassName = "gap-5.5";
 
 function SidebarNavigation({ spacious = false }: { spacious?: boolean }) {
 	const currentShellRoute = useCurrentShellRoute();
-	const demo = useDemoRuntime();
 	const getShellRoutePath = useShellRoutePath();
 
 	return (
@@ -31,20 +29,18 @@ function SidebarNavigation({ spacious = false }: { spacious?: boolean }) {
 					spacious ? centeredSidebarNavigationGapClassName : "gap-0.5",
 				)}
 			>
-				{shellNavigationRoutes
-					.filter((route) => route.id !== "dashboard" || !demo)
-					.map((route) => (
-						<RailLink
-							key={route.id}
-							to={getShellRoutePath(route.path)}
-							label={route.navLabel}
-							shortcut={route.shortcut}
-							comingSoon={route.comingSoon}
-							active={currentShellRoute.id === route.id}
-						>
-							{route.icon}
-						</RailLink>
-					))}
+				{shellNavigationRoutes.map((route) => (
+					<RailLink
+						key={route.id}
+						to={getShellRoutePath(route.path)}
+						label={route.navLabel}
+						shortcut={route.shortcut}
+						comingSoon={route.comingSoon}
+						active={currentShellRoute.id === route.id}
+					>
+						{route.icon}
+					</RailLink>
+				))}
 			</ul>
 		</nav>
 	);

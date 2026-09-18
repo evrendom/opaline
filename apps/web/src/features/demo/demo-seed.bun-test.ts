@@ -20,3 +20,16 @@ test("static demo rows use the production analytics contract without runtime loo
 		seed.sessions.some((session) => session.member_swear_matches.length > 0),
 	).toBe(true);
 });
+
+test("the default dashboard seed includes a populated daily cost chart for its range", () => {
+	const { dashboard } = DemoSeedSchema.parse(fixture);
+	expect(dashboard.input.requestedMetric).toBe("cost");
+	expect(dashboard.data.requestedMetric).toBe("cost");
+	expect(dashboard.data.metrics.cost.total).toBeGreaterThan(0);
+	expect(dashboard.data.metrics.cost.trend[0]?.date).toBe(
+		dashboard.input.startDate,
+	);
+	expect(dashboard.data.metrics.cost.trend.at(-1)?.date).toBe(
+		dashboard.input.endDate,
+	);
+});

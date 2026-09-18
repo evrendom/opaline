@@ -93,7 +93,7 @@ export function CostDashboardPage() {
 					</section>
 				) : null}
 			</section>
-			<div className="cost-page-scroll">
+			<div className="cost-page-scroll" tabIndex={-1}>
 				<div className="cost-page-content">
 					{isError ? (
 						<div className="cost-error" role="alert">

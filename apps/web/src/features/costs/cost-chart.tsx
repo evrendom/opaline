@@ -23,6 +23,8 @@ import {
 } from "@/app/ui/tooltip";
 import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
 import { formatIsoDate } from "@/lib/format";
 import {
 	CHART_INTERVALS,
@@ -116,6 +118,7 @@ export function CostChart({
 	refreshing,
 	interval,
 }: Props) {
+	const demo = useDemoRuntime();
 	const [showMedian, setShowMedian] = useState(true);
 	const [showP95, setShowP95] = useState(true);
 	const data = getMetricData(dashboard, metric);
@@ -305,6 +308,9 @@ export function CostChart({
 				)}
 			</div>
 			<div className="cost-chart-canvas">
+				{demo && data ? (
+					<DemoTrendPreview trend={trend} color={primaryColor} />
+				) : null}
 				{pending ? (
 					<ChartSkeleton
 						label={`Loading ${metricLabel.toLowerCase()}`}

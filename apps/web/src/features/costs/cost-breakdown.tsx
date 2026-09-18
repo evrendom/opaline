@@ -33,6 +33,7 @@ import {
 	CodexModelIcon,
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { costLabel, formatMetric, METRIC_LABELS } from "./cost-format";
 import { COST_LABELS } from "./use-cost-dashboard";
 
@@ -334,10 +335,26 @@ function EntryIcon({
 	dimension: CostDimension;
 	entry: CostBreakdownEntry;
 }) {
+	const demo = useDemoRuntime();
+	const image =
+		demo?.seed.members.find((member) => member.userId === entry.id)?.image ??
+		entry.image;
+	// Bundled demo portraits must be present in the prerendered HTML. The
+	// interactive Avatar waits for a client-side image load before showing it.
+	if (dimension === "members" && demo && image)
+		return (
+			<img
+				src={image}
+				alt=""
+				width={22}
+				height={22}
+				className="size-5.5 shrink-0 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+			/>
+		);
 	if (dimension === "members")
 		return (
 			<Avatar className="size-5.5 shrink-0 rounded-full ring-1 ring-black/5 dark:ring-white/10">
-				<AvatarImage src={entry.image ?? undefined} alt="" />
+				<AvatarImage src={image ?? undefined} alt="" />
 				<AvatarFallback className="cost-member-initial">
 					{entry.label
 						.split(/\s+/u)

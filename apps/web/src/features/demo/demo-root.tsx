@@ -10,8 +10,10 @@ import { MemoryRouter } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { SessionsPage } from "@/features/sessions/sessions-page";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
+import { orpc } from "@/lib/orpc";
 import { ensureLiveDemoSession } from "../../../../marketing/src/scripts/live-demo";
 import {
 	getDemoActive,
@@ -26,12 +28,24 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		getDemoActive,
 		getDemoServerActive,
 	);
-	const [client] = useState(
-		() =>
-			new QueryClient({
-				defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
-			}),
-	);
+	const [client] = useState(() => {
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+		});
+		// Render the actual dashboard before activation, then refresh it on Explore.
+		client.setQueryData(
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.overview.costs.queryOptions({
+					input: seed.dashboard.input,
+				}).queryKey,
+			],
+			seed.dashboard.data,
+			{ updatedAt: 0 },
+		);
+		return client;
+	});
 	const [connection, setConnection] = useState<
 		"idle" | "connecting" | "live" | "error"
 	>("idle");
@@ -42,7 +56,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		if (active && document.activeElement === document.body)
 			document
 				.querySelector<HTMLElement>(
-					'[data-slot="sessions-overview-scroll-container"]',
+					'.cost-page-scroll, [data-slot="sessions-overview-scroll-container"]',
 				)
 				?.focus({ preventScroll: true });
 	}, [active]);
@@ -66,7 +80,9 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		<DemoRuntimeContext.Provider value={{ seed, live }}>
 			<QueryClientProvider client={client}>
 				<MemoryRouter
-					initialEntries={["/session?from=2026-08-01&to=2026-08-31"]}
+					initialEntries={[
+						`/dashboard?from=${seed.dashboard.input.startDate}&to=${seed.dashboard.input.endDate}`,
+					]}
 				>
 					<WorkspaceStateProvider
 						value={{
@@ -86,7 +102,8 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 						<DateRangeProvider storageKey="demoDateRange">
 							<div className="h-full" inert={!active} data-demo-surface>
 								<AppRouter
-									rootRedirectTarget="/session"
+									rootRedirectTarget="/dashboard"
+									dashboardComponent={DashboardPage}
 									sessionComponent={SessionsPage}
 								/>
 							</div>

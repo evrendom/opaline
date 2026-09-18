@@ -262,6 +262,7 @@ export function captureSignUpFailed(
 }
 
 export function captureDashboardViewed(payload: DashboardViewedCaptureInput) {
+	if (import.meta.env.MODE === "product-demo") return;
 	void client.productAnalytics.dashboardViewed(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});
@@ -276,6 +277,7 @@ export function captureDashboardLoadFailed(
 export function captureDashboardFilterChanged(
 	payload: DashboardFilterChangedCaptureInput,
 ) {
+	if (import.meta.env.MODE === "product-demo") return;
 	void client.productAnalytics.dashboardFilterChanged(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});
@@ -284,6 +286,7 @@ export function captureDashboardFilterChanged(
 export function captureDashboardDrilldownOpened(
 	payload: DashboardDrilldownOpenedCaptureInput,
 ) {
+	if (import.meta.env.MODE === "product-demo") return;
 	void client.productAnalytics.dashboardDrilldownOpened(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});

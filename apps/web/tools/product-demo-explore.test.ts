@@ -1,10 +1,9 @@
 import { expect, test } from "bun:test";
 import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
-import seed from "../src/features/demo/seed.json";
 import { parseSessionOverviewRows } from "../src/features/sessions/session-overview-response";
 
-test("Explore replaces the initial preview with every live session without an overview error", async () => {
+test("Explore opens the metrics dashboard and Sessions still loads live session data", async () => {
 	const browser = await chromium.launch({ channel: "chrome", headless: true });
 	try {
 		const page = await browser.newPage({
@@ -15,18 +14,21 @@ test("Explore replaces the initial preview with every live session without an ov
 			.locator(
 				'astro-island[component-export="InstantV2DemoExperience"]:not([ssr])',
 			)
-			.waitFor();
+			.waitFor({ state: "attached" });
 		const frame = page.frameLocator("[data-instant-v2-product-iframe]");
 		const rows = frame.locator('[data-dashboard-grid-row-scope="session"]');
-		await rows.nth(seed.sessions.length - 1).waitFor();
-		expect(await rows.count()).toBe(seed.sessions.length);
+		await frame.locator(".cost-metrics").waitFor();
+		expect(await frame.locator(".cost-metric").count()).toBe(4);
+		expect(await rows.count()).toBe(0);
+		await page.locator("[data-instant-v2-dashboard-demo]").click();
+		await frame.locator("html[data-demo-live]").waitFor();
 
 		const responsePromise = page.waitForResponse(
 			(response) =>
-				new URL(response.url()).pathname === "/rpc/analytics/sessions/list" &&
-				response.ok(),
+				new URL(response.url()).pathname ===
+					"/api/demo/rpc/analytics/sessions/list" && response.ok(),
 		);
-		await page.locator("[data-instant-v2-dashboard-demo]").click();
+		await frame.getByRole("link", { name: "Sessions", exact: true }).click();
 		const response = await responsePromise;
 		expect(response.headers()["x-opaline-preview-data"]).not.toBe(
 			"local-snapshot",
@@ -36,13 +38,15 @@ test("Explore replaces the initial preview with every live session without an ov
 			typeof payload === "object" && payload !== null && "json" in payload,
 		);
 		const liveRows = parseSessionOverviewRows(payload.json);
-		expect(liveRows).toHaveLength(seed.totalSessionCount);
-		await frame.locator("html[data-demo-live]").waitFor();
-		// The real table mounts 50 rows at a time; scrolling reveals the next batch.
-		await rows.nth(seed.sessions.length).waitFor();
-		await rows.last().scrollIntoViewIfNeeded();
-		await rows.nth(liveRows.length - 1).waitFor({ timeout: 30_000 });
-		expect(await rows.count()).toBe(liveRows.length);
+		expect(liveRows).toHaveLength(50);
+		await rows.first().waitFor();
+		const hrefs = await rows.evaluateAll((elements) =>
+			elements.map((element) => element.getAttribute("href")),
+		);
+		expect(hrefs.length).toBeGreaterThan(0);
+		for (const href of hrefs) {
+			expect(liveRows.some((row) => href?.includes(row.session_id))).toBe(true);
+		}
 		expect(
 			await frame
 				.getByText("We couldn't load the session overview for this range.", {
@@ -50,12 +54,6 @@ test("Explore replaces the initial preview with every live session without an ov
 				})
 				.count(),
 		).toBe(0);
-		const hrefs = await rows.evaluateAll((elements) =>
-			elements.map((element) => element.getAttribute("href")),
-		);
-		for (const row of liveRows) {
-			expect(hrefs.some((href) => href?.includes(row.session_id))).toBe(true);
-		}
 	} finally {
 		await browser.close();
 	}

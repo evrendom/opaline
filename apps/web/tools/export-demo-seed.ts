@@ -31,7 +31,12 @@ async function read(path: string, input?: unknown) {
 		throw new Error(`Seed read failed: ${path} (${response.status})`);
 	return response.json();
 }
-const [organizationData, sessionsData] = await Promise.all([
+const dashboardInput = {
+	startDate: "2026-08-01",
+	endDate: "2026-08-31",
+	requestedMetric: "cost",
+};
+const [organizationData, sessionsData, dashboardData] = await Promise.all([
 	read("/api/auth/organization/get-full-organization"),
 	read("/rpc/analytics/sessions/list", {
 		startDate: "2026-08-01",
@@ -40,6 +45,7 @@ const [organizationData, sessionsData] = await Promise.all([
 		sortBy: "session_date",
 		sortOrder: "desc",
 	}),
+	read("/rpc/analytics/overview/costs", dashboardInput),
 ]);
 const organization = organizationSchema.parse(organizationData);
 const sessions = z
@@ -49,8 +55,8 @@ const sessions = z
 		json: z.array(SessionOverviewAnalyticsSchema),
 	})
 	.parse(sessionsData).json;
-if (sessions.length !== 93)
-	throw new Error("Expected the approved 93-session demo");
+if (sessions.length !== 85)
+	throw new Error("Expected the approved 85-session demo");
 const members = [];
 await mkdir(new URL("../demo-public/demo-avatars/", import.meta.url), {
 	recursive: true,
@@ -83,6 +89,10 @@ const seed = DemoSeedSchema.parse({
 	members,
 	sessions: sessions.slice(0, 30),
 	totalSessionCount: sessions.length,
+	dashboard: {
+		input: dashboardInput,
+		data: z.object({ json: z.unknown() }).parse(dashboardData).json,
+	},
 	maxima: {
 		input: Math.max(...sessions.map((row) => row.input_tokens)),
 		output: Math.max(...sessions.map((row) => row.output_tokens)),
