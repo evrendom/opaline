@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	buildLineageEnrichedMetadataCte,
+	buildSessionHasSubagentsSql,
 	buildSessionLineageCteDefinitions,
 	SESSION_HAS_SUBAGENTS_SQL,
 } from "./session-lineage-analytics.service.js";
@@ -19,11 +20,12 @@ describe("session-lineage analytics selector", () => {
 		expect(sql).not.toContain("FINAL");
 	});
 
-	test("removes the lineage table from the read path when consumers are off", () => {
+	test("keeps explicit native lineage while heuristic consumers are off", () => {
 		const sql = buildSessionLineageCteDefinitions(false);
 
-		expect(sql).not.toContain("rudel.session_lineage");
-		expect(sql).toContain("WHERE 0");
+		expect(sql).toContain("rudel.session_lineage");
+		expect(sql).toContain("confidence = 'native_parent_id'");
+		expect(sql).toContain("0 AND");
 	});
 
 	test("adds typed children to metadata and exposes one combined predicate", () => {
@@ -34,8 +36,12 @@ describe("session-lineage analytics selector", () => {
 
 		expect(sql).toContain("ifNull(lineage.linked_subagent_count, 0)");
 		expect(sql).toContain("lineage.linked_subagents");
+		expect(sql).toContain("sa.* EXCEPT (organization_id, user_id)");
 		expect(SESSION_HAS_SUBAGENTS_SQL).toBe(
-			"(subagent_count + linked_subagent_count) > 0",
+			"((subagent_count + linked_subagent_count) > 0 OR length(native_child_sessions) > 0)",
+		);
+		expect(buildSessionHasSubagentsSql("sa")).toBe(
+			"((sa.subagent_count + sa.linked_subagent_count) > 0 OR length(sa.native_child_sessions) > 0)",
 		);
 	});
 });

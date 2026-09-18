@@ -8,6 +8,7 @@ import {
 } from "@rudel/agent-adapters";
 import {
 	type contract,
+	extractNativeCodexLineageEvidence,
 	type IngestSessionInput,
 	IngestSessionOutputSchema,
 	PRODUCT_ANALYTICS_EVENTS,
@@ -140,10 +141,13 @@ import {
 	persistSessionLanguageSignalsBestEffort,
 	persistSessionLanguageSignalsWithExecutor,
 } from "./services/session-language-signal-persistence.service.js";
+import { projectNativeSessionLineage } from "./services/session-native-lineage.service.js";
 import {
 	claimSessionIngestOwnership,
+	recordSessionAgentMetadata,
 	recordSessionIngestContent,
 	reserveUsageExtractionGeneration,
+	SessionAgentMetadataConflictError,
 	UsageExtractionSupersededError,
 } from "./services/session-ownership.service.js";
 import {
@@ -666,6 +670,36 @@ export async function processIngestSession({
 			previousContentBytes: previousContentShape.contentBytes,
 		});
 	}
+	const nativeLineage = extractNativeCodexLineageEvidence({
+		content: filteredInput.content,
+		sessionDate: timestamps.sessionDate,
+		sessionId: input.sessionId,
+		source: filteredInput.source,
+	});
+	try {
+		await recordSessionAgentMetadata(orgId, input.sessionId, context.user.id, {
+			nativeParentSessionId: nativeLineage?.parentSessionId,
+			nativeSubagentModel: nativeLineage?.model,
+			nativeSubagentPath: nativeLineage?.agentPath,
+			source: filteredInput.source,
+		});
+	} catch (error) {
+		if (error instanceof SessionAgentMetadataConflictError) {
+			throw new ORPCError("BAD_REQUEST", { message: error.message });
+		}
+		throw error;
+	}
+	if (filteredInput.source === "codex") {
+		// This runs before both idempotency exits so retries repair lineage even
+		// when the raw transcript and usage receipt are already complete. The
+		// durable arrival marker makes the wake-up below a one-time recovery.
+		await projectNativeSessionLineage({
+			notifyPendingArrival: true,
+			organizationId: orgId,
+			sessionId: input.sessionId,
+			userId: context.user.id,
+		});
+	}
 
 	// Hash the exact bytes and filter version stored by the server. This makes
 	// an old unfiltered CLI upload and a current pre-filtered CLI upload
@@ -1182,6 +1216,9 @@ async function processPreparedIngestSession({
 					generation: usageGeneration,
 					modelRateCardVersion: usageExtraction.receipt.modelRateCardVersion,
 				},
+				filteredInput.source === "codex"
+					? { deferArrivalNotification: true }
+					: undefined,
 			);
 		} catch (error) {
 			if (error instanceof UsageExtractionSupersededError) {
@@ -1198,6 +1235,14 @@ async function processPreparedIngestSession({
 			store: "postgres",
 			target: "usage-receipt",
 		});
+		if (filteredInput.source === "codex") {
+			await projectNativeSessionLineage({
+				notifyPendingArrival: true,
+				organizationId: orgId,
+				sessionId: input.sessionId,
+				userId: context.user.id,
+			});
+		}
 		response.usageChecksum = usageExtraction.receipt.checksum;
 
 		const uploadCompletedPayload = getSessionUploadCompletedPayload(

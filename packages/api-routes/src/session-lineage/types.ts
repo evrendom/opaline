@@ -9,7 +9,20 @@ export type LineageConfidence =
 	| "ambiguous"
 	| "attested_temporal"
 	| "id_echo"
+	| "native_parent_id"
 	| "prompt_echo";
+
+export interface NativeCodexLineageEvidence {
+	readonly agentNickname: string | undefined;
+	readonly agentPath: string | undefined;
+	readonly childSessionId: string;
+	readonly depth: number | undefined;
+	readonly model: string;
+	readonly parentSessionId: string;
+	readonly sessionDate: string;
+	readonly startTs: string;
+	readonly workdir: string | undefined;
+}
 
 export interface RawLineageSession {
 	readonly content: string;

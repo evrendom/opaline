@@ -13,7 +13,7 @@ import {
 	buildDateFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
-import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
+import { buildSessionHasSubagentsSql } from "./session-lineage-analytics.service.js";
 import {
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
@@ -23,6 +23,10 @@ const logger = getLogger(["rudel", "api", "project-service"]);
 
 const PROJECT_KEY_EXPR = `if(git_remote != '', git_remote, if(package_name != '', package_name, project_path))`;
 const PROJECT_DISPLAY_EXPR = `if(git_remote != '', arrayElement(splitByChar('/', git_remote), -1), arrayElement(splitByChar('/', replaceAll(project_path, '\\\\', '/')), -1))`;
+
+function buildAliasedProjectDisplayExpr(alias: string): string {
+	return `if(${alias}.git_remote != '', arrayElement(splitByChar('/', ${alias}.git_remote), -1), arrayElement(splitByChar('/', replaceAll(${alias}.project_path, '\\\\', '/')), -1))`;
+}
 
 function buildProjectDisplaySubquery(
 	orgParamName: string,
@@ -573,15 +577,15 @@ export async function getProjectFeatureUsage(
 	const adoptionQuery = `
 	WITH ${usage.cteDefinitions}
 	    SELECT
-      COUNT(*) as total_sessions,
-	      countIf(${SESSION_HAS_SUBAGENTS_SQL}) as subagents_sessions,
-      countIf(length(skills) > 0) as skills_sessions,
-      countIf(length(slash_commands) > 0) as slash_commands_sessions
-	    FROM ${usage.sessionsRelation}
-    WHERE ${PROJECT_DISPLAY_EXPR} = ${projectDisplaySubquery}
-      AND ${buildDateFilter("days")}
-      AND organization_id = {orgId:String}
-      AND (git_remote != '' OR package_name != '' OR project_path != '')
+	      countIf(sa.is_top_level_session = 1) as total_sessions,
+	      countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as subagents_sessions,
+	      countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as skills_sessions,
+	      countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as slash_commands_sessions
+	    FROM ${usage.sessionsRelation} AS sa
+    WHERE ${buildAliasedProjectDisplayExpr("sa")} = ${projectDisplaySubquery}
+      AND ${buildDateFilter("days", "sa.session_date")}
+      AND sa.organization_id = {orgId:String}
+      AND (sa.git_remote != '' OR sa.package_name != '' OR sa.project_path != '')
   `;
 
 	const topSubagentsQuery = `

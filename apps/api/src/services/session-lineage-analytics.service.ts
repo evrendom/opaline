@@ -5,27 +5,18 @@ import { shouldReadSessionLineage } from "../lib/env.js";
 const SESSION_LINEAGE_TABLE = "rudel.session_lineage";
 const LINKED_SUBAGENT_ARRAY_TYPE =
 	"Array(Tuple(String, String, String, String, String))";
+const NATIVE_CHILD_ARRAY_TYPE = "Array(Tuple(String, String))";
 
-export const SESSION_HAS_SUBAGENTS_SQL =
-	"(subagent_count + linked_subagent_count) > 0";
+export function buildSessionHasSubagentsSql(alias?: string): string {
+	const prefix = alias ? `${alias}.` : "";
+	return `((${prefix}subagent_count + ${prefix}linked_subagent_count) > 0 OR length(${prefix}native_child_sessions) > 0)`;
+}
+
+export const SESSION_HAS_SUBAGENTS_SQL = buildSessionHasSubagentsSql();
 
 export function buildSessionLineageCteDefinitions(
 	enabled = shouldReadSessionLineage(),
 ): string {
-	if (!enabled) {
-		return `
-		session_lineage_counts AS (
-			SELECT
-				CAST('', 'String') AS organization_id,
-				CAST('', 'String') AS user_id,
-				CAST('', 'String') AS parent_source,
-				CAST('', 'String') AS parent_session_id,
-				toUInt64(0) AS linked_subagent_count,
-				CAST([], '${LINKED_SUBAGENT_ARRAY_TYPE}') AS linked_subagents
-			WHERE 0
-		)`;
-	}
-
 	return `
 		session_lineage_current AS (
 			SELECT
@@ -44,6 +35,35 @@ export function buildSessionLineageCteDefinitions(
 				AND derivation_version = ${SESSION_LINEAGE_DERIVATION_VERSION}
 			GROUP BY organization_id, user_id, child_source, child_session_id
 		),
+		session_native_parents AS (
+			SELECT
+				organization_id,
+				user_id,
+				child_source,
+				child_session_id,
+				parent_session_id
+			FROM session_lineage_current
+			WHERE confidence = 'native_parent_id'
+				AND countable = 1
+				AND child_source = 'codex'
+				AND parent_source = 'codex'
+		),
+		session_native_children AS (
+			SELECT
+				organization_id,
+				user_id,
+				parent_session_id,
+				arraySort(
+					child -> tupleElement(child, 1),
+					groupArray(tuple(child_session_id, child_model))
+				) AS native_child_sessions
+			FROM session_lineage_current
+			WHERE confidence = 'native_parent_id'
+				AND countable = 1
+				AND child_source = 'codex'
+				AND parent_source = 'codex'
+			GROUP BY organization_id, user_id, parent_session_id
+		),
 		session_lineage_counts AS (
 			SELECT
 				organization_id,
@@ -51,6 +71,7 @@ export function buildSessionLineageCteDefinitions(
 				parent_source,
 				parent_session_id,
 				countIf(
+					${enabled ? "" : "0 AND"}
 					countable = 1
 					AND outcome = 'successful'
 					AND confidence IN ('id_echo', 'prompt_echo', 'attested_temporal')
@@ -65,6 +86,7 @@ export function buildSessionLineageCteDefinitions(
 							child_model,
 							confidence
 						),
+						${enabled ? "" : "0 AND"}
 						countable = 1
 							AND outcome = 'successful'
 							AND confidence IN ('id_echo', 'prompt_echo', 'attested_temporal')
@@ -82,13 +104,31 @@ export function buildLineageEnrichedMetadataCte(input: {
 	return `
 		${input.outputRelation} AS (
 			SELECT
-				sa.*,
+				sa.* EXCEPT (organization_id, user_id),
+				sa.organization_id AS organization_id,
+				sa.user_id AS user_id,
+				toUInt8(ifNull(native_parent.parent_session_id, '') = '') AS is_top_level_session,
+				ifNull(native_parent.parent_session_id, '') AS native_parent_session_id,
+				ifNull(
+					native_children.native_child_sessions,
+					CAST([], '${NATIVE_CHILD_ARRAY_TYPE}')
+				) AS native_child_sessions,
 				ifNull(lineage.linked_subagent_count, 0) AS linked_subagent_count,
 				ifNull(
 					lineage.linked_subagents,
 					CAST([], '${LINKED_SUBAGENT_ARRAY_TYPE}')
 				) AS linked_subagents
 			FROM ${input.baseRelation} AS sa
+			ANY LEFT JOIN session_native_parents AS native_parent
+				ON native_parent.organization_id = sa.organization_id
+				AND native_parent.user_id = sa.user_id
+				AND native_parent.child_source = sa.source
+				AND native_parent.child_session_id = sa.session_id
+			ANY LEFT JOIN session_native_children AS native_children
+				ON native_children.organization_id = sa.organization_id
+				AND native_children.user_id = sa.user_id
+				AND sa.source = 'codex'
+				AND native_children.parent_session_id = sa.session_id
 			ANY LEFT JOIN session_lineage_counts AS lineage
 				ON lineage.organization_id = sa.organization_id
 				AND lineage.user_id = sa.user_id

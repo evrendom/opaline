@@ -8,6 +8,8 @@ import {
 	SessionDetailInitialSchema,
 	SessionDetailOverviewInputSchema,
 	SessionDetailOverviewSchema,
+	SessionDetailRelationshipsInputSchema,
+	SessionDetailRelationshipsSchema,
 	SessionDetailSpineInputSchema,
 	SessionDetailSpineSchema,
 	SessionDetailSubagentInputSchema,
@@ -30,6 +32,10 @@ export const sessionDetailProcedureContracts = {
 	detailOverview: oc
 		.input(SessionDetailOverviewInputSchema)
 		.output(SessionDetailOverviewSchema)
+		.errors(SESSION_DETAIL_REVISION_ERRORS),
+	detailRelationships: oc
+		.input(SessionDetailRelationshipsInputSchema)
+		.output(SessionDetailRelationshipsSchema)
 		.errors(SESSION_DETAIL_REVISION_ERRORS),
 	detailSpine: oc
 		.input(SessionDetailSpineInputSchema)

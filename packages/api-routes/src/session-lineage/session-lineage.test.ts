@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { extractChildLineageEvidence } from "./child-provenance.js";
+import {
+	extractChildLineageEvidence,
+	extractNativeCodexLineageEvidence,
+} from "./child-provenance.js";
 import { correlateSessionLineage } from "./correlate.js";
 import { extractLaunchAnchors } from "./launch-evidence.js";
 import { classifyShellLaunch } from "./shell-launch.js";
@@ -12,6 +15,88 @@ import type {
 const ORGANIZATION_ID = "org";
 const USER_ID = "user";
 const WORKDIR = "/repo";
+
+describe("native Codex lineage extraction", () => {
+	test("accepts matching explicit spawn metadata", () => {
+		const content = [
+			codexLine("2026-09-18T09:25:51.697Z", "session_meta", {
+				cwd: WORKDIR,
+				id: "child",
+				originator: "codex_sdk_ts",
+				parent_thread_id: "parent",
+				session_id: "parent",
+				source: {
+					subagent: {
+						thread_spawn: {
+							agent_nickname: "Hegel",
+							agent_path: "/root/review",
+							depth: 1,
+							parent_thread_id: "parent",
+						},
+					},
+				},
+				thread_source: "subagent",
+			}),
+			codexLine("2026-09-18T09:25:52.000Z", "turn_context", {
+				model: "gpt-5.6-sol",
+			}),
+		].join("\n");
+
+		expect(
+			extractNativeCodexLineageEvidence(
+				createRawSession({ content, sessionId: "child", source: "codex" }),
+			),
+		).toEqual({
+			agentNickname: "Hegel",
+			agentPath: "/root/review",
+			childSessionId: "child",
+			depth: 1,
+			model: "gpt-5.6-sol",
+			parentSessionId: "parent",
+			sessionDate: "2026-08-22T05:41:37.000Z",
+			startTs: "2026-09-18T09:25:51.697Z",
+			workdir: WORKDIR,
+		});
+	});
+
+	test("rejects mismatched identities, cycles, and non-subagent sessions", () => {
+		const create = (metadata: Record<string, unknown>, sessionId = "child") =>
+			extractNativeCodexLineageEvidence(
+				createRawSession({
+					content: codexLine("2026-09-18T09:25:51.697Z", "session_meta", {
+						id: "child",
+						parent_thread_id: "parent",
+						session_id: "parent",
+						source: {
+							subagent: {
+								thread_spawn: { parent_thread_id: "parent" },
+							},
+						},
+						thread_source: "subagent",
+						...metadata,
+					}),
+					sessionId,
+					source: "codex",
+				}),
+			);
+
+		expect(create({}, "different-upload-id")).toBeUndefined();
+		expect(create({ parent_thread_id: "other" })).toBeUndefined();
+		expect(create({ session_id: "root-of-nested-tree" })).toMatchObject({
+			parentSessionId: "parent",
+		});
+		expect(
+			create({
+				parent_thread_id: "child",
+				session_id: "child",
+				source: {
+					subagent: { thread_spawn: { parent_thread_id: "child" } },
+				},
+			}),
+		).toBeUndefined();
+		expect(create({ thread_source: "cli" })).toBeUndefined();
+	});
+});
 
 describe("shell-carried launch classification", () => {
 	test("rejects probes and resumes", () => {

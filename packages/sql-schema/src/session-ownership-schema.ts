@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
 	bigint,
 	index,
@@ -19,6 +20,24 @@ export const sessionOwnership = pgTable(
 		userId: text("user_id")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
+		agentSource: text("agent_source"),
+		agentMetadataScannedAt: timestamp("agent_metadata_scanned_at", {
+			withTimezone: true,
+			mode: "date",
+		}),
+		agentMetadataScanOutcome: text("agent_metadata_scan_outcome"),
+		nativeParentSessionId: text("native_parent_session_id"),
+		nativeSubagentModel: text("native_subagent_model"),
+		nativeSubagentPath: text("native_subagent_path"),
+		nativeLineageProjectedAt: timestamp("native_lineage_projected_at", {
+			withTimezone: true,
+			mode: "date",
+		}),
+		nativeLineageProjectedSignature: text("native_lineage_projected_signature"),
+		arrivalNotifiedAt: timestamp("arrival_notified_at", {
+			withTimezone: true,
+			mode: "date",
+		}),
 		lastContentSha256: text("last_content_sha256"),
 		lastContentBytes: integer("last_content_bytes"),
 		lastAssistantLineCount: integer("last_assistant_line_count"),
@@ -69,6 +88,19 @@ export const sessionOwnership = pgTable(
 			table.organizationId,
 			table.createdAt,
 		),
+		index("session_ownership_native_parent_idx")
+			.on(table.organizationId, table.userId, table.nativeParentSessionId)
+			.where(sql`${table.nativeParentSessionId} IS NOT NULL`),
+		index("session_ownership_agent_metadata_scan_idx")
+			.on(
+				table.createdAt.desc(),
+				table.organizationId,
+				table.userId,
+				table.sessionId,
+			)
+			.where(
+				sql`${table.agentSource} IS NULL AND ${table.agentMetadataScannedAt} IS NULL`,
+			),
 	],
 );
 

@@ -51,6 +51,24 @@ interface UsageExtractionReceiptRecord {
 	modelRateCardVersion: string;
 }
 
+export interface SessionAgentMetadata {
+	readonly nativeParentSessionId?: string;
+	readonly nativeSubagentModel?: string;
+	readonly nativeSubagentPath?: string;
+	readonly rawIngestedAt?: string;
+	readonly rawSessionDate?: string;
+	readonly source: "claude_code" | "codex";
+}
+
+export class SessionAgentMetadataConflictError extends Error {
+	constructor() {
+		super(
+			"Session agent metadata conflicts with the existing ownership record",
+		);
+		this.name = "SessionAgentMetadataConflictError";
+	}
+}
+
 export interface UsageBackfillOwnershipState {
 	lastContentSha256: string | null;
 	lastIngestedAt: Date | null;
@@ -96,6 +114,116 @@ export async function claimSessionIngestOwnership(
 	return getOwnershipClaim(reservedOwner, organizationId, sessionId, userId);
 }
 
+export async function recordSessionAgentMetadata(
+	organizationId: string,
+	sessionId: string,
+	userId: string,
+	metadata: SessionAgentMetadata,
+	database: postgres.Sql = sqlClient,
+): Promise<void> {
+	if (
+		(metadata.rawIngestedAt === undefined) !==
+		(metadata.rawSessionDate === undefined)
+	) {
+		throw new SessionAgentMetadataConflictError();
+	}
+	if (
+		metadata.nativeParentSessionId !== undefined &&
+		(metadata.source !== "codex" ||
+			metadata.nativeParentSessionId === sessionId)
+	) {
+		throw new SessionAgentMetadataConflictError();
+	}
+	await database.begin(async (transaction) => {
+		// Serialize lineage changes per organization so two concurrent opposite
+		// edges cannot both pass the cycle check.
+		await transaction.unsafe(
+			"SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+			[`session-native-lineage:${organizationId}`],
+		);
+		const [row] = await transaction.unsafe<Array<{ session_id: string }>>(
+			`
+			WITH RECURSIVE ancestors(session_id, parent_session_id) AS (
+				SELECT session_id, native_parent_session_id
+				FROM session_ownership
+				WHERE organization_id = $1
+					AND user_id = $2
+					AND session_id = $5
+					AND agent_source = 'codex'
+				UNION
+				SELECT parent.session_id, parent.native_parent_session_id
+				FROM session_ownership parent
+				JOIN ancestors child ON child.parent_session_id = parent.session_id
+				WHERE parent.organization_id = $1
+					AND parent.user_id = $2
+					AND parent.agent_source = 'codex'
+			)
+			UPDATE session_ownership
+			SET
+				agent_source = COALESCE(agent_source, $4),
+				native_parent_session_id = COALESCE(native_parent_session_id, $5),
+				native_subagent_model = CASE
+					WHEN $6::text IS NULL THEN native_subagent_model
+					WHEN native_subagent_model IS NULL OR native_subagent_model = 'codex'
+						THEN $6
+					ELSE native_subagent_model
+				END,
+				native_subagent_path = COALESCE(native_subagent_path, $7),
+				last_session_date = CASE
+					WHEN $8::timestamptz IS NULL THEN last_session_date
+					WHEN last_ingested_at IS NULL OR last_ingested_at <= $9::timestamptz
+						THEN $8::timestamptz
+					ELSE last_session_date
+				END,
+				last_ingested_at = CASE
+					WHEN $9::timestamptz IS NULL THEN last_ingested_at
+					ELSE GREATEST(
+						COALESCE(last_ingested_at, '-infinity'::timestamptz),
+						$9::timestamptz
+					)
+				END
+			WHERE organization_id = $1
+				AND user_id = $2
+				AND session_id = $3
+				AND (agent_source IS NULL OR agent_source = $4)
+				AND (
+					$5::text IS NULL
+					OR native_parent_session_id IS NULL
+					OR native_parent_session_id = $5
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM session_ownership conflicting_parent
+					WHERE conflicting_parent.organization_id = $1
+						AND conflicting_parent.session_id = $5
+						AND (
+							conflicting_parent.user_id <> $2
+							OR conflicting_parent.agent_source NOT IN ('codex')
+						)
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ancestors
+					WHERE session_id = $3 OR parent_session_id = $3
+				)
+			RETURNING session_id
+			`,
+			[
+				organizationId,
+				userId,
+				sessionId,
+				metadata.source,
+				metadata.nativeParentSessionId ?? null,
+				metadata.nativeSubagentModel ?? null,
+				metadata.nativeSubagentPath ?? null,
+				metadata.rawSessionDate ?? null,
+				metadata.rawIngestedAt ?? null,
+			],
+		);
+		if (!row) throw new SessionAgentMetadataConflictError();
+	});
+}
+
 export async function recordSessionIngestContent(
 	organizationId: string,
 	sessionId: string,
@@ -106,6 +234,7 @@ export async function recordSessionIngestContent(
 	ingestedAt: Date,
 	revision: string,
 	usageReceipt?: UsageExtractionReceiptRecord,
+	options?: { readonly deferArrivalNotification?: boolean },
 ): Promise<void> {
 	// Raw bookkeeping follows the shared revision ordering. Usage extraction must
 	// match both its reserved generation and the raw revision it describes.
@@ -184,13 +313,60 @@ export async function recordSessionIngestContent(
 		if (completed.length !== 1) {
 			throw new UsageExtractionSupersededError();
 		}
-		if (ownership?.isFirstCompletion) {
+		if (ownership?.isFirstCompletion && !options?.deferArrivalNotification) {
 			// Delivered only after this successful receipt transaction commits.
 			await transaction.unsafe("SELECT pg_notify($1, '')", [
 				sessionArrivalChannel(organizationId),
 			]);
 		}
 	});
+}
+
+export async function notifyPendingSessionArrival(
+	organizationId: string,
+	sessionId: string,
+	userId: string,
+): Promise<boolean> {
+	return sqlClient.begin(async (transaction) => {
+		const payload = await markPendingSessionArrival(
+			organizationId,
+			sessionId,
+			userId,
+			transaction,
+		);
+		if (payload === null) return false;
+		await transaction.unsafe("SELECT pg_notify($1, $2)", [
+			sessionArrivalChannel(organizationId),
+			payload,
+		]);
+		return true;
+	});
+}
+
+export async function markPendingSessionArrival(
+	organizationId: string,
+	sessionId: string,
+	userId: string,
+	database: postgres.Sql | postgres.TransactionSql,
+): Promise<"" | "lineage-refresh" | null> {
+	const [pending] = await database.unsafe<
+		Array<{ native_parent_session_id: string | null }>
+	>(
+		`
+		UPDATE session_ownership
+		SET arrival_notified_at = NOW()
+		WHERE organization_id = $1
+			AND session_id = $2
+			AND user_id = $3
+			AND agent_source = 'codex'
+			AND last_usage_completed_at IS NOT NULL
+			AND arrival_notified_at IS NULL
+		RETURNING native_parent_session_id
+		`,
+		[organizationId, sessionId, userId],
+	);
+	if (!pending) return null;
+	return pending.native_parent_session_id === null ? "" : "lineage-refresh";
 }
 
 export async function reserveUsageExtractionGeneration(

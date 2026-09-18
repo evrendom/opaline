@@ -31,6 +31,7 @@ export async function streamSessionArrivals(
 	let closed = false;
 	let refreshing = false;
 	let refreshPending = false;
+	let changeNotificationPending = false;
 	let resume: (() => void) | undefined;
 	let heartbeat: ReturnType<typeof setInterval> | undefined;
 	let deadline: ReturnType<typeof setTimeout> | undefined;
@@ -64,14 +65,18 @@ export async function streamSessionArrivals(
 			),
 		);
 	}
-	async function refresh() {
+	async function refresh(sendEmptyPage: boolean) {
 		refreshPending = true;
+		changeNotificationPending ||= sendEmptyPage;
 		if (closed || refreshing) return;
 		refreshing = true;
 		try {
 			while (refreshPending && !closed) {
 				refreshPending = false;
+				const shouldSendEmptyPage = changeNotificationPending;
+				changeNotificationPending = false;
 				let after: string | undefined;
+				let sentPage = false;
 				do {
 					const member = await readSessionArrivalMember(organizationId, userId);
 					if (!member) {
@@ -86,10 +91,11 @@ export async function streamSessionArrivals(
 					const sessions = page.sessions.filter(
 						(session) => !sent.has(session.sessionId),
 					);
-					if (sessions.length) {
+					if (sessions.length > 0 || (shouldSendEmptyPage && !sentPage)) {
 						await send({ ...page, sessions });
-						for (const session of sessions) sent.add(session.sessionId);
+						sentPage = true;
 					}
+					for (const session of sessions) sent.add(session.sessionId);
 					after = page.nextCursor ?? undefined;
 				} while (after && !closed);
 			}
@@ -107,15 +113,16 @@ export async function streamSessionArrivals(
 				close();
 				return;
 			}
-			void send({ since: baseline, sessions: [], nextCursor: null });
 			void listener
 				.listen(
 					sessionArrivalChannel(organizationId),
-					() => {
-						void refresh();
+					(payload) => {
+						void refresh(payload === "lineage-refresh");
 					},
 					() => {
-						void refresh();
+						void send({ since: baseline, sessions: [], nextCursor: null }).then(
+							() => refresh(false),
+						);
 					},
 				)
 				.catch(() => close());

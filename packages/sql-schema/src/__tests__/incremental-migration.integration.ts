@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0034_TIMESTAMP = "1789718160105";
+const MIGRATION_0037_TIMESTAMP = "1789723000000";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0034 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0037 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0034 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0034] = await migrationSql<MigrationState[]>`
+			const [after0037] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,15 +61,56 @@ test("applies migrations 0020-0034 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0034).toEqual({
-				count: 35,
-				latestTimestamp: MIGRATION_0034_TIMESTAMP,
+			expect(after0037).toEqual({
+				count: 38,
+				latestTimestamp: MIGRATION_0037_TIMESTAMP,
 			});
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [arrivalsIndex] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.session_ownership_arrivals_idx')::text AS name
 			`;
 			expect(arrivalsIndex?.name).toBe("session_ownership_arrivals_idx");
+			const [nativeParentIndex] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.session_ownership_native_parent_idx')::text AS name
+			`;
+			expect(nativeParentIndex?.name).toBe(
+				"session_ownership_native_parent_idx",
+			);
+			const [agentMetadataScanIndex] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.session_ownership_agent_metadata_scan_idx')::text AS name
+			`;
+			expect(agentMetadataScanIndex?.name).toBe(
+				"session_ownership_agent_metadata_scan_idx",
+			);
+			const nativeLineageColumns = await migrationSql<Array<{ name: string }>>`
+				SELECT column_name AS name
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'session_ownership'
+					AND column_name IN (
+						'agent_source',
+						'agent_metadata_scanned_at',
+						'agent_metadata_scan_outcome',
+						'native_parent_session_id',
+						'native_lineage_projected_at',
+						'native_lineage_projected_signature',
+						'native_subagent_model',
+						'native_subagent_path',
+						'arrival_notified_at'
+					)
+				ORDER BY column_name
+			`;
+			expect([...nativeLineageColumns]).toEqual([
+				{ name: "agent_metadata_scan_outcome" },
+				{ name: "agent_metadata_scanned_at" },
+				{ name: "agent_source" },
+				{ name: "arrival_notified_at" },
+				{ name: "native_lineage_projected_at" },
+				{ name: "native_lineage_projected_signature" },
+				{ name: "native_parent_session_id" },
+				{ name: "native_subagent_model" },
+				{ name: "native_subagent_path" },
+			]);
 			const [repositoryUploadTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.repository_upload_report')::text AS name
 			`;

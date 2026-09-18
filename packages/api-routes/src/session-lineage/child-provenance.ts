@@ -1,8 +1,55 @@
 import type {
 	ChildLineageEvidence,
 	LineageOutcome,
+	NativeCodexLineageEvidence,
 	RawLineageSession,
 } from "./types.js";
+
+export function extractNativeCodexLineageEvidence(
+	session: Pick<
+		RawLineageSession,
+		"content" | "sessionDate" | "sessionId" | "source"
+	>,
+): NativeCodexLineageEvidence | undefined {
+	if (session.source !== "codex") return undefined;
+	const lines = parseJsonLines(session.content);
+	const sessionMeta = lines.find((line) => line.type === "session_meta");
+	const metadata = readRecord(sessionMeta?.payload);
+	if (metadata?.thread_source !== "subagent") return undefined;
+	const childSessionId = readString(metadata.id);
+	if (!childSessionId || childSessionId !== session.sessionId) return undefined;
+
+	const source = readRecord(metadata.source);
+	const subagent = readRecord(source?.subagent);
+	const threadSpawn = readRecord(subagent?.thread_spawn);
+	const nestedParentId = readString(threadSpawn?.parent_thread_id);
+	if (!nestedParentId || nestedParentId === childSessionId) return undefined;
+	const parentIds = [
+		readString(metadata.parent_thread_id),
+		nestedParentId,
+	].filter((value): value is string => value !== undefined);
+	if (parentIds.some((value) => value !== nestedParentId)) return undefined;
+
+	const model = lines
+		.map((line) => readRecord(line.payload))
+		.map((payload) => readString(payload?.model))
+		.find(Boolean);
+	const depth = threadSpawn?.depth;
+	return {
+		agentNickname: readString(threadSpawn?.agent_nickname),
+		agentPath: readString(threadSpawn?.agent_path),
+		childSessionId,
+		depth:
+			typeof depth === "number" && Number.isSafeInteger(depth) && depth > 0
+				? depth
+				: undefined,
+		model: model ?? "codex",
+		parentSessionId: nestedParentId,
+		sessionDate: session.sessionDate,
+		startTs: readString(sessionMeta?.timestamp) ?? session.sessionDate,
+		workdir: readString(metadata.cwd),
+	};
+}
 
 export function extractChildLineageEvidence(
 	session: RawLineageSession,

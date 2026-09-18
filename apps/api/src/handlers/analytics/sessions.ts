@@ -20,6 +20,7 @@ import {
 	InvalidSessionDetailWindowCursorError,
 } from "../../services/session-detail-derivation.service.js";
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
+import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import { listUploadFailures } from "../../services/upload-failure.service.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
@@ -189,6 +190,23 @@ const detailOverview = os.analytics.sessions.detailOverview
 		}
 	});
 
+const detailRelationships = os.analytics.sessions.detailRelationships
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			{
+				isOrgAdmin: context.isOrgAdmin,
+				requesterUserId: context.user.id,
+			},
+		);
+		return readNativeSessionRelationships({
+			organizationId: context.organizationId,
+			sessionId: input.sessionId,
+			userId: ownerId,
+		});
+	});
+
 const detailWindow = os.analytics.sessions.detailWindow
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
@@ -306,6 +324,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	uploadFailures,
 	detailBodyChunk,
 	detailOverview,
+	detailRelationships,
 	detailInitial,
 	detailSpine,
 	detailSubagent,

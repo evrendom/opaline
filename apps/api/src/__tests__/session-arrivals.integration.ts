@@ -7,7 +7,10 @@ import {
 import { z } from "zod";
 import { sqlClient } from "../db.js";
 import { sessionArrivalChannel } from "../services/session-arrival-channel.js";
-import { recordSessionIngestContent } from "../services/session-ownership.service.js";
+import {
+	notifyPendingSessionArrival,
+	recordSessionIngestContent,
+} from "../services/session-ownership.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -113,6 +116,7 @@ async function complete(
 	organizationId: string,
 	sessionId: string,
 	withReceipt = true,
+	deferArrivalNotification = false,
 ) {
 	await recordSessionIngestContent(
 		organizationId,
@@ -140,6 +144,7 @@ async function complete(
 					modelRateCardVersion: "test",
 				}
 			: undefined,
+		{ deferArrivalNotification },
 	);
 }
 
@@ -219,5 +224,52 @@ test("delivers a bulk import over one stream with bounded pages", async () => {
 	}
 	expect(ids).toHaveLength(205);
 	expect(new Set(ids).size).toBe(205);
+	stream.close();
+});
+
+test("suppresses native child toasts while still delivering cache refresh events", async () => {
+	const owner = users[0];
+	assert(owner);
+	const stream = await connect(owner.id, owner.token);
+	const parentId = `native-parent-${run}`;
+	const childId = `native-child-${run}`;
+	await sqlClient`
+		INSERT INTO session_ownership (
+			organization_id,
+			session_id,
+			user_id,
+			agent_source,
+			native_parent_session_id
+		) VALUES
+			(${owner.id}, ${parentId}, ${owner.id}, 'codex', NULL),
+			(${owner.id}, ${childId}, ${owner.id}, 'codex', ${parentId})
+	`;
+	const notifications: string[] = [];
+	const subscription = await sqlClient.listen(
+		sessionArrivalChannel(owner.id),
+		(payload) => notifications.push(payload),
+	);
+	await complete(owner.id, childId, true, true);
+	expect(await notifyPendingSessionArrival(owner.id, childId, owner.id)).toBe(
+		true,
+	);
+	expect((await stream.next()).sessions).toEqual([]);
+	expect(await notifyPendingSessionArrival(owner.id, childId, owner.id)).toBe(
+		false,
+	);
+
+	await complete(owner.id, parentId, true, true);
+	expect(await notifyPendingSessionArrival(owner.id, parentId, owner.id)).toBe(
+		true,
+	);
+	expect((await stream.next()).sessions).toEqual([
+		{ sessionId: parentId, userName: "owner" },
+	]);
+	expect(await notifyPendingSessionArrival(owner.id, parentId, owner.id)).toBe(
+		false,
+	);
+	await Bun.sleep(25);
+	expect(notifications).toEqual(["lineage-refresh", ""]);
+	await subscription.unlisten();
 	stream.close();
 });

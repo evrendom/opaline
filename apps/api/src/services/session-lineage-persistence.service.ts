@@ -12,6 +12,7 @@ import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
 
 const INPUT_SEQUENCE_BITS = 48n;
 const MAX_INPUT_SEQUENCE = (1n << INPUT_SEQUENCE_BITS) - 1n;
+const NATIVE_INPUT_SEQUENCE_FLAG = 1n << 47n;
 
 export interface SessionLineageRowBuildInput {
 	readonly edge: SessionLineageEdge;
@@ -109,6 +110,68 @@ export function buildUnmatchedSessionLineageRow(input: {
 	};
 }
 
+export function buildNativeSessionLineageRow(input: {
+	readonly childIngestedAt: Date | string;
+	readonly childModel: string;
+	readonly childSessionDate: Date | string;
+	readonly childSessionId: string;
+	readonly countable: boolean;
+	readonly derivedAt: Date | string;
+	readonly evidenceAt: Date | string;
+	readonly organizationId: string;
+	readonly parentSessionDate: Date | string;
+	readonly parentSessionId: string;
+	readonly userId: string;
+}): RudelSessionLineageRow {
+	const evidenceMillis = Math.max(
+		toUnixTimestampMilliseconds(input.childIngestedAt),
+		toUnixTimestampMilliseconds(input.evidenceAt),
+	);
+	const inputSequence = BigInt(evidenceMillis);
+	const nativeStateSequence =
+		inputSequence * 4n +
+		(input.countable ? 2n : 0n) +
+		(input.childModel === "codex" ? 0n : 1n);
+	const replacementInputSequence =
+		NATIVE_INPUT_SEQUENCE_FLAG + nativeStateSequence;
+	if (replacementInputSequence > MAX_INPUT_SEQUENCE) {
+		throw new Error(
+			"Native session-lineage replacement sequence exceeds the 48-bit budget",
+		);
+	}
+	return {
+		anchor_operation_ordinal: 0,
+		anchor_tool_use_id: "",
+		anchor_ts: toClickHouseDateTime(input.parentSessionDate),
+		carrier: "codex_native_subagent",
+		child_entrypoint: "",
+		child_first_ingested_at: toClickHouseDateTime(input.childIngestedAt),
+		child_model: input.childModel,
+		child_originator: "codex_sdk_ts",
+		child_session_date: toClickHouseDateTime(input.childSessionDate),
+		child_session_id: input.childSessionId,
+		child_source: "codex",
+		child_start_ts: toClickHouseDateTime(input.childSessionDate),
+		confidence: "native_parent_id",
+		countable: input.countable ? 1 : 0,
+		derivation_version: SESSION_LINEAGE_DERIVATION_VERSION,
+		derived_at: toClickHouseDateTime(input.derivedAt),
+		input_sequence: inputSequence.toString(),
+		organization_id: input.organizationId,
+		outcome: "unknown",
+		parent_session_date: toClickHouseDateTime(input.parentSessionDate),
+		parent_session_id: input.parentSessionId,
+		parent_source: "codex",
+		prompt_fingerprint: "",
+		reason: "explicit native Codex parent metadata",
+		replacement_version: encodeReplacementVersion(
+			replacementInputSequence,
+		).toString(),
+		user_id: input.userId,
+		workdir: "",
+	};
+}
+
 export function fingerprintPrompt(
 	prompt: string,
 	fingerprintKey: string,
@@ -176,8 +239,8 @@ export function insertSessionLineageRowsWithDefaultExecutor(
 	return insertSessionLineageRows(getClickhouse(), rows);
 }
 
-function toUnixTimestampMilliseconds(value: string): number {
-	const timestamp = Date.parse(value);
+function toUnixTimestampMilliseconds(value: Date | string): number {
+	const timestamp = new Date(value).getTime();
 	if (!Number.isSafeInteger(timestamp) || timestamp < 0) {
 		throw new Error("Session-lineage input timestamp is invalid");
 	}

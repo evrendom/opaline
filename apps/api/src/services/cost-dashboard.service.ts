@@ -66,13 +66,13 @@ export async function getCostDashboard(
   WHERE sa.organization_id = {orgId:String}
  `
 			: `
-  SELECT 'cost' AS metric, toString(usage_date) AS date, user_id AS member,
-   ${repositorySql("sa")} AS repository, model_used AS model,
-	   ifNull(estimated_cost, 0) AS value, NOT cost_is_complete AS incomplete, '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
+  SELECT 'cost' AS metric, toString(sa.usage_date) AS date, sa.user_id AS member,
+	   ${repositorySql("sa")} AS repository, sa.model_used AS model,
+	   ifNull(sa.estimated_cost, 0) AS value, NOT sa.cost_is_complete AS incomplete, '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
 	   '' AS coverage_status, toUInt8(0) AS prefiltered
   FROM ${usage.dailySessionsRelation} AS sa
-  WHERE organization_id = {orgId:String}
-   AND usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
+  WHERE sa.organization_id = {orgId:String}
+   AND sa.usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
  `;
 	// One row per session, bucketed by start date. Count it once under the same
 	// primary model as the session list, not once per request/model/day.

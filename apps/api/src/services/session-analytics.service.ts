@@ -14,7 +14,7 @@ import {
 } from "../clickhouse.js";
 import { shouldUsePersistentSkillAnalytics } from "../lib/env.js";
 import { getRepositorySqlFilter } from "./repository-filter.service.js";
-import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
+import { buildSessionHasSubagentsSql } from "./session-lineage-analytics.service.js";
 import {
 	appendSessionListSqlFilters,
 	getSessionListRepositoryKey,
@@ -61,6 +61,9 @@ export interface SessionAnalyticsRaw {
 	subagent_types: string[];
 	subagent_count: number;
 	native_subagents?: Array<readonly [string, string]>;
+	native_child_sessions?: Array<readonly [string, string]>;
+	native_parent_session_id?: string;
+	is_top_level_session?: number;
 	linked_subagent_count?: number;
 	linked_subagents?: Array<
 		readonly [
@@ -182,6 +185,9 @@ export function mapSessionAnalyticsRow(
 				subagent_id,
 				model: model || null,
 			}),
+		),
+		native_child_sessions: (row.native_child_sessions ?? []).map(
+			([session_id, model]) => ({ model, session_id }),
 		),
 		linked_subagent_count: row.linked_subagent_count ?? 0,
 		linked_subagents: (row.linked_subagents ?? []).map(
@@ -371,6 +377,7 @@ async function getSessionAnalyticsBaseRows(
 	      subagent_types,
 	      subagent_count,
 	      native_subagents,
+	      native_child_sessions,
 	      linked_subagent_count,
 	      linked_subagents,
 	      skills,
@@ -382,6 +389,7 @@ async function getSessionAnalyticsBaseRows(
 	    FROM ${usage.sessionsRelation} AS sa
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
+	  AND sa.is_top_level_session = 1
       ${filters.length > 0 ? `AND ${filters.join("\n      AND ")}` : ""}
     ORDER BY ${sortColumn} ${sortDirection}, sa.source ASC, sa.session_id ASC
     ${filterRepositories ? "" : "LIMIT {limit:UInt32} OFFSET {offset:UInt32}"}
@@ -515,14 +523,14 @@ export async function getSessionAnalyticsSummary(
 	addOptionalStringEqFilter(
 		filters,
 		query_params,
-		"user_id",
+		"sa.user_id",
 		"userId",
 		user_id,
 	);
 	addOptionalStringEqFilter(
 		filters,
 		query_params,
-		"project_path",
+		"sa.project_path",
 		"projectPath",
 		project_path,
 	);
@@ -534,20 +542,20 @@ export async function getSessionAnalyticsSummary(
 	    WITH ${usage.cteDefinitions},
 	    totals AS (
       SELECT
-        COUNT(*) as cnt_sessions,
-        SUM(total_interactions) as sum_interactions,
-        SUM(quick_responses) as sum_quick_responses,
-        SUM(long_pauses) as sum_long_pauses,
-        ifNull(AVG(actual_duration_min), 0) as avg_duration,
-        ifNull(AVG(total_interactions), 0) as avg_interactions,
-        ifNull(AVG(avg_period_sec), 0) as avg_response,
-        ifNull(AVG(median_period_sec), 0) as med_response,
-	        countIf(${SESSION_HAS_SUBAGENTS_SQL}) as cnt_subagents,
-        countIf(length(skills) > 0) as cnt_skills,
-        countIf(length(slash_commands) > 0) as cnt_slash
-	      FROM ${usage.sessionsRelation}
-      WHERE ${buildDateFilter("days")}
-        AND organization_id = {orgId:String}
+		countIf(sa.is_top_level_session = 1) as cnt_sessions,
+		SUM(sa.total_interactions) as sum_interactions,
+		SUM(sa.quick_responses) as sum_quick_responses,
+		SUM(sa.long_pauses) as sum_long_pauses,
+		ifNull(avgIf(sa.actual_duration_min, sa.is_top_level_session = 1), 0) as avg_duration,
+		ifNull(avgIf(sa.total_interactions, sa.is_top_level_session = 1), 0) as avg_interactions,
+		ifNull(avgIf(sa.avg_period_sec, sa.is_top_level_session = 1), 0) as avg_response,
+		ifNull(avgIf(sa.median_period_sec, sa.is_top_level_session = 1), 0) as med_response,
+	        countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as cnt_subagents,
+		countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as cnt_skills,
+		countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as cnt_slash
+	      FROM ${usage.sessionsRelation} AS sa
+	  WHERE ${buildDateFilter("days", "sa.session_date")}
+		AND sa.organization_id = {orgId:String}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
     )
     SELECT
@@ -618,11 +626,17 @@ export async function getSessionAnalyticsSummaryComparison(
 		orgId,
 	};
 	const filters: string[] = [];
-	addOptionalStringEqFilter(filters, baseParams, "user_id", "userId", user_id);
 	addOptionalStringEqFilter(
 		filters,
 		baseParams,
-		"project_path",
+		"sa.user_id",
+		"userId",
+		user_id,
+	);
+	addOptionalStringEqFilter(
+		filters,
+		baseParams,
+		"sa.project_path",
 		"projectPath",
 		project_path,
 	);
@@ -634,15 +648,15 @@ export async function getSessionAnalyticsSummaryComparison(
 	    WITH ${usage.cteDefinitions},
 	    totals AS (
       SELECT
-        COUNT(*) as cnt_sessions,
-        ifNull(AVG(actual_duration_min), 0) as avg_duration,
-        ifNull(AVG(avg_period_sec), 0) as avg_response,
-	        countIf(${SESSION_HAS_SUBAGENTS_SQL}) as cnt_subagents,
-        countIf(length(skills) > 0) as cnt_skills,
-        countIf(length(slash_commands) > 0) as cnt_slash
-	      FROM ${usage.sessionsRelation}
+		countIf(sa.is_top_level_session = 1) as cnt_sessions,
+		ifNull(avgIf(sa.actual_duration_min, sa.is_top_level_session = 1), 0) as avg_duration,
+		ifNull(avgIf(sa.avg_period_sec, sa.is_top_level_session = 1), 0) as avg_response,
+	        countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as cnt_subagents,
+		countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as cnt_skills,
+		countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as cnt_slash
+	      FROM ${usage.sessionsRelation} AS sa
       WHERE ${dateCondition}
-        AND organization_id = {orgId:String}
+		AND sa.organization_id = {orgId:String}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
     )
     SELECT
@@ -655,9 +669,11 @@ export async function getSessionAnalyticsSummaryComparison(
     FROM totals
   `;
 
-	const currentQuery = summarySQL(buildDateFilter("currentDays"));
+	const currentQuery = summarySQL(
+		buildDateFilter("currentDays", "sa.session_date"),
+	);
 	const previousQuery = summarySQL(
-		"session_date >= now64(3) - toIntervalDay({previousDays:UInt32}) AND session_date < now64(3) - toIntervalDay({currentDays:UInt32})",
+		"sa.session_date >= now64(3) - toIntervalDay({previousDays:UInt32}) AND sa.session_date < now64(3) - toIntervalDay({currentDays:UInt32})",
 	);
 
 	const [currentData, previousData] = await Promise.all([
@@ -825,6 +841,19 @@ const METRIC_EXPRESSIONS: Record<DimensionAnalysisInput["metric"], string> = {
 	total_errors: "SUM(error_count)",
 };
 
+const SESSION_SCOPED_DIMENSION_METRICS = new Set<
+	DimensionAnalysisInput["metric"]
+>([
+	"session_count",
+	"avg_duration",
+	"avg_interactions",
+	"avg_response_time",
+	"median_response_time",
+	"avg_tokens",
+	"avg_success_score",
+	"avg_errors",
+]);
+
 const DIMENSION_EXPRESSIONS: Record<
 	DimensionAnalysisInput["dimension"],
 	string
@@ -838,7 +867,7 @@ const DIMENSION_EXPRESSIONS: Record<
 	used_plan_mode: "used_plan_mode",
 	used_skills: "if(length(skills) > 0, 1, 0)",
 	used_slash_commands: "if(length(slash_commands) > 0, 1, 0)",
-	used_subagents: `if(${SESSION_HAS_SUBAGENTS_SQL}, 1, 0)`,
+	used_subagents: `if(${buildSessionHasSubagentsSql("sa")}, 1, 0)`,
 };
 
 export async function getSessionDimensionAnalysis(
@@ -872,19 +901,22 @@ export async function getSessionDimensionAnalysis(
 	const metricExpression = METRIC_EXPRESSIONS[metric];
 	const dimensionExpression = DIMENSION_EXPRESSIONS[dimension];
 	const splitByExpression = split_by ? DIMENSION_EXPRESSIONS[split_by] : null;
+	const topLevelMetricFilter = SESSION_SCOPED_DIMENSION_METRICS.has(metric)
+		? "AND sa.is_top_level_session = 1"
+		: "";
 
 	const filters: string[] = [];
 	addOptionalStringEqFilter(
 		filters,
 		query_params,
-		"user_id",
+		"sa.user_id",
 		"userId",
 		user_id,
 	);
 	addOptionalStringEqFilter(
 		filters,
 		query_params,
-		"project_path",
+		"sa.project_path",
 		"projectPath",
 		project_path,
 	);
@@ -905,6 +937,7 @@ export async function getSessionDimensionAnalysis(
       FROM ${usage.sessionsRelation} AS sa
       WHERE ${buildDateFilter("days")}
         AND sa.organization_id = {orgId:String}
+		${topLevelMetricFilter}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
       GROUP BY dimension_value, split_value
       ORDER BY metric_value DESC
@@ -918,6 +951,7 @@ export async function getSessionDimensionAnalysis(
       FROM ${usage.sessionsRelation} AS sa
       WHERE ${buildDateFilter("days")}
         AND sa.organization_id = {orgId:String}
+		${topLevelMetricFilter}
         ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
       GROUP BY dimension_value
       ORDER BY metric_value DESC

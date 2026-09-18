@@ -84,6 +84,20 @@ export const SessionDetailOverviewInputSchema = z
 export const SessionDetailInitialInputSchema =
 	SessionDetailOverviewInputSchema.pick({ sessionId: true });
 
+export const SessionDetailRelationshipsInputSchema =
+	SessionDetailInitialInputSchema;
+
+const NativeSessionRelationshipSchema = z.object({
+	agentPath: z.string().nullable(),
+	model: z.string().nullable(),
+	sessionId: z.string(),
+});
+
+export const SessionDetailRelationshipsSchema = z.object({
+	children: z.array(NativeSessionRelationshipSchema),
+	parent: NativeSessionRelationshipSchema.nullable(),
+});
+
 export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
@@ -783,6 +797,9 @@ export const SessionDetailInitialSchema = z
 	);
 
 export type SessionDetailInitial = z.infer<typeof SessionDetailInitialSchema>;
+export type SessionDetailRelationships = z.infer<
+	typeof SessionDetailRelationshipsSchema
+>;
 
 export const SessionDetailSubagentSchema = z
 	.object({

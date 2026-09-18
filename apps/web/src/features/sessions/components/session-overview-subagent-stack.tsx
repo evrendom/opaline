@@ -19,23 +19,38 @@ type SessionSubagentData = Pick<
 	| "subagent_count"
 	| "subagent_types"
 	| "native_subagents"
+	| "native_child_sessions"
 	| "linked_subagent_count"
 	| "linked_subagents"
 >;
 
-export function getSessionOverviewSubagents(session: SessionSubagentData) {
+interface SessionOverviewSubagent {
+	id: string;
+	label: string;
+	model: string | null;
+}
+
+export function getSessionOverviewSubagents(
+	session: SessionSubagentData,
+): SessionOverviewSubagent[] {
 	const nativeCount = Math.max(
 		resolveSessionNativeSubagentCount(
 			session.subagent_count,
 			session.subagent_types,
 		),
 		session.native_subagents?.length ?? 0,
+		session.native_child_sessions?.length ?? 0,
 	);
+	const uploadedChildren = session.native_child_sessions ?? [];
 	const native = Array.from({ length: nativeCount }, (_, index) => {
-		const agent = session.native_subagents?.[index];
+		const child = uploadedChildren[index];
+		const agent =
+			uploadedChildren.length === 0
+				? session.native_subagents?.[index]
+				: undefined;
 		return {
-			id: `native:${agent?.subagent_id ?? index}`,
-			model: agent?.model ?? null,
+			id: `native:${child?.session_id ?? agent?.subagent_id ?? index}`,
+			model: child?.model ?? agent?.model ?? null,
 			// Types are a distinct aggregate, not an index-aligned identity map.
 			label: `Subagent ${index + 1}`,
 		};
@@ -86,7 +101,7 @@ export function SessionOverviewSubagentStack({
 				const ModelIcon = getModelIconComponent(agent.model ?? undefined);
 				const Icon = ModelIcon ?? TraceBotIcon;
 				const label = `${agent.label}: ${agent.model ? formatModelDisplayLabel(agent.model) : "Model unavailable"}`;
-				return (
+				const icon = (
 					<span
 						key={agent.id}
 						aria-label={label}
@@ -109,6 +124,7 @@ export function SessionOverviewSubagentStack({
 						</span>
 					</span>
 				);
+				return <span key={agent.id}>{icon}</span>;
 			})}
 		</div>
 	);

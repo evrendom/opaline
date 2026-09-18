@@ -14,6 +14,7 @@ import {
 } from "./services/r2-ingest-storage.service.js";
 import { startSessionLanguageSignalReconciliationWorker } from "./services/session-language-signal-reconciliation.service.js";
 import { shutdownSessionLanguageSignalScanner } from "./services/session-language-signal-scanner.service.js";
+import { startSessionLineageReconciliationWorker } from "./services/session-lineage-reconciliation.service.js";
 import { shutdownUsageExtractionQueue } from "./services/usage-extraction.service.js";
 
 export interface FlyApiLifecycle {
@@ -38,6 +39,10 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 		process.env.NODE_ENV === "test"
 			? undefined
 			: startSessionLanguageSignalReconciliationWorker();
+	const sessionLineageReconciliationWorker =
+		process.env.NODE_ENV === "test"
+			? undefined
+			: startSessionLineageReconciliationWorker();
 	let isShuttingDown = false;
 
 	return {
@@ -54,6 +59,7 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 				shutdownApiProductAnalytics(),
 				clickHousePurgeWorker.stop(),
 				sessionLanguageSignalReconciliationWorker?.stop(),
+				sessionLineageReconciliationWorker?.stop(),
 			]);
 		},
 	};

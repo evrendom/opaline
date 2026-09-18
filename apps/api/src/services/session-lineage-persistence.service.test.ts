@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionLineageEdge } from "@rudel/api-routes";
 import {
+	buildNativeSessionLineageRow,
 	buildSessionLineageRow,
 	buildUnmatchedSessionLineageRow,
 	fingerprintPrompt,
@@ -124,5 +125,48 @@ describe("session-lineage persistence", () => {
 		expect(row.input_sequence).toBe(
 			String(Date.parse("2026-08-22T05:45:00.000Z")),
 		);
+	});
+
+	test("native completion wins out of order without hiding evidence freshness", () => {
+		const base = {
+			childIngestedAt: "2026-09-18T09:26:00.000Z",
+			childModel: "gpt-5.6-sol",
+			childSessionDate: "2026-09-18T09:25:51.697Z",
+			childSessionId: "child-native",
+			derivedAt: "2026-09-18T09:30:00.000Z",
+			evidenceAt: "2026-09-18T09:29:00.000Z",
+			organizationId: "org-1",
+			parentSessionDate: "2026-09-18T09:20:00.000Z",
+			parentSessionId: "parent-native",
+			userId: "user-1",
+		};
+		const orphan = buildNativeSessionLineageRow({
+			...base,
+			countable: false,
+		});
+		const completed = buildNativeSessionLineageRow({
+			...base,
+			countable: true,
+		});
+		const fallback = buildNativeSessionLineageRow({
+			...base,
+			childModel: "codex",
+			countable: true,
+		});
+
+		expect(orphan.input_sequence).toBe(String(Date.parse(base.evidenceAt)));
+		expect(completed.input_sequence).toBe(orphan.input_sequence);
+		expect(BigInt(completed.replacement_version)).toBeGreaterThan(
+			BigInt(orphan.replacement_version),
+		);
+		expect(BigInt(completed.replacement_version)).toBeGreaterThan(
+			BigInt(fallback.replacement_version),
+		);
+		expect(completed).toMatchObject({
+			carrier: "codex_native_subagent",
+			confidence: "native_parent_id",
+			countable: 1,
+			workdir: "",
+		});
 	});
 });

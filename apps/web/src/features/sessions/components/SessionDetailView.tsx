@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
@@ -136,6 +137,16 @@ export function SessionDetailView({
 	);
 	const { userMap, avatarMap } = useUserMap();
 	const { state: organization } = useOrganization();
+	const relationshipsQuery = useQuery({
+		enabled: Boolean(organization.activeOrg?.id && sessionId),
+		queryFn: () => client.analytics.sessions.detailRelationships({ sessionId }),
+		queryKey: [
+			"org",
+			organization.activeOrg?.id,
+			"session-native-relationships",
+			sessionId,
+		],
+	});
 	const knownFailure = initialSession?.upload_failure;
 	const failureQuery = useQuery({
 		queryKey: ["session-upload-failure", organization.activeOrg?.id, sessionId],
@@ -299,6 +310,35 @@ export function SessionDetailView({
 					totalSessions={totalSessions}
 					viewModel={viewModel}
 				/>
+				{relationshipsQuery.data?.parent ||
+				relationshipsQuery.data?.children.length ? (
+					<nav
+						aria-label="Native subagent sessions"
+						className="flex min-h-9 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-(--dashboardy-border) px-4 text-xs text-(--dashboardy-muted)"
+					>
+						{relationshipsQuery.data.parent ? (
+							<Link
+								className="font-medium text-(--dashboardy-heading) hover:underline"
+								to={getShellRoutePath(
+									appRoutes.sessionDetail(
+										relationshipsQuery.data.parent.sessionId,
+									),
+								)}
+							>
+								Parent session
+							</Link>
+						) : null}
+						{relationshipsQuery.data.children.map((child, index) => (
+							<Link
+								key={child.sessionId}
+								className="font-medium text-(--dashboardy-heading) hover:underline"
+								to={getShellRoutePath(appRoutes.sessionDetail(child.sessionId))}
+							>
+								{child.agentPath?.split("/").at(-1) || `Subagent ${index + 1}`}
+							</Link>
+						))}
+					</nav>
+				) : null}
 
 				<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
 					{failure ? (

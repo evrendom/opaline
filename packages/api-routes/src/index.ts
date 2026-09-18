@@ -897,6 +897,7 @@ export const contract = {
 				.output(UploadFailuresPageSchema),
 			detailBodyChunk: sessionDetailProcedureContracts.detailBodyChunk,
 			detailOverview: sessionDetailProcedureContracts.detailOverview,
+			detailRelationships: sessionDetailProcedureContracts.detailRelationships,
 			detailInitial: sessionDetailProcedureContracts.detailInitial,
 			detailSpine: sessionDetailProcedureContracts.detailSpine,
 			detailSubagent: sessionDetailProcedureContracts.detailSubagent,

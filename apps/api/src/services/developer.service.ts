@@ -21,7 +21,10 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
-import { SESSION_HAS_SUBAGENTS_SQL } from "./session-lineage-analytics.service.js";
+import {
+	buildSessionHasSubagentsSql,
+	SESSION_HAS_SUBAGENTS_SQL,
+} from "./session-lineage-analytics.service.js";
 import {
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
@@ -737,14 +740,14 @@ export async function getDeveloperFeatureUsage(
 	const adoptionQuery = `
 	WITH ${usage.cteDefinitions}
 	    SELECT
-      COUNT(*) as total_sessions,
-	      countIf(${SESSION_HAS_SUBAGENTS_SQL}) as subagents_sessions,
-      countIf(length(skills) > 0) as skills_sessions,
-      countIf(length(slash_commands) > 0) as slash_commands_sessions
-	    FROM ${usage.sessionsRelation}
-    WHERE user_id = {userId:String}
-      AND ${buildDateFilter("days")}
-      AND organization_id = {orgId:String}
+	      countIf(sa.is_top_level_session = 1) as total_sessions,
+	      countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as subagents_sessions,
+	      countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as skills_sessions,
+	      countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as slash_commands_sessions
+	    FROM ${usage.sessionsRelation} AS sa
+    WHERE sa.user_id = {userId:String}
+      AND ${buildDateFilter("days", "sa.session_date")}
+      AND sa.organization_id = {orgId:String}
   `;
 
 	// One scan ARRAY JOINs over a tagged union of all three feature dim arrays;

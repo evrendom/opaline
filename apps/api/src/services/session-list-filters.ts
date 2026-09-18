@@ -58,11 +58,14 @@ export async function getSessionFilterCatalog(
 	};
 	const [row] = await queryClickhouse<CatalogRow>({
 		query: `WITH ${usage.cteDefinitions}
-   SELECT groupUniqArray(tuple(git_remote, package_name, project_path)) AS repositories,
-    groupUniqArray(model_used) AS models, groupUniqArrayArray(sa.skills) AS skills,
-    groupUniqArray(user_id) AS users, countIf(empty(sa.skills)) AS no_skills, count() AS session_count,
+   SELECT groupUniqArray(tuple(sa.git_remote, sa.package_name, sa.project_path)) AS repositories,
+    groupUniqArray(sa.model_used) AS models, groupUniqArrayArray(sa.skills) AS skills,
+    groupUniqArray(sa.user_id) AS users, countIf(empty(sa.skills)) AS no_skills, count() AS session_count,
     [${RANGE_KEYS.map((key) => `tuple(min(${RANGE_COLUMNS[key]}), max(${RANGE_COLUMNS[key]}))`).join(", ")}] AS ranges
-   FROM ${usage.sessionsRelation} AS sa WHERE sa.organization_id = {orgId:String} AND ${dateFilter}`,
+   FROM ${usage.sessionsRelation} AS sa
+   WHERE sa.organization_id = {orgId:String}
+    AND sa.is_top_level_session = 1
+    AND ${dateFilter}`,
 		query_params: queryParams,
 	});
 	if (!row) throw new Error("Session filter catalog was not returned");

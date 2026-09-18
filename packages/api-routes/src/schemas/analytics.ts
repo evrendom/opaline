@@ -359,6 +359,11 @@ export const LinkedSubagentSchema = z.object({
 	confidence: z.enum(["id_echo", "prompt_echo", "attested_temporal"]),
 });
 
+export const NativeChildSessionSchema = z.object({
+	model: z.string(),
+	session_id: z.string(),
+});
+
 export const SessionAnalyticsSchema = z.object({
 	// Present only for a diagnostic row; transcript-derived metrics are unavailable.
 	upload_failure: StoredUploadFailureSchema.optional(),
@@ -390,6 +395,7 @@ export const SessionAnalyticsSchema = z.object({
 			}),
 		)
 		.optional(),
+	native_child_sessions: z.array(NativeChildSessionSchema).optional(),
 	linked_subagent_count: z.number().int().nonnegative().optional(),
 	linked_subagents: z.array(LinkedSubagentSchema).optional(),
 	skills: z.array(z.string()),

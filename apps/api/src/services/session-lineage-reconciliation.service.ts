@@ -3,6 +3,8 @@ import {
 	correlateSessionLineage,
 	extractChildLineageEvidence,
 	extractLaunchAnchors,
+	extractNativeCodexLineageEvidence,
+	type NativeCodexLineageEvidence,
 	type RawLineageSession,
 	SESSION_LINEAGE_DERIVATION_VERSION,
 } from "@rudel/api-routes";
@@ -11,6 +13,7 @@ import { getClickhouse } from "../clickhouse.js";
 import {
 	readPositiveSafeIntegerEnv,
 	readRequiredSecretEnv,
+	shouldDeriveSessionLineage,
 } from "../lib/env.js";
 import {
 	buildSessionLineageRow,
@@ -52,7 +55,16 @@ export interface SessionLineageReconciliationEnvironment {
 		rows: readonly RudelSessionLineageRow[],
 	) => Promise<void>;
 	readonly now: () => Date;
+	readonly recordAgentMetadata?: (
+		session: RawLineageSession,
+		evidence: NativeCodexLineageEvidence | undefined,
+	) => Promise<void>;
+	readonly projectNativeLineage?: (
+		session: RawLineageSession,
+		evidence: NativeCodexLineageEvidence,
+	) => Promise<boolean>;
 	readonly queryLagCount: (derivationVersion: number) => Promise<number>;
+	readonly repairNativeLineage?: (batchSize: number) => Promise<number>;
 	readonly queryScopeSessions: (
 		scope: SessionLineageScope,
 	) => Promise<readonly RawLineageSession[]>;
@@ -105,6 +117,7 @@ const STALE_LINEAGE_CTES = `
 				ingested_at
 			FROM rudel.codex_sessions
 			WHERE match(content, '\\"originator\\"\\s*:\\s*\\"codex_exec\\"')
+				OR match(content, '\\"thread_source\\"\\s*:\\s*\\"subagent\\"')
 		)
 		GROUP BY source, organization_id, user_id, session_id
 	),
@@ -140,9 +153,10 @@ const STALE_LINEAGE_CTES = `
 			organization_id,
 			user_id,
 			child_source,
-			child_session_id,
-			argMax(derivation_version, replacement_version) AS derivation_version,
-			argMax(input_sequence, replacement_version) AS input_sequence
+				child_session_id,
+				argMax(derivation_version, replacement_version) AS derivation_version,
+				argMax(input_sequence, replacement_version) AS input_sequence,
+				argMax(confidence, replacement_version) AS confidence
 		FROM rudel.session_lineage
 		GROUP BY organization_id, user_id, child_source, child_session_id
 	),
@@ -152,10 +166,14 @@ const STALE_LINEAGE_CTES = `
 			raw.organization_id AS organization_id,
 			raw.user_id AS user_id,
 			raw.session_id AS child_session_id,
-			greatest(
-				raw.child_latest_ingested_at,
-				parents.parent_latest_ingested_at
-			) AS child_latest_ingested_at
+				if(
+					lineage.confidence = 'native_parent_id',
+					raw.child_latest_ingested_at,
+					greatest(
+						raw.child_latest_ingested_at,
+						parents.parent_latest_ingested_at
+					)
+				) AS child_latest_ingested_at
 		FROM raw_children AS raw
 		LEFT ANY JOIN raw_parent_scopes AS parents
 			ON parents.organization_id = raw.organization_id
@@ -168,9 +186,13 @@ const STALE_LINEAGE_CTES = `
 			AND lineage.child_session_id = raw.session_id
 		WHERE lineage.derivation_version = 0
 			OR lineage.derivation_version < {derivationVersion:UInt16}
-			OR lineage.input_sequence < toUInt64(toUnixTimestamp64Milli(greatest(
+			OR lineage.input_sequence < toUInt64(toUnixTimestamp64Milli(if(
+				lineage.confidence = 'native_parent_id',
 				raw.child_latest_ingested_at,
-				parents.parent_latest_ingested_at
+				greatest(
+					raw.child_latest_ingested_at,
+					parents.parent_latest_ingested_at
+				)
 			)))
 	)`;
 
@@ -247,10 +269,6 @@ export function buildSessionLineageScopeSessionsQuery(): string {
 			FROM rudel.codex_sessions
 			WHERE organization_id = {orgId:String}
 				AND user_id = {userId:String}
-				AND (
-					positionCaseInsensitive(content, 'claude') > 0
-					OR match(content, '\\"originator\\"\\s*:\\s*\\"codex_exec\\"')
-				)
 		)
 		GROUP BY source, organization_id, session_id
 	`;
@@ -265,6 +283,41 @@ function createDefaultEnvironment(): SessionLineageReconciliationEnvironment {
 		),
 		insertRows: (rows) => insertSessionLineageRows(clickhouse, rows),
 		now: () => new Date(),
+		recordAgentMetadata: async (session, evidence) => {
+			const { recordSessionAgentMetadata } = await import(
+				"./session-ownership.service.js"
+			);
+			await recordSessionAgentMetadata(
+				session.organizationId,
+				session.sessionId,
+				session.userId,
+				{
+					nativeParentSessionId: evidence?.parentSessionId,
+					nativeSubagentModel: evidence?.model,
+					nativeSubagentPath: evidence?.agentPath,
+					rawIngestedAt: session.latestIngestedAt,
+					rawSessionDate: session.sessionDate,
+					source: session.source,
+				},
+			);
+		},
+		projectNativeLineage: async (session, evidence) => {
+			const { projectNativeSessionLineage } = await import(
+				"./session-native-lineage.service.js"
+			);
+			const projected = await projectNativeSessionLineage({
+				organizationId: session.organizationId,
+				sessionId: session.sessionId,
+				userId: session.userId,
+			});
+			return projected.includes(evidence.childSessionId);
+		},
+		repairNativeLineage: async (batchSize) => {
+			const { repairNativeSessionLineage } = await import(
+				"./session-native-lineage.service.js"
+			);
+			return repairNativeSessionLineage(batchSize);
+		},
 		queryLagCount: async (derivationVersion) => {
 			const rows = await clickhouse.query<SessionLineageLagCountRow>({
 				clickhouse_settings: QUERY_SETTINGS,
@@ -295,16 +348,19 @@ export async function reconcileSessionLineageOnce(
 	batchSize: number,
 	env: SessionLineageReconciliationEnvironment = createDefaultEnvironment(),
 ): Promise<SessionLineageReconciliationResult> {
+	const repairedNative = (await env.repairNativeLineage?.(batchSize)) ?? 0;
 	const staleChildren = await env.queryStaleChildren(
 		SESSION_LINEAGE_DERIVATION_VERSION,
 		batchSize,
 		0,
 	);
-	if (staleChildren.length === 0) return emptyResult();
+	if (staleChildren.length === 0) {
+		return addNativeRepairs(emptyResult(), repairedNative);
+	}
 
 	const result = await reconcileStaleChildren(staleChildren, env);
 	return {
-		...result,
+		...addNativeRepairs(result, repairedNative),
 		remainingLag: await env.queryLagCount(SESSION_LINEAGE_DERIVATION_VERSION),
 	};
 }
@@ -313,7 +369,10 @@ export async function reconcileSessionLineageUntilCaughtUp(
 	batchSize: number,
 	env: SessionLineageReconciliationEnvironment = createDefaultEnvironment(),
 ): Promise<SessionLineageReconciliationResult> {
-	let aggregate = emptyResult();
+	let aggregate = addNativeRepairs(
+		emptyResult(),
+		await repairNativeLineageUntilBounded(batchSize, env),
+	);
 	let offset = 0;
 	const processedBatches = new Set<string>();
 	for (
@@ -356,6 +415,42 @@ export async function reconcileSessionLineageUntilCaughtUp(
 	return result;
 }
 
+async function repairNativeLineageUntilBounded(
+	batchSize: number,
+	env: SessionLineageReconciliationEnvironment,
+): Promise<number> {
+	if (!env.repairNativeLineage) return 0;
+	return drainNativeLineageRepairs(batchSize, env.repairNativeLineage);
+}
+
+async function drainNativeLineageRepairs(
+	batchSize: number,
+	repair: (batchSize: number) => Promise<number>,
+): Promise<number> {
+	let repaired = 0;
+	for (
+		let batchIndex = 0;
+		batchIndex < DEFAULT_MAX_BATCHES_PER_RUN;
+		batchIndex += 1
+	) {
+		const batch = await repair(batchSize);
+		repaired += batch;
+		if (batch < batchSize) break;
+	}
+	return repaired;
+}
+
+function addNativeRepairs(
+	result: SessionLineageReconciliationResult,
+	repaired: number,
+): SessionLineageReconciliationResult {
+	return {
+		...result,
+		candidates: result.candidates + repaired,
+		edges: result.edges + repaired,
+	};
+}
+
 async function reconcileStaleChildren(
 	staleChildren: readonly StaleSessionLineageChildRow[],
 	env: SessionLineageReconciliationEnvironment,
@@ -363,12 +458,6 @@ async function reconcileStaleChildren(
 	let aggregate = emptyResult();
 	for (const scope of uniqueScopes(staleChildren)) {
 		const sessions = await env.queryScopeSessions(scope);
-		const anchors = sessions.flatMap(extractLaunchAnchors);
-		const children = sessions.flatMap((session) => {
-			const evidence = extractChildLineageEvidence(session);
-			return evidence ? [evidence] : [];
-		});
-		const correlation = correlateSessionLineage(anchors, children);
 		const staleChildIds = new Set(
 			staleChildren
 				.filter(
@@ -378,6 +467,46 @@ async function reconcileStaleChildren(
 				)
 				.map((row) => `${row.child_source}\u0000${row.child_session_id}`),
 		);
+		const nativeEvidence = sessions.flatMap((session) => {
+			const evidence = extractNativeCodexLineageEvidence(session);
+			return evidence ? [{ evidence, session }] : [];
+		});
+		const relevantNativeEvidence = nativeEvidence.filter((native) =>
+			staleChildIds.has(`codex\u0000${native.evidence.childSessionId}`),
+		);
+		if (env.recordAgentMetadata) {
+			for (const session of sessions) {
+				try {
+					await env.recordAgentMetadata(
+						session,
+						extractNativeCodexLineageEvidence(session),
+					);
+				} catch (error) {
+					logger.warn(
+						"Skipping historical session ownership metadata during lineage reconciliation (organization_id={organizationId} session_id={sessionId} error={error})",
+						{
+							error: error instanceof Error ? error.message : String(error),
+							organizationId: session.organizationId,
+							sessionId: session.sessionId,
+						},
+					);
+				}
+			}
+		}
+		const projectedNativeChildIds = new Set<string>();
+		if (env.projectNativeLineage) {
+			for (const native of relevantNativeEvidence) {
+				if (await env.projectNativeLineage(native.session, native.evidence)) {
+					projectedNativeChildIds.add(native.evidence.childSessionId);
+				}
+			}
+		}
+		const anchors = sessions.flatMap(extractLaunchAnchors);
+		const children = sessions.flatMap((session) => {
+			const evidence = extractChildLineageEvidence(session);
+			return evidence ? [evidence] : [];
+		});
+		const correlation = correlateSessionLineage(anchors, children);
 		const relevantEdges = correlation.edges.filter((edge) =>
 			staleChildIds.has(
 				`${edge.child.childSource}\u0000${edge.child.childSessionId}`,
@@ -388,6 +517,11 @@ async function reconcileStaleChildren(
 				(edge) => `${edge.child.childSource}\u0000${edge.child.childSessionId}`,
 			),
 		);
+		for (const native of relevantNativeEvidence) {
+			if (projectedNativeChildIds.has(native.evidence.childSessionId)) {
+				matchedChildIds.add(`codex\u0000${native.evidence.childSessionId}`);
+			}
+		}
 		const scopeEvidenceAt = sessions.reduce(
 			(latest, session) =>
 				Date.parse(session.latestIngestedAt) > Date.parse(latest)
@@ -428,8 +562,10 @@ async function reconcileStaleChildren(
 		const scopeStaleCount = [...staleChildIds].length;
 		aggregate = addResults(aggregate, {
 			anchors: anchors.length,
-			candidates: children.length,
-			edges: relevantEdges.filter((edge) => edge.countable).length,
+			candidates: children.length + relevantNativeEvidence.length,
+			edges:
+				relevantEdges.filter((edge) => edge.countable).length +
+				projectedNativeChildIds.size,
 			failedEdges: relevantEdges.filter((edge) => !edge.countable).length,
 			remainingLag: 0,
 			unmatchedAnchors: correlation.unmatchedAnchorIds.length,
@@ -502,7 +638,8 @@ export function startSessionLineageReconciliationWorker(input?: {
 	const initialDelayMs =
 		input?.initialDelayMs ??
 		Math.max(1_000, Math.floor(intervalMs * (0.5 + Math.random())));
-	const env = createDefaultEnvironment();
+	const deriveHeuristicLineage = shouldDeriveSessionLineage();
+	let env: SessionLineageReconciliationEnvironment | undefined;
 	let activeRun = Promise.resolve();
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -516,7 +653,16 @@ export function startSessionLineageReconciliationWorker(input?: {
 	};
 	const runWorkerPass = async () => {
 		try {
-			await reconcileSessionLineageUntilCaughtUp(batchSize, env);
+			if (deriveHeuristicLineage) {
+				const activeEnv = env ?? createDefaultEnvironment();
+				env = activeEnv;
+				await reconcileSessionLineageUntilCaughtUp(batchSize, activeEnv);
+			} else {
+				const { repairNativeSessionLineage } = await import(
+					"./session-native-lineage.service.js"
+				);
+				await drainNativeLineageRepairs(batchSize, repairNativeSessionLineage);
+			}
 		} catch (error) {
 			logger.error("Session-lineage reconciliation failed: {error}", {
 				error: String(error),

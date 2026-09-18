@@ -18,20 +18,27 @@ describe("uniform successful-subagent adoption semantics", () => {
 			],
 		);
 		const predicateToken = "${" + "SESSION_HAS_SUBAGENTS_SQL}";
+		const aliasedPredicateToken =
+			"${" + 'buildSessionHasSubagentsSql("sa")' + "}";
+		const prefixToken = "${" + "prefix}";
 
-		expect(lineage).toContain('"(subagent_count + linked_subagent_count) > 0"');
+		expect(lineage).toContain(
+			`OR length(${prefixToken}native_child_sessions) > 0)`,
+		);
 		expect(
-			sessions.match(/countIf\(\$\{SESSION_HAS_SUBAGENTS_SQL\}\)/gu),
+			sessions.match(
+				/countIf\(sa\.is_top_level_session = 1 AND \$\{buildSessionHasSubagentsSql\("sa"\)\}\)/gu,
+			),
 		).toHaveLength(2);
 		expect(sessions).toContain(
-			`used_subagents: \`if(${predicateToken}, 1, 0)\``,
+			`used_subagents: \`if(${aliasedPredicateToken}, 1, 0)\``,
 		);
 		expect(developers).toContain(`${predicateToken} as has_subagents`);
 		expect(developers).toContain(
-			`countIf(${predicateToken}) as subagents_sessions`,
+			`countIf(sa.is_top_level_session = 1 AND ${aliasedPredicateToken}) as subagents_sessions`,
 		);
 		expect(projects).toContain(
-			`countIf(${predicateToken}) as subagents_sessions`,
+			`countIf(sa.is_top_level_session = 1 AND ${aliasedPredicateToken}) as subagents_sessions`,
 		);
 		expect(events).toContain(
 			"sa.linked_subagent_count AS linked_subagent_count",

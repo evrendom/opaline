@@ -6,6 +6,7 @@ import {
 	buildSessionLineageScopeSessionsQuery,
 	buildStaleSessionLineageQuery,
 	reconcileSessionLineageOnce,
+	reconcileSessionLineageUntilCaughtUp,
 	type SessionLineageReconciliationEnvironment,
 	type StaleSessionLineageChildRow,
 } from "./session-lineage-reconciliation.service.js";
@@ -98,6 +99,35 @@ function staleChild(): StaleSessionLineageChildRow {
 	};
 }
 
+function nativeChildSession(
+	sessionId = "child-1",
+	parentSessionId = "parent-native",
+): RawLineageSession {
+	const child = childSession();
+	return {
+		...child,
+		sessionId,
+		content: [
+			{
+				timestamp: "2026-08-22T12:00:01.000Z",
+				type: "session_meta",
+				payload: {
+					id: sessionId,
+					parent_thread_id: parentSessionId,
+					source: {
+						subagent: {
+							thread_spawn: { parent_thread_id: parentSessionId },
+						},
+					},
+					thread_source: "subagent",
+				},
+			},
+		]
+			.map((line) => JSON.stringify(line))
+			.join("\n"),
+	};
+}
+
 function environment(
 	inserted: RudelSessionLineageRow[],
 	sessions: readonly RawLineageSession[],
@@ -125,8 +155,9 @@ describe("session-lineage reconciliation", () => {
 		expect(staleQuery).toContain("entrypoint");
 		expect(staleQuery).toContain("sdk-cli");
 		expect(staleQuery).toContain(
-			"lineage.input_sequence < toUInt64(toUnixTimestamp64Milli(greatest(",
+			"lineage.input_sequence < toUInt64(toUnixTimestamp64Milli(if(",
 		);
+		expect(staleQuery).toContain("lineage.confidence = 'native_parent_id'");
 		expect(scopeQuery).toContain("organization_id = {orgId:String}");
 		expect(scopeQuery).toContain("user_id = {userId:String}");
 		expect(scopeQuery).not.toContain("toIntervalDay");
@@ -177,5 +208,94 @@ describe("session-lineage reconciliation", () => {
 			parent_session_id: "",
 			reason: "unmatched child candidate",
 		});
+	});
+
+	test("repairs explicit native metadata and only marks a projected child", async () => {
+		const recorded: string[] = [];
+		const env: SessionLineageReconciliationEnvironment = {
+			...environment([], [nativeChildSession()]),
+			recordAgentMetadata: async (session, evidence) => {
+				recorded.push(
+					`${session.sessionId}:${evidence?.parentSessionId ?? "root"}`,
+				);
+			},
+			projectNativeLineage: async () => true,
+		};
+
+		const result = await reconcileSessionLineageOnce(25, env);
+
+		expect(recorded).toEqual(["child-1:parent-native"]);
+		expect(result).toMatchObject({
+			candidates: 1,
+			edges: 1,
+			unmatchedChildren: 0,
+		});
+	});
+
+	test("does not count native children outside the stale batch", async () => {
+		const projected: string[] = [];
+		const env: SessionLineageReconciliationEnvironment = {
+			...environment(
+				[],
+				[
+					nativeChildSession(),
+					nativeChildSession("already-current", "other-parent"),
+				],
+			),
+			projectNativeLineage: async (session) => {
+				projected.push(session.sessionId);
+				return true;
+			},
+		};
+
+		const result = await reconcileSessionLineageOnce(1, env);
+
+		expect(projected).toEqual(["child-1"]);
+		expect(result.unmatchedChildren).toBe(0);
+		expect(result.edges).toBe(1);
+	});
+
+	test("repairs pending native projections even when raw lineage is current", async () => {
+		let repairCalls = 0;
+		const env: SessionLineageReconciliationEnvironment = {
+			...environment([], []),
+			queryStaleChildren: async () => [],
+			repairNativeLineage: async () => {
+				repairCalls += 1;
+				return 1;
+			},
+		};
+
+		const result = await reconcileSessionLineageOnce(25, env);
+
+		expect(repairCalls).toBe(1);
+		expect(result).toEqual({
+			anchors: 0,
+			candidates: 1,
+			edges: 1,
+			failedEdges: 0,
+			remainingLag: 0,
+			unmatchedAnchors: 0,
+			unmatchedChildren: 0,
+		});
+	});
+
+	test("drains bounded native projection repair batches", async () => {
+		const repairs = [2, 2, 1];
+		let repairCalls = 0;
+		const env: SessionLineageReconciliationEnvironment = {
+			...environment([], []),
+			queryStaleChildren: async () => [],
+			repairNativeLineage: async () => {
+				const repaired = repairs[repairCalls] ?? 0;
+				repairCalls += 1;
+				return repaired;
+			},
+		};
+
+		const result = await reconcileSessionLineageUntilCaughtUp(2, env);
+
+		expect(repairCalls).toBe(3);
+		expect(result).toMatchObject({ candidates: 5, edges: 5 });
 	});
 });

@@ -77,12 +77,11 @@ function WorkspaceSessionArrivalNotifications({
 					},
 				});
 			}
-			if (next.arrivals.length) {
-				// Refresh the visible dashboard and session rows in one batch.
-				void queryClient.invalidateQueries({
-					queryKey: ["org", organizationId],
-				});
-			}
+			// Empty pages are change notifications for child uploads whose parent
+			// view needs refreshing without showing a top-level arrival toast.
+			void queryClient.invalidateQueries({
+				queryKey: ["org", organizationId],
+			});
 		});
 		return () => {
 			events.close();

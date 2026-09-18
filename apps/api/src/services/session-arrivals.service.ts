@@ -29,6 +29,7 @@ export async function listSessionArrivals(
 			AND (${userId}::text IS NULL OR s.user_id = ${userId})
 			AND s.created_at >= ${input.since}::timestamptz
 			AND s.last_usage_completed_at IS NOT NULL
+			AND s.native_parent_session_id IS NULL
 			AND (${input.after ?? null}::text IS NULL OR s.session_id > ${input.after ?? null})
 		ORDER BY s.session_id
 		LIMIT ${PAGE_SIZE + 1}

@@ -1,4 +1,7 @@
-export { extractChildLineageEvidence } from "./child-provenance.js";
+export {
+	extractChildLineageEvidence,
+	extractNativeCodexLineageEvidence,
+} from "./child-provenance.js";
 export { correlateSessionLineage } from "./correlate.js";
 export { extractLaunchAnchors } from "./launch-evidence.js";
 export {
@@ -12,6 +15,7 @@ export {
 	type LineageConfidence,
 	type LineageOutcome,
 	type LineageProvider,
+	type NativeCodexLineageEvidence,
 	type RawLineageSession,
 	SESSION_LINEAGE_DEFAULT_MATCH_WINDOW_MS,
 	SESSION_LINEAGE_DERIVATION_VERSION,
