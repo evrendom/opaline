@@ -93,6 +93,7 @@ export async function runNativeSessionLineageMaintenance(
 				missing: discovery.missing,
 				nativeChildren: discovery.nativeChildren,
 				projected: discovery.projected,
+				readFailed: discovery.readFailed,
 				repaired: projection.repaired,
 				rejected: discovery.rejected,
 				scanned: discovery.scanned,
@@ -116,6 +117,10 @@ export async function runNativeSessionLineageMaintenance(
 			(total, result) => total + result.projected,
 			0,
 		),
+		readFailed: drain.results.reduce(
+			(total, result) => total + result.readFailed,
+			0,
+		),
 		repaired: drain.results.reduce(
 			(total, result) => total + result.repaired,
 			0,
@@ -129,7 +134,7 @@ export async function runNativeSessionLineageMaintenance(
 		stopReason: drain.stopReason,
 	};
 	logger.info(
-		"Native session lineage maintenance completed: scanned={scanned}, nativeChildren={nativeChildren}, projected={projected}, repaired={repaired}, missing={missing}, rejected={rejected}, skipped={skipped}, hasMore={hasMore}",
+		"Native session lineage maintenance completed: scanned={scanned}, nativeChildren={nativeChildren}, projected={projected}, repaired={repaired}, missing={missing}, readFailed={readFailed}, rejected={rejected}, skipped={skipped}, hasMore={hasMore}",
 		result,
 	);
 	return result;

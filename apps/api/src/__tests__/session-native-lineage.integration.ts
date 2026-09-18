@@ -36,7 +36,11 @@ import {
 	repairNativeSessionLineage,
 	repairNativeSessionLineagePass,
 } from "../services/session-native-lineage.service.js";
-import { runNativeMetadataDiscoveryPass } from "../services/session-native-metadata-discovery.service.js";
+import {
+	classifyBoundedNativeMetadataContentReadFailure,
+	readBoundedNativeMetadataContent,
+	runNativeMetadataDiscoveryPass,
+} from "../services/session-native-metadata-discovery.service.js";
 import {
 	claimSessionIngestOwnership,
 	recordSessionAgentMetadata,
@@ -409,6 +413,7 @@ describe("native Codex lineage", () => {
 			missing: 0,
 			nativeChildren: 0,
 			projected: 0,
+			readFailed: 0,
 			rejected: 0,
 			scanned: 0,
 			skipped: 0,
@@ -430,6 +435,7 @@ describe("native Codex lineage", () => {
 			missing: 1,
 			nativeChildren: 1,
 			projected: 0,
+			readFailed: 0,
 			rejected: 0,
 			scanned: 2,
 			skipped: 0,
@@ -470,6 +476,7 @@ describe("native Codex lineage", () => {
 				missing: 2,
 				nativeChildren: 0,
 				projected: 1,
+				readFailed: 0,
 				repaired: 0,
 				rejected: 0,
 				scanned: 3,
@@ -531,6 +538,7 @@ describe("native Codex lineage", () => {
 			missing: 0,
 			nativeChildren: 0,
 			projected: 0,
+			readFailed: 0,
 			rejected: 0,
 			scanned: 0,
 			skipped: 0,
@@ -574,6 +582,7 @@ describe("native Codex lineage", () => {
 			missing: 0,
 			nativeChildren: 0,
 			projected: 0,
+			readFailed: 0,
 			rejected: 1,
 			scanned: 3,
 			skipped: 1,
@@ -607,6 +616,266 @@ describe("native Codex lineage", () => {
 			},
 		]);
 		await deleteDiscoveryRaw([rejectedChildId, oversizedId, followingRootId]);
+	});
+
+	test("reads a bounded winning revision from wide physical granules", async () => {
+		const rawTable = `rudel.native_metadata_content_read_${run.replaceAll("-", "")}`;
+		const sessionDate = "2026-09-18T12:00:00.000Z";
+		const locator = (sessionId: string, rawRevision: string) => ({
+			firstIngestedAt: sessionDate,
+			latestIngestedAt: sessionDate,
+			organizationId,
+			projectPath: "/workspace/opaline",
+			rawRevision,
+			sessionDate,
+			sessionId,
+			userId,
+		});
+		try {
+			await clickhouse.execute({
+				query: `
+					CREATE TABLE ${rawTable} (
+						organization_id String,
+						session_date DateTime64(3, 'UTC'),
+						session_id String,
+						user_id String,
+						project_path String,
+						content String,
+						revision UInt64,
+						ingested_at DateTime64(3, 'UTC')
+					)
+					ENGINE = MergeTree
+					PARTITION BY toYYYYMM(toDate(session_date))
+					ORDER BY (organization_id, session_date, session_id)
+					SETTINGS index_granularity = 8192, index_granularity_bytes = 0
+				`,
+			});
+			await clickhouse.execute({
+				clickhouse_settings: {
+					max_memory_usage: "5000000000",
+					max_threads: 1,
+				},
+				query: `
+					INSERT INTO ${rawTable}
+					SELECT
+						{organizationId:String},
+						parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC'),
+						concat('max-', toString(number)),
+						{userId:String},
+						'/workspace/opaline',
+						concat(
+							'{"type":"session_meta","payload":{"id":"',
+							concat('max-', toString(number)),
+							'","thread_source":"user"}}\\n',
+							'{"type":"turn_context","payload":{"model":"gpt-5.6-sol"}}\\n',
+							repeat(repeat('x', 1000000), 134),
+							repeat('x', 216000)
+						),
+						toUInt64(100 + number),
+						parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+					FROM numbers(4)
+				`,
+				query_params: { organizationId, sessionDate, userId },
+			});
+			await clickhouse.execute({ query: `OPTIMIZE TABLE ${rawTable} FINAL` });
+
+			await expect(
+				clickhouse.query({
+					clickhouse_settings: {
+						max_block_size: "1",
+						max_memory_usage: String(256 * 1024 * 1024),
+						max_threads: 1,
+					},
+					query: `
+						SELECT
+							session_id,
+							argMax(substring(content, 1, 65536), ingested_at) AS header
+						FROM ${rawTable}
+						PREWHERE organization_id = {organizationId:String}
+							AND user_id = {userId:String}
+						GROUP BY organization_id, session_id
+					`,
+					query_params: { organizationId, userId },
+				}),
+			).rejects.toMatchObject({ code: "241", type: "MEMORY_LIMIT_EXCEEDED" });
+
+			const [size] = await clickhouse.query<{ contentBytes: number }>({
+				clickhouse_settings: {
+					max_bytes_to_read: String(1024 * 1024),
+					max_memory_usage: String(64 * 1024 * 1024),
+					max_threads: 1,
+				},
+				query: `
+					SELECT content.size AS contentBytes
+					FROM ${rawTable}
+					PREWHERE organization_id = {organizationId:String}
+						AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+						AND session_id = 'max-3'
+						AND user_id = {userId:String}
+						AND revision = 103
+					LIMIT 1
+				`,
+				query_params: { organizationId, sessionDate, userId },
+			});
+			expect(Number(size?.contentBytes)).toBeLessThanOrEqual(128 * 1024 * 1024);
+
+			const fallback = await readBoundedNativeMetadataContent(
+				clickhouse,
+				rawTable,
+				locator("max-3", "103"),
+			);
+			expect(fallback).toMatchObject({
+				content: {
+					headerComplete: 1,
+					model: "gpt-5.6-sol",
+					modelSearchComplete: 1,
+				},
+				fallbackAttempted: true,
+			});
+
+			await clickhouse.execute({ query: `TRUNCATE TABLE ${rawTable}` });
+			await clickhouse.execute({
+				clickhouse_settings: {
+					max_memory_usage: "3000000000",
+					max_threads: 1,
+				},
+				query: `
+					INSERT INTO ${rawTable}
+					SELECT
+						{organizationId:String},
+						parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC'),
+						if(number = 0, 'target-a-neighbor', 'target-z-child'),
+						{userId:String},
+						'/workspace/opaline',
+						concat(
+							'{"type":"session_meta","payload":{"id":"',
+							if(number = 0, 'target-a-neighbor', 'target-z-child'),
+							'","thread_source":"user"}}\\n',
+							'{"type":"turn_context","payload":{"model":"gpt-5.6-sol"}}\\n',
+							repeat(repeat('x', 1000000), if(number = 0, 120, 23))
+						),
+						toUInt64(100 + number),
+						parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+					FROM numbers(2)
+				`,
+				query_params: { organizationId, sessionDate, userId },
+			});
+			await clickhouse.execute({ query: `OPTIMIZE TABLE ${rawTable} FINAL` });
+			const targetSized = await readBoundedNativeMetadataContent(
+				clickhouse,
+				rawTable,
+				locator("target-z-child", "101"),
+			);
+			expect(targetSized).toMatchObject({
+				content: { model: "gpt-5.6-sol" },
+				fallbackAttempted: false,
+			});
+		} finally {
+			await clickhouse.execute({ query: `DROP TABLE IF EXISTS ${rawTable}` });
+		}
+	});
+
+	test("surfaces an unresolved wide row and continues to the next candidate", async () => {
+		const failedId = `content-read-01-failed-${run}`;
+		const followingId = `content-read-02-following-${run}`;
+		await reserve(failedId);
+		await reserve(followingId);
+		await sqlClient`
+			UPDATE session_ownership
+			SET created_at = '2099-12-30T00:00:00.000Z'::timestamptz
+			WHERE organization_id = ${organizationId}
+				AND session_id IN (${failedId}, ${followingId})
+		`;
+		await clickhouse.execute({
+			clickhouse_settings: {
+				max_memory_usage: "3000000000",
+				max_threads: 1,
+			},
+			query: `
+				INSERT INTO rudel.codex_sessions (
+					session_date,
+					last_interaction_date,
+					session_id,
+					organization_id,
+					project_path,
+					content,
+					filter_version,
+					revision,
+					ingested_at,
+					user_id,
+					git_branch,
+					git_sha,
+					tag
+				)
+				SELECT
+					parseDateTime64BestEffort('2026-09-18T13:00:00.000Z', 3, 'UTC'),
+					parseDateTime64BestEffort('2026-09-18T13:00:00.000Z', 3, 'UTC'),
+					if(number = 0, {failedId:String}, {followingId:String}),
+					{organizationId:String},
+					'/workspace/opaline',
+					concat(
+						'{"type":"session_meta","payload":{"id":"',
+						if(number = 0, {failedId:String}, {followingId:String}),
+						'","originator":"codex_sdk_ts","thread_source":"user"}}\\n',
+						if(number = 0, repeat(repeat('x', 1000000), 200), '')
+					),
+					1,
+					toUInt64(100 + number),
+					parseDateTime64BestEffort('2026-09-18T13:00:00.000Z', 3, 'UTC'),
+					{userId:String},
+					NULL,
+					NULL,
+					NULL
+				FROM numbers(2)
+			`,
+			query_params: { failedId, followingId, organizationId, userId },
+		});
+
+		expect(await runNativeMetadataDiscoveryPass(2)).toEqual({
+			discovered: 1,
+			hasMore: false,
+			missing: 0,
+			nativeChildren: 0,
+			projected: 0,
+			readFailed: 1,
+			rejected: 0,
+			scanned: 2,
+			skipped: 1,
+		});
+		expect(await readDiscoveryState([failedId, followingId])).toEqual([
+			{
+				hasRaw: false,
+				hasUsageReceipt: false,
+				scanned: true,
+				scanOutcome: "content-read-failed",
+				sessionId: failedId,
+				source: null,
+			},
+			{
+				hasRaw: true,
+				hasUsageReceipt: false,
+				scanned: true,
+				scanOutcome: "codex",
+				sessionId: followingId,
+				source: "codex",
+			},
+		]);
+		await deleteDiscoveryRaw([failedId, followingId]);
+	});
+
+	test("classifies a timed-out bounded content read for persisted failure handling", () => {
+		const timeout = Object.assign(new Error("bounded test timeout"), {
+			code: "159",
+			type: "TIMEOUT_EXCEEDED",
+		});
+
+		expect(classifyBoundedNativeMetadataContentReadFailure(timeout)).toEqual({
+			code: "159",
+			type: "TIMEOUT_EXCEEDED",
+		});
+		expect(
+			classifyBoundedNativeMetadataContentReadFailure(new Error("unbounded")),
+		).toBeUndefined();
 	});
 
 	test("guards cycles and ownership boundaries", async () => {

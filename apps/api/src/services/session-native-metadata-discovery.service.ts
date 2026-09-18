@@ -1,8 +1,10 @@
+import { getLogger } from "@logtape/logtape";
 import {
 	extractNativeCodexLineageEvidence,
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type RawLineageSession,
 } from "@rudel/api-routes";
-import { getClickhouse } from "../clickhouse.js";
+import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
 	hasMaintenanceTimeRemaining,
@@ -14,10 +16,25 @@ import {
 	SessionAgentMetadataConflictError,
 } from "./session-ownership.service.js";
 
+const logger = getLogger(["rudel", "api", "session-native-metadata-discovery"]);
 const NATIVE_METADATA_MAX_HEADER_BYTES = 64 * 1024;
 const NATIVE_METADATA_MODEL_SEARCH_BYTES = 1024 * 1024;
-const NATIVE_METADATA_MAX_RESULT_BYTES = 8 * 1024 * 1024;
-const NATIVE_METADATA_MAX_MEMORY_BYTES = 256 * 1024 * 1024;
+const NATIVE_METADATA_LOCATOR_MAX_RESULT_BYTES = 8 * 1024 * 1024;
+const NATIVE_METADATA_LOCATOR_MAX_MEMORY_BYTES = 256 * 1024 * 1024;
+const NATIVE_METADATA_CONTENT_PRIMARY_MAX_BYTES_TO_READ = 160 * 1024 * 1024;
+// Ingest accepts at most 128 MiB of transcript content. A one-row local
+// reproduction needs just over twice that amount while ClickHouse decodes the
+// String and evaluates the bounded header/model expressions. Keep the larger
+// allowance on the exact, single-revision query only.
+const NATIVE_METADATA_CONTENT_PRIMARY_MAX_MEMORY_BYTES = 384 * 1024 * 1024;
+// A sparse granule can require decoding preceding Strings before ClickHouse
+// reaches the exact key. The fallback repairs a measured four-row, near-limit
+// granule while retaining a hard per-candidate bound.
+const NATIVE_METADATA_CONTENT_FALLBACK_MAX_BYTES_TO_READ = 640 * 1024 * 1024;
+const NATIVE_METADATA_CONTENT_FALLBACK_MAX_MEMORY_BYTES = 672 * 1024 * 1024;
+const NATIVE_METADATA_CONTENT_MAX_RESULT_BYTES = 2 * 1024 * 1024;
+const NATIVE_METADATA_SIZE_MAX_BYTES_TO_READ = 1024 * 1024;
+const NATIVE_METADATA_SIZE_MAX_MEMORY_BYTES = 64 * 1024 * 1024;
 const NATIVE_MODEL_PATTERN =
 	'(?m)^\\s*\\{[^\\n]*"type"\\s*:\\s*"turn_context"[^\\n]*"model"\\s*:\\s*"([A-Za-z0-9][A-Za-z0-9._:/-]{0,127})"[^\\n]*\\}\\s*$';
 
@@ -33,6 +50,7 @@ export interface NativeMetadataDiscoveryPassResult {
 	readonly missing: number;
 	readonly nativeChildren: number;
 	readonly projected: number;
+	readonly readFailed: number;
 	readonly rejected: number;
 	readonly scanned: number;
 	readonly skipped: number;
@@ -64,18 +82,48 @@ export async function runNativeMetadataDiscoveryPass(
 	let nativeChildren = 0;
 	let processed = 0;
 	let projected = 0;
+	let readFailed = 0;
 	let rejected = 0;
 	let skipped = 0;
 
 	for (const group of grouped) {
 		if (!hasMaintenanceTimeRemaining(deadline)) break;
-		const rawSessions = await readRawSessions(group);
-		const rawBySessionId = new Map(
-			rawSessions.map((session) => [session.sessionId, session]),
+		const rawLocators = await readRawSessionLocators(group);
+		const locatorBySessionId = new Map(
+			rawLocators.map((locator) => [locator.sessionId, locator]),
 		);
 		for (const candidate of group.candidates) {
 			if (!hasMaintenanceTimeRemaining(deadline)) break;
-			const session = rawBySessionId.get(candidate.session_id);
+			const locator = locatorBySessionId.get(candidate.session_id);
+			if (!locator) {
+				await markMetadataScanned(candidate, "missing");
+				missing += 1;
+				processed += 1;
+				continue;
+			}
+			const contentRead = await readBoundedNativeMetadataContent(
+				getClickhouse(),
+				"rudel.codex_sessions",
+				locator,
+			);
+			if (contentRead.failure) {
+				logger.warn(
+					"Native metadata content read failed within bounded ClickHouse limits (session_id={sessionId}, code={code}, type={type})",
+					{
+						code: contentRead.failure.code,
+						sessionId: candidate.session_id,
+						type: contentRead.failure.type,
+					},
+				);
+				await markMetadataScanned(candidate, "content-read-failed");
+				processed += 1;
+				readFailed += 1;
+				skipped += 1;
+				continue;
+			}
+			const session = contentRead.content
+				? { ...locator, ...contentRead.content, source: "codex" as const }
+				: undefined;
 			if (!session) {
 				await markMetadataScanned(candidate, "missing");
 				missing += 1;
@@ -144,6 +192,7 @@ export async function runNativeMetadataDiscoveryPass(
 		missing,
 		nativeChildren,
 		projected,
+		readFailed,
 		rejected,
 		scanned: processed,
 		skipped,
@@ -173,17 +222,16 @@ function groupCandidatesByOwner(
 	}));
 }
 
-async function readRawSessions(
+async function readRawSessionLocators(
 	group: CandidateGroup,
-): Promise<readonly RawNativeMetadataSession[]> {
+): Promise<readonly RawNativeMetadataLocator[]> {
 	const sessionIds = group.candidates.map((candidate) => candidate.session_id);
-	return getClickhouse().query<RawNativeMetadataSession>({
+	return getClickhouse().query<RawNativeMetadataLocator>({
 		clickhouse_settings: {
-			max_block_size: "1",
 			max_bytes_to_read: "4000000000",
 			max_execution_time: 10,
-			max_memory_usage: String(NATIVE_METADATA_MAX_MEMORY_BYTES),
-			max_result_bytes: String(NATIVE_METADATA_MAX_RESULT_BYTES),
+			max_memory_usage: String(NATIVE_METADATA_LOCATOR_MAX_MEMORY_BYTES),
+			max_result_bytes: String(NATIVE_METADATA_LOCATOR_MAX_RESULT_BYTES),
 			max_result_rows: String(group.candidates.length),
 			max_threads: 1,
 			result_overflow_mode: "throw",
@@ -191,47 +239,14 @@ async function readRawSessions(
 		},
 		query: `
 			SELECT
-				'codex' AS source,
 				organization_id AS organizationId,
-				argMax(user_id, ingested_at) AS userId,
+				argMax(user_id, revision) AS userId,
 				session_id AS sessionId,
-				argMax(
-					if(
-						if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
-							<= {maxHeaderBytes:UInt64},
-						substring(
-							content,
-							1,
-							if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
-						),
-						''
-					),
-					ingested_at
-				) AS header,
-				argMax(
-					if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
-						<= {maxHeaderBytes:UInt64},
-					ingested_at
-				) AS headerComplete,
-				argMax(
-					extract(
-						substring(content, 1, {modelSearchBytes:UInt64}),
-						{modelPattern:String}
-					),
-					ingested_at
-				) AS model,
-				argMax(
-					length(content) <= {modelSearchBytes:UInt64}
-						OR extract(
-							substring(content, 1, {modelSearchBytes:UInt64}),
-							{modelPattern:String}
-						) != '',
-					ingested_at
-				) AS modelSearchComplete,
-				argMax(project_path, ingested_at) AS projectPath,
-				formatDateTime(argMax(session_date, ingested_at), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS sessionDate,
+				argMax(project_path, revision) AS projectPath,
+				toString(max(revision)) AS rawRevision,
+				formatDateTime(argMax(session_date, revision), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS sessionDate,
 				formatDateTime(min(ingested_at), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS firstIngestedAt,
-				formatDateTime(max(ingested_at), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS latestIngestedAt
+				formatDateTime(argMax(ingested_at, revision), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS latestIngestedAt
 			FROM rudel.codex_sessions
 			PREWHERE organization_id = {organizationId:String}
 				AND user_id = {userId:String}
@@ -240,13 +255,219 @@ async function readRawSessions(
 		`,
 		query_params: {
 			organizationId: group.organizationId,
-			maxHeaderBytes: NATIVE_METADATA_MAX_HEADER_BYTES,
-			modelPattern: NATIVE_MODEL_PATTERN,
-			modelSearchBytes: NATIVE_METADATA_MODEL_SEARCH_BYTES,
 			sessionIds,
 			userId: group.userId,
 		},
 	});
+}
+
+export interface NativeMetadataContentLocator
+	extends Omit<RawLineageSession, "content" | "source"> {
+	readonly rawRevision: string;
+}
+
+type RawNativeMetadataLocator = NativeMetadataContentLocator;
+
+export interface RawNativeMetadataContent {
+	readonly header: string;
+	readonly headerComplete: number;
+	readonly model: string;
+	readonly modelSearchComplete: number;
+}
+
+interface NativeMetadataContentReadLimits {
+	readonly maxBytesToRead: number;
+	readonly maxMemoryBytes: number;
+}
+
+export interface NativeMetadataContentReadResult {
+	readonly content?: RawNativeMetadataContent;
+	readonly failure?: { readonly code: string; readonly type: string };
+	readonly fallbackAttempted: boolean;
+}
+
+export async function readBoundedNativeMetadataContent(
+	executor: Pick<ClickHouseExecutor, "query">,
+	rawTable: string,
+	locator: NativeMetadataContentLocator,
+): Promise<NativeMetadataContentReadResult> {
+	if (!/^rudel\.[a-z][a-z0-9_]*$/u.test(rawTable)) {
+		throw new Error("Invalid native metadata raw table name");
+	}
+	try {
+		return {
+			content: await readRawSessionContent(executor, rawTable, locator, {
+				maxBytesToRead: NATIVE_METADATA_CONTENT_PRIMARY_MAX_BYTES_TO_READ,
+				maxMemoryBytes: NATIVE_METADATA_CONTENT_PRIMARY_MAX_MEMORY_BYTES,
+			}),
+			fallbackAttempted: false,
+		};
+	} catch (error) {
+		const primaryFailure =
+			classifyBoundedNativeMetadataContentReadFailure(error);
+		if (!primaryFailure) throw error;
+		let contentBytes: number;
+		try {
+			contentBytes = await readRawSessionContentBytes(
+				executor,
+				rawTable,
+				locator,
+			);
+		} catch (sizeError) {
+			const sizeFailure =
+				classifyBoundedNativeMetadataContentReadFailure(sizeError);
+			if (!sizeFailure) throw sizeError;
+			return { failure: sizeFailure, fallbackAttempted: false };
+		}
+		if (contentBytes > INGEST_AGGREGATE_CONTENT_MAX_BYTES) {
+			return {
+				failure: {
+					code: "CONTENT_TOO_LARGE",
+					type: "CONTENT_TOO_LARGE_FOR_BOUNDED_FALLBACK",
+				},
+				fallbackAttempted: false,
+			};
+		}
+		try {
+			return {
+				content: await readRawSessionContent(executor, rawTable, locator, {
+					maxBytesToRead: NATIVE_METADATA_CONTENT_FALLBACK_MAX_BYTES_TO_READ,
+					maxMemoryBytes: NATIVE_METADATA_CONTENT_FALLBACK_MAX_MEMORY_BYTES,
+				}),
+				fallbackAttempted: true,
+			};
+		} catch (fallbackError) {
+			const fallbackFailure =
+				classifyBoundedNativeMetadataContentReadFailure(fallbackError);
+			if (!fallbackFailure) throw fallbackError;
+			return { failure: fallbackFailure, fallbackAttempted: true };
+		}
+	}
+}
+
+async function readRawSessionContent(
+	executor: Pick<ClickHouseExecutor, "query">,
+	rawTable: string,
+	locator: RawNativeMetadataLocator,
+	limits: NativeMetadataContentReadLimits,
+): Promise<RawNativeMetadataContent | undefined> {
+	const [content] = await executor.query<RawNativeMetadataContent>({
+		clickhouse_settings: {
+			max_block_size: "1",
+			max_bytes_to_read: String(limits.maxBytesToRead),
+			max_execution_time: 10,
+			max_memory_usage: String(limits.maxMemoryBytes),
+			max_result_bytes: String(NATIVE_METADATA_CONTENT_MAX_RESULT_BYTES),
+			max_result_rows: "1",
+			max_threads: 1,
+			result_overflow_mode: "throw",
+			timeout_before_checking_execution_speed: 0,
+		},
+		query: `
+			SELECT
+				if(
+					if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
+						<= {maxHeaderBytes:UInt64},
+					substring(
+						content,
+						1,
+						if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
+					),
+					''
+				) AS header,
+				if(position(content, '\\n') = 0, length(content), position(content, '\\n') - 1)
+					<= {maxHeaderBytes:UInt64} AS headerComplete,
+				extract(
+					substring(content, 1, {modelSearchBytes:UInt64}),
+					{modelPattern:String}
+				) AS model,
+				length(content) <= {modelSearchBytes:UInt64}
+					OR extract(
+						substring(content, 1, {modelSearchBytes:UInt64}),
+						{modelPattern:String}
+					) != '' AS modelSearchComplete
+			FROM ${rawTable}
+			PREWHERE organization_id = {organizationId:String}
+				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+				AND session_id = {sessionId:String}
+				AND user_id = {userId:String}
+				AND revision = {rawRevision:UInt64}
+			LIMIT 1
+		`,
+		query_params: {
+			maxHeaderBytes: NATIVE_METADATA_MAX_HEADER_BYTES,
+			modelPattern: NATIVE_MODEL_PATTERN,
+			modelSearchBytes: NATIVE_METADATA_MODEL_SEARCH_BYTES,
+			organizationId: locator.organizationId,
+			rawRevision: locator.rawRevision,
+			sessionDate: locator.sessionDate,
+			sessionId: locator.sessionId,
+			userId: locator.userId,
+		},
+	});
+	return content;
+}
+
+async function readRawSessionContentBytes(
+	executor: Pick<ClickHouseExecutor, "query">,
+	rawTable: string,
+	locator: RawNativeMetadataLocator,
+): Promise<number> {
+	const [row] = await executor.query<{ contentBytes: number | string }>({
+		clickhouse_settings: {
+			max_block_size: "1",
+			max_bytes_to_read: String(NATIVE_METADATA_SIZE_MAX_BYTES_TO_READ),
+			max_execution_time: 10,
+			max_memory_usage: String(NATIVE_METADATA_SIZE_MAX_MEMORY_BYTES),
+			max_result_bytes: "1024",
+			max_result_rows: "1",
+			max_threads: 1,
+			result_overflow_mode: "throw",
+			timeout_before_checking_execution_speed: 0,
+		},
+		query: `
+			SELECT content.size AS contentBytes
+			FROM ${rawTable}
+			PREWHERE organization_id = {organizationId:String}
+				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
+				AND session_id = {sessionId:String}
+				AND user_id = {userId:String}
+				AND revision = {rawRevision:UInt64}
+			LIMIT 1
+		`,
+		query_params: {
+			organizationId: locator.organizationId,
+			rawRevision: locator.rawRevision,
+			sessionDate: locator.sessionDate,
+			sessionId: locator.sessionId,
+			userId: locator.userId,
+		},
+	});
+	const contentBytes = Number(row?.contentBytes);
+	if (!Number.isSafeInteger(contentBytes) || contentBytes < 0) {
+		throw new Error("ClickHouse returned an invalid native transcript size");
+	}
+	return contentBytes;
+}
+
+export function classifyBoundedNativeMetadataContentReadFailure(
+	error: unknown,
+): { readonly code: string; readonly type: string } | undefined {
+	if (typeof error !== "object" || error === null) return undefined;
+	const code = Reflect.get(error, "code");
+	const type = Reflect.get(error, "type");
+	if (
+		typeof code !== "string" ||
+		typeof type !== "string" ||
+		!(
+			(code === "159" && type === "TIMEOUT_EXCEEDED") ||
+			(code === "241" && type === "MEMORY_LIMIT_EXCEEDED") ||
+			(code === "307" && type === "TOO_MANY_BYTES")
+		)
+	) {
+		return undefined;
+	}
+	return { code, type };
 }
 
 interface RawNativeMetadataSession extends Omit<RawLineageSession, "content"> {
@@ -319,6 +540,7 @@ function emptyResult(hasMore: boolean): NativeMetadataDiscoveryPassResult {
 		missing: 0,
 		nativeChildren: 0,
 		projected: 0,
+		readFailed: 0,
 		rejected: 0,
 		scanned: 0,
 		skipped: 0,
