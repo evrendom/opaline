@@ -1,9 +1,5 @@
-import {
-	SessionArrivalsInputSchema,
-	SessionArrivalsPageSchema,
-} from "./session-arrivals.js";
-
 export {
+	SESSION_ARRIVALS_PATH,
 	type SessionArrival,
 	SessionArrivalsInputSchema,
 	SessionArrivalsPageSchema,
@@ -878,9 +874,6 @@ export const contract = {
 				.output(z.array(ProjectErrorSchema)),
 		},
 		sessions: {
-			arrivals: oc
-				.input(SessionArrivalsInputSchema)
-				.output(SessionArrivalsPageSchema),
 			uploadFailures: oc
 				.input(
 					z.object({

@@ -1,16 +1,22 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 import assert from "node:assert/strict";
-import { SessionArrivalsPageSchema } from "@rudel/api-routes";
+import {
+	SESSION_ARRIVALS_PATH,
+	SessionArrivalsPageSchema,
+} from "@rudel/api-routes";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
+import { sessionArrivalChannel } from "../services/session-arrival-channel.js";
+import { recordSessionIngestContent } from "../services/session-ownership.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
 } from "./helpers/api-test-server.js";
 
-setDefaultTimeout(60_000);
+setDefaultTimeout(20_000);
 let server: ApiTestServer;
 const users: { id: string; token: string }[] = [];
+const streams: AbortController[] = [];
 const run = crypto.randomUUID();
 
 beforeAll(async () => {
@@ -40,6 +46,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+	for (const controller of streams) controller.abort();
 	await server?.stop();
 	for (const user of users) {
 		await sqlClient`DELETE FROM organization WHERE id = ${user.id}`;
@@ -48,85 +55,169 @@ afterAll(async () => {
 	await sqlClient.end();
 });
 
-function request(
-	input: { organizationId?: string; since?: string; after?: string },
-	token?: string,
-) {
-	return fetch(`${server.baseUrl}/rpc/analytics/sessions/arrivals`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-		},
-		body: JSON.stringify({ json: { organizationId: users[0]?.id, ...input } }),
-	});
+function request(organizationId: string, token?: string, since?: string) {
+	const controller = new AbortController();
+	streams.push(controller);
+	return {
+		controller,
+		response: fetch(
+			`${server.baseUrl}${SESSION_ARRIVALS_PATH}?${new URLSearchParams({ organizationId })}`,
+			{
+				signal: controller.signal,
+				headers: {
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+					...(since ? { "Last-Event-ID": since } : {}),
+				},
+			},
+		),
+	};
 }
 
-async function arrivals(
-	input: { organizationId?: string; since?: string; after?: string },
-	token: string,
-) {
-	const response = await request(input, token);
+async function connect(organizationId: string, token: string, since?: string) {
+	const connection = request(organizationId, token, since);
+	const response = await connection.response;
 	expect(response.status, server.readOutput()).toBe(200);
-	return z
-		.object({ json: SessionArrivalsPageSchema })
-		.parse(await response.json()).json;
+	expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+	assert(response.body);
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = "";
+	async function next() {
+		for (;;) {
+			const boundary = buffer.indexOf("\n\n");
+			if (boundary !== -1) {
+				const event = buffer.slice(0, boundary);
+				buffer = buffer.slice(boundary + 2);
+				const data = event
+					.split("\n")
+					.find((line) => line.startsWith("data: "));
+				if (data)
+					return SessionArrivalsPageSchema.parse(JSON.parse(data.slice(6)));
+				continue;
+			}
+			const chunk = await reader.read();
+			assert(!chunk.done, "Stream closed before the expected event");
+			buffer += decoder.decode(chunk.value, { stream: true });
+		}
+	}
+	const baseline = await next();
+	expect(baseline.sessions).toEqual([]);
+	return {
+		next,
+		since: baseline.since,
+		close: () => connection.controller.abort(),
+	};
 }
 
-test("workspace feed waits for completed uploads, ignores history, and enforces detail permissions", async () => {
+async function complete(
+	organizationId: string,
+	sessionId: string,
+	withReceipt = true,
+) {
+	await recordSessionIngestContent(
+		organizationId,
+		sessionId,
+		"a".repeat(64),
+		{
+			version: 1,
+			assistantLineCount: 1,
+			contentBytes: 10,
+			main: { assistantLineCount: 1, contentBytes: 10 },
+			subagents: {},
+		},
+		1,
+		new Date(),
+		new Date(),
+		"1",
+		withReceipt
+			? {
+					checksum: "b".repeat(64),
+					diagnostics: "{}",
+					eventCount: 1,
+					extractionVersion: 1,
+					eventIdentityVersion: 1,
+					generation: "0",
+					modelRateCardVersion: "test",
+				}
+			: undefined,
+	);
+}
+
+test("pushes successful ingestion commits, checks access, and catches up after reconnect", async () => {
 	const [owner, member, outsider] = users;
 	assert(owner && member && outsider);
-	expect((await request({})).status).toBe(401);
+	expect((await request(owner.id).response).status).toBe(401);
+	expect((await request(owner.id, outsider.token).response).status).toBe(403);
+	expect(
+		(await request(owner.id, owner.token, "invalid").response).status,
+	).toBe(400);
 	await sqlClient`INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${crypto.randomUUID()}, ${owner.id}, ${member.id}, 'member', now())`;
-	await sqlClient`UPDATE session SET active_organization_id = ${owner.id} WHERE user_id = ${member.id}`;
-	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at, last_ingested_at) VALUES (${owner.id}, 'historical', ${owner.id}, now() - interval '1 day', now())`;
-	const baseline = await arrivals({}, owner.token);
-	expect(baseline.sessions).toEqual([]);
-	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at, last_ingested_at, last_session_date) VALUES
-		(${owner.id}, 'ready', ${owner.id}, now(), now(), now() - interval '1 year'),
-		(${owner.id}, 'pending', ${member.id}, now(), null, now()),
-		(${outsider.id}, 'other-workspace', ${outsider.id}, now(), now(), now())`;
-	expect(
-		(await arrivals({ since: baseline.since }, owner.token)).sessions,
-	).toEqual([{ sessionId: "ready", userName: "owner" }]);
-	expect(
-		(await arrivals({ since: baseline.since }, member.token)).sessions,
-	).toEqual([]);
-	await sqlClient`UPDATE session_ownership SET last_ingested_at = now() WHERE organization_id = ${owner.id} AND session_id IN ('pending', 'historical')`;
-	expect(
-		(await arrivals({ since: baseline.since }, member.token)).sessions,
-	).toEqual([{ sessionId: "pending", userName: "member" }]);
-	expect(
-		(await arrivals({ since: baseline.since }, owner.token)).sessions.map(
-			(row) => row.sessionId,
-		),
-	).toEqual(["pending", "ready"]);
-	expect(
-		(await request({ since: baseline.since }, outsider.token)).status,
-	).toBe(403);
-	const outsiderSessions = await arrivals(
-		{ since: baseline.since, organizationId: outsider.id },
-		outsider.token,
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at, last_ingested_at, last_usage_completed_at)
+		VALUES (${owner.id}, 'historical', ${owner.id}, now() - interval '1 day', now(), now())`;
+	const ownerStream = await connect(owner.id, owner.token);
+	const memberStream = await connect(owner.id, member.token);
+	const notifications: string[] = [];
+	const subscription = await sqlClient.listen(
+		sessionArrivalChannel(owner.id),
+		(payload) => {
+			notifications.push(payload);
+		},
 	);
-	expect(outsiderSessions.sessions.map((row) => row.sessionId)).toEqual([
-		"other-workspace",
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at) VALUES
+		(${owner.id}, 'ready', ${owner.id}, now()), (${owner.id}, 'pending', ${member.id}, now())`;
+	await complete(owner.id, "ready", false);
+	await Bun.sleep(50);
+	expect(notifications).toEqual([]);
+	await sqlClient`UPDATE session_ownership SET usage_extraction_generation = 1 WHERE organization_id = ${owner.id} AND session_id = 'ready'`;
+	await expect(complete(owner.id, "ready")).rejects.toThrow();
+	expect(notifications).toEqual([]);
+	await sqlClient`UPDATE session_ownership SET usage_extraction_generation = 0 WHERE organization_id = ${owner.id} AND session_id = 'ready'`;
+	await complete(owner.id, "ready");
+	expect((await ownerStream.next()).sessions).toEqual([
+		{ sessionId: "ready", userName: "owner" },
 	]);
+	await complete(owner.id, "ready");
+	await complete(owner.id, "historical");
+	await complete(owner.id, "pending");
+	expect((await memberStream.next()).sessions).toEqual([
+		{ sessionId: "pending", userName: "member" },
+	]);
+	expect((await ownerStream.next()).sessions).toEqual([
+		{ sessionId: "pending", userName: "member" },
+	]);
+	expect(notifications).toHaveLength(2);
+	ownerStream.close();
+	memberStream.close();
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id) VALUES (${owner.id}, 'offline', ${owner.id})`;
+	await complete(owner.id, "offline");
+	const reconnected = await connect(owner.id, owner.token, ownerStream.since);
+	expect(
+		(await reconnected.next()).sessions.map((row) => row.sessionId),
+	).toEqual(["offline", "pending", "ready"]);
+	reconnected.close();
+	await subscription.unlisten();
 });
 
-test("paginates bulk arrivals without dropping or repeating sessions", async () => {
+test("delivers a bulk import over one stream with bounded pages", async () => {
 	const owner = users[0];
 	assert(owner);
-	const baseline = await arrivals({}, owner.token);
-	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at, last_ingested_at)
-		SELECT ${owner.id}, 'bulk-' || lpad(n::text, 3, '0'), ${owner.id}, now(), now() FROM generate_series(1, 205) AS n`;
+	const stream = await connect(owner.id, owner.token);
+	await sqlClient.begin(async (transaction) => {
+		await transaction.unsafe(
+			`INSERT INTO session_ownership (organization_id, session_id, user_id, created_at, last_ingested_at, last_usage_completed_at) SELECT $1, 'bulk-' || lpad(n::text, 3, '0'), $1, now(), now(), now() FROM generate_series(1, 205) AS n`,
+			[owner.id],
+		);
+		await transaction.unsafe("SELECT pg_notify($1, '')", [
+			sessionArrivalChannel(owner.id),
+		]);
+	});
 	const ids: string[] = [];
-	let after: string | undefined;
-	do {
-		const page = await arrivals({ since: baseline.since, after }, owner.token);
+	for (let i = 0; i < 3; i++) {
+		const page = await stream.next();
 		expect(page.sessions.length).toBeLessThanOrEqual(100);
 		ids.push(...page.sessions.map((row) => row.sessionId));
-		after = page.nextCursor ?? undefined;
-	} while (after);
+	}
 	expect(ids).toHaveLength(205);
 	expect(new Set(ids).size).toBe(205);
+	stream.close();
 });

@@ -18,7 +18,7 @@ export async function listSessionArrivals(
 		return { since: clock.since, sessions: [], nextCursor: null };
 	}
 
-	// Scan from the subscription baseline on every poll. A reserved session can
+	// Scan from the subscription baseline on connection and upload events. A reserved session can
 	// finish later than newer sessions, so advancing a completion watermark would
 	// lose delayed uploads. The primary key provides stable, bounded pagination.
 	const rows = await sqlClient<{ sessionId: string; userName: string }[]>`
@@ -28,7 +28,7 @@ export async function listSessionArrivals(
 		WHERE s.organization_id = ${organizationId}
 			AND (${userId}::text IS NULL OR s.user_id = ${userId})
 			AND s.created_at >= ${input.since}::timestamptz
-			AND s.last_ingested_at IS NOT NULL
+			AND s.last_usage_completed_at IS NOT NULL
 			AND (${input.after ?? null}::text IS NULL OR s.session_id > ${input.after ?? null})
 		ORDER BY s.session_id
 		LIMIT ${PAGE_SIZE + 1}
@@ -40,4 +40,14 @@ export async function listSessionArrivals(
 		nextCursor:
 			rows.length > PAGE_SIZE ? (sessions.at(-1)?.sessionId ?? null) : null,
 	};
+}
+
+export async function readSessionArrivalMember(
+	organizationId: string,
+	userId: string,
+) {
+	const [member] = await sqlClient<{ role: string }[]>`
+		SELECT role FROM member WHERE organization_id = ${organizationId} AND user_id = ${userId}
+	`;
+	return member;
 }

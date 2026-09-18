@@ -15,6 +15,21 @@ const headerRuleBySource = new Map(
 );
 
 describe("Vercel deployment configuration", () => {
+	test("routes session arrival events through a streaming function before the SPA", () => {
+		expect(rewriteBySource.get("/api/sessions/arrivals/events")).toBe(
+			"/api/session-arrivals?__opaline_path=/api/sessions/arrivals/events",
+		);
+		expect(
+			vercelConfig.functions["api/session-arrivals.ts"].maxDuration,
+		).toBeGreaterThan(240);
+		expect(
+			rewriteSources.indexOf("/api/sessions/arrivals/events"),
+		).toBeLessThan(
+			rewriteSources.findIndex((source) =>
+				source.startsWith("/:path((?!assets"),
+			),
+		);
+	});
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {
 		for (const { source, destination } of [
 			{ source: "/privacy", destination: "/legal/privacy-policy/" },

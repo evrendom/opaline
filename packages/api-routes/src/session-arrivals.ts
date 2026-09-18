@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const SESSION_ARRIVALS_PATH = "/api/sessions/arrivals/events";
+
 export const SessionArrivalsInputSchema = z.object({
 	organizationId: z.string().min(1).max(200),
 	// Omit on the first request to establish a server-clock baseline.

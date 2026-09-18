@@ -1,6 +1,7 @@
 import { getLogger, withContext } from "@logtape/logtape";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
+import { SESSION_ARRIVALS_PATH } from "@rudel/api-routes";
 import type { Session as AuthSession } from "./auth.js";
 import { createAuth } from "./auth.js";
 import { db, sqlClient } from "./db.js";
@@ -10,6 +11,7 @@ import {
 	handleAvatarUploadRequest,
 } from "./handlers/avatar-http.js";
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
+import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
 	getTeamInviteRoute,
@@ -346,7 +348,10 @@ export async function fetchHandler(
 			const finalResponse =
 				url.pathname === "/rpc" ||
 				url.pathname.startsWith("/rpc/") ||
-				(/^\/api\/cli\/connections\/[a-f0-9-]+\/events$/u.test(url.pathname) &&
+				((url.pathname === SESSION_ARRIVALS_PATH ||
+					/^\/api\/cli\/connections\/[a-f0-9-]+\/events$/u.test(
+						url.pathname,
+					)) &&
 					response.headers.get("Content-Type")?.startsWith("text/event-stream"))
 					? response
 					: await enforceApiResponseSize({
@@ -472,6 +477,16 @@ async function handleRequest(
 			getBrowserUserId: async (req) =>
 				(await auth.api.getSession({ headers: req.headers }))?.user.id ?? null,
 		});
+		for (const [key, value] of Object.entries(cors))
+			response.headers.set(key, value);
+		return response;
+	}
+	if (url.pathname === SESSION_ARRIVALS_PATH) {
+		const session = await auth.api.getSession({ headers: request.headers });
+		const response = await handleSessionArrivalsRequest(
+			request,
+			session?.user.id ?? null,
+		);
 		for (const [key, value] of Object.entries(cors))
 			response.headers.set(key, value);
 		return response;

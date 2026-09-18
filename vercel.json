@@ -43,6 +43,11 @@
 			"includeFiles": "{apps/api/src/**,dist-site/app.html,dist-site/404.html,dist-site/410/index.html,packages/*/src/**}",
 			"memory": 1024,
 			"maxDuration": 30
+		},
+		"api/session-arrivals.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
 		}
 	},
 	"crons": [
@@ -129,6 +134,10 @@
 		{
 			"source": "/team/invite/:token",
 			"destination": "/api/invite?__opaline_path=/team/invite/:token"
+		},
+		{
+			"source": "/api/sessions/arrivals/events",
+			"destination": "/api/session-arrivals?__opaline_path=/api/sessions/arrivals/events"
 		},
 		{
 			"source": "/api/cli/connections",

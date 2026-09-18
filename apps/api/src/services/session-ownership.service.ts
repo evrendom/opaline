@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
+import { sessionArrivalChannel } from "./session-arrival-channel.js";
 import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
 export { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
@@ -110,7 +111,9 @@ export async function recordSessionIngestContent(
 	// match both its reserved generation and the raw revision it describes.
 	const ingestedAtIso = ingestedAt.toISOString();
 	return sqlClient.begin(async (transaction) => {
-		await transaction.unsafe(
+		const [ownership] = await transaction.unsafe<
+			Array<{ isFirstCompletion: boolean }>
+		>(
 			`
 			UPDATE session_ownership
 			SET
@@ -128,6 +131,7 @@ export async function recordSessionIngestContent(
 					last_revision IS NULL
 					OR last_revision <= $8::bigint
 				)
+			RETURNING last_usage_completed_at IS NULL AS "isFirstCompletion"
 			`,
 			[
 				contentSha256,
@@ -179,6 +183,12 @@ export async function recordSessionIngestContent(
 		);
 		if (completed.length !== 1) {
 			throw new UsageExtractionSupersededError();
+		}
+		if (ownership?.isFirstCompletion) {
+			// Delivered only after this successful receipt transaction commits.
+			await transaction.unsafe("SELECT pg_notify($1, '')", [
+				sessionArrivalChannel(organizationId),
+			]);
 		}
 	});
 }
