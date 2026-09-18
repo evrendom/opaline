@@ -93,6 +93,8 @@ type Props = {
 	signalTypes: CostDashboardInput["signalTypes"];
 	interval: ChartInterval;
 	onMetricChange: (metric: DashboardMetric) => void;
+	onRefresh: () => void;
+	refreshing: boolean;
 	splitBy: CostDashboardInput["splitBy"];
 	onResetSplit: () => void;
 };
@@ -106,11 +108,26 @@ export function CostChart({
 	runSignals,
 	signalTypes,
 	onMetricChange,
+	onRefresh,
+	refreshing,
 	interval,
 }: Props) {
 	const data = getMetricData(dashboard, metric);
 	const metricLabel = METRIC_LABELS[metric];
 	const unavailable = data === null;
+	const coverage = metric === "agentRuns" ? data?.coverage : undefined;
+	const coverageParts = coverage
+		? [
+				`${formatMetric(data?.total ?? 0, "agentRuns")} indexed runs`,
+				`${formatMetric(coverage.indexedSessions, "sessions")} sessions indexed`,
+				coverage.indexingSessions > 0
+					? `${formatMetric(coverage.indexingSessions, "sessions")} still indexing`
+					: undefined,
+				coverage.unavailableSessions > 0
+					? `${formatMetric(coverage.unavailableSessions, "sessions")} unavailable to index`
+					: undefined,
+			].filter((part): part is string => Boolean(part))
+		: [];
 	const gradientId = useId();
 	const trend = useMemo(
 		() => groupChartTrend(data?.trend ?? [], interval),
@@ -158,6 +175,7 @@ export function CostChart({
 				<FluidMenuHover items=".cost-metric" />
 				{DASHBOARD_METRICS.map((value) => {
 					const total = getMetricTotal(dashboard, value);
+					const metricData = getMetricData(dashboard, value);
 					return (
 						<Metric
 							key={value}
@@ -177,6 +195,11 @@ export function CostChart({
 										: formatMetric(total, value)
 							}
 							unavailable={total === null}
+							qualifier={
+								value === "agentRuns" && metricData?.incomplete
+									? "indexed"
+									: undefined
+							}
 							primary={metric === value}
 							onClick={() => onMetricChange(value)}
 						/>
@@ -185,13 +208,40 @@ export function CostChart({
 			</fieldset>
 			<div className="cost-chart-key" data-fluid-menu-root="">
 				<FluidMenuHover items=".cost-text-button" />
-				<div className="cost-chart-legend">
-					{series.map((entry) => (
-						<div key={entry.id} className="cost-legend-item">
-							<i style={{ backgroundColor: entry.color }} />
-							{entry.label}
-						</div>
-					))}
+				<div className="cost-chart-key-copy">
+					<div className="cost-chart-legend">
+						{series.map((entry) => (
+							<div key={entry.id} className="cost-legend-item">
+								<i style={{ backgroundColor: entry.color }} />
+								{entry.label}
+							</div>
+						))}
+					</div>
+					{coverage ? (
+						<output className="cost-chart-coverage">
+							<span>{coverageParts.join(" · ")}</span>
+							<button
+								type="button"
+								className="cost-text-button cost-coverage-refresh"
+								onClick={onRefresh}
+								disabled={refreshing}
+							>
+								{refreshing ? "Refreshing…" : "Refresh"}
+							</button>
+						</output>
+					) : unavailable ? (
+						<output className="cost-chart-coverage">
+							<span>{metricLabel} are still being indexed</span>
+							<button
+								type="button"
+								className="cost-text-button cost-coverage-refresh"
+								onClick={onRefresh}
+								disabled={refreshing}
+							>
+								{refreshing ? "Refreshing…" : "Refresh"}
+							</button>
+						</output>
+					) : null}
 				</div>
 				{splitBy !== "none" ? (
 					<button
@@ -318,9 +368,17 @@ export function CostChart({
 						<p>
 							{unavailable
 								? `${metricLabel} are still being indexed`
-								: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
+								: metric === "agentRuns" &&
+										((coverage?.indexingSessions ?? 0) > 0 ||
+											(coverage?.unavailableSessions ?? 0) > 0)
+									? "No indexed agent runs match yet"
+									: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
 						</p>
-						{!unavailable ? (
+						{!unavailable &&
+						metric === "agentRuns" &&
+						coverage?.indexingSessions ? (
+							<p>Some sessions are still being indexed.</p>
+						) : !unavailable ? (
 							<p>Try a different date range or clear your filters.</p>
 						) : null}
 					</div>
@@ -333,6 +391,7 @@ function Metric({
 	label,
 	description,
 	value,
+	qualifier,
 	primary = false,
 	unavailable,
 	onClick,
@@ -340,6 +399,7 @@ function Metric({
 	label: string;
 	description: string | undefined;
 	value: string | undefined;
+	qualifier: string | undefined;
 	primary?: boolean;
 	unavailable: boolean;
 	onClick: () => void;
@@ -380,7 +440,12 @@ function Metric({
 			{value === undefined ? (
 				<div className="cost-skeleton cost-metric-skeleton" />
 			) : (
-				<span className="cost-metric-value">{value}</span>
+				<span className="cost-metric-value">
+					{value}
+					{qualifier ? (
+						<small className="cost-metric-qualifier">{qualifier}</small>
+					) : null}
+				</span>
 			)}
 		</div>
 	);

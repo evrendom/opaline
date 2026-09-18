@@ -128,6 +128,7 @@ async function ingest(
 	content: string,
 	userIndex = 0,
 	indexed = true,
+	projectPath = "/test/agent-runs",
 ) {
 	const user = users[userIndex];
 	assert(user);
@@ -139,7 +140,7 @@ async function ingest(
 	const input = {
 		content,
 		sessionId,
-		projectPath: "/test/agent-runs",
+		projectPath,
 		source: "claude_code" as const,
 	};
 	await adapter.ingest(ch, input, {
@@ -180,7 +181,12 @@ async function dashboard(
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				json: { startDate: day, endDate: day, ...filters },
+				json: {
+					startDate: day,
+					endDate: day,
+					requestedMetric: "agentRuns",
+					...filters,
+				},
 			}),
 		},
 	);
@@ -221,6 +227,127 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect(filtered.metrics.agentRuns?.total).toBe(1);
 	expect(filtered.metrics.agentRuns?.breakdowns.durations).toHaveLength(9);
 	expect((await dashboard({}, 1)).metrics.agentRuns?.total).toBe(1);
+});
+
+test("requested detail metric does not change filtered headline totals", async () => {
+	const filters = {
+		models: ["claude-sonnet-4-5"],
+		signalTypes: ["userPositive" as const],
+		runSignals: ["positive" as const],
+	};
+	const results = await Promise.all(
+		(["cost", "sessions", "signals", "agentRuns"] as const).map(
+			(requestedMetric) => dashboard({ ...filters, requestedMetric }),
+		),
+	);
+	const legacy = await dashboard({ ...filters, requestedMetric: undefined });
+	const totals = results.map((result) => ({
+		cost: result.metrics.cost.total,
+		sessions: result.metrics.sessions.total,
+		signals: result.metrics.signals?.total,
+		agentRuns: result.metrics.agentRuns?.total,
+	}));
+	const expectedTotals = totals[0];
+	assert(expectedTotals);
+	expect(totals).toEqual(totals.map(() => expectedTotals));
+	expect({
+		cost: legacy.metrics.cost.total,
+		sessions: legacy.metrics.sessions.total,
+		signals: legacy.metrics.signals?.total,
+		agentRuns: legacy.metrics.agentRuns?.total,
+	}).toEqual(expectedTotals);
+	expect(results[0]?.metrics.cost.breakdowns.members).not.toHaveLength(0);
+	expect(results[0]?.metrics.agentRuns?.breakdowns.members).toHaveLength(0);
+	expect(results[2]?.metrics.signals?.breakdowns.signalTypes).not.toHaveLength(
+		0,
+	);
+	expect(results[3]?.metrics.agentRuns?.breakdowns.runSignals).not.toHaveLength(
+		0,
+	);
+	expect(legacy.metrics.cost.breakdowns.members).not.toHaveLength(0);
+	expect(legacy.metrics.signals?.breakdowns.signalTypes).not.toHaveLength(0);
+	expect(legacy.metrics.agentRuns?.breakdowns.runSignals).not.toHaveLength(0);
+});
+
+test("returns matched indexed runs while another selected session is indexing", async () => {
+	const repository = `/test/partial-coverage-${run}`;
+	await ingest(
+		`partial-indexed-${run}`,
+		transcript(60, "Great", true),
+		0,
+		true,
+		repository,
+	);
+	await ingest(
+		`partial-stale-${run}`,
+		transcript(60, "Great", true),
+		0,
+		false,
+		repository,
+	);
+	const runs = (
+		await dashboard({
+			repositories: [repository],
+			runSignals: ["positive"],
+			skillsUsed: ["yes"],
+		})
+	).metrics.agentRuns;
+	expect(runs?.total).toBe(1);
+	expect(runs?.incomplete).toBe(true);
+	expect(runs?.coverage).toEqual({
+		indexedSessions: 1,
+		indexingSessions: 1,
+		unavailableSessions: 0,
+	});
+});
+
+test("counts a multi-run session once in coverage under run filters", async () => {
+	const repository = `/test/session-coverage-${run}`;
+	const content =
+		transcript(60) +
+		"\n" +
+		transcript(300, "Great", false, start + 120_000)
+			.replaceAll('"u1"', '"u3"')
+			.replaceAll('"a1"', '"a3"')
+			.replaceAll('"u2"', '"u4"')
+			.replaceAll('"m1"', '"m3"');
+	await ingest(`coverage-once-${run}`, content, 0, true, repository);
+	const runs = (
+		await dashboard({
+			repositories: [repository],
+			runSignals: ["positive"],
+			durations: ["5to15m"],
+		})
+	).metrics.agentRuns;
+	expect(runs?.total).toBe(1);
+	expect(runs?.coverage).toEqual({
+		indexedSessions: 1,
+		indexingSessions: 0,
+		unavailableSessions: 0,
+	});
+});
+
+test("reports a stale session without its current raw revision as unavailable", async () => {
+	const repository = `/test/unavailable-coverage-${run}`;
+	const sessionId = `coverage-unavailable-${run}`;
+	await ingest(sessionId, transcript(60, "Great"), 0, true, repository);
+	await ingest(sessionId, transcript(300, "Great"), 0, false, repository);
+	const user = users[0];
+	assert(user);
+	await ch.execute({
+		query: `ALTER TABLE rudel.claude_sessions DELETE WHERE organization_id = {org:String} AND session_id = {sessionId:String} SETTINGS mutations_sync = 2`,
+		query_params: { org: user.id, sessionId },
+	});
+	const runs = (
+		await dashboard({ repositories: [repository], runSignals: ["positive"] })
+	).metrics.agentRuns;
+	expect(runs?.total).toBe(0);
+	expect(runs?.incomplete).toBe(true);
+	expect(runs?.coverage).toEqual({
+		indexedSessions: 0,
+		indexingSessions: 0,
+		unavailableSessions: 1,
+	});
 });
 
 test("later revisions replace no-reply feedback without duplicating the run", async () => {
@@ -266,10 +393,18 @@ test("preserves unrecognized model identities for run filters", async () => {
 	).toBe(true);
 });
 
-test("unindexed revisions remain unknown even under run filters", async () => {
-	await ingest(`stale-${run}`, transcript(300), 0, false);
-	expect(
-		(await dashboard({ runSignals: ["mixed"], skillsUsed: ["yes"] })).metrics
-			.agentRuns,
-	).toBeNull();
+test("unindexed revisions keep valid runs visible and report coverage", async () => {
+	const repository = `/test/stale-coverage-${run}`;
+	await ingest(`stale-${run}`, transcript(300), 0, false, repository);
+	const runs = (
+		await dashboard({
+			repositories: [repository],
+			runSignals: ["mixed"],
+			skillsUsed: ["yes"],
+		})
+	).metrics.agentRuns;
+	expect(runs).not.toBeNull();
+	expect(runs?.incomplete).toBe(true);
+	expect(runs?.coverage?.indexingSessions).toBeGreaterThanOrEqual(1);
+	expect(runs?.coverage?.unavailableSessions).toBe(0);
 });

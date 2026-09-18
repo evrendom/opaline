@@ -19,6 +19,9 @@ export const CostDimensionSchema = z.enum([
 	"skillsUsed",
 ]);
 export const CostDashboardInputSchema = DateRangeInputSchema.extend({
+	requestedMetric: z
+		.enum(["cost", "sessions", "signals", "agentRuns"])
+		.optional(),
 	members: z.array(z.string().max(512)).max(100).default([]),
 	repositories: z.array(z.string().max(4096)).max(100).default([]),
 	models: z.array(z.string().max(512)).max(100).default([]),
@@ -77,8 +80,18 @@ export const DashboardMetricDataSchema = z.object({
 		durations: z.array(CostBreakdownEntrySchema),
 		skillsUsed: z.array(CostBreakdownEntrySchema),
 	}),
+	coverage: z
+		.object({
+			indexedSessions: z.number().int().nonnegative(),
+			indexingSessions: z.number().int().nonnegative(),
+			unavailableSessions: z.number().int().nonnegative(),
+		})
+		.optional(),
 });
 export const CostDashboardSchema = z.object({
+	requestedMetric: z
+		.enum(["cost", "sessions", "signals", "agentRuns"])
+		.optional(),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]),
 	metrics: z.object({
 		cost: DashboardMetricDataSchema,

@@ -61,6 +61,7 @@ export function useCostDashboard() {
 	const input: CostDashboardInput = {
 		startDate: dates.startDate,
 		endDate: dates.endDate,
+		requestedMetric: metric,
 		splitBy,
 		members: params.getAll("member").slice(0, 100).sort(),
 		repositories: params.getAll("repo").slice(0, 100).sort(),
@@ -104,17 +105,23 @@ export function useCostDashboard() {
 		...orpc.analytics.overview.costs.queryOptions({ input }),
 		staleTime: 60_000,
 		placeholderData: (previous, previousQuery) =>
-			previousQuery?.queryKey[1] === workspace.activeOrg?.id
+			previousQuery?.queryKey[1] === workspace.activeOrg?.id &&
+			previous?.requestedMetric === metric
 				? previous
 				: undefined,
 		refetchOnWindowFocus: false,
-		refetchInterval:
-			metric === "agentRuns" || metric === "signals"
-				? (query) =>
-						query.state.data && query.state.data.metrics[metric] === null
-							? 5_000
-							: false
-				: false,
+		refetchInterval: (query) => {
+			if (query.state.fetchFailureCount > 0) return false;
+			const data = query.state.data;
+			const needsRefresh =
+				metric === "agentRuns"
+					? (data?.metrics.agentRuns?.coverage?.indexingSessions ?? 0) > 0
+					: metric === "signals" && data?.metrics.signals === null;
+			if (!needsRefresh) return false;
+			// Indexing normally resolves quickly. Retry twice with backoff, then leave
+			// refresh under the user's control instead of polling forever.
+			return [10_000, 30_000][query.state.dataUpdateCount - 1] ?? false;
+		},
 	});
 	function update(action: (next: URLSearchParams) => void) {
 		setParams((current) => {

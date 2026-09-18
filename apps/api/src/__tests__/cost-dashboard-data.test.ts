@@ -450,3 +450,54 @@ test("outdated run summaries remain unknown rather than zero", () => {
 		0,
 	);
 });
+
+test("keeps indexed runs visible with session-level indexing coverage", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				dimension: "headline",
+				id: "",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "members",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexed",
+				value: 2,
+				matched_value: 2,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexing",
+				value: 1,
+				matched_value: 1,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "unavailable",
+				value: 1,
+				matched_value: 1,
+			}),
+		],
+		{ ...input, requestedMetric: "agentRuns" },
+		members,
+	).metrics.agentRuns;
+
+	expect(result?.total).toBe(3);
+	expect(result?.incomplete).toBe(true);
+	expect(result?.coverage).toEqual({
+		indexedSessions: 2,
+		indexingSessions: 1,
+		unavailableSessions: 1,
+	});
+});

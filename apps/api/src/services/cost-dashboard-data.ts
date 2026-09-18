@@ -9,9 +9,9 @@ import type {
 import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
 
 export interface CostAggregateRow {
-	metric: Exclude<DashboardMetric, "commits">;
+	metric: Exclude<DashboardMetric, "commits"> | "agentRunCoverage";
 	date: string;
-	dimension: CostDimension;
+	dimension: CostDimension | "headline" | "coverage";
 	id: string;
 	value: number;
 	incomplete: number;
@@ -52,6 +52,7 @@ export function buildCostDashboard(
 		? { ...input, splitBy: "none" as const }
 		: input;
 	return {
+		requestedMetric: input.requestedMetric,
 		splitBy: input.splitBy,
 		metrics: {
 			cost: buildMetric(
@@ -87,7 +88,19 @@ function buildAgentRuns(
 	members: ReadonlyMap<string, MemberLabel>,
 ): DashboardMetricData | null {
 	const runs = rows.filter((row) => row.metric === "agentRuns");
-	if (runs.some((row) => Number(row.matched_incomplete) > 0)) return null;
+	const runHeadlineRows = rows.some(
+		(row) => row.metric === "agentRuns" && row.dimension === "headline",
+	)
+		? runs.filter((row) => row.dimension === "headline")
+		: runs;
+	// Preserve the original all-or-nothing contract for deployed clients that do
+	// not send requestedMetric. Current clients can render fresh runs alongside
+	// explicit scan coverage.
+	if (
+		input.requestedMetric === undefined &&
+		runHeadlineRows.some((row) => Number(row.matched_incomplete) > 0)
+	)
+		return null;
 	const result = buildMetric(
 		runs,
 		input.splitBy === "signalTypes" || input.splitBy === "phrases"
@@ -96,6 +109,25 @@ function buildAgentRuns(
 		members,
 		"Agent runs",
 	);
+	const coverageRows = rows.filter(
+		(row) => row.metric === "agentRunCoverage" && row.dimension === "coverage",
+	);
+	if (coverageRows.length > 0) {
+		const coverage = {
+			indexedSessions: 0,
+			indexingSessions: 0,
+			unavailableSessions: 0,
+		};
+		for (const row of coverageRows) {
+			const count = Number(row.matched_value);
+			if (row.id === "indexed") coverage.indexedSessions += count;
+			else if (row.id === "indexing") coverage.indexingSessions += count;
+			else if (row.id === "unavailable") coverage.unavailableSessions += count;
+		}
+		result.coverage = coverage;
+		result.incomplete ||=
+			coverage.indexingSessions > 0 || coverage.unavailableSessions > 0;
+	}
 	const fixed = {
 		runSignals: AGENT_RUN_SIGNALS,
 		durations: AGENT_RUN_DURATIONS,
@@ -124,18 +156,15 @@ function buildSignal(
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
 ): DashboardMetricData | null {
-	if (
-		rows.some(
-			(row) => row.metric === "signals" && Number(row.matched_incomplete) > 0,
-		)
+	const signalRows = rows.filter((row) => row.metric === "signals");
+	const signalHeadlineRows = signalRows.some(
+		(row) => row.dimension === "headline",
 	)
+		? signalRows.filter((row) => row.dimension === "headline")
+		: signalRows;
+	if (signalHeadlineRows.some((row) => Number(row.matched_incomplete) > 0))
 		return null;
-	const result = buildMetric(
-		rows.filter((row) => row.metric === "signals"),
-		input,
-		members,
-		"Language signals",
-	);
+	const result = buildMetric(signalRows, input, members, "Language signals");
 	// Keep the three known categories selectable even when another filter leaves
 	// one at zero. Phrase choices remain limited to actual matched text.
 	for (const [id, label] of Object.entries(SIGNAL_LABELS)) {
@@ -200,6 +229,9 @@ function buildMetric(
 			Number(row.matched_rows) > 0 &&
 			(chartDimension !== "phrases" || Boolean(row.id)),
 	);
+	const headlineRows = rows.some((row) => row.dimension === "headline")
+		? rows.filter((row) => row.dimension === "headline")
+		: chartRows;
 	const totals = new Map<string, number>();
 	for (const row of chartRows)
 		totals.set(row.id, (totals.get(row.id) ?? 0) + Number(row.matched_value));
@@ -246,9 +278,12 @@ function buildMetric(
 		breakdowns,
 		trend,
 		series,
-		total: trend.reduce((sum, point) => sum + point.total, 0),
-		incomplete: chartRows.some((row) => Number(row.matched_incomplete) > 0),
-		hasUsage: chartRows.length > 0,
+		total: headlineRows.reduce(
+			(sum, row) => sum + Number(row.matched_value),
+			0,
+		),
+		incomplete: headlineRows.some((row) => Number(row.matched_incomplete) > 0),
+		hasUsage: headlineRows.some((row) => Number(row.matched_rows) > 0),
 	};
 }
 

@@ -38,18 +38,31 @@ session may contribute runs after its opening date, so queries deliberately do
 not restrict summary reads to sessions opened within the selected date range.
 Organization filters and query read/time/result caps remain enforced.
 
+The current web client sends its active metric with each request. The API still
+returns all four headline totals, but expands detailed dimensions only for that
+metric. Requests from older clients that omit the selector keep the original
+all-details response during a staged rollout.
+
 ## Deploy in order
 
-1. Against the intended ClickHouse environment, run:
-   `bun run --cwd packages/ch-schema ch:migrate:language-signals`.
-   Stop on checksum or schema validation failure. Do not edit a deployed journal
-   or replay historical migrations to make it pass. Rerunning this command is safe.
-2. Deploy the API/indexing worker, then the web app. The CI migration invocation
-   exercises fresh test infrastructure; it does **not** migrate production.
+1. Production Vercel builds run
+   `bun run --cwd packages/ch-schema ch:migrate:language-signals` before type
+   checking or building. The command uses the ClickHouse credentials injected
+   into the production build; preview builds skip it. A checksum or exact
+   type/default validation failure fails the candidate before smoke testing and
+   promotion. Rerunning the command is safe. CI's isolated migration invocation
+   still validates fresh infrastructure; it does **not** migrate production.
+2. Deploy the API/indexing worker, then the web app. For a non-Vercel environment,
+   run the same migration command against that environment before deploying the
+   API. Do not edit a deployed journal or replay historical migrations to make it
+   pass.
 3. Let the existing language-signal reconciliation worker rebuild stale summaries
    to scan version 6. It processes bounded batches (default 25, up to 20 batches,
-   with the maintenance deadline). Missing/stale runs display “still being indexed”
-   instead of zero; the dashboard polls while indexing.
+   with the maintenance deadline). The dashboard keeps valid indexed runs visible
+   and separately reports sessions that are still indexing. If the current raw
+   revision is no longer retained, it reports the session as unavailable to
+   index. The web app retries twice with backoff and then offers manual refresh;
+   it does not poll indefinitely.
 4. Observe reconciliation logs (`sessions_rescanned`, `sessions_failed`,
    `remaining_lag`, `deadline_stopped`), ClickHouse query latency/read bytes and
    part/merge pressure. Lower `LANGUAGE_SIGNAL_RECONCILE_BATCH_SIZE` if needed;
@@ -58,6 +71,35 @@ Organization filters and query read/time/result caps remain enforced.
 
 Historical sessions whose raw transcripts have expired cannot be reconstructed
 from summary counts alone. Keep them visibly unknown; do not fabricate zero runs.
+
+## Bounded load measurement
+
+Measure on a representative nonproduction clone before enabling a large
+backfill. Local fixtures prove behavior but do not represent production part
+counts, compression, storage latency, or merge pressure.
+
+1. Export that clone's normal `CLICKHOUSE_*` variables. Run exactly one stale
+   discovery/content scan/write plus the lag count, recording wall time:
+
+   ```sh
+   time (cd apps/api && bun --eval 'const { reconcileSessionLanguageSignalsOnce } = await import("./src/services/session-language-signal-reconciliation.service.ts"); console.log(await reconcileSessionLanguageSignalsOnce(1))')
+   ```
+
+2. Immediately read the finished stale-discovery queries from ClickHouse's query
+   log. This command only prints timing/read/memory counters and is capped to the
+   ten most recent rows. The representative clone must have `system.query_log`
+   enabled; the isolated local test config does not create that table, so local
+   runs can validate behavior and wall time but not these server counters:
+
+   ```sh
+   (cd apps/api && bun --eval 'const { getClickhouse } = await import("./src/clickhouse.ts"); const ch = getClickhouse(); await ch.execute({ query: "SYSTEM FLUSH LOGS" }); console.log(await ch.query({ query: `SELECT query_duration_ms, read_rows, read_bytes, memory_usage, result_rows FROM system.query_log WHERE event_time >= now() - INTERVAL 10 MINUTE AND type = {queryType:String} AND positionCaseInsensitive(query, {marker:String}) > 0 AND positionCaseInsensitive(query, {queryLog:String}) = 0 ORDER BY query_start_time_microseconds DESC LIMIT 10 SETTINGS max_execution_time = 10`, query_params: { queryType: "QueryFinish", marker: "raw_sessions AS", queryLog: "system.query_log" } })); await ch.close()')
+   ```
+
+3. On a disposable clone, repeat with batch sizes `5` and `25`. Compare discovery
+   `read_rows`/`read_bytes` and wall time, plus write/merge pressure. Stop if the
+   existing 30-second/10-GB discovery caps or the maintenance deadline are close.
+   Batch size bounds rows rebuilt, but it does not bound the aggregate scan used
+   to discover stale identities, so measure both discovery and content work.
 
 Rollback: roll back the application and leave the additive column/data in place.
 The old application ignores it. Dropping it would lose the newly indexed facts.
