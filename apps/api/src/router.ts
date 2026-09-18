@@ -36,6 +36,7 @@ import { analyticsRouter } from "./handlers/analytics/index.js";
 import { chatwootRouter } from "./handlers/chatwoot.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
+import { repositorySettingsRouter } from "./handlers/repository-settings.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { readBooleanEnv } from "./lib/env.js";
@@ -1646,6 +1647,7 @@ const deleteOrganization = os.deleteOrganization
 	});
 
 export const router: Router<typeof contract, AppContext> = os.router({
+	repositorySettings: repositorySettingsRouter,
 	health,
 	me,
 	profile: profileRouter,

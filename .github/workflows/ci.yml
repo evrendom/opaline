@@ -358,6 +358,7 @@ jobs:
       target: production
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
 
   deploy:
     if: >-

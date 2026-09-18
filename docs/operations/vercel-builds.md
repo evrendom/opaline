@@ -18,3 +18,9 @@ Application type checks in `apps/api` remain enabled independently.
 The web `build` script emits assets. Use `bun run verify` for a checked local
 build, or `bun run --cwd apps/web check-types` for a frontend-only type check.
 Smoke checks and promotion still run after Vercel creates the deployment.
+
+Production deploys run the Postgres migration runner before deploying source to
+Vercel, using the production `PG_CONNECTION_STRING` secret. A failed migration
+stops deployment. Keep migrations compatible with the currently serving version
+because it continues serving while the new deployment builds. Preview deployments
+do not run production migrations.

@@ -64,6 +64,10 @@ const CreateWorkspacePage = lazyNamed(
 	() => import("@/features/settings/workspace/components/CreateWorkspaceCard"),
 	"CreateWorkspaceCard",
 );
+const SessionsSettingsPage = lazyNamed(
+	() => import("@/features/settings/sessions/sessions-settings-page"),
+	"SessionsSettingsPage",
+);
 const MembersSettingsPage = lazyNamed(
 	() => import("@/features/settings/members/MembersSettingsPage"),
 	"MembersSettingsPage",
@@ -231,6 +235,15 @@ function getShellRouteElements(
 						<LazyRoute
 							Component={WorkspaceSettingsPage}
 							fallback={<SettingsPageSkeleton routeId="workspace" />}
+						/>
+					}
+				/>
+				<Route
+					path={settingsRouteMap.sessions.segment}
+					element={
+						<LazyRoute
+							Component={SessionsSettingsPage}
+							fallback={<SettingsPageSkeleton routeId="sessions" />}
 						/>
 					}
 				/>

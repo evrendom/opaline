@@ -1,9 +1,17 @@
+import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
 
 export { CliConnectionIdSchema } from "./cli-connection.js";
+export {
+	type RepositorySettings,
+	RepositorySettingsSchema,
+	type RepositoryUploadReport,
+	RepositoryUploadReportSchema,
+	RepositoryUploadSettingsSchema,
+} from "./repository-settings.js";
 export {
 	type StoredUploadFailure,
 	type UploadFailure,
@@ -690,6 +698,7 @@ const IngestSessionErrors = {
 } as const;
 
 export const contract = {
+	repositorySettings: repositorySettingsContract,
 	health: oc.output(HealthSchema),
 	me: oc.output(UserSchema),
 	profile: {
