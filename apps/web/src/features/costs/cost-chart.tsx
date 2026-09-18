@@ -142,7 +142,6 @@ export function CostChart({
 				point.startDate > today
 					? null
 					: (durations.get(point.date)?.p95Seconds ?? null),
-			unknownDurationCount: durations.get(point.date)?.unknownCount,
 		}));
 	}, [data?.trend, durationStats, interval, today]);
 	const visiblePointCount = trend.filter(
@@ -397,17 +396,6 @@ export function CostChart({
 													</strong>
 												</div>
 											))}
-											{point?.unknownDurationCount !== undefined ? (
-												<div className="cost-duration-unknown-count">
-													<span>Runs without duration</span>
-													<strong>
-														{formatMetric(
-															point.unknownDurationCount,
-															"agentRuns",
-														)}
-													</strong>
-												</div>
-											) : null}
 										</div>
 									) : null;
 								}}
