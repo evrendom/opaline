@@ -14,6 +14,7 @@ import {
 } from "../clickhouse.js";
 import { shouldUsePersistentSkillAnalytics } from "../lib/env.js";
 import { getRepositorySqlFilter } from "./repository-filter.service.js";
+import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
 import { buildSessionHasSubagentsSql } from "./session-lineage-analytics.service.js";
 import {
 	appendSessionListSqlFilters,
@@ -345,7 +346,13 @@ async function getSessionAnalyticsBaseRows(
 	const estimatedCostSql = "sa.estimated_cost";
 
 	const query = `
-		WITH ${usage.cteDefinitions}
+		WITH RECURSIVE ${usage.cteDefinitions},
+		${buildSessionFamilyCostCte({
+			inputRelation: usage.sessionsRelation,
+			outputRelation: "session_list_costs",
+			rootFilterSql: `sa.is_top_level_session = 1 AND ${dateFilter}`,
+			rootRelation: undefined,
+		})}
 		${useSkillReceipts ? `, ${buildActiveSkillUsesCte({ filterSkillName: true })}` : ""}
 	    SELECT
 	      sa.source AS source,
@@ -386,7 +393,7 @@ async function getSessionAnalyticsBaseRows(
       error_count,
       model_used,
 	      used_plan_mode
-	    FROM ${usage.sessionsRelation} AS sa
+	    FROM session_list_costs AS sa
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
 	  AND sa.is_top_level_session = 1

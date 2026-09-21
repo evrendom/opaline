@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
+import { SESSION_DETAIL_INITIAL_QUERY_PREFIX } from "./components/session-detail-fast-query";
 import { collectNewSessionArrivals } from "./session-arrival-tracker";
 
 export function SessionArrivalNotifications() {
@@ -81,6 +82,11 @@ function WorkspaceSessionArrivalNotifications({
 			// view needs refreshing without showing a top-level arrival toast.
 			void queryClient.invalidateQueries({
 				queryKey: ["org", organizationId],
+			});
+			// A child can change the family cost while the parent's transcript
+			// revision stays the same. Refresh the displayed overview as well.
+			void queryClient.invalidateQueries({
+				queryKey: SESSION_DETAIL_INITIAL_QUERY_PREFIX,
 			});
 		});
 		return () => {

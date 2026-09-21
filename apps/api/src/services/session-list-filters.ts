@@ -9,6 +9,7 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import type { SessionAnalyticsListRow } from "./session-analytics.service.js";
+import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
 
 const NO_SKILLS = "__no_skills_used__";
@@ -57,12 +58,18 @@ export async function getSessionFilterCatalog(
 		ranges: [number | null, number | null][];
 	};
 	const [row] = await queryClickhouse<CatalogRow>({
-		query: `WITH ${usage.cteDefinitions}
+		query: `WITH RECURSIVE ${usage.cteDefinitions},
+   ${buildSessionFamilyCostCte({
+			inputRelation: usage.sessionsRelation,
+			outputRelation: "session_filter_costs",
+			rootFilterSql: `sa.is_top_level_session = 1 AND ${dateFilter}`,
+			rootRelation: undefined,
+		})}
    SELECT groupUniqArray(tuple(sa.git_remote, sa.package_name, sa.project_path)) AS repositories,
     groupUniqArray(sa.model_used) AS models, groupUniqArrayArray(sa.skills) AS skills,
     groupUniqArray(sa.user_id) AS users, countIf(empty(sa.skills)) AS no_skills, count() AS session_count,
     [${RANGE_KEYS.map((key) => `tuple(min(${RANGE_COLUMNS[key]}), max(${RANGE_COLUMNS[key]}))`).join(", ")}] AS ranges
-   FROM ${usage.sessionsRelation} AS sa
+   FROM session_filter_costs AS sa
    WHERE sa.organization_id = {orgId:String}
     AND sa.is_top_level_session = 1
     AND ${dateFilter}`,

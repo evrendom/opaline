@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import type {
 	SessionDetailBodyChunkInput,
+	SessionDetailOverview,
 	SessionDetailWindowRequest,
 } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
@@ -37,6 +38,7 @@ import {
 	getSessionDetailCurrentRevision,
 	getSessionDetailRawSnapshot,
 } from "./session-detail-snapshot.service.js";
+import { getSessionFamilyCost } from "./session-family-cost.service.js";
 
 const logger = getLogger(["rudel", "api", "session-detail"]);
 const MAX_LATENCY_SAMPLES = 1_024;
@@ -300,6 +302,7 @@ export async function getSessionDetailInitial(input: {
 		if (!derivation) return null;
 		const assemblyStartedAt = performance.now();
 		const response = buildSessionDetailInitial(derivation);
+		response.overview = await withSessionFamilyCost(response.overview, input);
 		logger.info("Assembled initial session detail", {
 			instanceId,
 			assemblyDurationMs: Math.round(performance.now() - assemblyStartedAt),
@@ -325,11 +328,12 @@ export async function getSessionDetailOverview(input: {
 		if (!derivation) {
 			return null;
 		}
-		const response = getSessionDetailOverviewPage({
+		const overview = getSessionDetailOverviewPage({
 			cursor: input.turnCursor,
 			derivation,
 			limit: input.turnLimit,
 		});
+		const response = await withSessionFamilyCost(overview, input);
 		logger.info(
 			"Serialized session detail overview ({serializedBytes} bytes)",
 			{
@@ -340,6 +344,31 @@ export async function getSessionDetailOverview(input: {
 	} finally {
 		logRequestLatency("overview", startedAt);
 	}
+}
+
+async function withSessionFamilyCost(
+	overview: SessionDetailOverview,
+	input: { organizationId: string; ownerId: string; sessionId: string },
+): Promise<SessionDetailOverview> {
+	if (overview.session.source !== "codex") return overview;
+	// Descendants can advance without a new parent revision. Keep their cost
+	// outside the immutable transcript derivation cache.
+	let estimatedCost: number | null = null;
+	try {
+		estimatedCost = await getSessionFamilyCost({
+			...input,
+			estimatedCost: overview.session.estimatedCost,
+			source: overview.session.source,
+		});
+	} catch (error) {
+		// Keep the transcript available when analytics is unavailable, without
+		// presenting the parent's subtotal as the complete session cost.
+		logger.warn("Session family cost unavailable", { error });
+	}
+	return {
+		...overview,
+		session: { ...overview.session, estimatedCost },
+	};
 }
 
 export async function getSessionDetailWindow(input: {

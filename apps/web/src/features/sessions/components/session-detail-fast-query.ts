@@ -31,6 +31,10 @@ import {
 } from "./session-detail-response";
 
 const SESSION_DETAIL_FAST_QUERY_PREFIX = "session-detail-v2";
+export const SESSION_DETAIL_INITIAL_QUERY_PREFIX = [
+	SESSION_DETAIL_FAST_QUERY_PREFIX,
+	"initial",
+] as const;
 // A cold initial load prepares the whole transcript on the server. Very large
 // sessions can exceed the normal page deadline before that preparation is cached.
 const SESSION_DETAIL_INITIAL_TIMEOUT_MS = 90_000;
@@ -41,7 +45,7 @@ export const SESSION_DETAIL_BODY_CACHE_TIME_MS = SESSION_DETAIL_BODY_GC_TIME_MS;
 export const SESSION_DETAIL_WINDOW_CACHE_TIME_MS = 10 * 60 * 1_000;
 
 export function sessionDetailInitialQueryKey(sessionId: string) {
-	return [SESSION_DETAIL_FAST_QUERY_PREFIX, "initial", sessionId] as const;
+	return [...SESSION_DETAIL_INITIAL_QUERY_PREFIX, sessionId] as const;
 }
 
 export async function fetchSessionDetailInitial(

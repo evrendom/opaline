@@ -10,6 +10,7 @@ import assert from "node:assert";
 import { extractTranscriptUsageMetrics } from "@rudel/api-routes";
 import {
 	ingestRudelSessionAnalytics,
+	ingestRudelSessionLineage,
 	ingestRudelUsageEvents,
 	type RudelSessionAnalyticsRow,
 	type RudelUsageEventsRow,
@@ -17,10 +18,13 @@ import {
 import { extractUsageEvents, type UsageEventSource } from "@rudel/usage-events";
 import { createClickHouseExecutor } from "../clickhouse.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
+import { getSessionFamilyCost } from "../services/session-family-cost.service.js";
 import {
 	buildSessionLanguageSignalRow,
 	insertSessionLanguageSignalRows,
 } from "../services/session-language-signal-persistence.service.js";
+import { buildNativeSessionLineageRow } from "../services/session-lineage-persistence.service.js";
+import { getSessionFilterCatalog } from "../services/session-list-filters.js";
 import {
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
@@ -680,6 +684,309 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			if (previousMode === undefined)
 				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
 			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+		}
+	});
+
+	test("lists recursive Codex families once with descendant costs and owner isolation", async () => {
+		const familyOrganizationId = `${organizationId}_families`;
+		const familyUserId = `${userId}_family`;
+		const otherFamilyUserId = `${isolatedUserId}_family`;
+		const familySessionIds = ["parent", "child", "grandchild"].map(
+			(role) => `${role}_${runId}`,
+		);
+		const incompleteSessionIds = ["incomplete_parent", "incomplete_child"].map(
+			(role) => `${role}_${runId}`,
+		);
+		const [parentSessionId, childSessionId, grandchildSessionId] =
+			familySessionIds;
+		const [incompleteParentSessionId, incompleteChildSessionId] =
+			incompleteSessionIds;
+		assert(parentSessionId && childSessionId && grandchildSessionId);
+		assert(incompleteParentSessionId && incompleteChildSessionId);
+		const unseededParentSessionId = `unseeded_parent_${runId}`;
+		const unseededChildSessionId = `unseeded_child_${runId}`;
+		const otherOwnerSessionId = `other_owner_${runId}`;
+		const allSessionIds = [
+			...familySessionIds,
+			...incompleteSessionIds,
+			otherOwnerSessionId,
+			unseededChildSessionId,
+		];
+		const at = "2026-09-20 08:00:00.000";
+		const previousMode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+
+		try {
+			await ingestRudelSessionAnalytics(
+				executor,
+				allSessionIds.map((sessionId) => ({
+					...buildSessionAnalyticsRow(sessionId),
+					organization_id: familyOrganizationId,
+					source: "codex",
+					model_used: "gpt-5.6-sol",
+					session_date: at,
+					user_id:
+						sessionId === otherOwnerSessionId
+							? otherFamilyUserId
+							: familyUserId,
+				})),
+				{ validate: true },
+			);
+
+			const pricedIds = [
+				...familySessionIds,
+				incompleteParentSessionId,
+				otherOwnerSessionId,
+				unseededChildSessionId,
+			];
+			await ingestRudelUsageEvents(
+				executor,
+				[
+					...pricedIds.flatMap((sessionId, index) => {
+						const ownerId =
+							sessionId === otherOwnerSessionId
+								? otherFamilyUserId
+								: familyUserId;
+						return [
+							buildEventRow(sessionId, "1", {
+								cache_read_input_tokens: "0",
+								cache_write_1h_input_tokens: "0",
+								cache_write_5m_input_tokens: "0",
+								context_input_tokens: "100000",
+								event_id: index.toString(16).padStart(64, "0"),
+								model_provider: "openai",
+								organization_id: familyOrganizationId,
+								output_tokens: "10000",
+								raw_model: "gpt-5.6-sol",
+								resolved_model: "gpt-5.6-sol",
+								service_tier: "standard",
+								source: "codex",
+								uncached_input_tokens: "100000",
+								usage_date: "2026-09-20",
+								occurred_at: at,
+								user_id: ownerId,
+							}),
+							{
+								...buildReceiptRow(sessionId, "1", 1, true, "codex"),
+								organization_id: familyOrganizationId,
+								user_id: ownerId,
+							},
+						];
+					}),
+					buildEventRow(incompleteChildSessionId, "1", {
+						cache_read_input_tokens: "0",
+						cache_write_1h_input_tokens: "0",
+						cache_write_5m_input_tokens: "0",
+						context_input_tokens: "100000",
+						event_id: "f".repeat(64),
+						model_provider: "openai",
+						organization_id: familyOrganizationId,
+						raw_model: "gpt-5.6-sol",
+						resolved_model: "gpt-5.6-sol",
+						service_tier: "batch",
+						source: "codex",
+						usage_date: "2026-09-20",
+						occurred_at: at,
+						user_id: familyUserId,
+					}),
+					{
+						...buildReceiptRow(incompleteChildSessionId, "1", 1, true, "codex"),
+						organization_id: familyOrganizationId,
+						user_id: familyUserId,
+					},
+				],
+				{ validate: true },
+			);
+
+			await ingestRudelSessionLineage(
+				executor,
+				(
+					[
+						[parentSessionId, childSessionId],
+						[childSessionId, grandchildSessionId],
+						[incompleteParentSessionId, incompleteChildSessionId],
+						[unseededParentSessionId, unseededChildSessionId],
+					] as const
+				).map(([parentSessionId, childSessionId], index) =>
+					buildNativeSessionLineageRow({
+						childIngestedAt: new Date(at),
+						childModel: "gpt-5.6-sol",
+						childSessionDate: new Date(at),
+						childSessionId,
+						countable: true,
+						derivedAt: new Date(`2026-09-20T08:0${index}:01.000Z`),
+						evidenceAt: new Date(at),
+						organizationId: familyOrganizationId,
+						parentSessionDate: new Date(at),
+						parentSessionId,
+						userId: familyUserId,
+					}),
+				),
+				{ validate: true },
+			);
+
+			const ownCosts = await executor.query<{
+				estimated_cost: number;
+				session_id: string;
+			}>({
+				query: `WITH ${buildUsageEventAnalyticsCte({}, false)}
+					SELECT session_id, estimated_cost FROM usage_analytics_sessions
+					WHERE user_id = {userId:String} AND session_id IN ({sessionIds:Array(String)})`,
+				query_params: {
+					orgId: familyOrganizationId,
+					sessionIds: familySessionIds,
+					userId: familyUserId,
+				},
+			});
+			const expectedFamilyCost = ownCosts.reduce(
+				(total, row) => total + Number(row.estimated_cost),
+				0,
+			);
+			expect(ownCosts).toHaveLength(3);
+			const rootOwnCost = ownCosts.find(
+				(row) => row.session_id === parentSessionId,
+			)?.estimated_cost;
+			assert(rootOwnCost !== undefined);
+			expect(
+				await getSessionFamilyCost({
+					estimatedCost: 123,
+					organizationId: familyOrganizationId,
+					ownerId: familyUserId,
+					sessionId: parentSessionId,
+					source: "codex",
+				}),
+			).toBeCloseTo(expectedFamilyCost - rootOwnCost + 123, 8);
+			const unseededFamilyCost = await getSessionFamilyCost({
+				estimatedCost: 7.5,
+				organizationId: familyOrganizationId,
+				ownerId: familyUserId,
+				sessionId: unseededParentSessionId,
+				source: "codex",
+			});
+			expect(unseededFamilyCost).not.toBeNull();
+			expect(unseededFamilyCost).toBeGreaterThan(7.5);
+			expect(
+				await getSessionFamilyCost({
+					estimatedCost: rootOwnCost,
+					organizationId: familyOrganizationId,
+					ownerId: familyUserId,
+					sessionId: incompleteParentSessionId,
+					source: "codex",
+				}),
+			).toBeNull();
+
+			await ingestRudelUsageEvents(
+				executor,
+				[
+					buildEventRow(unseededChildSessionId, "2", {
+						cache_read_input_tokens: "0",
+						cache_write_1h_input_tokens: "0",
+						cache_write_5m_input_tokens: "0",
+						context_input_tokens: "100000",
+						event_id: (pricedIds.length - 1).toString(16).padStart(64, "0"),
+						model_provider: "openai",
+						organization_id: familyOrganizationId,
+						output_tokens: "20000",
+						raw_model: "gpt-5.6-sol",
+						resolved_model: "gpt-5.6-sol",
+						service_tier: "standard",
+						source: "codex",
+						uncached_input_tokens: "100000",
+						usage_date: "2026-09-20",
+						occurred_at: at,
+						user_id: familyUserId,
+					}),
+					{
+						...buildReceiptRow(unseededChildSessionId, "2", 1, true, "codex"),
+						organization_id: familyOrganizationId,
+						user_id: familyUserId,
+					},
+				],
+				{ validate: true },
+			);
+			const revisedUnseededFamilyCost = await getSessionFamilyCost({
+				estimatedCost: 7.5,
+				organizationId: familyOrganizationId,
+				ownerId: familyUserId,
+				sessionId: unseededParentSessionId,
+				source: "codex",
+			});
+			expect(revisedUnseededFamilyCost).not.toBeNull();
+			expect(revisedUnseededFamilyCost).not.toBe(unseededFamilyCost);
+
+			const rows = await getSessionAnalytics(familyOrganizationId, {
+				end_date: "2026-09-20",
+				limit: 20,
+				start_date: "2026-09-20",
+			});
+			expect(rows.map((row) => row.session_id).sort()).toEqual(
+				[
+					parentSessionId,
+					incompleteParentSessionId,
+					otherOwnerSessionId,
+				].sort(),
+			);
+			expect(
+				rows.find((row) => row.session_id === parentSessionId),
+			).toMatchObject({ estimated_cost: expectedFamilyCost });
+			expect(
+				rows.find((row) => row.session_id === incompleteParentSessionId),
+			).toMatchObject({ estimated_cost: null });
+
+			const costFilteredRows = await getSessionAnalytics(familyOrganizationId, {
+				end_date: "2026-09-20",
+				filters: {
+					excluded: { model: [], repository: [], skills: [], user: [] },
+					ranges: {
+						cost: {
+							minimum: (rootOwnCost + expectedFamilyCost) / 2,
+							maximum: null,
+						},
+						duration: { minimum: null, maximum: null },
+						errors: { minimum: null, maximum: null },
+						input: { minimum: null, maximum: null },
+						output: { minimum: null, maximum: null },
+						subagents: { minimum: null, maximum: null },
+					},
+				},
+				limit: 1,
+				start_date: "2026-09-20",
+			});
+			expect(costFilteredRows.map((row) => row.session_id)).toEqual([
+				parentSessionId,
+			]);
+
+			const ownerRows = await getSessionAnalytics(familyOrganizationId, {
+				end_date: "2026-09-20",
+				start_date: "2026-09-20",
+				user_id: familyUserId,
+			});
+			expect(ownerRows.map((row) => row.session_id).sort()).toEqual(
+				[parentSessionId, incompleteParentSessionId].sort(),
+			);
+
+			const catalog = await getSessionFilterCatalog(familyOrganizationId, {
+				end_date: "2026-09-20",
+				start_date: "2026-09-20",
+			});
+			expect(catalog.sessionCount).toBe(3);
+			expect(catalog.ranges.cost.minimum).toBeLessThanOrEqual(rootOwnCost);
+			expect(catalog.ranges.cost.maximum).toBeGreaterThanOrEqual(
+				expectedFamilyCost,
+			);
+		} finally {
+			if (previousMode === undefined)
+				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+			for (const table of [
+				"session_lineage",
+				"usage_events",
+				"session_analytics",
+			])
+				await executor.execute({
+					query: `DELETE FROM rudel.${table} WHERE organization_id = {orgId:String} SETTINGS lightweight_deletes_sync = 3`,
+					query_params: { orgId: familyOrganizationId },
+				});
 		}
 	});
 
