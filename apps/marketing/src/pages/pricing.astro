@@ -291,7 +291,7 @@ const featureRows = [
 	canonical="/pricing"
 >
 	<a class="pricing-skip-link" href="#main-content">Skip to main content</a>
-	<InstantV2Nav active="pricing" />
+	<InstantV2Nav active="pricing" filled />
 
 	<main id="main-content" class="pricing-page">
 		<div class="pricing-container">
@@ -615,7 +615,7 @@ const featureRows = [
 
 	.pricing-page h1 {
 		max-width: 24ch;
-		margin: 0;
+		margin: 0 0 0 32px;
 		font-size: clamp(52px, 4.25vw, 64px);
 		font-weight: 500;
 		letter-spacing: -0.05em;
@@ -1071,6 +1071,10 @@ const featureRows = [
 			margin-top: 112px;
 		}
 
+		.pricing-page h1 {
+			margin-left: 8px;
+		}
+
 		.pricing-card {
 			padding-inline: 8px;
 		}
@@ -1092,6 +1096,7 @@ const featureRows = [
 		}
 
 		.pricing-page h1 {
+			margin-left: 0;
 			font-size: 48px;
 		}
 

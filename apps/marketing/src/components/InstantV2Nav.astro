@@ -5,9 +5,10 @@ interface Props {
 	active?: "product" | "pricing";
 	productHref?: string;
 	enableDemo?: boolean;
+	filled?: boolean;
 }
 
-const { active, productHref = "#product" } = Astro.props;
+const { active, productHref = "#product", filled = false } = Astro.props;
 
 // Product navigation stays hidden during the beta launch.
 const showProductLinks = false;
@@ -17,7 +18,11 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	.replace(/^<svg\s/, '<svg aria-hidden="true" focusable="false" ');
 ---
 
-<header class="instant-v2-nav" data-instant-v2-nav data-scrolled="true">
+<header
+	class:list={["instant-v2-nav", { "instant-v2-nav-filled": filled }]}
+	data-instant-v2-nav
+	data-scrolled="true"
+>
 	<div class="instant-v2-nav-inner">
 		<a class="instant-v2-nav-label" href="/" aria-label="Homepage">
 			<Fragment set:html={flatOpalineWordmark} />
@@ -159,6 +164,10 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		height: 42px;
 		align-items: center;
 		background: transparent;
+	}
+
+	.instant-v2-nav-filled {
+		background: #fff;
 	}
 
 	.instant-v2-nav-inner,
