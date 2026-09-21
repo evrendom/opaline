@@ -2,7 +2,6 @@ import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { waitForDemoActivation } from "@/features/demo/demo-activation";
 import { getApiBaseUrl } from "./api-base-url";
-import { resetChatwoot } from "./chatwoot";
 import { resetProductAnalytics } from "./product-analytics";
 import { queryClient } from "./query-client";
 
@@ -37,7 +36,6 @@ export function refreshAuthClientState() {
 }
 
 export async function signOut() {
-	resetChatwoot();
 	resetProductAnalytics();
 	await authClient.signOut();
 	queryClient.clear();

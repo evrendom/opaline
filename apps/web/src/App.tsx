@@ -24,6 +24,7 @@ import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
+import { SupportEmailButton } from "@/features/support/SupportEmailButton";
 import { authClient } from "./lib/auth-client";
 
 const ConversationTraceFixturePage = import.meta.env.DEV
@@ -141,6 +142,7 @@ function SessionAwareApp() {
 			<>
 				<ProductAnalyticsSessionSync session={session} />
 				<AuthenticatedApp rootRedirectTarget={rootRedirectTarget} />
+				{session ? <SupportEmailButton /> : null}
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);

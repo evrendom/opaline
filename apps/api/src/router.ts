@@ -34,7 +34,6 @@ import {
 import { ingestProcessingSqlClient, sqlClient } from "./db.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
-import { chatwootRouter } from "./handlers/chatwoot.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
 import { repositorySettingsRouter } from "./handlers/repository-settings.js";
@@ -1703,7 +1702,6 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		sessionUploadStatus: cliSessionUploadStatus,
 		reportUploadFailures: cliReportUploadFailures,
 	},
-	chatwoot: chatwootRouter,
 	listMyOrganizations,
 	ingestSession: ingestSessionHandler,
 	ingest: {

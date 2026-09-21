@@ -21,11 +21,7 @@ COPY apps/ apps/
 COPY packages/ packages/
 COPY turbo.json turbo.json
 
-# Chatwoot config is baked into the frontend at build time via Vite
 ARG VITE_API_BASE_URL=""
-ARG VITE_CHATWOOT_BASE_URL=""
-ARG VITE_CHATWOOT_WEBSITE_TOKEN=""
-ARG VITE_CHATWOOT_ENABLED="true"
 ARG VITE_POSTHOG_KEY=""
 ARG VITE_POSTHOG_HOST="https://us.i.posthog.com"
 ARG VITE_POSTHOG_ENABLED="false"

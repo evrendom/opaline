@@ -85,10 +85,12 @@ async function loadPostHogClient(): Promise<PostHogClient | null> {
 					capture_exceptions: true,
 					capture_pageleave: "if_capture_pageview",
 					capture_pageview: true,
+					cookieless_mode: "always",
 					debug: isDebugModeEnabled(),
 					defaults: "2026-01-30",
 					disable_session_recording: true,
 					disable_surveys: true,
+					person_profiles: "never",
 				});
 				client.register({
 					environment: getEnvironment(),
@@ -162,6 +164,38 @@ function monitorGitHubClicks() {
 	});
 }
 
+function monitorPricingActions() {
+	document.addEventListener("click", (event) => {
+		const link =
+			event.target instanceof Element
+				? event.target.closest<HTMLAnchorElement>(
+						"[data-marketing-pricing-action]",
+					)
+				: null;
+		if (!link) {
+			return;
+		}
+
+		const card = link.closest<HTMLElement>(".pricing-card");
+		const billingToggle = card?.querySelector<HTMLButtonElement>(
+			"[data-pricing-toggle]",
+		);
+		const billingPeriod = billingToggle
+			? billingToggle.getAttribute("aria-pressed") === "true"
+				? "yearly"
+				: "monthly"
+			: link.dataset.marketingPricingPlan === "free"
+				? "free"
+				: "custom";
+
+		captureMarketingEvent("marketing_pricing_action_clicked", {
+			action: link.dataset.marketingPricingAction ?? "unknown",
+			billing_period: billingPeriod,
+			plan: link.dataset.marketingPricingPlan ?? "unknown",
+		});
+	});
+}
+
 function monitorProductIframe() {
 	const iframe = document.querySelector<HTMLIFrameElement>(
 		"[data-instant-v2-product-iframe]",
@@ -218,6 +252,7 @@ function monitorProductIframe() {
 function initMarketingMonitoring() {
 	monitorInstallCopies();
 	monitorGitHubClicks();
+	monitorPricingActions();
 	monitorProductIframe();
 	void loadPostHogClient();
 }

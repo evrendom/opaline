@@ -358,11 +358,6 @@ export const CliSessionUploadStatusOutputSchema = z.object({
 	uploadedSessionIds: z.array(z.string()),
 });
 
-export const ChatwootIdentitySchema = z.object({
-	identifier: z.string(),
-	identifier_hash: z.string().regex(/^[a-f0-9]{64}$/u),
-});
-
 export const OrganizationSchema = z.object({
 	id: z.string(),
 	name: z.string(),
@@ -732,9 +727,6 @@ export const contract = {
 		sessionUploadStatus: oc
 			.input(CliSessionUploadStatusInputSchema)
 			.output(CliSessionUploadStatusOutputSchema),
-	},
-	chatwoot: {
-		identity: oc.output(ChatwootIdentitySchema.nullable()),
 	},
 	listMyOrganizations: oc.output(z.array(OrganizationSchema)),
 	ingestSession: oc

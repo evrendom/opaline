@@ -71,7 +71,7 @@ describe("production HTTP response policy", () => {
 			"frame-ancestors 'none'",
 		);
 		expect(response.headers.get("Content-Security-Policy")).toContain(
-			"script-src 'self' https://*.posthog.com https://*.chatwoot.com",
+			"script-src 'self' https://*.posthog.com",
 		);
 		expect(response.headers.get("Strict-Transport-Security")).toBe(
 			"max-age=31536000; includeSubDomains",

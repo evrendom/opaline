@@ -179,12 +179,10 @@ describe("Vercel deployment configuration", () => {
 			...PRODUCTION_SECURITY_HEADERS,
 			"Content-Security-Policy": PRODUCTION_SECURITY_HEADERS[
 				"Content-Security-Policy"
-			]
-				.replace("frame-src ", "frame-src 'self' ")
-				.replace(
-					"connect-src 'self'",
-					"connect-src 'self' https://api.github.com",
-				),
+			].replace(
+				"connect-src 'self'",
+				"connect-src 'self' https://api.github.com",
+			),
 		});
 		const demoHeaders = Object.fromEntries(
 			configuredHeadersForPath("/product-demo/index.html").map((header) => [

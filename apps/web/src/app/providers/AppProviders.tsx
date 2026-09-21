@@ -4,7 +4,6 @@ import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { ProductWindowBackdropProvider } from "@/features/shell/components/product-window-backdrop";
-import { ChatwootBootstrap } from "@/features/support/chatwoot/ChatwootBootstrap";
 import { OrganizationProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { queryClient } from "@/lib/query-client";
 
@@ -19,10 +18,7 @@ export function AppProviders({ children }: AppProvidersProps) {
 				<ThemeProvider>
 					<ProductWindowBackdropProvider>
 						<OrganizationProvider>
-							<DateRangeProvider>
-								<ChatwootBootstrap />
-								{children}
-							</DateRangeProvider>
+							<DateRangeProvider>{children}</DateRangeProvider>
 						</OrganizationProvider>
 					</ProductWindowBackdropProvider>
 				</ThemeProvider>

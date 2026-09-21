@@ -1,15 +1,15 @@
 export const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"base-uri 'self'",
-	"connect-src 'self' https://*.posthog.com https://*.chatwoot.com wss://*.chatwoot.com",
+	"connect-src 'self' https://*.posthog.com",
 	"font-src 'self' data:",
 	"form-action 'self'",
 	"frame-ancestors 'none'",
-	"frame-src https://*.chatwoot.com",
+	"frame-src 'self'",
 	"img-src 'self' data: blob: https:",
 	"media-src 'self' blob: https:",
 	"object-src 'none'",
-	"script-src 'self' https://*.posthog.com https://*.chatwoot.com",
+	"script-src 'self' https://*.posthog.com",
 	"style-src 'self' 'unsafe-inline'",
 	"worker-src 'self' blob:",
 ].join("; ");
