@@ -148,10 +148,14 @@ describe("native Codex lineage", () => {
 			parent: null,
 		});
 
-		await insertAnalytics(parentId, childId);
+		// Rolling analytics windows need a runtime-relative fixture so this test
+		// does not expire as its fixed historical transcript dates age.
+		const analyticsSessionDate = new Date(Date.now() - 5 * 60 * 1000);
+		await insertAnalytics(parentId, childId, analyticsSessionDate);
+		const analyticsDate = analyticsSessionDate.toISOString().slice(0, 10);
 		const dateRange = {
-			end_date: "2026-09-18",
-			start_date: "2026-09-18",
+			end_date: analyticsDate,
+			start_date: analyticsDate,
 		};
 		expect(
 			(await getSessionFilterCatalog(organizationId, dateRange)).sessionCount,
@@ -1339,21 +1343,35 @@ function buildClaudeRawSession(sessionId: string) {
 	};
 }
 
-async function insertAnalytics(parentId: string, childId: string) {
+async function insertAnalytics(
+	parentId: string,
+	childId: string,
+	sessionDate: Date,
+) {
+	const formatTimestamp = (date: Date) =>
+		date.toISOString().replace("T", " ").replace("Z", "");
+	const sessionTimestamp = formatTimestamp(sessionDate);
+	const lastInteractionTimestamp = formatTimestamp(
+		new Date(sessionDate.getTime() + 30_000),
+	);
+	const ingestedTimestamp = formatTimestamp(
+		new Date(sessionDate.getTime() + 60_000),
+	);
+
 	await clickhouse.insert({
 		table: "rudel.session_analytics",
 		values: [parentId, childId].map((sessionId, index) => ({
 			actual_duration_min: 1,
 			error_count: 0,
-			ingested_at: "2026-09-18 10:01:00.000",
+			ingested_at: ingestedTimestamp,
 			input_tokens: String(index + 1),
-			last_interaction_date: "2026-09-18 10:00:30.000",
+			last_interaction_date: lastInteractionTimestamp,
 			model_used: "gpt-5.6-sol",
 			organization_id: organizationId,
 			output_tokens: "1",
 			project_path: "/workspace/opaline",
 			revision: "1",
-			session_date: "2026-09-18 10:00:00.000",
+			session_date: sessionTimestamp,
 			session_id: sessionId,
 			skills: [],
 			source: "codex",

@@ -6,37 +6,35 @@ Analytics for Claude Code and Codex. Opaline gives you a dashboard with insights
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime installed
+- Node.js 20 or newer
 
 ## Getting Started
 
 1. Create an account at [opaline.so](https://opaline.so)
-2. Install the CLI and connect it to your account:
+2. Run the CLI from any directory:
 
 ```bash
-npm install --global opaline
-
-opaline login     # authenticate via your browser
-opaline enable    # auto-upload sessions when Claude Code / Codex exits
+npx opaline@latest
 ```
 
-3. Invite teammates (optional): go to **Settings → Organization** in the dashboard, enter their email, and share the generated invite link with them.
+3. Choose repositories with ↑↓ and Space, then press Enter to review and confirm. Sign in through your browser and choose a workspace when prompted.
+4. Invite teammates (optional): go to **Settings → Organization** in the dashboard, enter their email, and share the generated invite link with them.
 
-That's it. Your Claude Code / Codex sessions will now be uploaded automatically.
+Existing sessions upload during setup, and future Claude Code and Codex sessions sync automatically for the repositories you enable.
 
-Already have past sessions? Upload them in one go:
+Already started setup in the browser? Run the command Opaline gives you, including its one-time code, and approve sign-in in that same browser:
 
 ```bash
-opaline upload    # interactive picker for batch upload
+npx opaline@latest --code <one-time-code>
 ```
 
 See the [Opaline CLI documentation](https://github.com/opalinehq/cli#readme) for all available commands.
 
 ## How It Works
 
-1. You install the CLI and run `opaline enable`
-2. This registers Claude Code / Codex hooks that run when a session ends
-3. The hook redacts known secret patterns and uploads the session transcript to Opaline
+1. The CLI finds saved Claude Code and Codex sessions and groups them by repository
+2. Confirming your selection uploads existing sessions and registers hooks for future sessions in the repositories you enable
+3. The CLI filters known secret patterns before uploading each session transcript to Opaline
 4. Transcripts are stored in ClickHouse and processed into analytics
 
 ## What Data Is Collected
