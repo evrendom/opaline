@@ -57,7 +57,7 @@ export function ReposPage() {
 	);
 }
 
-function RepoMetrics({ repo }: { repo: RepositorySummary }) {
+export function RepoMetrics({ repo }: { repo: RepositorySummary }) {
 	const signals = [
 		{
 			count: repo.signals.userPositive,
@@ -129,11 +129,6 @@ function RepoMetrics({ repo }: { repo: RepositorySummary }) {
 					</li>
 				))}
 			</ul>
-			{!repo.signals.complete ? (
-				<p className="text-(--session-overview-muted)">
-					Signals still processing
-				</p>
-			) : null}
 		</div>
 	);
 }

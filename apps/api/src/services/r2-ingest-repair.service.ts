@@ -1,4 +1,5 @@
 import { sqlClient } from "../db.js";
+import { isVercelRuntime } from "../lib/api-runtime.js";
 import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
@@ -52,9 +53,10 @@ export async function runR2IngestRepairPass(
 				deadline,
 				process: (sessionInput, identity, signal) =>
 					processIngestSession({
-						// Repair raw ingest and durable bookkeeping without coupling job
-						// recovery to derived language-signal availability. The dedicated
-						// language-signal reconciler fills any missing row independently.
+						// Vercel has no resident reconciler, so recovered jobs must attempt
+						// their derived signals before completing. Best-effort persistence
+						// still keeps scanner availability outside the recovery contract.
+						awaitBestEffortLanguageSignals: isVercelRuntime(),
 						awaitLanguageSignals: false,
 						context: {
 							apiKeyId: null,

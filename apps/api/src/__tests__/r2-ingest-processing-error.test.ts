@@ -20,7 +20,7 @@ import {
 } from "../services/r2-ingest-processing-error.js";
 
 describe("R2 ingest processing error classification", () => {
-	test("defers derived language signals on both durable R2 processing paths", async () => {
+	test("awaits best-effort language signals on both Vercel R2 processing paths", async () => {
 		const [routerSource, repairSource] = await Promise.all([
 			Bun.file(new URL("../router.ts", import.meta.url)).text(),
 			Bun.file(
@@ -31,8 +31,14 @@ describe("R2 ingest processing error classification", () => {
 		expect(routerSource).toMatch(
 			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitLanguageSignals: false,/u,
 		);
+		expect(routerSource).toMatch(
+			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitBestEffortLanguageSignals: isVercelRuntime\(\),/u,
+		);
 		expect(repairSource).toMatch(
 			/repairRecoverableR2IngestJobs\([\s\S]*?awaitLanguageSignals: false,/u,
+		);
+		expect(repairSource).toMatch(
+			/repairRecoverableR2IngestJobs\([\s\S]*?awaitBestEffortLanguageSignals: isVercelRuntime\(\),/u,
 		);
 		expect(routerSource).toMatch(
 			/shouldStartBestEffortLanguageSignals\(\{[\s\S]*?durableProcessing: durableProcessing !== undefined,/u,
