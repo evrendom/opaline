@@ -2,12 +2,12 @@
 import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
 
 interface Props {
-	active?: "product";
+	active?: "product" | "pricing";
 	productHref?: string;
 	enableDemo?: boolean;
 }
 
-const { active = "product", productHref = "#product" } = Astro.props;
+const { active, productHref = "#product" } = Astro.props;
 
 // Product navigation stays hidden during the beta launch.
 const showProductLinks = false;
@@ -23,9 +23,9 @@ const flatOpalineWordmark = opalineWordmarkSvg
 			<Fragment set:html={flatOpalineWordmark} />
 		</a>
 
-		{
-			showProductLinks && (
-				<nav class="instant-v2-nav-links" aria-label="Main navigation">
+		<nav class="instant-v2-nav-links" aria-label="Main navigation">
+			{
+				showProductLinks && (
 					<a
 						class:list={[
 							"instant-v2-nav-link instant-v2-nav-link-product",
@@ -38,9 +38,23 @@ const flatOpalineWordmark = opalineWordmarkSvg
 					>
 						<span class="instant-v2-nav-product-pill">Product</span>
 					</a>
-				</nav>
-			)
-		}
+				)
+			}
+			{
+				active === "pricing" ? (
+					<span
+						class="instant-v2-nav-link instant-v2-nav-link-pricing instant-v2-nav-link-current"
+						aria-current="page"
+					>
+						<span>Pricing</span>
+					</span>
+				) : (
+					<a class="instant-v2-nav-link instant-v2-nav-link-pricing" href="/pricing">
+						<span>Pricing</span>
+					</a>
+				)
+			}
+		</nav>
 
 		<button
 			class="instant-v2-nav-install"
@@ -254,6 +268,15 @@ const flatOpalineWordmark = opalineWordmarkSvg
 
 	.instant-v2-nav-link.is-active > span {
 		background: #ebebeb;
+	}
+
+	.instant-v2-nav-link-current > span {
+		background: transparent;
+	}
+
+	.instant-v2-nav-link-current {
+		color: #1f1f1f;
+		font-weight: 500;
 	}
 
 	.instant-v2-nav-link-product {

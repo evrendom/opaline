@@ -3,75 +3,34 @@ import LegalPage from "../../components/LegalPage.astro";
 import contentHtml from "../../content/legal/opaline-terms.html?raw";
 
 const toc = [
-	{ id: "definitions", label: "Definitions" },
-	{ id: "acceptance-and-authority", label: "Acceptance and authority" },
-	{ id: "business-use-only", label: "Business use only" },
-	{ id: "the-hosted-service", label: "The Hosted Service" },
-	{ id: "open-source-software", label: "Open-Source Software" },
-	{
-		id: "accounts-and-authorised-users",
-		label: "Accounts and Authorised Users",
-	},
+	{ id: "agreement-and-eligibility", label: "Agreement and eligibility" },
+	{ id: "service", label: "The service" },
+	{ id: "accounts", label: "Accounts and Users" },
 	{ id: "acceptable-use", label: "Acceptable use" },
 	{ id: "customer-content", label: "Customer Content" },
-	{
-		id: "sensitive-and-prohibited-information",
-		label: "Sensitive and prohibited information",
-	},
+	{ id: "sensitive-information", label: "Sensitive information" },
 	{ id: "data-protection", label: "Data protection" },
 	{ id: "confidentiality", label: "Confidentiality" },
-	{ id: "product-analytics", label: "Product Analytics" },
+	{ id: "intellectual-property", label: "Intellectual property and feedback" },
+	{ id: "plans-and-payment", label: "Plans and payment" },
+	{ id: "service-operation", label: "Service operation" },
 	{ id: "third-party-services", label: "Third-party services" },
-	{ id: "intellectual-property", label: "Intellectual property" },
-	{ id: "feedback", label: "Feedback" },
-	{
-		id: "free-service-and-future-paid-plans",
-		label: "Free service and future paid plans",
-	},
-	{
-		id: "support-availability-and-changes-to-the-service",
-		label: "Support, availability and service changes",
-	},
-	{
-		id: "backups-and-reliance-on-the-service",
-		label: "Backups and reliance on the service",
-	},
-	{ id: "suspension", label: "Suspension" },
-	{ id: "term-and-termination", label: "Term and termination" },
-	{
-		id: "no-guarantee-and-service-limitations",
-		label: "No guarantee and service limitations",
-	},
+	{ id: "suspension-and-termination", label: "Suspension and termination" },
+	{ id: "service-limitations", label: "Service limitations" },
 	{ id: "liability", label: "Liability" },
-	{ id: "customer-indemnification", label: "Customer indemnification" },
-	{ id: "changes-to-these-terms", label: "Changes to these Terms" },
-	{
-		id: "governing-law-and-jurisdiction",
-		label: "Governing law and jurisdiction",
-	},
-	{ id: "general-provisions", label: "General provisions" },
+	{ id: "indemnification", label: "Customer indemnification" },
+	{ id: "changes", label: "Changes to these Terms" },
+	{ id: "governing-law", label: "Governing law" },
+	{ id: "general", label: "General" },
 	{ id: "contact", label: "Contact" },
-	{ id: "data-processing-agreement", label: "Data Processing Agreement" },
-	{
-		id: "schedule-1-processing-details",
-		label: "Schedule 1 — Processing Details",
-	},
-	{
-		id: "schedule-2-technical-and-organisational-measures",
-		label: "Schedule 2 — Technical and Organisational Measures",
-	},
-	{
-		id: "schedule-3-authorised-subprocessors",
-		label: "Schedule 3 — Authorised Subprocessors",
-	},
 ];
 ---
 
 <LegalPage
 	title="Opaline Terms of Service"
 	description="Terms governing access to and use of the hosted Opaline service."
-	lastUpdated="27 August 2026"
-	lastUpdatedDate="2026-08-27"
+	lastUpdated="21 September 2026"
+	lastUpdatedDate="2026-09-21"
 	dateLabel="Effective date:"
 	active="terms"
 	{toc}

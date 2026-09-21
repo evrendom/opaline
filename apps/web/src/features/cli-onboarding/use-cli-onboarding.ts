@@ -22,6 +22,11 @@ import { copyCliCommand, type PreparedCliCommand } from "./copy-cli-command";
 const STORAGE_KEY = "opaline.cli-connection";
 const SETUP_COMMAND = "npx opaline@latest";
 const CONNECTION_ACTIVITY_TIMEOUT_MS = 90_000;
+const FRESH_SETUP_PARAM = "fresh";
+
+function requestsFreshSetup(search: string): boolean {
+	return new URLSearchParams(search).get(FRESH_SETUP_PARAM) === "1";
+}
 
 function readLocalCommand(): string | null {
 	if (
@@ -44,6 +49,10 @@ export function useCliOnboarding(
 	},
 ) {
 	const { mode, onOpenDashboard, autoOpenDashboard = true } = options;
+	const freshSetup =
+		mode === "setup" &&
+		typeof window !== "undefined" &&
+		requestsFreshSetup(window.location.search);
 	const [localCommand, setLocalCommand] = useState<string | null>(null);
 	useEffect(() => setLocalCommand(readLocalCommand()), []);
 	const [id, setId] = useState<string | null>(null);
@@ -74,6 +83,7 @@ export function useCliOnboarding(
 		// Only a setup route restores a previous connection. A demo visit stays
 		// a demo until this tab hands a fresh command to the terminal.
 		if (mode !== "setup") return;
+		if (freshSetup) return;
 		const fromUrl = readCliAuthorization(window.location.search);
 		if (fromUrl) {
 			setAuthorization(fromUrl);
@@ -101,7 +111,7 @@ export function useCliOnboarding(
 		} catch {
 			/* Optional resume storage. */
 		}
-	}, [mode]);
+	}, [mode, freshSetup]);
 	useEffect(() => {
 		// Only share the login link after the API confirms this browser owns it.
 		if (!authorization || snapshot?.id !== authorization.id) return;
@@ -134,6 +144,7 @@ export function useCliOnboarding(
 			const url = new URL(window.location.href);
 			url.searchParams.delete("connect");
 			url.searchParams.delete("user_code");
+			url.searchParams.delete(FRESH_SETUP_PARAM);
 			window.history.replaceState(window.history.state, "", url);
 			try {
 				localStorage.setItem(STORAGE_KEY, result.connection.id);
@@ -165,6 +176,10 @@ export function useCliOnboarding(
 		// uploads nor consume another one-time pairing code.
 		if (mode !== "setup" || !active || id) return;
 		if (new URLSearchParams(window.location.search).has("connect")) return;
+		if (freshSetup) {
+			void create();
+			return;
+		}
 		let saved: string | null = null;
 		try {
 			saved = localStorage.getItem(STORAGE_KEY);
@@ -173,7 +188,7 @@ export function useCliOnboarding(
 		}
 		if (CliConnectionIdSchema.safeParse(saved).success) setId(saved);
 		else void create();
-	}, [mode, active, id, create]);
+	}, [mode, active, id, create, freshSetup]);
 
 	useEffect(() => {
 		function changed(event: StorageEvent) {
@@ -183,6 +198,7 @@ export function useCliOnboarding(
 			}
 			if (
 				mode === "setup" &&
+				!freshSetup &&
 				event.key === STORAGE_KEY &&
 				event.newValue !== id &&
 				!new URLSearchParams(window.location.search).has("connect") &&
@@ -195,7 +211,7 @@ export function useCliOnboarding(
 		}
 		window.addEventListener("storage", changed);
 		return () => window.removeEventListener("storage", changed);
-	}, [mode, id]);
+	}, [mode, id, freshSetup]);
 
 	useEffect(() => {
 		if (!active || !id) return;

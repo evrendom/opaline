@@ -1,0 +1,1198 @@
+---
+import InstantV2Nav from "../components/InstantV2Nav.astro";
+import Layout from "../layouts/Layout.astro";
+
+const salesEmail = "evren@opaline.so";
+const createSalesEmail = (plan: string, questions: string[]) => {
+	const subject = `Interested in Opaline ${plan}`;
+	const body = [
+		"Hi Opaline Team,",
+		"",
+		`I'd be interested in Opaline ${plan}.`,
+		"",
+		...questions,
+		"",
+		"Best,",
+		"[Name]",
+	].join("\n");
+	return `mailto:${salesEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+};
+
+const businessSalesEmail = createSalesEmail("Business", [
+	"Company:",
+	"Website:",
+	"Team size:",
+	"Coding agents used:",
+	"Approximate monthly agent sessions:",
+	"What we'd like to understand:",
+]);
+
+const enterpriseSalesEmail = createSalesEmail("Enterprise", [
+	"Company:",
+	"Website:",
+	"Team size:",
+	"Expected monthly agent sessions:",
+	"Preferred deployment: Cloud / On-prem / Self-hosted",
+	"SSO or SCIM requirements:",
+	"Billing preference: Card / Invoice / PO",
+	"Migration and onboarding needs:",
+	"Target timeline:",
+	"Anything else:",
+]);
+
+const checkoutLinks = {
+	basic: {
+		monthly: "https://buy.stripe.com/dRm14n4WrbctehybdB2B200",
+		yearly: "https://buy.stripe.com/aFadR9dsX0xP2yQ3L92B201",
+	},
+	business: {
+		monthly: "https://buy.stripe.com/7sY4gzcoTgwNgpGdlJ2B202",
+		yearly: "https://buy.stripe.com/5kQ00j0Gb1BTa1i81p2B203",
+	},
+} as const;
+
+const plans = [
+	{
+		id: "free",
+		name: "Free",
+		price: "$0",
+		billing: "Free forever",
+		actions: [{ label: "Get started", href: "/welcome?fresh=1" }],
+	},
+	{
+		id: "basic",
+		name: "Basic",
+		price: "$21",
+		monthlyPrice: "$25",
+		yearlyPrice: "$21",
+		priceDetail: "per member/month",
+		billing: "Billed yearly",
+		actions: [
+			{
+				label: "Get started",
+				href: checkoutLinks.basic.yearly,
+				monthlyHref: checkoutLinks.basic.monthly,
+				yearlyHref: checkoutLinks.basic.yearly,
+			},
+		],
+	},
+	{
+		id: "business",
+		name: "Business",
+		price: "$42",
+		monthlyPrice: "$50",
+		yearlyPrice: "$42",
+		priceDetail: "per member/month",
+		billing: "Billed yearly",
+		actions: [
+			{
+				label: "Get started",
+				href: checkoutLinks.business.yearly,
+				monthlyHref: checkoutLinks.business.monthly,
+				yearlyHref: checkoutLinks.business.yearly,
+				primary: true,
+			},
+			{ label: "Contact sales", href: businessSalesEmail },
+		],
+	},
+	{
+		id: "enterprise",
+		name: "Enterprise",
+		price: "From $85",
+		priceDetail: "per member/month",
+		billing: "+$1,000 annual platform fee",
+		actions: [{ label: "Contact sales", href: enterpriseSalesEmail }],
+	},
+] as const;
+
+const featureRows = [
+	{
+		id: "members",
+		descriptions: {
+			free: "Free includes up to three workspace members.",
+			basic: "Basic includes unlimited workspace members.",
+			business: "Business includes unlimited workspace members.",
+			enterprise: "Enterprise includes unlimited workspace members.",
+		},
+		labels: {
+			free: "3 members",
+			basic: "Unlimited members",
+			business: "Unlimited members",
+			enterprise: "Unlimited members",
+		},
+		included: { free: true, basic: true, business: true, enterprise: true },
+	},
+	{
+		id: "agent-runs",
+		descriptions: {
+			free: "Free includes analysis for up to 50,000 agent runs each month.",
+			basic: "Basic includes unlimited agent runs each month.",
+			business: "Business includes unlimited agent runs each month.",
+			enterprise: "Enterprise includes unlimited agent runs each month.",
+		},
+		labels: {
+			free: "50k agent runs / month",
+			basic: "Unlimited agent runs",
+			business: "Unlimited agent runs",
+			enterprise: "Unlimited agent runs",
+		},
+		included: { free: true, basic: true, business: true, enterprise: true },
+	},
+	{
+		id: "org-agent-analytics",
+		description:
+			"See coding-agent adoption, activity, token volume, and estimated spend across your organization.",
+		labels: {
+			free: "Org-level coding agent analytics",
+			basic: "Org-level coding agent analytics",
+			business: "Org-level coding agent analytics",
+			enterprise: "Org-level coding agent analytics",
+		},
+		included: { free: true, basic: true, business: true, enterprise: true },
+	},
+	{
+		id: "session-trace",
+		description:
+			"Inspect the full timeline of prompts, responses, tool calls, commands, and subagent activity for every session.",
+		labels: {
+			free: "Deep session trace viewer",
+			basic: "Deep session trace viewer",
+			business: "Deep session trace viewer",
+			enterprise: "Deep session trace viewer",
+		},
+		included: { free: true, basic: true, business: true, enterprise: true },
+	},
+	{
+		id: "session-intelligence",
+		description:
+			"Surface recurring patterns, blockers, failures, and opportunities across your organization’s agent sessions.",
+		labels: {
+			free: "Advanced Session Intelligence",
+			basic: "Advanced Session Intelligence",
+			business: "Advanced Session Intelligence",
+			enterprise: "Advanced Session Intelligence",
+		},
+		included: { free: false, basic: false, business: true, enterprise: true },
+	},
+	{
+		id: "weekly-reports",
+		description:
+			"Receive a weekly digest of agent adoption, performance changes, notable sessions, and team trends.",
+		labels: {
+			free: "Weekly agent reports",
+			basic: "Weekly agent reports",
+			business: "Weekly agent reports",
+			enterprise: "Weekly agent reports",
+		},
+		included: { free: false, basic: false, business: true, enterprise: true },
+	},
+	{
+		id: "self-hosted",
+		description:
+			"Deploy Opaline inside infrastructure that your organization controls.",
+		labels: {
+			free: "On-prem / self-hosted deployment",
+			basic: "On-prem / self-hosted deployment",
+			business: "On-prem / self-hosted deployment",
+			enterprise: "On-prem / self-hosted deployment",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "invoice-billing",
+		description:
+			"Pay by invoice or purchase order with terms arranged for your organization.",
+		labels: {
+			free: "Invoice/PO billing",
+			basic: "Invoice/PO billing",
+			business: "Invoice/PO billing",
+			enterprise: "Invoice/PO billing",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "saml-scim",
+		description:
+			"Connect your identity provider for single sign-on and automated user provisioning.",
+		labels: {
+			free: "SAML and SCIM",
+			basic: "SAML and SCIM",
+			business: "SAML and SCIM",
+			enterprise: "SAML and SCIM",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "admin-controls",
+		description:
+			"Control access, roles, workspace policies, and administrative permissions in detail.",
+		labels: {
+			free: "Granular admin controls",
+			basic: "Granular admin controls",
+			business: "Granular admin controls",
+			enterprise: "Granular admin controls",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "data-modeling",
+		description:
+			"Model teams, repositories, workflows, and session metadata around your organization’s structure.",
+		labels: {
+			free: "Advanced session data modeling",
+			basic: "Advanced session data modeling",
+			business: "Advanced session data modeling",
+			enterprise: "Advanced session data modeling",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "migration-support",
+		description:
+			"Get hands-on help importing existing data, configuring Opaline, and onboarding your teams.",
+		labels: {
+			free: "Migration & onboarding support",
+			basic: "Migration & onboarding support",
+			business: "Migration & onboarding support",
+			enterprise: "Migration & onboarding support",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "account-management",
+		description:
+			"Work with a dedicated contact for rollout planning, account needs, and ongoing coordination.",
+		labels: {
+			free: "Account management",
+			basic: "Account management",
+			business: "Account management",
+			enterprise: "Account management",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+	{
+		id: "founder-support",
+		description:
+			"Reach Opaline’s founder directly at any hour for urgent Enterprise support.",
+		labels: {
+			free: "24/7 Founder Support",
+			basic: "24/7 Founder Support",
+			business: "24/7 Founder Support",
+			enterprise: "24/7 Founder Support",
+		},
+		included: { free: false, basic: false, business: false, enterprise: true },
+	},
+] as const;
+---
+
+<Layout
+	title="Pricing — Opaline"
+	description="Simple pricing for Opaline agent-session analytics, from growing teams to enterprise organizations."
+	canonical="/pricing"
+>
+	<a class="pricing-skip-link" href="#main-content">Skip to main content</a>
+	<InstantV2Nav active="pricing" />
+
+	<main id="main-content" class="pricing-page">
+		<div class="pricing-container">
+			<h1>Pricing</h1>
+
+			<div class="pricing-plans">
+				{
+					plans.map((plan) => (
+						<section class="pricing-card" id={plan.id}>
+							<div>
+								<hgroup>
+									<h2>{plan.name}</h2>
+									<p class="pricing-price">
+										<span
+											data-price={plan.id}
+											data-monthly-price={"monthlyPrice" in plan ? plan.monthlyPrice : undefined}
+											data-yearly-price={"yearlyPrice" in plan ? plan.yearlyPrice : undefined}
+										>
+											{plan.price}
+										</span>
+										{"priceDetail" in plan ? (
+											<span class="pricing-price-detail" data-price-detail={plan.id}>
+												{plan.priceDetail}
+											</span>
+										) : null}
+									</p>
+								</hgroup>
+
+								<div class="pricing-billing">
+									{"monthlyPrice" in plan ? (
+										<>
+											<button
+												class="pricing-toggle"
+												type="button"
+												aria-label="Use monthly billing"
+												aria-pressed="true"
+												data-pricing-toggle
+											>
+												<span aria-hidden="true" />
+											</button>
+											<span data-billing-label>{plan.billing}</span>
+										</>
+									) : (
+										<span>{plan.billing}</span>
+									)}
+								</div>
+
+								<div class="pricing-actions">
+									{plan.actions.map((action) => (
+										<a
+											class:list={[
+												"pricing-button",
+												{ "pricing-button-primary": "primary" in action && action.primary },
+											]}
+											href={action.href}
+											data-checkout-link={"monthlyHref" in action ? true : undefined}
+											data-monthly-href={"monthlyHref" in action ? action.monthlyHref : undefined}
+											data-yearly-href={"yearlyHref" in action ? action.yearlyHref : undefined}
+											data-local-app-path={action.href.startsWith("/welcome") ? action.href : undefined}
+											data-instant-v2-pointer-glow
+										>
+											<span
+												class="pricing-button-opalescence"
+												data-instant-v2-pointer-glow-effect
+												aria-hidden="true"
+											/>
+											<span class="pricing-button-glass" aria-hidden="true" />
+											<span class="pricing-button-label">{action.label}</span>
+										</a>
+									))}
+								</div>
+
+								<ul class="pricing-features" role="list">
+									{featureRows.map((feature) => {
+										const included = feature.included[plan.id];
+										const featureLabel = feature.labels[plan.id];
+										const featureDescription =
+											"descriptions" in feature ? feature.descriptions[plan.id] : feature.description;
+										const tooltipId = `pricing-tooltip-${plan.id}-${feature.id}`;
+										const mobileTooltipId = `${tooltipId}-mobile`;
+
+										return (
+											<li class:list={{ "pricing-feature-excluded": !included }}>
+												<span class="pricing-tooltip-shell pricing-tooltip-shell-desktop">
+													<button
+														class="pricing-tooltip-trigger"
+														type="button"
+														aria-label={`About ${featureLabel}`}
+														aria-describedby={tooltipId}
+														aria-expanded="false"
+													>
+														{included ? (
+															<svg
+																class="pricing-check pricing-status-default"
+																width="16"
+																height="16"
+																viewBox="0 0 16 16"
+																aria-hidden="true"
+															>
+																<path
+																	fill-rule="evenodd"
+																	clip-rule="evenodd"
+																	d="M8 1.002a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm4.101 5.101a.85.85 0 0 0-1.202-1.202L6.5 9.3 5.101 7.901a.85.85 0 0 0-1.202 1.202l2 2a.85.85 0 0 0 1.202 0l5-5Z"
+																/>
+															</svg>
+														) : (
+															<span class="pricing-minus pricing-status-default" aria-hidden="true">−</span>
+														)}
+														<span class="pricing-status-info" aria-hidden="true">i</span>
+													</button>
+													<span class="pricing-tooltip" id={tooltipId} role="tooltip">
+														{featureDescription}
+													</span>
+												</span>
+
+												<span class="pricing-mobile-status" aria-hidden="true">
+													{included ? (
+														<svg class="pricing-check" width="16" height="16" viewBox="0 0 16 16">
+															<path
+																fill-rule="evenodd"
+																clip-rule="evenodd"
+																d="M8 1.002a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm4.101 5.101a.85.85 0 0 0-1.202-1.202L6.5 9.3 5.101 7.901a.85.85 0 0 0-1.202 1.202l2 2a.85.85 0 0 0 1.202 0l5-5Z"
+															/>
+														</svg>
+													) : (
+														<span class="pricing-minus">−</span>
+													)}
+												</span>
+
+												<span class="pricing-feature-content">
+													<span class="pricing-visually-hidden">
+														{included ? "Included: " : "Not included: "}
+													</span>
+													<span class="pricing-feature-label">
+														{featureLabel}
+												{feature.id === "founder-support" ? (
+													<>
+														<!-- Good luck calling that number here. While you're ordering, get me a margherita please to 2261 Market Street, San Francisco, CA 94114. -->
+														{" "}+1 (628) <span class="pricing-private-number">776-0400</span>
+															</>
+														) : null}
+													</span>
+												</span>
+
+												<span class="pricing-tooltip-shell pricing-tooltip-shell-mobile">
+													<button
+														class="pricing-tooltip-trigger"
+														type="button"
+														aria-label={`About ${featureLabel}`}
+														aria-describedby={mobileTooltipId}
+														aria-expanded="false"
+													>
+														<span class="pricing-status-info pricing-status-info-static" aria-hidden="true">i</span>
+													</button>
+													<span class="pricing-tooltip" id={mobileTooltipId} role="tooltip">
+														{featureDescription}
+													</span>
+												</span>
+											</li>
+										);
+									})}
+								</ul>
+							</div>
+
+						</section>
+					))
+				}
+			</div>
+
+		</div>
+	</main>
+
+	<script>
+		import { initializeInstantV2SmoothScroll } from "../scripts/instant-v2-smooth-scroll";
+
+		initializeInstantV2SmoothScroll();
+
+		if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+			const localAppOrigin = `${window.location.protocol}//${window.location.hostname}:4011`;
+			for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-local-app-path]")) {
+				const path = link.dataset.localAppPath;
+				if (path) link.href = `${localAppOrigin}${path}`;
+			}
+		}
+
+		const pricingToggles = document.querySelectorAll<HTMLButtonElement>("[data-pricing-toggle]");
+
+		function setYearlyBilling(yearly: boolean) {
+			for (const toggle of pricingToggles) {
+				const card = toggle.closest<HTMLElement>(".pricing-card");
+				const planId = card?.id;
+				const price = planId ? card?.querySelector<HTMLElement>(`[data-price="${planId}"]`) : null;
+				const billingLabel = card?.querySelector<HTMLElement>("[data-billing-label]");
+				const checkoutLink = card?.querySelector<HTMLAnchorElement>("[data-checkout-link]");
+
+				toggle.setAttribute("aria-pressed", String(yearly));
+				toggle.setAttribute("aria-label", yearly ? "Use monthly billing" : "Use yearly billing");
+				if (price) price.textContent = yearly ? price.dataset.yearlyPrice ?? "" : price.dataset.monthlyPrice ?? "";
+				if (billingLabel) billingLabel.textContent = yearly ? "Billed yearly" : "Billed monthly";
+				if (checkoutLink) {
+					checkoutLink.href = yearly
+						? checkoutLink.dataset.yearlyHref ?? checkoutLink.href
+						: checkoutLink.dataset.monthlyHref ?? checkoutLink.href;
+				}
+			}
+		}
+
+		for (const toggle of pricingToggles) {
+			toggle.addEventListener("click", () => {
+				setYearlyBilling(toggle.getAttribute("aria-pressed") !== "true");
+			});
+		}
+
+		const tooltipTriggers = document.querySelectorAll<HTMLButtonElement>(".pricing-tooltip-trigger");
+
+		function closeTouchTooltips(except?: HTMLElement) {
+			for (const shell of document.querySelectorAll<HTMLElement>(".pricing-tooltip-shell[data-open='true']")) {
+				if (shell === except) continue;
+				shell.dataset.open = "false";
+				const trigger = shell.querySelector<HTMLButtonElement>(".pricing-tooltip-trigger");
+				trigger?.setAttribute("aria-expanded", "false");
+				if (document.activeElement === trigger) trigger.blur();
+			}
+		}
+
+		for (const tooltipTrigger of tooltipTriggers) {
+			function positionTooltip() {
+				const tooltipId = tooltipTrigger.getAttribute("aria-describedby");
+				const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+				if (!tooltip) return;
+
+				tooltip.dataset.positioned = "true";
+				const triggerRect = tooltipTrigger.getBoundingClientRect();
+				const tooltipWidth = tooltip.offsetWidth;
+				const viewportPadding = 16;
+				const idealViewportLeft = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
+				const tooltipViewportLeft = Math.min(
+					window.innerWidth - tooltipWidth - viewportPadding,
+					Math.max(viewportPadding, idealViewportLeft),
+				);
+				const arrowCenter = Math.min(
+					tooltipWidth - 12,
+					Math.max(12, triggerRect.left + triggerRect.width / 2 - tooltipViewportLeft),
+				);
+
+				tooltip.style.setProperty("--pricing-tooltip-left", `${tooltipViewportLeft - triggerRect.left}px`);
+				tooltip.style.setProperty("--pricing-tooltip-arrow-left", `${arrowCenter}px`);
+			}
+
+			tooltipTrigger.addEventListener("pointerenter", positionTooltip);
+			tooltipTrigger.addEventListener("focus", positionTooltip);
+			tooltipTrigger.addEventListener("click", () => {
+				if (!window.matchMedia("(hover: none), (pointer: coarse)").matches) return;
+
+				const shell = tooltipTrigger.closest<HTMLElement>(".pricing-tooltip-shell");
+				if (!shell) return;
+				const shouldOpen = shell.dataset.open !== "true";
+
+				closeTouchTooltips(shell);
+				positionTooltip();
+				shell.dataset.open = String(shouldOpen);
+				tooltipTrigger.setAttribute("aria-expanded", String(shouldOpen));
+				if (!shouldOpen) tooltipTrigger.blur();
+			});
+			tooltipTrigger.addEventListener("keydown", (event) => {
+				if (event.key !== "Escape") return;
+				const shell = tooltipTrigger.closest<HTMLElement>(".pricing-tooltip-shell");
+				if (shell) shell.dataset.open = "false";
+				tooltipTrigger.setAttribute("aria-expanded", "false");
+				tooltipTrigger.blur();
+			});
+		}
+
+		document.addEventListener("pointerdown", (event) => {
+			if (event.target instanceof Element && event.target.closest(".pricing-tooltip-shell")) return;
+			closeTouchTooltips();
+		});
+
+	</script>
+</Layout>
+
+<style>
+	:global(body) {
+		background: #fff;
+	}
+
+	:global(html),
+	:global(body) {
+		overscroll-behavior: none;
+	}
+
+	.pricing-page {
+		isolation: isolate;
+		min-height: calc(100svh - 42px);
+		color: var(--color-ink-strong);
+	}
+
+	.pricing-container {
+		width: min(calc(100% - 20px), 1344px);
+		margin-inline: auto;
+		padding: 132px 0 62px;
+	}
+
+	.pricing-skip-link {
+		position: fixed;
+		z-index: 100;
+		top: 12px;
+		left: 12px;
+		padding: 10px 14px;
+		border-radius: 6px;
+		background: var(--color-ink-strong);
+		color: #fff;
+		font-size: 14px;
+		font-weight: 500;
+		transform: translateY(-160%);
+	}
+
+	.pricing-skip-link:focus {
+		transform: translateY(0);
+	}
+
+	.pricing-page h1 {
+		max-width: 24ch;
+		margin: 0;
+		font-size: clamp(52px, 4.25vw, 64px);
+		font-weight: 500;
+		letter-spacing: -0.05em;
+		text-wrap: balance;
+	}
+
+	.pricing-plans {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		width: 100%;
+		max-width: 1344px;
+		margin-top: 130px;
+	}
+
+	.pricing-card {
+		position: relative;
+		display: flex;
+		min-width: 0;
+		min-height: 512px;
+		flex-direction: column;
+		padding-inline: 32px;
+	}
+
+	.pricing-card + .pricing-card::before {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: 1px;
+		background: var(--color-line);
+		content: "";
+	}
+
+	.pricing-card h2 {
+		max-width: 40ch;
+		margin: 0;
+		font-size: 22px;
+		font-weight: 550;
+		letter-spacing: -0.025em;
+		text-wrap: balance;
+	}
+
+	.pricing-price {
+		display: flex;
+		align-items: baseline;
+		gap: 7px;
+		min-height: 28px;
+		margin: 8px 0 0;
+		font-size: 18px;
+		font-variant-numeric: tabular-nums;
+		font-weight: 500;
+	}
+
+	.pricing-price-detail {
+		color: var(--color-ink-muted);
+		font-size: 15px;
+		font-weight: 400;
+	}
+
+	.pricing-billing {
+		display: flex;
+		min-height: 64px;
+		align-items: center;
+		gap: 8px;
+		margin-top: 16px;
+		border-top: 1px solid var(--color-line-soft);
+		border-bottom: 1px solid var(--color-line-soft);
+		color: var(--color-ink-muted);
+		font-size: 15px;
+	}
+
+	.pricing-toggle {
+		position: relative;
+		width: 34px;
+		height: 20px;
+		flex-shrink: 0;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		background: rgba(23, 24, 27, 0.18);
+		cursor: pointer;
+	}
+
+	.pricing-toggle span {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: 0 1px 2px rgba(23, 24, 27, 0.18);
+		transition: transform 160ms ease-out;
+	}
+
+	.pricing-toggle[aria-pressed="true"] {
+		background: var(--color-blue);
+	}
+
+	.pricing-toggle[aria-pressed="true"] span {
+		transform: translateX(14px);
+	}
+
+	.pricing-features {
+		display: grid;
+		gap: 0;
+		padding: 24px 0 0;
+		margin: 0;
+		list-style: none;
+	}
+
+	.pricing-features li {
+		position: relative;
+		display: flex;
+		height: 48px;
+		align-items: center;
+		gap: 10px;
+		color: rgba(23, 24, 27, 0.7);
+		font-size: 15px;
+		line-height: 1.35;
+	}
+
+	.pricing-check {
+		width: 16px;
+		height: 16px;
+		fill: rgba(23, 24, 27, 0.68);
+	}
+
+	.pricing-minus {
+		display: inline-flex;
+		width: 16px;
+		height: 16px;
+		align-items: center;
+		justify-content: center;
+		color: rgba(23, 24, 27, 0.24);
+		font-size: 18px;
+		line-height: 1;
+	}
+
+	.pricing-feature-content {
+		min-width: 0;
+	}
+
+	.pricing-feature-label {
+		min-width: 0;
+	}
+
+	.pricing-feature-excluded .pricing-feature-label {
+		color: rgba(23, 24, 27, 0.3);
+	}
+
+	.pricing-visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		border: 0;
+		margin: -1px;
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		overflow: hidden;
+		white-space: nowrap;
+	}
+
+	.pricing-tooltip-shell {
+		position: relative;
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+	}
+
+	.pricing-mobile-status,
+	.pricing-tooltip-shell-mobile {
+		display: none;
+	}
+
+	.pricing-tooltip-trigger {
+		position: relative;
+		display: inline-flex;
+		width: 16px;
+		height: 16px;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		cursor: help;
+		font-family: inherit;
+		line-height: 1;
+	}
+
+	.pricing-status-default,
+	.pricing-status-info {
+		transition: opacity 100ms ease-out;
+	}
+
+	.pricing-status-info {
+		position: absolute;
+		display: inline-flex;
+		width: 15px;
+		height: 15px;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(23, 24, 27, 0.32);
+		border-radius: 50%;
+		color: rgba(23, 24, 27, 0.52);
+		font-size: 10px;
+		font-weight: 600;
+		opacity: 0;
+	}
+
+	.pricing-status-info-static {
+		opacity: 1;
+	}
+
+	.pricing-feature-excluded .pricing-status-info {
+		border-color: rgba(23, 24, 27, 0.18);
+		color: rgba(23, 24, 27, 0.28);
+	}
+
+	.pricing-tooltip-shell:focus-within .pricing-status-default,
+	.pricing-tooltip-shell[data-open="true"] .pricing-status-default {
+		opacity: 0;
+	}
+
+	.pricing-tooltip-shell:focus-within .pricing-status-info,
+	.pricing-tooltip-shell[data-open="true"] .pricing-status-info {
+		opacity: 1;
+	}
+
+	.pricing-tooltip-trigger:focus-visible {
+		outline: 2px solid var(--color-focus);
+		outline-offset: 3px;
+	}
+
+	.pricing-tooltip-trigger::before {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: max(100%, 48px);
+		height: max(100%, 48px);
+		content: "";
+		transform: translate(-50%, -50%);
+	}
+
+	.pricing-tooltip {
+		position: absolute;
+		z-index: 50;
+		bottom: calc(100% + 9px);
+		left: var(--pricing-tooltip-left, 0);
+		width: max-content;
+		max-width: min(288px, calc(100vw - 32px));
+		padding: 6px 12px;
+		border-radius: 12px;
+		background: var(--color-ink-strong);
+		box-shadow: 0 8px 24px rgba(23, 24, 27, 0.16);
+		color: #fff;
+		font-size: 13px;
+		font-weight: 400;
+		line-height: 1.45;
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(4px) scale(0.95);
+		transform-origin: var(--pricing-tooltip-arrow-left, 50%) bottom;
+		transition:
+			opacity 120ms ease-out,
+			transform 120ms ease-out,
+			visibility 120ms step-end;
+		visibility: hidden;
+	}
+
+	.pricing-tooltip:not([data-positioned]) {
+		display: none;
+	}
+
+	.pricing-tooltip::after {
+		position: absolute;
+		bottom: -4px;
+		left: calc(var(--pricing-tooltip-arrow-left, 50%) - 4px);
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		background: var(--color-ink-strong);
+		content: "";
+		transform: rotate(45deg);
+	}
+
+	.pricing-tooltip-shell:focus-within .pricing-tooltip,
+	.pricing-tooltip-shell[data-open="true"] .pricing-tooltip {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		transition:
+			opacity 120ms ease-out,
+			transform 120ms ease-out,
+			visibility 0ms;
+		visibility: visible;
+	}
+
+	.pricing-private-number {
+		display: inline-block;
+		filter: blur(4px);
+		user-select: none;
+	}
+
+	.pricing-actions {
+		display: flex;
+		width: 100%;
+		gap: 8px;
+		margin-top: 24px;
+	}
+
+	.pricing-button {
+		position: relative;
+		isolation: isolate;
+		display: inline-flex;
+		width: 100%;
+		min-width: 0;
+		flex: 1 1 0;
+		height: 36px;
+		align-items: center;
+		justify-content: center;
+		padding: 0 12px;
+		border: 0;
+		border-radius: 8px;
+		background: #fff;
+		box-shadow:
+			inset 0 0 0 0.5px rgba(0, 0, 0, 0.12),
+			0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		font-size: 13px;
+		font-weight: 500;
+		overflow: hidden;
+		transition:
+			background-color 150ms ease-out,
+			box-shadow 150ms ease-out;
+	}
+
+	.pricing-button-primary {
+		background: rgba(0, 0, 0, 0.95);
+		box-shadow: none;
+		color: #fff;
+	}
+
+	.pricing-button-opalescence {
+		position: absolute;
+		z-index: 0;
+		top: 50%;
+		left: 50%;
+		width: 58px;
+		height: 24px;
+		border-radius: 999px;
+		background-image: linear-gradient(
+			90deg,
+			oklch(var(--instant-v2-glimm-blue) / 0.16) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / 0.196) 40%,
+			oklch(var(--instant-v2-glimm-purple) / 0.19) 60%,
+			oklch(var(--instant-v2-glimm-pink) / 0.196) 80%
+		);
+		filter: blur(6px);
+		opacity: 0;
+		transform: translate3d(
+			calc(-50% + var(--instant-v2-glow-x, 0px)),
+			calc(-50% + var(--instant-v2-glow-y, 0px)),
+			0
+		);
+		transition: opacity 180ms ease-out;
+	}
+
+	.pricing-button-primary .pricing-button-opalescence {
+		background-image: linear-gradient(
+			90deg,
+			oklch(var(--instant-v2-glimm-blue) / 0.44) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / 0.5) 40%,
+			oklch(var(--instant-v2-glimm-purple) / 0.47) 60%,
+			oklch(var(--instant-v2-glimm-pink) / 0.5) 80%
+		);
+	}
+
+	.pricing-button-glass {
+		position: absolute;
+		z-index: 1;
+		inset: 0;
+		border-radius: inherit;
+		background: oklch(1 0 0 / 0.36);
+		box-shadow:
+			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
+			inset 0 1px 0 oklch(1 0 0 / 0.62);
+		pointer-events: none;
+	}
+
+	.pricing-button-primary .pricing-button-glass {
+		background: oklch(0.1 0 0 / 0.38);
+		box-shadow:
+			inset 0 0 0 0.5px oklch(1 0 0 / 0.1),
+			inset 0 1px 0 oklch(1 0 0 / 0.12);
+	}
+
+	.pricing-button-label {
+		position: relative;
+		z-index: 2;
+	}
+
+	@media (any-hover: hover) {
+		.pricing-tooltip-shell:hover .pricing-status-default {
+			opacity: 0;
+		}
+
+		.pricing-tooltip-shell:hover .pricing-status-info {
+			opacity: 1;
+		}
+
+		.pricing-tooltip-shell:hover .pricing-tooltip {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+			transition:
+				opacity 120ms ease-out,
+				transform 120ms ease-out,
+				visibility 0ms;
+			visibility: visible;
+		}
+
+		.pricing-tooltip-trigger:hover .pricing-status-info {
+			border-color: rgba(23, 24, 27, 0.56);
+			color: rgba(23, 24, 27, 0.78);
+		}
+
+		.pricing-button:hover {
+			background: #fff;
+		}
+
+		.pricing-button-primary:hover {
+			background: rgba(0, 0, 0, 0.95);
+		}
+
+		.pricing-button:hover .pricing-button-opalescence {
+			opacity: 1;
+		}
+
+	}
+
+	.pricing-button:focus-visible .pricing-button-opalescence {
+		opacity: 1;
+	}
+
+	@media (max-width: 1099px) {
+		.pricing-container {
+			width: min(calc(100% - 56px), 968px);
+			padding-top: 92px;
+		}
+
+		.pricing-plans {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			margin-top: 112px;
+		}
+
+		.pricing-card {
+			padding-inline: 8px;
+		}
+
+		.pricing-card:nth-child(3)::before {
+			display: none;
+		}
+
+		.pricing-card:nth-child(n + 3) {
+			padding-top: 56px;
+			border-top: 1px solid var(--color-line);
+		}
+	}
+
+	@media (max-width: 720px) {
+		.pricing-container {
+			width: calc(100% - 32px);
+			padding: 72px 0 40px;
+		}
+
+		.pricing-page h1 {
+			font-size: 48px;
+		}
+
+		.pricing-plans {
+			grid-template-columns: 1fr;
+			margin-top: 76px;
+		}
+
+		.pricing-card,
+		.pricing-card:first-child,
+		.pricing-card:last-child {
+			min-height: 0;
+			padding: 0 0 56px;
+		}
+
+		.pricing-card + .pricing-card {
+			padding-top: 56px;
+			border-top: 1px solid var(--color-line);
+		}
+
+		.pricing-card + .pricing-card::before {
+			display: none;
+		}
+
+		.pricing-card h2 {
+			font-size: 26px;
+		}
+
+		.pricing-price {
+			flex-wrap: wrap;
+			font-size: 23px;
+		}
+
+		.pricing-price-detail,
+		.pricing-billing,
+		.pricing-features li,
+		.pricing-button {
+			font-size: 16px;
+		}
+
+		.pricing-billing {
+			min-height: 88px;
+		}
+
+		.pricing-features li {
+			height: 54px;
+		}
+
+		.pricing-tooltip-shell-desktop {
+			display: none;
+		}
+
+		.pricing-mobile-status {
+			display: inline-flex;
+			order: 1;
+			flex: 0 0 16px;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.pricing-feature-content {
+			order: 2;
+			flex: 1 1 auto;
+		}
+
+		.pricing-tooltip-shell-mobile {
+			display: inline-flex;
+			order: 3;
+			margin-left: auto;
+		}
+
+		.pricing-tooltip-shell-mobile .pricing-tooltip {
+			top: 50%;
+			right: calc(100% + 9px);
+			bottom: auto;
+			left: auto !important;
+			max-width: min(288px, calc(100vw - 57px));
+			transform: translate(4px, -50%) scale(0.95);
+			transform-origin: right center;
+		}
+
+		.pricing-tooltip-shell-mobile .pricing-tooltip::after {
+			top: calc(50% - 4px);
+			right: -4px;
+			bottom: auto;
+			left: auto;
+		}
+
+		.pricing-tooltip-shell-mobile:focus-within .pricing-tooltip,
+		.pricing-tooltip-shell-mobile[data-open="true"] .pricing-tooltip {
+			transform: translate(0, -50%) scale(1);
+		}
+
+		.pricing-button {
+			width: 100%;
+			min-height: 48px;
+		}
+
+		.pricing-actions {
+			flex-direction: column;
+		}
+
+	}
+</style>

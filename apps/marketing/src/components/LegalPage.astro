@@ -14,7 +14,7 @@ interface Props {
 	lastUpdated: string;
 	lastUpdatedDate: string;
 	dateLabel?: string;
-	active: "privacy" | "terms";
+	active: "privacy" | "terms" | "dpa" | "subprocessors";
 	toc: TocItem[];
 	contentHtml?: string;
 }
@@ -801,9 +801,31 @@ const {
 	};
 
 	let scrollFrame = 0;
+	let programmaticSectionId: string | null = null;
+	let programmaticScrollReleaseTimer = 0;
+
+	const scheduleProgrammaticScrollRelease = (delay = 160) => {
+		window.clearTimeout(programmaticScrollReleaseTimer);
+		programmaticScrollReleaseTimer = window.setTimeout(() => {
+			programmaticSectionId = null;
+			queueScrollState();
+		}, delay);
+	};
+
 	const updateScrollState = () => {
 		scrollFrame = 0;
 		if (!headings.length) return;
+		if (programmaticSectionId) {
+			setCurrentSection(programmaticSectionId);
+			for (const button of desktopTocButtons) {
+				button.toggleAttribute(
+					"data-in-view",
+					button.dataset.legalTocButton === programmaticSectionId,
+				);
+			}
+			moveHighlight(programmaticSectionId);
+			return;
+		}
 
 		const headingLine = getHeadingLine();
 		const atPageBottom =
@@ -873,6 +895,8 @@ const {
 			if (dialog?.open) closeDialog();
 			window.setTimeout(
 				() => {
+					programmaticSectionId = id;
+					scheduleProgrammaticScrollRelease(300);
 					const top =
 						window.scrollY +
 						heading.getBoundingClientRect().top -
@@ -888,7 +912,14 @@ const {
 	}
 
 	updateScrollState();
-	window.addEventListener("scroll", queueScrollState, { passive: true });
+	window.addEventListener(
+		"scroll",
+		() => {
+			if (programmaticSectionId) scheduleProgrammaticScrollRelease();
+			queueScrollState();
+		},
+		{ passive: true },
+	);
 	window.addEventListener("resize", queueScrollState, { passive: true });
 	window.addEventListener("pageshow", queueScrollState, { passive: true });
 	reducedMotion.addEventListener("change", queueScrollState);

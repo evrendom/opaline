@@ -1,0 +1,20 @@
+---
+import LegalPage from "../../components/LegalPage.astro";
+import contentHtml from "../../content/legal/opaline-subprocessors.html?raw";
+
+const toc = [
+	{ id: "authorized-subprocessors", label: "Authorized subprocessors" },
+	{ id: "independent-controllers", label: "Other service providers" },
+	{ id: "changes", label: "Changes to this list" },
+];
+---
+
+<LegalPage
+	title="Opaline Subprocessors"
+	description="Providers that help Opaline deliver, secure and support the hosted service."
+	lastUpdated="21 September 2026"
+	lastUpdatedDate="2026-09-21"
+	active="subprocessors"
+	{toc}
+	{contentHtml}
+/>

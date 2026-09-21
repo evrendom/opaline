@@ -1,5 +1,9 @@
 @import "./tokens.css";
 
+@view-transition {
+	navigation: auto;
+}
+
 @font-face {
 	font-family: "Inter Variable";
 	font-style: normal;
@@ -100,6 +104,11 @@ a.opaline-title-button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation: none;
+	}
+
 	*,
 	*::before,
 	*::after {
