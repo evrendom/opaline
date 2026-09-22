@@ -1,24 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { createAuth } from "../auth.js";
+import { createOrganizationPlugin } from "../auth-organization.js";
 
 describe("organization deletion security", () => {
-	test("createAuth disables Better Auth organization deletion", () => {
-		const mockDb = {};
-		const auth = createAuth(mockDb, {
-			appURL: "http://localhost:4010",
-			frontendURL: "http://localhost:4011",
-			secret: "test-secret-that-is-at-least-32-chars",
-		});
+	test("organization policy disables Better Auth organization deletion", () => {
+		const plugin = createOrganizationPlugin(
+			{ frontendURL: "http://localhost:4011" },
+			{
+				enqueueBillingTraitsForUser: async () => {},
+				getOrganizationMemberLimit: async () => 3,
+				logBillingTraitsError: () => {},
+				sendOrganizationInvitationEmail: async () => {},
+			},
+		);
 
-		// The organization plugin should have disableOrganizationDeletion set.
-		// Verify by attempting to call the delete endpoint — it should be rejected
-		// by Better Auth itself before reaching any handler.
-		const response = auth.api.deleteOrganization({
-			body: { organizationId: "fake-org-id" },
-			headers: new Headers(),
-		});
-
-		expect(response).rejects.toThrow();
+		expect(plugin.options.disableOrganizationDeletion).toBe(true);
 	});
 
 	test("route handler blocks /api/auth/organization/delete with 404", async () => {

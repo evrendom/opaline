@@ -5,13 +5,17 @@ import {
 	buildDefaultOrganizationSlug,
 	createDefaultOrganizationWithRetry,
 	createOrganizationPlugin,
-} from "../auth.js";
+} from "../auth-organization.js";
 
-const organizationHooks = createOrganizationPlugin({
-	appURL: "http://localhost:4010",
-	frontendURL: "http://localhost:4011",
-	secret: "test-secret-that-is-at-least-32-chars",
-}).options.organizationHooks;
+const organizationHooks = createOrganizationPlugin(
+	{ frontendURL: "http://localhost:4011" },
+	{
+		enqueueBillingTraitsForUser: async () => {},
+		getOrganizationMemberLimit: async () => 3,
+		logBillingTraitsError: () => {},
+		sendOrganizationInvitationEmail: async () => {},
+	},
+).options.organizationHooks;
 
 assert(organizationHooks);
 
