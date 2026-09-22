@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+	OPALINE_BILLING_MODES,
+	OPALINE_BILLING_PERIODS,
+	OPALINE_BILLING_PLANS,
+} from "./billing.js";
 import { SourceSchema } from "./schemas/source.js";
 
 export const PRODUCT_ANALYTICS_EVENT_VERSION = 1 as const;
@@ -111,6 +116,23 @@ export const ProductAnalyticsInviteChannelSchema = z.literal("email");
 export const ProductAnalyticsInviteSourceSchema = z.literal("settings_members");
 
 export const ProductAnalyticsJoinMethodSchema = z.literal("invite_accept");
+
+export const ProductAnalyticsBillingPlanSchema = z.enum(OPALINE_BILLING_PLANS);
+
+export const ProductAnalyticsBillingPeriodSchema = z.enum(
+	OPALINE_BILLING_PERIODS,
+);
+
+export const ProductAnalyticsSubscriptionStatusSchema = z.enum([
+	"active",
+	"canceled",
+	"incomplete",
+	"incomplete_expired",
+	"past_due",
+	"paused",
+	"trialing",
+	"unpaid",
+]);
 
 export type ProductAnalyticsEnvironment = z.infer<
 	typeof ProductAnalyticsEnvironmentSchema
@@ -227,6 +249,9 @@ export const PRODUCT_ANALYTICS_EVENTS = {
 	DASHBOARD_DRILLDOWN_OPENED: "Dashboard Drilldown Opened",
 	ORGANIZATION_ACTION_TRIGGERED: "Organization Action Triggered",
 	AUTHENTICATION_ACTION_TRIGGERED: "Authentication Action Triggered",
+	PAYMENT_CHECKOUT_STARTED: "Payment Checkout Started",
+	PAYMENT_PLAN_CHANGE_STARTED: "Payment Plan Change Started",
+	PAYMENT_COMPLETED: "Payment Completed",
 	INVITE_SENT: "Invite Sent",
 	ORGANIZATION_MEMBER_JOINED: "Organization Member Joined",
 	ORGANIZATION_DELETED: "Organization Deleted",
@@ -446,6 +471,54 @@ export const AuthenticationActionTriggeredEventSchema = WebEventSchema.extend({
 	http_status: z.number().int().positive().optional(),
 }).strict();
 
+export const PaymentCompletedEventSchema = RequiredCommonSchema.extend({
+	surface: z.literal("api"),
+	billing_mode: z.enum(OPALINE_BILLING_MODES),
+	organization_id: idSchema,
+	user_id: idSchema,
+	stripe_invoice_id: idSchema,
+	payment_provider: z.literal("stripe"),
+	plan: ProductAnalyticsBillingPlanSchema,
+	billing_period: ProductAnalyticsBillingPeriodSchema,
+	payment_status: z.literal("paid"),
+	subscription_status: ProductAnalyticsSubscriptionStatusSchema,
+	amount_total: z.number().int().nonnegative(),
+	catalog_recurring_amount: z.number().int().nonnegative(),
+	catalog_unit_amount: z.number().int().nonnegative(),
+	currency: z.string().length(3),
+	seat_quantity: z.number().int().positive(),
+}).strict();
+
+export const PaymentCheckoutStartedEventSchema = RequiredCommonSchema.extend({
+	surface: z.literal("api"),
+	billing_mode: z.enum(OPALINE_BILLING_MODES),
+	organization_id: idSchema,
+	user_id: idSchema,
+	payment_provider: z.literal("stripe"),
+	plan: ProductAnalyticsBillingPlanSchema,
+	billing_period: ProductAnalyticsBillingPeriodSchema,
+	catalog_recurring_amount: z.number().int().nonnegative(),
+	catalog_unit_amount: z.number().int().nonnegative(),
+	currency: z.string().length(3),
+	seat_quantity: z.number().int().positive(),
+	checkout_session_id: idSchema,
+}).strict();
+
+export const PaymentPlanChangeStartedEventSchema = RequiredCommonSchema.extend({
+	surface: z.literal("api"),
+	billing_mode: z.enum(OPALINE_BILLING_MODES),
+	organization_id: idSchema,
+	user_id: idSchema,
+	payment_provider: z.literal("stripe"),
+	plan: ProductAnalyticsBillingPlanSchema,
+	billing_period: ProductAnalyticsBillingPeriodSchema,
+	catalog_recurring_amount: z.number().int().nonnegative(),
+	catalog_unit_amount: z.number().int().nonnegative(),
+	currency: z.string().length(3),
+	seat_quantity: z.number().int().positive(),
+	portal_session_id: idSchema,
+}).strict();
+
 export const ProductAnalyticsEventSchemas = {
 	[PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP]: AccountSignedUpEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.SIGN_UP_FAILED]: SignUpFailedEventSchema,
@@ -469,6 +542,11 @@ export const ProductAnalyticsEventSchemas = {
 		OrganizationActionTriggeredEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]:
 		AuthenticationActionTriggeredEventSchema,
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_CHECKOUT_STARTED]:
+		PaymentCheckoutStartedEventSchema,
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_PLAN_CHANGE_STARTED]:
+		PaymentPlanChangeStartedEventSchema,
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_COMPLETED]: PaymentCompletedEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEventSchema,
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]:
 		OrganizationMemberJoinedEventSchema,
@@ -507,6 +585,13 @@ export type OrganizationActionTriggeredEvent = z.infer<
 export type AuthenticationActionTriggeredEvent = z.infer<
 	typeof AuthenticationActionTriggeredEventSchema
 >;
+export type PaymentCompletedEvent = z.infer<typeof PaymentCompletedEventSchema>;
+export type PaymentCheckoutStartedEvent = z.infer<
+	typeof PaymentCheckoutStartedEventSchema
+>;
+export type PaymentPlanChangeStartedEvent = z.infer<
+	typeof PaymentPlanChangeStartedEventSchema
+>;
 export type InviteSentEvent = z.infer<typeof InviteSentEventSchema>;
 export type OrganizationMemberJoinedEvent = z.infer<
 	typeof OrganizationMemberJoinedEventSchema
@@ -531,6 +616,9 @@ export interface ProductAnalyticsEventPayloadMap {
 	[PRODUCT_ANALYTICS_EVENTS.DASHBOARD_DRILLDOWN_OPENED]: DashboardDrilldownOpenedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_ACTION_TRIGGERED]: OrganizationActionTriggeredEvent;
 	[PRODUCT_ANALYTICS_EVENTS.AUTHENTICATION_ACTION_TRIGGERED]: AuthenticationActionTriggeredEvent;
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_CHECKOUT_STARTED]: PaymentCheckoutStartedEvent;
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_PLAN_CHANGE_STARTED]: PaymentPlanChangeStartedEvent;
+	[PRODUCT_ANALYTICS_EVENTS.PAYMENT_COMPLETED]: PaymentCompletedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.INVITE_SENT]: InviteSentEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_MEMBER_JOINED]: OrganizationMemberJoinedEvent;
 	[PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_DELETED]: OrganizationDeletedEvent;

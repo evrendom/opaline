@@ -3,6 +3,8 @@ import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackP
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildWorkspaceSettingsTracking } from "@/features/settings/settings-page-tracking";
+import { BillingManagementCard } from "@/features/settings/workspace/components/BillingManagementCard";
+import { BillingSandboxCard } from "@/features/settings/workspace/components/BillingSandboxCard";
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
 import { WorkspaceDangerZoneCard } from "@/features/settings/workspace/components/WorkspaceDangerZoneCard";
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
@@ -57,6 +59,15 @@ export function WorkspaceSettingsSection() {
 						canManage={data.canManage}
 						onInvalidate={data.invalidate}
 					/>
+					{data.currentUserRole === "owner" ? (
+						<>
+							<BillingManagementCard
+								organizationId={data.activeOrg.id}
+								workspaceSlug={data.activeOrg.slug}
+							/>
+							<BillingSandboxCard organizationId={data.activeOrg.id} />
+						</>
+					) : null}
 					<WorkspaceDangerZoneCard
 						organization={data.activeOrg}
 						canManage={data.canManage}

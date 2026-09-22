@@ -21,6 +21,8 @@ import {
 } from "./email.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
+import { enqueueBillingTraitsForUser } from "./services/billing.service.js";
+import { getOrganizationMemberLimit } from "./services/billing-entitlements.service.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
 const logger = getLogger(["rudel", "api", "auth"]);
@@ -186,7 +188,19 @@ export function createOrganizationPlugin(config: AuthConfig) {
 		allowUserToCreateOrganization: true,
 		creatorRole: "owner",
 		disableOrganizationDeletion: true,
+		membershipLimit: (_user, targetOrganization) =>
+			getOrganizationMemberLimit(targetOrganization.id),
 		organizationHooks: {
+			async afterRemoveMember({ member }) {
+				try {
+					await enqueueBillingTraitsForUser(member.userId);
+				} catch (error) {
+					logger.error(
+						"Failed to queue billing traits for removed user {userId}: {error}",
+						{ userId: member.userId, error },
+					);
+				}
+			},
 			async beforeCreateOrganization({ organization: organizationData }) {
 				assertValidOrganizationSlug(organizationData.slug ?? "");
 			},
@@ -359,6 +373,15 @@ export function createAuth(db: object, config: AuthConfig) {
 							);
 						}
 
+						try {
+							await enqueueBillingTraitsForUser(user.id);
+						} catch (err) {
+							logger.error(
+								"Failed to queue billing traits for new user {userId}: {error}",
+								{ userId: user.id, error: err },
+							);
+						}
+
 						await captureApiProductAnalyticsEvent({
 							distinctId: user.id,
 							event: PRODUCT_ANALYTICS_EVENTS.ACCOUNT_SIGNED_UP,
@@ -480,6 +503,14 @@ export function createAuth(db: object, config: AuthConfig) {
 								organization_member_count: members.length,
 							},
 						});
+						try {
+							await enqueueBillingTraitsForUser(createdMember.userId);
+						} catch (err) {
+							logger.error(
+								"Failed to queue billing traits for member {userId}: {error}",
+								{ userId: createdMember.userId, error: err },
+							);
+						}
 					},
 				},
 			},

@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
+import { FreeWorkspaceMonthlyAgentRunLimitExceededError } from "./billing-entitlements.service.js";
 import { sessionArrivalChannel } from "./session-arrival-channel.js";
 import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
 
@@ -532,23 +533,24 @@ async function reserveSessionOwner(
 	database: postgres.Sql | postgres.ReservedSql,
 ): Promise<ReservedSessionOwner> {
 	// The no-op update returns the winning row when a concurrent insert wins.
-	const [row] = await database.unsafe<
-		Array<{
-			last_assistant_line_count: number | null;
-			last_content_bytes: number | null;
-			last_content_sha256: string | null;
-			last_content_shape_json: string | null;
-			last_filter_version: number | null;
-			last_session_date: Date | null;
-			last_usage_content_sha256: string | null;
-			last_usage_checksum: string | null;
-			last_usage_extraction_version: number | null;
-			last_usage_event_identity_version: number | null;
-			last_usage_model_rate_card_version: string | null;
-			user_id: string;
-		}>
-	>(
-		`
+	const [row] = await database
+		.unsafe<
+			Array<{
+				last_assistant_line_count: number | null;
+				last_content_bytes: number | null;
+				last_content_sha256: string | null;
+				last_content_shape_json: string | null;
+				last_filter_version: number | null;
+				last_session_date: Date | null;
+				last_usage_content_sha256: string | null;
+				last_usage_checksum: string | null;
+				last_usage_extraction_version: number | null;
+				last_usage_event_identity_version: number | null;
+				last_usage_model_rate_card_version: string | null;
+				user_id: string;
+			}>
+		>(
+			`
 		INSERT INTO session_ownership AS ownership (
 			organization_id,
 			session_id,
@@ -575,8 +577,14 @@ async function reserveSessionOwner(
 			last_usage_event_identity_version,
 			last_usage_model_rate_card_version
 		`,
-		[organizationId, sessionId, candidateOwner],
-	);
+			[organizationId, sessionId, candidateOwner],
+		)
+		.catch((error: unknown) => {
+			if (isFreeAgentRunLimitDatabaseError(error)) {
+				throw new FreeWorkspaceMonthlyAgentRunLimitExceededError();
+			}
+			throw error;
+		});
 	if (!row) {
 		throw new Error("Session ownership reservation did not return an owner");
 	}
@@ -594,6 +602,18 @@ async function reserveSessionOwner(
 		lastUsageModelRateCardVersion: row.last_usage_model_rate_card_version,
 		userId: row.user_id,
 	};
+}
+
+function isFreeAgentRunLimitDatabaseError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		error.code === "23514" &&
+		"message" in error &&
+		typeof error.message === "string" &&
+		error.message.includes("agent runs per month")
+	);
 }
 
 function getOwnershipClaim(

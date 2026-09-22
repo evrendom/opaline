@@ -1,3 +1,4 @@
+export * from "./billing.js";
 export {
 	SESSION_ARRIVALS_PATH,
 	type SessionArrival,
@@ -5,6 +6,17 @@ export {
 	SessionArrivalsPageSchema,
 } from "./session-arrivals.js";
 
+import {
+	BillingConfigurationOutputSchema,
+	BillingPricingStateInputSchema,
+	BillingPricingStateOutputSchema,
+	CreateOrganizationBillingPortalOutputSchema,
+	CreateOrganizationCheckoutInputSchema,
+	CreateOrganizationCheckoutOutputSchema,
+	OrganizationBillingInputSchema,
+	OrganizationBillingSummaryOutputSchema,
+	SelectOrganizationPlanOutputSchema,
+} from "./billing.js";
 import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,
@@ -710,6 +722,25 @@ const IngestSessionErrors = {
 } as const;
 
 export const contract = {
+	billing: {
+		configuration: oc.output(BillingConfigurationOutputSchema),
+		current: oc.output(OrganizationBillingSummaryOutputSchema),
+		pricing: oc
+			.input(BillingPricingStateInputSchema)
+			.output(BillingPricingStateOutputSchema),
+		summary: oc
+			.input(OrganizationBillingInputSchema)
+			.output(OrganizationBillingSummaryOutputSchema),
+		createCheckout: oc
+			.input(CreateOrganizationCheckoutInputSchema)
+			.output(CreateOrganizationCheckoutOutputSchema),
+		createPortal: oc
+			.input(OrganizationBillingInputSchema)
+			.output(CreateOrganizationBillingPortalOutputSchema),
+		selectPlan: oc
+			.input(CreateOrganizationCheckoutInputSchema)
+			.output(SelectOrganizationPlanOutputSchema),
+	},
 	repositorySettings: repositorySettingsContract,
 	health: oc.output(HealthSchema),
 	me: oc.output(UserSchema),

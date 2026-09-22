@@ -52,7 +52,7 @@ export const sessionOwnership = pgTable(
 			mode: "date",
 		}),
 		revisionHead: bigint("revision_head", { mode: "bigint" })
-			.default(0n)
+			.default(sql`0`)
 			.notNull(),
 		lastRevision: bigint("last_revision", { mode: "bigint" }),
 		usageExtractionGeneration: bigint("usage_extraction_generation", {

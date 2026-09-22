@@ -32,6 +32,7 @@ import {
 	getClickhouse,
 } from "./clickhouse.js";
 import { ingestProcessingSqlClient, sqlClient } from "./db.js";
+import { getFrontendOrigin } from "./frontend-origin.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
@@ -69,11 +70,18 @@ import {
 	checkManualIngestRateLimit,
 	checkOrganizationSessionCountRateLimit,
 } from "./rate-limit.js";
-import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
 import {
-	enqueueClickHousePurge,
-	wakeClickHousePurgeWorker,
-} from "./services/clickhouse-purge.service.js";
+	createOrganizationBillingPortalSession,
+	createOrganizationCheckoutSession,
+	createOrganizationPlanSelectionSession,
+	readBillingPricingState,
+	readOrganizationBillingSummary,
+} from "./services/billing.service.js";
+import {
+	assertCanStartOrganizationAgentRun,
+	FreeWorkspaceMonthlyAgentRunLimitExceededError,
+} from "./services/billing-entitlements.service.js";
+import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
@@ -124,6 +132,10 @@ import {
 	getCachedOrgSessionCount,
 	hasOrgUploadsInLastDays,
 } from "./services/org-session.service.js";
+import {
+	deleteOrganizationPostgresData,
+	OrganizationDeletionForbiddenError,
+} from "./services/organization-deletion.service.js";
 import {
 	commitR2IngestJob,
 	R2IngestCommitError,
@@ -178,6 +190,7 @@ import {
 	UsageExtractionQueueFullError,
 	UsageExtractionQueueTimeoutError,
 } from "./services/usage-extraction.service.js";
+import { getStripeBillingConfiguration } from "./stripe-client.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
 let ingestRateLimitEnvironment =
@@ -433,6 +446,13 @@ function createIngestErrorFactories(
 	};
 }
 
+function rethrowAgentRunLimitAsForbidden(error: unknown): never {
+	if (error instanceof FreeWorkspaceMonthlyAgentRunLimitExceededError) {
+		throw new ORPCError("FORBIDDEN", { message: error.message });
+	}
+	throw error;
+}
+
 export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 	return {
 		redactionBudgetExceeded: () =>
@@ -636,7 +656,7 @@ export async function processIngestSession({
 		orgId,
 		input.sessionId,
 		context.user.id,
-	);
+	).catch(rethrowAgentRunLimitAsForbidden);
 	if (!ownership.owned) {
 		throw errorFactories.sessionOwnershipConflict();
 	}
@@ -1387,6 +1407,10 @@ const r2IngestInit = os.ingest.init
 			input.organizationId ?? activeOrganizationId,
 			context.user.id,
 		);
+		await assertCanStartOrganizationAgentRun(
+			organizationId,
+			input.sessionId,
+		).catch(rethrowAgentRunLimitAsForbidden);
 
 		try {
 			return await initR2IngestJob({
@@ -1612,56 +1636,10 @@ const deleteOrganization = os.deleteOrganization
 				);
 			}
 
-			await sqlClient.begin(async (transaction) => {
-				await transaction.unsafe(
-					`
-						SELECT id
-						FROM "user"
-						WHERE id = $1
-						FOR UPDATE
-					`,
-					[userId],
-				);
-
-				const ownership = await transaction.unsafe<Array<{ id: string }>>(
-					`
-						SELECT id
-						FROM member
-						WHERE organization_id = $1
-							AND user_id = $2
-							AND role = 'owner'
-						LIMIT 1
-					`,
-					[orgId, userId],
-				);
-
-				if (ownership.length === 0) {
-					logger.info(
-						"Rejected organization deletion because the user is not its owner (user_id={userId} organization_id={organizationId})",
-						{ organizationId: orgId, userId },
-					);
-					throw new ORPCError("FORBIDDEN", {
-						message: "Only the organization owner can delete it",
-					});
-				}
-
-				await enqueueClickHousePurge(
-					{ targetId: orgId, targetType: "organization" },
-					transaction,
-				);
-				await transaction.unsafe("DELETE FROM organization WHERE id = $1", [
-					orgId,
-				]);
-				await transaction.unsafe(
-					`
-						UPDATE session
-						SET active_organization_id = NULL
-						WHERE active_organization_id = $1
-					`,
-					[orgId],
-				);
+			await deleteOrganizationPostgresData({
+				organizationId: orgId,
+				userId,
 			});
-			await wakeClickHousePurgeWorker();
 
 			await captureApiProductAnalyticsEvent({
 				distinctId: userId,
@@ -1681,6 +1659,13 @@ const deleteOrganization = os.deleteOrganization
 			);
 			return { success: true as const };
 		} catch (error) {
+			if (error instanceof OrganizationDeletionForbiddenError) {
+				logger.info(
+					"Rejected organization deletion because the user is not its owner (user_id={userId} organization_id={organizationId})",
+					{ organizationId: orgId, userId },
+				);
+				throw new ORPCError("FORBIDDEN", { message: error.message });
+			}
 			if (error instanceof ORPCError) throw error;
 			logger.error(
 				"Organization deletion failed (user_id={userId} organization_id={organizationId} error={error})",
@@ -1690,7 +1675,149 @@ const deleteOrganization = os.deleteOrganization
 		}
 	});
 
+const getBillingConfiguration = os.billing.configuration
+	.use(authMiddleware)
+	.handler(() => getStripeBillingConfiguration());
+
+const getCurrentBillingSummary = os.billing.current
+	.use(authMiddleware)
+	.handler(async ({ context }) => {
+		const activeOrganizationId = getActiveOrganizationId(context.session);
+		const [membership] = await sqlClient<Array<{ organization_id: string }>>`
+			SELECT organization_id
+			FROM member
+			WHERE user_id = ${context.user.id}
+			ORDER BY (organization_id = ${activeOrganizationId ?? ""}) DESC,
+				created_at ASC, organization_id ASC
+			LIMIT 1
+		`;
+		return membership
+			? readOrganizationBillingSummary(membership.organization_id)
+			: { hasBillingAccount: false as const };
+	});
+
+const getBillingPricingState = os.billing.pricing
+	.use(authMiddleware)
+	.handler(async ({ input, context }) => {
+		const pricingState = await readBillingPricingState({
+			preferredOrganizationId: getActiveOrganizationId(context.session),
+			userId: context.user.id,
+			workspaceSlug: input.workspaceSlug,
+		});
+		if (input.workspaceSlug && !pricingState.hasWorkspace) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "The requested workspace is not available to this user",
+			});
+		}
+		return pricingState;
+	});
+
+const getBillingSummary = os.billing.summary
+	.use(authMiddleware)
+	.handler(async ({ input, context }) => {
+		await requireOwnedBillingOrganization(
+			input.organizationId,
+			context.user.id,
+		);
+		return readOrganizationBillingSummary(input.organizationId);
+	});
+
+const createBillingCheckout = os.billing.createCheckout
+	.use(authMiddleware)
+	.use(settingsMutationMiddleware)
+	.handler(async ({ input, context }) => {
+		const organization = await requireOwnedBillingOrganization(
+			input.organizationId,
+			context.user.id,
+		);
+
+		const workspaceSettingsUrl = new URL(
+			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
+			getFrontendOrigin(),
+		);
+
+		return createOrganizationCheckoutSession({
+			billingPeriod: input.billingPeriod,
+			cancelUrl: workspaceSettingsUrl.toString(),
+			organizationId: input.organizationId,
+			plan: input.plan,
+			successUrl: workspaceSettingsUrl.toString(),
+			userEmail: context.user.email,
+			userId: context.user.id,
+		});
+	});
+
+const createBillingPortal = os.billing.createPortal
+	.use(authMiddleware)
+	.use(settingsMutationMiddleware)
+	.handler(async ({ input, context }) => {
+		const organization = await requireOwnedBillingOrganization(
+			input.organizationId,
+			context.user.id,
+		);
+		const returnUrl = new URL(
+			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
+			getFrontendOrigin(),
+		);
+		return createOrganizationBillingPortalSession({
+			organizationId: input.organizationId,
+			returnUrl: returnUrl.toString(),
+		});
+	});
+
+const selectBillingPlan = os.billing.selectPlan
+	.use(authMiddleware)
+	.use(settingsMutationMiddleware)
+	.handler(async ({ input, context }) => {
+		const organization = await requireOwnedBillingOrganization(
+			input.organizationId,
+			context.user.id,
+		);
+		const workspaceSettingsUrl = new URL(
+			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
+			getFrontendOrigin(),
+		);
+		return createOrganizationPlanSelectionSession({
+			billingPeriod: input.billingPeriod,
+			cancelUrl: workspaceSettingsUrl.toString(),
+			organizationId: input.organizationId,
+			plan: input.plan,
+			successUrl: workspaceSettingsUrl.toString(),
+			userEmail: context.user.email,
+			userId: context.user.id,
+		});
+	});
+
+async function requireOwnedBillingOrganization(
+	organizationId: string,
+	userId: string,
+): Promise<{ slug: string }> {
+	const [organization] = await sqlClient<Array<{ role: string; slug: string }>>`
+		SELECT m.role, o.slug
+		FROM member m
+		INNER JOIN organization o ON o.id = m.organization_id
+		WHERE m.organization_id = ${organizationId}
+			AND m.user_id = ${userId}
+		LIMIT 1
+	`;
+	if (!organization || organization.role !== "owner") {
+		throw new ORPCError("FORBIDDEN", {
+			message: "Only the organization owner can manage billing",
+		});
+	}
+	return { slug: organization.slug };
+}
+
 export const router: Router<typeof contract, AppContext> = os.router({
+	billing: {
+		configuration: getBillingConfiguration,
+		current: getCurrentBillingSummary,
+		pricing: getBillingPricingState,
+		summary: getBillingSummary,
+		createCheckout: createBillingCheckout,
+		createPortal: createBillingPortal,
+		selectPlan: selectBillingPlan,
+	},
 	repositorySettings: repositorySettingsRouter,
 	health,
 	me,

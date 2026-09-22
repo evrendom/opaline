@@ -101,6 +101,16 @@ async function main(): Promise<void> {
 			spawnProcess("API", ["src/index.ts"], API_DIR, localApiEnvironment),
 		);
 	}
+	if (localApiEnvironment.STRIPE_BILLING_MODE === "sandbox") {
+		processes.push(
+			spawnProcess(
+				"billing sandbox worker",
+				["run", "billing:sandbox:worker"],
+				API_DIR,
+				localApiEnvironment,
+			),
+		);
+	}
 	processes.push(
 		spawnProcess(
 			"product",

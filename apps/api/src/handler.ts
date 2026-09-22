@@ -14,6 +14,10 @@ import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
+	handleStripeWebhookRequest,
+	STRIPE_WEBHOOK_PATH,
+} from "./handlers/stripe-webhook-http.js";
+import {
 	getTeamInviteRoute,
 	handleTeamInviteImageRequest,
 } from "./handlers/team-invite-page-http.js";
@@ -41,6 +45,7 @@ import type { ApiKeyAuthFailure } from "./middleware.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
+import { getStripeWebhookConfig } from "./stripe-client.js";
 
 await setupLogging();
 
@@ -421,6 +426,16 @@ async function handleRequest(
 	publicLookupSource: string,
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
+	if (url.pathname === STRIPE_WEBHOOK_PATH) {
+		const stripeConfig = getStripeWebhookConfig();
+		if (!stripeConfig) {
+			return Response.json(
+				{ error: "Stripe billing is not configured" },
+				{ status: 503 },
+			);
+		}
+		return handleStripeWebhookRequest(request, stripeConfig);
+	}
 	if (
 		/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(url.pathname) ||
 		/^\/rpc\/(?:wrappedShare|wrappedResume|wrappedDecimalClaim|analytics\/wrapped)(?:\/|$)/u.test(

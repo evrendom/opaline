@@ -267,6 +267,34 @@
 			"when": 1789723000000,
 			"tag": "0037_agent_metadata_scan",
 			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1790050367003,
+			"tag": "0038_solid_nightcrawler",
+			"breakpoints": true
+		},
+		{
+			"idx": 39,
+			"version": "7",
+			"when": 1790056780817,
+			"tag": "0039_free_monthly_agent_runs",
+			"breakpoints": true
+		},
+		{
+			"idx": 40,
+			"version": "7",
+			"when": 1790057656388,
+			"tag": "0040_billing_checkout_idempotency",
+			"breakpoints": true
+		},
+		{
+			"idx": 41,
+			"version": "7",
+			"when": 1790058953161,
+			"tag": "0041_colossal_corsair",
+			"breakpoints": true
 		}
 	]
 }

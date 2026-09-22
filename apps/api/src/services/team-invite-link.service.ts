@@ -1,6 +1,11 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
+import { enqueueBillingTraitsForUser } from "./billing.service.js";
+import { assertCanAddOrganizationMember } from "./billing-entitlements.service.js";
+
+const logger = getLogger(["rudel", "api", "team-invite-link"]);
 
 export type TeamInviteAcceptResult =
 	| {
@@ -121,26 +126,39 @@ export async function acceptTeamInviteLink(input: {
 		return { status: "missing" };
 	}
 
-	return sqlClient.begin(async (transaction) => {
-		const organization = await getOrganizationForTeamInvite(
-			transaction,
-			hashTeamInviteToken(input.token),
-		);
-		if (!organization) {
-			return { status: "missing" };
-		}
+	const result: TeamInviteAcceptResult = await sqlClient.begin(
+		async (transaction): Promise<TeamInviteAcceptResult> => {
+			const organization = await getOrganizationForTeamInvite(
+				transaction,
+				hashTeamInviteToken(input.token),
+			);
+			if (!organization) {
+				return { status: "missing" };
+			}
 
-		const joined = await addOrganizationMember(
-			transaction,
-			organization.id,
-			input.userId,
-		);
-		return {
-			organizationId: organization.id,
-			organizationName: organization.name,
-			status: joined ? "joined" : "already_member",
-		};
-	});
+			const joined = await addOrganizationMember(
+				transaction,
+				organization.id,
+				input.userId,
+			);
+			return {
+				organizationId: organization.id,
+				organizationName: organization.name,
+				status: joined ? "joined" : "already_member",
+			};
+		},
+	);
+	if (result.status === "joined") {
+		try {
+			await enqueueBillingTraitsForUser(input.userId);
+		} catch (error) {
+			logger.error(
+				"Failed to queue billing traits for team-link user {userId}: {error}",
+				{ error, userId: input.userId },
+			);
+		}
+	}
+	return result;
 }
 
 async function getManageableOrganization(
@@ -152,7 +170,7 @@ async function getManageableOrganization(
 ) {
 	const [organization] = await transaction.unsafe<TeamInviteOrganization[]>(
 		`
-		SELECT o.id, o.name, o.slug
+			SELECT o.id, o.name, o.slug
 		FROM organization o
 		INNER JOIN member m
 			ON m.organization_id = o.id
@@ -191,7 +209,7 @@ async function getOrganizationForTeamInvite(
 ) {
 	const [organization] = await transaction.unsafe<TeamInviteOrganization[]>(
 		`
-		SELECT o.id, o.name, o.slug
+			SELECT o.id, o.name, o.slug
 		FROM team_invite_link i
 		INNER JOIN organization o
 			ON o.id = i.organization_id
@@ -212,6 +230,12 @@ async function addOrganizationMember(
 	organizationId: string,
 	userId: string,
 ) {
+	const shouldAdd = await assertCanAddOrganizationMember(
+		transaction,
+		organizationId,
+		userId,
+	);
+	if (!shouldAdd) return false;
 	const [member] = await transaction.unsafe<Array<{ id: string }>>(
 		`
 		INSERT INTO member (

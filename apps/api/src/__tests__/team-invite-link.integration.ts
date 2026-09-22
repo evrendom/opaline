@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import assert from "node:assert";
 import { createHash, randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { sqlClient } from "../db.js";
+import { createAuth } from "../auth.js";
+import { db, sqlClient } from "../db.js";
+import { FreeWorkspaceMemberLimitExceededError } from "../services/billing-entitlements.service.js";
 import {
 	acceptTeamInviteLink,
 	createTeamInviteLink,
@@ -20,6 +22,11 @@ interface TeamInviteFixture {
 const CONCURRENT_ACCEPTANCE_COUNT = 10;
 const organizationIds: string[] = [];
 const userIds: string[] = [];
+const testAuth = createAuth(db, {
+	appURL: "http://localhost:4010",
+	frontendURL: "http://localhost:4011",
+	secret: "team-invite-integration-secret-at-least-32-characters",
+});
 
 afterEach(async () => {
 	for (const organizationId of organizationIds) {
@@ -126,7 +133,7 @@ describe("team invite links", () => {
 	});
 
 	test("allows an owner to revoke a link and rejects revocation by a member", async () => {
-		const fixture = await createTeamInviteFixture();
+		const fixture = await createTeamInviteFixture({ includeMember: true });
 		const link = await createTeamInviteLink({
 			organizationId: fixture.organizationId,
 			userId: fixture.ownerId,
@@ -151,6 +158,134 @@ describe("team invite links", () => {
 				userId: fixture.candidateId,
 			}),
 		).toEqual({ status: "missing" });
+	});
+
+	test("limits a free workspace to three members", async () => {
+		const fixture = await createTeamInviteFixture({ includeMember: true });
+		const link = await createTeamInviteLink({
+			organizationId: fixture.organizationId,
+			userId: fixture.ownerId,
+		});
+		assert(link);
+
+		expect(
+			await acceptTeamInviteLink({
+				token: link.token,
+				userId: fixture.candidateId,
+			}),
+		).toMatchObject({ status: "joined" });
+		await expect(
+			acceptTeamInviteLink({
+				token: link.token,
+				userId: fixture.secondCandidateId,
+			}),
+		).rejects.toBeInstanceOf(FreeWorkspaceMemberLimitExceededError);
+		expect(
+			await countMemberships(fixture.organizationId, fixture.secondCandidateId),
+		).toBe(0);
+	});
+
+	test("marks a teammate who joins a paid workspace as paid", async () => {
+		const fixture = await createTeamInviteFixture();
+		await sqlClient`
+			INSERT INTO billing_subscription (
+				stripe_subscription_id, organization_id, purchaser_user_id,
+				stripe_customer_id, stripe_subscription_item_id, plan,
+				billing_period, status, seat_quantity, last_paid_amount,
+				last_paid_currency, last_paid_at
+			) VALUES (
+				${`sub_${randomUUID()}`}, ${fixture.organizationId}, ${fixture.ownerId},
+				${`cus_${randomUUID()}`}, ${`si_${randomUUID()}`}, 'business',
+				'yearly', 'active', 2, 100800, 'usd', NOW()
+			)
+		`;
+		const link = await createTeamInviteLink({
+			organizationId: fixture.organizationId,
+			userId: fixture.ownerId,
+		});
+		assert(link);
+
+		expect(
+			await acceptTeamInviteLink({
+				token: link.token,
+				userId: fixture.candidateId,
+			}),
+		).toMatchObject({ status: "joined" });
+
+		const [traits] = await sqlClient<
+			Array<{ properties: Record<string, boolean | number | string | null> }>
+		>`
+			SELECT properties
+			FROM billing_analytics_outbox
+			WHERE kind = 'traits' AND user_id = ${fixture.candidateId}
+			ORDER BY occurred_at DESC, id DESC
+			LIMIT 1
+		`;
+		assert(traits);
+		expect(traits.properties).toMatchObject({
+			billing_last_payment_amount: 100800,
+			billing_last_payment_currency: "usd",
+			billing_period: "yearly",
+			billing_plan: "business",
+			billing_seat_quantity: 2,
+			billing_subscription_type: "business_yearly",
+			has_paid_workspace: true,
+			payment_status: "paid",
+			was_invited_to_team: true,
+		});
+	});
+
+	test("removing a teammate clears inherited paid workspace traits", async () => {
+		const fixture = await createTeamInviteFixture();
+		await insertPaidSubscription(fixture);
+		const link = await createTeamInviteLink({
+			organizationId: fixture.organizationId,
+			userId: fixture.ownerId,
+		});
+		assert(link);
+		await acceptTeamInviteLink({
+			token: link.token,
+			userId: fixture.candidateId,
+		});
+		const [member] = await sqlClient<Array<{ id: string }>>`
+			SELECT id FROM member
+			WHERE organization_id = ${fixture.organizationId}
+				AND user_id = ${fixture.candidateId}
+		`;
+		assert(member);
+		const sessionToken = randomUUID();
+		await sqlClient`
+			INSERT INTO session (
+				id, token, user_id, expires_at, active_organization_id
+			) VALUES (
+				${randomUUID()}, ${sessionToken}, ${fixture.ownerId},
+				${new Date(Date.now() + 60_000).toISOString()},
+				${fixture.organizationId}
+			)
+		`;
+
+		await testAuth.api.removeMember({
+			body: {
+				memberIdOrEmail: member.id,
+				organizationId: fixture.organizationId,
+			},
+			headers: new Headers({ authorization: `Bearer ${sessionToken}` }),
+		});
+
+		expect(
+			await countMemberships(fixture.organizationId, fixture.candidateId),
+		).toBe(0);
+		const traits = await readLatestBillingTraits(fixture.candidateId);
+		expect(traits).toMatchObject({
+			billing_last_payment_amount: null,
+			billing_period: "none",
+			billing_plan: "free",
+			billing_seat_quantity: 0,
+			billing_subscription_type: "free",
+			has_paid_workspace: false,
+			payment_status: "free",
+			was_invited_to_team: false,
+		});
 	});
 
 	test("accepts the same invite concurrently without duplicate membership", async () => {
@@ -343,7 +478,9 @@ describe("team invite links", () => {
 	});
 });
 
-async function createTeamInviteFixture(): Promise<TeamInviteFixture> {
+async function createTeamInviteFixture(
+	options: { includeMember?: boolean } = {},
+): Promise<TeamInviteFixture> {
 	const ownerId = randomUUID();
 	const candidateId = randomUUID();
 	const memberId = randomUUID();
@@ -371,10 +508,14 @@ async function createTeamInviteFixture(): Promise<TeamInviteFixture> {
 	`;
 	await sqlClient`
 		INSERT INTO member (id, organization_id, user_id, role)
-		VALUES
-			(${randomUUID()}, ${organizationId}, ${ownerId}, 'owner'),
-			(${randomUUID()}, ${organizationId}, ${memberId}, 'member')
+		VALUES (${randomUUID()}, ${organizationId}, ${ownerId}, 'owner')
 	`;
+	if (options.includeMember) {
+		await sqlClient`
+			INSERT INTO member (id, organization_id, user_id, role)
+			VALUES (${randomUUID()}, ${organizationId}, ${memberId}, 'member')
+		`;
+	}
 
 	return {
 		candidateId,
@@ -394,6 +535,35 @@ async function countMemberships(organizationId: string, userId: string) {
 	`;
 	assert(membership);
 	return Number(membership.count);
+}
+
+async function insertPaidSubscription(fixture: TeamInviteFixture) {
+	await sqlClient`
+		INSERT INTO billing_subscription (
+			stripe_subscription_id, organization_id, purchaser_user_id,
+			stripe_customer_id, stripe_subscription_item_id, plan,
+			billing_period, status, seat_quantity, last_paid_amount,
+			last_paid_currency, last_paid_at
+		) VALUES (
+			${`sub_${randomUUID()}`}, ${fixture.organizationId}, ${fixture.ownerId},
+			${`cus_${randomUUID()}`}, ${`si_${randomUUID()}`}, 'basic',
+			'monthly', 'active', 2, 5000, 'usd', NOW()
+		)
+	`;
+}
+
+async function readLatestBillingTraits(userId: string) {
+	const [traits] = await sqlClient<
+		Array<{ properties: Record<string, boolean | number | string | null> }>
+	>`
+		SELECT properties
+		FROM billing_analytics_outbox
+		WHERE kind = 'traits' AND user_id = ${userId}
+		ORDER BY occurred_at DESC, id DESC
+		LIMIT 1
+	`;
+	assert(traits);
+	return traits.properties;
 }
 
 async function countActiveInvites(organizationId: string) {

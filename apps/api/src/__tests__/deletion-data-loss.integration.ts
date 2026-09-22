@@ -209,7 +209,7 @@ describe("deletion data-loss hardening", () => {
 		expect(replacement.id).not.toBe(identity.userId);
 	});
 
-	test("preserves a candidate organization that gains another member before account deletion commits", async () => {
+	test("blocks account deletion when an owned organization gains another member", async () => {
 		const victim = await createTestIdentity("account-race-victim");
 		const survivor = await createTestIdentity("account-race-survivor");
 		const lockClient = createPostgresClient();
@@ -247,7 +247,7 @@ describe("deletion data-loss hardening", () => {
 		await lockClient.end();
 
 		expect(settledBeforeMemberJoin).toBe(false);
-		expect(response.status).toBe(200);
+		expect(response.status).toBe(409);
 
 		const [victimUser] = await sqlClient<Array<{ id: string }>>`
 			SELECT id FROM "user" WHERE id = ${victim.userId}
@@ -261,10 +261,10 @@ describe("deletion data-loss hardening", () => {
 			WHERE organization_id = ${victim.userId}
 				AND user_id = ${survivor.userId}
 		`;
-		expect(victimUser).toBeUndefined();
+		expect(victimUser?.id).toBe(victim.userId);
 		expect(survivingOrganization?.id).toBe(victim.userId);
 		expect(survivorMembership?.id).toBeDefined();
-		expect(await countPurgeJobs("account", victim.userId)).toBe(1);
+		expect(await countPurgeJobs("account", victim.userId)).toBe(0);
 		expect(await countPurgeJobs("organization", victim.userId)).toBe(0);
 	});
 

@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0037_TIMESTAMP = "1789723000000";
+const MIGRATION_0041_TIMESTAMP = "1790058953161";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0037 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0041 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0037 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0037] = await migrationSql<MigrationState[]>`
+			const [after0041] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,10 +61,65 @@ test("applies migrations 0020-0037 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0037).toEqual({
-				count: 38,
-				latestTimestamp: MIGRATION_0037_TIMESTAMP,
+			expect(after0041).toEqual({
+				count: 42,
+				latestTimestamp: MIGRATION_0041_TIMESTAMP,
 			});
+			const billingTables = await migrationSql<Array<{ name: string }>>`
+				SELECT tablename AS name
+				FROM pg_tables
+				WHERE schemaname = 'public'
+					AND tablename IN (
+						'billing_analytics_outbox',
+						'billing_checkout_attempt',
+						'billing_customer',
+						'billing_subscription',
+						'organization_monthly_usage',
+						'stripe_webhook_event'
+					)
+				ORDER BY tablename
+			`;
+			expect([...billingTables]).toEqual([
+				{ name: "billing_analytics_outbox" },
+				{ name: "billing_checkout_attempt" },
+				{ name: "billing_customer" },
+				{ name: "billing_subscription" },
+				{ name: "organization_monthly_usage" },
+				{ name: "stripe_webhook_event" },
+			]);
+			const pendingSeatColumns = await migrationSql<Array<{ name: string }>>`
+				SELECT column_name AS name
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'billing_subscription'
+					AND column_name IN (
+						'pending_seat_expires_at',
+						'pending_seat_quantity'
+					)
+				ORDER BY column_name
+			`;
+			expect([...pendingSeatColumns]).toEqual([
+				{ name: "pending_seat_expires_at" },
+				{ name: "pending_seat_quantity" },
+			]);
+			const [memberLimitTrigger] = await migrationSql<TableState[]>`
+				SELECT trigger_name AS name
+				FROM information_schema.triggers
+				WHERE event_object_schema = 'public'
+					AND event_object_table = 'member'
+					AND trigger_name = 'member_free_workspace_limit'
+			`;
+			expect(memberLimitTrigger?.name).toBe("member_free_workspace_limit");
+			const [agentRunLimitTrigger] = await migrationSql<TableState[]>`
+				SELECT trigger_name AS name
+				FROM information_schema.triggers
+				WHERE event_object_schema = 'public'
+					AND event_object_table = 'session_ownership'
+					AND trigger_name = 'session_ownership_free_workspace_agent_run_limit'
+			`;
+			expect(agentRunLimitTrigger?.name).toBe(
+				"session_ownership_free_workspace_agent_run_limit",
+			);
 			expect(tableAfter0020?.name).toBe("clickhouse_purge_job");
 			const [arrivalsIndex] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.session_ownership_arrivals_idx')::text AS name

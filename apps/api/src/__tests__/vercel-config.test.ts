@@ -19,6 +19,10 @@ const nativeLineageEntrypointSource = readFileSync(
 	resolve(import.meta.dir, "../../../../api/cron/native-lineage.ts"),
 	"utf8",
 );
+const billingEntrypointSource = readFileSync(
+	resolve(import.meta.dir, "../../../../api/cron/billing.ts"),
+	"utf8",
+);
 
 describe("Vercel deployment configuration", () => {
 	test("routes session arrival events through a streaming function before the SPA", () => {
@@ -49,7 +53,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -58,6 +62,24 @@ describe("Vercel deployment configuration", () => {
 		expect(nativeLineageEntrypointSource).not.toContain("api-maintenance");
 		expect(nativeLineageEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/native-lineage$/u",
+		);
+	});
+
+	test("reconciles durable billing work every minute in a dedicated function", () => {
+		expect(vercelConfig.functions["api/cron/billing.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 60,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/billing",
+			schedule: "* * * * *",
+		});
+		expect(billingEntrypointSource).toContain(
+			'from "../../apps/api/src/handlers/billing-reconciliation-maintenance.js"',
+		);
+		expect(billingEntrypointSource).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
 		);
 	});
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

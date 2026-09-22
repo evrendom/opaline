@@ -40,16 +40,7 @@ const enterpriseSalesEmail = createSalesEmail("Enterprise", [
 	"Anything else:",
 ]);
 
-const checkoutLinks = {
-	basic: {
-		monthly: "https://buy.stripe.com/dRm14n4WrbctehybdB2B200",
-		yearly: "https://buy.stripe.com/aFadR9dsX0xP2yQ3L92B201",
-	},
-	business: {
-		monthly: "https://buy.stripe.com/7sY4gzcoTgwNgpGdlJ2B202",
-		yearly: "https://buy.stripe.com/5kQ00j0Gb1BTa1i81p2B203",
-	},
-} as const;
+const billingEntryPath = "/welcome?fresh=1";
 
 const plans = [
 	{
@@ -69,10 +60,10 @@ const plans = [
 		billing: "Billed yearly",
 		actions: [
 			{
-				label: "Get started",
-				href: checkoutLinks.basic.yearly,
-				monthlyHref: checkoutLinks.basic.monthly,
-				yearlyHref: checkoutLinks.basic.yearly,
+				label: "Choose in workspace",
+				href: billingEntryPath,
+				monthlyHref: billingEntryPath,
+				yearlyHref: billingEntryPath,
 			},
 		],
 	},
@@ -86,10 +77,10 @@ const plans = [
 		billing: "Billed yearly",
 		actions: [
 			{
-				label: "Get started",
-				href: checkoutLinks.business.yearly,
-				monthlyHref: checkoutLinks.business.monthly,
-				yearlyHref: checkoutLinks.business.yearly,
+				label: "Choose in workspace",
+				href: billingEntryPath,
+				monthlyHref: billingEntryPath,
+				yearlyHref: billingEntryPath,
 				primary: true,
 			},
 			{ label: "Contact sales", href: businessSalesEmail },
@@ -125,13 +116,13 @@ const featureRows = [
 	{
 		id: "agent-runs",
 		descriptions: {
-			free: "Free includes analysis for up to 50,000 agent runs each month.",
+			free: "Free includes up to 50,000 agent runs per workspace each month.",
 			basic: "Basic includes unlimited agent runs each month.",
 			business: "Business includes unlimited agent runs each month.",
 			enterprise: "Enterprise includes unlimited agent runs each month.",
 		},
 		labels: {
-			free: "50k agent runs / month",
+			free: "50,000 agent runs / month",
 			basic: "Unlimited agent runs",
 			business: "Unlimited agent runs",
 			enterprise: "Unlimited agent runs",
@@ -346,13 +337,14 @@ const featureRows = [
 												"pricing-button",
 												{ "pricing-button-primary": "primary" in action && action.primary },
 											]}
-											href={action.href}
+											href={"monthlyHref" in action ? undefined : action.href}
+											aria-disabled={"monthlyHref" in action ? "true" : undefined}
 											data-marketing-pricing-action={action.label.toLowerCase().replace(" ", "_")}
 											data-marketing-pricing-plan={plan.id}
 											data-checkout-link={"monthlyHref" in action ? true : undefined}
 											data-monthly-href={"monthlyHref" in action ? action.monthlyHref : undefined}
 											data-yearly-href={"yearlyHref" in action ? action.yearlyHref : undefined}
-											data-local-app-path={action.href.startsWith("/welcome") ? action.href : undefined}
+											data-local-app-path={action.href.startsWith("/") ? action.href : undefined}
 											data-free-plan-start={plan.id === "free" ? true : undefined}
 											data-instant-v2-pointer-glow
 										>
@@ -362,7 +354,9 @@ const featureRows = [
 												aria-hidden="true"
 											/>
 											<span class="pricing-button-glass" aria-hidden="true" />
-											<span class="pricing-button-label">{action.label}</span>
+											<span class="pricing-button-label">
+												{"monthlyHref" in action ? "Checking…" : action.label}
+											</span>
 										</a>
 									))}
 								</div>
@@ -469,6 +463,12 @@ const featureRows = [
 
 	<script>
 		import { initializeInstantV2SmoothScroll } from "../scripts/instant-v2-smooth-scroll";
+		import {
+			findPricingOfferState,
+			type PricingBillingPeriod,
+			type PricingWorkspaceState,
+			readPricingWorkspaceState,
+		} from "../scripts/pricing-current-plan";
 
 		initializeInstantV2SmoothScroll();
 
@@ -476,11 +476,35 @@ const featureRows = [
 			? `${window.location.protocol}//${window.location.hostname}:4011`
 			: null;
 		const appOrigin = localAppOrigin ?? window.location.origin;
+		const resolveAppHref = (path: string) => new URL(path, appOrigin).href;
+		let pricingWorkspaceState: PricingWorkspaceState | null = null;
+		let pricingStateResolution: "pending" | "anonymous" | "ready" | "unavailable" = "pending";
+
+		async function resolvePricingWorkspaceState() {
+			try {
+				const workspaceSlug = new URLSearchParams(window.location.search).get("workspace");
+				const response = await fetch(`${appOrigin}/rpc/billing/pricing`, {
+					method: "POST",
+					credentials: "include",
+					cache: "no-store",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ json: workspaceSlug ? { workspaceSlug } : {} }),
+				});
+				if (response.status === 401) return { kind: "anonymous" } as const;
+				if (!response.ok) return { kind: "unavailable" } as const;
+				const state = readPricingWorkspaceState(await response.json());
+				return state
+					? { kind: "ready", state } as const
+					: { kind: "unavailable" } as const;
+			} catch {
+				return { kind: "unavailable" } as const;
+			}
+		}
 
 		if (localAppOrigin) {
 			for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-local-app-path]")) {
 				const path = link.dataset.localAppPath;
-				if (path) link.href = `${localAppOrigin}${path}`;
+				if (path) link.href = resolveAppHref(path);
 			}
 		}
 
@@ -528,23 +552,143 @@ const featureRows = [
 		const pricingToggles = document.querySelectorAll<HTMLButtonElement>("[data-pricing-toggle]");
 
 		function setYearlyBilling(yearly: boolean) {
+			const billingPeriod: PricingBillingPeriod = yearly ? "yearly" : "monthly";
 			for (const toggle of pricingToggles) {
 				const card = toggle.closest<HTMLElement>(".pricing-card");
 				const planId = card?.id;
 				const price = planId ? card?.querySelector<HTMLElement>(`[data-price="${planId}"]`) : null;
 				const billingLabel = card?.querySelector<HTMLElement>("[data-billing-label]");
 				const checkoutLink = card?.querySelector<HTMLAnchorElement>("[data-checkout-link]");
+				const checkoutLabel = checkoutLink?.querySelector<HTMLElement>(".pricing-button-label");
 
 				toggle.setAttribute("aria-pressed", String(yearly));
 				toggle.setAttribute("aria-label", yearly ? "Use monthly billing" : "Use yearly billing");
 				if (price) price.textContent = yearly ? price.dataset.yearlyPrice ?? "" : price.dataset.monthlyPrice ?? "";
 				if (billingLabel) billingLabel.textContent = yearly ? "Billed yearly" : "Billed monthly";
 				if (checkoutLink) {
-					checkoutLink.href = yearly
-						? checkoutLink.dataset.yearlyHref ?? checkoutLink.href
-						: checkoutLink.dataset.monthlyHref ?? checkoutLink.href;
+					applyPricingAction(checkoutLink, checkoutLabel, planId ?? "", billingPeriod);
 				}
 			}
+		}
+
+		void resolvePricingWorkspaceState().then((result) => {
+			pricingStateResolution = result.kind;
+			pricingWorkspaceState = result.kind === "ready" ? result.state : null;
+			const currentOffer = pricingWorkspaceState?.offers.find(
+				(offer) => offer.action === "current",
+			);
+			setYearlyBilling(currentOffer?.billingPeriod !== "monthly");
+		});
+
+		function applyPricingAction(
+			link: HTMLAnchorElement,
+			label: HTMLElement | null,
+			plan: string,
+			billingPeriod: PricingBillingPeriod,
+		) {
+			link.removeAttribute("href");
+			delete link.dataset.serverPricingAction;
+			link.dataset.currentPlan = "false";
+			link.dataset.pricingDisabled = "true";
+			link.setAttribute("aria-disabled", "true");
+			link.tabIndex = -1;
+			if (pricingStateResolution === "pending") {
+				if (label) label.textContent = "Checking…";
+				return;
+			}
+			if (pricingStateResolution === "anonymous") {
+				const onboardingPath =
+					billingPeriod === "yearly" ? link.dataset.yearlyHref : link.dataset.monthlyHref;
+				if (onboardingPath) link.href = resolveAppHref(onboardingPath);
+				link.dataset.pricingDisabled = "false";
+				link.setAttribute("aria-disabled", "false");
+				link.tabIndex = 0;
+				if (label) label.textContent = "Choose in workspace";
+				return;
+			}
+			if (!pricingWorkspaceState) {
+				if (label) label.textContent = "Unavailable";
+				return;
+			}
+			const offer = findPricingOfferState(pricingWorkspaceState, plan, billingPeriod);
+			if (!offer) {
+				if (label) label.textContent = "Unavailable";
+				return;
+			}
+			if (offer.action === "current") {
+				link.dataset.currentPlan = "true";
+				if (label) label.textContent = "Current";
+				return;
+			}
+			if (offer.action === "owner_required") {
+				if (label) label.textContent = "Workspace owner only";
+				return;
+			}
+			if (offer.action === "resolve_payment") {
+				link.href = resolveAppHref(`/${encodeURIComponent(pricingWorkspaceState.workspaceSlug)}/settings/workspace`);
+				link.dataset.pricingDisabled = "false";
+				link.setAttribute("aria-disabled", "false");
+				link.tabIndex = 0;
+				if (label) label.textContent = "Resolve payment";
+				return;
+			}
+			link.dataset.serverPricingAction = "select";
+			link.dataset.pricingDisabled = "false";
+			link.setAttribute("aria-disabled", "false");
+			link.tabIndex = 0;
+			if (label) label.textContent = "Select plan";
+		}
+
+		for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-checkout-link]")) {
+			link.addEventListener("click", (event) => {
+				if (link.dataset.serverPricingAction !== "select") {
+					if (link.dataset.pricingDisabled === "true") event.preventDefault();
+					return;
+				}
+				event.preventDefault();
+				void selectPricingPlan(link);
+			});
+		}
+
+		async function selectPricingPlan(link: HTMLAnchorElement) {
+			if (!pricingWorkspaceState) return;
+			const card = link.closest<HTMLElement>(".pricing-card");
+			const toggle = card?.querySelector<HTMLButtonElement>("[data-pricing-toggle]");
+			const plan = card?.id;
+			const billingPeriod = toggle?.getAttribute("aria-pressed") === "true" ? "yearly" : "monthly";
+			const label = link.querySelector<HTMLElement>(".pricing-button-label");
+			if (!plan || (plan !== "basic" && plan !== "business")) return;
+			link.dataset.serverPricingAction = "opening";
+			link.dataset.pricingDisabled = "true";
+			link.setAttribute("aria-disabled", "true");
+			if (label) label.textContent = "Opening…";
+			try {
+				const response = await fetch(`${appOrigin}/rpc/billing/selectPlan`, {
+					method: "POST",
+					credentials: "include",
+					cache: "no-store",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						json: {
+							billingPeriod,
+							organizationId: pricingWorkspaceState.organizationId,
+							plan,
+						},
+					}),
+				});
+				const redirectUrl = response.ok ? readRedirectUrl(await response.json()) : null;
+				if (!redirectUrl) throw new Error("Plan selection failed");
+				window.location.assign(redirectUrl);
+			} catch {
+				applyPricingAction(link, label, plan, billingPeriod);
+			}
+		}
+
+		function readRedirectUrl(value: unknown) {
+			if (typeof value !== "object" || value === null || !("json" in value)) return null;
+			const json = value.json;
+			if (typeof json !== "object" || json === null || !("redirectUrl" in json)) return null;
+			return typeof json.redirectUrl === "string" ? json.redirectUrl : null;
 		}
 
 		for (const toggle of pricingToggles) {
@@ -1005,6 +1149,25 @@ const featureRows = [
 		background: rgba(0, 0, 0, 0.95);
 		box-shadow: none;
 		color: #fff;
+	}
+
+	.pricing-button[data-current-plan="true"] {
+		border-color: rgba(0, 0, 0, 0.08);
+		background: #f0f0f0;
+		color: #8a8a8a;
+		cursor: default;
+		pointer-events: none;
+	}
+
+	.pricing-button[data-pricing-disabled="true"] {
+		cursor: default;
+		opacity: 0.58;
+		pointer-events: none;
+	}
+
+	.pricing-button[data-current-plan="true"] .pricing-button-opalescence,
+	.pricing-button[data-current-plan="true"] .pricing-button-glass {
+		display: none;
 	}
 
 	.pricing-button-opalescence {

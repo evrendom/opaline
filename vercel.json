@@ -29,6 +29,11 @@
 			"memory": 2048,
 			"maxDuration": 90
 		},
+		"api/cron/billing.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 60
+		},
 		"api/ingest.ts": {
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 2048,
@@ -63,6 +68,10 @@
 		{
 			"path": "/api/cron/native-lineage",
 			"schedule": "30 3 * * *"
+		},
+		{
+			"path": "/api/cron/billing",
+			"schedule": "* * * * *"
 		}
 	],
 	"headers": [
@@ -185,7 +194,7 @@
 			"destination": "/api/rpc?__opaline_path=/health/ready"
 		},
 		{
-			"source": "/api/:routePath((?!cron/repair$)(?!cron/native-lineage$).*)",
+			"source": "/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$).*)",
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},
 		{

@@ -8,6 +8,7 @@
 		"benchmark:usage-extraction": "bun scripts/benchmark-usage-extraction.ts",
 		"check:disclosure": "bun scripts/check-disclosure.ts",
 		"dev": "turbo run dev",
+		"dev:billing-sandbox": "bun scripts/dev-billing-sandbox.ts",
 		"dev:real": "bun scripts/dev-real-app.ts",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",

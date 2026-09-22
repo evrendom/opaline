@@ -2,7 +2,10 @@ import { getLogger } from "@logtape/logtape";
 import { ORPCError } from "@orpc/server";
 import { sqlClient } from "../../db.js";
 import { adminMiddleware, os } from "../../middleware.js";
-import { deleteUserPostgresData } from "../../services/user-deletion.service.js";
+import {
+	AccountDeletionBlockedError,
+	deleteUserPostgresData,
+} from "../../services/user-deletion.service.js";
 
 const logger = getLogger(["rudel", "api", "admin"]);
 
@@ -36,9 +39,17 @@ export const deleteUser = os.admin.deleteUser
 			adminId: context.user.id,
 		});
 
-		const { deletedOrganizationIds } = await deleteUserPostgresData(userId, {
-			sqlClient,
-		});
+		let deletedOrganizationIds: string[];
+		try {
+			({ deletedOrganizationIds } = await deleteUserPostgresData(userId, {
+				sqlClient,
+			}));
+		} catch (error) {
+			if (error instanceof AccountDeletionBlockedError) {
+				throw new ORPCError("CONFLICT", { message: error.message });
+			}
+			throw error;
+		}
 
 		logger.info(
 			"User {userId} deletion committed; ClickHouse purge queued; deletedOrganizationIds={deletedOrganizationIds}",

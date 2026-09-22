@@ -107,6 +107,45 @@ export async function captureApiProductAnalyticsEvent<
 	}
 }
 
+export class ProductAnalyticsUnavailableError extends Error {
+	constructor() {
+		super("PostHog product analytics is not configured");
+		this.name = "ProductAnalyticsUnavailableError";
+	}
+}
+
+export async function deliverApiProductAnalyticsEvent<
+	Name extends ProductAnalyticsEventName,
+>(options: {
+	distinctId: string;
+	event: Name;
+	eventUuid: string;
+	occurredAt: Date;
+	payload: ApiCapturePayload<Name>;
+}): Promise<void> {
+	const instance = getClient();
+	if (!instance) throw new ProductAnalyticsUnavailableError();
+	await instance.captureImmediate({
+		distinctId: options.distinctId,
+		event: options.event,
+		properties: buildPayload(options.event, options.payload),
+		timestamp: options.occurredAt,
+		uuid: options.eventUuid,
+	});
+}
+
+export async function deliverApiProductAnalyticsPersonProperties(options: {
+	distinctId: string;
+	properties: Readonly<Record<string, boolean | null | number | string>>;
+}): Promise<void> {
+	const instance = getClient();
+	if (!instance) throw new ProductAnalyticsUnavailableError();
+	await instance.identifyImmediate({
+		distinctId: options.distinctId,
+		properties: options.properties,
+	});
+}
+
 export async function shutdownApiProductAnalytics(timeoutMs = 5_000) {
 	const instance = getClient();
 	if (!instance) {

@@ -15,7 +15,10 @@ import {
 	deleteUserAvatarInTx,
 	getUserAvatarOwnerByPublicId,
 } from "../services/avatar-upload.service.js";
-import { deleteUserPostgresData } from "../services/user-deletion.service.js";
+import {
+	AccountDeletionBlockedError,
+	deleteUserPostgresData,
+} from "../services/user-deletion.service.js";
 import { notifyAccountDeletion } from "../slack.js";
 
 const logger = getLogger(["rudel", "api", "profile"]);
@@ -141,9 +144,17 @@ const deleteMine = os.profile.deleteMine
 			email: userEmail,
 		});
 
-		const { deletedOrganizationIds } = await deleteUserPostgresData(userId, {
-			sqlClient,
-		});
+		let deletedOrganizationIds: string[];
+		try {
+			({ deletedOrganizationIds } = await deleteUserPostgresData(userId, {
+				sqlClient,
+			}));
+		} catch (error) {
+			if (error instanceof AccountDeletionBlockedError) {
+				throw new ORPCError("CONFLICT", { message: error.message });
+			}
+			throw error;
+		}
 		const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
 		const slackNotification = slackWebhookUrl
 			? notifyAccountDeletion(
