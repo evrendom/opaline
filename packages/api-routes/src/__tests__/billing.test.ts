@@ -9,6 +9,7 @@ import {
 	OPALINE_BILLING_OFFERS,
 	OrganizationBillingInputSchema,
 	OrganizationBillingSummaryOutputSchema,
+	RequestOrganizationBillingUpgradeOutputSchema,
 	stripeObjectMatchesBillingMode,
 } from "../billing.js";
 import {
@@ -148,6 +149,18 @@ describe("Opaline billing catalog", () => {
 				portalUrl: "https://billing.stripe.com/p/session/test_123",
 			}),
 		).toMatchObject({ billingMode: "sandbox" });
+	});
+
+	test("exposes a PII-free upgrade request result", () => {
+		expect(
+			RequestOrganizationBillingUpgradeOutputSchema.parse({ notified: true }),
+		).toEqual({ notified: true });
+		expect(() =>
+			RequestOrganizationBillingUpgradeOutputSchema.parse({
+				notified: true,
+				ownerEmail: "owner@example.com",
+			}),
+		).toThrow();
 	});
 });
 

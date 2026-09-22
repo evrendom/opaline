@@ -577,7 +577,11 @@ const featureRows = [
 			const currentOffer = pricingWorkspaceState?.offers.find(
 				(offer) => offer.action === "current",
 			);
-			setYearlyBilling(currentOffer?.billingPeriod !== "monthly");
+			const requestedBillingPeriod = new URLSearchParams(window.location.search).get("billing");
+			setYearlyBilling(
+				requestedBillingPeriod === "yearly" ||
+					(requestedBillingPeriod !== "monthly" && currentOffer?.billingPeriod !== "monthly"),
+			);
 		});
 
 		function applyPricingAction(
@@ -621,7 +625,11 @@ const featureRows = [
 				return;
 			}
 			if (offer.action === "owner_required") {
-				if (label) label.textContent = "Workspace owner only";
+				link.dataset.serverPricingAction = "request_owner";
+				link.dataset.pricingDisabled = "false";
+				link.setAttribute("aria-disabled", "false");
+				link.tabIndex = 0;
+				if (label) label.textContent = "Select plan";
 				return;
 			}
 			if (offer.action === "resolve_payment") {
@@ -641,23 +649,57 @@ const featureRows = [
 
 		for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-checkout-link]")) {
 			link.addEventListener("click", (event) => {
-				if (link.dataset.serverPricingAction !== "select") {
+				if (
+					link.dataset.serverPricingAction !== "select" &&
+					link.dataset.serverPricingAction !== "request_owner"
+				) {
 					if (link.dataset.pricingDisabled === "true") event.preventDefault();
 					return;
 				}
 				event.preventDefault();
-				void selectPricingPlan(link);
+				if (link.dataset.serverPricingAction === "request_owner") {
+					void requestOwnerUpgrade(link);
+				} else {
+					void selectPricingPlan(link);
+				}
 			});
+		}
+
+		async function requestOwnerUpgrade(link: HTMLAnchorElement) {
+			if (!pricingWorkspaceState) return;
+			const selection = readPricingSelection(link);
+			if (!selection) return;
+			const label = link.querySelector<HTMLElement>(".pricing-button-label");
+			link.dataset.serverPricingAction = "sending";
+			link.dataset.pricingDisabled = "true";
+			link.setAttribute("aria-disabled", "true");
+			if (label) label.textContent = "Sending…";
+			try {
+				const response = await fetch(`${appOrigin}/rpc/billing/requestUpgrade`, {
+					method: "POST",
+					credentials: "include",
+					cache: "no-store",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						json: {
+							billingPeriod: selection.billingPeriod,
+							organizationId: pricingWorkspaceState.organizationId,
+							plan: selection.plan,
+						},
+					}),
+				});
+				if (!response.ok) throw new Error("Upgrade request failed");
+				window.location.assign(resolveAppHref("/pricing/owner-notified/"));
+			} catch {
+				applyPricingAction(link, label, selection.plan, selection.billingPeriod);
+			}
 		}
 
 		async function selectPricingPlan(link: HTMLAnchorElement) {
 			if (!pricingWorkspaceState) return;
-			const card = link.closest<HTMLElement>(".pricing-card");
-			const toggle = card?.querySelector<HTMLButtonElement>("[data-pricing-toggle]");
-			const plan = card?.id;
-			const billingPeriod = toggle?.getAttribute("aria-pressed") === "true" ? "yearly" : "monthly";
+			const selection = readPricingSelection(link);
 			const label = link.querySelector<HTMLElement>(".pricing-button-label");
-			if (!plan || (plan !== "basic" && plan !== "business")) return;
+			if (!selection) return;
 			link.dataset.serverPricingAction = "opening";
 			link.dataset.pricingDisabled = "true";
 			link.setAttribute("aria-disabled", "true");
@@ -670,9 +712,9 @@ const featureRows = [
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						json: {
-							billingPeriod,
+							billingPeriod: selection.billingPeriod,
 							organizationId: pricingWorkspaceState.organizationId,
-							plan,
+							plan: selection.plan,
 						},
 					}),
 				});
@@ -680,8 +722,18 @@ const featureRows = [
 				if (!redirectUrl) throw new Error("Plan selection failed");
 				window.location.assign(redirectUrl);
 			} catch {
-				applyPricingAction(link, label, plan, billingPeriod);
+				applyPricingAction(link, label, selection.plan, selection.billingPeriod);
 			}
+		}
+
+		function readPricingSelection(link: HTMLAnchorElement) {
+			const card = link.closest<HTMLElement>(".pricing-card");
+			const toggle = card?.querySelector<HTMLButtonElement>("[data-pricing-toggle]");
+			const plan = card?.id;
+			if (plan !== "basic" && plan !== "business") return null;
+			const billingPeriod: PricingBillingPeriod =
+				toggle?.getAttribute("aria-pressed") === "true" ? "yearly" : "monthly";
+			return { billingPeriod, plan };
 		}
 
 		function readRedirectUrl(value: unknown) {

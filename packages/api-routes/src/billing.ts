@@ -67,6 +67,12 @@ export const SelectOrganizationPlanOutputSchema = z.object({
 	redirectUrl: z.string().url(),
 });
 
+export const RequestOrganizationBillingUpgradeOutputSchema = z
+	.object({
+		notified: z.literal(true),
+	})
+	.strict();
+
 export const OrganizationBillingInputSchema = z.object({
 	organizationId: z.string().min(1),
 });
@@ -166,6 +172,9 @@ export type CreateOrganizationBillingPortalOutput = z.infer<
 >;
 export type SelectOrganizationPlanOutput = z.infer<
 	typeof SelectOrganizationPlanOutputSchema
+>;
+export type RequestOrganizationBillingUpgradeOutput = z.infer<
+	typeof RequestOrganizationBillingUpgradeOutputSchema
 >;
 
 export interface OpalineBillingPriceIdentity {

@@ -70,6 +70,7 @@ import {
 	checkManualIngestRateLimit,
 	checkOrganizationSessionCountRateLimit,
 } from "./rate-limit.js";
+import { readResendConfig } from "./resend-config.js";
 import {
 	createOrganizationBillingPortalSession,
 	createOrganizationCheckoutSession,
@@ -81,6 +82,11 @@ import {
 	assertCanStartOrganizationAgentRun,
 	FreeWorkspaceMonthlyAgentRunLimitExceededError,
 } from "./services/billing-entitlements.service.js";
+import {
+	BillingUpgradeRequestForbiddenError,
+	BillingUpgradeRequestOwnerError,
+	requestOrganizationBillingUpgrade,
+} from "./services/billing-upgrade-request.service.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
@@ -1788,6 +1794,35 @@ const selectBillingPlan = os.billing.selectPlan
 		});
 	});
 
+const requestBillingUpgrade = os.billing.requestUpgrade
+	.use(authMiddleware)
+	.use(settingsMutationMiddleware)
+	.handler(async ({ input, context }) => {
+		try {
+			await requestOrganizationBillingUpgrade(
+				{
+					billingPeriod: input.billingPeriod,
+					organizationId: input.organizationId,
+					plan: input.plan,
+					requesterUserId: context.user.id,
+				},
+				{
+					frontendOrigin: getFrontendOrigin(),
+					resend: readResendConfig(),
+				},
+			);
+			return { notified: true as const };
+		} catch (error) {
+			if (error instanceof BillingUpgradeRequestForbiddenError) {
+				throw new ORPCError("FORBIDDEN", { message: error.message });
+			}
+			if (error instanceof BillingUpgradeRequestOwnerError) {
+				throw new ORPCError("CONFLICT", { message: error.message });
+			}
+			throw error;
+		}
+	});
+
 async function requireOwnedBillingOrganization(
 	organizationId: string,
 	userId: string,
@@ -1817,6 +1852,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		createCheckout: createBillingCheckout,
 		createPortal: createBillingPortal,
 		selectPlan: selectBillingPlan,
+		requestUpgrade: requestBillingUpgrade,
 	},
 	repositorySettings: repositorySettingsRouter,
 	health,

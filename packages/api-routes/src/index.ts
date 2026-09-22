@@ -15,6 +15,7 @@ import {
 	CreateOrganizationCheckoutOutputSchema,
 	OrganizationBillingInputSchema,
 	OrganizationBillingSummaryOutputSchema,
+	RequestOrganizationBillingUpgradeOutputSchema,
 	SelectOrganizationPlanOutputSchema,
 } from "./billing.js";
 import { repositorySettingsContract } from "./repository-settings.js";
@@ -740,6 +741,9 @@ export const contract = {
 		selectPlan: oc
 			.input(CreateOrganizationCheckoutInputSchema)
 			.output(SelectOrganizationPlanOutputSchema),
+		requestUpgrade: oc
+			.input(CreateOrganizationCheckoutInputSchema)
+			.output(RequestOrganizationBillingUpgradeOutputSchema),
 	},
 	repositorySettings: repositorySettingsContract,
 	health: oc.output(HealthSchema),
