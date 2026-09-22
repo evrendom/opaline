@@ -45,7 +45,13 @@ interface CheckoutInput {
 interface WebhookRow {
 	attempt_count: number;
 	event_id: string;
+	status: "blocked" | "pending" | "processed";
 }
+
+export type StripeWebhookProcessingResult =
+	| "blocked"
+	| "processed"
+	| "retrying";
 
 type StoredSubscriptionStatus =
 	| "active"
@@ -777,6 +783,25 @@ export async function runStripeWebhookPass(limit = 20): Promise<number> {
 	return processed;
 }
 
+export async function processStripeWebhookEvent(
+	eventId: string,
+): Promise<StripeWebhookProcessingResult> {
+	return sqlClient.begin(async (transaction) => {
+		const [row] = await transaction.unsafe<WebhookRow[]>(
+			`SELECT event_id, attempt_count, status
+			FROM stripe_webhook_event
+			WHERE event_id = $1
+			FOR UPDATE`,
+			[eventId],
+		);
+		if (!row) {
+			throw new Error(`Stripe webhook event ${eventId} is not queued`);
+		}
+		if (row.status !== "pending") return row.status;
+		return processWebhookRow(row, transaction);
+	});
+}
+
 export async function readBlockedStripeWebhookCount(): Promise<number> {
 	const [row] = await sqlClient.unsafe<Array<{ count: number }>>(
 		`SELECT COUNT(*)::int AS count
@@ -847,14 +872,14 @@ export async function reconcileBillingSeats(limit = 5): Promise<number> {
 	if (candidates.length === 0) return 0;
 	let reconciled = 0;
 	for (const candidate of candidates) {
-		if (await reconcileBillingSeatCandidate(candidate.organization_id)) {
+		if (await reconcileOrganizationBillingSeats(candidate.organization_id)) {
 			reconciled += 1;
 		}
 	}
 	return reconciled;
 }
 
-async function reconcileBillingSeatCandidate(
+export async function reconcileOrganizationBillingSeats(
 	organizationId: string,
 ): Promise<boolean> {
 	return sqlClient.begin(async (transaction) => {
@@ -970,7 +995,7 @@ export async function enqueueBillingTraitsForUser(
 async function processNextWebhook(): Promise<boolean> {
 	return sqlClient.begin(async (transaction) => {
 		const [row] = await transaction.unsafe<WebhookRow[]>(
-			`SELECT event_id, attempt_count
+			`SELECT event_id, attempt_count, status
 			FROM stripe_webhook_event
 			WHERE status = 'pending' AND next_attempt_at <= NOW()
 			ORDER BY event_created_at, event_id
@@ -978,55 +1003,65 @@ async function processNextWebhook(): Promise<boolean> {
 			FOR UPDATE SKIP LOCKED`,
 		);
 		if (!row) return false;
-		try {
-			await transaction.savepoint(async (processingTransaction) => {
-				const event = await requireStripeClient().events.retrieve(row.event_id);
-				assertStripeObjectMode(
-					event.livemode,
-					requireStripeBillingMode(),
-					"webhook event",
-				);
-				await processStripeEvent(event, processingTransaction);
-				await processingTransaction.unsafe(
-					`UPDATE stripe_webhook_event
-					SET status = 'processed', processed_at = NOW(), payload = '{}'::jsonb,
-						last_error = NULL
-					WHERE event_id = $1`,
-					[row.event_id],
-				);
-			});
-		} catch (error) {
-			const attempts = row.attempt_count + 1;
-			const blocked = attempts >= MAX_WEBHOOK_ATTEMPTS;
-			const nextAttemptAt = new Date(
-				Date.now() + stripeWebhookRetryDelayMs(attempts),
-			);
-			await transaction.unsafe(
-				`UPDATE stripe_webhook_event
-				SET status = $2, attempt_count = $3,
-					next_attempt_at = $5,
-					last_error = left($4, 1000)
-				WHERE event_id = $1`,
-				[
-					row.event_id,
-					blocked ? "blocked" : "pending",
-					attempts,
-					error instanceof Error ? error.message : String(error),
-					nextAttemptAt.toISOString(),
-				],
-			);
-			if (blocked) {
-				billingLogger.error(
-					"Stripe webhook permanently blocked after retries (event_id={eventId}, error={error})",
-					{
-						error: error instanceof Error ? error.message : String(error),
-						eventId: row.event_id,
-					},
-				);
-			}
-		}
+		await processWebhookRow(row, transaction);
 		return true;
 	});
+}
+
+async function processWebhookRow(
+	row: WebhookRow,
+	transaction: postgres.TransactionSql,
+): Promise<StripeWebhookProcessingResult> {
+	try {
+		await transaction.savepoint(async (processingTransaction) => {
+			const event = await requireStripeClient().events.retrieve(row.event_id);
+			assertStripeObjectMode(
+				event.livemode,
+				requireStripeBillingMode(),
+				"webhook event",
+			);
+			await processStripeEvent(event, processingTransaction);
+			await processingTransaction.unsafe(
+				`UPDATE stripe_webhook_event
+				SET status = 'processed', processed_at = NOW(), payload = '{}'::jsonb,
+					last_error = NULL
+				WHERE event_id = $1`,
+				[row.event_id],
+			);
+		});
+		return "processed";
+	} catch (error) {
+		const attempts = row.attempt_count + 1;
+		const blocked = attempts >= MAX_WEBHOOK_ATTEMPTS;
+		const nextAttemptAt = new Date(
+			Date.now() + stripeWebhookRetryDelayMs(attempts),
+		);
+		await transaction.unsafe(
+			`UPDATE stripe_webhook_event
+			SET status = $2, attempt_count = $3,
+				next_attempt_at = $5,
+				last_error = left($4, 1000)
+			WHERE event_id = $1`,
+			[
+				row.event_id,
+				blocked ? "blocked" : "pending",
+				attempts,
+				error instanceof Error ? error.message : String(error),
+				nextAttemptAt.toISOString(),
+			],
+		);
+		if (blocked) {
+			billingLogger.error(
+				"Stripe webhook permanently blocked after retries (event_id={eventId}, error={error})",
+				{
+					error: error instanceof Error ? error.message : String(error),
+					eventId: row.event_id,
+				},
+			);
+			return "blocked";
+		}
+		return "retrying";
+	}
 }
 
 async function processStripeEvent(

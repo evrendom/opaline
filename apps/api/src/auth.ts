@@ -19,7 +19,10 @@ import {
 } from "./email.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
-import { enqueueBillingTraitsForUser } from "./services/billing.service.js";
+import {
+	enqueueBillingTraitsForUser,
+	reconcileOrganizationBillingSeats,
+} from "./services/billing.service.js";
 import { getOrganizationMemberLimit } from "./services/billing-entitlements.service.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
@@ -188,6 +191,13 @@ export function createAuth(db: object, config: AuthConfig) {
 							{ userId, error },
 						);
 					},
+					logSeatReconciliationError: ({ error, organizationId }) => {
+						logger.error(
+							"Failed to reconcile billing seats for organization {organizationId}: {error}",
+							{ organizationId, error },
+						);
+					},
+					reconcileOrganizationBillingSeats,
 					sendOrganizationInvitationEmail: (data) =>
 						sendOrganizationInvitationEmail(resend, data),
 				},
@@ -385,6 +395,16 @@ export function createAuth(db: object, config: AuthConfig) {
 								organization_member_count: members.length,
 							},
 						});
+						try {
+							await reconcileOrganizationBillingSeats(
+								createdMember.organizationId,
+							);
+						} catch (err) {
+							logger.error(
+								"Failed to reconcile billing seats for organization {organizationId}: {error}",
+								{ organizationId: createdMember.organizationId, error: err },
+							);
+						}
 						try {
 							await enqueueBillingTraitsForUser(createdMember.userId);
 						} catch (err) {

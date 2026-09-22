@@ -13,6 +13,8 @@ const organizationHooks = createOrganizationPlugin(
 		enqueueBillingTraitsForUser: async () => {},
 		getOrganizationMemberLimit: async () => 3,
 		logBillingTraitsError: () => {},
+		logSeatReconciliationError: () => {},
+		reconcileOrganizationBillingSeats: async () => false,
 		sendOrganizationInvitationEmail: async () => {},
 	},
 ).options.organizationHooks;

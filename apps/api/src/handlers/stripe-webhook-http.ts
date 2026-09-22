@@ -1,5 +1,9 @@
 import type Stripe from "stripe";
-import { enqueueStripeWebhookEvent } from "../services/billing.service.js";
+import {
+	enqueueStripeWebhookEvent,
+	processStripeWebhookEvent,
+} from "../services/billing.service.js";
+import { runBillingAnalyticsOutboxPass } from "../services/billing-analytics-outbox.service.js";
 import {
 	constructStripeWebhookEvent,
 	readRequestTextWithinLimit,
@@ -62,5 +66,13 @@ export async function handleStripeWebhookRequest(
 	}
 
 	await enqueueStripeWebhookEvent(event);
-	return Response.json({ queued: true, received: true });
+	const processingResult = await processStripeWebhookEvent(event.id);
+	if (processingResult !== "processed") {
+		return Response.json(
+			{ error: "Stripe webhook processing failed", received: true },
+			{ status: 500 },
+		);
+	}
+	await runBillingAnalyticsOutboxPass(50);
+	return Response.json({ processed: true, received: true });
 }

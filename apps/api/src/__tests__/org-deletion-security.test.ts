@@ -9,6 +9,8 @@ describe("organization deletion security", () => {
 				enqueueBillingTraitsForUser: async () => {},
 				getOrganizationMemberLimit: async () => 3,
 				logBillingTraitsError: () => {},
+				logSeatReconciliationError: () => {},
+				reconcileOrganizationBillingSeats: async () => false,
 				sendOrganizationInvitationEmail: async () => {},
 			},
 		);

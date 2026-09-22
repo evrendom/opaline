@@ -19,6 +19,13 @@ export interface OrganizationPluginEnvironment {
 		readonly error: unknown;
 		readonly userId: string;
 	}) => void;
+	readonly logSeatReconciliationError: (input: {
+		readonly error: unknown;
+		readonly organizationId: string;
+	}) => void;
+	readonly reconcileOrganizationBillingSeats: (
+		organizationId: string,
+	) => Promise<boolean>;
 	readonly sendOrganizationInvitationEmail: (
 		data: InvitationEmailData,
 	) => Promise<void>;
@@ -43,6 +50,14 @@ export function createOrganizationPlugin(
 			env.getOrganizationMemberLimit(targetOrganization.id),
 		organizationHooks: {
 			async afterRemoveMember({ member }) {
+				try {
+					await env.reconcileOrganizationBillingSeats(member.organizationId);
+				} catch (error) {
+					env.logSeatReconciliationError({
+						error,
+						organizationId: member.organizationId,
+					});
+				}
 				try {
 					await env.enqueueBillingTraitsForUser(member.userId);
 				} catch (error) {

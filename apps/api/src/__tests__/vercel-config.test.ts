@@ -65,7 +65,7 @@ describe("Vercel deployment configuration", () => {
 		);
 	});
 
-	test("reconciles durable billing work every minute in a dedicated function", () => {
+	test("runs a daily billing recovery pass compatible with Vercel Hobby", () => {
 		expect(vercelConfig.functions["api/cron/billing.ts"]).toEqual({
 			includeFiles: "{apps/api/src/**,packages/*/src/**}",
 			memory: 1024,
@@ -73,8 +73,11 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(vercelConfig.crons).toContainEqual({
 			path: "/api/cron/billing",
-			schedule: "* * * * *",
+			schedule: "15 3 * * *",
 		});
+		for (const cron of vercelConfig.crons) {
+			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
+		}
 		expect(billingEntrypointSource).toContain(
 			'from "../../apps/api/src/handlers/billing-reconciliation-maintenance.js"',
 		);
