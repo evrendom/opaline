@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	buildBillingPricingOfferActions,
 	stripeWebhookRetryDelayMs,
-} from "./billing.service.js";
+} from "./billing-domain.js";
 
 describe("billing pricing actions", () => {
 	test("lets an owner keep or change an active plan", () => {

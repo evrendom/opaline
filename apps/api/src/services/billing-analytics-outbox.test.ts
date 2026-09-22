@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	billingAnalyticsRetryDelayMs,
 	buildUserBillingTraits,
-} from "./billing-analytics-outbox.service.js";
+} from "./billing-analytics-domain.js";
 
 describe("billing analytics traits", () => {
 	test("keeps a past-due teammate's plan identity during payment recovery", () => {

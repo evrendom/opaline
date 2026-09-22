@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import {
-	type BillingPricingOfferAction,
 	type BillingPricingState,
 	findOpalineBillingOffer,
 	findOpalineBillingOfferByPrice,
@@ -28,6 +27,10 @@ import {
 	enqueueBillingTraitsForOrganization,
 	enqueueBillingTraitsForUsers,
 } from "./billing-analytics-outbox.service.js";
+import {
+	buildBillingPricingOfferActions,
+	stripeWebhookRetryDelayMs,
+} from "./billing-domain.js";
 
 interface CheckoutInput {
 	billingPeriod: OpalineBillingPeriod;
@@ -155,8 +158,6 @@ interface SeatReconciliationCandidate {
 type BillingSql = postgres.Sql | postgres.TransactionSql;
 
 const MAX_WEBHOOK_ATTEMPTS = 36;
-const MAX_WEBHOOK_RETRY_DELAY_MS = 3 * 60 * 60 * 1000;
-const WEBHOOK_RETRY_BASE_DELAY_MS = 60 * 1000;
 const BILLING_PORTAL_CONFIGURATION_VERSION = "5";
 const billingLogger = getLogger(["rudel", "api", "billing"]);
 
@@ -598,36 +599,6 @@ export async function readBillingPricingState(input: {
 	};
 }
 
-export function buildBillingPricingOfferActions(input: {
-	billingPeriod: OpalineBillingPeriod | null;
-	canManageBilling: boolean;
-	plan: OpalineBillingPlan | null;
-	status: StoredSubscriptionStatus | null;
-}): BillingPricingOfferAction[] {
-	const hasPaidAccess =
-		input.status === "active" || input.status === "trialing";
-	const canStartCheckout =
-		input.status === null ||
-		input.status === "canceled" ||
-		input.status === "incomplete_expired";
-	return OPALINE_BILLING_OFFERS.map((offer) => {
-		const isCurrent =
-			hasPaidAccess &&
-			input.plan === offer.plan &&
-			input.billingPeriod === offer.billingPeriod;
-		let action: BillingPricingOfferAction["action"];
-		if (isCurrent) action = "current";
-		else if (!input.canManageBilling) action = "owner_required";
-		else if (hasPaidAccess || canStartCheckout) action = "select";
-		else action = "resolve_payment";
-		return {
-			action,
-			billingPeriod: offer.billingPeriod,
-			plan: offer.plan,
-		};
-	});
-}
-
 export async function createOrganizationPlanSelectionSession(
 	input: CheckoutInput,
 ): Promise<
@@ -1056,16 +1027,6 @@ async function processNextWebhook(): Promise<boolean> {
 		}
 		return true;
 	});
-}
-
-export function stripeWebhookRetryDelayMs(attemptCount: number): number {
-	if (!Number.isSafeInteger(attemptCount) || attemptCount < 1) {
-		throw new Error("Stripe webhook attempt count must be a positive integer");
-	}
-	return Math.min(
-		WEBHOOK_RETRY_BASE_DELAY_MS * 2 ** Math.min(attemptCount - 1, 20),
-		MAX_WEBHOOK_RETRY_DELAY_MS,
-	);
 }
 
 async function processStripeEvent(

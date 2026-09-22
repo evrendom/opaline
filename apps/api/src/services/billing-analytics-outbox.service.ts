@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-	findOpalineBillingOffer,
-	type OpalineBillingPeriod,
-	type OpalineBillingPlan,
-	PRODUCT_ANALYTICS_EVENTS,
-} from "@rudel/api-routes";
+import { PRODUCT_ANALYTICS_EVENTS } from "@rudel/api-routes";
 import type postgres from "postgres";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
@@ -12,11 +7,15 @@ import {
 	deliverApiProductAnalyticsEvent,
 	deliverApiProductAnalyticsPersonProperties,
 } from "../lib/product-analytics.js";
-import { getStripeBillingMode } from "../stripe-client.js";
+import {
+	billingAnalyticsRetryDelayMs,
+	buildUserBillingTraits,
+	type DatabaseTimestamp,
+	parseBillingDatabaseTimestamp,
+	type UserBillingRow,
+} from "./billing-analytics-domain.js";
 
 type BillingSql = postgres.Sql | postgres.TransactionSql;
-type AnalyticsProperties = Record<string, boolean | null | number | string>;
-type DatabaseTimestamp = Date | string;
 
 interface AnalyticsOutboxRow {
 	attempt_count: number;
@@ -25,19 +24,6 @@ interface AnalyticsOutboxRow {
 	kind: "event" | "traits";
 	occurred_at: DatabaseTimestamp;
 	properties: unknown;
-	user_id: string;
-}
-
-interface UserBillingRow {
-	billing_period: OpalineBillingPeriod | null;
-	last_paid_amount: number | null;
-	last_paid_at: DatabaseTimestamp | null;
-	last_paid_currency: string | null;
-	organization_id: string | null;
-	plan: OpalineBillingPlan | null;
-	role: string;
-	seat_quantity: number | null;
-	status: string | null;
 	user_id: string;
 }
 
@@ -98,8 +84,6 @@ const AnalyticsPropertiesSchema = z.record(
 	z.union([z.boolean(), z.null(), z.number().finite(), z.string()]),
 );
 const MAX_ATTEMPTS = 36;
-const BASE_RETRY_DELAY_MS = 60_000;
-const MAX_RETRY_DELAY_MS = 3 * 60 * 60 * 1000;
 
 export async function enqueueBillingAnalyticsEvent(
 	input:
@@ -243,18 +227,6 @@ export async function requeueBlockedBillingAnalyticsDeliveries(): Promise<number
 	return rows.length;
 }
 
-export function billingAnalyticsRetryDelayMs(attemptCount: number): number {
-	if (!Number.isSafeInteger(attemptCount) || attemptCount < 1) {
-		throw new Error(
-			"Billing analytics attempt count must be a positive integer",
-		);
-	}
-	return Math.min(
-		BASE_RETRY_DELAY_MS * 2 ** (attemptCount - 1),
-		MAX_RETRY_DELAY_MS,
-	);
-}
-
 function readUserBillingRows(
 	userIds: readonly string[],
 	executor: BillingSql,
@@ -277,100 +249,6 @@ function readUserBillingRows(
 		WHERE member.user_id = ANY($1::text[])`,
 		[userIds],
 	);
-}
-
-export function buildUserBillingTraits(
-	rows: readonly UserBillingRow[],
-): AnalyticsProperties {
-	const subscription = rows
-		.filter(isCurrentSubscriptionBillingRow)
-		.sort(compareSubscriptionWorkspace)[0];
-	const hasPaidWorkspace = rows.some(isPaidAccessBillingRow);
-	return {
-		billing_mode: getStripeBillingMode() ?? "unconfigured",
-		billing_last_payment_amount: subscription?.last_paid_amount ?? null,
-		billing_last_payment_at: subscription?.last_paid_at
-			? parseDatabaseTimestamp(subscription.last_paid_at).toISOString()
-			: null,
-		billing_last_payment_currency: subscription?.last_paid_currency ?? null,
-		billing_period: subscription?.billing_period ?? "none",
-		billing_plan: subscription?.plan ?? "free",
-		billing_seat_quantity: subscription?.seat_quantity ?? 0,
-		billing_subscription_status: subscription?.status ?? "none",
-		billing_subscription_type: subscription
-			? `${subscription.plan}_${subscription.billing_period}`
-			: "free",
-		has_paid_workspace: hasPaidWorkspace,
-		payment_status: subscription
-			? billingPaymentStatus(subscription.status)
-			: "free",
-		was_invited_to_team: rows.some((row) => row.role !== "owner"),
-	};
-}
-
-interface SubscriptionBillingRow extends UserBillingRow {
-	billing_period: OpalineBillingPeriod;
-	organization_id: string;
-	plan: OpalineBillingPlan;
-	seat_quantity: number;
-	status: string;
-}
-
-interface PaidAccessBillingRow extends SubscriptionBillingRow {
-	status: "active" | "past_due" | "trialing";
-}
-
-function isCurrentSubscriptionBillingRow(
-	row: UserBillingRow,
-): row is SubscriptionBillingRow {
-	return (
-		row.status !== null &&
-		row.status !== "canceled" &&
-		row.status !== "incomplete_expired" &&
-		row.billing_period !== null &&
-		row.organization_id !== null &&
-		row.plan !== null &&
-		row.seat_quantity !== null
-	);
-}
-
-function isPaidAccessBillingRow(
-	row: UserBillingRow,
-): row is PaidAccessBillingRow {
-	return (
-		(row.status === "active" ||
-			row.status === "trialing" ||
-			row.status === "past_due") &&
-		row.billing_period !== null &&
-		row.organization_id !== null &&
-		row.plan !== null &&
-		row.seat_quantity !== null
-	);
-}
-
-function billingPaymentStatus(status: string): string {
-	if (status === "active" || status === "trialing") return "paid";
-	return status;
-}
-
-function compareSubscriptionWorkspace(
-	left: SubscriptionBillingRow,
-	right: SubscriptionBillingRow,
-): number {
-	const leftOffer = findOpalineBillingOffer(left.plan, left.billing_period);
-	const rightOffer = findOpalineBillingOffer(right.plan, right.billing_period);
-	return (
-		billingStatusPriority(right.status) - billingStatusPriority(left.status) ||
-		(rightOffer?.monthlyPriceUsd ?? 0) * right.seat_quantity -
-			(leftOffer?.monthlyPriceUsd ?? 0) * left.seat_quantity ||
-		left.organization_id.localeCompare(right.organization_id)
-	);
-}
-
-function billingStatusPriority(status: string): number {
-	if (status === "active" || status === "trialing") return 3;
-	if (status === "past_due") return 2;
-	return 1;
 }
 
 async function processNextAnalyticsRow(): Promise<boolean> {
@@ -429,7 +307,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			distinctId: row.user_id,
 			event: PRODUCT_ANALYTICS_EVENTS.PAYMENT_CHECKOUT_STARTED,
 			eventUuid: row.id,
-			occurredAt: parseDatabaseTimestamp(row.occurred_at),
+			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: CheckoutStartedPropertiesSchema.parse(row.properties),
 		});
 		return;
@@ -439,7 +317,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			distinctId: row.user_id,
 			event: PRODUCT_ANALYTICS_EVENTS.PAYMENT_COMPLETED,
 			eventUuid: row.id,
-			occurredAt: parseDatabaseTimestamp(row.occurred_at),
+			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: PaymentCompletedPropertiesSchema.parse(row.properties),
 		});
 		return;
@@ -449,7 +327,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			distinctId: row.user_id,
 			event: PRODUCT_ANALYTICS_EVENTS.PAYMENT_PLAN_CHANGE_STARTED,
 			eventUuid: row.id,
-			occurredAt: parseDatabaseTimestamp(row.occurred_at),
+			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: PlanChangeStartedPropertiesSchema.parse(row.properties),
 		});
 		return;
@@ -457,8 +335,4 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 	throw new Error(
 		`Unsupported billing analytics event: ${row.event_name ?? "none"}`,
 	);
-}
-
-function parseDatabaseTimestamp(value: DatabaseTimestamp): Date {
-	return value instanceof Date ? value : new Date(value);
 }
