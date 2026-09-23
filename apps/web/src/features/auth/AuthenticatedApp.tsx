@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import {
@@ -7,6 +8,8 @@ import {
 } from "@/app/routes";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { orpc } from "@/lib/orpc";
+import { getAuthenticatedRootPath } from "./authenticated-root-path";
 
 export function AuthenticatedApp({
 	rootRedirectTarget,
@@ -15,8 +18,31 @@ export function AuthenticatedApp({
 }) {
 	const { state } = useOrganization();
 	const { pathname, search, hash } = useLocation();
+	const isRootEntry =
+		(pathname === "/" || pathname === "/login") && !rootRedirectTarget;
+	const setupStatus = useQuery({
+		...orpc.cli.setupStatus.queryOptions({}),
+		enabled: isRootEntry,
+	});
+
+	if (isRootEntry) {
+		if (state.isLoading || setupStatus.isPending)
+			return <ProductLoadingScreen />;
+
+		const workspace = state.activeOrg ?? state.organizations[0];
+		return (
+			<Navigate
+				to={getAuthenticatedRootPath({
+					hasUploadedSessions: setupStatus.data?.hasUploadedSessions === true,
+					workspaceSlug: workspace?.slug ?? null,
+				})}
+				replace
+			/>
+		);
+	}
+
 	const destination =
-		pathname === "/" && rootRedirectTarget
+		(pathname === "/" || pathname === "/login") && rootRedirectTarget
 			? rootRedirectTarget
 			: `${pathname}${search}${hash}`;
 	if (getWorkspaceRelativePath(destination) !== null) {

@@ -1,14 +1,25 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { Building2, Check, Loader2, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { z } from "zod";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { appRoutes } from "@/app/routes";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import { activateInvitedWorkspaceOnboarding } from "@/features/cli-onboarding/invited-workspace-onboarding";
 import { USER_INVITATIONS_KEY } from "@/features/workspace/hooks/useUserInvitations";
-import { resolveWorkspaceAppPath } from "@/features/workspace/organization/workspace-navigation";
 import { authClient } from "@/lib/auth-client";
+import "@/features/auth/guest-app.css";
+import "@/features/shell/website-button.css";
+
+const InvitationPresentationSchema = z.object({
+	inviter: z.object({
+		image: z.string().nullable(),
+		name: z.string(),
+	}),
+	organizationName: z.string(),
+});
 
 function InvitationLoginRedirectMount({
 	invitationId,
@@ -28,6 +39,15 @@ export function AcceptInvitationPage() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { data: session, isPending: sessionLoading } = authClient.useSession();
+	const presentationQuery = useQuery({
+		enabled: Boolean(session && invitationId),
+		queryFn: () => getInvitationPresentation(invitationId ?? ""),
+		queryKey: ["invitation-presentation", invitationId],
+	});
+	const presentation = presentationQuery.data;
+	const organizationName = presentation?.organizationName ?? "your workspace";
+	const inviterName = presentation?.inviter.name ?? "your teammate";
+	const inviterInitial = inviterName.trim().charAt(0).toUpperCase() || "?";
 	const { trackAuthenticationAction } = useAnalyticsTracking({
 		pageName: "accept_invitation",
 	});
@@ -35,6 +55,10 @@ export function AcceptInvitationPage() {
 		"idle" | "accepting" | "accepted" | "error"
 	>("idle");
 	const [error, setError] = useState<string | null>(null);
+	const [acceptedOrganizationName, setAcceptedOrganizationName] = useState<
+		string | null
+	>(null);
+	const displayOrganizationName = acceptedOrganizationName ?? organizationName;
 
 	const handleAccept = async () => {
 		if (!invitationId) return;
@@ -61,13 +85,13 @@ export function AcceptInvitationPage() {
 			return;
 		}
 
-		let destination = appRoutes.session();
+		let destination: string;
 		try {
-			if (res.data)
-				destination = await resolveWorkspaceAppPath(
-					res.data.member.organizationId,
-					appRoutes.session(),
-				);
+			if (!res.data)
+				throw new Error("The invitation did not return a workspace.");
+			destination = await activateInvitedWorkspaceOnboarding(
+				res.data.member.organizationId,
+			);
 		} catch (cause) {
 			setError(
 				cause instanceof Error
@@ -77,9 +101,10 @@ export function AcceptInvitationPage() {
 			setStatus("error");
 			return;
 		}
+		setAcceptedOrganizationName(organizationName);
 		setStatus("accepted");
 		queryClient.invalidateQueries({ queryKey: USER_INVITATIONS_KEY });
-		setTimeout(() => navigate(destination, { replace: true }), 1500);
+		setTimeout(() => navigate(destination, { replace: true }), 600);
 	};
 
 	const handleReject = async () => {
@@ -95,13 +120,16 @@ export function AcceptInvitationPage() {
 					: undefined,
 		});
 		await authClient.organization.rejectInvitation({ invitationId });
-		navigate(appRoutes.session());
+		navigate("/", { replace: true });
 	};
 
-	if (sessionLoading) {
+	if (
+		sessionLoading ||
+		(Boolean(session && invitationId) && presentationQuery.isPending)
+	) {
 		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<Loader2 className="h-6 w-6 animate-spin text-muted" />
+			<div className="flex min-h-dvh items-center justify-center bg-white">
+				<Loader2 className="size-6 animate-spin text-muted" />
 			</div>
 		);
 	}
@@ -110,68 +138,118 @@ export function AcceptInvitationPage() {
 		return (
 			<>
 				<InvitationLoginRedirectMount invitationId={invitationId} />
-				<div className="flex min-h-screen items-center justify-center">
-					<Loader2 className="h-6 w-6 animate-spin text-muted" />
+				<div className="flex min-h-dvh items-center justify-center bg-white">
+					<Loader2 className="size-6 animate-spin text-muted" />
 				</div>
 			</>
 		);
 	}
 
+	if (presentationQuery.isError) {
+		return (
+			<div className="opaline-auth-shell">
+				<main className="opaline-auth-main">
+					<div className="opaline-auth-content">
+						<div className="opaline-auth-intro">
+							<img
+								className="opaline-auth-mark"
+								src="/opaline-icon.svg"
+								alt="Opaline"
+							/>
+							<h1>Invitation unavailable</h1>
+							<p>This invitation has expired or is no longer available.</p>
+						</div>
+					</div>
+				</main>
+			</div>
+		);
+	}
+
 	return (
-		<div className="flex min-h-screen items-center justify-center">
-			<div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 text-center">
-				<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-hover">
-					{status === "accepted" ? (
-						<Check className="h-6 w-6 text-status-success-icon" />
-					) : (
-						<Building2 className="h-6 w-6 text-accent" />
-					)}
-				</div>
+		<div className="opaline-auth-shell">
+			<main className="opaline-auth-main">
+				<div className="opaline-auth-content">
+					<div className="opaline-auth-intro" aria-live="polite">
+						<img
+							className="opaline-auth-mark"
+							src="/opaline-icon.svg"
+							alt="Opaline"
+						/>
+						{status === "accepted" ? (
+							<>
+								<h1>Joining {displayOrganizationName}</h1>
+								<p>Opening session setup...</p>
+							</>
+						) : (
+							<>
+								<h1 className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-balance">
+									<span>Join</span>
+									<span className="inline-flex items-center gap-1.5">
+										<Avatar size="sm">
+											{presentation?.inviter.image ? (
+												<AvatarImage
+													src={presentation.inviter.image}
+													alt={inviterName}
+												/>
+											) : null}
+											<AvatarFallback>{inviterInitial}</AvatarFallback>
+										</Avatar>
+										<span>{inviterName}</span>
+									</span>
+									<span>in {displayOrganizationName}</span>
+								</h1>
+								<p>
+									Accept the invitation, then connect and upload your coding
+									sessions.
+								</p>
+							</>
+						)}
+					</div>
 
-				{status === "accepted" ? (
-					<>
-						<h1 className="text-lg font-semibold text-heading mb-2">
-							Welcome to the team!
-						</h1>
-						<p className="text-sm text-muted">Redirecting to dashboard...</p>
-					</>
-				) : (
-					<>
-						<h1 className="text-lg font-semibold text-heading mb-2">
-							You've been invited
-						</h1>
-						<p className="text-sm text-muted mb-6">
-							Accept this invitation to join the organization.
-						</p>
-
-						{error && <p className="text-sm text-red-500 mb-4">{error}</p>}
-
-						<div className="flex gap-3 justify-center">
+					{status === "accepted" ? null : (
+						<div className="opaline-auth-stage flex flex-col gap-2">
+							{error ? (
+								<p
+									className="text-pretty rounded-lg bg-destructive/5 px-3 py-2 text-base text-destructive ring-1 ring-destructive/15 sm:text-sm"
+									role="alert"
+								>
+									{error}
+								</p>
+							) : null}
 							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleReject}
-								disabled={status === "accepting"}
-							>
-								<X className="h-4 w-4 mr-1" />
-								Decline
-							</Button>
-							<Button
-								size="sm"
+								type="button"
+								className="opaline-website-primary-button w-full"
 								onClick={handleAccept}
 								disabled={status === "accepting"}
 							>
-								{status === "accepting" ? (
-									<Loader2 className="h-4 w-4 mr-1 animate-spin" />
-								) : (
-									<Check className="h-4 w-4 mr-1" />
-								)}
-								Accept
+								<span>
+									{status === "accepting" ? "Joining..." : "Join workspace"}
+								</span>
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								className="w-full"
+								onClick={handleReject}
+								disabled={status === "accepting"}
+							>
+								Decline invitation
 							</Button>
 						</div>
-					</>
-				)}
-			</div>
+					)}
+				</div>
+			</main>
 		</div>
 	);
+}
+
+async function getInvitationPresentation(invitationId: string) {
+	const response = await fetch(
+		`/api/invitations/${encodeURIComponent(invitationId)}/presentation`,
+		{ credentials: "include" },
+	);
+	if (!response.ok) {
+		throw new Error("Invitation not found or no longer available");
+	}
+	return InvitationPresentationSchema.parse(await response.json());
 }

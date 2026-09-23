@@ -30,12 +30,14 @@ type Progress = z.infer<typeof ProgressSchema>;
 export function WelcomeSteps({
 	session,
 	authorization,
+	invitedWorkspaceId,
 	snapshot,
 	onFinish,
 	onSignOut,
 }: {
 	session: NonNullable<CliSession>;
 	authorization: CliAuthorization;
+	invitedWorkspaceId: string | null;
 	snapshot: CliConnectionSnapshot;
 	onFinish: () => void;
 	onSignOut: () => Promise<void>;
@@ -48,12 +50,19 @@ export function WelcomeSteps({
 		readProgress(storageKey, snapshot),
 	);
 	const [organizationId, setOrganizationId] = useState(
-		snapshot.organizationId ?? progress.organizationId ?? session.user.id,
+		snapshot.organizationId ??
+			progress.organizationId ??
+			invitedWorkspaceId ??
+			session.user.id,
 	);
 	const [createdOrganization, setCreatedOrganization] =
 		useState<Organization | null>(null);
 	const connectedOrganizationId =
 		snapshot.organizationId ?? progress.organizationId;
+	const isInvitedWorkspace =
+		Boolean(invitedWorkspaceId) &&
+		organizationId === invitedWorkspaceId &&
+		!connectedOrganizationId;
 	const organization =
 		state.organizations.find(
 			(org) => org.id === (connectedOrganizationId ?? organizationId),
@@ -71,6 +80,7 @@ export function WelcomeSteps({
 	const [error, setError] = useState<string | null>(null);
 	const heading = useRef<HTMLHeadingElement>(null);
 	const finishing = useRef(false);
+	const organizationSelectionTouched = useRef(false);
 	const selectedCount = snapshot.repositories
 		.filter((repo) => repo.enabled)
 		.reduce((count, repo) => count + repo.sessionCount, 0);
@@ -109,6 +119,25 @@ export function WelcomeSteps({
 	useEffect(() => {
 		if (progress.step) heading.current?.focus({ preventScroll: true });
 	}, [progress.step]);
+	useEffect(() => {
+		if (
+			organizationSelectionTouched.current ||
+			snapshot.organizationId ||
+			progress.organizationId ||
+			invitedWorkspaceId ||
+			!state.activeOrg?.id ||
+			organizationId !== session.user.id
+		)
+			return;
+		setOrganizationId(state.activeOrg.id);
+	}, [
+		invitedWorkspaceId,
+		organizationId,
+		progress.organizationId,
+		session.user.id,
+		snapshot.organizationId,
+		state.activeOrg?.id,
+	]);
 	useEffect(() => {
 		if (
 			progress.step === "done" &&
@@ -324,7 +353,9 @@ export function WelcomeSteps({
 			<div key={progress.step} className="cli-welcome-step-content">
 				<h1 ref={heading} tabIndex={-1}>
 					{progress.step === "workspace"
-						? "Set up your workspace"
+						? isInvitedWorkspace
+							? `Join ${organization?.name ?? "your workspace"}`
+							: "Set up your workspace"
 						: progress.step === "profile"
 							? "Set up your profile"
 							: progress.step === "invite"
@@ -335,7 +366,9 @@ export function WelcomeSteps({
 				</h1>
 				<p>
 					{progress.step === "workspace"
-						? "Where your team's sessions will land."
+						? isInvitedWorkspace
+							? "Connect and upload your sessions to this workspace."
+							: "Where your team's sessions will land."
 						: progress.step === "profile"
 							? "Choose how you’ll appear in your workspace."
 							: progress.step === "invite"
@@ -359,8 +392,13 @@ export function WelcomeSteps({
 									id="welcome-workspace"
 									name="workspace"
 									value={organization?.id ?? ""}
-									disabled={busy || Boolean(connectedOrganizationId)}
+									disabled={
+										busy ||
+										Boolean(connectedOrganizationId) ||
+										isInvitedWorkspace
+									}
 									onChange={(event) => {
+										organizationSelectionTouched.current = true;
 										setOrganizationId(event.target.value);
 										setWorkspaceName(null);
 										setWorkspaceSlug(null);

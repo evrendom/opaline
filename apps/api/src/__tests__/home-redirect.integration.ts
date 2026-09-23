@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { sqlClient } from "../db.js";
@@ -38,12 +39,10 @@ test("missing and invalid sessions return to marketing without caching a persona
 	}
 });
 
-test("opens the active workspace, falls back to a membership, and handles no workspace", async () => {
+test("opens welcome before the first upload, then the active workspace sessions", async () => {
 	const { cookie, userId } = await createUser();
 	await sqlClient`DELETE FROM organization WHERE id = ${userId}`;
-	expect((await openHome(cookie)).headers.get("Location")).toBe(
-		"/settings/workspace",
-	);
+	expect((await openHome(cookie)).headers.get("Location")).toBe("/welcome");
 
 	const organizations = [];
 	for (const name of ["First", "Second"]) {
@@ -63,16 +62,22 @@ test("opens the active workspace, falls back to a membership, and handles no wor
 		organizations.push(organization);
 	}
 	const second = organizations[1];
-	expect(second).toBeDefined();
+	assert(second);
 	const activated = await authPost(
 		"organization/set-active",
-		{ organizationId: second?.id },
+		{ organizationId: second.id },
 		cookie,
 	);
 	expect(activated.status).toBe(200);
 	const active = await openHome(cookie);
 	expect(active.status).toBe(302);
-	expect(active.headers.get("Location")).toBe(`/${second?.slug}/dashboard`);
+	expect(active.headers.get("Location")).toBe("/welcome");
+
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, last_ingested_at)
+		VALUES (${second.id}, ${`home-${randomUUID()}`}, ${userId}, NOW())`;
+	expect((await openHome(cookie)).headers.get("Location")).toBe(
+		`/${second.slug}/sessions`,
+	);
 
 	const cleared = await authPost(
 		"organization/set-active",
@@ -89,7 +94,7 @@ test("opens the active workspace, falls back to a membership, and handles no wor
 		.parse(await listed.json());
 	expect(memberships).toHaveLength(2);
 	expect((await openHome(cookie)).headers.get("Location")).toBe(
-		`/${memberships[0]?.slug}/dashboard`,
+		`/${memberships[0]?.slug}/sessions`,
 	);
 });
 

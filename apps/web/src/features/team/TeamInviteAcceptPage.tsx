@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { appRoutes } from "@/app/routes";
-import { resolveWorkspaceAppPath } from "@/features/workspace/organization/workspace-navigation";
+import { activateInvitedWorkspaceOnboarding } from "@/features/cli-onboarding/invited-workspace-onboarding";
 import { authClient } from "@/lib/auth-client";
 import { client } from "@/lib/orpc";
 
@@ -35,7 +35,7 @@ export function TeamInviteAcceptPage() {
 			}
 
 			void acceptTeamInvite({
-				navigateToTeam: (path) => navigate(path, { replace: true }),
+				navigateToWelcome: (path) => navigate(path, { replace: true }),
 				setState,
 				token,
 			});
@@ -71,22 +71,21 @@ export function TeamInviteAcceptPage() {
 }
 
 async function acceptTeamInvite(input: {
-	navigateToTeam: (path: string) => void;
+	navigateToWelcome: (path: string) => void;
 	setState: (state: TeamInviteState) => void;
 	token: string;
 }) {
-	const { navigateToTeam, setState, token } = input;
+	const { navigateToWelcome, setState, token } = input;
 
 	setState({ status: "pending" });
 
 	try {
 		const result = await client.teamInviteLink.accept({ token });
-		const path = await resolveWorkspaceAppPath(
+		const path = await activateInvitedWorkspaceOnboarding(
 			result.organization_id,
-			appRoutes.team(),
 		);
 		setState({ status: "ready", path });
-		navigateToTeam(path);
+		navigateToWelcome(path);
 	} catch (error) {
 		setState({
 			message: getTeamInviteErrorMessage(error),

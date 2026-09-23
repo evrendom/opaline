@@ -4,10 +4,11 @@ import { authClient } from "@/lib/auth-client";
 
 export const USER_INVITATIONS_KEY = ["user-invitations"] as const;
 
-export function useUserInvitations() {
+export function useUserInvitations(enabled = true) {
 	const queryClient = useQueryClient();
 
 	const { data, isLoading } = useQuery({
+		enabled,
 		queryKey: USER_INVITATIONS_KEY,
 		queryFn: async () => {
 			const res = await authClient.organization.listUserInvitations();

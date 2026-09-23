@@ -96,7 +96,7 @@ test("public homepage routes reject writes", async () => {
 	expect(response.headers.get("Allow")).toBe("GET, HEAD");
 });
 
-test("signed-in users stay on /home, while root visits open the workspace and expired sessions return to /", async () => {
+test("signed-in users stay on /home, while root visits follow setup progress and expired sessions return to /", async () => {
 	const signup = await fetch(new URL("/api/auth/sign-up/email", server.url), {
 		method: "POST",
 		headers: { "Content-Type": "application/json", Origin: "http://localhost" },
@@ -121,7 +121,12 @@ test("signed-in users stay on /home, while root visits open the workspace and ex
 	assert(workspace);
 	const signedIn = await openPage(cookie);
 	expect(signedIn.status).toBe(302);
-	expect(signedIn.headers.get("Location")).toBe(`/${workspace.slug}/dashboard`);
+	expect(signedIn.headers.get("Location")).toBe("/welcome");
+	await sqlClient`INSERT INTO session_ownership (organization_id, session_id, user_id, last_ingested_at)
+		VALUES (${userId}, ${`vercel-home-${randomUUID()}`}, ${userId}, NOW())`;
+	expect((await openPage(cookie)).headers.get("Location")).toBe(
+		`/${workspace.slug}/sessions`,
+	);
 	expect(signedIn.headers.get("Cache-Control")).toBe("private, no-store");
 	await expectMarketing(cookie, "/api/public-home");
 	await sqlClient`UPDATE session SET expires_at = NOW() - INTERVAL '1 hour' WHERE user_id = ${userId}`;

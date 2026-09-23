@@ -39,6 +39,10 @@ vi.mock("@/features/auth/ResetPasswordApp", () => ({
 	ResetPasswordApp: () => <div>Reset Password App</div>,
 }));
 
+vi.mock("@/features/support/SupportEmailButton", () => ({
+	SupportEmailButton: () => null,
+}));
+
 describe("App routing", () => {
 	beforeEach(() => {
 		mockUseSession.mockReset();
@@ -73,6 +77,21 @@ describe("App routing", () => {
 		expect(
 			await screen.findByText("/welcome?user_code=ABCD-1234"),
 		).toBeInTheDocument();
+	});
+
+	it("hands signed-in login visits to authenticated routing", () => {
+		mockUseSession.mockReturnValue({
+			data: { user: { id: "user-1" } },
+			isPending: false,
+		});
+
+		render(
+			<MemoryRouter initialEntries={["/login"]}>
+				<App />
+			</MemoryRouter>,
+		);
+
+		expect(screen.getByText("Authenticated App")).toBeInTheDocument();
 	});
 });
 

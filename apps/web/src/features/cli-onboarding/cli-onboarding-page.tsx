@@ -5,6 +5,7 @@ import { useOrganization } from "@/features/workspace/organization/useOrganizati
 import { authClient } from "@/lib/auth-client";
 import { getCliConnectionTone } from "./cli-connection-state";
 import { CliOnboardingContent } from "./cli-onboarding-content";
+import { getInvitedWorkspaceId } from "./invited-workspace-onboarding";
 import { useCliOnboarding } from "./use-cli-onboarding";
 import "../../../../marketing/src/components/InstantV2DemoExperience.css";
 
@@ -15,6 +16,7 @@ export function CliOnboardingPage() {
 	const deviceUserCode = searchParams.has("connect")
 		? null
 		: searchParams.get("user_code");
+	const invitedWorkspaceId = getInvitedWorkspaceId(location.search);
 	const { state } = useOrganization();
 	const { refetch } = authClient.useSession();
 	const [destination, setDestination] = useState<{
@@ -59,6 +61,7 @@ export function CliOnboardingPage() {
 		<CliOnboardingContent
 			snapshot={snapshot}
 			authorization={onboarding.authorization}
+			invitedWorkspaceId={invitedWorkspaceId}
 			deviceUserCode={deviceUserCode}
 			connectionError={
 				onboarding.error ??

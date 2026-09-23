@@ -11,6 +11,7 @@ import {
 	handleAvatarUploadRequest,
 } from "./handlers/avatar-http.js";
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
+import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
@@ -456,10 +457,19 @@ async function handleRequest(
 		const session = await auth.api.getSession({ headers: request.headers });
 		let destination = "/";
 		if (session) {
-			// The session was already authenticated above. Query its memberships
+			// The session was already authenticated above. Query its landing state
 			// directly instead of re-running auth inside listOrganizations.
-			const [workspace] = await sqlClient<{ slug: string }[]>`
-				SELECT o.slug
+			const [workspace] = await sqlClient<
+				{ has_uploaded_sessions: boolean; slug: string }[]
+			>`
+				SELECT
+					o.slug,
+					EXISTS (
+						SELECT 1
+						FROM session_ownership s
+						WHERE s.user_id = ${session.user.id}
+							AND s.last_ingested_at IS NOT NULL
+					) AS has_uploaded_sessions
 				FROM organization o
 				INNER JOIN member m ON m.organization_id = o.id
 				WHERE m.user_id = ${session.user.id}
@@ -468,9 +478,10 @@ async function handleRequest(
 				LIMIT 1
 			`;
 
-			destination = workspace
-				? `/${encodeURIComponent(workspace.slug)}/dashboard`
-				: "/settings/workspace";
+			destination =
+				workspace?.has_uploaded_sessions === true
+					? `/${encodeURIComponent(workspace.slug)}/sessions`
+					: "/welcome";
 		}
 		return new Response(null, {
 			status: 302,
@@ -507,6 +518,16 @@ async function handleRequest(
 		for (const [key, value] of Object.entries(cors))
 			response.headers.set(key, value);
 		return response;
+	}
+	const invitationPresentationMatch =
+		/^\/api\/invitations\/([^/]+)\/presentation$/u.exec(url.pathname);
+	if (invitationPresentationMatch?.[1]) {
+		return handleInvitationPresentationRequest({
+			cors,
+			getSession: (req) => auth.api.getSession({ headers: req.headers }),
+			invitationId: invitationPresentationMatch[1],
+			request,
+		});
 	}
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
