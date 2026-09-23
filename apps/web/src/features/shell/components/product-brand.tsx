@@ -7,7 +7,6 @@ export function ProductBrand() {
 			<span className="product-brand-wordmark">
 				<img alt="Opaline" src={opalineWordmarkUrl} />
 			</span>
-			<span className="product-brand-alpha">Alpha</span>
 		</span>
 	);
 }
