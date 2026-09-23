@@ -163,6 +163,48 @@ describe("model rate card", () => {
 		).toBeNull();
 	});
 
+	it("prices GPT-6 Sol and Luna from September 22 in every published tier", () => {
+		for (const [model, baseRates, longRates] of [
+			["gpt-6-sol", [2, 0.2, 2.5, 10], [4, 0.4, 5, 15]],
+			["gpt-6-luna", [0.1, 0.01, 0.125, 0.5], [0.2, 0.02, 0.25, 0.75]],
+		] as const) {
+			expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
+			expect(resolveModelPricing(model, { at: "2026-09-21" })).toBeNull();
+
+			for (const [contextInputTokens, rates] of [
+				[272_000, baseRates],
+				[272_001, longRates],
+			] as const) {
+				const [input, cached, write, output] = rates;
+				expect(
+					resolveModelPricing(model, {
+						at: "2026-09-22",
+						contextInputTokens,
+					}),
+				).toMatchObject({
+					inputPerMTok: input,
+					cacheReadPerMTok: cached,
+					cacheWrite5mPerMTok: write,
+					outputPerMTok: output,
+				});
+				for (const serviceTier of ["fast", "priority"]) {
+					expect(
+						resolveModelPricing(model, {
+							at: "2026-09-22",
+							contextInputTokens,
+							serviceTier,
+						}),
+					).toMatchObject({
+						inputPerMTok: input * 2,
+						cacheReadPerMTok: cached * 2,
+						cacheWrite5mPerMTok: write * 2,
+						outputPerMTok: output * 2,
+					});
+				}
+			}
+		}
+	});
+
 	it("keeps Fable 5 and 5.1 identities and cache rates separate", () => {
 		expect(resolveCanonicalModelIdentity("claude-fable-5-1")?.model).toBe(
 			"claude-fable-5-1",

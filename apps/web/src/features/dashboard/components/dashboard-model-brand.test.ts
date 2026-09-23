@@ -7,6 +7,8 @@ describe("formatModelDisplayLabel", () => {
 		expect(formatModelDisplayLabel("gpt-5.6-terra")).toBe("GPT 5.6 Terra");
 		expect(formatModelDisplayLabel("gpt-5.6-luna")).toBe("GPT 5.6 Luna");
 		expect(formatModelDisplayLabel("gpt-6-astra")).toBe("GPT 6 Astra");
+		expect(formatModelDisplayLabel("gpt-6-sol")).toBe("GPT 6 Sol");
+		expect(formatModelDisplayLabel("gpt-6-luna")).toBe("GPT 6 Luna");
 		expect(formatModelDisplayLabel("GPT 5.6 Sol")).toBe("GPT 5.6 Sol");
 		expect(formatModelDisplayLabel("gpt-5.6")).toBe("GPT 5.6");
 	});

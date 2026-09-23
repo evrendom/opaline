@@ -550,7 +550,7 @@ describe("Claude usage-event extraction", () => {
 
 		expect(result.events).toEqual([]);
 		expect(result.receipt.eventCount).toBe(0);
-		expect(result.receipt.modelRateCardVersion).toBe("2026-09-16");
+		expect(result.receipt.modelRateCardVersion).toBe("2026-09-23");
 		expect(result.receipt.checksum).toBe(
 			"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
 		);
@@ -922,6 +922,24 @@ describe("Claude usage-event extraction", () => {
 });
 
 describe("Codex usage-event extraction", () => {
+	test("GPT-6 Sol and Luna retain their canonical priced identities", () => {
+		for (const model of ["gpt-6-sol", "gpt-6-luna"]) {
+			const event = onlyEvent(
+				extractCodex([
+					turnContext(model),
+					codexLine(vector(10, 0, 1, 0), vector(10, 0, 1, 0)),
+				]),
+			);
+
+			expect(event).toMatchObject({
+				modelStatus: "resolved",
+				rawModel: model,
+				resolvedModel: model,
+			});
+			expect(event.qualityFlags).not.toContain("no_public_rate");
+		}
+	});
+
 	test("known unpriced identities retain canonical model identity", () => {
 		const event = onlyEvent(
 			extractCodex([

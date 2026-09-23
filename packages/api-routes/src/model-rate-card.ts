@@ -51,7 +51,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-09-16";
+export const MODEL_RATE_CARD_VERSION = "2026-09-23";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -88,6 +88,72 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		outputPerMTok: 75,
 		source: "https://developers.openai.com/api/docs/pricing",
 		verifiedAt: "2026-09-16",
+		notes: "Full-request rates above 272k input tokens.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-sol",
+		displayName: "GPT-6 Sol",
+		match: ["^gpt-6-sol$"],
+		effectiveFrom: "2026-09-22",
+		contextBand: "base",
+		inputPerMTok: 2,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 2.5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 10,
+		source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
+		verifiedAt: "2026-09-23",
+		notes:
+			"Standard first-party API rates from release; cache token classes are billed separately.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-sol",
+		displayName: "GPT-6 Sol",
+		match: ["^gpt-6-sol$"],
+		effectiveFrom: "2026-09-22",
+		contextBand: "long",
+		inputPerMTok: 4,
+		cacheReadPerMTok: 0.4,
+		cacheWrite5mPerMTok: 5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 15,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-23",
+		notes: "Full-request rates above 272k input tokens.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-luna",
+		displayName: "GPT-6 Luna",
+		match: ["^gpt-6-luna$"],
+		effectiveFrom: "2026-09-22",
+		contextBand: "base",
+		inputPerMTok: 0.1,
+		cacheReadPerMTok: 0.01,
+		cacheWrite5mPerMTok: 0.125,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 0.5,
+		source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
+		verifiedAt: "2026-09-23",
+		notes:
+			"Standard first-party API rates from release; cache token classes are billed separately.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-luna",
+		displayName: "GPT-6 Luna",
+		match: ["^gpt-6-luna$"],
+		effectiveFrom: "2026-09-22",
+		contextBand: "long",
+		inputPerMTok: 0.2,
+		cacheReadPerMTok: 0.02,
+		cacheWrite5mPerMTok: 0.25,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 0.75,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-23",
 		notes: "Full-request rates above 272k input tokens.",
 	},
 
@@ -1162,6 +1228,22 @@ export const MODEL_UNPRICED_IDENTITIES: readonly UnpricedModelIdentity[] = [
 // resolver; a non-base value must match one of these dated rules or it is
 // unpriced. Multipliers apply independently to every published token class.
 export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
+	...[
+		["gpt-6-sol", "2026-09-22"],
+		["gpt-6-luna", "2026-09-22"],
+	].map(
+		([model, effectiveFrom]): ModelRateModifierEntry => ({
+			provider: "openai",
+			model: String(model),
+			dimension: "service_tier",
+			values: ["fast", "priority"],
+			effectiveFrom: String(effectiveFrom),
+			multiplier: 2,
+			source: "https://developers.openai.com/api/docs/pricing",
+			verifiedAt: "2026-09-23",
+			notes: "Fast/Priority doubles every token class in both context bands.",
+		}),
+	),
 	{
 		provider: "openai",
 		model: "gpt-6-astra",

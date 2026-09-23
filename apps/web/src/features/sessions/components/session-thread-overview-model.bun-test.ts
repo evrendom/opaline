@@ -91,6 +91,19 @@ describe("buildSessionOverviewCallSeries", () => {
 		]);
 	});
 
+	test("uses the published GPT-6 context window when telemetry omits it", () => {
+		for (const model of ["gpt-6-sol", "gpt-6-luna"]) {
+			const rows = [createRow({ index: 0, xEndRatio: 1, xStartRatio: 0 })];
+			const series = buildSessionOverviewCallSeries(rows, () => [
+				createUsageEvent({ inputTokens: 100, model }),
+			]);
+
+			expect(series.aggregates.modelContextLimits).toEqual([
+				{ model, source: "catalog", tokenLimit: 1_050_000 },
+			]);
+		}
+	});
+
 	test("normalizes call composition and session aggregates once", () => {
 		const rows = [
 			createRow({ index: 0, xEndRatio: 0.4, xStartRatio: 0 }),

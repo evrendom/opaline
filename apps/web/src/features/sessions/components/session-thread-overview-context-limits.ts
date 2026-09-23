@@ -12,6 +12,7 @@ const LEGACY_CLAUDE_CONTEXT_TOKENS = 200_000;
 
 const FABLE_MODEL_PATTERN = /^claude-fable-5(?:-\d{8})?$/;
 const SOL_MODEL_PATTERN = /^gpt-5\.6(?:-sol)?$/;
+const GPT_6_MODEL_PATTERN = /^gpt-6-(?:astra|sol|luna)$/;
 
 function hasPrefix(model: string, prefixes: readonly string[]) {
 	return prefixes.some((prefix) => model.startsWith(prefix));
@@ -33,6 +34,9 @@ export function resolvePulseInputTokenLimit(
 	if (SOL_MODEL_PATTERN.test(model)) {
 		return CODEX_SOL_CONTEXT_TOKENS;
 	}
+	if (GPT_6_MODEL_PATTERN.test(model)) {
+		return OPENAI_FRONTIER_CONTEXT_TOKENS;
+	}
 	return undefined;
 }
 
@@ -49,6 +53,12 @@ export function resolveSessionOverviewContextWindow(
 		}
 		if (SOL_MODEL_PATTERN.test(model)) {
 			return { source: "catalog", tokenLimit: CODEX_SOL_CONTEXT_TOKENS };
+		}
+		if (GPT_6_MODEL_PATTERN.test(model)) {
+			return {
+				source: "catalog",
+				tokenLimit: OPENAI_FRONTIER_CONTEXT_TOKENS,
+			};
 		}
 		if (hasPrefix(model, ["gpt-5.4", "gpt-5.5", "gpt-5.6"])) {
 			return {

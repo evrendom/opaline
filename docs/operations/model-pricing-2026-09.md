@@ -1,21 +1,25 @@
 # September 2026 model identity and pricing update
 
-Verified against first-party documentation on September 16, 2026. These are USD per million tokens for standard first-party API processing, not subscription charges or an invoice reconciliation.
+Verified against first-party documentation on September 23, 2026. These are USD per million tokens for standard first-party API processing, not subscription charges or an invoice reconciliation.
 
 | Model / request date | Uncached input | Cache read | Cache write | Output |
 | --- | ---: | ---: | ---: | ---: |
 | GPT-5.6 Sol, June 26–August 20 | 5 | 0.50 | 6.25 | 30 |
 | GPT-5.6 Sol, August 21 onward | 4 | 0.40 | 5 | 20 |
 | GPT-6 Astra, September 3 onward | 10 | 1 | 12.50 | 50 |
+| GPT-6 Sol, September 22 onward | 2 | 0.20 | 2.50 | 10 |
+| GPT-6 Luna, September 22 onward | 0.10 | 0.01 | 0.125 | 0.50 |
 | Claude Fable 5.1, September 1 onward | 10 | 0.25 | 12.50 (5m) / 20 (1h) | 50 |
 
-Sol and Astra requests above 272,000 input-context tokens use 2× input/cache rates and 1.5× output rates for the full request. Exactly 272,000 stays in the base band. The implementation supports Astra Fast/Priority at 2× in either band and the current Sol long-context Fast/Priority rates. Fable 5.1 has no long-context surcharge; US-only inference adds 10% to every token class. Original Fable 5 continues to use its own $1 cache-read rate; a 5.1 model ID never matches the Fable 5 pattern.
+GPT-5.6 Sol and the GPT-6 family use 2× input/cache rates and 1.5× output rates above 272,000 input-context tokens. Exactly 272,000 stays in the base band. The implementation supports GPT-6 Astra, Sol, and Luna Fast/Priority at 2× in either band and the current GPT-5.6 Sol long-context Fast/Priority rates. Fable 5.1 has no long-context surcharge; US-only inference adds 10% to every token class. Original Fable 5 continues to use its own $1 cache-read rate; a 5.1 model ID never matches the Fable 5 pattern.
 
 ## Sources and date precision
 
-- [OpenAI API changelog](https://developers.openai.com/api/docs/changelog): Sol's reduction announced August 21, 2026; Astra released September 3, 2026.
-- [OpenAI pricing](https://developers.openai.com/api/docs/pricing): current Sol and Astra standard, long-context, caching and Fast rates.
+- [OpenAI API changelog](https://developers.openai.com/api/docs/changelog): GPT-5.6 Sol's reduction announced August 21, Astra released September 3, and GPT-6 Sol and Luna released September 22, 2026.
+- [OpenAI pricing](https://developers.openai.com/api/docs/pricing): current GPT-5.6 Sol and GPT-6 family standard, long-context, caching and Fast rates.
 - [Astra model documentation](https://developers.openai.com/api/docs/models/gpt-6-astra): token rates and context threshold.
+- [GPT-6 Sol documentation](https://developers.openai.com/api/docs/models/gpt-6-sol): model identity, context window and token rates.
+- [GPT-6 Luna documentation](https://developers.openai.com/api/docs/models/gpt-6-luna): model identity, context window and token rates.
 - [Fable 5.1 documentation](https://platform.claude.com/docs/en/models/fable-5-1/overview): September 1 release and token rates.
 - [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing): Fable 5 versus 5.1 cache rates, full-context pricing and US inference premium.
 
