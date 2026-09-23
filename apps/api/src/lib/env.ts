@@ -1,6 +1,10 @@
 import { isLoopbackHostname, parseSafeBrowserUrl } from "@rudel/api-routes";
 
 const MINIMUM_AUTH_SECRET_LENGTH = 32;
+const VERCEL_DEPLOYMENT_HOST_ENV_VARS = [
+	"VERCEL_URL",
+	"VERCEL_BRANCH_URL",
+] as const;
 
 export type UsageEventAnalyticsCutoverMode = "all" | "canary" | "off";
 
@@ -23,12 +27,48 @@ export interface CliDeviceVerificationUrlConfig {
 }
 
 /**
- * Append `/device` to the CORS origin, which by definition carries no path,
+ * Return the exact Vercel preview origins assigned to this deployment.
+ *
+ * Vercel exposes hostnames without a protocol. Restricting them to
+ * `*.vercel.app` keeps the auth allowlist fail-closed if one of these
+ * environment variables is accidentally overridden.
+ */
+export function readVercelDeploymentOrigins(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	const origins = new Set<string>();
+
+	for (const name of VERCEL_DEPLOYMENT_HOST_ENV_VARS) {
+		const hostname = environment[name]?.trim().toLowerCase();
+		if (!hostname?.endsWith(".vercel.app")) continue;
+
+		try {
+			const url = new URL(`https://${hostname}`);
+			if (
+				url.hostname !== hostname ||
+				url.pathname !== "/" ||
+				url.port !== "" ||
+				url.search !== "" ||
+				url.hash !== ""
+			) {
+				continue;
+			}
+			origins.add(url.origin);
+		} catch {
+			// Ignore malformed platform values rather than weakening auth startup.
+		}
+	}
+
+	return [...origins];
+}
+
+/**
+ * Append `/welcome` to the CORS origin, which by definition carries no path,
  * query or fragment.
  *
  * String-concatenating a non-bare origin corrupts the result rather than failing
  * — `https://opaline.so?tenant=acme` would become
- * `https://opaline.so/?tenant=acme/device`, and a fragment swallows `/device`
+ * `https://opaline.so/?tenant=acme/welcome`, and a fragment swallows `/welcome`
  * entirely. Reject at boot instead, consistent with this file's fail-fast
  * doctrine, and build the path with the URL API rather than by concatenation.
  */
@@ -44,11 +84,11 @@ function deriveVerificationUrlFromOrigin(fallbackOrigin: string): string {
 
 	if (parsed.search !== "" || parsed.hash !== "" || parsed.pathname !== "/") {
 		throw new Error(
-			`ALLOWED_ORIGIN must be a bare origin with no path, query string or fragment (got "${fallbackOrigin}"). Set CLI_DEVICE_VERIFICATION_URL explicitly if the device page is not at /device on that origin.`,
+			`ALLOWED_ORIGIN must be a bare origin with no path, query string or fragment (got "${fallbackOrigin}"). Set CLI_DEVICE_VERIFICATION_URL explicitly if the device page is not at /welcome on that origin.`,
 		);
 	}
 
-	return new URL("/device", parsed).toString();
+	return new URL("/welcome", parsed).toString();
 }
 
 /**

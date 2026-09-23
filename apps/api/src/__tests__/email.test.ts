@@ -13,6 +13,10 @@ import {
 	sendOrganizationInvitationEmail,
 	syncSignupContact,
 } from "../email.js";
+import {
+	OPALINE_AUTOMATED_EMAIL_SENDER,
+	readResendConfig,
+} from "../resend-config.js";
 
 const invitation = {
 	frontendURL: "https://opaline.so/",
@@ -77,9 +81,21 @@ describe("email helpers", () => {
 		});
 
 		expect(message.subject).toBe("Your Opaline sign-in code");
+		expect(message.html).toContain(">Opaline</p>");
+		expect(message.html).toContain("sign in to Opaline");
 		expect(message.html).toContain("123&lt;45&quot;");
 		expect(message.html).not.toContain('123<45"');
 		expect(message.text).toContain('123<45"');
+		expect(message.html).toContain("Opaline Labs, Inc.<br>2261 Market Street");
+		expect(message.html).toContain("San Francisco, CA 94114");
+		expect(message.text).toContain(
+			"Opaline Labs, Inc.\n2261 Market Street\nSan Francisco, CA 94114",
+		);
+	});
+
+	test("uses the Opaline sender for automated emails", () => {
+		expect(OPALINE_AUTOMATED_EMAIL_SENDER).toBe("Opaline <evren@opaline.so>");
+		expect(readResendConfig().fromEmail).toBe(OPALINE_AUTOMATED_EMAIL_SENDER);
 	});
 
 	test("buildClickHousePurgeFailureAlertContent includes actionable sanitized fields", () => {
@@ -111,7 +127,7 @@ describe("email helpers", () => {
 
 	test("getResendConfigWarnings reports disabled email integrations", () => {
 		expect(getResendConfigWarnings({ apiKey: "test-key" })).toEqual([
-			"Resend emails are disabled because RESEND_FROM_EMAIL is not set.",
+			"Resend emails are disabled because no sender is configured.",
 		]);
 		expect(
 			getResendConfigWarnings({

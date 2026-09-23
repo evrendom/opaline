@@ -1,7 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import type { CliConnectionSnapshot } from "../../../../../packages/api-routes/src/cli-connection";
-import type { CliAuthorization } from "./cli-authorization";
+import {
+	type CliAuthorization,
+	cliAuthorizationUrl,
+} from "./cli-authorization";
+import { CliDeviceAuthorization } from "./cli-device-authorization";
 import {
 	type CliSession,
 	readCliSession,
@@ -10,20 +14,25 @@ import {
 	signInCliWithProvider,
 	signOutCliSession,
 } from "./cli-onboarding-auth";
+import "@/features/shell/website-button.css";
 import "./cli-onboarding.css";
 
 import { WelcomeBack, WelcomeProgress } from "./welcome-panel";
 import { WelcomeSteps } from "./welcome-steps";
 
-export function CliSignIn({
-	authorization,
-	snapshot,
-	onFinish,
-}: {
-	authorization: CliAuthorization;
-	snapshot: CliConnectionSnapshot;
-	onFinish: () => void;
-}) {
+type CliSignInProps =
+	| {
+			mode: "paired";
+			authorization: CliAuthorization;
+			snapshot: CliConnectionSnapshot;
+			onFinish: () => void;
+	  }
+	| {
+			mode: "device";
+			userCode: string;
+	  };
+
+export function CliSignIn(props: CliSignInProps) {
 	const { refetch } = authClient.useSession();
 	const [session, setSession] = useState<CliSession>(null);
 	const [checking, setChecking] = useState(true);
@@ -38,6 +47,8 @@ export function CliSignIn({
 	const localPreview =
 		["localhost", "127.0.0.1"].includes(window.location.hostname) &&
 		document.querySelector('meta[name="opaline-local-cli"]') !== null;
+	const authorizationId =
+		props.mode === "paired" ? props.authorization.id : null;
 	useEffect(() => {
 		const abort = new AbortController();
 		const refresh = () =>
@@ -57,7 +68,10 @@ export function CliSignIn({
 		refresh();
 		window.addEventListener("focus", refresh);
 		const sync = (event: StorageEvent) => {
-			if (event.key?.startsWith(`opaline.welcome.${authorization.id}.`))
+			if (
+				authorizationId &&
+				event.key?.startsWith(`opaline.welcome.${authorizationId}.`)
+			)
 				refresh();
 		};
 		window.addEventListener("storage", sync);
@@ -66,7 +80,11 @@ export function CliSignIn({
 			window.removeEventListener("focus", refresh);
 			window.removeEventListener("storage", sync);
 		};
-	}, [authorization.id]);
+	}, [authorizationId]);
+	const callbackURL =
+		props.mode === "paired"
+			? cliAuthorizationUrl(props.authorization, window.location.origin)
+			: window.location.href;
 
 	async function run(action: () => Promise<unknown>) {
 		if (busy) return;
@@ -106,14 +124,21 @@ export function CliSignIn({
 				<output>Checking your sign-in…</output>
 			</>
 		);
-	if (session)
+	if (session && props.mode === "device")
+		return (
+			<CliDeviceAuthorization
+				userCode={props.userCode}
+				userId={session.user.id}
+			/>
+		);
+	if (session && props.mode === "paired")
 		return (
 			<WelcomeSteps
 				key={session.user.id}
 				session={session}
-				authorization={authorization}
-				snapshot={snapshot}
-				onFinish={onFinish}
+				authorization={props.authorization}
+				snapshot={props.snapshot}
+				onFinish={props.onFinish}
 				onSignOut={async () => {
 					await signOutCliSession();
 					setSession(null);
@@ -134,8 +159,16 @@ export function CliSignIn({
 					}}
 				/>
 			)}
-			<h2>Make this dashboard yours</h2>
-			<p>Sign in to bring your selected sessions into your own workspace.</p>
+			<h2>
+				{props.mode === "device"
+					? "Sign in to connect your terminal"
+					: "Make this dashboard yours"}
+			</h2>
+			<p>
+				{props.mode === "device"
+					? "Use your Opaline account to approve this CLI request."
+					: "Sign in to bring your selected sessions into your own workspace."}
+			</p>
 			{error ? (
 				<p className="cli-onboarding-error" role="alert">
 					{error}
@@ -146,21 +179,22 @@ export function CliSignIn({
 					<div className="cli-onboarding-auth-options">
 						<button
 							type="button"
+							className="opaline-website-primary-button"
 							disabled={busy}
 							onClick={() =>
-								void run(() => signInCliWithProvider("google", authorization))
+								void run(() => signInCliWithProvider("github", callbackURL))
 							}
 						>
-							Continue with Google
+							<span>Continue with GitHub</span>
 						</button>
 						<button
 							type="button"
 							disabled={busy}
 							onClick={() =>
-								void run(() => signInCliWithProvider("github", authorization))
+								void run(() => signInCliWithProvider("google", callbackURL))
 							}
 						>
-							Continue with GitHub
+							Continue with Google
 						</button>
 						<span className="cli-onboarding-divider">or</span>
 						<button

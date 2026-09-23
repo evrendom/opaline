@@ -76,9 +76,10 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-user Postgres-backed ingest byte cap shared by all of the user's API keys (default: 10 GiB) |
 | `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Per-user fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
 | `RESEND_API_KEY` | No | Resend API key for email integration |
-| `RESEND_FROM_EMAIL` | No | Sender address for organization invitation emails |
 | `RESEND_AUDIENCE_ID` | No | Resend audience ID for signup contact sync |
 | `VITE_ADMIN_ORGANIZATION_ID` | No | Organization ID whose members have admin panel access |
+
+Automated product emails use the fixed sender `Opaline <evren@opaline.so>`.
 
 ## Local chkit development
 

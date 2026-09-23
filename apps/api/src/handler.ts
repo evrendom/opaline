@@ -32,6 +32,7 @@ import {
 	readCliDeviceVerificationUrl,
 	readNonNegativeSafeIntegerEnv,
 	readPositiveSafeIntegerEnv,
+	readVercelDeploymentOrigins,
 } from "./lib/env.js";
 import { maybeCompressSessionDetailRpcResponse } from "./lib/http-compression.js";
 import {
@@ -106,6 +107,7 @@ const trustedOrigins = [
 	...new Set([
 		preferredFrontendOrigin,
 		...configuredTrustedOrigins,
+		...readVercelDeploymentOrigins(),
 		...DEFAULT_DEV_ORIGINS,
 	]),
 ];

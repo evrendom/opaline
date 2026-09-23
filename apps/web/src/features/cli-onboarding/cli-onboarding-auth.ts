@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { getInitialSignupName } from "../../lib/auth-signup-name";
-import {
-	type CliAuthorization,
-	cliAuthorizationUrl,
-} from "./cli-authorization";
+import type { CliAuthorization } from "./cli-authorization";
 
 const SessionSchema = z
 	.object({
@@ -34,12 +31,8 @@ export async function readCliSession(
 
 export async function signInCliWithProvider(
 	provider: "google" | "github",
-	authorization: CliAuthorization,
+	callbackURL: string,
 ) {
-	const callbackURL = cliAuthorizationUrl(
-		authorization,
-		window.location.origin,
-	);
 	const result = await postCliAuth("/api/auth/sign-in/social", {
 		provider,
 		callbackURL,
@@ -81,6 +74,13 @@ export async function approveCliAuthorization(
 	await postCliAuth("/api/auth/device/approve", {
 		userCode: authorization.userCode,
 	});
+}
+
+export async function submitCliDeviceDecision(
+	userCode: string,
+	action: "approve" | "deny",
+) {
+	await postCliAuth(`/api/auth/device/${action}`, { userCode });
 }
 
 export async function signOutCliSession() {

@@ -11,6 +11,7 @@ import "@/features/dashboard/dashboard-theme.css";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import "./product-window-chrome.css";
+import "./welcome-shell.css";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
 import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";

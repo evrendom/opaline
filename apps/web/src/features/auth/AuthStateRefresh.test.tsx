@@ -138,7 +138,7 @@ describe("auth state refresh", () => {
 
 	it("preserves device flow destinations for email signup", () => {
 		expect(getEmailSignupSuccessDestination("/", "?user_code=ABCD")).toBe(
-			"/?user_code=ABCD",
+			"/welcome?user_code=ABCD",
 		);
 	});
 
@@ -188,8 +188,8 @@ describe("auth state refresh", () => {
 
 	it("preserves device destinations for social signup flows", () => {
 		expect(getSocialSignupRedirectOptions("/", "?user_code=ABCD")).toEqual({
-			callbackURL: "/?user_code=ABCD",
-			newUserCallbackURL: "/?user_code=ABCD",
+			callbackURL: "/welcome?user_code=ABCD",
+			newUserCallbackURL: "/welcome?user_code=ABCD",
 		});
 	});
 
@@ -275,7 +275,7 @@ describe("auth state refresh", () => {
 
 		await waitFor(() => {
 			expect(mockNavigateToDestination).toHaveBeenCalledWith(
-				"/?user_code=ABCD",
+				"/welcome?user_code=ABCD",
 			);
 		});
 	});
@@ -333,10 +333,12 @@ describe("auth state refresh", () => {
 		view.unmount();
 		render(<SignupForm onSwitchToLogin={vi.fn()} />);
 
-		expect(screen.getByLabelText("Email")).toHaveValue(
-			"ada.lovelace@example.com",
-		);
-		expect(screen.getByLabelText("Email code")).toHaveValue("");
+		expect(
+			screen.getByText("Sent email to ada.lovelace@example.com."),
+		).toBeInTheDocument();
+		const signupCodeInput = screen.getByLabelText("Email code");
+		expect(signupCodeInput).toHaveValue("");
+		expect(signupCodeInput).toHaveFocus();
 		expect(
 			screen.getByRole("button", { name: "Verify code" }),
 		).toBeInTheDocument();
@@ -383,7 +385,7 @@ describe("auth state refresh", () => {
 		mockSignInEmailOtp.mockResolvedValue({ error: null });
 
 		const user = userEvent.setup();
-		render(<LoginForm onSwitchToSignup={vi.fn()} />);
+		render(<LoginForm />);
 
 		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
 		await user.type(screen.getByLabelText("Email"), "ada@example.com");
@@ -419,7 +421,7 @@ describe("auth state refresh", () => {
 		mockSignInEmailOtp.mockResolvedValue({ error: null });
 
 		const user = userEvent.setup();
-		const view = render(<LoginForm onSwitchToSignup={vi.fn()} />);
+		const view = render(<LoginForm />);
 
 		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
 		await user.type(screen.getByLabelText("Email"), "ada@example.com");
@@ -434,10 +436,14 @@ describe("auth state refresh", () => {
 
 		window.sessionStorage.clear();
 		view.unmount();
-		render(<LoginForm onSwitchToSignup={vi.fn()} />);
+		render(<LoginForm />);
 
-		expect(screen.getByLabelText("Email")).toHaveValue("ada@example.com");
-		expect(screen.getByLabelText("Email code")).toHaveValue("");
+		expect(
+			screen.getByText("Sent email to ada@example.com."),
+		).toBeInTheDocument();
+		const loginCodeInput = screen.getByLabelText("Email code");
+		expect(loginCodeInput).toHaveValue("");
+		expect(loginCodeInput).toHaveFocus();
 		expect(
 			screen.getByRole("button", { name: "Verify code" }),
 		).toBeInTheDocument();
@@ -466,7 +472,7 @@ describe("auth state refresh", () => {
 		});
 
 		const user = userEvent.setup();
-		render(<LoginForm onSwitchToSignup={vi.fn()} />);
+		render(<LoginForm />);
 
 		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
 		await user.type(screen.getByLabelText("Email"), "ada@example.com");

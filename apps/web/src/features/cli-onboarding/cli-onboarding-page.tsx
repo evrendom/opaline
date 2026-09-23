@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useProductWindowConnectionTone } from "@/features/shell/components/product-window-backdrop";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { authClient } from "@/lib/auth-client";
@@ -10,6 +10,11 @@ import "../../../../marketing/src/components/InstantV2DemoExperience.css";
 
 export function CliOnboardingPage() {
 	const navigate = useNavigate();
+	const location = useLocation();
+	const searchParams = new URLSearchParams(location.search);
+	const deviceUserCode = searchParams.has("connect")
+		? null
+		: searchParams.get("user_code");
 	const { state } = useOrganization();
 	const { refetch } = authClient.useSession();
 	const [destination, setDestination] = useState<{
@@ -27,7 +32,7 @@ export function CliOnboardingPage() {
 		},
 		[refetch],
 	);
-	const onboarding = useCliOnboarding(true, {
+	const onboarding = useCliOnboarding(deviceUserCode === null, {
 		mode: "setup",
 		autoOpenDashboard: false,
 		onOpenDashboard: openDashboard,
@@ -54,6 +59,7 @@ export function CliOnboardingPage() {
 		<CliOnboardingContent
 			snapshot={snapshot}
 			authorization={onboarding.authorization}
+			deviceUserCode={deviceUserCode}
 			connectionError={
 				onboarding.error ??
 				(onboarding.setupInactive

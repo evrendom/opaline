@@ -17,7 +17,7 @@ describe("readCliDeviceVerificationUrl: derived from ALLOWED_ORIGIN", () => {
 		delete process.env[ENV_VAR];
 		const config = readCliDeviceVerificationUrl("https://opaline.so");
 
-		expect(config.url).toBe("https://opaline.so/device");
+		expect(config.url).toBe("https://opaline.so/welcome");
 		expect(config.warning).toBeUndefined();
 	});
 
@@ -28,7 +28,7 @@ describe("readCliDeviceVerificationUrl: derived from ALLOWED_ORIGIN", () => {
 		delete process.env[ENV_VAR];
 		const config = readCliDeviceVerificationUrl(origin);
 
-		expect(config.url).toBe(`${origin}/device`);
+		expect(config.url).toBe(`${origin}/welcome`);
 		expect(config.warning).toBeUndefined();
 	});
 
@@ -38,7 +38,7 @@ describe("readCliDeviceVerificationUrl: derived from ALLOWED_ORIGIN", () => {
 		delete process.env[ENV_VAR];
 		const config = readCliDeviceVerificationUrl("http://rudel.internal");
 
-		expect(config.url).toBe("http://rudel.internal/device");
+		expect(config.url).toBe("http://rudel.internal/welcome");
 		expect(config.warning).toContain("plaintext");
 		expect(config.warning).toContain("--allow-insecure-api-base");
 		expect(config.warning).toContain("ALLOWED_ORIGIN");
@@ -51,8 +51,8 @@ describe("readCliDeviceVerificationUrl: ALLOWED_ORIGIN must be a bare origin", (
 		"https://opaline.so#frag",
 		"https://opaline.so/nested",
 	])("throws at boot for non-bare origin %p", (origin) => {
-		// Concatenating `/device` onto these silently corrupts the result:
-		// `https://opaline.so/?tenant=acme/device`, or a fragment that swallows
+		// Concatenating `/welcome` onto these silently corrupts the result:
+		// `https://opaline.so/?tenant=acme/welcome`, or a fragment that swallows
 		// the path entirely.
 		delete process.env[ENV_VAR];
 
@@ -73,7 +73,7 @@ describe("readCliDeviceVerificationUrl: ALLOWED_ORIGIN must be a bare origin", (
 		delete process.env[ENV_VAR];
 
 		expect(readCliDeviceVerificationUrl("https://opaline.so/").url).toBe(
-			"https://opaline.so/device",
+			"https://opaline.so/welcome",
 		);
 	});
 

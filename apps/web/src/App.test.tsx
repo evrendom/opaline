@@ -22,10 +22,6 @@ vi.mock("@/features/auth/GuestApp", () => ({
 	GuestApp: () => <div>Guest App</div>,
 }));
 
-vi.mock("@/features/auth/DeviceAuthorizationApp", () => ({
-	DeviceAuthorizationApp: () => <div>Device App</div>,
-}));
-
 vi.mock("@/features/auth/AuthenticatedApp", () => ({
 	AuthenticatedApp: ({
 		rootRedirectTarget,
@@ -63,20 +59,20 @@ describe("App routing", () => {
 		);
 	});
 
-	it("renders device approval outside the guest app", () => {
-		mockUseSession.mockReturnValue({
-			data: { session: { userId: "user-1" }, user: { id: "user-1" } },
-			isPending: false,
-		});
-
+	it.each([
+		"/?user_code=ABCD-1234",
+		"/device?user_code=ABCD-1234",
+	])("redirects the legacy device entry %s into welcome", async (entry) => {
 		render(
-			<MemoryRouter initialEntries={["/?user_code=ABCD-1234"]}>
+			<MemoryRouter initialEntries={[entry]}>
 				<App />
+				<CurrentLocation />
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Device App")).toBeInTheDocument();
-		expect(screen.queryByText("Guest App")).toBeNull();
+		expect(
+			await screen.findByText("/welcome?user_code=ABCD-1234"),
+		).toBeInTheDocument();
 	});
 });
 

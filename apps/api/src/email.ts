@@ -86,7 +86,7 @@ export function getResendConfigWarnings(config: ResendConfig): string[] {
 	}
 
 	if (!config.fromEmail) {
-		return ["Resend emails are disabled because RESEND_FROM_EMAIL is not set."];
+		return ["Resend emails are disabled because no sender is configured."];
 	}
 
 	if (!config.clickHousePurgeAlertRecipient) {
@@ -243,15 +243,26 @@ export function buildEmailVerificationOtpEmailContent(data: {
 }): EmailVerificationOtpEmailContent {
 	const safeOtp = normalizeText(data.otp);
 	const subject = getEmailVerificationOtpSubject(data.type);
+	const action =
+		data.type === "forget-password"
+			? "reset your Opaline password"
+			: data.type === "change-email" || data.type === "email-verification"
+				? "verify your Opaline email"
+				: "sign in to Opaline";
 
 	return {
 		subject,
 		html: `
-<p>Your Opaline code is:</p>
-<p style="font-size:28px;letter-spacing:6px;font-weight:700;">${escapeHtml(safeOtp)}</p>
-<p>This code expires in 5 minutes. If you did not request it, you can ignore this email.</p>
+<div style="max-width:480px;margin:0 auto;padding:32px 24px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#171717;">
+  <p style="margin:0 0 32px;font-size:16px;font-weight:650;letter-spacing:-0.02em;">Opaline</p>
+  <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;letter-spacing:-0.025em;">Your verification code</h1>
+  <p style="margin:0 0 24px;color:#737373;font-size:14px;line-height:1.6;">Use this code to ${action}.</p>
+  <p style="margin:0 0 24px;padding:16px 18px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;font-size:28px;font-weight:650;letter-spacing:6px;line-height:1;text-align:center;">${escapeHtml(safeOtp)}</p>
+  <p style="margin:0;color:#737373;font-size:12px;line-height:1.6;">This code expires in 5 minutes. If you did not request it, you can ignore this email.</p>
+  <p style="margin:32px 0 0;padding-top:20px;border-top:1px solid #e5e5e5;color:#a3a3a3;font-size:11px;line-height:1.6;">Opaline Labs, Inc.<br>2261 Market Street<br>San Francisco, CA 94114</p>
+</div>
 `,
-		text: `Your Opaline code is: ${safeOtp}\n\nThis code expires in 5 minutes. If you did not request it, you can ignore this email.`,
+		text: `Opaline\n\nYour verification code is: ${safeOtp}\n\nUse this code to ${action}. It expires in 5 minutes. If you did not request it, you can ignore this email.\n\nOpaline Labs, Inc.\n2261 Market Street\nSan Francisco, CA 94114`,
 	};
 }
 

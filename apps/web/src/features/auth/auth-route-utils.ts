@@ -90,7 +90,7 @@ function getDirectAuthDestination(
 	const userCode = getDeviceUserCode(search);
 	if (userCode) {
 		const connectionId = getCliConnectionId(search);
-		return `/?user_code=${encodeURIComponent(userCode)}${connectionId ? `&connect=${encodeURIComponent(connectionId)}` : ""}`;
+		return `/welcome?user_code=${encodeURIComponent(userCode)}${connectionId ? `&connect=${encodeURIComponent(connectionId)}` : ""}`;
 	}
 
 	const redirect = getValidRedirect(search);
@@ -138,7 +138,7 @@ export function getAuthCallbackURL(
 		return "/";
 	}
 
-	if (directDestination.startsWith("/?user_code=")) {
+	if (directDestination.startsWith("/welcome?user_code=")) {
 		return directDestination;
 	}
 

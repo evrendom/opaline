@@ -33,11 +33,10 @@ const LOGIN_CODE_INPUT_ID = "login-code";
 
 interface LoginFormProps {
 	hideSwitchPrompt?: boolean;
-	onSwitchToSignup: () => void;
 }
 
-export function LoginForm(props: LoginFormProps) {
-	const { hideSwitchPrompt = false, onSwitchToSignup } = props;
+export function LoginForm(props: LoginFormProps = {}) {
+	const { hideSwitchPrompt = false } = props;
 	const [initialLoginDraft] = useState(readPendingEmailLoginCodeDraft);
 	const [email, setEmail] = useState(() => initialLoginDraft?.email ?? "");
 	const [emailCode, setEmailCode] = useState("");
@@ -61,6 +60,7 @@ export function LoginForm(props: LoginFormProps) {
 	});
 	const hasValidEmail = isValidAuthEmail(email);
 	const hasValidEmailCode = isValidEmailCode(emailCode);
+	const isVerifyingEmail = showEmailForm && emailCodeStage === "code";
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -217,162 +217,188 @@ export function LoginForm(props: LoginFormProps) {
 
 	return (
 		<div className="w-full max-w-sm">
-			<div className="flex flex-col gap-4">
-				<div className="flex flex-col gap-2">
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => handleSocialSignIn("google")}
-					>
-						Log in with Google
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => handleSocialSignIn("github")}
-					>
-						Log in with GitHub
-					</Button>
-				</div>
-
-				<div className="flex items-center gap-2">
-					<Separator className="flex-1" />
-					<span className="text-xs text-muted-foreground">OR</span>
-					<Separator className="flex-1" />
-				</div>
-
-				{feedback ? (
-					<div
-						role={feedback.kind === "error" ? "alert" : "status"}
-						aria-live="polite"
-						className={cn(
-							"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
-							feedback.kind === "error"
-								? "bg-destructive/5 text-destructive ring-destructive/15"
-								: "bg-muted/35 text-muted-foreground ring-border/60",
-							"whitespace-pre-line",
-						)}
-					>
-						{feedback.message}
+			{isVerifyingEmail ? (
+				<div
+					key="verify-email"
+					className="opaline-auth-stage opaline-email-verification"
+				>
+					<div className="opaline-email-verification-intro">
+						<p id="login-code-delivery">Sent email to {email}.</p>
+						<button
+							type="button"
+							disabled={loading}
+							onClick={() => {
+								clearPendingEmailLoginCodeDraft();
+								setFeedback(null);
+								setEmailCode("");
+								setEmailCodeStage("email");
+							}}
+							className="opaline-auth-email-switch"
+						>
+							Use another one
+							<span aria-hidden="true" />
+						</button>
 					</div>
-				) : null}
 
-				{showEmailForm ? (
-					<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="email">Email</Label>
-							<Input
-								disabled={emailCodeStage === "code"}
-								id="email"
-								name="email"
-								type="email"
-								autoComplete="email"
-								placeholder="you@example.com"
-								value={email}
-								onChange={(e) => {
-									handleEmailChange(e.target.value);
-								}}
-								required
-							/>
+					{feedback?.kind === "error" ? (
+						<div
+							role="alert"
+							aria-live="polite"
+							className="rounded-lg bg-destructive/5 px-3 py-2 text-destructive ring-1 ring-destructive/15"
+						>
+							{feedback.message}
 						</div>
-						{emailCodeStage === "code" ? (
+					) : null}
+
+					<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+						<Label className="sr-only" htmlFor={LOGIN_CODE_INPUT_ID}>
+							Email code
+						</Label>
+						<Input
+							aria-describedby="login-code-delivery"
+							autoComplete="one-time-code"
+							autoFocus
+							className="opaline-auth-code-input"
+							id={LOGIN_CODE_INPUT_ID}
+							inputMode="numeric"
+							name="code"
+							pattern="[0-9]*"
+							placeholder="123456"
+							value={emailCode}
+							onChange={(e) => {
+								handleEmailCodeChange(e.target.value);
+							}}
+							required
+						/>
+						<Button type="submit" disabled={loading}>
+							{loading ? "Verifying..." : "Verify code"}
+						</Button>
+					</form>
+				</div>
+			) : (
+				<div
+					key="login-options"
+					className="opaline-auth-stage flex flex-col gap-4"
+				>
+					<div className="flex flex-col gap-2">
+						<Button
+							type="button"
+							className="opaline-website-primary-button"
+							onClick={() => handleSocialSignIn("github")}
+						>
+							<span>Log in with GitHub</span>
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => handleSocialSignIn("google")}
+						>
+							Log in with Google
+						</Button>
+					</div>
+
+					<div className="flex items-center gap-2">
+						<Separator className="flex-1" />
+						<span className="text-xs text-muted-foreground">OR</span>
+						<Separator className="flex-1" />
+					</div>
+
+					{feedback ? (
+						<div
+							role={feedback.kind === "error" ? "alert" : "status"}
+							aria-live="polite"
+							className={cn(
+								"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
+								feedback.kind === "error"
+									? "bg-destructive/5 text-destructive ring-destructive/15"
+									: "bg-muted/35 text-muted-foreground ring-border/60",
+								"whitespace-pre-line",
+							)}
+						>
+							{feedback.message}
+						</div>
+					) : null}
+
+					{showEmailForm ? (
+						<form onSubmit={handleSubmit} className="flex flex-col gap-4">
 							<div className="flex flex-col gap-2">
-								<Label htmlFor={LOGIN_CODE_INPUT_ID}>Email code</Label>
+								<Label className="sr-only" htmlFor="email">
+									Email
+								</Label>
 								<Input
-									autoComplete="one-time-code"
-									id={LOGIN_CODE_INPUT_ID}
-									inputMode="numeric"
-									name="code"
-									pattern="[0-9]*"
-									placeholder="123456"
-									value={emailCode}
+									disabled={emailCodeStage === "code"}
+									id="email"
+									name="email"
+									type="email"
+									autoComplete="email"
+									placeholder="you@example.com"
+									value={email}
 									onChange={(e) => {
-										handleEmailCodeChange(e.target.value);
+										handleEmailChange(e.target.value);
 									}}
 									required
 								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="xs"
-									onClick={() => {
-										clearPendingEmailLoginCodeDraft();
-										setFeedback(null);
-										setEmailCode("");
-										setEmailCodeStage("email");
-									}}
-									className="self-start px-0 text-muted-foreground hover:text-foreground"
-								>
-									Use a different email
-								</Button>
 							</div>
-						) : null}
-						<Button type="submit" disabled={loading}>
-							{emailCodeStage === "code"
-								? loading
-									? "Verifying..."
-									: "Verify code"
-								: loading
-									? "Sending code..."
-									: "Send code"}
-						</Button>
-					</form>
-				) : (
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => {
-							setFeedback(null);
-							setEmailCode("");
-							setEmailCodeStage("email");
-							setShowEmailForm(true);
-						}}
-					>
-						Log in with Email
-					</Button>
-				)}
-
-				<p className="text-center text-xs text-muted-foreground">
-					By signing up, you agree to our{" "}
-					<a
-						href="https://opaline.so/terms"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="underline underline-offset-4 hover:text-primary"
-					>
-						Terms of Service
-					</a>{" "}
-					and{" "}
-					<a
-						href="https://opaline.so/privacy"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="underline underline-offset-4 hover:text-primary"
-					>
-						Privacy Policy
-					</a>
-				</p>
-
-				{hideSwitchPrompt ? null : (
-					<p className="text-center text-sm text-muted-foreground">
-						Don&apos;t have an account?{" "}
-						<button
+							<Button type="submit" disabled={loading}>
+								{loading ? "Sending code..." : "Send code"}
+							</Button>
+						</form>
+					) : (
+						<Button
 							type="button"
+							variant="outline"
 							onClick={() => {
-								clearPendingEmailLoginCodeDraft();
-								trackAuthenticationAction({
-									actionName: "open_signup",
-									sourceComponent: "login_form",
-								});
-								onSwitchToSignup();
+								setFeedback(null);
+								setEmailCode("");
+								setEmailCodeStage("email");
+								setShowEmailForm(true);
 							}}
+						>
+							Log in with Email
+						</Button>
+					)}
+
+					<p className="text-center text-xs text-muted-foreground">
+						By signing up, you agree to our{" "}
+						<a
+							href="https://opaline.so/terms"
+							target="_blank"
+							rel="noopener noreferrer"
 							className="underline underline-offset-4 hover:text-primary"
 						>
-							Sign up
-						</button>
+							Terms of Service
+						</a>{" "}
+						and{" "}
+						<a
+							href="https://opaline.so/privacy"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="underline underline-offset-4 hover:text-primary"
+						>
+							Privacy Policy
+						</a>
 					</p>
-				)}
-			</div>
+
+					{hideSwitchPrompt ? null : (
+						<p className="text-center text-sm text-muted-foreground">
+							Don&apos;t have an account?{" "}
+							<a
+								href="/welcome"
+								onClick={() => {
+									clearPendingEmailLoginCodeDraft();
+									trackAuthenticationAction({
+										actionName: "open_signup",
+										sourceComponent: "login_form",
+									});
+								}}
+								className="underline underline-offset-4 hover:text-primary"
+							>
+								Get started
+							</a>
+						</p>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

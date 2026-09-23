@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
 	getWorkspaceRelativePath,
@@ -17,7 +17,6 @@ import {
 	isGetStartedPath,
 	isResetPasswordPath,
 } from "@/features/auth/auth-route-utils";
-import { DeviceAuthorizationApp } from "@/features/auth/DeviceAuthorizationApp";
 import { GuestApp } from "@/features/auth/GuestApp";
 import { useOAuthDebugAutoDump } from "@/features/auth/oauth-debug";
 import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
@@ -87,6 +86,7 @@ function SessionAwareApp() {
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
 	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
+	const isLegacyDevicePath = location.pathname === "/device";
 	const rootRedirectTarget =
 		getValidRedirect(location.search) ??
 		(location.pathname === "/"
@@ -99,16 +99,12 @@ function SessionAwareApp() {
 		return <NotFoundPage />;
 	}
 
-	if (deviceUserCode && !isCliSetupPath) {
+	if (isLegacyDevicePath || (deviceUserCode && !isCliSetupPath)) {
 		return (
-			<>
-				<ProductAnalyticsSessionSync session={session} />
-				<DeviceAuthorizationApp
-					key={deviceUserCode}
-					deviceUserCode={deviceUserCode}
-					session={session ?? null}
-				/>
-			</>
+			<Navigate
+				replace
+				to={`${CLI_SETUP_PATH}${location.search}${location.hash}`}
+			/>
 		);
 	}
 

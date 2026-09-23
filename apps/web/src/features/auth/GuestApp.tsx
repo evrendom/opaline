@@ -3,6 +3,8 @@ import { useState } from "react";
 import { readPendingEmailCodeDraft } from "@/features/auth/email-code-auth";
 import { LoginForm } from "@/features/auth/LoginForm";
 import { SignupForm } from "@/features/auth/SignupForm";
+import "@/features/shell/website-button.css";
+import "./guest-app.css";
 
 type Page = "login" | "signup";
 
@@ -18,36 +20,38 @@ export function GuestApp(props: GuestAppProps = {}) {
 	const [page, setPage] = useState<Page>(
 		() => readPendingEmailCodeDraft()?.mode ?? "login",
 	);
+	const pageTitle =
+		title ?? (page === "login" ? "Welcome back" : "Create your account");
+	const pageDescription =
+		description ??
+		(page === "login"
+			? "Sign in to continue to Opaline."
+			: "Create an account to start exploring your coding sessions.");
 
 	return (
-		<div className="flex min-h-screen flex-col items-center justify-center gap-6">
-			{showLogo ? (
-				<img src="/favicon-light.svg" alt="Opaline" className="h-10 w-10" />
-			) : null}
-			{eyebrow || title || description ? (
-				<div className="max-w-2xl space-y-3 px-4 text-center">
-					{eyebrow ? (
-						<p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-							{eyebrow}
-						</p>
-					) : null}
-					{title ? (
-						<h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-							{title}
-						</h1>
-					) : null}
-					{description ? (
-						<p className="text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
-							{description}
-						</p>
-					) : null}
+		<div className="opaline-auth-shell">
+			<main className="opaline-auth-main">
+				<div className="opaline-auth-content">
+					<div className="opaline-auth-intro">
+						{showLogo ? (
+							<img
+								className="opaline-auth-mark"
+								src="/opaline-icon.svg"
+								alt="Opaline"
+							/>
+						) : null}
+						{eyebrow ? <p className="opaline-auth-eyebrow">{eyebrow}</p> : null}
+						<h1>{pageTitle}</h1>
+						<p>{pageDescription}</p>
+					</div>
+
+					{page === "login" ? (
+						<LoginForm />
+					) : (
+						<SignupForm onSwitchToLogin={() => setPage("login")} />
+					)}
 				</div>
-			) : null}
-			{page === "login" ? (
-				<LoginForm onSwitchToSignup={() => setPage("signup")} />
-			) : (
-				<SignupForm onSwitchToLogin={() => setPage("login")} />
-			)}
+			</main>
 		</div>
 	);
 }

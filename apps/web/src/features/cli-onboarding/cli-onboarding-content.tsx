@@ -12,6 +12,7 @@ import "./welcome.css";
 export function CliOnboardingContent({
 	snapshot,
 	authorization,
+	deviceUserCode,
 	connectionError,
 	displayCommand,
 	onCopy,
@@ -19,6 +20,7 @@ export function CliOnboardingContent({
 }: {
 	snapshot: CliConnectionSnapshot | null;
 	authorization: CliAuthorization | null;
+	deviceUserCode: string | null;
 	connectionError: string | null;
 	displayCommand: string;
 	onCopy: () => Promise<boolean>;
@@ -28,13 +30,17 @@ export function CliOnboardingContent({
 	const stopped =
 		snapshot && ["failed", "cancelled", "expired"].includes(snapshot.state);
 	const needsReconnect = Boolean(connectionError || stopped);
+	const hasDeviceAuthorization = deviceUserCode !== null;
 	return (
 		<>
 			{panel &&
 				createPortal(
 					<WelcomePanel>
-						{!needsReconnect && snapshot && authorization ? (
+						{hasDeviceAuthorization ? (
+							<CliSignIn mode="device" userCode={deviceUserCode} />
+						) : !needsReconnect && snapshot && authorization ? (
 							<CliSignIn
+								mode="paired"
 								snapshot={snapshot}
 								authorization={authorization}
 								onFinish={onFinish}
@@ -69,7 +75,9 @@ export function CliOnboardingContent({
 					</WelcomePanel>,
 					panel,
 				)}
-			<WelcomeSessionPreview snapshot={needsReconnect ? null : snapshot} />
+			<WelcomeSessionPreview
+				snapshot={hasDeviceAuthorization || needsReconnect ? null : snapshot}
+			/>
 		</>
 	);
 }
