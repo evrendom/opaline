@@ -138,6 +138,7 @@ if (cliDeviceVerification.warning) {
 
 export const auth = createAuth(db, {
 	appURL,
+	crm: { accessToken: process.env.CRM_ACCESS_TOKEN },
 	frontendURL: preferredFrontendOrigin,
 	secret: betterAuthSecret,
 	resend,

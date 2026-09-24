@@ -24,6 +24,7 @@ const organizationIds: string[] = [];
 const userIds: string[] = [];
 const testAuth = createAuth(db, {
 	appURL: "http://localhost:4010",
+	crm: undefined,
 	frontendURL: "http://localhost:4011",
 	secret: "team-invite-integration-secret-at-least-32-characters",
 });

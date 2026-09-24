@@ -11,6 +11,11 @@ import {
 	readBlockedBillingAnalyticsCount,
 	runBillingAnalyticsOutboxPass,
 } from "../services/billing-analytics-outbox.service.js";
+import {
+	refreshAllCustomerAccountSnapshots,
+	refreshCustomerUsageSnapshots,
+	runCustomerAccountCRMPass,
+} from "../services/customer-account-snapshot.service.js";
 
 const logger = getLogger(["rudel", "api", "billing-maintenance"]);
 
@@ -18,6 +23,9 @@ export interface BillingMaintenanceResult {
 	analytics: number;
 	blockedAnalytics: number;
 	blockedWebhooks: number;
+	customerAccounts: number;
+	customerUsage: number;
+	crm: number;
 	ok: boolean;
 	pendingSeatCharges: number;
 	seats: number;
@@ -29,6 +37,8 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 	const webhooks = await runStripeWebhookPass(20);
 	const seats = await reconcileBillingSeats(5);
 	const analytics = await runBillingAnalyticsOutboxPass(50);
+	const { crm, customerAccounts, customerUsage } =
+		await runCustomerAccountMaintenance();
 	const blockedWebhooks = await readBlockedStripeWebhookCount();
 	const blockedAnalytics = await readBlockedBillingAnalyticsCount();
 	const retryingWebhooks = await readRetryingStripeWebhookCount();
@@ -59,8 +69,11 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 	}
 	return {
 		analytics,
+		crm,
 		blockedAnalytics,
 		blockedWebhooks,
+		customerAccounts,
+		customerUsage,
 		ok:
 			blockedAnalytics === 0 &&
 			blockedWebhooks === 0 &&
@@ -70,6 +83,41 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 		seats,
 		webhooks,
 	};
+}
+
+async function runCustomerAccountMaintenance(): Promise<{
+	crm: number;
+	customerAccounts: number;
+	customerUsage: number;
+}> {
+	let customerAccounts = 0;
+	let customerUsage = 0;
+	let crm = 0;
+	try {
+		customerAccounts = await refreshAllCustomerAccountSnapshots();
+	} catch (error) {
+		logger.error("Customer account projection refresh failed: {error}", {
+			error: String(error),
+		});
+	}
+	try {
+		customerUsage = await refreshCustomerUsageSnapshots(100);
+	} catch (error) {
+		logger.error("Customer account usage refresh failed: {error}", {
+			error: String(error),
+		});
+	}
+	try {
+		crm = await runCustomerAccountCRMPass(
+			{ accessToken: process.env.CRM_ACCESS_TOKEN },
+			50,
+		);
+	} catch (error) {
+		logger.error("Customer account CRM delivery failed: {error}", {
+			error: String(error),
+		});
+	}
+	return { crm, customerAccounts, customerUsage };
 }
 
 export async function handleBillingReconciliationMaintenanceRequest(

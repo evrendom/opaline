@@ -14,12 +14,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0041_TIMESTAMP = "1790058953161";
+const MIGRATION_0042_TIMESTAMP = "1790248718000";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0041 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0042 to a database already migrated through 0019", async () => {
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough0019();
@@ -52,7 +52,7 @@ test("applies migrations 0020-0041 to a database already migrated through 0019",
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0041] = await migrationSql<MigrationState[]>`
+			const [after0042] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,10 +61,14 @@ test("applies migrations 0020-0041 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0041).toEqual({
-				count: 42,
-				latestTimestamp: MIGRATION_0041_TIMESTAMP,
+			expect(after0042).toEqual({
+				count: 43,
+				latestTimestamp: MIGRATION_0042_TIMESTAMP,
 			});
+			const [customerAccountTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.customer_account_snapshot')::text AS name
+			`;
+			expect(customerAccountTable?.name).toBe("customer_account_snapshot");
 			const billingTables = await migrationSql<Array<{ name: string }>>`
 				SELECT tablename AS name
 				FROM pg_tables

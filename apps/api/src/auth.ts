@@ -5,6 +5,7 @@ import * as schema from "@rudel/sql-schema";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
+import { type CRMConfig, syncSignupToCRM } from "./crm.js";
 import {
 	createDefaultOrganizationWithRetry,
 	createOrganizationPlugin,
@@ -24,6 +25,7 @@ import {
 	reconcileOrganizationBillingSeats,
 } from "./services/billing.service.js";
 import { getOrganizationMemberLimit } from "./services/billing-entitlements.service.js";
+import { refreshCustomerAccountSnapshot } from "./services/customer-account-snapshot.service.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
 const logger = getLogger(["rudel", "api", "auth"]);
@@ -83,6 +85,7 @@ function toTrackedOrganizationRole(
 
 export interface AuthConfig {
 	appURL: string;
+	crm: CRMConfig | undefined;
 	cookiePrefix?: string;
 	frontendURL: string;
 	secret: string;
@@ -217,6 +220,9 @@ export function createAuth(db: object, config: AuthConfig) {
 				create: {
 					after: async (user, ctx) => {
 						const adapter = ctx?.context?.adapter;
+						let defaultWorkspace:
+							| { id: string; name: string; slug: string }
+							| undefined;
 						let organizationId: string | undefined;
 						let isDefaultOrganizationReady = false;
 						let accounts: Array<{
@@ -255,6 +261,11 @@ export function createAuth(db: object, config: AuthConfig) {
 										},
 									});
 									organizationId = org.id;
+									defaultWorkspace = {
+										id: org.id,
+										name: org.name,
+										slug: org.slug,
+									};
 									isDefaultOrganizationReady = true;
 								}
 							}
@@ -263,6 +274,17 @@ export function createAuth(db: object, config: AuthConfig) {
 								"Failed to create default organization for user {userId}: {error}",
 								{ userId: user.id, error: err },
 							);
+						}
+
+						if (organizationId) {
+							try {
+								await refreshCustomerAccountSnapshot(organizationId);
+							} catch (err) {
+								logger.error(
+									"Failed to refresh customer account for new user {userId}: {error}",
+									{ error: err, userId: user.id },
+								);
+							}
 						}
 
 						try {
@@ -283,6 +305,13 @@ export function createAuth(db: object, config: AuthConfig) {
 								is_default_organization_ready: isDefaultOrganizationReady,
 								organization_id: organizationId,
 							},
+						});
+
+						await syncSignupToCRM(config.crm, {
+							email: user.email,
+							id: user.id,
+							name: getUserDisplayName(user),
+							workspace: defaultWorkspace,
 						});
 
 						await syncSignupContact(resend, {

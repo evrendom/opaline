@@ -14,6 +14,7 @@ import {
 	parseBillingDatabaseTimestamp,
 	type UserBillingRow,
 } from "./billing-analytics-domain.js";
+import { refreshCustomerAccountSnapshot } from "./customer-account-snapshot.service.js";
 
 type BillingSql = postgres.Sql | postgres.TransactionSql;
 
@@ -189,6 +190,7 @@ export async function enqueueBillingTraitsForOrganization(
 		members.map((member) => member.user_id),
 		executor,
 	);
+	await refreshCustomerAccountSnapshot(organizationId, executor);
 }
 
 export async function runBillingAnalyticsOutboxPass(

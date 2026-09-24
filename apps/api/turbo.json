@@ -4,6 +4,7 @@
 		"dev": {
 			"passThroughEnv": [
 				"$TURBO_EXTENDS$",
+				"CRM_ACCESS_TOKEN",
 				"PG_DIRECT_CONNECTION_STRING",
 				"TRUSTED_PROXY_HOPS",
 				"CRON_SECRET",

@@ -7,6 +7,7 @@ import {
 import { z } from "zod";
 import { sqlClient } from "../db.js";
 import { FreeWorkspaceMonthlyAgentRunLimitExceededError } from "../services/billing-entitlements.service.js";
+import { refreshCustomerAccountSnapshot } from "../services/customer-account-snapshot.service.js";
 import { claimSessionIngestOwnership } from "../services/session-ownership.service.js";
 import {
 	type ApiTestServer,
@@ -109,6 +110,37 @@ test("returns the active paid workspace plan to a teammate", async () => {
 		billingPeriod: "yearly",
 		hasBillingAccount: true,
 		plan: "business",
+	});
+});
+
+test("projects current account and payment state for CRM delivery", async () => {
+	await refreshCustomerAccountSnapshot(userId);
+	const [account] = await sqlClient<
+		Array<{
+			billing_period: string;
+			billing_plan: string;
+			member_count: number;
+			payment_status: string;
+			seat_quantity: number;
+			subscription_status: string;
+		}>
+	>`SELECT
+		billing_period,
+		billing_plan,
+		member_count,
+		payment_status,
+		seat_quantity,
+		subscription_status
+	FROM customer_account_snapshot
+	WHERE organization_id = ${userId}`;
+
+	expect(account).toEqual({
+		billing_period: "yearly",
+		billing_plan: "business",
+		member_count: 2,
+		payment_status: "paid",
+		seat_quantity: 3,
+		subscription_status: "active",
 	});
 });
 
