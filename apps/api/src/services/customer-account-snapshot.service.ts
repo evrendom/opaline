@@ -17,12 +17,12 @@ interface CustomerAccountRow {
 	crm_sync_attempt_count: number;
 	billing_period: string;
 	billing_plan: string;
-	last_active_at: Date | null;
+	last_active_at: Date | string | null;
 	last_paid_amount: number | null;
-	last_paid_at: Date | null;
+	last_paid_at: Date | string | null;
 	last_paid_currency: string | null;
 	member_count: number;
-	organization_created_at: Date;
+	organization_created_at: Date | string;
 	organization_id: string;
 	organization_name: string;
 	organization_slug: string;
