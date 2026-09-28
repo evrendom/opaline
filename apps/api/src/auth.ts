@@ -220,9 +220,6 @@ export function createAuth(db: object, config: AuthConfig) {
 				create: {
 					after: async (user, ctx) => {
 						const adapter = ctx?.context?.adapter;
-						let defaultWorkspace:
-							| { id: string; name: string; slug: string }
-							| undefined;
 						let organizationId: string | undefined;
 						let isDefaultOrganizationReady = false;
 						let accounts: Array<{
@@ -261,11 +258,6 @@ export function createAuth(db: object, config: AuthConfig) {
 										},
 									});
 									organizationId = org.id;
-									defaultWorkspace = {
-										id: org.id,
-										name: org.name,
-										slug: org.slug,
-									};
 									isDefaultOrganizationReady = true;
 								}
 							}
@@ -308,10 +300,10 @@ export function createAuth(db: object, config: AuthConfig) {
 						});
 
 						await syncSignupToCRM(config.crm, {
+							createdAt: user.createdAt,
 							email: user.email,
 							id: user.id,
 							name: getUserDisplayName(user),
-							workspace: defaultWorkspace,
 						});
 
 						await syncSignupContact(resend, {

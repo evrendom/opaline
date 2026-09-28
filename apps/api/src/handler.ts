@@ -11,6 +11,7 @@ import {
 	handleAvatarUploadRequest,
 } from "./handlers/avatar-http.js";
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
+import { handleCustomerActivityRequest } from "./handlers/customer-activity-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
@@ -519,6 +520,17 @@ async function handleRequest(
 		for (const [key, value] of Object.entries(cors))
 			response.headers.set(key, value);
 		return response;
+	}
+	if (url.pathname === "/api/customer-activity") {
+		return handleCustomerActivityRequest({
+			crm: { accessToken: process.env.CRM_ACCESS_TOKEN },
+			cors,
+			getUser: async () => {
+				const session = await auth.api.getSession({ headers: request.headers });
+				return session?.user ?? null;
+			},
+			request,
+		});
 	}
 	const invitationPresentationMatch =
 		/^\/api\/invitations\/([^/]+)\/presentation$/u.exec(url.pathname);

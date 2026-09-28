@@ -1,5 +1,8 @@
 import { getLogger } from "@logtape/logtape";
+import { getClickhouse } from "../clickhouse.js";
+import { sqlClient } from "../db.js";
 import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
+import { syncCRMCustomer360 } from "../services/crm-company.service.js";
 import {
 	readBlockedStripeWebhookCount,
 	readPendingSeatChargeCount,
@@ -14,7 +17,6 @@ import {
 import {
 	refreshAllCustomerAccountSnapshots,
 	refreshCustomerUsageSnapshots,
-	runCustomerAccountCRMPass,
 } from "../services/customer-account-snapshot.service.js";
 
 const logger = getLogger(["rudel", "api", "billing-maintenance"]);
@@ -26,6 +28,7 @@ export interface BillingMaintenanceResult {
 	customerAccounts: number;
 	customerUsage: number;
 	crm: number;
+	crmCompanies: number;
 	ok: boolean;
 	pendingSeatCharges: number;
 	seats: number;
@@ -37,7 +40,7 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 	const webhooks = await runStripeWebhookPass(20);
 	const seats = await reconcileBillingSeats(5);
 	const analytics = await runBillingAnalyticsOutboxPass(50);
-	const { crm, customerAccounts, customerUsage } =
+	const { crm, crmCompanies, customerAccounts, customerUsage } =
 		await runCustomerAccountMaintenance();
 	const blockedWebhooks = await readBlockedStripeWebhookCount();
 	const blockedAnalytics = await readBlockedBillingAnalyticsCount();
@@ -70,6 +73,7 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 	return {
 		analytics,
 		crm,
+		crmCompanies,
 		blockedAnalytics,
 		blockedWebhooks,
 		customerAccounts,
@@ -87,12 +91,14 @@ export async function runBillingMaintenancePass(): Promise<BillingMaintenanceRes
 
 async function runCustomerAccountMaintenance(): Promise<{
 	crm: number;
+	crmCompanies: number;
 	customerAccounts: number;
 	customerUsage: number;
 }> {
 	let customerAccounts = 0;
 	let customerUsage = 0;
 	let crm = 0;
+	let crmCompanies = 0;
 	try {
 		customerAccounts = await refreshAllCustomerAccountSnapshots();
 	} catch (error) {
@@ -108,16 +114,19 @@ async function runCustomerAccountMaintenance(): Promise<{
 		});
 	}
 	try {
-		crm = await runCustomerAccountCRMPass(
+		const result = await syncCRMCustomer360(
 			{ accessToken: process.env.CRM_ACCESS_TOKEN },
-			50,
+			sqlClient,
+			getClickhouse(),
 		);
+		crm = result.people;
+		crmCompanies = result.companies;
 	} catch (error) {
-		logger.error("Customer account CRM delivery failed: {error}", {
+		logger.error("CRM company delivery failed: {error}", {
 			error: String(error),
 		});
 	}
-	return { crm, customerAccounts, customerUsage };
+	return { crm, crmCompanies, customerAccounts, customerUsage };
 }
 
 export async function handleBillingReconciliationMaintenanceRequest(

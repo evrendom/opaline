@@ -1,35 +1,8 @@
-import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
-import {
-	type CRMConfig,
-	ensureCRMWorkspaceAttributes,
-	syncWorkspaceToCRM,
-} from "../crm.js";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 
 type CustomerAccountSql = postgres.Sql | postgres.TransactionSql;
-
-interface CustomerAccountRow {
-	active_members_30d: number;
-	agent_runs_7d: number;
-	agent_runs_30d: number;
-	crm_sync_attempt_count: number;
-	billing_period: string;
-	billing_plan: string;
-	last_active_at: Date | string | null;
-	last_paid_amount: number | null;
-	last_paid_at: Date | string | null;
-	last_paid_currency: string | null;
-	member_count: number;
-	organization_created_at: Date | string;
-	organization_id: string;
-	organization_name: string;
-	organization_slug: string;
-	payment_status: string;
-	seat_quantity: number;
-	subscription_status: string;
-}
 
 interface CustomerUsageRow {
 	active_members_30d: number;
@@ -38,9 +11,6 @@ interface CustomerUsageRow {
 	last_active_at: string | null;
 	organization_id: string;
 }
-
-const logger = getLogger(["rudel", "api", "customer-account-snapshot"]);
-const MAX_CRM_ATTEMPTS = 36;
 
 export async function refreshCustomerAccountSnapshot(
 	organizationId: string,
@@ -103,11 +73,6 @@ export async function refreshCustomerUsageSnapshots(
 				active_members_30d = $4,
 				last_active_at = $5,
 				usage_refreshed_at = NOW(),
-				crm_sync_pending_at = NOW(),
-				crm_synced_at = NULL,
-				crm_sync_attempt_count = 0,
-				crm_next_attempt_at = NOW(),
-				crm_last_error = NULL,
 				updated_at = NOW()
 			WHERE organization_id = $1`,
 			[
@@ -120,92 +85,6 @@ export async function refreshCustomerUsageSnapshots(
 		);
 	}
 	return organizationIds.length;
-}
-
-export async function runCustomerAccountCRMPass(
-	config: CRMConfig | undefined,
-	limit = 20,
-	executor: CustomerAccountSql = sqlClient,
-): Promise<number> {
-	assertBatchSize(limit);
-	if (!config?.accessToken?.trim()) return 0;
-	await ensureCRMWorkspaceAttributes(config);
-	let processed = 0;
-	for (let index = 0; index < limit; index += 1) {
-		const [row] = await executor.unsafe<CustomerAccountRow[]>(
-			`SELECT *
-			FROM customer_account_snapshot
-			WHERE crm_synced_at IS NULL
-				AND crm_sync_attempt_count < $1
-				AND crm_next_attempt_at <= NOW()
-			ORDER BY crm_next_attempt_at, organization_id
-			LIMIT 1`,
-			[MAX_CRM_ATTEMPTS],
-		);
-		if (!row) break;
-		try {
-			await syncWorkspaceToCRM(config, {
-				activeMembers30d: row.active_members_30d,
-				agentRuns7d: row.agent_runs_7d,
-				agentRuns30d: row.agent_runs_30d,
-				billingPeriod: row.billing_period,
-				billingPlan: row.billing_plan,
-				createdAt: row.organization_created_at,
-				id: row.organization_id,
-				lastActiveAt: row.last_active_at,
-				lastPaidAmount: row.last_paid_amount,
-				lastPaidAt: row.last_paid_at,
-				lastPaidCurrency: row.last_paid_currency,
-				lifecycleStage: getLifecycleStage(row),
-				memberCount: row.member_count,
-				name: row.organization_name,
-				paymentStatus: row.payment_status,
-				seatQuantity: row.seat_quantity,
-				slug: row.organization_slug,
-				subscriptionStatus: row.subscription_status,
-			});
-			await executor.unsafe(
-				`UPDATE customer_account_snapshot
-				SET crm_synced_at = NOW(), crm_last_error = NULL, updated_at = NOW()
-				WHERE organization_id = $1`,
-				[row.organization_id],
-			);
-		} catch (error) {
-			const attemptCount = row.crm_sync_attempt_count + 1;
-			await executor.unsafe(
-				`UPDATE customer_account_snapshot
-				SET crm_sync_attempt_count = $2,
-					crm_next_attempt_at = NOW() + ($3 * INTERVAL '1 millisecond'),
-					crm_last_error = $4,
-					updated_at = NOW()
-				WHERE organization_id = $1`,
-				[
-					row.organization_id,
-					attemptCount,
-					crmRetryDelayMs(attemptCount),
-					String(error).slice(0, 2_000),
-				],
-			);
-			logger.error(
-				"Failed to sync customer account {organizationId} to CRM: {error}",
-				{ error, organizationId: row.organization_id },
-			);
-		}
-		processed += 1;
-	}
-	return processed;
-}
-
-function getLifecycleStage(
-	row: Pick<
-		CustomerAccountRow,
-		"agent_runs_30d" | "billing_plan" | "member_count"
-	>,
-): "signed_up" | "activated" | "team" | "paid" {
-	if (row.billing_plan !== "free") return "paid";
-	if (row.member_count > 1) return "team";
-	if (row.agent_runs_30d > 0) return "activated";
-	return "signed_up";
 }
 
 async function refreshOperationalSnapshots(
@@ -250,11 +129,6 @@ async function refreshOperationalSnapshots(
 			last_paid_amount = EXCLUDED.last_paid_amount,
 			last_paid_currency = EXCLUDED.last_paid_currency,
 			last_paid_at = EXCLUDED.last_paid_at,
-			crm_sync_pending_at = NOW(),
-			crm_synced_at = NULL,
-			crm_sync_attempt_count = 0,
-			crm_next_attempt_at = NOW(),
-			crm_last_error = NULL,
 			updated_at = NOW()
 		WHERE ROW(
 			customer_account_snapshot.organization_name,
@@ -286,8 +160,4 @@ function assertBatchSize(limit: number): void {
 	if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
 		throw new Error("Customer account batch size must be between 1 and 100");
 	}
-}
-
-function crmRetryDelayMs(attemptCount: number): number {
-	return Math.min(60 * 60 * 1000, 1000 * 2 ** Math.min(attemptCount, 12));
 }

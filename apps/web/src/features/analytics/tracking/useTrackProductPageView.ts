@@ -5,6 +5,7 @@ import {
 	captureDashboardViewed,
 	isDashboardPageName,
 } from "@/lib/product-analytics";
+import { recordDailyCustomerActivity } from "./customer-activity";
 
 export type PageViewSectionState = "populated" | "empty" | "error" | "hidden";
 
@@ -239,6 +240,7 @@ export function useTrackProductPageView(options: {
 		) {
 			return;
 		}
+		void recordDailyCustomerActivity(userId);
 
 		const viewedRangeKey = `${userId}:${organizationId}:${pageName}:${startDate}:${endDate}`;
 		if (viewedRangeKeyRef.current === viewedRangeKey) {
