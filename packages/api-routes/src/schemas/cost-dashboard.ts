@@ -25,7 +25,7 @@ export const AgentRunDurationIntervalSchema = z.enum([
 	"quarterly",
 	"yearly",
 ]);
-export const CostDashboardInputSchema = DateRangeInputSchema.extend({
+const CostDashboardInputBaseSchema = DateRangeInputSchema.extend({
 	requestedMetric: z
 		.enum(["cost", "sessions", "signals", "agentRuns"])
 		.optional(),
@@ -42,14 +42,35 @@ export const CostDashboardInputSchema = DateRangeInputSchema.extend({
 		.max(2)
 		.default([]),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]).default("none"),
-}).refine(
-	(input) => {
-		const days =
-			(Date.parse(input.endDate) - Date.parse(input.startDate)) / 86_400_000;
-		return days >= 0 && days < 366;
-	},
-	{ message: "Choose a date range of up to one year." },
+});
+function isWithinOneYear(input: { startDate: string; endDate: string }) {
+	const days =
+		(Date.parse(input.endDate) - Date.parse(input.startDate)) / 86_400_000;
+	return days >= 0 && days < 366;
+}
+const ONE_YEAR_MESSAGE = { message: "Choose a date range of up to one year." };
+export const CostDashboardInputSchema = CostDashboardInputBaseSchema.refine(
+	isWithinOneYear,
+	ONE_YEAR_MESSAGE,
 );
+// Anonymous cross-tenant operator view: members and repositories are neither
+// filterable nor split targets, so user identities and customer repository
+// names never leave the API.
+export const AdminCostDashboardInputSchema = CostDashboardInputBaseSchema.omit({
+	members: true,
+	repositories: true,
+})
+	.extend({
+		requestedMetric: z.enum(["cost", "sessions", "signals", "agentRuns"]),
+		splitBy: z
+			.enum([
+				"none",
+				...CostDimensionSchema.exclude(["members", "repositories"]).options,
+			])
+			.default("none"),
+	})
+	.strict()
+	.refine(isWithinOneYear, ONE_YEAR_MESSAGE);
 
 export const CostBreakdownEntrySchema = z.object({
 	id: z.string(),
@@ -135,5 +156,8 @@ export type DashboardMetric = z.infer<typeof DashboardMetricSchema>;
 export type DashboardMetricData = z.infer<typeof DashboardMetricDataSchema>;
 export type CostDimension = z.infer<typeof CostDimensionSchema>;
 export type CostDashboardInput = z.infer<typeof CostDashboardInputSchema>;
+export type AdminCostDashboardInput = z.infer<
+	typeof AdminCostDashboardInputSchema
+>;
 export type CostDashboard = z.infer<typeof CostDashboardSchema>;
 export type CostBreakdownEntry = z.infer<typeof CostBreakdownEntrySchema>;

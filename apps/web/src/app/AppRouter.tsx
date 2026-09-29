@@ -34,6 +34,10 @@ function lazyNamed<TModule extends Record<string, unknown>>(
 	});
 }
 
+const AdminDashboardPage = lazyNamed(
+	() => import("@/features/admin/AdminDashboardPage"),
+	"AdminDashboardPage",
+);
 const CliOnboardingPage = lazyNamed(
 	() => import("@/features/cli-onboarding/cli-onboarding-page"),
 	"CliOnboardingPage",
@@ -308,6 +312,10 @@ export function AppRouter({
 			<Route
 				path="/team/invite/:token"
 				element={<LazyRoute Component={TeamInviteAcceptPage} />}
+			/>
+			<Route
+				path={appRoutes.admin()}
+				element={<LazyRoute Component={AdminDashboardPage} />}
 			/>
 			<Route
 				path="/:workspaceSlug/join/:token"

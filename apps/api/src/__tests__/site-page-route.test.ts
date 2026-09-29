@@ -63,6 +63,7 @@ test("login, pairing, onboarding, and existing app aliases remain available", ()
 		"/team",
 		"/skills",
 		"/repos",
+		"/admin",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "app" });
 	}

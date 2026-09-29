@@ -1,6 +1,10 @@
 import { SESSION_LINEAGE_DERIVATION_VERSION } from "@rudel/api-routes";
 import { getSafeClickHouseTable } from "../clickhouse.js";
 import { shouldReadSessionLineage } from "../lib/env.js";
+import {
+	type AnalyticsTenant,
+	organizationMatchSql,
+} from "./analytics-tenant.js";
 
 const SESSION_LINEAGE_TABLE = "rudel.session_lineage";
 const LINKED_SUBAGENT_ARRAY_TYPE =
@@ -16,6 +20,7 @@ export const SESSION_HAS_SUBAGENTS_SQL = buildSessionHasSubagentsSql();
 
 export function buildSessionLineageCteDefinitions(
 	enabled = shouldReadSessionLineage(),
+	tenant: AnalyticsTenant = "organization",
 ): string {
 	return `
 		session_lineage_current AS (
@@ -31,7 +36,7 @@ export function buildSessionLineageCteDefinitions(
 				argMax(outcome, replacement_version) AS outcome,
 				argMax(countable, replacement_version) AS countable
 			FROM ${getSafeClickHouseTable(SESSION_LINEAGE_TABLE)}
-			WHERE organization_id = {orgId:String}
+			WHERE ${organizationMatchSql("organization_id", tenant)}
 				AND derivation_version = ${SESSION_LINEAGE_DERIVATION_VERSION}
 			GROUP BY organization_id, user_id, child_source, child_session_id
 		),

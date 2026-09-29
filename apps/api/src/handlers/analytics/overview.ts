@@ -105,7 +105,10 @@ const successRate = os.analytics.overview.successRate
 const costs = os.analytics.overview.costs
 	.use(orgMiddleware)
 	.handler(({ input, context }) =>
-		getCostDashboard(context.organizationId, input),
+		getCostDashboard(
+			{ tenant: "organization", orgId: context.organizationId },
+			input,
+		),
 	);
 
 export const overviewRouter = os.analytics.overview.router({

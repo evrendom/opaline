@@ -162,6 +162,22 @@ describe("usage-event analytics query contract", () => {
 		expect(eventsSql).toContain("sa.linked_subagents AS linked_subagents");
 	});
 
+	test("drops every tenant binding for all-organization reads", () => {
+		const legacySql = buildLegacyUsageAnalyticsCte(true, "allOrganizations");
+		const eventsSql = buildUsageEventAnalyticsCte(
+			{ tenant: "allOrganizations" },
+			true,
+		);
+
+		for (const sql of [legacySql, eventsSql]) {
+			expect(sql).not.toContain("{orgId:String}");
+			expect(sql).toContain("FROM rudel.session_lineage");
+		}
+		expect(buildLegacyUsageAnalyticsCte(true)).toContain(
+			"WHERE organization_id = {orgId:String}",
+		);
+	});
+
 	test("prices legacy cache writes at the 1-hour tier", () => {
 		const sql = buildLegacyUsageAnalyticsCte();
 		const oneHourTierSql = buildEstimatedCostSql({

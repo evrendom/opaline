@@ -33,7 +33,7 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 		SETTINGS_PATH.test(path) ||
 		SESSION_PATH.test(path) ||
 		LEGACY_PATH.test(path) ||
-		/^\/(?:skills|repos|team|invitation\/[^/]+)$/u.test(path)
+		/^\/(?:admin|skills|repos|team|invitation\/[^/]+)$/u.test(path)
 	)
 		return { kind: "app" };
 

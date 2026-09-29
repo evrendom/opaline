@@ -1,5 +1,6 @@
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ReactNode } from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { CHART_INTERVALS } from "./chart-interval";
@@ -7,10 +8,24 @@ import { ChartIntervalPicker } from "./chart-interval-picker";
 import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
 import { costLabel, getMetricData, METRIC_LABELS } from "./cost-format";
-import { COST_LABELS, useCostDashboard } from "./use-cost-dashboard";
+import {
+	COST_LABELS,
+	type CostDashboardController,
+	useCostDashboard,
+} from "./use-cost-dashboard";
 import "./cost-dashboard.css";
 
 export function CostDashboardPage() {
+	return <CostDashboardView dashboard={useCostDashboard()} />;
+}
+
+export function CostDashboardView({
+	dashboard,
+	toolbarStart,
+}: {
+	dashboard: CostDashboardController;
+	toolbarStart?: ReactNode;
+}) {
 	const {
 		input,
 		query,
@@ -22,7 +37,7 @@ export function CostDashboardPage() {
 		clear,
 		setSplit,
 		setMetric,
-	} = useCostDashboard();
+	} = dashboard;
 	const { data, isPending, isError } = query;
 	const selectedData = getMetricData(data, metric);
 	const filtered = dimensions.some((dimension) => input[dimension].length > 0);
@@ -38,6 +53,7 @@ export function CostDashboardPage() {
 				data-fluid-menu-root=""
 			>
 				<FluidMenuHover items="button" />
+				{toolbarStart}
 				<DashboardDateControls
 					className="h-7 shrink-0 gap-1.5 rounded-md border-0 bg-(--cost-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--cost-foreground) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--cost-hover) focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--cost-blue) has-data-[icon=inline-start]:pl-1.5 aria-expanded:bg-(--cost-hover) sm:h-7 sm:text-sm dark:bg-(--cost-surface) dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent] dark:hover:bg-(--cost-hover) [&_svg]:size-4 [&_svg]:h-lh [&_svg]:text-[#5d5d5d] dark:[&_svg]:text-[#acaeb2]"
 					sourceComponent="cost_dashboard_date_picker"

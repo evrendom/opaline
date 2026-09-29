@@ -1,10 +1,13 @@
 import type {
+	AdminCostDashboardInput,
+	CostDashboard,
 	CostDashboardInput,
 	CostDimension,
 	DashboardMetric,
 	DashboardSignal,
 } from "@rudel/api-routes";
 import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
+import { type Query, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -18,6 +21,9 @@ export const COST_DIMENSIONS: CostDimension[] = [
 	"repositories",
 	"models",
 ];
+// The all-users admin view is anonymous: no member or repository facets. The
+// API rejects both too.
+const ADMIN_COST_DIMENSIONS: CostDimension[] = ["models"];
 export const RUN_DIMENSIONS: CostDimension[] = [
 	"runSignals",
 	"durations",
@@ -40,9 +46,74 @@ export const COST_LABELS = {
 	skillsUsed: "Skills used",
 };
 
+export type CostDashboardController = ReturnType<typeof useCostDashboard>;
+
 export function useCostDashboard() {
-	const { state: dates } = useDateRange();
 	const { state: workspace } = useOrganization();
+	const state = useCostDashboardState(COST_DIMENSIONS);
+	const { input, metric } = state;
+	const query = useAnalyticsQuery({
+		...orpc.analytics.overview.costs.queryOptions({ input }),
+		staleTime: 60_000,
+		placeholderData: (previous, previousQuery) =>
+			previousQuery?.queryKey[1] === workspace.activeOrg?.id &&
+			previous?.requestedMetric === metric
+				? previous
+				: undefined,
+		refetchOnWindowFocus: false,
+		refetchInterval: (query) => indexingRefetchInterval(query, metric),
+	});
+	return { ...state, query };
+}
+
+export function useAdminCostDashboard(): CostDashboardController {
+	const state = useCostDashboardState(ADMIN_COST_DIMENSIONS);
+	const { input, metric } = state;
+	const adminInput: AdminCostDashboardInput = {
+		startDate: input.startDate,
+		endDate: input.endDate,
+		requestedMetric: metric,
+		durationInterval: input.durationInterval,
+		splitBy:
+			input.splitBy === "members" || input.splitBy === "repositories"
+				? "none"
+				: input.splitBy,
+		models: input.models,
+		signalTypes: input.signalTypes,
+		phrases: input.phrases,
+		runSignals: input.runSignals,
+		durations: input.durations,
+		skillsUsed: input.skillsUsed,
+	};
+	const query = useQuery({
+		...orpc.admin.dashboard.queryOptions({ input: adminInput }),
+		staleTime: 60_000,
+		placeholderData: (previous) =>
+			previous?.requestedMetric === metric ? previous : undefined,
+		refetchOnWindowFocus: false,
+		refetchInterval: (query) => indexingRefetchInterval(query, metric),
+	});
+	return { ...state, query };
+}
+
+function indexingRefetchInterval(
+	query: Query<CostDashboard, Error, CostDashboard, readonly unknown[]>,
+	metric: DashboardMetric,
+): number | false {
+	if (query.state.fetchFailureCount > 0) return false;
+	const data = query.state.data;
+	const needsRefresh =
+		metric === "agentRuns"
+			? (data?.metrics.agentRuns?.coverage?.indexingSessions ?? 0) > 0
+			: metric === "signals" && data?.metrics.signals === null;
+	if (!needsRefresh) return false;
+	// Indexing normally resolves quickly. Retry twice with backoff, then leave
+	// refresh under the user's control instead of polling forever.
+	return [10_000, 30_000][query.state.dataUpdateCount - 1] ?? false;
+}
+
+function useCostDashboardState(costDimensions: CostDimension[]) {
+	const { state: dates } = useDateRange();
 	const [params, setParams] = useSearchParams();
 	const selectedMetric = params.get("metric");
 	const metric =
@@ -52,10 +123,10 @@ export function useCostDashboard() {
 			?.value ?? "daily";
 	const dimensions =
 		metric === "agentRuns"
-			? [...RUN_DIMENSIONS, ...COST_DIMENSIONS]
+			? [...RUN_DIMENSIONS, ...costDimensions]
 			: metric === "signals"
-				? [...SIGNAL_DIMENSIONS, ...COST_DIMENSIONS]
-				: COST_DIMENSIONS;
+				? [...SIGNAL_DIMENSIONS, ...costDimensions]
+				: costDimensions;
 	const split = params.get("split");
 	const splitBy = dimensions.find((dimension) => dimension === split) ?? "none";
 	const input: CostDashboardInput = {
@@ -64,8 +135,12 @@ export function useCostDashboard() {
 		requestedMetric: metric,
 		durationInterval: metric === "agentRuns" ? interval : undefined,
 		splitBy,
-		members: params.getAll("member").slice(0, 100).sort(),
-		repositories: params.getAll("repo").slice(0, 100).sort(),
+		members: costDimensions.includes("members")
+			? params.getAll("member").slice(0, 100).sort()
+			: [],
+		repositories: costDimensions.includes("repositories")
+			? params.getAll("repo").slice(0, 100).sort()
+			: [],
 		models: params.getAll("model").slice(0, 100).sort(),
 
 		signalTypes:
@@ -102,28 +177,6 @@ export function useCostDashboard() {
 					)
 				: [],
 	};
-	const query = useAnalyticsQuery({
-		...orpc.analytics.overview.costs.queryOptions({ input }),
-		staleTime: 60_000,
-		placeholderData: (previous, previousQuery) =>
-			previousQuery?.queryKey[1] === workspace.activeOrg?.id &&
-			previous?.requestedMetric === metric
-				? previous
-				: undefined,
-		refetchOnWindowFocus: false,
-		refetchInterval: (query) => {
-			if (query.state.fetchFailureCount > 0) return false;
-			const data = query.state.data;
-			const needsRefresh =
-				metric === "agentRuns"
-					? (data?.metrics.agentRuns?.coverage?.indexingSessions ?? 0) > 0
-					: metric === "signals" && data?.metrics.signals === null;
-			if (!needsRefresh) return false;
-			// Indexing normally resolves quickly. Retry twice with backoff, then leave
-			// refresh under the user's control instead of polling forever.
-			return [10_000, 30_000][query.state.dataUpdateCount - 1] ?? false;
-		},
-	});
 	function update(action: (next: URLSearchParams) => void) {
 		setParams((current) => {
 			const next = new URLSearchParams(current);
@@ -167,7 +220,6 @@ export function useCostDashboard() {
 		});
 	}
 	return {
-		query,
 		input,
 		metric,
 		interval,

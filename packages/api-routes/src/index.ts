@@ -51,6 +51,7 @@ import { oc } from "@orpc/contract";
 import { z } from "zod";
 
 import {
+	AdminCostDashboardInputSchema,
 	CostDashboardInputSchema,
 	CostDashboardSchema,
 } from "./schemas/cost-dashboard.js";
@@ -66,6 +67,8 @@ export {
 } from "./schemas/agent-runs.js";
 
 export {
+	type AdminCostDashboardInput,
+	AdminCostDashboardInputSchema,
 	type CostBreakdownEntry,
 	type CostDashboard,
 	type CostDashboardInput,
@@ -826,6 +829,9 @@ export const contract = {
 		deleteUser: oc
 			.input(z.object({ userId: z.string() }))
 			.output(z.object({ success: z.literal(true) })),
+		dashboard: oc
+			.input(AdminCostDashboardInputSchema)
+			.output(CostDashboardSchema),
 	},
 	productAnalytics: {
 		dashboardViewed: oc

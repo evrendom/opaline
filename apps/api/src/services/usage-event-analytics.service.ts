@@ -4,7 +4,14 @@ import {
 	getClickhouse,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import { shouldUseUsageEventAnalytics } from "../lib/env.js";
+import {
+	readUsageEventAnalyticsCutoverConfig,
+	shouldUseUsageEventAnalytics,
+} from "../lib/env.js";
+import {
+	type AnalyticsTenant,
+	organizationMatchSql,
+} from "./analytics-tenant.js";
 import {
 	buildEstimatedCostSql,
 	getModelPricingCatalog,
@@ -276,6 +283,7 @@ const SESSION_METADATA_COLUMNS = `
 `;
 
 export interface UsageAnalyticsScope {
+	readonly tenant?: AnalyticsTenant;
 	readonly sessionIdParam?: string;
 	readonly sourceParam?: string;
 	readonly userIdParam?: string;
@@ -362,7 +370,7 @@ export class UsageEventAnalyticsReadinessGate {
 }
 
 function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
-	const filters = ["organization_id = {orgId:String}"];
+	const filters = [organizationMatchSql("organization_id", scope.tenant)];
 	if (scope.userIdParam) {
 		filters.push(`user_id = {${scope.userIdParam}:String}`);
 	}
@@ -384,7 +392,7 @@ export function buildUsageEventAnalyticsCte(
 	// resolves exact ReplacingMergeTree state without scanning unrelated tenants.
 	// Keep this pipeline single-pass: ClickHouse inlines repeated CTE references.
 	return `
-		${buildSessionLineageCteDefinitions(lineageEnabled)},
+		${buildSessionLineageCteDefinitions(lineageEnabled, scope.tenant)},
 		latest_usage_records AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
@@ -609,18 +617,21 @@ export function buildUsageEventAnalyticsCte(
 				AND sa.user_id = r.user_id
 				AND sa.source = r.source
 				AND sa.session_id = r.session_id
-			WHERE sa.organization_id = {orgId:String}
+			WHERE ${organizationMatchSql("sa.organization_id", scope.tenant)}
 		)
 	`;
 }
 
-export function buildLegacyUsageAnalyticsCte(lineageEnabled?: boolean): string {
+export function buildLegacyUsageAnalyticsCte(
+	lineageEnabled?: boolean,
+	tenant: AnalyticsTenant = "organization",
+): string {
 	return `
-		${buildSessionLineageCteDefinitions(lineageEnabled)},
+		${buildSessionLineageCteDefinitions(lineageEnabled, tenant)},
 		usage_analytics_metadata_base AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} FINAL
-			WHERE organization_id = {orgId:String}
+			WHERE ${organizationMatchSql("organization_id", tenant)}
 		),
 		${buildLineageEnrichedMetadataCte({
 			baseRelation: "usage_analytics_metadata_base",
@@ -709,6 +720,30 @@ export async function getUsageAnalyticsQueryContext(
 	await readinessGate.assertReady();
 	return {
 		cteDefinitions: buildUsageEventAnalyticsCte(scope),
+		dailySessionsRelation: "usage_analytics_daily_sessions",
+		mode: "events",
+		sessionsRelation: "usage_analytics_sessions",
+	};
+}
+
+// Canary routing is per organization, so a cross-tenant read uses request-level
+// analytics only once the cutover covers every organization.
+export async function getAllOrganizationsUsageAnalyticsQueryContext(): Promise<UsageAnalyticsQueryContext> {
+	if (readUsageEventAnalyticsCutoverConfig().mode !== "all") {
+		return {
+			cteDefinitions: buildLegacyUsageAnalyticsCte(
+				undefined,
+				"allOrganizations",
+			),
+			dailySessionsRelation: "usage_analytics_daily_sessions",
+			mode: "legacy",
+			sessionsRelation: "usage_analytics_sessions",
+		};
+	}
+
+	await readinessGate.assertReady();
+	return {
+		cteDefinitions: buildUsageEventAnalyticsCte({ tenant: "allOrganizations" }),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
 		mode: "events",
 		sessionsRelation: "usage_analytics_sessions",
