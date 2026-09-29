@@ -1,6 +1,6 @@
 # September 2026 model identity and pricing update
 
-Verified against first-party documentation on September 23, 2026. These are USD per million tokens for standard first-party API processing, not subscription charges or an invoice reconciliation.
+Verified against first-party documentation on September 29, 2026. These are USD per million tokens for standard first-party API processing, not subscription charges or an invoice reconciliation.
 
 | Model / request date | Uncached input | Cache read | Cache write | Output |
 | --- | ---: | ---: | ---: | ---: |
@@ -10,8 +10,12 @@ Verified against first-party documentation on September 23, 2026. These are USD 
 | GPT-6 Sol, September 22 onward | 2 | 0.20 | 2.50 | 10 |
 | GPT-6 Luna, September 22 onward | 0.10 | 0.01 | 0.125 | 0.50 |
 | Claude Fable 5.1, September 1 onward | 10 | 0.25 | 12.50 (5m) / 20 (1h) | 50 |
+| Claude Mythos 5.1, September 1 onward | 10 | 0.25 | 12.50 (5m) / 20 (1h) | 50 |
+| Claude Opus 5.5, September 22 onward | 4 | 0.20 | 5 (5m) / 8 (1h) | 20 |
+| Claude Sonnet 5.5, September 28 onward | 2 | 0.20 | 2.50 (5m) / 4 (1h) | 10 |
+| Claude Sonnet 5, June 30 onward | 2 | 0.20 | 2.50 (5m) / 4 (1h) | 10 |
 
-GPT-5.6 Sol and the GPT-6 family use 2× input/cache rates and 1.5× output rates above 272,000 input-context tokens. Exactly 272,000 stays in the base band. The implementation supports GPT-6 Astra, Sol, and Luna Fast/Priority at 2× in either band and the current GPT-5.6 Sol long-context Fast/Priority rates. Fable 5.1 has no long-context surcharge; US-only inference adds 10% to every token class. Original Fable 5 continues to use its own $1 cache-read rate; a 5.1 model ID never matches the Fable 5 pattern.
+GPT-5.6 Sol and the GPT-6 family use 2× input/cache rates and 1.5× output rates above 272,000 input-context tokens. Exactly 272,000 stays in the base band. The implementation supports GPT-6 Astra, Sol, and Luna Fast/Priority at 2× in either band and the current GPT-5.6 Sol long-context Fast/Priority rates. Fable 5.1 has no long-context surcharge; US-only inference adds 10% to every token class. Original Fable 5 continues to use its own $1 cache-read rate; a 5.1 model ID never matches the Fable 5 pattern. Mythos 5.1 shares Fable 5.1's rates. Opus 5.5 cache reads are 0.05× input; its Fast mode is 2× ($8/$40) in every token class. Mythos 5.1, Opus 5.5 and Sonnet 5.5 bill the full 1M context at the base rate and take the 10% US-only inference premium. Sonnet 5's launch rate became its standard price: Anthropic cancelled the scheduled September 1 increase to $3/$15 before it took effect, so no Sonnet 5 request is priced at $3/$15.
 
 ## Sources and date precision
 
@@ -21,7 +25,11 @@ GPT-5.6 Sol and the GPT-6 family use 2× input/cache rates and 1.5× output rate
 - [GPT-6 Sol documentation](https://developers.openai.com/api/docs/models/gpt-6-sol): model identity, context window and token rates.
 - [GPT-6 Luna documentation](https://developers.openai.com/api/docs/models/gpt-6-luna): model identity, context window and token rates.
 - [Fable 5.1 documentation](https://platform.claude.com/docs/en/models/fable-5-1/overview): September 1 release and token rates.
-- [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing): Fable 5 versus 5.1 cache rates, full-context pricing and US inference premium.
+- [Mythos 5.1 documentation](https://platform.claude.com/docs/en/models/mythos-5-1/overview): September 1 release, model identity and token rates.
+- [Opus 5.5 documentation](https://platform.claude.com/docs/en/models/opus-5-5/overview): September 22 release, model identity and token rates.
+- [Sonnet 5.5 documentation](https://platform.claude.com/docs/en/models/sonnet-5-5/overview): September 28 release, model identity and token rates.
+- [Anthropic Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode): Opus 5.5 Fast rates.
+- [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing): Fable 5 versus 5.1 and Opus 5.5 cache rates, full-context pricing, US inference premium and the cancelled Sonnet 5 increase.
 
 The providers publish calendar dates, not an exact intraday billing cutover time in these sources. The existing pricing engine normalizes each request timestamp to a UTC date; tests pin this convention at midnight and with timezone offsets. Do not claim sub-day invoice accuracy from these announcements. Sol's promotion is available **at least through November 21**, not confirmed to end that day. The catalog therefore does not invent a November 22 price increase; reverify when the provider announces another change.
 

@@ -74,18 +74,78 @@ describe("model rate card", () => {
 		}
 	});
 
-	it("resolves the same model to its date-specific price", () => {
-		const introductory = resolveModelPricing("claude-sonnet-5", {
-			at: "2026-08-31",
-		});
-		const standard = resolveModelPricing("claude-sonnet-5", {
-			at: "2026-09-01",
-		});
+	it("keeps Sonnet 5 at its launch price after the cancelled September increase", () => {
+		for (const at of ["2026-06-30", "2026-08-31", "2026-09-01", "2026-09-29"]) {
+			expect(resolveModelPricing("claude-sonnet-5", { at })).toMatchObject({
+				inputPerMTok: 2,
+				cacheReadPerMTok: 0.2,
+				cacheWrite5mPerMTok: 2.5,
+				cacheWrite1hPerMTok: 4,
+				outputPerMTok: 10,
+			});
+		}
+	});
 
-		expect(introductory?.inputPerMTok).toBe(2);
-		expect(introductory?.outputPerMTok).toBe(10);
-		expect(standard?.inputPerMTok).toBe(3);
-		expect(standard?.outputPerMTok).toBe(15);
+	it("prices Claude Mythos 5.1, Opus 5.5, and Sonnet 5.5 from release", () => {
+		for (const [model, releasedOn, dayBefore, rates] of [
+			[
+				"claude-mythos-5-1",
+				"2026-09-01",
+				"2026-08-31",
+				[10, 0.25, 12.5, 20, 50],
+			],
+			["claude-opus-5-5", "2026-09-22", "2026-09-21", [4, 0.2, 5, 8, 20]],
+			["claude-sonnet-5-5", "2026-09-28", "2026-09-27", [2, 0.2, 2.5, 4, 10]],
+		] as const) {
+			const [input, cached, write5m, write1h, output] = rates;
+			expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
+			expect(resolveCanonicalModelIdentity(`${model}[1m]`)?.model).toBe(model);
+			expect(resolveModelPricing(model, { at: dayBefore })).toBeNull();
+			expect(
+				resolveModelPricing(model, {
+					at: releasedOn,
+					contextInputTokens: 900_000,
+				}),
+			).toMatchObject({
+				inputPerMTok: input,
+				cacheReadPerMTok: cached,
+				cacheWrite5mPerMTok: write5m,
+				cacheWrite1hPerMTok: write1h,
+				outputPerMTok: output,
+			});
+			expect(
+				resolveModelPricing(model, { at: releasedOn, inferenceGeo: "us" })
+					?.inputPerMTok,
+			).toBeCloseTo(input * 1.1);
+		}
+
+		expect(
+			resolveModelPricing("claude-opus-5-5", {
+				at: "2026-09-22",
+				inferenceSpeed: "fast",
+			}),
+		).toMatchObject({
+			inputPerMTok: 8,
+			cacheReadPerMTok: 0.4,
+			outputPerMTok: 40,
+		});
+		for (const model of ["claude-mythos-5-1", "claude-sonnet-5-5"]) {
+			expect(
+				resolveModelPricing(model, {
+					at: "2026-09-29",
+					inferenceSpeed: "fast",
+				}),
+			).toBeNull();
+		}
+		expect(resolveCanonicalModelIdentity("claude-opus-5")?.model).toBe(
+			"claude-opus-5",
+		);
+		expect(resolveCanonicalModelIdentity("claude-sonnet-5")?.model).toBe(
+			"claude-sonnet-5",
+		);
+		expect(resolveCanonicalModelIdentity("claude-mythos-5")?.model).toBe(
+			"claude-mythos-5",
+		);
 	});
 
 	it("uses the August 21 Sol reduction only for requests on or after that UTC date", () => {

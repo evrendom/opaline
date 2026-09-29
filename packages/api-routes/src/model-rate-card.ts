@@ -51,7 +51,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-09-23";
+export const MODEL_RATE_CARD_VERSION = "2026-09-29";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -814,6 +814,23 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 	},
 	{
 		provider: "anthropic",
+		model: "claude-mythos-5-1",
+		displayName: "Claude Mythos 5.1",
+		match: ["^claude-mythos-5-1(?:-\\d{8})?$"],
+		effectiveFrom: "2026-09-01",
+		contextBand: "base",
+		inputPerMTok: 10,
+		cacheReadPerMTok: 0.25,
+		cacheWrite5mPerMTok: 12.5,
+		cacheWrite1hPerMTok: 20,
+		outputPerMTok: 50,
+		source: "https://platform.claude.com/docs/en/models/mythos-5-1/overview",
+		verifiedAt: "2026-09-29",
+		notes:
+			"Limited availability; shares Fable 5.1 rates, including $0.25 cache reads.",
+	},
+	{
+		provider: "anthropic",
 		model: "claude-fable-5",
 		displayName: "Claude Fable 5",
 		match: ["^claude-fable-5(?:-\\d{8})?$"],
@@ -843,6 +860,23 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		source: "https://platform.claude.com/docs/en/about-claude/pricing",
 		verifiedAt: "2026-08-02",
 		notes: "Limited availability; the full 1M context uses the base rate.",
+	},
+	{
+		provider: "anthropic",
+		model: "claude-opus-5-5",
+		displayName: "Claude Opus 5.5",
+		match: ["^claude-opus-5-5(?:-\\d{8})?$"],
+		effectiveFrom: "2026-09-22",
+		contextBand: "base",
+		inputPerMTok: 4,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 5,
+		cacheWrite1hPerMTok: 8,
+		outputPerMTok: 20,
+		source: "https://platform.claude.com/docs/en/models/opus-5-5/overview",
+		verifiedAt: "2026-09-29",
+		notes:
+			"Cache reads are 0.05x input; the full 1M context uses the base rate.",
 	},
 	{
 		provider: "anthropic",
@@ -962,19 +996,20 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 	// Anthropic: Claude Sonnet and Haiku
 	{
 		provider: "anthropic",
-		model: "claude-sonnet-5",
-		displayName: "Claude Sonnet 5",
-		match: ["^claude-sonnet-5(?:-\\d{8})?$"],
-		effectiveFrom: "2026-09-01",
+		model: "claude-sonnet-5-5",
+		displayName: "Claude Sonnet 5.5",
+		match: ["^claude-sonnet-5-5(?:-\\d{8})?$"],
+		effectiveFrom: "2026-09-28",
 		contextBand: "base",
-		inputPerMTok: 3,
-		cacheReadPerMTok: 0.3,
-		cacheWrite5mPerMTok: 3.75,
-		cacheWrite1hPerMTok: 6,
-		outputPerMTok: 15,
-		source: "https://platform.claude.com/docs/en/about-claude/pricing",
-		verifiedAt: "2026-08-02",
-		notes: "Published follow-on rate; the full 1M context uses the base rate.",
+		inputPerMTok: 2,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 2.5,
+		cacheWrite1hPerMTok: 4,
+		outputPerMTok: 10,
+		source: "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+		verifiedAt: "2026-09-29",
+		notes:
+			"Standard rate from release; the full 1M context uses the base rate.",
 	},
 	{
 		provider: "anthropic",
@@ -982,7 +1017,6 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		displayName: "Claude Sonnet 5",
 		match: ["^claude-sonnet-5(?:-\\d{8})?$"],
 		effectiveFrom: "2026-06-30",
-		effectiveTo: "2026-08-31",
 		contextBand: "base",
 		inputPerMTok: 2,
 		cacheReadPerMTok: 0.2,
@@ -990,9 +1024,9 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		cacheWrite1hPerMTok: 4,
 		outputPerMTok: 10,
 		source: "https://platform.claude.com/docs/en/about-claude/pricing",
-		verifiedAt: "2026-08-02",
+		verifiedAt: "2026-09-29",
 		notes:
-			"Introductory rate through August 31, 2026; the full 1M context uses the base rate.",
+			"Launch rate made standard; the scheduled September 1 increase to $3/$15 was cancelled and never billed.",
 	},
 	{
 		provider: "anthropic",
@@ -1338,6 +1372,34 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 			source: "https://platform.claude.com/docs/en/build-with-claude/fast-mode",
 			verifiedAt: "2026-08-05",
 			notes: "Published $10/$50 Fast mode; cache multipliers stack.",
+		}),
+	),
+	{
+		provider: "anthropic",
+		model: "claude-opus-5-5",
+		dimension: "inference_speed",
+		values: ["fast"],
+		effectiveFrom: "2026-09-22",
+		multiplier: 2,
+		source: "https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+		verifiedAt: "2026-09-29",
+		notes: "Published $8/$40 Fast mode; cache multipliers stack.",
+	},
+	...[
+		["claude-mythos-5-1", "2026-09-01"],
+		["claude-opus-5-5", "2026-09-22"],
+		["claude-sonnet-5-5", "2026-09-28"],
+	].map(
+		([model, effectiveFrom]): ModelRateModifierEntry => ({
+			provider: "anthropic",
+			model: String(model),
+			dimension: "inference_geo",
+			values: ["us"],
+			effectiveFrom: String(effectiveFrom),
+			multiplier: 1.1,
+			source: "https://platform.claude.com/docs/en/about-claude/pricing",
+			verifiedAt: "2026-09-29",
+			notes: "Anthropic US-only inference premium; all token classes stack.",
 		}),
 	),
 	...[
