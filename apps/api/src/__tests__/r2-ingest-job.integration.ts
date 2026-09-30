@@ -392,6 +392,7 @@ describe("R2 ingest commit lifecycle", () => {
 			SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
 			SESSION_INGEST_QUIESCED: "true",
 			SKILL_EXTRACTION_ENABLED: "false",
+			TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
 			USAGE_EVENT_EXTRACTION_ENABLED: "false",
 		});
 		let identity: QuiescedTestIdentity | undefined;
@@ -523,6 +524,7 @@ describe("R2 ingest commit lifecycle", () => {
 				SESSION_INGEST_OPERATOR_TOKEN: operatorToken,
 				SESSION_INGEST_QUIESCED: "false",
 				SKILL_EXTRACTION_ENABLED: "false",
+				TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
 				USAGE_EVENT_EXTRACTION_ENABLED: "false",
 			});
 			const rescuedResponse = await fetch(

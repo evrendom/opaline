@@ -8,6 +8,16 @@ const maintenanceSource = readFileSync(
 );
 
 describe("daily API maintenance", () => {
+	test("runs durable transcript retirement independently of publications under a maintenance deadline", () => {
+		expect(maintenanceSource).toContain("runTranscriptRecordsRetirementPass({");
+		expect(maintenanceSource).toContain(
+			"TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000",
+		);
+		expect(maintenanceSource).toContain(
+			'runMaintenanceStep("transcript-records"',
+		);
+		expect(maintenanceSource).toContain('transcriptRecords.status === "ok"');
+	});
 	test("wires revision-receipt cleanup into the bounded daily drain", () => {
 		expect(maintenanceSource).toContain(
 			"const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000",

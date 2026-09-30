@@ -1,0 +1,46 @@
+export {
+	classifyCommand,
+	classifyScriptName,
+	combineCommandClasses,
+	extractShellFileMutations,
+	parseShellCommand,
+	type ShellConnector,
+	type ShellFileMutation,
+	type ShellMutationBasis,
+} from "./command-class.js";
+export {
+	classifyUserText,
+	stripInjectedWrappers,
+	type UserTextClassification,
+} from "./injected-wrappers.js";
+export {
+	decodeTranscriptRecordsReceipt,
+	encodeTranscriptRecordsReceipt,
+	type TranscriptRecordsReceipt,
+} from "./receipt.js";
+export {
+	createSplitStats,
+	type MutableSplitStats,
+	type SessionTranscriptInput,
+	splitSessionTranscript,
+	splitTranscript,
+	summarizeSplit,
+} from "./split-transcript.js";
+export { buildTranscriptTextFields, countCodePoints } from "./text-fields.js";
+export {
+	type CommandClass,
+	FILE_MUTATION_OPERATIONS,
+	type FileOperation,
+	type SplitTranscriptOptions,
+	TRANSCRIPT_RECORD_EXCERPT_CHARS,
+	TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES,
+	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
+	TRANSCRIPT_RECORDS_PARSER_VERSION,
+	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+	TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
+	type TranscriptRecordDraft,
+	type TranscriptRecordKind,
+	type TranscriptSource,
+	type TranscriptSplitSummary,
+	type TranscriptTextBudget,
+} from "./types.js";

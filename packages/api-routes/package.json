@@ -9,7 +9,8 @@
 		"./codex-usage-replay": "./src/codex-usage-replay.ts",
 		"./model-pricing": "./src/model-pricing.ts",
 		"./organization-paths": "./src/organization-paths.ts",
-		"./reserved-slugs": "./src/reserved-slugs.ts"
+		"./reserved-slugs": "./src/reserved-slugs.ts",
+		"./transcript-records": "./src/session-transcript/transcript-records/index.ts"
 	},
 	"scripts": {
 		"check-types": "tsc --noEmit",

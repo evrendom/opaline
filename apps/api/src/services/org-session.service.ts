@@ -10,6 +10,7 @@ const SESSION_LANGUAGE_SIGNALS_TABLE = "rudel.session_language_signals";
 const SKILL_RECEIPTS_TABLE = "rudel.skill_receipts";
 const SKILL_USES_TABLE = "rudel.skill_uses";
 const SKILL_VERSION_CONTENTS_TABLE = "rudel.skill_version_contents";
+const TRANSCRIPT_RECORDS_TABLE = "rudel.transcript_records";
 const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE =
 	"rudel.wrapped_user_archetype_snapshots_v1";
@@ -177,6 +178,7 @@ async function deleteSessions(
 		{ column, table: SKILL_RECEIPTS_TABLE },
 		{ column, table: SKILL_USES_TABLE },
 		{ column, table: SKILL_VERSION_CONTENTS_TABLE },
+		{ column, table: TRANSCRIPT_RECORDS_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 	];

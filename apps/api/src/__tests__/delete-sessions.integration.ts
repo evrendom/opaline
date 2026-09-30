@@ -10,6 +10,7 @@ import {
 	deleteOrgSessions,
 	deleteUserSessions,
 } from "../services/org-session.service.js";
+import { buildTranscriptRecordRow } from "../services/transcript-records-ingest.service.js";
 
 const testRunId = `del_test_${Date.now()}_${Math.random()
 	.toString(36)
@@ -57,6 +58,7 @@ async function countSkillRows(
 			"rudel.skill_receipts",
 			"rudel.skill_uses",
 			"rudel.skill_version_contents",
+			"rudel.transcript_records",
 		].map(async (table) => {
 			const [row] = await ch.query<CountRow>({
 				query: `SELECT count() AS count FROM ${getSafeClickHouseTable(table)} WHERE ${column} = {value:String}`,
@@ -177,6 +179,44 @@ async function ingestSkillRows(
 			},
 		],
 	});
+	await ch.insert({
+		table: "rudel.transcript_records",
+		values: [
+			buildTranscriptRecordRow(
+				{
+					organizationId: targetOrgId,
+					revision: "1",
+					sessionDate: "2026-07-29T10:00:00.000Z",
+					sessionId,
+					source: "claude_code",
+					userId,
+				},
+				{
+					agentId: "",
+					blockIdx: 0,
+					byteLen: 12,
+					byteStart: 0,
+					callId: "",
+					commandClass: "",
+					exitCode: null,
+					fileOp: "",
+					filePath: "",
+					head: "purge me",
+					isError: false,
+					kind: "user_prompt",
+					recordIdx: 1,
+					spawnedAgentId: "",
+					subtype: "",
+					tail: "",
+					text: "purge me",
+					textChars: 8,
+					toolName: "",
+					ts: "2026-07-29T10:00:00.000Z",
+					turnIdx: 1,
+				},
+			),
+		],
+	});
 }
 
 function createSnapshot(
@@ -248,6 +288,7 @@ afterAll(async () => {
 		"rudel.skill_receipts",
 		"rudel.skill_uses",
 		"rudel.skill_version_contents",
+		"rudel.transcript_records",
 	]) {
 		await ch
 			.execute({
@@ -281,7 +322,7 @@ describe("ClickHouse session purge (integration)", () => {
 			async () =>
 				(await countByOrg(orgId)) > 0 &&
 				(await countSnapshotsByOrg(orgId)) > 0 &&
-				(await countSkillRows("organization_id", orgId)) === 3,
+				(await countSkillRows("organization_id", orgId)) === 4,
 		);
 		expect(inserted).toBe(true);
 
@@ -310,8 +351,8 @@ describe("ClickHouse session purge (integration)", () => {
 				(await countByUser(userIdBeta)) > 0 &&
 				(await countSnapshotsByUser(userIdAlpha)) > 0 &&
 				(await countSnapshotsByUser(userIdBeta)) > 0 &&
-				(await countSkillRows("user_id", userIdAlpha)) === 3 &&
-				(await countSkillRows("user_id", userIdBeta)) === 3,
+				(await countSkillRows("user_id", userIdAlpha)) === 4 &&
+				(await countSkillRows("user_id", userIdBeta)) === 4,
 		);
 		expect(inserted).toBe(true);
 
@@ -325,7 +366,7 @@ describe("ClickHouse session purge (integration)", () => {
 		expect(await countSnapshotsByUser(userIdAlpha)).toBe(0);
 		expect(await countSnapshotsByUser(userIdBeta)).toBeGreaterThan(0);
 		expect(await countSkillRows("user_id", userIdAlpha)).toBe(0);
-		expect(await countSkillRows("user_id", userIdBeta)).toBe(3);
+		expect(await countSkillRows("user_id", userIdBeta)).toBe(4);
 
 		await deleteUserSessions(userIdBeta);
 	}, 120000);

@@ -1,0 +1,654 @@
+import { Buffer } from "node:buffer";
+import { createHash, randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
+import {
+	decodeTranscriptRecordsReceipt,
+	encodeTranscriptRecordsReceipt,
+	TRANSCRIPT_RECORDS_PARSER_VERSION,
+	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+	type TranscriptRecordDraft,
+	type TranscriptRecordsReceipt,
+	type TranscriptSource,
+	type TranscriptSplitSummary,
+} from "@rudel/api-routes/transcript-records";
+import {
+	ingestRudelTranscriptRecords,
+	type RudelTranscriptRecordsRow,
+} from "@rudel/ch-schema/generated";
+import {
+	type ClickHouseExecutor,
+	getSafeClickHouseTable,
+} from "../clickhouse.js";
+import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
+import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
+
+export const TRANSCRIPT_RECORDS_TABLE = "rudel.transcript_records";
+
+/** Rows and approximate JSON bytes per insert. */
+const INSERT_BATCH_MAX_ROWS = 2_000;
+const INSERT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
+const RECEIPT_SCAN_SETTINGS = {
+	max_bytes_to_read: String(256 * 1024 * 1024),
+	max_execution_time: 30,
+	max_rows_to_read: "5000000",
+} as const;
+
+/**
+ * How long a superseded committed generation stays readable, measured from the
+ * publication that superseded it. It must exceed the readers' enforced
+ * whole-read deadline (`TRANSCRIPT_READ_DEADLINE_MS`), so a read that pinned a
+ * generation can never have its rows deleted before it finishes or times out.
+ */
+export const TRANSCRIPT_RECORDS_RETIRE_GRACE_MS = 10 * 60_000;
+export const MAX_RETIRED_GENERATIONS_PER_PASS = 100;
+
+const logger = getLogger(["rudel", "api", "transcript-records-ingest"]);
+
+export interface TranscriptRecordsIdentity {
+	readonly organizationId: string;
+	readonly sessionId: string;
+	readonly source: TranscriptSource;
+	readonly userId: string;
+}
+
+/**
+ * One extraction generation of a session: the raw revision the rows came from
+ * and the splitter version that produced them. Generations are the unit of
+ * publication. The generation is part of the row identity, so rows of different
+ * generations never collapse into each other, and a generation that never
+ * received its receipt cannot disturb the committed one.
+ */
+export interface TranscriptRecordsGeneration {
+	readonly parserVersion: number;
+	/** Raw-session revision as an unsigned decimal string. */
+	readonly revision: string;
+}
+
+export interface TranscriptRecordsWriteInput extends TranscriptRecordsIdentity {
+	readonly deadlineAt?: number;
+	readonly signal?: AbortSignal;
+	/**
+	 * Deletion fence, awaited immediately before every insert. It throws
+	 * `ClickHouseWriteFencedError` when the user or organization is being
+	 * deleted; the rows already written for this generation are then deleted and
+	 * the error is rethrown. Any other error is a transient lookup failure: the
+	 * rows stay (they are invisible without a receipt) and the error propagates.
+	 */
+	readonly assertWritable: () => Promise<void>;
+	/**
+	 * Names this write attempt inside the insert deduplication tokens. Every
+	 * attempt defaults to a fresh one, so rows deleted by an earlier attempt are
+	 * never suppressed as duplicates when the generation is rebuilt. Retries of
+	 * one insert inside an attempt share its token.
+	 */
+	readonly attemptId?: string;
+	/** Hash of the raw transcript content the drafts were derived from. */
+	readonly contentSha256: string;
+	/** Clock for receipt timestamps and retirement; tests inject one. */
+	readonly now?: () => Date;
+	/** Pulled one draft at a time, so a producer can apply backpressure. */
+	readonly drafts:
+		| AsyncIterable<TranscriptRecordDraft>
+		| Iterable<TranscriptRecordDraft>;
+	/** Raw-session revision as an unsigned decimal string. */
+	/** Retirement grace for superseded generations (default 10 minutes). */
+	readonly retireGraceMs?: number;
+	readonly revision: string;
+	readonly sessionDate: string;
+	/** Read once, after every draft was consumed. */
+	readonly summary: () => TranscriptSplitSummary;
+}
+
+export interface TranscriptRecordsWriteResult {
+	readonly batchCount: number;
+	readonly rowCount: number;
+}
+
+export interface TranscriptRecordsReceiptState
+	extends TranscriptRecordsGeneration {
+	readonly receipt: TranscriptRecordsReceipt;
+}
+
+interface ReceiptRow {
+	head: string;
+	parser_version: number;
+	revision_text: string;
+}
+
+interface GenerationRow {
+	parser_version: number;
+	/** The generation's receipt, or '' when it was never committed. */
+	receipt_head: string;
+	revision_text: string;
+}
+
+/**
+ * Write every record of one generation, then its receipt row, then retire
+ * superseded generations.
+ *
+ * The write is idempotent: rows are keyed by generation, stream, and line, so
+ * a retry after a crash converges on the same rows when the table merges. Each
+ * attempt has its own deduplication namespace: ClickHouse remembers insert
+ * tokens even after the rows are deleted, so a rebuilt generation must never
+ * reuse them. The receipt is written only after every batch succeeds, so
+ * readers never see a half-written generation, and a half-written generation
+ * never merges into the committed one.
+ */
+export async function writeTranscriptRecords(
+	executor: ClickHouseExecutor,
+	input: TranscriptRecordsWriteInput,
+): Promise<TranscriptRecordsWriteResult> {
+	const now = input.now ?? (() => new Date());
+	const deadline = createTranscriptRecordsDeadline({
+		deadlineAt: input.deadlineAt,
+		now: () => now().getTime(),
+		signal: input.signal,
+	});
+	try {
+		return await writeGeneration(executor, input, deadline);
+	} finally {
+		deadline.dispose();
+	}
+}
+
+async function writeGeneration(
+	executor: ClickHouseExecutor,
+	input: TranscriptRecordsWriteInput,
+	deadline: ReturnType<typeof createTranscriptRecordsDeadline>,
+): Promise<TranscriptRecordsWriteResult> {
+	deadline.assertActive();
+	assertRevision(input.revision);
+	const generation: TranscriptRecordsGeneration = {
+		parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+		revision: input.revision,
+	};
+	const tokenPrefix = buildDeduplicationTokenPrefix(
+		input,
+		input.attemptId ?? randomUUID(),
+	);
+	const now = input.now ?? (() => new Date());
+	let batch: RudelTranscriptRecordsRow[] = [];
+	let batchBytes = 0;
+	let batchCount = 0;
+	let rowCount = 0;
+	const publish = async (
+		rows:
+			| readonly RudelTranscriptRecordsRow[]
+			| ((publishedAt: Date) => readonly RudelTranscriptRecordsRow[]),
+		deduplicationToken: string,
+	) => {
+		try {
+			await deadline.wait(input.assertWritable);
+		} catch (error) {
+			// Delete only on a confirmed fence. A transient lookup failure keeps
+			// the rows: they are invisible without a receipt and the retry
+			// converges on them.
+			if (error instanceof ClickHouseWriteFencedError && batchCount > 0) {
+				await deleteTranscriptRecordsGeneration(executor, input, generation);
+			}
+			throw error;
+		}
+		const publishedAt = now();
+		await deadline.wait(() =>
+			insertBatch(
+				executor,
+				typeof rows === "function" ? rows(publishedAt) : rows,
+				deduplicationToken,
+				deadline.signal,
+			),
+		);
+		return publishedAt;
+	};
+	const flush = async () => {
+		if (batch.length === 0) return;
+		await publish(batch, `${tokenPrefix}:${batchCount}`);
+		batchCount++;
+		batch = [];
+		batchBytes = 0;
+	};
+	for await (const draft of input.drafts) {
+		deadline.assertActive();
+		const row = buildTranscriptRecordRow(input, draft);
+		batch.push(row);
+		batchBytes += estimateRowBytes(row);
+		rowCount++;
+		if (
+			batch.length >= INSERT_BATCH_MAX_ROWS ||
+			batchBytes >= INSERT_BATCH_MAX_BYTES
+		) {
+			await flush();
+		}
+	}
+	await flush();
+
+	const summary = input.summary();
+	const publishedAt = await publish(
+		(publishedAt) => [
+			buildTranscriptRecordsReceiptRow(input, {
+				contentSha256: input.contentSha256,
+				lineCount: summary.lineCount,
+				oversizedLineCount: summary.oversizedLineCount,
+				parserVersion: generation.parserVersion,
+				publishedAt: publishedAt.toISOString(),
+				rowCount,
+				streamCount: summary.streamCount,
+				textTruncated: summary.textTruncated,
+				unparseableLineCount: summary.unparseableLineCount,
+			}),
+		],
+		`${tokenPrefix}:receipt`,
+	);
+	logger.info(
+		"Transcript records written (organization_id={organizationId} session_id={sessionId} rows={rows} batches={batches})",
+		{
+			batches: batchCount,
+			organizationId: input.organizationId,
+			rows: rowCount,
+			sessionId: input.sessionId,
+		},
+	);
+	if (input.deadlineAt === undefined)
+		await retireSupersededGenerations(executor, input, {
+			graceMs: input.retireGraceMs ?? TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
+			now: now(),
+			published: generation,
+			publishedAtMs: publishedAt.getTime(),
+		});
+	return { batchCount, rowCount };
+}
+
+export function buildTranscriptRecordRow(
+	identity: TranscriptRecordsIdentity & {
+		readonly revision: string;
+		readonly sessionDate: string;
+	},
+	draft: TranscriptRecordDraft,
+): RudelTranscriptRecordsRow {
+	return {
+		agent_id: draft.agentId,
+		block_idx: draft.blockIdx,
+		byte_len: draft.byteLen,
+		byte_start: String(draft.byteStart),
+		call_id: draft.callId,
+		command_class: draft.commandClass,
+		exit_code: draft.exitCode,
+		file_op: draft.fileOp,
+		file_path: draft.filePath,
+		head: draft.head,
+		is_error: draft.isError,
+		kind: draft.kind,
+		organization_id: identity.organizationId,
+		parser_version: TRANSCRIPT_RECORDS_PARSER_VERSION,
+		record_idx: draft.recordIdx,
+		revision: identity.revision,
+		session_date: toClickHouseTimestamp(identity.sessionDate),
+		session_id: identity.sessionId,
+		source: identity.source,
+		spawned_agent_id: draft.spawnedAgentId,
+		subtype: draft.subtype,
+		tail: draft.tail,
+		text: draft.text,
+		text_chars: draft.textChars,
+		tool_name: draft.toolName,
+		ts: toClickHouseTimestamp(draft.ts),
+		turn_idx: draft.turnIdx,
+		user_id: identity.userId,
+	};
+}
+
+export function buildTranscriptRecordsReceiptRow(
+	identity: TranscriptRecordsIdentity & {
+		readonly revision: string;
+		readonly sessionDate: string;
+	},
+	receipt: TranscriptRecordsReceipt,
+): RudelTranscriptRecordsRow {
+	return {
+		agent_id: "",
+		block_idx: 0,
+		byte_len: 0,
+		byte_start: "0",
+		call_id: "",
+		command_class: "",
+		exit_code: null,
+		file_op: "",
+		file_path: "",
+		head: encodeTranscriptRecordsReceipt(receipt),
+		is_error: false,
+		kind: "receipt",
+		organization_id: identity.organizationId,
+		parser_version: receipt.parserVersion,
+		record_idx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+		revision: identity.revision,
+		session_date: toClickHouseTimestamp(identity.sessionDate),
+		session_id: identity.sessionId,
+		source: identity.source,
+		spawned_agent_id: "",
+		subtype: "",
+		tail: "",
+		text: "",
+		text_chars: 0,
+		tool_name: "",
+		ts: toClickHouseTimestamp(identity.sessionDate),
+		turn_idx: 0,
+		user_id: identity.userId,
+	};
+}
+
+/**
+ * The committed generation of one session: its newest receipt by raw revision,
+ * then parser version. Null when no generation has been published.
+ */
+export async function readTranscriptRecordsReceipt(
+	executor: ClickHouseExecutor,
+	identity: Pick<
+		TranscriptRecordsIdentity,
+		"organizationId" | "sessionId" | "userId"
+	>,
+): Promise<TranscriptRecordsReceiptState | null> {
+	const [row] = await executor.query<ReceiptRow>({
+		clickhouse_settings: RECEIPT_SCAN_SETTINGS,
+		query: `
+			SELECT toString(revision) AS revision_text, parser_version, head
+			FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+				AND agent_id = ''
+				AND record_idx = {receiptRecordIdx:UInt32}
+				AND block_idx = 0
+			ORDER BY revision DESC, parser_version DESC
+			LIMIT 1
+		`,
+		query_params: {
+			organizationId: identity.organizationId,
+			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+			sessionId: identity.sessionId,
+			userId: identity.userId,
+		},
+	});
+	if (!row) return null;
+	const receipt = decodeTranscriptRecordsReceipt(row.head);
+	return receipt
+		? {
+				parserVersion: Number(row.parser_version),
+				receipt,
+				revision: row.revision_text,
+			}
+		: null;
+}
+
+/** True when the newest receipt matches this content and parser version. */
+export function hasMatchingTranscriptRecordsReceipt(
+	state: TranscriptRecordsReceiptState | null,
+	expected: { readonly contentSha256: string; readonly revision?: string },
+): boolean {
+	return (
+		state !== null &&
+		state.receipt.parserVersion === TRANSCRIPT_RECORDS_PARSER_VERSION &&
+		state.receipt.contentSha256 === expected.contentSha256 &&
+		(expected.revision === undefined || state.revision === expected.revision)
+	);
+}
+
+export function hashTranscriptContent(
+	content: string,
+	subagents: Readonly<Record<string, string>> = {},
+): string {
+	const hash = createHash("sha256");
+	hash.update(content, "utf8");
+	for (const agentId of Object.keys(subagents).sort()) {
+		hash.update(`\u0000${agentId}\u0000`, "utf8");
+		hash.update(subagents[agentId] ?? "", "utf8");
+	}
+	return hash.digest("hex");
+}
+
+/**
+ * Delete every row of one generation only while deletion is under way for the
+ * whole target. Ordinary failures must retain shared generations, including a
+ * receipt that another writer may have published concurrently.
+ */
+export async function deleteTranscriptRecordsGeneration(
+	executor: ClickHouseExecutor,
+	identity: Pick<
+		TranscriptRecordsIdentity,
+		"organizationId" | "sessionId" | "userId"
+	>,
+	generation: TranscriptRecordsGeneration,
+): Promise<void> {
+	await executor.execute({
+		clickhouse_settings: { lightweight_deletes_sync: "1" },
+		query: `
+			DELETE FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
+			WHERE organization_id = {organizationId:String}
+				AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+				AND revision = {revision:UInt64}
+				AND parser_version = {parserVersion:UInt16}
+		`,
+		query_params: {
+			organizationId: identity.organizationId,
+			parserVersion: generation.parserVersion,
+			revision: generation.revision,
+			sessionId: identity.sessionId,
+			userId: identity.userId,
+		},
+	});
+}
+
+/**
+ * After a generation is published, retire what it superseded:
+ *
+ * - generations that never committed (crashed attempts) go immediately, since
+ *   no reader pins a generation without a receipt;
+ * - a superseded committed generation goes only once its grace period has
+ *   elapsed, measured from the receipt of the generation that superseded it.
+ *   The grace exceeds the readers' whole-read deadline, so a read that pinned
+ *   it can never lose its rows to an arbitrary number of publications.
+ *
+ * Failure is logged, never thrown: the new generation is already committed and
+ * the next publication retries the cleanup.
+ */
+async function retireSupersededGenerations(
+	executor: ClickHouseExecutor,
+	identity: TranscriptRecordsIdentity,
+	retirement: {
+		readonly graceMs: number;
+		readonly now: Date;
+		readonly published: TranscriptRecordsGeneration;
+		readonly publishedAtMs: number;
+	},
+): Promise<void> {
+	try {
+		await retireSupersededTranscriptRecordsGenerations(
+			executor,
+			identity,
+			retirement,
+		);
+	} catch (error) {
+		logger.warn(
+			"Transcript records cleanup of superseded generations failed (organization_id={organizationId} session_id={sessionId} error={error})",
+			{
+				error: error instanceof Error ? error.message : String(error),
+				organizationId: identity.organizationId,
+				sessionId: identity.sessionId,
+			},
+		);
+	}
+}
+
+export async function retireSupersededTranscriptRecordsGenerations(
+	executor: ClickHouseExecutor,
+	identity: Pick<
+		TranscriptRecordsIdentity,
+		"organizationId" | "sessionId" | "userId"
+	>,
+	retirement: {
+		readonly abortSignal?: AbortSignal;
+		readonly graceMs: number;
+		readonly now: Date;
+		readonly published: TranscriptRecordsGeneration;
+		readonly publishedAtMs: number;
+	},
+): Promise<number> {
+	const { published } = retirement;
+	const older = await executor.query<GenerationRow>({
+		abortSignal: retirement.abortSignal,
+		clickhouse_settings: RECEIPT_SCAN_SETTINGS,
+		query: `
+				SELECT
+					toString(revision) AS revision_text,
+					parser_version,
+					anyIf(head, kind = 'receipt') AS receipt_head
+				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
+				WHERE organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND (revision, parser_version) < ({revision:UInt64}, {parserVersion:UInt16})
+				GROUP BY revision, parser_version
+				ORDER BY revision DESC, parser_version DESC
+				LIMIT {generationLimit:UInt32}
+			`,
+		query_params: {
+			generationLimit: MAX_RETIRED_GENERATIONS_PER_PASS,
+			organizationId: identity.organizationId,
+			parserVersion: published.parserVersion,
+			revision: published.revision,
+			sessionId: identity.sessionId,
+			userId: identity.userId,
+		},
+	});
+	const retired = selectRetiredGenerations(older, retirement);
+	if (retired.length === 0) return 0;
+	const clauses = retired.map(
+		(_, index) =>
+			`(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16})`,
+	);
+	const retiredParams: Record<string, unknown> = {};
+	for (const [index, generation] of retired.entries()) {
+		retiredParams[`revision${index}`] = generation.revision;
+		retiredParams[`parserVersion${index}`] = generation.parserVersion;
+	}
+	await executor.execute({
+		abortSignal: retirement.abortSignal,
+		clickhouse_settings: { lightweight_deletes_sync: "1" },
+		query: `
+				DELETE FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
+				WHERE organization_id = {organizationId:String}
+					AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+					AND (${clauses.join(" OR ")})
+			`,
+		query_params: {
+			organizationId: identity.organizationId,
+			sessionId: identity.sessionId,
+			userId: identity.userId,
+			...retiredParams,
+		},
+	});
+	return retired.length;
+}
+
+/** Older generations (newest first) that are garbage or past their grace. */
+function selectRetiredGenerations(
+	older: readonly GenerationRow[],
+	retirement: {
+		readonly graceMs: number;
+		readonly now: Date;
+		readonly publishedAtMs: number;
+	},
+): TranscriptRecordsGeneration[] {
+	const retired: TranscriptRecordsGeneration[] = [];
+	// Publication time of the next newer committed generation: the moment the
+	// generation below it stopped being the committed one.
+	let supersededAtMs = retirement.publishedAtMs;
+	for (const row of older) {
+		const generation = {
+			parserVersion: Number(row.parser_version),
+			revision: row.revision_text,
+		};
+		const receipt = decodeTranscriptRecordsReceipt(row.receipt_head);
+		if (receipt === undefined) {
+			retired.push(generation);
+			continue;
+		}
+		if (supersededAtMs <= retirement.now.getTime() - retirement.graceMs) {
+			retired.push(generation);
+		}
+		const publishedAtMs = Date.parse(receipt.publishedAt);
+		// An unreadable timestamp keeps this generation and everything below it
+		// for another pass rather than guessing.
+		supersededAtMs = Number.isFinite(publishedAtMs)
+			? publishedAtMs
+			: Number.POSITIVE_INFINITY;
+	}
+	return retired.slice(0, MAX_RETIRED_GENERATIONS_PER_PASS);
+}
+
+async function insertBatch(
+	executor: ClickHouseExecutor,
+	rows: readonly RudelTranscriptRecordsRow[],
+	deduplicationToken: string,
+	abortSignal: AbortSignal,
+): Promise<void> {
+	await ingestRudelTranscriptRecords(
+		{
+			insert: ({ table, values }) =>
+				executor.insert({
+					abortSignal,
+					asyncInsert: false,
+					deduplicationToken,
+					table,
+					values,
+				}),
+		},
+		[...rows],
+		{ validate: false },
+	);
+}
+
+function buildDeduplicationTokenPrefix(
+	input: TranscriptRecordsIdentity & { readonly revision: string },
+	attemptId: string,
+): string {
+	const digest = createHash("sha256")
+		.update(
+			[
+				TRANSCRIPT_RECORDS_TABLE,
+				input.organizationId,
+				input.userId,
+				input.sessionId,
+				input.source,
+				input.revision,
+				TRANSCRIPT_RECORDS_PARSER_VERSION,
+				attemptId,
+			].join("\u0000"),
+		)
+		.digest("hex");
+	return `transcript-records:${digest}`;
+}
+
+function estimateRowBytes(row: RudelTranscriptRecordsRow): number {
+	return (
+		Buffer.byteLength(row.text, "utf8") +
+		Buffer.byteLength(row.head, "utf8") +
+		Buffer.byteLength(row.tail, "utf8") +
+		Buffer.byteLength(row.file_path, "utf8") +
+		400
+	);
+}
+
+function assertRevision(revision: string): void {
+	if (!/^[1-9]\d*$/u.test(revision)) {
+		throw new Error("Transcript records revision must be an unsigned integer");
+	}
+}
+
+function toClickHouseTimestamp(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		throw new Error(`Invalid transcript record timestamp: ${value}`);
+	}
+	return date.toISOString().replace("T", " ").replace("Z", "");
+}

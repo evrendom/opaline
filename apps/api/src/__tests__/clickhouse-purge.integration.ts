@@ -17,10 +17,12 @@ import {
 	getClickHousePurgeFailureAlertIdempotencyKey,
 } from "../email.js";
 import {
+	assertNoClickHousePurgeTombstone,
 	type ClickHousePurgeProcessorEnv,
 	type ClickHousePurgeTarget,
 	calculateExponentialBackoffWithJitter,
 	enqueueClickHousePurge,
+	hasClickHousePurgeTombstone,
 	registerClickHousePurgeWorker,
 	runClickHousePurgeWorkerOnce,
 	sanitizeClickHousePurgeError,
@@ -518,6 +520,105 @@ describe("durable ClickHouse purge worker", () => {
 		);
 	});
 
+	test("schedules one follow-up pass after a successful purge", async () => {
+		const target: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_followup`,
+			targetType: "account",
+		};
+		await enqueue(target, 3);
+		const executed: string[] = [];
+		const env = {
+			...createProcessorEnv(async (purged) => {
+				executed.push(purged.targetId);
+			}, rejectUnexpectedAlert),
+			followUpDelayMs: 600_000,
+		};
+
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
+		expect(executed).toEqual([target.targetId]);
+		expect(await getFollowUpDueAt(target)).not.toBeNull();
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(false);
+		expect(executed).toHaveLength(1);
+
+		await makeFollowUpDue(target);
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
+		expect(executed).toEqual([target.targetId, target.targetId]);
+		expect(await getFollowUpDueAt(target)).toBeNull();
+		expect(await getPurgeJob(target)).toEqual(
+			expect.objectContaining({ status: "succeeded" }),
+		);
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(false);
+		expect(executed).toHaveLength(2);
+	});
+
+	test("retries a failed follow-up pass without disturbing the succeeded purge", async () => {
+		const target: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_followup_retry`,
+			targetType: "organization",
+		};
+		await enqueue(target, 3);
+		let calls = 0;
+		const env = {
+			...createProcessorEnv(async () => {
+				calls++;
+				if (calls === 2) throw new Error("ClickHouse is unavailable");
+			}, rejectUnexpectedAlert),
+			followUpDelayMs: 600_000,
+		};
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
+
+		await makeFollowUpDue(target);
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
+
+		expect(calls).toBe(2);
+		expect(await getPurgeJob(target)).toEqual(
+			expect.objectContaining({ status: "succeeded" }),
+		);
+		const retryAt = await getFollowUpDueAt(target);
+		expect(retryAt?.getTime() ?? 0).toBeGreaterThan(Date.now());
+		await makeFollowUpDue(target);
+		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
+		expect(calls).toBe(3);
+		expect(await getFollowUpDueAt(target)).toBeNull();
+	});
+
+	test("a purge job fences writers for its account or organization", async () => {
+		const accountTarget: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_fence_user`,
+			targetType: "account",
+		};
+		const organizationTarget: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_fence_org`,
+			targetType: "organization",
+		};
+		const bystander = {
+			organizationId: `${TEST_RUN_ID}_fence_other_org`,
+			userId: `${TEST_RUN_ID}_fence_other_user`,
+		};
+		const accountOwner = {
+			organizationId: bystander.organizationId,
+			userId: accountTarget.targetId,
+		};
+		const organizationMember = {
+			organizationId: organizationTarget.targetId,
+			userId: bystander.userId,
+		};
+		expect(await hasClickHousePurgeTombstone(accountOwner)).toBe(false);
+
+		await enqueue(accountTarget, 3);
+		await enqueue(organizationTarget, 3);
+
+		expect(await hasClickHousePurgeTombstone(accountOwner)).toBe(true);
+		expect(await hasClickHousePurgeTombstone(organizationMember)).toBe(true);
+		expect(await hasClickHousePurgeTombstone(bystander)).toBe(false);
+		await expect(
+			assertNoClickHousePurgeTombstone(accountOwner),
+		).rejects.toThrow("fenced");
+		await expect(
+			assertNoClickHousePurgeTombstone(bystander),
+		).resolves.toBeUndefined();
+	});
+
 	test("revives a failed purge and clears its alert state", async () => {
 		const target: ClickHousePurgeTarget = {
 			targetId: `${TEST_RUN_ID}_revive_failed`,
@@ -985,6 +1086,59 @@ describe("durable ClickHouse purge worker", () => {
 		expect(await countPurgeJobs(retainedTarget)).toBe(1);
 	});
 
+	test("never expires a succeeded purge whose follow-up work is outstanding", async () => {
+		const pending: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_pending_followup`,
+			targetType: "account",
+		};
+		const finishedLongAgo: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_followup_done_old`,
+			targetType: "account",
+		};
+		const finishedRecently: ClickHousePurgeTarget = {
+			targetId: `${TEST_RUN_ID}_followup_done_recent`,
+			targetType: "account",
+		};
+		await sqlClient`
+			INSERT INTO clickhouse_purge_job (
+				id, target_type, target_id, status, attempt_count, max_attempts,
+				next_attempt_at, succeeded_at, followup_due_at, followup_completed_at
+			)
+			VALUES
+				(
+					${crypto.randomUUID()}, ${pending.targetType}, ${pending.targetId},
+					'succeeded', 1, 1, NULL,
+					NOW() - INTERVAL '90 days', NOW() - INTERVAL '60 days', NULL
+				),
+				(
+					${crypto.randomUUID()}, ${finishedLongAgo.targetType}, ${finishedLongAgo.targetId},
+					'succeeded', 1, 1, NULL,
+					NOW() - INTERVAL '90 days', NULL, NOW() - INTERVAL '31 days'
+				),
+				(
+					${crypto.randomUUID()}, ${finishedRecently.targetType}, ${finishedRecently.targetId},
+					'succeeded', 1, 1, NULL,
+					NOW() - INTERVAL '90 days', NULL, NOW() - INTERVAL '1 day'
+				)
+		`;
+
+		const worker = startClickHousePurgeWorker({
+			pollIntervalMs: 60_000,
+			resend: {},
+		});
+		await worker.stop();
+
+		expect(await countPurgeJobs(pending)).toBe(1);
+		expect(await countPurgeJobs(finishedLongAgo)).toBe(0);
+		expect(await countPurgeJobs(finishedRecently)).toBe(1);
+		expect(
+			await hasClickHousePurgeTombstone({
+				organizationId: "unrelated",
+				userId: pending.targetId,
+			}),
+		).toBe(true);
+	});
+
 	test("sends an alert even when legacy failure timestamps are missing", async () => {
 		const target: ClickHousePurgeTarget = {
 			targetId: `${TEST_RUN_ID}_missing_timestamps`,
@@ -1234,6 +1388,27 @@ interface PurgeJobRow {
 	maxAttempts: number;
 	nextAttemptAt: Date | string | null;
 	status: string;
+}
+
+async function getFollowUpDueAt(
+	target: ClickHousePurgeTarget,
+): Promise<Date | null> {
+	const [row] = await sqlClient<Array<{ followupDueAt: Date | string | null }>>`
+		SELECT followup_due_at AS "followupDueAt"
+		FROM clickhouse_purge_job
+		WHERE target_type = ${target.targetType}
+			AND target_id = ${target.targetId}
+	`;
+	return row?.followupDueAt ? new Date(row.followupDueAt) : null;
+}
+
+async function makeFollowUpDue(target: ClickHousePurgeTarget): Promise<void> {
+	await sqlClient`
+		UPDATE clickhouse_purge_job
+		SET followup_due_at = NOW() - INTERVAL '1 second'
+		WHERE target_type = ${target.targetType}
+			AND target_id = ${target.targetId}
+	`;
 }
 
 async function getPurgeJob(

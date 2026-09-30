@@ -60,11 +60,13 @@ const ALLOWED_CLICKHOUSE_TABLES = new Set([
 	"rudel.skill_receipts",
 	"rudel.skill_uses",
 	"rudel.skill_version_contents",
+	"rudel.transcript_records",
 	"rudel.usage_events",
 	"rudel.wrapped_user_archetype_snapshots_v1",
 ]);
 
 export interface ClickHouseStatement {
+	abortSignal?: AbortSignal;
 	clickhouse_settings?: ClickHouseSettings;
 	query: string;
 	query_params?: Record<string, unknown>;
@@ -76,6 +78,7 @@ export interface ClickHouseExecutor {
 	execute(statement: ClickHouseStatement): Promise<void>;
 	query<T>(statement: ClickHouseStatement): Promise<T[]>;
 	insert(params: {
+		abortSignal?: AbortSignal;
 		asyncInsert?: boolean;
 		deduplicationToken?: string;
 		table: string;
@@ -220,14 +223,24 @@ export function createClickHouseExecutor(config: {
 			await client.close();
 		},
 		async execute(statement: ClickHouseStatement) {
+			statement.abortSignal?.throwIfAborted();
 			await client.command({
+				abort_signal:
+					statement.abortSignal === undefined
+						? undefined
+						: AbortSignal.any([statement.abortSignal]),
 				clickhouse_settings: statement.clickhouse_settings,
 				query: statement.query,
 				query_params: statement.query_params,
 			});
 		},
 		async query<T>(statement: ClickHouseStatement): Promise<T[]> {
+			statement.abortSignal?.throwIfAborted();
 			const result = await client.query({
+				abort_signal:
+					statement.abortSignal === undefined
+						? undefined
+						: AbortSignal.any([statement.abortSignal]),
 				clickhouse_settings: statement.clickhouse_settings,
 				query: statement.query,
 				query_params: statement.query_params,
@@ -236,6 +249,7 @@ export function createClickHouseExecutor(config: {
 			return result.json();
 		},
 		async insert(params) {
+			params.abortSignal?.throwIfAborted();
 			const table = getSafeClickHouseTable(params.table);
 			// Use command() with FORMAT JSONEachRow instead of client.insert()
 			// because ClickHouse Cloud's @clickhouse/client insert() silently drops data.
@@ -246,6 +260,10 @@ export function createClickHouseExecutor(config: {
 					? "async_insert=0, input_format_parallel_parsing=0"
 					: "async_insert=1, wait_for_async_insert=1, input_format_parallel_parsing=0";
 			await client.command({
+				abort_signal:
+					params.abortSignal === undefined
+						? undefined
+						: AbortSignal.any([params.abortSignal]),
 				clickhouse_settings: createClickHouseInsertDeduplicationSettings(
 					params.deduplicationToken,
 				),

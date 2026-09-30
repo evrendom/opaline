@@ -88,6 +88,7 @@ import {
 	requestOrganizationBillingUpgrade,
 } from "./services/billing-upgrade-request.service.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
+import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
@@ -182,6 +183,11 @@ import {
 	readSkillExtractionReceipt,
 	writeSkillExtraction,
 } from "./services/skill-extraction-ingest.service.js";
+import {
+	isTranscriptRecordsCurrent,
+	persistTranscriptRecordsBestEffort,
+	readTranscriptRecordsExtractionConfig,
+} from "./services/transcript-records-extraction.service.js";
 import { reportUploadFailures } from "./services/upload-failure.service.js";
 import {
 	hasMatchingUsageExtractionReceipt,
@@ -883,6 +889,11 @@ async function processPreparedIngestSession({
 		"SKILL_EXTRACTION_ENABLED",
 		true,
 	);
+	const transcriptRecordsConfig = readTranscriptRecordsExtractionConfig();
+	const subagents: Record<string, string> = {};
+	for (const subagent of filteredInput.subagents ?? []) {
+		subagents[subagent.agentId] = subagent.content;
+	}
 	const response = {
 		success: true as const,
 		sessionId: input.sessionId,
@@ -924,10 +935,26 @@ async function processPreparedIngestSession({
 					sourceContentSha256: hashSkillSourceContent(filteredInput.content),
 				},
 			);
-		if (!skillReceiptMatches) {
+		const transcriptRecordsCurrent = await isTranscriptRecordsCurrent(
+			getClickhouse(),
+			{
+				config: transcriptRecordsConfig,
+				content: filteredInput.content,
+				organizationId: orgId,
+				sessionId: input.sessionId,
+				subagents,
+				userId: context.user.id,
+			},
+		);
+		if (!skillReceiptMatches || !transcriptRecordsCurrent) {
 			logger.info(
-				"Reprocessing duplicate session with a missing or stale skill receipt (organization_id={organizationId} session_id={sessionId})",
-				{ organizationId: orgId, sessionId: input.sessionId },
+				"Reprocessing duplicate session with a missing or stale derived-data receipt (organization_id={organizationId} session_id={sessionId} skills_current={skillsCurrent} transcript_records_current={transcriptRecordsCurrent})",
+				{
+					organizationId: orgId,
+					sessionId: input.sessionId,
+					skillsCurrent: skillReceiptMatches,
+					transcriptRecordsCurrent,
+				},
 			);
 		} else {
 			logger.info(
@@ -1033,6 +1060,30 @@ async function processPreparedIngestSession({
 		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
 	}
 
+	// Derived data must never endanger the upload or the required extraction
+	// below: the job never rejects, runs in its own worker under its own limits,
+	// and is only awaited (in `finally`) so the response sees its receipt.
+	const transcriptRecordsJob = persistTranscriptRecordsBestEffort(
+		getClickhouse(),
+		{
+			assertWritable: () =>
+				assertNoClickHousePurgeTombstone({
+					organizationId: orgId,
+					userId: context.user.id,
+				}),
+			config: transcriptRecordsConfig,
+			content: filteredInput.content,
+			organizationId: orgId,
+			revision,
+			sessionDate: timestamps.sessionDate,
+			sessionId: input.sessionId,
+			signal,
+			source: filteredInput.source,
+			subagents,
+			userId: context.user.id,
+		},
+	);
+
 	try {
 		if (!usageExtractionEnabled && !skillExtractionEnabled) {
 			logger.warn(
@@ -1073,10 +1124,6 @@ async function processPreparedIngestSession({
 				return { contentSha256: contentHash, result: response };
 			}
 			throw error;
-		}
-		const subagents: Record<string, string> = {};
-		for (const subagent of filteredInput.subagents ?? []) {
-			subagents[subagent.agentId] = subagent.content;
 		}
 		let usageExtraction: UsageExtractionResult;
 		let skillExtraction: SkillExtractionResult | null;
@@ -1289,6 +1336,7 @@ async function processPreparedIngestSession({
 
 		return { contentSha256: contentHash, result: response };
 	} finally {
+		await transcriptRecordsJob;
 		if (
 			shouldAwaitBestEffortLanguageSignals({
 				awaitBestEffortLanguageSignals,

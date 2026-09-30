@@ -46,6 +46,14 @@ export const clickhousePurgeJob = pgTable(
 			withTimezone: true,
 			mode: "date",
 		}),
+		followupDueAt: timestamp("followup_due_at", {
+			withTimezone: true,
+			mode: "date",
+		}),
+		followupCompletedAt: timestamp("followup_completed_at", {
+			withTimezone: true,
+			mode: "date",
+		}),
 		leaseToken: text("lease_token"),
 		leaseExpiresAt: timestamp("lease_expires_at", {
 			withTimezone: true,

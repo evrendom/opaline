@@ -18,6 +18,7 @@ import {
 } from "../services/r2-ingest-storage.service.js";
 import { reconcileSessionLanguageSignalsUntilCaughtUp } from "../services/session-language-signal-reconciliation.service.js";
 import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
+import { runTranscriptRecordsRetirementPass } from "../services/transcript-records-retirement.service.js";
 
 const logger = getLogger(["rudel", "api", "maintenance"]);
 const DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE = 25;
@@ -29,6 +30,7 @@ const CLICKHOUSE_PURGE_BUDGET_MS = 90_000;
 const R2_INGEST_BUDGET_MS = 90_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
+const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
 
 export async function handleApiMaintenanceRequest(
 	request: Request,
@@ -66,6 +68,14 @@ async function runApiMaintenance() {
 	const languageSignals = await runMaintenanceStep("language-signals", () =>
 		runLanguageSignalMaintenance(invocationDeadline),
 	);
+	const transcriptRecords = await runMaintenanceStep("transcript-records", () =>
+		runTranscriptRecordsRetirementPass({
+			deadline: createMaintenanceQueueDeadline(
+				invocationDeadline,
+				TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS,
+			),
+		}),
+	);
 	if (!hasMaintenanceTimeRemaining(invocationDeadline)) {
 		logger.warn(
 			"Daily API maintenance reached its invocation deadline; returning with queued work left for the next cron",
@@ -79,9 +89,11 @@ async function runApiMaintenance() {
 			clickHousePurge.status === "ok" &&
 			r2Ingest.status === "ok" &&
 			sessionRevisionReceipts.status === "ok" &&
-			languageSignals.status === "ok",
+			languageSignals.status === "ok" &&
+			transcriptRecords.status === "ok",
 		r2Ingest,
 		sessionRevisionReceipts,
+		transcriptRecords,
 	};
 }
 

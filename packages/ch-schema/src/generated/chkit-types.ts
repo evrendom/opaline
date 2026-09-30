@@ -400,6 +400,71 @@ export const RudelSkillVersionContentsRowSchema = z.object({
 export type RudelSkillVersionContentsRowInput = z.input<typeof RudelSkillVersionContentsRowSchema>
 export type RudelSkillVersionContentsRowOutput = z.output<typeof RudelSkillVersionContentsRowSchema>
 
+export type RudelTranscriptRecordsRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  source: string
+  agent_id: string
+  revision: string
+  record_idx: number
+  block_idx: number
+  turn_idx: number
+  ts: string
+  session_date: string
+  kind: string
+  subtype: string
+  tool_name: string
+  command_class: string
+  is_error: boolean
+  exit_code: number | null
+  call_id: string
+  file_path: string
+  file_op: string
+  spawned_agent_id: string
+  byte_start: string
+  byte_len: number
+  text_chars: number
+  parser_version: number
+  head: string
+  tail: string
+  text: string
+}
+
+export const RudelTranscriptRecordsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  source: z.string(),
+  agent_id: z.string(),
+  revision: z.string(),
+  record_idx: z.number(),
+  block_idx: z.number(),
+  turn_idx: z.number(),
+  ts: z.string(),
+  session_date: z.string(),
+  kind: z.string(),
+  subtype: z.string(),
+  tool_name: z.string(),
+  command_class: z.string(),
+  is_error: z.boolean(),
+  exit_code: z.number().nullable(),
+  call_id: z.string(),
+  file_path: z.string(),
+  file_op: z.string(),
+  spawned_agent_id: z.string(),
+  byte_start: z.string(),
+  byte_len: z.number(),
+  text_chars: z.number(),
+  parser_version: z.number(),
+  head: z.string(),
+  tail: z.string(),
+  text: z.string(),
+})
+
+export type RudelTranscriptRecordsRowInput = z.input<typeof RudelTranscriptRecordsRowSchema>
+export type RudelTranscriptRecordsRowOutput = z.output<typeof RudelTranscriptRecordsRowSchema>
+
 export type RudelUsageEventsRow = {
   organization_id: string
   user_id: string

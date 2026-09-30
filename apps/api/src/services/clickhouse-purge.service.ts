@@ -11,6 +11,7 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import {
@@ -42,6 +43,13 @@ const CONFIGURED_POLL_INTERVAL_MS = readPositiveSafeIntegerEnv(
 	"CLICKHOUSE_PURGE_POLL_INTERVAL_MS",
 	DEFAULT_POLL_INTERVAL_MS,
 );
+// Longer than the longest bounded write that can race a deletion, so the
+// follow-up pass removes whatever such a write published after the first pass.
+const DEFAULT_FOLLOWUP_DELAY_MS = 15 * 60_000;
+const CONFIGURED_FOLLOWUP_DELAY_MS = readPositiveSafeIntegerEnv(
+	"CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS",
+	DEFAULT_FOLLOWUP_DELAY_MS,
+);
 
 export type ClickHousePurgeTarget =
 	| { targetId: string; targetType: "account" }
@@ -51,6 +59,8 @@ export type ClickHousePurgeFailureAlert = ClickHousePurgeFailureAlertData;
 
 export interface ClickHousePurgeProcessorEnv {
 	executePurge: (target: ClickHousePurgeTarget) => Promise<void>;
+	/** Delay before the follow-up purge pass (default 15 minutes). */
+	followUpDelayMs?: number;
 	leaseDurationMs: number;
 	now: () => Date;
 	random: () => number;
@@ -183,12 +193,59 @@ export async function enqueueClickHousePurge(
 				alert_sent_at = NULL,
 				lease_token = NULL,
 				lease_expires_at = NULL,
+				followup_due_at = NULL,
+				followup_completed_at = NULL,
 				created_at = NOW(),
 				updated_at = NOW()
 			WHERE clickhouse_purge_job.status IN ('succeeded', 'failed')
 		`,
 		[crypto.randomUUID(), target.targetType, target.targetId, maxAttempts],
 	);
+}
+
+/**
+ * Deletion fence for writers of data that an account or organization purge
+ * deletes. A `clickhouse_purge_job` row for the target is the tombstone: it is
+ * written in the same transaction as the deletion and outlives the purge.
+ * Every long-running writer (backfills, derived-data ingest, R2 PUTs) follows
+ * the same three steps, so a write can never resurrect deleted data for good:
+ *
+ * 1. Check before write: call `assertNoClickHousePurgeTombstone` immediately
+ *    before each external publication (ClickHouse insert, R2 PUT, backfill
+ *    insert) and abort, cleaning up what was written so far, when it throws.
+ * 2. Register intent before a PUT: objects get a durable intent row first, so
+ *    purge and orphan cleanup can always find them.
+ * 3. Second purge pass: a successful purge schedules one follow-up pass after
+ *    `CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS` (default 15 minutes, longer than any
+ *    bounded write) that deletes again. A write that passed step 1 just before
+ *    the tombstone appeared is removed by that pass, which closes the
+ *    check-then-write race without distributed locks.
+ *
+ * The tombstone outlives all of that work: a job is never expired while its
+ * follow-up is outstanding (`followup_due_at`), and its retention is measured
+ * from the last pass that completed (`followup_completed_at`).
+ */
+export async function hasClickHousePurgeTombstone(
+	target: { organizationId: string; userId: string },
+	database: postgres.Sql = sqlClient,
+): Promise<boolean> {
+	const rows = await database<Array<{ found: number }>>`
+		SELECT 1 AS found
+		FROM clickhouse_purge_job
+		WHERE (target_type = 'account' AND target_id = ${target.userId})
+			OR (target_type = 'organization' AND target_id = ${target.organizationId})
+		LIMIT 1
+	`;
+	return rows.length > 0;
+}
+
+export async function assertNoClickHousePurgeTombstone(
+	target: { organizationId: string; userId: string },
+	database: postgres.Sql = sqlClient,
+): Promise<void> {
+	if (await hasClickHousePurgeTombstone(target, database)) {
+		throw new ClickHouseWriteFencedError();
+	}
 }
 
 export function startClickHousePurgeWorker(
@@ -418,7 +475,9 @@ export async function runClickHousePurgeWorkerOnce(
 	if (purgeJobClaim.status === "claimed") {
 		await processClaimedPurgeJob(purgeJobClaim.job, env);
 	}
-	const handledPurgeWork = purgeJobClaim.status !== "empty";
+	const handledFollowUp =
+		purgeJobClaim.status === "empty" && (await runNextFollowUpPurge(env));
+	const handledPurgeWork = purgeJobClaim.status !== "empty" || handledFollowUp;
 
 	const sendFailureAlert = env.sendFailureAlert;
 	if (!sendFailureAlert || !hasMaintenanceTimeRemaining(deadline)) {
@@ -516,7 +575,8 @@ async function deleteExpiredSucceededPurgeJobs(
 	await database`
 		DELETE FROM clickhouse_purge_job
 		WHERE status = 'succeeded'
-			AND succeeded_at < NOW() - ${SUCCEEDED_JOB_RETENTION_MS}::bigint * INTERVAL '1 millisecond'
+			AND followup_due_at IS NULL
+			AND COALESCE(followup_completed_at, succeeded_at) < NOW() - ${SUCCEEDED_JOB_RETENTION_MS}::bigint * INTERVAL '1 millisecond'
 	`;
 }
 
@@ -540,6 +600,13 @@ async function getNextClickHousePurgeWorkDueAt(
 				status = 'running'
 				AND lease_expires_at IS NOT NULL
 			)
+
+			UNION ALL
+
+			SELECT followup_due_at AS due_at
+			FROM clickhouse_purge_job
+			WHERE status = 'succeeded'
+				AND followup_due_at IS NOT NULL
 
 			UNION ALL
 
@@ -847,6 +914,80 @@ async function renewClickHousePurgeJobLease(
 	return renewed.length === 1;
 }
 
+interface ClaimedFollowUpPurge {
+	id: string;
+	targetId: string;
+	targetType: ClickHousePurgeTarget["targetType"];
+}
+
+/**
+ * Runs the follow-up pass of one succeeded purge whose delay has elapsed. The
+ * claim pushes `followup_due_at` out by the lease, so concurrent workers skip
+ * it and a crashed worker's pass becomes due again; success clears it.
+ */
+async function runNextFollowUpPurge(
+	env: ClickHousePurgeProcessorEnv,
+): Promise<boolean> {
+	const [claimed] = await env.sqlClient<ClaimedFollowUpPurge[]>`
+		UPDATE clickhouse_purge_job
+		SET
+			followup_due_at = NOW() + ${env.leaseDurationMs}::bigint * INTERVAL '1 millisecond',
+			updated_at = NOW()
+		WHERE id = (
+			SELECT id
+			FROM clickhouse_purge_job
+			WHERE status = 'succeeded'
+				AND followup_due_at <= NOW()
+			ORDER BY followup_due_at ASC
+			FOR UPDATE SKIP LOCKED
+			LIMIT 1
+		)
+		RETURNING id, target_type AS "targetType", target_id AS "targetId"
+	`;
+	if (!claimed) {
+		return false;
+	}
+	try {
+		await env.executePurge({
+			targetId: claimed.targetId,
+			targetType: claimed.targetType,
+		});
+	} catch (error) {
+		logger.warn(
+			"ClickHouse follow-up purge pass failed and will retry (job_id={jobId} error={error})",
+			{ error: sanitizeClickHousePurgeError(error), jobId: claimed.id },
+		);
+		await env.sqlClient`
+			UPDATE clickhouse_purge_job
+			SET
+				followup_due_at = NOW() + ${DEFAULT_RETRY_MAX_DELAY_MS}::bigint * INTERVAL '1 millisecond',
+				updated_at = NOW()
+			WHERE id = ${claimed.id}
+				AND status = 'succeeded'
+				AND followup_due_at IS NOT NULL
+		`;
+		return true;
+	}
+	await env.sqlClient`
+		UPDATE clickhouse_purge_job
+		SET
+			followup_due_at = NULL,
+			followup_completed_at = NOW(),
+			updated_at = NOW()
+		WHERE id = ${claimed.id}
+			AND status = 'succeeded'
+	`;
+	logger.info(
+		"ClickHouse follow-up purge pass succeeded (job_id={jobId} target_type={targetType} target_id={targetId})",
+		{
+			jobId: claimed.id,
+			targetId: claimed.targetId,
+			targetType: claimed.targetType,
+		},
+	);
+	return true;
+}
+
 async function markPurgeSucceeded(
 	job: ClaimedPurgeJob,
 	env: ClickHousePurgeProcessorEnv,
@@ -857,6 +998,7 @@ async function markPurgeSucceeded(
 			status = 'succeeded',
 			last_error = NULL,
 			succeeded_at = NOW(),
+			followup_due_at = NOW() + ${env.followUpDelayMs ?? CONFIGURED_FOLLOWUP_DELAY_MS}::bigint * INTERVAL '1 millisecond',
 			lease_token = NULL,
 			lease_expires_at = NULL,
 			updated_at = NOW()
