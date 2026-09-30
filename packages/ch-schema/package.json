@@ -35,7 +35,8 @@
 		"ch:migrate:product-launch": "bun scripts/migrate-product-launch.ts",
 		"ch:migrate:repository-evidence-index": "bun scripts/migrate-repository-evidence-index.ts",
 		"ch:migrate:language-signals": "bun scripts/migrate-language-signals.ts",
-		"ch:migrate:transcript-records": "bun scripts/migrate-transcript-records.ts"
+		"ch:migrate:transcript-records": "bun scripts/migrate-transcript-records.ts",
+		"ch:migrate:production": "bun run ch:migrate:language-signals && bun run ch:migrate:transcript-records && bun run ch:migrate:repository-evidence-index"
 	},
 	"dependencies": {
 		"@chkit/clickhouse": "0.1.0-beta.16",

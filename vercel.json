@@ -1,6 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then bun run --cwd packages/ch-schema ch:migrate:language-signals && bun run --cwd packages/ch-schema ch:migrate:transcript-records && bun run --cwd packages/ch-schema ch:migrate:repository-evidence-index; fi && bun run check-types:vercel && bun run build:site",
+	"buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then bun run --cwd packages/ch-schema ch:migrate:production; fi && bun run check-types:vercel && bun run build:site",
 	"bunVersion": "1.x",
 	"git": {
 		"deploymentEnabled": false

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import chSchemaPackage from "../../../../packages/ch-schema/package.json" with {
+	type: "json",
+};
 import vercelConfig from "../../../../vercel.json" with { type: "json" };
 import { PRODUCTION_SECURITY_HEADERS } from "../lib/http-response-policy.js";
 import {
@@ -85,33 +88,34 @@ describe("Vercel deployment configuration", () => {
 			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
 		);
 	});
-	test("runs the repository evidence migration before a production build", () => {
-		const repositoryMigration =
-			"bun run --cwd packages/ch-schema ch:migrate:repository-evidence-index";
-		const languageSignalMigration =
-			"bun run --cwd packages/ch-schema ch:migrate:language-signals";
-		const transcriptRecordsMigration =
-			"bun run --cwd packages/ch-schema ch:migrate:transcript-records";
+	test("runs ClickHouse forward migrations before a production build", () => {
+		// Vercel rejects project build commands longer than 256 characters.
+		expect(vercelConfig.buildCommand.length).toBeLessThanOrEqual(256);
 		expect(vercelConfig.buildCommand).toContain(
 			'if [ "$VERCEL_ENV" = "production" ]',
 		);
+		const productionMigration =
+			"bun run --cwd packages/ch-schema ch:migrate:production";
 		expect(
-			vercelConfig.buildCommand.indexOf(repositoryMigration),
+			vercelConfig.buildCommand.indexOf(productionMigration),
 		).toBeGreaterThan(-1);
-		expect(
-			vercelConfig.buildCommand.indexOf(languageSignalMigration),
-		).toBeGreaterThan(-1);
-		expect(
-			vercelConfig.buildCommand.indexOf(languageSignalMigration),
-		).toBeLessThan(
-			vercelConfig.buildCommand.indexOf(transcriptRecordsMigration),
-		);
-		expect(
-			vercelConfig.buildCommand.indexOf(transcriptRecordsMigration),
-		).toBeLessThan(vercelConfig.buildCommand.indexOf(repositoryMigration));
-		expect(vercelConfig.buildCommand.indexOf(repositoryMigration)).toBeLessThan(
+		expect(vercelConfig.buildCommand.indexOf(productionMigration)).toBeLessThan(
 			vercelConfig.buildCommand.indexOf("bun run check-types:vercel"),
 		);
+
+		const productionScript = chSchemaPackage.scripts["ch:migrate:production"];
+		const languageSignals = productionScript.indexOf(
+			"ch:migrate:language-signals",
+		);
+		const transcriptRecords = productionScript.indexOf(
+			"ch:migrate:transcript-records",
+		);
+		const repositoryEvidence = productionScript.indexOf(
+			"ch:migrate:repository-evidence-index",
+		);
+		expect(languageSignals).toBeGreaterThan(-1);
+		expect(languageSignals).toBeLessThan(transcriptRecords);
+		expect(transcriptRecords).toBeLessThan(repositoryEvidence);
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {
