@@ -1,3 +1,4 @@
+export { isHighRiskCredentialPath } from "./credential-path.js";
 export {
 	assertFilteredJsonValidity,
 	FILTER_VERSION,

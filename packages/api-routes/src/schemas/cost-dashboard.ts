@@ -25,10 +25,21 @@ export const AgentRunDurationIntervalSchema = z.enum([
 	"quarterly",
 	"yearly",
 ]);
+/**
+ * Metrics a dashboard request can select. Which of them exist for a given
+ * scope and deployment is decided by the server and returned as
+ * `availableMetrics`, so clients never render a metric the server cannot serve.
+ */
+export const CostDashboardRequestedMetricSchema = z.enum([
+	"cost",
+	"sessions",
+	"signals",
+	"agentRuns",
+	"mergedPullRequests",
+	"ciFailuresPerPullRequest",
+]);
 const CostDashboardInputBaseSchema = DateRangeInputSchema.extend({
-	requestedMetric: z
-		.enum(["cost", "sessions", "signals", "agentRuns"])
-		.optional(),
+	requestedMetric: CostDashboardRequestedMetricSchema.optional(),
 	durationInterval: AgentRunDurationIntervalSchema.optional(),
 	members: z.array(z.string().max(512)).max(100).default([]),
 	repositories: z.array(z.string().max(4096)).max(100).default([]),
@@ -78,6 +89,8 @@ export const CostBreakdownEntrySchema = z.object({
 	value: z.number().nonnegative(),
 	incomplete: z.boolean(),
 	image: z.string().nullable(),
+	numerator: z.number().nonnegative().optional(),
+	denominator: z.number().nonnegative().optional(),
 });
 export const DashboardMetricSchema = z.enum([
 	"cost",
@@ -85,6 +98,8 @@ export const DashboardMetricSchema = z.enum([
 	"commits",
 	"signals",
 	"agentRuns",
+	"mergedPullRequests",
+	"ciFailuresPerPullRequest",
 ]);
 
 export const AgentRunDurationStatsSchema = z.object({
@@ -116,6 +131,10 @@ export const DashboardMetricDataSchema = z.object({
 			date: z.string(),
 			total: z.number(),
 			values: z.record(z.number()),
+			numerator: z.number().nonnegative().optional(),
+			denominator: z.number().nonnegative().optional(),
+			numeratorValues: z.record(z.number().nonnegative()).optional(),
+			denominatorValues: z.record(z.number().nonnegative()).optional(),
 		}),
 	),
 	breakdowns: z.object({
@@ -136,12 +155,15 @@ export const DashboardMetricDataSchema = z.object({
 		})
 		.optional(),
 	durationStats: AgentRunDurationStatsSchema.optional(),
+	numerator: z.number().nonnegative().optional(),
+	denominator: z.number().nonnegative().optional(),
 });
 export const CostDashboardSchema = z.object({
-	requestedMetric: z
-		.enum(["cost", "sessions", "signals", "agentRuns"])
-		.optional(),
+	requestedMetric: CostDashboardRequestedMetricSchema.optional(),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]),
+	// Server source of truth for the metrics this scope offers. Requests for a
+	// metric outside this list are answered as the default cost view.
+	availableMetrics: z.array(CostDashboardRequestedMetricSchema),
 	metrics: z.object({
 		cost: DashboardMetricDataSchema,
 		sessions: DashboardMetricDataSchema,
@@ -149,6 +171,8 @@ export const CostDashboardSchema = z.object({
 		commits: DashboardMetricDataSchema.nullable(),
 		signals: DashboardMetricDataSchema.nullable(),
 		agentRuns: DashboardMetricDataSchema.nullable(),
+		mergedPullRequests: DashboardMetricDataSchema.nullable(),
+		ciFailuresPerPullRequest: DashboardMetricDataSchema.nullable(),
 	}),
 });
 export type DashboardSignal = z.infer<typeof DashboardSignalSchema>;
@@ -156,6 +180,9 @@ export type DashboardMetric = z.infer<typeof DashboardMetricSchema>;
 export type DashboardMetricData = z.infer<typeof DashboardMetricDataSchema>;
 export type CostDimension = z.infer<typeof CostDimensionSchema>;
 export type CostDashboardInput = z.infer<typeof CostDashboardInputSchema>;
+export type CostDashboardRequestedMetric = z.infer<
+	typeof CostDashboardRequestedMetricSchema
+>;
 export type AdminCostDashboardInput = z.infer<
 	typeof AdminCostDashboardInputSchema
 >;

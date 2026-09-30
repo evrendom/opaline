@@ -5,6 +5,7 @@ import {
 	registerClickHousePurgeWorker,
 	startClickHousePurgeWorker,
 } from "./services/clickhouse-purge.service.js";
+import { startGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
 import { shutdownIngestFilterQueue } from "./services/ingest-filter.service.js";
 import { registerR2IngestCleanupWorker } from "./services/r2-ingest-cleanup.service.js";
 import { runR2IngestRepairPass } from "./services/r2-ingest-repair.service.js";
@@ -44,6 +45,8 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 		process.env.NODE_ENV === "test"
 			? undefined
 			: startSessionLineageReconciliationWorker();
+	const githubEvidenceWorker =
+		process.env.NODE_ENV === "test" ? undefined : startGitHubEvidenceWorker();
 	let isShuttingDown = false;
 
 	return {
@@ -57,6 +60,7 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 			shutdownUsageExtractionQueue();
 			shutdownSessionLanguageSignalScanner();
 			await Promise.all([
+				githubEvidenceWorker?.stop(),
 				shutdownApiProductAnalytics(),
 				clickHousePurgeWorker.stop(),
 				sessionLanguageSignalReconciliationWorker?.stop(),

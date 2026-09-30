@@ -11,9 +11,9 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
-import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
+import { purgeGitHubObjectIntents } from "./github-evidence-object-fence.service.js";
 import {
 	deleteOrgSessions,
 	deleteUserSessions,
@@ -311,6 +311,27 @@ async function snapshotR2PurgeObjects(
 				SELECT object_key
 				FROM repository_evidence_object
 				WHERE organization_id = $2
+
+				UNION
+
+				SELECT metadata_object_key AS object_key
+				FROM github_evidence_collection
+				WHERE organization_id = $2
+					AND metadata_object_key IS NOT NULL
+
+				UNION
+
+				SELECT object_key
+				FROM github_ci_log_receipt
+				WHERE organization_id = $2
+					AND object_key IS NOT NULL
+
+				UNION
+
+				SELECT chunk->>'objectKey' AS object_key
+				FROM github_evidence_collection collection,
+				 jsonb_array_elements(collection.metadata_chunks) chunk
+				WHERE collection.organization_id = $2
 			) evidence_objects
 			ON CONFLICT (purge_job_id, object_key) DO NOTHING
 		`,
@@ -339,52 +360,6 @@ export async function deleteSnapshottedRepositoryEvidenceObjects(
 		`,
 		[userId],
 	);
-}
-
-/**
- * Deletion fence for writers of data that an account or organization purge
- * deletes. A `clickhouse_purge_job` row for the target is the tombstone: it is
- * written in the same transaction as the deletion and outlives the purge.
- * Every long-running writer (backfills, derived-data ingest, R2 PUTs) follows
- * the same three steps, so a write can never resurrect deleted data for good:
- *
- * 1. Check before write: call `assertNoClickHousePurgeTombstone` immediately
- *    before each external publication (ClickHouse insert, R2 PUT, backfill
- *    insert) and abort, cleaning up what was written so far, when it throws.
- * 2. Register intent before a PUT: objects get a durable intent row first, so
- *    purge and orphan cleanup can always find them.
- * 3. Second purge pass: a successful purge schedules one follow-up pass after
- *    `CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS` (default 15 minutes, longer than any
- *    bounded write) that deletes again. A write that passed step 1 just before
- *    the tombstone appeared is removed by that pass, which closes the
- *    check-then-write race without distributed locks.
- *
- * The tombstone outlives all of that work: a job is never expired while its
- * follow-up is outstanding (`followup_due_at`), and its retention is measured
- * from the last pass that completed (`followup_completed_at`).
- */
-export async function hasClickHousePurgeTombstone(
-	target: { organizationId: string; userId?: string },
-	database: postgres.Sql | postgres.TransactionSql = sqlClient,
-): Promise<boolean> {
-	const rows = await database.unsafe<Array<{ found: number }>>(
-		`SELECT 1 AS found
-		 FROM clickhouse_purge_job
-		 WHERE (target_type = 'account' AND target_id = $1)
-			OR (target_type = 'organization' AND target_id = $2)
-		 LIMIT 1`,
-		[target.userId ?? "", target.organizationId],
-	);
-	return rows.length > 0;
-}
-
-export async function assertNoClickHousePurgeTombstone(
-	target: { organizationId: string; userId?: string },
-	database: postgres.Sql | postgres.TransactionSql = sqlClient,
-): Promise<void> {
-	if (await hasClickHousePurgeTombstone(target, database)) {
-		throw new ClickHouseWriteFencedError();
-	}
 }
 
 export function startClickHousePurgeWorker(
@@ -618,6 +593,14 @@ export async function purgeRepositoryEvidenceObjects(
 		retainRows: !pass.finalPass,
 	});
 	await purgeEvidenceIntents(target, pass, database, r2);
+	if (target.targetType === "organization") {
+		await purgeGitHubObjectIntents({
+			database,
+			finalPass: pass.finalPass,
+			organizationId: target.targetId,
+			r2,
+		});
+	}
 }
 
 async function purgeEvidenceIntents(

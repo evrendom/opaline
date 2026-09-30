@@ -662,12 +662,14 @@ export const NEAR_MISS_MUTATIONS: readonly NearMissMutation[] = [
 		value: `sk-${BODY_20.slice(0, 19)}T3BlbkFJ${OPENAI_TAIL}`,
 	},
 	{
+		// A block that runs to end of input is redacted as unterminated, so the
+		// mutants below close with a non-body character instead.
 		ruleId: "private-key",
 		kind: "truncated-last-char",
 		value: [
 			"-----BEGIN PRIVATE KEY-----",
 			pad("CANARY", 64, "A"),
-			"-----END PRIVATE KEY----",
+			'-----END PRIVATE KEY----"',
 		].join("\n"),
 	},
 	{
@@ -688,7 +690,7 @@ export const NEAR_MISS_MUTATIONS: readonly NearMissMutation[] = [
 		value: [
 			"-----BEGIN PRIVATE KEY-----",
 			pad("CANARY", 44, "A"),
-			"-----END PRIVATE KEY-----",
+			'-----END PRIVATE KEY-----"',
 		].join("\n"),
 	},
 	{

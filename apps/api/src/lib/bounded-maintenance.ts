@@ -21,8 +21,12 @@ export interface MaintenanceDrainResult<TResult extends MaintenancePassResult> {
 
 export function hasMaintenanceTimeRemaining(
 	deadline: MaintenanceDeadline | undefined,
+	minimumRemainingMs = 0,
 ): boolean {
-	return deadline === undefined || deadline.now() < deadline.deadlineAt;
+	return (
+		deadline === undefined ||
+		deadline.now() + minimumRemainingMs < deadline.deadlineAt
+	);
 }
 
 export function createMaintenanceQueueDeadline(

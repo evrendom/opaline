@@ -18,13 +18,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0044 to a database already migrated through 0019 and main's 0043", async () => {
+test("applies migrations 0020-0045 to a database already migrated through 0019, main's 0043, and repository evidence 0044", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0044_repository_evidence_capture");
+	expect(latestMigration?.tag).toBe("0045_github_repository_evidence");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -34,6 +34,7 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
 	const migrationsThrough0019 = await createMigrationsThrough(19);
 	const migrationsThrough0043 = await createMigrationsThrough(43);
+	const migrationsThrough0044 = await createMigrationsThrough(44);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -78,10 +79,19 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 				SELECT to_regclass('public.repository_evidence_capture')::text AS name
 			`;
 			expect(captureBefore0044?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0044 });
+			const [captureAfter0044] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.repository_evidence_capture')::text AS name
+			`;
+			expect(captureAfter0044?.name).toBe("repository_evidence_capture");
+			const [githubBefore0045] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.github_evidence_collection')::text AS name
+			`;
+			expect(githubBefore0045?.name).toBeNull();
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0044] = await migrationSql<MigrationState[]>`
+			const [after0045] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -90,8 +100,8 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0044).toEqual({
-				count: 45,
+			expect(after0045).toEqual({
+				count: 46,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [customerAccountTable] = await migrationSql<TableState[]>`
@@ -209,9 +219,16 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 				SELECT expected.name, to_regclass('public.' || expected.name)::text AS relation
 				FROM (VALUES
 					('clickhouse_purge_object'),
+					('github_app_installation'),
+					('github_ci_log_receipt'),
+					('github_evidence_collection'),
+					('github_evidence_object_intent'),
+					('github_pull_request_snapshot'),
+					('github_repository_binding'),
 					('repository_evidence_capture'),
 					('repository_evidence_object'),
 					('repository_evidence_upload'),
+					('repository_evidence_upload_intent'),
 					('repository_evidence_upload_object')
 				) AS expected(name)
 				ORDER BY expected.name
@@ -238,6 +255,7 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 				FROM pg_constraint
 				WHERE conname IN (
 					'clickhouse_purge_object_purge_job_id_clickhouse_purge_job_id_fk',
+					'github_app_installation_installed_by_user_id_user_id_fk',
 					'repository_evidence_upload_object_object_fk'
 				)
 				ORDER BY conname
@@ -247,6 +265,11 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 					name: "clickhouse_purge_object_purge_job_id_clickhouse_purge_job_id_fk",
 					onDelete: "cascade",
 					onUpdate: "cascade",
+				},
+				{
+					name: "github_app_installation_installed_by_user_id_user_id_fk",
+					onDelete: "set null",
+					onUpdate: "no action",
 				},
 				{
 					name: "repository_evidence_upload_object_object_fk",
@@ -451,6 +474,7 @@ test("applies migrations 0020-0044 to a database already migrated through 0019 a
 		await adminSql.end();
 		await rm(migrationsThrough0019, { force: true, recursive: true });
 		await rm(migrationsThrough0043, { force: true, recursive: true });
+		await rm(migrationsThrough0044, { force: true, recursive: true });
 	}
 });
 

@@ -2,6 +2,7 @@ import type {
 	CostBreakdownEntry,
 	CostDashboard,
 	CostDashboardInput,
+	CostDashboardRequestedMetric,
 	CostDimension,
 	DashboardMetric,
 	DashboardMetricData,
@@ -40,12 +41,85 @@ const SIGNAL_LABELS: Record<string, string> = {
 };
 const MAX_NAMED_SERIES = 7;
 
+/** Metrics every dashboard scope serves. */
+export const BASE_DASHBOARD_METRICS = [
+	"cost",
+	"sessions",
+	"agentRuns",
+	"signals",
+] as const satisfies readonly CostDashboardRequestedMetric[];
+const PULL_REQUEST_DASHBOARD_METRICS = [
+	"mergedPullRequests",
+	"ciFailuresPerPullRequest",
+] as const satisfies readonly CostDashboardRequestedMetric[];
+
+export interface DashboardMetricAvailabilityOptions {
+	/** `GITHUB_EVIDENCE_UI_ENABLED`; the GitHub evidence UI is dark-launched. */
+	readonly githubEvidenceUiEnabled: boolean;
+}
+
+/**
+ * The server-side source of truth for which dashboard metrics exist. Pull
+ * request metrics need a workspace repository scope, so the anonymous
+ * all-users view never offers them, and they stay hidden until the GitHub
+ * evidence UI is enabled for the deployment.
+ */
+export function listAvailableDashboardMetrics(
+	tenant: "organization" | "allOrganizations",
+	options: DashboardMetricAvailabilityOptions,
+): CostDashboardRequestedMetric[] {
+	return tenant === "organization" && options.githubEvidenceUiEnabled
+		? [...BASE_DASHBOARD_METRICS, ...PULL_REQUEST_DASHBOARD_METRICS]
+		: [...BASE_DASHBOARD_METRICS];
+}
+
+/**
+ * Answer a request for a metric the scope does not offer as the default cost
+ * view, so a stale link never reaches a hidden metric's query path.
+ */
+export function resolveAvailableDashboardInput(
+	input: CostDashboardInput,
+	availableMetrics: readonly CostDashboardRequestedMetric[],
+): CostDashboardInput {
+	return input.requestedMetric === undefined ||
+		availableMetrics.includes(input.requestedMetric)
+		? input
+		: { ...input, requestedMetric: "cost" };
+}
+
+/** Every UTC date in the inclusive range, so charts plot measured zeros. */
+export function listDashboardDates(
+	input: Pick<CostDashboardInput, "endDate" | "startDate">,
+): string[] {
+	const dates: string[] = [];
+	for (
+		let stamp = Date.parse(input.startDate);
+		stamp <= Date.parse(input.endDate);
+		stamp += 86_400_000
+	) {
+		dates.push(new Date(stamp).toISOString().slice(0, 10));
+	}
+	return dates;
+}
+
+export interface CostDashboardBuildOptions {
+	/** Defaults to the base metrics, keeping optional metrics hidden. */
+	readonly availableMetrics?: readonly CostDashboardRequestedMetric[];
+	readonly pullRequests?: Readonly<{
+		mergedPullRequests: DashboardMetricData | null;
+		ciFailuresPerPullRequest: DashboardMetricData | null;
+	}>;
+}
+
 export function buildCostDashboard(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
 	durationStats?: NonNullable<DashboardMetricData["durationStats"]>,
+	options: CostDashboardBuildOptions = {},
 ): CostDashboard {
+	const availableMetrics = options.availableMetrics ?? BASE_DASHBOARD_METRICS;
+	const pullRequestsAvailable = availableMetrics.includes("mergedPullRequests");
 	// Signal-only splits do not alter cost/session totals in the metric strip.
 	const baseInput = !["none", "members", "repositories", "models"].includes(
 		input.splitBy,
@@ -55,6 +129,7 @@ export function buildCostDashboard(
 	return {
 		requestedMetric: input.requestedMetric,
 		splitBy: input.splitBy,
+		availableMetrics: [...availableMetrics],
 		metrics: {
 			cost: buildMetric(
 				rows.filter((row) => row.metric === "cost"),
@@ -79,6 +154,12 @@ export function buildCostDashboard(
 				members,
 			),
 			agentRuns: buildAgentRuns(rows, input, members, durationStats),
+			mergedPullRequests: pullRequestsAvailable
+				? (options.pullRequests?.mergedPullRequests ?? null)
+				: null,
+			ciFailuresPerPullRequest: pullRequestsAvailable
+				? (options.pullRequests?.ciFailuresPerPullRequest ?? null)
+				: null,
 		},
 	};
 }
@@ -257,18 +338,13 @@ function buildMetric(
 	if (splitBy !== "none" && ranked.length > limit)
 		series.push({ id: "other", label: "Other" });
 	const seriesId = new Map(named.map(([id], index) => [id, `series-${index}`]));
-	const trend: DashboardMetricData["trend"] = [];
-	for (
-		let stamp = Date.parse(input.startDate);
-		stamp <= Date.parse(input.endDate);
-		stamp += 86_400_000
-	) {
-		trend.push({
-			date: new Date(stamp).toISOString().slice(0, 10),
+	const trend: DashboardMetricData["trend"] = listDashboardDates(input).map(
+		(date) => ({
+			date,
 			total: 0,
 			values: Object.fromEntries(series.map((entry) => [entry.id, 0])),
-		});
-	}
+		}),
+	);
 	const byDate = new Map(trend.map((point) => [point.date, point]));
 	for (const row of chartRows) {
 		const point = byDate.get(row.date);

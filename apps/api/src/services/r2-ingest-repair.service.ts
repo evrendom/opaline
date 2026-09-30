@@ -10,6 +10,10 @@ import {
 	processIngestSession,
 } from "../router.js";
 import {
+	getNextGitHubObjectWorkDueAt,
+	sweepGitHubEvidenceObjects,
+} from "./github-evidence-object-fence.service.js";
+import {
 	getNextR2IngestWorkDueAt,
 	repairR2IngestCleanupJobs,
 	sweepExpiredR2IngestJobs,
@@ -90,6 +94,13 @@ export async function runR2IngestRepairPass(
 	const evidence = hasMaintenanceTimeRemaining(deadline)
 		? await sweepRepositoryEvidence({ database: sqlClient, deadline, r2 })
 		: { attempted: 0, completed: 0, hasMore: true };
+	const githubObjects = hasMaintenanceTimeRemaining(deadline)
+		? await sweepGitHubEvidenceObjects({
+				database: sqlClient,
+				deadline,
+				r2,
+			})
+		: { attempted: 0, completed: 0, hasMore: true };
 	const deadlineReached = !hasMaintenanceTimeRemaining(deadline);
 
 	return {
@@ -97,23 +108,29 @@ export async function runR2IngestRepairPass(
 			expired.attempted +
 			recovered.attempted +
 			cleanup.attempted +
-			evidence.attempted,
+			evidence.attempted +
+			githubObjects.attempted,
 		completed:
 			expired.completed +
 			recovered.completed +
 			cleanup.completed +
-			evidence.completed,
+			evidence.completed +
+			githubObjects.completed,
 		hasMore:
 			deadlineReached ||
 			expired.hasMore ||
 			recovered.hasMore ||
 			cleanup.hasMore ||
-			evidence.hasMore,
+			evidence.hasMore ||
+			githubObjects.hasMore,
 		nextDueAt: deadlineReached
 			? null
 			: earliest(
-					await getNextR2IngestWorkDueAt(sqlClient),
-					await getNextEvidenceWorkDueAt(sqlClient),
+					earliest(
+						await getNextR2IngestWorkDueAt(sqlClient),
+						await getNextEvidenceWorkDueAt(sqlClient),
+					),
+					await getNextGitHubObjectWorkDueAt(sqlClient),
 				),
 	};
 }

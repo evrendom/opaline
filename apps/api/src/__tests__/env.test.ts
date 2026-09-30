@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+	isGitHubEvidenceUiEnabled,
 	readBooleanEnv,
 	readNonNegativeSafeIntegerEnv,
 	readRequiredSecretEnv,
@@ -203,5 +204,25 @@ describe("skill analytics cutover configuration", () => {
 			SKILL_ANALYTICS_CUTOVER_MODE: "all",
 		});
 		expect(shouldUsePersistentSkillAnalytics("org-c", all)).toBe(true);
+	});
+});
+
+describe("GitHub evidence UI dark-launch switch", () => {
+	test("keeps the UI hidden unless it is explicitly enabled", () => {
+		expect(isGitHubEvidenceUiEnabled({})).toBe(false);
+		expect(
+			isGitHubEvidenceUiEnabled({ GITHUB_EVIDENCE_UI_ENABLED: "false" }),
+		).toBe(false);
+		expect(
+			isGitHubEvidenceUiEnabled({ GITHUB_EVIDENCE_UI_ENABLED: "true" }),
+		).toBe(true);
+	});
+
+	test("fails closed to hidden for ambiguous values", () => {
+		for (const invalidValue of ["1", "TRUE", "yes", "", " true"]) {
+			expect(
+				isGitHubEvidenceUiEnabled({ GITHUB_EVIDENCE_UI_ENABLED: invalidValue }),
+			).toBe(false);
+		}
 	});
 });

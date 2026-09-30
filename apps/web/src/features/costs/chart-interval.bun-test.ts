@@ -107,6 +107,58 @@ describe("Dashboard chart intervals", () => {
 		).toEqual(points);
 	});
 
+	test("recomputes CI ratios from additive components across intervals", () => {
+		const trend = [
+			{
+				date: "2026-04-06",
+				total: 2,
+				values: { repo: 2 },
+				numerator: 2,
+				denominator: 1,
+				numeratorValues: { repo: 2 },
+				denominatorValues: { repo: 1 },
+			},
+			{
+				date: "2026-04-07",
+				total: 0.5,
+				values: { repo: 0.5 },
+				numerator: 1,
+				denominator: 2,
+				numeratorValues: { repo: 1 },
+				denominatorValues: { repo: 2 },
+			},
+		];
+		const [weekly] = groupChartTrend(trend, "weekly", "ratio");
+		assert(weekly);
+
+		expect(weekly.total).toBe(1);
+		expect(weekly.values.repo).toBe(1);
+		expect(getChartSeriesValue(weekly, "repo", "2026-04-08", "ratio")).toBe(1);
+	});
+
+	test("shows one failed attempt across two merged PRs as 0.5 daily and weekly", () => {
+		const trend = [
+			{
+				date: "2026-09-18",
+				total: 0.5,
+				values: { total: 0.5 },
+				numerator: 1,
+				denominator: 2,
+				numeratorValues: { total: 1 },
+				denominatorValues: { total: 2 },
+			},
+		];
+		const [daily] = groupChartTrend(trend, "daily", "ratio");
+		const [weekly] = groupChartTrend(trend, "weekly", "ratio");
+		assert(daily);
+		assert(weekly);
+
+		expect(daily.total).toBe(0.5);
+		expect(weekly.total).toBe(0.5);
+		expect(weekly.numerator).toBe(1);
+		expect(weekly.denominator).toBe(2);
+	});
+
 	test("keeps the entire week on the axis but leaves future days unplotted", () => {
 		const week = [2, 0, 5, 0, 0, 0, 0].map((total, index) => ({
 			date: `2026-04-${String(index + 6).padStart(2, "0")}`,
@@ -134,6 +186,29 @@ describe("Dashboard chart intervals", () => {
 				getChartSeriesValue(point, "total", "2026-04-08"),
 			),
 		).toEqual([7]);
+	});
+
+	test("keeps zero-merged-PR periods on the line at every interval", () => {
+		// The API zero-fills every day, so empty periods plot at zero instead of
+		// being skipped and interpolated across.
+		const trend = Array.from({ length: 30 }, (_, index) => {
+			const date = new Date(Date.UTC(2026, 8, 1 + index))
+				.toISOString()
+				.slice(0, 10);
+			const total = date === "2026-09-02" || date === "2026-09-29" ? 1 : 0;
+			return { date, total, values: { total } };
+		});
+		const plotted = (interval: (typeof CHART_INTERVALS)[number]["value"]) =>
+			groupChartTrend(trend, interval).map((point) =>
+				getChartSeriesValue(point, "total", "2026-09-30"),
+			);
+
+		expect(plotted("daily")).toHaveLength(30);
+		expect(plotted("daily").filter((total) => total === 0)).toHaveLength(28);
+		expect(plotted("weekly")).toEqual([1, 0, 0, 0, 1]);
+		expect(plotted("monthly")).toEqual([2]);
+		expect(plotted("quarterly")).toEqual([2]);
+		expect(plotted("yearly")).toEqual([2]);
 	});
 
 	test("labels periods in UTC and tooltips show only the included dates", () => {

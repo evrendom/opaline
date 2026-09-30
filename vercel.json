@@ -34,6 +34,11 @@
 			"memory": 1024,
 			"maxDuration": 60
 		},
+		"api/cron/github-evidence.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
 		"api/ingest.ts": {
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 2048,
@@ -72,6 +77,10 @@
 		{
 			"path": "/api/cron/billing",
 			"schedule": "15 3 * * *"
+		},
+		{
+			"path": "/api/cron/github-evidence",
+			"schedule": "45 3 * * *"
 		}
 	],
 	"headers": [
@@ -194,7 +203,7 @@
 			"destination": "/api/rpc?__opaline_path=/health/ready"
 		},
 		{
-			"source": "/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$).*)",
+			"source": "/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$).*)",
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},
 		{

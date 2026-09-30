@@ -14,7 +14,11 @@ import {
 import {
 	buildCostDashboard,
 	type CostAggregateRow,
+	type DashboardMetricAvailabilityOptions,
+	listAvailableDashboardMetrics,
+	resolveAvailableDashboardInput,
 } from "./cost-dashboard-data.js";
+import { getPullRequestDashboardMetrics } from "./pull-request-dashboard.service.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildCanonicalPricingModelSql,
@@ -48,6 +52,8 @@ const DIMENSIONS_BY_METRIC = {
 		"durations",
 		"skillsUsed",
 	],
+	mergedPullRequests: ["members", "repositories", "models"],
+	ciFailuresPerPullRequest: ["members", "repositories", "models"],
 } as const;
 
 interface AgentRunDurationAggregateRow {
@@ -60,8 +66,32 @@ interface AgentRunDurationAggregateRow {
 
 export async function getCostDashboard(
 	scope: CostDashboardScope,
-	input: CostDashboardInput,
+	requestedInput: CostDashboardInput,
+	availability: DashboardMetricAvailabilityOptions,
 ): Promise<CostDashboard> {
+	const availableMetrics = listAvailableDashboardMetrics(
+		scope.tenant,
+		availability,
+	);
+	const input = resolveAvailableDashboardInput(
+		requestedInput,
+		availableMetrics,
+	);
+	if (
+		scope.tenant === "organization" &&
+		(input.requestedMetric === "mergedPullRequests" ||
+			input.requestedMetric === "ciFailuresPerPullRequest")
+	) {
+		const pullRequestMetrics = await getPullRequestDashboardMetrics(
+			scope.orgId,
+			input,
+			{ database: sqlClient, queryClickhouse },
+		);
+		return buildCostDashboard([], input, new Map(), undefined, {
+			availableMetrics,
+			pullRequests: pullRequestMetrics,
+		});
+	}
 	const orgMatch = (column: string) =>
 		organizationMatchSql(column, scope.tenant);
 	const repositorySql = (alias: string) =>
@@ -439,6 +469,7 @@ export async function getCostDashboard(
 			]),
 		),
 		durationStats,
+		{ availableMetrics },
 	);
 	if (scope.tenant === "allOrganizations") {
 		for (const metric of Object.values(dashboard.metrics))

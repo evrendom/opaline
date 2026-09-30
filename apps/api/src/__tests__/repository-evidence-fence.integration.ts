@@ -8,12 +8,12 @@ import {
 import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import {
-	assertNoClickHousePurgeTombstone,
 	type ClickHousePurgePass,
 	purgeRepositoryEvidenceObjects,
 	runClickHousePurgeWorkerOnce,
 	runClickHousePurgeWorkerPass,
 } from "../services/clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import {
 	commitRepositoryEvidence,
 	initRepositoryEvidence,
@@ -362,10 +362,13 @@ describe("repository evidence deletion fence", () => {
 			[...r2.objects.keys()].filter((key) => key.startsWith("evidence/")),
 		).toEqual([]);
 		await expect(
-			assertNoClickHousePurgeTombstone({
-				organizationId: fixture.organizationId,
-				userId: fixture.survivorId,
-			}),
+			assertNoClickHousePurgeTombstone(
+				{
+					organizationId: fixture.organizationId,
+					userId: fixture.survivorId,
+				},
+				{ database: sqlClient },
+			),
 		).resolves.toBeUndefined();
 	});
 

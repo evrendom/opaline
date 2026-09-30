@@ -47,6 +47,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `R2_ACCOUNT_ID` | No | Cloudflare account ID for the EU-jurisdiction `opaline-ingest-prod` bucket. Direct-to-R2 ingest is disabled unless all three R2 variables are set. |
 | `R2_ACCESS_KEY_ID` | No | Bucket-scoped R2 S3 access key ID. |
 | `R2_SECRET_ACCESS_KEY` | No | Bucket-scoped R2 S3 secret access key. |
+| `GITHUB_EVIDENCE_UI_ENABLED` | No | Dark-launch switch for the user-facing GitHub evidence UI: the dashboard's Merged PRs metric (with its CI-errors-per-PR companion) and the workspace settings GitHub section. The server decides visibility (`availableMetrics` on the dashboard payload, `visibility` on `githubRepositoryEvidence.status`). Collection, persistence, cron, and webhooks run regardless. Only the exact value `true` enables it; missing and invalid values fail closed to hidden (default: off, including local dev). |
 | `CLICKHOUSE_PURGE_POLL_INTERVAL_MS` | No | Crash-recovery ceiling for durable ClickHouse purge jobs; enqueue paths and scheduled retries wake the in-process worker sooner (default: 3,600,000 / 60 min) |
 | `CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS` | No | Delay before the second purge pass that re-deletes ClickHouse rows, multipart intents and R2 keys written by requests that were already in flight when an account or workspace was deleted; must exceed the longest bounded evidence write (default: 900,000 / 15 min) |
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |

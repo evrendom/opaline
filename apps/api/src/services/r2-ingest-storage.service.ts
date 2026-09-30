@@ -6,6 +6,7 @@ import {
 	GetObjectCommand,
 	HeadObjectCommand,
 	ListMultipartUploadsCommand,
+	PutObjectCommand,
 	S3Client,
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -88,6 +89,16 @@ export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
 	) => Promise<R2ObjectMetadata | null>;
 }
 
+export interface R2EvidenceStorageClient extends R2MultipartUploadClient {
+	putObject: (input: {
+		body: Uint8Array;
+		contentType: string;
+		metadata: Readonly<Record<string, string>>;
+		objectKey: string;
+		signal?: AbortSignal;
+	}) => Promise<void>;
+}
+
 export function readR2IngestAvailability(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
 	warnIgnoredEndpoint: (
@@ -163,7 +174,7 @@ function warnIgnoredR2Endpoint(reason: IgnoredR2EndpointOverrideReason): void {
 
 export function createR2MultipartUploadClient(
 	configuration: R2IngestConfiguration,
-): R2MultipartUploadClient {
+): R2EvidenceStorageClient {
 	const client = new S3Client({
 		credentials: {
 			accessKeyId: configuration.accessKeyId,
@@ -283,6 +294,19 @@ export function createR2MultipartUploadClient(
 				if (isNotFoundError(error)) return null;
 				throw error;
 			}
+		},
+		async putObject(input) {
+			await client.send(
+				new PutObjectCommand({
+					Body: input.body,
+					Bucket: configuration.bucket,
+					ContentLength: input.body.byteLength,
+					ContentType: input.contentType,
+					Key: input.objectKey,
+					Metadata: input.metadata,
+				}),
+				{ abortSignal: input.signal },
+			);
 		},
 		presignUploadPart(input) {
 			return getSignedUrl(

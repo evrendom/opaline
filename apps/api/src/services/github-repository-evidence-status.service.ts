@@ -1,0 +1,60 @@
+import type { GitHubRepositoryEvidenceStatus } from "@rudel/api-routes";
+import type { GitHubRepositoryConnectionStatus } from "./github-repository-binding.service.js";
+
+export type GitHubSetupState =
+	| { readonly configured: true }
+	| { readonly configured: false; readonly configurationError: string };
+
+/**
+ * Workspace GitHub status for the settings UI. While the GitHub evidence UI is
+ * dark-launched the answer is `hidden` and neither the deployment's GitHub
+ * setup nor the workspace connection is read, so nothing about it leaks into a
+ * surface that is not supposed to exist yet.
+ */
+export async function resolveGitHubRepositoryEvidenceStatus(input: {
+	readonly uiEnabled: boolean;
+	readonly isOrgAdmin: boolean;
+	readonly readSetup: () => GitHubSetupState;
+	readonly loadConnection: () => Promise<GitHubRepositoryConnectionStatus>;
+}): Promise<GitHubRepositoryEvidenceStatus> {
+	if (!input.uiEnabled) return { visibility: "hidden" };
+	const setup = input.readSetup();
+	if (!setup.configured) {
+		return {
+			visibility: "visible",
+			connection: {
+				accountLogin: null,
+				canManage: input.isOrgAdmin,
+				configurationError: setup.configurationError,
+				configured: false,
+				connected: false,
+				installationId: null,
+				manageUrl: null,
+				repositories: [],
+				repositorySelection: null,
+			},
+		};
+	}
+	const status = await input.loadConnection();
+	return {
+		visibility: "visible",
+		connection: {
+			accountLogin: status.accountLogin,
+			canManage: input.isOrgAdmin,
+			configurationError: null,
+			configured: true,
+			connected: status.connected,
+			installationId: status.installationId,
+			manageUrl: input.isOrgAdmin ? status.manageUrl : null,
+			repositories: status.repositories.map((repository) => ({
+				defaultBranch: repository.defaultBranch,
+				isPrivate: repository.isPrivate,
+				name: repository.name,
+				nodeId: repository.nodeId,
+				owner: repository.owner,
+				repositoryId: repository.repositoryId,
+			})),
+			repositorySelection: status.repositorySelection,
+		},
+	};
+}

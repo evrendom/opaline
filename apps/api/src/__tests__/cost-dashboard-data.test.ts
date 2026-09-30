@@ -1,8 +1,11 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { CostDashboardInputSchema } from "@rudel/api-routes";
 import {
 	buildCostDashboard,
 	type CostAggregateRow,
+	listAvailableDashboardMetrics,
+	listDashboardDates,
+	resolveAvailableDashboardInput,
 } from "../services/cost-dashboard-data.js";
 
 const input = CostDashboardInputSchema.parse({
@@ -500,4 +503,90 @@ test("keeps indexed runs visible with session-level indexing coverage", () => {
 		indexingSessions: 1,
 		unavailableSessions: 1,
 	});
+});
+
+describe("dashboard metric availability", () => {
+	const pullRequests = {
+		mergedPullRequests: buildCostDashboard([row()], input, members).metrics
+			.cost,
+		ciFailuresPerPullRequest: null,
+	};
+
+	test("offers pull request metrics only to workspaces with the GitHub evidence UI enabled", () => {
+		expect(
+			listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: false,
+			}),
+		).toEqual(["cost", "sessions", "agentRuns", "signals"]);
+		expect(
+			listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: true,
+			}),
+		).toEqual([
+			"cost",
+			"sessions",
+			"agentRuns",
+			"signals",
+			"mergedPullRequests",
+			"ciFailuresPerPullRequest",
+		]);
+		expect(
+			listAvailableDashboardMetrics("allOrganizations", {
+				githubEvidenceUiEnabled: true,
+			}),
+		).toEqual(["cost", "sessions", "agentRuns", "signals"]);
+	});
+
+	test("answers a request for a hidden metric as the default cost view", () => {
+		const hidden = listAvailableDashboardMetrics("organization", {
+			githubEvidenceUiEnabled: false,
+		});
+		const visible = listAvailableDashboardMetrics("organization", {
+			githubEvidenceUiEnabled: true,
+		});
+		for (const requestedMetric of [
+			"mergedPullRequests",
+			"ciFailuresPerPullRequest",
+		] as const) {
+			expect(
+				resolveAvailableDashboardInput({ ...input, requestedMetric }, hidden)
+					.requestedMetric,
+			).toBe("cost");
+			expect(
+				resolveAvailableDashboardInput({ ...input, requestedMetric }, visible)
+					.requestedMetric,
+			).toBe(requestedMetric);
+		}
+		expect(resolveAvailableDashboardInput(input, hidden)).toBe(input);
+	});
+
+	test("excludes pull request metrics from the payload unless they are available", () => {
+		const hidden = buildCostDashboard([], input, members, undefined, {
+			pullRequests,
+		});
+		const visible = buildCostDashboard([], input, members, undefined, {
+			availableMetrics: listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: true,
+			}),
+			pullRequests,
+		});
+
+		expect(hidden.availableMetrics).not.toContain("mergedPullRequests");
+		expect(hidden.availableMetrics).not.toContain("ciFailuresPerPullRequest");
+		expect(hidden.metrics.mergedPullRequests).toBeNull();
+		expect(visible.availableMetrics).toContain("mergedPullRequests");
+		expect(visible.availableMetrics).toContain("ciFailuresPerPullRequest");
+		expect(visible.metrics.mergedPullRequests).toBe(
+			pullRequests.mergedPullRequests,
+		);
+	});
+});
+
+test("lists every UTC day of an inclusive range, across month and leap boundaries", () => {
+	expect(
+		listDashboardDates({ startDate: "2028-02-28", endDate: "2028-03-01" }),
+	).toEqual(["2028-02-28", "2028-02-29", "2028-03-01"]);
+	expect(
+		listDashboardDates({ startDate: "2026-09-30", endDate: "2026-09-30" }),
+	).toEqual(["2026-09-30"]);
 });

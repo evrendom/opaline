@@ -17,17 +17,19 @@ import {
 	getClickHousePurgeFailureAlertIdempotencyKey,
 } from "../email.js";
 import {
-	assertNoClickHousePurgeTombstone,
 	type ClickHousePurgeProcessorEnv,
 	type ClickHousePurgeTarget,
 	calculateExponentialBackoffWithJitter,
 	enqueueClickHousePurge,
-	hasClickHousePurgeTombstone,
 	registerClickHousePurgeWorker,
 	runClickHousePurgeWorkerOnce,
 	sanitizeClickHousePurgeError,
 	startClickHousePurgeWorker,
 } from "../services/clickhouse-purge.service.js";
+import {
+	assertNoClickHousePurgeTombstone,
+	hasClickHousePurgeTombstone,
+} from "../services/clickhouse-purge-tombstone.service.js";
 import {
 	deleteOrgSessions,
 	deleteUserSessions,
@@ -603,35 +605,52 @@ describe("durable ClickHouse purge worker", () => {
 			organizationId: organizationTarget.targetId,
 			userId: bystander.userId,
 		};
-		expect(await hasClickHousePurgeTombstone(accountOwner)).toBe(false);
+		expect(
+			await hasClickHousePurgeTombstone(accountOwner, { database: sqlClient }),
+		).toBe(false);
 
 		await enqueue(accountTarget, 3);
 		await enqueue(organizationTarget, 3);
 
-		expect(await hasClickHousePurgeTombstone(accountOwner)).toBe(true);
-		expect(await hasClickHousePurgeTombstone(organizationMember)).toBe(true);
 		expect(
-			await hasClickHousePurgeTombstone({
-				organizationId: organizationTarget.targetId,
+			await hasClickHousePurgeTombstone(accountOwner, { database: sqlClient }),
+		).toBe(true);
+		expect(
+			await hasClickHousePurgeTombstone(organizationMember, {
+				database: sqlClient,
 			}),
 		).toBe(true);
-		expect(await hasClickHousePurgeTombstone(bystander)).toBe(false);
+		expect(
+			await hasClickHousePurgeTombstone(
+				{
+					organizationId: organizationTarget.targetId,
+				},
+				{ database: sqlClient },
+			),
+		).toBe(true);
+		expect(
+			await hasClickHousePurgeTombstone(bystander, { database: sqlClient }),
+		).toBe(false);
 		await sqlClient.begin(async (transaction) => {
-			expect(await hasClickHousePurgeTombstone(accountOwner, transaction)).toBe(
-				true,
-			);
+			expect(
+				await hasClickHousePurgeTombstone(accountOwner, {
+					database: transaction,
+				}),
+			).toBe(true);
 			await expect(
-				assertNoClickHousePurgeTombstone(organizationMember, transaction),
+				assertNoClickHousePurgeTombstone(organizationMember, {
+					database: transaction,
+				}),
 			).rejects.toThrow("fenced");
 			await expect(
-				assertNoClickHousePurgeTombstone(bystander, transaction),
+				assertNoClickHousePurgeTombstone(bystander, { database: transaction }),
 			).resolves.toBeUndefined();
 		});
 		await expect(
-			assertNoClickHousePurgeTombstone(accountOwner),
+			assertNoClickHousePurgeTombstone(accountOwner, { database: sqlClient }),
 		).rejects.toThrow("fenced");
 		await expect(
-			assertNoClickHousePurgeTombstone(bystander),
+			assertNoClickHousePurgeTombstone(bystander, { database: sqlClient }),
 		).resolves.toBeUndefined();
 	});
 
@@ -1166,10 +1185,13 @@ describe("durable ClickHouse purge worker", () => {
 		expect(await countPurgeJobs(finishedLongAgo)).toBe(0);
 		expect(await countPurgeJobs(finishedRecently)).toBe(1);
 		expect(
-			await hasClickHousePurgeTombstone({
-				organizationId: "unrelated",
-				userId: pending.targetId,
-			}),
+			await hasClickHousePurgeTombstone(
+				{
+					organizationId: "unrelated",
+					userId: pending.targetId,
+				},
+				{ database: sqlClient },
+			),
 		).toBe(true);
 	});
 

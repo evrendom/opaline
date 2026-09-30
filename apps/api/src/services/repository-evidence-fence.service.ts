@@ -16,7 +16,7 @@ import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
  *
  * 1. Check before write. Immediately before each external publication
  *    (multipart creation, multipart completion, ClickHouse insert) call
- *    `assertNoClickHousePurgeTombstone` (clickhouse-purge.service.ts, where the
+ *    `assertNoClickHousePurgeTombstone` (clickhouse-purge-tombstone.service.ts, where the
  *    full pattern is documented). `clickhouse_purge_job` rows act as the
  *    tombstones: they are inserted in the same transaction that deletes the
  *    account or organization and are retained after success.

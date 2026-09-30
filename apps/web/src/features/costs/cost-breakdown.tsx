@@ -34,7 +34,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import { costLabel, formatMetric, METRIC_LABELS } from "./cost-format";
+import { costLabel, formatMetricRatio, METRIC_LABELS } from "./cost-format";
 import { COST_LABELS } from "./use-cost-dashboard";
 
 type Props = {
@@ -83,6 +83,7 @@ export function CostBreakdown({
 			.toLowerCase()
 			.includes(search.toLowerCase()),
 	);
+	const description = getBreakdownDescription(dimension, metric);
 	return (
 		<>
 			<section
@@ -92,19 +93,7 @@ export function CostBreakdown({
 				aria-busy={pending}
 			>
 				<div className="cost-breakdown-heading">
-					<h2
-						title={
-							dimension === "runSignals"
-								? "Signal in the immediately following user reply. No signal means a reply without detected positive or negative feedback; No reply means no following user message."
-								: dimension === "durations"
-									? "Elapsed time from user prompt to final assistant message, including waits. Unknown duration is counted separately."
-									: dimension === "skillsUsed"
-										? "Whether the run contains a recorded skill invocation."
-										: undefined
-						}
-					>
-						{label}
-					</h2>
+					<h2 title={description}>{label}</h2>
 					<div>
 						{metric === "cost" ? (
 							<>
@@ -140,7 +129,10 @@ export function CostBreakdown({
 					) : (
 						<p className="cost-breakdown-empty">
 							{unavailable
-								? "Still being indexed…"
+								? metric === "mergedPullRequests" ||
+									metric === "ciFailuresPerPullRequest"
+									? "Pull request data unavailable."
+									: "Still being indexed…"
 								: `No matching ${label.toLowerCase()}.`}
 						</p>
 					)}
@@ -275,6 +267,36 @@ export function CostBreakdown({
 	);
 }
 
+function getBreakdownDescription(
+	dimension: CostDimension,
+	metric: DashboardMetric,
+) {
+	if (dimension === "runSignals") {
+		return "Signal in the immediately following user reply. No signal means a reply without detected positive or negative feedback; No reply means no following user message.";
+	}
+	if (dimension === "durations") {
+		return "Elapsed time from user prompt to final assistant message, including waits. Unknown duration is counted separately.";
+	}
+	if (dimension === "skillsUsed") {
+		return "Whether the run contains a recorded skill invocation.";
+	}
+	if (
+		(metric === "mergedPullRequests" ||
+			metric === "ciFailuresPerPullRequest") &&
+		dimension === "members"
+	) {
+		return "Member attribution uses linked Opaline session owners. A pull request can appear under multiple members when it links to multiple sessions.";
+	}
+	if (
+		(metric === "mergedPullRequests" ||
+			metric === "ciFailuresPerPullRequest") &&
+		dimension === "models"
+	) {
+		return "A pull request can appear under multiple models when its linked sessions used more than one model.";
+	}
+	return undefined;
+}
+
 function BreakdownRow({
 	entry,
 	metric,
@@ -300,7 +322,7 @@ function BreakdownRow({
 			aria-pressed={selected}
 			aria-label={`Filter ${COST_LABELS[dimension].toLowerCase()} by ${label}`}
 			onClick={() => onToggle(entry.id)}
-			title={`${label} · ${formatMetric(entry.value, metric)}`}
+			title={`${label} · ${formatMetricRatio(entry.value, metric, entry.denominator)}`}
 		>
 			<span
 				className="cost-row-bar"
@@ -315,14 +337,18 @@ function BreakdownRow({
 				) : null}
 			</span>
 			<span className="cost-row-amount">
-				{formatMetric(entry.value, metric)}
+				{formatMetricRatio(entry.value, metric, entry.denominator)}
 			</span>
 			<span className="cost-row-share">
-				{total > 0
-					? entry.value > 0 && entry.value / total < 0.01
-						? "<1%"
-						: `${Math.round((entry.value / total) * 100)}%`
-					: "—"}
+				{metric === "ciFailuresPerPullRequest"
+					? entry.denominator === undefined
+						? "—"
+						: `${entry.denominator} ${entry.denominator === 1 ? "PR" : "PRs"}`
+					: total > 0
+						? entry.value > 0 && entry.value / total < 0.01
+							? "<1%"
+							: `${Math.round((entry.value / total) * 100)}%`
+						: "—"}
 			</span>
 		</button>
 	);
@@ -462,7 +488,9 @@ function downloadBreakdown(
 		],
 		...entries.map((entry) => [
 			costLabel(dimension, entry.label),
-			metric === "cost" ? entry.value.toFixed(6) : String(entry.value),
+			metric === "cost"
+				? entry.value.toFixed(6)
+				: formatMetricRatio(entry.value, metric, entry.denominator),
 			...(metric === "cost" ? [String(entry.incomplete)] : []),
 		]),
 	]

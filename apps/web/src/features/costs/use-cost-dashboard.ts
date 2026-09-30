@@ -2,19 +2,21 @@ import type {
 	AdminCostDashboardInput,
 	CostDashboard,
 	CostDashboardInput,
+	CostDashboardRequestedMetric,
 	CostDimension,
 	DashboardMetric,
 	DashboardSignal,
 } from "@rudel/api-routes";
 import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
 import { type Query, useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
-import { DASHBOARD_METRICS } from "./cost-format";
+import { DASHBOARD_METRICS, listDashboardTabs } from "./cost-format";
 
 export const COST_DIMENSIONS: CostDimension[] = [
 	"members",
@@ -46,6 +48,8 @@ export const COST_LABELS = {
 	skillsUsed: "Skills used",
 };
 
+type RequestedMetric = NonNullable<CostDashboardInput["requestedMetric"]>;
+
 export type CostDashboardController = ReturnType<typeof useCostDashboard>;
 
 export function useCostDashboard() {
@@ -63,7 +67,12 @@ export function useCostDashboard() {
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
-	return { ...state, query };
+	const metrics = useServerDashboardTabs(
+		state,
+		query.data,
+		workspace.activeOrg?.id,
+	);
+	return { ...state, metrics, query };
 }
 
 export function useAdminCostDashboard(): CostDashboardController {
@@ -72,7 +81,9 @@ export function useAdminCostDashboard(): CostDashboardController {
 	const adminInput: AdminCostDashboardInput = {
 		startDate: input.startDate,
 		endDate: input.endDate,
-		requestedMetric: metric,
+		// The anonymous view has no repository scope, so the server never offers
+		// pull request metrics there.
+		requestedMetric: metric === "mergedPullRequests" ? "cost" : metric,
 		durationInterval: input.durationInterval,
 		splitBy:
 			input.splitBy === "members" || input.splitBy === "repositories"
@@ -93,7 +104,44 @@ export function useAdminCostDashboard(): CostDashboardController {
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
-	return { ...state, query };
+	const metrics = useServerDashboardTabs(state, query.data, "admin");
+	return { ...state, metrics, query };
+}
+
+/**
+ * The server lists the metrics a scope offers. Keep the last answer while a
+ * different metric loads so tabs do not flicker, and move a stale link to a
+ * metric the server does not offer (such as a dark-launched one) back to cost.
+ */
+function useServerDashboardTabs(
+	state: Pick<DashboardState, "metric" | "setMetric">,
+	data: CostDashboard | undefined,
+	scope: string | undefined,
+) {
+	const [known, setKnown] = useState<{
+		scope: string | undefined;
+		metrics: readonly CostDashboardRequestedMetric[];
+	} | null>(null);
+	const current = data?.availableMetrics;
+	useEffect(() => {
+		if (!current) return;
+		setKnown((previous) =>
+			previous !== null &&
+			previous.scope === scope &&
+			previous.metrics.length === current.length &&
+			previous.metrics.every((metric, index) => metric === current[index])
+				? previous
+				: { scope, metrics: current },
+		);
+	}, [current, scope]);
+	const { metric, setMetric } = state;
+	const unavailable = current !== undefined && !current.includes(metric);
+	useEffect(() => {
+		if (unavailable) setMetric("cost", { replace: true });
+	}, [setMetric, unavailable]);
+	return listDashboardTabs(
+		current ?? (known?.scope === scope ? known?.metrics : undefined),
+	);
 }
 
 function indexingRefetchInterval(
@@ -105,19 +153,41 @@ function indexingRefetchInterval(
 	const needsRefresh =
 		metric === "agentRuns"
 			? (data?.metrics.agentRuns?.coverage?.indexingSessions ?? 0) > 0
-			: metric === "signals" && data?.metrics.signals === null;
+			: metric === "signals"
+				? data?.metrics.signals === null
+				: metric === "mergedPullRequests"
+					? data?.availableMetrics.includes(metric) === true &&
+						data.metrics[metric] === null
+					: false;
 	if (!needsRefresh) return false;
 	// Indexing normally resolves quickly. Retry twice with backoff, then leave
 	// refresh under the user's control instead of polling forever.
 	return [10_000, 30_000][query.state.dataUpdateCount - 1] ?? false;
 }
 
+type DashboardState = ReturnType<typeof useCostDashboardState>;
+
 function useCostDashboardState(costDimensions: CostDimension[]) {
 	const { state: dates } = useDateRange();
 	const [params, setParams] = useSearchParams();
 	const selectedMetric = params.get("metric");
-	const metric =
-		DASHBOARD_METRICS.find((value) => value === selectedMetric) ?? "cost";
+	// Request the linked metric directly; the server answers a metric its scope
+	// does not offer as cost and useServerDashboardTabs then corrects the URL.
+	const metric: RequestedMetric =
+		selectedMetric === "ciFailuresPerPullRequest"
+			? "mergedPullRequests"
+			: (DASHBOARD_METRICS.find((value) => value === selectedMetric) ?? "cost");
+	useEffect(() => {
+		if (selectedMetric !== "ciFailuresPerPullRequest") return;
+		setParams(
+			(current) => {
+				const next = new URLSearchParams(current);
+				next.set("metric", "mergedPullRequests");
+				return next;
+			},
+			{ replace: true },
+		);
+	}, [selectedMetric, setParams]);
 	const interval =
 		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
 			?.value ?? "daily";
@@ -213,12 +283,26 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 			else next.set("interval", value);
 		});
 	}
-	function setMetric(value: DashboardMetric) {
-		update((next) => {
-			if (value === "cost") next.delete("metric");
-			else next.set("metric", value);
-		});
-	}
+	// Reads the current metric from the URL, not this render, so it stays
+	// referentially stable for effects that correct the selected metric.
+	const setMetric = useCallback(
+		(value: DashboardMetric, options?: { replace?: boolean }) => {
+			setParams((current) => {
+				const next = new URLSearchParams(current);
+				if (
+					usesPullRequestRepositories(current.get("metric")) !==
+					usesPullRequestRepositories(value)
+				) {
+					next.delete(parameterFor("repositories"));
+					if (next.get("split") === "repositories") next.delete("split");
+				}
+				if (value === "cost") next.delete("metric");
+				else next.set("metric", value);
+				return next;
+			}, options);
+		},
+		[setParams],
+	);
 	return {
 		input,
 		metric,
@@ -230,6 +314,14 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 		setSplit,
 		setMetric,
 	};
+}
+
+// Pull request metrics filter by GitHub repository ID rather than the session
+// repository URL, so repository filters do not carry across that boundary.
+function usesPullRequestRepositories(metric: string | null) {
+	return (
+		metric === "mergedPullRequests" || metric === "ciFailuresPerPullRequest"
+	);
 }
 
 function parameterFor(dimension: CostDimension) {

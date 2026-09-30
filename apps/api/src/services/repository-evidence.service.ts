@@ -12,7 +12,7 @@ import {
 	type RepositoryEvidenceUploadObject,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
-import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import { toPostgresJson } from "./postgres-json.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 import {
@@ -159,7 +159,7 @@ export async function initRepositoryEvidence(
 			uploads,
 		};
 		await options.database.begin(async (transaction) => {
-			await assertNoClickHousePurgeTombstone(scope, transaction);
+			await assertNoClickHousePurgeTombstone(scope, { database: transaction });
 			await assertReusedObjectsAvailable(
 				transaction,
 				options.organizationId,
@@ -476,7 +476,7 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 				"Repository evidence upload was resumed; retry its current upload plan.",
 			);
 		}
-		await assertNoClickHousePurgeTombstone(scope, transaction);
+		await assertNoClickHousePurgeTombstone(scope, { database: transaction });
 		await assertSessionOwnedInTransaction(transaction, {
 			organizationId: options.organizationId,
 			sessionId: plan.input.session.sessionId,
@@ -602,7 +602,7 @@ async function authorizeEvidenceWrite(input: {
 }): Promise<void> {
 	await assertNoClickHousePurgeTombstone(
 		{ organizationId: input.organizationId, userId: input.userId },
-		input.database,
+		{ database: input.database },
 	);
 	const claim = await claimSessionIngestOwnership(
 		input.organizationId,
@@ -742,7 +742,9 @@ async function createUploadPlans(input: {
 				if (!objectKey) {
 					throw new Error("Repository evidence object has no registered key");
 				}
-				await assertNoClickHousePurgeTombstone(input.scope, input.database);
+				await assertNoClickHousePurgeTombstone(input.scope, {
+					database: input.database,
+				});
 				// The intent is committed before the multipart upload exists so a
 				// crash between creation and the upload plan cannot leak it.
 				const intentId = await registerMultipartIntent(

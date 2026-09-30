@@ -31,6 +31,7 @@
         "@rudel/api-routes": "workspace:*",
         "@rudel/ch-schema": "workspace:*",
         "@rudel/language-signals": "workspace:*",
+        "@rudel/repo-intelligence-source-github": "workspace:*",
         "@rudel/secret-filter": "workspace:*",
         "@rudel/sql-schema": "workspace:*",
         "@rudel/usage-events": "workspace:*",
@@ -219,6 +220,18 @@
       "version": "0.0.0",
       "dependencies": {
         "@rudel/secret-filter": "workspace:*",
+      },
+      "devDependencies": {
+        "@rudel/typescript-config": "workspace:*",
+        "bun-types": "latest",
+        "typescript": "5.9.2",
+      },
+    },
+    "packages/repo-intelligence-source-github": {
+      "name": "@rudel/repo-intelligence-source-github",
+      "version": "0.0.0",
+      "dependencies": {
+        "zod": "^3.24.0",
       },
       "devDependencies": {
         "@rudel/typescript-config": "workspace:*",
@@ -1043,6 +1056,8 @@
     "@rudel/local-context-source": ["@rudel/local-context-source@workspace:packages/local-context-source"],
 
     "@rudel/marketing": ["@rudel/marketing@workspace:apps/marketing"],
+
+    "@rudel/repo-intelligence-source-github": ["@rudel/repo-intelligence-source-github@workspace:packages/repo-intelligence-source-github"],
 
     "@rudel/secret-filter": ["@rudel/secret-filter@workspace:packages/secret-filter"],
 

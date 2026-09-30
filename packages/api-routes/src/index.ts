@@ -73,6 +73,8 @@ export {
 	type CostDashboard,
 	type CostDashboardInput,
 	CostDashboardInputSchema,
+	type CostDashboardRequestedMetric,
+	CostDashboardRequestedMetricSchema,
 	CostDashboardSchema,
 	type CostDimension,
 	type DashboardMetric,
@@ -80,6 +82,12 @@ export {
 	type DashboardSignal,
 } from "./schemas/cost-dashboard.js";
 
+import {
+	GitHubCreateInstallationOutputSchema,
+	GitHubRepositoryEvidenceStatusSchema,
+	GitHubSyncCommitInputSchema,
+	GitHubSyncCommitOutputSchema,
+} from "./github-repository-evidence.js";
 import {
 	DashboardDrilldownOpenedCaptureInputSchema,
 	DashboardFilterChangedCaptureInputSchema,
@@ -154,6 +162,7 @@ import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
 export * from "./avatar.js";
 export * from "./device-flow.js";
+export * from "./github-repository-evidence.js";
 export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
 export * from "./product-analytics.js";
@@ -795,6 +804,13 @@ export const contract = {
 		requestUpgrade: oc
 			.input(CreateOrganizationCheckoutInputSchema)
 			.output(RequestOrganizationBillingUpgradeOutputSchema),
+	},
+	githubRepositoryEvidence: {
+		status: oc.output(GitHubRepositoryEvidenceStatusSchema),
+		createInstallation: oc.output(GitHubCreateInstallationOutputSchema),
+		syncCommit: oc
+			.input(GitHubSyncCommitInputSchema)
+			.output(GitHubSyncCommitOutputSchema),
 	},
 	repositoryEvidence: {
 		init: oc

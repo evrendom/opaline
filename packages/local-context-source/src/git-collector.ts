@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 
 const UTF8_DECODER = new TextDecoder();
-const SAFE_DIFF_PATHSPEC: readonly string[] = [
+export const SAFE_DIFF_PATHSPEC: readonly string[] = [
 	".",
 	...getHighRiskContentPathspecExclusions(),
 ];

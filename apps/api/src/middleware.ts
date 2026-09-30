@@ -1,4 +1,4 @@
-import { implement, ORPCError } from "@orpc/server";
+import { type Implementer, implement, ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import type { Session } from "./auth.js";
 import { sqlClient } from "./db.js";
@@ -18,7 +18,8 @@ export interface ApiKeyAuthFailure {
 	message: string;
 }
 
-export const os = implement(contract).$context<AppContext>();
+export const os: Implementer<typeof contract, AppContext, AppContext> =
+	implement(contract).$context<AppContext>();
 
 export const authMiddleware = os.middleware(async ({ context, next }) => {
 	if (!context.user || !context.session) {

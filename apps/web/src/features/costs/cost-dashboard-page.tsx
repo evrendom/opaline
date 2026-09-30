@@ -30,6 +30,7 @@ export function CostDashboardView({
 		input,
 		query,
 		metric,
+		metrics,
 		interval,
 		setInterval,
 		dimensions,
@@ -40,6 +41,7 @@ export function CostDashboardView({
 	} = dashboard;
 	const { data, isPending, isError } = query;
 	const selectedData = getMetricData(data, metric);
+	const isPullRequestMetric = metric === "mergedPullRequests";
 	const filtered = dimensions.some((dimension) => input[dimension].length > 0);
 	return (
 		<div
@@ -129,6 +131,7 @@ export function CostDashboardView({
 						<CostChart
 							data={data}
 							metric={metric}
+							metrics={metrics}
 							runSignals={input.runSignals}
 							signalTypes={input.signalTypes}
 							interval={interval}
@@ -144,6 +147,7 @@ export function CostDashboardView({
 						<div
 							className="cost-breakdowns"
 							data-signals={metric === "signals"}
+							data-pull-requests={isPullRequestMetric}
 						>
 							{dimensions.map((dimension) => (
 								<CostBreakdown

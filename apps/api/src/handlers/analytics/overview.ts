@@ -1,3 +1,4 @@
+import { isGitHubEvidenceUiEnabled } from "../../lib/env.js";
 import { orgMiddleware, os } from "../../middleware.js";
 import { getCostDashboard } from "../../services/cost-dashboard.service.js";
 import {
@@ -108,6 +109,7 @@ const costs = os.analytics.overview.costs
 		getCostDashboard(
 			{ tenant: "organization", orgId: context.organizationId },
 			input,
+			{ githubEvidenceUiEnabled: isGitHubEvidenceUiEnabled() },
 		),
 	);
 

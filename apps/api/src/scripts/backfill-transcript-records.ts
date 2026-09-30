@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
-import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -57,7 +57,8 @@ if (values.execute && !values.cutoff) {
 
 const options: TranscriptRecordsBackfillOptions = {
 	// The deletion fence reads Postgres, so PG_CONNECTION_STRING is required.
-	assertWritable: (target) => assertNoClickHousePurgeTombstone(target),
+	assertWritable: (target) =>
+		assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 	batchMaxBytes: parsePositiveInteger(
 		values["batch-max-bytes"],
 		DEFAULT_BATCH_MAX_BYTES,

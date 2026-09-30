@@ -54,7 +54,10 @@
 .cost-metrics {
 	min-width: 0;
 	display: grid;
-	grid-template-columns: repeat(4, minmax(165px, 1fr));
+	/* One equal column per metric the server offers, so a hidden metric never
+	   leaves an empty cell. */
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(150px, 1fr);
 	overflow-x: auto;
 	scrollbar-width: thin;
 	border-bottom: 1px solid var(--cost-border);
@@ -283,6 +286,9 @@
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 }
+.cost-breakdowns[data-pull-requests="true"] {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .cost-breakdowns[data-signals="true"]
 	> .cost-breakdown[data-dimension="phrases"] {
 	grid-column: span 2;
@@ -385,7 +391,7 @@
 }
 .cost-row-share {
 	position: relative;
-	width: 30px;
+	min-width: 30px;
 	text-align: right;
 	color: var(--cost-muted);
 	font-size: 0.6875rem;

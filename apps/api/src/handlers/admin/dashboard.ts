@@ -1,3 +1,4 @@
+import { isGitHubEvidenceUiEnabled } from "../../lib/env.js";
 import { adminMiddleware, os } from "../../middleware.js";
 import { getCostDashboard } from "../../services/cost-dashboard.service.js";
 
@@ -7,5 +8,6 @@ export const dashboard = os.admin.dashboard
 		getCostDashboard(
 			{ tenant: "allOrganizations" },
 			{ ...input, members: [], repositories: [] },
+			{ githubEvidenceUiEnabled: isGitHubEvidenceUiEnabled() },
 		),
 	);

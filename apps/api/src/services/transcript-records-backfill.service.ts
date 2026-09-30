@@ -39,7 +39,7 @@ import {
  * - Fenced: every insert is preceded by the deletion-fence check
  *   (`assertWritable`), so rows buffered before an account or organization
  *   deletion are never published after it; see the fence comment in
- *   `clickhouse-purge.service.ts`.
+ *   `clickhouse-purge-tombstone.service.ts`.
  */
 
 const logger = getLogger(["rudel", "api", "transcript-records-backfill"]);

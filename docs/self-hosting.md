@@ -144,6 +144,66 @@ Set the OAuth callback URL to `https://your-domain.com/api/auth/callback/github`
 
 Without these, users can still sign up and log in with email/password.
 
+## GitHub Repository Evidence (Optional)
+
+Repository evidence uses a separate, read-only GitHub App. Its credentials are
+not interchangeable with `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, which
+configure social login.
+
+Configure the GitHub App with these repository permissions set to read-only:
+Actions, Checks, Contents, Metadata, Pull requests, and Commit statuses. Leave
+**Request user authorization (OAuth) during installation** disabled so the App
+can use a Setup URL. Set both the App's **Setup URL** and one of its **Callback
+URLs** to the public API callback:
+
+```text
+https://your-api-domain.com/api/github/setup
+```
+
+Then configure all of the repository App variables:
+
+```bash
+GITHUB_REPOSITORY_APP_ID="numeric-app-id"
+GITHUB_REPOSITORY_APP_SLUG="your-app-slug"
+GITHUB_REPOSITORY_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
+GITHUB_REPOSITORY_APP_CLIENT_ID="your-github-app-client-id"
+GITHUB_REPOSITORY_APP_CLIENT_SECRET="your-github-app-client-secret"
+GITHUB_REPOSITORY_APP_CALLBACK_URL="https://your-api-domain.com/api/github/setup"
+GITHUB_REPOSITORY_APP_STATE_SECRET="at-least-32-random-characters"
+```
+
+`GITHUB_REPOSITORY_APP_STATE_SECRET` may be omitted to use
+`BETTER_AUTH_SECRET`. Any missing or partial repository App configuration makes
+the connection control unavailable instead of accepting an unverified
+installation.
+
+The user-facing GitHub experience (the workspace settings GitHub section and the
+dashboard's Merged PRs metric) stays hidden until you also set
+`GITHUB_EVIDENCE_UI_ENABLED=true`. Collection, the maintenance cron, and
+webhooks do not depend on it.
+
+Connection is a two-step GitHub flow. The Setup URL returns an installation ID,
+then Opaline requests a short-lived GitHub App user authorization and verifies
+the signed-in GitHub user's access to that exact installation. The user token
+is used once and is not stored. Opaline binds only the repositories returned by
+GitHub for both that user and that installation; repositories accessible only
+to the App are not added to the workspace. This association check does not
+grant or prove GitHub organization-owner status. Opaline separately requires
+the connecting user to be an owner or administrator of the Opaline workspace.
+The repository set is a verified snapshot. Use **Reconnect** in workspace
+settings after changing GitHub repository selection or user access; Opaline
+does not continuously synchronize later GitHub user-access revocations.
+
+Accepting a repository capture only records a durable collection request; the
+GitHub calls run afterwards in the bounded evidence worker. The resident worker
+(Fly) is woken immediately and otherwise polls every five minutes. Deployments
+without a resident worker (Vercel) collect on the scheduled maintenance cron.
+Collection persists each filtered job log as it is fetched, stops fetching logs
+after a 256 MiB per-collection budget (recorded as partial coverage), and runs
+at most two collections per API process. Objects are registered in a durable
+intent table before they are written, so an interrupted collection or a
+workspace deletion can always find and remove them.
+
 ## Direct-to-R2 Ingest Lifecycle Backstop
 
 When direct-to-R2 ingest is enabled, configure an object lifecycle rule on the
@@ -182,5 +242,13 @@ npx wrangler r2 bucket lifecycle list <bucket-name>
 | `ALLOWED_ORIGIN` | Yes | CORS origin (same as `APP_URL` for single-domain) |
 | `GITHUB_CLIENT_ID` | No | GitHub OAuth client ID |
 | `GITHUB_CLIENT_SECRET` | No | GitHub OAuth client secret |
+| `GITHUB_REPOSITORY_APP_ID` | No | Numeric ID of the repository evidence GitHub App |
+| `GITHUB_REPOSITORY_APP_SLUG` | No | URL slug of the repository evidence GitHub App |
+| `GITHUB_REPOSITORY_APP_PRIVATE_KEY` | No | Private key used only for GitHub App JWTs |
+| `GITHUB_REPOSITORY_APP_CLIENT_ID` | No | Client ID of the same repository evidence GitHub App |
+| `GITHUB_REPOSITORY_APP_CLIENT_SECRET` | No | Client secret used for the one-shot user authorization exchange |
+| `GITHUB_REPOSITORY_APP_CALLBACK_URL` | No | Public `/api/github/setup` URL registered as the App Setup and OAuth callback URL |
+| `GITHUB_REPOSITORY_APP_STATE_SECRET` | No | Dedicated 32+ character callback-state secret; defaults to `BETTER_AUTH_SECRET` |
+| `GITHUB_EVIDENCE_UI_ENABLED` | No | Set to `true` to show the Merged PRs dashboard metric and the workspace settings GitHub section. Evidence collection runs regardless; missing or invalid values keep the UI hidden |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |

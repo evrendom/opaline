@@ -66,6 +66,13 @@ describe("repository evidence account deletion", () => {
 			],
 		);
 		await sqlClient.unsafe(
+			`INSERT INTO github_app_installation (
+				installation_id, organization_id, account_id, account_login,
+				account_type, repository_selection, permissions, installed_by_user_id
+			 ) VALUES ($1, $2, 'github-account', 'opaline-test', 'Organization', 'all', '{}'::jsonb, $3)`,
+			[`${TEST_RUN_ID}_installation`, organizationId, victimId],
+		);
+		await sqlClient.unsafe(
 			`INSERT INTO repository_evidence_object (
 				organization_id, object_id, object_key, kind, byte_length,
 				media_type, content_encoding, filter_version, status, available_at
@@ -136,6 +143,14 @@ describe("repository evidence account deletion", () => {
 			SELECT id FROM organization WHERE id = ${organizationId}
 		`;
 		expect(organization?.id).toBe(organizationId);
+		const [installation] = await sqlClient<
+			Array<{ installedByUserId: string | null }>
+		>`
+			SELECT installed_by_user_id AS "installedByUserId"
+			FROM github_app_installation
+			WHERE installation_id = ${`${TEST_RUN_ID}_installation`}
+		`;
+		expect(installation?.installedByUserId).toBeNull();
 		const objects = await sqlClient<Array<{ objectId: string }>>`
 			SELECT object_id AS "objectId"
 			FROM repository_evidence_object
@@ -197,7 +212,10 @@ describe("repository evidence account deletion", () => {
 		const organizationRows = await sqlClient<
 			Array<{ count: number; tableName: string }>
 		>`
-			SELECT 'repository_evidence_capture' AS "tableName", COUNT(*)::int AS count
+			SELECT 'github_app_installation' AS "tableName", COUNT(*)::int AS count
+			FROM github_app_installation WHERE organization_id = ${organizationId}
+			UNION ALL
+			SELECT 'repository_evidence_capture', COUNT(*)::int
 			FROM repository_evidence_capture WHERE organization_id = ${organizationId}
 			UNION ALL
 			SELECT 'repository_evidence_object', COUNT(*)::int
@@ -211,6 +229,7 @@ describe("repository evidence account deletion", () => {
 			ORDER BY "tableName"
 		`;
 		expect([...organizationRows]).toEqual([
+			{ count: 0, tableName: "github_app_installation" },
 			{ count: 0, tableName: "repository_evidence_capture" },
 			{ count: 0, tableName: "repository_evidence_object" },
 			{ count: 0, tableName: "repository_evidence_upload" },

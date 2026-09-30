@@ -12,6 +12,7 @@ import {
 } from "./handlers/avatar-http.js";
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
 import { handleCustomerActivityRequest } from "./handlers/customer-activity-http.js";
+import { handleGitHubRepositorySetupRequest } from "./handlers/github-repository-evidence-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
@@ -541,6 +542,19 @@ async function handleRequest(
 			invitationId: invitationPresentationMatch[1],
 			request,
 		});
+	}
+	if (url.pathname === "/api/github/setup") {
+		const response = await handleGitHubRepositorySetupRequest({
+			database: sqlClient,
+			frontendOrigin: preferredFrontendOrigin,
+			getSession: async (req) =>
+				(await auth.api.getSession({ headers: req.headers })) ?? null,
+			request,
+		});
+		for (const [key, value] of Object.entries(cors)) {
+			response.headers.set(key, value);
+		}
+		return response;
 	}
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });

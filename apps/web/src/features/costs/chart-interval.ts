@@ -24,9 +24,12 @@ interface ChartPoint extends DailyPoint {
 	endDate: string;
 }
 
+export type ChartAggregation = "ratio" | "sum";
+
 export function groupChartTrend(
 	trend: readonly DailyPoint[],
 	interval: ChartInterval,
+	aggregation: ChartAggregation = "sum",
 ): ChartPoint[] {
 	const buckets = new Map<string, ChartPoint>();
 	for (const point of trend) {
@@ -40,23 +43,78 @@ export function groupChartTrend(
 				total: 0,
 				values: {},
 			};
+			if (aggregation === "ratio") {
+				bucket.numerator = 0;
+				bucket.denominator = 0;
+				bucket.numeratorValues = {};
+				bucket.denominatorValues = {};
+			}
 			buckets.set(date, bucket);
 		}
 		bucket.endDate = point.date;
-		bucket.total += point.total;
+		if (aggregation === "ratio") {
+			bucket.numerator = (bucket.numerator ?? 0) + (point.numerator ?? 0);
+			bucket.denominator = (bucket.denominator ?? 0) + (point.denominator ?? 0);
+			for (const [id, value] of Object.entries(point.numeratorValues ?? {})) {
+				if (bucket.numeratorValues) {
+					bucket.numeratorValues[id] =
+						(bucket.numeratorValues[id] ?? 0) + value;
+				}
+			}
+			for (const [id, value] of Object.entries(point.denominatorValues ?? {})) {
+				if (bucket.denominatorValues) {
+					bucket.denominatorValues[id] =
+						(bucket.denominatorValues[id] ?? 0) + value;
+				}
+			}
+		} else {
+			bucket.total += point.total;
+		}
 		for (const [id, value] of Object.entries(point.values)) {
-			bucket.values[id] = (bucket.values[id] ?? 0) + value;
+			if (aggregation === "sum") {
+				bucket.values[id] = (bucket.values[id] ?? 0) + value;
+			}
+		}
+	}
+	if (aggregation === "ratio") {
+		for (const bucket of buckets.values()) {
+			bucket.total = divideRatio(bucket.numerator, bucket.denominator);
+			const seriesIds = new Set([
+				...Object.keys(bucket.numeratorValues ?? {}),
+				...Object.keys(bucket.denominatorValues ?? {}),
+			]);
+			for (const id of seriesIds) {
+				bucket.values[id] = divideRatio(
+					bucket.numeratorValues?.[id],
+					bucket.denominatorValues?.[id],
+				);
+			}
 		}
 	}
 	return [...buckets.values()];
+}
+
+function divideRatio(
+	numerator: number | undefined,
+	denominator: number | undefined,
+) {
+	return denominator && denominator > 0 ? (numerator ?? 0) / denominator : 0;
 }
 
 export function getChartSeriesValue(
 	point: ChartPoint,
 	seriesId: string,
 	today: string,
+	aggregation: ChartAggregation = "sum",
 ) {
-	return point.startDate > today ? null : (point.values[seriesId] ?? 0);
+	if (point.startDate > today) return null;
+	if (
+		aggregation === "ratio" &&
+		(point.denominatorValues?.[seriesId] ?? 0) === 0
+	) {
+		return null;
+	}
+	return point.values[seriesId] ?? 0;
 }
 
 function bucketDate(value: string, interval: ChartInterval): string {

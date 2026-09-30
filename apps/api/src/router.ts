@@ -41,7 +41,7 @@ import { repositorySettingsRouter } from "./handlers/repository-settings.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { ClickHouseWriteFencedError } from "./lib/clickhouse-write-fence.js";
-import { readBooleanEnv } from "./lib/env.js";
+import { isGitHubEvidenceUiEnabled, readBooleanEnv } from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
 	getIngestContentShape,
@@ -63,6 +63,7 @@ import {
 	type AppContext,
 	authMiddleware,
 	ingestAuthMiddleware,
+	orgMiddleware,
 	os,
 	settingsMutationMiddleware,
 } from "./middleware.js";
@@ -89,7 +90,22 @@ import {
 	requestOrganizationBillingUpgrade,
 } from "./services/billing-upgrade-request.service.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
-import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge-tombstone.service.js";
+import {
+	createGitHubInstallationUrl,
+	type GitHubRepositoryAppConfig,
+	readGitHubInstallationStateSecret,
+	readGitHubRepositoryAppConfig,
+	readGitHubRepositoryAppUserAuthorizationConfig,
+} from "./services/github-app.service.js";
+import {
+	collectAndPersistGitHubCommitEvidence,
+	enqueueGitHubEvidenceCollection,
+	GitHubEvidenceCapacityError,
+} from "./services/github-evidence-persistence.service.js";
+import { wakeGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
+import { getGitHubRepositoryConnectionStatus } from "./services/github-repository-binding.service.js";
+import { resolveGitHubRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
@@ -165,6 +181,11 @@ import {
 	persistRepositoryEvidenceIndex,
 } from "./services/repository-evidence-index.service.js";
 import {
+	createPostgresRepositoryBindingLookup,
+	RepositoryEvidenceRepositoryBindingError,
+	resolveTrustedRepositoryIdentity,
+} from "./services/repository-evidence-repository-binding.service.js";
+import {
 	persistSessionLanguageSignals,
 	persistSessionLanguageSignalsBestEffort,
 	persistSessionLanguageSignalsWithExecutor,
@@ -215,8 +236,50 @@ import {
 import { getStripeBillingConfiguration } from "./stripe-client.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
+const GITHUB_NOT_CONFIGURED_MESSAGE =
+	"GitHub connection is not configured for this Opaline deployment.";
+const GITHUB_CONFIGURATION_INVALID_MESSAGE =
+	"GitHub connection is unavailable because its server configuration is invalid.";
 let ingestRateLimitEnvironment =
 	createPostgresIngestRateLimitEnvironment(sqlClient);
+
+type GitHubSetupAvailability =
+	| {
+			readonly config: GitHubRepositoryAppConfig;
+			readonly configurationError: null;
+			readonly stateSecret: string;
+	  }
+	| {
+			readonly config: null;
+			readonly configurationError: string;
+			readonly stateSecret: null;
+	  };
+
+function readGitHubSetupAvailability(): GitHubSetupAvailability {
+	try {
+		const config = readGitHubRepositoryAppConfig();
+		const userAuthorizationConfig =
+			readGitHubRepositoryAppUserAuthorizationConfig();
+		if (!config || !userAuthorizationConfig) {
+			return {
+				config: null,
+				configurationError: GITHUB_NOT_CONFIGURED_MESSAGE,
+				stateSecret: null,
+			};
+		}
+		return {
+			config,
+			configurationError: null,
+			stateSecret: readGitHubInstallationStateSecret(),
+		};
+	} catch {
+		return {
+			config: null,
+			configurationError: GITHUB_CONFIGURATION_INVALID_MESSAGE,
+			stateSecret: null,
+		};
+	}
+}
 
 export function setIngestRateLimitEnvironmentForTests(
 	environment: IngestRateLimitEnvironment,
@@ -1077,10 +1140,13 @@ async function processPreparedIngestSession({
 		getClickhouse(),
 		{
 			assertWritable: () =>
-				assertNoClickHousePurgeTombstone({
-					organizationId: orgId,
-					userId: context.user.id,
-				}),
+				assertNoClickHousePurgeTombstone(
+					{
+						organizationId: orgId,
+						userId: context.user.id,
+					},
+					{ database: sqlClient },
+				),
 			config: transcriptRecordsConfig,
 			content: filteredInput.content,
 			organizationId: orgId,
@@ -1439,20 +1505,20 @@ const repositoryEvidenceInit = os.repositoryEvidence.init
 				message: "Repository evidence storage is unavailable.",
 			});
 		}
-		if (input.repository.provider !== null) {
-			throw new ORPCError("BAD_REQUEST", {
-				message: "Repository provider identity must be resolved by the server.",
-			});
-		}
 		const organizationId = await resolveIngestOrganizationId(
 			input.organizationId,
 			context.user.id,
 		);
 		try {
 			const r2 = createR2MultipartUploadClient(availability.configuration);
+			const repository = await resolveTrustedRepositoryIdentity({
+				lookup: createPostgresRepositoryBindingLookup(sqlClient),
+				organizationId,
+				repository: input.repository,
+			});
 			return await initRepositoryEvidence({
 				database: sqlClient,
-				input,
+				input: { ...input, repository },
 				now: () => new Date(),
 				organizationId,
 				r2,
@@ -1463,6 +1529,111 @@ const repositoryEvidenceInit = os.repositoryEvidence.init
 			throw toRepositoryEvidenceOrpcError(error);
 		}
 	});
+
+const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
+	.use(orgMiddleware)
+	.handler(({ context }) =>
+		resolveGitHubRepositoryEvidenceStatus({
+			uiEnabled: isGitHubEvidenceUiEnabled(),
+			isOrgAdmin: context.isOrgAdmin,
+			readSetup: () => {
+				const availability = readGitHubSetupAvailability();
+				return availability.config
+					? { configured: true }
+					: {
+							configured: false,
+							configurationError: availability.configurationError,
+						};
+			},
+			loadConnection: () =>
+				getGitHubRepositoryConnectionStatus({
+					database: sqlClient,
+					organizationId: context.organizationId,
+				}),
+		}),
+	);
+
+const githubRepositoryEvidenceCreateInstallation =
+	os.githubRepositoryEvidence.createInstallation
+		.use(orgMiddleware)
+		.handler(async ({ context }) => {
+			if (!context.isOrgAdmin) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Workspace administrator access is required.",
+				});
+			}
+			const availability = readGitHubSetupAvailability();
+			if (!availability.config) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					message: availability.configurationError,
+				});
+			}
+			const organizations = await sqlClient.unsafe<Array<{ slug: string }>>(
+				"SELECT slug FROM organization WHERE id = $1 LIMIT 1",
+				[context.organizationId],
+			);
+			const organization = organizations[0];
+			if (!organization) throw new ORPCError("NOT_FOUND");
+			return {
+				url: createGitHubInstallationUrl({
+					config: availability.config,
+					organizationId: context.organizationId,
+					stateSecret: availability.stateSecret,
+					userId: context.user.id,
+					workspaceSlug: organization.slug,
+				}),
+			};
+		});
+
+const githubRepositoryEvidenceSyncCommit =
+	os.githubRepositoryEvidence.syncCommit
+		.use(orgMiddleware)
+		.handler(async ({ context, input, signal }) => {
+			const config = readGitHubRepositoryAppConfig();
+			if (!config) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					message: "GitHub repository evidence is not configured.",
+				});
+			}
+			const availability = readR2IngestAvailability();
+			if (!availability.enabled) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					message: "Repository evidence storage is unavailable.",
+				});
+			}
+			try {
+				return await collectAndPersistGitHubCommitEvidence({
+					commitSha: input.commitSha,
+					config,
+					contextId: input.contextId,
+					refresh: input.refresh,
+					database: sqlClient,
+					initiatedByUserId: context.user.id,
+					organizationId: context.organizationId,
+					repositoryId: input.repositoryId,
+					r2: createR2MultipartUploadClient(availability.configuration),
+					sessionId: input.sessionId,
+					signal,
+				});
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message === "GitHub repository binding was not found."
+				) {
+					throw new ORPCError("NOT_FOUND", { message: error.message });
+				}
+				if (
+					error instanceof Error &&
+					error.message === "GitHub evidence collection is already in progress."
+				) {
+					throw new ORPCError("CONFLICT", { message: error.message });
+				}
+				if (error instanceof GitHubEvidenceCapacityError) {
+					throw new ORPCError("TOO_MANY_REQUESTS", { message: error.message });
+				}
+				throw error;
+			}
+		});
 
 const repositoryEvidenceCommit = os.repositoryEvidence.commit
 	.use(ingestAuthMiddleware)
@@ -1505,14 +1676,52 @@ const repositoryEvidenceCommit = os.repositoryEvidence.commit
 			});
 			// Final fence before the external ClickHouse publication; the purge
 			// job's second pass removes anything that slips past this check.
-			await assertNoClickHousePurgeTombstone({
-				organizationId,
-				userId: context.user.id,
-			});
+			await assertNoClickHousePurgeTombstone(
+				{ organizationId, userId: context.user.id },
+				{ database: sqlClient },
+			);
 			await persistRepositoryEvidenceIndex({
 				clickhouse: getClickhouse(),
 				row: committed.preparedIndex,
 			});
+			const provider = committed.evidence.input.repository.provider;
+			const commitSha = committed.evidence.input.capture.headGitCommit;
+			const githubConfig = readGitHubRepositoryAppConfig();
+			if (
+				provider?.provider === "github" &&
+				commitSha &&
+				githubConfig &&
+				(committed.evidence.input.capture.timing.lifecycle === "checkpoint" ||
+					committed.evidence.input.capture.timing.lifecycle === "end")
+			) {
+				try {
+					// Durably enqueue and acknowledge; the bounded worker performs the
+					// provider calls so GitHub latency never delays the CLI.
+					signal?.throwIfAborted();
+					const enqueued = await enqueueGitHubEvidenceCollection({
+						commitSha,
+						contextId: committed.evidence.input.capture.contextId,
+						database: sqlClient,
+						initiatedByUserId: context.user.id,
+						organizationId,
+						repositoryId: provider.repositoryId,
+						sessionId: committed.evidence.input.session.sessionId,
+						sessionSource: committed.evidence.input.session.source,
+						sessionUserId: context.user.id,
+					});
+					if (enqueued.status === "queued") wakeGitHubEvidenceWorker();
+				} catch (error) {
+					logger.error(
+						"GitHub evidence collection could not be queued after repository evidence commit (organization_id={organizationId} repository_id={repositoryId} commit_sha={commitSha} error={error})",
+						{
+							commitSha,
+							error: String(error),
+							organizationId,
+							repositoryId: provider.repositoryId,
+						},
+					);
+				}
+			}
 			return committed.output;
 		} catch (error) {
 			throw toRepositoryEvidenceOrpcError(error);
@@ -1520,6 +1729,9 @@ const repositoryEvidenceCommit = os.repositoryEvidence.commit
 	});
 
 function toRepositoryEvidenceOrpcError(error: unknown): Error {
+	if (error instanceof RepositoryEvidenceRepositoryBindingError) {
+		return new ORPCError("BAD_REQUEST", { message: error.message });
+	}
 	if (error instanceof ClickHouseWriteFencedError) {
 		return new ORPCError("CONFLICT", { message: error.message });
 	}
@@ -2028,6 +2240,11 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		createPortal: createBillingPortal,
 		selectPlan: selectBillingPlan,
 		requestUpgrade: requestBillingUpgrade,
+	},
+	githubRepositoryEvidence: {
+		createInstallation: githubRepositoryEvidenceCreateInstallation,
+		status: githubRepositoryEvidenceStatus,
+		syncCommit: githubRepositoryEvidenceSyncCommit,
 	},
 	repositorySettings: repositorySettingsRouter,
 	repositoryEvidence: {

@@ -36,8 +36,7 @@ import {
 } from "./chart-interval";
 import {
 	costLabel,
-	DASHBOARD_METRICS,
-	formatMetric,
+	formatMetricRatio,
 	formatRunDuration,
 	getMetricData,
 	getMetricTotal,
@@ -95,6 +94,7 @@ type Props = {
 	data: CostDashboard | undefined;
 	pending: boolean;
 	metric: DashboardMetric;
+	metrics: readonly DashboardMetric[];
 	runSignals: CostDashboardInput["runSignals"];
 	signalTypes: CostDashboardInput["signalTypes"];
 	interval: ChartInterval;
@@ -111,6 +111,7 @@ export function CostChart({
 	splitBy,
 	onResetSplit,
 	metric,
+	metrics,
 	runSignals,
 	signalTypes,
 	onMetricChange,
@@ -121,9 +122,15 @@ export function CostChart({
 	const demo = useDemoRuntime();
 	const [showMedian, setShowMedian] = useState(true);
 	const [showP95, setShowP95] = useState(true);
+	const [showCiFailures, setShowCiFailures] = useState(true);
 	const data = getMetricData(dashboard, metric);
+	const ciData = dashboard?.metrics.ciFailuresPerPullRequest;
 	const metricLabel = METRIC_LABELS[metric];
 	const unavailable = data === null;
+	const unavailableLabel =
+		metric === "mergedPullRequests" || metric === "ciFailuresPerPullRequest"
+			? "Pull request data is unavailable"
+			: `${metricLabel} are still being indexed`;
 	const coverage = metric === "agentRuns" ? data?.coverage : undefined;
 	const durationStats =
 		metric === "agentRuns" ? data?.durationStats : undefined;
@@ -137,8 +144,21 @@ export function CostChart({
 				? durationStats.trend.map((point) => [point.date, point])
 				: [],
 		);
+		const ciTrend = new Map(
+			metric === "mergedPullRequests"
+				? groupChartTrend(ciData?.trend ?? [], interval, "ratio").map(
+						(point) => [point.date, point],
+					)
+				: [],
+		);
 		return groupChartTrend(data?.trend ?? [], interval).map((point) => ({
 			...point,
+			ciFailureRatio:
+				point.startDate > today ||
+				(ciTrend.get(point.date)?.denominator ?? 0) === 0
+					? null
+					: (ciTrend.get(point.date)?.total ?? null),
+			ciFailureDenominator: ciTrend.get(point.date)?.denominator,
 			medianSeconds:
 				point.startDate > today
 					? null
@@ -148,7 +168,7 @@ export function CostChart({
 					? null
 					: (durations.get(point.date)?.p95Seconds ?? null),
 		}));
-	}, [data?.trend, durationStats, interval, today]);
+	}, [ciData?.trend, data?.trend, durationStats, interval, metric, today]);
 	const visiblePointCount = trend.filter(
 		(point) => point.startDate <= today,
 	).length;
@@ -186,7 +206,9 @@ export function CostChart({
 			aria-label={
 				metric === "agentRuns"
 					? "Agent runs with median and P95 duration over time"
-					: `${metricLabel} over time`
+					: metric === "mergedPullRequests"
+						? "Merged pull requests with captured failed CI job attempts per pull request over time"
+						: `${metricLabel} over time`
 			}
 			aria-busy={pending}
 		>
@@ -196,7 +218,7 @@ export function CostChart({
 				data-fluid-menu-root=""
 			>
 				<FluidMenuHover items=".cost-metric" />
-				{DASHBOARD_METRICS.map((value) => {
+				{metrics.map((value) => {
 					const total = getMetricTotal(dashboard, value);
 					const metricData = getMetricData(dashboard, value);
 					return (
@@ -213,7 +235,7 @@ export function CostChart({
 									? undefined
 									: total === null
 										? "—"
-										: formatMetric(total, value)
+										: formatMetricRatio(total, value, metricData?.denominator)
 							}
 							unavailable={total === null}
 							qualifier={
@@ -268,6 +290,30 @@ export function CostChart({
 									</strong>
 								</button>
 							</>
+						) : metric === "mergedPullRequests" ? (
+							<button
+								type="button"
+								className="cost-legend-item cost-duration-legend"
+								data-percentile="p95"
+								aria-label="CI errors per PR"
+								title="Captured failed CI job attempts per captured merged PR, grouped by the PR merged date (UTC)."
+								aria-pressed={showCiFailures}
+								onClick={() => setShowCiFailures((visible) => !visible)}
+							>
+								<i aria-hidden="true" />
+								CI errors / PR{" "}
+								<strong>
+									{dashboard === undefined
+										? "…"
+										: ciData == null
+											? "—"
+											: formatMetricRatio(
+													ciData.total,
+													"ciFailuresPerPullRequest",
+													ciData.denominator,
+												)}
+								</strong>
+							</button>
 						) : null}
 					</div>
 					{coverage && data?.incomplete ? (
@@ -283,7 +329,7 @@ export function CostChart({
 						</output>
 					) : unavailable ? (
 						<output className="cost-chart-coverage">
-							<span>{metricLabel} are still being indexed</span>
+							<span>{unavailableLabel}</span>
 							<button
 								type="button"
 								className="cost-text-button cost-coverage-refresh"
@@ -387,6 +433,26 @@ export function CostChart({
 											: false
 									}
 								/>
+							) : metric === "mergedPullRequests" ? (
+								<YAxis
+									yAxisId="ci"
+									hide={!showCiFailures || ciData === null}
+									orientation="right"
+									tickFormatter={(value) =>
+										formatMetricRatio(
+											Number(value),
+											"ciFailuresPerPullRequest",
+											1,
+										)
+									}
+									domain={[0, "auto"]}
+									axisLine={false}
+									tickLine={false}
+									tickCount={4}
+									tickMargin={10}
+									width={56}
+									tick={{ fill: "var(--cost-muted)", fontSize: 11 }}
+								/>
 							) : null}
 							<Tooltip
 								cursor={{ stroke: "var(--cost-muted)", strokeDasharray: "3 4" }}
@@ -409,7 +475,17 @@ export function CostChart({
 														{item.dataKey === "medianSeconds" ||
 														item.dataKey === "p95Seconds"
 															? formatRunDuration(Number(item.value))
-															: formatMetric(Number(item.value), metric)}
+															: item.dataKey === "ciFailureRatio"
+																? formatMetricRatio(
+																		Number(item.value),
+																		"ciFailuresPerPullRequest",
+																		point?.ciFailureDenominator,
+																	)
+																: formatMetricRatio(
+																		Number(item.value),
+																		metric,
+																		point?.denominator,
+																	)}
 													</strong>
 												</div>
 											))}
@@ -422,7 +498,7 @@ export function CostChart({
 									yAxisId="count"
 									key={entry.id}
 									dataKey={(point) =>
-										getChartSeriesValue(point, entry.id, today)
+										getChartSeriesValue(point, entry.id, today, "sum")
 									}
 									name={entry.label}
 									type="linear"
@@ -488,6 +564,29 @@ export function CostChart({
 										isAnimationActive={false}
 									/>
 								</>
+							) : metric === "mergedPullRequests" ? (
+								<Line
+									yAxisId="ci"
+									hide={!showCiFailures || ciData === null}
+									dataKey="ciFailureRatio"
+									name="CI errors / PR"
+									type="linear"
+									stroke="var(--cost-duration-p95)"
+									strokeWidth={2}
+									strokeDasharray="6 4"
+									dot={{
+										r: 2,
+										strokeWidth: 0,
+										fill: "var(--cost-duration-p95)",
+									}}
+									activeDot={{
+										r: 4,
+										stroke: "var(--cost-surface)",
+										strokeWidth: 2,
+									}}
+									connectNulls={false}
+									isAnimationActive={false}
+								/>
 							) : null}
 						</ComposedChart>
 					</ResponsiveContainer>
@@ -496,7 +595,7 @@ export function CostChart({
 					<div className="cost-chart-empty">
 						<p>
 							{unavailable
-								? `${metricLabel} are still being indexed`
+								? unavailableLabel
 								: metric === "agentRuns" &&
 										((coverage?.indexingSessions ?? 0) > 0 ||
 											(coverage?.unavailableSessions ?? 0) > 0)

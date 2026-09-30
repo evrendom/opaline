@@ -46,6 +46,19 @@ export async function deleteUserPostgresData(
 			{ targetId: userId, targetType: "account" },
 			transaction,
 		);
+		await transaction.unsafe(
+			`UPDATE github_evidence_collection
+			 SET session_user_id = '', session_source = '',
+			     session_id = CASE WHEN session_id = '' THEN '' ELSE id END, context_id = '',
+			     status = CASE WHEN status IN ('queued', 'collecting', 'failed') THEN 'cancelled' ELSE status END,
+			     lease_expires_at = NULL, retry_after = NULL, refresh_due_at = NULL, updated_at = NOW()
+			 WHERE session_user_id = $1 OR (session_id <> '' AND initiated_by_user_id = $1)`,
+			[userId],
+		);
+		await transaction.unsafe(
+			"UPDATE github_pull_request_snapshot SET session_user_id = '', session_source = '', session_id = '' WHERE session_user_id = $1",
+			[userId],
+		);
 		const confirmedOrganizationIds =
 			candidateOrganizationIds.length === 0
 				? []

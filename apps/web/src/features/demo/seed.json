@@ -1593,6 +1593,7 @@
 		"data": {
 			"requestedMetric": "cost",
 			"splitBy": "none",
+			"availableMetrics": ["cost", "sessions", "agentRuns", "signals"],
 			"metrics": {
 				"cost": {
 					"total": 3200.9865277999993,
@@ -2055,7 +2056,9 @@
 							}
 						]
 					}
-				}
+				},
+				"mergedPullRequests": null,
+				"ciFailuresPerPullRequest": null
 			}
 		}
 	}

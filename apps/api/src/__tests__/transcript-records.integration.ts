@@ -13,10 +13,8 @@ import {
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
-import {
-	assertNoClickHousePurgeTombstone,
-	enqueueClickHousePurge,
-} from "../services/clickhouse-purge.service.js";
+import { enqueueClickHousePurge } from "../services/clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -1119,7 +1117,8 @@ describe("transcript records backfill", () => {
 			);
 		}
 		const run = await backfillTranscriptRecords(clickhouse, {
-			assertWritable: assertNoClickHousePurgeTombstone,
+			assertWritable: (target) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 			batchMaxBytes: 64 * 1024,
 			batchMaxRows: 10,
 			cutoff: new Date(BASE_TIME_MS + 86_400_000),
@@ -1182,7 +1181,7 @@ describe("transcript records backfill", () => {
 					published = true;
 					await writeSession(fixture);
 				}
-				await assertNoClickHousePurgeTombstone(target);
+				await assertNoClickHousePurgeTombstone(target, { database: sqlClient });
 			},
 			maxRows: 2_001,
 		});
@@ -1247,7 +1246,7 @@ describe("transcript records backfill", () => {
 		const run = await backfillTranscriptRecords(clickhouse, {
 			...fixture.options,
 			assertWritable: async (target) => {
-				await assertNoClickHousePurgeTombstone(target);
+				await assertNoClickHousePurgeTombstone(target, { database: sqlClient });
 				fences++;
 				clock += 5_000;
 			},
@@ -1315,7 +1314,9 @@ describe("transcript records backfill", () => {
 			userId: backfillUserId,
 		});
 		const options = {
-			assertWritable: assertNoClickHousePurgeTombstone,
+			assertWritable: (
+				target: Parameters<typeof assertNoClickHousePurgeTombstone>[0],
+			) => assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 			batchMaxBytes: 64 * 1024 * 1024,
 			batchMaxRows: 10,
 			cutoff: new Date(BASE_TIME_MS + 86_400_000),
@@ -1577,7 +1578,9 @@ async function createBackfillFixture(label: string, records = 4) {
 	return {
 		...fixture,
 		options: {
-			assertWritable: assertNoClickHousePurgeTombstone,
+			assertWritable: (
+				target: Parameters<typeof assertNoClickHousePurgeTombstone>[0],
+			) => assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 			batchMaxBytes: 64 * 1024 * 1024,
 			batchMaxRows: 10,
 			cutoff: new Date(BASE_TIME_MS + 86_400_000),
@@ -1624,7 +1627,8 @@ describe("transcript records backfill and deletion", () => {
 		);
 
 		const run = await backfillTranscriptRecords(clickhouse, {
-			assertWritable: assertNoClickHousePurgeTombstone,
+			assertWritable: (target) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 			batchMaxBytes: 64 * 1024 * 1024,
 			batchMaxRows: 10,
 			cutoff: new Date(BASE_TIME_MS + 86_400_000),
@@ -1679,7 +1683,8 @@ describe("transcript records backfill and deletion", () => {
 		);
 
 		const run = await backfillTranscriptRecords(clickhouse, {
-			assertWritable: assertNoClickHousePurgeTombstone,
+			assertWritable: (target) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
 			batchMaxBytes: 64 * 1024 * 1024,
 			batchMaxRows: 10,
 			cutoff: new Date(BASE_TIME_MS + 86_400_000),
@@ -1730,10 +1735,13 @@ describe("transcript records backfill and deletion", () => {
 							),
 						);
 					}
-					await assertNoClickHousePurgeTombstone({
-						organizationId: raceOrganizationId,
-						userId: raceUserId,
-					});
+					await assertNoClickHousePurgeTombstone(
+						{
+							organizationId: raceOrganizationId,
+							userId: raceUserId,
+						},
+						{ database: sqlClient },
+					);
 				},
 				contentSha256: hashTranscriptContent(session.main),
 				drafts: splitSessionTranscript({

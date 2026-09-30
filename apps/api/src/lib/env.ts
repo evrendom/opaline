@@ -296,6 +296,22 @@ export function shouldReadSessionLineage(
 	);
 }
 
+/**
+ * Dark-launch switch for every user-facing GitHub evidence surface: the Merged
+ * PRs dashboard metric (with its CI-errors-per-PR companion) and the workspace
+ * settings GitHub section. Collection, persistence, cron, and webhook paths do
+ * not read it and keep running regardless.
+ *
+ * Only the exact string "true" enables the UI. Missing, "false", and any
+ * invalid value fail closed to hidden: a typo must never expose a half-rolled
+ * out experience, and a UI toggle must not take down the dashboard.
+ */
+export function isGitHubEvidenceUiEnabled(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return environment.GITHUB_EVIDENCE_UI_ENABLED === "true";
+}
+
 function readBooleanFromEnvironment(
 	environment: Readonly<Record<string, string | undefined>>,
 	name: string,

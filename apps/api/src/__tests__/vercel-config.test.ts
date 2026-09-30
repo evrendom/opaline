@@ -56,7 +56,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -88,6 +88,23 @@ describe("Vercel deployment configuration", () => {
 			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
 		);
 	});
+	test("runs GitHub evidence maintenance in an isolated cron function", () => {
+		expect(vercelConfig.functions["api/cron/github-evidence.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 2048,
+			maxDuration: 300,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/github-evidence",
+			schedule: "45 3 * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/github-evidence$)");
+	});
+
 	test("runs ClickHouse forward migrations before a production build", () => {
 		// Vercel rejects project build commands longer than 256 characters.
 		expect(vercelConfig.buildCommand.length).toBeLessThanOrEqual(256);

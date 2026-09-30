@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
-	R2MultipartUploadClient,
+	R2EvidenceStorageClient,
 	R2ObjectMetadata,
 } from "../../services/r2-ingest-storage.service.js";
 
@@ -21,9 +21,11 @@ export class NoSuchUploadError extends Error {
 }
 
 /** In-memory R2 that models multipart uploads, completion, and deletion. */
-export class FakeEvidenceR2 implements R2MultipartUploadClient {
+export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 	readonly abortedUploadIds: string[] = [];
 	readonly deletedKeys: string[] = [];
+	readonly putKeys: string[] = [];
+	putFailure: Error | null = null;
 	readonly objects = new Map<string, FakeObject>();
 	readonly uploads = new Map<string, FakeMultipartUpload>();
 	private nextUploadNumber = 1;
@@ -105,6 +107,20 @@ export class FakeEvidenceR2 implements R2MultipartUploadClient {
 				initiatedAt: upload.initiatedAt,
 				uploadId,
 			}));
+	}
+
+	async putObject(input: {
+		body: Uint8Array;
+		contentType?: string;
+		metadata: Readonly<Record<string, string>>;
+		objectKey: string;
+	}): Promise<void> {
+		if (this.putFailure) throw this.putFailure;
+		this.putKeys.push(input.objectKey);
+		this.objects.set(input.objectKey, {
+			bytes: input.body,
+			metadata: input.metadata,
+		});
 	}
 
 	async presignUploadPart(input: {
