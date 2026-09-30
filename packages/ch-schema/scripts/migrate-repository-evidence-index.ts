@@ -289,7 +289,8 @@ async function assertRepositoryEvidenceIndexSchema(
 	const tableMatches =
 		tables.length === 1 &&
 		table !== undefined &&
-		table.engine === options.expectedEngine &&
+		// ObsessionDB reports `engine` as SharedMergeTree for every replicated
+		// table; the replacing engine and its version are validated from engine_full.
 		hasExpectedReplacingVersion(table.engine_full, options.expectedEngine) &&
 		table.sorting_key === REPOSITORY_EVIDENCE_INDEX_KEY &&
 		table.primary_key === REPOSITORY_EVIDENCE_INDEX_KEY &&
