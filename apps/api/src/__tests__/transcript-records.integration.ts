@@ -79,6 +79,7 @@ afterAll(async () => {
 		"rudel.transcript_records",
 		"rudel.claude_sessions",
 		"rudel.codex_sessions",
+		"rudel.session_analytics",
 		"rudel.usage_events",
 		"rudel.skill_receipts",
 		"rudel.skill_uses",
