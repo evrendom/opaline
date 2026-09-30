@@ -28,6 +28,9 @@ async function waitForRow(
 	intervalMs = 1_000,
 ): Promise<
 	| {
+			git_branch: string | null;
+			git_remote: string;
+			git_sha: string | null;
 			session_id: string;
 			project_path: string;
 			content: string;
@@ -38,11 +41,14 @@ async function waitForRow(
 	while (Date.now() < deadline) {
 		try {
 			const rows = await executor.query<{
+				git_branch: string | null;
+				git_remote: string;
+				git_sha: string | null;
 				session_id: string;
 				project_path: string;
 				content: string;
 			}>({
-				query: `SELECT session_id, project_path, content FROM ${liveTable} WHERE session_id = {sessionId:String} LIMIT 1`,
+				query: `SELECT session_id, project_path, content, git_remote, git_branch, git_sha FROM ${liveTable} WHERE session_id = {sessionId:String} LIMIT 1`,
 				query_params: {
 					sessionId,
 				},
@@ -93,6 +99,9 @@ describe("clickhouse executor integration", () => {
 		const now = new Date().toISOString().replace("Z", "");
 		const projectPath = "/tmp/quote-'\\\\\n\u2028";
 		const content = "line1\nquote:'\nbackslash:\\\nunicode:\u2028";
+		const gitBranch = "feature/persist-repository-context";
+		const gitRemote = "https://github.com/opalinehq/athena.git";
+		const gitSha = "2da22344d8ef9688578378cfc302874f520b52bb";
 
 		insertedSessionIds.add(sessionId);
 
@@ -105,14 +114,14 @@ describe("clickhouse executor integration", () => {
 					session_id: sessionId,
 					organization_id: "org_test",
 					project_path: projectPath,
-					git_remote: "",
+					git_remote: gitRemote,
 					package_name: "",
 					package_type: "",
 					content,
 					ingested_at: now,
 					user_id: "user_test",
-					git_branch: "main",
-					git_sha: null,
+					git_branch: gitBranch,
+					git_sha: gitSha,
 					tag: "clickhouse-test",
 					subagents: {},
 				},
@@ -125,6 +134,9 @@ describe("clickhouse executor integration", () => {
 		expect(row?.session_id).toBe(sessionId);
 		expect(row?.project_path).toBe(projectPath);
 		expect(row?.content).toBe(content);
+		expect(row?.git_remote).toBe(gitRemote);
+		expect(row?.git_branch).toBe(gitBranch);
+		expect(row?.git_sha).toBe(gitSha);
 
 		await executor.execute({
 			clickhouse_settings: { lightweight_deletes_sync: "0" },

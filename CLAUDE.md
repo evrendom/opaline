@@ -48,7 +48,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `R2_ACCESS_KEY_ID` | No | Bucket-scoped R2 S3 access key ID. |
 | `R2_SECRET_ACCESS_KEY` | No | Bucket-scoped R2 S3 secret access key. |
 | `CLICKHOUSE_PURGE_POLL_INTERVAL_MS` | No | Crash-recovery ceiling for durable ClickHouse purge jobs; enqueue paths and scheduled retries wake the in-process worker sooner (default: 3,600,000 / 60 min) |
-| `CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS` | No | Delay before the second purge pass that re-deletes after a successful account or organization purge, closing the check-then-write race of writers; must exceed the longest bounded write (default: 900,000 / 15 min) |
+| `CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS` | No | Delay before the second purge pass that re-deletes ClickHouse rows, multipart intents and R2 keys written by requests that were already in flight when an account or workspace was deleted; must exceed the longest bounded evidence write (default: 900,000 / 15 min) |
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |
 | `ALLOWED_ORIGIN` | No | CORS origin (default: `http://localhost:4011`) |
 | `TRUSTED_PROXY_HOPS` | No | Number of trusted reverse proxies in front of the API (or in front of Fly Proxy); used to resolve client IPs from right to left in `X-Forwarded-For` (default: 0) |
@@ -160,6 +160,8 @@ Schema definitions live in `packages/ch-schema/src/db/schema/*.ts`. The toolkit 
 ### Workflow
 
 Run `bun run ch:bootstrap` before starting API writers. For a fresh installation it replays the original migration files, uses the controlled F16 runner, and adds the `subagent_count` prerequisite before the September 11 view recreation. For an existing local installation, it applies only the missing suffix when the journal is an ordered, checksum-verified prefix of checked-in history, using the controlled F16 runner, existing forward scripts, or stock chkit restricted to each pending migration. As with fresh replay, this offline local path permits checked-in destructive DDL; it must not run against production. Historical SQL and checksums remain unchanged. Bootstrap refuses unjournaled tables, non-prefix or mismatched history, and partial F16 state; use the controlled recovery procedure for interrupted F16 migrations. A fully journaled installation is a checksum-verified no-op. Production continues to use the controlled forward scripts, not bootstrap. Local ClickHouse needs the `s3` storage-policy alias mounted by Docker Compose and CI.
+
+Bootstrap includes `20260930120000_repository_evidence_index.sql`: fresh installs replay its original DDL, while verified-prefix upgrades use `migrate-repository-evidence-index.ts` with the local `ReplacingMergeTree` engine. CI runs only bootstrap, without a second repository-index migration step. Production runs the language-signals, transcript-records, and repository-evidence-index forward scripts in that order; the repository-index script retains its `SharedReplacingMergeTree` default there.
 
 All commands run from `packages/ch-schema`:
 

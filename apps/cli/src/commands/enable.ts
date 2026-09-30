@@ -170,6 +170,15 @@ async function runEnable(): Promise<undefined | Error> {
 		const isAlreadyEnabled = adapter.isHookInstalled();
 
 		if (isAlreadyEnabled) {
+			try {
+				// Installs made before SessionStart capture only have the SessionEnd
+				// hook; installHook is idempotent and adds whatever is missing.
+				adapter.installHook();
+			} catch (error) {
+				p.log.warn(
+					`${adapter.name}: could not refresh the auto-upload hook (${error instanceof Error ? error.message : String(error)})`,
+				);
+			}
 			p.log.info(
 				`${adapter.name}: Auto-upload hook is already enabled. Organization updated.`,
 			);

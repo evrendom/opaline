@@ -87,6 +87,13 @@ refuses the upload, reports the reason in stderr and
 `~/.rudel/logs/hook-upload.log`, and adds the session to the failed-upload queue
 for `rudel upload --retry`; it does not fall back to the saved API base.
 
+Repository evidence delivers large transcripts in bounded windows. Accepted
+windows leave a private, persisted continuation until the remaining stable
+records are delivered, including after a terminal hook exits. Run
+`rudel upload --retry` again if its bounded batch leaves more work. Pending
+captures made with an older secret-filter version are quarantined, never
+replayed unchanged; recollect those sessions with the upgraded CLI.
+
 When run without arguments, `rudel upload` scans `~/.claude/projects/` for all projects with session transcripts and presents an interactive picker. The current project (matched from your working directory) and its subfolders are pre-selected. Use arrow keys to navigate, space to toggle, and enter to confirm.
 
 ### `rudel whoami`

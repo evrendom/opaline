@@ -4,6 +4,7 @@ export {
 	extractAgentIds,
 	readSubagentFiles,
 } from "./adapters/claude-code/index.js";
+export { ensureSessionStartHook as ensureClaudeSessionStartHook } from "./adapters/claude-code/settings.js";
 export {
 	codexAdapter,
 	findActiveRolloutFile,

@@ -47,6 +47,7 @@ jobs:
               - "packages/agent-adapters/**"
               - "packages/ch-schema/**"
               - "packages/api-routes/**"
+              - "packages/local-context-source/**"
               - "packages/secret-filter/**"
               - "packages/typescript-config/**"
               - "package.json"

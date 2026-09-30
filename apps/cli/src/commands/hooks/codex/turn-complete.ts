@@ -10,6 +10,7 @@ import { removeFailedUpload } from "../../../lib/failed-uploads.js";
 import { getGitInfo } from "../../../lib/git-info.js";
 import { reportHookUploadFailure } from "../../../lib/hook-upload-failure.js";
 import { getProjectOrgId } from "../../../lib/project-config.js";
+import { captureAndUploadSessionEvidence } from "../../../lib/session-evidence.js";
 import { allowsInsecureEndpointFromEnv } from "../../../lib/upload-endpoint.js";
 import {
 	formatRedactionSummary,
@@ -84,13 +85,32 @@ async function runTurnComplete(
 
 		const apiBase = process.env.RUDEL_API_BASE ?? credentials.apiBaseUrl;
 		const endpoint = `${apiBase}/rpc`;
+		const evidenceOrganizationId = organizationId ?? credentials.user?.id;
+		if (evidenceOrganizationId) {
+			try {
+				const receipt = await captureAndUploadSessionEvidence({
+					credentials,
+					lifecycle: "checkpoint",
+					onWarning: (warning) => logger.warn("{warning}", { warning }),
+					organizationId: evidenceOrganizationId,
+					request,
+					terminalTranscript: false,
+				});
+				logger.info("Repository evidence accepted for context {contextId}", {
+					contextId: receipt.contextId,
+				});
+			} catch (error) {
+				logger.warn("Repository evidence capture deferred: {error}", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
 		const result = await uploadSession(request, {
 			endpoint,
 			token: credentials.token,
 			allowInsecureEndpoint: allowsInsecureEndpointFromEnv(),
 			authType: credentials.authType,
 		});
-
 		if (result.success) {
 			const redactionSummary = formatRedactionSummary(
 				result.redacted,

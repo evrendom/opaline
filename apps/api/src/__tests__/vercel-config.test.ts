@@ -85,6 +85,35 @@ describe("Vercel deployment configuration", () => {
 			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
 		);
 	});
+	test("runs the repository evidence migration before a production build", () => {
+		const repositoryMigration =
+			"bun run --cwd packages/ch-schema ch:migrate:repository-evidence-index";
+		const languageSignalMigration =
+			"bun run --cwd packages/ch-schema ch:migrate:language-signals";
+		const transcriptRecordsMigration =
+			"bun run --cwd packages/ch-schema ch:migrate:transcript-records";
+		expect(vercelConfig.buildCommand).toContain(
+			'if [ "$VERCEL_ENV" = "production" ]',
+		);
+		expect(
+			vercelConfig.buildCommand.indexOf(repositoryMigration),
+		).toBeGreaterThan(-1);
+		expect(
+			vercelConfig.buildCommand.indexOf(languageSignalMigration),
+		).toBeGreaterThan(-1);
+		expect(
+			vercelConfig.buildCommand.indexOf(languageSignalMigration),
+		).toBeLessThan(
+			vercelConfig.buildCommand.indexOf(transcriptRecordsMigration),
+		);
+		expect(
+			vercelConfig.buildCommand.indexOf(transcriptRecordsMigration),
+		).toBeLessThan(vercelConfig.buildCommand.indexOf(repositoryMigration));
+		expect(vercelConfig.buildCommand.indexOf(repositoryMigration)).toBeLessThan(
+			vercelConfig.buildCommand.indexOf("bun run check-types:vercel"),
+		);
+	});
+
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {
 		for (const { source, destination } of [
 			{ source: "/privacy", destination: "/legal/privacy-policy/" },

@@ -100,6 +100,79 @@ export const RudelDependencyHealthProbesRowSchema = z.object({
 export type RudelDependencyHealthProbesRowInput = z.input<typeof RudelDependencyHealthProbesRowSchema>
 export type RudelDependencyHealthProbesRowOutput = z.output<typeof RudelDependencyHealthProbesRowSchema>
 
+export type RudelRepositorySessionEvidenceIndexRow = {
+  organization_id: string
+  user_id: string
+  repository_id: string
+  repository_provider: string
+  repository_host: string
+  repository_owner: string
+  repository_name: string
+  worktree_id: string
+  context_id: string
+  capture_id: string
+  parent_context_id: string | null
+  manifest_object_id: string
+  session_source: string
+  session_id: string
+  run_id: string
+  segment_id: string
+  agent_id: string
+  parent_agent_id: string
+  capture_lifecycle: string
+  capture_started_at: string
+  first_action_at: string | null
+  first_action_basis: string
+  first_action_relationship: string
+  capture_status: string
+  capture_completed_at: string | null
+  coverage_status: string
+  coverage_areas: [string, string, string][]
+  available_skills: string[]
+  skill_assessments: [string, string, string, string, string, string][]
+  context_facets: [string, string, string, string, string, number][]
+  index_version: string
+  indexed_at: string
+}
+
+export const RudelRepositorySessionEvidenceIndexRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  repository_id: z.string(),
+  repository_provider: z.string(),
+  repository_host: z.string(),
+  repository_owner: z.string(),
+  repository_name: z.string(),
+  worktree_id: z.string(),
+  context_id: z.string(),
+  capture_id: z.string(),
+  parent_context_id: z.string().nullable(),
+  manifest_object_id: z.string(),
+  session_source: z.string(),
+  session_id: z.string(),
+  run_id: z.string(),
+  segment_id: z.string(),
+  agent_id: z.string(),
+  parent_agent_id: z.string(),
+  capture_lifecycle: z.string(),
+  capture_started_at: z.string(),
+  first_action_at: z.string().nullable(),
+  first_action_basis: z.string(),
+  first_action_relationship: z.string(),
+  capture_status: z.string(),
+  capture_completed_at: z.string().nullable(),
+  coverage_status: z.string(),
+  coverage_areas: z.array(z.tuple([z.string(), z.string(), z.string()])),
+  available_skills: z.array(z.string()),
+  skill_assessments: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string(), z.string()])),
+  context_facets: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string(), z.number()])),
+  index_version: z.string(),
+  indexed_at: z.string(),
+})
+
+export type RudelRepositorySessionEvidenceIndexRowInput = z.input<typeof RudelRepositorySessionEvidenceIndexRowSchema>
+export type RudelRepositorySessionEvidenceIndexRowOutput = z.output<typeof RudelRepositorySessionEvidenceIndexRowSchema>
+
 export type RudelSessionAnalyticsRow = {
   session_date: string
   last_interaction_date: string

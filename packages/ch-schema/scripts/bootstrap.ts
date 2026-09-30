@@ -31,6 +31,10 @@ const FORWARD_SCRIPTS = new Map([
 	["20260916210000_signal_phrase_counts.sql", "migrate-language-signals.ts"],
 	["20260918120000_agent_run_summaries.sql", "migrate-language-signals.ts"],
 	["20260930105809_transcript_records.sql", "migrate-transcript-records.ts"],
+	[
+		"20260930120000_repository_evidence_index.sql",
+		"migrate-repository-evidence-index.ts",
+	],
 ]);
 
 interface BootstrapMigration {
@@ -39,11 +43,15 @@ interface BootstrapMigration {
 	checksum: string;
 }
 
-async function runMigrationCommand(args: readonly string[]): Promise<void> {
+async function runMigrationCommand(
+	args: readonly string[],
+	environment: Record<string, string> = {},
+): Promise<void> {
 	const child = Bun.spawn([process.execPath, ...args], {
 		cwd: resolve(import.meta.dir, ".."),
 		env: {
 			...process.env,
+			...environment,
 			CLICKHOUSE_DB: "default",
 			CLICKHOUSE_URL:
 				process.env.CLICKHOUSE_URL?.trim() || "http://localhost:8123",
@@ -61,7 +69,12 @@ async function applyForwardMigration(
 ): Promise<void> {
 	const script = FORWARD_SCRIPTS.get(migration.name);
 	if (script) {
-		await runMigrationCommand([resolve(import.meta.dir, script)]);
+		await runMigrationCommand(
+			[resolve(import.meta.dir, script)],
+			script === "migrate-repository-evidence-index.ts"
+				? { REPOSITORY_EVIDENCE_INDEX_EXPECTED_ENGINE: "ReplacingMergeTree" }
+				: {},
+		);
 		return;
 	}
 	const directory = await mkdtemp(resolve(tmpdir(), "opaline-ch-upgrade-"));

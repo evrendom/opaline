@@ -8,6 +8,7 @@ export { dependencyHealthProbe } from "./dependency-health-schema.js";
 export * from "./ingest-job-schema.js";
 export * from "./ingest-processing-schema.js";
 export * from "./ingest-rate-limit-schema.js";
+export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";
 export * from "./session-ownership-schema.js";
 export * from "./session-revision-schema.js";

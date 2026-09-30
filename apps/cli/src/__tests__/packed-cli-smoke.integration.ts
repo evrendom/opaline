@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { FILTER_VERSION } from "@rudel/secret-filter";
 import {
 	containsAnyCanary,
@@ -71,6 +71,19 @@ test("RUDEL_PACKED_CLI points at an existing absolute artifact on Node >= 20", a
 	expect(isAbsolute(packedCliPath)).toBe(true);
 	await access(packedCliPath);
 	expect(await getNodeMajorVersion()).toBeGreaterThanOrEqual(20);
+});
+
+test("packed manifest has no workspace runtime dependencies", async () => {
+	const packedCliPath = requirePackedCliPath();
+	const packageJson = JSON.parse(
+		await readFile(join(dirname(packedCliPath), "..", "package.json"), "utf8"),
+	) as { dependencies?: Record<string, unknown> };
+	const workspaceDependencies = Object.entries(
+		packageJson.dependencies ?? {},
+	).filter(([, version]) =>
+		typeof version === "string" ? version.startsWith("workspace:") : false,
+	);
+	expect(workspaceDependencies).toEqual([]);
 });
 
 test("--version matches the workspace package.json version", async () => {

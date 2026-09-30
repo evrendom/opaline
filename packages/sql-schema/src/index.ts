@@ -1,4 +1,5 @@
 export { cliConnection } from "./cli-connection-schema.js";
+export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";
 export type {
 	AccountInsert,
@@ -13,6 +14,8 @@ export type {
 	BillingSubscriptionSelect,
 	ClickHousePurgeJobInsert,
 	ClickHousePurgeJobSelect,
+	ClickHousePurgeObjectInsert,
+	ClickHousePurgeObjectSelect,
 	CustomerAccountSnapshotInsert,
 	CustomerAccountSnapshotSelect,
 	DeviceCodeInsert,
@@ -64,6 +67,7 @@ export {
 	billingCustomer,
 	billingSubscription,
 	clickhousePurgeJob,
+	clickhousePurgeObject,
 	customerAccountSnapshot,
 	deviceCode,
 	ingestJob,

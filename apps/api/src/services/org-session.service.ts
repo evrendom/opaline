@@ -1,4 +1,5 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
+import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
 import {
 	type ClickHouseStatement,
 	getClickhouse,
@@ -168,20 +169,7 @@ async function deleteSessions(
 	column: "organization_id" | "user_id",
 	targetId: string,
 ): Promise<void> {
-	const plans = [
-		...getAllAdapters().map((adapter) => ({
-			column,
-			table: adapter.rawTableName,
-		})),
-		{ column, table: SESSION_ANALYTICS_TABLE },
-		{ column, table: SESSION_LANGUAGE_SIGNALS_TABLE },
-		{ column, table: SKILL_RECEIPTS_TABLE },
-		{ column, table: SKILL_USES_TABLE },
-		{ column, table: SKILL_VERSION_CONTENTS_TABLE },
-		{ column, table: TRANSCRIPT_RECORDS_TABLE },
-		{ column, table: USAGE_EVENTS_TABLE },
-		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
-	];
+	const plans = getClickHouseSessionPurgePlans(column);
 	const results = await Promise.allSettled(
 		plans.map((plan) =>
 			deleteSessionsFromTable(plan.table, plan.column, targetId),
@@ -201,6 +189,29 @@ async function deleteSessions(
 	if (failures.length > 0) {
 		throw new AggregateError(failures, "ClickHouse purge failed");
 	}
+}
+
+export function getClickHouseSessionPurgePlans(
+	column: "organization_id" | "user_id",
+): ReadonlyArray<{
+	readonly column: "organization_id" | "user_id";
+	readonly table: string;
+}> {
+	return [
+		...getAllAdapters().map((adapter) => ({
+			column,
+			table: adapter.rawTableName,
+		})),
+		{ column, table: SESSION_ANALYTICS_TABLE },
+		{ column, table: SESSION_LANGUAGE_SIGNALS_TABLE },
+		{ column, table: SKILL_RECEIPTS_TABLE },
+		{ column, table: SKILL_USES_TABLE },
+		{ column, table: SKILL_VERSION_CONTENTS_TABLE },
+		{ column, table: TRANSCRIPT_RECORDS_TABLE },
+		{ column, table: USAGE_EVENTS_TABLE },
+		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
+		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },
+	];
 }
 
 async function deleteSessionsFromTable(

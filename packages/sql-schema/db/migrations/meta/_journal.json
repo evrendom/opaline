@@ -309,6 +309,13 @@
 			"when": 1790766126841,
 			"tag": "0043_purge_followup_pass",
 			"breakpoints": true
+		},
+		{
+			"idx": 44,
+			"version": "7",
+			"when": 1790776186712,
+			"tag": "0044_repository_evidence_capture",
+			"breakpoints": true
 		}
 	]
 }

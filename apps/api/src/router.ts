@@ -40,6 +40,7 @@ import { profileRouter } from "./handlers/profile.js";
 import { repositorySettingsRouter } from "./handlers/repository-settings.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
+import { ClickHouseWriteFencedError } from "./lib/clickhouse-write-fence.js";
 import { readBooleanEnv } from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
@@ -154,6 +155,15 @@ import {
 	readR2IngestAvailability,
 } from "./services/r2-ingest-storage.service.js";
 import { hasRawSessionRow } from "./services/raw-session.service.js";
+import {
+	commitRepositoryEvidence,
+	initRepositoryEvidence,
+	RepositoryEvidenceStateError,
+} from "./services/repository-evidence.service.js";
+import {
+	buildRepositoryEvidenceIndexRow,
+	persistRepositoryEvidenceIndex,
+} from "./services/repository-evidence-index.service.js";
 import {
 	persistSessionLanguageSignals,
 	persistSessionLanguageSignalsBestEffort,
@@ -1414,6 +1424,123 @@ const ingestSessionHandler = os.ingestSession
 		return processed.result;
 	});
 
+const repositoryEvidenceInit = os.repositoryEvidence.init
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context }) => {
+		if (!context.apiKeyId) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "An ingest API key is required",
+			});
+		}
+		const availability = readR2IngestAvailability();
+		if (!availability.enabled) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { missingVariables: [...availability.missingVariables] },
+				message: "Repository evidence storage is unavailable.",
+			});
+		}
+		if (input.repository.provider !== null) {
+			throw new ORPCError("BAD_REQUEST", {
+				message: "Repository provider identity must be resolved by the server.",
+			});
+		}
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId,
+			context.user.id,
+		);
+		try {
+			const r2 = createR2MultipartUploadClient(availability.configuration);
+			return await initRepositoryEvidence({
+				database: sqlClient,
+				input,
+				now: () => new Date(),
+				organizationId,
+				r2,
+				randomUUID: () => crypto.randomUUID(),
+				userId: context.user.id,
+			});
+		} catch (error) {
+			throw toRepositoryEvidenceOrpcError(error);
+		}
+	});
+
+const repositoryEvidenceCommit = os.repositoryEvidence.commit
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, signal }) => {
+		if (!context.apiKeyId) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "An ingest API key is required",
+			});
+		}
+		const availability = readR2IngestAvailability();
+		if (!availability.enabled) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				data: { missingVariables: [...availability.missingVariables] },
+				message: "Repository evidence storage is unavailable.",
+			});
+		}
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId,
+			context.user.id,
+		);
+		try {
+			const r2 = createR2MultipartUploadClient(availability.configuration);
+			const indexedAt = new Date();
+			const committed = await commitRepositoryEvidence({
+				database: sqlClient,
+				input,
+				now: () => new Date(),
+				organizationId,
+				prepareIndex: (evidence) =>
+					buildRepositoryEvidenceIndexRow(
+						evidence.input,
+						evidence.manifest,
+						indexedAt,
+						context.user.id,
+					),
+				r2,
+				randomUUID: () => crypto.randomUUID(),
+				signal,
+				userId: context.user.id,
+			});
+			// Final fence before the external ClickHouse publication; the purge
+			// job's second pass removes anything that slips past this check.
+			await assertNoClickHousePurgeTombstone({
+				organizationId,
+				userId: context.user.id,
+			});
+			await persistRepositoryEvidenceIndex({
+				clickhouse: getClickhouse(),
+				row: committed.preparedIndex,
+			});
+			return committed.output;
+		} catch (error) {
+			throw toRepositoryEvidenceOrpcError(error);
+		}
+	});
+
+function toRepositoryEvidenceOrpcError(error: unknown): Error {
+	if (error instanceof ClickHouseWriteFencedError) {
+		return new ORPCError("CONFLICT", { message: error.message });
+	}
+	if (error instanceof FreeWorkspaceMonthlyAgentRunLimitExceededError) {
+		return new ORPCError("FORBIDDEN", { message: error.message });
+	}
+	if (!(error instanceof RepositoryEvidenceStateError)) {
+		return error instanceof Error ? error : new Error(String(error));
+	}
+	switch (error.code) {
+		case "EVIDENCE_NOT_FOUND":
+			return new ORPCError("NOT_FOUND", { message: error.message });
+		case "EVIDENCE_EXPIRED":
+		case "EVIDENCE_OBJECT_MISMATCH":
+		case "EVIDENCE_ORGANIZATION_MISMATCH":
+		case "EVIDENCE_SESSION_CONFLICT":
+		case "EVIDENCE_UPLOAD_CONFLICT":
+			return new ORPCError("CONFLICT", { message: error.message });
+	}
+}
+
 const r2IngestInit = os.ingest.init
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input, context, errors }) => {
@@ -1903,6 +2030,10 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		requestUpgrade: requestBillingUpgrade,
 	},
 	repositorySettings: repositorySettingsRouter,
+	repositoryEvidence: {
+		commit: repositoryEvidenceCommit,
+		init: repositoryEvidenceInit,
+	},
 	health,
 	me,
 	profile: profileRouter,

@@ -14,15 +14,26 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
-const MIGRATION_0043_TIMESTAMP = "1790766126841";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0043 to a database already migrated through 0019", async () => {
+test("applies migrations 0020-0044 to a database already migrated through 0019 and main's 0043", async () => {
+	const journalValue: unknown = JSON.parse(
+		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
+	);
+	const entries = readMigrationEntries(journalValue);
+	const latestMigration = entries.at(-1);
+	expect(latestMigration?.tag).toBe("0044_repository_evidence_capture");
+	for (const [index, entry] of entries.entries()) {
+		if (index > 0) {
+			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
+		}
+	}
 	const connectionString = getPostgresConnectionString();
 	const databaseName = `rudel_migration_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
-	const migrationsThrough0019 = await createMigrationsThrough0019();
+	const migrationsThrough0019 = await createMigrationsThrough(19);
+	const migrationsThrough0043 = await createMigrationsThrough(43);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -50,9 +61,27 @@ test("applies migrations 0020-0043 to a database already migrated through 0019",
 			});
 			expect(tableBefore0020?.name).toBeNull();
 
+			await migrate(database, { migrationsFolder: migrationsThrough0043 });
+			const followupColumns = await migrationSql<Array<{ name: string }>>`
+				SELECT column_name AS name
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'clickhouse_purge_job'
+					AND column_name IN ('followup_due_at', 'followup_completed_at')
+				ORDER BY column_name
+			`;
+			expect([...followupColumns]).toEqual([
+				{ name: "followup_completed_at" },
+				{ name: "followup_due_at" },
+			]);
+			const [captureBefore0044] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.repository_evidence_capture')::text AS name
+			`;
+			expect(captureBefore0044?.name).toBeNull();
+
 			await migrate(database, { migrationsFolder });
 
-			const [after0043] = await migrationSql<MigrationState[]>`
+			const [after0044] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -61,9 +90,9 @@ test("applies migrations 0020-0043 to a database already migrated through 0019",
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0043).toEqual({
-				count: 44,
-				latestTimestamp: MIGRATION_0043_TIMESTAMP,
+			expect(after0044).toEqual({
+				count: 45,
+				latestTimestamp: String(latestMigration?.when),
 			});
 			const [customerAccountTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.customer_account_snapshot')::text AS name
@@ -174,6 +203,57 @@ test("applies migrations 0020-0043 to a database already migrated through 0019",
 				SELECT to_regclass('public.repository_upload_report')::text AS name
 			`;
 			expect(repositoryUploadTable?.name).toBe("repository_upload_report");
+			const captureTables = await migrationSql<
+				Array<{ name: string; relation: string | null }>
+			>`
+				SELECT expected.name, to_regclass('public.' || expected.name)::text AS relation
+				FROM (VALUES
+					('clickhouse_purge_object'),
+					('repository_evidence_capture'),
+					('repository_evidence_object'),
+					('repository_evidence_upload'),
+					('repository_evidence_upload_object')
+				) AS expected(name)
+				ORDER BY expected.name
+			`;
+			expect([...captureTables]).toEqual(
+				captureTables.map(({ name }) => ({ name, relation: name })),
+			);
+			const deletionActions = await migrationSql<
+				Array<{ name: string; onDelete: string; onUpdate: string }>
+			>`
+				SELECT
+					conname AS name,
+					CASE confdeltype
+						WHEN 'c' THEN 'cascade'
+						WHEN 'n' THEN 'set null'
+						ELSE confdeltype::text
+					END AS "onDelete",
+					CASE confupdtype
+						WHEN 'c' THEN 'cascade'
+						WHEN 'n' THEN 'set null'
+						WHEN 'a' THEN 'no action'
+						ELSE confupdtype::text
+					END AS "onUpdate"
+				FROM pg_constraint
+				WHERE conname IN (
+					'clickhouse_purge_object_purge_job_id_clickhouse_purge_job_id_fk',
+					'repository_evidence_upload_object_object_fk'
+				)
+				ORDER BY conname
+			`;
+			expect([...deletionActions]).toEqual([
+				{
+					name: "clickhouse_purge_object_purge_job_id_clickhouse_purge_job_id_fk",
+					onDelete: "cascade",
+					onUpdate: "cascade",
+				},
+				{
+					name: "repository_evidence_upload_object_object_fk",
+					onDelete: "cascade",
+					onUpdate: "no action",
+				},
+			]);
 			const probeId = crypto.randomUUID();
 			await migrationSql`INSERT INTO dependency_health_probe (id) VALUES (${probeId})`;
 			const probe = await migrationSql<
@@ -370,6 +450,7 @@ test("applies migrations 0020-0043 to a database already migrated through 0019",
 		);
 		await adminSql.end();
 		await rm(migrationsThrough0019, { force: true, recursive: true });
+		await rm(migrationsThrough0043, { force: true, recursive: true });
 	}
 });
 
@@ -390,22 +471,19 @@ interface TableState {
 	name: string | null;
 }
 
-async function createMigrationsThrough0019(): Promise<string> {
+async function createMigrationsThrough(lastIndex: number): Promise<string> {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue).filter(
-		(entry) => entry.idx <= 19,
+		(entry) => entry.idx <= lastIndex,
 	);
-	if (
-		entries.length !== 20 ||
-		entries.at(-1)?.tag !== "0019_wrapped_share_social_image"
-	) {
-		throw new Error("Expected migrations 0000 through 0019");
+	if (entries.length !== lastIndex + 1 || entries.at(-1)?.idx !== lastIndex) {
+		throw new Error(`Expected migrations 0000 through ${lastIndex}`);
 	}
 
 	const temporaryFolder = await mkdtemp(
-		join(tmpdir(), "rudel-migrations-through-0019-"),
+		join(tmpdir(), `rudel-migrations-through-${lastIndex}-`),
 	);
 	await mkdir(join(temporaryFolder, "meta"));
 	for (const entry of entries) {

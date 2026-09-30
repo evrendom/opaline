@@ -49,7 +49,7 @@ export async function readCodexSessionMeta(
 		payload?: {
 			id?: string;
 			cwd?: string;
-			git?: { branch?: string; sha?: string };
+			git?: { branch?: string; commit_hash?: string; sha?: string };
 		};
 	} | null;
 
@@ -67,7 +67,7 @@ export async function readCodexSessionMeta(
 			"",
 		cwd: parsed.payload.cwd ?? "",
 		gitBranch: parsed.payload.git?.branch,
-		gitSha: parsed.payload.git?.sha,
+		gitSha: parsed.payload.git?.commit_hash ?? parsed.payload.git?.sha,
 	};
 }
 

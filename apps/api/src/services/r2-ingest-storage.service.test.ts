@@ -157,6 +157,43 @@ describe("R2 ingest storage configuration", () => {
 		);
 		await server.stop(true);
 	});
+
+	test("lists only the multipart uploads of the exact object key", async () => {
+		const requestedPrefixes: Array<string | null> = [];
+		const server = Bun.serve({
+			fetch(request) {
+				requestedPrefixes.push(new URL(request.url).searchParams.get("prefix"));
+				return new Response(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<ListMultipartUploadsResult>
+	<Bucket>${R2_INGEST_BUCKET}</Bucket>
+	<IsTruncated>false</IsTruncated>
+	<Upload><Key>evidence/key</Key><UploadId>exact</UploadId><Initiated>2026-09-30T10:00:00.000Z</Initiated></Upload>
+	<Upload><Key>evidence/key-longer</Key><UploadId>prefix-only</UploadId><Initiated>2026-09-30T10:00:00.000Z</Initiated></Upload>
+</ListMultipartUploadsResult>`,
+					{ headers: { "Content-Type": "application/xml" } },
+				);
+			},
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const client = createR2MultipartUploadClient({
+			accessKeyId: "test-access-key",
+			accountId: "test-account",
+			bucket: R2_INGEST_BUCKET,
+			endpoint: server.url.origin,
+			forcePathStyle: true,
+			secretAccessKey: "test-secret-key",
+		});
+
+		const uploads = await client.listMultipartUploads("evidence/key");
+
+		expect(requestedPrefixes).toEqual(["evidence/key"]);
+		expect(uploads).toEqual([
+			{ initiatedAt: new Date("2026-09-30T10:00:00.000Z"), uploadId: "exact" },
+		]);
+		await server.stop(true);
+	});
 });
 
 function createPresignedUploadStub(input: {

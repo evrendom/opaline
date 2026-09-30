@@ -119,8 +119,12 @@ export async function readSubagentFiles(
 ): Promise<SubagentFile[]> {
 	const subagents: SubagentFile[] = [];
 	const subagentDirs = await resolveSubagentDirectories(sessionDir, sessionId);
+	const queued = new Set(agentIds.filter(isSafeBasename));
+	const queue = [...queued];
 
-	for (const agentId of agentIds) {
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+		const agentId = queue[queueIndex];
+		if (!agentId) continue;
 		if (!isSafeBasename(agentId)) continue;
 
 		for (const subagentDir of subagentDirs) {
@@ -135,6 +139,11 @@ export async function readSubagentFiles(
 			try {
 				const content = await readFile(agentPath, "utf-8");
 				subagents.push({ agentId, content });
+				for (const nestedAgentId of extractAgentIds(content)) {
+					if (queued.size >= 512 || queued.has(nestedAgentId)) continue;
+					queued.add(nestedAgentId);
+					queue.push(nestedAgentId);
+				}
 				break;
 			} catch {
 				// Try next path

@@ -16,6 +16,10 @@ import {
 } from "./r2-ingest-cleanup.service.js";
 import { repairRecoverableR2IngestJobs } from "./r2-ingest-commit.service.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
+import {
+	getNextEvidenceWorkDueAt,
+	sweepRepositoryEvidence,
+} from "./repository-evidence-fence.service.js";
 
 export interface R2IngestRepairPassResult {
 	readonly attempted: number;
@@ -83,18 +87,39 @@ export async function runR2IngestRepairPass(
 				r2,
 			})
 		: { attempted: 0, completed: 0, hasMore: true };
+	const evidence = hasMaintenanceTimeRemaining(deadline)
+		? await sweepRepositoryEvidence({ database: sqlClient, deadline, r2 })
+		: { attempted: 0, completed: 0, hasMore: true };
 	const deadlineReached = !hasMaintenanceTimeRemaining(deadline);
 
 	return {
-		attempted: expired.attempted + recovered.attempted + cleanup.attempted,
-		completed: expired.completed + recovered.completed + cleanup.completed,
+		attempted:
+			expired.attempted +
+			recovered.attempted +
+			cleanup.attempted +
+			evidence.attempted,
+		completed:
+			expired.completed +
+			recovered.completed +
+			cleanup.completed +
+			evidence.completed,
 		hasMore:
 			deadlineReached ||
 			expired.hasMore ||
 			recovered.hasMore ||
-			cleanup.hasMore,
+			cleanup.hasMore ||
+			evidence.hasMore,
 		nextDueAt: deadlineReached
 			? null
-			: await getNextR2IngestWorkDueAt(sqlClient),
+			: earliest(
+					await getNextR2IngestWorkDueAt(sqlClient),
+					await getNextEvidenceWorkDueAt(sqlClient),
+				),
 	};
+}
+
+function earliest(first: Date | null, second: Date | null): Date | null {
+	if (!first) return second;
+	if (!second) return first;
+	return first.getTime() <= second.getTime() ? first : second;
 }

@@ -300,6 +300,35 @@ describe("subagent reader", () => {
 		expect(subagents[0]?.agentId).toBe("new-agent");
 	});
 
+	test("recursively reads nested Claude subagent transcripts", async () => {
+		const sessionDir = join(tempDir, "nested-subagent-test");
+		const sessionId = "nested-session";
+		const subagentsDir = join(sessionDir, sessionId, "subagents");
+		await mkdir(subagentsDir, { recursive: true });
+		await writeFile(
+			join(subagentsDir, "agent-parent-agent.jsonl"),
+			JSON.stringify({ toolUseResult: { agentId: "nested-agent" } }),
+		);
+		await writeFile(
+			join(subagentsDir, "agent-nested-agent.jsonl"),
+			JSON.stringify({
+				type: "assistant",
+				message: { content: "nested work" },
+			}),
+		);
+
+		const subagents = await readSubagentFiles(
+			sessionDir,
+			["parent-agent"],
+			sessionId,
+		);
+
+		expect(subagents.map((subagent) => subagent.agentId)).toEqual([
+			"parent-agent",
+			"nested-agent",
+		]);
+	});
+
 	test("rejects invalid IDs even when called directly", async () => {
 		const sessionDir = join(tempDir, "subagent-invalid-id-test");
 		await mkdir(sessionDir, { recursive: true });
@@ -479,17 +508,27 @@ describe("full upload pipeline (dry-run)", () => {
 		},
 	);
 
-	test("full CLI dry-run with file path and subagent files", async () => {
+	test("full CLI dry-run reports UTF-8 bytes for file path and subagent files", async () => {
 		const projectDir = join(tempDir, "cli-path-test2");
 		await mkdir(projectDir, { recursive: true });
+		const sessionContent = SAMPLE_SESSION_CONTENT.replace(
+			"Hello, help me fix a bug",
+			"Héllo, help me fix a bug 🧪",
+		);
+		const subagentContent = SAMPLE_SUBAGENT_CONTENT.replace(
+			"Subagent work done",
+			"Subagent wørk done 🧪",
+		);
+		const sessionBytes = Buffer.byteLength(sessionContent, "utf8");
+		const subagentBytes = Buffer.byteLength(subagentContent, "utf8");
 
 		const sessionFile = join(projectDir, "cli-test-session.jsonl");
-		await writeFile(sessionFile, SAMPLE_SESSION_CONTENT);
+		await writeFile(sessionFile, sessionContent);
 
 		// Create subagent files so they get included in the request
 		await writeFile(
 			join(projectDir, "agent-sub-agent-001.jsonl"),
-			SAMPLE_SUBAGENT_CONTENT,
+			subagentContent,
 		);
 
 		const cliPath = join(import.meta.dir, "..", "bin", "cli.ts");
@@ -507,6 +546,11 @@ describe("full upload pipeline (dry-run)", () => {
 		expect(stdout).toContain("Dry run - would upload:");
 		expect(stdout).toContain('"sessionId": "cli-test-session"');
 		expect(stdout).toContain('"subagents"');
+		expect(sessionBytes).toBeGreaterThan(sessionContent.length);
+		expect(subagentBytes).toBeGreaterThan(subagentContent.length);
+		expect(stdout).toContain(`Transcript: ${sessionBytes} bytes`);
+		expect(stdout).toContain(`"content": "[${sessionBytes} bytes]"`);
+		expect(stdout).toContain(`"content": "[${subagentBytes} bytes]"`);
 	});
 
 	test("full CLI dry-run selects the Codex adapter for a rollout path", async () => {

@@ -18,6 +18,15 @@ import {
 	deleteOrgSessions,
 	deleteUserSessions,
 } from "./org-session.service.js";
+import {
+	createR2MultipartUploadClient,
+	type R2MultipartUploadClient,
+	readR2IngestAvailability,
+} from "./r2-ingest-storage.service.js";
+import {
+	holdIntentsForPurge,
+	runIntentsForPurgeTarget,
+} from "./repository-evidence-fence.service.js";
 
 const logger = getLogger(["rudel", "api", "clickhouse-purge"]);
 
@@ -35,6 +44,7 @@ const MIN_DUE_WORK_DELAY_MS = 100;
 const MAX_ERROR_SEGMENTS = 8;
 const MAX_ERROR_DEPTH = 4;
 const MAX_SANITIZED_ERROR_LENGTH = 800;
+const MAX_R2_DELETE_OBJECTS = 1_000;
 const CONFIGURED_MAX_ATTEMPTS = readPositiveSafeIntegerEnv(
 	"CLICKHOUSE_PURGE_MAX_ATTEMPTS",
 	DEFAULT_MAX_ATTEMPTS,
@@ -46,6 +56,7 @@ const CONFIGURED_POLL_INTERVAL_MS = readPositiveSafeIntegerEnv(
 // Longer than the longest bounded write that can race a deletion, so the
 // follow-up pass removes whatever such a write published after the first pass.
 const DEFAULT_FOLLOWUP_DELAY_MS = 15 * 60_000;
+const PURGE_INTENT_HOLD_MARGIN_MS = 10 * 60_000;
 const CONFIGURED_FOLLOWUP_DELAY_MS = readPositiveSafeIntegerEnv(
 	"CLICKHOUSE_PURGE_FOLLOWUP_DELAY_MS",
 	DEFAULT_FOLLOWUP_DELAY_MS,
@@ -55,10 +66,28 @@ export type ClickHousePurgeTarget =
 	| { targetId: string; targetType: "account" }
 	| { targetId: string; targetType: "organization" };
 
+export type EvidencePurgeR2Client = Pick<
+	R2MultipartUploadClient,
+	"abortMultipartUpload" | "deleteObjects" | "listMultipartUploads"
+>;
+
 export type ClickHousePurgeFailureAlert = ClickHousePurgeFailureAlertData;
 
+/**
+ * Describes which pass is running. The first pass keeps the snapshotted R2
+ * keys and the multipart intents so the follow-up pass can still find objects
+ * that an in-flight write published after it; only the follow-up removes them.
+ */
+export interface ClickHousePurgePass {
+	readonly finalPass: boolean;
+	readonly purgeJobId: string;
+}
+
 export interface ClickHousePurgeProcessorEnv {
-	executePurge: (target: ClickHousePurgeTarget) => Promise<void>;
+	executePurge: (
+		target: ClickHousePurgeTarget,
+		pass?: ClickHousePurgePass,
+	) => Promise<void>;
 	/** Delay before the follow-up purge pass (default 15 minutes). */
 	followUpDelayMs?: number;
 	leaseDurationMs: number;
@@ -126,6 +155,7 @@ export interface StartClickHousePurgeWorkerOptions {
 		nextDueAt?: Date | null;
 	}>;
 	resend: ResendConfig;
+	r2?: EvidencePurgeR2Client;
 	sqlClient?: postgres.Sql;
 }
 
@@ -201,6 +231,114 @@ export async function enqueueClickHousePurge(
 		`,
 		[crypto.randomUUID(), target.targetType, target.targetId, maxAttempts],
 	);
+	await holdIntentsForPurge(
+		transaction,
+		target,
+		new Date(
+			Date.now() + CONFIGURED_FOLLOWUP_DELAY_MS + PURGE_INTENT_HOLD_MARGIN_MS,
+		),
+	);
+	const [job] = await transaction.unsafe<Array<{ id: string }>>(
+		`SELECT id FROM clickhouse_purge_job
+		 WHERE target_type = $1 AND target_id = $2
+		 LIMIT 1
+		 FOR UPDATE`,
+		[target.targetType, target.targetId],
+	);
+	if (!job) throw new Error("ClickHouse purge job was not persisted");
+	await snapshotR2PurgeObjects(target, job.id, transaction);
+}
+
+async function snapshotR2PurgeObjects(
+	target: ClickHousePurgeTarget,
+	purgeJobId: string,
+	transaction: postgres.TransactionSql,
+): Promise<void> {
+	if (target.targetType === "account") {
+		await transaction.unsafe(
+			`
+				SELECT evidence_object.organization_id, evidence_object.object_id
+				FROM repository_evidence_object evidence_object
+				WHERE EXISTS (
+					SELECT 1
+					FROM repository_evidence_upload_object object_reference
+					INNER JOIN repository_evidence_upload evidence_upload
+						ON evidence_upload.id = object_reference.upload_id
+					WHERE object_reference.organization_id = evidence_object.organization_id
+						AND object_reference.object_id = evidence_object.object_id
+						AND evidence_upload.user_id = $1
+				)
+				ORDER BY evidence_object.organization_id, evidence_object.object_id
+				FOR UPDATE OF evidence_object
+			`,
+			[target.targetId],
+		);
+		await transaction.unsafe(
+			`
+				INSERT INTO clickhouse_purge_object (purge_job_id, object_key)
+				SELECT $1, evidence_object.object_key
+				FROM repository_evidence_object evidence_object
+				WHERE EXISTS (
+					SELECT 1
+					FROM repository_evidence_upload_object object_reference
+					INNER JOIN repository_evidence_upload evidence_upload
+						ON evidence_upload.id = object_reference.upload_id
+					WHERE object_reference.organization_id = evidence_object.organization_id
+						AND object_reference.object_id = evidence_object.object_id
+						AND evidence_upload.user_id = $2
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM repository_evidence_upload_object surviving_reference
+					INNER JOIN repository_evidence_upload surviving_upload
+						ON surviving_upload.id = surviving_reference.upload_id
+					WHERE surviving_reference.organization_id = evidence_object.organization_id
+						AND surviving_reference.object_id = evidence_object.object_id
+						AND surviving_upload.user_id <> $2
+				)
+				ON CONFLICT (purge_job_id, object_key) DO NOTHING
+			`,
+			[purgeJobId, target.targetId],
+		);
+		return;
+	}
+
+	await transaction.unsafe(
+		`
+			INSERT INTO clickhouse_purge_object (purge_job_id, object_key)
+			SELECT $1, object_key
+			FROM (
+				SELECT object_key
+				FROM repository_evidence_object
+				WHERE organization_id = $2
+			) evidence_objects
+			ON CONFLICT (purge_job_id, object_key) DO NOTHING
+		`,
+		[purgeJobId, target.targetId],
+	);
+}
+
+export async function deleteSnapshottedRepositoryEvidenceObjects(
+	userId: string,
+	transaction: postgres.TransactionSql,
+): Promise<void> {
+	await transaction.unsafe(
+		`
+			DELETE FROM repository_evidence_object evidence_object
+			USING clickhouse_purge_job purge_job, clickhouse_purge_object purge_object
+			WHERE purge_job.target_type = 'account'
+				AND purge_job.target_id = $1
+				AND purge_object.purge_job_id = purge_job.id
+				AND purge_object.object_key = evidence_object.object_key
+				AND NOT EXISTS (
+					SELECT 1
+					FROM repository_evidence_upload_object object_reference
+					WHERE object_reference.organization_id = evidence_object.organization_id
+						AND object_reference.object_id = evidence_object.object_id
+				)
+		`,
+		[userId],
+	);
 }
 
 /**
@@ -226,22 +364,23 @@ export async function enqueueClickHousePurge(
  * from the last pass that completed (`followup_completed_at`).
  */
 export async function hasClickHousePurgeTombstone(
-	target: { organizationId: string; userId: string },
-	database: postgres.Sql = sqlClient,
+	target: { organizationId: string; userId?: string },
+	database: postgres.Sql | postgres.TransactionSql = sqlClient,
 ): Promise<boolean> {
-	const rows = await database<Array<{ found: number }>>`
-		SELECT 1 AS found
-		FROM clickhouse_purge_job
-		WHERE (target_type = 'account' AND target_id = ${target.userId})
-			OR (target_type = 'organization' AND target_id = ${target.organizationId})
-		LIMIT 1
-	`;
+	const rows = await database.unsafe<Array<{ found: number }>>(
+		`SELECT 1 AS found
+		 FROM clickhouse_purge_job
+		 WHERE (target_type = 'account' AND target_id = $1)
+			OR (target_type = 'organization' AND target_id = $2)
+		 LIMIT 1`,
+		[target.userId ?? "", target.organizationId],
+	);
 	return rows.length > 0;
 }
 
 export async function assertNoClickHousePurgeTombstone(
-	target: { organizationId: string; userId: string },
-	database: postgres.Sql = sqlClient,
+	target: { organizationId: string; userId?: string },
+	database: postgres.Sql | postgres.TransactionSql = sqlClient,
 ): Promise<void> {
 	if (await hasClickHousePurgeTombstone(target, database)) {
 		throw new ClickHouseWriteFencedError();
@@ -437,13 +576,17 @@ export async function runClickHousePurgeWorkerPass(
 function createClickHousePurgeProcessorEnv(
 	options: StartClickHousePurgeWorkerOptions,
 ): ClickHousePurgeProcessorEnv {
+	const r2 = options.r2 ?? createOptionalPurgeR2Client();
+	const database = options.sqlClient ?? sqlClient;
 	return {
-		executePurge: async (target) => {
+		executePurge: async (target, pass) => {
 			if (target.targetType === "organization") {
 				await deleteOrgSessions(target.targetId);
-				return;
+			} else {
+				await deleteUserSessions(target.targetId);
 			}
-			await deleteUserSessions(target.targetId);
+			if (pass)
+				await purgeRepositoryEvidenceObjects(target, pass, database, r2);
 		},
 		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
 		now: () => new Date(),
@@ -454,8 +597,103 @@ function createClickHousePurgeProcessorEnv(
 			options.resend.clickHousePurgeAlertRecipient
 				? (alert) => sendClickHousePurgeFailureAlert(options.resend, alert)
 				: undefined,
-		sqlClient: options.sqlClient ?? sqlClient,
+		sqlClient: database,
 	};
+}
+
+function createOptionalPurgeR2Client(): EvidencePurgeR2Client | undefined {
+	const availability = readR2IngestAvailability();
+	return availability.enabled
+		? createR2MultipartUploadClient(availability.configuration)
+		: undefined;
+}
+
+export async function purgeRepositoryEvidenceObjects(
+	target: ClickHousePurgeTarget,
+	pass: ClickHousePurgePass,
+	database: postgres.Sql,
+	r2: EvidencePurgeR2Client | undefined,
+): Promise<void> {
+	await deleteCapturedR2PurgeObjects(pass.purgeJobId, database, r2, {
+		retainRows: !pass.finalPass,
+	});
+	await purgeEvidenceIntents(target, pass, database, r2);
+}
+
+async function purgeEvidenceIntents(
+	target: ClickHousePurgeTarget,
+	pass: ClickHousePurgePass,
+	database: postgres.Sql,
+	r2: EvidencePurgeR2Client | undefined,
+): Promise<void> {
+	if (!r2) {
+		const [pending] = await database.unsafe<Array<{ id: string }>>(
+			`SELECT id FROM repository_evidence_upload_intent
+			 WHERE ${target.targetType === "account" ? "user_id" : "organization_id"} = $1
+			 LIMIT 1`,
+			[target.targetId],
+		);
+		if (pending) {
+			throw new Error(
+				"R2 evidence purge is required but its storage client is unavailable",
+			);
+		}
+		return;
+	}
+	await runIntentsForPurgeTarget({
+		database,
+		finalPass: pass.finalPass,
+		holdUntil: new Date(
+			Date.now() + CONFIGURED_FOLLOWUP_DELAY_MS + PURGE_INTENT_HOLD_MARGIN_MS,
+		),
+		r2,
+		target,
+	});
+}
+
+/**
+ * Deletes the snapshotted R2 keys. Every pass deletes them; only the final pass
+ * removes the rows, so the second pass can delete objects that an in-flight
+ * commit materialized after the first pass.
+ */
+export async function deleteCapturedR2PurgeObjects(
+	purgeJobId: string,
+	database: postgres.Sql,
+	r2: Pick<R2MultipartUploadClient, "deleteObjects"> | undefined,
+	options: { readonly retainRows: boolean } = { retainRows: false },
+): Promise<number> {
+	let deleted = 0;
+	let cursor = "";
+	while (true) {
+		const rows = await database.unsafe<Array<{ objectKey: string }>>(
+			`
+				SELECT object_key AS "objectKey"
+				FROM clickhouse_purge_object
+				WHERE purge_job_id = $1 AND object_key > $3
+				ORDER BY object_key
+				LIMIT $2
+			`,
+			[purgeJobId, MAX_R2_DELETE_OBJECTS, cursor],
+		);
+		const objectKeys = rows.map((row) => row.objectKey);
+		const last = objectKeys.at(-1);
+		if (last === undefined) return deleted;
+		if (!r2) {
+			throw new Error(
+				"R2 evidence purge is required but its storage client is unavailable",
+			);
+		}
+		await r2.deleteObjects(objectKeys);
+		if (!options.retainRows) {
+			await database.unsafe(
+				`DELETE FROM clickhouse_purge_object
+				 WHERE purge_job_id = $1 AND object_key = ANY($2::text[])`,
+				[purgeJobId, objectKeys],
+			);
+		}
+		cursor = last;
+		deleted += objectKeys.length;
+	}
 }
 
 function getEarlierDate(first: Date | null, second: Date | null): Date | null {
@@ -755,10 +993,13 @@ async function processClaimedPurgeJob(
 	let purgeError: unknown;
 
 	try {
-		await env.executePurge({
-			targetId: job.targetId,
-			targetType: job.targetType,
-		});
+		await env.executePurge(
+			{
+				targetId: job.targetId,
+				targetType: job.targetType,
+			},
+			{ finalPass: false, purgeJobId: job.id },
+		);
 	} catch (error) {
 		purgeError = error;
 	}
@@ -948,10 +1189,13 @@ async function runNextFollowUpPurge(
 		return false;
 	}
 	try {
-		await env.executePurge({
-			targetId: claimed.targetId,
-			targetType: claimed.targetType,
-		});
+		await env.executePurge(
+			{
+				targetId: claimed.targetId,
+				targetType: claimed.targetType,
+			},
+			{ finalPass: true, purgeJobId: claimed.id },
+		);
 	} catch (error) {
 		logger.warn(
 			"ClickHouse follow-up purge pass failed and will retry (job_id={jobId} error={error})",

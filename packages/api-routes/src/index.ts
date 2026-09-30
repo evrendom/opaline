@@ -89,6 +89,12 @@ import {
 	ProductAnalyticsUploadModeSchema,
 } from "./product-analytics.js";
 import {
+	RepositoryEvidenceCommitInputSchema,
+	RepositoryEvidenceCommitOutputSchema,
+	RepositoryEvidenceInitInputSchema,
+	RepositoryEvidenceInitOutputSchema,
+} from "./repository-evidence.js";
+import {
 	DateRangeInputSchema,
 	DaysInputSchema,
 	DeveloperCostBreakdownSchema,
@@ -152,6 +158,48 @@ export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
 export * from "./product-analytics.js";
 export { type RepoIdentity, resolveRepoIdentity } from "./repo-identity.js";
+export {
+	createRepositoryEvidenceInitInputSchema,
+	REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_OBJECT_BYTES,
+	REPOSITORY_EVIDENCE_MAX_OBJECTS,
+	REPOSITORY_EVIDENCE_PART_SIZE_BYTES,
+	REPOSITORY_EVIDENCE_PROTOCOL,
+	type RepositoryEvidenceCapture,
+	RepositoryEvidenceCaptureSchema,
+	RepositoryEvidenceCaptureTimingSchema,
+	type RepositoryEvidenceCommitInput,
+	RepositoryEvidenceCommitInputSchema,
+	type RepositoryEvidenceCommitOutput,
+	RepositoryEvidenceCommitOutputSchema,
+	RepositoryEvidenceCompletedObjectSchema,
+	RepositoryEvidenceCompletedPartSchema,
+	type RepositoryEvidenceCoverageArea,
+	RepositoryEvidenceCoverageAreaSchema,
+	RepositoryEvidenceCoverageItemSchema,
+	type RepositoryEvidenceInitInput,
+	RepositoryEvidenceInitInputSchema,
+	type RepositoryEvidenceInitOutput,
+	RepositoryEvidenceInitOutputSchema,
+	type RepositoryEvidenceLocalIdentity,
+	RepositoryEvidenceLocalIdentitySchema,
+	type RepositoryEvidenceObjectDescriptor,
+	RepositoryEvidenceObjectDescriptorSchema,
+	RepositoryEvidenceObjectIdSchema,
+	RepositoryEvidenceObjectKindSchema,
+	type RepositoryEvidenceProviderIdentity,
+	RepositoryEvidenceProviderIdentitySchema,
+	type RepositoryEvidenceRemoteHint,
+	RepositoryEvidenceRemoteHintSchema,
+	type RepositoryEvidenceRepositoryIdentity,
+	RepositoryEvidenceRepositoryIdentitySchema,
+	type RepositoryEvidenceSessionIdentity,
+	RepositoryEvidenceSessionIdentitySchema,
+	RepositoryEvidenceTranscriptWatermarkSchema,
+	type RepositoryEvidenceUploadObject,
+	RepositoryEvidenceUploadObjectSchema,
+	RepositoryEvidenceUploadPartSchema,
+} from "./repository-evidence.js";
 export * from "./safe-url.js";
 export * from "./schemas/analytics.js";
 export {
@@ -747,6 +795,14 @@ export const contract = {
 		requestUpgrade: oc
 			.input(CreateOrganizationCheckoutInputSchema)
 			.output(RequestOrganizationBillingUpgradeOutputSchema),
+	},
+	repositoryEvidence: {
+		init: oc
+			.input(RepositoryEvidenceInitInputSchema)
+			.output(RepositoryEvidenceInitOutputSchema),
+		commit: oc
+			.input(RepositoryEvidenceCommitInputSchema)
+			.output(RepositoryEvidenceCommitOutputSchema),
 	},
 	repositorySettings: repositorySettingsContract,
 	health: oc.output(HealthSchema),

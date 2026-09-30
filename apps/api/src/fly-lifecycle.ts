@@ -28,6 +28,7 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 		: undefined;
 	const clickHousePurgeWorker = startClickHousePurgeWorker({
 		enabled: readBooleanEnv("CLICKHOUSE_PURGE_WORKER_ENABLED", true),
+		...(r2IngestCleanupClient ? { r2: r2IngestCleanupClient } : {}),
 		repairR2IngestCleanup: r2IngestCleanupClient
 			? () => runR2IngestRepairPass(r2IngestCleanupClient)
 			: undefined,

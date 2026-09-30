@@ -21,6 +21,7 @@ import {
 import { getGitInfo } from "../lib/git-info.js";
 import { getProjectOrgId } from "../lib/project-config.js";
 import { scanAndGroupProjects } from "../lib/project-grouping.js";
+import { retryPendingSessionEvidence } from "../lib/session-evidence.js";
 import { resolveSession } from "../lib/session-resolver.js";
 import {
 	DEFAULT_ENDPOINT,
@@ -274,7 +275,7 @@ async function runSingleUpload(
 		throw error;
 	}
 
-	write(`Transcript: ${request.content.length} bytes`);
+	write(`Transcript: ${Buffer.byteLength(request.content, "utf8")} bytes`);
 	if (request.subagents && request.subagents.length > 0) {
 		write(`Subagents: ${request.subagents.length} file(s)`);
 	}
@@ -284,10 +285,10 @@ async function runSingleUpload(
 	if (flags.dryRun) {
 		const preview = {
 			...request,
-			content: `[${request.content.length} bytes]`,
+			content: `[${Buffer.byteLength(request.content, "utf8")} bytes]`,
 			subagents: request.subagents?.map((s) => ({
 				...s,
-				content: `[${s.content.length} bytes]`,
+				content: `[${Buffer.byteLength(s.content, "utf8")} bytes]`,
 			})),
 		};
 		write("Dry run - would upload:");
@@ -337,11 +338,38 @@ async function runRetryUpload(
 	credentials: Credentials | null,
 ): Promise<undefined | Error> {
 	p.intro("rudel upload --retry");
+	let evidenceRetryError: Error | undefined;
+	if (!flags.dryRun) {
+		if (!credentials) {
+			return new Error("Not authenticated. Run `rudel login` first.");
+		}
+		if (credentials.user) {
+			try {
+				const evidenceCount = await retryPendingSessionEvidence(credentials, {
+					allowInsecureEndpoint: allowPlaintextEndpoint,
+					endpoint: flags.endpoint,
+					onWarning: (message) => p.log.warn(message),
+				});
+				if (evidenceCount > 0) {
+					p.log.success(
+						`Retried ${evidenceCount} pending repository evidence capture(s).`,
+					);
+				}
+			} catch (error) {
+				evidenceRetryError = new Error(
+					`Repository evidence retry failed: ${error instanceof Error ? error.message : String(error)}`,
+				);
+				p.log.warn(
+					`${evidenceRetryError.message} Raw upload retries will continue.`,
+				);
+			}
+		}
+	}
 
 	const failures = await loadFailedUploads();
 	if (failures.length === 0) {
 		p.outro("No failed uploads to retry.");
-		return;
+		return evidenceRetryError;
 	}
 
 	const retryableFailures = failures.filter((failure) =>
@@ -368,7 +396,7 @@ async function runRetryUpload(
 	}
 	if (retryableFailures.length === 0) {
 		p.outro("No retryable uploads. Permanent failures remain recorded.");
-		return;
+		return evidenceRetryError;
 	}
 
 	if (flags.dryRun) {
@@ -390,7 +418,7 @@ async function runRetryUpload(
 
 		if (p.isCancel(shouldRetry) || !shouldRetry) {
 			p.cancel("Retry cancelled.");
-			return;
+			return evidenceRetryError;
 		}
 	}
 
@@ -451,8 +479,15 @@ async function runRetryUpload(
 	p.outro("Done!");
 
 	if (summary.failed > 0) {
+		if (evidenceRetryError) {
+			return new AggregateError(
+				[evidenceRetryError, new Error(`${summary.failed} upload(s) failed.`)],
+				`Repository evidence retry failed and ${summary.failed} raw upload(s) failed.`,
+			);
+		}
 		return new Error(`${summary.failed} upload(s) failed.`);
 	}
+	return evidenceRetryError;
 }
 
 async function runUpload(

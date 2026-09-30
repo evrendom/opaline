@@ -5,6 +5,7 @@ import {
 	DeleteObjectsCommand,
 	GetObjectCommand,
 	HeadObjectCommand,
+	ListMultipartUploadsCommand,
 	S3Client,
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -49,6 +50,7 @@ export interface R2MultipartUploadInitClient {
 		uploadId: string;
 	}) => Promise<void>;
 	createMultipartUpload: (input: {
+		contentType?: string;
 		metadata: Readonly<Record<string, string>>;
 		objectKey: string;
 	}) => Promise<{ uploadId: string }>;
@@ -74,6 +76,12 @@ export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
 	}) => Promise<void>;
 	deleteObjects: (objectKeys: readonly string[]) => Promise<void>;
 	getObject: (objectKey: string, signal?: AbortSignal) => Promise<Uint8Array>;
+	listMultipartUploads: (objectKey: string) => Promise<
+		readonly {
+			initiatedAt: Date;
+			uploadId: string;
+		}[]
+	>;
 	headObject: (
 		objectKey: string,
 		signal?: AbortSignal,
@@ -180,7 +188,7 @@ export function createR2MultipartUploadClient(
 			const result = await client.send(
 				new CreateMultipartUploadCommand({
 					Bucket: configuration.bucket,
-					ContentType: "application/x-ndjson",
+					ContentType: input.contentType ?? "application/x-ndjson",
 					Key: input.objectKey,
 					Metadata: input.metadata,
 				}),
@@ -235,6 +243,25 @@ export function createR2MultipartUploadClient(
 				throw new Error("R2 returned an ingest object without a body");
 			}
 			return result.Body.transformToByteArray();
+		},
+		async listMultipartUploads(objectKey) {
+			const result = await client.send(
+				new ListMultipartUploadsCommand({
+					Bucket: configuration.bucket,
+					Prefix: objectKey,
+				}),
+			);
+			return (result.Uploads ?? [])
+				.filter(
+					(upload) =>
+						upload.Key === objectKey &&
+						upload.UploadId !== undefined &&
+						upload.Initiated !== undefined,
+				)
+				.map((upload) => ({
+					initiatedAt: upload.Initiated as Date,
+					uploadId: upload.UploadId as string,
+				}));
 		},
 		async headObject(objectKey, signal) {
 			try {

@@ -610,7 +610,23 @@ describe("durable ClickHouse purge worker", () => {
 
 		expect(await hasClickHousePurgeTombstone(accountOwner)).toBe(true);
 		expect(await hasClickHousePurgeTombstone(organizationMember)).toBe(true);
+		expect(
+			await hasClickHousePurgeTombstone({
+				organizationId: organizationTarget.targetId,
+			}),
+		).toBe(true);
 		expect(await hasClickHousePurgeTombstone(bystander)).toBe(false);
+		await sqlClient.begin(async (transaction) => {
+			expect(await hasClickHousePurgeTombstone(accountOwner, transaction)).toBe(
+				true,
+			);
+			await expect(
+				assertNoClickHousePurgeTombstone(organizationMember, transaction),
+			).rejects.toThrow("fenced");
+			await expect(
+				assertNoClickHousePurgeTombstone(bystander, transaction),
+			).resolves.toBeUndefined();
+		});
 		await expect(
 			assertNoClickHousePurgeTombstone(accountOwner),
 		).rejects.toThrow("fenced");
@@ -666,17 +682,35 @@ describe("durable ClickHouse purge worker", () => {
 		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
 		const firstJob = await getPurgeJob(target);
 		expect(firstJob?.alertStatus).toBe("sent");
+		if (!firstJob) {
+			throw new Error(
+				"Expected the first purge failure lifecycle to be stored",
+			);
+		}
+		const retainedObjectKey = `evidence/test/${TEST_RUN_ID}/revived-alert`;
+		await sqlClient`
+			INSERT INTO clickhouse_purge_object (purge_job_id, object_key)
+			VALUES (${firstJob.id}, ${retainedObjectKey})
+		`;
 
 		await enqueue(target, 1);
 		expect(await runClickHousePurgeWorkerOnce(env)).toBe(true);
 		const secondJob = await getPurgeJob(target);
-		if (!firstJob || !secondJob) {
+		if (!secondJob) {
 			throw new Error("Expected both purge failure lifecycles to be stored");
 		}
+		const [retainedPurgeObject] = await sqlClient<
+			Array<{ purgeJobId: string }>
+		>`
+			SELECT purge_job_id AS "purgeJobId"
+			FROM clickhouse_purge_object
+			WHERE object_key = ${retainedObjectKey}
+		`;
 
 		expect(alerts).toHaveLength(2);
 		expect(secondJob.alertStatus).toBe("sent");
 		expect(secondJob.id).not.toBe(firstJob.id);
+		expect(retainedPurgeObject?.purgeJobId).toBe(secondJob.id);
 		expect(alerts.map((alert) => alert.id)).toEqual([
 			firstJob.id,
 			secondJob.id,

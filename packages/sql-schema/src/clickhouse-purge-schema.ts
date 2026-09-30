@@ -4,6 +4,7 @@ import {
 	index,
 	integer,
 	pgTable,
+	primaryKey,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -113,5 +114,43 @@ export const clickhousePurgeJob = pgTable(
 	],
 );
 
+/**
+ * Immutable R2 object keys captured before an account or organization row is
+ * deleted. This table deliberately has no tenant foreign key: it must survive
+ * tenant cascades until the durable purge job has deleted the objects.
+ */
+export const clickhousePurgeObject = pgTable(
+	"clickhouse_purge_object",
+	{
+		purgeJobId: text("purge_job_id")
+			.notNull()
+			.references(() => clickhousePurgeJob.id, {
+				onDelete: "cascade",
+				onUpdate: "cascade",
+			}),
+		objectKey: text("object_key").notNull(),
+		createdAt: timestamp("created_at", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		primaryKey({
+			columns: [table.purgeJobId, table.objectKey],
+			name: "clickhouse_purge_object_pkey",
+		}),
+		check(
+			"clickhouse_purge_object_key_check",
+			sql`length(btrim(${table.objectKey})) > 0`,
+		),
+	],
+);
+
 export type ClickHousePurgeJobSelect = typeof clickhousePurgeJob.$inferSelect;
 export type ClickHousePurgeJobInsert = typeof clickhousePurgeJob.$inferInsert;
+export type ClickHousePurgeObjectSelect =
+	typeof clickhousePurgeObject.$inferSelect;
+export type ClickHousePurgeObjectInsert =
+	typeof clickhousePurgeObject.$inferInsert;

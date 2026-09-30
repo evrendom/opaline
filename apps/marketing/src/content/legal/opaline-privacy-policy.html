@@ -19,6 +19,7 @@
 <p>We collect names, email addresses, profile images, account and organization identifiers, workspace memberships and roles, invitations, authentication provider, login records, preferences, subscription information and protected API or CLI credentials.</p>
 <h3>Coding-agent session content</h3>
 <p>When a Customer submits a session, it can contain prompts, model responses, system messages, source code, files and file paths, terminal commands and output, tool calls, repository and version-control information, URLs, timestamps, model and token information, errors, and personal or confidential information appearing in those materials.</p>
+<p>When the CLI captures a session inside a Git repository, it also collects repository context by default: Git state such as branch, commit, remote and file-status information, recent commit metadata, size-limited diffs of uncommitted changes, untracked text files, and agent instruction and configuration files such as AGENTS.md, CLAUDE.md, skills and MCP configuration. The CLI filters known secret formats from this content before upload, and we use it to link agent sessions to the code changes that result from them.</p>
 <h3>Workspace analytics</h3>
 <p>We create Customer-directed analytics from submitted sessions, such as session and interaction counts, timing, token and model usage, repository and project information, skill and agent activity, errors, classifications, reports and User-, project- or workspace-level comparisons.</p>
 <h3>Device, usage and log information</h3>

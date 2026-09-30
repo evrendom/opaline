@@ -68,6 +68,7 @@
       "devDependencies": {
         "@rudel/agent-adapters": "workspace:*",
         "@rudel/api-routes": "workspace:*",
+        "@rudel/local-context-source": "workspace:*",
         "@rudel/secret-filter": "workspace:*",
         "@rudel/typescript-config": "workspace:*",
         "@types/node": "^22",
@@ -207,6 +208,18 @@
     "packages/language-signals": {
       "name": "@rudel/language-signals",
       "version": "0.0.0",
+      "devDependencies": {
+        "@rudel/typescript-config": "workspace:*",
+        "bun-types": "latest",
+        "typescript": "5.9.2",
+      },
+    },
+    "packages/local-context-source": {
+      "name": "@rudel/local-context-source",
+      "version": "0.0.0",
+      "dependencies": {
+        "@rudel/secret-filter": "workspace:*",
+      },
       "devDependencies": {
         "@rudel/typescript-config": "workspace:*",
         "bun-types": "latest",
@@ -1026,6 +1039,8 @@
     "@rudel/ch-schema": ["@rudel/ch-schema@workspace:packages/ch-schema"],
 
     "@rudel/language-signals": ["@rudel/language-signals@workspace:packages/language-signals"],
+
+    "@rudel/local-context-source": ["@rudel/local-context-source@workspace:packages/local-context-source"],
 
     "@rudel/marketing": ["@rudel/marketing@workspace:apps/marketing"],
 

@@ -1,6 +1,7 @@
 import type postgres from "postgres";
 import { cancelOrganizationBillingSubscription } from "./billing.service.js";
 import {
+	deleteSnapshottedRepositoryEvidenceObjects,
 	enqueueClickHousePurge,
 	wakeClickHousePurgeWorker,
 } from "./clickhouse-purge.service.js";
@@ -45,29 +46,43 @@ export async function deleteUserPostgresData(
 			{ targetId: userId, targetType: "account" },
 			transaction,
 		);
-		const deletedOrganizations =
+		const confirmedOrganizationIds =
 			candidateOrganizationIds.length === 0
 				? []
-				: await transaction.unsafe<Array<{ id: string }>>(
-						`DELETE FROM organization
-						WHERE id = ANY($1::text[])
-							AND NOT EXISTS (
-								SELECT 1 FROM member
-								WHERE member.organization_id = organization.id
-									AND member.user_id <> $2
-							)
-						RETURNING id`,
-						[candidateOrganizationIds, userId],
-					);
-		const deletedOrganizationIds = deletedOrganizations.map(
-			(organization) => organization.id,
-		);
-		for (const organizationId of deletedOrganizationIds) {
+				: (
+						await transaction.unsafe<Array<{ id: string }>>(
+							`SELECT id
+							FROM organization
+							WHERE id = ANY($1::text[])
+								AND NOT EXISTS (
+									SELECT 1 FROM member
+									WHERE member.organization_id = organization.id
+										AND member.user_id <> $2
+								)
+							ORDER BY id`,
+							[candidateOrganizationIds, userId],
+						)
+					).map((organization) => organization.id);
+		// Enqueue each purge before the delete so the job snapshots the
+		// organization's repository evidence objects before foreign keys cascade.
+		for (const organizationId of confirmedOrganizationIds) {
 			await enqueueClickHousePurge(
 				{ targetId: organizationId, targetType: "organization" },
 				transaction,
 			);
 		}
+		const deletedOrganizations =
+			confirmedOrganizationIds.length === 0
+				? []
+				: await transaction.unsafe<Array<{ id: string }>>(
+						`DELETE FROM organization
+						WHERE id = ANY($1::text[])
+						RETURNING id`,
+						[confirmedOrganizationIds],
+					);
+		const deletedOrganizationIds = deletedOrganizations.map(
+			(organization) => organization.id,
+		);
 		await transaction.unsafe("DELETE FROM apikey WHERE reference_id = $1", [
 			userId,
 		]);
@@ -79,6 +94,8 @@ export async function deleteUserPostgresData(
 			);
 		}
 		await transaction.unsafe('DELETE FROM "user" WHERE id = $1', [userId]);
+		await deleteSnapshottedRepositoryEvidenceObjects(userId, transaction);
+
 		return { deletedOrganizationIds };
 	});
 	await wakeClickHousePurgeWorker();

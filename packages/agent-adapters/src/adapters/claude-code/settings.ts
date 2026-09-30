@@ -2,7 +2,8 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-const HOOK_COMMAND = "rudel hooks claude session-end";
+const SESSION_END_HOOK_COMMAND = "rudel hooks claude session-end";
+const SESSION_START_HOOK_COMMAND = "rudel hooks claude session-start";
 
 interface HookEntry {
 	type: string;
@@ -17,6 +18,7 @@ interface HookMatcher {
 
 interface ClaudeSettings {
 	hooks?: {
+		SessionStart?: HookMatcher[];
 		SessionEnd?: HookMatcher[];
 		[key: string]: unknown;
 	};
@@ -49,66 +51,145 @@ export function getClaudeSettingsPath(): string {
 	return join(findClaudeDir(), "settings.json");
 }
 
-export function readClaudeSettings(): ClaudeSettings {
-	const path = getClaudeSettingsPath();
+export function readClaudeSettings(
+	path: string = getClaudeSettingsPath(),
+): ClaudeSettings {
 	if (!existsSync(path)) return {};
 	const content = readFileSync(path, "utf-8");
 	return JSON.parse(content) as ClaudeSettings;
 }
 
-export function writeClaudeSettings(settings: ClaudeSettings): void {
-	const path = getClaudeSettingsPath();
+export function writeClaudeSettings(
+	settings: ClaudeSettings,
+	path: string = getClaudeSettingsPath(),
+): void {
 	mkdirSync(dirname(path), { recursive: true });
 	writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
-export function isHookEnabled(): boolean {
-	const settings = readClaudeSettings();
-	const entries = settings.hooks?.SessionEnd;
-	if (!Array.isArray(entries)) return false;
-	return entries.some((entry) =>
-		entry.hooks?.some((h) => h.command === HOOK_COMMAND),
-	);
+/**
+ * SessionEnd is the hook every install has had since auto-upload shipped, so it
+ * alone means "enabled". SessionStart was added later and is backfilled by
+ * `ensureSessionStartHook`; requiring it here would make existing installs
+ * suddenly report that auto-upload is off.
+ */
+export function isHookEnabled(path: string = getClaudeSettingsPath()): boolean {
+	const settings = readClaudeSettings(path);
+	return hasHookCommand(settings.hooks?.SessionEnd, SESSION_END_HOOK_COMMAND);
 }
 
-export function addHook(): void {
-	const settings = readClaudeSettings();
+/**
+ * Adds the SessionStart hook to an install that predates it. Returns true when
+ * the settings file changed. Settings without the SessionEnd hook are left
+ * alone, so this never enables auto-upload for a project that did not opt in.
+ */
+export function ensureSessionStartHook(
+	path: string = getClaudeSettingsPath(),
+): boolean {
+	const settings = readClaudeSettings(path);
+	const hooks = settings.hooks;
+	if (!hooks || !hasHookCommand(hooks.SessionEnd, SESSION_END_HOOK_COMMAND)) {
+		return false;
+	}
+	if (hasHook(hooks.SessionStart, SESSION_START_HOOK_COMMAND)) return false;
+
+	hooks.SessionStart = addHookEntry(
+		Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [],
+		SESSION_START_HOOK_COMMAND,
+	);
+	writeClaudeSettings(settings, path);
+	return true;
+}
+
+export function addHook(path: string = getClaudeSettingsPath()): void {
+	const settings = readClaudeSettings(path);
 	if (!settings.hooks) {
 		settings.hooks = {};
 	}
 	if (!Array.isArray(settings.hooks.SessionEnd)) {
 		settings.hooks.SessionEnd = [];
 	}
-
-	const alreadyExists = settings.hooks.SessionEnd.some((entry) =>
-		entry.hooks?.some((h) => h.command === HOOK_COMMAND),
+	if (!Array.isArray(settings.hooks.SessionStart)) {
+		settings.hooks.SessionStart = [];
+	}
+	settings.hooks.SessionStart = addHookEntry(
+		settings.hooks.SessionStart,
+		SESSION_START_HOOK_COMMAND,
 	);
-	if (alreadyExists) return;
+	settings.hooks.SessionEnd = addHookEntry(
+		settings.hooks.SessionEnd,
+		SESSION_END_HOOK_COMMAND,
+	);
 
-	settings.hooks.SessionEnd.push({
-		matcher: "",
-		hooks: [{ type: "command", command: HOOK_COMMAND, async: true }],
-	});
-
-	writeClaudeSettings(settings);
+	writeClaudeSettings(settings, path);
 }
 
-export function removeHook(): void {
-	const settings = readClaudeSettings();
+export function removeHook(path: string = getClaudeSettingsPath()): void {
+	const settings = readClaudeSettings(path);
 	const hooks = settings.hooks;
-	const entries = hooks?.SessionEnd;
-	if (!hooks || !Array.isArray(entries)) return;
-
-	hooks.SessionEnd = entries.filter(
-		(entry) => !entry.hooks?.some((h) => h.command === HOOK_COMMAND),
+	if (!hooks) return;
+	hooks.SessionStart = removeHookEntries(
+		hooks.SessionStart,
+		SESSION_START_HOOK_COMMAND,
 	);
-
-	if (hooks.SessionEnd.length === 0) {
-		delete hooks.SessionEnd;
-	}
+	hooks.SessionEnd = removeHookEntries(
+		hooks.SessionEnd,
+		SESSION_END_HOOK_COMMAND,
+	);
+	if (hooks.SessionStart?.length === 0) delete hooks.SessionStart;
+	if (hooks.SessionEnd?.length === 0) delete hooks.SessionEnd;
 	if (Object.keys(hooks).length === 0) {
 		delete settings.hooks;
 	}
 
-	writeClaudeSettings(settings);
+	writeClaudeSettings(settings, path);
+}
+
+function hasHookCommand(
+	entries: HookMatcher[] | undefined,
+	command: string,
+): boolean {
+	return (
+		Array.isArray(entries) &&
+		entries.some((entry) =>
+			entry.hooks?.some((hook) => hook.command === command),
+		)
+	);
+}
+
+function hasHook(entries: HookMatcher[] | undefined, command: string): boolean {
+	return (
+		Array.isArray(entries) &&
+		entries.some((entry) =>
+			entry.hooks?.some(
+				(hook) =>
+					hook.type === "command" &&
+					hook.command === command &&
+					hook.async === true,
+			),
+		)
+	);
+}
+
+function addHookEntry(entries: HookMatcher[], command: string): HookMatcher[] {
+	if (hasHook(entries, command)) return entries;
+	return [
+		...(removeHookEntries(entries, command) ?? []),
+		{
+			matcher: "",
+			hooks: [{ type: "command", command, async: true }],
+		},
+	];
+}
+
+function removeHookEntries(
+	entries: HookMatcher[] | undefined,
+	command: string,
+): HookMatcher[] | undefined {
+	return entries
+		?.map((entry) => ({
+			...entry,
+			hooks: entry.hooks.filter((hook) => hook.command !== command),
+		}))
+		.filter((entry) => entry.hooks.length > 0);
 }
