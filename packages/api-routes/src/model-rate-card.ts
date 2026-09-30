@@ -51,7 +51,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-09-29";
+export const MODEL_RATE_CARD_VERSION = "2026-09-30";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -88,6 +88,39 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		outputPerMTok: 75,
 		source: "https://developers.openai.com/api/docs/pricing",
 		verifiedAt: "2026-09-16",
+		notes: "Full-request rates above 272k input tokens.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6.1-sol",
+		displayName: "GPT-6.1 Sol",
+		match: ["^gpt-6\\.1-sol$"],
+		effectiveFrom: "2026-09-29",
+		contextBand: "base",
+		inputPerMTok: 2,
+		cacheReadPerMTok: 0.1,
+		cacheWrite5mPerMTok: 2.5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 10,
+		source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+		verifiedAt: "2026-09-30",
+		notes:
+			"Standard first-party API rates from release; cached input is half GPT-6 Sol's rate.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6.1-sol",
+		displayName: "GPT-6.1 Sol",
+		match: ["^gpt-6\\.1-sol$"],
+		effectiveFrom: "2026-09-29",
+		contextBand: "long",
+		inputPerMTok: 4,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 15,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-30",
 		notes: "Full-request rates above 272k input tokens.",
 	},
 	{
@@ -1280,6 +1313,17 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 	),
 	{
 		provider: "openai",
+		model: "gpt-6.1-sol",
+		dimension: "service_tier",
+		values: ["fast", "priority"],
+		effectiveFrom: "2026-09-29",
+		multiplier: 2,
+		source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+		verifiedAt: "2026-09-30",
+		notes: "Fast/Priority doubles every token class in both context bands.",
+	},
+	{
+		provider: "openai",
 		model: "gpt-6-astra",
 		dimension: "service_tier",
 		values: ["fast", "priority"],
@@ -1288,6 +1332,17 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 		source: "https://developers.openai.com/api/docs/pricing",
 		verifiedAt: "2026-09-16",
 		notes: "Fast/Priority doubles every token class in both context bands.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6-astra",
+		dimension: "service_tier",
+		values: ["ultrafast"],
+		effectiveFrom: "2026-09-29",
+		multiplier: 6,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-09-30",
+		notes: "Ultrafast is 6x every token class in both context bands.",
 	},
 	{
 		provider: "openai",

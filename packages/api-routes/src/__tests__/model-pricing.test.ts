@@ -223,13 +223,73 @@ describe("model rate card", () => {
 		).toBeNull();
 	});
 
-	it("prices GPT-6 Sol and Luna from September 22 in every published tier", () => {
-		for (const [model, baseRates, longRates] of [
-			["gpt-6-sol", [2, 0.2, 2.5, 10], [4, 0.4, 5, 15]],
-			["gpt-6-luna", [0.1, 0.01, 0.125, 0.5], [0.2, 0.02, 0.25, 0.75]],
+	it("prices Astra Ultrafast at 6x from September 29 in both context bands", () => {
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-28",
+				serviceTier: "ultrafast",
+			}),
+		).toBeNull();
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-29",
+				serviceTier: "ultrafast",
+				contextInputTokens: 272_000,
+			}),
+		).toMatchObject({
+			inputPerMTok: 60,
+			cacheReadPerMTok: 6,
+			cacheWrite5mPerMTok: 75,
+			outputPerMTok: 300,
+		});
+		expect(
+			resolveModelPricing("gpt-6-astra", {
+				at: "2026-09-29",
+				serviceTier: "ultrafast",
+				contextInputTokens: 272_001,
+			}),
+		).toMatchObject({
+			inputPerMTok: 120,
+			cacheReadPerMTok: 12,
+			cacheWrite5mPerMTok: 150,
+			outputPerMTok: 450,
+		});
+		for (const model of ["gpt-6-sol", "gpt-6.1-sol", "gpt-6-luna"]) {
+			expect(
+				resolveModelPricing(model, {
+					at: "2026-09-29",
+					serviceTier: "ultrafast",
+				}),
+			).toBeNull();
+		}
+	});
+
+	it("prices GPT-6 Sol, Luna and 6.1 Sol from release in every published tier", () => {
+		for (const [model, dayBefore, releasedAt, baseRates, longRates] of [
+			[
+				"gpt-6-sol",
+				"2026-09-21",
+				"2026-09-22",
+				[2, 0.2, 2.5, 10],
+				[4, 0.4, 5, 15],
+			],
+			[
+				"gpt-6-luna",
+				"2026-09-21",
+				"2026-09-22",
+				[0.1, 0.01, 0.125, 0.5],
+				[0.2, 0.02, 0.25, 0.75],
+			],
+			[
+				"gpt-6.1-sol",
+				"2026-09-28",
+				"2026-09-29",
+				[2, 0.1, 2.5, 10],
+				[4, 0.2, 5, 15],
+			],
 		] as const) {
 			expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
-			expect(resolveModelPricing(model, { at: "2026-09-21" })).toBeNull();
+			expect(resolveModelPricing(model, { at: dayBefore })).toBeNull();
 
 			for (const [contextInputTokens, rates] of [
 				[272_000, baseRates],
@@ -238,7 +298,7 @@ describe("model rate card", () => {
 				const [input, cached, write, output] = rates;
 				expect(
 					resolveModelPricing(model, {
-						at: "2026-09-22",
+						at: releasedAt,
 						contextInputTokens,
 					}),
 				).toMatchObject({
@@ -250,7 +310,7 @@ describe("model rate card", () => {
 				for (const serviceTier of ["fast", "priority"]) {
 					expect(
 						resolveModelPricing(model, {
-							at: "2026-09-22",
+							at: releasedAt,
 							contextInputTokens,
 							serviceTier,
 						}),

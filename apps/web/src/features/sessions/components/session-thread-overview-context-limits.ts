@@ -12,7 +12,7 @@ const LEGACY_CLAUDE_CONTEXT_TOKENS = 200_000;
 
 const FABLE_MODEL_PATTERN = /^claude-fable-5(?:-\d{8})?$/;
 const SOL_MODEL_PATTERN = /^gpt-5\.6(?:-sol)?$/;
-const GPT_6_MODEL_PATTERN = /^gpt-6-(?:astra|sol|luna)$/;
+const GPT_6_MODEL_PATTERN = /^(?:gpt-6-(?:astra|sol|luna)|gpt-6\.1-sol)$/;
 
 function hasPrefix(model: string, prefixes: readonly string[]) {
 	return prefixes.some((prefix) => model.startsWith(prefix));

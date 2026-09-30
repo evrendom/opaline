@@ -91,6 +91,24 @@ describe("request billing metadata", () => {
 		expect(metrics.estimatedCost).toBeCloseTo(2.89, 8);
 	});
 
+	test("prices Astra Ultrafast at 6x only from its release date", () => {
+		const released = extractTranscriptUsageMetrics(
+			codexTranscript([{ at: "2026-09-29T00:00:00Z", infoTier: "ultrafast" }]),
+			undefined,
+		);
+		// A standard request is $1.55.
+		expect(released.estimatedCost).toBeCloseTo(9.3, 8);
+
+		const beforeRelease = extractTranscriptUsageMetrics(
+			codexTranscript([
+				{ at: "2026-09-28T23:59:59.999Z", infoTier: "ultrafast" },
+			]),
+			undefined,
+		);
+		expect(beforeRelease.estimatedCost).toBeUndefined();
+		expect(beforeRelease.inputTokens).toBe(150_000);
+	});
+
 	test("keeps unsupported and malformed explicit tiers unpriced without losing tokens", () => {
 		for (const infoTier of ["future-tier", "flex", { mode: "fast" }]) {
 			const metrics = extractTranscriptUsageMetrics(

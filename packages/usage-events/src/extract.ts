@@ -1589,7 +1589,15 @@ const ALLOWED_SERVICE_TIERS: Readonly<
 	Record<UsageEventSource, ReadonlySet<string>>
 > = {
 	claude_code: new Set(["batch", "priority", "standard"]),
-	codex: new Set(["auto", "default", "fast", "flex", "priority", "scale"]),
+	codex: new Set([
+		"auto",
+		"default",
+		"fast",
+		"flex",
+		"priority",
+		"scale",
+		"ultrafast",
+	]),
 };
 
 function normalizeServiceTier(

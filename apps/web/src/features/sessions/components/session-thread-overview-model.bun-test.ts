@@ -92,7 +92,7 @@ describe("buildSessionOverviewCallSeries", () => {
 	});
 
 	test("uses the published GPT-6 context window when telemetry omits it", () => {
-		for (const model of ["gpt-6-sol", "gpt-6-luna"]) {
+		for (const model of ["gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
 			const rows = [createRow({ index: 0, xEndRatio: 1, xStartRatio: 0 })];
 			const series = buildSessionOverviewCallSeries(rows, () => [
 				createUsageEvent({ inputTokens: 100, model }),

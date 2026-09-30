@@ -550,7 +550,7 @@ describe("Claude usage-event extraction", () => {
 
 		expect(result.events).toEqual([]);
 		expect(result.receipt.eventCount).toBe(0);
-		expect(result.receipt.modelRateCardVersion).toBe("2026-09-29");
+		expect(result.receipt.modelRateCardVersion).toBe("2026-09-30");
 		expect(result.receipt.checksum).toBe(
 			"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
 		);
@@ -922,8 +922,8 @@ describe("Claude usage-event extraction", () => {
 });
 
 describe("Codex usage-event extraction", () => {
-	test("GPT-6 Sol and Luna retain their canonical priced identities", () => {
-		for (const model of ["gpt-6-sol", "gpt-6-luna"]) {
+	test("GPT-6 Sol, Luna and 6.1 Sol retain their canonical priced identities", () => {
+		for (const model of ["gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
 			const event = onlyEvent(
 				extractCodex([
 					turnContext(model),
@@ -1556,6 +1556,23 @@ describe("Codex usage-event extraction", () => {
 			modelProvider: "openai",
 			serviceTier: "fast",
 		});
+	});
+
+	test("Codex accepts Ultrafast telemetry for GPT-6 Astra", () => {
+		const event = onlyEvent(
+			extractCodex([
+				turnContext("gpt-6-astra"),
+				codexLine(
+					vector(10, 0, 1, 0),
+					vector(10, 0, 1, 0),
+					"2026-09-29T10:00:00.000Z",
+					"ULTRAFAST",
+				),
+			]),
+		);
+
+		expect(event.serviceTier).toBe("ultrafast");
+		expect(event.qualityFlags).not.toContain("unrecognized_service_tier");
 	});
 
 	test("C-11 user-only transcript yields zero events", () => {
