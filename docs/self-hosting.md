@@ -28,10 +28,14 @@ CLICKHOUSE_URL=https://your-instance.obsessiondb.com \
 CLICKHOUSE_USERNAME=your-username \
 CLICKHOUSE_PASSWORD=your-password \
 CLICKHOUSE_DB=default \
-  bun --bun --cwd packages/ch-schema chkit migrate --apply
+  bun run --cwd packages/ch-schema ch:bootstrap
 ```
 
-The migration creates the `rudel` database, the `claude_sessions` and `session_analytics` tables, and a materialized view that computes analytics on insert. The cloud migration uses `SharedReplacingMergeTree` for `claude_sessions`.
+Bootstrap replays the checked-in migrations into an empty `rudel` database, including the controlled F16 migration and its live verification checkpoints. It establishes `subagent_count` before the historical analytics-view recreation, without editing any historical SQL or its journal checksum. Run it before starting any API writers; this offline path assumes one writer endpoint. Existing local installations with an ordered, checksum-verified journal prefix receive only the missing migrations, through the controlled F16 runner, existing forward scripts, or stock chkit restricted to each pending migration. As with fresh replay, this local path permits checked-in destructive DDL and must not run against production. Production upgrades continue to use the controlled forward migration scripts, not bootstrap or a historical replay.
+
+Bootstrap is a no-op when the complete ordered history is already journaled with its original checksums. It refuses unjournaled existing tables, gaps, reordered/unknown/duplicate entries, checksum mismatches, and partial F16 state. Interrupted F16 migrations require the controlled recovery procedure. If a disposable fresh bootstrap fails, drop both `rudel` and `default._chkit_migrations` before retrying; never do this on an existing installation.
+
+Local ClickHouse also needs the historical storage policy named `s3`. Docker Compose and CI mount `.github/clickhouse/config.d/storage-policy.xml`, which maps its `default` volume to the local default disk; no actual S3 service is needed.
 
 > **Note**: `CLICKHOUSE_DB` must be set to `default` for the migration because the `rudel` database doesn't exist yet — the migration creates it. Use `CLICKHOUSE_USERNAME` throughout; `CLICKHOUSE_USER` is accepted as a legacy fallback, and setting both to different values is an error.
 >

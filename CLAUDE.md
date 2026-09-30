@@ -123,7 +123,8 @@ bun run dev:local
 This runs `scripts/dev-local.sh`, which:
 1. Starts local Postgres + ClickHouse via Docker Compose (`docker compose up -d --wait`)
 2. Runs Postgres migrations
-3. Launches the API (`:4010`) and web app (`:4011`) in parallel
+3. Bootstraps an empty ClickHouse database, upgrades a checksum-verified journal prefix, or verifies a fully journaled installation
+4. Launches the API (`:4010`) and web app (`:4011`) in parallel
 
 Open **http://localhost:4011** in your browser. Sign up with email/password to create a local account. Social login (Google/GitHub) is not available in this mode since there are no OAuth client credentials.
 
@@ -157,6 +158,8 @@ Schema definitions live in `packages/ch-schema/src/db/schema/*.ts`. The toolkit 
 **Important**: chkit needs to connect to `default` first when it may need to run `CREATE DATABASE`. The migration and status scripts set `CLICKHOUSE_DB=default` for that connection. The generate and codegen scripts do not need the override because they do not connect to ClickHouse or only read schema files.
 
 ### Workflow
+
+Run `bun run ch:bootstrap` before starting API writers. For a fresh installation it replays the original migration files, uses the controlled F16 runner, and adds the `subagent_count` prerequisite before the September 11 view recreation. For an existing local installation, it applies only the missing suffix when the journal is an ordered, checksum-verified prefix of checked-in history, using the controlled F16 runner, existing forward scripts, or stock chkit restricted to each pending migration. As with fresh replay, this offline local path permits checked-in destructive DDL; it must not run against production. Historical SQL and checksums remain unchanged. Bootstrap refuses unjournaled tables, non-prefix or mismatched history, and partial F16 state; use the controlled recovery procedure for interrupted F16 migrations. A fully journaled installation is a checksum-verified no-op. Production continues to use the controlled forward scripts, not bootstrap. Local ClickHouse needs the `s3` storage-policy alias mounted by Docker Compose and CI.
 
 All commands run from `packages/ch-schema`:
 

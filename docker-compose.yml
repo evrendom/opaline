@@ -23,6 +23,7 @@ services:
       CLICKHOUSE_PASSWORD: clickhouse
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./.github/clickhouse/config.d/storage-policy.xml:/etc/clickhouse-server/config.d/storage-policy.xml:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--password", "clickhouse", "--query", "SELECT 1"]
       interval: 5s

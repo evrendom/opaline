@@ -216,38 +216,8 @@ jobs:
       - name: Run Postgres migrations
         run: bun run --cwd packages/sql-schema migrate
 
-      - name: Apply pre-F16 ClickHouse prerequisites (disposable CI only)
-        working-directory: packages/ch-schema
-        env:
-          F16_NONPROD_APPLY_PREREQUISITES: ci-only
-        run: bun run ch:migrate:f16:ci-prerequisites
-
-      - name: Run controlled F16 ClickHouse migration (evidence-backed CI auto-approval)
-        working-directory: packages/ch-schema
-        env:
-          F16_BACKFILL_BUCKET_COUNT: "2"
-          F16_CATALOG_BARRIER_TIMEOUT_MS: "120000"
-          F16_CLICKHOUSE_TOPOLOGY: single-node
-          F16_DDL_TASK_TIMEOUT_SECONDS: "180"
-          F16_MAX_BYTES_BEFORE_EXTERNAL_GROUP_BY: "268435456"
-          F16_MAX_BYTES_BEFORE_EXTERNAL_SORT: "268435456"
-          F16_MAX_MEMORY_USAGE_BYTES: "2147483648"
-          F16_MAX_TEMPORARY_DATA_ON_DISK_BYTES: "4294967296"
-          F16_MIGRATION_REQUEST_TIMEOUT_MS: "600000"
-          F16_NONPROD_AUTO_APPROVE_CHECKPOINTS: ci-only
-        run: bun run ch:migrate:f16
-
-      - name: Apply product launch ClickHouse metadata
-        run: bun run --cwd packages/ch-schema ch:migrate:product-launch
-
-      - name: Apply ClickHouse storage probe table
-        run: bun run --cwd packages/ch-schema ch:migrate:dependency-health
-
-      - name: Apply Dashboard language-signal columns
-        run: bun run --cwd packages/ch-schema ch:migrate:language-signals
-
-      - name: Apply transcript records table
-        run: bun run --cwd packages/ch-schema ch:migrate:transcript-records
+      - name: Bootstrap fresh ClickHouse (original checksums and controlled F16 verification)
+        run: bun run --cwd packages/ch-schema ch:bootstrap
 
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream

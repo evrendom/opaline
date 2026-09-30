@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
 	REDACTION_DID_NOT_CONVERGE_CODE,
@@ -8,6 +9,7 @@ import {
 	SESSION_OWNERSHIP_CONFLICT_CODE,
 	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
 } from "@rudel/api-routes";
+import * as secretFilter from "@rudel/secret-filter";
 import {
 	SecretFilterConvergenceError,
 	SecretFilterJsonIntegrityError,
@@ -208,6 +210,73 @@ describe("isRetryableUploadError", () => {
 });
 
 describe("uploadSession aggregate size guard", () => {
+	test("rejects a synthetic oversized transcript quickly without invoking secret filtering", async () => {
+		const content = "a".repeat(
+			Math.floor(
+				INGEST_AGGREGATE_CONTENT_MAX_BYTES /
+					(1 - secretFilter.MAX_REDACTION_RATIO),
+			) + 1,
+		);
+		const filterSpy = spyOn(secretFilter, "filterSessionTextFields");
+		try {
+			const startedAt = performance.now();
+			const result = await uploadSession(
+				{
+					source: "claude_code",
+					sessionId: "preflight-oversized-test",
+					projectPath: "/test/project",
+					content,
+				},
+				{
+					endpoint: "http://127.0.0.1:1/rpc",
+					allowInsecureEndpoint: false,
+					token: "unused",
+				},
+			);
+			const elapsedMs = performance.now() - startedAt;
+
+			expect(filterSpy).not.toHaveBeenCalled();
+			expect(result).toEqual({
+				success: false,
+				error:
+					"Session transcript payload is 160.00 MiB, above the 128.00 MiB per-session limit. Reduce the transcript/subagent payload before retrying.",
+				attempts: 0,
+				retryable: false,
+			});
+			expect(elapsedMs).toBeLessThan(1000);
+		} finally {
+			filterSpy.mockRestore();
+		}
+	});
+
+	test("allows a raw oversized transcript that fits after safe redaction", async () => {
+		const content = `${"a".repeat(209)} ${"ghp_"}${"b".repeat(36)}`;
+		const stub = startIngestStub({
+			respond: () =>
+				Response.json({ json: { success: true, sessionId: "shrink-to-fit" } }),
+		});
+		try {
+			const result = await uploadSession(
+				{
+					source: "claude_code",
+					sessionId: "shrink-to-fit",
+					projectPath: "/test/project",
+					content,
+				},
+				{
+					endpoint: `${stub.loopbackBase}/rpc`,
+					allowInsecureEndpoint: true,
+					maxAggregateBytes: 240,
+					token: INGEST_STUB_TEST_TOKEN,
+				},
+			);
+			expect(result.success).toBe(true);
+			expect(stub.requests).toHaveLength(1);
+		} finally {
+			await stub.server.stop(true);
+		}
+	});
+
 	test("rejects an oversized aggregate before making a network attempt", async () => {
 		const result = await uploadSession(
 			{

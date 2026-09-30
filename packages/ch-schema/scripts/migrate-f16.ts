@@ -666,7 +666,9 @@ export function createMigrationClient(input: {
 	};
 }
 
-function createExecutor(client: MigrationHttpClient): ClickHouseExecutor {
+export function createExecutor(
+	client: MigrationHttpClient,
+): ClickHouseExecutor {
 	return {
 		async close() {
 			await client.close();

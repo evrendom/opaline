@@ -19,6 +19,7 @@ import {
 	filterSessionTextFields,
 	getRedactionBudgetAnomaly,
 	getRedactionCount,
+	MAX_REDACTION_RATIO,
 	mergeRedactionCounts,
 	type RedactionBudgetAnomaly,
 	type RedactionCounts,
@@ -38,6 +39,7 @@ export interface UploadConfig {
 	onRetry?: (attempt: number, maxAttempts: number, error: string) => void;
 }
 
+const PREFLIGHT_MIN_INPUT_BYTES = 32 * 1024 * 1024;
 const RETRYABLE_STATUS_CODES = new Set([408, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 const BASE_DELAY_MS = 1_000;
@@ -298,6 +300,22 @@ export async function uploadSession(
 	config: UploadConfig,
 ): Promise<UploadResult> {
 	const inputBytes = getUploadAggregateBytes(request);
+	const maxAggregateBytes =
+		config.maxAggregateBytes ?? INGEST_AGGREGATE_CONTENT_MAX_BYTES;
+	// Skip the expensive secret filter only for large inputs that cannot fit even
+	// after the maximum redaction shrinkage. Smaller inputs still filter first, so
+	// a redaction-budget abort keeps precedence over the aggregate-size abort.
+	if (
+		inputBytes > PREFLIGHT_MIN_INPUT_BYTES &&
+		inputBytes * (1 - MAX_REDACTION_RATIO) > maxAggregateBytes
+	) {
+		return {
+			success: false,
+			error: formatTranscriptTooLargeError(inputBytes, maxAggregateBytes),
+			attempts: 0,
+			retryable: false,
+		};
+	}
 	let filteredText: SessionTextFilterResult<UploadSubagent>;
 	try {
 		filteredText = filterSessionTextFields({
@@ -332,8 +350,6 @@ export async function uploadSession(
 		subagents: filteredText.subagents ? [...filteredText.subagents] : undefined,
 		filter_version: FILTER_VERSION,
 	};
-	const maxAggregateBytes =
-		config.maxAggregateBytes ?? INGEST_AGGREGATE_CONTENT_MAX_BYTES;
 	const aggregateBytes = getUploadAggregateBytes(filteredRequest);
 	if (aggregateBytes > maxAggregateBytes) {
 		return {
