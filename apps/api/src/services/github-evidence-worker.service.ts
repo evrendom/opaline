@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { sqlClient } from "../db.js";
 import { readGitHubRepositoryAppConfig } from "./github-app.service.js";
 import { runGitHubEvidenceCollectionMaintenance } from "./github-evidence-maintenance.service.js";
+import { pruneGitHubWebhookDeliveries } from "./github-webhook-delivery.service.js";
 import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
@@ -15,26 +16,30 @@ const CONTINUE_DELAY_MS = 1_000;
 
 export interface GitHubEvidenceWorker {
 	readonly stop: () => Promise<void>;
-	readonly wake: () => void;
+	readonly wake: (delayMs?: number) => void;
 }
 
 let registeredWorker: GitHubEvidenceWorker | undefined;
 
 /**
- * Wakes the resident worker after a collection was durably enqueued. Without a
- * resident worker (for example on Vercel) the queued request is picked up by
- * the next scheduled maintenance pass.
+ * Wakes the resident worker after a collection was durably enqueued, or at the
+ * moment a webhook-requested refresh falls due. Without a resident worker (for
+ * example on Vercel) the durable request is picked up by the resident worker
+ * of another process or by the next scheduled maintenance pass.
  */
-export function wakeGitHubEvidenceWorker(): void {
-	registeredWorker?.wake();
+export function wakeGitHubEvidenceWorker(delayMs = 0): void {
+	registeredWorker?.wake(delayMs);
 }
 
 export async function runConfiguredGitHubEvidenceMaintenance(
 	limit = 1,
 	signal?: AbortSignal,
+	collectionIds?: readonly string[],
 ) {
 	const config = readGitHubRepositoryAppConfig();
 	if (!config) return { enabled: false as const, hasMore: false };
+	if (!collectionIds)
+		await pruneGitHubWebhookDeliveries({ database: sqlClient });
 	const storage = readR2IngestAvailability();
 	if (!storage.enabled) {
 		throw new Error(
@@ -43,6 +48,7 @@ export async function runConfiguredGitHubEvidenceMaintenance(
 	}
 	const result = await runGitHubEvidenceCollectionMaintenance({
 		config,
+		collectionIds,
 		database: sqlClient,
 		limit,
 		r2: createR2MultipartUploadClient(storage.configuration),
@@ -56,21 +62,26 @@ export async function runConfiguredGitHubEvidenceMaintenance(
 export function startGitHubEvidenceWorker(): GitHubEvidenceWorker {
 	let stopped = false;
 	let running = false;
-	let runAgain = false;
+	// Earliest wake requested while a pass was running.
+	let wakeAt: number | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	let scheduledAt: number | undefined;
 	let active: Promise<void> = Promise.resolve();
 
 	function schedule(delayMs: number): void {
 		if (stopped) return;
 		if (timer) clearTimeout(timer);
+		scheduledAt = Date.now() + delayMs;
 		timer = setTimeout(startPass, delayMs);
 		timer.unref();
 	}
 
 	function startPass(): void {
 		if (stopped) return;
+		timer = undefined;
+		scheduledAt = undefined;
 		if (running) {
-			runAgain = true;
+			wakeAt = Date.now();
 			return;
 		}
 		running = true;
@@ -94,12 +105,18 @@ export function startGitHubEvidenceWorker(): GitHubEvidenceWorker {
 			.finally(() => {
 				running = false;
 				if (stopped) return;
-				if (runAgain || continueSoon) {
-					runAgain = false;
-					schedule(CONTINUE_DELAY_MS);
-					return;
-				}
-				schedule(POLL_INTERVAL_MS);
+				const requestedDelay =
+					wakeAt === undefined ? Number.POSITIVE_INFINITY : wakeAt - Date.now();
+				wakeAt = undefined;
+				schedule(
+					Math.max(
+						0,
+						Math.min(
+							continueSoon ? CONTINUE_DELAY_MS : POLL_INTERVAL_MS,
+							requestedDelay,
+						),
+					),
+				);
 			});
 	}
 
@@ -110,13 +127,15 @@ export function startGitHubEvidenceWorker(): GitHubEvidenceWorker {
 			if (timer) clearTimeout(timer);
 			await active;
 		},
-		wake() {
+		wake(delayMs = 0) {
 			if (stopped) return;
+			const at = Date.now() + Math.max(0, delayMs);
 			if (running) {
-				runAgain = true;
+				wakeAt = Math.min(wakeAt ?? at, at);
 				return;
 			}
-			schedule(0);
+			if (scheduledAt !== undefined && scheduledAt <= at) return;
+			schedule(at - Date.now());
 		},
 	};
 	registeredWorker = worker;

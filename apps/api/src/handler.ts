@@ -13,6 +13,10 @@ import {
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
 import { handleCustomerActivityRequest } from "./handlers/customer-activity-http.js";
 import { handleGitHubRepositorySetupRequest } from "./handlers/github-repository-evidence-http.js";
+import {
+	GITHUB_WEBHOOK_PATH,
+	handleConfiguredGitHubWebhookRequest,
+} from "./handlers/github-webhook-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
@@ -432,6 +436,9 @@ async function handleRequest(
 	publicLookupSource: string,
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
+	if (url.pathname === GITHUB_WEBHOOK_PATH) {
+		return handleConfiguredGitHubWebhookRequest(request);
+	}
 	if (url.pathname === STRIPE_WEBHOOK_PATH) {
 		const stripeConfig = getStripeWebhookConfig();
 		if (!stripeConfig) {

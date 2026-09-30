@@ -2,5 +2,6 @@
 	"extends": "./api/tsconfig.json",
 	"compilerOptions": {
 		"noCheck": false
-	}
+	},
+	"include": ["api/**/*.ts", "scripts/github-webhook-vercel.integration.ts"]
 }

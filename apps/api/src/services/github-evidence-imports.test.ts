@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 
 test.each([
 	"./github-evidence-persistence.service.ts",
+	"./github-webhook-delivery.service.ts",
+	"../handlers/github-webhook-http.ts",
 	"./pull-request-dashboard.service.ts",
 ])("imports %s without database configuration or module mocks", async (module) => {
 	const environment = { ...process.env };

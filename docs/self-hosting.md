@@ -170,6 +170,7 @@ GITHUB_REPOSITORY_APP_CLIENT_ID="your-github-app-client-id"
 GITHUB_REPOSITORY_APP_CLIENT_SECRET="your-github-app-client-secret"
 GITHUB_REPOSITORY_APP_CALLBACK_URL="https://your-api-domain.com/api/github/setup"
 GITHUB_REPOSITORY_APP_STATE_SECRET="at-least-32-random-characters"
+GITHUB_REPOSITORY_APP_WEBHOOK_SECRET="at-least-32-random-characters"
 ```
 
 `GITHUB_REPOSITORY_APP_STATE_SECRET` may be omitted to use
@@ -203,6 +204,36 @@ after a 256 MiB per-collection budget (recorded as partial coverage), and runs
 at most two collections per API process. Objects are registered in a durable
 intent table before they are written, so an interrupted collection or a
 workspace deletion can always find and remove them.
+
+### GitHub App webhooks (optional)
+
+Webhooks make merges and CI results appear within minutes instead of after the
+daily reconciliation cron. On Vercel, the webhook acknowledges with HTTP 202
+and registers a platform-managed `context.waitUntil` continuation: it waits
+30 seconds plus 1 second of timer slack, then collects only the affected
+collection identities in batches of at most 25 under one 240-second pass
+budget. The function's 300-second maximum duration covers both debounce and
+collection. Concurrent attempts retain the existing reservation and lease
+protection; unfinished work remains durable for the daily cron. Self-hosted
+Bun/Fly servers still wake their resident worker, which otherwise polls every
+five minutes. In the App settings, activate the webhook, set the
+**Webhook URL** to `https://your-api-domain.com/api/webhooks/github`, set the
+**Webhook secret** to the value of `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET`
+(generate it with `openssl rand -hex 32`), and subscribe to **Pull request**,
+**Check suite**, **Workflow run** and **Status**. Installation events are sent
+to every App automatically. No permission beyond the read-only set above is
+required.
+
+The endpoint rejects unsigned or mis-signed requests, deduplicates by
+`X-GitHub-Delivery`, and only schedules work: a pull request or CI event for a
+bound repository pulls the next refresh of the matching session-linked
+collections forward (debounced by 30 seconds), and installation events keep
+installation and repository-binding state current. Events for installations or
+repositories that are not bound to a workspace are dropped without being
+stored, and payloads are never persisted. Added repositories are not bound
+automatically; use **Reconnect**. Without the secret the endpoint responds 503
+and the daily cron remains the only refresh path. The cron also remains the
+fallback for missed deliveries in any configuration.
 
 ## Direct-to-R2 Ingest Lifecycle Backstop
 
@@ -249,6 +280,7 @@ npx wrangler r2 bucket lifecycle list <bucket-name>
 | `GITHUB_REPOSITORY_APP_CLIENT_SECRET` | No | Client secret used for the one-shot user authorization exchange |
 | `GITHUB_REPOSITORY_APP_CALLBACK_URL` | No | Public `/api/github/setup` URL registered as the App Setup and OAuth callback URL |
 | `GITHUB_REPOSITORY_APP_STATE_SECRET` | No | Dedicated 32+ character callback-state secret; defaults to `BETTER_AUTH_SECRET` |
+| `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` | No | 32+ character GitHub App webhook secret; enables `/api/webhooks/github` |
 | `GITHUB_EVIDENCE_UI_ENABLED` | No | Set to `true` to show the Merged PRs dashboard metric and the workspace settings GitHub section. Evidence collection runs regardless; missing or invalid values keep the UI hidden |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |

@@ -325,7 +325,7 @@ async function runCollection(
 		);
 		const failedAt = now();
 		await input.database.unsafe(
-			"UPDATE github_evidence_collection SET status = 'failed', error = $2, completed_at = $3, lease_expires_at = NULL, retry_after = CASE WHEN retry_count < $4 THEN $5::timestamptz ELSE NULL END, refresh_due_at = CASE WHEN session_user_id <> '' AND observation_started_at > $3::timestamptz - INTERVAL '14 days' THEN $3::timestamptz + INTERVAL '1 day' ELSE NULL END, updated_at = $3 WHERE id = $1 AND status = 'collecting'",
+			"UPDATE github_evidence_collection SET status = 'failed', error = $2, completed_at = $3, lease_expires_at = NULL, retry_after = CASE WHEN retry_count < $4 THEN $5::timestamptz ELSE NULL END, refresh_due_at = CASE WHEN session_user_id <> '' AND observation_started_at > $3::timestamptz - INTERVAL '14 days' THEN LEAST(refresh_due_at, $3::timestamptz + INTERVAL '1 day') ELSE NULL END, updated_at = $3 WHERE id = $1 AND status = 'collecting'",
 			[
 				reservation.collectionId,
 				filteredError,
@@ -836,7 +836,7 @@ async function completeCollection(input: {
 				(status) => status.state === "pending",
 			);
 		await transaction.unsafe(
-			"UPDATE github_evidence_collection SET status = $2, coverage = $3::text::jsonb, metadata_object_id = $4, metadata_object_key = $5, metadata_chunks = $10::text::jsonb, error = NULL, completed_at = $6, lease_expires_at = NULL, retry_after = CASE WHEN $2 = 'partial' AND retry_count < $7 THEN $8::timestamptz ELSE NULL END, refresh_due_at = CASE WHEN $9 AND session_user_id <> '' AND observation_started_at > $6::timestamptz - INTERVAL '14 days' THEN $6::timestamptz + INTERVAL '1 day' ELSE NULL END, updated_at = $6 WHERE id = $1 AND status = 'collecting'",
+			"UPDATE github_evidence_collection SET status = $2, coverage = $3::text::jsonb, metadata_object_id = $4, metadata_object_key = $5, metadata_chunks = $10::text::jsonb, error = NULL, completed_at = $6, lease_expires_at = NULL, retry_after = CASE WHEN $2 = 'partial' AND retry_count < $7 THEN $8::timestamptz ELSE NULL END, refresh_due_at = CASE WHEN session_user_id <> '' AND observation_started_at > $6::timestamptz - INTERVAL '14 days' THEN CASE WHEN $9 THEN LEAST(refresh_due_at, $6::timestamptz + INTERVAL '1 day') ELSE refresh_due_at END ELSE NULL END, updated_at = $6 WHERE id = $1 AND status = 'collecting'",
 			[
 				input.collectionId,
 				input.status,

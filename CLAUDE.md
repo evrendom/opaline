@@ -84,6 +84,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `RATE_LIMIT_INGEST_REQUESTS_WINDOW` | No | Per-user fixed ingest request window in seconds; minimum 60 (default: 3,600) |
 | `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-user Postgres-backed ingest byte cap shared by all of the user's API keys (default: 10 GiB) |
 | `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Per-user fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
+| `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` | No | GitHub App webhook secret (32+ characters). Enables the signed `/api/webhooks/github` endpoint that schedules near-real-time PR and CI evidence refreshes; unset keeps the daily cron as the only refresh path. |
 | `RESEND_API_KEY` | No | Resend API key for email integration |
 | `RESEND_AUDIENCE_ID` | No | Resend audience ID for signup contact sync |
 | `VITE_ADMIN_ORGANIZATION_ID` | No | Organization ID whose members have admin panel access |

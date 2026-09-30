@@ -32,6 +32,7 @@ export interface GitHubEvidenceMaintenanceResult {
 
 export async function runGitHubEvidenceCollectionMaintenance(input: {
 	readonly config: GitHubRepositoryAppConfig;
+	readonly collectionIds?: readonly string[];
 	readonly createInstallationToken?: CollectInput["createInstallationToken"];
 	readonly database: postgres.Sql;
 	readonly limit?: number;
@@ -47,13 +48,15 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		);
 	}
 	const now = input.now ?? (() => new Date());
+	const collectionIds = input.collectionIds ? [...input.collectionIds] : null;
 	const agedRefreshes = await input.database.unsafe<Array<{ id: string }>>(
 		`UPDATE github_evidence_collection SET refresh_due_at = NULL
 		 WHERE id IN (SELECT id FROM github_evidence_collection
 		  WHERE refresh_due_at IS NOT NULL AND observation_started_at <= $1::timestamptz - INTERVAL '14 days'
+		  AND ${collectionIdentityScope("github_evidence_collection", 3)}
 		  ORDER BY refresh_due_at LIMIT $2 FOR UPDATE SKIP LOCKED)
 		 RETURNING id`,
-		[now().toISOString(), limit],
+		[now().toISOString(), limit, collectionIds],
 	);
 	await input.database.unsafe(
 		`WITH expired AS (
@@ -62,6 +65,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		   WHERE status = 'collecting'
 		     AND retry_count >= $1
 		     AND lease_expires_at <= $2
+		     AND ${collectionIdentityScope("github_evidence_collection", 4)}
 		   ORDER BY lease_expires_at
 		   LIMIT $3
 		   FOR UPDATE SKIP LOCKED
@@ -72,11 +76,11 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		     completed_at = $2,
 		     lease_expires_at = NULL,
 		     retry_after = NULL,
-		     refresh_due_at = CASE WHEN session_user_id <> '' AND observation_started_at > $2::timestamptz - INTERVAL '14 days' THEN $2::timestamptz + INTERVAL '1 day' ELSE NULL END,
+		     refresh_due_at = CASE WHEN session_user_id <> '' AND observation_started_at > $2::timestamptz - INTERVAL '14 days' THEN LEAST(refresh_due_at, $2::timestamptz + INTERVAL '1 day') ELSE NULL END,
 		     updated_at = $2
 		 FROM expired
 		 WHERE collection.id = expired.id`,
-		[MAX_AUTOMATIC_RETRIES, now().toISOString(), limit],
+		[MAX_AUTOMATIC_RETRIES, now().toISOString(), limit, collectionIds],
 	);
 	const candidates = await input.database.unsafe<
 		GitHubEvidenceMaintenanceCandidate[]
@@ -89,6 +93,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		     OR (candidate.status = 'collecting' AND candidate.lease_expires_at <= $1)
 		   )) OR (candidate.status IN ('complete', 'partial', 'failed') AND candidate.refresh_due_at <= $1
 		     AND candidate.session_user_id <> '' AND candidate.observation_started_at > $1::timestamptz - INTERVAL '14 days'))
+		   AND ${collectionIdentityScope("candidate", 3)}
 		   AND NOT EXISTS (
 		     SELECT 1
 		     FROM github_evidence_collection newer
@@ -101,7 +106,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		   )
 		 ORDER BY coalesce(candidate.retry_after, candidate.refresh_due_at, candidate.lease_expires_at), candidate.created_at
 		 LIMIT $2`,
-		[now().toISOString(), limit],
+		[now().toISOString(), limit, collectionIds],
 	);
 	const exhaustedFailures = await input.database.unsafe<
 		Array<{ present: boolean }>
@@ -111,6 +116,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		   FROM github_evidence_collection exhausted
 		   WHERE exhausted.status = 'failed'
 		     AND exhausted.retry_count >= $1
+		     AND ${collectionIdentityScope("exhausted", 2)}
 		     AND NOT EXISTS (
 		       SELECT 1 FROM github_evidence_collection newer
 		       WHERE newer.organization_id = exhausted.organization_id
@@ -122,7 +128,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		     )
 		   LIMIT 1
 		 ) AS present`,
-		[MAX_AUTOMATIC_RETRIES],
+		[MAX_AUTOMATIC_RETRIES, collectionIds],
 	);
 
 	let succeeded = 0;
@@ -184,4 +190,12 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		hasMore: candidates.length === limit || agedRefreshes.length === limit,
 		succeeded,
 	};
+}
+
+function collectionIdentityScope(alias: string, parameter: number): string {
+	return `($${parameter}::text[] IS NULL OR
+		(${alias}.organization_id, ${alias}.repository_id, ${alias}.commit_sha, ${alias}.session_id, ${alias}.context_id) IN (
+			SELECT organization_id, repository_id, commit_sha, session_id, context_id
+			FROM github_evidence_collection WHERE id = ANY($${parameter}::text[])
+		))`;
 }

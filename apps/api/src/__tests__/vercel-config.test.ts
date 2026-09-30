@@ -56,7 +56,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -103,6 +103,19 @@ describe("Vercel deployment configuration", () => {
 				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/github-evidence$)");
+	});
+
+	test("receives GitHub App webhooks in an isolated function", () => {
+		expect(vercelConfig.functions["api/webhooks/github.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 300,
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!webhooks/github$)");
 	});
 
 	test("runs ClickHouse forward migrations before a production build", () => {

@@ -366,3 +366,45 @@ export const githubEvidenceObjectIntent = pgTable(
 		),
 	],
 );
+
+/**
+ * Durable dedupe ledger for verified GitHub App webhook deliveries that
+ * targeted a bound installation or repository. Raw payloads are never stored:
+ * a row keeps only the delivery identity, routing identifiers and the outcome
+ * of mapping the event onto the evidence collection queue. Deliveries for
+ * unbound installations or repositories are dropped without a row.
+ */
+export const githubWebhookDelivery = pgTable(
+	"github_webhook_delivery",
+	{
+		deliveryId: text("delivery_id").primaryKey(),
+		organizationId: text("organization_id")
+			.notNull()
+			.references(() => organization.id, { onDelete: "cascade" }),
+		installationId: text("installation_id").notNull(),
+		repositoryId: text("repository_id"),
+		event: text("event").notNull(),
+		action: text("action").default("").notNull(),
+		outcome: text("outcome").notNull(),
+		affectedRows: integer("affected_rows").default(0).notNull(),
+		receivedAt: timestamp("received_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("github_webhook_delivery_received_idx").on(table.receivedAt),
+		index("github_webhook_delivery_organization_idx").on(table.organizationId),
+		check(
+			"github_webhook_delivery_id_check",
+			sql`${table.deliveryId} ~ '^[A-Za-z0-9-]{1,64}$'`,
+		),
+		check(
+			"github_webhook_delivery_outcome_check",
+			sql`${table.outcome} IN ('refresh_scheduled', 'installation_updated', 'no_op')`,
+		),
+		check(
+			"github_webhook_delivery_affected_rows_check",
+			sql`${table.affectedRows} >= 0`,
+		),
+	],
+);

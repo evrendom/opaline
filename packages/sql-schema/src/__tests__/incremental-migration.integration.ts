@@ -18,13 +18,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0045 to a database already migrated through 0019, main's 0043, and repository evidence 0044", async () => {
+test("applies migrations 0020-0046 to a database already migrated through 0019, main's 0043, repository evidence 0044, and GitHub evidence 0045", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0045_github_repository_evidence");
+	expect(latestMigration?.tag).toBe("0046_github_webhook_delivery");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -35,6 +35,7 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 	const migrationsThrough0019 = await createMigrationsThrough(19);
 	const migrationsThrough0043 = await createMigrationsThrough(43);
 	const migrationsThrough0044 = await createMigrationsThrough(44);
+	const migrationsThrough0045 = await createMigrationsThrough(45);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -88,10 +89,15 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 				SELECT to_regclass('public.github_evidence_collection')::text AS name
 			`;
 			expect(githubBefore0045?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0045 });
+			const [webhookBefore0046] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.github_webhook_delivery')::text AS name
+			`;
+			expect(webhookBefore0046?.name).toBeNull();
 
 			await migrate(database, { migrationsFolder });
 
-			const [after0045] = await migrationSql<MigrationState[]>`
+			const [after0046] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -100,8 +106,8 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0045).toEqual({
-				count: 46,
+			expect(after0046).toEqual({
+				count: 47,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [customerAccountTable] = await migrationSql<TableState[]>`
@@ -225,6 +231,7 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 					('github_evidence_object_intent'),
 					('github_pull_request_snapshot'),
 					('github_repository_binding'),
+					('github_webhook_delivery'),
 					('repository_evidence_capture'),
 					('repository_evidence_object'),
 					('repository_evidence_upload'),
@@ -256,6 +263,7 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 				WHERE conname IN (
 					'clickhouse_purge_object_purge_job_id_clickhouse_purge_job_id_fk',
 					'github_app_installation_installed_by_user_id_user_id_fk',
+					'github_webhook_delivery_organization_id_organization_id_fk',
 					'repository_evidence_upload_object_object_fk'
 				)
 				ORDER BY conname
@@ -269,6 +277,11 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 				{
 					name: "github_app_installation_installed_by_user_id_user_id_fk",
 					onDelete: "set null",
+					onUpdate: "no action",
+				},
+				{
+					name: "github_webhook_delivery_organization_id_organization_id_fk",
+					onDelete: "cascade",
 					onUpdate: "no action",
 				},
 				{
@@ -475,6 +488,7 @@ test("applies migrations 0020-0045 to a database already migrated through 0019, 
 		await rm(migrationsThrough0019, { force: true, recursive: true });
 		await rm(migrationsThrough0043, { force: true, recursive: true });
 		await rm(migrationsThrough0044, { force: true, recursive: true });
+		await rm(migrationsThrough0045, { force: true, recursive: true });
 	}
 });
 
