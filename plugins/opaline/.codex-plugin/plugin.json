@@ -15,7 +15,7 @@
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "Opaline",
-		"shortDescription": "Coding agent costs & sessions",
+		"shortDescription": "Analyze your agent sessions",
 		"longDescription": "Opaline indexes the Claude Code and Codex sessions you and your team upload with the Opaline CLI. Ask what your coding agents cost and which members, repositories and models drove it, list and open past sessions down to individual turns, see which skills get used, and check whether an error has come up before. The Opaline dashboard also opens from the sidebar.\n\nOpaline only reads data from workspaces your Opaline account belongs to, and it cannot change or delete your sessions or workspace data. Sessions must be uploaded with the Opaline CLI first; the plugin walks you through that after installation.",
 		"developerName": "Opaline",
 		"category": "Developer Tools",
@@ -37,9 +37,7 @@
 		"brandColor": "#1F1F1F",
 		"brandColorDark": "#ECECEC",
 		"composerIcon": "./assets/opaline.png",
-		"composerIconDark": "./assets/opaline-dark.png",
 		"logo": "./assets/opaline.png",
-		"logoDark": "./assets/opaline-dark.png",
 		"screenshots": []
 	},
 	"extensions": {
