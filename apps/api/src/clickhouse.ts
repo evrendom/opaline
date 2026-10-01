@@ -722,6 +722,7 @@ export function getClickhouse(): ClickHouseExecutor {
 							deduplicationToken,
 						});
 					} catch (error) {
+						if (params.abortSignal?.aborted) throw error;
 						if (attempt === maxRetries - 1) {
 							logger.error(
 								"Insert into {table} failed after {maxRetries} attempts: {error}",

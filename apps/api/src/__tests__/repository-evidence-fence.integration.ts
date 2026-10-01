@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import {
 	type RepositoryEvidenceInitInput,
 	RepositoryEvidenceInitInputSchema,
 	type RepositoryEvidenceObjectDescriptor,
 } from "@rudel/api-routes";
+import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import {
@@ -22,6 +24,11 @@ import {
 } from "../services/repository-evidence.service.js";
 import { EVIDENCE_R2_CONCURRENCY } from "../services/repository-evidence-batching.js";
 import { sweepRepositoryEvidence } from "../services/repository-evidence-fence.service.js";
+import { buildRepositoryEvidenceIndexRow } from "../services/repository-evidence-index.service.js";
+import {
+	publishRepositoryEvidenceIndexAfterCommit,
+	runRepositoryEvidenceIndexPublisherPass,
+} from "../services/repository-evidence-index-publication.service.js";
 import { deleteUserPostgresData } from "../services/user-deletion.service.js";
 import {
 	FakeEvidenceR2,
@@ -172,7 +179,10 @@ function newEvidence(
 	payloadContent: string,
 ) {
 	const manifest = buildObject(
-		JSON.stringify({ unique: crypto.randomUUID() }),
+		JSON.stringify({
+			unique: crypto.randomUUID(),
+			contextIndex: { facets: [], skills: [] },
+		}),
 		"context-manifest",
 	);
 	const payload = buildObject(payloadContent, "source-blob");
@@ -217,7 +227,13 @@ async function uploadAndCommit(input: {
 		},
 		now: () => new Date(),
 		organizationId: input.organizationId,
-		prepareIndex: () => "prepared",
+		prepareIndex: (evidence) =>
+			buildRepositoryEvidenceIndexRow(
+				evidence.input,
+				evidence.manifest,
+				new Date(),
+				input.userId,
+			),
 		r2: input.r2,
 		randomUUID: () => crypto.randomUUID(),
 		userId: input.userId,
@@ -249,6 +265,310 @@ async function countRows(sql: string, parameters: string[]): Promise<number> {
 	);
 	return row?.count ?? 0;
 }
+
+async function initializeForPublication(name: string) {
+	const fixture = await createFixture(name);
+	const r2 = new FakeEvidenceR2();
+	const evidence = newEvidence(
+		fixture.organizationId,
+		`${RUN_ID}-${name}`,
+		"publication",
+	);
+	const initialized = await initialize(fixture, fixture.victimId, evidence, r2);
+	return {
+		fixture,
+		evidence,
+		initialized,
+		organizationId: fixture.organizationId,
+		r2,
+		userId: fixture.victimId,
+		contextId: evidence.input.capture.contextId,
+		database: sqlClient,
+	};
+}
+
+async function commitForPublication(name: string) {
+	const input = await initializeForPublication(name);
+	return { ...input, committed: await uploadAndCommit(input) };
+}
+
+async function readPublication(organizationId: string) {
+	const [row] = await sqlClient.unsafe<
+		Array<{
+			indexRow: unknown;
+			publishedAt: string | null;
+			nextAttemptAt: string;
+		}>
+	>(
+		`SELECT index_row AS "indexRow", index_published_at::text AS "publishedAt",
+		 index_next_attempt_at::text AS "nextAttemptAt" FROM repository_evidence_capture
+		 WHERE organization_id = $1`,
+		[organizationId],
+	);
+	assert(row);
+	return row;
+}
+
+async function makePublicationDue(organizationId: string) {
+	await sqlClient.unsafe(
+		"UPDATE repository_evidence_capture SET index_next_attempt_at = NOW() WHERE organization_id = $1",
+		[organizationId],
+	);
+}
+
+async function countPublished(organizationId: string) {
+	const [row] = await getClickhouse().query<{ count: number }>({
+		query: `SELECT count() AS count FROM rudel.repository_session_evidence_index FINAL
+		 WHERE organization_id = {organizationId:String} SETTINGS max_execution_time=10`,
+		query_params: { organizationId },
+	});
+	assert(row);
+	return row.count;
+}
+
+describe("durable repository evidence index publication", () => {
+	test("quarantines a permanently invalid stored row without holding back healthy rows", async () => {
+		const poisoned = await commitForPublication("poison-index");
+		const healthy = await commitForPublication("healthy-index");
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_capture SET index_published_at = NULL, index_next_attempt_at = NOW() WHERE organization_id = ANY($1::text[])",
+			[[poisoned.organizationId, healthy.organizationId]],
+		);
+		await sqlClient.unsafe(
+			`UPDATE repository_evidence_capture SET index_row = '{"context_id":"not-a-uuid"}'::jsonb WHERE organization_id = $1`,
+			[poisoned.organizationId],
+		);
+		for (let pass = 0; pass < 2; pass += 1) {
+			await runRepositoryEvidenceIndexPublisherPass({
+				database: sqlClient,
+				clickhouse: getClickhouse(),
+			});
+			await makePublicationDue(healthy.organizationId);
+		}
+		expect(await countPublished(healthy.organizationId)).toBe(1);
+		expect(
+			(await readPublication(healthy.organizationId)).publishedAt,
+		).not.toBeNull();
+		const quarantined = await readPublication(poisoned.organizationId);
+		expect(quarantined.publishedAt).toBeNull();
+		expect(String(quarantined.nextAttemptAt)).toContain("infinity");
+		expect(await countPublished(poisoned.organizationId)).toBe(0);
+	});
+
+	test("publishes healthy rows one by one when ClickHouse rejects the batch", async () => {
+		const first = await commitForPublication("isolated-index-a");
+		const second = await commitForPublication("isolated-index-b");
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_capture SET index_published_at = NULL, index_next_attempt_at = NOW() WHERE organization_id = ANY($1::text[])",
+			[[first.organizationId, second.organizationId]],
+		);
+		const clickhouse = getClickhouse();
+		const pass = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse: {
+				...clickhouse,
+				insert: (params: Parameters<typeof clickhouse.insert>[0]) => {
+					const rows = params.values as Array<{ organization_id: string }>;
+					if (rows.some((row) => row.organization_id === first.organizationId))
+						return Promise.reject(new Error("ClickHouse rejected the row"));
+					return clickhouse.insert(params);
+				},
+			},
+		});
+		expect(pass.published).toBeGreaterThanOrEqual(1);
+		expect(await countPublished(second.organizationId)).toBe(1);
+		expect(await countPublished(first.organizationId)).toBe(0);
+		const deferred = await readPublication(first.organizationId);
+		expect(deferred.publishedAt).toBeNull();
+		expect(new Date(deferred.nextAttemptAt).getTime()).toBeGreaterThan(
+			Date.now() + 50_000,
+		);
+	});
+
+	test("publishes many pending captures with one ClickHouse insert", async () => {
+		const first = await commitForPublication("batch-index-a");
+		const second = await commitForPublication("batch-index-b");
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_capture SET index_published_at = NULL, index_next_attempt_at = NOW() WHERE organization_id = ANY($1::text[])",
+			[[first.organizationId, second.organizationId]],
+		);
+		const clickhouse = getClickhouse();
+		let inserts = 0;
+		const pass = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse: {
+				...clickhouse,
+				insert: (params: Parameters<typeof clickhouse.insert>[0]) => {
+					inserts += 1;
+					return clickhouse.insert(params);
+				},
+			},
+		});
+		expect(pass.published).toBeGreaterThanOrEqual(2);
+		expect(inserts).toBe(1);
+		expect(await countPublished(first.organizationId)).toBe(1);
+		expect(await countPublished(second.organizationId)).toBe(1);
+	});
+
+	test("commits successfully with an insert slower than three seconds and publishes in a later pass", async () => {
+		const input = await initializeForPublication("slow-index");
+		const clickhouse = getClickhouse();
+		let aborted = false;
+		const slowExecutor = {
+			...clickhouse,
+			async insert(params: Parameters<typeof clickhouse.insert>[0]) {
+				assert(params.abortSignal);
+				params.abortSignal.addEventListener(
+					"abort",
+					() => {
+						aborted = true;
+					},
+					{ once: true },
+				);
+				await delay(10_000, undefined, { signal: params.abortSignal });
+				await clickhouse.insert(params);
+			},
+		};
+		const startedAt = performance.now();
+		const committed = await uploadAndCommit(input);
+		await assertNoClickHousePurgeTombstone(input, { database: sqlClient });
+		await publishRepositoryEvidenceIndexAfterCommit({
+			...input,
+			clickhouse: slowExecutor,
+		});
+		expect(performance.now() - startedAt).toBeLessThan(5_000);
+		expect(aborted).toBe(true);
+		expect(committed.output.status).toBe("accepted");
+		const pending = await readPublication(input.organizationId);
+		expect(pending.indexRow).toEqual(committed.preparedIndex);
+		expect(pending.publishedAt).toBeNull();
+		expect(await countPublished(input.organizationId)).toBe(0);
+		await makePublicationDue(input.organizationId);
+		const pass = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse,
+		});
+		expect(pass.published).toBe(1);
+		expect(
+			(await readPublication(input.organizationId)).publishedAt,
+		).not.toBeNull();
+		expect(await countPublished(input.organizationId)).toBe(1);
+	});
+
+	test("keeps the commit successful when inline publication fails", async () => {
+		const input = await commitForPublication("scheduling-failure");
+		const clickhouse = getClickhouse();
+		await publishRepositoryEvidenceIndexAfterCommit({
+			...input,
+			clickhouse: {
+				...clickhouse,
+				insert: (params) =>
+					clickhouse.insert({
+						...params,
+						values: [{ ...params.values[0], context_id: "not-a-uuid" }],
+					}),
+			},
+		});
+		expect(input.committed.output.status).toBe("accepted");
+		expect(
+			(await readPublication(input.organizationId)).publishedAt,
+		).toBeNull();
+		await makePublicationDue(input.organizationId);
+		expect((await runRepositoryEvidenceIndexPublisherPass()).published).toBe(1);
+		expect(await countPublished(input.organizationId)).toBe(1);
+	});
+
+	test("backs off a real ClickHouse failure and eventually publishes the same prepared row", async () => {
+		const input = await commitForPublication("failed-index");
+		const clickhouse = getClickhouse();
+		const failingExecutor = {
+			...clickhouse,
+			insert: (params: Parameters<typeof clickhouse.insert>[0]) =>
+				clickhouse.insert({
+					...params,
+					values: [{ ...params.values[0], context_id: "not-a-uuid" }],
+				}),
+		};
+		const failed = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse: failingExecutor,
+		});
+		expect(failed).toMatchObject({
+			attempted: 1,
+			published: 0,
+			hasMore: false,
+		});
+		const pending = await readPublication(input.organizationId);
+		expect(pending.publishedAt).toBeNull();
+		expect(new Date(pending.nextAttemptAt).getTime()).toBeGreaterThan(
+			Date.now() + 50_000,
+		);
+		expect(await countPublished(input.organizationId)).toBe(0);
+		const deferred = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse,
+		});
+		expect(deferred.attempted).toBe(0);
+		await makePublicationDue(input.organizationId);
+		const retried = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse,
+		});
+		expect(retried.published).toBe(1);
+		expect((await readPublication(input.organizationId)).indexRow).toEqual(
+			input.committed.preparedIndex,
+		);
+		expect(
+			(await readPublication(input.organizationId)).publishedAt,
+		).not.toBeNull();
+		expect(await countPublished(input.organizationId)).toBe(1);
+	});
+
+	test.each([
+		"account",
+		"organization",
+	])("drops publication when a %s purge tombstone exists", async (targetType) => {
+		const input = await commitForPublication(`purged-index-${targetType}`);
+		await sqlClient.unsafe(
+			"INSERT INTO clickhouse_purge_job (id, target_type, target_id, max_attempts) VALUES ($1, $2, $3, 5)",
+			[
+				crypto.randomUUID(),
+				targetType,
+				targetType === "account"
+					? input.fixture.victimId
+					: input.organizationId,
+			],
+		);
+		const pass = await runRepositoryEvidenceIndexPublisherPass({
+			database: sqlClient,
+			clickhouse: getClickhouse(),
+		});
+		expect(pass).toMatchObject({ attempted: 1, published: 0, hasMore: false });
+		const dropped = await readPublication(input.organizationId);
+		expect(dropped.indexRow).toBeNull();
+		expect(dropped.publishedAt).toBeNull();
+		expect(await countPublished(input.organizationId)).toBe(0);
+	});
+
+	test("publishes inline on the fast path", async () => {
+		const input = await commitForPublication("fast-index");
+		await publishRepositoryEvidenceIndexAfterCommit({
+			...input,
+			clickhouse: getClickhouse(),
+		});
+		expect(input.committed.output.status).toBe("accepted");
+		expect(
+			(await readPublication(input.organizationId)).publishedAt,
+		).not.toBeNull();
+		expect(await countPublished(input.organizationId)).toBe(1);
+		await publishRepositoryEvidenceIndexAfterCommit({
+			...input,
+			clickhouse: getClickhouse(),
+		});
+		expect(await countPublished(input.organizationId)).toBe(1);
+		expect((await runRepositoryEvidenceIndexPublisherPass()).attempted).toBe(0);
+	});
+});
 
 describe("repository evidence session ownership", () => {
 	test("rejects evidence for a session owned by another member before reserving anything", async () => {

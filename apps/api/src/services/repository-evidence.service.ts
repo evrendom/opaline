@@ -11,6 +11,7 @@ import {
 	type RepositoryEvidenceObjectDescriptor,
 	type RepositoryEvidenceUploadObject,
 } from "@rudel/api-routes";
+import type { RudelRepositorySessionEvidenceIndexRow } from "@rudel/ch-schema/generated";
 import type postgres from "postgres";
 import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import { toPostgresJson } from "./postgres-json.js";
@@ -223,24 +224,24 @@ export async function initRepositoryEvidence(
 	}
 }
 
-export interface CommitRepositoryEvidenceOptions<TPreparedIndex> {
+export interface CommitRepositoryEvidenceOptions {
 	readonly database: postgres.Sql;
 	readonly input: RepositoryEvidenceCommitInput;
 	readonly now: () => Date;
 	readonly organizationId: string;
 	readonly prepareIndex: (
 		evidence: RepositoryEvidenceForIndex,
-	) => TPreparedIndex;
+	) => RudelRepositorySessionEvidenceIndexRow;
 	readonly r2: R2MultipartUploadClient;
 	readonly randomUUID: () => string;
 	readonly signal?: AbortSignal;
 	readonly userId: string;
 }
 
-export interface CommitRepositoryEvidenceResult<TPreparedIndex> {
+export interface CommitRepositoryEvidenceResult {
 	readonly evidence: RepositoryEvidenceForIndex;
 	readonly output: RepositoryEvidenceCommitOutput;
-	readonly preparedIndex: TPreparedIndex;
+	readonly preparedIndex: RudelRepositorySessionEvidenceIndexRow;
 }
 
 export interface RepositoryEvidenceForIndex {
@@ -299,10 +300,10 @@ async function readVerifiedEvidenceFromPlan(input: {
 	};
 }
 
-function prepareRepositoryEvidenceIndex<TPreparedIndex>(
+function prepareRepositoryEvidenceIndex(
 	evidence: RepositoryEvidenceForIndex,
-	prepareIndex: (evidence: RepositoryEvidenceForIndex) => TPreparedIndex,
-): TPreparedIndex {
+	prepareIndex: CommitRepositoryEvidenceOptions["prepareIndex"],
+): RudelRepositorySessionEvidenceIndexRow {
 	try {
 		return prepareIndex(evidence);
 	} catch {
@@ -313,9 +314,9 @@ function prepareRepositoryEvidenceIndex<TPreparedIndex>(
 	}
 }
 
-export async function commitRepositoryEvidence<TPreparedIndex>(
-	options: CommitRepositoryEvidenceOptions<TPreparedIndex>,
-): Promise<CommitRepositoryEvidenceResult<TPreparedIndex>> {
+export async function commitRepositoryEvidence(
+	options: CommitRepositoryEvidenceOptions,
+): Promise<CommitRepositoryEvidenceResult> {
 	assertOrganization(options.input.organizationId, options.organizationId);
 	const upload = await findUploadById(
 		options.input.uploadReceiptId,
@@ -528,11 +529,11 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 				provider, provider_host, provider_repository_id,
 				provider_repository_node_id, provider_owner, provider_name,
 				session_id, run_id, segment_id, agent_id, parent_agent_id, source,
-				lifecycle, base_git_commit, head_git_commit, captured_at, coverage
+				lifecycle, base_git_commit, head_git_commit, captured_at, coverage, index_row
 			) VALUES (
 				$1, $2, $3, $4, $5, $6, $7, $8,
 				$9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-				$21, $22, $23, $24, $25::text::jsonb
+				$21, $22, $23, $24, $25::text::jsonb, $26::text::jsonb
 			) ON CONFLICT (organization_id, context_id) DO NOTHING`,
 			[
 				options.organizationId,
@@ -560,6 +561,7 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 				plan.input.capture.headGitCommit,
 				plan.input.capture.timing.captureCompletedAt,
 				JSON.stringify(plan.input.coverage),
+				JSON.stringify(preparedIndex),
 			],
 		);
 		await transaction.unsafe(

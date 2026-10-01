@@ -48,10 +48,27 @@ const FACET_COVERAGE = new Set([
 export async function persistRepositoryEvidenceIndex(input: {
 	readonly clickhouse: ClickHouseExecutor;
 	readonly row: RudelRepositorySessionEvidenceIndexRow;
+	readonly signal?: AbortSignal;
 }): Promise<void> {
+	await persistRepositoryEvidenceIndexRows({
+		clickhouse: input.clickhouse,
+		rows: [input.row],
+		signal: input.signal,
+	});
+}
+
+export async function persistRepositoryEvidenceIndexRows(input: {
+	readonly clickhouse: ClickHouseExecutor;
+	readonly rows: readonly RudelRepositorySessionEvidenceIndexRow[];
+	readonly signal?: AbortSignal;
+}): Promise<void> {
+	if (input.rows.length === 0) return;
 	await ingestRudelRepositorySessionEvidenceIndex(
-		input.clickhouse,
-		[input.row],
+		{
+			insert: (params) =>
+				input.clickhouse.insert({ ...params, abortSignal: input.signal }),
+		},
+		[...input.rows],
 		{
 			validate: true,
 		},

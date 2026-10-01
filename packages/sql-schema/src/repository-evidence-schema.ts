@@ -188,6 +188,13 @@ export const repositoryEvidenceCapture = pgTable(
 		headGitCommit: text("head_git_commit"),
 		capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
 		coverage: jsonb("coverage").notNull(),
+		indexRow: jsonb("index_row"),
+		indexPublishedAt: timestamp("index_published_at", { withTimezone: true }),
+		indexNextAttemptAt: timestamp("index_next_attempt_at", {
+			withTimezone: true,
+		})
+			.defaultNow()
+			.notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -198,6 +205,11 @@ export const repositoryEvidenceCapture = pgTable(
 			name: "repository_evidence_capture_pkey",
 		}),
 		uniqueIndex("repository_evidence_capture_upload_uidx").on(table.uploadId),
+		index("repository_evidence_capture_index_pending_idx")
+			.on(table.createdAt)
+			.where(
+				sql`${table.indexPublishedAt} IS NULL AND ${table.indexRow} IS NOT NULL`,
+			),
 		index("repository_evidence_capture_session_idx").on(
 			table.organizationId,
 			table.sessionId,

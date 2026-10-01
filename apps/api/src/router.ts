@@ -181,10 +181,8 @@ import {
 	initRepositoryEvidence,
 	RepositoryEvidenceStateError,
 } from "./services/repository-evidence.service.js";
-import {
-	buildRepositoryEvidenceIndexRow,
-	persistRepositoryEvidenceIndex,
-} from "./services/repository-evidence-index.service.js";
+import { buildRepositoryEvidenceIndexRow } from "./services/repository-evidence-index.service.js";
+import { publishRepositoryEvidenceIndexAfterCommit } from "./services/repository-evidence-index-publication.service.js";
 import {
 	createPostgresRepositoryBindingLookup,
 	RepositoryEvidenceRepositoryBindingError,
@@ -1691,9 +1689,11 @@ const repositoryEvidenceCommit = os.repositoryEvidence.commit
 				{ organizationId, userId: context.user.id },
 				{ database: sqlClient },
 			);
-			await persistRepositoryEvidenceIndex({
+			await publishRepositoryEvidenceIndexAfterCommit({
 				clickhouse: getClickhouse(),
-				row: committed.preparedIndex,
+				database: sqlClient,
+				organizationId,
+				contextId: committed.output.contextId,
 			});
 			const provider = committed.evidence.input.repository.provider;
 			const commitSha = committed.evidence.input.capture.headGitCommit;

@@ -18,13 +18,15 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0047 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, and GitHub webhook delivery 0046", async () => {
+test("applies migrations 0020-0048 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, and GitHub webhook delivery 0046", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0047_mcp_oauth");
+	expect(latestMigration?.tag).toBe(
+		"0048_repository_evidence_index_publication",
+	);
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -131,9 +133,22 @@ test("applies migrations 0020-0047 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0047).toEqual({
-				count: 48,
+				count: 49,
 				latestTimestamp: String(latestMigration?.when),
 			});
+			const publicationColumns = await migrationSql<Array<{ name: string }>>`
+				SELECT column_name AS name
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'repository_evidence_capture'
+					AND column_name IN ('index_row', 'index_published_at', 'index_next_attempt_at')
+				ORDER BY column_name
+			`;
+			expect(publicationColumns.map((column) => column.name)).toEqual([
+				"index_next_attempt_at",
+				"index_published_at",
+				"index_row",
+			]);
 			const [customerAccountTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.customer_account_snapshot')::text AS name
 			`;

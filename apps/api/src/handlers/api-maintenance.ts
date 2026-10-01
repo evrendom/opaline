@@ -16,6 +16,7 @@ import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
 } from "../services/r2-ingest-storage.service.js";
+import { runRepositoryEvidenceIndexPublisherPass } from "../services/repository-evidence-index-publication.service.js";
 import { reconcileSessionLanguageSignalsUntilCaughtUp } from "../services/session-language-signal-reconciliation.service.js";
 import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
 import { runTranscriptRecordsRetirementPass } from "../services/transcript-records-retirement.service.js";
@@ -28,6 +29,7 @@ const MAINTENANCE_MAX_PASSES_PER_STEP = 50;
 const MAINTENANCE_INVOCATION_BUDGET_MS = 270_000;
 const CLICKHOUSE_PURGE_BUDGET_MS = 90_000;
 const R2_INGEST_BUDGET_MS = 90_000;
+const REPOSITORY_EVIDENCE_INDEX_BUDGET_MS = 60_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
@@ -57,11 +59,28 @@ export async function handleR2IngestMaintenanceRequest(
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	try {
-		const result = await runR2Maintenance({
+		const invocationDeadline = {
 			deadlineAt: Date.now() + MAINTENANCE_INVOCATION_BUDGET_MS,
 			now: Date.now,
-		});
-		return Response.json(result);
+		};
+		// Transcript ingest retries come first; the evidence index is derived.
+		const result = await runR2Maintenance(invocationDeadline);
+		const repositoryEvidenceIndex = await runMaintenanceStep(
+			"repository-evidence-index",
+			() =>
+				runRepositoryEvidenceIndexPublisherPass({
+					deadline: createMaintenanceQueueDeadline(
+						invocationDeadline,
+						REPOSITORY_EVIDENCE_INDEX_BUDGET_MS,
+					),
+				}),
+		);
+		return Response.json(
+			{ ...result, repositoryEvidenceIndex },
+			{
+				status: repositoryEvidenceIndex.status === "ok" ? 200 : 500,
+			},
+		);
 	} catch (error) {
 		logger.error("R2 ingest maintenance failed: {error}", {
 			error: String(error),
@@ -80,6 +99,16 @@ async function runApiMaintenance() {
 	};
 	const clickHousePurge = await runMaintenanceStep("clickhouse-purge", () =>
 		runClickHouseMaintenance(invocationDeadline),
+	);
+	const repositoryEvidenceIndex = await runMaintenanceStep(
+		"repository-evidence-index",
+		() =>
+			runRepositoryEvidenceIndexPublisherPass({
+				deadline: createMaintenanceQueueDeadline(
+					invocationDeadline,
+					REPOSITORY_EVIDENCE_INDEX_BUDGET_MS,
+				),
+			}),
 	);
 	const r2Ingest = await runMaintenanceStep("r2-ingest", () =>
 		runR2Maintenance(invocationDeadline),
@@ -108,8 +137,10 @@ async function runApiMaintenance() {
 	return {
 		clickHousePurge,
 		languageSignals,
+		repositoryEvidenceIndex,
 		ok:
 			clickHousePurge.status === "ok" &&
+			repositoryEvidenceIndex.status === "ok" &&
 			r2Ingest.status === "ok" &&
 			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok" &&
