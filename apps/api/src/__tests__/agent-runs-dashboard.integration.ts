@@ -257,7 +257,11 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect(mergedView.metrics.sessions?.total).toBe(
 		sessionsView.metrics.sessions?.total,
 	);
-	expect(mergedView.metrics.cost?.total).toBe(sessionsView.metrics.cost?.total);
+	expect(sessionsView.metrics.cost.total).toBeCloseTo(0.00084, 12);
+	expect(mergedView.metrics.cost.total).toBeCloseTo(
+		sessionsView.metrics.cost.total,
+		12,
+	);
 });
 
 async function seedPullRequestActivity(

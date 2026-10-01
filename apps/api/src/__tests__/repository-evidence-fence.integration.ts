@@ -758,17 +758,22 @@ describe("repository evidence sweeper", () => {
 			sqlClient,
 			r2,
 		);
+		const liveSweepNow = new Date();
 		await sqlClient.unsafe(
-			"UPDATE repository_evidence_upload_intent SET due_at = NOW() WHERE upload_receipt_id = $1",
-			[victimInit.uploadReceiptId],
+			"UPDATE repository_evidence_upload_intent SET due_at = $2 WHERE upload_receipt_id = $1",
+			[victimInit.uploadReceiptId, liveSweepNow.toISOString()],
 		);
-		await sweepRepositoryEvidence({ database: sqlClient, r2 });
+		await sweepRepositoryEvidence({
+			database: sqlClient,
+			r2,
+			now: liveSweepNow,
+		});
 		expect(r2.uploads.has(unknownUpload.uploadId)).toBe(true);
 		expect(r2.uploads.has(survivorUpload.uploadId)).toBe(true);
 		expect(
 			await countRows(
-				"SELECT COUNT(*)::int AS count FROM repository_evidence_upload_intent WHERE upload_receipt_id = $1 AND upload_id IS NULL",
-				[victimInit.uploadReceiptId],
+				"SELECT COUNT(*)::int AS count FROM repository_evidence_upload_intent WHERE upload_receipt_id = $1 AND upload_id IS NULL AND due_at > $2",
+				[victimInit.uploadReceiptId, liveSweepNow.toISOString()],
 			),
 		).toBe(1);
 		await uploadAndCommit({
@@ -779,11 +784,16 @@ describe("repository evidence sweeper", () => {
 			userId: fixture.survivorId,
 		});
 		await deleteUserPostgresData(fixture.survivorId, { sqlClient });
+		const removedSweepNow = new Date();
 		await sqlClient.unsafe(
-			"UPDATE repository_evidence_upload_intent SET due_at = NOW() WHERE upload_receipt_id = $1",
-			[victimInit.uploadReceiptId],
+			"UPDATE repository_evidence_upload_intent SET due_at = $2 WHERE upload_receipt_id = $1",
+			[victimInit.uploadReceiptId, removedSweepNow.toISOString()],
 		);
-		await sweepRepositoryEvidence({ database: sqlClient, r2 });
+		await sweepRepositoryEvidence({
+			database: sqlClient,
+			r2,
+			now: removedSweepNow,
+		});
 		expect(r2.abortedUploadIds).toContain(unknownUpload.uploadId);
 		expect(r2.abortedUploadIds).not.toContain(survivorUpload.uploadId);
 		expect(
