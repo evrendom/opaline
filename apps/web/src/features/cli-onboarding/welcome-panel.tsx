@@ -67,16 +67,25 @@ export function WelcomeBack({
 	);
 }
 
-export function WelcomeProgress({ step }: { step: 1 | 2 | 3 | 4 }) {
+export function WelcomeProgress({
+	step,
+	includeGitHub = false,
+}: {
+	step: 1 | 2 | 3 | 4 | 5;
+	includeGitHub?: boolean;
+}) {
+	const steps = includeGitHub
+		? ["Sign in", "Workspace", "GitHub", "Profile", "Invite"]
+		: STEPS;
 	const target = useContext(ProgressTarget);
 	if (!target) return null;
 	return createPortal(
 		<nav
 			className="cli-welcome-progress"
-			aria-label={`Step ${step} of 4: ${STEPS[step - 1]}`}
+			aria-label={`Step ${step} of ${steps.length}: ${steps[step - 1]}`}
 		>
 			<ol aria-label="Setup progress">
-				{STEPS.map((label, index) => (
+				{steps.map((label, index) => (
 					<li
 						key={label}
 						aria-label={label}

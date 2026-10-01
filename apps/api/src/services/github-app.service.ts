@@ -35,6 +35,7 @@ export interface GitHubRepositoryAppUserAuthorizationConfig {
 }
 
 export interface GitHubInstallState {
+	readonly returnTo: "settings" | "onboarding";
 	readonly organizationId: string;
 	readonly userId: string;
 	readonly workspaceSlug: string;
@@ -194,7 +195,31 @@ export function verifyGitHubAppJwtForTests(
 	);
 }
 
+export async function uninstallGitHubInstallation(input: {
+	readonly config: GitHubRepositoryAppConfig;
+	readonly installationId: string;
+	readonly fetch?: typeof globalThis.fetch;
+}): Promise<void> {
+	assertInstallationId(input.installationId);
+	const response = await (input.fetch ?? globalThis.fetch)(
+		`${GITHUB_API}/app/installations/${input.installationId}`,
+		{
+			method: "DELETE",
+			headers: {
+				Accept: "application/vnd.github+json",
+				Authorization: `Bearer ${createGitHubAppJwt(input.config)}`,
+				"X-GitHub-Api-Version": GITHUB_API_VERSION,
+				"User-Agent": "opaline-repository-evidence/1",
+			},
+		},
+	);
+	if (!response.ok && response.status !== 404) {
+		throw new Error(`GitHub uninstall failed with HTTP ${response.status}`);
+	}
+}
+
 export function createGitHubInstallationUrl(input: {
+	readonly returnTo?: "settings" | "onboarding";
 	readonly config: GitHubRepositoryAppConfig;
 	readonly organizationId: string;
 	readonly stateSecret: string;
@@ -204,6 +229,7 @@ export function createGitHubInstallationUrl(input: {
 	readonly nonce?: string;
 }): string {
 	const state = createGitHubInstallState({
+		returnTo: input.returnTo,
 		organizationId: input.organizationId,
 		stateSecret: input.stateSecret,
 		userId: input.userId,
@@ -219,6 +245,7 @@ export function createGitHubInstallationUrl(input: {
 }
 
 export function createGitHubInstallState(input: {
+	readonly returnTo?: "settings" | "onboarding";
 	readonly organizationId: string;
 	readonly stateSecret: string;
 	readonly userId: string;
@@ -231,6 +258,7 @@ export function createGitHubInstallState(input: {
 	}
 	const nowSeconds = Math.floor((input.now ?? new Date()).getTime() / 1000);
 	const encoded = encodeJson({
+		returnTo: input.returnTo,
 		exp: nowSeconds + INSTALL_STATE_TTL_SECONDS,
 		iat: nowSeconds,
 		nonce: input.nonce ?? randomBytes(18).toString("base64url"),
@@ -244,6 +272,7 @@ export function createGitHubInstallState(input: {
 }
 
 export function createGitHubUserAuthorizationUrl(input: {
+	readonly returnTo?: "settings" | "onboarding";
 	readonly config: GitHubRepositoryAppUserAuthorizationConfig;
 	readonly installationId: string;
 	readonly organizationId: string;
@@ -268,6 +297,7 @@ export function createGitHubUserAuthorizationUrl(input: {
 }
 
 export function createGitHubUserAuthorizationState(input: {
+	readonly returnTo?: "settings" | "onboarding";
 	readonly installationId: string;
 	readonly organizationId: string;
 	readonly stateSecret: string;
@@ -282,6 +312,7 @@ export function createGitHubUserAuthorizationState(input: {
 	}
 	const nowSeconds = Math.floor((input.now ?? new Date()).getTime() / 1000);
 	const encoded = encodeJson({
+		returnTo: input.returnTo,
 		exp: nowSeconds + INSTALL_STATE_TTL_SECONDS,
 		iat: nowSeconds,
 		installationId: input.installationId,
@@ -305,6 +336,7 @@ export function verifyGitHubInstallState(input: {
 		throw new Error("GitHub installation state payload is invalid");
 	}
 	return {
+		returnTo: value.returnTo ?? "settings",
 		organizationId: value.organizationId,
 		userId: value.userId,
 		workspaceSlug: value.workspaceSlug,
@@ -321,6 +353,7 @@ export function verifyGitHubUserAuthorizationState(input: {
 		throw new Error("GitHub user authorization state payload is invalid");
 	}
 	return {
+		returnTo: value.returnTo ?? "settings",
 		installationId: value.installationId,
 		organizationId: value.organizationId,
 		userId: value.userId,
@@ -590,6 +623,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 interface StatePayload {
+	readonly returnTo?: "settings" | "onboarding";
 	readonly exp: number;
 	readonly iat: number;
 	readonly installationId?: unknown;
@@ -604,6 +638,9 @@ interface StatePayload {
 function isStatePayload(value: unknown): value is StatePayload {
 	if (!isRecord(value)) return false;
 	return (
+		(value.returnTo === undefined ||
+			value.returnTo === "settings" ||
+			value.returnTo === "onboarding") &&
 		value.version === INSTALL_STATE_VERSION &&
 		Number.isSafeInteger(value.iat) &&
 		Number.isSafeInteger(value.exp) &&

@@ -24,10 +24,31 @@ const CONNECTED_STATUS: GitHubRepositoryConnectionStatus = {
 			nodeId: "R_athena",
 			owner: "opalinehq",
 			repositoryId: "55",
+			sync: { state: "ready" },
 		},
 	],
 	repositorySelection: "selected",
 };
+
+function renderCard(
+	status: GitHubRepositoryConnectionStatus | undefined,
+	options: { isError?: boolean; withDisconnect?: boolean } = {},
+) {
+	return renderToStaticMarkup(
+		<GitHubConnectionCard
+			status={status}
+			isPending={false}
+			isError={options.isError ?? false}
+			isConnecting={false}
+			actionError={null}
+			onConnect={() => {}}
+			onDisconnect={
+				options.withDisconnect === false ? undefined : async () => true
+			}
+			onRetry={() => {}}
+		/>,
+	);
+}
 
 test("dashboard syncing and visible states, and admin-only retention advice", () => {
 	const card = (status: GitHubRepositoryConnectionStatus) =>
@@ -51,34 +72,44 @@ test("dashboard syncing and visible states, and admin-only retention advice", ()
 	expect(card({ ...CONNECTED_STATUS, dashboard: "visible" })).toContain(
 		"Open dashboard",
 	);
-	expect(card(CONNECTED_STATUS)).toContain("Settings → Actions → General");
+	expect(card(CONNECTED_STATUS)).toContain("Raise Actions retention on GitHub");
 	expect(card({ ...CONNECTED_STATUS, canManage: false })).not.toContain(
-		"Settings → Actions → General",
+		"Raise Actions retention on GitHub",
 	);
 });
 
 test("renders verified connection details and admin actions", () => {
-	const markup = renderToStaticMarkup(
-		<GitHubConnectionCard
-			status={CONNECTED_STATUS}
-			isPending={false}
-			isError={false}
-			isConnecting={false}
-			actionError={null}
-			onConnect={() => {}}
-			onRetry={() => {}}
-		/>,
-	);
+	const markup = renderCard(CONNECTED_STATUS);
 
 	expect(markup).toContain("Connected to <strong>opalinehq</strong>");
-	expect(markup).toContain("Selected repositories (1)");
-	expect(markup).toContain("opalinehq/athena");
-	expect(markup).toContain("Private · main");
+	expect(markup).not.toContain("opalinehq/athena");
 	expect(markup).toContain("Manage on GitHub");
 	expect(markup).toContain("Reconnect");
-	expect(markup).toContain("The capture update has not been published yet.");
-	expect(markup).toContain("npx opaline@latest update");
-	expect(markup).toContain("npx opaline@latest");
+	expect(markup).toContain("Disconnect GitHub");
+	expect(markup).not.toContain("npx opaline@latest");
+});
+
+test("shows a suspended installation without Reconnect or dashboard rows", () => {
+	const markup = renderCard({ ...CONNECTED_STATUS, suspended: true });
+
+	expect(markup).toContain("is suspended, so syncing is paused");
+	expect(markup).toContain("Unsuspend on GitHub");
+	expect(markup).not.toContain("Reconnect</button>");
+	expect(markup).not.toContain("Open dashboard");
+	expect(markup).toContain("Disconnect GitHub");
+});
+
+test("keeps management of a connected workspace admin-only", () => {
+	const markup = renderCard({
+		...CONNECTED_STATUS,
+		canManage: false,
+		manageUrl: null,
+	});
+
+	expect(markup).toContain("Ask a workspace admin to change it.");
+	expect(markup).not.toContain("Manage on GitHub");
+	expect(markup).not.toContain("Reconnect");
+	expect(markup).not.toContain("Disconnect GitHub");
 });
 
 test("keeps connection actions admin-only", () => {
@@ -144,7 +175,7 @@ test("shows unavailable and retry states without implying a connection", () => {
 	);
 
 	expect(unavailable).toContain(
-		"GitHub connections are not available right now.",
+		"GitHub connections aren&#x27;t set up on this deployment yet.",
 	);
 	expect(unavailable).toContain("Unavailable");
 	expect(unavailable).not.toContain(">Connect GitHub</button>");
@@ -179,7 +210,7 @@ test("renders no GitHub section before visibility is known or when it fails to l
 	expect(renderSection(undefined, true)).toBe("");
 });
 
-test("renders the connection card and CLI note once the server shows the section", () => {
+test("renders the connection card once the server shows the section", () => {
 	const markup = renderSection({
 		visibility: "visible",
 		dashboard: "syncing",
@@ -188,8 +219,6 @@ test("renders the connection card and CLI note once the server shows the section
 
 	expect(markup).toContain("GitHub");
 	expect(markup).toContain("Connected to <strong>opalinehq</strong>");
-	expect(markup).toContain("Opaline CLI");
-	expect(markup).toContain("npx opaline@latest update");
 });
 
 test("accepts only documented callback results", () => {
@@ -198,6 +227,7 @@ test("accepts only documented callback results", () => {
 		"cancelled",
 		"session-required",
 		"forbidden",
+		"already-connected",
 		"error",
 	] as const) {
 		expect(readGitHubCallbackResult(`?github=${result}`)).toBe(result);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { generateKeyPairSync } from "node:crypto";
+import { createHmac, generateKeyPairSync } from "node:crypto";
 import {
 	assertGitHubRepositoryEvidencePermissions,
 	createGitHubAppJwt,
@@ -23,6 +23,14 @@ const privateKeyPem = key.privateKey
 const config = { appId: "12345", privateKeyPem, slug: "opaline-evidence" };
 const secret = "s".repeat(64);
 const now = new Date("2026-09-19T12:00:00.000Z");
+
+function createHmacSignedState(payload: unknown, stateSecret: string): string {
+	const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+	const signature = createHmac("sha256", stateSecret)
+		.update(encoded)
+		.digest("base64url");
+	return `${encoded}.${signature}`;
+}
 
 describe("GitHub App authentication", () => {
 	test("creates a short-lived, valid RS256 app JWT", () => {
@@ -52,9 +60,37 @@ describe("GitHub App authentication", () => {
 			verifyGitHubInstallState({ now, state, stateSecret: secret }),
 		).toEqual({
 			organizationId: "organization-1",
+			returnTo: "settings",
 			userId: "user-1",
 			workspaceSlug: "acme",
 		});
+	});
+
+	test("carries the onboarding return target and rejects unknown targets", () => {
+		const state = createGitHubInstallState({
+			nonce: "n".repeat(18),
+			now,
+			organizationId: "organization-1",
+			returnTo: "onboarding",
+			stateSecret: secret,
+			userId: "user-1",
+			workspaceSlug: "acme",
+		});
+		expect(
+			verifyGitHubInstallState({ now, state, stateSecret: secret }).returnTo,
+		).toBe("onboarding");
+
+		const [encoded] = state.split(".");
+		const payload = JSON.parse(
+			Buffer.from(encoded ?? "", "base64url").toString("utf8"),
+		);
+		const forged = createHmacSignedState(
+			{ ...payload, returnTo: "https://evil.example" },
+			secret,
+		);
+		expect(() =>
+			verifyGitHubInstallState({ now, state: forged, stateSecret: secret }),
+		).toThrow();
 	});
 
 	test("rejects tampered and expired installation state", () => {
@@ -132,6 +168,7 @@ describe("GitHub App authentication", () => {
 			}),
 		).toEqual({
 			installationId: "24680",
+			returnTo: "settings",
 			organizationId: "organization-1",
 			userId: "user-1",
 			workspaceSlug: "acme",

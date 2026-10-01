@@ -5,6 +5,8 @@ import { resolveGitHubRepositoryEvidenceStatus } from "./github-repository-evide
 
 const CONNECTION: GitHubRepositoryConnectionStatus = {
 	accountLogin: "opalinehq",
+	accountType: "Organization",
+	suspended: false,
 	connected: true,
 	installationId: "1234",
 	manageUrl:
@@ -54,6 +56,8 @@ test("shows the workspace connection once the GitHub evidence UI is enabled", as
 		dashboard: "syncing",
 		connection: {
 			accountLogin: "opalinehq",
+			accountType: "Organization",
+			suspended: false,
 			canManage: true,
 			configurationError: null,
 			configured: true,
@@ -130,4 +134,22 @@ test("ready workspaces expose the visible dashboard state", async () => {
 		dashboard: "visible",
 		connection: { dashboard: "visible", canManage: false },
 	});
+});
+
+test("treats a suspended installation as connected but not syncing", async () => {
+	const loadDashboard = mock(async () => "visible" as const);
+	const status = await resolveGitHubRepositoryEvidenceStatus({
+		uiEnabled: true,
+		isOrgAdmin: true,
+		readSetup: () => ({ configured: true }),
+		loadConnection: async () => ({ ...CONNECTION, suspended: true }),
+		loadDashboard,
+	});
+
+	expect(status).toMatchObject({
+		visibility: "visible",
+		dashboard: "notConnected",
+		connection: { connected: true, suspended: true },
+	});
+	expect(loadDashboard).not.toHaveBeenCalled();
 });

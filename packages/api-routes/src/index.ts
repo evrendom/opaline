@@ -93,7 +93,10 @@ export {
 } from "./schemas/cost-dashboard.js";
 
 import {
+	GitHubCreateInstallationInputSchema,
 	GitHubCreateInstallationOutputSchema,
+	GitHubDisconnectInputSchema,
+	GitHubDisconnectOutputSchema,
 	GitHubRepositoryEvidenceStatusSchema,
 	GitHubSyncCommitInputSchema,
 	GitHubSyncCommitOutputSchema,
@@ -819,7 +822,23 @@ export const contract = {
 	},
 	githubRepositoryEvidence: {
 		status: oc.output(GitHubRepositoryEvidenceStatusSchema),
-		createInstallation: oc.output(GitHubCreateInstallationOutputSchema),
+		createInstallation: oc
+			.input(GitHubCreateInstallationInputSchema)
+			.output(GitHubCreateInstallationOutputSchema),
+		disconnect: oc
+			.input(GitHubDisconnectInputSchema)
+			.errors({
+				WORKSPACE_CHANGED: {
+					status: 409,
+					message:
+						"The active workspace changed in another tab. Reload and try again.",
+				},
+				GITHUB_UNINSTALL_FAILED: {
+					status: 502,
+					message: "GitHub could not be disconnected. Please try again.",
+				},
+			})
+			.output(GitHubDisconnectOutputSchema),
 		syncCommit: oc
 			.input(GitHubSyncCommitInputSchema)
 			.output(GitHubSyncCommitOutputSchema),

@@ -12,11 +12,18 @@ import {
 	primarySettingsRoutes,
 	settingsRouteMap,
 } from "@/features/settings/config/settings-routes";
+import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { cn } from "@/lib/utils";
 import "./components/settings-section.css";
 
 export function SettingsLayout() {
+	const { state } = useOrganization();
+	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
+	const routes = primarySettingsRoutes.filter(
+		(route) => route.id !== "github" || query.data?.visibility === "visible",
+	);
 	const getShellRoutePath = useShellRoutePath();
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -35,7 +42,7 @@ export function SettingsLayout() {
 					<nav aria-label="Settings sections" data-fluid-menu-root="">
 						<FluidMenuHover items="a[href]" />
 						<ul className="flex flex-col gap-1">
-							{primarySettingsRoutes.map((route) => (
+							{routes.map((route) => (
 								<li key={route.id}>
 									<Link
 										to={getShellRoutePath(route.path)}
@@ -62,9 +69,7 @@ export function SettingsLayout() {
 					<Select
 						value={activeRouteId}
 						onValueChange={(value) => {
-							const route = primarySettingsRoutes.find(
-								(item) => item.id === value,
-							);
+							const route = routes.find((item) => item.id === value);
 							if (route) navigate(getShellRoutePath(route.path));
 						}}
 					>
@@ -75,7 +80,7 @@ export function SettingsLayout() {
 							<SelectValue>{settingsRouteMap[activeRouteId].label}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
-							{primarySettingsRoutes.map((route) => (
+							{routes.map((route) => (
 								<SelectItem key={route.id} value={route.id}>
 									{route.label}
 								</SelectItem>

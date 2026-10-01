@@ -1,12 +1,12 @@
 import type { GitHubRepositoryEvidenceStatus } from "@rudel/api-routes";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { GitHubRepositoryList } from "@/features/settings/github/GitHubRepositoryList";
+import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { GitHubConnectionCard } from "@/features/settings/workspace/components/GitHubConnectionCard";
-import { client } from "@/lib/orpc";
 
-const CALLBACK_MESSAGES = {
+export const GITHUB_CALLBACK_MESSAGES = {
 	connected: {
 		kind: "success",
 		message: "GitHub connected to this workspace.",
@@ -27,9 +27,13 @@ const CALLBACK_MESSAGES = {
 		kind: "error",
 		message: "GitHub could not be connected. Please try again.",
 	},
+	"already-connected": {
+		kind: "error",
+		message: "This GitHub account is already connected to another workspace.",
+	},
 } as const;
 
-type GitHubCallbackResult = keyof typeof CALLBACK_MESSAGES;
+type GitHubCallbackResult = keyof typeof GITHUB_CALLBACK_MESSAGES;
 
 export function WorkspaceGitHubConnection({
 	organizationId,
@@ -39,20 +43,14 @@ export function WorkspaceGitHubConnection({
 	const location = useLocation();
 	const navigate = useNavigate();
 	const handledCallback = useRef<string | null>(null);
-	const [isConnecting, setIsConnecting] = useState(false);
-	const [actionError, setActionError] = useState<string | null>(null);
-	const query = useQuery({
-		queryKey: ["github-repository-evidence", organizationId],
-		queryFn: () => client.githubRepositoryEvidence.status(),
-		refetchOnWindowFocus: "always",
-		staleTime: 10_000,
-	});
+	const { query, action, actionError, connect, disconnect } =
+		useGitHubConnection(organizationId);
 	const callbackResult = readGitHubCallbackResult(location.search);
 
 	useEffect(() => {
 		if (!callbackResult || handledCallback.current === location.key) return;
 		handledCallback.current = location.key;
-		const notification = CALLBACK_MESSAGES[callbackResult];
+		const notification = GITHUB_CALLBACK_MESSAGES[callbackResult];
 		toast[notification.kind](
 			notification.message,
 			callbackResult === "connected"
@@ -75,27 +73,15 @@ export function WorkspaceGitHubConnection({
 		);
 	}, [callbackResult, location, navigate, query]);
 
-	async function connectGitHub() {
-		if (isConnecting) return;
-		setIsConnecting(true);
-		setActionError(null);
-		try {
-			const response =
-				await client.githubRepositoryEvidence.createInstallation();
-			window.location.assign(response.url);
-		} catch {
-			setActionError("GitHub could not be opened. Please try again.");
-			setIsConnecting(false);
-		}
-	}
-
 	return (
 		<WorkspaceGitHubConnectionView
 			evidenceStatus={query.data}
 			isError={query.isError}
-			isConnecting={isConnecting}
+			isConnecting={action === "connecting"}
+			isDisconnecting={action === "disconnecting"}
 			actionError={actionError}
-			onConnect={() => void connectGitHub()}
+			onConnect={() => void connect()}
+			onDisconnect={disconnect}
 			onRetry={() => void query.refetch()}
 		/>
 	);
@@ -114,6 +100,8 @@ export function WorkspaceGitHubConnectionView({
 	actionError,
 	onConnect,
 	onRetry,
+	isDisconnecting = false,
+	onDisconnect,
 }: {
 	evidenceStatus: GitHubRepositoryEvidenceStatus | undefined;
 	isError: boolean;
@@ -121,18 +109,28 @@ export function WorkspaceGitHubConnectionView({
 	actionError: string | null;
 	onConnect: () => void;
 	onRetry: () => void;
+	isDisconnecting?: boolean;
+	onDisconnect?: () => Promise<boolean>;
 }) {
 	if (evidenceStatus?.visibility !== "visible") return null;
+	const connection = evidenceStatus.connection;
 	return (
-		<GitHubConnectionCard
-			status={evidenceStatus.connection}
-			isPending={false}
-			isError={isError}
-			isConnecting={isConnecting}
-			actionError={actionError}
-			onConnect={onConnect}
-			onRetry={onRetry}
-		/>
+		<>
+			<GitHubConnectionCard
+				status={connection}
+				isPending={false}
+				isError={isError}
+				isConnecting={isConnecting}
+				isDisconnecting={isDisconnecting}
+				onDisconnect={onDisconnect}
+				actionError={actionError}
+				onConnect={onConnect}
+				onRetry={onRetry}
+			/>
+			{connection.connected ? (
+				<GitHubRepositoryList status={connection} />
+			) : null}
+		</>
 	);
 }
 
@@ -140,7 +138,7 @@ export function readGitHubCallbackResult(
 	search: string,
 ): GitHubCallbackResult | null {
 	const value = new URLSearchParams(search).get("github");
-	return value && value in CALLBACK_MESSAGES
+	return value && value in GITHUB_CALLBACK_MESSAGES
 		? readKnownCallbackResult(value)
 		: null;
 }
@@ -151,6 +149,7 @@ function readKnownCallbackResult(value: string): GitHubCallbackResult | null {
 		value === "cancelled" ||
 		value === "session-required" ||
 		value === "forbidden" ||
+		value === "already-connected" ||
 		value === "error"
 	) {
 		return value;

@@ -7,10 +7,23 @@ export const GitHubRepositoryBindingSchema = z.object({
 	nodeId: z.string().min(1).max(200),
 	owner: z.string().min(1).max(100),
 	repositoryId: z.string().regex(/^[1-9][0-9]*$/u),
+	// Optional so clients built before per-repository sync state keep parsing.
+	sync: z
+		.discriminatedUnion("state", [
+			z.object({ state: z.literal("ready") }),
+			z.object({ state: z.literal("syncing") }),
+			z.object({
+				state: z.literal("unavailable"),
+				reason: z.enum(["no-access", "not-found"]),
+			}),
+		])
+		.optional(),
 });
 
 export const GitHubRepositoryConnectionStatusSchema = z.object({
 	accountLogin: z.string().nullable(),
+	accountType: z.enum(["Organization", "User"]).nullable().optional(),
+	suspended: z.boolean().optional(),
 	canManage: z.boolean(),
 	configurationError: z.string().nullable(),
 	configured: z.boolean(),
@@ -46,6 +59,27 @@ export const GitHubRepositoryEvidenceStatusSchema = z.discriminatedUnion(
 
 export const GitHubCreateInstallationOutputSchema = z.object({
 	url: z.string().url(),
+});
+
+export const GitHubConnectionReturnToSchema = z.enum([
+	"settings",
+	"onboarding",
+]);
+export type GitHubConnectionReturnTo = z.infer<
+	typeof GitHubConnectionReturnToSchema
+>;
+
+export const GitHubCreateInstallationInputSchema = z
+	.object({ returnTo: GitHubConnectionReturnToSchema.optional() })
+	.optional();
+
+export const GitHubDisconnectInputSchema = z.object({
+	// The workspace the user confirmed; it must still be the active one.
+	organizationId: z.string().min(1).max(200),
+});
+
+export const GitHubDisconnectOutputSchema = z.object({
+	disconnected: z.boolean(),
 });
 
 export const GitHubSyncCommitInputSchema = z.object({

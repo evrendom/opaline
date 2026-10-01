@@ -15,6 +15,7 @@ import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
+import { GitHubSettingsPage } from "@/features/settings/github/GitHubSettingsPage";
 import { SettingsIndexRedirect } from "@/features/settings/SettingsIndexRedirect";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
 import { LeftSidebarAppShellLayout } from "@/features/shell/AppShellLayout";
@@ -224,6 +225,10 @@ function getShellRouteElements(
 				}
 			/>
 			<Route path={routePaths.settings} element={<SettingsLayout />}>
+				<Route
+					path={settingsRouteMap.github.segment}
+					element={<GitHubSettingsPage />}
+				/>
 				<Route
 					index
 					element={

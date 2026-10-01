@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# Generated migration snapshots and codegen; collapsed in GitHub diffs.
+packages/sql-schema/db/migrations/meta/*.json linguist-generated=true
+packages/ch-schema/chx/meta/*.json linguist-generated=true
+packages/ch-schema/src/generated/** linguist-generated=true

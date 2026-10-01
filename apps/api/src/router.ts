@@ -41,7 +41,11 @@ import { repositorySettingsRouter } from "./handlers/repository-settings.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { ClickHouseWriteFencedError } from "./lib/clickhouse-write-fence.js";
-import { isGitHubEvidenceUiEnabled, readBooleanEnv } from "./lib/env.js";
+import {
+	isGitHubEvidenceUiEnabled,
+	readBooleanEnv,
+	readGitHubEvidenceUiForceOrgIds,
+} from "./lib/env.js";
 import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
 	getIngestContentShape,
@@ -111,6 +115,7 @@ import {
 import { wakeGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
 import { readGitHubOutcomesReadiness } from "./services/github-outcomes-readiness.service.js";
 import { getGitHubRepositoryConnectionStatus } from "./services/github-repository-binding.service.js";
+import { disconnectGitHubRepositoryInstallation } from "./services/github-repository-disconnect.service.js";
 import { resolveGitHubRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
@@ -1551,7 +1556,9 @@ const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 	.use(orgMiddleware)
 	.handler(({ context }) =>
 		resolveGitHubRepositoryEvidenceStatus({
-			uiEnabled: isGitHubEvidenceUiEnabled(),
+			uiEnabled:
+				isGitHubEvidenceUiEnabled() ||
+				readGitHubEvidenceUiForceOrgIds().includes(context.organizationId),
 			isOrgAdmin: context.isOrgAdmin,
 			readSetup: () => {
 				const availability = readGitHubSetupAvailability();
@@ -1578,7 +1585,7 @@ const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 const githubRepositoryEvidenceCreateInstallation =
 	os.githubRepositoryEvidence.createInstallation
 		.use(orgMiddleware)
-		.handler(async ({ context }) => {
+		.handler(async ({ context, input }) => {
 			if (!context.isOrgAdmin) {
 				throw new ORPCError("FORBIDDEN", {
 					message: "Workspace administrator access is required.",
@@ -1598,6 +1605,7 @@ const githubRepositoryEvidenceCreateInstallation =
 			if (!organization) throw new ORPCError("NOT_FOUND");
 			return {
 				url: createGitHubInstallationUrl({
+					returnTo: input?.returnTo,
 					config: availability.config,
 					organizationId: context.organizationId,
 					stateSecret: availability.stateSecret,
@@ -1605,6 +1613,26 @@ const githubRepositoryEvidenceCreateInstallation =
 					workspaceSlug: organization.slug,
 				}),
 			};
+		});
+
+const githubRepositoryEvidenceDisconnect =
+	os.githubRepositoryEvidence.disconnect
+		.use(orgMiddleware)
+		.handler(async ({ context, errors, input }) => {
+			if (!context.isOrgAdmin) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Workspace administrator access is required.",
+				});
+			}
+			if (input.organizationId !== context.organizationId)
+				throw errors.WORKSPACE_CHANGED();
+			const result = await disconnectGitHubRepositoryInstallation({
+				database: sqlClient,
+				organizationId: context.organizationId,
+				readConfig: readGitHubRepositoryAppConfig,
+			});
+			if (result === "github-failed") throw errors.GITHUB_UNINSTALL_FAILED();
+			return { disconnected: result === "disconnected" };
 		});
 
 const githubRepositoryEvidenceSyncCommit =
@@ -2284,6 +2312,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		requestUpgrade: requestBillingUpgrade,
 	},
 	githubRepositoryEvidence: {
+		disconnect: githubRepositoryEvidenceDisconnect,
 		createInstallation: githubRepositoryEvidenceCreateInstallation,
 		status: githubRepositoryEvidenceStatus,
 		syncCommit: githubRepositoryEvidenceSyncCommit,

@@ -11,22 +11,29 @@ import {
 	verifyGitHubInstallState,
 	verifyGitHubUserAuthorizationState,
 } from "../services/github-app.service.js";
-import { persistGitHubRepositoryInstallation } from "../services/github-repository-binding.service.js";
+import {
+	GitHubInstallationAlreadyBoundError,
+	persistGitHubRepositoryInstallation,
+} from "../services/github-repository-binding.service.js";
 
 export type GitHubSettingsConnectionResult =
 	| "cancelled"
 	| "connected"
 	| "error"
 	| "forbidden"
+	| "already-connected"
 	| "session-required";
 
 export function createGitHubSettingsRedirect(input: {
 	readonly frontendOrigin: string;
 	readonly result: GitHubSettingsConnectionResult;
 	readonly workspaceSlug: string;
+	readonly returnTo?: "settings" | "onboarding";
 }): Response {
 	const destination = new URL(
-		`/${encodeURIComponent(input.workspaceSlug)}/settings/workspace`,
+		input.returnTo === "onboarding"
+			? "/welcome"
+			: `/${encodeURIComponent(input.workspaceSlug)}/settings/github`,
 		input.frontendOrigin,
 	);
 	destination.searchParams.set("github", input.result);
@@ -42,6 +49,7 @@ export function createGitHubSettingsRedirect(input: {
 export async function handleGitHubRepositorySetupRequest(input: {
 	readonly database: postgres.Sql;
 	readonly environment?: Readonly<Record<string, string | undefined>>;
+	readonly fetch?: typeof globalThis.fetch;
 	readonly frontendOrigin: string;
 	readonly getSession: (
 		request: Request,
@@ -98,6 +106,7 @@ export async function handleGitHubRepositorySetupRequest(input: {
 	}
 	const redirect = (result: GitHubSettingsConnectionResult) =>
 		createGitHubSettingsRedirect({
+			returnTo: state.returnTo,
 			frontendOrigin: input.frontendOrigin,
 			result,
 			workspaceSlug: state.workspaceSlug,
@@ -140,6 +149,7 @@ export async function handleGitHubRepositorySetupRequest(input: {
 		let authorizationUrl: string;
 		try {
 			authorizationUrl = createGitHubUserAuthorizationUrl({
+				returnTo: installState.returnTo,
 				config: userAuthorizationConfig,
 				installationId,
 				organizationId: installState.organizationId,
@@ -163,16 +173,19 @@ export async function handleGitHubRepositorySetupRequest(input: {
 	if (!code) return redirect("error");
 	try {
 		const userToken = await exchangeGitHubUserAuthorizationCode({
+			fetch: input.fetch,
 			code,
 			config: userAuthorizationConfig,
 			state: stateValue,
 			stateSecret,
 		});
 		const repositories = await listGitHubUserInstallationRepositories({
+			fetch: input.fetch,
 			installationId: authorizationState.installationId,
 			token: userToken,
 		});
 		const details = await readGitHubInstallation({
+			fetch: input.fetch,
 			config,
 			installationId: authorizationState.installationId,
 		});
@@ -185,7 +198,9 @@ export async function handleGitHubRepositorySetupRequest(input: {
 			organizationId: state.organizationId,
 			repositories,
 		});
-	} catch {
+	} catch (error) {
+		if (error instanceof GitHubInstallationAlreadyBoundError)
+			return redirect("already-connected");
 		return redirect("error");
 	}
 	return redirect("connected");

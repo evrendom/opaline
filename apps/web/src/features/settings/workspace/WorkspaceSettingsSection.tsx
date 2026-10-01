@@ -8,7 +8,6 @@ import { BillingSandboxCard } from "@/features/settings/workspace/components/Bil
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
 import { WorkspaceDangerZoneCard } from "@/features/settings/workspace/components/WorkspaceDangerZoneCard";
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
-import { WorkspaceGitHubConnection } from "@/features/settings/workspace/components/WorkspaceGitHubConnection";
 import { WorkspaceIdentityCard } from "@/features/settings/workspace/components/WorkspaceIdentityCard";
 import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-workspace-settings-data";
 
@@ -69,7 +68,6 @@ export function WorkspaceSettingsSection() {
 							<BillingSandboxCard organizationId={data.activeOrg.id} />
 						</>
 					) : null}
-					<WorkspaceGitHubConnection organizationId={data.activeOrg.id} />
 					<WorkspaceDangerZoneCard
 						organization={data.activeOrg}
 						canManage={data.canManage}

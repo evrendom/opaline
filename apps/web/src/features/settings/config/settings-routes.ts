@@ -2,6 +2,7 @@ import { appRoutes, getCanonicalAppPath } from "@/app/routes";
 
 export type SettingsRouteId =
 	| "workspace"
+	| "github"
 	| "sessions"
 	| "members"
 	| "invitations"
@@ -24,6 +25,12 @@ export const settingsRouteMap: Record<
 		label: "Workspace",
 		segment: "workspace",
 		path: appRoutes.settingsWorkspace(),
+	},
+	github: {
+		id: "github",
+		label: "GitHub",
+		segment: "github",
+		path: appRoutes.settingsGitHub(),
 	},
 	sessions: {
 		id: "sessions",
@@ -61,12 +68,14 @@ const settingsRoutes = Object.values(settingsRouteMap);
 
 export type PrimarySettingsRouteId =
 	| "workspace"
+	| "github"
 	| "sessions"
 	| "members"
 	| "account";
 
 export const primarySettingsRoutes = [
 	settingsRouteMap.workspace,
+	settingsRouteMap.github,
 	settingsRouteMap.sessions,
 	settingsRouteMap.members,
 	settingsRouteMap.account,
@@ -88,6 +97,7 @@ export function getActiveSettingsRouteId(
 	}
 
 	if (matchedRoute === "sessions") return "sessions";
+	if (matchedRoute === "github") return "github";
 
 	if (matchedRoute === "members") {
 		return "members";

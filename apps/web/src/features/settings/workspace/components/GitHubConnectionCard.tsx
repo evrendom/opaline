@@ -1,5 +1,14 @@
 import type { GitHubRepositoryConnectionStatus } from "@rudel/api-routes";
+import { useState } from "react";
 import { Button, buttonVariants } from "@/app/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/app/ui/dialog";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	WorkspaceSettingsGroup,
@@ -7,32 +16,37 @@ import {
 } from "@/features/settings/workspace/components/workspace-settings-group";
 import "./github-connection-card.css";
 
-const VISIBLE_REPOSITORY_LIMIT = 12;
-
 export function GitHubConnectionCard({
 	status,
 	isPending,
 	isError,
 	isConnecting,
+	isDisconnecting = false,
 	actionError,
 	onConnect,
+	onDisconnect,
 	onRetry,
 }: {
 	status: GitHubRepositoryConnectionStatus | undefined;
 	isPending: boolean;
 	isError: boolean;
 	isConnecting: boolean;
+	isDisconnecting?: boolean;
 	actionError: string | null;
 	onConnect: () => void;
+	onDisconnect?: () => Promise<boolean>;
 	onRetry: () => void;
 }) {
+	const connected = status?.connected === true;
+	const suspended = connected && status?.suspended === true;
+	const canManage = status?.canManage === true;
 	return (
 		<WorkspaceSettingsGroup
-			title="GitHub"
-			description="Connect GitHub so Opaline can count merged pull requests and CI runs in your repositories and attach them to sessions. Session content is not sent to GitHub."
+			title="Connection"
+			description="Connect GitHub so Opaline can count merged pull requests and CI runs in your repositories and attach them to sessions. Opaline reads metadata only: pull requests, CI runs and commits, never code."
 		>
 			<WorkspaceSettingsRow
-				label="Connection"
+				label="Account"
 				description={
 					<ConnectionDescription status={status} isError={isError} />
 				}
@@ -41,14 +55,14 @@ export function GitHubConnectionCard({
 					status={status}
 					isPending={isPending}
 					isError={isError}
+					isBusy={isConnecting || isDisconnecting}
 					isConnecting={isConnecting}
 					onConnect={onConnect}
 					onRetry={onRetry}
 				/>
 			</WorkspaceSettingsRow>
 
-			{status?.connected ? <RepositoryAccess status={status} /> : null}
-			{status?.connected ? (
+			{status && connected && !suspended ? (
 				<WorkspaceSettingsRow
 					label="Dashboard"
 					description={
@@ -60,36 +74,31 @@ export function GitHubConnectionCard({
 					{status.dashboard === "visible" ? (
 						<a
 							className="cost-text-button"
-							href="../dashboard?metric=mergedPullRequests"
+							href="../../dashboard?metric=mergedPullRequests"
 						>
 							Open dashboard
 						</a>
 					) : null}
 				</WorkspaceSettingsRow>
 			) : null}
-			{status?.connected && status.canManage ? (
+
+			{status && connected && canManage && !suspended ? (
 				<WorkspaceSettingsRow
 					label="CI history"
-					description="GitHub keeps workflow runs and checks only for each repository's Actions retention period, 90 days by default. Raising it in Settings → Actions → General keeps more history from now on. It can't bring back runs GitHub has already deleted."
+					description="GitHub deletes CI runs after 90 days by default. Raise Actions retention on GitHub to keep more."
 				>
 					<a href={status.manageUrl ?? undefined}>Check GitHub access</a>
 				</WorkspaceSettingsRow>
 			) : null}
 
-			<WorkspaceSettingsRow
-				label="Opaline CLI"
-				description="Existing sessions stay unchanged. New automatic uploads include repository context after you install the upcoming update."
-			>
-				<div className="github-connection-cli-update">
-					<p>The capture update has not been published yet.</p>
-					<code>npx opaline@latest update</code>
-					<code>npx opaline@latest</code>
-					<p>
-						After release, update Opaline and review automatic uploads in each
-						repository.
-					</p>
-				</div>
-			</WorkspaceSettingsRow>
+			{connected && canManage && onDisconnect ? (
+				<DisconnectRow
+					accountLogin={status?.accountLogin ?? null}
+					isBusy={isConnecting || isDisconnecting}
+					isDisconnecting={isDisconnecting}
+					onDisconnect={onDisconnect}
+				/>
+			) : null}
 
 			{actionError ? (
 				<div className="github-connection-error" role="alert">
@@ -112,18 +121,33 @@ function ConnectionDescription({
 	}
 	if (!status) return <>Checking this workspace…</>;
 	if (!status.configured) {
-		return <>GitHub connections are not available right now.</>;
+		return <>GitHub connections aren't set up on this deployment yet.</>;
 	}
 	if (!status.connected) {
 		return status.canManage ? (
-			<>Connect this workspace to select repositories.</>
+			<>Connect this workspace to choose repositories.</>
 		) : (
 			<>Ask a workspace admin to connect GitHub.</>
 		);
 	}
+	const account = (
+		<strong>
+			{status.accountLogin ?? "GitHub"}
+			{status.accountType === "User" ? " (personal account)" : null}
+		</strong>
+	);
+	if (status.suspended) {
+		return (
+			<>
+				The installation on {account} is suspended, so syncing is paused.
+				{status.canManage ? null : " Ask a workspace admin to unsuspend it."}
+			</>
+		);
+	}
 	return (
 		<>
-			Connected to <strong>{status.accountLogin ?? "GitHub"}</strong>
+			Connected to {account}
+			{status.canManage ? null : ". Ask a workspace admin to change it."}
 		</>
 	);
 }
@@ -132,6 +156,7 @@ function ConnectionControl({
 	status,
 	isPending,
 	isError,
+	isBusy,
 	isConnecting,
 	onConnect,
 	onRetry,
@@ -139,6 +164,7 @@ function ConnectionControl({
 	status: GitHubRepositoryConnectionStatus | undefined;
 	isPending: boolean;
 	isError: boolean;
+	isBusy: boolean;
 	isConnecting: boolean;
 	onConnect: () => void;
 	onRetry: () => void;
@@ -156,92 +182,112 @@ function ConnectionControl({
 	}
 	if (!status.connected) {
 		return status.canManage ? (
-			<Button
-				type="button"
-				size="sm"
-				disabled={isConnecting}
-				onClick={onConnect}
-			>
+			<Button type="button" size="sm" disabled={isBusy} onClick={onConnect}>
 				{isConnecting ? "Opening GitHub…" : "Connect GitHub"}
 			</Button>
 		) : (
 			<span className="github-connection-state">Not connected</span>
 		);
 	}
+	const manageLink =
+		status.canManage && status.manageUrl ? (
+			<a
+				data-slot="button"
+				className={buttonVariants({ variant: "outline", size: "sm" })}
+				href={status.manageUrl}
+				target="_blank"
+				rel="noreferrer"
+			>
+				{status.suspended ? "Unsuspend on GitHub" : "Manage on GitHub"}
+				<span className="sr-only"> (opens in a new tab)</span>
+			</a>
+		) : null;
 	return (
 		<div className="github-connection-actions">
-			<span className="github-connection-state" data-state="connected">
-				Connected
-			</span>
-			{status.manageUrl ? (
-				<a
-					data-slot="button"
-					className={buttonVariants({ variant: "outline", size: "sm" })}
-					href={status.manageUrl}
-					target="_blank"
-					rel="noreferrer"
-					aria-label="Manage GitHub connection (opens in a new tab)"
-				>
-					Manage on GitHub
-				</a>
-			) : null}
-			{status.canManage ? (
+			{manageLink}
+			{status.canManage && !status.suspended ? (
 				<Button
 					type="button"
 					variant="ghost"
 					size="sm"
-					disabled={isConnecting}
+					disabled={isBusy}
 					onClick={onConnect}
 				>
 					{isConnecting ? "Opening GitHub…" : "Reconnect"}
 				</Button>
 			) : null}
+			{status.canManage ? null : (
+				<span className="github-connection-state">
+					{status.suspended ? "Suspended" : "Connected"}
+				</span>
+			)}
 		</div>
 	);
 }
 
-function RepositoryAccess({
-	status,
+function DisconnectRow({
+	accountLogin,
+	isBusy,
+	isDisconnecting,
+	onDisconnect,
 }: {
-	status: GitHubRepositoryConnectionStatus;
+	accountLogin: string | null;
+	isBusy: boolean;
+	isDisconnecting: boolean;
+	onDisconnect: () => Promise<boolean>;
 }) {
-	const repositories = [...status.repositories].sort((left, right) =>
-		`${left.owner}/${left.name}`.localeCompare(`${right.owner}/${right.name}`),
-	);
-	const visibleRepositories = repositories.slice(0, VISIBLE_REPOSITORY_LIMIT);
-	const hiddenCount = repositories.length - visibleRepositories.length;
-	const selectionLabel =
-		status.repositorySelection === "all"
-			? `Repositories verified during connection (${repositories.length})`
-			: `Selected repositories (${repositories.length})`;
-
+	const [open, setOpen] = useState(false);
 	return (
 		<WorkspaceSettingsRow
-			label="Repository access"
-			description={selectionLabel}
+			label="Disconnect"
+			description="Uninstalls the Opaline GitHub App and stops syncing. Collected pull request and CI history is hidden, not deleted, and comes back if you reconnect."
 		>
-			{repositories.length > 0 ? (
-				<div className="github-connection-repositories">
-					<ul aria-label="Connected GitHub repositories">
-						{visibleRepositories.map((repository) => (
-							<li key={repository.repositoryId}>
-								<span title={`${repository.owner}/${repository.name}`}>
-									{repository.owner}/{repository.name}
-								</span>
-								<small>
-									{repository.isPrivate ? "Private" : "Public"} ·{" "}
-									{repository.defaultBranch}
-								</small>
-							</li>
-						))}
-					</ul>
-					{hiddenCount > 0 ? <p>And {hiddenCount} more</p> : null}
-				</div>
-			) : (
-				<p className="github-connection-empty">
-					No repositories are available to this connection.
-				</p>
-			)}
+			<Button
+				type="button"
+				variant="destructive"
+				size="sm"
+				disabled={isBusy}
+				onClick={() => setOpen(true)}
+			>
+				Disconnect GitHub
+			</Button>
+			<Dialog
+				open={open}
+				onOpenChange={(next) => !isDisconnecting && setOpen(next)}
+			>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Disconnect GitHub?</DialogTitle>
+						<DialogDescription>
+							This uninstalls the Opaline GitHub App from{" "}
+							{accountLogin ? <strong>{accountLogin}</strong> : "GitHub"} and
+							stops syncing pull requests and CI runs for this workspace.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="ghost"
+							disabled={isDisconnecting}
+							onClick={() => setOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="button"
+							variant="destructive"
+							disabled={isDisconnecting}
+							onClick={() => {
+								void onDisconnect().then((disconnected) => {
+									if (disconnected) setOpen(false);
+								});
+							}}
+						>
+							{isDisconnecting ? "Disconnecting…" : "Disconnect"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</WorkspaceSettingsRow>
 	);
 }

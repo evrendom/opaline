@@ -1,73 +1,17 @@
-.github-connection-state,
-.github-connection-empty,
-.github-connection-cli-update,
-.github-connection-repositories {
+.github-connection-state {
 	color: var(--muted-foreground);
 }
 
-.github-connection-state[data-state="connected"] {
-	color: var(--foreground);
-}
-
-.github-connection-actions,
-.github-connection-cli-update,
-.github-connection-repositories {
-	display: flex;
-	width: 100%;
-	min-width: 0;
-	flex-direction: column;
-	gap: 8px;
-}
-
 .github-connection-actions {
-	align-items: stretch;
-}
-
-.github-connection-cli-update {
-	font-size: 12px;
-}
-
-.github-connection-cli-update code {
-	overflow-wrap: anywhere;
-	border-radius: 5px;
-	background: var(--muted);
-	padding: 5px 7px;
-	color: var(--foreground);
-	font-family: var(--font-mono);
-}
-
-.github-connection-repositories ul {
 	display: flex;
-	max-height: 240px;
-	flex-direction: column;
-	gap: 10px;
-	overflow-y: auto;
-}
-
-.github-connection-repositories li {
-	display: flex;
-	min-width: 0;
-	flex-direction: column;
-}
-
-.github-connection-repositories li > span {
-	overflow: hidden;
-	color: var(--foreground);
-	text-overflow: ellipsis;
+	flex-wrap: nowrap;
 	white-space: nowrap;
-}
-
-.github-connection-repositories small {
-	font-size: 11px;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
 }
 
 .github-connection-error {
 	padding: 12px 0;
 	color: var(--destructive);
-}
-
-@container workspace-settings (min-width: 480px) {
-	.github-connection-actions {
-		align-items: flex-end;
-	}
 }

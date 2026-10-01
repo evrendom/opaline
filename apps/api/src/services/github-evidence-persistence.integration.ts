@@ -297,6 +297,8 @@ describe("GitHub evidence lease timestamps", () => {
 			}),
 		).toEqual({
 			accountLogin: "github-lease",
+			accountType: "Organization",
+			suspended: false,
 			connected: true,
 			installationId,
 			manageUrl: `https://github.com/organizations/github-lease/settings/installations/${installationId}`,
@@ -310,6 +312,7 @@ describe("GitHub evidence lease timestamps", () => {
 					organizationId,
 					owner: "opalinehq",
 					repositoryId,
+					sync: { state: "syncing" },
 				},
 			],
 			repositorySelection: "selected",

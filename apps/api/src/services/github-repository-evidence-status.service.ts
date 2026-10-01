@@ -6,10 +6,11 @@ export type GitHubSetupState =
 	| { readonly configured: false; readonly configurationError: string };
 
 /**
- * Workspace GitHub status for the settings UI. While the GitHub evidence UI is
- * dark-launched the answer is `hidden` and neither the deployment's GitHub
- * setup nor the workspace connection is read, so nothing about it leaks into a
- * surface that is not supposed to exist yet.
+ * Workspace GitHub status for settings and onboarding. While the GitHub
+ * evidence UI is dark-launched for this workspace (global flag off and not a
+ * forced preview organization) the answer is `hidden` and neither the
+ * deployment's GitHub setup nor the workspace connection is read, so nothing
+ * about it leaks into a surface that is not supposed to exist yet.
  */
 export async function resolveGitHubRepositoryEvidenceStatus(input: {
 	readonly uiEnabled: boolean;
@@ -41,14 +42,17 @@ export async function resolveGitHubRepositoryEvidenceStatus(input: {
 		};
 	}
 	const status = await input.loadConnection();
-	const dashboard = status.connected
-		? ((await input.loadDashboard?.()) ?? "syncing")
-		: "notConnected";
+	const dashboard =
+		status.connected && !status.suspended
+			? ((await input.loadDashboard?.()) ?? "syncing")
+			: "notConnected";
 	return {
 		visibility: "visible",
 		dashboard,
 		connection: {
 			accountLogin: status.accountLogin,
+			accountType: status.accountType,
+			suspended: status.suspended,
 			canManage: input.isOrgAdmin,
 			configurationError: null,
 			configured: true,
@@ -62,6 +66,7 @@ export async function resolveGitHubRepositoryEvidenceStatus(input: {
 				nodeId: repository.nodeId,
 				owner: repository.owner,
 				repositoryId: repository.repositoryId,
+				sync: repository.sync,
 			})),
 			repositorySelection: status.repositorySelection,
 			dashboard,

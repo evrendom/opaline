@@ -1,8 +1,15 @@
 import { ORG_SLUG_MAX_LENGTH } from "@rudel/api-routes/reserved-slugs";
+import { useQueryClient } from "@tanstack/react-query";
 import { CameraIcon, LinkIcon } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
+import {
+	GITHUB_CONNECTION_QUERY_KEY,
+	useGitHubConnection,
+} from "@/features/settings/github/use-github-connection";
+import { readGitHubCallbackResult } from "@/features/settings/workspace/components/WorkspaceGitHubConnection";
 import type { Organization } from "@/features/workspace/organization/types";
 import {
 	suggestWorkspaceSlug,
@@ -19,13 +26,16 @@ import {
 	readCliSession,
 } from "./cli-onboarding-auth";
 import { copyCliCommand } from "./copy-cli-command";
+import {
+	isGitHubOnboardingAvailable,
+	WelcomeGitHubStep,
+} from "./welcome-github-step";
 import { WelcomeBack, WelcomeProgress } from "./welcome-panel";
-
-const ProgressSchema = z.object({
-	step: z.enum(["workspace", "profile", "invite", "done"]),
-	organizationId: z.string().nullable(),
-});
-type Progress = z.infer<typeof ProgressSchema>;
+import {
+	readWelcomeProgress,
+	type WelcomeSetupProgress,
+	writeWelcomeProgress,
+} from "./welcome-progress";
 
 export function WelcomeSteps({
 	session,
@@ -43,11 +53,14 @@ export function WelcomeSteps({
 	onSignOut: () => Promise<void>;
 }) {
 	const { state, meta } = useOrganization();
+	const queryClient = useQueryClient();
+	const location = useLocation();
+	const navigate = useNavigate();
 	const { refetch } = authClient.useSession();
 	const { refetch: refetchOrganizations } = authClient.useListOrganizations();
 	const storageKey = `opaline.welcome.${authorization.id}.${session.user.id}`;
-	const [progress, setProgress] = useState<Progress>(() =>
-		readProgress(storageKey, snapshot),
+	const [progress, setProgress] = useState<WelcomeSetupProgress>(() =>
+		readWelcomeProgress(storageKey, snapshot),
 	);
 	const [organizationId, setOrganizationId] = useState(
 		snapshot.organizationId ??
@@ -94,6 +107,15 @@ export function WelcomeSteps({
 			meta.isOrgAdmin);
 	const canInvite =
 		state.activeOrg?.id === progress.organizationId && meta.isOrgAdmin;
+	const github = useGitHubConnection(
+		state.activeOrg?.id === progress.organizationId
+			? progress.organizationId
+			: null,
+		"onboarding",
+	);
+	const showGitHub =
+		canInvite && isGitHubOnboardingAvailable(github.query.data);
+	const githubResult = readGitHubCallbackResult(location.search);
 	const slug =
 		workspaceSlug ??
 		(!connectedOrganizationId && (!organization || isPersonal)
@@ -111,11 +133,43 @@ export function WelcomeSteps({
 	useEffect(() => {
 		const sync = (event: StorageEvent) => {
 			if (event.key === storageKey && event.newValue)
-				setProgress(readProgress(storageKey, snapshot));
+				setProgress(readWelcomeProgress(storageKey, snapshot));
 		};
 		window.addEventListener("storage", sync);
 		return () => window.removeEventListener("storage", sync);
 	}, [storageKey, snapshot]);
+	useEffect(() => {
+		if (progress.step !== "github" || state.isLoading) return;
+		// GitHub is optional: whenever it can't be offered for the onboarding
+		// workspace (another tab switched workspaces, not an admin, unavailable),
+		// move on instead of waiting.
+		if (
+			state.activeOrg?.id !== progress.organizationId ||
+			!meta.isOrgAdmin ||
+			github.query.isError ||
+			(github.query.data && !isGitHubOnboardingAvailable(github.query.data))
+		) {
+			const next = { ...progress, step: "profile" as const };
+			writeWelcomeProgress(storageKey, next);
+			setProgress(next);
+		} else if (
+			githubResult === "connected" &&
+			progress.github !== "connected"
+		) {
+			const next = { ...progress, github: "connected" as const };
+			writeWelcomeProgress(storageKey, next);
+			setProgress(next);
+		}
+	}, [
+		progress,
+		state.isLoading,
+		state.activeOrg?.id,
+		meta.isOrgAdmin,
+		github.query.data,
+		github.query.isError,
+		githubResult,
+		storageKey,
+	]);
 	useEffect(() => {
 		if (progress.step) heading.current?.focus({ preventScroll: true });
 	}, [progress.step]);
@@ -149,15 +203,23 @@ export function WelcomeSteps({
 		}
 	}, [progress.step, snapshot.state, onFinish]);
 
-	function advance(step: Progress["step"], id = progress.organizationId) {
-		const next = { step, organizationId: id };
-		try {
-			localStorage.setItem(storageKey, JSON.stringify(next));
-		} catch {
-			/* The active tab can still complete setup. */
-		}
+	function advance(
+		step: WelcomeSetupProgress["step"],
+		id = progress.organizationId,
+		github = progress.github,
+	) {
+		const next = { step, organizationId: id, github };
+		writeWelcomeProgress(storageKey, next);
 		setProgress(next);
 		setError(null);
+		if (step !== "github" && githubResult) {
+			const params = new URLSearchParams(location.search);
+			params.delete("github");
+			navigate(
+				{ pathname: location.pathname, search: params.toString() },
+				{ replace: true },
+			);
+		}
 	}
 	async function run(action: () => Promise<void>) {
 		if (busy) return;
@@ -232,8 +294,22 @@ export function WelcomeSteps({
 			if (!progress.organizationId && snapshot.state === "awaiting_login")
 				await approveCliAuthorization(authorization, destination.id);
 			setWorkspaceSlug(slug);
-			advance("profile", destination.id);
 			await refetch();
+			const status = await client.githubRepositoryEvidence
+				.status()
+				.catch(() => null);
+			if (status)
+				queryClient.setQueryData(
+					[GITHUB_CONNECTION_QUERY_KEY, destination.id],
+					status,
+				);
+			advance(
+				isGitHubOnboardingAvailable(status ?? undefined) &&
+					progress.github === "pending"
+					? "github"
+					: "profile",
+				destination.id,
+			);
 		});
 	}
 	async function saveProfile(event: FormEvent) {
@@ -332,20 +408,36 @@ export function WelcomeSteps({
 		});
 	}
 	const stepNumber =
-		progress.step === "workspace" ? 2 : progress.step === "profile" ? 3 : 4;
+		progress.step === "workspace"
+			? 2
+			: progress.step === "github"
+				? 3
+				: progress.step === "profile"
+					? showGitHub
+						? 4
+						: 3
+					: showGitHub
+						? 5
+						: 4;
+	if (progress.step === "github" && !showGitHub)
+		return <output>Checking setup…</output>;
 	return (
 		<div className="cli-welcome-step" data-welcome-step={progress.step}>
-			<WelcomeProgress step={stepNumber} />
+			<WelcomeProgress step={stepNumber} includeGitHub={showGitHub} />
 			{progress.step !== "workspace" && (
 				<WelcomeBack
 					disabled={busy}
 					onClick={() =>
 						advance(
-							progress.step === "profile"
+							progress.step === "github"
 								? "workspace"
-								: progress.step === "invite"
-									? "profile"
-									: "invite",
+								: progress.step === "profile"
+									? showGitHub
+										? "github"
+										: "workspace"
+									: progress.step === "invite"
+										? "profile"
+										: "invite",
 						)
 					}
 				/>
@@ -356,24 +448,28 @@ export function WelcomeSteps({
 						? isInvitedWorkspace
 							? `Join ${organization?.name ?? "your workspace"}`
 							: "Set up your workspace"
-						: progress.step === "profile"
-							? "Set up your profile"
-							: progress.step === "invite"
-								? "Invite teammates"
-								: snapshot.state === "completed"
-									? "Your dashboard is ready"
-									: "Your sessions are on their way"}
+						: progress.step === "github"
+							? "Connect GitHub"
+							: progress.step === "profile"
+								? "Set up your profile"
+								: progress.step === "invite"
+									? "Invite teammates"
+									: snapshot.state === "completed"
+										? "Your dashboard is ready"
+										: "Your sessions are on their way"}
 				</h1>
 				<p>
 					{progress.step === "workspace"
 						? isInvitedWorkspace
 							? "Connect and upload your sessions to this workspace."
 							: "Where your team's sessions will land."
-						: progress.step === "profile"
-							? "Choose how you’ll appear in your workspace."
-							: progress.step === "invite"
-								? "Bring your team into the picture."
-								: "You’re all set. Your dashboard will open when the upload finishes."}
+						: progress.step === "github"
+							? "See merged PRs and CI runs next to your sessions."
+							: progress.step === "profile"
+								? "Choose how you’ll appear in your workspace."
+								: progress.step === "invite"
+									? "Bring your team into the picture."
+									: "You’re all set. Your dashboard will open when the upload finishes."}
 				</p>
 				{error && (
 					<p className="cli-onboarding-error" role="alert">
@@ -508,6 +604,22 @@ export function WelcomeSteps({
 						)}
 					</form>
 				)}
+				{progress.step === "github" ? (
+					<WelcomeGitHubStep
+						status={github.query.data}
+						result={githubResult}
+						connected={progress.github === "connected"}
+						busy={github.action !== "idle"}
+						error={github.actionError}
+						onConnect={() => void github.connect()}
+						onSkip={() =>
+							advance("profile", progress.organizationId, "skipped")
+						}
+						onContinue={() =>
+							advance("profile", progress.organizationId, "connected")
+						}
+					/>
+				) : null}
 				{progress.step === "profile" && (
 					<form
 						onSubmit={(event) => void saveProfile(event)}
@@ -652,23 +764,4 @@ export function WelcomeSteps({
 			</div>
 		</div>
 	);
-}
-
-function readProgress(key: string, snapshot: CliConnectionSnapshot): Progress {
-	try {
-		const parsed = ProgressSchema.safeParse(
-			JSON.parse(localStorage.getItem(key) ?? "null"),
-		);
-		if (parsed.success) return parsed.data;
-	} catch {
-		/* Fall back to the server-confirmed connection state. */
-	}
-	return {
-		step:
-			snapshot.organizationId && snapshot.state !== "awaiting_login"
-				? "profile"
-				: "workspace",
-		organizationId:
-			snapshot.state === "awaiting_login" ? null : snapshot.organizationId,
-	};
 }

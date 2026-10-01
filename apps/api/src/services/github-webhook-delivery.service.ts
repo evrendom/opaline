@@ -337,7 +337,7 @@ async function scheduleRefresh(
 	return rows.map(({ id }) => id);
 }
 
-async function applyInstallationChange(
+export async function applyInstallationChange(
 	transaction: Transaction,
 	input: {
 		readonly change: "deleted" | "suspended" | "unsuspended";
@@ -354,9 +354,15 @@ async function applyInstallationChange(
 				: ["active", ["suspended"]];
 	const updated = await transaction.unsafe(
 		`UPDATE github_app_installation SET status = $2, updated_at = $4
-		 WHERE installation_id = $1 AND status = ANY($3::text[])
+		 WHERE installation_id = $1 AND status = ANY($3::text[]) AND organization_id = $5
 		 RETURNING installation_id`,
-		[input.installationId, status, fromStatuses, input.now.toISOString()],
+		[
+			input.installationId,
+			status,
+			fromStatuses,
+			input.now.toISOString(),
+			input.organizationId,
+		],
 	);
 	if (input.change === "unsuspended") {
 		const bindings = await transaction.unsafe<Array<{ repository_id: string }>>(
