@@ -39,6 +39,8 @@ export function LoginForm(props: LoginFormProps = {}) {
 	const { hideSwitchPrompt = false } = props;
 	const [initialLoginDraft] = useState(readPendingEmailLoginCodeDraft);
 	const [email, setEmail] = useState(() => initialLoginDraft?.email ?? "");
+	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
 	const [emailCode, setEmailCode] = useState("");
 	const [emailCodeStage, setEmailCodeStage] = useState<EmailCodeStage>(() =>
 		initialLoginDraft ? "code" : "email",
@@ -67,12 +69,12 @@ export function LoginForm(props: LoginFormProps = {}) {
 		setFeedback(null);
 		const loginEmail = normalizeAuthEmail(email);
 
-		if (emailCodeStage === "email") {
+		if (emailCodeStage === "email" && !showPassword) {
 			await sendEmailCode();
 			return;
 		}
 
-		if (!hasValidEmailCode) {
+		if (!showPassword && !hasValidEmailCode) {
 			const codeField = document.getElementById(LOGIN_CODE_INPUT_ID);
 			if (codeField instanceof HTMLInputElement) {
 				codeField.focus();
@@ -88,14 +90,16 @@ export function LoginForm(props: LoginFormProps = {}) {
 		trackAuthenticationAction({
 			actionName: "sign_in",
 			sourceComponent: "login_form",
-			authMethod: "email_otp",
+			authMethod: showPassword ? "email_password" : "email_otp",
 		});
 		clearPendingSignupRedirect();
 		setLoading(true);
-		const { error } = await authClient.signIn.emailOtp({
-			email: loginEmail,
-			otp: emailCode,
-		});
+		const { error } = showPassword
+			? await authClient.signIn.email({ email: loginEmail, password })
+			: await authClient.signIn.emailOtp({
+					email: loginEmail,
+					otp: emailCode,
+				});
 		setLoading(false);
 		if (error) {
 			setFeedback({
@@ -103,7 +107,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 				message: formatAuthErrorMessage({
 					error,
 					fallbackMessage: "Sign in failed",
-					operation: "email code sign in",
+					operation: showPassword ? "password sign in" : "email code sign in",
 				}),
 			});
 			return;
@@ -339,8 +343,51 @@ export function LoginForm(props: LoginFormProps = {}) {
 									required
 								/>
 							</div>
+							{showPassword ? (
+								<div className="flex flex-col gap-2">
+									<Label className="sr-only" htmlFor="password">
+										Password
+									</Label>
+									<Input
+										id="password"
+										name="password"
+										type="password"
+										autoComplete="current-password"
+										placeholder="Password"
+										value={password}
+										onChange={(e) => {
+											setPassword(e.target.value);
+											setFeedback(null);
+										}}
+										disabled={loading}
+										required
+									/>
+								</div>
+							) : null}
 							<Button type="submit" disabled={loading}>
-								{loading ? "Sending code..." : "Send code"}
+								{showPassword
+									? loading
+										? "Signing in..."
+										: "Sign in"
+									: loading
+										? "Sending code..."
+										: "Send code"}
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="text-muted-foreground"
+								disabled={loading}
+								onClick={() => {
+									setShowPassword(!showPassword);
+									setPassword("");
+									setFeedback(null);
+								}}
+							>
+								{showPassword
+									? "Use an email code instead"
+									: "Use a password instead"}
 							</Button>
 						</form>
 					) : (

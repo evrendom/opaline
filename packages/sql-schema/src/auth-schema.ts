@@ -188,6 +188,81 @@ export const deviceCode = pgTable("deviceCode", {
 	scope: text("scope"),
 });
 
+// OAuth clients and tokens for the MCP plugin (Codex / ChatGPT connectors).
+export const oauthApplication = pgTable("oauthApplication", {
+	id: text("id").primaryKey(),
+	name: text("name"),
+	icon: text("icon"),
+	metadata: text("metadata"),
+	clientId: text("client_id").notNull().unique(),
+	clientSecret: text("client_secret"),
+	redirectUrls: text("redirect_urls").notNull(),
+	type: text("type").notNull(),
+	authenticationScheme: text("authentication_scheme"),
+	disabled: boolean("disabled").default(false),
+	userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+});
+
+export const oauthAccessToken = pgTable("oauthAccessToken", {
+	id: text("id").primaryKey(),
+	accessToken: text("access_token").notNull().unique(),
+	refreshToken: text("refresh_token").notNull().unique(),
+	accessTokenExpiresAt: timestamp("access_token_expires_at", {
+		withTimezone: true,
+		mode: "date",
+	}).notNull(),
+	refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+		withTimezone: true,
+		mode: "date",
+	}).notNull(),
+	clientId: text("client_id")
+		.notNull()
+		.references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+	userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+	scopes: text("scopes").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+});
+
+export const oauthConsent = pgTable("oauthConsent", {
+	id: text("id").primaryKey(),
+	clientId: text("client_id")
+		.notNull()
+		.references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+	userId: text("user_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }),
+	scopes: text("scopes").notNull(),
+	consentGiven: boolean("consent_given").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+});
+
+// Settings the user edits on the Opaline plugin page in ChatGPT and Codex.
+export const mcpUserSetting = pgTable("mcp_user_setting", {
+	userId: text("user_id")
+		.primaryKey()
+		.references(() => user.id, { onDelete: "cascade" }),
+	defaultWorkspace: text("default_workspace"),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+});
+
 export type UserSelect = typeof user.$inferSelect;
 export type UserInsert = typeof user.$inferInsert;
 export type SessionSelect = typeof session.$inferSelect;

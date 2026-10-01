@@ -24,6 +24,7 @@ const {
 	mockNavigateToDestination,
 	mockRefreshAuthClientState,
 	mockSendVerificationOtp,
+	mockSignInEmail,
 	mockSignInEmailOtp,
 	mockSignInSocial,
 	mockTrackAuthenticationAction,
@@ -31,6 +32,7 @@ const {
 	mockNavigateToDestination: vi.fn(),
 	mockRefreshAuthClientState: vi.fn(),
 	mockSendVerificationOtp: vi.fn(),
+	mockSignInEmail: vi.fn(),
 	mockSignInEmailOtp: vi.fn(),
 	mockSignInSocial: vi.fn(),
 	mockTrackAuthenticationAction: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock("@/lib/auth-client", () => ({
 			sendVerificationOtp: mockSendVerificationOtp,
 		},
 		signIn: {
+			email: mockSignInEmail,
 			emailOtp: mockSignInEmailOtp,
 			social: mockSignInSocial,
 		},
@@ -72,6 +75,7 @@ describe("auth state refresh", () => {
 	beforeEach(() => {
 		window.history.replaceState({}, "", "/");
 		mockSendVerificationOtp.mockReset();
+		mockSignInEmail.mockReset();
 		mockSignInEmailOtp.mockReset();
 		mockSignInSocial.mockReset();
 		mockNavigateToDestination.mockReset();
@@ -414,6 +418,82 @@ describe("auth state refresh", () => {
 
 		expect(mockRefreshAuthClientState).toHaveBeenCalledTimes(1);
 		expect(window.location.search).toBe("");
+	});
+
+	it.each([
+		"/",
+		"/acme/sessions",
+		"/api/mcp/consent?client_id=chatgpt&state=review",
+	])("hard-navigates to %s after password sign in", async (destination) => {
+		window.history.replaceState(
+			{},
+			"",
+			`/login?redirect=${encodeURIComponent(destination)}&signup_redirect=%2Fwelcome`,
+		);
+		mockSignInEmail.mockResolvedValue({ error: null });
+		const user = userEvent.setup();
+		render(<LoginForm />);
+
+		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
+		expect(
+			screen.getByRole("button", { name: "Send code" }),
+		).toBeInTheDocument();
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+		await user.type(screen.getByLabelText("Email"), "Ada@Example.com");
+		await user.click(
+			screen.getByRole("button", { name: "Use a password instead" }),
+		);
+		await user.type(screen.getByLabelText("Password"), "reviewer-password");
+		await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+		await waitFor(() => {
+			expect(mockNavigateToDestination).toHaveBeenCalledWith(destination);
+		});
+		expect(mockSignInEmail).toHaveBeenCalledWith({
+			email: "Ada@Example.com",
+			password: "reviewer-password",
+		});
+		expect(mockRefreshAuthClientState).toHaveBeenCalledTimes(1);
+		expect(mockSendVerificationOtp).not.toHaveBeenCalled();
+		expect(mockSignInEmailOtp).not.toHaveBeenCalled();
+		expect(
+			new URLSearchParams(window.location.search).has("signup_redirect"),
+		).toBe(false);
+	});
+
+	it("shows password sign in errors and can switch back to email codes", async () => {
+		mockSignInEmail.mockResolvedValue({
+			error: { message: "Invalid email or password" },
+		});
+		mockSendVerificationOtp.mockResolvedValue({ error: null });
+		const user = userEvent.setup();
+		render(<LoginForm />);
+
+		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
+		await user.type(screen.getByLabelText("Email"), "ada@example.com");
+		await user.click(
+			screen.getByRole("button", { name: "Use a password instead" }),
+		);
+		await user.type(screen.getByLabelText("Password"), "wrong-password");
+		await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+		const alert = await screen.findByRole("alert");
+		expect(alert).toHaveTextContent("Invalid email or password");
+		expect(alert).toHaveTextContent("Operation: password sign in");
+		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
+		expect(mockNavigateToDestination).not.toHaveBeenCalled();
+		expect(mockRefreshAuthClientState).not.toHaveBeenCalled();
+		await user.click(
+			screen.getByRole("button", { name: "Use an email code instead" }),
+		);
+		expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Send code" }));
+		expect(await screen.findByLabelText("Email code")).toBeInTheDocument();
+		expect(mockSendVerificationOtp).toHaveBeenCalledWith({
+			email: "ada@example.com",
+			type: "sign-in",
+		});
 	});
 
 	it("restores a pending email sign in code after remounting", async () => {

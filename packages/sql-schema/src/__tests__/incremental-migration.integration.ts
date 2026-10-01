@@ -18,13 +18,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0046 to a database already migrated through 0019, main's 0043, repository evidence 0044, and GitHub evidence 0045", async () => {
+test("applies migrations 0020-0047 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, and GitHub webhook delivery 0046", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0046_github_webhook_delivery");
+	expect(latestMigration?.tag).toBe("0047_mcp_oauth");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -36,6 +36,7 @@ test("applies migrations 0020-0046 to a database already migrated through 0019, 
 	const migrationsThrough0043 = await createMigrationsThrough(43);
 	const migrationsThrough0044 = await createMigrationsThrough(44);
 	const migrationsThrough0045 = await createMigrationsThrough(45);
+	const migrationsThrough0046 = await createMigrationsThrough(46);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -94,10 +95,33 @@ test("applies migrations 0020-0046 to a database already migrated through 0019, 
 				SELECT to_regclass('public.github_webhook_delivery')::text AS name
 			`;
 			expect(webhookBefore0046?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0046 });
+			const [oauthBefore0047] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public."oauthAccessToken"')::text AS name
+			`;
+			expect(oauthBefore0047?.name).toBeNull();
 
 			await migrate(database, { migrationsFolder });
+			const mcpTables = await migrationSql<Array<{ name: string }>>`
+				SELECT tablename AS name
+				FROM pg_tables
+				WHERE schemaname = 'public'
+					AND tablename IN (
+						'mcp_user_setting',
+						'oauthAccessToken',
+						'oauthApplication',
+						'oauthConsent'
+					)
+				ORDER BY tablename
+			`;
+			expect([...mcpTables]).toEqual([
+				{ name: "mcp_user_setting" },
+				{ name: "oauthAccessToken" },
+				{ name: "oauthApplication" },
+				{ name: "oauthConsent" },
+			]);
 
-			const [after0046] = await migrationSql<MigrationState[]>`
+			const [after0047] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -106,8 +130,8 @@ test("applies migrations 0020-0046 to a database already migrated through 0019, 
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0046).toEqual({
-				count: 47,
+			expect(after0047).toEqual({
+				count: 48,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [customerAccountTable] = await migrationSql<TableState[]>`

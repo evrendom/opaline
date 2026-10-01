@@ -7,6 +7,7 @@ const indexablePaths = [
 	"/legal/terms-of-service/",
 	"/legal/data-processing-agreement/",
 	"/legal/subprocessors/",
+	"/support/",
 ] as const;
 
 const escapeXml = (value: string) =>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import {
@@ -45,6 +46,10 @@ export function AuthenticatedApp({
 		(pathname === "/" || pathname === "/login") && rootRedirectTarget
 			? rootRedirectTarget
 			: `${pathname}${search}${hash}`;
+	// API pages (such as the MCP connection consent) are not SPA routes.
+	if (destination.startsWith("/api/")) {
+		return <ApiPageRedirect to={destination} />;
+	}
 	if (getWorkspaceRelativePath(destination) !== null) {
 		if (state.isLoading) return <ProductLoadingScreen />;
 		const workspace = state.activeOrg ?? state.organizations[0];
@@ -64,4 +69,11 @@ export function AuthenticatedApp({
 			return <Navigate to={appRoutes.settingsWorkspace()} replace />;
 	}
 	return <AppRouter rootRedirectTarget={rootRedirectTarget} />;
+}
+
+function ApiPageRedirect({ to }: { to: string }) {
+	useEffect(() => {
+		window.location.replace(to);
+	}, [to]);
+	return <ProductLoadingScreen />;
 }

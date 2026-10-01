@@ -209,6 +209,10 @@
 			"destination": "/api/rpc?__opaline_path=/rpc/:routePath*"
 		},
 		{
+			"source": "/.well-known/:routePath*",
+			"destination": "/api/rpc?__opaline_path=/.well-known/:routePath*"
+		},
+		{
 			"source": "/health",
 			"destination": "/api/rpc?__opaline_path=/health"
 		},

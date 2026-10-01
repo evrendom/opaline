@@ -18,6 +18,7 @@ import {
 	handleConfiguredGitHubWebhookRequest,
 } from "./handlers/github-webhook-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
+import { handleMcpRoute } from "./handlers/mcp-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
@@ -439,6 +440,13 @@ async function handleRequest(
 	if (url.pathname === GITHUB_WEBHOOK_PATH) {
 		return handleConfiguredGitHubWebhookRequest(request);
 	}
+	const mcpResponse = handleMcpRoute(request, url, {
+		auth,
+		allowedOrigins: trustedOrigins,
+		publicLookupSource,
+		requestId,
+	});
+	if (mcpResponse) return mcpResponse;
 	if (url.pathname === STRIPE_WEBHOOK_PATH) {
 		const stripeConfig = getStripeWebhookConfig();
 		if (!stripeConfig) {
@@ -582,7 +590,7 @@ async function handleRequest(
 	if (url.pathname === "/api/auth/organization/delete") {
 		return new Response("Not Found", { status: 404, headers: cors });
 	}
-	if (url.pathname.startsWith("/api/auth")) {
+	if (url.pathname === "/api/auth" || url.pathname.startsWith("/api/auth/")) {
 		const response = await auth.handler(request);
 		for (const [key, value] of Object.entries(cors)) {
 			response.headers.set(key, value);

@@ -1,0 +1,105 @@
+{
+	"name": "opaline",
+	"version": "1.0.0",
+	"description": "Ask about your team's Claude Code and Codex sessions, costs, skills and repositories in Opaline.",
+	"author": {
+		"name": "Opaline",
+		"email": "evren@opaline.so",
+		"url": "https://opaline.so"
+	},
+	"homepage": "https://opaline.so",
+	"repository": "https://github.com/opalinehq/athena",
+	"license": "MIT",
+	"keywords": ["opaline", "analytics", "claude-code", "codex", "sessions"],
+	"skills": "./skills/",
+	"mcpServers": "./.mcp.json",
+	"interface": {
+		"displayName": "Opaline",
+		"shortDescription": "Coding agent costs & sessions",
+		"longDescription": "Opaline indexes the Claude Code and Codex sessions you and your team upload with the Opaline CLI. Ask what your coding agents cost and which members, repositories and models drove it, list and open past sessions down to individual turns, see which skills get used, and check whether an error has come up before. The Opaline dashboard also opens from the sidebar.\n\nOpaline only reads data from workspaces your Opaline account belongs to, and it cannot change or delete your sessions or workspace data. Sessions must be uploaded with the Opaline CLI first; the plugin walks you through that after installation.",
+		"developerName": "Opaline",
+		"category": "Developer Tools",
+		"capabilities": [
+			"Report agent cost, sessions and runs over time",
+			"List and open past coding sessions",
+			"Show team, repository and skill usage",
+			"Find recurring errors"
+		],
+		"websiteURL": "https://opaline.so",
+		"supportURL": "https://opaline.so/support/",
+		"privacyPolicyURL": "https://opaline.so/legal/privacy-policy/",
+		"termsOfServiceURL": "https://opaline.so/legal/terms-of-service/",
+		"defaultPrompt": [
+			"What did our coding agents cost this month, and what drove it?",
+			"Show my sessions from yesterday",
+			"Which errors keep coming up in our sessions?"
+		],
+		"brandColor": "#1F1F1F",
+		"brandColorDark": "#ECECEC",
+		"composerIcon": "./assets/opaline.png",
+		"composerIconDark": "./assets/opaline-dark.png",
+		"logo": "./assets/opaline.png",
+		"logoDark": "./assets/opaline-dark.png",
+		"screenshots": []
+	},
+	"extensions": {
+		"com.openai": {
+			"onboardingSkill": "./skills/setup/SKILL.md",
+			"review": {
+				"test_cases": {
+					"positive": [
+						{
+							"description": "Cost over a period and what drove it",
+							"prompt": "What did our coding agents cost in the last 30 days, and which repository and model drove it?",
+							"tools_triggered": "get_dashboard",
+							"expected_behavior": "States the total estimated API cost in USD for the last 30 days and names the top repositories and models with their amounts, using the sample workspace data, with a link to the same dashboard view on opaline.so."
+						},
+						{
+							"description": "List recent sessions",
+							"prompt": "Show my coding sessions from the last 7 days.",
+							"tools_triggered": "list_sessions",
+							"expected_behavior": "Lists the sample sessions from the last 7 days with date, repository, agent, model, duration and estimated cost."
+						},
+						{
+							"description": "Explain one session",
+							"prompt": "What happened in my most recent coding session?",
+							"tools_triggered": "list_sessions, get_session, read_session_turn",
+							"expected_behavior": "Finds the newest sample session and summarizes what was asked and what the agent did, based on its turns, without inventing details."
+						},
+						{
+							"description": "Team usage",
+							"prompt": "Who on my team used coding agents the most this month?",
+							"tools_triggered": "get_team",
+							"expected_behavior": "Ranks the members of the sample workspace by sessions or cost for the period and shows their totals."
+						},
+						{
+							"description": "Recurring errors",
+							"prompt": "Which errors keep coming up in our coding sessions lately?",
+							"tools_triggered": "find_recurring_errors",
+							"expected_behavior": "Lists errors that occurred in more than one sample session in the period with how often they occurred, or says that none recurred."
+						}
+					],
+					"negative": [
+						{
+							"description": "Deleting data is not supported",
+							"prompt": "Delete my coding session from yesterday in Opaline."
+						},
+						{
+							"description": "Purchasing a plan is not supported",
+							"prompt": "Upgrade my Opaline workspace to the paid plan."
+						},
+						{
+							"description": "Workspaces the account does not belong to",
+							"prompt": "Show the coding agent costs of the acme-corp workspace in Opaline."
+						}
+					]
+				},
+				"commerce": false,
+				"commerce_description": "Opaline does not sell products or process payments in ChatGPT or Codex."
+			},
+			"publication": {
+				"release_notes": "First release: agent cost and usage dashboards, sessions down to individual turns, team, skills, repositories and recurring errors, with a sidebar dashboard, a default workspace setting and session @-mentions."
+			}
+		}
+	}
+}
