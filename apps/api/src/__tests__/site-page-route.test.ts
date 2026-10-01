@@ -33,6 +33,8 @@ test("workspace routes require an existence check", () => {
 		"/acme/sessions/",
 		"/acme/sessions/session-id/v2",
 		"/acme/settings/members",
+		"/acme/settings/github",
+		"/acme/settings/sessions",
 		"/acme/dashboard",
 		"/acme/home",
 		"/acme/skills",

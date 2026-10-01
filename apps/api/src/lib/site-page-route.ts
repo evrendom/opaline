@@ -10,7 +10,7 @@ export type SitePageRoute =
 // Unlike a blanket SPA fallback, this cannot turn arbitrary public URLs into
 // successful login pages. Workspace existence is checked at the HTTP boundary.
 const SETTINGS_PATH =
-	/^\/settings(?:\/(?:account|workspace|members|invitations|create-workspace))?$/u;
+	/^\/settings(?:\/(?:account|workspace|github|sessions|members|invitations|create-workspace))?$/u;
 const SESSION_PATH = /^\/(?:session|sessions|newsesh)(?:\/[^/]+(?:\/v2)?)?$/u;
 const LEGACY_PATH =
 	/^\/(?:dashboard(?:\/(?:sessions(?:\/[^/]+)?|developers(?:\/[^/]+)?|projects|errors|roi|analytics))?|dashboardy|developers(?:\/[^/]+)?|projects|errors|roi|analytics|session\/full\/[^/]+)$/u;
