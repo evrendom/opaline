@@ -100,6 +100,244 @@ export const RudelDependencyHealthProbesRowSchema = z.object({
 export type RudelDependencyHealthProbesRowInput = z.input<typeof RudelDependencyHealthProbesRowSchema>
 export type RudelDependencyHealthProbesRowOutput = z.output<typeof RudelDependencyHealthProbesRowSchema>
 
+export type RudelGithubCiJobsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  run_id: string
+  attempt: number
+  job_id: string
+  name: string
+  status: string
+  conclusion: string | null
+  created_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  runner_name: string
+  labels: string[]
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubCiJobsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  run_id: z.string(),
+  attempt: z.number(),
+  job_id: z.string(),
+  name: z.string(),
+  status: z.string(),
+  conclusion: z.string().nullable(),
+  created_at: z.string().nullable(),
+  started_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  runner_name: z.string(),
+  labels: z.array(z.string()),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubCiJobsRowInput = z.input<typeof RudelGithubCiJobsRowSchema>
+export type RudelGithubCiJobsRowOutput = z.output<typeof RudelGithubCiJobsRowSchema>
+
+export type RudelGithubCiRunPullRequestsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  pr_number: number
+  run_created_at: string
+  kind: string
+  run_id: string
+  attempt: number
+  basis: string
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubCiRunPullRequestsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  pr_number: z.number(),
+  run_created_at: z.string(),
+  kind: z.string(),
+  run_id: z.string(),
+  attempt: z.number(),
+  basis: z.string(),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubCiRunPullRequestsRowInput = z.input<typeof RudelGithubCiRunPullRequestsRowSchema>
+export type RudelGithubCiRunPullRequestsRowOutput = z.output<typeof RudelGithubCiRunPullRequestsRowSchema>
+
+export type RudelGithubCiRunsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  kind: string
+  run_id: string
+  attempt: number
+  created_at: string
+  updated_at: string | null
+  workflow_id: string
+  workflow_name: string
+  workflow_path: string
+  app_slug: string
+  event: string
+  head_sha: string
+  head_branch: string
+  status: string
+  conclusion: string | null
+  run_started_at: string | null
+  completed_at: string | null
+  actor: string
+  triggering_actor: string
+  display_title: string
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubCiRunsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  kind: z.string(),
+  run_id: z.string(),
+  attempt: z.number(),
+  created_at: z.string(),
+  updated_at: z.string().nullable(),
+  workflow_id: z.string(),
+  workflow_name: z.string(),
+  workflow_path: z.string(),
+  app_slug: z.string(),
+  event: z.string(),
+  head_sha: z.string(),
+  head_branch: z.string(),
+  status: z.string(),
+  conclusion: z.string().nullable(),
+  run_started_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  actor: z.string(),
+  triggering_actor: z.string(),
+  display_title: z.string(),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubCiRunsRowInput = z.input<typeof RudelGithubCiRunsRowSchema>
+export type RudelGithubCiRunsRowOutput = z.output<typeof RudelGithubCiRunsRowSchema>
+
+export type RudelGithubPullRequestCommitsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  sha: string
+  pr_number: number
+  last_seen_head_sha: string
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubPullRequestCommitsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  sha: z.string(),
+  pr_number: z.number(),
+  last_seen_head_sha: z.string(),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubPullRequestCommitsRowInput = z.input<typeof RudelGithubPullRequestCommitsRowSchema>
+export type RudelGithubPullRequestCommitsRowOutput = z.output<typeof RudelGithubPullRequestCommitsRowSchema>
+
+export type RudelGithubPullRequestDetailsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  number: number
+  additions: number | null
+  deletions: number | null
+  changed_files: number | null
+  commits: number | null
+  merged_by: string
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubPullRequestDetailsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  number: z.number(),
+  additions: z.number().nullable(),
+  deletions: z.number().nullable(),
+  changed_files: z.number().nullable(),
+  commits: z.number().nullable(),
+  merged_by: z.string(),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubPullRequestDetailsRowInput = z.input<typeof RudelGithubPullRequestDetailsRowSchema>
+export type RudelGithubPullRequestDetailsRowOutput = z.output<typeof RudelGithubPullRequestDetailsRowSchema>
+
+export type RudelGithubPullRequestsRow = {
+  workspace_id: string
+  provider: string
+  repository_id: string
+  number: number
+  provider_pull_request_id: string
+  state: string
+  draft: number
+  created_at: string
+  updated_at: string
+  closed_at: string | null
+  merged_at: string | null
+  head_sha: string
+  head_ref: string
+  base_ref: string
+  head_repository_id: string
+  merge_commit_sha: string
+  author_id: string
+  author_login: string
+  title: string
+  labels: string[]
+  version: string
+  synced_at: string
+}
+
+export const RudelGithubPullRequestsRowSchema = z.object({
+  workspace_id: z.string(),
+  provider: z.string(),
+  repository_id: z.string(),
+  number: z.number(),
+  provider_pull_request_id: z.string(),
+  state: z.string(),
+  draft: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  closed_at: z.string().nullable(),
+  merged_at: z.string().nullable(),
+  head_sha: z.string(),
+  head_ref: z.string(),
+  base_ref: z.string(),
+  head_repository_id: z.string(),
+  merge_commit_sha: z.string(),
+  author_id: z.string(),
+  author_login: z.string(),
+  title: z.string(),
+  labels: z.array(z.string()),
+  version: z.string(),
+  synced_at: z.string(),
+})
+
+export type RudelGithubPullRequestsRowInput = z.input<typeof RudelGithubPullRequestsRowSchema>
+export type RudelGithubPullRequestsRowOutput = z.output<typeof RudelGithubPullRequestsRowSchema>
+
 export type RudelRepositorySessionEvidenceIndexRow = {
   organization_id: string
   user_id: string

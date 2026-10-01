@@ -29,7 +29,7 @@ export function GitHubConnectionCard({
 	return (
 		<WorkspaceSettingsGroup
 			title="GitHub"
-			description="Connect GitHub so Opaline can verify repositories and attach pull requests, reviews, checks, and workflow results to new sessions. Session content is not sent to GitHub."
+			description="Connect GitHub so Opaline can count merged pull requests and CI runs in your repositories and attach them to sessions. Session content is not sent to GitHub."
 		>
 			<WorkspaceSettingsRow
 				label="Connection"
@@ -48,6 +48,33 @@ export function GitHubConnectionCard({
 			</WorkspaceSettingsRow>
 
 			{status?.connected ? <RepositoryAccess status={status} /> : null}
+			{status?.connected ? (
+				<WorkspaceSettingsRow
+					label="Dashboard"
+					description={
+						status.dashboard === "visible"
+							? "Merged PRs and CI runs are on the dashboard."
+							: "Opaline is reading pull request and CI history from GitHub. Merged PRs and CI runs appear on the dashboard when it finishes."
+					}
+				>
+					{status.dashboard === "visible" ? (
+						<a
+							className="cost-text-button"
+							href="../dashboard?metric=mergedPullRequests"
+						>
+							Open dashboard
+						</a>
+					) : null}
+				</WorkspaceSettingsRow>
+			) : null}
+			{status?.connected && status.canManage ? (
+				<WorkspaceSettingsRow
+					label="CI history"
+					description="GitHub keeps workflow runs and checks only for each repository's Actions retention period, 90 days by default. Raising it in Settings → Actions → General keeps more history from now on. It can't bring back runs GitHub has already deleted."
+				>
+					<a href={status.manageUrl ?? undefined}>Check GitHub access</a>
+				</WorkspaceSettingsRow>
+			) : null}
 
 			<WorkspaceSettingsRow
 				label="Opaline CLI"

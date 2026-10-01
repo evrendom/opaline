@@ -24,7 +24,7 @@ import {
 	enqueueGitHubEvidenceCollection,
 	GitHubEvidenceCapacityError,
 } from "./github-evidence-persistence.service.js";
-import { getPullRequestDashboardMetrics } from "./pull-request-dashboard.service.js";
+import { getGitHubOutcomesDashboardMetrics } from "./github-outcomes-dashboard.service.js";
 import { deleteUserPostgresData } from "./user-deletion.service.js";
 
 setDefaultTimeout(60_000);
@@ -413,22 +413,34 @@ describe("GitHub evidence queue and attribution", () => {
 		});
 		expect(
 			(
-				await getPullRequestDashboardMetrics(workspace.organizationId, input, {
-					database: sqlClient,
-					queryClickhouse,
-				})
+				await getGitHubOutcomesDashboardMetrics(
+					workspace.organizationId,
+					input,
+					null,
+					false,
+					{
+						database: sqlClient,
+						queryClickhouse,
+					},
+				)
 			).mergedPullRequests,
-		).toBeNull();
+		).toEqual(expect.objectContaining({ total: 0 }));
 		await run(
 			{ ...base, listCommitPullRequests: async () => page<never>([]) },
 			true,
 		);
 		expect(
 			(
-				await getPullRequestDashboardMetrics(workspace.organizationId, input, {
-					database: sqlClient,
-					queryClickhouse,
-				})
+				await getGitHubOutcomesDashboardMetrics(
+					workspace.organizationId,
+					input,
+					null,
+					false,
+					{
+						database: sqlClient,
+						queryClickhouse,
+					},
+				)
 			).mergedPullRequests?.total,
 		).toBe(0);
 	});

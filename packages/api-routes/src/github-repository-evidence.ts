@@ -22,6 +22,7 @@ export const GitHubRepositoryConnectionStatusSchema = z.object({
 	manageUrl: z.string().url().nullable(),
 	repositories: z.array(GitHubRepositoryBindingSchema).max(10_000),
 	repositorySelection: z.enum(["all", "selected"]).nullable(),
+	dashboard: z.enum(["notConnected", "syncing", "visible"]).optional(),
 });
 
 /**
@@ -35,6 +36,9 @@ export const GitHubRepositoryEvidenceStatusSchema = z.discriminatedUnion(
 		z.object({ visibility: z.literal("hidden") }),
 		z.object({
 			visibility: z.literal("visible"),
+			dashboard: z
+				.enum(["notConnected", "syncing", "visible"])
+				.default("notConnected"),
 			connection: GitHubRepositoryConnectionStatusSchema,
 		}),
 	],

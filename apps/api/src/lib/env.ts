@@ -312,6 +312,19 @@ export function isGitHubEvidenceUiEnabled(
 	return environment.GITHUB_EVIDENCE_UI_ENABLED === "true";
 }
 
+export function readGitHubEvidenceUiForceOrgIds(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	return [
+		...new Set(
+			(environment.GITHUB_EVIDENCE_UI_FORCE_ORG_IDS ?? "")
+				.split(",")
+				.map((value) => value.trim())
+				.filter(Boolean),
+		),
+	];
+}
+
 function readBooleanFromEnvironment(
 	environment: Readonly<Record<string, string | undefined>>,
 	name: string,

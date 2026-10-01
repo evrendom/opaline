@@ -194,10 +194,23 @@ async function deleteSessions(
 export function getClickHouseSessionPurgePlans(
 	column: "organization_id" | "user_id",
 ): ReadonlyArray<{
-	readonly column: "organization_id" | "user_id";
+	readonly column: "organization_id" | "user_id" | "workspace_id";
 	readonly table: string;
 }> {
 	return [
+		...(column === "organization_id"
+			? [
+					"github_pull_requests",
+					"github_pull_request_details",
+					"github_pull_request_commits",
+					"github_ci_runs",
+					"github_ci_run_pull_requests",
+					"github_ci_jobs",
+				].map((table) => ({
+					column: "workspace_id" as const,
+					table: `rudel.${table}`,
+				}))
+			: []),
 		...getAllAdapters().map((adapter) => ({
 			column,
 			table: adapter.rawTableName,
@@ -216,7 +229,7 @@ export function getClickHouseSessionPurgePlans(
 
 async function deleteSessionsFromTable(
 	tableName: string,
-	column: "organization_id" | "user_id",
+	column: "organization_id" | "user_id" | "workspace_id",
 	targetId: string,
 ): Promise<void> {
 	const clickhouse = getClickhouse();

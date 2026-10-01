@@ -521,6 +521,7 @@ describe("dashboard metric availability", () => {
 		expect(
 			listAvailableDashboardMetrics("organization", {
 				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
 			}),
 		).toEqual([
 			"cost",
@@ -529,10 +530,12 @@ describe("dashboard metric availability", () => {
 			"signals",
 			"mergedPullRequests",
 			"ciFailuresPerPullRequest",
+			"ciRuns",
 		]);
 		expect(
 			listAvailableDashboardMetrics("allOrganizations", {
 				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
 			}),
 		).toEqual(["cost", "sessions", "agentRuns", "signals"]);
 	});
@@ -543,6 +546,7 @@ describe("dashboard metric availability", () => {
 		});
 		const visible = listAvailableDashboardMetrics("organization", {
 			githubEvidenceUiEnabled: true,
+			githubVisibility: "visible",
 		});
 		for (const requestedMetric of [
 			"mergedPullRequests",
@@ -567,6 +571,7 @@ describe("dashboard metric availability", () => {
 		const visible = buildCostDashboard([], input, members, undefined, {
 			availableMetrics: listAvailableDashboardMetrics("organization", {
 				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
 			}),
 			pullRequests,
 		});
@@ -603,6 +608,7 @@ describe("dashboard metric availability", () => {
 			{
 				availableMetrics: listAvailableDashboardMetrics("organization", {
 					githubEvidenceUiEnabled: true,
+					githubVisibility: "visible",
 				}),
 				pullRequests,
 			},

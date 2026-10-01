@@ -1,5 +1,14 @@
 export * from "./billing.js";
 export {
+	CI_EVENT_LABELS,
+	CI_RUN_CONCLUSIONS,
+	CiConclusionSchema,
+	GITHUB_INACTIVE_FILTER_TOOLTIP,
+	GITHUB_RETENTION_TOOLTIP,
+	PULL_REQUEST_CI,
+	PullRequestCiSchema,
+} from "./schemas/github-outcomes.js";
+export {
 	SESSION_ARRIVALS_PATH,
 	type SessionArrival,
 	SessionArrivalsInputSchema,

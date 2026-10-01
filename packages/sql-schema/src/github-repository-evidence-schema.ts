@@ -31,6 +31,8 @@ export const githubAppInstallation = pgTable(
 		installedByUserId: text("installed_by_user_id").references(() => user.id, {
 			onDelete: "set null",
 		}),
+		sweepRateRemaining: integer("sweep_rate_remaining"),
+		sweepRateResetAt: timestamp("sweep_rate_reset_at", { withTimezone: true }),
 		installedAt: timestamp("installed_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),

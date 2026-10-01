@@ -18,15 +18,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0048 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, and GitHub webhook delivery 0046", async () => {
+test("applies migrations 0020-0050 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, and GitHub outcomes 0049", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe(
-		"0048_repository_evidence_index_publication",
-	);
+	expect(latestMigration?.tag).toBe("0050_organization_feature_readiness");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -39,6 +37,8 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 	const migrationsThrough0044 = await createMigrationsThrough(44);
 	const migrationsThrough0045 = await createMigrationsThrough(45);
 	const migrationsThrough0046 = await createMigrationsThrough(46);
+	const migrationsThrough0048 = await createMigrationsThrough(48);
+	const migrationsThrough0049 = await createMigrationsThrough(49);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -102,6 +102,16 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 				SELECT to_regclass('public."oauthAccessToken"')::text AS name
 			`;
 			expect(oauthBefore0047?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0048 });
+			const [sweepBefore0049] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.github_repository_sweep')::text AS name
+			`;
+			expect(sweepBefore0049?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0049 });
+			const [readinessBefore0050] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.organization_feature_readiness')::text AS name
+			`;
+			expect(readinessBefore0050?.name).toBeNull();
 
 			await migrate(database, { migrationsFolder });
 			const mcpTables = await migrationSql<Array<{ name: string }>>`
@@ -123,7 +133,7 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 				{ name: "oauthConsent" },
 			]);
 
-			const [after0047] = await migrationSql<MigrationState[]>`
+			const [after0050] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -132,8 +142,8 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0047).toEqual({
-				count: 49,
+			expect(after0050).toEqual({
+				count: 51,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const publicationColumns = await migrationSql<Array<{ name: string }>>`
@@ -149,6 +159,20 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 				"index_published_at",
 				"index_row",
 			]);
+			const outcomesTables = await migrationSql<Array<{ name: string }>>`
+				SELECT tablename AS name FROM pg_tables
+				WHERE schemaname = 'public' AND tablename IN (
+					'github_pull_request', 'github_pull_request_commit', 'github_ci_run',
+					'github_ci_job', 'github_repository_sweep'
+				)
+			`;
+			expect([...outcomesTables]).toEqual([
+				{ name: "github_repository_sweep" },
+			]);
+			const [readinessAfter0050] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.organization_feature_readiness')::text AS name
+			`;
+			expect(readinessAfter0050?.name).toBe("organization_feature_readiness");
 			const [customerAccountTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.customer_account_snapshot')::text AS name
 			`;
@@ -528,6 +552,9 @@ test("applies migrations 0020-0048 to a database already migrated through 0019, 
 		await rm(migrationsThrough0043, { force: true, recursive: true });
 		await rm(migrationsThrough0044, { force: true, recursive: true });
 		await rm(migrationsThrough0045, { force: true, recursive: true });
+		await rm(migrationsThrough0046, { force: true, recursive: true });
+		await rm(migrationsThrough0048, { force: true, recursive: true });
+		await rm(migrationsThrough0049, { force: true, recursive: true });
 	}
 });
 

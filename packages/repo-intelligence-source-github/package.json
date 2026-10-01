@@ -8,7 +8,8 @@
 	},
 	"scripts": {
 		"check-types": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"test:integration": "bun test ./src/github-sweep-source.integration.ts"
 	},
 	"dependencies": {
 		"zod": "^3.24.0"

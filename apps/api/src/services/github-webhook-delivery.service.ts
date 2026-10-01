@@ -1,4 +1,12 @@
 import type postgres from "postgres";
+import {
+	persistGitHubChecks,
+	persistGitHubPullRequests,
+	persistGitHubRuns,
+	persistGitHubStatuses,
+} from "./github-outcomes-persistence.service.js";
+import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
+import { enqueueGitHubRepositorySweep } from "./github-repository-sweep.service.js";
 import type { GitHubWebhookIntent } from "./github-webhook-events.js";
 
 /**
@@ -29,8 +37,9 @@ export type GitHubWebhookDeliveryResult =
 type Transaction = postgres.TransactionSql;
 
 /**
- * Claims the delivery and applies its intent in one transaction, so a delivery
- * is either fully applied exactly once or not at all. Tenancy always comes from
+ * Claims the delivery in Postgres, acknowledging versioned ClickHouse facts
+ * before committing delivery progress. A crash replays facts idempotently.
+ * Tenancy always comes from
  * Opaline's own installation and binding rows: the payload only contributes
  * numeric GitHub identifiers, which must match an active binding of the same
  * installation.
@@ -73,6 +82,7 @@ export async function recordGitHubWebhookDelivery(input: {
 			input.intent,
 			now,
 		);
+		await refreshPrTotalsReadiness(transaction, organizationId, now);
 		await transaction.unsafe(
 			"UPDATE github_webhook_delivery SET outcome = $2, affected_rows = $3 WHERE delivery_id = $1",
 			[input.deliveryId, applied.outcome, applied.affectedRows],
@@ -115,7 +125,7 @@ async function resolveOrganization(
 			   AND binding.repository_id = $2
 			   AND binding.status = 'active'
 			   AND installation.status = 'active'
-			 LIMIT 1`,
+			 LIMIT 1 FOR SHARE OF binding, installation`,
 			[intent.installationId, intent.repositoryId],
 		);
 		return rows[0]?.organization_id ?? null;
@@ -145,18 +155,64 @@ async function applyIntent(
 }> {
 	switch (intent.kind) {
 		case "refresh": {
+			if (intent.outcome) {
+				const scope = { organizationId, repositoryId: intent.repositoryId };
+				switch (intent.outcome.kind) {
+					case "pull_request":
+						await persistGitHubPullRequests(
+							scope,
+							[intent.outcome.data],
+							"webhook",
+							now,
+							transaction,
+						);
+						break;
+					case "actions_run":
+						await persistGitHubRuns(
+							scope,
+							[intent.outcome.data],
+							"webhook",
+							now,
+							transaction,
+						);
+						break;
+					case "check_suite":
+						await persistGitHubChecks(
+							scope,
+							[intent.outcome.data],
+							"check_suite",
+							"webhook",
+							now,
+							transaction,
+						);
+						break;
+					case "status":
+						await persistGitHubStatuses(
+							scope,
+							[intent.outcome.data],
+							intent.commitShas[0] ?? "",
+							"webhook",
+							now,
+							transaction,
+						);
+						break;
+				}
+			}
 			const refreshDueAt = new Date(
 				now.getTime() + GITHUB_WEBHOOK_REFRESH_DEBOUNCE_MS,
 			);
-			const collectionIds = await scheduleRefresh(transaction, {
-				commitShas: intent.commitShas,
-				now,
-				organizationId,
-				pullRequestIds: intent.pullRequestIds,
-				refreshDueAt,
-				repositoryId: intent.repositoryId,
-			});
-			const affectedRows = collectionIds.length;
+			const collectionIds =
+				intent.refreshSessionEvidence === false
+					? []
+					: await scheduleRefresh(transaction, {
+							commitShas: intent.commitShas,
+							now,
+							organizationId,
+							pullRequestIds: intent.pullRequestIds,
+							refreshDueAt,
+							repositoryId: intent.repositoryId,
+						});
+			const affectedRows = collectionIds.length + (intent.outcome ? 1 : 0);
 			return affectedRows > 0
 				? {
 						outcome: "refresh_scheduled",
@@ -302,6 +358,22 @@ async function applyInstallationChange(
 		 RETURNING installation_id`,
 		[input.installationId, status, fromStatuses, input.now.toISOString()],
 	);
+	if (input.change === "unsuspended") {
+		const bindings = await transaction.unsafe<Array<{ repository_id: string }>>(
+			`SELECT repository_id FROM github_repository_binding WHERE organization_id = $1 AND installation_id = $2 AND status = 'active'`,
+			[input.organizationId, input.installationId],
+		);
+		for (const binding of bindings)
+			await enqueueGitHubRepositorySweep(
+				{
+					organizationId: input.organizationId,
+					repositoryId: binding.repository_id,
+				},
+				input.now,
+				transaction,
+				true,
+			);
+	}
 	if (input.change !== "deleted") return updated.length;
 	const removed = await transaction.unsafe(
 		`UPDATE github_repository_binding SET status = 'removed', updated_at = $3

@@ -105,6 +105,7 @@ import {
 	GitHubEvidenceCapacityError,
 } from "./services/github-evidence-persistence.service.js";
 import { wakeGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
+import { readGitHubOutcomesReadiness } from "./services/github-outcomes-readiness.service.js";
 import { getGitHubRepositoryConnectionStatus } from "./services/github-repository-binding.service.js";
 import { resolveGitHubRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
 import {
@@ -1556,6 +1557,11 @@ const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 					database: sqlClient,
 					organizationId: context.organizationId,
 				}),
+			loadDashboard: async () =>
+				(await readGitHubOutcomesReadiness(sqlClient, context.organizationId))
+					?.firstReadyAt
+					? "visible"
+					: "syncing",
 		}),
 	);
 

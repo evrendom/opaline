@@ -16,6 +16,11 @@ import {
 	type ApiTestServer,
 	startApiTestServer,
 } from "./helpers/api-test-server.js";
+import {
+	seedGitHubPull,
+	seedGitHubRepository,
+	seedGitHubRun,
+} from "./helpers/github-outcomes-fixture.js";
 
 setDefaultTimeout(60_000);
 let server: ApiTestServer;
@@ -251,7 +256,7 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect((await dashboard({}, 1)).metrics.agentRuns?.total).toBe(1);
 	const sessionsView = await dashboard({ requestedMetric: "sessions" });
 	const mergedView = await dashboard({ requestedMetric: "mergedPullRequests" });
-	expect(mergedView.requestedMetric).toBe("mergedPullRequests");
+	expect(mergedView.requestedMetric).toBe("cost");
 	expect(mergedView.metrics.agentRuns?.total).toBe(8);
 	expect(mergedView.metrics.sessions?.total).toBeGreaterThan(0);
 	expect(mergedView.metrics.sessions?.total).toBe(
@@ -318,67 +323,21 @@ async function seedPullRequestActivity(
 		],
 		{ validate: true },
 	);
-	const installationId = `${repositoryId}-${user.id}`;
-	const collectionId = crypto.randomUUID();
-	await sqlClient.unsafe(
-		`INSERT INTO github_app_installation
-		 (installation_id, organization_id, account_id, account_login, account_type,
-		  repository_selection, permissions, status, installed_by_user_id)
-		 VALUES ($1, $2, '1', 'opalinehq', 'Organization', 'selected', '{}'::jsonb, 'active', $3)`,
-		[installationId, user.id, user.id],
+	await seedGitHubRepository(user.id, repositoryId, bindingFullName);
+	await seedGitHubPull(
+		user.id,
+		repositoryId,
+		148,
+		new Date(start - 3600000).toISOString(),
+		new Date(start).toISOString(),
 	);
-	await sqlClient.unsafe(
-		`INSERT INTO github_repository_binding
-		 (organization_id, repository_id, installation_id, node_id, owner, name,
-		  full_name, default_branch, is_private)
-		 VALUES ($1, $2, $3, $2, $4, $5, $6, 'main', true)`,
-		[
+	for (const id of ["lint", "test"])
+		await seedGitHubRun(
 			user.id,
 			repositoryId,
-			installationId,
-			owner,
-			repositoryName,
-			bindingFullName,
-		],
-	);
-	await sqlClient.unsafe(
-		`INSERT INTO github_evidence_collection
-		 (id, organization_id, repository_id, installation_id, session_id, session_source,
-		  session_user_id, commit_sha, status, source_version, coverage, completed_at)
-		 VALUES ($1, $2, $3, $4, $5, 'claude_code', $2, $6, 'complete', 'test',
-		  '{"pullRequestCoverageComplete":true}'::jsonb, $7)`,
-		[
-			collectionId,
-			user.id,
-			repositoryId,
-			installationId,
-			sessionId,
-			"b".repeat(40),
-			new Date(start).toISOString(),
-		],
-	);
-	await sqlClient.unsafe(
-		`INSERT INTO github_pull_request_snapshot
-		 (organization_id, collection_id, repository_id, provider_pull_request_id,
-		  pull_number, head_sha, merged_at, session_id, session_source, session_user_id,
-		  coverage_complete, ci_coverage_complete, observed_at)
-		 VALUES ($1, $2, $3, '148', 148, $4, $5, $6, 'claude_code', $1, true, true, $5)`,
-		[
-			user.id,
-			collectionId,
-			repositoryId,
-			"b".repeat(40),
-			new Date(start).toISOString(),
-			sessionId,
-		],
-	);
-	for (const jobId of ["lint", "test"])
-		await sqlClient.unsafe(
-			`INSERT INTO github_ci_log_receipt
-			 (organization_id, collection_id, repository_id, workflow_run_id, run_attempt,
-			  job_id, job_name, status, conclusion, filter_version, redaction_counts)
-			 VALUES ($1, $2, $3, $3, 1, $4, $4, 'completed', 'failure', 1, '{}'::jsonb)`,
-			[user.id, collectionId, repositoryId, jobId],
+			id,
+			new Date(start - 1800000).toISOString(),
+			{ conclusion: "failure", pullNumber: 148 },
 		);
 	return repository;
 }
@@ -401,6 +360,7 @@ test("PR repository IDs scope every headline like the default metric in both cut
 		for (const requestedMetric of [
 			"mergedPullRequests",
 			"ciFailuresPerPullRequest",
+			"ciRuns",
 		] as const) {
 			const result = await dashboard(
 				{ requestedMetric, repositories: ["148001"] },
@@ -499,7 +459,7 @@ test("PR canonical model filters retain legacy aliases and unknown identities in
 							baseline.metrics[metric]?.incomplete,
 						);
 					}
-					expect(result.metrics.mergedPullRequests?.total).toBe(1);
+					expect(result.metrics.mergedPullRequests?.total).toBe(2);
 					expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
 				}
 			}

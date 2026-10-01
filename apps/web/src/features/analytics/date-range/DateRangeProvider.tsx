@@ -5,6 +5,7 @@ import type {
 	DateRangeSource,
 } from "@/features/analytics/date-range/types";
 import {
+	getAnalyticsMaxDays,
 	getInclusiveDateRangeDays,
 	normalizeAnalyticsDateRange,
 } from "@/lib/analytics-date-range";
@@ -38,13 +39,20 @@ function readDateRangeFromSearchParams(
 	const toParam = searchParams.get("to");
 
 	if (fromParam && toParam) {
-		return normalizeAnalyticsDateRange(fromParam, toParam);
+		return normalizeAnalyticsDateRange(
+			fromParam,
+			toParam,
+			getAnalyticsMaxDays(searchParams.get("metric")),
+		);
 	}
 
 	return null;
 }
 
-function readStoredDateRange(storageKey: string): StoredDateRange | null {
+function readStoredDateRange(
+	storageKey: string,
+	maxDays: number,
+): StoredDateRange | null {
 	if (typeof window === "undefined") {
 		return null;
 	}
@@ -54,7 +62,7 @@ function readStoredDateRange(storageKey: string): StoredDateRange | null {
 		if (stored) {
 			const parsed: unknown = JSON.parse(stored);
 			if (isStoredDateRange(parsed)) {
-				return normalizeAnalyticsDateRange(parsed.start, parsed.end);
+				return normalizeAnalyticsDateRange(parsed.start, parsed.end, maxDays);
 			}
 		}
 	} catch {
@@ -87,7 +95,10 @@ function resolveDateRange(
 		return { dateRange: searchDateRange, source: "url" };
 	}
 
-	const storedDateRange = readStoredDateRange(storageKey);
+	const storedDateRange = readStoredDateRange(
+		storageKey,
+		getAnalyticsMaxDays(searchParams.get("metric")),
+	);
 	if (storedDateRange) {
 		return { dateRange: storedDateRange, source: "storage" };
 	}
@@ -134,8 +145,11 @@ export function DateRangeProvider({
 				);
 				const nextDateRange = updater(currentDateRange);
 				const normalizedDateRange =
-					normalizeAnalyticsDateRange(nextDateRange.start, nextDateRange.end) ??
-					currentDateRange;
+					normalizeAnalyticsDateRange(
+						nextDateRange.start,
+						nextDateRange.end,
+						getAnalyticsMaxDays(prev.get("metric")),
+					) ?? currentDateRange;
 				const nextSearchParams = new URLSearchParams(prev);
 
 				nextSearchParams.set("from", normalizedDateRange.start);
@@ -174,6 +188,7 @@ export function DateRangeProvider({
 			},
 		},
 		meta: {
+			maxDays: getAnalyticsMaxDays(searchParams.get("metric")),
 			dayCount: getInclusiveDateRangeDays(dateRange.start, dateRange.end),
 			source,
 		},

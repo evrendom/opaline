@@ -106,8 +106,15 @@ export function getChartSeriesValue(
 	seriesId: string,
 	today: string,
 	aggregation: ChartAggregation = "sum",
+	availableFrom?: string | null,
+	historyAvailable = true,
 ) {
-	if (point.startDate > today) return null;
+	if (
+		!historyAvailable ||
+		point.startDate > today ||
+		(availableFrom && point.endDate < availableFrom)
+	)
+		return null;
 	if (
 		aggregation === "ratio" &&
 		(point.denominatorValues?.[seriesId] ?? 0) === 0
@@ -115,6 +122,13 @@ export function getChartSeriesValue(
 		return null;
 	}
 	return point.values[seriesId] ?? 0;
+}
+
+export function isCiHistoryAvailable(
+	history: DashboardMetricData["githubHistory"],
+	endDate: string,
+) {
+	return Boolean(history?.ciFrom && endDate >= history.ciFrom);
 }
 
 function bucketDate(value: string, interval: ChartInterval): string {

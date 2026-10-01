@@ -60,14 +60,23 @@ export function createGitHubWebhookVercelHandler(
 		const runMaintenance =
 			dependencies.runMaintenance ??
 			(async (ids, passSignal) => {
-				const { runConfiguredGitHubEvidenceMaintenance } = await import(
+				const {
+					runConfiguredGitHubEvidenceMaintenance,
+					runConfiguredGitHubRepositorySweep,
+				} = await import(
 					"../../apps/api/src/services/github-evidence-worker.service.js"
 				);
-				return runConfiguredGitHubEvidenceMaintenance(
-					BATCH_SIZE,
-					passSignal,
-					ids,
-				);
+				const live =
+					ids.length > 0
+						? await runConfiguredGitHubEvidenceMaintenance(
+								BATCH_SIZE,
+								passSignal,
+								ids,
+							)
+						: { hasMore: false };
+				if (live.hasMore) return live;
+				const sweep = await runConfiguredGitHubRepositorySweep(passSignal);
+				return { hasMore: sweep.requests > 0 && sweep.hasMore };
 			});
 		let hasMore = true;
 		while (hasMore) {

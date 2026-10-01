@@ -1,8 +1,8 @@
 import type { RouterClient } from "@orpc/server";
 import {
 	type CostDashboard,
+	CostDashboardInputSchema,
 	CostDashboardRequestedMetricSchema,
-	CostDashboardSchema,
 } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
 import type { router } from "../router.js";
@@ -139,7 +139,8 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 }
 
 const DASHBOARD_METRICS = CostDashboardRequestedMetricSchema.options;
-const SPLITS = CostDashboardSchema.shape.splitBy.options;
+const SPLITS =
+	CostDashboardInputSchema.innerType().shape.splitBy.removeDefault().options;
 
 export const MCP_TOOLS: readonly McpTool[] = [
 	{

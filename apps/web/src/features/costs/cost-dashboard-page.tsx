@@ -1,8 +1,11 @@
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { ReactNode } from "react";
+import { GITHUB_INACTIVE_FILTER_TOOLTIP } from "@rudel/api-routes";
+import { type ReactNode, useState } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { CHART_INTERVALS } from "./chart-interval";
 import { ChartIntervalPicker } from "./chart-interval-picker";
 import { CostBreakdown } from "./cost-breakdown";
@@ -40,9 +43,17 @@ export function CostDashboardView({
 		setMetric,
 	} = dashboard;
 	const { data, isPending, isError } = query;
+	const workspace = useOptionalOrganization();
+	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
 	const selectedData = getMetricData(data, metric);
 	const isPullRequestMetric = metric === "mergedPullRequests";
-	const filtered = dimensions.some((dimension) => input[dimension].length > 0);
+	const isGitHubMetric = isPullRequestMetric || metric === "ciRuns";
+	const chipDimensions = isGitHubMetric
+		? ([...dimensions, "members", "models"] as const)
+		: dimensions;
+	const filtered = chipDimensions.some(
+		(dimension) => input[dimension].length > 0,
+	);
 	return (
 		<div
 			className="cost-page isolate antialiased"
@@ -71,33 +82,85 @@ export function CostDashboardView({
 						className="cost-active-filters"
 						aria-label="Active dashboard filters"
 					>
-						{dimensions.flatMap((dimension) =>
+						{chipDimensions.flatMap((dimension) =>
 							input[dimension].map((id) => {
+								const member =
+									dimension === "members"
+										? workspace?.state.members?.find(
+												(entry) => entry.user.id === id,
+											)
+										: undefined;
 								const label =
 									(selectedData ?? data?.metrics.cost)?.breakdowns[
 										dimension
-									].find((entry) => entry.id === id)?.label ?? id;
+									].find((entry) => entry.id === id)?.label ??
+									member?.user.name ??
+									id;
+								const inactive =
+									isGitHubMetric &&
+									(dimension === "members" || dimension === "models");
 								return (
-									<button
-										type="button"
+									<Tooltip
 										key={`${dimension}:${id}`}
-										className="cost-filter-chip"
-										onClick={() => toggle(dimension, id)}
-										title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
-										aria-label={`Remove ${COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}`}
+										triggerId={
+											inactive
+												? `cost-filter-${dimension}-${encodeURIComponent(id)}`
+												: undefined
+										}
+										open={
+											inactive
+												? focusedFilter === `${dimension}:${id}`
+												: undefined
+										}
+										onOpenChange={(open) => {
+											if (inactive)
+												setFocusedFilter(open ? `${dimension}:${id}` : null);
+										}}
 									>
-										<span className="cost-filter-dimension">
-											{COST_LABELS[dimension]}
-										</span>
-										<span className="truncate">
-											{costLabel(dimension, label) || "Unattributed"}
-										</span>
-										<HugeiconsIcon
-											icon={Cancel01Icon}
-											size={12}
-											className="shrink-0"
-										/>
-									</button>
+										<TooltipTrigger
+											asChild
+											id={`cost-filter-${dimension}-${encodeURIComponent(id)}`}
+											onFocus={() => {
+												if (inactive) setFocusedFilter(`${dimension}:${id}`);
+											}}
+											onBlur={() => setFocusedFilter(null)}
+										>
+											<button
+												type="button"
+												key={`${dimension}:${id}`}
+												className="cost-filter-chip"
+												data-inactive={inactive}
+												aria-describedby={
+													inactive
+														? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
+														: undefined
+												}
+												onClick={() => toggle(dimension, id)}
+												title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
+												aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
+											>
+												<span className="cost-filter-dimension">
+													{COST_LABELS[dimension]}
+												</span>
+												<span className="truncate">
+													{costLabel(dimension, label) || "Unattributed"}
+												</span>
+												<HugeiconsIcon
+													icon={Cancel01Icon}
+													size={12}
+													className="shrink-0"
+												/>
+											</button>
+										</TooltipTrigger>
+										{inactive ? (
+											<TooltipContent
+												role="tooltip"
+												id={`cost-filter-description-${dimension}-${encodeURIComponent(id)}`}
+											>
+												{GITHUB_INACTIVE_FILTER_TOOLTIP}
+											</TooltipContent>
+										) : null}
+									</Tooltip>
 								);
 							}),
 						)}
@@ -148,6 +211,7 @@ export function CostDashboardView({
 							className="cost-breakdowns"
 							data-signals={metric === "signals"}
 							data-pull-requests={isPullRequestMetric}
+							data-ci-runs={metric === "ciRuns"}
 						>
 							{dimensions.map((dimension) => (
 								<CostBreakdown

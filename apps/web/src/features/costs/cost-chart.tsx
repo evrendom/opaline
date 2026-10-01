@@ -5,6 +5,7 @@ import type {
 	CostDashboardInput,
 	DashboardMetric,
 } from "@rudel/api-routes";
+import { GITHUB_RETENTION_TOOLTIP } from "@rudel/api-routes";
 import { useId, useMemo, useState } from "react";
 import {
 	Area,
@@ -25,6 +26,7 @@ import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
+import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { formatIsoDate } from "@/lib/format";
 import {
 	CHART_INTERVALS,
@@ -33,6 +35,7 @@ import {
 	formatChartPeriod,
 	getChartSeriesValue,
 	groupChartTrend,
+	isCiHistoryAvailable,
 } from "./chart-interval";
 import {
 	costLabel,
@@ -90,6 +93,16 @@ const SIGNAL_COLORS: Record<string, string> = {
 	none: SERIES_COLORS[0],
 	noReply: SERIES_COLORS[8],
 };
+const CI_COLORS: Record<string, string> = {
+	success: SERIES_COLORS[2],
+	failure: SERIES_COLORS[1],
+	timedOut: SERIES_COLORS[7],
+	cancelled: SERIES_COLORS[8],
+	neutral: SERIES_COLORS[8],
+	skipped: SERIES_COLORS[6],
+	actionRequired: SERIES_COLORS[3],
+	inProgress: SERIES_COLORS[0],
+};
 type Props = {
 	data: CostDashboard | undefined;
 	pending: boolean;
@@ -120,20 +133,36 @@ export function CostChart({
 	interval,
 }: Props) {
 	const demo = useDemoRuntime();
+	const workspace = useOptionalOrganization();
 	const [showMedian, setShowMedian] = useState(true);
 	const [showP95, setShowP95] = useState(true);
 	const [showCiFailures, setShowCiFailures] = useState(true);
 	const data = getMetricData(dashboard, metric);
+	const history = data?.githubHistory;
+	const availableFrom =
+		metric === "ciRuns" ? history?.ciFrom : history?.pullRequestsFrom;
+	const noHistory = Boolean(
+		availableFrom &&
+			data?.trend.at(-1)?.date &&
+			(data.trend.at(-1)?.date ?? "") < availableFrom,
+	);
 	const ciData = dashboard?.metrics.ciFailuresPerPullRequest;
 	const metricLabel = METRIC_LABELS[metric];
-	const unavailable = data === null;
+	const ciHistoryAvailable =
+		metric !== "ciRuns" ||
+		isCiHistoryAvailable(history, data?.trend.at(-1)?.date ?? "");
+	const unavailable = data === null || !ciHistoryAvailable;
 	const unavailableLabel =
 		metric === "mergedPullRequests" || metric === "ciFailuresPerPullRequest"
 			? "Pull request data is unavailable"
-			: `${metricLabel} are still being indexed`;
+			: metric === "ciRuns"
+				? "CI history is unavailable"
+				: `${metricLabel} are still being indexed`;
 	const coverage = metric === "agentRuns" ? data?.coverage : undefined;
 	const durationStats =
-		metric === "agentRuns" ? data?.durationStats : undefined;
+		metric === "agentRuns" || metric === "ciRuns"
+			? data?.durationStats
+			: undefined;
 	const gradientId = useId();
 	const today = formatIsoDate(new Date());
 	const trend = useMemo(() => {
@@ -151,8 +180,22 @@ export function CostChart({
 					)
 				: [],
 		);
+		const cycle = new Map(
+			data?.cycleTimeStats?.interval === interval
+				? data.cycleTimeStats.trend.map((point) => [point.date, point])
+				: [],
+		);
 		return groupChartTrend(data?.trend ?? [], interval).map((point) => ({
 			...point,
+			cycleMedianSeconds: cycle.get(point.date)?.medianSeconds,
+			cycleP90Seconds: cycle.get(point.date)?.p90Seconds,
+			ciMinutes: ciHistoryAvailable
+				? data?.ciMinutes?.trend
+						.filter(
+							(day) => day.date >= point.startDate && day.date <= point.endDate,
+						)
+						.reduce((sum, day) => sum + day.minutes, 0)
+				: undefined,
 			ciFailureRatio:
 				point.startDate > today ||
 				(ciTrend.get(point.date)?.denominator ?? 0) === 0
@@ -168,7 +211,17 @@ export function CostChart({
 					? null
 					: (durations.get(point.date)?.p95Seconds ?? null),
 		}));
-	}, [ciData?.trend, data?.trend, durationStats, interval, metric, today]);
+	}, [
+		ciData?.trend,
+		ciHistoryAvailable,
+		data?.trend,
+		data?.cycleTimeStats,
+		data?.ciMinutes,
+		durationStats,
+		interval,
+		metric,
+		today,
+	]);
 	const visiblePointCount = trend.filter(
 		(point) => point.startDate <= today,
 	).length;
@@ -195,6 +248,13 @@ export function CostChart({
 				label:
 					splitBy === "none" ? metricLabel : costLabel(splitBy, entry.label),
 				color:
+					(metric === "ciRuns" && splitBy === "ciConclusions"
+						? CI_COLORS[
+								data.breakdowns.ciConclusions.find(
+									(conclusion) => conclusion.label === entry.label,
+								)?.id ?? ""
+							]
+						: undefined) ??
 					(signalType ? SIGNAL_COLORS[signalType] : undefined) ??
 					SERIES_COLORS[index % SERIES_COLORS.length],
 			};
@@ -204,11 +264,13 @@ export function CostChart({
 		<section
 			className="cost-chart-panel"
 			aria-label={
-				metric === "agentRuns"
-					? "Agent runs with median and P95 duration over time"
-					: metric === "mergedPullRequests"
-						? "Merged pull requests with captured failed CI job attempts per pull request over time"
-						: `${metricLabel} over time`
+				metric === "ciRuns"
+					? "CI runs with median and P95 duration over time"
+					: metric === "agentRuns"
+						? "Agent runs with median and P95 duration over time"
+						: metric === "mergedPullRequests"
+							? "Merged pull requests with CI failures per pull request over time"
+							: `${metricLabel} over time`
 			}
 			aria-busy={pending}
 		>
@@ -221,27 +283,39 @@ export function CostChart({
 				{metrics.map((value) => {
 					const total = getMetricTotal(dashboard, value);
 					const metricData = getMetricData(dashboard, value);
+					const unknownCi =
+						value === "ciRuns" &&
+						!isCiHistoryAvailable(
+							metricData?.githubHistory,
+							metricData?.trend.at(-1)?.date ?? "",
+						);
 					return (
 						<Metric
 							key={value}
 							label={METRIC_LABELS[value]}
 							description={
-								value === "cost"
-									? "Estimated cost of this usage at API rates. This does not reflect actual subscription charges."
-									: undefined
+								value === "mergedPullRequests"
+									? "Every pull request merged in your connected repositories, by merge date (UTC), whether or not AI was used."
+									: value === "ciRuns"
+										? "GitHub Actions workflow runs in your connected repositories, by the date each run was created (UTC). Each re-run attempt counts as a run."
+										: value === "cost"
+											? "Estimated cost of this usage at API rates. This does not reflect actual subscription charges."
+											: undefined
 							}
 							value={
 								total === undefined
 									? undefined
-									: total === null
+									: total === null || unknownCi
 										? "—"
 										: formatMetricRatio(total, value, metricData?.denominator)
 							}
-							unavailable={total === null}
+							unavailable={total === null || unknownCi}
 							qualifier={
-								value === "agentRuns" && metricData?.incomplete
-									? "indexed"
-									: undefined
+								metricData?.githubHistory?.preview
+									? "preview"
+									: value === "agentRuns" && metricData?.incomplete
+										? "indexed"
+										: undefined
 							}
 							primary={metric === value}
 							onClick={() => onMetricChange(value)}
@@ -259,13 +333,18 @@ export function CostChart({
 								{entry.label}
 							</div>
 						))}
-						{metric === "agentRuns" ? (
+						{metric === "agentRuns" || metric === "ciRuns" ? (
 							<>
 								<button
 									type="button"
 									className="cost-legend-item cost-duration-legend"
 									data-percentile="median"
 									aria-label="Median duration"
+									title={
+										metric === "ciRuns"
+											? "Duration from run start to its last update."
+											: undefined
+									}
 									aria-pressed={showMedian}
 									onClick={() => setShowMedian((visible) => !visible)}
 								>
@@ -280,6 +359,11 @@ export function CostChart({
 									className="cost-legend-item cost-duration-legend"
 									data-percentile="p95"
 									aria-label="P95 duration"
+									title={
+										metric === "ciRuns"
+											? "Duration from run start to its last update."
+											: undefined
+									}
 									aria-pressed={showP95}
 									onClick={() => setShowP95((visible) => !visible)}
 								>
@@ -295,13 +379,13 @@ export function CostChart({
 								type="button"
 								className="cost-legend-item cost-duration-legend"
 								data-percentile="p95"
-								aria-label="CI errors per PR"
-								title="Captured failed CI job attempts per captured merged PR, grouped by the PR merged date (UTC)."
+								aria-label="CI failures per PR"
+								title="Failed CI attempts per merged PR, counting only PRs whose CI history is available. Re-runs count. Grouped by merge date (UTC)."
 								aria-pressed={showCiFailures}
 								onClick={() => setShowCiFailures((visible) => !visible)}
 							>
 								<i aria-hidden="true" />
-								CI errors / PR{" "}
+								CI failures / PR{" "}
 								<strong>
 									{dashboard === undefined
 										? "…"
@@ -316,6 +400,39 @@ export function CostChart({
 							</button>
 						) : null}
 					</div>
+					{history ? (
+						<GitHubHistoryNotes
+							history={history}
+							metric={metric}
+							startDate={data?.trend[0]?.date ?? ""}
+							settingsUrl={
+								workspace?.meta.isOrgAdmin && workspace.state.activeOrg
+									? `/${workspace.state.activeOrg.slug}/settings/workspace`
+									: undefined
+							}
+						/>
+					) : null}
+					{metric === "mergedPullRequests" && data?.cycleTimeStats ? (
+						<output className="cost-chart-coverage" aria-label="PR cycle time">
+							<span title="Time from pull request creation to merge.">
+								PR cycle time · Median{" "}
+								{formatRunDuration(data.cycleTimeStats.medianSeconds)} · P90{" "}
+								{formatRunDuration(data.cycleTimeStats.p90Seconds)}
+							</span>
+						</output>
+					) : null}
+					{metric === "ciRuns" && data?.ciMinutes ? (
+						<output className="cost-chart-coverage">
+							<span title="Sum of completed run durations; billing multipliers are not included.">
+								CI minutes (approximate billed Actions minutes):{" "}
+								{!ciHistoryAvailable
+									? "—"
+									: new Intl.NumberFormat("en-US", {
+											maximumFractionDigits: 1,
+										}).format(data.ciMinutes.total)}
+							</span>
+						</output>
+					) : null}
 					{coverage && data?.incomplete ? (
 						<output className="cost-chart-coverage">
 							<button
@@ -415,7 +532,7 @@ export function CostChart({
 								width={56}
 								tick={{ fill: "var(--cost-muted)", fontSize: 11 }}
 							/>
-							{metric === "agentRuns" ? (
+							{metric === "agentRuns" || metric === "ciRuns" ? (
 								<YAxis
 									yAxisId="duration"
 									hide={!showMedian && !showP95}
@@ -489,6 +606,25 @@ export function CostChart({
 													</strong>
 												</div>
 											))}
+											{availableFrom &&
+											point &&
+											point.startDate < availableFrom &&
+											point.endDate >= availableFrom ? (
+												<p>CI history from {historyDate(availableFrom)}</p>
+											) : null}
+											{point?.cycleMedianSeconds !== undefined ? (
+												<p>
+													PR cycle time · Median{" "}
+													{formatRunDuration(point.cycleMedianSeconds)} · P90{" "}
+													{formatRunDuration(point.cycleP90Seconds)}
+												</p>
+											) : null}
+											{point?.ciMinutes !== undefined ? (
+												<p>
+													{point.ciMinutes.toFixed(1)} CI minutes (approximate
+													billed Actions minutes)
+												</p>
+											) : null}
 										</div>
 									) : null;
 								}}
@@ -498,7 +634,14 @@ export function CostChart({
 									yAxisId="count"
 									key={entry.id}
 									dataKey={(point) =>
-										getChartSeriesValue(point, entry.id, today, "sum")
+										getChartSeriesValue(
+											point,
+											entry.id,
+											today,
+											"sum",
+											availableFrom,
+											ciHistoryAvailable,
+										)
 									}
 									name={entry.label}
 									type="linear"
@@ -518,7 +661,7 @@ export function CostChart({
 									isAnimationActive={false}
 								/>
 							))}
-							{metric === "agentRuns" ? (
+							{metric === "agentRuns" || metric === "ciRuns" ? (
 								<>
 									<Line
 										yAxisId="duration"
@@ -569,7 +712,7 @@ export function CostChart({
 									yAxisId="ci"
 									hide={!showCiFailures || ciData === null}
 									dataKey="ciFailureRatio"
-									name="CI errors / PR"
+									name="CI failures / PR"
 									type="linear"
 									stroke="var(--cost-duration-p95)"
 									strokeWidth={2}
@@ -591,20 +734,32 @@ export function CostChart({
 						</ComposedChart>
 					</ResponsiveContainer>
 				)}
-				{!pending && (unavailable || (data && !data.hasUsage)) ? (
+				{!pending && (unavailable || noHistory || (data && !data.hasUsage)) ? (
 					<div className="cost-chart-empty">
 						<p>
-							{unavailable
-								? unavailableLabel
-								: metric === "agentRuns" &&
-										((coverage?.indexingSessions ?? 0) > 0 ||
-											(coverage?.unavailableSessions ?? 0) > 0)
-									? "No indexed agent runs match yet"
-									: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
+							{noHistory
+								? "No GitHub history for these dates"
+								: unavailable
+									? unavailableLabel
+									: metric === "agentRuns" &&
+											((coverage?.indexingSessions ?? 0) > 0 ||
+												(coverage?.unavailableSessions ?? 0) > 0)
+										? "No indexed agent runs match yet"
+										: metric === "mergedPullRequests"
+											? "No merged pull requests in this selection"
+											: metric === "ciRuns"
+												? "No CI runs in this selection"
+												: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
 						</p>
-						{!unavailable &&
-						metric === "agentRuns" &&
-						coverage?.indexingSessions ? (
+						{noHistory ? (
+							<p>
+								{metric === "ciRuns"
+									? `CI history starts ${historyDate(availableFrom)}. GitHub had already deleted older runs when this workspace connected.`
+									: `PR history starts ${historyDate(availableFrom)}.`}
+							</p>
+						) : !unavailable &&
+							metric === "agentRuns" &&
+							coverage?.indexingSessions ? (
 							<p>Some sessions are still being indexed.</p>
 						) : !unavailable ? (
 							<p>Try a different date range or clear your filters.</p>
@@ -613,6 +768,86 @@ export function CostChart({
 				) : null}
 			</div>
 		</section>
+	);
+}
+function historyDate(value: string | null | undefined) {
+	return value
+		? new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+				year: "numeric",
+				timeZone: "UTC",
+			})
+		: "unavailable";
+}
+export function GitHubHistoryNotes({
+	history,
+	metric,
+	startDate,
+	settingsUrl,
+}: {
+	history: NonNullable<
+		NonNullable<CostDashboard["metrics"]["ciRuns"]>["githubHistory"]
+	>;
+	metric: DashboardMetric;
+	startDate: string;
+	settingsUrl?: string;
+}) {
+	return (
+		<output className="cost-chart-coverage" aria-live="polite">
+			{history.preview ? (
+				<span>
+					Preview: GitHub history is still syncing, so totals may be incomplete.
+				</span>
+			) : null}
+			{history.pullRequestsFrom && startDate < history.pullRequestsFrom ? (
+				<span>PR history from {historyDate(history.pullRequestsFrom)}</span>
+			) : null}
+			{history.ciUnavailablePullRequests > 0 ||
+			(metric === "ciRuns" && history.ciFrom && startDate < history.ciFrom) ? (
+				<InfoTooltip>
+					<TooltipTrigger className="cost-text-button">
+						CI history{" "}
+						{history.ciFrom
+							? `from ${historyDate(history.ciFrom)}`
+							: "unavailable"}
+						{history.ciUnavailablePullRequests > 0
+							? ` · ${history.ciUnavailablePullRequests} ${history.ciUnavailablePullRequests === 1 ? "PR" : "PRs"} excluded`
+							: ""}
+					</TooltipTrigger>
+					<TooltipContent>{GITHUB_RETENTION_TOOLTIP}</TooltipContent>
+				</InfoTooltip>
+			) : null}
+			{history.syncingRepositories > 0 ? (
+				<span>
+					{history.syncingRepositories}{" "}
+					{history.syncingRepositories === 1
+						? "repository is"
+						: "repositories are"}{" "}
+					still syncing and{" "}
+					{history.syncingRepositories === 1 ? "isn't" : "aren't"} included yet.
+				</span>
+			) : null}
+			{history.unavailableRepositories > 0 ? (
+				<span>
+					{history.unavailableRepositories}{" "}
+					{history.unavailableRepositories === 1
+						? "repository couldn't"
+						: "repositories couldn't"}{" "}
+					be read from GitHub.
+					{settingsUrl ? (
+						<>
+							{" "}
+							<a href={settingsUrl}>Check GitHub access</a>
+						</>
+					) : null}
+				</span>
+			) : null}
+			{history.lastSyncedAt &&
+			Date.now() - Date.parse(history.lastSyncedAt) > 48 * 3600000 ? (
+				<span>Last synced with GitHub {historyDate(history.lastSyncedAt)}</span>
+			) : null}
+		</output>
 	);
 }
 function Metric({

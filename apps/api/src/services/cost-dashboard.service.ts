@@ -18,7 +18,8 @@ import {
 	listAvailableDashboardMetrics,
 	resolveAvailableDashboardInput,
 } from "./cost-dashboard-data.js";
-import { getPullRequestDashboardMetrics } from "./pull-request-dashboard.service.js";
+import { buildDurationPeriods } from "./dashboard-duration-periods.js";
+import { getGitHubOutcomesDashboardMetrics } from "./github-outcomes-dashboard.service.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildCanonicalPricingModelSql,
@@ -26,6 +27,8 @@ import {
 	getUsageAnalyticsQueryContext,
 	resolveCanonicalPricingModel,
 } from "./usage-event-analytics.service.js";
+
+export { buildDurationPeriods } from "./dashboard-duration-periods.js";
 
 const MAX_AGGREGATE_ROWS = 100_000;
 type AgentRunDurationInterval = NonNullable<
@@ -53,8 +56,9 @@ const DIMENSIONS_BY_METRIC = {
 		"durations",
 		"skillsUsed",
 	],
-	mergedPullRequests: ["members", "repositories", "models"],
-	ciFailuresPerPullRequest: ["members", "repositories", "models"],
+	mergedPullRequests: [],
+	ciFailuresPerPullRequest: [],
+	ciRuns: [],
 } as const;
 
 interface AgentRunDurationAggregateRow {
@@ -78,12 +82,13 @@ export async function getCostDashboard(
 		requestedInput,
 		availableMetrics,
 	);
-	const isPullRequestMetric =
+	const isGitHubMetric =
 		input.requestedMetric === "mergedPullRequests" ||
-		input.requestedMetric === "ciFailuresPerPullRequest";
+		input.requestedMetric === "ciFailuresPerPullRequest" ||
+		input.requestedMetric === "ciRuns";
 	const repositories =
 		scope.tenant === "organization" &&
-		isPullRequestMetric &&
+		isGitHubMetric &&
 		input.repositories.length > 0
 			? (
 					await sqlClient.unsafe<Array<{ full_name: string }>>(
@@ -97,7 +102,7 @@ export async function getCostDashboard(
 		organizationMatchSql(column, scope.tenant);
 	const repositorySql = (alias: string) => {
 		const repository = scopedRepositorySql(scope.tenant, alias);
-		return isPullRequestMetric
+		return isGitHubMetric
 			? `if(${alias}.git_remote != '' AND startsWith(lower(${repository}), 'github.com/'), lower(${repository}), ${repository})`
 			: repository;
 	};
@@ -429,19 +434,23 @@ export async function getCostDashboard(
 		input.requestedMetric === "agentRuns"
 			? queryAgentRunDurationStats(scope, input, usage.cteDefinitions)
 			: Promise.resolve(undefined);
-	const pullRequestsPromise =
-		scope.tenant === "organization" &&
-		(input.requestedMetric === "mergedPullRequests" ||
-			input.requestedMetric === "ciFailuresPerPullRequest")
-			? getPullRequestDashboardMetrics(scope.orgId, input, {
-					database: sqlClient,
-					queryClickhouse,
-				})
+	const githubOutcomesPromise =
+		scope.tenant === "organization" && isGitHubMetric
+			? getGitHubOutcomesDashboardMetrics(
+					scope.orgId,
+					input,
+					availability.githubReadiness ?? null,
+					availability.githubVisibility === "preview",
+					{
+						database: sqlClient,
+						queryClickhouse,
+					},
+				)
 			: Promise.resolve(undefined);
 	const [rows, durationRows, pullRequests] = await Promise.all([
 		rowsPromise,
 		durationRowsPromise,
-		pullRequestsPromise,
+		githubOutcomesPromise,
 	]);
 	// Never present a silently truncated subtotal as the total cost.
 	if (rows.length > MAX_AGGREGATE_ROWS)
@@ -632,53 +641,6 @@ function buildAgentRunDurationStats(
 		p95Seconds,
 		trend,
 	};
-}
-
-function buildDurationPeriods(
-	startDate: string,
-	endDate: string,
-	interval: AgentRunDurationInterval,
-): AgentRunDurationStats["trend"] {
-	const periods = new Map<string, AgentRunDurationStats["trend"][number]>();
-	for (
-		let stamp = Date.parse(startDate);
-		stamp <= Date.parse(endDate);
-		stamp += 86_400_000
-	) {
-		const currentDate = new Date(stamp).toISOString().slice(0, 10);
-		const date = durationPeriodDate(currentDate, interval);
-		const existing = periods.get(date);
-		if (existing) {
-			existing.endDate = currentDate;
-			continue;
-		}
-		periods.set(date, {
-			date,
-			startDate: currentDate,
-			endDate: currentDate,
-			sampleCount: 0,
-			unknownCount: 0,
-			medianSeconds: null,
-			p95Seconds: null,
-		});
-	}
-	return [...periods.values()];
-}
-
-function durationPeriodDate(
-	value: string,
-	interval: AgentRunDurationInterval,
-): string {
-	const date = new Date(`${value}T00:00:00Z`);
-	if (interval === "weekly") {
-		date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
-	} else if (interval !== "daily") {
-		date.setUTCDate(1);
-		if (interval === "quarterly")
-			date.setUTCMonth(Math.floor(date.getUTCMonth() / 3) * 3);
-		if (interval === "yearly") date.setUTCMonth(0);
-	}
-	return date.toISOString().slice(0, 10);
 }
 
 function readDurationQuantiles(

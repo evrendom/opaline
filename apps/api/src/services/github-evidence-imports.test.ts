@@ -4,7 +4,8 @@ test.each([
 	"./github-evidence-persistence.service.ts",
 	"./github-webhook-delivery.service.ts",
 	"../handlers/github-webhook-http.ts",
-	"./pull-request-dashboard.service.ts",
+	"./github-outcomes-dashboard.service.ts",
+	"./github-outcomes-readiness.service.ts",
 ])("imports %s without database configuration or module mocks", async (module) => {
 	const environment = { ...process.env };
 	delete environment.PG_CONNECTION_STRING;

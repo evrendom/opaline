@@ -3,6 +3,8 @@ import type {
 	GitHubInstallationDetails,
 	GitHubInstallationRepository,
 } from "./github-app.service.js";
+import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
+import { enqueueGitHubRepositorySweep } from "./github-repository-sweep.service.js";
 
 export interface GitHubRepositoryBinding {
 	readonly defaultBranch: string;
@@ -117,7 +119,18 @@ export async function persistGitHubRepositoryInstallation(input: {
 					input.now.toISOString(),
 				],
 			);
+			await enqueueGitHubRepositorySweep(
+				{ organizationId: input.organizationId, repositoryId: repository.id },
+				input.now,
+				transaction,
+				true,
+			);
 		}
+		await refreshPrTotalsReadiness(
+			transaction,
+			input.organizationId,
+			input.now,
+		);
 	});
 }
 

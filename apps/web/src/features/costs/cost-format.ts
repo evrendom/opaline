@@ -13,7 +13,8 @@ export const METRIC_LABELS = {
 	signals: "Language signals",
 	agentRuns: "Agent runs",
 	mergedPullRequests: "Merged PRs",
-	ciFailuresPerPullRequest: "CI errors / PR",
+	ciFailuresPerPullRequest: "CI failures / PR",
+	ciRuns: "CI runs",
 };
 // Presentation order of the metric tabs. Which of them render is decided by the
 // server's `availableMetrics`; the CI-errors-per-PR companion has no tab of its
@@ -24,6 +25,7 @@ export const DASHBOARD_METRICS = [
 	"agentRuns",
 	"signals",
 	"mergedPullRequests",
+	"ciRuns",
 ] as const satisfies readonly CostDashboardRequestedMetric[];
 export type DashboardTabMetric = (typeof DASHBOARD_METRICS)[number];
 // Before the server has answered, show only the metrics every scope serves so

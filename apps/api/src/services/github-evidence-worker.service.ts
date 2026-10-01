@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { sqlClient } from "../db.js";
 import { readGitHubRepositoryAppConfig } from "./github-app.service.js";
 import { runGitHubEvidenceCollectionMaintenance } from "./github-evidence-maintenance.service.js";
+import { runGitHubRepositorySweep } from "./github-repository-sweep.service.js";
 import { pruneGitHubWebhookDeliveries } from "./github-webhook-delivery.service.js";
 import {
 	createR2MultipartUploadClient,
@@ -31,6 +32,12 @@ export function wakeGitHubEvidenceWorker(delayMs = 0): void {
 	registeredWorker?.wake(delayMs);
 }
 
+export async function runConfiguredGitHubRepositorySweep(signal?: AbortSignal) {
+	const config = readGitHubRepositoryAppConfig();
+	if (!config) return { enabled: false, requests: 0, hasMore: false };
+	return runGitHubRepositorySweep({ config, database: sqlClient, signal });
+}
+
 export async function runConfiguredGitHubEvidenceMaintenance(
 	limit = 1,
 	signal?: AbortSignal,
@@ -42,6 +49,19 @@ export async function runConfiguredGitHubEvidenceMaintenance(
 		await pruneGitHubWebhookDeliveries({ database: sqlClient });
 	const storage = readR2IngestAvailability();
 	if (!storage.enabled) {
+		const [work] = await sqlClient.unsafe<Array<{ pending: boolean }>>(
+			`SELECT EXISTS(SELECT 1 FROM github_evidence_collection WHERE ($1::text[] IS NULL OR id = ANY($1::text[])) AND (status IN ('queued', 'collecting') OR retry_count < 2 AND retry_after <= NOW() OR refresh_due_at <= NOW())) AS pending`,
+			[collectionIds ? [...collectionIds] : null],
+		);
+		if (!work?.pending)
+			return {
+				enabled: true as const,
+				attempted: 0,
+				failed: 0,
+				hasExhaustedFailures: false,
+				hasMore: false,
+				succeeded: 0,
+			};
 		throw new Error(
 			"GitHub evidence collection requires configured object storage.",
 		);
@@ -100,6 +120,15 @@ export function startGitHubEvidenceWorker(): GitHubEvidenceWorker {
 			.catch(() => {
 				logger.error(
 					"GitHub evidence maintenance failed; inspect durable collection state.",
+				);
+			})
+			.then(async () => {
+				const sweep = await runConfiguredGitHubRepositorySweep();
+				continueSoon ||= sweep.requests > 0 && sweep.hasMore;
+			})
+			.catch(() => {
+				logger.error(
+					"GitHub repository sweep failed; durable progress resumes on the next pass.",
 				);
 			})
 			.finally(() => {

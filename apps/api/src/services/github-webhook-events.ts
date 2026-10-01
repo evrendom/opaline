@@ -1,5 +1,21 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+	type SweepCheck,
+	type SweepPullRequest,
+	type SweepRun,
+	type SweepStatus,
+	sweepCheckSchema,
+	sweepPullRequestSchema,
+	sweepRunSchema,
+	sweepStatusSchema,
+} from "@rudel/repo-intelligence-source-github";
 import { z } from "zod";
+
+export type GitHubOutcomeEvent =
+	| { kind: "pull_request"; data: SweepPullRequest }
+	| { kind: "actions_run"; data: SweepRun }
+	| { kind: "check_suite"; data: SweepCheck }
+	| { kind: "status"; data: SweepStatus };
 
 /**
  * Pure GitHub App webhook handling: signature verification and the mapping
@@ -23,6 +39,8 @@ export type GitHubWebhookIntent =
 			readonly repositoryId: string;
 			readonly commitShas: readonly string[];
 			readonly pullRequestIds: readonly string[];
+			readonly outcome?: GitHubOutcomeEvent;
+			readonly refreshSessionEvidence?: boolean;
 	  }
 	| {
 			readonly kind: "installation";
@@ -73,19 +91,19 @@ const pullRequestPayload = z.object({
 	pull_request: z.object({ id: githubId, head: z.object({ sha: commitSha }) }),
 });
 const checkSuitePayload = z.object({
-	action: z.literal("completed"),
+	action,
 	installation: reference,
 	repository: reference,
 	check_suite: z.object({ head_sha: commitSha }),
 });
 const workflowRunPayload = z.object({
-	action: z.literal("completed"),
+	action,
 	installation: reference,
 	repository: reference,
 	workflow_run: z.object({ head_sha: commitSha }),
 });
 const statusPayload = z.object({
-	state: z.enum(["error", "failure", "success"]),
+	state: z.enum(["error", "failure", "success", "pending"]),
 	installation: reference,
 	repository: reference,
 	sha: commitSha,
@@ -144,7 +162,11 @@ export const GITHUB_WEBHOOK_HANDLERS: Readonly<
 > = {
 	pull_request(payload) {
 		const parsed = pullRequestPayload.safeParse(payload);
-		if (!parsed.success || !PULL_REQUEST_ACTIONS.has(parsed.data.action))
+		if (
+			!parsed.success ||
+			(!PULL_REQUEST_ACTIONS.has(parsed.data.action) &&
+				!outcomeEvent("pull_request", payload).outcome)
+		)
 			return null;
 		return {
 			action: parsed.data.action,
@@ -154,33 +176,55 @@ export const GITHUB_WEBHOOK_HANDLERS: Readonly<
 				repositoryId: parsed.data.repository.id,
 				commitShas: [parsed.data.pull_request.head.sha],
 				pullRequestIds: [parsed.data.pull_request.id],
+				...outcomeEvent("pull_request", payload),
+				...(!PULL_REQUEST_ACTIONS.has(parsed.data.action)
+					? { refreshSessionEvidence: false }
+					: {}),
 			},
 		};
 	},
 	check_suite(payload) {
 		const parsed = checkSuitePayload.safeParse(payload);
-		return parsed.success
-			? refreshCommit(
-					parsed.data,
-					parsed.data.action,
-					parsed.data.check_suite.head_sha,
+		return parsed.success &&
+			(parsed.data.action === "completed" ||
+				outcomeEvent("check_suite", payload).outcome)
+			? withOutcome(
+					refreshCommit(
+						parsed.data,
+						parsed.data.action,
+						parsed.data.check_suite.head_sha,
+					),
+					"check_suite",
+					payload,
 				)
 			: null;
 	},
 	workflow_run(payload) {
 		const parsed = workflowRunPayload.safeParse(payload);
-		return parsed.success
-			? refreshCommit(
-					parsed.data,
-					parsed.data.action,
-					parsed.data.workflow_run.head_sha,
+		return parsed.success &&
+			(parsed.data.action === "completed" ||
+				outcomeEvent("actions_run", payload).outcome)
+			? withOutcome(
+					refreshCommit(
+						parsed.data,
+						parsed.data.action,
+						parsed.data.workflow_run.head_sha,
+					),
+					"actions_run",
+					payload,
 				)
 			: null;
 	},
 	status(payload) {
 		const parsed = statusPayload.safeParse(payload);
-		return parsed.success
-			? refreshCommit(parsed.data, parsed.data.state, parsed.data.sha)
+		return parsed.success &&
+			(parsed.data.state !== "pending" ||
+				outcomeEvent("status", payload).outcome)
+			? withOutcome(
+					refreshCommit(parsed.data, parsed.data.state, parsed.data.sha),
+					"status",
+					payload,
+				)
 			: null;
 	},
 	installation(payload) {
@@ -223,6 +267,55 @@ export const GITHUB_WEBHOOK_HANDLERS: Readonly<
 		};
 	},
 };
+
+function withOutcome(
+	event: GitHubWebhookEvent,
+	kind: GitHubOutcomeEvent["kind"],
+	payload: unknown,
+): GitHubWebhookEvent {
+	return event.intent.kind === "refresh"
+		? {
+				...event,
+				intent: {
+					...event.intent,
+					...outcomeEvent(kind, payload),
+					...(((kind === "actions_run" || kind === "check_suite") &&
+						event.action !== "completed") ||
+					(kind === "status" && event.action === "pending")
+						? { refreshSessionEvidence: false }
+						: {}),
+				},
+			}
+		: event;
+}
+
+function outcomeEvent(
+	kind: GitHubOutcomeEvent["kind"],
+	payload: unknown,
+): { outcome?: GitHubOutcomeEvent } {
+	const envelope = z
+		.object({
+			pull_request: z.unknown().optional(),
+			workflow_run: z.unknown().optional(),
+			check_suite: z.unknown().optional(),
+		})
+		.safeParse(payload);
+	if (!envelope.success) return {};
+	if (kind === "pull_request") {
+		const result = sweepPullRequestSchema.safeParse(envelope.data.pull_request);
+		return result.success ? { outcome: { kind, data: result.data } } : {};
+	}
+	if (kind === "actions_run") {
+		const result = sweepRunSchema.safeParse(envelope.data.workflow_run);
+		return result.success ? { outcome: { kind, data: result.data } } : {};
+	}
+	if (kind === "check_suite") {
+		const result = sweepCheckSchema.safeParse(envelope.data.check_suite);
+		return result.success ? { outcome: { kind, data: result.data } } : {};
+	}
+	const result = sweepStatusSchema.safeParse(payload);
+	return result.success ? { outcome: { kind, data: result.data } } : {};
+}
 
 export function mapGitHubWebhookEvent(
 	event: string,

@@ -287,7 +287,25 @@
 	gap: 16px;
 }
 .cost-breakdowns[data-pull-requests="true"] {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cost-breakdowns[data-ci-runs="true"] {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cost-breakdowns[data-ci-runs="true"]
+	> .cost-breakdown[data-dimension="ciWorkflows"] {
+	grid-column: span 2;
+}
+.cost-filter-chip[data-inactive="true"] {
+	opacity: 0.6;
+}
+.cost-chart-coverage {
+	flex-wrap: wrap;
+}
+.cost-cycle-time {
+	display: block;
+	color: var(--cost-muted);
+	font-size: 10px;
 }
 .cost-breakdowns[data-signals="true"]
 	> .cost-breakdown[data-dimension="phrases"] {
@@ -692,8 +710,14 @@
 		> .cost-breakdown[data-dimension="phrases"] {
 		grid-column: auto;
 	}
-	.cost-breakdowns {
+	.cost-breakdowns,
+	.cost-breakdowns[data-pull-requests="true"],
+	.cost-breakdowns[data-ci-runs="true"] {
 		grid-template-columns: 1fr;
+	}
+	.cost-breakdowns[data-ci-runs="true"]
+		> .cost-breakdown[data-dimension="ciWorkflows"] {
+		grid-column: auto;
 	}
 	.cost-breakdown-list {
 		min-height: 100px;

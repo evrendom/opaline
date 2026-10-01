@@ -8,6 +8,7 @@ import type {
 	DashboardMetricData,
 } from "@rudel/api-routes";
 import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
+import type { GitHubReadiness } from "./github-outcomes-readiness.service.js";
 
 export interface CostAggregateRow {
 	metric: Exclude<DashboardMetric, "commits"> | "agentRunCoverage";
@@ -33,6 +34,12 @@ const DIMENSIONS: CostDimension[] = [
 	"runSignals",
 	"durations",
 	"skillsUsed",
+	"pullRequestCi",
+	"githubAuthors",
+	"ciConclusions",
+	"ciEvents",
+	"ciWorkflows",
+	"ciAttempts",
 ];
 const SIGNAL_LABELS: Record<string, string> = {
 	modelApologies: "Model apologies",
@@ -51,11 +58,14 @@ export const BASE_DASHBOARD_METRICS = [
 const PULL_REQUEST_DASHBOARD_METRICS = [
 	"mergedPullRequests",
 	"ciFailuresPerPullRequest",
+	"ciRuns",
 ] as const satisfies readonly CostDashboardRequestedMetric[];
 
 export interface DashboardMetricAvailabilityOptions {
 	/** `GITHUB_EVIDENCE_UI_ENABLED`; the GitHub evidence UI is dark-launched. */
 	readonly githubEvidenceUiEnabled: boolean;
+	readonly githubVisibility?: "hidden" | "visible" | "preview";
+	readonly githubReadiness?: GitHubReadiness | null;
 }
 
 /**
@@ -68,7 +78,10 @@ export function listAvailableDashboardMetrics(
 	tenant: "organization" | "allOrganizations",
 	options: DashboardMetricAvailabilityOptions,
 ): CostDashboardRequestedMetric[] {
-	return tenant === "organization" && options.githubEvidenceUiEnabled
+	return tenant === "organization" &&
+		options.githubEvidenceUiEnabled &&
+		(options.githubVisibility === "visible" ||
+			options.githubVisibility === "preview")
 		? [...BASE_DASHBOARD_METRICS, ...PULL_REQUEST_DASHBOARD_METRICS]
 		: [...BASE_DASHBOARD_METRICS];
 }
@@ -81,10 +94,19 @@ export function resolveAvailableDashboardInput(
 	input: CostDashboardInput,
 	availableMetrics: readonly CostDashboardRequestedMetric[],
 ): CostDashboardInput {
-	return input.requestedMetric === undefined ||
+	const resolved: CostDashboardInput =
+		input.requestedMetric === undefined ||
 		availableMetrics.includes(input.requestedMetric)
-		? input
-		: { ...input, requestedMetric: "cost" };
+			? input
+			: { ...input, requestedMetric: "cost" };
+	if (
+		["mergedPullRequests", "ciFailuresPerPullRequest", "ciRuns"].includes(
+			resolved.requestedMetric ?? "",
+		) &&
+		(resolved.splitBy === "members" || resolved.splitBy === "models")
+	)
+		return { ...resolved, splitBy: "none" };
+	return resolved;
 }
 
 /** Every UTC date in the inclusive range, so charts plot measured zeros. */
@@ -108,6 +130,7 @@ export interface CostDashboardBuildOptions {
 	readonly pullRequests?: Readonly<{
 		mergedPullRequests: DashboardMetricData | null;
 		ciFailuresPerPullRequest: DashboardMetricData | null;
+		ciRuns?: DashboardMetricData | null;
 	}>;
 }
 
@@ -159,6 +182,9 @@ export function buildCostDashboard(
 				: null,
 			ciFailuresPerPullRequest: pullRequestsAvailable
 				? (options.pullRequests?.ciFailuresPerPullRequest ?? null)
+				: null,
+			ciRuns: pullRequestsAvailable
+				? (options.pullRequests?.ciRuns ?? null)
 				: null,
 		},
 	};
@@ -268,7 +294,7 @@ function buildSignal(
 	return result.incomplete ? null : result;
 }
 
-function buildMetric(
+export function buildMetric(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
@@ -283,6 +309,12 @@ function buildMetric(
 		runSignals: [],
 		durations: [],
 		skillsUsed: [],
+		pullRequestCi: [],
+		githubAuthors: [],
+		ciConclusions: [],
+		ciEvents: [],
+		ciWorkflows: [],
+		ciAttempts: [],
 	};
 	for (const dimension of DIMENSIONS) {
 		const entries = new Map<string, CostBreakdownEntry>();
@@ -326,7 +358,9 @@ function buildMetric(
 	const limit =
 		chartDimension === "durations"
 			? AGENT_RUN_DURATIONS.length
-			: MAX_NAMED_SERIES;
+			: chartDimension === "ciConclusions"
+				? 8
+				: MAX_NAMED_SERIES;
 	const named = ranked.slice(0, limit);
 	const series =
 		splitBy === "none"

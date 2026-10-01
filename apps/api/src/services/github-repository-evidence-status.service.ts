@@ -16,12 +16,16 @@ export async function resolveGitHubRepositoryEvidenceStatus(input: {
 	readonly isOrgAdmin: boolean;
 	readonly readSetup: () => GitHubSetupState;
 	readonly loadConnection: () => Promise<GitHubRepositoryConnectionStatus>;
+	readonly loadDashboard?: () => Promise<
+		"notConnected" | "syncing" | "visible"
+	>;
 }): Promise<GitHubRepositoryEvidenceStatus> {
 	if (!input.uiEnabled) return { visibility: "hidden" };
 	const setup = input.readSetup();
 	if (!setup.configured) {
 		return {
 			visibility: "visible",
+			dashboard: "notConnected",
 			connection: {
 				accountLogin: null,
 				canManage: input.isOrgAdmin,
@@ -32,12 +36,17 @@ export async function resolveGitHubRepositoryEvidenceStatus(input: {
 				manageUrl: null,
 				repositories: [],
 				repositorySelection: null,
+				dashboard: "notConnected",
 			},
 		};
 	}
 	const status = await input.loadConnection();
+	const dashboard = status.connected
+		? ((await input.loadDashboard?.()) ?? "syncing")
+		: "notConnected";
 	return {
 		visibility: "visible",
+		dashboard,
 		connection: {
 			accountLogin: status.accountLogin,
 			canManage: input.isOrgAdmin,
@@ -55,6 +64,7 @@ export async function resolveGitHubRepositoryEvidenceStatus(input: {
 				repositoryId: repository.repositoryId,
 			})),
 			repositorySelection: status.repositorySelection,
+			dashboard,
 		},
 	};
 }

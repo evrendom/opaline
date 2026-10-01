@@ -12,6 +12,7 @@ export interface DateRangeActions {
 }
 
 export interface DateRangeMeta {
+	maxDays?: number;
 	dayCount: number;
 	source: DateRangeSource;
 }

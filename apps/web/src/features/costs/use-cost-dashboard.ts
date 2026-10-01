@@ -7,7 +7,12 @@ import type {
 	DashboardMetric,
 	DashboardSignal,
 } from "@rudel/api-routes";
-import { AGENT_RUN_DURATIONS, AGENT_RUN_SIGNALS } from "@rudel/api-routes";
+import {
+	AGENT_RUN_DURATIONS,
+	AGENT_RUN_SIGNALS,
+	CI_RUN_CONCLUSIONS,
+	PULL_REQUEST_CI,
+} from "@rudel/api-routes";
 import { type Query, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -32,10 +37,24 @@ export const RUN_DIMENSIONS: CostDimension[] = [
 	"skillsUsed",
 ];
 export const SIGNAL_DIMENSIONS: CostDimension[] = ["signalTypes", "phrases"];
+export const PR_DIMENSIONS: CostDimension[] = [
+	"repositories",
+	"githubAuthors",
+	"pullRequestCi",
+];
+export const CI_DIMENSIONS: CostDimension[] = [
+	"ciConclusions",
+	"ciEvents",
+	"ciAttempts",
+	"ciWorkflows",
+	"repositories",
+];
 export const ALL_COST_DIMENSIONS = [
 	...RUN_DIMENSIONS,
 	...SIGNAL_DIMENSIONS,
 	...COST_DIMENSIONS,
+	...PR_DIMENSIONS,
+	...CI_DIMENSIONS,
 ];
 export const COST_LABELS = {
 	members: "Members",
@@ -46,6 +65,12 @@ export const COST_LABELS = {
 	runSignals: "Follow-up signal",
 	durations: "Run duration",
 	skillsUsed: "Skills used",
+	pullRequestCi: "CI status",
+	githubAuthors: "GitHub author",
+	ciConclusions: "Conclusion",
+	ciEvents: "Event",
+	ciWorkflows: "Workflow",
+	ciAttempts: "Attempt",
 };
 
 type RequestedMetric = NonNullable<CostDashboardInput["requestedMetric"]>;
@@ -83,12 +108,18 @@ export function useAdminCostDashboard(): CostDashboardController {
 		endDate: input.endDate,
 		// The anonymous view has no repository scope, so the server never offers
 		// pull request metrics there.
-		requestedMetric: metric === "mergedPullRequests" ? "cost" : metric,
+		requestedMetric:
+			metric === "mergedPullRequests" || metric === "ciRuns" ? "cost" : metric,
 		durationInterval: input.durationInterval,
 		splitBy:
-			input.splitBy === "members" || input.splitBy === "repositories"
-				? "none"
-				: input.splitBy,
+			input.splitBy === "models" ||
+			input.splitBy === "signalTypes" ||
+			input.splitBy === "phrases" ||
+			input.splitBy === "runSignals" ||
+			input.splitBy === "durations" ||
+			input.splitBy === "skillsUsed"
+				? input.splitBy
+				: "none",
 		models: input.models,
 		signalTypes: input.signalTypes,
 		phrases: input.phrases,
@@ -192,18 +223,27 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
 			?.value ?? "daily";
 	const dimensions =
-		metric === "agentRuns"
-			? [...RUN_DIMENSIONS, ...costDimensions]
-			: metric === "signals"
-				? [...SIGNAL_DIMENSIONS, ...costDimensions]
-				: costDimensions;
+		metric === "mergedPullRequests"
+			? PR_DIMENSIONS
+			: metric === "ciRuns"
+				? CI_DIMENSIONS
+				: metric === "agentRuns"
+					? [...RUN_DIMENSIONS, ...costDimensions]
+					: metric === "signals"
+						? [...SIGNAL_DIMENSIONS, ...costDimensions]
+						: costDimensions;
 	const split = params.get("split");
 	const splitBy = dimensions.find((dimension) => dimension === split) ?? "none";
 	const input: CostDashboardInput = {
 		startDate: dates.startDate,
 		endDate: dates.endDate,
 		requestedMetric: metric,
-		durationInterval: metric === "agentRuns" ? interval : undefined,
+		durationInterval:
+			metric === "agentRuns" ||
+			metric === "ciRuns" ||
+			metric === "mergedPullRequests"
+				? interval
+				: undefined,
 		splitBy,
 		members: costDimensions.includes("members")
 			? params.getAll("member").slice(0, 100).sort()
@@ -212,6 +252,18 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 			? params.getAll("repo").slice(0, 100).sort()
 			: [],
 		models: params.getAll("model").slice(0, 100).sort(),
+		pullRequestCi: PULL_REQUEST_CI.filter(({ id }) =>
+			params.getAll("prCi").includes(id),
+		).map(({ id }) => id),
+		githubAuthors: params.getAll("author").slice(0, 100).sort(),
+		ciConclusions: CI_RUN_CONCLUSIONS.filter(({ id }) =>
+			params.getAll("conclusion").includes(id),
+		).map(({ id }) => id),
+		ciEvents: params.getAll("event").slice(0, 100).sort(),
+		ciWorkflows: params.getAll("workflow").slice(0, 100).sort(),
+		ciAttempts: (["first", "rerun"] as const).filter((id) =>
+			params.getAll("attempt").includes(id),
+		),
 
 		signalTypes:
 			metric === "signals"
@@ -290,8 +342,8 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 			setParams((current) => {
 				const next = new URLSearchParams(current);
 				if (
-					usesPullRequestRepositories(current.get("metric")) !==
-					usesPullRequestRepositories(value)
+					usesGitHubRepositories(current.get("metric")) !==
+					usesGitHubRepositories(value)
 				) {
 					next.delete(parameterFor("repositories"));
 					if (next.get("split") === "repositories") next.delete("split");
@@ -318,9 +370,11 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 
 // Pull request metrics filter by GitHub repository ID rather than the session
 // repository URL, so repository filters do not carry across that boundary.
-function usesPullRequestRepositories(metric: string | null) {
+function usesGitHubRepositories(metric: string | null) {
 	return (
-		metric === "mergedPullRequests" || metric === "ciFailuresPerPullRequest"
+		metric === "mergedPullRequests" ||
+		metric === "ciFailuresPerPullRequest" ||
+		metric === "ciRuns"
 	);
 }
 
@@ -334,6 +388,12 @@ function parameterFor(dimension: CostDimension) {
 		runSignals: "feedback",
 		durations: "duration",
 		skillsUsed: "skills",
+		pullRequestCi: "prCi",
+		githubAuthors: "author",
+		ciConclusions: "conclusion",
+		ciEvents: "event",
+		ciWorkflows: "workflow",
+		ciAttempts: "attempt",
 	};
 	return parameters[dimension];
 }

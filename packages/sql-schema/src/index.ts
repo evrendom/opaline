@@ -1,4 +1,8 @@
 export { cliConnection } from "./cli-connection-schema.js";
+export {
+	githubRepositorySweep,
+	organizationFeatureReadiness,
+} from "./github-outcomes-schema.js";
 export * from "./github-repository-evidence-schema.js";
 export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";

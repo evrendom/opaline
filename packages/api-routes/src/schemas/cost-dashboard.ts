@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AgentRunDurationSchema, AgentRunSignalSchema } from "./agent-runs.js";
 import { DateRangeInputSchema } from "./analytics.js";
+import { CiConclusionSchema, PullRequestCiSchema } from "./github-outcomes.js";
 
 export const DashboardSignalSchema = z.enum([
 	"modelApologies",
@@ -17,6 +18,12 @@ export const CostDimensionSchema = z.enum([
 	"runSignals",
 	"durations",
 	"skillsUsed",
+	"pullRequestCi",
+	"githubAuthors",
+	"ciConclusions",
+	"ciEvents",
+	"ciWorkflows",
+	"ciAttempts",
 ]);
 export const AgentRunDurationIntervalSchema = z.enum([
 	"daily",
@@ -37,6 +44,7 @@ export const CostDashboardRequestedMetricSchema = z.enum([
 	"agentRuns",
 	"mergedPullRequests",
 	"ciFailuresPerPullRequest",
+	"ciRuns",
 ]);
 const CostDashboardInputBaseSchema = DateRangeInputSchema.extend({
 	requestedMetric: CostDashboardRequestedMetricSchema.optional(),
@@ -53,6 +61,15 @@ const CostDashboardInputBaseSchema = DateRangeInputSchema.extend({
 		.max(2)
 		.default([]),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]).default("none"),
+	pullRequestCi: z.array(PullRequestCiSchema).max(4).default([]),
+	githubAuthors: z.array(z.string().max(512)).max(100).default([]),
+	ciConclusions: z.array(CiConclusionSchema).max(8).default([]),
+	ciEvents: z.array(z.string().max(100)).max(100).default([]),
+	ciWorkflows: z.array(z.string().max(64)).max(100).default([]),
+	ciAttempts: z
+		.array(z.enum(["first", "rerun"]))
+		.max(2)
+		.default([]),
 });
 function isWithinOneYear(input: { startDate: string; endDate: string }) {
 	const days =
@@ -61,8 +78,18 @@ function isWithinOneYear(input: { startDate: string; endDate: string }) {
 }
 const ONE_YEAR_MESSAGE = { message: "Choose a date range of up to one year." };
 export const CostDashboardInputSchema = CostDashboardInputBaseSchema.refine(
-	isWithinOneYear,
-	ONE_YEAR_MESSAGE,
+	(input) =>
+		["mergedPullRequests", "ciFailuresPerPullRequest", "ciRuns"].includes(
+			input.requestedMetric ?? "",
+		)
+			? Date.parse(input.endDate) >= Date.parse(input.startDate) &&
+				Date.parse(input.endDate) - Date.parse(input.startDate) <
+					732 * 86_400_000
+			: isWithinOneYear(input),
+	{
+		message:
+			"Choose up to two years for GitHub metrics, or one year for session metrics.",
+	},
 );
 // Anonymous cross-tenant operator view: members and repositories are neither
 // filterable nor split targets, so user identities and customer repository
@@ -70,13 +97,28 @@ export const CostDashboardInputSchema = CostDashboardInputBaseSchema.refine(
 export const AdminCostDashboardInputSchema = CostDashboardInputBaseSchema.omit({
 	members: true,
 	repositories: true,
+	pullRequestCi: true,
+	githubAuthors: true,
+	ciConclusions: true,
+	ciEvents: true,
+	ciWorkflows: true,
+	ciAttempts: true,
 })
 	.extend({
 		requestedMetric: z.enum(["cost", "sessions", "signals", "agentRuns"]),
 		splitBy: z
 			.enum([
 				"none",
-				...CostDimensionSchema.exclude(["members", "repositories"]).options,
+				...CostDimensionSchema.exclude([
+					"members",
+					"repositories",
+					"pullRequestCi",
+					"githubAuthors",
+					"ciConclusions",
+					"ciEvents",
+					"ciWorkflows",
+					"ciAttempts",
+				]).options,
 			])
 			.default("none"),
 	})
@@ -91,6 +133,9 @@ export const CostBreakdownEntrySchema = z.object({
 	image: z.string().nullable(),
 	numerator: z.number().nonnegative().optional(),
 	denominator: z.number().nonnegative().optional(),
+	medianSeconds: z.number().nonnegative().nullable().optional(),
+	p90Seconds: z.number().nonnegative().nullable().optional(),
+	approximateMinutes: z.number().nonnegative().optional(),
 });
 export const DashboardMetricSchema = z.enum([
 	"cost",
@@ -100,6 +145,7 @@ export const DashboardMetricSchema = z.enum([
 	"agentRuns",
 	"mergedPullRequests",
 	"ciFailuresPerPullRequest",
+	"ciRuns",
 ]);
 
 export const AgentRunDurationStatsSchema = z.object({
@@ -146,6 +192,12 @@ export const DashboardMetricDataSchema = z.object({
 		runSignals: z.array(CostBreakdownEntrySchema),
 		durations: z.array(CostBreakdownEntrySchema),
 		skillsUsed: z.array(CostBreakdownEntrySchema),
+		pullRequestCi: z.array(CostBreakdownEntrySchema).default([]),
+		githubAuthors: z.array(CostBreakdownEntrySchema).default([]),
+		ciConclusions: z.array(CostBreakdownEntrySchema).default([]),
+		ciEvents: z.array(CostBreakdownEntrySchema).default([]),
+		ciWorkflows: z.array(CostBreakdownEntrySchema).default([]),
+		ciAttempts: z.array(CostBreakdownEntrySchema).default([]),
 	}),
 	coverage: z
 		.object({
@@ -155,10 +207,44 @@ export const DashboardMetricDataSchema = z.object({
 		})
 		.optional(),
 	durationStats: AgentRunDurationStatsSchema.optional(),
+	cycleTimeStats: AgentRunDurationStatsSchema.omit({
+		p95Seconds: true,
+		trend: true,
+	})
+		.extend({
+			p90Seconds: z.number().nonnegative().nullable(),
+			trend: z.array(
+				AgentRunDurationStatsSchema.shape.trend.element
+					.omit({ p95Seconds: true })
+					.extend({ p90Seconds: z.number().nonnegative().nullable() }),
+			),
+		})
+		.optional(),
+	ciMinutes: z
+		.object({
+			total: z.number().nonnegative(),
+			trend: z.array(
+				z.object({ date: z.string(), minutes: z.number().nonnegative() }),
+			),
+			repositories: z.array(CostBreakdownEntrySchema),
+			workflows: z.array(CostBreakdownEntrySchema),
+		})
+		.optional(),
+	githubHistory: z
+		.object({
+			pullRequestsFrom: z.string().date().nullable(),
+			ciFrom: z.string().date().nullable(),
+			ciUnavailablePullRequests: z.number().int().nonnegative(),
+			syncingRepositories: z.number().int().nonnegative(),
+			unavailableRepositories: z.number().int().nonnegative(),
+			lastSyncedAt: z.string().datetime().nullable(),
+			preview: z.boolean(),
+		})
+		.optional(),
 	numerator: z.number().nonnegative().optional(),
 	denominator: z.number().nonnegative().optional(),
 });
-export const CostDashboardSchema = z.object({
+const costDashboardOutputSchema = z.object({
 	requestedMetric: CostDashboardRequestedMetricSchema.optional(),
 	splitBy: z.enum(["none", ...CostDimensionSchema.options]),
 	// Server source of truth for the metrics this scope offers. Requests for a
@@ -173,6 +259,7 @@ export const CostDashboardSchema = z.object({
 		agentRuns: DashboardMetricDataSchema.nullable(),
 		mergedPullRequests: DashboardMetricDataSchema.nullable(),
 		ciFailuresPerPullRequest: DashboardMetricDataSchema.nullable(),
+		ciRuns: DashboardMetricDataSchema.nullable().default(null),
 	}),
 });
 export type DashboardSignal = z.infer<typeof DashboardSignalSchema>;
@@ -186,5 +273,10 @@ export type CostDashboardRequestedMetric = z.infer<
 export type AdminCostDashboardInput = z.infer<
 	typeof AdminCostDashboardInputSchema
 >;
-export type CostDashboard = z.infer<typeof CostDashboardSchema>;
+export type CostDashboard = z.infer<typeof costDashboardOutputSchema>;
+export const CostDashboardSchema: z.ZodType<
+	CostDashboard,
+	z.ZodTypeDef,
+	unknown
+> = costDashboardOutputSchema;
 export type CostBreakdownEntry = z.infer<typeof CostBreakdownEntrySchema>;

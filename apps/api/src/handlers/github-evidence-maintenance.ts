@@ -12,9 +12,10 @@ export async function handleGitHubEvidenceMaintenanceRequest(
 	}
 	try {
 		// Unauthorized probes must not initialize database or provider clients.
-		const { runConfiguredGitHubEvidenceMaintenance } = await import(
-			"../services/github-evidence-worker.service.js"
-		);
+		const {
+			runConfiguredGitHubEvidenceMaintenance,
+			runConfiguredGitHubRepositorySweep,
+		} = await import("../services/github-evidence-worker.service.js");
 		const deadlineAt = Date.now() + INVOCATION_BUDGET_MS;
 		const drain = await drainMaintenancePasses({
 			deadline: { deadlineAt, now: Date.now },
@@ -52,9 +53,31 @@ export async function handleGitHubEvidenceMaintenanceRequest(
 			stopReason: drain.stopReason,
 			continuation: drain.hasMore ? "durable-collection-queue" : null,
 		};
+		const sweepDrain = await drainMaintenancePasses({
+			deadline: { deadlineAt, now: Date.now },
+			maxIterations: 1_000,
+			runPass: async () => {
+				const pass = await runConfiguredGitHubRepositorySweep(
+					AbortSignal.timeout(Math.max(1, deadlineAt - Date.now())),
+				);
+				return {
+					...pass,
+					pending: pass.hasMore,
+					hasMore: pass.requests > 0 && pass.hasMore,
+				};
+			},
+		});
+		const sweep = {
+			enabled: sweepDrain.results.some((pass) => pass.enabled),
+			requests: sweepDrain.results.reduce(
+				(sum, pass) => sum + pass.requests,
+				0,
+			),
+			hasMore: sweepDrain.results.at(-1)?.pending ?? sweepDrain.hasMore,
+		};
 		const ok = result.failed === 0 && !result.hasExhaustedFailures;
 		return Response.json(
-			{ githubEvidence: result, ok },
+			{ githubEvidence: result, githubSweep: sweep, ok },
 			{ status: ok ? 200 : 503 },
 		);
 	} catch {

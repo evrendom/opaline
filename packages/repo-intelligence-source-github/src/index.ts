@@ -3,6 +3,18 @@ export {
 	type GitHubSourceOptions,
 } from "./github-source.js";
 export {
+	createGitHubSweepSource,
+	type SweepCheck,
+	type SweepJob,
+	type SweepPullRequest,
+	type SweepRun,
+	type SweepStatus,
+	sweepCheckSchema,
+	sweepPullRequestSchema,
+	sweepRunSchema,
+	sweepStatusSchema,
+} from "./github-sweep-source.js";
+export {
 	createGitHubAuthorization,
 	type GitHubAuthorization,
 	type GitHubConditionalCache,

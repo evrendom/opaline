@@ -20,10 +20,11 @@ export function DashboardDateControls({
 	calendarControls?: AnalyticsDateRangePickerProps["calendarControls"];
 	triggerSuffix?: AnalyticsDateRangePickerProps["triggerSuffix"];
 }) {
-	const { state, actions } = useDateRange();
+	const { state, actions, meta } = useDateRange();
 
 	return (
 		<AnalyticsDateRangePicker
+			maxDays={meta.maxDays}
 			startDate={state.startDate}
 			endDate={state.endDate}
 			onDateRangeApply={actions.setDateRange}

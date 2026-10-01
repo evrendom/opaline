@@ -28,6 +28,7 @@ import {
 } from "../date-presets";
 
 export type AnalyticsDateRangePickerProps = {
+	maxDays?: number;
 	startDate: string;
 	endDate: string;
 	onDateRangeApply: (startDate: string, endDate: string) => void;
@@ -82,6 +83,7 @@ function getValidDateRange(
 }
 
 export function AnalyticsDateRangePicker({
+	maxDays = 365,
 	startDate,
 	endDate,
 	onDateRangeApply,
@@ -125,7 +127,7 @@ export function AnalyticsDateRangePicker({
 		}
 	});
 	const today = new Date();
-	const supportedDateRange = getSupportedAnalyticsDateRange(today);
+	const supportedDateRange = getSupportedAnalyticsDateRange(today, maxDays);
 	const selectedDateRange = useMemo(
 		() => getValidDateRange(startDate, endDate),
 		[endDate, startDate],

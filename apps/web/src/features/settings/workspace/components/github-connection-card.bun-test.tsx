@@ -29,6 +29,34 @@ const CONNECTED_STATUS: GitHubRepositoryConnectionStatus = {
 	repositorySelection: "selected",
 };
 
+test("dashboard syncing and visible states, and admin-only retention advice", () => {
+	const card = (status: GitHubRepositoryConnectionStatus) =>
+		renderToStaticMarkup(
+			<GitHubConnectionCard
+				status={status}
+				isPending={false}
+				isError={false}
+				isConnecting={false}
+				actionError={null}
+				onConnect={() => {}}
+				onRetry={() => {}}
+			/>,
+		);
+	expect(card({ ...CONNECTED_STATUS, dashboard: "syncing" })).toContain(
+		"Opaline is reading pull request and CI history from GitHub.",
+	);
+	expect(card({ ...CONNECTED_STATUS, dashboard: "visible" })).toContain(
+		"Merged PRs and CI runs are on the dashboard.",
+	);
+	expect(card({ ...CONNECTED_STATUS, dashboard: "visible" })).toContain(
+		"Open dashboard",
+	);
+	expect(card(CONNECTED_STATUS)).toContain("Settings → Actions → General");
+	expect(card({ ...CONNECTED_STATUS, canManage: false })).not.toContain(
+		"Settings → Actions → General",
+	);
+});
+
 test("renders verified connection details and admin actions", () => {
 	const markup = renderToStaticMarkup(
 		<GitHubConnectionCard
@@ -154,6 +182,7 @@ test("renders no GitHub section before visibility is known or when it fails to l
 test("renders the connection card and CLI note once the server shows the section", () => {
 	const markup = renderSection({
 		visibility: "visible",
+		dashboard: "syncing",
 		connection: CONNECTED_STATUS,
 	});
 

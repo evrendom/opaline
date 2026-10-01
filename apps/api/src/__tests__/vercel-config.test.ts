@@ -172,6 +172,9 @@ describe("Vercel deployment configuration", () => {
 		expect(languageSignals).toBeGreaterThan(-1);
 		expect(languageSignals).toBeLessThan(transcriptRecords);
 		expect(transcriptRecords).toBeLessThan(repositoryEvidence);
+		expect(repositoryEvidence).toBeLessThan(
+			productionScript.indexOf("ch:migrate:github-outcomes"),
+		);
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

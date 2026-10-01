@@ -34,7 +34,12 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import { costLabel, formatMetricRatio, METRIC_LABELS } from "./cost-format";
+import {
+	costLabel,
+	formatMetricRatio,
+	formatRunDuration,
+	METRIC_LABELS,
+} from "./cost-format";
 import { COST_LABELS } from "./use-cost-dashboard";
 
 type Props = {
@@ -113,7 +118,12 @@ export function CostBreakdown({
 						<BreakdownSkeleton />
 					) : entries.length ? (
 						entries
-							.slice(0, dimension === "durations" ? entries.length : 7)
+							.slice(
+								0,
+								dimension === "durations" || dimension === "ciConclusions"
+									? entries.length
+									: 8,
+							)
 							.map((entry) => (
 								<BreakdownRow
 									key={entry.id}
@@ -338,6 +348,23 @@ function BreakdownRow({
 			</span>
 			<span className="cost-row-amount">
 				{formatMetricRatio(entry.value, metric, entry.denominator)}
+				{entry.approximateMinutes !== undefined ? (
+					<small
+						className="cost-cycle-time"
+						title="Approximation of billed Actions minutes; billing multipliers are not included."
+					>
+						{new Intl.NumberFormat("en-US", {
+							maximumFractionDigits: 1,
+						}).format(entry.approximateMinutes)}{" "}
+						CI minutes (approx.)
+					</small>
+				) : null}
+				{entry.medianSeconds !== undefined ? (
+					<small className="cost-cycle-time">
+						Median {formatRunDuration(entry.medianSeconds)} · P90{" "}
+						{formatRunDuration(entry.p90Seconds)}
+					</small>
+				) : null}
 			</span>
 			<span className="cost-row-share">
 				{metric === "ciFailuresPerPullRequest"

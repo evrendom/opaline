@@ -17,6 +17,19 @@ const points = [
 	{ date: "2026-01-05", total: 19, values: { a: 9, b: 10 } },
 ];
 
+test("history floors leave null buckets before coverage and preserve straddling buckets", () => {
+	const grouped = groupChartTrend(points, "weekly");
+	const first = grouped[0];
+	const second = grouped[1];
+	assert(first && second);
+	expect(
+		getChartSeriesValue(first, "a", "2026-01-06", "sum", "2025-12-30"),
+	).toBeNull();
+	expect(
+		getChartSeriesValue(second, "a", "2026-01-06", "sum", "2025-12-30"),
+	).toBe(15);
+});
+
 describe("Dashboard chart intervals", () => {
 	test("groups Monday–Sunday weeks across the year without extending the selected data", () => {
 		expect(groupChartTrend(points, "weekly")).toEqual([

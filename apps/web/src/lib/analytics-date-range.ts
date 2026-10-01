@@ -8,6 +8,13 @@ import {
 } from "date-fns";
 
 export const MAX_ANALYTICS_DAYS = 365;
+export function getAnalyticsMaxDays(metric: string | null) {
+	return metric === "mergedPullRequests" ||
+		metric === "ciFailuresPerPullRequest" ||
+		metric === "ciRuns"
+		? 732
+		: MAX_ANALYTICS_DAYS;
+}
 
 export function getInclusiveDateRangeDays(startDate: string, endDate: string) {
 	const range = parseDateRange(startDate, endDate);
@@ -26,6 +33,7 @@ export function isAnalyticsRangeTooLarge(days: number) {
 export function normalizeAnalyticsDateRange(
 	startDate: string,
 	endDate: string,
+	maxDays = MAX_ANALYTICS_DAYS,
 ) {
 	const range = parseDateRange(startDate, endDate);
 
@@ -33,7 +41,7 @@ export function normalizeAnalyticsDateRange(
 		return null;
 	}
 
-	const earliestSupportedDate = subDays(range.end, MAX_ANALYTICS_DAYS - 1);
+	const earliestSupportedDate = subDays(range.end, maxDays - 1);
 	const normalizedStart =
 		range.start < earliestSupportedDate ? earliestSupportedDate : range.start;
 
@@ -67,13 +75,14 @@ export function expandAnalyticsDateRange(
 	return eachDayOfInterval(range);
 }
 
-export function getSupportedAnalyticsDateRange(endDate = new Date()) {
+export function getSupportedAnalyticsDateRange(
+	endDate = new Date(),
+	maxDays = MAX_ANALYTICS_DAYS,
+) {
 	const normalizedEndDate = new Date(endDate);
 	const supportedStartDate = new Date(normalizedEndDate);
 
-	supportedStartDate.setDate(
-		normalizedEndDate.getDate() - (MAX_ANALYTICS_DAYS - 1),
-	);
+	supportedStartDate.setDate(normalizedEndDate.getDate() - (maxDays - 1));
 
 	return {
 		end: normalizedEndDate,

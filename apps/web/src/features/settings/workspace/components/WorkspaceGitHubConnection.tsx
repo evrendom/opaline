@@ -53,7 +53,15 @@ export function WorkspaceGitHubConnection({
 		if (!callbackResult || handledCallback.current === location.key) return;
 		handledCallback.current = location.key;
 		const notification = CALLBACK_MESSAGES[callbackResult];
-		toast[notification.kind](notification.message);
+		toast[notification.kind](
+			notification.message,
+			callbackResult === "connected"
+				? {
+						description:
+							"Tip: raise Actions retention in GitHub to keep more CI history.",
+					}
+				: undefined,
+		);
 		if (callbackResult === "connected") void query.refetch();
 		const nextSearch = new URLSearchParams(location.search);
 		nextSearch.delete("github");

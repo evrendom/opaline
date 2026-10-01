@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { DASHBOARD_METRICS, listDashboardTabs } from "./cost-format";
+import {
+	DASHBOARD_METRICS,
+	listDashboardTabs,
+	METRIC_LABELS,
+} from "./cost-format";
+
+test("CI runs is opt-in and the failure companion uses the stage-1 label", () => {
+	expect(listDashboardTabs(["cost", "ciRuns"])).toEqual(["cost", "ciRuns"]);
+	expect(listDashboardTabs(undefined)).not.toContain("ciRuns");
+	expect(METRIC_LABELS.ciFailuresPerPullRequest).toBe("CI failures / PR");
+});
 
 describe("dashboard metric tabs", () => {
 	test("renders only the metrics the server offers, in presentation order", () => {

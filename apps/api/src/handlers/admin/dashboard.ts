@@ -7,7 +7,17 @@ export const dashboard = os.admin.dashboard
 	.handler(({ input }) =>
 		getCostDashboard(
 			{ tenant: "allOrganizations" },
-			{ ...input, members: [], repositories: [] },
+			{
+				...input,
+				members: [],
+				repositories: [],
+				pullRequestCi: [],
+				githubAuthors: [],
+				ciConclusions: [],
+				ciEvents: [],
+				ciWorkflows: [],
+				ciAttempts: [],
+			},
 			{ githubEvidenceUiEnabled: isGitHubEvidenceUiEnabled() },
 		),
 	);

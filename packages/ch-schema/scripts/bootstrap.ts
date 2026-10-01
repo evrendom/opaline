@@ -22,6 +22,7 @@ import {
 const MIGRATIONS_DIR = resolve(import.meta.dir, "../chx/migrations");
 const SUBAGENT_VIEW_MIGRATION = "20260911055631_auto.sql";
 const FORWARD_SCRIPTS = new Map([
+	["20261001120000_github_outcomes.sql", "migrate-github-outcomes.ts"],
 	["20260913190000_product_launch.sql", "migrate-product-launch.ts"],
 	[
 		"20260916120000_dependency_health_probes.sql",
@@ -223,7 +224,10 @@ async function run(): Promise<void> {
 					);
 					console.log("Established subagent_count prerequisite.");
 				}
-				if (mode === "upgrade") {
+				if (
+					mode === "upgrade" ||
+					migration.name === "20261001120000_github_outcomes.sql"
+				) {
 					const currentJournal = await journalStore.readJournal();
 					if (
 						currentJournal.applied.some(

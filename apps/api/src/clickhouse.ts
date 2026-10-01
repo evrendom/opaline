@@ -52,6 +52,12 @@ const SESSION_ANALYTICS_MV_FILTER_MARKER =
 	"WHERE _is_capped OR length(_timestamps) > 0";
 
 const ALLOWED_CLICKHOUSE_TABLES = new Set([
+	"rudel.github_pull_requests",
+	"rudel.github_pull_request_details",
+	"rudel.github_pull_request_commits",
+	"rudel.github_ci_runs",
+	"rudel.github_ci_run_pull_requests",
+	"rudel.github_ci_jobs",
 	"rudel.claude_sessions",
 	"rudel.codex_sessions",
 	"rudel.repository_session_evidence_index",

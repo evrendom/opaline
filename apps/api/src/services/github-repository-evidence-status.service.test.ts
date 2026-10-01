@@ -51,6 +51,7 @@ test("shows the workspace connection once the GitHub evidence UI is enabled", as
 
 	expect(GitHubRepositoryEvidenceStatusSchema.parse(status)).toEqual({
 		visibility: "visible",
+		dashboard: "syncing",
 		connection: {
 			accountLogin: "opalinehq",
 			canManage: true,
@@ -70,6 +71,7 @@ test("shows the workspace connection once the GitHub evidence UI is enabled", as
 				},
 			],
 			repositorySelection: "selected",
+			dashboard: "syncing",
 		},
 	});
 });
@@ -84,6 +86,7 @@ test("keeps management links admin-only when visible", async () => {
 
 	expect(status).toMatchObject({
 		visibility: "visible",
+		dashboard: "syncing",
 		connection: { canManage: false, manageUrl: null },
 	});
 });
@@ -103,6 +106,7 @@ test("reports an unconfigured deployment without loading the connection", async 
 
 	expect(status).toMatchObject({
 		visibility: "visible",
+		dashboard: "notConnected",
 		connection: {
 			configured: false,
 			configurationError: "GitHub connection is not configured.",
@@ -111,4 +115,19 @@ test("reports an unconfigured deployment without loading the connection", async 
 		},
 	});
 	expect(loadConnection).not.toHaveBeenCalled();
+});
+
+test("ready workspaces expose the visible dashboard state", async () => {
+	const status = await resolveGitHubRepositoryEvidenceStatus({
+		uiEnabled: true,
+		isOrgAdmin: false,
+		readSetup: () => ({ configured: true }),
+		loadConnection: async () => CONNECTION,
+		loadDashboard: async () => "visible",
+	});
+	expect(GitHubRepositoryEvidenceStatusSchema.parse(status)).toMatchObject({
+		visibility: "visible",
+		dashboard: "visible",
+		connection: { dashboard: "visible", canManage: false },
+	});
 });

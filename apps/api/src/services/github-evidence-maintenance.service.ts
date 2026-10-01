@@ -94,16 +94,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		   )) OR (candidate.status IN ('complete', 'partial', 'failed') AND candidate.refresh_due_at <= $1
 		     AND candidate.session_user_id <> '' AND candidate.observation_started_at > $1::timestamptz - INTERVAL '14 days'))
 		   AND ${collectionIdentityScope("candidate", 3)}
-		   AND NOT EXISTS (
-		     SELECT 1
-		     FROM github_evidence_collection newer
-		     WHERE newer.organization_id = candidate.organization_id
-		       AND newer.repository_id = candidate.repository_id
-		       AND newer.commit_sha = candidate.commit_sha
-		       AND newer.session_id = candidate.session_id
-		       AND newer.context_id = candidate.context_id
-		       AND newer.attempt_number > candidate.attempt_number
-		   )
+		   AND ${latestGitHubEvidenceAttempt("candidate")}
 		 ORDER BY coalesce(candidate.retry_after, candidate.refresh_due_at, candidate.lease_expires_at), candidate.created_at
 		 LIMIT $2`,
 		[now().toISOString(), limit, collectionIds],
@@ -117,15 +108,7 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		   WHERE exhausted.status = 'failed'
 		     AND exhausted.retry_count >= $1
 		     AND ${collectionIdentityScope("exhausted", 2)}
-		     AND NOT EXISTS (
-		       SELECT 1 FROM github_evidence_collection newer
-		       WHERE newer.organization_id = exhausted.organization_id
-		         AND newer.repository_id = exhausted.repository_id
-		         AND newer.commit_sha = exhausted.commit_sha
-		         AND newer.session_id = exhausted.session_id
-		         AND newer.context_id = exhausted.context_id
-		         AND newer.attempt_number > exhausted.attempt_number
-		     )
+		     AND ${latestGitHubEvidenceAttempt("exhausted")}
 		   LIMIT 1
 		 ) AS present`,
 		[MAX_AUTOMATIC_RETRIES, collectionIds],
@@ -190,6 +173,18 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 		hasMore: candidates.length === limit || agedRefreshes.length === limit,
 		succeeded,
 	};
+}
+
+export function latestGitHubEvidenceAttempt(alias: string): string {
+	return `NOT EXISTS (
+		SELECT 1 FROM github_evidence_collection newer
+		WHERE newer.organization_id = ${alias}.organization_id
+		  AND newer.repository_id = ${alias}.repository_id
+		  AND newer.commit_sha = ${alias}.commit_sha
+		  AND newer.session_id = ${alias}.session_id
+		  AND newer.context_id = ${alias}.context_id
+		  AND newer.attempt_number > ${alias}.attempt_number
+	)`;
 }
 
 function collectionIdentityScope(alias: string, parameter: number): string {

@@ -1,6 +1,14 @@
-import { isGitHubEvidenceUiEnabled } from "../../lib/env.js";
+import { sqlClient } from "../../db.js";
+import {
+	isGitHubEvidenceUiEnabled,
+	readGitHubEvidenceUiForceOrgIds,
+} from "../../lib/env.js";
 import { orgMiddleware, os } from "../../middleware.js";
 import { getCostDashboard } from "../../services/cost-dashboard.service.js";
+import {
+	readGitHubOutcomesReadiness,
+	resolveGitHubOutcomesVisibility,
+} from "../../services/github-outcomes-readiness.service.js";
 import {
 	getModelTokensTrend,
 	getOverviewInsights,
@@ -105,13 +113,27 @@ const successRate = os.analytics.overview.successRate
 
 const costs = os.analytics.overview.costs
 	.use(orgMiddleware)
-	.handler(({ input, context }) =>
-		getCostDashboard(
+	.handler(async ({ input, context }) => {
+		const uiEnabled = isGitHubEvidenceUiEnabled();
+		const readiness = uiEnabled
+			? await readGitHubOutcomesReadiness(sqlClient, context.organizationId)
+			: null;
+		return getCostDashboard(
 			{ tenant: "organization", orgId: context.organizationId },
 			input,
-			{ githubEvidenceUiEnabled: isGitHubEvidenceUiEnabled() },
-		),
-	);
+			{
+				githubEvidenceUiEnabled: uiEnabled,
+				githubReadiness: readiness,
+				githubVisibility: resolveGitHubOutcomesVisibility({
+					uiEnabled,
+					forced: readGitHubEvidenceUiForceOrgIds().includes(
+						context.organizationId,
+					),
+					readiness,
+				}),
+			},
+		);
+	});
 
 export const overviewRouter = os.analytics.overview.router({
 	costs,
