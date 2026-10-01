@@ -59,6 +59,7 @@ import {
 	captureApiProductAnalyticsEvent,
 	hashProjectPath,
 } from "./lib/product-analytics.js";
+import { readRepositoryEvidenceCapturePauseSeconds } from "./lib/repository-evidence-capture.js";
 import {
 	type AppContext,
 	authMiddleware,
@@ -1492,12 +1493,15 @@ const ingestSessionHandler = os.ingestSession
 
 const repositoryEvidenceInit = os.repositoryEvidence.init
 	.use(ingestAuthMiddleware)
-	.handler(async ({ input, context }) => {
+	.handler(async ({ input, context, errors }) => {
 		if (!context.apiKeyId) {
 			throw new ORPCError("UNAUTHORIZED", {
 				message: "An ingest API key is required",
 			});
 		}
+		const pauseSeconds = readRepositoryEvidenceCapturePauseSeconds();
+		if (pauseSeconds !== undefined)
+			throw errors.EVIDENCE_CAPTURE_DISABLED({ data: { pauseSeconds } });
 		const availability = readR2IngestAvailability();
 		if (!availability.enabled) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
@@ -1637,12 +1641,15 @@ const githubRepositoryEvidenceSyncCommit =
 
 const repositoryEvidenceCommit = os.repositoryEvidence.commit
 	.use(ingestAuthMiddleware)
-	.handler(async ({ input, context, signal }) => {
+	.handler(async ({ input, context, signal, errors }) => {
 		if (!context.apiKeyId) {
 			throw new ORPCError("UNAUTHORIZED", {
 				message: "An ingest API key is required",
 			});
 		}
+		const pauseSeconds = readRepositoryEvidenceCapturePauseSeconds();
+		if (pauseSeconds !== undefined)
+			throw errors.EVIDENCE_CAPTURE_DISABLED({ data: { pauseSeconds } });
 		const availability = readR2IngestAvailability();
 		if (!availability.enabled) {
 			throw new ORPCError("SERVICE_UNAVAILABLE", {
