@@ -16,14 +16,19 @@ import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.s
 import { toPostgresJson } from "./postgres-json.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 import {
+	EVIDENCE_R2_CREATION_TIMEOUT_MS,
+	evidenceSqlBatches,
+	mapEvidenceStorage,
+} from "./repository-evidence-batching.js";
+import {
 	abortUploadIntents,
-	attachMultipartUploadId,
+	attachMultipartUploadIds,
 	EVIDENCE_INTENT_GRACE_MS,
 	EVIDENCE_UPLOAD_TTL_MS,
 	type EvidenceIntentScope,
 	expediteReceiptIntents,
 	expediteUploadIntents,
-	registerMultipartIntent,
+	registerMultipartIntents,
 } from "./repository-evidence-fence.service.js";
 import { claimSessionIngestOwnership } from "./session-ownership.service.js";
 
@@ -184,15 +189,12 @@ export async function initRepositoryEvidence(
 					initializedAt.toISOString(),
 				],
 			);
-			for (const object of options.input.objects) {
-				await transaction.unsafe(
-					`INSERT INTO repository_evidence_upload_object (
-						upload_id, organization_id, object_id
-					) VALUES ($1, $2, $3)
-					ON CONFLICT (upload_id, object_id) DO NOTHING`,
-					[uploadReceiptId, options.organizationId, object.objectId],
-				);
-			}
+			await linkUploadObjects(
+				transaction,
+				uploadReceiptId,
+				options.organizationId,
+				options.input.objects.map((object) => object.objectId),
+			);
 		});
 
 		return {
@@ -378,55 +380,56 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 		plan.input.objects.map((object) => object.objectId),
 		options.database,
 	);
-	let manifestBytes: Uint8Array | undefined;
-	for (let offset = 0; offset < plan.input.objects.length; offset += 8) {
-		const batch = plan.input.objects.slice(offset, offset + 8);
-		const verified = await Promise.all(
-			batch.map(async (descriptor) => {
-				const uploadPlan = plan.uploads.find(
-					(candidate) => candidate.objectId === descriptor.objectId,
-				);
-				let bytes: Uint8Array;
-				if (uploadPlan) {
-					const completion = options.input.objects.find(
-						(candidate) => candidate.objectId === descriptor.objectId,
+	const uploadPlans = new Map(
+		plan.uploads.map((object) => [object.objectId, object]),
+	);
+	const completions = new Map(
+		options.input.objects.map((object) => [object.objectId, object]),
+	);
+	const completedUploadIds: string[] = [];
+	const verified = await mapEvidenceStorage(
+		plan.input.objects,
+		async (descriptor) => {
+			const uploadPlan = uploadPlans.get(descriptor.objectId);
+			let bytes: Uint8Array;
+			if (uploadPlan) {
+				const completion = completions.get(descriptor.objectId);
+				if (!completion) {
+					throw new RepositoryEvidenceStateError(
+						"EVIDENCE_OBJECT_MISMATCH",
+						`Missing completion for ${descriptor.objectId}.`,
 					);
-					if (!completion) {
-						throw new RepositoryEvidenceStateError(
-							"EVIDENCE_OBJECT_MISMATCH",
-							`Missing completion for ${descriptor.objectId}.`,
-						);
-					}
-					bytes = await materializeEvidenceObject({
-						completion,
-						descriptor,
-						r2: options.r2,
-						signal: options.signal,
-						upload: uploadPlan,
-					});
-				} else {
-					const known = knownObjects.get(descriptor.objectId);
-					if (known?.status === "available") return null;
-					if (!known) {
-						throw new RepositoryEvidenceStateError(
-							"EVIDENCE_OBJECT_MISMATCH",
-							`Evidence object ${descriptor.objectId} is not registered.`,
-						);
-					}
-					bytes = await readVerifiedEvidenceObject({
-						descriptor,
-						objectKey: known.objectKey,
-						r2: options.r2,
-						signal: options.signal,
-					});
 				}
-				return descriptor.objectId === plan.input.manifestObjectId
-					? bytes
-					: null;
-			}),
-		);
-		manifestBytes ??= verified.find((bytes) => bytes !== null) ?? undefined;
-	}
+				const materialized = await materializeEvidenceObject({
+					completion,
+					descriptor,
+					r2: options.r2,
+					signal: options.signal,
+					upload: uploadPlan,
+				});
+				bytes = materialized.bytes;
+				if (materialized.multipartCompleted)
+					completedUploadIds.push(uploadPlan.uploadId);
+			} else {
+				const known = knownObjects.get(descriptor.objectId);
+				if (known?.status === "available") return null;
+				if (!known) {
+					throw new RepositoryEvidenceStateError(
+						"EVIDENCE_OBJECT_MISMATCH",
+						`Evidence object ${descriptor.objectId} is not registered.`,
+					);
+				}
+				bytes = await readVerifiedEvidenceObject({
+					descriptor,
+					objectKey: known.objectKey,
+					r2: options.r2,
+					signal: options.signal,
+				});
+			}
+			return descriptor.objectId === plan.input.manifestObjectId ? bytes : null;
+		},
+	);
+	const manifestBytes = verified.find((bytes) => bytes !== null) ?? undefined;
 	const evidence = await readVerifiedEvidenceFromPlan({
 		database: options.database,
 		manifestBytes,
@@ -485,6 +488,25 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 		const objectIds = [
 			...new Set(plan.input.objects.map((object) => object.objectId)),
 		];
+		const lockedObjects = await lockKnownObjects(
+			options.organizationId,
+			objectIds,
+			transaction,
+		);
+		for (const objectId of objectIds) {
+			const verifiedKey =
+				uploadPlans.get(objectId)?.objectKey ??
+				knownObjects.get(objectId)?.objectKey;
+			if (
+				!verifiedKey ||
+				lockedObjects.get(objectId)?.objectKey !== verifiedKey
+			) {
+				throw new RepositoryEvidenceStateError(
+					"EVIDENCE_UPLOAD_CONFLICT",
+					"Repository evidence object generations changed before commit; retry the upload.",
+				);
+			}
+		}
 		const available = await transaction.unsafe<Array<{ objectId: string }>>(
 			`UPDATE repository_evidence_object
 			 SET status = 'available', available_at = COALESCE(available_at, $1), updated_at = $1
@@ -553,6 +575,7 @@ export async function commitRepositoryEvidence<TPreparedIndex>(
 		return "accepted" as const;
 	});
 	await abortUploadIntents({
+		completedUploadIds,
 		database: options.database,
 		r2: options.r2,
 		uploadReceiptId: upload.id,
@@ -648,15 +671,8 @@ async function ensurePendingObjects(input: {
 	readonly organizationId: string;
 }): Promise<ReadonlyMap<string, string>> {
 	if (input.objects.length === 0) return new Map();
-	await input.database.begin(async (transaction) => {
-		for (const object of input.objects) {
-			await insertPendingObject(transaction, input, object);
-		}
-	});
-	const rows = await findKnownObjects(
-		input.organizationId,
-		input.objects.map((object) => object.objectId),
-		input.database,
+	const rows = await input.database.begin((transaction) =>
+		insertPendingObjects(transaction, input, input.objects),
 	);
 	const keys = new Map<string, string>();
 	for (const [objectId, row] of rows) {
@@ -665,35 +681,74 @@ async function ensurePendingObjects(input: {
 	return keys;
 }
 
-async function insertPendingObject(
+async function insertPendingObjects(
 	database: postgres.Sql | postgres.TransactionSql,
 	context: { readonly now: Date; readonly organizationId: string },
-	object: RepositoryEvidenceObjectDescriptor,
-): Promise<string> {
+	objects: readonly RepositoryEvidenceObjectDescriptor[],
+): Promise<ReadonlyMap<string, EvidenceObjectRow>> {
 	// Refreshing updated_at keeps a reused pending row away from the stale
 	// object sweeper while this upload is being planned.
-	const [row] = await database.unsafe<Array<{ objectKey: string }>>(
-		`INSERT INTO repository_evidence_object (
-			organization_id, object_id, object_key, kind, byte_length,
-			media_type, content_encoding, filter_version, status, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
-		ON CONFLICT (organization_id, object_id) DO UPDATE
-		SET updated_at = GREATEST(repository_evidence_object.updated_at, EXCLUDED.updated_at)
-		RETURNING object_key AS "objectKey"`,
-		[
-			context.organizationId,
-			object.objectId,
-			createEvidenceObjectKey(context.organizationId, object.objectId),
-			object.kind,
-			object.byteLength,
-			object.mediaType,
-			object.contentEncoding,
-			object.filterVersion,
-			context.now.toISOString(),
-		],
+	const result = new Map<string, EvidenceObjectRow>();
+	const sorted = [...objects].sort((left, right) =>
+		left.objectId.localeCompare(right.objectId),
 	);
-	if (!row) throw new Error("Repository evidence object was not registered");
-	return row.objectKey;
+	for (const batch of evidenceSqlBatches(sorted)) {
+		const rows = await database.unsafe<EvidenceObjectRow[]>(
+			`INSERT INTO repository_evidence_object (
+				organization_id, object_id, object_key, kind, byte_length,
+				media_type, content_encoding, filter_version, status, updated_at
+			)
+			SELECT $2, item."objectId", item."objectKey", item.kind, item."byteLength",
+				item."mediaType", item."contentEncoding", item."filterVersion", 'pending', $3::timestamptz
+			FROM jsonb_to_recordset($1::text::jsonb) AS item(
+				"objectId" text, "objectKey" text, kind text, "byteLength" integer,
+				"mediaType" text, "contentEncoding" text, "filterVersion" integer
+			)
+			ORDER BY item."objectId"
+			ON CONFLICT (organization_id, object_id) DO UPDATE
+			SET updated_at = GREATEST(repository_evidence_object.updated_at, EXCLUDED.updated_at)
+			RETURNING object_id AS "objectId", object_key AS "objectKey", byte_length AS "byteLength", status`,
+			[
+				JSON.stringify(
+					batch.map((object) => ({
+						...object,
+						objectKey: createEvidenceObjectKey(
+							context.organizationId,
+							object.objectId,
+						),
+					})),
+				),
+				context.organizationId,
+				context.now.toISOString(),
+			],
+		);
+		for (const row of rows) result.set(row.objectId, row);
+		for (const object of batch) {
+			if (result.get(object.objectId)?.byteLength !== object.byteLength) {
+				throw new RepositoryEvidenceStateError(
+					"EVIDENCE_OBJECT_MISMATCH",
+					`Evidence object ${object.objectId} conflicts with its recorded byte length.`,
+				);
+			}
+		}
+	}
+	return result;
+}
+
+async function linkUploadObjects(
+	transaction: postgres.TransactionSql,
+	uploadReceiptId: string,
+	organizationId: string,
+	objectIds: readonly string[],
+): Promise<void> {
+	for (const batch of evidenceSqlBatches(objectIds)) {
+		await transaction.unsafe(
+			`INSERT INTO repository_evidence_upload_object (upload_id, organization_id, object_id)
+			 SELECT $1, $2, unnest($3::text[])
+			 ON CONFLICT (upload_id, object_id) DO NOTHING`,
+			[uploadReceiptId, organizationId, batch],
+		);
+	}
 }
 
 async function assertReusedObjectsAvailable(
@@ -734,25 +789,31 @@ async function createUploadPlans(input: {
 	readonly r2: R2MultipartUploadClient;
 	readonly scope: EvidenceIntentScope;
 }): Promise<RepositoryEvidenceUploadObject[]> {
-	const results: RepositoryEvidenceUploadObject[] = [];
-	for (let offset = 0; offset < input.missing.length; offset += 8) {
-		const settled = await Promise.allSettled(
-			input.missing.slice(offset, offset + 8).map(async (object) => {
-				const objectKey = input.objectKeys.get(object.objectId);
-				if (!objectKey) {
-					throw new Error("Repository evidence object has no registered key");
-				}
-				await assertNoClickHousePurgeTombstone(input.scope, {
-					database: input.database,
-				});
-				// The intent is committed before the multipart upload exists so a
-				// crash between creation and the upload plan cannot leak it.
-				const intentId = await registerMultipartIntent(
-					input.database,
-					input.scope,
-					objectKey,
-					input.intentDueAt,
-				);
+	if (input.missing.length === 0) return [];
+	const intents = input.missing.map((object) => {
+		const objectKey = input.objectKeys.get(object.objectId);
+		if (!objectKey)
+			throw new Error("Repository evidence object has no registered key");
+		return { id: crypto.randomUUID(), object, objectKey };
+	});
+	const creationSignal = AbortSignal.timeout(EVIDENCE_R2_CREATION_TIMEOUT_MS);
+	await input.database.begin(async (transaction) => {
+		await assertNoClickHousePurgeTombstone(input.scope, {
+			database: transaction,
+		});
+		await registerMultipartIntents(
+			transaction,
+			input.scope,
+			intents.map(({ id, objectKey }) => ({ id, objectKey })),
+			input.intentDueAt,
+		);
+	});
+	const attached: Array<{ id: string; uploadId: string }> = [];
+	try {
+		return await mapEvidenceStorage(
+			intents,
+			async ({ id, object, objectKey }) => {
+				creationSignal.throwIfAborted();
 				const created = await input.r2.createMultipartUpload({
 					contentType: object.mediaType,
 					metadata: {
@@ -762,13 +823,10 @@ async function createUploadPlans(input: {
 						"upload-receipt-id": input.scope.uploadReceiptId,
 					},
 					objectKey,
+					signal: creationSignal,
 				});
-				await attachMultipartUploadId(
-					input.database,
-					intentId,
-					created.uploadId,
-				);
 				input.createdUploads.push({ objectKey, uploadId: created.uploadId });
+				attached.push({ id, uploadId: created.uploadId });
 				const byteLengths = getPartByteLengths(object.byteLength);
 				const urls = await Promise.all(
 					byteLengths.map((byteLength, index) =>
@@ -792,15 +850,11 @@ async function createUploadPlans(input: {
 					})),
 					uploadId: created.uploadId,
 				};
-			}),
+			},
 		);
-		const failure = settled.find((result) => result.status === "rejected");
-		if (failure?.status === "rejected") throw failure.reason;
-		for (const result of settled) {
-			if (result.status === "fulfilled") results.push(result.value);
-		}
+	} finally {
+		await attachMultipartUploadIds(input.database, input.scope, attached);
 	}
-	return results;
 }
 
 async function resumeRepositoryEvidenceUpload(
@@ -852,11 +906,22 @@ async function resumeRepositoryEvidenceUpload(
 				uploadReceiptId: upload.id,
 				userId: options.userId,
 			};
-			const rows = await lockKnownObjects(
-				options.organizationId,
-				plan.input.objects.map((object) => object.objectId),
-				transaction,
+			const rows = new Map(
+				await lockKnownObjects(
+					options.organizationId,
+					plan.input.objects.map((object) => object.objectId),
+					transaction,
+				),
 			);
+			const inserted = await insertPendingObjects(
+				transaction,
+				{ now, organizationId: options.organizationId },
+				plan.input.objects.filter((object) => !rows.has(object.objectId)),
+			);
+			for (const [objectId, row] of inserted) rows.set(objectId, row);
+			await linkUploadObjects(transaction, upload.id, options.organizationId, [
+				...inserted.keys(),
+			]);
 			await transaction.unsafe(
 				`UPDATE repository_evidence_object
 				 SET updated_at = GREATEST(updated_at, $3)
@@ -874,57 +939,66 @@ async function resumeRepositoryEvidenceUpload(
 			const incomplete: RepositoryEvidenceUploadObject[] = [];
 			const unplanned: RepositoryEvidenceObjectDescriptor[] = [];
 			const objectKeys = new Map<string, string>();
-			for (const descriptor of plan.input.objects) {
-				const row = rows.get(descriptor.objectId);
-				if (row?.status === "available") continue;
-				const objectKey =
-					row?.objectKey ??
-					(await insertPendingObject(
-						transaction,
-						{ now, organizationId: options.organizationId },
-						descriptor,
-					));
-				objectKeys.set(descriptor.objectId, objectKey);
-				const object = plan.uploads.find(
-					(candidate) =>
-						candidate.objectId === descriptor.objectId &&
-						candidate.objectKey === objectKey,
-				);
-				if (!object) {
-					unplanned.push(descriptor);
-					continue;
-				}
-				const materialized = await options.r2.headObject(object.objectKey);
-				if (!isExpectedObject(materialized, descriptor)) {
-					incomplete.push(object);
-					if (materialized !== null) renew = true;
-					continue;
-				}
-				try {
-					await readVerifiedEvidenceObject({
-						descriptor,
-						objectKey: object.objectKey,
-						r2: options.r2,
-						signal: undefined,
-					});
-				} catch (error) {
-					if (
-						!(error instanceof RepositoryEvidenceStateError) ||
-						error.code !== "EVIDENCE_OBJECT_MISMATCH"
-					) {
-						throw error;
+			const uploadPlans = new Map(
+				plan.uploads.map((object) => [object.objectId, object]),
+			);
+			const checked = await mapEvidenceStorage(
+				plan.input.objects,
+				async (descriptor) => {
+					const row = rows.get(descriptor.objectId);
+					if (row?.status === "available") return null;
+					if (!row)
+						throw new Error("Repository evidence object was not registered");
+					const objectKey = row.objectKey;
+					objectKeys.set(descriptor.objectId, objectKey);
+					const object = uploadPlans.get(descriptor.objectId);
+					if (!object || object.objectKey !== objectKey) {
+						return { descriptor, object: null, renew: false };
 					}
-					incomplete.push(object);
-					renew = true;
-				}
+					const materialized = await options.r2.headObject(object.objectKey);
+					if (materialized === null) {
+						return {
+							descriptor,
+							object,
+							renew: !(await options.r2.hasMultipartUpload(object)),
+						};
+					}
+					if (!isExpectedObject(materialized, descriptor)) {
+						return { descriptor, object, renew: true };
+					}
+					try {
+						await readVerifiedEvidenceObject({
+							descriptor,
+							objectKey: object.objectKey,
+							r2: options.r2,
+							signal: undefined,
+						});
+					} catch (error) {
+						if (
+							!(error instanceof RepositoryEvidenceStateError) ||
+							error.code !== "EVIDENCE_OBJECT_MISMATCH"
+						) {
+							throw error;
+						}
+						return { descriptor, object, renew: true };
+					}
+					return null;
+				},
+			);
+			for (const result of checked) {
+				if (!result) continue;
+				renew ||= result.renew;
+				if (result.object) incomplete.push(result.object);
+				else unplanned.push(result.descriptor);
 			}
 			const expiresAt = renew
 				? new Date(now.getTime() + EVIDENCE_UPLOAD_TTL_MS)
 				: toDate(upload.expiresAt);
+			const descriptors = new Map(
+				plan.input.objects.map((object) => [object.objectId, object]),
+			);
 			const describe = (object: RepositoryEvidenceUploadObject) => {
-				const descriptor = plan.input.objects.find(
-					(item) => item.objectId === object.objectId,
-				);
+				const descriptor = descriptors.get(object.objectId);
 				if (!descriptor) {
 					throw new Error("Stored evidence upload has no descriptor.");
 				}
@@ -1009,8 +1083,9 @@ async function restoreInitOutput(
 		);
 	}
 	const plan = parseStoredPlan(upload.request);
-	const missingObjects = await Promise.all(
-		plan.uploads.map(async (object) => ({
+	const missingObjects = await mapEvidenceStorage(
+		plan.uploads,
+		async (object) => ({
 			...object,
 			parts: await Promise.all(
 				object.parts.map(async (part) => ({
@@ -1023,7 +1098,7 @@ async function restoreInitOutput(
 					}),
 				})),
 			),
-		})),
+		}),
 	);
 	const missing = new Set(missingObjects.map((object) => object.objectId));
 	return {
@@ -1044,19 +1119,22 @@ async function materializeEvidenceObject(input: {
 	readonly r2: R2MultipartUploadClient;
 	readonly signal: AbortSignal | undefined;
 	readonly upload: RepositoryEvidenceUploadObject;
-}): Promise<Uint8Array> {
+}): Promise<{ bytes: Uint8Array; multipartCompleted: boolean }> {
 	const existing = await input.r2.headObject(
 		input.upload.objectKey,
 		input.signal,
 	);
 	if (isExpectedObject(existing, input.descriptor)) {
 		try {
-			return await readVerifiedEvidenceObject({
-				descriptor: input.descriptor,
-				objectKey: input.upload.objectKey,
-				r2: input.r2,
-				signal: input.signal,
-			});
+			return {
+				bytes: await readVerifiedEvidenceObject({
+					descriptor: input.descriptor,
+					objectKey: input.upload.objectKey,
+					r2: input.r2,
+					signal: input.signal,
+				}),
+				multipartCompleted: false,
+			};
 		} catch (error) {
 			if (
 				!(error instanceof RepositoryEvidenceStateError) ||
@@ -1093,12 +1171,15 @@ async function materializeEvidenceObject(input: {
 			`Materialized object ${input.descriptor.objectId} did not match its declared size and digest.`,
 		);
 	}
-	return readVerifiedEvidenceObject({
-		descriptor: input.descriptor,
-		objectKey: input.upload.objectKey,
-		r2: input.r2,
-		signal: input.signal,
-	});
+	return {
+		bytes: await readVerifiedEvidenceObject({
+			descriptor: input.descriptor,
+			objectKey: input.upload.objectKey,
+			r2: input.r2,
+			signal: input.signal,
+		}),
+		multipartCompleted: true,
+	};
 }
 
 async function readVerifiedEvidenceObject(input: {
@@ -1148,10 +1229,11 @@ function assertCompletionMatches(
 			"Completed evidence objects do not match the initialized upload.",
 		);
 	}
+	const uploadPlans = new Map(
+		uploads.map((object) => [object.objectId, object]),
+	);
 	for (const completion of completed) {
-		const upload = uploads.find(
-			(candidate) => candidate.objectId === completion.objectId,
-		);
+		const upload = uploadPlans.get(completion.objectId);
 		if (
 			!upload ||
 			upload.objectKey !== completion.objectKey ||

@@ -28,6 +28,7 @@ export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 	putFailure: Error | null = null;
 	readonly objects = new Map<string, FakeObject>();
 	readonly uploads = new Map<string, FakeMultipartUpload>();
+	multipartListingLimit = Number.POSITIVE_INFINITY;
 	private nextUploadNumber = 1;
 	initiatedAt = new Date();
 
@@ -91,6 +92,13 @@ export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 		return object.bytes;
 	}
 
+	async hasMultipartUpload(input: {
+		objectKey: string;
+		uploadId: string;
+	}): Promise<boolean> {
+		return this.uploads.get(input.uploadId)?.objectKey === input.objectKey;
+	}
+
 	async headObject(objectKey: string): Promise<R2ObjectMetadata | null> {
 		const object = this.objects.get(objectKey);
 		return object
@@ -106,7 +114,8 @@ export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 			.map(([uploadId, upload]) => ({
 				initiatedAt: upload.initiatedAt,
 				uploadId,
-			}));
+			}))
+			.slice(0, this.multipartListingLimit);
 	}
 
 	async putObject(input: {

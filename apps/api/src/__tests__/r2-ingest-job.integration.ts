@@ -101,6 +101,14 @@ class FakeR2Client implements R2MultipartUploadClient {
 		if (!object.complete) this.objects.delete(input.objectKey);
 	}
 
+	async hasMultipartUpload(input: {
+		objectKey: string;
+		uploadId: string;
+	}): Promise<boolean> {
+		const object = this.objects.get(input.objectKey);
+		return !!object && !object.complete && object.uploadId === input.uploadId;
+	}
+
 	async listMultipartUploads(
 		objectKey: string,
 	): Promise<readonly { initiatedAt: Date; uploadId: string }[]> {

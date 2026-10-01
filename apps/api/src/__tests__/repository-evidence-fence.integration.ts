@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
 	type RepositoryEvidenceInitInput,
@@ -19,9 +20,13 @@ import {
 	initRepositoryEvidence,
 	RepositoryEvidenceStateError,
 } from "../services/repository-evidence.service.js";
+import { EVIDENCE_R2_CONCURRENCY } from "../services/repository-evidence-batching.js";
 import { sweepRepositoryEvidence } from "../services/repository-evidence-fence.service.js";
 import { deleteUserPostgresData } from "../services/user-deletion.service.js";
-import { FakeEvidenceR2 } from "./helpers/fake-evidence-r2.js";
+import {
+	FakeEvidenceR2,
+	NoSuchUploadError,
+} from "./helpers/fake-evidence-r2.js";
 
 setDefaultTimeout(120_000);
 
@@ -318,6 +323,116 @@ describe("repository evidence session ownership", () => {
 });
 
 describe("repository evidence deletion fence", () => {
+	test("deleting a member during the first creation window preserves another member's shared upload", async () => {
+		const fixture = await createFixture("overlapping-init");
+		const creationStarted = Promise.withResolvers<void>();
+		const releaseCreation = Promise.withResolvers<void>();
+		class GatedEvidenceR2 extends FakeEvidenceR2 {
+			blockParts = false;
+
+			override async presignUploadPart(
+				input: Parameters<FakeEvidenceR2["presignUploadPart"]>[0],
+			): Promise<string> {
+				if (this.blockParts) {
+					creationStarted.resolve();
+					await releaseCreation.promise;
+				}
+				return super.presignUploadPart(input);
+			}
+		}
+		const r2 = new GatedEvidenceR2();
+		const survivorEvidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-overlap-survivor`,
+			"overlapping payload",
+		);
+		const survivorInit = await initialize(
+			fixture,
+			fixture.survivorId,
+			survivorEvidence,
+			r2,
+		);
+		const sharedUpload = survivorInit.missingObjects.find(
+			(object) =>
+				object.objectId === survivorEvidence.payload.descriptor.objectId,
+		);
+		assert(sharedUpload);
+		const victimEvidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-overlap-victim`,
+			"overlapping payload",
+		);
+		const victimInput = {
+			...victimEvidence,
+			input: {
+				...victimEvidence.input,
+				objects: [
+					victimEvidence.manifest.descriptor,
+					...Array.from(
+						{ length: EVIDENCE_R2_CONCURRENCY - 1 },
+						(_, index) =>
+							buildObject(`victim-only ${index}`, "source-blob").descriptor,
+					),
+					victimEvidence.payload.descriptor,
+				],
+			},
+		};
+		r2.blockParts = true;
+		const victimResult = initialize(
+			fixture,
+			fixture.victimId,
+			victimInput,
+			r2,
+		).catch((error: unknown) => error);
+		await creationStarted.promise;
+		try {
+			expect(
+				await countRows(
+					"SELECT COUNT(*)::int AS count FROM repository_evidence_upload_intent WHERE user_id = $1 AND object_key = $2 AND upload_id IS NULL",
+					[fixture.victimId, sharedUpload.objectKey],
+				),
+			).toBe(1);
+			await deleteUserPostgresData(fixture.victimId, { sqlClient });
+			const [job] = await sqlClient.unsafe<Array<{ id: string }>>(
+				"SELECT id FROM clickhouse_purge_job WHERE target_type = 'account' AND target_id = $1",
+				[fixture.victimId],
+			);
+			assert(job);
+			await purgeRepositoryEvidenceObjects(
+				{ targetId: fixture.victimId, targetType: "account" },
+				{ finalPass: false, purgeJobId: job.id },
+				sqlClient,
+				r2,
+			);
+			expect(r2.abortedUploadIds).not.toContain(sharedUpload.uploadId);
+			expect(r2.uploads.has(sharedUpload.uploadId)).toBe(true);
+			await uploadAndCommit({
+				evidence: survivorEvidence,
+				initialized: survivorInit,
+				organizationId: fixture.organizationId,
+				r2,
+				userId: fixture.survivorId,
+			});
+		} finally {
+			releaseCreation.resolve();
+			await victimResult;
+		}
+		expect(await victimResult).toBeInstanceOf(ClickHouseWriteFencedError);
+		const [job] = await sqlClient.unsafe<Array<{ id: string }>>(
+			"SELECT id FROM clickhouse_purge_job WHERE target_type = 'account' AND target_id = $1",
+			[fixture.victimId],
+		);
+		assert(job);
+		await purgeRepositoryEvidenceObjects(
+			{ targetId: fixture.victimId, targetType: "account" },
+			{ finalPass: true, purgeJobId: job.id },
+			sqlClient,
+			r2,
+		);
+		expect(r2.objects.has(sharedUpload.objectKey)).toBe(true);
+		expect(r2.uploads.size).toBe(0);
+	});
+
 	test("rejects init and commit once a deletion tombstone exists and creates no multipart upload", async () => {
 		const fixture = await createFixture("tombstone");
 		const r2 = new FakeEvidenceR2();
@@ -591,6 +706,200 @@ describe("repository evidence deletion fence", () => {
 });
 
 describe("repository evidence sweeper", () => {
+	test("retains unidentified uploads on a live shared generation until that generation is removed", async () => {
+		const fixture = await createFixture("unknown-shared-owner");
+		const r2 = new FakeEvidenceR2();
+		const victimEvidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-unknown-victim`,
+			"shared unknown upload",
+		);
+		const survivorEvidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-unknown-survivor`,
+			"shared unknown upload",
+		);
+		const victimInit = await initialize(
+			fixture,
+			fixture.victimId,
+			victimEvidence,
+			r2,
+		);
+		const survivorInit = await initialize(
+			fixture,
+			fixture.survivorId,
+			survivorEvidence,
+			r2,
+		);
+		const unknownUpload = victimInit.missingObjects.find(
+			(object) =>
+				object.objectId === victimEvidence.payload.descriptor.objectId,
+		);
+		const survivorUpload = survivorInit.missingObjects.find(
+			(object) =>
+				object.objectId === survivorEvidence.payload.descriptor.objectId,
+		);
+		assert(unknownUpload);
+		assert(survivorUpload);
+		expect(unknownUpload.objectKey).toBe(survivorUpload.objectKey);
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_upload_intent SET upload_id = NULL WHERE upload_receipt_id = $1 AND object_key = $2",
+			[victimInit.uploadReceiptId, unknownUpload.objectKey],
+		);
+		await deleteUserPostgresData(fixture.victimId, { sqlClient });
+		const [job] = await sqlClient.unsafe<Array<{ id: string }>>(
+			"SELECT id FROM clickhouse_purge_job WHERE target_type = 'account' AND target_id = $1",
+			[fixture.victimId],
+		);
+		assert(job);
+		await purgeRepositoryEvidenceObjects(
+			{ targetId: fixture.victimId, targetType: "account" },
+			{ finalPass: true, purgeJobId: job.id },
+			sqlClient,
+			r2,
+		);
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_upload_intent SET due_at = NOW() WHERE upload_receipt_id = $1",
+			[victimInit.uploadReceiptId],
+		);
+		await sweepRepositoryEvidence({ database: sqlClient, r2 });
+		expect(r2.uploads.has(unknownUpload.uploadId)).toBe(true);
+		expect(r2.uploads.has(survivorUpload.uploadId)).toBe(true);
+		expect(
+			await countRows(
+				"SELECT COUNT(*)::int AS count FROM repository_evidence_upload_intent WHERE upload_receipt_id = $1 AND upload_id IS NULL",
+				[victimInit.uploadReceiptId],
+			),
+		).toBe(1);
+		await uploadAndCommit({
+			evidence: survivorEvidence,
+			initialized: survivorInit,
+			organizationId: fixture.organizationId,
+			r2,
+			userId: fixture.survivorId,
+		});
+		await deleteUserPostgresData(fixture.survivorId, { sqlClient });
+		await sqlClient.unsafe(
+			"UPDATE repository_evidence_upload_intent SET due_at = NOW() WHERE upload_receipt_id = $1",
+			[victimInit.uploadReceiptId],
+		);
+		await sweepRepositoryEvidence({ database: sqlClient, r2 });
+		expect(r2.abortedUploadIds).toContain(unknownUpload.uploadId);
+		expect(r2.abortedUploadIds).not.toContain(survivorUpload.uploadId);
+		expect(
+			await countRows(
+				"SELECT COUNT(*)::int AS count FROM repository_evidence_upload_intent WHERE upload_receipt_id = $1",
+				[victimInit.uploadReceiptId],
+			),
+		).toBe(0);
+	});
+
+	test("preserves live multipart IDs and parts when the listing omits them", async () => {
+		const fixture = await createFixture("truncated-resume");
+		const r2 = new FakeEvidenceR2();
+		r2.multipartListingLimit = 1;
+		const evidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-truncated-session`,
+			"already uploaded payload",
+		);
+		const first = await initialize(fixture, fixture.survivorId, evidence, r2);
+		const other = {
+			...evidence,
+			input: {
+				...evidence.input,
+				operationId: crypto.randomUUID(),
+				capture: { ...evidence.input.capture, contextId: crypto.randomUUID() },
+			},
+		};
+		const initialized = await initialize(
+			fixture,
+			fixture.survivorId,
+			other,
+			r2,
+		);
+		const live = initialized.missingObjects.find(
+			(object) => object.objectId === evidence.payload.descriptor.objectId,
+		);
+		assert(live);
+		r2.putPart(live.uploadId, 1, evidence.payload.bytes);
+		expect(await r2.headObject(live.objectKey)).toBeNull();
+		expect(
+			(await r2.listMultipartUploads(live.objectKey)).map(
+				(upload) => upload.uploadId,
+			),
+		).not.toContain(live.uploadId);
+		const resumed = await initialize(fixture, fixture.survivorId, other, r2);
+		expect(resumed.uploadReceiptId).toBe(initialized.uploadReceiptId);
+		expect(resumed.missingObjects.map((object) => object.uploadId)).toEqual(
+			initialized.missingObjects.map((object) => object.uploadId),
+		);
+		expect(r2.abortedUploadIds).toEqual([]);
+		expect(r2.uploads.get(live.uploadId)?.parts.get(1)).toEqual(
+			evidence.payload.bytes,
+		);
+		await uploadAndCommit({
+			evidence: other,
+			initialized: resumed,
+			organizationId: fixture.organizationId,
+			r2,
+			userId: fixture.survivorId,
+		});
+		expect([...r2.uploads.keys()].sort()).toEqual(
+			first.missingObjects.map((object) => object.uploadId).sort(),
+		);
+	});
+
+	test("resumes an unexpired receipt after its multipart upload ID was revoked", async () => {
+		const fixture = await createFixture("revoked-resume");
+		const r2 = new FakeEvidenceR2();
+		const evidence = newEvidence(
+			fixture.organizationId,
+			`${RUN_ID}-revoked-session`,
+			"recoverable payload",
+		);
+		const initialized = await initialize(
+			fixture,
+			fixture.survivorId,
+			evidence,
+			r2,
+		);
+		const revoked = initialized.missingObjects.find(
+			(object) => object.objectId === evidence.payload.descriptor.objectId,
+		);
+		assert(revoked);
+		await r2.abortMultipartUpload(revoked);
+		expect(() =>
+			r2.putPart(revoked.uploadId, 1, evidence.payload.bytes),
+		).toThrow(NoSuchUploadError);
+		const resumed = await initialize(fixture, fixture.survivorId, evidence, r2);
+		expect(resumed.uploadReceiptId).toBe(initialized.uploadReceiptId);
+		const replacement = resumed.missingObjects.find(
+			(object) => object.objectId === revoked.objectId,
+		);
+		assert(replacement);
+		expect(replacement.objectKey).toBe(revoked.objectKey);
+		expect(replacement.uploadId).not.toBe(revoked.uploadId);
+		expect(r2.uploads.has(replacement.uploadId)).toBe(true);
+		const resumedAgain = await initialize(
+			fixture,
+			fixture.survivorId,
+			evidence,
+			r2,
+		);
+		expect(
+			resumedAgain.missingObjects.map((object) => object.uploadId),
+		).toEqual(resumed.missingObjects.map((object) => object.uploadId));
+		await uploadAndCommit({
+			evidence,
+			initialized: resumedAgain,
+			organizationId: fixture.organizationId,
+			r2,
+			userId: fixture.survivorId,
+		});
+		expect(r2.uploads.size).toBe(0);
+	});
+
 	test("aborts deduplicated multipart uploads before releasing their intents", async () => {
 		const fixture = await createFixture("deduplicated");
 		const r2 = new FakeEvidenceR2();

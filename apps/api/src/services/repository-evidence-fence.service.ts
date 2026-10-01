@@ -5,6 +5,10 @@ import {
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
+import {
+	evidenceSqlBatches,
+	mapEvidenceStorage,
+} from "./repository-evidence-batching.js";
 
 /**
  * Deletion fence for repository evidence.
@@ -14,8 +18,8 @@ import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
  * durable record that lets deletion (or a sweeper) find it. The pattern is
  * deliberately small and is applied identically by every evidence writer:
  *
- * 1. Check before write. Immediately before each external publication
- *    (multipart creation, multipart completion, ClickHouse insert) call
+ * 1. Check before a write phase. Before registering a creation batch and before
+ *    multipart materialization or ClickHouse publication, call
  *    `assertNoClickHousePurgeTombstone` (clickhouse-purge-tombstone.service.ts, where the
  *    full pattern is documented). `clickhouse_purge_job` rows act as the
  *    tombstones: they are inserted in the same transaction that deletes the
@@ -39,7 +43,6 @@ const logger = getLogger(["rudel", "api", "repository-evidence-fence"]);
 export const EVIDENCE_UPLOAD_TTL_MS = 60 * 60_000;
 export const EVIDENCE_INTENT_GRACE_MS = 10 * 60_000;
 const EVIDENCE_STALE_PENDING_OBJECT_MS = 2 * EVIDENCE_UPLOAD_TTL_MS;
-const UNKNOWN_UPLOAD_ID_WINDOW_MS = 2 * 60_000;
 const MAX_SWEEP_ITEMS = 20;
 const INTENT_RETRY_DELAY_MS = 5 * 60_000;
 
@@ -65,40 +68,50 @@ interface IntentRow {
 	readonly uploadId: string | null;
 }
 
-export async function registerMultipartIntent(
+export async function registerMultipartIntents(
 	database: EvidenceDatabase,
 	scope: EvidenceIntentScope,
-	objectKey: string,
+	intents: readonly { readonly id: string; readonly objectKey: string }[],
 	dueAt: Date,
-): Promise<string> {
-	const id = crypto.randomUUID();
-	await database.unsafe(
-		`INSERT INTO repository_evidence_upload_intent (
-			id, organization_id, user_id, upload_receipt_id, object_key, due_at
-		) VALUES ($1, $2, $3, $4, $5, $6)`,
-		[
-			id,
-			scope.organizationId,
-			scope.userId,
-			scope.uploadReceiptId,
-			objectKey,
-			dueAt.toISOString(),
-		],
-	);
-	return id;
+): Promise<void> {
+	for (const batch of evidenceSqlBatches(intents)) {
+		await database.unsafe(
+			`INSERT INTO repository_evidence_upload_intent (
+				id, organization_id, user_id, upload_receipt_id, object_key, due_at
+			)
+			SELECT item.id, $2, $3, $4, item."objectKey", $5::timestamptz
+			FROM jsonb_to_recordset($1::text::jsonb) AS item(id text, "objectKey" text)`,
+			[
+				JSON.stringify(batch),
+				scope.organizationId,
+				scope.userId,
+				scope.uploadReceiptId,
+				dueAt.toISOString(),
+			],
+		);
+	}
 }
 
-export async function attachMultipartUploadId(
+export async function attachMultipartUploadIds(
 	database: EvidenceDatabase,
-	intentId: string,
-	uploadId: string,
+	scope: EvidenceIntentScope,
+	intents: readonly { readonly id: string; readonly uploadId: string }[],
 ): Promise<void> {
-	await database.unsafe(
-		`UPDATE repository_evidence_upload_intent
-		 SET upload_id = $2
-		 WHERE id = $1`,
-		[intentId, uploadId],
-	);
+	for (const batch of evidenceSqlBatches(intents)) {
+		await database.unsafe(
+			`UPDATE repository_evidence_upload_intent AS intent
+			 SET upload_id = item."uploadId"
+			 FROM jsonb_to_recordset($1::text::jsonb) AS item(id text, "uploadId" text)
+			 WHERE intent.id = item.id AND intent.organization_id = $2
+				AND intent.user_id = $3 AND intent.upload_receipt_id = $4`,
+			[
+				JSON.stringify(batch),
+				scope.organizationId,
+				scope.userId,
+				scope.uploadReceiptId,
+			],
+		);
+	}
 }
 
 /**
@@ -184,12 +197,11 @@ export async function runIntentsForPurgeTarget(input: {
 		if (!last) return processed;
 		cursor = last.id;
 		for (const row of rows) {
-			await executeIntent(input.database, input.r2, row, {
+			const completed = await executeIntent(input.database, input.r2, row, {
 				deleteObjectKey: true,
-				forceAbortUnknown: true,
 			});
 			processed += 1;
-			if (input.finalPass) {
+			if (input.finalPass && completed) {
 				await input.database.unsafe(
 					"DELETE FROM repository_evidence_upload_intent WHERE id = $1",
 					[row.id],
@@ -205,6 +217,7 @@ export async function runIntentsForPurgeTarget(input: {
 }
 
 export async function abortUploadIntents(input: {
+	readonly completedUploadIds?: readonly string[];
 	readonly database: postgres.Sql;
 	readonly r2: Pick<
 		R2MultipartUploadClient,
@@ -223,22 +236,31 @@ export async function abortUploadIntents(input: {
 			AND ($2::text[] IS NULL OR upload_id = ANY($2::text[]))`,
 		[input.uploadReceiptId, input.uploadIds ?? null],
 	);
-	for (const row of rows) {
+	const materialized = new Set(input.completedUploadIds);
+	const completed = await mapEvidenceStorage(rows, async (row) => {
 		try {
-			await executeIntent(input.database, input.r2, row, {
-				deleteObjectKey: false,
-				forceAbortUnknown: false,
-			});
-			await input.database.unsafe(
-				"DELETE FROM repository_evidence_upload_intent WHERE id = $1",
-				[row.id],
-			);
+			if (row.uploadId === null || !materialized.has(row.uploadId)) {
+				const completed = await executeIntent(input.database, input.r2, row, {
+					deleteObjectKey: false,
+				});
+				if (!completed) return null;
+			}
+			return row.id;
 		} catch (error) {
 			logger.warn(
 				"Evidence multipart abort will be retried by the sweeper (intent_id={intentId} error={error})",
 				{ error: safeErrorCode(error), intentId: row.id },
 			);
+			return null;
 		}
+	});
+	const completedIds = completed.filter((id) => id !== null);
+	for (const batch of evidenceSqlBatches(completedIds)) {
+		await input.database.unsafe(
+			`DELETE FROM repository_evidence_upload_intent
+			 WHERE id = ANY($1::text[]) AND upload_receipt_id = $2`,
+			[batch, input.uploadReceiptId],
+		);
 	}
 }
 
@@ -347,10 +369,24 @@ export async function sweepRepositoryEvidence(input: {
 			}
 			attempted += 1;
 			try {
-				await executeIntent(input.database, input.r2, row, {
-					deleteObjectKey: row.deleteObject,
-					forceAbortUnknown: row.deleteObject,
-				});
+				const intentCompleted = await executeIntent(
+					input.database,
+					input.r2,
+					row,
+					{
+						deleteObjectKey: row.deleteObject,
+					},
+				);
+				if (!intentCompleted) {
+					await input.database.unsafe(
+						"UPDATE repository_evidence_upload_intent SET due_at = $2 WHERE id = $1",
+						[
+							row.id,
+							new Date(now.getTime() + INTENT_RETRY_DELAY_MS).toISOString(),
+						],
+					);
+					continue;
+				}
 				await input.database.unsafe(
 					"DELETE FROM repository_evidence_upload_intent WHERE id = $1",
 					[row.id],
@@ -415,31 +451,24 @@ async function executeIntent(
 	intent: IntentRow,
 	options: {
 		readonly deleteObjectKey: boolean;
-		readonly forceAbortUnknown: boolean;
 	},
-): Promise<void> {
+): Promise<boolean> {
 	if (intent.uploadId !== null) {
 		await abortIgnoringMissing(r2, intent.objectKey, intent.uploadId);
 	} else {
-		const createdAt =
-			intent.createdAt instanceof Date
-				? intent.createdAt
-				: new Date(intent.createdAt);
+		const [live] = await database.unsafe<Array<{ objectKey: string }>>(
+			`SELECT object_key AS "objectKey"
+			 FROM repository_evidence_object
+			 WHERE object_key = $1 LIMIT 1`,
+			[intent.objectKey],
+		);
 		const uploads = await r2.listMultipartUploads(intent.objectKey);
+		if (live && uploads.length > 0) return false;
 		for (const upload of uploads) {
-			// Without a recorded upload ID only uploads started by the intent's own
-			// request can be identified, so other live uploads for the same key are
-			// left alone unless the key itself is being deleted.
-			if (
-				options.forceAbortUnknown ||
-				upload.initiatedAt.getTime() <=
-					createdAt.getTime() + UNKNOWN_UPLOAD_ID_WINDOW_MS
-			) {
-				await abortIgnoringMissing(r2, intent.objectKey, upload.uploadId);
-			}
+			await abortIgnoringMissing(r2, intent.objectKey, upload.uploadId);
 		}
 	}
-	if (!options.deleteObjectKey) return;
+	if (!options.deleteObjectKey) return true;
 	const [live] = await database.unsafe<Array<{ objectKey: string }>>(
 		`SELECT object_key AS "objectKey"
 		 FROM repository_evidence_object
@@ -449,6 +478,7 @@ async function executeIntent(
 	);
 	// A surviving row owns the key; only keys without a row are garbage.
 	if (!live) await r2.deleteObjects([intent.objectKey]);
+	return true;
 }
 
 async function abortIgnoringMissing(

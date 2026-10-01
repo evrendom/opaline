@@ -73,6 +73,7 @@ function createMemoryR2(
 		createMultipartUpload: async () => ({ uploadId: "unused" }),
 		deleteObjects: async () => {},
 		getObject: async (key) => objects.get(key) ?? new Uint8Array(),
+		hasMultipartUpload: async () => false,
 		headObject: async (key) => {
 			const value = objects.get(key);
 			return value ? { byteLength: value.byteLength, metadata: {} } : null;

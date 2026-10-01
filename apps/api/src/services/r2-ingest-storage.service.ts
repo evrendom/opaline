@@ -6,6 +6,7 @@ import {
 	GetObjectCommand,
 	HeadObjectCommand,
 	ListMultipartUploadsCommand,
+	ListPartsCommand,
 	PutObjectCommand,
 	S3Client,
 	UploadPartCommand,
@@ -54,6 +55,7 @@ export interface R2MultipartUploadInitClient {
 		contentType?: string;
 		metadata: Readonly<Record<string, string>>;
 		objectKey: string;
+		signal?: AbortSignal;
 	}) => Promise<{ uploadId: string }>;
 	presignUploadPart: (input: {
 		byteLength: number;
@@ -77,6 +79,10 @@ export interface R2MultipartUploadClient extends R2MultipartUploadInitClient {
 	}) => Promise<void>;
 	deleteObjects: (objectKeys: readonly string[]) => Promise<void>;
 	getObject: (objectKey: string, signal?: AbortSignal) => Promise<Uint8Array>;
+	hasMultipartUpload: (input: {
+		objectKey: string;
+		uploadId: string;
+	}) => Promise<boolean>;
 	listMultipartUploads: (objectKey: string) => Promise<
 		readonly {
 			initiatedAt: Date;
@@ -203,6 +209,7 @@ export function createR2MultipartUploadClient(
 					Key: input.objectKey,
 					Metadata: input.metadata,
 				}),
+				{ abortSignal: input.signal },
 			);
 			if (!result.UploadId) {
 				throw new Error("R2 did not return a multipart upload ID");
@@ -254,6 +261,26 @@ export function createR2MultipartUploadClient(
 				throw new Error("R2 returned an ingest object without a body");
 			}
 			return result.Body.transformToByteArray();
+		},
+		async hasMultipartUpload(input) {
+			try {
+				await client.send(
+					new ListPartsCommand({
+						Bucket: configuration.bucket,
+						Key: input.objectKey,
+						MaxParts: 1,
+						UploadId: input.uploadId,
+					}),
+				);
+				return true;
+			} catch (error) {
+				return !(
+					typeof error === "object" &&
+					error !== null &&
+					"name" in error &&
+					error.name === "NoSuchUpload"
+				);
+			}
 		},
 		async listMultipartUploads(objectKey) {
 			const result = await client.send(

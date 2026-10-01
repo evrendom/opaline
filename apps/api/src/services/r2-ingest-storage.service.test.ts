@@ -158,6 +158,99 @@ describe("R2 ingest storage configuration", () => {
 		await server.stop(true);
 	});
 
+	test("cancels multipart creation when its phase deadline expires", async () => {
+		const server = Bun.serve({
+			async fetch() {
+				await Bun.sleep(100);
+				return new Response(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<InitiateMultipartUploadResult>
+	<Bucket>${R2_INGEST_BUCKET}</Bucket><Key>evidence/key</Key><UploadId>too-late</UploadId>
+</InitiateMultipartUploadResult>`,
+					{ headers: { "Content-Type": "application/xml" } },
+				);
+			},
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const client = createR2MultipartUploadClient({
+			accessKeyId: "test-access-key",
+			accountId: "test-account",
+			bucket: R2_INGEST_BUCKET,
+			endpoint: server.url.origin,
+			forcePathStyle: true,
+			secretAccessKey: "test-secret-key",
+		});
+		await expect(
+			client.createMultipartUpload({
+				metadata: {},
+				objectKey: "evidence/key",
+				signal: AbortSignal.timeout(10),
+			}),
+		).rejects.toThrow();
+		await server.stop(true);
+	});
+
+	test("checks the exact upload ID and treats only NoSuchUpload as gone", async () => {
+		const requestedUrls: URL[] = [];
+		const responses = [
+			{ code: null, exists: true, status: 200 },
+			{ code: "NoSuchUpload", exists: false, status: 404 },
+			{ code: "AccessDenied", exists: true, status: 403 },
+			{ code: "NoSuchKey", exists: true, status: 404 },
+			{ code: "ServiceUnavailable", exists: true, status: 503 },
+		];
+		let responseIndex = 0;
+		const server = Bun.serve({
+			fetch(request) {
+				requestedUrls.push(new URL(request.url));
+				const response = responses[responseIndex];
+				if (!response) throw new Error("Unexpected ListParts request");
+				return new Response(
+					response.code
+						? `<Error><Code>${response.code}</Code><Message>test failure</Message></Error>`
+						: `<ListPartsResult><Bucket>${R2_INGEST_BUCKET}</Bucket><Key>evidence/key</Key><UploadId>live-id</UploadId><IsTruncated>false</IsTruncated></ListPartsResult>`,
+					{
+						headers: { "Content-Type": "application/xml" },
+						status: response.status,
+					},
+				);
+			},
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const client = createR2MultipartUploadClient({
+			accessKeyId: "test-access-key",
+			accountId: "test-account",
+			bucket: R2_INGEST_BUCKET,
+			endpoint: server.url.origin,
+			forcePathStyle: true,
+			secretAccessKey: "test-secret-key",
+		});
+		for (const response of responses) {
+			expect(
+				await client.hasMultipartUpload({
+					objectKey: "evidence/key",
+					uploadId: "live-id",
+				}),
+			).toBe(response.exists);
+			responseIndex += 1;
+		}
+		for (const url of requestedUrls) {
+			expect(url.pathname).toBe(`/${R2_INGEST_BUCKET}/evidence/key`);
+			expect(url.searchParams.get("uploadId")).toBe("live-id");
+			expect(url.searchParams.get("max-parts")).toBe("1");
+			expect(url.searchParams.has("uploads")).toBe(false);
+		}
+		await server.stop(true);
+		expect(
+			await client.hasMultipartUpload({
+				objectKey: "evidence/key",
+				uploadId: "live-id",
+			}),
+		).toBe(true);
+	}, 15_000);
+
 	test("lists only the multipart uploads of the exact object key", async () => {
 		const requestedPrefixes: Array<string | null> = [];
 		const server = Bun.serve({
