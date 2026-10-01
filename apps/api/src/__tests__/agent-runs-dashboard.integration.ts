@@ -5,10 +5,13 @@ import {
 	type CostDashboardInput,
 	CostDashboardSchema,
 } from "@rudel/api-routes";
+import { ingestRudelUsageEvents } from "@rudel/ch-schema/generated";
+import { extractUsageEvents } from "@rudel/usage-events";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { persistSessionLanguageSignalsWithExecutor } from "../services/session-language-signal-persistence.service.js";
+import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -26,12 +29,14 @@ const ch = getClickhouse();
 
 beforeAll(async () => {
 	server = await startApiTestServer({
+		GITHUB_EVIDENCE_UI_ENABLED: "true",
 		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "off",
 	});
 	eventServer = await startApiTestServer({
+		GITHUB_EVIDENCE_UI_ENABLED: "true",
 		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "all",
 	});
-	for (const name of ["owner", "outsider"]) {
+	for (const name of ["owner", "outsider", "model-owner"]) {
 		const response = await fetch(`${server.baseUrl}/api/auth/sign-up/email`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -56,6 +61,7 @@ afterAll(async () => {
 			"claude_sessions",
 			"session_analytics",
 			"session_language_signals",
+			"usage_events",
 		])
 			await ch.execute({
 				query: `ALTER TABLE rudel.${table} DELETE WHERE organization_id = {org:String}`,
@@ -71,6 +77,7 @@ function transcript(
 	feedback?: string,
 	skills = false,
 	begin = start,
+	model = "claude-sonnet-4-5",
 ) {
 	const lines: unknown[] = [
 		{
@@ -89,7 +96,7 @@ function transcript(
 			timestamp: new Date(begin + 1000).toISOString(),
 			message: {
 				role: "assistant",
-				model: "claude-sonnet-4-5",
+				model,
 				content: [
 					{
 						type: "tool_use",
@@ -108,7 +115,7 @@ function transcript(
 		message: {
 			role: "assistant",
 			id: "m1",
-			model: "claude-sonnet-4-5",
+			model,
 			usage: { input_tokens: 10, output_tokens: 5 },
 			content: [{ type: "text", text: "Done" }],
 		},
@@ -141,6 +148,7 @@ async function ingest(
 	userIndex = 0,
 	indexed = true,
 	projectPath = "/test/agent-runs",
+	gitRemote?: string,
 ) {
 	const user = users[userIndex];
 	assert(user);
@@ -153,6 +161,7 @@ async function ingest(
 		content,
 		sessionId,
 		projectPath,
+		gitRemote,
 		source: "claude_code" as const,
 	};
 	await adapter.ingest(ch, input, {
@@ -176,6 +185,7 @@ async function ingest(
 			},
 			ch,
 		);
+	return { ingestedAt, rawRevision };
 }
 async function dashboard(
 	filters: Partial<CostDashboardInput> = {},
@@ -239,7 +249,328 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect(filtered.metrics.agentRuns?.total).toBe(1);
 	expect(filtered.metrics.agentRuns?.breakdowns.durations).toHaveLength(9);
 	expect((await dashboard({}, 1)).metrics.agentRuns?.total).toBe(1);
+	const sessionsView = await dashboard({ requestedMetric: "sessions" });
+	const mergedView = await dashboard({ requestedMetric: "mergedPullRequests" });
+	expect(mergedView.requestedMetric).toBe("mergedPullRequests");
+	expect(mergedView.metrics.agentRuns?.total).toBe(8);
+	expect(mergedView.metrics.sessions?.total).toBeGreaterThan(0);
+	expect(mergedView.metrics.sessions?.total).toBe(
+		sessionsView.metrics.sessions?.total,
+	);
+	expect(mergedView.metrics.cost?.total).toBe(sessionsView.metrics.cost?.total);
 });
+
+async function seedPullRequestActivity(
+	repositoryId: string,
+	model = "claude-sonnet-4-5",
+	userIndex = 0,
+	bindingFullName = `opalinehq/headline-${repositoryId}-${userIndex}-${run}`,
+	remoteFullName = bindingFullName,
+) {
+	const user = users[userIndex];
+	assert(user);
+	const [owner, repositoryName] = bindingFullName.split("/");
+	assert(owner && repositoryName);
+	const repository = `github.com/${remoteFullName}`;
+	const sessionId = `pr-${repositoryId}-${userIndex}-${run}`;
+	const content = transcript(60, "Great", false, start, model);
+	const { ingestedAt, rawRevision } = await ingest(
+		sessionId,
+		content,
+		userIndex,
+		true,
+		`/test/${repositoryName}`,
+		userIndex === 0
+			? `git@github.com:${remoteFullName}.git`
+			: `https://github.com/${remoteFullName}.git`,
+	);
+	const extraction = extractUsageEvents({
+		content,
+		organizationId: user.id,
+		userId: user.id,
+		sessionId,
+		source: "claude_code",
+		subagents: {},
+	});
+	expect(extraction.status).toBe("complete");
+	await ingestRudelUsageEvents(
+		ch,
+		[
+			...buildUsageEventRows(
+				{
+					contentSha256: "a".repeat(64),
+					extraction,
+					filterVersion: 1,
+					generation: rawRevision,
+					ingestedAt,
+					organizationId: user.id,
+					sessionDate: new Date(start),
+					sessionId,
+					source: "claude_code",
+					userId: user.id,
+				},
+				[],
+			),
+		],
+		{ validate: true },
+	);
+	const installationId = `${repositoryId}-${user.id}`;
+	const collectionId = crypto.randomUUID();
+	await sqlClient.unsafe(
+		`INSERT INTO github_app_installation
+		 (installation_id, organization_id, account_id, account_login, account_type,
+		  repository_selection, permissions, status, installed_by_user_id)
+		 VALUES ($1, $2, '1', 'opalinehq', 'Organization', 'selected', '{}'::jsonb, 'active', $3)`,
+		[installationId, user.id, user.id],
+	);
+	await sqlClient.unsafe(
+		`INSERT INTO github_repository_binding
+		 (organization_id, repository_id, installation_id, node_id, owner, name,
+		  full_name, default_branch, is_private)
+		 VALUES ($1, $2, $3, $2, $4, $5, $6, 'main', true)`,
+		[
+			user.id,
+			repositoryId,
+			installationId,
+			owner,
+			repositoryName,
+			bindingFullName,
+		],
+	);
+	await sqlClient.unsafe(
+		`INSERT INTO github_evidence_collection
+		 (id, organization_id, repository_id, installation_id, session_id, session_source,
+		  session_user_id, commit_sha, status, source_version, coverage, completed_at)
+		 VALUES ($1, $2, $3, $4, $5, 'claude_code', $2, $6, 'complete', 'test',
+		  '{"pullRequestCoverageComplete":true}'::jsonb, $7)`,
+		[
+			collectionId,
+			user.id,
+			repositoryId,
+			installationId,
+			sessionId,
+			"b".repeat(40),
+			new Date(start).toISOString(),
+		],
+	);
+	await sqlClient.unsafe(
+		`INSERT INTO github_pull_request_snapshot
+		 (organization_id, collection_id, repository_id, provider_pull_request_id,
+		  pull_number, head_sha, merged_at, session_id, session_source, session_user_id,
+		  coverage_complete, ci_coverage_complete, observed_at)
+		 VALUES ($1, $2, $3, '148', 148, $4, $5, $6, 'claude_code', $1, true, true, $5)`,
+		[
+			user.id,
+			collectionId,
+			repositoryId,
+			"b".repeat(40),
+			new Date(start).toISOString(),
+			sessionId,
+		],
+	);
+	for (const jobId of ["lint", "test"])
+		await sqlClient.unsafe(
+			`INSERT INTO github_ci_log_receipt
+			 (organization_id, collection_id, repository_id, workflow_run_id, run_attempt,
+			  job_id, job_name, status, conclusion, filter_version, redaction_counts)
+			 VALUES ($1, $2, $3, $3, 1, $4, $4, 'completed', 'failure', 1, '{}'::jsonb)`,
+			[user.id, collectionId, repositoryId, jobId],
+		);
+	return repository;
+}
+
+test("PR repository IDs scope every headline like the default metric in both cutover modes", async () => {
+	const repository = await seedPullRequestActivity("148001");
+	await seedPullRequestActivity("148001", "claude-sonnet-4-5", 1);
+	await seedPullRequestActivity("148002");
+	await seedPullRequestActivity("148003", "claude-sonnet-4-5", 1);
+	for (const endpoint of [server, eventServer]) {
+		const baseline = await dashboard(
+			{ requestedMetric: "cost", repositories: [repository] },
+			0,
+			endpoint,
+		);
+		expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
+		expect(baseline.metrics.sessions?.total).toBe(1);
+		expect(baseline.metrics.signals?.total).toBe(1);
+		expect(baseline.metrics.agentRuns?.total).toBe(1);
+		for (const requestedMetric of [
+			"mergedPullRequests",
+			"ciFailuresPerPullRequest",
+		] as const) {
+			const result = await dashboard(
+				{ requestedMetric, repositories: ["148001"] },
+				0,
+				endpoint,
+			);
+			for (const metric of [
+				"cost",
+				"sessions",
+				"signals",
+				"agentRuns",
+			] as const) {
+				expect(result.metrics[metric]?.total).toBe(
+					baseline.metrics[metric]?.total,
+				);
+				expect(result.metrics[metric]?.incomplete).toBe(
+					baseline.metrics[metric]?.incomplete,
+				);
+			}
+			expect(result.metrics.mergedPullRequests?.total).toBe(1);
+			expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
+			expect(
+				result.metrics.mergedPullRequests?.breakdowns.repositories[0]?.id,
+			).toBe("148001");
+			for (const repositories of [
+				["148003"],
+				["999999"],
+				["148003", "999999"],
+			]) {
+				const unmatched = await dashboard(
+					{ requestedMetric, repositories },
+					0,
+					endpoint,
+				);
+				for (const metric of [
+					"cost",
+					"sessions",
+					"signals",
+					"agentRuns",
+					"mergedPullRequests",
+					"ciFailuresPerPullRequest",
+				] as const)
+					expect(unmatched.metrics[metric]?.total).toBe(0);
+			}
+			const multiple = await dashboard(
+				{ requestedMetric, repositories: ["148001", "148002", "999999"] },
+				0,
+				endpoint,
+			);
+			expect(multiple.metrics.sessions?.total).toBe(2);
+			expect(multiple.metrics.mergedPullRequests?.total).toBe(2);
+			expect(multiple.metrics.ciFailuresPerPullRequest?.total).toBe(2);
+		}
+	}
+});
+
+test("PR canonical model filters retain legacy aliases and unknown identities in both cutover modes", async () => {
+	await seedPullRequestActivity("148004", "claude-sonnet-4-5", 2);
+	await seedPullRequestActivity("148005", "mystery-model", 2);
+	for (const endpoint of [server, eventServer]) {
+		for (const [alias, canonical] of [
+			["claude-sonnet-4-5", "claude-sonnet-4-5-20250929"],
+			["mystery-model", "mystery-model"],
+		]) {
+			assert(alias && canonical);
+			const baseline = await dashboard(
+				{ requestedMetric: "cost", models: [alias] },
+				2,
+				endpoint,
+			);
+			expect(baseline.metrics.sessions?.total).toBe(1);
+			expect(baseline.metrics.signals?.total).toBe(1);
+			expect(baseline.metrics.agentRuns?.total).toBe(1);
+			if (alias !== canonical)
+				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
+			for (const model of [canonical, alias]) {
+				for (const requestedMetric of [
+					"mergedPullRequests",
+					"ciFailuresPerPullRequest",
+				] as const) {
+					const result = await dashboard(
+						{ requestedMetric, models: [model] },
+						2,
+						endpoint,
+					);
+					for (const metric of [
+						"cost",
+						"sessions",
+						"signals",
+						"agentRuns",
+					] as const) {
+						expect(result.metrics[metric]?.total).toBe(
+							baseline.metrics[metric]?.total,
+						);
+						expect(result.metrics[metric]?.incomplete).toBe(
+							baseline.metrics[metric]?.incomplete,
+						);
+					}
+					expect(result.metrics.mergedPullRequests?.total).toBe(1);
+					expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
+				}
+			}
+		}
+	}
+});
+
+for (const requestedMetric of [
+	"mergedPullRequests",
+	"ciFailuresPerPullRequest",
+] as const) {
+	test(`PR ${requestedMetric} mixed-case GitHub repository filters retain every headline in both cutover modes`, async () => {
+		for (const [index, repositoryId] of (requestedMetric ===
+		"mergedPullRequests"
+			? ["148006", "148007"]
+			: ["148008", "148009"]
+		).entries()) {
+			const fullName = `opalinehq/headline-${repositoryId}-${run}`;
+			const repository = await seedPullRequestActivity(
+				repositoryId,
+				"claude-sonnet-4-5",
+				0,
+				index === 0 ? fullName.toUpperCase() : fullName,
+				index === 0 ? fullName : fullName.toUpperCase(),
+			);
+			await ingest(
+				`local-case-${repositoryId}-${run}`,
+				transcript(60, "Great"),
+				0,
+				true,
+				repository.toUpperCase(),
+			);
+			for (const endpoint of [server, eventServer]) {
+				const baseline = await dashboard(
+					{ requestedMetric: "cost", repositories: [repository] },
+					0,
+					endpoint,
+				);
+				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
+				expect(baseline.metrics.sessions?.total).toBe(1);
+				expect(baseline.metrics.signals?.total).toBe(1);
+				expect(baseline.metrics.agentRuns?.total).toBe(1);
+				const wrongCase = await dashboard(
+					{
+						requestedMetric: "cost",
+						repositories: [repository.replace("github.com", "GitHub.com")],
+					},
+					0,
+					endpoint,
+				);
+				const result = await dashboard(
+					{ requestedMetric, repositories: [repositoryId] },
+					0,
+					endpoint,
+				);
+				for (const metric of [
+					"cost",
+					"sessions",
+					"signals",
+					"agentRuns",
+				] as const) {
+					expect(wrongCase.metrics[metric]?.total).toBe(0);
+					expect(result.metrics[metric]?.total).toBe(
+						baseline.metrics[metric]?.total,
+					);
+					expect(result.metrics[metric]?.incomplete).toBe(
+						baseline.metrics[metric]?.incomplete,
+					);
+				}
+				expect(result.metrics.mergedPullRequests?.total).toBe(1);
+				expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
+			}
+		}
+	});
+}
 
 test("returns exact median and P95 durations for filtered runs and UTC periods", async () => {
 	const repository = `/test/duration-stats-${run}`;

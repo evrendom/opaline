@@ -580,6 +580,42 @@ describe("dashboard metric availability", () => {
 			pullRequests.mergedPullRequests,
 		);
 	});
+
+	test("keeps the other headline tiles when a pull request metric is selected", () => {
+		const headline = (metric: CostAggregateRow["metric"], value: number) =>
+			row({
+				metric,
+				dimension: "headline",
+				id: "",
+				value,
+				matched_value: value,
+			});
+		const result = buildCostDashboard(
+			[
+				headline("cost", 12.5),
+				headline("sessions", 4),
+				headline("signals", 3),
+				headline("agentRuns", 6),
+			],
+			{ ...input, requestedMetric: "mergedPullRequests" },
+			members,
+			undefined,
+			{
+				availableMetrics: listAvailableDashboardMetrics("organization", {
+					githubEvidenceUiEnabled: true,
+				}),
+				pullRequests,
+			},
+		);
+
+		expect(result.metrics.cost?.total).toBe(12.5);
+		expect(result.metrics.sessions?.total).toBe(4);
+		expect(result.metrics.signals?.total).toBe(3);
+		expect(result.metrics.agentRuns?.total).toBe(6);
+		expect(result.metrics.mergedPullRequests).toBe(
+			pullRequests.mergedPullRequests,
+		);
+	});
 });
 
 test("lists every UTC day of an inclusive range, across month and leap boundaries", () => {

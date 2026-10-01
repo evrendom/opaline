@@ -24,6 +24,7 @@ import {
 	buildCanonicalPricingModelSql,
 	getAllOrganizationsUsageAnalyticsQueryContext,
 	getUsageAnalyticsQueryContext,
+	resolveCanonicalPricingModel,
 } from "./usage-event-analytics.service.js";
 
 const MAX_AGGREGATE_ROWS = 100_000;
@@ -77,25 +78,29 @@ export async function getCostDashboard(
 		requestedInput,
 		availableMetrics,
 	);
-	if (
+	const isPullRequestMetric =
+		input.requestedMetric === "mergedPullRequests" ||
+		input.requestedMetric === "ciFailuresPerPullRequest";
+	const repositories =
 		scope.tenant === "organization" &&
-		(input.requestedMetric === "mergedPullRequests" ||
-			input.requestedMetric === "ciFailuresPerPullRequest")
-	) {
-		const pullRequestMetrics = await getPullRequestDashboardMetrics(
-			scope.orgId,
-			input,
-			{ database: sqlClient, queryClickhouse },
-		);
-		return buildCostDashboard([], input, new Map(), undefined, {
-			availableMetrics,
-			pullRequests: pullRequestMetrics,
-		});
-	}
+		isPullRequestMetric &&
+		input.repositories.length > 0
+			? (
+					await sqlClient.unsafe<Array<{ full_name: string }>>(
+						`SELECT full_name FROM github_repository_binding
+						 WHERE organization_id = $1 AND repository_id = ANY($2::text[])`,
+						[scope.orgId, input.repositories],
+					)
+				).map((binding) => `github.com/${binding.full_name.toLowerCase()}`)
+			: input.repositories;
 	const orgMatch = (column: string) =>
 		organizationMatchSql(column, scope.tenant);
-	const repositorySql = (alias: string) =>
-		scopedRepositorySql(scope.tenant, alias);
+	const repositorySql = (alias: string) => {
+		const repository = scopedRepositorySql(scope.tenant, alias);
+		return isPullRequestMetric
+			? `if(${alias}.git_remote != '' AND startsWith(lower(${repository}), 'github.com/'), lower(${repository}), ${repository})`
+			: repository;
+	};
 	// The unsplit trend is built from the members facet, so the anonymous view
 	// keeps that facet with one blank member instead of dropping it.
 	const memberSql = (alias: string) =>
@@ -115,6 +120,7 @@ export async function getCostDashboard(
 	const legacyAllDetails = input.requestedMetric === undefined;
 	const detailedSignals =
 		legacyAllDetails || input.requestedMetric === "signals";
+	const canonicalModel = buildCanonicalPricingModelSql("sa.model_used");
 	// Reuse the request pricing pipeline, before its session rollup replaces the
 	// model dimension with a single display model. No transcript bodies are read.
 	const source =
@@ -140,7 +146,8 @@ export async function getCostDashboard(
  `
 			: `
   SELECT 'cost' AS metric, toString(sa.usage_date) AS date, ${memberSql("sa")} AS member,
-	   ${repositorySql("sa")} AS repository, sa.model_used AS model,
+	   ${repositorySql("sa")} AS repository,
+	   if(${canonicalModel} != '', ${canonicalModel}, sa.model_used) AS model,
 	   ifNull(sa.estimated_cost, 0) AS value, NOT sa.cost_is_complete AS incomplete, '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
 	   '' AS coverage_status, toUInt8(0) AS prefiltered
   FROM ${usage.dailySessionsRelation} AS sa
@@ -149,10 +156,6 @@ export async function getCostDashboard(
  `;
 	// One row per session, bucketed by start date. Count it once under the same
 	// primary model as the session list, not once per request/model/day.
-	const canonicalModel =
-		usage.mode === "events"
-			? buildCanonicalPricingModelSql("sa.model_used")
-			: "sa.model_used";
 	const sessions = `
 	  SELECT 'sessions' AS metric, toString(toDate(sa.session_date)) AS date,
 	   ${memberSql("sa")} AS member, ${repositorySql("sa")} AS repository,
@@ -218,7 +221,7 @@ export async function getCostDashboard(
 	const runDuration = agentRunDurationSql("run", durationCases);
 	const sessionMemberMatch =
 		"(empty({members:Array(String)}) OR has({members:Array(String)}, sa.user_id))";
-	const sessionRepositoryMatch = `(empty({repositories:Array(String)}) OR has({repositories:Array(String)}, ${repositorySql("sa")}))`;
+	const sessionRepositoryMatch = `(NOT {hasRepositoryFilter:Bool} OR has({repositories:Array(String)}, ${repositorySql("sa")}))`;
 	const runs =
 		input.requestedMetric === "agentRuns"
 			? `
@@ -288,7 +291,7 @@ export async function getCostDashboard(
 	const memberMatch =
 		"(s.prefiltered = 1 OR empty({members:Array(String)}) OR has({members:Array(String)}, member))";
 	const repositoryMatch =
-		"(s.prefiltered = 1 OR empty({repositories:Array(String)}) OR has({repositories:Array(String)}, repository))";
+		"(s.prefiltered = 1 OR NOT {hasRepositoryFilter:Bool} OR has({repositories:Array(String)}, repository))";
 	const modelMatch =
 		"(s.prefiltered = 1 OR empty({models:Array(String)}) OR has({models:Array(String)}, model) OR (metric = 'agentRuns' AND s.incomplete))";
 	// Each signal row is one exact phrase frequency, not a copy of the category
@@ -404,8 +407,9 @@ export async function getCostDashboard(
 			startDate: input.startDate,
 			endDate: input.endDate,
 			members: input.members,
-			repositories: input.repositories,
-			models: input.models,
+			repositories,
+			hasRepositoryFilter: input.repositories.length > 0,
+			models: input.models.map(resolveCanonicalPricingModel),
 			signalTypes: input.signalTypes,
 			phrases: input.phrases,
 			runSignals: input.runSignals,
@@ -425,9 +429,19 @@ export async function getCostDashboard(
 		input.requestedMetric === "agentRuns"
 			? queryAgentRunDurationStats(scope, input, usage.cteDefinitions)
 			: Promise.resolve(undefined);
-	const [rows, durationRows] = await Promise.all([
+	const pullRequestsPromise =
+		scope.tenant === "organization" &&
+		(input.requestedMetric === "mergedPullRequests" ||
+			input.requestedMetric === "ciFailuresPerPullRequest")
+			? getPullRequestDashboardMetrics(scope.orgId, input, {
+					database: sqlClient,
+					queryClickhouse,
+				})
+			: Promise.resolve(undefined);
+	const [rows, durationRows, pullRequests] = await Promise.all([
 		rowsPromise,
 		durationRowsPromise,
+		pullRequestsPromise,
 	]);
 	// Never present a silently truncated subtotal as the total cost.
 	if (rows.length > MAX_AGGREGATE_ROWS)
@@ -469,7 +483,7 @@ export async function getCostDashboard(
 			]),
 		),
 		durationStats,
-		{ availableMetrics },
+		{ availableMetrics, pullRequests },
 	);
 	if (scope.tenant === "allOrganizations") {
 		for (const metric of Object.values(dashboard.metrics))
@@ -569,7 +583,7 @@ async function queryAgentRunDurationStats(
 			endDate: input.endDate,
 			members: input.members,
 			repositories: input.repositories,
-			models: input.models,
+			models: input.models.map(resolveCanonicalPricingModel),
 			runSignals: input.runSignals,
 			durations: input.durations,
 			skillsUsed: input.skillsUsed,
@@ -679,7 +693,7 @@ function readDurationQuantiles(
 }
 
 function agentRunModelSql(runAlias: string, sessionAlias: string): string {
-	return `coalesce(nullIf(${buildCanonicalPricingModelSql(`${runAlias}.4`)}, ''), nullIf(${runAlias}.4, ''), ${sessionAlias}.model_used)`;
+	return `coalesce(nullIf(${buildCanonicalPricingModelSql(`${runAlias}.4`)}, ''), nullIf(${runAlias}.4, ''), nullIf(${buildCanonicalPricingModelSql(`${sessionAlias}.model_used`)}, ''), ${sessionAlias}.model_used)`;
 }
 
 function agentRunDurationCasesSql(runAlias: string): string {

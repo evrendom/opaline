@@ -131,6 +131,17 @@ export function buildCanonicalPricingModelSql(modelExpr: string): string {
 	return `multiIf(${clauses.join(", ")}, '')`;
 }
 
+export function resolveCanonicalPricingModel(model: string): string {
+	const normalizedModel = model.trim().toLowerCase();
+	return (
+		getModelPricingCatalog().find((entry) =>
+			entry.match.some((pattern) =>
+				new RegExp(pattern, "u").test(normalizedModel),
+			),
+		)?.model ?? model
+	);
+}
+
 function buildLongContextAvailableSql(): string {
 	const clauses = getModelPricingCatalog()
 		.filter((entry) => entry.contextBand === "long")

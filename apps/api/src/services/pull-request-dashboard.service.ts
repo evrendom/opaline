@@ -7,6 +7,7 @@ import type {
 import type postgres from "postgres";
 import type { queryClickhouse } from "../clickhouse.js";
 import { listDashboardDates } from "./cost-dashboard-data.js";
+import { resolveCanonicalPricingModel } from "./usage-event-analytics.service.js";
 
 const FAILED_CONCLUSIONS = ["failure", "startup_failure", "timed_out"] as const;
 const MAX_OBSERVATION_ROWS = 100_000;
@@ -201,12 +202,14 @@ export async function getPullRequestDashboardMetrics(
 			ciComplete: row.ci_coverage_complete,
 		}));
 	});
+	const selectedModels = input.models.map(resolveCanonicalPricingModel);
 	const matched = attributed.filter(
 		(row) =>
 			(input.members.length === 0 || input.members.includes(row.member)) &&
 			(input.repositories.length === 0 ||
 				input.repositories.includes(row.repository)) &&
-			(input.models.length === 0 || input.models.includes(row.model)),
+			(selectedModels.length === 0 ||
+				selectedModels.includes(resolveCanonicalPricingModel(row.model))),
 	);
 	return {
 		mergedPullRequests: buildPullRequestMetric(matched, input, false),
