@@ -50,6 +50,29 @@ export async function handleApiMaintenanceRequest(
 	}
 }
 
+export async function handleR2IngestMaintenanceRequest(
+	request: Request,
+): Promise<Response> {
+	if (!isAuthorizedCronRequest(request)) {
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
+	try {
+		const result = await runR2Maintenance({
+			deadlineAt: Date.now() + MAINTENANCE_INVOCATION_BUDGET_MS,
+			now: Date.now,
+		});
+		return Response.json(result);
+	} catch (error) {
+		logger.error("R2 ingest maintenance failed: {error}", {
+			error: String(error),
+		});
+		return Response.json(
+			{ error: "R2 ingest maintenance failed" },
+			{ status: 500 },
+		);
+	}
+}
+
 async function runApiMaintenance() {
 	const invocationDeadline: MaintenanceDeadline = {
 		deadlineAt: Date.now() + MAINTENANCE_INVOCATION_BUDGET_MS,

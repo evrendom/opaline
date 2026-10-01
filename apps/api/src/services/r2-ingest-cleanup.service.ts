@@ -7,6 +7,10 @@ import {
 } from "../lib/bounded-maintenance.js";
 import type { IngestProcessingFailpoint } from "./ingest-processing-boundary.js";
 import { passIngestProcessingBoundary } from "./ingest-processing-boundary.js";
+import {
+	R2_INGEST_DEPENDENCY_UNAVAILABLE,
+	R2_INGEST_TRANSIENT_ERROR_CODES,
+} from "./r2-ingest-processing-error.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-cleanup"]);
@@ -22,6 +26,10 @@ export interface R2IngestCleanupJob {
 	readonly id: string;
 	readonly objectManifest: unknown;
 	readonly objectsDeletedAt: Date | string | null;
+}
+
+interface LockedR2IngestCleanupJob extends R2IngestCleanupJob {
+	readonly status: string;
 }
 
 export interface R2IngestCleanupRepairResult {
@@ -63,41 +71,54 @@ export async function cleanupIngestJobObjects(
 	failpoint: IngestProcessingFailpoint | undefined,
 	wakeWorkerOnFailure = true,
 ): Promise<boolean> {
-	if (job.objectsDeletedAt) return true;
-	const manifest = CleanupManifestSchema.parse(job.objectManifest);
 	try {
-		for (const object of manifest) {
-			try {
-				await r2.abortMultipartUpload({
-					objectKey: object.objectKey,
-					uploadId: object.uploadId,
+		return await database.begin(async (transaction) => {
+			const [current] = await transaction.unsafe<LockedR2IngestCleanupJob[]>(
+				`SELECT id, status, object_manifest AS "objectManifest",
+					objects_deleted_at AS "objectsDeletedAt"
+				 FROM ingest_job WHERE id = $1
+					AND (status != 'failed' OR expires_at <= NOW()
+						OR COALESCE(last_error_code, '') != ALL($2::text[]))
+				 FOR UPDATE`,
+				[job.id, R2_INGEST_TRANSIENT_ERROR_CODES],
+			);
+			if (!current || !["completed", "failed"].includes(current.status))
+				return false;
+			if (current.objectsDeletedAt) return true;
+			const manifest = CleanupManifestSchema.parse(current.objectManifest);
+			for (const object of manifest) {
+				try {
+					await r2.abortMultipartUpload({
+						objectKey: object.objectKey,
+						uploadId: object.uploadId,
+					});
+				} catch (error) {
+					if (!isNoSuchUploadError(error)) throw error;
+					logger.debug(
+						"R2 multipart upload was already absent (job_id={jobId} object_key={objectKey})",
+						{ jobId: job.id, objectKey: object.objectKey },
+					);
+				}
+				await passIngestProcessingBoundary(failpoint, {
+					store: "r2",
+					target: "abort-multipart",
 				});
-			} catch (error) {
-				if (!isNoSuchUploadError(error)) throw error;
-				logger.debug(
-					"R2 multipart upload was already absent (job_id={jobId} object_key={objectKey})",
-					{ jobId: job.id, objectKey: object.objectKey },
-				);
 			}
+			await r2.deleteObjects(manifest.map((object) => object.objectKey));
 			await passIngestProcessingBoundary(failpoint, {
 				store: "r2",
-				target: "abort-multipart",
+				target: "delete-objects",
 			});
-		}
-		await r2.deleteObjects(manifest.map((object) => object.objectKey));
-		await passIngestProcessingBoundary(failpoint, {
-			store: "r2",
-			target: "delete-objects",
-		});
-		await database.unsafe(
-			`UPDATE ingest_job
+			await transaction.unsafe(
+				`UPDATE ingest_job
 			 SET objects_deleted_at = NOW(), updated_at = NOW()
 			 WHERE id = $1
 				AND status IN ('completed', 'failed')
 				AND objects_deleted_at IS NULL`,
-			[job.id],
-		);
-		return true;
+				[job.id],
+			);
+			return true;
+		});
 	} catch (error) {
 		logger.warn(
 			"R2 ingest object cleanup will be retried (job_id={jobId} error={error})",
@@ -131,9 +152,11 @@ export async function repairR2IngestCleanupJobs(input: {
 		 FROM ingest_job
 		 WHERE status IN ('completed', 'failed')
 			AND objects_deleted_at IS NULL
+			AND (status != 'failed' OR expires_at <= NOW()
+				OR COALESCE(last_error_code, '') != ALL($2::text[]))
 		 ORDER BY updated_at ASC, id ASC
 		 LIMIT $1`,
-		[limit],
+		[limit, R2_INGEST_TRANSIENT_ERROR_CODES],
 	);
 	let attempted = 0;
 	let completed = 0;
@@ -248,7 +271,8 @@ export async function getNextR2IngestWorkDueAt(
 		 FROM (
 			SELECT available_at AS due_at
 			FROM ingest_job
-			WHERE status = 'pending' AND attempts > 0
+			WHERE status = 'pending'
+				AND (attempts > 0 OR last_error_code = '${R2_INGEST_DEPENDENCY_UNAVAILABLE}')
 
 			UNION ALL
 

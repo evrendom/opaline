@@ -35,6 +35,8 @@ import {
 } from "./r2-ingest-materialization-gate.js";
 import {
 	isDefinitelyPermanentProcessingError,
+	isRetryableProcessingError,
+	R2_INGEST_DEPENDENCY_UNAVAILABLE,
 	R2IngestCommitError,
 } from "./r2-ingest-processing-error.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
@@ -45,6 +47,7 @@ const logger = getLogger(["rudel", "api", "r2-ingest-commit"]);
 const DEFAULT_LEASE_DURATION_MS = 30 * 60_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const RETRY_MAX_DELAY_MS = 60_000;
+const TRANSIENT_RETRY_MAX_DELAY_MS = 5 * 60_000;
 const INTERRUPTED_FINAL_CLAIM_RESCUE_CODE =
 	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE =
@@ -97,11 +100,13 @@ interface IngestJobRow {
 	sessionId: string;
 	status: "pending" | "running" | "completed" | "failed";
 	userId: string;
+	updatedAt: Date | string;
 }
 
 interface ClaimedIngestJob extends IngestJobRow {
 	leaseToken: string;
 	status: "running";
+	transientRetryDelayMs: number;
 }
 
 type RequestedJobClaim =
@@ -180,9 +185,10 @@ export async function commitR2IngestJob(
 	if (
 		(admission.attempts >= admission.maxAttempts &&
 			!rescueInterruptedFinalClaim) ||
-		willExpireBeforeLeaseEnds(admission, admissionNow, leaseDurationMs)
+		isJobExpired(admission, admissionNow)
 	) {
 		const admissionError =
+			!isJobExpired(admission, admissionNow) &&
 			admission.attempts >= admission.maxAttempts &&
 			!rescueInterruptedFinalClaim
 				? new R2IngestCommitError(
@@ -437,6 +443,15 @@ async function claimRequestedJob(input: {
 			input.now,
 			input.sessionIngestQuiesced,
 		);
+		if (isJobExpired(requestedRow, input.now)) {
+			await terminalizeExpiredJob(requestedRow.id, input.now, transaction);
+			const [failed] = await transaction.unsafe<IngestJobRow[]>(
+				`${selectIngestJobSql()} WHERE id = $1`,
+				[requestedRow.id],
+			);
+			if (!failed) throw new Error("Expired R2 ingest job disappeared");
+			return { job: failed, kind: "failed" };
+		}
 		if (
 			requestedRow.attempts >= requestedRow.maxAttempts &&
 			!rescueInterruptedFinalClaim
@@ -447,17 +462,6 @@ async function claimRequestedJob(input: {
 				[requestedRow.id],
 			);
 			if (!failed) throw new Error("Terminal R2 ingest job disappeared");
-			return { job: failed, kind: "failed" };
-		}
-		if (
-			willExpireBeforeLeaseEnds(requestedRow, input.now, input.leaseDurationMs)
-		) {
-			await terminalizeExpiredJob(requestedRow.id, input.now, transaction);
-			const [failed] = await transaction.unsafe<IngestJobRow[]>(
-				`${selectIngestJobSql()} WHERE id = $1`,
-				[requestedRow.id],
-			);
-			if (!failed) throw new Error("Expired R2 ingest job disappeared");
 			return { job: failed, kind: "failed" };
 		}
 		const requested = await claimLockedJob({
@@ -495,6 +499,7 @@ function assertRequestedJobCanBeClaimed(job: IngestJobRow, now: Date): void {
 	}
 	if (
 		job.status === "pending" &&
+		!isJobExpired(job, now) &&
 		toDate(job.availableAt).getTime() > now.getTime()
 	) {
 		throw new R2IngestCommitError(
@@ -514,7 +519,20 @@ async function claimLockedJob(input: {
 	now: Date;
 	transaction: postgres.TransactionSql;
 }): Promise<ClaimedIngestJob> {
-	const leaseExpiresAt = new Date(input.now.getTime() + input.leaseDurationMs);
+	const leaseExpiresAt = new Date(
+		Math.min(
+			input.now.getTime() + input.leaseDurationMs,
+			toDate(input.job.expiresAt).getTime(),
+		),
+	);
+	const transientRetryDelayMs =
+		input.job.lastErrorCode === R2_INGEST_DEPENDENCY_UNAVAILABLE
+			? Math.max(
+					RETRY_BASE_DELAY_MS,
+					toDate(input.job.availableAt).getTime() -
+						toDate(input.job.updatedAt).getTime(),
+				)
+			: RETRY_BASE_DELAY_MS;
 	const attemptIncrement = input.claimMode === "standard" ? 1 : 0;
 	const claimErrorCode =
 		input.claimMode === "interrupted_final_rescue"
@@ -555,7 +573,8 @@ async function claimLockedJob(input: {
 			ingest_metadata AS "ingestMetadata",
 			FALSE AS "canonicalWriteRecorded",
 			result,
-			objects_deleted_at AS "objectsDeletedAt"`,
+			objects_deleted_at AS "objectsDeletedAt",
+			updated_at AS "updatedAt"`,
 		[
 			attemptIncrement,
 			JSON.stringify(input.manifest),
@@ -570,7 +589,12 @@ async function claimLockedJob(input: {
 	if (!claimed || claimed.status !== "running" || !claimed.leaseToken) {
 		throw new Error("R2 ingest lease claim failed");
 	}
-	return { ...claimed, leaseToken: claimed.leaseToken, status: "running" };
+	return {
+		...claimed,
+		leaseToken: claimed.leaseToken,
+		status: "running",
+		transientRetryDelayMs,
+	};
 }
 
 export interface R2IngestRecoveryRepairResult {
@@ -605,7 +629,9 @@ export async function repairRecoverableR2IngestJobs(input: {
 	const candidates = await input.database.unsafe<IngestJobRow[]>(
 		`${selectIngestJobSql()}
 		 WHERE (
-			(status = 'pending' AND attempts > 0 AND available_at <= $1)
+			(status = 'pending'
+				AND (attempts > 0 OR last_error_code = '${R2_INGEST_DEPENDENCY_UNAVAILABLE}')
+				AND available_at <= $1)
 			OR (status = 'running' AND lease_expires_at <= $1)
 		 )
 			AND expires_at > $2
@@ -613,11 +639,7 @@ export async function repairRecoverableR2IngestJobs(input: {
 			CASE WHEN status = 'running' THEN lease_expires_at ELSE available_at END ASC,
 			created_at ASC
 		 LIMIT $3`,
-		[
-			repairNow.toISOString(),
-			new Date(repairNow.getTime() + leaseDurationMs).toISOString(),
-			limit,
-		],
+		[repairNow.toISOString(), repairNow.toISOString(), limit],
 	);
 	const run = input.gate
 		? input.gate.run.bind(input.gate)
@@ -728,7 +750,8 @@ async function claimRecoverableJob(input: {
 		}
 		const eligible =
 			(candidate.status === "pending" &&
-				candidate.attempts > 0 &&
+				(candidate.attempts > 0 ||
+					candidate.lastErrorCode === R2_INGEST_DEPENDENCY_UNAVAILABLE) &&
 				toDate(candidate.availableAt).getTime() <= input.now.getTime()) ||
 			(candidate.status === "running" &&
 				toDate(candidate.leaseExpiresAt).getTime() <= input.now.getTime());
@@ -743,6 +766,15 @@ async function claimRecoverableJob(input: {
 			input.now,
 			input.sessionIngestQuiesced,
 		);
+		if (isJobExpired(candidate, input.now)) {
+			await terminalizeExpiredJob(candidate.id, input.now, transaction);
+			const [failed] = await transaction.unsafe<IngestJobRow[]>(
+				`${selectIngestJobSql()} WHERE id = $1`,
+				[candidate.id],
+			);
+			if (!failed) throw new Error("Expired R2 ingest job disappeared");
+			return { job: failed, kind: "failed" };
+		}
 		if (
 			candidate.attempts >= candidate.maxAttempts &&
 			!rescueInterruptedFinalClaim
@@ -753,17 +785,6 @@ async function claimRecoverableJob(input: {
 				[candidate.id],
 			);
 			if (!failed) throw new Error("Terminal R2 ingest job disappeared");
-			return { job: failed, kind: "failed" };
-		}
-		if (
-			willExpireBeforeLeaseEnds(candidate, input.now, input.leaseDurationMs)
-		) {
-			await terminalizeExpiredJob(candidate.id, input.now, transaction);
-			const [failed] = await transaction.unsafe<IngestJobRow[]>(
-				`${selectIngestJobSql()} WHERE id = $1`,
-				[candidate.id],
-			);
-			if (!failed) throw new Error("Expired R2 ingest job disappeared");
 			return { job: failed, kind: "failed" };
 		}
 		return {
@@ -1246,13 +1267,29 @@ async function recordProcessingFailure(
 	database: postgres.Sql,
 	now: Date,
 ): Promise<"lease_lost" | "retryable" | "terminal"> {
-	const code = getSafeErrorCode(error);
 	const permanent = isDefinitelyPermanentProcessingError(error);
-	const terminal = permanent || job.attempts >= job.maxAttempts;
-	const retryDelayMs = Math.min(
-		RETRY_MAX_DELAY_MS,
-		RETRY_BASE_DELAY_MS * 2 ** Math.max(0, job.attempts - 1),
-	);
+	const transient = !permanent && isRetryableProcessingError(error);
+	const expired = isJobExpired(job, now);
+	const terminal =
+		expired || permanent || (!transient && job.attempts >= job.maxAttempts);
+	const code = expired
+		? "R2_INGEST_JOB_EXPIRED"
+		: transient
+			? R2_INGEST_DEPENDENCY_UNAVAILABLE
+			: getSafeErrorCode(error);
+	const retryDelayMs = transient
+		? Math.min(
+				TRANSIENT_RETRY_MAX_DELAY_MS,
+				Math.floor(
+					RETRY_BASE_DELAY_MS +
+						Math.random() *
+							(job.transientRetryDelayMs * 3 - RETRY_BASE_DELAY_MS),
+				),
+			)
+		: Math.min(
+				RETRY_MAX_DELAY_MS,
+				RETRY_BASE_DELAY_MS * 2 ** Math.max(0, job.attempts - 1),
+			);
 	const updated = await database.unsafe<Array<{ id: string }>>(
 		`UPDATE ingest_job
 		 SET
@@ -1263,18 +1300,24 @@ async function recordProcessingFailure(
 			failed_at = $5,
 			lease_token = NULL,
 			lease_expires_at = NULL,
-			updated_at = $6
+			updated_at = $6,
+			attempts = attempts - $9
 		 WHERE id = $7 AND status = 'running' AND lease_token = $8
 		 RETURNING id`,
 		[
 			terminal ? "failed" : "pending",
-			new Date(now.getTime() + retryDelayMs).toISOString(),
+			new Date(
+				Math.min(now.getTime() + retryDelayMs, toDate(job.expiresAt).getTime()),
+			).toISOString(),
 			code,
-			getSafeErrorMessage(error),
+			expired
+				? "Ingest job expired before completion"
+				: getSafeErrorMessage(error),
 			terminal ? now.toISOString() : null,
 			now.toISOString(),
 			job.id,
 			job.leaseToken,
+			transient ? 1 : 0,
 		],
 	);
 	if (updated.length !== 1) return "lease_lost";
@@ -1360,7 +1403,8 @@ function selectIngestJobSql(): string {
 				AND revision.operation_id = 'r2:' || ingest_job.id
 		) AS "canonicalWriteRecorded",
 		result,
-		objects_deleted_at AS "objectsDeletedAt"
+		objects_deleted_at AS "objectsDeletedAt",
+		updated_at AS "updatedAt"
 	FROM ingest_job`;
 }
 
@@ -1390,12 +1434,8 @@ function getSafeErrorMessage(error: unknown): string {
 		: "Ingest processing temporarily failed and may be retried";
 }
 
-function willExpireBeforeLeaseEnds(
-	job: IngestJobRow,
-	now: Date,
-	leaseDurationMs: number,
-): boolean {
-	return toDate(job.expiresAt).getTime() <= now.getTime() + leaseDurationMs;
+function isJobExpired(job: IngestJobRow, now: Date): boolean {
+	return toDate(job.expiresAt).getTime() <= now.getTime();
 }
 
 function assertPositiveLeaseDuration(value: number): void {

@@ -105,6 +105,40 @@ describe("R2 ingest processing error classification", () => {
 	});
 
 	test.each([
+		502, 503, 504,
+	])("recognizes a ClickHouse proxy HTTP %d", (status) => {
+		expect(
+			isRetryableProcessingError(
+				Object.assign(new Error("proxy unavailable"), { status }),
+			),
+		).toBe(true);
+		expect(
+			isRetryableProcessingError(new Error(`ClickHouse HTTP ${status}`)),
+		).toBe(true);
+	});
+
+	test.each([
+		"no available server",
+		"No available servers",
+		"connection refused",
+		"connection reset",
+		"socket hang up",
+		"request timed out",
+	])("recognizes transport-only message %s", (message) => {
+		expect(isRetryableProcessingError(new Error(message))).toBe(true);
+	});
+
+	test("recognizes the analytics readiness gate", () => {
+		expect(
+			isRetryableProcessingError(
+				new ORPCError("SERVICE_UNAVAILABLE", {
+					message: "Request-level usage analytics is temporarily unavailable",
+				}),
+			),
+		).toBe(true);
+	});
+
+	test.each([
 		["InternalError", 500],
 		["ServiceUnavailable", 503],
 		["ClientDisconnect", 400],
@@ -157,6 +191,19 @@ describe("R2 ingest processing error classification", () => {
 
 		expect(error).toMatchObject({ code, type });
 		expect(isRetryableProcessingError(error)).toBe(true);
+	});
+
+	test.each([
+		["6", "CANNOT_PARSE_TEXT", "Cannot parse string 'timeout' as UInt64"],
+		["47", "UNKNOWN_IDENTIFIER", "Unknown expression identifier 'timeout'"],
+	])("does not refund typed ClickHouse error %s/%s", (code, type, message) => {
+		const error = parseError(
+			`Code: ${code}. DB::Exception: ${message}. (${type})`,
+		);
+
+		expect(error).toMatchObject({ code, type });
+		expect(isRetryableProcessingError(error)).toBe(false);
+		expect(isDefinitelyPermanentProcessingError(error)).toBe(false);
 	});
 
 	test.each([

@@ -24,6 +24,11 @@
 			"memory": 2048,
 			"maxDuration": 300
 		},
+		"api/cron/r2-ingest.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
 		"api/cron/native-lineage.ts": {
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 2048,
@@ -71,6 +76,10 @@
 		}
 	},
 	"crons": [
+		{
+			"path": "/api/cron/r2-ingest",
+			"schedule": "* * * * *"
+		},
 		{
 			"path": "/api/cron/repair",
 			"schedule": "0 3 * * *"
@@ -208,7 +217,7 @@
 			"destination": "/api/rpc?__opaline_path=/health/ready"
 		},
 		{
-			"source": "/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
+			"source": "/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},
 		{

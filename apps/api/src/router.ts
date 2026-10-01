@@ -168,6 +168,10 @@ import {
 } from "./services/r2-ingest-commit.service.js";
 import { toR2IngestCommitOrpcError } from "./services/r2-ingest-http-error.js";
 import {
+	isRetryableProcessingError,
+	R2_INGEST_DEPENDENCY_UNAVAILABLE,
+} from "./services/r2-ingest-processing-error.js";
+import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
 } from "./services/r2-ingest-storage.service.js";
@@ -1899,6 +1903,21 @@ const r2IngestCommit = os.ingest.commit
 				userId: context.user.id,
 			});
 		} catch (error) {
+			if (isRetryableProcessingError(error)) {
+				const status = await getR2IngestJobStatus(input.jobId, context.user.id);
+				if (
+					status?.status === "pending" &&
+					status.error?.code === R2_INGEST_DEPENDENCY_UNAVAILABLE
+				) {
+					throw toR2IngestCommitOrpcError(
+						new R2IngestCommitError(
+							"R2_INGEST_JOB_RETRY_LATER",
+							"Ingest job is waiting for dependency recovery and will be retried",
+							true,
+						),
+					);
+				}
+			}
 			if (error instanceof ORPCError) throw error;
 			if (error instanceof R2IngestCommitError) {
 				throw toR2IngestCommitOrpcError(error);

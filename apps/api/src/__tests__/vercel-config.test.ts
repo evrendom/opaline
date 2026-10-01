@@ -56,7 +56,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -78,7 +78,9 @@ describe("Vercel deployment configuration", () => {
 			path: "/api/cron/billing",
 			schedule: "15 3 * * *",
 		});
-		for (const cron of vercelConfig.crons) {
+		for (const cron of vercelConfig.crons.filter(
+			(cron) => cron.path !== "/api/cron/r2-ingest",
+		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
 		expect(billingEntrypointSource).toContain(
@@ -86,6 +88,30 @@ describe("Vercel deployment configuration", () => {
 		);
 		expect(billingEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
+		);
+	});
+
+	test("re-picks R2 ingest retries every minute independently of daily maintenance", () => {
+		expect(vercelConfig.functions["api/cron/r2-ingest.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 300,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/r2-ingest",
+			schedule: "* * * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find((rule) =>
+			rule.source.startsWith("/api/:routePath"),
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/r2-ingest$)");
+		const entrypoint = readFileSync(
+			resolve(import.meta.dir, "../../../../api/cron/r2-ingest.ts"),
+			"utf8",
+		);
+		expect(entrypoint).toContain("fetch: handleR2IngestMaintenanceRequest");
+		expect(entrypoint).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/r2-ingest$/u",
 		);
 	});
 	test("runs GitHub evidence maintenance in an isolated cron function", () => {

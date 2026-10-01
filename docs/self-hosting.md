@@ -284,3 +284,7 @@ npx wrangler r2 bucket lifecycle list <bucket-name>
 | `GITHUB_EVIDENCE_UI_ENABLED` | No | Set to `true` to show the Merged PRs dashboard metric and the workspace settings GitHub section. Evidence collection runs regardless; missing or invalid values keep the UI hidden |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+
+## Vercel Hobby and the R2 ingest cron
+
+`vercel.json` schedules `/api/cron/r2-ingest` every minute, so ingest jobs that were left pending during a ClickHouse outage are picked up again within minutes. Vercel Hobby only allows daily cron jobs and rejects deployments with more frequent schedules. On Hobby, remove the `/api/cron/r2-ingest` entry from `crons`. The daily `/api/cron/repair` job still re-picks pending jobs, just less often.

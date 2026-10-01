@@ -1,3 +1,4 @@
+import { ClickHouseError } from "@clickhouse/client-web";
 import { ORPCError } from "@orpc/server";
 import {
 	REDACTION_BUDGET_EXCEEDED_CODE,
@@ -12,6 +13,15 @@ import {
 	SessionLanguageSignalScannerOperationalError,
 } from "./ingest-worker-operational.error.js";
 import { R2IngestMaterializationGateError } from "./r2-ingest-materialization-gate.js";
+
+export const R2_INGEST_DEPENDENCY_UNAVAILABLE =
+	"R2_INGEST_DEPENDENCY_UNAVAILABLE";
+export const R2_INGEST_TRANSIENT_ERROR_CODES = [
+	R2_INGEST_DEPENDENCY_UNAVAILABLE,
+	"R2_INGEST_TRANSIENT_FAILURE",
+	"R2_INGEST_SERVICE_UNAVAILABLE",
+	"R2_INGEST_GATEWAY_TIMEOUT",
+];
 
 const MAX_ERROR_GRAPH_NODES = 64;
 // Conservative subset of ClickHouse's documented connector retry list. Query,
@@ -28,9 +38,6 @@ const RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE = new Map([
 	["319", "UNKNOWN_STATUS_OF_INSERT"],
 	["999", "KEEPER_EXCEPTION"],
 ]);
-const RETRYABLE_CLICKHOUSE_ERROR_TYPES = new Set(
-	RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.values(),
-);
 const RETRYABLE_ERROR_CODES = new Set([
 	"40001",
 	"40P01",
@@ -177,6 +184,12 @@ function isRetryableErrorNode(error: object): boolean {
 	if (error instanceof ORPCError && RETRYABLE_ORPC_CODES.has(error.code)) {
 		return true;
 	}
+	if (
+		error instanceof ClickHouseError ||
+		getErrorString(error, "type") !== null
+	) {
+		return isRetryableClickHouseError(error);
+	}
 	if (isRetryableClickHouseError(error)) return true;
 	const code = getErrorString(error, "code");
 	if (
@@ -190,6 +203,14 @@ function isRetryableErrorNode(error: object): boolean {
 	if (name && RETRYABLE_ERROR_NAMES.has(name)) return true;
 	const message = getErrorString(error, "message");
 	if (message && RETRYABLE_TRANSPORT_MESSAGES.has(message)) return true;
+	if (
+		message &&
+		/(?:no available servers?|connection (?:refused|reset)|socket hang up|\b(?:timeout|timed out)\b|\b(?:HTTP(?:\s+(?:status|error))?|status(?:\s+code)?)[\s:=]+(?:502|503|504)\b)/iu.test(
+			message,
+		)
+	) {
+		return true;
+	}
 	const httpStatusCode = getHttpStatusCode(error);
 	return (
 		httpStatusCode === 408 ||
@@ -215,8 +236,7 @@ function isRetryableClickHouseError(error: object): boolean {
 	if (code && type) {
 		return RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.get(code) === type;
 	}
-	if (code && RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.has(code)) return true;
-	return type !== null && RETRYABLE_CLICKHOUSE_ERROR_TYPES.has(type);
+	return code !== null && RETRYABLE_CLICKHOUSE_ERROR_TYPES_BY_CODE.has(code);
 }
 
 function getErrorString(error: object, key: string): string | null {
