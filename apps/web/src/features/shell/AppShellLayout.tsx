@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/app/ui/tooltip";
 import "@/features/dashboard/dashboard-theme.css";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBanner";
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
@@ -201,6 +202,7 @@ export function LeftSidebarAppShellLayout() {
 
 	const shellWindowContent = (
 		<>
+			{!demo && !isWelcome ? <ServiceStatusBanner /> : null}
 			{isHomeWorkspaceRoute || isSettingsWorkspaceRoute ? null : (
 				<SiteHeader
 					setNewseshListPortalHost={setNewseshListHeaderPortal}

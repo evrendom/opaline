@@ -84,7 +84,7 @@ jobs:
         run: |
           deploy_args=()
           if [[ "${DEPLOY_ENVIRONMENT}" == "production" ]]; then
-            deploy_args+=(--prod --skip-domain)
+            deploy_args+=(--prod --skip-domain --build-env "CH_DEPLOY_SHA=${GITHUB_SHA}")
           else
             deploy_args+=(
               --env "APP_URL=https://${PREVIEW_HOST}"
