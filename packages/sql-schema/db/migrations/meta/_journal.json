@@ -358,6 +358,13 @@
 			"when": 1790869713038,
 			"tag": "0050_organization_feature_readiness",
 			"breakpoints": true
+		},
+		{
+			"idx": 51,
+			"version": "7",
+			"when": 1790872604294,
+			"tag": "0051_user_cli_version",
+			"breakpoints": true
 		}
 	]
 }

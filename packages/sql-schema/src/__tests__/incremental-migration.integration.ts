@@ -18,13 +18,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0050 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, and GitHub outcomes 0049", async () => {
+test("applies migrations 0020-0051 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, and organization feature readiness 0050", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0050_organization_feature_readiness");
+	expect(latestMigration?.tag).toBe("0051_user_cli_version");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -39,6 +39,7 @@ test("applies migrations 0020-0050 to a database already migrated through 0019, 
 	const migrationsThrough0046 = await createMigrationsThrough(46);
 	const migrationsThrough0048 = await createMigrationsThrough(48);
 	const migrationsThrough0049 = await createMigrationsThrough(49);
+	const migrationsThrough0050 = await createMigrationsThrough(50);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -112,6 +113,11 @@ test("applies migrations 0020-0050 to a database already migrated through 0019, 
 				SELECT to_regclass('public.organization_feature_readiness')::text AS name
 			`;
 			expect(readinessBefore0050?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0050 });
+			const [cliVersionBefore0051] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.user_cli_version')::text AS name
+			`;
+			expect(cliVersionBefore0051?.name).toBeNull();
 
 			await migrate(database, { migrationsFolder });
 			const mcpTables = await migrationSql<Array<{ name: string }>>`
@@ -133,7 +139,7 @@ test("applies migrations 0020-0050 to a database already migrated through 0019, 
 				{ name: "oauthConsent" },
 			]);
 
-			const [after0050] = await migrationSql<MigrationState[]>`
+			const [after0051] = await migrationSql<MigrationState[]>`
 				SELECT
 					COUNT(*)::int AS count,
 					MAX(created_at)::text AS "latestTimestamp"
@@ -142,10 +148,14 @@ test("applies migrations 0020-0050 to a database already migrated through 0019, 
 			const [tableAfter0020] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
-			expect(after0050).toEqual({
-				count: 51,
+			expect(after0051).toEqual({
+				count: 52,
 				latestTimestamp: String(latestMigration?.when),
 			});
+			const [cliVersionTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.user_cli_version')::text AS name
+			`;
+			expect(cliVersionTable?.name).toBe("user_cli_version");
 			const publicationColumns = await migrationSql<Array<{ name: string }>>`
 				SELECT column_name AS name
 				FROM information_schema.columns
@@ -555,6 +565,7 @@ test("applies migrations 0020-0050 to a database already migrated through 0019, 
 		await rm(migrationsThrough0046, { force: true, recursive: true });
 		await rm(migrationsThrough0048, { force: true, recursive: true });
 		await rm(migrationsThrough0049, { force: true, recursive: true });
+		await rm(migrationsThrough0050, { force: true, recursive: true });
 	}
 });
 

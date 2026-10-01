@@ -9,6 +9,7 @@ import { SidebarInset, SidebarProvider } from "@/app/ui/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import "@/features/dashboard/dashboard-theme.css";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
+import { CliUpdateNotice } from "@/features/cli-update/CliUpdateNotice";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBanner";
 import "./product-window-chrome.css";
@@ -234,6 +235,7 @@ export function LeftSidebarAppShellLayout() {
 					</div>
 				</div>
 			</div>
+			{!demo && !isWelcome ? <CliUpdateNotice /> : null}
 		</>
 	);
 

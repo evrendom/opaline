@@ -27,6 +27,7 @@ import {
 	RequestOrganizationBillingUpgradeOutputSchema,
 	SelectOrganizationPlanOutputSchema,
 } from "./billing.js";
+import { CliUpdateStatusSchema } from "./cli-version.js";
 import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,
@@ -171,6 +172,7 @@ import {
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
 export * from "./avatar.js";
+export * from "./cli-version.js";
 export * from "./device-flow.js";
 export * from "./github-repository-evidence.js";
 export * from "./model-pricing.js";
@@ -846,6 +848,7 @@ export const contract = {
 		authStatus: oc.output(CliUserSchema),
 		revokeToken: oc.output(z.object({ success: z.literal(true) })),
 		setupStatus: oc.output(CliSetupStatusSchema),
+		updateStatus: oc.output(CliUpdateStatusSchema),
 		sessionUploadStatus: oc
 			.input(CliSessionUploadStatusInputSchema)
 			.output(CliSessionUploadStatusOutputSchema),

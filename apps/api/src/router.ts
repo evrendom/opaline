@@ -91,6 +91,10 @@ import {
 	requestOrganizationBillingUpgrade,
 } from "./services/billing-upgrade-request.service.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
+import {
+	getCliUpdateStatus,
+	recordUserCliVersion,
+} from "./services/cli-version.service.js";
 import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge-tombstone.service.js";
 import {
 	createGitHubInstallationUrl,
@@ -327,6 +331,10 @@ function getSessionUploadCompletedPayload(
 		content_size_bucket: bucketContentSize(input.content.length),
 	};
 }
+
+const cliUpdateStatus = os.cli.updateStatus
+	.use(authMiddleware)
+	.handler(({ context }) => getCliUpdateStatus(sqlClient, context.user.id));
 
 const health = os.health.handler(() => {
 	return {
@@ -1095,6 +1103,8 @@ async function processPreparedIngestSession({
 		store: "postgres",
 		target: "raw-receipt",
 	});
+	// Feeds the web app's CLI update notice; direct and R2 uploads both pass here.
+	await recordUserCliVersion(sqlClient, context.user.id, input.cli_version);
 	const languageSignalInput = {
 		content: filteredInput.content,
 		organizationId: orgId,
@@ -2290,6 +2300,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		authStatus: cliAuthStatus,
 		revokeToken: revokeCliToken,
 		setupStatus: cliSetupStatus,
+		updateStatus: cliUpdateStatus,
 		sessionUploadStatus: cliSessionUploadStatus,
 		reportUploadFailures: cliReportUploadFailures,
 	},
