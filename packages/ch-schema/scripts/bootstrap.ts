@@ -33,6 +33,10 @@ const FORWARD_SCRIPTS = new Map([
 	["20260918120000_agent_run_summaries.sql", "migrate-language-signals.ts"],
 	["20260930105809_transcript_records.sql", "migrate-transcript-records.ts"],
 	[
+		"20261001160000_session_git_observations.sql",
+		"migrate-session-git-observations.ts",
+	],
+	[
 		"20260930120000_repository_evidence_index.sql",
 		"migrate-repository-evidence-index.ts",
 	],

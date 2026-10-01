@@ -504,6 +504,63 @@ export const RudelSessionAnalyticsRowSchema = z.object({
 export type RudelSessionAnalyticsRowInput = z.input<typeof RudelSessionAnalyticsRowSchema>
 export type RudelSessionAnalyticsRowOutput = z.output<typeof RudelSessionAnalyticsRowSchema>
 
+export type RudelSessionGitObservationsRow = {
+  organization_id: string
+  user_id: string
+  source: string
+  session_id: string
+  revision: string
+  parser_version: number
+  transcript_parser_version: number
+  agent_id: string
+  record_idx: number
+  block_idx: number
+  call_id: string
+  kind: string
+  short_sha: string
+  branch: string
+  subject_sha256: string
+  push_from_sha: string
+  push_to_sha: string
+  push_source_branch: string
+  pr_repo: string
+  pr_number: number
+  commit_hash: string
+  repository_url: string
+  ts: string
+  label: string
+}
+
+export const RudelSessionGitObservationsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  transcript_parser_version: z.number(),
+  agent_id: z.string(),
+  record_idx: z.number(),
+  block_idx: z.number(),
+  call_id: z.string(),
+  kind: z.string(),
+  short_sha: z.string(),
+  branch: z.string(),
+  subject_sha256: z.string(),
+  push_from_sha: z.string(),
+  push_to_sha: z.string(),
+  push_source_branch: z.string(),
+  pr_repo: z.string(),
+  pr_number: z.number(),
+  commit_hash: z.string(),
+  repository_url: z.string(),
+  ts: z.string(),
+  label: z.string(),
+})
+
+export type RudelSessionGitObservationsRowInput = z.input<typeof RudelSessionGitObservationsRowSchema>
+export type RudelSessionGitObservationsRowOutput = z.output<typeof RudelSessionGitObservationsRowSchema>
+
 export type RudelSessionLanguageSignalsRow = {
   organization_id: string
   session_date: string

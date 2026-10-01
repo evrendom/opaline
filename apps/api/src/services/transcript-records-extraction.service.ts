@@ -10,6 +10,7 @@ import {
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readBooleanEnv, readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
 import {
 	hashTranscriptContent,
 	hasMatchingTranscriptRecordsReceipt,
@@ -346,6 +347,7 @@ export async function persistTranscriptRecordsBestEffort(
 				summary: stream.summary,
 				userId: input.userId,
 			});
+			await persistGitObservationsBestEffort(executor, input);
 			return "written";
 		} finally {
 			release();

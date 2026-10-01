@@ -221,6 +221,7 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: SKILL_USES_TABLE },
 		{ column, table: SKILL_VERSION_CONTENTS_TABLE },
 		{ column, table: TRANSCRIPT_RECORDS_TABLE },
+		{ column, table: "rudel.session_git_observations" },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },

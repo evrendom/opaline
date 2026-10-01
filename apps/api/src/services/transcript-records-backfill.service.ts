@@ -16,6 +16,7 @@ import {
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
+import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
 import { TranscriptRecordsDeadlineExceededError } from "./transcript-records-deadline.js";
 import {
 	hashTranscriptContent,
@@ -317,6 +318,11 @@ async function processBatch(
 			});
 			result.completedCount++;
 			result.rowsWritten += write.rowCount;
+			await persistGitObservationsBestEffort(executor, {
+				...candidate,
+				signal: options.signal,
+				assertWritable: () => options.assertWritable(candidate),
+			});
 		} catch (error) {
 			options.signal?.throwIfAborted();
 			if (
