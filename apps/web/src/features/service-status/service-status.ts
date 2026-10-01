@@ -9,7 +9,13 @@ export function parseServiceStatus(body: unknown): ServiceStatus {
 	if (typeof dependencies !== "object" || dependencies === null) {
 		return "unknown";
 	}
-	const clickhouse = (dependencies as { clickhouse?: unknown }).clickhouse;
+	// Prefer the read check: slow ClickHouse writes do not stop analytics.
+	// Servers without it report only the strict write check.
+	const deps = dependencies as {
+		clickhouse?: unknown;
+		clickhouse_read?: unknown;
+	};
+	const clickhouse = deps.clickhouse_read ?? deps.clickhouse;
 	if (typeof clickhouse !== "object" || clickhouse === null) return "unknown";
 	const status = (clickhouse as { status?: unknown }).status;
 	if (status === "ok") return "ok";

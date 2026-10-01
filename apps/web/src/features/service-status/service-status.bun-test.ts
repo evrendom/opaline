@@ -38,4 +38,27 @@ describe("parseServiceStatus", () => {
 			expect(parseServiceStatus(body)).toBe("unknown");
 		}
 	});
+
+	test("uses the read check when writes are slow but reads work", () => {
+		expect(
+			parseServiceStatus({
+				status: "unavailable",
+				dependencies: {
+					postgres: { status: "ok" },
+					clickhouse: { status: "unavailable" },
+					clickhouse_read: { status: "ok" },
+				},
+			}),
+		).toBe("ok");
+		expect(
+			parseServiceStatus({
+				status: "unavailable",
+				dependencies: {
+					postgres: { status: "ok" },
+					clickhouse: { status: "unavailable" },
+					clickhouse_read: { status: "unavailable" },
+				},
+			}),
+		).toBe("analytics-unavailable");
+	});
 });

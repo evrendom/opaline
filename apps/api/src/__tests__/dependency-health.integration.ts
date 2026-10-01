@@ -57,6 +57,10 @@ describe("database readiness", () => {
 					dependencies: {
 						postgres: { status: "ok" },
 						clickhouse: { status: "unavailable" },
+						// Without INSERT, reads still serve analytics; without SELECT they cannot.
+						clickhouse_read: {
+							status: missingPrivilege === "INSERT" ? "ok" : "unavailable",
+						},
 					},
 				});
 				// Granting the missing privilege makes the same real storage probe pass.
@@ -131,6 +135,7 @@ describe("database readiness", () => {
 				dependencies: {
 					postgres: { status: "ok", duration_ms: expect.any(Number) },
 					clickhouse: { status: "ok", duration_ms: expect.any(Number) },
+					clickhouse_read: { status: "ok", duration_ms: expect.any(Number) },
 				},
 			});
 		}
@@ -169,6 +174,10 @@ describe("database readiness", () => {
 						status: dependency === "postgres" ? "ok" : "unavailable",
 						duration_ms: expect.any(Number),
 					},
+					clickhouse_read: {
+						status: dependency === "postgres" ? "ok" : "unavailable",
+						duration_ms: expect.any(Number),
+					},
 				},
 			});
 			const liveness = await fetch(`${base}/health`);
@@ -204,6 +213,10 @@ describe("database readiness", () => {
 				dependencies: {
 					postgres: { status: "unavailable", duration_ms: expect.any(Number) },
 					clickhouse: {
+						status: "unavailable",
+						duration_ms: expect.any(Number),
+					},
+					clickhouse_read: {
 						status: "unavailable",
 						duration_ms: expect.any(Number),
 					},

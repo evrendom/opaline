@@ -12,7 +12,11 @@ interface DependencyStatus {
 
 interface HealthResult {
 	status: "ok" | "unavailable";
-	dependencies: { postgres: DependencyStatus; clickhouse: DependencyStatus };
+	dependencies: {
+		postgres: DependencyStatus;
+		clickhouse: DependencyStatus;
+		clickhouse_read: DependencyStatus;
+	};
 }
 
 let pending: Promise<HealthResult> | undefined;
@@ -44,15 +48,24 @@ function getPendingCheck(): Promise<HealthResult> {
 }
 
 async function checkDependencies(): Promise<HealthResult> {
-	const [postgresStatus, clickhouseStatus] = await Promise.all([
-		measureDependency(checkPostgres),
-		measureDependency(checkClickHouse),
-	]);
+	const [postgresStatus, clickhouseStatus, clickhouseReadStatus] =
+		await Promise.all([
+			measureDependency(checkPostgres),
+			measureDependency(checkClickHouse),
+			measureDependency(checkClickHouseRead),
+		]);
+	// Readiness stays strict: an acknowledged ClickHouse write is required.
+	// The read check only tells the app whether analytics can still be served
+	// while writes are slow.
 	const healthy =
 		postgresStatus.status === "ok" && clickhouseStatus.status === "ok";
 	return {
 		status: healthy ? "ok" : "unavailable",
-		dependencies: { postgres: postgresStatus, clickhouse: clickhouseStatus },
+		dependencies: {
+			postgres: postgresStatus,
+			clickhouse: clickhouseStatus,
+			clickhouse_read: clickhouseReadStatus,
+		},
 	};
 }
 
@@ -154,6 +167,36 @@ async function checkClickHouse(): Promise<void> {
 		const rows = await result.json<{ probe_id: string }>();
 		if (rows[0]?.probe_id !== probeId)
 			throw new Error("ClickHouse storage probe was not readable");
+	} finally {
+		await client.close();
+	}
+}
+
+// Reads a stored row without writing, so slow inserts do not report analytics
+// as unavailable.
+async function checkClickHouseRead(): Promise<void> {
+	const url = process.env.CLICKHOUSE_URL || "http://localhost:8123";
+	const client = createClient({
+		url,
+		username: resolveClickHouseUsername(process.env, url),
+		password: process.env.CLICKHOUSE_PASSWORD || "",
+		database: "default",
+		request_timeout: TIMEOUT_MS,
+	});
+	try {
+		const result = await client.query({
+			query: "SELECT probe_id FROM rudel.dependency_health_probes LIMIT 1",
+			format: "JSONEachRow",
+			abort_signal: AbortSignal.timeout(TIMEOUT_MS),
+			clickhouse_settings: {
+				max_execution_time: 2,
+				timeout_before_checking_execution_speed: 0,
+				max_rows_to_read: "100000",
+				max_bytes_to_read: "1048576",
+				use_query_cache: 0,
+			},
+		});
+		await result.json();
 	} finally {
 		await client.close();
 	}
