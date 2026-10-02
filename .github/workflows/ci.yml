@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       cli: ${{ steps.filter.outputs.cli }}
+      integration: ${{ steps.integration.outputs.integration }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,6 +55,23 @@ jobs:
               - "bun.lock"
               - ".github/actions/setup/**"
               - ".github/workflows/ci.yml"
+
+      # Integration exercises the API, CLI, marketing build, packages and
+      # scripts. The web app, the MCP plugin code (no integration test reaches
+      # it) and Markdown cannot change its outcome, so PRs touching only those
+      # skip it. Every listed condition must hold for a changed file.
+      - name: Detect integration changes
+        id: integration
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          base: main
+          predicate-quantifier: every
+          filters: |
+            integration:
+              - "{apps/api/**,apps/cli/**,apps/marketing/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json,vercel.json}"
+              - "!apps/api/src/mcp/**"
+              - "!apps/api/src/handlers/mcp-http*"
+              - "!**/*.md"
 
   verify:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -109,7 +127,12 @@ jobs:
         run: bun run --cwd apps/web test:resource-budgets:chrome
 
   integration:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Always on main: production deploys wait for it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+      needs.changes.outputs.integration == 'true')
+    needs: changes
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     services:
