@@ -114,7 +114,12 @@ const successRate = os.analytics.overview.successRate
 const costs = os.analytics.overview.costs
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => {
-		const uiEnabled = isGitHubEvidenceUiEnabled();
+		// Forced workspaces see the GitHub metrics (as a preview until their
+		// history is complete) even while the deployment keeps them dark.
+		const forced = readGitHubEvidenceUiForceOrgIds().includes(
+			context.organizationId,
+		);
+		const uiEnabled = isGitHubEvidenceUiEnabled() || forced;
 		const readiness = uiEnabled
 			? await readGitHubOutcomesReadiness(sqlClient, context.organizationId)
 			: null;
@@ -126,9 +131,7 @@ const costs = os.analytics.overview.costs
 				githubReadiness: readiness,
 				githubVisibility: resolveGitHubOutcomesVisibility({
 					uiEnabled,
-					forced: readGitHubEvidenceUiForceOrgIds().includes(
-						context.organizationId,
-					),
+					forced,
 					readiness,
 				}),
 			},

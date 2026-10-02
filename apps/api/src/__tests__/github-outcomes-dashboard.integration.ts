@@ -515,7 +515,7 @@ test("split coverage is ready; a gap and stale reconciliation exclude the repo w
 	).not.toBeNull();
 });
 
-test("forced preview and global kill switch; disconnect clears sticky readiness", async () => {
+test("forced workspaces preview with or without the global flag; disconnect clears sticky readiness", async () => {
 	const preview = users[2];
 	const outsider = users[1];
 	assert(preview && outsider);
@@ -541,9 +541,18 @@ test("forced preview and global kill switch; disconnect clears sticky readiness"
 		GITHUB_EVIDENCE_UI_FORCE_ORG_IDS: preview.id,
 	});
 	servers.push(disabled);
-	const result = await dashboard({ requestedMetric: "ciRuns" }, 2, disabled);
-	expect(result.requestedMetric).toBe("cost");
-	expect(result.availableMetrics).not.toContain("ciRuns");
+	// A forced workspace sees its GitHub metrics even with the deployment dark…
+	const forcedWhileDark = await dashboard(
+		{ requestedMetric: "ciRuns" },
+		2,
+		disabled,
+	);
+	expect(forcedWhileDark.requestedMetric).toBe("ciRuns");
+	expect(forcedWhileDark.metrics.ciRuns?.githubHistory?.preview).toBe(true);
+	// …while every other workspace, even a ready one, stays hidden.
+	const notForced = await dashboard({ requestedMetric: "ciRuns" }, 0, disabled);
+	expect(notForced.requestedMetric).toBe("cost");
+	expect(notForced.availableMetrics).not.toContain("ciRuns");
 	await sqlClient.unsafe(
 		`UPDATE github_app_installation SET status = 'deleted' WHERE organization_id = $1`,
 		[outsider.id],
