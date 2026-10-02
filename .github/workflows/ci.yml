@@ -127,10 +127,12 @@ jobs:
         run: bun run --cwd apps/web test:resource-budgets:chrome
 
   integration:
-    # Always on main: production deploys wait for it.
+    # Pushes to main follow the same filter (the production deploy accepts a
+    # skip); manual deploys always run it.
     if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.pull_request.draft == false &&
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+      github.event.pull_request.draft == false) &&
       needs.changes.outputs.integration == 'true')
     needs: changes
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -362,7 +364,8 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.verify.result == 'success' &&
-      needs.integration.result == 'success' &&
+      (needs.integration.result == 'success' ||
+      needs.integration.result == 'skipped') &&
       needs.cli-smoke-required.result == 'success' }}
     needs: [verify, integration, cli-smoke-required]
     uses: ./.github/workflows/vercel.yml
