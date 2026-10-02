@@ -351,6 +351,8 @@ async function readResource(
 							},
 						},
 						"openai/widgetDomain": pluginAssetOrigin(),
+						// The app titles itself; no extra "Opaline" header above it.
+						"openai/widgetHideAttribution": true,
 						"openai/widgetCSP": {
 							resource_domains: pluginResourceDomains(),
 							connect_domains: [],
