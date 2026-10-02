@@ -66,14 +66,17 @@ html[data-app-mode="plugin"] .dashboardy-page {
 html[data-app-mode="plugin"] [class*="--session-overview-surface:"] {
 	--session-overview-surface: var(--background);
 }
-/* The host already titles the plugin: page titles go, and so does a header
-   bar that holds nothing else (session detail keeps its breadcrumb bar). */
-html[data-app-mode="plugin"] [data-slot="dashboard-header"] h1 {
-	visibility: hidden;
+/* In dark mode tooltips look like the menus instead of an inverted pill. */
+html[data-app-mode="plugin"].dark [data-slot="tooltip-content"] {
+	background: var(--popover);
+	color: var(--popover-foreground);
+	box-shadow: 0 0 0 1px var(--border);
 }
-html[data-app-mode="plugin"]
-	[data-slot="dashboard-header"]:not(:has(button, a[href], input)) {
-	display: none;
+html[data-app-mode="plugin"].dark
+	[data-slot="tooltip-content"]
+	[class*="bg-foreground"] {
+	background: var(--popover);
+	fill: var(--popover);
 }
 html[data-app-mode="plugin"] .cost-page {
 	--cost-surface: var(--background);
@@ -84,7 +87,9 @@ html[data-app-mode="plugin"] .cost-page {
 /* With a host theme, Opaline's neutral greys follow it; brand and status
    colours and translucent tints stay. Hosts without one keep the web look. */
 html[data-host-styles] {
-	--hover: var(--color-background-tertiary, var(--color-background-secondary));
+	/* A tint of the host's text, visible on any theme (dark hosts may send
+	   near-identical background shades). */
+	--hover: color-mix(in oklab, var(--foreground) 8%, transparent);
 }
 html[data-host-styles] body,
 html[data-host-styles] :is([class~="bg-white"], [class~="bg-[#fcfcfc]"]) {
