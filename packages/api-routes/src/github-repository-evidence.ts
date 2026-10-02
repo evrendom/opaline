@@ -11,7 +11,11 @@ export const GitHubRepositoryBindingSchema = z.object({
 	sync: z
 		.discriminatedUnion("state", [
 			z.object({ state: z.literal("ready") }),
-			z.object({ state: z.literal("syncing") }),
+			z.object({
+				state: z.literal("syncing"),
+				// Share of the repository's history windows already read (0–1).
+				progress: z.number().min(0).max(1).optional(),
+			}),
 			z.object({
 				state: z.literal("unavailable"),
 				reason: z.enum(["no-access", "not-found"]),

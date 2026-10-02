@@ -7,6 +7,16 @@ import {
 	WorkspaceGitHubConnectionView,
 } from "./WorkspaceGitHubConnection";
 
+const REPOSITORY: GitHubRepositoryConnectionStatus["repositories"][number] = {
+	defaultBranch: "main",
+	isPrivate: true,
+	name: "athena",
+	nodeId: "R_athena",
+	owner: "opalinehq",
+	repositoryId: "55",
+	sync: { state: "ready" },
+};
+
 const CONNECTED_STATUS: GitHubRepositoryConnectionStatus = {
 	accountLogin: "opalinehq",
 	canManage: true,
@@ -16,17 +26,7 @@ const CONNECTED_STATUS: GitHubRepositoryConnectionStatus = {
 	installationId: "1234",
 	manageUrl:
 		"https://github.com/organizations/opalinehq/settings/installations",
-	repositories: [
-		{
-			defaultBranch: "main",
-			isPrivate: true,
-			name: "athena",
-			nodeId: "R_athena",
-			owner: "opalinehq",
-			repositoryId: "55",
-			sync: { state: "ready" },
-		},
-	],
+	repositories: [REPOSITORY],
 	repositorySelection: "selected",
 };
 
@@ -64,7 +64,7 @@ test("dashboard syncing and visible states, and admin-only retention advice", ()
 			/>,
 		);
 	expect(card({ ...CONNECTED_STATUS, dashboard: "syncing" })).toContain(
-		"Opaline is reading pull request and CI history from GitHub.",
+		"Reading pull request and CI history from GitHub. 1 of 1 repository ready",
 	);
 	expect(card({ ...CONNECTED_STATUS, dashboard: "visible" })).toContain(
 		"Merged PRs and CI runs are on the dashboard.",
@@ -234,4 +234,37 @@ test("accepts only documented callback results", () => {
 	}
 	expect(readGitHubCallbackResult("?github=connected-later")).toBeNull();
 	expect(readGitHubCallbackResult("?other=value")).toBeNull();
+});
+
+test("shows history progress across repositories while syncing", () => {
+	const markup = renderCard({
+		...CONNECTED_STATUS,
+		dashboard: "syncing",
+		repositories: [
+			{
+				...REPOSITORY,
+				repositoryId: "1",
+				sync: { state: "ready" },
+			},
+			{
+				...REPOSITORY,
+				repositoryId: "2",
+				sync: { state: "syncing", progress: 0.5 },
+			},
+			{
+				...REPOSITORY,
+				repositoryId: "3",
+				sync: { state: "syncing" },
+			},
+			{
+				...REPOSITORY,
+				repositoryId: "4",
+				sync: { state: "unavailable", reason: "no-access" },
+			},
+		],
+	});
+
+	expect(markup).toContain("1 of 4 repositories ready");
+	expect(markup).toContain('aria-valuenow="62"');
+	expect(markup).toContain(">62%<");
 });

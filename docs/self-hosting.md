@@ -208,13 +208,13 @@ workspace deletion can always find and remove them.
 ### GitHub App webhooks (optional)
 
 Webhooks make merges and CI results appear within minutes instead of after the
-daily reconciliation cron. On Vercel, the webhook acknowledges with HTTP 202
+next reconciliation cron run. On Vercel, the webhook acknowledges with HTTP 202
 and registers a platform-managed `context.waitUntil` continuation: it waits
 30 seconds plus 1 second of timer slack, then collects only the affected
 collection identities in batches of at most 25 under one 240-second pass
 budget. The function's 300-second maximum duration covers both debounce and
 collection. Concurrent attempts retain the existing reservation and lease
-protection; unfinished work remains durable for the daily cron. Self-hosted
+protection; unfinished work remains durable for the reconciliation cron. Self-hosted
 Bun/Fly servers still wake their resident worker, which otherwise polls every
 five minutes. In the App settings, activate the webhook, set the
 **Webhook URL** to `https://your-api-domain.com/api/webhooks/github`, set the
@@ -232,7 +232,7 @@ installation and repository-binding state current. Events for installations or
 repositories that are not bound to a workspace are dropped without being
 stored, and payloads are never persisted. Added repositories are not bound
 automatically; use **Reconnect**. Without the secret the endpoint responds 503
-and the daily cron remains the only refresh path. The cron also remains the
+and the reconciliation cron remains the only refresh path. The cron also remains the
 fallback for missed deliveries in any configuration.
 
 ## Direct-to-R2 Ingest Lifecycle Backstop
@@ -285,6 +285,6 @@ npx wrangler r2 bucket lifecycle list <bucket-name>
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
 
-## Vercel Hobby and the R2 ingest cron
+## Vercel Hobby and the frequent crons
 
-`vercel.json` schedules `/api/cron/r2-ingest` every minute, so ingest jobs that were left pending during a ClickHouse outage are picked up again within minutes. Vercel Hobby only allows daily cron jobs and rejects deployments with more frequent schedules. On Hobby, remove the `/api/cron/r2-ingest` entry from `crons`. The daily `/api/cron/repair` job still re-picks pending jobs, just less often.
+`vercel.json` schedules `/api/cron/r2-ingest` every minute, so ingest jobs that were left pending during a ClickHouse outage are picked up again within minutes. It also runs `/api/cron/github-evidence` every five minutes: Vercel has no resident worker, so pending GitHub evidence collections and the repository history sweep only advance when this cron runs (up to about four minutes per run; an idle run returns immediately). Vercel Hobby only allows daily cron jobs and rejects deployments with more frequent schedules. On Hobby, remove the `/api/cron/r2-ingest` entry and change `/api/cron/github-evidence` to a daily schedule. The daily `/api/cron/repair` job still re-picks pending ingest jobs, and the initial GitHub history then takes much longer to complete.

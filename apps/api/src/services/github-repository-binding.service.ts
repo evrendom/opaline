@@ -193,10 +193,17 @@ export async function getGitHubRepositoryConnectionStatus(input: {
 		"SELECT organization_id, repository_id, installation_id, node_id, owner, name, default_branch, is_private FROM github_repository_binding WHERE organization_id = $1 AND installation_id = $2 AND status = 'active' ORDER BY lower(owner), lower(name), repository_id",
 		[input.organizationId, installation.installation_id],
 	);
-	const readiness = await readGitHubOutcomesReadiness(
-		input.database,
-		input.organizationId,
-	);
+	const [readiness, windows] = await Promise.all([
+		readGitHubOutcomesReadiness(input.database, input.organizationId),
+		input.database.unsafe<
+			Array<{ repository_id: string; done: number; total: number }>
+		>(
+			`SELECT repository_id, count(*) FILTER (WHERE status IN ('complete', 'unavailable'))::int AS done, count(*) FILTER (WHERE status <> 'split')::int AS total
+			 FROM github_repository_sweep WHERE organization_id = $1 GROUP BY repository_id, dataset`,
+			[input.organizationId],
+		),
+	]);
+	const progressByRepository = readSweepProgress(windows);
 	const readinessByRepository = new Map(
 		readiness?.details.repositories.map((repository) => [
 			repository.repositoryId,
@@ -216,7 +223,10 @@ export async function getGitHubRepositoryConnectionStatus(input: {
 		}),
 		repositories: repositories.map((row) => ({
 			...mapBindingRow(row),
-			sync: toRepositorySyncState(readinessByRepository.get(row.repository_id)),
+			sync: toRepositorySyncState(
+				readinessByRepository.get(row.repository_id),
+				progressByRepository.get(row.repository_id),
+			),
 		})),
 		repositorySelection: installation.repository_selection,
 	};
@@ -269,10 +279,38 @@ function mapBindingRow(row: {
 
 function toRepositorySyncState(
 	readiness: GitHubRepositoryReadiness | undefined,
+	progress: number | undefined,
 ): GitHubRepositorySyncState {
 	if (readiness?.reason === "github-403")
 		return { state: "unavailable", reason: "no-access" };
 	if (readiness?.reason === "github-404")
 		return { state: "unavailable", reason: "not-found" };
-	return readiness?.included ? { state: "ready" } : { state: "syncing" };
+	if (readiness?.included) return { state: "ready" };
+	return progress === undefined
+		? { state: "syncing" }
+		: { state: "syncing", progress };
+}
+
+/** Per repository: the mean, over its datasets, of finished history windows. */
+function readSweepProgress(
+	windows: ReadonlyArray<{
+		repository_id: string;
+		done: number;
+		total: number;
+	}>,
+): Map<string, number> {
+	const shares = new Map<string, number[]>();
+	for (const { repository_id: repositoryId, done, total } of windows) {
+		if (total <= 0) continue;
+		shares.set(repositoryId, [
+			...(shares.get(repositoryId) ?? []),
+			Math.min(1, done / total),
+		]);
+	}
+	return new Map(
+		[...shares].map(([repositoryId, values]) => [
+			repositoryId,
+			values.reduce((sum, value) => sum + value, 0) / values.length,
+		]),
+	);
 }

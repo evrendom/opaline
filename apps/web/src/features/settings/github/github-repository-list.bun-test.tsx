@@ -22,7 +22,13 @@ const STATUS: GitHubRepositoryConnectionStatus = {
 	manageUrl: null,
 	repositories: [
 		{ ...REPOSITORY, sync: { state: "ready" } },
-		{ ...REPOSITORY, name: "web", repositoryId: "56", isPrivate: false },
+		{
+			...REPOSITORY,
+			name: "web",
+			repositoryId: "56",
+			isPrivate: false,
+			sync: { state: "syncing", progress: 0.42 },
+		},
 		{
 			...REPOSITORY,
 			name: "legacy",
@@ -54,7 +60,7 @@ test("lists every repository with the Automatic uploads table layout", () => {
 test("labels every sync state and pauses a suspended installation", () => {
 	const markup = renderToStaticMarkup(<GitHubRepositoryList status={STATUS} />);
 	expect(markup).toContain(">Synced<");
-	expect(markup).toContain(">Syncing<");
+	expect(markup).toContain(">Syncing 42%<");
 	expect(markup).toContain(">Not found<");
 	expect(markup).toContain(">No access<");
 

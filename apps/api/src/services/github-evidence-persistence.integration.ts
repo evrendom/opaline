@@ -319,6 +319,31 @@ describe("GitHub evidence lease timestamps", () => {
 		});
 	});
 
+	test("reports history progress as the mean share of finished windows per dataset", async () => {
+		// actions: 1 of 2 weekly windows done; pulls: 1 of 1 done; a split parent is ignored.
+		await sqlClient.unsafe(
+			`INSERT INTO github_repository_sweep (organization_id, repository_id, dataset, window_start, window_end, status)
+			 VALUES ($1, $2, 'actions', '2026-01-01', '2026-01-07', 'complete'),
+			        ($1, $2, 'actions', '2026-01-08', '2026-01-14', 'pending'),
+			        ($1, $2, 'actions', '2026-01-15', '2026-01-21', 'split'),
+			        ($1, $2, 'pulls', '2024-10-01', '2026-10-01', 'complete')`,
+			[organizationId, repositoryId],
+		);
+		const status = await getGitHubRepositoryConnectionStatus({
+			database: sqlClient,
+			organizationId,
+		});
+		await sqlClient.unsafe(
+			"DELETE FROM github_repository_sweep WHERE organization_id = $1",
+			[organizationId],
+		);
+
+		expect(status.repositories[0]?.sync).toEqual({
+			state: "syncing",
+			progress: 0.75,
+		});
+	});
+
 	test("rejects an active string lease without mutating its attempt", async () => {
 		const collectionId = randomUUID();
 		const sessionId = `active-${suffix}`;

@@ -90,7 +90,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `RATE_LIMIT_INGEST_REQUESTS_WINDOW` | No | Per-user fixed ingest request window in seconds; minimum 60 (default: 3,600) |
 | `RATE_LIMIT_INGEST_BYTES_MAX` | No | Positive integer per-user Postgres-backed ingest byte cap shared by all of the user's API keys (default: 10 GiB) |
 | `RATE_LIMIT_INGEST_BYTES_WINDOW` | No | Per-user fixed ingest byte window in seconds; minimum 60 (default: 3,600) |
-| `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` | No | GitHub App webhook secret (32+ characters). Enables the signed `/api/webhooks/github` endpoint that schedules near-real-time PR and CI evidence refreshes; unset keeps the daily cron as the only refresh path. |
+| `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` | No | GitHub App webhook secret (32+ characters). Enables the signed `/api/webhooks/github` endpoint that schedules near-real-time PR and CI evidence refreshes; unset keeps the five-minute `/api/cron/github-evidence` cron as the only refresh path. |
 | `MCP_PLUGIN_PUBLIC` | No | Dark-launch switch for the Opaline ChatGPT/Codex plugin (`/api/mcp` and its consent page). Only the exact value `true` opens it to every account; otherwise only members of `VITE_ADMIN_ORGANIZATION_ID` can connect and call tools, and nobody can when that is unset (default: team only, including local dev). |
 | `OPENAI_APPS_CHALLENGE_TOKEN` | No | Domain-verification token from the OpenAI plugin dashboard, served as plain text at `/.well-known/openai-apps-challenge`; unset returns 404. |
 | `RESEND_API_KEY` | No | Resend API key for email integration |

@@ -63,23 +63,21 @@ export function GitHubConnectionCard({
 			</WorkspaceSettingsRow>
 
 			{status && connected && !suspended ? (
-				<WorkspaceSettingsRow
-					label="Dashboard"
-					description={
-						status.dashboard === "visible"
-							? "Merged PRs and CI runs are on the dashboard."
-							: "Opaline is reading pull request and CI history from GitHub. Merged PRs and CI runs appear on the dashboard when it finishes."
-					}
-				>
-					{status.dashboard === "visible" ? (
+				status.dashboard === "visible" ? (
+					<WorkspaceSettingsRow
+						label="Dashboard"
+						description="Merged PRs and CI runs are on the dashboard."
+					>
 						<a
 							className="cost-text-button"
 							href="../../dashboard?metric=mergedPullRequests"
 						>
 							Open dashboard
 						</a>
-					) : null}
-				</WorkspaceSettingsRow>
+					</WorkspaceSettingsRow>
+				) : (
+					<SyncProgressRow repositories={status.repositories} />
+				)
 			) : null}
 
 			{status && connected && canManage && !suspended ? (
@@ -222,6 +220,50 @@ function ConnectionControl({
 				</span>
 			)}
 		</div>
+	);
+}
+
+function SyncProgressRow({
+	repositories,
+}: {
+	repositories: GitHubRepositoryConnectionStatus["repositories"];
+}) {
+	const ready = repositories.filter(
+		(repository) => repository.sync?.state === "ready",
+	).length;
+	// Unavailable repositories are finished too: there is nothing left to read.
+	const progress =
+		repositories.length === 0
+			? 0
+			: repositories.reduce(
+					(sum, { sync }) =>
+						sum +
+						(sync?.state === "syncing" || !sync ? (sync?.progress ?? 0) : 1),
+					0,
+				) / repositories.length;
+	const percent = Math.floor(progress * 100);
+	return (
+		<WorkspaceSettingsRow
+			label="History"
+			description={`Reading pull request and CI history from GitHub. ${ready} of ${repositories.length} ${repositories.length === 1 ? "repository" : "repositories"} ready; merged PRs and CI runs appear on the dashboard when all are.`}
+		>
+			<div className="github-connection-progress">
+				<div
+					className="github-connection-progress-track"
+					role="progressbar"
+					aria-label="GitHub history sync"
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-valuenow={percent}
+				>
+					<div
+						className="github-connection-progress-fill"
+						style={{ width: `${percent}%` }}
+					/>
+				</div>
+				<span className="github-connection-progress-value">{percent}%</span>
+			</div>
+		</WorkspaceSettingsRow>
 	);
 }
 

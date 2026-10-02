@@ -79,7 +79,9 @@ describe("Vercel deployment configuration", () => {
 			schedule: "15 3 * * *",
 		});
 		for (const cron of vercelConfig.crons.filter(
-			(cron) => cron.path !== "/api/cron/r2-ingest",
+			(cron) =>
+				cron.path !== "/api/cron/r2-ingest" &&
+				cron.path !== "/api/cron/github-evidence",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
@@ -122,7 +124,9 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(vercelConfig.crons).toContainEqual({
 			path: "/api/cron/github-evidence",
-			schedule: "45 3 * * *",
+			// Vercel has no resident worker: live collections and the history
+			// sweep only advance when this runs, so it drains every few minutes.
+			schedule: "*/5 * * * *",
 		});
 		const apiCatchAll = vercelConfig.rewrites.find(
 			(rewrite) =>

@@ -117,7 +117,12 @@ function SyncStatus({
 	const [state, label] = suspended
 		? (["disabled", "Paused"] as const)
 		: !sync || sync.state === "syncing"
-			? (["unknown", "Syncing"] as const)
+			? ([
+					"unknown",
+					sync?.progress === undefined
+						? "Syncing"
+						: `Syncing ${Math.floor(sync.progress * 100)}%`,
+				] as const)
 			: sync.state === "ready"
 				? (["enabled", "Synced"] as const)
 				: ([

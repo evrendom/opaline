@@ -15,3 +15,39 @@
 	padding: 12px 0;
 	color: var(--destructive);
 }
+
+.github-connection-progress {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 10px;
+}
+
+.github-connection-progress-track {
+	height: 4px;
+	flex: 1;
+	overflow: hidden;
+	border-radius: 2px;
+	background: var(--border);
+}
+
+.github-connection-progress-fill {
+	height: 100%;
+	border-radius: 2px;
+	background: var(--foreground);
+	transition: width 300ms ease-out;
+}
+
+.github-connection-progress-value {
+	min-width: 3ch;
+	color: var(--muted-foreground);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.github-connection-progress-fill {
+		transition: none;
+	}
+}

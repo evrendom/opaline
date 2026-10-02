@@ -21,6 +21,12 @@ export function useGitHubConnection(
 		enabled: organizationId !== null,
 		refetchOnWindowFocus: "always",
 		staleTime: 10_000,
+		// Keep the history progress moving while GitHub is still being read.
+		refetchInterval: (current) =>
+			current.state.data?.visibility === "visible" &&
+			current.state.data.dashboard === "syncing"
+				? 30_000
+				: false,
 	});
 
 	async function connect() {
