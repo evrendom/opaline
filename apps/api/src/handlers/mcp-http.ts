@@ -300,7 +300,7 @@ async function handleMcpRequest(
 				resources: [
 					{
 						uri: DASHBOARD_WIDGET_URI,
-						name: "Opaline dashboard",
+						name: "Opaline",
 						mimeType: MCP_APP_MIME_TYPE,
 					},
 				],
@@ -351,8 +351,6 @@ async function readResource(
 							},
 						},
 						"openai/widgetDomain": pluginAssetOrigin(),
-						// The app titles itself; no extra "Opaline" header above it.
-						"openai/widgetHideAttribution": true,
 						"openai/widgetCSP": {
 							resource_domains: pluginResourceDomains(),
 							connect_domains: [],

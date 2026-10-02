@@ -590,6 +590,17 @@
 	box-shadow: none;
 }
 
+/* The same tint as the session list's model marks, kept opaque over rails. */
+.dark .session-constellation-tree
+	[data-trace-tree-row-content]
+	.session-turn-table-model-icon {
+	--trace-icon-bg: color-mix(
+		in oklab,
+		#fff 8%,
+		var(--dashboardy-surface-opaque)
+	);
+}
+
 .session-constellation-tree
 	.session-turn-table-model-icon[data-trace-icon-tone="claude"] {
 	--trace-icon-fg: #cc7d5e;

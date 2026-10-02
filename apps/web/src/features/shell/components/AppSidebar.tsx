@@ -64,12 +64,12 @@ export function AppSidebar({
 				)}
 			>
 				<FluidMenuHover items="[data-sidebar-interactive]" />
-				{isCenteredLayout ? null : (
+				{/* The plugin's host already titles it "Opaline". */}
+				{isCenteredLayout || import.meta.env.MODE === "plugin" ? null : (
 					<div
 						className={`mt-[var(--sidebar-section-first-margin-top)] flex w-full flex-col ${sidebarRailHorizontalPaddingClassName}`}
 					>
-						{/* The plugin's host already titles it "Opaline". */}
-						{import.meta.env.MODE === "plugin" ? null : <WorkspaceMenuButton />}
+						<WorkspaceMenuButton />
 					</div>
 				)}
 

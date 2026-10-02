@@ -160,7 +160,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_dashboard",
-		title: "Opaline dashboard",
+		title: "Opaline",
 		description:
 			"The Opaline dashboard: total and daily trend of agent cost (USD), sessions, signals, agent runs, merged pull requests or CI failures per PR for a date range (default: the last 30 days), with the top members, repositories, models and other breakdowns. Filter by member user IDs, repository names or models, or split the trend by a dimension.",
 		inputSchema: input({
