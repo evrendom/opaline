@@ -28,6 +28,10 @@ const users: { id: string; token: string }[] = [];
 const servers: ApiTestServer[] = [];
 let server: ApiTestServer;
 const now = new Date();
+// The fixture starts repository history two years before now.
+const historyStart = new Date(now);
+historyStart.setUTCFullYear(now.getUTCFullYear() - 2);
+const historyFrom = historyStart.toISOString().slice(0, 10);
 
 beforeAll(async () => {
 	server = await startApiTestServer({
@@ -389,7 +393,7 @@ test("two years of repository history are accepted independent of sessions", asy
 	expect(result.metrics.mergedPullRequests?.total).toBe(3);
 	expect(
 		result.metrics.mergedPullRequests?.githubHistory?.pullRequestsFrom,
-	).toBe("2024-10-01");
+	).toBe(historyFrom);
 });
 
 test("complete repositories with no Actions are no CI, never unavailable or passing", async () => {
@@ -418,7 +422,7 @@ test("complete repositories with no Actions are no CI, never unavailable or pass
 	expect(result.metrics.ciFailuresPerPullRequest?.denominator).toBe(0);
 	expect(result.metrics.ciRuns?.total).toBe(0);
 	expect(result.metrics.ciRuns?.ciMinutes?.total).toBe(0);
-	expect(result.metrics.ciRuns?.githubHistory?.ciFrom).toBe("2024-10-01");
+	expect(result.metrics.ciRuns?.githubHistory?.ciFrom).toBe(historyFrom);
 });
 
 test("runs are counted for repositories whose CI floor falls back to the PR floor", async () => {
@@ -436,7 +440,7 @@ test("runs are counted for repositories whose CI floor falls back to the PR floo
 		requestedMetric: "ciRuns",
 	});
 	expect(result.metrics.ciRuns?.total).toBe(1);
-	expect(result.metrics.ciRuns?.githubHistory?.ciFrom).toBe("2024-10-01");
+	expect(result.metrics.ciRuns?.githubHistory?.ciFrom).toBe(historyFrom);
 });
 
 test("removed, syncing and inaccessible bindings are excluded and readiness is sticky", async () => {
