@@ -54,7 +54,19 @@ html[data-app-mode="plugin"] .dashboard-01-preview {
 		var(--plugin-chrome)
 	);
 	--dashboard-01-content-background: var(--background);
+	--dashboard-01-chrome-surface: var(
+		--color-background-secondary,
+		var(--plugin-chrome)
+	);
 	--dashboard-01-font-roster-display: var(--font-sans);
+}
+/* Page surfaces take the host's main colour, as the dashboard already does. */
+html[data-app-mode="plugin"] .dashboardy-page {
+	--dashboardy-surface: var(--background);
+	--dashboardy-surface-opaque: var(--background);
+}
+html[data-app-mode="plugin"] [class*="--session-overview-surface:"] {
+	--session-overview-surface: var(--background);
 }
 html[data-app-mode="plugin"] .cost-page {
 	--cost-surface: var(--background);

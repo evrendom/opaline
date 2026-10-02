@@ -237,7 +237,9 @@ export function LeftSidebarAppShellLayout() {
 					</div>
 				</div>
 			</div>
-			{!demo && !isWelcome ? <CliUpdateNotice /> : null}
+			{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
+				<CliUpdateNotice />
+			) : null}
 		</>
 	);
 

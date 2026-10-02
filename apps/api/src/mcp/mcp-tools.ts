@@ -192,15 +192,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				models: (args.models as string[]) ?? [],
 			};
 			const { metric: _metric, ...filters } = query;
-			const input = {
+			// The contract fills every other filter, so this is the exact input
+			// (and cache key) the web dashboard uses.
+			const input = CostDashboardInputSchema.parse({
 				...filters,
 				requestedMetric: query.metric,
-				signalTypes: [],
-				phrases: [],
-				runSignals: [],
-				durations: [],
-				skillsUsed: [],
-			};
+			});
 			const [dashboard, bootstrap] = await Promise.all([
 				client.analytics.overview.costs(input),
 				readPluginBootstrap(client, context),
