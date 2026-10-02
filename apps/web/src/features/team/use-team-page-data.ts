@@ -297,7 +297,9 @@ export function useTeamPageData() {
 	const currentUserId =
 		getSessionUserId(session) ?? getActiveMemberUserId(activeMember);
 	const canInviteTeamMembers =
-		activeOrganizationId !== null && workspaceMeta?.isOrgAdmin === true;
+		import.meta.env.MODE !== "plugin" &&
+		activeOrganizationId !== null &&
+		workspaceMeta?.isOrgAdmin === true;
 	const {
 		data: fullOrganization,
 		isLoading: isOrganizationPending,

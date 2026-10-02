@@ -203,7 +203,9 @@ export function LeftSidebarAppShellLayout() {
 
 	const shellWindowContent = (
 		<>
-			{!demo && !isWelcome ? <ServiceStatusBanner /> : null}
+			{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
+				<ServiceStatusBanner />
+			) : null}
 			{isHomeWorkspaceRoute || isSettingsWorkspaceRoute ? null : (
 				<SiteHeader
 					setNewseshListPortalHost={setNewseshListHeaderPortal}
@@ -285,7 +287,9 @@ export function LeftSidebarAppShellLayout() {
 						</ShellBottomNavigationPortalContext.Provider>
 					</NewseshListHeaderPortalContext.Provider>
 				</ShellHeaderPortalContext.Provider>
-				{!demo && !isWelcome ? <SessionArrivalNotifications /> : null}
+				{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
+					<SessionArrivalNotifications />
+				) : null}
 				<AppToaster richColors position="bottom-right" />
 			</TooltipProvider>
 		</ShellOnboardingPanelContext.Provider>

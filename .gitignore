@@ -79,4 +79,5 @@ CLAUDE.local.md
 # Combined marketing and product build
 dist-site/
 dist-demo/
+dist-plugin/
 .demo-ssr/

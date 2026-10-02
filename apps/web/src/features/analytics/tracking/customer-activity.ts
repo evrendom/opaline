@@ -4,7 +4,12 @@ const inFlightUsers = new Set<string>();
 export async function recordDailyCustomerActivity(
 	userId: string,
 ): Promise<void> {
-	if (typeof window === "undefined" || inFlightUsers.has(userId)) return;
+	if (
+		typeof window === "undefined" ||
+		import.meta.env.MODE === "plugin" ||
+		inFlightUsers.has(userId)
+	)
+		return;
 	const day = new Date().toISOString().slice(0, 10);
 	const storageKey = `${ACTIVITY_STORAGE_PREFIX}:${userId}`;
 	try {

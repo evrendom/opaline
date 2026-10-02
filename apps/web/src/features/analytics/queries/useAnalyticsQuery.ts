@@ -14,6 +14,13 @@ export function useAnalyticsQuery<TQueryFnData, TData = TQueryFnData>(
 
 	return useQuery({
 		...options,
+		...(import.meta.env.MODE === "plugin"
+			? {
+					refetchInterval: false,
+					refetchOnWindowFocus: false,
+					refetchOnReconnect: false,
+				}
+			: {}),
 		queryKey: ["org", state.activeOrg?.id, ...(options.queryKey ?? [])],
 		enabled:
 			!!state.activeOrg?.id &&

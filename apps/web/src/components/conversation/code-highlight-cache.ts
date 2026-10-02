@@ -35,7 +35,12 @@ function cacheHighlight(highlight: PreparedCodeHighlight) {
 }
 
 function getHighlightWorker() {
-	if (highlightWorker || typeof Worker !== "function") {
+	// The plugin app's sandbox cannot start workers from our origin.
+	if (
+		highlightWorker ||
+		typeof Worker !== "function" ||
+		import.meta.env.MODE === "plugin"
+	) {
 		return highlightWorker;
 	}
 	highlightWorker = new Worker(

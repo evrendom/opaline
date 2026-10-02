@@ -32,7 +32,7 @@ function SiteHeaderLeadingControls({
 					/>
 				</>
 			) : null}
-			{showWorkspaceMenu ? (
+			{import.meta.env.MODE !== "plugin" && showWorkspaceMenu ? (
 				<div className="flex shrink-0 items-center gap-1">
 					<WorkspaceMenuButton variant="header" />
 					<Separator

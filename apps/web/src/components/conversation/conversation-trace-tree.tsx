@@ -91,8 +91,9 @@ const COLLAPSED_TRACE_COUNT_STYLE: CollapsedTraceCountStyle = {
 	color:
 		"var(--constellation-tree-tertiary, var(--session-overview-subtle, var(--session-overview-muted)))",
 	height: 16,
-	mask: 'url("/opaline-trace-fill.svg") center / contain no-repeat',
-	WebkitMask: 'url("/opaline-trace-fill.svg") center / contain no-repeat',
+	mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
+	WebkitMask:
+		'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 	width: 16,
 };
 
@@ -589,9 +590,9 @@ function ConversationTraceTreeConnector({
 							y={elbowY - TRACE_DOT_RADIUS}
 							style={{
 								fill: "var(--conversation-trace-junction-color, var(--conversation-trace-connector-color, var(--session-overview-border)))",
-								mask: 'url("/opaline-trace-fill.svg") center / contain no-repeat',
+								mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 								WebkitMask:
-									'url("/opaline-trace-fill.svg") center / contain no-repeat',
+									'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 								stroke: "none",
 							}}
 						/>

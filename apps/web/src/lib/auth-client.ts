@@ -1,6 +1,7 @@
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { waitForDemoActivation } from "@/features/demo/demo-activation";
+import { openPluginLink, pluginAuthFetch } from "@/widget/host-bridge";
 import { getApiBaseUrl } from "./api-base-url";
 import { resetProductAnalytics } from "./product-analytics";
 import { queryClient } from "./query-client";
@@ -9,8 +10,19 @@ export const authClient = createAuthClient({
 	baseURL: getApiBaseUrl(),
 	basePath:
 		import.meta.env.MODE === "product-demo" ? "/api/demo/auth" : "/api/auth",
-	plugins: [organizationClient(), emailOTPClient()],
+	plugins:
+		import.meta.env.MODE === "plugin"
+			? [organizationClient()]
+			: [organizationClient(), emailOTPClient()],
+	disableDefaultFetchPlugins: import.meta.env.MODE === "plugin",
+	sessionOptions:
+		import.meta.env.MODE === "plugin"
+			? { refetchOnWindowFocus: false, refetchInterval: 0 }
+			: undefined,
 	fetchOptions: {
+		...(import.meta.env.MODE === "plugin"
+			? { customFetchImpl: pluginAuthFetch }
+			: {}),
 		onRequest: (context) => {
 			// Shared hooks subscribe during preparation; only Explore may
 			// release their auth reads. The real app has no such gate.
@@ -36,6 +48,10 @@ export function refreshAuthClientState() {
 }
 
 export async function signOut() {
+	if (import.meta.env.MODE === "plugin") {
+		openPluginLink("/");
+		return;
+	}
 	resetProductAnalytics();
 	await authClient.signOut();
 	queryClient.clear();

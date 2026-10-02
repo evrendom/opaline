@@ -99,6 +99,23 @@
 	],
 	"headers": [
 		{
+			"source": "/plugin/:path*",
+			"headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }]
+		},
+		{
+			"source": "/plugin/entry.js",
+			"headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+		},
+		{
+			"source": "/plugin/assets/:path*",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=31536000, immutable"
+				}
+			]
+		},
+		{
 			"source": "/(.*)",
 			"headers": [
 				{
@@ -283,7 +300,7 @@
 			"destination": "/api/rpc?__opaline_path=/api/public-home"
 		},
 		{
-			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
+			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|plugin(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
 			"destination": "/api/page?__opaline_path=/:path"
 		}
 	],

@@ -19,6 +19,7 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-rail-icon: #a4a7a7;
 	--dashboard-01-rail-icon-active: #121517;
 	--dashboard-01-rail-hover: rgba(0, 0, 0, 0.02);
+	--dashboard-01-rail-active: rgba(255, 255, 255, 0.72);
 	--dashboard-01-avatar-background: #e6e7e8;
 	--dashboard-01-avatar-foreground: #6b6f72;
 	--dashboard-01-tone-blue: #2f5fe5;
@@ -308,7 +309,8 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-content-background: oklch(0.205 0 0);
 	--dashboard-01-rail-icon: oklch(0.708 0 0);
 	--dashboard-01-rail-icon-active: oklch(0.985 0 0);
-	--dashboard-01-rail-hover: rgba(0, 0, 0, 0.02);
+	--dashboard-01-rail-hover: rgb(255 255 255 / 0.04);
+	--dashboard-01-rail-active: rgb(255 255 255 / 0.1);
 	--dashboard-01-avatar-background: oklch(0.269 0 0);
 	--dashboard-01-avatar-foreground: oklch(0.708 0 0);
 	--dashboard-01-tone-blue: #6d8fff;
@@ -572,7 +574,11 @@ body:has(.dashboard-01-preview)::after {
 		0 1px 2px rgb(17 24 39 / 0.08);
 }
 
-.dark .dashboard-01-chrome-sidebar [data-sidebar-nav-row][data-active="true"] {
+.dark
+	.dashboard-01-chrome-sidebar
+	[data-sidebar-nav-row][data-active="true"]:not(
+		[data-sidebar-row-mode="collapsed"]
+	) {
 	box-shadow:
 		inset 0 0 0 1px rgb(255 255 255 / 0.08),
 		0 1px 2px rgb(0 0 0 / 0.24);

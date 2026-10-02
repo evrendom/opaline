@@ -1,0 +1,92 @@
+html[data-app-mode="plugin"] {
+	--plugin-chrome: #f7f7f8;
+	--plugin-surface: #fff;
+	--plugin-text: #222225;
+	--plugin-muted: #737379;
+	--plugin-border: rgb(0 0 0 / 8%);
+	--background: var(--color-background-primary, var(--plugin-surface));
+	--foreground: var(--color-text-primary, var(--plugin-text));
+	--card: var(--background);
+	--card-foreground: var(--foreground);
+	--popover: var(--background);
+	--popover-foreground: var(--foreground);
+	--muted: var(--color-background-secondary, var(--plugin-chrome));
+	--muted-foreground: var(--color-text-secondary, var(--plugin-muted));
+	--border: var(--color-border-primary, var(--plugin-border));
+	--input: var(--border);
+	--accent: var(--muted);
+	--accent-foreground: var(--foreground);
+	--secondary: var(--muted);
+	--secondary-foreground: var(--foreground);
+	--primary: var(--foreground);
+	--primary-foreground: var(--background);
+	--sidebar: var(--color-background-secondary, var(--plugin-chrome));
+	--sidebar-foreground: var(--foreground);
+	--sidebar-border: var(--border);
+	--app-font-sans: var(--font-sans);
+	--app-font-heading: var(--font-sans);
+	--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+	font-family: var(--font-sans);
+	color: var(--foreground);
+	background: var(--background);
+}
+html[data-app-mode="plugin"].dark {
+	--plugin-chrome: #111113;
+	--plugin-surface: #191a1c;
+	--plugin-text: #e6e6e9;
+	--plugin-muted: #8e8e94;
+	--plugin-border: rgb(255 255 255 / 9%);
+}
+html[data-app-mode="plugin"] body {
+	margin: 0;
+	font-family: var(--font-sans);
+}
+html[data-app-mode="plugin"] .font-sans {
+	font-family: var(--font-sans);
+}
+html[data-app-mode="plugin"] .font-mono {
+	font-family: var(--font-mono);
+}
+html[data-app-mode="plugin"] .dashboard-01-preview {
+	--dashboard-01-chrome-background: var(
+		--color-background-secondary,
+		var(--plugin-chrome)
+	);
+	--dashboard-01-content-background: var(--background);
+	--dashboard-01-font-roster-display: var(--font-sans);
+}
+html[data-app-mode="plugin"] .cost-page {
+	--cost-surface: var(--background);
+	--cost-foreground: var(--foreground);
+	--cost-muted: var(--muted-foreground);
+	--cost-border: var(--border);
+}
+.plugin-card {
+	padding: 16px;
+	max-width: 480px;
+}
+.plugin-card p {
+	margin: 0 0 8px;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+.plugin-card strong {
+	font-size: 28px;
+	font-weight: 600;
+}
+.plugin-card svg {
+	display: block;
+	width: 100%;
+	height: 48px;
+	margin: 12px 0;
+}
+.plugin-card button {
+	font: inherit;
+	color: var(--foreground);
+	background: var(--muted);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 7px 16px;
+	cursor: pointer;
+}

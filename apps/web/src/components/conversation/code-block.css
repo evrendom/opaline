@@ -100,7 +100,7 @@
 .dark .trace-code-block,
 .dark .trace-inline-code {
 	--trace-code-surface: #ffffff09;
-	--trace-code-sticky-surface: var(--session-overview-surface, #111827);
+	--trace-code-sticky-surface: var(--session-overview-surface, #191a1c);
 	--trace-code-border: #ffffff3b;
 	--trace-code-outline: #ffffff12;
 	--trace-code-primary: #ffffffed;

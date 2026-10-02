@@ -12,7 +12,7 @@ export function ProductLoadingIndicator() {
 			className="flex min-h-0 flex-1 items-center justify-center"
 		>
 			<img
-				src="/favicon-light.svg"
+				src={`${import.meta.env.BASE_URL}favicon-light.svg`}
 				alt=""
 				aria-hidden="true"
 				width={48}
@@ -20,7 +20,7 @@ export function ProductLoadingIndicator() {
 				className="size-12 dark:hidden"
 			/>
 			<img
-				src="/favicon-dark.svg"
+				src={`${import.meta.env.BASE_URL}favicon-dark.svg`}
 				alt=""
 				aria-hidden="true"
 				width={48}

@@ -53,7 +53,8 @@ function getConfig() {
 	const host = (import.meta.env.VITE_POSTHOG_HOST ?? "").trim();
 	const enabled =
 		(import.meta.env.VITE_POSTHOG_ENABLED ?? "false").trim() === "true";
-	if (!enabled || key.length === 0 || host.length === 0) {
+	// Hosts of the plugin app allow no third-party connections.
+	if (!enabled || import.meta.env.MODE === "plugin" || !key || !host) {
 		return null;
 	}
 	return { key, host };
@@ -261,8 +262,13 @@ export function captureSignUpFailed(
 	captureEvent(PRODUCT_ANALYTICS_EVENTS.SIGN_UP_FAILED, payload);
 }
 
+// The demo and the plugin app record no product analytics of their own.
+const recordsServerAnalytics = !["product-demo", "plugin"].includes(
+	import.meta.env.MODE,
+);
+
 export function captureDashboardViewed(payload: DashboardViewedCaptureInput) {
-	if (import.meta.env.MODE === "product-demo") return;
+	if (!recordsServerAnalytics) return;
 	void client.productAnalytics.dashboardViewed(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});
@@ -277,7 +283,7 @@ export function captureDashboardLoadFailed(
 export function captureDashboardFilterChanged(
 	payload: DashboardFilterChangedCaptureInput,
 ) {
-	if (import.meta.env.MODE === "product-demo") return;
+	if (!recordsServerAnalytics) return;
 	void client.productAnalytics.dashboardFilterChanged(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});
@@ -286,7 +292,7 @@ export function captureDashboardFilterChanged(
 export function captureDashboardDrilldownOpened(
 	payload: DashboardDrilldownOpenedCaptureInput,
 ) {
-	if (import.meta.env.MODE === "product-demo") return;
+	if (!recordsServerAnalytics) return;
 	void client.productAnalytics.dashboardDrilldownOpened(payload).catch(() => {
 		// Product analytics must never break the dashboard.
 	});

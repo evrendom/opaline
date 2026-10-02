@@ -86,7 +86,7 @@ const stringTuningConfig = {
 	},
 	rowActiveBg: {
 		key: "__sidebar_tune_active_bg",
-		defaultValue: "rgba(255, 255, 255, 0.72)",
+		defaultValue: "var(--dashboard-01-rail-active)",
 	},
 	rowFg: {
 		key: "__sidebar_tune_fg",

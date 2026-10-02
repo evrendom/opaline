@@ -10,6 +10,7 @@ import {
 	normalizeAnalyticsDateRange,
 } from "@/lib/analytics-date-range";
 import { formatIsoDate } from "@/lib/format";
+import { getWidgetState, setWidgetState } from "@/widget/host-bridge";
 
 type StoredDateRange = {
 	start: string;
@@ -53,6 +54,12 @@ function readStoredDateRange(
 	storageKey: string,
 	maxDays: number,
 ): StoredDateRange | null {
+	if (import.meta.env.MODE === "plugin") {
+		const range = getWidgetState().dateRange;
+		return range
+			? normalizeAnalyticsDateRange(range.start, range.end, maxDays)
+			: null;
+	}
 	if (typeof window === "undefined") {
 		return null;
 	}
@@ -107,6 +114,10 @@ function resolveDateRange(
 }
 
 function writeStoredDateRange(dateRange: StoredDateRange, storageKey: string) {
+	if (import.meta.env.MODE === "plugin") {
+		setWidgetState({ dateRange });
+		return;
+	}
 	if (typeof window === "undefined") {
 		return;
 	}

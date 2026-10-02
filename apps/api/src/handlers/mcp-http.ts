@@ -9,17 +9,20 @@ import {
 import { sqlClient } from "../db.js";
 import { getFrontendOrigin } from "../frontend-origin.js";
 import {
-	DASHBOARD_WIDGET_HTML,
 	DASHBOARD_WIDGET_URI,
 	MCP_APP_MIME_TYPE,
 	OPALINE_ICON,
+	pluginAssetOrigin,
+	readDashboardWidgetHtml,
 } from "../mcp/dashboard-widget.js";
 import {
+	APP_ONLY,
 	MCP_TOOLS,
 	McpToolError,
 	type McpWorkspace,
 	SESSION_RESOURCE_PREFIX,
 } from "../mcp/mcp-tools.js";
+import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
 
@@ -45,6 +48,7 @@ const CAPABILITIES = {
 	extensions: { "openai/settings": SETTINGS },
 	experimental: { "openai/settings": SETTINGS },
 };
+const TOOLS = [...MCP_TOOLS, ...PLUGIN_TOOLS];
 
 interface McpDependencies {
 	readonly auth: Auth;
@@ -269,7 +273,7 @@ async function handleMcpRequest(
 			return rpcResult(message.id, {});
 		case "tools/list":
 			return rpcResult(message.id, {
-				tools: MCP_TOOLS.map((tool) => ({
+				tools: TOOLS.map((tool) => ({
 					name: tool.name,
 					title: tool.title,
 					description: tool.description,
@@ -333,9 +337,22 @@ async function readResource(
 				{
 					uri,
 					mimeType: MCP_APP_MIME_TYPE,
-					text: DASHBOARD_WIDGET_HTML,
+					text: await readDashboardWidgetHtml(),
 					_meta: {
 						"openai/ui": { availableDisplayModes: ["inline", "fullscreen"] },
+						ui: {
+							domain: pluginAssetOrigin(),
+							csp: {
+								resourceDomains: [pluginAssetOrigin()],
+								baseUriDomains: [pluginAssetOrigin()],
+								connectDomains: [],
+							},
+						},
+						"openai/widgetDomain": pluginAssetOrigin(),
+						"openai/widgetCSP": {
+							resource_domains: [pluginAssetOrigin()],
+							connect_domains: [],
+						},
 					},
 				},
 			],
@@ -373,21 +390,34 @@ async function callTool(
 	params: Record<string, unknown>,
 	dependencies: McpDependencies,
 ) {
-	const tool = MCP_TOOLS.find((candidate) => candidate.name === params.name);
+	const tool = TOOLS.find((candidate) => candidate.name === params.name);
 	const args = (params.arguments ?? {}) as Record<string, unknown>;
 	try {
 		if (!tool) throw new McpToolError(`Unknown tool: ${params.name}`);
 		const workspace = await resolveWorkspace(userId, args.workspace);
-		const client = createRouterClient(router, {
-			context: await createToolContext(userId, workspace, dependencies),
-		});
-		const result = await tool.run(client, args, { userId, workspace });
+		const context = await createToolContext(userId, workspace, dependencies);
+		const client = createRouterClient(router, { context });
+		const { result, widget } = splitWidget(
+			await tool.run(client, args, { userId, workspace, authSession: context }),
+		);
 		const link = tool.link
 			? `\n\nOpen in Opaline: ${getFrontendOrigin()}/${encodeURIComponent(workspace.slug)}${tool.link(args)}`
 			: "";
 		return {
-			content: [{ type: "text", text: `${JSON.stringify(result)}${link}` }],
-			...(tool.meta ? { structuredContent: result } : {}),
+			content:
+				tool.meta?.ui === APP_ONLY.ui || isPluginTool(tool)
+					? []
+					: [{ type: "text", text: `${JSON.stringify(result)}${link}` }],
+			...(isPluginTool(tool)
+				? { structuredContent: { result } }
+				: result && typeof result === "object"
+					? {
+							structuredContent: Array.isArray(result)
+								? { items: result }
+								: result,
+						}
+					: {}),
+			...(widget ? { _meta: { "opaline/widget": widget } } : {}),
 		};
 	} catch (error) {
 		if (!(error instanceof McpToolError || error instanceof ORPCError)) {
@@ -396,15 +426,31 @@ async function callTool(
 				error,
 			});
 		}
-		const message =
-			error instanceof McpToolError || error instanceof ORPCError
-				? error.message
-				: "The tool failed. Try again.";
+		const known = error instanceof McpToolError || error instanceof ORPCError;
+		const message = known ? error.message : "The tool failed. Try again.";
+		// The widget's session view retries and refreshes on these codes.
+		const typed =
+			error instanceof ORPCError
+				? { code: error.code, status: error.status, data: error.data }
+				: {
+						code: known ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR",
+						status: known ? 400 : 500,
+					};
 		return {
 			content: [{ type: "text", text: message }],
+			structuredContent: { error: { ...typed, message } },
 			isError: true as const,
 		};
 	}
+}
+
+/** `widget` is the plugin app's data; hosts pass `_meta` to the app only. */
+function splitWidget(output: unknown): { result: unknown; widget?: unknown } {
+	if (!output || typeof output !== "object" || !("widget" in output)) {
+		return { result: output };
+	}
+	const { widget, ...result } = output;
+	return { result, widget };
 }
 
 async function resolveWorkspace(

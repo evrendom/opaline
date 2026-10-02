@@ -145,7 +145,7 @@ export function useSessionsPageData({
 		...failureOptions,
 		queryKey: ["org", organization.activeOrg?.id, ...failureOptions.queryKey],
 		enabled: !!organization.activeOrg?.id && demo?.live !== false,
-		refetchInterval: 10_000,
+		refetchInterval: import.meta.env.MODE === "plugin" ? false : 10_000,
 	});
 	const previousFailures = useRef<
 		{ scope: string; ids: Set<string> } | undefined

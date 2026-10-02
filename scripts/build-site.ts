@@ -6,7 +6,7 @@ import { checkSiteArchive } from "./check-site-archive";
 
 const root = resolve(import.meta.dir, "..");
 const output = join(root, "dist-site");
-for (const [cwd, command] of [["apps/web", "build"], ["apps/web", "build:demo"], ["apps/marketing", "build"]]) {
+for (const [cwd, command] of [["apps/web", "build"], ["apps/web", "build:demo"], ["apps/web", "build:widget"], ["apps/marketing", "build"]]) {
 	const child = Bun.spawn(["bun", "run", command], { cwd: join(root, cwd), stdout: "inherit", stderr: "inherit", env: { ...process.env, PUBLIC_POSTHOG_KEY: process.env.PUBLIC_POSTHOG_KEY || process.env.VITE_POSTHOG_KEY, PUBLIC_POSTHOG_HOST: process.env.PUBLIC_POSTHOG_HOST || process.env.VITE_POSTHOG_HOST, PUBLIC_POSTHOG_ENABLED: process.env.PUBLIC_POSTHOG_ENABLED || process.env.VITE_POSTHOG_ENABLED } });
 	if (await child.exited !== 0) throw new Error(`Site build failed: ${cwd} ${command}`);
 }
@@ -20,6 +20,7 @@ await cp(join(root, "apps/marketing/dist"), output, { recursive: true });
 await cp(join(output, "index.html"), join(output, "marketing.html"));
 await rm(join(output, "index.html"));
 await cp(join(root, "apps/web/dist-demo"), join(output, "product-demo"), { recursive: true });
+await cp(join(root, "apps/web/dist-plugin"), join(output, "plugin"), { recursive: true });
 
 // A generated /home page would shadow its Vercel rewrite to marketing.html.
 for (const path of ["home.html", "home/index.html"]) {

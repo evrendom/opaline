@@ -8,6 +8,7 @@
 		"dev": "vite",
 		"build": "vite build",
 		"build:demo": "bun tools/build-demo.mjs",
+		"build:widget": "bun tools/build-widget.mjs",
 		"export:demo-seed": "bun --tsconfig-override tsconfig.app.json tools/export-demo-seed.ts",
 		"check-types": "tsc -b",
 		"test": "vitest run && bun tools/run-bun-tests.ts",

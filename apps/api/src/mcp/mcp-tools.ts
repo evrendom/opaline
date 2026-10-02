@@ -5,6 +5,7 @@ import {
 	CostDashboardRequestedMetricSchema,
 } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
+import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 
@@ -23,6 +24,7 @@ export interface McpWorkspace {
 export interface McpToolContext {
 	readonly userId: string;
 	readonly workspace: McpWorkspace;
+	readonly authSession: Pick<AppContext, "user" | "session">;
 }
 
 export interface McpTool {
@@ -60,7 +62,8 @@ const oneOf = (values: readonly string[], description: string): JsonSchema => ({
 const date = (description: string) =>
 	string(`${description} (YYYY-MM-DD, UTC).`);
 const DAYS = integer("Look back this many days (default 7, max 365).");
-const APP_ONLY = { ui: { visibility: ["app"] } };
+/** Tools only the widget or the host UI call; hidden from the model. */
+export const APP_ONLY = { ui: { visibility: ["app"] } };
 const isoDay = (offsetDays = 0) =>
 	new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 
@@ -178,7 +181,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"openai/ui": { entrypoints: [{ type: "global" }] },
 		},
 		icons: [OPALINE_ICON],
-		run: async (client, args, { workspace }) => {
+		run: async (client, args, context) => {
 			const query = {
 				startDate: (args.startDate as string | undefined) ?? isoDay(-29),
 				endDate: (args.endDate as string | undefined) ?? isoDay(),
@@ -188,14 +191,31 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				repositories: (args.repositories as string[]) ?? [],
 				models: (args.models as string[]) ?? [],
 			};
-			const dashboard = await client.analytics.overview.costs({
-				...query,
+			const { metric: _metric, ...filters } = query;
+			const input = {
+				...filters,
 				requestedMetric: query.metric,
-			});
-			// The widget re-runs the tool with these, changing one control.
+				signalTypes: [],
+				phrases: [],
+				runSignals: [],
+				durations: [],
+				skillsUsed: [],
+			};
+			const [dashboard, bootstrap] = await Promise.all([
+				client.analytics.overview.costs(input),
+				readPluginBootstrap(client, context),
+			]);
+			const view = { ...query, workspace: context.workspace.slug };
 			return {
 				...summarizeDashboard(dashboard, query.metric),
-				query: { ...query, workspace: workspace.slug },
+				query: view,
+				// Only the plugin app reads `widget` (as `_meta`): its first screen
+				// renders from this without another round trip.
+				widget: {
+					query: view,
+					dashboard: { input, data: dashboard },
+					bootstrap,
+				},
 			};
 		},
 		link: (args) =>
@@ -498,9 +518,35 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 ];
 
-/** Mentioned sessions are read back through resources/read. */
 export const SESSION_RESOURCE_PREFIX = "opaline://sessions/";
 
 export function sessionResourceUri(workspace: string, sessionId: string) {
 	return `${SESSION_RESOURCE_PREFIX}${encodeURIComponent(workspace)}/${encodeURIComponent(sessionId)}`;
+}
+
+async function readPluginBootstrap(client: Client, context: McpToolContext) {
+	const organizations = await client.listMyOrganizations();
+	const organization = organizations.find(
+		(org) => org.id === context.workspace.id,
+	);
+	if (!organization || !context.authSession.user)
+		throw new McpToolError("Workspace not available.");
+	const members = await sqlClient<
+		{
+			id: string;
+			userId: string;
+			role: string;
+			user: { id: string; name: string; email: string; image: string | null };
+		}[]
+	>`
+		SELECT m.id, m.user_id AS "userId", m.role,
+			json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'image', u.image) AS "user"
+		FROM member m JOIN "user" u ON u.id = m.user_id
+		WHERE m.organization_id = ${organization.id}
+	`;
+	return {
+		session: context.authSession,
+		organization: { ...organization, members, invitations: [] },
+		member: members.find((member) => member.userId === context.userId),
+	};
 }
