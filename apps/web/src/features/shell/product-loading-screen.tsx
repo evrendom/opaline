@@ -11,21 +11,10 @@ export function ProductLoadingIndicator() {
 			aria-busy="true"
 			className="flex min-h-0 flex-1 items-center justify-center"
 		>
-			<img
-				src={`${import.meta.env.BASE_URL}favicon-light.svg`}
-				alt=""
+			{/* A CSS image resolves from the app's own origin, also in the plugin. */}
+			<span
 				aria-hidden="true"
-				width={48}
-				height={48}
-				className="size-12 dark:hidden"
-			/>
-			<img
-				src={`${import.meta.env.BASE_URL}favicon-dark.svg`}
-				alt=""
-				aria-hidden="true"
-				width={48}
-				height={48}
-				className="hidden size-12 dark:block"
+				className="size-12 bg-[url(/favicon-light.svg)] bg-contain bg-center bg-no-repeat dark:bg-[url(/favicon-dark.svg)]"
 			/>
 			<span className="sr-only">Loading workspace</span>
 		</output>

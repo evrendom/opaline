@@ -14,15 +14,20 @@ const PluginRoot = lazy(() =>
 	import("./plugin-root").then((module) => ({ default: module.PluginRoot })),
 );
 
+// The web app's loading mark; it appears only if loading takes a moment.
+const loading = (
+	<output className="plugin-loading" aria-label="Loading Opaline" />
+);
+
 function Plugin() {
 	const [host, setHost] = useState<HostState>(getHostState);
 	const [error, setError] = useState("");
 	useEffect(() => onHostState(setHost), []);
 	const seed = host.toolOutput;
-	if (!seed) return <output className="plugin-card">Loading Opaline…</output>;
+	if (!seed) return loading;
 	if (host.displayMode === "fullscreen")
 		return (
-			<Suspense fallback={<output>Loading Opaline…</output>}>
+			<Suspense fallback={loading}>
 				<PluginRoot
 					key={seed.bootstrap.organization.id}
 					host={host}

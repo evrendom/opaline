@@ -1,3 +1,4 @@
+import { AVATAR_TRUSTED_OAUTH_HOSTS } from "@rudel/api-routes";
 import { getFrontendOrigin } from "../frontend-origin.js";
 
 export const DASHBOARD_WIDGET_URI = "ui://opaline/dashboard.html";
@@ -12,6 +13,28 @@ export const OPALINE_ICON = {
 
 export function pluginAssetOrigin() {
 	return new URL(process.env.APP_URL ?? getFrontendOrigin()).origin;
+}
+
+/** Origins the plugin app may load from: ours and the OAuth avatar hosts. */
+export function pluginResourceDomains() {
+	return [
+		pluginAssetOrigin(),
+		...AVATAR_TRUSTED_OAUTH_HOSTS.map((host) => `https://${host}`),
+	];
+}
+
+/**
+ * Uploaded avatars are stored as relative `/api/avatar/<id>` URLs, which the
+ * plugin app on the host's origin cannot resolve.
+ */
+export function withAbsoluteAvatars<T>(value: T): T {
+	if (value === undefined) return value;
+	return JSON.parse(
+		JSON.stringify(value).replaceAll(
+			'"/api/avatar/',
+			`"${pluginAssetOrigin()}/api/avatar/`,
+		),
+	);
 }
 
 // The plugin app is the web app built in plugin mode (`build:widget`) and

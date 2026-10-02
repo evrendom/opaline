@@ -189,9 +189,13 @@ function publish(update: HostState) {
 	};
 	const root = document.documentElement;
 	root.classList.toggle("dark", state.theme === "dark");
-	for (const [name, value] of Object.entries(state.styles?.variables ?? {})) {
-		if (name.startsWith("--")) root.style.setProperty(name, value);
+	const variables = Object.entries(state.styles?.variables ?? {});
+	// Host weights share Tailwind's names (--font-weight-*); Opaline keeps its own.
+	for (const [name, value] of variables) {
+		if (name.startsWith("--") && !name.startsWith("--font-weight-"))
+			root.style.setProperty(name, value);
 	}
+	root.toggleAttribute("data-host-styles", variables.length > 0);
 	for (const listener of listeners) listener(state);
 }
 

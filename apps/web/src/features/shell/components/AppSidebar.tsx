@@ -68,7 +68,8 @@ export function AppSidebar({
 					<div
 						className={`mt-[var(--sidebar-section-first-margin-top)] flex w-full flex-col ${sidebarRailHorizontalPaddingClassName}`}
 					>
-						<WorkspaceMenuButton />
+						{/* The plugin's host already titles it "Opaline". */}
+						{import.meta.env.MODE === "plugin" ? null : <WorkspaceMenuButton />}
 					</div>
 				)}
 

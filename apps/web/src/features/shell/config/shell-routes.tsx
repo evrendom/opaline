@@ -96,8 +96,11 @@ export const shellRouteMap = {
 	settings: shellRoutes[5],
 } as const;
 
+// The plugin app is read-only; settings stay on opaline.so.
 export const shellNavigationRoutes = shellRoutes.filter(
-	(route) => !route.comingSoon,
+	(route) =>
+		!route.comingSoon &&
+		!(import.meta.env.MODE === "plugin" && route.id === "settings"),
 );
 
 export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {

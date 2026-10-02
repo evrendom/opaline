@@ -13,7 +13,9 @@ import {
 	MCP_APP_MIME_TYPE,
 	OPALINE_ICON,
 	pluginAssetOrigin,
+	pluginResourceDomains,
 	readDashboardWidgetHtml,
+	withAbsoluteAvatars,
 } from "../mcp/dashboard-widget.js";
 import {
 	APP_ONLY,
@@ -343,14 +345,14 @@ async function readResource(
 						ui: {
 							domain: pluginAssetOrigin(),
 							csp: {
-								resourceDomains: [pluginAssetOrigin()],
+								resourceDomains: pluginResourceDomains(),
 								baseUriDomains: [pluginAssetOrigin()],
 								connectDomains: [],
 							},
 						},
 						"openai/widgetDomain": pluginAssetOrigin(),
 						"openai/widgetCSP": {
-							resource_domains: [pluginAssetOrigin()],
+							resource_domains: pluginResourceDomains(),
 							connect_domains: [],
 						},
 					},
@@ -409,7 +411,7 @@ async function callTool(
 					? []
 					: [{ type: "text", text: `${JSON.stringify(result)}${link}` }],
 			...(isPluginTool(tool)
-				? { structuredContent: { result } }
+				? { structuredContent: { result: withAbsoluteAvatars(result) } }
 				: result && typeof result === "object"
 					? {
 							structuredContent: Array.isArray(result)
@@ -417,7 +419,9 @@ async function callTool(
 								: result,
 						}
 					: {}),
-			...(widget ? { _meta: { "opaline/widget": widget } } : {}),
+			...(widget
+				? { _meta: { "opaline/widget": withAbsoluteAvatars(widget) } }
+				: {}),
 		};
 	} catch (error) {
 		if (!(error instanceof McpToolError || error instanceof ORPCError)) {
