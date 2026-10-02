@@ -135,6 +135,6 @@ export function getModelBrandIconClassName(model: string | undefined) {
 
 	const badgeTone = getModelBadgeTone(model);
 	return badgeTone.icon === "codex"
-		? "text-[#111111]"
+		? "text-[#111111] dark:text-white"
 		: badgeTone.identityIconClassName;
 }

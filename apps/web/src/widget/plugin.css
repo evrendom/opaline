@@ -49,6 +49,9 @@ html[data-app-mode="plugin"] .font-mono {
 	font-family: var(--font-mono);
 }
 html[data-app-mode="plugin"] .dashboard-01-preview {
+	--dashboard-01-window-radius: 12px;
+	/* The rail shares the window's colour, so the selected item needs a tone. */
+	--dashboard-01-rail-active: var(--muted);
 	/* The rail and frame share the window's colour, like the host's own header. */
 	--dashboard-01-chrome-background: var(--background);
 	--dashboard-01-content-background: var(--background);
@@ -62,6 +65,15 @@ html[data-app-mode="plugin"] .dashboardy-page {
 }
 html[data-app-mode="plugin"] [class*="--session-overview-surface:"] {
 	--session-overview-surface: var(--background);
+}
+/* The host already titles the plugin: page titles go, and so does a header
+   bar that holds nothing else (session detail keeps its breadcrumb bar). */
+html[data-app-mode="plugin"] [data-slot="dashboard-header"] h1 {
+	visibility: hidden;
+}
+html[data-app-mode="plugin"]
+	[data-slot="dashboard-header"]:not(:has(button, a[href], input)) {
+	display: none;
 }
 html[data-app-mode="plugin"] .cost-page {
 	--cost-surface: var(--background);
@@ -81,8 +93,8 @@ html[data-host-styles] :is([class~="bg-white"], [class~="bg-[#fcfcfc]"]) {
 html[data-host-styles] .dashboard-01-preview {
 	--dashboard-01-rail-icon: var(--color-text-tertiary, var(--muted-foreground));
 	--dashboard-01-rail-icon-active: var(--color-text-primary);
-	--dashboard-01-rail-hover: var(--hover);
-	--dashboard-01-rail-active: var(--color-background-primary);
+	--dashboard-01-rail-hover: color-mix(in oklab, var(--hover) 50%, transparent);
+	--dashboard-01-rail-active: var(--hover);
 	--dashboard-01-avatar-background: var(--hover);
 	--dashboard-01-avatar-foreground: var(--muted-foreground);
 }
