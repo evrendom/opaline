@@ -1,13 +1,29 @@
 import type { RouterClient } from "@orpc/server";
 import {
+	AnalysisFindInputSchema,
+	AnalysisHistoryGetInputSchema,
+	AnalysisHistoryQueryInputSchema,
+	AnalysisHistorySaveInputSchema,
+	AnalysisHistorySearchInputSchema,
+	AnalysisHistoryShareInputSchema,
+	AnalysisReadInputSchema,
 	type CostDashboard,
 	CostDashboardInputSchema,
 	CostDashboardRequestedMetricSchema,
 } from "@rudel/api-routes";
+import { z } from "zod";
 import { sqlClient } from "../db.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
+import {
+	renderAnalysisSearch,
+	renderAnalysisTree,
+	renderFind,
+	renderRead,
+	renderStoredQuery,
+} from "./analysis-renderers.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
+import { parseMcpInput } from "./input-validation.js";
 
 type Client = RouterClient<typeof router>;
 
@@ -144,7 +160,120 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 const DASHBOARD_METRICS = CostDashboardRequestedMetricSchema.options;
 const SPLITS = CostDashboardInputSchema.shape.splitBy.unwrap().options;
 
+/** One tool for the analysis log; `action` selects the history procedure. */
+const AnalysesToolInputSchema = z
+	.object({
+		action: z
+			.enum(["search", "get", "query", "save", "share"])
+			.default("search"),
+		...AnalysisHistorySearchInputSchema.partial().shape,
+		...AnalysisHistorySaveInputSchema.partial().shape,
+		...AnalysisHistoryQueryInputSchema.partial().shape,
+		...AnalysisHistoryShareInputSchema.partial().shape,
+	})
+	.strict();
+
+/**
+ * The JSON Schema MCP hosts show the model for a tool taking `schema`, plus the
+ * `workspace` every tool accepts. Cross-field refinements stay server-side.
+ */
+function zodToolInput(schema: z.ZodObject): JsonSchema {
+	return z.toJSONSchema(
+		schema.safeExtend({ workspace: z.string().optional() }),
+		{ io: "input", target: "draft-7", unrepresentable: "any" },
+	);
+}
+
 export const MCP_TOOLS: readonly McpTool[] = [
+	{
+		name: "find",
+		title: "Find runs and deterministic events",
+		description: [
+			"Where did something happen in the user's agent runs? Cheap and deterministic: call it before read. Answers say where, never why; why needs read.",
+			"A run is one user prompt and everything the agent did until the next prompt. A ref is {sessionId, agentId, turn}: agentId '' is the main transcript, otherwise a subagent; turn starts at 1.",
+			"Scope: from/to (UTC days, default last 7) and/or latest=N (the newest N sessions in that range). Members see their own sessions; admins can pass userId.",
+			"source=runs: one row per run with minutes, cost, edits, failed calls, not-found reads/searches, the next prompt's reaction and raw chars (what reading it costs). groupBy gives totals for trends. refs returns only those runs plus their summed minutes and cost: use it to price runs you read.",
+			"source=tool: failed tool calls grouped by tool group, cause and detail, with example refs. Each failure belongs to its own run.",
+			"source=user: every negative or swearing user prompt and every agent apology, each with its origin run: for a prompt, the run before it; for an apology, the run the user was correcting (its own run if there is none). Matches are word-list candidates; quoted or pasted text can match too.",
+			"kind=friction: a hook or policy blocked the call. kind=mistake: the agent's wrong assumption (wrong path, stale patch, bad flag). kind=validation: tests, typecheck, lint or build rejected the code. kind=environment: missing dependency, service or credential. kind=noise: an expected non-zero exit such as a search with no hits; hidden unless includeNoise. kind=other: no rule matched.",
+			"The header states coverage (sessions in scope vs indexed) and how many runs are unpriced; repeat it in the answer.",
+			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result.",
+		].join("\n"),
+		inputSchema: zodToolInput(AnalysisFindInputSchema),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderFind(
+				await client.analysis.find(
+					parseMcpInput(AnalysisFindInputSchema, args),
+				),
+			),
+	},
+	{
+		name: "read",
+		title: "Read selected runs",
+		description: [
+			"Read specific runs (1-10 refs from find) to see what actually happened. This is where tokens go: read only the runs that fit the question, never a whole session run by run.",
+			"maxChars (default 12000, max 40000) is shared across all refs; [cut] marks what was left out.",
+			"depth=exchange (default): the user's prompt, files the agent edited, checks it ran after its last edit and whether they passed, failed calls with their error line, its final message, and the user's next prompt.",
+			"depth=turn: every record of the run, compact.",
+			"depth=record: the exact text of one record of one run (record index from turn or find), optionally a fromChar/toChar slice. Use it to quote evidence.",
+			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result.",
+		].join("\n"),
+		inputSchema: zodToolInput(AnalysisReadInputSchema),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderRead(
+				await client.analysis.read(
+					parseMcpInput(AnalysisReadInputSchema, args),
+				),
+			),
+	},
+	{
+		name: "analyses",
+		title: "Past analyses",
+		description: [
+			"The analysis log: questions asked before, the steps taken and the final answers. Call action=search before analysing anything; if a past analysis matches, get it and update it from its cutoff instead of starting over.",
+			"action=search: past analyses by meaning (text) or most recent (no text); yours plus ones shared with the workspace.",
+			"action=get: one analysis as its path: question, steps (sub-question, finding, the asker's reply, query ids) and final answer.",
+			"action=query: the exact stored result of one query, flagged stale when a session it read has changed. Open one only to check or quote a specific step; replaying every query costs as much as redoing the analysis.",
+			"action=save: once, just before your last message, which must repeat the saved final answer in full: the final answer, a finding per step (step = id from its trace line or its exact sub-question), clarifications you asked the asker (question + reply), up to 8 topics, and updates = the analysis this one updates.",
+			"action=share: share an analysis with the workspace (or stop sharing). Results quoting others' sessions stay readable only by their owners and admins.",
+		].join("\n"),
+		inputSchema: zodToolInput(AnalysesToolInputSchema),
+		run: async (client, { workspace: _workspace, action, ...args }) => {
+			const history = client.analysis.history;
+			switch (action) {
+				case "get":
+					return renderAnalysisTree(
+						await history.get(
+							parseMcpInput(AnalysisHistoryGetInputSchema, args),
+						),
+					);
+				case "query":
+					return renderStoredQuery(
+						await history.query(
+							parseMcpInput(AnalysisHistoryQueryInputSchema, args),
+						),
+					);
+				case "save": {
+					const saved = await history.save(
+						parseMcpInput(AnalysisHistorySaveInputSchema, args),
+					);
+					return `saved analysis=${saved.analysis} status=${saved.status}`;
+				}
+				case "share": {
+					const shared = await history.share(
+						parseMcpInput(AnalysisHistoryShareInputSchema, args),
+					);
+					return `analysis=${shared.analysis} shared=${shared.shared}`;
+				}
+				default:
+					return renderAnalysisSearch(
+						await history.search(
+							parseMcpInput(AnalysisHistorySearchInputSchema, args),
+						),
+					);
+			}
+		},
+	},
 	{
 		name: "list_workspaces",
 		title: "List workspaces",
@@ -248,7 +377,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			skillName: string("Only sessions that used this skill."),
 			source: oneOf(["claude_code", "codex"], "Only sessions from this agent."),
 			sortBy: oneOf(
-				["session_date", "duration_min", "total_tokens", "success_score"],
+				["session_date", "duration_min", "total_tokens"],
 				"Sort column (default session_date).",
 			),
 			sortOrder: oneOf(["asc", "desc"], "Sort order (default desc)."),

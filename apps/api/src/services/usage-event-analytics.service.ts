@@ -327,6 +327,35 @@ export function buildUsageCostSubtotalSql(
 	return `toNullable(round(sum(ifNull(${estimatedCostExpression}, 0)), ${precision}))`;
 }
 
+export function buildPricedUsageEventsCte(filters: string): string {
+	return `
+		analysis_usage_candidates AS (
+			SELECT e.*, if(e.model_status = 'unresolved', e.raw_model, e.resolved_model) AS pricing_identity,
+				if(e.context_input_tokens > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS}, 'long', 'base') AS context_band,
+				toUInt8(${PRICEABLE_EVENT_SQL}) AS is_priceable,
+				e.uncached_input_tokens AS group_uncached_input_tokens,
+				e.cache_read_input_tokens AS group_cache_read_input_tokens,
+				e.cache_write_5m_input_tokens AS group_cache_write_5m_input_tokens,
+				e.cache_write_1h_input_tokens AS group_cache_write_1h_input_tokens,
+				e.output_tokens AS group_output_tokens
+			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} AS e FINAL
+			WHERE ${filters} AND e.record_kind = 'event' AND e.is_deleted = 0
+		),
+		analysis_usage_groups AS (
+			SELECT c.*, ${EVENT_CANONICAL_PRICING_MODEL_SQL} AS pricing_model
+			FROM analysis_usage_candidates AS c
+		),
+		analysis_usage_rate_card AS (${EVENT_PRICING_RATE_CARD_SQL}),
+		analysis_priced_events AS (
+			SELECT g.*, ${EVENT_GROUP_COST_SQL} AS estimated_cost
+			FROM analysis_usage_groups AS g
+			ANY LEFT JOIN analysis_usage_rate_card AS r
+				ON g.pricing_model = r.model
+				AND r.context_band = if(g.context_band = 'long' AND ${EVENT_LONG_CONTEXT_AVAILABLE_SQL} = 1, 'long', 'base')
+				AND g.usage_date >= r.effective_from AND g.usage_date <= r.effective_to
+		)`;
+}
+
 export class UsageEventAnalyticsReadinessGate {
 	private readonly degradedTtlMs: number;
 	private inFlight: Promise<ReadinessState> | null = null;

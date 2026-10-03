@@ -409,7 +409,13 @@ async function callTool(
 			content:
 				tool.meta?.ui === APP_ONLY.ui || isPluginTool(tool)
 					? []
-					: [{ type: "text", text: `${JSON.stringify(result)}${link}` }],
+					: [
+							{
+								type: "text",
+								// Analysis tools return compact text; everything else is JSON.
+								text: `${typeof result === "string" ? result : JSON.stringify(result)}${link}`,
+							},
+						],
 			...(isPluginTool(tool)
 				? { structuredContent: { result: withAbsoluteAvatars(result) } }
 				: result && typeof result === "object"

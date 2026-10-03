@@ -1,0 +1,141 @@
+import type {
+	AnalysisFindOutput,
+	AnalysisReadOutput,
+	AnalysisTrace,
+} from "@rudel/api-routes";
+
+type Header = AnalysisFindOutput["header"];
+
+/**
+ * Largest find or read result, in UTF-8 bytes of its JSON. The analysis log
+ * stores exactly the returned result, so one stored result stays a quarter of
+ * Convex's 1 MiB document limit; at about four bytes a token it is also some
+ * 64k agent tokens, more than one answer should cost.
+ */
+export const ANALYSIS_OUTPUT_MAX_BYTES = 256 * 1024;
+/**
+ * Bytes kept free for the trace the handler adds after capture
+ * (`header.trace` on find, `trace` on read): three ids take about 170 bytes
+ * even at 40 characters each. Fitting stops this far below the ceiling, so
+ * the stored result is exactly the returned one and the response still fits.
+ */
+export const TRACE_RESERVE_BYTES = 256;
+const BODY_MAX_BYTES = ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES;
+
+/**
+ * The find result with as many leading rows, groups or events as fit
+ * `ANALYSIS_OUTPUT_MAX_BYTES` with its trace; a cut result is truncated and
+ * says so.
+ */
+export function fitFindOutput(output: AnalysisFindOutput): AnalysisFindOutput {
+	if (jsonBytes(output) <= BODY_MAX_BYTES) return output;
+	if ("rows" in output)
+		return fitItems(output.header, output.rows, "rows", (rows, header) => ({
+			...output,
+			header,
+			rows,
+		}));
+	if (output.source === "user")
+		return fitItems(
+			output.header,
+			output.events,
+			"events",
+			(events, header) => ({ ...output, header, events }),
+		);
+	if (output.source === "tool")
+		return fitItems(
+			output.header,
+			output.groups,
+			"groups",
+			(groups, header) => ({ ...output, header, groups }),
+		);
+	return fitItems(output.header, output.groups, "groups", (groups, header) => ({
+		...output,
+		header,
+		groups,
+	}));
+}
+
+/**
+ * The read result with as many leading sections as fit
+ * `ANALYSIS_OUTPUT_MAX_BYTES` with its trace; reads that lost sections are
+ * truncated.
+ */
+export function fitReadOutput(output: AnalysisReadOutput): AnalysisReadOutput {
+	const total = output.reads.reduce(
+		(sum, read) => sum + read.sections.length,
+		0,
+	);
+	return fitCount(total, (count) => {
+		if (count === total) return output;
+		let left = count;
+		const reads = output.reads.map((read) => {
+			const sections = read.sections.slice(0, left);
+			left -= sections.length;
+			return sections.length === read.sections.length
+				? read
+				: { ...read, sections, truncated: true };
+		});
+		return { ...output, reads, truncated: true };
+	});
+}
+
+/** The find response: the fitted result with the trace it was stored under. */
+export function withFindTrace(
+	output: AnalysisFindOutput,
+	trace: AnalysisTrace,
+): AnalysisFindOutput {
+	return { ...output, header: { ...output.header, trace } };
+}
+
+/** The read response: the fitted result with the trace it was stored under. */
+export function withReadTrace(
+	output: AnalysisReadOutput,
+	trace: AnalysisTrace,
+): AnalysisReadOutput {
+	return { ...output, trace };
+}
+
+export function jsonBytes(value: unknown): number {
+	return Buffer.byteLength(JSON.stringify(value));
+}
+
+function fitItems<TItem>(
+	header: Header,
+	items: readonly TItem[],
+	noun: string,
+	build: (items: TItem[], header: Header) => AnalysisFindOutput,
+): AnalysisFindOutput {
+	return fitCount(items.length, (count) =>
+		build(
+			items.slice(0, count),
+			count === items.length
+				? header
+				: {
+						...header,
+						truncated: true,
+						notes: [
+							...header.notes,
+							`only the first ${count} of ${items.length} ${noun} fit the ${ANALYSIS_OUTPUT_MAX_BYTES / 1024} KiB result ceiling; narrow the scope or lower limit`,
+						],
+					},
+		),
+	);
+}
+
+/** `build(count)` for the largest `count` up to `total` whose JSON leaves the trace room. */
+function fitCount<TOutput>(
+	total: number,
+	build: (count: number) => TOutput,
+): TOutput {
+	const full = build(total);
+	if (jsonBytes(full) <= BODY_MAX_BYTES) return full;
+	let low = 0;
+	let high = total - 1;
+	while (low < high) {
+		const middle = Math.ceil((low + high) / 2);
+		if (jsonBytes(build(middle)) <= BODY_MAX_BYTES) low = middle;
+		else high = middle - 1;
+	}
+	return build(low);
+}

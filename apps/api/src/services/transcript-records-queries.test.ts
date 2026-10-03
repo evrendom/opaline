@@ -172,6 +172,11 @@ describe("transcript record statements", () => {
 					"substringUTF8(if(empty(text), head, text), 1, {recordChars:UInt32}) AS text_slice",
 				);
 				expect(statement.query_params?.recordChars).toBe(100);
+			} else if (name === "turn prompt") {
+				expect(statement.query).toContain(
+					"substringUTF8(if(empty(text), concat(head, '\\n', tail), text), 1, {promptChars:UInt32}) AS text_slice",
+				);
+				expect(statement.query_params?.promptChars).toBe(100);
 			} else {
 				expect(statement.query).toMatch(/substringUTF8\(text,/u);
 			}
@@ -198,7 +203,27 @@ describe("transcript record statements", () => {
 		expect(statement.query).toContain(
 			"(session_id, agent_id, call_id) NOT IN (",
 		);
-		expect(statement.query).toContain("AND is_error");
+		expect(statement.query).toContain(
+			"AND (is_error OR (exit_code IS NOT NULL AND exit_code != 0))",
+		);
+	});
+
+	test("nonzero exits are failures even when is_error is false", () => {
+		const failures = buildTurnFailuresStatement(scope, generation, "", 1, 10);
+		const actions = buildTurnActionsStatement(
+			scope,
+			generation,
+			"",
+			1,
+			10,
+			100,
+		);
+		expect(failures.query).toContain(
+			"is_error OR (exit_code IS NOT NULL AND exit_code != 0)",
+		);
+		expect(actions.query).toContain(
+			"results.is_error OR (results.exit_code IS NOT NULL AND results.exit_code != 0)",
+		);
 	});
 
 	test("several sessions bind their own generation each", () => {

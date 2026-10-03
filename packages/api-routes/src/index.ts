@@ -57,6 +57,47 @@ import {
 
 export type { RepositorySummary } from "./schemas/repositories.js";
 
+import { analysisContract } from "./analysis.js";
+import { analysisHistoryContract } from "./analysis-history.js";
+
+export {
+	type AnalysisEvent,
+	type AnalysisFindInput,
+	AnalysisFindInputSchema,
+	type AnalysisFindOutput,
+	AnalysisFindOutputSchema,
+	type AnalysisReadInput,
+	AnalysisReadInputSchema,
+	type AnalysisReadOutput,
+	AnalysisReadOutputSchema,
+	type AnalysisRun,
+	type AnalysisTrace,
+	AnalysisTraceSchema,
+	type RunRef,
+} from "./analysis.js";
+export {
+	type AnalysisCost,
+	AnalysisCostSchema,
+	AnalysisHistoryGetInputSchema,
+	type AnalysisHistoryGetOutput,
+	AnalysisHistoryGetOutputSchema,
+	AnalysisHistoryQueryInputSchema,
+	type AnalysisHistoryQueryOutput,
+	AnalysisHistoryQueryOutputSchema,
+	type AnalysisHistorySaveInput,
+	AnalysisHistorySaveInputSchema,
+	AnalysisHistorySaveOutputSchema,
+	type AnalysisHistorySearchInput,
+	AnalysisHistorySearchInputSchema,
+	type AnalysisHistorySearchOutput,
+	AnalysisHistorySearchOutputSchema,
+	AnalysisHistoryShareInputSchema,
+	AnalysisHistoryShareOutputSchema,
+	type AnalysisHost,
+	AnalysisHostSchema,
+	type AnalysisScope,
+} from "./analysis-history.js";
+
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
@@ -798,6 +839,7 @@ const IngestSessionErrors = {
 } as const;
 
 export const contract = {
+	analysis: { ...analysisContract, history: analysisHistoryContract },
 	billing: {
 		configuration: oc.output(BillingConfigurationOutputSchema),
 		current: oc.output(OrganizationBillingSummaryOutputSchema),

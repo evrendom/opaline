@@ -34,6 +34,7 @@ import {
 import { ingestProcessingSqlClient, sqlClient } from "./db.js";
 import { getFrontendOrigin } from "./frontend-origin.js";
 import { adminRouter } from "./handlers/admin/index.js";
+import { analysisRouter } from "./handlers/analysis/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
@@ -2346,4 +2347,5 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	admin: adminRouter,
 	productAnalytics: productAnalyticsRouter,
 	analytics: analyticsRouter,
+	analysis: analysisRouter,
 });

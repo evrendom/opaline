@@ -13,6 +13,7 @@ import {
 } from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
+import { purgeAnalysisLogs } from "./analysis-log/config.js";
 import { purgeGitHubObjectIntents } from "./github-evidence-object-fence.service.js";
 import {
 	deleteOrgSessions,
@@ -560,6 +561,7 @@ function createClickHousePurgeProcessorEnv(
 			} else {
 				await deleteUserSessions(target.targetId);
 			}
+			await purgeAnalysisLogs(target);
 			if (pass)
 				await purgeRepositoryEvidenceObjects(target, pass, database, r2);
 		},

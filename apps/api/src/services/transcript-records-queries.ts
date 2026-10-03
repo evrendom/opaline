@@ -27,6 +27,7 @@ const QUERY_SETTINGS = {
 	max_execution_time: 30,
 	max_rows_to_read: "50000000",
 	max_result_rows: "100000",
+	max_result_bytes: "16777216",
 	result_overflow_mode: "throw",
 } as const;
 
@@ -98,7 +99,7 @@ function unfailedFileChangeFilter(): string {
 					FROM ${table()} FINAL
 					WHERE ${recordsFilter()}
 						AND kind = 'tool_result'
-						AND is_error
+						AND (is_error OR (exit_code IS NOT NULL AND exit_code != 0))
 						AND call_id != ''
 				)`;
 }
@@ -351,7 +352,7 @@ export function buildTurnPromptStatement(
 			SELECT
 				record_idx,
 				text_chars,
-				substringUTF8(text, 1, {promptChars:UInt32}) AS text_slice
+				substringUTF8(if(empty(text), concat(head, '\\n', tail), text), 1, {promptChars:UInt32}) AS text_slice
 			FROM ${table()} FINAL
 			WHERE ${turnFilter()}
 				AND kind = 'user_prompt'
@@ -372,6 +373,7 @@ export function buildTurnActionsStatement(
 	turnIdx: number,
 	limit: number,
 	targetChars: number,
+	checksAfter: number | undefined = undefined,
 ): ClickHouseStatement {
 	return {
 		clickhouse_settings: { ...QUERY_SETTINGS, join_use_nulls: 1 },
@@ -395,11 +397,12 @@ export function buildTurnActionsStatement(
 				FROM ${table()} FINAL
 				WHERE ${turnFilter()}
 					AND kind = 'tool_call'
+					${checksAfter === undefined ? "" : "AND record_idx > {checksAfter:UInt32} AND (command_class IN ('test','build','typecheck','lint') OR match(lower(tool_name), 'playwright|chrome|browser'))"}
 			) AS c
 			LEFT JOIN (
 				SELECT
 					results.call_id,
-					max(toUInt8(results.is_error)) AS any_result_is_error,
+					max(toUInt8(results.is_error OR (results.exit_code IS NOT NULL AND results.exit_code != 0))) AS any_result_is_error,
 					argMax(results.exit_code, results.record_idx) AS last_result_exit_code
 				FROM ${table()} AS results FINAL
 				WHERE ${streamFilter("results")}
@@ -420,6 +423,7 @@ export function buildTurnActionsStatement(
 			...turnParams(scope, generation, agentId, turnIdx),
 			limit,
 			targetChars,
+			checksAfter: checksAfter ?? 0,
 		},
 	};
 }
@@ -473,7 +477,7 @@ export function buildTurnFailuresStatement(
 				if(tail != '', tail, head) AS excerpt
 			FROM ${table()} FINAL
 			WHERE ${turnFilter()}
-				AND is_error
+				AND (is_error OR (exit_code IS NOT NULL AND exit_code != 0))
 				AND kind IN ('tool_result', 'meta')
 			ORDER BY record_idx, block_idx
 			LIMIT {limit:UInt32}

@@ -273,6 +273,7 @@ export interface RecordSlice {
 
 interface ReaderOptions {
 	readonly executor?: ClickHouseExecutor;
+	readonly generation?: SessionGeneration;
 }
 
 /** The committed generation of one session plus what its receipt recorded. */
@@ -365,7 +366,7 @@ export function readRecord(
 	);
 }
 
-async function withReadDeadline<T>(
+export async function withReadDeadline<T>(
 	name: string,
 	operation: () => Promise<T>,
 ): Promise<T> {
@@ -609,9 +610,9 @@ async function runTurnRead(
 		turnIdx,
 		view,
 	} satisfies TurnDetail;
-	const generation = (
-		await resolveGenerations(executor, scope, [sessionId])
-	).get(sessionId);
+	const generation =
+		options.generation ??
+		(await resolveGenerations(executor, scope, [sessionId])).get(sessionId);
 	if (generation === undefined) return base;
 	const pinned: TurnDetail = {
 		...base,
@@ -676,9 +677,9 @@ async function runRecordRead(
 		tool: "",
 		turnIdx: 0,
 	};
-	const generation = (
-		await resolveGenerations(executor, scope, [sessionId])
-	).get(sessionId);
+	const generation =
+		options.generation ??
+		(await resolveGenerations(executor, scope, [sessionId])).get(sessionId);
 	if (generation === undefined) return empty;
 	const blocks = parseRows(
 		recordBlockRow,

@@ -10,6 +10,7 @@
 		"includes": [
 			"apps/**",
 			"packages/**",
+			"convex/**",
 			"*.json",
 			"!**/generated",
 			"!design-archive",

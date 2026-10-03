@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
 	MAX_LANGUAGE_SIGNAL_MATCHES,
+	mayContainLanguageSignal,
 	scanLanguageSignals,
 	scanMemberLanguageSignals,
 	scanModelLanguageSignals,
@@ -563,4 +564,34 @@ test("verbatim frequencies retain repetitions and sum to category totals", () =>
 		expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
 			total,
 		);
+});
+
+test("the category prefilter only skips texts the scanner cannot match", () => {
+	const texts = [
+		"Sorry, you are right, I broke it.",
+		"My apologies — I’m sorry for the confusion.",
+		"I apologized already.",
+		"this is fucking broken ??",
+		"why??",
+		"Looks great, thanks!",
+		"Fixed the routing; tests pass.",
+		"unsorry business, apologetics and sorrynot",
+		"",
+	];
+	for (const text of texts)
+		for (const category of [
+			"negative",
+			"swear",
+			"apology",
+			"positive",
+		] as const)
+			if (
+				scanLanguageSignals(text).some((match) => match.category === category)
+			)
+				expect(mayContainLanguageSignal(text, category)).toBe(true);
+	expect(
+		mayContainLanguageSignal("Fixed the routing; tests pass.", "apology"),
+	).toBe(false);
+	expect(mayContainLanguageSignal("I’m sorry", "apology")).toBe(true);
+	expect(mayContainLanguageSignal("why??", "negative")).toBe(true);
 });

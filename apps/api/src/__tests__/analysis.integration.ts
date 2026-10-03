@@ -1,0 +1,1332 @@
+import "./helpers/local-integration-guard.js";
+import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
+import assert from "node:assert/strict";
+import { createRouterClient } from "@orpc/server";
+import {
+	AnalysisFindInputSchema,
+	AnalysisFindOutputSchema,
+	AnalysisHistoryGetOutputSchema,
+	AnalysisHistoryQueryOutputSchema,
+	AnalysisHistorySearchOutputSchema,
+	AnalysisReadOutputSchema,
+} from "@rudel/api-routes";
+import {
+	createSplitStats,
+	splitSessionTranscript,
+	summarizeSplit,
+	TRANSCRIPT_RECORDS_PARSER_VERSION,
+	type TranscriptSource,
+} from "@rudel/api-routes/transcript-records";
+import { extractUsageEvents } from "@rudel/usage-events";
+import { z } from "zod";
+import {
+	type ClickHouseExecutor,
+	type ClickHouseStatement,
+	getClickhouse,
+} from "../clickhouse.js";
+import { sqlClient } from "../db.js";
+import { createAnalysisRouter } from "../handlers/analysis/index.js";
+import { renderRead } from "../mcp/analysis-renderers.js";
+import { withAnalysisDeadline } from "../services/analysis/deadline.js";
+import { findAnalysis } from "../services/analysis/find.service.js";
+import { readAnalysis } from "../services/analysis/read.service.js";
+import { toolGroupSql } from "../services/analysis/tool-groups.js";
+import {
+	buildTranscriptRecordRow,
+	buildTranscriptRecordsReceiptRow,
+	hashTranscriptContent,
+} from "../services/transcript-records-ingest.service.js";
+import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
+import {
+	type ApiTestServer,
+	startApiTestServer,
+} from "./helpers/api-test-server.js";
+import {
+	claudeDuplicateFixture,
+	codexInFileUsageFixture,
+} from "./helpers/usage-provenance-fixtures.js";
+
+setDefaultTimeout(120_000);
+const runId = crypto.randomUUID();
+const baseMs = Date.now() - 3_600_000;
+const day = new Date(baseMs).toISOString().slice(0, 10);
+const clickhouse = getClickhouse();
+let server: ApiTestServer | undefined;
+let userId: string | undefined;
+let bearerToken = "";
+const createdUsers: string[] = [];
+
+beforeAll(async () => {
+	const environment = {
+		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "legacy",
+		CLICKHOUSE_PURGE_WORKER_ENABLED: "false",
+		ANALYSIS_LOG_STORE: "memory",
+	};
+	server = await startApiTestServer(environment);
+	const account = await signup("admin");
+	userId = account.user.id;
+	bearerToken = account.token;
+	// The analysis log runs only for listed workspaces; the admin's is known now.
+	await server.stop();
+	server = await startApiTestServer({
+		...environment,
+		ANALYSIS_LOG_WORKSPACES: userId,
+	});
+});
+
+afterAll(async () => {
+	await server?.stop();
+	for (const table of [
+		"rudel.transcript_records",
+		"rudel.usage_events",
+		"rudel.session_analytics",
+	]) {
+		await clickhouse.execute({
+			query: `DELETE FROM ${table} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+			query_params: { organizationId: userId ?? `analysis_unused_${runId}` },
+		});
+	}
+	for (const id of createdUsers) {
+		await sqlClient`DELETE FROM organization WHERE id = ${id}`;
+		await sqlClient`DELETE FROM "user" WHERE id = ${id}`;
+	}
+});
+
+test("real API: pinned Claude/Codex runs, line prices, failure refs, reaction origins and bounded exchange", async () => {
+	const claudeId = `analysis_claude_${runId}`;
+	const codexId = `analysis_codex_${runId}`;
+	await seedSession(
+		claudeId,
+		"claude_code",
+		claudeTranscript(),
+		"claude-sonnet-4-5",
+	);
+	await seedSession(codexId, "codex", codexTranscript(), "gpt-5");
+	const scope = { from: day, to: day };
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "runs", ...scope }),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	expect(runs.header).toMatchObject({
+		sessionsInScope: 2,
+		indexedSessions: 2,
+		runsInScope: 4,
+		unpricedRuns: 2,
+		classifierVersion: 1,
+	});
+	const first = runs.rows.find(
+		(row) => row.ref.sessionId === claudeId && row.ref.turn === 1,
+	);
+	assert(first);
+	assert(first.costUsd !== null);
+	for (const groupBy of ["week", "model", "repository", "agent"]) {
+		const grouped = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", {
+				source: "runs",
+				...scope,
+				groupBy,
+				limit: 1,
+			}),
+		);
+		assert(grouped.source === "runs" && "groups" in grouped);
+		expect(grouped.groups).toHaveLength(1);
+		expect(grouped.header.runsInScope).toBe(4);
+	}
+	expect(first.costUsd).toBeCloseTo(0.0045, 4);
+	expect(first).toMatchObject({
+		edits: 1,
+		toolCalls: 3,
+		failedCalls: 1,
+		readCalls: 1,
+		notFound: 1,
+		nextReaction: "swear",
+	});
+	expect(
+		runs.rows.find((row) => row.ref.sessionId === codexId && row.ref.turn === 1)
+			?.costUsd,
+	).toBeCloseTo(0.0023, 4);
+	expect(runs.rows.some((row) => row.promptHead.includes("uncommitted"))).toBe(
+		false,
+	);
+	const tools = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "tool", ...scope }),
+	);
+	assert(tools.source === "tool");
+	expect(
+		tools.groups.find((group) => group.toolGroup === "read"),
+	).toMatchObject({ count: 2, sessions: 2 });
+	expect(
+		tools.groups
+			.flatMap((group) => group.examples)
+			.some(
+				(example) =>
+					example.ref.sessionId === claudeId &&
+					example.ref.turn === 1 &&
+					example.record === 7,
+			),
+	).toBe(true);
+	const reactions = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "user", ...scope }),
+	);
+	assert(reactions.source === "user");
+	expect(
+		reactions.events.find(
+			(event) =>
+				event.type === "swear" && event.eventRef.sessionId === claudeId,
+		)?.originRef,
+	).toEqual(first.ref);
+	expect(
+		reactions.events.find(
+			(event) =>
+				event.type === "apology" && event.eventRef.sessionId === claudeId,
+		),
+	).toMatchObject({ originRef: first.ref, originCostUsd: first.costUsd });
+	const exchange = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", { refs: [first.ref] }),
+	);
+	expect(exchange.reads[0]?.sections.map((section) => section.name)).toEqual([
+		"prompt",
+		"files edited",
+		"checks after last edit",
+		"failed calls",
+		"final",
+		"next prompt",
+	]);
+	expect(
+		exchange.reads[0]?.sections.find(
+			(section) => section.name === "checks after last edit",
+		)?.text,
+	).toContain("pass\ttest\tbun test");
+	expect(
+		exchange.reads[0]?.sections.find(
+			(section) => section.name === "files edited",
+		)?.text,
+	).toContain("src/a.ts");
+	expect(
+		exchange.reads[0]?.sections.find((section) => section.name === "final")
+			?.text,
+	).toBe("Finished the change.");
+	const selected = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "runs", ...scope, refs: [first.ref] }),
+	);
+	expect(selected.header.runsInScope).toBe(1);
+	expect(selected.header.pricedCostUsd).toBe(first.costUsd);
+	const bounded = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [first.ref, { sessionId: codexId, agentId: "", turn: 1 }],
+			maxChars: 200,
+		}),
+	);
+	expect(bounded.truncated).toBe(true);
+	expect(
+		bounded.reads.reduce(
+			(total, read) =>
+				total +
+				Array.from(read.header).length +
+				read.sections.reduce(
+					(sum, section) => sum + Array.from(section.text).length,
+					0,
+				),
+			0,
+		),
+	).toBeLessThanOrEqual(200);
+	expect(renderRead(bounded)).toEndWith("[cut]");
+	const record = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [first.ref],
+			depth: "record",
+			record: 1,
+			fromChar: 0,
+			toChar: 3,
+		}),
+	);
+	expect(record.reads[0]?.sections[0]?.text).toBe("Fix");
+	const wrongRecord = await rpcResponse("analysis/read", {
+		refs: [first.ref],
+		depth: "record",
+		record: 9,
+	});
+	expect(wrongRecord.status).toBe(400);
+});
+
+test("members cannot widen find scope and read refuses foreign refs before querying records; admins span and narrow members", async () => {
+	assert(userId);
+	const firstMember = await signup("member-a");
+	const secondMember = await signup("member-b");
+	for (const member of [firstMember, secondMember]) {
+		await sqlClient`INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${crypto.randomUUID()}, ${userId}, ${member.user.id}, 'member', now())`;
+		await sqlClient`UPDATE session SET active_organization_id = ${userId} WHERE user_id = ${member.user.id}`;
+	}
+	const ownId = `member_a_${runId}`;
+	const foreignId = `member_b_${runId}`;
+	await seedSession(
+		ownId,
+		"claude_code",
+		claudeTranscript(),
+		"claude-sonnet-4-5",
+		{ owner: firstMember.user.id },
+	);
+	await seedSession(
+		foreignId,
+		"claude_code",
+		claudeTranscript(),
+		"claude-sonnet-4-5",
+		{ owner: secondMember.user.id },
+	);
+	const ownRef = { sessionId: ownId, agentId: "", turn: 1 };
+	const foreignRef = { sessionId: foreignId, agentId: "", turn: 1 };
+	for (const source of ["runs", "tool", "user"]) {
+		for (const selector of [{ sessionId: foreignId }, { refs: [foreignRef] }]) {
+			const response = await rpcResponse(
+				"analysis/find",
+				{ source, from: day, to: day, ...selector },
+				firstMember.token,
+			);
+			expect(response.status).toBe(200);
+			const result = AnalysisFindOutputSchema.parse(
+				z.object({ json: z.unknown() }).parse(await response.json()).json,
+			);
+			expect(result.header.sessionsInScope).toBe(0);
+			expect(result.header.runsInScope).toBe(0);
+		}
+	}
+	expect(
+		(
+			await rpcResponse(
+				"analysis/find",
+				{ source: "runs", userId: secondMember.user.id },
+				firstMember.token,
+			)
+		).status,
+	).toBe(403);
+	expect(
+		(
+			await rpcResponse(
+				"analysis/read",
+				{ refs: [ownRef, foreignRef], depth: "turn" },
+				firstMember.token,
+			)
+		).status,
+	).toBe(403);
+	const statements: ClickHouseStatement[] = [];
+	const client = createRouterClient(
+		createAnalysisRouter({ executor: observingExecutor(statements) }),
+		{
+			context: {
+				user: {
+					id: firstMember.user.id,
+					name: "Analysis integration",
+					email: `analysis-member-a-${runId}@example.com`,
+					emailVerified: false,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+				session: {
+					id: crypto.randomUUID(),
+					token: firstMember.token,
+					userId: firstMember.user.id,
+					expiresAt: new Date(Date.now() + 60_000),
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					activeOrganizationId: userId,
+				},
+				apiKeyId: null,
+				authFailure: null,
+				ingestOperatorAuthorized: false,
+				requestId: crypto.randomUUID(),
+				publicLookupSource: "test",
+			},
+		},
+	);
+	await expect(
+		client.read({ refs: [ownRef, foreignRef], depth: "turn" }),
+	).rejects.toMatchObject({ code: "FORBIDDEN" });
+	expect(statements).toHaveLength(0);
+	const admin = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			refs: [ownRef, foreignRef],
+		}),
+	);
+	assert(admin.source === "runs" && "rows" in admin);
+	expect(new Set(admin.rows.map((row) => row.ref.sessionId))).toEqual(
+		new Set([ownId, foreignId]),
+	);
+	const narrowed = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			refs: [ownRef, foreignRef],
+			userId: firstMember.user.id,
+		}),
+	);
+	assert(narrowed.source === "runs" && "rows" in narrowed);
+	expect(narrowed.rows.map((row) => row.ref.sessionId)).toEqual([ownId]);
+});
+
+test("aggregate find succeeds beyond the lowered record cap; text ceilings return explicit coverage", async () => {
+	assert(userId);
+	for (const index of [0, 1, 2])
+		await seedSession(
+			`cap_${index}_${runId}`,
+			"claude_code",
+			shortRecordsTranscript(80),
+			"cap-model",
+		);
+	const statements: ClickHouseStatement[] = [];
+	const input = AnalysisFindInputSchema.parse({
+		source: "runs",
+		from: day,
+		to: day,
+		latest: 200,
+		limit: 1,
+		model: "cap-model",
+	});
+	// 240 records but 3 runs: capping every records statement at 3 result rows
+	// proves run facts come back aggregated per run, never per record.
+	const result = await findAnalysis({ organizationId: userId, userId }, input, {
+		executor: observingExecutor(statements, 3),
+		recordRowCap: 2,
+	});
+	assert(result.source === "runs" && "rows" in result);
+	expect(result.rows).toHaveLength(1);
+	expect(result.header).toMatchObject({
+		sessionsInScope: 3,
+		runsInScope: 3,
+		truncated: true,
+	});
+	expect(
+		statements.every((statement) => !statement.query.includes("AS scan_text")),
+	).toBe(true);
+	expect(
+		statements.every((statement) => statement.abortSignal !== undefined),
+	).toBe(true);
+	expect(
+		new Set(statements.map((statement) => statement.abortSignal)).size,
+	).toBe(1);
+	const scan = await findAnalysis(
+		{ organizationId: userId, userId },
+		{ ...input, source: "user" },
+		{ executor: clickhouse, recordRowCap: 2 },
+	);
+	expect(scan.header.truncated).toBe(true);
+	expect(scan.header.notes.join(" ")).toContain(
+		"text scan coverage curtailed at 2 rows",
+	);
+	const byteScan = await findAnalysis(
+		{ organizationId: userId, userId },
+		{ ...input, source: "user" },
+		{ executor: clickhouse, recordByteCap: 1 },
+	);
+	expect(byteScan.header.truncated).toBe(true);
+	expect(byteScan.header.notes.join(" ")).toContain("0 rows / 0 bytes");
+});
+
+test("unmerged duplicate records and record-budget batches leave find and read unchanged", async () => {
+	assert(userId);
+	const plainId = `dedupe_plain_${runId}`;
+	const copiedId = `dedupe_copied_${runId}`;
+	await seedSession(plainId, "claude_code", claudeTranscript(), "dedupe-model");
+	await seedSession(
+		copiedId,
+		"claude_code",
+		claudeTranscript(),
+		"dedupe-model",
+		{
+			duplicateRecords: true,
+		},
+	);
+	const owner = userId;
+	const scope = { organizationId: owner, userId: owner };
+	const find = (sessionId: string, args: Record<string, unknown>) =>
+		findAnalysis(
+			scope,
+			AnalysisFindInputSchema.parse({ from: day, to: day, sessionId, ...args }),
+		);
+	for (const args of [
+		{ source: "runs" },
+		{ source: "tool", includeNoise: true },
+		{ source: "user" },
+	]) {
+		const plain = await find(plainId, args);
+		expect(plain.header.runsInScope).toBeGreaterThan(0);
+		expect(
+			JSON.stringify(await find(copiedId, args)).replaceAll(copiedId, plainId),
+		).toBe(JSON.stringify(plain));
+	}
+	const runs = await find(plainId, { source: "runs" });
+	assert(runs.source === "runs" && "rows" in runs);
+	const ref = runs.rows[0]?.ref;
+	assert(ref);
+	for (const depth of ["exchange", "turn"] as const) {
+		const read = (sessionId: string) =>
+			readAnalysis(owner, new Map([[sessionId, owner]]), {
+				refs: [{ ...ref, sessionId }],
+				depth,
+				maxChars: 12_000,
+			});
+		expect(
+			JSON.stringify(await read(copiedId)).replaceAll(copiedId, plainId),
+		).toBe(JSON.stringify(await read(plainId)));
+	}
+	// One run-facts statement per session when the record budget is below one session.
+	const input = AnalysisFindInputSchema.parse({
+		source: "runs",
+		from: day,
+		to: day,
+		model: "dedupe-model",
+	});
+	const statements: ClickHouseStatement[] = [];
+	const split = await findAnalysis(scope, input, {
+		executor: observingExecutor(statements),
+		batchRecords: 1,
+	});
+	expect(
+		statements.filter((statement) =>
+			statement.query.includes("run_facts AS ("),
+		),
+	).toHaveLength(2);
+	expect(split).toEqual(await findAnalysis(scope, input));
+});
+
+test("many short raw records keep metadata and never exceed the emitted maxChars; uncommitted text is invisible", async () => {
+	const sessionId = `short_records_${runId}`;
+	await seedSession(
+		sessionId,
+		"claude_code",
+		shortRecordsTranscript(200),
+		"short-record-model",
+	);
+	for (const maxChars of [200, 1200, 12000]) {
+		const result = AnalysisReadOutputSchema.parse(
+			await rpc("analysis/read", {
+				refs: [{ sessionId, agentId: "", turn: 1 }],
+				depth: "turn",
+				maxChars,
+			}),
+		);
+		const text = renderRead(result);
+		expect(text.length).toBeLessThanOrEqual(maxChars);
+		expect(text).not.toContain("uncommitted");
+		if (maxChars > 200) {
+			expect(
+				result.reads[0]?.sections.some(
+					(section) =>
+						section.record?.kind === "tool_result" && section.record.isError,
+				),
+			).toBe(true);
+			expect(text).toContain("tool_result");
+		}
+	}
+	const result = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [{ sessionId, agentId: "", turn: 1 }],
+			depth: "record",
+			record: 1,
+		}),
+	);
+	expect(result.reads[0]?.sections[0]?.text).toBe("Many records");
+	const find = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			sessionId,
+			from: day,
+			to: day,
+		}),
+	);
+	assert(find.source === "runs" && "rows" in find);
+	expect(find.rows[0]?.promptHead).toBe("Many records");
+});
+
+test("exchange uses the full last-edit boundary and preserves the failure head", async () => {
+	const sessionId = `last_edit_${runId}`;
+	const lines: unknown[] = [
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Edit files" },
+		},
+	];
+	for (let index = 0; index < 201; index++)
+		lines.push(
+			claudeTool(`edit-${index}`, "Write", {
+				file_path: `file-${index}.ts`,
+				content: "new",
+			}),
+		);
+	lines.push(
+		claudeTool("check", "Bash", { command: "bun test" }),
+		claudeResult("check", "Process exited with code 0\npass"),
+	);
+	lines.push(
+		claudeTool("final-edit", "Write", {
+			file_path: "last.ts",
+			content: "unchecked",
+		}),
+	);
+	lines.push(
+		claudeTool("read-missing", "Read", { file_path: "missing.ts" }),
+		claudeResult(
+			"read-missing",
+			`ENOENT: no such file or directory, open /repo/missing.ts\n${"diagnostic body\n".repeat(1000)}`,
+			true,
+		),
+	);
+	await seedSession(
+		sessionId,
+		"claude_code",
+		lines.map((line) => JSON.stringify(line)).join("\n"),
+		"claude-sonnet-4-5",
+	);
+	const exchange = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [{ sessionId, agentId: "", turn: 1 }],
+			maxChars: 40000,
+		}),
+	);
+	expect(
+		exchange.reads[0]?.sections.find(
+			(section) => section.name === "checks after last edit",
+		)?.text,
+	).toBe("");
+	expect(
+		exchange.reads[0]?.sections.find(
+			(section) => section.name === "failed calls",
+		)?.text,
+	).toContain("ENOENT: no such file or directory, open /repo/missing.ts");
+	expect(exchange.truncated).toBe(true);
+});
+
+test("one deadline aborts the active ClickHouse query and stops subsequent statements", async () => {
+	const statements: ClickHouseStatement[] = [];
+	await expect(
+		withAnalysisDeadline(
+			"integration deadline",
+			async (executor) => {
+				for (let index = 0; index < 3; index++)
+					await executor.query({
+						query: "SELECT sleep(0.4) LIMIT 1",
+						clickhouse_settings: { max_execution_time: 1 },
+					});
+			},
+			{ executor: observingExecutor(statements), deadlineMs: 50 },
+		),
+	).rejects.toThrow("deadline");
+	await Bun.sleep(500);
+	expect(statements).toHaveLength(1);
+	expect(statements[0]?.abortSignal?.aborted).toBe(true);
+});
+
+test("a failed ClickHouse sibling aborts the shared signal and no following batch runs", async () => {
+	const statements: ClickHouseStatement[] = [];
+	await expect(
+		withAnalysisDeadline(
+			"sibling error",
+			async (executor) => {
+				await Promise.all([
+					executor.query({ query: "SELECT sleep(0.4) LIMIT 1" }),
+					executor.query({
+						query: "SELECT definitely_missing_analysis_column LIMIT 1",
+					}),
+				]);
+				await executor.query({ query: "SELECT 1 LIMIT 1" });
+			},
+			{ executor: observingExecutor(statements) },
+		),
+	).rejects.toThrow();
+	await Bun.sleep(500);
+	expect(statements).toHaveLength(2);
+	expect(
+		new Set(statements.map((statement) => statement.abortSignal)).size,
+	).toBe(1);
+	expect(statements.every((statement) => statement.abortSignal?.aborted)).toBe(
+		true,
+	);
+});
+
+test("SQL ceilings return explicit incomplete coverage rather than a record-overflow exception", async () => {
+	assert(userId);
+	const input = AnalysisFindInputSchema.parse({
+		source: "runs",
+		from: day,
+		to: day,
+		latest: 200,
+		limit: 1,
+	});
+	const executor: ClickHouseExecutor = {
+		close: () => clickhouse.close(),
+		execute: (statement) => clickhouse.execute(statement),
+		insert: (params) => clickhouse.insert(params),
+		query: (statement) =>
+			clickhouse.query({
+				...statement,
+				clickhouse_settings: {
+					...statement.clickhouse_settings,
+					max_rows_to_read: "1",
+				},
+			}),
+	};
+	const result = await findAnalysis({ organizationId: userId, userId }, input, {
+		executor,
+	});
+	expect(result.header.truncated).toBe(true);
+	expect(result.header.notes.join(" ")).toContain("SQL work ceiling reached");
+});
+
+test("run reactions are aggregated from the full genuine prompt, not just its head", async () => {
+	const sessionId = `reaction_aggregate_${runId}`;
+	const user = (content: string) => ({
+		type: "user",
+		timestamp: at(0),
+		message: { role: "user", content },
+	});
+	const response = {
+		type: "assistant",
+		timestamp: at(1),
+		message: { content: [{ type: "text", text: "Response" }] },
+	};
+	const content = [
+		user("First prompt"),
+		response,
+		user(`${"prefix ".repeat(100)}fuck ??`),
+		response,
+		user("<system_instruction>fuck</system_instruction>what??"),
+	]
+		.map((line) => JSON.stringify(line))
+		.join("\n");
+	await seedSession(sessionId, "claude_code", content, "reaction-model");
+	const result = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			sessionId,
+		}),
+	);
+	assert(result.source === "runs" && "rows" in result);
+	expect(result.rows.find((row) => row.ref.turn === 1)?.nextReaction).toBe(
+		"swear",
+	);
+	expect(result.rows.find((row) => row.ref.turn === 2)?.nextReaction).toBe(
+		"negative",
+	);
+});
+
+test("SQL usage provenance: Claude duplicate/collision costs stay unattributed; in-file Codex usage belongs only to the child", async () => {
+	for (const childId of ["worker", "main"]) {
+		const sessionId = `duplicate_${childId}_${runId}`;
+		const fixture = claudeDuplicateFixture(childId, at(0));
+		await seedSession(
+			sessionId,
+			"claude_code",
+			fixture.content,
+			"session-model",
+			{ subagents: fixture.subagents, extractedUsage: true },
+		);
+		const result = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", {
+				source: "runs",
+				sessionId,
+				from: day,
+				to: day,
+			}),
+		);
+		assert(result.source === "runs" && "rows" in result);
+		expect(result.rows).toHaveLength(3);
+		expect(
+			result.rows.every(
+				(row) => row.costUsd === null && row.model === "session-model",
+			),
+		).toBe(true);
+		expect(result.header.unattributedCostUsd).toBeCloseTo(0.0045, 4);
+		expect(result.header.pricedCostUsd).toBe(0);
+		const read = AnalysisReadOutputSchema.parse(
+			await rpc("analysis/read", { refs: result.rows.map((row) => row.ref) }),
+		);
+		expect(
+			read.reads.every((row) => row.header.includes("costUsd=unpriced")),
+		).toBe(true);
+	}
+	const sessionId = `in_file_child_${runId}`;
+	await seedSession(
+		sessionId,
+		"codex",
+		codexInFileUsageFixture(at(0)),
+		"session-model",
+		{ extractedUsage: true },
+	);
+	const result = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			sessionId,
+			from: day,
+			to: day,
+		}),
+	);
+	assert(result.source === "runs" && "rows" in result);
+	expect(result.rows.find((row) => row.ref.agentId === "")?.costUsd).toBeNull();
+	expect(
+		result.rows.find((row) => row.ref.agentId === "/root/worker")?.costUsd,
+	).toBeCloseTo(0.0023, 4);
+	expect(result.header.unattributedCostUsd).toBe(0);
+});
+
+async function seedSession(
+	sessionId: string,
+	source: TranscriptSource,
+	content: string,
+	model: string,
+	options: {
+		owner?: string;
+		subagents?: Record<string, string>;
+		extractedUsage?: boolean;
+		/** Inserts the committed records a second time, like a retried insert that has not merged yet. */
+		duplicateRecords?: boolean;
+	} = {},
+): Promise<void> {
+	assert(userId);
+	const identity = {
+		organizationId: userId,
+		userId: options.owner ?? userId,
+		sessionId,
+		source,
+		revision: "1",
+		sessionDate: at(0),
+	};
+	const stats = createSplitStats();
+	const rows = [
+		...splitSessionTranscript(
+			{ content, subagents: options.subagents, sessionDate: at(0), source },
+			stats,
+		),
+	].map((draft) => buildTranscriptRecordRow(identity, draft));
+	const summary = summarizeSplit(stats);
+	await clickhouse.insert({
+		table: "rudel.transcript_records",
+		asyncInsert: false,
+		values: [
+			...rows,
+			buildTranscriptRecordsReceiptRow(identity, {
+				...summary,
+				contentSha256: hashTranscriptContent(content),
+				parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+				publishedAt: new Date().toISOString(),
+				rowCount: rows.length,
+			}),
+			...rows.map((row) => ({
+				...row,
+				revision: "2",
+				head: "uncommitted",
+				text: "uncommitted",
+			})),
+		],
+	});
+	if (options.duplicateRecords)
+		await clickhouse.insert({
+			table: "rudel.transcript_records",
+			asyncInsert: false,
+			values: rows,
+		});
+	await clickhouse.insert({
+		table: "rudel.session_analytics",
+		asyncInsert: false,
+		values: [
+			{
+				organization_id: userId,
+				user_id: identity.userId,
+				session_id: sessionId,
+				source,
+				session_date: timestamp(0),
+				last_interaction_date: timestamp(10),
+				project_path: "/test/analysis",
+				git_remote: "repo",
+				model_used: model,
+				revision: "1",
+			},
+		],
+	});
+	if (options.extractedUsage) {
+		const extraction = extractUsageEvents({
+			organizationId: userId,
+			userId: identity.userId,
+			sessionId,
+			source,
+			content,
+			subagents: options.subagents ?? {},
+		});
+		assert.equal(extraction.status, "complete");
+		await clickhouse.insert({
+			table: "rudel.usage_events",
+			asyncInsert: false,
+			values: [
+				...buildUsageEventRows(
+					{
+						organizationId: userId,
+						userId: identity.userId,
+						sessionId,
+						source,
+						generation: "1",
+						extraction,
+						replaceAbsentEvents: false,
+						contentSha256: hashTranscriptContent(content),
+						filterVersion: 1,
+						ingestedAt: new Date(),
+						sessionDate: new Date(baseMs),
+					},
+					[],
+				),
+			],
+		});
+	} else
+		await clickhouse.insert({
+			table: "rudel.usage_events",
+			asyncInsert: false,
+			values: [
+				{
+					organization_id: userId,
+					user_id: identity.userId,
+					session_id: sessionId,
+					source,
+					agent_id: "main",
+					event_id: sessionId.replaceAll("-", "").padEnd(64, "0").slice(0, 64),
+					record_kind: "event",
+					event_version: "1",
+					occurred_at: timestamp(2),
+					usage_date: day,
+					has_valid_timestamp: 1,
+					raw_model: model,
+					resolved_model: model,
+					model_status: "resolved",
+					model_provider: source === "codex" ? "openai" : "anthropic",
+					context_input_tokens: "1000",
+					uncached_input_tokens: "1000",
+					output_tokens: "100",
+					first_observed_line: 2,
+				},
+			],
+		});
+	await sqlClient`INSERT INTO session_ownership (organization_id, user_id, session_id) VALUES (${userId}, ${identity.userId}, ${sessionId})`;
+}
+
+async function signup(label: string) {
+	assert(server);
+	const response = await fetch(`${server.baseUrl}/api/auth/sign-up/email`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			email: `analysis-${label}-${runId}@example.com`,
+			name: "Analysis integration",
+			password: "analysis-test-password",
+		}),
+	});
+	expect(response.ok).toBe(true);
+	const account = z
+		.object({ token: z.string(), user: z.object({ id: z.string() }) })
+		.parse(await response.json());
+	createdUsers.push(account.user.id);
+	return account;
+}
+
+function observingExecutor(
+	statements: ClickHouseStatement[],
+	recordResultRows?: number,
+): ClickHouseExecutor {
+	return {
+		close: () => clickhouse.close(),
+		execute: (statement) => clickhouse.execute(statement),
+		insert: (params) => clickhouse.insert(params),
+		query: (statement) => {
+			statements.push(statement);
+			return clickhouse.query(
+				recordResultRows && statement.query.includes("record_idx < 4294967295")
+					? {
+							...statement,
+							clickhouse_settings: {
+								...statement.clickhouse_settings,
+								max_result_rows: String(recordResultRows),
+							},
+						}
+					: statement,
+			);
+		},
+	};
+}
+
+function shortRecordsTranscript(count: number): string {
+	return [
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Many records" },
+		},
+		...Array.from({ length: count }, (_, index) =>
+			claudeResult(`call-${index}`, "x", index % 2 === 0),
+		),
+	]
+		.map((line) => JSON.stringify(line))
+		.join("\n");
+}
+function claudeTool(id: string, name: string, input: unknown) {
+	return {
+		type: "assistant",
+		timestamp: at(1),
+		message: {
+			role: "assistant",
+			content: [{ type: "tool_use", id, name, input }],
+		},
+	};
+}
+function claudeResult(id: string, content: string, isError = false) {
+	return {
+		type: "user",
+		timestamp: at(2),
+		message: {
+			role: "user",
+			content: [
+				{ type: "tool_result", tool_use_id: id, content, is_error: isError },
+			],
+		},
+	};
+}
+
+async function rpc(path: string, input: unknown): Promise<unknown> {
+	const response = await rpcResponse(path, input);
+	assert.equal(
+		response.status,
+		200,
+		`${await response.clone().text()}\n${server?.readOutput()}`,
+	);
+	return z.object({ json: z.unknown() }).parse(await response.json()).json;
+}
+
+async function rpcResponse(
+	path: string,
+	input: unknown,
+	token = bearerToken,
+): Promise<Response> {
+	assert(server);
+	return fetch(`${server.baseUrl}/rpc/${path}`, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ json: input }),
+	});
+}
+
+function claudeTranscript(): string {
+	const user = (content: unknown, offset: number) => ({
+		type: "user",
+		timestamp: at(offset),
+		message: { role: "user", content },
+	});
+	const assistant = (content: unknown, offset: number) => ({
+		type: "assistant",
+		timestamp: at(offset),
+		message: { role: "assistant", content },
+	});
+	return [
+		user("Fix the file", 0),
+		assistant(
+			[
+				{
+					type: "tool_use",
+					id: "edit",
+					name: "Edit",
+					input: {
+						file_path: "src/a.ts",
+						old_string: "old",
+						new_string: "new",
+					},
+				},
+			],
+			1,
+		),
+		user([{ type: "tool_result", tool_use_id: "edit", content: "Updated" }], 2),
+		assistant(
+			[
+				{
+					type: "tool_use",
+					id: "test",
+					name: "Bash",
+					input: { command: "bun test" },
+				},
+			],
+			3,
+		),
+		user(
+			[
+				{
+					type: "tool_result",
+					tool_use_id: "test",
+					content: "Process exited with code 0\nTests passed",
+				},
+			],
+			4,
+		),
+		assistant(
+			[
+				{
+					type: "tool_use",
+					id: "read",
+					name: "Read",
+					input: { file_path: "missing.ts" },
+				},
+			],
+			5,
+		),
+		user(
+			[
+				{
+					type: "tool_result",
+					tool_use_id: "read",
+					is_error: true,
+					content: "ENOENT: open 'missing.ts'",
+				},
+			],
+			6,
+		),
+		assistant([{ type: "text", text: "Finished the change." }], 7),
+		user("fuck, fix the mistake", 8),
+		assistant([{ type: "text", text: "I'm sorry for the mistake." }], 9),
+	]
+		.map((line) => JSON.stringify(line))
+		.join("\n");
+}
+
+function codexTranscript(): string {
+	return [
+		{
+			timestamp: at(0),
+			type: "response_item",
+			payload: {
+				type: "message",
+				role: "user",
+				content: [{ type: "input_text", text: "Read the file" }],
+			},
+		},
+		{
+			timestamp: at(1),
+			type: "response_item",
+			payload: {
+				type: "function_call",
+				name: "exec_command",
+				arguments: JSON.stringify({ cmd: "cat missing.ts" }),
+				call_id: "read",
+			},
+		},
+		{
+			timestamp: at(2),
+			type: "response_item",
+			payload: {
+				type: "function_call_output",
+				call_id: "read",
+				output: "Process exited with code 2\nENOENT: open 'missing.ts'",
+			},
+		},
+		{
+			timestamp: at(3),
+			type: "response_item",
+			payload: {
+				type: "message",
+				role: "assistant",
+				content: [{ type: "output_text", text: "File is absent." }],
+			},
+		},
+		{
+			timestamp: at(4),
+			type: "response_item",
+			payload: {
+				type: "message",
+				role: "user",
+				content: [{ type: "input_text", text: "fuck, use the right file" }],
+			},
+		},
+		{
+			timestamp: at(5),
+			type: "response_item",
+			payload: {
+				type: "message",
+				role: "assistant",
+				content: [{ type: "output_text", text: "I'm sorry for the mistake." }],
+			},
+		},
+	]
+		.map((line) => JSON.stringify(line))
+		.join("\n");
+}
+
+function at(offset: number): string {
+	return new Date(baseMs + offset * 1_000).toISOString();
+}
+
+function timestamp(offset: number): string {
+	return at(offset).replace("T", " ").replace("Z", "");
+}
+
+test("tool groups normalize Claude and Codex tools, splitting shell calls by their first word", async () => {
+	const cases = [
+		["Bash", "bun test", "shell"],
+		["exec_command", "cat file", "read"],
+		["functions.exec_command", "rg term", "search"],
+		["shell", "sed -n '1,5p' file", "read"],
+		["local_shell", "head file", "read"],
+		["write_stdin", "", "shell"],
+		["Bash", "less file", "read"],
+		["Bash", "tail file", "read"],
+		["Bash", "grep term", "search"],
+		["Bash", "find src", "search"],
+		["Bash", "fd app", "search"],
+		["Bash", "ls src", "search"],
+		["Bash", "echo rg", "shell"],
+		["Bash", "cd src && cat file", "shell"],
+		["Bash", "sed -i s/a/b/ file", "shell"],
+		["Read", "", "read"],
+		["Grep", "", "search"],
+		["Glob", "", "search"],
+		["LS", "", "search"],
+		["Edit", "", "edit"],
+		["Write", "", "edit"],
+		["MultiEdit", "", "edit"],
+		["NotebookEdit", "", "edit"],
+		["apply_patch", "", "edit"],
+		["mcp__playwright__goto", "", "browser"],
+		["mcp__chrome__navigate", "", "browser"],
+		["WebFetch", "", "web"],
+		["WebSearch", "", "web"],
+		["web_search", "", "web"],
+		["mcp__db__query", "", "mcp"],
+		["Task", "", "subagent"],
+		["Agent", "", "subagent"],
+		["spawn_agent", "", "subagent"],
+		["custom", "", "other"],
+	] as const;
+	const rows = await clickhouse.query<{
+		tool: string;
+		command: string;
+		group: string;
+	}>({
+		query: `SELECT c.1 AS tool, c.2 AS command, ${toolGroupSql("c.1", "c.2")} AS group
+			FROM (SELECT arrayJoin(arrayZip({tools:Array(String)}, {commands:Array(String)})) AS c)`,
+		query_params: {
+			tools: cases.map(([tool]) => tool),
+			commands: cases.map(([, command]) => command),
+		},
+	});
+	expect(rows.map((row) => [row.tool, row.command, row.group])).toEqual(
+		cases.map((entry) => [...entry]),
+	);
+});
+
+test("the analysis log stores each call under its step and returns the path, the result and search hits", async () => {
+	assert(userId);
+	const sessionId = `analysis_log_${runId}`;
+	await seedSession(sessionId, "claude_code", claudeTranscript(), "log-model");
+	const found = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			sessionId,
+			question: "Why did my last session go wrong?",
+			step: "Which runs failed?",
+		}),
+	);
+	const trace = found.header.trace;
+	assert(trace);
+	const ref = { sessionId, agentId: "", turn: 1 };
+	const read = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [ref],
+			analysis: trace.analysis,
+			step: "What happened in the failing run?",
+			parentStep: trace.step,
+		}),
+	);
+	expect(read.trace?.analysis).toBe(trace.analysis);
+	await rpc("analysis/history/save", {
+		analysis: trace.analysis,
+		finalAnswer: "The agent never checked its edit.",
+		findings: [{ step: trace.step, finding: "one failing run" }],
+		topics: ["failures"],
+	});
+
+	const tree = AnalysisHistoryGetOutputSchema.parse(
+		await rpc("analysis/history/get", { analysis: trace.analysis }),
+	);
+	expect(tree.status).toBe("finished");
+	expect(tree.host).toBe("home");
+	expect(
+		tree.steps.map((step) => [step.question, step.parent, step.finding]),
+	).toEqual([
+		["Which runs failed?", null, "one failing run"],
+		["What happened in the failing run?", trace.step, null],
+	]);
+	const stored = AnalysisHistoryQueryOutputSchema.parse(
+		await rpc("analysis/history/query", { query: trace.query }),
+	);
+	expect(stored).toMatchObject({ stale: false, unavailable: null });
+	expect(
+		stored.call.tool === "find" && stored.call.output?.header.runsInScope,
+	).toBe(found.header.runsInScope);
+	const hits = AnalysisHistorySearchOutputSchema.parse(
+		await rpc("analysis/history/search", { text: "failing run" }),
+	);
+	expect(hits.analyses[0]?.id).toBe(trace.analysis);
+
+	const member = await signup("log-member");
+	// Earlier tests filled the free plan's member seats.
+	await sqlClient`DELETE FROM member WHERE organization_id = ${userId} AND role = 'member'`;
+	await sqlClient`INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${crypto.randomUUID()}, ${userId}, ${member.user.id}, 'member', now())`;
+	await sqlClient`UPDATE session SET active_organization_id = ${userId} WHERE user_id = ${member.user.id}`;
+	expect(
+		(
+			await rpcResponse(
+				"analysis/history/get",
+				{ analysis: trace.analysis },
+				member.token,
+			)
+		).status,
+	).toBe(404);
+	await rpc("analysis/history/share", {
+		analysis: trace.analysis,
+		shared: true,
+	});
+	const shared = AnalysisHistoryGetOutputSchema.parse(
+		z
+			.object({ json: z.unknown() })
+			.parse(
+				await (
+					await rpcResponse(
+						"analysis/history/get",
+						{ analysis: trace.analysis },
+						member.token,
+					)
+				).json(),
+			).json,
+	);
+	// The workspace does not restrict results, so the member reads the admin's.
+	expect(shared.steps[0]?.queries[0]?.unavailable).toBeNull();
+	const sharedQuery = AnalysisHistoryQueryOutputSchema.parse(
+		z
+			.object({ json: z.unknown() })
+			.parse(
+				await (
+					await rpcResponse(
+						"analysis/history/query",
+						{ query: trace.query },
+						member.token,
+					)
+				).json(),
+			).json,
+	);
+	expect(sharedQuery.unavailable).toBeNull();
+	expect(
+		sharedQuery.call.tool === "find" &&
+			sharedQuery.call.output?.header.runsInScope,
+	).toBe(found.header.runsInScope);
+});

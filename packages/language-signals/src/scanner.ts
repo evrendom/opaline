@@ -53,6 +53,34 @@ const LANGUAGE_SIGNAL_PATTERN = new RegExp(
 	"giu",
 );
 
+/**
+ * Cheap check that a text could contain a surface of one category: the
+ * category's compiled surfaces without the word-boundary guards, so it can
+ * only over-match. Callers run the full scan only when it passes, which keeps
+ * results identical while skipping texts that cannot match.
+ */
+const CATEGORY_PREFILTERS = new Map(
+	(["negative", "swear", "apology", "positive"] as const).map((category) => [
+		category,
+		new RegExp(
+			[
+				...(category === "negative" ? [NEGATIVE_QUESTION_RUN.source] : []),
+				...COMPILED_SURFACES.filter(
+					(surface) => surface.category === category,
+				).map(({ source }) => source),
+			].join("|"),
+			"iu",
+		),
+	]),
+);
+
+export function mayContainLanguageSignal(
+	text: string,
+	category: BuiltInLanguageSignalCategory,
+): boolean {
+	return CATEGORY_PREFILTERS.get(category)?.test(text) ?? false;
+}
+
 const ADJACENT_POSITIVE_NEGATION_PATTERN =
 	/(?:do\s+not|don['’]?t|does\s+not|doesn['’]?t|did\s+not|didn['’]?t|not)\s+$/iu;
 const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
