@@ -618,7 +618,7 @@ export const R2IngestInitInputSchema = R2IngestMetadataSchema.extend({
 			maximum: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 			message: `Aggregate transcript content exceeds ${INGEST_AGGREGATE_CONTENT_MAX_BYTES} bytes`,
 			path: ["objects"],
-			type: "array",
+			origin: "array",
 		});
 	}
 });

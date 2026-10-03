@@ -545,7 +545,7 @@ const SessionDetailJsonValueSchema: z.ZodType<SessionDetailJsonValue> = z.lazy(
 			z.number(),
 			z.string(),
 			z.array(SessionDetailJsonValueSchema),
-			z.record(SessionDetailJsonValueSchema),
+			z.record(z.string(), SessionDetailJsonValueSchema),
 		]),
 );
 
@@ -652,7 +652,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 	z
 		.object({
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
-			input: z.record(SessionDetailJsonValueSchema),
+			input: z.record(z.string(), SessionDetailJsonValueSchema),
 			kind: z.literal("tool"),
 			activity: TranscriptToolActivitySchema.optional(),
 			provider: SessionDetailProviderSchema.optional(),
@@ -721,7 +721,7 @@ export const SessionDetailTraceItemSchema: z.ZodType<SessionDetailTraceItem> =
 				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 				kind: z.literal("summary"),
 				text: z.string(),
-				timestamp: z.undefined(),
+				timestamp: z.undefined().optional(),
 			})
 			.strict(),
 	]);

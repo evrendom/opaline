@@ -176,11 +176,15 @@ export const DashboardMetricDataSchema = z.object({
 		z.object({
 			date: z.string(),
 			total: z.number(),
-			values: z.record(z.number()),
+			values: z.record(z.string(), z.number()),
 			numerator: z.number().nonnegative().optional(),
 			denominator: z.number().nonnegative().optional(),
-			numeratorValues: z.record(z.number().nonnegative()).optional(),
-			denominatorValues: z.record(z.number().nonnegative()).optional(),
+			numeratorValues: z
+				.record(z.string(), z.number().nonnegative())
+				.optional(),
+			denominatorValues: z
+				.record(z.string(), z.number().nonnegative())
+				.optional(),
 		}),
 	),
 	breakdowns: z.object({
@@ -274,9 +278,6 @@ export type AdminCostDashboardInput = z.infer<
 	typeof AdminCostDashboardInputSchema
 >;
 export type CostDashboard = z.infer<typeof costDashboardOutputSchema>;
-export const CostDashboardSchema: z.ZodType<
-	CostDashboard,
-	z.ZodTypeDef,
-	unknown
-> = costDashboardOutputSchema;
+export const CostDashboardSchema: z.ZodType<CostDashboard, unknown> =
+	costDashboardOutputSchema;
 export type CostBreakdownEntry = z.infer<typeof CostBreakdownEntrySchema>;

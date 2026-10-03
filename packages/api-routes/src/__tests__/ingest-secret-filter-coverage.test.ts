@@ -42,15 +42,15 @@ describe("ingest transcript filter coverage", () => {
 	});
 });
 
-function getStringPaths(schema: z.ZodTypeAny, prefix = ""): readonly string[] {
-	if (schema instanceof z.ZodOptional) {
+function getStringPaths(
+	schema: z.core.$ZodType,
+	prefix = "",
+): readonly string[] {
+	if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) {
 		return getStringPaths(schema.unwrap(), prefix);
 	}
-	if (schema instanceof z.ZodDefault) {
-		return getStringPaths(schema.removeDefault(), prefix);
-	}
-	if (schema instanceof z.ZodEffects) {
-		return getStringPaths(schema.innerType(), prefix);
+	if (schema instanceof z.ZodPipe) {
+		return getStringPaths(schema.in, prefix);
 	}
 	if (schema instanceof z.ZodArray) {
 		return getStringPaths(schema.element, `${prefix}[]`);

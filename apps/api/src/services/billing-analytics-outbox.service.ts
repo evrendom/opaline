@@ -82,6 +82,7 @@ const PaymentCompletedPropertiesSchema = z.object({
 	user_id: z.string().min(1),
 });
 const AnalyticsPropertiesSchema = z.record(
+	z.string(),
 	z.union([z.boolean(), z.null(), z.number().finite(), z.string()]),
 );
 const MAX_ATTEMPTS = 36;

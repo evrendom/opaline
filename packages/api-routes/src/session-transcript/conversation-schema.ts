@@ -30,13 +30,13 @@ export const ToolResultTextContentSchema = TextContentSchema.extend({
 export const ToolResultImageContentSchema = z.object({
 	type: z.literal("image"),
 	rawType: z.string().optional(),
-	source: z.unknown(),
+	source: z.unknown().optional(),
 });
 
 export const ToolResultStructuredContentSchema = z.object({
 	type: z.literal("structured"),
 	rawType: z.string().optional(),
-	value: z.unknown(),
+	value: z.unknown().optional(),
 });
 
 export const ToolResultContentSchema = z.object({

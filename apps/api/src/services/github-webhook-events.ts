@@ -112,7 +112,7 @@ const installationPayload = z.object({
 	action,
 	installation: z.object({
 		id: githubId,
-		permissions: z.record(z.unknown()).optional(),
+		permissions: z.record(z.string(), z.unknown()).optional(),
 	}),
 });
 const installationRepositoriesPayload = z.object({

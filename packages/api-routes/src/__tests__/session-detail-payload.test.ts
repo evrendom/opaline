@@ -12,6 +12,7 @@ import {
 	SessionDetailStaleRevisionDataSchema,
 	SessionDetailSubagentInputSchema,
 	SessionDetailSubagentSchema,
+	SessionDetailTraceItemSchema,
 	SessionDetailTurnInputSchema,
 	SessionDetailTurnSchema,
 	SessionDetailWindowRequestSchema,
@@ -517,5 +518,18 @@ describe("session detail payload contracts", () => {
 			userItems: [],
 		});
 		expect(parsed.turns[2]?.bodyOmitted).toBe("oversized");
+	});
+
+	test("accepts a summary item after a JSON round trip drops its undefined timestamp", () => {
+		const summary = {
+			id: "summary-0",
+			kind: "summary",
+			text: "Earlier context",
+			timestamp: undefined,
+		};
+
+		expect(
+			SessionDetailTraceItemSchema.parse(JSON.parse(JSON.stringify(summary))),
+		).toEqual({ id: "summary-0", kind: "summary", text: "Earlier context" });
 	});
 });

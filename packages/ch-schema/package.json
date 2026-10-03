@@ -50,7 +50,7 @@
 		"@chkit/plugin-obsessiondb": "0.1.0-beta.16",
 		"@chkit/plugin-pull": "0.1.0-beta.16",
 		"chkit": "0.1.0-beta.16",
-		"zod": "^3.24.0"
+		"zod": "^4.6.5"
 	},
 	"devDependencies": {
 		"@obsessiondb/chcli": "0.1.1-beta.4",

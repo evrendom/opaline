@@ -1,7 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import type { McpTool } from "./mcp-tools.js";
 
 /**
@@ -45,15 +44,24 @@ export const PLUGIN_TOOLS: readonly McpTool[] = PLUGIN_PROCEDURES.map(
 			description: `Read-only Opaline procedure ${path}, for the Opaline app.`,
 			inputSchema: {
 				type: "object",
-				...zodToJsonSchema(schema, { $refStrategy: "none" }),
+				...z.toJSONSchema(schema, {
+					io: "input",
+					target: "draft-7",
+					unrepresentable: "any",
+				}),
 			},
 			meta: { ui: { visibility: ["app"] } },
 			run: (client, args) => {
 				const parsed = schema.safeParse(args);
 				if (!parsed.success) {
-					throw new ORPCError("BAD_REQUEST", { data: parsed.error.flatten() });
+					throw new ORPCError("BAD_REQUEST", {
+						data: z.flattenError(parsed.error),
+					});
 				}
-				const { workspace: _, ...input } = parsed.data;
+				const { workspace: _, ...input } = parsed.data as Record<
+					string,
+					unknown
+				>;
 				const procedure = path
 					.split(".")
 					.reduce<unknown>(
@@ -77,21 +85,22 @@ export function pluginInputSchema(path: (typeof PLUGIN_PROCEDURES)[number]) {
 		.reduce<unknown>(
 			(node, key) => (node as Record<string, unknown>)[key],
 			contract,
-		) as { "~orpc": { inputSchema?: z.ZodTypeAny } };
+		) as { "~orpc": { inputSchema?: z.ZodType } };
 	return withWorkspace(procedure["~orpc"].inputSchema ?? z.object({}));
 }
 
-function withWorkspace(schema: z.ZodTypeAny): z.ZodTypeAny {
-	if (schema instanceof z.ZodEffects) return withWorkspace(schema.innerType());
+function withWorkspace(schema: z.core.$ZodType): z.ZodType {
+	if (schema instanceof z.ZodPipe) return withWorkspace(schema.in);
 	if (schema instanceof z.ZodObject) {
-		return schema.extend({ workspace: z.string().min(1) }).strict();
+		return schema.safeExtend({ workspace: z.string().min(1) }).strict();
 	}
 	if (
 		schema instanceof z.ZodUnion ||
 		schema instanceof z.ZodDiscriminatedUnion
 	) {
-		const [first, second, ...rest] = schema.options.map(withWorkspace);
-		return z.union([first, second, ...rest]);
+		return z.union(
+			schema.options.map(withWorkspace) as [z.ZodType, ...z.ZodType[]],
+		);
 	}
 	throw new Error("Plugin procedures take an object input.");
 }

@@ -142,8 +142,7 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 }
 
 const DASHBOARD_METRICS = CostDashboardRequestedMetricSchema.options;
-const SPLITS =
-	CostDashboardInputSchema.innerType().shape.splitBy.removeDefault().options;
+const SPLITS = CostDashboardInputSchema.shape.splitBy.unwrap().options;
 
 export const MCP_TOOLS: readonly McpTool[] = [
 	{

@@ -14,7 +14,7 @@ import {
 import { SCAN_VERSION } from "@rudel/language-signals";
 import { z } from "zod";
 
-const unknownObjectSchema = z.record(z.unknown());
+const unknownObjectSchema = z.record(z.string(), z.unknown());
 const overviewSessionShape = SessionDetailOverviewSchema.shape.session.shape;
 const overviewActivityTotalsSchema =
 	SessionDetailOverviewSchema.shape.activityTotals;

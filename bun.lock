@@ -42,8 +42,7 @@
         "posthog-node": "5.46.1",
         "resend": "^6.9.3",
         "stripe": "22.6.2",
-        "zod": "3.25.76",
-        "zod-to-json-schema": "3.25.1",
+        "zod": "4.6.5",
       },
       "devDependencies": {
         "@rudel/typescript-config": "workspace:*",
@@ -134,7 +133,7 @@
         "shiki": "4.4.2",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.5.0",
-        "zod": "^3.25.0",
+        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@playwright/test": "1.62.0",
@@ -177,7 +176,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@orpc/contract": "latest",
-        "zod": "^3.24.0",
+        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@rudel/secret-filter": "workspace:*",
@@ -198,7 +197,7 @@
         "@chkit/plugin-obsessiondb": "0.1.0-beta.16",
         "@chkit/plugin-pull": "0.1.0-beta.16",
         "chkit": "0.1.0-beta.16",
-        "zod": "^3.24.0",
+        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@obsessiondb/chcli": "0.1.1-beta.4",
@@ -232,7 +231,7 @@
       "name": "@rudel/repo-intelligence-source-github",
       "version": "0.0.0",
       "dependencies": {
-        "zod": "^3.24.0",
+        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@rudel/typescript-config": "workspace:*",
@@ -2608,7 +2607,7 @@
 
     "zeptomatch": ["zeptomatch@2.1.0", "", { "dependencies": { "grammex": "^3.1.11", "graphmatch": "^1.1.0" } }, "sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA=="],
 
-    "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.1", "", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-pM/SU9d3YAggzi6MtR4h7ruuQlqKtad8e9S0fmxcMi+ueAK5Korys/aWcV9LIIHTVbj01NdzxcnXSN+O74ZIVA=="],
 
@@ -2849,6 +2848,8 @@
     "router/path-to-regexp": ["path-to-regexp@8.3.0", "", {}, "sha512-7jdwVIRtsP8MYpdXSwOS0YdD0Du+qOoF/AEPIt88PcCFrZCzx41oxku1jD88hZBwbNUIEfpqvuhjFaMAqMTWnA=="],
 
     "satteri/@types/hast": ["@types/hast@3.0.5", "", { "dependencies": { "@types/unist": "*" } }, "sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g=="],
+
+    "shadcn/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "shiki/@types/hast": ["@types/hast@3.0.5", "", { "dependencies": { "@types/unist": "*" } }, "sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g=="],
 

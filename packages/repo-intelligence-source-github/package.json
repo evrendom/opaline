@@ -12,7 +12,7 @@
 		"test:integration": "bun test ./src/github-sweep-source.integration.ts"
 	},
 	"dependencies": {
-		"zod": "^3.24.0"
+		"zod": "^4.6.5"
 	},
 	"devDependencies": {
 		"@rudel/typescript-config": "workspace:*",

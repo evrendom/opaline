@@ -1312,10 +1312,7 @@ function assertNonNegativeInteger(value: number, name: string): void {
  * of surfacing `undefined`. ClickHouse returns 64-bit integers as strings and
  * booleans as numbers or booleans, which the schemas normalize.
  */
-function parseRows<T>(
-	schema: z.ZodType<T, z.ZodTypeDef, unknown>,
-	rows: unknown[],
-): T[] {
+function parseRows<T>(schema: z.ZodType<T, unknown>, rows: unknown[]): T[] {
 	return rows.map((row) => schema.parse(row));
 }
 
