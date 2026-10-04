@@ -9,7 +9,7 @@ Opaline stores the user's uploaded Claude Code and Codex sessions. The `opaline`
 
 ## 1. Tools at hand
 
-**Past analyses first.** `analyses` is the log of questions asked before: `action=search` (by meaning, or recent), `action=get` (the path: steps, findings, final answer), `action=query` (the exact stored result of one step's query, flagged stale if a session changed), `action=save`, `action=share`.
+**Past analyses first.** `analyses` is the log of questions asked before: `action=search` (by meaning, or recent), `action=get` (the path: steps, findings, final answer), `action=query` (the exact stored result of one step's query, flagged stale if a session changed), `action=save`, `action=share`. If `analyses` says history is off for the workspace, go on with `find` and `read` and skip searching and saving.
 
 **Analysing agent runs** (why things go wrong, what it cost, retros):
 

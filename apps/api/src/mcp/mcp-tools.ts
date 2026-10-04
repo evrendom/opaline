@@ -1,4 +1,4 @@
-import type { RouterClient } from "@orpc/server";
+import { ORPCError, type RouterClient } from "@orpc/server";
 import {
 	AnalysisFindInputSchema,
 	AnalysisHistoryGetInputSchema,
@@ -238,41 +238,14 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"action=share: share an analysis with the workspace (or stop sharing). Results quoting others' sessions stay readable only by their owners and admins.",
 		].join("\n"),
 		inputSchema: zodToolInput(AnalysesToolInputSchema),
-		run: async (client, { workspace: _workspace, action, ...args }) => {
-			const history = client.analysis.history;
-			switch (action) {
-				case "get":
-					return renderAnalysisTree(
-						await history.get(
-							parseMcpInput(AnalysisHistoryGetInputSchema, args),
-						),
-					);
-				case "query":
-					return renderStoredQuery(
-						await history.query(
-							parseMcpInput(AnalysisHistoryQueryInputSchema, args),
-						),
-					);
-				case "save": {
-					const saved = await history.save(
-						parseMcpInput(AnalysisHistorySaveInputSchema, args),
-					);
-					return `saved analysis=${saved.analysis} status=${saved.status}`;
-				}
-				case "share": {
-					const shared = await history.share(
-						parseMcpInput(AnalysisHistoryShareInputSchema, args),
-					);
-					return `analysis=${shared.analysis} shared=${shared.shared}`;
-				}
-				default:
-					return renderAnalysisSearch(
-						await history.search(
-							parseMcpInput(AnalysisHistorySearchInputSchema, args),
-						),
-					);
-			}
-		},
+		run: (client, { workspace: _workspace, action, ...args }) =>
+			// Where the log is off, its message tells the agent to go on with
+			// find and read: a plain result, not a failed call.
+			runAnalysesAction(client, action, args).catch((error: unknown) => {
+				if (error instanceof ORPCError && error.code === "PRECONDITION_FAILED")
+					return error.message;
+				throw error;
+			}),
 	},
 	{
 		name: "list_workspaces",
@@ -647,6 +620,40 @@ export const SESSION_RESOURCE_PREFIX = "opaline://sessions/";
 
 export function sessionResourceUri(workspace: string, sessionId: string) {
 	return `${SESSION_RESOURCE_PREFIX}${encodeURIComponent(workspace)}/${encodeURIComponent(sessionId)}`;
+}
+
+async function runAnalysesAction(client: Client, action: unknown, args: Args) {
+	const history = client.analysis.history;
+	switch (action) {
+		case "get":
+			return renderAnalysisTree(
+				await history.get(parseMcpInput(AnalysisHistoryGetInputSchema, args)),
+			);
+		case "query":
+			return renderStoredQuery(
+				await history.query(
+					parseMcpInput(AnalysisHistoryQueryInputSchema, args),
+				),
+			);
+		case "save": {
+			const saved = await history.save(
+				parseMcpInput(AnalysisHistorySaveInputSchema, args),
+			);
+			return `saved analysis=${saved.analysis} status=${saved.status}`;
+		}
+		case "share": {
+			const shared = await history.share(
+				parseMcpInput(AnalysisHistoryShareInputSchema, args),
+			);
+			return `analysis=${shared.analysis} shared=${shared.shared}`;
+		}
+		default:
+			return renderAnalysisSearch(
+				await history.search(
+					parseMcpInput(AnalysisHistorySearchInputSchema, args),
+				),
+			);
+	}
 }
 
 async function readPluginBootstrap(client: Client, context: McpToolContext) {

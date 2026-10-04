@@ -25,12 +25,18 @@ import {
 	getClickhouse,
 } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
-import { createAnalysisRouter } from "../handlers/analysis/index.js";
+import {
+	ANALYSIS_HISTORY_OFF,
+	createAnalysisRouter,
+} from "../handlers/analysis/index.js";
 import { renderRead } from "../mcp/analysis-renderers.js";
+import { MCP_TOOLS } from "../mcp/mcp-tools.js";
+import { router } from "../router.js";
 import { withAnalysisDeadline } from "../services/analysis/deadline.js";
 import { findAnalysis } from "../services/analysis/find.service.js";
 import { readAnalysis } from "../services/analysis/read.service.js";
 import { toolGroupSql } from "../services/analysis/tool-groups.js";
+import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
 import {
 	buildTranscriptRecordRow,
 	buildTranscriptRecordsReceiptRow,
@@ -75,6 +81,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+	setAnalysisLogForTests(undefined);
 	await server?.stop();
 	for (const table of [
 		"rudel.transcript_records",
@@ -1329,4 +1336,62 @@ test("the analysis log stores each call under its step and returns the path, the
 		sharedQuery.call.tool === "find" &&
 			sharedQuery.call.output?.header.runsInScope,
 	).toBe(found.header.runsInScope);
+});
+
+test("where the log is off, history fails with an agent-actionable message and the analyses MCP tool returns it as its result", async () => {
+	assert(userId);
+	// The server lists only the admin's workspace, so a new account's is off.
+	const outsider = await signup("log-off");
+	const refused = await rpcResponse(
+		"analysis/history/search",
+		{ text: "failing run" },
+		outsider.token,
+	);
+	expect(refused.status).toBe(412);
+	expect(await refused.text()).toContain(ANALYSIS_HISTORY_OFF);
+
+	const analyses = MCP_TOOLS.find((tool) => tool.name === "analyses");
+	assert(analyses);
+	const user = {
+		id: userId,
+		name: "Analysis integration",
+		email: `analysis-admin-${runId}@example.com`,
+		emailVerified: false,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	};
+	const session = {
+		id: crypto.randomUUID(),
+		token: bearerToken,
+		userId,
+		expiresAt: new Date(Date.now() + 60_000),
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		activeOrganizationId: userId,
+	};
+	const client = createRouterClient(router, {
+		context: {
+			user,
+			session,
+			apiKeyId: null,
+			authFailure: null,
+			ingestOperatorAuthorized: false,
+			requestId: crypto.randomUUID(),
+			publicLookupSource: "test",
+		},
+	});
+	// In this process the log is off for every workspace; afterAll resets it.
+	setAnalysisLogForTests(null);
+	for (const args of [
+		{ text: "failing run" },
+		{ action: "get", analysis: crypto.randomUUID() },
+	]) {
+		expect(
+			await analyses.run(client, args, {
+				userId,
+				workspace: { id: userId, slug: "analysis-log-off" },
+				authSession: { user, session },
+			}),
+		).toBe(ANALYSIS_HISTORY_OFF);
+	}
 });

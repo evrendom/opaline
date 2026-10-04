@@ -92,9 +92,9 @@ bun run convex:dev --once --codegen disable
 
 Give the API `ANALYSIS_LOG_PURGE_BACKENDS=convex`, `ANALYSIS_LOG_STORE=convex`,
 `CONVEX_URL`, `ANALYSIS_LOG_SIGNING_KEY`, `OPENAI_API_KEY` and
-`ANALYSIS_LOG_WORKSPACES` (the team's workspace ids; nobody else is captured or
-sees history). Capture into Convex starts only once `convex` is declared in
-`ANALYSIS_LOG_PURGE_BACKENDS`.
+`ANALYSIS_LOG_WORKSPACES` (the team's workspace ids, or `*` for every workspace;
+nobody else is captured or sees history). Capture into Convex starts only once
+`convex` is declared in `ANALYSIS_LOG_PURGE_BACKENDS`.
 Account and workspace purges clean the deployment whenever `CONVEX_URL` is
 set, even with capture off, and fail (the durable job retries) while `convex`
 is declared without `CONVEX_URL`, or the signing key is invalid. A purge runs

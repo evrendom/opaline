@@ -53,6 +53,28 @@ test("capture and history run only for the listed workspaces", () => {
 	}
 });
 
+test("* alone turns the log on for every workspace; * mixed with ids turns it off", () => {
+	process.env.ANALYSIS_LOG_STORE = "memory";
+	setAnalysisLogForTests(undefined);
+	process.env.ANALYSIS_LOG_WORKSPACES = " * ";
+	expect(getAnalysisLog(WORKSPACE)).not.toBeNull();
+	expect(getAnalysisLog("workspace_two")).not.toBeNull();
+	expect(getAnalysisLog("")).toBeNull();
+	for (const value of [`*,${WORKSPACE}`, `${WORKSPACE}, *`, "*,*"]) {
+		process.env.ANALYSIS_LOG_WORKSPACES = value;
+		expect(getAnalysisLog(WORKSPACE)).toBeNull();
+		expect(getAnalysisLog("workspace_two")).toBeNull();
+	}
+});
+
+test("* restricts results in every workspace; * mixed with ids restricts them all", () => {
+	for (const value of ["*", `*,${WORKSPACE}`]) {
+		process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = value;
+		expect(restrictsAnalysisResults(WORKSPACE)).toBe(true);
+		expect(restrictsAnalysisResults("workspace_two")).toBe(true);
+	}
+});
+
 test("stored results are restricted only in the listed workspaces", () => {
 	process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = ` other , ${WORKSPACE}`;
 	expect(restrictsAnalysisResults(WORKSPACE)).toBe(true);

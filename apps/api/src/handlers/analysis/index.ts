@@ -26,6 +26,10 @@ import type { AnalysisLog } from "../../services/analysis-log/types.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-access.js";
 
+/** Why history calls fail where the log is off, phrased for the calling agent. */
+export const ANALYSIS_HISTORY_OFF =
+	"Analysis history is off for this workspace; answer with find and read, and skip analyses search and save.";
+
 /** Longest rendered trace line ("trace analysis=… step=… query=…") plus its newline. */
 const TRACE_LINE_RESERVE = 80;
 
@@ -134,9 +138,10 @@ export function createAnalysisRouter(
 	});
 	const requireLog = (context: { organizationId: string }): AnalysisLog => {
 		const log = analysisLog(context.organizationId);
+		// Agents read this message (the analyses MCP tool returns it as text).
 		if (!log)
 			throw new ORPCError("PRECONDITION_FAILED", {
-				message: "The analysis log is not enabled for this workspace",
+				message: ANALYSIS_HISTORY_OFF,
 			});
 		return log;
 	};

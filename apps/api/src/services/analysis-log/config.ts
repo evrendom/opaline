@@ -18,15 +18,16 @@ let configured: AnalysisLog | null | undefined;
 
 /**
  * The analysis log for one workspace. Capture and history run only for the
- * workspaces listed in `ANALYSIS_LOG_WORKSPACES` (comma-separated ids; empty
- * or missing means nobody), and only with a configured store:
+ * workspaces listed in `ANALYSIS_LOG_WORKSPACES` (comma-separated ids, or `*`
+ * for every workspace; empty or missing means nobody), and only with a
+ * configured store:
  * `ANALYSIS_LOG_STORE` = `memory` keeps analyses in process, embedded with
  * OpenAI when `OPENAI_API_KEY` is set and local word vectors otherwise;
  * `convex` uses the Convex deployment at `CONVEX_URL`, authenticated with
  * `ANALYSIS_LOG_SIGNING_KEY`, and always OpenAI, because its vectors persist.
  */
 export function getAnalysisLog(workspaceId: string): AnalysisLog | null {
-	return listsWorkspace("ANALYSIS_LOG_WORKSPACES", workspaceId)
+	return listsWorkspace("ANALYSIS_LOG_WORKSPACES", workspaceId, false)
 		? configuredAnalysisLog()
 		: null;
 }
@@ -34,18 +35,66 @@ export function getAnalysisLog(workspaceId: string): AnalysisLog | null {
 /**
  * Whether the workspace opted into restricting stored results that read other
  * members' sessions to admins and the sessions' own member
- * (`ANALYSIS_LOG_RESTRICTED_WORKSPACES`, comma-separated ids; empty or missing
- * means nobody, so a shared analysis shows its results to the workspace).
+ * (`ANALYSIS_LOG_RESTRICTED_WORKSPACES`, comma-separated ids or `*`; empty or
+ * missing means nobody, so a shared analysis shows its results to the
+ * workspace).
  */
 export function restrictsAnalysisResults(workspaceId: string): boolean {
-	return listsWorkspace("ANALYSIS_LOG_RESTRICTED_WORKSPACES", workspaceId);
+	return listsWorkspace(
+		"ANALYSIS_LOG_RESTRICTED_WORKSPACES",
+		workspaceId,
+		true,
+	);
 }
 
-function listsWorkspace(variable: string, workspaceId: string): boolean {
-	const workspaces = (process.env[variable] ?? "")
+/**
+ * Whether the variable lists the workspace. An invalid list answers
+ * `whenInvalid` for every workspace: the side that never widens access.
+ */
+function listsWorkspace(
+	variable: string,
+	workspaceId: string,
+	whenInvalid: boolean,
+): boolean {
+	const listed = workspaceList(variable);
+	if (listed.error) {
+		reportConfigError(listed.error);
+		return whenInvalid;
+	}
+	return workspaceId !== "" && (listed.all || listed.ids.includes(workspaceId));
+}
+
+/**
+ * Workspaces a comma-separated variable names: `*` alone is every workspace,
+ * ids name some, empty or missing is none. `*` among ids is an error.
+ */
+function workspaceList(variable: string): {
+	all: boolean;
+	ids: string[];
+	error: string | null;
+} {
+	const ids = (process.env[variable] ?? "")
 		.split(",")
-		.map((id) => id.trim());
-	return workspaceId !== "" && workspaces.includes(workspaceId);
+		.map((id) => id.trim())
+		.filter(Boolean);
+	const all = ids.includes("*");
+	return {
+		all: all && ids.length === 1,
+		ids: all ? [] : ids,
+		error:
+			all && ids.length > 1
+				? `${variable} mixes * with workspace ids; use * alone or only ids`
+				: null,
+	};
+}
+
+const reportedConfigErrors = new Set<string>();
+
+/** Logs each configuration error once per process, not on every request. */
+function reportConfigError(error: string): void {
+	if (reportedConfigErrors.has(error)) return;
+	reportedConfigErrors.add(error);
+	logger.error("Analysis log configuration error: {error}", { error });
 }
 
 /**
