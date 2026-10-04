@@ -47,6 +47,16 @@ export function resolveGitHubOutcomesVisibility(input: {
 	return input.forced ? "preview" : "hidden";
 }
 
+// A daily pass is enqueued 24 h after the previous one and can take hours to finish.
+const READY_HISTORY_MAX_AGE_HOURS = 48;
+
+/**
+ * A repository is included while its completed history is contiguous from its
+ * first window to its last complete window end and that end is recent. Windows
+ * of a newer pass that is still running do not exclude it: coverage is measured
+ * only over complete windows and only up to the last complete end, so a pending
+ * window matters only where no complete window covers its range (a gap).
+ */
 export async function refreshPrTotalsReadiness(
 	database: postgres.Sql | postgres.TransactionSql,
 	organizationId: string,
@@ -57,10 +67,10 @@ export async function refreshPrTotalsReadiness(
 	 WITH datasets AS (
 	  SELECT s.repository_id, s.dataset,
 	   range_agg(tstzrange(s.window_start, s.window_end + interval '1 second', '[)')) FILTER (WHERE s.status = 'complete') AS covered,
-	   min(s.window_start) AS first_start, max(s.window_end) + interval '1 second' AS last_end,
-	   max(s.window_end) FILTER (WHERE s.status = 'complete') AS last_complete_end,
+	   min(s.window_start) AS first_start,
+	   max(s.window_end) FILTER (WHERE s.status = 'complete') + interval '1 second' AS complete_end,
+	   coalesce(max(s.window_end) FILTER (WHERE s.status = 'complete') >= $2::timestamptz - make_interval(hours => $3::int), false) AS recent,
 	   min(s.retention_boundary) AS ci_from,
-	   bool_or(s.status = 'pending') AS pending,
 	   bool_or(s.status = 'unavailable' AND s.error IN ('github-403', 'github-404')) AS inaccessible,
 	   min(s.error) FILTER (WHERE s.status = 'unavailable' AND s.error IN ('github-403', 'github-404')) AS reason,
 	   bool_or(s.status = 'unavailable' AND s.error IS DISTINCT FROM 'provider-retention') AS unavailable,
@@ -68,15 +78,13 @@ export async function refreshPrTotalsReadiness(
 	  FROM github_repository_sweep s WHERE s.organization_id = $1 GROUP BY 1,2
 	 ), repos AS (
 	  SELECT b.repository_id, b.full_name, p.first_start AS pr_from, a.ci_from,
-	   coalesce(NOT e.pending AND NOT e.unavailable, false) AS external_complete,
-	   coalesce(a.ci_from IS NULL AND a.covered @> tstzrange(p.first_start, a.last_end, '[)'), false) AS no_actions,
-	   coalesce(p.covered @> tstzrange(p.first_start, p.last_end, '[)')
-	    AND a.covered @> tstzrange(greatest(p.first_start, a.ci_from), a.last_end, '[)')
-	    AND NOT coalesce(t.pending OR t.unavailable, false)
-	    AND NOT coalesce(e.pending OR e.unavailable, false)
-	    AND e.first_start IS NOT NULL
-	    AND p.last_complete_end >= $2::timestamptz - interval '24 hours'
-	    AND a.last_complete_end >= $2::timestamptz - interval '24 hours'
+	   coalesce(e.covered @> tstzrange(e.first_start, e.complete_end, '[)') AND e.recent AND NOT e.unavailable, false) AS external_complete,
+	   coalesce(a.ci_from IS NULL AND a.covered @> tstzrange(p.first_start, a.complete_end, '[)'), false) AS no_actions,
+	   coalesce(p.covered @> tstzrange(p.first_start, p.complete_end, '[)') AND p.recent
+	    AND a.covered @> tstzrange(greatest(p.first_start, a.ci_from), a.complete_end, '[)') AND a.recent
+	    AND (t.dataset IS NULL OR t.covered @> tstzrange(t.first_start, t.complete_end, '[)') AND t.recent)
+	    AND e.covered @> tstzrange(e.first_start, e.complete_end, '[)') AND e.recent
+	    AND NOT coalesce(p.unavailable OR a.unavailable OR t.unavailable OR e.unavailable, false)
 	    AND NOT coalesce(p.inaccessible OR a.inaccessible OR t.inaccessible OR e.inaccessible, false), false) AS included,
 	   coalesce(p.reason, a.reason, t.reason, e.reason) AS reason,
 	   least(p.synced, a.synced) AS synced
@@ -103,6 +111,6 @@ export async function refreshPrTotalsReadiness(
 	  first_ready_at = CASE WHEN NOT (EXCLUDED.details->>'activeInstallation')::boolean OR jsonb_array_length(EXCLUDED.details->'repositories') = 0 THEN NULL
 	   ELSE coalesce(organization_feature_readiness.first_ready_at, EXCLUDED.first_ready_at) END,
 	  computed_at = EXCLUDED.computed_at, details = EXCLUDED.details`,
-		[organizationId, now.toISOString()],
+		[organizationId, now.toISOString(), READY_HISTORY_MAX_AGE_HOURS],
 	);
 }

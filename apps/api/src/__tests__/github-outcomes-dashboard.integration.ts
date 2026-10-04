@@ -443,6 +443,53 @@ test("runs are counted for repositories whose CI floor falls back to the PR floo
 	expect(result.metrics.ciRuns?.githubHistory?.ciFrom).toBe(historyFrom);
 });
 
+test("a repository mid daily pass keeps its metrics and is not syncing", async () => {
+	const owner = users[0];
+	assert(owner);
+	const previousPass = new Date(now.getTime() - 26 * 3_600_000);
+	await seedGitHubRepository(owner.id, "206", "opalinehq/daily-pass", {
+		now: previousPass,
+	});
+	const passStart = new Date(now.getTime() - 2 * 3_600_000);
+	const passHorizon = new Date(passStart);
+	passHorizon.setUTCFullYear(passHorizon.getUTCFullYear() - 2);
+	for (const dataset of ["pulls", "actions", "attempts", "external"])
+		await sqlClient.unsafe(
+			`INSERT INTO github_repository_sweep (organization_id, repository_id, dataset, window_start, window_end, status) VALUES ($1, '206', $2, $3, $4, 'pending')`,
+			[owner.id, dataset, passHorizon.toISOString(), passStart.toISOString()],
+		);
+	await seedGitHubPull(
+		owner.id,
+		"206",
+		1,
+		"2026-09-29T00:00:00Z",
+		"2026-09-30T00:00:00Z",
+	);
+	await seedGitHubRun(owner.id, "206", "daily", "2026-09-29T12:00:00Z", {
+		pullNumber: 1,
+	});
+	await refreshPrTotalsReadiness(sqlClient, owner.id, now);
+	const readiness = await readGitHubOutcomesReadiness(sqlClient, owner.id);
+	expect(
+		readiness?.details.repositories.find((repo) => repo.repositoryId === "206")
+			?.included,
+	).toBe(true);
+	const pulls = (await dashboard({ repositories: ["206"] })).metrics
+		.mergedPullRequests;
+	expect(pulls?.total).toBe(1);
+	expect(
+		pulls?.breakdowns.pullRequestCi.find((entry) => entry.id === "passed")
+			?.value,
+	).toBe(1);
+	expect(pulls?.githubHistory?.syncingRepositories).toBe(0);
+	expect(pulls?.incomplete).toBe(false);
+	const runs = (
+		await dashboard({ repositories: ["206"], requestedMetric: "ciRuns" })
+	).metrics.ciRuns;
+	expect(runs?.total).toBe(1);
+	expect(runs?.incomplete).toBe(false);
+});
+
 test("removed, syncing and inaccessible bindings are excluded and readiness is sticky", async () => {
 	const owner = users[0];
 	assert(owner);

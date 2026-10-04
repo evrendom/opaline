@@ -18,7 +18,14 @@ import {
 	persistGitHubRuns,
 	persistGitHubStatuses,
 } from "./github-outcomes-persistence.service.js";
-import { persistGitHubRepositoryInstallation } from "./github-repository-binding.service.js";
+import {
+	readGitHubOutcomesReadiness,
+	refreshPrTotalsReadiness,
+} from "./github-outcomes-readiness.service.js";
+import {
+	getGitHubRepositoryConnectionStatus,
+	persistGitHubRepositoryInstallation,
+} from "./github-repository-binding.service.js";
 import {
 	enqueueGitHubRepositorySweep,
 	isGitHubSweepEnabled,
@@ -36,6 +43,7 @@ import { deleteUserPostgresData } from "./user-deletion.service.js";
 setDefaultTimeout(120_000);
 
 const NOW = new Date("2026-10-01T12:00:00Z");
+const RETENTION_BOUNDARY = "2025-09-01T00:00:00.000Z";
 const HEAD = "a".repeat(40);
 const ids: string[] = [];
 const users: string[] = [];
@@ -1261,6 +1269,124 @@ test("a workspace purge tombstone fences every fact writer", async () => {
 	expect(progress).toEqual({ status: "pending", cursor: {} });
 	await expectEmpty(scope.organizationId);
 });
+
+test("a daily pass in progress keeps a repository with complete history ready", async () => {
+	const scope = await seedCompletedHistory();
+	expect((await repositoryReadiness(scope, NOW))?.included).toBe(true);
+	const nextPass = new Date(NOW.getTime() + 86_400_000);
+	await enqueueGitHubRepositorySweep(scope, nextPass, sqlClient);
+	const pending = await sqlClient.unsafe<Array<{ dataset: string }>>(
+		"SELECT DISTINCT dataset FROM github_repository_sweep WHERE organization_id = $1 AND status = 'pending' ORDER BY dataset",
+		[scope.organizationId],
+	);
+	expect(pending.map((row) => row.dataset)).toEqual([
+		"actions",
+		"attempts",
+		"commits",
+		"external",
+		"jobs",
+		"pulls",
+	]);
+	const repository = await repositoryReadiness(
+		scope,
+		new Date(nextPass.getTime() + 3 * 3_600_000),
+	);
+	expect(repository).toMatchObject({
+		included: true,
+		externalComplete: true,
+		reason: null,
+	});
+	expect(new Date(repository?.ciFrom ?? "").toISOString()).toBe(
+		RETENTION_BOUNDARY,
+	);
+	expect(
+		(await readGitHubOutcomesReadiness(sqlClient, scope.organizationId))
+			?.status,
+	).toBe("ready");
+	const connection = await getGitHubRepositoryConnectionStatus({
+		database: sqlClient,
+		organizationId: scope.organizationId,
+	});
+	expect(connection.repositories[0]?.sync).toEqual({ state: "ready" });
+});
+
+test("a repository whose last complete pass ended over 48 hours ago is not ready", async () => {
+	const scope = await seedCompletedHistory();
+	await enqueueGitHubRepositorySweep(
+		scope,
+		new Date(NOW.getTime() + 86_400_000),
+		sqlClient,
+	);
+	expect(
+		(await repositoryReadiness(scope, new Date(NOW.getTime() + 47 * 3_600_000)))
+			?.included,
+	).toBe(true);
+	expect(
+		(await repositoryReadiness(scope, new Date(NOW.getTime() + 49 * 3_600_000)))
+			?.included,
+	).toBe(false);
+	const connection = await getGitHubRepositoryConnectionStatus({
+		database: sqlClient,
+		organizationId: scope.organizationId,
+	});
+	expect(connection.repositories[0]?.sync?.state).toBe("syncing");
+});
+
+test("a pending window inside complete history excludes the repository though a daily pass overlaps it", async () => {
+	const scope = await seedCompletedHistory();
+	const nextPass = new Date(NOW.getTime() + 86_400_000);
+	await enqueueGitHubRepositorySweep(scope, nextPass, sqlClient);
+	const midPass = new Date(nextPass.getTime() + 3 * 3_600_000);
+	expect((await repositoryReadiness(scope, midPass))?.included).toBe(true);
+	const reopened = await sqlClient.unsafe(
+		`UPDATE github_repository_sweep SET status = 'pending', completed_at = NULL WHERE organization_id = $1 AND dataset = 'actions' AND status = 'complete' AND window_start <= '2026-03-01T00:00:00Z' AND window_end > '2026-03-01T00:00:00Z'`,
+		[scope.organizationId],
+	);
+	expect(reopened.count).toBe(1);
+	expect((await repositoryReadiness(scope, midPass))?.included).toBe(false);
+});
+
+test("an initial sync that never completed is not ready", async () => {
+	const scope = await seed(2, true);
+	await sqlClient.unsafe(
+		`UPDATE github_repository_sweep SET status = 'complete', completed_at = $2 WHERE organization_id = $1 AND dataset <> 'pulls'`,
+		[scope.organizationId, NOW.toISOString()],
+	);
+	expect((await repositoryReadiness(scope, NOW))?.included).toBe(false);
+	const connection = await getGitHubRepositoryConnectionStatus({
+		database: sqlClient,
+		organizationId: scope.organizationId,
+	});
+	expect(connection.repositories[0]?.sync?.state).toBe("syncing");
+});
+
+/** Completes the initial two-year pass; Actions history older than GitHub retains is unavailable. */
+async function seedCompletedHistory() {
+	const scope = await seed(2, true);
+	await sqlClient.unsafe(
+		`UPDATE github_repository_sweep SET status = 'complete', completed_at = $2, retention_boundary = $3 WHERE organization_id = $1`,
+		[scope.organizationId, NOW.toISOString(), RETENTION_BOUNDARY],
+	);
+	await sqlClient.unsafe(
+		`UPDATE github_repository_sweep SET status = 'unavailable', error = 'provider-retention' WHERE organization_id = $1 AND dataset = 'actions' AND window_end < $2`,
+		[scope.organizationId, RETENTION_BOUNDARY],
+	);
+	return scope;
+}
+
+async function repositoryReadiness(
+	scope: { organizationId: string; repositoryId: string },
+	now: Date,
+) {
+	await refreshPrTotalsReadiness(sqlClient, scope.organizationId, now);
+	const readiness = await readGitHubOutcomesReadiness(
+		sqlClient,
+		scope.organizationId,
+	);
+	return readiness?.details.repositories.find(
+		(repository) => repository.repositoryId === scope.repositoryId,
+	);
+}
 
 async function seed(days = 2, fullHistory = false) {
 	const organizationId = `s1-${randomUUID()}`;
