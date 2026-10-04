@@ -9,6 +9,7 @@ import {
 import {
 	type contract,
 	extractNativeCodexLineageEvidence,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
 	IngestSessionOutputSchema,
 	PRODUCT_ANALYTICS_EVENTS,
@@ -20,8 +21,8 @@ import {
 	SESSION_OWNERSHIP_CONFLICT_CODE,
 	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
 } from "@rudel/api-routes";
+import { SESSION_INGEST_FILTER_VERSION } from "@rudel/api-routes/transcript-slim";
 import {
-	FILTER_VERSION,
 	getRedactionBudgetAnomaly,
 	SecretFilterConvergenceError,
 	SecretFilterJsonIntegrityError,
@@ -51,6 +52,7 @@ import { computeIngestContentHash } from "./lib/ingest-content-hash.js";
 import {
 	getIngestContentShape,
 	type IngestContentShape,
+	isComparableIngestShapeVersion,
 	isUnexpectedIngestShrink,
 	resolvePreviousIngestContentShape,
 } from "./lib/ingest-content-shape.js";
@@ -80,6 +82,12 @@ import {
 } from "./rate-limit.js";
 import { readResendConfig } from "./resend-config.js";
 import {
+	type AnalysisUploadEnv,
+	createAnalysisUploadEnv,
+	linkUploadedSession,
+	resolveAnalysisUploadWorkspace,
+} from "./services/analysis-log/analysis-uploads.js";
+import {
 	createOrganizationBillingPortalSession,
 	createOrganizationCheckoutSession,
 	createOrganizationPlanSelectionSession,
@@ -101,6 +109,7 @@ import {
 	recordUserCliVersion,
 } from "./services/cli-version.service.js";
 import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge-tombstone.service.js";
+import { persistGitObservationsBestEffort } from "./services/git-observation-extraction.service.js";
 import {
 	createGitHubInstallationUrl,
 	type GitHubRepositoryAppConfig,
@@ -368,6 +377,10 @@ const cliAuthStatus = os.cli.authStatus
 			id: context.user.id,
 			email: context.user.email,
 			name: context.user.name,
+			capabilities: {
+				analysisLinkedUploads: true as const,
+				transcriptSlimming: true as const,
+			},
 		};
 	});
 
@@ -584,6 +597,7 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 export async function processIngestSession({
 	aggregateContentMaxBytes,
 	allowQuiescedIngest = false,
+	analysisUploads,
 	awaitBestEffortLanguageSignals = false,
 	awaitLanguageSignals,
 	context,
@@ -596,6 +610,8 @@ export async function processIngestSession({
 }: {
 	aggregateContentMaxBytes?: number;
 	allowQuiescedIngest?: boolean;
+	/** Where `input.analysisId` links are recorded; the configured log by default. */
+	analysisUploads?: AnalysisUploadEnv;
 	awaitBestEffortLanguageSignals?: boolean;
 	awaitLanguageSignals: boolean;
 	context: {
@@ -700,7 +716,7 @@ export async function processIngestSession({
 	});
 	const redactionBudgetAnomaly = getRedactionBudgetAnomaly(
 		filteredText.redactedBytes,
-		aggregateBytes,
+		filteredText.filterInputBytes,
 		filteredText.counts,
 	);
 	if (redactionBudgetAnomaly) {
@@ -713,7 +729,7 @@ export async function processIngestSession({
 		...input,
 		content: filteredText.content,
 		subagents: filteredText.subagents ? [...filteredText.subagents] : undefined,
-		filter_version: FILTER_VERSION,
+		filter_version: SESSION_INGEST_FILTER_VERSION,
 	};
 	const adapter = getAdapter(filteredInput.source);
 	let timestamps: SessionTimestamps | null;
@@ -767,10 +783,14 @@ export async function processIngestSession({
 	const previousContentShape = resolvePreviousIngestContentShape(ownership);
 	if (
 		!input.force_replace &&
-		(ownership.lastFilterVersion === null ||
-			ownership.lastFilterVersion === FILTER_VERSION) &&
 		previousContentShape !== null &&
 		isUnexpectedIngestShrink(previousContentShape, contentShape, {
+			// Only byte sizes are re-baselined across a filter version bump;
+			// lost assistant records or subagent streams are always refused.
+			compareBytes: isComparableIngestShapeVersion(
+				ownership.lastFilterVersion,
+				SESSION_INGEST_FILTER_VERSION,
+			),
 			compareTotalsOnly: ownership.lastContentShape === null,
 		})
 	) {
@@ -827,7 +847,7 @@ export async function processIngestSession({
 	// an old unfiltered CLI upload and a current pre-filtered CLI upload
 	// converge after server filtering instead of creating duplicate rows.
 	const contentHash = computeIngestContentHash(filteredInput);
-	return processPreparedIngestSession({
+	const processed = await processPreparedIngestSession({
 		awaitBestEffortLanguageSignals,
 		awaitLanguageSignals,
 		context,
@@ -846,6 +866,41 @@ export async function processIngestSession({
 		},
 		signal,
 	});
+	if (!input.analysisId) return processed;
+	// After the upload is stored, so every path (direct, R2 commit and its
+	// recovery, identical re-uploads) records the link; the echo tells the CLI.
+	const linked = await linkUploadedSession(
+		{
+			analysisId: input.analysisId,
+			organizationId: orgId,
+			sessionId: input.sessionId,
+			source: filteredInput.source,
+			uploadedAt: new Date().toISOString(),
+			userId: context.user.id,
+		},
+		analysisUploads ?? createAnalysisUploadEnv(),
+	);
+	return linked
+		? {
+				...processed,
+				result: { ...processed.result, analysisId: input.analysisId },
+			}
+		: processed;
+}
+
+/** An upload naming an analysis goes to that analysis's workspace. */
+async function resolveUploadOrganizationId(
+	analysisId: string | undefined,
+	requestedOrganizationId: string | null,
+	userId: string,
+): Promise<string | null> {
+	return analysisId
+		? resolveAnalysisUploadWorkspace(
+				analysisId,
+				userId,
+				createAnalysisUploadEnv(),
+			)
+		: requestedOrganizationId;
 }
 
 interface PreparedIngestSession {
@@ -905,7 +960,7 @@ async function processPreparedIngestSession({
 			const ledgerResult = await withIngestProcessingLedger(
 				{
 					filteredContentSha256: contentHash,
-					filterVersion: FILTER_VERSION,
+					filterVersion: SESSION_INGEST_FILTER_VERSION,
 					organizationId: orgId,
 					sessionId: input.sessionId,
 				},
@@ -1025,7 +1080,10 @@ async function processPreparedIngestSession({
 				}),
 				{
 					parserVersion: SKILL_PARSER_VERSION,
-					sourceContentSha256: hashSkillSourceContent(filteredInput.content),
+					sourceContentSha256: hashSkillSourceContent(
+						filteredInput.content,
+						subagents,
+					),
 				},
 			);
 		const transcriptRecordsCurrent = await isTranscriptRecordsCurrent(
@@ -1050,6 +1108,22 @@ async function processPreparedIngestSession({
 				},
 			);
 		} else {
+			// Records are current, but their git observations may have been
+			// skipped (no admission slot) or failed; extraction is a no-op when its
+			// receipt is current and is best-effort, never failing the upload.
+			if (transcriptRecordsConfig.enabled)
+				await persistGitObservationsBestEffort(getClickhouse(), {
+					assertWritable: () =>
+						assertNoClickHousePurgeTombstone(
+							{ organizationId: orgId, userId: context.user.id },
+							{ database: sqlClient },
+						),
+					organizationId: orgId,
+					sessionId: input.sessionId,
+					signal,
+					source: filteredInput.source,
+					userId: context.user.id,
+				});
 			logger.info(
 				"Skipping duplicate session ingest (organization_id={organizationId} session_id={sessionId})",
 				{ organizationId: orgId, sessionId: input.sessionId },
@@ -1102,7 +1176,7 @@ async function processPreparedIngestSession({
 		input.sessionId,
 		contentHash,
 		contentShape,
-		FILTER_VERSION,
+		SESSION_INGEST_FILTER_VERSION,
 		new Date(timestamps.sessionDate),
 		ingestedAt,
 		revision,
@@ -1256,7 +1330,7 @@ async function processPreparedIngestSession({
 					await writeUsageExtraction(clickhouse, {
 						contentSha256: contentHash,
 						extraction: error.extraction,
-						filterVersion: FILTER_VERSION,
+						filterVersion: SESSION_INGEST_FILTER_VERSION,
 						generation: usageGeneration,
 						ingestedAt,
 						organizationId: orgId,
@@ -1336,7 +1410,7 @@ async function processPreparedIngestSession({
 		await writeUsageExtraction(clickhouse, {
 			contentSha256: contentHash,
 			extraction: usageExtraction,
-			filterVersion: FILTER_VERSION,
+			filterVersion: SESSION_INGEST_FILTER_VERSION,
 			generation: usageGeneration,
 			ingestedAt,
 			organizationId: orgId,
@@ -1373,7 +1447,7 @@ async function processPreparedIngestSession({
 				input.sessionId,
 				contentHash,
 				contentShape,
-				FILTER_VERSION,
+				SESSION_INGEST_FILTER_VERSION,
 				new Date(timestamps.sessionDate),
 				ingestedAt,
 				revision,
@@ -1495,8 +1569,18 @@ const cliSessionUploadStatus = os.cli.sessionUploadStatus
 
 const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
-	.handler(async ({ input, context, errors, signal }) => {
+	.handler(async ({ input: requested, context, errors, signal }) => {
+		const analysisOrganizationId = await resolveUploadOrganizationId(
+			requested.analysisId,
+			null,
+			context.user.id,
+		);
+		const input = analysisOrganizationId
+			? { ...requested, organizationId: analysisOrganizationId }
+			: requested;
 		const processed = await processIngestSession({
+			// Sessions above the direct size upload only through R2.
+			aggregateContentMaxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
 			allowQuiescedIngest: context.ingestOperatorAuthorized,
 			awaitLanguageSignals: isVercelRuntime(),
 			context: {
@@ -1855,7 +1939,11 @@ const r2IngestInit = os.ingest.init
 
 		const activeOrganizationId = getActiveOrganizationId(context.session);
 		const organizationId = await resolveIngestOrganizationId(
-			input.organizationId ?? activeOrganizationId,
+			await resolveUploadOrganizationId(
+				input.analysisId,
+				input.organizationId ?? activeOrganizationId,
+				context.user.id,
+			),
 			context.user.id,
 		);
 		await assertCanStartOrganizationAgentRun(
@@ -1866,7 +1954,7 @@ const r2IngestInit = os.ingest.init
 		try {
 			return await initR2IngestJob({
 				database: sqlClient,
-				input,
+				input: input.analysisId ? { ...input, organizationId } : input,
 				now: () => new Date(),
 				organizationId,
 				r2: createR2MultipartUploadClient(availability.configuration),

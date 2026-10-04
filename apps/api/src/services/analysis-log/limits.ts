@@ -7,4 +7,6 @@
  */
 export const MAX_QUERIES_PER_ANALYSIS = 200;
 export const MAX_STEPS_PER_ANALYSIS = 200;
+/** Chat sessions linked to one analysis (a chat, its parents and subagents). */
+export const MAX_SESSIONS_PER_ANALYSIS = 200;
 export const MAX_QUERY_ARGS_BYTES = 32 * 1024;

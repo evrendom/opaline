@@ -199,6 +199,47 @@ describe("usage extraction worker boundary", () => {
 		byteQueue.close();
 	});
 
+	test("admits a session above the standard size only into an empty queue", async () => {
+		const MEBIBYTE = 1024 * 1024;
+		const queue = createQueue();
+		const largeController = new AbortController();
+		const large = queue.extract({
+			bytes: 256 * MEBIBYTE,
+			input: { ...BASE_INPUT, content: "large" },
+			signal: largeController.signal,
+			userId: "tenant-large",
+		});
+		const rejectedLarge = queue.extract({
+			bytes: 129 * MEBIBYTE,
+			input: { ...BASE_INPUT, content: "second large" },
+			signal: new AbortController().signal,
+			userId: "tenant-other",
+		});
+		const rejectedStandard = queue.extract({
+			bytes: 1,
+			input: { ...BASE_INPUT, content: "standard" },
+			signal: new AbortController().signal,
+			userId: "tenant-other",
+		});
+
+		expect(queue.getMetrics()).toMatchObject({
+			queueDepth: 1,
+			queuedBytes: 256 * MEBIBYTE,
+			rejectionCount: 2,
+		});
+		largeController.abort();
+		await expect(rejectedLarge).rejects.toMatchObject({
+			limit: "global-bytes",
+		});
+		await expect(rejectedStandard).rejects.toMatchObject({
+			limit: "global-bytes",
+		});
+		await expect(large).rejects.toBeInstanceOf(
+			UsageExtractionQueueAbortedError,
+		);
+		queue.close();
+	});
+
 	test("dispatches accepted work round-robin across users", async () => {
 		const queue = createQueue();
 		const slowContent = `${JSON.stringify({ type: "user" })}\n`.repeat(100_000);

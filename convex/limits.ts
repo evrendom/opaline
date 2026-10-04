@@ -6,7 +6,8 @@
  */
 export const MAX_QUERIES_PER_ANALYSIS = 200;
 export const MAX_STEPS_PER_ANALYSIS = 200;
+export const MAX_SESSIONS_PER_ANALYSIS = 200;
 
-export function analysisFull(child: "queries" | "steps") {
+export function analysisFull(child: "queries" | "steps" | "sessions") {
 	return { kind: "analysisFull", child } as const;
 }

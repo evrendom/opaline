@@ -268,6 +268,53 @@ describe("IngestFilterQueue limits", () => {
 	});
 });
 
+describe("IngestFilterQueue large sessions", () => {
+	test("admits a session above the standard size only into an empty queue", async () => {
+		const MEBIBYTE = 1024 * 1024;
+		const queue = new IngestFilterQueue({
+			globalMaxBytes: 256 * MEBIBYTE,
+			globalMaxJobs: 8,
+			perUserMaxBytes: 128 * MEBIBYTE,
+			perUserMaxJobs: 5,
+			timeoutMs: 10_000,
+		});
+		const largeController = new AbortController();
+		const large = queue.filter({
+			bytes: 200 * MEBIBYTE,
+			fields: { content: "large", subagents: undefined },
+			signal: largeController.signal,
+			userId: "large-user",
+		});
+		const secondLarge = queue.filter({
+			bytes: 129 * MEBIBYTE,
+			fields: { content: "second large", subagents: undefined },
+			signal: new AbortController().signal,
+			userId: "other-user",
+		});
+		const standardController = new AbortController();
+		const standard = queue.filter({
+			bytes: 56 * MEBIBYTE,
+			fields: { content: "standard", subagents: undefined },
+			signal: standardController.signal,
+			userId: "other-user",
+		});
+
+		expect(queue.getMetrics()).toMatchObject({
+			queueDepth: 2,
+			queuedBytes: 256 * MEBIBYTE,
+			rejectionCount: 1,
+		});
+		largeController.abort();
+		standardController.abort();
+		await expect(secondLarge).rejects.toMatchObject({ limit: "global-bytes" });
+		await expect(large).rejects.toBeInstanceOf(IngestFilterQueueAbortedError);
+		await expect(standard).rejects.toBeInstanceOf(
+			IngestFilterQueueAbortedError,
+		);
+		queue.close();
+	});
+});
+
 describe("IngestFilterQueue cleanup and fairness", () => {
 	test("returns a typed operational error when the worker crashes", async () => {
 		const queue = new IngestFilterQueue(

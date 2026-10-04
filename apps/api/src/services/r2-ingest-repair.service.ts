@@ -1,3 +1,5 @@
+import { getLogger } from "@logtape/logtape";
+import type { IngestSessionInput } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
 import { isVercelRuntime } from "../lib/api-runtime.js";
 import {
@@ -17,13 +19,26 @@ import {
 	getNextR2IngestWorkDueAt,
 	repairR2IngestCleanupJobs,
 	sweepExpiredR2IngestJobs,
+	wakeR2IngestWorker,
 } from "./r2-ingest-cleanup.service.js";
-import { repairRecoverableR2IngestJobs } from "./r2-ingest-commit.service.js";
+import {
+	hasDueLargeR2IngestWork,
+	type R2IngestProcessor,
+	repairRecoverableR2IngestJobs,
+} from "./r2-ingest-commit.service.js";
+import { canMaterializeLargeR2IngestJobs } from "./r2-ingest-materialization-gate.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 import {
 	getNextEvidenceWorkDueAt,
 	sweepRepositoryEvidence,
 } from "./repository-evidence-fence.service.js";
+
+const logger = getLogger(["rudel", "api", "r2-ingest-repair"]);
+const LARGE_INGEST_WATCH_INTERVAL_MS = 15_000;
+
+export interface LargeR2IngestWatcher {
+	readonly stop: () => void;
+}
 
 export interface R2IngestRepairPassResult {
 	readonly attempted: number;
@@ -59,27 +74,7 @@ export async function runR2IngestRepairPass(
 		? await repairRecoverableR2IngestJobs({
 				database: sqlClient,
 				deadline,
-				process: (sessionInput, identity, signal) =>
-					processIngestSession({
-						// Vercel has no resident reconciler, so recovered jobs must attempt
-						// their derived signals before completing. Best-effort persistence
-						// still keeps scanner availability outside the recovery contract.
-						awaitBestEffortLanguageSignals: isVercelRuntime(),
-						awaitLanguageSignals: false,
-						context: {
-							apiKeyId: null,
-							session: null,
-							user: { id: identity.userId },
-						},
-						durableProcessing: {
-							failpoint: undefined,
-							operationId: identity.operationId,
-						},
-						enforceRateLimits: false,
-						errorFactories: createBackgroundIngestErrorFactories(),
-						input: sessionInput,
-						signal,
-					}),
+				process: processRecoveredR2IngestJob,
 				r2,
 				sessionIngestQuiesced,
 			})
@@ -135,8 +130,73 @@ export async function runR2IngestRepairPass(
 	};
 }
 
+/**
+ * Materializes one recovered R2 job. Shared by the recovery pass (Vercel cron,
+ * resident worker) and the large-session worker, so every path runs the same
+ * processing with background error factories and no rate limits.
+ */
+export function processRecoveredR2IngestJob(
+	sessionInput: IngestSessionInput,
+	identity: { operationId: string; userId: string },
+	signal: AbortSignal,
+): ReturnType<R2IngestProcessor> {
+	return processIngestSession({
+		// Vercel has no resident reconciler, so recovered jobs must attempt
+		// their derived signals before completing. Best-effort persistence
+		// still keeps scanner availability outside the recovery contract.
+		awaitBestEffortLanguageSignals: isVercelRuntime(),
+		awaitLanguageSignals: false,
+		context: {
+			apiKeyId: null,
+			session: null,
+			user: { id: identity.userId },
+		},
+		durableProcessing: {
+			failpoint: undefined,
+			operationId: identity.operationId,
+		},
+		enforceRateLimits: false,
+		errorFactories: createBackgroundIngestErrorFactories(),
+		input: sessionInput,
+		signal,
+	});
+}
+
 function earliest(first: Date | null, second: Date | null): Date | null {
 	if (!first) return second;
 	if (!second) return first;
 	return first.getTime() <= second.getTime() ? first : second;
+}
+
+/**
+ * Large sessions are committed on Vercel but materialized only by the resident
+ * worker, which otherwise learns of new work at its next scheduled pass. This
+ * polls one indexed row every 15 seconds and wakes the worker when a large job
+ * is due. A no-op where large jobs cannot be materialized.
+ */
+export function startLargeR2IngestWatcher(): LargeR2IngestWatcher {
+	if (!canMaterializeLargeR2IngestJobs()) return { stop() {} };
+	let checking = false;
+	const timer = setInterval(() => {
+		if (checking) return;
+		checking = true;
+		hasDueLargeR2IngestWork(sqlClient, new Date())
+			.then((due) => {
+				if (due) wakeR2IngestWorker();
+			})
+			.catch((error: unknown) => {
+				logger.warn("Large R2 ingest watch failed: {error}", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			})
+			.finally(() => {
+				checking = false;
+			});
+	}, LARGE_INGEST_WATCH_INTERVAL_MS);
+	timer.unref();
+	return {
+		stop() {
+			clearInterval(timer);
+		},
+	};
 }

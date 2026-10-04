@@ -17,7 +17,10 @@ import {
 	type IngestSessionInput,
 } from "@rudel/api-routes";
 import {
-	FILTER_VERSION,
+	SESSION_INGEST_FILTER_VERSION,
+	slimTranscriptText,
+} from "@rudel/api-routes/transcript-slim";
+import {
 	filterSessionTextFields,
 	getRedactionBudgetAnomaly,
 	mergeRedactionCounts,
@@ -865,7 +868,7 @@ describe("release pressure: E2E integration", () => {
 			if (isClaude) {
 				const storedRow = await getStoredFilteredSession(userId, sessionId);
 				assert(storedRow);
-				expect(storedRow.filter_version).toBe(FILTER_VERSION);
+				expect(storedRow.filter_version).toBe(SESSION_INGEST_FILTER_VERSION);
 				expect(hashText(storedRow.content)).toBe(hashText(expectedContent));
 				const storedSubagent = storedRow.subagents["nested-agent-001"];
 				assert(storedSubagent);
@@ -874,7 +877,7 @@ describe("release pressure: E2E integration", () => {
 			} else {
 				const storedRow = await getStoredCodexSession(userId, sessionId);
 				assert(storedRow);
-				expect(storedRow.filter_version).toBe(FILTER_VERSION);
+				expect(storedRow.filter_version).toBe(SESSION_INGEST_FILTER_VERSION);
 				expect(hashText(storedRow.content)).toBe(hashText(expectedContent));
 			}
 		}, 120_000);
@@ -1133,19 +1136,23 @@ function expectOverBudget(content: string): void {
 
 /**
  * The hash the server records in session_ownership.last_content_sha256:
- * computeIngestContentHash over the server-side filtered input (router.ts
- * filters, pins filter_version, and hashes exactly this shape).
+ * computeIngestContentHash over the server-side slimmed and filtered input
+ * (the ingest filter worker slims and filters, router.ts pins filter_version
+ * and hashes exactly this shape).
  */
 function computeExpectedServerContentHash(request: IngestSessionInput): string {
 	const filtered = filterSessionTextFields({
-		content: request.content,
-		subagents: request.subagents,
+		content: slimTranscriptText(request.content),
+		subagents: request.subagents?.map((subagent) => ({
+			...subagent,
+			content: slimTranscriptText(subagent.content),
+		})),
 	});
 	return computeIngestContentHash({
 		...request,
 		content: filtered.content,
 		subagents: filtered.subagents ? [...filtered.subagents] : undefined,
-		filter_version: FILTER_VERSION,
+		filter_version: SESSION_INGEST_FILTER_VERSION,
 	});
 }
 

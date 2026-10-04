@@ -43,6 +43,26 @@ export function resolvePreviousIngestContentShape(input: {
 	};
 }
 
+/**
+ * Whether the stored byte sizes may be compared with this upload. A shape
+ * stored under an older session filter version describes bytes the current
+ * server no longer produces (for example before transcript slimming), so the
+ * first upload after an upgrade re-baselines the byte sizes once; every later
+ * upload at the same version compares them again. Assistant-record counts and
+ * previously uploaded subagent streams do not depend on the filter version and
+ * are always compared. Legacy rows without a version and rows stored by a
+ * newer version (a rollback, whose stored bytes are only ever smaller) are
+ * still compared in full.
+ */
+export function isComparableIngestShapeVersion(
+	storedFilterVersion: number | null,
+	currentFilterVersion: number,
+): boolean {
+	return (
+		storedFilterVersion === null || storedFilterVersion >= currentFilterVersion
+	);
+}
+
 export function getIngestContentShape(
 	input: IngestSessionInput,
 ): IngestContentShape {
@@ -76,12 +96,17 @@ export function getIngestContentShape(
 export function isUnexpectedIngestShrink(
 	previous: IngestContentShape,
 	current: IngestContentShape,
-	options: { compareTotalsOnly?: boolean } = {},
+	options: {
+		/** False only while re-baselining byte sizes across a filter version. */
+		compareBytes?: boolean;
+		compareTotalsOnly?: boolean;
+	} = {},
 ): boolean {
+	const compareBytes = options.compareBytes ?? true;
 	if (options.compareTotalsOnly) {
-		return isComponentShrink(previous, current);
+		return isComponentShrink(previous, current, compareBytes);
 	}
-	if (isComponentShrink(previous.main, current.main)) {
+	if (isComponentShrink(previous.main, current.main, compareBytes)) {
 		return true;
 	}
 	for (const [agentId, previousSubagent] of Object.entries(
@@ -90,7 +115,7 @@ export function isUnexpectedIngestShrink(
 		const currentSubagent = current.subagents[agentId];
 		if (
 			!currentSubagent ||
-			isComponentShrink(previousSubagent, currentSubagent)
+			isComponentShrink(previousSubagent, currentSubagent, compareBytes)
 		) {
 			return true;
 		}
@@ -101,6 +126,7 @@ export function isUnexpectedIngestShrink(
 function isComponentShrink(
 	previous: IngestContentComponentShape,
 	current: IngestContentComponentShape,
+	compareBytes: boolean,
 ): boolean {
 	const allowedLineLoss = Math.max(
 		INGEST_SHRINK_MIN_LINE_TOLERANCE,
@@ -114,6 +140,7 @@ function isComponentShrink(
 	) {
 		return true;
 	}
+	if (!compareBytes) return false;
 	const allowedByteLoss = Math.max(
 		INGEST_SHRINK_MIN_BYTE_TOLERANCE,
 		Math.floor(previous.contentBytes * INGEST_SHRINK_MAX_RELATIVE_BYTE_LOSS),

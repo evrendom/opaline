@@ -1,7 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 import {
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
 	REDACTION_DID_NOT_CONVERGE_CODE,
@@ -213,7 +213,7 @@ describe("uploadSession aggregate size guard", () => {
 	test("rejects a synthetic oversized transcript quickly without invoking secret filtering", async () => {
 		const content = "a".repeat(
 			Math.floor(
-				INGEST_AGGREGATE_CONTENT_MAX_BYTES /
+				INGEST_DIRECT_CONTENT_MAX_BYTES /
 					(1 - secretFilter.MAX_REDACTION_RATIO),
 			) + 1,
 		);

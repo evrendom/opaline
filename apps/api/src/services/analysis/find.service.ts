@@ -55,6 +55,8 @@ import {
 import { isAnalysisWorkLimit, query } from "./sql.js";
 
 type Header = AnalysisFindOutput["header"];
+/** A run's own facts; its next reaction and family are added per page. */
+type RunBase = Omit<AnalysisRun, "nextReaction" | "parentSessionId" | "depth">;
 type ToolGroupResult = Extract<
 	AnalysisFindOutput,
 	{ source: "tool" }
@@ -160,6 +162,11 @@ export function findAnalysisWithOwners(
 				owners = [
 					...new Set(resolved.batches.map((batch) => batch.scope.userId)),
 				];
+				const sessions = new Map(
+					resolved.batches.flatMap((batch) =>
+						batch.sessions.map((session) => [session.session_id, session]),
+					),
+				);
 				const context: FindContext = {
 					executor,
 					input,
@@ -168,12 +175,8 @@ export function findAnalysisWithOwners(
 					after,
 					scope: resolved,
 					header: newHeader(resolved),
-					runs: await loadScopeRuns(executor, resolved, input),
-					sessions: new Map(
-						resolved.batches.flatMap((batch) =>
-							batch.sessions.map((session) => [session.session_id, session]),
-						),
-					),
+					runs: await loadScopeRuns(executor, resolved, input, sessions),
+					sessions,
 					scan: {
 						rows: 0,
 						bytes: 0,
@@ -210,11 +213,17 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 	}
 }
 
-/** One run-facts statement per batch; everything else in the request works on these rows. */
+/**
+ * One run-facts statement per batch; everything else in the request works on
+ * these rows. With `model`, only runs whose usage includes that model are kept,
+ * each narrowed to that model's cost (a run without usage counts by its
+ * session's model).
+ */
 async function loadScopeRuns(
 	executor: ClickHouseExecutor,
 	scope: ResolvedScope,
 	input: AnalysisFindInput,
+	sessions: ReadonlyMap<string, AnalysisSession>,
 ): Promise<Map<string, RunRow>> {
 	const wanted = input.refs ? new Set(input.refs.map(runKey)) : undefined;
 	const runs = new Map<string, RunRow>();
@@ -225,23 +234,62 @@ async function loadScopeRuns(
 			batch.generations,
 		)) {
 			const key = runKey(rowRef(row));
-			if (!wanted || wanted.has(key)) runs.set(key, row);
+			if (wanted && !wanted.has(key)) continue;
+			const run = input.model
+				? runForModel(row, sessions.get(row.session_id), input.model)
+				: row;
+			if (run) runs.set(key, run);
 		}
 	return runs;
 }
 
-function addCoverage({ runs, header }: FindContext): void {
+/** The part of a run that used `model`, or undefined when it used none of it. */
+function runForModel(
+	row: RunRow,
+	session: AnalysisSession | undefined,
+	model: string,
+): RunRow | undefined {
+	if (row.model_costs.length === 0)
+		return session?.model === model ? row : undefined;
+	const entry = row.model_costs.find(([name]) => name === model);
+	if (!entry) return undefined;
+	const unattributed = row.session_unattributed_models.filter(
+		([name]) => name === model,
+	);
+	return {
+		...row,
+		cost: entry[1],
+		unpriced_observations: entry[2],
+		usage_model: model,
+		model_costs: [entry],
+		session_unattributed: unattributed.reduce((sum, [, cost]) => sum + cost, 0),
+		session_unattributed_models: unattributed,
+	};
+}
+
+function addCoverage({ runs, header, input }: FindContext): void {
 	const sessions = new Map<string, number>();
+	let partiallyPriced = 0;
 	for (const run of runs.values()) {
 		header.runsInScope++;
 		header.minutes += run.minutes;
+		header.activeMinutes = (header.activeMinutes ?? 0) + run.active_minutes;
 		header.rawChars += run.raw_chars;
 		if (run.cost === null) header.unpricedRuns++;
 		else header.pricedCostUsd += run.cost;
+		if (run.cost !== null && run.unpriced_observations > 0) partiallyPriced++;
 		sessions.set(run.session_id, run.session_unattributed);
 	}
 	for (const unattributed of sessions.values())
 		header.unattributedCostUsd += unattributed;
+	if (partiallyPriced)
+		header.notes.push(
+			`${partiallyPriced} priced runs also have usage that could not be priced (unknown model or rate); their cost covers only the priced part`,
+		);
+	if (input.model)
+		header.notes.push(
+			`model=${input.model} keeps runs whose usage includes that model and counts only that model's cost; runs without usage count by their session's model`,
+		);
 }
 
 async function findRuns(context: FindContext): Promise<FoundPage> {
@@ -258,10 +306,15 @@ async function findRuns(context: FindContext): Promise<FoundPage> {
 	return paged(context, rows.map(keyOf), more, {
 		source: "runs",
 		header: context.header,
-		rows: rows.map((row) => ({
-			...toRun(row, context.sessions.get(row.session_id)),
-			nextReaction: reactions.get(runKey(rowRef(row))) ?? null,
-		})),
+		rows: rows.map((row) => {
+			const session = context.sessions.get(row.session_id);
+			return {
+				...toRun(row, session),
+				nextReaction: reactions.get(runKey(rowRef(row))) ?? null,
+				parentSessionId: session?.parentSessionId ?? null,
+				depth: session?.depth ?? 0,
+			};
+		}),
 	});
 }
 
@@ -274,25 +327,45 @@ function findRunGroups(context: FindContext): Promise<FoundPage> {
 			runs: number;
 			sessions: Set<string>;
 			minutes: number;
+			activeMinutes: number;
 			cost: number | null;
 		}
 	>();
+	let multiModelRuns = 0;
 	for (const row of context.runs.values()) {
-		const run = toRun(row, context.sessions.get(row.session_id));
-		const key = groupKey(run, input.groupBy);
-		const group = groups.get(key) ?? {
-			key,
-			runs: 0,
-			sessions: new Set<string>(),
-			minutes: 0,
-			cost: null,
-		};
-		groups.set(key, group);
-		group.runs++;
-		group.sessions.add(row.session_id);
-		group.minutes += row.minutes;
-		group.cost = sumCost(group.cost, row.cost);
+		const session = context.sessions.get(row.session_id);
+		// By model, a run's cost goes to each model it used, never all to one.
+		const parts =
+			input.groupBy === "model" && row.model_costs.length > 0
+				? row.model_costs.map(([model, cost]) => ({ key: model, cost }))
+				: [
+						{
+							key: groupKey(toRun(row, session), session, input.groupBy),
+							cost: row.cost,
+						},
+					];
+		if (parts.length > 1) multiModelRuns++;
+		for (const part of parts) {
+			const group = groups.get(part.key) ?? {
+				key: part.key,
+				runs: 0,
+				sessions: new Set<string>(),
+				minutes: 0,
+				activeMinutes: 0,
+				cost: null,
+			};
+			groups.set(part.key, group);
+			group.runs++;
+			group.sessions.add(row.session_id);
+			group.minutes += row.minutes;
+			group.activeMinutes += row.active_minutes;
+			group.cost = sumCost(group.cost, part.cost);
+		}
 	}
+	if (multiModelRuns)
+		context.header.notes.push(
+			`${multiModelRuns} runs used several models: each model's group has that model's cost and counts the run, so costs add up across groups but runs, sessions and minutes do not`,
+		);
 	const keyOf = (group: { runs: number; key: string }) => [
 		group.runs,
 		group.key,
@@ -312,7 +385,9 @@ function findRunGroups(context: FindContext): Promise<FoundPage> {
 				key: group.key,
 				runs: group.runs,
 				sessions: group.sessions.size,
-				minutes: group.minutes,
+				// Sums of floats depend on row order; rounding keeps pages consistent.
+				minutes: roundMinutes(group.minutes),
+				activeMinutes: roundMinutes(group.activeMinutes),
 				costUsd: roundNullableCost(group.cost),
 			})),
 		}),
@@ -390,6 +465,8 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 						ref,
 						record: row.record_idx,
 						errorLine: errorLine(row.head, row.tail),
+						parentSessionId:
+							context.sessions.get(row.session_id)?.parentSessionId ?? null,
 					});
 			},
 		);
@@ -475,6 +552,9 @@ async function findReactions(context: FindContext): Promise<FoundPage> {
 				...event,
 				originMinutes: origin?.minutes ?? null,
 				originCostUsd: roundNullableCost(origin?.cost ?? null),
+				parentSessionId:
+					context.sessions.get(event.eventRef.sessionId)?.parentSessionId ??
+					null,
 			};
 		}),
 		groups: [...counts].map(([type, count]) => ({
@@ -574,6 +654,7 @@ function newHeader(scope: ResolvedScope): Header {
 		indexedSessions: scope.indexedSessions,
 		runsInScope: 0,
 		minutes: 0,
+		activeMinutes: 0,
 		pricedCostUsd: 0,
 		unattributedCostUsd: 0,
 		unpricedRuns: 0,
@@ -587,6 +668,8 @@ function newHeader(scope: ResolvedScope): Header {
 /** Notes only say something when it applies to this answer. */
 function finishHeader({ header, scope, scan }: FindContext): void {
 	header.pricedCostUsd = roundCost(header.pricedCostUsd);
+	header.minutes = roundMinutes(header.minutes);
+	header.activeMinutes = roundMinutes(header.activeMinutes ?? 0);
 	header.unattributedCostUsd = roundCost(header.unattributedCostUsd);
 	if (header.indexedSessions < header.sessionsInScope)
 		header.notes.push(
@@ -595,6 +678,10 @@ function finishHeader({ header, scope, scan }: FindContext): void {
 	if (header.unattributedCostUsd > 0)
 		header.notes.push(
 			"unattributedCostUsd is usage that cannot be tied to one run unambiguously; it is in no run's cost",
+		);
+	if (scope.subagentThreads)
+		header.notes.push(
+			`${scope.subagentThreads} of the ${header.sessionsInScope} sessions are Codex subagent threads: their runs carry parentSessionId and depth, a session in scope brings its threads, latest counts a session with its threads as one, and groupBy=session totals each family`,
 		);
 	if (scope.sessionCapReached)
 		header.notes.push(
@@ -619,6 +706,7 @@ function workLimitHeader(input: AnalysisFindInput): Header {
 			sessionsInScope: 0,
 			indexedSessions: 0,
 			sessionCapReached: false,
+			subagentThreads: 0,
 			batches: [],
 		}),
 		truncated: true,
@@ -640,16 +728,15 @@ function emptyResult(
 		: { source: "runs", header, rows: [] };
 }
 
-function toRun(
-	row: RunRow,
-	session: AnalysisSession | undefined,
-): Omit<AnalysisRun, "nextReaction"> {
+function toRun(row: RunRow, session: AnalysisSession | undefined): RunBase {
 	return {
 		ref: rowRef(row),
 		startedAt: new Date(row.started_ms).toISOString(),
 		minutes: row.minutes,
+		activeMinutes: row.active_minutes,
 		costUsd: roundNullableCost(row.cost),
 		model: row.usage_model || session?.model || "",
+		models: row.model_costs.map(([model]) => model),
 		repository: session?.repository ?? "",
 		agent: session?.source ?? "claude_code",
 		promptHead: row.prompt_head,
@@ -716,10 +803,13 @@ function cursorAt(
 	return key ? writeFindCursor(input, key) : undefined;
 }
 
+/** `session` groups a Codex subagent thread under the top session of its family. */
 function groupKey(
-	run: Omit<AnalysisRun, "nextReaction">,
+	run: RunBase,
+	session: AnalysisSession | undefined,
 	groupBy: AnalysisFindInput["groupBy"],
 ): string {
+	if (groupBy === "session") return session?.rootSessionId ?? run.ref.sessionId;
 	if (groupBy === "week") {
 		const day = new Date(run.startedAt);
 		day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
@@ -743,6 +833,10 @@ function sumCost(left: number | null, right: number | null): number | null {
 
 function roundCost(cost: number): number {
 	return Math.round(cost * 10_000) / 10_000;
+}
+
+function roundMinutes(minutes: number): number {
+	return Math.round(minutes * 10_000) / 10_000;
 }
 
 function roundNullableCost(cost: number | null): number | null {

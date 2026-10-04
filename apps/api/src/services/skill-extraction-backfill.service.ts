@@ -134,6 +134,7 @@ interface CandidateCensus {
 
 interface RawSessionRow {
 	content: string;
+	subagents: Record<string, string> | null;
 	raw_ingested_at: string;
 	raw_revision: string;
 	raw_session_date: string;
@@ -365,6 +366,7 @@ function prepareCandidate(
 		parserVersion,
 		sessionDate: parseClickHouseUtc(raw.raw_session_date).toISOString(),
 		source: candidate.source,
+		subagents: raw.subagents ?? {},
 	});
 	if (hasMatchingSkillExtractionReceipt(receipt ?? null, extraction)) {
 		return { status: "already_complete" };
@@ -668,10 +670,15 @@ async function listSourceCandidates(
 	const organizationFilter = options.organizationId
 		? "AND organization_id = {organizationId:String}"
 		: "";
+	// Claude subagent transcripts invoke skills too.
 	const marker =
 		source === "claude_code"
-			? `position(content, '"name":"Skill"') > 0`
+			? `(position(content, '"name":"Skill"') > 0 OR arrayExists(stream -> position(stream, '"name":"Skill"') > 0, mapValues(subagents)))`
 			: `position(content, 'skills/') > 0 AND position(content, 'SKILL') > 0`;
+	const streamBytes =
+		source === "claude_code"
+			? "length(content) + arraySum(arrayMap(stream -> length(stream), mapValues(subagents)))"
+			: "length(content)";
 	const rows = await executor.query<RawSessionCandidateRow>({
 		clickhouse_settings: {
 			...SOURCE_SCAN_SETTINGS,
@@ -686,7 +693,7 @@ async function listSourceCandidates(
 					argMax(user_id, revision) AS latest_user_id,
 					toString(argMax(session_date, revision)) AS latest_session_date,
 					toString(max(revision)) AS latest_revision,
-					argMax(length(content), revision) AS latest_content_bytes,
+					argMax(${streamBytes}, revision) AS latest_content_bytes,
 					argMax(toUInt8(${marker}), revision) AS has_skill_marker,
 					count() OVER () AS raw_session_count
 				FROM ${table}
@@ -821,6 +828,7 @@ async function readRawSessions(
 				user_id,
 				session_id,
 				content,
+				${first.source === "claude_code" ? "subagents" : "CAST(map(), 'Map(String, String)') AS subagents"},
 				toString(session_date) AS raw_session_date,
 				toString(revision) AS raw_revision,
 				toString(ingested_at) AS raw_ingested_at

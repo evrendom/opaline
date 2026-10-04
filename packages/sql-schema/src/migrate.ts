@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { validateDeferredConstraints } from "./post-migrate.js";
 
 const connectionString = process.env.PG_CONNECTION_STRING;
 if (!connectionString) {
@@ -36,6 +37,17 @@ try {
 	await migrate(db, { migrationsFolder });
 	await assertRequiredOwnershipMigrationsAreRecorded();
 	console.log("Migrations applied and ownership history verified.");
+	// Constraints added NOT VALID are validated outside the migration
+	// transaction, under a lock that does not block reads or writes.
+	for (const result of await validateDeferredConstraints(sql)) {
+		if (result.status === "deferred") {
+			console.warn(
+				`Constraint ${result.constraint} stays NOT VALID until the next run (new rows are already checked): ${result.error}`,
+			);
+		} else {
+			console.log(`Constraint ${result.constraint}: ${result.status}`);
+		}
+	}
 } finally {
 	await sql.end();
 }

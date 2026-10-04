@@ -16,6 +16,7 @@ const header: AnalysisFindOutput["header"] = {
 	indexedSessions: 1,
 	runsInScope: 1,
 	minutes: 1,
+	activeMinutes: 0.5,
 	pricedCostUsd: 0.25,
 	unattributedCostUsd: 0,
 	unpricedRuns: 0,
@@ -34,8 +35,10 @@ test("runs render compact TSV, all facts, escaped cells and null pricing", () =>
 				ref,
 				startedAt: "2026-10-03T00:00:00Z",
 				minutes: 1,
+				activeMinutes: 1,
 				costUsd: null,
 				model: "model",
+				models: ["model", "other-model"],
 				repository: "repo",
 				agent: "claude_code",
 				promptHead: "hello\nnext\tcolumn",
@@ -47,15 +50,42 @@ test("runs render compact TSV, all facts, escaped cells and null pricing", () =>
 				notFound: 1,
 				nextReaction: null,
 				rawChars: 1_000,
+				parentSessionId: null,
+				depth: 0,
+			},
+			{
+				ref: { sessionId: "child", agentId: "", turn: 1 },
+				startedAt: "2026-10-03T00:01:00Z",
+				minutes: 1,
+				activeMinutes: 1,
+				costUsd: 0.5,
+				model: "model",
+				models: ["model", "other-model"],
+				repository: "repo",
+				agent: "codex",
+				promptHead: "",
+				edits: 0,
+				toolCalls: 0,
+				failedCalls: 0,
+				readCalls: 0,
+				searchCalls: 0,
+				notFound: 0,
+				nextReaction: null,
+				rawChars: 10,
+				parentSessionId: "session",
+				depth: 1,
 			},
 		],
 	});
 	expect(text).toContain("sessions=2 indexed=1 runs=1");
 	expect(text).toContain("classifier=1 truncated=false");
-	expect(text).toContain("ref\tstartedAt\tminutes\tcostUsd");
+	expect(text).toContain("ref\tstartedAt\tminutes\tactiveMinutes\tcostUsd");
 	expect(text).toContain('"agentId":"","turn":1');
 	expect(text).toContain("hello\\nnext\\tcolumn");
-	expect(text).toContain("\t1\tnull\tmodel\t");
+	expect(text).toContain("\t1\t1\tnull\tmodel\tmodel,other-model\trepo\t");
+	expect(text).toContain("\tparentSessionId\tdepth\tpromptHead");
+	expect(text).toContain("\t1000\tnull\t0\thello");
+	expect(text).toContain("\t10\tsession\t1\t");
 	expect(text).not.toContain('"header":');
 });
 
@@ -79,10 +109,19 @@ test("all group modes and reaction origins render with table headers", () => {
 			source: "runs",
 			header,
 			groups: [
-				{ key: "model", runs: 1, sessions: 1, minutes: 1, costUsd: 0.25 },
+				{
+					key: "model",
+					runs: 1,
+					sessions: 1,
+					minutes: 1,
+					activeMinutes: 0.5,
+					costUsd: 0.25,
+				},
 			],
 		}),
-	).toContain("key\truns\tsessions\tminutes\tcostUsd\nmodel\t1\t1\t1\t0.25");
+	).toContain(
+		"key\truns\tsessions\tminutes\tactiveMinutes\tcostUsd\nmodel\t1\t1\t1\t0.5\t0.25",
+	);
 	expect(
 		renderFind({
 			source: "tool",
@@ -100,11 +139,21 @@ test("all group modes and reaction origins render with table headers", () => {
 					topCommands: ["cat <path>"],
 					minutes: 1,
 					costUsd: 0.25,
-					examples: [{ ref, record: 3, errorLine: "ENOENT" }],
+					examples: [
+						{ ref, record: 3, errorLine: "ENOENT", parentSessionId: null },
+						{
+							ref: { ...ref, sessionId: "child" },
+							record: 4,
+							errorLine: "ENOENT",
+							parentSessionId: "session",
+						},
+					],
 				},
 			],
 		}),
-	).toContain('"turn":1}@3 ENOENT');
+	).toContain(
+		'"turn":1}@3 ENOENT; {"sessionId":"child","agentId":"","turn":1}@4 (subagent thread of session) ENOENT',
+	);
 	const user = renderFind({
 		source: "user",
 		header,
@@ -118,14 +167,15 @@ test("all group modes and reaction origins render with table headers", () => {
 				originRef: ref,
 				originMinutes: 1,
 				originCostUsd: 0.25,
+				parentSessionId: "parent",
 			},
 		],
 		groups: [{ type: "swear", count: 1, sessions: 1 }],
 	});
 	expect(user).toContain(
-		"eventRef\toriginRef\toriginMinutes\toriginCostUsd\tpartial\tquote",
+		"eventRef\toriginRef\toriginMinutes\toriginCostUsd\tpartial\tparentSessionId\tquote",
 	);
-	expect(user).toContain("\t1\t0.25\ttrue\tfuck");
+	expect(user).toContain("\t1\t0.25\ttrue\tparent\tfuck");
 	expect(user).toContain("type\tcount\tsessions\nswear\t1\t1");
 });
 

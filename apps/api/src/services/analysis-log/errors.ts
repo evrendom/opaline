@@ -8,10 +8,10 @@ export class SanitizedError extends Error {
 	override name = "SanitizedError";
 }
 
-/** A store refused a query or step because its analysis holds the most it may. */
+/** A store refused a query, step or session link because its analysis holds the most it may. */
 export class AnalysisFullError extends SanitizedError {
 	override name = "AnalysisFullError";
-	constructor(readonly child: "queries" | "steps") {
+	constructor(readonly child: "queries" | "steps" | "sessions") {
 		super(`The analysis already holds the most ${child} it may`);
 	}
 }

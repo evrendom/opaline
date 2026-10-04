@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	createTranscriptRecordsJobGate,
+	isTranscriptRecordsCurrent,
 	persistTranscriptRecordsBestEffort,
 	streamTranscriptRecordDrafts,
 } from "./transcript-records-extraction.service.js";
@@ -64,6 +65,34 @@ describe("transcript records job gate", () => {
 		secondRelease?.();
 		await third;
 		expect(order).toEqual(["second", "third"]);
+	});
+
+	test("a session above the standard size waits to run alone instead of being skipped", async () => {
+		const MEBIBYTE = 1024 * 1024;
+		const gate = createTranscriptRecordsJobGate({
+			maxBytes: 256 * MEBIBYTE,
+			maxJobs: 2,
+		});
+		const small = await gate.acquire(MEBIBYTE);
+		expect(small).toBeDefined();
+		let largeStarted = false;
+		const large = gate.acquire(256 * MEBIBYTE).then((release) => {
+			largeStarted = true;
+			return release;
+		});
+
+		await Bun.sleep(5);
+		expect(largeStarted).toBe(false);
+		expect(await gate.acquire(MEBIBYTE)).toBeUndefined();
+		small?.();
+		const largeRelease = await large;
+		expect(largeRelease).toBeDefined();
+		expect(await gate.acquire(MEBIBYTE)).toBeUndefined();
+		largeRelease?.();
+		const after = await gate.acquire(MEBIBYTE);
+		expect(after).toBeDefined();
+		after?.();
+		expect(await gate.acquire(257 * MEBIBYTE)).toBeUndefined();
 	});
 
 	test("queued jobs count against the byte budget like running ones", async () => {
@@ -326,5 +355,38 @@ describe("best-effort persistence", () => {
 		);
 
 		expect(outcome).toBe("skipped");
+	});
+});
+
+describe("isTranscriptRecordsCurrent", () => {
+	test("a failed receipt lookup is not a current receipt", async () => {
+		const current = await isTranscriptRecordsCurrent(
+			{
+				close: async () => {},
+				execute: async () => {},
+				insert: async () => {},
+				query: async () => {
+					throw new Error("ClickHouse is down");
+				},
+			},
+			{
+				config: {
+					enabled: true,
+					maxRows: 100,
+					queueMaxBytes: 1024 * 1024,
+					queueMaxJobs: 1,
+					textBudgetChars: 1_000,
+					textMaxChars: 1_000,
+					timeoutMs: 30_000,
+				},
+				content: claudeContent(2),
+				organizationId: "org",
+				sessionId: "session",
+				subagents: {},
+				userId: "user",
+			},
+		);
+
+		expect(current).toBe(false);
 	});
 });

@@ -1,3 +1,7 @@
+import {
+	formatInlineImageSize,
+	readInlineImageMarkerFromSource,
+} from "@rudel/api-routes";
 import { CodeBlock } from "./CodeBlock";
 import { formatShellOutput } from "./conversation-tools";
 import type { TraceToolResult } from "./conversation-trace";
@@ -30,6 +34,19 @@ export function TraceResultBody({ result }: { result: TraceToolResult }) {
 			) : null}
 			{keyedNonTextBlocks.map(({ block, key }) => {
 				if (block.type === "image") {
+					const omitted = readInlineImageMarkerFromSource(block.source);
+					if (omitted) {
+						return (
+							<p
+								className="text-[0.8125rem] text-[color:var(--dashboardy-muted)]"
+								data-trace-result-image-omitted
+								key={key}
+							>
+								Screenshot taken (image not stored) · {omitted.mediaType} ·{" "}
+								{formatInlineImageSize(omitted.bytes)}
+							</p>
+						);
+					}
 					const source = getSafeImageSource(block.source);
 					return source ? (
 						<img

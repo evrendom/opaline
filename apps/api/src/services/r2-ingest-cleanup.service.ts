@@ -8,6 +8,7 @@ import {
 import type { IngestProcessingFailpoint } from "./ingest-processing-boundary.js";
 import { passIngestProcessingBoundary } from "./ingest-processing-boundary.js";
 import {
+	R2_INGEST_COMMIT_QUEUED,
 	R2_INGEST_DEPENDENCY_UNAVAILABLE,
 	R2_INGEST_TRANSIENT_ERROR_CODES,
 } from "./r2-ingest-processing-error.js";
@@ -272,7 +273,7 @@ export async function getNextR2IngestWorkDueAt(
 			SELECT available_at AS due_at
 			FROM ingest_job
 			WHERE status = 'pending'
-				AND (attempts > 0 OR last_error_code = '${R2_INGEST_DEPENDENCY_UNAVAILABLE}')
+				AND (attempts > 0 OR last_error_code IN ('${R2_INGEST_DEPENDENCY_UNAVAILABLE}', '${R2_INGEST_COMMIT_QUEUED}'))
 
 			UNION ALL
 

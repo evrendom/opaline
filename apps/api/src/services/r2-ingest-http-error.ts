@@ -1,5 +1,8 @@
 import { ORPCError } from "@orpc/server";
-import type { R2IngestCommitError } from "./r2-ingest-processing-error.js";
+import {
+	type R2IngestCommitError,
+	R2IngestCommitQueuedError,
+} from "./r2-ingest-processing-error.js";
 
 export function toR2IngestCommitOrpcError(error: R2IngestCommitError) {
 	if (error.code === "R2_INGEST_JOB_NOT_FOUND") {
@@ -7,7 +10,11 @@ export function toR2IngestCommitOrpcError(error: R2IngestCommitError) {
 	}
 	if (error.retryable) {
 		return new ORPCError("SERVICE_UNAVAILABLE", {
-			data: { reason: error.code, retryAfterMs: 1_000 },
+			data: {
+				reason: error.code,
+				retryAfterMs: 1_000,
+				...(error instanceof R2IngestCommitQueuedError ? { queued: true } : {}),
+			},
 			message: error.message,
 		});
 	}

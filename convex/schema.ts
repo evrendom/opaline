@@ -1,6 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { analysis, embedding, query, querySession, step } from "./validators";
+import {
+	analysis,
+	embedding,
+	query,
+	querySession,
+	sessionLink,
+	step,
+} from "./validators";
 
 export const schema = defineSchema({
 	analyses: defineTable(
@@ -60,6 +67,12 @@ export const schema = defineSchema({
 		.index("by_query", ["queryId", "sessionId"])
 		.index("by_owner", ["ownerId"])
 		.index("by_analysis", ["analysisId"]),
+	// Chats uploaded for an analysis (`opaline import --analysis`). Account
+	// deletion removes the owner's rows through `by_owner`.
+	analysisSessions: defineTable(sessionLink)
+		.index("by_analysis_session", ["analysisId", "source", "sessionId"])
+		.index("by_analysis_uploaded", ["analysisId", "uploadedAt"])
+		.index("by_owner", ["ownerId"]),
 	// Vector filters only test equality, so `space` joins workspace and model:
 	// a search never compares vectors of different models.
 	embeddings: defineTable(

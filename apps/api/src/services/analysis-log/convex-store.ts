@@ -19,6 +19,7 @@ import type {
 	StoredAnalysis,
 	StoredEmbedding,
 	StoredQuery,
+	StoredSessionLink,
 	StoredStep,
 } from "./types.js";
 
@@ -96,11 +97,20 @@ const QuerySummarySchema = QueryFieldsSchema.extend({
 	ownerCount: z.number(),
 	onlyOwnerId: z.string().nullable(),
 }).transform(({ argsJson, ...query }) => ({ ...query, args: argsJson }));
+const SessionLinksSchema = z.array(
+	z.object({
+		analysisId: z.string(),
+		sessionId: z.string(),
+		source: z.enum(["claude_code", "codex"]),
+		ownerId: z.string(),
+		uploadedAt: z.string(),
+	}),
+);
 const DeletionSchema = z.object({ hasMore: z.boolean() });
 /** The ConvexError data of a full analysis (convex/limits.ts). */
 const AnalysisFullSchema = z.object({
 	kind: z.literal("analysisFull"),
-	child: z.enum(["queries", "steps"]),
+	child: z.enum(["queries", "steps", "sessions"]),
 });
 const MatchesSchema = z.array(
 	z.object({
@@ -137,6 +147,9 @@ interface ConvexFunctionArgs {
 	"deletion:byWorkspace": { workspaceId: string };
 	"deletion:markReadingOwner": { ownerId: string };
 	"deletion:sweep": Record<string, never>;
+	"deletion:sessionsByOwner": { ownerId: string };
+	"sessions:link": { link: StoredSessionLink };
+	"sessions:list": { analysisId: string };
 	"embeddings:add": { workspaceId: string; embedding: StoredEmbedding };
 	"embeddings:search": {
 		workspaceId: string;
@@ -163,6 +176,9 @@ const FUNCTION_TYPES = {
 	"deletion:byWorkspace": "mutation",
 	"deletion:markReadingOwner": "mutation",
 	"deletion:sweep": "mutation",
+	"deletion:sessionsByOwner": "mutation",
+	"sessions:link": "mutation",
+	"sessions:list": "query",
 	"embeddings:add": "mutation",
 	"embeddings:search": "action",
 } as const satisfies Record<keyof ConvexFunctionArgs, ConvexFunctionType>;
@@ -284,6 +300,24 @@ export function createConvexAnalysisStore({
 			await untilDone(() => run("deletion:sweep", {}));
 		},
 
+		async linkSession(link) {
+			await run("sessions:link", { link });
+		},
+		async getSessionLinks(analysisId) {
+			// Convex orders by upload time; ties go by source and session id.
+			return SessionLinksSchema.parse(
+				await run("sessions:list", { analysisId }),
+			).sort(
+				(left, right) =>
+					compare(left.uploadedAt, right.uploadedAt) ||
+					compare(left.source, right.source) ||
+					compare(left.sessionId, right.sessionId),
+			);
+		},
+		async deleteSessionLinksByOwner(ownerId) {
+			await untilDone(() => run("deletion:sessionsByOwner", { ownerId }));
+		},
+
 		async addEmbedding(workspaceId, embedding) {
 			await run("embeddings:add", { workspaceId, embedding });
 		},
@@ -298,6 +332,10 @@ export function createConvexAnalysisStore({
 			);
 		},
 	};
+}
+
+function compare(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function parseArgs(argsJson: string): Record<string, unknown> {

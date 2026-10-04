@@ -1,5 +1,9 @@
 import { AnalysisFullError } from "./errors.js";
-import { MAX_QUERIES_PER_ANALYSIS, MAX_STEPS_PER_ANALYSIS } from "./limits.js";
+import {
+	MAX_QUERIES_PER_ANALYSIS,
+	MAX_SESSIONS_PER_ANALYSIS,
+	MAX_STEPS_PER_ANALYSIS,
+} from "./limits.js";
 import type {
 	AnalysisStore,
 	EmbeddingMatch,
@@ -7,6 +11,7 @@ import type {
 	StoredAnalysis,
 	StoredEmbedding,
 	StoredQuery,
+	StoredSessionLink,
 	StoredStep,
 } from "./types.js";
 
@@ -23,6 +28,11 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 	// Like Convex: session links live apart from their queries, oldest first.
 	let links: SessionLink[] = [];
 	const embeddings: (StoredEmbedding & { workspaceId: string })[] = [];
+	let chats: StoredSessionLink[] = [];
+	const sameChat = (left: StoredSessionLink, right: StoredSessionLink) =>
+		left.analysisId === right.analysisId &&
+		left.source === right.source &&
+		left.sessionId === right.sessionId;
 	// Every method below runs without awaiting, so each one is a single
 	// atomic step, as each Convex mutation is.
 	const sessionsOf = (queryId: string) =>
@@ -47,6 +57,7 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 		for (const [id, query] of queries)
 			if (ids.has(query.analysisId)) queries.delete(id);
 		links = links.filter((link) => !ids.has(link.analysisId));
+		chats = chats.filter((chat) => !ids.has(chat.analysisId));
 		for (let index = embeddings.length - 1; index >= 0; index--)
 			if (ids.has(embeddings[index]?.analysisId ?? ""))
 				embeddings.splice(index, 1);
@@ -201,6 +212,40 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 			removeAnalyses((analysis) => analysis.workspaceId === workspaceId);
 		},
 
+		async linkSession(link) {
+			if (!analyses.has(link.analysisId))
+				throw new Error(`Analysis ${link.analysisId} is missing`);
+			const existing = chats.find((chat) => sameChat(chat, link));
+			if (existing) {
+				chats = chats.map((chat) =>
+					sameChat(chat, link)
+						? { ...chat, uploadedAt: link.uploadedAt }
+						: chat,
+				);
+				return;
+			}
+			if (
+				chats.filter((chat) => chat.analysisId === link.analysisId).length >=
+				MAX_SESSIONS_PER_ANALYSIS
+			)
+				throw new AnalysisFullError("sessions");
+			chats.push(structuredClone(link));
+		},
+		async getSessionLinks(analysisId) {
+			return chats
+				.filter((chat) => chat.analysisId === analysisId)
+				.sort(
+					(left, right) =>
+						compare(left.uploadedAt, right.uploadedAt) ||
+						compare(left.source, right.source) ||
+						compare(left.sessionId, right.sessionId),
+				)
+				.map((chat) => structuredClone(chat));
+		},
+		async deleteSessionLinksByOwner(ownerId) {
+			chats = chats.filter((chat) => chat.ownerId !== ownerId);
+		},
+
 		async addEmbedding(workspaceId, embedding) {
 			embeddings.push({ ...structuredClone(embedding), workspaceId });
 		},
@@ -234,6 +279,11 @@ function insert<TRecord extends { id: string }>(
 ): void {
 	if (records.has(record.id)) throw new Error(`${record.id} already exists`);
 	records.set(record.id, structuredClone(record));
+}
+
+/** Code-unit order, as Convex sorts index strings. */
+function compare(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function clone<T>(value: T | undefined): T | null {

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
+	IngestSessionInputSchema,
 	R2IngestCommitInputSchema,
 	R2IngestInitInputSchema,
 } from "../index.js";
@@ -52,6 +54,46 @@ describe("R2 ingest contract", () => {
 				"Subagent agentId values must be unique",
 			]);
 		}
+	});
+
+	test("pins the R2 and direct per-session limits mirrored by the CLI", () => {
+		expect(INGEST_AGGREGATE_CONTENT_MAX_BYTES).toBe(256 * 1024 * 1024);
+		expect(INGEST_DIRECT_CONTENT_MAX_BYTES).toBe(128 * 1024 * 1024);
+	});
+
+	test("accepts R2 sessions above the direct limit up to the aggregate limit", () => {
+		const result = R2IngestInitInputSchema.safeParse({
+			objects: [
+				{
+					byteLength: INGEST_AGGREGATE_CONTENT_MAX_BYTES - 1,
+					kind: "main",
+					sha256: HASH,
+				},
+				{ agentId: "child", byteLength: 1, kind: "subagent", sha256: HASH },
+			],
+			projectPath: "/work/project",
+			sessionId: "session-1",
+			source: "claude_code",
+		});
+
+		expect(result.success).toBe(true);
+	});
+
+	test("parses materialized R2 content up to the aggregate limit", () => {
+		const session = {
+			projectPath: "/work/project",
+			sessionId: "session-1",
+			source: "claude_code",
+		};
+		const content = "x".repeat(INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+
+		expect(
+			IngestSessionInputSchema.safeParse({ ...session, content }).success,
+		).toBe(true);
+		expect(
+			IngestSessionInputSchema.safeParse({ ...session, content: `${content}x` })
+				.success,
+		).toBe(false);
 	});
 
 	test("rejects aggregate content above the existing ingest ceiling", () => {

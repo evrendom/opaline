@@ -15,6 +15,7 @@ import { AnalysisFullError, loggableError } from "./errors.js";
 import {
 	MAX_QUERIES_PER_ANALYSIS,
 	MAX_QUERY_ARGS_BYTES,
+	MAX_SESSIONS_PER_ANALYSIS,
 	MAX_STEPS_PER_ANALYSIS,
 } from "./limits.js";
 import type {
@@ -274,7 +275,10 @@ export async function getAnalysisTree(
 	id: string,
 ): Promise<AnalysisHistoryGetOutput> {
 	const analysis = await visibleAnalysis(log, viewer, id);
-	const queries = await log.store.getQueries(analysis.id);
+	const [queries, chats] = await Promise.all([
+		log.store.getQueries(analysis.id),
+		log.store.getSessionLinks(analysis.id),
+	]);
 	const now = log.now();
 	return {
 		...summaryFields(analysis, viewer),
@@ -298,6 +302,21 @@ export async function getAnalysisTree(
 					unavailable: unavailableReason(query, analysis, viewer, now),
 				})),
 		})),
+		// A restricting workspace shows a linked chat only to its owner and
+		// admins, as it does stored results; otherwise to every viewer.
+		chatSessions: chats
+			.filter(
+				(chat) =>
+					!viewer.restrictResults ||
+					viewer.isAdmin ||
+					chat.ownerId === viewer.userId,
+			)
+			.map((chat) => ({
+				sessionId: chat.sessionId,
+				source: chat.source,
+				userId: chat.ownerId,
+				uploadedAt: chat.uploadedAt,
+			})),
 	};
 }
 
@@ -489,14 +508,14 @@ async function resolveStep(
 
 function analysisFull(
 	analysisId: string,
-	child: "queries" | "steps",
+	child: AnalysisFullError["child"],
 ): ORPCError<"BAD_REQUEST", unknown> {
-	return new ORPCError("BAD_REQUEST", {
-		message:
-			child === "queries"
-				? `Analysis ${analysisId} already has ${MAX_QUERIES_PER_ANALYSIS} queries, the most one analysis keeps; start a new analysis by passing question instead of analysis`
-				: `Analysis ${analysisId} already has ${MAX_STEPS_PER_ANALYSIS} steps, the most one analysis keeps; reuse a step id or start a new analysis by passing question instead of analysis`,
-	});
+	const messages = {
+		queries: `Analysis ${analysisId} already has ${MAX_QUERIES_PER_ANALYSIS} queries, the most one analysis keeps; start a new analysis by passing question instead of analysis`,
+		steps: `Analysis ${analysisId} already has ${MAX_STEPS_PER_ANALYSIS} steps, the most one analysis keeps; reuse a step id or start a new analysis by passing question instead of analysis`,
+		sessions: `Analysis ${analysisId} already has ${MAX_SESSIONS_PER_ANALYSIS} linked chat sessions, the most one analysis keeps`,
+	} as const;
+	return new ORPCError("BAD_REQUEST", { message: messages[child] });
 }
 
 async function authoredAnalysis(
@@ -524,7 +543,10 @@ async function visibleAnalysis(
 	return analysis;
 }
 
-function canSee(analysis: StoredAnalysis, viewer: AnalysisViewer): boolean {
+export function canSee(
+	analysis: StoredAnalysis,
+	viewer: Pick<AnalysisViewer, "workspaceId" | "userId">,
+): boolean {
 	return (
 		analysis.workspaceId === viewer.workspaceId &&
 		(analysis.authorId === viewer.userId || analysis.shared)
@@ -672,4 +694,7 @@ export async function purgeAnalysisLog(
 	await store.deleteAnalysesByAuthor(target.targetId);
 	signal.throwIfAborted();
 	await store.deleteAnalysesReadingOwner(target.targetId);
+	signal.throwIfAborted();
+	// Their chats linked to other members' analyses go; those analyses stay.
+	await store.deleteSessionLinksByOwner(target.targetId);
 }

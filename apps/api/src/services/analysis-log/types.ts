@@ -91,6 +91,20 @@ export interface QuerySummary
 	onlyOwnerId: string | null;
 }
 
+/**
+ * A chat uploaded for an analysis (`analysisId` on ingest): the conversation
+ * in which it ran. One link per analysis, source and session.
+ */
+export interface StoredSessionLink {
+	analysisId: string;
+	sessionId: string;
+	source: "claude_code" | "codex";
+	/** The member who uploaded the chat; it is their session. */
+	ownerId: string;
+	/** The latest upload of the session for this analysis. */
+	uploadedAt: string;
+}
+
 /** What an author may change on an analysis; identity, `cutoff` and the counts are kept by the store. */
 export type AnalysisPatch = Partial<
 	Omit<
@@ -181,6 +195,21 @@ export interface AnalysisStore {
 	deleteAnalysesByWorkspace(workspaceId: string): Promise<void>;
 	/** Every analysis, of any author or workspace, that read one of the owner's sessions. */
 	deleteAnalysesReadingOwner(ownerId: string): Promise<void>;
+
+	/**
+	 * Adds the link, or moves an existing link's `uploadedAt` to this upload.
+	 * Fails for a missing or deleting analysis, and with `AnalysisFullError`
+	 * once the analysis holds `MAX_SESSIONS_PER_ANALYSIS` links, checked in the
+	 * same atomic write. Deleting an analysis deletes its links.
+	 */
+	linkSession(link: StoredSessionLink): Promise<void>;
+	/** Oldest upload first, then by source and session id. */
+	getSessionLinks(analysisId: string): Promise<StoredSessionLink[]>;
+	/**
+	 * Account deletion: the owner's links in every analysis, of any author or
+	 * workspace. Repeating a call is safe and continues where the last stopped.
+	 */
+	deleteSessionLinksByOwner(ownerId: string): Promise<void>;
 
 	addEmbedding(workspaceId: string, embedding: StoredEmbedding): Promise<void>;
 	/**

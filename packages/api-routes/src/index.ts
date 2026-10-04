@@ -36,6 +36,15 @@ import {
 
 export { CliConnectionIdSchema } from "./cli-connection.js";
 export {
+	formatInlineImageMarker,
+	formatInlineImageMarkerLabel,
+	formatInlineImageSize,
+	INLINE_IMAGE_MARKER_PREFIX,
+	type InlineImageMarker,
+	parseInlineImageMarker,
+	readInlineImageMarkerFromSource,
+} from "./inline-image-marker.js";
+export {
 	type RepositorySettings,
 	RepositorySettingsSchema,
 	type RepositoryUploadReport,
@@ -459,10 +468,26 @@ export const UserSchema = z.object({
 	activeOrganizationId: z.string().nullable(),
 });
 
+/**
+ * What this server's upload endpoints understand, so the CLI can refuse a
+ * feature before uploading to an older server that would silently drop it.
+ */
+export const CliUploadCapabilitiesSchema = z.object({
+	/** `analysisId` on `ingestSession` / `ingest.init` links the upload to an analysis. */
+	analysisLinkedUploads: z.literal(true),
+	/**
+	 * The server slims every upload (`slimTranscriptText`) and re-baselines the
+	 * shrink check once per session, so a slimmed CLI upload is never refused
+	 * as a shrink. CLIs slim only when this is advertised.
+	 */
+	transcriptSlimming: z.literal(true).optional(),
+});
+
 export const CliUserSchema = z.object({
 	id: z.string(),
 	email: z.string(),
 	name: z.string(),
+	capabilities: CliUploadCapabilitiesSchema.optional(),
 });
 
 export const CliSetupStatusSchema = z.object({
@@ -523,7 +548,19 @@ export { SourceSchema } from "./schemas/source.js";
 
 import { SourceSchema } from "./schemas/source.js";
 
-export const INGEST_AGGREGATE_CONTENT_MAX_BYTES = 128 * 1024 * 1024;
+/**
+ * Per-session limit on the slimmed transcript content (main plus subagents)
+ * accepted through direct-to-R2 ingest.
+ */
+export const INGEST_AGGREGATE_CONTENT_MAX_BYTES = 256 * 1024 * 1024;
+/**
+ * The largest session the direct `ingestSession` request carries (request
+ * bodies are capped at 160 MiB), and the per-session limit before 256 MiB.
+ * Larger sessions upload only through R2, where the API also uses this size as
+ * the boundary above which a session is materialized alone by a resident
+ * worker with the memory for it.
+ */
+export const INGEST_DIRECT_CONTENT_MAX_BYTES = 128 * 1024 * 1024;
 export const INGEST_MAX_SUBAGENT_COUNT = 512;
 export const INGEST_LIMIT_REASONS = {
 	requestLimit: "request_limit",
@@ -534,7 +571,11 @@ export const INGEST_LIMIT_REASONS = {
 export type IngestLimitReason =
 	(typeof INGEST_LIMIT_REASONS)[keyof typeof INGEST_LIMIT_REASONS];
 
-const INGEST_CONTENT_MAX_CODE_UNITS = 160 * 1024 * 1024;
+// A string never has more UTF-16 code units than UTF-8 bytes, so this admits
+// every R2 session the aggregate limit accepts (R2 commits parse their
+// materialized content with these schemas). Direct requests stay bounded by
+// the 160 MiB body cap and the 128 MiB direct limit.
+const INGEST_CONTENT_MAX_CODE_UNITS = INGEST_AGGREGATE_CONTENT_MAX_BYTES;
 
 export const SubagentFileSchema = z.object({
 	agentId: z.string().max(200),
@@ -573,6 +614,12 @@ export const IngestSessionInputSchema = z.object({
 	platform_os: ProductAnalyticsPlatformOsSchema.optional(),
 	filter_version: z.number().int().min(0).max(65_535).optional(),
 	force_replace: z.boolean().optional(),
+	/**
+	 * An analysis in the analysis log this chat belongs to. The upload goes to
+	 * that analysis's workspace (the caller must be a member who can see it)
+	 * and is listed with it.
+	 */
+	analysisId: z.string().trim().min(1).max(40).optional(),
 });
 
 export const R2_INGEST_PROTOCOL = "r2_multipart_v1" as const;
@@ -590,6 +637,8 @@ export const IngestSessionOutputSchema = z.object({
 		.string()
 		.regex(/^[a-f0-9]{64}$/u)
 		.optional(),
+	/** Echoes the input's `analysisId` once the session is linked to that analysis. */
+	analysisId: z.string().optional(),
 });
 
 export const R2_INGEST_PART_SIZE_BYTES = 8 * 1024 * 1024;

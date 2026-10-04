@@ -1,5 +1,9 @@
 import { getLogger } from "@logtape/logtape";
-import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
+import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
+} from "@rudel/api-routes";
+import { isVercelRuntime } from "../lib/api-runtime.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-materialization-gate"]);
 
@@ -28,6 +32,8 @@ export interface R2IngestMaterializationGateStats {
 
 export interface R2IngestMaterializationGate {
 	getStats: () => R2IngestMaterializationGateStats;
+	/** The largest job this gate admits; recovery selects only jobs up to it. */
+	readonly maxJobBytes: number;
 	run: <TResult>(
 		bytes: number,
 		operation: (signal: AbortSignal) => Promise<TResult>,
@@ -41,7 +47,16 @@ interface PendingOperation {
 	readonly start: () => void;
 }
 
+/**
+ * Admission for materializing R2 jobs in one process. Jobs up to `maxBytes`
+ * share the byte and job budgets. When `largeJobMaxBytes` is set, a job above
+ * `maxBytes` (up to that size) is also admitted but runs alone: it starts only
+ * when nothing else is active, and nothing starts beside it because its bytes
+ * fill the shared budget. Without it, larger jobs are rejected, so processes
+ * without the memory for them never start one.
+ */
 export function createR2IngestMaterializationGate(input: {
+	readonly largeJobMaxBytes?: number;
 	readonly maxBytes: number;
 	readonly maxJobs: number;
 	readonly maxQueuedJobs: number;
@@ -51,6 +66,9 @@ export function createR2IngestMaterializationGate(input: {
 	readonly unsettledOperationTimeoutMs?: number;
 }): R2IngestMaterializationGate {
 	assertPositiveInteger(input.maxBytes, "maxBytes");
+	if (input.largeJobMaxBytes !== undefined) {
+		assertPositiveInteger(input.largeJobMaxBytes, "largeJobMaxBytes");
+	}
 	assertPositiveInteger(input.maxJobs, "maxJobs");
 	assertPositiveInteger(input.maxQueuedJobs, "maxQueuedJobs");
 	assertPositiveInteger(input.operationTimeoutMs, "operationTimeoutMs");
@@ -66,12 +84,14 @@ export function createR2IngestMaterializationGate(input: {
 		);
 	}
 
+	const maxJobBytes = Math.max(input.maxBytes, input.largeJobMaxBytes ?? 0);
 	let activeBytes = 0;
 	let activeJobs = 0;
 	let queuedBytes = 0;
 	const pending: PendingOperation[] = [];
 
 	function canStart(bytes: number): boolean {
+		if (bytes > input.maxBytes) return activeJobs === 0;
 		return activeJobs < input.maxJobs && activeBytes + bytes <= input.maxBytes;
 	}
 
@@ -85,7 +105,16 @@ export function createR2IngestMaterializationGate(input: {
 
 	function dispatch(): void {
 		while (activeJobs < input.maxJobs) {
-			const nextIndex = pending.findIndex((candidate) =>
+			// Jobs queued behind a waiting large job do not overtake it; otherwise
+			// a steady stream of small jobs could keep it from ever running alone.
+			const firstLargeIndex = pending.findIndex(
+				(candidate) => candidate.bytes > input.maxBytes,
+			);
+			const eligible =
+				firstLargeIndex === -1
+					? pending
+					: pending.slice(0, firstLargeIndex + 1);
+			const nextIndex = eligible.findIndex((candidate) =>
 				canStart(candidate.bytes),
 			);
 			if (nextIndex === -1) return;
@@ -107,16 +136,13 @@ export function createR2IngestMaterializationGate(input: {
 				queuedJobs: pending.length,
 			};
 		},
+		maxJobBytes,
 		run<TResult>(
 			bytes: number,
 			operation: (signal: AbortSignal) => Promise<TResult>,
 			externalSignal?: AbortSignal,
 		) {
-			if (
-				!Number.isSafeInteger(bytes) ||
-				bytes <= 0 ||
-				bytes > input.maxBytes
-			) {
+			if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > maxJobBytes) {
 				return Promise.reject(
 					new R2IngestMaterializationGateError(
 						"R2_INGEST_GATE_FULL",
@@ -258,8 +284,25 @@ export function createR2IngestMaterializationGate(input: {
 	};
 }
 
+/**
+ * Whether this process's own recovery materializes sessions above 128 MiB:
+ * only a resident Bun server (self-hosted, local, or a Fly-style worker).
+ * Vercel functions of the main project never do, whatever their environment
+ * says (fail closed); production runs large sessions in the separate
+ * large-ingest deployment (`deploy/large-ingest`), whose worker builds its
+ * own gate after checking `R2_LARGE_INGEST_WORKER` and its memory.
+ */
+export function canMaterializeLargeR2IngestJobs(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return !isVercelRuntime(environment);
+}
+
 const r2IngestMaterializationGate = createR2IngestMaterializationGate({
-	maxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	largeJobMaxBytes: canMaterializeLargeR2IngestJobs()
+		? INGEST_AGGREGATE_CONTENT_MAX_BYTES
+		: undefined,
+	maxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
 	maxJobs: 1,
 	maxQueuedJobs: 8,
 	operationTimeoutMs: 20 * 60_000,
@@ -274,12 +317,8 @@ const r2IngestMaterializationGate = createR2IngestMaterializationGate({
 	unsettledOperationTimeoutMs: 30_000,
 });
 
-export function runWithR2IngestMaterializationSlot<TResult>(
-	bytes: number,
-	operation: (signal: AbortSignal) => Promise<TResult>,
-	signal?: AbortSignal,
-): Promise<TResult> {
-	return r2IngestMaterializationGate.run(bytes, operation, signal);
+export function getR2IngestMaterializationGate(): R2IngestMaterializationGate {
+	return r2IngestMaterializationGate;
 }
 
 function assertPositiveInteger(value: number, name: string): void {

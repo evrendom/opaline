@@ -20,6 +20,10 @@ import {
 } from "../lib/bounded-maintenance.js";
 import { readBooleanEnv } from "../lib/env.js";
 import {
+	isLargeIngestSession,
+	STANDARD_SESSION_MAX_BYTES,
+} from "../lib/ingest-size.js";
+import {
 	IngestProcessingCrashSimulationError,
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
@@ -29,15 +33,17 @@ import {
 	wakeR2IngestWorker,
 } from "./r2-ingest-cleanup.service.js";
 import {
+	getR2IngestMaterializationGate,
 	type R2IngestMaterializationGate,
 	R2IngestMaterializationGateError,
-	runWithR2IngestMaterializationSlot,
 } from "./r2-ingest-materialization-gate.js";
 import {
 	isDefinitelyPermanentProcessingError,
 	isRetryableProcessingError,
+	R2_INGEST_COMMIT_QUEUED,
 	R2_INGEST_DEPENDENCY_UNAVAILABLE,
 	R2IngestCommitError,
+	R2IngestCommitQueuedError,
 } from "./r2-ingest-processing-error.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 
@@ -48,6 +54,15 @@ const DEFAULT_LEASE_DURATION_MS = 30 * 60_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const RETRY_MAX_DELAY_MS = 60_000;
 const TRANSIENT_RETRY_MAX_DELAY_MS = 5 * 60_000;
+/**
+ * How long a queued commit waits before recovery claims it. Client retries in
+ * that window are answered at once instead of queueing for another slot.
+ */
+const COMMIT_QUEUED_DELAY_MS = 5_000;
+const COMMIT_QUEUED_MESSAGE =
+	"Commit accepted; waiting for a materialization slot";
+const LARGE_COMMIT_QUEUED_MESSAGE =
+	"Commit accepted; a large session is materialized by the resident worker";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_CODE =
 	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE =
@@ -241,11 +256,25 @@ export async function commitR2IngestJob(
 		throw error;
 	}
 
-	const run = options.gate
-		? options.gate.run.bind(options.gate)
-		: runWithR2IngestMaterializationSlot;
+	// A session above the standard size never materializes inside the commit
+	// request: it holds several copies of the transcript for minutes, and only
+	// the resident worker's process is sized for that. Store the receipt and
+	// let recovery there run it alone; the client polls `ingest.status`.
+	if (isLargeIngestSession(admission.expectedTotalBytes)) {
+		await markCommitQueued(
+			admission,
+			manifest,
+			now(),
+			database,
+			LARGE_COMMIT_QUEUED_MESSAGE,
+		);
+		wakeR2IngestWorker();
+		throw new R2IngestCommitQueuedError();
+	}
+
+	const gate = options.gate ?? getR2IngestMaterializationGate();
 	try {
-		return await run(
+		return await gate.run(
 			admission.expectedTotalBytes,
 			async (gateSignal) => {
 				const claim = await claimRequestedJob({
@@ -290,11 +319,60 @@ export async function commitR2IngestJob(
 			options.signal,
 		);
 	} catch (error) {
-		if (error instanceof R2IngestMaterializationGateError) {
+		if (!(error instanceof R2IngestMaterializationGateError)) throw error;
+		if (error.code === "R2_INGEST_GATE_OPERATION_TIMEOUT") {
 			throw new R2IngestCommitError(error.code, error.message, true);
 		}
-		throw error;
+		// Admission failed before any claim: the commit is valid, so store its
+		// receipt and let recovery materialize the job instead of losing it.
+		await markCommitQueued(
+			admission,
+			manifest,
+			now(),
+			database,
+			COMMIT_QUEUED_MESSAGE,
+		);
+		wakeR2IngestWorker();
+		throw new R2IngestCommitQueuedError();
 	}
+}
+
+/**
+ * Records an accepted commit that found no materialization slot. Jobs another
+ * request already claimed, finished, or made recoverable (attempts or a
+ * dependency error) are left alone.
+ */
+async function markCommitQueued(
+	job: IngestJobRow,
+	manifest: readonly StoredObject[],
+	now: Date,
+	database: postgres.Sql,
+	message: string,
+): Promise<void> {
+	await database.unsafe(
+		`UPDATE ingest_job
+		 SET
+			object_manifest = $1,
+			available_at = LEAST($2::timestamptz, expires_at),
+			last_error_code = $3,
+			last_error_message = $4,
+			updated_at = $5
+		 WHERE id = $6
+			AND user_id = $7
+			AND status = 'pending'
+			AND attempts = 0
+			AND expires_at > $5
+			AND (last_error_code IS NULL OR last_error_code = $3)`,
+		[
+			JSON.stringify(manifest),
+			new Date(now.getTime() + COMMIT_QUEUED_DELAY_MS).toISOString(),
+			R2_INGEST_COMMIT_QUEUED,
+			message,
+			now.toISOString(),
+			job.id,
+			job.userId,
+		],
+	);
 }
 
 async function readRequestedJob(
@@ -609,11 +687,15 @@ export async function repairRecoverableR2IngestJobs(input: {
 	gate?: R2IngestMaterializationGate;
 	leaseDurationMs?: number;
 	limit?: number;
+	/** Select only jobs larger than this (the large-session worker). */
+	minExpectedTotalBytes?: number;
 	now?: () => Date;
 	process: R2IngestProcessor;
 	r2: R2MultipartUploadClient;
 	randomUUID?: () => `${string}-${string}-${string}-${string}-${string}`;
 	sessionIngestQuiesced?: boolean;
+	/** Aborts the running materialization; the job is recorded as a retry. */
+	signal?: AbortSignal;
 }): Promise<R2IngestRecoveryRepairResult> {
 	const leaseDurationMs = input.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
 	assertPositiveLeaseDuration(leaseDurationMs);
@@ -626,24 +708,32 @@ export async function repairRecoverableR2IngestJobs(input: {
 		input.sessionIngestQuiesced ??
 		readBooleanEnv("SESSION_INGEST_QUIESCED", false);
 	const repairNow = now();
+	const gate = input.gate ?? getR2IngestMaterializationGate();
+	// Jobs larger than this process admits stay for a process that can run them
+	// (large sessions: the resident worker), instead of being claimed here.
 	const candidates = await input.database.unsafe<IngestJobRow[]>(
 		`${selectIngestJobSql()}
 		 WHERE (
 			(status = 'pending'
-				AND (attempts > 0 OR last_error_code = '${R2_INGEST_DEPENDENCY_UNAVAILABLE}')
+				AND (attempts > 0 OR last_error_code IN ('${R2_INGEST_DEPENDENCY_UNAVAILABLE}', '${R2_INGEST_COMMIT_QUEUED}'))
 				AND available_at <= $1)
 			OR (status = 'running' AND lease_expires_at <= $1)
 		 )
 			AND expires_at > $2
+			AND expected_total_bytes <= $4
+			AND expected_total_bytes > $5
 		 ORDER BY
 			CASE WHEN status = 'running' THEN lease_expires_at ELSE available_at END ASC,
 			created_at ASC
 		 LIMIT $3`,
-		[repairNow.toISOString(), repairNow.toISOString(), limit],
+		[
+			repairNow.toISOString(),
+			repairNow.toISOString(),
+			limit,
+			gate.maxJobBytes,
+			input.minExpectedTotalBytes ?? 0,
+		],
 	);
-	const run = input.gate
-		? input.gate.run.bind(input.gate)
-		: runWithR2IngestMaterializationSlot;
 	let attempted = 0;
 	let completed = 0;
 	let deadlineReached = false;
@@ -677,38 +767,42 @@ export async function repairRecoverableR2IngestJobs(input: {
 		}
 
 		try {
-			await run(candidate.expectedTotalBytes, async (signal) => {
-				const claim = await claimRecoverableJob({
-					candidateId: candidate.id,
-					database: input.database,
-					leaseDurationMs,
-					manifest,
-					now: now(),
-					randomUUID: input.randomUUID ?? createRandomUUID,
-					sessionIngestQuiesced,
-				});
-				if (!claim) return;
-				if (claim.kind === "completed" || claim.kind === "failed") {
-					await cleanupIngestJobObjects(
-						claim.job,
-						input.database,
-						input.r2,
-						undefined,
-					);
-					return;
-				}
-				await processClaimedJob({
-					database: input.database,
-					failpoint: undefined,
-					job: claim.job,
-					leaseDurationMs,
-					now,
-					process: input.process,
-					r2: input.r2,
-					signal,
-				});
-				completed += 1;
-			});
+			await gate.run(
+				candidate.expectedTotalBytes,
+				async (signal) => {
+					const claim = await claimRecoverableJob({
+						candidateId: candidate.id,
+						database: input.database,
+						leaseDurationMs,
+						manifest,
+						now: now(),
+						randomUUID: input.randomUUID ?? createRandomUUID,
+						sessionIngestQuiesced,
+					});
+					if (!claim) return;
+					if (claim.kind === "completed" || claim.kind === "failed") {
+						await cleanupIngestJobObjects(
+							claim.job,
+							input.database,
+							input.r2,
+							undefined,
+						);
+						return;
+					}
+					await processClaimedJob({
+						database: input.database,
+						failpoint: undefined,
+						job: claim.job,
+						leaseDurationMs,
+						now,
+						process: input.process,
+						r2: input.r2,
+						signal,
+					});
+					completed += 1;
+				},
+				input.signal,
+			);
 		} catch (error) {
 			logger.warn(
 				"Dedicated R2 ingest recovery did not complete (job_id={jobId} error={error})",
@@ -721,6 +815,33 @@ export async function repairRecoverableR2IngestJobs(input: {
 		completed,
 		hasMore: deadlineReached || candidates.length === limit,
 	};
+}
+
+/**
+ * True when a session above the standard size is ready for recovery. The
+ * resident worker polls this so large commits accepted by other processes
+ * (Vercel functions never materialize them) start within seconds instead of
+ * waiting for the worker's next scheduled pass.
+ */
+export async function hasDueLargeR2IngestWork(
+	database: postgres.Sql,
+	now: Date,
+): Promise<boolean> {
+	const rows = await database.unsafe<{ due: number }[]>(
+		`SELECT 1 AS due
+		 FROM ingest_job
+		 WHERE (
+			(status = 'pending'
+				AND (attempts > 0 OR last_error_code IN ('${R2_INGEST_DEPENDENCY_UNAVAILABLE}', '${R2_INGEST_COMMIT_QUEUED}'))
+				AND available_at <= $1)
+			OR (status = 'running' AND lease_expires_at <= $1)
+		 )
+			AND expires_at > $1
+			AND expected_total_bytes > $2
+		 LIMIT 1`,
+		[now.toISOString(), STANDARD_SESSION_MAX_BYTES],
+	);
+	return rows.length > 0;
 }
 
 async function claimRecoverableJob(input: {
@@ -751,7 +872,8 @@ async function claimRecoverableJob(input: {
 		const eligible =
 			(candidate.status === "pending" &&
 				(candidate.attempts > 0 ||
-					candidate.lastErrorCode === R2_INGEST_DEPENDENCY_UNAVAILABLE) &&
+					candidate.lastErrorCode === R2_INGEST_DEPENDENCY_UNAVAILABLE ||
+					candidate.lastErrorCode === R2_INGEST_COMMIT_QUEUED) &&
 				toDate(candidate.availableAt).getTime() <= input.now.getTime()) ||
 			(candidate.status === "running" &&
 				toDate(candidate.leaseExpiresAt).getTime() <= input.now.getTime());

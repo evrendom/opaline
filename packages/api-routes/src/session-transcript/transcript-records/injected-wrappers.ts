@@ -60,6 +60,8 @@ const COMPACT_SUMMARY_PATTERN =
 export interface WrapperAnalysis {
 	/** Subtype of the first wrapper found, '' when none. */
 	readonly firstSubtype: string;
+	/** The removed wrapper elements and AGENTS.md payloads, in order, '\n'-joined. */
+	readonly injected: string;
 	/** Text left after removing every wrapper element. Empty for wrapper-only messages. */
 	readonly remainder: string;
 }
@@ -67,28 +69,51 @@ export interface WrapperAnalysis {
 /** Remove injected wrapper elements and report what they were. */
 export function stripInjectedWrappers(text: string): WrapperAnalysis {
 	let firstSubtype = "";
+	const injected: string[] = [];
 	const withoutElements = text.replace(
 		WRAPPER_ELEMENT_PATTERN,
-		(_match, name: string) => {
+		(match, name: string) => {
 			if (firstSubtype === "") {
 				firstSubtype = WRAPPER_SUBTYPES.get(name.toLowerCase()) ?? "injected";
 			}
+			injected.push(match);
 			return "";
 		},
 	);
-	const withoutBodies = withoutElements.replace(AGENTS_MD_BODY_PATTERN, () => {
-		if (firstSubtype === "") firstSubtype = "agents_md";
-		return "";
-	});
-	const withoutHeaders = withoutBodies.replace(AGENTS_MD_HEADER_PATTERN, () => {
-		if (firstSubtype === "") firstSubtype = "agents_md";
-		return "";
-	});
-	return { firstSubtype, remainder: withoutHeaders.trim() };
+	const withoutHeaders = withoutElements.replace(
+		AGENTS_MD_HEADER_PATTERN,
+		(match) => {
+			if (firstSubtype === "") firstSubtype = "agents_md";
+			injected.push(match.trimEnd());
+			return "";
+		},
+	);
+	const withoutBodies = withoutHeaders.replace(
+		AGENTS_MD_BODY_PATTERN,
+		(match) => {
+			if (firstSubtype === "") firstSubtype = "agents_md";
+			injected.push(match);
+			return "";
+		},
+	);
+	return {
+		firstSubtype,
+		injected: injected.join("\n"),
+		remainder: withoutBodies.trim(),
+	};
 }
 
 export type UserTextClassification =
-	| { readonly kind: "prompt"; readonly text: string }
+	| {
+			readonly kind: "prompt";
+			readonly text: string;
+			/**
+			 * Wrapper elements removed from around the prompt ('' when none): the
+			 * instructions the agent saw with it, kept as their own record.
+			 */
+			readonly injected: string;
+			readonly injectedSubtype: string;
+	  }
 	| { readonly kind: "injected_context"; readonly subtype: string }
 	| { readonly kind: "compaction"; readonly subtype: string }
 	| { readonly kind: "meta"; readonly subtype: string };
@@ -113,7 +138,7 @@ export function classifyUserText(
 	if (COMPACT_SUMMARY_PATTERN.test(trimmed)) {
 		return { kind: "compaction", subtype: "compact_summary" };
 	}
-	const { firstSubtype, remainder } = stripInjectedWrappers(trimmed);
+	const { firstSubtype, injected, remainder } = stripInjectedWrappers(trimmed);
 	if (firstSubtype === "slash_command") {
 		// A typed slash command is tooling syntax, not a prompt boundary.
 		return { kind: "injected_context", subtype: "slash_command" };
@@ -133,5 +158,10 @@ export function classifyUserText(
 	if (SKILL_BODY_PATTERN.test(remainder)) {
 		return { kind: "injected_context", subtype: "skill_body" };
 	}
-	return { kind: "prompt", text: remainder };
+	return {
+		kind: "prompt",
+		text: remainder,
+		injected,
+		injectedSubtype: firstSubtype,
+	};
 }

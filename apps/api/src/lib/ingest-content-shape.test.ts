@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { IngestSessionInput } from "@rudel/api-routes";
 import {
+	SESSION_INGEST_FILTER_VERSION,
+	TRANSCRIPT_SLIM_VERSION,
+} from "@rudel/api-routes/transcript-slim";
+import { FILTER_VERSION } from "@rudel/secret-filter";
+import {
 	getIngestContentShape,
 	INGEST_SHRINK_MIN_BYTE_TOLERANCE,
 	INGEST_SHRINK_MIN_LINE_TOLERANCE,
+	isComparableIngestShapeVersion,
 	isUnexpectedIngestShrink,
 	resolvePreviousIngestContentShape,
 } from "./ingest-content-shape.js";
@@ -130,6 +136,117 @@ describe("isUnexpectedIngestShrink", () => {
 				compareTotalsOnly: true,
 			}),
 		).toBe(true);
+	});
+});
+
+describe("isUnexpectedIngestShrink while re-baselining byte sizes", () => {
+	const component = (assistantLineCount: number, contentBytes: number) => ({
+		assistantLineCount,
+		contentBytes,
+	});
+	const shape = (
+		main: ReturnType<typeof component>,
+		subagents: Record<string, ReturnType<typeof component>> = {},
+	) => ({
+		assistantLineCount: Object.values(subagents).reduce(
+			(total, value) => total + value.assistantLineCount,
+			main.assistantLineCount,
+		),
+		contentBytes: Object.values(subagents).reduce(
+			(total, value) => total + value.contentBytes,
+			main.contentBytes,
+		),
+		main,
+		subagents,
+		version: 1 as const,
+	});
+
+	test("accepts smaller bytes with the same records", () => {
+		expect(
+			isUnexpectedIngestShrink(
+				shape(component(12, 1_000_000)),
+				shape(component(12, 100_000)),
+				{ compareBytes: false },
+			),
+		).toBe(false);
+	});
+
+	test("still refuses lost assistant records", () => {
+		expect(
+			isUnexpectedIngestShrink(
+				shape(component(12, 1_000_000)),
+				shape(component(2, 1_000_000)),
+				{ compareBytes: false },
+			),
+		).toBe(true);
+		expect(
+			isUnexpectedIngestShrink(
+				shape(component(12, 1_000_000)),
+				shape(component(2, 1_000_000)),
+				{ compareBytes: false, compareTotalsOnly: true },
+			),
+		).toBe(true);
+	});
+
+	test("still refuses a dropped or truncated subagent stream", () => {
+		const previous = shape(component(4, 10_000), {
+			worker: component(8, 50_000),
+		});
+		expect(
+			isUnexpectedIngestShrink(previous, shape(component(4, 10_000)), {
+				compareBytes: false,
+			}),
+		).toBe(true);
+		expect(
+			isUnexpectedIngestShrink(
+				previous,
+				shape(component(4, 10_000), { worker: component(1, 50_000) }),
+				{ compareBytes: false },
+			),
+		).toBe(true);
+	});
+});
+
+describe("isComparableIngestShapeVersion", () => {
+	test("re-baselines once after the session filter version advances", () => {
+		expect(
+			isComparableIngestShapeVersion(
+				SESSION_INGEST_FILTER_VERSION - 1,
+				SESSION_INGEST_FILTER_VERSION,
+			),
+		).toBe(false);
+		expect(
+			isComparableIngestShapeVersion(
+				SESSION_INGEST_FILTER_VERSION,
+				SESSION_INGEST_FILTER_VERSION,
+			),
+		).toBe(true);
+	});
+
+	test("keeps checking legacy rows and rows stored by a newer version", () => {
+		expect(
+			isComparableIngestShapeVersion(null, SESSION_INGEST_FILTER_VERSION),
+		).toBe(true);
+		expect(
+			isComparableIngestShapeVersion(
+				SESSION_INGEST_FILTER_VERSION + 1,
+				SESSION_INGEST_FILTER_VERSION,
+			),
+		).toBe(true);
+	});
+
+	test("the session filter version covers the current secret filter and slimming", () => {
+		// Bump SESSION_INGEST_FILTER_VERSION whenever either component changes
+		// the stored bytes, then update this pin.
+		expect({
+			FILTER_VERSION,
+			SESSION_INGEST_FILTER_VERSION,
+			TRANSCRIPT_SLIM_VERSION,
+		}).toEqual({
+			FILTER_VERSION: 6,
+			SESSION_INGEST_FILTER_VERSION: 7,
+			TRANSCRIPT_SLIM_VERSION: 1,
+		});
 	});
 });
 

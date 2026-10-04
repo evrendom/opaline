@@ -1,9 +1,36 @@
 import { ORPCError } from "@orpc/server";
 import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
 } from "@rudel/api-routes";
+
+/**
+ * Sessions up to this size are "standard": every per-process budget (queues,
+ * timeouts, row and text limits) was sized for them and they keep today's
+ * behaviour. Larger R2 sessions (up to `INGEST_AGGREGATE_CONTENT_MAX_BYTES`)
+ * run alone in each queue and get budgets scaled to their size.
+ */
+export const STANDARD_SESSION_MAX_BYTES = INGEST_DIRECT_CONTENT_MAX_BYTES;
+
+export function isLargeIngestSession(bytes: number): boolean {
+	return bytes > STANDARD_SESSION_MAX_BYTES;
+}
+
+/**
+ * Scales a per-session budget sized for standard sessions to `bytes`:
+ * unchanged up to `STANDARD_SESSION_MAX_BYTES`, then proportional to the
+ * session size, capped at the ratio of the largest accepted session (2x).
+ */
+export function scaleSessionBudget(base: number, bytes: number): number {
+	if (!Number.isFinite(bytes)) return base;
+	const boundedBytes = Math.min(
+		Math.max(bytes, STANDARD_SESSION_MAX_BYTES),
+		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	);
+	return Math.ceil((base * boundedBytes) / STANDARD_SESSION_MAX_BYTES);
+}
 
 export function clampIngestAggregateContentMaxBytes(
 	override: number | undefined,

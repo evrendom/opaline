@@ -1,4 +1,5 @@
 import type { ShellFileMutation } from "./command-class.js";
+import type { UserTextClassification } from "./injected-wrappers.js";
 import type {
 	CommandClass,
 	FileOperation,
@@ -36,12 +37,31 @@ export interface CodexEndEvent {
 	readonly success: boolean | null;
 }
 
+/** The latest Codex code-mode `exec` script and the patch paths read from its source. */
+export interface CodexExecScript {
+	readonly callId: string;
+	readonly patchPaths: ReadonlySet<string>;
+}
+
 /** Mutable per-stream context shared by the format adapters and the core loop. */
 export interface StreamState {
 	readonly calls: Map<string, KnownCall>;
 	codexAgentPath: string;
+	/** Ids of completed Codex items already recorded (an item can complete twice). */
+	readonly codexCompletedItems: Set<string>;
 	readonly codexEndEvents: Map<string, CodexEndEvent>;
+	codexExecScript: CodexExecScript | undefined;
+	/**
+	 * Completed native web searches whose `web_search_call` response item, which
+	 * Codex writes right after the completion, has not arrived yet.
+	 */
+	codexPendingWebSearchMirrors: number;
 	isSubagent: boolean;
+	/**
+	 * Claude prompts delivered as queued-command attachments whose user message
+	 * copy, which some versions also write, has not been seen yet.
+	 */
+	readonly claudeQueuedPrompts: string[];
 	/** Text of the latest genuine prompt, used to collapse Codex mirror events. */
 	lastPromptText: string;
 	lastTs: string;
@@ -56,8 +76,12 @@ export function createStreamState(
 ): StreamState {
 	return {
 		calls: new Map(),
+		claudeQueuedPrompts: [],
 		codexAgentPath: "",
+		codexCompletedItems: new Set(),
 		codexEndEvents: new Map(),
+		codexExecScript: undefined,
+		codexPendingWebSearchMirrors: 0,
 		isSubagent,
 		lastPromptText: "",
 		lastTs: fallbackTs,
@@ -114,4 +138,23 @@ export function shellFileChangeItem(
 		subtype: direct ? "shell" : `shell_${mutation.basis}`,
 		toolName,
 	};
+}
+
+/**
+ * The instructions that arrived in one message with a human prompt (Conductor
+ * system instructions, reminders, AGENTS.md), kept readable as their own
+ * `injected_context` block after the prompt.
+ */
+export function injectedAroundPrompt(
+	classification: Extract<UserTextClassification, { kind: "prompt" }>,
+): LineItem[] {
+	return classification.injected === ""
+		? []
+		: [
+				{
+					kind: "injected_context",
+					subtype: classification.injectedSubtype || "injected",
+					text: classification.injected,
+				},
+			];
 }

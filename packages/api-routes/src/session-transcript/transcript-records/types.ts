@@ -7,7 +7,7 @@
  */
 
 /** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 4;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 5;
 
 /** record_idx of the per-revision receipt row. Real lines never reach this. */
 export const TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX = 4_294_967_295;
@@ -19,8 +19,28 @@ export const TRANSCRIPT_RECORD_EXCERPT_CHARS = 1_024;
 export const TRANSCRIPT_RECORD_TEXT_MAX_CHARS = 65_536;
 
 /**
+ * Cap on the stored `text` of injected context (instructions, reminders,
+ * memory files, AGENTS.md). Longer bodies stay readable through the record
+ * read's raw fallback.
+ */
+export const TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS = 16_384;
+
+/** Cap on the stored `text` of bookkeeping records that carry content (hooks, API errors, attachments). */
+export const TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS = 4_096;
+
+/**
  * Default total of head + tail + text characters stored for one session across
- * every stream. Once spent, later records keep structure and a short head only.
+ * every stream.
+ *
+ * The budget is paced over the session's raw bytes, main transcript first and
+ * then each subagent transcript: by the end of any line, the characters spent
+ * may not exceed the budget's share of the bytes read so far (unspent share
+ * carries forward). A large early stretch therefore cannot starve later turns
+ * or subagent transcripts; each keeps at least its proportional share. A record
+ * that does not fit its allowance keeps its head and tail excerpts and a shorter
+ * text, or, with nothing left, a short head, plus a short tail for tool results
+ * and errors so failure causes survive. Record reads fall back to the raw line
+ * for anything not stored.
  */
 export const TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS = 32 * 1024 * 1024;
 
@@ -111,6 +131,19 @@ export interface TranscriptRecordDraft {
 
 export interface TranscriptTextBudget {
 	remaining: number;
+	/**
+	 * Pacing over a whole session's raw bytes (see
+	 * `TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS`); absent, a record may use
+	 * whatever remains.
+	 */
+	readonly pace?: TranscriptTextPace;
+}
+
+export interface TranscriptTextPace {
+	readonly totalChars: number;
+	readonly totalBytes: number;
+	/** Raw bytes of the streams already split. */
+	bytesBefore: number;
 }
 
 export interface SplitTranscriptOptions {
@@ -123,6 +156,11 @@ export interface SplitTranscriptOptions {
 	readonly source: TranscriptSource;
 	readonly textBudget?: TranscriptTextBudget;
 	readonly textMaxChars?: number;
+	/**
+	 * Store the whole decoded text of every record that has one, with no cap or
+	 * budget (the record read's raw fallback re-derives one line this way).
+	 */
+	readonly fullText?: boolean;
 }
 
 export interface TranscriptSplitSummary {

@@ -391,6 +391,7 @@ export function buildTurnActionsStatement(
 				substringUTF8(c.head, 1, {targetChars:UInt32}) AS target,
 				r.any_result_is_error AS result_is_error,
 				r.last_result_exit_code AS result_exit_code,
+				r.last_result_running AS result_running,
 				r.call_id IS NOT NULL AS has_result
 			FROM (
 				SELECT record_idx, block_idx, ts, tool_name, command_class, file_path, file_op, call_id, head
@@ -403,7 +404,8 @@ export function buildTurnActionsStatement(
 				SELECT
 					results.call_id,
 					max(toUInt8(results.is_error OR (results.exit_code IS NOT NULL AND results.exit_code != 0))) AS any_result_is_error,
-					argMax(results.exit_code, results.record_idx) AS last_result_exit_code
+					argMax(results.exit_code, results.record_idx) AS last_result_exit_code,
+					argMax(toUInt8(results.subtype = 'running'), results.record_idx) AS last_result_running
 				FROM ${table()} AS results FINAL
 				WHERE ${streamFilter("results")}
 					AND results.kind = 'tool_result'
@@ -617,7 +619,8 @@ export function buildRecordBlocksStatement(
 				file_path,
 				byte_start,
 				byte_len,
-				text_chars
+				text_chars,
+				source
 			FROM ${table()} FINAL
 			WHERE ${streamFilter()}
 				AND record_idx = {recordIdx:UInt32}

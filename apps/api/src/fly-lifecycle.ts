@@ -8,7 +8,10 @@ import {
 import { startGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
 import { shutdownIngestFilterQueue } from "./services/ingest-filter.service.js";
 import { registerR2IngestCleanupWorker } from "./services/r2-ingest-cleanup.service.js";
-import { runR2IngestRepairPass } from "./services/r2-ingest-repair.service.js";
+import {
+	runR2IngestRepairPass,
+	startLargeR2IngestWatcher,
+} from "./services/r2-ingest-repair.service.js";
 import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
@@ -37,6 +40,9 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 	});
 	registerClickHousePurgeWorker(clickHousePurgeWorker);
 	registerR2IngestCleanupWorker(clickHousePurgeWorker);
+	const largeR2IngestWatcher = r2IngestCleanupClient
+		? startLargeR2IngestWatcher()
+		: undefined;
 	const sessionLanguageSignalReconciliationWorker =
 		process.env.NODE_ENV === "test"
 			? undefined
@@ -56,6 +62,7 @@ export function startFlyApiLifecycle(): FlyApiLifecycle {
 			}
 			isShuttingDown = true;
 
+			largeR2IngestWatcher?.stop();
 			shutdownIngestFilterQueue();
 			shutdownUsageExtractionQueue();
 			shutdownSessionLanguageSignalScanner();

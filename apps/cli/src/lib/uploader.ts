@@ -4,7 +4,7 @@ import type { ContractRouterClient } from "@orpc/contract";
 import { isMissingTranscriptTimestampMessage } from "@rudel/agent-adapters";
 import {
 	type contract,
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
 	parseSafeApiEndpoint,
@@ -301,7 +301,7 @@ export async function uploadSession(
 ): Promise<UploadResult> {
 	const inputBytes = getUploadAggregateBytes(request);
 	const maxAggregateBytes =
-		config.maxAggregateBytes ?? INGEST_AGGREGATE_CONTENT_MAX_BYTES;
+		config.maxAggregateBytes ?? INGEST_DIRECT_CONTENT_MAX_BYTES;
 	// Skip the expensive secret filter only for large inputs that cannot fit even
 	// after the maximum redaction shrinkage. Smaller inputs still filter first, so
 	// a redaction-budget abort keeps precedence over the aggregate-size abort.

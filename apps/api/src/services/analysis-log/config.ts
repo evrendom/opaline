@@ -33,6 +33,15 @@ export function getAnalysisLog(workspaceId: string): AnalysisLog | null {
 }
 
 /**
+ * The configured log whatever the workspace, to look an analysis up by id
+ * before its workspace is known. Callers must still require
+ * `getAnalysisLog(analysis.workspaceId)` before using what they found.
+ */
+export function getConfiguredAnalysisLog(): AnalysisLog | null {
+	return configuredAnalysisLog();
+}
+
+/**
  * Whether the workspace opted into restricting stored results that read other
  * members' sessions to admins and the sessions' own member
  * (`ANALYSIS_LOG_RESTRICTED_WORKSPACES`, comma-separated ids or `*`; empty or

@@ -7,6 +7,8 @@ import {
 import {
 	clampIngestAggregateContentMaxBytes,
 	enforceIngestAggregateSize,
+	isLargeIngestSession,
+	scaleSessionBudget,
 } from "../lib/ingest-size.js";
 
 const validBase = {
@@ -14,6 +16,25 @@ const validBase = {
 	sessionId: "session-1",
 	projectPath: "/test/project",
 };
+
+const MEBIBYTE = 1024 * 1024;
+
+describe("session budget scaling", () => {
+	test("keeps standard sessions on the base budget", () => {
+		expect(isLargeIngestSession(128 * MEBIBYTE)).toBe(false);
+		expect(isLargeIngestSession(128 * MEBIBYTE + 1)).toBe(true);
+		expect(scaleSessionBudget(30_000, 1)).toBe(30_000);
+		expect(scaleSessionBudget(30_000, 128 * MEBIBYTE)).toBe(30_000);
+		expect(scaleSessionBudget(30_000, Number.NaN)).toBe(30_000);
+	});
+
+	test("scales proportionally above the standard size up to 2x", () => {
+		expect(scaleSessionBudget(30_000, 192 * MEBIBYTE)).toBe(45_000);
+		expect(scaleSessionBudget(30_000, 256 * MEBIBYTE)).toBe(60_000);
+		expect(scaleSessionBudget(30_000, 1024 * MEBIBYTE)).toBe(60_000);
+		expect(scaleSessionBudget(1_000_000, 200 * MEBIBYTE)).toBe(1_562_500);
+	});
+});
 
 describe("enforceIngestAggregateSize", () => {
 	test("clamps overrides to the production aggregate ceiling", () => {

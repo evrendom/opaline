@@ -4,6 +4,7 @@ import { z } from "zod";
 import { IngestSessionInputSchema } from "../index.js";
 
 const NON_TRANSCRIPT_STRING_PATHS: readonly string[] = [
+	"analysisId",
 	"cli_version",
 	"client_surface",
 	"gitBranch",

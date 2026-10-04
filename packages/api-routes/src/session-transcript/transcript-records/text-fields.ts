@@ -15,6 +15,7 @@ export interface TranscriptTextFields {
 }
 
 const BUDGET_EXHAUSTED_HEAD_CHARS = 256;
+const BUDGET_EXHAUSTED_TAIL_CHARS = 512;
 
 /** Code points in `value`, matching ClickHouse `lengthUTF8` for valid text. */
 export function countCodePoints(value: string): number {
@@ -49,13 +50,18 @@ export function sliceEnd(value: string, start: number): string {
  *
  * `head` is the first excerpt and `tail` the last excerpt, non-overlapping: a
  * record shorter than one excerpt has an empty tail. `text` is a prefix of the
- * full text capped at `textMaxChars`. When the shared budget is spent, only a
- * short head survives; `textChars` stays exact.
+ * full text capped at `textMaxChars`. Storage is charged to the shared budget,
+ * limited by `allowance` (the record's paced share): a record that does not
+ * fit keeps both excerpts and as much text as fits, and with nothing left a
+ * short head only, plus a short tail when `keepTail` (tool results and
+ * errors, whose cause is usually at the end). `textChars` stays exact.
  */
 export function buildTranscriptTextFields(
 	fullText: string,
 	options: {
+		readonly allowance?: number;
 		readonly budget?: TranscriptTextBudget;
+		readonly keepTail?: boolean;
 		readonly textMaxChars?: number;
 	} = {},
 ): TranscriptTextFields {
@@ -64,16 +70,6 @@ export function buildTranscriptTextFields(
 	if (fullText === "") {
 		return { head: "", tail: "", text: "", textChars: 0, truncated: false };
 	}
-	if (options.budget && options.budget.remaining <= 0) {
-		return {
-			head: sliceStart(fullText, BUDGET_EXHAUSTED_HEAD_CHARS),
-			tail: "",
-			text: "",
-			textChars,
-			truncated: true,
-		};
-	}
-	const text = sliceStart(fullText, textMaxChars);
 	const head = sliceStart(fullText, TRANSCRIPT_RECORD_EXCERPT_CHARS);
 	const tail =
 		fullText.length > TRANSCRIPT_RECORD_EXCERPT_CHARS
@@ -85,16 +81,63 @@ export function buildTranscriptTextFields(
 					),
 				)
 			: "";
-	if (options.budget) {
-		options.budget.remaining -= text.length + head.length + tail.length;
+	const cappedText = sliceStart(fullText, textMaxChars);
+	const budget = options.budget;
+	const available =
+		budget === undefined
+			? Number.POSITIVE_INFINITY
+			: Math.min(budget.remaining, options.allowance ?? budget.remaining);
+	let fields: TranscriptTextFields;
+	if (cappedText.length + head.length + tail.length <= available) {
+		fields = {
+			head,
+			tail,
+			text: cappedText,
+			textChars,
+			truncated: cappedText.length < fullText.length,
+		};
+	} else if (head.length + tail.length < available) {
+		const text = sliceStart(
+			cappedText,
+			Math.floor(available - head.length - tail.length),
+		);
+		fields = { head, tail, text, textChars, truncated: true };
+	} else {
+		// Short excerpts only: whatever the allowance still covers, never less
+		// than a short head, and for tool results and errors a short tail.
+		const tailChars =
+			options.keepTail === true
+				? Math.min(
+						BUDGET_EXHAUSTED_TAIL_CHARS,
+						Math.max(0, fullText.length - BUDGET_EXHAUSTED_HEAD_CHARS),
+					)
+				: 0;
+		const shortHead = sliceStart(
+			fullText,
+			Math.max(
+				BUDGET_EXHAUSTED_HEAD_CHARS,
+				Math.min(head.length, Math.floor(available) - tailChars),
+			),
+		);
+		fields = {
+			head: shortHead,
+			tail:
+				tailChars > 0 && fullText.length > shortHead.length
+					? sliceEnd(
+							fullText,
+							Math.max(shortHead.length, fullText.length - tailChars),
+						)
+					: "",
+			text: "",
+			textChars,
+			truncated: true,
+		};
 	}
-	return {
-		head,
-		tail,
-		text,
-		textChars,
-		truncated: text.length < fullText.length,
-	};
+	if (budget !== undefined) {
+		budget.remaining -=
+			fields.text.length + fields.head.length + fields.tail.length;
+	}
+	return fields;
 }
 
 function isHighSurrogate(unit: number): boolean {

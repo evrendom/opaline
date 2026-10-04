@@ -76,7 +76,10 @@ export const AnalysisFindInputBaseSchema = z
 		reaction: z
 			.array(z.enum(["negative", "swear", "apology"]))
 			.default(["negative", "swear", "apology"]),
-		groupBy: z.enum(["week", "model", "repository", "agent"]).optional(),
+		/** `session`: one group per session, a Codex session with its subagent threads. */
+		groupBy: z
+			.enum(["week", "model", "repository", "agent", "session"])
+			.optional(),
 		refs: z.array(RunRefInputSchema).max(200).optional(),
 		/** Absent: `findLimit` picks a default per source. */
 		limit: z.number().int().min(1).max(200).optional(),
@@ -166,13 +169,21 @@ export const AnalysisReadInputSchema = AnalysisReadInputBaseSchema.superRefine(
 );
 
 const ReactionSchema = z.enum(["negative", "swear", "apology"]);
+/**
+ * The session that spawned this one when it is a Codex subagent thread
+ * (native lineage), else null. Results stored before it existed read as null.
+ */
+const ParentSessionIdSchema = z.string().nullable().default(null);
 const HeaderSchema = z.object({
 	from: z.string(),
 	to: z.string(),
 	sessionsInScope: z.number(),
 	indexedSessions: z.number(),
 	runsInScope: z.number(),
+	/** Wall-clock minutes of the runs (each from its first record to its last non-meta record). */
 	minutes: z.number(),
+	/** Active minutes of the runs; null in results stored before it existed. */
+	activeMinutes: z.number().nullable().default(null),
 	pricedCostUsd: z.number(),
 	unattributedCostUsd: z.number(),
 	unpricedRuns: z.number(),
@@ -187,9 +198,20 @@ const HeaderSchema = z.object({
 export const AnalysisRunSchema = z.object({
 	ref: RunRefSchema,
 	startedAt: z.string(),
+	/** Wall-clock span from the run's first record to its last non-meta record. */
 	minutes: z.number(),
+	/**
+	 * Time between the run's consecutive non-meta records, each gap capped at
+	 * 5 minutes (approval waits and stalls are not work); null in results
+	 * stored before it existed.
+	 */
+	activeMinutes: z.number().nullable().default(null),
+	/** Priced cost of the run; null when none of its usage could be priced. */
 	costUsd: z.number().nullable(),
+	/** Model of the run's latest usage (the session's model when it has none). */
 	model: z.string(),
+	/** Every model the run's usage was attributed to, most expensive first. */
+	models: z.array(z.string()).default([]),
 	repository: z.string(),
 	agent: z.enum(["claude_code", "codex"]),
 	promptHead: z.string().max(160),
@@ -201,12 +223,16 @@ export const AnalysisRunSchema = z.object({
 	notFound: z.number(),
 	nextReaction: ReactionSchema.nullable(),
 	rawChars: z.number(),
+	parentSessionId: ParentSessionIdSchema,
+	/** Subagent-thread depth below the top session: 0 top level, 1 a child, 2 a grandchild. */
+	depth: z.number().int().min(0).default(0),
 });
 const RunGroupSchema = z.object({
 	key: z.string(),
 	runs: z.number(),
 	sessions: z.number(),
 	minutes: z.number(),
+	activeMinutes: z.number().nullable().default(null),
 	costUsd: z.number().nullable(),
 });
 const ToolGroupSchema = z.object({
@@ -227,6 +253,7 @@ const ToolGroupSchema = z.object({
 				ref: RunRefSchema,
 				record: z.number(),
 				errorLine: z.string(),
+				parentSessionId: ParentSessionIdSchema,
 			}),
 		)
 		.max(5),
@@ -240,6 +267,7 @@ export const AnalysisEventSchema = z.object({
 	originRef: RunRefSchema.nullable(),
 	originMinutes: z.number().nullable(),
 	originCostUsd: z.number().nullable(),
+	parentSessionId: ParentSessionIdSchema,
 });
 export const AnalysisFindOutputSchema = z.union([
 	z.object({

@@ -35,7 +35,9 @@ survive. Results live in `queryOutputs` and the sessions a query read in
 listing an analysis reads neither. Embeddings have 1536 dimensions and record
 their model; vector search filters by workspace and model (joined in `space`,
 since vector filters only test equality) and returns at most 256 matches,
-best first. The API uses only OpenAI vectors with this store; a model change
+best first. Chats uploaded for an analysis (`opaline import --analysis`) are
+`analysisSessions` rows, one per analysis, source and session, at most 200 per
+analysis (`sessions:link` checks the count in the same transaction). The API uses only OpenAI vectors with this store; a model change
 leaves older vectors unmatched until they are embedded again.
 
 ## Size limits
@@ -71,6 +73,9 @@ half a transaction and continue on the next call. The purge's follow-up pass
 runs the same again and catches analyses that read the owner's sessions while
 the first pass ran. `analyses:save` writes findings, clarification steps and
 the analysis in one transaction, so a refused save writes nothing.
+Deleting an analysis deletes its `analysisSessions` rows; deleting an account
+also runs `deletion:sessionsByOwner`, which removes that member's chats from
+other members' analyses and keeps the analyses.
 
 A daily cron (03:00 UTC) expires results older than 90 days, or a year in
 shared or pinned analyses, mirroring the service's read-time check. It scans

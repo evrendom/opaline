@@ -1,6 +1,13 @@
 import { getLogger } from "@logtape/logtape";
-import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
+import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
+} from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import {
+	isLargeIngestSession,
+	scaleSessionBudget,
+} from "../lib/ingest-size.js";
 import { getIngestFilterWorkerError } from "./ingest-filter.error.js";
 import type {
 	IngestFilterFields,
@@ -12,8 +19,9 @@ import { IngestFilterWorkerOperationalError } from "./ingest-worker-operational.
 const logger = getLogger(["rudel", "api", "ingest-filter-queue"]);
 const QUEUE_RETRY_AFTER_MS = 1_000;
 // Production transcripts around 32 MiB can exceed 30 seconds when the shared
-// Fly CPU is contended. Keep enough headroom for the 128 MiB ingest limit while
-// staying well inside the API's 300-second request envelope.
+// Fly CPU is contended. Keep enough headroom for a 128 MiB session while staying
+// well inside the API's 300-second request envelope; larger R2 sessions scale
+// it with their size (`scaleSessionBudget`) and run on the resident worker.
 const DEFAULT_FILTER_TIMEOUT_MS = 120_000;
 
 export interface IngestFilterQueueConfig {
@@ -60,6 +68,7 @@ interface PendingFilterRequest extends IngestFilterRequest {
 	readonly requestId: number;
 	readonly resolve: (result: IngestFilterResult) => void;
 	timeout: ReturnType<typeof setTimeout>;
+	readonly timeoutMs: number;
 }
 
 interface UserQueueUsage {
@@ -157,6 +166,7 @@ export class IngestFilterQueue {
 
 		const requestId = this.nextRequestId;
 		this.nextRequestId += 1;
+		const timeoutMs = scaleSessionBudget(this.config.timeoutMs, request.bytes);
 
 		return new Promise((resolve, reject) => {
 			const abortListener = () => {
@@ -164,7 +174,7 @@ export class IngestFilterQueue {
 			};
 			const timeout = setTimeout(() => {
 				this.timeoutRequest(requestId);
-			}, this.config.timeoutMs);
+			}, timeoutMs);
 			const pending: PendingFilterRequest = {
 				...request,
 				abortListener,
@@ -173,6 +183,7 @@ export class IngestFilterQueue {
 				requestId,
 				resolve,
 				timeout,
+				timeoutMs,
 			};
 
 			this.pendingRequests.set(requestId, pending);
@@ -232,6 +243,15 @@ export class IngestFilterQueue {
 	private getExceededLimit(
 		request: IngestFilterRequest,
 	): QueueLimit | undefined {
+		// A session above the standard size is admitted only into an empty
+		// queue, so it never waits behind (or holds memory beside) other work;
+		// the byte budgets then bound whatever queues behind it.
+		if (
+			isLargeIngestSession(request.bytes) &&
+			request.bytes <= INGEST_AGGREGATE_CONTENT_MAX_BYTES
+		) {
+			return this.pendingRequests.size === 0 ? undefined : "global-bytes";
+		}
 		if (this.pendingRequests.size + 1 > this.config.globalMaxJobs) {
 			return "global-jobs";
 		}
@@ -316,7 +336,7 @@ export class IngestFilterQueue {
 		clearTimeout(pending.timeout);
 		pending.timeout = setTimeout(() => {
 			this.timeoutRequest(pending.requestId);
-		}, this.config.timeoutMs);
+		}, pending.timeoutMs);
 	}
 
 	private recordWaitTime(pending: PendingFilterRequest): void {
@@ -436,7 +456,7 @@ export class IngestFilterQueue {
 			"Transcript filtering request timed out after {timeoutMs}ms with {queueDepth} jobs queued",
 			{
 				queueDepth: this.pendingRequests.size,
-				timeoutMs: this.config.timeoutMs,
+				timeoutMs: pending.timeoutMs,
 			},
 		);
 		this.rejectPendingRequest(pending, new IngestFilterQueueTimeoutError());
@@ -509,7 +529,7 @@ export class IngestFilterQueue {
 const ingestFilterQueue = new IngestFilterQueue({
 	globalMaxBytes: readPositiveSafeIntegerEnv(
 		"INGEST_FILTER_QUEUE_GLOBAL_MAX_BYTES",
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES * 2,
+		INGEST_DIRECT_CONTENT_MAX_BYTES * 2,
 	),
 	globalMaxJobs: readPositiveSafeIntegerEnv(
 		"INGEST_FILTER_QUEUE_GLOBAL_MAX_JOBS",
@@ -517,7 +537,7 @@ const ingestFilterQueue = new IngestFilterQueue({
 	),
 	perUserMaxBytes: readPositiveSafeIntegerEnv(
 		"INGEST_FILTER_QUEUE_PER_USER_MAX_BYTES",
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		INGEST_DIRECT_CONTENT_MAX_BYTES,
 	),
 	perUserMaxJobs: readPositiveSafeIntegerEnv(
 		"INGEST_FILTER_QUEUE_PER_USER_MAX_JOBS",

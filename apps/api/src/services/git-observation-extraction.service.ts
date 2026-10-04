@@ -1,11 +1,7 @@
-import { Buffer } from "node:buffer";
 import { getLogger } from "@logtape/logtape";
 import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated";
 import { filterKnownSecrets } from "@rudel/secret-filter";
-import {
-	type ClickHouseExecutor,
-	getSafeClickHouseTable,
-} from "../clickhouse.js";
+import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import {
 	baseRow,
@@ -16,6 +12,7 @@ import {
 	type GitObservationRecord,
 	gitObservationGenerationVersion,
 } from "./git-observation-parser.js";
+import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "./transcript-records-ingest.service.js";
 
@@ -261,27 +258,18 @@ async function readRawRange(
 	record: GitObservationRecord,
 	signal: AbortSignal,
 ): Promise<string> {
-	const table = getSafeClickHouseTable(
-		input.source === "codex" ? "rudel.codex_sessions" : "rudel.claude_sessions",
-	);
-	const stream =
-		input.source === "claude_code"
-			? "if(mapContains(subagents, {agentId:String}), subagents[{agentId:String}], content)"
-			: "content";
-	const rows = await executor.query<{ raw: string }>({
-		abortSignal: signal,
-		clickhouse_settings: SCAN_SETTINGS,
-		query: `SELECT substring(${stream}, {byteStart:UInt64} + 1, {byteLen:UInt32}) AS raw FROM ${table} WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id = {sessionId:String} AND revision = {revision:UInt64} LIMIT 1`,
-		query_params: {
-			...identityParams(input),
+	const raw = await readRawTranscriptLine(
+		executor,
+		{
+			...input,
 			revision,
 			agentId: record.agent_id,
-			byteStart: record.byte_start,
+			byteStart: Number(record.byte_start),
 			byteLen: record.byte_len,
 		},
-	});
-	const raw = rows[0]?.raw;
-	if (raw === undefined || Buffer.byteLength(raw, "utf8") !== record.byte_len)
+		{ abortSignal: signal, clickhouseSettings: SCAN_SETTINGS },
+	);
+	if (raw === undefined)
 		throw new Error("Missing exact raw revision/range for git observation");
 	return raw;
 }

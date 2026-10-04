@@ -20,6 +20,7 @@ export {
 } from "./receipt.js";
 export {
 	createSplitStats,
+	decodeTranscriptLine,
 	type MutableSplitStats,
 	type SessionTranscriptInput,
 	splitSessionTranscript,
@@ -33,7 +34,9 @@ export {
 	type FileOperation,
 	type SplitTranscriptOptions,
 	TRANSCRIPT_RECORD_EXCERPT_CHARS,
+	TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES,
+	TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
@@ -43,4 +46,5 @@ export {
 	type TranscriptSource,
 	type TranscriptSplitSummary,
 	type TranscriptTextBudget,
+	type TranscriptTextPace,
 } from "./types.js";

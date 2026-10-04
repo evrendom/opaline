@@ -3,5 +3,9 @@
 	"compilerOptions": {
 		"noCheck": false
 	},
-	"include": ["api/**/*.ts", "scripts/github-webhook-vercel.integration.ts"]
+	"include": [
+		"api/**/*.ts",
+		"deploy/large-ingest/api/**/*.ts",
+		"scripts/github-webhook-vercel.integration.ts"
+	]
 }

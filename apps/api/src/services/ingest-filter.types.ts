@@ -8,7 +8,11 @@ export interface IngestFilterFields {
 	readonly subagents: IngestSessionInput["subagents"];
 }
 
-export type IngestFilterResult = SessionTextFilterResult<IngestSubagent>;
+export interface IngestFilterResult
+	extends SessionTextFilterResult<IngestSubagent> {
+	/** UTF-8 bytes secret filtering ran on: the upload after slimming. */
+	readonly filterInputBytes: number;
+}
 
 export interface IngestFilterWorkerRequest {
 	readonly requestId: number;

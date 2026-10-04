@@ -137,4 +137,85 @@ describe("R2 ingest materialization gate", () => {
 			queuedJobs: 0,
 		});
 	});
+
+	test("rejects jobs above the standard budget without a large-job ceiling", async () => {
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 128 * MEBIBYTE,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 5_000,
+			queueTimeoutMs: 5_000,
+		});
+
+		expect(gate.maxJobBytes).toBe(128 * MEBIBYTE);
+		await expect(
+			gate.run(128 * MEBIBYTE + 1, async () => "large"),
+		).rejects.toMatchObject({ code: "R2_INGEST_GATE_FULL" });
+	});
+
+	test("runs a large job alone and nothing beside it", async () => {
+		const gate = createR2IngestMaterializationGate({
+			largeJobMaxBytes: 256 * MEBIBYTE,
+			maxBytes: 128 * MEBIBYTE,
+			maxJobs: 2,
+			maxQueuedJobs: 4,
+			operationTimeoutMs: 5_000,
+			queueTimeoutMs: 5_000,
+		});
+		const order: string[] = [];
+		const hold = (name: string) => {
+			let release: () => void = () => {};
+			const promise = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const run = gate.run(
+				name === "large" ? 256 * MEBIBYTE : MEBIBYTE,
+				async () => {
+					order.push(`start:${name}`);
+					await promise;
+					order.push(`end:${name}`);
+					return name;
+				},
+			);
+			return { release, run };
+		};
+
+		expect(gate.maxJobBytes).toBe(256 * MEBIBYTE);
+		const small = hold("small");
+		await Promise.resolve();
+		const large = hold("large");
+		await Promise.resolve();
+		const after = hold("after");
+		await Promise.resolve();
+		expect(order).toEqual(["start:small"]);
+		expect(gate.getStats()).toMatchObject({ activeJobs: 1, queuedJobs: 2 });
+
+		small.release();
+		await small.run;
+		await Promise.resolve();
+		expect(order).toEqual(["start:small", "end:small", "start:large"]);
+		expect(gate.getStats()).toMatchObject({
+			activeBytes: 256 * MEBIBYTE,
+			activeJobs: 1,
+			queuedJobs: 1,
+		});
+
+		large.release();
+		after.release();
+		await expect(Promise.all([large.run, after.run])).resolves.toEqual([
+			"large",
+			"after",
+		]);
+		expect(order).toEqual([
+			"start:small",
+			"end:small",
+			"start:large",
+			"end:large",
+			"start:after",
+			"end:after",
+		]);
+		await expect(
+			gate.run(256 * MEBIBYTE + 1, async () => "too large"),
+		).rejects.toMatchObject({ code: "R2_INGEST_GATE_FULL" });
+	});
 });

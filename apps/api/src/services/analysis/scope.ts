@@ -11,6 +11,13 @@ import {
 	type SessionGeneration,
 	type TranscriptReadScope,
 } from "../transcript-records-queries.js";
+import {
+	descendantSessions,
+	type FamilyPosition,
+	familyPosition,
+	loadSessionFamilies,
+	type SessionFamilies,
+} from "./lineage.js";
 import { ANALYSIS_QUERY_SETTINGS } from "./sql.js";
 
 export interface AnalysisScope {
@@ -26,7 +33,10 @@ const SessionSchema = z.object({
 	model: z.string(),
 	repository: z.string(),
 });
-export type AnalysisSession = z.infer<typeof SessionSchema>;
+type SessionRow = z.infer<typeof SessionSchema>;
+
+/** A session in scope with its place in its Codex subagent family. */
+export interface AnalysisSession extends SessionRow, FamilyPosition {}
 
 /** One owner's indexed sessions, small enough for one set of statements. */
 export interface ScopeBatch {
@@ -42,6 +52,8 @@ export interface ResolvedScope {
 	indexedSessions: number;
 	/** The session census hit MAX_SESSIONS; only the newest are covered. */
 	sessionCapReached: boolean;
+	/** Sessions in scope that are Codex subagent threads of another session. */
+	subagentThreads: number;
 	batches: ScopeBatch[];
 }
 
@@ -56,7 +68,20 @@ const BATCH_SESSIONS = 50;
  */
 const BATCH_RECORDS = 200_000;
 const DEFAULT_DAYS = 7;
+/**
+ * Lineage read for a window starts this many days before it: a thread in
+ * range resolves its parent chain through threads started up to a month
+ * earlier, and older ancestors make it the top of its family.
+ */
+const FAMILY_LOOKBACK_DAYS = 30;
 
+/**
+ * The sessions a find covers, each with its family position, batched per
+ * owner. Codex subagent threads count with the session that spawned them: a
+ * session in scope brings all its native descendants (whatever their date or
+ * model), and `latest` counts families (top sessions with their threads), not
+ * threads. Each session appears once, so costs are never counted twice.
+ */
 export async function resolveScope(
 	executor: ClickHouseExecutor,
 	scope: AnalysisScope,
@@ -64,20 +89,36 @@ export async function resolveScope(
 	batchRecords = BATCH_RECORDS,
 ): Promise<ResolvedScope> {
 	const { from, to } = defaultRange(input);
-	const found = z
-		.array(SessionSchema)
-		.parse(
-			await executor.query<unknown>(
-				buildSessionsStatement(scope, input, from, to),
-			),
-		);
-	const sessions = found.slice(0, MAX_SESSIONS);
+	const [found, families] = await Promise.all([
+		querySessions(executor, buildSessionsStatement(scope, input, from, to)),
+		loadSessionFamilies(executor, scope, {
+			childSince: shiftDays(from, -FAMILY_LOOKBACK_DAYS),
+		}),
+	]);
+	const selected = input.latest
+		? newestFamilies(found.slice(0, MAX_SESSIONS), input.latest, families)
+		: found.slice(0, MAX_SESSIONS);
+	const capReached =
+		found.length > MAX_SESSIONS &&
+		(!input.latest || familyCount(selected, families) < input.latest);
+	// With refs only the named runs count, so their families are not pulled in.
+	const threads = input.refs
+		? []
+		: await queryDescendants(executor, scope, selected, families);
+	const sessions = [...selected, ...threads]
+		.slice(0, MAX_SESSIONS)
+		.map((session) => ({
+			...session,
+			...familyPosition(families, session.user_id, session.session_id),
+		}));
 	const resolved: ResolvedScope = {
 		from,
 		to,
 		sessionsInScope: sessions.length,
 		indexedSessions: 0,
-		sessionCapReached: found.length > sessions.length,
+		sessionCapReached:
+			capReached || selected.length + threads.length > MAX_SESSIONS,
+		subagentThreads: sessions.filter((session) => session.depth > 0).length,
 		batches: [],
 	};
 	for (const userId of new Set(sessions.map((session) => session.user_id))) {
@@ -168,6 +209,76 @@ export function batchByRecords(
 	return batches;
 }
 
+/**
+ * Sessions of the newest `latest` families, newest first: a family is ranked
+ * by its newest matching session and contributes all its matching sessions.
+ */
+function newestFamilies(
+	sessions: readonly SessionRow[],
+	latest: number,
+	families: SessionFamilies,
+): SessionRow[] {
+	const roots = new Set<string>();
+	for (const session of sessions) {
+		if (roots.size === latest) break;
+		roots.add(rootKey(session, families));
+	}
+	return sessions.filter((session) => roots.has(rootKey(session, families)));
+}
+
+function familyCount(
+	sessions: readonly SessionRow[],
+	families: SessionFamilies,
+): number {
+	return new Set(sessions.map((session) => rootKey(session, families))).size;
+}
+
+function rootKey(session: SessionRow, families: SessionFamilies): string {
+	const { rootSessionId } = familyPosition(
+		families,
+		session.user_id,
+		session.session_id,
+	);
+	return JSON.stringify([session.user_id, rootSessionId]);
+}
+
+/** Native descendants of `selected` that it does not already hold, by owner. */
+async function queryDescendants(
+	executor: ClickHouseExecutor,
+	scope: AnalysisScope,
+	selected: readonly SessionRow[],
+	families: SessionFamilies,
+): Promise<SessionRow[]> {
+	const threads: SessionRow[] = [];
+	for (const userId of new Set(selected.map((session) => session.user_id))) {
+		const ids = descendantSessions(
+			families,
+			userId,
+			selected
+				.filter((session) => session.user_id === userId)
+				.map((session) => session.session_id),
+		);
+		for (let offset = 0; offset < ids.length; offset += BATCH_SESSIONS)
+			threads.push(
+				...(await querySessions(
+					executor,
+					buildSessionsByIdStatement(
+						{ organizationId: scope.organizationId, userId },
+						ids.slice(offset, offset + BATCH_SESSIONS),
+					),
+				)),
+			);
+	}
+	return threads;
+}
+
+async function querySessions(
+	executor: ClickHouseExecutor,
+	statement: ClickHouseStatement,
+): Promise<SessionRow[]> {
+	return z.array(SessionSchema).parse(await executor.query<unknown>(statement));
+}
+
 export function defaultRange(input: Pick<AnalysisFindInput, "from" | "to">) {
 	const to = input.to ?? new Date().toISOString().slice(0, 10);
 	return { from: input.from ?? shiftDays(to, 1 - DEFAULT_DAYS), to };
@@ -186,19 +297,29 @@ function buildSessionsStatement(
 	const optional = {
 		user_id: ["userId", scope.userId],
 		source: ["agent", input.agent],
-		model_used: ["model", input.model],
 		session_id: ["sessionId", input.sessionId],
 	} as const;
 	const params: Record<string, unknown> = {
 		organizationId: scope.organizationId,
 		from,
 		to,
-		latest: input.latest ?? MAX_SESSIONS + 1,
+		limit: MAX_SESSIONS + 1,
 	};
 	for (const [column, [name, value]] of Object.entries(optional)) {
 		if (!value) continue;
 		filters.push(`${column} = {${name}:String}`);
 		params[name] = value;
+	}
+	if (input.model) {
+		// A session qualifies by its recorded model or by any usage of the model;
+		// find then keeps only the runs whose usage includes it.
+		filters.push(`(model_used = {model:String} OR session_id IN (
+			SELECT session_id FROM ${getSafeClickHouseTable("rudel.usage_events")}
+			WHERE organization_id = {organizationId:String}
+				${scope.userId ? "AND user_id = {userId:String}" : ""}
+				AND usage_date >= {from:Date} AND record_kind = 'event' AND is_deleted = 0
+				AND (resolved_model = {model:String} OR raw_model = {model:String})))`);
+		params.model = input.model;
 	}
 	if (input.repository) {
 		filters.push(
@@ -210,6 +331,28 @@ function buildSessionsStatement(
 		filters.push("session_id IN {refSessions:Array(String)}");
 		params.refSessions = [...new Set(input.refs.map((ref) => ref.sessionId))];
 	}
+	return sessionsStatement(filters, params);
+}
+
+/** One owner's sessions by id, whatever their date (subagent threads of sessions in scope). */
+function buildSessionsByIdStatement(
+	scope: { organizationId: string; userId: string },
+	sessionIds: readonly string[],
+): ClickHouseStatement {
+	return sessionsStatement(
+		[
+			"organization_id = {organizationId:String}",
+			"user_id = {userId:String}",
+			"session_id IN {sessionIds:Array(String)}",
+		],
+		{ ...scope, sessionIds: [...sessionIds], limit: sessionIds.length },
+	);
+}
+
+function sessionsStatement(
+	filters: readonly string[],
+	params: Record<string, unknown>,
+): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT session_id, user_id, source, model_used AS model,
@@ -217,7 +360,7 @@ function buildSessionsStatement(
 			FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 			WHERE ${filters.join(" AND ")}
 			ORDER BY session_date DESC, session_id, user_id LIMIT 1 BY user_id, session_id
-			LIMIT {latest:UInt32}`,
+			LIMIT {limit:UInt32}`,
 		query_params: params,
 	};
 }

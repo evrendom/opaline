@@ -6,13 +6,20 @@ import {
 } from "../codex-tool-translation.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
 import {
+	argvToCommand,
+	readCompletedItem,
+	takeWebSearchMirror,
+} from "./codex-completed-items.js";
+import {
 	classifyCommand,
 	combineCommandClasses,
 	extractShellFileMutations,
 } from "./command-class.js";
-import { readCodexExitCode } from "./exit-code.js";
+import { isCodexRunningOutput, readCodexExitCode } from "./exit-code.js";
+import { readCodexImageOutputText } from "./image-labels.js";
 import { classifyUserText } from "./injected-wrappers.js";
 import {
+	injectedAroundPrompt,
 	isRecord,
 	type LineItem,
 	type LineResult,
@@ -64,7 +71,13 @@ export function readCodexLine(
 		case "compacted":
 		case "compaction":
 			return {
-				items: [{ kind: "compaction", subtype: "compacted" }],
+				items: [
+					{
+						kind: "compaction",
+						subtype: "compacted",
+						text: readCompactedText(payload),
+					},
+				],
 				timestamp,
 			};
 		default:
@@ -73,6 +86,27 @@ export function readCodexLine(
 				timestamp,
 			};
 	}
+}
+
+/**
+ * The summary a Codex compaction carried forward: its `message`, else the
+ * `replacement_history` messages that replaced the conversation, by role.
+ */
+function readCompactedText(payload: Record<string, unknown>): string {
+	const message = readString(payload.message);
+	if (message !== undefined) return message;
+	const history = Array.isArray(payload.replacement_history)
+		? payload.replacement_history
+		: [];
+	return history
+		.flatMap((entry) => {
+			if (!isRecord(entry)) return [];
+			const text = readBlockText(entry.content);
+			if (text === "") return [];
+			const role = readString(entry.role);
+			return [role === undefined ? text : `[${role}]\n${text}`];
+		})
+		.join("\n\n");
 }
 
 function readSessionMetadata(
@@ -122,9 +156,10 @@ function readEventMessage(
 		const message = readString(payload.message) ?? readString(payload.text);
 		return message === undefined
 			? [metaItem("user_message")]
-			: [userTextItem(message, state, "user_message_mirror")];
+			: userTextItems(message, state, "user_message_mirror");
 	}
 	if (MIRROR_EVENTS.has(type)) return [metaItem(`${type}_mirror`)];
+	if (type === "item_completed") return readCompletedItem(payload.item, state);
 	if (type === "exec_command_end") {
 		const callId = readString(payload.call_id) ?? "";
 		const exitCode = readFiniteNumber(payload.exit_code);
@@ -183,6 +218,12 @@ function readResponseItem(
 	state: StreamState,
 ): LineItem[] {
 	const type = readString(payload.type) ?? "";
+	if (type === "web_search_call") {
+		if (takeWebSearchMirror(state)) return [metaItem("web_search_call_mirror")];
+	} else {
+		// The mirror follows its completion directly; anything else ends the wait.
+		state.codexPendingWebSearchMirrors = 0;
+	}
 	switch (type) {
 		case "message":
 			return readMessage(payload, state);
@@ -249,7 +290,7 @@ function readMessage(
 	if (role === "user") {
 		return text.trim() === ""
 			? [metaItem("user_empty")]
-			: [userTextItem(text, state, "user_message_mirror")];
+			: userTextItems(text, state, "user_message_mirror");
 	}
 	return [metaItem(`message_${role}`)];
 }
@@ -265,11 +306,11 @@ function readBlockText(content: unknown): string {
 		.join("\n");
 }
 
-function userTextItem(
+function userTextItems(
 	text: string,
 	state: StreamState,
 	mirrorLabel: string,
-): LineItem {
+): LineItem[] {
 	const classification = classifyUserText(text, {});
 	switch (classification.kind) {
 		case "prompt":
@@ -279,19 +320,24 @@ function userTextItem(
 				state.lastPromptText === classification.text
 			) {
 				// Codex records each prompt both as an event and as a response item.
-				return metaItem(mirrorLabel);
+				return [metaItem(mirrorLabel)];
 			}
-			return { kind: "user_prompt", text: classification.text };
+			return [
+				{ kind: "user_prompt", text: classification.text },
+				...injectedAroundPrompt(classification),
+			];
 		case "injected_context":
-			return {
-				kind: "injected_context",
-				subtype: classification.subtype,
-				text,
-			};
+			return [
+				{
+					kind: "injected_context",
+					subtype: classification.subtype,
+					text,
+				},
+			];
 		case "compaction":
-			return { kind: "compaction", subtype: classification.subtype, text };
+			return [{ kind: "compaction", subtype: classification.subtype, text }];
 		case "meta":
-			return metaItem(classification.subtype);
+			return [metaItem(classification.subtype)];
 	}
 }
 
@@ -338,6 +384,18 @@ function readCall(
 	for (const file of description.patchFiles) {
 		items.push(...patchFileItems(file, callId, toolName));
 	}
+	if (payloadType === "custom_tool_call" && toolName.toLowerCase() === "exec") {
+		state.codexExecScript = {
+			callId,
+			patchPaths: new Set(
+				description.patchFiles.flatMap((file) =>
+					file.movePath === undefined
+						? [file.path]
+						: [file.path, file.movePath],
+				),
+			),
+		};
+	}
 	const seen = new Set<string>();
 	for (const command of description.commands) {
 		for (const mutation of extractShellFileMutations(command)) {
@@ -377,6 +435,21 @@ function describeCall(
 	const rawText = typeof rawInput === "string" ? rawInput : undefined;
 	const args = isRecord(rawInput) ? rawInput : parseObject(rawText);
 
+	if (payloadType === "web_search_call") {
+		const action = isRecord(payload.action) ? payload.action : {};
+		const queries = Array.isArray(action.queries)
+			? action.queries.filter((query) => typeof query === "string")
+			: [];
+		return {
+			commands: [],
+			patchFiles: [],
+			text:
+				readString(action.query) ??
+				(queries.length > 0
+					? queries.join("\n")
+					: (readString(action.url) ?? "")),
+		};
+	}
 	if (lowered === "apply_patch") {
 		const patch =
 			readString(args?.input) ?? readString(args?.patch) ?? rawText ?? "";
@@ -486,7 +559,10 @@ function readOutput(
 	const callId = readString(payload.call_id) ?? "";
 	const known = callId === "" ? undefined : state.calls.get(callId);
 	const rawOutput = rawOutputString(payload.output ?? payload.tools);
-	const decoded = readTranscriptToolOutputText(payload.output) ?? rawOutput;
+	const decoded =
+		readCodexImageOutputText(payload.output) ??
+		readTranscriptToolOutputText(payload.output) ??
+		rawOutput;
 	const end = callId === "" ? undefined : state.codexEndEvents.get(callId);
 	const exitCode =
 		end?.exitCode ?? readCodexExitCode(payload.output ?? payload.tools);
@@ -496,6 +572,12 @@ function readOutput(
 			: end?.success === false || hasFailurePrefix(decoded);
 	const launchesSubagent =
 		known !== undefined && SPAWN_TOOL_NAMES.has(known.toolName.toLowerCase());
+	// Still running when recorded: neither a pass nor a failure.
+	const running =
+		exitCode === null &&
+		!isError &&
+		end === undefined &&
+		isCodexRunningOutput(payload.output);
 	return {
 		callId,
 		commandClass: known?.commandClass ?? "",
@@ -503,7 +585,7 @@ function readOutput(
 		isError,
 		kind: "tool_result",
 		spawnedAgentId: launchesSubagent ? readSpawnedAgentId(decoded) : "",
-		subtype: known === undefined ? "orphan" : "",
+		subtype: known === undefined ? "orphan" : running ? "running" : "",
 		text: decoded,
 		toolName: known?.toolName ?? "",
 	};
@@ -541,27 +623,6 @@ function parseObject(
 	} catch {
 		return undefined;
 	}
-}
-
-function argvToCommand(value: unknown): string {
-	if (typeof value === "string") return value;
-	if (!Array.isArray(value)) return "";
-	const argv = value.filter((part): part is string => typeof part === "string");
-	const shell = argv[0]?.split("/").at(-1);
-	if (
-		argv.length >= 3 &&
-		(shell === "bash" || shell === "sh" || shell === "zsh") &&
-		(argv[1] === "-lc" || argv[1] === "-c")
-	) {
-		return argv[2] ?? "";
-	}
-	return argv
-		.map((part) =>
-			/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part)
-				? part
-				: `'${part.replaceAll("'", "'\\''")}'`,
-		)
-		.join(" ");
 }
 
 function readFiniteNumber(value: unknown): number | undefined {

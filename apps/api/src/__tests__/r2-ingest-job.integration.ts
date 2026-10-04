@@ -6,9 +6,11 @@ import {
 	expect,
 	test,
 } from "bun:test";
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { S3ServiceException } from "@aws-sdk/client-s3";
 import { parseError } from "@clickhouse/client-web";
+import { createRouterClient } from "@orpc/server";
 import type {
 	IngestSessionInput,
 	R2IngestCommitInput,
@@ -22,8 +24,16 @@ import {
 } from "../clickhouse.js";
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { handleR2IngestMaintenanceRequest } from "../handlers/api-maintenance.js";
-import { type IngestErrorFactories, processIngestSession } from "../router.js";
+import { handleLargeR2IngestWorkerRequest } from "../handlers/large-r2-ingest-worker.js";
+import {
+	type IngestErrorFactories,
+	processIngestSession,
+	router,
+} from "../router.js";
 import { requeueFailedIngestJobs } from "../scripts/requeue-failed-ingest-jobs.js";
+import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
+import { createLocalEmbedder } from "../services/analysis-log/embedder.js";
+import { createMemoryAnalysisStore } from "../services/analysis-log/memory-store.js";
 import { IngestFilterQueue } from "../services/ingest-filter.service.js";
 import {
 	extendNonterminalR2IngestJobExpiries,
@@ -40,6 +50,7 @@ import {
 	withIngestProcessingLedger,
 } from "../services/ingest-processing-ledger.service.js";
 import { IngestFilterWorkerOperationalError } from "../services/ingest-worker-operational.error.js";
+import { runLargeR2IngestWorkerPass } from "../services/large-r2-ingest-worker.service.js";
 import {
 	acquirePostgresLease,
 	PostgresLeaseLostError,
@@ -52,10 +63,12 @@ import {
 } from "../services/r2-ingest-cleanup.service.js";
 import {
 	commitR2IngestJob,
+	hasDueLargeR2IngestWork,
 	type R2IngestProcessorResult,
 	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
 import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
+import { R2IngestCommitQueuedError } from "../services/r2-ingest-processing-error.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
 	R2_INGEST_BUCKET,
@@ -245,6 +258,20 @@ function createFakeR2S3Endpoint(): Bun.Server<undefined> {
 				);
 			}
 			if (objectKey === null) return new Response(null, { status: 404 });
+			if (request.method === "POST" && url.searchParams.has("uploads")) {
+				const metadata = Object.fromEntries(
+					[...request.headers]
+						.filter(([name]) => name.startsWith("x-amz-meta-"))
+						.map(([name, value]) => [name.slice("x-amz-meta-".length), value]),
+				);
+				const created = await fakeR2.createMultipartUpload({
+					metadata,
+					objectKey,
+				});
+				return xmlResponse(
+					`<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>${R2_INGEST_BUCKET}</Bucket><Key>${objectKey}</Key><UploadId>${created.uploadId}</UploadId></InitiateMultipartUploadResult>`,
+				);
+			}
 			const uploadId = url.searchParams.get("uploadId");
 			if (request.method === "DELETE" && uploadId) {
 				await fakeR2.abortMultipartUpload({ objectKey, uploadId });
@@ -363,11 +390,12 @@ describe("R2 ingest commit lifecycle", () => {
 		fakeR2.reset();
 	});
 
-	test("keeps a materialization queue timeout retryable without claiming the job", async () => {
+	test("a commit that times out while queued is stored and completed by recovery without another commit", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
 			"queued materialization transcript",
 		);
+		const committedAt = new Date("2030-01-01T00:00:00.000Z");
 		let releaseBlocker: (() => void) | undefined;
 		const blocker = new Promise<void>((resolve) => {
 			releaseBlocker = resolve;
@@ -383,28 +411,526 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(gate.getStats().activeJobs).toBe(1);
 
 		try {
-			await expect(
-				commitR2IngestJob({
-					gate,
-					input: buildCompletionInput(initialized),
-					process: async () => {
-						throw new Error("queued job unexpectedly started");
-					},
-					r2: fakeR2,
-					userId: USER_ID,
-				}),
-			).rejects.toMatchObject({
-				code: "R2_INGEST_GATE_QUEUE_TIMEOUT",
+			const queued = commitR2IngestJob({
+				gate,
+				input: buildCompletionInput(initialized),
+				now: () => committedAt,
+				process: async () => {
+					throw new Error("queued job unexpectedly started");
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			});
+			// Released CLIs poll status on this reason instead of failing.
+			await expect(queued).rejects.toMatchObject({
+				code: "R2_INGEST_JOB_RETRY_LATER",
 				retryable: true,
 			});
-			expect(
-				await getR2IngestJobStatus(initialized.jobId, USER_ID),
-			).toMatchObject({ attempts: 0, status: "pending" });
+			await expect(queued).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
 		} finally {
 			releaseBlocker?.();
 			await active;
 		}
+		const status = await getR2IngestJobStatus(initialized.jobId, USER_ID);
+		expect(status).toMatchObject({
+			attempts: 0,
+			error: { code: "R2_INGEST_COMMIT_QUEUED" },
+			result: null,
+			status: "pending",
+		});
+		expect(status?.availableAt).toBe(
+			new Date(committedAt.getTime() + 5_000).toISOString(),
+		);
+		expect(await getNextR2IngestWorkDueAt(sqlClient)).toEqual(
+			new Date(committedAt.getTime() + 5_000),
+		);
+
+		// A client retry inside the window is answered at once, without a slot.
+		await expect(
+			commitR2IngestJob({
+				gate,
+				input: buildCompletionInput(initialized),
+				now: () => new Date(committedAt.getTime() + 1_000),
+				process: async () => {
+					throw new Error("retry inside the window unexpectedly started");
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toMatchObject({ code: "R2_INGEST_JOB_RETRY_LATER" });
+		expect(gate.getStats()).toMatchObject({ activeJobs: 0, queuedJobs: 0 });
+
+		// Recovery ignores the job until its short delay passes, then finishes it
+		// from the stored completion receipt.
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				gate,
+				now: () => new Date(committedAt.getTime() + 1_000),
+				process: async (input) => processorResult(input.sessionId),
+				r2: fakeR2,
+			}),
+		).resolves.toMatchObject({ attempted: 0, completed: 0 });
+		let processed = 0;
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				gate,
+				now: () => new Date(committedAt.getTime() + 60_000),
+				process: async (input) => {
+					processed += 1;
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toMatchObject({ attempted: 1, completed: 1 });
+		expect(processed).toBe(1);
+		expect(fakeR2.completedKeys).toEqual(
+			initialized.objects.map((object) => object.objectKey),
+		);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: null,
+			result: { sessionId: initialized.jobId, success: true },
+			status: "completed",
+		});
 	});
+
+	test("the large-ingest worker materializes only queued sessions above the standard size, one per process", async () => {
+		const large = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"y".repeat(128 * 1024 * 1024 + 1),
+		);
+		const standard = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"standard queued transcript",
+		);
+		const workerGate = createR2IngestMaterializationGate({
+			largeJobMaxBytes: 256 * 1024 * 1024,
+			maxBytes: 128 * 1024 * 1024,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 60_000,
+			queueTimeoutMs: 10,
+		});
+		// The standard commit finds the worker's gate busy and is queued too.
+		let releaseBlocker: (() => void) | undefined;
+		const blocker = new Promise<void>((resolve) => {
+			releaseBlocker = resolve;
+		});
+		const active = workerGate.run(1, async () => blocker);
+		try {
+			for (const initialized of [large, standard])
+				await expect(
+					commitR2IngestJob({
+						gate: workerGate,
+						input: buildCompletionInput(initialized),
+						process: async () => {
+							throw new Error("commit unexpectedly materialized");
+						},
+						r2: fakeR2,
+						userId: USER_ID,
+					}),
+				).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
+			// Another large job is already running in this process.
+			await expect(
+				runLargeR2IngestWorkerPass({
+					database: sqlClient,
+					deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
+					gate: workerGate,
+					process: async () => {
+						throw new Error("a busy worker started a second job");
+					},
+					r2: fakeR2,
+				}),
+			).resolves.toEqual({ attempted: 0, completed: 0, stopReason: "busy" });
+		} finally {
+			releaseBlocker?.();
+			await active;
+		}
+		await sqlClient`
+			UPDATE ingest_job SET available_at = NOW() - INTERVAL '1 second'
+			WHERE id IN (${large.jobId}, ${standard.jobId})
+		`;
+
+		const processed: string[] = [];
+		await expect(
+			runLargeR2IngestWorkerPass({
+				database: sqlClient,
+				deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
+				gate: workerGate,
+				process: async (input) => {
+					processed.push(input.sessionId);
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toEqual({ attempted: 1, completed: 1, stopReason: "complete" });
+		expect(processed).toEqual([large.jobId]);
+		expect(await getR2IngestJobStatus(large.jobId, USER_ID)).toMatchObject({
+			status: "completed",
+		});
+		// Standard sessions stay with the main project's recovery.
+		expect(await getR2IngestJobStatus(standard.jobId, USER_ID)).toMatchObject({
+			error: { code: "R2_INGEST_COMMIT_QUEUED" },
+			status: "pending",
+		});
+		// Too little budget left for another large job: nothing is claimed.
+		await expect(
+			runLargeR2IngestWorkerPass({
+				database: sqlClient,
+				deadline: { deadlineAt: Date.now() + 60_000, now: Date.now },
+				gate: workerGate,
+				process: async () => {
+					throw new Error("started a job without enough budget");
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toEqual({ attempted: 0, completed: 0, stopReason: "deadline" });
+	}, 120_000);
+
+	test("the large-ingest worker endpoint requires the cron secret and fails closed without worker mode", async () => {
+		const previous = new Map(
+			["CRON_SECRET", "R2_LARGE_INGEST_WORKER"].map((name) => [
+				name,
+				process.env[name],
+			]),
+		);
+		try {
+			process.env.CRON_SECRET = "large-ingest-worker-secret";
+			delete process.env.R2_LARGE_INGEST_WORKER;
+			const url = "http://127.0.0.1/api/cron/large-r2-ingest";
+			expect(
+				(await handleLargeR2IngestWorkerRequest(new Request(url))).status,
+			).toBe(401);
+			const disabled = await handleLargeR2IngestWorkerRequest(
+				new Request(url, {
+					headers: { Authorization: "Bearer large-ingest-worker-secret" },
+				}),
+			);
+			expect(disabled.status).toBe(503);
+			expect(await disabled.json()).toMatchObject({
+				enabled: false,
+				reason: "flag_off",
+			});
+		} finally {
+			for (const [name, value] of previous)
+				restoreEnvironmentVariable(name, value);
+		}
+	});
+
+	test("a session above the standard size is queued at commit and materialized only where large jobs are admitted", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"x".repeat(128 * 1024 * 1024 + 1),
+		);
+		const committedAt = new Date("2030-01-01T00:00:00.000Z");
+		const createGate = (largeJobMaxBytes: number | undefined) =>
+			createR2IngestMaterializationGate({
+				largeJobMaxBytes,
+				maxBytes: 128 * 1024 * 1024,
+				maxJobs: 1,
+				maxQueuedJobs: 1,
+				operationTimeoutMs: 60_000,
+				queueTimeoutMs: 1_000,
+			});
+		// Vercel functions admit only standard jobs; the resident worker also
+		// admits large ones.
+		const standardGate = createGate(undefined);
+		const residentGate = createGate(256 * 1024 * 1024);
+
+		// Even where it could run, a large commit never materializes inline.
+		await expect(
+			commitR2IngestJob({
+				gate: residentGate,
+				input: buildCompletionInput(initialized),
+				now: () => committedAt,
+				process: async () => {
+					throw new Error("large commit unexpectedly materialized inline");
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
+		expect(residentGate.getStats()).toMatchObject({ activeJobs: 0 });
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 0,
+			error: { code: "R2_INGEST_COMMIT_QUEUED" },
+			status: "pending",
+		});
+		const dueAt = new Date(committedAt.getTime() + 60_000);
+		expect(await hasDueLargeR2IngestWork(sqlClient, committedAt)).toBe(false);
+		expect(await hasDueLargeR2IngestWork(sqlClient, dueAt)).toBe(true);
+
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				gate: standardGate,
+				now: () => dueAt,
+				process: async () => {
+					throw new Error("a standard process claimed a large job");
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toMatchObject({ attempted: 0, completed: 0 });
+
+		let processedBytes = 0;
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				gate: residentGate,
+				now: () => dueAt,
+				process: async (input) => {
+					processedBytes = byteLength(input.content);
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toMatchObject({ attempted: 1, completed: 1 });
+		expect(processedBytes).toBe(128 * 1024 * 1024 + 1);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 1,
+			error: null,
+			status: "completed",
+		});
+		expect(await hasDueLargeR2IngestWork(sqlClient, dueAt)).toBe(false);
+	}, 120_000);
+
+	test("the minute cron materializes a commit that timed out while queued", async () => {
+		const jobId = crypto.randomUUID();
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(`queued-cron-${jobId}`),
+		);
+		let releaseBlocker: (() => void) | undefined;
+		const blocker = new Promise<void>((resolve) => {
+			releaseBlocker = resolve;
+		});
+		const gate = createR2IngestMaterializationGate({
+			maxBytes: 128 * 1024 * 1024,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 1_000,
+			queueTimeoutMs: 10,
+		});
+		const active = gate.run(1, async () => blocker);
+		try {
+			await expect(
+				commitR2IngestJob({
+					gate,
+					input: buildCompletionInput(initialized),
+					process: createRealProcessor(undefined),
+					r2: fakeR2,
+					userId: USER_ID,
+				}),
+			).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
+		} finally {
+			releaseBlocker?.();
+			await active;
+		}
+		await sqlClient`
+			UPDATE ingest_job SET available_at = NOW() - INTERVAL '1 second'
+			WHERE id = ${jobId}
+		`;
+
+		const fakeR2Endpoint = createFakeR2S3Endpoint();
+		const environment = {
+			CRON_SECRET: "r2-ingest-queued-cron-secret",
+			R2_ACCESS_KEY_ID: "test-access-key",
+			R2_ACCOUNT_ID: "test-account",
+			R2_ENDPOINT: fakeR2Endpoint.url.origin,
+			R2_SECRET_ACCESS_KEY: "test-secret-key",
+			SKILL_EXTRACTION_ENABLED: "false",
+			TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
+			USAGE_EVENT_EXTRACTION_ENABLED: "false",
+			VERCEL: "1",
+		};
+		const previousEnvironment = new Map(
+			Object.keys(environment).map((name) => [name, process.env[name]]),
+		);
+		const cron = Bun.serve({
+			hostname: "127.0.0.1",
+			port: 0,
+			fetch: handleR2IngestMaintenanceRequest,
+		});
+		try {
+			for (const [name, value] of Object.entries(environment))
+				process.env[name] = value;
+			const recovered = await fetch(cron.url, {
+				headers: { Authorization: `Bearer ${environment.CRON_SECRET}` },
+			});
+			expect(recovered.status).toBe(200);
+			expect(await recovered.json()).toMatchObject({ enabled: true });
+			expect(await getR2IngestJobStatus(jobId, USER_ID)).toMatchObject({
+				attempts: 1,
+				error: null,
+				result: { sessionId: jobId, success: true },
+				status: "completed",
+			});
+		} finally {
+			for (const [name, value] of previousEnvironment)
+				restoreEnvironmentVariable(name, value);
+			await cron.stop(true);
+			await fakeR2Endpoint.stop(true);
+		}
+	}, 60_000);
+
+	test("an R2 upload naming an analysis goes to its workspace and echoes the link on commit and status", async () => {
+		const analysisWorkspaceId = `r2-analysis-workspace-${crypto.randomUUID()}`;
+		const analysisId = `a_r2_${crypto.randomUUID().slice(0, 8)}`;
+		const log = {
+			store: createMemoryAnalysisStore(),
+			embedder: createLocalEmbedder(),
+			now: () => new Date(),
+		};
+		const createdAt = new Date().toISOString();
+		await log.store.createAnalysis({
+			id: analysisId,
+			workspaceId: analysisWorkspaceId,
+			authorId: USER_ID,
+			host: "plugin",
+			question: "Which runs failed?",
+			status: "finished",
+			shared: false,
+			pinned: false,
+			createdAt,
+			cutoff: createdAt,
+			scope: { from: null, to: null, filters: {} },
+			finalAnswer: "None.",
+			topics: [],
+			updates: null,
+			notes: [],
+			cost: null,
+			queryCount: 0,
+			stepCount: 0,
+		});
+		await sqlClient`
+			INSERT INTO organization (id, name, slug)
+			VALUES (${analysisWorkspaceId}, 'R2 analysis workspace', ${analysisWorkspaceId})
+		`;
+		await sqlClient`
+			INSERT INTO member (id, organization_id, user_id, role)
+			VALUES (${crypto.randomUUID()}, ${analysisWorkspaceId}, ${USER_ID}, 'member')
+		`;
+		const fakeR2Endpoint = createFakeR2S3Endpoint();
+		const environment = {
+			ANALYSIS_LOG_WORKSPACES: analysisWorkspaceId,
+			R2_ACCESS_KEY_ID: "test-access-key",
+			R2_ACCOUNT_ID: "test-account",
+			R2_ENDPOINT: fakeR2Endpoint.url.origin,
+			R2_SECRET_ACCESS_KEY: "test-secret-key",
+			SKILL_EXTRACTION_ENABLED: "false",
+			TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
+			USAGE_EVENT_EXTRACTION_ENABLED: "false",
+		};
+		const previousEnvironment = new Map(
+			Object.keys(environment).map((name) => [name, process.env[name]]),
+		);
+		for (const [name, value] of Object.entries(environment))
+			process.env[name] = value;
+		setAnalysisLogForTests(log);
+		try {
+			const client = createRouterClient(router, {
+				context: {
+					user: {
+						id: USER_ID,
+						name: "R2 Ingest Test",
+						email: `${USER_ID}@example.com`,
+						emailVerified: false,
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					},
+					session: null,
+					apiKeyId: "r2-analysis-test-key",
+					authFailure: null,
+					ingestOperatorAuthorized: false,
+					requestId: crypto.randomUUID(),
+					publicLookupSource: "test",
+				},
+			});
+			const sessionId = `r2-analysis-chat-${crypto.randomUUID()}`;
+			const content = buildRealClaudeTranscript(`r2-analysis-${sessionId}`);
+			const initialized = await client.ingest.init({
+				analysisId,
+				objects: [
+					{
+						byteLength: byteLength(content),
+						kind: "main",
+						sha256: sha256(content),
+					},
+				],
+				// The CLI's default workspace; the analysis's workspace wins.
+				organizationId: ORGANIZATION_ID,
+				projectPath: "/test/r2-analysis",
+				sessionId,
+				source: "claude_code",
+				upload_mode: "manual",
+			});
+			const [job] = await sqlClient<Array<{ organizationId: string }>>`
+				SELECT organization_id AS "organizationId" FROM ingest_job
+				WHERE id = ${initialized.jobId}
+			`;
+			expect(job?.organizationId).toBe(analysisWorkspaceId);
+			const objectKey = initialized.objects[0]?.objectKey;
+			assert(objectKey);
+			fakeR2.uploadText(objectKey, content);
+
+			const committed = await client.ingest.commit(
+				buildCompletionInput(initialized),
+			);
+			expect(committed).toMatchObject({
+				result: { analysisId, sessionId, success: true },
+				status: "completed",
+			});
+			expect(
+				await client.ingest.status({ jobId: initialized.jobId }),
+			).toMatchObject({
+				result: { analysisId, sessionId },
+				status: "completed",
+			});
+			expect(await log.store.getSessionLinks(analysisId)).toEqual([
+				{
+					analysisId,
+					sessionId,
+					source: "claude_code",
+					ownerId: USER_ID,
+					uploadedAt: expect.any(String),
+				},
+			]);
+
+			await expect(
+				client.ingest.init({
+					analysisId: "a_unknown",
+					objects: [
+						{
+							byteLength: byteLength(content),
+							kind: "main",
+							sha256: sha256(content),
+						},
+					],
+					projectPath: "/test/r2-analysis",
+					sessionId: `${sessionId}-refused`,
+					source: "claude_code",
+				}),
+			).rejects.toMatchObject({ status: 404 });
+		} finally {
+			setAnalysisLogForTests(undefined);
+			for (const [name, value] of previousEnvironment)
+				restoreEnvironmentVariable(name, value);
+			await fakeR2Endpoint.stop(true);
+			await getClickhouse().execute({
+				query: `DELETE FROM ${getSafeClickHouseTable("rudel.claude_sessions")} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+				query_params: { organizationId: analysisWorkspaceId },
+			});
+			await sqlClient`DELETE FROM organization WHERE id = ${analysisWorkspaceId}`;
+		}
+	}, 60_000);
 
 	test("quiescence blocks ingest-state PostgreSQL writes and R2 access after authentication while allowing operator commit", async () => {
 		const operatorToken = `operator-${crypto.randomUUID()}`;
@@ -2472,6 +2998,57 @@ const SUPERSESSION_BOUNDARIES: {
 ];
 
 describe("R2 ingest real processor crash recovery", () => {
+	test("stores inline screenshots from an R2 upload as omission markers", async () => {
+		const jobId = crypto.randomUUID();
+		const pixels = Buffer.from(
+			Array.from({ length: 4_000 }, (_, index) => (index * 13) % 256),
+		);
+		const content = [
+			buildRealClaudeTranscript(`screenshot-${jobId}`),
+			JSON.stringify({
+				message: {
+					content: [
+						{
+							content: [
+								{
+									source: {
+										data: pixels.toString("base64"),
+										media_type: "image/png",
+										type: "base64",
+									},
+									type: "image",
+								},
+							],
+							tool_use_id: "toolu_screenshot",
+							type: "tool_result",
+						},
+					],
+					role: "user",
+				},
+				timestamp: "2026-08-25T10:00:03.000Z",
+				type: "user",
+			}),
+		].join("\n");
+		const initialized = await initializeUploadedJob(jobId, content);
+
+		const committed = await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			process: createRealProcessor(undefined),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+
+		expect(committed.status).toBe("completed");
+		const [raw] = await getClickhouse().query<{ content: string }>({
+			query: `SELECT content FROM rudel.claude_sessions WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
+			query_params: { organizationId: ORGANIZATION_ID, sessionId: jobId },
+		});
+		expect(raw?.content).toContain(
+			`"data":"opaline-image-omitted:v1;sha256=${createHash("sha256").update(pixels).digest("hex")};bytes=4000;type=image/png"`,
+		);
+		expect(raw?.content).not.toContain(pixels.toString("base64"));
+	}, 180_000);
+
 	test.each(
 		CRASH_BOUNDARIES,
 	)("is physically and logically idempotent after $label acknowledgement", async ({

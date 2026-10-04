@@ -1,9 +1,11 @@
 import { getClaudeMutationFiles } from "../session-turn-file-edits.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
 import { classifyCommand, extractShellFileMutations } from "./command-class.js";
-import { readClaudeExitCode } from "./exit-code.js";
+import { isClaudeBackgroundLaunch, readClaudeExitCode } from "./exit-code.js";
+import { readImageBlockLabel } from "./image-labels.js";
 import { classifyUserText } from "./injected-wrappers.js";
 import {
+	injectedAroundPrompt,
 	isRecord,
 	type LineItem,
 	type LineResult,
@@ -28,7 +30,13 @@ export function readClaudeLine(
 	state.isSubagent ||=
 		record.isSidechain === true && readString(record.agentId) !== undefined;
 	if (type === "assistant") {
+		if (record.isApiErrorMessage === true) {
+			return { items: [readApiErrorMessage(record)], timestamp };
+		}
 		return { items: readAssistantBlocks(record, state), timestamp };
+	}
+	if (type === "attachment") {
+		return { items: readAttachment(record.attachment, state), timestamp };
 	}
 	if (type === "user") {
 		return { items: readUserMessage(record, state), timestamp };
@@ -47,7 +55,7 @@ export function readClaudeLine(
 				timestamp,
 			};
 		}
-		return { items: [metaItem(`system:${subtype}`)], timestamp };
+		return { items: [readSystemRecord(record, subtype)], timestamp };
 	}
 	return { items: [metaItem(type === "" ? "unknown" : type)], timestamp };
 }
@@ -178,7 +186,7 @@ function readUserMessage(
 		flaggedMeta: record.isMeta === true,
 	};
 	if (typeof content === "string") {
-		return [classifiedUserItem(content, flags)];
+		return classifiedUserItems(content, flags, state);
 	}
 	if (!Array.isArray(content)) return [metaItem("user_empty")];
 
@@ -200,7 +208,7 @@ function readUserMessage(
 		);
 	}
 	const textParts: string[] = [];
-	let hasImage = false;
+	const imageLabels: string[] = [];
 	for (const block of content) {
 		if (typeof block === "string") {
 			textParts.push(block);
@@ -208,41 +216,58 @@ function readUserMessage(
 			if (block.type === "text" && typeof block.text === "string") {
 				textParts.push(block.text);
 			} else if (block.type === "image") {
-				hasImage = true;
+				imageLabels.push(readImageBlockLabel(block) ?? "[image]");
 			}
 		}
 	}
 	const joined = textParts.join("\n");
 	if (joined.trim() !== "") {
-		items.push(classifiedUserItem(joined, flags));
-	} else if (hasImage && resultBlocks.length === 0) {
+		items.push(...classifiedUserItems(joined, flags, state));
+	} else if (imageLabels.length > 0 && resultBlocks.length === 0) {
 		items.push(
 			flags.flaggedMeta
 				? { kind: "injected_context", subtype: "meta" }
-				: { kind: "user_prompt", text: "[image attachment]" },
+				: { kind: "user_prompt", text: formatImagePromptText(imageLabels) },
 		);
 	}
 	return items.length === 0 ? [metaItem("user_empty")] : items;
 }
 
-function classifiedUserItem(
+/** Image-only prompts keep `[image attachment]` unless a screenshot is marked. */
+function formatImagePromptText(imageLabels: readonly string[]): string {
+	return imageLabels.every((label) => label === "[image]")
+		? "[image attachment]"
+		: imageLabels.join("\n");
+}
+
+function classifiedUserItems(
 	text: string,
 	flags: { compactSummary: boolean; flaggedMeta: boolean },
-): LineItem {
+	state: StreamState,
+): LineItem[] {
 	const classification = classifyUserText(text, flags);
 	switch (classification.kind) {
 		case "prompt":
-			return { kind: "user_prompt", text: classification.text };
+			if (takeQueuedPrompt(state, classification.text)) {
+				// The queued-command attachment already recorded this prompt.
+				return [metaItem("queued_prompt_mirror")];
+			}
+			return [
+				{ kind: "user_prompt", text: classification.text },
+				...injectedAroundPrompt(classification),
+			];
 		case "injected_context":
-			return {
-				kind: "injected_context",
-				subtype: classification.subtype,
-				text,
-			};
+			return [
+				{
+					kind: "injected_context",
+					subtype: classification.subtype,
+					text,
+				},
+			];
 		case "compaction":
-			return { kind: "compaction", subtype: classification.subtype, text };
+			return [{ kind: "compaction", subtype: classification.subtype, text }];
 		case "meta":
-			return metaItem(classification.subtype);
+			return [metaItem(classification.subtype)];
 	}
 }
 
@@ -271,7 +296,12 @@ function readToolResult(
 		isError,
 		kind: "tool_result",
 		spawnedAgentId,
-		subtype: known === undefined ? "orphan" : "",
+		subtype:
+			known === undefined
+				? "orphan"
+				: !isError && isClaudeBackgroundLaunch(text)
+					? "running"
+					: "",
 		text,
 		toolName: known?.toolName ?? "",
 	};
@@ -293,11 +323,226 @@ function readResultText(content: unknown): string {
 		) {
 			parts.push(part.text);
 		} else if (isRecord(part) && part.type === "image") {
-			parts.push("[image]");
+			parts.push(readImageBlockLabel(part) ?? "[image]");
 		} else {
 			const unwrapped = readTranscriptToolOutputText(part);
 			if (unwrapped !== undefined) parts.push(unwrapped);
 		}
 	}
 	return parts.join("\n");
+}
+
+/**
+ * Claude Code top-level `attachment` records: what the harness added to the
+ * model's context outside user messages. Instructions, memory files, MCP
+ * server instructions, skill listings and externally edited file snippets are
+ * injected context with their text; a prompt the user queued while the agent
+ * worked is a genuine prompt (subtype `queued`, which starts a turn like any
+ * prompt); everything else is meta that keeps its label and any text.
+ */
+function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
+	if (!isRecord(attachment)) return [metaItem("attachment")];
+	const type = readString(attachment.type) ?? "unknown";
+	switch (type) {
+		case "instructions": {
+			const files = Array.isArray(attachment.files) ? attachment.files : [];
+			return [
+				injected(
+					"instructions",
+					files
+						.flatMap((file) =>
+							isRecord(file)
+								? [memoryText(readString(file.path), file.content)]
+								: [],
+						)
+						.join("\n\n"),
+				),
+			];
+		}
+		case "nested_memory": {
+			const content = isRecord(attachment.content) ? attachment.content : {};
+			const path = readString(attachment.path) ?? readString(content.path);
+			return [
+				{
+					...injected("nested_memory", memoryText(path, content.content)),
+					filePath: path ?? "",
+				},
+			];
+		}
+		case "mcp_instructions_delta":
+			return [
+				injected(
+					"mcp_instructions",
+					[
+						...readStrings(attachment.addedBlocks),
+						...readStrings(attachment.removedNames).map(
+							(name) => `removed: ${name}`,
+						),
+					].join("\n\n"),
+				),
+			];
+		case "skill_listing":
+			return [injected("skill_listing", readString(attachment.content) ?? "")];
+		case "edited_text_file": {
+			const path = readString(attachment.filename) ?? "";
+			return [
+				{
+					...injected("edited_text_file", readString(attachment.snippet) ?? ""),
+					filePath: path,
+				},
+			];
+		}
+		case "queued_command":
+			return readQueuedCommand(attachment, state);
+		case "command_permissions":
+			return [
+				metaItem("attachment:command_permissions", {
+					text: readStrings(attachment.allowedTools).join("\n"),
+				}),
+			];
+		default:
+			return [
+				metaItem(`attachment:${type}`, {
+					text:
+						readString(attachment.text) ??
+						readString(attachment.content) ??
+						readString(attachment.prompt) ??
+						"",
+				}),
+			];
+	}
+}
+
+function readQueuedCommand(
+	attachment: Record<string, unknown>,
+	state: StreamState,
+): LineItem[] {
+	const text = readPromptText(attachment.prompt);
+	const mode = readString(attachment.commandMode);
+	if (text.trim() === "") return [metaItem("attachment:queued_command")];
+	if (mode !== undefined && mode !== "prompt") {
+		return [
+			injected(
+				mode === "task-notification" ? "task_notification" : `queued_${mode}`,
+				text,
+			),
+		];
+	}
+	const classification = classifyUserText(text, {});
+	if (classification.kind !== "prompt") {
+		return classifiedUserItems(
+			text,
+			{ compactSummary: false, flaggedMeta: false },
+			state,
+		);
+	}
+	if (
+		!state.responseSincePrompt &&
+		state.lastPromptText === classification.text
+	) {
+		return [metaItem("queued_prompt_mirror")];
+	}
+	state.claudeQueuedPrompts.push(classification.text);
+	if (state.claudeQueuedPrompts.length > 16) state.claudeQueuedPrompts.shift();
+	return [
+		{ kind: "user_prompt", subtype: "queued", text: classification.text },
+		...injectedAroundPrompt(classification),
+	];
+}
+
+/**
+ * Claude Code `system` records other than compaction: hook summaries (their
+ * errors, added context and whether they stopped the agent), API errors and
+ * informational notices keep their content.
+ */
+function readSystemRecord(
+	record: Record<string, unknown>,
+	subtype: string,
+): LineItem {
+	const parts: string[] = [];
+	const content = readString(record.content);
+	if (content !== undefined) parts.push(content);
+	const prevented = record.preventedContinuation === true;
+	if (prevented) parts.push("preventedContinuation: true");
+	const stopReason = readString(record.stopReason);
+	if (stopReason !== undefined) parts.push(`stopReason: ${stopReason}`);
+	const hookErrors = readTexts(record.hookErrors);
+	for (const error of hookErrors) parts.push(`hookError: ${error}`);
+	for (const context of readTexts(record.hookAdditionalContext))
+		parts.push(`hookAdditionalContext: ${context}`);
+	const error = isRecord(record.error) ? record.error : undefined;
+	const errorText =
+		readString(error?.formatted) ??
+		readString(error?.message) ??
+		readString(record.error);
+	if (errorText !== undefined) parts.push(errorText);
+	return metaItem(
+		prevented ? `system:${subtype}:prevented` : `system:${subtype}`,
+		{
+			isError:
+				hookErrors.length > 0 ||
+				errorText !== undefined ||
+				readString(record.level) === "error",
+			text: parts.join("\n"),
+		},
+	);
+}
+
+/** An error Claude Code wrote as an assistant message (`isApiErrorMessage`); not model output. */
+function readApiErrorMessage(record: Record<string, unknown>): LineItem {
+	const message = isRecord(record.message) ? record.message : undefined;
+	const text = readPromptText(message?.content);
+	const code = readString(record.error);
+	return metaItem("api_error_message", {
+		isError: true,
+		text: code === undefined ? text : `[${code}] ${text}`,
+	});
+}
+
+function takeQueuedPrompt(state: StreamState, text: string): boolean {
+	const index = state.claudeQueuedPrompts.indexOf(text);
+	if (index === -1) return false;
+	state.claudeQueuedPrompts.splice(index, 1);
+	return true;
+}
+
+function injected(subtype: string, text: string): LineItem {
+	return { kind: "injected_context", subtype, text };
+}
+
+function memoryText(path: string | undefined, content: unknown): string {
+	const body = readString(content) ?? "";
+	return path === undefined ? body : `Contents of ${path}:\n${body}`;
+}
+
+/** Text of a string or of a list of text blocks. */
+function readPromptText(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (!Array.isArray(value)) return "";
+	return value
+		.flatMap((block) => {
+			if (typeof block === "string") return [block];
+			if (isRecord(block) && typeof block.text === "string")
+				return [block.text];
+			return [];
+		})
+		.join("\n");
+}
+
+function readStrings(value: unknown): string[] {
+	return Array.isArray(value)
+		? value.filter((item): item is string => typeof item === "string")
+		: [];
+}
+
+/** Strings, or objects rendered as JSON (hook errors may be either). */
+function readTexts(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((item) =>
+		typeof item === "string"
+			? [item]
+			: item === null || item === undefined
+				? []
+				: [safeStringify(item)],
+	);
 }

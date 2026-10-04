@@ -21,12 +21,14 @@ const NATIVE_METADATA_MAX_HEADER_BYTES = 64 * 1024;
 const NATIVE_METADATA_MODEL_SEARCH_BYTES = 1024 * 1024;
 const NATIVE_METADATA_LOCATOR_MAX_RESULT_BYTES = 8 * 1024 * 1024;
 const NATIVE_METADATA_LOCATOR_MAX_MEMORY_BYTES = 256 * 1024 * 1024;
-const NATIVE_METADATA_CONTENT_PRIMARY_MAX_BYTES_TO_READ = 160 * 1024 * 1024;
-// Ingest accepts at most 128 MiB of transcript content. A one-row local
-// reproduction needs just over twice that amount while ClickHouse decodes the
-// String and evaluates the bounded header/model expressions. Keep the larger
-// allowance on the exact, single-revision query only.
-const NATIVE_METADATA_CONTENT_PRIMARY_MAX_MEMORY_BYTES = 384 * 1024 * 1024;
+// R2 ingest accepts up to 256 MiB of transcript content (direct ingest 128
+// MiB), plus slack for the rest of the granule.
+const NATIVE_METADATA_CONTENT_PRIMARY_MAX_BYTES_TO_READ = 288 * 1024 * 1024;
+// A one-row local reproduction needs just over twice the row size while
+// ClickHouse decodes the String and evaluates the bounded header/model
+// expressions; keep three times the largest accepted session on the exact,
+// single-revision query only.
+const NATIVE_METADATA_CONTENT_PRIMARY_MAX_MEMORY_BYTES = 768 * 1024 * 1024;
 // A sparse granule can require decoding preceding Strings before ClickHouse
 // reaches the exact key. The fallback repairs a measured four-row, near-limit
 // granule while retaining a hard per-candidate bound.

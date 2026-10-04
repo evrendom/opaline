@@ -11,6 +11,15 @@ const LINKED_SUBAGENT_ARRAY_TYPE =
 	"Array(Tuple(String, String, String, String, String))";
 const NATIVE_CHILD_ARRAY_TYPE = "Array(Tuple(String, String))";
 
+/**
+ * A current lineage row that links a Codex thread to the Codex thread that
+ * spawned it from explicit native parent metadata, with the parent uploaded.
+ * Every reader that walks session families (list, detail, family cost,
+ * analysis) shares this rule.
+ */
+export const NATIVE_PARENT_EDGE_SQL =
+	"confidence = 'native_parent_id' AND countable = 1 AND child_source = 'codex' AND parent_source = 'codex'";
+
 export function buildSessionHasSubagentsSql(alias?: string): string {
 	const prefix = alias ? `${alias}.` : "";
 	return `((${prefix}subagent_count + ${prefix}linked_subagent_count) > 0 OR length(${prefix}native_child_sessions) > 0)`;
@@ -48,10 +57,7 @@ export function buildSessionLineageCteDefinitions(
 				child_session_id,
 				parent_session_id
 			FROM session_lineage_current
-			WHERE confidence = 'native_parent_id'
-				AND countable = 1
-				AND child_source = 'codex'
-				AND parent_source = 'codex'
+			WHERE ${NATIVE_PARENT_EDGE_SQL}
 		),
 		session_native_children AS (
 			SELECT
@@ -63,10 +69,7 @@ export function buildSessionLineageCteDefinitions(
 					groupArray(tuple(child_session_id, child_model))
 				) AS native_child_sessions
 			FROM session_lineage_current
-			WHERE confidence = 'native_parent_id'
-				AND countable = 1
-				AND child_source = 'codex'
-				AND parent_source = 'codex'
+			WHERE ${NATIVE_PARENT_EDGE_SQL}
 			GROUP BY organization_id, user_id, parent_session_id
 		),
 		session_lineage_counts AS (

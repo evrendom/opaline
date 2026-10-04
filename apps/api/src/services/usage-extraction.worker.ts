@@ -25,6 +25,7 @@ self.addEventListener(
 						sessionDate:
 							event.data.skillSessionDate ?? "1970-01-01T00:00:00.000Z",
 						source: event.data.input.source,
+						subagents: event.data.input.subagents,
 					})
 				: null;
 			self.postMessage({

@@ -6,6 +6,7 @@ import {
 	AnalysisReadInputBaseSchema,
 	AnalysisReadOutputSchema,
 } from "./analysis.js";
+import { SourceSchema } from "./schemas/source.js";
 
 /** Where an analysis was run. Evaluation analyses are kept but left out of searches. */
 export const AnalysisHostSchema = z.enum([
@@ -98,6 +99,16 @@ export const AnalysisHistoryGetOutputSchema = AnalysisSummarySchema.omit({
 			reply: z.string().nullable(),
 			finding: z.string().nullable(),
 			queries: z.array(QuerySummarySchema),
+		}),
+	),
+	/** Chats uploaded for this analysis (`opaline import --analysis`), oldest first. */
+	chatSessions: z.array(
+		z.object({
+			sessionId: z.string(),
+			source: SourceSchema,
+			/** The member whose chat it is. */
+			userId: z.string(),
+			uploadedAt: z.string(),
 		}),
 	),
 });

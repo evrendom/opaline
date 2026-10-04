@@ -17,6 +17,7 @@ const header: AnalysisFindOutput["header"] = {
 	indexedSessions: 1_000,
 	runsInScope: 20_000,
 	minutes: 1,
+	activeMinutes: 1,
 	pricedCostUsd: 1,
 	unattributedCostUsd: 0,
 	unpricedRuns: 0,
@@ -51,11 +52,13 @@ test("200 tool groups of multibyte text are cut to the leading groups that fit, 
 		lastSeen: "2026-09-01T00:00:00.000Z",
 		topCommands: Array.from({ length: 3 }, () => "命".repeat(200)),
 		minutes: 1,
+		activeMinutes: 1,
 		costUsd: null,
 		examples: Array.from({ length: 5 }, (_, record) => ({
 			ref,
 			record,
 			errorLine: "错\n".repeat(150),
+			parentSessionId: null,
 		})),
 	}));
 	const output: AnalysisFindOutput = { source: "tool", header, groups };
@@ -89,6 +92,7 @@ test("a find page cut to the ceiling continues after its last kept item", () => 
 		originRef: null,
 		originMinutes: null,
 		originCostUsd: null,
+		parentSessionId: null,
 	}));
 	const output: AnalysisFindOutput = {
 		source: "user",
@@ -168,12 +172,14 @@ test("a find body of exactly 256 KiB is cut so the response with its trace still
 		lastSeen: "2026-09-01T00:00:00.000Z",
 		topCommands: ["c".repeat(200)],
 		minutes: 1,
+		activeMinutes: 1,
 		costUsd: null,
 		examples: [
 			{
 				ref: { sessionId: crypto.randomUUID(), agentId: "", turn: 1 },
 				record: 1,
 				errorLine: "e".repeat(700),
+				parentSessionId: null,
 			},
 		],
 	}));

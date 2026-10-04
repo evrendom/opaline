@@ -17,6 +17,12 @@ import { R2IngestMaterializationGateError } from "./r2-ingest-materialization-ga
 
 export const R2_INGEST_DEPENDENCY_UNAVAILABLE =
 	"R2_INGEST_DEPENDENCY_UNAVAILABLE";
+/**
+ * A commit was accepted (its completion receipt is stored) but found no free
+ * materialization slot. Recovery selects jobs with this code, so the upload
+ * completes without the client committing again.
+ */
+export const R2_INGEST_COMMIT_QUEUED = "R2_INGEST_COMMIT_QUEUED";
 export const R2_INGEST_TRANSIENT_ERROR_CODES = [
 	R2_INGEST_DEPENDENCY_UNAVAILABLE,
 	"R2_INGEST_TRANSIENT_FAILURE",
@@ -122,6 +128,22 @@ export class R2IngestCommitError extends Error {
 		this.code = code;
 		this.name = "R2IngestCommitError";
 		this.retryable = retryable;
+	}
+}
+
+/**
+ * The commit is stored and queued: recovery materializes the job, so the
+ * client only polls `ingest.status`. It keeps `R2_INGEST_JOB_RETRY_LATER`,
+ * which released CLIs already treat as "in progress, poll status".
+ */
+export class R2IngestCommitQueuedError extends R2IngestCommitError {
+	constructor() {
+		super(
+			"R2_INGEST_JOB_RETRY_LATER",
+			"Ingest job is queued for processing and will complete without another commit",
+			true,
+		);
+		this.name = "R2IngestCommitQueuedError";
 	}
 }
 

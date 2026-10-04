@@ -1,6 +1,7 @@
 import type { ClickHouseSettings } from "@clickhouse/client-web";
 import type { Source } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
+import { NATIVE_PARENT_EDGE_SQL } from "./session-lineage-analytics.service.js";
 import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
 
 const SESSION_FAMILY_COST_QUERY_SETTINGS: ClickHouseSettings = {
@@ -46,10 +47,7 @@ export function buildSessionFamilyCostCte(input: {
 				parent_session_id,
 				child_session_id
 			FROM session_lineage_current
-			WHERE confidence = 'native_parent_id'
-				AND countable = 1
-				AND child_source = 'codex'
-				AND parent_source = 'codex'
+			WHERE ${NATIVE_PARENT_EDGE_SQL}
 		),
 		session_family_walk AS (
 			SELECT

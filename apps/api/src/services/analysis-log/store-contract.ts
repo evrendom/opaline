@@ -779,6 +779,136 @@ export function analysisStoreContract(
 			).toEqual([]);
 		});
 
+		test("chat links are kept once per analysis, source and session, oldest upload first, and a repeat moves its upload time", async () => {
+			const { store, analysis, ownerId, otherOwnerId } = setup();
+			await store.createAnalysis(analysis);
+			const chat = (
+				sessionId: string,
+				source: "claude_code" | "codex",
+				uploadedAt: string,
+				owner = ownerId,
+			) => ({
+				analysisId: analysis.id,
+				sessionId,
+				source,
+				ownerId: owner,
+				uploadedAt,
+			});
+			await store.linkSession(
+				chat("thread-b", "codex", "2026-10-03T10:02:00Z"),
+			);
+			await store.linkSession(
+				chat("thread-a", "codex", "2026-10-03T10:01:00Z"),
+			);
+			await store.linkSession(
+				chat("thread-a", "claude_code", "2026-10-03T10:01:00Z", otherOwnerId),
+			);
+			expect(await store.getSessionLinks(analysis.id)).toEqual([
+				chat("thread-a", "claude_code", "2026-10-03T10:01:00Z", otherOwnerId),
+				chat("thread-a", "codex", "2026-10-03T10:01:00Z"),
+				chat("thread-b", "codex", "2026-10-03T10:02:00Z"),
+			]);
+			await store.linkSession(
+				chat("thread-a", "codex", "2026-10-03T10:05:00Z"),
+			);
+			expect(await store.getSessionLinks(analysis.id)).toEqual([
+				chat("thread-a", "claude_code", "2026-10-03T10:01:00Z", otherOwnerId),
+				chat("thread-b", "codex", "2026-10-03T10:02:00Z"),
+				chat("thread-a", "codex", "2026-10-03T10:05:00Z"),
+			]);
+			expect(await store.getSessionLinks("a_missing")).toEqual([]);
+			await expect(
+				store.linkSession({
+					...chat("thread-c", "codex", analysis.cutoff),
+					analysisId: "a_missing",
+				}),
+			).rejects.toThrow();
+		});
+
+		test("an analysis refuses its 201st chat link but still refreshes linked ones", async () => {
+			const { store, analysis, ownerId } = setup();
+			await store.createAnalysis(analysis);
+			const chat = (index: number) => ({
+				analysisId: analysis.id,
+				sessionId: `thread-${index.toString().padStart(3, "0")}`,
+				source: "codex" as const,
+				ownerId,
+				uploadedAt: analysis.cutoff,
+			});
+			for (let index = 0; index < 200; index++)
+				await store.linkSession(chat(index));
+			const refused = await store.linkSession(chat(200)).then(
+				() => null,
+				(error: unknown) => error,
+			);
+			expect(refused).toBeInstanceOf(AnalysisFullError);
+			assert(refused instanceof AnalysisFullError);
+			expect(refused.child).toBe("sessions");
+			await store.linkSession({
+				...chat(0),
+				uploadedAt: "2026-10-04T00:00:00Z",
+			});
+			const links = await store.getSessionLinks(analysis.id);
+			expect(links).toHaveLength(200);
+			expect(links.at(-1)).toEqual({
+				...chat(0),
+				uploadedAt: "2026-10-04T00:00:00Z",
+			});
+		});
+
+		test("purges delete chat links with their analysis; an account purge also removes its chats from others' analyses", async () => {
+			const {
+				store,
+				analysis,
+				workspaceId,
+				otherAuthorId,
+				ownerId,
+				otherOwnerId,
+			} = setup();
+			const kept = {
+				...analysis,
+				id: `${analysis.id}_kept`,
+				authorId: otherAuthorId,
+			};
+			await store.createAnalysis(analysis);
+			await store.createAnalysis(kept);
+			const chat = (analysisId: string, owner: string) => ({
+				analysisId,
+				sessionId: `thread-${owner}`,
+				source: "codex" as const,
+				ownerId: owner,
+				uploadedAt: analysis.cutoff,
+			});
+			await store.linkSession(chat(analysis.id, ownerId));
+			await store.linkSession(chat(kept.id, ownerId));
+			await store.linkSession(chat(kept.id, otherOwnerId));
+
+			await purgeAnalysisLog(
+				store,
+				{ targetType: "account", targetId: ownerId },
+				AbortSignal.timeout(60_000),
+			);
+			await purgeAnalysisLog(
+				store,
+				{ targetType: "account", targetId: ownerId },
+				AbortSignal.timeout(60_000),
+			);
+			expect(await store.getAnalysis(kept.id)).toEqual(kept);
+			expect(await store.getSessionLinks(kept.id)).toEqual([
+				chat(kept.id, otherOwnerId),
+			]);
+			// The account's own chat in an analysis it did not write is gone too.
+			expect(await store.getSessionLinks(analysis.id)).toEqual([]);
+
+			await purgeAnalysisLog(
+				store,
+				{ targetType: "organization", targetId: workspaceId },
+				AbortSignal.timeout(60_000),
+			);
+			expect(await store.getAnalysis(kept.id)).toBeNull();
+			expect(await store.getSessionLinks(kept.id)).toEqual([]);
+		});
+
 		test("embedding search is workspace- and model-scoped, best first and limited, without vectors", async () => {
 			const { store, analysis, step, otherWorkspaceId } = setup();
 			await store.createAnalysis(analysis);

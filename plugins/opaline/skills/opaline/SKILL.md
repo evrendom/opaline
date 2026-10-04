@@ -25,6 +25,8 @@ Opaline stores the user's uploaded Claude Code and Codex sessions. The `opaline`
 
 A **ref is a run**: session + agent (`''` is the main transcript, otherwise a subagent) + turn. There is no way to read a whole session, and you should never try to reconstruct one run by run.
 
+**Codex subagent threads are subagents too**, even though each is a session of its own: `find` rows carry their `parentSessionId` and `depth`, and `read` shows a thread's parent run and, in the parent, the threads it spawned at the spawning call with their refs and tasks. Follow those links and count a thread as part of its parent's work, never as separate work.
+
 **Dashboards and lookups**: `get_dashboard`, `get_kpis`, `list_sessions` / `get_session` / `read_session_turn`, `get_team`, `find_recurring_errors`, `list_skills` / `get_skill`, `list_repositories` / `get_repository`, `get_billing`.
 
 ## 2. When to use what, and how
@@ -36,6 +38,7 @@ A **ref is a run**: session + agent (`''` is the main transcript, otherwise a su
   - Save with `updates` = that analysis and say what changed.
 - **Every `find`/`read` call is logged.** On the first call pass `question` = the asker's exact words; after that pass `analysis` = the id from the trace line and `step` = the sub-question this call answers (reuse a step id for more calls on it, `parentStep` for a follow-up). Steps are what you write out on purpose, never hidden reasoning.
 - **Finish with one `analyses action=save`, then the answer:** save the final answer, one finding per step (name the step by the id from its trace line or by its exact sub-question), any clarifying question you asked with the asker's reply, and up to 8 topics. Then give that same final answer, complete, as your last message: callers often see only the last message, so never end with a pointer like "see above". Within one analysis you already saw your query results; do not reopen them with `action=query`.
+- **Attach this chat after saving**, before the answer: if you can run shell commands and `opaline` is installed, run `opaline import "$CODEX_THREAD_ID" --analysis <analysis id>` (in Claude Code, use the current session id instead of `$CODEX_THREAD_ID`). If you can't, or the command fails (older CLIs have no `--analysis`), skip it silently and don't retry.
 
 - **Trends** ("spend per week", "which model costs most"): one `find source=runs groupBy=…` call or `get_dashboard`. Report the numbers; don't interpret beyond them.
 - **Insights** ("why do my agents fail", "what annoyed me"):

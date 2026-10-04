@@ -12,6 +12,8 @@ import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
+import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
+import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
 import { pruneExpiredPostgresLeases } from "../services/postgres-lease.service.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
@@ -35,6 +37,7 @@ const REPOSITORY_EVIDENCE_INDEX_BUDGET_MS = 60_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
+const DERIVED_RECORDS_RECONCILIATION_BUDGET_MS = 60_000;
 const COORDINATION_LEASE_BUDGET_MS = 10_000;
 
 export async function handleApiMaintenanceRequest(
@@ -131,6 +134,16 @@ async function runApiMaintenance() {
 			),
 		}),
 	);
+	const derivedRecords = await runMaintenanceStep("derived-records", () =>
+		reconcileDerivedTranscriptRecords({
+			assertWritable: (target) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
+			deadline: createMaintenanceQueueDeadline(
+				invocationDeadline,
+				DERIVED_RECORDS_RECONCILIATION_BUDGET_MS,
+			),
+		}),
+	);
 	const coordinationLeases = await runMaintenanceStep(
 		"coordination-leases",
 		() => runCoordinationLeaseMaintenance(invocationDeadline),
@@ -144,6 +157,7 @@ async function runApiMaintenance() {
 	return {
 		clickHousePurge,
 		coordinationLeases,
+		derivedRecords,
 		languageSignals,
 		repositoryEvidenceIndex,
 		ok:
@@ -153,6 +167,7 @@ async function runApiMaintenance() {
 			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok" &&
 			transcriptRecords.status === "ok" &&
+			derivedRecords.status === "ok" &&
 			coordinationLeases.status === "ok",
 		r2Ingest,
 		sessionRevisionReceipts,

@@ -65,6 +65,24 @@ export const markReadingOwner = apiMutation({
 	},
 });
 
+/**
+ * Account deletion: the owner's chats linked to any analysis, until half the
+ * transaction is used. The analyses themselves stay.
+ */
+export const sessionsByOwner = apiMutation({
+	args: { ownerId: v.string() },
+	returns: v.object({ hasMore: v.boolean() }),
+	handler: async (ctx, { ownerId }) => {
+		for await (const link of ctx.db
+			.query("analysisSessions")
+			.withIndex("by_owner", (index) => index.eq("ownerId", ownerId))) {
+			if (!(await hasHeadroom(ctx))) return { hasMore: true };
+			await ctx.db.delete(link._id);
+		}
+		return { hasMore: false };
+	},
+});
+
 /** Deletes analyses marked deleting with their children, as `byAuthor` does. */
 export const sweep = apiMutation({
 	args: {},
@@ -120,6 +138,11 @@ async function deleteChildren(
 		ctx.db
 			.query("embeddings")
 			.withIndex("by_analysis", (index) => index.eq("analysisId", analysisId)),
+		ctx.db
+			.query("analysisSessions")
+			.withIndex("by_analysis_session", (index) =>
+				index.eq("analysisId", analysisId),
+			),
 	];
 	for (const rows of children)
 		for await (const row of rows) {

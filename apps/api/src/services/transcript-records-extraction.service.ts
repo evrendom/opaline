@@ -10,6 +10,10 @@ import {
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readBooleanEnv, readPositiveSafeIntegerEnv } from "../lib/env.js";
+import {
+	isLargeIngestSession,
+	scaleSessionBudget,
+} from "../lib/ingest-size.js";
 import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
 import {
 	hashTranscriptContent,
@@ -45,7 +49,9 @@ export interface TranscriptRecordsExtractionConfig {
 
 /**
  * Kill switch and limits. `TRANSCRIPT_RECORDS_EXTRACTION_ENABLED=false` keeps
- * raw ingest available while skipping record extraction entirely.
+ * raw ingest available while skipping record extraction entirely. Row, text and
+ * time limits are sized for standard sessions; `scaleTranscriptRecordsLimits`
+ * scales them for a larger one.
  */
 export function readTranscriptRecordsExtractionConfig(): TranscriptRecordsExtractionConfig {
 	return {
@@ -77,6 +83,25 @@ export function readTranscriptRecordsExtractionConfig(): TranscriptRecordsExtrac
 	};
 }
 
+/**
+ * Per-session limits: unchanged up to the standard session size, then scaled
+ * with the session's bytes (2x at 256 MiB) so a large session that expands
+ * proportionally is not cut off by budgets sized for 128 MiB.
+ */
+export function scaleTranscriptRecordsLimits<
+	TLimits extends Pick<
+		TranscriptRecordsExtractionConfig,
+		"maxRows" | "textBudgetChars" | "timeoutMs"
+	>,
+>(limits: TLimits, bytes: number): TLimits {
+	return {
+		...limits,
+		maxRows: scaleSessionBudget(limits.maxRows, bytes),
+		textBudgetChars: scaleSessionBudget(limits.textBudgetChars, bytes),
+		timeoutMs: scaleSessionBudget(limits.timeoutMs, bytes),
+	};
+}
+
 export interface TranscriptRecordsJobGate {
 	/**
 	 * Resolves to a release function, or undefined when the job must be skipped:
@@ -96,8 +121,10 @@ export interface TranscriptRecordsJobGate {
  * the worker later holds a copy. Jobs that do not fit are rejected at
  * admission, a bounded number wait in FIFO order, and a waiter that is
  * cancelled or outlasts its deadline leaves the queue immediately, releasing
- * its bytes. Skipped sessions are repaired by a later identical upload or the
- * backfill.
+ * its bytes. A session above the standard size runs alone: if it fits
+ * `maxBytes` on its own it waits for running jobs to finish instead of being
+ * skipped, and nothing starts beside it. Skipped sessions are repaired by a
+ * later identical upload or the backfill.
  */
 export function createTranscriptRecordsJobGate(limits: {
 	readonly maxBytes: number;
@@ -105,22 +132,30 @@ export function createTranscriptRecordsJobGate(limits: {
 	readonly maxWaiting?: number;
 }): TranscriptRecordsJobGate {
 	let activeJobs = 0;
+	let exclusiveActive = false;
 	let reservedBytes = 0;
 	const waiting: {
 		bytes: number;
 		grant: (release: () => void) => void;
 	}[] = [];
+	const canStart = (bytes: number): boolean =>
+		!exclusiveActive &&
+		activeJobs < limits.maxJobs &&
+		(!isLargeIngestSession(bytes) || activeJobs === 0);
 	const start = (bytes: number): (() => void) => {
 		activeJobs++;
+		const exclusive = isLargeIngestSession(bytes);
+		if (exclusive) exclusiveActive = true;
 		let released = false;
 		return () => {
 			if (released) return;
 			released = true;
 			activeJobs--;
+			if (exclusive) exclusiveActive = false;
 			reservedBytes -= bytes;
 			for (
 				let next = waiting[0];
-				next !== undefined && activeJobs < limits.maxJobs;
+				next !== undefined && canStart(next.bytes);
 				next = waiting[0]
 			) {
 				waiting.shift();
@@ -131,10 +166,11 @@ export function createTranscriptRecordsJobGate(limits: {
 	return {
 		acquire(bytes, options = {}) {
 			if (options.signal?.aborted) return Promise.resolve(undefined);
-			if (reservedBytes + bytes > limits.maxBytes) {
-				return Promise.resolve(undefined);
-			}
-			if (waiting.length === 0 && activeJobs < limits.maxJobs) {
+			const fits = isLargeIngestSession(bytes)
+				? bytes <= limits.maxBytes
+				: reservedBytes + bytes <= limits.maxBytes;
+			if (!fits) return Promise.resolve(undefined);
+			if (waiting.length === 0 && canStart(bytes)) {
 				reservedBytes += bytes;
 				return Promise.resolve(start(bytes));
 			}
@@ -309,9 +345,10 @@ export async function persistTranscriptRecordsBestEffort(
 	};
 	try {
 		const contentBytes = measureBytes(input.content, input.subagents);
+		const limits = scaleTranscriptRecordsLimits(input.config, contentBytes);
 		const release = await (input.gate ?? getSharedGate(input.config)).acquire(
 			contentBytes,
-			{ signal: input.signal, timeoutMs: input.config.timeoutMs },
+			{ signal: input.signal, timeoutMs: limits.timeoutMs },
 		);
 		if (release === undefined) {
 			logger.warn(
@@ -326,14 +363,14 @@ export async function persistTranscriptRecordsBestEffort(
 					batchMaxBytes: WORKER_BATCH_MAX_BYTES,
 					batchMaxRows: WORKER_BATCH_MAX_ROWS,
 					content: input.content,
-					maxRows: input.config.maxRows,
+					maxRows: limits.maxRows,
 					sessionDate: input.sessionDate,
 					source: input.source,
 					subagents: input.subagents,
-					textBudgetChars: input.config.textBudgetChars,
-					textMaxChars: input.config.textMaxChars,
+					textBudgetChars: limits.textBudgetChars,
+					textMaxChars: limits.textMaxChars,
 				},
-				{ signal: input.signal, timeoutMs: input.config.timeoutMs },
+				{ signal: input.signal, timeoutMs: limits.timeoutMs },
 			);
 			await writeTranscriptRecords(executor, {
 				assertWritable: input.assertWritable,
@@ -373,9 +410,10 @@ export async function persistTranscriptRecordsBestEffort(
 
 /**
  * True when the duplicate-upload fast path may skip record extraction: the
- * kill switch is off, the receipt matches the content, or the receipt lookup
- * itself failed (for example before the migration is applied), in which case
- * an upload must never start failing because of derived data.
+ * kill switch is off or the receipt matches the content. A failed receipt
+ * lookup is not proof of a current receipt: the upload is reprocessed, whose
+ * extraction is best-effort, so the upload still never fails because of
+ * derived data.
  */
 export async function isTranscriptRecordsCurrent(
 	executor: ClickHouseExecutor,
@@ -396,14 +434,14 @@ export async function isTranscriptRecordsCurrent(
 		});
 	} catch (error) {
 		logger.warn(
-			"Transcript records receipt lookup failed; treating records as current (organization_id={organizationId} session_id={sessionId} error={error})",
+			"Transcript records receipt lookup failed; reprocessing the upload (organization_id={organizationId} session_id={sessionId} error={error})",
 			{
 				error: error instanceof Error ? error.message : String(error),
 				organizationId: input.organizationId,
 				sessionId: input.sessionId,
 			},
 		);
-		return true;
+		return false;
 	}
 }
 

@@ -790,8 +790,12 @@ describe("native Codex lineage", () => {
 			WHERE organization_id = ${organizationId}
 				AND session_id IN (${failedId}, ${followingId})
 		`;
+		// The failed row is wider than the largest accepted session (256 MiB).
+		// Only the raw row matters here; the analytics views cannot fit such a
+		// row in local ClickHouse's memory, so their errors are ignored.
 		await clickhouse.execute({
 			clickhouse_settings: {
+				materialized_views_ignore_errors: 1,
 				max_memory_usage: "3000000000",
 				max_threads: 1,
 			},
@@ -821,7 +825,7 @@ describe("native Codex lineage", () => {
 						'{"type":"session_meta","payload":{"id":"',
 						if(number = 0, {failedId:String}, {followingId:String}),
 						'","originator":"codex_sdk_ts","thread_source":"user"}}\\n',
-						if(number = 0, repeat(repeat('x', 1000000), 200), '')
+						if(number = 0, repeat(repeat('x', 1000000), 320), '')
 					),
 					1,
 					toUInt64(100 + number),

@@ -1,11 +1,18 @@
 import { getLogger } from "@logtape/logtape";
-import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
+import {
+	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	INGEST_DIRECT_CONTENT_MAX_BYTES,
+} from "@rudel/api-routes";
 import {
 	createIncompleteUsageExtractionResult,
 	type UsageExtractionInput,
 	type UsageExtractionResult,
 } from "@rudel/usage-events";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import {
+	isLargeIngestSession,
+	scaleSessionBudget,
+} from "../lib/ingest-size.js";
 import type {
 	SessionFactsExtractionResult,
 	UsageExtractionTelemetry,
@@ -181,9 +188,11 @@ export class UsageExtractionQueue {
 		this.nextRequestId += 1;
 		return new Promise((resolve, reject) => {
 			const abortListener = () => this.cancelRequest(requestId);
+			// Usage facts are required, so a large session gets a deadline scaled
+			// to its size instead of failing its upload at the standard budget.
 			const timeout = setTimeout(
 				() => this.timeoutRequest(requestId),
-				this.config.timeoutMs,
+				scaleSessionBudget(this.config.timeoutMs, request.bytes),
 			);
 			this.pending.set(requestId, {
 				...request,
@@ -233,6 +242,15 @@ export class UsageExtractionQueue {
 	private getExceededLimit(
 		request: UsageExtractionRequest,
 	): QueueLimit | undefined {
+		// A session above the standard size is admitted only into an empty
+		// queue, so it never waits behind (or holds memory beside) other work;
+		// the byte budgets then bound whatever queues behind it.
+		if (
+			isLargeIngestSession(request.bytes) &&
+			request.bytes <= INGEST_AGGREGATE_CONTENT_MAX_BYTES
+		) {
+			return this.pending.size === 0 ? undefined : "global-bytes";
+		}
 		if (this.pending.size + 1 > this.config.globalMaxJobs) {
 			return "global-jobs";
 		}
@@ -446,7 +464,7 @@ export class UsageExtractionQueue {
 const usageExtractionQueue = new UsageExtractionQueue({
 	globalMaxBytes: readPositiveSafeIntegerEnv(
 		"USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_BYTES",
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES * 2,
+		INGEST_DIRECT_CONTENT_MAX_BYTES * 2,
 	),
 	globalMaxJobs: readPositiveSafeIntegerEnv(
 		"USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_JOBS",
@@ -454,7 +472,7 @@ const usageExtractionQueue = new UsageExtractionQueue({
 	),
 	perUserMaxBytes: readPositiveSafeIntegerEnv(
 		"USAGE_EXTRACTION_QUEUE_PER_USER_MAX_BYTES",
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		INGEST_DIRECT_CONTENT_MAX_BYTES,
 	),
 	perUserMaxJobs: readPositiveSafeIntegerEnv(
 		"USAGE_EXTRACTION_QUEUE_PER_USER_MAX_JOBS",

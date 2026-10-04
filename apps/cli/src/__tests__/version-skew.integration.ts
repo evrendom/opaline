@@ -12,6 +12,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { REDACTION_BUDGET_EXCEEDED_MESSAGE } from "@rudel/api-routes";
+import { SESSION_INGEST_FILTER_VERSION } from "@rudel/api-routes/transcript-slim";
 import { FILTER_VERSION } from "@rudel/secret-filter";
 import {
 	getClickhouse,
@@ -122,10 +123,12 @@ describe("published rudel@0.1.17 against the current API", () => {
 	test("hard-requires the 0.1.17 artifact and pins the filter version", async () => {
 		expect(process.env.RUDEL_OLD_CLI_PATH).toBeTruthy();
 
-		// Every stored-row assertion in this file uses FILTER_VERSION. Pin the
-		// literal in exactly one place so a future filter bump fails loudly here
-		// and forces a deliberate re-run of the skew matrix.
+		// Every stored-row assertion in this file uses the server's session
+		// filter version (secret filter plus transcript slimming). Pin the
+		// literals in exactly one place so a future bump fails loudly here and
+		// forces a deliberate re-run of the skew matrix.
 		expect(FILTER_VERSION).toBe(6);
+		expect(SESSION_INGEST_FILTER_VERSION).toBe(7);
 
 		const workspace = await createSkewWorkspace("version-guard");
 		const result = await runOldCli(["--version"], workspace);
@@ -176,7 +179,7 @@ describe("published rudel@0.1.17 against the current API", () => {
 		}
 		expect(hashText(storedRow.content)).toBe(hashText(expectedContent));
 		expect(hashText(storedSubagent)).toBe(hashText(expectedSubagent));
-		expect(storedRow.filter_version).toBe(FILTER_VERSION);
+		expect(storedRow.filter_version).toBe(SESSION_INGEST_FILTER_VERSION);
 
 		oldClientUploadProbe = { secrets, sessionId };
 	}, 120_000);
@@ -340,7 +343,7 @@ describe("published rudel@0.1.17 against the current API", () => {
 		const storedRow = await getStoredFilteredSession(userId, sessionId);
 		assert(storedRow);
 		// Zero redactions still get the server's filter-version stamp.
-		expect(storedRow.filter_version).toBe(FILTER_VERSION);
+		expect(storedRow.filter_version).toBe(SESSION_INGEST_FILTER_VERSION);
 		expect(storedRow.content).toBe(cleanContent);
 	}, 90_000);
 
@@ -385,7 +388,7 @@ describe("published rudel@0.1.17 against the current API", () => {
 			"claude_code",
 		);
 		assert(analytics);
-		expect(analytics.filter_version).toBe(FILTER_VERSION);
+		expect(analytics.filter_version).toBe(SESSION_INGEST_FILTER_VERSION);
 	}, 90_000);
 });
 

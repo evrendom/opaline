@@ -107,7 +107,7 @@ export const ingestJob = pgTable(
 		check("ingest_job_max_attempts_check", sql`${table.maxAttempts} > 0`),
 		check(
 			"ingest_job_expected_total_bytes_check",
-			sql`${table.expectedTotalBytes} >= 0 AND ${table.expectedTotalBytes} <= ${128 * 1024 * 1024}`,
+			sql`${table.expectedTotalBytes} >= 0 AND ${table.expectedTotalBytes} <= ${256 * 1024 * 1024}`,
 		),
 		check(
 			"ingest_job_json_shape_check",

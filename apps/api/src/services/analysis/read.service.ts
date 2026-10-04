@@ -32,6 +32,14 @@ import {
 import { queryRunFacts, type RunRow } from "./run-queries.js";
 import { batchByRecords, queryCountedGenerations } from "./scope.js";
 import { isAnalysisWorkLimit, query } from "./sql.js";
+import {
+	childRef,
+	isDelegationTool,
+	loadSessionSubagents,
+	redactEncrypted,
+	type SessionSubagents,
+	type SubagentLink,
+} from "./subagents.js";
 
 type ReadResult = AnalysisReadOutput["reads"][number];
 
@@ -105,6 +113,11 @@ async function readRuns(
 		owners,
 		input.refs,
 	);
+	// A record read is the exact text of one record; families add nothing there.
+	const families =
+		input.depth === "record"
+			? new Map<string, SessionSubagents>()
+			: await loadFamilies(executor, organizationId, owners);
 	const budget = createBudget(input.maxChars);
 	const reads: ReadResult[] = [];
 	for (const ref of new Map(
@@ -124,16 +137,47 @@ async function readRuns(
 		reads.push(result);
 		if (!generation || !fact) continue;
 		const run = { scope: { organizationId, userId: owner }, generation, ref };
+		const family = families.get(ref.sessionId);
+		const links =
+			family?.calls.filter(
+				(link) =>
+					link.call.agentId === ref.agentId && link.call.turn === ref.turn,
+			) ?? [];
+		if (input.depth !== "record" && family?.parentSessionId)
+			result.sections.push({
+				name: "parent",
+				text: budget.take(parentText(family)),
+			});
 		if (input.depth === "record")
 			await readRecordDepth(executor, run, input, budget, result);
 		else if (budget.remaining < TRANSCRIPT_READ_MIN_CHARS)
 			result.truncated = true;
 		else if (input.depth === "turn")
-			await readTurnDepth(executor, run, budget, result);
-		else await readExchange(executor, run, fact, budget, result);
+			await readTurnDepth(executor, run, links, budget, result);
+		else await readExchange(executor, run, fact, links, budget, result);
 		result.truncated ||= budget.truncated;
 	}
 	return reads;
+}
+
+/**
+ * Codex subagent families of the read sessions, one owner at a time: a child
+ * thread's parent and spawning call, a parent's calls into its threads.
+ */
+async function loadFamilies(
+	executor: ClickHouseExecutor,
+	organizationId: string,
+	owners: ReadonlyMap<string, string>,
+): Promise<Map<string, SessionSubagents>> {
+	const families = new Map<string, SessionSubagents>();
+	for (const userId of new Set(owners.values()))
+		for (const [sessionId, family] of await loadSessionSubagents(
+			executor,
+			{ organizationId, userId },
+			[...owners].filter(([, owner]) => owner === userId).map(([id]) => id),
+		))
+			families.set(sessionId, family);
+	return families;
 }
 
 /** Committed generation per session and run facts per ref, one owner at a time. */
@@ -228,6 +272,7 @@ async function readRecordDepth(
 async function readTurnDepth(
 	executor: ClickHouseExecutor,
 	run: RunAddress,
+	links: readonly SubagentLink[],
 	budget: Budget,
 	result: ReadResult,
 ): Promise<void> {
@@ -245,7 +290,9 @@ async function readTurnDepth(
 	);
 	result.truncated = turn.truncated;
 	for (const row of turn.records) {
-		const text = budget.take(row.text);
+		const delegation = row.kind === "tool_call" && isDelegationTool(row.tool);
+		const shown = delegation ? redactEncrypted(row.text) : row.text;
+		const text = budget.take(shown);
 		result.sections.push({
 			name: "record",
 			text,
@@ -259,9 +306,15 @@ async function readTurnDepth(
 				commandClass: row.commandClass,
 				isError: row.isError,
 				exitCode: row.exitCode,
-				cut: row.textTruncated || text.length < row.text.length,
+				cut: row.textTruncated || text.length < shown.length,
 			},
 		});
+		for (const link of delegation ? links : [])
+			if (link.call.record === row.recordIdx)
+				result.sections.push({
+					name: "subagent",
+					text: budget.take(subagentLine(link)),
+				});
 	}
 }
 
@@ -273,6 +326,7 @@ async function readExchange(
 	executor: ClickHouseExecutor,
 	run: RunAddress,
 	fact: RunRow,
+	links: readonly SubagentLink[],
 	budget: Budget,
 	result: ReadResult,
 ): Promise<void> {
@@ -292,6 +346,8 @@ async function readExchange(
 	);
 	result.truncated = turn.truncated;
 	if (turn.prompt && fact.genuine_prompt > 0) add("prompt", turn.prompt.text);
+	// A subagent run opens with the task its parent delegated, not a human prompt.
+	else if (turn.prompt) add("task", turn.prompt.text);
 	add(
 		"files edited",
 		[...new Set(turn.changedFiles.map((file) => file.path))].join("\n"),
@@ -322,7 +378,7 @@ async function readExchange(
 			.slice(0, MAX_CHECKS)
 			.map(
 				(check) =>
-					`${checkStatus(check)}\t${check.command_class || check.tool_name}\t${check.target}`,
+					`${checkStatus(check)}\t${check.command_class || check.tool_name}\t${isDelegationTool(check.tool_name) ? redactEncrypted(check.target) : check.target}`,
 			)
 			.join("\n"),
 	);
@@ -344,6 +400,7 @@ async function readExchange(
 			.join("\n"),
 	);
 
+	if (links.length) add("subagents", links.map(subagentLine).join("\n"));
 	await addFinalMessage(executor, run, budget, result);
 	if (budget.remaining === 0) {
 		result.truncated = true;
@@ -413,20 +470,43 @@ async function addFinalMessage(
 	result.sections.push({ name: "final", text: parts.join("") });
 }
 
-function runHeader(fact: RunRow | undefined): string {
-	if (!fact) return "run not found or not indexed";
-	return `${new Date(fact.started_ms).toISOString()} minutes=${fact.minutes} costUsd=${fact.cost ?? "unpriced"} rawChars=${fact.raw_chars}`;
+/** Where a Codex subagent thread came from: the parent's spawning run and call. */
+function parentText(family: SessionSubagents): string {
+	const link = family.spawnedBy;
+	const from = link
+		? `spawned by ${JSON.stringify({ sessionId: family.parentSessionId, agentId: link.call.agentId, turn: link.call.turn })} at record ${link.call.record} (${link.call.tool}${link.basis === "time" ? ", matched by time" : ""})`
+		: `spawned by session ${family.parentSessionId} (spawning call not found)`;
+	return `${from}; depth ${family.depth}, top session ${family.rootSessionId}`;
 }
 
+/** A delegation call with the child run it reached and the task the child recorded. */
+function subagentLine(link: SubagentLink): string {
+	const task = link.task
+		? ` task: ${link.task.text.replace(/\s+/gu, " ").trim()}`
+		: "";
+	return `record ${link.call.record} ${link.call.tool} -> ${JSON.stringify(childRef(link))}${link.basis === "time" ? " (matched by time)" : ""}${task}`;
+}
+
+function runHeader(fact: RunRow | undefined): string {
+	if (!fact) return "run not found or not indexed";
+	return `${new Date(fact.started_ms).toISOString()} minutes=${fact.minutes} activeMinutes=${fact.active_minutes} costUsd=${fact.cost ?? "unpriced"} rawChars=${fact.raw_chars}`;
+}
+
+/**
+ * A check passed only when its result finished without an error. A result
+ * recorded while the process was still running ("Process running", "Script
+ * running", a background launch) has no outcome yet: `running`.
+ */
 function checkStatus(
 	check: z.infer<typeof CheckSchema>,
-): "fail" | "pass" | "unknown" {
+): "fail" | "pass" | "running" | "unknown" {
 	if (
 		check.result_is_error ||
 		(check.result_exit_code !== null && check.result_exit_code !== 0)
 	)
 		return "fail";
-	return check.has_result ? "pass" : "unknown";
+	if (!check.has_result) return "unknown";
+	return check.result_running ? "running" : "pass";
 }
 
 function createBudget(maxChars: number): Budget {
@@ -459,6 +539,7 @@ const CheckSchema = z.object({
 	has_result: z.union([z.number(), z.boolean()]),
 	result_is_error: z.number().nullable(),
 	result_exit_code: z.number().nullable(),
+	result_running: z.number().nullable(),
 });
 const FailureSchema = z.object({
 	record_idx: z.number(),

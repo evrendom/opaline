@@ -37,6 +37,7 @@ import { findAnalysis } from "../services/analysis/find.service.js";
 import { readAnalysis } from "../services/analysis/read.service.js";
 import { toolGroupSql } from "../services/analysis/tool-groups.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
+import { buildNativeSessionLineageRow } from "../services/session-lineage-persistence.service.js";
 import {
 	buildTranscriptRecordRow,
 	buildTranscriptRecordsReceiptRow,
@@ -57,6 +58,8 @@ const runId = crypto.randomUUID();
 const baseMs = Date.now() - 3_600_000;
 const day = new Date(baseMs).toISOString().slice(0, 10);
 const clickhouse = getClickhouse();
+/** A workspace the tests never sign in to; its lineage must stay invisible. */
+const otherOrganizationId = `analysis_other_org_${runId}`;
 let server: ApiTestServer | undefined;
 let userId: string | undefined;
 let bearerToken = "";
@@ -87,11 +90,16 @@ afterAll(async () => {
 		"rudel.transcript_records",
 		"rudel.usage_events",
 		"rudel.session_analytics",
+		"rudel.session_lineage",
 	]) {
-		await clickhouse.execute({
-			query: `DELETE FROM ${table} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
-			query_params: { organizationId: userId ?? `analysis_unused_${runId}` },
-		});
+		for (const organizationId of [
+			userId ?? `analysis_unused_${runId}`,
+			otherOrganizationId,
+		])
+			await clickhouse.execute({
+				query: `DELETE FROM ${table} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+				query_params: { organizationId },
+			});
 	}
 	for (const id of createdUsers) {
 		await sqlClient`DELETE FROM organization WHERE id = ${id}`;
@@ -607,6 +615,233 @@ test("exchange uses the full last-edit boundary and preserves the failure head",
 	expect(exchange.truncated).toBe(true);
 });
 
+test("a still-running check is not a pass; minutes end at the last non-meta record and activeMinutes caps idle gaps", async () => {
+	const sessionId = `running_check_${runId}`;
+	const lines = [
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Start the dev server and test" },
+		},
+		{
+			...claudeTool("edit", "Write", { file_path: "a.ts", content: "x" }),
+			timestamp: at(1),
+		},
+		{ ...claudeResult("edit", "File created"), timestamp: at(2) },
+		{
+			...claudeTool("watch", "Bash", {
+				command: "bun test --watch",
+				run_in_background: true,
+			}),
+			timestamp: at(3),
+		},
+		{
+			...claudeResult(
+				"watch",
+				"Command running in background with ID: bd486wkvr. Output is being written to: /tmp/claude/bd486wkvr.output",
+			),
+			timestamp: at(4),
+		},
+		{
+			...claudeTool("once", "Bash", { command: "bun test" }),
+			timestamp: at(5),
+		},
+		{ ...claudeResult("once", "12 pass\n0 fail"), timestamp: at(6) },
+		{
+			type: "assistant",
+			// 20 minutes idle (an approval wait) before the final message.
+			timestamp: at(6 + 20 * 60),
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: "Both started." }],
+			},
+		},
+		// Written when the session was resumed hours later; not part of the run.
+		{ type: "ai-title", timestamp: at(3 * 3600), aiTitle: "Dev server" },
+	];
+	await seedSession(
+		sessionId,
+		"claude_code",
+		lines.map((line) => JSON.stringify(line)).join("\n"),
+		"claude-sonnet-4-5",
+	);
+	const ref = { sessionId, agentId: "", turn: 1 };
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			refs: [ref],
+		}),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	const [run] = runs.rows;
+	assert(run);
+	expect(run.minutes).toBeCloseTo((6 + 20 * 60) / 60, 3);
+	expect(run.activeMinutes).toBeCloseTo((6 + 5 * 60) / 60, 3);
+	expect(runs.header.activeMinutes).toBeCloseTo(run.activeMinutes ?? 0, 6);
+	const exchange = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", { refs: [ref], maxChars: 4000 }),
+	);
+	const checks = exchange.reads[0]?.sections.find(
+		(section) => section.name === "checks after last edit",
+	)?.text;
+	expect(checks?.split("\n")).toEqual([
+		"running\ttest\tbun test --watch",
+		"pass\ttest\tbun test",
+	]);
+	expect(exchange.reads[0]?.header).toContain("activeMinutes=");
+});
+
+test("costs: unpriced usage stays unpriced, mixed-model runs split cost per model, and model= filters on run usage", async () => {
+	const mixedId = `cost_mixed_${runId}`;
+	const unpricedId = `cost_unpriced_${runId}`;
+	const lines = [
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Plan, then build" },
+		},
+		...[1, 2, 3].map((index) => ({
+			type: "assistant",
+			timestamp: at(index),
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: `step ${index}` }],
+			},
+		})),
+	];
+	const transcript = lines.map((line) => JSON.stringify(line)).join("\n");
+	// The session's recorded model is the last one; opus did the planning.
+	await seedSession(mixedId, "claude_code", transcript, "claude-sonnet-4-5", {
+		repository: `cost_repo_${runId}`,
+		usage: [
+			{ line: 2, model: "claude-opus-4-6" },
+			{ line: 3, model: "claude-sonnet-4-5" },
+			{ line: 4, model: "mystery-model-x" },
+		],
+	});
+	await seedSession(unpricedId, "claude_code", transcript, "mystery-model-x", {
+		repository: `cost_repo_${runId}`,
+		usage: [{ line: 2, model: "mystery-model-x" }],
+	});
+	const scope = { from: day, to: day, repository: `cost_repo_${runId}` };
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "runs", ...scope }),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	const mixed = runs.rows.find((row) => row.ref.sessionId === mixedId);
+	const unpriced = runs.rows.find((row) => row.ref.sessionId === unpricedId);
+	assert(mixed && unpriced);
+	expect(unpriced.costUsd).toBeNull();
+	expect(runs.header.unpricedRuns).toBe(1);
+	expect(mixed.model).toBe("mystery-model-x");
+	expect(mixed.models).toHaveLength(3);
+	expect(mixed.models.slice(0, 2)).toEqual([
+		"claude-opus-4-6",
+		"claude-sonnet-4-5",
+	]);
+	assert(mixed.costUsd !== null);
+	expect(
+		runs.header.notes.some((note) => note.includes("could not be priced")),
+	).toBe(true);
+
+	const byModel = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "runs", ...scope, groupBy: "model" }),
+	);
+	assert(byModel.source === "runs" && "groups" in byModel);
+	const group = (key: string) =>
+		byModel.groups.find((entry) => entry.key === key);
+	const opus = group("claude-opus-4-6")?.costUsd;
+	const sonnet = group("claude-sonnet-4-5")?.costUsd;
+	assert(typeof opus === "number" && typeof sonnet === "number");
+	// Opus is priced higher than sonnet for the same tokens: its spend is its own.
+	expect(opus).toBeGreaterThan(sonnet);
+	expect(opus + sonnet).toBeCloseTo(mixed.costUsd, 4);
+	expect(group("mystery-model-x")).toMatchObject({ runs: 2, costUsd: null });
+
+	const opusOnly = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			...scope,
+			model: "claude-opus-4-6",
+		}),
+	);
+	assert(opusOnly.source === "runs" && "rows" in opusOnly);
+	expect(opusOnly.rows.map((row) => row.ref.sessionId)).toEqual([mixedId]);
+	expect(opusOnly.rows[0]?.costUsd).toBeCloseTo(opus, 4);
+	expect(opusOnly.header.pricedCostUsd).toBeCloseTo(opus, 4);
+});
+
+test("a command that failed inside a Codex code-mode script is a failure of its own", async () => {
+	const sessionId = `codex_nested_${runId}`;
+	const transcript = jsonl([
+		codexLine(0, codexText("user", "Run the suite")),
+		codexLine(1, {
+			type: "custom_tool_call",
+			name: "exec",
+			call_id: "script",
+			input: 'const r = await tools.exec_command({ cmd: "bun test src" });',
+		}),
+		{
+			timestamp: at(2),
+			type: "event_msg",
+			payload: {
+				type: "item_completed",
+				item: {
+					type: "CommandExecution",
+					id: "exec-0198aaaa-1111-7000-8000-00000000000a",
+					command: ["/bin/zsh", "-lc", "bun test src"],
+					aggregated_output:
+						"src/login.test.ts:\nerror: expect(received).toBe(expected)\n1 fail",
+					exit_code: 1,
+					status: "failed",
+					source: "unified_exec_startup",
+				},
+			},
+		},
+		codexLine(3, {
+			type: "custom_tool_call_output",
+			call_id: "script",
+			output: [
+				{
+					type: "input_text",
+					text: "Script completed\nWall time 1.0 seconds\nOutput:\n",
+				},
+			],
+		}),
+		codexLine(4, codexText("assistant", "One test fails.")),
+	]);
+	await seedSession(sessionId, "codex", transcript, "gpt-5");
+	const tools = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "tool",
+			from: day,
+			to: day,
+			sessionId,
+		}),
+	);
+	assert(tools.source === "tool");
+	expect(tools.groups.map((group) => [group.toolGroup, group.count])).toEqual([
+		["shell", 1],
+	]);
+	expect(tools.groups[0]?.topCommands).toEqual(["bun test src"]);
+	expect(tools.groups[0]?.examples[0]).toMatchObject({
+		ref: { sessionId, agentId: "", turn: 1 },
+		record: 3,
+	});
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			sessionId,
+		}),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	expect(runs.rows[0]).toMatchObject({ failedCalls: 1, toolCalls: 2 });
+});
+
 test("one deadline aborts the active ClickHouse query and stops subsequent statements", async () => {
 	const statements: ClickHouseStatement[] = [];
 	await expect(
@@ -792,6 +1027,11 @@ async function seedSession(
 		extractedUsage?: boolean;
 		/** Inserts the committed records a second time, like a retried insert that has not merged yet. */
 		duplicateRecords?: boolean;
+		/** Seconds after `baseMs` the session starts (its `session_date`). */
+		startOffset?: number;
+		repository?: string;
+		/** Usage events to store instead of the default one (line 2, the session's model). */
+		usage?: readonly { line: number; model: string }[];
 	} = {},
 ): Promise<void> {
 	assert(userId);
@@ -846,10 +1086,10 @@ async function seedSession(
 				user_id: identity.userId,
 				session_id: sessionId,
 				source,
-				session_date: timestamp(0),
-				last_interaction_date: timestamp(10),
+				session_date: timestamp(options.startOffset ?? 0),
+				last_interaction_date: timestamp((options.startOffset ?? 0) + 10),
 				project_path: "/test/analysis",
-				git_remote: "repo",
+				git_remote: options.repository ?? "repo",
 				model_used: model,
 				revision: "1",
 			},
@@ -891,29 +1131,29 @@ async function seedSession(
 		await clickhouse.insert({
 			table: "rudel.usage_events",
 			asyncInsert: false,
-			values: [
-				{
-					organization_id: userId,
-					user_id: identity.userId,
-					session_id: sessionId,
-					source,
-					agent_id: "main",
-					event_id: sessionId.replaceAll("-", "").padEnd(64, "0").slice(0, 64),
-					record_kind: "event",
-					event_version: "1",
-					occurred_at: timestamp(2),
-					usage_date: day,
-					has_valid_timestamp: 1,
-					raw_model: model,
-					resolved_model: model,
-					model_status: "resolved",
-					model_provider: source === "codex" ? "openai" : "anthropic",
-					context_input_tokens: "1000",
-					uncached_input_tokens: "1000",
-					output_tokens: "100",
-					first_observed_line: 2,
-				},
-			],
+			values: (options.usage ?? [{ line: 2, model }]).map((usage, index) => ({
+				organization_id: userId,
+				user_id: identity.userId,
+				session_id: sessionId,
+				source,
+				agent_id: "main",
+				event_id: `${index}${sessionId.replaceAll("-", "")}`
+					.padEnd(64, "0")
+					.slice(0, 64),
+				record_kind: "event",
+				event_version: "1",
+				occurred_at: timestamp(2),
+				usage_date: day,
+				has_valid_timestamp: 1,
+				raw_model: usage.model,
+				resolved_model: usage.model,
+				model_status: "resolved",
+				model_provider: source === "codex" ? "openai" : "anthropic",
+				context_input_tokens: "1000",
+				uncached_input_tokens: "1000",
+				output_tokens: "100",
+				first_observed_line: usage.line,
+			})),
 		});
 	await sqlClient`INSERT INTO session_ownership (organization_id, user_id, session_id) VALUES (${userId}, ${identity.userId}, ${sessionId})`;
 }
@@ -1532,3 +1772,423 @@ test("reaction pages keep every text block of one record: two apologies in one a
 	expect(second.header.cursor).toBeUndefined();
 	expect([...first.events, ...second.events]).toEqual(whole.events);
 });
+
+test("Codex subagent threads: find keeps a family together with parent links and single costs; read joins parent and children at the spawning call", async () => {
+	assert(userId);
+	const owner = userId;
+	const repository = `lineage-${runId}`;
+	const id = (name: string) => `analysis_family_${name}_${runId}`;
+	const [parent, review, tests, grandchild] = [
+		id("parent"),
+		id("review"),
+		id("tests"),
+		id("grandchild"),
+	];
+	const [uncountable, inferred, standalone] = [
+		id("uncountable"),
+		id("inferred"),
+		id("standalone"),
+	];
+	const member = await signup("lineage-other");
+	const seed = (sessionId: string, content: string, startOffset: number) =>
+		seedSession(sessionId, "codex", content, "gpt-5", {
+			repository,
+			startOffset,
+		});
+	await seed(parent, codexParentTranscript(review, tests), 100);
+	await seed(review, codexReviewTranscript(parent, grandchild), 102);
+	await seed(tests, codexTestsTranscript(parent), 106);
+	await seed(grandchild, codexGrandchildTranscript(review), 103);
+	for (const [sessionId, offset] of [
+		[standalone, 89],
+		[inferred, 90],
+		[uncountable, 91],
+	] as const)
+		await seed(sessionId, codexTranscript(), offset);
+	const edge = (
+		childSessionId: string,
+		parentSessionId: string,
+		overrides: { countable?: boolean; organizationId?: string; user?: string },
+	) =>
+		buildNativeSessionLineageRow({
+			childIngestedAt: new Date(),
+			childModel: "gpt-5",
+			childSessionDate: at(100),
+			childSessionId,
+			countable: overrides.countable ?? true,
+			derivedAt: new Date(),
+			evidenceAt: new Date(),
+			organizationId: overrides.organizationId ?? owner,
+			parentSessionDate: at(100),
+			parentSessionId,
+			userId: overrides.user ?? owner,
+		});
+	await clickhouse.insert({
+		table: "rudel.session_lineage",
+		asyncInsert: false,
+		values: [
+			edge(review, parent, {}),
+			edge(tests, parent, {}),
+			edge(grandchild, review, {}),
+			// Not countable (the parent was never uploaded when it was derived).
+			edge(uncountable, parent, { countable: false }),
+			// An inferred link, not native parent metadata.
+			{
+				...edge(inferred, parent, {}),
+				carrier: "codex_exec_prompt",
+				confidence: "prompt_echo",
+			},
+			// Another member's and another workspace's rows naming this owner's sessions.
+			edge(standalone, parent, { user: member.user.id }),
+			edge(standalone, parent, { organizationId: otherOrganizationId }),
+		],
+	});
+	const scope = { from: day, to: day, repository };
+	const findRuns = async (input: Record<string, unknown>) => {
+		const output = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", { source: "runs", ...scope, ...input }),
+		);
+		assert(output.source === "runs" && "rows" in output);
+		return output;
+	};
+	const family = [parent, review, tests, grandchild];
+
+	// Asking for the parent brings its threads, each run linked to its parent.
+	const byParent = await findRuns({ sessionId: parent });
+	expect(new Set(byParent.rows.map((row) => row.ref.sessionId))).toEqual(
+		new Set(family),
+	);
+	expect(byParent.header.sessionsInScope).toBe(4);
+	const links = new Map(
+		byParent.rows.map((row) => [
+			row.ref.sessionId,
+			[row.parentSessionId, row.depth],
+		]),
+	);
+	expect(Object.fromEntries(links)).toEqual({
+		[parent]: [null, 0],
+		[review]: [parent, 1],
+		[tests]: [parent, 1],
+		[grandchild]: [review, 2],
+	});
+	expect(byParent.header.notes.join("\n")).toContain(
+		"3 of the 4 sessions are Codex subagent threads",
+	);
+	// Each thread is priced once: the header is the sum of its runs.
+	const priced = byParent.rows.reduce(
+		(sum, row) => sum + (row.costUsd ?? 0),
+		0,
+	);
+	// One usage event per session prices one run of each thread.
+	expect(
+		byParent.rows
+			.filter((row) => row.costUsd !== null)
+			.map((row) => row.ref.sessionId)
+			.sort(),
+	).toEqual([...family].sort());
+	expect(byParent.header.unpricedRuns).toBe(byParent.rows.length - 4);
+	// Rows are rounded to 4 decimals, the header sums before rounding.
+	expect(byParent.header.pricedCostUsd).toBeCloseTo(priced, 3);
+	expect(
+		new Set(byParent.rows.map((row) => JSON.stringify(row.ref))).size,
+	).toBe(byParent.rows.length);
+
+	// The whole repository: every session once, threads not added twice.
+	const all = await findRuns({});
+	expect(all.header.sessionsInScope).toBe(7);
+	expect(new Set(all.rows.map((row) => JSON.stringify(row.ref))).size).toBe(
+		all.rows.length,
+	);
+	// Seven sessions with one equal usage event each: nothing counted twice.
+	expect(all.header.pricedCostUsd).toBeCloseTo(
+		(byParent.header.pricedCostUsd * 7) / 4,
+		3,
+	);
+	for (const separate of [uncountable, inferred, standalone])
+		expect(
+			new Set(
+				all.rows
+					.filter((row) => row.ref.sessionId === separate)
+					.map((row) => JSON.stringify([row.parentSessionId, row.depth])),
+			),
+		).toEqual(new Set([JSON.stringify([null, 0])]));
+	const families = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			...scope,
+			groupBy: "session",
+		}),
+	);
+	assert(families.source === "runs" && "groups" in families);
+	expect(
+		Object.fromEntries(
+			families.groups.map((group) => [group.key, group.sessions]),
+		),
+	).toEqual({ [parent]: 4, [uncountable]: 1, [inferred]: 1, [standalone]: 1 });
+	expect(
+		families.groups.find((group) => group.key === parent)?.costUsd,
+	).toBeCloseTo(byParent.header.pricedCostUsd, 4);
+
+	// latest counts families: the newest session is a thread, its family comes whole.
+	expect(
+		new Set(
+			(await findRuns({ latest: 1 })).rows.map((row) => row.ref.sessionId),
+		),
+	).toEqual(new Set(family));
+	expect((await findRuns({ latest: 2 })).header.sessionsInScope).toBe(5);
+
+	// Failures and reactions inside a thread point back to its parent.
+	const tools = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "tool", ...scope, sessionId: parent }),
+	);
+	assert(tools.source === "tool");
+	expect(
+		tools.groups
+			.flatMap((group) => group.examples)
+			.find((example) => example.ref.sessionId === tests)?.parentSessionId,
+	).toBe(parent);
+	const reactions = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "user", ...scope, sessionId: parent }),
+	);
+	assert(reactions.source === "user");
+	expect(
+		reactions.events.find((event) => event.eventRef.sessionId === tests)
+			?.parentSessionId,
+	).toBe(parent);
+
+	// Reading the parent lists each thread at the call that reached it.
+	const read = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [
+				{ sessionId: parent, turn: 1 },
+				{ sessionId: parent, turn: 2 },
+			],
+		}),
+	);
+	const section = (index: number, name: string) =>
+		read.reads[index]?.sections.find((entry) => entry.name === name)?.text;
+	expect(section(0, "subagents")).toBe(
+		`record 3 spawn_agent -> ${JSON.stringify({ sessionId: review, agentId: "", turn: 1 })} task: Message Type: NEW_TASK Task name: /root/review Sender: /root Payload: Review src/a.ts for bugs`,
+	);
+	expect(section(1, "subagents")?.split("\n")).toEqual([
+		`record 7 spawn_agent -> ${JSON.stringify({ sessionId: tests, agentId: "", turn: 1 })} task: Message Type: NEW_TASK Task name: /root/tests Sender: /root Payload:`,
+		`record 9 followup_task -> ${JSON.stringify({ sessionId: review, agentId: "", turn: 2 })} task: Message Type: FOLLOWUP_TASK Task name: /root/review Sender: /root Payload: Also check src/b.ts`,
+	]);
+	expect(section(0, "parent")).toBeUndefined();
+	const turn = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [{ sessionId: parent, turn: 2 }],
+			depth: "turn",
+		}),
+	);
+	const records = turn.reads[0]?.sections ?? [];
+	const spawn = records.findIndex((entry) => entry.record?.index === 7);
+	expect(records[spawn]?.text).toContain('"message":"[encrypted]"');
+	expect(records[spawn]?.text).not.toContain("gAAAA");
+	expect(records[spawn]?.record?.cut).toBe(false);
+	expect(records[spawn + 1]?.name).toBe("subagent");
+	expect(records[spawn + 1]?.text).toContain(`"sessionId":"${tests}"`);
+
+	// Reading a thread starts with its parent run and its delegated task.
+	const threads = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", {
+			refs: [
+				{ sessionId: review, turn: 1 },
+				{ sessionId: grandchild, turn: 1 },
+				{ sessionId: tests, turn: 1 },
+				{ sessionId: uncountable, turn: 1 },
+			],
+		}),
+	);
+	const [reviewRead, grandchildRead, testsRead, uncountableRead] =
+		threads.reads;
+	expect(reviewRead?.sections[0]).toEqual({
+		name: "parent",
+		text: `spawned by ${JSON.stringify({ sessionId: parent, agentId: "", turn: 1 })} at record 3 (spawn_agent); depth 1, top session ${parent}`,
+	});
+	expect(
+		reviewRead?.sections.find((entry) => entry.name === "task")?.text,
+	).toContain("Review src/a.ts for bugs");
+	expect(
+		reviewRead?.sections.find((entry) => entry.name === "subagents")?.text,
+	).toBe(
+		`record 3 spawn_agent -> ${JSON.stringify({ sessionId: grandchild, agentId: "", turn: 1 })} task: Check the imports of src/a.ts`,
+	);
+	expect(grandchildRead?.sections[0]?.text).toBe(
+		`spawned by ${JSON.stringify({ sessionId: review, agentId: "", turn: 1 })} at record 3 (spawn_agent); depth 2, top session ${parent}`,
+	);
+	expect(testsRead?.sections[0]?.text).toContain(
+		`${JSON.stringify({ sessionId: parent, agentId: "", turn: 2 })} at record 7`,
+	);
+	expect(
+		uncountableRead?.sections.some((entry) => entry.name === "parent"),
+	).toBe(false);
+	// Other members' and workspaces' lineage never joins this owner's sessions.
+	expect(JSON.stringify(read)).not.toContain(standalone);
+});
+
+function codexMeta(sessionId: string, parent?: string, path?: string) {
+	return {
+		timestamp: at(0),
+		type: "session_meta",
+		payload: {
+			id: sessionId,
+			...(parent
+				? {
+						parent_thread_id: parent,
+						thread_source: "subagent",
+						agent_path: path ?? null,
+						source: {
+							subagent: {
+								thread_spawn: {
+									parent_thread_id: parent,
+									agent_path: path ?? null,
+								},
+							},
+						},
+					}
+				: { thread_source: "user" }),
+		},
+	};
+}
+
+function codexLine(offset: number, payload: Record<string, unknown>) {
+	return { timestamp: at(offset), type: "response_item", payload };
+}
+
+function codexText(role: "user" | "assistant", text: string) {
+	return {
+		type: "message",
+		role,
+		content: [{ type: role === "user" ? "input_text" : "output_text", text }],
+	};
+}
+
+function codexCall(callId: string, name: string, args: unknown) {
+	return {
+		type: "function_call",
+		name,
+		arguments: JSON.stringify(args),
+		call_id: callId,
+	};
+}
+
+function codexOutput(callId: string, output: string) {
+	return { type: "function_call_output", call_id: callId, output };
+}
+
+function codexTask(
+	recipient: string,
+	kind: string,
+	payload: string,
+	encrypted = false,
+) {
+	return {
+		type: "agent_message",
+		author: "/root",
+		recipient,
+		content: [
+			{
+				type: "input_text",
+				text: `Message Type: ${kind}\nTask name: ${recipient}\nSender: /root\nPayload:\n${encrypted ? "" : payload}`,
+			},
+			...(encrypted
+				? [{ type: "encrypted_content", encrypted_content: payload }]
+				: []),
+		],
+	};
+}
+
+const ENCRYPTED = `gAAAAABqvTvktoKr0mG1POcRDUOwiBy9eSTBRZSdTnb2AGan62XewcHE8IF2W1M-${"x".repeat(40)}`;
+
+function jsonl(lines: readonly unknown[]): string {
+	return lines.map((line) => JSON.stringify(line)).join("\n");
+}
+
+/** Spawns /root/review in turn 1, /root/tests and a follow-up to review in turn 2; messages encrypted. */
+function codexParentTranscript(review: string, tests: string): string {
+	return jsonl([
+		codexMeta(`parent-of-${review}-${tests}`),
+		codexLine(100, codexText("user", "Review and test the change")),
+		codexLine(
+			102,
+			codexCall("s1", "spawn_agent", {
+				task_name: "review",
+				message: ENCRYPTED,
+			}),
+		),
+		codexLine(102, codexOutput("s1", '{"task_name":"/root/review"}')),
+		codexLine(103, codexText("assistant", "Waiting for the review.")),
+		codexLine(105, codexText("user", "Now run the tests")),
+		codexLine(
+			106,
+			codexCall("s2", "spawn_agent", {
+				task_name: "tests",
+				message: ENCRYPTED,
+			}),
+		),
+		codexLine(106, codexOutput("s2", '{"task_name":"/root/tests"}')),
+		codexLine(
+			107,
+			codexCall("f1", "followup_task", {
+				target: "review",
+				message: ENCRYPTED,
+			}),
+		),
+		codexLine(107, codexOutput("f1", "")),
+		codexLine(109, codexText("assistant", "Done.")),
+	]);
+}
+
+/** A thread with a plain-text task that spawns the grandchild (older Codex: the result names its id). */
+function codexReviewTranscript(parent: string, grandchild: string): string {
+	return jsonl([
+		codexMeta(`review-${parent}`, parent, "/root/review"),
+		codexLine(
+			102,
+			codexTask("/root/review", "NEW_TASK", "Review src/a.ts for bugs"),
+		),
+		codexLine(
+			103,
+			codexCall("g1", "spawn_agent", {
+				message: "Check the imports of src/a.ts",
+			}),
+		),
+		codexLine(
+			103,
+			codexOutput(
+				"g1",
+				JSON.stringify({ agent_id: grandchild, nickname: "Poincare" }),
+			),
+		),
+		codexLine(104, codexText("assistant", "Found one bug.")),
+		codexLine(
+			107,
+			codexTask("/root/review", "FOLLOWUP_TASK", "Also check src/b.ts"),
+		),
+		codexLine(108, codexText("assistant", "src/b.ts is fine.")),
+	]);
+}
+
+/** A thread whose task payload is encrypted; its test run fails and it apologizes. */
+function codexTestsTranscript(parent: string): string {
+	return jsonl([
+		codexMeta(`tests-${parent}`, parent, "/root/tests"),
+		codexLine(106, codexTask("/root/tests", "NEW_TASK", ENCRYPTED, true)),
+		codexLine(107, codexCall("t1", "exec_command", { cmd: "bun test" })),
+		codexLine(
+			107,
+			codexOutput("t1", "Process exited with code 1\nFAIL src/a.test.ts"),
+		),
+		codexLine(108, codexText("assistant", "I'm sorry, the tests fail.")),
+	]);
+}
+
+/** Older Codex: the task arrives as a plain user message. */
+function codexGrandchildTranscript(review: string): string {
+	return jsonl([
+		codexMeta(`grandchild-${review}`, review),
+		codexLine(103, codexText("user", "Check the imports of src/a.ts")),
+		codexLine(104, codexText("assistant", "Imports are fine.")),
+	]);
+}

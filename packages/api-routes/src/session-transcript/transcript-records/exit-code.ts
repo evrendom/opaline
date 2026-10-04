@@ -21,6 +21,9 @@ const PREAMBLE_LINE =
 	/^(?:Chunk ID:|Wall time:?|Process running with session ID|Original token count:|Script completed|Script failed|Script running)/iu;
 const CLAUDE_EXIT_PREFIX_PATTERN = /^\s*Exit code:?\s+(-?\d+)/u;
 const PREAMBLE_MAX_LINES = 8;
+const RUNNING_PREAMBLE =
+	/^(?:Process running with session ID|Script running)\b/iu;
+const CLAUDE_BACKGROUND_PATTERN = /^\s*Command running in background with ID:/u;
 
 /**
  * Exit code recorded in a Codex tool output, or null when the transport
@@ -44,6 +47,29 @@ export function readClaudeExitCode(resultText: string): number | null {
 	if (match?.[1] === undefined) return null;
 	const value = Number(match[1]);
 	return Number.isSafeInteger(value) ? value : null;
+}
+
+/**
+ * True when the transport framing says the process was still running when the
+ * output was recorded (`Process running with session ID N`, `Script running`)
+ * and reported no exit code. Read from the preamble only, like exit codes.
+ */
+export function isCodexRunningOutput(output: unknown): boolean {
+	return readTransportTexts(output).some((text) => {
+		const lines = text.trimStart().split("\n", PREAMBLE_MAX_LINES + 1);
+		for (const rawLine of lines.slice(0, PREAMBLE_MAX_LINES)) {
+			const line = rawLine.replace(/\r$/u, "");
+			if (OUTPUT_MARKER.test(line)) return false;
+			if (RUNNING_PREAMBLE.test(line)) return true;
+			if (!PREAMBLE_LINE.test(line)) return false;
+		}
+		return false;
+	});
+}
+
+/** A Claude Code Bash result that only reports a background launch. */
+export function isClaudeBackgroundLaunch(resultText: string): boolean {
+	return CLAUDE_BACKGROUND_PATTERN.test(resultText.slice(0, 128));
 }
 
 function readTransportTexts(output: unknown): string[] {

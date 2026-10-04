@@ -15,6 +15,7 @@ import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { enqueueClickHousePurge } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
+import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -82,6 +83,7 @@ afterAll(async () => {
 		"rudel.skill_receipts",
 		"rudel.skill_uses",
 		"rudel.skill_version_contents",
+		"rudel.session_git_observations",
 	]) {
 		await clickhouse.execute({
 			query: `DELETE FROM ${table} WHERE organization_id IN {ids:Array(String)} SETTINGS lightweight_deletes_sync = 3`,
@@ -251,6 +253,7 @@ async function writeSession(input: {
 	readonly source?: TranscriptSource;
 	readonly subagents?: Record<string, string>;
 	readonly textBudgetChars?: number;
+	readonly textMaxChars?: number;
 	readonly userId?: string;
 }) {
 	const stats = createSplitStats();
@@ -261,6 +264,7 @@ async function writeSession(input: {
 			source: input.source ?? "claude_code",
 			subagents: input.subagents,
 			textBudgetChars: input.textBudgetChars,
+			textMaxChars: input.textMaxChars,
 		},
 		stats,
 	);
@@ -484,6 +488,8 @@ describe("transcript record readers", () => {
 		).toBeLessThanOrEqual(500);
 		expect(raw.records.map((record) => record.kind)).toEqual([
 			"user_prompt",
+			// The workspace rules that came with the prompt.
+			"injected_context",
 			"tool_call",
 			"tool_call",
 			"file_change",
@@ -573,7 +579,7 @@ describe("transcript record readers", () => {
 			textBudgetChars: 0,
 		});
 		const raw = await readTurn(scope, cappedSessionId, 1, "raw", 4_000);
-		expect(raw.records).toHaveLength(11);
+		expect(raw.records).toHaveLength(12);
 		expect(raw.records[0]?.text).toBe("make the login tests pass");
 		const failedResult = raw.records.find(
 			(record) => record.kind === "tool_result" && record.callId === "t-test",
@@ -583,6 +589,130 @@ describe("transcript record readers", () => {
 		expect(failedResult.text).toEndWith("[cut]");
 		expect(failedResult.textTruncated).toBe(true);
 		expect(raw.truncated).toBe(true);
+	});
+
+	test("record reads fall back to the exact raw line when storage capped the text", async () => {
+		const rawSessionId = `${sessionId}_raw_fallback`;
+		const output = Array.from(
+			{ length: 400 },
+			(_, index) => `line ${index} ✓ 日本`,
+		).join("\n");
+		const childReport = `Subagent report: ${"finding ".repeat(300)}done`;
+		const main = [
+			line({
+				message: { content: "run the long suite", role: "user" },
+				timestamp: at(1),
+				type: "user",
+			}),
+			line({
+				message: {
+					content: [
+						{
+							id: "t-long",
+							input: { command: "bun test" },
+							name: "Bash",
+							type: "tool_use",
+						},
+					],
+					role: "assistant",
+				},
+				timestamp: at(2),
+				type: "assistant",
+			}),
+			line({
+				message: {
+					content: [
+						{ content: output, tool_use_id: "t-long", type: "tool_result" },
+					],
+					role: "user",
+				},
+				timestamp: at(3),
+				type: "user",
+			}),
+		].join("\n");
+		const child = [
+			line({
+				agentId: "agent-raw",
+				isSidechain: true,
+				message: { content: "Report the findings.", role: "user" },
+				timestamp: at(4),
+				type: "user",
+			}),
+			line({
+				agentId: "agent-raw",
+				isSidechain: true,
+				message: {
+					content: [{ text: childReport, type: "text" }],
+					role: "assistant",
+				},
+				timestamp: at(5),
+				type: "assistant",
+			}),
+		].join("\n");
+		await getAdapter("claude_code").ingest(
+			clickhouse,
+			{
+				content: main,
+				projectPath: "/test/raw-fallback",
+				sessionId: rawSessionId,
+				source: "claude_code",
+				subagents: [{ agentId: "agent-raw", content: child }],
+			},
+			{
+				ingestedAt: new Date(BASE_TIME_MS),
+				organizationId,
+				revision: "500",
+				timestamps: { lastInteractionDate: at(5), sessionDate: SESSION_DATE },
+				userId,
+			},
+		);
+		await writeSession({
+			content: main,
+			revision: "500",
+			sessionId: rawSessionId,
+			subagents: { "agent-raw": child },
+			textMaxChars: 100,
+		});
+
+		const characters = Array.from(output);
+		const middle = await readRecord(scope, rawSessionId, 3, 4_000, 4_050);
+		expect(middle).toMatchObject({
+			kind: "tool_result",
+			textChars: characters.length,
+			textFromRaw: true,
+			textTruncatedInStorage: false,
+			text: characters.slice(4_000, 4_050).join(""),
+		});
+		// Within the stored prefix nothing extra is read.
+		const stored = await readRecord(scope, rawSessionId, 3, 0, 20);
+		expect(stored).toMatchObject({
+			textFromRaw: false,
+			text: characters.slice(0, 20).join(""),
+		});
+		const childText = await readRecord(scope, rawSessionId, 2, 2_000, 2_404, {
+			agentId: "agent-raw",
+		});
+		expect(childText).toMatchObject({
+			kind: "assistant_text",
+			textFromRaw: true,
+			text: Array.from(childReport).slice(2_000, 2_404).join(""),
+		});
+
+		// A generation whose raw revision is gone keeps its stored, capped text.
+		const orphanSessionId = `${sessionId}_raw_fallback_orphan`;
+		await writeSession({
+			content: main,
+			revision: "501",
+			sessionId: orphanSessionId,
+			textMaxChars: 100,
+		});
+		const orphan = await readRecord(scope, orphanSessionId, 3, 4_000, 4_050);
+		expect(orphan).toMatchObject({
+			found: true,
+			text: "",
+			textFromRaw: false,
+			textTruncatedInStorage: true,
+		});
 	});
 
 	test("realistic Codex and Claude subagents expose delegated turns through all readers", async () => {
@@ -1766,6 +1896,231 @@ describe("transcript records backfill and deletion", () => {
 	});
 });
 
+describe("derived transcript data reconciliation", () => {
+	test("repairs a raw revision that was never indexed and records whose git observations were missed", async () => {
+		const reconcileOrganizationId = `org_records_reconcile_${RUN_ID}`;
+		createdRecordsOrganizationIds.push(reconcileOrganizationId);
+		const unindexed = `reconcile_unindexed_${RUN_ID}`;
+		const withoutGit = `reconcile_without_git_${RUN_ID}`;
+		const recent = `reconcile_recent_${RUN_ID}`;
+		const content = [
+			line({
+				message: { content: "commit the fix", role: "user" },
+				timestamp: at(1),
+				type: "user",
+			}),
+			line({
+				message: {
+					content: [
+						{
+							id: "t-commit",
+							input: { command: 'git commit -m "fix login"' },
+							name: "Bash",
+							type: "tool_use",
+						},
+					],
+					role: "assistant",
+				},
+				timestamp: at(2),
+				type: "assistant",
+			}),
+			line({
+				message: {
+					content: [
+						{
+							content: "[main 1a2b3c4] fix login\n 1 file changed",
+							tool_use_id: "t-commit",
+							type: "tool_result",
+						},
+					],
+					role: "user",
+				},
+				timestamp: at(3),
+				type: "user",
+			}),
+		].join("\n");
+		const now = Date.now();
+		for (const [sessionId, ingestedAt] of [
+			[unindexed, now - 3_600_000],
+			[withoutGit, now - 3_600_000],
+			// Ingest may still be extracting this one: left alone.
+			[recent, now - 60_000],
+		] as const) {
+			await getAdapter("claude_code").ingest(
+				clickhouse,
+				{
+					content,
+					projectPath: "/test/reconcile",
+					sessionId,
+					source: "claude_code",
+					subagents: [],
+				},
+				{
+					ingestedAt: new Date(ingestedAt),
+					organizationId: reconcileOrganizationId,
+					revision: "900",
+					timestamps: { lastInteractionDate: at(3), sessionDate: SESSION_DATE },
+					userId,
+				},
+			);
+		}
+		await writeSession({
+			content,
+			organizationId: reconcileOrganizationId,
+			revision: "900",
+			sessionId: withoutGit,
+		});
+		const options = {
+			assertWritable: (target: { organizationId: string; userId: string }) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
+			deadline: { deadlineAt: Date.now() + 60_000, now: Date.now },
+			organizationId: reconcileOrganizationId,
+		};
+
+		const first = await reconcileDerivedTranscriptRecords(options);
+
+		expect(first).toMatchObject({
+			candidates: 2,
+			gitObservations: { failed: 0, skipped: 0, written: 1 },
+			hasMore: false,
+			transcriptRecords: { failed: 0, skipped: 0, written: 1 },
+		});
+		const receipts = await clickhouse.query<{
+			session_id: string;
+			records: string;
+			observations: string;
+		}>({
+			query: `SELECT session_id,
+					toString(max(revision)) AS records,
+					toString((SELECT max(revision) FROM rudel.session_git_observations o
+						WHERE o.organization_id = {organizationId:String} AND o.session_id = r.session_id AND o.kind = 'receipt')) AS observations
+				FROM rudel.transcript_records r
+				WHERE organization_id = {organizationId:String} AND kind = 'receipt'
+				GROUP BY session_id ORDER BY session_id`,
+			query_params: { organizationId: reconcileOrganizationId },
+		});
+		expect(receipts).toEqual([
+			{ observations: "900", records: "900", session_id: unindexed },
+			{ observations: "900", records: "900", session_id: withoutGit },
+		]);
+		const [observed] = await clickhouse.query<{ commits: string }>({
+			query: `SELECT toString(countIf(kind != 'receipt')) AS commits FROM rudel.session_git_observations
+				WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
+			query_params: {
+				organizationId: reconcileOrganizationId,
+				sessionId: unindexed,
+			},
+		});
+		expect(Number(observed?.commits)).toBeGreaterThan(0);
+
+		// Everything current: nothing left to repair.
+		expect(await reconcileDerivedTranscriptRecords(options)).toMatchObject({
+			candidates: 0,
+			hasMore: false,
+		});
+	});
+
+	test("counts subagent bytes against the session cap before either repair and charges every repair to the run budget", async () => {
+		const capOrganizationId = `org_records_reconcile_cap_${RUN_ID}`;
+		const budgetOrganizationId = `org_records_reconcile_budget_${RUN_ID}`;
+		createdRecordsOrganizationIds.push(capOrganizationId, budgetOrganizationId);
+		const content = [
+			line({
+				message: { content: "run the tests", role: "user" },
+				timestamp: at(1),
+				type: "user",
+			}),
+			line({
+				message: { content: "All tests pass.", role: "assistant" },
+				timestamp: at(2),
+				type: "assistant",
+			}),
+		].join("\n");
+		const mainBytes = Buffer.byteLength(content);
+		const subagentContent = Array.from({ length: 8 }, () => content).join("\n");
+		const ingestRaw = async (
+			organizationId: string,
+			sessionId: string,
+			subagents: { agentId: string; content: string }[],
+		) => {
+			await getAdapter("claude_code").ingest(
+				clickhouse,
+				{
+					content,
+					projectPath: "/test/reconcile",
+					sessionId,
+					source: "claude_code",
+					subagents,
+				},
+				{
+					ingestedAt: new Date(Date.now() - 3_600_000),
+					organizationId,
+					revision: "900",
+					timestamps: { lastInteractionDate: at(2), sessionDate: SESSION_DATE },
+					userId,
+				},
+			);
+		};
+		const options = (organizationId: string) => ({
+			assertWritable: (target: { organizationId: string; userId: string }) =>
+				assertNoClickHousePurgeTombstone(target, { database: sqlClient }),
+			deadline: { deadlineAt: Date.now() + 60_000, now: Date.now },
+			organizationId,
+		});
+
+		// A small main transcript whose subagents exceed the cap, missing its
+		// records; and one missing only git observations. Both are backfill-only.
+		const heavy = [{ agentId: "worker", content: subagentContent }];
+		const unindexedHeavy = `reconcile_heavy_unindexed_${RUN_ID}`;
+		const gitOnlyHeavy = `reconcile_heavy_git_only_${RUN_ID}`;
+		await ingestRaw(capOrganizationId, unindexedHeavy, heavy);
+		await ingestRaw(capOrganizationId, gitOnlyHeavy, heavy);
+		await writeSession({
+			content,
+			organizationId: capOrganizationId,
+			revision: "900",
+			sessionId: gitOnlyHeavy,
+			subagents: { worker: subagentContent },
+		});
+		const capped = {
+			...options(capOrganizationId),
+			maxSessionBytes: mainBytes * 2,
+		};
+		for (let run = 0; run < 2; run++) {
+			// Never repaired, and never re-entering the candidates on later runs.
+			expect(await reconcileDerivedTranscriptRecords(capped)).toMatchObject({
+				candidates: 0,
+				gitObservations: { failed: 0, skipped: 0, written: 0 },
+				oversized: 2,
+				transcriptRecords: { failed: 0, skipped: 0, written: 0 },
+			});
+		}
+
+		// Two git-only repairs within a budget for one: the second waits.
+		for (const suffix of ["a", "b"]) {
+			const sessionId = `reconcile_budget_${suffix}_${RUN_ID}`;
+			await ingestRaw(budgetOrganizationId, sessionId, []);
+			await writeSession({
+				content,
+				organizationId: budgetOrganizationId,
+				revision: "900",
+				sessionId,
+			});
+		}
+		expect(
+			await reconcileDerivedTranscriptRecords({
+				...options(budgetOrganizationId),
+				maxRunBytes: Math.floor(mainBytes * 1.5),
+			}),
+		).toMatchObject({
+			candidates: 2,
+			gitObservations: { failed: 0, skipped: 0, written: 1 },
+			hasMore: true,
+			oversized: 0,
+		});
+	});
+});
+
 describe("transcript records through the real API", () => {
 	test("ingest writes records, duplicate uploads repair nothing twice, and the kill switch disables extraction", async () => {
 		enabledServer = await startApiTestServer({
@@ -1821,6 +2176,39 @@ describe("transcript records through the real API", () => {
 		expect(second.status).toBe(200);
 		const [again] = await readSessionFacts(enabledScope, [input.sessionId]);
 		expect(again?.records).toBe(firstRecords ?? -1);
+
+		// Git observations missed after the records were published (no admission
+		// slot, a failure): the next duplicate upload repairs them alone.
+		const gitReceipts = async () =>
+			(
+				await clickhouse.query<{ receipts: string }>({
+					query: `SELECT toString(count()) AS receipts FROM rudel.session_git_observations
+						WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} AND kind = 'receipt'`,
+					query_params: {
+						organizationId: enabledUser.userId,
+						sessionId: input.sessionId,
+					},
+				})
+			)[0]?.receipts;
+		expect(await gitReceipts()).toBe("1");
+		await clickhouse.execute({
+			query:
+				"DELETE FROM rudel.session_git_observations WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} SETTINGS lightweight_deletes_sync = 3",
+			query_params: {
+				organizationId: enabledUser.userId,
+				sessionId: input.sessionId,
+			},
+		});
+		expect(await gitReceipts()).toBe("0");
+		const third = await ingest(
+			enabledServer.baseUrl,
+			enabledUser.bearerToken,
+			input,
+		);
+		expect(third.status).toBe(200);
+		expect(await gitReceipts()).toBe("1");
+		const [unchanged] = await readSessionFacts(enabledScope, [input.sessionId]);
+		expect(unchanged?.records).toBe(firstRecords ?? -1);
 
 		const disabled = await ingest(
 			disabledServer.baseUrl,

@@ -10,7 +10,12 @@ describe("stripInjectedWrappers", () => {
 			stripInjectedWrappers(
 				"<system_instruction>\nrules\n</system_instruction>\n\nfix it\n<system-reminder>x</system-reminder>",
 			),
-		).toEqual({ firstSubtype: "system_instruction", remainder: "fix it" });
+		).toEqual({
+			firstSubtype: "system_instruction",
+			injected:
+				"<system_instruction>\nrules\n</system_instruction>\n<system-reminder>x</system-reminder>",
+			remainder: "fix it",
+		});
 	});
 
 	test("matches wrappers in text that contains non-Latin-1 characters", () => {
@@ -20,6 +25,7 @@ describe("stripInjectedWrappers", () => {
 			),
 		).toEqual({
 			firstSubtype: "system_instruction",
+			injected: "<system_instruction>curly ’ quote 日本語</system_instruction>",
 			remainder: "übung macht den Meister",
 		});
 	});
@@ -29,11 +35,17 @@ describe("stripInjectedWrappers", () => {
 			stripInjectedWrappers(
 				"# AGENTS.md instructions for /repo\n<INSTRUCTIONS>\nbe nice\n</INSTRUCTIONS>\nreal task",
 			),
-		).toEqual({ firstSubtype: "agents_md", remainder: "real task" });
+		).toEqual({
+			firstSubtype: "agents_md",
+			injected:
+				"# AGENTS.md instructions for /repo\n<INSTRUCTIONS>\nbe nice\n</INSTRUCTIONS>",
+			remainder: "real task",
+		});
 		expect(
 			stripInjectedWrappers("use <instructions>step one</instructions> please"),
 		).toEqual({
 			firstSubtype: "",
+			injected: "",
 			remainder: "use <instructions>step one</instructions> please",
 		});
 	});
@@ -92,6 +104,23 @@ describe("classifyUserText", () => {
 		expect(classifyUserText("  please rename the file  ", {})).toEqual({
 			kind: "prompt",
 			text: "please rename the file",
+			injected: "",
+			injectedSubtype: "",
+		});
+	});
+
+	test("instructions around a prompt are returned so they stay readable", () => {
+		expect(
+			classifyUserText(
+				"<system_instruction>\nYou are working inside Conductor.\n</system_instruction>\n\nfix the login bug",
+				{},
+			),
+		).toEqual({
+			kind: "prompt",
+			text: "fix the login bug",
+			injected:
+				"<system_instruction>\nYou are working inside Conductor.\n</system_instruction>",
+			injectedSubtype: "system_instruction",
 		});
 	});
 });

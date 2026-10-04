@@ -1,11 +1,14 @@
 import {
 	countCodePoints,
+	decodeTranscriptLine,
 	decodeTranscriptRecordsReceipt,
+	TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES,
 	type TranscriptRecordsReceipt,
 	type TranscriptSource,
 } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
+import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import {
 	buildCommittedGenerationsStatement,
 	buildMapCommandsStatement,
@@ -164,8 +167,11 @@ export interface TurnAction {
 	readonly fileOp: string;
 	readonly filePath: string;
 	readonly recordIdx: number;
-	/** `no_result` when the transcript never recorded an output for the call. */
-	readonly status: "error" | "no_result" | "ok";
+	/**
+	 * `no_result` when the transcript never recorded an output for the call;
+	 * `running` when its latest output says the process was still running.
+	 */
+	readonly status: "error" | "no_result" | "ok" | "running";
 	/** File path for file tools, otherwise the first line of the command or input. */
 	readonly target: string;
 	readonly tool: string;
@@ -264,7 +270,12 @@ export interface RecordSlice {
 	readonly text: string;
 	/** Characters in the full decoded text before the storage cap. */
 	readonly textChars: number;
-	/** True when storage kept fewer characters than `textChars`. */
+	/**
+	 * True when the slice came from the raw transcript line because storage
+	 * kept fewer characters than the range asked for.
+	 */
+	readonly textFromRaw: boolean;
+	/** True when the slice still lacks characters the record has (storage capped, raw unavailable). */
 	readonly textTruncatedInStorage: boolean;
 	readonly to: number;
 	readonly tool: string;
@@ -672,6 +683,7 @@ async function runRecordRead(
 		subtype: "",
 		text: "",
 		textChars: 0,
+		textFromRaw: false,
 		textTruncatedInStorage: false,
 		to: fromChar + charCount,
 		tool: "",
@@ -707,6 +719,17 @@ async function runRecordRead(
 			),
 		),
 	);
+	const storedChars = slice?.stored_chars ?? 0;
+	// Storage kept less than the range asks for: read the record's exact raw
+	// line from the generation's own raw revision and decode it again.
+	const needsRaw =
+		storedChars < requested.text_chars && fromChar + charCount > storedChars;
+	const raw = needsRaw
+		? await readRecordTextFromRaw(executor, scope, sessionId, generation, {
+				agentId,
+				block: requested,
+			})
+		: undefined;
 	return {
 		...described,
 		blockIdx: requested.block_idx,
@@ -718,12 +741,70 @@ async function runRecordRead(
 		isError: requested.is_error,
 		kind: requested.kind,
 		subtype: requested.subtype,
-		text: slice?.slice ?? "",
+		text:
+			raw === undefined
+				? (slice?.slice ?? "")
+				: sliceCodePoints(raw, fromChar, charCount),
 		textChars: requested.text_chars,
-		textTruncatedInStorage: (slice?.stored_chars ?? 0) < requested.text_chars,
+		textFromRaw: raw !== undefined,
+		textTruncatedInStorage:
+			raw === undefined && storedChars < requested.text_chars,
 		tool: requested.tool_name,
 		turnIdx: requested.turn_idx,
 	};
+}
+
+/**
+ * The full decoded text of one block, re-derived from its raw line. Used only
+ * when the line is within the parse limit and the re-derived block has the
+ * stored block's kind and exact character count; otherwise undefined and the
+ * stored (capped) text stands.
+ */
+async function readRecordTextFromRaw(
+	executor: ClickHouseExecutor,
+	scope: TranscriptReadScope,
+	sessionId: string,
+	generation: SessionGeneration,
+	input: { readonly agentId: string; readonly block: RecordBlockRow },
+): Promise<string | undefined> {
+	const { block } = input;
+	if (
+		block.byte_len <= 0 ||
+		block.byte_len > TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES
+	)
+		return undefined;
+	const line = await readRawTranscriptLine(executor, {
+		...scope,
+		sessionId,
+		source: block.source,
+		revision: generation.revision,
+		agentId: input.agentId,
+		byteStart: block.byte_start,
+		byteLen: block.byte_len,
+	});
+	if (line === undefined) return undefined;
+	const decoded = decodeTranscriptLine({
+		agentId: input.agentId,
+		line,
+		source: block.source,
+	}).find((draft) => draft.blockIdx === block.block_idx);
+	return decoded !== undefined &&
+		decoded.kind === block.kind &&
+		decoded.textChars === block.text_chars
+		? decoded.text
+		: undefined;
+}
+
+/** `count` code points of `text` starting at code point `from` (ClickHouse `substringUTF8`). */
+function sliceCodePoints(text: string, from: number, count: number): string {
+	let result = "";
+	let index = 0;
+	for (const character of text) {
+		if (index >= from + count) break;
+		if (index >= from) result += character;
+		index++;
+	}
+	return result;
 }
 
 async function readCompactTurn(
@@ -1200,7 +1281,13 @@ function toAction(row: TurnActionRow): TurnAction {
 		fileOp: row.file_op,
 		filePath: row.file_path,
 		recordIdx: row.record_idx,
-		status: !hasResult ? "no_result" : row.result_is_error ? "error" : "ok",
+		status: !hasResult
+			? "no_result"
+			: row.result_is_error
+				? "error"
+				: row.result_running
+					? "running"
+					: "ok",
 		target: row.file_path !== "" ? row.file_path : firstLine(row.target),
 		tool: row.tool_name,
 	};
@@ -1416,6 +1503,7 @@ const turnActionRow = z.object({
 	record_idx: count,
 	result_exit_code: nullableCount.optional(),
 	result_is_error: nullableFlag.optional(),
+	result_running: nullableFlag.optional(),
 	target: z.string(),
 	tool_name: z.string(),
 	ts_ms: count,
@@ -1479,6 +1567,7 @@ const recordBlockRow = z.object({
 	file_path: z.string(),
 	is_error: flag,
 	kind: z.string(),
+	source: z.enum(["claude_code", "codex"]),
 	subtype: z.string(),
 	text_chars: count,
 	tool_name: z.string(),

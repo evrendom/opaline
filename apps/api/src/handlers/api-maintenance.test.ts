@@ -30,6 +30,15 @@ describe("daily API maintenance", () => {
 		);
 	});
 
+	test("repairs unfinished derived transcript data under its own budget", () => {
+		expect(maintenanceSource).toContain(
+			"DERIVED_RECORDS_RECONCILIATION_BUDGET_MS = 60_000",
+		);
+		expect(maintenanceSource).toContain('runMaintenanceStep("derived-records"');
+		expect(maintenanceSource).toContain("assertNoClickHousePurgeTombstone");
+		expect(maintenanceSource).toContain('derivedRecords.status === "ok"');
+	});
+
 	test("prunes coordination leases abandoned by crashed holders", () => {
 		expect(maintenanceSource).toContain(
 			"() => pruneExpiredPostgresLeases(sqlClient)",

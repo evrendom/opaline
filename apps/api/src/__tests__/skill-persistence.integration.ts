@@ -25,6 +25,7 @@ import {
 import { sqlClient } from "../db.js";
 import {
 	extractSessionSkills,
+	hashSkillSourceContent,
 	SKILL_PARSER_VERSION,
 } from "../services/skill-extraction.js";
 import {
@@ -883,6 +884,55 @@ describe("persistent skill extraction through the real API", () => {
 		} finally {
 			await deleteSkillTestOrganization(organizationId, true);
 		}
+	});
+});
+
+describe("skills used inside Claude subagent transcripts", () => {
+	test("a skill a subagent loaded is extracted, and its receipt covers every stream", async () => {
+		const sessionId = `skill_subagent_${RUN_ID}`;
+		const input: IngestSessionInput = {
+			content: JSON.stringify({
+				message: { role: "user", content: "delegate the review" },
+				timestamp: "2026-08-20T09:59:00.000Z",
+				type: "user",
+			}),
+			projectPath: "/tmp/skill-persistence-subagent",
+			sessionId,
+			source: "claude_code",
+			subagents: [
+				{
+					agentId: "agent-review",
+					content: claudeTranscript("subagent-only-skill", "# Child body\n"),
+				},
+			],
+			upload_mode: "manual",
+		};
+		expect((await callRpc("ingestSession", input)).status).toBe(200);
+		const detail = HistoricalSkillDetailSchema.parse(
+			readJsonEnvelope(
+				(
+					await callRpc("analytics/skills/detail", {
+						name: "subagent-only-skill",
+					})
+				).body,
+			),
+		);
+		expect(detail).toMatchObject({ claudeSessionCount: 1, sessionCount: 1 });
+		expect(detail.versions[0]?.content).toBe("# Child body\n");
+
+		// The receipt hashes every stream, so a duplicate upload or a replay of
+		// this content is already complete.
+		const [receipt] = await getClickhouse().query<{ sha: string }>({
+			query: `SELECT argMax(source_content_sha256, extraction_seq) AS sha FROM rudel.skill_receipts
+				WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
+			query_params: { organizationId: userId, sessionId },
+		});
+		expect(receipt?.sha).toBe(
+			hashSkillSourceContent(input.content, {
+				"agent-review": input.subagents?.[0]?.content ?? "",
+			}),
+		);
+		expect(receipt?.sha).not.toBe(hashSkillSourceContent(input.content));
 	});
 });
 

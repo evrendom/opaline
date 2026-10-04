@@ -14,7 +14,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 	const header = output.header;
 	const lines = [
 		`${output.source} ${header.from}..${header.to} sessions=${header.sessionsInScope} indexed=${header.indexedSessions} runs=${header.runsInScope}`,
-		`minutes=${header.minutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} classifier=${header.classifierVersion} truncated=${header.truncated}`,
+		`minutes=${header.minutes} activeMinutes=${header.activeMinutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} classifier=${header.classifierVersion} truncated=${header.truncated}`,
 		...header.notes.map((note) => `note: ${cell(note)}`),
 		...(header.cursor
 			? [
@@ -31,8 +31,10 @@ export function renderFind(output: AnalysisFindOutput): string {
 						"ref",
 						"startedAt",
 						"minutes",
+						"activeMinutes",
 						"costUsd",
 						"model",
+						"models",
 						"repository",
 						"agent",
 						"edits",
@@ -43,14 +45,18 @@ export function renderFind(output: AnalysisFindOutput): string {
 						"notFound",
 						"nextReaction",
 						"rawChars",
+						"parentSessionId",
+						"depth",
 						"promptHead",
 					],
 					output.rows.map((row) => [
 						refText(row.ref),
 						row.startedAt,
 						row.minutes,
+						row.activeMinutes,
 						row.costUsd,
 						row.model,
+						row.models.join(","),
 						row.repository,
 						row.agent,
 						row.edits,
@@ -61,6 +67,8 @@ export function renderFind(output: AnalysisFindOutput): string {
 						row.notFound,
 						row.nextReaction,
 						row.rawChars,
+						row.parentSessionId,
+						row.depth,
 						row.promptHead,
 					]),
 				),
@@ -68,12 +76,13 @@ export function renderFind(output: AnalysisFindOutput): string {
 		} else
 			lines.push(
 				table(
-					["key", "runs", "sessions", "minutes", "costUsd"],
+					["key", "runs", "sessions", "minutes", "activeMinutes", "costUsd"],
 					output.groups.map((group) => [
 						group.key,
 						group.runs,
 						group.sessions,
 						group.minutes,
+						group.activeMinutes,
 						group.costUsd,
 					]),
 				),
@@ -110,7 +119,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 					group.examples
 						.map(
 							(example) =>
-								`${refText(example.ref)}@${example.record} ${example.errorLine}`,
+								`${refText(example.ref)}@${example.record}${example.parentSessionId ? ` (subagent thread of ${example.parentSessionId})` : ""} ${example.errorLine}`,
 						)
 						.join("; "),
 				]),
@@ -127,6 +136,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 					"originMinutes",
 					"originCostUsd",
 					"partial",
+					"parentSessionId",
 					"quote",
 				],
 				output.events.map((event) => [
@@ -137,6 +147,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 					event.originMinutes,
 					event.originCostUsd,
 					event.partial,
+					event.parentSessionId,
 					event.quote,
 				]),
 			),
@@ -220,6 +231,10 @@ export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 	lines.push(
 		`final answer: ${output.finalAnswer === null ? "(none yet)" : cell(output.finalAnswer)}`,
 	);
+	for (const chat of output.chatSessions)
+		lines.push(
+			`chat session ${chat.sessionId} source=${chat.source} user=${chat.userId} uploaded=${chat.uploadedAt}`,
+		);
 	return lines.join("\n");
 }
 

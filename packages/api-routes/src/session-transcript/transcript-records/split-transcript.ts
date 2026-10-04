@@ -17,7 +17,9 @@ import {
 import {
 	type SplitTranscriptOptions,
 	TRANSCRIPT_RECORD_EXCERPT_CHARS,
+	TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES,
+	TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
 	type TranscriptRecordDraft,
@@ -27,7 +29,7 @@ import {
 	type TranscriptTextBudget,
 } from "./types.js";
 
-/** Kinds whose full decoded text is stored (capped). Others keep a head only. */
+/** Kinds whose full decoded text is stored up to the record cap. */
 const BODY_KINDS: ReadonlySet<TranscriptRecordKind> = new Set([
 	"user_prompt",
 	"assistant_text",
@@ -35,6 +37,7 @@ const BODY_KINDS: ReadonlySet<TranscriptRecordKind> = new Set([
 	"tool_call",
 	"tool_result",
 	"file_change",
+	"compaction",
 ]);
 
 /** Kinds that mean the agent has responded since the latest prompt. */
@@ -86,9 +89,14 @@ export function* splitSessionTranscript(
 	input: SessionTranscriptInput,
 	stats: MutableSplitStats = createSplitStats(),
 ): Generator<TranscriptRecordDraft> {
+	const totalChars =
+		input.textBudgetChars ?? TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS;
+	let totalBytes = Buffer.byteLength(input.content, "utf8");
+	for (const content of Object.values(input.subagents ?? {}))
+		totalBytes += Buffer.byteLength(content, "utf8");
 	const textBudget: TranscriptTextBudget = {
-		remaining:
-			input.textBudgetChars ?? TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
+		remaining: totalChars,
+		pace: { bytesBefore: 0, totalBytes, totalChars },
 	};
 	const shared = {
 		fallbackTs: input.sessionDate,
@@ -198,12 +206,19 @@ export function* splitTranscript(
 		let blockIdx = 0;
 		for (const item of result.items) {
 			applyTurnState(state, item);
-			const fields = BODY_KINDS.has(item.kind)
-				? buildTranscriptTextFields(item.text ?? "", {
-						budget: options.textBudget,
-						textMaxChars,
-					})
-				: headOnlyFields(item.text ?? "");
+			const cap = options.fullText
+				? Number.MAX_SAFE_INTEGER
+				: storedTextCap(item.kind, textMaxChars);
+			const budget = options.fullText ? undefined : options.textBudget;
+			const fields =
+				cap === undefined
+					? headOnlyFields(item.text ?? "")
+					: buildTranscriptTextFields(item.text ?? "", {
+							allowance: pacedAllowance(budget, byteOffset),
+							budget,
+							keepTail: item.kind === "tool_result" || item.isError === true,
+							textMaxChars: cap,
+						});
 			if (fields.truncated) stats.textTruncated = true;
 			stats.rowCount++;
 			yield buildDraft({
@@ -220,6 +235,65 @@ export function* splitTranscript(
 		if (isLast) break;
 	}
 	stats.streamCount += streams.size;
+	const pace = options.textBudget?.pace;
+	if (pace !== undefined)
+		pace.bytesBefore += Buffer.byteLength(content, "utf8");
+}
+
+/**
+ * Characters a record may still spend: the budget's share of the session's
+ * raw bytes up to the end of its line, minus what was already spent.
+ */
+function pacedAllowance(
+	budget: TranscriptTextBudget | undefined,
+	lineEndOffset: number,
+): number | undefined {
+	const pace = budget?.pace;
+	if (budget === undefined || pace === undefined || pace.totalBytes === 0)
+		return undefined;
+	const share = Math.min(
+		1,
+		(pace.bytesBefore + lineEndOffset) / pace.totalBytes,
+	);
+	const spent = pace.totalChars - budget.remaining;
+	return Math.floor(pace.totalChars * share) - spent;
+}
+
+/**
+ * Full decoded records of one raw JSONL line, exactly as the splitter derives
+ * them but with no cap or budget: the record read re-derives a line whose
+ * stored text was capped from its exact raw byte range. Records whose meaning
+ * depends on earlier lines (mirrors, delegation) may differ from the stored
+ * ones; callers match a block by kind and character count before using it.
+ */
+export function decodeTranscriptLine(input: {
+	readonly agentId: string;
+	readonly line: string;
+	readonly source: TranscriptSource;
+}): TranscriptRecordDraft[] {
+	return [
+		...splitTranscript({
+			agentId: input.agentId,
+			content: input.line,
+			fallbackTs: new Date(0).toISOString(),
+			fullText: true,
+			maxParseLineBytes: Number.MAX_SAFE_INTEGER,
+			source: input.source,
+		}),
+	];
+}
+
+/** Stored text cap of a kind; undefined keeps an excerpt only. */
+function storedTextCap(
+	kind: TranscriptRecordKind,
+	textMaxChars: number,
+): number | undefined {
+	if (BODY_KINDS.has(kind)) return textMaxChars;
+	if (kind === "injected_context")
+		return Math.min(textMaxChars, TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS);
+	if (kind === "meta")
+		return Math.min(textMaxChars, TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS);
+	return undefined;
 }
 
 function applyTurnState(state: StreamState, item: LineItem): void {

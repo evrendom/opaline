@@ -7,10 +7,15 @@ import {
 	test,
 } from "bun:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
 	type IngestSessionInput,
 	SESSION_UPLOAD_SHRINK_REJECTED_CODE,
 } from "@rudel/api-routes";
+import {
+	SESSION_INGEST_FILTER_VERSION,
+	slimTranscriptText,
+} from "@rudel/api-routes/transcript-slim";
 import {
 	extractUsageEvents,
 	USAGE_EVENT_EXTRACTION_VERSION,
@@ -64,6 +69,14 @@ const FRESH_REVISION_RECEIPT_SESSION_ID = `${TEST_RUN_ID}_fresh_revision_receipt
 const INVERTED_USAGE_REVISION_SESSION_ID = `${TEST_RUN_ID}_inverted_usage_revision`;
 const KEYED_RETRY_SESSION_ID = `${TEST_RUN_ID}_keyed_retry`;
 const LEGACY_RETRY_SESSION_ID = `${TEST_RUN_ID}_legacy_retry`;
+const PIXEL_REUPLOAD_SESSION_ID = `${TEST_RUN_ID}_pixel_reupload`;
+const CODEX_SLIM_SESSION_ID = `${TEST_RUN_ID}_codex_slim`;
+const CODEX_SAME_VERSION_SESSION_ID = `${TEST_RUN_ID}_codex_same_version`;
+const REBASELINE_RECORDS_SESSION_ID = `${TEST_RUN_ID}_rebaseline_records`;
+const PREVIOUS_SESSION_FILTER_VERSION = SESSION_INGEST_FILTER_VERSION - 1;
+const SCREENSHOT_PIXELS = Buffer.from(
+	Array.from({ length: 150_000 }, (_, index) => (index * 31 + 7) % 256),
+);
 
 let server: ApiTestServer;
 let userId: string;
@@ -727,6 +740,162 @@ describe("session ingest content bookkeeping", () => {
 		);
 	});
 
+	test("stores screenshots as markers and re-baselines a session stored with pixels once", async () => {
+		const pixelInput = makeClaudeScreenshotInput(PIXEL_REUPLOAD_SESSION_ID);
+		await seedStoredContentShape(pixelInput, PREVIOUS_SESSION_FILTER_VERSION);
+
+		const firstResponse = await callIngest(pixelInput);
+		expect(firstResponse.status).toBe(200);
+		const stored = await readLatestRawSession(PIXEL_REUPLOAD_SESSION_ID);
+		assert(stored);
+		const marker = `opaline-image-omitted:v1;sha256=${createHash("sha256").update(SCREENSHOT_PIXELS).digest("hex")};bytes=${SCREENSHOT_PIXELS.byteLength};type=image/png`;
+		expect(stored.content).toBe(slimTranscriptText(pixelInput.content));
+		expect(stored.content).toContain(`"data":"${marker}"`);
+		expect(stored.content).toContain(`"base64":"${marker}"`);
+		expect(stored.content).not.toContain(
+			SCREENSHOT_PIXELS.toString("base64").slice(0, 64),
+		);
+		const firstHash = await readLastContentHash(PIXEL_REUPLOAD_SESSION_ID);
+
+		// Old clients resend pixels and new clients send markers; both are the
+		// same stored transcript, not a new revision.
+		expect((await callIngest(pixelInput)).status).toBe(200);
+		expect(
+			(
+				await callIngest({
+					...pixelInput,
+					content: slimTranscriptText(pixelInput.content),
+				})
+			).status,
+		).toBe(200);
+		expect(await readLastContentHash(PIXEL_REUPLOAD_SESSION_ID)).toBe(
+			firstHash,
+		);
+		expect(
+			(await readLatestRawSession(PIXEL_REUPLOAD_SESSION_ID))?.revision,
+		).toBe(stored.revision);
+
+		const truncatedLines = stored.content.split("\n").slice(0, -2);
+		const truncatedResponse = await callIngest({
+			...pixelInput,
+			content: truncatedLines.join("\n"),
+		});
+		expect(truncatedResponse.status).toBe(409);
+		expect(readRpcErrorCode(truncatedResponse.body)).toBe(
+			SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+		);
+	});
+
+	test("the filter-version re-baseline skips only byte sizes: lost assistant records and subagent streams are still refused", async () => {
+		const base = makeClaudeInput(REBASELINE_RECORDS_SESSION_ID, 3);
+		const extraAssistantRecords = Array.from({ length: 11 }, (_, index) =>
+			JSON.stringify({
+				message: {
+					content: `Assistant record ${index}`,
+					role: "assistant",
+					usage: { input_tokens: 2, output_tokens: 1 },
+				},
+				timestamp: `2026-07-24T09:31:${String(index).padStart(2, "0")}.000Z`,
+				type: "assistant",
+			}),
+		);
+		const full: IngestSessionInput = {
+			...base,
+			content: [base.content, ...extraAssistantRecords].join("\n"),
+		};
+		expect(getIngestContentShape(full).main.assistantLineCount).toBe(12);
+		await seedStoredContentShape(full, PREVIOUS_SESSION_FILTER_VERSION);
+
+		// A released CLI uploading a truncated local transcript: 12 -> 2 records.
+		const truncated = {
+			...full,
+			content: full.content.split("\n").slice(0, 3).join("\n"),
+		};
+		expect(getIngestContentShape(truncated).main.assistantLineCount).toBe(2);
+		const truncatedResponse = await callIngest(truncated);
+		expect(truncatedResponse.status).toBe(409);
+		expect(readRpcErrorCode(truncatedResponse.body)).toBe(
+			SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+		);
+
+		// A previously uploaded subagent stream is missing.
+		const withoutSubagent = await callIngest({ ...full, subagents: [] });
+		expect(withoutSubagent.status).toBe(409);
+		expect(readRpcErrorCode(withoutSubagent.body)).toBe(
+			SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+		);
+		expect(await readLastFilterVersion(REBASELINE_RECORDS_SESSION_ID)).toBe(
+			PREVIOUS_SESSION_FILTER_VERSION,
+		);
+
+		// The complete transcript re-baselines and stores the current version.
+		expect((await callIngest(full)).status).toBe(200);
+		expect(await readLastFilterVersion(REBASELINE_RECORDS_SESSION_ID)).toBe(
+			SESSION_INGEST_FILTER_VERSION,
+		);
+	});
+
+	test("accepts a slimmed re-upload of a full Codex session stored by the previous filter version once", async () => {
+		const fullInput = makeCodexSlimmableInput(CODEX_SLIM_SESSION_ID);
+		const slimmedContent = slimTranscriptText(fullInput.content);
+		expect(slimmedContent.length).toBeLessThan(fullInput.content.length * 0.6);
+		await seedStoredContentShape(fullInput, PREVIOUS_SESSION_FILTER_VERSION);
+
+		// A slimming CLI uploads the slimmed transcript.
+		expect(
+			(await callIngest({ ...fullInput, content: slimmedContent })).status,
+		).toBe(200);
+		const stored = await readLatestRawSession(
+			CODEX_SLIM_SESSION_ID,
+			"rudel.codex_sessions",
+		);
+		assert(stored);
+		expect(stored.content).toBe(slimmedContent);
+		expect(await readLastFilterVersion(CODEX_SLIM_SESSION_ID)).toBe(
+			SESSION_INGEST_FILTER_VERSION,
+		);
+		const firstHash = await readLastContentHash(CODEX_SLIM_SESSION_ID);
+
+		// A released CLI resends the full transcript: the server slims it to
+		// the same bytes, hash and revision.
+		expect((await callIngest(fullInput)).status).toBe(200);
+		expect(await readLastContentHash(CODEX_SLIM_SESSION_ID)).toBe(firstHash);
+		expect(
+			(
+				await readLatestRawSession(
+					CODEX_SLIM_SESSION_ID,
+					"rudel.codex_sessions",
+				)
+			)?.revision,
+		).toBe(stored.revision);
+
+		// The re-baseline happened once: truncation is refused again.
+		const truncated = slimmedContent.split("\n").slice(0, -4).join("\n");
+		const truncatedResponse = await callIngest({
+			...fullInput,
+			content: truncated,
+		});
+		expect(truncatedResponse.status).toBe(409);
+		expect(readRpcErrorCode(truncatedResponse.body)).toBe(
+			SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+		);
+	});
+
+	test("still refuses the slimmed size against a full shape stored at the current filter version", async () => {
+		const fullInput = makeCodexSlimmableInput(CODEX_SAME_VERSION_SESSION_ID);
+		await seedStoredContentShape(fullInput, SESSION_INGEST_FILTER_VERSION);
+
+		const response = await callIngest({
+			...fullInput,
+			content: slimTranscriptText(fullInput.content),
+		});
+
+		expect(response.status).toBe(409);
+		expect(readRpcErrorCode(response.body)).toBe(
+			SESSION_UPLOAD_SHRINK_REJECTED_CODE,
+		);
+	});
+
 	test("force replacement retires request facts absent from the accepted generation", async () => {
 		const completeInput = makeClaudeInput(FORCE_REPLACE_SESSION_ID, 1);
 		expect((await callIngest(completeInput)).status).toBe(200);
@@ -941,6 +1110,53 @@ async function seedLegacyContentShape(
 	`;
 }
 
+/** The ownership row as a server storing `input` unslimmed left it. */
+async function seedStoredContentShape(
+	input: IngestSessionInput,
+	filterVersion: number,
+): Promise<void> {
+	const ownership = await claimSessionIngestOwnership(
+		userId,
+		input.sessionId,
+		userId,
+	);
+	assert(ownership.owned);
+	const shape = getIngestContentShape(input);
+
+	await sqlClient`
+		UPDATE session_ownership
+		SET
+			last_content_bytes = ${shape.contentBytes},
+			last_assistant_line_count = ${shape.assistantLineCount},
+			last_content_shape_json = ${JSON.stringify(shape)},
+			last_filter_version = ${filterVersion}
+		WHERE organization_id = ${userId}
+			AND session_id = ${input.sessionId}
+	`;
+}
+
+async function readLastFilterVersion(
+	sessionId: string,
+): Promise<number | null> {
+	const [row] = await sqlClient<Array<{ version: number | null }>>`
+		SELECT last_filter_version AS version
+		FROM session_ownership
+		WHERE organization_id = ${userId}
+			AND session_id = ${sessionId}
+	`;
+	return row?.version ?? null;
+}
+
+async function readLastContentHash(sessionId: string): Promise<string | null> {
+	const [row] = await sqlClient<Array<{ hash: string | null }>>`
+		SELECT last_content_sha256 AS hash
+		FROM session_ownership
+		WHERE organization_id = ${userId}
+			AND session_id = ${sessionId}
+	`;
+	return row?.hash ?? null;
+}
+
 async function callIngest(input: IngestSessionInput, baseUrl = server.baseUrl) {
 	const response = await fetch(`${baseUrl}/rpc/ingestSession`, {
 		method: "POST",
@@ -1019,6 +1235,9 @@ async function rawClaudeSessionExists(sessionId: string): Promise<boolean> {
 
 async function readLatestRawSession(
 	sessionId: string,
+	table:
+		| "rudel.claude_sessions"
+		| "rudel.codex_sessions" = "rudel.claude_sessions",
 ): Promise<{ content: string; revision: string } | undefined> {
 	const [row] = await getClickhouse().query<{
 		content: string;
@@ -1028,7 +1247,7 @@ async function readLatestRawSession(
 			SELECT
 				argMax(content, raw.revision) AS content,
 				toString(max(raw.revision)) AS revision
-			FROM rudel.claude_sessions AS raw
+			FROM ${table} AS raw
 			WHERE organization_id = {organizationId:String}
 				AND user_id = {userId:String}
 				AND session_id = {sessionId:String}
@@ -1127,6 +1346,150 @@ function makeClaudeInput(
 							).join("\n"),
 						},
 					],
+		upload_mode: "manual",
+	};
+}
+
+/**
+ * A screenshot tool result as Claude Code writes it: the pixels appear in the
+ * tool-result image source and again in `toolUseResult.file.base64`.
+ */
+function makeClaudeScreenshotInput(sessionId: string): IngestSessionInput {
+	const base = makeClaudeInput(sessionId, 0);
+	const pixels = SCREENSHOT_PIXELS.toString("base64");
+	const assistantLine = (index: number) =>
+		JSON.stringify({
+			message: {
+				content: `Assistant content after screenshot ${index}: ${"detail ".repeat(400)}`,
+				role: "assistant",
+				usage: { input_tokens: 2, output_tokens: 1 },
+			},
+			timestamp: `2026-07-24T09:31:${String(index).padStart(2, "0")}.000Z`,
+			type: "assistant",
+		});
+	return {
+		...base,
+		content: [
+			base.content,
+			JSON.stringify({
+				message: {
+					content: [
+						{
+							content: [
+								{
+									source: {
+										data: pixels,
+										media_type: "image/png",
+										type: "base64",
+									},
+									type: "image",
+								},
+							],
+							tool_use_id: "toolu_screenshot",
+							type: "tool_result",
+						},
+					],
+					role: "user",
+				},
+				timestamp: "2026-07-24T09:30:30.000Z",
+				toolUseResult: {
+					file: { base64: pixels, type: "image/png" },
+					type: "image",
+				},
+				type: "user",
+			}),
+			...Array.from({ length: 4 }, (_, index) => assistantLine(index + 1)),
+		].join("\n"),
+	};
+}
+
+/**
+ * A Codex session as released CLIs upload it: every command output three
+ * times, a browser screenshot and a compaction that replays earlier items.
+ */
+function makeCodexSlimmableInput(sessionId: string): IngestSessionInput {
+	const output = (index: number) =>
+		Array.from(
+			{ length: 400 },
+			(_, line) => `build ${index} step ${line}: compiled module`,
+		).join("\n");
+	const assistant = (index: number) => ({
+		payload: {
+			content: [{ text: `Assistant step ${index}`, type: "output_text" }],
+			role: "assistant",
+			type: "message",
+		},
+		timestamp: `2026-07-24T10:00:${String(index * 2 + 2).padStart(2, "0")}.000Z`,
+		type: "response_item",
+	});
+	const prompt = {
+		content: [{ text: "Run the build", type: "input_text" }],
+		role: "user",
+		type: "message",
+	};
+	const lines: unknown[] = [
+		{
+			payload: { cwd: "/repo", id: sessionId },
+			timestamp: "2026-07-24T10:00:00.000Z",
+			type: "session_meta",
+		},
+		{
+			payload: prompt,
+			timestamp: "2026-07-24T10:00:01.000Z",
+			type: "response_item",
+		},
+	];
+	for (let index = 0; index < 6; index += 1) {
+		lines.push(assistant(index), {
+			payload: {
+				item: {
+					aggregated_output: output(index),
+					command: ["/bin/zsh", "-lc", "bun run build"],
+					exit_code: 0,
+					formatted_output: output(index),
+					id: `exec-${index}`,
+					stdout: output(index),
+					type: "CommandExecution",
+				},
+				type: "item_completed",
+			},
+			timestamp: `2026-07-24T10:00:${String(index * 2 + 3).padStart(2, "0")}.000Z`,
+			type: "event_msg",
+		});
+	}
+	lines.push(
+		{
+			payload: {
+				item: {
+					id: "browser-1",
+					result: {
+						_meta: {
+							"codex/toolSurface": {
+								screenshot: {
+									url: `data:image/png;base64,${SCREENSHOT_PIXELS.toString("base64")}`,
+								},
+							},
+						},
+					},
+					type: "McpToolCall",
+				},
+				type: "item_completed",
+			},
+			timestamp: "2026-07-24T10:00:20.000Z",
+			type: "event_msg",
+		},
+		{
+			payload: { message: "", replacement_history: [prompt] },
+			timestamp: "2026-07-24T10:00:21.000Z",
+			type: "compacted",
+		},
+		assistant(10),
+	);
+	return {
+		content: lines.map((line) => JSON.stringify(line)).join("\n"),
+		projectPath: "/test/session-ingest-content-codex",
+		sessionId,
+		source: "codex",
 		upload_mode: "manual",
 	};
 }

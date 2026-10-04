@@ -110,6 +110,15 @@ export const queryWithOutput = query.extend({
 	owners: v.array(v.string()),
 });
 
+/** A chat uploaded for an analysis; one per analysis, source and session. */
+export const sessionLink = v.object({
+	analysisId: v.string(),
+	sessionId: v.string(),
+	source: v.union(v.literal("claude_code"), v.literal("codex")),
+	ownerId: v.string(),
+	uploadedAt: v.string(),
+});
+
 export const embedding = v.object({
 	analysisId: v.string(),
 	stepId: nullableString,

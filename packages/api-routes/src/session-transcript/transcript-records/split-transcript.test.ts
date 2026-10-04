@@ -2,12 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
 import {
 	createSplitStats,
+	decodeTranscriptLine,
 	splitSessionTranscript,
 	splitTranscript,
 } from "./split-transcript.js";
-import type { TranscriptRecordDraft } from "./types.js";
+import {
+	TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
+	type TranscriptRecordDraft,
+} from "./types.js";
 
 const SESSION_DATE = "2026-08-01T10:00:00.000Z";
+const SCREENSHOT_SHA256 =
+	"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const SCREENSHOT_MARKER = `opaline-image-omitted:v1;sha256=${SCREENSHOT_SHA256};bytes=87119;type=image/png`;
+const SCREENSHOT_LABEL = "[screenshot image/png 85.1 KB sha256:0123456789ab]";
 
 const fixtureUrl = (name: string) =>
 	new URL(`../__fixtures__/${name}`, import.meta.url);
@@ -106,6 +114,8 @@ describe("Claude Code records", () => {
 			]),
 		).toEqual([
 			[1, "system_instruction"],
+			// The instructions that came with the prompt stay readable after it.
+			[2, "system_instruction"],
 			[4, "system_reminder"],
 			[5, "slash_command"],
 			[6, "local_command"],
@@ -116,6 +126,22 @@ describe("Claude Code records", () => {
 		expect(
 			rows.filter((row) => row.subtype === "interrupt").map((row) => row.kind),
 		).toEqual(["meta"]);
+		const promptWithInstructions = rows.filter((row) => row.recordIdx === 2);
+		expect(
+			promptWithInstructions.map((row) => [row.blockIdx, row.kind, row.text]),
+		).toEqual([
+			[0, "user_prompt", "fix the login bug"],
+			[
+				1,
+				"injected_context",
+				"<system_instruction>\nYou are working inside Conductor.\n</system_instruction>",
+			],
+		]);
+		// Injected context and compaction summaries keep their text, not just a head.
+		expect(ofKind(rows, "compaction")[0]?.text).toBe("summary of earlier work");
+		expect(rows.find((row) => row.subtype === "system_reminder")?.text).toBe(
+			"<system-reminder>todo list changed</system-reminder>",
+		);
 	});
 
 	test("records before the first prompt belong to turn zero and prompts without a reply share a turn", () => {
@@ -384,6 +410,47 @@ describe("Claude Code records", () => {
 		expect(rows[1]?.ts).toBe("2026-08-01T10:00:01.000Z");
 	});
 
+	test("marked screenshots keep their type, size and hash in prompts and tool results", () => {
+		const rows = claudeRows([
+			claudeUser([
+				{
+					source: {
+						data: SCREENSHOT_MARKER,
+						media_type: "image/png",
+						type: "base64",
+					},
+					type: "image",
+				},
+			]),
+			claudeAssistant([
+				{ id: "toolu_shot", input: {}, name: "screenshot", type: "tool_use" },
+			]),
+			claudeUser([
+				{
+					content: [
+						{ text: "captured", type: "text" },
+						{
+							source: {
+								data: SCREENSHOT_MARKER,
+								media_type: "image/png",
+								type: "base64",
+							},
+							type: "image",
+						},
+						{ source: {}, type: "image" },
+					],
+					tool_use_id: "toolu_shot",
+					type: "tool_result",
+				},
+			]),
+		]);
+
+		expect(ofKind(rows, "user_prompt")[0]?.text).toBe(SCREENSHOT_LABEL);
+		expect(ofKind(rows, "tool_result")[0]?.text).toBe(
+			`captured\n${SCREENSHOT_LABEL}\n[image]`,
+		);
+	});
+
 	test("byte ranges are exact for multi-byte text and blank lines", () => {
 		const lines = [
 			jsonLine(claudeUser("héllo wörld 日本語 🚀")),
@@ -482,12 +549,22 @@ describe("huge records", () => {
 		expect(stats.oversizedLineCount).toBe(1);
 	});
 
-	test("an exhausted session budget keeps structure and a short head", () => {
+	test("an exhausted session budget keeps a short head, and tool results their tail", () => {
+		const cause = "Error: ENOENT: no such file, open 'config.json'";
 		const rows = [
 			...splitSessionTranscript({
 				content: [
 					jsonLine(claudeUser("z".repeat(2_000))),
-					jsonLine(claudeUser("second prompt after the budget is spent")),
+					jsonLine(
+						claudeUser([
+							{
+								content: `${"log line\n".repeat(300)}${cause}`,
+								is_error: true,
+								tool_use_id: "missing",
+								type: "tool_result",
+							},
+						]),
+					),
 				].join("\n"),
 				sessionDate: SESSION_DATE,
 				source: "claude_code",
@@ -495,10 +572,73 @@ describe("huge records", () => {
 			}),
 		];
 
-		expect(rows[0]?.text.length).toBeGreaterThan(0);
+		expect(rows[0]).toMatchObject({ text: "", tail: "", textChars: 2_000 });
+		expect(rows[0]?.head).toBe("z".repeat(256));
 		expect(rows[1]?.text).toBe("");
-		expect(rows[1]?.head).toBe("second prompt after the budget is spent");
-		expect(rows[1]?.textChars).toBe(39);
+		expect(rows[1]?.head).toStartWith("log line");
+		expect(rows[1]?.head.length).toBe(256);
+		expect(rows[1]?.tail).toEndWith(cause);
+		expect(rows[1]?.tail.length).toBe(512);
+	});
+
+	test("a record over its allowance keeps both excerpts and as much text as fits", () => {
+		const body = "a".repeat(5_000);
+		const [row] = [
+			...splitSessionTranscript({
+				content: jsonLine(claudeUser(body)),
+				sessionDate: SESSION_DATE,
+				source: "claude_code",
+				textBudgetChars: 3_000,
+			}),
+		];
+		expect(row?.head.length).toBe(1_024);
+		expect(row?.tail.length).toBe(1_024);
+		expect(row?.text.length).toBe(3_000 - 2_048);
+	});
+
+	test("pacing keeps late turns and subagent transcripts from being starved", () => {
+		const early = Array.from({ length: 10 }, (_, index) =>
+			jsonLine(
+				claudeUser([
+					{
+						content: `${index}`.repeat(20_000),
+						tool_use_id: `t${index}`,
+						type: "tool_result",
+					},
+				]),
+			),
+		);
+		const late = Array.from({ length: 10 }, (_, index) =>
+			jsonLine(claudeUser(`late prompt ${index} ${"q".repeat(1_500)}`)),
+		);
+		const child = jsonLine(
+			claudeAssistant([
+				{ text: `child finding ${"c".repeat(1_500)}`, type: "text" },
+			]),
+		);
+		const rows = [
+			...splitSessionTranscript({
+				content: [...early, ...late].join("\n"),
+				sessionDate: SESSION_DATE,
+				source: "claude_code",
+				subagents: { "agent-1": child },
+				textBudgetChars: 100_000,
+			}),
+		];
+		const latePrompts = ofKind(rows, "user_prompt");
+		expect(latePrompts).toHaveLength(10);
+		// Without pacing the early tool results would spend the whole budget and
+		// every later record would keep a 256-character head.
+		for (const prompt of latePrompts)
+			expect(prompt.head.length).toBeGreaterThan(256);
+		const childText = rows.find((row) => row.agentId === "agent-1");
+		expect(childText?.head.length).toBeGreaterThan(256);
+		const spent = rows.reduce(
+			(total, row) =>
+				total + row.text.length + row.head.length + row.tail.length,
+			0,
+		);
+		expect(spent).toBeLessThanOrEqual(100_000 + 256 * rows.length);
 	});
 });
 
@@ -803,7 +943,10 @@ describe("Codex records", () => {
 				row.recordIdx,
 				row.subtype,
 			]),
-		).toEqual([[2, "environment_context"]]);
+		).toEqual([
+			[2, "environment_context"],
+			[3, "system_instruction"],
+		]);
 
 		const results = ofKind(rows, "tool_result");
 		expect(
@@ -983,6 +1126,29 @@ describe("Codex records", () => {
 		expect(ofKind(rows, "tool_result")[0]?.text).toBe("error TS2345");
 	});
 
+	test("image outputs render marked screenshots as labels instead of raw JSON", () => {
+		const output = (callId: string, value: unknown) => ({
+			payload: { call_id: callId, output: value, type: "function_call_output" },
+			timestamp: "2026-03-02T04:29:41.000Z",
+			type: "response_item",
+		});
+		const blocks = [
+			{ text: "captured-sidebar", type: "input_text" },
+			{ detail: "original", image_url: SCREENSHOT_MARKER, type: "input_image" },
+			{ image_url: "data:image/png;base64,AAAA", type: "input_image" },
+		];
+		const rows = codexRows(
+			[output("array", blocks), output("encoded", JSON.stringify(blocks))]
+				.map(jsonLine)
+				.join("\n"),
+		);
+
+		expect(ofKind(rows, "tool_result").map((row) => row.text)).toEqual([
+			`captured-sidebar\n${SCREENSHOT_LABEL}\n[image]`,
+			`captured-sidebar\n${SCREENSHOT_LABEL}\n[image]`,
+		]);
+	});
+
 	test("application output never overrides the transport exit code", () => {
 		const output = (callId: string, text: unknown) => ({
 			payload: { call_id: callId, output: text, type: "function_call_output" },
@@ -1077,6 +1243,7 @@ describe("Codex records", () => {
 
 		expect(rows.map((row) => [row.kind, row.subtype, row.turnIdx])).toEqual([
 			["user_prompt", "", 1],
+			["injected_context", "environment_context", 1],
 			["meta", "user_message_mirror", 1],
 			["assistant_text", "", 1],
 			["user_prompt", "", 2],
@@ -1129,5 +1296,333 @@ describe("Codex records", () => {
 			delegated?.subtype,
 			delegated?.turnIdx,
 		]).toEqual(["reviewer", "delegation", 1]);
+	});
+});
+
+describe("readable context", () => {
+	test("Codex compaction keeps the summary it carried forward", () => {
+		const rows = codexRows(
+			[
+				{
+					payload: {
+						compaction_response_id: null,
+						message: "",
+						replacement_history: [
+							{
+								content: [{ text: "Handoff: tests pass", type: "input_text" }],
+								role: "user",
+								type: "message",
+							},
+						],
+					},
+					timestamp: "2026-03-02T04:29:38.000Z",
+					type: "compacted",
+				},
+			]
+				.map(jsonLine)
+				.join("\n"),
+		);
+		expect(rows[0]).toMatchObject({
+			kind: "compaction",
+			subtype: "compacted",
+			text: "[user]\nHandoff: tests pass",
+		});
+	});
+
+	test("injected context is capped at its own limit and a line decodes in full", () => {
+		const memory = `Contents of /repo/CLAUDE.md:\n${"rule ".repeat(5_000)}`;
+		const line = jsonLine(
+			claudeUser(`<system-reminder>${memory}</system-reminder>`),
+		);
+		const [stored] = claudeRows([line]);
+		expect(stored?.kind).toBe("injected_context");
+		expect(stored?.text.length).toBe(TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS);
+		expect(stored?.textChars).toBeGreaterThan(
+			TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
+		);
+		const [decoded] = decodeTranscriptLine({
+			agentId: "",
+			line,
+			source: "claude_code",
+		});
+		expect(decoded?.textChars).toBe(stored?.textChars);
+		expect(decoded?.text.length).toBe(stored?.textChars);
+		expect(decoded?.text.endsWith("rule </system-reminder>")).toBe(true);
+	});
+});
+
+describe("Claude attachments, hooks and API errors", () => {
+	const attachment = (value: Record<string, unknown>, second = 1) => ({
+		attachment: value,
+		timestamp: `2026-08-01T10:00:0${second}.000Z`,
+		type: "attachment",
+	});
+
+	test("instructions, memory, MCP instructions and edited files keep their content", () => {
+		const rows = claudeRows([
+			attachment({
+				files: [
+					{
+						content: "Always run the tests.",
+						path: "/repo/CLAUDE.md",
+						type: "Project",
+					},
+				],
+				type: "instructions",
+			}),
+			attachment({
+				content: {
+					content: "Use bun.",
+					contentDiffersFromDisk: false,
+					path: "/repo/apps/api/CLAUDE.md",
+					type: "Project",
+				},
+				displayPath: "apps/api/CLAUDE.md",
+				path: "/repo/apps/api/CLAUDE.md",
+				type: "nested_memory",
+			}),
+			attachment({
+				addedBlocks: ["## linear\nUse the issue tools."],
+				addedNames: ["linear"],
+				removedNames: ["old-server"],
+				type: "mcp_instructions_delta",
+			}),
+			attachment({
+				filename: "/repo/src/app.ts",
+				snippet: "12\tconst a = 1;",
+				type: "edited_text_file",
+			}),
+			attachment({
+				allowedTools: ["Bash", "Read"],
+				type: "command_permissions",
+			}),
+			attachment({ text: "Tokens used: 1000", type: "total_tokens_reminder" }),
+		]);
+		expect(
+			rows.map((row) => [row.kind, row.subtype, row.filePath, row.text]),
+		).toEqual([
+			[
+				"injected_context",
+				"instructions",
+				"",
+				"Contents of /repo/CLAUDE.md:\nAlways run the tests.",
+			],
+			[
+				"injected_context",
+				"nested_memory",
+				"/repo/apps/api/CLAUDE.md",
+				"Contents of /repo/apps/api/CLAUDE.md:\nUse bun.",
+			],
+			[
+				"injected_context",
+				"mcp_instructions",
+				"",
+				"## linear\nUse the issue tools.\n\nremoved: old-server",
+			],
+			[
+				"injected_context",
+				"edited_text_file",
+				"/repo/src/app.ts",
+				"12\tconst a = 1;",
+			],
+			["meta", "attachment:command_permissions", "", "Bash\nRead"],
+			["meta", "attachment:total_tokens_reminder", "", "Tokens used: 1000"],
+		]);
+	});
+
+	test("a queued prompt is a genuine prompt that starts a turn and counts once", () => {
+		const rows = claudeRows([
+			claudeUser("fix the build"),
+			claudeAssistant([{ text: "Working on it.", type: "text" }]),
+			attachment(
+				{
+					commandMode: "prompt",
+					prompt: "also update the docs",
+					source_uuid: "u-1",
+					timestamp: "2026-08-01T10:00:03.000Z",
+					type: "queued_command",
+				},
+				3,
+			),
+			attachment(
+				{
+					commandMode: "task-notification",
+					prompt: "<task-notification>done</task-notification>",
+					type: "queued_command",
+				},
+				4,
+			),
+			claudeAssistant([{ text: "Docs too.", type: "text" }]),
+			// Some versions also write the queued prompt as a user message.
+			claudeUser("also update the docs"),
+		]);
+		expect(
+			ofKind(rows, "user_prompt").map((row) => [
+				row.recordIdx,
+				row.subtype,
+				row.turnIdx,
+				row.text,
+			]),
+		).toEqual([
+			[1, "", 1, "fix the build"],
+			[3, "queued", 2, "also update the docs"],
+		]);
+		expect(rows.at(-1)).toMatchObject({
+			kind: "meta",
+			subtype: "queued_prompt_mirror",
+			turnIdx: 2,
+		});
+		expect(rows.find((row) => row.recordIdx === 4)).toMatchObject({
+			kind: "injected_context",
+			subtype: "task_notification",
+		});
+	});
+
+	test("hook summaries, API errors and error messages keep what happened", () => {
+		const rows = claudeRows([
+			{
+				hookAdditionalContext: [],
+				hookCount: 1,
+				hookErrors: ["lint hook exited 2: 3 problems"],
+				hookInfos: [{ command: "bun run lint", durationMs: 145 }],
+				level: "suggestion",
+				preventedContinuation: true,
+				stopReason: "Fix the lint errors first",
+				subtype: "stop_hook_summary",
+				timestamp: "2026-08-01T10:00:01.000Z",
+				type: "system",
+			},
+			{
+				error: {
+					connection: { code: "ENOTFOUND", message: "getaddrinfo ENOTFOUND" },
+					formatted: "Unable to connect to API (ENOTFOUND)",
+					isNetworkDown: true,
+					message: "Connection error.",
+				},
+				level: "error",
+				maxRetries: 10,
+				retryAttempt: 1,
+				subtype: "api_error",
+				timestamp: "2026-08-01T10:00:02.000Z",
+				type: "system",
+			},
+			{
+				error: "rate_limit",
+				isApiErrorMessage: true,
+				message: {
+					content: [
+						{
+							text: "You've hit your session limit · resets 7pm",
+							type: "text",
+						},
+					],
+					role: "assistant",
+				},
+				timestamp: "2026-08-01T10:00:03.000Z",
+				type: "assistant",
+			},
+		]);
+		expect(
+			rows.map((row) => [row.kind, row.subtype, row.isError, row.text]),
+		).toEqual([
+			[
+				"meta",
+				"system:stop_hook_summary:prevented",
+				true,
+				"preventedContinuation: true\nstopReason: Fix the lint errors first\nhookError: lint hook exited 2: 3 problems",
+			],
+			[
+				"meta",
+				"system:api_error",
+				true,
+				"Unable to connect to API (ENOTFOUND)",
+			],
+			[
+				"meta",
+				"api_error_message",
+				true,
+				"[rate_limit] You've hit your session limit · resets 7pm",
+			],
+		]);
+		expect(ofKind(rows, "assistant_text")).toHaveLength(0);
+	});
+});
+
+describe("still-running results", () => {
+	test("running-process framing without an exit code is running, not a pass", () => {
+		const call = (callId: string) => ({
+			payload: {
+				arguments: JSON.stringify({ cmd: "bun test --watch" }),
+				call_id: callId,
+				name: "exec_command",
+				type: "function_call",
+			},
+			timestamp: "2026-03-02T04:29:38.000Z",
+			type: "response_item",
+		});
+		const output = (callId: string, text: string) => ({
+			payload: { call_id: callId, output: text, type: "function_call_output" },
+			timestamp: "2026-03-02T04:29:39.000Z",
+			type: "response_item",
+		});
+		const rows = codexRows(
+			[
+				call("still"),
+				output(
+					"still",
+					"Chunk ID: 1a2b\nWall time: 10.0 seconds\nProcess running with session ID 4242\nOriginal token count: 12\nOutput:\nwatching…",
+				),
+				call("script"),
+				output(
+					"script",
+					"Script running with cell ID 111\nWall time 31.0 seconds\nOutput:\n",
+				),
+				call("done"),
+				output(
+					"done",
+					"Chunk ID: 3c4d\nWall time: 2.0 seconds\nProcess exited with code 0\nOutput:\nProcess running with session ID 1 (printed by the app)",
+				),
+			]
+				.map(jsonLine)
+				.join("\n"),
+		);
+		expect(
+			ofKind(rows, "tool_result").map((row) => [
+				row.callId,
+				row.subtype,
+				row.exitCode,
+				row.isError,
+			]),
+		).toEqual([
+			["still", "running", null, false],
+			["script", "running", null, false],
+			["done", "", 0, false],
+		]);
+	});
+
+	test("a Claude background launch is running", () => {
+		const rows = claudeRows([
+			claudeAssistant([
+				{
+					id: "bg",
+					input: { command: "bun run dev", run_in_background: true },
+					name: "Bash",
+					type: "tool_use",
+				},
+			]),
+			claudeUser([
+				{
+					content:
+						"Command running in background with ID: bd486wkvr. Output is being written to: /tmp/claude/bd486wkvr.output",
+					tool_use_id: "bg",
+					type: "tool_result",
+				},
+			]),
+		]);
+		expect(ofKind(rows, "tool_result")[0]).toMatchObject({
+			exitCode: null,
+			isError: false,
+			subtype: "running",
+		});
 	});
 });

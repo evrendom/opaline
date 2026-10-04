@@ -42,6 +42,7 @@ export function reactionEvents(row: TextRow): TimedEvent[] {
 				originRef: originRef(ref, type),
 				originMinutes: null,
 				originCostUsd: null,
+				parentSessionId: null,
 			},
 		];
 	});

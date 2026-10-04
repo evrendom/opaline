@@ -12,19 +12,20 @@ import { join } from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { validateDeferredConstraints } from "../post-migrate.js";
 
 const MIGRATION_0019_TIMESTAMP = "1785426102000";
 const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0052 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, and CLI version 0051", async () => {
+test("applies migrations 0020-0053 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, and coordination lease 0052", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0052_coordination_lease");
+	expect(latestMigration?.tag).toBe("0053_ingest_job_256_mib");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -41,6 +42,7 @@ test("applies migrations 0020-0052 to a database already migrated through 0019, 
 	const migrationsThrough0049 = await createMigrationsThrough(49);
 	const migrationsThrough0050 = await createMigrationsThrough(50);
 	const migrationsThrough0051 = await createMigrationsThrough(51);
+	const migrationsThrough0052 = await createMigrationsThrough(52);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -124,8 +126,29 @@ test("applies migrations 0020-0052 to a database already migrated through 0019, 
 				SELECT to_regclass('public.coordination_lease')::text AS name
 			`;
 			expect(leaseBefore0052?.name).toBeNull();
+			await migrate(database, { migrationsFolder: migrationsThrough0052 });
+			// 0053 must swap the size bound online over an existing ledger.
+			await seedIngestJobs(migrationSql);
 
 			await migrate(database, { migrationsFolder });
+			expect(await readExpectedTotalBytesCheck(migrationSql)).toEqual({
+				definition:
+					"CHECK (((expected_total_bytes >= 0) AND (expected_total_bytes <= 268435456))) NOT VALID",
+				validated: false,
+			});
+			expect(await validateDeferredConstraints(migrationSql)).toEqual([
+				{
+					constraint: "ingest_job_expected_total_bytes_check",
+					status: "validated",
+				},
+			]);
+			expect(await validateDeferredConstraints(migrationSql)).toEqual([
+				{
+					constraint: "ingest_job_expected_total_bytes_check",
+					status: "already_valid",
+				},
+			]);
+			await expectIngestJobSizeBound(migrationSql);
 			const mcpTables = await migrationSql<Array<{ name: string }>>`
 				SELECT tablename AS name
 				FROM pg_tables
@@ -155,7 +178,7 @@ test("applies migrations 0020-0052 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 53,
+				count: 54,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [cliVersionTable] = await migrationSql<TableState[]>`
@@ -517,6 +540,17 @@ test("applies migrations 0020-0052 to a database already migrated through 0019, 
 					AND contype = 'c'
 				ORDER BY conname
 			`;
+			const [expectedTotalBytesCheck] = await migrationSql<
+				Array<{ definition: string }>
+			>`
+				SELECT pg_get_constraintdef(oid) AS definition
+				FROM pg_constraint
+				WHERE conrelid = 'public.ingest_job'::regclass
+					AND conname = 'ingest_job_expected_total_bytes_check'
+			`;
+			expect(expectedTotalBytesCheck?.definition).toBe(
+				"CHECK (((expected_total_bytes >= 0) AND (expected_total_bytes <= 268435456)))",
+			);
 			expect([...ingestJobChecks]).toEqual([
 				{ name: "ingest_job_attempts_check" },
 				{ name: "ingest_job_content_sha256_check" },
@@ -587,8 +621,101 @@ test("applies migrations 0020-0052 to a database already migrated through 0019, 
 		await rm(migrationsThrough0049, { force: true, recursive: true });
 		await rm(migrationsThrough0050, { force: true, recursive: true });
 		await rm(migrationsThrough0051, { force: true, recursive: true });
+		await rm(migrationsThrough0052, { force: true, recursive: true });
 	}
 });
+
+test("a fresh database gets the 256 MiB ingest_job bound NOT VALID, then validated outside the migration", async () => {
+	const connectionString = getPostgresConnectionString();
+	const databaseName = `rudel_migration_fresh_${Date.now()}_${crypto.randomUUID().replaceAll("-", "")}`;
+	const adminSql = postgres(connectionString, { max: 1 });
+	try {
+		await adminSql.unsafe(`CREATE DATABASE "${databaseName}"`);
+		const databaseUrl = new URL(connectionString);
+		databaseUrl.pathname = `/${databaseName}`;
+		const migrationSql = postgres(databaseUrl.toString(), { max: 1 });
+		try {
+			await migrate(drizzle(migrationSql), { migrationsFolder });
+			expect((await readExpectedTotalBytesCheck(migrationSql))?.validated).toBe(
+				false,
+			);
+			expect(await validateDeferredConstraints(migrationSql)).toEqual([
+				{
+					constraint: "ingest_job_expected_total_bytes_check",
+					status: "validated",
+				},
+			]);
+			await expectIngestJobSizeBound(migrationSql);
+		} finally {
+			await migrationSql.end();
+		}
+	} finally {
+		await adminSql.unsafe(
+			`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`,
+		);
+		await adminSql.end();
+	}
+});
+
+async function seedIngestJobs(sql: postgres.Sql): Promise<void> {
+	await sql`
+		INSERT INTO "user" (id, name, email)
+		VALUES ('migration-ingest-user', 'Migration', 'migration-ingest@example.com')
+	`;
+	await sql`
+		INSERT INTO organization (id, name, slug)
+		VALUES ('migration-ingest-org', 'Migration', 'migration-ingest-org')
+	`;
+	await sql`
+		INSERT INTO ingest_job (
+			id, organization_id, user_id, session_id, source, object_manifest,
+			expected_sizes, expected_total_bytes, client_hashes, ingest_metadata
+		)
+		SELECT 'migration-job-' || n, 'migration-ingest-org', 'migration-ingest-user',
+			'migration-session-' || n, 'claude_code', '[]', '{}', 134217728, '{}', '{}'
+		FROM generate_series(1, 50) AS n
+	`;
+}
+
+async function readExpectedTotalBytesCheck(
+	sql: postgres.Sql,
+): Promise<{ definition: string; validated: boolean } | undefined> {
+	const [row] = await sql<Array<{ definition: string; validated: boolean }>>`
+		SELECT pg_get_constraintdef(oid) AS definition, convalidated AS validated
+		FROM pg_constraint
+		WHERE conrelid = 'public.ingest_job'::regclass
+			AND conname = 'ingest_job_expected_total_bytes_check'
+	`;
+	return row;
+}
+
+/** 256 MiB jobs are accepted and larger ones refused. */
+async function expectIngestJobSizeBound(sql: postgres.Sql): Promise<void> {
+	await sql`
+		INSERT INTO "user" (id, name, email)
+		VALUES ('migration-bound-user', 'Bound', 'migration-bound@example.com')
+		ON CONFLICT DO NOTHING
+	`;
+	await sql`
+		INSERT INTO organization (id, name, slug)
+		VALUES ('migration-bound-org', 'Bound', 'migration-bound-org')
+		ON CONFLICT DO NOTHING
+	`;
+	// `.execute()` starts the lazy postgres.js query so `rejects` can observe it.
+	const insert = (id: string, bytes: number) =>
+		sql`
+			INSERT INTO ingest_job (
+				id, organization_id, user_id, session_id, source, object_manifest,
+				expected_sizes, expected_total_bytes, client_hashes, ingest_metadata
+			)
+			VALUES (${id}, 'migration-bound-org', 'migration-bound-user', ${id},
+				'claude_code', '[]', '{}', ${bytes}, '{}', '{}')
+		`.execute();
+	await insert("migration-bound-max", 268_435_456);
+	await expect(insert("migration-bound-over", 268_435_457)).rejects.toThrow(
+		"ingest_job_expected_total_bytes_check",
+	);
+}
 
 interface MigrationJournalEntry {
 	breakpoints: boolean;

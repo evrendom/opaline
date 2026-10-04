@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { getLogger } from "@logtape/logtape";
 import {
 	createSplitStats,
@@ -16,6 +17,7 @@ import {
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
+import { scaleSessionBudget } from "../lib/ingest-size.js";
 import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
 import { TranscriptRecordsDeadlineExceededError } from "./transcript-records-deadline.js";
 import {
@@ -278,8 +280,13 @@ async function processBatch(
 		}
 		try {
 			const now = options.now ?? (() => new Date());
-			const deadlineAt = now().getTime() + options.sessionTimeoutMs;
 			const subagents = raw.subagents ?? {};
+			// Ingest's per-session scaling: a session above the standard size gets
+			// row, text and time bounds proportional to its bytes.
+			const sessionBytes = measureSessionBytes(raw.content, subagents);
+			const deadlineAt =
+				now().getTime() +
+				scaleSessionBudget(options.sessionTimeoutMs, sessionBytes);
 			const stats = createSplitStats();
 			const write = await writeTranscriptRecords(executor, {
 				deadlineAt,
@@ -298,15 +305,17 @@ async function processBatch(
 							sessionDate: toIsoUtc(candidate.sessionDate),
 							source: candidate.source,
 							subagents,
-							textBudgetChars:
+							textBudgetChars: scaleSessionBudget(
 								options.textBudgetChars ??
-								TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
+									TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
+								sessionBytes,
+							),
 							textMaxChars:
 								options.textMaxChars ?? TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 						},
 						stats,
 					),
-					options,
+					{ maxRows: scaleSessionBudget(options.maxRows, sessionBytes) },
 				),
 				organizationId: candidate.organizationId,
 				revision: candidate.revision,
@@ -649,6 +658,17 @@ function* boundDrafts(
 		}
 		yield draft;
 	}
+}
+
+function measureSessionBytes(
+	content: string,
+	subagents: Readonly<Record<string, string>>,
+): number {
+	let bytes = Buffer.byteLength(content, "utf8");
+	for (const value of Object.values(subagents)) {
+		bytes += Buffer.byteLength(value, "utf8");
+	}
+	return bytes;
 }
 
 function compareCandidates(left: Candidate, right: Candidate): number {
