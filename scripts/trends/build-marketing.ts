@@ -6,6 +6,9 @@ import { fetchTrendsSources } from "./fetch-trends-sources";
 // Opaline's stored sources first: the API's cron keeps each one's last good
 // capture. A source it has not stored yet (or an unreachable API) falls to
 // that source's own fetch below, when enabled, and otherwise to preview.
+// A failed fetch only leaves this build without that capture: it never sets
+// the source's kill switch, so the page still swaps in the stored capture
+// once the cron has one.
 let stored = { benchmarks: false, harness: false, usage: false };
 if (process.env.TRENDS_SOURCES_FETCH === "1") {
 	try {
@@ -18,7 +21,7 @@ if (process.env.TRENDS_SOURCES_FETCH === "1") {
 	}
 }
 
-let usageSource = process.env.TRENDS_USAGE_SOURCE;
+const usageSource = process.env.TRENDS_USAGE_SOURCE;
 if (
 	process.env.TRENDS_USAGE_FETCH === "1" &&
 	usageSource !== "preview" &&
@@ -28,14 +31,13 @@ if (
 		await fetchOpalineUsage();
 	} catch (error) {
 		console.error(
-			"Opaline usage unavailable; this build uses synthetic usage.",
+			"Opaline usage unavailable; this build uses synthetic usage until the page loads the stored capture.",
 			error,
 		);
-		usageSource = "preview";
 	}
 }
 
-let benchmarkSource = process.env.TRENDS_BENCHMARK_SOURCE;
+const benchmarkSource = process.env.TRENDS_BENCHMARK_SOURCE;
 if (
 	process.env.TRENDS_AA_FETCH === "1" &&
 	benchmarkSource !== "preview" &&
@@ -44,11 +46,13 @@ if (
 	try {
 		await fetchArtificialAnalysis();
 	} catch (error) {
-		console.error("AA unavailable; this build uses preview benchmarks.", error);
-		benchmarkSource = "preview";
+		console.error(
+			"AA unavailable; this build uses preview benchmarks until the page loads the stored capture.",
+			error,
+		);
 	}
 }
-let harnessSource = process.env.TRENDS_HARNESS_SOURCE;
+const harnessSource = process.env.TRENDS_HARNESS_SOURCE;
 if (
 	process.env.TRENDS_T3_FETCH === "1" &&
 	harnessSource !== "usage" &&
@@ -58,10 +62,9 @@ if (
 		await fetchT3Usage();
 	} catch (error) {
 		console.error(
-			"T3 Code usage unavailable; this build uses the usage population for Claude Code vs Codex.",
+			"T3 Code usage unavailable; this build uses the usage population for Claude Code vs Codex until the page loads the stored capture.",
 			error,
 		);
-		harnessSource = "usage";
 	}
 }
 const build = Bun.spawn(["bun", "run", "astro", "build"], {

@@ -84,7 +84,7 @@ import {
 	TRENDS_SECTIONS,
 	type TrendsSection,
 } from "./trends-sections";
-import { BenchmarkTable, TrendsTable } from "./trends-table";
+import { BenchmarkTable, FrictionTable, TrendsTable } from "./trends-table";
 import { MonthlyLines } from "./trends-timeline-chart";
 import "./trends-explorer.css";
 
@@ -125,13 +125,12 @@ type FrictionPer = "tokens" | "prompts";
 type FrictionLayout = "columns" | "rows";
 /** What friction can count, in the order its switch lists them. */
 const FRICTION_KINDS = [
-	{ id: "swears", tab: "User swearing", noun: "user swearing" },
-	{ id: "apologies", tab: "Model apology", noun: "model apologies" },
-	{ id: "toolErrors", tab: "Tool errors", noun: "failed tool calls" },
+	{ id: "swears", tab: "User swearing" },
+	{ id: "apologies", tab: "Model apology" },
+	{ id: "toolErrors", tab: "Tool errors" },
 ] as const satisfies readonly {
 	id: FrictionKind;
 	tab: string;
-	noun: string;
 }[];
 // Below these, a model's rate rests on too little to rank.
 const FRICTION_MIN_OUTPUT_TOKENS = 5_000_000;
@@ -252,14 +251,19 @@ const wildChart = (id: string): ChartRef => ({ mode: "wild", id });
  */
 const CHART_TABS: readonly {
 	readonly id: string;
+	/** The link's first segment: `#agent-runs/run-time-months`. */
+	readonly route: string;
 	readonly tab: string;
 	readonly charts: readonly ChartRef[];
+	/** The chart the tab opens on, when not its first. */
+	readonly home?: string;
 }[] = [
 	{
 		// One benchmark, laid out two ways (the toolbar flips them): the
 		// scatter against the intelligence index, or the bars ranking tokens
 		// and dollars.
 		id: "benchmarks",
+		route: "benchmarks",
 		tab: "Benchmarks",
 		charts: [
 			...TRADEOFF_SECTIONS.map((section) => benchmarkChart(section.id)),
@@ -271,15 +275,29 @@ const CHART_TABS: readonly {
 
 	{
 		id: "behavior",
+		route: "agent-runs",
 		tab: "Agent runs",
 		charts: BEHAVIOR_CHARTS.map((chart) => wildChart(chart.id)),
 	},
 	{
 		id: "usage",
+		route: "dev-usage",
 		tab: "Dev usage",
 		charts: ["runs", "harnesses", "volume", "friction-model"].map(wildChart),
+		// Friction, OpenAI's and Anthropic's models side by side.
+		home: "friction-model",
 	},
 ];
+/** The tabs as the navigation's breadcrumb names them, for the static copy
+ * trends.astro paints before the explorer hydrates. */
+export const TRENDS_NAV_TABS = CHART_TABS.map(({ route, tab }) => ({
+	route,
+	tab,
+}));
+/** The chart a tab opens on. */
+function tabHome(tab: (typeof CHART_TABS)[number]) {
+	return tab.charts.find((chart) => chart.id === tab.home) ?? tab.charts[0];
+}
 function chartTab(chart: ChartRef) {
 	return (
 		CHART_TABS.find((tab) =>
@@ -493,7 +511,7 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 						: wildSection?.kind === "share"
 							? shareRanked(snapshot, benchmarks)
 							: wildSection?.id === "friction-model"
-								? frictionRanked(snapshot, benchmarks)
+								? frictionRanked(snapshot)
 								: snapshot.models.filter(
 										(model) =>
 											(!wildSection || hasMeasurement(wildSection, model)) &&
@@ -598,6 +616,22 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 	const runsFixed = currentTab.id === "behavior";
 	const runsModels = usagePickerModels;
 	const runsModelIds = new Set(runsModels.map((model) => model.id));
+	// Friction has figures only for the models Claude Code and Codex run.
+	// Its list keeps to them (lined up with the rows, the rest would hang
+	// below the chart), and its only quick pick is OpenAI vs Anthropic: the
+	// benchmarks' Pareto and Frontier picks would add models it cannot draw.
+	const frictionShown = !lab && wildSection?.id === "friction-model";
+	const frictionIds = new Set(
+		frictionShown
+			? [
+					...frictionFigures(
+						snapshot,
+						state.frictionCounts,
+						state.frictionPer,
+					).keys(),
+				].filter((modelId) => benchmarks.some(({ id }) => id === modelId))
+			: [],
+	);
 	// Only while its model is on the chart: a row unticked or removed under
 	// the pointer lets go.
 	const focusIds: ReadonlySet<string> =
@@ -606,13 +640,20 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 			: pinnedFocusIds;
 	const settings = (patch: Partial<ExplorerState>) =>
 		setState((current) => ({ ...current, ...patch }));
-	// Another chart has another frontier: start fresh.
+	// Another chart has another frontier: start fresh. A selection nobody
+	// changed follows the chart: friction opens on OpenAI vs Anthropic, the
+	// rest on the default models.
 	const showChart = (chart: ChartRef) => {
-		settings(
-			chart.mode === "benchmarks"
+		const from = chartDefaultIds(currentChart, snapshot, initial);
+		const to = chartDefaultIds(chart, snapshot, initial);
+		const untouched =
+			sameIds(state.modelIds, from) && sameIds(state.listedIds, from);
+		settings({
+			...(chart.mode === "benchmarks"
 				? { mode: chart.mode, benchmarkId: chart.id }
-				: { mode: chart.mode, wildId: chart.id },
-		);
+				: { mode: chart.mode, wildId: chart.id }),
+			...(untouched ? { modelIds: to, listedIds: to } : {}),
+		});
 		setPinnedFocusIds(new Set());
 	};
 	// The benchmarks' other layout, carrying the measure over: the cost
@@ -1171,6 +1212,21 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 			measure={state.harnessMeasure}
 			measures={measures}
 		/>
+	) : wildSection.id === "friction-model" && wildSection.kind === "ranked" ? (
+		<FrictionTable
+			unit={wildUnit}
+			format={wildSection.format}
+			rows={frictionBarRows.map((row) => ({
+				id: row.model.id,
+				// The bars name a thin model with an asterisk already.
+				name: row.model.name.replace(/\*$/, ""),
+				provider: row.model.provider,
+				value: row.value,
+				thin: row.model.name.endsWith("*"),
+			}))}
+			models={snapshot.models}
+			thinNote={`* Fewer than ${state.frictionPer === "tokens" ? "5M output tokens" : `${FRICTION_MIN_PROMPTS} prompts`} so far.`}
+		/>
 	) : (
 		<TrendsTable
 			section={{ ...wildSection, unit: wildUnit }}
@@ -1526,13 +1582,18 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 			// the legend and chart show, so it stays in view.
 			listControls={narrow ? undefined : scatterTiles}
 			listedIds={runsFixed ? runsModelIds : state.listedIds}
+			drawableIds={frictionShown ? frictionIds : undefined}
 			paretoEnds={paretoEnds}
 			paretoCheap={
 				paretoSection?.metric === "timePerTaskSeconds" ? "fast" : "cheap"
 			}
 			featuredIds={frontierLabIds}
 			comparingIds={comparingIds}
-			presets={presets}
+			presets={
+				frictionShown
+					? presets.filter((preset) => preset.id === "openai-anthropic")
+					: presets
+			}
 			// A quick pick puts exactly its models on the chart and in
 			// the list; "Pareto" also draws their frontier.
 			onPreset={(preset) => {
@@ -1583,9 +1644,10 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 				);
 			}}
 			onReset={() => {
+				const ids = chartDefaultIds(currentChart, snapshot, initial);
 				settings({
-					modelIds: initial.modelIds,
-					listedIds: initial.listedIds,
+					modelIds: ids,
+					listedIds: ids,
 					...(lab ? { efforts: initial.efforts } : {}),
 				});
 				setPinnedFocusIds(new Set());
@@ -1599,7 +1661,7 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 
 	const selectChartTab = (tabId: string) => {
 		const tab = CHART_TABS.find((option) => option.id === tabId);
-		const chart = tabCharts[tabId] ?? tab?.charts[0];
+		const chart = tabCharts[tabId] ?? (tab ? tabHome(tab) : undefined);
 		if (chart) showChart(chart);
 	};
 	const previewTag =
@@ -1830,7 +1892,7 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 												value: row.value,
 											}))}
 											format={wildSection.format}
-											axisTitle={wildSection.unit}
+											axisTitle={wildUnit}
 											focusIds={focusIds}
 											onGeometry={setRankGeometry}
 										/>
@@ -2111,21 +2173,13 @@ function frictionSection(
 	per: FrictionPer,
 ): RankedSection {
 	const figures = frictionFigures(snapshot, counts, per);
-	// "Swears, apologies and failed tool calls", "Apologies", …
-	const nouns = FRICTION_KINDS.filter((kind) => counts.has(kind.id)).map(
-		(kind) => kind.noun,
-	);
-	const listed =
-		nouns.length > 1
-			? `${nouns.slice(0, -1).join(", ")} and ${nouns.at(-1)}`
-			: (nouns[0] ?? "");
-	const what = `${listed.charAt(0).toUpperCase()}${listed.slice(1)}`;
-	const who = "every developer";
-	const minimum =
-		per === "tokens" ? "5M output tokens" : `${FRICTION_MIN_PROMPTS} prompts`;
+	// The switches beside the title say what counts: "Friction" for more
+	// than one, else the one ("Tool errors").
+	const kinds = FRICTION_KINDS.filter((kind) => counts.has(kind.id));
+	const what = kinds.length === 1 ? kinds[0].tab : "Friction";
 	return {
 		...section,
-		unit: `${what} per ${per === "tokens" ? "10M output tokens" : "1,000 prompts"} · ${who} · * fewer than ${minimum}`,
+		unit: `${what} per ${per === "tokens" ? "10M output tokens" : "1,000 prompts"}`,
 		value: (metrics) => {
 			const id = "id" in metrics ? (metrics as TrendsModel).id : undefined;
 			return (id ? figures.get(id)?.value : undefined) ?? null;
@@ -2174,10 +2228,8 @@ function frictionColumns(
 }
 
 /** The pickable models with friction figures, the most output first. */
-function frictionRanked(
-	snapshot: TrendsSnapshot,
-	benchmarks: readonly TrendsBenchmarkModel[],
-) {
+function frictionRanked(snapshot: TrendsSnapshot) {
+	const benchmarks = snapshot.benchmarks ?? [];
 	const tokens = new Map(
 		(snapshot.friction?.all.models ?? []).map((row) => [
 			row.familyId,
@@ -3190,6 +3242,38 @@ function defaultState(snapshot: TrendsSnapshot): ExplorerState {
 	};
 }
 
+/** OpenAI's and Anthropic's models with friction figures, the most output
+ * tokens first, as many as a chart shows. */
+function frictionLabIds(snapshot: TrendsSnapshot): ReadonlySet<string> {
+	return new Set(
+		frictionRanked(snapshot)
+			.filter(
+				(model) =>
+					model.provider === "openai" || model.provider === "anthropic",
+			)
+			.map((model) => model.id)
+			.slice(0, MAX_SHOWN),
+	);
+}
+
+/** The models a chart opens on: friction's OpenAI vs Anthropic (when it
+ * has figures for them), every other chart the page's default. */
+function chartDefaultIds(
+	chart: ChartRef,
+	snapshot: TrendsSnapshot,
+	initial: ExplorerState,
+): ReadonlySet<string> {
+	if (chart.mode === "wild" && chart.id === "friction-model") {
+		const ids = frictionLabIds(snapshot);
+		if (ids.size > 0) return ids;
+	}
+	return initial.modelIds;
+}
+
+function sameIds(first: ReadonlySet<string>, second: ReadonlySet<string>) {
+	return first.size === second.size && [...first].every((id) => second.has(id));
+}
+
 function stateFromHash(
 	hash: string,
 	initial: ExplorerState,
@@ -3198,17 +3282,42 @@ function stateFromHash(
 	const [route, query] = hash.replace(/^#/, "").split("?");
 	const [dataset, chart] = route?.split("/") ?? [];
 	const legacy = TRENDS_SECTIONS.find((section) => section.id === dataset);
+	const routeTab = CHART_TABS.find((tab) => tab.route === dataset);
 	// The retired pushback scatter's links open the cost scatter.
 	const retiredPushback =
 		chart === "pushback-intelligence" || dataset === "pushback-intelligence";
+	// Older links named both usage tabs "wild".
 	const mode = retiredPushback
 		? "benchmarks"
-		: legacy
+		: legacy || dataset === "wild"
 			? "wild"
-			: dataset === "wild"
-				? "wild"
-				: initial.mode;
+			: (routeTab?.charts[0]?.mode ?? initial.mode);
 	const params = new URLSearchParams(query);
+	const benchmarkId =
+		BENCHMARK_SECTIONS.find((section) => section.id === chart)?.id ??
+		initial.benchmarkId;
+	const wildId =
+		legacy?.id ??
+		TRENDS_SECTIONS.find(
+			(section) =>
+				section.id === chart &&
+				CHART_TABS.some((tab) =>
+					tab.charts.some(
+						(option) => option.mode === "wild" && option.id === section.id,
+					),
+				),
+		)?.id ??
+		// A tab's link without a chart opens its home.
+		(routeTab && routeTab.id !== "benchmarks"
+			? tabHome(routeTab)?.id
+			: undefined) ??
+		initial.wildId;
+	// A link without models opens on its chart's default ones.
+	const chartDefault = chartDefaultIds(
+		{ mode, id: mode === "benchmarks" ? benchmarkId : wildId },
+		snapshot,
+		initial,
+	);
 	const modelIds = params.get("models");
 	const listedIds = params.get("list");
 	const effortIds = params.get("efforts");
@@ -3230,22 +3339,9 @@ function stateFromHash(
 	return {
 		...initial,
 		mode,
-		benchmarkId:
-			BENCHMARK_SECTIONS.find((section) => section.id === chart)?.id ??
-			initial.benchmarkId,
+		benchmarkId,
 		// Only charts a tab still offers; retired ones open the default.
-		wildId:
-			legacy?.id ??
-			TRENDS_SECTIONS.find(
-				(section) =>
-					section.id === chart &&
-					CHART_TABS.some((tab) =>
-						tab.charts.some(
-							(option) => option.mode === "wild" && option.id === section.id,
-						),
-					),
-			)?.id ??
-			initial.wildId,
+		wildId,
 		view: params.get("view") === "table" ? "table" : "chart",
 		log: params.get("scale") !== "linear",
 		// A link without settings (no query) opens with the defaults; the
@@ -3275,11 +3371,11 @@ function stateFromHash(
 							effortIds.split(",").includes(effort),
 						),
 					),
-		modelIds: selected ?? initial.modelIds,
-		// Older links carry no list: the recommended models plus the shown.
+		modelIds: selected ?? chartDefault,
+		// Older links carry no list: the chart's default models plus the shown.
 		listedIds:
 			listedIds === null
-				? new Set([...initial.listedIds, ...(selected ?? [])])
+				? new Set([...chartDefault, ...(selected ?? [])])
 				: new Set(listedIds.split(",").filter(Boolean)),
 		harnessMeasure: HARNESS_MEASURES.some((entry) => entry.id === measure)
 			? (measure as HarnessMeasure)
@@ -3324,5 +3420,6 @@ function hashFromState(state: ExplorerState) {
 	);
 	params.set("models", [...state.modelIds].join(","));
 	params.set("list", [...state.listedIds].join(","));
-	return `#${state.mode}/${state.mode === "benchmarks" ? state.benchmarkId : state.wildId}?${params}`;
+	const chart = state.mode === "benchmarks" ? state.benchmarkId : state.wildId;
+	return `#${chartTab({ mode: state.mode, id: chart }).route}/${chart}?${params}`;
 }

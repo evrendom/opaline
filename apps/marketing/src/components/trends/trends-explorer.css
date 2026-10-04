@@ -299,11 +299,11 @@
 }
 
 .trends-nav-trail .trends-tab:hover,
-.trends-nav-trail .trends-tab[aria-selected="true"] {
+.trends-nav-trail .trends-tab:is([aria-selected="true"], [data-selected]) {
 	color: var(--instant-v2-nav-ink, var(--color-ink-strong));
 }
 
-.trends-nav-trail .trends-tab[aria-selected="true"] {
+.trends-nav-trail .trends-tab:is([aria-selected="true"], [data-selected]) {
 	font-weight: 500;
 	text-decoration: underline;
 	text-decoration-thickness: 1px;
@@ -317,6 +317,30 @@
 
 .trends-nav-trail :focus-visible {
 	outline: none;
+}
+
+/* Until the explorer hydrates, trends.astro's static copy of its tabs
+ * stands in the trail, so they are there from the first paint; the
+ * explorer's own then take their place, identical, with nothing to
+ * appear. */
+.trends-nav-trail-static {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.trends-nav-trail-static .trends-crumb {
+	display: none;
+}
+
+.trends-nav-trail:has(> .trends-nav-trail-target:not(:empty))
+	> .trends-nav-trail-static {
+	display: none;
+}
+
+/* Only the preview tag arrives later, with the data it describes. */
+.trends-nav-trail-target .trends-preview {
+	animation: trends-fade 320ms ease-out both;
 }
 
 /* On a phone the breadcrumb ends in the shown chart, a menu button; the
@@ -433,6 +457,14 @@
 	.trends-nav-trail {
 		gap: 4px;
 		margin-inline: 0;
+	}
+
+	.trends-nav-trail-static .trends-tabs {
+		display: none;
+	}
+
+	.trends-nav-trail-static .trends-crumb {
+		display: inline-flex;
 	}
 
 	.trends-topbar {
@@ -2750,6 +2782,13 @@
 	overflow-x: auto;
 	/* Sideways only: vertical scrolling passes on to the page or dialog. */
 	overscroll-behavior-x: contain;
+}
+
+.trends-table-footnote {
+	margin-top: 12px;
+	color: var(--color-ink-muted);
+	font-size: 0.8125rem;
+	line-height: 1.125rem;
 }
 
 .trends-table {

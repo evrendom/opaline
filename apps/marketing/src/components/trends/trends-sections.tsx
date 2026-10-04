@@ -215,7 +215,7 @@ export const TRENDS_SECTIONS: readonly TrendsSection[] = [
 		id: "friction-model",
 		tab: "Friction by model",
 		kind: "ranked",
-		unit: "Swears, apologies and failed tool calls per 10M output tokens · every developer",
+		unit: "Friction per 10M output tokens",
 		value: () => null,
 		format: (value) => formatDecimal(value),
 	},

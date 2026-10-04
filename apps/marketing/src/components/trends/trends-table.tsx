@@ -44,6 +44,7 @@ function DataTable<Row>({
 	rows,
 	rowKey,
 	rowDimmed,
+	footnote,
 }: {
 	readonly caption: string;
 	readonly columns: readonly Column<Row>[];
@@ -51,43 +52,51 @@ function DataTable<Row>({
 	readonly rowKey: (row: Row) => string;
 	/** Rows that stand back, as their model does in the legend. */
 	readonly rowDimmed?: (row: Row) => boolean;
+	/** A note under the table, e.g. what an asterisk marks. */
+	readonly footnote?: string;
 }) {
 	return (
-		<div className="trends-table-scroll">
-			<table className="trends-table">
-				<caption className="visually-hidden">{caption}</caption>
-				<thead>
-					<tr>
-						{columns.map((column) => (
-							<th
-								key={column.label}
-								scope="col"
-								data-numeric={column.numeric ?? false}
-							>
-								{column.label}
-							</th>
-						))}
-					</tr>
-				</thead>
-				<tbody>
-					{rows.map((row) => (
-						<tr key={rowKey(row)} data-dimmed={rowDimmed?.(row) || undefined}>
-							{columns.map((column, index) =>
-								index === 0 ? (
-									<th key={column.label} scope="row">
-										{column.cell(row)}
-									</th>
-								) : (
-									<td key={column.label} data-numeric={column.numeric ?? false}>
-										{column.cell(row)}
-									</td>
-								),
-							)}
+		<>
+			<div className="trends-table-scroll">
+				<table className="trends-table">
+					<caption className="visually-hidden">{caption}</caption>
+					<thead>
+						<tr>
+							{columns.map((column) => (
+								<th
+									key={column.label}
+									scope="col"
+									data-numeric={column.numeric ?? false}
+								>
+									{column.label}
+								</th>
+							))}
 						</tr>
-					))}
-				</tbody>
-			</table>
-		</div>
+					</thead>
+					<tbody>
+						{rows.map((row) => (
+							<tr key={rowKey(row)} data-dimmed={rowDimmed?.(row) || undefined}>
+								{columns.map((column, index) =>
+									index === 0 ? (
+										<th key={column.label} scope="row">
+											{column.cell(row)}
+										</th>
+									) : (
+										<td
+											key={column.label}
+											data-numeric={column.numeric ?? false}
+										>
+											{column.cell(row)}
+										</td>
+									),
+								)}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			{footnote ? <p className="trends-table-footnote">{footnote}</p> : null}
+		</>
 	);
 }
 
@@ -197,6 +206,73 @@ export function BenchmarkTable({
 		<p className="trends-empty">
 			No observations for these models and reasoning efforts.
 		</p>
+	);
+}
+
+/** One of friction's bars: a model, its figure, and whether that rests on
+ * too little to rank (named with an asterisk). */
+export interface FrictionTableRow {
+	readonly id: string;
+	readonly name: string;
+	readonly provider: TrendsModel["provider"];
+	readonly value: number;
+	readonly thin: boolean;
+}
+
+/**
+ * Friction's table: exactly the chart's bars, highest first, with each
+ * published model's usage beside it ("–" for a model not yet published).
+ * The note under it says what the asterisk marks, while one is listed.
+ */
+export function FrictionTable({
+	unit,
+	format,
+	rows,
+	models,
+	thinNote,
+}: {
+	readonly unit: string;
+	readonly format: (value: number) => string;
+	readonly rows: readonly FrictionTableRow[];
+	readonly models: readonly TrendsModel[];
+	readonly thinNote: string;
+}) {
+	const usage = new Map(models.map((model) => [model.id, model]));
+	const fromUsage = (
+		label: string,
+		cell: (model: TrendsModel) => ReactNode,
+	): Column<FrictionTableRow> => ({
+		label,
+		numeric: true,
+		cell: (row) => {
+			const model = usage.get(row.id);
+			return model ? cell(model) : "–";
+		},
+	});
+	return (
+		<DataTable
+			caption={unit}
+			rows={[...rows].sort((first, second) => second.value - first.value)}
+			rowKey={(row) => row.id}
+			footnote={rows.some((row) => row.thin) ? thinNote : undefined}
+			columns={[
+				{
+					label: "Model",
+					cell: (row) => (
+						<span className="trends-table-model">
+							<ProviderMark provider={row.provider} />
+							{row.thin ? `${row.name}*` : row.name}
+						</span>
+					),
+				},
+				{ label: unit, numeric: true, cell: (row) => format(row.value) },
+				fromUsage("Agent runs", (model) => formatCompact(model.runs)),
+				fromUsage("Sessions", (model) =>
+					model.sessions === undefined ? "–" : formatCompact(model.sessions),
+				),
+				fromUsage("Developers", (model) => formatInteger(model.developers)),
+			]}
+		/>
 	);
 }
 

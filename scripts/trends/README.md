@@ -25,8 +25,10 @@ serves the stored captures, and the marketing build reads them with
 
 A source the API has not stored yet (the first deploy, before the cron ran)
 falls back to that source's own direct fetch below when its flag is set, and
-otherwise to preview data. The page reflects the stored data as of its last
-build; the cron alone does not rebuild it.
+otherwise to preview data. The build fetches from the live API, which on a
+deploy is the previous release. A failed fetch only leaves that build without
+the capture; it never sets the source's kill switch, so once open the page
+still swaps in the cron's stored capture (`useLatestTrendsSnapshot`).
 
 
 `bun run trends:fetch-aa` reads Artificial Analysis's public `/models` page and
@@ -98,8 +100,8 @@ recorded per run, so the benchmark join uses the vendor default effort.
 `bun run trends:fetch-usage` stores one response in
 `apps/marketing/src/trends/generated/opaline-usage.json` (gitignored);
 `TRENDS_USAGE_API_URL` points it at another API. `TRENDS_USAGE_FETCH=1`
-refreshes before the marketing build and falls back to synthetic usage if the
-fetch fails; `TRENDS_USAGE_SOURCE=preview` is the kill switch. Applying real
+refreshes before the marketing build and falls back to synthetic usage (until
+the page loads the stored capture) if the fetch fails; `TRENDS_USAGE_SOURCE=preview` is the kill switch. Applying real
 usage re-selects the benchmark groups, since In use follows the usage models.
 
 ## Claude Code vs Codex (T3 Code via Slopalytics)

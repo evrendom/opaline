@@ -109,6 +109,9 @@ interface PickerProps {
 	readonly hideOffFrontier?: boolean;
 	/** Models kept in the list beside the chart, shown on it or not. */
 	readonly listedIds?: ReadonlySet<string>;
+	/** The models the chart can draw, when not every one: the list beside
+	 * it keeps to them, whatever else is listed or selected. */
+	readonly drawableIds?: ReadonlySet<string>;
 	/** Takes a model out of the list, back to "Other models". */
 	readonly onRemove?: (id: string) => void;
 	/** Models on the Pareto frontier of every model available, tagged in
@@ -235,6 +238,7 @@ export function TrendsModelPicker({
 	frontierIds,
 	hideOffFrontier = false,
 	listedIds,
+	drawableIds,
 	onRemove,
 	paretoEnds,
 	paretoCheap = "cheap",
@@ -260,7 +264,8 @@ export function TrendsModelPicker({
 	// anything on the chart. Its dot shows or hides a model on the chart and
 	// keeps it listed; only its × sends it back to "Other models".
 	const isActive = (model: PickerModel) =>
-		listedIds?.has(model.id) || selected.has(model.id);
+		(drawableIds?.has(model.id) ?? true) &&
+		(listedIds?.has(model.id) || selected.has(model.id));
 	const active = models.filter(isActive);
 	// "All models" lists every model, on the chart or not, so its dots show
 	// what is selected; a search narrows it.
