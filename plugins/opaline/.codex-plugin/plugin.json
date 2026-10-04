@@ -1,6 +1,6 @@
 {
 	"name": "opaline",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Ask about your team's Claude Code and Codex sessions, costs, skills and repositories in Opaline.",
 	"author": {
 		"name": "Opaline",
