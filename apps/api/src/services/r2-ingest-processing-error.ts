@@ -12,6 +12,7 @@ import {
 	IngestFilterWorkerOperationalError,
 	SessionLanguageSignalScannerOperationalError,
 } from "./ingest-worker-operational.error.js";
+import { PostgresLeaseLostError } from "./postgres-lease.service.js";
 import { R2IngestMaterializationGateError } from "./r2-ingest-materialization-gate.js";
 
 export const R2_INGEST_DEPENDENCY_UNAVAILABLE =
@@ -175,6 +176,8 @@ export function isDefinitelyPermanentProcessingError(error: unknown): boolean {
 function isRetryableErrorNode(error: object): boolean {
 	if (error instanceof R2IngestCommitError && error.retryable) return true;
 	if (error instanceof R2IngestMaterializationGateError) return true;
+	// Another processor took over the identity; this attempt did nothing wrong.
+	if (error instanceof PostgresLeaseLostError) return true;
 	if (
 		error instanceof IngestFilterWorkerOperationalError ||
 		error instanceof SessionLanguageSignalScannerOperationalError

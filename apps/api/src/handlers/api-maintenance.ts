@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { sqlClient } from "../db.js";
 import {
 	createMaintenanceQueueDeadline,
 	drainMaintenancePasses,
@@ -11,6 +12,7 @@ import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
+import { pruneExpiredPostgresLeases } from "../services/postgres-lease.service.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
 	createR2MultipartUploadClient,
@@ -33,6 +35,7 @@ const REPOSITORY_EVIDENCE_INDEX_BUDGET_MS = 60_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
+const COORDINATION_LEASE_BUDGET_MS = 10_000;
 
 export async function handleApiMaintenanceRequest(
 	request: Request,
@@ -128,6 +131,10 @@ async function runApiMaintenance() {
 			),
 		}),
 	);
+	const coordinationLeases = await runMaintenanceStep(
+		"coordination-leases",
+		() => runCoordinationLeaseMaintenance(invocationDeadline),
+	);
 	if (!hasMaintenanceTimeRemaining(invocationDeadline)) {
 		logger.warn(
 			"Daily API maintenance reached its invocation deadline; returning with queued work left for the next cron",
@@ -136,6 +143,7 @@ async function runApiMaintenance() {
 
 	return {
 		clickHousePurge,
+		coordinationLeases,
 		languageSignals,
 		repositoryEvidenceIndex,
 		ok:
@@ -144,7 +152,8 @@ async function runApiMaintenance() {
 			r2Ingest.status === "ok" &&
 			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok" &&
-			transcriptRecords.status === "ok",
+			transcriptRecords.status === "ok" &&
+			coordinationLeases.status === "ok",
 		r2Ingest,
 		sessionRevisionReceipts,
 		transcriptRecords,
@@ -162,6 +171,26 @@ async function runSessionRevisionReceiptMaintenance(
 		"session-revision-receipts",
 		deadline,
 		() => runSessionRevisionReceiptCleanupPass(),
+	);
+	return {
+		deleted: drain.results.reduce((total, result) => total + result.deleted, 0),
+		hasMore: drain.hasMore,
+		iterations: drain.iterations,
+		stopReason: drain.stopReason,
+	};
+}
+
+async function runCoordinationLeaseMaintenance(
+	invocationDeadline: MaintenanceDeadline,
+) {
+	const deadline = createMaintenanceQueueDeadline(
+		invocationDeadline,
+		COORDINATION_LEASE_BUDGET_MS,
+	);
+	const drain = await runMaintenancePassLoop(
+		"coordination-leases",
+		deadline,
+		() => pruneExpiredPostgresLeases(sqlClient),
 	);
 	return {
 		deleted: drain.results.reduce((total, result) => total + result.deleted, 0),

@@ -24,8 +24,16 @@ import {
 	persistGitHubStatuses,
 } from "./github-outcomes-persistence.service.js";
 import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
+import {
+	assertPostgresLeaseHeld,
+	PostgresLeaseLostError,
+	withPostgresLease,
+} from "./postgres-lease.service.js";
 
 const DAY_MS = 86_400_000;
+// Longer than the 20-second sweep budget plus its final writes, and renewed
+// while the sweep runs; a crashed worker frees the installation within it.
+const SWEEP_LEASE_TTL_MS = 60_000;
 const DATASETS = [
 	"actions",
 	"jobs",
@@ -192,190 +200,199 @@ export async function runGitHubRepositorySweep(input: {
 			deferred = true;
 			break;
 		}
-		const connection = await input.database.reserve();
-		const lock = `github-sweep-installation:${binding.installation_id}`;
-		let locked = false;
-		try {
-			const [claimed] = await connection.unsafe<Array<{ locked: boolean }>>(
-				"SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked",
-				[lock],
-			);
-			if (!claimed?.locked) {
-				deferred = true;
-				continue;
-			}
-			locked = true;
-			await input.database.begin(async (transaction) => {
-				if (await lockGitHubOutcomesBinding(binding, transaction))
-					await enqueueGitHubRepositorySweep(binding, now(), transaction);
-			});
-			let source: ReturnType<typeof createGitHubSweepSource> | undefined;
-			while (
-				Date.now() < deadline &&
-				!input.signal?.aborted &&
-				requests < maxRequests &&
-				isGitHubSweepEnabled(input.environment)
-			) {
-				const sweep = await nextSweep(binding, input.database);
-				if (!sweep) break;
-				if (await liveLanePending(binding.installation_id, input.database)) {
-					deferred = true;
-					break;
-				}
-				try {
-					if (!source) {
-						const [budget] = await input.database.unsafe<
-							Array<{ available: boolean }>
-						>(
-							`SELECT sweep_rate_remaining IS NULL OR sweep_rate_remaining > 0 OR sweep_rate_reset_at <= $2 AS available FROM github_app_installation WHERE installation_id = $1`,
-							[binding.installation_id, now().toISOString()],
-						);
-						if (!budget?.available) {
-							deferred = true;
-							break;
-						}
-						const requestFetch = input.fetch ?? globalThis.fetch;
-						const tokenFetch: typeof globalThis.fetch = Object.assign(
-							async (url: string | URL | Request, init?: RequestInit) => {
-								const response = await requestFetch(url, {
-									...init,
-									signal: AbortSignal.any([
-										AbortSignal.timeout(Math.max(1, deadline - Date.now())),
-										...(input.signal ? [input.signal] : []),
-									]),
-								});
-								if (response.status === 403 || response.status === 404) {
-									await response.body?.cancel();
-									throw new GitHubSourceError({
-										kind: response.status === 403 ? "forbidden" : "not-found",
-										status: response.status,
-										message: "GitHub installation token is unavailable",
-										endpoint: "/app/installations/access_tokens",
-										requestId: response.headers.get("x-github-request-id"),
-										retryAfterMs: null,
+		const outcome = await withPostgresLease(
+			`github-sweep-installation:${binding.installation_id}`,
+			async (lease) => {
+				const signal = input.signal
+					? AbortSignal.any([input.signal, lease.signal])
+					: lease.signal;
+				await input.database.begin(async (transaction) => {
+					if (await lockGitHubOutcomesBinding(binding, transaction))
+						await enqueueGitHubRepositorySweep(binding, now(), transaction);
+				});
+				let source: ReturnType<typeof createGitHubSweepSource> | undefined;
+				while (
+					Date.now() < deadline &&
+					!signal.aborted &&
+					requests < maxRequests &&
+					isGitHubSweepEnabled(input.environment)
+				) {
+					const sweep = await nextSweep(binding, input.database);
+					if (!sweep) break;
+					if (await liveLanePending(binding.installation_id, input.database)) {
+						deferred = true;
+						break;
+					}
+					try {
+						if (!source) {
+							const [budget] = await input.database.unsafe<
+								Array<{ available: boolean }>
+							>(
+								`SELECT sweep_rate_remaining IS NULL OR sweep_rate_remaining > 0 OR sweep_rate_reset_at <= $2 AS available FROM github_app_installation WHERE installation_id = $1`,
+								[binding.installation_id, now().toISOString()],
+							);
+							if (!budget?.available) {
+								deferred = true;
+								break;
+							}
+							const requestFetch = input.fetch ?? globalThis.fetch;
+							const tokenFetch: typeof globalThis.fetch = Object.assign(
+								async (url: string | URL | Request, init?: RequestInit) => {
+									const response = await requestFetch(url, {
+										...init,
+										signal: AbortSignal.any([
+											AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+											signal,
+										]),
 									});
-								}
-								return response;
-							},
-							{ preconnect: requestFetch.preconnect },
-						);
-						const token = await (
-							input.createToken ?? createGitHubInstallationAccessToken
-						)({
-							config: input.config,
-							installationId: binding.installation_id,
-							fetch: tokenFetch,
-							now: now(),
-						});
-						const boundedFetch: typeof globalThis.fetch = Object.assign(
-							async (url: string | URL | Request, init?: RequestInit) => {
-								if (
-									Date.now() >= deadline ||
-									input.signal?.aborted ||
-									requests >= maxRequests ||
-									!isGitHubSweepEnabled(input.environment) ||
-									(await liveLanePending(
+									if (response.status === 403 || response.status === 404) {
+										await response.body?.cancel();
+										throw new GitHubSourceError({
+											kind: response.status === 403 ? "forbidden" : "not-found",
+											status: response.status,
+											message: "GitHub installation token is unavailable",
+											endpoint: "/app/installations/access_tokens",
+											requestId: response.headers.get("x-github-request-id"),
+											retryAfterMs: null,
+										});
+									}
+									return response;
+								},
+								{ preconnect: requestFetch.preconnect },
+							);
+							const token = await (
+								input.createToken ?? createGitHubInstallationAccessToken
+							)({
+								config: input.config,
+								installationId: binding.installation_id,
+								fetch: tokenFetch,
+								now: now(),
+							});
+							const boundedFetch: typeof globalThis.fetch = Object.assign(
+								async (url: string | URL | Request, init?: RequestInit) => {
+									if (
+										Date.now() >= deadline ||
+										signal.aborted ||
+										requests >= maxRequests ||
+										!isGitHubSweepEnabled(input.environment) ||
+										(await liveLanePending(
+											binding.installation_id,
+											input.database,
+										))
+									)
+										throw new Error("sweep-yield");
+									if (
+										!(await reserveRateBudget(
+											binding.installation_id,
+											now(),
+											input.database,
+										))
+									)
+										throw new Error("sweep-yield");
+									requests += 1;
+									const response = await requestFetch(url, {
+										...init,
+										signal: AbortSignal.any([
+											AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+											signal,
+										]),
+									});
+									await recordRateBudget(
 										binding.installation_id,
-										input.database,
-									))
-								)
-									throw new Error("sweep-yield");
-								if (
-									!(await reserveRateBudget(
-										binding.installation_id,
+										response.headers,
 										now(),
 										input.database,
-									))
-								)
-									throw new Error("sweep-yield");
-								requests += 1;
-								const signal = AbortSignal.any([
-									AbortSignal.timeout(Math.max(1, deadline - Date.now())),
-									...(input.signal ? [input.signal] : []),
-								]);
-								const response = await requestFetch(url, { ...init, signal });
-								await recordRateBudget(
-									binding.installation_id,
-									response.headers,
-									now(),
-									input.database,
-								);
-								return response;
-							},
-							{ preconnect: requestFetch.preconnect },
+									);
+									return response;
+								},
+								{ preconnect: requestFetch.preconnect },
+							);
+							source = createGitHubSweepSource({
+								authorization: createGitHubAuthorization(token),
+								fetch: boundedFetch,
+							});
+						}
+						const batch: GitHubOutcomesBatch = new Map();
+						const step = await collectStep(
+							sweep,
+							binding,
+							source,
+							now(),
+							batch,
 						);
-						source = createGitHubSweepSource({
-							authorization: createGitHubAuthorization(token),
-							fetch: boundedFetch,
-						});
-					}
-					const batch: GitHubOutcomesBatch = new Map();
-					const step = await collectStep(sweep, binding, source, now(), batch);
-					await input.database.begin(async (transaction) => {
-						if (!(await lockGitHubOutcomesBinding(binding, transaction)))
-							return;
-						await step.write(transaction);
-						await flushGitHubOutcomesBatch(binding, batch, transaction);
-						if (step.split) await splitWindow(sweep, transaction);
-						else
-							await updateSweep(
-								sweep,
-								step.cursor,
-								step.complete ? "complete" : "pending",
-								now(),
+						await input.database.begin(async (transaction) => {
+							if (!(await lockGitHubOutcomesBinding(binding, transaction)))
+								return;
+							await step.write(transaction);
+							await flushGitHubOutcomesBatch(
+								binding,
+								batch,
+								lease.signal,
 								transaction,
 							);
-						if (sweep.dataset === "actions" && step.complete)
-							await finalizeRetention(binding, transaction);
-					});
-				} catch (error) {
-					if (
-						error instanceof GitHubSourceError &&
-						(error.status === 403 || error.status === 404) &&
-						error.kind !== "rate-limit"
-					) {
-						await input.database.unsafe(
-							`UPDATE github_repository_sweep SET status = 'unavailable', error = $3, updated_at = $4 WHERE organization_id = $1 AND repository_id = $2 AND status = 'pending'`,
-							[
-								binding.organizationId,
-								binding.repositoryId,
-								`github-${error.status}`,
-								now().toISOString(),
-							],
-						);
-					} else if (
-						error instanceof GitHubSourceError &&
-						error.kind === "rate-limit"
-					) {
-						await input.database.unsafe(
-							`UPDATE github_app_installation SET sweep_rate_remaining = 0, sweep_rate_reset_at = GREATEST(sweep_rate_reset_at, $2::timestamptz) WHERE installation_id = $1`,
-							[
-								binding.installation_id,
-								new Date(
-									now().getTime() + Math.max(60_000, error.retryAfterMs ?? 0),
-								).toISOString(),
-							],
-						);
-						deferred = true;
-					} else if (
-						error instanceof GitHubSourceError &&
-						error.kind === "network"
-					)
-						deferred = true;
-					else if (input.signal?.aborted || Date.now() >= deadline)
-						deferred = true;
-					else throw error;
-					break;
+							// A worker that took over an expired lease owns the cursor now; a
+							// stalled worker must not move it back.
+							await assertPostgresLeaseHeld(lease, transaction);
+							if (step.split) await splitWindow(sweep, transaction);
+							else
+								await updateSweep(
+									sweep,
+									step.cursor,
+									step.complete ? "complete" : "pending",
+									now(),
+									transaction,
+								);
+							if (sweep.dataset === "actions" && step.complete)
+								await finalizeRetention(binding, transaction);
+						});
+					} catch (error) {
+						if (
+							error instanceof GitHubSourceError &&
+							(error.status === 403 || error.status === 404) &&
+							error.kind !== "rate-limit"
+						) {
+							await input.database.unsafe(
+								`UPDATE github_repository_sweep SET status = 'unavailable', error = $3, updated_at = $4 WHERE organization_id = $1 AND repository_id = $2 AND status = 'pending'`,
+								[
+									binding.organizationId,
+									binding.repositoryId,
+									`github-${error.status}`,
+									now().toISOString(),
+								],
+							);
+						} else if (
+							error instanceof GitHubSourceError &&
+							error.kind === "rate-limit"
+						) {
+							await input.database.unsafe(
+								`UPDATE github_app_installation SET sweep_rate_remaining = 0, sweep_rate_reset_at = GREATEST(sweep_rate_reset_at, $2::timestamptz) WHERE installation_id = $1`,
+								[
+									binding.installation_id,
+									new Date(
+										now().getTime() + Math.max(60_000, error.retryAfterMs ?? 0),
+									).toISOString(),
+								],
+							);
+							deferred = true;
+						} else if (
+							error instanceof GitHubSourceError &&
+							error.kind === "network"
+						)
+							deferred = true;
+						else if (
+							error instanceof PostgresLeaseLostError ||
+							signal.aborted ||
+							Date.now() >= deadline
+						)
+							deferred = true;
+						else throw error;
+						break;
+					}
 				}
-			}
-		} finally {
-			if (locked)
-				await connection.unsafe(
-					"SELECT pg_advisory_unlock(hashtextextended($1, 0))",
-					[lock],
-				);
-			connection.release();
-		}
+			},
+			{ database: input.database, ttlMs: SWEEP_LEASE_TTL_MS },
+		);
+		if (outcome.status === "busy") deferred = true;
 	}
 	for (const organizationId of new Set(
 		bindings.map((binding) => binding.organizationId),

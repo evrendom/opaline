@@ -30,6 +30,13 @@ describe("daily API maintenance", () => {
 		);
 	});
 
+	test("prunes coordination leases abandoned by crashed holders", () => {
+		expect(maintenanceSource).toContain(
+			"() => pruneExpiredPostgresLeases(sqlClient)",
+		);
+		expect(maintenanceSource).toContain('coordinationLeases.status === "ok"');
+	});
+
 	test("keeps native lineage out of heavyweight generic maintenance", () => {
 		expect(maintenanceSource).not.toContain("runNativeMetadataDiscoveryPass");
 		expect(maintenanceSource).not.toContain("repairNativeSessionLineagePass");

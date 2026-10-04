@@ -14,6 +14,7 @@ import {
 	IngestFilterWorkerOperationalError,
 	SessionLanguageSignalScannerOperationalError,
 } from "../services/ingest-worker-operational.error.js";
+import { PostgresLeaseLostError } from "../services/postgres-lease.service.js";
 import {
 	isDefinitelyPermanentProcessingError,
 	isRetryableProcessingError,
@@ -136,6 +137,18 @@ describe("R2 ingest processing error classification", () => {
 				}),
 			),
 		).toBe(true);
+	});
+
+	test("treats a lost coordination lease as transient, also when wrapped", () => {
+		const lost = new PostgresLeaseLostError("ingest-processing:identity");
+
+		expect(isRetryableProcessingError(lost)).toBe(true);
+		expect(
+			isRetryableProcessingError(
+				new Error("processing failed", { cause: lost }),
+			),
+		).toBe(true);
+		expect(isDefinitelyPermanentProcessingError(lost)).toBe(false);
 	});
 
 	test.each([

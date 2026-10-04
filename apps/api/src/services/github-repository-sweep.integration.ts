@@ -38,6 +38,10 @@ import {
 	deleteUserSessions,
 } from "./org-session.service.js";
 import { deleteOrganizationPostgresData } from "./organization-deletion.service.js";
+import {
+	acquirePostgresLease,
+	releasePostgresLease,
+} from "./postgres-lease.service.js";
 import { deleteUserPostgresData } from "./user-deletion.service.js";
 
 setDefaultTimeout(120_000);
@@ -640,25 +644,80 @@ test("workspace and sole-member account deletion durably purge stage-1 facts", a
 
 test("installation concurrency is one across independent worker invocations", async () => {
 	const scope = await seed();
-	const connection = await sqlClient.reserve();
-	const lock = `github-sweep-installation:${scope.installationId}`;
+	const lease = `github-sweep-installation:${scope.installationId}`;
+	const holder = randomUUID();
+	expect(await acquirePostgresLease(lease, holder, 60_000, sqlClient)).toBe(
+		true,
+	);
 	try {
-		await connection.unsafe(
-			"SELECT pg_advisory_lock(hashtextextended($1, 0))",
-			[lock],
-		);
 		const yielded = await execute(scope.organizationId, defaults);
 		expect(yielded.requests).toBe(0);
 		expect(yielded.hasMore).toBe(true);
 	} finally {
-		await connection.unsafe(
-			"SELECT pg_advisory_unlock(hashtextextended($1, 0))",
-			[lock],
-		);
-		connection.release();
+		expect(await releasePostgresLease(lease, holder, sqlClient)).toBe(true);
 	}
 	const resumed = await execute(scope.organizationId, defaults);
 	expect(resumed.requests).toBeGreaterThan(0);
+});
+
+test("an installation lease left by a crashed worker is taken over once it expires", async () => {
+	const scope = await seed();
+	const lease = `github-sweep-installation:${scope.installationId}`;
+	// The crashed worker never renews or releases its lease.
+	expect(
+		await acquirePostgresLease(lease, randomUUID(), 1_000, sqlClient),
+	).toBe(true);
+	const blocked = await execute(scope.organizationId, defaults);
+	expect(blocked.requests).toBe(0);
+	expect(blocked.hasMore).toBe(true);
+	await Bun.sleep(1_500);
+	const resumed = await execute(scope.organizationId, defaults);
+	expect(resumed.requests).toBeGreaterThan(0);
+	const [remaining] = await sqlClient<Array<{ count: number }>>`
+		SELECT count(*)::int AS count FROM coordination_lease WHERE name = ${lease}
+	`;
+	expect(remaining?.count).toBe(0);
+});
+
+test("a worker whose lease was taken over cannot commit its sweep cursor", async () => {
+	const scope = await seed();
+	const lease = `github-sweep-installation:${scope.installationId}`;
+	const successor = randomUUID();
+	let stolen = false;
+	const route: Route = async (url) => {
+		if (url.pathname.endsWith("/actions/runs") && !stolen) {
+			// The page is fetched; meanwhile the lease expires and a successor
+			// takes over before this worker commits.
+			stolen = true;
+			await sqlClient`
+				UPDATE coordination_lease SET holder = ${successor} WHERE name = ${lease}
+			`;
+		}
+		return defaults(url);
+	};
+
+	const stalled = await execute(scope.organizationId, route);
+
+	expect(stolen).toBe(true);
+	expect(stalled.hasMore).toBe(true);
+	const [committed] = await sqlClient<Array<{ count: number }>>`
+		SELECT count(*)::int AS count FROM github_repository_sweep
+		WHERE organization_id = ${scope.organizationId}
+			AND (status <> 'pending' OR cursor ? 'page')
+	`;
+	expect(committed?.count).toBe(0);
+	const [holder] = await sqlClient<Array<{ holder: string }>>`
+		SELECT holder FROM coordination_lease WHERE name = ${lease}
+	`;
+	expect(holder?.holder).toBe(successor);
+
+	expect(await releasePostgresLease(lease, successor, sqlClient)).toBe(true);
+	await execute(scope.organizationId, defaults);
+	const [completed] = await sqlClient<Array<{ count: number }>>`
+		SELECT count(*)::int AS count FROM github_repository_sweep
+		WHERE organization_id = ${scope.organizationId} AND status = 'complete'
+	`;
+	expect(completed?.count).toBeGreaterThan(0);
 });
 
 test("daily reconciliation finds re-runs on old commits without refetching unchanged commit maps", async () => {

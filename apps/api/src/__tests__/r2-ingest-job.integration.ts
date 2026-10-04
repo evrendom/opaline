@@ -41,6 +41,10 @@ import {
 } from "../services/ingest-processing-ledger.service.js";
 import { IngestFilterWorkerOperationalError } from "../services/ingest-worker-operational.error.js";
 import {
+	acquirePostgresLease,
+	PostgresLeaseLostError,
+} from "../services/postgres-lease.service.js";
+import {
 	cleanupIngestJobObjects,
 	getNextR2IngestWorkDueAt,
 	repairR2IngestCleanupJobs,
@@ -1818,6 +1822,46 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 	});
 
+	test("a lost coordination lease keeps the attempt and leaves the upload retryable", async () => {
+		const initialized = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"lost lease transcript",
+		);
+		const lost = new PostgresLeaseLostError("ingest-processing:identity");
+
+		await expect(
+			commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: async () => {
+					throw lost;
+				},
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).rejects.toBe(lost);
+		expect(
+			await getR2IngestJobStatus(initialized.jobId, USER_ID),
+		).toMatchObject({
+			attempts: 0,
+			error: { code: "R2_INGEST_DEPENDENCY_UNAVAILABLE" },
+			status: "pending",
+		});
+		expect(
+			initialized.objects.every((object) =>
+				fakeR2.objects.has(object.objectKey),
+			),
+		).toBe(true);
+
+		const retried = await commitR2IngestJob({
+			input: buildCompletionInput(initialized),
+			now: () => new Date("2030-01-01T00:00:00.000Z"),
+			process: async (input) => processorResult(input.sessionId),
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		expect(retried.status).toBe("completed");
+	});
+
 	test("leaves objects intact on an R2 ClientDisconnect service error", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
@@ -2861,70 +2905,102 @@ describe("R2 ingest real processor crash recovery", () => {
 		await expectPhysicalAndLogicalIdempotency(jobId, skillName);
 	}, 180_000);
 
-	test("releases all advisory locks when the targeted unlock is not confirmed", async () => {
-		const sessionId = `unlock-failure-${crypto.randomUUID()}`;
-		let unlockFailureInjected = false;
-		const semaphore = createIngestProcessingSemaphore({
-			maxActive: 1,
-			maxQueued: 1,
-			waitTimeoutMs: 1_000,
-		});
-		const result = await withIngestProcessingLedger(
-			{
-				filteredContentSha256: "d".repeat(64),
-				filterVersion: 2,
-				organizationId: ORGANIZATION_ID,
-				sessionId,
-			},
+	test("an identity whose processor crashed holding its lease resumes once the lease expires", async () => {
+		const identity = {
+			filteredContentSha256: "d".repeat(64),
+			filterVersion: 2,
+			organizationId: ORGANIZATION_ID,
+			sessionId: `crashed-lease-${crypto.randomUUID()}`,
+		};
+		const leaseName = `ingest-processing:${JSON.stringify([
+			identity.organizationId,
+			identity.sessionId,
+			identity.filteredContentSha256,
+			identity.filterVersion,
+		])}`;
+		// A processor that took the lease and died never releases or renews it.
+		expect(
+			await acquirePostgresLease(
+				leaseName,
+				crypto.randomUUID(),
+				1_000,
+				sqlClient,
+			),
+		).toBe(true);
+		const blocked = await withIngestProcessingLedger(
+			identity,
 			(value) => String(value),
-			async () => "ledger-completed",
-			{
-				database: ingestProcessingSqlClient,
-				failpoint: async (boundary) => {
-					if (
-						boundary.store === "postgres" &&
-						boundary.target === "advisory-unlock"
-					) {
-						unlockFailureInjected = true;
-						throw new Error("simulated advisory unlock failure");
-					}
-				},
-				now: () => new Date("2030-01-02T00:00:00.000Z"),
-				randomUUID: () => crypto.randomUUID(),
-				semaphore,
-				signal: undefined,
-			},
+			async () => "must-not-run-while-leased",
+			createLedgerTestEnvironment(ingestProcessingSqlClient),
 		);
-		expect(result).toEqual({
-			result: "ledger-completed",
+		expect(blocked).toEqual({ status: "already_processing" });
+
+		await Bun.sleep(1_500);
+		const resumed = await withIngestProcessingLedger(
+			identity,
+			(value) => String(value),
+			async () => "resumed-after-expiry",
+			createLedgerTestEnvironment(ingestProcessingSqlClient),
+		);
+		expect(resumed).toEqual({
+			result: "resumed-after-expiry",
 			status: "completed",
 		});
-		expect(unlockFailureInjected).toBe(true);
-		const lockIdentity = JSON.stringify([
-			ORGANIZATION_ID,
-			sessionId,
-			"d".repeat(64),
-			2,
-		]);
-		const lockConnection = await sqlClient.reserve();
-		let locked = false;
-		try {
-			const [available] = await lockConnection<Array<{ locked: boolean }>>`
-				SELECT pg_try_advisory_lock(hashtextextended(${lockIdentity}, 0)) AS locked
-			`;
-			locked = available?.locked === true;
-			expect(locked).toBe(true);
-		} finally {
-			try {
-				if (locked) {
-					await lockConnection`
-						SELECT pg_advisory_unlock(hashtextextended(${lockIdentity}, 0))
+		const [remaining] = await sqlClient<Array<{ count: number }>>`
+			SELECT count(*)::int AS count FROM coordination_lease WHERE name = ${leaseName}
+		`;
+		expect(remaining?.count).toBe(0);
+	});
+
+	test("a processor whose lease was taken over cannot overwrite the successor's ledger result", async () => {
+		const identity = {
+			filteredContentSha256: "f".repeat(64),
+			filterVersion: 2,
+			organizationId: ORGANIZATION_ID,
+			sessionId: `taken-over-${crypto.randomUUID()}`,
+		};
+		const leaseName = `ingest-processing:${JSON.stringify([
+			identity.organizationId,
+			identity.sessionId,
+			identity.filteredContentSha256,
+			identity.filterVersion,
+		])}`;
+		const successor = crypto.randomUUID();
+		let ledgerId = "";
+
+		await expect(
+			withIngestProcessingLedger(
+				identity,
+				(value) => String(value),
+				async (ledger) => {
+					ledgerId = ledger.id;
+					// The stalled processor's lease expired; a successor took it over
+					// and completed the same identity before the stale work returns.
+					await sqlClient`
+						UPDATE coordination_lease SET holder = ${successor} WHERE name = ${leaseName}
 					`;
-				}
-			} finally {
-				lockConnection.release();
-			}
-		}
+					await sqlClient`
+						UPDATE ingest_processing_ledger
+						SET
+							status = 'completed',
+							result = ${JSON.stringify("successor-result")}::jsonb,
+							completed_at = NOW()
+						WHERE id = ${ledger.id}
+					`;
+					return "stale-result";
+				},
+				createLedgerTestEnvironment(ingestProcessingSqlClient),
+			),
+		).rejects.toBeInstanceOf(PostgresLeaseLostError);
+
+		const [row] = await sqlClient<Array<{ result: unknown; status: string }>>`
+			SELECT status, result FROM ingest_processing_ledger WHERE id = ${ledgerId}
+		`;
+		expect(row).toEqual({ result: "successor-result", status: "completed" });
+		const [lease] = await sqlClient<Array<{ holder: string }>>`
+			SELECT holder FROM coordination_lease WHERE name = ${leaseName}
+		`;
+		expect(lease?.holder).toBe(successor);
 	});
 
 	test("returns already_processing across independent instances for the same hash", async () => {

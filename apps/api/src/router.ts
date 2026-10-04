@@ -920,7 +920,9 @@ async function processPreparedIngestSession({
 						extractSessionFacts,
 						input,
 						prepared,
-						signal,
+						signal: signal
+							? AbortSignal.any([signal, ledger.signal])
+							: ledger.signal,
 					}),
 				{
 					database: ingestProcessingSqlClient,

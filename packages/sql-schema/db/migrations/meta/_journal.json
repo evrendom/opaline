@@ -365,6 +365,13 @@
 			"when": 1790872604294,
 			"tag": "0051_user_cli_version",
 			"breakpoints": true
+		},
+		{
+			"idx": 52,
+			"version": "7",
+			"when": 1791101265137,
+			"tag": "0052_coordination_lease",
+			"breakpoints": true
 		}
 	]
 }

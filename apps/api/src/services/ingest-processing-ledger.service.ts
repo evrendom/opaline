@@ -3,7 +3,16 @@ import {
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
 } from "./ingest-processing-boundary.js";
+import {
+	assertPostgresLeaseHeld,
+	type PostgresLease,
+	withPostgresLease,
+} from "./postgres-lease.service.js";
 import { UsageExtractionSupersededError } from "./usage-extraction-superseded.error.js";
+
+// Renewed every 20 seconds while the upload is processed, so a processor that
+// crashes (or whose function is killed) frees the identity within a minute.
+const INGEST_PROCESSING_LEASE_TTL_MS = 60_000;
 
 export interface IngestProcessingIdentity {
 	readonly filteredContentSha256: string;
@@ -13,10 +22,12 @@ export interface IngestProcessingIdentity {
 }
 
 export interface ClaimedIngestProcessingLedger {
-	readonly connection: postgres.ReservedSql;
+	readonly connection: postgres.Sql;
 	readonly id: string;
 	readonly rawIngestedAt: Date;
 	readonly recovering: boolean;
+	/** Aborts when this processor can no longer prove it holds the identity's lease. */
+	readonly signal: AbortSignal;
 }
 
 export interface IngestProcessingTargetReceipt {
@@ -71,114 +82,107 @@ export async function withIngestProcessingLedger<TResult>(
 	env: IngestProcessingLedgerEnvironment,
 ): Promise<IngestProcessingLedgerResult<TResult>> {
 	const releasePermit = await env.semaphore.acquire(env.signal);
-	const lockIdentity = buildLockIdentity(identity);
 	try {
-		const connection = await env.database.reserve();
-		let locked = false;
-		try {
-			const [lock] = await connection.unsafe<Array<{ locked: boolean }>>(
-				"SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked",
-				[lockIdentity],
-			);
-			locked = lock?.locked === true;
-			if (!locked) return { status: "already_processing" };
-
-			const inserted = await connection.unsafe<Array<{ id: string }>>(
-				`INSERT INTO ingest_processing_ledger (
-				id,
-				organization_id,
-				session_id,
-				filtered_content_sha256,
-				filter_version,
-				raw_ingested_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (
-				organization_id,
-				session_id,
-				filtered_content_sha256,
-				filter_version
-			) DO NOTHING
-			RETURNING id`,
-				[
-					env.randomUUID(),
-					identity.organizationId,
-					identity.sessionId,
-					identity.filteredContentSha256,
-					identity.filterVersion,
-					env.now().toISOString(),
-				],
-			);
-
-			const row = await readLedgerRow(identity, connection);
-			if (row.status === "completed") {
-				return {
-					result: parseCompletedResult(row.result),
-					status: "completed",
-				};
-			}
-
-			await connection.unsafe(
-				`UPDATE ingest_processing_ledger
-			 SET status = 'processing', updated_at = NOW()
-			 WHERE id = $1`,
-				[row.id],
-			);
-			const result = await operation({
-				connection,
-				id: row.id,
-				rawIngestedAt: toDate(row.rawIngestedAt),
-				recovering: inserted.length === 0,
-			});
-			const completed = await connection.unsafe<Array<{ id: string }>>(
-				`UPDATE ingest_processing_ledger
-			 SET
-				status = 'completed',
-				result = $1,
-				completed_at = NOW(),
-				updated_at = NOW()
-			 WHERE id = $2
-			 RETURNING id`,
-				[connection.json(toJsonValue(result)), row.id],
-			);
-			if (completed.length !== 1) {
-				throw new Error("Ingest processing ledger completion failed");
-			}
-			await passIngestProcessingBoundary(env.failpoint, {
-				store: "postgres",
-				target: "ledger-completed",
-			});
-			return { result, status: "completed" };
-		} finally {
-			if (locked) await releaseProcessingLock(connection, lockIdentity, env);
-			connection.release();
-		}
+		const outcome = await withPostgresLease(
+			buildLeaseName(identity),
+			(lease) =>
+				processClaimedLedger(
+					identity,
+					parseCompletedResult,
+					operation,
+					lease,
+					env,
+				),
+			{ database: env.database, ttlMs: INGEST_PROCESSING_LEASE_TTL_MS },
+		);
+		return outcome.status === "busy"
+			? { status: "already_processing" }
+			: outcome.result;
 	} finally {
 		releasePermit();
 	}
 }
 
-async function releaseProcessingLock(
-	connection: postgres.ReservedSql,
-	lockIdentity: string,
+async function processClaimedLedger<TResult>(
+	identity: IngestProcessingIdentity,
+	parseCompletedResult: (value: unknown) => TResult,
+	operation: (ledger: ClaimedIngestProcessingLedger) => Promise<TResult>,
+	lease: PostgresLease,
 	env: IngestProcessingLedgerEnvironment,
-): Promise<void> {
-	let unlockConfirmed = false;
-	try {
-		await passIngestProcessingBoundary(env.failpoint, {
-			store: "postgres",
-			target: "advisory-unlock",
-		});
-		const [unlocked] = await connection.unsafe<Array<{ unlocked: boolean }>>(
-			"SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
-			[lockIdentity],
+): Promise<IngestProcessingLedgerResult<TResult>> {
+	const database = env.database;
+	const inserted = await database.unsafe<Array<{ id: string }>>(
+		`INSERT INTO ingest_processing_ledger (
+		id,
+		organization_id,
+		session_id,
+		filtered_content_sha256,
+		filter_version,
+		raw_ingested_at
+	)
+	VALUES ($1, $2, $3, $4, $5, $6)
+	ON CONFLICT (
+		organization_id,
+		session_id,
+		filtered_content_sha256,
+		filter_version
+	) DO NOTHING
+	RETURNING id`,
+		[
+			env.randomUUID(),
+			identity.organizationId,
+			identity.sessionId,
+			identity.filteredContentSha256,
+			identity.filterVersion,
+			env.now().toISOString(),
+		],
+	);
+
+	const row = await readLedgerRow(identity, database);
+	if (row.status === "completed") {
+		return {
+			result: parseCompletedResult(row.result),
+			status: "completed",
+		};
+	}
+
+	await database.unsafe(
+		`UPDATE ingest_processing_ledger
+	 SET status = 'processing', updated_at = NOW()
+	 WHERE id = $1`,
+		[row.id],
+	);
+	const result = await operation({
+		connection: database,
+		id: row.id,
+		rawIngestedAt: toDate(row.rawIngestedAt),
+		recovering: inserted.length === 0,
+		signal: lease.signal,
+	});
+	// A successor that took over an expired lease owns this ledger row now;
+	// the fence keeps a stalled processor from overwriting its result.
+	const completed = await database.begin(async (transaction) => {
+		await assertPostgresLeaseHeld(lease, transaction);
+		return transaction.unsafe<Array<{ id: string }>>(
+			`UPDATE ingest_processing_ledger
+		 SET
+			status = 'completed',
+			result = $1,
+			completed_at = NOW(),
+			updated_at = NOW()
+		 WHERE id = $2
+		 RETURNING id`,
+			[transaction.json(toJsonValue(result)), row.id],
 		);
-		unlockConfirmed = unlocked?.unlocked === true;
-	} catch {}
-	if (unlockConfirmed) return;
-	try {
-		await connection.unsafe("SELECT pg_advisory_unlock_all()");
-	} catch {}
+	});
+	if (completed.length !== 1) {
+		throw new Error("Ingest processing ledger completion failed");
+	}
+	await passIngestProcessingBoundary(env.failpoint, {
+		store: "postgres",
+		target: "ledger-completed",
+	});
+	return { result, status: "completed" };
 }
 
 export async function readIngestProcessingTargetReceipt(
@@ -289,7 +293,7 @@ export async function reserveLedgerUsageGeneration(
 
 async function readLedgerRow(
 	identity: IngestProcessingIdentity,
-	connection: postgres.ReservedSql,
+	connection: postgres.Sql,
 ): Promise<IngestProcessingLedgerRow> {
 	const [row] = await connection.unsafe<IngestProcessingLedgerRow[]>(
 		`SELECT
@@ -426,13 +430,13 @@ export const ingestProcessingSemaphore = createIngestProcessingSemaphore({
 	waitTimeoutMs: 1_000,
 });
 
-function buildLockIdentity(identity: IngestProcessingIdentity): string {
-	return JSON.stringify([
+function buildLeaseName(identity: IngestProcessingIdentity): string {
+	return `ingest-processing:${JSON.stringify([
 		identity.organizationId,
 		identity.sessionId,
 		identity.filteredContentSha256,
 		identity.filterVersion,
-	]);
+	])}`;
 }
 
 function toDate(value: Date | string): Date {

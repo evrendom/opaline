@@ -70,12 +70,13 @@ describe("ingest processing semaphore", () => {
 				// longer matches: the outer CAS returns no ledger row.
 				return Promise.resolve([]);
 			},
-		} as unknown as postgres.ReservedSql;
+		} as unknown as postgres.Sql;
 		const ledger: ClaimedIngestProcessingLedger = {
 			connection,
 			id: "ledger-id",
 			rawIngestedAt: new Date("2026-08-27T00:00:00.000Z"),
 			recovering: true,
+			signal: new AbortController().signal,
 		};
 
 		await expect(

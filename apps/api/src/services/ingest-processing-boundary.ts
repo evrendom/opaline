@@ -8,7 +8,6 @@ export type IngestProcessingBoundary =
 			target:
 				| "job-completed"
 				| "ledger-completed"
-				| "advisory-unlock"
 				| "raw-receipt"
 				| "usage-generation"
 				| "usage-receipt";

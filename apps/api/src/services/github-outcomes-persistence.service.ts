@@ -35,9 +35,11 @@ export async function lockGitHubOutcomesBinding(
 export async function flushGitHubOutcomesBatch(
 	scope: GitHubOutcomesScope,
 	batch: GitHubOutcomesBatch,
+	signal: AbortSignal,
 	database: Writer,
 ): Promise<void> {
-	for (const [table, rows] of batch) await insert(scope, table, rows, database);
+	for (const [table, rows] of batch)
+		await insert(scope, table, rows, signal, database);
 }
 
 export async function persistGitHubPullRequests(
@@ -396,16 +398,18 @@ async function write(
 ): Promise<void> {
 	if (rows.length === 0) return;
 	if (batch) batch.set(table, [...(batch.get(table) ?? []), ...rows]);
-	else await insert(scope, table, rows, database);
+	else await insert(scope, table, rows, undefined, database);
 }
 
 async function insert(
 	scope: GitHubOutcomesScope,
 	table: string,
 	rows: Row[],
+	signal: AbortSignal | undefined,
 	database: Writer,
 ): Promise<void> {
 	if (rows.length === 0) return;
+	signal?.throwIfAborted();
 	await assertNoClickHousePurgeTombstone(scope, { database });
 	const active = await database.unsafe(
 		`SELECT 1 FROM github_repository_binding binding INNER JOIN github_app_installation installation ON installation.installation_id = binding.installation_id AND installation.organization_id = binding.organization_id WHERE binding.organization_id = $1 AND binding.repository_id = $2 AND binding.status = 'active' AND installation.status = 'active'`,
@@ -413,6 +417,7 @@ async function insert(
 	);
 	if (active.length === 0) throw new Error("github-outcomes-binding-inactive");
 	await getClickhouse().insert({
+		abortSignal: signal,
 		table: `rudel.${table}`,
 		values: rows,
 		asyncInsert: true,
