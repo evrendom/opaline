@@ -62,7 +62,7 @@ const COMMIT_QUEUED_DELAY_MS = 5_000;
 const COMMIT_QUEUED_MESSAGE =
 	"Commit accepted; waiting for a materialization slot";
 const LARGE_COMMIT_QUEUED_MESSAGE =
-	"Commit accepted; a large session is materialized by the resident worker";
+	"Commit accepted; a large session is materialized by the large-ingest worker";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_CODE =
 	"R2_INGEST_INTERRUPTED_FINAL_CLAIM_RESCUE";
 const INTERRUPTED_FINAL_CLAIM_RESCUE_MESSAGE =
@@ -256,11 +256,17 @@ export async function commitR2IngestJob(
 		throw error;
 	}
 
-	// A session above the standard size never materializes inside the commit
-	// request: it holds several copies of the transcript for minutes, and only
-	// the resident worker's process is sized for that. Store the receipt and
-	// let recovery there run it alone; the client polls `ingest.status`.
-	if (isLargeIngestSession(admission.expectedTotalBytes)) {
+	// A session above the standard size, or above what this process's gate
+	// admits (main Vercel functions: `LARGE_INGEST_MIN_BYTES`), never
+	// materializes inside the commit request: it holds several copies of the
+	// transcript for minutes, and only the large-ingest worker (or a resident
+	// server) is sized for that. Store the receipt and let recovery there run
+	// it alone; the client polls `ingest.status`.
+	const gate = options.gate ?? getR2IngestMaterializationGate();
+	if (
+		isLargeIngestSession(admission.expectedTotalBytes) ||
+		admission.expectedTotalBytes > gate.maxJobBytes
+	) {
 		await markCommitQueued(
 			admission,
 			manifest,
@@ -272,7 +278,6 @@ export async function commitR2IngestJob(
 		throw new R2IngestCommitQueuedError();
 	}
 
-	const gate = options.gate ?? getR2IngestMaterializationGate();
 	try {
 		return await gate.run(
 			admission.expectedTotalBytes,

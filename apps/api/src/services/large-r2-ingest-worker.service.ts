@@ -6,7 +6,10 @@ import {
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
 import { readBooleanEnv } from "../lib/env.js";
-import { STANDARD_SESSION_MAX_BYTES } from "../lib/ingest-size.js";
+import {
+	LARGE_INGEST_MIN_BYTES,
+	STANDARD_SESSION_MAX_BYTES,
+} from "../lib/ingest-size.js";
 import { LARGE_R2_INGEST_WORKER_MAX_DURATION_MS } from "./large-r2-ingest-worker-config.js";
 import {
 	type R2IngestProcessor,
@@ -40,7 +43,8 @@ export interface LargeR2IngestWorkerPassResult {
 let workerGate: R2IngestMaterializationGate | undefined;
 
 /**
- * Claims and materializes due sessions above the standard size, one at a time
+ * Claims and materializes due sessions above `LARGE_INGEST_MIN_BYTES` (queued,
+ * retrying, or running with an expired lease), one at a time
  * and alone in this process, until the budget no longer fits another job.
  * Each job is aborted at the deadline and recorded as a retry; a hard kill is
  * recovered when its five-minute lease lapses.
@@ -75,7 +79,7 @@ export async function runLargeR2IngestWorkerPass(input: {
 			gate,
 			leaseDurationMs: LARGE_JOB_LEASE_DURATION_MS,
 			limit: 1,
-			minExpectedTotalBytes: STANDARD_SESSION_MAX_BYTES,
+			minExpectedTotalBytes: LARGE_INGEST_MIN_BYTES,
 			process: input.process,
 			r2: input.r2,
 			signal: AbortSignal.timeout(remainingMs),

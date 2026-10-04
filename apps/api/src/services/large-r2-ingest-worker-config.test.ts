@@ -3,7 +3,12 @@ import {
 	hasLargeR2IngestWorkerFiles,
 	readLargeR2IngestWorkerState,
 } from "./large-r2-ingest-worker-config.js";
-import { canMaterializeLargeR2IngestJobs } from "./r2-ingest-materialization-gate.js";
+import {
+	canMaterializeLargeR2IngestJobs,
+	getProcessR2IngestGateBytes,
+} from "./r2-ingest-materialization-gate.js";
+
+const MEBIBYTE = 1024 * 1024;
 
 describe("large R2 ingest worker mode", () => {
 	test("stays off unless the flag is exactly true", () => {
@@ -47,6 +52,19 @@ describe("large R2 ingest worker mode", () => {
 			}),
 		).toBe(false);
 		expect(canMaterializeLargeR2IngestJobs({})).toBe(true);
+	});
+
+	test("main Vercel functions admit only jobs up to 48 MiB; resident servers admit every session", () => {
+		expect(
+			getProcessR2IngestGateBytes({
+				R2_LARGE_INGEST_WORKER: "true",
+				VERCEL: "1",
+			}),
+		).toEqual({ largeJobMaxBytes: undefined, maxBytes: 48 * MEBIBYTE });
+		expect(getProcessR2IngestGateBytes({})).toEqual({
+			largeJobMaxBytes: 256 * MEBIBYTE,
+			maxBytes: 128 * MEBIBYTE,
+		});
 	});
 
 	test("finds every Bun worker entry file next to the service", () => {

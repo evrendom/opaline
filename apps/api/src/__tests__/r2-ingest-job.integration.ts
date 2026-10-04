@@ -67,7 +67,10 @@ import {
 	type R2IngestProcessorResult,
 	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
-import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
+import {
+	createR2IngestMaterializationGate,
+	getProcessR2IngestGateBytes,
+} from "../services/r2-ingest-materialization-gate.js";
 import { R2IngestCommitQueuedError } from "../services/r2-ingest-processing-error.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
@@ -589,6 +592,107 @@ describe("R2 ingest commit lifecycle", () => {
 				r2: fakeR2,
 			}),
 		).resolves.toEqual({ attempted: 0, completed: 0, stopReason: "deadline" });
+	}, 120_000);
+
+	test("a main Vercel function queues a 60 MiB commit for the large-ingest worker, which rescues it after an expired lease", async () => {
+		const midsize = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"m".repeat(60 * 1024 * 1024),
+		);
+		const small = await initializeUploadedJob(
+			crypto.randomUUID(),
+			"small transcript on the main project",
+		);
+		const vercelGate = createR2IngestMaterializationGate({
+			...getProcessR2IngestGateBytes({ VERCEL: "1" }),
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 60_000,
+			queueTimeoutMs: 1_000,
+		});
+
+		const queued = commitR2IngestJob({
+			gate: vercelGate,
+			input: buildCompletionInput(midsize),
+			process: async () => {
+				throw new Error("a main Vercel function materialized a 60 MiB job");
+			},
+			r2: fakeR2,
+			userId: USER_ID,
+		});
+		// CLI 0.11 and 0.12 poll status on this reason instead of failing.
+		await expect(queued).rejects.toMatchObject({
+			code: "R2_INGEST_JOB_RETRY_LATER",
+			retryable: true,
+		});
+		await expect(queued).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
+		expect(vercelGate.getStats()).toMatchObject({ activeJobs: 0 });
+		expect(await getR2IngestJobStatus(midsize.jobId, USER_ID)).toMatchObject({
+			attempts: 0,
+			error: { code: "R2_INGEST_COMMIT_QUEUED" },
+			status: "pending",
+		});
+
+		// Sessions up to 48 MiB still materialize inside the commit.
+		expect(
+			await commitR2IngestJob({
+				gate: vercelGate,
+				input: buildCompletionInput(small),
+				process: async (input) => processorResult(input.sessionId),
+				r2: fakeR2,
+				userId: USER_ID,
+			}),
+		).toMatchObject({ status: "completed" });
+
+		// The production failure: a commit claimed the job and was killed, so the
+		// job stays running until its lease lapses.
+		await sqlClient`
+			UPDATE ingest_job
+			SET
+				status = 'running',
+				attempts = 1,
+				lease_token = 'killed-commit-lease',
+				lease_expires_at = NOW() - INTERVAL '1 second'
+			WHERE id = ${midsize.jobId}
+		`;
+		await expect(
+			repairRecoverableR2IngestJobs({
+				database: sqlClient,
+				gate: vercelGate,
+				process: async () => {
+					throw new Error("main recovery claimed a 60 MiB job");
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toMatchObject({ attempted: 0, completed: 0 });
+
+		const workerGate = createR2IngestMaterializationGate({
+			largeJobMaxBytes: 256 * 1024 * 1024,
+			maxBytes: 128 * 1024 * 1024,
+			maxJobs: 1,
+			maxQueuedJobs: 1,
+			operationTimeoutMs: 60_000,
+			queueTimeoutMs: 10,
+		});
+		const processed: string[] = [];
+		await expect(
+			runLargeR2IngestWorkerPass({
+				database: sqlClient,
+				deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
+				gate: workerGate,
+				process: async (input) => {
+					processed.push(input.sessionId);
+					return processorResult(input.sessionId);
+				},
+				r2: fakeR2,
+			}),
+		).resolves.toEqual({ attempted: 1, completed: 1, stopReason: "complete" });
+		expect(processed).toEqual([midsize.jobId]);
+		expect(await getR2IngestJobStatus(midsize.jobId, USER_ID)).toMatchObject({
+			attempts: 2,
+			error: null,
+			status: "completed",
+		});
 	}, 120_000);
 
 	test("the large-ingest worker endpoint requires the cron secret and fails closed without worker mode", async () => {
