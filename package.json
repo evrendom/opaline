@@ -4,6 +4,10 @@
 	"type": "module",
 	"license": "MIT",
 	"scripts": {
+		"trends:fetch-aa": "bun scripts/trends/fetch-artificial-analysis.ts",
+		"trends:fetch-t3": "bun scripts/trends/fetch-t3-usage.ts",
+		"trends:fetch-usage": "bun scripts/trends/fetch-opaline-usage.ts",
+		"trends:test": "bun test scripts/trends/trends-data.test.ts scripts/trends/fetch-artificial-analysis.test.ts scripts/trends/trends-t3.test.ts scripts/trends/trends-opaline.test.ts scripts/trends/trends-refresh.test.ts",
 		"build": "turbo run build",
 		"benchmark:usage-extraction": "bun scripts/benchmark-usage-extraction.ts",
 		"check:disclosure": "bun scripts/check-disclosure.ts",

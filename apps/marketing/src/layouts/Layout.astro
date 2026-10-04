@@ -18,6 +18,8 @@ interface Props {
 	dateModified?: string;
 	noindex?: boolean;
 	socialImage?: SocialImage;
+	/** Browser chrome color for pages that follow the device's dark mode. */
+	darkThemeColor?: string;
 }
 
 const {
@@ -26,6 +28,7 @@ const {
 	canonical,
 	dateModified,
 	noindex = false,
+	darkThemeColor,
 	socialImage = {
 		src: "/images/opaline-social.png",
 		alt: "Team-wide, message-level analytics for coding agents",
@@ -96,7 +99,24 @@ const structuredDataJson = structuredData
 		<link rel="mask-icon" href="/opaline-icon.svg" color="#2c2d30" />
 		<link rel="canonical" href={canonicalUrl} />
 		<link rel="sitemap" href="/sitemap.xml" />
-		<meta name="theme-color" content="#ffffff" />
+		{
+			darkThemeColor ? (
+				<>
+					<meta
+						name="theme-color"
+						media="(prefers-color-scheme: light)"
+						content="#ffffff"
+					/>
+					<meta
+						name="theme-color"
+						media="(prefers-color-scheme: dark)"
+						content={darkThemeColor}
+					/>
+				</>
+			) : (
+				<meta name="theme-color" content="#ffffff" />
+			)
+		}
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
 		<meta name="robots" content={robots} />

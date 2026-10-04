@@ -10,6 +10,7 @@
 		"includes": [
 			"apps/**",
 			"packages/**",
+			"scripts/trends/**",
 			"convex/**",
 			"*.json",
 			"!**/generated",

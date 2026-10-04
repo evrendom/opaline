@@ -9,6 +9,12 @@
 		"./codex-usage-replay": "./src/codex-usage-replay.ts",
 		"./transcript-slim": "./src/transcript-slim.ts",
 		"./model-pricing": "./src/model-pricing.ts",
+		"./model-registry": "./src/model-registry.ts",
+		"./trends-aa-release": "./src/trends-aa-release.ts",
+		"./trends-source-fetch": "./src/trends-source-fetch.ts",
+		"./trends-sources": "./src/trends-sources.ts",
+		"./trends-t3-usage": "./src/trends-t3-usage.ts",
+		"./trends-usage": "./src/trends-usage.ts",
 		"./organization-paths": "./src/organization-paths.ts",
 		"./reserved-slugs": "./src/reserved-slugs.ts",
 		"./transcript-records": "./src/session-transcript/transcript-records/index.ts"

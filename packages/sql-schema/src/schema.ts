@@ -16,6 +16,7 @@ export { repositoryUploadReport } from "./repository-upload-schema.js";
 export * from "./session-ownership-schema.js";
 export * from "./session-revision-schema.js";
 export * from "./team-invite-link-schema.js";
+export { trendsSource } from "./trends-source-schema.js";
 export * from "./user-cli-version-schema.js";
 export * from "./wrapped-decimal-claim-schema.js";
 export * from "./wrapped-resume-schema.js";

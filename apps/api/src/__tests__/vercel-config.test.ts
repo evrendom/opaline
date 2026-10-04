@@ -26,6 +26,10 @@ const billingEntrypointSource = readFileSync(
 	resolve(import.meta.dir, "../../../../api/cron/billing.ts"),
 	"utf8",
 );
+const trendsSourcesEntrypointSource = readFileSync(
+	resolve(import.meta.dir, "../../../../api/cron/trends-sources.ts"),
+	"utf8",
+);
 
 describe("Vercel deployment configuration", () => {
 	test("routes session arrival events through a streaming function before the SPA", () => {
@@ -56,7 +60,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -133,6 +137,27 @@ describe("Vercel deployment configuration", () => {
 				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/github-evidence$)");
+	});
+
+	test("refreshes the Trends sources in an isolated daily cron function", () => {
+		expect(vercelConfig.functions["api/cron/trends-sources.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 2048,
+			maxDuration: 300,
+		});
+		// After Slopalytics publishes its day (about 03:10 UTC).
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/trends-sources",
+			schedule: "0 4 * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/trends-sources$)");
+		expect(trendsSourcesEntrypointSource).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/trends-sources$/u",
+		);
 	});
 
 	test("receives GitHub App webhooks in an isolated function", () => {

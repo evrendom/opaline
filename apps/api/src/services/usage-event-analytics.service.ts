@@ -423,6 +423,114 @@ function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
 	return filters.join("\n\t\t\t\t\tAND ");
 }
 
+/**
+ * Request usage grouped by everything its price depends on. `keys` are extra
+ * grouping columns of `from` (aliased `e`) carried into the groups.
+ */
+function buildPricingCandidatesSelect(
+	from: string,
+	keys: readonly string[] = [],
+): string {
+	return `
+			SELECT
+				e.organization_id,
+				e.user_id,
+				e.source,
+				e.session_id,
+				e.record_kind,
+				e.usage_date,${keys.map((key) => `\n\t\t\t\te.${key},`).join("")}
+				if(e.model_status = 'unresolved', e.raw_model, e.resolved_model) AS pricing_identity,
+				e.model_provider,
+				e.service_tier,
+				e.inference_speed,
+				e.inference_geo,
+				if(
+					e.context_input_tokens > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS},
+					'long',
+					'base'
+				) AS context_band,
+				toUInt8(${PRICEABLE_EVENT_SQL}) AS is_priceable,
+				toUInt8(has(e.quality_flags, 'inference_geo_not_available')) AS has_geo_gap,
+				any(e.latest_main_model) AS latest_main_model,
+				any(e.latest_event_model) AS latest_event_model,
+				sum(e.uncached_input_tokens) AS group_uncached_input_tokens,
+				sum(e.cache_read_input_tokens) AS group_cache_read_input_tokens,
+				sum(e.cache_write_5m_input_tokens) AS group_cache_write_5m_input_tokens,
+				sum(e.cache_write_1h_input_tokens) AS group_cache_write_1h_input_tokens,
+				sum(e.output_tokens) AS group_output_tokens
+			FROM ${from} AS e
+			GROUP BY
+				e.organization_id,
+				e.user_id,
+				e.source,
+				e.session_id,
+				e.record_kind,
+				e.usage_date,
+				pricing_identity,
+				e.model_provider,
+				e.service_tier,
+				e.inference_speed,
+				e.inference_geo,
+				context_band,
+				is_priceable,
+				has_geo_gap${keys.map((key) => `,\n\t\t\t\te.${key}`).join("")}`;
+}
+
+/** Prices pricing groups (aliased `g`) against the dated rate card. */
+function buildPricedGroupsSelect(from: string): string {
+	return `
+			SELECT
+				g.*,
+				${EVENT_GROUP_COST_SQL} AS group_estimated_cost
+			FROM ${from} AS g
+			ANY LEFT JOIN usage_event_pricing_rate_card AS r
+				ON g.pricing_model = r.model
+				AND r.context_band = if(
+					g.context_band = 'long'
+						AND ${EVENT_LONG_CONTEXT_AVAILABLE_SQL} = 1,
+					'long',
+					'base'
+				)
+				AND g.usage_date >= r.effective_from
+				AND g.usage_date <= r.effective_to`;
+}
+
+/**
+ * Prices request usage per agent run, across every tenant. Requests belong to
+ * the run whose start is the latest at or before them, so a run owns its
+ * subagents' requests and any work until the next run starts. Requests before
+ * a session's first run get run_idx 0. Needs the CTEs of
+ * `buildUsageEventAnalyticsCte` and a `runWindowsRelation` with the session
+ * key and `run_starts` sorted ascending.
+ */
+export function buildRunPricedUsageCte(runWindowsRelation: string): string {
+	return `
+		run_usage_records AS (
+			SELECT
+				e.*,
+				arrayLastIndex(start -> start <= e.occurred_at, w.run_starts) AS run_idx
+			FROM usage_records_with_display_model AS e
+			INNER JOIN ${runWindowsRelation} AS w
+				ON e.organization_id = w.organization_id
+				AND e.user_id = w.user_id
+				AND e.source = w.source
+				AND e.session_id = w.session_id
+			WHERE e.record_kind = 'event' AND e.has_valid_timestamp = 1
+		),
+		run_usage_candidates AS (
+			${buildPricingCandidatesSelect("run_usage_records", ["run_idx"])}
+		),
+		run_usage_pricing_groups AS (
+			SELECT
+				c.*,
+				${EVENT_CANONICAL_PRICING_MODEL_SQL} AS pricing_model
+			FROM run_usage_candidates AS c
+		),
+		run_priced_usage_groups AS (
+			${buildPricedGroupsSelect("run_usage_pricing_groups")}
+		)`;
+}
+
 export function buildUsageEventAnalyticsCte(
 	scope: UsageAnalyticsScope = {},
 	lineageEnabled?: boolean,
@@ -497,48 +605,7 @@ export function buildUsageEventAnalyticsCte(
 			)
 		),
 		usage_event_pricing_candidates AS (
-			SELECT
-				e.organization_id,
-				e.user_id,
-				e.source,
-				e.session_id,
-				e.record_kind,
-				e.usage_date,
-				if(e.model_status = 'unresolved', e.raw_model, e.resolved_model) AS pricing_identity,
-				e.model_provider,
-				e.service_tier,
-				e.inference_speed,
-				e.inference_geo,
-				if(
-					e.context_input_tokens > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS},
-					'long',
-					'base'
-				) AS context_band,
-				toUInt8(${PRICEABLE_EVENT_SQL}) AS is_priceable,
-				toUInt8(has(e.quality_flags, 'inference_geo_not_available')) AS has_geo_gap,
-				any(e.latest_main_model) AS latest_main_model,
-				any(e.latest_event_model) AS latest_event_model,
-				sum(e.uncached_input_tokens) AS group_uncached_input_tokens,
-				sum(e.cache_read_input_tokens) AS group_cache_read_input_tokens,
-				sum(e.cache_write_5m_input_tokens) AS group_cache_write_5m_input_tokens,
-				sum(e.cache_write_1h_input_tokens) AS group_cache_write_1h_input_tokens,
-				sum(e.output_tokens) AS group_output_tokens
-			FROM usage_records_with_display_model AS e
-			GROUP BY
-				e.organization_id,
-				e.user_id,
-				e.source,
-				e.session_id,
-				e.record_kind,
-				e.usage_date,
-				pricing_identity,
-				e.model_provider,
-				e.service_tier,
-				e.inference_speed,
-				e.inference_geo,
-				context_band,
-				is_priceable,
-				has_geo_gap
+			${buildPricingCandidatesSelect("usage_records_with_display_model")}
 		),
 		usage_event_pricing_groups AS (
 			SELECT
@@ -550,20 +617,7 @@ export function buildUsageEventAnalyticsCte(
 			${EVENT_PRICING_RATE_CARD_SQL}
 		),
 		priced_usage_groups AS (
-			SELECT
-				g.*,
-				${EVENT_GROUP_COST_SQL} AS group_estimated_cost
-			FROM usage_event_pricing_groups AS g
-			ANY LEFT JOIN usage_event_pricing_rate_card AS r
-				ON g.pricing_model = r.model
-				AND r.context_band = if(
-					g.context_band = 'long'
-						AND ${EVENT_LONG_CONTEXT_AVAILABLE_SQL} = 1,
-					'long',
-					'base'
-				)
-				AND g.usage_date >= r.effective_from
-				AND g.usage_date <= r.effective_to
+			${buildPricedGroupsSelect("usage_event_pricing_groups")}
 		),
 		usage_event_session_rollups AS (
 			SELECT

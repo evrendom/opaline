@@ -102,3 +102,4 @@ export {
 	wrappedResume,
 	wrappedShare,
 } from "./schema.js";
+export { trendsSource } from "./trends-source-schema.js";

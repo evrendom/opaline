@@ -2,13 +2,23 @@
 import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
 
 interface Props {
-	active?: "product" | "pricing";
+	active?: "product" | "trends" | "pricing";
 	productHref?: string;
 	enableDemo?: boolean;
 	filled?: boolean;
+	/** The copy-install button on the right (off on Trends). */
+	install?: boolean;
+	/** The Pricing link (off on Trends). */
+	pricing?: boolean;
 }
 
-const { active, productHref = "#product", filled = false } = Astro.props;
+const {
+	active,
+	productHref = "#product",
+	filled = false,
+	install = true,
+	pricing = true,
+} = Astro.props;
 
 // Product navigation stays hidden during the beta launch.
 const showProductLinks = false;
@@ -46,109 +56,129 @@ const flatOpalineWordmark = opalineWordmarkSvg
 				)
 			}
 			{
-				active === "pricing" ? (
+				active === "trends" ? (
 					<span
-						class="instant-v2-nav-link instant-v2-nav-link-pricing instant-v2-nav-link-current"
+						class="instant-v2-nav-link instant-v2-nav-link-trends instant-v2-nav-link-current"
 						aria-current="page"
 					>
-						<span>Pricing</span>
+						<span>Trends</span>
 					</span>
 				) : (
-					<a class="instant-v2-nav-link instant-v2-nav-link-pricing" href="/pricing">
-						<span>Pricing</span>
+					<a class="instant-v2-nav-link instant-v2-nav-link-trends" href="/trends">
+						<span>Trends</span>
 					</a>
 				)
 			}
+			<slot name="trail" />
+			{
+				pricing &&
+					(active === "pricing" ? (
+						<span
+							class="instant-v2-nav-link instant-v2-nav-link-pricing instant-v2-nav-link-current"
+							aria-current="page"
+						>
+							<span>Pricing</span>
+						</span>
+					) : (
+						<a class="instant-v2-nav-link instant-v2-nav-link-pricing" href="/pricing">
+							<span>Pricing</span>
+						</a>
+					))
+			}
 		</nav>
 
-		<button
-			class="instant-v2-nav-install"
-			type="button"
-			data-instant-v2-install
-			data-instant-v2-copy
-			data-instant-v2-copy-icon-button
-			data-instant-v2-pointer-glow
-			data-marketing-install-source="navigation"
-			data-install-command="npx opaline@latest"
-			data-copy-feedback-ms="2000"
-			aria-label="copy install command: npx opaline@latest"
-			title="copy install command"
-		>
-			<span
-				class="instant-v2-nav-install-opalescence"
-				data-instant-v2-pointer-glow-effect
-				aria-hidden="true"
-			></span>
-			<span
-				class="instant-v2-nav-install-glass"
-				aria-hidden="true"
-			></span>
-			<span class="instant-v2-copy-content">
-				<svg
-					class="instant-v2-copy-icon"
-					viewBox="0 0 24 24"
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					aria-hidden="true"
+		{
+			install && (
+				<button
+					class="instant-v2-nav-install"
+					type="button"
+					data-instant-v2-install
+					data-instant-v2-copy
+					data-instant-v2-copy-icon-button
+					data-instant-v2-pointer-glow
+					data-marketing-install-source="navigation"
+					data-install-command="npx opaline@latest"
+					data-copy-feedback-ms="2000"
+					aria-label="copy install command: npx opaline@latest"
+					title="copy install command"
 				>
-					<rect
-						class="instant-v2-copy-icon-lower"
-						x="4.75"
-						y="8.75"
-						width="10.5"
-						height="10.5"
-						rx="2"
-						stroke="currentColor"
-						stroke-width="1.5"
-					></rect>
-					<g mask="url(#instant-v2-nav-copy-icon-mask)">
-						<rect
-							class="instant-v2-copy-icon-upper"
-							x="8.75"
-							y="4.75"
-							width="10.5"
-							height="10.5"
-							rx="2"
-							stroke="currentColor"
-							stroke-width="1.5"
-						></rect>
-					</g>
-					<path
-						class="instant-v2-copy-icon-check"
-						d="M9.25 12.25L11 14.25L15 10"
-						stroke="currentColor"
-						stroke-width="1.5"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						pathLength="1"
-					></path>
-					<mask
-						id="instant-v2-nav-copy-icon-mask"
-						maskUnits="userSpaceOnUse"
-					>
-						<rect width="24" height="24" fill="#fff"></rect>
-						<rect
-							class="instant-v2-copy-icon-mask-shape"
-							x="4.75"
-							y="8.75"
-							width="10.5"
-							height="10.5"
-							rx="2"
-							fill="#000"
-							stroke="#000"
-							stroke-width="1.5"
-						></rect>
-					</mask>
-				</svg>
-				<span class="instant-v2-copy-label instant-v2-copy-full"
-					>npx opaline@latest</span
-				>
-				<span
-					class="instant-v2-copy-label instant-v2-copy-short"
-					aria-hidden="true">npm i -g…</span
-				>
-			</span>
-		</button>
+					<span
+						class="instant-v2-nav-install-opalescence"
+						data-instant-v2-pointer-glow-effect
+						aria-hidden="true"
+					></span>
+					<span
+						class="instant-v2-nav-install-glass"
+						aria-hidden="true"
+					></span>
+					<span class="instant-v2-copy-content">
+						<svg
+							class="instant-v2-copy-icon"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							aria-hidden="true"
+						>
+							<rect
+								class="instant-v2-copy-icon-lower"
+								x="4.75"
+								y="8.75"
+								width="10.5"
+								height="10.5"
+								rx="2"
+								stroke="currentColor"
+								stroke-width="1.5"
+							></rect>
+							<g mask="url(#instant-v2-nav-copy-icon-mask)">
+								<rect
+									class="instant-v2-copy-icon-upper"
+									x="8.75"
+									y="4.75"
+									width="10.5"
+									height="10.5"
+									rx="2"
+									stroke="currentColor"
+									stroke-width="1.5"
+								></rect>
+							</g>
+							<path
+								class="instant-v2-copy-icon-check"
+								d="M9.25 12.25L11 14.25L15 10"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								pathLength="1"
+							></path>
+							<mask
+								id="instant-v2-nav-copy-icon-mask"
+								maskUnits="userSpaceOnUse"
+							>
+								<rect width="24" height="24" fill="#fff"></rect>
+								<rect
+									class="instant-v2-copy-icon-mask-shape"
+									x="4.75"
+									y="8.75"
+									width="10.5"
+									height="10.5"
+									rx="2"
+									fill="#000"
+									stroke="#000"
+									stroke-width="1.5"
+								></rect>
+							</mask>
+						</svg>
+						<span class="instant-v2-copy-label instant-v2-copy-full"
+							>npx opaline@latest</span
+						>
+						<span
+							class="instant-v2-copy-label instant-v2-copy-short"
+							aria-hidden="true">npm i -g…</span
+						>
+					</span>
+				</button>
+			)
+		}
 
 	</div>
 </header>
@@ -157,6 +187,22 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	.instant-v2-nav {
 		--instant-v2-nav-outgoing-opacity: 1;
 		--instant-v2-nav-outgoing-scale: 1;
+		/* Light by default; a page with its own dark mode (Trends) sets
+		 * these. */
+		--instant-v2-nav-ink: #1f1f1f;
+		--instant-v2-nav-ink-muted: #525252;
+		--instant-v2-nav-button: #fff;
+		--instant-v2-nav-button-pressed: #f9f9f9;
+		--instant-v2-nav-button-ink: rgba(0, 0, 0, 0.87);
+		--instant-v2-nav-button-shadow:
+			inset 0 0 0 0.5px transparent,
+			0 0 0 0.5px rgba(0, 0, 0, 0.06),
+			0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		--instant-v2-nav-glass: oklch(1 0 0 / 0.36);
+		--instant-v2-nav-glass-edge:
+			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
+			inset 0 1px 0 oklch(1 0 0 / 0.62);
 		position: sticky;
 		top: 0;
 		z-index: 40;
@@ -213,7 +259,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		flex: none;
 		align-items: center;
 		justify-self: start;
-		color: #1f1f1f;
+		color: var(--instant-v2-nav-ink);
 		text-decoration: none;
 		transform: scale(var(--instant-v2-nav-outgoing-scale));
 		transform-origin: center;
@@ -249,7 +295,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		align-items: center;
 		justify-content: center;
 		border-radius: 6px;
-		color: #525252;
+		color: var(--instant-v2-nav-ink-muted);
 		font-size: 12px;
 		font-weight: 400;
 		line-height: 16px;
@@ -271,7 +317,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	}
 
 	.instant-v2-nav-link.is-active {
-		color: #1f1f1f;
+		color: var(--instant-v2-nav-ink);
 		font-weight: 500;
 	}
 
@@ -284,7 +330,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	}
 
 	.instant-v2-nav-link-current {
-		color: #1f1f1f;
+		color: var(--instant-v2-nav-ink);
 		font-weight: 500;
 	}
 
@@ -361,13 +407,9 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		padding: 0 10px;
 		border: 0;
 		border-radius: 6px;
-		background: #fff;
-		box-shadow:
-			inset 0 0 0 0.5px transparent,
-			0 0 0 0.5px rgba(0, 0, 0, 0.06),
-			0 1px 1px -1px rgba(0, 0, 0, 0.1),
-			0 1px 2px rgba(0, 0, 0, 0.05);
-		color: rgba(0, 0, 0, 0.87);
+		background: var(--instant-v2-nav-button);
+		box-shadow: var(--instant-v2-nav-button-shadow);
+		color: var(--instant-v2-nav-button-ink);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 11px;
@@ -419,12 +461,10 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		z-index: 1;
 		inset: 0;
 		border-radius: inherit;
-		background: oklch(1 0 0 / 0.36);
+		background: var(--instant-v2-nav-glass);
 		-webkit-backdrop-filter: blur(5px) saturate(1.45);
 		backdrop-filter: blur(5px) saturate(1.45);
-		box-shadow:
-			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
-			inset 0 1px 0 oklch(1 0 0 / 0.62);
+		box-shadow: var(--instant-v2-nav-glass-edge);
 		pointer-events: none;
 	}
 
@@ -652,11 +692,11 @@ const flatOpalineWordmark = opalineWordmarkSvg
 
 	@media (any-hover: hover) {
 		.instant-v2-nav-link:hover {
-			color: #1f1f1f;
+			color: var(--instant-v2-nav-ink);
 		}
 
 		.instant-v2-nav-install:hover {
-			background: #fff;
+			background: var(--instant-v2-nav-button);
 		}
 
 		.instant-v2-nav-demo:hover {
@@ -674,7 +714,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	}
 
 	.instant-v2-nav-install:active {
-		background: #f9f9f9;
+		background: var(--instant-v2-nav-button-pressed);
 	}
 
 	.instant-v2-nav-demo:active {

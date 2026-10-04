@@ -81,3 +81,6 @@ dist-site/
 dist-demo/
 dist-plugin/
 .demo-ssr/
+
+# Public-site benchmark captures stay local; never publish them in Git.
+apps/marketing/src/trends/generated/

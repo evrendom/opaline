@@ -1,0 +1,80 @@
+---
+import InstantV2Nav from "../components/InstantV2Nav.astro";
+import { TrendsExplorer } from "../components/trends/TrendsExplorer";
+import Layout from "../layouts/Layout.astro";
+import {
+	liveTrendsSources,
+	loadTrendsSnapshot,
+} from "../trends/load-trends-snapshot";
+
+const snapshot = loadTrendsSnapshot();
+const live = liveTrendsSources();
+---
+
+<Layout
+	title="Opaline Trends — Benchmarks and coding agents in the wild"
+	description="Compare model intelligence, cost and time across reasoning efforts alongside run time, tool calls, friction and agent runs from Opaline."
+	canonical="/trends"
+	dateModified={snapshot.publishedAt}
+	noindex={snapshot.sources.benchmarks.kind === "preview" || snapshot.sources.usage.kind === "preview"}
+	darkThemeColor="#141417"
+>
+	<div class="trends-site-nav">
+		<InstantV2Nav active="trends" install={false} pricing={false}>
+			{/* Trends, a chevron, then the charts' tabs: the explorer renders
+			    it here once hydrated (wide screens; narrow ones keep it in
+			    the page). */}
+			<span class="trends-nav-trail" slot="trail">
+				<svg class="trends-nav-arrow" viewBox="0 0 16 16" aria-hidden="true">
+					<path d="M6 3.5 10.5 8 6 12.5" />
+				</svg>
+				<span class="trends-nav-trail-target" data-trends-nav-trail></span>
+			</span>
+		</InstantV2Nav>
+	</div>
+	<h1 class="visually-hidden">Opaline Trends</h1>
+	<TrendsExplorer client:load snapshot={snapshot} live={live} />
+</Layout>
+
+<style>
+	/* The app shell owns scrolling; no rubber-band or scroll chaining. */
+	:global(html),
+	:global(body) {
+		overscroll-behavior: none;
+	}
+
+	/* The landing page's navigation over the app, which takes the rest of
+	 * the viewport; on the app's surface, so it follows its dark mode. */
+	:global(body) {
+		--trends-site-nav: 42px;
+	}
+
+	/* No box of its own, so the navigation stays sticky on the page. */
+	.trends-site-nav {
+		display: contents;
+	}
+
+	.trends-site-nav :global(.instant-v2-nav) {
+		background: var(--color-surface);
+	}
+
+	/* "Trends" leads the breadcrumb, greyed; the shown chart after it is
+	 * the current one. */
+	.trends-site-nav :global(.instant-v2-nav-link-trends) {
+		color: var(--instant-v2-nav-ink-muted);
+		font-weight: 400;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.trends-site-nav :global(.instant-v2-nav) {
+			--instant-v2-nav-ink: var(--color-ink-strong);
+			--instant-v2-nav-ink-muted: var(--color-ink-muted);
+			--instant-v2-nav-button: #2a2a2f;
+			--instant-v2-nav-button-pressed: #222226;
+			--instant-v2-nav-button-ink: var(--color-ink-strong);
+			--instant-v2-nav-button-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+			--instant-v2-nav-glass: rgb(42 42 47 / 0.36);
+			--instant-v2-nav-glass-edge: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+		}
+	}
+</style>

@@ -8,7 +8,7 @@
 	},
 	"scripts": {
 		"dev": "astro dev",
-		"build": "astro build",
+		"build": "bun ../../scripts/trends/build-marketing.ts",
 		"preview": "astro preview",
 		"preview:product": "bun ../../scripts/preview-site.ts",
 		"dev:product": "bun run --cwd ../.. build:site && bun ../../scripts/preview-site.ts",

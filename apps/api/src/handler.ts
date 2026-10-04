@@ -2,6 +2,8 @@ import { getLogger, withContext } from "@logtape/logtape";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { SESSION_ARRIVALS_PATH } from "@rudel/api-routes";
+import { TRENDS_SOURCES_PATH } from "@rudel/api-routes/trends-sources";
+import { TRENDS_USAGE_PATH } from "@rudel/api-routes/trends-usage";
 import type { Session as AuthSession } from "./auth.js";
 import { createAuth } from "./auth.js";
 import { db, sqlClient } from "./db.js";
@@ -29,6 +31,8 @@ import {
 	getTeamInviteRoute,
 	handleTeamInviteImageRequest,
 } from "./handlers/team-invite-page-http.js";
+import { handleTrendsSourcesRequest } from "./handlers/trends-sources-http.js";
+import { handleTrendsUsageRequest } from "./handlers/trends-usage-http.js";
 import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
@@ -596,6 +600,26 @@ async function handleRequest(
 			response.headers.set(key, value);
 		}
 		return response;
+	}
+
+	if (url.pathname === TRENDS_USAGE_PATH) {
+		if (request.method !== "GET" && request.method !== "HEAD") {
+			return new Response("Method Not Allowed", {
+				headers: { ...cors, Allow: "GET, HEAD" },
+				status: 405,
+			});
+		}
+		return handleTrendsUsageRequest({ cors, method: request.method });
+	}
+
+	if (url.pathname === TRENDS_SOURCES_PATH) {
+		if (request.method !== "GET" && request.method !== "HEAD") {
+			return new Response("Method Not Allowed", {
+				headers: { ...cors, Allow: "GET, HEAD" },
+				status: 405,
+			});
+		}
+		return handleTrendsSourcesRequest({ cors, method: request.method });
 	}
 
 	if (url.pathname.startsWith("/api/avatar/")) {
