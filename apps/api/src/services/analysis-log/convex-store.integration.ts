@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
+import { createConvexHttpClient } from "./convex-http.js";
 import { createConvexAnalysisStore } from "./convex-store.js";
 import {
 	apiClaims,
@@ -103,6 +104,59 @@ test("internal functions reject the API's own valid token", async () => {
 	await expect(
 		authenticated.query(visibleMatches, { workspaceId: "w", ids: [] }),
 	).rejects.toThrow("Could not find public function");
+});
+
+test("the HTTP client reads exactly what ConvexHttpClient reads", async () => {
+	const store = createConvexAnalysisStore({
+		url,
+		signingKey,
+		signal: undefined,
+	});
+	const id = `a_${crypto.randomUUID()}`;
+	const now = new Date().toISOString();
+	await store.createAnalysis({
+		id,
+		workspaceId: `workspace_${id}`,
+		authorId: `author_${id}`,
+		host: "eval",
+		question: "Parity — 错 ✓",
+		status: "unfinished",
+		shared: false,
+		pinned: false,
+		createdAt: now,
+		cutoff: now,
+		scope: { from: null, to: null, filters: {} },
+		finalAnswer: null,
+		topics: ["parity"],
+		updates: null,
+		notes: [],
+		cost: {
+			source: "reported",
+			model: "gpt-5",
+			inputTokens: 1_234_567,
+			cachedInputTokens: 0,
+			cacheWriteTokens: 0,
+			outputTokens: 89,
+			reasoningTokens: 0,
+			costUsd: 0.1234,
+		},
+		queryCount: 0,
+		stepCount: 0,
+	});
+	const token = await createTokenSource(signingKey)();
+	const viaHttp = await createConvexHttpClient(deploymentUrl)(
+		"query",
+		"analyses:get",
+		{ id },
+		{ token, signal: AbortSignal.timeout(30_000) },
+	);
+	expect(viaHttp).toEqual(await client(token).query(getAnalysis, { id }));
+	expect(await store.getAnalysis(id)).toMatchObject({
+		id,
+		question: "Parity — 错 ✓",
+		cost: { inputTokens: 1_234_567, costUsd: 0.1234 },
+	});
+	await store.deleteAnalysesByAuthor(`author_${id}`);
 });
 
 test("a failed store call names only the function, never its arguments", async () => {

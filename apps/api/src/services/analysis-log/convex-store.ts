@@ -3,17 +3,12 @@ import {
 	AnalysisHistoryGetOutputSchema,
 	AnalysisHostSchema,
 } from "@rudel/api-routes";
-import { ConvexHttpClient } from "convex/browser";
-import {
-	type DefaultFunctionArgs,
-	type FunctionArgs,
-	type FunctionReference,
-	getFunctionName,
-	makeFunctionReference,
-	type OptionalRestArgs,
-} from "convex/server";
-import { ConvexError } from "convex/values";
 import { z } from "zod";
+import {
+	ConvexCallError,
+	type ConvexFunctionType,
+	createConvexHttpClient,
+} from "./convex-http.js";
 import { createTokenSource, type SigningKey } from "./convex-token.js";
 import { AnalysisFullError, SanitizedError } from "./errors.js";
 import type {
@@ -116,68 +111,66 @@ const MatchesSchema = z.array(
 	}),
 );
 
-/** The public functions in convex/, by module. Only the API's tokens may call them. */
-const convex = {
-	analyses: {
-		create: mutationReference<{ analysis: StoredAnalysis }>("analyses:create"),
-		get: queryReference<{ id: string }>("analyses:get"),
-		update: mutationReference<{ id: string; patch: AnalysisPatch }>(
-			"analyses:update",
-		),
-		save: mutationReference<{ id: string; save: AnalysisSave }>(
-			"analyses:save",
-		),
-		latestOpen: queryReference<{
-			workspaceId: string;
-			authorId: string;
-			since: string;
-		}>("analyses:latestOpen"),
-		recent: queryReference<{
-			workspaceId: string;
-			viewerId: string;
-			limit: number;
-		}>("analyses:recent"),
-	},
-	steps: {
-		create: mutationReference<{ step: StoredStep }>("steps:create"),
-		list: queryReference<{ analysisId: string }>("steps:list"),
-	},
-	queries: {
-		create: mutationReference<{
-			query: StoredQueryFields;
-			sessions: QuerySession[];
-			owners: string[];
-			outputJson: string | null;
-		}>("queries:create"),
-		get: queryReference<{ id: string }>("queries:get"),
-		list: queryReference<{ analysisId: string }>("queries:list"),
-	},
+/** The public functions in convex/ the store calls, with their arguments. Only the API's tokens may call them. */
+interface ConvexFunctionArgs {
+	"analyses:create": { analysis: StoredAnalysis };
+	"analyses:get": { id: string };
+	"analyses:update": { id: string; patch: AnalysisPatch };
+	"analyses:save": { id: string; save: AnalysisSave };
+	"analyses:latestOpen": {
+		workspaceId: string;
+		authorId: string;
+		since: string;
+	};
+	"analyses:recent": { workspaceId: string; viewerId: string; limit: number };
+	"steps:create": { step: StoredStep };
+	"steps:list": { analysisId: string };
+	"queries:create": {
+		query: StoredQueryFields;
+		sessions: QuerySession[];
+		owners: string[];
+		outputJson: string | null;
+	};
+	"queries:get": { id: string };
+	"queries:list": { analysisId: string };
+	"deletion:byAuthor": { authorId: string };
+	"deletion:byWorkspace": { workspaceId: string };
+	"deletion:markReadingOwner": { ownerId: string };
+	"deletion:sweep": Record<string, never>;
+	"embeddings:add": { workspaceId: string; embedding: StoredEmbedding };
+	"embeddings:search": {
+		workspaceId: string;
+		model: string;
+		vector: number[];
+		limit: number;
+	};
+}
 
-	deletion: {
-		byAuthor: mutationReference<{ authorId: string }>("deletion:byAuthor"),
-		byWorkspace: mutationReference<{ workspaceId: string }>(
-			"deletion:byWorkspace",
-		),
-		markReadingOwner: mutationReference<{ ownerId: string }>(
-			"deletion:markReadingOwner",
-		),
-		sweep: mutationReference<Record<string, never>>("deletion:sweep"),
-	},
-	embeddings: {
-		add: mutationReference<{ workspaceId: string; embedding: StoredEmbedding }>(
-			"embeddings:add",
-		),
-		search: makeFunctionReference<
-			"action",
-			{ workspaceId: string; model: string; vector: number[]; limit: number },
-			unknown
-		>("embeddings:search"),
-	},
-};
+/** Whether each function is a query, mutation or action (it picks the HTTP endpoint). */
+const FUNCTION_TYPES = {
+	"analyses:create": "mutation",
+	"analyses:get": "query",
+	"analyses:update": "mutation",
+	"analyses:save": "mutation",
+	"analyses:latestOpen": "query",
+	"analyses:recent": "query",
+	"steps:create": "mutation",
+	"steps:list": "query",
+	"queries:create": "mutation",
+	"queries:get": "query",
+	"queries:list": "query",
+	"deletion:byAuthor": "mutation",
+	"deletion:byWorkspace": "mutation",
+	"deletion:markReadingOwner": "mutation",
+	"deletion:sweep": "mutation",
+	"embeddings:add": "mutation",
+	"embeddings:search": "action",
+} as const satisfies Record<keyof ConvexFunctionArgs, ConvexFunctionType>;
 
 /**
  * The analysis log in Convex (ADR 0001). Each store call is one Convex
- * function call authenticated with a token signed by the API's key. Every
+ * function call over Convex's HTTP API (convex-http.ts), authenticated with a
+ * token signed by the API's key. Every
  * HTTP request ends after `REQUEST_TIMEOUT_MS` or when `signal` aborts, and
  * deletion loops stop with it.
  */
@@ -190,57 +183,35 @@ export function createConvexAnalysisStore({
 	signingKey: SigningKey;
 	signal: AbortSignal | undefined;
 }): AnalysisStore {
-	const timeout = () => AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-	const client = new ConvexHttpClient(url, {
-		// Function log lines may quote stored evidence; never print them.
-		logger: false,
-		fetch: Object.assign(
-			(
-				input: Parameters<typeof fetch>[0],
-				init?: Parameters<typeof fetch>[1],
-			) =>
-				fetch(input, {
-					...init,
-					signal: signal ? AbortSignal.any([signal, timeout()]) : timeout(),
-				}),
-			{ preconnect: fetch.preconnect },
-		),
-	});
+	const client = createConvexHttpClient(url);
 	const token = createTokenSource(signingKey);
 	// Convex errors can repeat the rejected arguments, which may quote
 	// transcript evidence: callers only ever see which function failed, or
 	// that an analysis is full.
-	const call = async <TResult>(
-		fn: FunctionReference<"query" | "mutation" | "action">,
-		request: () => Promise<TResult>,
-	): Promise<TResult> => {
+	const run = async <TPath extends keyof ConvexFunctionArgs>(
+		path: TPath,
+		args: ConvexFunctionArgs[TPath],
+	): Promise<unknown> => {
 		try {
-			client.setAuth(await token());
-			return await request();
+			const bearer = await token();
+			const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+			return await client(FUNCTION_TYPES[path], path, args, {
+				token: bearer,
+				signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+			});
 		} catch (error) {
+			if (!(error instanceof ConvexCallError))
+				throw new SanitizedError(
+					`Convex ${path} failed (${error instanceof Error ? error.name : typeof error})`,
+				);
 			const full =
-				error instanceof ConvexError
-					? AnalysisFullSchema.safeParse(error.data)
+				error.failure.kind === "convexError"
+					? AnalysisFullSchema.safeParse(error.failure.data)
 					: undefined;
 			if (full?.success) throw new AnalysisFullError(full.data.child);
-			throw new SanitizedError(
-				`Convex ${getFunctionName(fn)} failed (${error instanceof Error ? error.name : typeof error})`,
-			);
+			throw new SanitizedError(error.message);
 		}
 	};
-	const query = <TQuery extends FunctionReference<"query">>(
-		fn: TQuery,
-		...args: OptionalRestArgs<TQuery>
-	) => call(fn, () => client.query(fn, ...args));
-	// The client is shared by all requests: skip its one-at-a-time queue.
-	const mutation = <TMutation extends FunctionReference<"mutation">>(
-		fn: TMutation,
-		args: FunctionArgs<TMutation>,
-	) => call(fn, () => client.mutation(fn, args, { skipQueue: true }));
-	const action = <TAction extends FunctionReference<"action">>(
-		fn: TAction,
-		...args: OptionalRestArgs<TAction>
-	) => call(fn, () => client.action(fn, ...args));
 	const untilDone = async (batch: () => Promise<unknown>) => {
 		let hasMore = true;
 		while (hasMore) {
@@ -251,22 +222,20 @@ export function createConvexAnalysisStore({
 
 	return {
 		async createAnalysis(analysis) {
-			await mutation(convex.analyses.create, { analysis });
+			await run("analyses:create", { analysis });
 		},
 		async getAnalysis(id) {
-			return AnalysisSchema.nullable().parse(
-				await query(convex.analyses.get, { id }),
-			);
+			return AnalysisSchema.nullable().parse(await run("analyses:get", { id }));
 		},
 		async updateAnalysis(id, patch) {
-			await mutation(convex.analyses.update, { id, patch });
+			await run("analyses:update", { id, patch });
 		},
 		async saveAnalysis(id, save) {
-			await mutation(convex.analyses.save, { id, save });
+			await run("analyses:save", { id, save });
 		},
 		async latestOpenAnalysis(workspaceId, authorId, since) {
 			return AnalysisSchema.nullable().parse(
-				await query(convex.analyses.latestOpen, {
+				await run("analyses:latestOpen", {
 					workspaceId,
 					authorId,
 					since,
@@ -275,21 +244,19 @@ export function createConvexAnalysisStore({
 		},
 		async recentAnalyses(workspaceId, viewerId, limit) {
 			return AnalysisSchema.array().parse(
-				await query(convex.analyses.recent, { workspaceId, viewerId, limit }),
+				await run("analyses:recent", { workspaceId, viewerId, limit }),
 			);
 		},
 
 		async createStep(step) {
-			await mutation(convex.steps.create, { step });
+			await run("steps:create", { step });
 		},
 		async getSteps(analysisId) {
-			return StepSchema.array().parse(
-				await query(convex.steps.list, { analysisId }),
-			);
+			return StepSchema.array().parse(await run("steps:list", { analysisId }));
 		},
 
 		async createQuery({ args, output, sessions, owners, ...fields }) {
-			await mutation(convex.queries.create, {
+			await run("queries:create", {
 				query: { ...fields, argsJson: JSON.stringify(args) },
 				sessions,
 				owners,
@@ -297,38 +264,32 @@ export function createConvexAnalysisStore({
 			});
 		},
 		async getQuery(id) {
-			return QuerySchema.nullable().parse(
-				await query(convex.queries.get, { id }),
-			);
+			return QuerySchema.nullable().parse(await run("queries:get", { id }));
 		},
 		async getQueries(analysisId) {
 			return QuerySummarySchema.array().parse(
-				await query(convex.queries.list, { analysisId }),
+				await run("queries:list", { analysisId }),
 			);
 		},
 
 		async deleteAnalysesByAuthor(authorId) {
-			await untilDone(() => mutation(convex.deletion.byAuthor, { authorId }));
+			await untilDone(() => run("deletion:byAuthor", { authorId }));
 		},
 		async deleteAnalysesByWorkspace(workspaceId) {
-			await untilDone(() =>
-				mutation(convex.deletion.byWorkspace, { workspaceId }),
-			);
+			await untilDone(() => run("deletion:byWorkspace", { workspaceId }));
 		},
 		async deleteAnalysesReadingOwner(ownerId) {
 			// Hide them all first, then delete them in bounded batches.
-			await untilDone(() =>
-				mutation(convex.deletion.markReadingOwner, { ownerId }),
-			);
-			await untilDone(() => mutation(convex.deletion.sweep, {}));
+			await untilDone(() => run("deletion:markReadingOwner", { ownerId }));
+			await untilDone(() => run("deletion:sweep", {}));
 		},
 
 		async addEmbedding(workspaceId, embedding) {
-			await mutation(convex.embeddings.add, { workspaceId, embedding });
+			await run("embeddings:add", { workspaceId, embedding });
 		},
 		async searchEmbeddings(workspaceId, model, vector, limit) {
 			return MatchesSchema.parse(
-				await action(convex.embeddings.search, {
+				await run("embeddings:search", {
 					workspaceId,
 					model,
 					vector,
@@ -337,14 +298,6 @@ export function createConvexAnalysisStore({
 			);
 		},
 	};
-}
-
-function queryReference<TArgs extends DefaultFunctionArgs>(name: string) {
-	return makeFunctionReference<"query", TArgs, unknown>(name);
-}
-
-function mutationReference<TArgs extends DefaultFunctionArgs>(name: string) {
-	return makeFunctionReference<"mutation", TArgs, unknown>(name);
 }
 
 function parseArgs(argsJson: string): Record<string, unknown> {
