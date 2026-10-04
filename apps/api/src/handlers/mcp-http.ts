@@ -402,9 +402,15 @@ async function callTool(
 		const { result, widget } = splitWidget(
 			await tool.run(client, args, { userId, workspace, authSession: context }),
 		);
+		// Its own content block, so a JSON result stays parseable JSON.
 		const link = tool.link
-			? `\n\nOpen in Opaline: ${getFrontendOrigin()}/${encodeURIComponent(workspace.slug)}${tool.link(args)}`
-			: "";
+			? [
+					{
+						type: "text",
+						text: `Open in Opaline: ${getFrontendOrigin()}/${encodeURIComponent(workspace.slug)}${tool.link(args)}`,
+					},
+				]
+			: [];
 		return {
 			content:
 				tool.meta?.ui === APP_ONLY.ui || isPluginTool(tool)
@@ -413,8 +419,10 @@ async function callTool(
 							{
 								type: "text",
 								// Analysis tools return compact text; everything else is JSON.
-								text: `${typeof result === "string" ? result : JSON.stringify(result)}${link}`,
+								text:
+									typeof result === "string" ? result : JSON.stringify(result),
 							},
+							...link,
 						],
 			...(isPluginTool(tool)
 				? { structuredContent: { result: withAbsoluteAvatars(result) } }

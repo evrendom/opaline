@@ -24,6 +24,7 @@ import {
 } from "./analysis-renderers.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 import { parseMcpInput } from "./input-validation.js";
+import { compactSkills } from "./skill-summaries.js";
 
 type Client = RouterClient<typeof router>;
 
@@ -190,13 +191,14 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		title: "Find runs and deterministic events",
 		description: [
 			"Where did something happen in the user's agent runs? Cheap and deterministic: call it before read. Answers say where, never why; why needs read.",
-			"A run is one user prompt and everything the agent did until the next prompt. A ref is {sessionId, agentId, turn}: agentId '' is the main transcript, otherwise a subagent; turn starts at 1.",
+			"A run is one user prompt and everything the agent did until the next prompt. A ref is {sessionId, agentId, turn}: agentId '' (the default) is the main transcript, otherwise a subagent; turn starts at 1.",
 			"Scope: from/to (UTC days, default last 7) and/or latest=N (the newest N sessions in that range). Members see their own sessions; admins can pass userId.",
 			"source=runs: one row per run with minutes, cost, edits, failed calls, not-found reads/searches, the next prompt's reaction and raw chars (what reading it costs). groupBy gives totals for trends. refs returns only those runs plus their summed minutes and cost: use it to price runs you read.",
 			"source=tool: failed tool calls grouped by tool group, cause and detail, with example refs. Each failure belongs to its own run.",
 			"source=user: every negative or swearing user prompt and every agent apology, each with its origin run: for a prompt, the run before it; for an apology, the run the user was correcting (its own run if there is none). Matches are word-list candidates; quoted or pasted text can match too.",
 			"kind=friction: a hook or policy blocked the call. kind=mistake: the agent's wrong assumption (wrong path, stale patch, bad flag). kind=validation: tests, typecheck, lint or build rejected the code. kind=environment: missing dependency, service or credential. kind=noise: an expected non-zero exit such as a search with no hits; hidden unless includeNoise. kind=other: no rule matched.",
 			"The header states coverage (sessions in scope vs indexed) and how many runs are unpriced; repeat it in the answer.",
+			"Pages: limit rows, groups or events per call (default 50, 20 for source=tool, max 200). When more follow, the header has a 'more: pass cursor=…' line: call again with the same arguments plus that cursor instead of splitting the date range.",
 			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result.",
 		].join("\n"),
 		inputSchema: zodToolInput(AnalysisFindInputSchema),
@@ -439,9 +441,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "list_skills",
 		title: "List skills",
-		description: "Skills used in the workspace with usage counts and last use.",
+		description:
+			"Skills used in the workspace with session counts, version counts, users and top repositories. For a skill's content and versions use get_skill.",
 		inputSchema: input(),
-		run: (client) => client.analytics.skills.list(),
+		run: async (client) => compactSkills(await client.analytics.skills.list()),
 		link: () => "/skills",
 	},
 	{
@@ -473,8 +476,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			{ repoKey: string("Repository key from list_repositories.") },
 			["repoKey"],
 		),
-		run: (client, args) =>
-			client.analytics.repositories.detail({ repoKey: args.repoKey as string }),
+		run: async (client, args) => {
+			const { skills } = await client.analytics.repositories.detail({
+				repoKey: args.repoKey as string,
+			});
+			return { skills: compactSkills(skills) };
+		},
 		link: (args) => `/repos${query(args, { repoKey: "repo" })}`,
 	},
 	{

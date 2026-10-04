@@ -17,6 +17,7 @@ Opaline stores the user's uploaded Claude Code and Codex sessions. The `opaline`
   - `tool`: failed tool calls, grouped by tool group → cause → detail (lint rule, TS code, missing module, stale patch…), with example refs.
   - `user`: every negative or swearing prompt and every agent apology. Each one comes with the **origin run** that caused it: for a prompt, the run right before it; for an apology, the run the user was correcting.
   - `runs`: the runs in a scope (`latest=N` sessions and/or `from`/`to`), one row per run with its facts (minutes, $, edits, failed calls, not-found reads/searches, the next prompt's reaction, raw chars). Add `groupBy` for totals. Pass `refs` to price a set of runs you read.
+  - More than one page: if the header has a `more: pass cursor=…` line, call `find` again with the same arguments plus that `cursor`. Don't split the date range into many calls.
 - `read`: reads specific runs by ref (at most 10 per call) under a character budget.
   - `exchange` (default): prompt → files edited → checks run after the last edit → failed calls → final message → the user's next prompt.
   - `turn`: every record of the run.

@@ -78,6 +78,38 @@ test("200 tool groups of multibyte text are cut to the leading groups that fit, 
 	expect(output.header.notes).toEqual(["existing note"]);
 });
 
+test("a find page cut to the ceiling continues after its last kept item", () => {
+	const ref = { sessionId: crypto.randomUUID(), agentId: "", turn: 1 };
+	const events = Array.from({ length: 500 }, (_, index) => ({
+		type: "negative" as const,
+		terms: ["wrong"],
+		eventRef: { ...ref, turn: index + 1, record: 1 },
+		quote: "错".repeat(200),
+		partial: false,
+		originRef: null,
+		originMinutes: null,
+		originCostUsd: null,
+	}));
+	const output: AnalysisFindOutput = {
+		source: "user",
+		header: { ...header, truncated: true, cursor: "after-499" },
+		events,
+		groups: [],
+	};
+
+	const fitted = fitFindOutput(output, (index) => `after-${index}`);
+	const kept = fitted.source === "user" ? fitted.events : [];
+	expect(kept.length).toBeGreaterThan(0);
+	expect(kept.length).toBeLessThan(events.length);
+	expect(jsonBytes(fitted)).toBeLessThanOrEqual(
+		ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES,
+	);
+	expect(fitted.header.cursor).toBe(`after-${kept.length - 1}`);
+	expect(fitted.header.notes.at(-1)).toBe(
+		`only the first ${kept.length} of 500 events fit the 256 KiB result ceiling; pass the cursor for the rest, or narrow the scope or lower limit`,
+	);
+});
+
 test("a read whose escaped text exceeds the ceiling keeps its leading sections and is truncated", () => {
 	const section = (index: number) => ({
 		name: "record",

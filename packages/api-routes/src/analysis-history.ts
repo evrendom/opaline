@@ -127,7 +127,16 @@ export const AnalysisHistoryQueryOutputSchema = z.object({
 
 export const AnalysisHistorySaveInputSchema = z
 	.object({
-		analysis: id,
+		/** Missing only when no find/read call of this analysis was logged. */
+		analysis: z
+			.string({
+				error: (issue) =>
+					issue.input === undefined
+						? "required: pass the analysis id from the trace line of a find or read call (trace analysis=<id>); without one, nothing was logged to save"
+						: undefined,
+			})
+			.min(1)
+			.max(40),
 		finalAnswer: z.string().min(1).max(20_000),
 		/** `step` is a step id from the trace line, or the step's sub-question text. */
 		findings: z

@@ -25,6 +25,7 @@ interface HistoricalSkillSummaryRow {
 	top_user_ids: string[];
 	top_user_session_counts: number[];
 	user_count: number;
+	version_count: number;
 }
 
 interface HistoricalSkillAgentSummaryRow {
@@ -120,6 +121,7 @@ export async function listHistoricalSkills(
 					uniqExact(tuple(user_id, agent, session_id)) AS session_count,
 					uniqExactIf(tuple(user_id, session_id), agent = 'claude') AS claude_session_count,
 					uniqExactIf(tuple(user_id, session_id), agent = 'codex') AS codex_session_count,
+					uniqExactIf(content_sha256, content_sha256 != '') AS version_count,
 					argMaxIf(
 						content_sha256,
 						tuple(used_at, agent, user_id, session_id, content_sha256),
@@ -191,6 +193,7 @@ export async function listHistoricalSkills(
 				summaries.session_count AS session_count,
 				summaries.claude_session_count AS claude_session_count,
 				summaries.codex_session_count AS codex_session_count,
+				summaries.version_count AS version_count,
 				contents.content_preview AS content_preview,
 				users.user_count AS user_count,
 				arrayMap(user -> user.1, users.top_users) AS top_user_ids,
@@ -233,6 +236,7 @@ export async function listHistoricalSkills(
 		claudeSessionCount: Number(row.claude_session_count),
 		codexSessionCount: Number(row.codex_session_count),
 		contentPreview: row.content_preview || null,
+		versionCount: Number(row.version_count),
 		attribution: {
 			userCount: Number(row.user_count),
 			topUsers: row.top_user_ids.map((userId, index) => ({

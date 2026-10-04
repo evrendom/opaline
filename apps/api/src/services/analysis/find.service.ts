@@ -1,8 +1,9 @@
-import type {
-	AnalysisFindInput,
-	AnalysisFindOutput,
-	AnalysisRun,
-	RunRef,
+import {
+	type AnalysisFindInput,
+	type AnalysisFindOutput,
+	type AnalysisRun,
+	findLimit,
+	type RunRef,
 } from "@rudel/api-routes";
 import type { z } from "zod";
 import {
@@ -17,6 +18,15 @@ import {
 	errorLine,
 	normalize,
 } from "./failure-classifier.js";
+import {
+	type CursorKey,
+	type CursorOrder,
+	compareKeys,
+	isAfter,
+	readFindCursor,
+	takePage,
+	writeFindCursor,
+} from "./find-cursor.js";
 import { fitFindOutput } from "./output-ceiling.js";
 import {
 	promptReaction,
@@ -63,6 +73,11 @@ interface FindEnv {
 interface FindContext {
 	executor: ClickHouseExecutor;
 	input: AnalysisFindInput;
+	/** Items per page (`findLimit`). */
+	limit: number;
+	/** Sort order of this call's items, and the position its cursor encodes. */
+	order: CursorOrder;
+	after: CursorKey | undefined;
 	scope: ResolvedScope;
 	header: Header;
 	scan: ScanBudget;
@@ -88,8 +103,19 @@ interface ScanBudget {
 	partialTexts: number;
 }
 
+/** One page of a find result with the sort key of each of its items. */
+interface FoundPage {
+	output: AnalysisFindOutput;
+	keys: CursorKey[];
+}
+
 /** Rows per scan page; text is cut at 16k characters, so a page stays under the 16 MB result ceiling. */
 const SCAN_PAGE_ROWS = 512;
+/** Each sort key ends in an identity, so the order is total and pages are exact. */
+const RUN_ORDER: CursorOrder = ["desc", "asc"];
+const RUN_GROUP_ORDER: CursorOrder = ["desc", "asc"];
+const TOOL_GROUP_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc"];
+const EVENT_ORDER: CursorOrder = ["desc", "desc", "asc", "asc", "asc"];
 
 export type { AnalysisScope };
 
@@ -98,7 +124,8 @@ export type { AnalysisScope };
  * grouped by cause, or lexicon reactions with their origin runs. Everything is
  * deterministic and pinned to each session's committed transcript generation.
  * A ClickHouse work ceiling returns an explicitly incomplete answer, as does
- * a result too large for `ANALYSIS_OUTPUT_MAX_BYTES`.
+ * a result too large for `ANALYSIS_OUTPUT_MAX_BYTES`. Results are paged: when
+ * more items follow, `header.cursor` continues after the last one returned.
  */
 export async function findAnalysis(
 	scope: AnalysisScope,
@@ -121,6 +148,8 @@ export function findAnalysisWithOwners(
 		"analysis.find",
 		async (executor) => {
 			let owners: string[] = [];
+			const order = cursorOrder(input);
+			const after = readFindCursor(input, order);
 			try {
 				const resolved = await resolveScope(
 					executor,
@@ -134,6 +163,9 @@ export function findAnalysisWithOwners(
 				const context: FindContext = {
 					executor,
 					input,
+					limit: findLimit(input),
+					order,
+					after,
 					scope: resolved,
 					header: newHeader(resolved),
 					runs: await loadScopeRuns(executor, resolved, input),
@@ -152,9 +184,12 @@ export function findAnalysisWithOwners(
 					},
 				};
 				addCoverage(context);
-				const result = await findBySource(context);
+				const found = await findBySource(context);
 				finishHeader(context);
-				return { output: fitFindOutput(result), owners };
+				const output = fitFindOutput(found.output, (index) =>
+					cursorAt(input, found.keys, index),
+				);
+				return { output, owners };
 			} catch (error) {
 				if (!isAnalysisWorkLimit(error)) throw error;
 				return { output: emptyResult(input, workLimitHeader(input)), owners };
@@ -164,7 +199,7 @@ export function findAnalysisWithOwners(
 	);
 }
 
-function findBySource(context: FindContext): Promise<AnalysisFindOutput> {
+function findBySource(context: FindContext): Promise<FoundPage> {
 	switch (context.input.source) {
 		case "runs":
 			return context.input.groupBy ? findRunGroups(context) : findRuns(context);
@@ -209,25 +244,29 @@ function addCoverage({ runs, header }: FindContext): void {
 		header.unattributedCostUsd += unattributed;
 }
 
-async function findRuns(context: FindContext): Promise<AnalysisFindOutput> {
-	const { executor, input, scope, header } = context;
-	const rows = [...context.runs.values()]
-		.sort((left, right) => compareRuns(left, right, input.sort))
-		.slice(0, input.limit);
-	header.truncated ||= header.runsInScope > rows.length;
+async function findRuns(context: FindContext): Promise<FoundPage> {
+	const { executor, input, scope } = context;
+	const keyOf = (row: RunRow) => runSortKey(row, input.sort);
+	const { page: rows, more } = takePage(
+		[...context.runs.values()],
+		keyOf,
+		context.order,
+		context.after,
+		context.limit,
+	);
 	const reactions = await nextReactions(executor, scope.batches, rows);
-	return {
+	return paged(context, rows.map(keyOf), more, {
 		source: "runs",
-		header,
+		header: context.header,
 		rows: rows.map((row) => ({
 			...toRun(row, context.sessions.get(row.session_id)),
 			nextReaction: reactions.get(runKey(rowRef(row))) ?? null,
 		})),
-	};
+	});
 }
 
-function findRunGroups(context: FindContext): Promise<AnalysisFindOutput> {
-	const { input, header } = context;
+function findRunGroups(context: FindContext): Promise<FoundPage> {
+	const { input } = context;
 	const groups = new Map<
 		string,
 		{
@@ -254,22 +293,30 @@ function findRunGroups(context: FindContext): Promise<AnalysisFindOutput> {
 		group.minutes += row.minutes;
 		group.cost = sumCost(group.cost, row.cost);
 	}
-	const sorted = [...groups.values()].sort(
-		(left, right) =>
-			right.runs - left.runs || left.key.localeCompare(right.key),
+	const keyOf = (group: { runs: number; key: string }) => [
+		group.runs,
+		group.key,
+	];
+	const { page, more } = takePage(
+		[...groups.values()],
+		keyOf,
+		context.order,
+		context.after,
+		context.limit,
 	);
-	header.truncated ||= sorted.length > input.limit;
-	return Promise.resolve({
-		source: "runs",
-		header,
-		groups: sorted.slice(0, input.limit).map((group) => ({
-			key: group.key,
-			runs: group.runs,
-			sessions: group.sessions.size,
-			minutes: group.minutes,
-			costUsd: roundNullableCost(group.cost),
-		})),
-	});
+	return Promise.resolve(
+		paged(context, page.map(keyOf), more, {
+			source: "runs",
+			header: context.header,
+			groups: page.map((group) => ({
+				key: group.key,
+				runs: group.runs,
+				sessions: group.sessions.size,
+				minutes: group.minutes,
+				costUsd: roundNullableCost(group.cost),
+			})),
+		}),
+	);
 }
 
 interface FailureBucket {
@@ -278,8 +325,8 @@ interface FailureBucket {
 	commands: Map<string, number>;
 }
 
-async function findFailures(context: FindContext): Promise<AnalysisFindOutput> {
-	const { input, scope, header } = context;
+async function findFailures(context: FindContext): Promise<FoundPage> {
+	const { input, scope } = context;
 	const buckets = new Map<string, FailureBucket>();
 	for (const batch of scope.batches)
 		await scanPages(
@@ -346,19 +393,24 @@ async function findFailures(context: FindContext): Promise<AnalysisFindOutput> {
 					});
 			},
 		);
-	const top = [...buckets.values()]
-		.sort(
-			(left, right) =>
-				right.group.count - left.group.count ||
-				left.group.cause.localeCompare(right.group.cause) ||
-				left.group.detail.localeCompare(right.group.detail),
-		)
-		.slice(0, input.limit);
-	header.truncated ||= buckets.size > top.length;
+	const keyOf = ({ group }: FailureBucket) => [
+		group.count,
+		group.cause,
+		group.detail,
+		group.toolGroup,
+		group.kind,
+	];
+	const { page: top, more } = takePage(
+		[...buckets.values()],
+		keyOf,
+		context.order,
+		context.after,
+		context.limit,
+	);
 	const runs = context.runs;
-	return {
+	return paged(context, top.map(keyOf), more, {
 		source: "tool",
-		header,
+		header: context.header,
 		groups: top.map(({ group, runs: refs, commands }) => {
 			const priced = [...refs.keys()].flatMap((key) => runs.get(key) ?? []);
 			return {
@@ -377,13 +429,11 @@ async function findFailures(context: FindContext): Promise<AnalysisFindOutput> {
 				),
 			};
 		}),
-	};
+	});
 }
 
-async function findReactions(
-	context: FindContext,
-): Promise<AnalysisFindOutput> {
-	const { input, scope, header } = context;
+async function findReactions(context: FindContext): Promise<FoundPage> {
+	const { input, scope } = context;
 	const counts = new Map(
 		input.reaction.map((type) => [
 			type,
@@ -391,6 +441,7 @@ async function findReactions(
 		]),
 	);
 	let events: TimedEvent[] = [];
+	let following = 0;
 	for (const batch of scope.batches)
 		await scanPages(
 			context,
@@ -402,23 +453,21 @@ async function findReactions(
 					if (!count) continue;
 					count.count++;
 					count.sessions.add(event.eventRef.sessionId);
+					if (!isAfter(eventSortKey(event), context.after, context.order))
+						continue;
+					following++;
 					events.push(event);
 				}
-				if (events.length > input.limit * 2)
-					events = newestEvents(events, input.limit);
+				if (events.length > context.limit * 2)
+					events = newestEvents(events, context.limit);
 			},
 		);
-	events = newestEvents(events, input.limit);
-	const total = [...counts.values()].reduce(
-		(sum, count) => sum + count.count,
-		0,
-	);
-	header.truncated ||= total > events.length;
+	events = newestEvents(events, context.limit);
 	const origins = context.runs;
-	return {
+	return paged(context, events.map(eventSortKey), following > events.length, {
 		source: "user",
-		header,
-		events: events.map(({ at: _at, ...event }) => {
+		header: context.header,
+		events: events.map(({ at: _at, block: _block, ...event }) => {
 			const origin = event.originRef
 				? origins.get(runKey(event.originRef))
 				: undefined;
@@ -433,7 +482,20 @@ async function findReactions(
 			count: count.count,
 			sessions: count.sessions.size,
 		})),
-	};
+	});
+}
+
+/** A page of `output` whose items have `keys`; the header says if more follow. */
+function paged(
+	{ input, header }: FindContext,
+	keys: CursorKey[],
+	more: boolean,
+	output: AnalysisFindOutput,
+): FoundPage {
+	header.truncated ||= more;
+	const last = keys.at(-1);
+	if (more && last) header.cursor = writeFindCursor(input, last);
+	return { output, keys };
 }
 
 /**
@@ -613,11 +675,8 @@ function rowRef(row: {
 	};
 }
 
-function compareRuns(
-	left: RunRow,
-	right: RunRow,
-	sort: AnalysisFindInput["sort"],
-): number {
+/** The sort column descending (unpriced runs last), then the ref. */
+function runSortKey(row: RunRow, sort: AnalysisFindInput["sort"]): CursorKey {
 	const column = {
 		startedAt: "started_ms",
 		minutes: "minutes",
@@ -625,10 +684,36 @@ function compareRuns(
 		failedCalls: "failed_calls",
 		rawChars: "raw_chars",
 	} as const satisfies Record<AnalysisFindInput["sort"], keyof RunRow>;
-	return (
-		(right[column[sort]] ?? -Infinity) - (left[column[sort]] ?? -Infinity) ||
-		runKey(rowRef(left)).localeCompare(runKey(rowRef(right)))
-	);
+	return [row[column[sort]], runKey(rowRef(row))];
+}
+
+/**
+ * Newest first, then the later record, its content block, the type and the
+ * stream: one record may hold several text blocks, each with its own events.
+ */
+function eventSortKey(event: TimedEvent): CursorKey {
+	return [
+		event.at,
+		event.eventRef.record,
+		event.block,
+		event.type,
+		runKey(event.eventRef),
+	];
+}
+
+function cursorOrder(input: AnalysisFindInput): CursorOrder {
+	if (input.source === "tool") return TOOL_GROUP_ORDER;
+	if (input.source === "user") return EVENT_ORDER;
+	return input.groupBy ? RUN_GROUP_ORDER : RUN_ORDER;
+}
+
+function cursorAt(
+	input: AnalysisFindInput,
+	keys: readonly CursorKey[],
+	index: number,
+): string | undefined {
+	const key = keys[index];
+	return key ? writeFindCursor(input, key) : undefined;
 }
 
 function groupKey(
@@ -646,11 +731,8 @@ function groupKey(
 
 function newestEvents(events: TimedEvent[], limit: number): TimedEvent[] {
 	return events
-		.sort(
-			(left, right) =>
-				right.at.localeCompare(left.at) ||
-				right.eventRef.record - left.eventRef.record ||
-				left.type.localeCompare(right.type),
+		.sort((left, right) =>
+			compareKeys(eventSortKey(left), eventSortKey(right), EVENT_ORDER),
 		)
 		.slice(0, limit);
 }

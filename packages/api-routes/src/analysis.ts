@@ -9,6 +9,11 @@ export const RunRefSchema = z
 	})
 	.strict();
 
+/** A ref as callers pass it: `agentId` defaults to the main transcript (`''`). */
+const RunRefInputSchema = RunRefSchema.extend({
+	agentId: z.string().max(200).default(""),
+});
+
 /**
  * Every find/read call belongs to an analysis. The first call of an analysis
  * passes the asker's `question`; later calls pass the returned `analysis` id.
@@ -72,11 +77,14 @@ export const AnalysisFindInputBaseSchema = z
 			.array(z.enum(["negative", "swear", "apology"]))
 			.default(["negative", "swear", "apology"]),
 		groupBy: z.enum(["week", "model", "repository", "agent"]).optional(),
-		refs: z.array(RunRefSchema).max(200).optional(),
-		limit: z.number().int().min(1).max(200).default(50),
+		refs: z.array(RunRefInputSchema).max(200).optional(),
+		/** Absent: `findLimit` picks a default per source. */
+		limit: z.number().int().min(1).max(200).optional(),
 		sort: z
 			.enum(["startedAt", "minutes", "costUsd", "failedCalls", "rawChars"])
 			.default("startedAt"),
+		/** Opaque position from a previous page's header; the other arguments must match that call. */
+		cursor: z.string().min(1).max(4_096).optional(),
 		...traceInput,
 	})
 	.strict();
@@ -103,7 +111,7 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 /** The read arguments without cross-field checks; Zod 4 cannot derive a partial from a refined object. */
 export const AnalysisReadInputBaseSchema = z
 	.object({
-		refs: z.array(RunRefSchema).min(1).max(10),
+		refs: z.array(RunRefInputSchema).min(1).max(10),
 		depth: z.enum(["exchange", "turn", "record"]).default("exchange"),
 		maxChars: z.number().int().min(1).max(40_000).default(12_000),
 		record: z.number().int().min(1).max(4_294_967_294).optional(),
@@ -172,6 +180,8 @@ const HeaderSchema = z.object({
 	truncated: z.boolean(),
 	notes: z.array(z.string()),
 	classifierVersion: z.number().int(),
+	/** Present when more rows, groups or events follow this page. */
+	cursor: z.string().optional(),
 	trace: AnalysisTraceSchema.optional(),
 });
 export const AnalysisRunSchema = z.object({
@@ -302,6 +312,11 @@ export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
 export type AnalysisReadInput = z.infer<typeof AnalysisReadInputSchema>;
 export type AnalysisReadOutput = z.infer<typeof AnalysisReadOutputSchema>;
+
+/** The page size of a find call: its `limit`, or 20 tool groups, else 50. */
+export function findLimit(input: Pick<AnalysisFindInput, "limit" | "source">) {
+	return input.limit ?? (input.source === "tool" ? 20 : 50);
+}
 
 export const analysisContract = {
 	find: oc.input(AnalysisFindInputSchema).output(AnalysisFindOutputSchema),

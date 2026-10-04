@@ -73,6 +73,7 @@ export {
 	type AnalysisRun,
 	type AnalysisTrace,
 	AnalysisTraceSchema,
+	findLimit,
 	type RunRef,
 } from "./analysis.js";
 export {

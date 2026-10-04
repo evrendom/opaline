@@ -24,32 +24,34 @@ const BODY_MAX_BYTES = ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES;
 
 /**
  * The find result with as many leading rows, groups or events as fit
- * `ANALYSIS_OUTPUT_MAX_BYTES` with its trace; a cut result is truncated and
- * says so.
+ * `ANALYSIS_OUTPUT_MAX_BYTES` with its trace; a cut result is truncated, says
+ * so, and continues with `cursorAfter(index of its last item)`.
  */
-export function fitFindOutput(output: AnalysisFindOutput): AnalysisFindOutput {
+export function fitFindOutput(
+	output: AnalysisFindOutput,
+	cursorAfter: (index: number) => string | undefined = () => undefined,
+): AnalysisFindOutput {
 	if (jsonBytes(output) <= BODY_MAX_BYTES) return output;
+	const page = { header: output.header, cursorAfter };
 	if ("rows" in output)
-		return fitItems(output.header, output.rows, "rows", (rows, header) => ({
+		return fitItems(page, output.rows, "rows", (rows, header) => ({
 			...output,
 			header,
 			rows,
 		}));
 	if (output.source === "user")
-		return fitItems(
-			output.header,
-			output.events,
-			"events",
-			(events, header) => ({ ...output, header, events }),
-		);
+		return fitItems(page, output.events, "events", (events, header) => ({
+			...output,
+			header,
+			events,
+		}));
 	if (output.source === "tool")
-		return fitItems(
-			output.header,
-			output.groups,
-			"groups",
-			(groups, header) => ({ ...output, header, groups }),
-		);
-	return fitItems(output.header, output.groups, "groups", (groups, header) => ({
+		return fitItems(page, output.groups, "groups", (groups, header) => ({
+			...output,
+			header,
+			groups,
+		}));
+	return fitItems(page, output.groups, "groups", (groups, header) => ({
 		...output,
 		header,
 		groups,
@@ -101,26 +103,31 @@ export function jsonBytes(value: unknown): number {
 }
 
 function fitItems<TItem>(
-	header: Header,
+	{
+		header,
+		cursorAfter,
+	}: {
+		header: Header;
+		cursorAfter: (index: number) => string | undefined;
+	},
 	items: readonly TItem[],
 	noun: string,
 	build: (items: TItem[], header: Header) => AnalysisFindOutput,
 ): AnalysisFindOutput {
-	return fitCount(items.length, (count) =>
-		build(
-			items.slice(0, count),
-			count === items.length
-				? header
-				: {
-						...header,
-						truncated: true,
-						notes: [
-							...header.notes,
-							`only the first ${count} of ${items.length} ${noun} fit the ${ANALYSIS_OUTPUT_MAX_BYTES / 1024} KiB result ceiling; narrow the scope or lower limit`,
-						],
-					},
-		),
-	);
+	return fitCount(items.length, (count) => {
+		const kept = items.slice(0, count);
+		if (count === items.length) return build(kept, header);
+		const cursor = count > 0 ? cursorAfter(count - 1) : undefined;
+		return build(kept, {
+			...header,
+			truncated: true,
+			notes: [
+				...header.notes,
+				`only the first ${count} of ${items.length} ${noun} fit the ${ANALYSIS_OUTPUT_MAX_BYTES / 1024} KiB result ceiling; ${cursor ? "pass the cursor for the rest, or " : ""}narrow the scope or lower limit`,
+			],
+			cursor,
+		});
+	});
 }
 
 /** `build(count)` for the largest `count` up to `total` whose JSON leaves the trace room. */

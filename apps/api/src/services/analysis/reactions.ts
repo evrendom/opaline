@@ -8,8 +8,10 @@ import {
 import type { TextRow } from "./scan-queries.js";
 
 type Reaction = AnalysisEvent["type"];
+/** An event with what orders it but is not returned: its time and content block. */
 export interface TimedEvent extends AnalysisEvent {
 	at: string;
+	block: number;
 }
 
 const QUOTE_CHARS = 200;
@@ -31,6 +33,7 @@ export function reactionEvents(row: TextRow): TimedEvent[] {
 		return [
 			{
 				at: new Date(row.started_ms).toISOString(),
+				block: row.block_idx,
 				type,
 				terms: [...new Set(matches.map((match) => match.matchedText))],
 				eventRef: { ...ref, record: row.record_idx },

@@ -114,6 +114,7 @@ describe("persistent skill extraction through the real API", () => {
 				claudeSessionCount: 1,
 				codexSessionCount: 0,
 				contentPreview: CLAUDE_BODY,
+				versionCount: 1,
 				attribution: {
 					userCount: 1,
 					topUsers: [{ userId, sessionCount: 1 }],
@@ -186,6 +187,7 @@ describe("persistent skill extraction through the real API", () => {
 				claudeSessionCount: 0,
 				codexSessionCount: 1,
 				contentPreview: CODEX_BODY,
+				versionCount: 1,
 				attribution: {
 					userCount: 1,
 					topUsers: [{ userId, sessionCount: 1 }],

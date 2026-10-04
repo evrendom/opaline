@@ -491,6 +491,8 @@ export const HistoricalSkillSummarySchema = z.object({
 	codexSessionCount: z.number().int().nonnegative(),
 	contentPreview: z.string().nullable().default(null),
 	attribution: HistoricalSkillAttributionSchema.optional(),
+	/** Distinct contents used; absent where only the legacy reader answers. */
+	versionCount: z.number().int().nonnegative().optional(),
 });
 
 export const HistoricalSkillVersionSchema = z.object({

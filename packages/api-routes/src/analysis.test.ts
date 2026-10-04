@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
 	AnalysisFindInputSchema,
 	AnalysisReadInputSchema,
+	findLimit,
 } from "./analysis.js";
+import { AnalysisHistorySaveInputSchema } from "./analysis-history.js";
 
 const ref = { sessionId: "session", agentId: "", turn: 1 };
 describe("analysis input validation", () => {
@@ -13,11 +15,62 @@ describe("analysis input validation", () => {
 				.success,
 		).toBe(false);
 		expect(AnalysisFindInputSchema.parse({ source: "runs" })).toMatchObject({
-			limit: 50,
 			includeNoise: false,
 			sort: "startedAt",
 			reaction: ["negative", "swear", "apology"],
 		});
+	});
+	test("find pages hold 50 items, 20 tool groups, or the given limit", () => {
+		expect(findLimit(AnalysisFindInputSchema.parse({ source: "runs" }))).toBe(
+			50,
+		);
+		expect(findLimit(AnalysisFindInputSchema.parse({ source: "user" }))).toBe(
+			50,
+		);
+		expect(findLimit(AnalysisFindInputSchema.parse({ source: "tool" }))).toBe(
+			20,
+		);
+		expect(
+			findLimit(AnalysisFindInputSchema.parse({ source: "tool", limit: 200 })),
+		).toBe(200);
+	});
+	test("refs default agentId to the main transcript", () => {
+		const { agentId: _agentId, ...main } = ref;
+		expect(AnalysisReadInputSchema.parse({ refs: [main] }).refs).toEqual([
+			{ sessionId: "session", agentId: "", turn: 1 },
+		]);
+		expect(
+			AnalysisFindInputSchema.parse({ source: "runs", refs: [main] }).refs,
+		).toEqual([{ sessionId: "session", agentId: "", turn: 1 }]);
+		expect(
+			AnalysisReadInputSchema.parse({
+				refs: [{ ...main, agentId: "agent-1" }],
+			}).refs[0]?.agentId,
+		).toBe("agent-1");
+		expect(
+			AnalysisReadInputSchema.safeParse({ refs: [{ ...main, extra: 1 }] })
+				.success,
+		).toBe(false);
+	});
+	test("saving without an analysis id says to pass the id from a trace line", () => {
+		const result = AnalysisHistorySaveInputSchema.safeParse({
+			finalAnswer: "answer",
+		});
+		expect(result.success).toBe(false);
+		expect(result.error?.issues).toEqual([
+			expect.objectContaining({
+				path: ["analysis"],
+				message: expect.stringContaining(
+					"pass the analysis id from the trace line of a find or read call",
+				),
+			}),
+		]);
+		expect(
+			AnalysisHistorySaveInputSchema.safeParse({
+				analysis: 7,
+				finalAnswer: "answer",
+			}).error?.issues[0]?.message,
+		).toBe("Invalid input: expected string, received number");
 	});
 	test("find rejects invalid scope, enums, limits, reversed dates and excessive refs", () => {
 		for (const input of [
@@ -26,6 +79,8 @@ describe("analysis input validation", () => {
 			{ source: "runs", latest: 0 },
 			{ source: "runs", limit: 201 },
 			{ source: "runs", limit: 1.5 },
+			{ source: "runs", limit: 0 },
+			{ source: "runs", cursor: "" },
 			{ source: "runs", from: "2026-02-30" },
 			{ source: "runs", from: "2026-10-03", to: "2026-10-02" },
 			{ source: "tool", groupBy: "week" },

@@ -59,6 +59,20 @@ test("runs render compact TSV, all facts, escaped cells and null pricing", () =>
 	expect(text).not.toContain('"header":');
 });
 
+test("a page with more results names its cursor; the last page has no more line", () => {
+	const more = renderFind({
+		source: "runs",
+		header: { ...header, truncated: true, cursor: "abc_-123" },
+		groups: [],
+	});
+	expect(more.split("\n")).toContain(
+		"more: pass cursor=abc_-123 with the same arguments to continue",
+	);
+	expect(renderFind({ source: "runs", header, groups: [] })).not.toContain(
+		"more:",
+	);
+});
+
 test("all group modes and reaction origins render with table headers", () => {
 	expect(
 		renderFind({

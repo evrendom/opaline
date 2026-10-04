@@ -918,6 +918,18 @@ async function seedSession(
 	await sqlClient`INSERT INTO session_ownership (organization_id, user_id, session_id) VALUES (${userId}, ${identity.userId}, ${sessionId})`;
 }
 
+/** The paged items of a find result: rows, groups or events. */
+function items(output: z.infer<typeof AnalysisFindOutputSchema>): unknown[] {
+	if (output.source === "user") return output.events;
+	return "rows" in output ? output.rows : output.groups;
+}
+
+function shiftDay(isoDay: string, days: number): string {
+	return new Date(Date.parse(isoDay) + days * 86_400_000)
+		.toISOString()
+		.slice(0, 10);
+}
+
 async function signup(label: string) {
 	assert(server);
 	const response = await fetch(`${server.baseUrl}/api/auth/sign-up/email`, {
@@ -1394,4 +1406,129 @@ test("where the log is off, history fails with an agent-actionable message and t
 			}),
 		).toBe(ANALYSIS_HISTORY_OFF);
 	}
+});
+
+test("find pages: a cursor continues the same call without duplicates, the last page has none, and other arguments reject it", async () => {
+	const scope = { from: day, to: day };
+	for (const input of [
+		{ source: "runs", ...scope },
+		{ source: "runs", ...scope, sort: "costUsd" },
+		{ source: "runs", ...scope, groupBy: "agent" },
+		{ source: "tool", ...scope, includeNoise: true },
+		{ source: "user", ...scope },
+	]) {
+		const whole = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", { ...input, limit: 200 }),
+		);
+		expect(whole.header.cursor).toBeUndefined();
+		const all = items(whole);
+		expect(all.length).toBeGreaterThan(1);
+
+		const first = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", { ...input, limit: 1 }),
+		);
+		expect(first.header.truncated).toBe(true);
+		const cursor = first.header.cursor;
+		assert(cursor);
+		const rest = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", {
+				...input,
+				limit: all.length - 1,
+				cursor,
+			}),
+		);
+		expect(rest.header.cursor).toBeUndefined();
+		expect([...items(first), ...items(rest)]).toEqual(all);
+		expect(rest.header.runsInScope).toBe(whole.header.runsInScope);
+
+		const other = await rpcResponse("analysis/find", {
+			...input,
+			from: shiftDay(day, -1),
+			cursor,
+		});
+		expect(other.status).toBe(400);
+		expect(await other.text()).toContain(
+			"cursor: returned by a find call with other arguments",
+		);
+	}
+	const forged = await rpcResponse("analysis/find", {
+		source: "runs",
+		...scope,
+		cursor: "not-a-cursor",
+	});
+	expect(forged.status).toBe(400);
+	expect(await forged.text()).toContain(
+		"cursor: not a cursor returned by find",
+	);
+
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { source: "runs", ...scope }),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	const main = runs.rows.find((row) => row.ref.agentId === "");
+	assert(main);
+	const { agentId: _agentId, ...withoutAgent } = main.ref;
+	const read = AnalysisReadOutputSchema.parse(
+		await rpc("analysis/read", { refs: [withoutAgent] }),
+	);
+	expect(read.reads[0]).toMatchObject({ ref: main.ref, found: true });
+});
+
+test("reaction pages keep every text block of one record: two apologies in one assistant message both appear", async () => {
+	const sessionId = `analysis_blocks_${runId}`;
+	await seedSession(
+		sessionId,
+		"claude_code",
+		[
+			{
+				type: "user",
+				timestamp: at(0),
+				message: { role: "user", content: "Rename the helper" },
+			},
+			{
+				type: "assistant",
+				timestamp: at(1),
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "text", text: "I'm sorry, I renamed the wrong file." },
+						{ type: "text", text: "Apologies, I also broke the import." },
+					],
+				},
+			},
+		]
+			.map((line) => JSON.stringify(line))
+			.join("\n"),
+		"claude-sonnet-4-5",
+	);
+	const input = {
+		source: "user",
+		from: day,
+		to: day,
+		sessionId,
+		reaction: ["apology"],
+	};
+	const whole = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", input),
+	);
+	assert(whole.source === "user");
+	expect(whole.events).toHaveLength(2);
+	expect(new Set(whole.events.map((event) => event.eventRef.record)).size).toBe(
+		1,
+	);
+
+	const first = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", { ...input, limit: 1 }),
+	);
+	assert(first.source === "user" && first.header.cursor);
+	const second = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			...input,
+			limit: 1,
+			cursor: first.header.cursor,
+		}),
+	);
+	assert(second.source === "user");
+	expect(second.header.cursor).toBeUndefined();
+	expect([...first.events, ...second.events]).toEqual(whole.events);
 });

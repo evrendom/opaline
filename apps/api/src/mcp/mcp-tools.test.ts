@@ -42,12 +42,14 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 		properties: {
 			source: { type: "string", enum: ["runs", "tool", "user"] },
 			from: { type: "string", format: "date" },
-			limit: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+			limit: { type: "integer", minimum: 1, maximum: 200 },
+			cursor: { type: "string" },
 			reaction: { default: ["negative", "swear", "apology"] },
 			refs: {
 				type: "array",
 				items: {
-					required: ["sessionId", "agentId", "turn"],
+					required: ["sessionId", "turn"],
+					properties: { agentId: { default: "" } },
 					additionalProperties: false,
 				},
 			},
@@ -59,7 +61,12 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 		required: ["refs"],
 		additionalProperties: false,
 		properties: {
-			refs: { type: "array", minItems: 1, maxItems: 10 },
+			refs: {
+				type: "array",
+				minItems: 1,
+				maxItems: 10,
+				items: { required: ["sessionId", "turn"] },
+			},
 			depth: { enum: ["exchange", "turn", "record"], default: "exchange" },
 			maxChars: { maximum: 40_000, default: 12_000 },
 			workspace: { type: "string" },

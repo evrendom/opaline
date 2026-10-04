@@ -16,6 +16,11 @@ export function renderFind(output: AnalysisFindOutput): string {
 		`${output.source} ${header.from}..${header.to} sessions=${header.sessionsInScope} indexed=${header.indexedSessions} runs=${header.runsInScope}`,
 		`minutes=${header.minutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} classifier=${header.classifierVersion} truncated=${header.truncated}`,
 		...header.notes.map((note) => `note: ${cell(note)}`),
+		...(header.cursor
+			? [
+					`more: pass cursor=${header.cursor} with the same arguments to continue`,
+				]
+			: []),
 		...(header.trace ? [traceLine(header.trace)] : []),
 	];
 	if (output.source === "runs") {
