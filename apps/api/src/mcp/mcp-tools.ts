@@ -30,6 +30,7 @@ import {
 	type McpToolAnnotations,
 	READ_ONLY,
 	REPLACES_OWN_SETTING,
+	SHARES_WITH_WORKSPACE,
 	WRITES_OWN_RECORDS,
 } from "./tool-annotations.js";
 
@@ -535,7 +536,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "share_answer",
-		annotations: WRITES_OWN_RECORDS,
+		annotations: SHARES_WITH_WORKSPACE,
 		title: "Share an answer",
 		description: [
 			"What it does: Shares a saved answer with your workspace.",

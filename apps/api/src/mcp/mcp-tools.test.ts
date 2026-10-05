@@ -264,6 +264,12 @@ test("every tool declares annotations, and only the tools that write are not rea
 		openWorldHint: false,
 	};
 
+	const shares = {
+		readOnlyHint: false,
+		destructiveHint: false,
+		openWorldHint: true,
+	};
+
 	const replaces = {
 		readOnlyHint: false,
 		destructiveHint: true,
@@ -275,9 +281,11 @@ test("every tool declares annotations, and only the tools that write are not rea
 			name,
 			...(name === "settings_update"
 				? replaces
-				: ["find", "read", "save_answer", "share_answer"].includes(name)
-					? writes
-					: readOnly),
+				: name === "share_answer"
+					? shares
+					: ["find", "read", "save_answer"].includes(name)
+						? writes
+						: readOnly),
 		});
 	}
 	expect(annotations.find).toEqual(writes);
@@ -285,7 +293,7 @@ test("every tool declares annotations, and only the tools that write are not rea
 	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
 		expect(annotations[name]).toEqual(readOnly);
 	expect(annotations.save_answer).toEqual(writes);
-	expect(annotations.share_answer).toEqual(writes);
+	expect(annotations.share_answer).toEqual(shares);
 });
 
 /** Words a user or reviewer would not know; tool texts explain instead. */

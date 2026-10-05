@@ -35,3 +35,14 @@ export const REPLACES_OWN_SETTING: McpToolAnnotations = {
 	destructiveHint: true,
 	openWorldHint: false,
 };
+
+/**
+ * Shares one of the caller's saved analyses with the other members of their
+ * workspace. Additive (nothing is deleted or revoked), but it makes content
+ * visible to other people, so it is marked open-world.
+ */
+export const SHARES_WITH_WORKSPACE: McpToolAnnotations = {
+	readOnlyHint: false,
+	destructiveHint: false,
+	openWorldHint: true,
+};
