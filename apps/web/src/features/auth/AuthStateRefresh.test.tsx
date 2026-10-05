@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRoutes } from "@/app/routes";
@@ -21,6 +21,7 @@ import { LoginForm } from "./LoginForm";
 import { SignupForm } from "./SignupForm";
 
 const {
+	mockAuthFetch,
 	mockNavigateToDestination,
 	mockRefreshAuthClientState,
 	mockSendVerificationOtp,
@@ -29,6 +30,7 @@ const {
 	mockSignInSocial,
 	mockTrackAuthenticationAction,
 } = vi.hoisted(() => ({
+	mockAuthFetch: vi.fn(),
 	mockNavigateToDestination: vi.fn(),
 	mockRefreshAuthClientState: vi.fn(),
 	mockSendVerificationOtp: vi.fn(),
@@ -40,6 +42,7 @@ const {
 
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {
+		$fetch: mockAuthFetch,
 		emailOtp: {
 			sendVerificationOtp: mockSendVerificationOtp,
 		},
@@ -74,6 +77,8 @@ describe("auth state refresh", () => {
 
 	beforeEach(() => {
 		window.history.replaceState({}, "", "/");
+		mockAuthFetch.mockReset();
+		mockAuthFetch.mockResolvedValue({ data: { available: false } });
 		mockSendVerificationOtp.mockReset();
 		mockSignInEmail.mockReset();
 		mockSignInEmailOtp.mockReset();
@@ -431,6 +436,7 @@ describe("auth state refresh", () => {
 			`/login?redirect=${encodeURIComponent(destination)}&signup_redirect=%2Fwelcome`,
 		);
 		mockSignInEmail.mockResolvedValue({ error: null });
+		mockAuthFetch.mockResolvedValue({ data: { available: true } });
 		const user = userEvent.setup();
 		render(<LoginForm />);
 
@@ -440,10 +446,10 @@ describe("auth state refresh", () => {
 		).toBeInTheDocument();
 		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
 		await user.type(screen.getByLabelText("Email"), "Ada@Example.com");
-		await user.click(
-			screen.getByRole("button", { name: "Use a password instead" }),
+		await user.type(
+			await screen.findByLabelText("Password"),
+			"reviewer-password",
 		);
-		await user.type(screen.getByLabelText("Password"), "reviewer-password");
 		await user.click(screen.getByRole("button", { name: "Sign in" }));
 
 		await waitFor(() => {
@@ -453,6 +459,13 @@ describe("auth state refresh", () => {
 			email: "Ada@Example.com",
 			password: "reviewer-password",
 		});
+		expect(mockAuthFetch).toHaveBeenCalledWith(
+			"/password-sign-in/available",
+			expect.objectContaining({
+				method: "POST",
+				body: { email: "Ada@Example.com" },
+			}),
+		);
 		expect(mockRefreshAuthClientState).toHaveBeenCalledTimes(1);
 		expect(mockSendVerificationOtp).not.toHaveBeenCalled();
 		expect(mockSignInEmailOtp).not.toHaveBeenCalled();
@@ -461,7 +474,85 @@ describe("auth state refresh", () => {
 		).toBe(false);
 	});
 
-	it("shows password sign in errors and can switch back to email codes", async () => {
+	it("keeps the email code flow for emails off the password list", async () => {
+		mockSendVerificationOtp.mockResolvedValue({ error: null });
+		const user = userEvent.setup();
+		render(<LoginForm />);
+
+		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
+		await user.type(screen.getByLabelText("Email"), "ada@example.com");
+		await waitFor(() => {
+			expect(mockAuthFetch).toHaveBeenCalledTimes(1);
+		});
+
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /password/i }),
+		).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Send code" }));
+		expect(await screen.findByLabelText("Email code")).toBeInTheDocument();
+		expect(mockSendVerificationOtp).toHaveBeenCalledWith({
+			email: "ada@example.com",
+			type: "sign-in",
+		});
+		expect(mockSignInEmail).not.toHaveBeenCalled();
+	});
+
+	it("lets an allowed email choose an email code instead of a password", async () => {
+		mockAuthFetch.mockResolvedValue({ data: { available: true } });
+		mockSendVerificationOtp.mockResolvedValue({ error: null });
+		const user = userEvent.setup();
+		render(<LoginForm />);
+
+		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
+		await user.type(screen.getByLabelText("Email"), "reviewer@example.com");
+		expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+		await user.click(
+			screen.getByRole("button", { name: "Use an email code instead" }),
+		);
+
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Send code" }));
+		expect(await screen.findByLabelText("Email code")).toBeInTheDocument();
+		expect(mockSendVerificationOtp).toHaveBeenCalledWith({
+			email: "reviewer@example.com",
+			type: "sign-in",
+		});
+		expect(mockSignInEmail).not.toHaveBeenCalled();
+	});
+
+	it("shows the password field once a failed lookup succeeds on window focus", async () => {
+		mockAuthFetch
+			.mockResolvedValueOnce({
+				data: null,
+				error: { status: 429, message: "Too many requests" },
+			})
+			.mockResolvedValue({ data: { available: true } });
+		const user = userEvent.setup();
+		render(<LoginForm />);
+
+		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
+		await user.type(screen.getByLabelText("Email"), "reviewer@example.com");
+		await waitFor(() => {
+			expect(mockAuthFetch).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+
+		await act(async () => {
+			window.dispatchEvent(new Event("focus"));
+		});
+
+		expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+		expect(mockAuthFetch).toHaveBeenCalledTimes(2);
+	});
+
+	it("shows password sign in errors and returns to email codes for another email", async () => {
+		mockAuthFetch.mockImplementation(
+			async (_path: string, options: { body: { email: string } }) => ({
+				data: { available: options.body.email === "reviewer@example.com" },
+			}),
+		);
 		mockSignInEmail.mockResolvedValue({
 			error: { message: "Invalid email or password" },
 		});
@@ -470,11 +561,8 @@ describe("auth state refresh", () => {
 		render(<LoginForm />);
 
 		await user.click(screen.getByRole("button", { name: "Log in with Email" }));
-		await user.type(screen.getByLabelText("Email"), "ada@example.com");
-		await user.click(
-			screen.getByRole("button", { name: "Use a password instead" }),
-		);
-		await user.type(screen.getByLabelText("Password"), "wrong-password");
+		await user.type(screen.getByLabelText("Email"), "reviewer@example.com");
+		await user.type(await screen.findByLabelText("Password"), "wrong-password");
 		await user.click(screen.getByRole("button", { name: "Sign in" }));
 
 		const alert = await screen.findByRole("alert");
@@ -483,9 +571,9 @@ describe("auth state refresh", () => {
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
 		expect(mockNavigateToDestination).not.toHaveBeenCalled();
 		expect(mockRefreshAuthClientState).not.toHaveBeenCalled();
-		await user.click(
-			screen.getByRole("button", { name: "Use an email code instead" }),
-		);
+
+		await user.clear(screen.getByLabelText("Email"));
+		await user.type(screen.getByLabelText("Email"), "ada@example.com");
 		expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
 		await user.click(screen.getByRole("button", { name: "Send code" }));

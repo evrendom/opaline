@@ -40,6 +40,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 |----------|----------|-------------|
 | `PG_CONNECTION_STRING` | Yes | Postgres connection string (e.g. `postgres://postgres:postgres@localhost:5432/rudel`) |
 | `BETTER_AUTH_SECRET` | Yes | Auth secret (generate with `openssl rand -base64 32`) |
+| `PASSWORD_AUTH_EMAILS` | No | Comma-separated, case-insensitive exact emails allowed to sign in or sign up with a password; `*` allows everyone (set by `dev-local.sh` and CI). Missing or empty allows nobody: everyone else uses email codes or social login. The API rejects `/sign-in/email` and `/sign-up/email` for other emails with the wrong-password error, and the login forms show the password field only after `POST /api/auth/password-sign-in/available` confirms the typed email. `DEMO_ACCOUNT_EMAIL` is always allowed. |
 | `CLICKHOUSE_URL` | Yes | ClickHouse HTTP endpoint |
 | `CLICKHOUSE_USERNAME` | Remote only | ClickHouse username; local endpoints may use `default` |
 | `CLICKHOUSE_PASSWORD` | No | ClickHouse password |

@@ -55,6 +55,7 @@ import { isAuthorizedIngestOperatorRequest } from "./lib/ingest-quiescence.js";
 import { resolvePublicLookupSource } from "./lib/public-lookup-source.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
+import { parsePasswordAuthEmails } from "./password-auth.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
@@ -151,6 +152,11 @@ export const auth = createAuth(db, {
 	appURL,
 	crm: { accessToken: process.env.CRM_ACCESS_TOKEN },
 	frontendURL: preferredFrontendOrigin,
+	// The showcase handler signs its account in with a password.
+	passwordAuthEmails: parsePasswordAuthEmails(
+		process.env.PASSWORD_AUTH_EMAILS,
+		[process.env.DEMO_ACCOUNT_EMAIL],
+	),
 	secret: betterAuthSecret,
 	resend,
 	socialProviders,

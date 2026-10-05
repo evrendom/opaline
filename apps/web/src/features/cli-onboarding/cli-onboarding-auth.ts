@@ -62,6 +62,11 @@ export async function signInCliWithEmail(email: string, otp: string) {
 	return readCliSession();
 }
 
+export async function signInCliWithPassword(email: string, password: string) {
+	await postCliAuth("/api/auth/sign-in/email", { email, password });
+	return readCliSession();
+}
+
 export async function approveCliAuthorization(
 	authorization: CliAuthorization,
 	organizationId: string,

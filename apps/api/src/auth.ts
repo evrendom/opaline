@@ -27,6 +27,10 @@ import {
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
 import {
+	type PasswordAuthAllowlist,
+	passwordAuthAllowlistPlugin,
+} from "./password-auth.js";
+import {
 	enqueueBillingTraitsForUser,
 	reconcileOrganizationBillingSeats,
 } from "./services/billing.service.js";
@@ -94,6 +98,8 @@ export interface AuthConfig {
 	crm: CRMConfig | undefined;
 	cookiePrefix?: string;
 	frontendURL: string;
+	/** Emails allowed to use email+password; defaults to nobody. */
+	passwordAuthEmails?: PasswordAuthAllowlist;
 	secret: string;
 	resend?: ResendConfig;
 	socialProviders?: Record<string, { clientId: string; clientSecret: string }>;
@@ -180,6 +186,9 @@ export function createAuth(db: object, config: AuthConfig) {
 		},
 		socialProviders: config.socialProviders,
 		plugins: [
+			passwordAuthAllowlistPlugin(
+				config.passwordAuthEmails ?? { kind: "emails", emails: new Set() },
+			),
 			emailOTP({
 				allowedAttempts: 5,
 				expiresIn: 5 * 60,

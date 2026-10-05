@@ -20,6 +20,7 @@ export async function startApiTestServer(
 		BETTER_AUTH_SECRET: "test-secret-for-integration-tests",
 		CLICKHOUSE_PURGE_WORKER_ENABLED: "false",
 		NODE_ENV: "test",
+		PASSWORD_AUTH_EMAILS: "*",
 		PORT: "0",
 		...environmentOverrides,
 	};

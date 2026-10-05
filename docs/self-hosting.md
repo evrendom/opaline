@@ -142,7 +142,7 @@ fly secrets set \
 
 Set the OAuth callback URL to `https://your-domain.com/api/auth/callback/github` (or `/google`).
 
-Without these, users can still sign up and log in with email/password.
+Without these, users can still sign up and log in with email codes. Password sign-in is limited to the emails in `PASSWORD_AUTH_EMAILS` (`*` allows everyone).
 
 ## GitHub Repository Evidence (Optional)
 
@@ -263,6 +263,7 @@ npx wrangler r2 bucket lifecycle list <bucket-name>
 |----------|----------|-------------|
 | `PG_CONNECTION_STRING` | Yes | Postgres connection string |
 | `BETTER_AUTH_SECRET` | Yes | Auth secret (`openssl rand -base64 32`) |
+| `PASSWORD_AUTH_EMAILS` | No | Comma-separated, case-insensitive emails allowed to sign in or sign up with a password; `*` allows everyone. Missing or empty allows nobody |
 | `CLICKHOUSE_URL` | Yes | ClickHouse HTTPS endpoint |
 | `CLICKHOUSE_USERNAME` | Yes | ClickHouse username |
 | `CLICKHOUSE_PASSWORD` | Yes | ClickHouse password |

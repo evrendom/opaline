@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { usePasswordSignIn } from "@/features/auth/password-sign-in";
 import { authClient } from "@/lib/auth-client";
 import type { CliConnectionSnapshot } from "../../../../../packages/api-routes/src/cli-connection";
 import {
@@ -11,6 +12,7 @@ import {
 	readCliSession,
 	sendCliEmailCode,
 	signInCliWithEmail,
+	signInCliWithPassword,
 	signInCliWithProvider,
 	signOutCliSession,
 } from "./cli-onboarding-auth";
@@ -42,9 +44,17 @@ export function CliSignIn(props: CliSignInProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [email, setEmail] = useState("");
 	const [otp, setOtp] = useState("");
+	const [password, setPassword] = useState("");
 	const [emailStage, setEmailStage] = useState<"choice" | "email" | "code">(
 		"choice",
 	);
+	// Only PASSWORD_AUTH_EMAILS accounts see a password field; they may still
+	// choose an email code, since an account created with a code has no password.
+	const [emailCodeChosenFor, setEmailCodeChosenFor] = useState<string | null>(
+		null,
+	);
+	const passwordAllowed = usePasswordSignIn(email) && emailStage === "email";
+	const passwordSignIn = passwordAllowed && emailCodeChosenFor !== email.trim();
 	const localPreview =
 		["localhost", "127.0.0.1"].includes(window.location.hostname) &&
 		document.querySelector('meta[name="opaline-local-cli"]') !== null;
@@ -106,11 +116,13 @@ export function CliSignIn(props: CliSignInProps) {
 	async function submitEmail(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		await run(async () => {
-			if (emailStage === "email") {
+			if (emailStage === "email" && !passwordSignIn) {
 				await sendCliEmailCode(email.trim());
 				setEmailStage("code");
 			} else {
-				const signedIn = await signInCliWithEmail(email.trim(), otp);
+				const signedIn = passwordSignIn
+					? await signInCliWithPassword(email.trim(), password)
+					: await signInCliWithEmail(email.trim(), otp);
 				if (!signedIn)
 					throw new Error("Sign-in did not complete. Please try again.");
 				setSession(signedIn);
@@ -258,13 +270,50 @@ export function CliSignIn(props: CliSignInProps) {
 								disabled={busy}
 								onChange={(event) => setEmail(event.target.value)}
 							/>
+							{passwordSignIn ? (
+								<>
+									<label htmlFor="cli-password">Password</label>
+									<input
+										autoComplete="current-password"
+										id="cli-password"
+										name="password"
+										type="password"
+										value={password}
+										required
+										disabled={busy}
+										onChange={(event) => setPassword(event.target.value)}
+									/>
+								</>
+							) : null}
 							<button
 								className="cli-onboarding-primary"
 								disabled={busy}
 								type="submit"
 							>
-								{busy ? "Sending…" : "Send sign-in code"}
+								{passwordSignIn
+									? busy
+										? "Signing in…"
+										: "Sign in"
+									: busy
+										? "Sending…"
+										: "Send sign-in code"}
 							</button>
+							{passwordAllowed ? (
+								<button
+									className="cli-onboarding-text-button"
+									type="button"
+									disabled={busy}
+									onClick={() => {
+										setEmailCodeChosenFor(passwordSignIn ? email.trim() : null);
+										setPassword("");
+										setError(null);
+									}}
+								>
+									{passwordSignIn
+										? "Use an email code instead"
+										: "Use a password instead"}
+								</button>
+							) : null}
 						</>
 					) : (
 						<>

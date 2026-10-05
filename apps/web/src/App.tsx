@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
@@ -83,6 +83,13 @@ function SessionAwareApp() {
 		}
 	}, [location.pathname]);
 	const { data: session, isPending } = authClient.useSession();
+	// Better Auth re-fetches the session whenever the tab becomes visible and
+	// reports a signed-out session as pending again while it does. Only the
+	// first lookup is unknown; replacing the tree on later re-fetches would
+	// unmount the sign-in forms and drop what the user typed.
+	const [sessionResolved, setSessionResolved] = useState(!isPending);
+	if (!isPending && !sessionResolved) setSessionResolved(true);
+	const isResolvingSession = isPending && !sessionResolved;
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
 	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
@@ -118,7 +125,7 @@ function SessionAwareApp() {
 		);
 	}
 
-	if (isPending && !isCliSetupPath) {
+	if (isResolvingSession && !isCliSetupPath) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />

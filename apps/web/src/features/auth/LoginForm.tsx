@@ -28,6 +28,7 @@ import {
 	recordOAuthRedirectResult,
 	recordOAuthRedirectStart,
 } from "./oauth-debug";
+import { usePasswordSignIn } from "./password-sign-in";
 
 const LOGIN_CODE_INPUT_ID = "login-code";
 
@@ -40,7 +41,6 @@ export function LoginForm(props: LoginFormProps = {}) {
 	const [initialLoginDraft] = useState(readPendingEmailLoginCodeDraft);
 	const [email, setEmail] = useState(() => initialLoginDraft?.email ?? "");
 	const [password, setPassword] = useState("");
-	const [showPassword, setShowPassword] = useState(false);
 	const [emailCode, setEmailCode] = useState("");
 	const [emailCodeStage, setEmailCodeStage] = useState<EmailCodeStage>(() =>
 		initialLoginDraft ? "code" : "email",
@@ -63,18 +63,28 @@ export function LoginForm(props: LoginFormProps = {}) {
 	const hasValidEmail = isValidAuthEmail(email);
 	const hasValidEmailCode = isValidEmailCode(emailCode);
 	const isVerifyingEmail = showEmailForm && emailCodeStage === "code";
+	// Only PASSWORD_AUTH_EMAILS accounts see a password field; everyone else
+	// gets an email code. Allowed accounts may still choose an email code,
+	// since an account created with a code has no password.
+	const [emailCodeChosenFor, setEmailCodeChosenFor] = useState<string | null>(
+		null,
+	);
+	const passwordAllowed =
+		usePasswordSignIn(email) && emailCodeStage === "email";
+	const passwordSignIn =
+		passwordAllowed && emailCodeChosenFor !== normalizeAuthEmail(email);
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
 		setFeedback(null);
 		const loginEmail = normalizeAuthEmail(email);
 
-		if (emailCodeStage === "email" && !showPassword) {
+		if (emailCodeStage === "email" && !passwordSignIn) {
 			await sendEmailCode();
 			return;
 		}
 
-		if (!showPassword && !hasValidEmailCode) {
+		if (!passwordSignIn && !hasValidEmailCode) {
 			const codeField = document.getElementById(LOGIN_CODE_INPUT_ID);
 			if (codeField instanceof HTMLInputElement) {
 				codeField.focus();
@@ -90,11 +100,11 @@ export function LoginForm(props: LoginFormProps = {}) {
 		trackAuthenticationAction({
 			actionName: "sign_in",
 			sourceComponent: "login_form",
-			authMethod: showPassword ? "email_password" : "email_otp",
+			authMethod: passwordSignIn ? "email_password" : "email_otp",
 		});
 		clearPendingSignupRedirect();
 		setLoading(true);
-		const { error } = showPassword
+		const { error } = passwordSignIn
 			? await authClient.signIn.email({ email: loginEmail, password })
 			: await authClient.signIn.emailOtp({
 					email: loginEmail,
@@ -107,7 +117,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 				message: formatAuthErrorMessage({
 					error,
 					fallbackMessage: "Sign in failed",
-					operation: showPassword ? "password sign in" : "email code sign in",
+					operation: passwordSignIn ? "password sign in" : "email code sign in",
 				}),
 			});
 			return;
@@ -343,7 +353,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 									required
 								/>
 							</div>
-							{showPassword ? (
+							{passwordSignIn ? (
 								<div className="flex flex-col gap-2">
 									<Label className="sr-only" htmlFor="password">
 										Password
@@ -365,7 +375,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 								</div>
 							) : null}
 							<Button type="submit" disabled={loading}>
-								{showPassword
+								{passwordSignIn
 									? loading
 										? "Signing in..."
 										: "Sign in"
@@ -373,22 +383,26 @@ export function LoginForm(props: LoginFormProps = {}) {
 										? "Sending code..."
 										: "Send code"}
 							</Button>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="text-muted-foreground"
-								disabled={loading}
-								onClick={() => {
-									setShowPassword(!showPassword);
-									setPassword("");
-									setFeedback(null);
-								}}
-							>
-								{showPassword
-									? "Use an email code instead"
-									: "Use a password instead"}
-							</Button>
+							{passwordAllowed ? (
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="text-muted-foreground"
+									disabled={loading}
+									onClick={() => {
+										setEmailCodeChosenFor(
+											passwordSignIn ? normalizeAuthEmail(email) : null,
+										);
+										setPassword("");
+										setFeedback(null);
+									}}
+								>
+									{passwordSignIn
+										? "Use an email code instead"
+										: "Use a password instead"}
+								</Button>
+							) : null}
 						</form>
 					) : (
 						<Button

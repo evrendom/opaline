@@ -24,6 +24,7 @@ export async function startTestServer(
 		APP_URL: "http://localhost",
 		BETTER_AUTH_SECRET: "test-secret-for-integration-tests",
 		ALLOWED_ORIGIN: "http://localhost",
+		PASSWORD_AUTH_EMAILS: "*",
 		...environmentOverrides,
 	};
 
