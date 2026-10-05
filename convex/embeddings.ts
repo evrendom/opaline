@@ -75,7 +75,8 @@ export const search = apiAction({
 });
 
 /**
- * The matched texts in search order, leaving out analyses being deleted.
+ * The matched texts in search order, leaving out drafts and analyses being
+ * deleted.
  * Each match reads its embedding and possibly its analysis, so the list ends
  * early when half the transaction is used.
  */
@@ -89,11 +90,10 @@ export const visibleMatches = internalQuery({
 			if (!(await hasHeadroom(ctx))) break;
 			const value = await ctx.db.get(id);
 			if (value?.workspaceId !== workspaceId) continue;
-			if (!visible.has(value.analysisId))
-				visible.set(
-					value.analysisId,
-					(await findAnalysis(value.analysisId, ctx)) !== null,
-				);
+			if (!visible.has(value.analysisId)) {
+				const analysis = await findAnalysis(value.analysisId, ctx);
+				visible.set(value.analysisId, !!analysis && analysis.draft !== true);
+			}
 			if (visible.get(value.analysisId))
 				matches.push({
 					analysisId: value.analysisId,

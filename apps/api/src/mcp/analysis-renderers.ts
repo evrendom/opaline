@@ -183,6 +183,7 @@ export function renderAnalysisSearch(
 			"shared",
 			"host",
 			"cutoff",
+			"updates",
 			"scope",
 			"match",
 			"question",
@@ -195,6 +196,7 @@ export function renderAnalysisSearch(
 			analysis.shared,
 			analysis.host,
 			analysis.cutoff,
+			analysis.updates ?? "",
 			scopeText(analysis.scope),
 			analysis.match.kind === "step"
 				? `step ${analysis.match.step}: ${analysis.match.text}`
@@ -207,7 +209,7 @@ export function renderAnalysisSearch(
 
 export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 	const lines = [
-		`analysis ${output.id} status=${output.status} mine=${output.mine} shared=${output.shared} host=${output.host} cutoff=${output.cutoff}${output.updates ? ` updates=${output.updates}` : ""}`,
+		`analysis ${output.id} status=${output.status} mine=${output.mine} shared=${output.shared} host=${output.host} cutoff=${output.cutoff} updates=${output.updates ?? "none"} updatedBy=${output.updatedBy.join(",") || "none"}`,
 		`scope ${scopeText(output.scope)}`,
 		`question: ${cell(output.question)}`,
 		output.cost
@@ -228,6 +230,14 @@ export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 			);
 		if (step.finding) lines.push(`${indent}  finding: ${cell(step.finding)}`);
 	}
+	if (output.changes.length)
+		lines.push(
+			`changes against ${output.updates}:`,
+			...output.changes.map(
+				(change) =>
+					`  ${change.change}: step ${change.step}: ${cell(change.finding)} (${cell(change.evidence)})`,
+			),
+		);
 	lines.push(
 		`final answer: ${output.finalAnswer === null ? "(none yet)" : cell(output.finalAnswer)}`,
 	);

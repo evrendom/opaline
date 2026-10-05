@@ -1,7 +1,15 @@
 import { expect, test } from "bun:test";
-import type { AnalysisFindOutput, AnalysisReadOutput } from "@rudel/api-routes";
+import type {
+	AnalysisFindOutput,
+	AnalysisHistoryGetOutput,
+	AnalysisReadOutput,
+} from "@rudel/api-routes";
 import { budgetReadOutput } from "../services/analysis/read-output.js";
-import { renderFind, renderRead } from "./analysis-renderers.js";
+import {
+	renderAnalysisTree,
+	renderFind,
+	renderRead,
+} from "./analysis-renderers.js";
 
 /** What analysis.read returns: its output already fitted to maxChars. */
 function renderBudgeted(output: AnalysisReadOutput): string {
@@ -256,4 +264,60 @@ test("read budgets include Unicode, every escape and tiny-budget cut markers", (
 		expect(text.length).toBeLessThanOrEqual(maxChars);
 		if (maxChars >= 5) expect(text).toEndWith("[cut]");
 	}
+});
+
+test("an analysis shows its data cutoff, the prior it updates, its revisions and how each finding changed", () => {
+	const analysis: AnalysisHistoryGetOutput = {
+		id: "a_new",
+		question: "Why do agents fail?",
+		status: "finished",
+		authorId: "u",
+		mine: true,
+		shared: false,
+		host: "plugin",
+		scope: { from: "2026-09-01", to: "2026-10-01", filters: {} },
+		cutoff: "2026-10-01T09:00:00.000Z",
+		createdAt: "2026-10-01T08:00:00.000Z",
+		updates: "a_old",
+		topics: [],
+		finalAnswer: "Fewer stale patches.",
+		notes: [],
+		cost: null,
+		changes: [
+			{
+				step: "s_1",
+				finding: "stale patches",
+				change: "weakened",
+				evidence: "4, was 11",
+			},
+			{
+				step: "s_2",
+				finding: "lint\tloops",
+				change: "new",
+				evidence: "3 runs",
+			},
+		],
+		updatedBy: ["a_newer"],
+		steps: [],
+		chatSessions: [],
+	};
+
+	expect(renderAnalysisTree(analysis).split("\n")).toEqual([
+		"analysis a_new status=finished mine=true shared=false host=plugin cutoff=2026-10-01T09:00:00.000Z updates=a_old updatedBy=a_newer",
+		"scope 2026-09-01..2026-10-01",
+		"question: Why do agents fail?",
+		"cost unavailable",
+		"changes against a_old:",
+		"  weakened: step s_1: stale patches (4, was 11)",
+		"  new: step s_2: lint\\tloops (3 runs)",
+		"final answer: Fewer stale patches.",
+	]);
+	expect(
+		renderAnalysisTree({
+			...analysis,
+			updates: null,
+			changes: [],
+			updatedBy: [],
+		}).split("\n")[0],
+	).toEndWith("updates=none updatedBy=none");
 });

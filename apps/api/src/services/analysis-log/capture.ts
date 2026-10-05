@@ -8,7 +8,13 @@ import { describeSessions, referencedSessionIds } from "./sessions.js";
 import type { AnalysisLog } from "./types.js";
 
 const logger = getLogger(["rudel", "api", "analysis-log"]);
-const TRACE_FIELDS = ["analysis", "question", "step", "parentStep"] as const;
+const TRACE_FIELDS = [
+	"analysis",
+	"question",
+	"updates",
+	"step",
+	"parentStep",
+] as const;
 
 /**
  * Stores a find/read call in the analysis log. Best effort: the call's result

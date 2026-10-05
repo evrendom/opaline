@@ -96,7 +96,11 @@ export const sweep = apiMutation({
 		),
 });
 
-async function deleteAnalyses(
+/**
+ * Deletes the given analyses with their children until half the transaction
+ * is used; `hasMore` while any remain. Also used by draft retention.
+ */
+export async function deleteAnalyses(
 	analyses: AsyncIterable<Doc<"analyses">>,
 	ctx: MutationCtx,
 ): Promise<{ hasMore: boolean }> {

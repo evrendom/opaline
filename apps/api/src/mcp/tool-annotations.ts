@@ -15,7 +15,11 @@ export const READ_ONLY: McpToolAnnotations = {
 	openWorldHint: false,
 };
 
-/** Writes the caller's own Opaline records (reversibly), never session data. */
+/**
+ * Writes only the caller's own Opaline records (an analysis draft, a saved
+ * analysis, a setting), never session or workspace data, and never deletes or
+ * overwrites anything.
+ */
 export const WRITES_OWN_RECORDS: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,

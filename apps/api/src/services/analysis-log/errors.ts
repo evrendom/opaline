@@ -16,6 +16,14 @@ export class AnalysisFullError extends SanitizedError {
 	}
 }
 
+/** A store refused to change a saved analysis: saving is append-only. */
+export class AnalysisSavedError extends SanitizedError {
+	override name = "AnalysisSavedError";
+	constructor() {
+		super("The analysis is already saved");
+	}
+}
+
 /** What may be logged about an error: a sanitized message, or only its class and code. */
 export function loggableError(error: unknown): string {
 	if (error instanceof SanitizedError) return error.message;

@@ -19,6 +19,7 @@ import {
 } from "../mcp/dashboard-widget.js";
 import {
 	APP_ONLY,
+	listedTool,
 	MCP_TOOLS,
 	McpToolError,
 	type McpWorkspace,
@@ -43,7 +44,7 @@ const SERVER_INFO = {
 	icons: [OPALINE_ICON],
 };
 const SERVER_INSTRUCTIONS =
-	"Opaline holds the user's uploaded Claude Code and Codex sessions. Tools only read them; save_analysis saves or shares an analysis in the user's analysis log. Dates are UTC.";
+	"Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup (instructions, docs, scripts, CI). No tool changes or deletes sessions. find and read record their calls in a private draft of the current analysis; save_analysis publishes that draft once (saving is append-only) or shares a saved analysis. Dates are UTC.";
 // OpenAI MCP extension: native settings on the plugin page.
 const SETTINGS = { readTool: "settings_read", updateTool: "settings_update" };
 const CAPABILITIES = {
@@ -300,16 +301,7 @@ async function handleMcpRequest(
 			return rpcResult(message.id, {});
 		case "tools/list":
 			return rpcResult(message.id, {
-				tools: TOOLS.map((tool) => ({
-					name: tool.name,
-					title: tool.title,
-					description: tool.description,
-					inputSchema: tool.inputSchema,
-					...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-					...(tool.icons ? { icons: tool.icons } : {}),
-					annotations: tool.annotations,
-					...(tool.meta ? { _meta: tool.meta } : {}),
-				})),
+				tools: TOOLS.map(listedTool),
 			});
 		case "tools/call":
 			return rpcResult(
@@ -381,7 +373,7 @@ async function readResource(
 			],
 		});
 	}
-	// A session the user @-mentioned: the same overview get_session returns.
+	// A session the user @-mentioned: the overview the app-only get_session returns.
 	const [workspace, sessionId] = uri.startsWith(SESSION_RESOURCE_PREFIX)
 		? uri
 				.slice(SESSION_RESOURCE_PREFIX.length)
@@ -397,12 +389,15 @@ async function readResource(
 	);
 	if (result.isError)
 		return rpcError(id, -32002, result.content[0]?.text ?? "");
+	// get_session is app-only, so its result is structured content only.
 	return rpcResult(id, {
 		contents: [
 			{
 				uri,
 				mimeType: "text/plain",
-				text: result.content[0]?.text ?? "",
+				text:
+					result.content[0]?.text ??
+					JSON.stringify(result.structuredContent ?? null),
 			},
 		],
 	});
@@ -698,7 +693,7 @@ function consentHtml(input: {
 	userId: string;
 }) {
 	return `<h1>Connect ${escapeHtml(input.clientName)} to Opaline?</h1>
-<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. It cannot change or delete your sessions or workspace data.</p>
+<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. Until an analysis is saved it is a private draft, deleted after 7 days. It cannot change or delete your sessions or workspace data.</p>
 <p class="muted">You will be sent back to ${escapeHtml(input.redirectHost || "the application")}. Only continue if you started this connection.</p>
 <form method="post" action="${MCP_CONSENT_PATH}">
 <input type="hidden" name="query" value="${escapeHtml(input.query)}" />

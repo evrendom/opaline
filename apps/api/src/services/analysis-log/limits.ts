@@ -10,3 +10,9 @@ export const MAX_STEPS_PER_ANALYSIS = 200;
 /** Chat sessions linked to one analysis (a chat, its parents and subagents). */
 export const MAX_SESSIONS_PER_ANALYSIS = 200;
 export const MAX_QUERY_ARGS_BYTES = 32 * 1024;
+/**
+ * Unsaved drafts are deleted this long after they were started; the service
+ * treats older drafts as gone before the daily cleanup reaches them.
+ * Mirrored in convex/retention.ts.
+ */
+export const DRAFT_RETENTION_MS = 7 * 86_400_000;

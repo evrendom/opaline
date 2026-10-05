@@ -15,6 +15,7 @@ import {
 	saveAnalysis,
 	searchAnalyses,
 	shareAnalysis,
+	sinceUpdatedCutoff,
 } from "../../services/analysis-log/analysis-log.service.js";
 import { captureCall, hostOf } from "../../services/analysis-log/capture.js";
 import {
@@ -66,22 +67,38 @@ export function createAnalysisRouter(
 				throw new ORPCError("FORBIDDEN", {
 					message: "Only workspace admins may filter by userId",
 				});
-			const { output, owners } = await findAnalysisWithOwners(
+			const log = analysisLog(context.organizationId);
+			// A revision gathers only the evidence since its prior's cutoff.
+			const scoped = log
+				? await sinceUpdatedCutoff(log, viewerOf(context), input)
+				: null;
+			const args = scoped?.input ?? input;
+			const found = await findAnalysisWithOwners(
 				{
 					organizationId: context.organizationId,
 					userId: context.isOrgAdmin ? (input.userId ?? null) : context.user.id,
 				},
-				input,
+				args,
 				env,
 			);
+			// The note is part of the stored result, so the draft records it too.
+			const output = scoped
+				? {
+						...found.output,
+						header: {
+							...found.output.header,
+							notes: [scoped.note, ...found.output.header.notes],
+						},
+					}
+				: found.output;
 			const trace = await captureCall(
 				env.executor,
-				analysisLog(context.organizationId),
+				log,
 				author(context),
 				"find",
-				input,
+				args,
 				output,
-				owners,
+				found.owners,
 			);
 			return trace ? withFindTrace(output, trace) : output;
 		});

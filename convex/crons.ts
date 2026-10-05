@@ -9,5 +9,13 @@ crons.daily(
 	),
 	{ cursor: null },
 );
+crons.daily(
+	"expire unsaved analysis drafts",
+	{ hourUTC: 3, minuteUTC: 0 },
+	makeFunctionReference<"mutation", Record<string, never>>(
+		"retention:expireDraftsDaily",
+	),
+	{},
+);
 
 export default crons;

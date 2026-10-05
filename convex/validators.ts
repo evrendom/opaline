@@ -2,6 +2,21 @@ import { v } from "convex/values";
 
 const nullableString = v.union(v.string(), v.null());
 
+/** How a finding moved against the analysis a revision updates. */
+export const change = v.object({
+	/** The step id it covers: the revision's, or the prior's for `dropped`. */
+	step: v.string(),
+	finding: v.string(),
+	change: v.union(
+		v.literal("confirmed"),
+		v.literal("strengthened"),
+		v.literal("weakened"),
+		v.literal("new"),
+		v.literal("dropped"),
+	),
+	evidence: v.string(),
+});
+
 export const analysis = v.object({
 	id: v.string(),
 	workspaceId: v.string(),
@@ -15,6 +30,12 @@ export const analysis = v.object({
 	),
 	question: v.string(),
 	status: v.union(v.literal("finished"), v.literal("unfinished")),
+	/**
+	 * Unsaved: hidden from every reader, deleted after 7 days (retention.ts).
+	 * Optional, like `changes`, for analyses recorded before drafts and for an
+	 * API deployed before them; reads always return both.
+	 */
+	draft: v.optional(v.boolean()),
 	shared: v.boolean(),
 	pinned: v.boolean(),
 	createdAt: v.string(),
@@ -27,6 +48,7 @@ export const analysis = v.object({
 	finalAnswer: nullableString,
 	topics: v.array(v.string()),
 	updates: nullableString,
+	changes: v.optional(v.array(change)),
 	notes: v.array(v.string()),
 	cost: v.union(
 		v.object({
@@ -45,6 +67,7 @@ export const analysis = v.object({
 	stepCount: v.number(),
 });
 
+/** Only `analyses:save` publishes a draft, so `draft` is not patchable. */
 export const analysisPatch = analysis
 	.omit(
 		"id",
@@ -54,6 +77,7 @@ export const analysisPatch = analysis
 		"cutoff",
 		"queryCount",
 		"stepCount",
+		"draft",
 	)
 	.partial();
 

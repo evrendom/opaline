@@ -81,3 +81,22 @@ test("a cursor that find did not return is a BAD_REQUEST", () => {
 		expect(read).toThrow("cursor: not a cursor returned by find");
 	}
 });
+
+test("a revision's first page (updates) continues with its draft id (analysis) over the same resolved window", () => {
+	// The handler passes the `from` resolved from the prior's cutoff on both calls.
+	const first = { ...input, updates: "a_prior", question: "Why?" };
+	const cursor = writeFindCursor(first, [2, "c"]);
+	expect(
+		readFindCursor(
+			{ ...input, cursor, analysis: "a_draft", step: "s_1" },
+			ORDER,
+		),
+	).toEqual([2, "c"]);
+	// A different window is still another call.
+	expect(() =>
+		readFindCursor(
+			{ ...input, from: "2026-09-02", cursor, analysis: "a_draft" },
+			ORDER,
+		),
+	).toThrow(ORPCError);
+});

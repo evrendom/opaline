@@ -1,4 +1,5 @@
 import type {
+	AnalysisChange,
 	AnalysisCost,
 	AnalysisHost,
 	AnalysisScope,
@@ -9,6 +10,10 @@ import type {
  * sub-questions, answered by queries or by the asker), the queries with their
  * exact results, and the final answer. Records are plain documents with ids
  * generated here, so the store can be Convex (ADR 0001) or memory in tests.
+ *
+ * find/read calls build a private draft (`draft`); saving publishes it once
+ * (`status` finished) and nothing about it changes afterwards. A revision is
+ * a new analysis whose `updates` names the one it revises.
  */
 export interface StoredAnalysis {
 	id: string;
@@ -17,6 +22,12 @@ export interface StoredAnalysis {
 	host: AnalysisHost;
 	question: string;
 	status: "finished" | "unfinished";
+	/**
+	 * An unsaved analysis built by find/read: hidden from every reader but its
+	 * author's own find/read/save calls, and deleted after `DRAFT_RETENTION_MS`.
+	 * Analyses recorded before drafts existed are false.
+	 */
+	draft: boolean;
 	shared: boolean;
 	pinned: boolean;
 	createdAt: string;
@@ -26,6 +37,8 @@ export interface StoredAnalysis {
 	finalAnswer: string | null;
 	topics: string[];
 	updates: string | null;
+	/** How each finding changed against `updates`, given when saving a revision. */
+	changes: AnalysisChange[];
 	notes: string[];
 	cost: AnalysisCost | null;
 	/** Queries and steps recorded so far; kept by the store. */
@@ -105,7 +118,7 @@ export interface StoredSessionLink {
 	uploadedAt: string;
 }
 
-/** What an author may change on an analysis; identity, `cutoff` and the counts are kept by the store. */
+/** What an author may change on an analysis; identity, `cutoff`, the counts and `draft` are kept by the store. */
 export type AnalysisPatch = Partial<
 	Omit<
 		StoredAnalysis,
@@ -116,6 +129,7 @@ export type AnalysisPatch = Partial<
 		| "cutoff"
 		| "queryCount"
 		| "stepCount"
+		| "draft"
 	>
 >;
 
@@ -148,34 +162,52 @@ export interface EmbeddingMatch {
 /**
  * Creating an existing id fails. Creating a step or query in an analysis that
  * already holds `MAX_STEPS_PER_ANALYSIS` or `MAX_QUERIES_PER_ANALYSIS` fails
- * with `AnalysisFullError`, checked in the same atomic write. Updates of a
+ * with `AnalysisFullError`, and in a saved (finished) analysis with
+ * `AnalysisSavedError`, checked in the same atomic write. Updates of a
  * missing record do nothing. Lists return [] for an unknown analysis.
  * Deletion first marks analyses deleting: they are hidden at once, and
- * creating steps, queries or saves in them fails.
+ * creating steps, queries or saves in them fails. Drafts are returned only by
+ * `getAnalysis` and `latestOpenAnalysis`, for the service's author checks.
  */
 export interface AnalysisStore {
 	createAnalysis(analysis: StoredAnalysis): Promise<void>;
 	getAnalysis(id: string): Promise<StoredAnalysis | null>;
 	updateAnalysis(id: string, patch: AnalysisPatch): Promise<void>;
-	/** The author's most recently active unfinished analysis since `since`. */
+	/** The author's most recently active draft since `since`. */
 	latestOpenAnalysis(
 		workspaceId: string,
 		authorId: string,
 		since: string,
 	): Promise<StoredAnalysis | null>;
-	/** Newest first: the viewer's own analyses plus shared ones of the workspace. */
+	/** Newest first, without drafts: the viewer's own analyses plus shared ones of the workspace. */
 	recentAnalyses(
 		workspaceId: string,
 		viewerId: string,
 		limit: number,
 	): Promise<StoredAnalysis[]>;
+	/**
+	 * Saved analyses of the workspace whose `updates` is `id`, at most
+	 * `limit`, without drafts. Visibility is filtered by the caller.
+	 */
+	analysesUpdating(
+		workspaceId: string,
+		id: string,
+		limit: number,
+	): Promise<StoredAnalysis[]>;
 
 	/**
-	 * One atomic write: every finding's step must belong to the analysis and
-	 * the clarifications must fit `MAX_STEPS_PER_ANALYSIS` (else
-	 * `AnalysisFullError`); a refused save writes nothing.
+	 * Publishes the analysis in one atomic write: it is no longer a draft.
+	 * Every finding's step must belong to the analysis, the clarifications must
+	 * fit `MAX_STEPS_PER_ANALYSIS` (else `AnalysisFullError`), and a saved
+	 * (finished) analysis is refused with `AnalysisSavedError`: saving is
+	 * append-only. A refused save writes nothing.
 	 */
 	saveAnalysis(id: string, save: AnalysisSave): Promise<void>;
+	/**
+	 * Deletes drafts created more than `DRAFT_RETENTION_MS` ago, with their
+	 * children, by the store's own clock. Saved analyses are never touched.
+	 */
+	expireDrafts(): Promise<void>;
 
 	/** Also advances the analysis's `stepCount`. */
 	createStep(step: StoredStep): Promise<void>;
@@ -213,8 +245,8 @@ export interface AnalysisStore {
 
 	addEmbedding(workspaceId: string, embedding: StoredEmbedding): Promise<void>;
 	/**
-	 * Nearest texts within the workspace among vectors of `model`, best first.
-	 * Visibility is filtered by the caller.
+	 * Nearest texts within the workspace among vectors of `model`, best first,
+	 * leaving out drafts. Visibility is otherwise filtered by the caller.
 	 */
 	searchEmbeddings(
 		workspaceId: string,

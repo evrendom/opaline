@@ -15,14 +15,16 @@ const RunRefInputSchema = RunRefSchema.extend({
 });
 
 /**
- * Every find/read call belongs to an analysis. The first call of an analysis
- * passes the asker's `question`; later calls pass the returned `analysis` id.
- * `step` names the sub-question the call answers: an existing step id, or new
- * sub-question text (optionally under `parentStep`).
+ * Every find/read call belongs to an analysis, kept as a private draft until
+ * it is saved. The first call of an analysis passes the asker's `question`,
+ * `updates` (the saved analysis it revises), or both; later calls pass the
+ * returned `analysis` id. `step` names the sub-question the call answers: an
+ * existing step id, or new sub-question text (optionally under `parentStep`).
  */
 const traceInput = {
 	analysis: z.string().min(1).max(40).optional(),
 	question: z.string().min(1).max(2_000).optional(),
+	updates: z.string().min(1).max(40).optional(),
 	step: z.string().min(1).max(500).optional(),
 	parentStep: z.string().min(1).max(40).optional(),
 };

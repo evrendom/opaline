@@ -24,7 +24,6 @@ import {
 } from "./analysis-renderers.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 import { parseMcpInput } from "./input-validation.js";
-import { compactSkills } from "./skill-summaries.js";
 import {
 	type McpToolAnnotations,
 	READ_ONLY,
@@ -69,10 +68,6 @@ const string = (description: string): JsonSchema => ({
 	type: "string",
 	description,
 });
-const integer = (description: string): JsonSchema => ({
-	type: "integer",
-	description,
-});
 const strings = (description: string): JsonSchema => ({
 	type: "array",
 	items: { type: "string" },
@@ -85,7 +80,8 @@ const oneOf = (values: readonly string[], description: string): JsonSchema => ({
 });
 const date = (description: string) =>
 	string(`${description} (YYYY-MM-DD, UTC).`);
-const DAYS = integer("Look back this many days (default 7, max 365).");
+const WORKSPACE_DESCRIPTION =
+	"Workspace slug from list_workspaces. Default: the default workspace in the plugin settings, else the one you last opened in Opaline.";
 /** Tools only the widget or the host UI call; hidden from the model. */
 export const APP_ONLY = { ui: { visibility: ["app"] } };
 const isoDay = (offsetDays = 0) =>
@@ -95,9 +91,7 @@ function input(properties: JsonSchema = {}, required: string[] = []) {
 	return {
 		type: "object",
 		properties: {
-			workspace: string(
-				"Workspace slug from list_workspaces. Defaults to the default workspace in the plugin settings, else the one the user last opened in Opaline.",
-			),
+			workspace: string(WORKSPACE_DESCRIPTION),
 			...properties,
 		},
 		required,
@@ -202,25 +196,135 @@ function zodToolInput(schema: z.ZodObject): JsonSchema {
 	);
 }
 
+/**
+ * Gives every property of a tool's input schema its description, including
+ * the properties of array items (`refs[].turn`). Fails at load when a
+ * property has none or a description names no property, so the published
+ * schema never carries an undescribed or unused parameter.
+ */
+function describeInput(
+	schema: JsonSchema,
+	descriptions: Record<string, string>,
+): JsonSchema {
+	const unused = new Set(Object.keys(descriptions));
+	const walk = (node: JsonSchema, prefix: string): JsonSchema => {
+		const properties = node.properties as Record<string, JsonSchema>;
+		return {
+			...node,
+			properties: Object.fromEntries(
+				Object.entries(properties).map(([key, property]) => {
+					const path = `${prefix}${key}`;
+					const description = descriptions[path];
+					if (!description)
+						throw new Error(`Tool input ${path} has no description`);
+					unused.delete(path);
+					const items = property.items as JsonSchema | undefined;
+					return [
+						key,
+						{
+							...property,
+							description,
+							...(items?.properties
+								? { items: walk(items, `${path}[].`) }
+								: {}),
+						},
+					];
+				}),
+			),
+		};
+	};
+	const described = walk(schema, "");
+	if (unused.size)
+		throw new Error(`Descriptions name no input: ${[...unused].join(", ")}`);
+	return described;
+}
+
+/** `structuredContent` of a tool returning a list: `{ items: [...] }`. */
+function itemsOutput(properties: Record<string, JsonSchema>): JsonSchema {
+	return {
+		type: "object",
+		properties: {
+			items: { type: "array", items: { type: "object", properties } },
+		},
+		required: ["items"],
+	};
+}
+
+/** A tool as `tools/list` publishes it; `annotations.title` repeats its title. */
+export function listedTool(tool: McpTool) {
+	return {
+		name: tool.name,
+		title: tool.title,
+		description: tool.description,
+		inputSchema: tool.inputSchema,
+		...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+		...(tool.icons ? { icons: tool.icons } : {}),
+		annotations: { title: tool.title, ...tool.annotations },
+		...(tool.meta ? { _meta: tool.meta } : {}),
+	};
+}
+
 export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "find",
-		annotations: READ_ONLY,
-		title: "Find runs and deterministic events",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Find patterns in agent runs",
 		description: [
-			"Where did something happen in the user's agent runs? Cheap and deterministic: call it before read. Answers say where, never why; why needs read.",
-			"A run is one user prompt and everything the agent did until the next prompt. A ref is {sessionId, agentId, turn}: agentId '' (the default) is the main transcript, otherwise a subagent; turn starts at 1.",
-			"Codex subagent threads are sessions of their own: their rows, examples and events carry parentSessionId (the session that spawned them) and runs a depth. A session in scope brings its subagent threads, latest=N counts a session with its threads as one, and groupBy=session totals each session with its threads. Follow a thread to its parent instead of treating it as separate work.",
-			"Scope: from/to (UTC days, default last 7) and/or latest=N (the newest N sessions in that range). Members see their own sessions; admins can pass userId.",
-			"source=runs: one row per run with minutes (wall-clock span), activeMinutes (gaps between records capped at 5 minutes, so approval waits and stalls do not count), cost, edits, failed calls, not-found reads/searches, the next prompt's reaction and raw chars (what reading it costs). groupBy gives totals for trends. refs returns only those runs plus their summed minutes and cost: use it to price runs you read.",
-			"source=tool: failed tool calls grouped by tool group, cause and detail, with example refs. Each failure belongs to its own run.",
-			"source=user: every negative or swearing user prompt and every agent apology, each with its origin run: for a prompt, the run before it; for an apology, the run the user was correcting (its own run if there is none). Matches are word-list candidates; quoted or pasted text can match too.",
-			"kind=friction: a hook or policy blocked the call. kind=mistake: the agent's wrong assumption (wrong path, stale patch, bad flag). kind=validation: tests, typecheck, lint or build rejected the code. kind=environment: missing dependency, service or credential. kind=noise: an expected non-zero exit such as a search with no hits; hidden unless includeNoise. kind=other: no rule matched.",
-			"The header states coverage (sessions in scope vs indexed) and how many runs are unpriced (usage with no price stays unpriced, never $0); repeat it in the answer. A run that used several models lists them in models; groupBy=model gives each model its own spend, and model=X keeps runs whose usage includes X and counts only X's cost.",
-			"Pages: limit rows, groups or events per call (default 50, 20 for source=tool, max 200). When more follow, the header has a 'more: pass cursor=…' line: call again with the same arguments plus that cursor instead of splitting the date range.",
-			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result in the caller's own analysis log, as provenance; no session or workspace data changes.",
+			"What it does: Finds where the team's agents got stuck, failed or wasted time and money, so the team can fix their setup.",
+			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
+			"Returns: The period covered, totals, and runs, failures by cause, or prompts where the user was unhappy.",
+			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
+			"Limits: Members see their own sessions, admins the whole team; up to 200 rows per call.",
 		].join("\n"),
-		inputSchema: zodToolInput(AnalysisFindInputSchema),
+		inputSchema: describeInput(zodToolInput(AnalysisFindInputSchema), {
+			source:
+				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies.",
+			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to, or the last day covered by the answer named in updates.",
+			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
+			latest: "Only the newest N sessions in the date range, 1-200.",
+			repository:
+				"Only sessions in this repository (a name from the repository column).",
+			agent: "Only sessions from claude_code or codex. Default: both.",
+			model:
+				"Only runs that used this model id; cost then counts only that model.",
+			sessionId: "Only this session and the subagents it started.",
+			userId:
+				"Admins only: only this member's sessions, to see where their setup needs help.",
+			toolGroup:
+				"source=tool only: shell, edit, read, search, browser, web, mcp, subagent or other.",
+			commandClass:
+				"source=tool only, shell failures: test, build, lint, typecheck, git, migrate, install or other.",
+			kind: "source=tool only: friction (blocked by a hook or policy), mistake (wrong path, stale patch, bad flag), validation (tests, types, lint or build failed), environment (missing tool or service), noise (expected failures, hidden by default) or other.",
+			cause:
+				"source=tool only: only this cause, copied from an earlier result.",
+			detail:
+				"source=tool only: only this detail (lint rule, error code), copied from an earlier result.",
+			includeNoise:
+				"source=tool only: also show expected failures. Default false.",
+			reaction:
+				"source=user only: negative (unhappy prompts), swear (strongly worded complaints), apology (the agent apologized). Default: all three.",
+			groupBy:
+				"source=runs only: totals per week, model, repository, agent or session instead of one row per run.",
+			refs: "Only these runs (at most 200), as given by an earlier result; with source=runs this returns their total time and cost.",
+			"refs[].sessionId": "The run's session id.",
+			"refs[].agentId":
+				"Empty (default) for the main agent, else the subagent's id.",
+			"refs[].turn": "The run's number in the session, from 1.",
+			limit: "Rows per call, 1-200. Default 50, or 20 for source=tool.",
+			sort: "source=runs order, biggest first: startedAt (default, newest first), minutes, costUsd, failedCalls or rawChars (size of the run's text).",
+			cursor:
+				"The value from an earlier result's 'more: pass cursor=…' line, to get the next page with the same other arguments.",
+			analysis:
+				"Id of the answer being worked on, from the 'analysis=' value at the end of an earlier find or read result. Leave out on the first call.",
+			question:
+				"First call only: the user's question, word for word. Starts a new answer.",
+			updates:
+				"First call only: id of a saved answer this new answer updates. from then defaults to the last day that answer covered.",
+			step: "The sub-question this call answers, as text, or a step id from an earlier result.",
+			parentStep:
+				"A step id from an earlier result; makes this step a follow-up of it.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
 			renderFind(
 				await client.analysis.find(
@@ -230,18 +334,43 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "read",
-		annotations: READ_ONLY,
-		title: "Read selected runs",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Read agent runs",
 		description: [
-			"Read specific runs (1-10 refs from find) to see what actually happened. This is where tokens go: read only the runs that fit the question, never a whole session run by run.",
-			"maxChars (default 12000, max 40000) is shared across all refs; [cut] marks what was left out.",
-			"depth=exchange (default): the user's prompt (or a subagent's delegated task), files the agent edited, checks it ran after its last edit and whether they passed, failed or were still running when recorded (running is no outcome, never a pass), failed calls with their error line, the Codex subagent threads it spawned or messaged (record, ref, task), its final message, and the user's next prompt.",
-			"A Codex subagent thread's read starts with its parent: the ref of the run and the record of the call that spawned it.",
-			"depth=turn: every record of the run, compact.",
-			"depth=record: the exact text of one record of one run (record index from turn or find), optionally a fromChar/toChar slice. Use it to quote evidence.",
-			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result in the caller's own analysis log, as provenance; no session or workspace data changes.",
+			"What it does: Shows what happened in up to 10 runs that find pointed to (a run is one prompt and the agent's work after it).",
+			"Use when: You need to see why something went wrong before you name a cause.",
+			"Returns: For each run, the prompt, files changed, checks run, failed calls and the agent's last message.",
+			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
+			"Limits: Only sessions you may open (your own, or any as an admin); output is cut to maxChars.",
 		].join("\n"),
-		inputSchema: zodToolInput(AnalysisReadInputSchema),
+		inputSchema: describeInput(zodToolInput(AnalysisReadInputSchema), {
+			refs: "Required. The runs to read, 1-10, as given by find.",
+			"refs[].sessionId": "The run's session id.",
+			"refs[].agentId":
+				"Empty (default) for the main agent, else the subagent's id.",
+			"refs[].turn": "The run's number in the session, from 1.",
+			depth:
+				"How much to show: exchange (default, the outcome in brief), turn (every step, compact) or record (the full text of one item).",
+			maxChars:
+				"Most characters returned for all runs, 1-40000. Default 12000.",
+			record:
+				"Record view only (required there): the item number, from the turn view or find.",
+			block:
+				"Record view only: the part within the item, from 0. Default: the first part with text.",
+			fromChar:
+				"Record view only: first character to show, from 0. Default: 0.",
+			toChar:
+				"Record view only: character to stop before, above fromChar. Default: the end.",
+			analysis:
+				"Id of the answer being worked on, from the 'analysis=' value at the end of an earlier find or read result. Leave out on the first call.",
+			question:
+				"First call only: the user's question, word for word. Starts a new answer.",
+			updates: "First call only: id of a saved answer this new answer updates.",
+			step: "The sub-question this call answers, as text, or a step id from an earlier result.",
+			parentStep:
+				"A step id from an earlier result; makes this step a follow-up of it.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
 			renderRead(
 				await client.analysis.read(
@@ -252,15 +381,25 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "analyses",
 		annotations: READ_ONLY,
-		title: "Past analyses",
+		title: "Search saved answers",
 		description: [
-			"The analysis log: questions asked before, the steps taken and the final answers. Call action=search before analysing anything; if a past analysis matches, get it and update it from its cutoff instead of starting over.",
-			"action=search: past analyses by meaning (text) or most recent (no text); yours plus ones shared with the workspace.",
-			"action=get: one analysis as its path: question, steps (sub-question, finding, the asker's reply, query ids), final answer and the chat sessions uploaded for it.",
-			"action=query: the exact stored result of one query, flagged stale when a session it read has changed. Open one only to check or quote a specific step; replaying every query costs as much as redoing the analysis.",
-			"To save or share an analysis, use save_analysis.",
+			"What it does: Searches the answers your team saved before and opens one.",
+			"Use when: Before a new question, to check whether a saved answer already covers it and can be updated.",
+			"Returns: A list of saved answers, or one answer with its findings, the last day its data covers, the steps behind it and links to older or newer versions.",
+			"Side effects: None.",
+			"Limits: Only answers you saved or that were shared with your workspace; unsaved work never appears.",
 		].join("\n"),
-		inputSchema: zodToolInput(AnalysesToolInputSchema),
+		inputSchema: describeInput(zodToolInput(AnalysesToolInputSchema), {
+			action:
+				"search (default): list saved answers. get: open one answer. query: open one stored result of an answer.",
+			text: "search: words to look for, matched by meaning (1-500 characters). Default: the most recent answers.",
+			limit: "search: how many answers to return, 1-50. Default 10.",
+			includeEval: "search: also show answers from test runs. Default false.",
+			analysis: "get: the answer's id (required for get).",
+			query:
+				"query: a stored result's id, shown in the steps of get (required for query).",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
 		run: (client, { workspace: _workspace, action, ...args }) =>
 			action === "save" || action === "share"
 				? Promise.resolve(ANALYSES_MOVED_TO_SAVE_ANALYSIS)
@@ -269,27 +408,75 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "save_analysis",
 		annotations: WRITES_OWN_RECORDS,
-		title: "Save analysis",
+		title: "Save or share an answer",
 		description: [
-			"Saves an analysis to the caller's analysis log, or shares it with the workspace. Changes no session or workspace data.",
-			"action=save (default): once, just before your last message, which must repeat the saved final answer in full: analysis = the id from the trace line of a find or read call, the final answer, a finding per step (step = id from its trace line or its exact sub-question), clarifications you asked the asker (question + reply), up to 8 topics, and updates = the analysis this one updates.",
-			"action=share: share an analysis with the workspace (shared=true) or stop sharing it (shared=false). Results quoting others' sessions stay readable only by their owners and admins.",
+			"What it does: Saves the finished answer, or shares a saved answer with your workspace.",
+			"Use when: Once, right before your final message; share only when the user asks.",
+			"Returns: The saved answer's id, or whether it is now shared.",
+			"Side effects: Saves the answer so you, and your workspace if shared, can see it; a saved answer is never changed or deleted, and an update is saved as a new answer linked to it. Sharing can be undone with shared=false.",
+			"Limits: Only the person who asked can save or share an answer, and each answer is saved once.",
 		].join("\n"),
-		inputSchema: zodToolInput(SaveAnalysisToolInputSchema),
+		inputSchema: describeInput(zodToolInput(SaveAnalysisToolInputSchema), {
+			action:
+				"save (default): save the answer. share: set whether your workspace can see a saved answer.",
+			analysis:
+				"Required. The answer's id, from the 'analysis=' value at the end of a find or read result.",
+			finalAnswer:
+				"save: the complete final answer, up to 20000 characters (required for save).",
+			findings: "save: one finding per step, at most 100. Default: none.",
+			"findings[].step": "The step's id, or its sub-question word for word.",
+			"findings[].finding": "What this step found, up to 4000 characters.",
+			clarifications:
+				"save: questions you asked the user, with their replies, at most 20. Default: none.",
+			"clarifications[].question": "The question you asked the user.",
+			"clarifications[].reply": "The user's reply.",
+			"clarifications[].before":
+				"A step id or sub-question to place it before. Default: at the end.",
+			topics: "save: up to 8 short topic words, used for search.",
+			updates:
+				"save: id of the saved answer this one updates, if the first find did not already name it.",
+			changes:
+				"save, only when updating an answer: one item for every finding saved now, plus a dropped item for each old finding that no longer holds.",
+			"changes[].step":
+				"The finding's step id or sub-question; for dropped, a step of the old answer.",
+			"changes[].change":
+				"confirmed, strengthened, weakened, new or dropped (compared with the old answer).",
+			"changes[].evidence":
+				"Short reason, with counts or dates, up to 500 characters.",
+			shared:
+				"share: true to share with your workspace, false to stop sharing (required for share).",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
 		run: (client, { workspace: _workspace, action, ...args }) =>
 			withLogOffMessage(writeAnalysis(client, action, args)),
 	},
 	{
 		name: "list_workspaces",
 		annotations: READ_ONLY,
-		title: "List workspaces",
-		description:
-			"Lists the Opaline workspaces the user belongs to. Pass a slug as `workspace` to any other tool.",
+		title: "List your workspaces",
+		description: [
+			"What it does: Lists the Opaline workspaces you belong to.",
+			"Use when: An answer looks empty, the user names another team, or you need a workspace name for another tool.",
+			"Returns: Each workspace's name, slug (the short name other tools take as workspace) and logo.",
+			"Side effects: None.",
+			"Limits: Only workspaces you are a member of.",
+		].join("\n"),
 		inputSchema: {
 			type: "object",
 			properties: {},
 			additionalProperties: false,
 		},
+		outputSchema: itemsOutput({
+			name: { type: "string", description: "Workspace name." },
+			slug: {
+				type: "string",
+				description: "Pass as workspace to other tools.",
+			},
+			logo: {
+				type: ["string", "null"],
+				description: "Logo URL, or null.",
+			},
+		}),
 		// Tools take the slug; the internal organization id stays out.
 		run: async (client) =>
 			(await client.listMyOrganizations()).map(({ name, slug, logo }) => ({
@@ -301,20 +488,70 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "get_dashboard",
 		annotations: READ_ONLY,
+		// "Opaline", the name Codex shows in the app's header (see #185).
 		title: "Opaline",
-		description:
-			"The Opaline dashboard: total and daily trend of agent cost (USD), sessions, signals, agent runs, merged pull requests or CI failures per PR for a date range (default: the last 30 days), with the top members, repositories, models and other breakdowns. Filter by member user IDs, repository names or models, or split the trend by a dimension.",
+		description: [
+			"What it does: Shows the Opaline dashboard in the chat: agent cost, sessions and runs over time, by repository, model and member.",
+			"Use when: The user asks to open or show the dashboard, or wants an overview of agent cost and usage.",
+			"Returns: The chosen metric's total, daily trend and top breakdowns, and the dashboard itself in the chat.",
+			"Side effects: None.",
+			"Limits: Up to one year per view; pull request metrics need a GitHub connection.",
+		].join("\n"),
 		inputSchema: input({
-			startDate: date("First day (default 30 days ago)"),
+			startDate: date("First day. Default: 29 days before today"),
 			endDate: date(
-				"Last day (default today), at most one year after startDate",
+				"Last day. Default: today; at most one year after startDate",
 			),
-			metric: oneOf(DASHBOARD_METRICS, "Metric to chart (default cost)."),
-			splitBy: oneOf(SPLITS, "Split the trend into series by this dimension."),
-			members: strings("Only these member user IDs (from get_team)."),
-			repositories: strings("Only these repositories."),
-			models: strings("Only these models."),
+			metric: oneOf(
+				DASHBOARD_METRICS,
+				"What to chart. Default: cost (estimated cost in USD).",
+			),
+			splitBy: oneOf(
+				SPLITS,
+				"Split the chart into one line per value of this. Default: none.",
+			),
+			members: strings(
+				"Only these members, by the user ids an earlier dashboard showed. Default: everyone you may see.",
+			),
+			repositories: strings("Only these repositories, by name. Default: all."),
+			models: strings("Only these model ids. Default: all."),
 		}),
+		outputSchema: {
+			type: "object",
+			properties: {
+				metric: { type: "string", description: "The charted metric." },
+				availableMetrics: {
+					type: "array",
+					items: { type: "string" },
+					description: "Metrics the workspace has data for.",
+				},
+				splitBy: { type: "string", description: "The split dimension." },
+				total: {
+					type: ["number", "null"],
+					description:
+						"Total for the range; null for a ratio over zero pull requests.",
+				},
+				incomplete: {
+					description: "Whether some data could not be counted.",
+				},
+				series: { description: "The series of a split trend." },
+				trend: {
+					type: "array",
+					description:
+						"One entry per day: date, total and, when split, values per series.",
+				},
+				top: {
+					type: "object",
+					description: "Up to 10 rows (id, label, value) per breakdown.",
+				},
+				durationStats: { description: "Duration statistics, when available." },
+				query: {
+					type: "object",
+					description: "The date range, filters and workspace used.",
+				},
+			},
+			required: ["metric", "trend", "query"],
+		},
 		// Also opens from the ChatGPT sidebar, which calls it with `{}`.
 		meta: {
 			ui: { resourceUri: DASHBOARD_WIDGET_URI },
@@ -360,85 +597,19 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			`/dashboard${query(args, { startDate: "from", endDate: "to", metric: "metric", splitBy: "split", members: "member", repositories: "repo", models: "model" })}`,
 	},
 	{
-		name: "get_kpis",
-		annotations: READ_ONLY,
-		title: "Get headline KPIs",
-		description:
-			"Headline counts for a date range: sessions, active members, projects, subagents, skills and slash commands.",
-		inputSchema: input(
-			{ startDate: date("First day"), endDate: date("Last day") },
-			["startDate", "endDate"],
-		),
-		run: (client, args) =>
-			client.analytics.overview.kpis({
-				startDate: args.startDate as string,
-				endDate: args.endDate as string,
-			}),
-	},
-	{
-		name: "list_sessions",
-		annotations: READ_ONLY,
-		title: "List sessions",
-		description:
-			"Lists Claude Code and Codex sessions in the workspace, newest first, with repository, branch, model, tokens, cost and duration. Filter by member, repository, skill or agent.",
-		inputSchema: input({
-			days: DAYS,
-			startDate: date(
-				"Optional first day; replaces days together with endDate",
-			),
-			endDate: date("Optional last day"),
-			userId: string("Only sessions of this member user ID."),
-			repository: string("Only sessions in this repository."),
-			skillName: string("Only sessions that used this skill."),
-			source: oneOf(["claude_code", "codex"], "Only sessions from this agent."),
-			sortBy: oneOf(
-				["session_date", "duration_min", "total_tokens"],
-				"Sort column (default session_date).",
-			),
-			sortOrder: oneOf(["asc", "desc"], "Sort order (default desc)."),
-			limit: integer("Page size (default 25, max 100)."),
-			offset: integer("Rows to skip for paging."),
-		}),
-		run: async (client, { workspace: _, limit, ...args }) => {
-			const sessions = await client.analytics.sessions.list({
-				...args,
-				limit: Math.min((limit as number | undefined) ?? 25, 100),
-			} as Parameters<Client["analytics"]["sessions"]["list"]>[0]);
-			// Only what answers "which sessions": not every analytics column.
-			return sessions.map((session) => ({
-				session_id: session.session_id,
-				user_id: session.user_id,
-				date: session.session_date,
-				repository: session.repository ?? session.project_path,
-				branch: session.git_branch,
-				agent: session.source,
-				model: session.model_used,
-				duration_min: session.duration_min,
-				total_tokens: session.total_tokens,
-				estimated_cost_usd: session.estimated_cost,
-				errors: session.error_count,
-				subagents: session.subagent_count,
-				skills: session.skills,
-				has_commit: session.has_commit,
-			}));
-		},
-		link: () => "/sessions",
-	},
-	{
 		name: "get_session",
 		annotations: READ_ONLY,
-		title: "Get session",
+		title: "Session: overview",
 		description:
-			"One session's summary, activity totals, subagents and its turns (each with an ID for read_session_turn). Only the session owner and workspace admins can open a session.",
+			"Used by Opaline to show a session the user mentioned with @. Not called by the assistant.",
 		inputSchema: input(
 			{
-				sessionId: string("Session ID from list_sessions."),
-				turnCursor: string(
-					"Cursor from a previous call to page through turns.",
-				),
+				sessionId: string("The session's id (required)."),
+				turnCursor: string("Position of the next page of turns."),
 			},
 			["sessionId"],
 		),
+		meta: APP_ONLY,
 		run: async (client, args) =>
 			withoutRenderIds(
 				await client.analytics.sessions.detailOverview({
@@ -449,120 +620,11 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		link: (args) => `/sessions/${encodeURIComponent(`${args.sessionId}`)}`,
 	},
 	{
-		name: "read_session_turn",
-		annotations: READ_ONLY,
-		title: "Read session turn",
-		description:
-			"The full content of one turn: the user's prompt and the agent's messages, tool calls and results.",
-		inputSchema: input(
-			{
-				sessionId: string("Session ID."),
-				revision: string("The `revision` value returned by get_session."),
-				turnId: string("Turn ID from get_session."),
-			},
-			["sessionId", "revision", "turnId"],
-		),
-		run: (client, args) =>
-			client.analytics.sessions.detailTurn({
-				sessionId: args.sessionId as string,
-				revision: args.revision as string,
-				turnId: args.turnId as string,
-			}),
-		link: (args) => `/sessions/${encodeURIComponent(`${args.sessionId}`)}`,
-	},
-	{
-		name: "get_team",
-		annotations: READ_ONLY,
-		title: "Get team",
-		description:
-			"Workspace members with their sessions, cost, tokens and activity trend over the last N days. Member IDs work as filters in other tools.",
-		inputSchema: input({ days: DAYS }),
-		run: (client, args) =>
-			client.analytics.developers.teamCards({
-				days: (args.days as number | undefined) ?? 7,
-			}),
-		link: () => "/team",
-	},
-	{
-		name: "list_skills",
-		annotations: READ_ONLY,
-		title: "List skills",
-		description:
-			"Skills used in the workspace with session counts, version counts, users and top repositories. For a skill's content and versions use get_skill.",
-		inputSchema: input(),
-		run: async (client) => compactSkills(await client.analytics.skills.list()),
-		link: () => "/skills",
-	},
-	{
-		name: "get_skill",
-		annotations: READ_ONLY,
-		title: "Get skill",
-		description: "One skill's content, versions and usage.",
-		inputSchema: input({ name: string("Skill name from list_skills.") }, [
-			"name",
-		]),
-		run: (client, args) =>
-			client.analytics.skills.detail({ name: args.name as string }),
-		link: (args) => `/skills${query(args, { name: "skill" })}`,
-	},
-	{
-		name: "list_repositories",
-		annotations: READ_ONLY,
-		title: "List repositories",
-		description:
-			"Repositories agents worked in, with sessions, cost and last activity.",
-		inputSchema: input(),
-		run: (client) => client.analytics.repositories.list(),
-		link: () => "/repos",
-	},
-	{
-		name: "get_repository",
-		annotations: READ_ONLY,
-		title: "Get repository",
-		description:
-			"Skills used in one repository. For its sessions use list_sessions with `repository`.",
-		inputSchema: input(
-			{ repoKey: string("Repository key from list_repositories.") },
-			["repoKey"],
-		),
-		run: async (client, args) => {
-			const { skills } = await client.analytics.repositories.detail({
-				repoKey: args.repoKey as string,
-			});
-			return { skills: compactSkills(skills) };
-		},
-		link: (args) => `/repos${query(args, { repoKey: "repo" })}`,
-	},
-	{
-		name: "find_recurring_errors",
-		annotations: READ_ONLY,
-		title: "Find recurring errors",
-		description:
-			"Errors that keep recurring across sessions in the last N days, with how often and where they occurred. Use it to check whether a failure has been seen before.",
-		inputSchema: input({
-			days: DAYS,
-			minOccurrences: integer("Minimum occurrences (default 2)."),
-			limit: integer("Maximum errors (default 20)."),
-		}),
-		run: (client, { workspace: _, ...args }) =>
-			client.analytics.errors.topRecurring(
-				args as Parameters<Client["analytics"]["errors"]["topRecurring"]>[0],
-			),
-	},
-	{
-		name: "get_billing",
-		annotations: READ_ONLY,
-		title: "Get billing",
-		description: "The workspace's plan, seats and usage limits.",
-		inputSchema: input(),
-		run: (client) => client.billing.current(),
-		link: () => "/settings/workspace",
-	},
-	{
 		name: "settings_read",
 		annotations: READ_ONLY,
-		title: "Read Opaline settings",
-		description: "Settings shown on the Opaline plugin page.",
+		title: "Settings: read",
+		description:
+			"Used by the plugin settings page to load your default workspace. Not called by the assistant.",
 		inputSchema: { type: "object", additionalProperties: false },
 		outputSchema: {
 			type: "object",
@@ -593,8 +655,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "settings_update",
 		annotations: WRITES_OWN_RECORDS,
-		title: "Update Opaline settings",
-		description: "Saves settings changed on the Opaline plugin page.",
+		title: "Settings: save",
+		description:
+			"Used by the plugin settings page to save your default workspace. Not called by the assistant.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -632,9 +695,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "mention_sessions",
 		annotations: READ_ONLY,
-		title: "Sessions",
+		title: "Sessions: @-mention search",
 		description:
-			"Finds recent sessions by repository, branch, model or date for @-mentions.",
+			"Used by the chat to suggest your recent sessions when you type @. Not called by the assistant.",
 		inputSchema: {
 			type: "object",
 			properties: { query: { type: "string" } },
@@ -737,8 +800,7 @@ type SessionOverview = Awaited<
 
 /**
  * The overview without what only the web app uses: event ids it scrolls to
- * and the signal classifier version. Turn ids and the revision stay, because
- * read_session_turn takes them.
+ * and the signal classifier version.
  */
 function withoutRenderIds(overview: SessionOverview) {
 	const { signalScanVersion: _version, ...activityTotals } =

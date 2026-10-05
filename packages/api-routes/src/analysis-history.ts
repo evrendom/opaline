@@ -37,6 +37,37 @@ export const AnalysisCostSchema = z.object({
 	costUsd: z.number().nullable(),
 });
 
+const ChangeKindSchema = z.enum([
+	"confirmed",
+	"strengthened",
+	"weakened",
+	"new",
+	"dropped",
+]);
+
+/**
+ * How one finding moved against the analysis a revision updates, as saved:
+ * `step` names the revision's step whose finding it covers (by id or exact
+ * sub-question), or, for `dropped` only, a step of the prior whose finding
+ * is no longer supported.
+ */
+export const AnalysisChangeInputSchema = z
+	.object({
+		step: z.string().min(1).max(500),
+		change: ChangeKindSchema,
+		evidence: z.string().min(1).max(500),
+	})
+	.strict();
+
+/** A stored change: the step id it was resolved to and that step's finding. */
+export const AnalysisChangeSchema = z.object({
+	step: z.string(),
+	/** The finding it covers (the prior's, for a dropped one). */
+	finding: z.string(),
+	change: ChangeKindSchema,
+	evidence: z.string(),
+});
+
 const AnalysisSummarySchema = z.object({
 	id: z.string(),
 	question: z.string(),
@@ -90,6 +121,10 @@ export const AnalysisHistoryGetOutputSchema = AnalysisSummarySchema.omit({
 	finalAnswer: z.string().nullable(),
 	notes: z.array(z.string()),
 	cost: AnalysisCostSchema.nullable(),
+	/** How each finding changed against `updates`; empty for a first analysis. */
+	changes: z.array(AnalysisChangeSchema),
+	/** Saved analyses the viewer may see that revise this one, oldest first. */
+	updatedBy: z.array(z.string()),
 	steps: z.array(
 		z.object({
 			id: z.string(),
@@ -171,7 +206,10 @@ export const AnalysisHistorySaveInputSchema = z
 			.max(20)
 			.default([]),
 		topics: z.array(z.string().min(1).max(40)).max(8).default([]),
+		/** The saved analysis this one revises; also set when its draft started with `updates`. */
 		updates: id.optional(),
+		/** Required when the analysis revises another: how each finding changed. */
+		changes: z.array(AnalysisChangeInputSchema).max(150).default([]),
 	})
 	.strict();
 export const AnalysisHistorySaveOutputSchema = z.object({
@@ -202,6 +240,7 @@ export type AnalysisHistoryGetOutput = z.infer<
 export type AnalysisHistoryQueryOutput = z.infer<
 	typeof AnalysisHistoryQueryOutputSchema
 >;
+export type AnalysisChange = z.infer<typeof AnalysisChangeSchema>;
 export type AnalysisHistorySaveInput = z.infer<
 	typeof AnalysisHistorySaveInputSchema
 >;

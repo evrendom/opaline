@@ -1,6 +1,6 @@
 {
 	"name": "opaline",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Team-wide insight into your coding agents: where they waste time and money, and which mistakes keep coming back.",
 	"author": {
 		"name": "Opaline",
@@ -21,24 +21,24 @@
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "Opaline",
-		"shortDescription": "Team insights on coding agents",
-		"longDescription": "Opaline shows how your whole team works with coding agents, across every teammate and over weeks or months.\n\nAsk in plain words: \"Where did our agents waste the most time this month?\", \"Which repositories cost us the most, and why?\", \"What mistakes keep coming back across the team?\". Opaline looks through all the sessions your team has uploaded, finds the patterns, reads the runs that show them and answers with the evidence. A dashboard shows cost and usage by member, repository and model.\n\nAnswers are saved as analyses, so the next question builds on the last one, and you can share them with your workspace.\n\nTo start, each teammate connects their coding agents at opaline.so. After you install the plugin, it walks you through it.\n\nOpaline only reads workspaces you belong to and never changes or deletes sessions.",
+		"shortDescription": "Improve your team's coding agent setup",
+		"longDescription": "Opaline helps your team improve its coding agent setup. It finds where agents get stuck or waste time and money across every teammate's sessions, so you can fix the instructions, docs, scripts and CI behind it.\n\nAsk in plain words: \"Where did our agents get stuck or waste the most time this month?\", \"Which repositories cost us the most, and why?\", \"What mistakes keep coming back in our agent runs?\". Opaline looks through the sessions your team has uploaded, finds the patterns, reads the runs that show them and answers with the evidence and a suggested fix. A dashboard shows cost and usage by repository and model, and per member to see where each person's setup needs help.\n\nAnswers are saved, so the next question on the same topic updates the last answer instead of starting over, and you can share them with your workspace.\n\nTo start, each teammate connects their coding agents at opaline.so. After you install the plugin, it walks you through it.\n\nOpaline only reads workspaces you belong to and never changes or deletes sessions.",
 		"developerName": "Opaline",
 		"category": "Developer Tools",
 		"capabilities": [
-			"Find patterns across your whole team's agent sessions over weeks or months",
-			"See where agents waste time and money, by member, repository and model",
-			"Spot mistakes that keep coming back across the team",
-			"Save analyses and share them with your workspace"
+			"Find where your team's coding agents get stuck or waste time and money",
+			"Spot mistakes that keep coming back, and see whether a fix worked",
+			"Get a concrete fix for your setup: instructions, docs, scripts or CI",
+			"Save answers, update them later and share them with your workspace"
 		],
 		"websiteURL": "https://opaline.so",
 		"supportURL": "https://opaline.so/support/",
 		"privacyPolicyURL": "https://opaline.so/legal/privacy-policy/",
 		"termsOfServiceURL": "https://opaline.so/legal/terms-of-service/",
 		"defaultPrompt": [
-			"Where did our coding agents waste the most time this month?",
+			"Where did our coding agents get stuck or waste the most time this month?",
 			"Which repositories cost us the most over the last 4 weeks, and why?",
-			"What mistakes keep coming back across the team?"
+			"What mistakes keep coming back in our agent runs?"
 		],
 		"brandColor": "#1F1F1F",
 		"brandColorDark": "#ECECEC",
@@ -57,34 +57,34 @@
 				"test_cases": {
 					"positive": [
 						{
-							"description": "Team-wide time waste over a month",
-							"prompt": "Where did our coding agents waste the most time over the last 30 days?",
+							"description": "Where agents get stuck over a month",
+							"prompt": "Where did our coding agents get stuck or waste the most time over the last 30 days?",
 							"tools_triggered": "analyses, find, read, save_analysis",
-							"expected_behavior": "States the scope it used (the last 30 days, every member of the sample workspace) and the coverage from the find header. Ranks a few concrete patterns by minutes and cost, each backed by run refs from more than one member, says how many runs it read out of how many matched, and saves the analysis before giving the final answer."
+							"expected_behavior": "find, read and save_analysis may ask for permission once; choosing \"always allow\" is fine. States the scope it used (the last 30 days, every session the account can see) and the coverage from the find header. Names a few concrete causes, such as agents following outdated web-app docs and repeated no-console lint failures, ranked by time and cost, each backed by runs it read from more than one member, and says how many runs it read out of how many matched. Suggests a setup fix for each (docs, scripts, lint config or instructions), saves the answer and then gives it in full."
 						},
 						{
-							"description": "Cost by repository and member over four weeks",
-							"prompt": "Which repositories cost our team the most over the last 4 weeks, and who drove it?",
-							"tools_triggered": "analyses, find, save_analysis",
-							"expected_behavior": "Gives estimated API cost in USD per repository and per member for the stated date range, from the sample workspace, mentions any unpriced runs, and does not interpret beyond the numbers. Saves the analysis before answering."
+							"description": "Cost by repository, and why",
+							"prompt": "Which repositories cost our team the most over the last 4 weeks, and why?",
+							"tools_triggered": "analyses, find, read, save_analysis",
+							"expected_behavior": "find, read and save_analysis may ask for permission once; choosing \"always allow\" is fine. Gives the estimated API cost in USD per repository for the stated date range, mentions any unpriced runs, and explains what drove the cost in the top repositories from runs it read (for example repeated retries in web-app), with a setup fix where one applies. Does not rank people. Saves the answer and then gives it in full."
 						},
 						{
 							"description": "Recurring mistakes across the team",
-							"prompt": "What mistakes keep coming back across the team this month?",
+							"prompt": "What mistakes keep coming back in our agent runs over the last 6 weeks?",
 							"tools_triggered": "analyses, find, read, save_analysis",
-							"expected_behavior": "Groups failed tool calls across members by cause, reads a sample of the runs behind the largest groups, and names the recurring mistakes with counts, run refs and a fix channel for each (instructions, other mechanism, or not fixable). Saves the analysis before answering."
+							"expected_behavior": "find, read and save_analysis may ask for permission once; choosing \"always allow\" is fine. Groups failed tool calls by cause, reads a sample of the runs behind the largest groups and names the recurring mistakes with run evidence from several weeks and members: agents following outdated web-app docs (a missing typecheck script, dollars instead of cents) and repeated no-console lint failures. Suggests a setup fix for each (for example update the docs, or add the lint rule to the agent instructions), does not rank people, and saves the answer before giving it."
 						},
 						{
-							"description": "Team dashboard",
-							"prompt": "Open the Opaline dashboard for our team for the last 30 days.",
+							"description": "Team dashboard in the chat",
+							"prompt": "Show the Opaline dashboard for our team for the last 30 days.",
 							"tools_triggered": "get_dashboard",
-							"expected_behavior": "Shows the Opaline dashboard for the last 30 days with estimated API cost, sessions and agent runs over time and breakdowns by member and repository for the sample workspace."
+							"expected_behavior": "Shows the Opaline dashboard in the chat for the last 30 days, with estimated API cost, sessions and agent runs over time and breakdowns by repository and model. It does not answer with a link instead and needs no permission prompt."
 						},
 						{
-							"description": "Weekly trend, saved and shared",
-							"prompt": "How did our agents' failed tool calls change week by week over the last 4 weeks? Share the analysis with my workspace.",
-							"tools_triggered": "analyses, find, save_analysis",
-							"expected_behavior": "Reports failed tool calls per week for the last 4 weeks of the sample workspace as numbers, saves the analysis, shares it with the workspace and confirms it is shared."
+							"description": "Update an earlier answer and share it",
+							"prompt": "Check again where our agents get stuck, update the earlier answer if there is one, and share it with my workspace.",
+							"tools_triggered": "analyses, find, read, save_analysis",
+							"expected_behavior": "find, read and save_analysis may ask for permission once; choosing \"always allow\" is fine. Searches the saved answers first. If one on the same topic exists (for example from an earlier test), it says so, looks only at sessions after the last day that answer covered, saves a new answer that says which findings were confirmed, weakened, new or dropped, and says it updated the earlier answer; otherwise it answers from scratch. Then shares the saved answer with the workspace and confirms it is shared."
 						}
 					],
 					"negative": [
@@ -107,7 +107,7 @@
 				"demo_recording_url": "https://www.youtube.com/watch?v=9nxh58DtOpU"
 			},
 			"publication": {
-				"release_notes": "Team-wide analysis: ask across every teammate's sessions over weeks or months; Opaline finds the patterns, reads the runs behind them and answers with evidence. Saving and sharing analyses moved to the new save_analysis tool, so the analyses tool is read-only. Adds dashboard screenshots."
+				"release_notes": "Opaline now focuses on improving your team's agent setup: find where agents get stuck or waste time, and what to fix. The assistant uses six tools with plain descriptions; the dashboard's data tools are used only by the dashboard. Answers follow one cycle: find a saved answer, look only at what happened since, and save the update as a new answer that says how each finding changed. find and read keep their calls as a private draft that nobody can open; it is kept only when save_analysis saves it, and unsaved drafts are deleted after 7 days. A saved answer is never changed."
 			}
 		}
 	}

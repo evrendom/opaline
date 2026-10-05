@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import { ORPCError } from "@orpc/server";
 import type {
+	AnalysisChange,
+	AnalysisFindInput,
 	AnalysisHistoryGetOutput,
 	AnalysisHistoryQueryOutput,
 	AnalysisHistorySaveInput,
@@ -11,8 +13,13 @@ import type {
 	AnalysisScope,
 	AnalysisTrace,
 } from "@rudel/api-routes";
-import { AnalysisFullError, loggableError } from "./errors.js";
 import {
+	AnalysisFullError,
+	AnalysisSavedError,
+	loggableError,
+} from "./errors.js";
+import {
+	DRAFT_RETENTION_MS,
 	MAX_QUERIES_PER_ANALYSIS,
 	MAX_QUERY_ARGS_BYTES,
 	MAX_SESSIONS_PER_ANALYSIS,
@@ -37,6 +44,13 @@ const OPEN_ANALYSIS_WINDOW_MS = 30 * 60_000;
 const RESULT_RETENTION_MS = 90 * 86_400_000;
 const SHARED_RESULT_RETENTION_MS = 365 * 86_400_000;
 const UNLABELLED_STEP = "(no step given)";
+/** Revisions listed with an analysis (`updatedBy`). */
+const MAX_LISTED_REVISIONS = 20;
+
+/** What save_analysis answers for a saved analysis: saving is append-only. */
+export function analysisAlreadySaved(id: string): string {
+	return `This analysis is already saved. To revise it, save a new analysis that passes updates=${id}.`;
+}
 
 export interface RecordedCall {
 	tool: "find" | "read";
@@ -45,6 +59,8 @@ export interface RecordedCall {
 	trace: {
 		analysis?: string;
 		question?: string;
+		/** On a draft's first call: the saved analysis it revises. */
+		updates?: string;
 		step?: string;
 		parentStep?: string;
 	};
@@ -56,8 +72,10 @@ export interface RecordedCall {
 }
 
 /**
- * Stores one find/read call under its analysis and step, creating either when
- * needed, and returns the ids the agent passes on its next call.
+ * Stores one find/read call under its draft analysis and step, creating
+ * either when needed, and returns the ids the agent passes on its next call.
+ * Only drafts take calls: a saved analysis never changes, so revising one
+ * starts a new draft (`updates`).
  */
 export async function recordQuery(
 	log: AnalysisLog,
@@ -74,10 +92,12 @@ export async function recordQuery(
 	try {
 		return await recordInto(log, analysis, call, now);
 	} catch (error) {
+		// Saved by a concurrent save_analysis after this call picked it.
+		if (error instanceof AnalysisSavedError) throw notADraft(analysis.id);
 		if (!(error instanceof AnalysisFullError)) throw error;
 		// Only a named analysis is the agent's to fix; one the server picked
 		// filled up under a concurrent call, so this call starts a new one.
-		if (call.trace.analysis || call.trace.question)
+		if (call.trace.analysis || call.trace.question || call.trace.updates)
 			throw analysisFull(analysis.id, error.child);
 		return recordInto(
 			log,
@@ -122,13 +142,33 @@ async function recordInto(
 	return { analysis: analysis.id, step: step.id, query: query.id };
 }
 
-/** The final answer, step findings and the asker's clarifications; the analysis becomes finished. */
+/**
+ * Publishes a draft: the final answer, step findings, the asker's
+ * clarifications and, for a revision, how each finding changed. The analysis
+ * becomes finished and visible to its author (and the workspace once shared).
+ * Saving is append-only: a saved analysis is refused unchanged, and a
+ * revision is a new analysis that names it in `updates`.
+ */
 export async function saveAnalysis(
 	log: AnalysisLog,
 	viewer: AnalysisViewer,
 	input: AnalysisHistorySaveInput,
 ): Promise<{ analysis: string; status: "finished" }> {
 	const analysis = await authoredAnalysis(log, viewer, input.analysis);
+	if (analysis.status === "finished")
+		throw new ORPCError("CONFLICT", {
+			message: analysisAlreadySaved(analysis.id),
+		});
+	if (input.updates && analysis.updates && input.updates !== analysis.updates)
+		throw new ORPCError("BAD_REQUEST", {
+			message: `Analysis ${analysis.id} was started to update ${analysis.updates}; pass updates=${analysis.updates} or leave updates out`,
+		});
+	const updates = input.updates ?? analysis.updates;
+	if (!updates && input.changes.length > 0)
+		throw new ORPCError("BAD_REQUEST", {
+			message:
+				"changes says how findings moved against the analysis this one updates; this analysis updates none, so leave changes out or pass updates",
+		});
 	const steps = await log.store.getSteps(analysis.id);
 	// Agents refer to steps by id or by the sub-question they wrote; accept both.
 	const stepOf = (reference: string) => {
@@ -166,7 +206,18 @@ export async function saveAnalysis(
 			};
 		},
 	);
-	if (input.updates) await visibleAnalysis(log, viewer, input.updates);
+	const changes = updates
+		? resolveChanges(
+				analysis.id,
+				await visibleAnalysis(log, viewer, updates),
+				await log.store.getSteps(updates),
+				findings.map(({ stepId, finding }) => ({
+					step: stepOf(stepId),
+					finding,
+				})),
+				input.changes,
+			)
+		: [];
 	const full = new ORPCError("BAD_REQUEST", {
 		message: `Analysis ${analysis.id} has ${steps.length} steps; with ${clarifications.length} clarifications it would pass ${MAX_STEPS_PER_ANALYSIS}, the most one analysis keeps; save fewer clarifications`,
 	});
@@ -181,12 +232,18 @@ export async function saveAnalysis(
 				status: "finished",
 				finalAnswer: input.finalAnswer,
 				topics: input.topics,
-				updates: input.updates ?? analysis.updates,
+				updates,
+				changes,
 				scope: scopeOf(await log.store.getQueries(analysis.id)),
 			},
 		});
 	} catch (error) {
 		if (error instanceof AnalysisFullError) throw full;
+		// A concurrent save won: nothing was written by this one.
+		if (error instanceof AnalysisSavedError)
+			throw new ORPCError("CONFLICT", {
+				message: analysisAlreadySaved(analysis.id),
+			});
 		throw error;
 	}
 	for (const step of clarifications)
@@ -208,6 +265,49 @@ export async function saveAnalysis(
 			input.topics.join(", "),
 		);
 	return { analysis: analysis.id, status: "finished" };
+}
+
+/**
+ * A find without `from` in a revision covers only the evidence since the
+ * revised analysis's data cutoff day: on the draft's first call (`updates`)
+ * and on every follow-up (`analysis` naming a draft that revises one), so
+ * pages and follow-ups keep one window. The note says so in the result's
+ * header. An explicit `from` always wins. Null when nothing changes; a draft
+ * the caller cannot add to is left for `recordQuery` to refuse.
+ */
+export async function sinceUpdatedCutoff(
+	log: AnalysisLog,
+	viewer: AnalysisViewer,
+	input: AnalysisFindInput,
+): Promise<{ input: AnalysisFindInput; note: string } | null> {
+	if (input.from) return null;
+	const updates = input.updates ?? (await draftUpdates(log, viewer, input));
+	if (!updates) return null;
+	const prior = await visibleAnalysis(log, viewer, updates);
+	const from = prior.cutoff.slice(0, 10);
+	if (input.to && input.to < from) return null;
+	return {
+		input: { ...input, from },
+		note: `from defaults to ${from}, the data cutoff of analysis ${prior.id} that this draft updates; pass from to cover earlier days`,
+	};
+}
+
+/** The analysis the named draft revises, when the caller may add to that draft. */
+async function draftUpdates(
+	log: AnalysisLog,
+	viewer: AnalysisViewer,
+	input: AnalysisFindInput,
+): Promise<string | null> {
+	if (!input.analysis) return null;
+	const draft = await log.store.getAnalysis(input.analysis);
+	if (
+		!draft?.draft ||
+		draft.workspaceId !== viewer.workspaceId ||
+		draft.authorId !== viewer.userId ||
+		isExpiredDraft(draft, log.now())
+	)
+		return null;
+	return draft.updates;
 }
 
 /**
@@ -275,9 +375,14 @@ export async function getAnalysisTree(
 	id: string,
 ): Promise<AnalysisHistoryGetOutput> {
 	const analysis = await visibleAnalysis(log, viewer, id);
-	const [queries, chats] = await Promise.all([
+	const [queries, chats, revisions] = await Promise.all([
 		log.store.getQueries(analysis.id),
 		log.store.getSessionLinks(analysis.id),
+		log.store.analysesUpdating(
+			analysis.workspaceId,
+			analysis.id,
+			MAX_LISTED_REVISIONS,
+		),
 	]);
 	const now = log.now();
 	return {
@@ -285,6 +390,11 @@ export async function getAnalysisTree(
 		finalAnswer: analysis.finalAnswer,
 		notes: analysis.notes,
 		cost: analysis.cost,
+		changes: analysis.changes,
+		updatedBy: revisions
+			.filter((revision) => canSee(revision, viewer))
+			.sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+			.map((revision) => revision.id),
 		steps: (await log.store.getSteps(analysis.id)).map((step) => ({
 			id: step.id,
 			parent: step.parentId,
@@ -380,6 +490,10 @@ export async function shareAnalysis(
 	shared: boolean,
 ): Promise<{ analysis: string; shared: boolean }> {
 	const analysis = await authoredAnalysis(log, viewer, id);
+	if (analysis.draft)
+		throw new ORPCError("BAD_REQUEST", {
+			message: `Analysis ${analysis.id} is an unsaved draft; save it with save_analysis first, then share it`,
+		});
 	await log.store.updateAnalysis(analysis.id, { shared });
 	return { analysis: analysis.id, shared };
 }
@@ -390,18 +504,20 @@ async function resolveAnalysis(
 	trace: RecordedCall["trace"],
 	now: string,
 ): Promise<StoredAnalysis> {
-	if (trace.analysis)
-		return authoredAnalysis(
+	if (trace.analysis) {
+		const analysis = await authoredAnalysis(
 			log,
-			{
-				workspaceId: author.workspaceId,
-				userId: author.userId,
-				isAdmin: false,
-				restrictResults: true,
-			},
+			authorViewer(author),
 			trace.analysis,
 		);
-	if (!trace.question) {
+		if (!analysis.draft) throw notADraft(analysis.id);
+		if (trace.updates && trace.updates !== analysis.updates)
+			throw new ORPCError("BAD_REQUEST", {
+				message: `updates only applies to the first call of a draft; analysis ${analysis.id} ${analysis.updates ? `updates ${analysis.updates}` : "updates no earlier analysis"}. Leave updates out, or start a new draft with updates and no analysis`,
+			});
+		return analysis;
+	}
+	if (!trace.question && !trace.updates) {
 		const open = await log.store.latestOpenAnalysis(
 			author.workspaceId,
 			author.userId,
@@ -410,6 +526,7 @@ async function resolveAnalysis(
 		// A full analysis the server picked is not the agent's mistake: start anew.
 		if (
 			open &&
+			!isExpiredDraft(open, new Date(now)) &&
 			open.queryCount < MAX_QUERIES_PER_ANALYSIS &&
 			open.stepCount < MAX_STEPS_PER_ANALYSIS
 		)
@@ -424,13 +541,19 @@ async function createAnalysis(
 	trace: RecordedCall["trace"],
 	now: string,
 ): Promise<StoredAnalysis> {
+	// A revision starts from a saved analysis its author may see.
+	const prior = trace.updates
+		? await visibleAnalysis(log, authorViewer(author), trace.updates)
+		: null;
+	const question = trace.question ?? prior?.question;
 	const analysis: StoredAnalysis = {
 		id: newId("a"),
 		workspaceId: author.workspaceId,
 		authorId: author.userId,
 		host: author.host,
-		question: trace.question ?? "(question not given)",
+		question: question ?? "(question not given)",
 		status: "unfinished",
+		draft: true,
 		shared: false,
 		pinned: false,
 		createdAt: now,
@@ -438,21 +561,22 @@ async function createAnalysis(
 		scope: { from: null, to: null, filters: {} },
 		finalAnswer: null,
 		topics: [],
-		updates: null,
+		updates: prior?.id ?? null,
+		changes: [],
 		notes: [],
 		cost: null,
 		queryCount: 0,
 		stepCount: 0,
 	};
 	await log.store.createAnalysis(analysis);
-	if (trace.question)
+	if (question)
 		await embedText(
 			log,
 			analysis.workspaceId,
 			analysis.id,
 			null,
 			"question",
-			trace.question,
+			question,
 		);
 	return analysis;
 }
@@ -506,6 +630,86 @@ async function resolveStep(
 	return step;
 }
 
+/**
+ * A revision's change list, checked before anything is written: every
+ * finding saved with the revision has exactly one change, naming its step by
+ * id or exact sub-question; a `dropped` change may instead name a step of
+ * the prior whose finding no longer holds, once. Refused lists name every
+ * missing, repeated or unknown step.
+ */
+function resolveChanges(
+	analysisId: string,
+	prior: StoredAnalysis,
+	priorSteps: StoredStep[],
+	findings: { step: StoredStep; finding: string }[],
+	changes: AnalysisHistorySaveInput["changes"],
+): AnalysisChange[] {
+	const byStep = new Map(findings.map((item) => [item.step.id, item]));
+	const matches = (step: StoredStep, reference: string) =>
+		step.id === reference || step.question === reference.trim();
+	const counts = new Map<string, number>();
+	const unknown: string[] = [];
+	const resolved: AnalysisChange[] = [];
+	for (const change of changes) {
+		const own = findings.find((item) => matches(item.step, change.step));
+		const dropped =
+			own || change.change !== "dropped"
+				? undefined
+				: priorSteps.find((step) => matches(step, change.step));
+		const step = own?.step ?? dropped;
+		if (!step) {
+			unknown.push(change.step);
+			continue;
+		}
+		counts.set(step.id, (counts.get(step.id) ?? 0) + 1);
+		resolved.push({
+			step: step.id,
+			finding: own?.finding ?? step.finding ?? step.question,
+			change: change.change,
+			evidence: change.evidence,
+		});
+	}
+	const label = (id: string) => {
+		const step = byStep.get(id)?.step ?? priorSteps.find((s) => s.id === id);
+		return step ? `${id} ("${step.question}")` : id;
+	};
+	const missing = [...byStep.keys()].filter((id) => !counts.has(id));
+	const repeated = [...counts]
+		.filter(([, count]) => count > 1)
+		.map(([id]) => id);
+	if (!missing.length && !repeated.length && !unknown.length) return resolved;
+	const problems = [
+		missing.length &&
+			`no change for the finding of ${missing.map(label).join(", ")}`,
+		repeated.length &&
+			`more than one change for ${repeated.map(label).join(", ")}`,
+		unknown.length &&
+			`no saved finding of this analysis, nor a step of ${prior.id} (allowed only with change=dropped), for ${unknown.map((reference) => `"${reference}"`).join(", ")}`,
+	].filter(Boolean);
+	throw new ORPCError("BAD_REQUEST", {
+		message: `Analysis ${analysisId} updates ${prior.id}, so changes needs exactly one item per finding saved now, naming its step by id or exact sub-question (plus change=dropped items for findings of ${prior.id} that no longer hold): ${problems.join("; ")}. Nothing was saved.`,
+	});
+}
+
+function notADraft(analysisId: string): ORPCError<"BAD_REQUEST", unknown> {
+	return new ORPCError("BAD_REQUEST", {
+		message: `Analysis ${analysisId} is saved, and a saved analysis never changes; find and read add only to the unsaved draft they started. To revise it, start a new draft by passing updates=${analysisId} (and no analysis), then save that draft`,
+	});
+}
+
+/** The author as a viewer, for checks that only compare workspace and author. */
+function authorViewer(author: {
+	workspaceId: string;
+	userId: string;
+}): AnalysisViewer {
+	return {
+		workspaceId: author.workspaceId,
+		userId: author.userId,
+		isAdmin: false,
+		restrictResults: true,
+	};
+}
+
 function analysisFull(
 	analysisId: string,
 	child: AnalysisFullError["child"],
@@ -524,7 +728,15 @@ async function authoredAnalysis(
 	id: string,
 ): Promise<StoredAnalysis> {
 	const analysis = await log.store.getAnalysis(id);
-	if (!analysis || analysis.workspaceId !== viewer.workspaceId)
+	// Another member's draft does not exist for the viewer; an expired one
+	// is gone for everyone, even before the daily cleanup deletes it.
+	if (
+		!analysis ||
+		analysis.workspaceId !== viewer.workspaceId ||
+		(analysis.draft &&
+			(analysis.authorId !== viewer.userId ||
+				isExpiredDraft(analysis, log.now())))
+	)
 		throw new ORPCError("NOT_FOUND");
 	if (analysis.authorId !== viewer.userId)
 		throw new ORPCError("FORBIDDEN", {
@@ -533,23 +745,39 @@ async function authoredAnalysis(
 	return analysis;
 }
 
+/** A saved analysis the viewer may see; drafts and everything else are NOT_FOUND. */
 async function visibleAnalysis(
 	log: AnalysisLog,
 	viewer: AnalysisViewer,
 	id: string,
 ): Promise<StoredAnalysis> {
 	const analysis = await log.store.getAnalysis(id);
-	if (!analysis || !canSee(analysis, viewer)) throw new ORPCError("NOT_FOUND");
+	if (!analysis || !canSee(analysis, viewer))
+		throw new ORPCError("NOT_FOUND", {
+			message: `No saved analysis ${id} that you can see`,
+		});
 	return analysis;
 }
 
+/**
+ * Drafts are seen by nobody, their author included: only the author's own
+ * find, read and save calls reach them.
+ */
 export function canSee(
 	analysis: StoredAnalysis,
 	viewer: Pick<AnalysisViewer, "workspaceId" | "userId">,
 ): boolean {
 	return (
+		!analysis.draft &&
 		analysis.workspaceId === viewer.workspaceId &&
 		(analysis.authorId === viewer.userId || analysis.shared)
+	);
+}
+
+function isExpiredDraft(analysis: StoredAnalysis, now: Date): boolean {
+	return (
+		analysis.draft &&
+		now.getTime() - Date.parse(analysis.createdAt) > DRAFT_RETENTION_MS
 	);
 }
 

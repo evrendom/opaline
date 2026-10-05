@@ -40,6 +40,23 @@ best first. Chats uploaded for an analysis (`opaline import --analysis`) are
 analysis (`sessions:link` checks the count in the same transaction). The API uses only OpenAI vectors with this store; a model change
 leaves older vectors unmatched until they are embedded again.
 
+## Drafts and append-only saves
+
+The API's `find` and `read` calls build an analysis with `draft: true`. A
+draft is returned only by `analyses:get` (the API checks that its author is
+asking, for find/read/save) and `analyses:latestOpen`; `analyses:recent`,
+`analyses:updatedBy` and the vector-match lookup leave drafts out, and the API
+treats them as not found everywhere else. `analyses:save` publishes a draft
+(sets `draft: false` and `status: "finished"`) in the same transaction that
+writes its findings. Saving is append-only: `analyses:save`, `steps:create`
+and `queries:create` refuse a finished analysis with `analysisSaved`
+ConvexError data, so a saved analysis never changes. A revision is a new
+analysis whose `updates` names the earlier one (`by_workspace_updates`), with
+its per-finding `changes` (each naming the step it covers; the API checks
+that every finding has exactly one before saving). Analyses recorded before drafts have no `draft` or
+`changes` field and read as not drafts with no changes, so they keep their
+visibility; no migration is needed.
+
 ## Size limits
 
 Convex reads at most 16 MiB and returns at most 8,192 array elements per
@@ -82,6 +99,13 @@ shared or pinned analyses, mirroring the service's read-time check. It scans
 only queries that still hold a result, 32 per transaction, and repeats a page
 it could not finish; expired results have left the index by then.
 
+A second daily cron at the same time (`retention:expireDraftsDaily`) deletes
+drafts started more than 7 days ago, with all their children, through
+`by_draft_created` and the same bounded deletion as `deletion:byAuthor`; it
+reschedules itself until none is left. Saved analyses never match. The API
+treats an older draft as gone before the cron reaches it. Account and
+workspace purges delete drafts like any other analysis.
+
 ## Deployment
 
 No generated code is needed: functions use the generic builders and typed
@@ -105,6 +129,17 @@ set, even with capture off, and fail (the durable job retries) while `convex`
 is declared without `CONVEX_URL`, or the signing key is invalid. A purge runs
 under one 60-second deadline, HTTP requests included, and the durable purge
 job retries what is left.
+
+To ship changed functions, schema or crons to an existing deployment, deploy
+Convex before the API that depends on them (new fields are optional, so the
+running API keeps working against the new functions):
+
+```sh
+CONVEX_DEPLOY_KEY='<the deployment key>' bun run convex:deploy --codegen disable
+```
+
+No CI job deploys Convex; this is a manual step. Convex builds new indexes
+during the push, and the cron schedule comes from `crons.ts`.
 
 To decommission the deployment, stop capture (unset `ANALYSIS_LOG_STORE`),
 wait until no purge job or follow-up is pending, delete or export the

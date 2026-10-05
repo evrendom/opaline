@@ -1,4 +1,5 @@
 import {
+	AnalysisChangeSchema,
 	AnalysisCostSchema,
 	AnalysisHistoryGetOutputSchema,
 	AnalysisHostSchema,
@@ -10,7 +11,11 @@ import {
 	createConvexHttpClient,
 } from "./convex-http.js";
 import { createTokenSource, type SigningKey } from "./convex-token.js";
-import { AnalysisFullError, SanitizedError } from "./errors.js";
+import {
+	AnalysisFullError,
+	AnalysisSavedError,
+	SanitizedError,
+} from "./errors.js";
 import type {
 	AnalysisPatch,
 	AnalysisSave,
@@ -39,6 +44,7 @@ const AnalysisSchema = z.object({
 	host: AnalysisHostSchema,
 	question: z.string(),
 	status: z.enum(["finished", "unfinished"]),
+	draft: z.boolean(),
 	shared: z.boolean(),
 	pinned: z.boolean(),
 	createdAt: z.string(),
@@ -47,6 +53,7 @@ const AnalysisSchema = z.object({
 	finalAnswer: z.string().nullable(),
 	topics: z.array(z.string()),
 	updates: z.string().nullable(),
+	changes: z.array(AnalysisChangeSchema),
 	notes: z.array(z.string()),
 	cost: AnalysisCostSchema.nullable(),
 	queryCount: z.number(),
@@ -112,6 +119,8 @@ const AnalysisFullSchema = z.object({
 	kind: z.literal("analysisFull"),
 	child: z.enum(["queries", "steps", "sessions"]),
 });
+/** The ConvexError data of a write to a saved analysis (convex/limits.ts). */
+const AnalysisSavedSchema = z.object({ kind: z.literal("analysisSaved") });
 const MatchesSchema = z.array(
 	z.object({
 		analysisId: z.string(),
@@ -133,6 +142,8 @@ interface ConvexFunctionArgs {
 		since: string;
 	};
 	"analyses:recent": { workspaceId: string; viewerId: string; limit: number };
+	"analyses:updatedBy": { workspaceId: string; id: string; limit: number };
+	"retention:expireDrafts": Record<string, never>;
 	"steps:create": { step: StoredStep };
 	"steps:list": { analysisId: string };
 	"queries:create": {
@@ -167,6 +178,8 @@ const FUNCTION_TYPES = {
 	"analyses:save": "mutation",
 	"analyses:latestOpen": "query",
 	"analyses:recent": "query",
+	"analyses:updatedBy": "query",
+	"retention:expireDrafts": "mutation",
 	"steps:create": "mutation",
 	"steps:list": "query",
 	"queries:create": "mutation",
@@ -225,6 +238,11 @@ export function createConvexAnalysisStore({
 					? AnalysisFullSchema.safeParse(error.failure.data)
 					: undefined;
 			if (full?.success) throw new AnalysisFullError(full.data.child);
+			if (
+				error.failure.kind === "convexError" &&
+				AnalysisSavedSchema.safeParse(error.failure.data).success
+			)
+				throw new AnalysisSavedError();
 			throw new SanitizedError(error.message);
 		}
 	};
@@ -248,6 +266,14 @@ export function createConvexAnalysisStore({
 		},
 		async saveAnalysis(id, save) {
 			await run("analyses:save", { id, save });
+		},
+		async expireDrafts() {
+			await untilDone(() => run("retention:expireDrafts", {}));
+		},
+		async analysesUpdating(workspaceId, id, limit) {
+			return AnalysisSchema.array().parse(
+				await run("analyses:updatedBy", { workspaceId, id, limit }),
+			);
 		},
 		async latestOpenAnalysis(workspaceId, authorId, since) {
 			return AnalysisSchema.nullable().parse(

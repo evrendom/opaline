@@ -1,5 +1,6 @@
-import { AnalysisFullError } from "./errors.js";
+import { AnalysisFullError, AnalysisSavedError } from "./errors.js";
 import {
+	DRAFT_RETENTION_MS,
 	MAX_QUERIES_PER_ANALYSIS,
 	MAX_SESSIONS_PER_ANALYSIS,
 	MAX_STEPS_PER_ANALYSIS,
@@ -78,6 +79,7 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 		async saveAnalysis(id, { findings, clarifications, patch }) {
 			const analysis = analyses.get(id);
 			if (!analysis) throw new Error(`Analysis ${id} is missing`);
+			if (analysis.status === "finished") throw new AnalysisSavedError();
 			for (const { stepId } of findings)
 				if (steps.get(stepId)?.analysisId !== id)
 					throw new Error(`Step ${stepId} is not in this analysis`);
@@ -106,8 +108,15 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 			analyses.set(id, {
 				...analysis,
 				...structuredClone(patch),
+				draft: false,
 				stepCount: analysis.stepCount + clarifications.length,
 			});
+		},
+		async expireDrafts() {
+			const before = new Date(Date.now() - DRAFT_RETENTION_MS).toISOString();
+			removeAnalyses(
+				(analysis) => analysis.draft && analysis.createdAt < before,
+			);
 		},
 		async latestOpenAnalysis(workspaceId, authorId, since) {
 			return clone(
@@ -116,6 +125,7 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 						(analysis) =>
 							analysis.workspaceId === workspaceId &&
 							analysis.authorId === authorId &&
+							analysis.draft &&
 							analysis.status === "unfinished" &&
 							analysis.cutoff >= since,
 					)
@@ -127,9 +137,21 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 				.filter(
 					(analysis) =>
 						analysis.workspaceId === workspaceId &&
+						!analysis.draft &&
 						(analysis.authorId === viewerId || analysis.shared),
 				)
 				.sort((left, right) => right.cutoff.localeCompare(left.cutoff))
+				.slice(0, limit)
+				.map((analysis) => structuredClone(analysis));
+		},
+		async analysesUpdating(workspaceId, id, limit) {
+			return [...analyses.values()]
+				.filter(
+					(analysis) =>
+						analysis.workspaceId === workspaceId &&
+						analysis.updates === id &&
+						!analysis.draft,
+				)
 				.slice(0, limit)
 				.map((analysis) => structuredClone(analysis));
 		},
@@ -138,6 +160,7 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 		async createStep(step) {
 			const analysis = analyses.get(step.analysisId);
 			if (!analysis) throw new Error(`Analysis ${step.analysisId} is missing`);
+			if (analysis.status === "finished") throw new AnalysisSavedError();
 			if (analysis.stepCount >= MAX_STEPS_PER_ANALYSIS)
 				throw new AnalysisFullError("steps");
 			insert(steps, step);
@@ -156,6 +179,7 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 		async createQuery({ sessions, ...query }) {
 			const analysis = analyses.get(query.analysisId);
 			if (!analysis) throw new Error(`Analysis ${query.analysisId} is missing`);
+			if (analysis.status === "finished") throw new AnalysisSavedError();
 			if (analysis.queryCount >= MAX_QUERIES_PER_ANALYSIS)
 				throw new AnalysisFullError("queries");
 			const owners = [
@@ -253,7 +277,9 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 			return embeddings
 				.filter(
 					(embedding) =>
-						embedding.workspaceId === workspaceId && embedding.model === model,
+						embedding.workspaceId === workspaceId &&
+						embedding.model === model &&
+						analyses.get(embedding.analysisId)?.draft === false,
 				)
 				.map((embedding) => ({
 					embedding,

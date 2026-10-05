@@ -10,6 +10,8 @@ import {
 } from "./validators";
 
 export const schema = defineSchema({
+	// `draft` and `changes` are absent on analyses recorded before them: those
+	// read as not drafts with no changes (`stored` in analyses.ts).
 	analyses: defineTable(
 		analysis.extend({ deleting: v.optional(v.literal(true)) }),
 	)
@@ -23,6 +25,8 @@ export const schema = defineSchema({
 			"cutoff",
 		])
 		.index("by_workspace_shared_cutoff", ["workspaceId", "shared", "cutoff"])
+		.index("by_workspace_updates", ["workspaceId", "updates"])
+		.index("by_draft_created", ["draft", "createdAt"])
 		.index("by_deleting", ["deleting"]),
 	steps: defineTable(step)
 		.index("by_app_id", ["id"])

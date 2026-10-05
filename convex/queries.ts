@@ -8,7 +8,11 @@ import {
 	findStep,
 	withoutSystemFields,
 } from "./functions";
-import { analysisFull, MAX_QUERIES_PER_ANALYSIS } from "./limits";
+import {
+	analysisFull,
+	analysisSaved,
+	MAX_QUERIES_PER_ANALYSIS,
+} from "./limits";
 import {
 	query,
 	querySession,
@@ -31,6 +35,7 @@ export const create = apiMutation({
 		const analysis = await findAnalysis(value.analysisId, ctx);
 		if (!analysis)
 			throw new Error(`Analysis ${value.analysisId} is missing or deleting`);
+		if (analysis.status === "finished") throw new ConvexError(analysisSaved());
 		if (analysis.queryCount >= MAX_QUERIES_PER_ANALYSIS)
 			throw new ConvexError(analysisFull("queries"));
 		if (

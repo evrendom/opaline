@@ -86,6 +86,9 @@ export {
 	type RunRef,
 } from "./analysis.js";
 export {
+	type AnalysisChange,
+	AnalysisChangeInputSchema,
+	AnalysisChangeSchema,
 	type AnalysisCost,
 	AnalysisCostSchema,
 	AnalysisHistoryGetInputSchema,

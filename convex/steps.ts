@@ -6,7 +6,7 @@ import {
 	findStep,
 	withoutSystemFields,
 } from "./functions";
-import { analysisFull, MAX_STEPS_PER_ANALYSIS } from "./limits";
+import { analysisFull, analysisSaved, MAX_STEPS_PER_ANALYSIS } from "./limits";
 import { step } from "./validators";
 
 export const create = apiMutation({
@@ -16,6 +16,7 @@ export const create = apiMutation({
 		const analysis = await findAnalysis(value.analysisId, ctx);
 		if (!analysis)
 			throw new Error(`Analysis ${value.analysisId} is missing or deleting`);
+		if (analysis.status === "finished") throw new ConvexError(analysisSaved());
 		if (analysis.stepCount >= MAX_STEPS_PER_ANALYSIS)
 			throw new ConvexError(analysisFull("steps"));
 		if (await findStep(value.id, ctx))
