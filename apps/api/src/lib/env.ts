@@ -325,6 +325,24 @@ export function readGitHubEvidenceUiForceOrgIds(
 	];
 }
 
+/**
+ * Workspaces whose members never reach PostHog from the API: test and seed
+ * workspaces would otherwise create a person per member on every signup and on
+ * every daily billing traits refresh.
+ */
+export function readProductAnalyticsExcludedOrgIds(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	return [
+		...new Set(
+			(environment.PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS ?? "")
+				.split(",")
+				.map((value) => value.trim())
+				.filter(Boolean),
+		),
+	];
+}
+
 function readBooleanFromEnvironment(
 	environment: Readonly<Record<string, string | undefined>>,
 	name: string,

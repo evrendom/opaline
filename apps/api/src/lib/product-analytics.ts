@@ -7,8 +7,11 @@ import {
 	PRODUCT_ANALYTICS_EVENT_VERSION,
 	parseProductAnalyticsEvent,
 } from "@rudel/api-routes";
+import type postgres from "postgres";
 import { PostHog } from "posthog-node";
+import { sqlClient } from "../db.js";
 import { isVercelRuntime } from "./api-runtime.js";
+import { readProductAnalyticsExcludedOrgIds } from "./env.js";
 
 type ApiAutoProps = "event_version" | "surface" | "environment";
 type ApiCapturePayload<Name extends ProductAnalyticsEventName> = Omit<
@@ -62,6 +65,31 @@ function getClient() {
 	return client;
 }
 
+type AnalyticsSql = postgres.Sql | postgres.TransactionSql;
+
+// Server-side distinct IDs are user IDs, so membership decides exclusion.
+// Callers that hold a transaction must pass it as `sql`: a second pool
+// connection per delivery can exhaust the pool and deadlock.
+export async function isExcludedFromProductAnalytics(
+	distinctId: string,
+	{
+		excludedOrgIds = readProductAnalyticsExcludedOrgIds(),
+		sql = sqlClient,
+	}: { excludedOrgIds?: readonly string[]; sql?: AnalyticsSql } = {},
+): Promise<boolean> {
+	if (excludedOrgIds.length === 0) {
+		return false;
+	}
+	const rows = await sql.unsafe<Array<{ excluded: boolean }>>(
+		`SELECT EXISTS (
+			SELECT 1 FROM member
+			WHERE user_id = $1 AND organization_id = ANY($2::text[])
+		) AS excluded`,
+		[distinctId, [...excludedOrgIds]],
+	);
+	return rows[0]?.excluded === true;
+}
+
 function buildPayload<Name extends ProductAnalyticsEventName>(
 	event: Name,
 	payload: ApiCapturePayload<Name>,
@@ -88,6 +116,9 @@ export async function captureApiProductAnalyticsEvent<
 	}
 
 	try {
+		if (await isExcludedFromProductAnalytics(options.distinctId)) {
+			return;
+		}
 		const message = {
 			distinctId: options.distinctId,
 			event: options.event,
@@ -122,9 +153,17 @@ export async function deliverApiProductAnalyticsEvent<
 	eventUuid: string;
 	occurredAt: Date;
 	payload: ApiCapturePayload<Name>;
+	sql: AnalyticsSql;
 }): Promise<void> {
 	const instance = getClient();
 	if (!instance) throw new ProductAnalyticsUnavailableError();
+	if (
+		await isExcludedFromProductAnalytics(options.distinctId, {
+			sql: options.sql,
+		})
+	) {
+		return;
+	}
 	await instance.captureImmediate({
 		distinctId: options.distinctId,
 		event: options.event,
@@ -137,9 +176,17 @@ export async function deliverApiProductAnalyticsEvent<
 export async function deliverApiProductAnalyticsPersonProperties(options: {
 	distinctId: string;
 	properties: Readonly<Record<string, boolean | null | number | string>>;
+	sql: AnalyticsSql;
 }): Promise<void> {
 	const instance = getClient();
 	if (!instance) throw new ProductAnalyticsUnavailableError();
+	if (
+		await isExcludedFromProductAnalytics(options.distinctId, {
+			sql: options.sql,
+		})
+	) {
+		return;
+	}
 	await instance.identifyImmediate({
 		distinctId: options.distinctId,
 		properties: options.properties,

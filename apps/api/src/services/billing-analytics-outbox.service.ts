@@ -268,7 +268,7 @@ async function processNextAnalyticsRow(): Promise<boolean> {
 		);
 		if (!row) return false;
 		try {
-			await deliverAnalyticsRow(row);
+			await deliverAnalyticsRow(row, transaction);
 			await transaction.unsafe(
 				`UPDATE billing_analytics_outbox
 				SET delivered_at = NOW(), last_error = NULL
@@ -297,11 +297,15 @@ async function processNextAnalyticsRow(): Promise<boolean> {
 	});
 }
 
-async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
+async function deliverAnalyticsRow(
+	row: AnalyticsOutboxRow,
+	transaction: postgres.TransactionSql,
+): Promise<void> {
 	if (row.kind === "traits") {
 		await deliverApiProductAnalyticsPersonProperties({
 			distinctId: row.user_id,
 			properties: AnalyticsPropertiesSchema.parse(row.properties),
+			sql: transaction,
 		});
 		return;
 	}
@@ -312,6 +316,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			eventUuid: row.id,
 			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: CheckoutStartedPropertiesSchema.parse(row.properties),
+			sql: transaction,
 		});
 		return;
 	}
@@ -322,6 +327,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			eventUuid: row.id,
 			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: PaymentCompletedPropertiesSchema.parse(row.properties),
+			sql: transaction,
 		});
 		return;
 	}
@@ -332,6 +338,7 @@ async function deliverAnalyticsRow(row: AnalyticsOutboxRow): Promise<void> {
 			eventUuid: row.id,
 			occurredAt: parseBillingDatabaseTimestamp(row.occurred_at),
 			payload: PlanChangeStartedPropertiesSchema.parse(row.properties),
+			sql: transaction,
 		});
 		return;
 	}
