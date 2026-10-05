@@ -42,7 +42,6 @@ const SERVER_INFO = {
 	version: "1.0.0",
 	icons: [OPALINE_ICON],
 };
-// Sent by both initialize and server/discover, which must agree.
 const SERVER_INSTRUCTIONS =
 	"Opaline holds the user's uploaded Claude Code and Codex sessions. Tools only read them; save_analysis saves or shares an analysis in the user's analysis log. Dates are UTC.";
 // OpenAI MCP extension: native settings on the plugin page.
@@ -222,6 +221,13 @@ async function handleMcpRequest(
 			headers: { Allow: "POST" },
 		});
 	}
+	// This is a legacy-era server (initialize handshake, up to 2025-11-25).
+	// A modern request (2026-07-28 and later) gets a plain 400 so dual-era
+	// clients fall back to initialize instead of seeing mixed signals.
+	const headerVersion = request.headers.get("mcp-protocol-version");
+	if (headerVersion && !PROTOCOL_VERSIONS.includes(headerVersion)) {
+		return unsupportedProtocolVersion(headerVersion);
+	}
 	const token = await mcpApi(dependencies.auth).getMcpSession({
 		headers: request.headers,
 	});
@@ -254,6 +260,30 @@ async function handleMcpRequest(
 		return new Response(null, { status: 202 });
 	}
 	const params = message.params ?? {};
+	const metaVersion = (params._meta as Record<string, unknown> | undefined)?.[
+		"io.modelcontextprotocol/protocolVersion"
+	];
+	// Protocol diagnostics for directory scans and hosts: method and declared
+	// versions only, never arguments, results or tokens.
+	logger.info(
+		"MCP {method} header={headerVersion} meta={metaVersion} requested={requestedVersion}",
+		{
+			method: message.method ?? "",
+			headerVersion: headerVersion ?? "",
+			metaVersion: typeof metaVersion === "string" ? metaVersion : "",
+			requestedVersion:
+				message.method === "initialize" &&
+				typeof params.protocolVersion === "string"
+					? params.protocolVersion
+					: "",
+		},
+	);
+	if (
+		typeof metaVersion === "string" &&
+		!PROTOCOL_VERSIONS.includes(metaVersion)
+	) {
+		return unsupportedProtocolVersion(metaVersion);
+	}
 	switch (message.method) {
 		case "initialize":
 			return rpcResult(message.id, {
@@ -264,14 +294,6 @@ async function handleMcpRequest(
 					: PROTOCOL_VERSIONS[0],
 				capabilities: CAPABILITIES,
 				serverInfo: SERVER_INFO,
-				instructions: SERVER_INSTRUCTIONS,
-			});
-		case "server/discover":
-			return rpcResult(message.id, {
-				resultType: "complete",
-				supportedVersions: PROTOCOL_VERSIONS,
-				_meta: { "io.modelcontextprotocol/serverInfo": SERVER_INFO },
-				capabilities: CAPABILITIES,
 				instructions: SERVER_INSTRUCTIONS,
 			});
 		case "ping":
@@ -705,6 +727,24 @@ function htmlPage(body: string, status = 200) {
 
 function rpcResult(id: JsonRpcRequest["id"], result: unknown) {
 	return Response.json({ jsonrpc: "2.0", id, result });
+}
+
+/** A legacy-era 400 (not the modern -32022 error), so clients fall back. */
+function unsupportedProtocolVersion(requested: string) {
+	logger.info("MCP rejected unsupported protocol version {requested}", {
+		requested,
+	});
+	return Response.json(
+		{
+			jsonrpc: "2.0",
+			id: null,
+			error: {
+				code: -32600,
+				message: `Unsupported MCP protocol version ${requested}; this server supports ${PROTOCOL_VERSIONS.join(", ")} with the initialize handshake.`,
+			},
+		},
+		{ status: 400 },
+	);
 }
 
 function rpcError(id: JsonRpcRequest["id"], code: number, message: string) {
