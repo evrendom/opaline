@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import { z } from "zod";
 import type { McpTool } from "./mcp-tools.js";
+import { READ_ONLY } from "./tool-annotations.js";
 
 /**
  * The read-only procedures the plugin app (the web app in plugin mode) may
@@ -40,6 +41,7 @@ export const PLUGIN_TOOLS: readonly McpTool[] = PLUGIN_PROCEDURES.map(
 		const schema = pluginInputSchema(path);
 		return {
 			name: `${PREFIX}${path.replaceAll(".", "__")}`,
+			annotations: READ_ONLY,
 			title: path,
 			description: `Read-only Opaline procedure ${path}, for the Opaline app.`,
 			inputSchema: {

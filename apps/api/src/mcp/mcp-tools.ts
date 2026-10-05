@@ -25,6 +25,11 @@ import {
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 import { parseMcpInput } from "./input-validation.js";
 import { compactSkills } from "./skill-summaries.js";
+import {
+	type McpToolAnnotations,
+	READ_ONLY,
+	WRITES_OWN_RECORDS,
+} from "./tool-annotations.js";
 
 type Client = RouterClient<typeof router>;
 
@@ -50,6 +55,8 @@ export interface McpTool {
 	readonly description: string;
 	readonly inputSchema: JsonSchema;
 	readonly outputSchema?: JsonSchema;
+	/** Published in tools/list; must match what `run` does. */
+	readonly annotations: McpToolAnnotations;
 	/** `_meta` for tools/list; tools with it return structuredContent. */
 	readonly meta?: Record<string, unknown>;
 	readonly icons?: readonly unknown[];
@@ -161,18 +168,28 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 const DASHBOARD_METRICS = CostDashboardRequestedMetricSchema.options;
 const SPLITS = CostDashboardInputSchema.shape.splitBy.unwrap().options;
 
-/** One tool for the analysis log; `action` selects the history procedure. */
+/** Reads of the analysis log; `action` selects the history procedure. */
 const AnalysesToolInputSchema = z
 	.object({
-		action: z
-			.enum(["search", "get", "query", "save", "share"])
-			.default("search"),
+		action: z.enum(["search", "get", "query"]).default("search"),
 		...AnalysisHistorySearchInputSchema.partial().shape,
-		...AnalysisHistorySaveInputSchema.partial().shape,
+		...AnalysisHistoryGetInputSchema.partial().shape,
 		...AnalysisHistoryQueryInputSchema.partial().shape,
+	})
+	.strict();
+
+/** Writes to the analysis log, kept apart so `analyses` stays read-only. */
+const SaveAnalysisToolInputSchema = z
+	.object({
+		action: z.enum(["save", "share"]).default("save"),
+		...AnalysisHistorySaveInputSchema.partial().shape,
 		...AnalysisHistoryShareInputSchema.partial().shape,
 	})
 	.strict();
+
+/** What `analyses` answers clients still sending the old write actions. */
+export const ANALYSES_MOVED_TO_SAVE_ANALYSIS =
+	"analyses only searches and reads the analysis log now. Nothing was saved: call save_analysis with the same arguments (action=save to save, action=share to share).";
 
 /**
  * The JSON Schema MCP hosts show the model for a tool taking `schema`, plus the
@@ -188,6 +205,7 @@ function zodToolInput(schema: z.ZodObject): JsonSchema {
 export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "find",
+		annotations: READ_ONLY,
 		title: "Find runs and deterministic events",
 		description: [
 			"Where did something happen in the user's agent runs? Cheap and deterministic: call it before read. Answers say where, never why; why needs read.",
@@ -200,7 +218,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"kind=friction: a hook or policy blocked the call. kind=mistake: the agent's wrong assumption (wrong path, stale patch, bad flag). kind=validation: tests, typecheck, lint or build rejected the code. kind=environment: missing dependency, service or credential. kind=noise: an expected non-zero exit such as a search with no hits; hidden unless includeNoise. kind=other: no rule matched.",
 			"The header states coverage (sessions in scope vs indexed) and how many runs are unpriced (usage with no price stays unpriced, never $0); repeat it in the answer. A run that used several models lists them in models; groupBy=model gives each model its own spend, and model=X keeps runs whose usage includes X and counts only X's cost.",
 			"Pages: limit rows, groups or events per call (default 50, 20 for source=tool, max 200). When more follow, the header has a 'more: pass cursor=…' line: call again with the same arguments plus that cursor instead of splitting the date range.",
-			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result.",
+			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result in the caller's own analysis log, as provenance; no session or workspace data changes.",
 		].join("\n"),
 		inputSchema: zodToolInput(AnalysisFindInputSchema),
 		run: async (client, { workspace: _workspace, ...args }) =>
@@ -212,6 +230,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "read",
+		annotations: READ_ONLY,
 		title: "Read selected runs",
 		description: [
 			"Read specific runs (1-10 refs from find) to see what actually happened. This is where tokens go: read only the runs that fit the question, never a whole session run by run.",
@@ -220,7 +239,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"A Codex subagent thread's read starts with its parent: the ref of the run and the record of the call that spawned it.",
 			"depth=turn: every record of the run, compact.",
 			"depth=record: the exact text of one record of one run (record index from turn or find), optionally a fromChar/toChar slice. Use it to quote evidence.",
-			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result.",
+			"Analysis log: on the first call of an analysis pass question = the asker's exact question; afterwards pass analysis = the id from the trace line, and step = the sub-question this call answers (or an existing step id, with parentStep for a follow-up). Every call is stored with its exact result in the caller's own analysis log, as provenance; no session or workspace data changes.",
 		].join("\n"),
 		inputSchema: zodToolInput(AnalysisReadInputSchema),
 		run: async (client, { workspace: _workspace, ...args }) =>
@@ -232,27 +251,37 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "analyses",
+		annotations: READ_ONLY,
 		title: "Past analyses",
 		description: [
 			"The analysis log: questions asked before, the steps taken and the final answers. Call action=search before analysing anything; if a past analysis matches, get it and update it from its cutoff instead of starting over.",
 			"action=search: past analyses by meaning (text) or most recent (no text); yours plus ones shared with the workspace.",
 			"action=get: one analysis as its path: question, steps (sub-question, finding, the asker's reply, query ids), final answer and the chat sessions uploaded for it.",
 			"action=query: the exact stored result of one query, flagged stale when a session it read has changed. Open one only to check or quote a specific step; replaying every query costs as much as redoing the analysis.",
-			"action=save: once, just before your last message, which must repeat the saved final answer in full: the final answer, a finding per step (step = id from its trace line or its exact sub-question), clarifications you asked the asker (question + reply), up to 8 topics, and updates = the analysis this one updates.",
-			"action=share: share an analysis with the workspace (or stop sharing). Results quoting others' sessions stay readable only by their owners and admins.",
+			"To save or share an analysis, use save_analysis.",
 		].join("\n"),
 		inputSchema: zodToolInput(AnalysesToolInputSchema),
 		run: (client, { workspace: _workspace, action, ...args }) =>
-			// Where the log is off, its message tells the agent to go on with
-			// find and read: a plain result, not a failed call.
-			runAnalysesAction(client, action, args).catch((error: unknown) => {
-				if (error instanceof ORPCError && error.code === "PRECONDITION_FAILED")
-					return error.message;
-				throw error;
-			}),
+			action === "save" || action === "share"
+				? Promise.resolve(ANALYSES_MOVED_TO_SAVE_ANALYSIS)
+				: withLogOffMessage(readAnalyses(client, action, args)),
+	},
+	{
+		name: "save_analysis",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Save analysis",
+		description: [
+			"Saves an analysis to the caller's analysis log, or shares it with the workspace. Changes no session or workspace data.",
+			"action=save (default): once, just before your last message, which must repeat the saved final answer in full: analysis = the id from the trace line of a find or read call, the final answer, a finding per step (step = id from its trace line or its exact sub-question), clarifications you asked the asker (question + reply), up to 8 topics, and updates = the analysis this one updates.",
+			"action=share: share an analysis with the workspace (shared=true) or stop sharing it (shared=false). Results quoting others' sessions stay readable only by their owners and admins.",
+		].join("\n"),
+		inputSchema: zodToolInput(SaveAnalysisToolInputSchema),
+		run: (client, { workspace: _workspace, action, ...args }) =>
+			withLogOffMessage(writeAnalysis(client, action, args)),
 	},
 	{
 		name: "list_workspaces",
+		annotations: READ_ONLY,
 		title: "List workspaces",
 		description:
 			"Lists the Opaline workspaces the user belongs to. Pass a slug as `workspace` to any other tool.",
@@ -261,10 +290,17 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			properties: {},
 			additionalProperties: false,
 		},
-		run: (client) => client.listMyOrganizations(),
+		// Tools take the slug; the internal organization id stays out.
+		run: async (client) =>
+			(await client.listMyOrganizations()).map(({ name, slug, logo }) => ({
+				name,
+				slug,
+				logo,
+			})),
 	},
 	{
 		name: "get_dashboard",
+		annotations: READ_ONLY,
 		title: "Opaline",
 		description:
 			"The Opaline dashboard: total and daily trend of agent cost (USD), sessions, signals, agent runs, merged pull requests or CI failures per PR for a date range (default: the last 30 days), with the top members, repositories, models and other breakdowns. Filter by member user IDs, repository names or models, or split the trend by a dimension.",
@@ -325,6 +361,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_kpis",
+		annotations: READ_ONLY,
 		title: "Get headline KPIs",
 		description:
 			"Headline counts for a date range: sessions, active members, projects, subagents, skills and slash commands.",
@@ -340,6 +377,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "list_sessions",
+		annotations: READ_ONLY,
 		title: "List sessions",
 		description:
 			"Lists Claude Code and Codex sessions in the workspace, newest first, with repository, branch, model, tokens, cost and duration. Filter by member, repository, skill or agent.",
@@ -388,6 +426,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_session",
+		annotations: READ_ONLY,
 		title: "Get session",
 		description:
 			"One session's summary, activity totals, subagents and its turns (each with an ID for read_session_turn). Only the session owner and workspace admins can open a session.",
@@ -400,15 +439,18 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			},
 			["sessionId"],
 		),
-		run: (client, args) =>
-			client.analytics.sessions.detailOverview({
-				sessionId: args.sessionId as string,
-				...(args.turnCursor ? { turnCursor: args.turnCursor as string } : {}),
-			}),
+		run: async (client, args) =>
+			withoutRenderIds(
+				await client.analytics.sessions.detailOverview({
+					sessionId: args.sessionId as string,
+					...(args.turnCursor ? { turnCursor: args.turnCursor as string } : {}),
+				}),
+			),
 		link: (args) => `/sessions/${encodeURIComponent(`${args.sessionId}`)}`,
 	},
 	{
 		name: "read_session_turn",
+		annotations: READ_ONLY,
 		title: "Read session turn",
 		description:
 			"The full content of one turn: the user's prompt and the agent's messages, tool calls and results.",
@@ -430,6 +472,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_team",
+		annotations: READ_ONLY,
 		title: "Get team",
 		description:
 			"Workspace members with their sessions, cost, tokens and activity trend over the last N days. Member IDs work as filters in other tools.",
@@ -442,6 +485,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "list_skills",
+		annotations: READ_ONLY,
 		title: "List skills",
 		description:
 			"Skills used in the workspace with session counts, version counts, users and top repositories. For a skill's content and versions use get_skill.",
@@ -451,6 +495,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_skill",
+		annotations: READ_ONLY,
 		title: "Get skill",
 		description: "One skill's content, versions and usage.",
 		inputSchema: input({ name: string("Skill name from list_skills.") }, [
@@ -462,6 +507,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "list_repositories",
+		annotations: READ_ONLY,
 		title: "List repositories",
 		description:
 			"Repositories agents worked in, with sessions, cost and last activity.",
@@ -471,6 +517,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_repository",
+		annotations: READ_ONLY,
 		title: "Get repository",
 		description:
 			"Skills used in one repository. For its sessions use list_sessions with `repository`.",
@@ -488,6 +535,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "find_recurring_errors",
+		annotations: READ_ONLY,
 		title: "Find recurring errors",
 		description:
 			"Errors that keep recurring across sessions in the last N days, with how often and where they occurred. Use it to check whether a failure has been seen before.",
@@ -503,6 +551,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "get_billing",
+		annotations: READ_ONLY,
 		title: "Get billing",
 		description: "The workspace's plan, seats and usage limits.",
 		inputSchema: input(),
@@ -511,6 +560,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "settings_read",
+		annotations: READ_ONLY,
 		title: "Read Opaline settings",
 		description: "Settings shown on the Opaline plugin page.",
 		inputSchema: { type: "object", additionalProperties: false },
@@ -542,6 +592,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "settings_update",
+		annotations: WRITES_OWN_RECORDS,
 		title: "Update Opaline settings",
 		description: "Saves settings changed on the Opaline plugin page.",
 		inputSchema: {
@@ -580,6 +631,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "mention_sessions",
+		annotations: READ_ONLY,
 		title: "Sessions",
 		description:
 			"Finds recent sessions by repository, branch, model or date for @-mentions.",
@@ -631,7 +683,33 @@ export function sessionResourceUri(workspace: string, sessionId: string) {
 	return `${SESSION_RESOURCE_PREFIX}${encodeURIComponent(workspace)}/${encodeURIComponent(sessionId)}`;
 }
 
-async function runAnalysesAction(client: Client, action: unknown, args: Args) {
+/**
+ * Where the log is off, its message tells the agent to go on with find and
+ * read: a plain result, not a failed call.
+ */
+function withLogOffMessage(result: Promise<string>) {
+	return result.catch((error: unknown) => {
+		if (error instanceof ORPCError && error.code === "PRECONDITION_FAILED")
+			return error.message;
+		throw error;
+	});
+}
+
+async function writeAnalysis(client: Client, action: unknown, args: Args) {
+	const history = client.analysis.history;
+	if (action === "share") {
+		const shared = await history.share(
+			parseMcpInput(AnalysisHistoryShareInputSchema, args),
+		);
+		return `analysis=${shared.analysis} shared=${shared.shared}`;
+	}
+	const saved = await history.save(
+		parseMcpInput(AnalysisHistorySaveInputSchema, args),
+	);
+	return `saved analysis=${saved.analysis} status=${saved.status}`;
+}
+
+async function readAnalyses(client: Client, action: unknown, args: Args) {
 	const history = client.analysis.history;
 	switch (action) {
 		case "get":
@@ -644,18 +722,6 @@ async function runAnalysesAction(client: Client, action: unknown, args: Args) {
 					parseMcpInput(AnalysisHistoryQueryInputSchema, args),
 				),
 			);
-		case "save": {
-			const saved = await history.save(
-				parseMcpInput(AnalysisHistorySaveInputSchema, args),
-			);
-			return `saved analysis=${saved.analysis} status=${saved.status}`;
-		}
-		case "share": {
-			const shared = await history.share(
-				parseMcpInput(AnalysisHistoryShareInputSchema, args),
-			);
-			return `analysis=${shared.analysis} shared=${shared.shared}`;
-		}
 		default:
 			return renderAnalysisSearch(
 				await history.search(
@@ -665,28 +731,70 @@ async function runAnalysesAction(client: Client, action: unknown, args: Args) {
 	}
 }
 
+type SessionOverview = Awaited<
+	ReturnType<Client["analytics"]["sessions"]["detailOverview"]>
+>;
+
+/**
+ * The overview without what only the web app uses: event ids it scrolls to
+ * and the signal classifier version. Turn ids and the revision stay, because
+ * read_session_turn takes them.
+ */
+function withoutRenderIds(overview: SessionOverview) {
+	const { signalScanVersion: _version, ...activityTotals } =
+		overview.activityTotals;
+	return {
+		...overview,
+		activityTotals,
+		turnPage: {
+			...overview.turnPage,
+			items: overview.turnPage.items.map((turn) => ({
+				...turn,
+				fileEvents: turn.fileEvents?.map(({ eventId: _id, ...event }) => event),
+				subagentEvents: turn.subagentEvents?.map(
+					({ eventId: _id, ...event }) => event,
+				),
+			})),
+		},
+	};
+}
+
+/**
+ * What the plugin app renders about people: member names, avatars and roles,
+ * and the caller's name and avatar on the account button. Emails and the rest
+ * of the account record stay out.
+ */
 async function readPluginBootstrap(client: Client, context: McpToolContext) {
 	const organizations = await client.listMyOrganizations();
 	const organization = organizations.find(
 		(org) => org.id === context.workspace.id,
 	);
-	if (!organization || !context.authSession.user)
+	const { user, session } = context.authSession;
+	if (!organization || !user || !session)
 		throw new McpToolError("Workspace not available.");
 	const members = await sqlClient<
 		{
 			id: string;
 			userId: string;
 			role: string;
-			user: { id: string; name: string; email: string; image: string | null };
+			user: { id: string; name: string; image: string | null };
 		}[]
 	>`
 		SELECT m.id, m.user_id AS "userId", m.role,
-			json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'image', u.image) AS "user"
+			json_build_object('id', u.id, 'name', u.name, 'image', u.image) AS "user"
 		FROM member m JOIN "user" u ON u.id = m.user_id
 		WHERE m.organization_id = ${organization.id}
 	`;
 	return {
-		session: context.authSession,
+		session: {
+			user: { id: user.id, name: user.name, image: user.image ?? null },
+			session: {
+				id: session.id,
+				userId: session.userId,
+				activeOrganizationId: organization.id,
+				expiresAt: session.expiresAt,
+			},
+		},
 		organization: { ...organization, members, invitations: [] },
 		member: members.find((member) => member.userId === context.userId),
 	};

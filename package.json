@@ -30,6 +30,8 @@
 		"chkit:link": "bun scripts/chkit-link.ts link",
 		"chkit:unlink": "bun scripts/chkit-link.ts unlink",
 		"build:site": "bun scripts/build-site.ts",
+		"plugin:screenshots": "bun scripts/plugin-screenshots.ts",
+		"plugin:zip": "bun scripts/build-plugin-zip.ts",
 		"check-types:vercel": "tsc --project tsconfig.json",
 		"check-types:convex": "tsc --project convex/tsconfig.json",
 		"convex:dev": "convex dev",

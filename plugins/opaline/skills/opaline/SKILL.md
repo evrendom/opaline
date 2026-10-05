@@ -1,15 +1,17 @@
 ---
 name: opaline
-description: Answer questions about the user's or their team's Claude Code and Codex sessions with the Opaline tools — why agents fail, what frustrated the user, where time and money went, agent cost and usage, past sessions, members, repositories, skills and billing. Use when the user asks what agents cost or did, why something keeps going wrong, wants a retro of recent sessions, wants a past session, or mentions Opaline.
+description: Answer questions about the user's or their team's coding agent sessions with the Opaline tools — why agents fail, what frustrated the user, where time and money went, agent cost and usage, past sessions, members, repositories, skills and billing. Use when the user asks what agents cost or did, why something keeps going wrong, wants a retro of recent sessions, wants a past session, or mentions Opaline.
 ---
 
 # Opaline
 
-Opaline stores the user's uploaded Claude Code and Codex sessions. The `opaline` MCP tools read that data and are read-only.
+Opaline stores the user's uploaded coding agent sessions. The `opaline` MCP tools read that data. Only `save_analysis` writes, and only to the analysis log: it saves or shares an analysis and never changes sessions or workspace data.
+
+**Answer only from Opaline.** Every fact in an answer comes from the Opaline tools. Never inspect local files, the working directory or git state (`git remote`, `git log`, the current branch) to work out which repository the user means: take repository names from `list_repositories` or from the `repository` column of `find` and `list_sessions` results, and ask the user if it is still ambiguous. This skill never runs shell commands.
 
 ## 1. Tools at hand
 
-**Past analyses first.** `analyses` is the log of questions asked before: `action=search` (by meaning, or recent), `action=get` (the path: steps, findings, final answer), `action=query` (the exact stored result of one step's query, flagged stale if a session changed), `action=save`, `action=share`. If `analyses` says history is off for the workspace, go on with `find` and `read` and skip searching and saving.
+**Past analyses first.** `analyses` is the log of questions asked before: `action=search` (by meaning, or recent), `action=get` (the path: steps, findings, final answer), `action=query` (the exact stored result of one step's query, flagged stale if a session changed). `save_analysis` writes to it: `action=save` (the default) and `action=share`. If `analyses` or `save_analysis` says history is off for the workspace, go on with `find` and `read` and skip searching and saving.
 
 **Analysing agent runs** (why things go wrong, what it cost, retros):
 
@@ -35,13 +37,14 @@ A **ref is a run**: session + agent (`''` is the main transcript, otherwise a su
   - Its findings and final answer are the starting point; trust them unless the data changed.
   - Rerun `find` only for the time after its cutoff (same arguments, new `from`), and `read` only runs it did not read.
   - Open a stored result (`action=query`) only for a specific step you must check or quote. Never replay all of its queries; that costs as much as redoing the analysis.
-  - Save with `updates` = that analysis and say what changed.
+  - Save with `save_analysis` and `updates` = that analysis, and say what changed.
 - **Every `find`/`read` call is logged.** On the first call pass `question` = the asker's exact words; after that pass `analysis` = the id from the trace line and `step` = the sub-question this call answers (reuse a step id for more calls on it, `parentStep` for a follow-up). Steps are what you write out on purpose, never hidden reasoning.
-- **Finish with one `analyses action=save`, then the answer:** save the final answer, one finding per step (name the step by the id from its trace line or by its exact sub-question), any clarifying question you asked with the asker's reply, and up to 8 topics. Then give that same final answer, complete, as your last message: callers often see only the last message, so never end with a pointer like "see above". Within one analysis you already saw your query results; do not reopen them with `action=query`.
-- **Attach this chat after saving**, before the answer: if you can run shell commands, run `opaline import "$CODEX_THREAD_ID" --analysis <analysis id>` (in Claude Code, use the current session id instead of `$CODEX_THREAD_ID`); if `opaline` is missing or rejects `--analysis`, run the same command once as `npx opaline@latest import …`. If that fails too, or you can't run commands, skip it silently and don't retry.
+- **Finish with one `save_analysis` call (`action=save`), then the answer:** save the final answer, one finding per step (name the step by the id from its trace line or by its exact sub-question), any clarifying question you asked with the asker's reply, and up to 8 topics. Then give that same final answer, complete, as your last message: callers often see only the last message, so never end with a pointer like "see above". Within one analysis you already saw your query results; do not reopen them with `action=query`.
+- **Share only when asked:** `save_analysis action=share shared=true` shares an analysis with the workspace; `shared=false` stops sharing.
+- **Think team-wide and over time.** Most questions are about the whole team over weeks or months: patterns across members and repositories, not one session. Unless the user narrows it, use the last 30 days and every session you can see (workspace admins see the whole team; members see their own), and say which scope you used.
 
 - **Trends** ("spend per week", "which model costs most"): one `find source=runs groupBy=…` call or `get_dashboard`. Report the numbers; don't interpret beyond them.
-- **Insights** ("why do my agents fail", "what annoyed me"):
+- **Insights** ("why do our agents fail", "what frustrates the team"):
   1. Call `find` for the right source.
   2. `read` a sample per group at `exchange` depth, up to 15, and say "read 15 of 46".
   3. Name what went wrong in the user's words.
@@ -73,7 +76,7 @@ Unread candidates stay "not attributed".
 The numbers below are made up. They only show the shape of a good answer.
 
 - **Accuracy**, "why do my agents fail?": `find source=tool` → the top cause is `edit → stale patch` (52) → `read` 15 of them → 11 came right after a formatter hook rewrote the file → `find source=runs refs=[those 11]` → "11 runs, 63 min, $14. Fix: other mechanism (re-read the file after hooks). Re-check: `find source=tool cause="stale patch"` next week."
-- **Accuracy + time**, "what annoyed me the most?": ask "last 2 or 4 weeks? Ranked by cost and time (default) or by harshest moments?" → `find source=user` → `read` the origin runs, up to 15 per reaction type → patterns such as "said done without clicking through the UI" with quotes and refs → price each pattern's origin runs → rank by $ and minutes.
+- **Accuracy + time**, "what frustrated me the most?": ask "last 2 or 4 weeks? Ranked by cost and time (default) or by harshest moments?" → `find source=user` → `read` the origin runs, up to 15 per reaction type → patterns such as "said done without clicking through the UI" with quotes and refs → price each pattern's origin runs → rank by $ and minutes.
 - **Time**, "retro my last 10 sessions for navigation": `find source=runs latest=10` → the 6 runs with not-found results or many searches before the first edit → `read` those 6 → "3 runs searched for a constant named in docs/sweep.md that no longer exists, 11 min. Fix: update the doc."
 - **Money**, "what did the wrong-layer edits cost?": after labelling the runs, `find source=runs refs=[…]` → "$23 and 94 min over 7 runs read; 31 unread candidates not attributed."
 - **Trend**, "spend per model per week": `find source=runs groupBy=model` and `groupBy=week`. Numbers only.
@@ -88,10 +91,4 @@ The numbers below are made up. They only show the shape of a good answer.
 
 ## When there is no data
 
-If the tools return no sessions, the user has probably not uploaded any yet. Ask them to run this in a terminal and follow the prompts. It is interactive, so do not run it yourself:
-
-```bash
-npx opaline@latest
-```
-
-It signs them in through the browser, uploads existing sessions for the repositories they choose, and keeps future sessions in sync.
+If the tools return no sessions, the workspace has no uploaded sessions yet. Tell the user to open https://opaline.so, sign in and follow the steps there to connect their coding agents; each teammate connects their own. Then check again with `list_sessions`. Don't run any commands for them.

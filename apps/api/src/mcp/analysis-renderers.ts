@@ -233,7 +233,7 @@ export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 	);
 	for (const chat of output.chatSessions)
 		lines.push(
-			`chat session ${chat.sessionId} source=${chat.source} user=${chat.userId} uploaded=${chat.uploadedAt}`,
+			`chat session ${chat.sessionId} source=${chat.source} uploaded=${chat.uploadedAt}`,
 		);
 	return lines.join("\n");
 }

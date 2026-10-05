@@ -1,7 +1,7 @@
 {
 	"name": "opaline",
-	"version": "1.1.0",
-	"description": "Ask about your team's Claude Code and Codex sessions, costs, skills and repositories in Opaline.",
+	"version": "1.2.0",
+	"description": "Team-wide insight into your coding agents: where they waste time and money, and which mistakes keep coming back.",
 	"author": {
 		"name": "Opaline",
 		"email": "evren@opaline.so",
@@ -10,35 +10,45 @@
 	"homepage": "https://opaline.so",
 	"repository": "https://github.com/opalinehq/athena",
 	"license": "MIT",
-	"keywords": ["opaline", "analytics", "claude-code", "codex", "sessions"],
+	"keywords": [
+		"opaline",
+		"analytics",
+		"coding-agents",
+		"team",
+		"cost"
+	],
 	"skills": "./skills/",
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "Opaline",
-		"shortDescription": "Analyze your agent sessions",
-		"longDescription": "Opaline indexes the Claude Code and Codex sessions you and your team upload with the Opaline CLI. Ask what your coding agents cost and which members, repositories and models drove it, list and open past sessions down to individual turns, see which skills get used, and check whether an error has come up before. The Opaline dashboard also opens from the sidebar.\n\nOpaline only reads data from workspaces your Opaline account belongs to, and it cannot change or delete your sessions or workspace data. Sessions must be uploaded with the Opaline CLI first; the plugin walks you through that after installation.",
+		"shortDescription": "Team insights on coding agents",
+		"longDescription": "Opaline shows how your whole team works with coding agents, across every teammate and over weeks or months.\n\nAsk in plain words: \"Where did our agents waste the most time this month?\", \"Which repositories cost us the most, and why?\", \"What mistakes keep coming back across the team?\". Opaline looks through all the sessions your team has uploaded, finds the patterns, reads the runs that show them and answers with the evidence. A dashboard shows cost and usage by member, repository and model.\n\nAnswers are saved as analyses, so the next question builds on the last one, and you can share them with your workspace.\n\nTo start, each teammate connects their coding agents at opaline.so. After you install the plugin, it walks you through it.\n\nOpaline only reads workspaces you belong to and never changes or deletes sessions.",
 		"developerName": "Opaline",
 		"category": "Developer Tools",
 		"capabilities": [
-			"Report agent cost, sessions and runs over time",
-			"List and open past coding sessions",
-			"Show team, repository and skill usage",
-			"Find recurring errors"
+			"Find patterns across your whole team's agent sessions over weeks or months",
+			"See where agents waste time and money, by member, repository and model",
+			"Spot mistakes that keep coming back across the team",
+			"Save analyses and share them with your workspace"
 		],
 		"websiteURL": "https://opaline.so",
 		"supportURL": "https://opaline.so/support/",
 		"privacyPolicyURL": "https://opaline.so/legal/privacy-policy/",
 		"termsOfServiceURL": "https://opaline.so/legal/terms-of-service/",
 		"defaultPrompt": [
-			"What did our coding agents cost this month, and what drove it?",
-			"Show my sessions from yesterday",
-			"Which errors keep coming up in our sessions?"
+			"Where did our coding agents waste the most time this month?",
+			"Which repositories cost us the most over the last 4 weeks, and why?",
+			"What mistakes keep coming back across the team?"
 		],
 		"brandColor": "#1F1F1F",
 		"brandColorDark": "#ECECEC",
 		"composerIcon": "./assets/opaline.png",
 		"logo": "./assets/opaline.png",
-		"screenshots": []
+		"screenshots": [
+			"./assets/screenshots/01-dashboard.png",
+			"./assets/screenshots/02-dashboard-dark.png",
+			"./assets/screenshots/03-dashboard-breakdowns.png"
+		]
 	},
 	"extensions": {
 		"com.openai": {
@@ -47,47 +57,47 @@
 				"test_cases": {
 					"positive": [
 						{
-							"description": "Cost over a period and what drove it",
-							"prompt": "What did our coding agents cost in the last 30 days, and which repository and model drove it?",
+							"description": "Team-wide time waste over a month",
+							"prompt": "Where did our coding agents waste the most time over the last 30 days?",
+							"tools_triggered": "analyses, find, read, save_analysis",
+							"expected_behavior": "States the scope it used (the last 30 days, every member of the sample workspace) and the coverage from the find header. Ranks a few concrete patterns by minutes and cost, each backed by run refs from more than one member, says how many runs it read out of how many matched, and saves the analysis before giving the final answer."
+						},
+						{
+							"description": "Cost by repository and member over four weeks",
+							"prompt": "Which repositories cost our team the most over the last 4 weeks, and who drove it?",
+							"tools_triggered": "analyses, find, save_analysis",
+							"expected_behavior": "Gives estimated API cost in USD per repository and per member for the stated date range, from the sample workspace, mentions any unpriced runs, and does not interpret beyond the numbers. Saves the analysis before answering."
+						},
+						{
+							"description": "Recurring mistakes across the team",
+							"prompt": "What mistakes keep coming back across the team this month?",
+							"tools_triggered": "analyses, find, read, save_analysis",
+							"expected_behavior": "Groups failed tool calls across members by cause, reads a sample of the runs behind the largest groups, and names the recurring mistakes with counts, run refs and a fix channel for each (instructions, other mechanism, or not fixable). Saves the analysis before answering."
+						},
+						{
+							"description": "Team dashboard",
+							"prompt": "Open the Opaline dashboard for our team for the last 30 days.",
 							"tools_triggered": "get_dashboard",
-							"expected_behavior": "States the total estimated API cost in USD for the last 30 days and names the top repositories and models with their amounts, using the sample workspace data, with a link to the same dashboard view on opaline.so."
+							"expected_behavior": "Shows the Opaline dashboard for the last 30 days with estimated API cost, sessions and agent runs over time and breakdowns by member and repository for the sample workspace."
 						},
 						{
-							"description": "List recent sessions",
-							"prompt": "Show my coding sessions from the last 7 days.",
-							"tools_triggered": "list_sessions",
-							"expected_behavior": "Lists the sample sessions from the last 7 days with date, repository, agent, model, duration and estimated cost."
-						},
-						{
-							"description": "Explain one session",
-							"prompt": "What happened in my most recent coding session?",
-							"tools_triggered": "list_sessions, get_session, read_session_turn",
-							"expected_behavior": "Finds the newest sample session and summarizes what was asked and what the agent did, based on its turns, without inventing details."
-						},
-						{
-							"description": "Team usage",
-							"prompt": "Who on my team used coding agents the most this month?",
-							"tools_triggered": "get_team",
-							"expected_behavior": "Ranks the members of the sample workspace by sessions or cost for the period and shows their totals."
-						},
-						{
-							"description": "Recurring errors",
-							"prompt": "Which errors keep coming up in our coding sessions lately?",
-							"tools_triggered": "find_recurring_errors",
-							"expected_behavior": "Lists errors that occurred in more than one sample session in the period with how often they occurred, or says that none recurred."
+							"description": "Weekly trend, saved and shared",
+							"prompt": "How did our agents' failed tool calls change week by week over the last 4 weeks? Share the analysis with my workspace.",
+							"tools_triggered": "analyses, find, save_analysis",
+							"expected_behavior": "Reports failed tool calls per week for the last 4 weeks of the sample workspace as numbers, saves the analysis, shares it with the workspace and confirms it is shared."
 						}
 					],
 					"negative": [
 						{
-							"description": "Deleting data is not supported",
-							"prompt": "Delete my coding session from yesterday in Opaline."
+							"description": "Deleting sessions is not supported: no tool deletes or edits session data",
+							"prompt": "Delete all of my coding sessions from last week in Opaline."
 						},
 						{
-							"description": "Purchasing a plan is not supported",
+							"description": "Billing changes are not supported: the plugin cannot change plans or take payments",
 							"prompt": "Upgrade my Opaline workspace to the paid plan."
 						},
 						{
-							"description": "Workspaces the account does not belong to",
+							"description": "Workspaces the account does not belong to are not accessible",
 							"prompt": "Show the coding agent costs of the acme-corp workspace in Opaline."
 						}
 					]
@@ -96,7 +106,7 @@
 				"commerce_description": "Opaline does not sell products or process payments in ChatGPT or Codex."
 			},
 			"publication": {
-				"release_notes": "First release: agent cost and usage dashboards, sessions down to individual turns, team, skills, repositories and recurring errors, with a sidebar dashboard, a default workspace setting and session @-mentions."
+				"release_notes": "Team-wide analysis: ask across every teammate's sessions over weeks or months; Opaline finds the patterns, reads the runs behind them and answers with evidence. Saving and sharing analyses moved to the new save_analysis tool, so the analyses tool is read-only. Adds dashboard screenshots."
 			}
 		}
 	}

@@ -22,6 +22,13 @@ describe("plugin tools", () => {
 		]) {
 			expect(names).not.toContain(`app_${write}`);
 		}
+		for (const tool of PLUGIN_TOOLS) {
+			expect(tool.annotations).toEqual({
+				readOnlyHint: true,
+				destructiveHint: false,
+				openWorldHint: false,
+			});
+		}
 	});
 
 	test("are app-only with closed schemas that require a workspace", () => {

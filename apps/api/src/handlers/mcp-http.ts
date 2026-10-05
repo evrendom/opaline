@@ -262,7 +262,7 @@ async function handleMcpRequest(
 				capabilities: CAPABILITIES,
 				serverInfo: SERVER_INFO,
 				instructions:
-					"Opaline holds the user's uploaded Claude Code and Codex sessions. Read-only. Dates are UTC.",
+					"Opaline holds the user's uploaded Claude Code and Codex sessions. Tools only read them; save_analysis saves or shares an analysis in the user's analysis log. Dates are UTC.",
 			});
 		case "server/discover":
 			return rpcResult(message.id, {
@@ -282,11 +282,7 @@ async function handleMcpRequest(
 					inputSchema: tool.inputSchema,
 					...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
 					...(tool.icons ? { icons: tool.icons } : {}),
-					annotations: {
-						readOnlyHint: tool.name !== SETTINGS.updateTool,
-						destructiveHint: false,
-						openWorldHint: false,
-					},
+					annotations: tool.annotations,
 					...(tool.meta ? { _meta: tool.meta } : {}),
 				})),
 			});
@@ -677,7 +673,7 @@ function consentHtml(input: {
 	userId: string;
 }) {
 	return `<h1>Connect ${escapeHtml(input.clientName)} to Opaline?</h1>
-<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>. It cannot change anything.</p>
+<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. It cannot change or delete your sessions or workspace data.</p>
 <p class="muted">You will be sent back to ${escapeHtml(input.redirectHost || "the application")}. Only continue if you started this connection.</p>
 <form method="post" action="${MCP_CONSENT_PATH}">
 <input type="hidden" name="query" value="${escapeHtml(input.query)}" />
