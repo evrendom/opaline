@@ -12,21 +12,8 @@ export type CursorKey = readonly (string | number | null)[];
 /** Direction of each key element; `null` sorts as the lowest value. */
 export type CursorOrder = readonly ("asc" | "desc")[];
 
-/**
- * Arguments that do not change which items follow a position. The trace
- * fields only name the draft; `updates` changes the window only through the
- * `from` it resolves to, which is fingerprinted (the handler passes the
- * resolved `from`), so a first page with `updates` continues with `analysis`.
- */
-const PAGE_INDEPENDENT = new Set([
-	"cursor",
-	"limit",
-	"analysis",
-	"question",
-	"updates",
-	"step",
-	"parentStep",
-]);
+/** Arguments that do not change which items follow a position. */
+const PAGE_INDEPENDENT = new Set(["cursor", "limit", "analysis"]);
 
 const CursorSchema = z
 	.object({

@@ -5,7 +5,12 @@ import {
 	errorLine,
 	normalize,
 } from "./failure-classifier.js";
-import { originRef, promptReaction, reactionEvents } from "./reactions.js";
+import {
+	nextPromptReaction,
+	originRef,
+	promptReaction,
+	reactionEvents,
+} from "./reactions.js";
 import {
 	buildFailedResultsStatement,
 	buildLastAssistantRecordStatement,
@@ -352,6 +357,13 @@ describe("reactions and origins", () => {
 			"apology",
 		]);
 		expect(promptReaction(apology)).toBeNull();
+	});
+
+	test("read labels the next prompt's reaction instead of returning its text", () => {
+		expect(nextPromptReaction("fix this shit, it is broken again")).toBe(
+			"unhappy (strongly worded)",
+		);
+		expect(nextPromptReaction("thanks, looks good")).toBe("no complaint found");
 	});
 
 	test("delegated tasks and injected instructions are not the user's words", () => {

@@ -205,7 +205,7 @@ test("real API: pinned Claude/Codex runs, line prices, failure refs, reaction or
 		"checks after last edit",
 		"failed calls",
 		"final",
-		"next prompt",
+		"next prompt reaction",
 	]);
 	expect(
 		exchange.reads[0]?.sections.find(
@@ -1481,7 +1481,7 @@ test("tool groups normalize Claude and Codex tools, splitting shell calls by the
 	);
 });
 
-test("the analysis log stores each call under its step and returns the path, the result and search hits", async () => {
+test("the analysis log stores each call as its own step and returns the path, the result and search hits", async () => {
 	assert(userId);
 	const sessionId = `analysis_log_${runId}`;
 	await seedSession(sessionId, "claude_code", claudeTranscript(), "log-model");
@@ -1491,8 +1491,6 @@ test("the analysis log stores each call under its step and returns the path, the
 			from: day,
 			to: day,
 			sessionId,
-			question: "Why did my last session go wrong?",
-			step: "Which runs failed?",
 		}),
 	);
 	const trace = found.header.trace;
@@ -1502,13 +1500,12 @@ test("the analysis log stores each call under its step and returns the path, the
 		await rpc("analysis/read", {
 			refs: [ref],
 			analysis: trace.analysis,
-			step: "What happened in the failing run?",
-			parentStep: trace.step,
 		}),
 	);
 	expect(read.trace?.analysis).toBe(trace.analysis);
 	await rpc("analysis/history/save", {
 		analysis: trace.analysis,
+		question: "Why did my last session go wrong?",
 		finalAnswer: "The agent never checked its edit.",
 		findings: [{ step: trace.step, finding: "one failing run" }],
 		topics: ["failures"],
@@ -1518,12 +1515,17 @@ test("the analysis log stores each call under its step and returns the path, the
 		await rpc("analysis/history/get", { analysis: trace.analysis }),
 	);
 	expect(tree.status).toBe("finished");
+	expect(tree.question).toBe("Why did my last session go wrong?");
 	expect(tree.host).toBe("home");
 	expect(
 		tree.steps.map((step) => [step.question, step.parent, step.finding]),
 	).toEqual([
-		["Which runs failed?", null, "one failing run"],
-		["What happened in the failing run?", trace.step, null],
+		[
+			`find source=runs from=${day} to=${day} sessionId=${sessionId}`,
+			null,
+			"one failing run",
+		],
+		["read runs=1", null, null],
 	]);
 	const stored = AnalysisHistoryQueryOutputSchema.parse(
 		await rpc("analysis/history/query", { query: trace.query }),
@@ -1533,7 +1535,7 @@ test("the analysis log stores each call under its step and returns the path, the
 		stored.call.tool === "find" && stored.call.output?.header.runsInScope,
 	).toBe(found.header.runsInScope);
 	const hits = AnalysisHistorySearchOutputSchema.parse(
-		await rpc("analysis/history/search", { text: "failing run" }),
+		await rpc("analysis/history/search", { text: "session go wrong" }),
 	);
 	expect(hits.analyses[0]?.id).toBe(trace.analysis);
 
@@ -1590,7 +1592,7 @@ test("the analysis log stores each call under its step and returns the path, the
 	).toBe(found.header.runsInScope);
 });
 
-test("where the log is off, history fails with an agent-actionable message and the analyses MCP tool returns it as its result", async () => {
+test("where the log is off, history fails with an agent-actionable message and the saved-answer MCP tools return it as their result", async () => {
 	assert(userId);
 	// The server lists only the admin's workspace, so a new account's is off.
 	const outsider = await signup("log-off");
@@ -1602,8 +1604,11 @@ test("where the log is off, history fails with an agent-actionable message and t
 	expect(refused.status).toBe(412);
 	expect(await refused.text()).toContain(ANALYSIS_HISTORY_OFF);
 
-	const analyses = MCP_TOOLS.find((tool) => tool.name === "analyses");
-	assert(analyses);
+	const searchAnswers = MCP_TOOLS.find(
+		(tool) => tool.name === "search_answers",
+	);
+	const getAnswer = MCP_TOOLS.find((tool) => tool.name === "get_answer");
+	assert(searchAnswers && getAnswer);
 	const user = {
 		id: userId,
 		name: "Analysis integration",
@@ -1634,12 +1639,12 @@ test("where the log is off, history fails with an agent-actionable message and t
 	});
 	// In this process the log is off for every workspace; afterAll resets it.
 	setAnalysisLogForTests(null);
-	for (const args of [
-		{ text: "failing run" },
-		{ action: "get", analysis: crypto.randomUUID() },
-	]) {
+	for (const [tool, args] of [
+		[searchAnswers, { text: "failing run" }],
+		[getAnswer, { analysis: crypto.randomUUID() }],
+	] as const) {
 		expect(
-			await analyses.run(client, args, {
+			await tool.run(client, args, {
 				userId,
 				workspace: { id: userId, slug: "analysis-log-off" },
 				authSession: { user, session },

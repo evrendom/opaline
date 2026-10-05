@@ -136,11 +136,6 @@ interface ConvexFunctionArgs {
 	"analyses:get": { id: string };
 	"analyses:update": { id: string; patch: AnalysisPatch };
 	"analyses:save": { id: string; save: AnalysisSave };
-	"analyses:latestOpen": {
-		workspaceId: string;
-		authorId: string;
-		since: string;
-	};
 	"analyses:recent": { workspaceId: string; viewerId: string; limit: number };
 	"analyses:updatedBy": { workspaceId: string; id: string; limit: number };
 	"retention:expireDrafts": Record<string, never>;
@@ -176,7 +171,6 @@ const FUNCTION_TYPES = {
 	"analyses:get": "query",
 	"analyses:update": "mutation",
 	"analyses:save": "mutation",
-	"analyses:latestOpen": "query",
 	"analyses:recent": "query",
 	"analyses:updatedBy": "query",
 	"retention:expireDrafts": "mutation",
@@ -273,15 +267,6 @@ export function createConvexAnalysisStore({
 		async analysesUpdating(workspaceId, id, limit) {
 			return AnalysisSchema.array().parse(
 				await run("analyses:updatedBy", { workspaceId, id, limit }),
-			);
-		},
-		async latestOpenAnalysis(workspaceId, authorId, since) {
-			return AnalysisSchema.nullable().parse(
-				await run("analyses:latestOpen", {
-					workspaceId,
-					authorId,
-					since,
-				}),
 			);
 		},
 		async recentAnalyses(workspaceId, viewerId, limit) {

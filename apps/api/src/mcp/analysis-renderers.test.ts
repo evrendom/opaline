@@ -86,7 +86,8 @@ test("runs render compact TSV, all facts, escaped cells and null pricing", () =>
 		],
 	});
 	expect(text).toContain("sessions=2 indexed=1 runs=1");
-	expect(text).toContain("classifier=1 truncated=false");
+	expect(text).toContain("rawChars=1000 truncated=false");
+	expect(text).not.toContain("classifier=");
 	expect(text).toContain("ref\tstartedAt\tminutes\tactiveMinutes\tcostUsd");
 	expect(text).toContain('"agentId":"","turn":1');
 	expect(text).toContain("hello\\nnext\\tcolumn");
@@ -299,14 +300,21 @@ test("an analysis shows its data cutoff, the prior it updates, its revisions and
 		],
 		updatedBy: ["a_newer"],
 		steps: [],
-		chatSessions: [],
+		// Uploaded chats are not part of the plugin's output.
+		chatSessions: [
+			{
+				sessionId: "chat",
+				source: "codex",
+				userId: "u",
+				uploadedAt: "2026-10-01T09:00:00.000Z",
+			},
+		],
 	};
 
 	expect(renderAnalysisTree(analysis).split("\n")).toEqual([
-		"analysis a_new status=finished mine=true shared=false host=plugin cutoff=2026-10-01T09:00:00.000Z updates=a_old updatedBy=a_newer",
+		"analysis a_new status=finished mine=true shared=false cutoff=2026-10-01T09:00:00.000Z updates=a_old updatedBy=a_newer",
 		"scope 2026-09-01..2026-10-01",
 		"question: Why do agents fail?",
-		"cost unavailable",
 		"changes against a_old:",
 		"  weakened: step s_1: stale patches (4, was 11)",
 		"  new: step s_2: lint\\tloops (3 runs)",

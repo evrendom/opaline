@@ -118,20 +118,6 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 				(analysis) => analysis.draft && analysis.createdAt < before,
 			);
 		},
-		async latestOpenAnalysis(workspaceId, authorId, since) {
-			return clone(
-				[...analyses.values()]
-					.filter(
-						(analysis) =>
-							analysis.workspaceId === workspaceId &&
-							analysis.authorId === authorId &&
-							analysis.draft &&
-							analysis.status === "unfinished" &&
-							analysis.cutoff >= since,
-					)
-					.sort((left, right) => right.cutoff.localeCompare(left.cutoff))[0],
-			);
-		},
 		async recentAnalyses(workspaceId, viewerId, limit) {
 			return [...analyses.values()]
 				.filter(

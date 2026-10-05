@@ -54,6 +54,7 @@ describe("analysis input validation", () => {
 	});
 	test("saving without an analysis id says to pass the id from a trace line", () => {
 		const result = AnalysisHistorySaveInputSchema.safeParse({
+			question: "Where our agents get stuck",
 			finalAnswer: "answer",
 		});
 		expect(result.success).toBe(false);
@@ -68,9 +69,36 @@ describe("analysis input validation", () => {
 		expect(
 			AnalysisHistorySaveInputSchema.safeParse({
 				analysis: 7,
+				question: "Where our agents get stuck",
 				finalAnswer: "answer",
 			}).error?.issues[0]?.message,
 		).toBe("Invalid input: expected string, received number");
+	});
+	test("saving needs the question as a short title; find and read take no conversation text", () => {
+		expect(
+			AnalysisHistorySaveInputSchema.safeParse({
+				analysis: "a_1",
+				finalAnswer: "answer",
+			}).error?.issues,
+		).toEqual([
+			expect.objectContaining({
+				path: ["question"],
+				message:
+					"required: the question this answer addresses, as a short title",
+			}),
+		]);
+		for (const removed of ["question", "step", "parentStep", "updates"]) {
+			expect(
+				AnalysisFindInputSchema.safeParse({ source: "runs", [removed]: "x" })
+					.success,
+			).toBe(false);
+			expect(
+				AnalysisReadInputSchema.safeParse({
+					refs: [{ sessionId: "s", turn: 1 }],
+					[removed]: "x",
+				}).success,
+			).toBe(false);
+		}
 	});
 	test("find rejects invalid scope, enums, limits, reversed dates and excessive refs", () => {
 		for (const input of [

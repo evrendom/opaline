@@ -19,12 +19,15 @@ interface LoadedTools {
 	schemas: Record<string, Record<string, unknown>>;
 	annotations: Record<string, Record<string, boolean>>;
 	listed: ListedTool[];
-	movedSave: unknown;
-	movedShare: unknown;
-	movedMessage: string;
 	draft: { analysis: string };
-	revision: { analysis: string; step: string };
+	revision: { analysis: string; step: string; query: string };
 	flow: Record<string, Outcome>;
+	summaries: {
+		plain: unknown;
+		byMember: unknown;
+		widgetPlain: unknown;
+		widgetByMember: unknown;
+	};
 }
 
 async function loadTools(): Promise<LoadedTools> {
@@ -33,7 +36,7 @@ async function loadTools(): Promise<LoadedTools> {
 			process.execPath,
 			"--no-env-file",
 			"--eval",
-			`const { MCP_TOOLS, ANALYSES_MOVED_TO_SAVE_ANALYSIS, listedTool } = await import(${JSON.stringify(new URL("./mcp-tools.ts", import.meta.url).href)});
+			`const { MCP_TOOLS, listedTool, summarizeDashboard, withoutPersonRows } = await import(${JSON.stringify(new URL("./mcp-tools.ts", import.meta.url).href)});
 const { PLUGIN_TOOLS } = await import(${JSON.stringify(new URL("./plugin-tools.ts", import.meta.url).href)});
 const service = await import(${JSON.stringify(new URL("../services/analysis-log/analysis-log.service.ts", import.meta.url).href)});
 const { createMemoryAnalysisStore } = await import(${JSON.stringify(new URL("../services/analysis-log/memory-store.ts", import.meta.url).href)});
@@ -52,26 +55,45 @@ const client = { analysis: { history: {
 } } };
 const record = (trace) => service.recordQuery(log, { workspaceId: "w", userId: "u", host: "plugin" }, { tool: "find", args: { source: "runs" }, trace, output: { ok: true }, outputChars: 11, sessions: [], owners: [] });
 const outcome = (promise) => promise.then((result) => ({ result }), (error) => ({ error: error.message }));
-const draft = await record({ question: "Why do agents fail?" });
+const draft = await record({});
 const flow = {};
-flow.getDraft = await outcome(tool("analyses").run(client, { action: "get", analysis: draft.analysis }, context));
-flow.queryDraft = await outcome(tool("analyses").run(client, { action: "query", query: draft.query }, context));
-flow.shareDraft = await outcome(tool("save_analysis").run(client, { action: "share", analysis: draft.analysis, shared: true }, context));
-flow.save = await outcome(tool("save_analysis").run(client, { analysis: draft.analysis, finalAnswer: "Stale patches." }, context));
-flow.saveAgain = await outcome(tool("save_analysis").run(client, { analysis: draft.analysis, finalAnswer: "Changed." }, context));
-const revision = await record({ updates: draft.analysis });
-const revisionFindings = [{ step: revision.step, finding: "fewer stale patches" }];
-flow.reviseWithoutChanges = await outcome(tool("save_analysis").run(client, { analysis: revision.analysis, finalAnswer: "Fewer.", findings: revisionFindings }, context));
-flow.revise = await outcome(tool("save_analysis").run(client, { analysis: revision.analysis, finalAnswer: "Fewer.", findings: revisionFindings, changes: [{ step: revision.step, change: "weakened", evidence: "4, was 11" }] }, context));
-flow.getPrior = await outcome(tool("analyses").run(client, { action: "get", analysis: draft.analysis }, context));
-flow.getRevision = await outcome(tool("analyses").run(client, { action: "get", analysis: revision.analysis }, context));
+flow.getDraft = await outcome(tool("get_answer").run(client, { analysis: draft.analysis }, context));
+flow.queryDraft = await outcome(tool("get_answer_evidence").run(client, { query: draft.query }, context));
+flow.shareDraft = await outcome(tool("share_answer").run(client, { analysis: draft.analysis }, context));
+flow.saveWithoutQuestion = await outcome(tool("save_answer").run(client, { analysis: draft.analysis, finalAnswer: "Stale patches." }, context));
+flow.save = await outcome(tool("save_answer").run(client, { analysis: draft.analysis, question: "Why agents fail", finalAnswer: "Stale patches." }, context));
+flow.share = await outcome(tool("share_answer").run(client, { analysis: draft.analysis }, context));
+flow.unshare = await outcome(tool("share_answer").run(client, { analysis: draft.analysis, shared: false }, context));
+flow.saveAgain = await outcome(tool("save_answer").run(client, { analysis: draft.analysis, question: "Why agents fail", finalAnswer: "Changed." }, context));
+const revision = await record({});
+const revisionFindings = [{ step: revision.query, finding: "fewer stale patches" }];
+flow.reviseWithoutChanges = await outcome(tool("save_answer").run(client, { analysis: revision.analysis, question: "Why agents fail", updates: draft.analysis, finalAnswer: "Fewer.", findings: revisionFindings }, context));
+flow.revise = await outcome(tool("save_answer").run(client, { analysis: revision.analysis, question: "Why agents fail", updates: draft.analysis, finalAnswer: "Fewer.", findings: revisionFindings, changes: [{ step: revision.query, change: "weakened", evidence: "4, was 11" }] }, context));
+flow.getPrior = await outcome(tool("get_answer").run(client, { analysis: draft.analysis }, context));
+flow.getRevision = await outcome(tool("get_answer").run(client, { analysis: revision.analysis }, context));
+const member = { id: "user-secret-id", label: "Alex", value: 5, share: 1, image: null };
+const repo = { id: "acme/web", label: "acme/web", value: 5, share: 1, image: null };
+const dashboardOf = (splitBy) => ({
+	availableMetrics: ["cost"],
+	splitBy,
+	metrics: { cost: {
+		total: 5, incomplete: false,
+		series: splitBy === "members" ? [{ id: "user-secret-id", label: "Alex" }] : [],
+		trend: [{ date: "2026-10-01", total: 5, values: splitBy === "members" ? { "user-secret-id": 5 } : {} }],
+		breakdowns: { members: [member], repositories: [repo] },
+	} },
+});
+const summaries = {
+	plain: summarizeDashboard(dashboardOf("none"), "cost"),
+	byMember: summarizeDashboard(dashboardOf("members"), "cost"),
+	widgetPlain: withoutPersonRows(dashboardOf("none")),
+	widgetByMember: withoutPersonRows(dashboardOf("members")),
+};
 console.log(JSON.stringify({
+	summaries,
 	schemas: Object.fromEntries(MCP_TOOLS.map((tool) => [tool.name, tool.inputSchema])),
 	annotations: Object.fromEntries(MCP_TOOLS.map((tool) => [tool.name, tool.annotations])),
 	listed: [...MCP_TOOLS, ...PLUGIN_TOOLS].map(listedTool),
-	movedSave: await tool("analyses").run({}, { action: "save", analysis: "a", finalAnswer: "x" }, context),
-	movedShare: await tool("analyses").run({}, { action: "share", analysis: "a", shared: true }, context),
-	movedMessage: ANALYSES_MOVED_TO_SAVE_ANALYSIS,
 	draft,
 	revision,
 	flow,
@@ -138,33 +160,95 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 			workspace: { type: "string" },
 		},
 	});
-	expect(schemas.analyses).toMatchObject({
-		type: "object",
+	// find and read take only what their operation needs, plus the draft id.
+	expect(Object.keys(schemas.find?.properties ?? {}).sort()).toEqual(
+		[
+			"source",
+			"from",
+			"to",
+			"latest",
+			"repository",
+			"agent",
+			"model",
+			"sessionId",
+			"toolGroup",
+			"commandClass",
+			"kind",
+			"cause",
+			"detail",
+			"includeNoise",
+			"reaction",
+			"groupBy",
+			"refs",
+			"limit",
+			"sort",
+			"cursor",
+			"analysis",
+			"workspace",
+		].sort(),
+	);
+	expect(Object.keys(schemas.read?.properties ?? {}).sort()).toEqual(
+		[
+			"refs",
+			"depth",
+			"maxChars",
+			"record",
+			"block",
+			"fromChar",
+			"toChar",
+			"analysis",
+			"workspace",
+		].sort(),
+	);
+	for (const name of ["find", "read"])
+		for (const removed of [
+			"question",
+			"step",
+			"parentStep",
+			"updates",
+			"userId",
+		])
+			expect(schemas[name]?.properties).not.toHaveProperty(removed);
+	expect(schemas.save_answer?.properties).toHaveProperty("question");
+	expect(schemas.save_answer?.properties).toHaveProperty("updates");
+	// One operation per tool: each takes only its own inputs.
+	expect(Object.keys(schemas.search_answers?.properties ?? {}).sort()).toEqual([
+		"includeEval",
+		"limit",
+		"text",
+		"workspace",
+	]);
+	expect(schemas.get_answer).toMatchObject({
+		required: ["analysis"],
 		additionalProperties: false,
-		properties: {
-			action: { enum: ["search", "get", "query"], default: "search" },
-			limit: { default: 10 },
-			analysis: { type: "string" },
-			query: { type: "string" },
-			workspace: { type: "string" },
-		},
 	});
-	expect(schemas.analyses).not.toHaveProperty("required");
-	expect(schemas.analyses?.properties).not.toHaveProperty("finalAnswer");
-	expect(schemas.analyses?.properties).not.toHaveProperty("shared");
-	expect(schemas.save_analysis).toMatchObject({
+	expect(Object.keys(schemas.get_answer?.properties ?? {}).sort()).toEqual([
+		"analysis",
+		"workspace",
+	]);
+	expect(schemas.get_answer_evidence).toMatchObject({ required: ["query"] });
+	expect(Object.keys(schemas.share_answer?.properties ?? {}).sort()).toEqual([
+		"analysis",
+		"workspace",
+	]);
+	expect(schemas.save_answer).toMatchObject({
 		type: "object",
 		additionalProperties: false,
+		required: ["analysis", "question", "finalAnswer"],
 		properties: {
-			action: { enum: ["save", "share"], default: "save" },
 			analysis: { type: "string" },
 			finalAnswer: { type: "string" },
 			findings: { type: "array", default: [] },
-			shared: { type: "boolean" },
+			question: { type: "string", maxLength: 120 },
 			workspace: { type: "string" },
 		},
 	});
-	expect(schemas.save_analysis).not.toHaveProperty("required");
+	// The plugin only adds: no unsharing, and no conversation turns.
+	for (const name of ["save_answer", "share_answer"]) {
+		expect(schemas[name]?.properties).not.toHaveProperty("shared");
+		expect(schemas[name]?.properties).not.toHaveProperty("clarifications");
+		expect(schemas[name]?.properties).not.toHaveProperty("action");
+	}
 });
 
 test("every tool declares annotations, and only the tools that write are not read-only", async () => {
@@ -180,26 +264,28 @@ test("every tool declares annotations, and only the tools that write are not rea
 		openWorldHint: false,
 	};
 
+	const replaces = {
+		readOnlyHint: false,
+		destructiveHint: true,
+		openWorldHint: false,
+	};
+
 	for (const [name, value] of Object.entries(annotations)) {
 		expect({ name, ...value }).toEqual({
 			name,
-			...(["find", "read", "save_analysis", "settings_update"].includes(name)
-				? writes
-				: readOnly),
+			...(name === "settings_update"
+				? replaces
+				: ["find", "read", "save_answer", "share_answer"].includes(name)
+					? writes
+					: readOnly),
 		});
 	}
 	expect(annotations.find).toEqual(writes);
 	expect(annotations.read).toEqual(writes);
-	expect(annotations.analyses).toEqual(readOnly);
-	expect(annotations.save_analysis).toEqual(writes);
-});
-
-test("analyses answers the old save and share actions with a plain pointer to save_analysis", async () => {
-	const { movedSave, movedShare, movedMessage } = await loaded;
-
-	expect(movedMessage).toContain("save_analysis");
-	expect(movedSave).toBe(movedMessage);
-	expect(movedShare).toBe(movedMessage);
+	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
+		expect(annotations[name]).toEqual(readOnly);
+	expect(annotations.save_answer).toEqual(writes);
+	expect(annotations.share_answer).toEqual(writes);
 });
 
 /** Words a user or reviewer would not know; tool texts explain instead. */
@@ -241,12 +327,15 @@ test("the model sees only the analysis tools, the dashboard and the workspace li
 			.sort(),
 	).toEqual(
 		[
-			"analyses",
+			"search_answers",
+			"get_answer",
+			"get_answer_evidence",
 			"find",
 			"get_dashboard",
 			"list_workspaces",
 			"read",
-			"save_analysis",
+			"save_answer",
+			"share_answer",
 		].sort(),
 	);
 });
@@ -314,18 +403,22 @@ test("app-only tools have a plain title and one line saying the assistant does n
 		});
 });
 
-test("find, read and save_analysis describe the private draft and the append-only save", async () => {
+test("find, read, save_answer and share_answer describe the private draft, the append-only save and sharing", async () => {
 	const { listed } = await loaded;
 	const description = (name: string) =>
 		listed.find((tool) => tool.name === name)?.description ?? "";
 	for (const name of ["find", "read"])
 		expect(description(name)).toContain(
-			"Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
+			"Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
 		);
-	expect(description("save_analysis")).toContain(
-		"Nothing is posted outside Opaline. A saved answer is never changed or deleted; an update is saved as a new answer linked to it.",
+	expect(description("save_answer")).toContain(
+		"Nothing is published publicly or shared with other workspaces. OpenAI processes the title and topics to build the search index.",
 	);
-	expect(description("analyses")).toContain("Side effects: None.");
+	expect(description("share_answer")).toContain(
+		"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; workspaces that restrict results show those results only to admins and the session's owner.",
+	);
+	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
+		expect(description(name)).toContain("Side effects: None.");
 });
 
 test("analysis tools hide drafts, publish once, refuse a second save with a plain message and link revisions", async () => {
@@ -339,16 +432,22 @@ test("analysis tools hide drafts, publish once, refuse a second save with a plai
 		error: `No saved analysis ${id} that you can see`,
 	});
 	expect(flow.shareDraft).toEqual({
-		error: `Analysis ${id} is an unsaved draft; save it with save_analysis first, then share it`,
+		error: `Analysis ${id} is an unsaved draft; save it with save_answer first, then share it`,
+	});
+	expect(flow.saveWithoutQuestion).toEqual({
+		error:
+			"question: required: the question this answer addresses, as a short title",
 	});
 	expect(flow.save).toEqual({
 		result: `saved analysis=${id} status=finished`,
 	});
+	expect(flow.share).toEqual({ result: `analysis=${id} shared=true` });
+	expect(errorOf(flow.unshare)).toContain("shared");
 	expect(flow.saveAgain).toEqual({
 		error: `This analysis is already saved. To revise it, save a new analysis that passes updates=${id}.`,
 	});
 	expect(errorOf(flow.reviseWithoutChanges)).toBe(
-		`Analysis ${started.analysis} updates ${id}, so changes needs exactly one item per finding saved now, naming its step by id or exact sub-question (plus change=dropped items for findings of ${id} that no longer hold): no change for the finding of ${started.step} ("(no step given)"). Nothing was saved.`,
+		`Analysis ${started.analysis} updates ${id}, so changes needs exactly one item per finding saved now, naming its step by its step or query id (plus change=dropped items for findings of ${id} that no longer hold): no change for the finding of ${started.step} ("find source=runs"). Nothing was saved.`,
 	);
 	const saved = resultOf(flow.revise);
 	expect(saved).toMatch(/^saved analysis=a_\S+ status=finished$/);
@@ -378,3 +477,59 @@ function errorOf(outcome: Outcome | undefined): string {
 		throw new Error(`Expected an error, got ${JSON.stringify(outcome)}`);
 	return outcome.error;
 }
+
+test("get_dashboard never gives the model member ids; per-member rows appear by name only when split by member", async () => {
+	const { summaries, schemas } = await loaded;
+	expect(JSON.stringify(summaries)).not.toContain("user-secret-id");
+	expect(summaries.plain).toMatchObject({
+		top: { repositories: [{ id: "acme/web", label: "acme/web", value: 5 }] },
+	});
+	expect(
+		(summaries.plain as { top: Record<string, unknown> }).top,
+	).not.toHaveProperty("members");
+	expect(summaries.byMember).toMatchObject({
+		series: [{ label: "Alex" }],
+		trend: [{ values: { Alex: 5 } }],
+		top: { members: [{ label: "Alex", value: 5 }] },
+	});
+	expect(schemas.get_dashboard?.properties).not.toHaveProperty("members");
+});
+
+test("the dashboard app's first view gets no rows or series that name people", async () => {
+	const { summaries } = await loaded;
+	for (const widget of [summaries.widgetPlain, summaries.widgetByMember]) {
+		const text = JSON.stringify(widget);
+		expect(text).not.toContain("user-secret-id");
+		expect(text).not.toContain("Alex");
+		expect(text).toContain("acme/web");
+	}
+	expect(summaries.widgetByMember).toMatchObject({
+		metrics: {
+			cost: {
+				total: 5,
+				series: [],
+				trend: [{ date: "2026-10-01", total: 5, values: {} }],
+			},
+		},
+	});
+});
+
+test("list_workspaces marks the default workspace and counts sessions without content", async () => {
+	const { listed } = await loaded;
+	const tool = listed.find((entry) => entry.name === "list_workspaces") as
+		| (ListedTool & { outputSchema?: Record<string, unknown> })
+		| undefined;
+	expect(tool?.outputSchema).toMatchObject({
+		properties: {
+			items: {
+				items: {
+					properties: {
+						default: { type: "boolean" },
+						sessionsLast365Days: { type: "integer" },
+					},
+				},
+			},
+		},
+	});
+	expect(tool?.description).toContain("default: true");
+});

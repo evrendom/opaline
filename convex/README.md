@@ -44,7 +44,9 @@ leaves older vectors unmatched until they are embedded again.
 
 The API's `find` and `read` calls build an analysis with `draft: true`. A
 draft is returned only by `analyses:get` (the API checks that its author is
-asking, for find/read/save) and `analyses:latestOpen`; `analyses:recent`,
+asking, for find/read/save) and `analyses:latestOpen` (no longer called
+by the API: a find or read without an analysis id starts a new draft; it
+can be removed with the next Convex deploy); `analyses:recent`,
 `analyses:updatedBy` and the vector-match lookup leave drafts out, and the API
 treats them as not found everywhere else. `analyses:save` publishes a draft
 (sets `draft: false` and `status: "finished"`) in the same transaction that

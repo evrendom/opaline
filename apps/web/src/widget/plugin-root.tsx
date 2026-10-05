@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { getCanonicalAppPath } from "@/app/routes";
@@ -9,17 +9,22 @@ import {
 	DateRangeProvider,
 	useDateRange,
 } from "@/features/analytics/date-range/DateRangeProvider";
+import { DeferredPersonRowsContext } from "@/features/costs/deferred-person-rows";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { orpc } from "@/lib/orpc";
 import {
 	getWidgetState,
 	type HostState,
+	onAccountLoaded,
 	openPluginLink,
+	type PluginAccount,
 	type PluginSeed,
 	requestHost,
 	setWidgetState,
 } from "./host-bridge";
 import "../index.css";
+
+const PERSON_SPLITS = new Set(["members", "githubAuthors"]);
 
 // Masks need CORS from another origin; the sandbox gets this one inline.
 document.documentElement.style.setProperty(
@@ -34,6 +39,13 @@ export function PluginRoot({
 	host: HostState;
 	seed: PluginSeed;
 }) {
+	const [seedKey] = useState(() => [
+		"org",
+		seed.bootstrap.organization.id,
+		...orpc.analytics.overview.costs.queryOptions({
+			input: seed.dashboard.input,
+		}).queryKey,
+	]);
 	const [client] = useState(() => {
 		const client = new QueryClient({
 			defaultOptions: {
@@ -46,22 +58,27 @@ export function PluginRoot({
 				},
 			},
 		});
-		client.setQueryData(
-			[
-				"org",
-				seed.bootstrap.organization.id,
-				...orpc.analytics.overview.costs.queryOptions({
-					input: seed.dashboard.input,
-				}).queryKey,
-			],
-			seed.dashboard.data,
-		);
-		client.setQueryData(
-			["full-organization", seed.bootstrap.organization.id],
-			seed.bootstrap.organization,
-		);
+		// A trend split by person needs rows the first view does not carry,
+		// so that view loads through the costs tool instead.
+		if (!PERSON_SPLITS.has(seed.dashboard.input.splitBy ?? "none"))
+			client.setQueryData(seedKey, seed.dashboard.data);
 		return client;
 	});
+	const [personRowsLoaded, setPersonRowsLoaded] = useState(false);
+	// The role arrives with the account, when a view first needs it.
+	const [account, setAccount] = useState<PluginAccount | null>(null);
+	useEffect(() => onAccountLoaded(setAccount), []);
+	const deferredPersonRows = useMemo(
+		() => ({
+			isDeferred: (data: unknown) =>
+				!personRowsLoaded && data === seed.dashboard.data,
+			load: () => {
+				setPersonRowsLoaded(true);
+				void client.invalidateQueries({ queryKey: seedKey, exact: true });
+			},
+		}),
+		[client, personRowsLoaded, seed.dashboard.data, seedKey],
+	);
 	const organization = seed.bootstrap.organization;
 	const params = new URLSearchParams({
 		from: seed.query.startDate,
@@ -92,12 +109,14 @@ export function PluginRoot({
 							state: {
 								activeOrg: organization,
 								organizations: [organization],
-								members: organization.members,
+								// Loaded on demand (useFullOrganization) by views that
+								// show member names; get_dashboard does not send them.
+								members: undefined,
 								isLoading: false,
 							},
 							meta: {
 								isOrgAdmin: ["owner", "admin"].includes(
-									seed.bootstrap.member?.role ?? "",
+									account?.member?.role ?? "",
 								),
 							},
 							actions: {
@@ -107,9 +126,11 @@ export function PluginRoot({
 							},
 						}}
 					>
-						<DateRangeProvider>
-							<PluginRouter host={host} dashboardPath={dashboardPath} />
-						</DateRangeProvider>
+						<DeferredPersonRowsContext.Provider value={deferredPersonRows}>
+							<DateRangeProvider>
+								<PluginRouter host={host} dashboardPath={dashboardPath} />
+							</DateRangeProvider>
+						</DeferredPersonRowsContext.Provider>
 					</WorkspaceStateProvider>
 				</MemoryRouter>
 			</QueryClientProvider>

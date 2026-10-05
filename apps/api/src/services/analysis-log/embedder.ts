@@ -12,8 +12,9 @@ const EmbeddingResponseSchema = z.object({
 });
 
 /**
- * OpenAI embeddings for analysis questions, step sub-questions and topics
- * only — never transcripts or query results (ADR 0001).
+ * OpenAI embeddings for the question title and topics of saved analyses
+ * only, never transcripts or query results
+ * (ADR 0001).
  */
 export function createOpenAiEmbedder(
 	apiKey: string,

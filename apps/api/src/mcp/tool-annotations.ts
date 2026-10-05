@@ -16,12 +16,22 @@ export const READ_ONLY: McpToolAnnotations = {
 };
 
 /**
- * Writes only the caller's own Opaline records (an analysis draft, a saved
- * analysis, a setting), never session or workspace data, and never deletes or
- * overwrites anything.
+ * Adds only the caller's own Opaline records (an analysis draft, a saved or
+ * shared analysis), never session or workspace data, and never deletes,
+ * overwrites or revokes anything.
  */
 export const WRITES_OWN_RECORDS: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
+	openWorldHint: false,
+};
+
+/**
+ * Replaces one of the caller's own preferences (the default workspace). It
+ * deletes no data, but the old value is overwritten, so it is not additive.
+ */
+export const REPLACES_OWN_SETTING: McpToolAnnotations = {
+	readOnlyHint: false,
+	destructiveHint: true,
 	openWorldHint: false,
 };

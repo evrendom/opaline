@@ -12,6 +12,10 @@ import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
 import { costLabel, getMetricData, METRIC_LABELS } from "./cost-format";
 import {
+	PERSON_DIMENSIONS,
+	useDeferredPersonRows,
+} from "./deferred-person-rows";
+import {
 	COST_LABELS,
 	type CostDashboardController,
 	useCostDashboard,
@@ -46,6 +50,7 @@ export function CostDashboardView({
 	const workspace = useOptionalOrganization();
 	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
 	const selectedData = getMetricData(data, metric);
+	const loadPersonRows = useDeferredPersonRows(data);
 	const isPullRequestMetric = metric === "mergedPullRequests";
 	const isGitHubMetric = isPullRequestMetric || metric === "ciRuns";
 	const chipDimensions = isGitHubMetric
@@ -221,6 +226,11 @@ export function CostDashboardView({
 									metric={metric}
 									valueLabel={METRIC_LABELS[metric]}
 									unavailable={selectedData === null}
+									onLoadDeferred={
+										PERSON_DIMENSIONS.has(dimension)
+											? (loadPersonRows ?? undefined)
+											: undefined
+									}
 									selected={input[dimension]}
 									pending={isPending}
 									split={input.splitBy === dimension}

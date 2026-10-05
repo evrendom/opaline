@@ -1,5 +1,10 @@
 export { isHighRiskCredentialPath } from "./credential-path.js";
 export {
+	RETURNED_TEXT_REDACTION,
+	redactReturnedText,
+	redactReturnedValue,
+} from "./credential-redaction.js";
+export {
 	assertFilteredJsonValidity,
 	FILTER_VERSION,
 	FILTERED_TRANSCRIPT_PATHS,

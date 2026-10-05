@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import assert from "node:assert";
 import { ORPCError } from "@orpc/server";
-import type { AnalysisHistorySaveInput } from "@rudel/api-routes";
+import {
+	type AnalysisHistorySaveInput,
+	AnalysisHistorySaveInputSchema,
+} from "@rudel/api-routes";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import {
 	getAnalysisTree,
@@ -12,7 +15,7 @@ import {
 	saveAnalysis,
 	searchAnalyses,
 	shareAnalysis,
-	sinceUpdatedCutoff,
+	stepLabel,
 } from "./analysis-log.service.js";
 import { captureCall } from "./capture.js";
 import { createLocalEmbedder } from "./embedder.js";
@@ -39,119 +42,112 @@ const restrictedMemberViewer = { ...memberViewer, restrictResults: true };
 const memberAccount = { targetType: "account", targetId: "member" } as const;
 
 describe("recording queries", () => {
-	test("the first call opens an analysis; later calls group into steps by id or sub-question", async () => {
+	test("a call without an analysis id starts a new draft; each call with one adds its own step, labelled from its arguments", async () => {
 		const log = createLog();
 		const first = await recordQuery(
 			log,
 			lead,
-			call({
-				question: "What pissed me off?",
-				step: "Which prompts were negative?",
+			call({}, "find", { source: "tool", kind: "validation" }),
+		);
+		const second = await recordQuery(
+			log,
+			lead,
+			call({ analysis: first.analysis }, "find", { source: "tool" }),
+		);
+		const third = await recordQuery(
+			log,
+			lead,
+			call({ analysis: first.analysis }, "read", {
+				refs: [
+					{ sessionId: "s1", agentId: "", turn: 1 },
+					{ sessionId: "s2", agentId: "", turn: 3 },
+				],
+				depth: "turn",
+				maxChars: 12_000,
 			}),
 		);
-		const again = await recordQuery(
-			log,
-			lead,
-			call({ analysis: first.analysis, step: "Which prompts were negative?" }),
-		);
-		const byId = await recordQuery(
-			log,
-			lead,
-			call({ analysis: first.analysis, step: first.step }),
-		);
-		const child = await recordQuery(
-			log,
-			lead,
-			call(
-				{
-					analysis: first.analysis,
-					step: "What happened in those runs?",
-					parentStep: first.step,
-				},
-				"read",
-			),
-		);
-
-		expect([again.analysis, byId.analysis, child.analysis]).toEqual([
-			first.analysis,
-			first.analysis,
-			first.analysis,
-		]);
-		expect([again.step, byId.step]).toEqual([first.step, first.step]);
-		await publish(log, first.analysis);
-		const tree = await getAnalysisTree(log, leadViewer, first.analysis);
-		expect(tree.question).toBe("What pissed me off?");
-		expect(tree.status).toBe("finished");
-		expect(
-			tree.steps.map((step) => [
-				step.question,
-				step.parent,
-				step.queries.length,
-			]),
-		).toEqual([
-			["Which prompts were negative?", null, 3],
-			["What happened in those runs?", first.step, 1],
-		]);
-	});
-
-	test("a call without an analysis id joins the author's analysis active in the last 30 minutes", async () => {
-		const clock = { now: Date.parse("2026-10-03T10:00:00Z") };
-		const log = createLog(clock);
-		const first = await recordQuery(
-			log,
-			lead,
-			call({ question: "Why do agents fail?" }),
-		);
-		clock.now += 20 * 60_000;
-		const joined = await recordQuery(log, lead, call({}));
-		clock.now += 31 * 60_000;
 		const fresh = await recordQuery(log, lead, call({}));
 
-		expect(joined.analysis).toBe(first.analysis);
+		expect([second.analysis, third.analysis]).toEqual([
+			first.analysis,
+			first.analysis,
+		]);
 		expect(fresh.analysis).not.toBe(first.analysis);
+		expect(new Set([first.step, second.step, third.step]).size).toBe(3);
+		const steps = await log.store.getSteps(first.analysis);
+		expect(steps.map((step) => [step.question, step.parentId])).toEqual([
+			["find source=tool kind=validation", null],
+			["find source=tool", null],
+			["read runs=2 depth=turn", null],
+		]);
+		expect(await log.store.getAnalysis(first.analysis)).toMatchObject({
+			draft: true,
+			question: "(unsaved answer)",
+			queryCount: 3,
+			stepCount: 3,
+		});
+	});
+
+	test("step labels name the tool and the arguments the call set, never free text", () => {
+		expect(
+			stepLabel("find", {
+				source: "user",
+				from: "2026-09-01",
+				reaction: ["negative"],
+				includeNoise: false,
+				sort: "startedAt",
+				cursor: "abc",
+				refs: [{ sessionId: "s", agentId: "", turn: 1 }],
+			}),
+		).toBe("find source=user from=2026-09-01 reaction=negative runs=1");
+		expect(
+			stepLabel("find", { source: "runs", repository: "r".repeat(500) }),
+		).toHaveLength(200);
+	});
+
+	test("nothing is embedded for search before an answer is saved", async () => {
+		const embedded: string[] = [];
+		const log: AnalysisLog = {
+			...createLog(),
+			embedder: {
+				model: "test",
+				async embed(texts) {
+					embedded.push(...texts);
+					return texts.map(() => new Array<number>(1536).fill(0.1));
+				},
+			},
+		};
+		const draft = await recordQuery(log, lead, call({}));
+		await recordQuery(log, lead, call({ analysis: draft.analysis }, "read"));
+		expect(embedded).toEqual([]);
+
+		await saveAnalysis(log, leadViewer, {
+			analysis: draft.analysis,
+			question: "Where our agents get stuck",
+			finalAnswer: "Stale patches.",
+			findings: [],
+			topics: ["failures"],
+			changes: [],
+		});
+		expect(embedded).toEqual(["Where our agents get stuck", "failures"]);
 	});
 
 	test("an analysis keeps at most 200 queries and 200 steps, and queries of at most 32 KiB arguments", async () => {
 		const log = createLog();
-		const first = await recordQuery(log, lead, call({ question: "Big" }));
+		const first = await recordQuery(log, lead, call({}));
 		for (let index = 1; index < 200; index++)
 			await recordQuery(log, lead, call({ analysis: first.analysis }));
 		await expect(
 			recordQuery(log, lead, call({ analysis: first.analysis })),
 		).rejects.toThrow(
-			`Analysis ${first.analysis} already has 200 queries, the most one analysis keeps; start a new analysis`,
+			`Analysis ${first.analysis} already has 200 queries, the most one analysis keeps; save it, or start a new analysis`,
 		);
 
-		const steps = await recordQuery(
-			log,
-			lead,
-			call({ question: "Many steps", step: "Step 0" }),
-		);
-		for (let index = 1; index < 181; index++)
-			await recordQuery(
-				log,
-				lead,
-				call({ analysis: steps.analysis, step: `Step ${index}` }),
-			);
-		const clarify = (count: number) =>
-			saveAnalysis(log, leadViewer, {
-				analysis: steps.analysis,
-				finalAnswer: "x",
-				findings: [],
-				clarifications: Array.from({ length: count }, (_, index) => ({
-					question: `Clarification ${index}?`,
-					reply: "Yes",
-				})),
-				topics: [],
-				changes: [],
-			});
-		await expect(clarify(20)).rejects.toThrow("save fewer clarifications");
-		await clarify(19);
-		expect((await log.store.getAnalysis(steps.analysis))?.stepCount).toBe(200);
+		expect((await log.store.getAnalysis(first.analysis))?.stepCount).toBe(200);
 
 		await expect(
 			recordQuery(log, lead, {
-				...call({ question: "Long" }),
+				...call({}),
 				args: { source: "runs", repository: "r".repeat(32 * 1024) },
 			}),
 		).rejects.toThrow("an analysis keeps at most 32768 per query");
@@ -159,16 +155,12 @@ describe("recording queries", () => {
 
 	test("two calls racing for the last query or step of an analysis cannot pass 200", async () => {
 		const log = createLog();
-		const first = await recordQuery(log, lead, call({ question: "Race" }));
+		const first = await recordQuery(log, lead, call({}));
 		for (let index = 2; index < 200; index++)
-			await recordQuery(
-				log,
-				lead,
-				call({ analysis: first.analysis, step: `Step ${index}` }),
-			);
+			await recordQuery(log, lead, call({ analysis: first.analysis }));
 		const racing = await Promise.allSettled([
-			recordQuery(log, lead, call({ analysis: first.analysis, step: "A" })),
-			recordQuery(log, lead, call({ analysis: first.analysis, step: "B" })),
+			recordQuery(log, lead, call({ analysis: first.analysis })),
+			recordQuery(log, lead, call({ analysis: first.analysis })),
 		]);
 
 		expect(racing.map((result) => result.status).sort()).toEqual([
@@ -183,38 +175,9 @@ describe("recording queries", () => {
 		expect([analysis?.queryCount, analysis?.stepCount]).toEqual([200, 200]);
 	});
 
-	test("a call without an analysis id starts a new analysis when the open one is full", async () => {
-		const log = createLog();
-		const full = await recordQuery(log, lead, call({ question: "Full" }));
-		for (let index = 1; index < 200; index++)
-			await recordQuery(log, lead, call({}));
-
-		const next = await recordQuery(log, lead, call({}));
-		expect(next.analysis).not.toBe(full.analysis);
-		expect((await log.store.getAnalysis(next.analysis))?.question).toBe(
-			"(question not given)",
-		);
-		expect((await log.store.getAnalysis(full.analysis))?.queryCount).toBe(200);
-	});
-
-	test("two calls without an analysis id racing for its last query both succeed", async () => {
-		const log = createLog();
-		const full = await recordQuery(log, lead, call({ question: "Busy" }));
-		for (let index = 2; index < 200; index++)
-			await recordQuery(log, lead, call({}));
-
-		const racing = await Promise.all([
-			recordQuery(log, lead, call({})),
-			recordQuery(log, lead, call({})),
-		]);
-		expect(new Set(racing.map((trace) => trace.analysis)).size).toBe(2);
-		expect(racing.map((trace) => trace.analysis)).toContain(full.analysis);
-		expect((await log.store.getAnalysis(full.analysis))?.queryCount).toBe(200);
-	});
-
 	test("only the author can add to a draft; to anyone else it does not exist", async () => {
 		const log = createLog();
-		const first = await recordQuery(log, lead, call({ question: "Mine" }));
+		const first = await recordQuery(log, lead, call({}));
 
 		const refused = await recordQuery(
 			log,
@@ -228,42 +191,30 @@ describe("recording queries", () => {
 });
 
 describe("saving and reading back", () => {
-	test("save stores findings, places clarifications before a step and derives the scope", async () => {
+	test("save stores the question, findings and topics and derives the scope; it takes no clarifications", async () => {
 		const log = createLog();
 		const trace = await recordQuery(
 			log,
 			lead,
-			call(
-				{
-					question: "What pissed me off the most?",
-					step: "Which prompts were negative?",
-				},
-				"find",
-				{
-					source: "user",
-					from: "2026-09-05",
-					to: "2026-10-03",
-					repository: "athena",
-				},
-			),
+			call({}, "find", {
+				source: "user",
+				from: "2026-09-05",
+				to: "2026-10-03",
+				repository: "athena",
+			}),
 		);
 		await saveAnalysis(log, leadViewer, {
 			analysis: trace.analysis,
+			question: "What frustrated me most",
 			finalAnswer: "Design that misses your taste, ranked first by cost.",
 			findings: [{ step: trace.step, finding: "32 origin runs, 10 sessions" }],
-			clarifications: [
-				{
-					question: "2 or 4 weeks?",
-					reply: "4 weeks, by cost",
-					before: trace.step,
-				},
-			],
 			topics: ["frustration", "cost"],
 			changes: [],
 		});
 
 		const tree = await getAnalysisTree(log, leadViewer, trace.analysis);
 		expect(tree.status).toBe("finished");
+		expect(tree.question).toBe("What frustrated me most");
 		expect(tree.finalAnswer).toBe(
 			"Design that misses your taste, ranked first by cost.",
 		);
@@ -275,46 +226,46 @@ describe("saving and reading back", () => {
 		expect(
 			tree.steps.map((step) => [step.question, step.reply, step.finding]),
 		).toEqual([
-			["2 or 4 weeks?", "4 weeks, by cost", null],
-			["Which prompts were negative?", null, "32 origin runs, 10 sessions"],
+			[
+				"find source=user from=2026-09-05 to=2026-10-03 repository=athena",
+				null,
+				"32 origin runs, 10 sessions",
+			],
 		]);
 		expect(tree.topics).toEqual(["frustration", "cost"]);
+		expect(
+			AnalysisHistorySaveInputSchema.safeParse({
+				...saveInput(trace.analysis),
+				clarifications: [{ question: "2 or 4 weeks?", reply: "4" }],
+			}).success,
+		).toBe(false);
+		expect(
+			AnalysisHistorySaveInputSchema.safeParse({
+				...saveInput(trace.analysis),
+				question: "q".repeat(121),
+			}).success,
+		).toBe(false);
 	});
 
 	test("a refused save writes nothing", async () => {
 		const log = createLog();
-		const trace = await recordQuery(
-			log,
-			lead,
-			call({ question: "Almost full", step: "Step 0" }),
-		);
+		const trace = await recordQuery(log, lead, call({}));
 		for (let index = 1; index < 199; index++)
-			await recordQuery(
-				log,
-				lead,
-				call({ analysis: trace.analysis, step: `Step ${index}` }),
-			);
+			await recordQuery(log, lead, call({ analysis: trace.analysis }));
 		const before = await stored(log, trace.analysis);
 
 		await expect(
 			saveAnalysis(log, leadViewer, {
-				analysis: trace.analysis,
-				finalAnswer: "x",
-				findings: [{ step: trace.step, finding: "written too early" }],
-				clarifications: [
-					{ question: "One?", reply: "Yes" },
-					{ question: "Two?", reply: "Yes" },
-				],
-				topics: [],
-				changes: [],
+				...saveInput(trace.analysis),
+				findings: [{ step: "s_foreign", finding: "written too early" }],
 			}),
-		).rejects.toThrow("save fewer clarifications");
+		).rejects.toThrow("is not part of analysis");
 		await expect(
 			saveAnalysis(log, leadViewer, {
 				analysis: trace.analysis,
+				question: "Saved question",
 				finalAnswer: "x",
 				findings: [{ step: trace.step, finding: "written too early" }],
-				clarifications: [],
 				topics: [],
 				changes: [],
 				updates: "a_missing",
@@ -323,93 +274,55 @@ describe("saving and reading back", () => {
 		expect(await stored(log, trace.analysis)).toEqual(before);
 	});
 
-	test("a save that loses the last step to a concurrent call writes nothing", async () => {
-		const store = createMemoryAnalysisStore();
-		let competing: (() => Promise<void>) | undefined;
-		const log: AnalysisLog = {
-			...createLog(),
-			store: {
-				...store,
-				async getSteps(analysisId) {
-					const steps = await store.getSteps(analysisId);
-					// The competing step lands after the save read its steps.
-					const run = competing;
-					competing = undefined;
-					await run?.();
-					return steps;
-				},
-			},
-		};
-		const trace = await recordQuery(
-			log,
-			lead,
-			call({ question: "Almost full", step: "Step 0" }),
-		);
-		for (let index = 1; index < 199; index++)
-			await recordQuery(
-				log,
-				lead,
-				call({ analysis: trace.analysis, step: `Step ${index}` }),
-			);
-		const before = await stored(log, trace.analysis);
-		competing = () =>
-			recordQuery(
-				log,
-				lead,
-				call({ analysis: trace.analysis, step: "Last" }),
-			).then(() => undefined);
-
-		await expect(
-			saveAnalysis(log, leadViewer, {
-				analysis: trace.analysis,
-				finalAnswer: "x",
-				findings: [{ step: trace.step, finding: "written too early" }],
-				clarifications: [{ question: "One?", reply: "Yes" }],
-				topics: [],
-				changes: [],
-			}),
-		).rejects.toThrow("save fewer clarifications");
-		const after = await stored(log, trace.analysis);
-		expect(after.analysis?.finalAnswer).toBeNull();
-		expect(after.analysis?.draft).toBe(true);
-		expect(after.steps.filter((step) => step.finding !== null)).toEqual([]);
-		expect(after.steps).toHaveLength(before.steps.length + 1);
-	});
-
-	test("findings name a step by id or by its sub-question; other analyses' steps are rejected", async () => {
+	test("findings name a step by its step or query id; other analyses' steps are rejected", async () => {
 		const log = createLog();
-		const one = await recordQuery(
+		const one = await recordQuery(log, lead, call({}));
+		const two = await recordQuery(log, lead, call({}));
+		const read = await recordQuery(
 			log,
 			lead,
-			call({ question: "One", step: "Sub" }),
+			call({ analysis: two.analysis }, "read"),
 		);
-		const two = await recordQuery(
-			log,
-			lead,
-			call({ question: "Two", step: "Which runs failed?" }),
-		);
+		for (const step of [one.step, one.query])
+			await expect(
+				saveAnalysis(log, leadViewer, {
+					analysis: two.analysis,
+					question: "Saved question",
+					finalAnswer: "x",
+					findings: [{ step, finding: "y" }],
+					topics: [],
+					changes: [],
+				}),
+			).rejects.toThrow(`is not part of analysis ${two.analysis}`);
 		await expect(
 			saveAnalysis(log, leadViewer, {
-				analysis: two.analysis,
-				finalAnswer: "x",
-				findings: [{ step: one.step, finding: "y" }],
-				clarifications: [],
-				topics: [],
-				changes: [],
+				...({
+					analysis: two.analysis,
+					finalAnswer: "x",
+					findings: [],
+					clarifications: [],
+					topics: [],
+					changes: [],
+				} as unknown as AnalysisHistorySaveInput),
 			}),
-		).rejects.toThrow(`is not part of analysis ${two.analysis}`);
+		).rejects.toThrow();
 		await saveAnalysis(log, leadViewer, {
 			analysis: two.analysis,
+			question: "Saved question",
 			finalAnswer: "x",
-			findings: [{ step: "Which runs failed?", finding: "three" }],
-			clarifications: [],
+			findings: [
+				{ step: two.step, finding: "three" },
+				{ step: read.query, finding: "read two" },
+			],
 			topics: [],
 			changes: [],
 		});
 
 		expect(
-			(await getAnalysisTree(log, leadViewer, two.analysis)).steps[0]?.finding,
-		).toBe("three");
+			(await getAnalysisTree(log, leadViewer, two.analysis)).steps.map(
+				(step) => step.finding,
+			),
+		).toEqual(["three", "read two"]);
 	});
 });
 
@@ -417,7 +330,7 @@ describe("drafts and revisions", () => {
 	test("a draft older than 7 days is gone for its author before the daily cleanup deletes it", async () => {
 		const clock = { now: Date.parse("2026-10-03T10:00:00Z") };
 		const log = createLog(clock);
-		const draft = await recordQuery(log, lead, call({ question: "Old draft" }));
+		const draft = await recordQuery(log, lead, call({}));
 		clock.now += 7 * 86_400_000 + 1;
 
 		await expect(
@@ -430,166 +343,120 @@ describe("drafts and revisions", () => {
 		expect(fresh.analysis).not.toBe(draft.analysis);
 	});
 
-	test("a find that updates a saved analysis defaults from to its data cutoff day, and says so", async () => {
-		const clock = { now: Date.parse("2026-09-20T15:30:00Z") };
-		const log = createLog(clock);
-		const prior = await recordQuery(log, lead, call({ question: "Prior" }));
-		await publish(log, prior.analysis);
-		const input = {
-			source: "runs" as const,
-			includeNoise: false,
-			reaction: ["negative" as const],
-			sort: "startedAt" as const,
-			updates: prior.analysis,
-		};
-
-		expect(await sinceUpdatedCutoff(log, leadViewer, input)).toEqual({
-			input: { ...input, from: "2026-09-20" },
-			note: `from defaults to 2026-09-20, the data cutoff of analysis ${prior.analysis} that this draft updates; pass from to cover earlier days`,
-		});
-		expect(
-			await sinceUpdatedCutoff(log, leadViewer, {
-				...input,
-				from: "2026-09-01",
-			}),
-		).toBeNull();
-		expect(
-			await sinceUpdatedCutoff(log, leadViewer, { ...input, to: "2026-09-10" }),
-		).toBeNull();
-		const draft = await recordQuery(log, lead, call({ question: "Draft" }));
-		await expect(
-			sinceUpdatedCutoff(log, leadViewer, {
-				...input,
-				updates: draft.analysis,
-			}),
-		).rejects.toMatchObject({ code: "NOT_FOUND" });
-	});
-
-	test("follow-up finds in a revision keep the prior's cutoff as their default from; an explicit from wins", async () => {
-		const clock = { now: Date.parse("2026-09-01T15:30:00Z") };
-		const log = createLog(clock);
-		const prior = await recordQuery(log, lead, call({ question: "Prior" }));
-		await publish(log, prior.analysis);
-		clock.now = Date.parse("2026-10-01T09:00:00Z");
-		const draft = await recordQuery(
-			log,
-			lead,
-			call({ updates: prior.analysis }),
+	test("a draft created without a question gets its question when saved; a save without one is refused", async () => {
+		const log = createLog();
+		const draft = await recordQuery(log, lead, call({}));
+		expect((await log.store.getAnalysis(draft.analysis))?.question).toBe(
+			"(unsaved answer)",
 		);
-		const followUp = {
-			source: "runs" as const,
-			includeNoise: false,
-			reaction: ["negative" as const],
-			sort: "startedAt" as const,
-			analysis: draft.analysis,
-			step: "Since the cutoff",
-		};
+		const { question: _question, ...withoutQuestion } = saveInput(
+			draft.analysis,
+		);
+		await expect(
+			saveAnalysis(
+				log,
+				leadViewer,
+				withoutQuestion as unknown as AnalysisHistorySaveInput,
+			),
+		).rejects.toThrow();
+		expect((await log.store.getAnalysis(draft.analysis))?.draft).toBe(true);
+		expect(
+			AnalysisHistorySaveInputSchema.safeParse(withoutQuestion).error?.issues[0]
+				?.message,
+		).toBe("required: the question this answer addresses, as a short title");
 
-		expect(await sinceUpdatedCutoff(log, leadViewer, followUp)).toEqual({
-			input: { ...followUp, from: "2026-09-01" },
-			note: `from defaults to 2026-09-01, the data cutoff of analysis ${prior.analysis} that this draft updates; pass from to cover earlier days`,
+		await saveAnalysis(log, leadViewer, {
+			...saveInput(draft.analysis),
+			question: "Where our agents get stuck",
 		});
+		const tree = await getAnalysisTree(log, leadViewer, draft.analysis);
+		expect(tree.question).toBe("Where our agents get stuck");
 		expect(
-			await sinceUpdatedCutoff(log, leadViewer, {
-				...followUp,
-				from: "2026-09-20",
-			}),
-		).toBeNull();
-		// A draft that revises nothing, or another member's draft, keeps the default window.
-		const plain = await recordQuery(log, lead, call({ question: "Plain" }));
-		expect(
-			await sinceUpdatedCutoff(log, leadViewer, {
-				...followUp,
-				analysis: plain.analysis,
-			}),
-		).toBeNull();
-		expect(await sinceUpdatedCutoff(log, memberViewer, followUp)).toBeNull();
+			(
+				await searchAnalyses(log, leadViewer, {
+					text: "Where our agents get stuck",
+					limit: 5,
+					includeEval: false,
+				})
+			).analyses[0],
+		).toMatchObject({
+			id: draft.analysis,
+			match: { kind: "question", text: "Where our agents get stuck" },
+		});
 	});
 
 	test("a revision's changes must cover every finding saved with it exactly once, or nothing is saved", async () => {
 		const log = createLog();
-		const prior = await recordQuery(
-			log,
-			lead,
-			call({ question: "Why do agents fail?", step: "Stale patches" }),
-		);
+		const prior = await recordQuery(log, lead, call({}));
 		const lint = await recordQuery(
 			log,
 			lead,
-			call({ analysis: prior.analysis, step: "Lint loops" }),
+			call({ analysis: prior.analysis }, "find", { source: "tool" }),
 		);
 		await saveAnalysis(log, leadViewer, {
-			analysis: prior.analysis,
+			...saveInput(prior.analysis),
+			question: "Why do agents fail?",
 			finalAnswer: "Stale patches and lint loops.",
 			findings: [
 				{ step: prior.step, finding: "11 stale patches" },
 				{ step: lint.step, finding: "5 lint loops" },
 			],
-			clarifications: [],
-			topics: [],
-			changes: [],
 		});
-		const draft = await recordQuery(
-			log,
-			lead,
-			call({ updates: prior.analysis, step: "Stale patches since" }),
-		);
+		const draft = await recordQuery(log, lead, call({}));
 		const timeouts = await recordQuery(
 			log,
 			lead,
-			call({ analysis: draft.analysis, step: "Timeouts" }),
+			call({ analysis: draft.analysis }, "find", { source: "tool" }),
 		);
 		const before = await stored(log, draft.analysis);
 		const save = (changes: AnalysisHistorySaveInput["changes"]) =>
 			saveAnalysis(log, leadViewer, {
-				analysis: draft.analysis,
+				...saveInput(draft.analysis),
+				question: "Why do agents fail?",
 				finalAnswer: "Fewer stale patches; timeouts are new.",
 				findings: [
 					{ step: draft.step, finding: "4 stale patches" },
-					{ step: "Timeouts", finding: "3 timeouts" },
+					{ step: timeouts.query, finding: "3 timeouts" },
 				],
-				clarifications: [],
-				topics: [],
+				updates: prior.analysis,
 				changes,
 			});
 		const weakened = {
-			step: draft.step,
+			step: draft.query,
 			change: "weakened" as const,
 			evidence: "4, was 11",
 		};
 
 		await expect(save([weakened])).rejects.toThrow(
-			`no change for the finding of ${timeouts.step} ("Timeouts")`,
+			`no change for the finding of ${timeouts.step} ("find source=tool")`,
 		);
 		await expect(
 			save([
 				weakened,
-				{ ...weakened, step: "Stale patches since" },
-				{ step: "Timeouts", change: "new", evidence: "3 runs" },
+				{ ...weakened, step: draft.step },
+				{ step: timeouts.step, change: "new", evidence: "3 runs" },
 			]),
-		).rejects.toThrow(
-			`more than one change for ${draft.step} ("Stale patches since")`,
-		);
+		).rejects.toThrow(`more than one change for ${draft.step}`);
 		await expect(
 			save([
 				weakened,
-				{ step: "Timeouts", change: "new", evidence: "3 runs" },
-				{ step: "Lint loops", change: "weakened", evidence: "none" },
+				{ step: timeouts.step, change: "new", evidence: "3 runs" },
+				{ step: lint.query, change: "weakened", evidence: "none" },
 			]),
 		).rejects.toThrow(
-			`nor a step of ${prior.analysis} (allowed only with change=dropped), for "Lint loops"`,
+			`nor a step of ${prior.analysis} (allowed only with change=dropped), for "${lint.step}"`,
 		);
 		expect(await stored(log, draft.analysis)).toEqual(before);
 
 		await save([
 			weakened,
-			{ step: "Timeouts", change: "new", evidence: "3 runs" },
-			{ step: "Lint loops", change: "dropped", evidence: "none since" },
+			{ step: timeouts.step, change: "new", evidence: "3 runs" },
+			{ step: lint.query, change: "dropped", evidence: "none since" },
 		]);
 		expect(
 			(await getAnalysisTree(log, leadViewer, draft.analysis)).changes,
 		).toEqual([
-			{ ...weakened, finding: "4 stale patches" },
+			{ ...weakened, step: draft.step, finding: "4 stale patches" },
 			{
 				step: timeouts.step,
 				finding: "3 timeouts",
@@ -605,34 +472,26 @@ describe("drafts and revisions", () => {
 		]);
 	});
 
-	test("the Bayesian cycle: a saved prior is updated by a new draft that links it, and the prior and its evidence stay as they were", async () => {
+	test("the revision chain: search finds a saved answer, a new draft gathers evidence from its last day, and saving it with updates links both; the earlier answer and its evidence stay as they were", async () => {
 		const clock = { now: Date.parse("2026-09-01T09:00:00Z") };
 		const log = createLog(clock);
-		// A: the prior.
+		// A: the earlier answer.
 		const a = await recordQuery(
 			log,
 			lead,
-			call(
-				{ question: "Why do agents fail?", step: "Failures" },
-				"find",
-				{
-					source: "tool",
-				},
-				["lead"],
-			),
+			call({}, "find", { source: "tool" }, ["lead"]),
 		);
 		await saveAnalysis(log, leadViewer, {
-			analysis: a.analysis,
+			...saveInput(a.analysis),
+			question: "Why do agents fail?",
 			finalAnswer: "Mostly stale patches.",
 			findings: [{ step: a.step, finding: "11 stale patches" }],
-			clarifications: [],
 			topics: ["failures"],
-			changes: [],
 		});
 		const priorTree = await getAnalysisTree(log, leadViewer, a.analysis);
 		const priorResult = await getStoredQuery(log, leadViewer, a.query, current);
 
-		// A month later: search finds A, then B starts from it with find and read.
+		// A month later: search finds A; B looks only after A's last day.
 		clock.now = Date.parse("2026-10-01T09:00:00Z");
 		const found = await searchAnalyses(log, leadViewer, {
 			text: "Why do agents fail?",
@@ -640,40 +499,31 @@ describe("drafts and revisions", () => {
 			includeEval: false,
 		});
 		expect(found.analyses[0]?.id).toBe(a.analysis);
+		const from = priorTree.cutoff.slice(0, 10);
 		const b = await recordQuery(
 			log,
 			lead,
-			call(
-				{ updates: a.analysis, step: "Failures since the cutoff" },
-				"find",
-				{
-					source: "tool",
-					from: "2026-09-01",
-				},
-				["lead"],
-			),
+			call({}, "find", { source: "tool", from }, ["lead"]),
 		);
 		await recordQuery(
 			log,
 			lead,
-			call(
-				{ analysis: b.analysis, step: "Read the new stale patches" },
-				"read",
-				{},
-				["lead"],
-			),
+			call({ analysis: b.analysis }, "read", {}, ["lead"]),
 		);
 		await saveAnalysis(log, leadViewer, {
-			analysis: b.analysis,
+			...saveInput(b.analysis),
+			question: "Why do agents fail?",
 			finalAnswer: "Still stale patches, fewer of them.",
-			findings: [{ step: b.step, finding: "4 stale patches since 2026-09-01" }],
-			clarifications: [],
+			findings: [
+				{ step: b.query, finding: "4 stale patches since 2026-09-01" },
+			],
 			topics: ["failures"],
+			updates: a.analysis,
 			changes: [
 				{
-					step: b.step,
+					step: b.query,
 					change: "weakened",
-					evidence: "4 since the cutoff, 11 before",
+					evidence: "4 since 2026-09-01, 11 before",
 				},
 			],
 		});
@@ -681,6 +531,9 @@ describe("drafts and revisions", () => {
 		const posterior = await getAnalysisTree(log, leadViewer, b.analysis);
 		expect(posterior.updates).toBe(a.analysis);
 		expect(posterior.question).toBe("Why do agents fail?");
+		expect(posterior.steps[0]?.question).toBe(
+			"find source=tool from=2026-09-01",
+		);
 		expect(posterior.changes.map((change) => change.change)).toEqual([
 			"weakened",
 		]);
@@ -691,54 +544,54 @@ describe("drafts and revisions", () => {
 		);
 		await expect(
 			saveAnalysis(log, leadViewer, {
-				analysis: a.analysis,
+				...saveInput(a.analysis),
 				finalAnswer: "Overwritten",
-				findings: [],
-				clarifications: [],
-				topics: [],
-				changes: [],
 			}),
 		).rejects.toThrow(
 			`This analysis is already saved. To revise it, save a new analysis that passes updates=${a.analysis}.`,
+		);
+		// A saved answer takes no more calls; a revision starts a new draft.
+		await expect(
+			recordQuery(log, lead, call({ analysis: a.analysis })),
+		).rejects.toThrow(
+			`leave out analysis to start a new draft, then save that draft with updates=${a.analysis}`,
 		);
 	});
 });
 
 describe("search and visibility", () => {
-	test("search finds an analysis by a step's sub-question and hides others' private and eval analyses", async () => {
+	test("search finds a saved answer by its question and hides others' private and eval analyses", async () => {
 		const log = createLog();
-		const mine = await recordQuery(
-			log,
-			lead,
-			call({
-				question: "Why is the team annoyed?",
-				step: "Which runs had negative reactions in September?",
-			}),
-		);
+		const mine = await recordQuery(log, lead, call({}));
 		const private_ = await recordQuery(
 			log,
 			{ ...lead, userId: "member" },
-			call({ question: "Private negative reactions" }),
+			call({}),
 		);
 		const evaluation = await recordQuery(
 			log,
 			{ ...lead, host: "eval" },
-			call({ question: "Eval negative reactions" }),
+			call({}),
 		);
-		await publish(log, mine.analysis);
-		await publish(log, private_.analysis, memberViewer);
-		await publish(log, evaluation.analysis);
+		await publish(log, mine.analysis, leadViewer, "Why is the team annoyed?");
+		await publish(
+			log,
+			private_.analysis,
+			memberViewer,
+			"Private negative reactions",
+		);
+		await publish(log, evaluation.analysis, leadViewer, "Eval reactions");
 
 		const found = await searchAnalyses(log, leadViewer, {
-			text: "negative reactions in September",
+			text: "Why is the team annoyed",
 			limit: 5,
 			includeEval: false,
 		});
 		expect(found.analyses[0]?.id).toBe(mine.analysis);
 		expect(found.analyses[0]?.match).toEqual({
-			kind: "step",
-			step: mine.step,
-			text: "Which runs had negative reactions in September?",
+			kind: "question",
+			step: null,
+			text: "Why is the team annoyed?",
 		});
 		expect(found.analyses.map((analysis) => analysis.question)).toEqual([
 			"Why is the team annoyed?",
@@ -750,11 +603,7 @@ describe("search and visibility", () => {
 		const trace = await recordQuery(
 			log,
 			lead,
-			call({ question: "Team frustration" }, "read", {}, [
-				"lead",
-				"member",
-				"other",
-			]),
+			call({}, "read", {}, ["lead", "member", "other"]),
 		);
 		await expect(
 			getAnalysisTree(log, memberViewer, trace.analysis),
@@ -806,7 +655,7 @@ describe("search and visibility", () => {
 			],
 		};
 		const examples = await recordQuery(log, lead, {
-			...call({ question: "Why do tools fail?" }, "find", { source: "tool" }),
+			...call({}, "find", { source: "tool" }),
 			output,
 			sessions: [1, 2, 3, 4, 5].map((index) => ({
 				sessionId: `s_member_${index}`,
@@ -817,15 +666,13 @@ describe("search and visibility", () => {
 			owners: ["member", "bob"],
 		});
 		const grouped = await recordQuery(log, lead, {
-			...call({ analysis: examples.analysis, step: "How often?" }),
+			...call({ analysis: examples.analysis }),
 			owners: ["member", "bob"],
 		});
 		const memberOnly = await recordQuery(
 			log,
 			lead,
-			call({ analysis: examples.analysis, step: "Mine only" }, "read", {}, [
-				"member",
-			]),
+			call({ analysis: examples.analysis }, "read", {}, ["member"]),
 		);
 		await publish(log, examples.analysis);
 		await shareAnalysis(log, leadViewer, examples.analysis, true);
@@ -893,11 +740,7 @@ describe("search and visibility", () => {
 	test("results expire after 90 days and changed sessions are flagged stale", async () => {
 		const clock = { now: Date.parse("2026-07-01T00:00:00Z") };
 		const log = createLog(clock);
-		const trace = await recordQuery(
-			log,
-			lead,
-			call({ question: "Old" }, "find", {}, ["lead"]),
-		);
+		const trace = await recordQuery(log, lead, call({}, "find", {}, ["lead"]));
 		await publish(log, trace.analysis);
 		const changed = await getStoredQuery(
 			log,
@@ -918,22 +761,18 @@ describe("deletion", () => {
 	test("deleting an account removes its analyses and every analysis that read its sessions", async () => {
 		const log = createLog();
 		const leaving = { ...lead, userId: "member" };
-		const theirs = await recordQuery(
-			log,
-			leaving,
-			call({ question: "Their own" }),
-		);
+		const theirs = await recordQuery(log, leaving, call({}));
 		const team = await recordQuery(
 			log,
 			lead,
-			call({ question: "Team" }, "read", {}, ["lead", "member"]),
+			call({}, "read", {}, ["lead", "member"]),
 		);
 		const leadOnly = await recordQuery(
 			log,
 			lead,
-			call({ question: "Lead only" }, "read", {}, ["lead"]),
+			call({}, "read", {}, ["lead"]),
 		);
-		await publish(log, leadOnly.analysis);
+		await publish(log, leadOnly.analysis, leadViewer, "Lead only");
 
 		await purgeAnalysisLog(log.store, memberAccount, purgeSignal());
 		await purgeAnalysisLog(log.store, memberAccount, purgeSignal());
@@ -975,9 +814,9 @@ describe("deletion", () => {
 		assert(trace);
 		await saveAnalysis(log, leadViewer, {
 			analysis: trace.analysis,
+			question: "Saved question",
 			finalAnswer: "Busiest in late September.",
 			findings: [],
-			clarifications: [],
 			topics: [],
 			changes: [],
 		});
@@ -991,7 +830,7 @@ describe("deletion", () => {
 		const theirs = await recordQuery(
 			log,
 			{ ...lead, userId: "member" },
-			call({ question: "Their own" }),
+			call({}),
 		);
 		await expect(
 			purgeAnalysisLog(log.store, memberAccount, AbortSignal.abort()),
@@ -1004,7 +843,7 @@ describe("deletion", () => {
 
 	test("deleting a workspace removes every analysis in it", async () => {
 		const log = createLog();
-		const one = await recordQuery(log, lead, call({ question: "One" }));
+		const one = await recordQuery(log, lead, call({}));
 		await purgeAnalysisLog(
 			log.store,
 			{ targetType: "organization", targetId: workspaceId },
@@ -1024,15 +863,20 @@ async function publish(
 	log: AnalysisLog,
 	analysis: string,
 	viewer: typeof leadViewer = leadViewer,
+	question = "Saved question",
 ) {
-	await saveAnalysis(log, viewer, {
+	await saveAnalysis(log, viewer, { ...saveInput(analysis), question });
+}
+
+function saveInput(analysis: string): AnalysisHistorySaveInput {
+	return {
 		analysis,
+		question: "Saved question",
 		finalAnswer: "Answer",
 		findings: [],
-		clarifications: [],
 		topics: [],
 		changes: [],
-	});
+	};
 }
 
 /** The analysis and its steps as stored, drafts included. */

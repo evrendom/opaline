@@ -14,7 +14,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 	const header = output.header;
 	const lines = [
 		`${output.source} ${header.from}..${header.to} sessions=${header.sessionsInScope} indexed=${header.indexedSessions} runs=${header.runsInScope}`,
-		`minutes=${header.minutes} activeMinutes=${header.activeMinutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} classifier=${header.classifierVersion} truncated=${header.truncated}`,
+		`minutes=${header.minutes} activeMinutes=${header.activeMinutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} truncated=${header.truncated}`,
 		...header.notes.map((note) => `note: ${cell(note)}`),
 		...(header.cursor
 			? [
@@ -181,7 +181,6 @@ export function renderAnalysisSearch(
 			"status",
 			"mine",
 			"shared",
-			"host",
 			"cutoff",
 			"updates",
 			"scope",
@@ -194,7 +193,6 @@ export function renderAnalysisSearch(
 			analysis.status,
 			analysis.mine,
 			analysis.shared,
-			analysis.host,
 			analysis.cutoff,
 			analysis.updates ?? "",
 			scopeText(analysis.scope),
@@ -209,12 +207,9 @@ export function renderAnalysisSearch(
 
 export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 	const lines = [
-		`analysis ${output.id} status=${output.status} mine=${output.mine} shared=${output.shared} host=${output.host} cutoff=${output.cutoff} updates=${output.updates ?? "none"} updatedBy=${output.updatedBy.join(",") || "none"}`,
+		`analysis ${output.id} status=${output.status} mine=${output.mine} shared=${output.shared} cutoff=${output.cutoff} updates=${output.updates ?? "none"} updatedBy=${output.updatedBy.join(",") || "none"}`,
 		`scope ${scopeText(output.scope)}`,
 		`question: ${cell(output.question)}`,
-		output.cost
-			? `cost ${output.cost.source} model=${output.cost.model} input=${output.cost.inputTokens} cached=${output.cost.cachedInputTokens} cacheWrite=${output.cost.cacheWriteTokens} output=${output.cost.outputTokens} reasoning=${output.cost.reasoningTokens} usd=${output.cost.costUsd ?? "unpriced"}`
-			: "cost unavailable",
 		...output.notes.map((note) => `note: ${cell(note)}`),
 	];
 	const depth = new Map<string, number>();
@@ -241,10 +236,6 @@ export function renderAnalysisTree(output: AnalysisHistoryGetOutput): string {
 	lines.push(
 		`final answer: ${output.finalAnswer === null ? "(none yet)" : cell(output.finalAnswer)}`,
 	);
-	for (const chat of output.chatSessions)
-		lines.push(
-			`chat session ${chat.sessionId} source=${chat.source} uploaded=${chat.uploadedAt}`,
-		);
 	return lines.join("\n");
 }
 

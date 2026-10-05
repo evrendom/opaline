@@ -55,10 +55,7 @@ test("pages follow the cursor key: ties break by identity, unpriced last, no dup
 test("a cursor survives a new limit and trace ids but not other arguments", () => {
 	const cursor = writeFindCursor(input, [2, "c"]);
 	expect(
-		readFindCursor(
-			{ ...input, cursor, limit: 200, analysis: "a_1", step: "s_1" },
-			ORDER,
-		),
+		readFindCursor({ ...input, cursor, limit: 200, analysis: "a_1" }, ORDER),
 	).toEqual([2, "c"]);
 	for (const other of [
 		{ ...input, cursor, to: "2026-10-03" },
@@ -82,15 +79,10 @@ test("a cursor that find did not return is a BAD_REQUEST", () => {
 	}
 });
 
-test("a revision's first page (updates) continues with its draft id (analysis) over the same resolved window", () => {
-	// The handler passes the `from` resolved from the prior's cutoff on both calls.
-	const first = { ...input, updates: "a_prior", question: "Why?" };
-	const cursor = writeFindCursor(first, [2, "c"]);
+test("a first page without a draft id continues with the draft id its trace returned", () => {
+	const cursor = writeFindCursor(input, [2, "c"]);
 	expect(
-		readFindCursor(
-			{ ...input, cursor, analysis: "a_draft", step: "s_1" },
-			ORDER,
-		),
+		readFindCursor({ ...input, cursor, analysis: "a_draft" }, ORDER),
 	).toEqual([2, "c"]);
 	// A different window is still another call.
 	expect(() =>

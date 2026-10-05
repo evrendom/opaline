@@ -3,7 +3,6 @@ import { getLogger } from "@logtape/logtape";
 import { ORPCError } from "@orpc/server";
 import type {
 	AnalysisChange,
-	AnalysisFindInput,
 	AnalysisHistoryGetOutput,
 	AnalysisHistoryQueryOutput,
 	AnalysisHistorySaveInput,
@@ -12,6 +11,10 @@ import type {
 	AnalysisHost,
 	AnalysisScope,
 	AnalysisTrace,
+} from "@rudel/api-routes";
+import {
+	AnalysisFindInputSchema,
+	AnalysisReadInputSchema,
 } from "@rudel/api-routes";
 import {
 	AnalysisFullError,
@@ -38,16 +41,17 @@ import type {
 
 const logger = getLogger(["rudel", "api", "analysis-log"]);
 
-/** An unidentified call joins the author's analysis active within this window. */
-const OPEN_ANALYSIS_WINDOW_MS = 30 * 60_000;
 /** Query results expire after this; shared or pinned analyses keep them longer (ADR 0001). */
 const RESULT_RETENTION_MS = 90 * 86_400_000;
 const SHARED_RESULT_RETENTION_MS = 365 * 86_400_000;
-const UNLABELLED_STEP = "(no step given)";
+/** What a draft is called until save_answer gives it the asker's question. */
+const UNSAVED_QUESTION = "(unsaved answer)";
+/** Longest automatic step label; steps hold at most 500 characters. */
+const MAX_STEP_LABEL_CHARS = 200;
 /** Revisions listed with an analysis (`updatedBy`). */
 const MAX_LISTED_REVISIONS = 20;
 
-/** What save_analysis answers for a saved analysis: saving is append-only. */
+/** What save_answer answers for a saved analysis: saving is append-only. */
 export function analysisAlreadySaved(id: string): string {
 	return `This analysis is already saved. To revise it, save a new analysis that passes updates=${id}.`;
 }
@@ -56,14 +60,8 @@ export interface RecordedCall {
 	tool: "find" | "read";
 	/** The call's arguments without the trace fields. */
 	args: Record<string, unknown>;
-	trace: {
-		analysis?: string;
-		question?: string;
-		/** On a draft's first call: the saved analysis it revises. */
-		updates?: string;
-		step?: string;
-		parentStep?: string;
-	};
+	/** The draft this call adds to; without it the call starts a new draft. */
+	trace: { analysis?: string };
 	output: unknown;
 	outputChars: number;
 	sessions: QuerySession[];
@@ -72,10 +70,12 @@ export interface RecordedCall {
 }
 
 /**
- * Stores one find/read call under its draft analysis and step, creating
- * either when needed, and returns the ids the agent passes on its next call.
- * Only drafts take calls: a saved analysis never changes, so revising one
- * starts a new draft (`updates`).
+ * Stores one find/read call as its own step of a draft analysis, labelled
+ * from the tool and its arguments (never from free text), and returns the ids
+ * the agent passes on its next call. Without `analysis` the call starts a new
+ * draft. Only drafts take calls: a saved analysis never changes, so revising
+ * one means a new draft saved with `updates`. Nothing the conversation said
+ * is stored or embedded here; the question arrives with `save_answer`.
  */
 export async function recordQuery(
 	log: AnalysisLog,
@@ -92,19 +92,10 @@ export async function recordQuery(
 	try {
 		return await recordInto(log, analysis, call, now);
 	} catch (error) {
-		// Saved by a concurrent save_analysis after this call picked it.
+		// Saved by a concurrent save_answer after this call picked it.
 		if (error instanceof AnalysisSavedError) throw notADraft(analysis.id);
 		if (!(error instanceof AnalysisFullError)) throw error;
-		// Only a named analysis is the agent's to fix; one the server picked
-		// filled up under a concurrent call, so this call starts a new one.
-		if (call.trace.analysis || call.trace.question || call.trace.updates)
-			throw analysisFull(analysis.id, error.child);
-		return recordInto(
-			log,
-			await createAnalysis(log, author, call.trace, now),
-			call,
-			now,
-		);
+		throw analysisFull(analysis.id, error.child);
 	}
 }
 
@@ -117,7 +108,7 @@ async function recordInto(
 ): Promise<AnalysisTrace> {
 	if (analysis.queryCount >= MAX_QUERIES_PER_ANALYSIS)
 		throw new AnalysisFullError("queries");
-	const step = await resolveStep(log, analysis, call.trace, now);
+	const step = await createCallStep(log, analysis, call, now);
 	const query: StoredQuery = {
 		id: newId("q"),
 		analysisId: analysis.id,
@@ -143,8 +134,8 @@ async function recordInto(
 }
 
 /**
- * Publishes a draft: the final answer, step findings, the asker's
- * clarifications and, for a revision, how each finding changed. The analysis
+ * Publishes a draft: its question as a short title, the final answer, step
+ * findings and, for a revision, how each finding changed. The analysis
  * becomes finished and visible to its author (and the workspace once shared).
  * Saving is append-only: a saved analysis is refused unchanged, and a
  * revision is a new analysis that names it in `updates`.
@@ -154,6 +145,11 @@ export async function saveAnalysis(
 	viewer: AnalysisViewer,
 	input: AnalysisHistorySaveInput,
 ): Promise<{ analysis: string; status: "finished" }> {
+	if (!input.question?.trim())
+		throw new ORPCError("BAD_REQUEST", {
+			message:
+				"question is required: the question this answer addresses, as a short title",
+		});
 	const analysis = await authoredAnalysis(log, viewer, input.analysis);
 	if (analysis.status === "finished")
 		throw new ORPCError("CONFLICT", {
@@ -169,16 +165,20 @@ export async function saveAnalysis(
 			message:
 				"changes says how findings moved against the analysis this one updates; this analysis updates none, so leave changes out or pass updates",
 		});
-	const steps = await log.store.getSteps(analysis.id);
-	// Agents refer to steps by id or by the sub-question they wrote; accept both.
+	const [steps, queries] = await Promise.all([
+		log.store.getSteps(analysis.id),
+		log.store.getQueries(analysis.id),
+	]);
+	// Agents name a step by its step or query id from a trace line, or by its
+	// exact label; accept all three.
 	const stepOf = (reference: string) => {
+		const id = stepIdOf(queries, reference);
 		const step = steps.find(
-			(candidate) =>
-				candidate.id === reference || candidate.question === reference.trim(),
+			(candidate) => candidate.id === id || candidate.question === id.trim(),
 		);
 		if (!step)
 			throw new ORPCError("BAD_REQUEST", {
-				message: `Step "${reference}" is not part of analysis ${analysis.id}; use a step id from a trace line or its exact sub-question`,
+				message: `Step "${reference}" is not part of analysis ${analysis.id}; use the step or query id from the trace line of a find or read call`,
 			});
 		return step;
 	};
@@ -186,59 +186,40 @@ export async function saveAnalysis(
 		stepId: stepOf(step).id,
 		finding,
 	}));
-	const now = log.now().toISOString();
-	const clarifications = input.clarifications.map(
-		(clarification, index): StoredStep => {
-			const before = clarification.before
-				? stepOf(clarification.before)
-				: undefined;
-			return {
-				id: newId("s"),
-				analysisId: analysis.id,
-				parentId: null,
-				ordinal: before
-					? before.ordinal - 0.5 + index / 1_000
-					: Math.max(0, ...steps.map((item) => item.ordinal)) + 1 + index,
-				question: clarification.question,
-				reply: clarification.reply,
-				finding: null,
-				createdAt: now,
-			};
-		},
-	);
 	const changes = updates
-		? resolveChanges(
+		? await revisionChanges(
+				log,
+				viewer,
 				analysis.id,
-				await visibleAnalysis(log, viewer, updates),
-				await log.store.getSteps(updates),
+				updates,
 				findings.map(({ stepId, finding }) => ({
 					step: stepOf(stepId),
 					finding,
 				})),
-				input.changes,
+				input.changes.map((change) => ({
+					...change,
+					step: stepIdOf(queries, change.step),
+				})),
 			)
 		: [];
-	const full = new ORPCError("BAD_REQUEST", {
-		message: `Analysis ${analysis.id} has ${steps.length} steps; with ${clarifications.length} clarifications it would pass ${MAX_STEPS_PER_ANALYSIS}, the most one analysis keeps; save fewer clarifications`,
-	});
-	if (steps.length + clarifications.length > MAX_STEPS_PER_ANALYSIS) throw full;
-
 	// One atomic write: a refused save leaves the analysis as it was.
 	try {
+		// Clarification steps are no longer taken from the chat; earlier
+		// analyses keep theirs.
 		await log.store.saveAnalysis(analysis.id, {
 			findings,
-			clarifications,
+			clarifications: [],
 			patch: {
 				status: "finished",
+				question: input.question,
 				finalAnswer: input.finalAnswer,
 				topics: input.topics,
 				updates,
 				changes,
-				scope: scopeOf(await log.store.getQueries(analysis.id)),
+				scope: scopeOf(queries),
 			},
 		});
 	} catch (error) {
-		if (error instanceof AnalysisFullError) throw full;
 		// A concurrent save won: nothing was written by this one.
 		if (error instanceof AnalysisSavedError)
 			throw new ORPCError("CONFLICT", {
@@ -246,15 +227,15 @@ export async function saveAnalysis(
 			});
 		throw error;
 	}
-	for (const step of clarifications)
-		await embedText(
-			log,
-			analysis.workspaceId,
-			analysis.id,
-			step.id,
-			"step",
-			step.question,
-		);
+	// Search embeddings are computed only now, for the saved answer.
+	await embedText(
+		log,
+		analysis.workspaceId,
+		analysis.id,
+		null,
+		"question",
+		input.question,
+	);
 	if (input.topics.length)
 		await embedText(
 			log,
@@ -265,49 +246,6 @@ export async function saveAnalysis(
 			input.topics.join(", "),
 		);
 	return { analysis: analysis.id, status: "finished" };
-}
-
-/**
- * A find without `from` in a revision covers only the evidence since the
- * revised analysis's data cutoff day: on the draft's first call (`updates`)
- * and on every follow-up (`analysis` naming a draft that revises one), so
- * pages and follow-ups keep one window. The note says so in the result's
- * header. An explicit `from` always wins. Null when nothing changes; a draft
- * the caller cannot add to is left for `recordQuery` to refuse.
- */
-export async function sinceUpdatedCutoff(
-	log: AnalysisLog,
-	viewer: AnalysisViewer,
-	input: AnalysisFindInput,
-): Promise<{ input: AnalysisFindInput; note: string } | null> {
-	if (input.from) return null;
-	const updates = input.updates ?? (await draftUpdates(log, viewer, input));
-	if (!updates) return null;
-	const prior = await visibleAnalysis(log, viewer, updates);
-	const from = prior.cutoff.slice(0, 10);
-	if (input.to && input.to < from) return null;
-	return {
-		input: { ...input, from },
-		note: `from defaults to ${from}, the data cutoff of analysis ${prior.id} that this draft updates; pass from to cover earlier days`,
-	};
-}
-
-/** The analysis the named draft revises, when the caller may add to that draft. */
-async function draftUpdates(
-	log: AnalysisLog,
-	viewer: AnalysisViewer,
-	input: AnalysisFindInput,
-): Promise<string | null> {
-	if (!input.analysis) return null;
-	const draft = await log.store.getAnalysis(input.analysis);
-	if (
-		!draft?.draft ||
-		draft.workspaceId !== viewer.workspaceId ||
-		draft.authorId !== viewer.userId ||
-		isExpiredDraft(draft, log.now())
-	)
-		return null;
-	return draft.updates;
 }
 
 /**
@@ -492,7 +430,7 @@ export async function shareAnalysis(
 	const analysis = await authoredAnalysis(log, viewer, id);
 	if (analysis.draft)
 		throw new ORPCError("BAD_REQUEST", {
-			message: `Analysis ${analysis.id} is an unsaved draft; save it with save_analysis first, then share it`,
+			message: `Analysis ${analysis.id} is an unsaved draft; save it with save_answer first, then share it`,
 		});
 	await log.store.updateAnalysis(analysis.id, { shared });
 	return { analysis: analysis.id, shared };
@@ -504,54 +442,28 @@ async function resolveAnalysis(
 	trace: RecordedCall["trace"],
 	now: string,
 ): Promise<StoredAnalysis> {
-	if (trace.analysis) {
-		const analysis = await authoredAnalysis(
-			log,
-			authorViewer(author),
-			trace.analysis,
-		);
-		if (!analysis.draft) throw notADraft(analysis.id);
-		if (trace.updates && trace.updates !== analysis.updates)
-			throw new ORPCError("BAD_REQUEST", {
-				message: `updates only applies to the first call of a draft; analysis ${analysis.id} ${analysis.updates ? `updates ${analysis.updates}` : "updates no earlier analysis"}. Leave updates out, or start a new draft with updates and no analysis`,
-			});
-		return analysis;
-	}
-	if (!trace.question && !trace.updates) {
-		const open = await log.store.latestOpenAnalysis(
-			author.workspaceId,
-			author.userId,
-			new Date(Date.parse(now) - OPEN_ANALYSIS_WINDOW_MS).toISOString(),
-		);
-		// A full analysis the server picked is not the agent's mistake: start anew.
-		if (
-			open &&
-			!isExpiredDraft(open, new Date(now)) &&
-			open.queryCount < MAX_QUERIES_PER_ANALYSIS &&
-			open.stepCount < MAX_STEPS_PER_ANALYSIS
-		)
-			return open;
-	}
-	return createAnalysis(log, author, trace, now);
+	if (!trace.analysis) return createAnalysis(log, author, now);
+	const analysis = await authoredAnalysis(
+		log,
+		authorViewer(author),
+		trace.analysis,
+	);
+	if (!analysis.draft) throw notADraft(analysis.id);
+	return analysis;
 }
 
+/** A new draft; it gets its question and becomes searchable only when saved. */
 async function createAnalysis(
 	log: AnalysisLog,
 	author: { workspaceId: string; userId: string; host: AnalysisHost },
-	trace: RecordedCall["trace"],
 	now: string,
 ): Promise<StoredAnalysis> {
-	// A revision starts from a saved analysis its author may see.
-	const prior = trace.updates
-		? await visibleAnalysis(log, authorViewer(author), trace.updates)
-		: null;
-	const question = trace.question ?? prior?.question;
 	const analysis: StoredAnalysis = {
 		id: newId("a"),
 		workspaceId: author.workspaceId,
 		authorId: author.userId,
 		host: author.host,
-		question: question ?? "(question not given)",
+		question: UNSAVED_QUESTION,
 		status: "unfinished",
 		draft: true,
 		shared: false,
@@ -561,7 +473,7 @@ async function createAnalysis(
 		scope: { from: null, to: null, filters: {} },
 		finalAnswer: null,
 		topics: [],
-		updates: prior?.id ?? null,
+		updates: null,
 		changes: [],
 		notes: [],
 		cost: null,
@@ -569,65 +481,108 @@ async function createAnalysis(
 		stepCount: 0,
 	};
 	await log.store.createAnalysis(analysis);
-	if (question)
-		await embedText(
-			log,
-			analysis.workspaceId,
-			analysis.id,
-			null,
-			"question",
-			question,
-		);
 	return analysis;
 }
 
-/** `step` is an existing step id, or the text of a sub-question (reused when already asked). */
-async function resolveStep(
+/** Every call is its own step, labelled from its tool and arguments. */
+async function createCallStep(
 	log: AnalysisLog,
 	analysis: StoredAnalysis,
-	trace: RecordedCall["trace"],
+	call: RecordedCall,
 	now: string,
 ): Promise<StoredStep> {
 	const steps = await log.store.getSteps(analysis.id);
-	const text = trace.step ?? UNLABELLED_STEP;
-	const existing = steps.find(
-		(step) => step.id === text || step.question === text,
-	);
-	if (existing) return existing;
-	if (trace.step?.startsWith("s_"))
-		throw new ORPCError("BAD_REQUEST", {
-			message: `Step ${trace.step} is not part of analysis ${analysis.id}`,
-		});
-	const parent = trace.parentStep
-		? steps.find((step) => step.id === trace.parentStep)
-		: undefined;
-	if (trace.parentStep && !parent)
-		throw new ORPCError("BAD_REQUEST", {
-			message: `Parent step ${trace.parentStep} is not part of analysis ${analysis.id}`,
-		});
 	if (steps.length >= MAX_STEPS_PER_ANALYSIS)
 		throw new AnalysisFullError("steps");
 	const step: StoredStep = {
 		id: newId("s"),
 		analysisId: analysis.id,
-		parentId: parent?.id ?? null,
+		parentId: null,
 		ordinal: Math.max(0, ...steps.map((item) => item.ordinal)) + 1,
-		question: text,
+		question: stepLabel(call.tool, call.args),
 		reply: null,
 		finding: null,
 		createdAt: now,
 	};
 	await log.store.createStep(step);
-	if (trace.step)
-		await embedText(
-			log,
-			analysis.workspaceId,
-			analysis.id,
-			step.id,
-			"step",
-			text,
-		);
 	return step;
+}
+
+/** Argument values every find or read call has unless the agent changed them. */
+const CALL_DEFAULTS = {
+	find: AnalysisFindInputSchema.parse({ source: "runs" }),
+	read: AnalysisReadInputSchema.parse({
+		refs: [{ sessionId: "s", turn: 1 }],
+	}),
+} as const;
+
+/**
+ * "find source=tool kind=validation from=2026-09-01", "read runs=3
+ * depth=turn": the call's tool and the arguments it set (source always, other
+ * defaults left out), run lists as a count. Never free text from the chat.
+ */
+export function stepLabel(
+	tool: RecordedCall["tool"],
+	args: Record<string, unknown>,
+): string {
+	const defaults: Record<string, unknown> = CALL_DEFAULTS[tool];
+	const parts: string[] = [tool];
+	for (const [key, value] of Object.entries(args)) {
+		if (key === "workspace" || key === "cursor" || value === undefined)
+			continue;
+		if (
+			key !== "source" &&
+			key !== "refs" &&
+			JSON.stringify(value) === JSON.stringify(defaults[key])
+		)
+			continue;
+		if (key === "refs" && Array.isArray(value)) {
+			parts.push(`runs=${value.length}`);
+			continue;
+		}
+		if (Array.isArray(value)) {
+			parts.push(`${key}=${value.join(",")}`);
+			continue;
+		}
+		if (typeof value !== "object" || value === null)
+			parts.push(`${key}=${value}`);
+	}
+	const label = parts.join(" ");
+	return label.length > MAX_STEP_LABEL_CHARS
+		? `${label.slice(0, MAX_STEP_LABEL_CHARS - 1)}…`
+		: label;
+}
+
+/** A query id of this analysis names its step; any other reference is kept. */
+function stepIdOf(queries: QuerySummary[], reference: string): string {
+	return queries.find((query) => query.id === reference)?.stepId ?? reference;
+}
+
+/** `resolveChanges` against the revised analysis, whose query ids also name its steps. */
+async function revisionChanges(
+	log: AnalysisLog,
+	viewer: AnalysisViewer,
+	analysisId: string,
+	updates: string,
+	findings: { step: StoredStep; finding: string }[],
+	changes: AnalysisHistorySaveInput["changes"],
+): Promise<AnalysisChange[]> {
+	const prior = await visibleAnalysis(log, viewer, updates);
+	const [priorSteps, priorQueries] = await Promise.all([
+		log.store.getSteps(prior.id),
+		log.store.getQueries(prior.id),
+	]);
+	return resolveChanges(
+		analysisId,
+		prior,
+		priorSteps,
+		findings,
+		changes.map((change) =>
+			findings.some((item) => item.step.id === change.step)
+				? change
+				: { ...change, step: stepIdOf(priorQueries, change.step) },
+		),
+	);
 }
 
 /**
@@ -687,13 +642,13 @@ function resolveChanges(
 			`no saved finding of this analysis, nor a step of ${prior.id} (allowed only with change=dropped), for ${unknown.map((reference) => `"${reference}"`).join(", ")}`,
 	].filter(Boolean);
 	throw new ORPCError("BAD_REQUEST", {
-		message: `Analysis ${analysisId} updates ${prior.id}, so changes needs exactly one item per finding saved now, naming its step by id or exact sub-question (plus change=dropped items for findings of ${prior.id} that no longer hold): ${problems.join("; ")}. Nothing was saved.`,
+		message: `Analysis ${analysisId} updates ${prior.id}, so changes needs exactly one item per finding saved now, naming its step by its step or query id (plus change=dropped items for findings of ${prior.id} that no longer hold): ${problems.join("; ")}. Nothing was saved.`,
 	});
 }
 
 function notADraft(analysisId: string): ORPCError<"BAD_REQUEST", unknown> {
 	return new ORPCError("BAD_REQUEST", {
-		message: `Analysis ${analysisId} is saved, and a saved analysis never changes; find and read add only to the unsaved draft they started. To revise it, start a new draft by passing updates=${analysisId} (and no analysis), then save that draft`,
+		message: `Analysis ${analysisId} is saved, and a saved analysis never changes; find and read add only to the unsaved draft they started. To revise it, leave out analysis to start a new draft, then save that draft with updates=${analysisId}`,
 	});
 }
 
@@ -715,8 +670,8 @@ function analysisFull(
 	child: AnalysisFullError["child"],
 ): ORPCError<"BAD_REQUEST", unknown> {
 	const messages = {
-		queries: `Analysis ${analysisId} already has ${MAX_QUERIES_PER_ANALYSIS} queries, the most one analysis keeps; start a new analysis by passing question instead of analysis`,
-		steps: `Analysis ${analysisId} already has ${MAX_STEPS_PER_ANALYSIS} steps, the most one analysis keeps; reuse a step id or start a new analysis by passing question instead of analysis`,
+		queries: `Analysis ${analysisId} already has ${MAX_QUERIES_PER_ANALYSIS} queries, the most one analysis keeps; save it, or start a new analysis by leaving out analysis`,
+		steps: `Analysis ${analysisId} already has ${MAX_STEPS_PER_ANALYSIS} steps, the most one analysis keeps; save it, or start a new analysis by leaving out analysis`,
 		sessions: `Analysis ${analysisId} already has ${MAX_SESSIONS_PER_ANALYSIS} linked chat sessions, the most one analysis keeps`,
 	} as const;
 	return new ORPCError("BAD_REQUEST", { message: messages[child] });

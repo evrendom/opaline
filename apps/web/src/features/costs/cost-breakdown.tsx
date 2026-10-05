@@ -54,6 +54,8 @@ type Props = {
 	onToggle: (id: string) => void;
 	onSplit: () => void;
 	onClear: () => void;
+	/** Set while the rows are not loaded yet (plugin app); shows a load button. */
+	onLoadDeferred?: () => void;
 };
 
 export function CostBreakdown({
@@ -68,6 +70,7 @@ export function CostBreakdown({
 	onToggle,
 	onSplit,
 	onClear,
+	onLoadDeferred,
 }: Props) {
 	const [expanded, setExpanded] = useState(false);
 	const [search, setSearch] = useState("");
@@ -116,6 +119,16 @@ export function CostBreakdown({
 					<FluidMenuHover items=".cost-breakdown-row" />
 					{pending ? (
 						<BreakdownSkeleton />
+					) : onLoadDeferred ? (
+						<p className="cost-breakdown-empty">
+							<button
+								type="button"
+								className="cost-breakdown-load"
+								onClick={onLoadDeferred}
+							>
+								Show {label.toLowerCase()}
+							</button>
+						</p>
 					) : entries.length ? (
 						entries
 							.slice(
@@ -149,7 +162,7 @@ export function CostBreakdown({
 				</div>
 				<div className="cost-breakdown-footer">
 					<span>
-						{pending
+						{pending || onLoadDeferred
 							? ""
 							: `${entries.length} ${entries.length === 1 ? (dimension === "repositories" ? "repository" : countLabel.slice(0, -1)) : countLabel}`}
 					</span>

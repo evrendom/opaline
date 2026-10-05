@@ -27,7 +27,7 @@ test("maps the actual oRPC client path, input, workspace and abort signal to too
 	expect(result).toEqual({ revision: "revision-1" });
 	expect(calls).toEqual([
 		{
-			name: "app_analytics__sessions__detailInitial",
+			name: "app_session_overview",
 			args: { workspace: "team", sessionId: "session-1" },
 			signal: controller.signal,
 		},
@@ -58,7 +58,7 @@ test("no-input reads have closed workspace arguments; input cannot override the 
 	expect(
 		pluginToolCall(["analytics", "skills", "list"], undefined, "team"),
 	).toEqual({
-		name: "app_analytics__skills__list",
+		name: "app_skills_list",
 		arguments: { workspace: "team" },
 	});
 	expect(
@@ -71,6 +71,14 @@ test("no-input reads have closed workspace arguments; input cannot override the 
 	expect(() =>
 		pluginToolCall(["analytics.sessions", "list"], {}, "team"),
 	).toThrow();
+	// Procedures the server does not serve to the app have no tool.
+	expect(() => pluginToolCall(["profile", "updateMine"], {}, "team")).toThrow();
+	expect(
+		() => pluginToolCall(["analytics", "overview", "costs"], {}, "team").name,
+	).not.toThrow();
+	expect(
+		pluginToolCall(["analytics", "overview", "costs"], {}, "team").name,
+	).toBe("app_dashboard_metrics");
 	expect(() =>
 		pluginToolCall(["analytics", "sessions", "list"], [], "team"),
 	).toThrow();

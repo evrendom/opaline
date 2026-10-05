@@ -9,6 +9,8 @@
  * `_meta["opaline/widget"]`. The seed's people, repositories and workspace are
  * replaced with fictional ones (FICTIONAL); the run fails if any survive. The dashboard needs no other tool call; any the
  * app makes (`app_*`) is answered from the same seed or listed at the end.
+ * The per-member breakdown is hidden: the listing shows team patterns
+ * (trend, repositories, models), never a ranking of named people.
  *
  *   bun scripts/plugin-screenshots.ts [--skip-build]
  *
@@ -18,6 +20,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
+import { CostDashboardInputSchema } from "../packages/api-routes/src/index.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const WEB = join(ROOT, "apps/web");
@@ -126,10 +129,25 @@ try {
 					openExternal: () => {},
 				};
 			},
-			{ widget, shot },
+			// As get_dashboard sends it: no roster and no rows naming people.
+			{
+				widget: {
+					...widget,
+					members: undefined,
+					account: undefined,
+					dashboard: {
+						...widget.dashboard,
+						data: withoutPersonRows(widget.dashboard.data),
+					},
+				},
+				shot,
+			},
 		);
 		await page.goto(origin);
 		await page.waitForLoadState("networkidle");
+		await page.addStyleTag({
+			content: 'section[data-dimension="members"] { display: none !important; }',
+		});
 		if (shot.scroll) {
 			await page.mouse.move(WIDTH / 2, HEIGHT / 2);
 			await page.mouse.wheel(0, shot.scroll);
@@ -194,9 +212,15 @@ function pluginSeed() {
 			repositories: [],
 			models: [],
 		},
-		dashboard: sample.dashboard,
-		// The same minimal bootstrap get_dashboard sends (readPluginBootstrap).
-		bootstrap: {
+		// The exact input (and cache key) get_dashboard sends, so the first
+		// view renders from this data as it does for users.
+		dashboard: {
+			...sample.dashboard,
+			input: CostDashboardInputSchema.parse(sample.dashboard.input),
+		},
+		members,
+		// What app_account answers when a view needs the caller's account.
+		account: {
 			session: {
 				user: owner.user,
 				session: {
@@ -206,21 +230,28 @@ function pluginSeed() {
 					expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
 				},
 			},
+			member: owner,
+		},
+		// The same minimal bootstrap get_dashboard sends (readPluginBootstrap):
+		// the workspace only; the roster and the account load on demand.
+		bootstrap: {
 			organization: {
 				...sample.organization,
 				logo: null,
-				members,
+				members: [],
 				invitations: [],
 			},
-			member: owner,
 		},
 	};
 }
 
 /** Plugin tools answer `{ result }` in structuredContent, as mcp-http does. */
 function answerTool(name: string) {
+	if (name === "workspace_members")
+		return { structuredContent: { members: widget.members } };
+	if (name === "app_account") return { structuredContent: widget.account };
 	const results: Record<string, unknown> = {
-		app_analytics__overview__costs: widget.dashboard.data,
+		app_dashboard_metrics: widget.dashboard.data,
 	};
 	if (name in results)
 		return { structuredContent: { result: results[name] } };
@@ -230,5 +261,29 @@ function answerTool(name: string) {
 		structuredContent: {
 			error: { code: "NOT_FOUND", status: 404, message: "Not in the sample." },
 		},
+	};
+}
+
+/** Mirrors `withoutPersonRows` in apps/api/src/mcp/mcp-tools.ts. */
+function withoutPersonRows<T extends { metrics: Record<string, unknown> }>(
+	data: T,
+): T {
+	return {
+		...data,
+		metrics: Object.fromEntries(
+			Object.entries(data.metrics).map(([name, metric]) => [
+				name,
+				metric && typeof metric === "object" && "breakdowns" in metric
+					? {
+							...metric,
+							breakdowns: {
+								...(metric.breakdowns as object),
+								members: [],
+								githubAuthors: [],
+							},
+						}
+					: metric,
+			]),
+		),
 	};
 }

@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { redactReturnedValue } from "@rudel/secret-filter";
 import { type ClickHouseExecutor, getClickhouse } from "../../clickhouse.js";
 import { orgMiddleware, os } from "../../middleware.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
@@ -15,7 +16,6 @@ import {
 	saveAnalysis,
 	searchAnalyses,
 	shareAnalysis,
-	sinceUpdatedCutoff,
 } from "../../services/analysis-log/analysis-log.service.js";
 import { captureCall, hostOf } from "../../services/analysis-log/capture.js";
 import {
@@ -29,7 +29,7 @@ import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-acc
 
 /** Why history calls fail where the log is off, phrased for the calling agent. */
 export const ANALYSIS_HISTORY_OFF =
-	"Analysis history is off for this workspace; answer with find and read, and skip analyses search and save.";
+	"Analysis history is off for this workspace; answer with find and read, and skip search_answers, save_answer and share_answer.";
 
 /** Longest rendered trace line ("trace analysis=… step=… query=…") plus its newline. */
 const TRACE_LINE_RESERVE = 80;
@@ -67,38 +67,25 @@ export function createAnalysisRouter(
 				throw new ORPCError("FORBIDDEN", {
 					message: "Only workspace admins may filter by userId",
 				});
-			const log = analysisLog(context.organizationId);
-			// A revision gathers only the evidence since its prior's cutoff.
-			const scoped = log
-				? await sinceUpdatedCutoff(log, viewerOf(context), input)
-				: null;
-			const args = scoped?.input ?? input;
 			const found = await findAnalysisWithOwners(
 				{
 					organizationId: context.organizationId,
 					userId: context.isOrgAdmin ? (input.userId ?? null) : context.user.id,
 				},
-				args,
+				input,
 				env,
 			);
-			// The note is part of the stored result, so the draft records it too.
-			const output = scoped
-				? {
-						...found.output,
-						header: {
-							...found.output.header,
-							notes: [scoped.note, ...found.output.header.notes],
-						},
-					}
-				: found.output;
+			const { owners } = found;
+			// Credentials never leave in a result or its stored evidence.
+			const output = redactReturnedValue(found.output);
 			const trace = await captureCall(
 				env.executor,
-				log,
+				analysisLog(context.organizationId),
 				author(context),
 				"find",
-				args,
+				input,
 				output,
-				found.owners,
+				owners,
 			);
 			return trace ? withFindTrace(output, trace) : output;
 		});
@@ -127,10 +114,12 @@ export function createAnalysisRouter(
 				env,
 			);
 			// Keep room for the trace line so the rendered read stays within maxChars.
-			const output =
+			const fitted =
 				log && input.maxChars > TRACE_LINE_RESERVE * 2
 					? budgetReadOutput(read, input.maxChars - TRACE_LINE_RESERVE)
 					: read;
+			// Credentials never leave in a result or its stored evidence.
+			const output = redactReturnedValue(fitted);
 			const trace = await captureCall(
 				env.executor,
 				log,
@@ -140,7 +129,7 @@ export function createAnalysisRouter(
 				output,
 				[...new Set(owners.values())],
 			);
-			return trace && output !== read ? withReadTrace(output, trace) : output;
+			return trace && fitted !== read ? withReadTrace(output, trace) : output;
 		});
 
 	const viewerOf = (context: {

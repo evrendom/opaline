@@ -319,72 +319,6 @@ export function analysisStoreContract(
 			]);
 		});
 
-		test("latest open analysis is a draft and uses the activity cutoff, inclusive window, workspace and author", async () => {
-			const { store, otherWorkspaceId, otherAuthorId, ...context } = setup();
-			const analysis = { ...context.analysis, draft: true };
-			// Unfinished analyses recorded before drafts existed are never joined.
-			await store.createAnalysis({
-				...analysis,
-				id: `${analysis.id}_legacy`,
-				draft: false,
-				cutoff: "2026-10-03T14:00:00.000Z",
-			});
-			const boundary = "2026-10-03T10:00:00.000Z";
-			await store.createAnalysis({ ...analysis, cutoff: boundary });
-			await store.createAnalysis({
-				...analysis,
-				id: `${analysis.id}_old`,
-				cutoff: "2026-10-03T09:59:59.999Z",
-			});
-			await store.createAnalysis({
-				...analysis,
-				id: `${analysis.id}_finished`,
-				status: "finished",
-				cutoff: "2026-10-03T11:00:00.000Z",
-			});
-			await store.createAnalysis({
-				...analysis,
-				id: `${analysis.id}_workspace`,
-				workspaceId: otherWorkspaceId,
-				cutoff: "2026-10-03T12:00:00.000Z",
-			});
-			await store.createAnalysis({
-				...analysis,
-				id: `${analysis.id}_author`,
-				authorId: otherAuthorId,
-				cutoff: "2026-10-03T13:00:00.000Z",
-			});
-			expect(
-				(
-					await store.latestOpenAnalysis(
-						analysis.workspaceId,
-						analysis.authorId,
-						boundary,
-					)
-				)?.id,
-			).toBe(analysis.id);
-			expect(
-				await store.latestOpenAnalysis(
-					analysis.workspaceId,
-					analysis.authorId,
-					"2026-10-03T10:00:00.001Z",
-				),
-			).toBeNull();
-			const newest = {
-				...analysis,
-				id: `${analysis.id}_new`,
-				cutoff: "2026-10-03T10:01:00.000Z",
-			};
-			await store.createAnalysis(newest);
-			expect(
-				await store.latestOpenAnalysis(
-					analysis.workspaceId,
-					analysis.authorId,
-					boundary,
-				),
-			).toEqual(newest);
-		});
-
 		test("recent analyses includes only the viewer's own and shared workspace analyses, newest first", async () => {
 			const { store, analysis, otherWorkspaceId, otherAuthorId } = setup();
 			const own = { ...analysis, cutoff: "2026-10-03T10:00:00.000Z" };
@@ -545,13 +479,6 @@ export function analysisStoreContract(
 			expect(
 				await store.recentAnalyses(analysis.workspaceId, analysis.authorId, 10),
 			).toEqual([]);
-			expect(
-				await store.latestOpenAnalysis(
-					analysis.workspaceId,
-					analysis.authorId,
-					analysis.cutoff,
-				),
-			).toBeNull();
 			await expect(
 				store.createStep({ ...step, id: `${step.id}_late` }),
 			).rejects.toThrow();
@@ -616,11 +543,11 @@ export function analysisStoreContract(
 				userId: otherAuthorId,
 				host: "plugin" as const,
 			};
-			const record = (question: string) =>
+			const record = (_label: string) =>
 				recordQuery(log, author, {
 					tool: "read",
 					args: {},
-					trace: { question },
+					trace: {},
 					output: { ok: true },
 					outputChars: 11,
 					sessions: [sessionOf(ownerId)],
@@ -653,7 +580,7 @@ export function analysisStoreContract(
 			const trace = await recordQuery(log, admin, {
 				tool: "find",
 				args: { source: "runs", groupBy: "week" },
-				trace: { question: "How busy was the team?" },
+				trace: {},
 				output: { groups: [{ key: "2026-09-28", runs: 12, sessions: 3 }] },
 				outputChars: 60,
 				sessions: [],
@@ -669,9 +596,9 @@ export function analysisStoreContract(
 				},
 				{
 					analysis: trace.analysis,
+					question: "How busy was the team?",
 					finalAnswer: "Busiest in late September.",
 					findings: [],
-					clarifications: [],
 					topics: [],
 					changes: [],
 				},
@@ -932,11 +859,7 @@ export function analysisStoreContract(
 			const { store, workspaceId, otherAuthorId, ownerId, analysis } = setup();
 			const log = logOf(store);
 			const author = authorOf(workspaceId, analysis.authorId);
-			const draft = await recordQuery(
-				log,
-				author,
-				recorded({ question: "Why do drafts stay private?" }, [ownerId]),
-			);
+			const draft = await recordQuery(log, author, recorded({}, [ownerId]));
 			const stored = await store.getAnalysis(draft.analysis);
 			expect(stored).toMatchObject({ draft: true, status: "unfinished" });
 
@@ -1000,22 +923,20 @@ export function analysisStoreContract(
 			expect(await store.getAnalysis(draft.analysis)).toEqual(stored);
 		});
 
-		test("saving publishes a draft with its answer, findings, clarifications and topics", async () => {
+		test("saving publishes a draft with its question, answer, findings and topics", async () => {
 			const { store, workspaceId, analysis, ownerId } = setup();
 			const log = logOf(store);
 			const viewer = viewerOf(workspaceId, analysis.authorId);
 			const draft = await recordQuery(
 				log,
 				authorOf(workspaceId, analysis.authorId),
-				recorded({ question: "Which runs failed?", step: "Failed runs" }, [
-					ownerId,
-				]),
+				recorded({}, [ownerId]),
 			);
 			await saveAnalysis(log, viewer, {
 				analysis: draft.analysis,
+				question: "Which runs failed?",
 				finalAnswer: "Three runs failed.",
 				findings: [{ step: draft.step, finding: "three" }],
-				clarifications: [{ question: "This week?", reply: "Yes" }],
 				topics: ["failures"],
 				changes: [],
 			});
@@ -1023,13 +944,13 @@ export function analysisStoreContract(
 			expect(await store.getAnalysis(draft.analysis)).toMatchObject({
 				draft: false,
 				status: "finished",
+				question: "Which runs failed?",
 				finalAnswer: "Three runs failed.",
 				topics: ["failures"],
 			});
 			const tree = await getAnalysisTree(log, viewer, draft.analysis);
 			expect(tree.steps.map((step) => [step.question, step.finding])).toEqual([
-				["Failed runs", "three"],
-				["This week?", null],
+				["find source=runs", "three"],
 			]);
 			const query = await getStoredQuery(
 				log,
@@ -1053,11 +974,7 @@ export function analysisStoreContract(
 			const log = logOf(store);
 			const viewer = viewerOf(workspaceId, analysis.authorId);
 			const author = authorOf(workspaceId, analysis.authorId);
-			const draft = await recordQuery(
-				log,
-				author,
-				recorded({ question: "Saved once", step: "Only step" }, [ownerId]),
-			);
+			const draft = await recordQuery(log, author, recorded({}, [ownerId]));
 			await saveAnalysis(log, viewer, {
 				...emptySave(draft.analysis),
 				finalAnswer: "First answer",
@@ -1069,7 +986,6 @@ export function analysisStoreContract(
 				...emptySave(draft.analysis),
 				finalAnswer: "Second answer",
 				findings: [{ step: draft.step, finding: "second" }],
-				clarifications: [{ question: "Again?", reply: "Yes" }],
 				topics: ["changed"],
 			}).catch((error: unknown) => error);
 			expect(refused).toBeInstanceOf(ORPCError);
@@ -1080,11 +996,7 @@ export function analysisStoreContract(
 				analysisAlreadySaved(draft.analysis),
 			);
 			await expectCode(
-				recordQuery(
-					log,
-					author,
-					recorded({ analysis: draft.analysis, step: "Later" }),
-				),
+				recordQuery(log, author, recorded({ analysis: draft.analysis })),
 				"BAD_REQUEST",
 			);
 			// The store refuses on its own, atomically, whatever the caller checked.
@@ -1116,19 +1028,13 @@ export function analysisStoreContract(
 			expect((await store.getAnalysis(draft.analysis))?.shared).toBe(false);
 		});
 
-		test("a revision starts a draft from a saved prior, saves its changes and links both ways; the prior stays as it was", async () => {
+		test("a revision is a new draft saved with updates and its changes; both link ways and the earlier answer stays as it was", async () => {
 			const { store, workspaceId, otherAuthorId, analysis, ownerId } = setup();
 			const log = logOf(store);
 			const viewer = viewerOf(workspaceId, analysis.authorId);
 			const author = authorOf(workspaceId, analysis.authorId);
 			// A: the prior, saved and shared.
-			const a = await recordQuery(
-				log,
-				author,
-				recorded({ question: "Why do agents fail?", step: "Failures" }, [
-					ownerId,
-				]),
-			);
+			const a = await recordQuery(log, author, recorded({}, [ownerId]));
 			await saveAnalysis(log, viewer, {
 				...emptySave(a.analysis),
 				finalAnswer: "Stale patches.",
@@ -1137,25 +1043,22 @@ export function analysisStoreContract(
 			await shareAnalysis(log, viewer, a.analysis, true);
 			const priorBefore = await snapshot(store, a.analysis, a.query);
 
-			// B: a draft started with updates=A takes A's question.
-			const b = await recordQuery(
-				log,
-				author,
-				recorded({ updates: a.analysis, step: "Failures since" }, [ownerId]),
-			);
+			// B: a new draft, saved with updates=A.
+			const b = await recordQuery(log, author, recorded({}, [ownerId]));
 			expect(await store.getAnalysis(b.analysis)).toMatchObject({
 				draft: true,
-				updates: a.analysis,
-				question: "Why do agents fail?",
+				updates: null,
+				question: "(unsaved answer)",
 			});
 			await recordQuery(
 				log,
 				author,
-				recorded({ analysis: b.analysis, step: "Failures since" }, [ownerId]),
+				recorded({ analysis: b.analysis }, [ownerId]),
 			);
 			await expectCode(
 				saveAnalysis(log, viewer, {
 					...emptySave(b.analysis),
+					updates: a.analysis,
 					findings: [{ step: b.step, finding: "fewer stale patches" }],
 				}),
 				"BAD_REQUEST",
@@ -1163,11 +1066,13 @@ export function analysisStoreContract(
 			expect((await store.getAnalysis(b.analysis))?.draft).toBe(true);
 			await saveAnalysis(log, viewer, {
 				...emptySave(b.analysis),
+				question: "Why do agents fail?",
+				updates: a.analysis,
 				finalAnswer: "Still stale patches, fewer of them.",
 				findings: [{ step: b.step, finding: "fewer stale patches" }],
 				changes: [
 					{
-						step: "Failures since",
+						step: b.query,
 						change: "weakened",
 						evidence: "4 since the cutoff, was 11",
 					},
@@ -1176,6 +1081,7 @@ export function analysisStoreContract(
 
 			const posterior = await getAnalysisTree(log, viewer, b.analysis);
 			expect(posterior.updates).toBe(a.analysis);
+			expect(posterior.question).toBe("Why do agents fail?");
 			expect(posterior.changes).toEqual([
 				{
 					step: b.step,
@@ -1202,19 +1108,15 @@ export function analysisStoreContract(
 				(await getAnalysisTree(log, member, a.analysis)).updatedBy,
 			).toEqual([]);
 
-			// updates may also be given only when saving.
-			const c = await recordQuery(
-				log,
-				author,
-				recorded({ question: "Why do agents fail, this week?" }),
-			);
+			// A dropped change may name the earlier answer's step by its query id.
+			const c = await recordQuery(log, author, recorded({}));
 			await saveAnalysis(log, viewer, {
 				...emptySave(c.analysis),
 				updates: a.analysis,
 				findings: [{ step: c.step, finding: "two stale patches" }],
 				changes: [
 					{ step: c.step, change: "confirmed", evidence: "2 this week" },
-					{ step: a.step, change: "dropped", evidence: "none left" },
+					{ step: a.query, change: "dropped", evidence: "none left" },
 				],
 			});
 			const third = await getAnalysisTree(log, viewer, c.analysis);
@@ -1284,17 +1186,17 @@ export function analysisStoreContract(
 			const own = await recordQuery(
 				log,
 				authorOf(workspaceId, ownerId),
-				recorded({ question: "My own draft" }),
+				recorded({}),
 			);
 			const reading = await recordQuery(
 				log,
 				authorOf(otherWorkspaceId, otherAuthorId),
-				recorded({ question: "Reads the owner's sessions" }, [ownerId]),
+				recorded({}, [ownerId]),
 			);
 			const other = await recordQuery(
 				log,
 				authorOf(workspaceId, otherAuthorId),
-				recorded({ question: "Unrelated draft" }),
+				recorded({}),
 			);
 			await purgeAnalysisLog(
 				store,
@@ -1437,6 +1339,7 @@ function recorded(
 function emptySave(analysis: string) {
 	return {
 		analysis,
+		question: "Saved question",
 		finalAnswer: "Answer",
 		findings: [],
 		clarifications: [],

@@ -1,5 +1,6 @@
 import type { ClientLink } from "@orpc/client";
 import { ORPCError } from "@orpc/client";
+import { pluginToolName } from "@rudel/api-routes";
 
 export function readToolResult(result: unknown) {
 	if (!result || typeof result !== "object" || !("structuredContent" in result))
@@ -39,17 +40,17 @@ export function pluginToolCall(
 	input: unknown,
 	workspace: string,
 ): { name: string; arguments: Record<string, unknown> } {
-	if (
-		!path.length ||
-		path.some((part) => !/^[a-zA-Z][a-zA-Z0-9]*$/u.test(part))
-	)
-		throw new ORPCError("BAD_REQUEST");
+	// Only the procedures the server serves as app-only tools, by their names.
+	const name = path.every((part) => /^[a-zA-Z][a-zA-Z0-9]*$/u.test(part))
+		? pluginToolName(path.join("."))
+		: undefined;
+	if (!name) throw new ORPCError("BAD_REQUEST");
 	if (
 		input !== undefined &&
 		(input === null || typeof input !== "object" || Array.isArray(input))
 	)
 		throw new ORPCError("BAD_REQUEST");
-	return { name: `app_${path.join("__")}`, arguments: { ...input, workspace } };
+	return { name, arguments: { ...input, workspace } };
 }
 
 export function createPluginLink(

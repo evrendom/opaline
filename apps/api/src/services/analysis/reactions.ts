@@ -56,6 +56,18 @@ export function promptReaction(row: TextRow): "swear" | "negative" | null {
 }
 
 /**
+ * How the user's next prompt reacted to a run, as a one-line label: the
+ * prompt's text is only scanned here, never returned.
+ */
+export function nextPromptReaction(text: string): string {
+	const categories = new Set(
+		scanMemberLanguageSignals(text).map((match) => match.category),
+	);
+	if (categories.has("swear")) return "unhappy (strongly worded)";
+	return categories.has("negative") ? "unhappy" : "no complaint found";
+}
+
+/**
  * A reaction answers the run before it in the same stream. A first-turn
  * prompt has no earlier run; a first-turn apology is about its own run.
  */

@@ -6,8 +6,8 @@ import type {
 } from "@rudel/api-routes";
 
 /**
- * The analysis log: an analysis (one asked question), its steps (written-out
- * sub-questions, answered by queries or by the asker), the queries with their
+ * The analysis log: an analysis (one asked question), its steps (one per
+ * find/read call, labelled from its arguments, or a question to the asker), the queries with their
  * exact results, and the final answer. Records are plain documents with ids
  * generated here, so the store can be Convex (ADR 0001) or memory in tests.
  *
@@ -167,18 +167,12 @@ export interface EmbeddingMatch {
  * missing record do nothing. Lists return [] for an unknown analysis.
  * Deletion first marks analyses deleting: they are hidden at once, and
  * creating steps, queries or saves in them fails. Drafts are returned only by
- * `getAnalysis` and `latestOpenAnalysis`, for the service's author checks.
+ * `getAnalysis`, for the service's author checks.
  */
 export interface AnalysisStore {
 	createAnalysis(analysis: StoredAnalysis): Promise<void>;
 	getAnalysis(id: string): Promise<StoredAnalysis | null>;
 	updateAnalysis(id: string, patch: AnalysisPatch): Promise<void>;
-	/** The author's most recently active draft since `since`. */
-	latestOpenAnalysis(
-		workspaceId: string,
-		authorId: string,
-		since: string,
-	): Promise<StoredAnalysis | null>;
 	/** Newest first, without drafts: the viewer's own analyses plus shared ones of the workspace. */
 	recentAnalyses(
 		workspaceId: string,

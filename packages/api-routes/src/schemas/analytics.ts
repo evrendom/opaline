@@ -564,6 +564,15 @@ export const SessionFilterCatalogSchema = z.object({
 });
 export type SessionFilterCatalog = z.infer<typeof SessionFilterCatalogSchema>;
 
+/**
+ * The filter catalog's range: its options depend only on the date range, so
+ * it takes no paging, sorting or filters (`getSessionFilterCatalog`).
+ */
+export const SessionFilterCatalogInputSchema = DaysInputSchema.extend({
+	startDate: z.string().date().optional(),
+	endDate: z.string().date().optional(),
+});
+
 export const SessionListInputSchema = DaysInputSchema.extend({
 	repoKey: z.string().min(1).max(4096).optional(),
 	filters: SessionListFiltersSchema.optional(),

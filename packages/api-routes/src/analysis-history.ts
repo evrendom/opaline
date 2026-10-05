@@ -183,8 +183,21 @@ export const AnalysisHistorySaveInputSchema = z
 			})
 			.min(1)
 			.max(40),
+		/**
+		 * The question the answer addresses, as a short title (not the user's
+		 * words, no personal data); replaces the draft's placeholder.
+		 */
+		question: z
+			.string({
+				error: (issue) =>
+					issue.input === undefined
+						? "required: the question this answer addresses, as a short title"
+						: undefined,
+			})
+			.min(1)
+			.max(120),
 		finalAnswer: z.string().min(1).max(20_000),
-		/** `step` is a step id from the trace line, or the step's sub-question text. */
+		/** `step` is a step or query id from a trace line. */
 		findings: z
 			.array(
 				z.object({
@@ -194,19 +207,8 @@ export const AnalysisHistorySaveInputSchema = z
 			)
 			.max(100)
 			.default([]),
-		/** Questions the agent asked the asker, with their replies, placed before a step if given. */
-		clarifications: z
-			.array(
-				z.object({
-					question: z.string().min(1).max(500),
-					reply: z.string().min(1).max(2_000),
-					before: z.string().min(1).max(500).optional(),
-				}),
-			)
-			.max(20)
-			.default([]),
 		topics: z.array(z.string().min(1).max(40)).max(8).default([]),
-		/** The saved analysis this one revises; also set when its draft started with `updates`. */
+		/** The saved analysis this one revises. */
 		updates: id.optional(),
 		/** Required when the analysis revises another: how each finding changed. */
 		changes: z.array(AnalysisChangeInputSchema).max(150).default([]),

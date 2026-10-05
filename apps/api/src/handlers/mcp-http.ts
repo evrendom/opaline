@@ -26,6 +26,7 @@ import {
 	SESSION_RESOURCE_PREFIX,
 } from "../mcp/mcp-tools.js";
 import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
+import { withRedactedOutput } from "../mcp/redacted-tools.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
 
@@ -44,7 +45,7 @@ const SERVER_INFO = {
 	icons: [OPALINE_ICON],
 };
 const SERVER_INSTRUCTIONS =
-	"Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup (instructions, docs, scripts, CI). No tool changes or deletes sessions. find and read record their calls in a private draft of the current analysis; save_analysis publishes that draft once (saving is append-only) or shares a saved analysis. Dates are UTC.";
+	"Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup (instructions, docs, scripts, CI). No tool changes or deletes sessions. find and read record their calls in a private draft of the current analysis; save_answer publishes that draft once (saving is append-only) and share_answer shares a saved answer. Dates are UTC.";
 // OpenAI MCP extension: native settings on the plugin page.
 const SETTINGS = { readTool: "settings_read", updateTool: "settings_update" };
 const CAPABILITIES = {
@@ -53,7 +54,7 @@ const CAPABILITIES = {
 	extensions: { "openai/settings": SETTINGS },
 	experimental: { "openai/settings": SETTINGS },
 };
-const TOOLS = [...MCP_TOOLS, ...PLUGIN_TOOLS];
+const TOOLS = [...MCP_TOOLS, ...PLUGIN_TOOLS].map(withRedactedOutput);
 
 interface McpDependencies {
 	readonly auth: Auth;
@@ -693,7 +694,7 @@ function consentHtml(input: {
 	userId: string;
 }) {
 	return `<h1>Connect ${escapeHtml(input.clientName)} to Opaline?</h1>
-<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. Until an analysis is saved it is a private draft, deleted after 7 days. It cannot change or delete your sessions or workspace data.</p>
+<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. Until an analysis is saved it is a private draft, deleted after 7 days. It never changes or deletes your sessions. Besides analyses, it changes only your own default-workspace setting for the plugin, from the plugin settings page.</p>
 <p class="muted">You will be sent back to ${escapeHtml(input.redirectHost || "the application")}. Only continue if you started this connection.</p>
 <form method="post" action="${MCP_CONSENT_PATH}">
 <input type="hidden" name="query" value="${escapeHtml(input.query)}" />

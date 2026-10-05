@@ -20,7 +20,7 @@ import {
 import { withAnalysisDeadline } from "./deadline.js";
 import { errorLine } from "./failure-classifier.js";
 import { fitReadOutput } from "./output-ceiling.js";
-import { runKey } from "./reactions.js";
+import { nextPromptReaction, runKey } from "./reactions.js";
 import { budgetReadOutput } from "./read-output.js";
 import {
 	buildFailedResultsStatement,
@@ -320,7 +320,8 @@ async function readTurnDepth(
 
 /**
  * Prompt → files edited → checks run after the last successful edit → failed
- * calls → final assistant message → the user's next prompt.
+ * calls → final assistant message → how the user's next prompt reacted (a
+ * label; the prompt's text is not returned).
  */
 async function readExchange(
 	executor: ClickHouseExecutor,
@@ -414,7 +415,10 @@ async function readExchange(
 			Math.min(NEXT_PROMPT_CHARS, budget.remaining),
 		),
 	);
-	if (next) add("next prompt", next.text);
+	add(
+		"next prompt reaction",
+		next ? nextPromptReaction(next.text) : "no next prompt",
+	);
 }
 
 /** Every text block of the run's last assistant message, within the budget. */

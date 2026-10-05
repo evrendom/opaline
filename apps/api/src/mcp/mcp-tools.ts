@@ -1,6 +1,6 @@
 import { ORPCError, type RouterClient } from "@orpc/server";
 import {
-	AnalysisFindInputSchema,
+	AnalysisFindInputBaseSchema,
 	AnalysisHistoryGetInputSchema,
 	AnalysisHistoryQueryInputSchema,
 	AnalysisHistorySaveInputSchema,
@@ -12,9 +12,11 @@ import {
 	CostDashboardRequestedMetricSchema,
 } from "@rudel/api-routes";
 import { z } from "zod";
+import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
+import { countVisibleSessions } from "../services/analysis/visible-sessions.js";
 import {
 	renderAnalysisSearch,
 	renderAnalysisTree,
@@ -27,6 +29,7 @@ import { parseMcpInput } from "./input-validation.js";
 import {
 	type McpToolAnnotations,
 	READ_ONLY,
+	REPLACES_OWN_SETTING,
 	WRITES_OWN_RECORDS,
 } from "./tool-annotations.js";
 
@@ -80,6 +83,13 @@ const oneOf = (values: readonly string[], description: string): JsonSchema => ({
 });
 const date = (description: string) =>
 	string(`${description} (YYYY-MM-DD, UTC).`);
+/** Who sees a shared answer's stored results (`unavailableReason` in analysis-log.service.ts). */
+export const SHARING_DISCLOSURE =
+	"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; workspaces that restrict results show those results only to admins and the session's owner.";
+export const EMBEDDING_DISCLOSURE =
+	"OpenAI processes the title and topics to build the search index.";
+const ANALYSIS_ID_DESCRIPTION =
+	"Id of the answer being worked on, from an earlier result. Leave out to start a new one.";
 const WORKSPACE_DESCRIPTION =
 	"Workspace slug from list_workspaces. Default: the default workspace in the plugin settings, else the one you last opened in Opaline.";
 /** Tools only the widget or the host UI call; hidden from the model. */
@@ -111,7 +121,11 @@ function query(args: Args, keys: Record<string, string>) {
 	return search ? `?${search}` : "";
 }
 
-/** Keeps the requested metric with its trend and the top breakdown rows. */
+/**
+ * Keeps the requested metric with its trend and the top breakdown rows.
+ * Member user ids never reach the model: per-member rows and series appear
+ * only when the trend is split by member, and then by name alone.
+ */
 export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 	const data = dashboard.metrics[metric as keyof CostDashboard["metrics"]];
 	if (!data) {
@@ -122,13 +136,18 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 	// A ratio over zero pull requests is undefined, not zero.
 	const ratio = (value: number, denominator?: number) =>
 		denominator === 0 ? null : value;
+	const byMember = dashboard.splitBy === "members";
+	const names = new Map(data.series.map(({ id, label }) => [id, label]));
+	const key = (id: string) => (byMember ? (names.get(id) ?? id) : id);
 	return {
 		metric,
 		availableMetrics: dashboard.availableMetrics,
 		splitBy: dashboard.splitBy,
 		total: ratio(data.total, data.denominator),
 		incomplete: data.incomplete,
-		series: data.series,
+		series: byMember
+			? data.series.map(({ label }) => ({ label }))
+			: data.series,
 		trend: data.trend.map(
 			({ date, total, values, denominator, denominatorValues }) => ({
 				date,
@@ -138,7 +157,7 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 					: {
 							values: Object.fromEntries(
 								Object.entries(values).map(([id, value]) => [
-									id,
+									key(id),
 									ratio(value, denominatorValues?.[id]),
 								]),
 							),
@@ -147,43 +166,84 @@ export function summarizeDashboard(dashboard: CostDashboard, metric: string) {
 		),
 		top: Object.fromEntries(
 			Object.entries(data.breakdowns)
-				.filter(([, rows]) => rows.length > 0)
+				.filter(
+					([dimension, rows]) =>
+						rows.length > 0 && (dimension !== "members" || byMember),
+				)
 				.map(([dimension, rows]) => [
 					dimension,
 					rows
 						.slice(0, 10)
-						.map(({ id, label, value }) => ({ id, label, value })),
+						.map(({ id, label, value }) =>
+							dimension === "members" ? { label, value } : { id, label, value },
+						),
 				]),
 		),
 		...(data.durationStats ? { durationStats: data.durationStats } : {}),
 	};
 }
 
+/** Breakdowns that name people: workspace members and GitHub authors. */
+const PERSON_DIMENSIONS = ["members", "githubAuthors"] as const;
+
+/**
+ * The dashboard data the app's first view gets up front: totals, trends and
+ * the repository and model breakdowns, without rows or series that name
+ * people. The app loads those through its app-only costs tool when the user
+ * opens them (`DeferredPersonRows` in the web app).
+ */
+export function withoutPersonRows(dashboard: CostDashboard): CostDashboard {
+	const splitByPerson = (PERSON_DIMENSIONS as readonly string[]).includes(
+		dashboard.splitBy,
+	);
+	return {
+		...dashboard,
+		metrics: Object.fromEntries(
+			Object.entries(dashboard.metrics).map(([name, data]) => [
+				name,
+				data && {
+					...data,
+					breakdowns: {
+						...data.breakdowns,
+						...Object.fromEntries(
+							PERSON_DIMENSIONS.map((dimension) => [dimension, []]),
+						),
+					},
+					...(splitByPerson
+						? {
+								series: [],
+								trend: data.trend.map(
+									({
+										values: _values,
+										numeratorValues: _numerators,
+										denominatorValues: _denominators,
+										...point
+									}) => ({ ...point, values: {} }),
+								),
+							}
+						: {}),
+				},
+			]),
+		) as CostDashboard["metrics"],
+	};
+}
+
 const DASHBOARD_METRICS = CostDashboardRequestedMetricSchema.options;
 const SPLITS = CostDashboardInputSchema.shape.splitBy.unwrap().options;
 
-/** Reads of the analysis log; `action` selects the history procedure. */
-const AnalysesToolInputSchema = z
-	.object({
-		action: z.enum(["search", "get", "query"]).default("search"),
-		...AnalysisHistorySearchInputSchema.partial().shape,
-		...AnalysisHistoryGetInputSchema.partial().shape,
-		...AnalysisHistoryQueryInputSchema.partial().shape,
-	})
-	.strict();
+/**
+ * find as the model sees it: the per-member filter stays out (admins have
+ * the dashboard for per-member views). The procedure checks the rest.
+ */
+const FindToolInputSchema = AnalysisFindInputBaseSchema.omit({ userId: true });
 
-/** Writes to the analysis log, kept apart so `analyses` stays read-only. */
-const SaveAnalysisToolInputSchema = z
-	.object({
-		action: z.enum(["save", "share"]).default("save"),
-		...AnalysisHistorySaveInputSchema.partial().shape,
-		...AnalysisHistoryShareInputSchema.partial().shape,
-	})
-	.strict();
-
-/** What `analyses` answers clients still sending the old write actions. */
-export const ANALYSES_MOVED_TO_SAVE_ANALYSIS =
-	"analyses only searches and reads the analysis log now. Nothing was saved: call save_analysis with the same arguments (action=save to save, action=share to share).";
+/**
+ * The plugin only shares: stopping sharing revokes access, which is not an
+ * additive write, so it stays out of the plugin (the API keeps it).
+ */
+const ShareToolInputSchema = AnalysisHistoryShareInputSchema.omit({
+	shared: true,
+});
 
 /**
  * The JSON Schema MCP hosts show the model for a tool taking `schema`, plus the
@@ -273,13 +333,13 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"What it does: Finds where the team's agents got stuck, failed or wasted time and money, so the team can fix their setup.",
 			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
 			"Returns: The period covered, totals, and runs, failures by cause, or prompts where the user was unhappy.",
-			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
+			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
 			"Limits: Members see their own sessions, admins the whole team; up to 200 rows per call.",
 		].join("\n"),
-		inputSchema: describeInput(zodToolInput(AnalysisFindInputSchema), {
+		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
 				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies.",
-			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to, or the last day covered by the answer named in updates.",
+			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to. For totals and rankings, use the start of the window the user asked for.",
 			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
 			latest: "Only the newest N sessions in the date range, 1-200.",
 			repository:
@@ -288,8 +348,6 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			model:
 				"Only runs that used this model id; cost then counts only that model.",
 			sessionId: "Only this session and the subagents it started.",
-			userId:
-				"Admins only: only this member's sessions, to see where their setup needs help.",
 			toolGroup:
 				"source=tool only: shell, edit, read, search, browser, web, mcp, subagent or other.",
 			commandClass:
@@ -314,22 +372,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			sort: "source=runs order, biggest first: startedAt (default, newest first), minutes, costUsd, failedCalls or rawChars (size of the run's text).",
 			cursor:
 				"The value from an earlier result's 'more: pass cursor=…' line, to get the next page with the same other arguments.",
-			analysis:
-				"Id of the answer being worked on, from the 'analysis=' value at the end of an earlier find or read result. Leave out on the first call.",
-			question:
-				"First call only: the user's question, word for word. Starts a new answer.",
-			updates:
-				"First call only: id of a saved answer this new answer updates. from then defaults to the last day that answer covered.",
-			step: "The sub-question this call answers, as text, or a step id from an earlier result.",
-			parentStep:
-				"A step id from an earlier result; makes this step a follow-up of it.",
+			analysis: ANALYSIS_ID_DESCRIPTION,
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
 			renderFind(
-				await client.analysis.find(
-					parseMcpInput(AnalysisFindInputSchema, args),
-				),
+				await client.analysis.find(parseMcpInput(FindToolInputSchema, args)),
 			),
 	},
 	{
@@ -340,7 +388,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"What it does: Shows what happened in up to 10 runs that find pointed to (a run is one prompt and the agent's work after it).",
 			"Use when: You need to see why something went wrong before you name a cause.",
 			"Returns: For each run, the prompt, files changed, checks run, failed calls and the agent's last message.",
-			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
+			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
 			"Limits: Only sessions you may open (your own, or any as an admin); output is cut to maxChars.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(AnalysisReadInputSchema), {
@@ -361,14 +409,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"Record view only: first character to show, from 0. Default: 0.",
 			toChar:
 				"Record view only: character to stop before, above fromChar. Default: the end.",
-			analysis:
-				"Id of the answer being worked on, from the 'analysis=' value at the end of an earlier find or read result. Leave out on the first call.",
-			question:
-				"First call only: the user's question, word for word. Starts a new answer.",
-			updates: "First call only: id of a saved answer this new answer updates.",
-			step: "The sub-question this call answers, as text, or a step id from an earlier result.",
-			parentStep:
-				"A step id from an earlier result; makes this step a follow-up of it.",
+			analysis: ANALYSIS_ID_DESCRIPTION,
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
@@ -379,87 +420,153 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			),
 	},
 	{
-		name: "analyses",
+		name: "search_answers",
 		annotations: READ_ONLY,
 		title: "Search saved answers",
 		description: [
-			"What it does: Searches the answers your team saved before and opens one.",
-			"Use when: Before a new question, to check whether a saved answer already covers it and can be updated.",
-			"Returns: A list of saved answers, or one answer with its findings, the last day its data covers, the steps behind it and links to older or newer versions.",
+			"What it does: Lists answers your team saved about its coding-agent sessions, by meaning or most recent.",
+			"Use when: Before analysing the team's agent sessions (cost, time, failures, mistakes), to find an answer to update; not for support, account, billing or general coding questions.",
+			"Returns: A table of saved answers: id, question, last day of data, the answer each updates, and how each answer starts.",
 			"Side effects: None.",
-			"Limits: Only answers you saved or that were shared with your workspace; unsaved work never appears.",
+			"Limits: Only answers you saved or shared with your workspace; drafts never appear. Requires Opaline's answer history, which is on for every workspace.",
 		].join("\n"),
-		inputSchema: describeInput(zodToolInput(AnalysesToolInputSchema), {
-			action:
-				"search (default): list saved answers. get: open one answer. query: open one stored result of an answer.",
-			text: "search: words to look for, matched by meaning (1-500 characters). Default: the most recent answers.",
-			limit: "search: how many answers to return, 1-50. Default 10.",
-			includeEval: "search: also show answers from test runs. Default false.",
-			analysis: "get: the answer's id (required for get).",
-			query:
-				"query: a stored result's id, shown in the steps of get (required for query).",
+		inputSchema: describeInput(zodToolInput(AnalysisHistorySearchInputSchema), {
+			text: "Words to look for, matched by meaning (1-500 characters). Default: the most recent answers.",
+			limit: "How many answers to return, 1-50. Default 10.",
+			includeEval: "Also show answers from test runs. Default false.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: (client, { workspace: _workspace, action, ...args }) =>
-			action === "save" || action === "share"
-				? Promise.resolve(ANALYSES_MOVED_TO_SAVE_ANALYSIS)
-				: withLogOffMessage(readAnalyses(client, action, args)),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			withLogOffMessage(
+				client.analysis.history
+					.search(parseMcpInput(AnalysisHistorySearchInputSchema, args))
+					.then(renderAnalysisSearch),
+			),
 	},
 	{
-		name: "save_analysis",
-		annotations: WRITES_OWN_RECORDS,
-		title: "Save or share an answer",
+		name: "get_answer",
+		annotations: READ_ONLY,
+		title: "Open a saved answer",
 		description: [
-			"What it does: Saves the finished answer, or shares a saved answer with your workspace.",
-			"Use when: Once, right before your final message; share only when the user asks.",
-			"Returns: The saved answer's id, or whether it is now shared.",
-			"Side effects: Saves the answer in Opaline so you, and your own workspace if shared, can see it. Nothing is posted outside Opaline. A saved answer is never changed or deleted; an update is saved as a new answer linked to it. Sharing can be undone with shared=false.",
-			"Limits: Only the person who asked can save or share an answer, and each answer is saved once.",
+			"What it does: Opens one saved answer with its findings, steps and final answer.",
+			"Use when: search_answers found an answer that covers the question, so you can start from its findings.",
+			"Returns: The question, the last day its data covers, the answer it updates and newer versions, each step with its finding and stored result ids, the changes against the older answer, and the final answer.",
+			"Side effects: None.",
+			"Limits: Only answers you saved or that were shared with your workspace.",
 		].join("\n"),
-		inputSchema: describeInput(zodToolInput(SaveAnalysisToolInputSchema), {
-			action:
-				"save (default): save the answer. share: set whether your workspace can see a saved answer.",
+		inputSchema: describeInput(zodToolInput(AnalysisHistoryGetInputSchema), {
+			analysis: "Required. The saved answer's id, from search_answers.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			withLogOffMessage(
+				client.analysis.history
+					.get(parseMcpInput(AnalysisHistoryGetInputSchema, args))
+					.then(renderAnalysisTree),
+			),
+	},
+	{
+		name: "get_answer_evidence",
+		annotations: READ_ONLY,
+		title: "Open a stored result",
+		description: [
+			"What it does: Shows one stored find or read result behind a saved answer.",
+			"Use when: You must check or quote one step of a saved answer; never open all of them.",
+			"Returns: The stored result with its arguments, whether a session it read has changed since, or why it is unavailable (expired, removed or restricted).",
+			"Side effects: None.",
+			"Limits: Results expire after 90 days (a year when shared or pinned); workspaces that restrict results show them only to admins and the session's owner.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisHistoryQueryInputSchema), {
+			query:
+				"Required. A stored result's id, shown in the steps of get_answer.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			withLogOffMessage(
+				client.analysis.history
+					.query(parseMcpInput(AnalysisHistoryQueryInputSchema, args))
+					.then(renderStoredQuery),
+			),
+	},
+	{
+		name: "save_answer",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Save an answer",
+		description: [
+			"What it does: Saves the answer built from your find and read calls.",
+			"Use when: Once, right before your final message.",
+			"Returns: The saved answer's id.",
+			`Side effects: Saves the answer in your Opaline workspace, visible only to you until shared. A saved answer is never changed or deleted by the plugin's tools; an update is a new answer linked to it. Nothing is published publicly or shared with other workspaces. ${EMBEDDING_DISCLOSURE}`,
+			"Limits: Only the asker can save, once per answer. Requires Opaline's answer history, which is on for every workspace.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisHistorySaveInputSchema), {
 			analysis:
 				"Required. The answer's id, from the 'analysis=' value at the end of a find or read result.",
+			question:
+				"Required. A short title, not the user's words, no personal data, up to 120 characters, e.g. 'Where our agents get stuck'.",
 			finalAnswer:
-				"save: the complete final answer, up to 20000 characters (required for save).",
-			findings: "save: one finding per step, at most 100. Default: none.",
-			"findings[].step": "The step's id, or its sub-question word for word.",
+				"Required. The complete final answer, up to 20000 characters.",
+			findings: "One finding per step, at most 100. Default: none.",
+			"findings[].step":
+				"The step or query id from the 'analysis=… step=… query=…' line of the find or read call it comes from.",
 			"findings[].finding": "What this step found, up to 4000 characters.",
-			clarifications:
-				"save: questions you asked the user, with their replies, at most 20. Default: none.",
-			"clarifications[].question": "The question you asked the user.",
-			"clarifications[].reply": "The user's reply.",
-			"clarifications[].before":
-				"A step id or sub-question to place it before. Default: at the end.",
-			topics: "save: up to 8 short topic words, used for search.",
+			topics: "Up to 8 short topic words, used for search. Default: none.",
 			updates:
-				"save: id of the saved answer this one updates, if the first find did not already name it.",
+				"Id of the saved answer this one updates, from search_answers. Default: none.",
 			changes:
-				"save, only when updating an answer: one item for every finding saved now, plus a dropped item for each old finding that no longer holds.",
+				"Only when updating an answer: one item for every finding saved now, plus a dropped item for each old finding that no longer holds.",
 			"changes[].step":
-				"The finding's step id or sub-question; for dropped, a step of the old answer.",
+				"The finding's step or query id; for dropped, a step or query id of the old answer.",
 			"changes[].change":
 				"confirmed, strengthened, weakened, new or dropped (compared with the old answer).",
 			"changes[].evidence":
 				"Short reason, with counts or dates, up to 500 characters.",
-			shared:
-				"share: true to share with your workspace, false to stop sharing (required for share).",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: (client, { workspace: _workspace, action, ...args }) =>
-			withLogOffMessage(writeAnalysis(client, action, args)),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			withLogOffMessage(
+				client.analysis.history
+					.save(parseMcpInput(AnalysisHistorySaveInputSchema, args))
+					.then(
+						(saved) =>
+							`saved analysis=${saved.analysis} status=${saved.status}`,
+					),
+			),
+	},
+	{
+		name: "share_answer",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Share an answer",
+		description: [
+			"What it does: Shares a saved answer with your workspace.",
+			"Use when: Only when the user asks to share an answer.",
+			"Returns: Confirmation that the answer is shared.",
+			`Side effects: ${SHARING_DISCLOSURE} This tool only adds access; it never removes it.`,
+			"Limits: Only the person who asked can share an answer, and only once it is saved.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(ShareToolInputSchema), {
+			analysis: "Required. The saved answer's id, from save_answer.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			withLogOffMessage(
+				client.analysis.history
+					.share({ ...parseMcpInput(ShareToolInputSchema, args), shared: true })
+					.then(
+						(shared) => `analysis=${shared.analysis} shared=${shared.shared}`,
+					),
+			),
 	},
 	{
 		name: "list_workspaces",
 		annotations: READ_ONLY,
 		title: "List your workspaces",
 		description: [
-			"What it does: Lists the Opaline workspaces you belong to.",
-			"Use when: An answer looks empty, the user names another team, or you need a workspace name for another tool.",
-			"Returns: Each workspace's name, slug (the short name other tools take as workspace) and logo.",
+			"What it does: Lists the Opaline workspaces you belong to, with how many sessions you can see in each.",
+			"Use when: Checking that Opaline is set up, an answer looks empty, the user names another team, or you need a workspace name for another tool.",
+			"Returns: Each workspace's name, slug (the short name other tools take as workspace), logo, the number of sessions you can see from the last 365 days, and default: true on the one tools use when no workspace is given.",
 			"Side effects: None.",
-			"Limits: Only workspaces you are a member of.",
+			"Limits: Only workspaces you are a member of; admins count the whole team's sessions, members their own.",
 		].join("\n"),
 		inputSchema: {
 			type: "object",
@@ -476,14 +583,50 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				type: ["string", "null"],
 				description: "Logo URL, or null.",
 			},
+			default: {
+				type: "boolean",
+				description:
+					"True for the workspace tools use when no workspace is given.",
+			},
+			sessionsLast365Days: {
+				type: "integer",
+				description:
+					"Sessions you can see from the last 365 days (admins: the whole team; members: their own). A count only.",
+			},
 		}),
 		// Tools take the slug; the internal organization id stays out.
-		run: async (client) =>
-			(await client.listMyOrganizations()).map(({ name, slug, logo }) => ({
-				name,
-				slug,
-				logo,
-			})),
+		// list_workspaces takes no workspace, so the context holds the default.
+		run: async (_client, _args, { userId, workspace }) => {
+			const memberships = await sqlClient<
+				{
+					id: string;
+					name: string;
+					slug: string;
+					logo: string | null;
+					role: string;
+				}[]
+			>`
+				SELECT o.id, o.name, o.slug, o.logo, m.role
+				FROM member m JOIN organization o ON o.id = m.organization_id
+				WHERE m.user_id = ${userId}
+				ORDER BY o.name
+			`;
+			const executor = getClickhouse();
+			return Promise.all(
+				memberships.map(async ({ id, name, slug, logo, role }) => ({
+					name,
+					slug,
+					logo,
+					default: id === workspace.id,
+					sessionsLast365Days: await countVisibleSessions(
+						executor,
+						id,
+						role === "owner" || role === "admin" ? null : userId,
+						365,
+					),
+				})),
+			);
+		},
 	},
 	{
 		name: "get_dashboard",
@@ -510,9 +653,6 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				SPLITS,
 				"Split the chart into one line per value of this. Default: none.",
 			),
-			members: strings(
-				"Only these members, by the user ids an earlier dashboard showed. Default: everyone you may see.",
-			),
 			repositories: strings("Only these repositories, by name. Default: all."),
 			models: strings("Only these model ids. Default: all."),
 		}),
@@ -534,7 +674,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				incomplete: {
 					description: "Whether some data could not be counted.",
 				},
-				series: { description: "The series of a split trend." },
+				series: {
+					description:
+						"The series of a split trend; split by member, names only.",
+				},
 				trend: {
 					type: "array",
 					description:
@@ -542,7 +685,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				},
 				top: {
 					type: "object",
-					description: "Up to 10 rows (id, label, value) per breakdown.",
+					description:
+						"Up to 10 rows (id, label, value) per breakdown; per-member rows (label and value only) appear only when splitBy is members.",
 				},
 				durationStats: { description: "Duration statistics, when available." },
 				query: {
@@ -565,7 +709,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				endDate: (args.endDate as string | undefined) ?? isoDay(),
 				metric: (args.metric as (typeof DASHBOARD_METRICS)[number]) ?? "cost",
 				splitBy: (args.splitBy as (typeof SPLITS)[number]) ?? "none",
-				members: (args.members as string[]) ?? [],
+				// Member filters stay in the app: the model never sees member ids.
+				members: [] as string[],
 				repositories: (args.repositories as string[]) ?? [],
 				models: (args.models as string[]) ?? [],
 			};
@@ -588,7 +733,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				// renders from this without another round trip.
 				widget: {
 					query: view,
-					dashboard: { input, data: dashboard },
+					dashboard: { input, data: withoutPersonRows(dashboard) },
 					bootstrap,
 				},
 			};
@@ -599,9 +744,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	{
 		name: "get_session",
 		annotations: READ_ONLY,
-		title: "Session: overview",
+		title: "Session: mention preview",
 		description:
-			"Used by Opaline to show a session the user mentioned with @. Not called by the assistant.",
+			"Used by Opaline to show a session the user mentioned with @. Only the session's owner or a workspace admin can open it. Not called by the assistant.",
 		inputSchema: input(
 			{
 				sessionId: string("The session's id (required)."),
@@ -624,7 +769,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		annotations: READ_ONLY,
 		title: "Settings: read",
 		description:
-			"Used by the plugin settings page to load your default workspace. Not called by the assistant.",
+			"Used by the plugin settings page to load your default workspace. Reads only your own setting. Not called by the assistant.",
 		inputSchema: { type: "object", additionalProperties: false },
 		outputSchema: {
 			type: "object",
@@ -654,10 +799,11 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "settings_update",
-		annotations: WRITES_OWN_RECORDS,
+		// Replaces the default workspace setting.
+		annotations: REPLACES_OWN_SETTING,
 		title: "Settings: save",
 		description:
-			"Used by the plugin settings page to save your default workspace. Not called by the assistant.",
+			"Used by the plugin settings page to save your default workspace. Replaces the saved default workspace; only workspaces you belong to are accepted. Not called by the assistant.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -693,11 +839,36 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		},
 	},
 	{
+		name: "app_account",
+		annotations: READ_ONLY,
+		title: "Account: you",
+		description:
+			"Used by the Opaline dashboard to show your account button and mark your own sessions. Only your own account. Not called by the assistant.",
+		inputSchema: input(),
+		meta: APP_ONLY,
+		run: (client, _args, context) => readPluginAccount(client, context),
+	},
+	{
+		name: "workspace_members",
+		annotations: READ_ONLY,
+		title: "Team: member names",
+		description:
+			"Used by the Opaline dashboard to load member names and pictures when a view shows them. Members of the workspace only. Not called by the assistant.",
+		inputSchema: input(),
+		meta: APP_ONLY,
+		run: async (client, _args, { workspace }) => {
+			const organizations = await client.listMyOrganizations();
+			if (!organizations.some((org) => org.id === workspace.id))
+				throw new McpToolError("Workspace not available.");
+			return { members: await readWorkspaceMembers(workspace.id) };
+		},
+	},
+	{
 		name: "mention_sessions",
 		annotations: READ_ONLY,
 		title: "Sessions: @-mention search",
 		description:
-			"Used by the chat to suggest your recent sessions when you type @. Not called by the assistant.",
+			"Used by the chat to suggest your recent sessions when you type @. Only your own sessions. Not called by the assistant.",
 		inputSchema: {
 			type: "object",
 			properties: { query: { type: "string" } },
@@ -758,42 +929,6 @@ function withLogOffMessage(result: Promise<string>) {
 	});
 }
 
-async function writeAnalysis(client: Client, action: unknown, args: Args) {
-	const history = client.analysis.history;
-	if (action === "share") {
-		const shared = await history.share(
-			parseMcpInput(AnalysisHistoryShareInputSchema, args),
-		);
-		return `analysis=${shared.analysis} shared=${shared.shared}`;
-	}
-	const saved = await history.save(
-		parseMcpInput(AnalysisHistorySaveInputSchema, args),
-	);
-	return `saved analysis=${saved.analysis} status=${saved.status}`;
-}
-
-async function readAnalyses(client: Client, action: unknown, args: Args) {
-	const history = client.analysis.history;
-	switch (action) {
-		case "get":
-			return renderAnalysisTree(
-				await history.get(parseMcpInput(AnalysisHistoryGetInputSchema, args)),
-			);
-		case "query":
-			return renderStoredQuery(
-				await history.query(
-					parseMcpInput(AnalysisHistoryQueryInputSchema, args),
-				),
-			);
-		default:
-			return renderAnalysisSearch(
-				await history.search(
-					parseMcpInput(AnalysisHistorySearchInputSchema, args),
-				),
-			);
-	}
-}
-
 type SessionOverview = Awaited<
 	ReturnType<Client["analytics"]["sessions"]["detailOverview"]>
 >;
@@ -826,15 +961,9 @@ function withoutRenderIds(overview: SessionOverview) {
  * and the caller's name and avatar on the account button. Emails and the rest
  * of the account record stay out.
  */
-async function readPluginBootstrap(client: Client, context: McpToolContext) {
-	const organizations = await client.listMyOrganizations();
-	const organization = organizations.find(
-		(org) => org.id === context.workspace.id,
-	);
-	const { user, session } = context.authSession;
-	if (!organization || !user || !session)
-		throw new McpToolError("Workspace not available.");
-	const members = await sqlClient<
+/** One workspace's members as the plugin app shows them: names, images and roles, no emails. */
+async function readWorkspaceMembers(organizationId: string, userId?: string) {
+	return sqlClient<
 		{
 			id: string;
 			userId: string;
@@ -845,8 +974,38 @@ async function readPluginBootstrap(client: Client, context: McpToolContext) {
 		SELECT m.id, m.user_id AS "userId", m.role,
 			json_build_object('id', u.id, 'name', u.name, 'image', u.image) AS "user"
 		FROM member m JOIN "user" u ON u.id = m.user_id
-		WHERE m.organization_id = ${organization.id}
+		WHERE m.organization_id = ${organizationId}
+			${userId === undefined ? sqlClient`` : sqlClient`AND m.user_id = ${userId}`}
 	`;
+}
+
+/**
+ * What the dashboard's first view needs: the workspace (name, slug, logo).
+ * Nothing about the caller or other members is sent up front: the app loads
+ * the caller's account with `app_account` and the roster with
+ * `workspace_members` when a view needs them.
+ */
+async function readPluginBootstrap(client: Client, context: McpToolContext) {
+	const organizations = await client.listMyOrganizations();
+	const organization = organizations.find(
+		(org) => org.id === context.workspace.id,
+	);
+	if (!organization) throw new McpToolError("Workspace not available.");
+	return {
+		organization: { ...organization, members: [], invitations: [] },
+	};
+}
+
+/**
+ * The caller's account as the app shows it (account button, marking the
+ * caller's own sessions, admin-only links): id, name, image and role in the
+ * workspace. Authorization stays on the server for every procedure.
+ */
+async function readPluginAccount(client: Client, context: McpToolContext) {
+	const { organization } = await readPluginBootstrap(client, context);
+	const { user, session } = context.authSession;
+	if (!user || !session) throw new McpToolError("Workspace not available.");
+	const [member] = await readWorkspaceMembers(organization.id, context.userId);
 	return {
 		session: {
 			user: { id: user.id, name: user.name, image: user.image ?? null },
@@ -857,7 +1016,6 @@ async function readPluginBootstrap(client: Client, context: McpToolContext) {
 				expiresAt: session.expiresAt,
 			},
 		},
-		organization: { ...organization, members, invitations: [] },
-		member: members.find((member) => member.userId === context.userId),
+		member: member ?? null,
 	};
 }

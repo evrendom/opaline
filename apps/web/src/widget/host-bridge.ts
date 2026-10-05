@@ -3,10 +3,15 @@ import type { FullOrganization } from "@/features/workspace/hooks/useFullOrganiz
 import type { authClient } from "@/lib/auth-client";
 import { readToolResult } from "./plugin-transport";
 
+/** What get_dashboard sends up front: the workspace only. */
 interface PluginBootstrap {
-	session: typeof authClient.$Infer.Session;
 	organization: FullOrganization;
-	member?: FullOrganization["members"][number];
+}
+
+/** The caller's account, loaded on demand with `app_account`. */
+export interface PluginAccount {
+	session: typeof authClient.$Infer.Session;
+	member: FullOrganization["members"][number] | null;
 }
 
 export interface PluginSeed {
@@ -131,7 +136,7 @@ export function getPluginWorkspace() {
 export async function pluginAuthFetch(
 	input: string | URL | Request,
 	init?: RequestInit,
-) {
+): Promise<Response> {
 	const url = new URL(
 		input instanceof Request ? input.url : input,
 		window.location.origin,
@@ -147,14 +152,24 @@ export async function pluginAuthFetch(
 		);
 	const bootstrap = state.toolOutput?.bootstrap;
 	if (!bootstrap) return Response.json(null, { status: 401 });
-	const responses: Record<string, unknown> = {
-		"get-session": bootstrap.session,
-		"organization/list": [bootstrap.organization],
-		"organization/get-full-organization": bootstrap.organization,
-		"organization/get-active-member": bootstrap.member,
-		"organization/get-active-member-role": { role: bootstrap.member?.role },
-	};
 	const endpoint = url.pathname.replace(/^.*\/auth\//u, "");
+	// The roster is not part of get_dashboard's result: views that show
+	// member names load it once, on demand.
+	if (endpoint === "organization/get-full-organization") {
+		const { members } = await loadMembers();
+		return Response.json({ ...bootstrap.organization, members });
+	}
+	// The caller's account is not part of get_dashboard's result either:
+	// views that show it (account button, own sessions) load it once.
+	if (endpoint === "get-session")
+		return Response.json((await loadAccount()).session);
+	if (endpoint === "organization/get-active-member")
+		return Response.json((await loadAccount()).member);
+	if (endpoint === "organization/get-active-member-role")
+		return Response.json({ role: (await loadAccount()).member?.role });
+	const responses: Record<string, unknown> = {
+		"organization/list": [bootstrap.organization],
+	};
 	return endpoint in responses
 		? Response.json(responses[endpoint])
 		: Response.json(
@@ -162,6 +177,44 @@ export async function pluginAuthFetch(
 				{ status: 403 },
 			);
 }
+let members: Promise<{ members: FullOrganization["members"] }> | undefined;
+function loadMembers() {
+	members ??= callTool<{ members: FullOrganization["members"] }>(
+		"workspace_members",
+		{ workspace: getPluginWorkspace() },
+	).catch((error: unknown) => {
+		members = undefined;
+		throw error;
+	});
+	return members;
+}
+
+let account: Promise<PluginAccount> | undefined;
+const accountListeners = new Set<(account: PluginAccount) => void>();
+export function loadAccount() {
+	account ??= callTool<PluginAccount>("app_account", {
+		workspace: getPluginWorkspace(),
+	}).then(
+		(loaded) => {
+			for (const listener of accountListeners) listener(loaded);
+			return loaded;
+		},
+		(error: unknown) => {
+			account = undefined;
+			throw error;
+		},
+	);
+	return account;
+}
+/** Called once the account is loaded by any view; never loads it itself. */
+export function onAccountLoaded(listener: (account: PluginAccount) => void) {
+	accountListeners.add(listener);
+	void account?.then(listener, () => {});
+	return () => {
+		accountListeners.delete(listener);
+	};
+}
+
 export function getWidgetState() {
 	return window.openai?.widgetState ?? widgetState;
 }

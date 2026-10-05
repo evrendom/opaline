@@ -72,6 +72,7 @@ import { analysisHistoryContract } from "./analysis-history.js";
 export {
 	type AnalysisEvent,
 	type AnalysisFindInput,
+	AnalysisFindInputBaseSchema,
 	AnalysisFindInputSchema,
 	type AnalysisFindOutput,
 	AnalysisFindOutputSchema,
@@ -217,6 +218,7 @@ import {
 	ROITrendSchema,
 	SessionAnalyticsSummaryComparisonSchema,
 	SessionAnalyticsSummarySchema,
+	SessionFilterCatalogInputSchema,
 	SessionFilterCatalogSchema,
 	SessionListInputSchema,
 	SessionOverviewAnalyticsSchema,
@@ -234,6 +236,7 @@ export * from "./device-flow.js";
 export * from "./github-repository-evidence.js";
 export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
+export * from "./plugin-tool-names.js";
 export * from "./product-analytics.js";
 export { type RepoIdentity, resolveRepoIdentity } from "./repo-identity.js";
 export {
@@ -1138,7 +1141,7 @@ export const contract = {
 			detailTurn: sessionDetailProcedureContracts.detailTurn,
 			detailWindow: sessionDetailProcedureContracts.detailWindow,
 			filterCatalog: oc
-				.input(SessionListInputSchema)
+				.input(SessionFilterCatalogInputSchema)
 				.output(SessionFilterCatalogSchema),
 			list: oc
 				.input(SessionListInputSchema)

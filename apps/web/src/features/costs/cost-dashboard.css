@@ -847,3 +847,12 @@
 .cost-breakdown[data-dimension="durations"] .cost-row-share {
 	display: inline;
 }
+
+/* Plugin app: rows that name people load only when asked for. */
+.cost-breakdown-load {
+	color: var(--cost-blue);
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
