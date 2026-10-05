@@ -347,6 +347,18 @@ function Explorer({
 	useEffect(() => {
 		setNavTrail(document.querySelector<HTMLElement>("[data-trends-nav-trail]"));
 	}, []);
+	// With the tabs in the trail (the same commit, before paint), its static
+	// copy steps aside. An attribute, not :has(:not(:empty)) in CSS: Safari
+	// doesn't re-match that when the portal fills the target, and showed
+	// both copies.
+	useLayoutEffect(() => {
+		const trail = navTrail?.closest<HTMLElement>(".trends-nav-trail");
+		if (!trail) return;
+		trail.dataset.hydrated = "true";
+		return () => {
+			delete trail.dataset.hydrated;
+		};
+	}, [navTrail]);
 	const [pinnedFocusIds, setPinnedFocusIds] = useState<ReadonlySet<string>>(
 		new Set(),
 	);

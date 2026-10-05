@@ -319,10 +319,10 @@
 	outline: none;
 }
 
-/* Until the explorer hydrates, trends.astro's static copy of its tabs
- * stands in the trail, so they are there from the first paint; the
- * explorer's own then take their place, identical, with nothing to
- * appear. */
+/* Until the explorer hydrates, TrendsPage.astro's static copy of its
+ * tabs stands in the trail, so they are there from the first paint; the
+ * explorer's own then take their place (it marks the trail hydrated),
+ * identical, with nothing to appear. */
 .trends-nav-trail-static {
 	display: inline-flex;
 	align-items: center;
@@ -333,8 +333,7 @@
 	display: none;
 }
 
-.trends-nav-trail:has(> .trends-nav-trail-target:not(:empty))
-	> .trends-nav-trail-static {
+.trends-nav-trail[data-hydrated="true"] > .trends-nav-trail-static {
 	display: none;
 }
 
