@@ -42,6 +42,9 @@ const SERVER_INFO = {
 	version: "1.0.0",
 	icons: [OPALINE_ICON],
 };
+// Sent by both initialize and server/discover, which must agree.
+const SERVER_INSTRUCTIONS =
+	"Opaline holds the user's uploaded Claude Code and Codex sessions. Tools only read them; save_analysis saves or shares an analysis in the user's analysis log. Dates are UTC.";
 // OpenAI MCP extension: native settings on the plugin page.
 const SETTINGS = { readTool: "settings_read", updateTool: "settings_update" };
 const CAPABILITIES = {
@@ -261,8 +264,7 @@ async function handleMcpRequest(
 					: PROTOCOL_VERSIONS[0],
 				capabilities: CAPABILITIES,
 				serverInfo: SERVER_INFO,
-				instructions:
-					"Opaline holds the user's uploaded Claude Code and Codex sessions. Tools only read them; save_analysis saves or shares an analysis in the user's analysis log. Dates are UTC.",
+				instructions: SERVER_INSTRUCTIONS,
 			});
 		case "server/discover":
 			return rpcResult(message.id, {
@@ -270,6 +272,7 @@ async function handleMcpRequest(
 				supportedVersions: PROTOCOL_VERSIONS,
 				_meta: { "io.modelcontextprotocol/serverInfo": SERVER_INFO },
 				capabilities: CAPABILITIES,
+				instructions: SERVER_INSTRUCTIONS,
 			});
 		case "ping":
 			return rpcResult(message.id, {});
