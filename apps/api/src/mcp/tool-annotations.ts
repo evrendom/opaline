@@ -46,3 +46,14 @@ export const SHARES_WITH_WORKSPACE: McpToolAnnotations = {
 	destructiveHint: false,
 	openWorldHint: true,
 };
+
+/**
+ * Publishes the caller's saved answer in their workspace. Additive, but the
+ * title and topics are sent to OpenAI to build the search index, so it is
+ * marked open-world.
+ */
+export const SAVES_AND_INDEXES: McpToolAnnotations = {
+	readOnlyHint: false,
+	destructiveHint: false,
+	openWorldHint: true,
+};

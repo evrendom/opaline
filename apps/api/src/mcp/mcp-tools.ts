@@ -30,6 +30,7 @@ import {
 	type McpToolAnnotations,
 	READ_ONLY,
 	REPLACES_OWN_SETTING,
+	SAVES_AND_INDEXES,
 	SHARES_WITH_WORKSPACE,
 	WRITES_OWN_RECORDS,
 } from "./tool-annotations.js";
@@ -491,7 +492,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 	},
 	{
 		name: "save_answer",
-		annotations: WRITES_OWN_RECORDS,
+		annotations: SAVES_AND_INDEXES,
 		title: "Save an answer",
 		description: [
 			"What it does: Saves the answer built from your find and read calls.",

@@ -281,9 +281,9 @@ test("every tool declares annotations, and only the tools that write are not rea
 			name,
 			...(name === "settings_update"
 				? replaces
-				: name === "share_answer"
+				: name === "share_answer" || name === "save_answer"
 					? shares
-					: ["find", "read", "save_answer"].includes(name)
+					: ["find", "read"].includes(name)
 						? writes
 						: readOnly),
 		});
@@ -292,7 +292,7 @@ test("every tool declares annotations, and only the tools that write are not rea
 	expect(annotations.read).toEqual(writes);
 	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
 		expect(annotations[name]).toEqual(readOnly);
-	expect(annotations.save_answer).toEqual(writes);
+	expect(annotations.save_answer).toEqual(shares);
 	expect(annotations.share_answer).toEqual(shares);
 });
 
