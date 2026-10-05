@@ -545,6 +545,34 @@ export function HarnessBalance({
 										{ "--fill": TRENDS_HARNESS_COLORS.codex } as CSSProperties
 									}
 								/>
+								{/* 50/50 drawn like the hairline where the bands meet
+								    (the bands hide the gridline under them), parted
+								    where that hairline crosses it. */}
+								<mask
+									id={`${clipId}-even-gaps`}
+									maskUnits="userSpaceOnUse"
+									x="-5"
+									y="-5"
+									width="110"
+									height="110"
+								>
+									<rect x="-5" y="-5" width="110" height="110" fill="#fff" />
+									{boundaries.map((points, index) => (
+										<polyline
+											key={drawn[index]?.[0]?.index}
+											className="trends-balance-even-gap"
+											points={points.join(" ")}
+										/>
+									))}
+								</mask>
+								<line
+									className="trends-share-line trends-balance-boundary"
+									x1="0"
+									y1="50"
+									x2="100"
+									y2="50"
+									mask={`url(#${clipId}-even-gaps)`}
+								/>
 								{/* A hairline in the page's colour where the bands meet. */}
 								{boundaries.map((points, index) => (
 									<polyline

@@ -47,7 +47,7 @@ import {
 	type TradeoffSeries,
 } from "./trends-benchmark-charts";
 import { modelColors, modelSize } from "./trends-colors";
-import { exportChartPng } from "./trends-export";
+import { type ChartExport, exportChartPng } from "./trends-export";
 import {
 	HARNESS_MEASURES,
 	HarnessBalance,
@@ -311,23 +311,33 @@ function chartTab(chart: ChartRef) {
 export function TrendsExplorer({
 	snapshot,
 	live,
+	onExport = exportChartPng,
 }: {
 	snapshot: TrendsSnapshot;
 	/** The sources the build's kill switches leave real, for the refresh. */
 	live: TrendsLiveSources;
+	/** What the PNG button does with the chart; the card playground
+	 * (dev/trends-cards) shows the card instead of downloading it. */
+	onExport?: (chart: ChartExport) => Promise<void>;
 }) {
 	// The built snapshot first, then Opaline's latest stored sources.
 	const latest = useLatestTrendsSnapshot(snapshot, live);
 	return (
 		<MotionConfig reducedMotion="user">
 			<TrendsMotionProvider>
-				<Explorer snapshot={latest} />
+				<Explorer snapshot={latest} onExport={onExport} />
 			</TrendsMotionProvider>
 		</MotionConfig>
 	);
 }
 
-function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
+function Explorer({
+	snapshot,
+	onExport,
+}: {
+	snapshot: TrendsSnapshot;
+	onExport: (chart: ChartExport) => Promise<void>;
+}) {
 	const initial = useMemo(() => defaultState(snapshot), [snapshot]);
 	const [state, setState] = useState(initial);
 	const [hashReady, setHashReady] = useState(false);
@@ -818,28 +828,25 @@ function Explorer({ snapshot }: { snapshot: TrendsSnapshot }) {
 		const container = document
 			.getElementById(`${id}-chart-panel`)
 			?.querySelector<HTMLElement>(
-				".trends-tradeoff, .trends-benchmark-bars, .trends-balance, .trends-plot-frame",
+				".trends-tradeoff, .trends-benchmark-bars, .trends-balance, .trends-plot-frame, .trends-rank-rows",
 			);
 		if (!container) return;
 		setExporting(true);
 		try {
-			await exportChartPng({
+			await onExport({
 				container,
-				title: unit,
-				subtitle: [
-					logApplies ? (state.log ? "Log scale" : "Linear scale") : null,
+				// The view after commas; the axis title carries the scale.
+				title: [
+					unit,
 					pareto ? "Pareto frontier" : null,
 					!connected || state.lens === "quadrants"
 						? null
-						: lensName(state.lens, tradeoffGuide(section.id), "caption"),
-					lab && !connected
-						? state.arrangement === "ranked"
-							? "Ranked"
-							: "Grouped"
-						: null,
+						: lowerFirst(
+								lensName(state.lens, tradeoffGuide(section.id), "caption"),
+							),
 				]
 					.filter(Boolean)
-					.join(" · "),
+					.join(", "),
 				source: lab ? "Artificial Analysis" : wildSourceName,
 				updated: formatFullDay(
 					lab ? snapshot.sources.benchmarks.fetchedAt : wildUpdated,

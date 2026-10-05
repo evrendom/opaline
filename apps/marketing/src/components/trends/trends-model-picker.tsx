@@ -320,11 +320,12 @@ export function TrendsModelPicker({
 	}, [alignTo]);
 	// One list, so rows glide rather than jump between lists. On the harness
 	// chart each harness's heading stands over the models it runs (the
-	// labs list in that order already); headings fade in once the rows have
-	// made room, and fade out of the way as the rows close up.
+	// labs list in that order already), and models neither harness runs
+	// leave the list; headings fade in once the rows have made room, and
+	// fade out of the way as the rows close up.
 	const legendList = (list: readonly PickerModel[]) => {
 		const items: ReactNode[] = [];
-		let group: TrendsHarness | "other" | undefined;
+		let group: TrendsHarness | undefined;
 		// Lined up with a ranking beside it: its order, each row at its bar.
 		const aligned =
 			alignTo && listBox && listBox.left >= alignTo.right - 1
@@ -353,9 +354,8 @@ export function TrendsModelPicker({
 		};
 		let bottom = 0;
 		for (const model of rows) {
-			const harness = byHarness
-				? (HARNESS_OF[model.provider] ?? "other")
-				: undefined;
+			const harness = byHarness ? HARNESS_OF[model.provider] : undefined;
+			if (byHarness && !harness) continue;
 			if (harness && harness !== group)
 				items.push(
 					<motion.li
@@ -370,14 +370,8 @@ export function TrendsModelPicker({
 						}}
 						exit={{ opacity: 0, transition: { duration: 0.15 } }}
 					>
-						{harness === "other" ? (
-							"Other models"
-						) : (
-							<>
-								<HarnessMark harness={harness} />
-								{HARNESS_LABELS[harness]}
-							</>
-						)}
+						<HarnessMark harness={harness} />
+						{HARNESS_LABELS[harness]}
 					</motion.li>,
 				);
 			group = harness;

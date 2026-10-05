@@ -1,18 +1,30 @@
 import interLatinUrl from "../../assets/fonts/inter-variable-latin.woff2?url";
-import wordmarkUrl from "../../assets/opaline-wordmark-nav-small.svg?url";
-import wordmarkDarkUrl from "../../assets/opaline-wordmark-nav-small-dark.svg?url";
+import wordmarkUrl from "../../assets/opaline-trends-wordmark.svg?url";
+import wordmarkDarkUrl from "../../assets/opaline-trends-wordmark-dark.svg?url";
 
 /*
- * Exports the scatter as a PNG card: the Opaline brand, the chart's title
- * and view, the plot with its model list exactly as drawn, and a footer
- * with the source and opaline.so/trends. The plot is cloned from the page
- * with every computed style inlined, so it keeps the current colours (light
- * or dark) without the page's stylesheet; Inter is embedded, since an SVG
+ * Exports a chart as a PNG card: the Opaline Trends wordmark, the chart's
+ * title, the plot with its model list exactly as drawn, and a footer with
+ * the source and opaline.so/trends. The plot is cloned from the page with
+ * every computed style inlined, so it keeps the current colours (light or
+ * dark) without the page's stylesheet; Inter is embedded, since an SVG
  * drawn as an image can't load fonts of its own.
+ *
+ * The card is laid out around what the chart draws, not its boxes (the
+ * plot keeps room for hidden ticks, the model list's rows are wider than
+ * their names): equal margins left and right, the header and footer
+ * aligned with the chart's edges.
  */
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const PAD = 40;
+const PAD_X = 48;
+const PAD_TOP = 40;
+const PAD_BOTTOM = 36;
+const WORDMARK_HEIGHT = 20;
+// The wordmark's own proportions (112.191 × 16).
+const WORDMARK_WIDTH = (WORDMARK_HEIGHT * 112.191) / 16;
+const TITLE_SIZE = 20;
+const FOOTER_SIZE = 12;
 const SCALE = 2;
 
 // What the page's CSS decides on SVG marks, carried over as inline style.
@@ -47,19 +59,51 @@ const STYLE_PROPS = [
 
 const COLOR_PROPS = new Set(["fill", "stroke", "stop-color"]);
 
+// The marks whose boxes make up what a plot draws.
+const SHAPES =
+	"path, line, rect, circle, ellipse, polyline, polygon, text, image, use";
+
 export interface ChartExport {
 	/** The chart's container: the scatter's (holding its plot's SVG), or the
 	 * bars', drawn as HTML and carried over whole. */
 	readonly container: HTMLElement;
+	/** The title with the view after commas, e.g. "Intelligence index by
+	 * cost per task (USD), Pareto frontier". */
 	readonly title: string;
-	/** The view, e.g. "Log scale · Pareto frontier". */
-	readonly subtitle: string;
 	readonly source: string;
 	readonly updated: string;
 	readonly fileName: string;
 }
 
 export async function exportChartPng(chart: ChartExport) {
+	const blob = await chartCardPng(await buildChartCard(chart));
+	const link = document.createElement("a");
+	link.href = URL.createObjectURL(blob);
+	link.download = chart.fileName;
+	link.click();
+	setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+/** The card as an SVG, before it is drawn to a PNG. */
+export interface ChartCard {
+	readonly svg: SVGSVGElement;
+	readonly width: number;
+	readonly height: number;
+}
+
+export function chartCardPng(card: ChartCard) {
+	return rasterize(card.svg, card.width, card.height);
+}
+
+/** A region in the plot's coordinates (its box's top left is 0, 0). */
+interface Ink {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+export async function buildChartCard(chart: ChartExport): Promise<ChartCard> {
 	const plot = chart.container.querySelector<SVGSVGElement>(":scope > svg");
 	await settled(4000);
 	const box = (plot ?? chart.container).getBoundingClientRect();
@@ -68,7 +112,6 @@ export async function exportChartPng(chart: ChartExport) {
 	const surface = appStyle.backgroundColor;
 	const ink = colorOf("--color-ink-strong", app);
 	const muted = colorOf("--color-ink-muted", app);
-	const line = colorOf("--color-line", app);
 	const dark = matchMedia("(prefers-color-scheme: dark)").matches;
 
 	const [fontData, wordmark] = await Promise.all([
@@ -81,22 +124,47 @@ export async function exportChartPng(chart: ChartExport) {
 		".trends-plot-axis-title",
 	);
 	const axisBox = axisTitle?.getBoundingClientRect();
-	const contentWidth = Math.max(
-		box.width,
-		...legend.map((row) => row.right),
-		axisBox ? axisBox.right - box.left : 0,
+	const compare = chart.container.querySelector<HTMLElement>(
+		'.trends-compare[data-open="true"]',
 	);
-	const plotHeight = Math.max(
-		box.height,
-		axisBox ? axisBox.bottom - box.top : 0,
+	const compareShown =
+		plot !== null &&
+		compare !== null &&
+		Number(getComputedStyle(compare).opacity) > 0;
+
+	// What the chart draws: the plot's marks (or the HTML chart's bars,
+	// figures and labels), the model list's dots and names, the axis title
+	// and the comparison panel.
+	const drawn = drawnInk(plot ?? chart.container, box, surface);
+	for (const row of legend) grow(drawn, row.ink);
+	if (plot && axisTitle && axisBox)
+		grow(drawn, relative(textBox(axisTitle) ?? axisBox, box));
+	if (compareShown && compare)
+		grow(drawn, relative(compare.getBoundingClientRect(), box));
+	const drawnWidth = drawn.right - drawn.left;
+	const drawnHeight = drawn.bottom - drawn.top;
+
+	const title = chart.title;
+	const source = `Source: ${chart.source} · ${chart.updated}`;
+	const link = "opaline.so/trends";
+	// Wide enough for the title and the footer, should the chart be narrow.
+	const width = Math.ceil(
+		Math.max(
+			drawnWidth,
+			textWidth(title, TITLE_SIZE, 600),
+			textWidth(source, FOOTER_SIZE, 450) +
+				32 +
+				textWidth(link, FOOTER_SIZE, 500),
+		) +
+			PAD_X * 2,
 	);
-	const headerHeight = 112;
-	const footerHeight = 64;
-	// The plot leaves room above its box for the page's title, which the
-	// header takes over here.
-	const plotTop = headerHeight - 8;
-	const width = Math.ceil(contentWidth + PAD * 2);
-	const height = Math.ceil(plotTop + plotHeight + footerHeight);
+	// The chart centred; the header and footer on its edges.
+	const left = (width - drawnWidth) / 2;
+	const right = left + drawnWidth;
+	const titleY = PAD_TOP + WORDMARK_HEIGHT + 30;
+	const contentTop = titleY + TITLE_SIZE / 2 + 26;
+	const footerY = contentTop + drawnHeight + 36;
+	const height = Math.ceil(footerY + FOOTER_SIZE / 2 + PAD_BOTTOM);
 
 	const svg = element("svg", {
 		xmlns: SVG_NS,
@@ -109,45 +177,25 @@ export async function exportChartPng(chart: ChartExport) {
 	svg.append(style);
 	svg.append(
 		element("rect", { width, height, fill: srgb(surface) }),
-		// Brand, as in the app's top bar: the wordmark, a divider, "Trends".
 		element("image", {
 			href: wordmark,
-			x: PAD,
-			y: PAD - 4,
-			width: 80,
-			height: 20,
+			x: left,
+			y: PAD_TOP,
+			width: WORDMARK_WIDTH,
+			height: WORDMARK_HEIGHT,
 		}),
-		element("rect", {
-			x: PAD + 92,
-			y: PAD - 2,
-			width: 1,
-			height: 16,
-			fill: srgb(line),
-		}),
-		text("Trends", {
-			x: PAD + 105,
-			y: PAD + 6,
-			size: 15,
-			weight: 550,
-			fill: ink,
-		}),
-		text(chart.title, {
-			x: PAD,
-			y: PAD + 44,
-			size: 20,
+		text(title, {
+			x: left,
+			y: titleY,
+			size: TITLE_SIZE,
 			weight: 600,
 			fill: ink,
 		}),
-		text(chart.subtitle, {
-			x: PAD,
-			y: PAD + 68,
-			size: 13,
-			weight: 450,
-			fill: muted,
-		}),
 	);
 
-	const content = element("g", { transform: `translate(${PAD} ${plotTop})` });
+	const content = element("g", {
+		transform: `translate(${left - drawn.left} ${contentTop - drawn.top})`,
+	});
 	if (plot) {
 		const clone = plot.cloneNode(true) as SVGSVGElement;
 		inlineStyles(plot, clone);
@@ -176,45 +224,130 @@ export async function exportChartPng(chart: ChartExport) {
 	for (const row of legend) content.append(row.node);
 	// The comparison panel, when points are compared: HTML, carried over
 	// whole with its computed styles.
-	const compare = chart.container.querySelector<HTMLElement>(
-		'.trends-compare[data-open="true"]',
-	);
-	if (plot && compare && Number(getComputedStyle(compare).opacity) > 0)
-		content.append(htmlLayer(compare, box));
+	if (compareShown && compare) content.append(htmlLayer(compare, box));
 	svg.append(content);
 
-	const footerY = height - footerHeight + 8;
 	svg.append(
-		element("rect", {
-			x: PAD,
+		text(source, {
+			x: left,
 			y: footerY,
-			width: width - PAD * 2,
-			height: 1,
-			fill: srgb(line),
-		}),
-		text(`Source: ${chart.source} · ${chart.updated}`, {
-			x: PAD,
-			y: footerY + 28,
-			size: 12,
+			size: FOOTER_SIZE,
 			weight: 450,
 			fill: muted,
 		}),
-		text("opaline.so/trends", {
-			x: width - PAD,
-			y: footerY + 28,
-			size: 12,
+		text(link, {
+			x: right,
+			y: footerY,
+			size: FOOTER_SIZE,
 			weight: 500,
 			fill: ink,
 			anchor: "end",
 		}),
 	);
 
-	const blob = await rasterize(svg, width, height);
-	const link = document.createElement("a");
-	link.href = URL.createObjectURL(blob);
-	link.download = chart.fileName;
-	link.click();
-	setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+	return { svg: svg as SVGSVGElement, width, height };
+}
+
+/**
+ * The region a chart's visible marks cover, not its boxes: an SVG plot's
+ * painted shapes (not its hidden ticks, nor transparent hit areas), an
+ * HTML chart's text and the elements that paint a fill, border or shadow
+ * other than the card's surface.
+ */
+function drawnInk(root: Element, box: DOMRect, surface: string): Ink {
+	const ink: Ink = {
+		left: Number.POSITIVE_INFINITY,
+		top: Number.POSITIVE_INFINITY,
+		right: Number.NEGATIVE_INFINITY,
+		bottom: Number.NEGATIVE_INFINITY,
+	};
+	const add = (rect: DOMRect) => {
+		if (rect.width > 0 || rect.height > 0) grow(ink, relative(rect, box));
+	};
+	const visit = (node: Element) => {
+		if (
+			!node.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+		)
+			return;
+		const style = getComputedStyle(node);
+		if (node instanceof SVGElement) {
+			if (
+				node.matches(SHAPES) &&
+				(painted(style.fill) || painted(style.stroke))
+			)
+				add(node.getBoundingClientRect());
+		} else if (surfaced(style, surface)) add(node.getBoundingClientRect());
+		for (const child of node.childNodes) {
+			if (child instanceof Element) visit(child);
+			else if (
+				child.nodeType === Node.TEXT_NODE &&
+				!(node instanceof SVGElement) &&
+				child.textContent?.trim()
+			) {
+				const range = document.createRange();
+				range.selectNodeContents(child);
+				add(range.getBoundingClientRect());
+			}
+		}
+	};
+	visit(root);
+	// Nothing drawn: the chart's box.
+	return Number.isFinite(ink.left)
+		? ink
+		: { left: 0, top: 0, right: box.width, bottom: box.height };
+}
+
+/** Whether an HTML element paints anything of its own on the card. */
+function surfaced(style: CSSStyleDeclaration, surface: string) {
+	const fill = style.backgroundColor;
+	if (painted(fill) && srgb(fill) !== srgb(surface)) return true;
+	if (style.backgroundImage !== "none" || style.boxShadow !== "none")
+		return true;
+	return (["Top", "Right", "Bottom", "Left"] as const).some(
+		(side) =>
+			Number.parseFloat(style[`border${side}Width`]) > 0 &&
+			painted(style[`border${side}Color`]),
+	);
+}
+
+function painted(paint: string) {
+	if (!paint || paint === "none") return false;
+	if (paint.startsWith("url(")) return true;
+	const alpha = /\/\s*([\d.]+)\)$/.exec(srgb(paint));
+	return !alpha || Number(alpha[1]) > 0;
+}
+
+function grow(ink: Ink, region: Ink) {
+	ink.left = Math.min(ink.left, region.left);
+	ink.top = Math.min(ink.top, region.top);
+	ink.right = Math.max(ink.right, region.right);
+	ink.bottom = Math.max(ink.bottom, region.bottom);
+}
+
+function relative(rect: DOMRect | Ink, box: DOMRect): Ink {
+	return {
+		left: rect.left - box.left,
+		top: rect.top - box.top,
+		right: rect.right - box.left,
+		bottom: rect.bottom - box.top,
+	};
+}
+
+/** The box of an element's text itself, narrower than a block's. */
+function textBox(node: Element) {
+	const range = document.createRange();
+	range.selectNodeContents(node);
+	const rect = range.getBoundingClientRect();
+	return rect.width > 0 ? rect : null;
+}
+
+let measureContext: CanvasRenderingContext2D | null = null;
+
+function textWidth(content: string, size: number, weight: number) {
+	measureContext ??= document.createElement("canvas").getContext("2d");
+	if (!measureContext) return 0;
+	measureContext.font = `${weight} ${size}px "Inter Variable", Inter, system-ui, sans-serif`;
+	return measureContext.measureText(content).width;
 }
 
 /**
@@ -250,38 +383,57 @@ async function settled(limit: number) {
 	}
 }
 
-/** The model list beside the plot, as SVG in the plot's coordinates. */
+/**
+ * The model list beside the plot, as SVG in the plot's coordinates: its
+ * rows (a dot when shown, the maker's mark, the name) and its group
+ * headings (the harness chart's Claude Code, Codex and other models).
+ */
 function legendRows(box: DOMRect) {
 	const rows = document.querySelectorAll<HTMLElement>(
-		".trends-models-legend .trends-picker-group .trends-picker-model",
+		".trends-models-legend .trends-picker-group :is(.trends-picker-model, .trends-picker-company-name)",
 	);
 	return [...rows].flatMap((row) => {
 		const rowStyle = getComputedStyle(row);
 		const alpha = Number(rowStyle.opacity) * filterOpacity(rowStyle.filter);
-		const dot = row.querySelector<HTMLInputElement>(".trends-picker-dot");
-		const name = row.querySelector<HTMLElement>(".trends-picker-name");
-		if (alpha < 0.02 || !dot || !name) return [];
+		const label = rowLabel(row);
+		if (
+			alpha < 0.02 ||
+			!label ||
+			!row.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+		)
+			return [];
 		const group = element("g", { opacity: alpha.toFixed(3) });
-		const dotBox = dot.getBoundingClientRect();
-		const dotStyle = getComputedStyle(dot);
-		const cx = dotBox.left + dotBox.width / 2 - box.left;
-		const cy = dotBox.top + dotBox.height / 2 - box.top;
-		const radius = dotBox.width / 2;
-		const key = srgb(dotStyle.borderTopColor);
-		group.append(
-			element("circle", {
-				cx,
-				cy,
-				r: radius - 0.75,
-				fill: "none",
-				stroke: key,
-				"stroke-width": 1.5,
-				opacity: dotStyle.opacity,
-			}),
-		);
-		if (dot.checked)
-			group.append(element("circle", { cx, cy, r: radius - 3, fill: key }));
-		const mark = row.querySelector<SVGSVGElement>("svg.trends-mark");
+		const ink: Ink = relative(label.box, box);
+		const dot = row.querySelector<HTMLInputElement>(".trends-picker-dot");
+		const dotBox = dot?.getBoundingClientRect();
+		const dotStyle = dot ? getComputedStyle(dot) : null;
+		if (
+			dot &&
+			dotBox &&
+			dotStyle &&
+			dotBox.width > 0 &&
+			Number(dotStyle.opacity) > 0
+		) {
+			const cx = dotBox.left + dotBox.width / 2 - box.left;
+			const cy = dotBox.top + dotBox.height / 2 - box.top;
+			const radius = dotBox.width / 2;
+			const key = srgb(dotStyle.borderTopColor);
+			group.append(
+				element("circle", {
+					cx,
+					cy,
+					r: radius - 0.75,
+					fill: "none",
+					stroke: key,
+					"stroke-width": 1.5,
+					opacity: dotStyle.opacity,
+				}),
+			);
+			if (dot.checked)
+				group.append(element("circle", { cx, cy, r: radius - 3, fill: key }));
+			grow(ink, relative(dotBox, box));
+		}
+		const mark = row.querySelector<SVGSVGElement>(":scope > svg.trends-mark");
 		if (mark) {
 			const markBox = mark.getBoundingClientRect();
 			const markClone = mark.cloneNode(true) as SVGSVGElement;
@@ -292,20 +444,44 @@ function legendRows(box: DOMRect) {
 			markClone.setAttribute("height", String(markBox.height));
 			markClone.removeAttribute("class");
 			group.append(markClone);
+			grow(ink, relative(markBox, box));
 		}
-		const nameBox = name.getBoundingClientRect();
-		const nameStyle = getComputedStyle(name);
 		group.append(
-			text(name.textContent ?? "", {
-				x: nameBox.left - box.left,
-				y: nameBox.top + nameBox.height / 2 - box.top,
-				size: Number.parseFloat(nameStyle.fontSize),
-				weight: Number.parseFloat(nameStyle.fontWeight),
-				fill: nameStyle.color,
+			text(label.text, {
+				x: label.box.left - box.left,
+				y: label.box.top + label.box.height / 2 - box.top,
+				size: Number.parseFloat(label.style.fontSize),
+				weight: Number.parseFloat(label.style.fontWeight),
+				fill: label.style.color,
 			}),
 		);
-		return [{ node: group, right: nameBox.right - box.left }];
+		return [{ node: group, ink }];
 	});
+}
+
+/** A legend row's words: a model's name, or a heading's own text. */
+function rowLabel(row: HTMLElement) {
+	const name = row.querySelector<HTMLElement>(".trends-picker-name");
+	if (name) {
+		const box = textBox(name) ?? name.getBoundingClientRect();
+		return { text: name.textContent ?? "", box, style: getComputedStyle(name) };
+	}
+	const words = [...row.childNodes].filter(
+		(node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+	);
+	const first = words[0];
+	const last = words.at(-1);
+	if (!first || !last) return null;
+	const range = document.createRange();
+	range.setStartBefore(first);
+	range.setEndAfter(last);
+	const box = range.getBoundingClientRect();
+	if (box.width === 0) return null;
+	return {
+		text: words.map((node) => node.textContent?.trim()).join(" "),
+		box,
+		style: getComputedStyle(row),
+	};
 }
 
 // Colour properties of HTML elements, clipped to sRGB like the marks'.

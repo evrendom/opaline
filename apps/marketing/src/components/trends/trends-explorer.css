@@ -250,11 +250,11 @@
 	bottom: -11px;
 }
 
-/* In the site's navigation (trends.astro), after "Trends": a chevron,
- * then the charts as a breadcrumb at the navigation's size, the shown one
- * in ink and underlined. Outside the app, so it carries the
- * buttons' resets itself. Narrow, the tabs under the navigation stand in
- * for it. */
+/* In the site's navigation (TrendsPage.astro), after the Opaline Trends
+ * wordmark: a chevron, then the charts as a breadcrumb at the navigation's
+ * size, the shown one in ink and underlined. Outside the app, so it
+ * carries the buttons' resets itself. Narrow, the tabs under the
+ * navigation stand in for it. */
 .trends-nav-trail {
 	--trends-preview-ink: #7a5310;
 	display: inline-flex;
@@ -448,12 +448,6 @@
 }
 
 @media (max-width: 879px) {
-	/* Both crumbs one size: "Trends" greyed, the shown chart in ink. */
-	.trends-site-nav .instant-v2-nav-link-trends {
-		font-size: 15px;
-		line-height: 20px;
-	}
-
 	.trends-nav-trail {
 		gap: 4px;
 		margin-inline: 0;
@@ -2496,6 +2490,15 @@
 	stroke: var(--color-surface);
 	stroke-width: 2;
 	opacity: max(0, 1 - 2 * var(--turn));
+}
+
+/* The gap 50/50 leaves each side of the hairline where it crosses. */
+.trends-balance-even-gap {
+	fill: none;
+	stroke: #000;
+	stroke-linejoin: round;
+	stroke-width: 14px;
+	vector-effect: non-scaling-stroke;
 }
 
 /* The axis labels of both views: the old ones fade out as the chart

@@ -1,4 +1,5 @@
 ---
+import trendsWordmarkSvg from "../assets/opaline-trends-wordmark.svg?raw";
 import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
 
 interface Props {
@@ -10,6 +11,9 @@ interface Props {
 	install?: boolean;
 	/** The Pricing link (off on Trends). */
 	pricing?: boolean;
+	/** Trends leads with the Opaline Trends wordmark, which names the page,
+	 * in place of the Opaline one and the Trends link. */
+	wordmark?: "opaline" | "trends";
 }
 
 const {
@@ -18,13 +22,21 @@ const {
 	filled = false,
 	install = true,
 	pricing = true,
+	wordmark = "opaline",
 } = Astro.props;
 
 // Product navigation stays hidden during the beta launch.
 const showProductLinks = false;
 
-const flatOpalineWordmark = opalineWordmarkSvg
+// Flat, in the navigation's ink: the paths take currentColor, so the
+// wordmarks' own gradients (and the Trends one's title) are dropped.
+const flatWordmark = (
+	wordmark === "trends" ? trendsWordmarkSvg : opalineWordmarkSvg
+)
 	.trim()
+	.replace(/<title[^>]*>[\s\S]*?<\/title>\s*/, "")
+	.replace(/<defs>[\s\S]*?<\/defs>\s*/, "")
+	.replace(/\s(?:role|aria-labelledby)="[^"]*"/g, "")
 	.replace(/^<svg\s/, '<svg aria-hidden="true" focusable="false" ');
 ---
 
@@ -34,8 +46,13 @@ const flatOpalineWordmark = opalineWordmarkSvg
 	data-scrolled="true"
 >
 	<div class="instant-v2-nav-inner">
-		<a class="instant-v2-nav-label" href="/" aria-label="Homepage">
-			<Fragment set:html={flatOpalineWordmark} />
+		<a
+			class="instant-v2-nav-label"
+			href="/"
+			aria-label="Homepage"
+			data-wordmark={wordmark}
+		>
+			<Fragment set:html={flatWordmark} />
 		</a>
 
 		<nav class="instant-v2-nav-links" aria-label="Main navigation">
@@ -56,7 +73,7 @@ const flatOpalineWordmark = opalineWordmarkSvg
 				)
 			}
 			{
-				active === "trends" ? (
+				wordmark === "trends" ? null : active === "trends" ? (
 					<span
 						class="instant-v2-nav-link instant-v2-nav-link-trends instant-v2-nav-link-current"
 						aria-current="page"
@@ -271,6 +288,11 @@ const flatOpalineWordmark = opalineWordmarkSvg
 		display: block;
 		width: 64px;
 		height: 16px;
+	}
+
+	/* The Opaline Trends wordmark's proportions (112.191 × 16). */
+	.instant-v2-nav-label[data-wordmark="trends"] :global(svg) {
+		width: 112px;
 	}
 
 	.instant-v2-nav-label :global(svg path) {
