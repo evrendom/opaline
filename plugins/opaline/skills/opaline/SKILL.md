@@ -43,6 +43,7 @@ A **ref is a run**: session + agent (`''` is the main transcript, otherwise a su
 - **Share only when asked:** `save_analysis action=share shared=true` shares an analysis with the workspace; `shared=false` stops sharing.
 - **Think team-wide and over time.** Most questions are about the whole team over weeks or months: patterns across members and repositories, not one session. Unless the user narrows it, use the last 30 days and every session you can see (workspace admins see the whole team; members see their own), and say which scope you used.
 
+- **Dashboard** ("open/show the dashboard", "show our costs"): call `get_dashboard` with the date range. It shows the Opaline dashboard right in the chat. Never answer with a link to opaline.so instead, and don't call `find` first.
 - **Trends** ("spend per week", "which model costs most"): one `find source=runs groupBy=…` call or `get_dashboard`. Report the numbers; don't interpret beyond them.
 - **Insights** ("why do our agents fail", "what frustrates the team"):
   1. Call `find` for the right source.

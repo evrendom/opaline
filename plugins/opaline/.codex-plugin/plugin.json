@@ -103,7 +103,8 @@
 					]
 				},
 				"commerce": false,
-				"commerce_description": "Opaline does not sell products or process payments in ChatGPT or Codex."
+				"commerce_description": "Opaline does not sell products or process payments in ChatGPT or Codex.",
+				"demo_recording_url": "https://www.youtube.com/watch?v=9nxh58DtOpU"
 			},
 			"publication": {
 				"release_notes": "Team-wide analysis: ask across every teammate's sessions over weeks or months; Opaline finds the patterns, reads the runs behind them and answers with evidence. Saving and sharing analyses moved to the new save_analysis tool, so the analyses tool is read-only. Adds dashboard screenshots."
