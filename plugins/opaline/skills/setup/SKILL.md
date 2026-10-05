@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up Opaline right after the plugin is installed — check that the workspace has uploaded sessions and, if not, point the user to opaline.so to connect their coding agents.
+description: Set up Opaline right after the plugin is installed. Check that the workspace has uploaded sessions and, if not, point the user to opaline.so to connect their coding agents.
 ---
 
 # Set up Opaline

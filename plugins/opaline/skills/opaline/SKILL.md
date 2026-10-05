@@ -1,6 +1,6 @@
 ---
 name: opaline
-description: Help a team improve its coding agent setup with Opaline — find where agents get stuck, fail or waste time and money, and what to fix (instructions, docs, scripts, CI). Use when the user asks why agents keep going wrong, where time and money went, what agents cost, wants a retro of recent sessions, wants the Opaline dashboard, or mentions Opaline.
+description: Help a team improve its coding agent setup with Opaline: find where agents get stuck, fail or waste time and money, and what to fix (instructions, docs, scripts, CI). Use when the user asks why agents keep going wrong, where time and money went, what agents cost, wants a retro of recent sessions, wants the Opaline dashboard, or mentions Opaline.
 ---
 
 # Opaline

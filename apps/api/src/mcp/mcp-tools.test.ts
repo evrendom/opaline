@@ -323,7 +323,7 @@ test("find, read and save_analysis describe the private draft and the append-onl
 			"Nobody can see this unfinished answer, not even the user, until save_analysis saves it.",
 		);
 	expect(description("save_analysis")).toContain(
-		"a saved answer is never changed or deleted, and an update is saved as a new answer linked to it.",
+		"Nothing is posted outside Opaline. A saved answer is never changed or deleted; an update is saved as a new answer linked to it.",
 	);
 	expect(description("analyses")).toContain("Side effects: None.");
 });

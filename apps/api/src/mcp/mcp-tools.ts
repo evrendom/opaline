@@ -413,7 +413,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"What it does: Saves the finished answer, or shares a saved answer with your workspace.",
 			"Use when: Once, right before your final message; share only when the user asks.",
 			"Returns: The saved answer's id, or whether it is now shared.",
-			"Side effects: Saves the answer so you, and your workspace if shared, can see it; a saved answer is never changed or deleted, and an update is saved as a new answer linked to it. Sharing can be undone with shared=false.",
+			"Side effects: Saves the answer in Opaline so you, and your own workspace if shared, can see it. Nothing is posted outside Opaline. A saved answer is never changed or deleted; an update is saved as a new answer linked to it. Sharing can be undone with shared=false.",
 			"Limits: Only the person who asked can save or share an answer, and each answer is saved once.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(SaveAnalysisToolInputSchema), {
