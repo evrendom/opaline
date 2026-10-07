@@ -79,7 +79,7 @@ interface McpAuthApi {
 }
 
 const UNAVAILABLE_HTML =
-	"<p>Opaline for ChatGPT and Codex is not available for your account yet.</p>";
+	"<p>The Opaline plugin is not available for your account yet.</p>";
 
 /**
  * Dark launch: until MCP_PLUGIN_PUBLIC is exactly "true", only members of the

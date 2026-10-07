@@ -23,3 +23,26 @@ test("every plugin skill's front matter is valid YAML with a name and a descript
 		expect(`${parsed.description}`.length).toBeGreaterThan(20);
 	}
 });
+
+const PLUGIN = join(import.meta.dir, "../../../../plugins/opaline");
+
+test("the Claude Code manifest matches the Codex manifest", async () => {
+	const codex = await Bun.file(
+		join(PLUGIN, ".codex-plugin/plugin.json"),
+	).json();
+	const claude = await Bun.file(
+		join(PLUGIN, ".claude-plugin/plugin.json"),
+	).json();
+	for (const key of ["name", "version", "description", "license"]) {
+		expect({ key, value: claude[key] }).toEqual({ key, value: codex[key] });
+	}
+});
+
+test("the Claude Code marketplace lists the plugin", async () => {
+	const marketplace = await Bun.file(
+		join(PLUGIN, "../../.claude-plugin/marketplace.json"),
+	).json();
+	expect(marketplace.plugins).toContainEqual(
+		expect.objectContaining({ name: "opaline", source: "./plugins/opaline" }),
+	);
+});
