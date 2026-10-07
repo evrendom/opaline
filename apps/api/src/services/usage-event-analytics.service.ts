@@ -278,19 +278,7 @@ const SESSION_METADATA_COLUMNS = `
 		sa.linked_subagent_count AS linked_subagent_count,
 		sa.linked_subagents AS linked_subagents,
 		sa.actual_duration_min AS actual_duration_min,
-	sa.avg_period_sec AS avg_period_sec,
-	sa.median_period_sec AS median_period_sec,
-	sa.quick_responses AS quick_responses,
-	sa.normal_responses AS normal_responses,
-	sa.long_pauses AS long_pauses,
-	sa.error_count AS error_count,
-	sa.error_pattern AS error_pattern,
-	sa.has_commit AS has_commit,
-	sa.session_archetype AS session_archetype,
-	sa.success_score AS success_score,
-	sa.used_plan_mode AS used_plan_mode,
-	sa.inference_duration_sec AS inference_duration_sec,
-	sa.human_duration_sec AS human_duration_sec
+	sa.error_count AS error_count
 `;
 
 export interface UsageAnalyticsScope {

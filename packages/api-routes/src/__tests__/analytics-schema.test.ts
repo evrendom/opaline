@@ -58,9 +58,7 @@ describe("analytics input schemas", () => {
 
 	test("session rows default missing persisted language counts to zero", () => {
 		const parsed = SessionAnalyticsSchema.parse({
-			avg_period_sec: 0,
 			duration_min: 0,
-			has_commit: false,
 			input_tokens: 0,
 			model_used: "",
 			output_tokens: 0,
@@ -78,10 +76,8 @@ describe("analytics input schemas", () => {
 			skills: [],
 			slash_commands: [],
 			subagent_types: [],
-			success_score: 0,
 			total_interactions: 0,
 			total_tokens: 0,
-			used_plan_mode: false,
 			user_id: "user-1",
 		});
 

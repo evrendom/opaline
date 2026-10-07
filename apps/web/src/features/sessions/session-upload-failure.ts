@@ -23,14 +23,10 @@ export function uploadFailureSession(
 		total_tokens: 0,
 		input_tokens: 0,
 		output_tokens: 0,
-		success_score: 0,
 		total_interactions: 0,
-		avg_period_sec: 0,
 		subagent_types: [],
 		skills: [],
 		slash_commands: [],
-		has_commit: Boolean(failure.gitSha),
-		used_plan_mode: false,
 	};
 }
 

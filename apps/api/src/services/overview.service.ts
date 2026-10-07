@@ -92,12 +92,10 @@ export async function getUsersDailyTrend(
       toString(toDate(session_date)) as date,
       user_id,
       count() as sessions,
-      sum(has_commit) as total_commits,
       round(sum(actual_duration_min) / 60, 2) as total_hours,
       sum(ifNull(total_tokens, 0)) as total_tokens,
       sum(ifNull(input_tokens, 0)) as input_tokens,
       sum(ifNull(output_tokens, 0)) as output_tokens,
-      round(avg(success_score), 2) as avg_success_rate,
       length(arrayDistinct(arrayFilter(x -> x != '', arrayFlatten(groupArray(skills))))) as distinct_skills,
       length(arrayDistinct(arrayFilter(x -> x != '', arrayFlatten(groupArray(slash_commands))))) as distinct_slash_commands,
       arrayFilter(

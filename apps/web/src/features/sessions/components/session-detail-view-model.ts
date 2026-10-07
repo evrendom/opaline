@@ -69,7 +69,6 @@ type SessionDetailViewModelSource = Partial<
 		| "slash_commands"
 		| "source"
 		| "subagents"
-		| "success_score"
 		| "total_tokens"
 		| "user_id",
 		unknown
@@ -245,10 +244,6 @@ export function buildSessionDetailViewModel(
 		toOptionalString(session.last_interaction_date) ?? undefined;
 	const safeProjectPath = toOptionalString(session.project_path) ?? undefined;
 	const safeSource = toOptionalString(session.source) ?? undefined;
-	const safeSuccessScore =
-		session.success_score === undefined
-			? undefined
-			: toNumber(session.success_score);
 	const safeContent = toContentString(session.content);
 	const metadataBadges = createSessionMetadataBadges({
 		gitBranch: safeGitBranch,
@@ -286,7 +281,6 @@ export function buildSessionDetailViewModel(
 		safeSlashCommands,
 		safeSource,
 		safeSubagents,
-		safeSuccessScore,
 		safeTotalTokens,
 		safeUserDisplayName,
 		safeUserId,

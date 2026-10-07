@@ -20,12 +20,10 @@ vi.mock("@/features/workspace/hooks/useUserMap", () => ({
 }));
 
 const session: SessionAnalytics = {
-	avg_period_sec: 45,
 	duration_min: 12,
 	error_count: 3,
 	estimated_cost: 0.08,
 	git_branch: "rudel/pr2-usage-events",
-	has_commit: true,
 	input_tokens: 6_000,
 	model_used: "claude-sonnet-4",
 	output_tokens: 4_000,
@@ -45,10 +43,8 @@ const session: SessionAnalytics = {
 	slash_commands: [],
 	subagent_types: [],
 	subagent_count: 2,
-	success_score: 80,
 	total_interactions: 6,
 	total_tokens: 10_000,
-	used_plan_mode: false,
 	user_id: "user-1",
 	member_swears: 2,
 	member_swear_matches: ["fuck"],

@@ -35,11 +35,6 @@ export interface SessionAnalyticsRaw {
 
 	// Interaction timing metrics
 	total_interactions: number;
-	avg_period_sec: number;
-	median_period_sec: number;
-	quick_responses: number;
-	normal_responses: number;
-	long_pauses: number;
 	actual_duration_min: number;
 
 	// Duration metrics
@@ -56,7 +51,6 @@ export interface SessionAnalyticsRaw {
 	// Git activity
 	git_sha: string;
 	git_branch: string;
-	has_commit: number;
 
 	// Feature arrays
 	subagent_types: string[];
@@ -78,13 +72,9 @@ export interface SessionAnalyticsRaw {
 	skills: string[];
 	slash_commands: string[];
 
-	// Success metrics
-	success_score: number;
-
 	// Effectiveness correlation factors
 	error_count: number;
 	model_used: string;
-	used_plan_mode: number;
 
 	// Persisted language-signal counts
 	member_swears: number;
@@ -168,9 +158,7 @@ export function mapSessionAnalyticsRow(
 		output_tokens: row.output_tokens,
 		estimated_cost: row.cost_is_complete > 0 ? row.estimated_cost : null,
 		cost_uses_default_region: row.cost_uses_default_region > 0,
-		success_score: row.success_score,
 		total_interactions: row.total_interactions,
-		avg_period_sec: row.avg_period_sec,
 		subagent_types: row.subagent_types,
 		subagent_count: row.subagent_count,
 		native_subagents: (row.native_subagents ?? []).map(
@@ -194,10 +182,8 @@ export function mapSessionAnalyticsRow(
 		),
 		skills: row.skills,
 		slash_commands: row.slash_commands,
-		has_commit: row.has_commit > 0,
 		error_count: row.error_count,
 		model_used: row.model_used,
-		used_plan_mode: row.used_plan_mode > 0,
 		member_swears: row.member_swears,
 		member_apologies: row.member_apologies,
 		member_positive: row.member_positive,
@@ -357,11 +343,6 @@ async function getSessionAnalyticsBaseRows(
       git_remote,
       package_name,
       total_interactions,
-      avg_period_sec,
-      median_period_sec,
-      quick_responses,
-      normal_responses,
-      long_pauses,
       actual_duration_min,
       formatDateTime(sa.last_interaction_date, '%Y-%m-%dT%H:%i:%SZ') as last_interaction_date,
       total_tokens,
@@ -372,7 +353,6 @@ async function getSessionAnalyticsBaseRows(
 	  sa.cost_uses_default_region AS cost_uses_default_region,
       git_sha,
       git_branch,
-	      has_commit,
 	      subagent_types,
 	      subagent_count,
 	      native_subagents,
@@ -381,10 +361,8 @@ async function getSessionAnalyticsBaseRows(
 	      linked_subagents,
 	      skills,
       slash_commands,
-      success_score,
       error_count,
-      model_used,
-	      used_plan_mode
+      model_used
 	    FROM session_list_costs AS sa
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
@@ -547,7 +525,6 @@ export async function getSessionAnalyticsSummaryComparison(
       SELECT
 		countIf(sa.is_top_level_session = 1) as cnt_sessions,
 		ifNull(avgIf(sa.actual_duration_min, sa.is_top_level_session = 1), 0) as avg_duration,
-		ifNull(avgIf(sa.avg_period_sec, sa.is_top_level_session = 1), 0) as avg_response,
 	        countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as cnt_subagents,
 		countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as cnt_skills,
 		countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as cnt_slash
@@ -559,7 +536,6 @@ export async function getSessionAnalyticsSummaryComparison(
     SELECT
       cnt_sessions as total_sessions,
       ifNull(round(avg_duration, 2), 0) as avg_session_duration_min,
-      ifNull(round(avg_response, 2), 0) as avg_response_time_sec,
       round(cnt_subagents * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as subagents_adoption_rate,
       round(cnt_skills * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as skills_adoption_rate,
       round(cnt_slash * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as slash_commands_adoption_rate
@@ -587,7 +563,6 @@ export async function getSessionAnalyticsSummaryComparison(
 	const defaultPeriod: SessionSummaryComparisonPeriod = {
 		total_sessions: 0,
 		avg_session_duration_min: 0,
-		avg_response_time_sec: 0,
 		subagents_adoption_rate: 0,
 		skills_adoption_rate: 0,
 		slash_commands_adoption_rate: 0,
@@ -622,10 +597,6 @@ export async function getSessionAnalyticsSummaryComparison(
 			current.avg_session_duration_min || 0,
 			previous.avg_session_duration_min || 0,
 		),
-		avg_response_time_sec: calculateChange(
-			current.avg_response_time_sec || 0,
-			previous.avg_response_time_sec || 0,
-		),
 	};
 
 	return { current, previous, changes };
@@ -642,11 +613,8 @@ const METRIC_EXPRESSIONS: Record<DimensionAnalysisInput["metric"], string> = {
 	total_duration: "round(SUM(actual_duration_min) / 60, 2)",
 	avg_interactions: "round(AVG(total_interactions), 2)",
 	total_interactions: "SUM(total_interactions)",
-	avg_response_time: "round(AVG(avg_period_sec), 2)",
-	median_response_time: "round(AVG(median_period_sec), 2)",
 	avg_tokens: "round(AVG(total_tokens), 0)",
 	total_tokens: "SUM(total_tokens)",
-	avg_success_score: "round(AVG(success_score), 2)",
 	avg_errors: "round(AVG(error_count), 2)",
 	total_errors: "SUM(error_count)",
 };
@@ -657,10 +625,7 @@ const SESSION_SCOPED_DIMENSION_METRICS = new Set<
 	"session_count",
 	"avg_duration",
 	"avg_interactions",
-	"avg_response_time",
-	"median_response_time",
 	"avg_tokens",
-	"avg_success_score",
 	"avg_errors",
 ]);
 
@@ -673,8 +638,6 @@ const DIMENSION_EXPRESSIONS: Record<
 	repository:
 		"if(git_remote != '', git_remote, if(package_name != '', package_name, project_path))",
 	model_used: "model_used",
-	has_commit: "has_commit",
-	used_plan_mode: "used_plan_mode",
 	used_skills: "if(length(skills) > 0, 1, 0)",
 	used_slash_commands: "if(length(slash_commands) > 0, 1, 0)",
 	used_subagents: `if(${buildSessionHasSubagentsSql("sa")}, 1, 0)`,

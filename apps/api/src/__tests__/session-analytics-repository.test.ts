@@ -8,7 +8,6 @@ import { summarizeSessionLanguageSignals } from "../services/session-language-si
 
 const rawSession: SessionAnalyticsRaw = {
 	actual_duration_min: 12,
-	avg_period_sec: 45,
 	cost_is_complete: 1,
 	cost_uses_default_region: 0,
 	error_count: 3,
@@ -16,11 +15,8 @@ const rawSession: SessionAnalyticsRaw = {
 	git_branch: "main",
 	git_remote: "",
 	git_sha: "abc123",
-	has_commit: 1,
 	input_tokens: 6_000,
 	last_interaction_date: "2026-08-19T12:12:00Z",
-	long_pauses: 0,
-	median_period_sec: 40,
 	model_used: "gpt-5.6",
 	member_apologies: 0,
 	member_apology_matches: [],
@@ -34,12 +30,10 @@ const rawSession: SessionAnalyticsRaw = {
 	model_positive_matches: [],
 	model_swears: 0,
 	model_swear_matches: [],
-	normal_responses: 4,
 	organization_id: "org-1",
 	output_tokens: 4_000,
 	package_name: "",
 	project_path: "/opt/conductor/workspaces/rudel-v2/osaka",
-	quick_responses: 2,
 	session_date: "2026-08-19T12:00:00Z",
 	session_id: "session-1",
 	source: "codex",
@@ -47,10 +41,8 @@ const rawSession: SessionAnalyticsRaw = {
 	slash_commands: [],
 	subagent_count: 2,
 	subagent_types: [],
-	success_score: 80,
 	total_interactions: 6,
 	total_tokens: 10_000,
-	used_plan_mode: 0,
 	user_id: "user-1",
 };
 

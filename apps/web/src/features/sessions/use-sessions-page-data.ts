@@ -252,10 +252,6 @@ export function useSessionsPageData({
 						id: "avg_session_duration_min",
 						value: summaryComparison?.current.avg_session_duration_min,
 					},
-					{
-						id: "avg_response_time_sec",
-						value: summaryComparison?.current.avg_response_time_sec,
-					},
 				]
 			: [],
 	});

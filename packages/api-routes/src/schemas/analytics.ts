@@ -42,13 +42,11 @@ export const UserDailyTrendDataSchema = z.object({
 	date: z.string(),
 	user_id: z.string(),
 	sessions: z.number(),
-	total_commits: z.number(),
 	total_hours: z.number(),
 	total_tokens: z.number(),
 	input_tokens: z.number(),
 	output_tokens: z.number(),
 	cost: z.number().optional(),
-	avg_success_rate: z.number(),
 	distinct_skills: z.number(),
 	distinct_slash_commands: z.number(),
 	models_used: z.array(z.string()),
@@ -67,21 +65,13 @@ export const DeveloperSummarySchema = z.object({
 	total_duration_min: z.number(),
 	avg_session_duration_min: z.number(),
 	last_active_date: z.string(),
-	success_rate: z.number(),
 	cost: z.number().nullable(),
-	success_rate_trend: z.number(),
 	favorite_model: z.string().nullable(),
 });
 
 export const DeveloperTeamCardSchema = z.object({
 	user_id: z.string(),
 	display_name: z.string(),
-	archetype: z
-		.object({
-			key: z.string(),
-			name: z.string(),
-		})
-		.nullable(),
 	cost: z.number().nullable(),
 	input_tokens: z.number(),
 	output_tokens: z.number(),
@@ -92,10 +82,6 @@ export const DeveloperTeamCardSchema = z.object({
 	favorite_model: z.string().nullable(),
 	top_skills: z.array(z.object({ name: z.string(), count: z.number() })),
 });
-
-// ── Developer input schemas ────────────────────────────────────────
-
-// ── Projects ───────────────────────────────────────────────────────
 
 // ── Sessions ───────────────────────────────────────────────────────
 
@@ -138,9 +124,7 @@ export const SessionAnalyticsSchema = z.object({
 	output_tokens: z.number(),
 	estimated_cost: z.number().nullable().optional(),
 	cost_uses_default_region: z.boolean().optional(),
-	success_score: z.number(),
 	total_interactions: z.number(),
-	avg_period_sec: z.number(),
 	subagent_types: z.array(z.string()),
 	subagent_count: z.number().int().nonnegative().optional(),
 	native_subagents: z
@@ -156,10 +140,8 @@ export const SessionAnalyticsSchema = z.object({
 	linked_subagents: z.array(LinkedSubagentSchema).optional(),
 	skills: z.array(z.string()),
 	slash_commands: z.array(z.string()),
-	has_commit: z.boolean(),
 	error_count: z.number().int().nonnegative().optional(),
 	model_used: z.string(),
-	used_plan_mode: z.boolean(),
 	source: SourceSchema.optional(),
 	member_swears: z.number().int().nonnegative().default(0),
 	member_apologies: z.number().int().nonnegative().default(0),
@@ -204,7 +186,6 @@ export type SessionOverviewAnalytics = z.infer<
 export const SessionAnalyticsSummarySchema = z.object({
 	total_sessions: z.number(),
 	avg_session_duration_min: z.number(),
-	avg_response_time_sec: z.number(),
 	subagents_adoption_rate: z.number(),
 	skills_adoption_rate: z.number(),
 	slash_commands_adoption_rate: z.number(),
@@ -216,7 +197,6 @@ export const SessionAnalyticsSummaryComparisonSchema = z.object({
 	changes: z.object({
 		total_sessions: z.number(),
 		avg_session_duration_min: z.number(),
-		avg_response_time_sec: z.number(),
 	}),
 });
 
@@ -345,7 +325,7 @@ export const SessionListInputSchema = DaysInputSchema.extend({
 	limit: z.number().int().positive().max(MAX_LIMIT).default(100),
 	offset: z.number().int().nonnegative().default(0),
 	sortBy: z
-		.enum(["session_date", "duration_min", "total_tokens", "success_score"])
+		.enum(["session_date", "duration_min", "total_tokens"])
 		.default("session_date"),
 	sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -355,8 +335,6 @@ const VALID_DIMENSIONS = [
 	"project_path",
 	"repository",
 	"model_used",
-	"has_commit",
-	"used_plan_mode",
 	"used_skills",
 	"used_slash_commands",
 	"used_subagents",
@@ -369,11 +347,8 @@ const VALID_METRICS = [
 	// Retained for older deployed clients that still send interaction metrics.
 	"avg_interactions",
 	"total_interactions",
-	"avg_response_time",
-	"median_response_time",
 	"avg_tokens",
 	"total_tokens",
-	"avg_success_score",
 	"avg_errors",
 	"total_errors",
 ] as const;
@@ -392,39 +367,6 @@ export const DimensionAnalysisDataPointSchema = z.object({
 	metric_value: z.number().optional(),
 	split_values: z.record(z.string(), z.number()).optional(),
 });
-
-export const SessionDetailSchema = z.object({
-	session_id: z.string(),
-	user_id: z.string(),
-	session_date: z.string(),
-	last_interaction_date: z.string(),
-	project_path: z.string(),
-	repository: z.string().nullable(),
-	content: z.string(),
-	subagents: z.record(z.string(), z.string()),
-	skills: z.array(z.string()),
-	slash_commands: z.array(z.string()),
-	git_branch: z.string().nullable(),
-	git_sha: z.string().nullable(),
-	total_tokens: z.number(),
-	input_tokens: z.number(),
-	output_tokens: z.number(),
-	estimated_cost: z.number().nullable().optional(),
-	success_score: z.number().optional(),
-	duration_min: z.number().optional(),
-	model_used: z.string().optional(),
-	source: SourceSchema.optional(),
-});
-
-export const SessionDetailInputSchema = z.object({
-	sessionId: z.string().max(MAX_ID_FILTER_LENGTH),
-});
-
-// ── ROI ────────────────────────────────────────────────────────────
-
-// ── Errors ─────────────────────────────────────────────────────────
-
-// ── Learnings ──────────────────────────────────────────────────────
 
 // ── Type exports ───────────────────────────────────────────────────
 

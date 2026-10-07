@@ -13,4 +13,4 @@
 
 - Recover Wrapped from Git history only when explicitly requested.
 - Historical database schemas and migrations are retained for existing data.
-- The archetype pipeline remains in use by developer analytics.
+- The Wrapped archetype pipeline is retired; its ClickHouse tables stay until they are dropped (see `docs/l1-literal-schema.md`).

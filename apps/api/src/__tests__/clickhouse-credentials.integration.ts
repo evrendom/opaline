@@ -175,15 +175,6 @@ test("credential consumers use the named identity and fail closed before queryin
 	expect(missingUsername.stderr).toContain(MISSING_USERNAME_ERROR);
 	expect(fallbackQueries).toEqual([]);
 
-	const rebuild = await runProcess(
-		["bun", "packages/ch-schema/scripts/rebuild-wrapped-user-archetypes.ts"],
-		createCredentialTestEnvironment(config, {
-			CLICKHOUSE_PASSWORD: config.defaultPassword,
-		}),
-	);
-	expect(rebuild.exitCode).not.toBe(0);
-	expect(rebuild.stderr).toContain(MISSING_USERNAME_ERROR);
-
 	const chcli = await runProcess(
 		[
 			"bun",

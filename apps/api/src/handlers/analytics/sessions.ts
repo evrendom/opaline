@@ -32,7 +32,6 @@ const sortByMap: Record<string, "date" | "duration"> = {
 	session_date: "date",
 	duration_min: "duration",
 	total_tokens: "date",
-	success_score: "date",
 };
 
 const uploadFailures = os.analytics.sessions.uploadFailures

@@ -18,9 +18,6 @@ export const PLUGIN_PROCEDURES = Object.keys(
 	PLUGIN_TOOL_NAMES,
 ) as PluginProcedure[];
 
-/** Success-score metrics; the plugin never breaks them down by person. */
-const SCORE_KEY = /success/u;
-
 const SESSION_CONTENT =
 	"Only the session's owner or a workspace admin can open it";
 
@@ -165,28 +162,11 @@ export const PLUGIN_TOOLS: readonly McpTool[] = PLUGIN_PROCEDURES.map(
 						(node, key) => (node as Record<string, unknown>)[key],
 						client,
 					) as (input?: unknown) => Promise<unknown>;
-				return procedure(Object.keys(input).length ? input : undefined).then(
-					withoutPersonalScores,
-				);
+				return procedure(Object.keys(input).length ? input : undefined);
 			},
 		};
 	},
 );
-
-/**
- * Rows that belong to one person (they carry `user_id`) lose their success
- * scores, at any depth: the plugin app shows no per-person success score.
- */
-export function withoutPersonalScores(value: unknown): unknown {
-	if (Array.isArray(value)) return value.map(withoutPersonalScores);
-	if (!value || typeof value !== "object") return value;
-	const personal = "user_id" in value;
-	return Object.fromEntries(
-		Object.entries(value)
-			.filter(([key]) => !(personal && SCORE_KEY.test(key)))
-			.map(([key, child]) => [key, withoutPersonalScores(child)]),
-	);
-}
 
 export function isPluginTool(tool: McpTool) {
 	// By name: the server serves wrapped copies (`withRedactedOutput`).
@@ -198,19 +178,7 @@ export function isPluginTool(tool: McpTool) {
 
 /** The procedure's contract input, strict, plus the `workspace` slug. */
 export function pluginInputSchema(path: PluginProcedure) {
-	const schema = contractInputSchema(path);
-	// The breakdown can group by member, so it offers no success-score metric.
-	if (
-		path === "analytics.sessions.dimensionAnalysis" &&
-		schema instanceof z.ZodObject &&
-		schema.shape.metric instanceof z.ZodEnum
-	) {
-		const metrics = (schema.shape.metric.options as string[]).filter(
-			(metric) => !SCORE_KEY.test(metric),
-		);
-		return schema.extend({ metric: z.enum(metrics as [string, ...string[]]) });
-	}
-	return schema;
+	return contractInputSchema(path);
 }
 
 function contractInputSchema(path: PluginProcedure) {

@@ -35,10 +35,8 @@ export function buildDashboardSessionTabMetrics(
 	const changes = summaryComparison?.changes;
 	const totalSessions = current?.total_sessions ?? 0;
 	const avgDuration = current?.avg_session_duration_min ?? 0;
-	const avgResponseTime = current?.avg_response_time_sec ?? 0;
 	const totalSessionChange = changes?.total_sessions ?? 0;
 	const avgDurationChange = changes?.avg_session_duration_min ?? 0;
-	const avgResponseTimeChange = changes?.avg_response_time_sec ?? 0;
 
 	return [
 		{
@@ -50,20 +48,12 @@ export function buildDashboardSessionTabMetrics(
 			description: "Total AI sessions in the selected range.",
 		},
 		{
-			id: "uncommitted",
+			id: "avgDuration",
 			label: "Avg duration",
 			valueLabel: `${avgDuration.toFixed(1)}m`,
 			deltaLabel: formatSignedPercentChange(avgDurationChange),
 			deltaTone: getDeltaTone(avgDurationChange, { inverse: true }),
 			description: "Average session duration.",
-		},
-		{
-			id: "commitRate",
-			label: "Avg response",
-			valueLabel: `${avgResponseTime.toFixed(1)}s`,
-			deltaLabel: formatSignedPercentChange(avgResponseTimeChange),
-			deltaTone: getDeltaTone(avgResponseTimeChange, { inverse: true }),
-			description: "Average time between session interactions.",
 		},
 	];
 }

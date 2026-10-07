@@ -8,12 +8,6 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MAX_FIXTURE_DAYS = 14;
 const FIXTURE_MODELS = ["claude-sonnet-4.5", "gpt-5.1-codex"];
 const FIXTURE_REPOSITORIES = ["rudel/web", "rudel/api"];
-const FIXTURE_TEAM_CARD_ARCHETYPES = [
-	{ key: "maniac", name: "Maniac" },
-	{ key: "smooth_operator", name: "Smooth Operator" },
-	{ key: "roadrunner", name: "Roadrunner" },
-	{ key: "obsessed", name: "Obsessed" },
-];
 
 export interface FrontendFixtureMember {
 	userId: string;
@@ -79,8 +73,6 @@ export function buildTeamAnalyticsFixtures(input: {
 			input_tokens: teamCard.input_tokens,
 			last_active_date: teamCard.last_active_date,
 			output_tokens: teamCard.output_tokens,
-			success_rate: 84 - index * 3,
-			success_rate_trend: index === 0 ? 6 : 2,
 			total_duration_min: teamCard.total_sessions * (42 - index * 4),
 			total_sessions: teamCard.total_sessions,
 			total_tokens: teamCard.total_tokens,
@@ -147,7 +139,6 @@ function buildUserDailyTrend(
 			const outputTokens = sessions * (3_800 + memberIndex * 600);
 
 			return {
-				avg_success_rate: 86 - memberIndex * 4,
 				cost: Number(
 					(inputTokens * 0.000003 + outputTokens * 0.000015).toFixed(2),
 				),
@@ -165,7 +156,6 @@ function buildUserDailyTrend(
 					],
 				],
 				sessions,
-				total_commits: Math.max(0, sessions - 1 + (dayIndex % 2)),
 				total_hours: Number((sessions * 0.7).toFixed(1)),
 				total_tokens: inputTokens + outputTokens,
 				user_id: member.userId,
@@ -184,8 +174,6 @@ function buildDeveloperTeamCard(
 
 	return {
 		active_days: 8 - Math.min(index, 4),
-		archetype:
-			FIXTURE_TEAM_CARD_ARCHETYPES[index % FIXTURE_TEAM_CARD_ARCHETYPES.length],
 		cost: Number((inputTokens * 0.000003 + outputTokens * 0.000015).toFixed(2)),
 		display_name: member.displayName,
 		favorite_model: FIXTURE_MODELS[index % FIXTURE_MODELS.length],

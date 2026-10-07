@@ -8,4 +8,4 @@ The API returns HTTP 410 for retired Wrapped, resume, and RPC paths. Team invita
 
 Unused dashboard widgets, legacy UI primitives, setup polling, team demo data and portraits, and their exclusive dependencies were also removed. Current session, settings, skills, and team functionality remains.
 
-Historical SQL schemas and migrations remain so existing installations can retain their data. The ClickHouse archetype pipeline remains because developer analytics still reads its snapshots. Wrapped can be recovered from Git history if explicitly requested; it is not a current product specification.
+Historical SQL schemas and migrations remain so existing installations can retain their data. The ClickHouse archetype pipeline is retired as well; its tables stay until they are dropped. Wrapped can be recovered from Git history if explicitly requested; it is not a current product specification.

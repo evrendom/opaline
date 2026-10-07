@@ -14,11 +14,9 @@ function createSession({
 	userId: string;
 }): SessionAnalytics {
 	return {
-		avg_period_sec: 45,
 		duration_min: 12,
 		error_count: 0,
 		git_branch: "main",
-		has_commit: true,
 		input_tokens: 1_000,
 		member_apologies: 0,
 		member_positive: 0,
@@ -43,10 +41,8 @@ function createSession({
 		slash_commands: [],
 		subagent_count: 0,
 		subagent_types: [],
-		success_score: 100,
 		total_tokens: 1_500,
 		total_interactions: 1,
-		used_plan_mode: false,
 		user_id: userId,
 		worktree: null,
 	};

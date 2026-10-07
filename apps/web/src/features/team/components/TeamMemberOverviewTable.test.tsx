@@ -10,7 +10,6 @@ function buildTeamMemberRow(
 	return {
 		activeDays: 14,
 		activityTrend: [1, 3, 2, 5],
-		archetype: { key: "obsessed", name: "Obsessed" },
 		cost: 42,
 		displayName: "Ada Lovelace",
 		email: "ada@example.com",

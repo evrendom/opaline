@@ -49,8 +49,6 @@ function buildDeveloperSummary() {
 		input_tokens: rawSessionCount * 100,
 		last_active_date: "2026-04-22",
 		output_tokens: rawSessionCount * 200,
-		success_rate: 1,
-		success_rate_trend: 0,
 		total_duration_min: rawSessionCount * 12,
 		total_sessions: rawSessionCount,
 		total_tokens: rawSessionCount * 300,
@@ -61,7 +59,6 @@ function buildDeveloperSummary() {
 function buildTeamCard() {
 	return {
 		active_days: 4,
-		archetype: { key: "smooth_operator", name: "Smooth Operator" },
 		cost: 18,
 		display_name: "Ada Lovelace",
 		favorite_model: "claude-sonnet-4-5",
@@ -97,7 +94,6 @@ vi.mock("@/lib/orpc", () => ({
 					queryOptions: () => ({
 						queryFn: async () => [
 							{
-								avg_success_rate: 1,
 								cost: 18,
 								date: "2026-04-22",
 								distinct_skills: 1,
@@ -107,7 +103,6 @@ vi.mock("@/lib/orpc", () => ({
 								output_tokens: rawSessionCount * 200,
 								repositories_touched: [],
 								sessions: rawSessionCount,
-								total_commits: 0,
 								total_hours: 1,
 								total_tokens: rawSessionCount * 300,
 								user_id: "user-1",

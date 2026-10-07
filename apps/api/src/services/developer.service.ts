@@ -2,16 +2,7 @@ import type {
 	DeveloperSummary as DeveloperSummaryBase,
 	DeveloperTeamCard as DeveloperTeamCardBase,
 } from "@rudel/api-routes";
-import {
-	WRAPPED_ARCHETYPE_CENTROID_VERSION,
-	WRAPPED_ARCHETYPE_PIPELINE_VERSION,
-	WRAPPED_ARCHETYPE_SCOPE,
-} from "@rudel/ch-schema/wrapped-archetype-constants";
-import {
-	addOptionalStringInFilter,
-	buildDateFilter,
-	queryClickhouse,
-} from "../clickhouse.js";
+import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
 	buildUsageCostSubtotalSql,
@@ -27,12 +18,6 @@ export type DeveloperTeamCard = DeveloperTeamCardBase;
 interface FavoriteModelRow {
 	user_id: string;
 	favorite_model: string;
-}
-
-interface TeamCardArchetypeRow {
-	user_id: string;
-	archetype_key: string;
-	archetype_name: string;
 }
 
 async function getFavoriteModelByUser(orgId: string, days: number) {
@@ -68,80 +53,6 @@ async function getFavoriteModelByUser(orgId: string, days: number) {
 	return new Map(rows.map((row) => [row.user_id, row.favorite_model] as const));
 }
 
-async function getLatestWrappedArchetypeByUser(
-	orgId: string,
-	userIds: readonly string[],
-) {
-	if (userIds.length === 0) {
-		return new Map<string, NonNullable<DeveloperTeamCard["archetype"]>>();
-	}
-
-	const where = [
-		"s.scope = {scope:String}",
-		"s.organization_id = {orgId:String}",
-	];
-	const query_params: Record<string, unknown> = {
-		centroidVersion: WRAPPED_ARCHETYPE_CENTROID_VERSION,
-		orgId,
-		pipelineVersion: WRAPPED_ARCHETYPE_PIPELINE_VERSION,
-		scope: WRAPPED_ARCHETYPE_SCOPE,
-	};
-	addOptionalStringInFilter(
-		where,
-		query_params,
-		"s.user_id",
-		"userId",
-		Array.from(userIds),
-	);
-
-	try {
-		const rows = await queryClickhouse<TeamCardArchetypeRow>({
-			query: `
-				WITH latest_run AS (
-					SELECT snapshot_id
-					FROM rudel.wrapped_user_archetype_runs_v1
-					WHERE scope = {scope:String}
-						AND pipeline_version = {pipelineVersion:String}
-						AND centroid_version = {centroidVersion:String}
-					ORDER BY snapshot_created_at DESC
-					LIMIT 1
-				)
-				SELECT
-					s.user_id AS user_id,
-					s.archetype_key AS archetype_key,
-					s.archetype_name AS archetype_name
-				FROM latest_run AS r
-				INNER JOIN rudel.wrapped_user_archetype_snapshots_v1 AS s
-					ON s.snapshot_id = r.snapshot_id
-				WHERE ${where.join("\n\t\t\t\t\tAND ")}
-			`,
-			query_params,
-		});
-
-		const archetypeByUser = new Map<
-			string,
-			NonNullable<DeveloperTeamCard["archetype"]>
-		>();
-		for (const row of rows) {
-			const key = row.archetype_key.trim();
-			const name = row.archetype_name.trim();
-			if (key.length === 0 || name.length === 0) {
-				continue;
-			}
-
-			archetypeByUser.set(row.user_id, { key, name });
-		}
-
-		return archetypeByUser;
-	} catch (error) {
-		console.warn(
-			"[developer.service] getLatestWrappedArchetypeByUser failed, returning null archetypes",
-			error,
-		);
-		return new Map<string, NonNullable<DeveloperTeamCard["archetype"]>>();
-	}
-}
-
 /**
  * Get list of all developers with summary stats
  */
@@ -152,7 +63,6 @@ export async function getDeveloperList(
 	const d = Number(days);
 	const query_params = {
 		currentDays: d,
-		previousDays: d * 2,
 		orgId,
 	};
 	const usage = await getUsageAnalyticsQueryContext(orgId);
@@ -170,20 +80,9 @@ export async function getDeveloperList(
         round(SUM(actual_duration_min), 2) as total_duration_min,
         round(AVG(actual_duration_min), 2) as avg_session_duration_min,
 		formatDateTime(max(session_date), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') as last_active_date,
-        round(AVG(success_score), 2) as success_rate,
 		${buildUsageCostSubtotalSql("estimated_cost", 4)} as total_cost
       FROM ${usage.sessionsRelation}
       WHERE ${buildDateFilter("currentDays")}
-        AND organization_id = {orgId:String}
-      GROUP BY user_id
-    ),
-    previous_period AS (
-      SELECT
-        user_id,
-        round(AVG(success_score), 2) as prev_success_rate
-      FROM ${usage.sessionsRelation}
-      WHERE session_date >= now64(3) - toIntervalDay({previousDays:UInt32})
-        AND session_date < now64(3) - toIntervalDay({currentDays:UInt32})
         AND organization_id = {orgId:String}
       GROUP BY user_id
     )
@@ -197,11 +96,8 @@ export async function getDeveloperList(
       c.total_duration_min,
       c.avg_session_duration_min,
       c.last_active_date,
-      c.success_rate,
-      c.total_cost as cost,
-      round(c.success_rate - ifNull(p.prev_success_rate, c.success_rate), 2) as success_rate_trend
+      c.total_cost as cost
     FROM current_period c
-    LEFT JOIN previous_period p ON c.user_id = p.user_id
     ORDER BY c.total_sessions DESC
   `;
 
@@ -313,22 +209,19 @@ export async function getDeveloperTeamCards(
 	}
 
 	const userIds = summaryRows.map((row) => row.user_id);
-	const [users, archetypeByUser] = await Promise.all([
-		sqlClient.unsafe<
-			Array<{
-				id: string;
-				name: string | null;
-			}>
-		>(
-			`
-				SELECT id, name
-				FROM "user"
-				WHERE id = ANY($1::text[])
-			`,
-			[userIds],
-		),
-		getLatestWrappedArchetypeByUser(orgId, userIds),
-	]);
+	const users = await sqlClient.unsafe<
+		Array<{
+			id: string;
+			name: string | null;
+		}>
+	>(
+		`
+			SELECT id, name
+			FROM "user"
+			WHERE id = ANY($1::text[])
+		`,
+		[userIds],
+	);
 	const displayNameByUserId = new Map(
 		users
 			.map((entry) => [entry.id, entry.name?.trim() ?? ""] as const)
@@ -345,7 +238,6 @@ export async function getDeveloperTeamCards(
 			{
 				user_id: row.user_id,
 				display_name: displayName,
-				archetype: archetypeByUser.get(row.user_id) ?? null,
 				cost: row.cost === null ? null : Number(row.cost),
 				input_tokens: Number(row.total_input_tokens) || 0,
 				output_tokens: Number(row.total_output_tokens) || 0,

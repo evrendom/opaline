@@ -8,10 +8,8 @@ import {
 } from "./sessions-overview-table-utils";
 
 const session: SessionAnalytics = {
-	avg_period_sec: 45,
 	duration_min: 12,
 	error_count: 0,
-	has_commit: true,
 	input_tokens: 6_000,
 	model_used: "gpt-5.6",
 	output_tokens: 4_000,
@@ -29,10 +27,8 @@ const session: SessionAnalytics = {
 	skills: [],
 	slash_commands: [],
 	subagent_types: [],
-	success_score: 80,
 	total_interactions: 6,
 	total_tokens: 10_000,
-	used_plan_mode: false,
 	user_id: "user-1",
 	worktree: "osaka",
 	member_swears: 0,

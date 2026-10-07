@@ -15,10 +15,8 @@ import {
 } from "./sessions-overview-table-utils";
 
 const baseSession: SessionAnalytics = {
-	avg_period_sec: 45,
 	duration_min: 12,
 	error_count: 3,
-	has_commit: true,
 	input_tokens: 6_000,
 	model_used: "claude-sonnet-4",
 	output_tokens: 4_000,
@@ -38,10 +36,8 @@ const baseSession: SessionAnalytics = {
 	slash_commands: [],
 	subagent_types: [],
 	subagent_count: 2,
-	success_score: 80,
 	total_interactions: 6,
 	total_tokens: 10_000,
-	used_plan_mode: false,
 	user_id: "user-1",
 	member_swears: 0,
 	member_apologies: 0,
