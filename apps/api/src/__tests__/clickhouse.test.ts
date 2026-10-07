@@ -253,12 +253,8 @@ describe("analytics service guardrails", () => {
 	test("does not use quoted interpolation or escapeString in runtime services", async () => {
 		const serviceFiles = [
 			"developer.service.ts",
-			"error.service.ts",
-			"learnings.service.ts",
 			"org-session.service.ts",
 			"overview.service.ts",
-			"project.service.ts",
-			"roi.service.ts",
 			"session-analytics.service.ts",
 		];
 

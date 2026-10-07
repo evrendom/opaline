@@ -1,62 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import {
 	DaysInputSchema,
-	DeveloperDetailsInputSchema,
-	DeveloperSessionsInputSchema,
 	DeveloperSummarySchema,
 	DeveloperTeamCardSchema,
 	DimensionAnalysisInputSchema,
 	HistoricalSkillDetailSchema,
 	HistoricalSkillSummarySchema,
-	LearningEntrySchema,
-	LearningsListInputSchema,
-	ProjectDetailDataSchema,
-	ProjectInvestmentSchema,
-	RecurringErrorsInputSchema,
-	ROIDashboardSchema,
-	ROIMetricsSchema,
 	SessionAnalyticsSchema,
 	SessionListInputSchema,
-	UserTokenUsageDataSchema,
 } from "../schemas/analytics.js";
 
 describe("analytics input schemas", () => {
 	test("reject oversized free-form analytics filters", () => {
-		expect(() =>
-			DeveloperDetailsInputSchema.parse({
-				days: 7,
-				userId: "a".repeat(513),
-			}),
-		).toThrow();
 		expect(() =>
 			SessionListInputSchema.parse({
 				days: 7,
 				projectPath: "a".repeat(4097),
 			}),
 		).toThrow();
-	});
-
-	test("bounds learning pages and content", () => {
-		expect(LearningsListInputSchema.parse({})).toMatchObject({ limit: 50 });
-		expect(LearningsListInputSchema.safeParse({ limit: 100 }).success).toBe(
-			true,
-		);
-		expect(LearningsListInputSchema.safeParse({ limit: 101 }).success).toBe(
-			false,
-		);
-		expect(
-			LearningEntrySchema.safeParse({
-				content: "a".repeat(5_001),
-				created_at: "2026-08-25T00:00:00Z",
-				project_path: "/repo",
-				repository: null,
-				scope: "project",
-				session_id: "session-1",
-				tags: [],
-				type: "feedback",
-				user_id: "user-1",
-			}).success,
-		).toBe(false);
 	});
 
 	test("bounds historical skill version bodies", () => {
@@ -249,30 +210,6 @@ describe("analytics input schemas", () => {
 			).toBe(true);
 		}
 	});
-
-	test("limit capped at 1000 on developer sessions", () => {
-		expect(
-			DeveloperSessionsInputSchema.safeParse({
-				userId: "u1",
-				limit: 1000,
-			}).success,
-		).toBe(true);
-		expect(
-			DeveloperSessionsInputSchema.safeParse({
-				userId: "u1",
-				limit: 1001,
-			}).success,
-		).toBe(false);
-	});
-
-	test("limit capped at 1000 on recurring errors", () => {
-		expect(RecurringErrorsInputSchema.safeParse({ limit: 1000 }).success).toBe(
-			true,
-		);
-		expect(RecurringErrorsInputSchema.safeParse({ limit: 1001 }).success).toBe(
-			false,
-		);
-	});
 });
 
 describe("usage-event cutover output contract", () => {
@@ -280,11 +217,6 @@ describe("usage-event cutover output contract", () => {
 		const publicKeys = [
 			DeveloperSummarySchema,
 			DeveloperTeamCardSchema,
-			ProjectDetailDataSchema,
-			ProjectInvestmentSchema,
-			ROIDashboardSchema,
-			ROIMetricsSchema,
-			UserTokenUsageDataSchema,
 		].flatMap((schema) => Object.keys(schema.shape));
 
 		for (const internalField of [
@@ -305,15 +237,6 @@ describe("usage-event cutover output contract", () => {
 			true,
 		);
 		expect(DeveloperTeamCardSchema.shape.cost.safeParse(null).success).toBe(
-			true,
-		);
-		expect(ProjectDetailDataSchema.shape.cost.safeParse(null).success).toBe(
-			true,
-		);
-		expect(ProjectInvestmentSchema.shape.cost.safeParse(null).success).toBe(
-			true,
-		);
-		expect(UserTokenUsageDataSchema.shape.cost.safeParse(null).success).toBe(
 			true,
 		);
 	});

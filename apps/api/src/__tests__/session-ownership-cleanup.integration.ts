@@ -544,11 +544,15 @@ async function expectCleanupApiResults(): Promise<void> {
 		),
 	).toBe(true);
 
-	const summary = await callRpc(owner.token, "analytics/sessions/summary", {
-		days: 30,
+	const comparison = await callRpc(
+		owner.token,
+		"analytics/sessions/summaryComparison",
+		{ days: 30 },
+	);
+	expect(comparison.status).toBe(200);
+	expect(comparison.body).toMatchObject({
+		json: { current: { total_sessions: 2 } },
 	});
-	expect(summary.status).toBe(200);
-	expect(readRpcJsonProperty(summary.body, "total_sessions")).toBe(2);
 }
 
 function formatUtcDate(timestamp: number): string {

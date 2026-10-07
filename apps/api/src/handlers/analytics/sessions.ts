@@ -2,7 +2,6 @@ import { ORPCError } from "@orpc/server";
 import { orgMiddleware, os } from "../../middleware.js";
 import {
 	getSessionAnalytics,
-	getSessionAnalyticsSummary,
 	getSessionAnalyticsSummaryComparison,
 	getSessionDimensionAnalysis,
 } from "../../services/session-analytics.service.js";
@@ -76,14 +75,6 @@ const filterCatalog = os.analytics.sessions.filterCatalog
 			end_date: input.endDate,
 		}),
 	);
-
-const summary = os.analytics.sessions.summary
-	.use(orgMiddleware)
-	.handler(async ({ input, context }) => {
-		return getSessionAnalyticsSummary(context.organizationId, {
-			days: input.days,
-		});
-	});
 
 const summaryComparison = os.analytics.sessions.summaryComparison
 	.use(orgMiddleware)
@@ -332,7 +323,6 @@ export const sessionsRouter = os.analytics.sessions.router({
 	detailWindow,
 	list,
 	filterCatalog,
-	summary,
 	summaryComparison,
 	dimensionAnalysis,
 });

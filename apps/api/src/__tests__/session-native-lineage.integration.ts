@@ -14,12 +14,8 @@ import {
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { handleNativeSessionLineageMaintenanceRequest } from "../handlers/native-session-lineage-maintenance.js";
-import { getDeveloperFeatureUsage } from "../services/developer.service.js";
-import { getProjectFeatureUsage } from "../services/project.service.js";
 import {
-	getInteractionTimingDistribution,
 	getSessionAnalytics,
-	getSessionAnalyticsSummary,
 	getSessionAnalyticsSummaryComparison,
 	getSessionDimensionAnalysis,
 } from "../services/session-analytics.service.js";
@@ -169,11 +165,6 @@ describe("native Codex lineage", () => {
 				})
 			).map((session) => session.session_id),
 		).toEqual([parentId]);
-		const summary = await getSessionAnalyticsSummary(organizationId, {
-			days: 1,
-		});
-		expect(summary.total_sessions).toBe(1);
-		expect(summary.subagents_adoption_rate).toBe(100);
 		const comparison = await getSessionAnalyticsSummaryComparison(
 			organizationId,
 			{ days: 1 },
@@ -196,21 +187,6 @@ describe("native Codex lineage", () => {
 		expect(tokenDimension).toEqual([
 			{ dimension_value: "gpt-5.6-sol", metric_value: 5 },
 		]);
-		expect(
-			(await getDeveloperFeatureUsage(organizationId, userId, 1))
-				.subagents_adoption_rate,
-		).toBe(100);
-		expect(
-			(await getProjectFeatureUsage(organizationId, "/workspace/opaline", 1))
-				.subagents_adoption_rate,
-		).toBe(100);
-		expect(
-			await getInteractionTimingDistribution(organizationId, {
-				days: 1,
-				project_path: "/workspace/opaline",
-				user_id: userId,
-			}),
-		).toHaveLength(3);
 	});
 
 	test("projects parent-first and repairs a missed completion exactly once", async () => {

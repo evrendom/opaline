@@ -174,59 +174,20 @@ import {
 import {
 	DateRangeInputSchema,
 	DaysInputSchema,
-	DeveloperCostBreakdownSchema,
-	DeveloperDetailsInputSchema,
-	DeveloperDetailsSchema,
-	DeveloperErrorSchema,
-	DeveloperFeatureUsageSchema,
-	DeveloperProjectSchema,
-	DeveloperSessionSchema,
-	DeveloperSessionsInputSchema,
 	DeveloperSummarySchema,
 	DeveloperTeamCardSchema,
-	DeveloperTimelineSchema,
-	DeveloperTrendDataPointSchema,
 	DimensionAnalysisDataPointSchema,
 	DimensionAnalysisInputSchema,
-	ErrorsDashboardSchema,
-	ErrorTrendDataPointSchema,
-	ErrorTrendsInputSchema,
 	HistoricalSkillDetailInputSchema,
 	HistoricalSkillDetailSchema,
 	HistoricalSkillSummarySchema,
-	InsightSchema,
-	LearningEntrySchema,
-	LearningsFeedStatsSchema,
-	LearningsListInputSchema,
-	LearningsTrendDataPointSchema,
-	LearningsTrendInputSchema,
-	ModelTokensTrendDataSchema,
 	OverviewKPIsSchema,
-	ProjectContributorSchema,
-	ProjectCostBreakdownSchema,
-	ProjectDetailDataSchema,
-	ProjectDetailsInputSchema,
-	ProjectErrorSchema,
-	ProjectFeatureUsageSchema,
-	ProjectInvestmentSchema,
-	ProjectTrendDataPointSchema,
-	RecurringErrorSchema,
-	RecurringErrorsInputSchema,
-	RepositoryDailyTrendDataSchema,
-	ROIDashboardSchema,
-	ROIMetricsSchema,
-	ROITrendSchema,
 	SessionAnalyticsSummaryComparisonSchema,
-	SessionAnalyticsSummarySchema,
 	SessionFilterCatalogInputSchema,
 	SessionFilterCatalogSchema,
 	SessionListInputSchema,
 	SessionOverviewAnalyticsSchema,
-	SuccessRateSchema,
-	TeamSummaryComparisonSchema,
-	UsageTrendDataSchema,
 	UserDailyTrendDataSchema,
-	UserTokenUsageDataSchema,
 } from "./schemas/analytics.js";
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
@@ -1052,73 +1013,15 @@ export const contract = {
 		overview: {
 			costs: oc.input(CostDashboardInputSchema).output(CostDashboardSchema),
 			kpis: oc.input(DateRangeInputSchema).output(OverviewKPIsSchema),
-			usageTrend: oc
-				.input(DateRangeInputSchema)
-				.output(z.array(UsageTrendDataSchema)),
-			modelTokensTrend: oc
-				.input(DateRangeInputSchema)
-				.output(z.array(ModelTokensTrendDataSchema)),
-			usersTokenUsage: oc
-				.input(DateRangeInputSchema)
-				.output(z.array(UserTokenUsageDataSchema)),
 			usersDailyTrend: oc
 				.input(DateRangeInputSchema)
 				.output(z.array(UserDailyTrendDataSchema)),
-			repositoriesDailyTrend: oc
-				.input(DateRangeInputSchema)
-				.output(z.array(RepositoryDailyTrendDataSchema)),
-			insights: oc.input(DateRangeInputSchema).output(z.array(InsightSchema)),
-			teamSummaryComparison: oc
-				.input(DateRangeInputSchema)
-				.output(TeamSummaryComparisonSchema),
-			successRate: oc.input(DateRangeInputSchema).output(SuccessRateSchema),
 		},
 		developers: {
 			list: oc.input(DaysInputSchema).output(z.array(DeveloperSummarySchema)),
 			teamCards: oc
 				.input(DaysInputSchema)
 				.output(z.array(DeveloperTeamCardSchema)),
-			details: oc
-				.input(DeveloperDetailsInputSchema)
-				.output(DeveloperDetailsSchema),
-			sessions: oc
-				.input(DeveloperSessionsInputSchema)
-				.output(z.array(DeveloperSessionSchema)),
-			projects: oc
-				.input(DeveloperDetailsInputSchema)
-				.output(z.array(DeveloperProjectSchema)),
-			timeline: oc
-				.input(DeveloperDetailsInputSchema)
-				.output(z.array(DeveloperTimelineSchema)),
-			features: oc
-				.input(DeveloperDetailsInputSchema)
-				.output(DeveloperFeatureUsageSchema),
-			errors: oc
-				.input(DeveloperDetailsInputSchema)
-				.output(z.array(DeveloperErrorSchema)),
-			trends: oc
-				.input(DaysInputSchema)
-				.output(z.array(DeveloperTrendDataPointSchema)),
-		},
-		projects: {
-			investment: oc
-				.input(DaysInputSchema)
-				.output(z.array(ProjectInvestmentSchema)),
-			trends: oc
-				.input(DaysInputSchema)
-				.output(z.array(ProjectTrendDataPointSchema)),
-			details: oc
-				.input(ProjectDetailsInputSchema)
-				.output(ProjectDetailDataSchema),
-			contributors: oc
-				.input(ProjectDetailsInputSchema)
-				.output(z.array(ProjectContributorSchema)),
-			features: oc
-				.input(ProjectDetailsInputSchema)
-				.output(ProjectFeatureUsageSchema),
-			errors: oc
-				.input(ProjectDetailsInputSchema)
-				.output(z.array(ProjectErrorSchema)),
 		},
 		sessions: {
 			uploadFailures: oc
@@ -1146,7 +1049,6 @@ export const contract = {
 			list: oc
 				.input(SessionListInputSchema)
 				.output(z.array(SessionOverviewAnalyticsSchema)),
-			summary: oc.input(DaysInputSchema).output(SessionAnalyticsSummarySchema),
 			summaryComparison: oc
 				.input(DaysInputSchema)
 				.output(SessionAnalyticsSummaryComparisonSchema),
@@ -1163,37 +1065,6 @@ export const contract = {
 			detail: oc
 				.input(HistoricalSkillDetailInputSchema)
 				.output(HistoricalSkillDetailSchema),
-		},
-		roi: {
-			dashboard: oc.input(DateRangeInputSchema).output(ROIDashboardSchema),
-			metrics: oc.input(DaysInputSchema).output(ROIMetricsSchema),
-			trends: oc.input(DaysInputSchema).output(z.array(ROITrendSchema)),
-			breakdownDevelopers: oc
-				.input(DaysInputSchema)
-				.output(z.array(DeveloperCostBreakdownSchema)),
-			breakdownProjects: oc
-				.input(DaysInputSchema)
-				.output(z.array(ProjectCostBreakdownSchema)),
-		},
-		errors: {
-			dashboard: oc.input(DateRangeInputSchema).output(ErrorsDashboardSchema),
-			topRecurring: oc
-				.input(RecurringErrorsInputSchema)
-				.output(z.array(RecurringErrorSchema)),
-			trends: oc
-				.input(ErrorTrendsInputSchema)
-				.output(z.array(ErrorTrendDataPointSchema)),
-		},
-		learnings: {
-			list: oc
-				.input(LearningsListInputSchema)
-				.output(z.array(LearningEntrySchema)),
-			stats: oc.input(DaysInputSchema).output(LearningsFeedStatsSchema),
-			users: oc.output(z.array(z.string())),
-			projects: oc.output(z.array(z.string())),
-			trend: oc
-				.input(LearningsTrendInputSchema)
-				.output(z.array(LearningsTrendDataPointSchema)),
 		},
 	},
 };

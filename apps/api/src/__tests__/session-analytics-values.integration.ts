@@ -7,10 +7,6 @@ import {
 	createClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import { getDeveloperErrors } from "../services/developer.service.js";
-import { getTopRecurringErrors } from "../services/error.service.js";
-import { getLearningsFeed } from "../services/learnings.service.js";
-import { getProjectErrors } from "../services/project.service.js";
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import { getSessionDetailRawSnapshot } from "../services/session-detail-snapshot.service.js";
 
@@ -204,14 +200,7 @@ function recentRetentionTranscript(): string {
 	completedAt.setUTCSeconds(completedAt.getUTCSeconds() + 10);
 
 	return [
-		userLine(
-			startedAt.toISOString(),
-			[
-				"TypeError: retention probe",
-				"<command-name>/compound:feedback</command-name>",
-				"<command-args>Keep transcript access tied to raw retention.</command-args>",
-			].join("\n"),
-		),
+		userLine(startedAt.toISOString(), "TypeError: retention probe"),
 		JSON.stringify({
 			type: "tool_result",
 			is_error: true,
@@ -656,15 +645,14 @@ describe("session_analytics computed values", () => {
 		}
 	}, 300000);
 
-	test("retains error classification after raw transcripts expire", async () => {
+	test("keeps analytics but drops raw transcript access after raw sessions expire", async () => {
 		const sessionId = `values_retention_${runId}`;
-		const projectPath = `/test/retention-${runId}`;
 		const content = recentRetentionTranscript();
 
 		await ingest({
 			source: "claude_code",
 			sessionId,
-			projectPath,
+			projectPath: `/test/retention-${runId}`,
 			content,
 			subagents: [
 				{
@@ -684,33 +672,6 @@ describe("session_analytics computed values", () => {
 		expect(detail?.subagents).toEqual({
 			"retention-agent": "retained only with the raw session",
 		});
-
-		const developerErrors = await getDeveloperErrors(ORG_ID, USER_ID);
-		expect(developerErrors.map((error) => error.error_pattern)).toContain(
-			"TypeError",
-		);
-
-		const projectErrors = await getProjectErrors(ORG_ID, projectPath);
-		expect(projectErrors.map((error) => error.error_pattern)).toContain(
-			"TypeError",
-		);
-
-		const recurringErrors = await getTopRecurringErrors(ORG_ID, {
-			min_occurrences: 1,
-		});
-		expect(recurringErrors.map((error) => error.error_pattern)).toContain(
-			"TypeError",
-		);
-
-		const learnings = await getLearningsFeed(ORG_ID, {
-			user_id: USER_ID,
-			project_path: projectPath,
-		});
-		expect(learnings).toHaveLength(1);
-		expect(learnings[0]?.content).toBe(
-			"Keep transcript access tied to raw retention.",
-		);
-		expect(learnings[0]?.subagents).toEqual(["retention-agent"]);
 
 		await executor.execute({
 			query: `
@@ -733,28 +694,5 @@ describe("session_analytics computed values", () => {
 		expect(
 			await getSessionDetailRawSnapshot(ORG_ID, sessionId, USER_ID),
 		).toBeNull();
-		expect(
-			(await getDeveloperErrors(ORG_ID, USER_ID)).map(
-				(error) => error.error_pattern,
-			),
-		).toContain("TypeError");
-		expect(
-			(await getProjectErrors(ORG_ID, projectPath)).map(
-				(error) => error.error_pattern,
-			),
-		).toContain("TypeError");
-		expect(
-			(
-				await getTopRecurringErrors(ORG_ID, {
-					min_occurrences: 1,
-				})
-			).map((error) => error.error_pattern),
-		).toContain("TypeError");
-		expect(
-			await getLearningsFeed(ORG_ID, {
-				user_id: USER_ID,
-				project_path: projectPath,
-			}),
-		).toEqual([]);
 	}, 240000);
 });

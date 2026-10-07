@@ -115,20 +115,13 @@ curl -s -b .context/cookies.txt \
 
 | Method | Input | Description |
 |--------|-------|-------------|
-| `analytics/overview/kpis` | `{"json": {"days": N}}` | Overview KPIs |
-| `analytics/overview/usageTrend` | `{"json": {"days": N}}` | Usage trend data |
-| `analytics/overview/modelTokensTrend` | `{"json": {"days": N}}` | Model token trends |
-| `analytics/overview/insights` | `{"json": {"days": N}}` | Insights |
-| `analytics/overview/teamSummaryComparison` | `{"json": {"days": N}}` | Team summary comparison |
-| `analytics/overview/successRate` | `{"json": {"days": N}}` | Success rate |
+| `analytics/overview/kpis` | `{"json": {"startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD"}}` | Overview KPIs |
+| `analytics/overview/usersDailyTrend` | `{"json": {"startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD"}}` | Per-member daily trend |
 | `analytics/developers/list` | `{"json": {"days": N}}` | List developers |
-| `analytics/developers/trends` | `{"json": {"days": N}}` | Developer trends |
-| `analytics/projects/investment` | `{"json": {"days": N}}` | Project investment |
-| `analytics/projects/trends` | `{"json": {"days": N}}` | Project trends |
-| `analytics/sessions/summary` | `{"json": {"days": N}}` | Session summary |
-| `analytics/roi/metrics` | `{"json": {"days": N}}` | ROI metrics |
-| `analytics/roi/trends` | `{"json": {"days": N}}` | ROI trends |
-| `analytics/users/mappings` | `{"json": {"days": N}}` | User mappings |
+| `analytics/developers/teamCards` | `{"json": {"days": N}}` | Team member cards |
+| `analytics/sessions/summaryComparison` | `{"json": {"days": N}}` | Session summary vs the previous period |
+| `analytics/repositories/list` | `{}` | Repositories |
+| `analytics/skills/list` | `{}` | Skills |
 
 ### Examples
 
@@ -139,15 +132,15 @@ curl -s -b .context/cookies.txt \
   -H "Content-Type: application/json" \
   -d '{}' | jq '.json'
 
-# Get overview KPIs for last 30 days (input wrapped in json)
+# Get overview KPIs for a date range (input wrapped in json)
 curl -s -b .context/cookies.txt \
   -X POST http://localhost:4010/rpc/analytics/overview/kpis \
   -H "Content-Type: application/json" \
-  -d '{"json": {"days": 30}}' | jq '.json'
+  -d '{"json": {"startDate": "2026-09-01", "endDate": "2026-09-30"}}' | jq '.json'
 
-# Get usage trend for last 7 days
+# Compare the last 7 days of sessions with the 7 days before
 curl -s -b .context/cookies.txt \
-  -X POST http://localhost:4010/rpc/analytics/overview/usageTrend \
+  -X POST http://localhost:4010/rpc/analytics/sessions/summaryComparison \
   -H "Content-Type: application/json" \
   -d '{"json": {"days": 7}}' | jq '.json'
 

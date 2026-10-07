@@ -3,7 +3,6 @@ import {
 	buildLineageEnrichedMetadataCte,
 	buildSessionHasSubagentsSql,
 	buildSessionLineageCteDefinitions,
-	SESSION_HAS_SUBAGENTS_SQL,
 } from "./session-lineage-analytics.service.js";
 
 describe("session-lineage analytics selector", () => {
@@ -37,7 +36,7 @@ describe("session-lineage analytics selector", () => {
 		expect(sql).toContain("ifNull(lineage.linked_subagent_count, 0)");
 		expect(sql).toContain("lineage.linked_subagents");
 		expect(sql).toContain("sa.* EXCEPT (organization_id, user_id)");
-		expect(SESSION_HAS_SUBAGENTS_SQL).toBe(
+		expect(buildSessionHasSubagentsSql()).toBe(
 			"((subagent_count + linked_subagent_count) > 0 OR length(native_child_sessions) > 0)",
 		);
 		expect(buildSessionHasSubagentsSql("sa")).toBe(

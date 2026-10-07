@@ -25,8 +25,6 @@ export function buildSessionHasSubagentsSql(alias?: string): string {
 	return `((${prefix}subagent_count + ${prefix}linked_subagent_count) > 0 OR length(${prefix}native_child_sessions) > 0)`;
 }
 
-export const SESSION_HAS_SUBAGENTS_SQL = buildSessionHasSubagentsSql();
-
 export function buildSessionLineageCteDefinitions(
 	enabled = shouldReadSessionLineage(),
 	tenant: AnalyticsTenant = "organization",
