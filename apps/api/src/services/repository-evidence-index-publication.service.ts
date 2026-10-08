@@ -1,14 +1,14 @@
 import { getLogger } from "@logtape/logtape";
-import {
-	type RudelRepositorySessionEvidenceIndexRow,
-	RudelRepositorySessionEvidenceIndexRowSchema,
-} from "@rudel/ch-schema/generated";
 import type postgres from "postgres";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import type { MaintenanceDeadline } from "../lib/bounded-maintenance.js";
 import { hasClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
-import { persistRepositoryEvidenceIndexRows } from "./repository-evidence-index.service.js";
+import {
+	persistRepositoryEvidenceIndexRows,
+	type RepositoryEvidenceIndexRow,
+	RepositoryEvidenceIndexRowSchema,
+} from "./repository-evidence-index.service.js";
 
 const logger = getLogger(["rudel", "api", "repository-evidence-index"]);
 const INLINE_BUDGET_MS = 3_000;
@@ -106,7 +106,7 @@ async function publishCaptures(
 ): Promise<number> {
 	const publishable: Array<{
 		readonly capture: PendingCapture;
-		readonly row: RudelRepositorySessionEvidenceIndexRow;
+		readonly row: RepositoryEvidenceIndexRow;
 	}> = [];
 	for (const capture of captures) {
 		// Never publish evidence of an account or workspace being purged; the
@@ -119,9 +119,9 @@ async function publishCaptures(
 			);
 			continue;
 		}
-		const parsed = RudelRepositorySessionEvidenceIndexRowSchema.safeParse(
-			capture.indexRow,
-		);
+		// Rows stored before retirement step 3 still carry skill_assessments;
+		// parsing strips it.
+		const parsed = RepositoryEvidenceIndexRowSchema.safeParse(capture.indexRow);
 		if (!parsed.success) {
 			// A stored row that can never be valid must not hold back the batch.
 			await deferCaptures(env.database, [capture], "infinity");

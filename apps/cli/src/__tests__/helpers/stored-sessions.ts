@@ -36,7 +36,7 @@ export interface StoredAnalyticsSession {
 	readonly user_id: string;
 	readonly source: string;
 	readonly filter_version: number;
-	readonly error_pattern: string;
+	readonly error_count: number;
 }
 
 export interface StoredSessionReaders {
@@ -120,7 +120,7 @@ export function createStoredSessionReaders(
 		async getStoredAnalyticsSession(organizationId, sessionId, source) {
 			for (let attempt = 0; attempt < 20; attempt += 1) {
 				const [row] = await deps.getClickhouse().query<StoredAnalyticsSession>({
-					query: `SELECT session_id, organization_id, user_id, source, filter_version, error_pattern FROM ${deps.getSafeTable("rudel.session_analytics")} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} AND source = {source:String} ORDER BY ingested_at DESC LIMIT 1`,
+					query: `SELECT session_id, organization_id, user_id, source, filter_version, error_count FROM ${deps.getSafeTable("rudel.session_analytics")} WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String} AND source = {source:String} ORDER BY ingested_at DESC LIMIT 1`,
 					query_params: {
 						organizationId,
 						sessionId,

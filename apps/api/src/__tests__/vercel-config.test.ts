@@ -204,6 +204,12 @@ describe("Vercel deployment configuration", () => {
 		expect(repositoryEvidence).toBeLessThan(
 			productionScript.indexOf("ch:migrate:github-outcomes"),
 		);
+		// The views stop writing retired interpretations after every additive step.
+		expect(
+			productionScript.indexOf("ch:migrate:session-git-observations"),
+		).toBeLessThan(
+			productionScript.indexOf("ch:migrate:session-analytics-retirement"),
+		);
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

@@ -6,6 +6,7 @@ import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { withMvSourcePredicate } from "../src/mv-session-filter.js";
 import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../src/mv-sql/claude-session-analytics.js";
 import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../src/mv-sql/codex-session-analytics.js";
+import { SESSION_ANALYTICS_INSERT_COLUMNS } from "../src/session-analytics-mv.js";
 import { buildCanonicalRevisionDigestSql } from "../src/subagent-metrics-backfill.js";
 
 const FUTURE_TOLERANCE_MS = 60_000;
@@ -31,49 +32,10 @@ const DEFAULT_JOURNAL_PATH = resolve(
 	".context/subagent-metrics-backfill-journal.json",
 );
 
-const TARGET_COLUMNS = [
-	"session_date",
-	"last_interaction_date",
-	"session_id",
-	"organization_id",
-	"project_path",
-	"git_remote",
-	"package_name",
-	"package_type",
-	"filter_version",
-	"ingested_at",
-	"user_id",
-	"git_branch",
-	"git_sha",
-	"tag",
-	"source",
-	"skills",
-	"slash_commands",
-	"subagent_types",
-	"subagent_count",
-	"native_subagents",
-	"input_tokens",
-	"output_tokens",
-	"cache_read_input_tokens",
-	"cache_creation_input_tokens",
-	"total_tokens",
-	"total_interactions",
-	"actual_duration_min",
-	"avg_period_sec",
-	"median_period_sec",
-	"quick_responses",
-	"normal_responses",
-	"long_pauses",
-	"error_count",
-	"error_pattern",
-	"model_used",
-	"has_commit",
-	"session_archetype",
-	"success_score",
-	"used_plan_mode",
-	"inference_duration_sec",
-	"human_duration_sec",
-] as const;
+// The recovery columns without `revision`, which this backfill keeps.
+const TARGET_COLUMNS = SESSION_ANALYTICS_INSERT_COLUMNS.filter(
+	(column) => column !== "revision",
+);
 
 type Source = "claude_code" | "codex";
 type EpochName = "c0" | "c1" | "c2";

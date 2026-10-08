@@ -1,9 +1,20 @@
 import type { RepositoryEvidenceInitInput } from "@rudel/api-routes";
-import {
-	ingestRudelRepositorySessionEvidenceIndex,
-	type RudelRepositorySessionEvidenceIndexRow,
-} from "@rudel/ch-schema/generated";
+import { RudelRepositorySessionEvidenceIndexRowSchema } from "@rudel/ch-schema/generated";
+import type { z } from "zod";
 import type { ClickHouseExecutor } from "../clickhouse.js";
+
+/**
+ * An evidence index row as written. `skill_assessments` is no longer written
+ * (docs/l1-literal-schema.md, retirement step 3): its column keeps its
+ * default until it is dropped, and parsing strips it from stored rows.
+ */
+export const RepositoryEvidenceIndexRowSchema =
+	RudelRepositorySessionEvidenceIndexRowSchema.omit({
+		skill_assessments: true,
+	});
+export type RepositoryEvidenceIndexRow = z.infer<
+	typeof RepositoryEvidenceIndexRowSchema
+>;
 
 const SKILL_USE = new Set(["observed-used", "no-observed-use", "unknown"]);
 const SKILL_SCOPE = new Set(["session", "run", "agent"]);
@@ -47,7 +58,7 @@ const FACET_COVERAGE = new Set([
 
 export async function persistRepositoryEvidenceIndex(input: {
 	readonly clickhouse: ClickHouseExecutor;
-	readonly row: RudelRepositorySessionEvidenceIndexRow;
+	readonly row: RepositoryEvidenceIndexRow;
 	readonly signal?: AbortSignal;
 }): Promise<void> {
 	await persistRepositoryEvidenceIndexRows({
@@ -59,20 +70,17 @@ export async function persistRepositoryEvidenceIndex(input: {
 
 export async function persistRepositoryEvidenceIndexRows(input: {
 	readonly clickhouse: ClickHouseExecutor;
-	readonly rows: readonly RudelRepositorySessionEvidenceIndexRow[];
+	readonly rows: readonly RepositoryEvidenceIndexRow[];
 	readonly signal?: AbortSignal;
 }): Promise<void> {
 	if (input.rows.length === 0) return;
-	await ingestRudelRepositorySessionEvidenceIndex(
-		{
-			insert: (params) =>
-				input.clickhouse.insert({ ...params, abortSignal: input.signal }),
-		},
-		[...input.rows],
-		{
-			validate: true,
-		},
-	);
+	await input.clickhouse.insert({
+		table: "rudel.repository_session_evidence_index",
+		values: input.rows.map((row) =>
+			RepositoryEvidenceIndexRowSchema.parse(row),
+		),
+		abortSignal: input.signal,
+	});
 }
 
 export function buildRepositoryEvidenceIndexRow(
@@ -80,7 +88,7 @@ export function buildRepositoryEvidenceIndexRow(
 	manifest: unknown,
 	indexedAt: Date,
 	userId: string,
-): RudelRepositorySessionEvidenceIndexRow {
+): RepositoryEvidenceIndexRow {
 	const contextIndex = readContextIndex(manifest);
 	const provider = evidence.repository.provider;
 	const coverageStatus = evidence.coverage.some(
@@ -139,17 +147,6 @@ export function buildRepositoryEvidenceIndexRow(
 		segment_id: evidence.session.segmentId,
 		session_id: evidence.session.sessionId,
 		session_source: evidence.session.source,
-		skill_assessments: contextIndex.skills.map((skill) => {
-			const use = readSkillUse(skill.use);
-			return [
-				skill.name,
-				use.status,
-				use.scopeKind,
-				use.scopeId,
-				use.coverage,
-				worstAccess(skill.definitions.map((definition) => definition.access)),
-			];
-		}),
 		worktree_id: evidence.repository.local.worktreeId,
 	};
 }
@@ -181,7 +178,6 @@ interface IndexedFacet {
 interface IndexedSkill {
 	readonly definitions: readonly IndexedResource[];
 	readonly name: string;
-	readonly use: unknown;
 }
 
 function readContextIndex(value: unknown): {
@@ -228,10 +224,11 @@ function readContextIndex(value: unknown): {
 			}
 			enumString(skill.discovery, SKILL_DISCOVERY, "skill discovery");
 			enumString(skill.nameSource, SKILL_NAME_SOURCE, "skill name source");
+			// Still validated, though its assessment is no longer stored.
+			readSkillUse(skill.use);
 			return {
 				definitions: skill.definitions.map(readResource),
 				name: skill.name,
-				use: skill.use,
 			};
 		}),
 	};

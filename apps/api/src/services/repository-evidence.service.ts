@@ -11,7 +11,6 @@ import {
 	type RepositoryEvidenceObjectDescriptor,
 	type RepositoryEvidenceUploadObject,
 } from "@rudel/api-routes";
-import type { RudelRepositorySessionEvidenceIndexRow } from "@rudel/ch-schema/generated";
 import type postgres from "postgres";
 import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import { toPostgresJson } from "./postgres-json.js";
@@ -31,6 +30,7 @@ import {
 	expediteUploadIntents,
 	registerMultipartIntents,
 } from "./repository-evidence-fence.service.js";
+import type { RepositoryEvidenceIndexRow } from "./repository-evidence-index.service.js";
 import { claimSessionIngestOwnership } from "./session-ownership.service.js";
 
 const SHA256_PREFIX = "sha256:";
@@ -231,7 +231,7 @@ export interface CommitRepositoryEvidenceOptions {
 	readonly organizationId: string;
 	readonly prepareIndex: (
 		evidence: RepositoryEvidenceForIndex,
-	) => RudelRepositorySessionEvidenceIndexRow;
+	) => RepositoryEvidenceIndexRow;
 	readonly r2: R2MultipartUploadClient;
 	readonly randomUUID: () => string;
 	readonly signal?: AbortSignal;
@@ -241,7 +241,7 @@ export interface CommitRepositoryEvidenceOptions {
 export interface CommitRepositoryEvidenceResult {
 	readonly evidence: RepositoryEvidenceForIndex;
 	readonly output: RepositoryEvidenceCommitOutput;
-	readonly preparedIndex: RudelRepositorySessionEvidenceIndexRow;
+	readonly preparedIndex: RepositoryEvidenceIndexRow;
 }
 
 export interface RepositoryEvidenceForIndex {
@@ -303,7 +303,7 @@ async function readVerifiedEvidenceFromPlan(input: {
 function prepareRepositoryEvidenceIndex(
 	evidence: RepositoryEvidenceForIndex,
 	prepareIndex: CommitRepositoryEvidenceOptions["prepareIndex"],
-): RudelRepositorySessionEvidenceIndexRow {
+): RepositoryEvidenceIndexRow {
 	try {
 		return prepareIndex(evidence);
 	} catch {

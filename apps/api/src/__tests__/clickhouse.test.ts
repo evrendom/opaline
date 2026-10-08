@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { RudelSessionAnalyticsRowSchema } from "@rudel/ch-schema/generated";
-import { SESSION_ANALYTICS_INSERT_COLUMNS } from "@rudel/ch-schema/session-analytics-mv";
+import {
+	RETIRED_SESSION_ANALYTICS_COLUMNS,
+	SESSION_ANALYTICS_INSERT_COLUMNS,
+} from "@rudel/ch-schema/session-analytics-mv";
 import {
 	addOptionalStringEqFilter,
 	addOptionalStringInFilter,
@@ -148,9 +151,17 @@ describe("clickhouse helpers", () => {
 			"ledger-1:rudel.codex_sessions:session-analytics-repair",
 		);
 
-		expect(Object.keys(RudelSessionAnalyticsRowSchema.shape)).toEqual([
-			...SESSION_ANALYTICS_INSERT_COLUMNS,
-		]);
+		// The retired columns keep their defaults until they are dropped.
+		const retired: readonly string[] = RETIRED_SESSION_ANALYTICS_COLUMNS;
+		expect(
+			Object.keys(RudelSessionAnalyticsRowSchema.shape).filter(
+				(column) => !retired.includes(column),
+			),
+		).toEqual([...SESSION_ANALYTICS_INSERT_COLUMNS]);
+		for (const column of RETIRED_SESSION_ANALYTICS_COLUMNS) {
+			expect(statement.query).not.toContain(`\`${column}\``);
+			expect(codexStatement.query).not.toContain(` as ${column}`);
+		}
 		expect(statement.query).toContain("INSERT INTO rudel.session_analytics");
 		expect(statement.query).toContain("SETTINGS async_insert=0");
 		expect(statement.query).toContain("FROM rudel.claude_sessions AS cs");

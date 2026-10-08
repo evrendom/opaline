@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/claude-session-analytics.js";
 import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
+import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../session-analytics-mv.js";
 
 const migration = readFileSync(
 	resolve(import.meta.dir, "../../chx/migrations/20260730180016_auto.sql"),
@@ -11,7 +12,7 @@ const migration = readFileSync(
 const currentMvMigration = readFileSync(
 	resolve(
 		import.meta.dir,
-		"../../chx/migrations/20260913190000_product_launch.sql",
+		"../../chx/migrations/20261008120000_session_analytics_retired_writes.sql",
 	),
 	"utf8",
 );
@@ -166,5 +167,21 @@ FROM rudel.session_analytics_v2;`;
 		expect(migration).toContain(
 			"CREATE MATERIALIZED VIEW IF NOT EXISTS rudel.session_analytics_mv",
 		);
+	});
+});
+
+describe("session analytics retirement step 3", () => {
+	test("replaces both view queries in place and writes no retired column", () => {
+		expect(countOccurrences(currentMvMigration, "MODIFY QUERY")).toBe(2);
+		expect(currentMvMigration).not.toMatch(/\b(?:DROP|CREATE)\b/u);
+		for (const sql of [
+			CLAUDE_SESSION_ANALYTICS_MV_SQL,
+			CODEX_SESSION_ANALYTICS_MV_SQL,
+		]) {
+			// No `--` comment can hide in a view query (CLAUDE.md known issue).
+			expect(sql).not.toContain("--");
+			for (const column of RETIRED_SESSION_ANALYTICS_COLUMNS)
+				expect(sql).not.toMatch(new RegExp(`\\b${column}\\b`, "u"));
+		}
 	});
 });

@@ -11,6 +11,12 @@ import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import { getSessionDetailRawSnapshot } from "../services/session-detail-snapshot.service.js";
 
 /**
+ * chkit wrote this column's default with doubled quotes, so it is the literal
+ * text `''`; the column is dropped in a later migration.
+ */
+const RETIRED_ERROR_PATTERN_DEFAULT = "''";
+
+/**
  * Value assertions for the session_analytics materialized views.
  *
  * Replaces analytics.integration.ts, which asserted response *shapes* (46 of its
@@ -542,7 +548,7 @@ describe("session_analytics computed values", () => {
 		);
 	}, 300000);
 
-	test("clamps a negative Claude success score to zero", async () => {
+	test("counts a Claude underflow transcript's errors and tokens without interpreting them", async () => {
 		const sessionId = `values_underflow_${runId}`;
 		await ingest({
 			source: "claude_code",
@@ -557,12 +563,13 @@ describe("session_analytics computed values", () => {
 		if (!row) throw new Error("no underflow analytics row produced");
 
 		expect(row.error_count).toBe(10);
-		expect(row.error_pattern).toBe("UnknownError");
 		expect(num(row.total_tokens)).toBe(1_600_100);
+		// Retirement step 3: interpretations keep their column defaults.
+		expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		expect(row.success_score).toBe(0);
 	}, 180000);
 
-	test("clamps a negative Codex success score to zero through real ingest", async () => {
+	test("counts a Codex underflow transcript's errors and tokens through real ingest without interpreting them", async () => {
 		const sessionId = `values_codex_underflow_${runId}`;
 		await ingest({
 			source: "codex",
@@ -577,8 +584,8 @@ describe("session_analytics computed values", () => {
 		if (!row) throw new Error("no Codex underflow analytics row produced");
 
 		expect(row.error_count).toBe(10);
-		expect(row.error_pattern).toBe("TypeError");
 		expect(num(row.total_tokens)).toBe(1_600_100);
+		expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		expect(row.success_score).toBe(0);
 	}, 180000);
 
@@ -590,7 +597,6 @@ describe("session_analytics computed values", () => {
 			sessionDate: number;
 			lastInteractionDate: number;
 			errorCount: number;
-			errorPattern: string;
 		}> = [
 			{
 				source: "claude_code",
@@ -599,7 +605,6 @@ describe("session_analytics computed values", () => {
 				sessionDate: Date.parse("2026-05-04T10:00:00.000Z"),
 				lastInteractionDate: Date.parse("2026-05-04T10:00:30.000Z"),
 				errorCount: 10,
-				errorPattern: "UnknownError",
 			},
 			{
 				source: "codex",
@@ -608,7 +613,6 @@ describe("session_analytics computed values", () => {
 				sessionDate: Date.parse("2026-03-02T04:29:38.576Z"),
 				lastInteractionDate: Date.parse("2026-03-02T04:29:55.000Z"),
 				errorCount: 10,
-				errorPattern: "TypeError",
 			},
 		];
 
@@ -641,7 +645,7 @@ describe("session_analytics computed values", () => {
 			expect(num(row.inference_duration_sec)).toBe(0);
 			expect(num(row.human_duration_sec)).toBe(0);
 			expect(row.error_count).toBe(testCase.errorCount);
-			expect(row.error_pattern).toBe(testCase.errorPattern);
+			expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		}
 	}, 300000);
 
@@ -690,7 +694,7 @@ describe("session_analytics computed values", () => {
 
 		const analyticsRows = await readAnalytics(sessionId);
 		expect(analyticsRows).toHaveLength(1);
-		expect(analyticsRows[0]?.error_pattern).toBe("TypeError");
+		expect(analyticsRows[0]?.error_count).toBeGreaterThan(0);
 		expect(
 			await getSessionDetailRawSnapshot(ORG_ID, sessionId, USER_ID),
 		).toBeNull();

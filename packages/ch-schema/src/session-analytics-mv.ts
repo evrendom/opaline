@@ -32,14 +32,21 @@ export const SESSION_ANALYTICS_INSERT_COLUMNS = [
 	"total_tokens",
 	"total_interactions",
 	"actual_duration_min",
+	"error_count",
+	"model_used",
+] as const;
+
+/**
+ * Interpretations the views no longer write (docs/l1-literal-schema.md,
+ * retirement step 3). The columns keep their defaults until they are dropped.
+ */
+export const RETIRED_SESSION_ANALYTICS_COLUMNS = [
 	"avg_period_sec",
 	"median_period_sec",
 	"quick_responses",
 	"normal_responses",
 	"long_pauses",
-	"error_count",
 	"error_pattern",
-	"model_used",
 	"has_commit",
 	"session_archetype",
 	"success_score",

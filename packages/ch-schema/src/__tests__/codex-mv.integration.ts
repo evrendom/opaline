@@ -8,6 +8,7 @@ import type {
 } from "../generated/chkit-types.js";
 import { withSessionFilter } from "../mv-session-filter.js";
 import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
+import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../session-analytics-mv.js";
 import { createTestExecutor, waitForQuery } from "./helpers/executor.js";
 
 setDefaultTimeout(120_000);
@@ -337,12 +338,7 @@ describe("codex_session_analytics_mv", () => {
 		expect(a.package_name).toBe("myapp");
 		expect(a.package_type).toBe("package.json");
 
-		// Codex-specific hardcoded values
-		expect(a.used_plan_mode).toBe(0);
-		expect(a.human_duration_sec).toBe(0);
-
-		// Git sha is set, so has_commit should be 1
-		expect(a.has_commit).toBe(1);
+		expectNoRetiredColumns(a);
 
 		// Fixture has response_item + event_msg lines
 		expect(a.total_interactions).toBeGreaterThan(0);
@@ -351,30 +347,11 @@ describe("codex_session_analytics_mv", () => {
 		expect(a.actual_duration_min).toBeGreaterThan(100);
 
 		// The codex skills regex looks for "name":"exec_command" ... skills/<x>/SKILL.
-		// This fixture invokes no skill, so the array is empty — which is also why
-		// success_score gets no skills bonus and the exploration branch cannot fire.
+		// This fixture invokes no skill, so the array is empty.
 		expect(a.skills).toEqual([]);
 
 		// Clean session has no tool errors
 		expect(a.error_count).toBe(0);
-		expect(a.error_pattern).toBe("");
-
-		// 127 min with only 428 output tokens matches no special branch:
-		//   quick_win   needs duration <= 10
-		//   deep_work   needs output > 50000
-		//   struggle    needs input + output > 1000000  (here 55459)
-		//   exploration needs >= 3 skills
-		//   abandoned   needs duration < 3
-		expect(a.session_archetype).toBe("standard");
-
-		// 50 base
-		//   + 20  git_sha is set
-		//   +  0  output/input = 428/55031 = 0.008, not > 0.5
-		//   +  0  no skills
-		//   -  0  55459 tokens is under the 1500000 penalty threshold
-		//   -  0  127 min is not < 2
-		//   -  0  no errors
-		expect(a.success_score).toBe(70);
 	}, 120_000);
 
 	test("counts errors from non-zero exit codes and error text in tool output", async () => {
@@ -425,16 +402,7 @@ describe("codex_session_analytics_mv", () => {
 		// 3. exit_code:0 with clean "Success" text -> counts as 0
 		// Total: 2 errors
 		expect(a.error_count).toBe(2);
-		expect(a.error_pattern).toBe("TypeError");
-
-		// 50 base + 20 (git_sha) - least(2, 10) * 2 = 66.
-		// The <2min / <200-output penalty does not apply: duration rounds to 0 min,
-		// but output is 800, so the second half of that condition fails.
-		expect(a.success_score).toBe(66);
-
-		// quick_win needs output > 1000 and this fixture has 800, so it falls through
-		// to standard like the clean one.
-		expect(a.session_archetype).toBe("standard");
+		expectNoRetiredColumns(a);
 	}, 120_000);
 
 	test("detects real skill invocations without duplicates or decoys", async () => {
@@ -480,12 +448,7 @@ describe("codex_session_analytics_mv", () => {
 		// The fixture invokes testing-bun twice and clickhouse-query once through
 		// exec_command. Paths in a read_file call and assistant prose are decoys.
 		expect(analytics.skills).toEqual(["testing-bun", "clickhouse-query"]);
-
-		// 50 base + 20 for git_sha + (2 distinct skills * 5). The token ratio is
-		// exactly 0.5, so the strict > 0.5 output-ratio bonus does not apply.
-		// Duration is 1 minute, but output is 500, so the <200 short-session
-		// penalty does not apply either.
-		expect(analytics.success_score).toBe(80);
+		expectNoRetiredColumns(analytics);
 	}, 120_000);
 
 	test("clamps a negative success score to zero before the UInt8 cast", async () => {
@@ -524,9 +487,8 @@ describe("codex_session_analytics_mv", () => {
 		if (!analytics) throw new Error("no underflow analytics row produced");
 
 		expect(analytics.error_count).toBe(10);
-		expect(analytics.error_pattern).toBe("TypeError");
 		expect(Number(analytics.total_tokens)).toBe(1_600_100);
-		expect(analytics.success_score).toBe(0);
+		expectNoRetiredColumns(analytics);
 	}, 120_000);
 
 	test("deduplicates on organization, user, and session identity", async () => {
@@ -580,3 +542,9 @@ describe("codex_session_analytics_mv", () => {
 		]);
 	}, 120_000);
 });
+
+/** Retirement step 3: the view's query no longer outputs the retired interpretations. */
+function expectNoRetiredColumns(row: Record<string, unknown>): void {
+	for (const column of RETIRED_SESSION_ANALYTICS_COLUMNS)
+		expect(row).not.toHaveProperty(column);
+}

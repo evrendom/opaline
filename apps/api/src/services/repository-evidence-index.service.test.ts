@@ -9,7 +9,7 @@ const INDEXED_AT = new Date("2026-09-19T12:00:03.000Z");
 const MANIFEST_HASH = "a".repeat(64);
 
 describe("repository evidence index mapping", () => {
-	test("maps available skill use, instruction facets, plans, and partial coverage", () => {
+	test("maps available skills, instruction facets, plans, and partial coverage", () => {
 		const row = buildRepositoryEvidenceIndexRow(
 			makeEvidence(),
 			makeManifest(),
@@ -22,25 +22,8 @@ describe("repository evidence index mapping", () => {
 			"testing-bun",
 			"unknown-skill",
 		]);
-		expect(row.skill_assessments).toEqual([
-			[
-				"clickhouse-best-practices",
-				"observed-used",
-				"session",
-				"session-1",
-				"complete",
-				"readable",
-			],
-			[
-				"testing-bun",
-				"no-observed-use",
-				"agent",
-				"agent-1",
-				"complete",
-				"reference-only",
-			],
-			["unknown-skill", "unknown", "run", "run-1", "partial", "denied"],
-		]);
+		// Retirement step 3: skill use is still validated but no longer stored.
+		expect(row).not.toHaveProperty("skill_assessments");
 		expect(row.context_facets).toEqual([
 			[
 				"agents-instructions",

@@ -145,6 +145,8 @@ Order per item: stop reading, stop writing (materialized views and recovery SQL)
 
 The language-signal lexicon stays: it stores literal phrase matches.
 
+Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery SQL stop writing the step 2 and 3 columns (`success_score`, `has_commit`, `used_plan_mode`, `avg_period_sec`, `median_period_sec`, `quick_responses`, `normal_responses`, `long_pauses`, `error_pattern`, `session_archetype`, `inference_duration_sec`, `human_duration_sec`) with `20261008120000_session_analytics_retired_writes.sql`, and the evidence index stops writing `skill_assessments`; their columns keep defaults until a later migration drops them, once every writer runs that code.
+
 ## Order of work
 
 1. This spec and step 1 of the retirement. Done.
