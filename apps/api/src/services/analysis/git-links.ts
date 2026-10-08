@@ -107,7 +107,7 @@ export const GIT_EVENT_ROW_CAP = 20_000;
 /** CI runs listed per event; `ciRunsObserved` counts all that were found. */
 const CI_RUNS_PER_EVENT = 200;
 /** A CI check that names a branch reads the branch's runs of the day before it. */
-const BRANCH_RUN_WINDOW_MS = 86_400_000;
+export const BRANCH_RUN_WINDOW_MS = 86_400_000;
 /** Runs read per checked branch and page; beyond it, older windows are unknown. */
 const BRANCH_RUNS_CAP = 2_000;
 /** A target's CI history is taken to start this long before its first sighting. */
@@ -625,7 +625,7 @@ export async function loadObservationGenerations(
 	return chosen;
 }
 
-async function queryObservations(
+export async function queryObservations(
 	executor: ClickHouseExecutor,
 	batch: ScopeBatch,
 	generations: ReadonlyMap<string, ObservationGeneration>,
@@ -679,7 +679,7 @@ async function queryObservations(
 }
 
 /** Sets each observation's run from its pinned `transcript_records` result row. */
-async function addTurns(
+export async function addTurns(
 	executor: ClickHouseExecutor,
 	batches: readonly ScopeBatch[],
 	seeds: Seed[],
@@ -1815,7 +1815,7 @@ function isRemote(value: string): boolean {
 	);
 }
 
-function seedPrefix(seed: Seed): string {
+export function seedPrefix(seed: Seed): string {
 	if (seed.kind === "commit_created") return seed.shortSha;
 	if (seed.kind === "push_range") return seed.pushTo;
 	if (seed.kind === "ci_check" && /^[a-f\d]{7,39}$/u.test(seed.commitHash))
@@ -1823,7 +1823,7 @@ function seedPrefix(seed: Seed): string {
 	return "";
 }
 
-function seedFullSha(seed: Seed): string | null {
+export function seedFullSha(seed: Seed): string | null {
 	if (
 		(seed.kind === "codex_session_meta" ||
 			seed.kind === "evidence_capture" ||
@@ -1836,13 +1836,13 @@ function seedFullSha(seed: Seed): string | null {
 }
 
 /** The branch an event names: a pushed branch, or a CI check's branch target. */
-function seedBranch(seed: Seed): string {
+export function seedBranch(seed: Seed): string {
 	return seed.kind === "push_range" || seed.kind === "ci_check"
 		? seed.branch
 		: "";
 }
 
-function branchName(ref: string): string {
+export function branchName(ref: string): string {
 	return ref.replace(/^refs\/heads\//u, "");
 }
 
@@ -1871,7 +1871,7 @@ function compareRevision(left: string, right: string): number {
 	return difference > 0n ? 1 : difference < 0n ? -1 : 0;
 }
 
-function key(left: string, right: string | number): string {
+export function key(left: string, right: string | number): string {
 	return `${left}|${right}`;
 }
 

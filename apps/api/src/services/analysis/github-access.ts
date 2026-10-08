@@ -36,6 +36,33 @@ async function loadGitHubAccess(organizationId: string): Promise<GitHubAccess> {
 	});
 	if (visibility === "hidden")
 		return { visibility, bindings: [], repositories: new Map() };
+	return {
+		...(await loadBindingsAndCoverage(organizationId, readiness)),
+		visibility,
+	};
+}
+
+/**
+ * The workspace's active bindings and collection coverage whatever the
+ * dashboard shows: L1 edges are facts, so they do not depend on the GitHub
+ * UI rollout; reads still decide visibility.
+ */
+export async function loadGitHubAccessForEdges(
+	organizationId: string,
+): Promise<GitHubAccess> {
+	return {
+		...(await loadBindingsAndCoverage(
+			organizationId,
+			await readGitHubOutcomesReadiness(sqlClient, organizationId),
+		)),
+		visibility: "visible",
+	};
+}
+
+async function loadBindingsAndCoverage(
+	organizationId: string,
+	readiness: Awaited<ReturnType<typeof readGitHubOutcomesReadiness>>,
+): Promise<Omit<GitHubAccess, "visibility">> {
 	const rows = await sqlClient.unsafe<
 		Array<{ repository_id: string; full_name: string }>
 	>(
@@ -43,7 +70,6 @@ async function loadGitHubAccess(organizationId: string): Promise<GitHubAccess> {
 		[organizationId],
 	);
 	return {
-		visibility,
 		bindings: rows.map((row) => ({
 			repositoryId: row.repository_id,
 			fullName: row.full_name,

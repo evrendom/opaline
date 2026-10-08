@@ -13,6 +13,7 @@ import {
 	type GitObservationRecord,
 	gitObservationGenerationVersion,
 } from "./git-observation-parser.js";
+import { enqueueSessionEdgesBestEffort } from "./l1-edges/l1-edge-enqueue.js";
 import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "./transcript-records-ingest.service.js";
@@ -40,6 +41,8 @@ export interface GitObservationExtractionInput
 	signal?: AbortSignal;
 	deadlineAt?: number;
 	expectedGeneration?: { revision: string; parserVersion: number };
+	/** Runs after a generation is written; queues the session's L1 edges by default. */
+	onWritten?: (session: TranscriptRecordsIdentity) => Promise<void>;
 }
 
 interface Generation {
@@ -235,6 +238,12 @@ export async function extractGitObservations(
 		);
 		await deadline.wait(input.assertWritable);
 		await deadline.wait(() => retireOlder(executor, scope, deadline.signal));
+		await (input.onWritten ?? enqueueSessionEdgesBestEffort)({
+			organizationId: input.organizationId,
+			userId: input.userId,
+			source: input.source,
+			sessionId: input.sessionId,
+		});
 		return "written";
 	} catch (error) {
 		if (error instanceof ClickHouseWriteFencedError)

@@ -60,7 +60,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -85,7 +85,8 @@ describe("Vercel deployment configuration", () => {
 		for (const cron of vercelConfig.crons.filter(
 			(cron) =>
 				cron.path !== "/api/cron/r2-ingest" &&
-				cron.path !== "/api/cron/github-evidence",
+				cron.path !== "/api/cron/github-evidence" &&
+				cron.path !== "/api/cron/l1-edges",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
