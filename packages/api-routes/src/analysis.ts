@@ -33,7 +33,7 @@ export const AnalysisTraceSchema = z.object({
 /** The find arguments without cross-field checks; Zod 4 cannot derive a partial from a refined object. */
 export const AnalysisFindInputBaseSchema = z
 	.object({
-		source: z.enum(["runs", "tool", "user"]),
+		source: z.enum(["runs", "tool", "user", "git"]),
 		from: z.string().date().optional(),
 		to: z.string().date().optional(),
 		latest: z.number().int().min(1).max(200).optional(),
@@ -265,6 +265,225 @@ export const AnalysisEventSchema = z.object({
 	originCostUsd: z.number().nullable(),
 	parentSessionId: ParentSessionIdSchema,
 });
+const GitRepositorySchema = z.object({
+	/** Immutable GitHub repository id of the workspace's active binding. */
+	id: z.string(),
+	fullName: z.string(),
+	/** `event`: named by the event; `session`: the session's git remote (only when the event names none); `capture`: a CLI evidence capture. */
+	basis: z.enum(["event", "session", "capture"]),
+	/** The literal value it was resolved from. */
+	value: z.string(),
+});
+/**
+ * Whether GitHub facts could be looked up for the event. Only `linked` and
+ * `preview` were queried; for every other state, counts are null (unknown),
+ * never zero.
+ */
+const GitHubCoverageSchema = z.object({
+	status: z.enum([
+		"linked",
+		"preview",
+		"collecting",
+		"not_visible",
+		"unbound",
+		"not_github",
+		"no_repository",
+	]),
+	/** Why the repository is not (yet) included in GitHub collection. */
+	reason: z.string().nullable(),
+	/** Earliest PR and CI times collected for the repository; older facts are unknown. */
+	prFrom: z.string().nullable(),
+	ciFrom: z.string().nullable(),
+	/** End (exclusive) of the history the repository's collection holds without a gap; later facts are unknown. */
+	coveredThrough: z.string().nullable(),
+});
+const GitPullRequestSchema = z.object({
+	number: z.number().int(),
+	/** The repository the PR lives in (the base). */
+	repositoryId: z.string(),
+	/** The repository its head branch lives in; differs from `repositoryId` for a fork. */
+	headRepositoryId: z.string(),
+	title: z.string(),
+	state: z.string(),
+	draft: z.boolean(),
+	createdAt: z.string(),
+	mergedAt: z.string().nullable(),
+	closedAt: z.string().nullable(),
+	headRef: z.string(),
+	headSha: z.string(),
+	mergeCommitSha: z.string(),
+	/**
+	 * Every rule that linked it: `named` by the event, `branch` (the pushed
+	 * branch in the pushed repository is its head), `commit` (the resolved SHA
+	 * is one of its commits), `snapshot` (GitHub listed it for the session's
+	 * captured commit).
+	 */
+	bases: z.array(z.enum(["named", "branch", "commit", "snapshot"])),
+	/** For `commit`: whether the PR's current head still contains the commit when last collected; null when unknown. */
+	commitInHead: z.boolean().nullable(),
+});
+const GitCiRunSchema = z.object({
+	repositoryId: z.string(),
+	kind: z.string(),
+	runId: z.string(),
+	attempt: z.number().int(),
+	workflow: z.string(),
+	event: z.string(),
+	branch: z.string(),
+	headSha: z.string(),
+	status: z.string(),
+	conclusion: z.string().nullable(),
+	createdAt: z.string(),
+	/** When this attempt started (a rerun keeps the run's `createdAt`); null when not recorded. */
+	startedAt: z.string().nullable(),
+	completedAt: z.string().nullable(),
+	/**
+	 * Every connection of the run to the event: `pushed_sha` (it ran on the
+	 * event's SHA), `named_run` (the event names the run), `branch` (it ran on
+	 * the branch a CI check names, created in the day before the check),
+	 * `pull_request` (GitHub links it to one of the event's PRs; `linkBasis`
+	 * says how), `merge_commit` (it ran on the merge commit of one of the
+	 * event's PRs).
+	 */
+	edges: z.array(
+		z.object({
+			basis: z.enum([
+				"pushed_sha",
+				"named_run",
+				"branch",
+				"pull_request",
+				"merge_commit",
+			]),
+			linkBasis: z.string().nullable(),
+			prNumber: z.number().int().nullable(),
+		}),
+	),
+});
+/**
+ * One git or GitHub event of a session, as the transcript or a CLI evidence
+ * capture recorded it, with what GitHub holds for it. Every link names the
+ * rule that made it; what could not be looked up is null, never empty.
+ */
+export const AnalysisGitEventSchema = z.object({
+	sessionId: z.string(),
+	agentId: z.string(),
+	/** The run the event belongs to; null before the first prompt, for captures, or when its generation is no longer indexed. */
+	turn: z.number().int().nullable(),
+	/** Transcript record and block; 0 for evidence captures. */
+	record: z.number().int(),
+	block: z.number().int(),
+	call: z.string(),
+	at: z.string(),
+	kind: z.enum([
+		"commit_created",
+		"push_range",
+		"pr_url",
+		"mcp_pr_created",
+		"ci_check",
+		"codex_session_meta",
+		"evidence_capture",
+		"evidence_snapshot",
+	]),
+	/** Evidence label: `observed`, `forced_update`, `unconfirmed` (a check the command does not show ran), or a capture lifecycle (`checkpoint`, `end`). */
+	label: z.string(),
+	branch: z.string(),
+	sourceBranch: z.string(),
+	shortSha: z.string(),
+	pushFrom: z.string(),
+	pushTo: z.string(),
+	remote: z.string(),
+	prRepo: z.string(),
+	prNumber: z.number().int().nullable(),
+	commitHash: z.string(),
+	/** Base commit of an evidence capture. */
+	baseCommit: z.string(),
+	/** CI run id a CI status read names. */
+	runId: z.string(),
+	/** The observation generation the event comes from; `current` is false when it predates the session's indexed transcript. Null for captures. */
+	generation: z
+		.object({
+			revision: z.string(),
+			parserVersion: z.number().int(),
+			transcriptParserVersion: z.number().int(),
+			current: z.boolean(),
+		})
+		.nullable(),
+	repository: GitRepositorySchema.nullable(),
+	github: GitHubCoverageSchema,
+	/**
+	 * The full SHA an abbreviated one resolves to: `value` only when exactly one
+	 * collected SHA matched; `candidates` null when not looked up; `complete`
+	 * false when the repository's collection is incomplete, so the match is
+	 * among what was collected.
+	 */
+	sha: z
+		.object({
+			value: z.string().nullable(),
+			candidates: z.number().int().nullable(),
+			complete: z.boolean(),
+		})
+		.nullable(),
+	pullRequests: z.array(GitPullRequestSchema),
+	/** CI runs found for the event, newest first, at most 200 listed. */
+	ciRuns: z.array(GitCiRunSchema).max(200),
+	/** Runs found (a lower bound when `ciRunCount` is null). */
+	ciRunsObserved: z.number().int(),
+	/**
+	 * The event's CI run attempts that started before `ciRunCountThrough`: set
+	 * only when every target it names was looked up and the history of each
+	 * target lies within the collected coverage of every repository its runs
+	 * come from; null means unknown. Runs found after the boundary are listed
+	 * in `ciRuns` but not counted.
+	 */
+	ciRunCount: z.number().int().nullable(),
+	/** End (exclusive) of the history `ciRunCount` covers: the earliest `coveredThrough` of the repositories its runs come from; null with the count. */
+	ciRunCountThrough: z.string().nullable(),
+	/**
+	 * Why `ciRunCount` is null: `github_status` (the event's repository is not
+	 * fully collected, see `github.status`), `push_without_sha` (a new-branch
+	 * push), `sha_unresolved` (the abbreviated SHA matched no or several
+	 * commits), `no_target` (it names no SHA, run, branch or PR),
+	 * `target_not_found` (a PR or run it names was not collected),
+	 * `target_history_unknown` (nothing in the session records the SHA's
+	 * creation, so its earlier CI may predate collection), `repository_incomplete` (a PR's base repository is not fully
+	 * collected), `before_coverage` (a target's history starts before a
+	 * repository's collected history: a day before the PR was created, the
+	 * SHA's creation, a named run's creation, or the branch window),
+	 * `after_coverage` (the event is not
+	 * before a repository's `coveredThrough`), `search_capped` (a lookup hit
+	 * its ceiling).
+	 */
+	ciRunCountUnknown: z
+		.enum([
+			"github_status",
+			"push_without_sha",
+			"sha_unresolved",
+			"no_target",
+			"target_not_found",
+			"target_history_unknown",
+			"repository_incomplete",
+			"before_coverage",
+			"after_coverage",
+			"search_capped",
+		])
+		.nullable(),
+	/** Conclusions of the runs found. */
+	ciConclusions: z.record(z.string(), z.number().int()),
+	/**
+	 * For a push: CI status reads later in the same stream (`count` those that
+	 * ran, `unconfirmed` those the command does not show ran) and in the same
+	 * call (`sameCall`, order within the call not known).
+	 */
+	checksAfter: z
+		.object({
+			count: z.number().int(),
+			unconfirmed: z.number().int(),
+			sameCall: z.number().int(),
+			first: z.object({ record: z.number().int(), at: z.string() }).nullable(),
+		})
+		.nullable(),
+	parentSessionId: ParentSessionIdSchema,
+});
 export const AnalysisFindOutputSchema = z.union([
 	z.object({
 		source: z.literal("runs"),
@@ -292,6 +511,11 @@ export const AnalysisFindOutputSchema = z.union([
 				sessions: z.number(),
 			}),
 		),
+	}),
+	z.object({
+		source: z.literal("git"),
+		header: HeaderSchema,
+		events: z.array(AnalysisGitEventSchema),
 	}),
 ]);
 export const AnalysisReadOutputSchema = z.object({
@@ -334,6 +558,7 @@ export type AnalysisFindInput = z.infer<typeof AnalysisFindInputSchema>;
 export type AnalysisFindOutput = z.infer<typeof AnalysisFindOutputSchema>;
 export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
+export type AnalysisGitEvent = z.infer<typeof AnalysisGitEventSchema>;
 export type AnalysisReadInput = z.infer<typeof AnalysisReadInputSchema>;
 export type AnalysisReadOutput = z.infer<typeof AnalysisReadOutputSchema>;
 

@@ -4,6 +4,7 @@ import { AnalysisFindInputSchema } from "@rudel/api-routes";
 import {
 	type CursorKey,
 	type CursorOrder,
+	compareKeys,
 	readFindCursor,
 	takePage,
 	writeFindCursor,
@@ -91,4 +92,24 @@ test("a first page without a draft id continues with the draft id its trace retu
 			ORDER,
 		),
 	).toThrow(ORPCError);
+});
+
+test('strings compare by code point, as UTF-8 bytes in ClickHouse and Postgres COLLATE "C" do', () => {
+	const values = [
+		"a",
+		"\u{E000}",
+		"\u{1F600}",
+		"\u{FFFF}",
+		"ab",
+		"",
+		"\u{10000}",
+	];
+	const bytes = [...values].sort((left, right) =>
+		Buffer.compare(Buffer.from(left), Buffer.from(right)),
+	);
+	expect(
+		[...values].sort((left, right) => compareKeys([left], [right], ["asc"])),
+	).toEqual(bytes);
+	// Code units would put U+1F600 (a surrogate pair) before U+E000.
+	expect(compareKeys(["\u{E000}"], ["\u{1F600}"], ["asc"])).toBeLessThan(0);
 });

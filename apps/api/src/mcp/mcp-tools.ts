@@ -334,13 +334,13 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description: [
 			"What it does: Finds where the team's agents got stuck, failed or wasted time and money, so the team can fix their setup.",
 			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
-			"Returns: The period covered, totals, and runs, failures by cause, or prompts where the user was unhappy.",
+			"Returns: The period covered, totals, and runs, failures by cause, unhappy prompts, or git events.",
 			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
 			"Limits: Members see their own sessions, admins the whole team; up to 200 rows per call.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
-				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies.",
+				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push.",
 			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to. For totals and rankings, use the start of the window the user asked for.",
 			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
 			latest: "Only the newest N sessions in the date range, 1-200.",

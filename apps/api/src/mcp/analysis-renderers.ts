@@ -125,6 +125,93 @@ export function renderFind(output: AnalysisFindOutput): string {
 				]),
 			),
 		);
+	} else if (output.source === "git") {
+		lines.push(
+			table(
+				[
+					"ref",
+					"at",
+					"kind",
+					"label",
+					"literal",
+					"generation",
+					"repository",
+					"github",
+					"sha",
+					"pullRequests",
+					"ciRunCount",
+					"ciRunsObserved",
+					"ciConclusions",
+					"ciRuns",
+					"checksAfter",
+					"parentSessionId",
+				],
+				output.events.map((event) => [
+					gitEventAddress(event),
+					event.at,
+					event.kind,
+					event.label,
+					[
+						event.call && `call=${event.call}`,
+						event.branch && `branch=${event.branch}`,
+						event.sourceBranch && `from=${event.sourceBranch}`,
+						event.shortSha && `commit=${event.shortSha}`,
+						event.kind === "push_range" &&
+							`push=${event.pushFrom || "new"}..${event.pushTo || "new"}`,
+						event.remote && `remote=${event.remote}`,
+						event.prRepo && `repo=${event.prRepo}`,
+						event.prNumber !== null && `pr=${event.prNumber}`,
+						event.runId && `run=${event.runId}`,
+						event.baseCommit && `base=${event.baseCommit}`,
+						event.commitHash && `head=${event.commitHash}`,
+					]
+						.filter(Boolean)
+						.join(" "),
+					event.generation
+						? `${event.generation.revision}/${event.generation.parserVersion}${event.generation.current ? "" : " not-current"}`
+						: null,
+					event.repository
+						? `${event.repository.fullName} id=${event.repository.id} (${event.repository.basis}: ${event.repository.value})`
+						: null,
+					[
+						event.github.status,
+						event.github.reason && `reason=${event.github.reason}`,
+						event.github.prFrom && `prFrom=${event.github.prFrom}`,
+						event.github.ciFrom && `ciFrom=${event.github.ciFrom}`,
+						event.github.coveredThrough &&
+							`coveredThrough=${event.github.coveredThrough}`,
+					]
+						.filter(Boolean)
+						.join(" "),
+					event.sha
+						? `${event.sha.value ?? "unresolved"} candidates=${event.sha.candidates ?? "unknown"}${event.sha.complete ? "" : " (collection incomplete)"}`
+						: null,
+					event.pullRequests
+						.map(
+							(pr) =>
+								`repo=${pr.repositoryId}#${pr.number} ${pr.state}${pr.draft ? " draft" : ""}${pr.mergedAt ? ` merged=${pr.mergedAt} merge=${pr.mergeCommitSha}` : ""} head=${pr.headRef}@${pr.headSha}${pr.headRepositoryId !== pr.repositoryId ? ` headRepo=${pr.headRepositoryId}` : ""} [${pr.bases.join(",")}]${pr.commitInHead === null ? "" : ` commitInHead=${pr.commitInHead}`} ${pr.title}`,
+						)
+						.join("; "),
+					event.ciRunCount === null
+						? `unknown (${event.ciRunCountUnknown})`
+						: `${event.ciRunCount} before ${event.ciRunCountThrough}`,
+					event.ciRunsObserved,
+					Object.entries(event.ciConclusions)
+						.map(([conclusion, count]) => `${conclusion}=${count}`)
+						.join(" "),
+					event.ciRuns
+						.map(
+							(run) =>
+								`repo=${run.repositoryId} ${run.kind}#${run.runId}.${run.attempt} ${run.workflow} ${run.status}/${run.conclusion ?? "none"} ${run.event} ${run.branch}@${run.headSha} created=${run.createdAt}${run.startedAt && run.startedAt !== run.createdAt ? ` started=${run.startedAt}` : ""} completed=${run.completedAt ?? "unknown"} [${run.edges.map((edge) => `${edge.basis}${edge.linkBasis ? `:${edge.linkBasis}` : ""}${edge.prNumber ? `#${edge.prNumber}` : ""}`).join(",")}]`,
+						)
+						.join("; "),
+					event.checksAfter
+						? `ran=${event.checksAfter.count} unconfirmed=${event.checksAfter.unconfirmed} sameCall=${event.checksAfter.sameCall}${event.checksAfter.first ? ` first@${event.checksAfter.first.record} ${event.checksAfter.first.at}` : ""}`
+						: null,
+					event.parentSessionId,
+				]),
+			),
+		);
 	} else {
 		lines.push(
 			table(
@@ -166,6 +253,24 @@ export function renderFind(output: AnalysisFindOutput): string {
  * `analysis.read` already fitted the output to its budget; this only formats
  * it. The trace line is outside that budget (about 60 characters).
  */
+/**
+ * Where an event can be read: a transcript event as `ref@record.block` with the
+ * native content block `read` takes (and the match ordinal within it), an
+ * evidence event as its origin.
+ */
+function gitEventAddress(
+	event: Extract<AnalysisFindOutput, { source: "git" }>["events"][number],
+): string {
+	if (event.record === 0)
+		return `${event.sessionId}/${event.agentId || "main"} ${event.call}`;
+	const block = Math.floor(event.block / 65_536);
+	const ordinal = event.block % 65_536;
+	const at = `@${event.record}.${block}${ordinal ? ` match ${ordinal}` : ""}`;
+	return event.turn === null
+		? `${event.sessionId}/${event.agentId || "main"}${at} (no run)`
+		: `${refText({ sessionId: event.sessionId, agentId: event.agentId, turn: event.turn })}${at}`;
+}
+
 export function renderRead(output: AnalysisReadOutput): string {
 	const text = formatReadOutput(output);
 	return output.trace ? `${traceLine(output.trace)}\n${text}` : text;

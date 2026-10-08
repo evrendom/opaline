@@ -55,6 +55,8 @@ export interface ResolvedScope {
 	/** Sessions in scope that are Codex subagent threads of another session. */
 	subagentThreads: number;
 	batches: ScopeBatch[];
+	/** Sessions in scope without a committed transcript generation, per owner (CLI evidence still applies to them). */
+	unindexed: { scope: ScopeBatch["scope"]; sessions: AnalysisSession[] }[];
 }
 
 const MAX_SESSIONS = 10_000;
@@ -120,6 +122,7 @@ export async function resolveScope(
 			capReached || selected.length + threads.length > MAX_SESSIONS,
 		subagentThreads: sessions.filter((session) => session.depth > 0).length,
 		batches: [],
+		unindexed: [],
 	};
 	for (const userId of new Set(sessions.map((session) => session.user_id))) {
 		const owned = sessions.filter((session) => session.user_id === userId);
@@ -132,6 +135,14 @@ export async function resolveScope(
 				batchSessions.map((session) => session.session_id),
 			);
 			resolved.indexedSessions += generations.length;
+			const indexed = new Set(
+				generations.map((generation) => generation.sessionId),
+			);
+			const missing = batchSessions.filter(
+				(session) => !indexed.has(session.session_id),
+			);
+			if (missing.length > 0)
+				resolved.unindexed.push({ scope: ownerScope, sessions: missing });
 			for (const batch of batchByRecords(generations, batchRecords)) {
 				const ids = new Set(batch.map((generation) => generation.sessionId));
 				resolved.batches.push({

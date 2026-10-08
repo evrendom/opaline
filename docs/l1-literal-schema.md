@@ -98,17 +98,19 @@ Connecting every session to the pull requests and CI runs it touched is required
 | Session repository | session `git_remote`; Codex `session_meta.git.repository_url`; push `To <remote>`; PR URL `owner/name`; repository evidence index | active `github_repository_binding.repository_id` | basis (`remote`, `codex_meta`, `push_remote`, `pr_url`, `evidence_index`) and the literal value |
 | Observation turn | `session_git_observations` row | `transcript_records` call and result | same generation, `record_idx`, `block_idx / 65536`, `call_id`; gives `turn_idx` |
 | PR mentioned or created | `pr_url`, `mcp_pr_created`, Claude `pr-link` | `github_pull_requests` (repository, number) | observation kind; whether the call was `gh pr create` |
-| Pushed SHA | push `push_to_sha` (abbreviated) | full SHA in `github_pull_request_commits`, `github_pull_requests.head_sha` or `github_ci_runs.head_sha` | prefix match within the repository; `candidate_count`; matched only when it is 1 |
+| Pushed SHA | push `push_to_sha` (abbreviated) | full SHA in `github_pull_request_commits`, `github_pull_requests.head_sha` or `github_ci_runs.head_sha`, over all collected history | prefix match within the repository; `candidate_count`; matched only when it is 1 |
 | Pushed branch | push `branch` | `github_pull_requests.head_ref` | exact; PR created/updated times kept as values, not filters |
 | Commit in PR | `commit_created.short_sha` | `github_pull_request_commits.sha` | prefix match; whether the PR head still contains it |
-| CI on a pushed SHA | resolved full SHA | `github_ci_runs.head_sha` (all runs, any branch) | run kind, event, attempt, conclusion, time from push to run |
+| CI on a pushed SHA | resolved full SHA | `github_ci_runs.head_sha` (all collected runs, any branch, any date) | run kind, event, attempt, conclusion, time from push to run |
+| CI run a check names | `ci_check.run_id` | `github_ci_runs.run_id` (every attempt) | `named_run` |
+| CI on a checked branch | `ci_check.branch` | `github_ci_runs.head_branch`, created in the day before the check | `branch`; at most 2,000 runs per branch and page, beyond which the count is unknown |
 | CI on a PR | linked PR | `github_ci_run_pull_requests` → `github_ci_runs` | `basis` (`provider`, `head-sha`) |
 | PR from the session's HEAD | `github_pull_request_snapshot` | the session | capture commit, coverage flags |
 | Commits per capture | `repository_evidence_capture` base and head commits | PR commits and CI runs | lifecycle (`checkpoint`, `end`), capture time |
 | CI checked after push | `ci_check` observations after the push in the same stream | the push | the check command, exit code, delay |
-| Not covered | binding, readiness, retention boundary, observation receipt, new-branch push without SHA | the session | the reason, never an empty result |
+| Not covered | binding, readiness, retention boundary, last sync, observation receipt, new-branch push without SHA, a check without a target | the session | the reason (`github.status`, `ciRunCountUnknown`), never an empty result or a zero count |
 
-Git extractor version 3 records the `To <remote>` of each push, new-branch pushes and `ci_check` calls. Parser v6 adds Claude `pr-link` and `gitOperation`.
+Git extractor version 3 records the `To <remote>` of each push, new-branch pushes, forced updates and `ci_check` calls (`unconfirmed` when the command does not show they ran). `find source=git` implements these links, pinned to the observation generation of each session's indexed transcript, with per-event GitHub coverage. A CI status read keeps the run id it names (`gh run view|watch <id>`, MCP `run_id`) in `run_id`. An event's CI count is the run attempts started before `ciRunCountThrough`, the earliest `coveredThrough` (end of the completed pulls, actions, attempts and external windows) of every repository its runs come from, a fork PR's base included. It is set only when every target the event names was looked up and each target's history starts inside that coverage: a PR's a day before its creation, a named run's at its creation, a branch check's at its window, and a SHA's at the commit observation of the session that created it. A SHA the session did not create has an unknown history, since a later PR or run on it does not date its earlier CI. Otherwise the count is null with the reason; runs found after the boundary are listed, not counted. Not yet stored: Claude `pr-link` and `gitOperation`, which parser v6 adds.
 
 ## GitHub evidence in L1
 

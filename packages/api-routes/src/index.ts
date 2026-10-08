@@ -76,6 +76,7 @@ export {
 	AnalysisFindInputSchema,
 	type AnalysisFindOutput,
 	AnalysisFindOutputSchema,
+	type AnalysisGitEvent,
 	type AnalysisReadInput,
 	AnalysisReadInputSchema,
 	type AnalysisReadOutput,

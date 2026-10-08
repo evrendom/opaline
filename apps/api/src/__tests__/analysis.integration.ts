@@ -33,10 +33,19 @@ import { renderRead } from "../mcp/analysis-renderers.js";
 import { MCP_TOOLS } from "../mcp/mcp-tools.js";
 import { router } from "../router.js";
 import { withAnalysisDeadline } from "../services/analysis/deadline.js";
-import { findAnalysis } from "../services/analysis/find.service.js";
+import {
+	findAnalysis,
+	findAnalysisWithOwners,
+} from "../services/analysis/find.service.js";
+import type { GitHubSource } from "../services/analysis/git-links.js";
 import { readAnalysis } from "../services/analysis/read.service.js";
 import { toolGroupSql } from "../services/analysis/tool-groups.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
+import {
+	baseRow,
+	type GitObservationRecord,
+	parseGitObservations,
+} from "../services/git-observation-parser.js";
 import { buildNativeSessionLineageRow } from "../services/session-lineage-persistence.service.js";
 import {
 	buildTranscriptRecordRow,
@@ -1160,7 +1169,7 @@ async function seedSession(
 
 /** The paged items of a find result: rows, groups or events. */
 function items(output: z.infer<typeof AnalysisFindOutputSchema>): unknown[] {
-	if (output.source === "user") return output.events;
+	if (output.source === "user" || output.source === "git") return output.events;
 	return "rows" in output ? output.rows : output.groups;
 }
 
@@ -2197,3 +2206,489 @@ function codexGrandchildTranscript(review: string): string {
 		codexLine(104, codexText("assistant", "Imports are fine.")),
 	]);
 }
+
+test("source=git joins a session's pushes and CI checks to its PR and the CI runs on the pushed SHA, the PR and its merge commit", async () => {
+	assert(userId);
+	const organizationId = userId;
+	const sessionId = `analysis_git_${runId}`;
+	const repositoryId = `9${Date.now() % 1_000_000_000}`;
+	const fullSha = `d4e5f6a${"0".repeat(32)}1`;
+	const prHead = `c0ffee0${"0".repeat(32)}2`;
+	const mergeSha = `e0e0e0e${"0".repeat(32)}3`;
+	const coveredFrom = new Date(baseMs - 3 * 86_400_000)
+		.toISOString()
+		.slice(0, 10);
+	const transcript = jsonl([
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Push and watch CI" },
+		},
+		// The session creates the pushed commit, which dates its CI history.
+		claudeTool("commit", "Bash", { command: "git commit -m 'feat: links'" }),
+		claudeResult("commit", "[feat/links d4e5f6a] feat: links\n 1 file changed"),
+		claudeTool("push", "Bash", { command: "git push -u origin feat/links" }),
+		claudeResult(
+			"push",
+			"To github.com:opalinehq/athena.git\n   a1b2c3d..d4e5f6a  feat/links -> feat/links",
+		),
+		claudeTool("checks", "Bash", {
+			command: "gh pr checks 133 --repo opalinehq/athena",
+		}),
+		claudeResult("checks", "Exit code 1\nbuild\tfail", true),
+		claudeTool("fork", "Bash", { command: "git push fork feat/links" }),
+		claudeResult(
+			"fork",
+			"To github.com:someone/else.git\n   a1b2c3d..d4e5f6a  feat/links -> feat/links",
+		),
+		claudeTool("runs", "Bash", {
+			command: "gh run list --branch main -R opalinehq/athena",
+		}),
+		claudeResult("runs", "completed\tsuccess\tCI"),
+	]);
+	await seedSession(sessionId, "claude_code", transcript, "claude-opus-5-5", {
+		repository: "github.com/opalinehq/athena",
+	});
+	const input = {
+		organizationId,
+		userId: organizationId,
+		sessionId,
+		source: "claude_code" as const,
+		revision: "1",
+		transcriptParserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+	};
+	const observations = parseGitObservations({
+		...input,
+		records: [
+			...splitSessionTranscript({
+				content: transcript,
+				sessionDate: at(0),
+				source: "claude_code",
+			}),
+		].map(
+			(draft): GitObservationRecord => ({
+				agent_id: draft.agentId,
+				record_idx: draft.recordIdx,
+				block_idx: draft.blockIdx,
+				call_id: draft.callId,
+				kind: draft.kind,
+				subtype: draft.subtype,
+				tool_name: draft.toolName,
+				is_error: draft.isError,
+				exit_code: draft.exitCode,
+				ts: draft.ts,
+				text: draft.text,
+				text_chars: draft.textChars,
+				byte_start: String(draft.byteStart),
+				byte_len: draft.byteLen,
+			}),
+		),
+	});
+	expect(observations.map((row) => row.kind)).toEqual([
+		"commit_created",
+		"push_range",
+		"ci_check",
+		"push_range",
+		"ci_check",
+	]);
+	const github = {
+		workspace_id: organizationId,
+		provider: "github",
+		repository_id: repositoryId,
+		version: "1",
+		synced_at: timestamp(5),
+	};
+	const source: GitHubSource = {
+		access: async () => ({
+			visibility: "visible" as const,
+			bindings: [{ repositoryId, fullName: "opalinehq/athena" }],
+			repositories: new Map([
+				[
+					repositoryId,
+					{
+						included: true,
+						// Collected from well before the session, so the branch
+						// check's day-long window is covered too.
+						prFrom: coveredFrom,
+						ciFrom: coveredFrom,
+						coveredThrough: new Date().toISOString(),
+						reason: null,
+					},
+				],
+			]),
+		}),
+		evidence: async () => ({ snapshots: [], captures: [] }),
+	};
+	const find = (
+		extra: Record<string, unknown>,
+		sourceOverride: GitHubSource = source,
+	) =>
+		findAnalysis(
+			{ organizationId, userId: null },
+			AnalysisFindInputSchema.parse({
+				source: "git",
+				sessionId,
+				from: day,
+				to: day,
+				...extra,
+			}),
+			{ executor: clickhouse, github: sourceOverride },
+		).then((output) => {
+			const parsed = AnalysisFindOutputSchema.parse(output);
+			assert(parsed.source === "git");
+			return parsed;
+		});
+	try {
+		await clickhouse.insert({
+			table: "rudel.session_git_observations",
+			asyncInsert: false,
+			values: [
+				...observations,
+				{
+					...baseRow(input, {
+						agent_id: "",
+						record_idx: 4_294_967_295,
+						block_idx: 0,
+						call_id: "",
+						ts: at(0),
+					}),
+					kind: "receipt",
+					label: "",
+				},
+			],
+		});
+		await clickhouse.insert({
+			table: "rudel.github_pull_requests",
+			asyncInsert: false,
+			values: [
+				{
+					...github,
+					number: 133,
+					provider_pull_request_id: "p133",
+					state: "closed",
+					draft: 0,
+					created_at: timestamp(1),
+					updated_at: timestamp(4),
+					merged_at: timestamp(4),
+					head_sha: prHead,
+					head_ref: "feat/links",
+					base_ref: "main",
+					head_repository_id: repositoryId,
+					merge_commit_sha: mergeSha,
+					title: "feat: links",
+				},
+			],
+		});
+		await clickhouse.insert({
+			table: "rudel.github_pull_request_commits",
+			asyncInsert: false,
+			values: [
+				{ ...github, sha: fullSha, pr_number: 133, last_seen_head_sha: prHead },
+			],
+		});
+		const run = (
+			runId: string,
+			sha: string,
+			conclusion: string,
+			offset: number,
+			event = "pull_request",
+		) => ({
+			...github,
+			kind: "actions_run",
+			run_id: runId,
+			attempt: 1,
+			created_at: timestamp(offset),
+			workflow_name: "CI",
+			event,
+			head_sha: sha,
+			head_branch: event === "push" ? "main" : "feat/links",
+			status: "completed",
+			conclusion,
+		});
+		await clickhouse.insert({
+			table: "rudel.github_ci_runs",
+			asyncInsert: false,
+			values: [
+				run("7001", fullSha, "failure", 3),
+				run("7002", prHead, "success", 4),
+				run("7003", mergeSha, "failure", 6, "push"),
+				// On main a minute before the session: in the branch check's window.
+				run("7004", `b0b0b0b${"0".repeat(32)}4`, "success", -60, "push"),
+			],
+		});
+		await clickhouse.insert({
+			table: "rudel.github_ci_run_pull_requests",
+			asyncInsert: false,
+			values: [
+				{
+					...github,
+					pr_number: 133,
+					run_created_at: timestamp(4),
+					kind: "actions_run",
+					run_id: "7002",
+					attempt: 1,
+					basis: "provider",
+				},
+			],
+		});
+
+		const output = await find({});
+		const pushes = output.events.filter((event) => event.kind === "push_range");
+		const athena = pushes.find((event) =>
+			event.remote.includes("opalinehq/athena"),
+		);
+		expect(athena).toMatchObject({
+			turn: 1,
+			label: "observed",
+			generation: { revision: "1", current: true },
+			repository: { id: repositoryId, basis: "event" },
+			github: { status: "linked" },
+			sha: { value: fullSha, candidates: 1 },
+			ciRunCount: 3,
+			ciRunCountThrough: expect.any(String),
+			ciRunCountUnknown: null,
+			ciConclusions: { failure: 2, success: 1 },
+			checksAfter: { count: 2 },
+		});
+		expect(athena?.pullRequests).toMatchObject([
+			{
+				number: 133,
+				bases: ["branch", "commit"],
+				commitInHead: true,
+				mergeCommitSha: mergeSha,
+			},
+		]);
+		expect(
+			athena?.ciRuns
+				.map((ciRun) => [
+					ciRun.runId,
+					ciRun.repositoryId === repositoryId,
+					ciRun.edges.map((edge) => [edge.basis, edge.linkBasis]),
+				])
+				.sort(),
+		).toEqual([
+			["7001", true, [["pushed_sha", null]]],
+			["7002", true, [["pull_request", "provider"]]],
+			["7003", true, [["merge_commit", null]]],
+		]);
+		const checkRecord = output.events.find(
+			(event) => event.kind === "ci_check" && event.prNumber === 133,
+		)?.record;
+		expect(athena?.checksAfter).toEqual({
+			count: 2,
+			unconfirmed: 0,
+			sameCall: 0,
+			first: { record: checkRecord ?? -1, at: expect.any(String) },
+		});
+		// A push to a repository without a binding is never linked to the session's repository.
+		const other = pushes.find((event) => event.remote.includes("someone/else"));
+		expect(other).toMatchObject({
+			repository: null,
+			github: { status: "unbound" },
+			sha: { value: null, candidates: null },
+			ciRunCount: null,
+			pullRequests: [],
+		});
+		const check = output.events.find(
+			(event) => event.kind === "ci_check" && event.prNumber === 133,
+		);
+		expect(check).toMatchObject({
+			label: "observed",
+			prNumber: 133,
+			pullRequests: [{ number: 133, bases: ["named"] }],
+		});
+		// A check that names only a branch lists that branch's runs of the day before it.
+		const branchCheck = output.events.find(
+			(event) => event.kind === "ci_check" && event.branch === "main",
+		);
+		expect(branchCheck).toMatchObject({
+			pullRequests: [],
+			ciRunCount: 1,
+			ciRunCountUnknown: null,
+		});
+		expect(
+			branchCheck?.ciRuns.map((ciRun) => [
+				ciRun.runId,
+				ciRun.edges.map((edge) => edge.basis),
+			]),
+		).toEqual([["7004", ["branch"]]]);
+
+		const first = await find({ limit: 1 });
+		expect(first.events).toHaveLength(1);
+		assert(first.header.cursor);
+		const rest = await find({ limit: 10, cursor: first.header.cursor });
+		expect(rest.events).toHaveLength(output.events.length - 1);
+		expect(rest.events.map((event) => event.record)).not.toContain(
+			first.events[0]?.record,
+		);
+
+		const hidden = await find(
+			{},
+			{
+				access: async () => ({
+					visibility: "hidden" as const,
+					bindings: [],
+					repositories: new Map(),
+				}),
+				evidence: async () => ({ snapshots: [], captures: [] }),
+			},
+		);
+		expect(hidden.events).toHaveLength(output.events.length);
+		expect(
+			hidden.events.every(
+				(event) =>
+					event.github.status === "not_visible" && event.ciRunCount === null,
+			),
+		).toBe(true);
+		expect(hidden.header.notes.join("\n")).toContain("not visible");
+	} finally {
+		await clickhouse.execute({
+			query:
+				"DELETE FROM rudel.session_git_observations WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3",
+			query_params: { organizationId },
+		});
+		for (const table of [
+			"rudel.github_pull_requests",
+			"rudel.github_pull_request_commits",
+			"rudel.github_ci_runs",
+			"rudel.github_ci_run_pull_requests",
+		])
+			await clickhouse.execute({
+				query: `DELETE FROM ${table} WHERE workspace_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+				query_params: { organizationId },
+			});
+	}
+});
+
+test("source=git pages a member's unindexed CLI captures from Postgres exactly and counts the member as an owner", async () => {
+	assert(userId);
+	const organizationId = userId;
+	const member = await signup("evidence-owner");
+	await sqlClient`INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${crypto.randomUUID()}, ${organizationId}, ${member.user.id}, 'member', now())`;
+	const sessions = [`evidence_a_${runId}`, `evidence_b_${runId}`];
+	const uploadId = `analysis_evidence_upload_${runId}`;
+	// Same millisecond, different microseconds: one page boundary falls inside it.
+	const sameMs = new Date(baseMs + 30_000).toISOString().replace("Z", "");
+	const captures: [string, string, string | null, string][] = [
+		["c1", sessions[0] ?? "", null, `${sameMs}400Z`],
+		["c2", sessions[0] ?? "", null, `${sameMs}800Z`],
+		["c3", sessions[0] ?? "", "agent-x", `${sameMs}100Z`],
+		["c4", sessions[0] ?? "", "agent-x", `${sameMs}900Z`],
+		["c5", sessions[1] ?? "", null, `${sameMs}000Z`],
+		["c6", sessions[1] ?? "", "agent-y", `${sameMs}500Z`],
+		["c7", sessions[0] ?? "", null, at(20)],
+		["c8", sessions[1] ?? "", null, at(40)],
+	];
+	try {
+		await clickhouse.insert({
+			table: "rudel.session_analytics",
+			asyncInsert: false,
+			values: sessions.map((sessionId) => ({
+				organization_id: organizationId,
+				user_id: member.user.id,
+				session_id: sessionId,
+				source: "codex",
+				session_date: timestamp(0),
+				last_interaction_date: timestamp(10),
+				project_path: "/test/evidence",
+				git_remote: "repo",
+				model_used: "gpt-5",
+				revision: "1",
+			})),
+		});
+		// One upload per capture, as the CLI uploads them.
+		for (const [context, sessionId, agentId, capturedAt] of captures) {
+			await sqlClient.unsafe(
+				`INSERT INTO repository_evidence_upload (
+					id, operation_id, organization_id, user_id, context_id,
+					manifest_object_id, request, missing_object_ids, expires_at
+				 ) VALUES ($1, $1, $2, $3, $1, 'manifest', '{}'::jsonb, '[]'::jsonb, NOW() + INTERVAL '1 hour')`,
+				[`${uploadId}_${context}`, organizationId, member.user.id],
+			);
+			await sqlClient.unsafe(
+				`INSERT INTO repository_evidence_capture (
+					organization_id, context_id, user_id, upload_id, manifest_object_id,
+					installation_id, local_repository_id, local_worktree_id, session_id,
+					run_id, segment_id, agent_id, source, lifecycle, head_git_commit,
+					captured_at, coverage
+				 ) VALUES (
+					$1, $2, $3, $4, 'manifest', 'installation', 'local-repository',
+					'local-worktree', $5, 'run', 'segment', $6, 'codex', 'checkpoint',
+					$7, $8::timestamptz, '[]'::jsonb
+				 )`,
+				[
+					organizationId,
+					`${runId}_${context}`,
+					member.user.id,
+					`${uploadId}_${context}`,
+					sessionId,
+					agentId,
+					context,
+					capturedAt,
+				],
+			);
+		}
+		const { postgresGitHubSource } = await import(
+			"../services/analysis/github-access.js"
+		);
+		const source: GitHubSource = {
+			access: async () => ({
+				visibility: "visible" as const,
+				bindings: [],
+				repositories: new Map(),
+			}),
+			evidence: postgresGitHubSource.evidence,
+		};
+		const find = (extra: Record<string, unknown>) =>
+			// The scope an admin's `userId` filter resolves to in the handler.
+			findAnalysisWithOwners(
+				{ organizationId, userId: member.user.id },
+				AnalysisFindInputSchema.parse({
+					source: "git",
+					userId: member.user.id,
+					from: day,
+					to: day,
+					...extra,
+				}),
+				{ executor: clickhouse, github: source },
+			).then(({ output, owners }) => {
+				const parsed = AnalysisFindOutputSchema.parse(output);
+				assert(parsed.source === "git");
+				return { output: parsed, owners };
+			});
+
+		const all = await find({ limit: 50 });
+		// Only the member's sessions were read, though none has an indexed transcript.
+		expect(all.owners).toEqual([member.user.id]);
+		// Newest first, then session, stream and capture, as the cursor orders them.
+		const order = all.output.events.map((event) => event.commitHash);
+		expect(order).toEqual(["c8", "c1", "c2", "c3", "c4", "c5", "c6", "c7"]);
+		expect(
+			all.output.events.every(
+				(event) =>
+					event.kind === "evidence_capture" &&
+					event.github.status === "not_github",
+			),
+		).toBe(true);
+
+		const paged: string[] = [];
+		let cursor: string | undefined;
+		for (let page = 0; page < captures.length; page++) {
+			const next = await find({ limit: 2, ...(cursor ? { cursor } : {}) });
+			expect(next.owners).toEqual([member.user.id]);
+			paged.push(...next.output.events.map((event) => event.commitHash));
+			cursor = next.output.header.cursor ?? undefined;
+			if (!cursor) break;
+		}
+		expect(paged).toEqual(order);
+	} finally {
+		await sqlClient.unsafe(
+			"DELETE FROM repository_evidence_capture WHERE organization_id = $1 AND upload_id LIKE $2",
+			[organizationId, `${uploadId}_%`],
+		);
+		await sqlClient.unsafe(
+			"DELETE FROM repository_evidence_upload WHERE organization_id = $1 AND id LIKE $2",
+			[organizationId, `${uploadId}_%`],
+		);
+	}
+});

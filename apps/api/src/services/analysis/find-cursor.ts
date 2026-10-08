@@ -93,7 +93,11 @@ export function compareKeys(
 	return 0;
 }
 
-/** Numbers numerically, strings by code unit (total, unlike locale order). */
+/**
+ * Numbers numerically, strings by code point (total, unlike locale order):
+ * the order of UTF-8 bytes, as ClickHouse and Postgres `COLLATE "C"` compare
+ * strings, so SQL keysets and merged pages agree beyond the BMP.
+ */
 function compareValues(
 	left: string | number | null,
 	right: string | number | null,
@@ -103,7 +107,23 @@ function compareValues(
 	if (right === null) return 1;
 	if (typeof left === "number" && typeof right === "number")
 		return left - right;
-	return `${left}` < `${right}` ? -1 : 1;
+	return compareCodePoints(`${left}`, `${right}`);
+}
+
+function compareCodePoints(left: string, right: string): number {
+	const length = Math.min(left.length, right.length);
+	for (let index = 0; index < length; index++) {
+		const a = left.charCodeAt(index);
+		const b = right.charCodeAt(index);
+		// Surrogates (supplementary code points) sort after the rest of the BMP.
+		if (a !== b) return codePointRank(a) - codePointRank(b);
+	}
+	return left.length - right.length;
+}
+
+function codePointRank(unit: number): number {
+	if (unit >= 0xd800 && unit <= 0xdfff) return unit + 0x2000;
+	return unit >= 0xe000 ? unit - 0x800 : unit;
 }
 
 function fingerprint(input: AnalysisFindInput): string {

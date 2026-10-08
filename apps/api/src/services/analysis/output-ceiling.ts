@@ -45,6 +45,12 @@ export function fitFindOutput(
 			header,
 			events,
 		}));
+	if (output.source === "git")
+		return fitItems(page, output.events, "events", (events, header) => ({
+			...output,
+			header,
+			events,
+		}));
 	if (output.source === "tool")
 		return fitItems(page, output.groups, "groups", (groups, header) => ({
 			...output,

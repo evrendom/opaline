@@ -1358,6 +1358,15 @@ test("a daily pass in progress keeps a repository with complete history ready", 
 	expect(new Date(repository?.ciFrom ?? "").toISOString()).toBe(
 		RETENTION_BOUNDARY,
 	);
+	// Covered through the earliest dataset's last completed window end, exclusive.
+	const ends = await sqlClient.unsafe<Array<{ end: string }>>(
+		`SELECT to_char(max(window_end) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS end FROM github_repository_sweep WHERE organization_id = $1 AND status = 'complete' AND dataset IN ('pulls', 'actions', 'attempts', 'external') GROUP BY dataset`,
+		[scope.organizationId],
+	);
+	expect(ends).toHaveLength(4);
+	expect(Date.parse(repository?.coveredThrough ?? "")).toBe(
+		Math.min(...ends.map((row) => Date.parse(row.end))) + 1_000,
+	);
 	expect(
 		(await readGitHubOutcomesReadiness(sqlClient, scope.organizationId))
 			?.status,
@@ -1367,6 +1376,19 @@ test("a daily pass in progress keeps a repository with complete history ready", 
 		organizationId: scope.organizationId,
 	});
 	expect(connection.repositories[0]?.sync).toEqual({ state: "ready" });
+	// Without completed attempts windows, every attempt is not known to be collected.
+	await sqlClient.unsafe(
+		"UPDATE github_repository_sweep SET status = 'pending', completed_at = NULL WHERE organization_id = $1 AND dataset = 'attempts'",
+		[scope.organizationId],
+	);
+	expect(
+		(
+			await repositoryReadiness(
+				scope,
+				new Date(nextPass.getTime() + 3 * 3_600_000),
+			)
+		)?.coveredThrough,
+	).toBeNull();
 });
 
 test("a repository whose last complete pass ended over 48 hours ago is not ready", async () => {

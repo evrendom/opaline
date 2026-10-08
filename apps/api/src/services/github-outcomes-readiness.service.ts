@@ -11,6 +11,12 @@ const repositoryReadinessSchema = z.object({
 	noActions: z.boolean(),
 	reason: z.string().nullable(),
 	lastSyncedAt: z.string().nullable(),
+	/**
+	 * End (exclusive) of the history every dataset holds without a gap: the
+	 * earliest end of the completed windows. Readiness computed before this
+	 * field existed reads as null (unknown).
+	 */
+	coveredThrough: z.string().nullable().default(null),
 });
 export const gitHubReadinessSchema = z.object({
 	status: z.enum(["not_ready", "ready"]),
@@ -87,7 +93,10 @@ export async function refreshPrTotalsReadiness(
 	    AND NOT coalesce(p.unavailable OR a.unavailable OR t.unavailable OR e.unavailable, false)
 	    AND NOT coalesce(p.inaccessible OR a.inaccessible OR t.inaccessible OR e.inaccessible, false), false) AS included,
 	   coalesce(p.reason, a.reason, t.reason, e.reason) AS reason,
-	   least(p.synced, a.synced) AS synced
+	   least(p.synced, a.synced) AS synced,
+	   -- LEAST skips NULLs, so a dataset without completed windows leaves it unknown.
+	   CASE WHEN p.complete_end IS NULL OR a.complete_end IS NULL OR t.complete_end IS NULL OR e.complete_end IS NULL THEN NULL
+	    ELSE least(p.complete_end, a.complete_end, t.complete_end, e.complete_end) END AS covered_through
 	  FROM github_repository_binding b
 	  JOIN github_app_installation i ON i.installation_id = b.installation_id AND i.organization_id = b.organization_id AND i.status = 'active'
 	  LEFT JOIN datasets p ON p.repository_id = b.repository_id AND p.dataset = 'pulls'
@@ -100,7 +109,7 @@ export async function refreshPrTotalsReadiness(
 	   coalesce(bool_and(included), false) AS ready,
 	   coalesce(jsonb_agg(jsonb_build_object('repositoryId', repository_id, 'fullName', full_name,
 	    'included', included, 'prFrom', pr_from, 'ciFrom', ci_from, 'externalComplete', external_complete,
-	    'noActions', no_actions, 'reason', reason, 'lastSyncedAt', synced) ORDER BY repository_id), '[]'::jsonb) AS repositories
+	    'noActions', no_actions, 'reason', reason, 'lastSyncedAt', synced, 'coveredThrough', covered_through) ORDER BY repository_id), '[]'::jsonb) AS repositories
 	  FROM repos
 	 )
 	 INSERT INTO organization_feature_readiness (organization_id, feature, status, first_ready_at, computed_at, details)

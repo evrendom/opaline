@@ -27,6 +27,7 @@ import {
 	takePage,
 	writeFindCursor,
 } from "./find-cursor.js";
+import { type GitHubSource, loadGitPage } from "./git-links.js";
 import { fitFindOutput } from "./output-ceiling.js";
 import {
 	promptReaction,
@@ -69,6 +70,8 @@ interface FindEnv {
 	recordByteCap?: number;
 	/** Records per run-facts batch (tests lower it to split a scope). */
 	batchRecords?: number;
+	/** GitHub visibility and active bindings for source=git (tests inject them). */
+	github?: GitHubSource;
 	deadlineMs?: number;
 }
 
@@ -86,6 +89,8 @@ interface FindContext {
 	/** Every run of the scope (only `refs` when given), keyed by `runKey`. */
 	runs: Map<string, RunRow>;
 	sessions: Map<string, AnalysisSession>;
+	github: GitHubSource;
+	organizationId: string;
 }
 
 interface ScanRow {
@@ -118,6 +123,8 @@ const RUN_ORDER: CursorOrder = ["desc", "asc"];
 const RUN_GROUP_ORDER: CursorOrder = ["desc", "asc"];
 const TOOL_GROUP_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc"];
 const EVENT_ORDER: CursorOrder = ["desc", "desc", "asc", "asc", "asc"];
+/** Newest event first, then session, stream, record and block. */
+const GIT_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc", "asc"];
 
 export type { AnalysisScope };
 
@@ -159,8 +166,15 @@ export function findAnalysisWithOwners(
 					input,
 					env.batchRecords,
 				);
+				// source=git also reads CLI evidence of sessions without an indexed
+				// transcript; their owners own the result too.
 				owners = [
-					...new Set(resolved.batches.map((batch) => batch.scope.userId)),
+					...new Set([
+						...resolved.batches.map((batch) => batch.scope.userId),
+						...(input.source === "git"
+							? resolved.unindexed.map((group) => group.scope.userId)
+							: []),
+					]),
 				];
 				const sessions = new Map(
 					resolved.batches.flatMap((batch) =>
@@ -177,6 +191,8 @@ export function findAnalysisWithOwners(
 					header: newHeader(resolved),
 					runs: await loadScopeRuns(executor, resolved, input, sessions),
 					sessions,
+					github: env.github ?? lazyPostgresGitHubSource,
+					organizationId: scope.organizationId,
 					scan: {
 						rows: 0,
 						bytes: 0,
@@ -210,8 +226,58 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 			return findFailures(context);
 		case "user":
 			return findReactions(context);
+		case "git":
+			return findGitEvents(context);
 	}
 }
+
+/**
+ * The scope's git and GitHub events (commits, pushes, PR URLs and creations,
+ * CI status reads, Codex git metadata) with the PRs and CI runs GitHub links
+ * to them, newest first. GitHub facts appear only where the workspace's GitHub
+ * outcomes are visible, as on the dashboard.
+ */
+async function findGitEvents(context: FindContext): Promise<FoundPage> {
+	const { scope, header, input } = context;
+	const sessions = new Map(context.sessions);
+	for (const group of scope.unindexed)
+		for (const session of group.sessions)
+			sessions.set(session.session_id, session);
+	const page = await loadGitPage({
+		executor: context.executor,
+		organizationId: context.organizationId,
+		batches: scope.batches,
+		unindexed: scope.unindexed,
+		sessions,
+		runKeys:
+			input.refs?.length || input.model ? new Set(context.runs.keys()) : null,
+		after: context.after,
+		order: context.order,
+		limit: context.limit,
+		source: context.github,
+	});
+	header.notes.push(...page.notes);
+	if (page.truncated) header.truncated = true;
+	return paged(context, page.keys, page.more, {
+		source: "git",
+		header,
+		events: page.events,
+	});
+}
+
+/** Postgres-backed GitHub source, loaded only when source=git runs. */
+const lazyPostgresGitHubSource: GitHubSource = {
+	access: async (organizationId) =>
+		(await import("./github-access.js")).postgresGitHubSource.access(
+			organizationId,
+		),
+	evidence: async (organizationId, owners, page) =>
+		(await import("./github-access.js")).postgresGitHubSource.evidence(
+			organizationId,
+			owners,
+			page,
+		),
+};
 
 /**
  * One run-facts statement per batch; everything else in the request works on
@@ -708,6 +774,7 @@ function workLimitHeader(input: AnalysisFindInput): Header {
 			sessionCapReached: false,
 			subagentThreads: 0,
 			batches: [],
+			unindexed: [],
 		}),
 		truncated: true,
 		notes: [
@@ -723,6 +790,7 @@ function emptyResult(
 	if (input.source === "tool") return { source: "tool", header, groups: [] };
 	if (input.source === "user")
 		return { source: "user", header, events: [], groups: [] };
+	if (input.source === "git") return { source: "git", header, events: [] };
 	return input.groupBy
 		? { source: "runs", header, groups: [] }
 		: { source: "runs", header, rows: [] };
@@ -791,6 +859,7 @@ function eventSortKey(event: TimedEvent): CursorKey {
 function cursorOrder(input: AnalysisFindInput): CursorOrder {
 	if (input.source === "tool") return TOOL_GROUP_ORDER;
 	if (input.source === "user") return EVENT_ORDER;
+	if (input.source === "git") return GIT_ORDER;
 	return input.groupBy ? RUN_GROUP_ORDER : RUN_ORDER;
 }
 
