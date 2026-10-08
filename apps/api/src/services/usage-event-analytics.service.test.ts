@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { buildEstimatedCostSql } from "@rudel/api-routes";
 import {
 	buildLegacyUsageAnalyticsCte,
+	buildPricedUsageEventsCte,
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
 	getUsageAnalyticsQueryContext,
@@ -221,6 +222,19 @@ describe("usage-event analytics query contract", () => {
 			} else {
 				process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
 			}
+		}
+	});
+
+	test("picks each event's context band at its model's own threshold", () => {
+		const expected =
+			"multiIf(match(lowerUTF8(trimBoth(if(e.model_status = 'unresolved', e.raw_model, e.resolved_model))), '^claude-haiku-5-5(?:-\\\\d{8})?$'), 100000, 272000)";
+
+		for (const sql of [
+			buildPricedUsageEventsCte("1"),
+			buildUsageEventAnalyticsCte(),
+		]) {
+			expect(sql).toContain(`e.context_input_tokens > ${expected}`);
+			expect(sql).not.toContain("e.context_input_tokens > 272000");
 		}
 	});
 });

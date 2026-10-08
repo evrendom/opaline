@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	buildEstimatedCostSql,
 	calculateEstimatedCost,
+	getLongContextThresholdTokens,
 	renderModelPricingTable,
 	resolveCanonicalModelIdentity,
 	resolveModelPricing,
@@ -358,6 +359,94 @@ describe("model rate card", () => {
 		).toBe(0.275);
 	});
 
+	it("prices Claude Haiku 5.5 by prompt length from release", () => {
+		const model = "claude-haiku-5-5";
+		expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
+		expect(resolveCanonicalModelIdentity(`${model}[1m]`)?.model).toBe(model);
+		expect(resolveModelPricing(model, { at: "2026-10-06" })).toBeNull();
+		expect(getLongContextThresholdTokens(model)).toBe(100_000);
+
+		const base = {
+			inputPerMTok: 0.1,
+			cacheReadPerMTok: 0.01,
+			cacheWrite5mPerMTok: 0.125,
+			cacheWrite1hPerMTok: 0.2,
+			outputPerMTok: 0.5,
+		};
+		const long = {
+			inputPerMTok: 0.5,
+			cacheReadPerMTok: 0.05,
+			cacheWrite5mPerMTok: 0.625,
+			cacheWrite1hPerMTok: 1,
+			outputPerMTok: 2.5,
+		};
+		for (const [contextInputTokens, rates] of [
+			[undefined, base],
+			[100_000, base],
+			[100_001, long],
+			[900_000, long],
+		] as const) {
+			expect(
+				resolveModelPricing(model, { at: "2026-10-07", contextInputTokens }),
+			).toMatchObject(rates);
+		}
+
+		// The long band reprices every token class of the request, including
+		// the cached prefix that pushed the prompt over the threshold.
+		expect(
+			calculateEstimatedCost({
+				at: "2026-10-07",
+				model,
+				contextInputTokens: 150_000,
+				inputTokens: 40_000,
+				cacheReadInputTokens: 100_000,
+				cacheCreationInputTokens: 10_000,
+				outputTokens: 2_000,
+				precision: 6,
+			}),
+		).toBeCloseTo(0.02 + 0.005 + 0.00625 + 0.005, 6);
+
+		for (const contextInputTokens of [100_000, 100_001]) {
+			const standard = resolveModelPricing(model, {
+				at: "2026-10-07",
+				contextInputTokens,
+			});
+			expect(
+				resolveModelPricing(model, {
+					at: "2026-10-07",
+					contextInputTokens,
+					inferenceGeo: "us",
+				})?.outputPerMTok,
+			).toBeCloseTo((standard?.outputPerMTok ?? 0) * 1.1);
+		}
+		expect(
+			resolveModelPricing(model, { at: "2026-10-07", inferenceSpeed: "fast" }),
+		).toBeNull();
+
+		// Haiku 4.5 keeps its own flat rate; the new threshold is Haiku 5.5's.
+		expect(
+			resolveModelPricing("claude-haiku-4-5", {
+				at: "2026-10-07",
+				contextInputTokens: 150_000,
+			})?.inputPerMTok,
+		).toBe(1);
+		expect(getLongContextThresholdTokens("gpt-6-sol")).toBe(272_000);
+	});
+
+	it("sets a long-context threshold only on long rows, one per model", () => {
+		const thresholds = new Map<string, number | undefined>();
+		for (const entry of MODEL_RATE_CARD) {
+			if (entry.contextBand === "base") {
+				expect(entry.longContextAboveTokens).toBeUndefined();
+				continue;
+			}
+			if (thresholds.has(entry.model)) {
+				expect(entry.longContextAboveTokens).toBe(thresholds.get(entry.model));
+			}
+			thresholds.set(entry.model, entry.longContextAboveTokens);
+		}
+	});
+
 	it("selects published context bands explicitly", () => {
 		const base = resolveModelPricing("gpt-5.6-sol", {
 			at: "2026-08-01",
@@ -678,6 +767,8 @@ describe("model rate card", () => {
 
 		expect(sql).toContain("(context_input_tokens) > 272000");
 		expect(sql).toContain("(context_input_tokens) <= 272000");
+		expect(sql).toContain("(context_input_tokens) > 100000");
+		expect(sql).toContain("(context_input_tokens) <= 100000");
 		expect(sql).toContain("uncached_input_tokens");
 		expect(sql).toContain("cache_read_input_tokens");
 		expect(sql).toContain("cache_write_5m_input_tokens");

@@ -14,6 +14,7 @@ import {
 } from "./analytics-tenant.js";
 import {
 	buildEstimatedCostSql,
+	getLongContextThresholdTokens,
 	getModelPricingCatalog,
 	getModelPricingModifierCatalog,
 	MODEL_LONG_CONTEXT_THRESHOLD_TOKENS,
@@ -71,6 +72,9 @@ const EVENT_PRICING_RATE_CARD_SQL = buildEventPricingRateCardSql();
 const EVENT_CANONICAL_PRICING_MODEL_SQL =
 	buildCanonicalPricingModelSql("c.pricing_identity");
 const EVENT_LONG_CONTEXT_AVAILABLE_SQL = buildLongContextAvailableSql();
+const EVENT_LONG_CONTEXT_THRESHOLD_SQL = buildLongContextThresholdSql(
+	"if(e.model_status = 'unresolved', e.raw_model, e.resolved_model)",
+);
 // Stored unresolved events retain the provider's raw model. Resolve that identity
 // against today's dated catalog at read time; never infer prices from a session
 // label or relax conflicts, provider checks, or receipt consistency.
@@ -140,6 +144,30 @@ export function resolveCanonicalPricingModel(model: string): string {
 			),
 		)?.model ?? model
 	);
+}
+
+// The long band starts at the model's own threshold (Claude Haiku 5.5: above
+// 100,000 tokens), so it is chosen from the event's pricing identity before
+// grouping; models without an override keep the default.
+function buildLongContextThresholdSql(identityExpr: string): string {
+	const clauses = getModelPricingCatalog()
+		.filter(
+			(entry) =>
+				entry.contextBand === "long" &&
+				entry.longContextAboveTokens !== undefined,
+		)
+		.flatMap((entry) => [
+			entry.match
+				.map(
+					(pattern) =>
+						`match(lowerUTF8(trimBoth(${identityExpr})), '${escapeSqlString(pattern)}')`,
+				)
+				.join(" OR "),
+			String(getLongContextThresholdTokens(entry.model)),
+		]);
+	return clauses.length === 0
+		? String(MODEL_LONG_CONTEXT_THRESHOLD_TOKENS)
+		: `multiIf(${clauses.join(", ")}, ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS})`;
 }
 
 function buildLongContextAvailableSql(): string {
@@ -319,7 +347,7 @@ export function buildPricedUsageEventsCte(filters: string): string {
 	return `
 		analysis_usage_candidates AS (
 			SELECT e.*, if(e.model_status = 'unresolved', e.raw_model, e.resolved_model) AS pricing_identity,
-				if(e.context_input_tokens > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS}, 'long', 'base') AS context_band,
+				if(e.context_input_tokens > ${EVENT_LONG_CONTEXT_THRESHOLD_SQL}, 'long', 'base') AS context_band,
 				toUInt8(${PRICEABLE_EVENT_SQL}) AS is_priceable,
 				e.uncached_input_tokens AS group_uncached_input_tokens,
 				e.cache_read_input_tokens AS group_cache_read_input_tokens,
@@ -433,7 +461,7 @@ function buildPricingCandidatesSelect(
 				e.inference_speed,
 				e.inference_geo,
 				if(
-					e.context_input_tokens > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS},
+					e.context_input_tokens > ${EVENT_LONG_CONTEXT_THRESHOLD_SQL},
 					'long',
 					'base'
 				) AS context_band,

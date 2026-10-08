@@ -2,6 +2,9 @@ export type ModelPricingProvider = "anthropic" | "openai";
 
 export type ModelContextBand = "base" | "long";
 
+// Default start of a long band: a request whose full input context exceeds it
+// uses the model's "long" rows. A long row overrides it with
+// `longContextAboveTokens` when the provider sets its own threshold.
 export const MODEL_LONG_CONTEXT_THRESHOLD_TOKENS = 272_000;
 
 export type ModelRateCardEntry = {
@@ -12,6 +15,7 @@ export type ModelRateCardEntry = {
 	effectiveFrom: string;
 	effectiveTo?: string;
 	contextBand: ModelContextBand;
+	longContextAboveTokens?: number;
 	inputPerMTok: number;
 	cacheReadPerMTok: number | null;
 	cacheWrite5mPerMTok: number | null;
@@ -51,7 +55,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-09-30";
+export const MODEL_RATE_CARD_VERSION = "2026-10-08";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -1029,6 +1033,40 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 	// Anthropic: Claude Sonnet and Haiku
 	{
 		provider: "anthropic",
+		model: "claude-haiku-5-5",
+		displayName: "Claude Haiku 5.5",
+		match: ["^claude-haiku-5-5(?:-\\d{8})?$"],
+		effectiveFrom: "2026-10-07",
+		contextBand: "base",
+		inputPerMTok: 0.1,
+		cacheReadPerMTok: 0.01,
+		cacheWrite5mPerMTok: 0.125,
+		cacheWrite1hPerMTok: 0.2,
+		outputPerMTok: 0.5,
+		source: "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+		verifiedAt: "2026-10-08",
+		notes:
+			"Standard rate from release while the full prompt, cached tokens included, is at most 100,000 tokens.",
+	},
+	{
+		provider: "anthropic",
+		model: "claude-haiku-5-5",
+		displayName: "Claude Haiku 5.5",
+		match: ["^claude-haiku-5-5(?:-\\d{8})?$"],
+		effectiveFrom: "2026-10-07",
+		contextBand: "long",
+		longContextAboveTokens: 100_000,
+		inputPerMTok: 0.5,
+		cacheReadPerMTok: 0.05,
+		cacheWrite5mPerMTok: 0.625,
+		cacheWrite1hPerMTok: 1,
+		outputPerMTok: 2.5,
+		source: "https://platform.claude.com/docs/en/about-claude/pricing",
+		verifiedAt: "2026-10-08",
+		notes: "Full-request rates for prompts over 100,000 tokens.",
+	},
+	{
+		provider: "anthropic",
 		model: "claude-sonnet-5-5",
 		displayName: "Claude Sonnet 5.5",
 		match: ["^claude-sonnet-5-5(?:-\\d{8})?$"],
@@ -1457,6 +1495,18 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 			notes: "Anthropic US-only inference premium; all token classes stack.",
 		}),
 	),
+	{
+		provider: "anthropic",
+		model: "claude-haiku-5-5",
+		dimension: "inference_geo",
+		values: ["us"],
+		effectiveFrom: "2026-10-07",
+		multiplier: 1.1,
+		source: "https://platform.claude.com/docs/en/about-claude/pricing",
+		verifiedAt: "2026-10-08",
+		notes:
+			"Anthropic US-only inference premium; all token classes in both prompt-length bands stack.",
+	},
 	...[
 		["claude-opus-4-6", "2026-02-05"],
 		["claude-sonnet-4-6", "2026-02-17"],

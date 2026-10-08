@@ -78,6 +78,18 @@ function findCanonicalModelIdentity(
 	return null;
 }
 
+/**
+ * Input-context size above which `model` (a canonical rate-card model) uses its
+ * long rows. Exactly the threshold stays in the base band.
+ */
+export function getLongContextThresholdTokens(model: string): number {
+	return (
+		MODEL_RATE_CARD.find(
+			(entry) => entry.model === model && entry.contextBand === "long",
+		)?.longContextAboveTokens ?? MODEL_LONG_CONTEXT_THRESHOLD_TOKENS
+	);
+}
+
 export function resolveCanonicalModelIdentity(
 	model: string | null | undefined,
 ): CanonicalModelIdentity | null {
@@ -177,16 +189,19 @@ export function resolveModelPricing(
 ): ModelRateCardEntry | null {
 	const normalizedModel = normalizeModelId(model);
 	const date = normalizeDate(options.at);
-	const contextBand =
-		options.contextBand ??
-		(options.contextInputTokens !== undefined &&
-		options.contextInputTokens > MODEL_LONG_CONTEXT_THRESHOLD_TOKENS
-			? "long"
-			: "base");
 
 	if (!normalizedModel || date === null) {
 		return null;
 	}
+
+	const canonicalModel = findCanonicalModelIdentity(normalizedModel)?.model;
+	const contextBand =
+		options.contextBand ??
+		(options.contextInputTokens !== undefined &&
+		canonicalModel !== undefined &&
+		options.contextInputTokens > getLongContextThresholdTokens(canonicalModel)
+			? "long"
+			: "base");
 
 	let matchedEntry: ModelRateCardEntry | null = null;
 	for (const entry of MODEL_RATE_CARD) {
@@ -443,14 +458,11 @@ function buildCostSql({
 				(candidate) =>
 					candidate.model === entry.model && candidate.contextBand === "long",
 			);
+			const threshold = getLongContextThresholdTokens(entry.model);
 			if (entry.contextBand === "long") {
-				dateConditions.push(
-					`(${contextInputExpr}) > ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS}`,
-				);
+				dateConditions.push(`(${contextInputExpr}) > ${threshold}`);
 			} else if (hasLongBand) {
-				dateConditions.push(
-					`(${contextInputExpr}) <= ${MODEL_LONG_CONTEXT_THRESHOLD_TOKENS}`,
-				);
+				dateConditions.push(`(${contextInputExpr}) <= ${threshold}`);
 			}
 		}
 
