@@ -1,6 +1,6 @@
 # L1: the literal session schema
 
-L1 is the deterministic layer every analysis reads: what the transcripts, usage and GitHub recorded, normalized across Claude Code and Codex, with nothing inferred. The decision and its reasons are in [ADR 0002](adr/0002-literal-l1-for-analysis.md). This document is the target schema, where each fact comes from, what is missing today, and the order of work.
+L1 is the deterministic layer every analysis reads: what the transcripts, usage and GitHub recorded, normalized across Claude Code and Codex, with nothing inferred. The decisions and their reasons are in [ADR 0002](adr/0002-literal-l1-for-analysis.md) (literal facts) and [ADR 0003](adr/0003-l1-evidence-entities-edges.md) (evidence, entities and edges). This document is the target schema, where each fact comes from, what is missing today, and the order of work.
 
 ## Rules
 
@@ -9,6 +9,8 @@ L1 is the deterministic layer every analysis reads: what the transcripts, usage 
 3. **Replayable.** Facts come from the parser (`TRANSCRIPT_RECORDS_PARSER_VERSION`) over the stored raw transcript, kept for 365 days. Slimming keeps every record but replaces inline images with markers, and the secret filter redacts matched credentials, so only what survives both can be replayed. Adding a fact the stored transcript carries means a parser bump and `backfill:transcript-records`; facts the transcript never records (approved permission prompts) need capture.
 4. **Coverage is a fact.** What was not captured (a member who does not upload, a repository without the GitHub App, an extraction that hit its bounds) is stored and reported, not silently missing.
 5. **Narrow interface.** The analysis agent sees three views (`calls`, `runs`, `prompts`) behind `find`, a schema reference and premade queries. New facts add columns and enum values, not tools or parameters.
+6. **Evidence, entities, edges.** Evidence is immutable and replaced only by a new generation; entities (pull requests, commits, CI run attempts) are one full row per version; relationships are edge rows written by one reconciliation worker, each naming its `relation`, `basis` and witness `evidence_id`. Inferences are candidates, kept out of L1. `find` reads; it does not resolve.
+7. **ClickHouse for data, Postgres for control.** Everything analysis reads is in ClickHouse, including evidence captured through Postgres protocols (published as immutable copies). Postgres keeps auth, bindings, upload and sweep state, and the worker's queue, claims and watermarks.
 
 ## Views
 
@@ -91,7 +93,34 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 
 ## Sessions, pull requests and CI
 
-Connecting every session to the pull requests and CI runs it touched is required. Each link is a row that keeps the rule that made it, the literal values it matched, and how many candidates matched, so the agent can see a guess for what it is. Nothing is dropped because it did not match: an unmatched push stays a push with an empty match and a reason.
+Connecting every session, and the run inside it, to the commits, pull requests and CI runs it touched is required, in both directions: from a run to its pull requests and CI, and from a pull request to every run that created, pushed or named its commits. Each link is an edge row (ADR 0003) that keeps the relation, the basis, the literal values it matched, how many candidates matched and the evidence row that witnesses it, so the agent can see a guess for what it is. Nothing is dropped because it did not match: an unmatched push stays evidence with no edge and a reason.
+
+### Edges
+
+One table, `rudel.l1_edges`, holds every relationship, ordered by its source (`organization_id, from_kind, from_id, relation, to_kind, to_id, evidence_id`); a single-source materialized view copies it into `rudel.l1_edges_by_target`, ordered by target, for the reverse direction. Rows are full replacements versioned by `revision`, with `is_active = 0` for a retracted relationship. Kinds: `run` (`user/source/session/agent/run start record`: the raw record index stays stable while a transcript grows, so re-uploads keep the same ids; the generation an edge came from is a column), `session` (`user/source/session/agent`, for evidence that belongs to no run: PR snapshots, captures, Codex session metadata, observations before the first prompt; never assigned to a run by time), `commit` (`repository/full SHA`), `pull_request` (`repository/number`), `ci_run` (`repository/kind/run id/attempt`). Id components are percent-encoded. Each source keeps a resolution row per evidence row (`rudel.l1_edge_resolutions`: linked, unbound, not GitHub, no repository, ambiguous with its candidate count, not found), so evidence without an edge still says why.
+
+| Relation | From → to | Basis | Witness |
+|---|---|---|---|
+| `commit_created` | run → commit | `transcript` (commit output), `hook` | the observation or hook record |
+| `commit_pushed` | run → commit | `transcript` (push range), `hook` | the observation or hook record |
+| `commit_captured` | session → commit | `capture` (the capture's base or head commit; not proof of a push) | the capture |
+| `sha_mentioned` | run or session → commit | `transcript` (CI check `--commit`, Codex HEAD) | the observation |
+| `pr_named` | run → pull_request | `transcript` (PR URL, `gh pr create`, MCP, `gh pr checks <n>`) | the observation |
+| `pr_branch_head` | run → pull_request | `transcript` (pushed or checked branch is the PR's head) | the observation |
+| `pr_listed` | session → pull_request | `capture` (GitHub listed the PR for the captured commit) | the snapshot |
+| `ci_named` | run → ci_run | `transcript` (`gh run view|watch <id>`, MCP `run_id`) | the observation |
+| `ci_on_branch_window` | run → ci_run | `transcript` (a check names a branch; runs of the day before it) | the observation |
+| `commit_in_pr` | commit → pull_request | `github` (PR commits; `merge_commit` for a merged PR's merge SHA, never an open PR's test merge) | the membership or PR row |
+| `ci_on_sha` | commit → ci_run | `github` (run `head_sha`) | the run row |
+| `ci_for_pr` | pull_request → ci_run | `github` (`github_ci_run_pull_requests`, with GitHub's link basis) | the link row |
+
+A run's pull requests and CI runs are followed through these edges (run → commit → pull request → CI), never recomputed. An abbreviated SHA becomes a `commit` edge only when exactly one collected commit of the repository starts with it; otherwise the observation keeps its candidate count and no edge is written. Completeness of a run's CI is a property of the edges' coverage: a source's watermark says up to when its edges are complete.
+
+### Worker
+
+The reconciliation worker rebuilds a scope when an input changes: a session generation (git observations published, transcript reparsed, capture or snapshot published), a repository's pull requests or commits (sweep or webhook), or its CI runs. Its queue, claims, revisions and watermarks are Postgres rows; its output is ClickHouse rows. A rebuild is deterministic for its scope and the GitHub state it read, writes new revisions and retracts edges that no longer hold, and is fenced by purge tombstones. Run-side edges depend on GitHub data (a unique SHA prefix, a branch's PRs, a run's attempts), so a repository change re-queues the sessions that depend on it while they are open (14 days after their last evidence); older edges are frozen against the coverage recorded on their scope. An expired transcript never retracts edges.
+
+### Evidence it reads
 
 | Link | From | To | Rule stored with the row |
 |---|---|---|---|
@@ -110,7 +139,11 @@ Connecting every session to the pull requests and CI runs it touched is required
 | CI checked after push | `ci_check` observations after the push in the same stream | the push | the check command, exit code, delay |
 | Not covered | binding, readiness, retention boundary, last sync, observation receipt, new-branch push without SHA, a check without a target | the session | the reason (`github.status`, `ciRunCountUnknown`), never an empty result or a zero count |
 
-Git extractor version 3 records the `To <remote>` of each push, new-branch pushes, forced updates and `ci_check` calls (`unconfirmed` when the command does not show they ran). `find source=git` implements these links, pinned to the observation generation of each session's indexed transcript, with per-event GitHub coverage. A CI status read keeps the run id it names (`gh run view|watch <id>`, MCP `run_id`) in `run_id`. An event's CI count is the run attempts started before `ciRunCountThrough`, the earliest `coveredThrough` (end of the completed pulls, actions, attempts and external windows) of every repository its runs come from, a fork PR's base included. It is set only when every target the event names was looked up and each target's history starts inside that coverage: a PR's a day before its creation, a named run's at its creation, a branch check's at its window, and a SHA's at the commit observation of the session that created it. A SHA the session did not create has an unknown history, since a later PR or run on it does not date its earlier CI. Otherwise the count is null with the reason; runs found after the boundary are listed, not counted. Not yet stored: Claude `pr-link` and `gitOperation`, which parser v6 adds.
+Git extractor version 3 records the `To <remote>` of each push, new-branch pushes, forced updates and `ci_check` calls (`unconfirmed` when the command does not show they ran). Until the edge worker ships, `find source=git` computes these links at query time, pinned to the observation generation of each session's indexed transcript, with per-event GitHub coverage. A CI status read keeps the run id it names (`gh run view|watch <id>`, MCP `run_id`) in `run_id`. An event's CI count is the run attempts started before `ciRunCountThrough`, the earliest `coveredThrough` (end of the completed pulls, actions, attempts and external windows) of every repository its runs come from, a fork PR's base included. It is set only when every target the event names was looked up and each target's history starts inside that coverage: a PR's a day before its creation, a named run's at its creation, a branch check's at its window, and a SHA's at the commit observation of the session that created it. A SHA the session did not create has an unknown history, since a later PR or run on it does not date its earlier CI. Otherwise the count is null with the reason; runs found after the boundary are listed, not counted. Not yet stored: Claude `pr-link` and `gitOperation`, which parser v6 adds.
+
+### Capture for new sessions
+
+The CLI records exact ownership as evidence: before and after each git command an agent runs (Claude Code tool hooks), the ref positions and full object IDs it changed, with clone, worktree and agent process identity; Codex gets the same per turn from its turn-complete checkpoint. Old sessions keep the transcript and capture evidence they have. A commit whose committer time falls inside a run is a **candidate** (`rudel.l1_edge_candidates`, with the competing runs), never an edge, and trends compare periods on the same `basis`.
 
 ## GitHub evidence in L1
 
@@ -133,7 +166,7 @@ The CLI already captures CI workflows, `package.json` scripts, hooks, `AGENTS.md
 
 ## Scale
 
-Run facts are recomputed on every `find` today (`FINAL` over `transcript_records`, no text skip index), which is why `find` caps scope at 10,000 sessions and its text scans at 100,000 records or 64 MiB, on top of per-statement ClickHouse limits. `run_index` materializes `runs` per committed generation, written by a derived worker after receipt publication, covered by the purge and tombstone fence and by the retirement sweep like `transcript_records`. Weekly per-workspace aggregates sit on top for team-wide counts.
+Run facts and session links are recomputed on every `find` today (`FINAL` over `transcript_records`, no text skip index), which is why `find` caps scope at 10,000 sessions and its text scans at 100,000 records or 64 MiB, on top of per-statement ClickHouse limits. `run_index` materializes `runs` per committed generation, written by the same reconciliation worker after receipt publication, covered by the purge and tombstone fence and by the retirement sweep like `transcript_records`. Weekly per-workspace aggregates sit on top for team-wide counts.
 
 ## Retiring interpretations
 
@@ -153,11 +186,12 @@ Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery S
 
 1. This spec and step 1 of the retirement. Done.
 2. Retirement step 2. Done.
-3. Git extractor version 3 and the session, pull request and CI links, exposed to `find`.
-4. Retirement step 3 with the `session_analytics` migration.
-5. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill.
-6. `run_index`, coverage and retention; then retirement step 4 (`error_count`, regex skills).
-7. GitHub evidence and repository configuration in ClickHouse.
-8. `find` over `calls`, `runs` and `prompts`, the schema reference and premade queries in the plugin skill.
-9. The drift census and retirement step 5.
-10. Signals, from queries the analysis log shows recurring in kept answers.
+3. Git extractor version 3 and the session, pull request and CI links, exposed to `find` (computed at query time).
+4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
+5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse.
+6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills).
+7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill.
+8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
+9. GitHub evidence and repository configuration in ClickHouse.
+10. `find` over `calls`, `runs`, `prompts` and edges, the schema reference and premade queries in the plugin skill.
+11. The drift census and retirement step 5.
