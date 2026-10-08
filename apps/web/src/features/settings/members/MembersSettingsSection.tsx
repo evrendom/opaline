@@ -8,9 +8,9 @@ import {
 import { buildMembersSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
-import { WorkspaceInviteMemberCard } from "@/features/settings/workspace/components/WorkspaceInviteMemberCard";
-import { WorkspaceMembersCard } from "@/features/settings/workspace/components/WorkspaceMembersCard";
-import { WorkspaceOutgoingInvitationsCard } from "@/features/settings/workspace/components/WorkspaceOutgoingInvitationsCard";
+import { WorkspaceInviteMemberForm } from "@/features/settings/workspace/components/WorkspaceInviteMemberForm";
+import { WorkspaceMembersList } from "@/features/settings/workspace/components/WorkspaceMembersList";
+import { WorkspaceSentInvitations } from "@/features/settings/workspace/components/WorkspaceSentInvitations";
 import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-workspace-settings-data";
 import { TeamInviteLinkSurface } from "@/features/team/components/TeamInviteLinkSurface";
@@ -60,15 +60,27 @@ export function MembersSettingsSection() {
 
 			{!data.state.isPending && !data.state.isError && data.activeOrg ? (
 				<>
-					<WorkspaceMembersCard
-						members={data.fullOrg?.members ?? []}
-						canManage={data.canManage}
-						onInvalidate={data.invalidate}
-					/>
-					<WorkspaceInviteMemberCard
-						canManage={data.canManage}
-						onInvalidate={data.invalidate}
-					/>
+					{/* Members card: invite, then the roster, then any
+					    invitations still pending. */}
+					<WorkspaceSettingsGroup
+						title="Members"
+						description="Invite teammates by email. Admins and owners can manage members."
+					>
+						<WorkspaceInviteMemberForm
+							canManage={data.canManage}
+							onInvalidate={data.invalidate}
+						/>
+						<WorkspaceMembersList
+							members={data.fullOrg?.members ?? []}
+							canManage={data.canManage}
+							onInvalidate={data.invalidate}
+						/>
+						<WorkspaceSentInvitations
+							invitations={data.pendingInvitations}
+							canCancel={data.canManage}
+							onInvalidate={data.invalidate}
+						/>
+					</WorkspaceSettingsGroup>
 					<WorkspaceSettingsGroup
 						title="Invite link"
 						description="Share a link that lets teammates join this workspace as members."
@@ -85,11 +97,6 @@ export function MembersSettingsSection() {
 							</p>
 						)}
 					</WorkspaceSettingsGroup>
-					<WorkspaceOutgoingInvitationsCard
-						invitations={data.pendingInvitations}
-						canCancel={data.canManage}
-						onInvalidate={data.invalidate}
-					/>
 				</>
 			) : null}
 		</div>

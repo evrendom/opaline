@@ -1,4 +1,4 @@
-import { ChevronLeftIcon } from "lucide-react";
+import { IconChevronLeft } from "@tabler/icons-react";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { createPortal } from "react-dom";
 import { ProductBrand } from "@/features/shell/components/product-brand";
@@ -61,7 +61,7 @@ export function WelcomeBack({
 			onClick={onClick}
 			disabled={disabled}
 		>
-			<ChevronLeftIcon size={16} aria-hidden="true" />
+			<IconChevronLeft size={16} aria-hidden="true" />
 			Back
 		</button>
 	);

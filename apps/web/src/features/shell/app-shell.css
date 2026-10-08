@@ -1,0 +1,42 @@
+/* The product shell's canvas and window.
+   A flat canvas a shade darker than the window lets the window read as raised
+   with only a hairline shadow. Light only for now. Unlayered, like
+   app-surface.css, so it wins over the older dashboard-01 chrome rules. */
+
+.product-app-shell.dashboard-01-preview {
+	--sidebar: oklch(0.975 0 0);
+	--sidebar-foreground: oklch(0.145 0 0);
+	--sidebar-accent: oklch(0.95 0 0);
+	--sidebar-accent-foreground: oklch(0.205 0 0);
+}
+
+.product-app-shell .dashboard-01-window {
+	box-shadow: var(--custom-shadow);
+}
+
+/* Face for the sidebar and page header: the canonical InterVariable
+   from rsms/inter (OFL-1.1), with the optical-size axis the fontsource build
+   lacks, plus grayscale smoothing. Not scoped to .product-app-shell so the
+   demo and the mobile sheet get it too. */
+@font-face {
+	font-family: "InterVariable";
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+
+@font-face {
+	font-family: "InterVariable";
+	font-style: italic;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url("/fonts/InterVariable-Italic.woff2") format("woff2");
+}
+
+[data-slot="sidebar"],
+[data-slot="dashboard-header"] {
+	font-family: "InterVariable", var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}

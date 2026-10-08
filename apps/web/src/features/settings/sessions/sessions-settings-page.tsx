@@ -1,11 +1,10 @@
-import {
-	Copy01Icon,
-	Folder01Icon,
-	Search01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { RepositorySettings } from "@rudel/api-routes";
+import {
+	IconCheck,
+	IconCopy,
+	IconFolder,
+	IconSearch,
+} from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
@@ -14,6 +13,7 @@ import { Skeleton } from "@/app/ui/skeleton";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { orpc } from "@/lib/orpc";
+import "@/features/settings/components/settings-section.css";
 import "./sessions-settings.css";
 
 const MANAGE_COMMAND = "npx opaline@latest upload";
@@ -55,7 +55,7 @@ export function SessionsSettingsPage() {
 	return (
 		<div className="sessions-settings">
 			<section
-				className="sessions-settings-manage"
+				className="sessions-settings-manage settings-section-surface"
 				aria-labelledby="repository-upload-heading"
 			>
 				<h2 id="repository-upload-heading">Automatic uploads</h2>
@@ -73,11 +73,11 @@ export function SessionsSettingsPage() {
 						onClick={copyCommand}
 						aria-label="Copy repository management command"
 					>
-						<HugeiconsIcon
-							icon={copied ? Tick02Icon : Copy01Icon}
-							size={16}
-							aria-hidden="true"
-						/>
+						{copied ? (
+							<IconCheck size={16} aria-hidden="true" />
+						) : (
+							<IconCopy size={16} aria-hidden="true" />
+						)}
 						{copied ? "Copied" : "Copy"}
 					</Button>
 				</div>
@@ -87,6 +87,7 @@ export function SessionsSettingsPage() {
 				</p>
 			</section>
 			<section
+				className="settings-section-surface"
 				aria-labelledby="repository-list-heading"
 				aria-busy={query.isPending}
 			>
@@ -115,7 +116,7 @@ export function SessionsSettingsPage() {
 					computers.
 				</p>
 				<label className="sessions-settings-search">
-					<HugeiconsIcon icon={Search01Icon} size={16} aria-hidden="true" />
+					<IconSearch size={16} aria-hidden="true" />
 					<input
 						type="search"
 						name="repository-search"
@@ -161,11 +162,7 @@ export function SessionsSettingsPage() {
 											<tr key={repo.key}>
 												<td>
 													<div className="sessions-settings-repo">
-														<HugeiconsIcon
-															icon={Folder01Icon}
-															size={16}
-															aria-hidden="true"
-														/>
+														<IconFolder size={16} aria-hidden="true" />
 														<span
 															className="sessions-settings-repo-name"
 															title={repo.name}

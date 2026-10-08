@@ -12,7 +12,7 @@ import {
 	TraceSearchIcon,
 	TraceTerminalIcon,
 	TraceWrenchIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 
 export const CONVERSATION_TOOL_ICONS: Record<
 	ToolIconName,

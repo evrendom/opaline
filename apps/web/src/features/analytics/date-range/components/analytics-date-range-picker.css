@@ -1,3 +1,8 @@
+/* Range picker: a popover-sized squircle, a padded
+   preset column whose pick reads as a secondary chip, hairline dividers, and
+   month captions centred between edge arrows. Opaline keeps its interval
+   column, its Cancel/Apply footer, its fluid hover and its pebble-shaped
+   selected days. */
 .session-date-picker {
 	--ring: var(--session-menu-accent);
 	width: fit-content;
@@ -14,11 +19,8 @@
 	display: flex;
 	flex: none;
 	flex-direction: column;
+	gap: 4px;
 	width: 100%;
-}
-
-.session-date-picker-presets .session-menu-row[aria-pressed="true"]::before {
-	background: var(--session-menu-highlight);
 }
 
 .session-date-picker-divider {
@@ -37,24 +39,24 @@
 	--cell-size: 32px;
 	width: 100%;
 	padding: 8px 0 0;
-	font-size: 13px;
-	font-weight: 450;
+	font-size: 14px;
+	font-weight: 400;
 	color: var(--session-menu-label);
 }
 
 .session-date-picker-month-label {
-	font-size: 13px;
-	font-weight: 450;
+	font-size: 14px;
+	font-weight: 500;
 	line-height: 20px;
 	color: var(--session-menu-label);
 }
 
 .session-date-picker-weekday {
 	flex: 1;
-	font-size: 12px;
-	font-weight: 450;
+	font-size: 13px;
+	font-weight: 400;
 	line-height: 16px;
-	color: var(--session-menu-icon);
+	color: color-mix(in oklch, var(--session-menu-icon) 60%, transparent);
 }
 
 .session-date-picker-calendar .rdp-day_weekends {
@@ -77,8 +79,8 @@
 
 .session-date-picker-calendar button[data-day] {
 	border-radius: 9999px;
-	font-size: 13px;
-	font-weight: 450;
+	font-size: 14px;
+	font-weight: 400;
 	box-shadow: none;
 	outline: none;
 }
@@ -93,6 +95,21 @@
 
 .session-date-picker-calendar button[data-range-middle="true"] {
 	border-radius: 0;
+}
+
+/* Range band: where a week row starts or ends inside the range,
+   the band's outer corners round off (its --radius-md), so each row reads as
+   its own segment rather than running off the grid edge. */
+.session-date-picker-calendar td:first-child[data-selected="true"]
+	button[data-range-middle="true"] {
+	border-top-left-radius: 8px;
+	border-bottom-left-radius: 8px;
+}
+.session-date-picker-calendar
+	td:last-child[data-selected="true"]
+	button[data-range-middle="true"] {
+	border-top-right-radius: 8px;
+	border-bottom-right-radius: 8px;
 }
 
 /* Selected today must keep the same range cap as any other endpoint. */
@@ -181,8 +198,8 @@
 	height: 32px;
 	padding: 0 12px;
 	border-radius: 8px;
-	font-size: 13px;
-	font-weight: 450;
+	font-size: 14px;
+	font-weight: 400;
 	box-shadow: none;
 }
 
@@ -198,7 +215,7 @@
 
 @media (min-width: 768px) {
 	.session-date-picker-presets {
-		width: 175px;
+		width: 160px;
 	}
 	.session-date-picker-divider {
 		width: var(--session-menu-hairline);
@@ -206,5 +223,47 @@
 	}
 	.session-date-picker-calendar {
 		height: 298px;
+	}
+}
+
+/* The picker's option columns (presets, interval) pad their rows like
+   Preset buttons: 12px around, rows with their own rounded fill. */
+.session-date-picker .session-menu-list {
+	padding: 12px;
+}
+.session-date-picker .session-menu-list .session-menu-row {
+	padding: 0 12px;
+}
+.session-date-picker .session-menu-list .session-menu-row::before,
+.session-menu-surface.session-date-picker
+	.session-menu-list
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: 6px;
+}
+.session-date-picker
+	.session-menu-list
+	.session-menu-row[aria-pressed="true"]::before,
+.session-date-picker
+	.session-menu-list
+	.session-menu-row:has(:checked)::before {
+	background: var(--session-menu-selected);
+	box-shadow: var(--custom-shadow-secondary);
+}
+
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	/* A popover's 24px squircle; its rows and buttons sit concentric at 12px. */
+	.session-menu-surface.session-date-picker {
+		border-radius: 24px;
+	}
+	.session-date-picker .session-menu-list .session-menu-row::before,
+	.session-menu-surface.session-date-picker
+		.session-menu-list
+		.fluid-menu-hover-fill::before,
+	.session-date-picker-action {
+		border-radius: 12px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
 	}
 }

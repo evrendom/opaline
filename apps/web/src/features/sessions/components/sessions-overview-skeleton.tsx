@@ -31,7 +31,7 @@ export function SessionsOverviewSkeleton({
 				<div
 					key={rowId}
 					className={cn(
-						"grid h-9",
+						"grid h-12",
 						showSkillsColumn
 							? SESSION_OVERVIEW_GRID_CLASS_NAME
 							: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,

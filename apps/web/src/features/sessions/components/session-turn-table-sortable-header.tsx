@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type {
 	SessionTurnTableSortKey,
@@ -43,9 +43,12 @@ export function SessionTurnTableSortableHeader({
 					<span className="min-w-0 truncate">{label}</span>
 					{isActive ? (
 						sort.direction === "asc" ? (
-							<ChevronUp aria-hidden="true" className="size-3.5 shrink-0" />
+							<IconChevronUp aria-hidden="true" className="size-3.5 shrink-0" />
 						) : (
-							<ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+							<IconChevronDown
+								aria-hidden="true"
+								className="size-3.5 shrink-0"
+							/>
 						)
 					) : null}
 				</span>

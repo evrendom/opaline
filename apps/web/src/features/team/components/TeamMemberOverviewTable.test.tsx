@@ -98,7 +98,7 @@ describe("TeamMemberOverviewTable", () => {
 		expect(tableRows[2]).toHaveClass("h-16");
 	});
 
-	it("keeps an exact 64px horizontal gutter around the table", () => {
+	it("runs the table full-bleed with its outer cells on the 32px gutter", () => {
 		render(
 			<TeamMemberOverviewTable
 				canInviteTeamMembers={false}
@@ -107,7 +107,12 @@ describe("TeamMemberOverviewTable", () => {
 			/>,
 		);
 
-		expect(screen.getByRole("table").parentElement).toHaveClass("px-16");
+		// Tables: no inset around the table; the first and last cells
+		// pad to the page gutter instead.
+		const table = screen.getByRole("table");
+		expect(table.parentElement).not.toHaveClass("px-16");
+		expect(table).toHaveClass("[&_tr>*:first-child]:pl-8");
+		expect(table).toHaveClass("[&_tr>*:last-child]:pr-8");
 	});
 
 	it("shows the top three models and collapses the remainder into a count", () => {

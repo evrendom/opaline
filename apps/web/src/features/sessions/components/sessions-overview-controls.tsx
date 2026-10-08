@@ -16,14 +16,8 @@ export function SessionsOverviewControls({
 		<div
 			inert={inert}
 			data-slot="sessions-overview-controls"
-			className="pointer-events-auto flex shrink-0 items-center gap-1"
+			className="pointer-events-none flex min-w-0 flex-1 items-center gap-2 *:pointer-events-auto"
 		>
-			{showDateControl ? (
-				<DashboardDateControls
-					className="h-7 shrink-0 gap-1.5 rounded-md border-0 bg-(--session-overview-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--session-overview-text) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--session-overview-hover) focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent) has-data-[icon=inline-start]:pl-1.5 aria-expanded:bg-(--session-overview-hover) sm:h-7 sm:text-sm dark:bg-(--session-overview-surface) dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent] dark:hover:bg-(--session-overview-hover) [&_svg]:size-4 [&_svg]:h-lh [&_svg]:text-[#5d5d5d] dark:[&_svg]:text-[#acaeb2]"
-					sourceComponent="sessions_date_picker"
-				/>
-			) : null}
 			<SessionsOverviewSortMenu
 				activeSortLabel={tableState.activeSortLabel}
 				onSortChange={tableState.changeSort}
@@ -52,6 +46,12 @@ export function SessionsOverviewControls({
 					rangeFilterValues={tableState.rangeFilterValues}
 				/>
 			)}
+			{/* The range control trails at the toolbar's right. */}
+			{showDateControl ? (
+				<div className="ml-auto">
+					<DashboardDateControls sourceComponent="sessions_date_picker" />
+				</div>
+			) : null}
 		</div>
 	);
 }

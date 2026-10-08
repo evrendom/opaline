@@ -1,3 +1,4 @@
+import { IconMail } from "@tabler/icons-react";
 import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/app/ui/button";
@@ -10,13 +11,16 @@ import {
 	SelectValue,
 } from "@/app/ui/select";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import { WorkspaceRoleLabel } from "@/features/settings/workspace/components/workspace-role-label";
 import {
-	WorkspaceSettingsGroup,
-	WorkspaceSettingsRow,
+	WorkspaceSettingsField,
+	WorkspaceSettingsFields,
 } from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
-export function WorkspaceInviteMemberCard({
+// Invite row: email, role and Invite at the top of the
+// Members card.
+export function WorkspaceInviteMemberForm({
 	canManage,
 	onInvalidate,
 }: {
@@ -91,16 +95,13 @@ export function WorkspaceInviteMemberCard({
 
 	return (
 		<form onSubmit={inviteMember}>
-			<WorkspaceSettingsGroup
-				title="Invite member"
-				description="Invite a teammate by email and choose their workspace role."
-			>
-				{!canManage ? (
-					<p className="workspace-settings-empty">
-						Only admins and owners can invite new members.
-					</p>
-				) : null}
-				<WorkspaceSettingsRow label="Email" controlId={emailId}>
+			{!canManage ? (
+				<p className="workspace-settings-empty">
+					Only admins and owners can invite new members.
+				</p>
+			) : null}
+			<WorkspaceSettingsFields>
+				<WorkspaceSettingsField label="Email" controlId={emailId}>
 					<Input
 						id={emailId}
 						type="email"
@@ -116,8 +117,8 @@ export function WorkspaceInviteMemberCard({
 						disabled={!canManage || isInviting}
 						required
 					/>
-				</WorkspaceSettingsRow>
-				<WorkspaceSettingsRow label="Role" controlId={roleId}>
+				</WorkspaceSettingsField>
+				<WorkspaceSettingsField label="Role" controlId={roleId} size="compact">
 					<Select
 						value={inviteRole}
 						onValueChange={(value) => {
@@ -127,65 +128,66 @@ export function WorkspaceInviteMemberCard({
 					>
 						<SelectTrigger id={roleId}>
 							<SelectValue>
-								{inviteRole === "admin" ? "Admin" : "Member"}
+								<WorkspaceRoleLabel value={inviteRole} />
 							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="member">Member</SelectItem>
-							<SelectItem value="admin">Admin</SelectItem>
+							<SelectItem value="member">
+								<WorkspaceRoleLabel value="member" />
+							</SelectItem>
+							<SelectItem value="admin">
+								<WorkspaceRoleLabel value="admin" />
+							</SelectItem>
 						</SelectContent>
 					</Select>
-				</WorkspaceSettingsRow>
-				<div className="workspace-settings-actions">
-					<Button
-						type="submit"
-						size="sm"
-						disabled={
-							!canManage || isInviting || inviteEmail.trim().length === 0
-						}
-					>
-						{isInviting ? "Sending invite…" : "Send invite"}
-					</Button>
-				</div>
-				{inviteLink ? (
-					<div className="workspace-settings-link-surface">
-						<p className="workspace-settings-status">
-							{invitedEmail
-								? `Share this link with ${invitedEmail}.`
-								: "Share this link with the invited member."}
-						</p>
-						<div className="workspace-settings-link-value">
-							<Input
-								aria-label="Email invitation link"
-								value={inviteLink}
-								readOnly
-							/>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => void copyInviteLink()}
-							>
-								{copiedInviteLink ? "Copied" : "Copy link"}
-							</Button>
-						</div>
-						<div className="workspace-settings-link-actions">
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								onClick={() => {
-									setInviteLink(null);
-									setInvitedEmail(null);
-									setCopiedInviteLink(false);
-								}}
-							>
-								Dismiss
-							</Button>
-						</div>
+				</WorkspaceSettingsField>
+				<Button
+					type="submit"
+					size="sm"
+					disabled={!canManage || isInviting || inviteEmail.trim().length === 0}
+				>
+					<IconMail aria-hidden="true" />
+					{isInviting ? "Inviting…" : "Invite"}
+				</Button>
+			</WorkspaceSettingsFields>
+			{inviteLink ? (
+				<div className="workspace-settings-link-surface">
+					<p className="workspace-settings-status">
+						{invitedEmail
+							? `Share this link with ${invitedEmail}.`
+							: "Share this link with the invited member."}
+					</p>
+					<div className="workspace-settings-link-value">
+						<Input
+							aria-label="Email invitation link"
+							value={inviteLink}
+							readOnly
+						/>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => void copyInviteLink()}
+						>
+							{copiedInviteLink ? "Copied" : "Copy link"}
+						</Button>
 					</div>
-				) : null}
-			</WorkspaceSettingsGroup>
+					<div className="workspace-settings-link-actions">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onClick={() => {
+								setInviteLink(null);
+								setInvitedEmail(null);
+								setCopiedInviteLink(false);
+							}}
+						>
+							Dismiss
+						</Button>
+					</div>
+				</div>
+			) : null}
 		</form>
 	);
 }

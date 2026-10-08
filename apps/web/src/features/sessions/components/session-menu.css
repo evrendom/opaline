@@ -1,24 +1,24 @@
-/* Measured from the live reference. These tokens are scoped to session menus. */
+/* Menu surface (dropdown-menu / popover): a borderless
+   popover on its soft hairline shadow, squircle corners, a 4px list inset and
+   compact 14px rows. Opaline keeps its pebble checks, black accent and fluid
+   hover. These tokens are scoped to session menus. */
 .session-menu-popover,
 .session-menu-surface {
 	--session-menu-hairline: 1px;
-	--session-menu-background: lch(100 0 282);
-	--session-menu-border: lch(91.9 0 282);
-	--session-menu-label: lch(20 1 282);
-	--session-menu-focused-label: lch(10 0 282);
-	--session-menu-icon: lch(40 1 282);
-	--session-menu-highlight: lch(95 0 282);
+	--session-menu-background: oklch(1 0 0);
+	--session-menu-border: #efefef;
+	--session-menu-label: oklch(0.145 0 0);
+	--session-menu-focused-label: oklch(0.145 0 0);
+	--session-menu-icon: oklch(0.556 0 0);
+	--session-menu-highlight: oklch(0.97 0 0);
+	--session-menu-selected: oklch(0.95 0 0);
 	--session-menu-accent: #000;
 	--session-menu-check: #fff;
 	--session-menu-checkbox-border: lch(54.1 0 282);
-	--session-menu-parent-shadow:
-		0 6px 18px lch(0 0 0 / 0.02), 0 3px 9px lch(0 0 0 / 0.04),
-		0 1px 1px lch(0 0 0 / 0.04);
-	--session-menu-child-shadow:
-		0 9px 48px lch(0 0 0 / 0.08), 0 6px 24px lch(0 0 0 / 0.1),
-		0 1px 1px lch(0 0 0 / 0.04);
+	--session-menu-parent-shadow: var(--custom-shadow);
+	--session-menu-child-shadow: var(--custom-shadow);
 	font-family: "Inter Variable", sans-serif;
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 400;
 	line-height: 1.5;
 	letter-spacing: normal;
@@ -42,6 +42,7 @@
 	--session-menu-focused-label: #f4f4f5;
 	--session-menu-icon: #b8b8ba;
 	--session-menu-highlight: #2b2b2d;
+	--session-menu-selected: #333335;
 	--session-menu-checkbox-border: #77777b;
 	--session-menu-accent: #f4f4f5;
 	--session-menu-check: #1c1c1d;
@@ -64,11 +65,20 @@
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
-	border: var(--session-menu-hairline) solid var(--session-menu-border);
-	border-radius: 12px;
+	border: 0;
+	border-radius: 8px;
 	background: var(--session-menu-background);
 	box-shadow: var(--session-menu-parent-shadow);
 	outline: none;
+}
+/* Squircle corners where supported: a dropdown's 16px (rounded-2xl). */
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.session-menu-surface {
+		border-radius: 16px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
 }
 
 .session-menu-parent {
@@ -79,7 +89,7 @@
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-width: thin;
-	padding: 6px 0;
+	padding: 4px 0;
 }
 .session-menu-list > ul {
 	margin: 0;
@@ -93,7 +103,7 @@
 	align-items: center;
 	gap: 14px;
 	height: calc(36px + var(--session-menu-hairline));
-	padding: 0 12px 0 14px;
+	padding: 0 12px;
 	border-bottom: var(--session-menu-hairline) solid var(--session-menu-border);
 }
 .session-menu-search input {
@@ -108,7 +118,7 @@
 	background: transparent;
 	color: var(--session-menu-label);
 	font:
-		400 13px / normal "Inter Variable",
+		400 14px / normal "Inter Variable",
 		sans-serif;
 	letter-spacing: normal;
 	box-shadow: none;
@@ -144,18 +154,18 @@
 	height: 32px;
 	min-height: 32px;
 	flex-shrink: 0;
-	padding: 0 18px 0 14px;
+	padding: 0 16px 0 12px;
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	color: var(--session-menu-label);
 	font:
-		450 13px / normal "Inter Variable",
+		400 14px / normal "Inter Variable",
 		sans-serif;
 	letter-spacing: normal;
 	text-align: left;
 	white-space: nowrap;
-	cursor: default;
+	cursor: pointer;
 	outline: none;
 	user-select: none;
 	transition: color 100ms ease-in-out;
@@ -163,9 +173,9 @@
 .session-menu-row::before {
 	content: "";
 	position: absolute;
-	inset: 0 6px;
+	inset: 0 4px;
 	z-index: -1;
-	border-radius: 8px;
+	border-radius: 6px;
 	pointer-events: none;
 }
 .session-menu-row:is(
@@ -186,6 +196,21 @@
 	)::before {
 	background: var(--session-menu-highlight);
 }
+/* A filter that's been changed reads like the toolbar's active Filter button:
+   its icon and label take the accent, with a dot before the chevron. */
+.session-menu-row[data-active="true"] {
+	color: var(--session-menu-focused-label);
+}
+.session-menu-row[data-active="true"] > .session-menu-icon:first-child {
+	color: var(--session-menu-accent);
+}
+.session-menu-active-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--session-menu-accent);
+}
 .session-menu-row:disabled {
 	color: var(--session-menu-icon);
 	pointer-events: none;
@@ -199,7 +224,7 @@
 }
 .session-menu-separator {
 	position: relative;
-	height: 12px;
+	height: 9px;
 	flex: none;
 }
 .session-menu-separator::before {
@@ -286,15 +311,15 @@
 	width: calc(206px + 2 * var(--session-menu-hairline));
 	max-height: var(--available-height);
 	overflow-y: auto;
-	padding: 6px 0;
+	padding: 4px 0;
 	transform-origin: var(--transform-origin);
 }
 .session-menu-sort .session-menu-row {
-	padding-left: 38px;
+	padding-left: 36px;
 }
 .session-menu-sort-check {
 	position: absolute;
-	left: 14px;
+	left: 12px;
 	display: flex;
 	align-items: center;
 	color: var(--session-menu-icon);
@@ -442,8 +467,8 @@
 .session-menu-surface .fluid-menu-hover-fill::before {
 	content: "";
 	position: absolute;
-	inset: 0 6px;
-	border-radius: 8px;
+	inset: 0 4px;
+	border-radius: 6px;
 	background: var(--session-menu-highlight);
 }
 .session-menu-row[data-fluid-menu-item]::before {

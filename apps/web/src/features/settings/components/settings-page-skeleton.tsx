@@ -44,14 +44,14 @@ export function SettingsPageSkeleton({
 				</div>
 			) : routeId === "workspace" ? (
 				<>
-					<WorkspaceSettingsGroup title="Workspace" hideTitle>
+					<WorkspaceSettingsGroup title="Workspace">
 						{["Name", "Slug"].map((label) => (
 							<WorkspaceSettingsRow key={label} label={label}>
 								<Skeleton />
 							</WorkspaceSettingsRow>
 						))}
 					</WorkspaceSettingsGroup>
-					<WorkspaceSettingsGroup title="Danger zone">
+					<WorkspaceSettingsGroup title="Danger zone" tone="danger">
 						<WorkspaceSettingsRow
 							label="Delete workspace"
 							description="Permanently delete this workspace and its session data for every member. This cannot be undone."
@@ -62,7 +62,7 @@ export function SettingsPageSkeleton({
 				</>
 			) : routeId === "members" ? (
 				<>
-					<WorkspaceSettingsGroup title="Members" hideTitle>
+					<WorkspaceSettingsGroup title="Members">
 						{["first", "second", "third", "fourth"].map((key) => (
 							<MemberRowSkeleton key={key} />
 						))}
@@ -136,7 +136,7 @@ export function SettingsPageSkeleton({
 							<Skeleton className="h-5 w-64 max-w-full rounded" />
 						</div>
 					</WorkspaceSettingsGroup>
-					<WorkspaceSettingsGroup title="Danger zone">
+					<WorkspaceSettingsGroup title="Danger zone" tone="danger">
 						<WorkspaceSettingsRow
 							label="Delete account"
 							description="Permanently delete your account and all related data. This cannot be undone."

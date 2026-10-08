@@ -2,29 +2,32 @@ import { type ReactNode, useId } from "react";
 import "./workspace-settings.css";
 import "../../components/settings-section.css";
 
+/** A card: the section's title and description head the
+ * card, its rows follow. */
 export function WorkspaceSettingsGroup({
 	title,
 	description,
-	hideTitle = false,
+	tone = "default",
 	children,
 }: {
 	title: string;
 	description?: string;
-	hideTitle?: boolean;
+	/** Danger zones title their card in the destructive color. */
+	tone?: "default" | "danger";
 	children: ReactNode;
 }) {
 	const titleId = useId();
 	return (
-		<section className="workspace-settings-group" aria-labelledby={titleId}>
-			<div
-				className={hideTitle ? "sr-only" : "workspace-settings-group-heading"}
-			>
+		<section
+			className="workspace-settings-group settings-section-surface"
+			aria-labelledby={titleId}
+			data-tone={tone === "danger" ? "danger" : undefined}
+		>
+			<div className="workspace-settings-group-heading">
 				<h2 id={titleId}>{title}</h2>
 				{description ? <p>{description}</p> : null}
 			</div>
-			<div className="workspace-settings-group-rows settings-section-surface">
-				{children}
-			</div>
+			<div className="workspace-settings-group-rows">{children}</div>
 		</section>
 	);
 }
@@ -55,6 +58,36 @@ export function WorkspaceSettingsRow({
 				) : null}
 			</div>
 			<div className="workspace-settings-row-control">{children}</div>
+		</div>
+	);
+}
+
+/** Fields: label over control, laid side by side and
+ * bottom-aligned so a trailing button lines up with the inputs. */
+export function WorkspaceSettingsFields({ children }: { children: ReactNode }) {
+	return <div className="workspace-settings-fields">{children}</div>;
+}
+
+export function WorkspaceSettingsField({
+	label,
+	controlId,
+	size = "fill",
+	children,
+}: {
+	label: ReactNode;
+	controlId?: string;
+	/** `fill` shares the row; `compact` fits a short control like a role. */
+	size?: "fill" | "compact";
+	children: ReactNode;
+}) {
+	return (
+		<div className="workspace-settings-field" data-size={size}>
+			{controlId ? (
+				<label htmlFor={controlId}>{label}</label>
+			) : (
+				<div>{label}</div>
+			)}
+			{children}
 		</div>
 	);
 }

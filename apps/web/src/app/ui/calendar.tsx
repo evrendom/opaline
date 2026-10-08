@@ -1,9 +1,8 @@
 import {
-	ArrowDownIcon,
-	ArrowLeftIcon,
-	ArrowRightIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+	IconChevronDown,
+	IconChevronLeft,
+	IconChevronRight,
+} from "@tabler/icons-react";
 import * as React from "react";
 import {
 	type DayButton,
@@ -154,20 +153,13 @@ function Calendar({
 				Chevron: ({ className, orientation, ...props }) => {
 					if (orientation === "left") {
 						return (
-							<HugeiconsIcon
-								icon={ArrowLeftIcon}
-								strokeWidth={2}
-								className={cn("size-4", className)}
-								{...props}
-							/>
+							<IconChevronLeft className={cn("size-4", className)} {...props} />
 						);
 					}
 
 					if (orientation === "right") {
 						return (
-							<HugeiconsIcon
-								icon={ArrowRightIcon}
-								strokeWidth={2}
+							<IconChevronRight
 								className={cn("size-4", className)}
 								{...props}
 							/>
@@ -175,12 +167,7 @@ function Calendar({
 					}
 
 					return (
-						<HugeiconsIcon
-							icon={ArrowDownIcon}
-							strokeWidth={2}
-							className={cn("size-4", className)}
-							{...props}
-						/>
+						<IconChevronDown className={cn("size-4", className)} {...props} />
 					);
 				},
 				DayButton: ({ ...props }) => (

@@ -1,3 +1,4 @@
+import { Avatar, AvatarFallback } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { WorkspaceSettingsRow } from "@/features/settings/workspace/components/workspace-settings-group";
 
@@ -38,22 +39,35 @@ export function WorkspaceOutgoingInvitationsTable({
 		<ul className="workspace-settings-list" aria-label="Outgoing invitations">
 			{invitations.map((invitation) => (
 				<li key={invitation.id}>
+					{/* Sent invitation: who, their role, and revoke. */}
 					<WorkspaceSettingsRow
-						label={<span className="break-all">{invitation.email}</span>}
-						description={`${invitation.role || "Member"} · Sent ${formatDate(invitation.createdAt)}`}
+						label={
+							<div className="workspace-settings-member-identity">
+								<Avatar size="sm">
+									<AvatarFallback>
+										{invitation.email.slice(0, 2).toUpperCase()}
+									</AvatarFallback>
+								</Avatar>
+								<div className="workspace-settings-member-copy">
+									<span className="break-all">{invitation.email}</span>
+									<span>Sent {formatDate(invitation.createdAt)}</span>
+								</div>
+							</div>
+						}
 					>
+						<span className="workspace-settings-badge capitalize">
+							{invitation.role || "member"}
+						</span>
 						{canCancel ? (
 							<Button
 								type="button"
 								variant="outline"
 								size="sm"
-								aria-label={`Cancel invitation to ${invitation.email}`}
+								aria-label={`Revoke invitation to ${invitation.email}`}
 								onClick={() => onCancel(invitation.id)}
 								disabled={pendingInvitationId !== null}
 							>
-								{pendingInvitationId === invitation.id
-									? "Canceling…"
-									: "Cancel"}
+								{pendingInvitationId === invitation.id ? "Revoking…" : "Revoke"}
 							</Button>
 						) : (
 							<span className="workspace-settings-status">Pending</span>

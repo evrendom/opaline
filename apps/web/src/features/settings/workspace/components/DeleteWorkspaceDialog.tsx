@@ -1,5 +1,5 @@
+import { IconAlertTriangle, IconLoader2 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/app/ui/button";
 import {
@@ -71,7 +71,7 @@ function DeleteWorkspaceDialogBody({
 		<DialogContent>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
-					<AlertTriangleIcon className="text-destructive" />
+					<IconAlertTriangle className="text-destructive" />
 					Delete workspace
 				</DialogTitle>
 				<DialogDescription>
@@ -83,7 +83,7 @@ function DeleteWorkspaceDialogBody({
 			<div className="flex flex-col gap-4">
 				{isLoading ? (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
-						<Loader2Icon className="animate-spin" />
+						<IconLoader2 className="animate-spin" />
 						Checking workspace data…
 					</div>
 				) : (
@@ -125,7 +125,7 @@ function DeleteWorkspaceDialogBody({
 					disabled={!canDelete}
 				>
 					{isDeleting ? (
-						<Loader2Icon data-icon="inline-start" className="animate-spin" />
+						<IconLoader2 data-icon="inline-start" className="animate-spin" />
 					) : null}
 					Delete workspace
 				</Button>

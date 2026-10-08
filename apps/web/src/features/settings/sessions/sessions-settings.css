@@ -1,16 +1,20 @@
 .sessions-settings {
 	display: flex;
 	flex-direction: column;
-	gap: 36px;
+	gap: 24px;
 	padding-bottom: 32px;
 	font-size: 14px;
 	line-height: 1.5;
+}
+/* Each section is a card (see settings-section.css). */
+.sessions-settings > section {
+	padding: 20px;
 }
 .sessions-settings h2 {
 	margin: 0;
 	font-size: 14px;
 	line-height: 20px;
-	font-weight: 550;
+	font-weight: 500;
 	color: var(--foreground);
 }
 .sessions-settings p {

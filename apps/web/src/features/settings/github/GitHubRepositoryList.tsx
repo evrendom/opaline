@@ -1,6 +1,5 @@
-import { Folder01Icon, Search01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { GitHubRepositoryConnectionStatus } from "@rudel/api-routes";
+import { IconFolder, IconSearch } from "@tabler/icons-react";
 import { useState } from "react";
 import "@/features/settings/sessions/sessions-settings.css";
 
@@ -44,7 +43,7 @@ export function GitHubRepositoryList({
 						: null}
 				</p>
 				<label className="sessions-settings-search">
-					<HugeiconsIcon icon={Search01Icon} size={16} aria-hidden="true" />
+					<IconSearch size={16} aria-hidden="true" />
 					<input
 						type="search"
 						name="github-repository-search"
@@ -68,11 +67,7 @@ export function GitHubRepositoryList({
 								<tr key={repository.repositoryId}>
 									<td>
 										<div className="sessions-settings-repo">
-											<HugeiconsIcon
-												icon={Folder01Icon}
-												size={16}
-												aria-hidden="true"
-											/>
+											<IconFolder size={16} aria-hidden="true" />
 											<span
 												className="sessions-settings-repo-name"
 												title={`${repository.owner}/${repository.name}`}

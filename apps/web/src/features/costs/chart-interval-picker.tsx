@@ -1,5 +1,4 @@
-import { Tick02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCheck } from "@tabler/icons-react";
 import { useId } from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
@@ -32,9 +31,7 @@ export function ChartIntervalPicker({
 							onChange={() => onChange(option.value)}
 							className="sr-only"
 						/>
-						<HugeiconsIcon
-							icon={Tick02Icon}
-							strokeWidth={2}
+						<IconCheck
 							aria-hidden="true"
 							className="session-menu-icon size-3.5 shrink-0"
 						/>

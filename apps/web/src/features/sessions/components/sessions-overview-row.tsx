@@ -1,6 +1,5 @@
-import { AlertCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { SessionAnalytics } from "@rudel/api-routes";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -28,6 +27,7 @@ import {
 	getSessionOverviewCost,
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
 	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
+	SESSION_OVERVIEW_ROW_HEIGHT,
 } from "@/features/sessions/components/sessions-overview-table-utils";
 import {
 	type UseFluidHoverReturn,
@@ -417,12 +417,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 								: `${formatNumber(errorCount)} detected tool/API ${errorCount === 1 ? "error" : "errors"}`
 						}
 					>
-						<HugeiconsIcon
-							aria-hidden="true"
-							className="size-3 shrink-0"
-							icon={AlertCircleIcon}
-							strokeWidth={1.5}
-						/>
+						<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
 						<span>{errorCount === null ? "—" : formatNumber(errorCount)}</span>
 					</span>
 				) : null}
@@ -495,7 +490,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							top: virtualTop,
 							left: 0,
 							width: "100%",
-							height: 36,
+							height: SESSION_OVERVIEW_ROW_HEIGHT,
 						}
 			}
 			ref={itemRef}

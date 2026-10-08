@@ -1,11 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
 import {
-	ArrowDown01Icon,
-	ArrowUp01Icon,
-	SortByDown01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+	IconCheck,
+	IconChevronDown,
+	IconChevronUp,
+	IconSortDescending,
+} from "@tabler/icons-react";
 import { useRef } from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import "./session-menu.css";
@@ -49,25 +48,19 @@ export function SessionsOverviewSortMenu({
 				aria-label={`Sort sessions, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
 				className={SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME}
 			>
-				<HugeiconsIcon
-					icon={SortByDown01Icon}
-					strokeWidth={1.75}
+				<IconSortDescending
 					aria-hidden="true"
 					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 				<span className="text-(--session-overview-muted)">Sorted by</span>
 				<span>{activeSortLabel}</span>
 				{sort.direction === "asc" ? (
-					<HugeiconsIcon
-						icon={ArrowUp01Icon}
-						strokeWidth={1.75}
+					<IconChevronUp
 						aria-hidden="true"
 						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 					/>
 				) : (
-					<HugeiconsIcon
-						icon={ArrowDown01Icon}
-						strokeWidth={1.75}
+					<IconChevronDown
 						aria-hidden="true"
 						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 					/>
@@ -148,12 +141,7 @@ export function SessionsOverviewSortMenu({
 function SortCheck() {
 	return (
 		<Menu.RadioItemIndicator className="session-menu-sort-check">
-			<HugeiconsIcon
-				icon={Tick02Icon}
-				strokeWidth={2}
-				aria-hidden="true"
-				className="size-3.5"
-			/>
+			<IconCheck aria-hidden="true" className="size-3.5" />
 		</Menu.RadioItemIndicator>
 	);
 }

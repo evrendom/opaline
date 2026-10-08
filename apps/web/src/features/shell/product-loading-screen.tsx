@@ -1,9 +1,13 @@
 import "@/app/app-surface.css";
 import { SidebarInset } from "@/app/ui/sidebar";
-import { getDefaultSidebarShellTuningState } from "@/features/shell/config/sidebar-shell-debug";
+import {
+	ShellWindowColumn,
+	ShellWindowFooterPlaceholder,
+	shellWindowRadiusClassName,
+} from "@/features/shell/components/shell-window-column";
+import { cn } from "@/lib/utils";
 import "./product-window-chrome.css";
-
-const sidebarWidth = `${getDefaultSidebarShellTuningState().collapsedWidth}rem`;
+import "./app-shell.css";
 
 export function ProductLoadingIndicator() {
 	return (
@@ -26,14 +30,29 @@ export function ProductLoadingIndicator() {
 export function ProductLoadingScreen() {
 	return (
 		<div className="product-app-shell dashboard-01-preview flex h-dvh overflow-hidden overscroll-none text-foreground">
+			{/* Matches the sidebar's footprint so the window doesn't jump when the
+			    real sidebar mounts. */}
 			<div
 				aria-hidden="true"
-				className="hidden shrink-0 md:block"
-				style={{ width: sidebarWidth }}
+				data-variant="inset"
+				className="peer hidden w-56 shrink-0 md:block"
 			/>
-			<SidebarInset className="dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] md:m-(--dashboard-01-window-inset) md:ml-0 md:rounded-(--dashboard-01-window-radius) md:shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)]">
-				<ProductLoadingIndicator />
-			</SidebarInset>
+			<ShellWindowColumn
+				footer={
+					import.meta.env.MODE === "plugin" ? null : (
+						<ShellWindowFooterPlaceholder />
+					)
+				}
+			>
+				<SidebarInset
+					className={cn(
+						"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
+						shellWindowRadiusClassName,
+					)}
+				>
+					<ProductLoadingIndicator />
+				</SidebarInset>
+			</ShellWindowColumn>
 		</div>
 	);
 }

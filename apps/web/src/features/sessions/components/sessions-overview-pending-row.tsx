@@ -1,5 +1,4 @@
-import { AlertCircleIcon, User02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconAlertCircle, IconUser } from "@tabler/icons-react";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { cn } from "@/lib/utils";
 import { SessionModelMark } from "./session-model-mark";
@@ -183,12 +182,7 @@ export function SessionsOverviewPendingRow({
 							data-session-overview-error-tag
 							title="Error count will appear after upload"
 						>
-							<HugeiconsIcon
-								aria-hidden="true"
-								className="size-3 shrink-0"
-								icon={AlertCircleIcon}
-								strokeWidth={1.5}
-							/>
+							<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
 							<span className="inline-block h-1.5 w-2 rounded-sm bg-current opacity-20" />
 						</span>
 					)}
@@ -241,11 +235,7 @@ export function SessionsOverviewPendingRow({
 						)}
 					</div>
 					<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-black/4 text-black/40 dark:bg-white/8 dark:text-white/40">
-						<HugeiconsIcon
-							icon={User02Icon}
-							className="size-3.5"
-							strokeWidth={1.5}
-						/>
+						<IconUser className="size-3.5" />
 					</span>
 				</div>
 				<div

@@ -10,8 +10,14 @@ import {
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { calculateCost, formatUsername } from "@/lib/format";
 
-export const SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME =
-	"relative flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-(--session-overview-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--session-overview-text) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent) aria-expanded:bg-(--session-overview-hover) sm:text-sm dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]";
+// One-line table rows: 48px (8px of air around a 32px line).
+export const SESSION_OVERVIEW_ROW_HEIGHT = 48;
+// The sticky header (and toolbar) above the rows; the virtual list offsets
+// its rows by it. Keep in step with the header's h-12.
+export const SESSION_OVERVIEW_HEADER_HEIGHT = 48;
+
+// Toolbar button (see .toolbar-button in preset-extensions.css).
+export const SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME = "toolbar-button";
 
 export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
 	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--session-overview-surface) font-sans [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fcfcfc] [--session-overview-text:#101112] dark:[--session-overview-border:rgba(255,255,255,0.08)] dark:[--session-overview-hover:rgba(255,255,255,0.05)] dark:[--session-overview-muted:rgba(255,255,255,0.65)] dark:[--session-overview-subtle:rgba(255,255,255,0.5)] dark:[--session-overview-surface:#191a1c] dark:[--session-overview-text:#e6e6e9]";

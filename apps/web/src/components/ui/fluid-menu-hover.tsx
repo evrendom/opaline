@@ -7,8 +7,21 @@ const DEFAULT_ITEMS =
 	'[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button:not([data-slot="button"]), [data-slot="button"][data-variant="ghost"], [data-fluid-menu-option], label[for]';
 const ROOT = "[data-fluid-menu-root]";
 
-/** Decorative only: primitives retain ownership of focus, typeahead and clicks. */
-export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
+/**
+ * Decorative only: primitives retain ownership of focus, typeahead and clicks.
+ *
+ * `bridgeGap` keeps the highlight on the nearest item while the pointer
+ * crosses a gap between items of up to that many pixels, so it glides from
+ * row to row instead of fading out and back in. Lists with spaced-out rows
+ * (the app sidebar) opt in; tight menus have no gaps to bridge.
+ */
+export function FluidMenuHover({
+	items = DEFAULT_ITEMS,
+	bridgeGap = 0,
+}: {
+	items?: string;
+	bridgeGap?: number;
+}) {
 	const anchorRef = useRef<HTMLSpanElement>(null);
 	const containerRef = useRef<HTMLElement | null>(null);
 	const hover = useFluidHover(containerRef, { gapClick: false });
@@ -41,6 +54,24 @@ export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
 				(item) => item.contains(target) && !isDisabled(item),
 			);
 		};
+		// The enabled item nearest the pointer, if it is within `bridgeGap`.
+		const nearest = (x: number, y: number) => {
+			let closest: HTMLElement | undefined;
+			let closestDistance = bridgeGap;
+			for (const item of registered) {
+				if (isDisabled(item)) continue;
+				const rect = item.getBoundingClientRect();
+				const distance = Math.hypot(
+					Math.max(rect.left - x, 0, x - rect.right),
+					Math.max(rect.top - y, 0, y - rect.bottom),
+				);
+				if (distance <= closestDistance) {
+					closest = item;
+					closestDistance = distance;
+				}
+			}
+			return closest;
+		};
 		const sync = () => {
 			const next = Array.from(
 				container.querySelectorAll<HTMLElement>(items),
@@ -69,13 +100,30 @@ export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
 			if (active && isDisabled(active)) activate(undefined);
 		};
 		const onPointerOver = (event: PointerEvent) => {
-			if (event.pointerType === "touch") return;
+			if (event.pointerType === "touch" || bridgeGap > 0) return;
 			activate(resolve(event.target));
+		};
+		// With bridging, follow every move (once per frame): pointerover only
+		// fires on entering an element, so it never notices the pointer
+		// crossing a gap.
+		let frame: number | null = null;
+		const onPointerMove = (event: PointerEvent) => {
+			if (event.pointerType === "touch") return;
+			const { target, clientX, clientY } = event;
+			if (frame !== null) cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				frame = null;
+				activate(resolve(target) ?? nearest(clientX, clientY));
+			});
 		};
 		const onEnter = () => {
 			sessionRef.current += 1;
 		};
-		const onLeave = () => activate(undefined);
+		const onLeave = () => {
+			if (frame !== null) cancelAnimationFrame(frame);
+			frame = null;
+			activate(undefined);
+		};
 		const onFocus = (event: FocusEvent) => activate(resolve(event.target));
 		const onBlur = (event: FocusEvent) => {
 			if (
@@ -114,6 +162,7 @@ export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
 		// Also refresh a force-mounted popup when its opening transition begins.
 		container.addEventListener("animationstart", remeasure);
 		container.addEventListener("pointerover", onPointerOver);
+		if (bridgeGap > 0) container.addEventListener("pointermove", onPointerMove);
 		container.addEventListener("pointerenter", onEnter);
 		container.addEventListener("pointerleave", onLeave);
 		container.addEventListener("focusin", onFocus);
@@ -122,6 +171,8 @@ export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
 			observer.disconnect();
 			container.removeEventListener("animationstart", remeasure);
 			container.removeEventListener("pointerover", onPointerOver);
+			container.removeEventListener("pointermove", onPointerMove);
+			if (frame !== null) cancelAnimationFrame(frame);
 			container.removeEventListener("pointerenter", onEnter);
 			container.removeEventListener("pointerleave", onLeave);
 			container.removeEventListener("focusin", onFocus);
@@ -130,7 +181,7 @@ export function FluidMenuHover({ items = DEFAULT_ITEMS }: { items?: string }) {
 				item.removeAttribute("data-fluid-menu-item");
 			});
 		};
-	}, [items, registerItem, remeasure, sessionRef, setActiveIndex]);
+	}, [bridgeGap, items, registerItem, remeasure, sessionRef, setActiveIndex]);
 
 	return (
 		<>

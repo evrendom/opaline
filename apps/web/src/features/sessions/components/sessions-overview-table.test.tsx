@@ -453,9 +453,10 @@ describe("SessionsOverviewTable", () => {
 		expect(controls.children).toHaveLength(3);
 		const titleRowButtons = within(controls).getAllByRole("button");
 		expect(titleRowButtons).toHaveLength(3);
-		expect(titleRowButtons[0]).toHaveTextContent("Date range");
-		expect(titleRowButtons[1]).toHaveAccessibleName(/^Sort sessions, /);
-		expect(titleRowButtons[2]).toHaveAccessibleName("Filter sessions");
+		// Sort and filter lead; the date range trails at the right.
+		expect(titleRowButtons[0]).toHaveAccessibleName(/^Sort sessions, /);
+		expect(titleRowButtons[1]).toHaveAccessibleName("Filter sessions");
+		expect(titleRowButtons[2]).toHaveTextContent("Date range");
 
 		await user.click(filterButton);
 		for (const filterLabel of [

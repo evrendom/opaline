@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { IconArrowLeft, IconChevronRight } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
 import type {
 	SessionDetailActivityGroup,
@@ -44,7 +44,7 @@ export function SessionDetailActivityPanel({
 											{occurrence.turnLabel}
 											{occurrence.time ? ` · ${occurrence.time}` : ""}
 										</p>
-										<ChevronRight
+										<IconChevronRight
 											aria-hidden="true"
 											className="size-3.5 shrink-0"
 										/>
@@ -99,7 +99,7 @@ export function SessionDetailActivityOccurrencePanel({
 					onClick={onBack}
 					type="button"
 				>
-					<ArrowLeft aria-hidden="true" className="size-3.5" />
+					<IconArrowLeft aria-hidden="true" className="size-3.5" />
 				</button>
 				<p className="min-w-0 flex-1 truncate px-1 text-[0.8125rem]/5 font-medium">
 					{group.label}

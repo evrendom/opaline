@@ -30,7 +30,7 @@ describe("TranscriptFoldSummaryControl", () => {
 		expect(markup.match(/data-transcript-fold-summary-metric=/g)).toHaveLength(
 			5,
 		);
-		expect(markup.match(/data-trace-hugeicon/g)).toHaveLength(6);
+		expect(markup.match(/data-trace-glyph/g)).toHaveLength(6);
 		expect(markup).toContain('title="47 Reasoning"');
 		expect(markup).toContain('title="1 Images Viewed"');
 		expect(markup).toContain('data-trace-icon-tone="violet"');

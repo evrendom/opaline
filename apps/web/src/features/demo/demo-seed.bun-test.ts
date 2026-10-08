@@ -33,3 +33,26 @@ test("the default dashboard seed includes a populated daily cost chart for its r
 		dashboard.input.endDate,
 	);
 });
+
+test("the demo seed carries a populated trend for every other stat card", () => {
+	const { dashboard, previews } = DemoSeedSchema.parse(fixture);
+	expect(previews.map((preview) => preview.input.requestedMetric)).toEqual([
+		"sessions",
+		"agentRuns",
+		"signals",
+	]);
+	for (const { input, data } of previews) {
+		const metric = input.requestedMetric ?? "cost";
+		expect(input.startDate).toBe(dashboard.input.startDate);
+		expect(input.endDate).toBe(dashboard.input.endDate);
+		expect(data.requestedMetric).toBe(metric);
+		expect(data.metrics[metric]?.trend.some((point) => point.total > 0)).toBe(
+			true,
+		);
+	}
+});
+
+test("the demo seed names a member as the signed-in viewer", () => {
+	const { members, viewerUserId } = DemoSeedSchema.parse(fixture);
+	expect(members.map((member) => member.userId)).toContain(viewerUserId);
+});

@@ -1,6 +1,6 @@
 import { ORG_SLUG_MAX_LENGTH } from "@rudel/api-routes/reserved-slugs";
+import { IconCamera, IconLink } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CameraIcon, LinkIcon } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -635,7 +635,7 @@ export function WelcomeSteps({
 									{image ? (
 										<img src={image} alt="Your profile" />
 									) : (
-										<CameraIcon size={20} aria-hidden="true" />
+										<IconCamera size={20} aria-hidden="true" />
 									)}
 									<input
 										type="file"
@@ -709,7 +709,7 @@ export function WelcomeSteps({
 										disabled={busy}
 										onClick={copyInviteLink}
 									>
-										<LinkIcon size={14} aria-hidden="true" />
+										<IconLink size={14} aria-hidden="true" />
 										Copy invite link
 									</button>
 								</div>

@@ -1,104 +1,119 @@
 "use client";
 
-import { Sidebar } from "@/app/ui/sidebar";
+import { Link } from "react-router-dom";
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarFooter,
+	SidebarGroup,
+	SidebarGroupContent,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+} from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { RailLink } from "@/features/shell/components/shell-rail";
-import { UserRailButton } from "@/features/shell/components/UserRailButton";
-import { WorkspaceMenuButton } from "@/features/shell/components/WorkspaceMenuButton";
-import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
+import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
+import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
+import { SidebarWorkspaceSwitcher } from "@/features/shell/components/SidebarWorkspaceSwitcher";
+import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
+import {
+	type ShellRouteDefinition,
+	shellNavigationRoutes,
+} from "@/features/shell/config/shell-routes";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
-import { cn } from "@/lib/utils";
 
-type SidebarLayout = "centered" | "standard";
+const primaryRoutes = shellNavigationRoutes.filter(
+	(route) => route.id !== "settings",
+);
+const footerRoutes = shellNavigationRoutes.filter(
+	(route) => route.id === "settings",
+);
 
-const sidebarRailHorizontalPaddingClassName =
-	"pl-[calc(var(--sidebar-rail-inset-left)+var(--sidebar-collapsed-section-padding-x))] pr-[calc(var(--sidebar-rail-inset-right)+var(--sidebar-collapsed-section-padding-x))]";
-// 22px total: the standard 2px gap plus the requested 20px.
-const centeredSidebarNavigationGapClassName = "gap-5.5";
-
-function SidebarNavigation({ spacious = false }: { spacious?: boolean }) {
-	const currentShellRoute = useCurrentShellRoute();
+function SidebarNavItem({
+	route,
+	active,
+}: {
+	route: ShellRouteDefinition;
+	active: boolean;
+}) {
 	const getShellRoutePath = useShellRoutePath();
 
 	return (
-		<nav aria-label="Primary">
-			<ul
-				className={cn(
-					"flex list-none flex-col",
-					spacious ? centeredSidebarNavigationGapClassName : "gap-0.5",
-				)}
-			>
-				{shellNavigationRoutes.map((route) => (
-					<RailLink
-						key={route.id}
+		<SidebarMenuItem>
+			<SidebarMenuButton
+				data-sidebar-interactive=""
+				isActive={active}
+				render={
+					<Link
 						to={getShellRoutePath(route.path)}
-						label={route.navLabel}
-						shortcut={route.shortcut}
-						comingSoon={route.comingSoon}
-						active={currentShellRoute.id === route.id}
-					>
-						{route.icon}
-					</RailLink>
-				))}
-			</ul>
-		</nav>
+						aria-current={active ? "page" : undefined}
+					/>
+				}
+			>
+				<ShellNavIcon
+					icon={route.icon}
+					activeIcon={route.activeIcon}
+					active={active}
+					tone={route.tone}
+				/>
+				<span>{route.navLabel}</span>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
 	);
 }
 
-export function AppSidebar({
-	layout = "standard",
-}: {
-	layout?: SidebarLayout;
-}) {
-	const isCenteredLayout = layout === "centered";
+export function AppSidebar() {
+	const currentShellRoute = useCurrentShellRoute();
 
 	return (
-		<Sidebar collapsible="icon" className="dashboard-01-chrome-sidebar">
+		<Sidebar variant="inset" collapsible="offcanvas">
+			{/* One highlight glides between rows on hover (Opaline's fluid
+			    hover), tinted like a row hover. */}
 			<div
-				data-slot="sidebar-inner"
 				data-fluid-menu-root=""
-				className={cn(
-					"relative flex size-full min-w-0 flex-col overflow-hidden bg-transparent",
-					!isCenteredLayout && "pb-3",
-				)}
+				className="flex min-h-0 flex-1 flex-col [--session-overview-hover:color-mix(in_oklab,var(--sidebar-accent)_70%,transparent)]"
 			>
-				<FluidMenuHover items="[data-sidebar-interactive]" />
+				<FluidMenuHover items="[data-sidebar-interactive]" bridgeGap={12} />
 				{/* The plugin's host already titles it "Opaline". */}
-				{isCenteredLayout || import.meta.env.MODE === "plugin" ? null : (
-					<div
-						className={`mt-[var(--sidebar-section-first-margin-top)] flex w-full flex-col ${sidebarRailHorizontalPaddingClassName}`}
-					>
-						<WorkspaceMenuButton />
-					</div>
+				{import.meta.env.MODE === "plugin" ? null : (
+					<SidebarHeader>
+						<SidebarWorkspaceSwitcher />
+					</SidebarHeader>
 				)}
 
-				<div
-					data-sidebar-navigation-stage
-					className={cn(
-						"relative min-h-0 w-full flex-1",
-						isCenteredLayout && "flex items-center",
-					)}
-				>
-					<div
-						data-sidebar-navigation-cluster
-						className={cn(
-							"w-full",
-							sidebarRailHorizontalPaddingClassName,
-							!isCenteredLayout && "absolute top-3 left-0",
-						)}
-					>
-						<SidebarNavigation spacious={isCenteredLayout} />
-					</div>
-				</div>
+				<SidebarContent>
+					<SidebarGroup>
+						<SidebarGroupContent>
+							<nav aria-label="Primary">
+								<SidebarMenu>
+									{primaryRoutes.map((route) => (
+										<SidebarNavItem
+											key={route.id}
+											route={route}
+											active={currentShellRoute.id === route.id}
+										/>
+									))}
+								</SidebarMenu>
+							</nav>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				</SidebarContent>
 
-				{isCenteredLayout ? null : (
-					<div
-						className={`w-full pl-[calc(var(--sidebar-rail-inset-left)+var(--sidebar-collapsed-footer-padding-x))] pr-[calc(var(--sidebar-rail-inset-right)+var(--sidebar-collapsed-footer-padding-x))]`}
-					>
-						<UserRailButton />
-					</div>
-				)}
+				<SidebarFooter>
+					<SidebarMenu>
+						<SidebarInstallCommand />
+						{footerRoutes.map((route) => (
+							<SidebarNavItem
+								key={route.id}
+								route={route}
+								active={currentShellRoute.id === route.id}
+							/>
+						))}
+						<SidebarUserMenu />
+					</SidebarMenu>
+				</SidebarFooter>
 			</div>
 		</Sidebar>
 	);

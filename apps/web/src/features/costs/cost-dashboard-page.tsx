@@ -1,10 +1,21 @@
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { GITHUB_INACTIVE_FILTER_TOOLTIP } from "@rudel/api-routes";
-import { type ReactNode, useState } from "react";
+import {
+	type DashboardMetric,
+	GITHUB_INACTIVE_FILTER_TOOLTIP,
+} from "@rudel/api-routes";
+import { IconX } from "@tabler/icons-react";
+import {
+	type CSSProperties,
+	type ReactNode,
+	type RefObject,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { CHART_INTERVALS } from "./chart-interval";
 import { ChartIntervalPicker } from "./chart-interval-picker";
@@ -20,24 +31,31 @@ import {
 	type CostDashboardController,
 	useCostDashboard,
 } from "./use-cost-dashboard";
+import { type MetricPreviews, useMetricPreviews } from "./use-metric-previews";
 import "./cost-dashboard.css";
 
 export function CostDashboardPage() {
-	return <CostDashboardView dashboard={useCostDashboard()} />;
+	const dashboard = useCostDashboard();
+	const previews = useMetricPreviews(dashboard.inputFor, dashboard.metrics);
+	return <CostDashboardView dashboard={dashboard} previews={previews} />;
 }
 
 export function CostDashboardView({
 	dashboard,
 	toolbarStart,
+	previews,
 }: {
 	dashboard: CostDashboardController;
 	toolbarStart?: ReactNode;
+	/** Sparkline trends for the stat cards other than the charted one. */
+	previews?: MetricPreviews;
 }) {
 	const {
 		input,
 		query,
 		metric,
 		metrics,
+		metricsPending,
 		interval,
 		setInterval,
 		dimensions,
@@ -48,6 +66,25 @@ export function CostDashboardView({
 	} = dashboard;
 	const { data, isPending, isError } = query;
 	const workspace = useOptionalOrganization();
+	// The last chart that finished loading, per workspace. While a newly picked
+	// metric loads without a cached answer, keep drawing this one (dimmed)
+	// instead of swapping the chart for a skeleton; the picked card's ring
+	// moves at once. The skeleton is left for the very first load.
+	const orgId = workspace?.state.activeOrg?.id;
+	const [settled, setSettled] = useState<{
+		data: NonNullable<typeof data>;
+		metric: DashboardMetric;
+		orgId: string | undefined;
+	} | null>(null);
+	if (
+		data &&
+		!isPending &&
+		(settled?.data !== data ||
+			settled.metric !== metric ||
+			settled.orgId !== orgId)
+	)
+		setSettled({ data, metric, orgId });
+	const showSettled = isPending && settled !== null && settled.orgId === orgId;
 	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
 	const selectedData = getMetricData(data, metric);
 	const loadPersonRows = useDeferredPersonRows(data);
@@ -59,126 +96,131 @@ export function CostDashboardView({
 	const filtered = chipDimensions.some(
 		(dimension) => input[dimension].length > 0,
 	);
+	// The range controls sit on the page title row; without a
+	// shell header (embeds, tests) they stay in the toolbar.
+	const headerPortal = useShellHeaderPortal();
+	const rangeControls = (
+		<div
+			className="cost-range-controls"
+			data-fluid-menu-root=""
+			data-in-header={headerPortal ? "" : undefined}
+		>
+			<FluidMenuHover items="button" />
+			<DashboardDateControls
+				sourceComponent="cost_dashboard_date_picker"
+				triggerSuffix={
+					CHART_INTERVALS.find((option) => option.value === interval)?.label
+				}
+				calendarControls={
+					<ChartIntervalPicker value={interval} onChange={setInterval} />
+				}
+			/>
+		</div>
+	);
+	// The active filters sit in the chart card's header, as chips that each
+	// remove their own filter.
+	const activeFilters = filtered ? (
+		<section
+			className="cost-active-filters"
+			aria-label="Active dashboard filters"
+		>
+			{chipDimensions.flatMap((dimension) =>
+				input[dimension].map((id) => {
+					const member =
+						dimension === "members"
+							? workspace?.state.members?.find((entry) => entry.user.id === id)
+							: undefined;
+					const label =
+						(selectedData ?? data?.metrics.cost)?.breakdowns[dimension].find(
+							(entry) => entry.id === id,
+						)?.label ??
+						member?.user.name ??
+						id;
+					const inactive =
+						isGitHubMetric &&
+						(dimension === "members" || dimension === "models");
+					return (
+						<Tooltip
+							key={`${dimension}:${id}`}
+							triggerId={
+								inactive
+									? `cost-filter-${dimension}-${encodeURIComponent(id)}`
+									: undefined
+							}
+							open={
+								inactive ? focusedFilter === `${dimension}:${id}` : undefined
+							}
+							onOpenChange={(open) => {
+								if (inactive)
+									setFocusedFilter(open ? `${dimension}:${id}` : null);
+							}}
+						>
+							<TooltipTrigger
+								asChild
+								id={`cost-filter-${dimension}-${encodeURIComponent(id)}`}
+								onFocus={() => {
+									if (inactive) setFocusedFilter(`${dimension}:${id}`);
+								}}
+								onBlur={() => setFocusedFilter(null)}
+							>
+								<button
+									type="button"
+									key={`${dimension}:${id}`}
+									className="cost-filter-chip"
+									data-inactive={inactive}
+									aria-describedby={
+										inactive
+											? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
+											: undefined
+									}
+									onClick={() => toggle(dimension, id)}
+									title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
+									aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
+								>
+									<span className="cost-filter-dimension">
+										{COST_LABELS[dimension]}
+									</span>
+									<span className="truncate">
+										{costLabel(dimension, label) || "Unattributed"}
+									</span>
+									<IconX size={12} className="shrink-0" />
+								</button>
+							</TooltipTrigger>
+							{inactive ? (
+								<TooltipContent
+									role="tooltip"
+									id={`cost-filter-description-${dimension}-${encodeURIComponent(id)}`}
+								>
+									{GITHUB_INACTIVE_FILTER_TOOLTIP}
+								</TooltipContent>
+							) : null}
+						</Tooltip>
+					);
+				}),
+			)}
+		</section>
+	) : null;
+	const showToolbar = toolbarStart !== undefined || !headerPortal;
+	const breakdownsRef = useRef<HTMLDivElement>(null);
+	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
 		<div
 			className="cost-page isolate antialiased"
 			aria-busy={query.isFetching}
-			data-updating={query.isFetching && !isPending}
+			data-updating={(query.isFetching && !isPending) || showSettled}
 		>
-			<section
-				className="cost-page-toolbar"
-				aria-label="Dashboard controls"
-				data-fluid-menu-root=""
-			>
-				<FluidMenuHover items="button" />
-				{toolbarStart}
-				<DashboardDateControls
-					className="h-7 shrink-0 gap-1.5 rounded-md border-0 bg-(--cost-surface) py-1 pr-2 pl-1.5 text-base font-medium tracking-[-0.01em] text-(--cost-foreground) shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] outline-none hover:bg-(--cost-hover) focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--cost-blue) has-data-[icon=inline-start]:pl-1.5 aria-expanded:bg-(--cost-hover) sm:h-7 sm:text-sm dark:bg-(--cost-surface) dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent] dark:hover:bg-(--cost-hover) [&_svg]:size-4 [&_svg]:h-lh [&_svg]:text-[#5d5d5d] dark:[&_svg]:text-[#acaeb2]"
-					sourceComponent="cost_dashboard_date_picker"
-					triggerSuffix={
-						CHART_INTERVALS.find((option) => option.value === interval)?.label
-					}
-					calendarControls={
-						<ChartIntervalPicker value={interval} onChange={setInterval} />
-					}
-				/>
-				{filtered ? (
-					<section
-						className="cost-active-filters"
-						aria-label="Active dashboard filters"
-					>
-						{chipDimensions.flatMap((dimension) =>
-							input[dimension].map((id) => {
-								const member =
-									dimension === "members"
-										? workspace?.state.members?.find(
-												(entry) => entry.user.id === id,
-											)
-										: undefined;
-								const label =
-									(selectedData ?? data?.metrics.cost)?.breakdowns[
-										dimension
-									].find((entry) => entry.id === id)?.label ??
-									member?.user.name ??
-									id;
-								const inactive =
-									isGitHubMetric &&
-									(dimension === "members" || dimension === "models");
-								return (
-									<Tooltip
-										key={`${dimension}:${id}`}
-										triggerId={
-											inactive
-												? `cost-filter-${dimension}-${encodeURIComponent(id)}`
-												: undefined
-										}
-										open={
-											inactive
-												? focusedFilter === `${dimension}:${id}`
-												: undefined
-										}
-										onOpenChange={(open) => {
-											if (inactive)
-												setFocusedFilter(open ? `${dimension}:${id}` : null);
-										}}
-									>
-										<TooltipTrigger
-											asChild
-											id={`cost-filter-${dimension}-${encodeURIComponent(id)}`}
-											onFocus={() => {
-												if (inactive) setFocusedFilter(`${dimension}:${id}`);
-											}}
-											onBlur={() => setFocusedFilter(null)}
-										>
-											<button
-												type="button"
-												key={`${dimension}:${id}`}
-												className="cost-filter-chip"
-												data-inactive={inactive}
-												aria-describedby={
-													inactive
-														? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
-														: undefined
-												}
-												onClick={() => toggle(dimension, id)}
-												title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
-												aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
-											>
-												<span className="cost-filter-dimension">
-													{COST_LABELS[dimension]}
-												</span>
-												<span className="truncate">
-													{costLabel(dimension, label) || "Unattributed"}
-												</span>
-												<HugeiconsIcon
-													icon={Cancel01Icon}
-													size={12}
-													className="shrink-0"
-												/>
-											</button>
-										</TooltipTrigger>
-										{inactive ? (
-											<TooltipContent
-												role="tooltip"
-												id={`cost-filter-description-${dimension}-${encodeURIComponent(id)}`}
-											>
-												{GITHUB_INACTIVE_FILTER_TOOLTIP}
-											</TooltipContent>
-										) : null}
-									</Tooltip>
-								);
-							}),
-						)}
-						<button
-							type="button"
-							className="cost-text-button"
-							onClick={() => clear()}
-						>
-							Clear all
-						</button>
-					</section>
-				) : null}
-			</section>
+			{headerPortal ? createPortal(rangeControls, headerPortal) : null}
+			{showToolbar ? (
+				<section
+					className="cost-page-toolbar"
+					aria-label="Dashboard controls"
+					data-fluid-menu-root=""
+				>
+					<FluidMenuHover items="button" />
+					{toolbarStart}
+					{headerPortal ? null : rangeControls}
+				</section>
+			) : null}
 			<div className="cost-page-scroll" tabIndex={-1}>
 				<div className="cost-page-content">
 					{isError ? (
@@ -197,23 +239,42 @@ export function CostDashboardView({
 						</div>
 					) : (
 						<CostChart
-							data={data}
-							metric={metric}
+							data={showSettled ? settled.data : data}
+							metric={showSettled ? settled.metric : metric}
+							selectedMetric={metric}
 							metrics={metrics}
+							metricsPending={metricsPending}
+							filters={activeFilters}
+							previews={previews}
 							runSignals={input.runSignals}
 							signalTypes={input.signalTypes}
 							interval={interval}
 							onMetricChange={setMetric}
 							onRefresh={() => query.refetch()}
 							refreshing={query.isFetching && !isPending}
-							pending={isPending}
-							splitBy={data?.splitBy ?? input.splitBy}
+							pending={isPending && !showSettled}
+							splitBy={
+								showSettled
+									? settled.data.splitBy
+									: (data?.splitBy ?? input.splitBy)
+							}
 							onResetSplit={() => setSplit("none")}
 						/>
 					)}
 					<div className="cost-breakdowns-container" hidden={isError}>
 						<div
+							ref={breakdownsRef}
 							className="cost-breakdowns"
+							// Every row is as tall as the space left under the chart: one row
+							// fits the page exactly, more rows keep that height and scroll.
+							data-sized={breakdownRowHeight ? "" : undefined}
+							style={
+								breakdownRowHeight
+									? ({
+											"--breakdown-row-height": `${breakdownRowHeight}px`,
+										} as CSSProperties)
+									: undefined
+							}
 							data-signals={metric === "signals"}
 							data-pull-requests={isPullRequestMetric}
 							data-ci-runs={metric === "ciRuns"}
@@ -247,4 +308,44 @@ export function CostDashboardView({
 			</div>
 		</div>
 	);
+}
+
+// The shortest a breakdown row gets before the page scrolls instead.
+const MIN_BREAKDOWN_ROW_HEIGHT = 205;
+
+/**
+ * The height left for a breakdown row under the chart: from the grid's top to
+ * the bottom of the scroll viewport, less the page's bottom padding. Tracks the
+ * viewport and the content above (the chart's notes vary by metric).
+ */
+function useBreakdownRowHeight(ref: RefObject<HTMLElement | null>) {
+	const [height, setHeight] = useState<number | null>(null);
+	useLayoutEffect(() => {
+		const grid = ref.current;
+		const scroll = grid?.closest<HTMLElement>(".cost-page-scroll");
+		const content = grid?.closest<HTMLElement>(".cost-page-content");
+		if (!grid || !scroll || !content || typeof ResizeObserver === "undefined")
+			return;
+		const measure = () => {
+			const top =
+				grid.getBoundingClientRect().top -
+				scroll.getBoundingClientRect().top +
+				scroll.scrollTop;
+			const bottom = Number.parseFloat(getComputedStyle(content).paddingBottom);
+			setHeight(
+				Math.max(
+					MIN_BREAKDOWN_ROW_HEIGHT,
+					Math.floor(scroll.clientHeight - top - bottom),
+				),
+			);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(scroll);
+		for (const child of content.children) {
+			if (!child.contains(grid)) observer.observe(child);
+		}
+		return () => observer.disconnect();
+	}, [ref]);
+	return height;
 }

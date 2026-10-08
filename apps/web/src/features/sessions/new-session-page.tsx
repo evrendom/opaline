@@ -125,7 +125,6 @@ export function NewSessionPage() {
 						>
 							<SessionDetailView
 								navigation={sessionNavigation}
-								onClose={undefined}
 								position={sessionPosition}
 								sessionId={activeSessionId}
 								totalSessions={viewableSessions.length}

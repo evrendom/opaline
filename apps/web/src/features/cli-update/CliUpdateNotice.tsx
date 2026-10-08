@@ -1,15 +1,14 @@
 import {
-	ArrowUpRight01Icon,
-	Cancel01Icon,
-	Copy01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
 	CLI_UPDATE_COMMAND,
 	type CliUpdateStatus,
 	getCliReleaseUrl,
 } from "@rudel/api-routes";
+import {
+	IconArrowUpRight,
+	IconCheck,
+	IconCopy,
+	IconX,
+} from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -122,12 +121,7 @@ function CliUpdateNoticeView({
 					aria-label="Dismiss CLI update notice"
 					onClick={onDismiss}
 				>
-					<HugeiconsIcon
-						aria-hidden="true"
-						className="size-3.5"
-						icon={Cancel01Icon}
-						strokeWidth={1.8}
-					/>
+					<IconX aria-hidden="true" className="size-3.5" stroke={1.8} />
 				</button>
 			</div>
 			<div className="session-menu-list">
@@ -137,12 +131,15 @@ function CliUpdateNoticeView({
 					title={CLI_UPDATE_COMMAND}
 					onClick={() => void copyCommand()}
 				>
-					<HugeiconsIcon
-						aria-hidden="true"
-						className="session-menu-icon size-4"
-						icon={copied ? Tick02Icon : Copy01Icon}
-						strokeWidth={1.6}
-					/>
+					{copied ? (
+						<IconCheck
+							aria-hidden="true"
+							className="session-menu-icon size-4"
+							stroke={1.6}
+						/>
+					) : (
+						<IconCopy aria-hidden="true" className="session-menu-icon size-4" />
+					)}
 					<span className="min-w-0 flex-1 truncate">
 						{copied ? "Copied" : "Copy update command"}
 					</span>
@@ -153,11 +150,10 @@ function CliUpdateNoticeView({
 					rel="noreferrer"
 					className="session-menu-row"
 				>
-					<HugeiconsIcon
+					<IconArrowUpRight
 						aria-hidden="true"
 						className="session-menu-icon size-4"
-						icon={ArrowUpRight01Icon}
-						strokeWidth={1.6}
+						stroke={1.6}
 					/>
 					<span className="min-w-0 flex-1 truncate">What's new</span>
 					<span className="sr-only"> (opens in a new tab)</span>

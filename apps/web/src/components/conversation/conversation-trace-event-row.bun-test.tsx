@@ -204,7 +204,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		).toBeGreaterThan(markup.indexOf("data-trace-shell-command-preview"));
 		expect(markup).toContain("text-[0.75rem]/4");
 		expect(markup).toContain("select-none");
-		expect(markup.match(/data-trace-hugeicon/g)).toHaveLength(1);
+		expect(markup.match(/data-trace-glyph/g)).toHaveLength(1);
 		expect(markup).toContain('data-trace-tag-context="terminal"');
 	});
 
@@ -382,7 +382,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).not.toContain("input_image");
 	});
 
-	test("uses the TypeScript Hugeicon and brand color for TypeScript files", () => {
+	test("uses the TypeScript icon and brand color for TypeScript files", () => {
 		const markup = renderToStaticMarkup(
 			<ConversationTraceEventRow
 				event={{
@@ -402,7 +402,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).not.toContain("data-trace-preview");
 	});
 
-	test("uses the Markdown Hugeicon for Markdown file tags", () => {
+	test("uses the Markdown icon for Markdown file tags", () => {
 		const markup = renderExpandedEvent({
 			id: "write-markdown-1",
 			input: {
@@ -576,7 +576,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 });
 
 describe("ConversationTraceEventRow Codex parity", () => {
-	test("uses the new-file Hugeicon for an add-only Codex patch", () => {
+	test("uses the new-file icon for an add-only Codex patch", () => {
 		const markup = renderCollapsedEvent({
 			id: "codex-add-file",
 			input: attachCodexCorrelation(

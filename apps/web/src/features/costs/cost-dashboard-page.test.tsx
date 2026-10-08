@@ -47,8 +47,10 @@ function Page({
 		<CostDashboardView
 			dashboard={{
 				input,
+				inputFor: (requestedMetric) => ({ ...input, requestedMetric }),
 				metric,
 				metrics: ["cost", "mergedPullRequests", "ciRuns"],
+				metricsPending: false,
 				interval: "daily",
 				query,
 				dimensions: metric === "ciRuns" ? CI_DIMENSIONS : PR_DIMENSIONS,

@@ -7,10 +7,10 @@ import type {
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 
 export const METRIC_LABELS = {
-	cost: "API Cost",
+	cost: "Cost",
 	sessions: "Sessions",
 	commits: "Commits",
-	signals: "Language signals",
+	signals: "Language",
 	agentRuns: "Agent runs",
 	mergedPullRequests: "Merged PRs",
 	ciFailuresPerPullRequest: "CI failures / PR",
@@ -28,8 +28,9 @@ export const DASHBOARD_METRICS = [
 	"ciRuns",
 ] as const satisfies readonly CostDashboardRequestedMetric[];
 export type DashboardTabMetric = (typeof DASHBOARD_METRICS)[number];
-// Before the server has answered, show only the metrics every scope serves so
-// an optional metric never flashes in and back out.
+// Before the server has answered, list only the metrics every scope serves so
+// an optional metric never flashes in and back out. The stat cards themselves
+// wait for the answer (see `metricsPending`); this list starts their previews.
 const PRE_AVAILABILITY_METRICS: readonly CostDashboardRequestedMetric[] = [
 	"cost",
 	"sessions",

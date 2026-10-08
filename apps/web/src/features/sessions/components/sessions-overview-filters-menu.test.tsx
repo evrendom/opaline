@@ -148,9 +148,16 @@ describe("SessionsOverviewFiltersMenu linear variant", () => {
 		await user.click(statusButton);
 
 		expect(screen.getByRole("dialog")).toBeVisible();
+		const tokensRow = screen.getByRole("button", {
+			name: "Configure Tokens filter",
+		});
+		expect(tokensRow).toHaveAttribute("title", "In 1K–50K · Out 500–5K");
+		expect(tokensRow.querySelector(".session-menu-active-dot")).not.toBeNull();
 		expect(
-			screen.getByRole("button", { name: "Configure Tokens filter" }),
-		).toHaveAttribute("title", "In 1K–50K · Out 500–5K");
+			screen
+				.getByRole("button", { name: "Configure Model filter" })
+				.querySelector(".session-menu-active-dot"),
+		).toBeNull();
 	});
 
 	it("gives the pointer a grace delay around the side menu", async () => {

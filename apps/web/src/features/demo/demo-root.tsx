@@ -12,6 +12,7 @@ import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { SessionsPage } from "@/features/sessions/sessions-page";
+import { LAST_SESSION_UPLOAD_INPUT } from "@/features/shell/components/last-session-upload-bar";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { orpc } from "@/lib/orpc";
 import { ensureLiveDemoSession } from "../../../../marketing/src/scripts/live-demo";
@@ -32,16 +33,29 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		const client = new QueryClient({
 			defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 		});
-		// Render the actual dashboard before activation, then refresh it on Explore.
+		// Render the actual dashboard and its stat card trends before activation,
+		// then refresh them on Explore.
+		for (const { input, data } of [seed.dashboard, ...seed.previews]) {
+			client.setQueryData(
+				[
+					"org",
+					seed.organization.id,
+					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
+				],
+				data,
+				{ updatedAt: 0 },
+			);
+		}
+		// Seed rows are newest first: the last upload bar's session.
 		client.setQueryData(
 			[
 				"org",
 				seed.organization.id,
-				...orpc.analytics.overview.costs.queryOptions({
-					input: seed.dashboard.input,
+				...orpc.analytics.sessions.list.queryOptions({
+					input: LAST_SESSION_UPLOAD_INPUT,
 				}).queryKey,
 			],
-			seed.dashboard.data,
+			seed.sessions.slice(0, 1),
 			{ updatedAt: 0 },
 		);
 		return client;

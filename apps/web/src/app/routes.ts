@@ -85,6 +85,23 @@ export function isSessionDetailPath(pathname: string) {
 	);
 }
 
+// The open session on a /session/:id page (not /newsesh), for chrome that
+// renders outside the route element, like the shell header's breadcrumb.
+export function getSessionDetailId(pathname: string) {
+	const match = getCanonicalAppPath(pathname).match(
+		/^\/session\/([^/]+)(?:\/v2)?\/?$/u,
+	);
+	const sessionId = match?.[1];
+	if (!sessionId || sessionId === "full" || sessionId === "split") {
+		return null;
+	}
+	try {
+		return decodeURIComponent(sessionId);
+	} catch {
+		return sessionId;
+	}
+}
+
 export function isNewSessionPath(pathname: string) {
 	const canonicalPathname = getCanonicalAppPath(pathname);
 	const normalizedPathname =

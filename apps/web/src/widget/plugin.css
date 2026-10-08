@@ -84,6 +84,16 @@ html[data-app-mode="plugin"] .cost-page {
 	--cost-muted: var(--muted-foreground);
 	--cost-border: var(--border);
 }
+html[data-host-styles] .cost-page {
+	--cost-divider: var(--color-border-secondary, var(--border));
+	--cost-row-hover: var(--hover);
+}
+/* The dashboard's cards sit on a soft black shadow, invisible on a dark host:
+   a hairline in the host's border colour outlines them instead. */
+html[data-host-styles]
+:is(.cost-metric, .cost-chart-card, .cost-breakdown, .cost-error) {
+	box-shadow: 0 0 0 1px var(--border);
+}
 /* With a host theme, Opaline's neutral greys follow it; brand and status
    colours and translucent tints stay. Hosts without one keep the web look. */
 html[data-host-styles] {
@@ -136,6 +146,47 @@ html[data-host-styles] :is(.session-menu-popover, .session-menu-surface) {
 	--session-menu-checkbox-border: var(--border);
 	--session-menu-accent: var(--foreground);
 	--session-menu-check: var(--background);
+	/* A picked preset or interval: a step past the hover tint. */
+	--session-menu-selected: color-mix(
+		in oklab,
+		var(--foreground) 12%,
+		transparent
+	);
+}
+/* The web's menus float on a soft black shadow, which a dark host swallows.
+   With a host theme every menu, popover, dialog and tooltip keeps a hairline in
+   the host's border colour instead. */
+html[data-host-styles] .session-menu-surface {
+	border: var(--session-menu-hairline) solid var(--session-menu-border);
+}
+html[data-host-styles]
+	:is(
+		[data-slot="dropdown-menu-content"],
+		[data-slot="dropdown-menu-sub-content"],
+		[data-slot="select-content"],
+		[data-slot="popover-content"],
+		[data-slot="dialog-content"],
+		[data-slot="tooltip-content"]
+	) {
+	box-shadow:
+		0 0 0 1px var(--border),
+		0 8px 24px rgb(0 0 0 / 12%);
+}
+/* Toolbar pills and search fields: the host's surface, border and hover. */
+html[data-host-styles] :is(.toolbar-button, .toolbar-search) {
+	background: var(--background);
+	box-shadow: 0 0 0 1px var(--border);
+}
+html[data-host-styles] .toolbar-button:is(:hover, [aria-expanded="true"]) {
+	background: var(--hover);
+}
+html[data-host-styles]
+	.toolbar-button:is(
+		[data-variant="secondary"],
+		[aria-pressed="true"],
+		[data-active="true"]
+	) {
+	box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 24%, transparent);
 }
 /* The transcript tree keeps its own text palette. */
 html[data-host-styles] .session-constellation-tree {
@@ -162,7 +213,11 @@ html[data-host-styles]
 	color: var(--muted-foreground);
 }
 html[data-host-styles]
-	:is([class*="text-[#8d8d8d]"], [class*="text-[#ededed]"]) {
+	:is(
+		[class*="text-[#8d8d8d]"],
+		[class*="text-[#ededed]"],
+		[class*="text-[#b8b8b8]"]
+	) {
 	color: var(--color-text-tertiary, var(--muted-foreground));
 }
 /* Black-alpha text written inline (tool titles, labels, breadcrumbs). */

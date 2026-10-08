@@ -14,10 +14,19 @@ import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBanner";
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
+import "./app-shell.css";
+import {
+	AssistantPanel,
+	useAssistantShortcut,
+} from "@/features/assistant/AssistantPanel";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
+import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
+import {
+	ShellWindowColumn,
+	shellWindowRadiusClassName,
+} from "@/features/shell/components/shell-window-column";
 import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
-import { getDefaultSidebarShellTuningState } from "@/features/shell/config/sidebar-shell-debug";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { NewseshListHeaderPortalContext } from "@/features/shell/newsesh-list-header-portal";
 import { ShellBottomNavigationPortalContext } from "@/features/shell/shell-bottom-navigation-portal";
@@ -112,34 +121,6 @@ export function LeftSidebarAppShellLayout() {
 	const isWelcome = canonicalPathname === CLI_SETUP_PATH;
 	const [onboardingPanel, setOnboardingPanel] =
 		React.useState<HTMLElement | null>(null);
-	const sidebarTuning = React.useMemo(getDefaultSidebarShellTuningState, []);
-	const leftSidebarChromeStyle = React.useMemo<DashboardChromeStyle>(
-		() => ({
-			"--sidebar-width": `${sidebarTuning.collapsedWidth}rem`,
-			"--sidebar-width-icon": `${sidebarTuning.collapsedWidth}rem`,
-			"--header-height": "var(--dashboard-01-header-height)",
-			"--sidebar-section-first-margin-top": `${sidebarTuning.sectionMarginTop}rem`,
-			"--sidebar-rail-inset-left": `${sidebarTuning.railInsetLeft}rem`,
-			"--sidebar-rail-inset-right": `${sidebarTuning.railInsetRight}rem`,
-			"--sidebar-collapsed-section-padding-x": `${sidebarTuning.collapsedSectionPaddingX}rem`,
-			"--sidebar-collapsed-footer-padding-x": `${sidebarTuning.collapsedFooterPaddingX}rem`,
-			"--sidebar-row-height": `${sidebarTuning.rowHeight}rem`,
-			"--sidebar-row-radius": `${sidebarTuning.rowRadius}rem`,
-			"--sidebar-collapsed-row-padding-left": `${sidebarTuning.collapsedRowPaddingLeft}rem`,
-			"--sidebar-collapsed-row-padding-right": `${sidebarTuning.collapsedRowPaddingRight}rem`,
-			"--sidebar-row-gap": `${sidebarTuning.rowGap}rem`,
-			"--sidebar-icon-lane-size": `${sidebarTuning.iconLaneSize}rem`,
-			"--sidebar-icon-size": `${sidebarTuning.iconSize}rem`,
-			"--sidebar-avatar-size": `${sidebarTuning.avatarSize}rem`,
-			"--sidebar-row-idle-bg": sidebarTuning.rowIdleBg,
-			"--sidebar-row-hover-bg": sidebarTuning.rowHoverBg,
-			"--sidebar-row-active-bg": sidebarTuning.rowActiveBg,
-			"--sidebar-row-fg": sidebarTuning.rowFg,
-			"--sidebar-row-active-fg": sidebarTuning.rowActiveFg,
-			...defaultChromeStyle,
-		}),
-		[sidebarTuning],
-	);
 	const isSessionOverviewRoute = canonicalPathname === appRoutes.session();
 	const isSessionWorkspaceRoute =
 		isSessionOverviewRoute ||
@@ -165,6 +146,19 @@ export function LeftSidebarAppShellLayout() {
 		React.useState<HTMLElement | null>(null);
 	const [newseshListHeaderPortal, setNewseshListHeaderPortal] =
 		React.useState<HTMLElement | null>(null);
+	// The assistant lives in the full product only: the plugin host has its own
+	// chat, and the marketing demo and onboarding stay focused. Its replies are
+	// placeholders for now, so it stays out of production builds.
+	const assistantAvailable =
+		import.meta.env.DEV &&
+		import.meta.env.MODE !== "plugin" &&
+		!demo &&
+		!isWelcome;
+	// The plugin host and onboarding have no workspace sessions to date.
+	const showLastSessionUpload = import.meta.env.MODE !== "plugin" && !isWelcome;
+	const [assistantOpen, setAssistantOpen] = React.useState(false);
+	const openAssistant = React.useCallback(() => setAssistantOpen(true), []);
+	useAssistantShortcut(openAssistant, assistantAvailable && !assistantOpen);
 
 	React.useEffect(() => {
 		const handleShellShortcutKeyDown = (event: KeyboardEvent) => {
@@ -206,7 +200,7 @@ export function LeftSidebarAppShellLayout() {
 			{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
 				<ServiceStatusBanner />
 			) : null}
-			{isHomeWorkspaceRoute || isSettingsWorkspaceRoute ? null : (
+			{isHomeWorkspaceRoute ? null : (
 				<SiteHeader
 					setNewseshListPortalHost={setNewseshListHeaderPortal}
 					setPortalHost={setShellHeaderPortal}
@@ -272,17 +266,36 @@ export function LeftSidebarAppShellLayout() {
 									inert={isWelcome || undefined}
 								>
 									<SidebarProvider
-										defaultOpen={false}
-										open={false}
-										className="dashboard-01-chrome-frame h-full overflow-hidden overscroll-none"
-										style={leftSidebarChromeStyle}
+										className="group/shell dashboard-01-chrome-frame relative h-full min-h-0 overflow-clip overscroll-none"
+										style={defaultChromeStyle}
 									>
-										<div className="contents" inert={isWelcome || undefined}>
-											<AppSidebar />
-										</div>
-										<SidebarInset className="dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)] md:m-(--dashboard-01-window-inset) md:ml-0 md:rounded-(--dashboard-01-window-radius) md:shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)]">
-											{shellWindowContent}
-										</SidebarInset>
+										<AppSidebar />
+										<ShellWindowColumn
+											footer={
+												showLastSessionUpload ? <LastSessionUploadBar /> : null
+											}
+										>
+											<SidebarInset
+												className={cn(
+													"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
+													shellWindowRadiusClassName,
+												)}
+											>
+												{shellWindowContent}
+												{/* Lights up the window's right edge while the panel's
+												    resize handle is hovered or dragged. */}
+												<div
+													aria-hidden="true"
+													className="pointer-events-none absolute inset-0 z-10 rounded-lg border-r border-border/80 opacity-0 transition-opacity duration-200 group-has-[[data-assistant-resize]:hover]/shell:opacity-100 group-has-[[data-assistant-resize][data-resizing]]/shell:opacity-100 squircle:rounded-3xl corner-squircle"
+												/>
+											</SidebarInset>
+										</ShellWindowColumn>
+										{assistantAvailable ? (
+											<AssistantPanel
+												open={assistantOpen}
+												onOpenChange={setAssistantOpen}
+											/>
+										) : null}
 									</SidebarProvider>
 								</div>
 							</div>

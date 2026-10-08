@@ -39,7 +39,7 @@ import {
 	TraceBrainIcon,
 	TraceMessageIcon,
 	TraceWrenchIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import { ModelTraceIcon, TraceIcon } from "./conversation-trace-icons";
 import type { ConversationTraceInteractionEpisode } from "./conversation-trace-interaction-episodes";
 import { TraceResultBody } from "./conversation-trace-result-body";

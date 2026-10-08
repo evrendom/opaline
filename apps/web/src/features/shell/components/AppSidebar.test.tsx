@@ -1,27 +1,53 @@
 import { render, screen, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cloneElement, type ReactElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AppSidebar } from "./AppSidebar";
 
+function Passthrough({ children }: { children?: ReactNode }) {
+	return <div>{children}</div>;
+}
+
 vi.mock("@/app/ui/sidebar", () => ({
 	Sidebar: ({ children }: { children: ReactNode }) => <aside>{children}</aside>,
+	SidebarContent: Passthrough,
+	SidebarFooter: ({ children }: { children: ReactNode }) => (
+		<footer>{children}</footer>
+	),
+	SidebarGroup: Passthrough,
+	SidebarGroupContent: Passthrough,
+	SidebarHeader: Passthrough,
+	SidebarMenu: ({ children }: { children: ReactNode }) => <ul>{children}</ul>,
+	SidebarMenuItem: ({ children }: { children: ReactNode }) => (
+		<li>{children}</li>
+	),
+	SidebarMenuButton: ({
+		render = <button type="button" />,
+		isActive,
+		children,
+		...props
+	}: {
+		render?: ReactElement<Record<string, unknown>>;
+		isActive?: boolean;
+		children: ReactNode;
+	}) =>
+		cloneElement(
+			render,
+			{ ...props, "data-active": isActive ? "" : undefined },
+			children,
+		),
 }));
 
-vi.mock("@/features/shell/components/shell-rail", () => ({
-	RailLink: ({ label, to }: { label: string; to: string }) => (
+vi.mock("@/features/shell/components/SidebarUserMenu", () => ({
+	SidebarUserMenu: () => (
 		<li>
-			<a href={to}>{label}</a>
+			<button type="button">User menu</button>
 		</li>
 	),
 }));
 
-vi.mock("@/features/shell/components/UserRailButton", () => ({
-	UserRailButton: () => <button type="button">User menu</button>,
-}));
-
-vi.mock("@/features/shell/components/WorkspaceMenuButton", () => ({
-	WorkspaceMenuButton: () => <button type="button">Workspace menu</button>,
+vi.mock("@/features/shell/components/SidebarWorkspaceSwitcher", () => ({
+	SidebarWorkspaceSwitcher: () => <button type="button">Workspace menu</button>,
 }));
 
 vi.mock("@/features/shell/hooks/use-shell-route-path", () => ({
@@ -29,39 +55,62 @@ vi.mock("@/features/shell/hooks/use-shell-route-path", () => ({
 }));
 
 vi.mock("@/features/shell/hooks/useCurrentShellRoute", () => ({
-	useCurrentShellRoute: () => ({ id: "dashboard" }),
+	useCurrentShellRoute: () => ({ id: "sessions" }),
 }));
 
-describe("AppSidebar", () => {
-	it("centers only the navigation icons with 20px of additional spacing", () => {
-		const { container } = render(
-			<MemoryRouter>
-				<AppSidebar layout="centered" />
-			</MemoryRouter>,
-		);
+function renderSidebar() {
+	return render(
+		<MemoryRouter>
+			<AppSidebar />
+		</MemoryRouter>,
+	);
+}
 
-		expect(screen.queryByRole("button", { name: "Workspace menu" })).toBeNull();
-		expect(screen.queryByRole("button", { name: "User menu" })).toBeNull();
+describe("AppSidebar", () => {
+	it("lists the sections as labelled links, with settings in the footer", () => {
+		renderSidebar();
 
 		const navigation = screen.getByRole("navigation", { name: "Primary" });
 		expect(
 			within(navigation)
 				.getAllByRole("link")
-				.map((link) => link.getAttribute("href")),
-		).toEqual(expect.arrayContaining(["/session", "/team", "/settings"]));
-		expect(navigation.querySelector('a[href="/home"]')).toBeNull();
-		expect(navigation.querySelector("ul")).toHaveClass("gap-5.5");
+				.map((link) => link.textContent),
+		).toEqual(["Dashboard", "Sessions", "Skills", "Repos", "Team"]);
+
+		const footer = screen.getByRole("contentinfo");
 		expect(
-			container.querySelector("[data-sidebar-navigation-stage]"),
-		).toHaveClass("flex", "items-center");
+			within(footer).getByRole("link", { name: "Settings" }),
+		).toHaveAttribute("href", "/settings");
 	});
 
-	it("keeps the workspace and user controls in the standard sidebar", () => {
-		render(
-			<MemoryRouter>
-				<AppSidebar />
-			</MemoryRouter>,
+	it("offers the install command above settings", () => {
+		renderSidebar();
+
+		const footer = screen.getByRole("contentinfo");
+		const items = within(footer).getAllByRole("listitem");
+		expect(
+			within(items[0]).getByRole("button", {
+				name: "Copy install command: npx opaline@latest",
+			}),
+		).toHaveTextContent("npx opaline@latest");
+		expect(
+			within(items[1]).getByRole("link", { name: "Settings" }),
+		).toBeInTheDocument();
+	});
+
+	it("marks only the current section as active", () => {
+		renderSidebar();
+
+		const current = screen.getByRole("link", { current: "page" });
+		expect(current).toHaveTextContent("Sessions");
+		expect(current).toHaveAttribute("data-active");
+		expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute(
+			"data-active",
 		);
+	});
+
+	it("keeps the workspace switcher and user menu", () => {
+		renderSidebar();
 
 		expect(
 			screen.getByRole("button", { name: "Workspace menu" }),

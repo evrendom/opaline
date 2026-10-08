@@ -1,5 +1,5 @@
+import { IconLoader2 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
@@ -129,7 +129,7 @@ export function AcceptInvitationPage() {
 	) {
 		return (
 			<div className="flex min-h-dvh items-center justify-center bg-white">
-				<Loader2 className="size-6 animate-spin text-muted" />
+				<IconLoader2 className="size-6 animate-spin text-muted" />
 			</div>
 		);
 	}
@@ -139,7 +139,7 @@ export function AcceptInvitationPage() {
 			<>
 				<InvitationLoginRedirectMount invitationId={invitationId} />
 				<div className="flex min-h-dvh items-center justify-center bg-white">
-					<Loader2 className="size-6 animate-spin text-muted" />
+					<IconLoader2 className="size-6 animate-spin text-muted" />
 				</div>
 			</>
 		);

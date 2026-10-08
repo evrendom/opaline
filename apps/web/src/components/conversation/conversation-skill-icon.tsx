@@ -1,38 +1,38 @@
+import type { Icon } from "@tabler/icons-react";
 import {
-	Compass01Icon,
-	DrillIcon,
-	FlashlightIcon,
-	MagnetIcon,
-	MicroscopeIcon,
-	PaintBrush01Icon,
-	PencilRulerIcon,
-	RulerIcon,
-	Scissor01Icon,
-	TapeMeasureIcon,
-	Telescope01Icon,
-	TestTube01Icon,
-	ToolboxIcon,
-	ToolsIcon,
-	Wrench01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+	IconBox,
+	IconBrush,
+	IconBulb,
+	IconCompass,
+	IconHammer,
+	IconMagnet,
+	IconMicroscope,
+	IconPencilCog,
+	IconRuler,
+	IconRuler2,
+	IconScissors,
+	IconTelescope,
+	IconTestPipe,
+	IconTool,
+	IconTools,
+} from "@tabler/icons-react";
 
-const SKILL_ICONS = [
-	{ name: "wrench", icon: Wrench01Icon },
-	{ name: "drill", icon: DrillIcon },
-	{ name: "paintbrush", icon: PaintBrush01Icon },
-	{ name: "compass", icon: Compass01Icon },
-	{ name: "ruler", icon: RulerIcon },
-	{ name: "scissors", icon: Scissor01Icon },
-	{ name: "tape-measure", icon: TapeMeasureIcon },
-	{ name: "flashlight", icon: FlashlightIcon },
-	{ name: "magnet", icon: MagnetIcon },
-	{ name: "microscope", icon: MicroscopeIcon },
-	{ name: "telescope", icon: Telescope01Icon },
-	{ name: "drafting-tools", icon: PencilRulerIcon },
-	{ name: "toolbox", icon: ToolboxIcon },
-	{ name: "tools", icon: ToolsIcon },
-	{ name: "experiment", icon: TestTube01Icon },
+const SKILL_ICONS: { name: string; icon: Icon }[] = [
+	{ name: "wrench", icon: IconTool },
+	{ name: "drill", icon: IconHammer },
+	{ name: "paintbrush", icon: IconBrush },
+	{ name: "compass", icon: IconCompass },
+	{ name: "ruler", icon: IconRuler },
+	{ name: "scissors", icon: IconScissors },
+	{ name: "tape-measure", icon: IconRuler2 },
+	{ name: "flashlight", icon: IconBulb },
+	{ name: "magnet", icon: IconMagnet },
+	{ name: "microscope", icon: IconMicroscope },
+	{ name: "telescope", icon: IconTelescope },
+	{ name: "drafting-tools", icon: IconPencilCog },
+	{ name: "toolbox", icon: IconBox },
+	{ name: "tools", icon: IconTools },
+	{ name: "experiment", icon: IconTestPipe },
 ];
 
 export function getSkillIcon(skill: string) {
@@ -53,14 +53,14 @@ export function ConversationSkillIcon({
 	className: string;
 }) {
 	const choice = getSkillIcon(skill);
+	const Glyph = choice.icon;
 	return (
-		<HugeiconsIcon
+		<Glyph
 			aria-hidden="true"
 			className={className}
 			data-skill-icon={choice.name}
-			data-trace-hugeicon
-			icon={choice.icon}
-			strokeWidth={1.5}
+			data-trace-glyph
+			stroke={1.5}
 		/>
 	);
 }

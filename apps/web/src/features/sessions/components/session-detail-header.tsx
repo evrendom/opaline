@@ -1,15 +1,12 @@
 import {
-	ChevronDown,
-	ChevronRight,
-	ChevronsRight,
-	ChevronUp,
-	CircleDollarSign,
-	Clock3,
-	Gauge,
-	type LucideIcon,
-	Maximize2,
-	Minimize2,
-} from "lucide-react";
+	type Icon,
+	IconChevronDown,
+	IconChevronRight,
+	IconChevronUp,
+	IconClock,
+	IconCoin,
+	IconGauge,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Skeleton } from "@/app/ui/skeleton";
@@ -18,20 +15,14 @@ import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { DetailIdentityBreadcrumb } from "@/features/shell/components/detail-identity-breadcrumb";
 import { formatRoundedDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getRepositoryLabel } from "./session-context-chips";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
 import { SessionInteractionCounts } from "./session-interaction-counts";
 
 type SessionDetailViewModel = ReturnType<typeof buildSessionDetailViewModel>;
 
-export type SessionDetailDisplayControls = {
-	isFullscreen: boolean;
-	onClose: () => void;
-	onToggleFullscreen: () => void;
-};
-
 type SessionDetailHeaderProps = {
 	avatarMap: Record<string, string>;
-	displayControls: SessionDetailDisplayControls | undefined;
 	headerRef: (element: HTMLElement | null) => void;
 	hideMetrics: boolean;
 	isLoading: boolean;
@@ -39,6 +30,9 @@ type SessionDetailHeaderProps = {
 	portalHost: HTMLElement | null;
 	position: number | undefined;
 	sessionId: string;
+	/** The repo › branch › commit › session trail. Off on the full session
+	 *  page, where the shell breadcrumb and context chips carry it. */
+	showIdentity: boolean;
 	totalSessions: number;
 	viewModel: SessionDetailViewModel | undefined;
 };
@@ -46,11 +40,10 @@ type SessionDetailHeaderProps = {
 const sessionInfoTouchTargetClassName =
 	"absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden";
 
+// Record pill: round segments that tint on hover inside an
+// outlined pill.
 const sessionHeaderNavigationButtonClassName =
-	"group relative inline-flex size-7 shrink-0 items-center justify-center rounded-none bg-transparent text-[color:var(--dashboardy-muted)] outline-none transition-colors first:rounded-l-[3px] last:rounded-r-[3px] hover:bg-[color:var(--dashboardy-subsurface-strong)] hover:text-[color:var(--dashboardy-heading)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[color:var(--dashboardy-muted)]";
-
-const sessionHeaderDisplayButtonClassName =
-	"relative inline-flex size-7 shrink-0 items-center justify-center rounded-[4px] bg-transparent text-[color:var(--dashboardy-muted)] outline-none hover:bg-[color:var(--dashboardy-subsurface-strong)] hover:text-[color:var(--dashboardy-heading)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]";
+	"relative flex h-full items-center rounded-full p-2 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
 
 const sessionMetricsGroupClassName =
 	"flex w-fit min-w-0 max-w-full items-center divide-x divide-[color:var(--dashboardy-divider)] overflow-x-auto";
@@ -87,62 +80,6 @@ function SessionHeaderNavigationButton({
 	);
 }
 
-function SessionDisplayControls({
-	isFullscreen,
-	onClose,
-	onToggleFullscreen,
-}: SessionDetailDisplayControls) {
-	const FullscreenIcon = isFullscreen ? Minimize2 : Maximize2;
-	const fullscreenLabel = isFullscreen
-		? "Restore split view"
-		: "Expand session detail";
-
-	return (
-		<div className="flex shrink-0 items-center gap-1">
-			<button
-				type="button"
-				aria-label="Close session"
-				className={sessionHeaderDisplayButtonClassName}
-				onClick={onClose}
-			>
-				<ChevronsRight
-					aria-hidden="true"
-					className="size-4 shrink-0"
-					strokeWidth={1.75}
-				/>
-				<span aria-hidden="true" className={sessionInfoTouchTargetClassName} />
-			</button>
-			<button
-				type="button"
-				aria-label={fullscreenLabel}
-				aria-pressed={isFullscreen}
-				className={sessionHeaderDisplayButtonClassName}
-				onClick={onToggleFullscreen}
-			>
-				<FullscreenIcon
-					aria-hidden="true"
-					className="size-4 shrink-0"
-					strokeWidth={1.75}
-				/>
-				<span aria-hidden="true" className={sessionInfoTouchTargetClassName} />
-			</button>
-		</div>
-	);
-}
-
-function getRepositoryLabel(viewModel: SessionDetailViewModel | undefined) {
-	if (viewModel?.safeRepository) {
-		return viewModel.safeRepository;
-	}
-	if (!viewModel?.safeProjectPath) {
-		return "Unknown repository";
-	}
-	return (
-		viewModel.safeProjectPath.replaceAll("\\", "/").split("/").at(-1) ??
-		viewModel.safeProjectPath
-	);
-}
-
 function SessionIdentityBreadcrumb({
 	isLoading,
 	sessionId,
@@ -160,7 +97,7 @@ function SessionIdentityBreadcrumb({
 						<li key={item} className="flex shrink-0 items-center gap-1">
 							<Skeleton className="h-4 w-20 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
 							{index < 3 ? (
-								<ChevronRight
+								<IconChevronRight
 									aria-hidden="true"
 									className="size-4 shrink-0 text-black/6 dark:text-white/8"
 								/>
@@ -213,41 +150,28 @@ function SessionRecordNavigation({
 	return (
 		<nav
 			aria-label="Session navigation"
-			className="flex min-w-0 shrink-0 items-center gap-2.5"
+			className="flex h-8 min-w-0 shrink-0 items-center rounded-full bg-card text-sm shadow-(--custom-outline-shadow)"
 		>
 			<p
 				aria-live="polite"
-				className="min-w-0 truncate whitespace-nowrap text-[0.6875rem]/4 font-[450] text-[color:var(--dashboardy-muted)] tabular-nums"
+				className="min-w-0 truncate pr-1 pl-3 text-sm whitespace-nowrap text-muted-foreground tabular-nums"
 				title={positionTitle}
 			>
 				{positionLabel}
 			</p>
-			<div className="flex shrink-0 items-center divide-x divide-[color:var(--dashboardy-border)] rounded-sm border border-[color:var(--dashboardy-border)] bg-transparent">
-				<SessionHeaderNavigationButton
-					disabled={!navigation.hasPreviousSession}
-					icon={
-						<ChevronUp
-							aria-hidden="true"
-							className="size-3.5 shrink-0"
-							strokeWidth={1.75}
-						/>
-					}
-					label="Previous session"
-					onClick={navigation.onPreviousSession}
-				/>
-				<SessionHeaderNavigationButton
-					disabled={!navigation.hasNextSession}
-					icon={
-						<ChevronDown
-							aria-hidden="true"
-							className="size-3.5 shrink-0"
-							strokeWidth={1.75}
-						/>
-					}
-					label="Next session"
-					onClick={navigation.onNextSession}
-				/>
-			</div>
+			<span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
+			<SessionHeaderNavigationButton
+				disabled={!navigation.hasPreviousSession}
+				icon={<IconChevronUp aria-hidden="true" className="size-3.5" />}
+				label="Previous session"
+				onClick={navigation.onPreviousSession}
+			/>
+			<SessionHeaderNavigationButton
+				disabled={!navigation.hasNextSession}
+				icon={<IconChevronDown aria-hidden="true" className="size-3.5" />}
+				label="Next session"
+				onClick={navigation.onNextSession}
+			/>
 		</nav>
 	);
 }
@@ -258,7 +182,7 @@ function SessionMetric({
 	value,
 	mono = false,
 }: {
-	icon: LucideIcon;
+	icon: Icon;
 	label: string;
 	value: string | number;
 	mono?: boolean;
@@ -269,7 +193,7 @@ function SessionMetric({
 				<div className={cn(sessionMetricItemClassName, "cursor-help")}>
 					<Icon
 						aria-hidden="true"
-						className="size-4 h-lh shrink-0 stroke-[color:var(--dashboardy-heading)]"
+						className="size-4 h-lh shrink-0 text-[color:var(--dashboardy-heading)]"
 					/>
 					<div className="min-w-0 flex-1">
 						<div
@@ -345,17 +269,17 @@ function SessionMetrics({
 				userMessageCount={conversationSummary?.userMessages}
 			/>
 			<SessionMetric
-				icon={Clock3}
+				icon={IconClock}
 				label="Duration"
 				value={formatRoundedDuration(safeDurationMin)}
 			/>
-			<SessionMetric icon={Gauge} label="Tokens" value={tokenUsageLabel} mono />
 			<SessionMetric
-				icon={CircleDollarSign}
-				label="Cost"
-				value={costLabel}
+				icon={IconGauge}
+				label="Tokens"
+				value={tokenUsageLabel}
 				mono
 			/>
+			<SessionMetric icon={IconCoin} label="Cost" value={costLabel} mono />
 		</div>
 	);
 }
@@ -382,7 +306,6 @@ function SessionMetricsSkeleton() {
 
 export function SessionDetailHeader({
 	avatarMap,
-	displayControls,
 	headerRef,
 	hideMetrics,
 	isLoading,
@@ -390,6 +313,7 @@ export function SessionDetailHeader({
 	portalHost,
 	position,
 	sessionId,
+	showIdentity,
 	totalSessions,
 	viewModel,
 }: SessionDetailHeaderProps) {
@@ -400,18 +324,17 @@ export function SessionDetailHeader({
 	return createPortal(
 		<div
 			ref={headerRef}
-			className="dashboardy-page flex min-w-0 flex-1 items-center gap-6 overflow-hidden font-sans"
+			className="dashboardy-page flex min-w-0 flex-1 items-center justify-end gap-6 font-sans"
 		>
-			<div className="flex min-w-0 flex-1 items-center gap-1">
-				{displayControls ? (
-					<SessionDisplayControls {...displayControls} />
-				) : null}
-				<SessionIdentityBreadcrumb
-					isLoading={isLoading}
-					sessionId={sessionId}
-					viewModel={viewModel}
-				/>
-			</div>
+			{showIdentity ? (
+				<div className="flex min-w-0 flex-1 items-center gap-1">
+					<SessionIdentityBreadcrumb
+						isLoading={isLoading}
+						sessionId={sessionId}
+						viewModel={viewModel}
+					/>
+				</div>
+			) : null}
 			{hideMetrics ? null : (
 				<div className="hidden min-w-0 justify-end overflow-hidden lg:flex">
 					{isLoading ? <SessionMetricsSkeleton /> : null}

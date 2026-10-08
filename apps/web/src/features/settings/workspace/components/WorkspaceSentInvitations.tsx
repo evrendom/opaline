@@ -2,10 +2,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { WorkspaceOutgoingInvitationsTable } from "@/features/settings/workspace/components/WorkspaceOutgoingInvitationsTable";
-import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
-export function WorkspaceOutgoingInvitationsCard({
+// "Invitations sent": listed under the members, only
+// while some are pending.
+export function WorkspaceSentInvitations({
 	invitations,
 	canCancel,
 	onInvalidate,
@@ -48,17 +49,19 @@ export function WorkspaceOutgoingInvitationsCard({
 		}
 	};
 
+	if (invitations.length === 0) {
+		return null;
+	}
+
 	return (
-		<WorkspaceSettingsGroup
-			title="Outgoing invitations"
-			description="Pending invitations that haven't been accepted yet."
-		>
+		<div className="workspace-settings-subsection">
+			<h3>Invitations sent</h3>
 			<WorkspaceOutgoingInvitationsTable
 				invitations={invitations}
 				canCancel={canCancel}
 				pendingInvitationId={pendingInvitationId}
 				onCancel={(invitationId) => void cancelInvitation(invitationId)}
 			/>
-		</WorkspaceSettingsGroup>
+		</div>
 	);
 }

@@ -1,10 +1,6 @@
 "use client";
 
-import {
-	CommandIcon,
-	Settings01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
+import { IconCheck, IconCommand, IconSettings } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
 	appRoutes,
@@ -18,7 +14,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
-import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 import {
 	getUtilityRailItemClassName,
 	getUtilityRailLabelClassName,
@@ -133,7 +128,7 @@ export function WorkspaceMenuButton({
 						>
 							<span className="flex-1 truncate">{organization.name}</span>
 							{organization.id === state.activeOrg?.id ? (
-								<ShellHugeicon icon={Tick02Icon} />
+								<IconCheck aria-hidden="true" />
 							) : null}
 						</DropdownMenuItem>
 					))
@@ -146,7 +141,7 @@ export function WorkspaceMenuButton({
 						navigate(getShellRoutePath(appRoutes.settingsWorkspace()))
 					}
 				>
-					<ShellHugeicon icon={Settings01Icon} />
+					<IconSettings aria-hidden="true" />
 					Workspace settings
 				</DropdownMenuItem>
 				<DropdownMenuItem
@@ -154,7 +149,7 @@ export function WorkspaceMenuButton({
 						navigate(getShellRoutePath(appRoutes.settingsCreateWorkspace()))
 					}
 				>
-					<ShellHugeicon icon={CommandIcon} />
+					<IconCommand aria-hidden="true" />
 					Create workspace
 				</DropdownMenuItem>
 			</DropdownMenuContent>

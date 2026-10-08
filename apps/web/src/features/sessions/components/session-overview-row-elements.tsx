@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { NewseshLanguageSignalMatch } from "./newsesh-session-language-signal";
 
 export const SESSION_OVERVIEW_ROW_CLASS_NAME =
-	"group/session grid h-9 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)";
+	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)";
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
 	"text-base/5 font-[450] tracking-normal text-(--session-overview-text) sm:text-[0.8125rem]/5";

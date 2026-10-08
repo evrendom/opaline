@@ -14,7 +14,7 @@ import {
 	TracePencilIcon,
 	TraceReadIcon,
 	TraceSparklesIcon,
-} from "@/components/conversation/conversation-trace-hugeicons";
+} from "@/components/conversation/conversation-trace-glyphs";
 import { UserTraceAvatar } from "@/components/conversation/conversation-trace-icons";
 import {
 	ModelSectionHeader,

@@ -21,7 +21,9 @@ import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
 import { SessionsOverviewSkeleton } from "./sessions-overview-skeleton";
 import {
+	SESSION_OVERVIEW_HEADER_HEIGHT,
 	SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
+	SESSION_OVERVIEW_ROW_HEIGHT,
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
 } from "./sessions-overview-table-utils";
 import { useSessionsOverviewTableState } from "./use-sessions-overview-table-state";
@@ -114,12 +116,12 @@ export function SessionsOverviewTable({
 		count: tableState.sortedSessions.length,
 		rangeExtractor,
 		getScrollElement: () => tableScrollElementRef.current,
-		estimateSize: () => 36,
+		estimateSize: () => SESSION_OVERVIEW_ROW_HEIGHT,
 		getItemKey: (index) => {
 			const session = tableState.sortedSessions[index];
 			return session ? `${session.source}:${session.session_id}` : index;
 		},
-		scrollMargin: 40,
+		scrollMargin: SESSION_OVERVIEW_HEADER_HEIGHT,
 		overscan: 8,
 		enabled: !demo && !isLoading,
 	});
@@ -129,7 +131,13 @@ export function SessionsOverviewTable({
 			? virtualRows.flatMap((row) => {
 					const session = tableState.sortedSessions[row.index];
 					return session
-						? [{ session, position: row.index, start: row.start - 40 }]
+						? [
+								{
+									session,
+									position: row.index,
+									start: row.start - SESSION_OVERVIEW_HEADER_HEIGHT,
+								},
+							]
 						: [];
 				})
 			: tableState.visibleSessions.map((session, position) => ({
@@ -264,7 +272,7 @@ export function SessionsOverviewTable({
 					/>
 					<div
 						className={cn(
-							"@container/sessions-overview flex min-h-[calc(100%-2.5rem)] flex-col",
+							"@container/sessions-overview flex min-h-[calc(100%-3rem)] flex-col",
 							showSkillsColumn
 								? SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME
 								: "min-w-[812px]",

@@ -1,4 +1,4 @@
-import { User } from "lucide-react";
+import { IconUser } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { DashboardModelIdentity } from "@/features/dashboard/components/DashboardModelBadges";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ function SessionUserIdentity({
 						/>
 					) : (
 						<span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[color:var(--dashboardy-subsurface-strong)] outline-1 -outline-offset-1 outline-black/5 dark:outline-white/10">
-							<User className="size-3 shrink-0" />
+							<IconUser className="size-3 shrink-0" />
 						</span>
 					)}
 					<div className="shrink-0 font-mono text-base font-semibold tracking-normal text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]">

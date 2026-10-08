@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TraceBrainIcon, TraceReadIcon } from "./conversation-trace-hugeicons";
+import { TraceBrainIcon, TraceReadIcon } from "./conversation-trace-glyphs";
 import {
 	ModelTraceIcon,
 	TraceDisclosureIcon,
@@ -19,7 +19,7 @@ function getSymbolClassTokens(markup: string, symbol: "chevron" | "icon") {
 }
 
 describe("TraceDisclosureIcon", () => {
-	test("uses the reading-specific Hugeicon for file-read activity", () => {
+	test("uses the reading-specific icon for file-read activity", () => {
 		expect(CONVERSATION_TOOL_ICONS.file).toBe(TraceReadIcon);
 	});
 
@@ -47,7 +47,7 @@ describe("TraceDisclosureIcon", () => {
 		expect(markup).toContain('data-trace-icon-tone="violet"');
 		expect(markup).toContain('data-trace-tool-icon="sparkle"');
 		expect(markup).toContain("size-3.5");
-		expect(markup).toContain("data-trace-hugeicon");
+		expect(markup).toContain("data-trace-glyph");
 	});
 
 	test("shows the rotated collapsed arrow only on hover or focus", () => {

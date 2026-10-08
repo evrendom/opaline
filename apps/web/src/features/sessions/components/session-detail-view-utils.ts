@@ -1,4 +1,4 @@
-import { FolderGit2, GitBranch, type LucideIcon } from "lucide-react";
+import { type Icon, IconFolder, IconGitBranch } from "@tabler/icons-react";
 import { parseConversations } from "@/lib/conversation-schema";
 import { SessionDetailFastResponseError } from "./session-detail-fast-response";
 import {
@@ -191,7 +191,7 @@ function shortenLabelFromLeft(label: string, maxLength: number) {
 
 type SessionMetadataBadge = {
 	displayLabel: string;
-	icon: LucideIcon;
+	icon: Icon;
 	label: string;
 	tooltip: string;
 };
@@ -208,7 +208,7 @@ export function createSessionMetadataBadges({
 	if (repository) {
 		metadataBadges.push({
 			displayLabel: shortenLabelFromLeft(repository, 30),
-			icon: FolderGit2,
+			icon: IconFolder,
 			label: repository,
 			tooltip: "Repository",
 		});
@@ -217,7 +217,7 @@ export function createSessionMetadataBadges({
 	if (gitBranch) {
 		metadataBadges.push({
 			displayLabel: shortenLabelFromLeft(gitBranch, 26),
-			icon: GitBranch,
+			icon: IconGitBranch,
 			label: gitBranch,
 			tooltip: "Branch",
 		});

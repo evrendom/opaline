@@ -30,9 +30,8 @@ test("stage-1 GitHub dashboard happy path", async ({ page }, testInfo) => {
 		page.getByText("CI history from Sep 1, 2026 · 1 PR excluded"),
 	).toBeVisible();
 	await page.getByText("Weekly", { exact: true }).first().click();
-	await expect(page.locator(".cost-chart-frequency")).toHaveText(
-		"Weekly · UTC",
-	);
+	// The interval now reads in the date range button.
+	await expect(page.getByRole("button", { name: / · Weekly$/ })).toBeVisible();
 	await page.getByRole("button", { name: "CI failures per PR" }).click();
 	await page.screenshot({
 		path: testInfo.outputPath("s2-merged-prs.png"),

@@ -9,7 +9,7 @@ import {
 	TraceBotIcon,
 	TraceChevronDownIcon,
 	TraceUserIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import { getModelIconComponent } from "./conversation-trace-model-icon";
 
 const iconShellClassName =

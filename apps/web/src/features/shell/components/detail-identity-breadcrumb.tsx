@@ -1,5 +1,4 @@
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
+import { IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 interface DetailIdentityItem {
@@ -55,8 +54,8 @@ export function DetailIdentityBreadcrumb({
 								</span>
 							)}
 							{!current ? (
-								<ShellHugeicon
-									icon={ArrowRight01Icon}
+								<IconChevronRight
+									aria-hidden="true"
 									className="size-4 shrink-0 text-[#ededed] dark:text-[#373737]"
 								/>
 							) : null}

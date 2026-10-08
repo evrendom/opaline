@@ -145,7 +145,14 @@ function SessionAwareApp() {
 			<>
 				<ProductAnalyticsSessionSync session={session} />
 				<AuthenticatedApp rootRedirectTarget={rootRedirectTarget} />
-				{session ? <SupportEmailButton /> : null}
+				{/* Inside a workspace the bottom-right corner belongs to the
+				    assistant, which only development builds show (see
+				    AppShellLayout); everywhere else, support keeps it. */}
+				{session &&
+				(!import.meta.env.DEV ||
+					!getWorkspaceSlugFromPath(location.pathname)) ? (
+					<SupportEmailButton />
+				) : null}
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);

@@ -15,12 +15,22 @@ export const DemoSeedSchema = z.object({
 	members: z.array(
 		z.object({ userId: z.string(), name: z.string(), image: z.string() }),
 	),
+	// The showcase account's member, shown as the signed-in user before Explore.
+	viewerUserId: z.string(),
 	sessions: z.array(SessionOverviewAnalyticsSchema).max(30),
 	totalSessionCount: z.number(),
 	dashboard: z.object({
 		input: CostDashboardInputSchema,
 		data: CostDashboardSchema,
 	}),
+	// The other stat cards' requests: a dashboard response only carries a real
+	// trend for its requested metric, so each card's sparkline needs its own.
+	previews: z.array(
+		z.object({
+			input: CostDashboardInputSchema,
+			data: CostDashboardSchema,
+		}),
+	),
 	maxima: z.object({
 		input: z.number(),
 		output: z.number(),

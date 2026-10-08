@@ -1,4 +1,4 @@
-import { User } from "lucide-react";
+import { IconUser } from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { ModelTraceIcon } from "@/components/conversation/conversation-trace-icons";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
@@ -97,9 +97,9 @@ export function SessionModelMark({
 			) : null}
 			{!(demo && avatarUrl) ? (
 				<AvatarFallback className="bg-(--session-overview-surface)">
-					<User
+					<IconUser
 						aria-hidden="true"
-						className="size-2.5 shrink-0 stroke-(--session-overview-muted)"
+						className="size-2.5 shrink-0 text-(--session-overview-muted)"
 					/>
 				</AvatarFallback>
 			) : null}

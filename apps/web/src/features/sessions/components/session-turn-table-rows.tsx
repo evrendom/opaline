@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import type { SessionCompaction } from "./session-compactions";
 import type { SessionTurnEpisode } from "./session-turn-episodes";
 
@@ -36,9 +36,12 @@ export function SessionTurnEpisodeRow({
 					onClick={onToggle}
 				>
 					{collapsed ? (
-						<ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+						<IconChevronRight
+							aria-hidden="true"
+							className="size-3.5 shrink-0"
+						/>
 					) : (
-						<ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+						<IconChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
 					)}
 					<span className="min-w-0 flex-1 truncate">{episode.label}</span>
 					<span className="shrink-0 font-normal text-(--session-overview-muted) tabular-nums">

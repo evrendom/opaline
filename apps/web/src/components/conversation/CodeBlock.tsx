@@ -7,7 +7,7 @@ import {
 	TraceCodeIcon,
 	TraceMarkdownIcon,
 	TraceTypeScriptIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import "./code-block.css";
 
 // A scroll region has no interactive native element equivalent, but must be

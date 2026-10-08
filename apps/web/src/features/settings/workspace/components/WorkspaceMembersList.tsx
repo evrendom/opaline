@@ -2,10 +2,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
-import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { authClient } from "@/lib/auth-client";
 
-export function WorkspaceMembersCard({
+export function WorkspaceMembersList({
 	members,
 	canManage,
 	onInvalidate,
@@ -72,14 +71,12 @@ export function WorkspaceMembersCard({
 	};
 
 	return (
-		<WorkspaceSettingsGroup title="Members" hideTitle>
-			<WorkspaceMembersTable
-				members={members}
-				canEdit={canManage}
-				pendingKey={pendingMemberKey}
-				onRoleChange={(memberId, role) => void updateRole(memberId, role)}
-				onRemove={(memberId) => void removeMember(memberId)}
-			/>
-		</WorkspaceSettingsGroup>
+		<WorkspaceMembersTable
+			members={members}
+			canEdit={canManage}
+			pendingKey={pendingMemberKey}
+			onRoleChange={(memberId, role) => void updateRole(memberId, role)}
+			onRemove={(memberId) => void removeMember(memberId)}
+		/>
 	);
 }

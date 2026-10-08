@@ -1,7 +1,7 @@
 import type { TraceEvent } from "./conversation-trace";
 import { conversationTraceLabelClassName } from "./conversation-trace-class-names";
 import { ToolCallBody } from "./conversation-trace-event-row";
-import { TraceExchangeIcon } from "./conversation-trace-hugeicons";
+import { TraceExchangeIcon } from "./conversation-trace-glyphs";
 import { TraceIcon } from "./conversation-trace-icons";
 import { ExpandableTraceRow } from "./expandable-trace-row";
 

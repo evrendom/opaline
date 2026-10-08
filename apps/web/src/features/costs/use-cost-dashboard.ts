@@ -11,11 +11,19 @@ import {
 	AGENT_RUN_DURATIONS,
 	AGENT_RUN_SIGNALS,
 	CI_RUN_CONCLUSIONS,
+	CostDashboardRequestedMetricSchema,
 	PULL_REQUEST_CI,
 } from "@rudel/api-routes";
 import { type Query, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { useSearchParams } from "react-router-dom";
+import { z } from "zod";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
@@ -92,12 +100,12 @@ export function useCostDashboard() {
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
-	const metrics = useServerDashboardTabs(
+	const tabs = useServerDashboardTabs(
 		state,
 		query.data,
 		workspace.activeOrg?.id,
 	);
-	return { ...state, metrics, query };
+	return { ...state, ...tabs, query };
 }
 
 export function useAdminCostDashboard(): CostDashboardController {
@@ -135,14 +143,19 @@ export function useAdminCostDashboard(): CostDashboardController {
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
-	const metrics = useServerDashboardTabs(state, query.data, "admin");
-	return { ...state, metrics, query };
+	const tabs = useServerDashboardTabs(state, query.data, "admin");
+	return { ...state, ...tabs, query };
 }
 
 /**
  * The server lists the metrics a scope offers. Keep the last answer while a
  * different metric loads so tabs do not flicker, and move a stale link to a
  * metric the server does not offer (such as a dark-launched one) back to cost.
+ * Before this page load's first answer, the scope's answer from the previous
+ * visit stands in, so the stat cards (GitHub ones included) show straight
+ * away. With neither, `metricsPending` is true: the cards wait for the server
+ * rather than show a set that may grow, while `metrics` still lists the
+ * always-offered ones so their previews can start loading.
  */
 function useServerDashboardTabs(
 	state: Pick<DashboardState, "metric" | "setMetric">,
@@ -154,8 +167,10 @@ function useServerDashboardTabs(
 		metrics: readonly CostDashboardRequestedMetric[];
 	} | null>(null);
 	const current = data?.availableMetrics;
+	const stored = useStoredDashboardTabs(scope);
 	useEffect(() => {
 		if (!current) return;
+		writeStoredDashboardTabs(scope, current);
 		setKnown((previous) =>
 			previous !== null &&
 			previous.scope === scope &&
@@ -170,9 +185,66 @@ function useServerDashboardTabs(
 	useEffect(() => {
 		if (unavailable) setMetric("cost", { replace: true });
 	}, [setMetric, unavailable]);
-	return listDashboardTabs(
-		current ?? (known?.scope === scope ? known?.metrics : undefined),
+	const available =
+		current ?? (known?.scope === scope ? known?.metrics : stored);
+	return {
+		metrics: listDashboardTabs(available),
+		metricsPending: available === undefined,
+	};
+}
+
+const DASHBOARD_TABS_STORAGE_KEY = "opaline:dashboard-metrics:";
+const StoredDashboardTabsSchema = z.array(CostDashboardRequestedMetricSchema);
+
+/**
+ * The metrics the server offered this scope last time. Read through an
+ * external store so the server-rendered demo hydrates with nothing stored
+ * and picks the stored list up right after, instead of mismatching.
+ */
+function useStoredDashboardTabs(scope: string | undefined) {
+	const raw = useSyncExternalStore(
+		subscribeToStorage,
+		() => readStoredDashboardTabs(scope),
+		() => null,
 	);
+	return useMemo(() => {
+		if (raw === null) return undefined;
+		try {
+			const parsed = StoredDashboardTabsSchema.safeParse(JSON.parse(raw));
+			return parsed.success ? parsed.data : undefined;
+		} catch {
+			return undefined;
+		}
+	}, [raw]);
+}
+
+function subscribeToStorage(onChange: () => void) {
+	window.addEventListener("storage", onChange);
+	return () => window.removeEventListener("storage", onChange);
+}
+
+function readStoredDashboardTabs(scope: string | undefined) {
+	if (!scope) return null;
+	try {
+		return window.localStorage.getItem(DASHBOARD_TABS_STORAGE_KEY + scope);
+	} catch {
+		return null; // Blocked storage: wait for the server instead.
+	}
+}
+
+function writeStoredDashboardTabs(
+	scope: string | undefined,
+	metrics: readonly CostDashboardRequestedMetric[],
+) {
+	if (!scope) return;
+	try {
+		window.localStorage.setItem(
+			DASHBOARD_TABS_STORAGE_KEY + scope,
+			JSON.stringify(metrics),
+		);
+	} catch {
+		// Blocked storage: the next visit waits for the server.
+	}
 }
 
 function indexingRefetchInterval(
@@ -219,6 +291,96 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 			{ replace: true },
 		);
 	}, [selectedMetric, setParams]);
+	const { input, dimensions, interval } = buildDashboardInput(
+		params,
+		dates,
+		metric,
+		costDimensions,
+	);
+	// The request the dashboard would send if `value` were the charted metric.
+	// Stat card previews use it so switching cards is a cache hit.
+	const inputFor = (value: RequestedMetric) =>
+		buildDashboardInput(params, dates, value, costDimensions).input;
+	function update(action: (next: URLSearchParams) => void) {
+		setParams((current) => {
+			const next = new URLSearchParams(current);
+			action(next);
+			return next;
+		});
+	}
+	function toggle(dimension: CostDimension, id: string) {
+		const key = parameterFor(dimension);
+		update((next) => {
+			const values = next.getAll(key);
+			next.delete(key);
+			for (const value of values.includes(id)
+				? values.filter((value) => value !== id)
+				: [...values, id].slice(0, 100))
+				next.append(key, value);
+		});
+	}
+	function clear(dimension?: CostDimension) {
+		update((next) => {
+			for (const dim of dimension ? [dimension] : ALL_COST_DIMENSIONS)
+				next.delete(parameterFor(dim));
+		});
+	}
+	function setSplit(value: CostDashboardInput["splitBy"]) {
+		update((next) => {
+			if (value === "none") next.delete("split");
+			else next.set("split", value);
+		});
+	}
+	function setInterval(value: ChartInterval) {
+		update((next) => {
+			if (value === "daily") next.delete("interval");
+			else next.set("interval", value);
+		});
+	}
+	// Reads the current metric from the URL, not this render, so it stays
+	// referentially stable for effects that correct the selected metric.
+	const setMetric = useCallback(
+		(value: DashboardMetric, options?: { replace?: boolean }) => {
+			setParams((current) => {
+				const next = new URLSearchParams(current);
+				if (
+					usesGitHubRepositories(current.get("metric")) !==
+					usesGitHubRepositories(value)
+				) {
+					next.delete(parameterFor("repositories"));
+					if (next.get("split") === "repositories") next.delete("split");
+				}
+				if (value === "cost") next.delete("metric");
+				else next.set("metric", value);
+				return next;
+			}, options);
+		},
+		[setParams],
+	);
+	return {
+		input,
+		inputFor,
+		metric,
+		interval,
+		setInterval,
+		dimensions,
+		toggle,
+		clear,
+		setSplit,
+		setMetric,
+	};
+}
+
+/**
+ * The dashboard request for one metric, from the URL state and date range.
+ * Shared by the charted query and the stat card previews.
+ */
+function buildDashboardInput(
+	params: URLSearchParams,
+	dates: { startDate: string; endDate: string },
+	metric: RequestedMetric,
+	costDimensions: CostDimension[],
+) {
 	const interval =
 		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
 			?.value ?? "daily";
@@ -299,73 +461,7 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 					)
 				: [],
 	};
-	function update(action: (next: URLSearchParams) => void) {
-		setParams((current) => {
-			const next = new URLSearchParams(current);
-			action(next);
-			return next;
-		});
-	}
-	function toggle(dimension: CostDimension, id: string) {
-		const key = parameterFor(dimension);
-		update((next) => {
-			const values = next.getAll(key);
-			next.delete(key);
-			for (const value of values.includes(id)
-				? values.filter((value) => value !== id)
-				: [...values, id].slice(0, 100))
-				next.append(key, value);
-		});
-	}
-	function clear(dimension?: CostDimension) {
-		update((next) => {
-			for (const dim of dimension ? [dimension] : ALL_COST_DIMENSIONS)
-				next.delete(parameterFor(dim));
-		});
-	}
-	function setSplit(value: CostDashboardInput["splitBy"]) {
-		update((next) => {
-			if (value === "none") next.delete("split");
-			else next.set("split", value);
-		});
-	}
-	function setInterval(value: ChartInterval) {
-		update((next) => {
-			if (value === "daily") next.delete("interval");
-			else next.set("interval", value);
-		});
-	}
-	// Reads the current metric from the URL, not this render, so it stays
-	// referentially stable for effects that correct the selected metric.
-	const setMetric = useCallback(
-		(value: DashboardMetric, options?: { replace?: boolean }) => {
-			setParams((current) => {
-				const next = new URLSearchParams(current);
-				if (
-					usesGitHubRepositories(current.get("metric")) !==
-					usesGitHubRepositories(value)
-				) {
-					next.delete(parameterFor("repositories"));
-					if (next.get("split") === "repositories") next.delete("split");
-				}
-				if (value === "cost") next.delete("metric");
-				else next.set("metric", value);
-				return next;
-			}, options);
-		},
-		[setParams],
-	);
-	return {
-		input,
-		metric,
-		interval,
-		setInterval,
-		dimensions,
-		toggle,
-		clear,
-		setSplit,
-		setMetric,
-	};
+	return { input, dimensions, interval };
 }
 
 // Pull request metrics filter by GitHub repository ID rather than the session

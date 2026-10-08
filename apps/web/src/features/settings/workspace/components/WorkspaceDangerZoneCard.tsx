@@ -1,3 +1,4 @@
+import { IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -49,7 +50,7 @@ export function WorkspaceDangerZoneCard({
 
 	return (
 		<>
-			<WorkspaceSettingsGroup title="Danger zone">
+			<WorkspaceSettingsGroup title="Danger zone" tone="danger">
 				<WorkspaceSettingsRow
 					label="Delete workspace"
 					description="Permanently delete this workspace and its session data for every member. This cannot be undone."
@@ -61,6 +62,7 @@ export function WorkspaceDangerZoneCard({
 						onClick={() => setOpen(true)}
 						disabled={!canManage}
 					>
+						<IconTrash aria-hidden="true" />
 						Delete workspace
 					</Button>
 				</WorkspaceSettingsRow>

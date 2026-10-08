@@ -1,5 +1,6 @@
-import { AlertCircleIcon, RefreshCwIcon } from "lucide-react";
+import { IconAlertCircle, IconRefresh } from "@tabler/icons-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/app/ui/button";
 import {
 	Card,
@@ -9,6 +10,7 @@ import {
 	CardTitle,
 } from "@/app/ui/card";
 import { Skeleton } from "@/app/ui/skeleton";
+import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { TeamMemberOverviewTable } from "@/features/team/components/TeamMemberOverviewTable";
 import {
 	type TeamPageDiagnostics,
@@ -37,8 +39,8 @@ const teamTableHeaderSkeletons = [
 function TeamPageSkeleton() {
 	return (
 		<div className="-mx-4 -my-2 overflow-hidden lg:-mx-6">
-			<div className="min-w-272 px-16 py-2">
-				<div className="grid h-10 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/10 dark:border-white/10">
+			<div className="min-w-272 px-8">
+				<div className="grid h-12 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/[0.06] dark:border-white/[0.06]">
 					{teamTableHeaderSkeletons.map((skeleton, index) => (
 						<div key={skeleton.key} className={index === 0 ? "pr-3" : "px-3"}>
 							<Skeleton className={`h-3 rounded-sm ${skeleton.widthClass}`} />
@@ -48,10 +50,10 @@ function TeamPageSkeleton() {
 				{teamTableRowSkeletonKeys.map((rowKey) => (
 					<div
 						key={rowKey}
-						className="grid h-16 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/5 dark:border-white/5"
+						className="grid h-16 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/[0.04] dark:border-white/[0.04]"
 					>
 						<div className="flex items-center gap-3 pr-3">
-							<Skeleton className="size-10 shrink-0 rounded-full" />
+							<Skeleton className="size-8 shrink-0 rounded-full" />
 							<div className="grid gap-1.5">
 								<Skeleton className="h-3.5 w-28 rounded-sm" />
 								<Skeleton className="h-3 w-16 rounded-sm" />
@@ -157,7 +159,7 @@ function TeamPageError({
 		>
 			<CardHeader className="gap-3">
 				<div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-					<AlertCircleIcon className="size-5" />
+					<IconAlertCircle className="size-5" />
 				</div>
 				<div className="flex flex-col gap-1">
 					<CardTitle>Team roster unavailable</CardTitle>
@@ -267,20 +269,19 @@ function TeamPageRefreshButton({
 	onRefresh: () => void;
 }) {
 	return (
-		<div className="flex justify-end">
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={isRefreshing}
-				onClick={onRefresh}
-			>
-				<RefreshCwIcon
-					data-icon="inline-start"
-					className={isRefreshing ? "animate-spin" : undefined}
-				/>
-				{isRefreshing ? "Refreshing" : "Refresh"}
-			</Button>
-		</div>
+		// Toolbar pill.
+		<button
+			type="button"
+			className="toolbar-button"
+			disabled={isRefreshing}
+			onClick={onRefresh}
+		>
+			<IconRefresh
+				aria-hidden="true"
+				className={isRefreshing ? "animate-spin" : undefined}
+			/>
+			{isRefreshing ? "Refreshing" : "Refresh"}
+		</button>
 	);
 }
 
@@ -296,6 +297,7 @@ export function TeamPage() {
 		teamCards,
 	} = useTeamPageData();
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const headerPortal = useShellHeaderPortal();
 
 	async function handleRefresh() {
 		if (isRefreshing) {
@@ -338,14 +340,24 @@ export function TeamPage() {
 		content = <TeamPageEmpty />;
 	}
 
+	const refreshButton = (
+		<TeamPageRefreshButton
+			isRefreshing={isRefreshing}
+			onRefresh={() => {
+				void handleRefresh();
+			}}
+		/>
+	);
+
+	// The page's actions sit on the title row; without a shell
+	// header (embeds, tests) the button stays above the roster.
 	return (
-		<div className="flex flex-col gap-6 px-4 lg:px-6">
-			<TeamPageRefreshButton
-				isRefreshing={isRefreshing}
-				onRefresh={() => {
-					void handleRefresh();
-				}}
-			/>
+		<div className="flex flex-col gap-4 px-4 lg:px-6">
+			{headerPortal ? (
+				createPortal(refreshButton, headerPortal)
+			) : (
+				<div className="flex justify-end">{refreshButton}</div>
+			)}
 			{content}
 		</div>
 	);

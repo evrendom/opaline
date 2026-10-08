@@ -1,18 +1,18 @@
-import {
-	ArrowExpand01Icon,
-	GitBranchIcon,
-	GitForkIcon,
-	Message01Icon,
-	MoreHorizontalIcon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type {
 	CostBreakdownEntry,
 	CostDimension,
 	DashboardMetric,
 } from "@rudel/api-routes";
-import { useState } from "react";
+import type { Icon } from "@tabler/icons-react";
+import {
+	IconArrowsDiagonal,
+	IconCheck,
+	IconDots,
+	IconGitBranch,
+	IconGitFork,
+	IconMessage2,
+} from "@tabler/icons-react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import {
 	Dialog,
@@ -34,6 +34,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { SERIES_COLORS } from "./chart-colors";
 import {
 	costLabel,
 	formatMetricRatio,
@@ -76,15 +77,6 @@ export function CostBreakdown({
 	const [search, setSearch] = useState("");
 	const [menuOpen, setMenuOpen] = useState(false);
 	const label = COST_LABELS[dimension];
-	const countLabel =
-		dimension === "durations"
-			? "ranges"
-			: dimension === "runSignals" || dimension === "skillsUsed"
-				? "options"
-				: dimension === "phrases"
-					? "phrases"
-					: label.toLowerCase();
-	const total = entries.reduce((sum, row) => sum + row.value, 0);
 	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
 	const filtered = entries.filter((entry) =>
 		`${entry.id} ${costLabel(dimension, entry.label)}`
@@ -92,6 +84,14 @@ export function CostBreakdown({
 			.includes(search.toLowerCase()),
 	);
 	const description = getBreakdownDescription(dimension, metric);
+	// Share bars take the series colours the chart uses when split by this
+	// dimension (rows are ranked the same way).
+	const colorOf = new Map(
+		entries.map((entry, index) => [
+			entry.id,
+			SERIES_COLORS[index % (SERIES_COLORS.length - 1)] ?? SERIES_COLORS[0],
+		]),
+	);
 	return (
 		<>
 			<section
@@ -103,7 +103,11 @@ export function CostBreakdown({
 				<div className="cost-breakdown-heading">
 					<h2 title={description}>{label}</h2>
 					<div>
-						{metric === "cost" ? (
+						{selected.length ? (
+							<span className="cost-breakdown-selected">
+								{selected.length} selected
+							</span>
+						) : metric === "cost" ? (
 							<>
 								{METRIC_LABELS.cost}{" "}
 								<span className="cost-heading-currency">USD</span>
@@ -115,8 +119,10 @@ export function CostBreakdown({
 						)}
 					</div>
 				</div>
-				<div className="cost-breakdown-list" data-fluid-menu-root="">
-					<FluidMenuHover items=".cost-breakdown-row" />
+				<ScrollFade
+					className="cost-breakdown-list"
+					data-many={entries.length > 4 || undefined}
+				>
 					{pending ? (
 						<BreakdownSkeleton />
 					) : onLoadDeferred ? (
@@ -130,25 +136,18 @@ export function CostBreakdown({
 							</button>
 						</p>
 					) : entries.length ? (
-						entries
-							.slice(
-								0,
-								dimension === "durations" || dimension === "ciConclusions"
-									? entries.length
-									: 8,
-							)
-							.map((entry) => (
-								<BreakdownRow
-									key={entry.id}
-									dimension={dimension}
-									metric={metric}
-									entry={entry}
-									maximum={maximum}
-									total={total}
-									selected={selected.includes(entry.id)}
-									onToggle={onToggle}
-								/>
-							))
+						entries.map((entry) => (
+							<BreakdownRow
+								key={entry.id}
+								dimension={dimension}
+								metric={metric}
+								entry={entry}
+								maximum={maximum}
+								color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
+								selected={selected.includes(entry.id)}
+								onToggle={onToggle}
+							/>
+						))
 					) : (
 						<p className="cost-breakdown-empty">
 							{unavailable
@@ -159,21 +158,13 @@ export function CostBreakdown({
 								: `No matching ${label.toLowerCase()}.`}
 						</p>
 					)}
-				</div>
-				<div className="cost-breakdown-footer">
-					<span>
-						{pending || onLoadDeferred
-							? ""
-							: `${entries.length} ${entries.length === 1 ? (dimension === "repositories" ? "repository" : countLabel.slice(0, -1)) : countLabel}`}
-					</span>
-					<span>{selected.length ? `${selected.length} selected` : ""}</span>
-				</div>
+				</ScrollFade>
 				<div className="cost-tools" data-open={menuOpen || split}>
 					<div className="cost-tools-inner" data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-tool-button" />
 						<ToolButton
 							label={`View all ${label.toLowerCase()}`}
-							icon={ArrowExpand01Icon}
+							icon={IconArrowsDiagonal}
 							onClick={() => {
 								setSearch("");
 								setExpanded(true);
@@ -182,7 +173,7 @@ export function CostBreakdown({
 						/>
 						<ToolButton
 							label={split ? "Show total" : `Split by ${label.toLowerCase()}`}
-							icon={GitForkIcon}
+							icon={IconGitFork}
 							onClick={onSplit}
 							pressed={split}
 							disabled={pending || unavailable}
@@ -197,13 +188,14 @@ export function CostBreakdown({
 									/>
 								}
 							>
-								<HugeiconsIcon
-									icon={MoreHorizontalIcon}
-									size={16}
-									strokeWidth={1.5}
-								/>
+								<IconDots size={16} />
 							</DropdownMenuTrigger>
-							<DropdownMenuContent side="top" align="center" sideOffset={10}>
+							<DropdownMenuContent
+								side="top"
+								align="center"
+								sideOffset={10}
+								className="w-max"
+							>
 								<DropdownMenuItem
 									onClick={() =>
 										downloadBreakdown(dimension, entries, metric, valueLabel)
@@ -224,7 +216,7 @@ export function CostBreakdown({
 				</div>
 			</section>
 			<Dialog open={expanded} onOpenChange={setExpanded}>
-				<DialogContent className="cost-breakdown-dialog gap-4 rounded-xl sm:max-w-xl dark:shadow-none">
+				<DialogContent className="cost-breakdown-dialog gap-4 sm:max-w-xl">
 					<DialogTitle>{label}</DialogTitle>
 					<DialogDescription>
 						Select {label.toLowerCase()} to filter{" "}
@@ -256,7 +248,7 @@ export function CostBreakdown({
 									metric={metric}
 									entry={entry}
 									maximum={maximum}
-									total={total}
+									color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
 									selected={selected.includes(entry.id)}
 									onToggle={onToggle}
 								/>
@@ -320,20 +312,25 @@ function getBreakdownDescription(
 	return undefined;
 }
 
+/**
+ * BreakdownRow: glyph + name on the left; the value with a short
+ * share bar under it on the right. A button here, toggling the row's filter.
+ */
 function BreakdownRow({
 	entry,
 	metric,
 	dimension,
-	total,
 	maximum,
+	color,
 	selected,
 	onToggle,
 }: {
 	entry: CostBreakdownEntry;
 	metric: DashboardMetric;
 	dimension: CostDimension;
-	total: number;
 	maximum: number;
+	/** The share bar's colour. */
+	color: string;
 	selected: boolean;
 	onToggle: (id: string) => void;
 }) {
@@ -347,20 +344,22 @@ function BreakdownRow({
 			onClick={() => onToggle(entry.id)}
 			title={`${label} · ${formatMetricRatio(entry.value, metric, entry.denominator)}`}
 		>
-			<span
-				className="cost-row-bar"
-				style={{ width: `${maximum > 0 ? (entry.value / maximum) * 100 : 0}%` }}
-				aria-hidden="true"
-			/>
 			<span className="cost-row-identity">
 				<EntryIcon dimension={dimension} entry={entry} />
 				<span className="truncate">{label}</span>
-				{selected ? (
-					<HugeiconsIcon icon={Tick02Icon} size={14} className="shrink-0" />
-				) : null}
+				{selected ? <IconCheck size={14} className="shrink-0" /> : null}
 			</span>
 			<span className="cost-row-amount">
 				{formatMetricRatio(entry.value, metric, entry.denominator)}
+				{/* The share bar: scaled to the largest row, right-aligned. */}
+				<span className="cost-row-meter" aria-hidden="true">
+					<span
+						style={{
+							width: `${Math.max(2, maximum > 0 ? (entry.value / maximum) * 100 : 0)}%`,
+							backgroundColor: color,
+						}}
+					/>
+				</span>
 				{entry.approximateMinutes !== undefined ? (
 					<small
 						className="cost-cycle-time"
@@ -378,17 +377,6 @@ function BreakdownRow({
 						{formatRunDuration(entry.p90Seconds)}
 					</small>
 				) : null}
-			</span>
-			<span className="cost-row-share">
-				{metric === "ciFailuresPerPullRequest"
-					? entry.denominator === undefined
-						? "—"
-						: `${entry.denominator} ${entry.denominator === 1 ? "PR" : "PRs"}`
-					: total > 0
-						? entry.value > 0 && entry.value / total < 0.01
-							? "<1%"
-							: `${Math.round((entry.value / total) * 100)}%`
-						: "—"}
 			</span>
 		</button>
 	);
@@ -412,14 +400,14 @@ function EntryIcon({
 			<img
 				src={image}
 				alt=""
-				width={22}
-				height={22}
-				className="size-5.5 shrink-0 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+				width={16}
+				height={16}
+				className="size-4 shrink-0 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
 			/>
 		);
 	if (dimension === "members")
 		return (
-			<Avatar className="size-5.5 shrink-0 rounded-full ring-1 ring-black/5 dark:ring-white/10">
+			<Avatar className="size-4 shrink-0 rounded-full ring-1 ring-black/5 dark:ring-white/10">
 				<AvatarImage src={image ?? undefined} alt="" />
 				<AvatarFallback className="cost-member-initial">
 					{entry.label
@@ -431,29 +419,15 @@ function EntryIcon({
 			</Avatar>
 		);
 	if (dimension === "repositories")
-		return (
-			<HugeiconsIcon
-				icon={GitBranchIcon}
-				size={16}
-				className="shrink-0"
-				strokeWidth={1.5}
-			/>
-		);
+		return <IconGitBranch size={14} className="shrink-0" />;
 	if (dimension === "signalTypes" || dimension === "phrases")
-		return (
-			<HugeiconsIcon
-				icon={Message01Icon}
-				size={16}
-				className="shrink-0"
-				strokeWidth={1.5}
-			/>
-		);
+		return <IconMessage2 size={14} className="shrink-0" />;
 	if (dimension !== "models") return null;
 	const tone = getModelBadgeTone(entry.id);
 	if (tone.icon === "claude")
-		return <ClaudeModelIcon className="size-4 shrink-0" />;
+		return <ClaudeModelIcon className="size-3.5 shrink-0" />;
 	if (tone.icon === "codex")
-		return <CodexModelIcon className="size-4 shrink-0" />;
+		return <CodexModelIcon className="size-3.5 shrink-0" />;
 	return (
 		<span className="cost-unknown-model" aria-hidden="true">
 			?
@@ -463,13 +437,13 @@ function EntryIcon({
 
 function ToolButton({
 	label,
-	icon,
+	icon: Glyph,
 	onClick,
 	disabled,
 	pressed,
 }: {
 	label: string;
-	icon: typeof ArrowExpand01Icon;
+	icon: Icon;
 	onClick: () => void;
 	disabled: boolean;
 	pressed?: boolean;
@@ -485,7 +459,7 @@ function ToolButton({
 					onClick={onClick}
 					disabled={disabled}
 				>
-					<HugeiconsIcon icon={icon} size={16} strokeWidth={1.5} />
+					<Glyph size={16} />
 					<span
 						className="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
 						aria-hidden="true"
@@ -496,19 +470,74 @@ function ToolButton({
 		</Tooltip>
 	);
 }
+/** BreakdownRowsSkeleton: one blob per row slot at the real row
+ * height (glyph + name on the left, value + share bar on the right). */
 function BreakdownSkeleton() {
 	return (
 		<div className="cost-breakdown-skeleton" aria-hidden="true">
-			{[80, 64, 72, 48, 60].map((width, index) => (
-				<div key={width}>
-					<div className="cost-skeleton size-5 rounded-full" />
-					<div
-						className="cost-skeleton h-3"
-						style={{ width: `${width - index * 3}%` }}
-					/>
-					<div className="cost-skeleton h-3 w-10" />
+			{[0, 1, 2, 3, 4].map((index) => (
+				<div key={index}>
+					<div className="cost-breakdown-skeleton-name">
+						<div className="cost-skeleton size-3.5 rounded-full" />
+						<div className="cost-skeleton h-3.5 w-28" />
+					</div>
+					<div className="cost-breakdown-skeleton-value">
+						<div className="cost-skeleton h-3.5 w-12" />
+						<div className="cost-skeleton h-0.5 w-14" />
+					</div>
 				</div>
 			))}
+		</div>
+	);
+}
+
+/**
+ * ScrollFade: a scrolling list with fades over the top edge once
+ * scrolled and over the bottom while more rows are below.
+ */
+function ScrollFade({
+	className,
+	children,
+	...props
+}: React.ComponentProps<"div">) {
+	const viewport = useRef<HTMLDivElement>(null);
+	const content = useRef<HTMLDivElement>(null);
+	const [edges, setEdges] = useState({ top: false, bottom: false });
+	const update = useCallback(() => {
+		const element = viewport.current;
+		if (!element) return;
+		const top = element.scrollTop > 1;
+		const bottom =
+			element.scrollTop + element.clientHeight < element.scrollHeight - 1;
+		setEdges((current) =>
+			current.top === top && current.bottom === bottom
+				? current
+				: { top, bottom },
+		);
+	}, []);
+	useLayoutEffect(() => {
+		update();
+		const element = content.current;
+		if (!element || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(update);
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, [update]);
+	return (
+		<div className="cost-scroll-fade">
+			<div ref={viewport} onScroll={update} className={className} {...props}>
+				<div ref={content}>{children}</div>
+			</div>
+			<div
+				className="cost-scroll-fade-edge"
+				data-edge="top"
+				data-visible={edges.top || undefined}
+			/>
+			<div
+				className="cost-scroll-fade-edge"
+				data-edge="bottom"
+				data-visible={edges.bottom || undefined}
+			/>
 		</div>
 	);
 }

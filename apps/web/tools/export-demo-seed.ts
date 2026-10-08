@@ -36,8 +36,25 @@ const dashboardInput = {
 	endDate: "2026-08-31",
 	requestedMetric: "cost",
 };
-const [organizationData, sessionsData, dashboardData] = await Promise.all([
+// The other stat cards, as the dashboard requests them for their sparklines.
+const previewInputs = [
+	{ ...dashboardInput, requestedMetric: "sessions" },
+	{
+		...dashboardInput,
+		requestedMetric: "agentRuns",
+		durationInterval: "daily",
+	},
+	{ ...dashboardInput, requestedMetric: "signals" },
+];
+const [
+	organizationData,
+	sessionData,
+	sessionsData,
+	dashboardData,
+	...previewData
+] = await Promise.all([
 	read("/api/auth/organization/get-full-organization"),
+	read("/api/auth/get-session"),
 	read("/rpc/analytics/sessions/list", {
 		startDate: "2026-08-01",
 		endDate: "2026-08-31",
@@ -46,6 +63,7 @@ const [organizationData, sessionsData, dashboardData] = await Promise.all([
 		sortOrder: "desc",
 	}),
 	read("/rpc/analytics/overview/costs", dashboardInput),
+	...previewInputs.map((input) => read("/rpc/analytics/overview/costs", input)),
 ]);
 const organization = organizationSchema.parse(organizationData);
 const sessions = z
@@ -87,12 +105,19 @@ for (const member of organization.members.filter(
 const seed = DemoSeedSchema.parse({
 	organization,
 	members,
+	viewerUserId: z
+		.object({ user: z.object({ id: z.string() }) })
+		.parse(sessionData).user.id,
 	sessions: sessions.slice(0, 30),
 	totalSessionCount: sessions.length,
 	dashboard: {
 		input: dashboardInput,
 		data: z.object({ json: z.unknown() }).parse(dashboardData).json,
 	},
+	previews: previewInputs.map((input, index) => ({
+		input,
+		data: z.object({ json: z.unknown() }).parse(previewData[index]).json,
+	})),
 	maxima: {
 		input: Math.max(...sessions.map((row) => row.input_tokens)),
 		output: Math.max(...sessions.map((row) => row.output_tokens)),

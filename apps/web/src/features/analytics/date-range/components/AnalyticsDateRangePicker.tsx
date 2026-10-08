@@ -1,13 +1,12 @@
 "use client";
 
 import {
-	ArrowDown01Icon,
-	ArrowLeft01Icon,
-	ArrowRight01Icon,
-	ArrowUp01Icon,
-	Calendar03Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+	IconCalendar,
+	IconChevronDown,
+	IconChevronLeft,
+	IconChevronRight,
+	IconChevronUp,
+} from "@tabler/icons-react";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import type { ChevronProps, DateRange } from "react-day-picker";
 import { Button } from "@/app/ui/button";
@@ -46,20 +45,19 @@ function LinearCalendarChevron({
 	orientation = "right",
 	size = 16,
 }: ChevronProps) {
-	const icon =
+	const Glyph =
 		orientation === "left"
-			? ArrowLeft01Icon
+			? IconChevronLeft
 			: orientation === "up"
-				? ArrowUp01Icon
+				? IconChevronUp
 				: orientation === "down"
-					? ArrowDown01Icon
-					: ArrowRight01Icon;
+					? IconChevronDown
+					: IconChevronRight;
 	return (
-		<HugeiconsIcon
+		<Glyph
 			aria-hidden="true"
-			icon={icon}
 			size={size}
-			strokeWidth={1.75}
+			stroke={1.75}
 			className={cn("session-menu-icon size-4", className)}
 		/>
 	);
@@ -192,22 +190,17 @@ export function AnalyticsDateRangePicker({
 		>
 			<PopoverTrigger
 				render={
-					<Button
-						variant="outline"
-						size="sm"
-						className={cn(
-							"h-9 justify-start rounded-full border-border bg-background/90 px-3 text-sm font-medium text-foreground shadow-none",
-							triggerClassName,
-						)}
+					<button
+						type="button"
+						data-variant="secondary"
+						className={cn("toolbar-button", triggerClassName)}
 					/>
 				}
 			>
-				<HugeiconsIcon
+				<IconCalendar
 					aria-hidden="true"
 					data-icon="inline-start"
 					className="size-4"
-					icon={Calendar03Icon}
-					strokeWidth={1.75}
 				/>
 				{triggerSuffix ? `${displayValue} · ${triggerSuffix}` : displayValue}
 			</PopoverTrigger>
@@ -335,9 +328,10 @@ export function AnalyticsDateRangePicker({
 					button_previous: "session-date-picker-nav-button",
 					caption_label: "session-date-picker-month-label",
 					month: "flex min-w-0 flex-1 flex-col gap-2.5",
-					month_caption: "flex h-8 w-full items-center justify-start px-0",
+					month_caption: "flex h-8 w-full items-center justify-center px-0",
 					months: "relative flex flex-col gap-5 md:flex-row md:gap-[0.96rem]",
-					nav: "absolute top-0 right-0 z-20 flex items-center gap-0.5",
+					// Layout: the arrows at the outer edges of the months.
+					nav: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between *:pointer-events-auto",
 					week: "mt-1 flex w-full",
 					weekday: "session-date-picker-weekday",
 				}}

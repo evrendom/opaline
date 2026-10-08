@@ -1,14 +1,9 @@
 import { Menu } from "@base-ui/react/menu";
-import {
-	ArrowDown01Icon,
-	Layers01Icon,
-	Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type {
 	HistoricalSkillDetail,
 	HistoricalSkillVersion,
 } from "@rudel/api-routes";
+import { IconCheck, IconChevronDown, IconStack2 } from "@tabler/icons-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
@@ -55,7 +50,7 @@ export function HistoricalSkillDetailContent({
 	return (
 		<>
 			<div
-				className="flex h-10 shrink-0 items-center gap-3 border-b border-(--session-overview-border) px-3"
+				className="flex h-12 shrink-0 items-center gap-3 border-b border-(--session-overview-border) px-6"
 				data-slot="skill-version-toolbar"
 			>
 				{detail && selectedVersion ? (
@@ -146,16 +141,13 @@ function SkillVersionMenu({
 				aria-label={`Skill version, ${label}`}
 				className={SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME}
 			>
-				<HugeiconsIcon
-					icon={Layers01Icon}
-					strokeWidth={1.75}
+				<IconStack2
 					aria-hidden="true"
 					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 				<span>{label}</span>
-				<HugeiconsIcon
-					icon={ArrowDown01Icon}
-					strokeWidth={1.75}
+				<IconChevronDown
+					stroke={1.75}
 					aria-hidden="true"
 					className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
@@ -184,12 +176,7 @@ function SkillVersionMenu({
 									title={`Last used ${formatFullDateLabel(version.lastUsedAt)}`}
 								>
 									<Menu.RadioItemIndicator className="session-menu-sort-check">
-										<HugeiconsIcon
-											icon={Tick02Icon}
-											strokeWidth={2}
-											aria-hidden="true"
-											className="size-3.5"
-										/>
+										<IconCheck aria-hidden="true" className="size-3.5" />
 									</Menu.RadioItemIndicator>
 									Version {versions.length - index}
 								</Menu.RadioItem>

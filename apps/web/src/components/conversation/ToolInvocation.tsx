@@ -7,7 +7,7 @@ import {
 	TraceChevronDownIcon,
 	TraceChevronRightIcon,
 	TraceTerminalIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 
 interface ToolInvocationProps {
 	toolName: string;

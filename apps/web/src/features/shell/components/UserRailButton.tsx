@@ -1,10 +1,6 @@
 "use client";
 
-import {
-	Logout01Icon,
-	Settings01Icon,
-	User02Icon,
-} from "@hugeicons/core-free-icons";
+import { IconLogout, IconSettings, IconUser } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import {
@@ -15,7 +11,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
 import {
 	getInitials,
 	getUtilityRailItemClassName,
@@ -108,7 +103,7 @@ export function UserRailButton({
 								{getInitials(name ?? (demo ? "Demo" : undefined), email)}
 							</span>
 						) : (
-							<ShellHugeicon icon={User02Icon} className="size-4" />
+							<IconUser aria-hidden="true" className="size-4" />
 						)}
 					</div>
 				</div>
@@ -139,7 +134,7 @@ export function UserRailButton({
 						navigate(getShellRoutePath(appRoutes.settingsAccount()))
 					}
 				>
-					<ShellHugeicon icon={Settings01Icon} />
+					<IconSettings aria-hidden="true" />
 					Account settings
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
@@ -149,7 +144,7 @@ export function UserRailButton({
 						navigate("/");
 					}}
 				>
-					<ShellHugeicon icon={Logout01Icon} />
+					<IconLogout aria-hidden="true" />
 					Log out
 				</DropdownMenuItem>
 			</DropdownMenuContent>

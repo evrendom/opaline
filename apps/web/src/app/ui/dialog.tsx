@@ -1,8 +1,7 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconX } from "@tabler/icons-react";
 import type * as React from "react";
 import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,7 +30,7 @@ function DialogOverlay({
 		<DialogPrimitive.Backdrop
 			data-slot="dialog-overlay"
 			className={cn(
-				"fixed inset-0 isolate z-50 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+				"fixed inset-0 isolate z-50 bg-black/20 duration-100 supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
 				className,
 			)}
 			{...props}
@@ -53,7 +52,7 @@ function DialogContent({
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl squircle:rounded-[40px] corner-squircle bg-popover p-6 text-sm text-popover-foreground shadow-(--custom-shadow) duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[96%] data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[99%]",
 					className,
 				)}
 				{...props}
@@ -65,12 +64,12 @@ function DialogContent({
 						render={
 							<Button
 								variant="ghost"
-								className="absolute top-4 right-4 bg-secondary"
+								className="absolute top-4 right-4"
 								size="icon-sm"
 							/>
 						}
 					>
-						<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+						<IconX />
 						<span className="sr-only">Close</span>
 					</DialogPrimitive.Close>
 				)}
@@ -137,7 +136,7 @@ function DialogDescription({
 		<DialogPrimitive.Description
 			data-slot="dialog-description"
 			className={cn(
-				"text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+				"text-sm text-muted-foreground text-balance *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
 				className,
 			)}
 			{...props}

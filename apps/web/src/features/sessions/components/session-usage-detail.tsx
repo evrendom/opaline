@@ -1,6 +1,5 @@
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { SessionListInput } from "@rudel/api-routes";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import {
 	type CSSProperties,
@@ -29,8 +28,9 @@ import { SessionDetailErrorBoundary } from "@/features/sessions/components/sessi
 import { SessionsOverviewTable } from "@/features/sessions/components/sessions-overview-table";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
-import { DetailIdentityBreadcrumb } from "@/features/shell/components/detail-identity-breadcrumb";
+import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
 import {
 	ShellHeaderPortalContext,
 	useShellHeaderPortal,
@@ -64,6 +64,7 @@ export function SessionUsageDetail({
 	children: ReactNode;
 }) {
 	const headerPortal = useShellHeaderPortal();
+	const shellRoute = useCurrentShellRoute();
 	const [sessionHeaderPortal, setSessionHeaderPortal] =
 		useState<HTMLDivElement | null>(null);
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -135,15 +136,36 @@ export function SessionUsageDetail({
 		<>
 			{headerPortal
 				? createPortal(
-						<div className="flex min-w-0 flex-1 items-center gap-2 text-[0.8125rem]">
-							<DetailIdentityBreadcrumb
-								label={`${kind} breadcrumb`}
-								items={[
-									{ label: `${kind}s`, value: `${kind}s`, onClick: onBack },
-									{ label: kind, value: name },
-								]}
+						// Detail breadcrumb, as on the session page: the section's
+						// chip and muted name lead back to the list (lifting only their text
+						// on hover, outside the header's fluid fill); the name is the title.
+						<nav
+							aria-label={`${kind} breadcrumb`}
+							className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+						>
+							<button
+								type="button"
+								onClick={onBack}
+								data-fluid-menu-root=""
+								className="flex shrink-0 cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+							>
+								<ShellNavIcon
+									icon={shellRoute.icon}
+									activeIcon={shellRoute.activeIcon}
+									active={false}
+									tone={shellRoute.tone}
+								/>
+								{shellRoute.title}
+							</button>
+							<IconChevronRight
+								aria-hidden="true"
+								className="size-4 shrink-0 text-muted-foreground/50"
+								stroke={1.5}
 							/>
-						</div>,
+							<span aria-current="page" className="truncate">
+								{name}
+							</span>
+						</nav>,
 						headerPortal,
 					)
 				: null}
@@ -161,7 +183,7 @@ export function SessionUsageDetail({
 					>
 						{selectedSessionId ? (
 							<ShellHeaderPortalContext.Provider value={sessionHeaderPortal}>
-								<div className="flex h-10 shrink-0 items-center gap-2 border-b border-(--session-overview-border) px-3">
+								<div className="flex h-12 shrink-0 items-center gap-2 border-b border-(--session-overview-border) px-3">
 									<Button
 										aria-label={`Back to ${kind.toLowerCase()} sessions`}
 										title={`Back to ${kind.toLowerCase()} sessions`}
@@ -169,11 +191,7 @@ export function SessionUsageDetail({
 										size="icon-sm"
 										onClick={() => selectSession(null)}
 									>
-										<HugeiconsIcon
-											icon={ArrowLeft01Icon}
-											size={16}
-											strokeWidth={1.5}
-										/>
+										<IconChevronLeft size={16} />
 									</Button>
 									<div
 										ref={setSessionHeaderPortal}
@@ -189,7 +207,6 @@ export function SessionUsageDetail({
 											(session) => session.session_id === selectedSessionId,
 										)}
 										navigation={undefined}
-										onClose={undefined}
 										position={undefined}
 										sessionId={selectedSessionId}
 										showOverviewStrip={false}

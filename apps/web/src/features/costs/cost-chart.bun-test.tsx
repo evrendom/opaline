@@ -47,7 +47,9 @@ test.each([
 	ciRuns.trend = [{ date: "2026-09-30", total: 0, values: { total: 0 } }];
 	const html = renderCiChart(data);
 	expect(html).toContain('data-unavailable="true"');
-	expect(html).toContain('<span class="cost-metric-value">—');
+	expect(html).toMatch(
+		/<span class="cost-metric-value">(<small[^>]*>[^<]*<\/small>)?—<\/span>/,
+	);
 	expect(html).toContain("CI minutes (approximate billed Actions minutes): —");
 	expect(html).toContain("CI history is unavailable");
 	expect(html).not.toContain(

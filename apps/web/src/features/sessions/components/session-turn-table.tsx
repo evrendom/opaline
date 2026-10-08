@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import {
 	type CSSProperties,
 	type KeyboardEvent,
@@ -238,11 +238,11 @@ function SessionTurnTableViewedRowsButton({
 			onClick={scrollToViewedRows}
 			tabIndex={direction === undefined ? -1 : 0}
 		>
-			<ChevronUp
+			<IconChevronUp
 				aria-hidden="true"
 				className="hidden size-4 shrink-0 stroke-[oklch(0.67_0.164_262.589)] group-data-[direction=above]:block"
 			/>
-			<ChevronDown
+			<IconChevronDown
 				aria-hidden="true"
 				className="hidden size-4 shrink-0 stroke-[oklch(0.67_0.164_262.589)] group-data-[direction=below]:block"
 			/>

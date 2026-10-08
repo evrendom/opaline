@@ -1,4 +1,4 @@
-import { LinkIcon } from "lucide-react";
+import { IconLink } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/app/ui/button";
@@ -169,7 +169,7 @@ export function TeamInviteLinkSurface({
 		return (
 			<div className="flex w-full min-w-0 items-center gap-2">
 				<div className="grid h-10 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-full border border-black/10 bg-background p-1 dark:border-white/10">
-					<LinkIcon
+					<IconLink
 						aria-hidden="true"
 						className="size-4 h-lh shrink-0 justify-self-center stroke-muted-foreground"
 					/>
@@ -229,7 +229,7 @@ export function TeamInviteLinkSurface({
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-2">
 			<div className="grid h-11 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-full border border-black/10 bg-background p-1 dark:border-white/10">
-				<LinkIcon
+				<IconLink
 					aria-hidden="true"
 					className="size-4 h-lh shrink-0 justify-self-center stroke-muted-foreground"
 				/>

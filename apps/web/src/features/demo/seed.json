@@ -1941,5 +1941,2337 @@
 				"ciFailuresPerPullRequest": null
 			}
 		}
-	}
+	},
+	"previews": [
+		{
+			"input": {
+				"startDate": "2026-08-01",
+				"endDate": "2026-08-31",
+				"requestedMetric": "sessions",
+				"members": [],
+				"repositories": [],
+				"models": [],
+				"signalTypes": [],
+				"phrases": [],
+				"runSignals": [],
+				"durations": [],
+				"skillsUsed": [],
+				"splitBy": "none",
+				"pullRequestCi": [],
+				"githubAuthors": [],
+				"ciConclusions": [],
+				"ciEvents": [],
+				"ciWorkflows": [],
+				"ciAttempts": []
+			},
+			"data": {
+				"requestedMetric": "sessions",
+				"splitBy": "none",
+				"availableMetrics": ["cost", "sessions", "agentRuns", "signals"],
+				"metrics": {
+					"cost": {
+						"total": 3200.9865277999993,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "API Cost" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"sessions": {
+						"total": 85,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Sessions" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-02", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-03", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-04", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-05", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-06", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-07", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-11", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-12", "total": 8, "values": { "total": 8 } },
+							{ "date": "2026-08-13", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-14", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-15", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-18", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-19", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-20", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-21", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [
+								{
+									"id": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX",
+									"label": "Evren",
+									"value": 29,
+									"incomplete": false,
+									"image": "https://avatars.githubusercontent.com/u/158852680?v=4"
+								},
+								{
+									"id": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX",
+									"label": "Marc",
+									"value": 28,
+									"incomplete": false,
+									"image": "/api/avatar/bef8e0b5-90b7-4bf8-b7d2-c3eac332ed0b"
+								},
+								{
+									"id": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB",
+									"label": "Rafa",
+									"value": 28,
+									"incomplete": false,
+									"image": "/api/avatar/cdf54bd3-87c6-40d7-af10-715f8a1d15a7"
+								}
+							],
+							"repositories": [
+								{
+									"id": "github.com/evrendom/rudel",
+									"label": "evrendom/rudel",
+									"value": 84,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "github.com/opalinehq/athena",
+									"label": "opalinehq/athena",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"models": [
+								{
+									"id": "gpt-5.6-sol",
+									"label": "gpt-5.6-sol",
+									"value": 66,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "claude-fable-5",
+									"label": "claude-fable-5",
+									"value": 19,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"commits": null,
+					"signals": {
+						"total": 385,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Language signals" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [
+								{
+									"id": "modelApologies",
+									"label": "Model apologies",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userNegative",
+									"label": "Negative user",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userPositive",
+									"label": "Positive user",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"agentRuns": {
+						"total": 1864,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Agent runs" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [
+								{
+									"id": "positive",
+									"label": "Positive",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "negative",
+									"label": "Negative",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "mixed",
+									"label": "Mixed",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "none",
+									"label": "No signal",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "noReply",
+									"label": "No reply",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"durations": [
+								{
+									"id": "under1m",
+									"label": "Under 1 minute",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to5m",
+									"label": "1–5 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "5to15m",
+									"label": "5–15 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "15to30m",
+									"label": "15–30 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "30to60m",
+									"label": "30–60 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to3h",
+									"label": "1–3 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "3to12h",
+									"label": "3–12 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "12hPlus",
+									"label": "12 hours+",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "unknown",
+									"label": "Unknown duration",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"skillsUsed": [
+								{
+									"id": "yes",
+									"label": "Yes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "no",
+									"label": "No",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"mergedPullRequests": null,
+					"ciFailuresPerPullRequest": null,
+					"ciRuns": null
+				}
+			}
+		},
+		{
+			"input": {
+				"startDate": "2026-08-01",
+				"endDate": "2026-08-31",
+				"requestedMetric": "agentRuns",
+				"durationInterval": "daily",
+				"members": [],
+				"repositories": [],
+				"models": [],
+				"signalTypes": [],
+				"phrases": [],
+				"runSignals": [],
+				"durations": [],
+				"skillsUsed": [],
+				"splitBy": "none",
+				"pullRequestCi": [],
+				"githubAuthors": [],
+				"ciConclusions": [],
+				"ciEvents": [],
+				"ciWorkflows": [],
+				"ciAttempts": []
+			},
+			"data": {
+				"requestedMetric": "agentRuns",
+				"splitBy": "none",
+				"availableMetrics": ["cost", "sessions", "agentRuns", "signals"],
+				"metrics": {
+					"cost": {
+						"total": 3200.9865277999993,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "API Cost" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"sessions": {
+						"total": 85,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Sessions" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"commits": null,
+					"signals": {
+						"total": 385,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Language signals" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [
+								{
+									"id": "modelApologies",
+									"label": "Model apologies",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userNegative",
+									"label": "Negative user",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userPositive",
+									"label": "Positive user",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"agentRuns": {
+						"total": 1864,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Agent runs" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-02", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-03", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-04", "total": 26, "values": { "total": 26 } },
+							{ "date": "2026-08-05", "total": 67, "values": { "total": 67 } },
+							{ "date": "2026-08-06", "total": 59, "values": { "total": 59 } },
+							{ "date": "2026-08-07", "total": 32, "values": { "total": 32 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 96, "values": { "total": 96 } },
+							{ "date": "2026-08-11", "total": 37, "values": { "total": 37 } },
+							{
+								"date": "2026-08-12",
+								"total": 120,
+								"values": { "total": 120 }
+							},
+							{
+								"date": "2026-08-13",
+								"total": 139,
+								"values": { "total": 139 }
+							},
+							{
+								"date": "2026-08-14",
+								"total": 165,
+								"values": { "total": 165 }
+							},
+							{
+								"date": "2026-08-15",
+								"total": 199,
+								"values": { "total": 199 }
+							},
+							{ "date": "2026-08-16", "total": 65, "values": { "total": 65 } },
+							{
+								"date": "2026-08-17",
+								"total": 126,
+								"values": { "total": 126 }
+							},
+							{ "date": "2026-08-18", "total": 53, "values": { "total": 53 } },
+							{
+								"date": "2026-08-19",
+								"total": 113,
+								"values": { "total": 113 }
+							},
+							{
+								"date": "2026-08-20",
+								"total": 170,
+								"values": { "total": 170 }
+							},
+							{
+								"date": "2026-08-21",
+								"total": 186,
+								"values": { "total": 186 }
+							},
+							{ "date": "2026-08-22", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-25", "total": 2, "values": { "total": 2 } },
+							{
+								"date": "2026-08-26",
+								"total": 137,
+								"values": { "total": 137 }
+							},
+							{ "date": "2026-08-27", "total": 47, "values": { "total": 47 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [
+								{
+									"id": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX",
+									"label": "Marc",
+									"value": 703,
+									"incomplete": false,
+									"image": "/api/avatar/bef8e0b5-90b7-4bf8-b7d2-c3eac332ed0b"
+								},
+								{
+									"id": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB",
+									"label": "Rafa",
+									"value": 670,
+									"incomplete": false,
+									"image": "/api/avatar/cdf54bd3-87c6-40d7-af10-715f8a1d15a7"
+								},
+								{
+									"id": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX",
+									"label": "Evren",
+									"value": 491,
+									"incomplete": false,
+									"image": "https://avatars.githubusercontent.com/u/158852680?v=4"
+								}
+							],
+							"repositories": [
+								{
+									"id": "github.com/evrendom/rudel",
+									"label": "evrendom/rudel",
+									"value": 1694,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "github.com/opalinehq/athena",
+									"label": "opalinehq/athena",
+									"value": 170,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"models": [
+								{
+									"id": "gpt-5.6-sol",
+									"label": "gpt-5.6-sol",
+									"value": 1425,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "claude-fable-5",
+									"label": "claude-fable-5",
+									"value": 439,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [
+								{
+									"id": "positive",
+									"label": "Positive",
+									"value": 162,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "negative",
+									"label": "Negative",
+									"value": 29,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "mixed",
+									"label": "Mixed",
+									"value": 7,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "none",
+									"label": "No signal",
+									"value": 1584,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "noReply",
+									"label": "No reply",
+									"value": 82,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"durations": [
+								{
+									"id": "under1m",
+									"label": "Under 1 minute",
+									"value": 540,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to5m",
+									"label": "1–5 minutes",
+									"value": 583,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "5to15m",
+									"label": "5–15 minutes",
+									"value": 235,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "15to30m",
+									"label": "15–30 minutes",
+									"value": 50,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "30to60m",
+									"label": "30–60 minutes",
+									"value": 16,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to3h",
+									"label": "1–3 hours",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "3to12h",
+									"label": "3–12 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "12hPlus",
+									"label": "12 hours+",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "unknown",
+									"label": "Unknown duration",
+									"value": 438,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"skillsUsed": [
+								{
+									"id": "yes",
+									"label": "Yes",
+									"value": 725,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "no",
+									"label": "No",
+									"value": 1139,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						},
+						"coverage": {
+							"indexedSessions": 85,
+							"indexingSessions": 0,
+							"unavailableSessions": 0
+						},
+						"durationStats": {
+							"interval": "daily",
+							"sampleCount": 1426,
+							"unknownCount": 438,
+							"medianSeconds": 91.567,
+							"p95Seconds": 886.382,
+							"trend": [
+								{
+									"date": "2026-08-01",
+									"startDate": "2026-08-01",
+									"endDate": "2026-08-01",
+									"sampleCount": 6,
+									"unknownCount": 0,
+									"medianSeconds": 78.356,
+									"p95Seconds": 450.114
+								},
+								{
+									"date": "2026-08-02",
+									"startDate": "2026-08-02",
+									"endDate": "2026-08-02",
+									"sampleCount": 6,
+									"unknownCount": 4,
+									"medianSeconds": 963.861,
+									"p95Seconds": 1269.575
+								},
+								{
+									"date": "2026-08-03",
+									"startDate": "2026-08-03",
+									"endDate": "2026-08-03",
+									"sampleCount": 2,
+									"unknownCount": 0,
+									"medianSeconds": 850.167,
+									"p95Seconds": 850.167
+								},
+								{
+									"date": "2026-08-04",
+									"startDate": "2026-08-04",
+									"endDate": "2026-08-04",
+									"sampleCount": 22,
+									"unknownCount": 4,
+									"medianSeconds": 72.874,
+									"p95Seconds": 532.177
+								},
+								{
+									"date": "2026-08-05",
+									"startDate": "2026-08-05",
+									"endDate": "2026-08-05",
+									"sampleCount": 58,
+									"unknownCount": 9,
+									"medianSeconds": 74.54,
+									"p95Seconds": 1609.253
+								},
+								{
+									"date": "2026-08-06",
+									"startDate": "2026-08-06",
+									"endDate": "2026-08-06",
+									"sampleCount": 34,
+									"unknownCount": 25,
+									"medianSeconds": 227.505,
+									"p95Seconds": 952.492
+								},
+								{
+									"date": "2026-08-07",
+									"startDate": "2026-08-07",
+									"endDate": "2026-08-07",
+									"sampleCount": 29,
+									"unknownCount": 3,
+									"medianSeconds": 191.714,
+									"p95Seconds": 2226.257
+								},
+								{
+									"date": "2026-08-08",
+									"startDate": "2026-08-08",
+									"endDate": "2026-08-08",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-09",
+									"startDate": "2026-08-09",
+									"endDate": "2026-08-09",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-10",
+									"startDate": "2026-08-10",
+									"endDate": "2026-08-10",
+									"sampleCount": 76,
+									"unknownCount": 20,
+									"medianSeconds": 109.006,
+									"p95Seconds": 856.994
+								},
+								{
+									"date": "2026-08-11",
+									"startDate": "2026-08-11",
+									"endDate": "2026-08-11",
+									"sampleCount": 25,
+									"unknownCount": 12,
+									"medianSeconds": 158.672,
+									"p95Seconds": 838.888
+								},
+								{
+									"date": "2026-08-12",
+									"startDate": "2026-08-12",
+									"endDate": "2026-08-12",
+									"sampleCount": 96,
+									"unknownCount": 24,
+									"medianSeconds": 122.32,
+									"p95Seconds": 715.026
+								},
+								{
+									"date": "2026-08-13",
+									"startDate": "2026-08-13",
+									"endDate": "2026-08-13",
+									"sampleCount": 100,
+									"unknownCount": 39,
+									"medianSeconds": 128.594,
+									"p95Seconds": 810.945
+								},
+								{
+									"date": "2026-08-14",
+									"startDate": "2026-08-14",
+									"endDate": "2026-08-14",
+									"sampleCount": 100,
+									"unknownCount": 65,
+									"medianSeconds": 118.071,
+									"p95Seconds": 886.382
+								},
+								{
+									"date": "2026-08-15",
+									"startDate": "2026-08-15",
+									"endDate": "2026-08-15",
+									"sampleCount": 131,
+									"unknownCount": 68,
+									"medianSeconds": 78.45,
+									"p95Seconds": 531.656
+								},
+								{
+									"date": "2026-08-16",
+									"startDate": "2026-08-16",
+									"endDate": "2026-08-16",
+									"sampleCount": 64,
+									"unknownCount": 1,
+									"medianSeconds": 48.954,
+									"p95Seconds": 570.232
+								},
+								{
+									"date": "2026-08-17",
+									"startDate": "2026-08-17",
+									"endDate": "2026-08-17",
+									"sampleCount": 123,
+									"unknownCount": 3,
+									"medianSeconds": 48.762,
+									"p95Seconds": 244.828
+								},
+								{
+									"date": "2026-08-18",
+									"startDate": "2026-08-18",
+									"endDate": "2026-08-18",
+									"sampleCount": 44,
+									"unknownCount": 9,
+									"medianSeconds": 112.708,
+									"p95Seconds": 616.65
+								},
+								{
+									"date": "2026-08-19",
+									"startDate": "2026-08-19",
+									"endDate": "2026-08-19",
+									"sampleCount": 92,
+									"unknownCount": 21,
+									"medianSeconds": 108.746,
+									"p95Seconds": 884.949
+								},
+								{
+									"date": "2026-08-20",
+									"startDate": "2026-08-20",
+									"endDate": "2026-08-20",
+									"sampleCount": 146,
+									"unknownCount": 24,
+									"medianSeconds": 126.139,
+									"p95Seconds": 1829.044
+								},
+								{
+									"date": "2026-08-21",
+									"startDate": "2026-08-21",
+									"endDate": "2026-08-21",
+									"sampleCount": 144,
+									"unknownCount": 42,
+									"medianSeconds": 87.396,
+									"p95Seconds": 741.574
+								},
+								{
+									"date": "2026-08-22",
+									"startDate": "2026-08-22",
+									"endDate": "2026-08-22",
+									"sampleCount": 3,
+									"unknownCount": 0,
+									"medianSeconds": 2437.983,
+									"p95Seconds": 3102.978
+								},
+								{
+									"date": "2026-08-23",
+									"startDate": "2026-08-23",
+									"endDate": "2026-08-23",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-24",
+									"startDate": "2026-08-24",
+									"endDate": "2026-08-24",
+									"sampleCount": 4,
+									"unknownCount": 0,
+									"medianSeconds": 214.331,
+									"p95Seconds": 297.335
+								},
+								{
+									"date": "2026-08-25",
+									"startDate": "2026-08-25",
+									"endDate": "2026-08-25",
+									"sampleCount": 2,
+									"unknownCount": 0,
+									"medianSeconds": 10.804,
+									"p95Seconds": 10.804
+								},
+								{
+									"date": "2026-08-26",
+									"startDate": "2026-08-26",
+									"endDate": "2026-08-26",
+									"sampleCount": 87,
+									"unknownCount": 50,
+									"medianSeconds": 67.926,
+									"p95Seconds": 591.522
+								},
+								{
+									"date": "2026-08-27",
+									"startDate": "2026-08-27",
+									"endDate": "2026-08-27",
+									"sampleCount": 32,
+									"unknownCount": 15,
+									"medianSeconds": 94.284,
+									"p95Seconds": 716.695
+								},
+								{
+									"date": "2026-08-28",
+									"startDate": "2026-08-28",
+									"endDate": "2026-08-28",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-29",
+									"startDate": "2026-08-29",
+									"endDate": "2026-08-29",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-30",
+									"startDate": "2026-08-30",
+									"endDate": "2026-08-30",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								},
+								{
+									"date": "2026-08-31",
+									"startDate": "2026-08-31",
+									"endDate": "2026-08-31",
+									"sampleCount": 0,
+									"unknownCount": 0,
+									"medianSeconds": null,
+									"p95Seconds": null
+								}
+							]
+						}
+					},
+					"mergedPullRequests": null,
+					"ciFailuresPerPullRequest": null,
+					"ciRuns": null
+				}
+			}
+		},
+		{
+			"input": {
+				"startDate": "2026-08-01",
+				"endDate": "2026-08-31",
+				"requestedMetric": "signals",
+				"members": [],
+				"repositories": [],
+				"models": [],
+				"signalTypes": [],
+				"phrases": [],
+				"runSignals": [],
+				"durations": [],
+				"skillsUsed": [],
+				"splitBy": "none",
+				"pullRequestCi": [],
+				"githubAuthors": [],
+				"ciConclusions": [],
+				"ciEvents": [],
+				"ciWorkflows": [],
+				"ciAttempts": []
+			},
+			"data": {
+				"requestedMetric": "signals",
+				"splitBy": "none",
+				"availableMetrics": ["cost", "sessions", "agentRuns", "signals"],
+				"metrics": {
+					"cost": {
+						"total": 3200.9865277999993,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "API Cost" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"sessions": {
+						"total": 85,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Sessions" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"commits": null,
+					"signals": {
+						"total": 385,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Language signals" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-03", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-04", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-05", "total": 11, "values": { "total": 11 } },
+							{ "date": "2026-08-06", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-07", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-11", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-12", "total": 31, "values": { "total": 31 } },
+							{ "date": "2026-08-13", "total": 22, "values": { "total": 22 } },
+							{ "date": "2026-08-14", "total": 41, "values": { "total": 41 } },
+							{ "date": "2026-08-15", "total": 89, "values": { "total": 89 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 28, "values": { "total": 28 } },
+							{ "date": "2026-08-18", "total": 17, "values": { "total": 17 } },
+							{ "date": "2026-08-19", "total": 29, "values": { "total": 29 } },
+							{ "date": "2026-08-20", "total": 24, "values": { "total": 24 } },
+							{ "date": "2026-08-21", "total": 27, "values": { "total": 27 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 28, "values": { "total": 28 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [
+								{
+									"id": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX",
+									"label": "Evren",
+									"value": 157,
+									"incomplete": false,
+									"image": "https://avatars.githubusercontent.com/u/158852680?v=4"
+								},
+								{
+									"id": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX",
+									"label": "Marc",
+									"value": 118,
+									"incomplete": false,
+									"image": "/api/avatar/bef8e0b5-90b7-4bf8-b7d2-c3eac332ed0b"
+								},
+								{
+									"id": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB",
+									"label": "Rafa",
+									"value": 110,
+									"incomplete": false,
+									"image": "/api/avatar/cdf54bd3-87c6-40d7-af10-715f8a1d15a7"
+								}
+							],
+							"repositories": [
+								{
+									"id": "github.com/evrendom/rudel",
+									"label": "evrendom/rudel",
+									"value": 357,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "github.com/opalinehq/athena",
+									"label": "opalinehq/athena",
+									"value": 28,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"models": [
+								{
+									"id": "gpt-5.6-sol",
+									"label": "gpt-5.6-sol",
+									"value": 229,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "claude-fable-5",
+									"label": "claude-fable-5",
+									"value": 156,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"signalTypes": [
+								{
+									"id": "userPositive",
+									"label": "Positive user",
+									"value": 219,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "modelApologies",
+									"label": "Model apologies",
+									"value": 123,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userNegative",
+									"label": "Negative user",
+									"value": 43,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"phrases": [
+								{
+									"id": "good",
+									"label": "good",
+									"value": 45,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "correct",
+									"label": "correct",
+									"value": 30,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apology",
+									"label": "apology",
+									"value": 25,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "perfect",
+									"label": "perfect",
+									"value": 20,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "dont like",
+									"label": "dont like",
+									"value": 13,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "love",
+									"label": "love",
+									"value": 13,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "nice",
+									"label": "nice",
+									"value": 13,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "You were right",
+									"label": "You were right",
+									"value": 12,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "works now",
+									"label": "works now",
+									"value": 11,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apologies",
+									"label": "apologies",
+									"value": 10,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "you were right",
+									"label": "you were right",
+									"value": 9,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "solid",
+									"label": "solid",
+									"value": 8,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "sorry",
+									"label": "sorry",
+									"value": 8,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "agreed",
+									"label": "agreed",
+									"value": 7,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "great",
+									"label": "great",
+									"value": 7,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "elegant",
+									"label": "elegant",
+									"value": 6,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "love it",
+									"label": "love it",
+									"value": 6,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "??",
+									"label": "??",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my mistake",
+									"label": "my mistake",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "precisely",
+									"label": "precisely",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Apologies",
+									"label": "Apologies",
+									"value": 4,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "doesnt work",
+									"label": "doesnt work",
+									"value": 4,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "good job",
+									"label": "good job",
+									"value": 4,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "it worked",
+									"label": "it worked",
+									"value": 4,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "You’re right",
+									"label": "You’re right",
+									"value": 4,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Apology",
+									"label": "Apology",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "beautiful",
+									"label": "beautiful",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Correct",
+									"label": "Correct",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "did not work",
+									"label": "did not work",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "didnt work",
+									"label": "didnt work",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "does not work",
+									"label": "does not work",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "don't like",
+									"label": "don't like",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I misread",
+									"label": "I misread",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I was wrong",
+									"label": "I was wrong",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "lets do it",
+									"label": "lets do it",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Sorry",
+									"label": "Sorry",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "absolutely",
+									"label": "absolutely",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apologize",
+									"label": "apologize",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apologized",
+									"label": "apologized",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "fishy",
+									"label": "fishy",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Good",
+									"label": "Good",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Great work",
+									"label": "Great work",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I misunderstood",
+									"label": "I misunderstood",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "is not working",
+									"label": "is not working",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "makes sense",
+									"label": "makes sense",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my bad",
+									"label": "my bad",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "sounds good",
+									"label": "sounds good",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "thanks",
+									"label": "thanks",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that's on me",
+									"label": "that's on me",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "well done",
+									"label": "well done",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "???",
+									"label": "???",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "????",
+									"label": "????",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "?????",
+									"label": "?????",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Agreed",
+									"label": "Agreed",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apologise",
+									"label": "apologise",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "apologizing",
+									"label": "apologizing",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "excellent",
+									"label": "excellent",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "excuse me",
+									"label": "excuse me",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "forgive me",
+									"label": "forgive me",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "gorgeous",
+									"label": "gorgeous",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I agree",
+									"label": "I agree",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I got it wrong",
+									"label": "I got it wrong",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I misspoke",
+									"label": "I misspoke",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I owe you an apology",
+									"label": "I owe you an apology",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I stand corrected",
+									"label": "I stand corrected",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I take that back",
+									"label": "I take that back",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "I’m sorry",
+									"label": "I’m sorry",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "indeed",
+									"label": "indeed",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "looks correct",
+									"label": "looks correct",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "looks good",
+									"label": "looks good",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "mea culpa",
+									"label": "mea culpa",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my error",
+									"label": "my error",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my fault",
+									"label": "my fault",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "My mistake",
+									"label": "My mistake",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my oversight",
+									"label": "my oversight",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Nice",
+									"label": "Nice",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "not working",
+									"label": "not working",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "oops",
+									"label": "oops",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "our mistake",
+									"label": "our mistake",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "pardon",
+									"label": "pardon",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "regrettably",
+									"label": "regrettably",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "sincerely sorry",
+									"label": "sincerely sorry",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "still not working",
+									"label": "still not working",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "superb",
+									"label": "superb",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that is correct",
+									"label": "that is correct",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "That is my fault",
+									"label": "That is my fault",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that makes sense",
+									"label": "that makes sense",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that's my fault",
+									"label": "that's my fault",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that’s true",
+									"label": "that’s true",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "we messed up",
+									"label": "we messed up",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "we regret",
+									"label": "we regret",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "we screwed up",
+									"label": "we screwed up",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "we were wrong",
+									"label": "we were wrong",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "we're sorry",
+									"label": "we're sorry",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "works perfectly",
+									"label": "works perfectly",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "You were correct",
+									"label": "You were correct",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"agentRuns": {
+						"total": 1864,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Agent runs" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-04", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-05", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-06", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-07", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-10", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-11", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-12", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-13", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-14", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-15", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-16", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-17", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-18", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-19", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-20", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-21", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-22", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-23", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-24", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-25", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-26", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-27", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-28", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 0, "values": { "total": 0 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [
+								{
+									"id": "positive",
+									"label": "Positive",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "negative",
+									"label": "Negative",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "mixed",
+									"label": "Mixed",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "none",
+									"label": "No signal",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "noReply",
+									"label": "No reply",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"durations": [
+								{
+									"id": "under1m",
+									"label": "Under 1 minute",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to5m",
+									"label": "1–5 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "5to15m",
+									"label": "5–15 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "15to30m",
+									"label": "15–30 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "30to60m",
+									"label": "30–60 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to3h",
+									"label": "1–3 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "3to12h",
+									"label": "3–12 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "12hPlus",
+									"label": "12 hours+",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "unknown",
+									"label": "Unknown duration",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"skillsUsed": [
+								{
+									"id": "yes",
+									"label": "Yes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "no",
+									"label": "No",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"mergedPullRequests": null,
+					"ciFailuresPerPullRequest": null,
+					"ciRuns": null
+				}
+			}
+		}
+	],
+	"viewerUserId": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX"
 }

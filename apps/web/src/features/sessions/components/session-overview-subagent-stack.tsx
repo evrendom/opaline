@@ -1,6 +1,6 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
 import type { CSSProperties } from "react";
-import { TraceBotIcon } from "@/components/conversation/conversation-trace-hugeicons";
+import { TraceBotIcon } from "@/components/conversation/conversation-trace-glyphs";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import {
 	formatModelDisplayLabel,

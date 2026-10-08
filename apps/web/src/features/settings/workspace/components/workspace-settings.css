@@ -4,9 +4,7 @@
 	flex-direction: column;
 	gap: 32px;
 	width: 100%;
-	max-width: 640px;
 	min-width: 0;
-	margin-inline: auto;
 	padding-bottom: 48px;
 }
 
@@ -14,8 +12,9 @@
 	display: flex;
 	min-width: 0;
 	flex-direction: column;
-	gap: 12px;
-	font-size: 16px;
+	gap: 4px;
+	padding-top: 20px;
+	font-size: 14px;
 	line-height: 1.5;
 }
 
@@ -23,11 +22,18 @@
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	padding-inline: 20px;
 }
 
 .workspace-settings-group-heading h2 {
 	font-size: inherit;
 	font-weight: 500;
+}
+
+.workspace-settings-group[data-tone="danger"]
+	.workspace-settings-group-heading
+	h2 {
+	color: var(--destructive);
 }
 
 .workspace-settings-group-heading p,
@@ -37,7 +43,7 @@
 
 .workspace-settings-group-rows {
 	min-width: 0;
-	padding-inline: 16px;
+	padding: 0 20px 8px;
 }
 
 .workspace-settings-row,
@@ -54,9 +60,33 @@
 	gap: 12px;
 }
 
-.workspace-settings-group-rows > * + *,
-.workspace-settings-list > * + * {
+.workspace-settings-group-rows > * + * {
 	border-top: 1px solid var(--workspace-settings-border, #00000016);
+}
+
+.workspace-settings-list > * + * {
+	border-top: 1px solid var(--workspace-settings-list-border, #0000000d);
+}
+
+.workspace-settings-subsection {
+	padding-top: 16px;
+}
+
+/* Members card stacks the invite form, the roster and any sent
+   invitations without rules between them; roster rows split on a softer
+   line. */
+.workspace-settings-group-rows > form + *,
+.workspace-settings-group-rows > .workspace-settings-subsection {
+	border-top: 0;
+}
+
+.workspace-settings-list .workspace-settings-row {
+	min-height: 0;
+}
+
+.workspace-settings-subsection > h3 {
+	color: var(--muted-foreground);
+	font-weight: 500;
 }
 
 .workspace-settings-row-copy {
@@ -75,14 +105,16 @@
 	gap: 8px;
 }
 
+/* Input: a hairline shadow instead of a border. */
 .workspace-settings-group [data-slot="input"],
 .workspace-settings-url-field,
 .workspace-settings-group [data-slot="select-trigger"],
 .workspace-settings-link-value [data-slot="input"] {
 	height: 48px;
-	border: 1px solid var(--workspace-settings-border, #00000016);
-	border-radius: 6px;
+	border: 0;
+	border-radius: 8px;
 	background: transparent;
+	box-shadow: var(--custom-shadow);
 	font-size: inherit;
 	padding-inline: 10px;
 }
@@ -98,10 +130,51 @@
 	gap: 12px;
 }
 
+/* Member row: the email sits beside the name, smaller and muted. */
 .workspace-settings-member-copy {
 	display: flex;
 	min-width: 0;
-	flex-direction: column;
+	align-items: baseline;
+	gap: 10px;
+}
+
+.workspace-settings-member-copy > :first-child {
+	font-weight: 500;
+}
+
+.workspace-settings-member-copy > :last-child {
+	font-size: 12px;
+}
+
+.workspace-settings-list
+	.workspace-settings-row-control
+	> [data-slot="select-trigger"] {
+	width: auto;
+	min-width: 112px;
+}
+
+/* Secondary badge. */
+.workspace-settings-badge {
+	display: inline-flex;
+	height: 20px;
+	align-items: center;
+	border-radius: 999px;
+	padding-inline: 8px;
+	background: var(--secondary);
+	box-shadow: var(--custom-shadow-secondary);
+	color: var(--secondary-foreground);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.workspace-settings-group .workspace-settings-icon-button {
+	width: 32px;
+	padding: 0;
+	color: var(--muted-foreground);
+}
+
+.workspace-settings-group .workspace-settings-icon-button:hover {
+	color: var(--foreground);
 }
 
 .workspace-settings-member-copy > * {
@@ -163,7 +236,8 @@
 	border-radius: 6px;
 }
 
-.workspace-settings-row-control > [data-slot="input"][readonly] {
+.workspace-settings-row-control > [data-slot="input"][readonly],
+.workspace-settings-field > [data-slot="input"][readonly] {
 	color: var(--muted-foreground);
 }
 
@@ -175,11 +249,51 @@
 	gap: 8px;
 }
 
+/* Buttons: pills; outline ones sit on an outline shadow. */
 .workspace-settings-group [data-slot="button"] {
 	height: 48px;
-	border-radius: 6px;
+	border-radius: 999px;
 	font-size: inherit;
 	font-weight: 500;
+}
+
+.workspace-settings-group [data-slot="button"][data-variant="outline"] {
+	border: 0;
+	background: var(--background);
+	box-shadow: var(--custom-outline-shadow);
+}
+
+.workspace-settings-group [data-slot="button"][data-variant="outline"]:hover {
+	background: var(--muted);
+}
+
+.workspace-settings-fields {
+	display: flex;
+	min-width: 0;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 16px;
+	padding: 12px 0;
+}
+
+.workspace-settings-field {
+	display: flex;
+	min-width: 0;
+	flex: 1 1 200px;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.workspace-settings-field[data-size="compact"] {
+	flex: 0 0 184px;
+}
+
+.workspace-settings-field > :is(label, div):first-child {
+	font-weight: 500;
+}
+
+.workspace-settings-field [data-slot="select-trigger"] {
+	width: 100%;
 }
 
 .workspace-settings-error {
@@ -189,6 +303,7 @@
 
 .dark .workspace-settings-group {
 	--workspace-settings-border: #ffffff22;
+	--workspace-settings-list-border: #ffffff12;
 }
 
 @container workspace-settings (min-width: 480px) {
@@ -209,14 +324,24 @@
 	}
 
 	.workspace-settings-row-control > [data-slot="input"],
+	.workspace-settings-field [data-slot="input"],
 	.workspace-settings-url-field,
-	.workspace-settings-group [data-slot="select-trigger"],
+	.workspace-settings-field [data-slot="select-trigger"],
 	.workspace-settings-link-value [data-slot="input"],
-	.workspace-settings-row-control > [data-slot="skeleton"],
+	.workspace-settings-row-control > [data-slot="skeleton"] {
+		height: 36px;
+	}
+
+	.workspace-settings-row-control [data-slot="select-trigger"],
 	.workspace-settings-actions > [data-slot="skeleton"],
 	.workspace-settings-link-actions > [data-slot="skeleton"],
 	.workspace-settings-group [data-slot="button"] {
 		height: 32px;
+	}
+
+	/* A button sharing a row of fields matches the inputs beside it. */
+	.workspace-settings-fields > [data-slot="button"] {
+		height: 36px;
 	}
 }
 

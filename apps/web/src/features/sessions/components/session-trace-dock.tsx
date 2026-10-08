@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowUp } from "lucide-react";
+import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
@@ -80,7 +80,7 @@ export function SessionTraceDock({
 				)}
 				onClick={onReturn}
 			>
-				<ArrowLeft
+				<IconArrowLeft
 					aria-hidden="true"
 					className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
 				/>
@@ -97,7 +97,7 @@ export function SessionTraceDock({
 			<SessionTraceNavigationButton
 				disabled={!navigation.hasPreviousSession}
 				icon={
-					<ArrowUp
+					<IconArrowUp
 						aria-hidden="true"
 						className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>
@@ -115,7 +115,7 @@ export function SessionTraceDock({
 			<SessionTraceNavigationButton
 				disabled={!navigation.hasNextSession}
 				icon={
-					<ArrowDown
+					<IconArrowDown
 						aria-hidden="true"
 						className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>

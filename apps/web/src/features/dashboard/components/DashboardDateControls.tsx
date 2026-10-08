@@ -5,7 +5,6 @@ import {
 	type AnalyticsDateRangePickerProps,
 } from "@/features/analytics/date-range/components/AnalyticsDateRangePicker";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
-import { cn } from "@/lib/utils";
 
 export function DashboardDateControls({
 	className,
@@ -33,10 +32,7 @@ export function DashboardDateControls({
 			variant={variant}
 			calendarControls={calendarControls}
 			triggerSuffix={triggerSuffix}
-			triggerClassName={cn(
-				"dashboardy-action-button h-8 px-2.5 text-[13px] sm:h-8",
-				className,
-			)}
+			triggerClassName={className}
 		/>
 	);
 }

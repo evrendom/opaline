@@ -425,26 +425,6 @@ body:has(.dashboard-01-preview)::after {
 		0 0 0 1px rgb(255 255 255 / 0.06);
 }
 
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-slot="session-list-header-pane"],
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-slot="sessions-list-pane"],
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-slot="session-workspace-resize-handle"] {
-	display: none;
-}
-
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-slot="session-detail-header-pane"] {
-	border-left: 0;
-	box-shadow: none;
-}
-
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-slot="session-detail-pane"] {
-	box-shadow: none;
-}
-
 /* The split changes only the scroll viewport. Keep the table's query container
    sized to the full workspace so columns and skill tiers survive pane motion. */
 @container session-workspace (min-width: 0px) {
@@ -453,69 +433,12 @@ body:has(.dashboard-01-preview)::after {
 	}
 }
 
-/* Keep the real overview behind the moving detail instead of revealing an
-   empty flex-layout slot. Restore the split's normal sizing once it lands. */
-[data-slot="session-workspace"][data-session-pane-moving],
-[data-slot="dashboard-header"][data-session-pane-moving] {
-	position: relative;
-}
-
-.dashboard-01-window
-	[data-session-pane-moving]
-	> [data-slot="sessions-list-pane"],
-.dashboard-01-window
-	[data-session-pane-moving]
-	[data-slot="session-list-header-pane"] {
-	display: flex;
-	flex: 1;
-	width: 100%;
-}
-
-.dashboard-01-window
-	[data-session-pane-moving]
-	> [data-slot="session-detail-pane"],
-.dashboard-01-window
-	[data-session-pane-moving]
-	[data-slot="session-detail-header-pane"] {
-	position: absolute;
-	inset: 0;
-	@media (min-width: 640px) {
-		left: var(
-			--session-pane-motion-left,
-			var(--session-list-pane-width, clamp(20rem, 34vw, 40rem))
-		);
-	}
-}
-
-.dashboard-01-window
-	[data-session-pane-moving]
-	> [data-slot="session-workspace-resize-handle"] {
-	visibility: hidden;
-	position: absolute;
-}
-
-.dashboard-01-window:has([data-session-detail-fullscreen])
-	[data-session-pane-moving] {
-	--session-pane-motion-left: 0px;
-}
-
-.dashboard-01-window [data-session-pane-moving] [data-session-pane-resizing] {
-	left: auto;
-	width: var(--session-pane-resize-width);
-}
-
 /* The pane and its portaled header share Fluid Functionalism's large-surface
-   spring entrance and faster, non-bouncing exit. */
+   spring entrance. */
 @media (prefers-reduced-motion: no-preference) {
 	[data-slot="session-detail-pane"],
 	[data-slot="session-detail-header-pane"] {
 		transition: transform var(--session-pane-enter);
-	}
-
-	[data-slot="session-detail-pane"][data-session-pane-closing],
-	[data-slot="session-detail-header-pane"][data-session-pane-closing] {
-		transition: transform var(--session-pane-exit);
-		transform: translateX(100%);
 	}
 
 	@starting-style {
@@ -530,12 +453,6 @@ body:has(.dashboard-01-preview)::after {
 	[data-slot="session-detail-pane"],
 	[data-slot="session-detail-header-pane"] {
 		transition: opacity var(--session-pane-fade-enter);
-	}
-
-	[data-slot="session-detail-pane"][data-session-pane-closing],
-	[data-slot="session-detail-header-pane"][data-session-pane-closing] {
-		opacity: 0;
-		transition: opacity var(--session-pane-exit);
 	}
 
 	@starting-style {

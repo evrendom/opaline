@@ -1,3 +1,4 @@
+import { IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { Button } from "@/app/ui/button";
 import {
@@ -16,7 +17,7 @@ export function AccountDangerZoneCard({
 	const [open, setOpen] = useState(false);
 	return (
 		<>
-			<WorkspaceSettingsGroup title="Danger zone">
+			<WorkspaceSettingsGroup title="Danger zone" tone="danger">
 				<WorkspaceSettingsRow
 					label="Delete account"
 					description="Permanently delete your account and all related data. This cannot be undone."
@@ -27,6 +28,7 @@ export function AccountDangerZoneCard({
 						size="sm"
 						onClick={() => setOpen(true)}
 					>
+						<IconTrash aria-hidden="true" />
 						Delete account
 					</Button>
 				</WorkspaceSettingsRow>

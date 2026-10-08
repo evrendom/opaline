@@ -25,10 +25,7 @@ import {
 	ConversationTraceInteractionEpisodeRow,
 	ConversationTraceEventRow as EventRow,
 } from "./conversation-trace-event-row";
-import {
-	TraceFileIcon,
-	TraceSettingsIcon,
-} from "./conversation-trace-hugeicons";
+import { TraceFileIcon, TraceSettingsIcon } from "./conversation-trace-glyphs";
 import {
 	ModelTraceIcon,
 	TraceIcon,

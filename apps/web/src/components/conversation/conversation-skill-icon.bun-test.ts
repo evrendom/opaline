@@ -22,6 +22,6 @@ describe("skill icon selection", () => {
 	});
 
 	test("always supplies a library icon even for an empty name", () => {
-		expect(getSkillIcon("").icon.length).toBeGreaterThan(0);
+		expect(getSkillIcon("").icon).toBeTruthy();
 	});
 });

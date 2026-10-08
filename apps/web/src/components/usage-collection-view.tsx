@@ -1,12 +1,11 @@
-import {
-	BookOpen01Icon,
-	Folder01Icon,
-	Search01Icon,
-	SearchRemoveIcon,
-	User02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { HistoricalSkillSummary } from "@rudel/api-routes";
+import {
+	IconBook,
+	IconFolder,
+	IconSearch,
+	IconUser,
+	IconZoomCancel,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { memo, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -51,10 +50,12 @@ interface UsageCollectionViewProps {
 	inline?: boolean;
 }
 
+// Card grid: 16px gaps, its edges on the page title's 32px gutter.
 const USAGE_GRID_CLASS_NAME =
-	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-3 p-4 sm:p-[18px]";
+	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4 px-4 pt-1 pb-6 sm:px-8";
+// Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-white text-left text-(--session-overview-text) shadow-[0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] dark:border dark:border-white/10 dark:bg-(--dashboardy-surface-opaque) dark:shadow-none";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-card text-left text-(--session-overview-text) shadow-(--custom-shadow) squircle:rounded-3xl corner-squircle dark:border dark:border-white/10 dark:bg-(--dashboardy-surface-opaque) dark:shadow-none";
 const USAGE_METADATA_ICON_CLASS_NAME =
 	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
 const SKILL_CARD_MARKS: Record<string, { emoji: string; color: string }> = {
@@ -158,7 +159,9 @@ function UsageCollectionHeader({
 			className={cn(
 				"ml-auto flex min-w-0 flex-1 items-center justify-end gap-2",
 				inline &&
-					"w-full max-h-10 shrink-0 border-b border-(--session-overview-border) px-4 py-1.5",
+					// The detail page's side pane: a 48px strip on 24px gutters, level
+					// with the sessions toolbar beside it.
+					"h-12 w-full flex-none border-b border-(--session-overview-border) px-6",
 			)}
 		>
 			{inline ? <h2 className="mr-auto text-sm font-medium">Skills</h2> : null}
@@ -166,11 +169,9 @@ function UsageCollectionHeader({
 				<label className="sr-only" htmlFor={`${kind}-search`}>
 					Search {kind}
 				</label>
-				<HugeiconsIcon
-					icon={Search01Icon}
-					strokeWidth={1.5}
+				<IconSearch
 					aria-hidden="true"
-					className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-[#8d8d8d] dark:text-[#8c8c8c]"
+					className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-[#b8b8b8] dark:text-[#5b5b5b]"
 				/>
 				<input
 					id={`${kind}-search`}
@@ -179,7 +180,7 @@ function UsageCollectionHeader({
 					value={search}
 					onChange={(event) => onSearchChange(event.currentTarget.value)}
 					placeholder={`Search ${kind}`}
-					className="h-7 w-full rounded-md bg-transparent py-1 pr-2.5 pl-8 text-base text-(--dashboardy-heading) shadow-[0_0_0_0.5px_#0000000f,0_1px_2px_#0000000d] outline-none placeholder:text-(--dashboardy-subtle) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--dashboard-01-metric-button-focus-ring) sm:text-sm dark:ring-1 dark:ring-white/10 dark:shadow-none"
+					className="toolbar-search"
 				/>
 			</div>
 		</div>
@@ -223,13 +224,7 @@ function UsageCollectionState({
 	if (isError) {
 		return (
 			<UsageStateMessage
-				icon={
-					<HugeiconsIcon
-						icon={BookOpen01Icon}
-						strokeWidth={1.5}
-						aria-hidden="true"
-					/>
-				}
+				icon={<IconBook aria-hidden="true" />}
 				title={`${kind === "skills" ? "Skills" : "Repos"} couldn’t be loaded`}
 				description="Your historical sessions are still available. Try loading this view again."
 				action={
@@ -244,13 +239,7 @@ function UsageCollectionState({
 	if (itemCount === 0) {
 		return (
 			<UsageStateMessage
-				icon={
-					<HugeiconsIcon
-						icon={BookOpen01Icon}
-						strokeWidth={1.5}
-						aria-hidden="true"
-					/>
-				}
+				icon={<IconBook aria-hidden="true" />}
 				title={`No ${kind} yet`}
 				description={
 					kind === "skills"
@@ -264,13 +253,7 @@ function UsageCollectionState({
 	if (filteredItems.length === 0 && hasSearch) {
 		return (
 			<UsageStateMessage
-				icon={
-					<HugeiconsIcon
-						icon={SearchRemoveIcon}
-						strokeWidth={1.5}
-						aria-hidden="true"
-					/>
-				}
+				icon={<IconZoomCancel aria-hidden="true" />}
 				title={`No matching ${kind}`}
 				description="Try a different exact name or clear the search."
 				action={
@@ -390,10 +373,10 @@ const UsageCard = memo(function UsageCard({
 				aria-label={`Open ${skill.name}`}
 				onClick={() => onSelectItem(skill.id)}
 				onFocus={() => setActiveIndex(index)}
-				className="absolute inset-0 z-20 cursor-pointer rounded-lg outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+				className="absolute inset-0 z-20 cursor-pointer rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
-				<header className="flex min-h-16 flex-1 items-center gap-2.5 px-4 py-3">
+				<header className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">
 					<UsageCardMark skill={skill.name} emoji={skill.emoji} />
 					<h2
 						className="line-clamp-2 min-w-0 flex-1 font-sans text-base font-medium text-balance wrap-anywhere sm:text-sm"
@@ -402,7 +385,7 @@ const UsageCard = memo(function UsageCard({
 						{skill.name}
 					</h2>
 				</header>
-				<footer className="shrink-0 border-t border-black/5 px-4 py-3 dark:border-white/6">
+				<footer className="shrink-0 border-t border-black/[0.04] px-5 py-4 dark:border-white/6">
 					<UsageSummary
 						avatarMap={avatarMap}
 						attribution={skill.attribution}
@@ -564,9 +547,7 @@ function UsageUserAvatar({
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
 			<AvatarFallback className="bg-(--session-overview-hover)">
-				<HugeiconsIcon
-					icon={User02Icon}
-					strokeWidth={1.5}
+				<IconUser
 					aria-hidden="true"
 					className={USAGE_METADATA_ICON_CLASS_NAME}
 				/>
@@ -590,9 +571,7 @@ function RepositoryChip({
 			)}
 			title={`Repository ${label}, ${formatCompactSessionCount(sessionCount)}`}
 		>
-			<HugeiconsIcon
-				icon={Folder01Icon}
-				strokeWidth={1.5}
+			<IconFolder
 				aria-hidden="true"
 				className={USAGE_METADATA_ICON_CLASS_NAME}
 			/>
@@ -611,7 +590,7 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 			<div className={USAGE_GRID_CLASS_NAME}>
 				{["first", "second", "third", "fourth", "fifth", "sixth"].map((key) => (
 					<div key={key} className={USAGE_CARD_CLASS_NAME}>
-						<div className="flex min-h-16 flex-1 items-center gap-2.5 px-4 py-3">
+						<div className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">
 							<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
 							<Skeleton className="h-5 min-w-0 flex-1" />
 						</div>

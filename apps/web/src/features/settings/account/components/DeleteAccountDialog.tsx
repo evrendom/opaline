@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
+import { IconAlertTriangle, IconLoader2 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/app/ui/button";
 import {
@@ -59,7 +59,7 @@ export function DeleteAccountDialog({
 			<DialogContent>
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<AlertTriangleIcon className="text-destructive" />
+						<IconAlertTriangle className="text-destructive" />
 						Delete account
 					</DialogTitle>
 					<DialogDescription>
@@ -108,7 +108,7 @@ export function DeleteAccountDialog({
 						disabled={!canDelete}
 					>
 						{isDeleting ? (
-							<Loader2Icon data-icon="inline-start" className="animate-spin" />
+							<IconLoader2 data-icon="inline-start" className="animate-spin" />
 						) : null}
 						Delete account
 					</Button>

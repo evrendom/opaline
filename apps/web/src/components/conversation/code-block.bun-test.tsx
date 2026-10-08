@@ -44,7 +44,7 @@ describe("CodeBlock", () => {
 			markup.indexOf("data-trace-code-file-label"),
 		);
 		expect(markup).not.toContain("data-trace-code-github-icon");
-		expect(markup).toContain("data-trace-hugeicon");
+		expect(markup).toContain("data-trace-glyph");
 		expect(markup).toContain("trace-code-block");
 		expect(markup).toContain("border-[color:var(--trace-code-border)]");
 		expect(markup).toContain("padding:6px 8px");
@@ -110,7 +110,7 @@ describe("CodeBlock", () => {
 		);
 
 		expect(markup).toContain('data-trace-code-header-icon="code"');
-		expect(markup).toContain("data-trace-hugeicon");
+		expect(markup).toContain("data-trace-glyph");
 	});
 
 	test("keeps Prism Markdown table tokens inline", () => {

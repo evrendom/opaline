@@ -1,6 +1,8 @@
-import { FilterHorizontalIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import {
+	IconAdjustmentsHorizontal,
+	IconArrowLeft,
+	IconChevronRight,
+} from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import {
@@ -169,16 +171,11 @@ export function SessionsOverviewFiltersMenu({
 				aria-busy={isLoading || undefined}
 				aria-label={triggerLabel}
 				title={triggerLabel}
-				className={cn(
-					"relative flex h-7 shrink-0 items-center gap-1.5 rounded-md text-base font-medium tracking-[-0.01em] text-(--session-overview-muted) outline-none hover:bg-(--session-overview-hover) hover:text-(--session-overview-text) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent) sm:text-sm",
-					iconOnly
-						? "w-7 justify-center p-0"
-						: "bg-(--session-overview-surface) py-1 pr-2 pl-1.5 shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]",
-					activeFilterCount > 0 &&
-						"bg-(--session-overview-hover) text-(--session-overview-accent)",
-				)}
+				className="toolbar-button"
+				data-icon-only={iconOnly || undefined}
+				data-active={activeFilterCount > 0 || undefined}
 			>
-				<HugeiconsIcon
+				<IconAdjustmentsHorizontal
 					aria-hidden="true"
 					className={cn(
 						"size-4 h-lh shrink-0",
@@ -186,8 +183,6 @@ export function SessionsOverviewFiltersMenu({
 							? "text-(--session-overview-accent)"
 							: "text-[#5d5d5d] dark:text-[#acaeb2]",
 					)}
-					icon={FilterHorizontalIcon}
-					strokeWidth={1.75}
 				/>
 				{iconOnly ? null : <span>Filter</span>}
 				{activeFilterCount > 0 && !iconOnly ? (
@@ -371,7 +366,7 @@ export function SessionsOverviewFiltersMenu({
 										className="relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
 										onClick={() => setSelectedFilterKey(null)}
 									>
-										<ArrowLeft aria-hidden="true" className="size-4" />
+										<IconArrowLeft aria-hidden="true" className="size-4" />
 										<span
 											aria-hidden="true"
 											className="pointer-fine:hidden absolute top-1/2 left-1/2 size-12 -translate-1/2"
@@ -486,7 +481,7 @@ export function SessionsOverviewFiltersMenu({
 													rangeFilterValues,
 												)}
 											</span>
-											<ChevronRight
+											<IconChevronRight
 												aria-hidden="true"
 												className="size-4 shrink-0 text-muted-foreground"
 											/>

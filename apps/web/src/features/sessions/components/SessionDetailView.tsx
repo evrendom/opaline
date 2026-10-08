@@ -21,6 +21,7 @@ import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { formatUsername } from "@/lib/format";
 import { client } from "@/lib/orpc";
+import { SessionContextChips } from "./session-context-chips";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
 import {
 	fetchSessionDetailInitial,
@@ -41,13 +42,14 @@ import {
 	getSessionDetailErrorState,
 } from "./session-detail-view-utils";
 import { SessionUploadFailureDetail } from "./session-upload-failure-detail";
-import { useSessionPaneFullscreen } from "./use-session-pane-fullscreen";
 
 type SessionDetailViewProps = {
+	/** Session page: the shell header carries the breadcrumb and the
+	 *  session's identity sits in context chips above the detail. */
+	fullPage?: boolean;
 	showOverviewStrip?: boolean;
 	initialSession?: SessionAnalytics;
 	navigation: SessionNavigation | undefined;
-	onClose: (() => void) | undefined;
 	position: number | undefined;
 	sessionId: string;
 	totalSessions: number;
@@ -91,16 +93,14 @@ function SessionDetailStateMessage({
 }
 
 export function SessionDetailView({
+	fullPage = false,
 	showOverviewStrip = true,
 	initialSession,
 	navigation,
-	onClose,
 	position,
 	sessionId,
 	totalSessions,
 }: SessionDetailViewProps) {
-	const { contentRef, isFullscreen, toggleFullscreen } =
-		useSessionPaneFullscreen();
 	const headerRef = useRef<HTMLElement>(null);
 	const responseScrollRef = useRef<HTMLDivElement>(null);
 	const preservedTurnIdRef = useRef<string | undefined>(undefined);
@@ -284,22 +284,9 @@ export function SessionDetailView({
 
 	return (
 		<ConversationSkillLinkContext.Provider value={getSkillHref}>
-			<div
-				className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-(--dashboardy-surface) text-(--dashboardy-heading)"
-				ref={contentRef}
-				data-session-detail-fullscreen={isFullscreen ? "" : undefined}
-			>
+			<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-(--dashboardy-surface) text-(--dashboardy-heading)">
 				<SessionDetailHeader
 					avatarMap={avatarMap}
-					displayControls={
-						onClose
-							? {
-									isFullscreen,
-									onClose,
-									onToggleFullscreen: toggleFullscreen,
-								}
-							: undefined
-					}
 					headerRef={setHeaderElement}
 					hideMetrics
 					isLoading={isDetailLoading}
@@ -307,9 +294,17 @@ export function SessionDetailView({
 					portalHost={shellHeaderPortal}
 					position={position}
 					sessionId={sessionId}
+					showIdentity={!fullPage}
 					totalSessions={totalSessions}
 					viewModel={viewModel}
 				/>
+				{fullPage ? (
+					<SessionContextChips
+						avatarUrl={viewModel ? avatarMap[viewModel.safeUserId] : undefined}
+						isLoading={isDetailLoading}
+						viewModel={viewModel}
+					/>
+				) : null}
 				{relationshipsQuery.data?.parent ||
 				relationshipsQuery.data?.children.length ? (
 					<nav

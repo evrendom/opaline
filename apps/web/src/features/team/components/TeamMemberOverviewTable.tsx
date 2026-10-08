@@ -1,4 +1,8 @@
-import { ChevronDownIcon, ChevronUpIcon, UserPlusIcon } from "lucide-react";
+import {
+	IconChevronDown,
+	IconChevronUp,
+	IconUserPlus,
+} from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
@@ -180,7 +184,7 @@ function TeamTableSortableHeader({
 		<button
 			type="button"
 			aria-label={`Sort by ${label}, ${nextDirection}`}
-			className={`relative flex h-full w-full min-w-0 items-center gap-1 px-3 text-base font-medium whitespace-nowrap text-muted-foreground outline-none hover:bg-muted/50 focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring sm:text-sm ${
+			className={`relative flex h-full w-full min-w-0 items-center gap-1 px-3 text-base font-medium whitespace-nowrap text-foreground outline-none focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring sm:text-sm ${
 				align === "right" ? "justify-end text-right" : "justify-start text-left"
 			}`}
 			onClick={() => onSort(sortKey)}
@@ -188,12 +192,12 @@ function TeamTableSortableHeader({
 			<span className="min-w-0 truncate">{label}</span>
 			{isActive ? (
 				sort.direction === "asc" ? (
-					<ChevronUpIcon
+					<IconChevronUp
 						aria-hidden="true"
 						className="size-4 h-lh shrink-0 stroke-muted-foreground"
 					/>
 				) : (
-					<ChevronDownIcon
+					<IconChevronDown
 						aria-hidden="true"
 						className="size-4 h-lh shrink-0 stroke-muted-foreground"
 					/>
@@ -245,11 +249,11 @@ function ModelComposition({
 
 function TeamInviteRow({ organizationId }: { organizationId: string }) {
 	return (
-		<tr className="h-16 border-b border-black/5 dark:border-white/5">
+		<tr className="h-16 border-b border-black/[0.04] dark:border-white/[0.04]">
 			<td className="h-16 py-0 pr-3 pl-0 align-middle">
 				<div className="flex min-w-0 items-center gap-3">
-					<div className="grid size-10 shrink-0 place-content-center rounded-full border border-dashed border-black/15 bg-background dark:border-white/15">
-						<UserPlusIcon
+					<div className="grid size-8 shrink-0 place-content-center rounded-full border border-dashed border-black/15 bg-background dark:border-white/15">
+						<IconUserPlus
 							aria-hidden="true"
 							className="size-4 shrink-0 stroke-muted-foreground"
 						/>
@@ -273,10 +277,10 @@ function TeamInviteRow({ organizationId }: { organizationId: string }) {
 
 function TeamMemberRow({ row }: { row: TeamPageMemberOverviewRow }) {
 	return (
-		<tr className="h-16 border-b border-black/5 dark:border-white/5">
+		<tr className="h-16 border-b border-black/[0.04] dark:border-white/[0.04]">
 			<td className="h-16 py-0 pr-3 pl-0 align-middle">
 				<div className="flex min-w-0 items-center gap-3">
-					<Avatar className="size-10 overflow-hidden bg-background outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+					<Avatar className="size-8 overflow-hidden bg-background outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
 						{row.imageUrl ? <AvatarImage alt="" src={row.imageUrl} /> : null}
 						<AvatarFallback className="bg-muted font-medium text-foreground">
 							{getMemberInitials(row.displayName)}
@@ -346,8 +350,10 @@ export function TeamMemberOverviewTable({
 
 	return (
 		<div className="-mx-4 -my-2 overflow-x-auto whitespace-nowrap lg:-mx-6">
-			<div className="inline-block min-w-full px-16 py-2 align-middle">
-				<table className="w-full min-w-272 border-collapse">
+			<div className="inline-block min-w-full align-middle">
+				{/* Full-bleed table: rows run edge to edge, the outer cells
+				    pad to the page's 32px gutter, hairline dividers, a 48px head. */}
+				<table className="w-full min-w-272 border-collapse [&_th:first-child>button]:pl-0 [&_th:last-child>button]:pr-0 [&_tr>*:first-child]:pl-8 [&_tr>*:last-child]:pr-8">
 					<colgroup>
 						<col className="w-[24%]" />
 						<col className="w-[21%]" />
@@ -358,11 +364,11 @@ export function TeamMemberOverviewTable({
 						<col className="w-[11%]" />
 					</colgroup>
 					<thead>
-						<tr className="h-10 border-b border-black/10 dark:border-white/10">
-							<th className="h-10 py-0 pr-3 pl-0 text-left text-sm font-medium whitespace-nowrap text-muted-foreground">
+						<tr className="h-12 border-b border-black/[0.06] dark:border-white/[0.06]">
+							<th className="h-12 py-0 pr-3 pl-0 text-left text-sm font-medium whitespace-nowrap text-foreground">
 								Teammate
 							</th>
-							<th className="h-10 px-3 py-0 text-left text-sm font-medium whitespace-nowrap text-muted-foreground">
+							<th className="h-12 px-3 py-0 text-left text-sm font-medium whitespace-nowrap text-foreground">
 								Model composition
 							</th>
 							<th
@@ -373,7 +379,7 @@ export function TeamMemberOverviewTable({
 											: "descending"
 										: "none"
 								}
-								className="h-10 p-0 text-left whitespace-nowrap"
+								className="h-12 p-0 text-left whitespace-nowrap"
 							>
 								<TeamTableSortableHeader
 									align="left"
@@ -391,7 +397,7 @@ export function TeamMemberOverviewTable({
 											: "descending"
 										: "none"
 								}
-								className="h-10 p-0 text-right whitespace-nowrap"
+								className="h-12 p-0 text-right whitespace-nowrap"
 							>
 								<TeamTableSortableHeader
 									align="right"
@@ -409,7 +415,7 @@ export function TeamMemberOverviewTable({
 											: "descending"
 										: "none"
 								}
-								className="h-10 p-0 text-right whitespace-nowrap"
+								className="h-12 p-0 text-right whitespace-nowrap"
 							>
 								<TeamTableSortableHeader
 									align="right"
@@ -427,7 +433,7 @@ export function TeamMemberOverviewTable({
 											: "descending"
 										: "none"
 								}
-								className="h-10 p-0 text-right whitespace-nowrap"
+								className="h-12 p-0 text-right whitespace-nowrap"
 							>
 								<TeamTableSortableHeader
 									align="right"
@@ -437,7 +443,7 @@ export function TeamMemberOverviewTable({
 									sortKey="cost"
 								/>
 							</th>
-							<th className="h-10 py-0 pr-0 pl-3 text-right text-sm font-medium whitespace-nowrap text-muted-foreground">
+							<th className="h-12 py-0 pr-0 pl-3 text-right text-sm font-medium whitespace-nowrap text-foreground">
 								Last active
 							</th>
 						</tr>

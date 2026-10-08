@@ -1,15 +1,21 @@
 import {
-	BookOpen01Icon,
-	ChartLineData01Icon,
-	Clock03Icon,
-	Folder01Icon,
-	Settings01Icon,
-	UserGroupIcon,
-} from "@hugeicons/core-free-icons";
-import type { ReactElement } from "react";
+	type Icon,
+	IconBook,
+	IconBookFilled,
+	IconChartAreaLine,
+	IconChartAreaLineFilled,
+	IconFolder,
+	IconFolderFilled,
+	IconMessages,
+	IconMessagesFilled,
+	IconSettings,
+	IconSettingsFilled,
+	IconUser,
+	IconUserFilled,
+} from "@tabler/icons-react";
 import { appRoutes, getCanonicalAppPath } from "@/app/routes";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { ShellHugeicon } from "@/features/shell/components/shell-hugeicon";
+import type { ShellNavTone } from "@/features/shell/components/shell-nav-icon";
 
 export type ShellRouteId =
 	| "dashboard"
@@ -18,7 +24,33 @@ export type ShellRouteId =
 	| "repos"
 	| "team"
 	| "settings";
-export type ShellRouteIcon = ReactElement;
+
+// Section colours run down Opaline's sheen, blue to pink (opal-1…5 in
+// preset-extensions.css). The active section's chip turns a pale tint with a
+// 1px inner border in the section colour at 20%, and its glyph takes the
+// colour. Classes stay literal so Tailwind can see them.
+const tones = {
+	opal1: {
+		chip: "[--opal-fill:var(--color-opal-1-tint)] [--opal-ring:color-mix(in_oklch,var(--color-opal-1)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--color-opal-1)_25%,transparent)]",
+		glyph: "text-opal-1",
+	},
+	opal2: {
+		chip: "[--opal-fill:var(--color-opal-2-tint)] [--opal-ring:color-mix(in_oklch,var(--color-opal-2)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--color-opal-2)_25%,transparent)]",
+		glyph: "text-opal-2",
+	},
+	opal3: {
+		chip: "[--opal-fill:var(--color-opal-3-tint)] [--opal-ring:color-mix(in_oklch,var(--color-opal-3)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--color-opal-3)_25%,transparent)]",
+		glyph: "text-opal-3",
+	},
+	opal4: {
+		chip: "[--opal-fill:var(--color-opal-4-tint)] [--opal-ring:color-mix(in_oklch,var(--color-opal-4)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--color-opal-4)_25%,transparent)]",
+		glyph: "text-opal-4",
+	},
+	opal5: {
+		chip: "[--opal-fill:var(--color-opal-5-tint)] [--opal-ring:color-mix(in_oklch,var(--color-opal-5)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--color-opal-5)_25%,transparent)]",
+		glyph: "text-opal-5",
+	},
+} satisfies Record<string, ShellNavTone>;
 
 export type ShellRouteDefinition = {
 	id: ShellRouteId;
@@ -27,7 +59,12 @@ export type ShellRouteDefinition = {
 	navLabel: string;
 	shortcut: string;
 	comingSoon: boolean;
-	icon: ShellRouteIcon;
+	/** Outline icon, shown while the section is inactive. */
+	icon: Icon;
+	/** Filled icon, shown while the section is active. */
+	activeIcon: Icon;
+	/** Section colour for the active chip in the sidebar and page header. */
+	tone?: ShellNavTone;
 };
 
 export const shellRoutes = [
@@ -38,7 +75,9 @@ export const shellRoutes = [
 		title: "Dashboard",
 		navLabel: "Dashboard",
 		shortcut: "D",
-		icon: <ShellHugeicon icon={ChartLineData01Icon} />,
+		icon: IconChartAreaLine,
+		activeIcon: IconChartAreaLineFilled,
+		tone: tones.opal1,
 	},
 	{
 		id: "sessions",
@@ -47,7 +86,9 @@ export const shellRoutes = [
 		title: "Sessions",
 		navLabel: "Sessions",
 		shortcut: "H",
-		icon: <ShellHugeicon icon={Clock03Icon} />,
+		icon: IconMessages,
+		activeIcon: IconMessagesFilled,
+		tone: tones.opal2,
 	},
 	{
 		id: "skills",
@@ -56,7 +97,9 @@ export const shellRoutes = [
 		title: "Skills",
 		navLabel: "Skills",
 		shortcut: "K",
-		icon: <ShellHugeicon icon={BookOpen01Icon} />,
+		icon: IconBook,
+		activeIcon: IconBookFilled,
+		tone: tones.opal3,
 	},
 	{
 		id: "repos",
@@ -65,7 +108,9 @@ export const shellRoutes = [
 		title: "Repos",
 		navLabel: "Repos",
 		shortcut: "R",
-		icon: <ShellHugeicon icon={Folder01Icon} />,
+		icon: IconFolder,
+		activeIcon: IconFolderFilled,
+		tone: tones.opal4,
 	},
 	{
 		id: "team",
@@ -74,7 +119,9 @@ export const shellRoutes = [
 		title: "Team",
 		navLabel: "Team",
 		shortcut: "T",
-		icon: <ShellHugeicon icon={UserGroupIcon} />,
+		icon: IconUser,
+		activeIcon: IconUserFilled,
+		tone: tones.opal5,
 	},
 	{
 		id: "settings",
@@ -83,7 +130,8 @@ export const shellRoutes = [
 		title: "Settings",
 		navLabel: "Settings",
 		shortcut: "S",
-		icon: <ShellHugeicon icon={Settings01Icon} />,
+		icon: IconSettings,
+		activeIcon: IconSettingsFilled,
 	},
 ] satisfies readonly ShellRouteDefinition[];
 

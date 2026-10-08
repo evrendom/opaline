@@ -1,11 +1,13 @@
-import { ArrowRight01Icon, FilterEditIcon } from "@hugeicons/core-free-icons";
-import type { IconSvgElement } from "@hugeicons/react";
-import { HugeiconsIcon } from "@hugeicons/react";
+import {
+	type Icon,
+	IconChevronRight,
+	IconFilterEdit,
+} from "@tabler/icons-react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 
 type LinearFilterItem = {
 	group: "identity" | "usage" | "activity";
-	icon: IconSvgElement;
+	icon: Icon;
 	key: string;
 	label: string;
 };
@@ -27,12 +29,7 @@ export function LinearActiveFiltersButton({
 			onClick={onClick}
 			title={label}
 		>
-			<HugeiconsIcon
-				aria-hidden="true"
-				className="size-4"
-				icon={FilterEditIcon}
-				strokeWidth={1.7}
-			/>
+			<IconFilterEdit aria-hidden="true" className="size-4" />
 			<span
 				aria-hidden="true"
 				className="absolute top-1 right-1 size-1.5 rounded-full bg-black ring-1 ring-[#fcfcfc] dark:bg-[#f4f4f5] dark:ring-[#1c1c1d]"
@@ -96,19 +93,19 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 								}
 							>
 								<span className="session-menu-icon flex size-4 items-center justify-center">
-									<HugeiconsIcon
-										aria-hidden="true"
-										className="size-4"
-										icon={filter.icon}
-										strokeWidth={1.6}
-									/>
+									<filter.icon aria-hidden="true" className="size-4" />
 								</span>
 								<span className="min-w-0 flex-1 truncate">{filter.label}</span>
-								<HugeiconsIcon
+								{isActive ? (
+									<span
+										aria-hidden="true"
+										className="session-menu-active-dot"
+									/>
+								) : null}
+								<IconChevronRight
 									aria-hidden="true"
 									className="session-menu-icon size-3"
-									icon={ArrowRight01Icon}
-									strokeWidth={2.25}
+									stroke={2.25}
 								/>
 							</button>
 						</li>

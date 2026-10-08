@@ -1,5 +1,5 @@
 import { PreviewCard } from "@base-ui/react/preview-card";
-import { User } from "lucide-react";
+import { IconUser } from "@tabler/icons-react";
 import type { ReactElement } from "react";
 import type { SessionMemberProfileSummary } from "@/features/sessions/components/session-member-profile-summary";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,7 @@ function SessionMemberAvatar({
 				isTrigger ? "size-4.5" : "size-6",
 			)}
 		>
-			<User className="size-4 shrink-0 stroke-muted-foreground" />
+			<IconUser className="size-4 shrink-0 text-muted-foreground" />
 		</span>
 	);
 }

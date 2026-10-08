@@ -1,13 +1,20 @@
-.cost-page {
+/* The range controls render in the shell header, outside .cost-page, so they
+   share its tokens. */
+.cost-page,
+.cost-range-controls {
 	--cost-surface: var(--dashboard-01-content-background, #fcfcfc);
 	--cost-foreground: #292a2f;
 	--cost-muted: #828387;
 	--cost-border: rgb(0 0 0 / 7%);
 	--cost-soft: rgb(0 0 0 / 3%);
 	--cost-hover: rgb(0 0 0 / 5%);
+	--cost-divider: rgb(0 0 0 / 4%);
+	--cost-row-hover: rgb(0 0 0 / 1.5%);
 	--cost-blue: oklch(0.623 0.188 259.815);
 	--cost-duration-p95: oklch(0.606 0.219 292.717);
 	--cost-chart-fill-opacity: 0.08;
+}
+.cost-page {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
@@ -30,7 +37,7 @@
 	width: 100%;
 	max-width: 1600px;
 	margin-inline: auto;
-	padding: 28px 32px 24px;
+	padding: 12px 32px 24px;
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
@@ -41,56 +48,139 @@
 	flex-shrink: 0;
 	gap: 8px;
 	min-height: 40px;
-	padding: 5px 12px;
-	border-bottom: 1px solid var(--cost-border);
+	padding: 5px 32px;
 	background: var(--cost-surface);
 }
+
+/* Page-header controls: the range picker. */
+.cost-range-controls {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--cost-foreground);
+}
+.cost-range-controls[data-in-header] {
+	margin-left: auto;
+}
+/* Cards sit on a hairline shadow instead of a border; squircle corners where the browser supports them. */
+.cost-metric,
+.cost-chart-card,
+.cost-breakdown,
+.cost-error {
+	border-radius: 10px;
+	background: var(--card);
+	box-shadow: var(--custom-shadow);
+}
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.cost-metric,
+	.cost-chart-card,
+	.cost-breakdown,
+	.cost-error {
+		border-radius: 24px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+	.cost-metric::after {
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}
+/* Overview: a row of stat cards above the chart card. Each stat
+   card picks the chart's metric; the picked one carries a soft blue ring. */
 .cost-chart-panel {
-	border: 1px solid var(--cost-border);
-	border-radius: 12px;
-	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
 	container-type: inline-size;
+}
+.cost-chart-card {
+	overflow: hidden;
 }
 .cost-metrics {
 	min-width: 0;
 	display: grid;
-	/* One equal column per metric the server offers, so a hidden metric never
-	   leaves an empty cell. */
-	grid-auto-flow: column;
-	grid-auto-columns: minmax(150px, 1fr);
-	overflow-x: auto;
-	scrollbar-width: thin;
-	border-bottom: 1px solid var(--cost-border);
+	/* Equal columns for the metrics the server offers; when the row runs out
+	   of room (six GitHub-enabled metrics, or the assistant panel open) the
+	   cards wrap instead of widening the page. */
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	gap: 16px;
+	padding: 0;
+	border: 0;
 }
+/* Holds one row of stat cards while the server decides which metrics this
+   workspace gets, so the chart below does not jump when they arrive. */
+.cost-metrics[aria-busy="true"] {
+	min-height: 87px;
+}
+/* StatCard (size "sm"): 20px padding, one row with the
+   glyph and label on the left and the value on the right, and a full-bleed
+   sparkline pinned to the bottom edge. Accents come from --metric-color (the
+   Opaline palette). */
 .cost-metric {
 	position: relative;
-	padding: 12px 20px;
+	padding: 20px 20px 0;
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
-	border-right: 1px solid var(--cost-border);
+	gap: 8px;
 	min-width: 0;
+	overflow: hidden;
 	text-align: left;
-	cursor: pointer;
-	background: transparent;
+	transition: box-shadow 150ms ease;
 }
-.cost-metrics > .fluid-menu-hover-layer .fluid-menu-hover-fill {
-	background: var(--cost-soft);
+.cost-metric:hover {
+	box-shadow: var(--custom-shadow-secondary);
 }
 .cost-metric:has(.cost-metric-select:focus-visible) {
 	outline: 2px solid var(--cost-blue);
-	outline-offset: -2px;
+	outline-offset: 2px;
 }
+/* The charted metric's card wears the sidebar nav chips' shadow in its own
+   accent: a soft drop at 25% under the card's usual hairline, and a 1px inner
+   ring at 20%. The ring is an overlay above the content, so the full-bleed
+   sparkline never covers it, and it sits inside the card's edge, so the card
+   keeps its size. */
 .cost-metric[data-primary="true"] {
-	box-shadow: inset 0 -2px var(--cost-blue);
+	box-shadow:
+		var(--custom-shadow),
+		0 1.5px 2px color-mix(in oklch, var(--metric-color) 25%, transparent);
+}
+.cost-metric::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	border-radius: inherit;
+	pointer-events: none;
+	box-shadow: inset 0 0 0 1px transparent;
+	transition: box-shadow 150ms ease;
+}
+.cost-metric[data-primary="true"]::after {
+	box-shadow: inset 0 0 0 1px
+		color-mix(in oklch, var(--metric-color) 20%, transparent);
+}
+.cost-metric-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-width: 0;
+	min-height: 21px;
 }
 .cost-metric-label {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	color: var(--cost-muted);
+	gap: 7px;
+	min-width: 0;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	color: var(--cost-foreground);
+}
+.cost-metric-icon {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+	color: var(--metric-color);
 }
 .cost-metric-select {
 	min-width: 0;
@@ -101,60 +191,129 @@
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
+.cost-metric[data-primary="true"] .cost-metric-select {
+	cursor: default;
+}
 .cost-metric-select::after {
 	content: "";
 	position: absolute;
 	inset: 0;
 }
-.cost-metric-info {
-	position: relative;
-	z-index: 1;
-	display: grid;
-	place-items: center;
-	flex-shrink: 0;
-	width: 20px;
-	height: 20px;
-	margin-block: -2px;
-	border-radius: 4px;
-	color: var(--cost-muted);
-	cursor: help;
-}
-.cost-metric-info:hover {
-	color: var(--cost-foreground);
-}
-.cost-metric-info:focus-visible {
-	outline: 2px solid var(--cost-blue);
-	outline-offset: 2px;
-}
 .cost-metric-value {
 	display: flex;
 	align-items: baseline;
 	gap: 6px;
-	font-size: 1.375rem;
+	flex-shrink: 0;
+	font-size: 0.875rem;
+	line-height: 1.5;
 	font-weight: 500;
 	font-variant-numeric: tabular-nums;
-	letter-spacing: -0.045em;
+	letter-spacing: -0.025em;
 }
 .cost-metric-qualifier {
-	font-size: 0.6875rem;
-	font-weight: 500;
+	font-size: 0.75rem;
+	font-weight: 470;
 	letter-spacing: 0;
 	color: var(--cost-muted);
 }
+/* CardSparkline: the accent at half strength, its stroke at half again, over
+   a fill fading from 40% to 10% (text-*-400/50 sparklines). */
+.cost-metric-sparkline {
+	display: block;
+	flex-shrink: 0;
+	width: calc(100% + 40px);
+	height: 32px;
+	margin: 6px -20px 0;
+	overflow: visible;
+	color: color-mix(in oklch, var(--metric-color) 50%, transparent);
+}
+.cost-metric-trend-line {
+	stroke: currentColor;
+	stroke-opacity: 0.5;
+}
+/* The charted metric's card, and any card under the pointer, shows its trend
+   at full strength. Only the colour and the stroke's opacity move: easing a
+   stroke into a color-mix() of currentColor fades it out and back in. */
+.cost-metric-sparkline {
+	transition: color 150ms ease;
+}
+.cost-metric-trend-line {
+	transition: stroke-opacity 150ms ease;
+}
+.cost-metric:is([data-primary="true"], :hover)
+	.cost-metric-sparkline:not([data-placeholder]) {
+	color: var(--metric-color);
+}
+.cost-metric:is([data-primary="true"], :hover)
+	.cost-metric-sparkline:not([data-placeholder])
+	.cost-metric-trend-line {
+	stroke-opacity: 1;
+}
+/* The loading wave takes the sparkline's look: the card's accent (from the
+   .cost-metric-sparkline colour, so it follows selection and hover), a
+   half-opacity stroke and a 40%-to-10% fill, so the morph lands without a
+   colour change. */
+.cost-metric-wave [data-session-chart-loading-flow] path.fill-none {
+	stroke: currentColor;
+	stroke-opacity: 0.5;
+	transition: stroke-opacity 150ms ease;
+}
+.cost-metric-wave [data-session-chart-loading-flow] stop {
+	stop-color: currentColor;
+}
+.cost-metric-wave [data-session-chart-loading-flow] stop:first-child {
+	stop-opacity: 0.4;
+}
+.cost-metric-wave [data-session-chart-loading-flow] stop:last-child {
+	stop-opacity: 0.1;
+}
+.cost-metric:is([data-primary="true"], :hover)
+	.cost-metric-wave
+	[data-session-chart-loading-flow]
+	path.fill-none {
+	stroke-opacity: 1;
+}
+.cost-metric-sparkline[data-placeholder] {
+	color: var(--cost-muted);
+}
+.cost-metric-sparkline[data-placeholder] .cost-metric-trend-line {
+	stroke-opacity: 0.1;
+}
 
+/* The heading reserves a title row and one note row for every metric, so the
+   chart never jumps when a metric with notes (GitHub, indexing) is picked. */
 .cost-chart-key {
 	display: flex;
 	gap: 12px;
 	justify-content: space-between;
 	align-items: flex-start;
-	padding: 22px 24px 0;
-	min-height: 49px;
+	padding: 18px 20px 0;
+	min-height: 72px;
 }
 .cost-chart-key-copy {
 	display: flex;
-	flex-direction: column;
-	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
 	min-width: 0;
+}
+.cost-chart-key-copy > output {
+	flex-basis: auto;
+	white-space: nowrap;
+}
+/* Notes share one row under the title. */
+.cost-chart-key-copy > .cost-chart-legend {
+	flex-basis: auto;
+	margin-right: auto;
+}
+.cost-chart-key-copy > .cost-chart-title + .cost-chart-legend + output {
+	flex-basis: 100%;
+	max-width: max-content;
+}
+.cost-chart-title {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--cost-foreground);
 }
 .cost-chart-coverage {
 	display: flex;
@@ -187,10 +346,34 @@
 	border-radius: 50%;
 	flex-shrink: 0;
 }
-.cost-chart-frequency {
-	font-size: 0.6875rem;
+/* Top right of the chart's header: the split and filters, as removable tags
+   (in place of the old interval note; the date picker shows the interval). */
+.cost-chart-tags {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	max-width: 60%;
+	/* Centre the 28px chips on the title's line. */
+	margin-top: -4px;
+}
+/* "Split by" reads as a label beside its tag, not inside it. */
+.cost-chart-split {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.875rem;
 	color: var(--cost-muted);
 	white-space: nowrap;
+}
+.cost-chart-split > .cost-filter-chip {
+	color: var(--cost-foreground);
+}
+.cost-chart-tags > .cost-active-filters {
+	flex: none;
+	justify-content: flex-end;
 }
 .cost-duration-legend {
 	padding: 5px 6px;
@@ -313,22 +496,23 @@
 }
 .cost-breakdown {
 	position: relative;
-	border: 1px solid var(--cost-border);
-	border-radius: 12px;
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
+	overflow: hidden;
 }
+/* Breakdown card ("sm" Card with a full-bleed list): the title row,
+   then hairline-divided rows that scroll inside the card to its bottom edge. */
 .cost-breakdown-heading {
 	display: flex;
 	gap: 12px;
 	align-items: center;
 	justify-content: space-between;
-	padding: 17px 18px;
-	border-bottom: 1px solid var(--cost-border);
+	padding: 20px 20px 4px;
 }
 .cost-breakdown-heading h2 {
 	font-size: 0.875rem;
+	line-height: 1.5;
 	font-weight: 500;
 	text-wrap: balance;
 }
@@ -336,17 +520,73 @@
 	color: var(--cost-muted);
 	font-size: 0.6875rem;
 }
+.cost-breakdown-selected {
+	color: var(--cost-blue);
+	font-weight: 500;
+}
 .cost-heading-currency {
 	opacity: 0.6;
 	padding-left: 3px;
 }
+.cost-scroll-fade {
+	position: relative;
+	min-height: 0;
+}
 .cost-breakdown-list {
-	flex: 1;
-	padding: 9px;
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
-	min-height: 228px;
+	height: 240px;
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+.cost-breakdown-list::-webkit-scrollbar {
+	display: none;
+}
+.cost-scroll-fade-edge {
+	position: absolute;
+	inset-inline: 0;
+	height: 40px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 150ms ease;
+}
+.cost-scroll-fade-edge[data-edge="top"] {
+	top: 0;
+	background: linear-gradient(to bottom, var(--card), transparent);
+}
+.cost-scroll-fade-edge[data-edge="bottom"] {
+	bottom: 0;
+	background: linear-gradient(to top, var(--card), transparent);
+}
+.cost-scroll-fade-edge[data-edge="top"][data-visible] {
+	opacity: 1;
+}
+.cost-scroll-fade-edge[data-edge="bottom"][data-visible] {
+	opacity: 0.75;
+}
+.cost-breakdown-list .cost-breakdown-row {
+	justify-content: space-between;
+	gap: 24px;
+	min-height: 0;
+	padding: 12px 20px;
+	font-size: 0.875rem;
+	border-radius: 0;
+	border-top: 1px solid var(--cost-divider);
+	transition: background-color 150ms ease;
+}
+.cost-breakdown-list .cost-breakdown-row:first-child {
+	border-top-color: transparent;
+}
+/* A hovered row hides the hairlines around it, so the highlight reads as one
+   block (Breakdown rows). */
+.cost-breakdown-list .cost-breakdown-row:hover {
+	background: var(--cost-row-hover);
+}
+.cost-breakdown-list .cost-breakdown-row:hover,
+.cost-breakdown-list .cost-breakdown-row:hover + .cost-breakdown-row {
+	border-top-color: transparent;
+}
+/* A list that scrolls leaves room for its last row to clear the fade. */
+.cost-breakdown-list[data-many] .cost-breakdown-row:last-child {
+	padding-bottom: 36px;
 }
 .cost-breakdown-row {
 	position: relative;
@@ -381,23 +621,29 @@
 .cost-breakdown-row[aria-pressed="true"] {
 	color: var(--cost-blue);
 }
-.cost-row-bar {
-	position: absolute;
-	top: 1px;
-	bottom: 1px;
-	left: 0;
-	background: var(--cost-soft);
-	border-radius: 5px;
-	pointer-events: none;
+/* Share bar: 2px by 56px under the value, filled from the right in
+   the row's series colour. */
+.cost-row-meter {
+	display: flex;
+	justify-content: flex-end;
+	width: 56px;
+	height: 2px;
+	margin-top: 6px;
+	margin-left: auto;
+	border-radius: 999px;
+	background: color-mix(in oklch, var(--cost-muted) 10%, transparent);
+	overflow: hidden;
 }
-.cost-breakdown-row[aria-pressed="true"] .cost-row-bar {
-	background: rgb(77 125 224 / 8%);
+.cost-row-meter > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
 }
 .cost-row-identity {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 6px;
 	min-width: 0;
 	flex: 1;
 }
@@ -405,15 +651,7 @@
 	position: relative;
 	white-space: nowrap;
 	flex-shrink: 0;
-	font-size: 0.75rem;
-}
-.cost-row-share {
-	position: relative;
-	min-width: 30px;
 	text-align: right;
-	color: var(--cost-muted);
-	font-size: 0.6875rem;
-	flex-shrink: 0;
 }
 .cost-member-initial {
 	font-size: 0.5625rem;
@@ -425,14 +663,6 @@
 	width: 16px;
 	flex-shrink: 0;
 	text-align: center;
-}
-.cost-breakdown-footer {
-	display: flex;
-	justify-content: space-between;
-	padding: 10px 18px 18px;
-	min-height: 46px;
-	font-size: 0.6875rem;
-	color: var(--cost-muted);
 }
 .cost-tools {
 	position: absolute;
@@ -631,8 +861,6 @@
 	gap: 20px;
 	min-height: 220px;
 	padding: 32px;
-	border: 1px solid var(--cost-border);
-	border-radius: 12px;
 }
 .cost-error h2 {
 	font-weight: 500;
@@ -646,24 +874,40 @@
 	border-radius: 4px;
 	animation: cost-pulse 1.6s ease-in-out infinite;
 }
+/* Sized like the stat card value it stands in for, so the label keeps its
+   room while the number loads. */
 .cost-metric-skeleton {
-	height: 2.0625rem;
-	width: 110px;
-}
-.cost-breakdown-skeleton {
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
-	padding: 10px;
+	flex-shrink: 0;
+	height: 12px;
+	width: 64px;
 }
 .cost-breakdown-skeleton > div {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	justify-content: space-between;
+	gap: 24px;
+	padding: 12px 20px;
+	border-top: 1px solid var(--cost-divider);
 }
-.cost-breakdown-skeleton > div > div:last-child {
-	margin-left: auto;
+.cost-breakdown-skeleton > div:first-child {
+	border-top-color: transparent;
+}
+.cost-breakdown-skeleton-name {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+.cost-breakdown-skeleton-value {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
 	flex-shrink: 0;
+}
+.cost-breakdown-skeleton-value > div:first-child {
+	margin-block: 3px;
 }
 .cost-chart-skeleton {
 	position: absolute;
@@ -703,6 +947,140 @@
 @keyframes cost-pulse {
 	50% {
 		opacity: 0.45;
+	}
+}
+/* The chart loads as itself (chart-flow.ts): Recharts draws the heartbeat
+   behind a window sweeping across it, the way ChartLoadingWave flows. The
+   window moves by transform and the chart inside it moves back, both
+   compositor animations, so the flow keeps going while the main thread takes
+   the data in. When data lands the window freezes and opens to the full width
+   (inline styles from CostChart) while each point morphs to its real value,
+   the real axes fade in over the placeholder ones, and the duration lines
+   draw in once it settles. The stat cards morph their sparklines the same
+   way (ChartMorph). */
+.cost-chart-flow,
+.cost-chart-flow-track {
+	position: absolute;
+	inset: 0;
+}
+.cost-chart-canvas:is(
+		[data-phase="loading"],
+		[data-phase="prime"],
+		[data-phase="morph"]
+	)
+	.cost-chart-flow {
+	-webkit-mask:
+		linear-gradient(to right, transparent, #000 35%, #000 65%, transparent) 0 0
+		/ 30% 100% no-repeat;
+	mask:
+		linear-gradient(to right, transparent, #000 35%, #000 65%, transparent) 0 0
+		/ 30% 100% no-repeat;
+	animation: cost-chart-flow-window 2.8s linear infinite;
+	will-change: transform;
+}
+.cost-chart-canvas:is(
+		[data-phase="loading"],
+		[data-phase="prime"],
+		[data-phase="morph"]
+	)
+	.cost-chart-flow-track {
+	animation: cost-chart-flow-track 2.8s linear infinite;
+	will-change: transform;
+}
+@keyframes cost-chart-flow-window {
+	from {
+		transform: translateX(-30%);
+	}
+	to {
+		transform: translateX(100%);
+	}
+}
+@keyframes cost-chart-flow-track {
+	from {
+		transform: translateX(30%);
+	}
+	to {
+		transform: translateX(-100%);
+	}
+}
+.cost-chart-canvas:not([data-phase="idle"]) .cost-chart-flow {
+	pointer-events: none;
+}
+.cost-chart-canvas[data-phase="morph"]
+	:is(.recharts-cartesian-axis-ticks, .recharts-cartesian-grid) {
+	animation: cost-fade-in 500ms ease both;
+}
+.cost-chart-canvas[data-lines-entering] .recharts-line {
+	animation: cost-chart-draw 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cost-chart-canvas[data-phase="morph"] .recharts-area-curve {
+	transition: stroke 800ms ease-in-out;
+}
+.cost-chart-canvas[data-phase="morph"] .cost-chart-gradient stop {
+	transition:
+		stop-color 800ms ease-in-out,
+		stop-opacity 800ms ease-in-out;
+}
+.cost-chart-loading-guides {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+.cost-chart-loading-guides path {
+	stroke: color-mix(in srgb, var(--cost-foreground) 6%, transparent);
+}
+.cost-chart-skeleton[data-leaving] {
+	pointer-events: none;
+	animation: cost-chart-skeleton-out 650ms ease both;
+}
+.cost-metric[data-revealing] .cost-metric-wave {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	margin: 0;
+}
+.cost-metric[data-revealing]
+	.cost-metric-wave
+	[data-session-chart-loading-flow],
+.cost-metric[data-revealing] .cost-metric-trend {
+	visibility: hidden;
+}
+.cost-chart-morph {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+.cost-chart-empty,
+.cost-metric,
+.cost-metric-value {
+	animation: cost-fade-in 240ms ease;
+}
+@keyframes cost-chart-skeleton-out {
+	0% {
+		opacity: 1;
+	}
+	40%,
+	100% {
+		opacity: 0;
+	}
+}
+@keyframes cost-chart-draw {
+	/* Negative insets keep stroke caps and peaks unclipped at rest. */
+	from {
+		clip-path: inset(-8px 100% -8px -8px);
+	}
+	to {
+		clip-path: inset(-8px -8px -8px -8px);
+	}
+}
+@keyframes cost-fade-in {
+	from {
+		opacity: 0;
 	}
 }
 @container (max-width: 850px) {
@@ -749,9 +1127,6 @@
 	.cost-error {
 		font-size: 1rem;
 	}
-	.cost-row-share {
-		display: none;
-	}
 	.cost-chart-canvas {
 		height: 260px;
 	}
@@ -771,17 +1146,31 @@
 		min-height: 38px;
 		min-width: 38px;
 	}
-	.cost-breakdown-footer {
-		min-height: 60px;
-	}
 }
 @media (prefers-reduced-motion: reduce) {
 	.cost-tools,
 	.cost-tools-inner {
 		transition: none;
 	}
-	.cost-skeleton {
+	.cost-skeleton,
+	.cost-chart-empty,
+	.cost-metric,
+	.cost-metric-value,
+	.cost-chart-canvas[data-lines-entering] .recharts-line {
 		animation: none;
+	}
+	.cost-chart-canvas:is([data-phase="loading"], [data-phase="prime"])
+		.cost-chart-flow {
+		animation: none;
+		transform: translateX(35%);
+	}
+	.cost-chart-canvas:is([data-phase="loading"], [data-phase="prime"])
+		.cost-chart-flow-track {
+		animation: none;
+		transform: translateX(-35%);
+	}
+	.cost-chart-skeleton[data-leaving] {
+		animation-duration: 1ms;
 	}
 }
 .dark .cost-tools,
@@ -789,7 +1178,13 @@
 	box-shadow: 0 0 0 1px var(--cost-border);
 }
 
+/* Opaline's dark theme has no dark card shadow, so the light one vanishes:
+   outline the dashboard's cards with its hairline instead. */
+.dark :is(.cost-metric, .cost-chart-card, .cost-breakdown, .cost-error) {
+	box-shadow: 0 0 0 1px var(--cost-border);
+}
 .dark .cost-page,
+.dark .cost-range-controls,
 .dark .cost-breakdown-dialog {
 	--cost-surface: #191a1c;
 	--cost-chart-fill-opacity: 0.12;
@@ -798,9 +1193,17 @@
 	--cost-border: rgb(255 255 255 / 9%);
 	--cost-soft: rgb(255 255 255 / 4%);
 	--cost-hover: rgb(255 255 255 / 7%);
+	--cost-divider: rgb(255 255 255 / 4%);
+	--cost-row-hover: rgb(255 255 255 / 3%);
 }
-.cost-page[data-updating="true"] .cost-chart-panel {
-	opacity: 0.65;
+/* While newer numbers load, only the chart line dims, and only if the load
+   outlasts a beat, so quick refreshes never flicker. Cards stay crisp. */
+.cost-chart-canvas {
+	transition: opacity 150ms ease;
+}
+.cost-page[data-updating="true"] .cost-chart-canvas {
+	opacity: 0.55;
+	transition: opacity 200ms ease 250ms;
 }
 
 /* Only the Dashboard supplies this extra date-picker column. */
@@ -844,10 +1247,6 @@
 	margin-top: 0.5rem;
 }
 
-.cost-breakdown[data-dimension="durations"] .cost-row-share {
-	display: inline;
-}
-
 /* Plugin app: rows that name people load only when asked for. */
 .cost-breakdown-load {
 	color: var(--cost-blue);
@@ -855,4 +1254,20 @@
 	font: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
+}
+
+/* Breakdown rows sized to the space under the chart (data-sized, from
+   CostDashboardView): one row fits the page, more rows keep the same height and
+   the page scrolls. Each card's list fills its card and scrolls inside. */
+.cost-breakdowns[data-sized] {
+	grid-auto-rows: var(--breakdown-row-height);
+}
+.cost-breakdowns[data-sized] .cost-breakdown {
+	min-height: 0;
+}
+.cost-breakdowns[data-sized] .cost-scroll-fade {
+	flex: 1 1 0;
+}
+.cost-breakdowns[data-sized] .cost-breakdown-list {
+	height: 100%;
 }

@@ -30,7 +30,7 @@ import {
 	TraceExchangeIcon,
 	TraceMessageIcon,
 	TraceWrenchIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import {
 	TraceDisclosureIcon,
 	TraceIcon,

@@ -53,7 +53,10 @@ export function BillingManagementCard({
 	return (
 		<WorkspaceSettingsGroup title="Billing">
 			<WorkspaceSettingsRow label={planLabel} description={planDescription}>
-				<span className="workspace-settings-status">{currentPlan}</span>
+				{/* Plan badge. */}
+				<span className="inline-flex h-5 items-center rounded-full bg-emerald-500/10 px-2 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+					{currentPlan}
+				</span>
 			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow
 				label="Payment"
@@ -77,6 +80,8 @@ export function BillingManagementCard({
 				) : null}
 				<a
 					className={buttonVariants({ variant: "outline" })}
+					data-slot="button"
+					data-variant="outline"
 					href={pricingUrl.toString()}
 				>
 					Change plan

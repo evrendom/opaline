@@ -1,3 +1,4 @@
+import { IconTrash } from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import {
@@ -7,6 +8,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
+import {
+	WorkspaceOwnerBadge,
+	WorkspaceRoleLabel,
+} from "@/features/settings/workspace/components/workspace-role-label";
 import { WorkspaceSettingsRow } from "@/features/settings/workspace/components/workspace-settings-group";
 
 function getInitials(name: string, email: string) {
@@ -55,8 +60,9 @@ export function WorkspaceMembersTable({
 				<li key={member.id}>
 					<WorkspaceSettingsRow
 						label={
+							// Member row: name with the email beside it.
 							<div className="workspace-settings-member-identity">
-								<Avatar>
+								<Avatar size="sm">
 									{member.user.image ? (
 										<AvatarImage
 											src={member.user.image}
@@ -68,13 +74,15 @@ export function WorkspaceMembersTable({
 									</AvatarFallback>
 								</Avatar>
 								<div className="workspace-settings-member-copy">
-									<span>{member.user.name}</span>
+									<span>{member.user.name || member.user.email}</span>
 									<span>{member.user.email}</span>
 								</div>
 							</div>
 						}
 					>
-						{member.role !== "owner" && canEdit ? (
+						{member.role === "owner" ? (
+							<WorkspaceOwnerBadge />
+						) : canEdit ? (
 							<Select
 								value={member.role}
 								onValueChange={(value) => {
@@ -89,33 +97,47 @@ export function WorkspaceMembersTable({
 									aria-label={`Role for ${member.user.name || member.user.email}`}
 								>
 									<SelectValue>
-										{pendingKey === `role:${member.id}`
-											? "Saving…"
-											: member.role === "admin"
-												? "Admin"
-												: "Member"}
+										{pendingKey === `role:${member.id}` ? (
+											"Saving…"
+										) : (
+											<WorkspaceRoleLabel
+												value={member.role === "admin" ? "admin" : "member"}
+											/>
+										)}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="member">Member</SelectItem>
-									<SelectItem value="admin">Admin</SelectItem>
+									<SelectItem value="admin">
+										<WorkspaceRoleLabel value="admin" />
+									</SelectItem>
+									<SelectItem value="member">
+										<WorkspaceRoleLabel value="member" />
+									</SelectItem>
 								</SelectContent>
 							</Select>
 						) : (
-							<span className="workspace-settings-status capitalize">
-								{member.role}
+							<span className="workspace-settings-status">
+								<WorkspaceRoleLabel
+									value={member.role === "admin" ? "admin" : "member"}
+								/>
 							</span>
 						)}
 						{canEdit && member.role !== "owner" ? (
 							<Button
 								type="button"
-								variant="outline"
-								size="sm"
-								aria-label={`Remove ${member.user.name || member.user.email}`}
+								variant="ghost"
+								size="icon-sm"
+								className="workspace-settings-icon-button"
+								aria-label={
+									pendingKey === `remove:${member.id}`
+										? `Removing ${member.user.name || member.user.email}`
+										: `Remove ${member.user.name || member.user.email}`
+								}
+								title="Remove member"
 								onClick={() => onRemove(member.id)}
 								disabled={Boolean(pendingKey)}
 							>
-								{pendingKey === `remove:${member.id}` ? "Removing…" : "Remove"}
+								<IconTrash aria-hidden="true" />
 							</Button>
 						) : null}
 					</WorkspaceSettingsRow>

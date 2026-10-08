@@ -6,7 +6,7 @@ import type { ToolIconName } from "./conversation-tools";
 import {
 	TraceMarkdownIcon,
 	TraceTypeScriptIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import { getModelIconComponent } from "./conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "./conversation-trace-tool-icons";
 

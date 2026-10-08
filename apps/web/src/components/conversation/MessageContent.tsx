@@ -12,7 +12,7 @@ import { formatShellOutput } from "./conversation-tools";
 import {
 	TraceChevronDownIcon,
 	TraceChevronRightIcon,
-} from "./conversation-trace-hugeicons";
+} from "./conversation-trace-glyphs";
 import {
 	parseMessageTextBlocks,
 	type TextPart,

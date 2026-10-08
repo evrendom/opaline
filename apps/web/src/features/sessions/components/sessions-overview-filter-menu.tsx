@@ -1,5 +1,4 @@
-import { Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCheck, IconSearch } from "@tabler/icons-react";
 import { useId, useState } from "react";
 import { Checkbox } from "@/app/ui/checkbox";
 import { Input } from "@/app/ui/input";
@@ -43,11 +42,9 @@ export function SessionOverviewFilterOptionsPanel({
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
-					<HugeiconsIcon
+					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-muted-foreground"
-						icon={Search01Icon}
-						strokeWidth={1.75}
 					/>
 					<Input
 						id={`${controlId}-search`}
@@ -99,23 +96,16 @@ export function SessionOverviewFilterOptionsPanel({
 											data-checked={isChecked}
 										>
 											{isChecked ? (
-												<HugeiconsIcon
-													aria-hidden="true"
-													className="size-2.5"
-													icon={Tick02Icon}
-													strokeWidth={2}
-												/>
+												<IconCheck aria-hidden="true" className="size-2.5" />
 											) : null}
 										</span>
 									</span>
 								) : null}
 								<span className="min-w-0 flex-1 truncate">{option.label}</span>
 								{variant === "linear" && isChecked ? (
-									<HugeiconsIcon
+									<IconCheck
 										aria-hidden="true"
 										className="size-3.5 shrink-0 text-black dark:text-[#f4f4f5]"
-										icon={Tick02Icon}
-										strokeWidth={2}
 									/>
 								) : null}
 							</label>

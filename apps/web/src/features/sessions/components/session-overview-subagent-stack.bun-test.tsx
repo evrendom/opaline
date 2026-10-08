@@ -50,7 +50,7 @@ test("uses a bot for unknown models without guessing a vendor", () => {
 		/>,
 	);
 	expect(markup.match(/data-subagent-icon-kind="bot"/gu)).toHaveLength(3);
-	expect(markup.match(/data-trace-hugeicon/gu)).toHaveLength(3);
+	expect(markup.match(/data-trace-glyph/gu)).toHaveLength(3);
 	expect(markup).toContain("Model unavailable");
 	expect(getModelIconComponent("kimi-k2")).toBeNull();
 	expect(getModelIconComponent("cursor-composer")).toBeNull();
