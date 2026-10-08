@@ -13,6 +13,8 @@ import {
 } from "@rudel/api-routes";
 import type postgres from "postgres";
 import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
+import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
+import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import { toPostgresJson } from "./postgres-json.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 import {
@@ -563,6 +565,18 @@ export async function commitRepositoryEvidence(
 				JSON.stringify(plan.input.coverage),
 				JSON.stringify(preparedIndex),
 			],
+		);
+		// A capture is evidence of its session's L1 edges.
+		await enqueueL1EdgeScope(
+			transaction,
+			{
+				kind: "session",
+				organizationId: options.organizationId,
+				userId: options.userId,
+				source: plan.input.session.source,
+				sessionId: plan.input.session.sessionId,
+			},
+			{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS },
 		);
 		await transaction.unsafe(
 			`UPDATE repository_evidence_upload

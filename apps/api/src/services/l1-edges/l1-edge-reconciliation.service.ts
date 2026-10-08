@@ -7,11 +7,14 @@ import {
 	hasClickHousePurgeTombstone,
 } from "../clickhouse-purge-tombstone.service.js";
 import { L1_EDGE_RESOLVER_VERSION } from "./l1-edge-derivation.js";
+import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edge-enqueue.js";
+import { buildRepositoryEdges } from "./l1-edge-github.service.js";
 import {
 	type ClaimedL1EdgeScope,
 	claimL1EdgeScopes,
 	completeL1EdgeScope,
 	dropL1EdgeScope,
+	enqueueL1EdgeDependents,
 	failL1EdgeScope,
 	holdsL1EdgeLease,
 	recordL1EdgeDependencies,
@@ -30,6 +33,8 @@ const logger = getLogger(["rudel", "api", "l1-edges"]);
 
 /** A scope's lease; longer than one build, renewed by completing it. */
 const LEASE_MS = 3 * 60_000;
+/** Dependent sessions re-queued per repository change; the rest follow on later changes or the census. */
+const DEPENDENTS_PER_PASS = 1_000;
 const CLAIM_BATCH = 4;
 
 export class L1EdgeLeaseLostError extends Error {
@@ -74,10 +79,43 @@ async function processClaim(
 		userId: claim.userId ?? undefined,
 	};
 	try {
-		if (claim.scopeKind !== "session")
-			throw new Error(`Unsupported edge scope kind: ${claim.scopeKind}`);
 		if (await hasClickHousePurgeTombstone(target, { database: env.sql }))
 			throw new ClickHouseWriteFencedError();
+		const beforeWrite = async () => {
+			await assertNoClickHousePurgeTombstone(target, { database: env.sql });
+			if (!(await holdsL1EdgeLease(env.sql, claim)))
+				throw new L1EdgeLeaseLostError();
+		};
+		if (claim.scopeKind === "repository") {
+			const repositoryId = claim.repositoryId ?? claim.scopeId;
+			const build = await buildRepositoryEdges({
+				executor: env.sources.executor,
+				organizationId: claim.organizationId,
+				repositoryId,
+				revision: claim.revision,
+				watermark: claim.watermark,
+				now: env.now?.(),
+				beforeWrite,
+			});
+			// New GitHub facts can resolve or change the links of sessions that named them.
+			if (build.edgeCount > 0)
+				await enqueueL1EdgeDependents(
+					env.sql,
+					claim.organizationId,
+					[repositoryId],
+					{
+						limit: DEPENDENTS_PER_PASS,
+						debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS,
+					},
+				);
+			await completeL1EdgeScope(env.sql, claim, {
+				resolverVersion: L1_EDGE_RESOLVER_VERSION,
+				watermark: build.watermark,
+				edgeCount: build.edgeCount,
+				unresolvedCount: 0,
+			});
+			return true;
+		}
 		const session = {
 			userId: claim.userId ?? "",
 			source: claim.source ?? "",
@@ -90,11 +128,7 @@ async function processClaim(
 			revision: claim.revision,
 			previouslyBuilt: claim.builtRevision !== null,
 			now: env.now?.(),
-			beforeWrite: async () => {
-				await assertNoClickHousePurgeTombstone(target, { database: env.sql });
-				if (!(await holdsL1EdgeLease(env.sql, claim)))
-					throw new L1EdgeLeaseLostError();
-			},
+			beforeWrite,
 		});
 		if (build.written)
 			await recordL1EdgeDependencies(env.sql, claim, build.dependencies);

@@ -27,6 +27,8 @@ import {
 	type GitHubRepositoryBinding,
 	getGitHubRepositoryBinding,
 } from "./github-repository-binding.service.js";
+import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
+import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import { toPostgresJson } from "./postgres-json.js";
 import type { R2EvidenceStorageClient } from "./r2-ingest-storage.service.js";
 
@@ -785,6 +787,24 @@ async function completeCollection(input: {
 				],
 			);
 		}
+		// PR snapshots are evidence of their session's L1 edges.
+		if (
+			input.evidence.pullRequests.length > 0 &&
+			input.sessionId &&
+			sessionUserId &&
+			(sessionSource === "claude_code" || sessionSource === "codex")
+		)
+			await enqueueL1EdgeScope(
+				transaction,
+				{
+					kind: "session",
+					organizationId: input.organizationId,
+					userId: sessionUserId,
+					source: sessionSource,
+					sessionId: input.sessionId,
+				},
+				{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS },
+			);
 		for (const receipt of input.evidence.workflowJobLogReceipts) {
 			const job = jobs.get(receipt.jobId);
 			const run = runs.get(receipt.runId);

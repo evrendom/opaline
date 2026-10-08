@@ -44,7 +44,9 @@ export function l1EdgeScopeId(scope: L1EdgeScopeKey): string {
 /**
  * Requests a rebuild of a scope, coalescing with a pending request. The scope
  * becomes due after `debounceMs` (or earlier if it already was); a failed
- * scope is retried from its first attempt.
+ * scope is retried from its first attempt. Nothing is queued for a workspace
+ * or account that no longer exists, so callers can queue inside their own
+ * transaction (an upload, a sweep step, a webhook) without risking it.
  */
 export async function enqueueL1EdgeScope(
 	sql: Sql,
@@ -54,7 +56,10 @@ export async function enqueueL1EdgeScope(
 	const session = scope.kind === "session" ? scope : null;
 	await sql.unsafe(
 		`INSERT INTO l1_edge_scope (organization_id, scope_kind, scope_id, user_id, source, session_id, repository_id, priority, next_attempt_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + $9::bigint * interval '1 millisecond')
+		 SELECT $1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, $8::smallint,
+			now() + $9::bigint * interval '1 millisecond'
+		 WHERE EXISTS (SELECT 1 FROM organization WHERE id = $1::text)
+			AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM "user" WHERE id = $4::text))
 		 ON CONFLICT (organization_id, scope_kind, scope_id) DO UPDATE SET
 			request_count = l1_edge_scope.request_count + 1,
 			priority = LEAST(l1_edge_scope.priority, EXCLUDED.priority),

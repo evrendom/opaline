@@ -24,6 +24,8 @@ import {
 	persistGitHubStatuses,
 } from "./github-outcomes-persistence.service.js";
 import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
+import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
+import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import {
 	assertPostgresLeaseHeld,
 	PostgresLeaseLostError,
@@ -329,6 +331,16 @@ export async function runGitHubRepositorySweep(input: {
 								batch,
 								lease.signal,
 								transaction,
+							);
+							// New GitHub facts: project the repository's L1 edges.
+							await enqueueL1EdgeScope(
+								transaction,
+								{
+									kind: "repository",
+									organizationId: binding.organizationId,
+									repositoryId: binding.repositoryId,
+								},
+								{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS },
 							);
 							// A worker that took over an expired lease owns the cursor now; a
 							// stalled worker must not move it back.

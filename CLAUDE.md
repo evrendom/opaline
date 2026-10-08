@@ -369,6 +369,8 @@ Identity is `(organization_id, user_id, source, session_id)`. Generation `parser
 
 Apply `bun run --cwd packages/ch-schema ch:migrate:session-git-observations` (also appended to production migrations and local bootstrap). Run `bun run --cwd apps/api backfill:git-observations` to preview after records backfill; execute with `--execute --cutoff <printed cutoff>`. `--organization-id` and `--max-sessions` (default 10,000, maximum 100,000) bound the census; extraction uses the same hard per-session bounds as ingest. The cutoff is receipt publication (`head.publishedAt`), not the transcript's earlier session timestamp. Changed generations after the preview are skipped, not silently included. Postgres is required for the deletion fence.
 
+L1 edges (ADR 0003) are queued by git observation extraction, CLI captures, PR snapshots, GitHub sweeps and webhooks, and repository binding. To queue existing sessions and repositories, preview with `bun run --cwd apps/api backfill:l1-edges` and queue with `--execute` (`--organization-id` and `--max-sessions` narrow it); the worker builds them when `L1_EDGES_WORKER_ENABLED=true`.
+
 ## Releasing
 
 The CLI (`rudel` on npm) uses Release Please for automated versioning and changelogs, with automated npm publishing via OIDC trusted publishing (no OTP).

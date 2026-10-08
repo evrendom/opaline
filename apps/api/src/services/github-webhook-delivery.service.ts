@@ -8,6 +8,8 @@ import {
 import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
 import { enqueueGitHubRepositorySweep } from "./github-repository-sweep.service.js";
 import type { GitHubWebhookIntent } from "./github-webhook-events.js";
+import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
+import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 
 /**
  * A burst of events for one commit (check suites, workflow runs and statuses
@@ -198,6 +200,16 @@ async function applyIntent(
 						break;
 				}
 			}
+			if (intent.outcome)
+				await enqueueL1EdgeScope(
+					transaction,
+					{
+						kind: "repository",
+						organizationId,
+						repositoryId: intent.repositoryId,
+					},
+					{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS },
+				);
 			const refreshDueAt = new Date(
 				now.getTime() + GITHUB_WEBHOOK_REFRESH_DEBOUNCE_MS,
 			);

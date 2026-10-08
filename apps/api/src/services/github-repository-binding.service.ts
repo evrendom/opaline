@@ -10,6 +10,10 @@ import {
 	refreshPrTotalsReadiness,
 } from "./github-outcomes-readiness.service.js";
 import { enqueueGitHubRepositorySweep } from "./github-repository-sweep.service.js";
+import {
+	enqueueL1EdgeDependents,
+	enqueueL1EdgeScope,
+} from "./l1-edges/l1-edge-queue.service.js";
 
 type GitHubRepositorySyncState = NonNullable<
 	ContractConnectionStatus["repositories"][number]["sync"]
@@ -139,6 +143,18 @@ export async function persistGitHubRepositoryInstallation(input: {
 				input.now,
 				transaction,
 				true,
+			);
+			// Sessions that named this repository while it was unbound can link now.
+			await enqueueL1EdgeScope(transaction, {
+				kind: "repository",
+				organizationId: input.organizationId,
+				repositoryId: repository.id,
+			});
+			await enqueueL1EdgeDependents(
+				transaction,
+				input.organizationId,
+				[`name:${repository.fullName.toLowerCase()}`],
+				{ limit: 1_000 },
 			);
 		}
 		await refreshPrTotalsReadiness(
