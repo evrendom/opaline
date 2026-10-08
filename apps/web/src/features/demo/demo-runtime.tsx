@@ -11,6 +11,7 @@ export const DemoSeedSchema = z.object({
 		id: z.string(),
 		name: z.string(),
 		slug: z.string(),
+		logo: z.string(),
 	}),
 	members: z.array(
 		z.object({ userId: z.string(), name: z.string(), image: z.string() }),

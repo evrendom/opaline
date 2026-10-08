@@ -103,7 +103,11 @@ for (const member of organization.members.filter(
 	});
 }
 const seed = DemoSeedSchema.parse({
-	organization,
+	// The showcase workspace's mark is bundled with the demo, not stored upstream.
+	organization: {
+		...organization,
+		logo: "/product-demo/demo-workspace-logo.png",
+	},
 	members,
 	viewerUserId: z
 		.object({ user: z.object({ id: z.string() }) })

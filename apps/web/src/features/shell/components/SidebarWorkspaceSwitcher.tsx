@@ -26,12 +26,27 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 
 // The workspace's logo, or a building on a grey tile when it has none
 // (or the logo fails to load).
 function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
+	const demo = useDemoRuntime();
+	// The bundled demo logo must be present in the prerendered HTML. The
+	// interactive AvatarImage waits for a client-side image load.
+	if (demo && logo)
+		return (
+			<img
+				src={logo}
+				alt=""
+				width={20}
+				height={20}
+				aria-hidden="true"
+				className="size-5 shrink-0 object-contain"
+			/>
+		);
 	return (
 		<Avatar
 			aria-hidden="true"

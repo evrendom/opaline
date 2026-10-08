@@ -2,7 +2,8 @@
 	"organization": {
 		"id": "1zKtWzbRInKT6uNOqgXdcEGinGo2rXuW",
 		"name": "Opaline Demo",
-		"slug": "opaline-demo"
+		"slug": "opaline-demo",
+		"logo": "/product-demo/demo-workspace-logo.png"
 	},
 	"members": [
 		{
