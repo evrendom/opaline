@@ -1,16 +1,57 @@
 import { createHash } from "node:crypto";
 import {
+	parseShellCommand,
 	splitTranscript,
 	type TranscriptSource,
 } from "@rudel/api-routes/transcript-records";
 import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated";
 import { filterKnownSecrets } from "@rudel/secret-filter";
 
-export const GIT_OBSERVATION_PARSER_VERSION = 2;
+export const GIT_OBSERVATION_PARSER_VERSION = 3;
 export const GIT_OBSERVATION_MAX_RAW_BYTES = 1024 * 1024;
 export const GIT_OBSERVATION_MAX_ROWS = 10_000;
 export const GIT_TOOL_PATTERN =
-	/\bgit\b[^\n;&|]*\b(?:commit|push|merge|cherry-pick|rebase|revert)\b|\bgh\s+pr\b/iu;
+	/\bgit\b[^\n;&|]*\b(?:commit|push|merge|cherry-pick|rebase|revert)\b|\bgh\b[^\n;&|]*\b(?:pr|run)\b/iu;
+/**
+ * GitHub MCP tools that may read Actions runs, jobs or check status. The
+ * consolidated tools (`actions_get`, `actions_list`, `pull_request_read`) do
+ * so only for some methods, which the parser checks.
+ */
+export const GITHUB_CI_TOOL_PATTERN =
+	/(?:github|mcp).*?(?:workflow_run|workflow_job|job_logs|check_run|check_suite|commit_status|pull_request_status|actions_list|actions_get)/iu;
+const GITHUB_CI_METHOD_TOOL_PATTERN =
+	/(?:actions_list|actions_get|pull_request_read)$/iu;
+/** `gh` flags that take a value, so the value is not read as a PR, run or branch. */
+const GH_VALUE_FLAGS = new Set([
+	"-R",
+	"--repo",
+	"-i",
+	"--interval",
+	"--json",
+	"-q",
+	"--jq",
+	"-t",
+	"--template",
+	"-j",
+	"--job",
+	"-a",
+	"--attempt",
+	"-L",
+	"--limit",
+	"-w",
+	"--workflow",
+	"-b",
+	"--branch",
+	"-u",
+	"--user",
+	"-e",
+	"--event",
+	"-s",
+	"--status",
+	"-c",
+	"--commit",
+	"--created",
+]);
 export const GITHUB_PR_TOOL_PATTERN =
 	/(?:github|mcp).*?(?:create_pull_request|pull_request_create|create_pr|pull_request_read|pull_request_write|list_pull_requests|get_pull_request)/iu;
 
@@ -58,6 +99,7 @@ export function parseGitObservations(
 					record.kind === "tool_call" &&
 					(GIT_TOOL_PATTERN.test(record.text) ||
 						GITHUB_PR_TOOL_PATTERN.test(record.tool_name) ||
+						GITHUB_CI_TOOL_PATTERN.test(record.tool_name) ||
 						(input.source === "codex" &&
 							record.tool_name.split(".").at(-1) === "write_stdin")),
 			)
@@ -105,6 +147,49 @@ export function parseGitObservations(
 			if (record.is_error || record.exit_code !== null)
 				sessions.delete(sessionKey);
 		}
+		let ordinal = 0;
+		const add = (fields: Partial<RudelSessionGitObservationsRow>) => {
+			if (observations.length >= GIT_OBSERVATION_MAX_ROWS)
+				throw new Error("Git observation expansion limit exceeded");
+			observations.push({
+				...baseRow(input, record),
+				block_idx: record.block_idx * 65_536 + ordinal++,
+				...fields,
+			});
+		};
+		// A call that ran (it has an exit code, or no error) may have done things
+		// even when it failed overall: a CI status read is a fact whether checks
+		// passed or failed (`gh pr checks` exits non-zero while they are pending
+		// or failing), and a push may update one ref and reject another. Calls that
+		// never ran (an error without an exit code) or are still running are not.
+		if (
+			call &&
+			record.subtype !== "running" &&
+			(record.exit_code !== null || !record.is_error)
+		) {
+			for (const check of ciChecks(call, record)) add(check);
+			if (GIT_TOOL_PATTERN.test(call.text)) {
+				for (const match of record.text.matchAll(
+					/^\s*\[(.+?)\s+([a-f\d]{4,40})\]\s+(.+)$/gimu,
+				)) {
+					const branch = (match[1] ?? "").replace(/\s+\(root-commit\)$/u, "");
+					add({
+						kind: "commit_created",
+						short_sha: (match[2] ?? "").toLowerCase(),
+						branch: safeText(branch),
+						subject_sha256: createHash("sha256")
+							.update(match[3] ?? "")
+							.digest("hex"),
+					});
+				}
+				if (
+					!/\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*\s(?:--dry-run|-[A-Za-z]*n[A-Za-z]*)(?=\s|["']|$)/u.test(
+						call.text,
+					)
+				)
+					for (const push of pushLines(record.text)) add(push);
+			}
+		}
 		if (
 			record.is_error ||
 			(record.exit_code !== null && record.exit_code !== 0)
@@ -126,47 +211,6 @@ export function parseGitObservations(
 		}
 		const mcp = GITHUB_PR_TOOL_PATTERN.test(call.tool_name);
 		if (mcp && mcpFailed(record.text)) continue;
-		let ordinal = 0;
-		const add = (fields: Partial<RudelSessionGitObservationsRow>) => {
-			if (observations.length >= GIT_OBSERVATION_MAX_ROWS)
-				throw new Error("Git observation expansion limit exceeded");
-			observations.push({
-				...baseRow(input, record),
-				block_idx: record.block_idx * 65_536 + ordinal++,
-				...fields,
-			});
-		};
-		if (GIT_TOOL_PATTERN.test(call.text)) {
-			for (const match of record.text.matchAll(
-				/^\s*\[(.+?)\s+([a-f\d]{4,40})\]\s+(.+)$/gimu,
-			)) {
-				const branch = (match[1] ?? "").replace(/\s+\(root-commit\)$/u, "");
-				add({
-					kind: "commit_created",
-					short_sha: (match[2] ?? "").toLowerCase(),
-					branch: safeText(branch),
-					subject_sha256: createHash("sha256")
-						.update(match[3] ?? "")
-						.digest("hex"),
-				});
-			}
-			if (
-				!/\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*\s(?:--dry-run|-[A-Za-z]*n[A-Za-z]*)(?=\s|["']|$)/u.test(
-					call.text,
-				)
-			)
-				for (const match of record.text.matchAll(
-					/^\s*(?:\+\s+)?([a-f\d]{4,40})\.{2,3}([a-f\d]{4,40})\s+(\S+)\s+->\s+(\S+)(?:\s|$)/gimu,
-				)) {
-					add({
-						kind: "push_range",
-						push_from_sha: (match[1] ?? "").toLowerCase(),
-						push_to_sha: (match[2] ?? "").toLowerCase(),
-						push_source_branch: safeText(match[3] ?? ""),
-						branch: safeText(match[4] ?? ""),
-					});
-				}
-		}
 		const urlText = record.text.replaceAll("\\/", "/");
 		const seenUrls = new Set<string>();
 		for (const match of urlText.matchAll(
@@ -230,6 +274,7 @@ export function baseRow(
 		repository_url: "",
 		ts: timestampIso(record.ts).replace("T", " ").replace("Z", ""),
 		label: "observed",
+		run_id: "",
 	};
 }
 
@@ -313,4 +358,210 @@ function mcpFailed(text: string): boolean {
 	if (/"success"\s*:\s*false|"error"\s*:\s*(?:"[^"\n]+"|\{)/iu.test(text))
 		return true;
 	return /^\s*(?:error|failed|failure)\b/iu.test(text);
+}
+
+/**
+ * `git push` output, line by line: the `To <remote>` line names the
+ * repository of the ref updates that follow it. A new branch has no SHA range,
+ * so its push carries only the refs.
+ */
+function pushLines(text: string): Partial<RudelSessionGitObservationsRow>[] {
+	const pushes: Partial<RudelSessionGitObservationsRow>[] = [];
+	let remote = "";
+	for (const line of text.split(/\r?\n/u)) {
+		const to = /^To\s+(\S+)\s*$/u.exec(line);
+		if (to) {
+			remote = safeRepositoryUrl(to[1] ?? "");
+			continue;
+		}
+		const range =
+			/^\s*(?:\+\s+)?([a-f\d]{4,40})\.{2,3}([a-f\d]{4,40})\s+(\S+)\s+->\s+(\S+)(?:\s|$)/iu.exec(
+				line,
+			);
+		if (range) {
+			pushes.push({
+				kind: "push_range",
+				label: /^\s*\+\s|\(forced update\)/u.test(line)
+					? "forced_update"
+					: "observed",
+				push_from_sha: (range[1] ?? "").toLowerCase(),
+				push_to_sha: (range[2] ?? "").toLowerCase(),
+				push_source_branch: safeText(range[3] ?? ""),
+				branch: safeText(range[4] ?? ""),
+				repository_url: remote,
+			});
+			continue;
+		}
+		const created =
+			/^\s*\*\s+\[new branch\]\s+(\S+)\s+->\s+(\S+)(?:\s|$)/iu.exec(line);
+		if (created)
+			pushes.push({
+				kind: "push_range",
+				push_source_branch: safeText(created[1] ?? ""),
+				branch: safeText(created[2] ?? ""),
+				repository_url: remote,
+			});
+	}
+	return pushes;
+}
+
+/**
+ * The CI status reads a call made: `gh pr checks` and `gh run watch|view|list`
+ * invocations in a shell command (not text that merely mentions them), and
+ * GitHub MCP calls that read runs, jobs or check status. Each keeps the
+ * repository, PR and branch it names. A shell check is `unconfirmed` when the
+ * command does not show that it ran: it follows `||` or sits in a compound
+ * construct, or follows `&&` while the command failed overall.
+ */
+function ciChecks(
+	call: GitObservationRecord,
+	record: GitObservationRecord,
+): Partial<RudelSessionGitObservationsRow>[] {
+	const command = shellCommand(call);
+	if (command !== null) {
+		const segments = parseShellCommand(command);
+		return segments.flatMap((segment, index) => {
+			const target = ghCiTarget(segment.words);
+			if (!target) return [];
+			const connectors = segments
+				.slice(1, index + 1)
+				.map((part) => part.connector);
+			const unconditional = connectors.every(
+				(connector) => connector === ";" || connector === "|",
+			);
+			// Success proves every segment ran only for a pure `&&` chain:
+			// `false && gh pr checks; true` also exits 0 without running the check.
+			const chained =
+				record.exit_code === 0 &&
+				segments.every((part) => !part.nested) &&
+				segments.slice(1).every((part) => part.connector === "&&");
+			return [
+				{
+					kind: "ci_check",
+					...target,
+					label:
+						!segment.nested && (unconditional || chained)
+							? "observed"
+							: "unconfirmed",
+				},
+			];
+		});
+	}
+	if (record.is_error || mcpFailed(record.text)) return [];
+	if (GITHUB_CI_METHOD_TOOL_PATTERN.test(call.tool_name)) {
+		const method = /"method"\s*:\s*"([^"]+)"/u.exec(call.text)?.[1] ?? "";
+		if (!/status|check|run|job/iu.test(method)) return [];
+	} else if (!GITHUB_CI_TOOL_PATTERN.test(call.tool_name)) return [];
+	const owner = /"owner"\s*:\s*"([\w.-]+)"/u.exec(call.text)?.[1];
+	const name = /"repo"\s*:\s*"([\w.-]+)"/u.exec(call.text)?.[1];
+	return [
+		{
+			kind: "ci_check",
+			pr_repo: owner && name ? safeText(`${owner}/${name}`) : "",
+			pr_number: prNumber(
+				/"pull(?:_n|N)umber"\s*:\s*(\d+)/u.exec(call.text)?.[1],
+			),
+			run_id: /"run(?:_i|I)d"\s*:\s*"?(\d+)/u.exec(call.text)?.[1] ?? "",
+			commit_hash: commitSha(
+				/"(?:head_sha|headSha|sha|commit_sha)"\s*:\s*"([a-f\d]{7,40})"/iu.exec(
+					call.text,
+				)?.[1],
+			),
+		},
+	];
+}
+
+/**
+ * The shell command a call ran: Claude Bash input is the command; Codex shell
+ * calls carry it as JSON (`cmd`, or `command` as a string or an argv whose
+ * `-c`/`-lc` script is the command). Null for GitHub MCP tools.
+ */
+function shellCommand(call: GitObservationRecord): string | null {
+	if (
+		GITHUB_CI_TOOL_PATTERN.test(call.tool_name) ||
+		GITHUB_PR_TOOL_PATTERN.test(call.tool_name)
+	)
+		return null;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(call.text);
+	} catch {
+		return call.text;
+	}
+	const input = objectValue(parsed);
+	if (typeof input.cmd === "string") return input.cmd;
+	if (typeof input.command === "string") return input.command;
+	if (Array.isArray(input.command)) {
+		const words = input.command.filter(
+			(word): word is string => typeof word === "string",
+		);
+		const flag = words.findIndex((word) => /^-[a-z]*c$/u.test(word));
+		const script = flag > 0 ? words[flag + 1] : undefined;
+		return script ?? words.join(" ");
+	}
+	return call.text;
+}
+
+/** The repository, PR and branch a `gh` CI status invocation names. */
+function ghCiTarget(
+	words: readonly string[],
+): Pick<
+	RudelSessionGitObservationsRow,
+	"pr_repo" | "pr_number" | "branch" | "run_id" | "commit_hash"
+> | null {
+	if (words[0]?.split("/").at(-1) !== "gh") return null;
+	let repo = "";
+	let branch = "";
+	let commit = "";
+	const positional: string[] = [];
+	for (let index = 1; index < words.length; index++) {
+		const word = words[index] ?? "";
+		const [flag, inline] = word.startsWith("--") ? word.split("=", 2) : [word];
+		if (GH_VALUE_FLAGS.has(flag ?? "")) {
+			const value = inline ?? words[++index] ?? "";
+			if (flag === "-R" || flag === "--repo") repo = value;
+			if (flag === "-b" || flag === "--branch") branch = value;
+			if (flag === "-c" || flag === "--commit") commit = value;
+			continue;
+		}
+		if (word.startsWith("-")) continue;
+		positional.push(word);
+	}
+	const [group, action, target = ""] = positional;
+	const isCheck =
+		(group === "pr" && action === "checks") ||
+		(group === "run" && ["watch", "view", "list"].includes(action ?? ""));
+	if (!isCheck) return null;
+	let number = 0;
+	let runId = "";
+	if (group === "run" && action !== "list" && /^\d+$/u.test(target))
+		runId = target;
+	if (group === "pr") {
+		const url =
+			/^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/u.exec(target);
+		if (url) {
+			repo = `${url[1]}/${url[2]}`;
+			number = prNumber(url[3]);
+		} else if (/^\d+$/u.test(target)) number = prNumber(target);
+		else if (target) branch = target;
+	}
+	return {
+		pr_repo: safeText(repo.replace(/^https:\/\/github\.com\//u, "")),
+		pr_number: number,
+		branch: safeText(branch),
+		run_id: runId,
+		commit_hash: commitSha(commit),
+	};
+}
+
+/** A literal commit SHA a CI check names, lowercased; empty when it is not one. */
+function commitSha(value: string | undefined): string {
+	return value && /^[a-f\d]{7,40}$/iu.test(value) ? value.toLowerCase() : "";
+}
+
+function prNumber(value: string | undefined): number {
+	const number = Number(value ?? 0);
+	return Number.isSafeInteger(number) && number > 0 && number <= 4_294_967_295
+		? number
+		: 0;
 }

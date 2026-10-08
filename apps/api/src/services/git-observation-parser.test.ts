@@ -77,7 +77,7 @@ test("Codex bodyless session_meta raw fallback, transport success and repository
 	expect(JSON.stringify(rows)).not.toContain("password");
 });
 
-test("Codex PTY polls retain originating commands, agent scope and failure checks", () => {
+test("Codex PTY polls retain originating commands and agent scope; a failed command keeps the commit it printed", () => {
 	const input = parseInput(codexGitContinuationFixture());
 	const rows = parseGitObservations({
 		...input,
@@ -86,7 +86,12 @@ test("Codex PTY polls retain originating commands, agent scope and failure check
 			...input.records.filter((record) => record.kind === "tool_result"),
 		],
 	});
-	expect(rows).toHaveLength(3);
+	expect(rows).toHaveLength(4);
+	// git prints `[branch sha]` only once the commit exists; the exit code is a later command's.
+	expect(rows.find((row) => row.short_sha === "bad1234")?.call_id).toBe(
+		"failed-done",
+	);
+	expect(rows.some((row) => row.short_sha === "bad5678")).toBe(false);
 	expect(rows.find((row) => row.short_sha === "abc1234")).toMatchObject({
 		agent_id: "",
 		call_id: "done",
@@ -189,7 +194,7 @@ test("multiple commits in one tool output retain distinct replacing keys and CRL
 	);
 });
 
-test("MCP inner failure and explicit nonzero exit code never become PR observations", () => {
+test("MCP inner failure and explicit nonzero exit code never become PR observations; commits and pushes the call printed stay", () => {
 	const input = parseInput(claudeGitFixture());
 	const rows = parseGitObservations({
 		...input,
@@ -199,7 +204,17 @@ test("MCP inner failure and explicit nonzero exit code never become PR observati
 				: record,
 		),
 	});
-	expect(rows).toHaveLength(0);
+	expect(
+		rows.filter(
+			(row) => row.kind === "pr_url" || row.kind === "mcp_pr_created",
+		),
+	).toHaveLength(0);
+	expect(rows.map((row) => row.kind).sort()).toEqual([
+		"commit_created",
+		"commit_created",
+		"commit_created",
+		"push_range",
+	]);
 	const mcp = parseGitObservations({
 		...input,
 		records: input.records
@@ -273,5 +288,384 @@ function parseInput(fixture: GitTranscriptFixture): GitObservationParseInput {
 		revision: "100",
 		transcriptParserVersion: 4,
 		records,
+	};
+}
+
+test("pushes carry the To remote, and a new branch is a push without a SHA range", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("push", "git push -u origin feat/links"),
+			result(
+				"push",
+				[
+					"To https://x-access-token:secret@github.com/opalinehq/athena.git",
+					" * [new branch]      feat/links -> feat/links",
+					"To github.com:opalinehq/cli.git",
+					"   a1b2c3d..d4e5f6a  main -> main",
+				].join("\n"),
+			),
+		]),
+	);
+	expect(rows.filter((row) => row.kind === "push_range")).toMatchObject([
+		{
+			push_from_sha: "",
+			push_to_sha: "",
+			push_source_branch: "feat/links",
+			branch: "feat/links",
+			repository_url: "https://github.com/opalinehq/athena.git",
+		},
+		{
+			push_from_sha: "a1b2c3d",
+			push_to_sha: "d4e5f6a",
+			branch: "main",
+			repository_url: "github.com:opalinehq/cli.git",
+		},
+	]);
+	expect(JSON.stringify(rows)).not.toContain("secret");
+});
+
+test("CI status reads are ci_check observations whatever the checks returned", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("pending", "gh pr checks 133 --repo opalinehq/athena --watch"),
+			result("pending", "build pending", { exit_code: 8, is_error: true }),
+			call("failed", "gh run watch 42 --exit-status"),
+			result("failed", "X build failed", { exit_code: 1, is_error: true }),
+			call("passed", "gh run view 42"),
+			result("passed", "✓ build"),
+			call("denied", "gh pr checks 133"),
+			result("denied", "Permission denied by rule", { is_error: true }),
+			call("running", "gh run watch 43"),
+			result("running", "Process running with session ID 7", {
+				subtype: "running",
+			}),
+			call(
+				"mcp",
+				'{"owner":"opalinehq","repo":"athena","pullNumber":134}',
+				"mcp__github__get_pull_request_status",
+			),
+			result("mcp", '{"state":"failure"}'),
+			call("list", "gh pr list"),
+			result("list", "#133 feat: links"),
+		]),
+	);
+	expect(
+		rows
+			.filter((row) => row.kind === "ci_check")
+			.map(({ call_id, pr_repo, pr_number }) => ({
+				call_id,
+				pr_repo,
+				pr_number,
+			})),
+	).toEqual([
+		{ call_id: "pending", pr_repo: "opalinehq/athena", pr_number: 133 },
+		{ call_id: "failed", pr_repo: "", pr_number: 0 },
+		{ call_id: "passed", pr_repo: "", pr_number: 0 },
+		{ call_id: "mcp", pr_repo: "opalinehq/athena", pr_number: 134 },
+	]);
+});
+
+test("only real gh invocations are CI checks; conditional ones are unconfirmed", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("echo", "echo gh pr checks 133"),
+			result("echo", "gh pr checks 133"),
+			call("guarded", "false && gh pr checks 133"),
+			result("guarded", "", { exit_code: 1, is_error: true }),
+			call(
+				"chained",
+				"cd repo && gh -R opalinehq/cli pr checks https://github.com/opalinehq/athena/pull/7",
+			),
+			result("chained", "build\tpass", { exit_code: 0 }),
+			call("interval", "gh pr checks --watch --interval 10"),
+			result("interval", "All checks were successful"),
+			call("branch", "gh pr checks feat/links; echo done"),
+			result("branch", "build\tpending", { exit_code: 8, is_error: true }),
+			call("runs", "gh run list --branch main --limit 5"),
+			result("runs", "completed\tsuccess\tCI"),
+			call(
+				"codex",
+				JSON.stringify({ cmd: "gh run watch 42 --exit-status" }),
+				"exec_command",
+			),
+			result("codex", "Process exited with code 1", {
+				exit_code: 1,
+				is_error: true,
+			}),
+		]),
+	);
+	expect(
+		rows
+			.filter((row) => row.kind === "ci_check")
+			.map(({ call_id, label, pr_repo, pr_number, branch }) => ({
+				call_id,
+				label,
+				pr_repo,
+				pr_number,
+				branch,
+			})),
+	).toEqual([
+		{
+			call_id: "guarded",
+			label: "unconfirmed",
+			pr_repo: "",
+			pr_number: 133,
+			branch: "",
+		},
+		{
+			call_id: "chained",
+			label: "observed",
+			pr_repo: "opalinehq/athena",
+			pr_number: 7,
+			branch: "",
+		},
+		{
+			call_id: "interval",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 0,
+			branch: "",
+		},
+		{
+			call_id: "branch",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 0,
+			branch: "feat/links",
+		},
+		{
+			call_id: "runs",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 0,
+			branch: "main",
+		},
+		{
+			call_id: "codex",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 0,
+			branch: "",
+		},
+	]);
+});
+
+test("CI checks keep the run and commit they name; success after ; or || proves nothing", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("masked", "false && gh pr checks 133; true"),
+			result("masked", "", { exit_code: 0 }),
+			call("rescued", "false && gh pr checks 133 || true"),
+			result("rescued", "", { exit_code: 0 }),
+			call("view", "gh run view 42 --log-failed"),
+			result("view", "X build failed"),
+			call("list", "gh run list --commit ABC1234DEF --branch main"),
+			result("list", "completed\tfailure\tCI"),
+			call(
+				"mcp",
+				JSON.stringify({
+					method: "get_workflow_run",
+					owner: "opalinehq",
+					repo: "athena",
+					run_id: 7001,
+				}),
+				"mcp__github__actions_get",
+			),
+			result("mcp", JSON.stringify({ conclusion: "failure" })),
+		]),
+	);
+	expect(
+		rows.map(({ call_id, label, run_id, commit_hash, branch }) => ({
+			call_id,
+			label,
+			run_id,
+			commit_hash,
+			branch,
+		})),
+	).toEqual([
+		{
+			call_id: "masked",
+			label: "unconfirmed",
+			run_id: "",
+			commit_hash: "",
+			branch: "",
+		},
+		{
+			call_id: "rescued",
+			label: "unconfirmed",
+			run_id: "",
+			commit_hash: "",
+			branch: "",
+		},
+		{
+			call_id: "view",
+			label: "observed",
+			run_id: "42",
+			commit_hash: "",
+			branch: "",
+		},
+		{
+			call_id: "list",
+			label: "observed",
+			run_id: "",
+			commit_hash: "abc1234def",
+			branch: "main",
+		},
+		{
+			call_id: "mcp",
+			label: "observed",
+			run_id: "7001",
+			commit_hash: "",
+			branch: "",
+		},
+	]);
+});
+
+test("consolidated GitHub MCP tools are CI checks only for status, run and job methods", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call(
+				"status",
+				JSON.stringify({
+					method: "get_status",
+					owner: "opalinehq",
+					repo: "athena",
+					pullNumber: 9,
+				}),
+				"mcp__github__pull_request_read",
+			),
+			result("status", JSON.stringify({ state: "pending" })),
+			call(
+				"diff",
+				JSON.stringify({
+					method: "get_diff",
+					owner: "opalinehq",
+					repo: "athena",
+					pullNumber: 9,
+				}),
+				"mcp__github__pull_request_read",
+			),
+			result("diff", "diff --git"),
+			call(
+				"definition",
+				JSON.stringify({
+					method: "get_workflow",
+					owner: "opalinehq",
+					repo: "athena",
+				}),
+				"mcp__github__actions_get",
+			),
+			result("definition", "name: CI"),
+			call(
+				"run",
+				JSON.stringify({
+					method: "get_workflow_run",
+					owner: "opalinehq",
+					repo: "athena",
+				}),
+				"mcp__github__actions_get",
+			),
+			result("run", JSON.stringify({ conclusion: "failure" })),
+		]),
+	);
+	expect(
+		rows
+			.filter((row) => row.kind === "ci_check")
+			.map((row) => [row.call_id, row.pr_repo, row.pr_number]),
+	).toEqual([
+		["status", "opalinehq/athena", 9],
+		["run", "opalinehq/athena", 0],
+	]);
+});
+
+test("a push that updates one ref and rejects another keeps the update; forced updates are labelled", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("push", "git push origin main feat/links"),
+			result(
+				"push",
+				[
+					"To github.com:opalinehq/athena.git",
+					" + a1b2c3d...d4e5f6a feat/links -> feat/links (forced update)",
+					" ! [rejected]        main -> main (fetch first)",
+					"error: failed to push some refs",
+				].join("\n"),
+				{ exit_code: 1, is_error: true },
+			),
+		]),
+	);
+	expect(rows).toMatchObject([
+		{
+			kind: "push_range",
+			label: "forced_update",
+			push_to_sha: "d4e5f6a",
+			branch: "feat/links",
+			repository_url: "github.com:opalinehq/athena.git",
+		},
+	]);
+});
+
+test("parser version 3 starts a new observation generation", () => {
+	const [row] = parseGitObservations(
+		recordsInput([call("c", "gh run view 1"), result("c", "ok")]),
+	);
+	expect(row?.parser_version).toBe(3 * 256 + 4);
+});
+
+function recordsInput(
+	records: GitObservationRecord[],
+): GitObservationParseInput {
+	return {
+		organizationId: "org",
+		userId: "user",
+		sessionId: "session",
+		source: "claude_code",
+		revision: "100",
+		transcriptParserVersion: 4,
+		records: records.map((record, index) => ({
+			...record,
+			record_idx: index + 1,
+		})),
+	};
+}
+
+function call(
+	callId: string,
+	text: string,
+	toolName = "Bash",
+): GitObservationRecord {
+	return record(callId, "tool_call", text, { tool_name: toolName });
+}
+
+function result(
+	callId: string,
+	text: string,
+	fields: Partial<GitObservationRecord> = {},
+): GitObservationRecord {
+	return record(callId, "tool_result", text, fields);
+}
+
+function record(
+	callId: string,
+	kind: string,
+	text: string,
+	fields: Partial<GitObservationRecord>,
+): GitObservationRecord {
+	return {
+		agent_id: "",
+		record_idx: 0,
+		block_idx: 0,
+		call_id: callId,
+		kind,
+		subtype: "",
+		tool_name: "",
+		is_error: false,
+		exit_code: null,
+		ts: "2026-10-07T12:00:00.000Z",
+		text,
+		text_chars: [...text].length,
+		byte_start: "0",
+		byte_len: 0,
+		...fields,
 	};
 }

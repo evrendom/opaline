@@ -529,6 +529,7 @@ export type RudelSessionGitObservationsRow = {
   repository_url: string
   ts: string
   label: string
+  run_id: string
 }
 
 export const RudelSessionGitObservationsRowSchema = z.object({
@@ -556,6 +557,7 @@ export const RudelSessionGitObservationsRowSchema = z.object({
   repository_url: z.string(),
   ts: z.string(),
   label: z.string(),
+  run_id: z.string(),
 })
 
 export type RudelSessionGitObservationsRowInput = z.input<typeof RudelSessionGitObservationsRowSchema>

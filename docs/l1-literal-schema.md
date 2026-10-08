@@ -89,10 +89,44 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | instruction file versions per session | injected context, repository evidence | none |
 | permission prompts that were approved | not in transcripts; needs a capture hook | none |
 
+## Sessions, pull requests and CI
+
+Connecting every session to the pull requests and CI runs it touched is required. Each link is a row that keeps the rule that made it, the literal values it matched, and how many candidates matched, so the agent can see a guess for what it is. Nothing is dropped because it did not match: an unmatched push stays a push with an empty match and a reason.
+
+| Link | From | To | Rule stored with the row |
+|---|---|---|---|
+| Session repository | session `git_remote`; Codex `session_meta.git.repository_url`; push `To <remote>`; PR URL `owner/name`; repository evidence index | active `github_repository_binding.repository_id` | basis (`remote`, `codex_meta`, `push_remote`, `pr_url`, `evidence_index`) and the literal value |
+| Observation turn | `session_git_observations` row | `transcript_records` call and result | same generation, `record_idx`, `block_idx / 65536`, `call_id`; gives `turn_idx` |
+| PR mentioned or created | `pr_url`, `mcp_pr_created`, Claude `pr-link` | `github_pull_requests` (repository, number) | observation kind; whether the call was `gh pr create` |
+| Pushed SHA | push `push_to_sha` (abbreviated) | full SHA in `github_pull_request_commits`, `github_pull_requests.head_sha` or `github_ci_runs.head_sha` | prefix match within the repository; `candidate_count`; matched only when it is 1 |
+| Pushed branch | push `branch` | `github_pull_requests.head_ref` | exact; PR created/updated times kept as values, not filters |
+| Commit in PR | `commit_created.short_sha` | `github_pull_request_commits.sha` | prefix match; whether the PR head still contains it |
+| CI on a pushed SHA | resolved full SHA | `github_ci_runs.head_sha` (all runs, any branch) | run kind, event, attempt, conclusion, time from push to run |
+| CI on a PR | linked PR | `github_ci_run_pull_requests` → `github_ci_runs` | `basis` (`provider`, `head-sha`) |
+| PR from the session's HEAD | `github_pull_request_snapshot` | the session | capture commit, coverage flags |
+| Commits per capture | `repository_evidence_capture` base and head commits | PR commits and CI runs | lifecycle (`checkpoint`, `end`), capture time |
+| CI checked after push | `ci_check` observations after the push in the same stream | the push | the check command, exit code, delay |
+| Not covered | binding, readiness, retention boundary, observation receipt, new-branch push without SHA | the session | the reason, never an empty result |
+
+Git extractor version 3 records the `To <remote>` of each push, new-branch pushes and `ci_check` calls. Parser v6 adds Claude `pr-link` and `gitOperation`.
+
+## GitHub evidence in L1
+
+Reviews, review comments, issue comments, PR files with patches, check runs and annotations, commit statuses, workflow jobs and job logs are collected per commit today but stored only as JSON and log objects in R2. They move into ClickHouse tables keyed by workspace, repository, PR number and SHA, keeping the provider's literal fields (author, path, line, body, state, conclusion) after the secret filter, so review comments and CI failures can be searched and joined to the sessions above. Job logs keep their redacted text with byte offsets, as `transcript_records` does for transcripts.
+
+## Repository configuration
+
+The CLI already captures CI workflows, `package.json` scripts, hooks, `AGENTS.md`, `CLAUDE.md` and skills as files. They get indexed per capture: workflow jobs, steps and the commands they run; script names and commands; hook events and commands; instruction and skill files with their content hash. A session then links to the configuration it ran under, and a check that exists but is never run is visible.
+
+## Drift, retention and capture gaps
+
+- **Drift.** Claude Code and Codex add transcript fields often. A recurring census lists, per agent and version, every raw field path the parsers do not map, so new facts become work items instead of silent losses. The smoke test at the parser fixture level fails when a fact in this spec stops landing in its column.
+- **Retention.** Raw transcripts and `transcript_records` expire after 365 days. `run_index`, the GitHub links and the weekly aggregates get their own, longer retention so findings stay comparable over time; text stays bound to the transcript's retention.
+- **Capture gaps.** Approved permission prompts are not in transcripts and need a capture hook. Sessions that were never uploaded can only be counted through coverage. Cost per tool call has no defensible allocation and stays per request and per run.
+- **Scope.** Claude Code and Codex only.
+
 ## Joins
 
-- **Push to CI.** Pushed SHAs (`gitOperation`, push ranges) and `pr-link` records join `github_ci_runs.head_sha` and `github_ci_run_pull_requests`. Gives CI conclusions after each push, whether the run later called `gh run`/`gh pr checks`, and default-branch red intervals.
-- **Repository identity.** Session to GitHub `repository_id` through the repository evidence index and `github_repository_binding`; fall back to the literal remote, then path. The UI and the analysis agent use one identity.
 - **Instruction size.** Injected instruction characters per run, per instruction file hash. Transcripts record cache tokens per request, not per file, so a cost per instruction file is an estimate built on top of L1, not an L1 fact.
 
 ## Scale
@@ -113,10 +147,13 @@ The language-signal lexicon stays: it stores literal phrase matches.
 
 ## Order of work
 
-1. This spec and step 1 of the retirement.
-2. Retirement steps 2 and 3.
-3. Transcript-records parser v6 with the raw facts above, and backfill.
-4. `run_index`, the push-to-CI and repository joins, and coverage.
-5. `find` over `calls`, `runs` and `prompts`, the schema reference and premade queries in the plugin skill.
-6. Retirement steps 4 and 5.
-7. Signals, from queries the analysis log shows recurring in kept answers.
+1. This spec and step 1 of the retirement. Done.
+2. Retirement step 2. Done.
+3. Git extractor version 3 and the session, pull request and CI links, exposed to `find`.
+4. Retirement step 3 with the `session_analytics` migration.
+5. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill.
+6. `run_index`, coverage and retention; then retirement step 4 (`error_count`, regex skills).
+7. GitHub evidence and repository configuration in ClickHouse.
+8. `find` over `calls`, `runs` and `prompts`, the schema reference and premade queries in the plugin skill.
+9. The drift census and retirement step 5.
+10. Signals, from queries the analysis log shows recurring in kept answers.

@@ -7,6 +7,7 @@ import {
 	baseRow,
 	GIT_OBSERVATION_MAX_RAW_BYTES,
 	GIT_TOOL_PATTERN,
+	GITHUB_CI_TOOL_PATTERN,
 	GITHUB_PR_TOOL_PATTERN,
 	type GitObservationParseInput,
 	type GitObservationRecord,
@@ -155,7 +156,7 @@ export async function extractGitObservations(
 				query_params: {
 					...scope,
 					gitPattern: `(?i)${GIT_TOOL_PATTERN.source}`,
-					mcpPattern: `(?i)${GITHUB_PR_TOOL_PATTERN.source}`,
+					mcpPattern: `(?i)(?:${GITHUB_PR_TOOL_PATTERN.source})|(?:${GITHUB_CI_TOOL_PATTERN.source})`,
 				},
 			}),
 		);

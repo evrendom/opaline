@@ -37,6 +37,10 @@ const FORWARD_SCRIPTS = new Map([
 		"migrate-session-git-observations.ts",
 	],
 	[
+		"20261007180000_session_git_observation_run_ids.sql",
+		"migrate-session-git-observations.ts",
+	],
+	[
 		"20260930120000_repository_evidence_index.sql",
 		"migrate-repository-evidence-index.ts",
 	],

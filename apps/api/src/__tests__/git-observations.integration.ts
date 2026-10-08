@@ -129,7 +129,10 @@ test("Codex PTY continuations are fetched and paired within their agent scope", 
 		}),
 	).toBe("written");
 	const rows = await readRows(input.sessionId);
-	expect(rows).toHaveLength(3);
+	// The failed command printed `[main bad1234]`: git prints it only once the commit exists.
+	expect(rows).toHaveLength(4);
+	expect(rows.some((row) => row.short_sha === "bad1234")).toBe(true);
+	expect(rows.some((row) => row.short_sha === "bad5678")).toBe(false);
 	expect(rows.find((row) => row.short_sha === "abc1234")?.agent_id).toBe("");
 	expect(rows.find((row) => row.short_sha === "cafe123")?.agent_id).toBe(
 		"child-1",

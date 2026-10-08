@@ -158,6 +158,12 @@ export const sessionGitObservationsTable = table({
 			comment:
 				"Evidence label observed; a receipt is an internal completion marker, not evidence.",
 		},
+		{
+			name: "run_id",
+			type: "String",
+			comment:
+				"CI run id a CI status read names (gh run view or watch <id>, MCP run_id); empty otherwise.",
+		},
 	],
 	primaryKey: SESSION_GIT_OBSERVATIONS_KEY,
 	orderBy: SESSION_GIT_OBSERVATIONS_KEY,

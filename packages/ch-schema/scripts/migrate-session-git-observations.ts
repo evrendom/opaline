@@ -24,27 +24,37 @@ import {
 
 export const SESSION_GIT_OBSERVATIONS_MIGRATION =
 	"20261001160000_session_git_observations.sql";
+/** Additive `run_id` column (git extractor version 3). */
+export const SESSION_GIT_OBSERVATION_RUN_IDS_MIGRATION =
+	"20261007180000_session_git_observation_run_ids.sql";
 
 export async function runSessionGitObservationsMigration(options: {
 	executor: ClickHouseExecutor;
 	journalStore: MigrationJournalStore;
 	migrationSql: string;
+	runIdsMigrationSql: string;
 	targetDatabase: string;
 	expectedEngine: "ReplacingMergeTree" | "SharedReplacingMergeTree";
 	expectedStoragePolicy: string;
 }): Promise<void> {
 	if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(options.targetDatabase))
 		throw new Error("Unsafe ClickHouse database");
-	const checksum = checksumSQL(options.migrationSql);
-	const applied = (await options.journalStore.readJournal()).applied.filter(
-		(entry) => entry.name === SESSION_GIT_OBSERVATIONS_MIGRATION,
-	);
-	if (applied.some((entry) => entry.checksum !== checksum))
-		throw new Error("Git observations migration checksum mismatch");
-	if (applied.length === 0) {
-		for (const statement of extractExecutableStatements(options.migrationSql))
-			await options.executor.execute(statement);
-	}
+	const journal = (await options.journalStore.readJournal()).applied;
+	const ordered: readonly (readonly [string, string])[] = [
+		[SESSION_GIT_OBSERVATIONS_MIGRATION, options.migrationSql],
+		[SESSION_GIT_OBSERVATION_RUN_IDS_MIGRATION, options.runIdsMigrationSql],
+	];
+	const steps = ordered.map(([name, sql]) => {
+		const checksum = checksumSQL(sql);
+		const applied = journal.filter((entry) => entry.name === name);
+		if (applied.some((entry) => entry.checksum !== checksum))
+			throw new Error(`Git observations migration checksum mismatch: ${name}`);
+		return { name, sql, checksum, applied: applied.length > 0 };
+	});
+	for (const step of steps)
+		if (!step.applied)
+			for (const statement of extractExecutableStatements(step.sql))
+				await options.executor.execute(statement);
 	const columns = await options.executor.query<{
 		name: string;
 		type: string;
@@ -53,7 +63,7 @@ export async function runSessionGitObservationsMigration(options: {
 	}>(`
 		SELECT name, type, comment, default_kind FROM system.columns
 		WHERE database = '${options.targetDatabase}' AND table = 'session_git_observations'
-		ORDER BY position LIMIT 25 SETTINGS max_execution_time = 10`);
+		ORDER BY position LIMIT 30 SETTINGS max_execution_time = 10`);
 	const tables = await options.executor.query<{
 		engine_full: string;
 		sorting_key: string;
@@ -105,12 +115,13 @@ export async function runSessionGitObservationsMigration(options: {
 			"Session git observations schema mismatch (including engine_full, key, settings and COMMENTs)",
 		);
 	}
-	if (applied.length === 0)
-		await appendJournalEntryWithReconciliation(options.journalStore, {
-			name: SESSION_GIT_OBSERVATIONS_MIGRATION,
-			checksum,
-			appliedAt: new Date().toISOString().replace("Z", ""),
-		});
+	for (const step of steps)
+		if (!step.applied)
+			await appendJournalEntryWithReconciliation(options.journalStore, {
+				name: step.name,
+				checksum: step.checksum,
+				appliedAt: new Date().toISOString().replace("Z", ""),
+			});
 }
 
 async function main(): Promise<void> {
@@ -131,6 +142,14 @@ async function main(): Promise<void> {
 					import.meta.dir,
 					"../chx/migrations",
 					SESSION_GIT_OBSERVATIONS_MIGRATION,
+				),
+				"utf8",
+			),
+			runIdsMigrationSql: await readFile(
+				resolve(
+					import.meta.dir,
+					"../chx/migrations",
+					SESSION_GIT_OBSERVATION_RUN_IDS_MIGRATION,
 				),
 				"utf8",
 			),
