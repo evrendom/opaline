@@ -4,6 +4,7 @@ export {
 	organizationFeatureReadiness,
 } from "./github-outcomes-schema.js";
 export * from "./github-repository-evidence-schema.js";
+export * from "./l1-edge-schema.js";
 export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";
 export type {

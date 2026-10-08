@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0054 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, and coordination lease 0052", async () => {
+test("applies migrations 0020-0055 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, and coordination lease 0052", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0054_trends_source");
+	expect(latestMigration?.tag).toBe("0055_l1_edges");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -178,13 +178,17 @@ test("applies migrations 0020-0054 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 55,
+				count: 56,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.trends_source')::text AS name
 			`;
 			expect(trendsSourceTable?.name).toBe("trends_source");
+			const [edgeScopeTable] = await migrationSql<TableState[]>`
+				SELECT to_regclass('public.l1_edge_scope')::text AS name
+			`;
+			expect(edgeScopeTable?.name).toBe("l1_edge_scope");
 			const [cliVersionTable] = await migrationSql<TableState[]>`
 				SELECT to_regclass('public.user_cli_version')::text AS name
 			`;

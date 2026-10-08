@@ -338,6 +338,171 @@ export const RudelGithubPullRequestsRowSchema = z.object({
 export type RudelGithubPullRequestsRowInput = z.input<typeof RudelGithubPullRequestsRowSchema>
 export type RudelGithubPullRequestsRowOutput = z.output<typeof RudelGithubPullRequestsRowSchema>
 
+export type RudelL1EdgeResolutionsRow = {
+  organization_id: string
+  user_id: string
+  source: string
+  session_id: string
+  evidence_id: string
+  target: string
+  status: string
+  candidate_count: number
+  repository_id: string
+  repository_basis: string
+  repository_value: string
+  matched_value: string
+  evidence_revision: string
+  resolver_version: number
+  revision: string
+  is_active: number
+  written_at: string
+}
+
+export const RudelL1EdgeResolutionsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  evidence_id: z.string(),
+  target: z.string(),
+  status: z.string(),
+  candidate_count: z.number(),
+  repository_id: z.string(),
+  repository_basis: z.string(),
+  repository_value: z.string(),
+  matched_value: z.string(),
+  evidence_revision: z.string(),
+  resolver_version: z.number(),
+  revision: z.string(),
+  is_active: z.number(),
+  written_at: z.string(),
+})
+
+export type RudelL1EdgeResolutionsRowInput = z.input<typeof RudelL1EdgeResolutionsRowSchema>
+export type RudelL1EdgeResolutionsRowOutput = z.output<typeof RudelL1EdgeResolutionsRowSchema>
+
+export type RudelL1EdgesRow = {
+  organization_id: string
+  from_kind: string
+  from_id: string
+  relation: string
+  to_kind: string
+  to_id: string
+  evidence_id: string
+  basis: string
+  user_id: string
+  source: string
+  session_id: string
+  agent_id: string
+  turn_idx: number
+  repository_id: string
+  evidence_revision: string
+  evidence_parser_version: number
+  transcript_parser_version: number
+  observed_at: string
+  matched_value: string
+  match_rule: string
+  candidate_count: number
+  details: string
+  resolver_version: number
+  revision: string
+  is_active: number
+  written_at: string
+}
+
+export const RudelL1EdgesRowSchema = z.object({
+  organization_id: z.string(),
+  from_kind: z.string(),
+  from_id: z.string(),
+  relation: z.string(),
+  to_kind: z.string(),
+  to_id: z.string(),
+  evidence_id: z.string(),
+  basis: z.string(),
+  user_id: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  turn_idx: z.number(),
+  repository_id: z.string(),
+  evidence_revision: z.string(),
+  evidence_parser_version: z.number(),
+  transcript_parser_version: z.number(),
+  observed_at: z.string(),
+  matched_value: z.string(),
+  match_rule: z.string(),
+  candidate_count: z.number(),
+  details: z.string(),
+  resolver_version: z.number(),
+  revision: z.string(),
+  is_active: z.number(),
+  written_at: z.string(),
+})
+
+export type RudelL1EdgesRowInput = z.input<typeof RudelL1EdgesRowSchema>
+export type RudelL1EdgesRowOutput = z.output<typeof RudelL1EdgesRowSchema>
+
+export type RudelL1EdgesByTargetRow = {
+  organization_id: string
+  from_kind: string
+  from_id: string
+  relation: string
+  to_kind: string
+  to_id: string
+  evidence_id: string
+  basis: string
+  user_id: string
+  source: string
+  session_id: string
+  agent_id: string
+  turn_idx: number
+  repository_id: string
+  evidence_revision: string
+  evidence_parser_version: number
+  transcript_parser_version: number
+  observed_at: string
+  matched_value: string
+  match_rule: string
+  candidate_count: number
+  details: string
+  resolver_version: number
+  revision: string
+  is_active: number
+  written_at: string
+}
+
+export const RudelL1EdgesByTargetRowSchema = z.object({
+  organization_id: z.string(),
+  from_kind: z.string(),
+  from_id: z.string(),
+  relation: z.string(),
+  to_kind: z.string(),
+  to_id: z.string(),
+  evidence_id: z.string(),
+  basis: z.string(),
+  user_id: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  turn_idx: z.number(),
+  repository_id: z.string(),
+  evidence_revision: z.string(),
+  evidence_parser_version: z.number(),
+  transcript_parser_version: z.number(),
+  observed_at: z.string(),
+  matched_value: z.string(),
+  match_rule: z.string(),
+  candidate_count: z.number(),
+  details: z.string(),
+  resolver_version: z.number(),
+  revision: z.string(),
+  is_active: z.number(),
+  written_at: z.string(),
+})
+
+export type RudelL1EdgesByTargetRowInput = z.input<typeof RudelL1EdgesByTargetRowSchema>
+export type RudelL1EdgesByTargetRowOutput = z.output<typeof RudelL1EdgesByTargetRowSchema>
+
 export type RudelRepositorySessionEvidenceIndexRow = {
   organization_id: string
   user_id: string
