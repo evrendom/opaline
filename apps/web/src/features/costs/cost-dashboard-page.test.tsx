@@ -20,8 +20,11 @@ import { CI_DIMENSIONS, PR_DIMENSIONS } from "./use-cost-dashboard";
 
 function Page({
 	metric = "mergedPullRequests",
+	pending = false,
 }: {
-	metric?: "mergedPullRequests" | "ciRuns";
+	metric?: "cost" | "mergedPullRequests" | "ciRuns";
+	/** The server has not yet said which metrics this scope offers. */
+	pending?: boolean;
 }) {
 	const [input, setInput] = useState(
 		CostDashboardInputSchema.parse({
@@ -32,8 +35,10 @@ function Page({
 		}),
 	);
 	const query = useQuery({
-		queryKey: ["fixture"],
-		queryFn: async () => githubOutcomesDashboardFixture(),
+		queryKey: ["fixture", pending],
+		queryFn: pending
+			? () => new Promise<never>(() => {})
+			: async () => githubOutcomesDashboardFixture(),
 	});
 	function toggle(dimension: CostDimension, id: string) {
 		setInput((previous) =>
@@ -49,8 +54,10 @@ function Page({
 				input,
 				inputFor: (requestedMetric) => ({ ...input, requestedMetric }),
 				metric,
-				metrics: ["cost", "mergedPullRequests", "ciRuns"],
-				metricsPending: false,
+				metrics: pending
+					? ["cost", "sessions", "agentRuns", "signals"]
+					: ["cost", "mergedPullRequests", "ciRuns"],
+				metricsPending: pending,
 				interval: "daily",
 				query,
 				dimensions: metric === "ciRuns" ? CI_DIMENSIONS : PR_DIMENSIONS,
@@ -63,13 +70,16 @@ function Page({
 		/>
 	);
 }
-function renderPage(metric?: "mergedPullRequests" | "ciRuns") {
+function renderPage(
+	metric?: "cost" | "mergedPullRequests" | "ciRuns",
+	pending = false,
+) {
 	return render(
 		<MemoryRouter>
 			<QueryClientProvider client={new QueryClient()}>
 				<DateRangeProvider>
 					<TooltipProvider>
-						<Page metric={metric} />
+						<Page metric={metric} pending={pending} />
 					</TooltipProvider>
 				</DateRangeProvider>
 			</QueryClientProvider>
@@ -105,5 +115,15 @@ test("inactive member chip is focusable, explains the ignored filter, and remove
 		screen.queryByRole("button", {
 			name: "Remove member filter alice (not applied to CI runs)",
 		}),
+	).not.toBeInTheDocument();
+});
+test("the always-offered stat cards load before the server lists the scope's metrics", () => {
+	renderPage("cost", true);
+	const row = screen.getByRole("group", { name: "Chart metric" });
+	expect(row).toHaveAttribute("aria-busy", "true");
+	for (const label of ["Cost", "Sessions", "Agent runs", "Language"])
+		expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+	expect(
+		screen.queryByRole("button", { name: "Merged PRs" }),
 	).not.toBeInTheDocument();
 });

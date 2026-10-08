@@ -153,9 +153,9 @@ export function useAdminCostDashboard(): CostDashboardController {
  * metric the server does not offer (such as a dark-launched one) back to cost.
  * Before this page load's first answer, the scope's answer from the previous
  * visit stands in, so the stat cards (GitHub ones included) show straight
- * away. With neither, `metricsPending` is true: the cards wait for the server
- * rather than show a set that may grow, while `metrics` still lists the
- * always-offered ones so their previews can start loading.
+ * away. With neither, `metricsPending` is true and `metrics` lists the
+ * always-offered ones: their cards load straight away, and any optional ones
+ * join at the end when the server answers.
  */
 function useServerDashboardTabs(
 	state: Pick<DashboardState, "metric" | "setMetric">,

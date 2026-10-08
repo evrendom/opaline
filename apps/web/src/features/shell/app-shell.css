@@ -1,14 +1,6 @@
-/* The product shell's canvas and window.
-   A flat canvas a shade darker than the window lets the window read as raised
-   with only a hairline shadow. Light only for now. Unlayered, like
-   app-surface.css, so it wins over the older dashboard-01 chrome rules. */
-
-.product-app-shell.dashboard-01-preview {
-	--sidebar: oklch(0.975 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-accent: oklch(0.95 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-}
+/* The product shell's window. Its canvas keeps the dashboard-01 chrome
+   colours, like the marketing demo. Unlayered, like app-surface.css, so it
+   wins over the older dashboard-01 chrome rules. */
 
 .product-app-shell .dashboard-01-window {
 	box-shadow: var(--custom-shadow);

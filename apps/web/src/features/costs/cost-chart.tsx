@@ -455,7 +455,7 @@ export function CostChart({
 				aria-label="Chart metric"
 				aria-busy={metricsPending}
 			>
-				{(metricsPending ? [] : metrics).map((value) => {
+				{metrics.map((value) => {
 					const total = getMetricTotal(dashboard, value);
 					const metricData = getMetricData(dashboard, value);
 					// Only once the dashboard has answered: before that the card loads.

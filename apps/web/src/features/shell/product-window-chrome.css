@@ -48,17 +48,11 @@
 	height: 100%;
 }
 
+/* Full-bleed in the product; the colours stay the demo's. */
 .product-app-shell.dashboard-01-preview,
 .product-app-shell .dashboard-01-chrome-frame {
-	background: var(--sidebar);
 	border-radius: 0;
 	box-shadow: none;
-	backdrop-filter: none;
-	-webkit-backdrop-filter: none;
-}
-body:has(.product-app-shell.dashboard-01-preview)::before,
-body:has(.product-app-shell.dashboard-01-preview)::after {
-	display: none;
 }
 
 body:has(.dashboard-01-preview) > .product-window-backdrop {

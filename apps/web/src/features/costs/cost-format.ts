@@ -29,8 +29,8 @@ export const DASHBOARD_METRICS = [
 ] as const satisfies readonly CostDashboardRequestedMetric[];
 export type DashboardTabMetric = (typeof DASHBOARD_METRICS)[number];
 // Before the server has answered, list only the metrics every scope serves so
-// an optional metric never flashes in and back out. The stat cards themselves
-// wait for the answer (see `metricsPending`); this list starts their previews.
+// an optional metric never flashes in and back out. Their stat cards load
+// straight away; optional ones join at the end once the server answers.
 const PRE_AVAILABILITY_METRICS: readonly CostDashboardRequestedMetric[] = [
 	"cost",
 	"sessions",

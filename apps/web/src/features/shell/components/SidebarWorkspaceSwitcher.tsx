@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	IconBuilding,
 	IconCheck,
 	IconChevronDown,
 	IconPlus,
@@ -12,6 +13,7 @@ import {
 	getWorkspacePathAfterSwitch,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -24,21 +26,24 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
-import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 
-// Where a project favicon tile would sit: the mark on a white
-// Opaline pebble with the same hairline ring and soft drop shadow.
-function OpalineMark() {
+// The workspace's logo, or a building on a grey tile when it has none
+// (or the logo fails to load).
+function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 	return (
-		<span
+		<Avatar
 			aria-hidden="true"
-			className="relative grid size-5 shrink-0 place-items-center"
+			className="size-5 rounded-[5px] after:rounded-[5px]"
 		>
-			<OpalineShape className="absolute inset-0 drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.08)] [--opal-fill:var(--background)] [--opal-ring:rgb(0_0_0/0.1)]" />
-			<span className="relative size-3 bg-[#292A2F] [-webkit-mask:url('/opaline-icon.svg')_center/contain_no-repeat] [mask:url('/opaline-icon.svg')_center/contain_no-repeat]" />
-		</span>
+			{logo ? (
+				<AvatarImage src={logo} alt="" className="rounded-[5px]" />
+			) : null}
+			<AvatarFallback className="rounded-[5px] bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-300">
+				<IconBuilding className="size-3!" />
+			</AvatarFallback>
+		</Avatar>
 	);
 }
 
@@ -62,7 +67,7 @@ export function SidebarWorkspaceSwitcher() {
 							/>
 						}
 					>
-						<OpalineMark />
+						<WorkspaceMark logo={state.activeOrg?.logo} />
 						<span className="flex-1 truncate text-left font-medium">
 							{workspaceName}
 						</span>
