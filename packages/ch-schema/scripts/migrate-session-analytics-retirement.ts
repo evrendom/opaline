@@ -31,6 +31,11 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 	journalStore: MigrationJournalStore;
 	migrationSql: string;
 	targetDatabase: string;
+	/**
+	 * ClickHouse Cloud applies DDL to replicas asynchronously, so a read right
+	 * after MODIFY QUERY can see the old view; the check retries this often.
+	 */
+	readBack?: { attempts: number; delayMs: number };
 }): Promise<void> {
 	if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(options.targetDatabase))
 		throw new Error("Unsafe ClickHouse database");
@@ -40,26 +45,26 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 	);
 	if (applied.some((entry) => entry.checksum !== checksum))
 		throw new Error("Session analytics retirement migration checksum mismatch");
-	if (applied.length === 0)
+	const apply = async () => {
 		for (const statement of extractExecutableStatements(options.migrationSql))
 			await options.executor.execute(statement);
-	const views = await options.executor.query<{
-		name: string;
-		as_select: string;
-	}>(`
-		SELECT name, as_select FROM system.tables
-		WHERE database = '${options.targetDatabase}'
-			AND name IN (${VIEWS.map((view) => `'${view}'`).join(", ")})
-		LIMIT 4 SETTINGS max_execution_time = 10`);
-	for (const view of VIEWS) {
-		const query = views.find((row) => row.name === view)?.as_select;
-		const retired = RETIRED_SESSION_ANALYTICS_COLUMNS.filter((column) =>
-			new RegExp(`\\b${column}\\b`, "u").test(query ?? ""),
-		);
-		if (!query?.includes("_dedupe_rank") || retired.length > 0)
+	};
+	if (applied.length === 0) await apply();
+	const { attempts, delayMs } = options.readBack ?? {
+		attempts: 13,
+		delayMs: 10_000,
+	};
+	for (let attempt = 1; ; attempt++) {
+		const stale = await staleViews(options.executor, options.targetDatabase);
+		if (stale.length === 0) break;
+		if (attempt >= attempts)
 			throw new Error(
-				`Session analytics view ${view} still writes retired columns or lost its revision dedupe: ${retired.join(", ") || "missing view"}`,
+				`Session analytics views still write retired columns or lost their revision dedupe after ${attempts} reads: ${stale.join("; ")}`,
 			);
+		// Halfway, apply the idempotent MODIFY QUERY again in case it did not land.
+		if (applied.length === 0 && attempt === Math.ceil(attempts / 2))
+			await apply();
+		await new Promise((resolve) => setTimeout(resolve, delayMs));
 	}
 	if (applied.length === 0)
 		await appendJournalEntryWithReconciliation(options.journalStore, {
@@ -67,6 +72,27 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 			checksum,
 			appliedAt: new Date().toISOString().replace("Z", ""),
 		});
+}
+
+/** Views that still name a retired column or lost `_dedupe_rank`, with why. */
+async function staleViews(
+	executor: ClickHouseExecutor,
+	database: string,
+): Promise<string[]> {
+	const views = await executor.query<{ name: string; as_select: string }>(`
+		SELECT name, as_select FROM system.tables
+		WHERE database = '${database}'
+			AND name IN (${VIEWS.map((view) => `'${view}'`).join(", ")})
+		LIMIT 4 SETTINGS max_execution_time = 10`);
+	return VIEWS.flatMap((view) => {
+		const query = views.find((row) => row.name === view)?.as_select;
+		const retired = RETIRED_SESSION_ANALYTICS_COLUMNS.filter((column) =>
+			new RegExp(`\\b${column}\\b`, "u").test(query ?? ""),
+		);
+		return !query?.includes("_dedupe_rank") || retired.length > 0
+			? [`${view}: ${retired.join(", ") || "missing view or dedupe"}`]
+			: [];
+	});
 }
 
 async function main(): Promise<void> {
