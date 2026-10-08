@@ -47,7 +47,7 @@ export function CostDashboardView({
 }: {
 	dashboard: CostDashboardController;
 	toolbarStart?: ReactNode;
-	/** Sparkline trends for the stat cards other than the charted one. */
+	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
 }) {
 	const {
@@ -66,25 +66,33 @@ export function CostDashboardView({
 	} = dashboard;
 	const { data, isPending, isError } = query;
 	const workspace = useOptionalOrganization();
-	// The last chart that finished loading, per workspace. While a newly picked
-	// metric loads without a cached answer, keep drawing this one (dimmed)
-	// instead of swapping the chart for a skeleton; the picked card's ring
-	// moves at once. The skeleton is left for the very first load.
+	// The last chart that finished loading, per workspace and date range. While
+	// a newly picked metric loads without a cached answer, keep drawing this one
+	// (dimmed) instead of swapping the chart for a skeleton; the picked card's
+	// ring moves at once. A new date range plays the loading animation, as the
+	// stat cards do, since the old chart no longer describes it.
 	const orgId = workspace?.state.activeOrg?.id;
+	const range = `${input.startDate}/${input.endDate}`;
 	const [settled, setSettled] = useState<{
 		data: NonNullable<typeof data>;
 		metric: DashboardMetric;
 		orgId: string | undefined;
+		range: string;
 	} | null>(null);
 	if (
 		data &&
 		!isPending &&
 		(settled?.data !== data ||
 			settled.metric !== metric ||
-			settled.orgId !== orgId)
+			settled.orgId !== orgId ||
+			settled.range !== range)
 	)
-		setSettled({ data, metric, orgId });
-	const showSettled = isPending && settled !== null && settled.orgId === orgId;
+		setSettled({ data, metric, orgId, range });
+	const showSettled =
+		isPending &&
+		settled !== null &&
+		settled.orgId === orgId &&
+		settled.range === range;
 	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
 	const selectedData = getMetricData(data, metric);
 	const loadPersonRows = useDeferredPersonRows(data);

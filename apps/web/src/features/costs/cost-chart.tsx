@@ -2,6 +2,7 @@ import type {
 	CostDashboard,
 	CostDashboardInput,
 	DashboardMetric,
+	DashboardMetricData,
 } from "@rudel/api-routes";
 import { GITHUB_RETENTION_TOOLTIP } from "@rudel/api-routes";
 import {
@@ -134,11 +135,12 @@ type Props = {
 	/** The picked stat card; differs from `metric` while its chart loads. */
 	selectedMetric?: DashboardMetric;
 	metrics: readonly DashboardMetric[];
-	/** The server has not yet said which metrics this scope offers. */
+	/** The server has not yet said which metrics this scope offers, so cards
+	 * for optional metrics may still join `metrics`. */
 	metricsPending?: boolean;
 	/** The active filter chips, shown in the chart's header. */
 	filters?: ReactNode;
-	/** Sparkline trends for the stat cards other than the charted one. */
+	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
 	runSignals: CostDashboardInput["runSignals"];
 	signalTypes: CostDashboardInput["signalTypes"];
@@ -456,8 +458,12 @@ export function CostChart({
 				aria-busy={metricsPending}
 			>
 				{metrics.map((value) => {
-					const total = getMetricTotal(dashboard, value);
-					const metricData = getMetricData(dashboard, value);
+					// With previews, each card reads its own request's answer: the
+					// charted dashboard leaves the GitHub metrics out unless one of
+					// them is charted.
+					const source = previews ? previews[value] : dashboard;
+					const total = getMetricTotal(source, value);
+					const metricData = getMetricData(source, value);
 					// Only once the dashboard has answered: before that the card loads.
 					const unknownCi =
 						value === "ciRuns" &&
@@ -489,8 +495,7 @@ export function CostChart({
 							}
 							primary={selectedMetric === value}
 							trend={sparklineTotals(
-								previews?.[value] ??
-									(value === metric ? metricData?.trend : undefined),
+								previews || value === metric ? metricData?.trend : undefined,
 								interval,
 							)}
 							onClick={() => onMetricChange(value)}
@@ -1190,7 +1195,7 @@ function Metric({
 // The card's trend in the chart's interval, so the sparklines follow the
 // Daily/Weekly/Monthly picker like the big chart does.
 function sparklineTotals(
-	trend: MetricPreviews[DashboardMetric],
+	trend: DashboardMetricData["trend"] | undefined,
 	interval: ChartInterval,
 ): number[] | undefined {
 	return trend && groupChartTrend(trend, interval).map((point) => point.total);

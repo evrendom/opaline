@@ -14,7 +14,12 @@ import {
 	CostDashboardRequestedMetricSchema,
 	PULL_REQUEST_CI,
 } from "@rudel/api-routes";
-import { type Query, useQuery } from "@tanstack/react-query";
+import {
+	type Query,
+	type QueryClient,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	useCallback,
 	useEffect,
@@ -87,16 +92,17 @@ export type CostDashboardController = ReturnType<typeof useCostDashboard>;
 
 export function useCostDashboard() {
 	const { state: workspace } = useOrganization();
+	const queryClient = useQueryClient();
 	const state = useCostDashboardState(COST_DIMENSIONS);
 	const { input, metric } = state;
 	const query = useAnalyticsQuery({
 		...orpc.analytics.overview.costs.queryOptions({ input }),
 		staleTime: 60_000,
-		placeholderData: (previous, previousQuery) =>
-			previousQuery?.queryKey[1] === workspace.activeOrg?.id &&
-			previous?.requestedMetric === metric
-				? previous
-				: undefined,
+		placeholderData: dashboardPlaceholder(
+			queryClient,
+			costsQueryScope(workspace.activeOrg?.id),
+			input,
+		),
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
@@ -109,6 +115,7 @@ export function useCostDashboard() {
 }
 
 export function useAdminCostDashboard(): CostDashboardController {
+	const queryClient = useQueryClient();
 	const state = useCostDashboardState(ADMIN_COST_DIMENSIONS);
 	const { input, metric } = state;
 	const adminInput: AdminCostDashboardInput = {
@@ -138,13 +145,64 @@ export function useAdminCostDashboard(): CostDashboardController {
 	const query = useQuery({
 		...orpc.admin.dashboard.queryOptions({ input: adminInput }),
 		staleTime: 60_000,
-		placeholderData: (previous) =>
-			previous?.requestedMetric === metric ? previous : undefined,
+		placeholderData: dashboardPlaceholder(
+			queryClient,
+			orpc.admin.dashboard.key(),
+			adminInput,
+		),
 		refetchOnWindowFocus: false,
 		refetchInterval: (query) => indexingRefetchInterval(query, metric),
 	});
 	const tabs = useServerDashboardTabs(state, query.data, "admin");
 	return { ...state, ...tabs, query };
+}
+
+/** Every cached dashboard answer for one workspace, whatever its request. */
+export function costsQueryScope(orgId: string | undefined) {
+	return ["org", orgId, ...orpc.analytics.overview.costs.key()];
+}
+
+/**
+ * What stands in while a dashboard request loads: the latest cached answer
+ * for the same metric, date range and interval. A filter or split change then
+ * updates the chart and the stat cards in place, while a new date range has
+ * no stand-in, so the chart and every card play their loading animation
+ * together. Read from the cache rather than the observer's previous query:
+ * the stat cards' observers are replaced whenever their request changes.
+ */
+export function dashboardPlaceholder(
+	queryClient: QueryClient,
+	scope: readonly unknown[],
+	input: Pick<
+		CostDashboardInput,
+		"startDate" | "endDate" | "requestedMetric" | "durationInterval"
+	>,
+) {
+	return () => {
+		let latest: { data: CostDashboard; updatedAt: number } | undefined;
+		for (const query of queryClient
+			.getQueryCache()
+			.findAll({ queryKey: scope })) {
+			const data = query.state.data as CostDashboard | undefined;
+			const cached = (
+				query.queryKey.at(-1) as { input?: typeof input } | undefined
+			)?.input;
+			if (
+				!data ||
+				!cached ||
+				// The server answers a metric the scope does not offer as cost.
+				data.requestedMetric !== input.requestedMetric ||
+				cached.requestedMetric !== input.requestedMetric ||
+				cached.startDate !== input.startDate ||
+				cached.endDate !== input.endDate ||
+				cached.durationInterval !== input.durationInterval
+			)
+				continue;
+			if (!latest || query.state.dataUpdatedAt > latest.updatedAt)
+				latest = { data, updatedAt: query.state.dataUpdatedAt };
+		}
+		return latest?.data;
+	};
 }
 
 /**
