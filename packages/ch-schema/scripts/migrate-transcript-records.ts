@@ -41,8 +41,7 @@ export async function runTranscriptRecordsMigration(options: {
 	targetDatabase: string;
 	/**
 	 * ClickHouse Cloud applies DDL to replicas asynchronously, so a read right
-	 * after ALTER can miss a column on some replica; the check, which reads
-	 * every replica, retries this often.
+	 * after ALTER can miss a column; the check retries this often.
 	 */
 	readBack?: { attempts: number; delayMs: number };
 }): Promise<void> {
@@ -72,12 +71,10 @@ export async function runTranscriptRecordsMigration(options: {
 		attempts: 13,
 		delayMs: 10_000,
 	};
-	const replicas = await countReplicas(options.executor);
 	for (let attempt = 1; ; attempt++) {
 		const mismatch = await factColumnsMismatch(
 			options.executor,
 			options.targetDatabase,
-			replicas,
 		);
 		if (mismatch === null) break;
 		if (attempt >= attempts) throw new Error(mismatch);
@@ -95,25 +92,13 @@ export async function runTranscriptRecordsMigration(options: {
 }
 
 /**
- * Replicas of the `default` cluster: every ClickHouse Cloud replica that can
- * serve an insert. 0 or 1 on a single server.
- */
-async function countReplicas(executor: ClickHouseExecutor): Promise<number> {
-	const [row] = await executor.query<{ replicas: string | number }>(
-		`SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10`,
-	);
-	return Number(row?.replicas ?? 0);
-}
-
-/**
- * Why the installed fact columns differ from the schema on any replica, or
- * null once every replica has them: a writer routed to a replica that lags
- * would otherwise fail its insert after the journal says the migration ran.
+ * Why the installed fact columns differ from the schema, or null. Reads the
+ * replica that answers, like the other forward migrations: the production
+ * migration user may not read system.clusters.
  */
 async function factColumnsMismatch(
 	executor: ClickHouseExecutor,
 	database: string,
-	replicas: number,
 ): Promise<string | null> {
 	const table = (
 		transcriptRecordsSchema as unknown as { columns: Column[] }[]
@@ -122,46 +107,18 @@ async function factColumnsMismatch(
 	const expected = table.columns.slice(
 		table.columns.findIndex((column) => column.name === FACT_COLUMNS_FROM),
 	);
-	const source =
-		replicas > 1
-			? "clusterAllReplicas('default', system.columns)"
-			: "system.columns";
-	const rows = await executor.query<InstalledColumn & { host: string }>(`
-		SELECT hostName() AS host, name, type, comment, default_kind, compression_codec
-		FROM ${source}
+	const installed = await executor.query<InstalledColumn>(`
+		SELECT name, type, comment, default_kind, compression_codec
+		FROM system.columns
 		WHERE database = '${database}' AND table = 'transcript_records'
-		ORDER BY host, position LIMIT 64 BY host
-		SETTINGS max_execution_time = 10, skip_unavailable_shards = 0`);
-	const byHost = new Map<string, InstalledColumn[]>();
-	for (const row of rows)
-		byHost.set(row.host, [...(byHost.get(row.host) ?? []), row]);
-	if (byHost.size < Math.max(1, replicas))
-		return `Transcript records table visible on ${byHost.size} of ${replicas} replicas`;
-	for (const [host, columns] of byHost) {
-		const mismatch = hostMismatch(expected, columns);
-		if (mismatch !== null)
-			return replicas > 1 ? `${mismatch} on replica ${host}` : mismatch;
-	}
-	return null;
-}
-
-type InstalledColumn = {
-	name: string;
-	type: string;
-	comment: string;
-	default_kind: string;
-	compression_codec: string;
-};
-
-function hostMismatch(
-	expected: readonly Column[],
-	columns: readonly InstalledColumn[],
-): string | null {
-	const installed = columns.slice(
-		columns.findIndex((column) => column.name === FACT_COLUMNS_FROM),
+		ORDER BY position LIMIT 64
+		SETTINGS max_execution_time = 10`);
+	const from = installed.findIndex(
+		(column) => column.name === FACT_COLUMNS_FROM,
 	);
+	const facts = from === -1 ? [] : installed.slice(from);
 	const wrong = expected.filter((column, index) => {
-		const found = installed[index];
+		const found = facts[index];
 		return (
 			!found ||
 			found.name !== column.name ||
@@ -172,10 +129,18 @@ function hostMismatch(
 			(column.name === "facts" && found.compression_codec !== "CODEC(ZSTD(3))")
 		);
 	});
-	return wrong.length === 0 && installed.length === expected.length
+	return wrong.length === 0 && facts.length === expected.length
 		? null
 		: `Transcript records fact columns mismatch: ${wrong.map((column) => column.name).join(", ") || "unexpected columns"}`;
 }
+
+type InstalledColumn = {
+	name: string;
+	type: string;
+	comment: string;
+	default_kind: string;
+	compression_codec: string;
+};
 
 async function main(): Promise<void> {
 	const url = process.env.CLICKHOUSE_URL;

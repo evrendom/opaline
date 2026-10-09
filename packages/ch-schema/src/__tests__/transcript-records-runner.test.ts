@@ -27,10 +27,10 @@ const STALE = CURRENT.slice(
 );
 
 /**
- * A cluster of `replicas` where replica b serves the table without the fact
- * columns for its first `staleReads` reads.
+ * A server that serves the table without the fact columns for its first
+ * `staleReads` reads.
  */
-function cluster(replicas: number, staleReads: number) {
+function server(staleReads: number) {
 	let reads = 0;
 	const queries: string[] = [];
 	const journal: { name: string; checksum: string }[] = [];
@@ -38,14 +38,8 @@ function cluster(replicas: number, staleReads: number) {
 		execute: async () => {},
 		query: async (sql: string) => {
 			queries.push(sql);
-			if (sql.includes("system.clusters")) return [{ replicas }];
 			reads++;
-			const hosts = replicas > 1 ? ["a", "b"] : [""];
-			return hosts.flatMap((host) =>
-				(host === "b" && reads <= staleReads ? STALE : CURRENT).map(
-					(column) => ({ ...column, host }),
-				),
-			);
+			return reads <= staleReads ? STALE : CURRENT;
 		},
 	} as unknown as ClickHouseExecutor;
 	const journalStore = {
@@ -67,32 +61,33 @@ function cluster(replicas: number, staleReads: number) {
 }
 
 describe("transcript records runner", () => {
-	test("waits until every replica has the fact columns before journaling", async () => {
-		const state = cluster(2, 1);
+	test("waits until the fact columns read back before journaling", async () => {
+		const state = server(1);
 		await state.run();
 		expect(state.reads()).toBe(2);
 		expect(state.journal).toHaveLength(2);
-		expect(
-			state.queries.some((sql) =>
-				sql.includes("clusterAllReplicas('default', system.columns)"),
-			),
-		).toBe(true);
 	});
 
-	test("fails without journaling while one replica stays stale", async () => {
-		const state = cluster(2, Number.POSITIVE_INFINITY);
+	test("fails without journaling while the fact columns stay missing", async () => {
+		const state = server(Number.POSITIVE_INFINITY);
 		await expect(state.run()).rejects.toThrow(
 			"fact columns mismatch: agent_version",
 		);
 		expect(state.journal).toHaveLength(0);
 	});
 
-	test("a single server reads its own columns", async () => {
-		const state = cluster(0, 0);
+	// The production migration user lacks SELECT(cluster) ON system.clusters.
+	test("reads only system.columns", async () => {
+		const state = server(0);
 		await state.run();
 		expect(state.journal).toHaveLength(2);
 		expect(
-			state.queries.some((sql) => sql.includes("clusterAllReplicas")),
-		).toBe(false);
+			state.queries.every(
+				(sql) =>
+					sql.includes("FROM system.columns") &&
+					!sql.includes("system.clusters") &&
+					!sql.includes("clusterAllReplicas"),
+			),
+		).toBe(true);
 	});
 });
