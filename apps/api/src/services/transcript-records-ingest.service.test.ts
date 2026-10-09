@@ -12,6 +12,7 @@ import {
 	buildTranscriptRecordsReceiptRow,
 	hashTranscriptContent,
 	hasMatchingTranscriptRecordsReceipt,
+	noRecordFacts,
 	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 	writeTranscriptRecords,
 } from "./transcript-records-ingest.service.js";
@@ -53,6 +54,8 @@ const draft: TranscriptRecordDraft = {
 describe("transcript record rows", () => {
 	test("map a draft to table columns with ClickHouse-ready values", () => {
 		expect(buildTranscriptRecordRow(identity, draft)).toEqual({
+			// Parser v6 facts: not recorded until the parser fills them.
+			...noRecordFacts(),
 			agent_id: "",
 			block_idx: 1,
 			byte_len: 42,

@@ -57,6 +57,81 @@ const rudel_transcript_records = table({
 		// migration applies `CODEC(ZSTD(3))` to this column by hand. ClickHouse
 		// reports the column type as plain String, so drift checks stay clean.
 		{ name: "text", type: "String" },
+		// Parser v6 facts (docs/l1-literal-schema.md, step 7), added by
+		// 20261009150000_transcript_records_facts.sql. Literal values the record
+		// carries; empty, NULL or an empty map means not recorded, and rows of
+		// parser versions before a fact existed hold that default too, so readers
+		// gate a fact on parser_version.
+		{
+			name: "agent_version",
+			type: "LowCardinality(String)",
+			comment:
+				"Agent version that wrote the record: Claude Code version, Codex session_meta cli_version; empty when not recorded.",
+		},
+		{
+			name: "entrypoint",
+			type: "LowCardinality(String)",
+			comment:
+				"How the agent was started: Claude Code entrypoint, Codex originator; empty when not recorded.",
+		},
+		{
+			name: "denial_kind",
+			type: "LowCardinality(String)",
+			comment:
+				"Why a tool call did not run, as recorded (Claude Code toolDenialKind: permission-rule, user-rejected, cancelled, interrupted); empty otherwise.",
+		},
+		{
+			name: "duration_ms",
+			type: "UInt32",
+			nullable: true,
+			comment:
+				"Recorded duration in milliseconds (tool result, Codex item or task, cost state); NULL when not recorded.",
+		},
+		{
+			name: "timed_out_after_ms",
+			type: "UInt32",
+			nullable: true,
+			comment:
+				"Milliseconds after which the agent recorded a tool call as timed out; NULL when not recorded.",
+		},
+		{
+			name: "interrupted",
+			type: "Bool",
+			nullable: true,
+			comment:
+				"Whether the tool result records the call as interrupted; NULL when not recorded.",
+		},
+		{
+			name: "git_operation",
+			type: "Array(LowCardinality(String))",
+			comment:
+				"Git operations the agent recorded for a tool result (Claude Code gitOperation keys: push, pr, branch, commit); empty when not recorded.",
+		},
+		{
+			name: "mcp_server",
+			type: "LowCardinality(String)",
+			comment:
+				"MCP server of a tool call as recorded (Claude Code attributionMcpServer, Codex McpToolCall server); empty otherwise.",
+		},
+		{
+			name: "mcp_tool",
+			type: "LowCardinality(String)",
+			comment:
+				"MCP tool of a tool call as recorded (Claude Code attributionMcpTool, Codex McpToolCall tool); empty otherwise.",
+		},
+		{
+			name: "attribution_skill",
+			type: "LowCardinality(String)",
+			comment:
+				"Skill the agent attributed the record to (Claude Code attributionSkill); empty when not recorded.",
+		},
+		// The migration applies CODEC(ZSTD(3)) to this column by hand, as for text.
+		{
+			name: "facts",
+			type: "Map(LowCardinality(String), String)",
+			comment:
+				"Further literal facts of the record, keyed by the L1 spec column name from the parser fact registry; a missing key means not recorded.",
+		},
 	],
 	primaryKey: [
 		"organization_id",

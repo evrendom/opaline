@@ -964,6 +964,17 @@ export type RudelTranscriptRecordsRow = {
   head: string
   tail: string
   text: string
+  agent_version: string
+  entrypoint: string
+  denial_kind: string
+  duration_ms: number | null
+  timed_out_after_ms: number | null
+  interrupted: boolean | null
+  git_operation: string[]
+  mcp_server: string
+  mcp_tool: string
+  attribution_skill: string
+  facts: Record<string, string>
 }
 
 export const RudelTranscriptRecordsRowSchema = z.object({
@@ -995,6 +1006,17 @@ export const RudelTranscriptRecordsRowSchema = z.object({
   head: z.string(),
   tail: z.string(),
   text: z.string(),
+  agent_version: z.string(),
+  entrypoint: z.string(),
+  denial_kind: z.string(),
+  duration_ms: z.number().nullable(),
+  timed_out_after_ms: z.number().nullable(),
+  interrupted: z.boolean().nullable(),
+  git_operation: z.array(z.string()),
+  mcp_server: z.string(),
+  mcp_tool: z.string(),
+  attribution_skill: z.string(),
+  facts: z.record(z.string(), z.string()),
 })
 
 export type RudelTranscriptRecordsRowInput = z.input<typeof RudelTranscriptRecordsRowSchema>

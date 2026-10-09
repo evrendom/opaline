@@ -257,6 +257,39 @@ async function writeGeneration(
 	return { batchCount, rowCount };
 }
 
+/**
+ * The parser v6 fact columns of a record that records none: empty, NULL or an
+ * empty map, which mean not recorded.
+ */
+export function noRecordFacts(): Pick<
+	RudelTranscriptRecordsRow,
+	| "agent_version"
+	| "entrypoint"
+	| "denial_kind"
+	| "duration_ms"
+	| "timed_out_after_ms"
+	| "interrupted"
+	| "git_operation"
+	| "mcp_server"
+	| "mcp_tool"
+	| "attribution_skill"
+	| "facts"
+> {
+	return {
+		agent_version: "",
+		entrypoint: "",
+		denial_kind: "",
+		duration_ms: null,
+		timed_out_after_ms: null,
+		interrupted: null,
+		git_operation: [],
+		mcp_server: "",
+		mcp_tool: "",
+		attribution_skill: "",
+		facts: {},
+	};
+}
+
 export function buildTranscriptRecordRow(
 	identity: TranscriptRecordsIdentity & {
 		readonly revision: string;
@@ -265,6 +298,7 @@ export function buildTranscriptRecordRow(
 	draft: TranscriptRecordDraft,
 ): RudelTranscriptRecordsRow {
 	return {
+		...noRecordFacts(),
 		agent_id: draft.agentId,
 		block_idx: draft.blockIdx,
 		byte_len: draft.byteLen,
@@ -304,6 +338,7 @@ export function buildTranscriptRecordsReceiptRow(
 	receipt: TranscriptRecordsReceipt,
 ): RudelTranscriptRecordsRow {
 	return {
+		...noRecordFacts(),
 		agent_id: "",
 		block_idx: 0,
 		byte_len: 0,
