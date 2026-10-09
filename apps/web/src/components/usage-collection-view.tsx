@@ -55,25 +55,25 @@ const USAGE_GRID_CLASS_NAME =
 	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4 px-4 pt-1 pb-6 sm:px-8";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-card text-left text-(--session-overview-text) shadow-(--custom-shadow) squircle:rounded-3xl corner-squircle dark:border dark:border-white/10 dark:bg-(--dashboardy-surface-opaque) dark:shadow-none";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-card text-left text-(--session-overview-text) shadow-(--custom-shadow) squircle:rounded-3xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME =
 	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
 const SKILL_CARD_MARKS: Record<string, { emoji: string; color: string }> = {
-	wrench: { emoji: "🔧", color: "bg-[#f5dfcd]" },
-	drill: { emoji: "🛠️", color: "bg-[#dce7f5]" },
-	paintbrush: { emoji: "🎨", color: "bg-[#ede0f2]" },
-	compass: { emoji: "🧭", color: "bg-[#f4e9c9]" },
-	ruler: { emoji: "📏", color: "bg-[#dceade]" },
-	scissors: { emoji: "✂️", color: "bg-[#f4dddd]" },
-	"tape-measure": { emoji: "📐", color: "bg-[#f4e9c9]" },
-	flashlight: { emoji: "🔦", color: "bg-[#f5dfcd]" },
-	magnet: { emoji: "🧲", color: "bg-[#f4dddd]" },
-	microscope: { emoji: "🔬", color: "bg-[#dce7f5]" },
-	telescope: { emoji: "🔭", color: "bg-[#ede0f2]" },
-	"drafting-tools": { emoji: "✏️", color: "bg-[#f4e9c9]" },
-	toolbox: { emoji: "🧰", color: "bg-[#f5dfcd]" },
-	tools: { emoji: "⚙️", color: "bg-[#dceade]" },
-	experiment: { emoji: "🧪", color: "bg-[#dceade]" },
+	wrench: { emoji: "🔧", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
+	drill: { emoji: "🛠️", color: "bg-[#dce7f5] dark:bg-[#1f2a3b]" },
+	paintbrush: { emoji: "🎨", color: "bg-[#ede0f2] dark:bg-[#2f2238]" },
+	compass: { emoji: "🧭", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
+	ruler: { emoji: "📏", color: "bg-[#dceade] dark:bg-[#1f3324]" },
+	scissors: { emoji: "✂️", color: "bg-[#f4dddd] dark:bg-[#3a2222]" },
+	"tape-measure": { emoji: "📐", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
+	flashlight: { emoji: "🔦", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
+	magnet: { emoji: "🧲", color: "bg-[#f4dddd] dark:bg-[#3a2222]" },
+	microscope: { emoji: "🔬", color: "bg-[#dce7f5] dark:bg-[#1f2a3b]" },
+	telescope: { emoji: "🔭", color: "bg-[#ede0f2] dark:bg-[#2f2238]" },
+	"drafting-tools": { emoji: "✏️", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
+	toolbox: { emoji: "🧰", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
+	tools: { emoji: "⚙️", color: "bg-[#dceade] dark:bg-[#1f3324]" },
+	experiment: { emoji: "🧪", color: "bg-[#dceade] dark:bg-[#1f3324]" },
 };
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
@@ -408,7 +408,7 @@ function UsageCardMark({
 }) {
 	const mark = SKILL_CARD_MARKS[getSkillIcon(skill).name] ?? {
 		emoji: "✨",
-		color: "bg-[#ede0f2]",
+		color: "bg-[#ede0f2] dark:bg-[#2f2238]",
 	};
 	return (
 		<div

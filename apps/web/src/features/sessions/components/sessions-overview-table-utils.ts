@@ -20,7 +20,7 @@ export const SESSION_OVERVIEW_HEADER_HEIGHT = 48;
 export const SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME = "toolbar-button";
 
 export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
-	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--session-overview-surface) font-sans [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fcfcfc] [--session-overview-text:#101112] dark:[--session-overview-border:rgba(255,255,255,0.08)] dark:[--session-overview-hover:rgba(255,255,255,0.05)] dark:[--session-overview-muted:rgba(255,255,255,0.65)] dark:[--session-overview-subtle:rgba(255,255,255,0.5)] dark:[--session-overview-surface:#191a1c] dark:[--session-overview-text:#e6e6e9]";
+	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--session-overview-surface) font-sans [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fcfcfc] [--session-overview-text:#101112] dark:[--session-overview-border:rgba(255,255,255,0.08)] dark:[--session-overview-hover:rgba(255,255,255,0.05)] dark:[--session-overview-muted:rgba(255,255,255,0.65)] dark:[--session-overview-subtle:rgba(255,255,255,0.5)] dark:[--session-overview-surface:var(--background)] dark:[--session-overview-text:#e6e6e9]";
 
 // Reuse the former branch track's minimum width for the inline model/repo/branch.
 // Give the inline names 55% of spare width (up to 960px); Skills gets the rest.

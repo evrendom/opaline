@@ -9,6 +9,7 @@ import {
 import { MemoryRouter } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { SessionsPage } from "@/features/sessions/sessions-page";
@@ -92,43 +93,45 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 	});
 	return (
 		<DemoRuntimeContext.Provider value={{ seed, live }}>
-			<QueryClientProvider client={client}>
-				<MemoryRouter
-					initialEntries={[
-						`/dashboard?from=${seed.dashboard.input.startDate}&to=${seed.dashboard.input.endDate}`,
-					]}
-				>
-					<WorkspaceStateProvider
-						value={{
-							state: {
-								activeOrg: seed.organization,
-								organizations: [seed.organization],
-								isLoading: false,
-							},
-							meta: { isOrgAdmin: true },
-							actions: {
-								switchOrganization: async () => {
-									throw new Error("This demo uses the showcase workspace.");
-								},
-							},
-						}}
+			<ThemeProvider systemOnly>
+				<QueryClientProvider client={client}>
+					<MemoryRouter
+						initialEntries={[
+							`/dashboard?from=${seed.dashboard.input.startDate}&to=${seed.dashboard.input.endDate}`,
+						]}
 					>
-						<DateRangeProvider storageKey="demoDateRange">
-							<div className="h-full" inert={!active} data-demo-surface>
-								<AppRouter
-									rootRedirectTarget="/dashboard"
-									dashboardComponent={DashboardPage}
-									sessionComponent={SessionsPage}
-								/>
-							</div>
-						</DateRangeProvider>
-					</WorkspaceStateProvider>
-				</MemoryRouter>
-			</QueryClientProvider>
+						<WorkspaceStateProvider
+							value={{
+								state: {
+									activeOrg: seed.organization,
+									organizations: [seed.organization],
+									isLoading: false,
+								},
+								meta: { isOrgAdmin: true },
+								actions: {
+									switchOrganization: async () => {
+										throw new Error("This demo uses the showcase workspace.");
+									},
+								},
+							}}
+						>
+							<DateRangeProvider storageKey="demoDateRange">
+								<div className="h-full" inert={!active} data-demo-surface>
+									<AppRouter
+										rootRedirectTarget="/dashboard"
+										dashboardComponent={DashboardPage}
+										sessionComponent={SessionsPage}
+									/>
+								</div>
+							</DateRangeProvider>
+						</WorkspaceStateProvider>
+					</MemoryRouter>
+				</QueryClientProvider>
+			</ThemeProvider>
 			{active && connection === "error" ? (
 				<div
 					role="alert"
-					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-white p-4 shadow-lg"
+					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-popover p-4 text-popover-foreground shadow-lg dark:shadow-(--custom-shadow)"
 				>
 					The live demo could not connect.{" "}
 					<button type="button" onClick={() => void connect()}>

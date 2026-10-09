@@ -38,6 +38,9 @@ body:has(.cli-welcome-shell) > .product-window-backdrop {
 	pointer-events: none;
 	user-select: none;
 	width: max(100%, 1164px);
+	/* Open space between the form column and the window; the window runs
+	   off the right edge, so this moves it right without shrinking it. */
+	margin-left: clamp(64px, 11vw, 200px);
 	height: calc(100svh - 176px);
 	min-height: 420px;
 	max-height: 960px;
@@ -78,6 +81,7 @@ body:has(.cli-welcome-shell) > .product-window-backdrop {
 		width: 100%;
 		height: 400px;
 		min-height: 400px;
+		margin-left: 0;
 	}
 }
 

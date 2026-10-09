@@ -306,7 +306,7 @@ body:has(.dashboard-01-preview),
 .dark .dashboard-01-theme,
 .dark body:has(.dashboard-01-preview),
 .dark .dashboard-01-preview {
-	--dashboard-01-content-background: oklch(0.205 0 0);
+	--dashboard-01-content-background: var(--background);
 	--dashboard-01-rail-icon: oklch(0.708 0 0);
 	--dashboard-01-rail-icon-active: oklch(0.985 0 0);
 	--dashboard-01-rail-hover: rgb(255 255 255 / 0.04);
@@ -353,12 +353,14 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-chrome-turbulence-contrast: 190%;
 	--dashboard-01-chrome-turbulence-darkness: 0.8;
 	--dashboard-01-chrome-highlight-opacity: 0.15;
-	--dashboard-01-chrome-backdrop-fill: var(--dashboard-01-content-background);
-	--dashboard-01-chrome-surface: rgba(32, 32, 35, 0.76);
-	--dashboard-01-window-shadow: 0 0 4px rgb(0 0 0 / 0.13);
+	/* Dark layering: a solid shell (the --sidebar colour) under the content
+	   window (--background), with cards (--card) one step above that. */
+	--dashboard-01-chrome-backdrop-fill: oklch(0.145 0 0);
+	--dashboard-01-chrome-surface: oklch(0.145 0 0);
+	--dashboard-01-window-shadow: var(--custom-shadow);
 	--sidebar: var(--dashboard-01-chrome-surface);
 	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
+	--sidebar-primary: var(--color-opal-1);
 	--sidebar-primary-foreground: oklch(0.985 0 0);
 	--sidebar-accent: oklch(0.269 0 0);
 	--sidebar-accent-foreground: oklch(0.985 0 0);
@@ -397,6 +399,12 @@ body:has(.dashboard-01-preview) {
 	-webkit-backdrop-filter: blur(20px) saturate(1.12);
 }
 
+/* The white glass highlight is a light-mode touch; in dark it reads as a
+   bright edge. The window frame around it carries the hairline instead. */
+.dark .dashboard-01-chrome-frame {
+	box-shadow: none;
+}
+
 .dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] {
 	overflow: hidden;
 	border-right-width: 0;
@@ -420,9 +428,7 @@ body:has(.dashboard-01-preview)::after {
 }
 
 .dark .dashboard-01-window {
-	box-shadow:
-		0 18px 44px -30px rgb(0 0 0 / 0.72),
-		0 0 0 1px rgb(255 255 255 / 0.06);
+	box-shadow: var(--custom-shadow);
 }
 
 /* The split changes only the scroll viewport. Keep the table's query container
@@ -775,6 +781,12 @@ body:has(.dashboard-01-preview)::before {
 	mix-blend-mode: multiply;
 	filter: contrast(var(--dashboard-01-chrome-turbulence-contrast))
 		brightness(var(--dashboard-01-chrome-turbulence-darkness));
+}
+
+/* The dark shell is flat: no noise texture. */
+.dark body:has(.dashboard-01-preview)::before,
+.dark body:has(.dashboard-01-preview)::after {
+	content: none;
 }
 
 body:has(.dashboard-01-preview)::after {

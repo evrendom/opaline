@@ -1,5 +1,5 @@
-import { useTheme } from "next-themes";
 import type { CSSProperties } from "react";
+import { useTheme } from "@/app/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { usePreparedCodeHighlight } from "./code-highlight-cache";
 import type { PreparedCodeToken } from "./code-highlight-types";

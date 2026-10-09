@@ -229,8 +229,21 @@ const flatWordmark = (
 		background: transparent;
 	}
 
+	/* Split-rail-style dark: ink and buttons from the landing tokens, hairline
+	 * edges instead of drop shadows. */
+	:global(html.dark) .instant-v2-nav {
+		--instant-v2-nav-ink: var(--landing-ink);
+		--instant-v2-nav-ink-muted: var(--landing-ink-secondary);
+		--instant-v2-nav-button: var(--landing-control);
+		--instant-v2-nav-button-pressed: var(--landing-control-pressed);
+		--instant-v2-nav-button-ink: var(--landing-control-ink);
+		--instant-v2-nav-button-shadow: var(--landing-control-shadow);
+		--instant-v2-nav-glass: var(--landing-glass);
+		--instant-v2-nav-glass-edge: var(--landing-glass-edge);
+	}
+
 	.instant-v2-nav-filled {
-		background: #fff;
+		background: var(--landing-page);
 	}
 
 	.instant-v2-nav-inner,
@@ -344,7 +357,7 @@ const flatWordmark = (
 	}
 
 	.instant-v2-nav-link.is-active > span {
-		background: #ebebeb;
+		background: var(--landing-nav-active);
 	}
 
 	.instant-v2-nav-link-current > span {
@@ -382,13 +395,9 @@ const flatWordmark = (
 		justify-content: center;
 		padding: 0 10px;
 		border-radius: 6px;
-		background: #fff;
-		box-shadow:
-			inset 0 0 0 0.5px transparent,
-			0 0 0 0.5px rgba(0, 0, 0, 0.06),
-			0 1px 1px -1px rgba(0, 0, 0, 0.1),
-			0 1px 2px rgba(0, 0, 0, 0.05);
-		color: rgba(0, 0, 0, 0.87);
+		background: var(--instant-v2-nav-button);
+		box-shadow: var(--instant-v2-nav-button-shadow);
+		color: var(--instant-v2-nav-button-ink);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 13px;
@@ -462,10 +471,10 @@ const flatWordmark = (
 		border-radius: 999px;
 		background-image: linear-gradient(
 			90deg,
-			oklch(var(--instant-v2-glimm-blue) / 0.16) 20%,
-			oklch(var(--instant-v2-glimm-indigo) / 0.196) 40%,
-			oklch(var(--instant-v2-glimm-purple) / 0.19) 60%,
-			oklch(var(--instant-v2-glimm-pink) / 0.196) 80%
+			oklch(var(--instant-v2-glimm-blue) / calc(0.16 * var(--landing-glimm-strength, 1))) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / calc(0.196 * var(--landing-glimm-strength, 1))) 40%,
+			oklch(var(--instant-v2-glimm-purple) / calc(0.19 * var(--landing-glimm-strength, 1))) 60%,
+			oklch(var(--instant-v2-glimm-pink) / calc(0.196 * var(--landing-glimm-strength, 1))) 80%
 		);
 		filter: blur(var(--instant-v2-nav-glow-blur));
 		opacity: 0;
@@ -722,7 +731,7 @@ const flatWordmark = (
 		}
 
 		.instant-v2-nav-demo:hover {
-			background: #fff;
+			background: var(--instant-v2-nav-button);
 		}
 
 		.instant-v2-nav-install:hover .instant-v2-nav-install-opalescence {
@@ -740,7 +749,7 @@ const flatWordmark = (
 	}
 
 	.instant-v2-nav-demo:active {
-		background: #f9f9f9;
+		background: var(--instant-v2-nav-button-pressed);
 	}
 
 	@media (max-width: 899px) {

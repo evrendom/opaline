@@ -5,6 +5,7 @@ import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { AccountDangerZoneCard } from "@/features/settings/account/components/AccountDangerZoneCard";
+import { AppearanceCard } from "@/features/settings/account/components/AppearanceCard";
 import { ProfileLinkedAccountsCard } from "@/features/settings/account/components/ProfileLinkedAccountsCard";
 import { ProfileOverviewCard } from "@/features/settings/account/components/ProfileOverviewCard";
 import { useAccountSettingsData } from "@/features/settings/account/use-account-settings-data";
@@ -151,6 +152,7 @@ export function AccountSettingsSection() {
 				isSigningOut={isSigningOut}
 				onSignOut={() => void handleSignOut()}
 			/>
+			<AppearanceCard />
 			<ProfileLinkedAccountsCard
 				isPending={data.state.isPending}
 				linkedProviders={data.linkedProviders}

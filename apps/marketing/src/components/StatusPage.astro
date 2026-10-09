@@ -17,7 +17,16 @@ const { title, description } = Astro.props;
 		<div class="not-found-content">
 			<img
 				class="not-found-icon"
+				data-theme-asset="light"
 				src="/opaline-icon.svg"
+				alt=""
+				width="64"
+				height="64"
+			/>
+			<img
+				class="not-found-icon"
+				data-theme-asset="dark"
+				src="/opaline-icon-dark.svg"
 				alt=""
 				width="64"
 				height="64"
@@ -67,6 +76,16 @@ const { title, description } = Astro.props;
 		animation: not-found-icon-drift 3.6s ease-in-out infinite;
 	}
 
+	/* Both icons render; the theme picks one, so the markup never changes. */
+	.not-found-icon[data-theme-asset="dark"],
+	:global(html.dark) .not-found-icon[data-theme-asset="light"] {
+		display: none;
+	}
+
+	:global(html.dark) .not-found-icon[data-theme-asset="dark"] {
+		display: block;
+	}
+
 	.not-found-copy {
 		display: grid;
 		gap: 8px;
@@ -113,7 +132,7 @@ const { title, description } = Astro.props;
 	}
 
 	.not-found-home:hover {
-		border-color: rgba(36, 37, 41, 0.18);
+		border-color: rgb(var(--landing-ink-rgb) / 0.18);
 		background: var(--color-surface-subtle);
 	}
 

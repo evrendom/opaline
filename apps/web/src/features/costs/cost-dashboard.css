@@ -1178,15 +1178,10 @@
 	box-shadow: 0 0 0 1px var(--cost-border);
 }
 
-/* Opaline's dark theme has no dark card shadow, so the light one vanishes:
-   outline the dashboard's cards with its hairline instead. */
-.dark :is(.cost-metric, .cost-chart-card, .cost-breakdown, .cost-error) {
-	box-shadow: 0 0 0 1px var(--cost-border);
-}
 .dark .cost-page,
 .dark .cost-range-controls,
 .dark .cost-breakdown-dialog {
-	--cost-surface: #191a1c;
+	--cost-surface: var(--background);
 	--cost-chart-fill-opacity: 0.12;
 	--cost-foreground: #e6e6e9;
 	--cost-muted: #919299;

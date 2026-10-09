@@ -26,10 +26,10 @@
 	--dashboardy-row-hover: rgba(239, 246, 255, 0.82);
 }
 
-/* Opaline neutral dark (matches the cost dashboard), not Tailwind slate. */
+/* Pages sit on the window's own colour; neutral, not Tailwind slate. */
 .dark .dashboardy-page {
-	--dashboardy-surface: rgba(25, 26, 28, 0.92);
-	--dashboardy-surface-opaque: #191a1c;
+	--dashboardy-surface: var(--background);
+	--dashboardy-surface-opaque: var(--background);
 	--dashboardy-subsurface: rgba(34, 35, 38, 0.96);
 	--dashboardy-subsurface-opaque: #222326;
 	--dashboardy-subsurface-strong: rgba(40, 41, 45, 0.98);

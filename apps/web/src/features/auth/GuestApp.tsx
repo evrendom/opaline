@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { useTheme } from "@/app/providers/ThemeProvider";
 import { readPendingEmailCodeDraft } from "@/features/auth/email-code-auth";
 import { LoginForm } from "@/features/auth/LoginForm";
 import { SignupForm } from "@/features/auth/SignupForm";
@@ -17,6 +18,7 @@ interface GuestAppProps {
 
 export function GuestApp(props: GuestAppProps = {}) {
 	const { description, eyebrow, showLogo = true, title } = props;
+	const { resolvedTheme } = useTheme();
 	const [page, setPage] = useState<Page>(
 		() => readPendingEmailCodeDraft()?.mode ?? "login",
 	);
@@ -36,7 +38,11 @@ export function GuestApp(props: GuestAppProps = {}) {
 						{showLogo ? (
 							<img
 								className="opaline-auth-mark"
-								src="/opaline-icon.svg"
+								src={
+									resolvedTheme === "dark"
+										? "/opaline-icon-dark.svg"
+										: "/opaline-icon.svg"
+								}
 								alt="Opaline"
 							/>
 						) : null}

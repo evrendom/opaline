@@ -15,21 +15,21 @@
 /* Opaline's sheen: the marketing gradient's stops (apps/marketing tokens.css,
    --instant-v2-glimm-*) run blue → indigo → purple → pink. opal-1…opal-5 are
    five evenly spaced stops along it, interpolated in OKLCH; each -tint keeps
-   the hue at a pale lightness for fills. */
+   the hue at a pale lightness for fills (a deep one in dark mode, below). */
 @theme {
 	--color-opal-1: oklch(0.59 0.223 262.833);
 	--color-opal-2: oklch(0.583 0.239 281.458);
 	--color-opal-3: oklch(0.621 0.262 302.391);
 	--color-opal-4: oklch(0.668 0.273 323.991);
 	--color-opal-5: oklch(0.691 0.256 344.619);
-	--color-opal-1-tint: oklch(0.95 0.035 262.833);
-	--color-opal-2-tint: oklch(0.95 0.035 281.458);
-	--color-opal-3-tint: oklch(0.95 0.035 302.391);
-	--color-opal-4-tint: oklch(0.95 0.035 323.991);
-	--color-opal-5-tint: oklch(0.95 0.035 344.619);
 }
 
 @theme inline {
+	--color-opal-1-tint: var(--opal-1-tint);
+	--color-opal-2-tint: var(--opal-2-tint);
+	--color-opal-3-tint: var(--opal-3-tint);
+	--color-opal-4-tint: var(--opal-4-tint);
+	--color-opal-5-tint: var(--opal-5-tint);
 	--color-surface: var(--surface);
 	--color-heading: var(--heading);
 	--color-subheading: var(--subheading);
@@ -61,6 +61,11 @@
 
 :root {
 	--app-font-heading: "Nunito", var(--font-sans);
+	--opal-1-tint: oklch(0.95 0.035 262.833);
+	--opal-2-tint: oklch(0.95 0.035 281.458);
+	--opal-3-tint: oklch(0.95 0.035 302.391);
+	--opal-4-tint: oklch(0.95 0.035 323.991);
+	--opal-5-tint: oklch(0.95 0.035 344.619);
 	--surface: #f7f8f9;
 	--heading: oklch(0.145 0 0);
 	--subheading: oklch(0.556 0 0);
@@ -88,8 +93,8 @@
 	--chart-tooltip-border: oklch(0.922 0 0);
 	--chart-grid: oklch(0.97 0 0);
 	--chart-axis: oklch(0.556 0 0);
-	/* Hairline-plus-soft-drop shadows that stand in for borders. Light only for
-	   now. */
+	/* Hairline-plus-soft-drop shadows that stand in for borders. Dark swaps
+	   them for an inset highlight edge over deeper drops (below). */
 	--custom-shadow:
 		0px 0px 0px 0.5px rgba(0, 0, 0, 0.06), 0px 0.5px 2px -0.5px rgba(
 			0,
@@ -126,6 +131,34 @@
 }
 
 .dark {
+	--opal-1-tint: oklch(0.28 0.08 262.833);
+	--opal-2-tint: oklch(0.28 0.08 281.458);
+	--opal-3-tint: oklch(0.28 0.08 302.391);
+	--opal-4-tint: oklch(0.28 0.08 323.991);
+	--opal-5-tint: oklch(0.28 0.08 344.619);
+	--custom-shadow:
+		inset 0 0.75px 0 0 rgba(255, 255, 255, 0.03),
+		inset 0 0 0 0.75px rgba(255, 255, 255, 0.03), 0 0 0 0.75px rgba(
+			0,
+			0,
+			0,
+			0.1
+		),
+		0 2px 2px 0 rgba(0, 0, 0, 0.1), 0 4px 4px 0 rgba(0, 0, 0, 0.1),
+		0 8px 8px 0 rgba(0, 0, 0, 0.1);
+	--custom-shadow-lifted:
+		inset 0 0.75px 0 0 rgba(255, 255, 255, 0.06),
+		inset 0 0 0 0.75px rgba(255, 255, 255, 0.05), 0 0 0 0.75px rgba(
+			0,
+			0,
+			0,
+			0.3
+		),
+		0 4px 8px 0 rgba(0, 0, 0, 0.25), 0 12px 24px 0 rgba(0, 0, 0, 0.35),
+		0 24px 48px -8px rgba(0, 0, 0, 0.4);
+	--custom-shadow-secondary:
+		inset 0 0.5px 0 0 rgba(255, 255, 255, 0.04),
+		0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 0.5px 2px 0 rgba(0, 0, 0, 0.25);
 	--custom-outline-shadow:
 		inset 0 0.5px 0 0 rgba(255, 255, 255, 0.05),
 		inset 0 0 0 0.5px rgba(255, 255, 255, 0.045), 0 0 0 0.5px rgba(

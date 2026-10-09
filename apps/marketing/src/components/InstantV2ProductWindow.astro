@@ -67,8 +67,8 @@ const demoAppUrl =
 	.instant-v2-product-window {
 		--instant-v2-app-window-inset: 4px;
 		--instant-v2-app-window-radius: 8px;
-		--instant-v2-dashboard-component-color: #f3f3f2;
-		--instant-v2-dashboard-page-color: #fff;
+		--instant-v2-dashboard-component-color: var(--landing-window-component);
+		--instant-v2-dashboard-page-color: var(--landing-page);
 		--instant-v2-dashboard-shadow-fade-overhang: calc(
 			var(--instant-v2-showcase-gutter, 0px) +
 				var(--instant-v2-company-strip-height, 0px)
@@ -199,7 +199,7 @@ const demoAppUrl =
 				calc(100% - var(--instant-v2-showcase-gutter, 0px))
 				calc(100% - var(--instant-v2-dashboard-shadow-fade-overhang)),
 			var(--instant-v2-dashboard-page-color) 0%,
-			rgba(255, 255, 255, 0.5) 50%,
+			color-mix(in oklab, var(--instant-v2-dashboard-page-color) 50%, transparent) 50%,
 			transparent 100%
 		);
 	}
@@ -320,8 +320,8 @@ const demoAppUrl =
 		padding-inline: 12px;
 		border: 0;
 		border-radius: 8px;
-		background: rgba(0, 0, 0, 0.95);
-		color: #fff;
+		background: var(--landing-primary);
+		color: var(--landing-primary-ink);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 13px;
@@ -365,12 +365,10 @@ const demoAppUrl =
 		z-index: 1;
 		inset: 0;
 		border-radius: inherit;
-		background: oklch(0.1 0 0 / 0.38);
+		background: var(--landing-primary-glass);
 		-webkit-backdrop-filter: blur(6px) saturate(1.6);
 		backdrop-filter: blur(6px) saturate(1.6);
-		box-shadow:
-			inset 0 0 0 0.5px oklch(1 0 0 / 0.1),
-			inset 0 1px 0 oklch(1 0 0 / 0.12);
+		box-shadow: var(--landing-primary-glass-edge);
 		pointer-events: none;
 	}
 
@@ -392,7 +390,7 @@ const demoAppUrl =
 	}
 
 	.instant-v2-dashboard-demo-button:focus-visible {
-		outline: 2px solid rgba(0, 0, 0, 0.875);
+		outline: 2px solid var(--landing-focus);
 		outline-offset: 3px;
 	}
 

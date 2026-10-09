@@ -237,3 +237,24 @@
 		font-size: 12px;
 	}
 }
+
+/* Dark: only the rules the current sign-in and welcome screens still render. */
+.dark .cli-onboarding-surface {
+	color: oklch(0.985 0 0);
+}
+.dark .cli-onboarding-surface p {
+	color: oklch(0.708 0 0);
+}
+.dark .cli-onboarding-auth-options button {
+	border-color: rgb(255 255 255 / 15%);
+	background: var(--card);
+}
+.dark .cli-onboarding-divider {
+	color: oklch(0.556 0 0);
+}
+.dark .cli-onboarding-surface .cli-onboarding-error {
+	color: oklch(0.704 0.191 22.216);
+}
+.dark .cli-onboarding-email input {
+	border-color: rgb(255 255 255 / 15%);
+}

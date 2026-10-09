@@ -98,7 +98,8 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 
 	if (normalizedModel.includes("codex")) {
 		return {
-			chipClassName: "border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none",
+			chipClassName:
+				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
 			icon: "codex",
 			identityIconClassName: "text-[#111111] dark:text-white",
 		};
@@ -110,7 +111,8 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 		/(?:^|[\s/:_-])o[134](?:$|[\s/:_-])/u.test(normalizedModel)
 	) {
 		return {
-			chipClassName: "border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none",
+			chipClassName:
+				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
 			icon: "codex",
 			identityIconClassName: "text-[#111111] dark:text-white",
 		};

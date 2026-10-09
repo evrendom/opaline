@@ -21,7 +21,6 @@ const { snapshot, noindex = false } = Astro.props;
 	canonical="/trends"
 	dateModified={snapshot.publishedAt}
 	noindex={noindex || snapshot.sources.benchmarks.kind === "preview" || snapshot.sources.usage.kind === "preview"}
-	darkThemeColor="#141417"
 >
 	<div class="trends-site-nav">
 		<InstantV2Nav
@@ -110,16 +109,4 @@ const { snapshot, noindex = false } = Astro.props;
 		gap: 8px;
 	}
 
-	@media (prefers-color-scheme: dark) {
-		.trends-site-nav :global(.instant-v2-nav) {
-			--instant-v2-nav-ink: var(--color-ink-strong);
-			--instant-v2-nav-ink-muted: var(--color-ink-muted);
-			--instant-v2-nav-button: #2a2a2f;
-			--instant-v2-nav-button-pressed: #222226;
-			--instant-v2-nav-button-ink: var(--color-ink-strong);
-			--instant-v2-nav-button-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-			--instant-v2-nav-glass: rgb(42 42 47 / 0.36);
-			--instant-v2-nav-glass-edge: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-		}
-	}
 </style>

@@ -465,11 +465,9 @@
 	}
 }
 
-@media (prefers-color-scheme: dark) {
-	.trends-crumb-menu {
-		background: #2a2a2f;
-		box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-	}
+html.dark .trends-crumb-menu {
+	background: oklch(0.235 0 0);
+	box-shadow: inset 0 0 0 1px #ffffff12;
 }
 
 /* Controls */
@@ -5177,25 +5175,12 @@ button:focus-visible > .trends-info[data-in-option="true"] .trends-info-tip {
  * a dark groove with a dim highlight below. Model colors are light-dark()
  * pairs from trends-colors.ts, so they switch with the same setting.
  */
-:root {
-	color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-	/* html:root, because the site's tokens.css loads after this file. */
-	html:root {
-		--color-surface: #141417;
-		--color-surface-subtle: #1b1b1f;
-		--color-surface-muted: #222226;
-		--color-ink: #e4e5e8;
-		--color-ink-strong: #f4f4f5;
-		--color-ink-muted: rgb(228 229 232 / 0.62);
-		--color-ink-faint: rgb(228 229 232 / 0.38);
-		--color-line: rgb(255 255 255 / 0.1);
-		--color-line-soft: rgb(255 255 255 / 0.06);
+/* Dark follows the site's shared setting (html.dark, see Layout) and its
+ * Split-rail-style tokens in tokens.css: an oklch(0.15) page, white alpha ink
+ * and hairline edges. Only the chart's own colours are set here. */
+html.dark {
+	&:root {
 		--color-focus: #60a5fa;
-		--shadow-window: 0 0 #0000;
-		--shadow-float: 0 0 #0000;
 	}
 
 	.trends-nav-trail {
@@ -5205,13 +5190,13 @@ button:focus-visible > .trends-info[data-in-option="true"] .trends-info-tip {
 	.trends-app {
 		--trends-accent: #5b8ff7;
 		--trends-accent-strong: #84acfa;
-		--trends-dimmed: #3a3a40;
-		--trends-ink-rgb: 228 229 232;
-		--trends-raised: #2a2a2f;
-		--trends-raise-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-		--trends-ring: rgb(255 255 255 / 0.08);
+		--trends-dimmed: oklch(0.3 0 0);
+		--trends-ink-rgb: 255 255 255;
+		--trends-raised: oklch(0.235 0 0);
+		--trends-raise-shadow: inset 0 0 0 1px #ffffff12;
+		--trends-ring: #ffffff12;
 		--trends-tag-ink: var(--color-ink-strong);
-		--trends-tag-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+		--trends-tag-shadow: inset 0 0 0 1px #ffffff12;
 		--trends-groove: rgb(0 0 0 / 0.55);
 		--trends-groove-light: rgb(255 255 255 / 0.07);
 		--trends-good: #4ade80;
@@ -5243,7 +5228,7 @@ button:focus-visible > .trends-info[data-in-option="true"] .trends-info-tip {
 	}
 
 	.trends-info {
-		--info-grey: #6e6f75;
+		--info-grey: #ffffff64;
 	}
 
 	.trends-table-dialog[open]::backdrop {

@@ -149,15 +149,15 @@ const {
 <style is:global>
 	html,
 	body {
-		background: #fff;
+		background: var(--landing-page);
 		overscroll-behavior: none;
 	}
 
 	.legal-page {
 		isolation: isolate;
 		min-height: calc(100svh - 42px - 52px);
-		background: #fff;
-		color: rgba(0, 0, 0, 0.875);
+		background: var(--landing-page);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
 	}
@@ -175,7 +175,7 @@ const {
 		padding-inline: 24px;
 		border: 0;
 		background: transparent;
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-size: 15px;
 		font-weight: 500;
 		line-height: 24px;
@@ -193,7 +193,7 @@ const {
 	.legal-mobile-divider,
 	.legal-article-divider {
 		height: 1px;
-		background: rgba(0, 0, 0, 0.06);
+		background: rgb(var(--landing-ink-rgb) / 0.06);
 	}
 
 	.legal-content-section {
@@ -219,7 +219,7 @@ const {
 
 	.legal-article h1 {
 		margin: 0 0 40px;
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-size: 28px;
 		font-weight: 500;
 		letter-spacing: -0.01em;
@@ -234,7 +234,7 @@ const {
 	}
 
 	.legal-meta time {
-		color: rgba(0, 0, 0, 0.447);
+		color: rgb(var(--landing-ink-rgb) / 0.447);
 		font-size: 13px;
 		font-weight: 400;
 		line-height: 20px;
@@ -242,7 +242,7 @@ const {
 
 	.legal-prose {
 		max-width: 100%;
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-size: 15px;
 		font-weight: 400;
 		line-height: 24px;
@@ -269,7 +269,7 @@ const {
 	.legal-prose h6 {
 		scroll-margin-top: 66px;
 		margin: 64px 0 12px;
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-size: 18px;
 		font-weight: 500;
@@ -290,7 +290,7 @@ const {
 	}
 
 	.legal-prose a {
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-weight: 500;
 		text-decoration: underline;
 		text-decoration-thickness: 1px;
@@ -298,7 +298,7 @@ const {
 	}
 
 	.legal-prose strong {
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-weight: 500;
 	}
 
@@ -315,7 +315,7 @@ const {
 		height: 1px;
 		border: 0;
 		margin: 64px 0;
-		background: rgba(0, 0, 0, 0.08);
+		background: rgb(var(--landing-ink-rgb) / 0.08);
 	}
 
 	.legal-prose > div:has(table) {
@@ -335,7 +335,7 @@ const {
 	.legal-prose th,
 	.legal-prose td {
 		padding: 10px 16px 10px 0;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		border-bottom: 1px solid rgb(var(--landing-ink-rgb) / 0.08);
 		text-align: left;
 		vertical-align: top;
 	}
@@ -347,14 +347,14 @@ const {
 	.legal-prose blockquote {
 		padding-left: 16px;
 		margin: 24px 0;
-		border-left: 2px solid rgba(0, 0, 0, 0.12);
+		border-left: 2px solid rgb(var(--landing-ink-rgb) / 0.12);
 	}
 
 	.legal-prose code {
 		padding: 2px 4px;
-		border: 1px solid rgba(0, 0, 0, 0.08);
+		border: 1px solid rgb(var(--landing-ink-rgb) / 0.08);
 		border-radius: 4px;
-		background: rgba(0, 0, 0, 0.03);
+		background: rgb(var(--landing-ink-rgb) / 0.03);
 		font-family: var(--font-mono);
 		font-size: 13px;
 	}
@@ -364,7 +364,7 @@ const {
 		margin: 24px 0;
 		overflow: auto;
 		border-radius: 8px;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgb(var(--landing-ink-rgb) / 0.04);
 	}
 
 	.legal-prose img {
@@ -381,7 +381,7 @@ const {
 		width: 100%;
 		max-width: none;
 		margin-inline: auto;
-		border-top: 1px solid rgba(0, 0, 0, 0.06);
+		border-top: 1px solid rgb(var(--landing-ink-rgb) / 0.06);
 	}
 
 	.legal-toc-dialog {
@@ -426,7 +426,7 @@ const {
 		max-height: 80dvh;
 		flex-direction: column;
 		border-radius: 20px 20px 0 0;
-		background: #fff;
+		background: var(--landing-control);
 		overflow: hidden;
 		animation: legal-drawer-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
 	}
@@ -445,7 +445,7 @@ const {
 		flex: none;
 		border-radius: 999px;
 		margin: 5px auto 8px;
-		background: rgba(0, 0, 0, 0.12);
+		background: rgb(var(--landing-ink-rgb) / 0.12);
 	}
 
 	.legal-toc-dialog header {
@@ -458,7 +458,7 @@ const {
 
 	.legal-toc-dialog h2 {
 		margin: 0;
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		font-size: 18px;
 		font-weight: 500;
 		line-height: 24px;
@@ -473,7 +473,7 @@ const {
 		border: 0;
 		border-radius: 8px;
 		background: transparent;
-		color: rgba(0, 0, 0, 0.608);
+		color: rgb(var(--landing-ink-rgb) / 0.608);
 		cursor: pointer;
 	}
 
@@ -493,7 +493,7 @@ const {
 		padding: 8px 22px;
 		border: 0;
 		background: transparent;
-		color: rgba(0, 0, 0, 0.608);
+		color: rgb(var(--landing-ink-rgb) / 0.608);
 		font-size: 15px;
 		font-weight: 500;
 		line-height: 24px;
@@ -503,7 +503,7 @@ const {
 	}
 
 	.legal-toc-dialog nav button[aria-current="location"] {
-		color: rgba(0, 0, 0, 0.875);
+		color: rgb(var(--landing-ink-rgb) / 0.875);
 		opacity: 1;
 	}
 
@@ -598,7 +598,7 @@ const {
 		.legal-sidebar > p {
 			padding-inline: 8px;
 			margin: 0 0 16px;
-			color: rgba(0, 0, 0, 0.875);
+			color: rgb(var(--landing-ink-rgb) / 0.875);
 			font-size: 13px;
 			font-weight: 500;
 			line-height: 20px;
@@ -616,7 +616,7 @@ const {
 			inset: 0 0 auto;
 			height: 32px;
 			border-radius: 6px;
-			background: rgba(0, 0, 0, 0.06);
+			background: rgb(var(--landing-ink-rgb) / 0.06);
 			pointer-events: none;
 			will-change: transform, height;
 		}
@@ -633,7 +633,7 @@ const {
 			border: 0;
 			border-radius: 6px;
 			background: transparent;
-			color: rgba(0, 0, 0, 0.608);
+			color: rgb(var(--landing-ink-rgb) / 0.608);
 			font-size: 13px;
 			font-weight: 500;
 			line-height: 20px;
@@ -645,7 +645,7 @@ const {
 		.legal-toc-list button:hover,
 		.legal-toc-list button[data-in-view],
 		.legal-toc-list button[aria-current="location"] {
-			color: rgba(0, 0, 0, 0.875);
+			color: rgb(var(--landing-ink-rgb) / 0.875);
 			opacity: 1;
 		}
 	}

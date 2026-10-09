@@ -10,7 +10,7 @@
 	gap: 16px;
 	padding-inline: max(24px, 3.375vw);
 	background: transparent;
-	color: oklch(0 0 0 / 0.88);
+	color: var(--landing-ink);
 }
 
 .instant-v2-demo-bar > * {
@@ -26,8 +26,9 @@
 	max-width: 90vw;
 	padding: 8px 12px;
 	border-radius: 8px;
-	background: white;
-	box-shadow: 0 2px 12px #0002;
+	background: var(--landing-control);
+	box-shadow: var(--landing-control-shadow);
+	color: var(--landing-control-ink);
 	font-size: 12px;
 }
 .instant-v2-demo-connection-error button {
@@ -95,7 +96,7 @@
 	justify-content: center;
 	border: 0;
 	border-radius: 6px;
-	color: oklch(0 0 0 / 0.88);
+	color: var(--landing-ink);
 	cursor: pointer;
 	white-space: nowrap;
 	transition:
@@ -117,11 +118,9 @@
 	display: inline-flex;
 	height: 28px;
 	align-items: center;
-	background: rgba(255, 255, 255, 0.72);
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 255, 255, 0.48),
-		0 1px 2px rgba(17, 24, 39, 0.08);
-	color: #121517;
+	background: var(--landing-callout);
+	box-shadow: var(--landing-callout-edge);
+	color: var(--landing-callout-ink);
 	font-family: "Inter Variable", Inter, sans-serif;
 	font-feature-settings: "ss03";
 	font-size: 11px;
@@ -153,13 +152,9 @@
 	isolation: isolate;
 	flex: none;
 	padding: 0 10px;
-	background: #fff;
-	box-shadow:
-		inset 0 0 0 0.5px transparent,
-		0 0 0 0.5px rgba(0, 0, 0, 0.06),
-		0 1px 1px -1px rgba(0, 0, 0, 0.1),
-		0 1px 2px rgba(0, 0, 0, 0.05);
-	color: rgba(0, 0, 0, 0.87);
+	background: var(--landing-control);
+	box-shadow: var(--landing-control-shadow);
+	color: var(--landing-control-ink);
 	font-family: "Inter Variable", Inter, sans-serif;
 	font-feature-settings: "ss03";
 	font-size: 11px;
@@ -186,10 +181,26 @@
 	border-radius: 999px;
 	background-image: linear-gradient(
 		90deg,
-		oklch(var(--instant-v2-glimm-blue) / 0.16) 20%,
-		oklch(var(--instant-v2-glimm-indigo) / 0.196) 40%,
-		oklch(var(--instant-v2-glimm-purple) / 0.19) 60%,
-		oklch(var(--instant-v2-glimm-pink) / 0.196) 80%
+		oklch(
+				var(--instant-v2-glimm-blue) /
+				calc(0.16 * var(--landing-glimm-strength, 1))
+			)
+			20%,
+		oklch(
+				var(--instant-v2-glimm-indigo) /
+				calc(0.196 * var(--landing-glimm-strength, 1))
+			)
+			40%,
+		oklch(
+				var(--instant-v2-glimm-purple) /
+				calc(0.19 * var(--landing-glimm-strength, 1))
+			)
+			60%,
+		oklch(
+				var(--instant-v2-glimm-pink) /
+				calc(0.196 * var(--landing-glimm-strength, 1))
+			)
+			80%
 	);
 	filter: blur(var(--instant-v2-nav-glow-blur));
 	opacity: 0;
@@ -207,12 +218,10 @@
 	z-index: 1;
 	inset: 0;
 	border-radius: inherit;
-	background: oklch(1 0 0 / 0.36);
+	background: var(--landing-glass);
 	-webkit-backdrop-filter: blur(5px) saturate(1.45);
 	backdrop-filter: blur(5px) saturate(1.45);
-	box-shadow:
-		inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
-		inset 0 1px 0 oklch(1 0 0 / 0.62);
+	box-shadow: var(--landing-glass-edge);
 	pointer-events: none;
 }
 
@@ -283,10 +292,8 @@
 .instant-v2-demo-live {
 	gap: 5px;
 	padding-inline: 10px;
-	background: #fff;
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 255, 255, 0.48),
-		0 1px 2px rgba(17, 24, 39, 0.08);
+	background: var(--landing-control);
+	box-shadow: var(--landing-callout-edge);
 	font: inherit;
 	font-size: 12px;
 	font-weight: 500;
@@ -355,7 +362,7 @@
 
 @media (any-hover: hover) {
 	.instant-v2-demo-command:hover {
-		background: #fff;
+		background: var(--landing-control);
 	}
 
 	.instant-v2-demo-command:hover .instant-v2-demo-command-opalescence {
@@ -363,11 +370,11 @@
 	}
 
 	.instant-v2-demo-exit:hover {
-		background: oklch(1 0 0 / 0.62);
+		background: var(--landing-glass-hover);
 	}
 
 	.instant-v2-demo-live:not(:disabled):hover {
-		background: #f9f9f9;
+		background: var(--landing-control-pressed);
 	}
 }
 
@@ -376,7 +383,7 @@
 }
 
 .instant-v2-demo-command:active {
-	background: #f9f9f9;
+	background: var(--landing-control-pressed);
 }
 
 @keyframes instant-v2-demo-opalescence-expand {

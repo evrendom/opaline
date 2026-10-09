@@ -46,3 +46,108 @@
 		--page-gutter: 16px;
 	}
 }
+
+/* Landing page colours. Light is the original palette (Radix's grey alpha
+   scale); dark follows the reference design's: an oklch(0.15) page, the same scale in
+   white, hairline edges instead of drop shadows, and an inverted primary. */
+:root {
+	--landing-page: #fff;
+	/* The ink alpha scale's channels: black on light, white on dark. */
+	--landing-ink-rgb: 0 0 0;
+	--landing-ink: rgba(0, 0, 0, 0.875);
+	--landing-ink-secondary: rgba(0, 0, 0, 0.608);
+	--landing-ink-tertiary: rgba(0, 0, 0, 0.52);
+	--landing-ink-strong: rgba(0, 0, 0, 0.9);
+	--landing-fill: rgba(0, 0, 0, 0.063);
+	--landing-control: #fff;
+	--landing-control-pressed: #f9f9f9;
+	--landing-control-ink: rgba(0, 0, 0, 0.87);
+	--landing-control-shadow:
+		inset 0 0 0 0.5px transparent, 0 0 0 0.5px rgba(0, 0, 0, 0.06),
+		0 1px 1px -1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+	--landing-glass: oklch(1 0 0 / 0.36);
+	--landing-glass-hover: oklch(1 0 0 / 0.62);
+	--landing-glass-edge:
+		inset 0 0 0 0.5px oklch(1 0 0 / 0.72), inset 0 1px 0 oklch(1 0 0 / 0.62);
+	--landing-primary: rgba(0, 0, 0, 0.95);
+	--landing-primary-ink: #fff;
+	--landing-primary-glass: oklch(0.1 0 0 / 0.38);
+	--landing-primary-glass-edge:
+		inset 0 0 0 0.5px oklch(1 0 0 / 0.1), inset 0 1px 0 oklch(1 0 0 / 0.12);
+	--landing-focus: rgba(0, 0, 0, 0.875);
+	--landing-nav-active: #ebebeb;
+	--landing-window-component: #f3f3f2;
+	--landing-callout: rgba(255, 255, 255, 0.72);
+	--landing-callout-ink: #121517;
+	--landing-callout-edge:
+		inset 0 0 0 1px rgba(255, 255, 255, 0.48), 0 1px 2px rgba(17, 24, 39, 0.08);
+	/* Glimm, the opal shimmer: hover glows behind secondary buttons, the hero
+	   canvas and the demo's sweep band. */
+	--landing-glimm-strength: 1;
+	--landing-hero-canvas-strength: 1;
+	--landing-sweep: linear-gradient(
+		90deg,
+		transparent,
+		#95b6ff33 20%,
+		#aaa6f866 40%,
+		#cda3f78f 52%,
+		#efb1dc55 72%,
+		transparent
+	);
+}
+
+html.dark {
+	color-scheme: dark;
+	--color-surface: oklch(0.15 0 0);
+	--color-surface-subtle: oklch(0.185 0 0);
+	--color-surface-muted: oklch(0.205 0 0);
+	--color-ink: #ffffffed;
+	--color-ink-strong: #fffffff2;
+	--color-ink-muted: #ffffffaf;
+	--color-ink-faint: #ffffff64;
+	--color-line: #ffffff12;
+	--color-line-soft: #ffffff09;
+	--shadow-window: inset 0 0 0 1px #ffffff12;
+	--shadow-float: inset 0 0 0 1px #ffffff12;
+	--landing-page: oklch(0.15 0 0);
+	--landing-ink-rgb: 255 255 255;
+	--landing-ink: #ffffffed;
+	--landing-ink-secondary: #ffffffaf;
+	--landing-ink-tertiary: #ffffff8c;
+	--landing-ink-strong: #fffffff2;
+	--landing-fill: #ffffff12;
+	--landing-control: oklch(0.205 0 0);
+	--landing-control-pressed: oklch(0.185 0 0);
+	--landing-control-ink: #ffffffed;
+	--landing-control-shadow: inset 0 0 0 1px #ffffff12;
+	--landing-glass: oklch(0.15 0 0 / 0.5);
+	--landing-glass-hover: oklch(0.205 0 0 / 0.7);
+	--landing-glass-edge: inset 0 0 0 1px #ffffff12;
+	--landing-primary: #ffffffed;
+	--landing-primary-ink: oklch(0.15 0 0);
+	--landing-primary-glass: oklch(1 0 0 / 0.3);
+	--landing-primary-glass-edge:
+		inset 0 0 0 0.5px oklch(0 0 0 / 0.1), inset 0 1px 0 oklch(1 0 0 / 0.6);
+	--landing-focus: #ffffffed;
+	--landing-nav-active: #ffffff12;
+	/* The product window's shell: the same colour as the embedded app's own
+	   shell, so the frame, its gaps and the sidebar read as one surface. */
+	--landing-window-component: oklch(0.145 0 0);
+	--landing-callout: oklch(0.205 0 0 / 0.8);
+	--landing-callout-ink: #ffffffed;
+	--landing-callout-edge: inset 0 0 0 1px #ffffff12;
+	/* On dark the shimmer needs more presence behind dark buttons, and the
+	   sweep goes deeper and more saturated instead of washing the page
+	   with pale light (glimm's own advice for dark backgrounds). */
+	--landing-glimm-strength: 2.2;
+	--landing-hero-canvas-strength: 1.6;
+	--landing-sweep: linear-gradient(
+		90deg,
+		transparent,
+		#3d6ff044 20%,
+		#6a5cf077 40%,
+		#a35ef09a 52%,
+		#e0609f66 72%,
+		transparent
+	);
+}

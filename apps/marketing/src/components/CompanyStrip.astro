@@ -43,11 +43,12 @@ const currentYear = new Date().getFullYear();
 	</div>
 </footer>
 
+
 <style>
 	.company-strip {
 		min-height: var(--instant-v2-company-strip-height, 52px);
 		margin-top: var(--instant-v2-company-strip-offset-top, 0px);
-		color: rgba(0, 0, 0, 0.52);
+		color: var(--landing-ink-tertiary);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 11px;
@@ -64,7 +65,7 @@ const currentYear = new Date().getFullYear();
 		width: 100%;
 		height: var(--instant-v2-demo-company-strip-height);
 		margin-top: 0;
-		background: var(--instant-v2-page-bg, #fff);
+		background: var(--instant-v2-page-bg, var(--landing-page));
 		opacity: 1;
 		pointer-events: none;
 	}
@@ -114,12 +115,12 @@ const currentYear = new Date().getFullYear();
 	}
 
 	.company-strip a[aria-current="page"] {
-		color: rgba(0, 0, 0, 0.9);
+		color: var(--landing-ink-strong);
 	}
 
 	@media (any-hover: hover) {
 		.company-strip a:hover {
-			color: rgba(0, 0, 0, 0.9);
+			color: var(--landing-ink-strong);
 		}
 	}
 

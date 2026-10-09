@@ -134,8 +134,8 @@ export function startDemoSweep(
 		height: "100%",
 		pointerEvents: "none",
 		zIndex: "100000",
-		background:
-			"linear-gradient(90deg, transparent, #95b6ff33 20%, #aaa6f866 40%, #cda3f78f 52%, #efb1dc55 72%, transparent)",
+		// The band's gradient is a landing token, deeper in dark mode.
+		background: "var(--landing-sweep)",
 		willChange: "transform, opacity",
 	});
 	document.body.append(band);

@@ -1,6 +1,10 @@
 import type { CSSProperties } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import {
+	oneDark,
+	oneLight,
+} from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/app/providers/ThemeProvider";
 
 const CODE_BLOCK_STYLE: CSSProperties = {
 	background: "var(--skill-document-code-background)",
@@ -24,6 +28,7 @@ export function RichSkillCodeBlock({
 	content: string;
 	language: string;
 }) {
+	const { resolvedTheme } = useTheme();
 	return (
 		<SyntaxHighlighter
 			className="rich-skill-document__code-block"
@@ -31,7 +36,7 @@ export function RichSkillCodeBlock({
 			customStyle={CODE_BLOCK_STYLE}
 			language={language}
 			PreTag="pre"
-			style={oneLight}
+			style={resolvedTheme === "dark" ? oneDark : oneLight}
 		>
 			{content}
 		</SyntaxHighlighter>

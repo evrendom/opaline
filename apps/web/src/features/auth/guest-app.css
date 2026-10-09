@@ -1,15 +1,41 @@
+html:has(.opaline-auth-shell) {
+	--auth-surface: #fff;
+	--auth-text: #171717;
+	--auth-muted: #737373;
+	--auth-control: #fff;
+	--auth-control-hover: #f9f9f9;
+	--auth-input-border: rgb(23 23 23 / 15%);
+	--auth-control-shadow:
+		inset 0 0 0 0.5px rgb(0 0 0 / 0%), 0 0 0 0.5px rgb(0 0 0 / 6%),
+		0 1px 1px -1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 5%);
+	--auth-code-shadow:
+		inset 0 0 0 1px rgb(23 23 23 / 15%), 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+/* Dark: the app's window surface, with controls one step up like cards. */
+html.dark:has(.opaline-auth-shell) {
+	--auth-surface: var(--background);
+	--auth-text: var(--foreground);
+	--auth-muted: var(--muted-foreground);
+	--auth-control: var(--card);
+	--auth-control-hover: oklch(0.235 0 0);
+	--auth-input-border: rgb(255 255 255 / 15%);
+	--auth-control-shadow: var(--custom-outline-shadow);
+	--auth-code-shadow: inset 0 0 0 1px rgb(255 255 255 / 15%);
+}
+
 html:has(.opaline-auth-shell),
 body:has(.opaline-auth-shell) {
 	min-height: 100%;
-	background: #fff;
+	background: var(--auth-surface);
 	overscroll-behavior: none;
 }
 
 .opaline-auth-shell {
 	display: flex;
 	min-height: 100svh;
-	background: #fff;
-	color: #171717;
+	background: var(--auth-surface);
+	color: var(--auth-text);
 	font-family: "Inter Variable", Inter, system-ui, sans-serif;
 }
 
@@ -50,7 +76,7 @@ body:has(.opaline-auth-shell) {
 
 .opaline-auth-intro p {
 	margin: 0;
-	color: #737373;
+	color: var(--auth-muted);
 	font-size: 14px;
 	line-height: 1.6;
 	text-wrap: pretty;
@@ -78,29 +104,25 @@ body:has(.opaline-auth-shell) {
 .opaline-auth-content [data-slot="button"][data-variant="outline"] {
 	border-color: transparent;
 	padding: 10px 14px;
-	background: #fff;
-	box-shadow:
-		inset 0 0 0 0.5px rgb(0 0 0 / 0%),
-		0 0 0 0.5px rgb(0 0 0 / 6%),
-		0 1px 1px -1px rgb(0 0 0 / 10%),
-		0 1px 2px rgb(0 0 0 / 5%);
+	background: var(--auth-control);
+	box-shadow: var(--auth-control-shadow);
 }
 
 .opaline-auth-content
 	[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
-	background: #f9f9f9;
+	background: var(--auth-control-hover);
 }
 
 .opaline-auth-content [data-slot="input"] {
 	min-height: 44px;
-	border: 1px solid rgb(23 23 23 / 15%);
+	border: 1px solid var(--auth-input-border);
 	border-radius: 8px;
-	background: #fff;
+	background: var(--auth-control);
 }
 
 .opaline-auth-content [data-slot="input"]:focus-visible,
 .opaline-auth-content [data-slot="button"]:focus-visible {
-	outline: 2px solid #171717;
+	outline: 2px solid var(--auth-text);
 	outline-offset: 3px;
 }
 
@@ -126,7 +148,7 @@ body:has(.opaline-auth-shell) {
 .opaline-email-verification-intro p {
 	max-width: 36ch;
 	margin: 0;
-	color: #737373;
+	color: var(--auth-muted);
 	font-size: 14px;
 	line-height: 1.6;
 	overflow-wrap: anywhere;
@@ -138,7 +160,7 @@ body:has(.opaline-auth-shell) {
 	padding: 0;
 	border: 0;
 	background: transparent;
-	color: #737373;
+	color: var(--auth-muted);
 	font: inherit;
 	font-size: 13px;
 	line-height: 1.5;
@@ -148,12 +170,12 @@ body:has(.opaline-auth-shell) {
 }
 
 .opaline-auth-email-switch:hover:not(:disabled) {
-	color: #171717;
+	color: var(--auth-text);
 }
 
 .opaline-auth-email-switch:focus-visible {
 	border-radius: 4px;
-	outline: 2px solid #171717;
+	outline: 2px solid var(--auth-text);
 	outline-offset: 3px;
 }
 
@@ -176,11 +198,9 @@ body:has(.opaline-auth-shell) {
 	min-height: 56px;
 	border: 0;
 	padding-inline: 18px;
-	background: #fff;
-	box-shadow:
-		inset 0 0 0 1px rgb(23 23 23 / 15%),
-		0 1px 2px rgb(0 0 0 / 4%);
-	color: #171717;
+	background: var(--auth-control);
+	box-shadow: var(--auth-code-shadow);
+	color: var(--auth-text);
 	font-size: 18px;
 	font-variant-numeric: tabular-nums;
 	font-weight: 500;
@@ -190,7 +210,7 @@ body:has(.opaline-auth-shell) {
 
 .opaline-auth-content
 	[data-slot="input"].opaline-auth-code-input:focus-visible {
-	outline: 2px solid #171717;
+	outline: 2px solid var(--auth-text);
 	outline-offset: -2px;
 }
 

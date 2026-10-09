@@ -15,9 +15,10 @@
 }
 
 .dark .rich-skill-document {
-	--skill-document-code-background: #f6f8fa;
-	--skill-document-code-border: rgba(255, 255, 255, 0.12);
-	--skill-document-code-highlight: rgba(255, 255, 255, 0.18);
+	--skill-document-code-background: oklch(0.205 0 0);
+	/* the reference design's hairlines: a 7% edge and a barely-there inner highlight. */
+	--skill-document-code-border: rgba(255, 255, 255, 0.07);
+	--skill-document-code-highlight: rgba(255, 255, 255, 0.03);
 	--skill-document-inline-code-background: rgba(255, 255, 255, 0.09);
 	--skill-document-border: rgba(255, 255, 255, 0.16);
 	--skill-document-table-background: rgba(255, 255, 255, 0.055);

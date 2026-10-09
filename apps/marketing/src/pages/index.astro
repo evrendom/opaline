@@ -172,12 +172,12 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 
 	:global(html) {
 		--instant-v2-hero-recede-progress: 0;
-		--instant-v2-page-bg: #fff;
-		background: #fff;
+		--instant-v2-page-bg: var(--landing-page);
+		background: var(--landing-page);
 	}
 
 	:global(body) {
-		background: var(--instant-v2-page-bg, #fff);
+		background: var(--instant-v2-page-bg, var(--landing-page));
 		transition: background-color
 			var(--instant-v2-page-bg-duration, 420ms)
 			var(
@@ -188,7 +188,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 
 
 	:global(html[data-instant-v2-demo-exiting]) {
-		--instant-v2-page-bg: #fff;
+		--instant-v2-page-bg: var(--landing-page);
 		--instant-v2-page-bg-duration: var(
 			--instant-v2-demo-exit-duration,
 			1150ms
@@ -249,7 +249,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 		grid-column: 1 / span 7;
 		max-width: 820px;
 		margin: 0;
-		color: rgba(0, 0, 0, 0.875);
+		color: var(--landing-ink);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 56px;
@@ -282,7 +282,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 	.instant-v2-support p {
 		max-width: 42ch;
 		margin: 0 0 0 auto;
-		color: rgba(0, 0, 0, 0.608);
+		color: var(--landing-ink-secondary);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 15px;
@@ -311,7 +311,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 		justify-content: flex-end;
 		padding: 0;
 		border-radius: 8px;
-		background: rgba(0, 0, 0, 0.063);
+		background: var(--landing-fill);
 		overflow: hidden;
 	}
 
@@ -325,7 +325,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 		border: 0;
 		border-radius: 8px 0 0 8px;
 		background: transparent;
-		color: rgba(0, 0, 0, 0.875);
+		color: var(--landing-ink);
 		font-family: "Inter Variable", Inter, sans-serif;
 		font-feature-settings: "ss03";
 		font-size: 13px;
@@ -341,7 +341,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 		display: inline-flex;
 		min-width: 0;
 		align-items: center;
-		color: rgba(0, 0, 0, 0.608);
+		color: var(--landing-ink-secondary);
 	}
 
 	.instant-v2-open-source-github {
@@ -350,7 +350,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		color: rgba(0, 0, 0, 0.875);
+		color: var(--landing-ink);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -362,7 +362,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 	}
 
 	.instant-v2-open-source:focus-visible {
-		outline: 2px solid rgba(0, 0, 0, 0.875);
+		outline: 2px solid var(--landing-focus);
 		outline-offset: -2px;
 	}
 
@@ -459,7 +459,7 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 			margin: 0;
 			padding: 0 max(10px, env(safe-area-inset-right, 0px))
 				env(safe-area-inset-bottom, 0px) max(10px, env(safe-area-inset-left, 0px));
-			background: var(--instant-v2-page-bg, #fff);
+			background: var(--instant-v2-page-bg, var(--landing-page));
 		}
 
 		.instant-v2-showcase :global(.company-strip-inner) {
@@ -469,11 +469,18 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 			padding-block: 12px 4px;
 		}
 
+		/* Tall tap targets whose padding is the spacing, so every label sits
+		 * the same 16px apart and the row stays centred. */
+		.instant-v2-showcase :global(.company-strip-links) {
+			gap: 0;
+		}
+
 		.instant-v2-showcase :global(.company-strip-links a) {
 			display: inline-flex;
-			min-width: 44px;
 			min-height: 44px;
 			align-items: center;
+			justify-content: center;
+			padding-inline: 8px;
 			-webkit-tap-highlight-color: transparent;
 		}
 
@@ -526,6 +533,28 @@ const githubStars = (await readGithubStars()).toLocaleString("en-US");
 
 		.instant-v2-command-group {
 			--instant-v2-command-height: 44px;
+		}
+	}
+
+	/* Too narrow for one row of footer links: room for a second row, with
+	 * rows as far apart as the links (16px between labels both ways). */
+	@media (max-width: 379px) {
+		:global(html) {
+			--instant-v2-mobile-footer-height: calc(
+				112px + env(safe-area-inset-bottom, 0px)
+			);
+		}
+
+		.instant-v2-showcase :global(.company-strip-inner) {
+			gap: 8px;
+		}
+
+		.instant-v2-showcase :global(.company-strip-links) {
+			row-gap: 0;
+		}
+
+		.instant-v2-showcase :global(.company-strip-links a) {
+			min-height: 32px;
 		}
 	}
 

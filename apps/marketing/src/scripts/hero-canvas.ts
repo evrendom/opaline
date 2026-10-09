@@ -143,6 +143,7 @@ const fragmentSource = `#version 300 es
 	precision highp float;
 	uniform float time;
 	uniform float lineOpacity;
+	uniform float brightness;
 	uniform bool clampColor;
 	uniform vec3 paletteA;
 	uniform vec3 paletteB;
@@ -179,9 +180,39 @@ const fragmentSource = `#version 300 es
 		float paletteBend = sin(vPos.z * 0.04 + time * 0.32) * 0.09;
 		float palettePhase = paletteDrift + paletteBend + vPos.x * 0.024 + vPos.z * 0.004;
 		vec3 surfaceColor = glimmPalette(palettePhase);
+		surfaceColor *= brightness;
 		color = vec4(clampColor ? clamp(surfaceColor, 0.0, 1.0) : surfaceColor, lineOpacity);
 	}
 `;
+
+// The canvas is opaque and sits on the page, so it clears to the page's own
+// colour: white in light mode (as it always has), and in dark mode whichever
+// of <html> or <body> carries the dark surface.
+function readPageColor(): [number, number, number] {
+	if (!document.documentElement.classList.contains("dark")) return [1, 1, 1];
+	const context = document
+		.createElement("canvas")
+		.getContext("2d", { willReadFrequently: true });
+	if (!context) return [1, 1, 1];
+	for (const element of [document.documentElement, document.body]) {
+		context.clearRect(0, 0, 1, 1);
+		context.fillStyle = getComputedStyle(element).backgroundColor;
+		context.fillRect(0, 0, 1, 1);
+		const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+		if (alpha > 0) return [red / 255, green / 255, blue / 255];
+	}
+	return [1, 1, 1];
+}
+
+// Dark mode tunes the glow from CSS: --landing-hero-canvas-strength scales its
+// opacity, --landing-hero-canvas-brightness its colours (glimm's advice for
+// dark backgrounds: pale colours at full brightness read as harsh white).
+function readCanvasVariable(name: string) {
+	const value = Number.parseFloat(
+		getComputedStyle(document.documentElement).getPropertyValue(name),
+	);
+	return Number.isFinite(value) ? value : 1;
+}
 
 export function initializeHeroCanvas(
 	canvas: HTMLCanvasElement,
@@ -320,7 +351,8 @@ export function initializeHeroCanvas(
 		const canvasOpacity = Number.isFinite(requestedOpacity)
 			? Math.min(1, Math.max(0, requestedOpacity))
 			: 1;
-		gl.uniform1f(gl.getUniformLocation(program, "lineOpacity"), canvasOpacity);
+		const lineOpacity = gl.getUniformLocation(program, "lineOpacity");
+		const brightness = gl.getUniformLocation(program, "brightness");
 		gl.uniform1i(
 			gl.getUniformLocation(program, "clampColor"),
 			blurSurface ? 1 : 0,
@@ -380,10 +412,15 @@ export function initializeHeroCanvas(
 		let resumedAt = performance.now();
 		let frame = 0;
 		let visible = true;
+		let pageColor = readPageColor();
+		let canvasStrength = readCanvasVariable("--landing-hero-canvas-strength");
+		let canvasBrightness = readCanvasVariable(
+			"--landing-hero-canvas-brightness",
+		);
 		const paint = (now: number) => {
 			resize();
 			blur?.begin();
-			gl.clearColor(1, 1, 1, 1);
+			gl.clearColor(...pageColor, 1);
 			gl.clearDepth(1);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 			const forcedTime = Number(
@@ -396,6 +433,8 @@ export function initializeHeroCanvas(
 						? forcedTime
 						: fixedSeconds;
 			gl.uniform1f(time, elapsed);
+			gl.uniform1f(lineOpacity, Math.min(1, canvasOpacity * canvasStrength));
+			gl.uniform1f(brightness, canvasBrightness);
 			const nextPalette = readPaletteIndex();
 			if (nextPalette !== targetPalette) {
 				previousWeights.set(weights);
@@ -472,6 +511,17 @@ export function initializeHeroCanvas(
 				attributeFilter: ["data-hero-canvas-palette"],
 				attributes: true,
 			});
+		// The landing page follows the device's dark mode through html.dark.
+		const themeObserver = new MutationObserver(() => {
+			pageColor = readPageColor();
+			canvasStrength = readCanvasVariable("--landing-hero-canvas-strength");
+			canvasBrightness = readCanvasVariable("--landing-hero-canvas-brightness");
+			if (visible && !document.hidden) paint(performance.now());
+		});
+		themeObserver.observe(document.documentElement, {
+			attributeFilter: ["class"],
+			attributes: true,
+		});
 		addEventListener("resize", () => paint(performance.now()), {
 			passive: true,
 			signal: lifecycle.signal,
@@ -480,6 +530,7 @@ export function initializeHeroCanvas(
 			pause();
 			visibilityObserver.disconnect();
 			paletteObserver.disconnect();
+			themeObserver.disconnect();
 			blur?.dispose();
 			disposeTerrain();
 		};

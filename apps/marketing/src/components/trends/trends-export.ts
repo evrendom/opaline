@@ -112,7 +112,7 @@ export async function buildChartCard(chart: ChartExport): Promise<ChartCard> {
 	const surface = appStyle.backgroundColor;
 	const ink = colorOf("--color-ink-strong", app);
 	const muted = colorOf("--color-ink-muted", app);
-	const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+	const dark = document.documentElement.classList.contains("dark");
 
 	const [fontData, wordmark] = await Promise.all([
 		dataUrl(interLatinUrl, "font/woff2"),

@@ -112,13 +112,13 @@ export function SessionOverviewSubagentStack({
 						role="img"
 						title={label}
 					>
-						<span className="flex size-5 items-center justify-center bg-white [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
+						<span className="flex size-5 items-center justify-center bg-white dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
 							<Icon
 								className={cn(
 									"size-3.5 shrink-0",
 									ModelIcon
 										? getModelBrandIconClassName(agent.model ?? undefined)
-										: "text-[#8d8d8d]",
+										: "text-[#8d8d8d] dark:text-[#8c8c8c]",
 								)}
 							/>
 						</span>

@@ -818,8 +818,28 @@ const featureRows = [
 </Layout>
 
 <style>
+	/* Pricing colours: the ink alpha scale and controls flip to white in dark,
+	 * Split-rail-style (see the landing tokens in styles/tokens.css). */
+	:global(html) {
+		--pricing-ink-rgb: 23 24 27;
+		--pricing-button-shadow:
+			inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		--pricing-current: #f0f0f0;
+		--pricing-current-ink: #8a8a8a;
+		--pricing-current-border: rgba(0, 0, 0, 0.08);
+	}
+
+	:global(html.dark) {
+		--pricing-ink-rgb: 255 255 255;
+		--pricing-button-shadow: var(--landing-control-shadow);
+		--pricing-current: #ffffff09;
+		--pricing-current-ink: #ffffff64;
+		--pricing-current-border: #ffffff12;
+	}
+
 	:global(body) {
-		background: #fff;
+		background: var(--landing-page);
 	}
 
 	:global(html),
@@ -847,7 +867,7 @@ const featureRows = [
 		padding: 10px 14px;
 		border-radius: 6px;
 		background: var(--color-ink-strong);
-		color: #fff;
+		color: var(--landing-primary-ink);
 		font-size: 14px;
 		font-weight: 500;
 		transform: translateY(-160%);
@@ -939,7 +959,7 @@ const featureRows = [
 		padding: 0;
 		border: 0;
 		border-radius: 999px;
-		background: rgba(23, 24, 27, 0.18);
+		background: rgb(var(--pricing-ink-rgb) / 0.18);
 		cursor: pointer;
 	}
 
@@ -951,7 +971,7 @@ const featureRows = [
 		height: 14px;
 		border-radius: 50%;
 		background: #fff;
-		box-shadow: 0 1px 2px rgba(23, 24, 27, 0.18);
+		box-shadow: 0 1px 2px rgb(var(--pricing-ink-rgb) / 0.18);
 		transition: transform 160ms ease-out;
 	}
 
@@ -977,7 +997,7 @@ const featureRows = [
 		height: 48px;
 		align-items: center;
 		gap: 10px;
-		color: rgba(23, 24, 27, 0.7);
+		color: rgb(var(--pricing-ink-rgb) / 0.7);
 		font-size: 15px;
 		line-height: 1.35;
 	}
@@ -985,7 +1005,7 @@ const featureRows = [
 	.pricing-check {
 		width: 16px;
 		height: 16px;
-		fill: rgba(23, 24, 27, 0.68);
+		fill: rgb(var(--pricing-ink-rgb) / 0.68);
 	}
 
 	.pricing-minus {
@@ -994,7 +1014,7 @@ const featureRows = [
 		height: 16px;
 		align-items: center;
 		justify-content: center;
-		color: rgba(23, 24, 27, 0.24);
+		color: rgb(var(--pricing-ink-rgb) / 0.24);
 		font-size: 18px;
 		line-height: 1;
 	}
@@ -1008,7 +1028,7 @@ const featureRows = [
 	}
 
 	.pricing-feature-excluded .pricing-feature-label {
-		color: rgba(23, 24, 27, 0.3);
+		color: rgb(var(--pricing-ink-rgb) / 0.3);
 	}
 
 	.pricing-visually-hidden {
@@ -1063,9 +1083,9 @@ const featureRows = [
 		height: 15px;
 		align-items: center;
 		justify-content: center;
-		border: 1px solid rgba(23, 24, 27, 0.32);
+		border: 1px solid rgb(var(--pricing-ink-rgb) / 0.32);
 		border-radius: 50%;
-		color: rgba(23, 24, 27, 0.52);
+		color: rgb(var(--pricing-ink-rgb) / 0.52);
 		font-size: 10px;
 		font-weight: 600;
 		opacity: 0;
@@ -1076,8 +1096,8 @@ const featureRows = [
 	}
 
 	.pricing-feature-excluded .pricing-status-info {
-		border-color: rgba(23, 24, 27, 0.18);
-		color: rgba(23, 24, 27, 0.28);
+		border-color: rgb(var(--pricing-ink-rgb) / 0.18);
+		color: rgb(var(--pricing-ink-rgb) / 0.28);
 	}
 
 	.pricing-tooltip-shell:focus-within .pricing-status-default,
@@ -1115,8 +1135,8 @@ const featureRows = [
 		padding: 6px 12px;
 		border-radius: 12px;
 		background: var(--color-ink-strong);
-		box-shadow: 0 8px 24px rgba(23, 24, 27, 0.16);
-		color: #fff;
+		box-shadow: 0 8px 24px rgb(var(--pricing-ink-rgb) / 0.16);
+		color: var(--landing-primary-ink);
 		font-size: 13px;
 		font-weight: 400;
 		line-height: 1.45;
@@ -1184,11 +1204,8 @@ const featureRows = [
 		padding: 0 12px;
 		border: 0;
 		border-radius: 8px;
-		background: #fff;
-		box-shadow:
-			inset 0 0 0 0.5px rgba(0, 0, 0, 0.12),
-			0 1px 1px -1px rgba(0, 0, 0, 0.1),
-			0 1px 2px rgba(0, 0, 0, 0.05);
+		background: var(--landing-control);
+		box-shadow: var(--pricing-button-shadow);
 		font-size: 13px;
 		font-weight: 500;
 		overflow: hidden;
@@ -1198,15 +1215,15 @@ const featureRows = [
 	}
 
 	.pricing-button-primary {
-		background: rgba(0, 0, 0, 0.95);
+		background: var(--landing-primary);
 		box-shadow: none;
-		color: #fff;
+		color: var(--landing-primary-ink);
 	}
 
 	.pricing-button[data-current-plan="true"] {
-		border-color: rgba(0, 0, 0, 0.08);
-		background: #f0f0f0;
-		color: #8a8a8a;
+		border-color: var(--pricing-current-border);
+		background: var(--pricing-current);
+		color: var(--pricing-current-ink);
 		cursor: default;
 		pointer-events: none;
 	}
@@ -1232,10 +1249,10 @@ const featureRows = [
 		border-radius: 999px;
 		background-image: linear-gradient(
 			90deg,
-			oklch(var(--instant-v2-glimm-blue) / 0.16) 20%,
-			oklch(var(--instant-v2-glimm-indigo) / 0.196) 40%,
-			oklch(var(--instant-v2-glimm-purple) / 0.19) 60%,
-			oklch(var(--instant-v2-glimm-pink) / 0.196) 80%
+			oklch(var(--instant-v2-glimm-blue) / calc(0.16 * var(--landing-glimm-strength, 1))) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / calc(0.196 * var(--landing-glimm-strength, 1))) 40%,
+			oklch(var(--instant-v2-glimm-purple) / calc(0.19 * var(--landing-glimm-strength, 1))) 60%,
+			oklch(var(--instant-v2-glimm-pink) / calc(0.196 * var(--landing-glimm-strength, 1))) 80%
 		);
 		filter: blur(6px);
 		opacity: 0;
@@ -1262,18 +1279,14 @@ const featureRows = [
 		z-index: 1;
 		inset: 0;
 		border-radius: inherit;
-		background: oklch(1 0 0 / 0.36);
-		box-shadow:
-			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
-			inset 0 1px 0 oklch(1 0 0 / 0.62);
+		background: var(--landing-glass);
+		box-shadow: var(--landing-glass-edge);
 		pointer-events: none;
 	}
 
 	.pricing-button-primary .pricing-button-glass {
-		background: oklch(0.1 0 0 / 0.38);
-		box-shadow:
-			inset 0 0 0 0.5px oklch(1 0 0 / 0.1),
-			inset 0 1px 0 oklch(1 0 0 / 0.12);
+		background: var(--landing-primary-glass);
+		box-shadow: var(--landing-primary-glass-edge);
 	}
 
 	.pricing-button-label {
@@ -1301,16 +1314,16 @@ const featureRows = [
 		}
 
 		.pricing-tooltip-trigger:hover .pricing-status-info {
-			border-color: rgba(23, 24, 27, 0.56);
-			color: rgba(23, 24, 27, 0.78);
+			border-color: rgb(var(--pricing-ink-rgb) / 0.56);
+			color: rgb(var(--pricing-ink-rgb) / 0.78);
 		}
 
 		.pricing-button:hover {
-			background: #fff;
+			background: var(--landing-control);
 		}
 
 		.pricing-button-primary:hover {
-			background: rgba(0, 0, 0, 0.95);
+			background: var(--landing-primary);
 		}
 
 		.pricing-button:hover .pricing-button-opalescence {

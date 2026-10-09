@@ -5,16 +5,16 @@ import {
 	IconInfoCircle,
 	IconLoader2,
 } from "@tabler/icons-react";
-import { useTheme } from "next-themes";
 import type { CSSProperties } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { useTheme } from "@/app/providers/ThemeProvider";
 
 export function AppToaster(props: ToasterProps) {
-	const { theme = "system" } = useTheme();
+	const { resolvedTheme } = useTheme();
 
 	return (
 		<Sonner
-			theme={theme as ToasterProps["theme"]}
+			theme={resolvedTheme}
 			className="toaster group"
 			icons={{
 				success: <IconCircleCheck className="size-4" />,

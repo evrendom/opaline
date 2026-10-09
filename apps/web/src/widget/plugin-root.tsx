@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
+import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { getCanonicalAppPath } from "@/app/routes";
 import { embeddedConversationTraceMaskStyle } from "@/components/conversation/conversation-trace-mask";
 import {
@@ -94,10 +94,7 @@ export function PluginRoot({
 		for (const value of values) params.append(key, value);
 	const dashboardPath = `/${organization.slug}/dashboard?${params}`;
 	return (
-		<ThemeProvider
-			attribute="class"
-			forcedTheme={host.theme === "dark" ? "dark" : "light"}
-		>
+		<ThemeProvider forcedTheme={host.theme === "dark" ? "dark" : "light"}>
 			<QueryClientProvider client={client}>
 				<MemoryRouter
 					initialEntries={[

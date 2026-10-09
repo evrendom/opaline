@@ -28,7 +28,7 @@ const {
 	canonical,
 	dateModified,
 	noindex = false,
-	darkThemeColor,
+	darkThemeColor = "#0b0b0b",
 	socialImage = {
 		src: "/images/opaline-social.png",
 		alt: "Team-wide, message-level analytics for coding agents",
@@ -37,6 +37,20 @@ const {
 	},
 } = Astro.props;
 
+// Runs before first paint: the site always follows the visitor's system
+// preference, including when it switches.
+const darkModeScript = `{
+	const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+	const applyTheme = () => {
+		const dark = darkQuery.matches;
+		document.documentElement.classList.toggle("dark", dark);
+		// Set here too, not only in CSS, so the very first paint (before the
+		// stylesheet arrives) is already dark.
+		document.documentElement.style.colorScheme = dark ? "dark" : "light";
+	};
+	applyTheme();
+	darkQuery.addEventListener("change", applyTheme);
+}`;
 const siteUrl = Astro.site ?? new URL("https://opaline.so");
 const siteHomepageUrl = new URL("/", siteUrl);
 const canonicalUrl = canonical
@@ -93,9 +107,11 @@ const structuredDataJson = structuredData
 			type="font/woff2"
 			crossorigin
 		/>
-		<link rel="icon" href="/favicon.ico" sizes="any" />
-		<link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
-		<link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
+		<link rel="icon" href="/favicon.ico" sizes="any" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-dark-32x32.png" sizes="32x32" media="(prefers-color-scheme: dark)" />
+		<link rel="icon" type="image/png" href="/favicon-dark-16x16.png" sizes="16x16" media="(prefers-color-scheme: dark)" />
 		<link rel="mask-icon" href="/opaline-icon.svg" color="#2c2d30" />
 		<link rel="canonical" href={canonicalUrl} />
 		<link rel="sitemap" href="/sitemap.xml" />
@@ -155,6 +171,8 @@ const structuredDataJson = structuredData
 			)
 		}
 		<script is:inline>document.documentElement.dataset.js = "true";</script>
+		<script is:inline set:html={darkModeScript} />
+		<style is:inline>html.dark{background-color:#0b0b0b}</style>
 	</head>
 	<body>
 		<slot />

@@ -1,4 +1,4 @@
-import { useTheme } from "next-themes";
+import { useTheme } from "@/app/providers/ThemeProvider";
 import { ResetPasswordForm } from "@/features/auth/ResetPasswordForm";
 
 export function ResetPasswordApp() {
