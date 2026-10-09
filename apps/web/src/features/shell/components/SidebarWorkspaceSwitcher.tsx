@@ -29,9 +29,15 @@ import {
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { cn } from "@/lib/utils";
 
-// The workspace's logo, or a building on a grey tile when it has none
-// (or the logo fails to load).
+// --custom-shadow (the account avatar's edge) as drop-shadows, which follow
+// the Opaline mask where a box-shadow would draw a square.
+const WORKSPACE_MARK_SHADOW_CLASS_NAME =
+	"[filter:drop-shadow(0_0_0.5px_rgb(0_0_0_/_14%))_drop-shadow(0_0.5px_1px_rgb(0_0_0_/_6%))_drop-shadow(0_1px_2px_rgb(0_0_0_/_4%))] dark:[filter:drop-shadow(0_0_0.75px_rgb(0_0_0_/_20%))_drop-shadow(0_2px_2px_rgb(0_0_0_/_10%))_drop-shadow(0_4px_4px_rgb(0_0_0_/_10%))]";
+
+// The workspace's logo, or a building on a tile like the account avatar's
+// when it has none (or the logo fails to load), cut to the Opaline outline.
 function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 	const demo = useDemoRuntime();
 	// The bundled demo logo must be present in the prerendered HTML. The
@@ -44,21 +50,27 @@ function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 				width={20}
 				height={20}
 				aria-hidden="true"
-				className="size-5 shrink-0 object-contain"
+				className={cn(
+					"size-5 shrink-0 object-contain",
+					WORKSPACE_MARK_SHADOW_CLASS_NAME,
+				)}
 			/>
 		);
+	// The shadow sits on a wrapper because the mask clips the avatar's own.
 	return (
-		<Avatar
+		<span
 			aria-hidden="true"
-			className="size-5 rounded-[5px] after:rounded-[5px]"
+			className={cn("flex size-5 shrink-0", WORKSPACE_MARK_SHADOW_CLASS_NAME)}
 		>
-			{logo ? (
-				<AvatarImage src={logo} alt="" className="rounded-[5px]" />
-			) : null}
-			<AvatarFallback className="rounded-[5px] bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-300">
-				<IconBuilding className="size-3!" />
-			</AvatarFallback>
-		</Avatar>
+			<Avatar className="size-5 rounded-none after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
+				{logo ? (
+					<AvatarImage src={logo} alt="" className="rounded-none" />
+				) : null}
+				<AvatarFallback className="rounded-none">
+					<IconBuilding className="size-3!" />
+				</AvatarFallback>
+			</Avatar>
+		</span>
 	);
 }
 
