@@ -3,6 +3,8 @@ import { sessionScopeId } from "./l1-edge-ids.js";
 import {
 	enqueueL1EdgeDependents,
 	enqueueL1EdgeScope,
+	enqueueL1EdgeSessionScopes,
+	L1_EDGE_ENQUEUE_BATCH,
 	l1EdgeScopeId,
 } from "./l1-edge-queue.service.js";
 
@@ -71,5 +73,37 @@ describe("the run index scope", () => {
 		await enqueueL1EdgeDependents(sql, "org", ["101"], { limit: 10 });
 		expect(calls[0]?.query).toContain("scope.scope_kind = 'session'");
 		expect(calls[0]?.query).not.toContain("run_index");
+	});
+});
+
+describe("bulk session scope requests", () => {
+	test("coalesce duplicates, batch the statements and coalesce like one request", async () => {
+		const { sql, calls } = recordingSql();
+		const sessions = Array.from(
+			{ length: L1_EDGE_ENQUEUE_BATCH + 1 },
+			(_, index) => ({ ...session, sessionId: `s${index}` }),
+		);
+		await enqueueL1EdgeSessionScopes(
+			sql,
+			"run_index",
+			"org",
+			[...sessions, sessions[0] ?? session],
+			{ priority: 1 },
+		);
+		expect(calls).toHaveLength(2);
+		expect(calls[0]?.params.slice(0, 2)).toEqual(["org", "run_index"]);
+		expect(calls[0]?.params[2]).toHaveLength(L1_EDGE_ENQUEUE_BATCH);
+		expect(calls[1]?.params[2]).toEqual([
+			sessionScopeId({ ...session, sessionId: `s${L1_EDGE_ENQUEUE_BATCH}` }),
+		]);
+		expect(calls[0]?.params.slice(6)).toEqual([1, 0]);
+		// The same coalescing as a single request.
+		const single = recordingSql();
+		await enqueueL1EdgeScope(single.sql, { kind: "session", ...session });
+		const conflict = (query: string) =>
+			query.slice(query.indexOf("ON CONFLICT"));
+		expect(calls[0]?.query).toContain(
+			conflict(single.calls[0]?.query ?? "").trim(),
+		);
 	});
 });

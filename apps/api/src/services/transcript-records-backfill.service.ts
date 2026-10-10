@@ -19,6 +19,7 @@ import {
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { scaleSessionBudget } from "../lib/ingest-size.js";
 import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
+import { enqueueSessionEdgesBestEffort } from "./l1-edges/l1-edge-enqueue.js";
 import { TranscriptRecordsDeadlineExceededError } from "./transcript-records-deadline.js";
 import {
 	hashTranscriptContent,
@@ -331,6 +332,9 @@ async function processBatch(
 				...candidate,
 				signal: options.signal,
 				assertWritable: () => options.assertWritable(candidate),
+				// Backfill priority: live uploads' edges are built first.
+				onWritten: (session) =>
+					enqueueSessionEdgesBestEffort(session, { priority: 1 }),
 			});
 		} catch (error) {
 			options.signal?.throwIfAborted();

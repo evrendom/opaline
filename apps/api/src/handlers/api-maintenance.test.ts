@@ -34,6 +34,12 @@ describe("daily API maintenance", () => {
 		);
 		expect(maintenanceSource).toContain('runIndexCensus.status === "ok"');
 	});
+	test("re-queues missing or stale edge builds from a daily census, never an upload path", () => {
+		expect(maintenanceSource).toContain("requeueStaleL1EdgeScopes({");
+		expect(maintenanceSource).toContain("L1_EDGE_CENSUS_BUDGET_MS = 30_000");
+		expect(maintenanceSource).toContain('runMaintenanceStep("l1-edge-census"');
+		expect(maintenanceSource).toContain('l1EdgeCensus.status === "ok"');
+	});
 	test("wires revision-receipt cleanup into the bounded daily drain", () => {
 		expect(maintenanceSource).toContain(
 			"const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000",

@@ -8,6 +8,7 @@ import {
 	previewTranscriptRecordsBackfill,
 	type TranscriptRecordsBackfillOptions,
 } from "../services/transcript-records-backfill.service.js";
+import { TRANSCRIPT_RECORDS_RETIRE_GRACE_MS } from "../services/transcript-records-ingest.service.js";
 
 const DEFAULT_MAX_SESSIONS = readPositiveSafeIntegerEnv(
 	"TRANSCRIPT_RECORDS_BACKFILL_MAX_SESSIONS",
@@ -105,6 +106,16 @@ try {
 		: await previewTranscriptRecordsBackfill(executor, options);
 	console.log(JSON.stringify(result, null, 2));
 	if (result.failedCount > 0) process.exitCode = 2;
+	if (values.execute && result.completedCount > 0) {
+		// The generations this run superseded stay readable for the grace,
+		// then only the daily pass (ten sessions a day) would delete them.
+		const scope = values["organization-id"]
+			? `--organization-id ${values["organization-id"]}`
+			: "--all-organizations";
+		console.error(
+			`Superseded generations are retirable after ${new Date(Date.now() + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS).toISOString()}: bun run retire:transcript-records ${scope} (preview), then add --execute.`,
+		);
+	}
 } finally {
 	await executor.close();
 	await sqlClient.end();

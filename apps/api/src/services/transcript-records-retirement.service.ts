@@ -4,6 +4,7 @@ import {
 } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseExecutor,
+	type ClickHouseStatement,
 	getClickhouse,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
@@ -18,6 +19,12 @@ import {
 
 const MAX_SESSIONS_PER_PASS = 10;
 const PASS_TIMEOUT_MS = 10_000;
+const CENSUS_SETTINGS = {
+	max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
+	max_execution_time: 10,
+	max_rows_to_read: "10000000",
+	result_overflow_mode: "throw",
+} as const;
 
 interface RetirementSessionRow {
 	organization_id: string;
@@ -26,6 +33,51 @@ interface RetirementSessionRow {
 	revision_text: string;
 	parser_version: number;
 	receipt_head: string;
+}
+
+/**
+ * Sessions with more than one committed generation whose newest receipt was
+ * published at or before `retireBefore` (so the generations it superseded
+ * are past the grace), in key order, at most `limit`. Shared by the daily pass and the operator drain
+ * (`drainTranscriptRecordsRetirement`), so both retire exactly the same
+ * sessions.
+ */
+export function buildTranscriptRecordsRetirementCensusStatement(input: {
+	readonly limit: number;
+	readonly organizationId?: string;
+	readonly retireBefore: number;
+	readonly settings?: ClickHouseStatement["clickhouse_settings"];
+}): ClickHouseStatement {
+	return {
+		clickhouse_settings: input.settings ?? CENSUS_SETTINGS,
+		query: `
+				SELECT organization_id, user_id, session_id,
+					toString(newest_generation.1) AS revision_text,
+					newest_generation.2 AS parser_version, receipt_head
+				FROM (
+				SELECT organization_id, user_id, session_id,
+					max((revision, parser_version)) AS newest_generation,
+					argMax(head, (revision, parser_version, JSONExtractString(head, 'publishedAt'))) AS receipt_head
+				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
+				WHERE agent_id = ''
+					AND record_idx = {receiptRecordIdx:UInt32}
+					AND block_idx = 0 AND kind = 'receipt'
+					${input.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"}
+				GROUP BY organization_id, user_id, session_id
+				HAVING uniqExact((revision, parser_version)) > 1
+					AND parseDateTime64BestEffortOrNull(JSONExtractString(receipt_head, 'publishedAt'), 3, 'UTC')
+						<= fromUnixTimestamp64Milli({retireBefore:Int64}, 'UTC')
+				)
+				ORDER BY organization_id, user_id, session_id
+				LIMIT {maxSessions:UInt32}
+			`,
+		query_params: {
+			maxSessions: input.limit,
+			organizationId: input.organizationId,
+			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+			retireBefore: input.retireBefore,
+		},
+	};
 }
 
 export async function runTranscriptRecordsRetirementPass(
@@ -60,40 +112,12 @@ export async function runTranscriptRecordsRetirementPass(
 	try {
 		const sessions = await deadline.wait(() =>
 			executor.query<RetirementSessionRow>({
-				abortSignal: deadline.signal,
-				clickhouse_settings: {
-					max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
-					max_execution_time: 10,
-					max_rows_to_read: "10000000",
-					result_overflow_mode: "throw",
-				},
-				query: `
-				SELECT organization_id, user_id, session_id,
-					toString(newest_generation.1) AS revision_text,
-					newest_generation.2 AS parser_version, receipt_head
-				FROM (
-				SELECT organization_id, user_id, session_id,
-					max((revision, parser_version)) AS newest_generation,
-					argMax(head, (revision, parser_version, JSONExtractString(head, 'publishedAt'))) AS receipt_head
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE agent_id = ''
-					AND record_idx = {receiptRecordIdx:UInt32}
-					AND block_idx = 0 AND kind = 'receipt'
-					${options.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"}
-				GROUP BY organization_id, user_id, session_id
-				HAVING uniqExact((revision, parser_version)) > 1
-					AND parseDateTime64BestEffortOrNull(JSONExtractString(receipt_head, 'publishedAt'), 3, 'UTC')
-						<= fromUnixTimestamp64Milli({retireBefore:Int64}, 'UTC')
-				)
-				ORDER BY organization_id, user_id, session_id
-				LIMIT {maxSessions:UInt32}
-			`,
-				query_params: {
-					maxSessions,
+				...buildTranscriptRecordsRetirementCensusStatement({
+					limit: maxSessions,
 					organizationId: options.organizationId,
-					receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 					retireBefore: startedAt - TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-				},
+				}),
+				abortSignal: deadline.signal,
 			}),
 		);
 		let generationsRetired = 0;

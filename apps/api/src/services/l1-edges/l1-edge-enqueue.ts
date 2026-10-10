@@ -23,6 +23,8 @@ interface QueuedSession {
  */
 export async function enqueueSessionEdgesBestEffort(
 	session: QueuedSession,
+	/** 1 for backfills, so live uploads are built first. */
+	options: { priority?: 0 | 1 } = {},
 ): Promise<void> {
 	if (
 		process.env.L1_EDGES_ENQUEUE_ENABLED === "false" ||
@@ -34,7 +36,7 @@ export async function enqueueSessionEdgesBestEffort(
 		await enqueueL1EdgeScope(
 			sqlClient,
 			{ kind: "session", ...session },
-			{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS },
+			{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS, priority: options.priority },
 		);
 	} catch (error) {
 		logger.warn("Could not queue edges for session {sessionId}: {error}", {

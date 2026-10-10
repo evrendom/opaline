@@ -63,6 +63,29 @@ export function l1EdgeScopeId(scope: L1EdgeScopeKey): string {
 }
 
 /**
+ * How a request coalesces with an existing scope row: one more request, the
+ * more urgent priority, and the due time below.
+ */
+const ENQUEUE_CONFLICT_SQL = `ON CONFLICT (organization_id, scope_kind, scope_id) DO UPDATE SET
+			request_count = l1_edge_scope.request_count + 1,
+			priority = LEAST(l1_edge_scope.priority, EXCLUDED.priority),
+			-- A pending scope keeps the earlier due time, but a request never
+			-- shortens a failed build's backoff (last_error is set by a failure
+			-- and cleared only by a completed build); a parked scope
+			-- ('infinity') wakes with fresh attempts.
+			next_attempt_at = CASE
+				WHEN l1_edge_scope.request_count > l1_edge_scope.built_request_count
+					AND l1_edge_scope.next_attempt_at <> 'infinity'
+				THEN CASE WHEN l1_edge_scope.last_error IS NOT NULL THEN l1_edge_scope.next_attempt_at
+					ELSE LEAST(l1_edge_scope.next_attempt_at, EXCLUDED.next_attempt_at) END
+				ELSE EXCLUDED.next_attempt_at END,
+			attempt_count = CASE WHEN l1_edge_scope.next_attempt_at = 'infinity' THEN 0 ELSE l1_edge_scope.attempt_count END,
+			updated_at = now()`;
+
+/** Scopes one bulk request statement queues. */
+export const L1_EDGE_ENQUEUE_BATCH = 500;
+
+/**
  * Requests a rebuild of a scope, coalescing with a pending request. The scope
  * becomes due after `debounceMs` (or earlier if it already was); a failed
  * scope is retried from its first attempt. Nothing is queued for a workspace
@@ -75,6 +98,53 @@ export async function enqueueL1EdgeScope(
 	options: { debounceMs?: number; priority?: 0 | 1 } = {},
 ): Promise<void> {
 	await enqueueScopes(sql, scope, [scope.kind], options);
+}
+
+/**
+ * Requests rebuilds of many session-shaped scopes (`session` or `run_index`)
+ * of one workspace, as `enqueueL1EdgeScope` does for one, in statements of
+ * at most `L1_EDGE_ENQUEUE_BATCH` scopes (duplicates coalesce first).
+ * Sessions whose owner no longer exists are skipped, and nothing is queued
+ * for a workspace that no longer exists. Returns how many scopes were
+ * queued or re-requested.
+ */
+export async function enqueueL1EdgeSessionScopes(
+	sql: Sql,
+	kind: "session" | "run_index",
+	organizationId: string,
+	sessions: readonly SessionIdentity[],
+	options: { debounceMs?: number; priority?: 0 | 1 } = {},
+): Promise<number> {
+	const unique = new Map(
+		sessions.map((session) => [sessionScopeId(session), session]),
+	);
+	const all = [...unique.entries()];
+	let queued = 0;
+	for (let offset = 0; offset < all.length; offset += L1_EDGE_ENQUEUE_BATCH) {
+		const batch = all.slice(offset, offset + L1_EDGE_ENQUEUE_BATCH);
+		const rows = await sql.unsafe(
+			`INSERT INTO l1_edge_scope (organization_id, scope_kind, scope_id, user_id, source, session_id, repository_id, priority, next_attempt_at)
+			 SELECT $1::text, $2::text, scope.scope_id, scope.user_id, scope.source, scope.session_id, NULL, $7::smallint,
+				now() + $8::bigint * interval '1 millisecond'
+			 FROM unnest($3::text[], $4::text[], $5::text[], $6::text[]) AS scope(scope_id, user_id, source, session_id)
+			 WHERE EXISTS (SELECT 1 FROM organization WHERE id = $1::text)
+				AND EXISTS (SELECT 1 FROM "user" WHERE id = scope.user_id)
+			 ${ENQUEUE_CONFLICT_SQL}
+			 RETURNING 1`,
+			[
+				organizationId,
+				kind,
+				batch.map(([scopeId]) => scopeId),
+				batch.map(([, session]) => session.userId),
+				batch.map(([, session]) => session.source),
+				batch.map(([, session]) => session.sessionId),
+				options.priority ?? 0,
+				options.debounceMs ?? 0,
+			],
+		);
+		queued += rows.length;
+	}
+	return queued;
 }
 
 async function enqueueScopes(
@@ -91,21 +161,7 @@ async function enqueueScopes(
 		 FROM unnest($2::text[]) AS kind
 		 WHERE EXISTS (SELECT 1 FROM organization WHERE id = $1::text)
 			AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM "user" WHERE id = $4::text))
-		 ON CONFLICT (organization_id, scope_kind, scope_id) DO UPDATE SET
-			request_count = l1_edge_scope.request_count + 1,
-			priority = LEAST(l1_edge_scope.priority, EXCLUDED.priority),
-			-- A pending scope keeps the earlier due time, but a request never
-			-- shortens a failed build's backoff (last_error is set by a failure
-			-- and cleared only by a completed build); a parked scope
-			-- ('infinity') wakes with fresh attempts.
-			next_attempt_at = CASE
-				WHEN l1_edge_scope.request_count > l1_edge_scope.built_request_count
-					AND l1_edge_scope.next_attempt_at <> 'infinity'
-				THEN CASE WHEN l1_edge_scope.last_error IS NOT NULL THEN l1_edge_scope.next_attempt_at
-					ELSE LEAST(l1_edge_scope.next_attempt_at, EXCLUDED.next_attempt_at) END
-				ELSE EXCLUDED.next_attempt_at END,
-			attempt_count = CASE WHEN l1_edge_scope.next_attempt_at = 'infinity' THEN 0 ELSE l1_edge_scope.attempt_count END,
-			updated_at = now()`,
+		 ${ENQUEUE_CONFLICT_SQL}`,
 		[
 			scope.organizationId,
 			[...kinds],

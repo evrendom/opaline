@@ -122,7 +122,7 @@ A run's pull requests and CI runs are followed through these edges (run → comm
 
 ### Worker
 
-The reconciliation worker rebuilds a scope when an input changes: a session generation (git observations published, transcript reparsed, capture or snapshot published), a repository's pull requests or commits (sweep or webhook), or its CI runs. Its queue, claims, revisions and watermarks are Postgres rows; its output is ClickHouse rows. A rebuild is deterministic for its scope and the GitHub state it read, writes new revisions and retracts edges that no longer hold, and is fenced by purge tombstones. Run-side edges depend on GitHub data (a unique SHA prefix, a branch's PRs, a run's attempts), so a repository change re-queues the sessions that depend on it while they are open (14 days after their last evidence); older edges are frozen against the coverage recorded on their scope. An expired transcript never retracts edges.
+The reconciliation worker rebuilds a scope when an input changes: a session generation (git observations published, transcript reparsed, capture or snapshot published), a repository's pull requests or commits (sweep or webhook), or its CI runs. Its queue, claims, revisions and watermarks are Postgres rows; its output is ClickHouse rows. A rebuild is deterministic for its scope and the GitHub state it read, writes new revisions and retracts edges that no longer hold, and is fenced by purge tombstones. Run-side edges depend on GitHub data (a unique SHA prefix, a branch's PRs, a run's attempts), so a repository change re-queues the sessions that depend on it while they are open (14 days after their last evidence); older edges are frozen against the coverage recorded on their scope. An expired transcript never retracts edges. A daily census (`l1-edge-census`) re-queues the sessions with recent observations or captures whose scope is missing, unbuilt or built from another observation generation or resolver version, and active bindings without a repository scope, so a lost request is not lost for good.
 
 What a build records so a reader can trust it (resolver version 2): a repository build stores the collection coverage it read before the GitHub tables (included, PR and CI start, `coveredThrough`, read time), so counts from GitHub-side edges are complete up to it; a session build stores the coverage of every repository its links touch, a fork pull request's base included, and whether it hit its evidence caps (`truncated`). A CI check's branch search keeps a `branch_ci_run` resolution (`linked`, `not_found`, or `capped` when more runs may exist), so an empty capped search never reads as none, and CI edges keep the run's creation time.
 
@@ -190,12 +190,14 @@ Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery S
 
 ## Order of work
 
+Existing data is brought up to each step with the backfills, in the order and with the checks of the [backfill runbook](l1-backfill-runbook.md).
+
 1. This spec and step 1 of the retirement. Done.
 2. Retirement step 2. Done.
 3. Git extractor version 3 and the session, pull request and CI links, exposed to `find` (computed at query time).
 4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
 5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse. Built: the worker (its cron off until `L1_EDGES_WORKER_ENABLED`), `find`'s edge reads with the query-time fallback, and `pullRequest`; captures and snapshots are still read from Postgres.
-6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills). Built: the table, its builds on the worker and its retirement; the backfill and census, and `find` reading it, are next.
+6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills). Built: the table, its builds on the worker, its retirement, the census and the backfill (`backfill:run-index`); `find` reading it is next.
 7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts and Codex spawned thread ids) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
 8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
 9. GitHub evidence and repository configuration in ClickHouse.

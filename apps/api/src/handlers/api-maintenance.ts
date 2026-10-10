@@ -14,6 +14,7 @@ import { readResendConfig } from "../resend-config.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
+import { requeueStaleL1EdgeScopes } from "../services/l1-edges/l1-edge-census.service.js";
 import { requeueStaleRunIndexScopes } from "../services/l1-edges/run-index-census.service.js";
 import { runRunIndexRetirementPass } from "../services/l1-edges/run-index-retirement.service.js";
 import { pruneExpiredPostgresLeases } from "../services/postgres-lease.service.js";
@@ -41,6 +42,7 @@ const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
 const RUN_INDEX_RETIREMENT_BUDGET_MS = 10_000;
 const RUN_INDEX_CENSUS_BUDGET_MS = 30_000;
+const L1_EDGE_CENSUS_BUDGET_MS = 30_000;
 const DERIVED_RECORDS_RECONCILIATION_BUDGET_MS = 60_000;
 const COORDINATION_LEASE_BUDGET_MS = 10_000;
 
@@ -155,6 +157,15 @@ async function runApiMaintenance() {
 			),
 		}),
 	);
+	const l1EdgeCensus = await runMaintenanceStep("l1-edge-census", () =>
+		requeueStaleL1EdgeScopes({
+			sql: sqlClient,
+			deadline: createMaintenanceQueueDeadline(
+				invocationDeadline,
+				L1_EDGE_CENSUS_BUDGET_MS,
+			),
+		}),
+	);
 	const derivedRecords = await runMaintenanceStep("derived-records", () =>
 		reconcileDerivedTranscriptRecords({
 			assertWritable: (target) =>
@@ -179,6 +190,7 @@ async function runApiMaintenance() {
 		clickHousePurge,
 		coordinationLeases,
 		derivedRecords,
+		l1EdgeCensus,
 		languageSignals,
 		repositoryEvidenceIndex,
 		ok:
@@ -190,6 +202,7 @@ async function runApiMaintenance() {
 			transcriptRecords.status === "ok" &&
 			runIndex.status === "ok" &&
 			runIndexCensus.status === "ok" &&
+			l1EdgeCensus.status === "ok" &&
 			derivedRecords.status === "ok" &&
 			coordinationLeases.status === "ok",
 		r2Ingest,
