@@ -576,6 +576,239 @@ export const RudelRepositorySessionEvidenceIndexRowSchema = z.object({
 export type RudelRepositorySessionEvidenceIndexRowInput = z.input<typeof RudelRepositorySessionEvidenceIndexRowSchema>
 export type RudelRepositorySessionEvidenceIndexRowOutput = z.output<typeof RudelRepositorySessionEvidenceIndexRowSchema>
 
+export type RudelRunIndexRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  revision: string
+  parser_version: number
+  index_version: number
+  agent_id: string
+  start_record: number
+  row_kind: string
+  source: string
+  turn_idx: number
+  run_id: string
+  build_revision: string
+  built_at: string
+  session_date: string
+  unrecorded_facts: string[]
+  agent_version: string | null
+  entrypoint: string | null
+  started_at: string
+  ended_at: string
+  end_record: number
+  minutes: number
+  active_minutes: number
+  record_count: number
+  raw_chars: string
+  duration_ms: number | null
+  time_to_first_token_ms: number | null
+  prompt_head: string | null
+  genuine_prompts: number
+  turn_origin: string | null
+  prompt_source: string | null
+  origin_kind: string | null
+  trigger_turn: string | null
+  thread_source: string | null
+  prompt_origin_basis: string
+  permission_mode: string | null
+  permission_modes: string[]
+  auto_mode_bash_first: string | null
+  auto_mode_bash_first_steer: string | null
+  auto_mode_bypass: string | null
+  auto_mode_steer_only: string | null
+  auto_mode_consent_flow: string | null
+  approval_policy: string | null
+  approvals_reviewer: string | null
+  sandbox_policy: string | null
+  sandbox_network_access: string | null
+  permission_profile: string | null
+  collaboration_mode: string | null
+  model: string | null
+  models: string[]
+  effort: string | null
+  per_turn_effort: string | null
+  context_window: number | null
+  context_input_tokens_at_start: string | null
+  tool_calls: number
+  failed_calls: number
+  edits: number
+  reads: number
+  searches: number
+  not_found: number
+  denied_calls: number | null
+  interrupted_calls: number | null
+  timed_out_calls: number | null
+  mcp_calls: number | null
+  mcp_servers: string[]
+  skills: string[]
+  slash_commands: string[]
+  subagent_types: string[]
+  compactions: number
+  compact_trigger: string | null
+  compact_pre_tokens: string | null
+  aborted: string | null
+  abort_reason: string | null
+  turn_error: string | null
+  turn_error_kind: string | null
+  interrupt_markers: number
+  stop_reason: string | null
+  hook_stop_reason: string | null
+  prevented_continuation: string | null
+  hook_count: number | null
+  hook_errors: string | null
+  hook_runs: string | null
+  api_errors: number | null
+  api_error: string | null
+  api_error_statuses: string[]
+  retry_attempts: number | null
+  refusals: number | null
+  fallback_model: string | null
+  goal: string | null
+  git_operations: string[]
+  pushed_branches: string[]
+  commit_shas: string[]
+  pr_urls: string[]
+  usage_observations: number
+  usage_unpriced: number
+  usage_model: string
+  cost_usd: number | null
+  model_costs: ([string, number | null, number])[]
+  uncached_input_tokens: string | null
+  cache_read_input_tokens: string | null
+  cache_write_5m_input_tokens: string | null
+  cache_write_1h_input_tokens: string | null
+  output_tokens: string | null
+  reasoning_output_tokens: string | null
+  pricing_version: string
+  facts_truncated: boolean | null
+  run_count: number
+  usage_receipt: string
+  cost_state: Record<string, string>
+  title: string | null
+  repository: string
+  session_model: string
+}
+
+export const RudelRunIndexRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  index_version: z.number(),
+  agent_id: z.string(),
+  start_record: z.number(),
+  row_kind: z.string(),
+  source: z.string(),
+  turn_idx: z.number(),
+  run_id: z.string(),
+  build_revision: z.string(),
+  built_at: z.string(),
+  session_date: z.string(),
+  unrecorded_facts: z.array(z.string()),
+  agent_version: z.string().nullable(),
+  entrypoint: z.string().nullable(),
+  started_at: z.string(),
+  ended_at: z.string(),
+  end_record: z.number(),
+  minutes: z.number(),
+  active_minutes: z.number(),
+  record_count: z.number(),
+  raw_chars: z.string(),
+  duration_ms: z.number().nullable(),
+  time_to_first_token_ms: z.number().nullable(),
+  prompt_head: z.string().nullable(),
+  genuine_prompts: z.number(),
+  turn_origin: z.string().nullable(),
+  prompt_source: z.string().nullable(),
+  origin_kind: z.string().nullable(),
+  trigger_turn: z.string().nullable(),
+  thread_source: z.string().nullable(),
+  prompt_origin_basis: z.string(),
+  permission_mode: z.string().nullable(),
+  permission_modes: z.array(z.string()),
+  auto_mode_bash_first: z.string().nullable(),
+  auto_mode_bash_first_steer: z.string().nullable(),
+  auto_mode_bypass: z.string().nullable(),
+  auto_mode_steer_only: z.string().nullable(),
+  auto_mode_consent_flow: z.string().nullable(),
+  approval_policy: z.string().nullable(),
+  approvals_reviewer: z.string().nullable(),
+  sandbox_policy: z.string().nullable(),
+  sandbox_network_access: z.string().nullable(),
+  permission_profile: z.string().nullable(),
+  collaboration_mode: z.string().nullable(),
+  model: z.string().nullable(),
+  models: z.array(z.string()),
+  effort: z.string().nullable(),
+  per_turn_effort: z.string().nullable(),
+  context_window: z.number().nullable(),
+  context_input_tokens_at_start: z.string().nullable(),
+  tool_calls: z.number(),
+  failed_calls: z.number(),
+  edits: z.number(),
+  reads: z.number(),
+  searches: z.number(),
+  not_found: z.number(),
+  denied_calls: z.number().nullable(),
+  interrupted_calls: z.number().nullable(),
+  timed_out_calls: z.number().nullable(),
+  mcp_calls: z.number().nullable(),
+  mcp_servers: z.array(z.string()),
+  skills: z.array(z.string()),
+  slash_commands: z.array(z.string()),
+  subagent_types: z.array(z.string()),
+  compactions: z.number(),
+  compact_trigger: z.string().nullable(),
+  compact_pre_tokens: z.string().nullable(),
+  aborted: z.string().nullable(),
+  abort_reason: z.string().nullable(),
+  turn_error: z.string().nullable(),
+  turn_error_kind: z.string().nullable(),
+  interrupt_markers: z.number(),
+  stop_reason: z.string().nullable(),
+  hook_stop_reason: z.string().nullable(),
+  prevented_continuation: z.string().nullable(),
+  hook_count: z.number().nullable(),
+  hook_errors: z.string().nullable(),
+  hook_runs: z.string().nullable(),
+  api_errors: z.number().nullable(),
+  api_error: z.string().nullable(),
+  api_error_statuses: z.array(z.string()),
+  retry_attempts: z.number().nullable(),
+  refusals: z.number().nullable(),
+  fallback_model: z.string().nullable(),
+  goal: z.string().nullable(),
+  git_operations: z.array(z.string()),
+  pushed_branches: z.array(z.string()),
+  commit_shas: z.array(z.string()),
+  pr_urls: z.array(z.string()),
+  usage_observations: z.number(),
+  usage_unpriced: z.number(),
+  usage_model: z.string(),
+  cost_usd: z.number().nullable(),
+  model_costs: z.array(z.tuple([z.string(), z.number().nullable(), z.number()])),
+  uncached_input_tokens: z.string().nullable(),
+  cache_read_input_tokens: z.string().nullable(),
+  cache_write_5m_input_tokens: z.string().nullable(),
+  cache_write_1h_input_tokens: z.string().nullable(),
+  output_tokens: z.string().nullable(),
+  reasoning_output_tokens: z.string().nullable(),
+  pricing_version: z.string(),
+  facts_truncated: z.boolean().nullable(),
+  run_count: z.number(),
+  usage_receipt: z.string(),
+  cost_state: z.record(z.string(), z.string()),
+  title: z.string().nullable(),
+  repository: z.string(),
+  session_model: z.string(),
+})
+
+export type RudelRunIndexRowInput = z.input<typeof RudelRunIndexRowSchema>
+export type RudelRunIndexRowOutput = z.output<typeof RudelRunIndexRowSchema>
+
 export type RudelSessionAnalyticsRow = {
   session_date: string
   last_interaction_date: string

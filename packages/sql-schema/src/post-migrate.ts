@@ -9,6 +9,7 @@ import type postgres from "postgres";
  */
 export const DEFERRED_CONSTRAINT_VALIDATIONS = [
 	{ constraint: "ingest_job_expected_total_bytes_check", table: "ingest_job" },
+	{ constraint: "l1_edge_scope_kind_check", table: "l1_edge_scope" },
 ] as const;
 
 export type DeferredConstraintValidation =

@@ -60,6 +60,7 @@ async function countSkillRows(
 			"rudel.skill_uses",
 			"rudel.skill_version_contents",
 			"rudel.transcript_records",
+			"rudel.run_index",
 		].map(async (table) => {
 			const [row] = await ch.query<CountRow>({
 				query: `SELECT count() AS count FROM ${getSafeClickHouseTable(table)} WHERE ${column} = {value:String}`,
@@ -219,6 +220,27 @@ async function ingestSkillRows(
 			),
 		],
 	});
+	await ch.insert({
+		table: "rudel.run_index",
+		values: [
+			{
+				organization_id: targetOrgId,
+				user_id: userId,
+				session_id: sessionId,
+				revision: "1",
+				parser_version: 8,
+				index_version: 1,
+				agent_id: "",
+				start_record: 1,
+				row_kind: "run",
+				source: "claude_code",
+				turn_idx: 1,
+				build_revision: "1",
+				session_date: "2026-07-29 10:00:00.000",
+				prompt_head: "purge me",
+			},
+		],
+	});
 }
 
 function createSnapshot(
@@ -291,6 +313,7 @@ afterAll(async () => {
 		"rudel.skill_uses",
 		"rudel.skill_version_contents",
 		"rudel.transcript_records",
+		"rudel.run_index",
 	]) {
 		await ch
 			.execute({
@@ -324,7 +347,7 @@ describe("ClickHouse session purge (integration)", () => {
 			async () =>
 				(await countByOrg(orgId)) > 0 &&
 				(await countSnapshotsByOrg(orgId)) > 0 &&
-				(await countSkillRows("organization_id", orgId)) === 4,
+				(await countSkillRows("organization_id", orgId)) === 5,
 		);
 		expect(inserted).toBe(true);
 
@@ -353,8 +376,8 @@ describe("ClickHouse session purge (integration)", () => {
 				(await countByUser(userIdBeta)) > 0 &&
 				(await countSnapshotsByUser(userIdAlpha)) > 0 &&
 				(await countSnapshotsByUser(userIdBeta)) > 0 &&
-				(await countSkillRows("user_id", userIdAlpha)) === 4 &&
-				(await countSkillRows("user_id", userIdBeta)) === 4,
+				(await countSkillRows("user_id", userIdAlpha)) === 5 &&
+				(await countSkillRows("user_id", userIdBeta)) === 5,
 		);
 		expect(inserted).toBe(true);
 
@@ -368,7 +391,7 @@ describe("ClickHouse session purge (integration)", () => {
 		expect(await countSnapshotsByUser(userIdAlpha)).toBe(0);
 		expect(await countSnapshotsByUser(userIdBeta)).toBeGreaterThan(0);
 		expect(await countSkillRows("user_id", userIdAlpha)).toBe(0);
-		expect(await countSkillRows("user_id", userIdBeta)).toBe(4);
+		expect(await countSkillRows("user_id", userIdBeta)).toBe(5);
 
 		await deleteUserSessions(userIdBeta);
 	}, 120000);

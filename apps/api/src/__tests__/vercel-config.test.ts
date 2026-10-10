@@ -211,6 +211,10 @@ describe("Vercel deployment configuration", () => {
 		).toBeLessThan(
 			productionScript.indexOf("ch:migrate:session-analytics-retirement"),
 		);
+		// The run index ships with the L1 tables, before anything writes it.
+		expect(productionScript.indexOf("ch:migrate:l1-edges")).toBeLessThan(
+			productionScript.indexOf("ch:migrate:run-index"),
+		);
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

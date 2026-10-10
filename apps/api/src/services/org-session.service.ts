@@ -5,7 +5,7 @@ import {
 	getClickhouse,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import { L1_EDGE_TABLES } from "./l1-edges/l1-edge-tables.js";
+import { L1_EDGE_TABLES, RUN_INDEX_TABLE } from "./l1-edges/l1-edge-tables.js";
 
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const SESSION_LANGUAGE_SIGNALS_TABLE = "rudel.session_language_signals";
@@ -225,6 +225,7 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: "rudel.session_git_observations" },
 		// Session edges carry their owner; GitHub edges (empty user) go with the workspace.
 		...L1_EDGE_TABLES.map((table) => ({ column, table })),
+		{ column, table: RUN_INDEX_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },

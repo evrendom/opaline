@@ -64,6 +64,7 @@ const ALLOWED_CLICKHOUSE_TABLES = new Set([
 	"rudel.l1_edge_resolutions",
 	"rudel.codex_sessions",
 	"rudel.repository_session_evidence_index",
+	"rudel.run_index",
 	"rudel.session_analytics",
 	"rudel.session_git_observations",
 	"rudel.session_language_signals",

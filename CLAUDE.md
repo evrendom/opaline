@@ -373,6 +373,8 @@ Apply `bun run --cwd packages/ch-schema ch:migrate:session-git-observations` (al
 
 L1 edges (ADR 0003) are queued by git observation extraction, CLI captures, PR snapshots, GitHub sweeps and webhooks, and repository binding. To queue existing sessions and repositories, preview with `bun run --cwd apps/api backfill:l1-edges` and queue with `--execute` (`--organization-id` and `--max-sessions` narrow it); the worker builds them when `L1_EDGES_WORKER_ENABLED=true`.
 
+`rudel.run_index` (docs/l1-literal-schema.md, "Scale") stores the `runs` view per committed transcript-records generation: one row per run and a receipt per session generation, keyed by the generation and versioned by the worker's build revision. Runs are kept 1,095 days (`RUN_INDEX_RETENTION_DAYS`); the free-text columns have a 365-day column TTL (`RUN_INDEX_TEXT_RETENTION_DAYS`), written by hand in `20261010120000_run_index.sql` because chkit cannot express column TTLs, so expired text reads NULL. Apply it with `bun run --cwd packages/ch-schema ch:migrate:run-index` (also in production migrations and local bootstrap); the runner journals only after every replica serves the table, its key, TTLs and comments. The account and workspace purges cover it.
+
 ## Releasing
 
 The CLI (`rudel` on npm) uses Release Please for automated versioning and changelogs, with automated npm publishing via OIDC trusted publishing (no OTP).

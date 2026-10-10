@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0055 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, and coordination lease 0052", async () => {
+test("applies migrations 0020-0056 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0055_l1_edges");
+	expect(latestMigration?.tag).toBe("0056_run_index_scope");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -43,6 +43,7 @@ test("applies migrations 0020-0055 to a database already migrated through 0019, 
 	const migrationsThrough0050 = await createMigrationsThrough(50);
 	const migrationsThrough0051 = await createMigrationsThrough(51);
 	const migrationsThrough0052 = await createMigrationsThrough(52);
+	const migrationsThrough0055 = await createMigrationsThrough(55);
 	const adminSql = postgres(connectionString, { max: 1 });
 
 	try {
@@ -129,6 +130,9 @@ test("applies migrations 0020-0055 to a database already migrated through 0019, 
 			await migrate(database, { migrationsFolder: migrationsThrough0052 });
 			// 0053 must swap the size bound online over an existing ledger.
 			await seedIngestJobs(migrationSql);
+			// 0056 must widen the edge scope kinds online over an existing queue.
+			await migrate(database, { migrationsFolder: migrationsThrough0055 });
+			await seedEdgeScopes(migrationSql);
 
 			await migrate(database, { migrationsFolder });
 			expect(await readExpectedTotalBytesCheck(migrationSql)).toEqual({
@@ -136,19 +140,26 @@ test("applies migrations 0020-0055 to a database already migrated through 0019, 
 					"CHECK (((expected_total_bytes >= 0) AND (expected_total_bytes <= 268435456))) NOT VALID",
 				validated: false,
 			});
+			const edgeScopeCheck = await readEdgeScopeKindCheck(migrationSql);
+			expect(edgeScopeCheck?.validated).toBe(false);
+			expect(edgeScopeCheck?.definition).toContain("'run_index'::text");
+			expect(edgeScopeCheck?.definition).toEndWith(" NOT VALID");
 			expect(await validateDeferredConstraints(migrationSql)).toEqual([
 				{
 					constraint: "ingest_job_expected_total_bytes_check",
 					status: "validated",
 				},
+				{ constraint: "l1_edge_scope_kind_check", status: "validated" },
 			]);
 			expect(await validateDeferredConstraints(migrationSql)).toEqual([
 				{
 					constraint: "ingest_job_expected_total_bytes_check",
 					status: "already_valid",
 				},
+				{ constraint: "l1_edge_scope_kind_check", status: "already_valid" },
 			]);
 			await expectIngestJobSizeBound(migrationSql);
+			await expectEdgeScopeKinds(migrationSql);
 			const mcpTables = await migrationSql<Array<{ name: string }>>`
 				SELECT tablename AS name
 				FROM pg_tables
@@ -178,7 +189,7 @@ test("applies migrations 0020-0055 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 56,
+				count: 57,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`
@@ -630,6 +641,7 @@ test("applies migrations 0020-0055 to a database already migrated through 0019, 
 		await rm(migrationsThrough0050, { force: true, recursive: true });
 		await rm(migrationsThrough0051, { force: true, recursive: true });
 		await rm(migrationsThrough0052, { force: true, recursive: true });
+		await rm(migrationsThrough0055, { force: true, recursive: true });
 	}
 });
 
@@ -652,8 +664,10 @@ test("a fresh database gets the 256 MiB ingest_job bound NOT VALID, then validat
 					constraint: "ingest_job_expected_total_bytes_check",
 					status: "validated",
 				},
+				{ constraint: "l1_edge_scope_kind_check", status: "validated" },
 			]);
 			await expectIngestJobSizeBound(migrationSql);
+			await expectEdgeScopeKinds(migrationSql);
 		} finally {
 			await migrationSql.end();
 		}
@@ -722,6 +736,54 @@ async function expectIngestJobSizeBound(sql: postgres.Sql): Promise<void> {
 	await insert("migration-bound-max", 268_435_456);
 	await expect(insert("migration-bound-over", 268_435_457)).rejects.toThrow(
 		"ingest_job_expected_total_bytes_check",
+	);
+}
+
+/** A session and a repository scope queued before 0056. */
+async function seedEdgeScopes(sql: postgres.Sql): Promise<void> {
+	await sql`
+		INSERT INTO l1_edge_scope (organization_id, scope_kind, scope_id, user_id, source, session_id, repository_id)
+		VALUES ('migration-ingest-org', 'session', 'migration-ingest-user/claude_code/s', 'migration-ingest-user', 'claude_code', 's', NULL),
+			('migration-ingest-org', 'repository', '101', NULL, NULL, NULL, '101')
+	`;
+}
+
+async function readEdgeScopeKindCheck(
+	sql: postgres.Sql,
+): Promise<{ definition: string; validated: boolean } | undefined> {
+	const [row] = await sql<Array<{ definition: string; validated: boolean }>>`
+		SELECT pg_get_constraintdef(oid) AS definition, convalidated AS validated
+		FROM pg_constraint
+		WHERE conrelid = 'public.l1_edge_scope'::regclass
+			AND conname = 'l1_edge_scope_kind_check'
+	`;
+	return row;
+}
+
+/** A run index scope is a session's; one without its session is refused. */
+async function expectEdgeScopeKinds(sql: postgres.Sql): Promise<void> {
+	await sql`
+		INSERT INTO "user" (id, name, email)
+		VALUES ('migration-scope-user', 'Scope', 'migration-scope@example.com')
+		ON CONFLICT DO NOTHING
+	`;
+	await sql`
+		INSERT INTO organization (id, name, slug)
+		VALUES ('migration-scope-org', 'Scope', 'migration-scope-org')
+		ON CONFLICT DO NOTHING
+	`;
+	// `.execute()` starts the lazy postgres.js query so `rejects` can observe it.
+	const insert = (kind: string, userId: string | null) =>
+		sql`
+			INSERT INTO l1_edge_scope (organization_id, scope_kind, scope_id, user_id, source, session_id)
+			VALUES ('migration-scope-org', ${kind}, ${`${kind}-${userId}`}, ${userId}, 'codex', 's')
+		`.execute();
+	await insert("run_index", "migration-scope-user");
+	await expect(insert("run_index", null)).rejects.toThrow(
+		"l1_edge_scope_kind_check",
+	);
+	await expect(insert("runs", "migration-scope-user")).rejects.toThrow(
+		"l1_edge_scope_kind_check",
 	);
 }
 

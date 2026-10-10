@@ -53,6 +53,7 @@ const FORWARD_SCRIPTS = new Map([
 		"migrate-session-analytics-retirement.ts",
 	],
 	["20261009120000_l1_edges.sql", "migrate-l1-edges.ts"],
+	["20261010120000_run_index.sql", "migrate-run-index.ts"],
 ]);
 
 interface BootstrapMigration {

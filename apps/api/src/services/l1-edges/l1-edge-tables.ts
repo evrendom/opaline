@@ -8,3 +8,9 @@ export const L1_EDGE_TABLES = [
 	L1_EDGES_BY_TARGET_TABLE,
 	L1_EDGE_RESOLUTIONS_TABLE,
 ] as const;
+/**
+ * The L1 run index (docs/l1-literal-schema.md, "Scale"): runs per committed
+ * transcript generation, written by the same worker and purged with the
+ * session's other derived rows.
+ */
+export const RUN_INDEX_TABLE = "rudel.run_index";

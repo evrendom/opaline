@@ -23,8 +23,9 @@ import { organization, user } from "./auth-schema.js";
 export const l1EdgeRevisionSeq = pgSequence("l1_edge_revision_seq");
 
 /**
- * The edge worker's queue: one row per scope (a session, or a repository's
- * GitHub facts), coalescing requests. A scope is due while
+ * The edge worker's queue: one row per scope (a session, a repository's
+ * GitHub facts, or a session's run index, which shares the session's scope
+ * id but never its repository re-queues), coalescing requests. A scope is due while
  * `request_count > built_request_count`; a claim takes a lease and a
  * revision, and only the lease holder completes it.
  */
@@ -92,7 +93,7 @@ export const l1EdgeScope = pgTable(
 			.where(sql`${table.requestCount} > ${table.builtRequestCount}`),
 		check(
 			"l1_edge_scope_kind_check",
-			sql`(${table.scopeKind} = 'session' AND ${table.userId} IS NOT NULL AND ${table.sessionId} IS NOT NULL AND ${table.source} IN ('claude_code', 'codex')) OR (${table.scopeKind} = 'repository' AND ${table.repositoryId} IS NOT NULL AND ${table.userId} IS NULL)`,
+			sql`(${table.scopeKind} IN ('session', 'run_index') AND ${table.userId} IS NOT NULL AND ${table.sessionId} IS NOT NULL AND ${table.source} IN ('claude_code', 'codex')) OR (${table.scopeKind} = 'repository' AND ${table.repositoryId} IS NOT NULL AND ${table.userId} IS NULL)`,
 		),
 	],
 );
