@@ -52,25 +52,25 @@ Parser v6 writes call facts on the row of the line that carries them. Claude fac
 
 | Column | Claude source | Codex source | Today |
 |---|---|---|---|
-| `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` | computed per query |
-| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | stored (Codex, parser v7) |
-| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | stored (parser v8); prompt kind still by wrapper heuristic |
-| `permission_mode` | `permissionMode` | none | stored (Claude, parser v7) |
-| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | stored (Claude, parser v7) |
-| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | stored (Codex, parser v7) |
-| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); model and effort per record stored (parser v7) |
-| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | stored (parser v6, every record) |
-| `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) | stored; tokens not exposed |
-| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | `context_window` stored (Codex, parser v7); start tokens from usage |
-| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; trigger and pre-tokens stored (Claude, parser v7) |
-| `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` | computed per query (no denied) |
-| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` | stored (parser v7); Claude interrupt markers in text |
-| `stop_reason` | assistant `message.stop_reason` | none | stored (Claude, parser v7) |
-| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none | stored (Claude, parser v7) |
-| `hook_runs` (command, duration) | system `hookInfos` | none | stored (Claude, parser v7) |
-| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | stored (Claude, parser v7) |
-| `goal` | none | `thread_goal_updated.goal` | stored (Codex, parser v7) |
-| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` stored (parser v6) |
+| `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` | stored (`run_index`) |
+| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | stored (Codex, parser v7); per run in `run_index` |
+| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | stored (parser v8); prompt kind still by wrapper heuristic, which `run_index` names (`prompt_origin_basis`) |
+| `permission_mode` | `permissionMode` | none | stored (Claude, parser v7); per run in `run_index` |
+| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | stored (Claude, parser v7); per run in `run_index` |
+| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | stored (Codex, parser v7); per run in `run_index` |
+| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); model and effort per record stored (parser v7); per run in `run_index` |
+| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | stored (parser v6, every record); per run in `run_index` |
+| `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) | stored; priced per run in `run_index` at build time (`pricing_version`), tokens by kind included |
+| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | `context_window` stored (Codex, parser v7); start tokens from usage; both per run in `run_index` |
+| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; trigger and pre-tokens stored (Claude, parser v7); `compactions` per run in `run_index` |
+| `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` | stored (`run_index`; `denied_calls` from `denial_kind`) |
+| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` | stored (parser v7); Claude interrupt markers in text, counted per run in `run_index` |
+| `stop_reason` | assistant `message.stop_reason` | none | stored (Claude, parser v7); per run in `run_index` |
+| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none | stored (Claude, parser v7); per run in `run_index` |
+| `hook_runs` (command, duration) | system `hookInfos` | none | stored (Claude, parser v7); per run in `run_index` |
+| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | stored (Claude, parser v7); per run in `run_index` |
+| `goal` | none | `thread_goal_updated.goal` | stored (Codex, parser v7); per run in `run_index` |
+| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` stored (parser v6); `run_index` keeps the recorded branches, commit SHAs and PR URLs, and links follow the edges by `run_id` |
 | `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same | join |
 | `repository_id` | repository evidence index, GitHub binding | same | heuristic key in the UI, literal coalesce in analysis |
 
@@ -162,7 +162,7 @@ The CLI already captures CI workflows, `package.json` scripts, hooks, `AGENTS.md
 ## Drift, retention and capture gaps
 
 - **Drift.** Claude Code and Codex add transcript fields often. A recurring census lists, per agent and version, every raw field path the parsers do not map, so new facts become work items instead of silent losses. The smoke test at the parser fixture level fails when a fact in this spec stops landing in its column.
-- **Retention.** Raw transcripts and `transcript_records` expire after 365 days. `run_index`, the GitHub links and the weekly aggregates get their own, longer retention so findings stay comparable over time; text stays bound to the transcript's retention.
+- **Retention.** Raw transcripts and `transcript_records` expire after 365 days. `run_index` keeps runs for 1,095 days from the session date (`RUN_INDEX_RETENTION_DAYS`); its free-text columns (prompt head, goal, turn and API errors, hook stop reasons, errors and runs, title) have a 365-day column TTL, so text never outlives the transcript and expired text reads NULL. The GitHub links and the weekly aggregates get their own, longer retention so findings stay comparable over time.
 - **Capture gaps.** Approved permission prompts are not in transcripts and need a capture hook. Sessions that were never uploaded can only be counted through coverage. Cost per tool call has no defensible allocation and stays per request and per run.
 - **Scope.** Claude Code and Codex only.
 
@@ -172,7 +172,7 @@ The CLI already captures CI workflows, `package.json` scripts, hooks, `AGENTS.md
 
 ## Scale
 
-Run facts and session links are recomputed on every `find` today (`FINAL` over `transcript_records`, no text skip index), which is why `find` caps scope at 10,000 sessions and its text scans at 100,000 records or 64 MiB, on top of per-statement ClickHouse limits. `run_index` materializes `runs` per committed generation, written by the same reconciliation worker after receipt publication, covered by the purge and tombstone fence and by the retirement sweep like `transcript_records`. Weekly per-workspace aggregates sit on top for team-wide counts.
+Run facts and session links are recomputed on every `find` today (`FINAL` over `transcript_records`, no text skip index), which is why `find` caps scope at 10,000 sessions and its text scans at 100,000 records or 64 MiB, on top of per-statement ClickHouse limits. `rudel.run_index` materializes `runs` per committed generation: one row per run, keyed by the generation (`revision`, `parser_version`, `index_version`), the build (`build_revision`) and the run's stream and start record, so its `run_id` is the edges' run id, and one `receipt` per build, written after its runs, holding session facts (run count, call and error totals, merged skills, slash commands, subagent types and models, usage no run claims, the last cost-state, the title, the repository key and session model). Every build is an immutable snapshot: the receipt with the newest (generation, build) commits the session's runs, readers read only that build (the API's run index reader), and a build that dies before its receipt changes nothing they see. The same reconciliation worker builds it (scope kind `run_index`, same scope id as the session's edges, never deferred for observations or re-queued by repository changes). Its request rides on the edges' request after git observations are written (ingest, backfill and repair), in the same statement; nothing else in an upload waits on the queue for it, and a daily census queues recently ingested sessions whose committed snapshot is missing or stale (transcript generation, index or pricing version, or usage extraction). A build reads the generation with the statements `find` uses for its runs, so their numbers cannot drift, copies each run's facts from its own records (the first or last recorded value, sorted sets, counts of records that carry one) and attributes Codex lifecycle rows to runs by `turn_id` (an opening row without a completion joins the next prompt with nothing between; a completion stays in the run it ended). A fact the generation's parser version or agent cannot record is NULL, and arrays name it in `unrecorded_facts`. Costs are frozen at build time with `pricing_version` from one usage extraction: its receipt must be complete with exactly the events it counts (otherwise usage is stored as unknown), every usage read is bound to it, it must be the same after the build's reads, and the runs' usage plus the usage no run claims (unverified, or on lines no run covers) must add up to it. A new usage receipt or pricing rebuilds the generation, a current receipt is skipped, a session over 200,000 records is frozen with its reason, and an expired transcript keeps its runs. Text past its 365 days is nulled before it is written and when it is read, since the column TTL applies only at merges. Builds are fenced by the purge tombstones (a fenced session loses its run index rows and scope), covered by the account and workspace purges, and snapshots are retired like `transcript_records` by the daily sweep, found from all rows: crashed builds once older than the committed one or past the grace, superseded ones after the grace, never the committed one. Weekly per-workspace aggregates sit on top for team-wide counts.
 
 ## Retiring interpretations
 
@@ -195,7 +195,7 @@ Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery S
 3. Git extractor version 3 and the session, pull request and CI links, exposed to `find` (computed at query time).
 4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
 5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse. Built: the worker (its cron off until `L1_EDGES_WORKER_ENABLED`), `find`'s edge reads with the query-time fallback, and `pullRequest`; captures and snapshots are still read from Postgres.
-6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills).
+6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills). Built: the table, its builds on the worker and its retirement; the backfill and census, and `find` reading it, are next.
 7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts and Codex spawned thread ids) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
 8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
 9. GitHub evidence and repository configuration in ClickHouse.

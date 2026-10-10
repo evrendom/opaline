@@ -291,7 +291,7 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	const [built] = await sqlClient.unsafe<
 		{ done: boolean; edge_count: number }[]
 	>(
-		"SELECT request_count = built_request_count AS done, edge_count FROM l1_edge_scope WHERE organization_id = $1",
+		"SELECT request_count = built_request_count AS done, edge_count FROM l1_edge_scope WHERE organization_id = $1 AND scope_kind = 'session'",
 		[organizationId],
 	);
 	expect(built).toEqual({ done: true, edge_count: 4 });
@@ -325,7 +325,7 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	const [deferred] = await sqlClient.unsafe<
 		{ done: boolean; last_error: string | null }[]
 	>(
-		"SELECT request_count = built_request_count AS done, last_error FROM l1_edge_scope WHERE organization_id = $1",
+		"SELECT request_count = built_request_count AS done, last_error FROM l1_edge_scope WHERE organization_id = $1 AND scope_kind = 'session'",
 		[organizationId],
 	);
 	expect(deferred?.done).toBe(false);
@@ -362,7 +362,7 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	await pass();
 	expect(await activeEdges()).toEqual(edges);
 	const [rebuilt] = await sqlClient.unsafe<{ done: boolean }[]>(
-		"SELECT request_count = built_request_count AS done FROM l1_edge_scope WHERE organization_id = $1",
+		"SELECT request_count = built_request_count AS done FROM l1_edge_scope WHERE organization_id = $1 AND scope_kind = 'session'",
 		[organizationId],
 	);
 	expect(rebuilt?.done).toBe(true);
@@ -402,7 +402,9 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	const [{ count } = { count: -1 }] = await sqlClient.unsafe<
 		{ count: number }[]
 	>(
-		"SELECT count(*)::int AS count FROM l1_edge_scope WHERE organization_id = $1",
+		// The fenced session scope is dropped; a built run index scope may stay
+		// until the account is deleted, but none of its rows remain.
+		"SELECT count(*)::int AS count FROM l1_edge_scope WHERE organization_id = $1 AND scope_kind = 'session'",
 		[organizationId],
 	);
 	expect(count).toBe(0);

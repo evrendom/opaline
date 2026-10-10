@@ -574,7 +574,20 @@ export async function retireSupersededTranscriptRecordsGenerations(
 			userId: identity.userId,
 		},
 	});
-	const retired = selectRetiredGenerations(older, retirement);
+	const retired = selectRetiredGenerations(
+		older.map((row) => {
+			const receipt = decodeTranscriptRecordsReceipt(row.receipt_head);
+			return {
+				generation: {
+					parserVersion: Number(row.parser_version),
+					revision: row.revision_text,
+				},
+				publishedAtMs:
+					receipt === undefined ? null : Date.parse(receipt.publishedAt),
+			};
+		}),
+		retirement,
+	);
 	if (retired.length === 0) return 0;
 	const clauses = retired.map(
 		(_, index) =>
@@ -605,33 +618,41 @@ export async function retireSupersededTranscriptRecordsGenerations(
 	return retired.length;
 }
 
-/** Older generations (newest first) that are garbage or past their grace. */
-function selectRetiredGenerations(
-	older: readonly GenerationRow[],
+/**
+ * A generation older than the published one, with when its receipt was
+ * published: null when it never committed, NaN when the time is unreadable.
+ */
+export interface OlderGeneration<Generation> {
+	readonly generation: Generation;
+	readonly publishedAtMs: number | null;
+}
+
+/**
+ * Older generations (given newest first) that are garbage or past their
+ * grace. Shared by every store whose generations commit with a receipt
+ * (transcript records; the run index, whose generation also has an index
+ * version).
+ */
+export function selectRetiredGenerations<Generation>(
+	older: readonly OlderGeneration<Generation>[],
 	retirement: {
 		readonly graceMs: number;
 		readonly now: Date;
 		readonly publishedAtMs: number;
 	},
-): TranscriptRecordsGeneration[] {
-	const retired: TranscriptRecordsGeneration[] = [];
+): Generation[] {
+	const retired: Generation[] = [];
 	// Publication time of the next newer committed generation: the moment the
 	// generation below it stopped being the committed one.
 	let supersededAtMs = retirement.publishedAtMs;
-	for (const row of older) {
-		const generation = {
-			parserVersion: Number(row.parser_version),
-			revision: row.revision_text,
-		};
-		const receipt = decodeTranscriptRecordsReceipt(row.receipt_head);
-		if (receipt === undefined) {
+	for (const { generation, publishedAtMs } of older) {
+		if (publishedAtMs === null) {
 			retired.push(generation);
 			continue;
 		}
 		if (supersededAtMs <= retirement.now.getTime() - retirement.graceMs) {
 			retired.push(generation);
 		}
-		const publishedAtMs = Date.parse(receipt.publishedAt);
 		// An unreadable timestamp keeps this generation and everything below it
 		// for another pass rather than guessing.
 		supersededAtMs = Number.isFinite(publishedAtMs)

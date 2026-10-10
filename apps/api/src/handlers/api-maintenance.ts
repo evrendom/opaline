@@ -14,6 +14,8 @@ import { readResendConfig } from "../resend-config.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
+import { requeueStaleRunIndexScopes } from "../services/l1-edges/run-index-census.service.js";
+import { runRunIndexRetirementPass } from "../services/l1-edges/run-index-retirement.service.js";
 import { pruneExpiredPostgresLeases } from "../services/postgres-lease.service.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
@@ -37,6 +39,8 @@ const REPOSITORY_EVIDENCE_INDEX_BUDGET_MS = 60_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
 const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000;
+const RUN_INDEX_RETIREMENT_BUDGET_MS = 10_000;
+const RUN_INDEX_CENSUS_BUDGET_MS = 30_000;
 const DERIVED_RECORDS_RECONCILIATION_BUDGET_MS = 60_000;
 const COORDINATION_LEASE_BUDGET_MS = 10_000;
 
@@ -134,6 +138,23 @@ async function runApiMaintenance() {
 			),
 		}),
 	);
+	const runIndex = await runMaintenanceStep("run-index", () =>
+		runRunIndexRetirementPass({
+			deadline: createMaintenanceQueueDeadline(
+				invocationDeadline,
+				RUN_INDEX_RETIREMENT_BUDGET_MS,
+			),
+		}),
+	);
+	const runIndexCensus = await runMaintenanceStep("run-index-census", () =>
+		requeueStaleRunIndexScopes({
+			sql: sqlClient,
+			deadline: createMaintenanceQueueDeadline(
+				invocationDeadline,
+				RUN_INDEX_CENSUS_BUDGET_MS,
+			),
+		}),
+	);
 	const derivedRecords = await runMaintenanceStep("derived-records", () =>
 		reconcileDerivedTranscriptRecords({
 			assertWritable: (target) =>
@@ -167,9 +188,13 @@ async function runApiMaintenance() {
 			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok" &&
 			transcriptRecords.status === "ok" &&
+			runIndex.status === "ok" &&
+			runIndexCensus.status === "ok" &&
 			derivedRecords.status === "ok" &&
 			coordinationLeases.status === "ok",
 		r2Ingest,
+		runIndex,
+		runIndexCensus,
 		sessionRevisionReceipts,
 		transcriptRecords,
 	};

@@ -7,9 +7,16 @@ import { type SessionIdentity, sessionScopeId } from "./l1-edge-ids.js";
  * scope; a claim takes a lease and the next build revision; only the lease
  * holder completes or fails it, so a stale worker cannot overwrite a newer
  * build. A request that arrives during a build leaves the scope due again.
+ *
+ * A session has two scopes with the same id: its edges (`session`) and its
+ * run index (`run_index`). Only the edges depend on GitHub data, so
+ * repository changes and observation lag re-queue or defer `session` scopes
+ * alone.
  */
 
 type Sql = postgres.Sql | postgres.TransactionSql;
+
+export type L1EdgeScopeKind = "session" | "repository" | "run_index";
 
 /*
  * Parameters and results never rely on the client's type serializers for
@@ -21,12 +28,15 @@ type Sql = postgres.Sql | postgres.TransactionSql;
  */
 
 export type L1EdgeScopeKey =
-	| ({ kind: "session"; organizationId: string } & SessionIdentity)
+	| ({
+			kind: "session" | "run_index";
+			organizationId: string;
+	  } & SessionIdentity)
 	| { kind: "repository"; organizationId: string; repositoryId: string };
 
 export interface ClaimedL1EdgeScope {
 	organizationId: string;
-	scopeKind: "session" | "repository";
+	scopeKind: L1EdgeScopeKind;
 	scopeId: string;
 	userId: string | null;
 	source: string | null;
@@ -47,7 +57,9 @@ const RETRY_BASE_MS = 30_000;
 const RETRY_MAX_MS = 6 * 3_600_000;
 
 export function l1EdgeScopeId(scope: L1EdgeScopeKey): string {
-	return scope.kind === "session" ? sessionScopeId(scope) : scope.repositoryId;
+	return scope.kind === "repository"
+		? scope.repositoryId
+		: sessionScopeId(scope);
 }
 
 /**
@@ -62,11 +74,21 @@ export async function enqueueL1EdgeScope(
 	scope: L1EdgeScopeKey,
 	options: { debounceMs?: number; priority?: 0 | 1 } = {},
 ): Promise<void> {
-	const session = scope.kind === "session" ? scope : null;
+	await enqueueScopes(sql, scope, [scope.kind], options);
+}
+
+async function enqueueScopes(
+	sql: Sql,
+	scope: L1EdgeScopeKey,
+	kinds: readonly L1EdgeScopeKind[],
+	options: { debounceMs?: number; priority?: 0 | 1 },
+): Promise<void> {
+	const session = scope.kind === "repository" ? null : scope;
 	await sql.unsafe(
 		`INSERT INTO l1_edge_scope (organization_id, scope_kind, scope_id, user_id, source, session_id, repository_id, priority, next_attempt_at)
-		 SELECT $1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, $8::smallint,
+		 SELECT $1::text, kind, $3::text, $4::text, $5::text, $6::text, $7::text, $8::smallint,
 			now() + $9::bigint * interval '1 millisecond'
+		 FROM unnest($2::text[]) AS kind
 		 WHERE EXISTS (SELECT 1 FROM organization WHERE id = $1::text)
 			AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM "user" WHERE id = $4::text))
 		 ON CONFLICT (organization_id, scope_kind, scope_id) DO UPDATE SET
@@ -86,7 +108,7 @@ export async function enqueueL1EdgeScope(
 			updated_at = now()`,
 		[
 			scope.organizationId,
-			scope.kind,
+			[...kinds],
 			l1EdgeScopeId(scope),
 			session?.userId ?? null,
 			session?.source ?? null,

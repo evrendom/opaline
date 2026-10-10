@@ -18,6 +18,22 @@ describe("daily API maintenance", () => {
 		);
 		expect(maintenanceSource).toContain('transcriptRecords.status === "ok"');
 	});
+	test("retires superseded run index generations under their own budget", () => {
+		expect(maintenanceSource).toContain("runRunIndexRetirementPass({");
+		expect(maintenanceSource).toContain(
+			"RUN_INDEX_RETIREMENT_BUDGET_MS = 10_000",
+		);
+		expect(maintenanceSource).toContain('runMaintenanceStep("run-index"');
+		expect(maintenanceSource).toContain('runIndex.status === "ok"');
+	});
+	test("queues missing or stale run index builds from a daily census", () => {
+		expect(maintenanceSource).toContain("requeueStaleRunIndexScopes({");
+		expect(maintenanceSource).toContain("RUN_INDEX_CENSUS_BUDGET_MS = 30_000");
+		expect(maintenanceSource).toContain(
+			'runMaintenanceStep("run-index-census"',
+		);
+		expect(maintenanceSource).toContain('runIndexCensus.status === "ok"');
+	});
 	test("wires revision-receipt cleanup into the bounded daily drain", () => {
 		expect(maintenanceSource).toContain(
 			"const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000",

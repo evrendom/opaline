@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
+import { RUN_INDEX_VERSION } from "../analysis/run-index-sql.js";
 import {
 	assertNoClickHousePurgeTombstone,
 	hasClickHousePurgeTombstone,
@@ -15,6 +16,7 @@ import {
 	completeL1EdgeScope,
 	dropL1EdgeScope,
 	enqueueL1EdgeDependents,
+	enqueueL1EdgeScope,
 	failL1EdgeScope,
 	holdsL1EdgeLease,
 	recordL1EdgeDependencies,
@@ -28,7 +30,9 @@ import {
 	L1_EDGE_RESOLUTIONS_TABLE,
 	L1_EDGES_BY_TARGET_TABLE,
 	L1_EDGES_TABLE,
+	RUN_INDEX_TABLE,
 } from "./l1-edge-tables.js";
+import { buildRunIndex } from "./run-index.service.js";
 
 const logger = getLogger(["rudel", "api", "l1-edges"]);
 
@@ -140,6 +144,26 @@ async function processClaim(
 			source: claim.source ?? "",
 			sessionId: claim.sessionId ?? "",
 		};
+		if (claim.scopeKind === "run_index") {
+			// Reads only the session's own transcript and usage: never deferred
+			// for observations and never re-queued by repository changes.
+			const build = await buildRunIndex({
+				executor: env.sources.executor,
+				organizationId: claim.organizationId,
+				session,
+				buildRevision: claim.revision,
+				beforeWrite,
+				now: env.now,
+			});
+			await completeL1EdgeScope(env.sql, claim, {
+				resolverVersion: RUN_INDEX_VERSION,
+				input: build.input,
+				edgeCount: build.runCount,
+				unresolvedCount: 0,
+				frozenReason: build.frozenReason,
+			});
+			return build.written;
+		}
 		const build = await buildSessionEdges({
 			sources: env.sources,
 			organizationId: claim.organizationId,
@@ -157,10 +181,11 @@ async function processClaim(
 		if (build.written)
 			await recordL1EdgeDependencies(env.sql, claim, build.dependencies);
 		await completeL1EdgeScope(env.sql, claim, sessionCompletion(build));
+		if (build.written) await queueRunIndex(env.sql, claim, session);
 		return build.written;
 	} catch (error) {
 		if (error instanceof ClickHouseWriteFencedError) {
-			if (claim.scopeKind === "session")
+			if (claim.scopeKind !== "repository")
 				await deleteSessionEdges(env.sources.executor, claim);
 			await dropL1EdgeScope(env.sql, claim);
 			return false;
@@ -173,6 +198,31 @@ async function processClaim(
 		});
 		await failL1EdgeScope(env.sql, claim, message);
 		return false;
+	}
+}
+
+/**
+ * Queues a session's run index after its edges were built: the session's
+ * evidence changed, and this runs in the worker, so no upload waits on the
+ * run index's queue row. Best effort; the run index census catches a lost
+ * request.
+ */
+async function queueRunIndex(
+	sql: L1EdgePassEnv["sql"],
+	claim: ClaimedL1EdgeScope,
+	session: { userId: string; source: string; sessionId: string },
+): Promise<void> {
+	try {
+		await enqueueL1EdgeScope(sql, {
+			kind: "run_index",
+			organizationId: claim.organizationId,
+			...session,
+		});
+	} catch (error) {
+		logger.warn("Could not queue the run index of {scope}: {error}", {
+			scope: claim.scopeId,
+			error: error instanceof Error ? error.message : String(error),
+		});
 	}
 }
 
@@ -211,7 +261,10 @@ export function sessionCompletion(
 			};
 }
 
-/** Removes a fenced session's edges from every edge table. */
+/**
+ * Removes a fenced session's derived rows from every edge table and the run
+ * index, whichever of its scopes found the fence.
+ */
 async function deleteSessionEdges(
 	executor: ClickHouseExecutor,
 	claim: ClaimedL1EdgeScope,
@@ -222,6 +275,7 @@ async function deleteSessionEdges(
 		L1_EDGES_TABLE,
 		L1_EDGES_BY_TARGET_TABLE,
 		L1_EDGE_RESOLUTIONS_TABLE,
+		RUN_INDEX_TABLE,
 	])
 		await executor.execute({
 			clickhouse_settings: { lightweight_deletes_sync: "3" },

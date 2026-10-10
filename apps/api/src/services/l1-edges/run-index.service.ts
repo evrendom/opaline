@@ -1,0 +1,991 @@
+import { getLogger } from "@logtape/logtape";
+import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
+import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
+import { z } from "zod";
+import {
+	type ClickHouseExecutor,
+	getSafeClickHouseTable,
+} from "../../clickhouse.js";
+import {
+	type CodexLifecycleFacts,
+	codexLifecycleFactsByRun,
+	NO_CODEX_LIFECYCLE_FACTS,
+	streamTurnKey,
+} from "../analysis/codex-lifecycle.js";
+import { gateRunIndexRow } from "../analysis/run-index-columns.js";
+import {
+	expireRunIndexText,
+	readCommittedRunIndex,
+} from "../analysis/run-index-reader.js";
+import {
+	buildCodexLifecycleStatement,
+	buildCodexTurnMarksStatement,
+	buildRunIndexSessionStatement,
+	buildRunIndexStatement,
+	buildUnattributedUsageStatement,
+	CodexLifecycleRowSchema,
+	CodexTurnMarkSchema,
+	RUN_INDEX_PRICING_VERSION,
+	RUN_INDEX_VERSION,
+	type RunIndexFactsRow,
+	RunIndexFactsRowSchema,
+	type RunIndexSessionFacts,
+	RunIndexSessionFactsSchema,
+	type UnattributedUsageRow,
+	UnattributedUsageRowSchema,
+} from "../analysis/run-index-sql.js";
+import { queryCountedGenerations } from "../analysis/scope.js";
+import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
+import {
+	MAX_RETIRED_GENERATIONS_PER_PASS,
+	selectRetiredGenerations,
+	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
+} from "../transcript-records-ingest.service.js";
+import {
+	runNodeId,
+	type SessionIdentity,
+	sessionScopeId,
+} from "./l1-edge-ids.js";
+import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
+
+const logger = getLogger(["rudel", "api", "l1-edges"]);
+
+/**
+ * Records (receipt row counts) of the largest generation the build aggregates
+ * in one statement, the same bound `find` gives one batch. A larger session
+ * is frozen with its reason; `find` keeps computing its runs at query time.
+ */
+export const RUN_INDEX_MAX_SESSION_RECORDS = 200_000;
+const UINT32_MAX = 4_294_967_295;
+/** Relative tolerance of the cost conservation check (costs are rounded to 12 places). */
+const COST_TOLERANCE = 1e-9;
+
+/** A run index generation: the transcript generation and the index rules. */
+export interface RunIndexGeneration {
+	revision: string;
+	parserVersion: number;
+	indexVersion: number;
+}
+
+export interface RunIndexBuild {
+	/** False when nothing was written: current already, frozen, or no transcript. */
+	written: boolean;
+	frozenReason: string | null;
+	input: Record<string, unknown>;
+	runCount: number;
+}
+
+/** The session's usage changed while a build read it; the build is retried. */
+export class RunIndexUsageChangedError extends Error {
+	constructor() {
+		super("Usage changed while the run index was built; retrying");
+		this.name = "RunIndexUsageChangedError";
+	}
+}
+
+/**
+ * The usage extraction a build prices. `none`: the session has no usage.
+ * `consistent`: the newest receipt is complete and every event it counts is
+ * active at its generation, so its events are priced, and only they.
+ * `unknown`: anything else (incomplete, deleted, or events without a
+ * receipt); usage is stored as unknown, never as zero or a partial set.
+ * `key` names it on the receipt (`usage_receipt`), so a new extraction makes
+ * the stored costs stale.
+ */
+export interface RunIndexUsage {
+	state: "none" | "consistent" | "unknown";
+	/** The receipt's `event_version`, bound into every usage read; '0' reads none. */
+	generation: string;
+	/** Events the receipt counts (consistent only). */
+	events: number;
+	key: string;
+}
+
+const count = z.coerce.number();
+const UsageStateSchema = z.object({
+	generation: z.coerce.string(),
+	receipts: count,
+	complete: count,
+	expected_events: count,
+	receipt_deleted: count,
+	checksum: z.string(),
+	generation_events: count,
+	active_events: count,
+});
+const SessionRecordSchema = z.object({
+	repository: z.string(),
+	model: z.string(),
+});
+
+/**
+ * Builds the run index of one session (docs/l1-literal-schema.md, "Scale")
+ * from its committed transcript-records generation as one immutable
+ * snapshot: one aggregate statement for its runs, one each for the usage no
+ * run claims and the session facts (and, for Codex, its turn lifecycle
+ * rows), then the run rows and, last, the receipt that commits them. Until
+ * the receipt lands, readers keep reading the previous snapshot; a build
+ * that crashes before it changes nothing they read. `beforeWrite` runs
+ * before each insert (purge fence and lease). A build is skipped when the
+ * committed receipt already has this generation, index version, pricing and
+ * usage receipt; when the transcript has expired, the stored runs are kept.
+ */
+export async function buildRunIndex(input: {
+	executor: ClickHouseExecutor;
+	organizationId: string;
+	session: SessionIdentity;
+	/** The claimed build revision: the snapshot's id within its generation. */
+	buildRevision: number;
+	beforeWrite: () => Promise<void>;
+	now?: () => Date;
+	maxSessionRecords?: number;
+}): Promise<RunIndexBuild> {
+	const { executor, organizationId, session } = input;
+	const now = input.now ?? (() => new Date());
+	const scope = { organizationId, userId: session.userId };
+	const [committed] = await queryCountedGenerations(executor, scope, [
+		session.sessionId,
+	]);
+	const [marker] = await readCommittedRunIndex(
+		executor,
+		scope,
+		[session.sessionId],
+		"receipt",
+	);
+	if (!committed)
+		return {
+			written: false,
+			frozenReason: marker ? "transcript expired; run index kept" : null,
+			input: marker
+				? {
+						generation: markerGeneration(marker),
+						builtRevision: String(marker.build_revision),
+					}
+				: { generation: null },
+			runCount: marker?.run_count ?? 0,
+		};
+	const generation: RunIndexGeneration = {
+		revision: committed.revision,
+		parserVersion: committed.parserVersion,
+		indexVersion: RUN_INDEX_VERSION,
+	};
+	const usage = await readRunIndexUsage(executor, organizationId, session);
+	const key = {
+		generation,
+		pricingVersion: RUN_INDEX_PRICING_VERSION,
+		usageReceipt: usage.key,
+	};
+	if (marker && isCurrentMarker(marker, key))
+		return {
+			written: false,
+			frozenReason: null,
+			input: {
+				...key,
+				runs: marker.run_count,
+				builtRevision: String(marker.build_revision),
+			},
+			runCount: marker.run_count,
+		};
+	const maxRecords = input.maxSessionRecords ?? RUN_INDEX_MAX_SESSION_RECORDS;
+	if (committed.records > maxRecords)
+		return {
+			written: false,
+			frozenReason: `session has ${committed.records} records, over the run index bound of ${maxRecords}`,
+			input: { ...key, records: committed.records },
+			runCount: 0,
+		};
+
+	const bound = {
+		sessionId: committed.sessionId,
+		revision: committed.revision,
+		parserVersion: committed.parserVersion,
+		usageGeneration: usage.generation,
+	};
+	const runs = await query(
+		executor,
+		RunIndexFactsRowSchema,
+		buildRunIndexStatement(scope, bound),
+	);
+	const [unattributed] = await query(
+		executor,
+		UnattributedUsageRowSchema,
+		buildUnattributedUsageStatement(scope, bound),
+	);
+	const [facts] = await query(
+		executor,
+		RunIndexSessionFactsSchema,
+		buildRunIndexSessionStatement(scope, committed),
+	);
+	if (!unattributed || !facts)
+		throw new Error("Run index session statements returned no row");
+	const lifecycle =
+		session.source === "codex"
+			? codexLifecycleFactsByRun(
+					await query(
+						executor,
+						CodexLifecycleRowSchema,
+						buildCodexLifecycleStatement(scope, committed),
+					),
+					await query(
+						executor,
+						CodexTurnMarkSchema,
+						buildCodexTurnMarksStatement(scope, committed),
+					),
+				)
+			: new Map<string, CodexLifecycleFacts>();
+	const [recorded] = await query(executor, SessionRecordSchema, {
+		query: `SELECT coalesce(nullIf(git_remote, ''), nullIf(package_name, ''), project_path) AS repository,
+				model_used AS model
+			FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
+			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+				AND session_id = {sessionId:String} AND source = {source:String}
+			ORDER BY session_date DESC LIMIT 1`,
+		query_params: {
+			...scope,
+			sessionId: session.sessionId,
+			source: session.source,
+		},
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+	});
+	// The statements read the usage separately: it must be the same
+	// extraction after them as before, and every one of its events must be
+	// counted exactly once, by a run or as unattributed.
+	if (
+		(await readRunIndexUsage(executor, organizationId, session)).key !==
+		usage.key
+	)
+		throw new RunIndexUsageChangedError();
+	assertUsageConserved(runs, unattributed, usage);
+
+	const builtAt = now();
+	const context: RowContext = {
+		organizationId,
+		session,
+		generation,
+		buildRevision: input.buildRevision,
+		builtAt: clickHouseTime(builtAt.getTime()),
+		sessionDate: clickHouseTime(facts.session_date_ms),
+	};
+	// Text past its retention is never written, whatever the TTL merges do.
+	const finish = (row: RudelRunIndexRow, at: Date) =>
+		expireRunIndexText(
+			gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" }),
+			facts.session_date_ms,
+			at.getTime(),
+		);
+	const runRows = runs.map((run) =>
+		finish(
+			runRow(
+				run,
+				lifecycle.get(streamTurnKey(run.agent_id, run.turn_idx)) ??
+					NO_CODEX_LIFECYCLE_FACTS,
+				context,
+			),
+			builtAt,
+		),
+	);
+	// Each build has its own insert tokens: a generation deleted by a fence
+	// and rebuilt by a later claim is never dropped as a duplicate.
+	const token = `run-index:${organizationId}:${sessionScopeId(session)}:${generation.revision}:${generation.parserVersion}:${generation.indexVersion}:${input.buildRevision}`;
+	await input.beforeWrite();
+	// One insert, so a build's runs land together.
+	if (runRows.length > 0)
+		await executor.insert({
+			table: RUN_INDEX_TABLE,
+			values: runRows,
+			asyncInsert: false,
+			deduplicationToken: `${token}:runs`,
+		});
+	await input.beforeWrite();
+	// The receipt's time is its publication: superseded snapshots are kept
+	// for the retirement grace from it.
+	const publishedAt = now();
+	await executor.insert({
+		table: RUN_INDEX_TABLE,
+		values: [
+			finish(
+				receiptRow(
+					{ ...context, builtAt: clickHouseTime(publishedAt.getTime()) },
+					{
+						runs,
+						lifecycle,
+						unattributed,
+						facts,
+						usageReceipt: usage.key,
+						repository: recorded?.repository ?? "",
+						model: recorded?.model ?? "",
+					},
+				),
+				publishedAt,
+			),
+		],
+		asyncInsert: false,
+		deduplicationToken: `${token}:receipt`,
+	});
+	try {
+		await retireRunIndexSnapshots(executor, organizationId, session, {
+			graceMs: TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
+			now: now(),
+		});
+	} catch (error) {
+		// The new snapshot is committed; the sweep retries the cleanup.
+		logger.warn(
+			"Run index cleanup of superseded snapshots failed (session_id={sessionId} error={error})",
+			{
+				sessionId: session.sessionId,
+				error: error instanceof Error ? error.message : String(error),
+			},
+		);
+	}
+	return {
+		written: true,
+		frozenReason: null,
+		input: {
+			...key,
+			runs: runRows.length,
+			builtRevision: String(input.buildRevision),
+		},
+		runCount: runRows.length,
+	};
+}
+
+function isCurrentMarker(
+	marker: RudelRunIndexRow,
+	key: {
+		generation: RunIndexGeneration;
+		pricingVersion: string;
+		usageReceipt: string;
+	},
+): boolean {
+	return (
+		String(marker.revision) === key.generation.revision &&
+		marker.parser_version === key.generation.parserVersion &&
+		marker.index_version === key.generation.indexVersion &&
+		marker.pricing_version === key.pricingVersion &&
+		marker.usage_receipt === key.usageReceipt
+	);
+}
+
+function markerGeneration(marker: RudelRunIndexRow): RunIndexGeneration {
+	return {
+		revision: String(marker.revision),
+		parserVersion: marker.parser_version,
+		indexVersion: marker.index_version,
+	};
+}
+
+/**
+ * The session's newest usage extraction and whether it is one complete,
+ * consistent set (the checks of the usage analytics pipeline): its receipt
+ * is complete and not deleted, and the active events at its generation are
+ * exactly the events it counts.
+ */
+export async function readRunIndexUsage(
+	executor: ClickHouseExecutor,
+	organizationId: string,
+	session: Pick<SessionIdentity, "userId" | "sessionId">,
+): Promise<RunIndexUsage> {
+	const [state] = await query(executor, UsageStateSchema, {
+		query: `SELECT toString(any(receipt_generation)) AS generation, any(receipt_count) AS receipts,
+				any(receipt_complete) AS complete, any(receipt_events) AS expected_events,
+				any(receipt_is_deleted) AS receipt_deleted, toString(any(receipt_checksum_latest)) AS checksum,
+				countIf(record_kind = 'event' AND is_deleted = 0 AND event_version = receipt_generation) AS generation_events,
+				countIf(record_kind = 'event' AND is_deleted = 0) AS active_events
+			FROM (
+				SELECT record_kind, is_deleted, event_version,
+					argMaxIf(event_version, event_version, record_kind = 'receipt') OVER () AS receipt_generation,
+					countIf(record_kind = 'receipt') OVER () AS receipt_count,
+					argMaxIf(receipt_is_complete, event_version, record_kind = 'receipt') OVER () AS receipt_complete,
+					argMaxIf(receipt_event_count, event_version, record_kind = 'receipt') OVER () AS receipt_events,
+					argMaxIf(is_deleted, event_version, record_kind = 'receipt') OVER () AS receipt_is_deleted,
+					argMaxIf(receipt_checksum, event_version, record_kind = 'receipt') OVER () AS receipt_checksum_latest
+				FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
+				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+					AND session_id = {sessionId:String}
+			)`,
+		query_params: {
+			organizationId,
+			userId: session.userId,
+			sessionId: session.sessionId,
+		},
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+	});
+	return runIndexUsage(state);
+}
+
+/** What a usage state means for a build (`readRunIndexUsage`). */
+export function runIndexUsage(
+	state: z.infer<typeof UsageStateSchema> | undefined,
+): RunIndexUsage {
+	if (!state || (state.receipts === 0 && state.active_events === 0))
+		return { state: "none", generation: "0", events: 0, key: "" };
+	const receipt = `${state.generation}:${state.checksum}`;
+	if (
+		state.receipts > 0 &&
+		state.complete === 1 &&
+		state.receipt_deleted === 0 &&
+		state.generation_events === state.expected_events
+	)
+		return {
+			state: "consistent",
+			generation: state.generation,
+			events: state.expected_events,
+			key: receipt,
+		};
+	return {
+		state: "unknown",
+		generation: "0",
+		events: 0,
+		key:
+			state.receipts > 0
+				? `${receipt}:incomplete`
+				: `unreceipted:${state.active_events}`,
+	};
+}
+
+/**
+ * Every event of the priced extraction is counted exactly once: the runs'
+ * usage plus the unattributed usage is the whole set (observations, tokens
+ * by kind, cost), and the whole set is what the receipt counts. Otherwise
+ * the build is wrong and is not published.
+ */
+export function assertUsageConserved(
+	runs: readonly RunIndexFactsRow[],
+	unattributed: UnattributedUsageRow,
+	usage: RunIndexUsage,
+): void {
+	const failures: string[] = [];
+	const add = (pick: (row: UsageCounts) => number) =>
+		runs.reduce((sum, run) => sum + pick(run), pick(unattributed));
+	if (add((row) => row.usage_observations) !== unattributed.total_observations)
+		failures.push("observations");
+	if (add((row) => row.usage_unpriced) !== unattributed.total_unpriced)
+		failures.push("unpriced");
+	for (const kind of TOKEN_KINDS) {
+		const sum = [...runs, unattributed].reduce(
+			(total, row) => total + BigInt(row[kind] ?? "0"),
+			0n,
+		);
+		if (sum !== BigInt(unattributed[`total_${kind}`] || "0"))
+			failures.push(kind);
+	}
+	const cost = add((row) => row.cost_usd ?? 0);
+	const totalCost = unattributed.total_cost_usd ?? 0;
+	if (
+		Math.abs(cost - totalCost) >
+		COST_TOLERANCE * Math.max(1, Math.abs(totalCost))
+	)
+		failures.push("cost");
+	if (unattributed.total_observations !== usage.events)
+		failures.push("receipt event count");
+	if (failures.length > 0)
+		throw new Error(
+			`Run index usage is not conserved (${failures.join(", ")})`,
+		);
+}
+
+const TOKEN_KINDS = [
+	"uncached_input_tokens",
+	"cache_read_input_tokens",
+	"cache_write_5m_input_tokens",
+	"cache_write_1h_input_tokens",
+	"output_tokens",
+	"reasoning_output_tokens",
+] as const;
+
+type UsageCounts = Pick<
+	UnattributedUsageRow,
+	| "usage_observations"
+	| "usage_unpriced"
+	| "usage_model"
+	| "cost_usd"
+	| "model_costs"
+	| (typeof TOKEN_KINDS)[number]
+	| "context_input_tokens_at_start"
+>;
+
+interface RowContext {
+	organizationId: string;
+	session: SessionIdentity;
+	generation: RunIndexGeneration;
+	buildRevision: number;
+	builtAt: string;
+	sessionDate: string;
+}
+
+/** Columns every row of a build shares, and the not-recorded defaults of the rest. */
+function baseRow(context: RowContext): RudelRunIndexRow {
+	return {
+		organization_id: context.organizationId,
+		user_id: context.session.userId,
+		session_id: context.session.sessionId,
+		revision: context.generation.revision,
+		parser_version: context.generation.parserVersion,
+		index_version: context.generation.indexVersion,
+		agent_id: "",
+		start_record: 0,
+		row_kind: "run",
+		source: context.session.source,
+		turn_idx: 0,
+		run_id: "",
+		build_revision: String(context.buildRevision),
+		built_at: context.builtAt,
+		session_date: context.sessionDate,
+		unrecorded_facts: [],
+		agent_version: null,
+		entrypoint: null,
+		started_at: context.sessionDate,
+		ended_at: context.sessionDate,
+		end_record: 0,
+		minutes: 0,
+		active_minutes: 0,
+		record_count: 0,
+		raw_chars: "0",
+		duration_ms: null,
+		time_to_first_token_ms: null,
+		prompt_head: null,
+		genuine_prompts: 0,
+		turn_origin: null,
+		prompt_source: null,
+		origin_kind: null,
+		trigger_turn: null,
+		thread_source: null,
+		prompt_origin_basis: "",
+		permission_mode: null,
+		permission_modes: [],
+		auto_mode_bash_first: null,
+		auto_mode_bash_first_steer: null,
+		auto_mode_bypass: null,
+		auto_mode_steer_only: null,
+		auto_mode_consent_flow: null,
+		approval_policy: null,
+		approvals_reviewer: null,
+		sandbox_policy: null,
+		sandbox_network_access: null,
+		permission_profile: null,
+		collaboration_mode: null,
+		model: null,
+		models: [],
+		effort: null,
+		per_turn_effort: null,
+		context_window: null,
+		context_input_tokens_at_start: null,
+		tool_calls: 0,
+		failed_calls: 0,
+		edits: 0,
+		reads: 0,
+		searches: 0,
+		not_found: 0,
+		denied_calls: null,
+		interrupted_calls: null,
+		timed_out_calls: null,
+		mcp_calls: null,
+		mcp_servers: [],
+		skills: [],
+		slash_commands: [],
+		subagent_types: [],
+		compactions: 0,
+		compact_trigger: null,
+		compact_pre_tokens: null,
+		aborted: null,
+		abort_reason: null,
+		turn_error: null,
+		turn_error_kind: null,
+		interrupt_markers: 0,
+		stop_reason: null,
+		hook_stop_reason: null,
+		prevented_continuation: null,
+		hook_count: null,
+		hook_errors: null,
+		hook_runs: null,
+		api_errors: null,
+		api_error: null,
+		api_error_statuses: [],
+		retry_attempts: null,
+		refusals: null,
+		fallback_model: null,
+		goal: null,
+		git_operations: [],
+		pushed_branches: [],
+		commit_shas: [],
+		pr_urls: [],
+		usage_observations: 0,
+		usage_unpriced: 0,
+		usage_model: "",
+		cost_usd: null,
+		model_costs: [],
+		uncached_input_tokens: null,
+		cache_read_input_tokens: null,
+		cache_write_5m_input_tokens: null,
+		cache_write_1h_input_tokens: null,
+		output_tokens: null,
+		reasoning_output_tokens: null,
+		pricing_version: RUN_INDEX_PRICING_VERSION,
+		facts_truncated: null,
+		run_count: 0,
+		usage_receipt: "",
+		cost_state: {},
+		title: null,
+		repository: "",
+		session_model: "",
+	};
+}
+
+/** The usage columns of a run or of the receipt's unattributed usage. */
+function usageColumns(
+	usage: UsageCounts,
+): Pick<
+	RudelRunIndexRow,
+	| "usage_observations"
+	| "usage_unpriced"
+	| "usage_model"
+	| "cost_usd"
+	| "model_costs"
+	| "uncached_input_tokens"
+	| "cache_read_input_tokens"
+	| "cache_write_5m_input_tokens"
+	| "cache_write_1h_input_tokens"
+	| "output_tokens"
+	| "reasoning_output_tokens"
+	| "context_input_tokens_at_start"
+> {
+	return {
+		usage_observations: usage.usage_observations,
+		usage_unpriced: usage.usage_unpriced,
+		usage_model: usage.usage_model,
+		cost_usd: usage.cost_usd,
+		model_costs: usage.model_costs.map(([model, cost, unpriced]) => [
+			model,
+			cost,
+			Math.min(UINT32_MAX, unpriced),
+		]),
+		uncached_input_tokens: usage.uncached_input_tokens,
+		cache_read_input_tokens: usage.cache_read_input_tokens,
+		cache_write_5m_input_tokens: usage.cache_write_5m_input_tokens,
+		cache_write_1h_input_tokens: usage.cache_write_1h_input_tokens,
+		output_tokens: usage.output_tokens,
+		reasoning_output_tokens: usage.reasoning_output_tokens,
+		context_input_tokens_at_start: usage.context_input_tokens_at_start,
+	};
+}
+
+/**
+ * A run row from its stored facts, before gating. `lifecycle` holds the
+ * Codex lifecycle facts attributed to the run by `turn_id`; where a fact can
+ * come from either kind of record (model, effort, aborted), an agent writes
+ * it in only one of them.
+ */
+export function runRow(
+	run: RunIndexFactsRow,
+	lifecycle: CodexLifecycleFacts,
+	context: RowContext,
+): RudelRunIndexRow {
+	const origin = [
+		run.l_turn_origin,
+		run.l_prompt_source,
+		run.l_origin_kind,
+		run.l_trigger_turn,
+		run.thread_source,
+	];
+	return {
+		...baseRow(context),
+		agent_id: run.agent_id,
+		start_record: run.start_record,
+		turn_idx: run.turn_idx,
+		run_id: runNodeId(context.session, run.agent_id, run.start_record),
+		agent_version: run.l_agent_version,
+		entrypoint: run.l_entrypoint,
+		started_at: clickHouseTime(run.started_ms),
+		ended_at: clickHouseTime(run.ended_ms),
+		end_record: run.end_record,
+		minutes: run.minutes,
+		active_minutes: run.active_minutes,
+		record_count: run.record_count,
+		raw_chars: run.raw_chars,
+		duration_ms:
+			lifecycle.durationMs === null
+				? null
+				: Math.min(UINT32_MAX, lifecycle.durationMs),
+		time_to_first_token_ms: uint32OrNull(lifecycle.timeToFirstTokenMs),
+		prompt_head: run.prompt_head,
+		genuine_prompts: run.genuine_prompts,
+		turn_origin: run.l_turn_origin,
+		prompt_source: run.l_prompt_source,
+		origin_kind: run.l_origin_kind,
+		trigger_turn: run.l_trigger_turn,
+		thread_source: run.thread_source,
+		prompt_origin_basis: origin.some((value) => value !== "")
+			? "native"
+			: "wrapper",
+		permission_mode: run.l_permission_mode,
+		permission_modes: run.l_permission_modes,
+		auto_mode_bash_first: run.l_auto_mode_bash_first,
+		auto_mode_bash_first_steer: run.l_auto_mode_bash_first_steer,
+		auto_mode_bypass: run.l_auto_mode_bypass,
+		auto_mode_steer_only: run.l_auto_mode_steer_only,
+		auto_mode_consent_flow: run.l_auto_mode_consent_flow,
+		approval_policy: lifecycle.approvalPolicy,
+		approvals_reviewer: lifecycle.approvalsReviewer,
+		sandbox_policy: lifecycle.sandboxPolicy,
+		sandbox_network_access: lifecycle.sandboxNetworkAccess,
+		permission_profile: lifecycle.permissionProfile,
+		collaboration_mode: lifecycle.collaborationMode,
+		model: lifecycle.model || run.l_model,
+		models: sortedUnion(run.l_models, lifecycle.models),
+		effort: lifecycle.effort || run.l_effort,
+		per_turn_effort: run.l_per_turn_effort,
+		context_window: uint32OrNull(lifecycle.contextWindow),
+		tool_calls: run.tool_calls,
+		failed_calls: run.failed_calls,
+		edits: run.edits,
+		reads: run.reads,
+		searches: run.searches,
+		not_found: run.not_found,
+		denied_calls: run.l_denied_calls,
+		interrupted_calls: run.l_interrupted_calls,
+		timed_out_calls: run.l_timed_out_calls,
+		mcp_calls: run.l_mcp_calls,
+		mcp_servers: run.l_mcp_servers,
+		skills: run.l_skills,
+		slash_commands: run.l_slash_commands,
+		subagent_types: run.subagent_types,
+		compactions: run.l_compactions,
+		compact_trigger: run.l_compact_trigger,
+		compact_pre_tokens: /^\d+$/u.test(run.l_compact_pre_tokens)
+			? run.l_compact_pre_tokens
+			: null,
+		aborted: recordedFlag(
+			run.l_aborted_true + lifecycle.abortedTrue,
+			run.l_aborted_false + lifecycle.abortedFalse,
+		),
+		abort_reason: lifecycle.abortReason,
+		turn_error: lifecycle.turnError,
+		turn_error_kind: lifecycle.turnErrorKind,
+		interrupt_markers: run.l_interrupt_markers,
+		stop_reason: run.l_stop_reason,
+		hook_stop_reason: run.l_hook_stop_reason,
+		prevented_continuation: recordedFlag(
+			run.l_prevented_true,
+			run.l_prevented_false,
+		),
+		hook_count:
+			run.l_hook_summaries > 0 ? Math.min(UINT32_MAX, run.l_hook_count) : null,
+		hook_errors: jsonList(run.l_hook_errors),
+		hook_runs: jsonList(run.l_hook_runs),
+		api_errors: run.l_api_errors,
+		api_error: run.l_api_error,
+		api_error_statuses: run.l_api_error_statuses,
+		retry_attempts: run.l_retry_attempts,
+		refusals: run.l_refusals,
+		fallback_model: run.l_fallback_model,
+		goal: run.l_goal,
+		git_operations: run.l_git_operations,
+		pushed_branches: run.l_pushed_branches,
+		commit_shas: run.l_commit_shas,
+		pr_urls: run.l_pr_urls,
+		...usageColumns(run),
+		facts_truncated: run.l_facts_truncated > 0,
+	};
+}
+
+/**
+ * The receipt: written last, it commits the build and holds the session's
+ * facts. Calls, denials and API errors total the runs; skills, slash
+ * commands, subagent types and models merge them; usage is what no run can
+ * claim.
+ */
+export function receiptRow(
+	context: RowContext,
+	session: {
+		runs: readonly RunIndexFactsRow[];
+		lifecycle: ReadonlyMap<string, CodexLifecycleFacts>;
+		unattributed: UnattributedUsageRow;
+		facts: RunIndexSessionFacts;
+		usageReceipt: string;
+		repository: string;
+		model: string;
+	},
+): RudelRunIndexRow {
+	const runs = session.runs;
+	const total = (pick: (run: RunIndexFactsRow) => number) =>
+		Math.min(
+			UINT32_MAX,
+			runs.reduce((sum, run) => sum + pick(run), 0),
+		);
+	const merged = (pick: (run: RunIndexFactsRow) => readonly string[]) =>
+		sortedUnion(...runs.map(pick));
+	const costStateDuration = session.facts.cost_state_duration_ms;
+	return {
+		...baseRow(context),
+		start_record: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+		row_kind: "receipt",
+		thread_source: session.facts.thread_source,
+		models: merged((run) => [
+			...run.l_models,
+			...(session.lifecycle.get(streamTurnKey(run.agent_id, run.turn_idx))
+				?.models ?? []),
+		]),
+		tool_calls: total((run) => run.tool_calls),
+		failed_calls: total((run) => run.failed_calls),
+		denied_calls: total((run) => run.l_denied_calls),
+		api_errors: total((run) => run.l_api_errors),
+		skills: merged((run) => run.l_skills),
+		slash_commands: merged((run) => run.l_slash_commands),
+		subagent_types: merged((run) => run.subagent_types),
+		...usageColumns(session.unattributed),
+		facts_truncated: runs.some((run) => run.l_facts_truncated > 0),
+		run_count: runs.length,
+		usage_receipt: session.usageReceipt,
+		cost_state:
+			session.facts.has_cost_state > 0
+				? {
+						...session.facts.cost_state,
+						...(costStateDuration === null
+							? {}
+							: { duration_ms: String(costStateDuration) }),
+					}
+				: {},
+		title: session.facts.title,
+		repository: session.repository,
+		session_model: session.model,
+	};
+}
+
+const SnapshotRowSchema = z.object({
+	revision_text: z.string(),
+	parser_version: count,
+	index_version: count,
+	build_text: z.string(),
+	receipts: count,
+	receipt_built_ms: count,
+	written_ms: count,
+});
+
+/** A build's snapshot: its generation and build revision. */
+export interface RunIndexSnapshot extends RunIndexGeneration {
+	buildRevision: string;
+}
+
+/**
+ * Retires a session's snapshots that no reader can pin or will pin again,
+ * found from all its rows, receipts or not:
+ *
+ * - older than the committed snapshot (the newest with a receipt) and never
+ *   committed: a crashed build, at once;
+ * - older and committed: once the grace since the snapshot that superseded
+ *   it was published has passed (a reader may still hold it);
+ * - newer than the committed snapshot, or with no committed snapshot at all,
+ *   and never committed: a crashed build once its last write is older than
+ *   the grace (a build in flight writes its receipt within its lease).
+ *
+ * The committed snapshot itself is never retired, even after its transcript
+ * expired.
+ */
+export async function retireRunIndexSnapshots(
+	executor: ClickHouseExecutor,
+	organizationId: string,
+	session: Pick<SessionIdentity, "userId" | "sessionId">,
+	retirement: { abortSignal?: AbortSignal; graceMs: number; now: Date },
+): Promise<number> {
+	const identity = {
+		organizationId,
+		userId: session.userId,
+		sessionId: session.sessionId,
+	};
+	const snapshots = await query(executor, SnapshotRowSchema, {
+		abortSignal: retirement.abortSignal,
+		query: `SELECT toString(revision) AS revision_text, parser_version, index_version,
+				toString(build_revision) AS build_text,
+				countIf(row_kind = 'receipt') AS receipts,
+				maxIf(toUnixTimestamp64Milli(built_at), row_kind = 'receipt') AS receipt_built_ms,
+				max(toUnixTimestamp64Milli(built_at)) AS written_ms
+			FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
+			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+				AND session_id = {sessionId:String}
+			GROUP BY revision, parser_version, index_version, build_revision
+			ORDER BY revision DESC, parser_version DESC, index_version DESC, build_revision DESC
+			LIMIT {snapshotLimit:UInt32}`,
+		query_params: {
+			...identity,
+			snapshotLimit: 10 * MAX_RETIRED_GENERATIONS_PER_PASS,
+		},
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+	});
+	const retired = selectRetiredSnapshots(snapshots, retirement);
+	if (retired.length === 0) return 0;
+	const params: Record<string, unknown> = { ...identity };
+	const clauses = retired.map((snapshot, index) => {
+		params[`revision${index}`] = snapshot.revision;
+		params[`parserVersion${index}`] = snapshot.parserVersion;
+		params[`indexVersion${index}`] = snapshot.indexVersion;
+		params[`build${index}`] = snapshot.buildRevision;
+		return `(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16} AND index_version = {indexVersion${index}:UInt16} AND build_revision = {build${index}:UInt64})`;
+	});
+	await executor.execute({
+		abortSignal: retirement.abortSignal,
+		clickhouse_settings: { lightweight_deletes_sync: "1" },
+		query: `DELETE FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
+			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+				AND session_id = {sessionId:String} AND (${clauses.join(" OR ")})`,
+		query_params: params,
+	});
+	return retired.length;
+}
+
+/** The snapshots `retireRunIndexSnapshots` deletes, from rows newest first. */
+export function selectRetiredSnapshots(
+	snapshots: readonly z.infer<typeof SnapshotRowSchema>[],
+	retirement: { graceMs: number; now: Date },
+): RunIndexSnapshot[] {
+	const snapshotOf = (
+		row: z.infer<typeof SnapshotRowSchema>,
+	): RunIndexSnapshot => ({
+		revision: row.revision_text,
+		parserVersion: row.parser_version,
+		indexVersion: row.index_version,
+		buildRevision: row.build_text,
+	});
+	const committed = snapshots.findIndex((row) => row.receipts > 0);
+	const graceStart = retirement.now.getTime() - retirement.graceMs;
+	// Never committed and not written for longer than the grace: crashed.
+	const abandoned = (committed < 0 ? snapshots : snapshots.slice(0, committed))
+		.filter((row) => row.receipts === 0 && row.written_ms <= graceStart)
+		.map(snapshotOf);
+	const head = snapshots[committed];
+	const superseded = head
+		? selectRetiredGenerations(
+				snapshots.slice(committed + 1).map((row) => ({
+					generation: snapshotOf(row),
+					// A rebuild's newer receipt only keeps the snapshot below longer.
+					publishedAtMs: row.receipts > 0 ? row.receipt_built_ms : null,
+				})),
+				{ ...retirement, publishedAtMs: head.receipt_built_ms },
+			)
+		: [];
+	return [...abandoned, ...superseded].slice(
+		0,
+		MAX_RETIRED_GENERATIONS_PER_PASS,
+	);
+}
+
+/** 'true' when a record says true, 'false' when records say only false, '' when none says. */
+function recordedFlag(trueCount: number, falseCount: number): string {
+	return trueCount > 0 ? "true" : falseCount > 0 ? "false" : "";
+}
+
+/** Raw JSON entries as one JSON array; '' when there are none. */
+function jsonList(entries: readonly string[]): string {
+	return entries.length === 0 ? "" : `[${entries.join(",")}]`;
+}
+
+function sortedUnion(...lists: readonly (readonly string[])[]): string[] {
+	return [...new Set(lists.flat())].sort();
+}
+
+function uint32OrNull(value: string): number | null {
+	if (!/^\d+$/u.test(value)) return null;
+	return Math.min(UINT32_MAX, Number(value));
+}
+
+function clickHouseTime(ms: number): string {
+	return new Date(ms).toISOString().replace("T", " ").replace("Z", "");
+}
