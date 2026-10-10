@@ -605,11 +605,193 @@ test("a push that updates one ref and rejects another keeps the update; forced u
 	]);
 });
 
-test("parser version 3 starts a new observation generation", () => {
+test("parser version 4 starts a new observation generation", () => {
 	const [row] = parseGitObservations(
 		recordsInput([call("c", "gh run view 1"), result("c", "ok")]),
 	);
-	expect(row?.parser_version).toBe(3 * 256 + 4);
+	expect(row?.parser_version).toBe(4 * 256 + 4);
+});
+
+test("recorded gitOperation and pr-link facts add what the output text did not show", async () => {
+	const content = await Bun.file(
+		new URL(
+			"../../../../packages/api-routes/src/session-transcript/__fixtures__/l1-facts/claude-2.1.jsonl",
+			import.meta.url,
+		),
+	).text();
+	const records: GitObservationRecord[] = [
+		...splitSessionTranscript({
+			content,
+			sessionDate: "2026-10-01T09:00:00.000Z",
+			source: "claude_code",
+		}),
+	].map((draft) => ({
+		agent_id: draft.agentId,
+		record_idx: draft.recordIdx,
+		block_idx: draft.blockIdx,
+		call_id: draft.callId,
+		kind: draft.kind,
+		subtype: draft.subtype,
+		tool_name: draft.toolName,
+		is_error: draft.isError,
+		exit_code: draft.exitCode,
+		ts: draft.ts,
+		text: draft.text,
+		text_chars: draft.textChars,
+		byte_start: String(draft.byteStart),
+		byte_len: draft.byteLen,
+		facts: { ...draft.facts.extra } as Record<string, string>,
+		git_operation: draft.facts.gitOperation,
+	}));
+	const rows = parseGitObservations({
+		organizationId: "org",
+		userId: "user",
+		sessionId: "session",
+		source: "claude_code",
+		revision: "100",
+		transcriptParserVersion: 8,
+		records,
+	}).map((row) => ({
+		call_id: row.call_id,
+		kind: row.kind,
+		label: row.label,
+		branch: row.branch,
+		short_sha: row.short_sha,
+		pr: row.pr_number ? `${row.pr_repo}#${row.pr_number}` : "",
+	}));
+	expect(rows).toEqual([
+		// The push's output has no commit or push lines; Claude recorded both.
+		{
+			call_id: "toolu_push",
+			kind: "push_range",
+			label: "git_operation",
+			branch: "fix/login",
+			short_sha: "",
+			pr: "",
+		},
+		{
+			call_id: "toolu_push",
+			kind: "commit_created",
+			label: "git_operation",
+			branch: "",
+			short_sha: "4f2a9c1",
+			pr: "",
+		},
+		// gh pr create printed the URL; the recorded PR adds nothing.
+		{
+			call_id: "toolu_pr",
+			kind: "pr_url",
+			label: "observed",
+			branch: "",
+			short_sha: "",
+			pr: "acme/app#42",
+		},
+		// The pr-link record names the PR on its own.
+		{
+			call_id: "",
+			kind: "pr_url",
+			label: "pr_link",
+			branch: "",
+			short_sha: "",
+			pr: "acme/app#42",
+		},
+	]);
+});
+
+test("a recorded PR number with no URL anywhere keeps its repository unknown", () => {
+	// Real shape: `gh pr ready 148` records {pr: {number: 148, action: "ready"}}.
+	const rows = parseGitObservations(
+		recordsInput([
+			call("ready", "gh pr ready 148"),
+			result("ready", "", {
+				facts: { "git.pr.action": "ready", "git.pr.number": "148" },
+				git_operation: ["pr"],
+			}),
+		]),
+	);
+	expect(
+		rows.map((row) => [row.kind, row.label, row.pr_repo, row.pr_number]),
+	).toEqual([["pr_url", "git_operation", "", 148]]);
+});
+
+test("a recorded PR number takes the repository its command names, never a guess", () => {
+	const ready = (command: string) =>
+		parseGitObservations(
+			recordsInput([
+				call("ready", command),
+				result("ready", "", {
+					facts: { "git.pr.action": "ready", "git.pr.number": "148" },
+					git_operation: ["pr"],
+				}),
+			]),
+		).map((row) => [row.kind, row.pr_repo, row.pr_number]);
+	expect(ready("gh pr ready 148 --repo other/app")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	expect(ready("gh pr ready -R https://github.com/Other/App.git 148")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	expect(ready("gh pr ready https://github.com/other/app/pull/148")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	expect(ready("gh pr ready -Rother/app 148")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	expect(ready("gh pr ready -R=other/app 148")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	expect(ready("gh pr ready 148 --repo github.com/other/app")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	// Only the gh pr invocation for this PR names its repository.
+	expect(
+		ready("gh pr ready 148 --repo a/one && gh pr view 3 --repo b/two"),
+	).toEqual([["pr_url", "a/one", 148]]);
+	expect(ready('printf "%s" "--repo other/app" && gh pr ready 148')).toEqual([
+		["pr_url", "", 148],
+	]);
+	expect(ready("grep -r foo src && gh pr ready 148")).toEqual([
+		["pr_url", "", 148],
+	]);
+	expect(ready("gh pr ready 148 && gh pr view 3 --repo other/app")).toEqual([
+		["pr_url", "", 148],
+	]);
+	expect(ready("gh --repo other/app pr ready 148")).toEqual([
+		["pr_url", "other/app", 148],
+	]);
+	// An unnumbered invocation may be the same PR in another repository.
+	expect(
+		ready("gh pr ready --repo a/one && gh pr view 148 --repo b/two"),
+	).toEqual([]);
+	// Listing PRs elsewhere names no repository for this one.
+	expect(ready("gh pr ready 148; gh pr list --repo opalinehq/athena")).toEqual([
+		["pr_url", "", 148],
+	]);
+	// One invocation for it names a repository and another names none.
+	expect(ready("gh pr view 148 && gh pr ready --repo b/two")).toEqual([]);
+	// The PR's own invocations disagree: ambiguous, so nothing is linked.
+	expect(
+		ready("gh pr ready 148 --repo a/one || gh pr ready 148 --repo b/two"),
+	).toEqual([]);
+});
+
+test("a recorded PR whose URL the output lacks becomes a pr_url observation", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("pr", "gh pr ready 7"),
+			result("pr", "✓ Pull request #7 is marked as ready for review", {
+				facts: {
+					"git.pr.action": "ready",
+					"git.pr.number": "7",
+					"git.pr.url": "https://github.com/acme/app/pull/7",
+				},
+				git_operation: ["pr"],
+			}),
+		]),
+	);
+	expect(
+		rows.map((row) => [row.kind, row.label, row.pr_repo, row.pr_number]),
+	).toEqual([["pr_url", "git_operation", "acme/app", 7]]);
 });
 
 function recordsInput(

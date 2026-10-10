@@ -1114,7 +1114,8 @@ const PENDING: Readonly<Record<string, string>> = {
 	"calls.attribution_agent": "no non-null value seen yet; needs a fixture",
 	"runs.context_input_tokens_at_start": "usage events, not the parser",
 	"runs.compacted": "compaction records (kind), not a fact",
-	"runs.pushed_shas": "git extractor 4",
+	"runs.pushed_shas":
+		"push output (regex); gitOperation records only the branch",
 	"prompts.instruction_sha256": "not in transcripts; drift census (step 11)",
 };
 

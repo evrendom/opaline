@@ -7,7 +7,7 @@ import {
 import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated";
 import { filterKnownSecrets } from "@rudel/secret-filter";
 
-export const GIT_OBSERVATION_PARSER_VERSION = 3;
+export const GIT_OBSERVATION_PARSER_VERSION = 4;
 export const GIT_OBSERVATION_MAX_RAW_BYTES = 1024 * 1024;
 export const GIT_OBSERVATION_MAX_ROWS = 10_000;
 export const GIT_TOOL_PATTERN =
@@ -70,6 +70,10 @@ export interface GitObservationRecord {
 	text_chars: number;
 	byte_start: string;
 	byte_len: number;
+	/** Parser 6+ literal facts of the record (`facts` map); empty on older generations. */
+	facts?: Record<string, string>;
+	/** Parser 6+ `gitOperation` keys of a tool result. */
+	git_operation?: readonly string[];
 	raw?: string;
 }
 
@@ -132,6 +136,21 @@ export function parseGitObservations(
 					repository_url: repositoryUrl,
 				});
 		}
+		// Claude `pr-link` records name the PR the session worked on (parser 6+).
+		if (record.kind === "meta" && record.subtype === "pr-link") {
+			const pr = pullRequestFromFacts(
+				record.facts?.pr_repository,
+				record.facts?.pr_number,
+			);
+			if (pr)
+				observations.push({
+					...baseRow(input, record),
+					kind: "pr_url",
+					label: "pr_link",
+					...pr,
+				});
+			continue;
+		}
 		if (record.kind !== "tool_result") continue;
 		let call = calls.get(callKey(record));
 		if (
@@ -148,14 +167,27 @@ export function parseGitObservations(
 				sessions.delete(sessionKey);
 		}
 		let ordinal = 0;
+		const added: Partial<RudelSessionGitObservationsRow>[] = [];
 		const add = (fields: Partial<RudelSessionGitObservationsRow>) => {
 			if (observations.length >= GIT_OBSERVATION_MAX_ROWS)
 				throw new Error("Git observation expansion limit exceeded");
+			added.push(fields);
 			observations.push({
 				...baseRow(input, record),
 				block_idx: record.block_idx * 65_536 + ordinal++,
 				...fields,
 			});
+		};
+		// Claude records what a call did to git (`gitOperation`, parser 6+);
+		// each fact the output text did not already show becomes an
+		// observation labelled git_operation, after the text's own.
+		const addRecordedOperations = () => {
+			for (const fields of gitOperationObservations(
+				record,
+				added,
+				call ? shellCommand(call) : null,
+			))
+				add(fields);
 		};
 		// A call that ran (it has an exit code, or no error) may have done things
 		// even when it failed overall: a CI status read is a fact whether checks
@@ -193,9 +225,14 @@ export function parseGitObservations(
 		if (
 			record.is_error ||
 			(record.exit_code !== null && record.exit_code !== 0)
-		)
+		) {
+			addRecordedOperations();
 			continue;
-		if (!call) continue;
+		}
+		if (!call) {
+			addRecordedOperations();
+			continue;
+		}
 		if (
 			input.source === "codex" &&
 			call.tool_name.split(".").at(-1) === "exec_command"
@@ -210,7 +247,10 @@ export function parseGitObservations(
 				);
 		}
 		const mcp = GITHUB_PR_TOOL_PATTERN.test(call.tool_name);
-		if (mcp && mcpFailed(record.text)) continue;
+		if (mcp && mcpFailed(record.text)) {
+			addRecordedOperations();
+			continue;
+		}
 		const urlText = record.text.replaceAll("\\/", "/");
 		const seenUrls = new Set<string>();
 		for (const match of urlText.matchAll(
@@ -236,8 +276,182 @@ export function parseGitObservations(
 				pr_number: number,
 			});
 		}
+		addRecordedOperations();
 	}
 	return observations;
+}
+
+/**
+ * Observations from a tool result's recorded `gitOperation` facts that its
+ * output text did not already yield: a pushed branch with no push line, a
+ * commit SHA with no commit line, a pull request with no URL in the output.
+ */
+function gitOperationObservations(
+	record: GitObservationRecord,
+	fromText: readonly Partial<RudelSessionGitObservationsRow>[],
+	command: string | null,
+): Partial<RudelSessionGitObservationsRow>[] {
+	const facts = record.facts ?? {};
+	const operations = new Set(record.git_operation ?? []);
+	const out: Partial<RudelSessionGitObservationsRow>[] = [];
+	const label = "git_operation";
+	const pushBranch = safeText(facts["git.push.branch"] ?? "");
+	if (
+		operations.has("push") &&
+		pushBranch !== "" &&
+		!fromText.some(
+			(row) => row.kind === "push_range" && row.branch === pushBranch,
+		)
+	)
+		out.push({ kind: "push_range", label, branch: pushBranch });
+	const sha = (facts["git.commit.sha"] ?? "").toLowerCase();
+	if (
+		operations.has("commit") &&
+		/^[a-f\d]{4,64}$/u.test(sha) &&
+		!fromText.some(
+			(row) =>
+				row.kind === "commit_created" &&
+				(row.short_sha?.startsWith(sha) ||
+					sha.startsWith(row.short_sha ?? "-")),
+		)
+	)
+		out.push({ kind: "commit_created", label, short_sha: sha });
+	// A recorded PR number without a URL takes the repository its command
+	// names (`--repo owner/name`, `-R`, a PR URL argument); naming none keeps
+	// it unknown, so the edge resolver uses the session's repository and
+	// records that basis; naming several makes it ambiguous, so it is skipped.
+	const recordedNumber = Number(facts["git.pr.number"]);
+	const named = commandRepository(command, recordedNumber);
+	const pr =
+		pullRequestFromUrl(facts["git.pr.url"] ?? "") ??
+		(Number.isSafeInteger(recordedNumber) &&
+		recordedNumber >= 1 &&
+		recordedNumber <= 4_294_967_295 &&
+		named !== null
+			? { pr_repo: named, pr_number: recordedNumber }
+			: null);
+	if (
+		operations.has("pr") &&
+		pr &&
+		!fromText.some(
+			(row) =>
+				(row.kind === "pr_url" || row.kind === "mcp_pr_created") &&
+				row.pr_number === pr.pr_number &&
+				(pr.pr_repo === "" ||
+					row.pr_repo?.toLowerCase() === pr.pr_repo.toLowerCase()),
+		)
+	)
+		out.push({ kind: "pr_url", label, ...pr });
+	return out;
+}
+
+/**
+ * The repository a shell command's `gh pr` invocations name for pull request
+ * `number`: their `--repo`/`-R` values or PR URL arguments. Only `gh pr`
+ * invocations that name that number or none (the current branch's PR) count;
+ * a matching number alone does not prove the same PR across repositories, so
+ * any two that name different repositories, or one naming a repository and
+ * one naming none (the session's), make it ambiguous (null). "" when none of
+ * them names a repository.
+ */
+function commandRepository(
+	command: string | null,
+	number: number,
+): string | null {
+	if (!command) return "";
+	// "" stands for the session's repository: an invocation naming none
+	// disagrees with one naming another repository.
+	const named = new Set<string>();
+	for (const segment of parseShellCommand(command)) {
+		const target = ghPrTarget(segment.words);
+		if (!target || (target.number !== number && target.number !== 0)) continue;
+		named.add(target.repo);
+	}
+	if (named.size > 1) return null;
+	const [repository = ""] = named;
+	return safeText(repository);
+}
+
+/** The PR number (0 when none) and repository ("" when none) a `gh pr` invocation names. */
+function ghPrTarget(
+	words: readonly string[],
+): { number: number; repo: string } | null {
+	if (words[0]?.split("/").at(-1) !== "gh") return null;
+	// `gh --repo owner/name pr ready 148`: repository flags may precede `pr`.
+	let repo = "";
+	const positional: string[] = [];
+	for (let index = 1; index < words.length; index++) {
+		const word = words[index] ?? "";
+		const repoFlag = /^(?:--repo|-R)(?:=(.*))?$/u.exec(word);
+		if (repoFlag) {
+			repo = repoFlag[1] ?? words[++index] ?? "";
+			continue;
+		}
+		if (word.startsWith("-R") && word.length > 2) {
+			repo = word.slice(2);
+			continue;
+		}
+		const [flag] = word.startsWith("--") ? word.split("=", 2) : [word];
+		if (GH_VALUE_FLAGS.has(flag ?? "") && !word.includes("=")) {
+			index++;
+			continue;
+		}
+		if (word.startsWith("-")) continue;
+		positional.push(word);
+	}
+	// Only commands acting on one pull request; `gh pr list` and
+	// `gh pr status` name none.
+	if (positional[0] !== "pr" || GH_PR_MULTI_ACTIONS.has(positional[1] ?? ""))
+		return null;
+	const target = positional[2] ?? "";
+	const url = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/u.exec(
+		target,
+	);
+	if (url)
+		return {
+			number: prNumber(url[3]),
+			repo: normalizeRepository(`${url[1]}/${url[2]}`),
+		};
+	return {
+		number: /^\d+$/u.test(target) ? prNumber(target) : 0,
+		repo: normalizeRepository(repo),
+	};
+}
+
+const GH_PR_MULTI_ACTIONS: ReadonlySet<string> = new Set(["list", "status"]);
+
+/** `owner/name` of a gh repository argument (HOST/OWNER/REPO, URL, .git), lowercased. */
+function normalizeRepository(value: string): string {
+	const path = value
+		.trim()
+		.replace(/^https?:\/\//u, "")
+		.replace(/^github\.com\//iu, "")
+		.replace(/\.git$/u, "");
+	return /^[\w.-]+\/[\w.-]+$/u.test(path) ? path.toLowerCase() : "";
+}
+
+function pullRequestFromUrl(
+	url: string,
+): { pr_repo: string; pr_number: number } | null {
+	const match =
+		/^https:\/\/github\.com\/([a-z\d_.-]+)\/([a-z\d_.-]+)\/pull\/([1-9]\d*)(?![\dA-Za-z])/iu.exec(
+			url,
+		);
+	return match
+		? pullRequestFromFacts(`${match[1]}/${match[2]}`, match[3])
+		: null;
+}
+
+function pullRequestFromFacts(
+	repository: string | undefined,
+	number: string | undefined,
+): { pr_repo: string; pr_number: number } | null {
+	if (!repository || !/^[a-z\d_.-]+\/[a-z\d_.-]+$/iu.test(repository))
+		return null;
+	const parsed = Number(number);
+	if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 4_294_967_295)
+		return null;
+	return { pr_repo: safeText(repository), pr_number: parsed };
 }
 
 export function baseRow(

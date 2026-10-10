@@ -155,7 +155,9 @@ export async function extractGitObservations(
 				clickhouse_settings: SCAN_SETTINGS,
 				query: `SELECT ${recordColumns()} FROM rudel.transcript_records FINAL WHERE ${recordsFilter()} AND (
 				(kind = 'tool_call' AND (match(text, {gitPattern:String}) OR match(tool_name, {mcpPattern:String}) OR text_chars > lengthUTF8(text) OR (source = 'codex' AND match(tool_name, '(^|[.])write_stdin$'))))
-				OR (source = 'codex' AND kind = 'meta' AND subtype = 'session_meta')) ORDER BY agent_id, record_idx, block_idx LIMIT ${MAX_CALLS + 1}`,
+				OR (source = 'codex' AND kind = 'meta' AND subtype = 'session_meta')
+				OR (kind = 'meta' AND subtype = 'pr-link')
+				OR (kind = 'tool_result' AND notEmpty(git_operation))) ORDER BY agent_id, record_idx, block_idx LIMIT ${MAX_CALLS + 1}`,
 				query_params: {
 					...scope,
 					gitPattern: `(?i)${GIT_TOOL_PATTERN.source}`,
@@ -182,13 +184,23 @@ export async function extractGitObservations(
 					);
 		if (results.length > MAX_RESULTS)
 			throw new Error("Git observation result bound exceeded");
-		const records = [...candidates, ...results];
+		// A result with recorded git operations can be both a candidate and the
+		// result of a candidate call: keep one copy.
+		const seen = new Set<string>();
+		const records = [...candidates, ...results].filter((record) => {
+			const key = `${record.agent_id}\u0000${record.record_idx}\u0000${record.block_idx}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
 		let rawBytes = 0;
 		let rawReads = 0;
 		for (const record of records) {
 			deadline.assertActive();
+			// Only Codex session_meta is read from the raw line; other records need
+			// it only when their stored text was capped.
 			if (
-				record.kind !== "meta" &&
+				!(record.kind === "meta" && record.subtype === "session_meta") &&
 				record.text_chars <= [...record.text].length
 			)
 				continue;
@@ -364,5 +376,5 @@ function recordsFilter(): string {
 	return `${identityFilter()} AND revision = {revision:UInt64} AND parser_version = {transcriptParserVersion:UInt16}`;
 }
 function recordColumns(): string {
-	return "agent_id, record_idx, block_idx, call_id, kind, subtype, tool_name, is_error, exit_code, ts, text, text_chars, toString(byte_start) AS byte_start, byte_len";
+	return "agent_id, record_idx, block_idx, call_id, kind, subtype, tool_name, is_error, exit_code, ts, text, text_chars, toString(byte_start) AS byte_start, byte_len, facts, git_operation";
 }
