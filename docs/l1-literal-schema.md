@@ -25,24 +25,26 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `command_argv0`, `command_prefix` | first words of the shell command | `parsed_cmd`, `command` | none |
 | `command_fingerprint`, `command_simhash` | normalized command / written script | same | none |
 | `is_error`, `exit_code` | `tool_result.is_error`, transport framing | `exit_code`, `status = failed` | stored |
-| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded | raw (Claude); text (Codex) |
-| `return_code_interpretation` | `toolUseResult.returnCodeInterpretation` | none | raw |
-| `duration_ms` | `toolUseResult.durationMs` / `durationSeconds` | `item.duration`, `completed_at_ms - started_at_ms` | raw |
-| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | none | raw |
-| `is_async`, `background_task_id` | `toolUseResult.isAsync`, `backgroundTaskId`, input `run_in_background` | running preamble | raw (subtype `running` only) |
-| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | `turn_aborted` | raw |
-| `stdout_chars`, `stderr_chars`, `persisted_output_bytes` | `toolUseResult.stdout`, `stderr`, `persistedOutputSize` | `stdout`, `stderr`, `aggregated_output` | text (merged) |
+| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded | stored (Claude, parser v6); text (Codex) |
+| `return_code_interpretation` | `toolUseResult.returnCodeInterpretation` | none | stored (parser v6) |
+| `duration_ms` | `toolUseResult.durationMs` / `durationSeconds` | `item.duration`, `completed_at_ms - started_at_ms` | stored (parser v6) |
+| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | none | stored (parser v6) |
+| `is_async`, `background_task_id` | `toolUseResult.isAsync`, `backgroundTaskId`, input `run_in_background` | running preamble | stored (Claude, parser v6); subtype `running` (Codex) |
+| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | `turn_aborted` | stored (Claude, parser v6); Codex with `runs` |
+| `stdout_chars`, `stderr_chars`, `persisted_output_bytes` | `toolUseResult.stdout`, `stderr`, `persistedOutputSize` | `stdout`, `stderr`, `aggregated_output` | stored (Claude, parser v6); text (Codex, merged) |
 | `result_chars` | result text | output text | stored (`text_chars`) |
-| `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` | raw (Claude) |
-| `git_operation` | `toolUseResult.gitOperation` (`push`, `pr`, `branch`, `commit`) | none (observations parser) | raw |
-| `mcp_server`, `mcp_tool`, `mcp_read_only` | `attributionMcpServer`, `attributionMcpTool`, `mcpMeta` | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` | text (tool name only) |
+| `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` | stored (Claude, parser v6) |
+| `git_operation` | `toolUseResult.gitOperation` (`push`, `pr`, `branch`, `commit`) | none (observations parser) | stored (parser v6) |
+| `mcp_server`, `mcp_tool`, `mcp_read_only` | `attributionMcpServer`, `attributionMcpTool`, `mcpMeta` | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` | stored (parser v6; `mcp_read_only` Codex only) |
 | `file_path`, `file_op` | Read/Write/Edit input | patch paths | stored |
-| `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` | raw |
-| `stale_read` | `toolUseResult.staleReadFileStateHint` | none | raw |
-| `search_matches` | `toolUseResult.numFiles`, `matches` | none | raw |
+| `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` | stored (Claude, parser v6); Codex in `file_change` text |
+| `stale_read` | `toolUseResult.staleReadFileStateHint` | none | stored (parser v6) |
+| `search_matches` | `toolUseResult.numFiles`, `matches` | none | stored (`numFiles`, parser v6) |
 | `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` | stored (Claude); raw (Codex) |
-| `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` | raw |
+| `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` | skill (Claude) and plugin (Codex) stored (parser v6); rest raw |
 | `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `turn_context.cwd` | session-level only |
+
+Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Fact values share a session budget (4M characters): past it a record keeps only short values and says `facts_truncated`.
 
 ### `runs`: one row per run (one human prompt and everything until the next)
 
@@ -55,7 +57,7 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | raw |
 | `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | raw |
 | `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); effort raw |
-| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | raw |
+| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | stored (parser v6, every record) |
 | `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) | stored; tokens not exposed |
 | `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | raw / stored |
 | `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; rest raw |
@@ -66,7 +68,7 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `hook_runs` (command, duration) | system `hookInfos` | none | raw |
 | `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | text / raw |
 | `goal` | none | `thread_goal_updated.goal` | raw |
-| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` raw |
+| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` stored (parser v6) |
 | `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same | join |
 | `repository_id` | repository evidence index, GitHub binding | same | heuristic key in the UI, literal coalesce in analysis |
 
@@ -139,7 +141,7 @@ The reconciliation worker rebuilds a scope when an input changes: a session gene
 | CI checked after push | `ci_check` observations after the push in the same stream | the push | the check command, exit code, delay |
 | Not covered | binding, readiness, retention boundary, last sync, observation receipt, new-branch push without SHA, a check without a target | the session | the reason (`github.status`, `ciRunCountUnknown`), never an empty result or a zero count |
 
-Git extractor version 3 records the `To <remote>` of each push, new-branch pushes, forced updates and `ci_check` calls (`unconfirmed` when the command does not show they ran). Until the edge worker ships, `find source=git` computes these links at query time, pinned to the observation generation of each session's indexed transcript, with per-event GitHub coverage. A CI status read keeps the run id it names (`gh run view|watch <id>`, MCP `run_id`) in `run_id`. An event's CI count is the run attempts started before `ciRunCountThrough`, the earliest `coveredThrough` (end of the completed pulls, actions, attempts and external windows) of every repository its runs come from, a fork PR's base included. It is set only when every target the event names was looked up and each target's history starts inside that coverage: a PR's a day before its creation, a named run's at its creation, a branch check's at its window, and a SHA's at the commit observation of the session that created it. A SHA the session did not create has an unknown history, since a later PR or run on it does not date its earlier CI. Otherwise the count is null with the reason; runs found after the boundary are listed, not counted. Not yet stored: Claude `pr-link` and `gitOperation`, which parser v6 adds.
+Git extractor version 3 records the `To <remote>` of each push, new-branch pushes, forced updates and `ci_check` calls (`unconfirmed` when the command does not show they ran). Until the edge worker ships, `find source=git` computes these links at query time, pinned to the observation generation of each session's indexed transcript, with per-event GitHub coverage. A CI status read keeps the run id it names (`gh run view|watch <id>`, MCP `run_id`) in `run_id`. An event's CI count is the run attempts started before `ciRunCountThrough`, the earliest `coveredThrough` (end of the completed pulls, actions, attempts and external windows) of every repository its runs come from, a fork PR's base included. It is set only when every target the event names was looked up and each target's history starts inside that coverage: a PR's a day before its creation, a named run's at its creation, a branch check's at its window, and a SHA's at the commit observation of the session that created it. A SHA the session did not create has an unknown history, since a later PR or run on it does not date its earlier CI. Otherwise the count is null with the reason; runs found after the boundary are listed, not counted. Parser v6 stores Claude `pr-link` and `gitOperation` as record facts; git extractor version 4 will read those instead of matching command output.
 
 ### Capture for new sessions
 
@@ -190,7 +192,7 @@ Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery S
 4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
 5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse.
 6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills).
-7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill.
+7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
 8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
 9. GitHub evidence and repository configuration in ClickHouse.
 10. `find` over `calls`, `runs`, `prompts` and edges, the schema reference and premade queries in the plugin skill.

@@ -7,7 +7,130 @@
  */
 
 /** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 5;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 6;
+
+/** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
+export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
+
+/** Cap on one value in `facts` (code points). */
+export const TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS = 512;
+
+/** Cap on a `facts` value that holds a JSON list (code points). */
+export const TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS = 2_048;
+
+/**
+ * Characters of `facts` values one session may store across its streams. The
+ * typed fact columns are short and always kept; once the budget is spent, a
+ * record keeps only values of at most `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`
+ * and says `facts_truncated`, so a cut value never reads as not recorded.
+ */
+export const TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS = 4 * 1024 * 1024;
+export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
+
+/**
+ * Keys of `facts`, named after the L1 spec columns, with the parser version
+ * that first fills each. A key is written only when the record carries the
+ * value, so a missing key means not recorded, and only for rows of at least
+ * its version.
+ */
+export const TRANSCRIPT_RECORD_FACT_KEYS = {
+	/** Claude tool result `returnCodeInterpretation`. */
+	return_code_interpretation: 6,
+	/** Claude tool result `noOutputExpected` (true/false). */
+	no_output_expected: 6,
+	/** Claude tool result `timeoutMs`. */
+	timeout_ms: 6,
+	/** Claude tool result `isAsync` (true/false). */
+	is_async: 6,
+	/** Claude tool result `backgroundTaskId`. */
+	background_task_id: 6,
+	/**
+	 * Claude tool result `bashEditDiff.files[]` as a JSON array of
+	 * `{filePath, created?, deleted?}`, cut to whole entries that fit the cap.
+	 */
+	shell_edit_files: 6,
+	/** Files of `bashEditDiff` left out of `shell_edit_files`: its `moreFiles` plus entries cut by the cap. */
+	shell_edit_files_more: 6,
+	/** Claude tool result `bashEditDiff.changedFiles` paths, as a JSON array cut to whole entries. */
+	shell_edit_changed_files: 6,
+	/** `changedFiles` paths cut by the cap. */
+	shell_edit_changed_files_more: 6,
+	/** Claude tool result `bashEditDiff.unavailable` and `.shared` (true/false). */
+	shell_edit_unavailable: 6,
+	shell_edit_shared: 6,
+	/** Lines added and removed in a Claude tool result `structuredPatch`. */
+	patch_lines_added: 6,
+	patch_lines_removed: 6,
+	/** Claude tool result `userModified` (true/false). */
+	user_modified: 6,
+	/** Characters of a Claude tool result `stdout` and `stderr`; the text itself stays in `text`. */
+	stdout_chars: 6,
+	stderr_chars: 6,
+	/** Claude tool result `persistedOutputSize`. */
+	persisted_output_bytes: 6,
+	/** Claude tool result `staleReadFileStateHint`, the notice naming files changed since they were read. */
+	stale_read: 6,
+	/** Claude search tool result `numFiles`. */
+	search_matches: 6,
+	/** Claude tool result `gitOperation` values. */
+	"git.push.branch": 6,
+	"git.pr.number": 6,
+	"git.pr.action": 6,
+	"git.pr.url": 6,
+	"git.commit.sha": 6,
+	"git.commit.kind": 6,
+	"git.branch.ref": 6,
+	"git.branch.action": 6,
+	/** Claude `pr-link` record. */
+	pr_repository: 6,
+	pr_number: 6,
+	pr_url: 6,
+	/** Codex McpToolCall `readOnlyHint` (true/false). */
+	mcp_read_only: 6,
+	/** Codex McpToolCall `pluginId`. */
+	attribution_plugin: 6,
+	/** "true" when the session fact budget dropped longer values of this record. */
+	facts_truncated: 6,
+} as const satisfies Record<string, number>;
+
+export type TranscriptRecordFactKey = keyof typeof TRANSCRIPT_RECORD_FACT_KEYS;
+
+/**
+ * Literal facts of one record (parser v6): empty, null or an empty map when
+ * the record does not carry them.
+ */
+export interface TranscriptRecordFacts {
+	/** Claude Code `version`, Codex session_meta `cli_version`, carried forward in the stream. */
+	readonly agentVersion: string;
+	/** Claude Code `entrypoint`, Codex session_meta `originator`, carried forward in the stream. */
+	readonly entrypoint: string;
+	/** Claude `toolDenialKind` of a tool result. */
+	readonly denialKind: string;
+	readonly durationMs: number | null;
+	readonly timedOutAfterMs: number | null;
+	readonly interrupted: boolean | null;
+	/** Claude tool result `gitOperation` keys (push, pr, branch, commit). */
+	readonly gitOperation: readonly string[];
+	readonly mcpServer: string;
+	readonly mcpTool: string;
+	/** Claude assistant `attributionSkill`. */
+	readonly attributionSkill: string;
+	readonly extra: Readonly<Partial<Record<TranscriptRecordFactKey, string>>>;
+}
+
+export const NO_TRANSCRIPT_RECORD_FACTS: TranscriptRecordFacts = {
+	agentVersion: "",
+	entrypoint: "",
+	denialKind: "",
+	durationMs: null,
+	timedOutAfterMs: null,
+	interrupted: null,
+	gitOperation: [],
+	mcpServer: "",
+	mcpTool: "",
+	attributionSkill: "",
+	extra: {},
+};
 
 /** record_idx of the per-revision receipt row. Real lines never reach this. */
 export const TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX = 4_294_967_295;
@@ -127,6 +250,8 @@ export interface TranscriptRecordDraft {
 	readonly head: string;
 	readonly tail: string;
 	readonly text: string;
+	/** Literal facts the record carries (parser v6). */
+	readonly facts: TranscriptRecordFacts;
 }
 
 export interface TranscriptTextBudget {
@@ -156,6 +281,8 @@ export interface SplitTranscriptOptions {
 	readonly source: TranscriptSource;
 	readonly textBudget?: TranscriptTextBudget;
 	readonly textMaxChars?: number;
+	/** Session fact budget shared by its streams (see `TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS`). */
+	readonly factBudget?: { remaining: number };
 	/**
 	 * Store the whole decoded text of every record that has one, with no cap or
 	 * budget (the record read's raw fallback re-derives one line this way).

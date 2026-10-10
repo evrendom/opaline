@@ -3,14 +3,22 @@ import type { UserTextClassification } from "./injected-wrappers.js";
 import type {
 	CommandClass,
 	FileOperation,
+	TranscriptRecordFacts,
 	TranscriptRecordKind,
 } from "./types.js";
+
+/** Facts of one item; the agent version and entrypoint come from the stream. */
+export type LineFacts = Partial<
+	Omit<TranscriptRecordFacts, "agentVersion" | "entrypoint">
+>;
 
 /** One logical row derived from a raw JSONL line, before identity and text caps. */
 export interface LineItem {
 	readonly callId?: string;
 	readonly commandClass?: CommandClass;
 	readonly exitCode?: number | null;
+	/** Literal facts the line carries for this item (parser v6). */
+	readonly facts?: LineFacts;
 	readonly fileOp?: FileOperation;
 	readonly filePath?: string;
 	readonly isError?: boolean;
@@ -29,6 +37,8 @@ export interface LineResult {
 
 export interface KnownCall {
 	readonly commandClass: CommandClass;
+	/** MCP identity recorded with the call, repeated on its result. */
+	readonly facts?: LineFacts;
 	readonly toolName: string;
 }
 
@@ -45,6 +55,8 @@ export interface CodexExecScript {
 
 /** Mutable per-stream context shared by the format adapters and the core loop. */
 export interface StreamState {
+	/** Agent version of the latest record that named one (Claude `version`, Codex `cli_version`). */
+	agentVersion: string;
 	readonly calls: Map<string, KnownCall>;
 	codexAgentPath: string;
 	/** Ids of completed Codex items already recorded (an item can complete twice). */
@@ -56,6 +68,8 @@ export interface StreamState {
 	 * Codex writes right after the completion, has not arrived yet.
 	 */
 	codexPendingWebSearchMirrors: number;
+	/** How the agent was started (Claude `entrypoint`, Codex `originator`). */
+	entrypoint: string;
 	isSubagent: boolean;
 	/**
 	 * Claude prompts delivered as queued-command attachments whose user message
@@ -75,6 +89,7 @@ export function createStreamState(
 	isSubagent = false,
 ): StreamState {
 	return {
+		agentVersion: "",
 		calls: new Map(),
 		claudeQueuedPrompts: [],
 		codexAgentPath: "",
@@ -82,6 +97,7 @@ export function createStreamState(
 		codexEndEvents: new Map(),
 		codexExecScript: undefined,
 		codexPendingWebSearchMirrors: 0,
+		entrypoint: "",
 		isSubagent,
 		lastPromptText: "",
 		lastTs: fallbackTs,

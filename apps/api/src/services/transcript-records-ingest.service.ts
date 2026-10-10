@@ -7,6 +7,7 @@ import {
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 	type TranscriptRecordDraft,
+	type TranscriptRecordFacts,
 	type TranscriptRecordsReceipt,
 	type TranscriptSource,
 	type TranscriptSplitSummary,
@@ -290,6 +291,25 @@ export function noRecordFacts(): Pick<
 	};
 }
 
+/** The parser v6 fact columns of a draft. */
+export function recordFactColumns(
+	facts: TranscriptRecordFacts,
+): ReturnType<typeof noRecordFacts> {
+	return {
+		agent_version: facts.agentVersion,
+		entrypoint: facts.entrypoint,
+		denial_kind: facts.denialKind,
+		duration_ms: facts.durationMs,
+		timed_out_after_ms: facts.timedOutAfterMs,
+		interrupted: facts.interrupted,
+		git_operation: [...facts.gitOperation],
+		mcp_server: facts.mcpServer,
+		mcp_tool: facts.mcpTool,
+		attribution_skill: facts.attributionSkill,
+		facts: { ...facts.extra },
+	};
+}
+
 export function buildTranscriptRecordRow(
 	identity: TranscriptRecordsIdentity & {
 		readonly revision: string;
@@ -298,7 +318,7 @@ export function buildTranscriptRecordRow(
 	draft: TranscriptRecordDraft,
 ): RudelTranscriptRecordsRow {
 	return {
-		...noRecordFacts(),
+		...recordFactColumns(draft.facts),
 		agent_id: draft.agentId,
 		block_idx: draft.blockIdx,
 		byte_len: draft.byteLen,
@@ -665,11 +685,25 @@ function buildDeduplicationTokenPrefix(
 }
 
 function estimateRowBytes(row: RudelTranscriptRecordsRow): number {
+	// Typed fact strings and arrays, then the map; JSON adds quotes and separators.
+	let factBytes = [
+		row.agent_version,
+		row.entrypoint,
+		row.denial_kind,
+		row.mcp_server,
+		row.mcp_tool,
+		row.attribution_skill,
+		...row.git_operation,
+	].reduce((total, value) => total + Buffer.byteLength(value, "utf8") + 4, 0);
+	for (const [key, value] of Object.entries(row.facts))
+		factBytes +=
+			Buffer.byteLength(key, "utf8") + Buffer.byteLength(value, "utf8") + 6;
 	return (
 		Buffer.byteLength(row.text, "utf8") +
 		Buffer.byteLength(row.head, "utf8") +
 		Buffer.byteLength(row.tail, "utf8") +
 		Buffer.byteLength(row.file_path, "utf8") +
+		factBytes +
 		400
 	);
 }

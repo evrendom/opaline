@@ -63,10 +63,15 @@ export async function enqueueL1EdgeScope(
 		 ON CONFLICT (organization_id, scope_kind, scope_id) DO UPDATE SET
 			request_count = l1_edge_scope.request_count + 1,
 			priority = LEAST(l1_edge_scope.priority, EXCLUDED.priority),
+			-- A pending scope keeps the earlier due time, but a request never
+			-- shortens a failed build's backoff (last_error is set by a failure
+			-- and cleared only by a completed build); a parked scope
+			-- ('infinity') wakes with fresh attempts.
 			next_attempt_at = CASE
 				WHEN l1_edge_scope.request_count > l1_edge_scope.built_request_count
 					AND l1_edge_scope.next_attempt_at <> 'infinity'
-				THEN LEAST(l1_edge_scope.next_attempt_at, EXCLUDED.next_attempt_at)
+				THEN CASE WHEN l1_edge_scope.last_error IS NOT NULL THEN l1_edge_scope.next_attempt_at
+					ELSE LEAST(l1_edge_scope.next_attempt_at, EXCLUDED.next_attempt_at) END
 				ELSE EXCLUDED.next_attempt_at END,
 			attempt_count = CASE WHEN l1_edge_scope.next_attempt_at = 'infinity' THEN 0 ELSE l1_edge_scope.attempt_count END,
 			updated_at = now()`,
@@ -201,7 +206,12 @@ export async function completeL1EdgeScope(
 
 /**
  * Records a failed build and backs off; after `L1_EDGE_MAX_ATTEMPTS` the
- * scope waits for its next request. Returns false when the lease was lost.
+ * scope waits for its next request. A request that arrived during that last
+ * build already is that next request: the attempts restart and the scope is
+ * retried after the first backoff, as when a request reaches a parked scope,
+ * rather than parked (a deferred build waits for exactly that request). Every
+ * failure backs off, so frequent requests cannot make a failing scope spin.
+ * Returns false when the lease was lost.
  */
 export async function failL1EdgeScope(
 	sql: Sql,
@@ -210,10 +220,17 @@ export async function failL1EdgeScope(
 	random: () => number = Math.random,
 ): Promise<boolean> {
 	const delayMs = l1EdgeRetryDelayMs(claim.attemptCount, random());
+	const restartDelayMs = l1EdgeRetryDelayMs(1, random());
 	const rows = await sql.unsafe(
 		`UPDATE l1_edge_scope SET
-			next_attempt_at = CASE WHEN attempt_count >= $5 THEN 'infinity'::timestamptz
-				ELSE now() + $6::bigint * interval '1 millisecond' END,
+			next_attempt_at = CASE
+				WHEN attempt_count < $5 THEN now() + $6::bigint * interval '1 millisecond'
+				WHEN request_count > claimed_request_count
+				THEN now() + $8::bigint * interval '1 millisecond'
+				ELSE 'infinity'::timestamptz END,
+			attempt_count = CASE
+				WHEN attempt_count >= $5 AND request_count > claimed_request_count THEN 0
+				ELSE attempt_count END,
 			last_error = $7, lease_token = NULL, lease_expires_at = NULL, updated_at = now()
 		 WHERE organization_id = $1 AND scope_kind = $2 AND scope_id = $3 AND lease_token = $4
 		 RETURNING 1`,
@@ -225,6 +242,7 @@ export async function failL1EdgeScope(
 			L1_EDGE_MAX_ATTEMPTS,
 			delayMs,
 			error.slice(0, 1_000),
+			restartDelayMs,
 		],
 	);
 	return rows.length === 1;
@@ -304,7 +322,8 @@ export async function enqueueL1EdgeDependents(
 			request_count = scope.request_count + 1,
 			next_attempt_at = CASE
 				WHEN scope.request_count > scope.built_request_count AND scope.next_attempt_at <> 'infinity'
-				THEN LEAST(scope.next_attempt_at, now() + $4::bigint * interval '1 millisecond')
+				THEN CASE WHEN scope.last_error IS NOT NULL THEN scope.next_attempt_at
+					ELSE LEAST(scope.next_attempt_at, now() + $4::bigint * interval '1 millisecond') END
 				ELSE now() + $4::bigint * interval '1 millisecond' END,
 			attempt_count = CASE WHEN scope.next_attempt_at = 'infinity' THEN 0 ELSE scope.attempt_count END,
 			updated_at = now()

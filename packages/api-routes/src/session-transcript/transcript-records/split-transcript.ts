@@ -4,6 +4,7 @@ import { readCodexAgentId, readCodexLine } from "./codex-records.js";
 import {
 	createStreamState,
 	isRecord,
+	type LineFacts,
 	type LineItem,
 	type StreamState,
 } from "./line-items.js";
@@ -15,14 +16,18 @@ import {
 	type TranscriptTextFields,
 } from "./text-fields.js";
 import {
+	NO_TRANSCRIPT_RECORD_FACTS,
 	type SplitTranscriptOptions,
 	TRANSCRIPT_RECORD_EXCERPT_CHARS,
+	TRANSCRIPT_RECORD_FACT_SHORT_CHARS,
 	TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES,
 	TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
+	TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS,
 	TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
 	type TranscriptRecordDraft,
+	type TranscriptRecordFacts,
 	type TranscriptRecordKind,
 	type TranscriptSource,
 	type TranscriptSplitSummary,
@@ -78,6 +83,7 @@ export interface SessionTranscriptInput {
 	readonly subagents?: Readonly<Record<string, string>>;
 	readonly textBudgetChars?: number;
 	readonly textMaxChars?: number;
+	readonly factBudgetChars?: number;
 }
 
 /**
@@ -99,6 +105,10 @@ export function* splitSessionTranscript(
 		pace: { bytesBefore: 0, totalBytes, totalChars },
 	};
 	const shared = {
+		factBudget: {
+			remaining:
+				input.factBudgetChars ?? TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS,
+		},
 		fallbackTs: input.sessionDate,
 		maxParseLineBytes: input.maxParseLineBytes,
 		source: input.source,
@@ -133,6 +143,13 @@ export function* splitTranscript(
 		let state = streams.get(agentId);
 		if (state === undefined) {
 			state = createStreamState(options.fallbackTs, agentId !== "");
+			// A Codex sub-agent inside the file runs in the same CLI as the file's
+			// own agent, whose session_meta came first.
+			const main = streams.get(mainAgentId);
+			if (main !== undefined) {
+				state.agentVersion = main.agentVersion;
+				state.entrypoint = main.entrypoint;
+			}
 			streams.set(agentId, state);
 		}
 		return state;
@@ -162,13 +179,7 @@ export function* splitTranscript(
 			stats.oversizedLineCount++;
 			stats.rowCount++;
 			const state = streamFor(mainAgentId);
-			yield buildOversizedDraft(
-				line,
-				mainAgentId,
-				state.lastTs,
-				state.turnIdx,
-				location,
-			);
+			yield buildOversizedDraft(line, mainAgentId, state, location);
 			if (isLast) break;
 			continue;
 		}
@@ -225,7 +236,9 @@ export function* splitTranscript(
 				agentId,
 				blockIdx,
 				fields,
-				item,
+				item: options.fullText
+					? item
+					: { ...item, facts: budgetFacts(item.facts, options.factBudget) },
 				location,
 				state,
 				ts,
@@ -296,6 +309,39 @@ function storedTextCap(
 	return undefined;
 }
 
+/**
+ * Spend the session fact budget on a record's `facts` values; past it, keep
+ * only short values and mark the record `facts_truncated`.
+ */
+function budgetFacts(
+	facts: LineFacts | undefined,
+	budget: { remaining: number } | undefined,
+): LineFacts | undefined {
+	if (facts?.extra === undefined || budget === undefined) return facts;
+	const values = Object.entries(facts.extra);
+	let chars = 0;
+	for (const [, value] of values) chars += value?.length ?? 0;
+	if (chars <= budget.remaining) {
+		budget.remaining -= chars;
+		return facts;
+	}
+	const kept: Record<string, string> = {};
+	let dropped = false;
+	for (const [key, value] of values) {
+		if (value === undefined) continue;
+		if (value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS) {
+			dropped = true;
+			continue;
+		}
+		kept[key] = value;
+		budget.remaining -= value.length;
+	}
+	return {
+		...facts,
+		extra: dropped ? { ...kept, facts_truncated: "true" } : kept,
+	};
+}
+
 function applyTurnState(state: StreamState, item: LineItem): void {
 	if (item.kind === "user_prompt") {
 		// Consecutive prompts with no response between them belong to one turn.
@@ -331,6 +377,7 @@ function buildDraft(input: {
 		callId: item.callId ?? "",
 		commandClass: item.commandClass ?? "",
 		exitCode: item.exitCode ?? null,
+		facts: { ...streamFacts(input.state), ...item.facts },
 		fileOp: item.fileOp ?? "",
 		filePath: item.filePath ?? "",
 		head: fields.head,
@@ -348,11 +395,19 @@ function buildDraft(input: {
 	};
 }
 
+/** Facts every record of a stream carries: the agent version and entrypoint. */
+function streamFacts(state: StreamState): TranscriptRecordFacts {
+	return {
+		...NO_TRANSCRIPT_RECORD_FACTS,
+		agentVersion: state.agentVersion,
+		entrypoint: state.entrypoint,
+	};
+}
+
 function buildOversizedDraft(
 	line: string,
 	agentId: string,
-	ts: string,
-	turnIdx: number,
+	state: StreamState,
 	location: { byteLen: number; byteStart: number; lineNumber: number },
 ): TranscriptRecordDraft {
 	return {
@@ -363,6 +418,7 @@ function buildOversizedDraft(
 		callId: "",
 		commandClass: "",
 		exitCode: null,
+		facts: streamFacts(state),
 		fileOp: "",
 		filePath: "",
 		head: sliceStart(line, TRANSCRIPT_RECORD_EXCERPT_CHARS),
@@ -378,8 +434,8 @@ function buildOversizedDraft(
 		text: "",
 		textChars: line.length,
 		toolName: "",
-		ts,
-		turnIdx,
+		ts: state.lastTs,
+		turnIdx: state.turnIdx,
 	};
 }
 

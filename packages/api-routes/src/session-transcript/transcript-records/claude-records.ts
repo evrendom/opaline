@@ -7,6 +7,7 @@ import { classifyUserText } from "./injected-wrappers.js";
 import {
 	injectedAroundPrompt,
 	isRecord,
+	type LineFacts,
 	type LineItem,
 	type LineResult,
 	metaItem,
@@ -15,6 +16,13 @@ import {
 	safeStringify,
 	shellFileChangeItem,
 } from "./line-items.js";
+import {
+	claudePrLinkFacts,
+	claudeToolResultFacts,
+	factText,
+	mcpFacts,
+	mergeFacts,
+} from "./record-facts.js";
 import type { CommandClass } from "./types.js";
 
 const SUBAGENT_LAUNCH_TOOLS: ReadonlySet<string> = new Set(["task", "agent"]);
@@ -29,11 +37,21 @@ export function readClaudeLine(
 	const type = readString(record.type) ?? "";
 	state.isSubagent ||=
 		record.isSidechain === true && readString(record.agentId) !== undefined;
+	const version = readString(record.version);
+	if (version !== undefined) state.agentVersion = factText(version, 64);
+	const entrypoint = readString(record.entrypoint);
+	if (entrypoint !== undefined) state.entrypoint = factText(entrypoint, 64);
 	if (type === "assistant") {
 		if (record.isApiErrorMessage === true) {
 			return { items: [readApiErrorMessage(record)], timestamp };
 		}
 		return { items: readAssistantBlocks(record, state), timestamp };
+	}
+	if (type === "pr-link") {
+		return {
+			items: [metaItem(type, { facts: claudePrLinkFacts(record) })],
+			timestamp,
+		};
 	}
 	if (type === "attachment") {
 		return { items: readAttachment(record.attachment, state), timestamp };
@@ -70,6 +88,7 @@ function readAssistantBlocks(
 		return content === "" ? [] : [{ kind: "assistant_text", text: content }];
 	}
 	if (!Array.isArray(content)) return [metaItem("assistant_empty")];
+	const attribution = readAttribution(record, content);
 	const items: LineItem[] = [];
 	for (const block of content) {
 		if (!isRecord(block)) continue;
@@ -92,22 +111,59 @@ function readAssistantBlocks(
 			case "tool_use":
 			case "server_tool_use":
 			case "mcp_tool_use":
-				items.push(...readToolUse(block, state));
+				items.push(...readToolUse(block, state, attribution.call));
 				break;
 			case "web_search_tool_result":
 			case "mcp_tool_result":
-				items.push(readToolResult(block, state, undefined));
+				items.push(readToolResult(block, state, undefined, undefined));
 				break;
 			default:
 				break;
 		}
 	}
-	return items.length === 0 ? [metaItem("assistant_empty")] : items;
+	const lineItems = items.length === 0 ? [metaItem("assistant_empty")] : items;
+	return attribution.line === undefined
+		? lineItems
+		: lineItems.map((item) => ({
+				...item,
+				facts: mergeFacts(item.facts, attribution.line),
+			}));
+}
+
+/**
+ * Claude Code attribution of an assistant line: the skill applies to every
+ * record of the line; the MCP server and tool to its call, when the line holds
+ * exactly one (Claude Code writes one content block per line).
+ */
+function readAttribution(
+	record: Record<string, unknown>,
+	content: readonly unknown[],
+): { call: LineFacts | undefined; line: LineFacts | undefined } {
+	const skill = readString(record.attributionSkill);
+	const server = readString(record.attributionMcpServer);
+	const tool = readString(record.attributionMcpTool);
+	const calls = content.filter(
+		(block) =>
+			isRecord(block) &&
+			(block.type === "tool_use" || block.type === "mcp_tool_use"),
+	).length;
+	const call: LineFacts = {
+		...(server === undefined ? {} : { mcpServer: factText(server, 128) }),
+		...(tool === undefined ? {} : { mcpTool: factText(tool, 128) }),
+	};
+	return {
+		call: calls === 1 && Object.keys(call).length > 0 ? call : undefined,
+		line:
+			skill === undefined
+				? undefined
+				: { attributionSkill: factText(skill, 128) },
+	};
 }
 
 function readToolUse(
 	block: Record<string, unknown>,
 	state: StreamState,
+	callFacts: LineFacts | undefined,
 ): LineItem[] {
 	const toolName = readString(block.name) ?? "unknown";
 	const callId = readString(block.id) ?? "";
@@ -171,7 +227,16 @@ function readToolUse(
 			});
 		}
 	}
-	if (callId !== "") state.calls.set(callId, { commandClass, toolName });
+	if (callFacts !== undefined && items[0] !== undefined) {
+		items[0] = { ...items[0], facts: callFacts };
+	}
+	if (callId !== "") {
+		state.calls.set(callId, {
+			commandClass,
+			...(callFacts === undefined ? {} : { facts: callFacts }),
+			toolName,
+		});
+	}
 	return items;
 }
 
@@ -198,12 +263,15 @@ function readUserMessage(
 	const toolUseResult = isRecord(record.toolUseResult)
 		? record.toolUseResult
 		: undefined;
+	// Both describe the line's one result; a line with several stays unattributed.
+	const single = resultBlocks.length === 1;
 	for (const block of resultBlocks) {
 		items.push(
 			readToolResult(
 				block,
 				state,
-				resultBlocks.length === 1 ? toolUseResult : undefined,
+				single ? toolUseResult : undefined,
+				single ? readString(record.toolDenialKind) : undefined,
 			),
 		);
 	}
@@ -275,6 +343,7 @@ function readToolResult(
 	block: Record<string, unknown>,
 	state: StreamState,
 	toolUseResult: Record<string, unknown> | undefined,
+	denialKind: string | undefined,
 ): LineItem {
 	const callId = readString(block.tool_use_id) ?? "";
 	const known = callId === "" ? undefined : state.calls.get(callId);
@@ -293,6 +362,10 @@ function readToolResult(
 		callId,
 		commandClass: known?.commandClass ?? "",
 		exitCode,
+		facts: mergeFacts(
+			known?.facts === undefined ? undefined : mcpFacts(known.facts),
+			claudeToolResultFacts(toolUseResult, denialKind),
+		),
 		isError,
 		kind: "tool_result",
 		spawnedAgentId,

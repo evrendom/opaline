@@ -125,7 +125,47 @@ test("scopes coalesce, claim with a lease and revision, and only the lease holde
 	);
 	expect(next).toBe("infinity");
 	await enqueueL1EdgeScope(sqlClient, session("a"));
-	expect((await claimOwn()).map((claim) => claim.attemptCount)).toEqual([1]);
+	const [requeued] = await claimOwn();
+	expect(requeued?.attemptCount).toBe(1);
+	if (!requeued) throw new Error("expected a requeued claim");
+
+	// A request that arrives during the last attempt is not parked by its
+	// failure: the attempts restart after the first backoff.
+	await sqlClient.unsafe(
+		"UPDATE l1_edge_scope SET attempt_count = $4 WHERE organization_id = $1 AND scope_kind = $2 AND scope_id = $3",
+		[organizationId, "session", requeued.scopeId, L1_EDGE_MAX_ATTEMPTS],
+	);
+	await enqueueL1EdgeScope(sqlClient, session("a"));
+	expect(await failL1EdgeScope(sqlClient, requeued, "deferred", () => 0)).toBe(
+		true,
+	);
+	const restarted = async () =>
+		(
+			await sqlClient.unsafe<
+				{ parked: boolean; due: boolean; attempts: number }[]
+			>(
+				"SELECT next_attempt_at = 'infinity' AS parked, next_attempt_at <= now() AS due, attempt_count AS attempts FROM l1_edge_scope WHERE organization_id = $1 AND scope_id = $2",
+				[organizationId, requeued.scopeId],
+			)
+		)[0];
+	expect(await restarted()).toEqual({ parked: false, due: false, attempts: 0 });
+	// A request after the restart does not erase its backoff either.
+	await enqueueL1EdgeScope(sqlClient, session("a"));
+	expect(await restarted()).toEqual({ parked: false, due: false, attempts: 0 });
+	await sqlClient.unsafe(
+		"UPDATE l1_edge_scope SET next_attempt_at = now() WHERE organization_id = $1 AND scope_id = $2",
+		[organizationId, requeued.scopeId],
+	);
+	const [retry] = await claimOwn();
+	expect(retry?.attemptCount).toBe(1);
+	if (!retry) throw new Error("expected a retry claim");
+	// Before the cutoff a failure backs off even when requests keep arriving,
+	// during the build or after it.
+	await enqueueL1EdgeScope(sqlClient, session("a"));
+	expect(await failL1EdgeScope(sqlClient, retry, "boom", () => 0)).toBe(true);
+	expect(await restarted()).toEqual({ parked: false, due: false, attempts: 1 });
+	await enqueueL1EdgeScope(sqlClient, session("a"));
+	expect(await restarted()).toEqual({ parked: false, due: false, attempts: 1 });
 
 	// A repository change re-queues open dependents only.
 	await recordL1EdgeDependencies(sqlClient, third, [

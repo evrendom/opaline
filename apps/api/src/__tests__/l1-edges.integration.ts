@@ -5,6 +5,7 @@ import {
 	splitSessionTranscript,
 	summarizeSplit,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
+	type TranscriptRecordDraft,
 } from "@rudel/api-routes/transcript-records";
 import postgres from "postgres";
 import { getClickhouse } from "../clickhouse.js";
@@ -206,24 +207,7 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	};
 	const observations = parseGitObservations({
 		...observationInput,
-		records: drafts.map(
-			(draft): GitObservationRecord => ({
-				agent_id: draft.agentId,
-				record_idx: draft.recordIdx,
-				block_idx: draft.blockIdx,
-				call_id: draft.callId,
-				kind: draft.kind,
-				subtype: draft.subtype,
-				tool_name: draft.toolName,
-				is_error: draft.isError,
-				exit_code: draft.exitCode,
-				ts: draft.ts,
-				text: draft.text,
-				text_chars: draft.textChars,
-				byte_start: String(draft.byteStart),
-				byte_len: draft.byteLen,
-			}),
-		),
+		records: observationRecords(drafts),
 	});
 	expect(observations.map((row) => row.kind)).toEqual([
 		"commit_created",
@@ -317,6 +301,72 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	await pass();
 	expect(await activeEdges()).toEqual(edges);
 
+	// A newer transcript generation is published before its observations are
+	// re-extracted: the build waits and keeps the edges rather than rebuilding
+	// from stale observations.
+	const republished = { ...identity, revision: "2" };
+	await clickhouse.insert({
+		table: "rudel.transcript_records",
+		asyncInsert: false,
+		values: [
+			...drafts.map((draft) => buildTranscriptRecordRow(republished, draft)),
+			buildTranscriptRecordsReceiptRow(republished, {
+				...summarizeSplit(stats),
+				contentSha256: hashTranscriptContent(transcript),
+				parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+				publishedAt: new Date().toISOString(),
+				rowCount: rows.length,
+			}),
+		],
+	});
+	await enqueueL1EdgeScope(sqlClient, scope);
+	await pass();
+	expect(await activeEdges()).toEqual(edges);
+	const [deferred] = await sqlClient.unsafe<
+		{ done: boolean; last_error: string | null }[]
+	>(
+		"SELECT request_count = built_request_count AS done, last_error FROM l1_edge_scope WHERE organization_id = $1",
+		[organizationId],
+	);
+	expect(deferred?.done).toBe(false);
+	expect(deferred?.last_error).toContain("git observations lag");
+	// The re-extraction lands and requeues the session; once the deferral's
+	// backoff (30 seconds) passes, the build completes.
+	const reextracted = { ...observationInput, revision: "2" };
+	await clickhouse.insert({
+		table: "rudel.session_git_observations",
+		asyncInsert: false,
+		values: [
+			...parseGitObservations({
+				...reextracted,
+				records: observationRecords(drafts),
+			}),
+			{
+				...baseRow(reextracted, {
+					agent_id: "",
+					record_idx: 4_294_967_295,
+					block_idx: 0,
+					call_id: "",
+					ts: at(0),
+				}),
+				kind: "receipt",
+				label: "",
+			},
+		],
+	});
+	await enqueueL1EdgeScope(sqlClient, scope);
+	await sqlClient.unsafe(
+		"UPDATE l1_edge_scope SET next_attempt_at = now() WHERE organization_id = $1",
+		[organizationId],
+	);
+	await pass();
+	expect(await activeEdges()).toEqual(edges);
+	const [rebuilt] = await sqlClient.unsafe<{ done: boolean }[]>(
+		"SELECT request_count = built_request_count AS done FROM l1_edge_scope WHERE organization_id = $1",
+		[organizationId],
+	);
+	expect(rebuilt?.done).toBe(true);
+
 	// The PR leaves GitHub's data: its edges are retracted and the reason kept.
 	await clickhouse.execute({
 		query:
@@ -357,6 +407,27 @@ test("the worker writes a session's edges from its runs, readable by target, and
 	);
 	expect(count).toBe(0);
 });
+
+function observationRecords(
+	drafts: readonly TranscriptRecordDraft[],
+): GitObservationRecord[] {
+	return drafts.map((draft) => ({
+		agent_id: draft.agentId,
+		record_idx: draft.recordIdx,
+		block_idx: draft.blockIdx,
+		call_id: draft.callId,
+		kind: draft.kind,
+		subtype: draft.subtype,
+		tool_name: draft.toolName,
+		is_error: draft.isError,
+		exit_code: draft.exitCode,
+		ts: draft.ts,
+		text: draft.text,
+		text_chars: draft.textChars,
+		byte_start: String(draft.byteStart),
+		byte_len: draft.byteLen,
+	}));
+}
 
 function tool(id: string, command: string) {
 	return {

@@ -45,7 +45,20 @@ export type TranscriptRecordsWorkerMessage =
  * a record of bookkeeping with no text still counts.
  */
 export function estimateDraftMemoryBytes(draft: TranscriptRecordDraft): number {
+	const { facts } = draft;
+	let factCharacters =
+		facts.agentVersion.length +
+		facts.entrypoint.length +
+		facts.denialKind.length +
+		facts.mcpServer.length +
+		facts.mcpTool.length +
+		facts.attributionSkill.length;
+	for (const operation of facts.gitOperation)
+		factCharacters += operation.length + 16;
+	for (const [key, value] of Object.entries(facts.extra))
+		factCharacters += key.length + (value?.length ?? 0) + 16;
 	const characters =
+		factCharacters +
 		draft.head.length +
 		draft.tail.length +
 		draft.text.length +

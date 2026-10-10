@@ -54,6 +54,11 @@ export interface SessionEdgeBuild {
 	/** False when the transcript generation expired after edges were built: they are kept. */
 	written: boolean;
 	frozenReason: string | null;
+	/**
+	 * Set when the build must wait and retry, keeping the edges already built:
+	 * the git observations lag the committed transcript generation.
+	 */
+	deferredReason?: string;
 	input: Record<string, unknown>;
 	coverage: Record<string, unknown>;
 	edgeCount: number;
@@ -139,6 +144,24 @@ export async function buildSessionEdges(input: {
 			written: false,
 			frozenReason: "transcript generation expired; edges kept",
 			input: { generation: generation ?? null },
+			coverage: {},
+			edgeCount: 0,
+			unresolvedCount: 0,
+			dependencies: [],
+		};
+
+	// A new transcript generation (a re-upload or parser version) is published
+	// before its observations are re-extracted, and the old generation's run
+	// starts expire after the retirement grace. Building from the stale
+	// observations then would turn run edges into session edges and back;
+	// wait for the extraction, which requeues the session.
+	if (committed && generation && !generation.current && input.previouslyBuilt)
+		return {
+			written: false,
+			frozenReason: null,
+			deferredReason:
+				"git observations lag the committed transcript generation; edges kept",
+			input: { generation },
 			coverage: {},
 			edgeCount: 0,
 			unresolvedCount: 0,

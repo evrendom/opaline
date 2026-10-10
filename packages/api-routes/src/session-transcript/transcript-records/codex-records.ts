@@ -29,6 +29,7 @@ import {
 	safeStringify,
 	shellFileChangeItem,
 } from "./line-items.js";
+import { codexDurationMs, factText } from "./record-facts.js";
 import type { CommandClass } from "./types.js";
 
 const SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -132,6 +133,10 @@ function readSessionMetadata(
 		readString(payload.agent_path) ??
 		readString(spawn?.agent_path) ??
 		state.codexAgentPath;
+	const version = readString(payload.cli_version);
+	if (version !== undefined) state.agentVersion = factText(version, 64);
+	const originator = readString(payload.originator);
+	if (originator !== undefined) state.entrypoint = factText(originator, 64);
 }
 
 /**
@@ -171,10 +176,12 @@ function readEventMessage(
 				success: success ?? (exitCode === undefined ? null : exitCode === 0),
 			});
 		}
+		const duration = codexDurationMs(payload.duration);
 		return [
 			metaItem("exec_command_end", {
 				callId,
 				exitCode: exitCode ?? null,
+				...(duration === undefined ? {} : { facts: { durationMs: duration } }),
 				isError: exitCode !== undefined && exitCode !== 0,
 			}),
 		];

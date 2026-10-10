@@ -1,12 +1,14 @@
 import { classifyCommand } from "./command-class.js";
 import {
 	isRecord,
+	type LineFacts,
 	type LineItem,
 	metaItem,
 	readString,
 	type StreamState,
 	safeStringify,
 } from "./line-items.js";
+import { codexItemFacts, mcpFacts } from "./record-facts.js";
 import type { FileOperation } from "./types.js";
 
 /**
@@ -41,12 +43,19 @@ export function readCompletedItem(
 	const type = readString(item.type) ?? "unknown";
 	const label = `item_completed:${type}`;
 	const id = readString(item.id) ?? "";
+	// A completion of a recorded call keeps its literal facts (duration, MCP
+	// identity) on its own row, whatever order the call's output arrives in;
+	// readers join them to the call by call_id.
 	if (id !== "" && state.calls.has(id)) {
 		lendOutcomeToCall(id, type, item, state);
-		return [metaItem(`${label}_mirror`, { callId: id })];
+		return [
+			metaItem(`${label}_mirror`, { callId: id, facts: codexItemFacts(item) }),
+		];
 	}
 	if (id !== "" && state.codexCompletedItems.has(id)) {
-		return [metaItem(`${label}_repeat`, { callId: id })];
+		return [
+			metaItem(`${label}_repeat`, { callId: id, facts: codexItemFacts(item) }),
+		];
 	}
 	const items = readNewItem(type, id, item, state);
 	if (items === undefined) return [metaItem(label)];
@@ -96,15 +105,21 @@ function readNewItem(
 		case "CommandExecution":
 			return readCommandExecution(id, item);
 		case "McpToolCall":
-			return readToolItem(id, mcpToolName(item), item.arguments, {
-				isError:
-					item.status === "failed" ||
-					(isRecord(item.result) && item.result.isError === true) ||
-					item.error !== undefined,
-				output: isRecord(item.result)
-					? readContentText(item.result.content)
-					: errorText(item.error),
-			});
+			return readToolItem(
+				id,
+				mcpToolName(item),
+				item.arguments,
+				{
+					isError:
+						item.status === "failed" ||
+						(isRecord(item.result) && item.result.isError === true) ||
+						item.error !== undefined,
+					output: isRecord(item.result)
+						? readContentText(item.result.content)
+						: errorText(item.error),
+				},
+				codexItemFacts(item),
+			);
 		case "DynamicToolCall":
 			return readToolItem(id, dynamicToolName(item), item.arguments, {
 				isError: item.success === false || item.status === "failed",
@@ -141,6 +156,7 @@ function readCommandExecution(
 		{
 			...base,
 			exitCode,
+			facts: codexItemFacts(item),
 			isError: exitCode !== null ? exitCode !== 0 : item.status === "failed",
 			kind: "tool_result",
 			// No exit code and not finished: still running when recorded.
@@ -164,11 +180,13 @@ function readToolItem(
 	toolName: string,
 	input: unknown,
 	outcome: { readonly isError: boolean; readonly output: string },
+	facts: LineFacts = {},
 ): LineItem[] {
 	const base = { callId: id, subtype: NESTED, toolName };
 	return [
 		{
 			...base,
+			facts: mcpFacts(facts),
 			kind: "tool_call",
 			text:
 				typeof input === "string"
@@ -180,6 +198,7 @@ function readToolItem(
 		{
 			...base,
 			exitCode: null,
+			facts,
 			isError: outcome.isError,
 			kind: "tool_result",
 			text: outcome.output,

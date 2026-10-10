@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { getAdapter } from "@rudel/agent-adapters";
 import type { IngestSessionInput } from "@rudel/api-routes";
+import { NO_TRANSCRIPT_RECORD_FACTS } from "@rudel/api-routes/transcript-records";
 import {
 	ingestRudelWrappedUserArchetypeSnapshotsV1,
 	type RudelWrappedUserArchetypeSnapshotsV1Row,
@@ -199,6 +200,7 @@ async function ingestSkillRows(
 					callId: "",
 					commandClass: "",
 					exitCode: null,
+					facts: NO_TRANSCRIPT_RECORD_FACTS,
 					fileOp: "",
 					filePath: "",
 					head: "purge me",

@@ -1190,6 +1190,65 @@ describe("transcript record readers", () => {
 
 		expect(facts).toMatchObject({ indexed: false, turns: 0 });
 	});
+
+	test("parser v6 facts round-trip through the fact columns", async () => {
+		const factsSessionId = `records_${RUN_ID}_facts`;
+		const content = await Bun.file(
+			new URL(
+				"../../../../packages/api-routes/src/session-transcript/__fixtures__/l1-facts/claude-2.1.jsonl",
+				import.meta.url,
+			),
+		).text();
+		await writeSession({ content, revision: "100", sessionId: factsSessionId });
+
+		const rows = await clickhouse.query<{
+			agent_version: string;
+			call_id: string;
+			denial_kind: string;
+			duration_ms: number | null;
+			entrypoint: string;
+			facts: Record<string, string>;
+			git_operation: string[];
+			interrupted: boolean | null;
+			mcp_server: string;
+			parser_version: number;
+		}>({
+			query: `
+				SELECT call_id, agent_version, entrypoint, denial_kind, duration_ms,
+					interrupted, git_operation, mcp_server, facts, parser_version
+				FROM rudel.transcript_records FINAL
+				WHERE organization_id = {organization:String}
+					AND user_id = {user:String}
+					AND session_id = {sessionId:String}
+					AND kind = 'tool_result'
+					AND call_id IN ('toolu_pr', 'toolu_rm', 'toolu_fetch', 'toolu_mcp')
+				ORDER BY call_id
+			`,
+			query_params: {
+				organization: organizationId,
+				sessionId: factsSessionId,
+				user: userId,
+			},
+		});
+
+		expect(rows).toMatchObject([
+			{ call_id: "toolu_fetch", duration_ms: 4943, interrupted: null },
+			{ call_id: "toolu_mcp", mcp_server: "posthog" },
+			{
+				agent_version: "2.1.292",
+				call_id: "toolu_pr",
+				entrypoint: "sdk-ts",
+				facts: {
+					"git.pr.number": "42",
+					"git.pr.url": "https://github.com/acme/app/pull/42",
+				},
+				git_operation: ["branch", "pr"],
+				interrupted: false,
+				parser_version: TRANSCRIPT_RECORDS_PARSER_VERSION,
+			},
+			{ call_id: "toolu_rm", denial_kind: "permission-rule", facts: {} },
+		]);
+	});
 });
 
 describe("transcript records backfill", () => {

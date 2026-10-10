@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	decodeTranscriptRecordsReceipt,
 	encodeTranscriptRecordsReceipt,
+	NO_TRANSCRIPT_RECORD_FACTS,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	type TranscriptRecordDraft,
 } from "@rudel/api-routes/transcript-records";
@@ -35,6 +36,14 @@ const draft: TranscriptRecordDraft = {
 	callId: "call",
 	commandClass: "test",
 	exitCode: 2,
+	facts: {
+		...NO_TRANSCRIPT_RECORD_FACTS,
+		agentVersion: "2.1.292",
+		entrypoint: "sdk-ts",
+		gitOperation: ["push"],
+		interrupted: false,
+		extra: { "git.push.branch": "main", stdout_chars: "12" },
+	},
 	fileOp: "",
 	filePath: "",
 	head: "head",
@@ -54,8 +63,12 @@ const draft: TranscriptRecordDraft = {
 describe("transcript record rows", () => {
 	test("map a draft to table columns with ClickHouse-ready values", () => {
 		expect(buildTranscriptRecordRow(identity, draft)).toEqual({
-			// Parser v6 facts: not recorded until the parser fills them.
 			...noRecordFacts(),
+			agent_version: "2.1.292",
+			entrypoint: "sdk-ts",
+			git_operation: ["push"],
+			interrupted: false,
+			facts: { "git.push.branch": "main", stdout_chars: "12" },
 			agent_id: "",
 			block_idx: 1,
 			byte_len: 42,

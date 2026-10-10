@@ -130,6 +130,11 @@ async function processClaim(
 			now: env.now?.(),
 			beforeWrite,
 		});
+		if (build.deferredReason !== undefined) {
+			// Backs off and retries; extraction's requeue resets the attempts.
+			await failL1EdgeScope(env.sql, claim, build.deferredReason);
+			return false;
+		}
 		if (build.written)
 			await recordL1EdgeDependencies(env.sql, claim, build.dependencies);
 		await completeL1EdgeScope(env.sql, claim, {
