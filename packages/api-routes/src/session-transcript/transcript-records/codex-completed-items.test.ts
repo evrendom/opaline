@@ -113,7 +113,7 @@ describe("Codex completed items", () => {
 		expect(scriptResult?.isError).toBe(false);
 	});
 
-	test("an item that mirrors a recorded call stays meta and lends its outcome", () => {
+	test("an item that mirrors a recorded call keeps its outcome on the meta row", () => {
 		const call = line("response_item", {
 			arguments: '{"query":"open issues"}',
 			call_id: "call_mcp",
@@ -144,7 +144,8 @@ describe("Codex completed items", () => {
 		expect(
 			rows.find((row) => row.subtype === "item_completed:McpToolCall_mirror"),
 		).toBeDefined();
-		expect(rows.find((row) => row.kind === "tool_result")?.isError).toBe(true);
+		expect(rows.find((row) => row.kind === "tool_result")?.isError).toBe(false);
+		expect(rows.find((row) => row.kind === "meta")?.isError).toBe(true);
 	});
 
 	test("nested MCP and app tools without a call of their own are recorded once", () => {

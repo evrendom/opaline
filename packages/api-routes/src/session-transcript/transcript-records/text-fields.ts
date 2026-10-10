@@ -17,6 +17,12 @@ export interface TranscriptTextFields {
 const BUDGET_EXHAUSTED_HEAD_CHARS = 256;
 const BUDGET_EXHAUSTED_TAIL_CHARS = 512;
 
+export function literalLineCount(text: string): number {
+	let count = text === "" || text.endsWith("\n") ? 0 : 1;
+	for (const character of text) if (character === "\n") count++;
+	return count;
+}
+
 /** Code points in `value`, matching ClickHouse `lengthUTF8` for valid text. */
 export function countCodePoints(value: string): number {
 	let count = 0;

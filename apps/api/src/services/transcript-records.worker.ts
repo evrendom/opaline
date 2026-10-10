@@ -56,6 +56,7 @@ async function splitAndStream(
 		};
 		for (const draft of splitSessionTranscript(
 			{
+				codexForkParentCalls: request.codexForkParentCalls,
 				content: request.content,
 				sessionDate: request.sessionDate,
 				source: request.source,

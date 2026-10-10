@@ -59,6 +59,10 @@ export interface StreamState {
 	agentVersion: string;
 	readonly calls: Map<string, KnownCall>;
 	codexAgentPath: string;
+	codexSessionId: string | undefined;
+	codexForkPoint:
+		| { readonly parentId: string; readonly ordinalExclusive: number }
+		| undefined;
 	/** Ids of completed Codex items already recorded (an item can complete twice). */
 	readonly codexCompletedItems: Set<string>;
 	readonly codexEndEvents: Map<string, CodexEndEvent>;
@@ -93,6 +97,8 @@ export function createStreamState(
 		calls: new Map(),
 		claudeQueuedPrompts: [],
 		codexAgentPath: "",
+		codexSessionId: undefined,
+		codexForkPoint: undefined,
 		codexCompletedItems: new Set(),
 		codexEndEvents: new Map(),
 		codexExecScript: undefined,

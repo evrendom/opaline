@@ -5,6 +5,7 @@ import {
 	translateCodexToolCall,
 } from "../codex-tool-translation.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
+import { appliedChangesFacts } from "./applied-changes.js";
 import {
 	argvToCommand,
 	readCompletedItem,
@@ -30,6 +31,7 @@ import {
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
+	clippedText,
 	codexAbortedCall,
 	codexCallTimeout,
 	codexDenialKind,
@@ -43,6 +45,7 @@ import {
 	mergeFacts,
 } from "./record-facts.js";
 import type { CommandClass } from "./types.js";
+import { withV9Facts } from "./v9-facts.js";
 
 const SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set([
 	"spawn_agent",
@@ -50,7 +53,7 @@ const SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set([
 	"agent",
 ]);
 const FAILURE_PREFIX_PATTERN =
-	/^(?:apply_patch verification failed|collab spawn failed|Script failed)\b/u;
+	/^(?:apply_patch verification failed|collab spawn failed|Script failed|write_stdin failed:|exec_command failed|tool call failed|Error parsing function call|failed to parse function arguments|unable to (?:locate|open) image at|aborted by user)(?:\s|:|$)/u;
 const SHELL_TOOL_NAMES: ReadonlySet<string> = new Set([
 	"shell",
 	"shell_command",
@@ -74,6 +77,45 @@ const MIRROR_EVENTS: ReadonlySet<string> = new Set([
 
 /** Turn one parsed Codex JSONL record into record items. */
 export function readCodexLine(
+	record: Record<string, unknown>,
+	state: StreamState,
+): LineResult {
+	const result = readCodexRecord(record, state);
+	const payload = isRecord(record.payload) ? record.payload : {};
+	const completed = isRecord(payload.item) ? payload.item : {};
+	const copiedMetadata =
+		record.type === "session_meta" &&
+		state.codexSessionId !== undefined &&
+		typeof payload.id === "string" &&
+		payload.id !== state.codexSessionId;
+	const inherited =
+		state.codexForkPoint !== undefined &&
+		typeof record.ordinal === "number" &&
+		Number.isSafeInteger(record.ordinal) &&
+		record.ordinal >= 0 &&
+		record.ordinal < state.codexForkPoint.ordinalExclusive;
+	const items = result.items.map((item) => {
+		const replayed = inherited || copiedMetadata;
+		const facts = mergeFacts(
+			item.facts,
+			item.kind === "file_change"
+				? {
+						extra: {
+							file_change_basis:
+								item.subtype === "nested" && completed.status === "completed"
+									? "applied"
+									: "requested",
+						},
+					}
+				: undefined,
+			replayed ? { extra: { fork_replayed: "true" } } : undefined,
+		);
+		return { ...item, facts };
+	});
+	return { ...result, items: withV9Facts(record, "codex", items) };
+}
+
+function readCodexRecord(
 	record: Record<string, unknown>,
 	state: StreamState,
 ): LineResult {
@@ -155,6 +197,26 @@ function readSessionMetadata(
 	payload: Record<string, unknown>,
 	state: StreamState,
 ): void {
+	if (state.codexSessionId !== undefined) return;
+	state.codexSessionId = readString(payload.id) ?? "";
+	const ordinalExclusive =
+		payload.subagent_history_start_ordinal ??
+		payload.forked_from_ordinal_exclusive;
+	// The file's own session_meta comes first; the parent's replayed copy, which
+	// may itself name an older fork point, must not replace its fork point.
+	if (
+		state.codexForkPoint === undefined &&
+		typeof payload.forked_from_id === "string" &&
+		payload.forked_from_id !== "" &&
+		payload.forked_from_id !== payload.id &&
+		typeof ordinalExclusive === "number" &&
+		Number.isSafeInteger(ordinalExclusive) &&
+		ordinalExclusive >= 0
+	)
+		state.codexForkPoint = {
+			parentId: payload.forked_from_id,
+			ordinalExclusive,
+		};
 	const source = isRecord(payload.source) ? payload.source : undefined;
 	const subagent = isRecord(source?.subagent) ? source.subagent : undefined;
 	const spawn = isRecord(subagent?.thread_spawn)
@@ -223,7 +285,8 @@ function readEventMessage(
 				callId,
 				exitCode: exitCode ?? null,
 				...(duration === undefined ? {} : { facts: { durationMs: duration } }),
-				isError: exitCode !== undefined && exitCode !== 0,
+				isError:
+					success === false || (exitCode !== undefined && exitCode !== 0),
 			}),
 		];
 	}
@@ -235,7 +298,11 @@ function readEventMessage(
 			state.codexEndEvents.set(callId, { exitCode: null, success });
 		}
 		return [
-			metaItem("patch_apply_end", { callId, isError: success === false }),
+			metaItem("patch_apply_end", {
+				callId,
+				isError: success === false,
+				facts: appliedChangesFacts(payload.changes, success === true),
+			}),
 		];
 	}
 	if (
@@ -259,6 +326,10 @@ function readEventMessage(
 		];
 	}
 	if (TASK_EVENTS.has(type)) return [readTaskEvent(type, payload)];
+	if (type === "thread_settings_applied" && isRecord(payload.thread_settings))
+		return [
+			metaItem(type, { facts: codexTurnContextFacts(payload.thread_settings) }),
+		];
 	return [metaItem(type === "" ? "event" : type)];
 }
 
@@ -545,7 +616,7 @@ function describeCall(
 	if (lowered === "exec" && payloadType === "custom_tool_call") {
 		return describeExecScript(rawText ?? "");
 	}
-	if (lowered === "exec_command") {
+	if (lowered === "exec_command" || lowered === "functions.exec_command") {
 		const command = readString(args?.cmd) ?? "";
 		return describeExecCommand(command, args ?? {}, toolName);
 	}
@@ -650,25 +721,28 @@ function readOutput(
 		readCodexImageOutputText(payload.output) ??
 		readTranscriptToolOutputText(payload.output) ??
 		rawOutput;
-	const end = callId === "" ? undefined : state.codexEndEvents.get(callId);
 	const denialKind = codexDenialKind(decoded);
 	const denialReason =
 		denialKind === "Rejected" ? codexDenialReason(decoded) : undefined;
 	const aborted = codexAbortedCall(decoded);
-	const exitCode =
-		end?.exitCode ?? readCodexExitCode(payload.output ?? payload.tools);
+	const exitCode = readCodexExitCode(payload.output ?? payload.tools);
 	const isError =
-		exitCode !== null
-			? exitCode !== 0
-			: end?.success === false || hasFailurePrefix(decoded);
+		denialKind !== undefined ||
+		aborted !== undefined ||
+		(exitCode !== null ? exitCode !== 0 : hasFailurePrefix(decoded));
+	const denialExtra: Partial<
+		Record<"denial_reason" | "facts_clipped", string>
+	> = {};
+	if (denialReason !== undefined)
+		denialExtra.denial_reason = clippedText(
+			denialExtra,
+			"denial_reason",
+			denialReason,
+		);
 	const launchesSubagent =
 		known !== undefined && SPAWN_TOOL_NAMES.has(known.toolName.toLowerCase());
 	// Still running when recorded: neither a pass nor a failure.
-	const running =
-		exitCode === null &&
-		!isError &&
-		end === undefined &&
-		isCodexRunningOutput(payload.output);
+	const running = isCodexRunningOutput(payload.output, exitCode);
 	return {
 		callId,
 		commandClass: known?.commandClass ?? "",
@@ -679,9 +753,7 @@ function readOutput(
 					facts: mergeFacts(
 						aborted,
 						denialKind === undefined ? undefined : { denialKind },
-						denialReason === undefined
-							? undefined
-							: { extra: { denial_reason: factText(denialReason) } },
+						denialReason === undefined ? undefined : { extra: denialExtra },
 					),
 				}),
 		isError,
@@ -689,7 +761,7 @@ function readOutput(
 		spawnedAgentId: launchesSubagent ? readSpawnedAgentId(decoded) : "",
 		subtype: known === undefined ? "orphan" : running ? "running" : "",
 		text: decoded,
-		toolName: known?.toolName ?? "",
+		toolName: readString(payload.name) ?? known?.toolName ?? "",
 	};
 }
 

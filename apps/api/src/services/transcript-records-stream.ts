@@ -14,6 +14,7 @@ import type {
  */
 
 export interface TranscriptRecordsSplitRequest {
+	readonly codexForkParentCalls?: Readonly<Record<string, readonly string[]>>;
 	/** Bytes of draft memory per batch (see `estimateDraftMemoryBytes`). */
 	readonly batchMaxBytes: number;
 	readonly batchMaxRows: number;

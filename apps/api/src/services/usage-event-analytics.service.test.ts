@@ -10,6 +10,19 @@ import {
 } from "./usage-event-analytics.service.js";
 
 describe("usage-event analytics query contract", () => {
+	test("configured thread tiers are priced and keep their configured provenance flag", () => {
+		const sql = buildPricedUsageEventsCte("1");
+		expect(sql).toContain("SELECT e.*");
+		expect(sql).not.toContain("service_tier_configured");
+		// Conflicting or unrecognized tiers stay unpriced.
+		expect(sql).toContain(
+			"AND NOT has(e.quality_flags, 'service_tier_conflict')",
+		);
+		expect(sql).toContain(
+			"AND NOT has(e.quality_flags, 'unrecognized_service_tier')",
+		);
+		expect(sql).toContain("AS is_priceable");
+	});
 	test("resolves exact latest state and admits only consistent complete receipts", () => {
 		const sql = buildUsageEventAnalyticsCte();
 

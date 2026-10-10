@@ -77,6 +77,38 @@ test("Codex bodyless session_meta raw fallback, transport success and repository
 	expect(JSON.stringify(rows)).not.toContain("password");
 });
 
+test("a Codex fork keeps its own session_meta git state and drops the replayed parent copy", () => {
+	const timestamp = "2026-09-12T12:00:00.000Z";
+	const meta = (id: string, git: Record<string, string>, extra = {}) =>
+		JSON.stringify({
+			type: "session_meta",
+			timestamp,
+			payload: { id, cwd: `/work/${id}`, git, ...extra },
+		});
+	const content = [
+		meta(
+			"fork-session",
+			{ branch: "feat/fork", commit_hash: "b".repeat(40) },
+			{ forked_from_id: "parent-session" },
+		),
+		meta("parent-session", {
+			branch: "main",
+			commit_hash: "c".repeat(40),
+			repository_url: "https://github.com/opalinehq/parent.git",
+		}),
+	].join("\n");
+	const rows = parseGitObservations(
+		parseInput({ source: "codex", timestamp, subagents: {}, content }),
+	);
+	expect(rows).toHaveLength(1);
+	expect(rows[0]).toMatchObject({
+		kind: "codex_session_meta",
+		branch: "feat/fork",
+		commit_hash: "b".repeat(40),
+		repository_url: "",
+	});
+});
+
 test("Codex PTY polls retain originating commands and agent scope; a failed command keeps the commit it printed", () => {
 	const input = parseInput(codexGitContinuationFixture());
 	const rows = parseGitObservations({

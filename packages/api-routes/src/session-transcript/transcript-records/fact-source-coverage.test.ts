@@ -230,7 +230,9 @@ describe("Codex writer-source coverage", () => {
 		}
 		for (const entry of FACT_CATALOG) {
 			for (const evidence of entry.agents.codex.evidence) {
-				expect(["writer_source", "llm_audit"]).toContain(evidence.kind);
+				expect(["writer_source", "llm_audit", "fixture_test"]).toContain(
+					evidence.kind,
+				);
 				if (evidence.kind === "writer_source") {
 					expect(evidence.version).toBe(CODEX_SOURCE_SNAPSHOT.version);
 					expect(evidence.supportsMeaning).toBe(true);

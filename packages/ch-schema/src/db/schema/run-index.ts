@@ -351,6 +351,17 @@ const RUN_INDEX_COLUMNS = [
 			"Distinct files written, edited or deleted by native edits, patches or unconditional shell commands whose call did not fail.",
 	},
 	{
+		name: "failed_edits",
+		type: "Nullable(UInt32)",
+		comment: "Failed edit requests, excluding refusals; parser 9 or newer.",
+	},
+	{
+		name: "refused_edits",
+		type: "Nullable(UInt32)",
+		comment:
+			"Refused native edit requests, including user declines but excluding interruptions; parser 9 or newer.",
+	},
+	{
 		name: "reads",
 		type: "UInt32",
 		comment: "Tool calls in the read group.",

@@ -23,6 +23,7 @@ describe("mapping evidence", () => {
 						"published_types",
 						"paired_run",
 						"llm_audit",
+						"fixture_test",
 					]).toContain(item.kind);
 	});
 	test("every mapping is classified, transforms are named and writer absences are proved", () => {

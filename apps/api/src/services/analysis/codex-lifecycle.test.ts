@@ -136,7 +136,7 @@ function lifecycleInputs(drafts: readonly TranscriptRecordDraft[]): {
 			approvals_reviewer: fact(draft, "approvals_reviewer"),
 			sandbox_policy: fact(draft, "sandbox_policy"),
 			sandbox_network_access: fact(draft, "sandbox_network_access"),
-			permission_profile: fact(draft, "permission_profile"),
+			permission_profile: fact(draft, "permission_profile_id"),
 			collaboration_mode: fact(draft, "collaboration_mode"),
 			model: fact(draft, "model"),
 			effort: fact(draft, "effort"),

@@ -49,6 +49,10 @@ const LEGACY_SESSION_COST_SQL = buildEstimatedCostSql({
 	cacheCreation1hInputExpr: "ifNull(sa.cache_creation_input_tokens, 0)",
 });
 
+// A usage event whose response recorded no tier but whose thread was configured
+// with one is priced at that configured tier, the only tier Codex logs. The
+// `service_tier_configured` quality flag stays on the stored event as the
+// explicit price basis, so the cost remains recomputable from the stored row.
 const PRICEABLE_EVENT_SQL = `
 	e.model_status IN ('resolved', 'unresolved')
 	AND e.has_valid_timestamp = 1

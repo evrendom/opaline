@@ -1,7 +1,7 @@
 import { MODEL_RATE_CARD_VERSION } from "@rudel/api-routes/model-pricing";
 
 export const USAGE_EVENT_IDENTITY_VERSION = 1;
-export const USAGE_EVENT_EXTRACTION_VERSION = 4;
+export const USAGE_EVENT_EXTRACTION_VERSION = 5;
 export const USAGE_EVENT_MODEL_RATE_CARD_VERSION = MODEL_RATE_CARD_VERSION;
 
 export type UsageEventSource = "claude_code" | "codex";
@@ -18,10 +18,13 @@ export type UsageEventTokenSource =
 	| "cumulative_delta_fallback";
 
 export interface UsageEventTokens {
+	recordedCacheWrite5mInputTokens?: number | null;
+	recordedCacheWrite1hInputTokens?: number | null;
 	uncachedInputTokens: number;
 	cacheReadInputTokens: number;
-	cacheWrite5mInputTokens: number;
-	cacheWrite1hInputTokens: number;
+	cacheWrite5mInputTokens: number | null;
+	cacheWrite1hInputTokens: number | null;
+	cacheWriteInputTokens: number | null;
 	outputTokens: number;
 	reasoningOutputTokens: number;
 }

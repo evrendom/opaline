@@ -567,7 +567,7 @@ function walkCodex(
 	if (Object.keys(payload).every((key) => key === "type"))
 		leaf(out, discriminator, "object", 0, undefined);
 	for (const [key, value] of Object.entries(payload)) {
-		if (key === "type") continue;
+		if (key === "type" && record.type !== "realtime_item") continue;
 		if (key === "item" && payloadType === "item_completed" && isObject(value)) {
 			const itemType = typeof value.type === "string" ? value.type : "unknown";
 			const base = `${discriminator}:${itemType}`;
@@ -595,7 +595,7 @@ function codexDiscriminator(record: Record<string, unknown>): string {
 	const payload = isObject(record.payload) ? record.payload : undefined;
 	const payloadType =
 		typeof payload?.type === "string" ? payload.type : undefined;
-	let discriminator = `${type}/${payloadType ?? ""}`;
+	let discriminator = `${type}/${type === "realtime_item" ? "" : (payloadType ?? "")}`;
 	if (payload !== undefined && type === "response_item") {
 		const name = typeof payload.name === "string" ? payload.name : undefined;
 		if (
@@ -649,6 +649,18 @@ function walk(
 	}
 	if (isObject(value)) {
 		const entries = Object.entries(value);
+		if (
+			key === "_meta" &&
+			isObject(value._codex_apps) &&
+			Object.hasOwn(value._codex_apps, "connector_auth_failure")
+		)
+			walk(
+				value._codex_apps.connector_auth_failure,
+				`${path}._codex_apps.connector_auth_failure`,
+				"connector_auth_failure",
+				depth + 2,
+				out,
+			);
 		if (entries.length === 0 || isOpaque(path) || depth > MAX_DEPTH) {
 			leaf(out, path, "object", 0, undefined);
 			return;

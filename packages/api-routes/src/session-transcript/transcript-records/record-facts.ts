@@ -1,6 +1,10 @@
 import { redactReturnedText } from "@rudel/secret-filter";
 import { isRecord, type LineFacts, readString } from "./line-items.js";
-import { countCodePoints, sliceStart } from "./text-fields.js";
+import {
+	countCodePoints,
+	literalLineCount,
+	sliceStart,
+} from "./text-fields.js";
 import {
 	TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS,
 	TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
@@ -82,8 +86,10 @@ export function claudeToolResultFacts(
 ): LineFacts {
 	const facts: { -readonly [K in keyof LineFacts]: LineFacts[K] } = {};
 	const extra: ExtraFacts = {};
-	if (denialKind !== undefined) facts.denialKind = factText(denialKind, 64);
-	if (toolUseResult === undefined) return facts;
+	if (denialKind !== undefined)
+		facts.denialKind = clippedText(extra, "denial_reason", denialKind, 64);
+	if (toolUseResult === undefined)
+		return { ...facts, ...(Object.keys(extra).length === 0 ? {} : { extra }) };
 	const result = toolUseResult;
 
 	if (typeof result.interrupted === "boolean")
@@ -105,7 +111,10 @@ export function claudeToolResultFacts(
 	setText(extra, "return_code_interpretation", result.returnCodeInterpretation);
 	setText(extra, "background_task_id", result.backgroundTaskId);
 	setText(extra, "stale_read", result.staleReadFileStateHint);
-	setInteger(extra, "search_matches", result.numFiles);
+	setInteger(extra, "files_found", result.numFiles);
+	setText(extra, "search_mode", result.mode);
+	setInteger(extra, "search_matches", result.numMatches);
+	setInteger(extra, "search_result_lines", result.numLines);
 	if (typeof result.stdout === "string")
 		extra.stdout_chars = String(countCodePoints(result.stdout));
 	if (typeof result.stderr === "string")
@@ -115,6 +124,9 @@ export function claudeToolResultFacts(
 	if (patch !== undefined) {
 		extra.patch_lines_added = String(patch.added);
 		extra.patch_lines_removed = String(patch.removed);
+	} else if (result.type === "create" && typeof result.content === "string") {
+		extra.patch_lines_added = String(literalLineCount(result.content));
+		extra.patch_lines_removed = "0";
 	}
 
 	if (isRecord(result.gitOperation)) {
@@ -237,12 +249,15 @@ export function codexItemFacts(item: Record<string, unknown>): LineFacts {
 	if (duration !== undefined) facts.durationMs = duration;
 	if (item.type === "CommandExecution" && Array.isArray(item.parsed_cmd)) {
 		const parts = item.parsed_cmd.filter(isRecord);
-		extra.parsed_cmd_types = cappedJsonList(
+		setList(
+			extra,
+			"parsed_cmd_types",
+			"parsed_cmd_types_more",
 			parts.flatMap((part) => {
 				const type = readString(part.type);
-				return type === undefined ? [] : [factText(type, 32)];
+				return type === undefined ? [] : [type];
 			}),
-		).json;
+		);
 		setList(
 			extra,
 			"parsed_cmd_read_paths",
@@ -256,12 +271,19 @@ export function codexItemFacts(item: Record<string, unknown>): LineFacts {
 	if (item.type === "McpToolCall") {
 		const server = readString(item.server);
 		const tool = readString(item.tool);
-		if (server !== undefined) facts.mcpServer = factText(server, 128);
-		if (tool !== undefined) facts.mcpTool = factText(tool, 128);
+		if (server !== undefined)
+			facts.mcpServer = clippedText(
+				extra,
+				"mcp_server_components",
+				server,
+				128,
+			);
+		if (tool !== undefined)
+			facts.mcpTool = clippedText(extra, "mcp_tool_components", tool, 128);
 		setBoolean(extra, "mcp_read_only", item.readOnlyHint);
 		setText(extra, "attribution_plugin", item.pluginId);
 	}
-	if (item.type === "SubAgentActivity") {
+	if (item.type === "SubAgentActivity" && item.kind === "started") {
 		const thread = readString(item.agent_thread_id);
 		if (thread !== undefined)
 			setList(
@@ -274,7 +296,9 @@ export function codexItemFacts(item: Record<string, unknown>): LineFacts {
 	}
 	if (
 		item.type === "CollabAgentToolCall" &&
-		Array.isArray(item.receiver_thread_ids)
+		item.tool === "spawn_agent" &&
+		Array.isArray(item.receiver_thread_ids) &&
+		item.receiver_thread_ids.length !== 0
 	)
 		setList(
 			extra,
@@ -314,6 +338,15 @@ export function codexTurnContextFacts(
 		"permission_profile",
 		profile?.type ?? payload.permission_profile,
 	);
+	setText(
+		extra,
+		"permission_profile_kind",
+		profile?.type ?? payload.permission_profile,
+	);
+	const activeProfile = isRecord(payload.active_permission_profile)
+		? payload.active_permission_profile
+		: undefined;
+	setText(extra, "permission_profile_id", activeProfile?.id);
 	const collaboration = isRecord(payload.collaboration_mode)
 		? payload.collaboration_mode
 		: undefined;
@@ -622,9 +655,11 @@ function shellEditFiles(diff: Record<string, unknown>): ExtraFacts {
 			if (!isRecord(file)) return [];
 			const filePath = readString(file.filePath);
 			if (filePath === undefined) return [];
-			const entry: Record<string, unknown> = { filePath: factText(filePath) };
-			if (file.created === true) entry.created = true;
-			if (file.deleted === true) entry.deleted = true;
+			const entry: Record<string, unknown> = {
+				filePath: clippedText(extra, "shell_edit_files", filePath),
+			};
+			if (typeof file.created === "boolean") entry.created = file.created;
+			if (typeof file.deleted === "boolean") entry.deleted = file.deleted;
 			return [entry];
 		});
 		const list = cappedJsonList(entries);
@@ -639,7 +674,9 @@ function shellEditFiles(diff: Record<string, unknown>): ExtraFacts {
 	if (Array.isArray(diff.changedFiles)) {
 		const list = cappedJsonList(
 			diff.changedFiles.flatMap((path) =>
-				typeof path === "string" && path !== "" ? [factText(path)] : [],
+				typeof path === "string" && path !== ""
+					? [clippedText(extra, "shell_edit_changed_files", path)]
+					: [],
 			),
 		);
 		extra.shell_edit_changed_files = list.json;
@@ -699,15 +736,16 @@ function setText(
 }
 
 /** `factText`, noting `key` in `facts_clipped` when the cap cut the value. */
-function clippedText(
+export function clippedText(
 	extra: ExtraFacts,
 	key: TranscriptRecordFactKey,
 	value: string,
 	maxChars = TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
 ): string {
-	const full = factText(value, Number.MAX_SAFE_INTEGER);
+	const prefix = sliceStart(value, maxChars + 1_024);
+	const full = factText(prefix, Number.MAX_SAFE_INTEGER);
 	const text = sliceStart(full, maxChars);
-	if (text.length < full.length) {
+	if (prefix.length < value.length || text.length < full.length) {
 		const keys = new Set(
 			(extra.facts_clipped ?? "").split(",").filter((name) => name !== ""),
 		);
@@ -732,5 +770,15 @@ function setList(
 		entries.map((entry) => clippedText(extra, key, entry, entryMaxChars)),
 	);
 	extra[key] = list.json;
-	if (list.cut > 0) extra[moreKey] = String(list.cut);
+	if (list.cut > 0) {
+		extra[moreKey] = String(list.cut);
+		extra.facts_clipped = [
+			...new Set([
+				...(extra.facts_clipped ?? "").split(",").filter(Boolean),
+				key,
+			]),
+		]
+			.sort()
+			.join(",");
+	}
 }

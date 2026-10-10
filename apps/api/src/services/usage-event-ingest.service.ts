@@ -311,8 +311,30 @@ function buildEventRow(
 		context_input_tokens: String(event.contextInputTokens),
 		uncached_input_tokens: String(event.uncachedInputTokens),
 		cache_read_input_tokens: String(event.cacheReadInputTokens),
-		cache_write_5m_input_tokens: String(event.cacheWrite5mInputTokens),
-		cache_write_1h_input_tokens: String(event.cacheWrite1hInputTokens),
+		cache_write_5m_input_tokens: String(event.cacheWrite5mInputTokens ?? 0),
+		cache_write_1h_input_tokens: String(event.cacheWrite1hInputTokens ?? 0),
+		recorded_cache_write_5m_input_tokens:
+			(Object.hasOwn(event, "recordedCacheWrite5mInputTokens")
+				? event.recordedCacheWrite5mInputTokens
+				: event.cacheWrite5mInputTokens) == null
+				? null
+				: String(
+						event.recordedCacheWrite5mInputTokens ??
+							event.cacheWrite5mInputTokens,
+					),
+		recorded_cache_write_1h_input_tokens:
+			(Object.hasOwn(event, "recordedCacheWrite1hInputTokens")
+				? event.recordedCacheWrite1hInputTokens
+				: event.cacheWrite1hInputTokens) == null
+				? null
+				: String(
+						event.recordedCacheWrite1hInputTokens ??
+							event.cacheWrite1hInputTokens,
+					),
+		cache_write_input_tokens:
+			event.cacheWriteInputTokens === null
+				? null
+				: String(event.cacheWriteInputTokens),
 		output_tokens: String(event.outputTokens),
 		reasoning_output_tokens: String(event.reasoningOutputTokens),
 		agent_id: event.agentId,
@@ -360,6 +382,9 @@ function buildReceiptRow(input: UsageEventWriteInput): RudelUsageEventsRow {
 		cache_read_input_tokens: "0",
 		cache_write_5m_input_tokens: "0",
 		cache_write_1h_input_tokens: "0",
+		recorded_cache_write_5m_input_tokens: null,
+		recorded_cache_write_1h_input_tokens: null,
+		cache_write_input_tokens: null,
 		output_tokens: "0",
 		reasoning_output_tokens: "0",
 		agent_id: "",
@@ -415,6 +440,9 @@ function buildTombstoneRow(
 		cache_read_input_tokens: "0",
 		cache_write_5m_input_tokens: "0",
 		cache_write_1h_input_tokens: "0",
+		recorded_cache_write_5m_input_tokens: null,
+		recorded_cache_write_1h_input_tokens: null,
+		cache_write_input_tokens: null,
 		output_tokens: "0",
 		reasoning_output_tokens: "0",
 		agent_id: "",
@@ -485,15 +513,28 @@ function validateWriteInput(input: UsageEventWriteInput): void {
 }
 
 function hasValidUsageEventTokens(event: UsageEvent): boolean {
-	return [
-		event.contextInputTokens,
-		event.uncachedInputTokens,
-		event.cacheReadInputTokens,
-		event.cacheWrite5mInputTokens,
-		event.cacheWrite1hInputTokens,
-		event.outputTokens,
-		event.reasoningOutputTokens,
-	].every((value) => Number.isSafeInteger(value) && value >= 0);
+	return (
+		[
+			event.contextInputTokens,
+			event.uncachedInputTokens,
+			event.cacheReadInputTokens,
+			event.outputTokens,
+			event.reasoningOutputTokens,
+		].every((value) => Number.isSafeInteger(value) && value >= 0) &&
+		[
+			event.cacheWrite5mInputTokens,
+			event.cacheWrite1hInputTokens,
+			event.cacheWriteInputTokens,
+		].every(
+			(value) => value === null || (Number.isSafeInteger(value) && value >= 0),
+		) &&
+		[
+			event.recordedCacheWrite5mInputTokens,
+			event.recordedCacheWrite1hInputTokens,
+		].every(
+			(value) => value == null || (Number.isSafeInteger(value) && value >= 0),
+		)
+	);
 }
 
 function parseUsageEventSource(value: string): UsageEventSource {

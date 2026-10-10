@@ -10,8 +10,8 @@
  *
  * Everything after the framing is application output. It is never scanned:
  * a test that prints `{"exit_code":1}` or `Process exited with code 1` must not
- * change the recorded result. A structured end event from the transcript still
- * outranks anything read here (see `readOutput` in `codex-records.ts`).
+ * change the recorded result. Structured end events keep their outcomes on
+ * their own rows rather than replacing this output's recorded framing.
  */
 
 const PROCESS_EXIT_PREAMBLE = /^Process exited with code\s+(-?\d+)\s*$/iu;
@@ -54,7 +54,11 @@ export function readClaudeExitCode(resultText: string): number | null {
  * output was recorded (`Process running with session ID N`, `Script running`)
  * and reported no exit code. Read from the preamble only, like exit codes.
  */
-export function isCodexRunningOutput(output: unknown): boolean {
+export function isCodexRunningOutput(
+	output: unknown,
+	recordedExitCode = readCodexExitCode(output),
+): boolean {
+	if (recordedExitCode !== null) return false;
 	return readTransportTexts(output).some((text) => {
 		const lines = text.trimStart().split("\n", PREAMBLE_MAX_LINES + 1);
 		for (const rawLine of lines.slice(0, PREAMBLE_MAX_LINES)) {

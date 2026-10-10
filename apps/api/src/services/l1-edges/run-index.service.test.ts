@@ -348,7 +348,7 @@ describe("building a session's run index", () => {
 			run_count: 2,
 			tool_calls: 6,
 			failed_calls: 1,
-			denied_calls: 1,
+			denied_calls: null,
 			models: ["claude-haiku-5-5", "claude-opus-5-5"],
 			skills: ["review", "ship-it"],
 			usage_receipt: "12:abc",
@@ -652,6 +652,31 @@ describe("run index rows", () => {
 			runRow(facts(), { ...NO_CODEX_LIFECYCLE_FACTS, abortedTrue: 1 }, context)
 				.aborted,
 		).toBe("true");
+	});
+
+	test("Claude abort reason and Codex turn effort survive row materialization", () => {
+		expect(
+			runRow(
+				facts({ l_abort_reason: "[Request interrupted by user]" }),
+				NO_CODEX_LIFECYCLE_FACTS,
+				context,
+			).abort_reason,
+		).toBe("[Request interrupted by user]");
+		const codex = {
+			...context,
+			session: { ...context.session, source: "codex" },
+		};
+		expect(
+			runRow(
+				facts({ l_effort: "low" }),
+				{ ...NO_CODEX_LIFECYCLE_FACTS, effort: "high" },
+				codex,
+			).per_turn_effort,
+		).toBe("high");
+		expect(
+			runRow(facts({ l_effort: "low" }), NO_CODEX_LIFECYCLE_FACTS, codex)
+				.per_turn_effort,
+		).toBe("low");
 	});
 
 	test("hook lists stay JSON arrays in record order; none recorded is empty, not an empty array", () => {

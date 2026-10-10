@@ -634,6 +634,8 @@ export type RudelRunIndexRow = {
   tool_calls: number
   failed_calls: number
   edits: number
+  failed_edits: number | null
+  refused_edits: number | null
   reads: number
   searches: number
   not_found: number
@@ -749,6 +751,8 @@ export const RudelRunIndexRowSchema = z.object({
   tool_calls: z.number(),
   failed_calls: z.number(),
   edits: z.number(),
+  failed_edits: z.number().nullable().default(null),
+  refused_edits: z.number().nullable().default(null),
   reads: z.number(),
   searches: z.number(),
   not_found: z.number(),
@@ -1283,6 +1287,9 @@ export type RudelUsageEventsRow = {
   cache_read_input_tokens: string
   cache_write_5m_input_tokens: string
   cache_write_1h_input_tokens: string
+  recorded_cache_write_5m_input_tokens: string | null
+  recorded_cache_write_1h_input_tokens: string | null
+  cache_write_input_tokens: string | null
   output_tokens: string
   reasoning_output_tokens: string
   agent_id: string
@@ -1328,6 +1335,9 @@ export const RudelUsageEventsRowSchema = z.object({
   cache_read_input_tokens: z.string(),
   cache_write_5m_input_tokens: z.string(),
   cache_write_1h_input_tokens: z.string(),
+  recorded_cache_write_5m_input_tokens: z.string().nullable().default(null),
+  recorded_cache_write_1h_input_tokens: z.string().nullable().default(null),
+  cache_write_input_tokens: z.string().nullable().default(null),
   output_tokens: z.string(),
   reasoning_output_tokens: z.string(),
   agent_id: z.string(),

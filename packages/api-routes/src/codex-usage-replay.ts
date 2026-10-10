@@ -116,7 +116,12 @@ function visitJsonLines(
 	content: string,
 	visit: (line: { value: Record<string, unknown> }) => boolean | undefined,
 ) {
-	for (const raw of content.split("\n")) {
+	let start = 0;
+	while (start < content.length) {
+		const newline = content.indexOf("\n", start);
+		const end = newline === -1 ? content.length : newline;
+		const raw = content.slice(start, end);
+		start = end + 1;
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(raw);

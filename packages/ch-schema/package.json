@@ -39,7 +39,8 @@
 		"ch:migrate:session-analytics-retirement": "bun scripts/migrate-session-analytics-retirement.ts",
 		"ch:migrate:l1-edges": "bun scripts/migrate-l1-edges.ts",
 		"ch:migrate:run-index": "bun scripts/migrate-run-index.ts",
-		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index",
+		"ch:migrate:parser-v9": "bun scripts/migrate-parser-v9.ts",
+		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:parser-v9",
 		"ch:migrate:github-outcomes": "bun scripts/migrate-github-outcomes.ts"
 	},
 	"dependencies": {

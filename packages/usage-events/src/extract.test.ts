@@ -11,8 +11,8 @@ import {
 } from "./index.js";
 
 describe("usage identity versioning", () => {
-	test("pins pricing-provenance extraction semantics to v4", () => {
-		expect(USAGE_EVENT_EXTRACTION_VERSION).toBe(4);
+	test("pins literal request snapshots to v5", () => {
+		expect(USAGE_EVENT_EXTRACTION_VERSION).toBe(5);
 	});
 
 	test("pins every event and lineage prefix to the identity-version knob", () => {
@@ -141,7 +141,7 @@ describe("usage attestation", () => {
 		const payload = getUsageAttestationPayload([event]);
 		expect(payload).toEqual([
 			[
-				"usage-attestation:v2",
+				"usage-attestation:v3",
 				event.eventId,
 				"message_id",
 				"2026-08-01",
@@ -153,6 +153,9 @@ describe("usage attestation", () => {
 				"",
 				10,
 				10,
+				0,
+				0,
+				0,
 				0,
 				0,
 				0,
@@ -328,7 +331,7 @@ describe("Claude usage-event extraction", () => {
 		expect(event.qualityFlags).not.toContain("agent_identity_conflict");
 	});
 
-	test("A-05 later zero shadow cannot erase an earlier 42/7 record", () => {
+	test("A-05 the final zero snapshot is kept literally", () => {
 		const first = claudeLine({
 			messageId: "shadowed",
 			requestId: "first",
@@ -344,12 +347,12 @@ describe("Claude usage-event extraction", () => {
 		});
 
 		expect(onlyEvent(extractClaude([first, shadow].join("\n")))).toMatchObject({
-			uncachedInputTokens: 42,
-			outputTokens: 7,
+			uncachedInputTokens: 0,
+			outputTokens: 0,
 		});
 	});
 
-	test("A-06 per-field maxima retain complementary valid fields", () => {
+	test("A-06 the last snapshot replaces earlier partial fields", () => {
 		const inputCopy = claudeLine({
 			messageId: "partial",
 			requestId: "one",
@@ -365,7 +368,7 @@ describe("Claude usage-event extraction", () => {
 
 		expect(
 			onlyEvent(extractClaude([inputCopy, outputCopy].join("\n"))),
-		).toMatchObject({ uncachedInputTokens: 42, outputTokens: 7 });
+		).toMatchObject({ uncachedInputTokens: 0, outputTokens: 7 });
 	});
 
 	test("A-07 main metadata wins a main/subagent model conflict", () => {
@@ -1556,6 +1559,31 @@ describe("Codex usage-event extraction", () => {
 			modelProvider: "openai",
 			serviceTier: "fast",
 		});
+	});
+
+	test("a Codex fork takes its provider from its own session_meta, not the replayed parent copy", () => {
+		const event = onlyEvent(
+			extractCodex([
+				codexSessionMeta({
+					forkedFromId: "parent-session",
+					modelProvider: "openai",
+				}),
+				JSON.stringify({
+					timestamp: "2026-08-01T10:00:00.010Z",
+					type: "session_meta",
+					payload: { id: "parent-session", model_provider: "other-provider" },
+				}),
+				turnContext("gpt-5.4"),
+				codexLine(
+					vector(10, 0, 1, 0),
+					vector(10, 0, 1, 0),
+					"2026-08-01T10:00:05.000Z",
+				),
+			]),
+		);
+
+		expect(event.modelProvider).toBe("openai");
+		expect(event.qualityFlags).not.toContain("unrecognized_model_provider");
 	});
 
 	test("Codex accepts Ultrafast telemetry for GPT-6 Astra", () => {

@@ -1,5 +1,6 @@
 import { getClaudeMutationFiles } from "../session-turn-file-edits.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
+import { appliedChangesFacts } from "./applied-changes.js";
 import { classifyCommand, extractShellFileMutations } from "./command-class.js";
 import { isClaudeBackgroundLaunch, readClaudeExitCode } from "./exit-code.js";
 import { readImageBlockLabel } from "./image-labels.js";
@@ -33,12 +34,37 @@ import {
 	mergeFacts,
 } from "./record-facts.js";
 import type { CommandClass } from "./types.js";
+import { withV9Facts } from "./v9-facts.js";
 
 const SUBAGENT_LAUNCH_TOOLS: ReadonlySet<string> = new Set(["task", "agent"]);
 const AGENT_ID_IN_TEXT_PATTERN = /\bagentId:\s*([A-Za-z0-9_-]+)/u;
 
 /** Turn one parsed Claude Code JSONL record into record items. */
 export function readClaudeLine(
+	record: Record<string, unknown>,
+	state: StreamState,
+): LineResult {
+	const result = readClaudeRecord(record, state);
+	return {
+		...result,
+		items: withV9Facts(
+			record,
+			"claude_code",
+			result.items.map((item) =>
+				item.kind === "file_change"
+					? {
+							...item,
+							facts: mergeFacts(item.facts, {
+								extra: { file_change_basis: "requested" },
+							}),
+						}
+					: item,
+			),
+		),
+	};
+}
+
+function readClaudeRecord(
 	record: Record<string, unknown>,
 	state: StreamState,
 ): LineResult {
@@ -128,7 +154,7 @@ function readAssistantBlocks(
 		return content === "" ? [] : [{ kind: "assistant_text", text: content }];
 	}
 	if (!Array.isArray(content)) return [metaItem("assistant_empty")];
-	const attribution = readAttribution(record, content);
+	const attribution = readAttribution(record);
 	const items: LineItem[] = [];
 	for (const block of content) {
 		if (!isRecord(block)) continue;
@@ -200,28 +226,27 @@ function withLineFacts(
  * record of the line; the MCP server and tool to its call, when the line holds
  * exactly one (Claude Code writes one content block per line).
  */
-function readAttribution(
-	record: Record<string, unknown>,
-	content: readonly unknown[],
-): { call: LineFacts | undefined; line: LineFacts | undefined } {
+function readAttribution(record: Record<string, unknown>): {
+	call: LineFacts | undefined;
+	line: LineFacts | undefined;
+} {
 	const skill = readString(record.attributionSkill);
 	const server = readString(record.attributionMcpServer);
 	const tool = readString(record.attributionMcpTool);
-	const calls = content.filter(
-		(block) =>
-			isRecord(block) &&
-			(block.type === "tool_use" || block.type === "mcp_tool_use"),
-	).length;
-	const call: LineFacts = {
-		...(server === undefined ? {} : { mcpServer: factText(server, 128) }),
-		...(tool === undefined ? {} : { mcpTool: factText(tool, 128) }),
+	const extra = {
+		...(server === undefined
+			? {}
+			: { attribution_mcp_server: factText(server) }),
+		...(tool === undefined ? {} : { attribution_mcp_tool: factText(tool) }),
 	};
 	return {
-		call: calls === 1 && Object.keys(call).length > 0 ? call : undefined,
-		line:
+		call: undefined,
+		line: mergeFacts(
+			Object.keys(extra).length === 0 ? undefined : { extra },
 			skill === undefined
 				? undefined
 				: { attributionSkill: factText(skill, 128) },
+		),
 	};
 }
 
@@ -297,6 +322,7 @@ function readToolUse(
 	const skill = lowered === "skill" ? readString(input.skill) : undefined;
 	const ownFacts = mergeFacts(
 		callFacts,
+		mcpCallIdentity(toolName),
 		skill === undefined
 			? undefined
 			: { extra: { skill: factText(skill, 128) } },
@@ -307,11 +333,21 @@ function readToolUse(
 	if (callId !== "") {
 		state.calls.set(callId, {
 			commandClass,
-			...(callFacts === undefined ? {} : { facts: callFacts }),
+			facts: mcpCallIdentity(toolName),
 			toolName,
 		});
 	}
 	return items;
+}
+
+function mcpCallIdentity(toolName: string): LineFacts {
+	const matched = /^mcp__(.+)__(.+)$/u.exec(toolName);
+	return matched === null
+		? {}
+		: {
+				mcpServer: factText(matched[1] ?? "", 128),
+				mcpTool: factText(matched[2] ?? "", 128),
+			};
 }
 
 function readUserMessage(
@@ -438,6 +474,7 @@ function readToolResult(
 		exitCode,
 		facts: mergeFacts(
 			known?.facts === undefined ? undefined : mcpFacts(known.facts),
+			claudeAppliedChanges(toolUseResult, !isError && denialKind === undefined),
 			claudeToolResultFacts(toolUseResult, denialKind),
 		),
 		isError,
@@ -452,6 +489,28 @@ function readToolResult(
 		text,
 		toolName: known?.toolName ?? "",
 	};
+}
+
+function claudeAppliedChanges(
+	result: Record<string, unknown> | undefined,
+	confirmed: boolean,
+): LineFacts {
+	if (result === undefined || !confirmed) return {};
+	const changes: Record<string, unknown> = {};
+	if (
+		typeof result.filePath === "string" &&
+		(result.type === "create" ||
+			result.type === "update" ||
+			Array.isArray(result.structuredPatch))
+	)
+		changes[result.filePath] = { type: result.type, content: result.content };
+	if (isRecord(result.bashEditDiff) && Array.isArray(result.bashEditDiff.files))
+		for (const file of result.bashEditDiff.files)
+			if (isRecord(file) && typeof file.filePath === "string")
+				changes[file.filePath] = file;
+	return Object.keys(changes).length === 0
+		? {}
+		: appliedChangesFacts(changes, true);
 }
 
 function readResultText(content: unknown): string {

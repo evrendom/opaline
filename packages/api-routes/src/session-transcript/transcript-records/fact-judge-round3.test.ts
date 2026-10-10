@@ -83,9 +83,14 @@ describe("binding judge round 3", () => {
 			expect(entry.meaning.length).toBeGreaterThan(20);
 			for (const agent of ["claude_code", "codex"] as const) {
 				const mapping = entry.agents[agent];
-				if (mapping.status !== "pending")
-					throw new Error(`Expected a parser-9 plan for ${key}/${agent}`);
-				expect(mapping.plan).toContain("parser 9");
+				if (mapping.status === "stored") {
+					expect(mapping.stores.since).toBe(9);
+					expect(
+						mapping.evidence.some((item) => item.kind === "fixture_test"),
+					).toBe(true);
+				} else if (mapping.status === "pending")
+					expect(mapping.plan).toContain("parser 9");
+				else throw new Error(`Expected a parser-9 mapping for ${key}/${agent}`);
 			}
 		}
 		const root = "token_usage_record/.session_id";
@@ -128,13 +133,13 @@ describe("binding judge round 3", () => {
 		}
 	});
 
-	test("Bash-only command text cannot claim stored timeout options", () => {
+	test("parser 9 keeps recorded Bash timeout options distinct from result timeouts", () => {
 		const timeout = mappingFor("calls/timeout_ms/claude_code");
 		if (timeout.status !== "stored") throw new Error("Monitor limit is stored");
 		const path = "assistant.message.content[tool_use:Bash].input.timeout";
-		expect(timeout.sources).not.toContain(path);
-		expect(timeout.gap?.sources).toContain(path);
-		expect(timeout.gap?.plan).toContain("parser 9");
+		expect(timeout.sources).toContain(path);
+		expect(timeout.stores.since).toBe(9);
+		expect(timeout.stores.facts).toContain("timeout_ms_components");
 		expect(timeout.sources).toContain("user.toolUseResult.timeoutMs");
 	});
 

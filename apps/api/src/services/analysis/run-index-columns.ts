@@ -36,6 +36,9 @@ export interface RunIndexColumnGate {
 	 * parser version kept (a Skill call's input, a slash command's name).
 	 */
 	readonly facts: readonly RunIndexFactSource[];
+	readonly factsBy?: Readonly<
+		Partial<Record<TranscriptSource, readonly RunIndexFactSource[]>>
+	>;
 	/** Run rows, the receipt (session facts), or both (totals and merged sets). */
 	readonly rows: "run" | "receipt" | "both";
 }
@@ -52,15 +55,48 @@ const gate = (
 	facts: readonly RunIndexFactSource[],
 	rows: RunIndexColumnGate["rows"] = "run",
 	sinceBy?: RunIndexColumnGate["sinceBy"],
+	factsBy?: RunIndexColumnGate["factsBy"],
 ): RunIndexColumnGate => ({
 	since,
 	agents,
 	facts,
 	rows,
 	...(sinceBy === undefined ? {} : { sinceBy }),
+	...(factsBy === undefined ? {} : { factsBy }),
 });
 
+export const RUN_INDEX_NARROWED_COLUMNS = {
+	duration_ms: {
+		claude_code:
+			"Claude durationMs/durationSeconds time individual tool results, not a turn. Session cost-state totalDuration is cumulative. Neither can be summed or copied as Codex task_complete/turn_aborted run duration.",
+	},
+	turn_origin: {
+		codex:
+			"Codex prompt_origin stores a communication author's identity, not the turnOrigin classification. Keep sender provenance in components; do not invent a classification.",
+	},
+	prompt_source: {
+		codex:
+			"Codex author identifies a sender, not Claude's promptSource classification. There is no equivalent source label to project.",
+	},
+	origin_kind: {
+		codex:
+			"Codex author is a sender path, not an origin.kind enum. Converting every author to 'agent' would fabricate an unrecorded kind.",
+	},
+	compact_pre_tokens: {
+		codex:
+			"Codex latest_token_usage_record is the latest request's usage snapshot, not context tokens immediately before compaction. Cumulative total_tokens/thread_token_usage and last-request input tokens are not this measurement.",
+	},
+	refusals: {
+		codex:
+			"Codex generic terminal errors include cyber_policy/misalignment_policy_violation; these report policy termination, not a recorded model refusal. Counting all errors or policy stops as model refusals changes the meaning.",
+	},
+} satisfies Partial<
+	Record<keyof RudelRunIndexRow, Partial<Record<TranscriptSource, string>>>
+>;
+
 export const RUN_INDEX_FACT_COLUMNS = {
+	failed_edits: gate(9, BOTH, []),
+	refused_edits: gate(9, BOTH, []),
 	agent_version: gate(6, BOTH, ["agentVersion"]),
 	entrypoint: gate(6, BOTH, ["entrypoint"]),
 	// The typed duration is older, but Codex task durations came with parser 7.
@@ -82,26 +118,55 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	approvals_reviewer: gate(7, CODEX, ["approvals_reviewer"]),
 	sandbox_policy: gate(7, CODEX, ["sandbox_policy"]),
 	sandbox_network_access: gate(7, CODEX, ["sandbox_network_access"]),
-	permission_profile: gate(7, CODEX, ["permission_profile"]),
+	permission_profile: gate(9, CODEX, ["permission_profile"]),
 	collaboration_mode: gate(7, CODEX, ["collaboration_mode"]),
 	model: gate(7, BOTH, ["model"]),
 	models: gate(7, BOTH, ["model"], "both"),
 	effort: gate(7, BOTH, ["effort"]),
-	per_turn_effort: gate(7, CLAUDE, ["per_turn_effort"]),
+	per_turn_effort: gate(7, BOTH, ["per_turn_effort"], "run", undefined, {
+		codex: ["effort"],
+	}),
 	context_window: gate(7, CODEX, ["context_window"]),
 	// Codex refusals and stopped calls are read from its output since parser 8.
-	denied_calls: gate(6, BOTH, ["denialKind"], "both", { codex: 8 }),
+	denied_calls: gate(9, BOTH, ["denialKind"], "both"),
 	interrupted_calls: gate(6, BOTH, ["interrupted"], "run", { codex: 8 }),
 	timed_out_calls: gate(6, CLAUDE, ["timedOutAfterMs"]),
-	mcp_calls: gate(6, BOTH, ["mcpServer"]),
-	mcp_servers: gate(6, BOTH, ["mcpServer"]),
-	skills: gate(6, CLAUDE, ["attributionSkill"], "both"),
+	mcp_calls: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
+	mcp_servers: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
+	skills: gate(
+		6,
+		BOTH,
+		["attributionSkill"],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["skill_components"],
+		},
+	),
 	slash_commands: gate(ALWAYS, CLAUDE, [], "both"),
-	subagent_types: gate(ALWAYS, CLAUDE, [], "both"),
+	subagent_types: gate(
+		ALWAYS,
+		BOTH,
+		[],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["subagent_type_components"],
+		},
+	),
 	compact_trigger: gate(7, CLAUDE, ["compact_trigger"]),
 	compact_pre_tokens: gate(7, CLAUDE, ["compact_pre_tokens"]),
 	aborted: gate(7, BOTH, ["aborted"]),
-	abort_reason: gate(7, CODEX, ["abort_reason"]),
+	abort_reason: gate(
+		7,
+		BOTH,
+		["abort_reason"],
+		"run",
+		{ claude_code: 9 },
+		{
+			claude_code: ["abort_reason_components"],
+		},
+	),
 	turn_error: gate(7, CODEX, ["turn_error"]),
 	turn_error_kind: gate(7, CODEX, ["turn_error_kind"]),
 	stop_reason: gate(7, CLAUDE, ["stop_reason"]),
@@ -110,9 +175,36 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	hook_count: gate(7, CLAUDE, ["hook_count"]),
 	hook_errors: gate(7, CLAUDE, ["hook_errors"]),
 	hook_runs: gate(7, CLAUDE, ["hook_runs"]),
-	api_errors: gate(7, CLAUDE, ["api_error", "api_error_status"], "both"),
-	api_error: gate(7, CLAUDE, ["api_error"]),
-	api_error_statuses: gate(7, CLAUDE, ["api_error_status"]),
+	api_errors: gate(
+		7,
+		BOTH,
+		["api_error", "api_error_status"],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
+	api_error: gate(
+		7,
+		BOTH,
+		["api_error"],
+		"run",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
+	api_error_statuses: gate(
+		7,
+		BOTH,
+		["api_error_status"],
+		"run",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
 	retry_attempts: gate(7, CLAUDE, ["retry_attempt"]),
 	refusals: gate(7, CLAUDE, ["refusal_category"]),
 	fallback_model: gate(7, CLAUDE, ["fallback_model"]),
@@ -120,7 +212,16 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	git_operations: gate(6, CLAUDE, ["gitOperation"]),
 	pushed_branches: gate(6, CLAUDE, ["git.push.branch"]),
 	commit_shas: gate(6, CLAUDE, ["git.commit.sha"]),
-	pr_urls: gate(6, CLAUDE, ["git.pr.url", "pr_url"]),
+	pr_urls: gate(
+		6,
+		BOTH,
+		["git.pr.url", "pr_url"],
+		"run",
+		{ codex: ALWAYS },
+		{
+			codex: [],
+		},
+	),
 	facts_truncated: gate(6, BOTH, ["facts_truncated"], "both"),
 	title: gate(8, CLAUDE, ["title"], "receipt"),
 	cost_state: gate(8, CLAUDE, ["cost_usd"], "receipt"),

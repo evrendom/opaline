@@ -1,3 +1,5 @@
+import { V9_FACT_KEYS } from "./v9-fact-sources.js";
+
 /**
  * Deterministic transcript record index.
  *
@@ -7,25 +9,25 @@
  */
 
 /** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 8;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 9;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
 
-/** Cap on one value in `facts` (code points). */
-export const TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS = 512;
+/** Cap on one value in `facts` (UTF-16 code units, without splitting surrogate pairs). */
+export const TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS = 4_096;
 
-/** Cap on a `facts` value that holds a JSON list (code points). */
-export const TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS = 2_048;
+/** Cap on a `facts` value that holds a JSON list (UTF-16 code units). */
+export const TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS = 65_536;
 
 /**
- * Characters of long `facts` values (over `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`)
+ * UTF-16 code units of long `facts` values (over `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`)
  * one session may store across its streams. Short values and the typed fact
  * columns are bounded per record and always kept; once the budget is spent, a
  * record drops its long values and says `facts_truncated`, so a cut value
  * never reads as not recorded.
  */
-export const TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS = 4 * 1024 * 1024;
+export const TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS = 16 * 1024 * 1024;
 export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
 
 /**
@@ -35,6 +37,19 @@ export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
  * its version.
  */
 export const TRANSCRIPT_RECORD_FACT_KEYS = {
+	...V9_FACT_KEYS,
+	permission_profile_kind: 9,
+	permission_profile_id: 9,
+	search_result_lines: 9,
+	parsed_cmd_types_more: 9,
+	attribution_mcp_server: 9,
+	attribution_mcp_tool: 9,
+	files_found: 9,
+	search_mode: 9,
+	file_change_basis: 9,
+	applied_changes: 9,
+	applied_changes_more: 9,
+	fork_replayed: 9,
 	/** Claude tool result `returnCodeInterpretation`. */
 	return_code_interpretation: 6,
 	/** Claude tool result `noOutputExpected` (true/false). */
@@ -71,7 +86,7 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	persisted_output_bytes: 6,
 	/** Claude tool result `staleReadFileStateHint`, the notice naming files changed since they were read. */
 	stale_read: 6,
-	/** Claude search tool result `numFiles`. */
+	/** Claude search tool result `numMatches`, never files or context lines. */
 	search_matches: 6,
 	/** Claude tool result `gitOperation` values. */
 	"git.push.branch": 6,
@@ -252,7 +267,7 @@ export const TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX = 4_294_967_295;
 /** Characters kept in `head` (first) and `tail` (last) of every record. */
 export const TRANSCRIPT_RECORD_EXCERPT_CHARS = 1_024;
 
-/** Default cap on the full decoded `text` stored per record (code points). */
+/** Default cap on the full decoded `text` stored per record (UTF-16 code units, without splitting surrogate pairs). */
 export const TRANSCRIPT_RECORD_TEXT_MAX_CHARS = 65_536;
 
 /**
@@ -386,6 +401,7 @@ export interface TranscriptTextPace {
 }
 
 export interface SplitTranscriptOptions {
+	readonly codexForkParentCalls?: Readonly<Record<string, readonly string[]>>;
 	/** '' for the main transcript, otherwise the subagent id. */
 	readonly agentId?: string;
 	readonly content: string;

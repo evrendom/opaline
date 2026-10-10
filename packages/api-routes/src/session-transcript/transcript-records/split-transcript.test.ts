@@ -984,25 +984,33 @@ describe("Codex records", () => {
 		]);
 	});
 
-	test("end events supply exit codes and patch failures for the matching output", async () => {
+	test("end events keep exit codes and patch failures on their own rows", async () => {
 		const rows = codexRows(await readFixture("codex-end-event-era.jsonl"));
 
 		const byCall = new Map(
 			ofKind(rows, "tool_result").map((row) => [row.callId, row]),
 		);
 		expect(byCall.get("structured-read")).toMatchObject({
-			exitCode: 0,
+			exitCode: null,
 			isError: false,
 		});
 		expect(byCall.get("structured-failure")).toMatchObject({
-			exitCode: 127,
-			isError: true,
+			exitCode: null,
+			isError: false,
 		});
 		expect(byCall.get("structured-patch")).toMatchObject({ isError: false });
 		expect(byCall.get("failed-patch")).toMatchObject({
 			exitCode: null,
-			isError: true,
+			isError: false,
 		});
+		expect(
+			rows.find(
+				(row) => row.kind === "meta" && row.callId === "structured-failure",
+			),
+		).toMatchObject({ exitCode: 127, isError: true });
+		expect(
+			rows.find((row) => row.kind === "meta" && row.callId === "failed-patch"),
+		).toMatchObject({ isError: true });
 		expect(
 			rows.filter((row) => row.kind === "meta").map((row) => row.subtype),
 		).toContain("exec_command_end");

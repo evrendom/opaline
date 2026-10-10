@@ -36,10 +36,14 @@ interface JsonLine {
 }
 
 interface ClaudeCandidate {
+	recordedCacheWrite5mInputTokens: number | null;
+	recordedCacheWrite1hInputTokens: number | null;
+	reasoningOutputTokens: number;
 	agentId: string;
 	cacheReadInputTokens: number;
 	cacheWrite5mInputTokens: number;
 	cacheWrite1hInputTokens: number;
+	cacheWriteInputTokens: number | null;
 	firstObservedLine: number;
 	identityKind: string;
 	identityValue: string;
@@ -204,7 +208,7 @@ export function getUsageAttestationPayload(
 	return [...events]
 		.sort((left, right) => compareBytes(left.eventId, right.eventId))
 		.map((event) => [
-			"usage-attestation:v2",
+			"usage-attestation:v3",
 			event.eventId,
 			event.identityKind,
 			event.usageDate,
@@ -219,6 +223,9 @@ export function getUsageAttestationPayload(
 			event.cacheReadInputTokens,
 			event.cacheWrite5mInputTokens,
 			event.cacheWrite1hInputTokens,
+			event.cacheWriteInputTokens,
+			event.recordedCacheWrite5mInputTokens ?? null,
+			event.recordedCacheWrite1hInputTokens ?? null,
 			event.outputTokens,
 			event.reasoningOutputTokens,
 		]);
@@ -338,6 +345,19 @@ function readClaudeCandidate(
 	}
 
 	const nestedTotal = nested5m + nested1h;
+	const reasoningOutputTokens = readOptionalToken(
+		readRecord(usage.output_tokens_details),
+		"thinking_tokens",
+		"claude_invalid_thinking_tokens",
+		diagnostics,
+	);
+	if (
+		reasoningOutputTokens === undefined ||
+		reasoningOutputTokens > outputTokens
+	) {
+		addDiagnostic(diagnostics, "claude_invalid_thinking_tokens", true);
+		return undefined;
+	}
 	const qualityFlags: string[] = [];
 	if (cacheCreation && flatCacheWrite !== nestedTotal) {
 		qualityFlags.push("cache_write_flat_nested_mismatch");
@@ -405,9 +425,21 @@ function readClaudeCandidate(
 
 	return {
 		agentId,
+		reasoningOutputTokens,
+		recordedCacheWrite5mInputTokens:
+			cacheCreation && Object.hasOwn(cacheCreation, "ephemeral_5m_input_tokens")
+				? nested5m
+				: null,
+		recordedCacheWrite1hInputTokens:
+			cacheCreation && Object.hasOwn(cacheCreation, "ephemeral_1h_input_tokens")
+				? nested1h
+				: null,
 		cacheReadInputTokens,
 		cacheWrite5mInputTokens,
 		cacheWrite1hInputTokens,
+		cacheWriteInputTokens: Object.hasOwn(usage, "cache_creation_input_tokens")
+			? flatCacheWrite
+			: null,
 		firstObservedLine: line.lineNumber,
 		identityKind,
 		identityValue,
@@ -509,11 +541,12 @@ function mergeClaudeCandidateGroup(
 		qualityFlags.add("agent_identity_conflict");
 	}
 
-	const uncachedInputTokens = maxField(group, "uncachedInputTokens");
-	const cacheReadInputTokens = maxField(group, "cacheReadInputTokens");
-	const cacheWrite5mInputTokens = maxField(group, "cacheWrite5mInputTokens");
-	const cacheWrite1hInputTokens = maxField(group, "cacheWrite1hInputTokens");
-	const outputTokens = maxField(group, "outputTokens");
+	const finalSnapshot = preferredMetadata.at(-1) ?? first;
+	const uncachedInputTokens = finalSnapshot.uncachedInputTokens;
+	const cacheReadInputTokens = finalSnapshot.cacheReadInputTokens;
+	const cacheWrite5mInputTokens = finalSnapshot.cacheWrite5mInputTokens;
+	const cacheWrite1hInputTokens = finalSnapshot.cacheWrite1hInputTokens;
+	const outputTokens = finalSnapshot.outputTokens;
 	const contextInputTokens =
 		uncachedInputTokens +
 		cacheReadInputTokens +
@@ -545,8 +578,13 @@ function mergeClaudeCandidateGroup(
 		cacheReadInputTokens,
 		cacheWrite5mInputTokens,
 		cacheWrite1hInputTokens,
+		cacheWriteInputTokens: finalSnapshot.cacheWriteInputTokens,
+		recordedCacheWrite5mInputTokens:
+			finalSnapshot.recordedCacheWrite5mInputTokens,
+		recordedCacheWrite1hInputTokens:
+			finalSnapshot.recordedCacheWrite1hInputTokens,
 		outputTokens,
-		reasoningOutputTokens: 0,
+		reasoningOutputTokens: finalSnapshot.reasoningOutputTokens,
 		agentId,
 		lineageId: hashParts([
 			getUsageIdentityPrefix("claude-lineage", input.versions.identityVersion),
@@ -667,6 +705,7 @@ function extractCodexEvents(
 	input: VersionedUsageExtractionInput,
 	diagnostics: Map<string, MutableDiagnostic>,
 ): readonly UsageEvent[] {
+	const requests = extractCodexRequestEvents(input, diagnostics);
 	const events: MutableUsageEvent[] = [];
 	const replayState = createCodexReplayState(input.content);
 	const transitionIndexes = new Map<string, number>();
@@ -676,17 +715,26 @@ function extractCodexEvents(
 	>();
 	let activeModel = "";
 	let activeModelProvider = "";
+	let configuredServiceTier: unknown;
 	const activeProviderQualityFlags: string[] = [];
 	let previousTotalKey = "";
 	let hasInterleaving = false;
 	let hasUnresolvedFallback = false;
 	let hasInheritedBaseline = replayState.active;
+	let sawSessionMeta = false;
+	let forkBoundary: number | undefined;
 	let lastTotal: CodexVector | undefined;
 	const outgoingTransitions = new Map<string, Set<string>>();
 
 	visitJsonLines(input.content, diagnostics, (line) => {
 		const payload = readRecord(line.value.payload);
 		if (line.value.type === "session_meta") {
+			// A fork file replays its parent's session_meta after its own; only the
+			// first one names this session's provider.
+			if (sawSessionMeta) return;
+			sawSessionMeta = true;
+			forkBoundary = codexForkBoundary(payload);
+			if (forkBoundary !== undefined) replayState.active = false;
 			activeModelProvider = normalizeBillingDimension(
 				payload?.model_provider,
 				new Set(["openai"]),
@@ -700,6 +748,17 @@ function extractCodexEvents(
 		if (line.value.type === "turn_context") {
 			const model = readNonEmptyString(payload?.model);
 			if (model && model !== SYNTHETIC_MODEL) activeModel = model;
+			if (payload && Object.hasOwn(payload, "service_tier"))
+				configuredServiceTier = payload.service_tier;
+			return;
+		}
+		if (
+			line.value.type === "event_msg" &&
+			payload?.type === "thread_settings_applied"
+		) {
+			const settings = readRecord(payload.thread_settings);
+			if (settings && Object.hasOwn(settings, "service_tier"))
+				configuredServiceTier = settings.service_tier;
 			return;
 		}
 		if (line.value.type !== "event_msg" || payload?.type !== "token_count") {
@@ -728,6 +787,21 @@ function extractCodexEvents(
 		if (!total) return;
 		lastTotal = total;
 		const totalKey = codexVectorKey(total);
+		if (
+			forkBoundary !== undefined &&
+			typeof line.value.ordinal === "number" &&
+			line.value.ordinal < forkBoundary
+		) {
+			addDiagnostic(
+				diagnostics,
+				"codex_replayed_parent_prefix_suppressed",
+				false,
+			);
+			hasInheritedBaseline = true;
+			addKnownTotal(knownTotals, total);
+			previousTotalKey = totalKey;
+			return;
+		}
 		const lastRecord = readRecord(info?.last_token_usage);
 		let last: CodexVector | undefined;
 		if (lastRecord && !hasRequiredCodexTokens(lastRecord)) {
@@ -744,13 +818,37 @@ function extractCodexEvents(
 			);
 		}
 		const occurredAt = readTimestamp(line.value.timestamp);
+		if (requests !== undefined && last === undefined) {
+			addDiagnostic(diagnostics, "codex_mixed_aggregate_witness", false);
+			addKnownTotal(knownTotals, total);
+			previousTotalKey = totalKey;
+			return;
+		}
+		if (
+			last !== undefined &&
+			isVectorLessThanOrEqual(last, total) &&
+			requests?.coveredTransitions.has(
+				`${codexVectorKey(subtractCodexVectors(total, last))}->${totalKey}`,
+			)
+		) {
+			addDiagnostic(diagnostics, "codex_request_usage_mirror", false);
+			addKnownTotal(knownTotals, total);
+			previousTotalKey = totalKey;
+			return;
+		}
 		const lineQualityFlags: string[] = [];
 		const serviceTier = normalizeServiceTier(
-			info?.service_tier ?? payload.service_tier,
+			info?.service_tier ?? payload.service_tier ?? configuredServiceTier,
 			"codex",
 			lineQualityFlags,
 			diagnostics,
 		);
+		if (
+			info?.service_tier === undefined &&
+			payload.service_tier === undefined &&
+			configuredServiceTier !== undefined
+		)
+			lineQualityFlags.push("service_tier_configured");
 
 		if (last && isZeroVector(last)) {
 			addDiagnostic(diagnostics, "codex_zero_last_increment", false);
@@ -912,8 +1010,11 @@ function extractCodexEvents(
 			addQualityFlag(event, "interleaved_model_attribution_unverified");
 		}
 	}
+	const combined = [...events, ...(requests?.events ?? [])].sort(
+		(left, right) => left.firstObservedLine - right.firstObservedLine,
+	);
 	addCodexFinalSnapshotDiagnostic(
-		events,
+		combined,
 		lastTotal,
 		{
 			hasInheritedBaseline,
@@ -923,7 +1024,7 @@ function extractCodexEvents(
 		diagnostics,
 	);
 
-	return events;
+	return combined;
 }
 
 function emitCodexTransition(input: {
@@ -1268,11 +1369,172 @@ function codexVectorToTokens(vector: CodexVector): UsageEventTokens {
 	return {
 		uncachedInputTokens: vector.inputTokens - vector.cacheReadInputTokens,
 		cacheReadInputTokens: vector.cacheReadInputTokens,
-		cacheWrite5mInputTokens: 0,
-		cacheWrite1hInputTokens: 0,
+		cacheWrite5mInputTokens: null,
+		cacheWrite1hInputTokens: null,
+		cacheWriteInputTokens: null,
 		outputTokens: vector.outputTokens,
 		reasoningOutputTokens: vector.reasoningOutputTokens,
 	};
+}
+
+function extractCodexRequestEvents(
+	input: VersionedUsageExtractionInput,
+	diagnostics: Map<string, MutableDiagnostic>,
+):
+	| { events: readonly UsageEvent[]; coveredTransitions: Set<string> }
+	| undefined {
+	if (!/"type"\s*:\s*"token_usage_record"/u.test(input.content))
+		return undefined;
+	const requests = new Map<string, UsageEvent>();
+	const coveredTransitions = new Set<string>();
+	let hasRequests = false;
+	let model = "";
+	let provider = "";
+	let serviceTier = "";
+	let hasConfiguredServiceTier = false;
+	let forkExclusive: number | undefined;
+	let sawSessionMeta = false;
+	visitJsonLines(input.content, diagnostics, (line) => {
+		const payload = readRecord(line.value.payload);
+		if (line.value.type === "session_meta" && !sawSessionMeta) {
+			// The first session_meta is the session's own; a fork replays its
+			// parent's after it.
+			sawSessionMeta = true;
+			provider = readNonEmptyString(payload?.model_provider) ?? "";
+			forkExclusive = codexForkBoundary(payload);
+		}
+		if (line.value.type === "turn_context") {
+			model = readNonEmptyString(payload?.model) ?? model;
+			if (payload && Object.hasOwn(payload, "service_tier")) {
+				hasConfiguredServiceTier = true;
+				serviceTier = readNonEmptyString(payload.service_tier) ?? "";
+			}
+		}
+		if (
+			line.value.type === "event_msg" &&
+			payload?.type === "thread_settings_applied"
+		) {
+			const settings = readRecord(payload.thread_settings);
+			if (settings && Object.hasOwn(settings, "service_tier")) {
+				hasConfiguredServiceTier = true;
+				serviceTier = readNonEmptyString(settings.service_tier) ?? "";
+			}
+		}
+		if (line.value.type !== "token_usage_record") return;
+		hasRequests = true;
+		if (
+			forkExclusive !== undefined &&
+			typeof line.value.ordinal === "number" &&
+			line.value.ordinal < forkExclusive
+		) {
+			addDiagnostic(diagnostics, "codex_replayed_request_usage", false);
+			return;
+		}
+		const responseId = readNonEmptyString(payload?.response_id);
+		const usage = readRecord(payload?.usage);
+		if (responseId === undefined || usage === undefined) {
+			addDiagnostic(diagnostics, "codex_invalid_request_usage", true);
+			return;
+		}
+		const vector = readCodexVector(
+			usage,
+			"codex_invalid_request_usage",
+			diagnostics,
+		);
+		if (vector === undefined) return;
+		const threadUsage = readRecord(payload?.thread_token_usage);
+		const threadInput = readToken(threadUsage?.input_tokens);
+		const threadCache = readToken(threadUsage?.cached_input_tokens);
+		if (
+			threadUsage &&
+			hasRequiredCodexTokens(threadUsage) &&
+			threadInput !== undefined &&
+			threadCache !== undefined &&
+			threadCache <= threadInput
+		) {
+			const total = readCodexVector(
+				threadUsage,
+				"codex_invalid_thread_usage",
+				diagnostics,
+			);
+			if (total && isVectorLessThanOrEqual(vector, total))
+				coveredTransitions.add(
+					`${codexVectorKey(subtractCodexVectors(total, vector))}->${codexVectorKey(total)}`,
+				);
+		}
+		const cacheWrite =
+			usage.cache_write_input_tokens != null
+				? readToken(usage.cache_write_input_tokens)
+				: null;
+		if (cacheWrite === undefined) {
+			addDiagnostic(diagnostics, "codex_invalid_request_cache_write", true);
+			return;
+		}
+		const occurredAt = readTimestamp(line.value.timestamp);
+		const qualityFlags = new Set<string>();
+		if (hasConfiguredServiceTier) qualityFlags.add("service_tier_configured");
+		const resolved = resolveUsageModel(
+			model,
+			occurredAt,
+			qualityFlags,
+			"codex",
+		);
+		const existing = requests.get(responseId);
+		requests.set(responseId, {
+			organizationId: input.organizationId,
+			userId: input.userId,
+			sessionId: input.sessionId,
+			source: "codex",
+			eventId: getEventId(input, "response_id", responseId),
+			identityKind: "response_id",
+			occurredAt,
+			usageDate: occurredAt?.slice(0, 10) ?? null,
+			rawModel: resolved.rawModel,
+			resolvedModel: resolved.resolvedModel,
+			modelStatus: resolved.status,
+			serviceTier,
+			modelProvider: provider,
+			inferenceSpeed: "",
+			inferenceGeo: "",
+			contextInputTokens: vector.inputTokens,
+			...codexVectorToTokens(vector),
+			cacheWriteInputTokens: cacheWrite,
+			agentId: "main",
+			lineageId: hashParts([
+				getUsageIdentityPrefix("codex-lineage", input.versions.identityVersion),
+				input.sessionId,
+				responseId,
+			]),
+			parentLineageId: "",
+			tokenSource: "provider_increment",
+			firstObservedLine: existing?.firstObservedLine ?? line.lineNumber,
+			duplicateObservationCount:
+				(existing?.duplicateObservationCount ?? -1) + 1,
+			qualityFlags: [...qualityFlags].sort(compareBytes),
+		});
+	});
+	return hasRequests
+		? { events: [...requests.values()], coveredTransitions }
+		: undefined;
+}
+
+function codexForkBoundary(
+	payload: Record<string, unknown> | undefined,
+): number | undefined {
+	if (
+		typeof payload?.forked_from_id !== "string" ||
+		payload.forked_from_id === "" ||
+		payload.forked_from_id === payload.id
+	)
+		return undefined;
+	const boundary =
+		payload.subagent_history_start_ordinal ??
+		payload.forked_from_ordinal_exclusive;
+	return typeof boundary === "number" &&
+		Number.isSafeInteger(boundary) &&
+		boundary >= 0
+		? boundary
+		: undefined;
 }
 
 function sumCodexEventVectors(events: readonly UsageEvent[]): CodexVector {
@@ -1557,18 +1819,6 @@ function resolveUsageModel(
 		resolvedModel: identity.model,
 		status: "resolved",
 	};
-}
-
-function maxField(
-	group: readonly ClaudeCandidate[],
-	field:
-		| "uncachedInputTokens"
-		| "cacheReadInputTokens"
-		| "cacheWrite5mInputTokens"
-		| "cacheWrite1hInputTokens"
-		| "outputTokens",
-): number {
-	return Math.max(...group.map((candidate) => candidate[field]));
 }
 
 function uniqueNonEmpty(values: readonly string[]): string[] {

@@ -337,6 +337,7 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 	}
 
 	let sessionId = "";
+	let sawSessionMeta = false;
 	let executionMode: ConversationExecutionMode = "unknown";
 	let rootModelSetting: string | undefined;
 	const modelSettingsByAgent = new Map<string, string>();
@@ -362,7 +363,12 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 		}
 
 		if (parsed.type === "session_meta") {
-			sessionId = (parsed.payload as { id?: string }).id ?? "codex-session";
+			// A fork file replays its parent's session_meta after its own; only the
+			// first one names this session.
+			if (!sawSessionMeta) {
+				sawSessionMeta = true;
+				sessionId = (parsed.payload as { id?: string }).id ?? "codex-session";
+			}
 			continue;
 		}
 

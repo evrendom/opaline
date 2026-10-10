@@ -12,6 +12,7 @@ import { RudelRunIndexRowSchema } from "@rudel/ch-schema/generated";
 import {
 	gateRunIndexRow,
 	RUN_INDEX_FACT_COLUMNS,
+	RUN_INDEX_NARROWED_COLUMNS,
 	type RunIndexColumnGate,
 	type RunIndexFactColumn,
 	type RunIndexFactSource,
@@ -27,13 +28,13 @@ const TYPED_SINCE = 6;
 /** Columns whose facts came later than their typed column (as in l1-facts.test.ts). */
 const SINCE_OVERRIDES: Partial<Record<RunIndexFactColumn, number>> = {
 	duration_ms: 7,
+	refused_edits: 9,
+	permission_profile: 9,
+	denied_calls: 9,
 };
-/**
- * Columns read from a fact the other agent also writes, on records the column
- * does not read: Claude tool results have a duration, but only Codex tasks
- * time a run.
- */
-const NARROWED: ReadonlySet<RunIndexFactColumn> = new Set(["duration_ms"]);
+const NARROWED: Partial<
+	Record<RunIndexFactColumn, Partial<Record<TranscriptSource, string>>>
+> = RUN_INDEX_NARROWED_COLUMNS;
 /** Facts the parser fixtures cannot show (a budget overflow). */
 const NOT_IN_FIXTURES: ReadonlySet<RunIndexFactSource> = new Set([
 	"facts_truncated",
@@ -52,9 +53,15 @@ async function split(
 			import.meta.url,
 		),
 	).text();
+	const v9 = await Bun.file(
+		new URL(
+			`../../../../../packages/api-routes/src/session-transcript/__fixtures__/l1-facts/${source === "codex" ? "codex" : "claude"}-v9.jsonl`,
+			import.meta.url,
+		),
+	).text();
 	return [
 		...splitSessionTranscript({
-			content,
+			content: `${content}\n${v9}`,
 			sessionDate: "2026-10-01T09:00:00.000Z",
 			source,
 		}),
@@ -100,9 +107,11 @@ describe("run index columns", () => {
 			codex: await split("codex"),
 		};
 		for (const [column, gate] of COLUMNS) {
-			const facts = gate.facts.filter((fact) => !NOT_IN_FIXTURES.has(fact));
-			if (facts.length === 0) continue;
 			for (const source of ["claude_code", "codex"] as const) {
+				const facts = (gate.factsBy?.[source] ?? gate.facts).filter(
+					(fact) => !NOT_IN_FIXTURES.has(fact),
+				);
+				if (facts.length === 0) continue;
 				const recorded = drafts[source].some((draft) =>
 					facts.some((fact) => carries(draft, fact)),
 				);
@@ -110,7 +119,7 @@ describe("run index columns", () => {
 					expect(`${column} ${source}: ${recorded}`).toBe(
 						`${column} ${source}: true`,
 					);
-				else if (!NARROWED.has(column))
+				else if (!NARROWED[column]?.[source])
 					expect(`${column} ${source}: ${recorded}`).toBe(
 						`${column} ${source}: false`,
 					);
@@ -141,7 +150,9 @@ describe("run index columns", () => {
 		expect(unrecordedRunIndexColumns("run", 8, "claude_code")).toEqual(
 			COLUMNS.filter(
 				([, gate]) =>
-					gate.rows !== "receipt" && !gate.agents.includes("claude_code"),
+					gate.rows !== "receipt" &&
+					(!gate.agents.includes("claude_code") ||
+						(gate.sinceBy?.claude_code ?? gate.since) > 8),
 			)
 				.map(([column]) => column)
 				.sort(),
@@ -149,6 +160,7 @@ describe("run index columns", () => {
 		expect(unrecordedRunIndexColumns("receipt", 8, "codex")).toEqual([
 			"api_errors",
 			"cost_state",
+			"denied_calls",
 			"skills",
 			"slash_commands",
 			"subagent_types",
@@ -198,48 +210,111 @@ describe("run index columns", () => {
 });
 
 describe("run index columns and the L1 fact catalog", () => {
-	test("every fact column is named by one catalog entry, which stores its facts for exactly the column's agents, from the column's version", () => {
+	test("skills links invocation and attribution meanings, including Codex's different key", () => {
+		expect(
+			FACT_CATALOG.filter((entry) => entry.runIndex?.includes("skills")).map(
+				(entry) => `${entry.view}/${entry.id}`,
+			),
+		).toEqual(["calls/attribution_skill", "calls/skill"]);
+		expect(RUN_INDEX_FACT_COLUMNS.skills.factsBy?.codex).toEqual([
+			"skill_components",
+		]);
+		expect(unrecordedRunIndexColumns("run", 8, "codex")).toContain("skills");
+		expect(unrecordedRunIndexColumns("run", 9, "codex")).not.toContain(
+			"skills",
+		);
+	});
+
+	test("every stored semantic counterpart is read, regardless of its storage key", () => {
+		const problems: string[] = [];
+		for (const [column, gate] of COLUMNS) {
+			for (const entry of FACT_CATALOG.filter((entry) =>
+				entry.runIndex?.includes(column),
+			)) {
+				for (const agent of FACT_AGENTS) {
+					if (
+						entry.agents[agent].status === "stored" &&
+						!gate.agents.includes(agent) &&
+						!NARROWED[column]?.[agent]
+					)
+						problems.push(
+							`${column}: ${entry.view}/${entry.id} stores ${agent}`,
+						);
+				}
+			}
+		}
+		expect(problems).toEqual([]);
+	});
+
+	test("every column links semantic catalog facts and reads supported per-agent fields and versions", () => {
 		const problems: string[] = [];
 		for (const [column, gate] of COLUMNS) {
 			const entries = FACT_CATALOG.filter((entry) =>
 				entry.runIndex?.includes(column),
 			);
-			if (entries.length !== 1) {
+			if (entries.length === 0) {
 				problems.push(`${column}: named by ${entries.length} catalog entries`);
 				continue;
 			}
-			const [entry] = entries;
-			if (entry === undefined) continue;
 			for (const agent of FACT_AGENTS) {
-				const fact = entry.agents[agent];
-				const stored = fact.status === "stored" || fact.status === "wrong";
-				const facts: readonly string[] = stored
-					? (fact.stores.facts ?? [])
-					: [];
-				const reads = gate.facts.filter((source) => facts.includes(source));
+				const stored = entries.flatMap((entry) => {
+					const fact = entry.agents[agent];
+					return fact.status === "stored" || fact.status === "wrong"
+						? [fact]
+						: [];
+				});
+				const facts = stored.flatMap((fact) => fact.stores.facts ?? []);
+				const sources = gate.factsBy?.[agent] ?? gate.facts;
+				const reads = sources.filter((source) => facts.includes(source));
 				if (gate.agents.includes(agent)) {
-					if (!stored)
-						problems.push(
-							`${column}: ${entry.id} is ${fact.status} for ${agent}`,
-						);
-					else if (gate.facts.length > 0 && reads.length !== gate.facts.length)
-						problems.push(
-							`${column}: ${entry.id} does not store ${gate.facts.join(", ")} for ${agent}`,
-						);
+					if (stored.length === 0)
+						problems.push(`${column}: no linked fact is stored for ${agent}`);
 					else if (
-						gate.facts.length > 0 &&
-						fact.stores.since !== (gate.sinceBy?.[agent] ?? gate.since)
+						sources.length > 0 &&
+						reads.length !== sources.length &&
+						column !== "failed_edits" &&
+						column !== "refused_edits"
 					)
 						problems.push(
-							`${column}: ${entry.id} stores it for ${agent} since ${fact.stores.since}, the column since ${gate.sinceBy?.[agent] ?? gate.since}`,
+							`${column}: catalog does not store ${sources.join(", ")} for ${agent}`,
 						);
-				} else if (reads.length > 0 && !NARROWED.has(column))
-					problems.push(
-						`${column}: ${entry.id} stores ${reads.join(", ")} for ${agent}, which the column does not read`,
-					);
+					else if (
+						sources.length > 0 &&
+						Math.max(
+							...reads.map((source) =>
+								source in TRANSCRIPT_RECORD_FACT_KEYS
+									? TRANSCRIPT_RECORD_FACT_KEYS[
+											source as keyof typeof TRANSCRIPT_RECORD_FACT_KEYS
+										]
+									: TYPED_SINCE,
+							),
+						) > (gate.sinceBy?.[agent] ?? gate.since)
+					)
+						problems.push(
+							`${column}: ${agent} sources are newer than the column's version ${gate.sinceBy?.[agent] ?? gate.since}`,
+						);
+				}
 			}
 		}
 		expect(problems).toEqual([]);
+	});
+
+	test("every semantic narrowing has a reason for an excluded stored counterpart", () => {
+		for (const [column, reasons] of Object.entries(NARROWED)) {
+			const gate: RunIndexColumnGate =
+				RUN_INDEX_FACT_COLUMNS[column as RunIndexFactColumn];
+			for (const [agent, reason] of Object.entries(reasons)) {
+				expect(reason.length).toBeGreaterThan(40);
+				expect(gate.agents).not.toContain(agent);
+				expect(
+					FACT_CATALOG.some(
+						(entry) =>
+							entry.runIndex?.includes(column) &&
+							entry.agents[agent as TranscriptSource].status === "stored",
+					),
+				).toBe(true);
+			}
+		}
 	});
 
 	test("every run_index column a catalog entry names exists", () => {

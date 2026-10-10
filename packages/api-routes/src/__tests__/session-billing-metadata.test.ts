@@ -12,7 +12,7 @@ function codexTranscript(
 ) {
 	return [
 		{ type: "session_meta", payload: { model_provider: modelProvider } },
-		// Requested Fast is not evidence of the tier actually billed.
+		// The configured tier is the price basis only when a response records none.
 		{ type: "turn_context", payload: { model, service_tier: "fast" } },
 		...requests.map((request, index) => ({
 			type: "event_msg",
@@ -55,7 +55,7 @@ function claudeTranscript(model: string, usage: Record<string, unknown>) {
 const AT = "2026-09-12T12:00:00Z";
 
 describe("request billing metadata", () => {
-	test("prices Fast and legacy Priority per request and respects standard fallback", () => {
+	test("prices Fast and legacy Priority per request, a recorded default beating the configured tier", () => {
 		const metrics = extractTranscriptUsageMetrics(
 			codexTranscript([
 				{ at: AT, infoTier: "fast" },
@@ -65,15 +65,91 @@ describe("request billing metadata", () => {
 			]),
 			undefined,
 		);
-		// Each standard request is $1.55; only the first two get the 2x premium.
-		expect(metrics.estimatedCost).toBeCloseTo(9.3, 8);
+		// Each standard request is $1.55. The first two record a 2x tier, the
+		// third records default (the configured Fast does not override it), and
+		// the fourth records none, so it is priced at the configured Fast tier.
+		expect(metrics.estimatedCost).toBeCloseTo(10.85, 8);
 		expect(metrics.usageEvents.map((event) => event.serviceTier)).toEqual([
 			"fast",
 			" PRIORITY ",
 			"default",
-			undefined,
+			"fast",
 		]);
 		expect(metrics.inputTokens).toBe(600_000);
+	});
+
+	test("prices a response without a recorded tier at the latest configured tier", () => {
+		const response = (tier?: string) => ({
+			type: "event_msg",
+			timestamp: AT,
+			payload: {
+				type: "token_count",
+				info: {
+					...(tier === undefined ? {} : { service_tier: tier }),
+					last_token_usage: {
+						input_tokens: 150_000,
+						cached_input_tokens: 50_000,
+						output_tokens: 10_000,
+					},
+					total_token_usage: {
+						input_tokens: 150_000,
+						cached_input_tokens: 50_000,
+						output_tokens: 10_000,
+					},
+				},
+			},
+		});
+		const transcript = (...lines: unknown[]) =>
+			[
+				{ type: "session_meta", payload: { model_provider: "openai" } },
+				{ type: "turn_context", payload: { model: "gpt-6-astra" } },
+				...lines,
+			]
+				.map((entry) => JSON.stringify(entry))
+				.join("\n");
+		// No configured tier: standard, $1.55.
+		expect(
+			extractTranscriptUsageMetrics(transcript(response()), undefined)
+				.estimatedCost,
+		).toBeCloseTo(1.55, 8);
+		// A thread setting configures Fast: $3.10.
+		const configured = extractTranscriptUsageMetrics(
+			transcript(
+				{
+					type: "event_msg",
+					payload: {
+						type: "thread_settings_applied",
+						thread_settings: { service_tier: "fast" },
+					},
+				},
+				response(),
+			),
+			undefined,
+		);
+		expect(configured.estimatedCost).toBeCloseTo(3.1, 8);
+		expect(configured.usageEvents[0]?.serviceTier).toBe("fast");
+		// A later setting that clears the tier returns to standard.
+		const cleared = extractTranscriptUsageMetrics(
+			transcript(
+				{
+					type: "event_msg",
+					payload: {
+						type: "thread_settings_applied",
+						thread_settings: { service_tier: "fast" },
+					},
+				},
+				{
+					type: "event_msg",
+					payload: {
+						type: "thread_settings_applied",
+						thread_settings: { service_tier: null },
+					},
+				},
+				response(),
+			),
+			undefined,
+		);
+		expect(cleared.estimatedCost).toBeCloseTo(1.55, 8);
 	});
 
 	test("uses each Fast request's date across Sol's price change", () => {

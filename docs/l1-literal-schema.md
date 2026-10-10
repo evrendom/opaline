@@ -6,7 +6,7 @@ L1 is the deterministic layer every analysis reads: what the transcripts, usage 
 
 1. **Literal values.** A column holds what the source recorded (`permission-rule`, `workspace-write`, `interrupted`), under one name for both agents. No labels, scores, buckets or archetypes.
 2. **Unknown is not false.** Every fact is nullable or has an explicit empty value meaning "not recorded". Each row carries `source` (agent) and `agent_version`, so a missing value can be told apart from a version that never emits it.
-3. **Replayable.** Facts come from the parser (`TRANSCRIPT_RECORDS_PARSER_VERSION`) over the stored raw transcript, kept for 365 days. Slimming keeps every record but replaces inline images with markers, and the secret filter redacts matched credentials, so only what survives both can be replayed. Adding a fact the stored transcript carries means a parser bump and `backfill:transcript-records`; facts the transcript never records (the upload mode) need capture.
+3. **Replayable.** Facts come from the parser (`TRANSCRIPT_RECORDS_PARSER_VERSION`) over the stored raw transcript, retained until a deletion request. Slimming keeps every record but replaces inline images with markers, and the secret filter redacts matched credentials, so only what survives both can be replayed. Adding a fact the stored transcript carries means a parser bump and `backfill:transcript-records`; facts the transcript never records (the upload mode) need capture. Raw retention is independent of derived-table TTLs.
 4. **Coverage is a fact.** What was not captured (a member who does not upload, a repository without the GitHub App, an extraction that hit its bounds) is stored and reported, not silently missing.
 5. **Narrow interface.** The analysis agent sees three views (`calls`, `runs`, `prompts`) behind `find`, a schema reference and premade queries. New facts add columns and enum values, not tools or parameters.
 6. **Evidence, entities, edges.** Evidence is immutable and replaced only by a new generation; entities (pull requests, commits, CI run attempts) are one full row per version; relationships are edge rows written by one reconciliation worker, each naming its `relation`, `basis` and witness `evidence_id`. Inferences are candidates, kept out of L1. `find` reads; it does not resolve.
@@ -36,17 +36,37 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `result_chars` | result text | output text |
 | `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` |
 | `git_operation` | `toolUseResult.gitOperation` (`push`, `pr`, `branch`, `commit`) | none (observations parser) |
-| `mcp_server`, `mcp_tool`, `mcp_read_only` | `attributionMcpServer`, `attributionMcpTool`, `mcpMeta` | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` |
+| `mcp_server`, `mcp_tool`, `mcp_read_only` | own `mcp__<server>__<tool>` call name; line attribution retained separately; `mcpMeta` for read-only | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` |
 | `file_path`, `file_op` | Read/Write/Edit input | patch paths |
 | `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` |
 | `stale_read` | `toolUseResult.staleReadFileStateHint` | none |
-| `search_matches` | `toolUseResult.numFiles`, `matches` | none |
-| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` |
+| `search_matches` | `numFiles` only for `files_with_matches`; `numMatches` for `count`; otherwise `numMatches`, then `numLines` | none |
+| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id` only for `kind=started`; `CollabAgentToolCall.receiver_thread_ids` only for `tool=spawn_agent` |
 | `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` |
 | `skill`, `parsed_cmd_types`, `parsed_cmd_read_paths` | `Skill` tool call `input.skill` (the invocation; `attributionSkill` marks the lines after it); a `Read` of a `SKILL.md` keeps its path | `CommandExecution.parsed_cmd`: Codex's own part types and the paths of its `read` parts (a skill is used by reading its `SKILL.md`) |
 | `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `exec_command` argument `workdir`, `CommandExecution.cwd`, `turn_context.cwd`; the branch only in `session_meta.git` |
 
-Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (4M characters): past it a record drops them and says `facts_truncated`; short values are always kept. Prompt and session facts (parser v8) sit on the prompt's records (Claude `turnOrigin`, `promptSource`, `origin.kind`, not on tool results of the same line), the Codex `session_meta` and `inter_agent_communication_metadata` rows, the Claude `instructions` attachment (`instruction_paths`), `cost-state` rows (cumulative; the session's last one holds the totals) and `ai-title` rows (the title is also the row's text). Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
+Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (256 Mi characters in parser 9): past it a record drops them and says `facts_truncated`; short values are always kept. Prompt and session facts (parser v8) sit on the prompt's records (Claude `turnOrigin`, `promptSource`, `origin.kind`, not on tool results of the same line), the Codex `session_meta` and `inter_agent_communication_metadata` rows, the Claude `instructions` attachment (`instruction_paths`), `cost-state` rows (cumulative; the session's last one holds the totals) and `ai-title` rows (the title is also the row's text). Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
+
+### Parser 9 representation and disclosure
+
+New literal families live in the registered `facts` Map, not new transcript-records columns. Each `<family>_components` value is a JSON array of `{path, ordinal, value}`. `path` is the census source path; `ordinal` orders repeated occurrences of that path on the same row. Components retain their distinct names and units: a root/parent turn ID is not a turn duration, and a configured tier is not an observed response tier. Root metadata attached to the first row remains record-scoped by its source path, not proof of ownership by that row's tool call. Call inputs are attached to their own call ID. Empty messages with recorded metadata get a metadata row rather than losing their fields.
+
+Absent keys, JSON `null`, empty strings/lists/objects, zero and `false` are distinct. Readers must gate these keys and corrected typed meanings on `parser_version >= 9`. Reasons, errors and descriptions have a 4,096-code-point cap; lists have a 65,536-character cap and at most 1,024 entries. Omitted outer or nested entries are counted in the family's `_more`; `facts_clipped` identifies capped families. Long values share a 16 Mi UTF-16-unit session fact budget; exhaustion sets `facts_truncated`. Text caps and `text_truncated` remain separate. Secret filtering is preserved; execution `env` maps are never retained. Offered tools contain names/server only, and media components retain presence, not inline bytes. By owner decision, Claude account `userEmail` is retained in `account_context`; it may differ from the Opaline account email, and account/workspace deletion purges it with `transcript_records`. Credential-container redaction remains unchanged.
+
+Requests and outcomes stay separate. `file_op` describes the requested mutation; `file_change_basis` distinguishes requested from recorded applied rows. Confirmed `FileChange.status=completed`, `patch_apply_end.success=true` and successful structured Claude edit/create results contribute `applied_changes`. Refused/failed requests do not. Unified hunk ranges keep the written decimal tokens; omitted range counts remain null. Claude Write creation line counts come from the recorded result content. Codex results retain late explicit exit codes without changing running-result identities. Refused, transport-failed, aborted and unparsable call envelopes are failures, not successful tool results.
+
+Claude MCP target identity comes only from the call's `mcp__<server>__<tool>` name; line attribution is retained separately. Codex named permission profiles use `active_permission_profile.id`; profile kind is separate. Spawn lists exclude wait/send activity. All existing non-replayed record identities retain the v5 identity contract.
+
+Fork replay requires an explicit `forked_from_id` plus identical literal parent `call_id`, or an explicitly written exclusive parent ordinal. The parser marks proven replay rows with `fork_replayed=true`, retaining identities and raw evidence. Live extraction/backfill resolve bounded, organization/user-scoped committed parent calls. Run-index version 2 also anti-matches against committed parent generations, so a child parsed before its parent is available is not counted twice when the index is built after the parent. Timestamps or a generic subagent parent are never tool-replay proof. A missing parent cannot be replaced with an inferred match.
+
+Run-index version 2 counts as `edits` the distinct paths of the `applied_changes` fact united with the `file_path` of `file_change` rows (`file_op` write, edit or delete; subtype `native`, `patch` or `nested`) of native edit tools (Claude Edit, Write, MultiEdit, NotebookEdit; Codex apply_patch) whose call has a result that is neither failed nor refused: the request plus a literal successful outcome is evidence, which matters because Claude sub-agent transcripts never carry `toolUseResult` and so never produce `applied_changes`. Paths inferred from shell command text (subtype `shell*`) never count, with distinct failed and refused edit-call counts (`failed_edits`, `refused_edits`, available from parser 9). Codex parsed-command read/search types override heuristics when present, including an empty/unknown list. Cancellations and interruptions are excluded from `denied_calls`. Pricing and interpretation stay outside literal L1.
+
+Usage extraction version 5 keys Codex request usage by `response_id`; turn/thread cumulative vectors are separately preserved evidence, never added to response tokens. Claude keeps the final main-chain snapshot for each request, not fieldwise maxima, including recorded thinking tokens. Unknown Codex cache writes remain null. Additive nullable `recorded_cache_write_5m_input_tokens`, `recorded_cache_write_1h_input_tokens` and `cache_write_input_tokens` retain the literal cache values; legacy numeric TTL columns remain pricing-compatibility projections. Receipt attestation v3 covers these distinctions without changing identity version 1. Configured Codex service tier is explicitly flagged as configured.
+
+Codex usage whose response records no service tier is priced at the thread's configured tier (the only tier Codex logs); a response's own recorded tier, including `default`, always wins. The stored event keeps the literal configured tier (an explicit null/empty clear stays empty, hence standard) and the `service_tier_configured` quality flag, which labels the price basis as configured, so the cost is recomputable from the stored row. Pricing stays outside literal L1; the parser records the facts.
+
+Counterpart proposals with no source path remain unresolved, not `not_recorded`: absence of a local witness is not writer-absence proof. Per-file instruction hashes also remain a separate configuration-index decision until literal file boundaries and framing policy are specified. See the verification report for the exact residual list.
 
 ### `runs`: one row per run (one human prompt and everything until the next)
 
@@ -60,7 +80,7 @@ Parser v6 writes call facts on the row of the line that carries them. Claude fac
 | `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` |
 | `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` |
 | `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` |
-| `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) |
+| `cost_usd`, tokens by kind | `usage_events` (final request snapshot) | `usage_events` (`token_usage_record` keyed by `response_id`, otherwise deduplicated `token_count` transitions) |
 | `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage |
 | `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` |
 | `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` |
@@ -68,7 +88,7 @@ Parser v6 writes call facts on the row of the line that carries them. Claude fac
 | `stop_reason` | assistant `message.stop_reason` | none |
 | `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none |
 | `hook_runs` (command, duration) | system `hookInfos` | none |
-| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none |
+| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | terminal `task_complete.error` provider/transport kinds feed API errors; no retry/fallback record; policy stops remain distinct from model refusals |
 | `goal` | none | `thread_goal_updated.goal` |
 | `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output |
 | `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same |
@@ -187,6 +207,97 @@ Order per item: stop reading, stop writing (materialized views and recovery SQL)
 The language-signal lexicon stays: it stores literal phrase matches.
 
 Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery SQL stop writing the step 2 and 3 columns (`success_score`, `has_commit`, `used_plan_mode`, `avg_period_sec`, `median_period_sec`, `quick_responses`, `normal_responses`, `long_pauses`, `error_pattern`, `session_archetype`, `inference_duration_sec`, `human_duration_sec`) with `20261008120000_session_analytics_retired_writes.sql`, and the evidence index stops writing `skill_assessments`; their columns keep defaults until a later migration drops them, once every writer runs that code.
+
+## Run-index semantic agent coverage (index 2, unshipped)
+
+Every one of the 63 gated fact columns is linked by meaning through the catalog entry's `runIndex`, not by matching storage-key spelling. Multiple entries may feed a column: `skills` links both invocation/read evidence and Claude attribution. The guard in `run-index-columns.test.ts` requires every stored agent counterpart to be read or explicitly excluded in `RUN_INDEX_NARROWED_COLUMNS` with a reason; supported per-agent fields and their first scalar/component versions are checked separately. A catalog entry's `stores.since` may describe a richer v9 family while its older scalar was already stored in v6-v8.
+
+C = Claude Code; X = Codex. Versions below are the first readable representation, including legacy text. Record-derived spans, call counts, edit totals and usage are outside these gates and remain unchanged.
+
+| Column | Semantic catalog link(s) | Agents before | Agents after |
+| --- | --- | --- | --- |
+| `failed_edits` | `runs/edits` | C v9; X v9 | C v9; X v9 |
+| `refused_edits` | `runs/edits` | C v9; X v9 | C v9; X v9 |
+| `agent_version` | `runs/agent_version` | C v6; X v6 | C v6; X v6 |
+| `entrypoint` | `runs/entrypoint` | C v6; X v6 | C v6; X v6 |
+| `duration_ms` | `runs/duration_ms` | X v7 | X v7; **NARROWED N1** |
+| `time_to_first_token_ms` | `runs/time_to_first_token_ms` | X v7 | X v7 |
+| `turn_origin` | `prompts/prompt_origin` | C v8 | C v8; **NARROWED N2** |
+| `prompt_source` | `prompts/prompt_origin` | C v8 | C v8; **NARROWED N3** |
+| `origin_kind` | `prompts/prompt_origin` | C v8 | C v8; **NARROWED N4** |
+| `trigger_turn` | `runs/prompt_triggers_turn` | X v8 | X v8 |
+| `thread_source` | `session/thread_source` | X v8 | X v8 |
+| `permission_mode` | `runs/permission_mode` | C v7 | C v7 |
+| `permission_modes` | `runs/permission_mode` | C v7 | C v7 |
+| `auto_mode_bash_first` | `runs/auto_mode_*` | C v7 | C v7 |
+| `auto_mode_bash_first_steer` | `runs/auto_mode_*` | C v7 | C v7 |
+| `auto_mode_bypass` | `runs/auto_mode_*` | C v7 | C v7 |
+| `auto_mode_steer_only` | `runs/auto_mode_*` | C v7 | C v7 |
+| `auto_mode_consent_flow` | `runs/auto_mode_*` | C v7 | C v7 |
+| `approval_policy` | `runs/approval_policy` | X v7 | X v7 |
+| `approvals_reviewer` | `runs/approvals_reviewer` | X v7 | X v7 |
+| `sandbox_policy` | `runs/sandbox_policy` | X v7 | X v7 |
+| `sandbox_network_access` | `runs/sandbox_policy` | X v7 | X v7 |
+| `permission_profile` | `runs/permission_profile` | X v9 | X v9 |
+| `collaboration_mode` | `runs/collaboration_mode` | X v7 | X v7 |
+| `model` | `runs/model` | C v7; X v7 | C v7; X v7 |
+| `models` | `runs/model` | C v7; X v7 | C v7; X v7 |
+| `effort` | `runs/effort` | C v7; X v7 | C v7; X v7 |
+| `per_turn_effort` | `runs/effort` | C v7 | C v7; X v7 |
+| `context_window` | `runs/context_window` | X v7 | X v7 |
+| `denied_calls` | `calls/denial_kind` | C v9; X v9 | C v9; X v9 |
+| `interrupted_calls` | `calls/interrupted` | C v6; X v8 | C v6; X v8 |
+| `timed_out_calls` | `calls/timed_out_after_ms` | C v6 | C v6 |
+| `mcp_calls` | `calls/mcp_server` | C v9; X v6 | C v9; X v6 |
+| `mcp_servers` | `calls/mcp_server` | C v9; X v6 | C v9; X v6 |
+| `skills` | `calls/attribution_skill` + `calls/skill` | C v6 | C v6; X v9 |
+| `slash_commands` | `prompts/slash_command` | C v1 | C v1 |
+| `subagent_types` | `calls/subagent_type` | C v1 | C v1; X v9 |
+| `compact_trigger` | `runs/compact_trigger` | C v7 | C v7 |
+| `compact_pre_tokens` | `runs/compact_pre_tokens` | C v7 | C v7; **NARROWED N5** |
+| `aborted` | `runs/aborted` | C v7; X v7 | C v7; X v7 |
+| `abort_reason` | `runs/abort_reason` | X v7 | C v9; X v7 |
+| `turn_error` | `runs/turn_error` | X v7 | X v7 |
+| `turn_error_kind` | `runs/turn_error_kind` | X v7 | X v7 |
+| `stop_reason` | `runs/stop_reason` | C v7 | C v7 |
+| `hook_stop_reason` | `runs/hook_stop_reason` | C v7 | C v7 |
+| `prevented_continuation` | `runs/prevented_continuation` | C v7 | C v7 |
+| `hook_count` | `runs/hook_errors` | C v7 | C v7 |
+| `hook_errors` | `runs/hook_errors` | C v7 | C v7 |
+| `hook_runs` | `runs/hook_runs` | C v7 | C v7 |
+| `api_errors` | `runs/api_errors` | C v7 | C v7; X v9 |
+| `api_error` | `runs/api_errors` | C v7 | C v7; X v9 |
+| `api_error_statuses` | `runs/api_errors` | C v7 | C v7; X v9 |
+| `retry_attempts` | `runs/retry_attempts` | C v7 | C v7 |
+| `refusals` | `runs/refusals` | C v7 | C v7; **NARROWED N6** |
+| `fallback_model` | `runs/fallback_model` | C v7 | C v7 |
+| `goal` | `runs/goal` | X v7 | X v7 |
+| `git_operations` | `calls/git_operation` | C v6 | C v6 |
+| `pushed_branches` | `calls/git_operation` | C v6 | C v6 |
+| `commit_shas` | `calls/git_operation` | C v6 | C v6 |
+| `pr_urls` | `runs/pr_number` | C v6 | C v6; X v1 |
+| `facts_truncated` | `session/facts_truncated` | C v6; X v6 | C v6; X v6 |
+| `title` | `session/title` | C v8 | C v8 |
+| `cost_state` | `session/cost_state` | C v8 | C v8 |
+
+### Written semantic narrowings
+
+- **N1, `duration_ms`:** Claude durationMs/durationSeconds time individual tool results, not a turn. Session cost-state totalDuration is cumulative. Neither can be summed or copied as Codex task_complete/turn_aborted run duration.
+- **N2, `turn_origin`:** Codex prompt_origin stores a communication author's identity, not the turnOrigin classification. Keep sender provenance in components; do not invent a classification.
+- **N3, `prompt_source`:** Codex author identifies a sender, not Claude's promptSource classification. There is no equivalent source label to project.
+- **N4, `origin_kind`:** Codex author is a sender path, not an origin.kind enum. Converting every author to 'agent' would fabricate an unrecorded kind.
+- **N5, `compact_pre_tokens`:** Codex latest_token_usage_record is the latest request's usage snapshot, not context tokens immediately before compaction. Cumulative total_tokens/thread_token_usage and last-request input tokens are not this measurement.
+- **N6, `refusals`:** Codex generic terminal errors include cyber_policy/misalignment_policy_violation; these report policy termination, not a recorded model refusal. Counting all errors or policy stops as model refusals changes the meaning.
+
+### Projection and rebuild rules
+
+- Codex skills use explicit UserMessage skill names (a path alone falls back to its directory name) and the parent directory name of parsed `read` paths ending in `SKILL.md`. Ordinary reads and search paths do not become skills. Claude attribution, literal Skill input and its typed `skill` fact are unioned; this does not prove instructions were followed.
+- Codex subagent types read only the `spawn_agent.arguments.agent_type` component, not model/effort. Both the run and receipt keep merged sets.
+- Codex per-turn effort uses turn-id-attributed lifecycle effort, falling back to the runs literal non-lifecycle effort; Claude keeps its separate `perTurnEffort` value.
+- Claude abort reason reads the recorded interruption component. A tool duration is never substituted for a run duration.
+- Codex API errors count terminal records with explicit provider/transport request kinds: `server_overloaded`, `usage_limit_exceeded`, `http_connection_failed`, `response_stream_connection_failed`, `response_stream_disconnected`, `response_too_many_failed_attempts`. Generic/policy errors are not API errors. Status sets contain only recorded three-digit HTTP statuses from `http_status_code` or `status_code`; a missing status stays empty, never a kind label or invented code. Terminal-only coverage is not full retry visibility.
+- Codex PR URLs are literal GitHub pull-request URLs extracted from the pinned stored tool-result text, not the 240-character head and not an unpinned `session_git_observations` join. The text has existed since parser 1. A named URL is not proof of PR creation; capped or omitted stored text cannot supply a URL.
+- `RUN_INDEX_VERSION` stays **2**. The existing pricing/rebuild fingerprint now includes literal run SQL, delegation SQL, agent gates and the row-projection rules as well as pricing SQL, invalidating stale unshipped index-2 snapshots without changing the index version. Pinned organization/user/generation filters precede grouping; no new unscoped join is added.
 
 ## Order of work
 

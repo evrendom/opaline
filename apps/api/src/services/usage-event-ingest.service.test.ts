@@ -19,6 +19,53 @@ import {
 const SHA256 = "a".repeat(64);
 
 describe("usage event ingest recovery contract", () => {
+	test("literal cache write columns distinguish unknown from recorded zero", () => {
+		const unknown = {
+			...event(),
+			cacheWrite5mInputTokens: null,
+			cacheWrite1hInputTokens: null,
+			cacheWriteInputTokens: null,
+		};
+		const absent = buildUsageEventRows(
+			writeInput("1", extraction([unknown])),
+			[],
+		).find((row) => row.record_kind === "event");
+		const zero = buildUsageEventRows(
+			writeInput("1", extraction([event()])),
+			[],
+		).find((row) => row.record_kind === "event");
+		expect(absent).toMatchObject({
+			recorded_cache_write_5m_input_tokens: null,
+			recorded_cache_write_1h_input_tokens: null,
+			cache_write_input_tokens: null,
+		});
+		expect(zero).toMatchObject({
+			recorded_cache_write_5m_input_tokens: "0",
+			recorded_cache_write_1h_input_tokens: "0",
+			cache_write_input_tokens: "0",
+		});
+		const unbucketed = buildUsageEventRows(
+			writeInput(
+				"1",
+				extraction([
+					{
+						...event(),
+						cacheWrite5mInputTokens: 4,
+						cacheWriteInputTokens: 4,
+						recordedCacheWrite5mInputTokens: null,
+						recordedCacheWrite1hInputTokens: null,
+					},
+				]),
+			),
+			[],
+		).find((row) => row.record_kind === "event");
+		expect(unbucketed).toMatchObject({
+			cache_write_5m_input_tokens: "4",
+			recorded_cache_write_5m_input_tokens: null,
+			recorded_cache_write_1h_input_tokens: null,
+			cache_write_input_tokens: "4",
+		});
+	});
 	test("V12 canonical active selector resolves versions and excludes receipts", () => {
 		const cte = buildActiveUsageEventsCte({ generationFence: true });
 
@@ -345,6 +392,7 @@ function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
 		agentId: "",
 		cacheReadInputTokens: 2,
 		cacheWrite1hInputTokens: 0,
+		cacheWriteInputTokens: 0,
 		cacheWrite5mInputTokens: 0,
 		contextInputTokens: 12,
 		duplicateObservationCount: 0,

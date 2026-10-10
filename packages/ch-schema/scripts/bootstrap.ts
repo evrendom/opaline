@@ -54,6 +54,7 @@ const FORWARD_SCRIPTS = new Map([
 	],
 	["20261009120000_l1_edges.sql", "migrate-l1-edges.ts"],
 	["20261010120000_run_index.sql", "migrate-run-index.ts"],
+	["20261010130000_parser_v9.sql", "migrate-parser-v9.ts"],
 ]);
 
 interface BootstrapMigration {

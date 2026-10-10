@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { readClaudeLine } from "./claude-records.js";
+import { codexOutcomes } from "./codex-outcomes.js";
 import { readCodexAgentId, readCodexLine } from "./codex-records.js";
 import {
 	createStreamState,
@@ -75,6 +76,7 @@ export function createSplitStats(): MutableSplitStats {
 }
 
 export interface SessionTranscriptInput {
+	readonly codexForkParentCalls?: Readonly<Record<string, readonly string[]>>;
 	readonly content: string;
 	readonly maxParseLineBytes?: number;
 	/** ISO timestamp of the session start; used until a record supplies its own. */
@@ -105,6 +107,7 @@ export function* splitSessionTranscript(
 		pace: { bytesBefore: 0, totalBytes, totalChars },
 	};
 	const shared = {
+		codexForkParentCalls: input.codexForkParentCalls,
 		factBudget: {
 			remaining:
 				input.factBudgetChars ?? TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS,
@@ -139,10 +142,18 @@ export function* splitTranscript(
 		options.maxParseLineBytes ?? TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES;
 	const textMaxChars = options.textMaxChars ?? TRANSCRIPT_RECORD_TEXT_MAX_CHARS;
 	const streams = new Map<string, StreamState>();
+	const outcomes =
+		options.source === "codex" ? codexOutcomes(content) : undefined;
 	const streamFor = (agentId: string): StreamState => {
 		let state = streams.get(agentId);
 		if (state === undefined) {
 			state = createStreamState(options.fallbackTs, agentId !== "");
+			const streamOutcomes = outcomes?.get(
+				agentId === mainAgentId ? "" : agentId,
+			);
+			if (streamOutcomes !== undefined)
+				for (const [callId, outcome] of streamOutcomes)
+					state.codexEndEvents.set(callId, outcome);
 			// A Codex sub-agent inside the file runs in the same CLI as the file's
 			// own agent, whose session_meta came first.
 			const main = streams.get(mainAgentId);
@@ -315,7 +326,7 @@ function storedTextCap(
  * record `facts_truncated`. Short values are always kept and cost nothing:
  * each is bounded, like the typed fact columns.
  */
-function budgetFacts(
+export function budgetFacts(
 	facts: LineFacts | undefined,
 	budget: { remaining: number } | undefined,
 ): LineFacts | undefined {

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import v9Cases from "../__fixtures__/l1-facts/v9-cases.json" with {
+	type: "json",
+};
 import {
 	type AgentFact,
 	type CatalogFactField,
@@ -27,6 +30,8 @@ import {
 	type TranscriptRecordFacts,
 	type TranscriptSource,
 } from "./types.js";
+import { V9_SOURCE_FACTS } from "./v9-fact-sources.js";
+import { V9_REGRESSION_COVERAGE } from "./v9-regressions.test.js";
 
 /**
  * The literal facts of the L1 fact catalog (fact-catalog.ts), one fixture
@@ -221,7 +226,13 @@ const CASES: readonly FactCase[] = [
 		row: { callId: "toolu_codegen", kind: "tool_result" },
 		facts: {
 			extra: {
-				shell_edit_changed_files_more: "27",
+				shell_edit_changed_files: JSON.stringify(
+					Array.from(
+						{ length: 60 },
+						(_, index) =>
+							`/repo/packages/generated/src/module-${String(index).padStart(3, "0")}/index.generated.ts`,
+					),
+				),
 				shell_edit_files: "[]",
 				shell_edit_files_more: "60",
 				shell_edit_shared: "true",
@@ -259,10 +270,10 @@ const CASES: readonly FactCase[] = [
 		facts: { extra: { is_async: "true" } },
 	},
 	{
-		name: "search matches",
+		name: "search files remain distinct from match and line counts",
 		fixture: "claude",
 		row: { callId: "toolu_grep", kind: "tool_result" },
-		facts: { extra: { search_matches: "3" } },
+		facts: { extra: { files_found: "3" } },
 	},
 	{
 		name: "patch line counts and user edits",
@@ -464,7 +475,7 @@ const CASES: readonly FactCase[] = [
 				turn_id: "t2",
 				effort: "high",
 				model: "gpt-6.1-sol",
-				permission_profile: "managed",
+				permission_profile_kind: "managed",
 				sandbox_network_access: "false",
 				sandbox_policy: "workspace-write",
 			},
@@ -513,7 +524,6 @@ const CASES: readonly FactCase[] = [
 		row: { kind: "meta", subtype: "thread_goal_updated" },
 		facts: {
 			extra: {
-				facts_clipped: "goal",
 				goal_status: "active",
 				goal_time_used_seconds: "22",
 				goal_tokens_used: "1200",
@@ -521,14 +531,13 @@ const CASES: readonly FactCase[] = [
 		},
 	},
 	{
-		name: "Codex sub-agent thread",
+		name: "Codex sub-agent activity is not a spawn",
 		fixture: "codex",
 		row: { kind: "meta", subtype: "item_completed:SubAgentActivity" },
 		facts: {
 			extra: {
-				spawned_thread_ids: JSON.stringify([
-					"01a10b68-012e-7a60-b141-5c0ccce6bc01",
-				]),
+				subagent_activity_components:
+					'[{"path":"event_msg/item_completed:SubAgentActivity.kind","ordinal":0,"value":"interacted"},{"path":"event_msg/item_completed:SubAgentActivity.agent_thread_id","ordinal":0,"value":"01a10b68-012e-7a60-b141-5c0ccce6bc01"}]',
 			},
 		},
 	},
@@ -555,7 +564,7 @@ const CASES: readonly FactCase[] = [
 			subtype: "item_completed:CollabAgentToolCall",
 			nth: 1,
 		},
-		facts: { extra: { spawned_thread_ids_more: "8" } },
+		facts: { extra: {} },
 	},
 	{
 		name: "long hook lists are cut and counted; long entries are marked clipped",
@@ -563,9 +572,6 @@ const CASES: readonly FactCase[] = [
 		row: { kind: "meta", subtype: "system:stop_hook_summary", nth: 0 },
 		facts: {
 			extra: {
-				facts_clipped: "hook_runs",
-				hook_errors_more: "4",
-				hook_runs_more: "3",
 				hook_stop_reason: "",
 				prevented_continuation: "false",
 			},
@@ -600,7 +606,7 @@ const CASES: readonly FactCase[] = [
 		name: "a long instruction list is cut to whole files and counted",
 		fixture: "claude",
 		row: { kind: "injected_context", subtype: "instructions", nth: 1 },
-		facts: { extra: { instruction_paths_more: "53" } },
+		facts: { extra: {} },
 	},
 	{
 		name: "Claude cost state",
@@ -691,7 +697,7 @@ const CASES: readonly FactCase[] = [
 		name: "a long read path list is cut to whole paths and counted",
 		fixture: "codex",
 		row: { callId: "nested_reads", kind: "tool_result" },
-		facts: { extra: { parsed_cmd_read_paths_more: "8" } },
+		facts: { extra: {} },
 	},
 	{
 		name: "Claude tool, call id and command",
@@ -716,7 +722,7 @@ const CASES: readonly FactCase[] = [
 		columns: { exitCode: null, isError: true },
 	},
 	{
-		name: "a refused Claude rm still becomes a delete (file_op is wrong until parser 9)",
+		name: "a refused Claude rm preserves its requested delete operation",
 		fixture: "claude",
 		row: { callId: "toolu_rm", kind: "file_change" },
 		columns: { fileOp: "delete", filePath: "node_modules" },
@@ -772,29 +778,29 @@ const CASES: readonly FactCase[] = [
 		name: "Codex result length and exit code",
 		fixture: "codex",
 		row: { callId: "call_cmd", kind: "tool_result" },
-		columns: { exitCode: 0, isError: false, textChars: 2 },
+		columns: { exitCode: null, isError: false, textChars: 2 },
 	},
 	{
-		name: "a refused Codex call is not an error (is_error is wrong until parser 9)",
+		name: "a refused Codex call is an error",
 		fixture: "codex",
 		row: { callId: "call_rejected", kind: "tool_result" },
-		columns: { exitCode: null, isError: false },
+		columns: { exitCode: null, isError: true },
 	},
 	{
 		name: "a Codex output still running",
 		fixture: "codex",
 		row: { callId: "call_late", kind: "tool_result", subtype: "running" },
-		columns: { exitCode: null, subtype: "running" },
+		columns: { exitCode: null, isError: false, subtype: "running" },
 	},
 	{
-		name: "a late Codex completion keeps no exit code (exit_code is wrong until parser 9)",
+		name: "a late Codex completion preserves its literal exit code",
 		fixture: "codex",
 		row: {
 			callId: "call_late",
 			kind: "meta",
 			subtype: "item_completed:CommandExecution_mirror",
 		},
-		columns: { exitCode: null, isError: false },
+		columns: { exitCode: 0, isError: false },
 	},
 	{
 		name: "Codex prompt",
@@ -820,7 +826,7 @@ const CASES: readonly FactCase[] = [
 		columns: { fileOp: "write", filePath: "src/new.ts" },
 	},
 	{
-		name: "a failed Codex patch still writes its file (file_op is wrong until parser 9)",
+		name: "a failed Codex patch preserves its requested write operation",
 		fixture: "codexEndEvent",
 		row: { callId: "failed-patch", kind: "file_change" },
 		columns: { fileOp: "write", filePath: "failed.ts" },
@@ -856,9 +862,7 @@ describe("parser facts", () => {
 		const { extra, ...typed } = item.facts ?? {};
 		expect(draft.facts).toMatchObject(typed);
 		if (extra !== undefined) {
-			if (Object.keys(extra).length === 0)
-				expect(draft.facts.extra).toEqual({});
-			else expect(draft.facts.extra).toMatchObject(extra);
+			expect(draft.facts.extra).toMatchObject(extra);
 		}
 		if (item.columns !== undefined) expect(draft).toMatchObject(item.columns);
 	});
@@ -905,10 +909,13 @@ describe("parser facts", () => {
 		expect(pr.facts.extra.facts_truncated).toBe("true");
 		// Only short values to begin with: nothing dropped, nothing marked.
 		const wait = findRow(rows, { callId: "toolu_wait", kind: "tool_result" });
-		expect(wait.facts.extra).toEqual({ timeout_ms: "1200000" });
+		expect(wait.facts.extra).toEqual({
+			timeout_ms: "1200000",
+			facts_truncated: "true",
+		});
 		// Records with no facts map are untouched.
 		const prompt = findRow(rows, { kind: "user_prompt" });
-		expect(prompt.facts.extra).toEqual({});
+		expect(prompt.facts.extra).toEqual({ facts_truncated: "true" });
 	});
 
 	test("fact text loses URL credentials, known secrets and generic credentials", () => {
@@ -948,7 +955,7 @@ describe("parser facts", () => {
 		expect(goal.text.startsWith("ship parser v7 with every run fact.")).toBe(
 			true,
 		);
-		expect(goal.facts.extra.goal?.length).toBe(512);
+		expect(goal.facts.extra.goal?.length).toBe(goal.text.length);
 	});
 
 	test("row text lifted from a field is redacted, and merged facts keep every clipped key", () => {
@@ -1070,7 +1077,7 @@ describe("parser facts", () => {
 	test("rows that carry nothing keep the not-recorded defaults", async () => {
 		const rows = await split(FIXTURES.claude);
 		const call = findRow(rows, { callId: "toolu_pr", kind: "tool_call" });
-		expect(call.facts).toEqual({
+		expect(call.facts).toMatchObject({
 			...NO_TRANSCRIPT_RECORD_FACTS,
 			agentVersion: "2.1.292",
 			entrypoint: "sdk-ts",
@@ -1156,9 +1163,12 @@ describe("parser facts", () => {
 /** Facts checked by the named tests above rather than a case, per agent. */
 const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	// The fact budget tests.
-	claude_code: new Set(["facts_truncated"]),
+	claude_code: new Set([
+		"facts_truncated",
+		...V9_REGRESSION_COVERAGE.claude_code,
+	]),
 	// The fact budget and goal text tests.
-	codex: new Set(["facts_truncated", "goal"]),
+	codex: new Set(["facts_truncated", "goal", ...V9_REGRESSION_COVERAGE.codex]),
 };
 
 /** Fact fields and record columns each agent's cases assert. */
@@ -1175,6 +1185,12 @@ function caseCoverage(): Map<FactAgent, Set<string>> {
 		])
 			if (key !== "extra") covered?.add(key);
 	}
+	for (const witness of v9Cases)
+		coverage
+			.get(witness.agent === "codex" ? "codex" : "claude_code")
+			?.add(witness.key);
+	for (const mapping of V9_SOURCE_FACTS)
+		coverage.get(mapping.agent)?.add(mapping.moreKey);
 	return coverage;
 }
 

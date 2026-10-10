@@ -310,7 +310,10 @@ describe("usage-event analytics ClickHouse rollups", () => {
 			{
 				id: "codex_mixed_tiers",
 				source: "codex",
-				cost: 9.3,
+				// Each standard request is $1.55. Three record a Fast/Priority tier and
+				// one a default; the last records none, so it is priced at the
+				// thread's configured Fast tier (service_tier_configured).
+				cost: 10.85,
 				content: [
 					{ type: "session_meta", payload: { model_provider: "openai" } },
 					{
@@ -1495,6 +1498,9 @@ function buildEventRow(
 		cache_read_input_tokens: "1000000",
 		cache_write_1h_input_tokens: "1000000",
 		cache_write_5m_input_tokens: "1000000",
+		recorded_cache_write_5m_input_tokens: null,
+		recorded_cache_write_1h_input_tokens: null,
+		cache_write_input_tokens: null,
 		content_sha256: "c".repeat(64),
 		context_input_tokens: "4000000",
 		duplicate_observation_count: 0,

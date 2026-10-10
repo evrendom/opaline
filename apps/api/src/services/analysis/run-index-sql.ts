@@ -6,11 +6,20 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { MODEL_RATE_CARD_VERSION } from "../pricing.service.js";
+import { forkParentCallsSql } from "../transcript-fork-replay.js";
 import type {
 	SessionGeneration,
 	TranscriptReadScope,
 } from "../transcript-records-queries.js";
 import { buildPricedUsageEventsCte } from "../usage-event-analytics.service.js";
+import { RUN_INDEX_FACT_COLUMNS } from "./run-index-columns.js";
+import {
+	componentStringsSql,
+	httpStatusesSql,
+	providerErrorKindSql,
+	RUN_INDEX_PR_URL_PATTERN,
+	skillNamesSql,
+} from "./run-index-components.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	GENUINE_PROMPT_SQL,
@@ -19,7 +28,11 @@ import {
 	records,
 	toolErrorSql,
 } from "./sql.js";
-import { toolGroupSql } from "./tool-groups.js";
+import {
+	nativeEditToolSql,
+	toolActivitySql,
+	toolGroupSql,
+} from "./tool-groups.js";
 
 /**
  * The statements that turn a committed transcript-records generation into
@@ -30,20 +43,7 @@ import { toolGroupSql } from "./tool-groups.js";
  */
 
 /** Version of the run index rules; a new version is a new run index generation. */
-export const RUN_INDEX_VERSION = 1;
-
-/**
- * Prices are frozen into the run index at build time. The rate card version
- * alone does not change with every pricing rule, so the version also hashes
- * the pricing SQL (catalog, modifiers, context bands): any change makes the
- * stored costs stale and the session is rebuilt when it is next claimed.
- */
-export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHash(
-	"sha256",
-)
-	.update(buildPricedUsageEventsCte(""))
-	.digest("hex")
-	.slice(0, 12)}`;
+export const RUN_INDEX_VERSION = 2;
 
 /** Literal string or count read back from ClickHouse; `''` and 0 mean none recorded. */
 const text = z.string();
@@ -105,6 +105,11 @@ const RECORD_FACT_KEYS = [
 	"git.pr.url",
 	"pr_url",
 	"facts_truncated",
+	"facts_clipped",
+	"skill",
+	"skill_components",
+	"abort_reason_components",
+	"api_errors_components",
 ] as const;
 
 /** Fact keys of the Codex lifecycle rows. */
@@ -143,6 +148,12 @@ const first = (expression: string, condition = `${expression} != ''`) =>
 const sortedSet = (expression: string) =>
 	`arraySort(groupUniqArrayIf(${expression}, ${expression} != ''))`;
 
+function runToolErrorSql(): string {
+	return `(${toolErrorSql()} OR (source = 'codex' AND parser_version >= 9 AND kind = 'meta' AND call_id != ''
+		AND (subtype IN ('exec_command_end', 'patch_apply_end') OR startsWith(subtype, 'item_completed:'))
+		AND (is_error OR ifNull(exit_code, 0) != 0)))`;
+}
+
 /**
  * A string field of a JSON object, also when the stored text is cut: a
  * capped record keeps a prefix that may no longer parse, and the field is
@@ -168,15 +179,17 @@ function jsonStringField(column: string, field: string): string {
  * `run_facts` aggregates them under `l_` names; `find` leaves them out.
  */
 export function runFactsCtes(options: { literal?: boolean } = {}): string {
-	const callGroup = toolGroupSql("tool_name", "head");
+	const callGroup = `coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "head")})`;
 	const literal = options.literal === true;
 	const headKinds = literal
 		? "kind IN ('tool_call', 'user_prompt') OR (kind = 'injected_context' AND subtype = 'slash_command')"
 		: "kind IN ('tool_call', 'user_prompt')";
 	const literalColumns = literal
 		? `,
-				source, agent_version, entrypoint, denial_kind, mcp_server, attribution_skill, git_operation,
+				agent_version, entrypoint, denial_kind, mcp_server, attribution_skill, git_operation,
 				timed_out_after_ms, ifNull(interrupted, false) AS interrupted_call,
+				if(source = 'codex' AND parser_version >= 9, ${providerErrorKindSql("facts['api_errors_components']")}, '') AS provider_error_kind,
+				if(source = 'codex' AND kind = 'tool_result', extractAll(text, '${RUN_INDEX_PR_URL_PATTERN.replaceAll("\\", "\\\\")}'), []) AS result_pr_urls,
 				toUInt8(source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}) AS lifecycle,
 				${RECORD_FACT_KEYS.map((key) => `facts['${key}'] AS ${factColumn(key)}`).join(", ")}`
 		: "";
@@ -184,20 +197,30 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 		? `,
 				${literalRunFacts()}`
 		: "";
-	return `calls AS (
+	// A native edit tool's own request row, never a path inferred from shell text.
+	const nativeEditSql = `kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != ''
+		AND subtype IN ('native', 'patch', 'nested') AND ${nativeEditToolSql("tool_name")}`;
+	return `${forkReplayCtes()},
+		calls AS (
 			SELECT session_id, agent_id, call_id,
 				argMinIf(${toolGroupSql("tool_name", `substringUTF8(head, 1, ${FACT_TEXT_CHARS})`)}, tuple(record_idx, block_idx), kind = 'tool_call') AS call_group,
-				max(${toolErrorSql()}) AS failed
+				max(${runToolErrorSql()}) AS failed,
+				max(mapContains(facts, 'parsed_cmd_types')) AS has_parsed_cmd,
+				groupUniqArrayArray(JSONExtract(facts['parsed_cmd_types'], 'Array(String)')) AS parsed_types,
+				max(denial_kind != '' AND denial_kind != 'interrupted') AS refused,
+				max(denial_kind IN ('cancelled', 'interrupted') OR ifNull(interrupted, false)) AS stopped,
+				max(kind = 'tool_result') AS has_result
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result') AND call_id != ''
+			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
 			GROUP BY session_id, agent_id, call_id
 		),
 		work_records AS (
 			SELECT session_id, agent_id, record_idx, block_idx, turn_idx, ts, kind, subtype,
-				tool_name, call_id, file_path, file_op, is_error, exit_code, text_chars,
-				if(${headKinds} OR ${toolErrorSql()}, substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head,
-				if(${toolErrorSql()}, substringUTF8(tail, 1, ${FACT_TEXT_CHARS}), '') AS tail${literalColumns}
-			FROM ${records()} FINAL WHERE ${pinnedFilter()} AND turn_idx >= 1
+				tool_name, call_id, file_path, file_op, is_error, exit_code, text_chars, parser_version, source,
+				facts['applied_changes'] AS applied_changes,
+				if(${headKinds} OR ${runToolErrorSql()}, substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head,
+				if(${runToolErrorSql()}, substringUTF8(tail, 1, ${FACT_TEXT_CHARS}), '') AS tail${literalColumns}
+			FROM ${records()} FINAL WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
 		),
 		run_facts AS (
 			SELECT w.session_id AS session_id, w.agent_id AS agent_id, w.turn_idx AS turn_idx,
@@ -209,25 +232,56 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				sum(text_chars) AS raw_chars,
 				countIf(${GENUINE_PROMPT_SQL}) AS genuine_prompt,
 				substringUTF8(argMinIf(head, tuple(record_idx, block_idx), ${GENUINE_PROMPT_SQL}), 1, 160) AS prompt_head,
-				uniqExactIf(file_path, kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != '' AND (w.call_id = '' OR NOT c.failed)) AS edits,
+				if(max(parser_version) >= 9,
+					length(arrayDistinct(arrayConcat(
+						arrayFlatten(groupArray(arrayMap(change -> JSONExtractString(change, 'path'), JSONExtractArrayRaw(applied_changes)))),
+						groupArrayIf(file_path, ${nativeEditSql}
+							AND w.call_id != '' AND c.has_result AND NOT c.failed AND NOT c.refused AND NOT c.stopped)))),
+					uniqExactIf(file_path, kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != '' AND (w.call_id = '' OR NOT c.failed))) AS edits,
+				uniqExactIf(w.call_id, ${nativeEditSql} AND w.call_id != '' AND NOT c.stopped AND c.failed AND NOT c.refused) AS failed_edits,
+				uniqExactIf(w.call_id, ${nativeEditSql} AND w.call_id != '' AND c.refused) AS refused_edits,
 				countIf(kind = 'tool_call') AS tool_calls,
-				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${toolErrorSql()}) AS failed_calls,
-				countIf(kind = 'tool_call' AND ${callGroup} = 'read') AS read_calls,
-				countIf(kind = 'tool_call' AND ${callGroup} = 'search') AS search_calls,
-				countIf(${toolErrorSql()} AND coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "''")}) IN ('read', 'search')
+				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${runToolErrorSql()}) AS failed_calls,
+				countIf(kind = 'tool_call' AND ${toolActivitySql("read", callGroup)}) AS read_calls,
+				countIf(kind = 'tool_call' AND ${toolActivitySql("search", callGroup)}) AS search_calls,
+				countIf(${toolErrorSql()} AND (${toolActivitySql("read", `coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "''")})`)} OR ${toolActivitySql("search", `coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "''")})`)})
 					AND match(concat(head, '\\n', tail), '(?i)not found|no such file|ENOENT|No files found')) AS not_found${literalFacts}
 			FROM work_records w
 			LEFT ANY JOIN calls c ON w.session_id = c.session_id AND w.agent_id = c.agent_id AND w.call_id = c.call_id
 			GROUP BY w.session_id, w.agent_id, w.turn_idx
 		),
-		${boundedRunsCte()}`;
+		${boundedRunsCte(FORK_REPLAY_FILTER)}`;
+}
+
+const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
+
+function forkReplayCtes(): string {
+	return `fork_links AS (
+			SELECT DISTINCT session_id, agent_id, JSONExtractString(component, 'value') AS parent_session_id
+			FROM ${records()} ARRAY JOIN JSONExtractArrayRaw(facts['parent_session_components']) AS component
+			WHERE ${pinnedFilter()} AND source = 'codex' AND parser_version >= 9
+				AND (session_id, agent_id, record_idx) IN (
+					SELECT session_id, agent_id, min(record_idx)
+					FROM ${records()} WHERE ${pinnedFilter()} AND source = 'codex' AND parser_version >= 9
+						AND kind = 'meta' AND subtype = 'session_meta'
+					GROUP BY session_id, agent_id)
+				AND JSONExtractString(component, 'path') = 'session_meta/.forked_from_id'
+				AND parent_session_id != '' AND parent_session_id != session_id
+		),
+		${forkParentCallsSql("(SELECT parent_session_id FROM fork_links)")},
+		replayed_calls AS (
+			SELECT f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
+			FROM fork_links f INNER JOIN parent_calls p ON f.parent_session_id = p.session_id
+		)`;
 }
 
 /**
  * Each run's line range in its stream, [first_record, boundary): the next
  * run's start, or one past the run's last record.
  */
-export function boundedRunsCte(): string {
+export function boundedRunsCte(
+	replayFilter = "facts['fork_replayed'] != 'true'",
+): string {
 	return `bounded_runs AS (
 			SELECT session_id, agent_id, turn_idx, first_record,
 				leadInFrame(first_record, 1, toUInt32(last_record + 1)) OVER (
@@ -235,7 +289,7 @@ export function boundedRunsCte(): string {
 					ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS boundary
 			FROM (
 				SELECT session_id, agent_id, turn_idx, min(record_idx) AS first_record, max(record_idx) AS last_record
-				FROM ${records()} WHERE ${pinnedFilter()} AND turn_idx >= 1
+				FROM ${records()} WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${replayFilter}
 				GROUP BY session_id, agent_id, turn_idx
 			)
 		)`;
@@ -254,6 +308,9 @@ function literalRunFacts(): string {
 	const callKey =
 		"if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx)))";
 	const skillInput = `if(kind = 'tool_call' AND tool_name = 'Skill', ${jsonStringField("head", "skill")}, '')`;
+	const codexSkills = `if(source = 'codex' AND parser_version >= 9, ${skillNamesSql(f("skill_components"))}, [])`;
+	const apiError = `if(source = 'codex', provider_error_kind, ${f("api_error")})`;
+	const apiStatuses = `if(source = 'codex', if(provider_error_kind != '', ${httpStatusesSql(f("api_errors_components"))}, []), if(${f("api_error_status")} != '', [${f("api_error_status")}], []))`;
 	const slashCommand =
 		"if(kind = 'injected_context' AND subtype = 'slash_command', trimBoth(extract(head, '<command-name>/?([^<]*)</command-name>')), '')";
 	const jsonEntries = (column: string) =>
@@ -280,19 +337,22 @@ function literalRunFacts(): string {
 			"compact_trigger",
 			"compact_pre_tokens",
 			"hook_stop_reason",
-			"api_error",
 			"fallback_model",
 		].map((key) => `${first(f(key))} AS l_${key}`),
 		`${first(f("model"), `${f("model")} != '' AND lifecycle = 0`)} AS l_model`,
 		`arraySort(groupUniqArrayIf(${f("model")}, ${f("model")} != '' AND lifecycle = 0)) AS l_models`,
 		`${first(f("effort"), `${f("effort")} != '' AND lifecycle = 0`)} AS l_effort`,
-		`uniqExactIf(${callKey}, kind = 'tool_result' AND denial_kind != '') AS l_denied_calls`,
+		`${first(`arrayElement(${componentStringsSql(f("abort_reason_components"), ".*")}, 1)`)} AS l_abort_reason`,
+		`${first(apiError)} AS l_api_error`,
+		`uniqExactIf(${callKey}, kind = 'tool_result' AND denial_kind != '' AND denial_kind != 'interrupted') AS l_denied_calls`,
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND interrupted_call) AS l_interrupted_calls`,
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND timed_out_after_ms IS NOT NULL) AS l_timed_out_calls`,
 		`uniqExactIf(${callKey}, mcp_server != '') AS l_mcp_calls`,
 		`${sortedSet("mcp_server")} AS l_mcp_servers`,
 		`arraySort(arrayDistinct(arrayConcat(groupUniqArrayIf(CAST(attribution_skill, 'String'), attribution_skill != ''),
-					groupUniqArrayIf(${skillInput}, ${skillInput} != '')))) AS l_skills`,
+					groupUniqArrayIf(${skillInput}, ${skillInput} != ''),
+					groupUniqArrayIf(${f("skill")}, ${f("skill")} != ''),
+					arrayFlatten(groupArray(${codexSkills}))))) AS l_skills`,
 		`arraySort(groupUniqArrayIf(${slashCommand}, ${slashCommand} != '')) AS l_slash_commands`,
 		`countIf(kind = 'compaction') AS l_compactions`,
 		`countIf(${f("aborted")} = 'true' AND lifecycle = 0) AS l_aborted_true`,
@@ -305,8 +365,8 @@ function literalRunFacts(): string {
 		`sum(toUInt64OrZero(${f("hook_count")})) AS l_hook_count`,
 		`${jsonEntries(f("hook_errors"))} AS l_hook_errors`,
 		`${jsonEntries(f("hook_runs"))} AS l_hook_runs`,
-		`uniqExactIf(record_idx, ${f("api_error")} != '' OR ${f("api_error_status")} != '') AS l_api_errors`,
-		`${sortedSet(f("api_error_status"))} AS l_api_error_statuses`,
+		`uniqExactIf(record_idx, ${apiError} != '' OR notEmpty(${apiStatuses})) AS l_api_errors`,
+		`arraySort(arrayDistinct(arrayFlatten(groupArray(${apiStatuses})))) AS l_api_error_statuses`,
 		`uniqExactIf(record_idx, ${f("retry_attempt")} != '') AS l_retry_attempts`,
 		`uniqExactIf(record_idx, ${f("refusal_category")} != '') AS l_refusals`,
 		`argMaxIf(${f("goal")}, tuple(record_idx, block_idx), ${f("goal")} != '') AS l_goal`,
@@ -314,15 +374,16 @@ function literalRunFacts(): string {
 		`${sortedSet(f("git.push.branch"))} AS l_pushed_branches`,
 		`${sortedSet(f("git.commit.sha"))} AS l_commit_shas`,
 		`arraySort(arrayDistinct(arrayConcat(groupUniqArrayIf(${f("git.pr.url")}, ${f("git.pr.url")} != ''),
-					groupUniqArrayIf(${f("pr_url")}, ${f("pr_url")} != '')))) AS l_pr_urls`,
-		`countIf(${f("facts_truncated")} = 'true') AS l_facts_truncated`,
+					groupUniqArrayIf(${f("pr_url")}, ${f("pr_url")} != ''), arrayFlatten(groupArray(result_pr_urls))))) AS l_pr_urls`,
+		`countIf(${f("facts_truncated")} = 'true' OR ${f("facts_clipped")} != '') AS l_facts_truncated`,
 	].join(",\n\t\t\t\t");
 }
 
 /**
  * Per run, the stream's Codex `thread_source` (from its `session_meta`) and
- * the `subagent_type` inputs of its Claude Task and Agent calls. The input
- * is read from the stored text, by its literal key when the text was cut.
+ * the requested types of Claude Task/Agent and Codex spawn_agent calls.
+ * Claude inputs are read from stored text; Codex reads only the named
+ * agent_type component, never its requested model or reasoning effort.
  */
 function runContextCtes(): string {
 	return `codex_streams AS (
@@ -335,9 +396,13 @@ function runContextCtes(): string {
 		run_delegations AS (
 			SELECT session_id, agent_id, turn_idx, arraySort(groupUniqArrayIf(subagent_type, subagent_type != '')) AS subagent_types
 			FROM (
-				SELECT session_id, agent_id, turn_idx, ${jsonStringField("text", "subagent_type")} AS subagent_type
+				SELECT session_id, agent_id, turn_idx, arrayJoin(if(source = 'codex' AND parser_version >= 9,
+					${componentStringsSql("facts['subagent_type_components']", "[.]arguments[.]agent_type$")},
+					[${jsonStringField("text", "subagent_type")}])) AS subagent_type
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND kind = 'tool_call' AND tool_name IN ('Task', 'Agent')
+				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
+					AND (kind = 'tool_call' AND tool_name IN ('Task', 'Agent')
+						OR source = 'codex' AND parser_version >= 9 AND facts['subagent_type_components'] != '')
 			)
 			GROUP BY session_id, agent_id, turn_idx
 		)`;
@@ -382,9 +447,14 @@ export function buildCodexLifecycleStatement(
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT agent_id, record_idx, block_idx, turn_idx, subtype,
 				any(facts['turn_id']) AS turn_id, any(duration_ms) AS task_duration_ms,
-				${LIFECYCLE_FACT_KEYS.map((key) => `any(facts['${key}']) AS ${key}`).join(", ")}
+				${LIFECYCLE_FACT_KEYS.map((key) =>
+					key === "permission_profile"
+						? "any(if(parser_version >= 9, facts['permission_profile_id'], facts['permission_profile'])) AS permission_profile"
+						: `any(facts['${key}']) AS ${key}`,
+				).join(", ")}
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}
+				AND facts['fork_replayed'] != 'true'
 			GROUP BY agent_id, record_idx, block_idx, turn_idx, subtype
 			ORDER BY agent_id, record_idx, block_idx`,
 		query_params: pinnedParams(scope, [generation]),
@@ -409,7 +479,7 @@ export function buildCodexTurnMarksStatement(
 		query: `SELECT agent_id, turn_idx, min(record_idx) AS turn_start,
 				maxIf(record_idx, kind IN ${RESPONSE_KINDS}) AS last_response
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND source = 'codex'
+			WHERE ${pinnedFilter()} AND source = 'codex' AND facts['fork_replayed'] != 'true'
 			GROUP BY agent_id, turn_idx
 			ORDER BY agent_id, turn_idx`,
 		query_params: pinnedParams(scope, [generation]),
@@ -577,6 +647,8 @@ export const RunIndexFactsRowSchema = z.object({
 	genuine_prompts: count,
 	prompt_head: text,
 	edits: count,
+	failed_edits: count,
+	refused_edits: count,
 	tool_calls: count,
 	failed_calls: count,
 	reads: count,
@@ -600,6 +672,7 @@ export const RunIndexFactsRowSchema = z.object({
 	l_compact_pre_tokens: text,
 	l_hook_stop_reason: text,
 	l_api_error: text,
+	l_abort_reason: text,
 	l_fallback_model: text,
 	l_model: text,
 	l_models: strings,
@@ -665,6 +738,7 @@ export function buildRunIndexStatement(
 				r.started_ms AS started_ms, r.l_ended_ms AS ended_ms, r.minutes AS minutes,
 				r.active_minutes AS active_minutes, r.l_record_count AS record_count, r.raw_chars AS raw_chars,
 				r.genuine_prompt AS genuine_prompts, r.prompt_head AS prompt_head, r.edits AS edits,
+				r.failed_edits AS failed_edits, r.refused_edits AS refused_edits,
 				r.tool_calls AS tool_calls, r.failed_calls AS failed_calls, r.read_calls AS reads,
 				r.search_calls AS searches, r.not_found AS not_found,
 				${LITERAL_COLUMNS.map((column) => `r.${column} AS ${column}`).join(", ")},
@@ -714,7 +788,7 @@ export function buildUnattributedUsageStatement(
 		`if(u.observations = 0, NULL, toString(u.${column})) AS ${column}`;
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `WITH ${boundedRunsCte()},
+		query: `WITH ${forkReplayCtes()}, ${boundedRunsCte(FORK_REPLAY_FILTER)},
 			${usageEventCtes({ generation: true })},
 			${runUsageCtes()},
 			unattributed_models AS (
@@ -787,3 +861,15 @@ export function buildRunIndexSessionStatement(
 		},
 	};
 }
+
+/** Pricing, literal SQL and per-agent gates fingerprint every unshipped index-2 rebuild. */
+export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHash(
+	"sha256",
+)
+	.update(buildPricedUsageEventsCte(""))
+	.update(runFactsCtes({ literal: true }))
+	.update(runContextCtes())
+	.update(JSON.stringify(RUN_INDEX_FACT_COLUMNS))
+	.update("codex-per-turn-effort:lifecycle;claude-abort:l_abort_reason")
+	.digest("hex")
+	.slice(0, 12)}`;

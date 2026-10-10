@@ -14,6 +14,18 @@ The worker only builds what is queued, live requests (priority 0) first, and onl
 
 ## 1. Merge and deploy
 
+### Parser 9 upgrade
+
+Target versions: transcript parser **9**, usage extraction **5**, usage identity **1**, attestation **v3**, run index **2**. This branch's local verification never connects to production; the following operations are for an authorized operator only.
+
+1. Leave the L1 worker off. Deploy the additive `20261010130000_parser_v9.sql` migration through `ch:migrate:production` (now includes `ch:migrate:parser-v9`). The runner checks nullable types on every replica before journaling. Do not change historical migration checksums or rewrite legacy numeric usage columns.
+2. Preview one small organization with the existing bounded transcript backfill flags, inspect issues, then execute with its printed cutoff. Process parent/root sessions before known fork children when possible. Parent absence is not replay proof; do not use timestamps as a substitute. Run-index 2 rechecks explicit parent-call matches at build time, including children parsed before the parent's receipt existed. Rebuild affected run indexes if a parent arrives after an index was published.
+3. Backfill usage extraction **before** enqueueing run-index builds. Use `backfill:usage-events`' existing preview/execute contract, one organization at a time; require complete v5 receipts with nullable recorded cache columns and v3 checksums. Keep identity version 1. Modern Codex response usage replaces, rather than adds to, token-count telemetry.
+4. Audit parser-9 coverage, confirmed applied edits, cancellation-excluded denials and replay exclusion; inspect `facts_clipped`, `_more`, `facts_truncated`, oversized/unparseable lines. Codex usage whose response records no service tier is priced at the thread's configured tier and carries the `service_tier_configured` quality flag as its price basis: inspect that flagged usage (its cost rises for threads configured to Fast or Priority) rather than expecting it to be unpriced. Do not treat zero populations for unwitnessed counterpart proposals as supported writer absences.
+5. Enqueue `backfill:run-index` for index version 2 only after usage and parent generations are ready. Enable the worker using the canary sequence below, then compare the before/after organization audit. Retire superseded derived generations only after the grace interval; raw transcripts remain until deletion requests.
+
+The legacy sequence below describes the full-stack rollout; replace `.v8` audit keys with `.v9` for this upgrade. No migration/backfill command was executed against a database during implementation.
+
 Merge the stack in order, each deployed and healthy before the next: the edge tables and queue, the session and GitHub-side builds, parser 6 schema and parsers 6 to 8, git extractor 4, the edge reads (`find`), the run index schema and builder, then this branch (retirement drain, run index backfill, edge census, audit). A production deploy applies the Postgres migrations first (Vercel workflow) and the ClickHouse migrations in the build (`ch:migrate:production`, which includes `ch:migrate:l1-edges` and `ch:migrate:run-index`). Keep `L1_EDGES_WORKER_ENABLED` unset (off) through the merges. From this branch on, the daily maintenance also runs `l1-edge-census`; it only queues requests.
 
 ## 2. Audit before

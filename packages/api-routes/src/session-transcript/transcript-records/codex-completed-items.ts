@@ -1,3 +1,4 @@
+import { appliedChangesFacts } from "./applied-changes.js";
 import { classifyCommand } from "./command-class.js";
 import {
 	isRecord,
@@ -8,7 +9,7 @@ import {
 	type StreamState,
 	safeStringify,
 } from "./line-items.js";
-import { codexItemFacts, mcpFacts } from "./record-facts.js";
+import { codexItemFacts, mcpFacts, mergeFacts } from "./record-facts.js";
 import type { FileOperation } from "./types.js";
 
 /**
@@ -21,8 +22,8 @@ import type { FileOperation } from "./types.js";
  * results (subtype `nested`) so failure analysis sees what ran inside a script.
  *
  * Nothing is counted twice:
- * - an item whose id is a known call id mirrors that call: it only lends its
- *   outcome to the call's output (like an end event) and stays meta;
+ * - an item whose id is a known call id mirrors that call: its own outcome
+ *   stays on the linked meta row, never replacing the call's output;
  * - an item id is recorded once even when Codex completes it again;
  * - a `FileChange` path already read statically from the enclosing script's
  *   source keeps that file change; the item adds only the paths it did not see;
@@ -49,7 +50,29 @@ export function readCompletedItem(
 	if (id !== "" && state.calls.has(id)) {
 		lendOutcomeToCall(id, type, item, state);
 		return [
-			metaItem(`${label}_mirror`, { callId: id, facts: codexItemFacts(item) }),
+			metaItem(`${label}_mirror`, {
+				callId: id,
+				exitCode:
+					type === "CommandExecution"
+						? readFiniteInteger(item.exit_code)
+						: null,
+				isError:
+					item.status === "failed" ||
+					item.status === "aborted" ||
+					item.success === false ||
+					(isRecord(item.result) && item.result.isError === true) ||
+					(type === "McpToolCall" && item.error != null) ||
+					(type === "CommandExecution" &&
+						readFiniteInteger(item.exit_code) !== null &&
+						item.exit_code !== 0),
+				facts: mergeFacts(
+					codexItemFacts(item),
+					appliedChangesFacts(
+						item.changes,
+						item.type === "FileChange" && item.status === "completed",
+					),
+				),
+			}),
 		];
 	}
 	if (id !== "" && state.codexCompletedItems.has(id)) {
@@ -114,7 +137,7 @@ function readNewItem(
 					isError:
 						item.status === "failed" ||
 						(isRecord(item.result) && item.result.isError === true) ||
-						item.error !== undefined,
+						item.error != null,
 					output: isRecord(item.result)
 						? readContentText(item.result.content)
 						: errorText(item.error),
@@ -122,10 +145,16 @@ function readNewItem(
 				codexItemFacts(item),
 			);
 		case "DynamicToolCall":
-			return readToolItem(id, dynamicToolName(item), item.arguments, {
-				isError: item.success === false || item.status === "failed",
-				output: readContentText(item.content_items),
-			});
+			return readToolItem(
+				id,
+				dynamicToolName(item),
+				item.arguments,
+				{
+					isError: item.success === false || item.status === "failed",
+					output: readContentText(item.content_items),
+				},
+				codexItemFacts(item),
+			);
 		case "FileChange":
 			return readFileChange(id, item, state);
 		case "WebSearch":
@@ -158,7 +187,10 @@ function readCommandExecution(
 			...base,
 			exitCode,
 			facts: codexItemFacts(item),
-			isError: exitCode !== null ? exitCode !== 0 : item.status === "failed",
+			isError:
+				item.status === "failed" ||
+				item.status === "aborted" ||
+				(exitCode !== null && exitCode !== 0),
 			kind: "tool_result",
 			// No exit code and not finished: still running when recorded.
 			...(exitCode === null &&
@@ -242,6 +274,7 @@ function readFileChange(
 			text: [readString(item.stdout), readString(item.stderr)]
 				.filter((part) => part !== undefined)
 				.join("\n"),
+			facts: appliedChangesFacts(changes, item.status === "completed"),
 		},
 	];
 }
@@ -324,14 +357,16 @@ function lendOutcomeToCall(
 		type === "CommandExecution" ? readFiniteInteger(item.exit_code) : null;
 	const failed =
 		item.status === "failed" ||
+		item.status === "aborted" ||
 		(isRecord(item.result) && item.result.isError === true) ||
-		item.success === false;
+		item.success === false ||
+		(type === "McpToolCall" && item.error != null);
 	const completed =
 		item.status === "completed" || item.success === true || exitCode === 0;
 	if (exitCode === null && !failed && !completed) return;
 	state.codexEndEvents.set(id, {
 		exitCode,
-		success: exitCode !== null ? exitCode === 0 : !failed,
+		success: !failed && (exitCode === null || exitCode === 0),
 	});
 }
 

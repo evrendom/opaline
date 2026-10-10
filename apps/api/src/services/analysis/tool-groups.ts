@@ -54,6 +54,23 @@ export function toolGroupSql(toolExpr: string, commandExpr: string): string {
 		'other')`;
 }
 
+/**
+ * True for a native edit tool by name (Claude Edit, Write, MultiEdit,
+ * NotebookEdit; Codex apply_patch): the tools whose own request is evidence of
+ * the edit when the call succeeds. Shell tools are never in this set.
+ */
+export function nativeEditToolSql(toolExpr: string): string {
+	const tools = NAMED.find(([group]) => group === "edit")?.[1] ?? [];
+	return `replaceRegexpOne(lower(${toolExpr}), '^functions\\\\.', '') IN (${sqlList(tools)})`;
+}
+
+export function toolActivitySql(
+	group: "read" | "search",
+	fallback: string,
+): string {
+	return `if(parser_version >= 9 AND c.has_parsed_cmd, has(c.parsed_types, '${group}'), ${fallback} = '${group}')`;
+}
+
 function sqlList(values: readonly string[]): string {
 	return values.map((value) => `'${value}'`).join(", ");
 }

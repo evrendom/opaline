@@ -111,12 +111,18 @@ export function parseGitObservations(
 	);
 	const sessions = new Map<string, GitObservationRecord>();
 	const observations: RudelSessionGitObservationsRow[] = [];
+	let sawSessionMeta = false;
 	for (const record of records) {
 		if (
 			record.kind === "meta" &&
 			record.subtype === "session_meta" &&
 			input.source === "codex"
 		) {
+			// A fork file replays its parent's session_meta after its own; only the
+			// first one is this session's, so the parent's git state is not read.
+			const replayedParentMeta = sawSessionMeta;
+			sawSessionMeta = true;
+			if (replayedParentMeta) continue;
 			if (!record.raw)
 				throw new Error("Missing bounded raw session_meta range");
 			const envelope: unknown = JSON.parse(record.raw);

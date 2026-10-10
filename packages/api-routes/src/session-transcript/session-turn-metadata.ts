@@ -520,6 +520,8 @@ function extractCodexTurnMetadata(
 	const replayState = createCodexReplayState(content);
 	let currentModel = fallbackModel;
 	let modelProvider: string | null | undefined;
+	let sawSessionMeta = false;
+	let configuredServiceTier: string | null | undefined;
 	let previousTokenUsageSignature: string | undefined;
 	const graph = buildCodexActivityGraph(content);
 	const graphOperations = [
@@ -602,11 +604,37 @@ function extractCodexTurnMetadata(
 		}
 
 		const line = result.data;
-		if (line.type === "session_meta") {
+		// A fork file replays its parent's session_meta after its own, so the
+		// first one names this session's provider.
+		if (line.type === "session_meta" && !sawSessionMeta) {
+			sawSessionMeta = true;
 			modelProvider = line.payload?.model_provider;
 		}
 		if (line.type === "turn_context" && line.payload?.model) {
 			currentModel = line.payload.model;
+		}
+		// The tier the thread is configured to run at: the only tier Codex logs
+		// when a response records none. A cleared setting (null) is standard.
+		if (
+			line.type === "turn_context" &&
+			line.payload?.service_tier !== undefined
+		) {
+			configuredServiceTier = line.payload.service_tier;
+		}
+		if (
+			line.type === "event_msg" &&
+			line.payload?.type === "thread_settings_applied"
+		) {
+			const settings = line.payload.thread_settings;
+			if (
+				typeof settings === "object" &&
+				settings !== null &&
+				Object.hasOwn(settings, "service_tier")
+			) {
+				const tier = (settings as { service_tier?: unknown }).service_tier;
+				configuredServiceTier =
+					typeof tier === "string" || tier === null ? tier : "<invalid>";
+			}
 		}
 
 		const turnIndex = getTurnIndex(line.timestamp, anchors);
@@ -667,10 +695,15 @@ function extractCodexTurnMetadata(
 			true,
 			{
 				modelProvider,
-				// The response tier is request-local. A requested Fast setting must not
-				// override a response that actually ran (and was billed) as default.
+				// The response tier is request-local: a configured Fast setting must not
+				// override a response that recorded its own tier (even default). Only
+				// when the response records none is the thread's configured tier, the
+				// only tier Codex logs, the price basis.
 				serviceTier:
-					line.payload.info?.service_tier ?? line.payload.service_tier,
+					line.payload.info?.service_tier ??
+					line.payload.service_tier ??
+					configuredServiceTier ??
+					undefined,
 			},
 			line.payload.info?.model_context_window,
 		);

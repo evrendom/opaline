@@ -44,6 +44,21 @@ const rudel_usage_events = table({
 		{ name: "cache_read_input_tokens", type: "UInt64" },
 		{ name: "cache_write_5m_input_tokens", type: "UInt64" },
 		{ name: "cache_write_1h_input_tokens", type: "UInt64" },
+		{
+			name: "recorded_cache_write_5m_input_tokens",
+			type: "Nullable(UInt64)",
+			default: "NULL",
+		},
+		{
+			name: "recorded_cache_write_1h_input_tokens",
+			type: "Nullable(UInt64)",
+			default: "NULL",
+		},
+		{
+			name: "cache_write_input_tokens",
+			type: "Nullable(UInt64)",
+			default: "NULL",
+		},
 		{ name: "output_tokens", type: "UInt64" },
 		{ name: "reasoning_output_tokens", type: "UInt64" },
 		{ name: "agent_id", type: "String" },

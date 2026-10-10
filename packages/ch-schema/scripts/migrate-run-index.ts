@@ -71,6 +71,14 @@ export async function runRunIndexMigration(options: {
 			await options.executor.execute(statement);
 	};
 	if (applied.length === 0) await apply();
+	for (const name of ["failed_edits", "refused_edits"]) {
+		const column = TABLE.columns.find((column) => column.name === name);
+		if (column === undefined)
+			throw new Error(`Missing parser 9 column: ${name}`);
+		await options.executor.execute(
+			`ALTER TABLE ${options.targetDatabase}.${TABLE.name} ADD COLUMN IF NOT EXISTS ${name} ${column.type} COMMENT '${column.comment.replaceAll("'", "\\'")}'`,
+		);
+	}
 
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,
@@ -188,8 +196,8 @@ function hostMismatch(
 	columns: readonly InstalledColumn[],
 	table: InstalledTable | undefined,
 ): string | null {
-	const wrong = TABLE.columns.filter((column, index) => {
-		const found = columns[index];
+	const wrong = TABLE.columns.filter((column) => {
+		const found = columns.find((found) => found.name === column.name);
 		return (
 			!found ||
 			found.name !== column.name ||
