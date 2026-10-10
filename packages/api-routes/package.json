@@ -23,6 +23,7 @@
 		"check-types": "tsc --noEmit",
 		"facts:census": "bun src/scripts/facts-census.ts",
 		"facts:matrix": "bun src/scripts/facts-matrix.ts",
+		"facts:review": "bun src/scripts/facts-review.ts",
 		"test": "bun test"
 	},
 	"dependencies": {

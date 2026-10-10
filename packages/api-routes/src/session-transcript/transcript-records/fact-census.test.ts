@@ -5,7 +5,10 @@ import { catalogSources } from "./fact-catalog.js";
 import {
 	addCensusText,
 	type CensusAgent,
+	censusPathParts,
+	censusRecordKind,
 	censusRecordPaths,
+	censusStepText,
 	compareCensus,
 	createCensus,
 	formatCensusReport,
@@ -364,6 +367,65 @@ describe("patterns and the ignore list", () => {
 	});
 });
 
+describe("path parts", () => {
+	test("split a path into its record kind and steps", () => {
+		expect(
+			censusPathParts(
+				"user.message.content[tool_use:Bash].input.hooks[].command~Exit code",
+			),
+		).toEqual({
+			head: "user",
+			steps: [
+				{ kind: "key", name: "message" },
+				{ kind: "key", name: "content" },
+				{ kind: "block", type: "tool_use", name: "Bash" },
+				{ kind: "key", name: "input" },
+				{ kind: "key", name: "hooks" },
+				{ kind: "element" },
+				{ kind: "key", name: "command" },
+				{ kind: "convention", id: "Exit code" },
+			],
+		});
+		expect(
+			censusPathParts("response_item/function_call:exec_command@metadata.{*}"),
+		).toEqual({
+			head: "response_item/function_call:exec_command",
+			steps: [
+				{ kind: "outer", name: "metadata" },
+				{ kind: "key", name: "{*}" },
+			],
+		});
+		expect(censusPathParts("event_msg/task_started")).toEqual({
+			head: "event_msg/task_started",
+			steps: [],
+		});
+	});
+
+	test("record kinds name the head every path of the record starts with", () => {
+		const codex = {
+			type: "event_msg",
+			payload: {
+				type: "item_completed",
+				item: { type: "CommandExecution", command: "ls" },
+			},
+		};
+		expect(censusRecordKind(codex, "codex")).toBe(
+			"event_msg/item_completed:CommandExecution",
+		);
+		expect(
+			censusRecordKind(
+				{ type: "attachment", attachment: { type: "plan_mode" } },
+				"claude_code",
+			),
+		).toBe("attachment/plan_mode");
+		const census = createCensus();
+		addCensusText(census, `${JSON.stringify(codex)}\n${JSON.stringify(codex)}`);
+		expect([...(census.kinds.get("codex") ?? [])]).toEqual([
+			["event_msg/item_completed:CommandExecution", 2],
+		]);
+	});
+});
+
 describe("the parser fixtures are fully catalogued", () => {
 	test("every field path in the transcript-records fixtures is a catalog source or ignored", async () => {
 		const root = new URL("../__fixtures__", import.meta.url).pathname;
@@ -374,6 +436,11 @@ describe("the parser fixtures are fully catalogued", () => {
 		expect(files.length).toBeGreaterThanOrEqual(7);
 		for (const file of files.sort())
 			addCensusText(census, await Bun.file(file).text());
+		for (const paths of census.paths.values())
+			for (const path of paths.keys()) {
+				const { head, steps } = censusPathParts(path);
+				expect(head + steps.map(censusStepText).join("")).toBe(path);
+			}
 		const report = compareCensus(census, FACT_CENSUS_CATALOG);
 		expect(report.agents.map((agent) => agent.agent)).toEqual([
 			"claude_code",

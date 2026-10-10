@@ -10,16 +10,14 @@
  * unless `--agent` is given. Exits 1 when a path is unmapped and
  * `--fail-on-unmapped` is set.
  */
-import { readdir, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
 import {
 	type CensusAgent,
 	censusReportJson,
-	censusStream,
 	compareCensus,
 	createCensus,
 	formatCensusReport,
 } from "../session-transcript/transcript-records/fact-census.js";
+import { addCensusPaths } from "../session-transcript/transcript-records/fact-census-files.js";
 import { FACT_CENSUS_CATALOG } from "../session-transcript/transcript-records/fact-census-ignored.js";
 
 interface Options {
@@ -60,45 +58,9 @@ function parseArgs(argv: readonly string[]): Options {
 	return options;
 }
 
-async function* jsonlFiles(path: string): AsyncGenerator<string> {
-	const info = await stat(path);
-	if (info.isFile()) {
-		yield path;
-		return;
-	}
-	const entries = await readdir(path, { withFileTypes: true });
-	entries.sort((a, b) => a.name.localeCompare(b.name));
-	for (const entry of entries) {
-		const child = join(path, entry.name);
-		if (entry.isDirectory()) yield* jsonlFiles(child);
-		else if (entry.isFile() && entry.name.endsWith(".jsonl")) yield child;
-	}
-}
-
-/** Feed a file to the census line by line, without holding it in memory. */
-async function censusFile(
-	addLine: (line: string) => void,
-	path: string,
-): Promise<void> {
-	const decoder = new TextDecoder();
-	let pending = "";
-	const reader = Bun.file(path).stream().getReader();
-	for (;;) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		pending += decoder.decode(value, { stream: true });
-		const lines = pending.split("\n");
-		pending = lines.pop() ?? "";
-		for (const line of lines) addLine(line);
-	}
-	addLine(pending + decoder.decode());
-}
-
 const options = parseArgs(process.argv.slice(2));
 const census = createCensus();
-for (const root of options.paths)
-	for await (const file of jsonlFiles(resolve(root)))
-		await censusFile(censusStream(census, options.agent), file);
+await addCensusPaths(census, options.paths, options.agent);
 const report = compareCensus(census, FACT_CENSUS_CATALOG);
 process.stdout.write(
 	options.json

@@ -262,6 +262,8 @@ export interface CensusPathStats {
 export interface Census {
 	readonly files: Map<CensusAgent, number>;
 	readonly records: Map<CensusAgent, number>;
+	/** Records per record kind (`censusRecordKind`), per agent. */
+	readonly kinds: Map<CensusAgent, Map<string, number>>;
 	readonly unparseable: Map<CensusAgent, number>;
 	readonly paths: Map<CensusAgent, Map<string, CensusPathStats>>;
 }
@@ -270,6 +272,7 @@ export function createCensus(): Census {
 	return {
 		files: new Map(),
 		records: new Map(),
+		kinds: new Map(CENSUS_AGENTS.map((agent) => [agent, new Map()])),
 		unparseable: new Map(),
 		paths: new Map(CENSUS_AGENTS.map((agent) => [agent, new Map()])),
 	};
@@ -303,6 +306,10 @@ export function addCensusRecord(
 	record: Record<string, unknown>,
 ): void {
 	census.records.set(agent, (census.records.get(agent) ?? 0) + 1);
+	const kinds = census.kinds.get(agent) ?? new Map<string, number>();
+	census.kinds.set(agent, kinds);
+	const kind = censusRecordKind(record, agent);
+	kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
 	const paths = census.paths.get(agent) ?? new Map();
 	census.paths.set(agent, paths);
 	for (const [path, value] of censusRecordPaths(record, agent)) {
@@ -407,12 +414,7 @@ function walkClaude(
 ): void {
 	const type = typeof record.type === "string" ? record.type : "unknown";
 	const attachment = isObject(record.attachment) ? record.attachment : {};
-	const discriminator =
-		type === "system" && typeof record.subtype === "string"
-			? `system/${record.subtype}`
-			: type === "attachment"
-				? `attachment/${typeof attachment.type === "string" ? attachment.type : "unknown"}`
-				: type;
+	const discriminator = claudeDiscriminator(record);
 	for (const [key, value] of Object.entries(record)) {
 		if (key === "type" || (key === "subtype" && type === "system")) continue;
 		if (key === "attachment" && type === "attachment") {
@@ -436,21 +438,10 @@ function walkCodex(
 	record: Record<string, unknown>,
 	out: Map<string, PathValue>,
 ): void {
-	const type = typeof record.type === "string" ? record.type : "unknown";
 	const payload = isObject(record.payload) ? record.payload : undefined;
 	const payloadType =
 		typeof payload?.type === "string" ? payload.type : undefined;
-	let discriminator = `${type}/${payloadType ?? ""}`;
-	if (payload !== undefined && type === "response_item") {
-		const name = typeof payload.name === "string" ? payload.name : undefined;
-		if (
-			name !== undefined &&
-			(payloadType === "function_call" || payloadType === "custom_tool_call")
-		)
-			discriminator += `:${toolName(name)}`;
-		if (payloadType === "message" && typeof payload.role === "string")
-			discriminator += `:${payload.role}`;
-	}
+	const discriminator = codexDiscriminator(record);
 	for (const [key, value] of Object.entries(record)) {
 		if (key === "type" || key === "payload") continue;
 		walk(value, `${discriminator}@${key}`, key, 1, out);
@@ -472,6 +463,54 @@ function walkCodex(
 		}
 		walk(value, `${discriminator}.${key}`, key, 1, out);
 	}
+}
+
+function claudeDiscriminator(record: Record<string, unknown>): string {
+	const type = typeof record.type === "string" ? record.type : "unknown";
+	if (type === "system" && typeof record.subtype === "string")
+		return `system/${record.subtype}`;
+	if (type !== "attachment") return type;
+	const attachment = isObject(record.attachment) ? record.attachment : {};
+	return `attachment/${typeof attachment.type === "string" ? attachment.type : "unknown"}`;
+}
+
+function codexDiscriminator(record: Record<string, unknown>): string {
+	const type = typeof record.type === "string" ? record.type : "unknown";
+	const payload = isObject(record.payload) ? record.payload : undefined;
+	const payloadType =
+		typeof payload?.type === "string" ? payload.type : undefined;
+	let discriminator = `${type}/${payloadType ?? ""}`;
+	if (payload !== undefined && type === "response_item") {
+		const name = typeof payload.name === "string" ? payload.name : undefined;
+		if (
+			name !== undefined &&
+			(payloadType === "function_call" || payloadType === "custom_tool_call")
+		)
+			discriminator += `:${toolName(name)}`;
+		if (payloadType === "message" && typeof payload.role === "string")
+			discriminator += `:${payload.role}`;
+	}
+	return discriminator;
+}
+
+/**
+ * The kind of a record: the head its paths start with (`user`,
+ * `system/turn_duration`, `response_item/function_call:exec_command`), and
+ * for a Codex completed item the item's type (`event_msg/item_completed:CommandExecution`).
+ */
+export function censusRecordKind(
+	record: Record<string, unknown>,
+	agent: CensusAgent,
+): string {
+	if (agent === "claude_code") return claudeDiscriminator(record);
+	const discriminator = codexDiscriminator(record);
+	const item = isObject(record.payload) ? record.payload.item : undefined;
+	return record.type === "event_msg" &&
+		isObject(record.payload) &&
+		record.payload.type === "item_completed" &&
+		isObject(item)
+		? `${discriminator}:${typeof item.type === "string" ? item.type : "unknown"}`
+		: discriminator;
 }
 
 function walk(
@@ -641,6 +680,79 @@ function conventionsAt(path: string): readonly CensusConvention[] {
 	return conventions;
 }
 
+// --- Path syntax --------------------------------------------------------------
+
+/** One step of a census path after its head. */
+export type CensusPathStep =
+	/** `.name`: an object key. */
+	| { readonly kind: "key"; readonly name: string }
+	/** `@name`: a Codex record field outside the payload. */
+	| { readonly kind: "outer"; readonly name: string }
+	/** `[]`: an array element. */
+	| { readonly kind: "element" }
+	/** `[type]` or `[type:name]`: an array element of a block type (and tool). */
+	| { readonly kind: "block"; readonly type: string; readonly name?: string }
+	/** `~id`: a text convention of the string before it. */
+	| { readonly kind: "convention"; readonly id: string };
+
+export interface CensusPathParts {
+	/** The record kind (`user`, `response_item/function_call:exec_command`). */
+	readonly head: string;
+	readonly steps: readonly CensusPathStep[];
+}
+
+/** A census path (or catalog source pattern) split into its head and steps. */
+export function censusPathParts(path: string): CensusPathParts {
+	const tilde = path.indexOf("~");
+	const body = tilde === -1 ? path : path.slice(0, tilde);
+	const headEnd = body.search(/[.@[]/u);
+	const head = headEnd === -1 ? body : body.slice(0, headEnd);
+	const steps: CensusPathStep[] = [];
+	let index = head.length;
+	while (index < body.length) {
+		const char = body[index];
+		if (char === "[") {
+			const close = body.indexOf("]", index);
+			const inner = body.slice(index + 1, close === -1 ? undefined : close);
+			const colon = inner.indexOf(":");
+			if (inner === "") steps.push({ kind: "element" });
+			else if (colon === -1) steps.push({ kind: "block", type: inner });
+			else
+				steps.push({
+					kind: "block",
+					type: inner.slice(0, colon),
+					name: inner.slice(colon + 1),
+				});
+			index = close === -1 ? body.length : close + 1;
+			continue;
+		}
+		const rest = body.slice(index + 1);
+		const end = rest.search(/[.@[]/u);
+		const name = end === -1 ? rest : rest.slice(0, end);
+		steps.push({ kind: char === "@" ? "outer" : "key", name });
+		index += 1 + name.length;
+	}
+	if (tilde !== -1)
+		steps.push({ kind: "convention", id: path.slice(tilde + 1) });
+	return { head, steps };
+}
+
+/** One step as the path writes it (`.name`, `@name`, `[]`, `[type:name]`, `~id`). */
+export function censusStepText(step: CensusPathStep): string {
+	switch (step.kind) {
+		case "key":
+			return `.${step.name}`;
+		case "outer":
+			return `@${step.name}`;
+		case "element":
+			return "[]";
+		case "block":
+			return `[${step.type}${step.name === undefined ? "" : `:${step.name}`}]`;
+		case "convention":
+			return `~${step.id}`;
+	}
+}
+
 // --- Patterns ---------------------------------------------------------------
 
 const patternCache = new Map<string, RegExp>();
@@ -732,18 +844,27 @@ export interface CensusCatalog {
 	readonly ignored: readonly IgnoredPath[];
 }
 
+/** The first ignore rule for the agent that covers a census path. */
+export function ignoreRuleFor(
+	path: string,
+	agent: CensusAgent,
+	ignored: readonly IgnoredPath[],
+): IgnoredPath | undefined {
+	return ignored.find(
+		(rule) =>
+			(rule.agent === undefined || rule.agent === agent) &&
+			pathMatches(rule.path, path) &&
+			!(rule.except ?? []).some((pattern) => pathMatches(pattern, path)),
+	);
+}
+
 /** Whether a census path is covered by an ignore rule for the agent. */
 export function isIgnoredPath(
 	path: string,
 	agent: CensusAgent,
 	ignored: readonly IgnoredPath[],
 ): boolean {
-	return ignored.some(
-		(rule) =>
-			(rule.agent === undefined || rule.agent === agent) &&
-			pathMatches(rule.path, path) &&
-			!(rule.except ?? []).some((pattern) => pathMatches(pattern, path)),
-	);
+	return ignoreRuleFor(path, agent, ignored) !== undefined;
 }
 
 /** Compare a census with the catalog's sources and the ignored paths. */
@@ -772,7 +893,7 @@ export function compareCensus(
 				ignoredPaths++;
 				continue;
 			}
-			unmapped.push(pathReport(path, stats));
+			unmapped.push(censusPathReport(path, stats));
 		}
 		unmapped.sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
 		agents.push({
@@ -790,7 +911,11 @@ export function compareCensus(
 	return { agents };
 }
 
-function pathReport(path: string, stats: CensusPathStats): CensusPathReport {
+/** One path's census numbers: count, version range, types and enum values. */
+export function censusPathReport(
+	path: string,
+	stats: CensusPathStats,
+): CensusPathReport {
 	const versions = [...stats.versions.keys()].sort(compareVersions);
 	return {
 		path,

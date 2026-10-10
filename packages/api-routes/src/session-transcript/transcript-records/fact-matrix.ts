@@ -19,12 +19,12 @@ import {
 
 export const FACT_MATRIX_PATH = "docs/l1-fact-matrix.md";
 
-const AGENT_NAMES: Readonly<Record<FactAgent, string>> = {
+export const AGENT_NAMES: Readonly<Record<FactAgent, string>> = {
 	claude_code: "Claude Code",
 	codex: "Codex",
 };
 
-const VIEW_TITLES: Readonly<Record<FactView, string>> = {
+export const VIEW_TITLES: Readonly<Record<FactView, string>> = {
 	calls: "Calls: one row per tool call",
 	runs: "Runs: one row per run (a prompt and everything until the next)",
 	prompts: "Prompts: one row per prompt or injected context",
@@ -38,12 +38,32 @@ const STATUS_ICONS: Readonly<Record<FactStatus, string>> = {
 	wrong: "🔴",
 };
 
-const STATUS_WORDS: Readonly<Record<FactStatus, string>> = {
+export const STATUS_WORDS: Readonly<Record<FactStatus, string>> = {
 	stored: "stored",
 	pending: "pending",
 	not_recorded: "not recorded",
 	wrong: "wrong",
 };
+
+/** What each status means (Markdown, as the matrix legend shows it). */
+export const STATUS_LEGEND: Readonly<Record<FactStatus | "gap", string>> = {
+	stored:
+		"Opaline stores it. `v6` is the transcript parser version that first stored it; `elsewhere` means another table (usage, run index, git observations), named in the details.",
+	gap: "stored, but the agent also records it in a place we do not read yet; the details say where and which change will read it.",
+	pending:
+		"the agent records it and we do not store it yet; the details name the change that will (`parser 9` is the next transcript parser version).",
+	not_recorded:
+		"the agent does not write it; the details say how that was checked.",
+	wrong:
+		"stored, but known to be incorrect; the details say what is wrong and the fix.",
+};
+
+/** What "local census" in the details refers to. */
+export const CENSUS_LEGEND = `"Local census" in the details is the ${LOCAL_CENSUS.replace(/^Census/u, "census")}; "locally" counts are from it too.`;
+
+/** How the short source names read (Markdown). */
+export const SOURCE_LEGEND =
+	"`toolUseResult.x` is a field of a Claude Code tool result, `Bash input.x` a tool call's argument, `exec_command args.x` a Codex call's argument, `CommandExecution.x` a field of a Codex completed item, `output “…”` a convention at the start of a call's output text. `{*}` stands for a key that is data (a file path, an id, a model name).";
 
 /** Rewrites from census paths to the short names the matrix shows. */
 const SHORT_SOURCE_RULES: readonly (readonly [RegExp, string])[] = [
@@ -102,11 +122,12 @@ function code(text: string): string {
 }
 
 /** Sources of one agent's fact, short and without repeats. */
-function shortSources(fact: AgentFact): string[] {
+export function shortSources(fact: AgentFact): string[] {
 	return [...new Set(fact.sources.map(shortSource))];
 }
 
-function versionLabel(fact: AgentFact): string {
+/** `v6` (the parser version that first stored it), `elsewhere`, or nothing. */
+export function versionLabel(fact: AgentFact): string {
 	if (fact.status !== "stored" && fact.status !== "wrong") return "";
 	if (
 		fact.stores.since !== undefined &&
@@ -147,9 +168,7 @@ function agentDetail(fact: AgentFact): string[] {
 	if (fact.status === "pending" || fact.status === "wrong")
 		lines.push(`${fact.status === "wrong" ? "Fix" : "Plan"}: ${fact.plan}`);
 	if (fact.status === "not_recorded")
-		lines.push(
-			`How we checked: ${fact.searched.replace(`${LOCAL_CENSUS}: `, "local census: ")}`,
-		);
+		lines.push(`How we checked: ${howChecked(fact.searched)}`);
 	if (fact.status === "stored" && fact.gap !== undefined)
 		lines.push(
 			`Gap: also recorded at ${fact.gap.sources.map((source) => code(shortSource(source))).join(", ")}. Plan: ${fact.gap.plan}`,
@@ -166,7 +185,15 @@ function agentDetail(fact: AgentFact): string[] {
 	return lines;
 }
 
-function counts(agent: FactAgent): Record<FactStatus | "gaps", number> {
+/** How a `not_recorded` fact was checked, with the census named in the legend. */
+export function howChecked(searched: string): string {
+	return searched.replace(`${LOCAL_CENSUS}: `, "local census: ");
+}
+
+/** Facts per status for one agent, and how many stored ones have a gap. */
+export function factStatusCounts(
+	agent: FactAgent,
+): Record<FactStatus | "gaps", number> {
 	const result = { stored: 0, pending: 0, not_recorded: 0, wrong: 0, gaps: 0 };
 	for (const entry of FACT_CATALOG) {
 		const fact = entry.agents[agent];
@@ -187,15 +214,15 @@ export function renderFactMatrix(): string {
 		"",
 		"## Legend",
 		"",
-		"- ✅ **stored**: Opaline stores it. `v6` is the transcript parser version that first stored it; `elsewhere` means another table (usage, run index, git observations), named in the details.",
-		"- ✅ … **+ gap**: stored, but the agent also records it in a place we do not read yet; the details say where and which change will read it.",
-		"- 🟡 **pending**: the agent records it and we do not store it yet; the details name the change that will (`parser 9` is the next transcript parser version).",
-		"- ⚪ **not recorded**: the agent does not write it; the details say how that was checked.",
-		"- 🔴 **wrong**: stored, but known to be incorrect; the details say what is wrong and the fix.",
+		`- ✅ **stored**: ${STATUS_LEGEND.stored}`,
+		`- ✅ … **+ gap**: ${STATUS_LEGEND.gap}`,
+		`- 🟡 **pending**: ${STATUS_LEGEND.pending}`,
+		`- ⚪ **not recorded**: ${STATUS_LEGEND.not_recorded}`,
+		`- 🔴 **wrong**: ${STATUS_LEGEND.wrong}`,
 		"",
-		`"Local census" in the details is the ${LOCAL_CENSUS.replace(/^Census/u, "census")}; "locally" counts are from it too.`,
+		CENSUS_LEGEND,
 		"",
-		"Under each status is where the agent records the fact, shortened: `toolUseResult.x` is a field of a Claude Code tool result, `Bash input.x` a tool call's argument, `exec_command args.x` a Codex call's argument, `CommandExecution.x` a field of a Codex completed item, `output “…”` a convention at the start of a call's output text. `{*}` stands for a key that is data (a file path, an id, a model name).",
+		`Under each status is where the agent records the fact, shortened: ${SOURCE_LEGEND}`,
 		"",
 		"## Summary",
 		"",
@@ -203,8 +230,8 @@ export function renderFactMatrix(): string {
 		"|---|---:|---:|",
 	];
 	const byAgent = Object.fromEntries(
-		FACT_AGENTS.map((agent) => [agent, counts(agent)]),
-	) as Record<FactAgent, ReturnType<typeof counts>>;
+		FACT_AGENTS.map((agent) => [agent, factStatusCounts(agent)]),
+	) as Record<FactAgent, ReturnType<typeof factStatusCounts>>;
 	for (const status of ["stored", "pending", "not_recorded", "wrong"] as const)
 		lines.push(
 			`| ${STATUS_ICONS[status]} ${STATUS_WORDS[status]} | ${FACT_AGENTS.map(

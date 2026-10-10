@@ -43,6 +43,9 @@ coverage/
 # Misc
 *.pem
 
+# Generated fact review page (bun run --cwd packages/api-routes facts:review)
+packages/api-routes/.fact-review/
+
 # Agent (conductor)
 .context
 
