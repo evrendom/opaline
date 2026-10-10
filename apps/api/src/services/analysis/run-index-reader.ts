@@ -1,9 +1,5 @@
 import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
 import {
-	RUN_INDEX_TEXT_COLUMNS,
-	RUN_INDEX_TEXT_RETENTION_DAYS,
-} from "@rudel/ch-schema/run-index";
-import {
 	type ClickHouseExecutor,
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
@@ -14,19 +10,18 @@ import { ANALYSIS_QUERY_SETTINGS } from "./sql.js";
 
 /**
  * Every read of `rudel.run_index` goes through here (docs/l1-literal-schema.md,
- * "Scale"). Two rules make a read correct:
+ * "Scale"). One rule makes a read correct:
  *
  * - Pinned to the committed snapshot. Each build writes an immutable snapshot
  *   (its runs, then its receipt); a session's committed snapshot is the
  *   receipt with the newest (revision, parser_version, index_version,
  *   build_revision), and only that build's rows are read. A build in flight,
  *   or one that crashed before its receipt, is never seen.
- * - Text expires. A column TTL applies only when parts merge, so the free-text
- *   columns are read as NULL once the text retention has passed, whatever the
- *   merges have done.
+ *
+ * Nothing expires: runs and their free text are kept until a deletion request
+ * (docs/l1-retention.md), so no column is read as NULL because of its age.
  */
 
-const DAY_MS = 86_400_000;
 /** 64-bit columns, read as decimal strings like the generated row type. */
 const UINT64_COLUMNS = [
 	"revision",
@@ -43,38 +38,9 @@ const UINT64_COLUMNS = [
 ] as const;
 
 /**
- * Whether text of a session dated `sessionDateMs` is past its retention at
- * `nowMs`: the column TTL's `toDate(session_date) + toIntervalDay(365)`
- * has been reached (UTC days).
- */
-export function isRunIndexTextExpired(
-	sessionDateMs: number,
-	nowMs: number,
-): boolean {
-	const expiresDay =
-		Math.floor(sessionDateMs / DAY_MS) + RUN_INDEX_TEXT_RETENTION_DAYS;
-	return expiresDay <= Math.floor(nowMs / DAY_MS);
-}
-
-/** The row with its free text nulled when the text retention has passed. */
-export function expireRunIndexText<Row extends Record<string, unknown>>(
-	row: Row,
-	sessionDateMs: number,
-	nowMs: number,
-): Row {
-	if (!isRunIndexTextExpired(sessionDateMs, nowMs)) return row;
-	return {
-		...row,
-		...Object.fromEntries(
-			RUN_INDEX_TEXT_COLUMNS.map((column) => [column, null]),
-		),
-	};
-}
-
-/**
  * Rows of the sessions' committed snapshots (`kind` narrows to runs or the
  * receipt), in session, stream and start order, typed like the generated
- * row: 64-bit integers as strings, expired text NULL.
+ * row: 64-bit integers as strings.
  */
 export function buildCommittedRunIndexStatement(
 	scope: TranscriptReadScope,
@@ -86,12 +52,8 @@ export function buildCommittedRunIndexStatement(
 				AND session_id IN {sessionIds:Array(String)}`;
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT * EXCEPT (${[...RUN_INDEX_TEXT_COLUMNS, ...UINT64_COLUMNS].join(", ")}),
-				${UINT64_COLUMNS.map((column) => `toString(${column}) AS ${column}`).join(", ")},
-				${RUN_INDEX_TEXT_COLUMNS.map(
-					(column) =>
-						`if(toDate(session_date) + toIntervalDay(${RUN_INDEX_TEXT_RETENTION_DAYS}) <= today(), NULL, ${column}) AS ${column}`,
-				).join(", ")}
+		query: `SELECT * EXCEPT (${UINT64_COLUMNS.join(", ")}),
+				${UINT64_COLUMNS.map((column) => `toString(${column}) AS ${column}`).join(", ")}
 			FROM (
 				SELECT * FROM ${table} FINAL
 				WHERE ${owner}${kind === undefined ? "" : " AND row_kind = {kind:String}"}

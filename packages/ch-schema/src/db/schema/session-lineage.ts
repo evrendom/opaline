@@ -48,7 +48,6 @@ const rudel_session_lineage = table({
 		"child_session_id",
 	],
 	orderBy: ["organization_id", "user_id", "child_source", "child_session_id"],
-	ttl: "toDate(child_session_date) + toIntervalDay(365)",
 	settings: {
 		index_granularity: "8192",
 		storage_policy: "'s3'",

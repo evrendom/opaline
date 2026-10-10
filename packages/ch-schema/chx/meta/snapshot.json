@@ -91,7 +91,6 @@
 			"primaryKey": ["organization_id", "session_date", "session_id"],
 			"orderBy": ["organization_id", "session_date", "session_id"],
 			"partitionBy": "toYYYYMM(toDate(session_date))",
-			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
 				"non_replicated_deduplication_window": "1000",
@@ -183,7 +182,6 @@
 			"primaryKey": ["organization_id", "session_date", "session_id"],
 			"orderBy": ["organization_id", "session_date", "session_id"],
 			"partitionBy": "toYYYYMM(toDate(session_date))",
-			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
 				"non_replicated_deduplication_window": "1000",
@@ -1644,7 +1642,6 @@
 				"child_source",
 				"child_session_id"
 			],
-			"ttl": "toDate(child_session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "8192",
 				"storage_policy": "'s3'"
@@ -2022,7 +2019,6 @@
 				"record_idx",
 				"block_idx"
 			],
-			"ttl": "toDate(session_date) + toIntervalDay(365)",
 			"settings": {
 				"index_granularity": "1024",
 				"index_granularity_bytes": "1048576",
@@ -3485,7 +3481,7 @@
 				{
 					"name": "session_date",
 					"type": "DateTime64(3, 'UTC')",
-					"comment": "Session date of the generation; retention is measured from it."
+					"comment": "Session date of the generation."
 				},
 				{
 					"name": "unrecorded_facts",
@@ -3550,7 +3546,7 @@
 				{
 					"name": "prompt_head",
 					"type": "Nullable(String)",
-					"comment": "First 160 characters of the run's first genuine prompt; NULL once the text retention passed."
+					"comment": "First 160 characters of the run's first genuine prompt; NULL when the run has none."
 				},
 				{
 					"name": "genuine_prompts",
@@ -3790,7 +3786,7 @@
 				{
 					"name": "turn_error",
 					"type": "Nullable(String)",
-					"comment": "First Codex task_complete error message of the run; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "First Codex task_complete error message of the run; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "turn_error_kind",
@@ -3810,7 +3806,7 @@
 				{
 					"name": "hook_stop_reason",
 					"type": "Nullable(String)",
-					"comment": "First Claude stop hook stopReason of the run; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "First Claude stop hook stopReason of the run; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "prevented_continuation",
@@ -3825,12 +3821,12 @@
 				{
 					"name": "hook_errors",
 					"type": "Nullable(String)",
-					"comment": "JSON array of the run's stop hook hookErrors in record order; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "JSON array of the run's stop hook hookErrors in record order; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "hook_runs",
 					"type": "Nullable(String)",
-					"comment": "JSON array of the run's stop hook hookInfos (command, durationMs) in record order; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "JSON array of the run's stop hook hookInfos (command, durationMs) in record order; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "api_errors",
@@ -3840,7 +3836,7 @@
 				{
 					"name": "api_error",
 					"type": "Nullable(String)",
-					"comment": "First Claude API error of the run; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "First Claude API error of the run; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "api_error_statuses",
@@ -3865,7 +3861,7 @@
 				{
 					"name": "goal",
 					"type": "Nullable(String)",
-					"comment": "Last Codex thread goal objective set in the run; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "Last Codex thread goal objective set in the run; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "git_operations",
@@ -3970,7 +3966,7 @@
 				{
 					"name": "title",
 					"type": "Nullable(String)",
-					"comment": "Receipt: last Claude ai-title of the main stream; NULL when the parser version or agent does not record it or once the text retention passed."
+					"comment": "Receipt: last Claude ai-title of the main stream; NULL when the parser version or agent does not record it."
 				},
 				{
 					"name": "repository",
@@ -4005,7 +4001,6 @@
 				"agent_id",
 				"start_record"
 			],
-			"ttl": "toDate(session_date) + toIntervalDay(1095)",
 			"settings": {
 				"index_granularity": "1024",
 				"index_granularity_bytes": "1048576",

@@ -13,10 +13,7 @@ import {
 	streamTurnKey,
 } from "../analysis/codex-lifecycle.js";
 import { gateRunIndexRow } from "../analysis/run-index-columns.js";
-import {
-	expireRunIndexText,
-	readCommittedRunIndex,
-} from "../analysis/run-index-reader.js";
+import { readCommittedRunIndex } from "../analysis/run-index-reader.js";
 import {
 	buildCodexLifecycleStatement,
 	buildCodexTurnMarksStatement,
@@ -127,7 +124,10 @@ const SessionRecordSchema = z.object({
  * that crashes before it changes nothing they read. `beforeWrite` runs
  * before each insert (purge fence and lease). A build is skipped when the
  * committed receipt already has this generation, index version, pricing and
- * usage receipt; when the transcript has expired, the stored runs are kept.
+ * usage receipt; when no transcript generation is committed any more (the
+ * transcript no longer exists), the stored runs are kept. Age never removes a
+ * transcript (docs/l1-retention.md), so the stored reason "transcript
+ * expired" is historical wording.
  */
 export async function buildRunIndex(input: {
 	executor: ClickHouseExecutor;
@@ -265,13 +265,8 @@ export async function buildRunIndex(input: {
 		builtAt: clickHouseTime(builtAt.getTime()),
 		sessionDate: clickHouseTime(facts.session_date_ms),
 	};
-	// Text past its retention is never written, whatever the TTL merges do.
-	const finish = (row: RudelRunIndexRow, at: Date) =>
-		expireRunIndexText(
-			gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" }),
-			facts.session_date_ms,
-			at.getTime(),
-		);
+	const finish = (row: RudelRunIndexRow) =>
+		gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" });
 	const runRows = runs.map((run) =>
 		finish(
 			runRow(
@@ -280,7 +275,6 @@ export async function buildRunIndex(input: {
 					NO_CODEX_LIFECYCLE_FACTS,
 				context,
 			),
-			builtAt,
 		),
 	);
 	// Each build has its own insert tokens: a generation deleted by a fence
@@ -315,7 +309,6 @@ export async function buildRunIndex(input: {
 						model: recorded?.model ?? "",
 					},
 				),
-				publishedAt,
 			),
 		],
 		asyncInsert: false,

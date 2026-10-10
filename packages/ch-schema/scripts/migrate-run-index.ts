@@ -15,8 +15,6 @@ import {
 } from "../src/clickhouse-connection.js";
 import {
 	RUN_INDEX_TEXT_COLUMNS,
-	RUN_INDEX_TEXT_TTL,
-	RUN_INDEX_TTL,
 	runIndexTable,
 } from "../src/db/schema/run-index.js";
 import {
@@ -41,12 +39,23 @@ const SETTINGS = [
 type Engine = "ReplacingMergeTree" | "SharedReplacingMergeTree";
 
 /**
+ * Comments the retention migration rewrites (`migrate-l1-retention.ts`): the
+ * table is created with the original wording, so this runner leaves them to
+ * the retention runner, which verifies them.
+ */
+const RETENTION_COMMENT_COLUMNS: ReadonlySet<string> = new Set([
+	"session_date",
+	...RUN_INDEX_TEXT_COLUMNS,
+]);
+
+/**
  * Creates `rudel.run_index` once and journals it only after every replica
- * serves the exact schema: columns, comments, engine, key, table TTL and the
- * free-text column TTLs. ClickHouse Cloud applies DDL to replicas
- * asynchronously, and a writer routed to a lagging replica would otherwise
- * fail (or write text without its TTL) after the journal says the migration
- * ran.
+ * serves the exact schema: columns, comments, engine and key. ClickHouse
+ * Cloud applies DDL to replicas asynchronously, and a writer routed to a
+ * lagging replica would otherwise fail after the journal says the migration
+ * ran. The table is created with the TTLs the retention migration removes,
+ * so TTLs are not checked here (`migrate-l1-retention.ts` checks that none
+ * is installed).
  */
 export async function runRunIndexMigration(options: {
 	executor: ClickHouseExecutor;
@@ -202,7 +211,8 @@ function hostMismatch(
 			!found ||
 			found.name !== column.name ||
 			found.type !== column.type ||
-			found.comment !== column.comment ||
+			(found.comment !== column.comment &&
+				!RETENTION_COMMENT_COLUMNS.has(column.name)) ||
 			found.default_kind !== ""
 		);
 	});
@@ -223,19 +233,10 @@ function hostMismatch(
 		table.partition_key !== "" ||
 		table.storage_policy !== expected.expectedStoragePolicy ||
 		table.comment !== TABLE.comment ||
-		!table.engine_full.includes(`TTL ${RUN_INDEX_TTL}`) ||
 		!SETTINGS.every((setting) => table.engine_full.includes(setting))
 	)
-		return "Run index table mismatch (engine_full, key, TTL, settings, comment)";
-	const untimed = RUN_INDEX_TEXT_COLUMNS.filter(
-		(name) =>
-			!columnDeclaration(table.create_table_query, name).includes(
-				`TTL ${RUN_INDEX_TEXT_TTL}`,
-			),
-	);
-	return untimed.length === 0
-		? null
-		: `Run index text columns without their TTL: ${untimed.join(", ")}`;
+		return "Run index table mismatch (engine_full, key, settings, comment)";
+	return null;
 }
 
 /**

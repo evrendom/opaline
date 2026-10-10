@@ -153,7 +153,6 @@ const rudel_transcript_records = table({
 		"record_idx",
 		"block_idx",
 	],
-	ttl: "toDate(session_date) + toIntervalDay(365)",
 	settings: {
 		index_granularity: "1024",
 		index_granularity_bytes: "1048576",

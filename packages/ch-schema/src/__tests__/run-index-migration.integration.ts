@@ -8,10 +8,6 @@ import {
 	runRunIndexMigration,
 } from "../../scripts/migrate-run-index.js";
 import { resolveClickHouseUsername } from "../clickhouse-connection.js";
-import {
-	RUN_INDEX_TEXT_COLUMNS,
-	RUN_INDEX_TEXT_RETENTION_DAYS,
-} from "../db/schema/run-index.js";
 
 const url = process.env.CLICKHOUSE_URL;
 if (!url) throw new Error("CLICKHOUSE_URL is required");
@@ -27,7 +23,7 @@ afterAll(async () => {
 	await executor.close();
 });
 
-test("creates the run index once, keeps every build, expires its text before its runs, and rejects drift", async () => {
+test("creates the run index once, keeps every build, and rejects drift", async () => {
 	const sql = (
 		await readFile(
 			resolve(import.meta.dir, "../../chx/migrations", RUN_INDEX_MIGRATION),
@@ -60,42 +56,11 @@ test("creates the run index once, keeps every build, expires its text before its
 			.map((entry) => entry.checksum),
 	).toEqual([checksumSQL(sql)]);
 
-	// A run past the text retention keeps its facts and loses its text; a
-	// recent run keeps both. Expired text reads NULL, never empty.
 	const day = (offset: number) =>
 		new Date(Date.now() + offset * 86_400_000)
 			.toISOString()
 			.replace("T", " ")
 			.replace("Z", "");
-	const text = Object.fromEntries(
-		RUN_INDEX_TEXT_COLUMNS.map((column) => [column, `${column} text`]),
-	);
-	await executor.execute(
-		`INSERT INTO ${database}.run_index (organization_id, user_id, session_id, revision, parser_version, index_version, agent_id, start_record, row_kind, source, turn_idx, build_revision, session_date, tool_calls, ${RUN_INDEX_TEXT_COLUMNS.join(", ")})
-		 VALUES ('org', 'u', 'old', 1, 8, 1, '', 1, 'run', 'claude_code', 1, 1, '${day(-(RUN_INDEX_TEXT_RETENTION_DAYS + 30))}', 3, ${RUN_INDEX_TEXT_COLUMNS.map((column) => `'${text[column]}'`).join(", ")}),
-		        ('org', 'u', 'new', 1, 8, 1, '', 1, 'run', 'claude_code', 1, 1, '${day(-1)}', 4, ${RUN_INDEX_TEXT_COLUMNS.map((column) => `'${text[column]}'`).join(", ")})`,
-	);
-	await executor.execute(
-		`ALTER TABLE ${database}.run_index MATERIALIZE TTL SETTINGS mutations_sync = 2`,
-	);
-	const rows = await executor.query<Record<string, unknown>>(
-		`SELECT session_id, tool_calls, ${RUN_INDEX_TEXT_COLUMNS.join(", ")}
-		 FROM ${database}.run_index FINAL ORDER BY session_id`,
-	);
-	expect(rows).toEqual([
-		{
-			session_id: "new",
-			tool_calls: 4,
-			...text,
-		},
-		{
-			session_id: "old",
-			tool_calls: 3,
-			...Object.fromEntries(
-				RUN_INDEX_TEXT_COLUMNS.map((column) => [column, null]),
-			),
-		},
-	]);
 
 	// Each build is its own snapshot: a later build of the same generation
 	// never replaces or merges away the rows of an earlier one.
@@ -118,12 +83,6 @@ test("creates the run index once, keeps every build, expires its text before its
 	await expect(
 		runRunIndexMigration({ ...options, migrationSql: `${sql}\nSELECT 1;\n` }),
 	).rejects.toThrow("checksum mismatch");
-	await executor.execute(
-		`ALTER TABLE ${database}.run_index MODIFY COLUMN goal REMOVE TTL`,
-	);
-	await expect(runRunIndexMigration(options)).rejects.toThrow(
-		"text columns without their TTL: goal",
-	);
 	await executor.execute(
 		`ALTER TABLE ${database}.run_index MODIFY COLUMN model LowCardinality(Nullable(String)) COMMENT 'wrong'`,
 	);

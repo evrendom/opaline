@@ -3,6 +3,7 @@ import { getAdapter } from "@rudel/agent-adapters";
 import type { IngestSessionInput } from "@rudel/api-routes";
 import { NO_TRANSCRIPT_RECORD_FACTS } from "@rudel/api-routes/transcript-records";
 import {
+	ingestRudelSessionLineage,
 	ingestRudelWrappedUserArchetypeSnapshotsV1,
 	type RudelWrappedUserArchetypeSnapshotsV1Row,
 } from "@rudel/ch-schema";
@@ -70,6 +71,56 @@ async function countSkillRows(
 		}),
 	);
 	return counts.reduce((total, count) => total + count, 0);
+}
+
+async function countLineageRows(
+	column: "organization_id" | "user_id",
+	value: string,
+): Promise<number> {
+	const [row] = await ch.query<CountRow>({
+		query: `SELECT count() AS count FROM ${getSafeClickHouseTable("rudel.session_lineage")} WHERE ${column} = {value:String}`,
+		query_params: { value },
+	});
+	return Number(row?.count ?? 0);
+}
+
+async function ingestLineageRow(
+	sessionId: string,
+	userId: string,
+	targetOrgId: string,
+): Promise<void> {
+	const at = "2026-07-29 10:00:00.000";
+	await ingestRudelSessionLineage(ch, [
+		{
+			anchor_operation_ordinal: 0,
+			anchor_tool_use_id: "",
+			anchor_ts: at,
+			carrier: "unmatched",
+			child_entrypoint: "",
+			child_first_ingested_at: at,
+			child_model: "gpt-test",
+			child_originator: "",
+			child_session_date: at,
+			child_session_id: sessionId,
+			child_source: "codex",
+			child_start_ts: at,
+			confidence: "ambiguous",
+			countable: 0,
+			derivation_version: 1,
+			derived_at: at,
+			input_sequence: "1",
+			organization_id: targetOrgId,
+			outcome: "unknown",
+			parent_session_date: at,
+			parent_session_id: "",
+			parent_source: "",
+			prompt_fingerprint: "c".repeat(64),
+			reason: "purge me",
+			replacement_version: "1",
+			user_id: userId,
+			workdir: "/test/delete-sessions",
+		},
+	]);
 }
 
 async function countSnapshotsByOrg(targetOrgId: string): Promise<number> {
@@ -314,6 +365,7 @@ afterAll(async () => {
 		"rudel.skill_version_contents",
 		"rudel.transcript_records",
 		"rudel.run_index",
+		"rudel.session_lineage",
 	]) {
 		await ch
 			.execute({
@@ -343,11 +395,13 @@ describe("ClickHouse session purge (integration)", () => {
 		await ingestSession(sessionByOrgId, userIdAlpha, orgId);
 		await ingestSnapshot(snapshotByOrgId, userIdAlpha, orgId);
 		await ingestSkillRows(sessionByOrgId, userIdAlpha, orgId);
+		await ingestLineageRow(sessionByOrgId, userIdAlpha, orgId);
 		const inserted = await waitFor(
 			async () =>
 				(await countByOrg(orgId)) > 0 &&
 				(await countSnapshotsByOrg(orgId)) > 0 &&
-				(await countSkillRows("organization_id", orgId)) === 5,
+				(await countSkillRows("organization_id", orgId)) === 5 &&
+				(await countLineageRows("organization_id", orgId)) === 1,
 		);
 		expect(inserted).toBe(true);
 
@@ -357,7 +411,8 @@ describe("ClickHouse session purge (integration)", () => {
 			async () =>
 				(await countByOrg(orgId)) === 0 &&
 				(await countSnapshotsByOrg(orgId)) === 0 &&
-				(await countSkillRows("organization_id", orgId)) === 0,
+				(await countSkillRows("organization_id", orgId)) === 0 &&
+				(await countLineageRows("organization_id", orgId)) === 0,
 		);
 		expect(cleared).toBe(true);
 	}, 120000);
@@ -369,6 +424,8 @@ describe("ClickHouse session purge (integration)", () => {
 		await ingestSnapshot(snapshotByUserBeta, userIdBeta, orgId);
 		await ingestSkillRows(sessionByUserAlpha, userIdAlpha, orgId);
 		await ingestSkillRows(sessionByUserBeta, userIdBeta, orgId);
+		await ingestLineageRow(sessionByUserAlpha, userIdAlpha, orgId);
+		await ingestLineageRow(sessionByUserBeta, userIdBeta, orgId);
 
 		const inserted = await waitFor(
 			async () =>
@@ -377,7 +434,9 @@ describe("ClickHouse session purge (integration)", () => {
 				(await countSnapshotsByUser(userIdAlpha)) > 0 &&
 				(await countSnapshotsByUser(userIdBeta)) > 0 &&
 				(await countSkillRows("user_id", userIdAlpha)) === 5 &&
-				(await countSkillRows("user_id", userIdBeta)) === 5,
+				(await countSkillRows("user_id", userIdBeta)) === 5 &&
+				(await countLineageRows("user_id", userIdAlpha)) === 1 &&
+				(await countLineageRows("user_id", userIdBeta)) === 1,
 		);
 		expect(inserted).toBe(true);
 
@@ -392,6 +451,8 @@ describe("ClickHouse session purge (integration)", () => {
 		expect(await countSnapshotsByUser(userIdBeta)).toBeGreaterThan(0);
 		expect(await countSkillRows("user_id", userIdAlpha)).toBe(0);
 		expect(await countSkillRows("user_id", userIdBeta)).toBe(5);
+		expect(await countLineageRows("user_id", userIdAlpha)).toBe(0);
+		expect(await countLineageRows("user_id", userIdBeta)).toBe(1);
 
 		await deleteUserSessions(userIdBeta);
 	}, 120000);

@@ -466,17 +466,17 @@ describe("building a session's run index", () => {
 		expect(receipt?.usage_receipt).toBe("12:abc:incomplete");
 	});
 
-	test("text past its retention is never written", async () => {
+	test("text of an old session is written like any other: nothing expires by age", async () => {
 		const fake = fakeClickHouse({
 			runs,
-			sessionDateMs: NOW.getTime() - 400 * 86_400_000,
+			sessionDateMs: NOW.getTime() - 4_000 * 86_400_000,
 		});
 		await build(fake);
 		expect(fake.inserts[0]?.values[0]).toMatchObject({
-			prompt_head: null,
+			prompt_head: expect.any(String),
 			tool_calls: 4,
 		});
-		expect(fake.inserts[1]?.values[0]?.title).toBeNull();
+		expect(fake.inserts[1]?.values[0]?.title).not.toBeNull();
 	});
 
 	test("an expired transcript keeps the stored runs", async () => {

@@ -45,7 +45,6 @@ export const baseSessionTableConfig = {
 	primaryKey: ["organization_id", "session_date", "session_id"],
 	orderBy: ["organization_id", "session_date", "session_id"],
 	partitionBy: "toYYYYMM(toDate(session_date))",
-	ttl: "toDate(session_date) + toIntervalDay(365)",
 	settings: {
 		index_granularity: "8192" as const,
 		non_replicated_deduplication_window: "1000" as const,

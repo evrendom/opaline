@@ -125,10 +125,11 @@ interface LatestRawSessionContentFilters {
 }
 
 /**
- * Latest transcript content from the raw tables that enforce 365-day retention.
+ * Latest transcript content from the raw tables. Raw transcripts are kept until
+ * a deletion request (docs/l1-retention.md), so a transcript-backed feature
+ * returns no row only for a session that was deleted.
  *
- * Callers must narrow the raw scan beyond organization. Analytics outlives raw
- * transcripts, so transcript-backed features return no row after raw expiry.
+ * Callers must narrow the raw scan beyond organization.
  */
 export function buildLatestRawSessionContentSql(
 	filters: LatestRawSessionContentFilters,

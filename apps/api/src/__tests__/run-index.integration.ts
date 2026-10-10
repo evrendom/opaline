@@ -569,7 +569,7 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 	expect(await generations()).toEqual(["2"]);
 	expect(await snapshotsOf(orphanSession)).toEqual(["2/2"]);
 
-	// Text past its retention reads NULL, before any TTL merge.
+	// Text is kept until a deletion request: an old run reads its text back.
 	const expiredSession = `${RUN}_expired`;
 	const longAgo = new Date(Date.now() - 400 * 86_400_000)
 		.toISOString()
@@ -603,8 +603,8 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 			row.title,
 		]),
 	).toEqual([
-		["run", 2, null, null],
-		["receipt", 2, null, null],
+		["run", 2, "an old prompt", "an old title"],
+		["receipt", 2, "an old prompt", "an old title"],
 	]);
 
 	// An expired transcript keeps its runs.

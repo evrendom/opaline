@@ -1,5 +1,4 @@
 import { schema, table } from "@chkit/core";
-import { RUN_INDEX_TTL } from "../../run-index.js";
 
 /**
  * `run_index` (docs/l1-literal-schema.md, "Scale"): the `runs` view
@@ -31,13 +30,7 @@ export const RUN_INDEX_KEY = [
 	"start_record",
 ];
 
-export {
-	RUN_INDEX_RETENTION_DAYS,
-	RUN_INDEX_TEXT_COLUMNS,
-	RUN_INDEX_TEXT_RETENTION_DAYS,
-	RUN_INDEX_TEXT_TTL,
-	RUN_INDEX_TTL,
-} from "../../run-index.js";
+export { RUN_INDEX_TEXT_COLUMNS } from "../../run-index.js";
 
 /** A literal string fact: NULL when it cannot be recorded, '' when none was. */
 const FACT = "LowCardinality(Nullable(String))";
@@ -120,7 +113,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "session_date",
 		type: "DateTime64(3, 'UTC')",
-		comment: "Session date of the generation; retention is measured from it.",
+		comment: "Session date of the generation.",
 	},
 	{
 		name: "unrecorded_facts",
@@ -195,7 +188,7 @@ const RUN_INDEX_COLUMNS = [
 		name: "prompt_head",
 		type: "Nullable(String)",
 		comment:
-			"First 160 characters of the run's first genuine prompt; NULL once the text retention passed.",
+			"First 160 characters of the run's first genuine prompt; NULL when the run has none.",
 	},
 	{
 		name: "genuine_prompts",
@@ -451,7 +444,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "turn_error",
 		type: "Nullable(String)",
-		comment: `First Codex task_complete error message of the run; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `First Codex task_complete error message of the run; ${NOT_RECORDABLE}.`,
 	},
 	{
 		name: "turn_error_kind",
@@ -473,7 +466,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "hook_stop_reason",
 		type: "Nullable(String)",
-		comment: `First Claude stop hook stopReason of the run; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `First Claude stop hook stopReason of the run; ${NOT_RECORDABLE}.`,
 	},
 	{
 		name: "prevented_continuation",
@@ -488,12 +481,12 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "hook_errors",
 		type: "Nullable(String)",
-		comment: `JSON array of the run's stop hook hookErrors in record order; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `JSON array of the run's stop hook hookErrors in record order; ${NOT_RECORDABLE}.`,
 	},
 	{
 		name: "hook_runs",
 		type: "Nullable(String)",
-		comment: `JSON array of the run's stop hook hookInfos (command, durationMs) in record order; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `JSON array of the run's stop hook hookInfos (command, durationMs) in record order; ${NOT_RECORDABLE}.`,
 	},
 	// API.
 	{
@@ -504,7 +497,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "api_error",
 		type: "Nullable(String)",
-		comment: `First Claude API error of the run; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `First Claude API error of the run; ${NOT_RECORDABLE}.`,
 	},
 	{
 		name: "api_error_statuses",
@@ -529,7 +522,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "goal",
 		type: "Nullable(String)",
-		comment: `Last Codex thread goal objective set in the run; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `Last Codex thread goal objective set in the run; ${NOT_RECORDABLE}.`,
 	},
 	// Git, as the transcript records it; PR and CI links are followed through l1_edges by run_id.
 	{
@@ -650,7 +643,7 @@ const RUN_INDEX_COLUMNS = [
 	{
 		name: "title",
 		type: "Nullable(String)",
-		comment: `Receipt: last Claude ai-title of the main stream; ${NOT_RECORDABLE} or once the text retention passed.`,
+		comment: `Receipt: last Claude ai-title of the main stream; ${NOT_RECORDABLE}.`,
 	},
 	{
 		name: "repository",
@@ -672,7 +665,6 @@ export const runIndexTable = table({
 	columns: RUN_INDEX_COLUMNS,
 	primaryKey: RUN_INDEX_KEY,
 	orderBy: RUN_INDEX_KEY,
-	ttl: RUN_INDEX_TTL,
 	settings: {
 		index_granularity: "1024",
 		index_granularity_bytes: "1048576",

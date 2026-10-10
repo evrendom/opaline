@@ -9,6 +9,7 @@ import { L1_EDGE_TABLES, RUN_INDEX_TABLE } from "./l1-edges/l1-edge-tables.js";
 
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const SESSION_LANGUAGE_SIGNALS_TABLE = "rudel.session_language_signals";
+const SESSION_LINEAGE_TABLE = "rudel.session_lineage";
 const SKILL_RECEIPTS_TABLE = "rudel.skill_receipts";
 const SKILL_USES_TABLE = "rudel.skill_uses";
 const SKILL_VERSION_CONTENTS_TABLE = "rudel.skill_version_contents";
@@ -218,6 +219,8 @@ export function getClickHouseSessionPurgePlans(
 		})),
 		{ column, table: SESSION_ANALYTICS_TABLE },
 		{ column, table: SESSION_LANGUAGE_SIGNALS_TABLE },
+		// Parent and child session ids, models and working directories.
+		{ column, table: SESSION_LINEAGE_TABLE },
 		{ column, table: SKILL_RECEIPTS_TABLE },
 		{ column, table: SKILL_USES_TABLE },
 		{ column, table: SKILL_VERSION_CONTENTS_TABLE },

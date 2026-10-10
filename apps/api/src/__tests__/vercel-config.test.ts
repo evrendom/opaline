@@ -215,6 +215,13 @@ describe("Vercel deployment configuration", () => {
 		expect(productionScript.indexOf("ch:migrate:l1-edges")).toBeLessThan(
 			productionScript.indexOf("ch:migrate:run-index"),
 		);
+		// Retention is removed from the tables the earlier steps created.
+		expect(productionScript.indexOf("ch:migrate:run-index")).toBeLessThan(
+			productionScript.indexOf("ch:migrate:l1-retention"),
+		);
+		expect(
+			productionScript.indexOf("ch:migrate:transcript-records"),
+		).toBeLessThan(productionScript.indexOf("ch:migrate:l1-retention"));
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

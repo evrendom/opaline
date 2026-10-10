@@ -14,5 +14,5 @@ We chose this because every interpretation we shipped was a guess about what mat
 - Normalizing names across agents is not interpretation: `denial_kind = 'permission-rule'` stays the transcript's literal value under one column name for both agents.
 - Every fact records which agent and agent version produced it, so a missing value can be told apart from a version that never emits the field. Unknown is never stored as false or zero.
 - The analysis interface stays narrow: a few literal views (`calls`, `runs`, `prompts`) behind `find` with filters and grouping on their columns, a schema reference with each column's meaning and traps, and premade queries in the skill. New facts add columns and enum values, not tools or parameters.
-- Facts are added by bumping the transcript-records parser and backfilling from raw transcripts, which are retained until a deletion request. Derived-table TTLs are separate retention policies.
+- Facts are added by bumping the transcript-records parser and backfilling from raw transcripts, which are kept until a deletion request (see `docs/l1-retention.md`).
 - Retired interpretations are removed in order: stop reading, stop writing, then drop storage. The spec is `docs/l1-literal-schema.md`.
