@@ -30,6 +30,7 @@ import {
 	idPrefixRange,
 	type SessionIdentity,
 	sessionScopeId,
+	splitL1NodeId,
 } from "./l1-edge-ids.js";
 import { L1_EDGE_RESOLUTIONS_TABLE, L1_EDGES_TABLE } from "./l1-edge-tables.js";
 
@@ -242,10 +243,30 @@ export async function buildSessionEdges(input: {
 			observations: observations.length,
 			captures: evidence.captures.length,
 			snapshots: evidence.snapshots.length,
+			// The build read only up to its caps: evidence beyond them has no edges.
+			truncated:
+				observations.length >= MAX_OBSERVATIONS ||
+				evidence.captures.length >= MAX_EVIDENCE ||
+				evidence.snapshots.length >= MAX_EVIDENCE,
 		},
+		// Every repository a link touches, a fork PR's base included, with the
+		// collection coverage the build read: counts from these edges are
+		// complete only up to it.
 		coverage: Object.fromEntries(
-			derived.repositoryKeys
-				.filter((repositoryKey) => !repositoryKey.startsWith("name:"))
+			[
+				...new Set([
+					...derived.repositoryKeys.filter(
+						(repositoryKey) => !repositoryKey.startsWith("name:"),
+					),
+					...derived.edges.flatMap((edge) =>
+						edge.to_kind === "pull_request" || edge.to_kind === "ci_run"
+							? [splitL1NodeId(edge.to_id)[0] ?? ""]
+							: [],
+					),
+				]),
+			]
+				.filter((repositoryId) => repositoryId !== "")
+				.sort()
 				.map((repositoryId) => {
 					const coverage = access.repositories.get(repositoryId);
 					return [

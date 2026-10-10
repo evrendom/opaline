@@ -49,6 +49,8 @@ export interface L1EdgePassEnv {
 	sources: SessionEdgeSources;
 	/** Stop claiming once this much time has passed. */
 	budgetMs: number;
+	/** Only this workspace's scopes (tests building their own fixtures). */
+	organizationId?: string;
 	now?: () => Date;
 }
 
@@ -63,6 +65,7 @@ export async function runL1EdgePass(env: L1EdgePassEnv): Promise<number> {
 		const claims = await claimL1EdgeScopes(env.sql, {
 			limit: CLAIM_BATCH,
 			leaseMs: LEASE_MS,
+			organizationId: env.organizationId,
 		});
 		if (claims.length === 0) break;
 		for (const claim of claims) if (await processClaim(claim, env)) built += 1;
@@ -88,6 +91,12 @@ async function processClaim(
 		};
 		if (claim.scopeKind === "repository") {
 			const repositoryId = claim.repositoryId ?? claim.scopeId;
+			// Read before the GitHub tables: the edges written below are complete
+			// at least up to this coverage, which bounds counts made from them.
+			const readAt = (env.now?.() ?? new Date()).toISOString();
+			const coverage = (
+				await env.sources.access(claim.organizationId)
+			).repositories.get(repositoryId);
 			const build = await buildRepositoryEdges({
 				executor: env.sources.executor,
 				organizationId: claim.organizationId,
@@ -110,6 +119,15 @@ async function processClaim(
 				);
 			await completeL1EdgeScope(env.sql, claim, {
 				resolverVersion: L1_EDGE_RESOLVER_VERSION,
+				coverage: {
+					[repositoryId]: {
+						included: coverage?.included ?? false,
+						prFrom: coverage?.prFrom ?? null,
+						ciFrom: coverage?.ciFrom ?? null,
+						coveredThrough: coverage?.coveredThrough ?? null,
+						readAt,
+					},
+				},
 				watermark: build.watermark,
 				edgeCount: build.edgeCount,
 				unresolvedCount: 0,

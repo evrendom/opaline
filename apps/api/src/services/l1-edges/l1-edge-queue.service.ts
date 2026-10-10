@@ -11,6 +11,15 @@ import { type SessionIdentity, sessionScopeId } from "./l1-edge-ids.js";
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
+/*
+ * Parameters and results never rely on the client's type serializers for
+ * dates: the API's shared client is wrapped by drizzle, whose postgres-js
+ * driver turns the date and date-array serializers and parsers into
+ * identities, so a JS array bound as `timestamptz[]` reaches the wire
+ * unserialized and a timestamptz column comes back as text. Times go in as
+ * ISO text cast in SQL and come back as epoch milliseconds.
+ */
+
 export type L1EdgeScopeKey =
 	| ({ kind: "session"; organizationId: string } & SessionIdentity)
 	| { kind: "repository"; organizationId: string; repositoryId: string };
@@ -96,16 +105,31 @@ export async function enqueueL1EdgeScope(
  */
 export async function claimL1EdgeScopes(
 	sql: postgres.Sql,
-	options: { limit: number; leaseMs: number },
+	options: {
+		limit: number;
+		leaseMs: number;
+		/** Only this workspace's scopes (tests building their own fixtures). */
+		organizationId?: string;
+	},
 ): Promise<ClaimedL1EdgeScope[]> {
 	const leaseToken = crypto.randomUUID();
 	return sql
 		.begin(async (transaction) =>
-			transaction.unsafe<ClaimedL1EdgeScope[]>(
+			transaction.unsafe<
+				(Omit<
+					ClaimedL1EdgeScope,
+					"watermark" | "revision" | "builtRevision"
+				> & {
+					revision: string;
+					builtRevision: string | null;
+					watermarkMs: number | null;
+				})[]
+			>(
 				`WITH due AS MATERIALIZED (
 				SELECT organization_id, scope_kind, scope_id FROM l1_edge_scope
 				WHERE request_count > built_request_count AND next_attempt_at <= now()
 					AND (lease_expires_at IS NULL OR lease_expires_at <= now())
+					AND ($4::text IS NULL OR organization_id = $4::text)
 				ORDER BY priority, next_attempt_at
 				FOR UPDATE SKIP LOCKED
 				LIMIT $1
@@ -122,22 +146,29 @@ export async function claimL1EdgeScopes(
 			RETURNING scope.organization_id AS "organizationId", scope.scope_kind AS "scopeKind", scope.scope_id AS "scopeId",
 				scope.user_id AS "userId", scope.source, scope.session_id AS "sessionId", scope.repository_id AS "repositoryId",
 				scope.lease_token AS "leaseToken", scope.claimed_revision::text AS "revision", scope.attempt_count AS "attemptCount",
-				scope.input, scope.coverage, scope.watermark, scope.built_revision::text AS "builtRevision",
+				scope.input, scope.coverage, (extract(epoch from scope.watermark) * 1000)::float8 AS "watermarkMs",
+				scope.built_revision::text AS "builtRevision",
 				scope.priority, scope.next_attempt_at
 			)
 			-- RETURNING has no order; build live scopes first, oldest first.
 			SELECT "organizationId", "scopeKind", "scopeId", "userId", source, "sessionId", "repositoryId",
-				"leaseToken", "revision", "attemptCount", input, coverage, watermark, "builtRevision"
+				"leaseToken", "revision", "attemptCount", input, coverage, "watermarkMs", "builtRevision"
 			FROM claimed ORDER BY priority, next_attempt_at, "scopeId"`,
-				[options.limit, leaseToken, options.leaseMs],
+				[
+					options.limit,
+					leaseToken,
+					options.leaseMs,
+					options.organizationId ?? null,
+				],
 			),
 		)
 		.then((rows) =>
-			rows.map((row) => ({
+			rows.map(({ watermarkMs, ...row }) => ({
 				...row,
 				revision: Number(row.revision),
 				builtRevision:
 					row.builtRevision === null ? null : Number(row.builtRevision),
+				watermark: watermarkMs === null ? null : new Date(Number(watermarkMs)),
 			})),
 		);
 }
@@ -290,8 +321,8 @@ export async function recordL1EdgeDependencies(
 	if (dependencies.length === 0) return;
 	await sql.unsafe(
 		`INSERT INTO l1_edge_scope_dependency (organization_id, repository_key, scope_kind, scope_id, open_until)
-		 SELECT $1, key, 'session', $2, until
-		 FROM unnest($3::text[], $4::timestamptz[]) AS dependency(key, until)
+		 SELECT $1, key, 'session', $2, until::timestamptz
+		 FROM unnest($3::text[], $4::text[]) AS dependency(key, until)
 		 ON CONFLICT (organization_id, repository_key, scope_id) DO UPDATE SET open_until = EXCLUDED.open_until`,
 		[
 			scope.organizationId,

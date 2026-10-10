@@ -26,7 +26,13 @@ import {
  */
 
 /** Version of these rules; a bump rebuilds every scope. */
-export const L1_EDGE_RESOLVER_VERSION = 1;
+/**
+ * Version of the rules that derive edges and resolutions; the backfill
+ * requeues every scope after a bump. 2: branch CI searches keep a
+ * resolution (capped included), CI edges keep the run's creation time, and
+ * session coverage includes every pull request's repository.
+ */
+export const L1_EDGE_RESOLVER_VERSION = 2;
 
 export interface DerivedEdge {
 	from_kind: "run" | "session";
@@ -66,14 +72,18 @@ export interface DerivedResolution {
 		| "commit"
 		| "pull_request"
 		| "branch_pull_request"
-		| "ci_run";
+		| "ci_run"
+		/** The runs of a CI check's branch in the day before it. */
+		| "branch_ci_run";
 	status:
 		| "linked"
 		| "unbound"
 		| "not_github"
 		| "no_repository"
 		| "ambiguous"
-		| "not_found";
+		| "not_found"
+		/** The search hit its row cap: more candidates may exist. */
+		| "capped";
 	candidate_count: number;
 	repository_id: string;
 	repository_basis: string;
@@ -311,19 +321,22 @@ export function deriveSessionEdges(input: {
 				seed.runId,
 			);
 			for (const run of attempts)
-				add({
-					relation: "ci_named",
-					to_kind: "ci_run",
-					to_id: ciRunNodeId(
-						run.repository_id,
-						run.kind,
-						run.run_id,
-						run.attempt,
-					),
-					matched_value: seed.runId,
-					match_rule: "run_id",
-					candidate_count: attempts.length,
-				});
+				add(
+					{
+						relation: "ci_named",
+						to_kind: "ci_run",
+						to_id: ciRunNodeId(
+							run.repository_id,
+							run.kind,
+							run.run_id,
+							run.attempt,
+						),
+						matched_value: seed.runId,
+						match_rule: "run_id",
+						candidate_count: attempts.length,
+					},
+					{ runCreatedAt: run.created_at },
+				);
 		}
 		if (seed.kind === "ci_check" && branch) {
 			const name = branchName(branch);
@@ -338,6 +351,13 @@ export function deriveSessionEdges(input: {
 				key(repository.id, name),
 			);
 			const capped = cappedAt !== undefined && windowFrom <= cappedAt;
+			// Kept even when nothing matched, so a capped empty search is not "none".
+			resolve(
+				"branch_ci_run",
+				capped ? "capped" : runs.length > 0 ? "linked" : "not_found",
+				runs.length,
+				name,
+			);
 			for (const run of runs)
 				add(
 					{
@@ -353,7 +373,11 @@ export function deriveSessionEdges(input: {
 						match_rule: "branch_window",
 						candidate_count: runs.length,
 					},
-					{ windowFrom: new Date(windowFrom).toISOString(), capped },
+					{
+						windowFrom: new Date(windowFrom).toISOString(),
+						capped,
+						runCreatedAt: run.created_at,
+					},
 				);
 		}
 	}

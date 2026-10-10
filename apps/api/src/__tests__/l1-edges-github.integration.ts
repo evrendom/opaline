@@ -72,7 +72,18 @@ const pass = async () => {
 			access: async () => ({
 				visibility: "visible" as const,
 				bindings: [{ repositoryId, fullName: "opalinehq/athena" }],
-				repositories: new Map(),
+				repositories: new Map([
+					[
+						repositoryId,
+						{
+							included: true,
+							prFrom: "2026-09-01 00:00:00.000",
+							ciFrom: "2026-09-01 00:00:00.000",
+							coveredThrough: "2026-10-08 00:00:00.000",
+							reason: null,
+						},
+					],
+				]),
 			}),
 			evidence: async () => ({ snapshots: [], captures: [] }),
 		},
@@ -213,10 +224,24 @@ test("a repository scope projects GitHub's commit, PR and CI links and re-queues
 		},
 	]);
 	const scopes = await sqlClient.unsafe<
-		{ scope_kind: string; request_count: string; watermark: string | null }[]
+		{
+			scope_kind: string;
+			request_count: string;
+			watermark: string | null;
+			coverage: Record<string, Record<string, unknown>> | null;
+		}[]
 	>(
-		"SELECT scope_kind, request_count::text, watermark::text FROM l1_edge_scope WHERE organization_id = $1 ORDER BY scope_kind",
+		"SELECT scope_kind, request_count::text, watermark::text, coverage FROM l1_edge_scope WHERE organization_id = $1 ORDER BY scope_kind",
 		[organizationId],
+	);
+	// The repository build records the collection coverage it read first:
+	// counts from its edges are complete up to it.
+	expect(scopes[0]?.coverage?.[repositoryId]).toMatchObject({
+		included: true,
+		coveredThrough: "2026-10-08 00:00:00.000",
+	});
+	expect(scopes[0]?.coverage?.[repositoryId]?.readAt).toEqual(
+		expect.any(String),
 	);
 	// The session was re-queued (a second request) and the repository has a watermark.
 	expect(

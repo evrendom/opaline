@@ -203,7 +203,7 @@ describe("session edges", () => {
 			branch: "main",
 			turn: 3,
 		});
-		const { edges } = derive([check], facts);
+		const { edges, resolutions } = derive([check], facts);
 		expect(
 			edges.map((edge) => [edge.relation, edge.to_id, edge.candidate_count]),
 		).toEqual([
@@ -211,6 +211,36 @@ describe("session edges", () => {
 			["ci_named", "101/actions_run/7001/2", 2],
 			["ci_on_branch_window", "101/actions_run/in/1", 1],
 		]);
+		// CI edges keep the run's creation time, so readers can find the run by date.
+		expect(edges.map((edge) => JSON.parse(edge.details).runCreatedAt)).toEqual([
+			"2026-10-07 11:30:00",
+			"2026-10-07 11:30:00",
+			"2026-10-07 09:00:00",
+		]);
+		expect(
+			resolutions
+				.filter((resolution) => resolution.target === "branch_ci_run")
+				.map((resolution) => [resolution.status, resolution.candidate_count]),
+		).toEqual([["linked", 1]]);
+	});
+
+	test("a capped branch CI search is kept as capped even when nothing matched", () => {
+		const facts = emptyGitHubFacts();
+		facts.branchRuns.set("101|main", []);
+		facts.branchRunsCappedAt.set(
+			"101|main",
+			Date.parse("2026-10-07T11:00:00Z"),
+		);
+		const { edges, resolutions } = derive(
+			[seed({ kind: "ci_check", prRepo: "opalinehq/athena", branch: "main" })],
+			facts,
+		);
+		expect(edges.filter((edge) => edge.to_kind === "ci_run")).toEqual([]);
+		expect(
+			resolutions
+				.filter((resolution) => resolution.target === "branch_ci_run")
+				.map((resolution) => [resolution.status, resolution.matched_value]),
+		).toEqual([["capped", "main"]]);
 	});
 
 	test("a repository named but not bound has no edge; its owner/name is a dependency so binding it re-queues the session", () => {

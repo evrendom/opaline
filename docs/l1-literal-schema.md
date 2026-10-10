@@ -124,6 +124,8 @@ A run's pull requests and CI runs are followed through these edges (run → comm
 
 The reconciliation worker rebuilds a scope when an input changes: a session generation (git observations published, transcript reparsed, capture or snapshot published), a repository's pull requests or commits (sweep or webhook), or its CI runs. Its queue, claims, revisions and watermarks are Postgres rows; its output is ClickHouse rows. A rebuild is deterministic for its scope and the GitHub state it read, writes new revisions and retracts edges that no longer hold, and is fenced by purge tombstones. Run-side edges depend on GitHub data (a unique SHA prefix, a branch's PRs, a run's attempts), so a repository change re-queues the sessions that depend on it while they are open (14 days after their last evidence); older edges are frozen against the coverage recorded on their scope. An expired transcript never retracts edges.
 
+What a build records so a reader can trust it (resolver version 2): a repository build stores the collection coverage it read before the GitHub tables (included, PR and CI start, `coveredThrough`, read time), so counts from GitHub-side edges are complete up to it; a session build stores the coverage of every repository its links touch, a fork pull request's base included, and whether it hit its evidence caps (`truncated`). A CI check's branch search keeps a `branch_ci_run` resolution (`linked`, `not_found`, or `capped` when more runs may exist), so an empty capped search never reads as none, and CI edges keep the run's creation time.
+
 ### Evidence it reads
 
 | Link | From | To | Rule stored with the row |
