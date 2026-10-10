@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { factText } from "./record-facts.js";
+import { claudeSystemFacts, factText, mergeFacts } from "./record-facts.js";
 import { splitSessionTranscript } from "./split-transcript.js";
 import {
 	NO_TRANSCRIPT_RECORD_FACTS,
@@ -60,6 +60,10 @@ interface FactCase {
 	readonly name: string;
 	readonly fixture: keyof typeof FIXTURES;
 	readonly row: {
+		/** Text the row's head contains. */
+		readonly text?: string;
+		/** Which of several matching rows, from 0. */
+		readonly nth?: number;
 		readonly callId?: string;
 		readonly kind: string;
 		readonly subtype?: string;
@@ -322,23 +326,240 @@ const CASES: readonly FactCase[] = [
 		row: { callId: "nested_mcp", kind: "tool_call" },
 		facts: { mcpServer: "node_repl", mcpTool: "js" },
 	},
+	{
+		name: "Claude permission mode on the prompt; a recorded false shutdown",
+		fixture: "claude",
+		row: { kind: "user_prompt", text: "plan the migration first" },
+		facts: { extra: { aborted: "false", permission_mode: "plan" } },
+	},
+	{
+		name: "Claude auto mode flags",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "attachment:auto_mode" },
+		facts: {
+			extra: {
+				auto_mode_bash_first: "true",
+				auto_mode_bash_first_steer: "relaxed",
+				auto_mode_bypass: "true",
+				auto_mode_consent_flow: "false",
+				auto_mode_steer_only: "true",
+			},
+		},
+	},
+	{
+		name: "Claude model, effort and stop reason on an assistant line",
+		fixture: "claude",
+		row: { kind: "assistant_text", text: "Here is the plan." },
+		facts: {
+			extra: {
+				effort: "xhigh",
+				model: "claude-opus-5-5",
+				per_turn_effort: "high",
+				stop_reason: "end_turn",
+			},
+		},
+	},
+	{
+		name: "Claude API error message",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "api_error_message" },
+		facts: {
+			extra: {
+				api_error: "rate_limit",
+				api_error_status: "429",
+				model: "claude-opus-5-5",
+			},
+		},
+	},
+	{
+		name: "Claude API retry",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "system:api_error" },
+		facts: {
+			extra: { max_retries: "10", retry_attempt: "1", retry_in_ms: "556" },
+		},
+	},
+	{
+		name: "Claude model refusal and fallback",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "system:model_refusal_fallback" },
+		facts: {
+			extra: {
+				fallback_model: "claude-opus-4-8",
+				original_model: "claude-opus-5-5[1m]",
+				refusal_category: "cyber",
+			},
+		},
+	},
+	{
+		name: "Claude stop hook summary",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "system:stop_hook_summary:prevented" },
+		facts: {
+			extra: {
+				hook_count: "2",
+				hook_errors: JSON.stringify(["lint failed: 2 errors"]),
+				hook_runs: JSON.stringify([
+					{
+						command: "/usr/local/bin/agent-finished claude-code",
+						durationMs: 132,
+					},
+					{ command: "bun run lint", durationMs: 4210 },
+				]),
+				hook_stop_reason: "Fix lint before stopping",
+				prevented_continuation: "true",
+			},
+		},
+	},
+	{
+		name: "Claude compaction metadata",
+		fixture: "claude",
+		row: { kind: "compaction", subtype: "compact_boundary" },
+		facts: { extra: { compact_pre_tokens: "167432", compact_trigger: "auto" } },
+	},
+	{
+		name: "Claude prompt after a shutdown",
+		fixture: "claude",
+		row: { kind: "user_prompt", text: "continue where you left off" },
+		facts: { extra: { aborted: "true" } },
+	},
+	{
+		name: "Codex turn context",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "turn_context" },
+		facts: {
+			extra: {
+				approval_policy: "on-request",
+				approvals_reviewer: "auto_review",
+				collaboration_mode: "default",
+				turn_id: "t2",
+				effort: "high",
+				model: "gpt-6.1-sol",
+				permission_profile: "managed",
+				sandbox_network_access: "false",
+				sandbox_policy: "workspace-write",
+			},
+		},
+	},
+	{
+		name: "Codex task start",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "task_started" },
+		facts: { extra: { context_window: "258400" } },
+	},
+	{
+		name: "Codex task completion",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "task_complete" },
+		facts: {
+			durationMs: 2272,
+			extra: { time_to_first_token_ms: "1941", turn_id: "t2" },
+		},
+	},
+	{
+		name: "Codex failed task",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "task_complete", nth: 1 },
+		facts: {
+			durationMs: 496_218,
+			extra: {
+				turn_error:
+					"Selected model is at capacity. Please try a different model.",
+				turn_error_kind: "server_overloaded",
+			},
+		},
+	},
+	{
+		name: "Codex aborted turn",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "turn_aborted" },
+		facts: {
+			durationMs: 2614,
+			extra: { abort_reason: "interrupted", aborted: "true", turn_id: "t4" },
+		},
+	},
+	{
+		name: "Codex goal",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "thread_goal_updated" },
+		facts: {
+			extra: {
+				facts_clipped: "goal",
+				goal_status: "active",
+				goal_time_used_seconds: "22",
+				goal_tokens_used: "1200",
+			},
+		},
+	},
+	{
+		name: "Codex sub-agent thread",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "item_completed:SubAgentActivity" },
+		facts: {
+			extra: {
+				spawned_thread_ids: JSON.stringify([
+					"01a10b68-012e-7a60-b141-5c0ccce6bc01",
+				]),
+			},
+		},
+	},
+	{
+		name: "Codex error variant with a payload",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "task_complete", nth: 2 },
+		facts: {
+			extra: {
+				turn_error: "unexpected status 401 Unauthorized",
+				turn_error_info: JSON.stringify({
+					http_connection_failed: { http_status_code: 401 },
+				}),
+				turn_error_kind: "http_connection_failed",
+				turn_id: "t5",
+			},
+		},
+	},
+	{
+		name: "a long thread list is cut to whole entries and counted",
+		fixture: "codex",
+		row: {
+			kind: "meta",
+			subtype: "item_completed:CollabAgentToolCall",
+			nth: 1,
+		},
+		facts: { extra: { spawned_thread_ids_more: "8" } },
+	},
+	{
+		name: "long hook lists are cut and counted; long entries are marked clipped",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "system:stop_hook_summary", nth: 0 },
+		facts: {
+			extra: {
+				facts_clipped: "hook_runs",
+				hook_errors_more: "4",
+				hook_runs_more: "3",
+				hook_stop_reason: "",
+				prevented_continuation: "false",
+			},
+		},
+	},
 ];
 
 function findRow(
 	rows: readonly TranscriptRecordDraft[],
 	row: FactCase["row"],
 ): TranscriptRecordDraft {
-	const match = rows.find(
+	const match = rows.filter(
 		(draft) =>
 			draft.kind === row.kind &&
 			(row.callId === undefined || draft.callId === row.callId) &&
-			(row.subtype === undefined || draft.subtype === row.subtype),
-	);
+			(row.subtype === undefined || draft.subtype === row.subtype) &&
+			(row.text === undefined || draft.head.includes(row.text)),
+	)[row.nth ?? 0];
 	if (match === undefined) throw new Error(`No row ${JSON.stringify(row)}`);
 	return match;
 }
 
-describe("parser v6 facts", () => {
+describe("parser facts", () => {
 	test.each(
 		CASES.map((item) => [item.name, item] as const),
 	)("%s", async (_name, item) => {
@@ -414,6 +635,98 @@ describe("parser v6 facts", () => {
 		]);
 	});
 
+	test("a failed Codex task is an error row with its message; a goal keeps its full text", async () => {
+		const rows = await split(FIXTURES.codex);
+		const failed = findRow(rows, {
+			kind: "meta",
+			subtype: "task_complete",
+			nth: 1,
+		});
+		expect(failed.isError).toBe(true);
+		expect(failed.text).toBe(
+			"Selected model is at capacity. Please try a different model.",
+		);
+		const goal = findRow(rows, {
+			kind: "meta",
+			subtype: "thread_goal_updated",
+		});
+		expect(goal.textChars).toBeGreaterThan(512);
+		expect(goal.text.startsWith("ship parser v7 with every run fact.")).toBe(
+			true,
+		);
+		expect(goal.facts.extra.goal?.length).toBe(512);
+	});
+
+	test("row text lifted from a field is redacted, and merged facts keep every clipped key", () => {
+		const content = [
+			JSON.stringify({
+				type: "event_msg",
+				timestamp: "2026-10-01T10:00:00.000Z",
+				payload: {
+					type: "task_complete",
+					turn_id: "t9",
+					error: {
+						message:
+							"deploy failed: INTERNAL_API_KEY=sk_live_abcdefghijklmnop1234",
+					},
+				},
+			}),
+			JSON.stringify({
+				type: "event_msg",
+				timestamp: "2026-10-01T10:00:01.000Z",
+				payload: {
+					type: "thread_goal_updated",
+					goal: {
+						objective: "run curl --token abcdef123456789xyz against staging",
+					},
+				},
+			}),
+		].join("\n");
+		const rows = [
+			...splitSessionTranscript({
+				content,
+				sessionDate: "2026-10-01T10:00:00.000Z",
+				source: "codex",
+			}),
+		];
+		expect(rows.map((row) => row.text)).toEqual([
+			"deploy failed: INTERNAL_API_KEY=[redacted]",
+			"run curl --token [redacted] against staging",
+		]);
+		expect(
+			mergeFacts(
+				{ extra: { facts_clipped: "turn_error" } },
+				{ extra: { facts_clipped: "model,goal" } },
+			).extra?.facts_clipped,
+		).toBe("goal,model,turn_error");
+	});
+
+	test("a list whose JSON exactly fits the cap keeps every entry", () => {
+		// 2 brackets + 3 commas + 4 × `{"command":""}` (14) + 1,987 characters = 2,048.
+		const commands = [497, 497, 497, 496].map((length) => "x".repeat(length));
+		const facts = claudeSystemFacts({
+			subtype: "stop_hook_summary",
+			hookInfos: commands.map((command) => ({ command })),
+		});
+		expect(facts.extra?.hook_runs?.length).toBe(2_048);
+		expect(facts.extra?.hook_runs_more).toBeUndefined();
+	});
+
+	test("a prompt's facts stay off the tool result on the same line", async () => {
+		const rows = await split(FIXTURES.claude);
+		const prompt = findRow(rows, {
+			kind: "user_prompt",
+			text: "also check the tests",
+		});
+		const result = findRow(rows, {
+			kind: "tool_result",
+			callId: "toolu_mixed",
+		});
+		expect(prompt.facts.extra.permission_mode).toBe("default");
+		expect(result.facts.extra.permission_mode).toBeUndefined();
+		expect(result.facts.extra.stdout_chars).toBe("4");
+	});
+
 	test("rows that carry nothing keep the not-recorded defaults", async () => {
 		const rows = await split(FIXTURES.claude);
 		const call = findRow(rows, { callId: "toolu_pr", kind: "tool_call" });
@@ -429,7 +742,7 @@ describe("parser v6 facts", () => {
 			(draft) => draft.kind === "user_prompt",
 		);
 		expect(prompts.map((draft) => draft.facts.agentVersion)).toEqual([
-			"2.1.292",
+			...prompts.slice(0, -1).map(() => "2.1.292"),
 			"2.1.293",
 		]);
 	});
@@ -451,8 +764,9 @@ describe("parser v6 facts", () => {
 			}
 		}
 		const covered = new Set([
-			// Checked by the fact budget test above.
+			// Checked by the fact budget and goal text tests above.
 			"facts_truncated",
+			"goal",
 			...CASES.flatMap((item) => [
 				...Object.keys(item.facts),
 				...Object.keys(item.facts.extra ?? {}),
@@ -535,43 +849,55 @@ const STORED: Readonly<Record<string, readonly FactField[]>> = {
 	"calls.search_matches": ["search_matches"],
 	"calls.attribution_skill": ["attributionSkill"],
 	"calls.attribution_plugin": ["attribution_plugin"],
+	"calls.spawned_agent_id": ["spawned_thread_ids"],
+	"runs.duration_ms": ["durationMs"],
+	"runs.time_to_first_token_ms": ["time_to_first_token_ms"],
+	"runs.permission_mode": ["permission_mode"],
+	"runs.auto_mode_*": [
+		"auto_mode_bash_first",
+		"auto_mode_bash_first_steer",
+		"auto_mode_bypass",
+		"auto_mode_steer_only",
+		"auto_mode_consent_flow",
+	],
+	"runs.approval_policy": ["approval_policy"],
+	"runs.approvals_reviewer": ["approvals_reviewer"],
+	"runs.sandbox_policy": ["sandbox_policy", "sandbox_network_access"],
+	"runs.permission_profile": ["permission_profile", "collaboration_mode"],
+	"runs.model": ["model"],
+	"runs.effort": ["effort", "per_turn_effort"],
+	"runs.context_window": ["context_window"],
+	"runs.compact_trigger": ["compact_trigger"],
+	"runs.compact_pre_tokens": ["compact_pre_tokens"],
+	"runs.aborted": ["aborted"],
+	"runs.abort_reason": ["abort_reason"],
+	"runs.turn_error": ["turn_error", "turn_error_kind"],
+	"runs.stop_reason": ["stop_reason"],
+	"runs.hook_stop_reason": ["hook_stop_reason"],
+	"runs.hook_errors": ["hook_errors", "hook_count"],
+	"runs.prevented_continuation": ["prevented_continuation"],
+	"runs.hook_runs": ["hook_runs"],
+	"runs.api_errors": ["api_error", "api_error_status"],
+	"runs.retry_attempts": ["retry_attempt", "max_retries", "retry_in_ms"],
+	"runs.refusals": ["refusal_category", "original_model"],
+	"runs.fallback_model": ["fallback_model"],
+	"runs.goal": ["goal"],
 	"runs.entrypoint": ["entrypoint"],
 	"runs.agent_version": ["agentVersion"],
 	"runs.pr_repository": ["pr_repository"],
 	"runs.pr_number": ["pr_number", "pr_url"],
 };
 
+/** Facts whose typed column predates them: the run duration came with parser 7. */
+const STORED_SINCE: Readonly<Record<string, number>> = {
+	"runs.duration_ms": 7,
+};
+
 /** Raw or text spec facts not stored yet, with where they land. */
 const PENDING: Readonly<Record<string, string>> = {
-	"calls.spawned_agent_id": "parser 7 (Codex spawned thread ids)",
 	"calls.attribution_agent": "no non-null value seen yet; needs a fixture",
-	"runs.duration_ms": "parser 7",
-	"runs.time_to_first_token_ms": "parser 7",
-	"runs.auto_mode_*": "parser 7",
-	"runs.approval_policy": "parser 7",
-	"runs.approvals_reviewer": "parser 7",
-	"runs.sandbox_policy": "parser 7",
-	"runs.permission_profile": "parser 7",
-	"runs.model": "parser 7 (usage stays authoritative)",
-	"runs.effort": "parser 7",
-	"runs.context_window": "parser 7",
-	"runs.context_input_tokens_at_start": "parser 7",
-	"runs.compacted": "parser 7",
-	"runs.compact_trigger": "parser 7",
-	"runs.compact_pre_tokens": "parser 7",
-	"runs.aborted": "parser 7",
-	"runs.abort_reason": "parser 7",
-	"runs.turn_error": "parser 7",
-	"runs.stop_reason": "parser 7",
-	"runs.hook_stop_reason": "parser 7",
-	"runs.hook_errors": "parser 7",
-	"runs.prevented_continuation": "parser 7",
-	"runs.hook_runs": "parser 7",
-	"runs.api_errors": "parser 7",
-	"runs.retry_attempts": "parser 7",
-	"runs.refusals": "parser 7",
-	"runs.fallback_model": "parser 7",
-	"runs.goal": "parser 7",
+	"runs.context_input_tokens_at_start": "usage events, not the parser",
+	"runs.compacted": "compaction records (kind), not a fact",
 	"runs.pushed_shas": "git extractor 4",
 	"runs.prompt_origin": "parser 8",
 	"prompts.prompt_origin": "parser 8",
@@ -625,32 +951,44 @@ describe("L1 spec drift", () => {
 		expect(facts.length).toBeGreaterThan(50);
 		const unplanned = facts.filter(
 			(fact) =>
-				/\b(raw|text|parser v6)\b/u.test(fact.today) &&
+				/\b(raw|text|parser v\d+)\b/u.test(fact.today) &&
 				STORED[fact.id] === undefined &&
 				PENDING[fact.id] === undefined,
 		);
 		expect(unplanned.map((fact) => fact.id)).toEqual([]);
 	});
 
-	test("the spec marks every stored fact as stored by parser v6", async () => {
+	test("the spec marks every stored fact with the parser version that stores it", async () => {
 		const facts = new Map(
 			(await readSpecFacts()).map((fact) => [fact.id, fact]),
 		);
-		for (const id of Object.keys(STORED)) {
-			expect(facts.get(id)?.today ?? `${id} missing from the spec`).toContain(
-				"parser v6",
-			);
+		for (const [id, fields] of Object.entries(STORED)) {
+			// The newest field decides; typed columns arrived with parser 6.
+			const since =
+				STORED_SINCE[id] ??
+				Math.max(
+					6,
+					...fields.map((field) =>
+						field in TRANSCRIPT_RECORD_FACT_KEYS
+							? TRANSCRIPT_RECORD_FACT_KEYS[
+									field as keyof typeof TRANSCRIPT_RECORD_FACT_KEYS
+								]
+							: 6,
+					),
+				);
+			expect(
+				`${id}: ${facts.get(id)?.today ?? "missing from the spec"}`,
+			).toContain(`parser v${since}`);
 		}
 	});
 
-	test("pending facts are still open in the spec", async () => {
+	test("pending facts are in the spec and not stored", async () => {
 		const facts = new Map(
 			(await readSpecFacts()).map((fact) => [fact.id, fact]),
 		);
 		for (const id of Object.keys(PENDING)) {
-			expect(facts.get(id)?.today ?? `${id} missing from the spec`).toMatch(
-				/\b(raw|text|regex)\b/u,
-			);
+			expect(facts.has(id)).toBe(true);
+			expect(STORED[id]).toBeUndefined();
 		}
 	});
 });

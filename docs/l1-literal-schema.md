@@ -40,34 +40,34 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` | stored (Claude, parser v6); Codex in `file_change` text |
 | `stale_read` | `toolUseResult.staleReadFileStateHint` | none | stored (parser v6) |
 | `search_matches` | `toolUseResult.numFiles`, `matches` | none | stored (`numFiles`, parser v6) |
-| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` | stored (Claude); raw (Codex) |
+| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` | stored (Claude); Codex thread ids stored (parser v7) |
 | `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` | skill (Claude) and plugin (Codex) stored (parser v6); rest raw |
 | `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `turn_context.cwd` | session-level only |
 
-Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Fact values share a session budget (4M characters): past it a record keeps only short values and says `facts_truncated`.
+Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (4M characters): past it a record drops them and says `facts_truncated`; short values are always kept. Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
 
 ### `runs`: one row per run (one human prompt and everything until the next)
 
 | Column | Claude source | Codex source | Today |
 |---|---|---|---|
 | `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` | computed per query |
-| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | raw |
+| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | stored (Codex, parser v7) |
 | `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | text heuristic (wrappers) |
-| `permission_mode` | `permissionMode` | none | collapsed to plan/default |
-| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | raw |
-| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | raw |
-| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); effort raw |
+| `permission_mode` | `permissionMode` | none | stored (Claude, parser v7) |
+| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | stored (Claude, parser v7) |
+| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | stored (Codex, parser v7) |
+| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); model and effort per record stored (parser v7) |
 | `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | stored (parser v6, every record) |
 | `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) | stored; tokens not exposed |
-| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | raw / stored |
-| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; rest raw |
+| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | `context_window` stored (Codex, parser v7); start tokens from usage |
+| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; trigger and pre-tokens stored (Claude, parser v7) |
 | `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` | computed per query (no denied) |
-| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` | text / raw |
-| `stop_reason` | assistant `message.stop_reason` | none | raw |
-| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none | text |
-| `hook_runs` (command, duration) | system `hookInfos` | none | raw |
-| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | text / raw |
-| `goal` | none | `thread_goal_updated.goal` | raw |
+| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` | stored (parser v7); Claude interrupt markers in text |
+| `stop_reason` | assistant `message.stop_reason` | none | stored (Claude, parser v7) |
+| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none | stored (Claude, parser v7) |
+| `hook_runs` (command, duration) | system `hookInfos` | none | stored (Claude, parser v7) |
+| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | stored (Claude, parser v7) |
+| `goal` | none | `thread_goal_updated.goal` | stored (Codex, parser v7) |
 | `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` stored (parser v6) |
 | `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same | join |
 | `repository_id` | repository evidence index, GitHub binding | same | heuristic key in the UI, literal coalesce in analysis |
@@ -192,7 +192,7 @@ Status: steps 1 and 2 stopped reading (#218, #219). The views and the recovery S
 4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
 5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse.
 6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills).
-7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
+7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts and Codex spawned thread ids) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
 8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
 9. GitHub evidence and repository configuration in ClickHouse.
 10. `find` over `calls`, `runs`, `prompts` and edges, the schema reference and premade queries in the plugin skill.

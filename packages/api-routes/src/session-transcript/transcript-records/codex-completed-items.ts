@@ -58,7 +58,8 @@ export function readCompletedItem(
 		];
 	}
 	const items = readNewItem(type, id, item, state);
-	if (items === undefined) return [metaItem(label)];
+	if (items === undefined)
+		return [metaItem(label, { facts: codexItemFacts(item) })];
 	if (id !== "") state.codexCompletedItems.add(id);
 	return items;
 }

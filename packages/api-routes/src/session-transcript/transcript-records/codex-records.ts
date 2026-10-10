@@ -29,7 +29,13 @@ import {
 	safeStringify,
 	shellFileChangeItem,
 } from "./line-items.js";
-import { codexDurationMs, factText } from "./record-facts.js";
+import {
+	codexDurationMs,
+	codexTaskFacts,
+	codexTurnContextFacts,
+	factRowText,
+	factText,
+} from "./record-facts.js";
 import type { CommandClass } from "./types.js";
 
 const SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -44,6 +50,13 @@ const SHELL_TOOL_NAMES: ReadonlySet<string> = new Set([
 	"shell_command",
 	"container.exec",
 	"local_shell",
+]);
+/** Turn lifecycle events whose run facts are kept on their meta row. */
+const TASK_EVENTS: ReadonlySet<string> = new Set([
+	"task_started",
+	"task_complete",
+	"turn_aborted",
+	"thread_goal_updated",
 ]);
 const MIRROR_EVENTS: ReadonlySet<string> = new Set([
 	"agent_message",
@@ -79,6 +92,11 @@ export function readCodexLine(
 						text: readCompactedText(payload),
 					},
 				],
+				timestamp,
+			};
+		case "turn_context":
+			return {
+				items: [metaItem(type, { facts: codexTurnContextFacts(payload) })],
 				timestamp,
 			};
 		default:
@@ -217,7 +235,38 @@ function readEventMessage(
 			}),
 		];
 	}
+	if (TASK_EVENTS.has(type)) return [readTaskEvent(type, payload)];
 	return [metaItem(type === "" ? "event" : type)];
+}
+
+/**
+ * A turn lifecycle event with its run facts. A failed task is an error row
+ * whose text is the error message; a goal's text is its full objective.
+ */
+function readTaskEvent(
+	type: string,
+	payload: Record<string, unknown>,
+): LineItem {
+	const facts = codexTaskFacts(type, payload);
+	const error = isRecord(payload.error)
+		? readString(payload.error.message)
+		: readString(payload.error);
+	if (type === "task_complete" && (error !== undefined || payload.error))
+		return metaItem(type, {
+			facts,
+			isError: true,
+			text: factRowText(error ?? ""),
+		});
+	if (type === "thread_goal_updated") {
+		const goal = isRecord(payload.goal) ? payload.goal : undefined;
+		return metaItem(type, {
+			facts,
+			text: factRowText(
+				readString(goal?.objective) ?? readString(payload.goal) ?? "",
+			),
+		});
+	}
+	return metaItem(type, { facts });
 }
 
 function readResponseItem(

@@ -17,7 +17,12 @@ import {
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
+	claudeApiErrorFacts,
+	claudeAutoModeFacts,
+	claudeLineFacts,
 	claudePrLinkFacts,
+	claudePromptFacts,
+	claudeSystemFacts,
 	claudeToolResultFacts,
 	factText,
 	mcpFacts,
@@ -43,9 +48,15 @@ export function readClaudeLine(
 	if (entrypoint !== undefined) state.entrypoint = factText(entrypoint, 64);
 	if (type === "assistant") {
 		if (record.isApiErrorMessage === true) {
-			return { items: [readApiErrorMessage(record)], timestamp };
+			return {
+				items: withLineFacts([readApiErrorMessage(record)], record),
+				timestamp,
+			};
 		}
-		return { items: readAssistantBlocks(record, state), timestamp };
+		return {
+			items: withLineFacts(readAssistantBlocks(record, state), record),
+			timestamp,
+		};
 	}
 	if (type === "pr-link") {
 		return {
@@ -57,14 +68,19 @@ export function readClaudeLine(
 		return { items: readAttachment(record.attachment, state), timestamp };
 	}
 	if (type === "user") {
-		return { items: readUserMessage(record, state), timestamp };
+		return {
+			items: withLineFacts(readUserMessage(record, state), record),
+			timestamp,
+		};
 	}
 	if (type === "system") {
 		const subtype = readString(record.subtype) ?? "";
+		const facts = claudeSystemFacts(record);
 		if (subtype === "compact_boundary" || isRecord(record.compactMetadata)) {
 			return {
 				items: [
 					{
+						facts,
 						kind: "compaction",
 						subtype: "compact_boundary",
 						text: readString(record.content) ?? "",
@@ -73,7 +89,10 @@ export function readClaudeLine(
 				timestamp,
 			};
 		}
-		return { items: [readSystemRecord(record, subtype)], timestamp };
+		return {
+			items: [{ ...readSystemRecord(record, subtype), facts }],
+			timestamp,
+		};
 	}
 	return { items: [metaItem(type === "" ? "unknown" : type)], timestamp };
 }
@@ -128,6 +147,31 @@ function readAssistantBlocks(
 				...item,
 				facts: mergeFacts(item.facts, attribution.line),
 			}));
+}
+
+/** A user or assistant line's own run facts, on every record it yields. */
+/**
+ * A user or assistant line's own run facts on every record it yields; the
+ * prompt's facts (permission mode, origin) only on its prompt-side records,
+ * not on tool results or file changes of the same line.
+ */
+function withLineFacts(
+	items: readonly LineItem[],
+	record: Record<string, unknown>,
+): LineItem[] {
+	const line = claudeLineFacts(record);
+	const prompt = claudePromptFacts(record);
+	if (line.extra === undefined && prompt.extra === undefined) return [...items];
+	return items.map((item) => ({
+		...item,
+		facts: mergeFacts(
+			item.facts,
+			line,
+			item.kind === "tool_result" || item.kind === "file_change"
+				? undefined
+				: prompt,
+		),
+	}));
 }
 
 /**
@@ -473,6 +517,12 @@ function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
 					text: readStrings(attachment.allowedTools).join("\n"),
 				}),
 			];
+		case "auto_mode":
+			return [
+				metaItem("attachment:auto_mode", {
+					facts: claudeAutoModeFacts(attachment),
+				}),
+			];
 		default:
 			return [
 				metaItem(`attachment:${type}`, {
@@ -567,6 +617,7 @@ function readApiErrorMessage(record: Record<string, unknown>): LineItem {
 	const text = readPromptText(message?.content);
 	const code = readString(record.error);
 	return metaItem("api_error_message", {
+		facts: claudeApiErrorFacts(record),
 		isError: true,
 		text: code === undefined ? text : `[${code}] ${text}`,
 	});

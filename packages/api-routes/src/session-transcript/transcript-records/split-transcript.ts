@@ -310,8 +310,10 @@ function storedTextCap(
 }
 
 /**
- * Spend the session fact budget on a record's `facts` values; past it, keep
- * only short values and mark the record `facts_truncated`.
+ * Spend the session fact budget on a record's long `facts` values (over
+ * `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`); past it, drop them and mark the
+ * record `facts_truncated`. Short values are always kept and cost nothing:
+ * each is bounded, like the typed fact columns.
  */
 function budgetFacts(
 	facts: LineFacts | undefined,
@@ -320,26 +322,24 @@ function budgetFacts(
 	if (facts?.extra === undefined || budget === undefined) return facts;
 	const values = Object.entries(facts.extra);
 	let chars = 0;
-	for (const [, value] of values) chars += value?.length ?? 0;
+	for (const [, value] of values)
+		if (
+			value !== undefined &&
+			value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS
+		)
+			chars += value.length;
 	if (chars <= budget.remaining) {
 		budget.remaining -= chars;
 		return facts;
 	}
 	const kept: Record<string, string> = {};
-	let dropped = false;
-	for (const [key, value] of values) {
-		if (value === undefined) continue;
-		if (value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS) {
-			dropped = true;
-			continue;
-		}
-		kept[key] = value;
-		budget.remaining -= value.length;
-	}
-	return {
-		...facts,
-		extra: dropped ? { ...kept, facts_truncated: "true" } : kept,
-	};
+	for (const [key, value] of values)
+		if (
+			value !== undefined &&
+			value.length <= TRANSCRIPT_RECORD_FACT_SHORT_CHARS
+		)
+			kept[key] = value;
+	return { ...facts, extra: { ...kept, facts_truncated: "true" } };
 }
 
 function applyTurnState(state: StreamState, item: LineItem): void {

@@ -162,6 +162,223 @@ export function codexItemFacts(item: Record<string, unknown>): LineFacts {
 		setBoolean(extra, "mcp_read_only", item.readOnlyHint);
 		setText(extra, "attribution_plugin", item.pluginId);
 	}
+	if (item.type === "SubAgentActivity") {
+		const thread = readString(item.agent_thread_id);
+		if (thread !== undefined)
+			setList(
+				extra,
+				"spawned_thread_ids",
+				"spawned_thread_ids_more",
+				[thread],
+				128,
+			);
+	}
+	if (
+		item.type === "CollabAgentToolCall" &&
+		Array.isArray(item.receiver_thread_ids)
+	)
+		setList(
+			extra,
+			"spawned_thread_ids",
+			"spawned_thread_ids_more",
+			item.receiver_thread_ids.filter(
+				(thread): thread is string =>
+					typeof thread === "string" && thread !== "",
+			),
+			128,
+		);
+	if (Object.keys(extra).length > 0) facts.extra = extra;
+	return facts;
+}
+
+/**
+ * Facts of a Codex `turn_context`: the approval, sandbox and permission
+ * settings, collaboration mode, model and effort the turn ran with.
+ */
+export function codexTurnContextFacts(
+	payload: Record<string, unknown>,
+): LineFacts {
+	const extra: ExtraFacts = {};
+	setText(extra, "turn_id", payload.turn_id);
+	setText(extra, "approval_policy", payload.approval_policy);
+	setText(extra, "approvals_reviewer", payload.approvals_reviewer);
+	const sandbox = isRecord(payload.sandbox_policy)
+		? payload.sandbox_policy
+		: undefined;
+	setText(extra, "sandbox_policy", sandbox?.type ?? payload.sandbox_policy);
+	setBoolean(extra, "sandbox_network_access", sandbox?.network_access);
+	const profile = isRecord(payload.permission_profile)
+		? payload.permission_profile
+		: undefined;
+	setText(
+		extra,
+		"permission_profile",
+		profile?.type ?? payload.permission_profile,
+	);
+	const collaboration = isRecord(payload.collaboration_mode)
+		? payload.collaboration_mode
+		: undefined;
+	setText(extra, "collaboration_mode", collaboration?.mode);
+	setText(extra, "model", payload.model);
+	setText(extra, "effort", payload.effort);
+	return withExtra({}, extra);
+}
+
+/**
+ * Facts of a Codex task or abort event: `task_started` (context window,
+ * collaboration mode), `task_complete` (duration, time to first token,
+ * error), `turn_aborted` (duration, reason), `thread_goal_updated` (goal).
+ */
+export function codexTaskFacts(
+	type: string,
+	payload: Record<string, unknown>,
+): LineFacts {
+	const facts: { -readonly [K in keyof LineFacts]: LineFacts[K] } = {};
+	const extra: ExtraFacts = {};
+	setText(extra, "turn_id", payload.turn_id);
+	if (type === "task_started") {
+		setInteger(extra, "context_window", payload.model_context_window);
+		setText(extra, "collaboration_mode", payload.collaboration_mode_kind);
+	}
+	if (type === "task_complete" || type === "turn_aborted") {
+		const duration = durationMs(payload.duration_ms);
+		if (duration !== undefined) facts.durationMs = duration;
+	}
+	if (type === "task_complete") {
+		setInteger(extra, "time_to_first_token_ms", payload.time_to_first_token_ms);
+		const error = isRecord(payload.error) ? payload.error : undefined;
+		setText(extra, "turn_error", error?.message ?? payload.error);
+		const info = error?.codex_error_info;
+		if (isRecord(info)) {
+			// A variant with a payload: `{"http_connection_failed": {...}}`.
+			setText(extra, "turn_error_kind", Object.keys(info)[0]);
+			setText(extra, "turn_error_info", JSON.stringify(info));
+		} else setText(extra, "turn_error_kind", info);
+	}
+	if (type === "turn_aborted") {
+		extra.aborted = "true";
+		setText(extra, "abort_reason", payload.reason);
+	}
+	if (type === "thread_goal_updated") {
+		const goal = isRecord(payload.goal) ? payload.goal : undefined;
+		setText(extra, "goal", goal?.objective ?? payload.goal);
+		setText(extra, "goal_status", goal?.status);
+		setInteger(extra, "goal_tokens_used", goal?.tokensUsed);
+		setInteger(extra, "goal_time_used_seconds", goal?.timeUsedSeconds);
+	}
+	return withExtra(facts, extra);
+}
+
+/**
+ * Run facts of a Claude record's own fields, which apply to every record the
+ * line yields: the prompt's `permissionMode`, `interruptedByShutdown`, and an
+ * assistant line's model, effort and stop reason.
+ */
+export function claudeLineFacts(record: Record<string, unknown>): LineFacts {
+	const extra: ExtraFacts = {};
+	setBoolean(extra, "aborted", record.interruptedByShutdown);
+	if (record.type === "assistant") {
+		const message = isRecord(record.message) ? record.message : undefined;
+		setText(extra, "model", message?.model);
+		setText(extra, "stop_reason", message?.stop_reason);
+		setText(extra, "effort", record.effort);
+		setText(extra, "per_turn_effort", record.perTurnEffort);
+	}
+	return withExtra({}, extra);
+}
+
+/**
+ * Facts a Claude prompt line records about its prompt: the permission mode.
+ * They belong to the prompt's records, not to tool results on the same line.
+ */
+export function claudePromptFacts(record: Record<string, unknown>): LineFacts {
+	const extra: ExtraFacts = {};
+	setText(extra, "permission_mode", record.permissionMode);
+	return withExtra({}, extra);
+}
+
+/** Facts of a Claude API error written as an assistant message. */
+export function claudeApiErrorFacts(
+	record: Record<string, unknown>,
+): LineFacts {
+	const extra: ExtraFacts = {};
+	setText(extra, "api_error", record.error);
+	setInteger(extra, "api_error_status", record.apiErrorStatus);
+	return withExtra({}, extra);
+}
+
+/**
+ * Facts of a Claude `system` record: stop hook summaries, API retries,
+ * model refusals and compaction metadata.
+ */
+export function claudeSystemFacts(record: Record<string, unknown>): LineFacts {
+	const extra: ExtraFacts = {};
+	if (record.subtype === "stop_hook_summary") {
+		if (typeof record.stopReason === "string")
+			extra.hook_stop_reason = clippedText(
+				extra,
+				"hook_stop_reason",
+				record.stopReason,
+			);
+		setBoolean(extra, "prevented_continuation", record.preventedContinuation);
+		setInteger(extra, "hook_count", record.hookCount);
+		if (Array.isArray(record.hookErrors))
+			setList(
+				extra,
+				"hook_errors",
+				"hook_errors_more",
+				record.hookErrors.flatMap((error) =>
+					error === null || error === undefined
+						? []
+						: [typeof error === "string" ? error : JSON.stringify(error)],
+				),
+			);
+		if (Array.isArray(record.hookInfos)) {
+			const runs = record.hookInfos.flatMap((hook) => {
+				if (!isRecord(hook)) return [];
+				const run: Record<string, unknown> = {};
+				const command = readString(hook.command);
+				if (command !== undefined)
+					run.command = clippedText(extra, "hook_runs", command);
+				const duration = durationMs(hook.durationMs);
+				if (duration !== undefined) run.durationMs = duration;
+				return [run];
+			});
+			const list = cappedJsonList(runs);
+			extra.hook_runs = list.json;
+			if (list.cut > 0) extra.hook_runs_more = String(list.cut);
+		}
+	}
+	setInteger(extra, "retry_attempt", record.retryAttempt);
+	setInteger(extra, "max_retries", record.maxRetries);
+	setInteger(extra, "retry_in_ms", record.retryInMs);
+	setText(extra, "refusal_category", record.apiRefusalCategory);
+	setText(extra, "original_model", record.originalModel);
+	setText(extra, "fallback_model", record.fallbackModel);
+	if (isRecord(record.compactMetadata)) {
+		setText(extra, "compact_trigger", record.compactMetadata.trigger);
+		setInteger(extra, "compact_pre_tokens", record.compactMetadata.preTokens);
+	}
+	return withExtra({}, extra);
+}
+
+/** Facts of a Claude `auto_mode` attachment. */
+export function claudeAutoModeFacts(
+	attachment: Record<string, unknown>,
+): LineFacts {
+	const extra: ExtraFacts = {};
+	setBoolean(extra, "auto_mode_bash_first", attachment.bashFirst);
+	setText(extra, "auto_mode_bash_first_steer", attachment.bashFirstSteer);
+	setBoolean(extra, "auto_mode_bypass", attachment.bypass);
+	setBoolean(extra, "auto_mode_steer_only", attachment.steerOnly);
+	setBoolean(extra, "auto_mode_consent_flow", attachment.autoModeConsentFlow);
+	return withExtra({}, extra);
+}
+
+function withExtra(
+	facts: { -readonly [K in keyof LineFacts]: LineFacts[K] },
+	extra: ExtraFacts,
+): LineFacts {
 	if (Object.keys(extra).length > 0) facts.extra = extra;
 	return facts;
 }
@@ -180,14 +397,28 @@ export function mergeFacts(
 ): LineFacts {
 	const merged: { -readonly [K in keyof LineFacts]: LineFacts[K] } = {};
 	const extra: ExtraFacts = {};
+	const clipped = new Set<string>();
 	for (const part of parts) {
 		if (part === undefined) continue;
 		const { extra: partExtra, ...rest } = part;
 		Object.assign(merged, rest);
-		if (partExtra !== undefined) Object.assign(extra, partExtra);
+		if (partExtra === undefined) continue;
+		Object.assign(extra, partExtra);
+		for (const key of (partExtra.facts_clipped ?? "").split(","))
+			if (key !== "") clipped.add(key);
 	}
+	// Each part lists its own clipped keys; the merge keeps all of them.
+	if (clipped.size > 0) extra.facts_clipped = [...clipped].sort().join(",");
 	if (Object.keys(extra).length > 0) merged.extra = extra;
 	return merged;
+}
+
+/**
+ * Text of a record lifted from one field of its line (an error, a goal, a
+ * title): redacted like a fact value but not capped; the text fields cap it.
+ */
+export function factRowText(value: string): string {
+	return factText(value, Number.MAX_SAFE_INTEGER);
 }
 
 function patchLineCounts(
@@ -255,7 +486,9 @@ function cappedJsonList(entries: readonly unknown[]): {
 	const kept: unknown[] = [];
 	let chars = 2;
 	for (const entry of entries) {
-		const entryChars = countCodePoints(JSON.stringify(entry)) + 1;
+		// A comma separates entries; the first needs none.
+		const entryChars =
+			countCodePoints(JSON.stringify(entry)) + (kept.length > 0 ? 1 : 0);
 		if (chars + entryChars > TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS) break;
 		chars += entryChars;
 		kept.push(entry);
@@ -290,5 +523,42 @@ function setText(
 		return;
 	}
 	const text = readString(value);
-	if (text !== undefined) extra[key] = factText(text);
+	if (text !== undefined) extra[key] = clippedText(extra, key, text);
+}
+
+/** `factText`, noting `key` in `facts_clipped` when the cap cut the value. */
+function clippedText(
+	extra: ExtraFacts,
+	key: TranscriptRecordFactKey,
+	value: string,
+	maxChars = TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
+): string {
+	const full = factText(value, Number.MAX_SAFE_INTEGER);
+	const text = sliceStart(full, maxChars);
+	if (text.length < full.length) {
+		const keys = new Set(
+			(extra.facts_clipped ?? "").split(",").filter((name) => name !== ""),
+		);
+		keys.add(key);
+		extra.facts_clipped = [...keys].sort().join(",");
+	}
+	return text;
+}
+
+/**
+ * A JSON list of text entries cut to whole entries at the list cap, with the
+ * number cut under `moreKey`; an entry cut at its own cap marks `key` clipped.
+ */
+function setList(
+	extra: ExtraFacts,
+	key: TranscriptRecordFactKey,
+	moreKey: TranscriptRecordFactKey,
+	entries: readonly string[],
+	entryMaxChars = TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
+): void {
+	const list = cappedJsonList(
+		entries.map((entry) => clippedText(extra, key, entry, entryMaxChars)),
+	);
+	extra[key] = list.json;
+	if (list.cut > 0) extra[moreKey] = String(list.cut);
 }

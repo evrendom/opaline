@@ -7,7 +7,7 @@
  */
 
 /** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 6;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 7;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -19,10 +19,11 @@ export const TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS = 512;
 export const TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS = 2_048;
 
 /**
- * Characters of `facts` values one session may store across its streams. The
- * typed fact columns are short and always kept; once the budget is spent, a
- * record keeps only values of at most `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`
- * and says `facts_truncated`, so a cut value never reads as not recorded.
+ * Characters of long `facts` values (over `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`)
+ * one session may store across its streams. Short values and the typed fact
+ * columns are bounded per record and always kept; once the budget is spent, a
+ * record drops its long values and says `facts_truncated`, so a cut value
+ * never reads as not recorded.
  */
 export const TRANSCRIPT_RECORDS_SESSION_FACT_BUDGET_CHARS = 4 * 1024 * 1024;
 export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
@@ -91,6 +92,85 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	attribution_plugin: 6,
 	/** "true" when the session fact budget dropped longer values of this record. */
 	facts_truncated: 6,
+	// Parser 7: run facts. They sit on the record that carries them (a Codex
+	// turn_context, task or abort event; a Claude prompt, assistant line or
+	// system record); a run reads them from its records.
+	/** Codex turn_context `approval_policy`, `approvals_reviewer`, `sandbox_policy.type`, `permission_profile.type`, `collaboration_mode.mode`. */
+	approval_policy: 7,
+	approvals_reviewer: 7,
+	sandbox_policy: 7,
+	/** Codex turn_context `sandbox_policy.network_access` (true/false). */
+	sandbox_network_access: 7,
+	permission_profile: 7,
+	collaboration_mode: 7,
+	/** Codex turn_context `model`; Claude assistant `message.model`. */
+	model: 7,
+	/** Codex turn_context `effort`; Claude assistant `effort`. */
+	effort: 7,
+	/** Claude assistant `perTurnEffort`. */
+	per_turn_effort: 7,
+	/** Codex task_started `model_context_window`. */
+	context_window: 7,
+	/** Codex task_complete `time_to_first_token_ms`. */
+	time_to_first_token_ms: 7,
+	/**
+	 * Codex task_complete `error.message`, and `error.codex_error_info`: its
+	 * text, or the variant tag of an object (`turn_error_info` keeps the
+	 * object as JSON).
+	 */
+	turn_error: 7,
+	turn_error_kind: 7,
+	turn_error_info: 7,
+	/** Codex `turn_id` of a turn_context, task_started, task_complete or turn_aborted: these precede the turn's prompt in the file, so readers join a turn's rows by it. */
+	turn_id: 7,
+	/** "true" on a Codex turn_aborted; a Claude record's `interruptedByShutdown` (true/false). */
+	aborted: 7,
+	/** Codex turn_aborted `reason`. */
+	abort_reason: 7,
+	/** Codex thread_goal_updated `goal.objective` (the full text is the row's text), `status`, `tokensUsed`, `timeUsedSeconds`. */
+	goal: 7,
+	goal_status: 7,
+	goal_tokens_used: 7,
+	goal_time_used_seconds: 7,
+	/** Claude user record `permissionMode`. */
+	permission_mode: 7,
+	/** Claude assistant `message.stop_reason`. */
+	stop_reason: 7,
+	/** Claude `auto_mode` attachment flags (true/false; `bashFirstSteer` is text, e.g. relaxed). */
+	auto_mode_bash_first: 7,
+	auto_mode_bash_first_steer: 7,
+	auto_mode_bypass: 7,
+	auto_mode_steer_only: 7,
+	auto_mode_consent_flow: 7,
+	/** Claude compaction `compactMetadata.trigger` and `.preTokens`. */
+	compact_trigger: 7,
+	compact_pre_tokens: 7,
+	/** Claude stop_hook_summary `stopReason`, `preventedContinuation` (true/false), `hookCount`. */
+	hook_stop_reason: 7,
+	prevented_continuation: 7,
+	hook_count: 7,
+	/** Claude stop_hook_summary `hookErrors` and `hookInfos[{command, durationMs}]`, as JSON arrays cut to whole entries. */
+	hook_errors: 7,
+	hook_runs: 7,
+	/** Entries cut from `hook_errors`, `hook_runs`, `spawned_thread_ids` by the list cap. */
+	hook_errors_more: 7,
+	hook_runs_more: 7,
+	spawned_thread_ids_more: 7,
+	/** Comma-separated keys of this record whose value (or a list entry) was cut at its cap. */
+	facts_clipped: 7,
+	/** Claude assistant API error `error` and `apiErrorStatus`. */
+	api_error: 7,
+	api_error_status: 7,
+	/** Claude system api_error `retryAttempt`, `maxRetries`, `retryInMs`. */
+	retry_attempt: 7,
+	max_retries: 7,
+	retry_in_ms: 7,
+	/** Claude model_refusal records `apiRefusalCategory`, `originalModel`, `fallbackModel`. */
+	refusal_category: 7,
+	original_model: 7,
+	fallback_model: 7,
+	/** Codex SubAgentActivity `agent_thread_id` / CollabAgentToolCall `receiver_thread_ids`, as a JSON array. */
+	spawned_thread_ids: 7,
 } as const satisfies Record<string, number>;
 
 export type TranscriptRecordFactKey = keyof typeof TRANSCRIPT_RECORD_FACT_KEYS;

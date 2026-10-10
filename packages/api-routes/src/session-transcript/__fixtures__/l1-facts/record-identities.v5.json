@@ -123,7 +123,20 @@
 		"|34|0|1|tool_result|",
 		"|35|0|1|tool_call|",
 		"|36|0|1|tool_result|",
-		"|37|0|2|user_prompt|"
+		"|37|0|2|user_prompt|",
+		"|38|0|2|meta|attachment:auto_mode",
+		"|39|0|2|assistant_text|",
+		"|40|0|2|meta|api_error_message",
+		"|41|0|2|meta|system:api_error",
+		"|42|0|2|meta|system:model_refusal_fallback",
+		"|43|0|2|meta|system:stop_hook_summary:prevented",
+		"|44|0|2|compaction|compact_boundary",
+		"|45|0|3|user_prompt|",
+		"|46|0|3|tool_call|",
+		"|47|0|3|tool_result|",
+		"|47|1|4|user_prompt|",
+		"|48|0|4|meta|system:stop_hook_summary",
+		"|49|0|4|user_prompt|"
 	],
 	"l1-facts/codex-0.156.jsonl": [
 		"|1|0|0|meta|session_meta",
@@ -144,6 +157,16 @@
 		"|14|0|1|tool_call|",
 		"|15|0|1|tool_result|running",
 		"|16|0|1|meta|item_completed:CommandExecution_mirror",
-		"/root/worker|17|0|0|assistant_text|"
+		"|17|0|1|meta|turn_context",
+		"|18|0|1|meta|task_started",
+		"|19|0|1|meta|item_completed:SubAgentActivity",
+		"|20|0|1|meta|item_completed:CollabAgentToolCall",
+		"|21|0|1|meta|task_complete",
+		"|22|0|1|meta|task_complete",
+		"|23|0|1|meta|turn_aborted",
+		"|24|0|1|meta|thread_goal_updated",
+		"|25|0|1|meta|task_complete",
+		"|26|0|1|meta|item_completed:CollabAgentToolCall",
+		"/root/worker|27|0|0|assistant_text|"
 	]
 }
