@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+	FACT_AGENTS,
+	FACT_CATALOG,
 	type NO_TRANSCRIPT_RECORD_FACTS,
 	splitSessionTranscript,
 	TRANSCRIPT_RECORD_FACT_KEYS,
@@ -193,5 +195,60 @@ describe("run index columns", () => {
 		const parser7 = gateRunIndexRow({ ...row, parser_version: 7 });
 		expect(parser7.denied_calls).toBeNull();
 		expect(parser7.unrecorded_facts).toContain("denied_calls");
+	});
+});
+
+describe("run index columns and the L1 fact catalog", () => {
+	test("every fact column is named by one catalog entry, which stores its facts for exactly the column's agents, from the column's version", () => {
+		const problems: string[] = [];
+		for (const [column, gate] of COLUMNS) {
+			const entries = FACT_CATALOG.filter((entry) =>
+				entry.runIndex?.includes(column),
+			);
+			if (entries.length !== 1) {
+				problems.push(`${column}: named by ${entries.length} catalog entries`);
+				continue;
+			}
+			const [entry] = entries;
+			if (entry === undefined) continue;
+			for (const agent of FACT_AGENTS) {
+				const fact = entry.agents[agent];
+				const stored = fact.status === "stored" || fact.status === "wrong";
+				const facts: readonly string[] = stored
+					? (fact.stores.facts ?? [])
+					: [];
+				const reads = gate.facts.filter((source) => facts.includes(source));
+				if (gate.agents.includes(agent)) {
+					if (!stored)
+						problems.push(
+							`${column}: ${entry.id} is ${fact.status} for ${agent}`,
+						);
+					else if (gate.facts.length > 0 && reads.length !== gate.facts.length)
+						problems.push(
+							`${column}: ${entry.id} does not store ${gate.facts.join(", ")} for ${agent}`,
+						);
+					else if (
+						gate.facts.length > 0 &&
+						fact.stores.since !== (gate.sinceBy?.[agent] ?? gate.since)
+					)
+						problems.push(
+							`${column}: ${entry.id} stores it for ${agent} since ${fact.stores.since}, the column since ${gate.sinceBy?.[agent] ?? gate.since}`,
+						);
+				} else if (reads.length > 0)
+					problems.push(
+						`${column}: ${entry.id} stores ${reads.join(", ")} for ${agent}, which the column does not read`,
+					);
+			}
+		}
+		expect(problems).toEqual([]);
+	});
+
+	test("every run_index column a catalog entry names exists", () => {
+		const columns = new Set<string>(COLUMNS.map(([column]) => column));
+		expect(
+			FACT_CATALOG.flatMap((entry) => entry.runIndex ?? []).filter(
+				(column) => !columns.has(column),
+			),
+		).toEqual([]);
 	});
 });

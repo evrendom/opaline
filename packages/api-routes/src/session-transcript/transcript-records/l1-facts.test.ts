@@ -1,4 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import {
+	type AgentFact,
+	type CatalogFactField,
+	type CatalogRecordColumn,
+	FACT_AGENTS,
+	FACT_CATALOG,
+	type FactAgent,
+	factCatalogIndex,
+} from "./fact-catalog.js";
 import {
 	claudeInstructionFacts,
 	claudeSystemFacts,
@@ -11,6 +21,7 @@ import { splitSessionTranscript } from "./split-transcript.js";
 import {
 	NO_TRANSCRIPT_RECORD_FACTS,
 	TRANSCRIPT_RECORD_FACT_KEYS,
+	TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	type TranscriptRecordDraft,
 	type TranscriptRecordFacts,
@@ -18,16 +29,28 @@ import {
 } from "./types.js";
 
 /**
- * The literal facts of docs/l1-literal-schema.md (step 7), one fixture case
- * per fact, from real Claude Code 2.1.29x and Codex 0.156 lines with values
- * replaced. The spec checks below fail when a raw or text fact in the spec is
- * neither stored nor listed as pending, or when a stored fact loses its case.
+ * The literal facts of the L1 fact catalog (fact-catalog.ts), one fixture
+ * case per stored fact and agent, from real Claude Code 2.1.29x and Codex
+ * 0.156 lines with values replaced. The catalog checks below fail when a
+ * registered fact or a fact of docs/l1-literal-schema.md has no catalog
+ * entry, when a stored fact loses its case for an agent, or when an entry
+ * lacks its evidence (a search for an absence, a plan for a gap or a bug).
+ * Cases of facts the catalog marks `wrong` pin today's behaviour; the fix
+ * changes both.
  */
 
 const FIXTURES = {
 	claude: "l1-facts/claude-2.1.jsonl",
 	codex: "l1-facts/codex-0.156.jsonl",
+	codexDirect: "codex-direct-era.jsonl",
+	codexEndEvent: "codex-end-event-era.jsonl",
+	codexCustomExec: "codex-custom-exec-era.jsonl",
 } as const;
+
+/** The agent that wrote each fixture. */
+function fixtureAgent(fixture: keyof typeof FIXTURES): FactAgent {
+	return FIXTURES[fixture].includes("claude") ? "claude_code" : "codex";
+}
 const IDENTITY_FIXTURES = [
 	"claude-subagent-turns.jsonl",
 	"codex-custom-exec-era.jsonl",
@@ -37,9 +60,6 @@ const IDENTITY_FIXTURES = [
 	FIXTURES.claude,
 	FIXTURES.codex,
 ] as const;
-
-type TypedFact = Exclude<keyof TranscriptRecordFacts, "extra">;
-type FactField = TypedFact | keyof typeof TRANSCRIPT_RECORD_FACT_KEYS;
 
 const drafts = new Map<string, TranscriptRecordDraft[]>();
 
@@ -75,11 +95,13 @@ interface FactCase {
 		readonly kind: string;
 		readonly subtype?: string;
 	};
-	readonly facts: Partial<Omit<TranscriptRecordFacts, "extra">> & {
+	readonly facts?: Partial<Omit<TranscriptRecordFacts, "extra">> & {
 		readonly extra?: Partial<
 			Record<keyof typeof TRANSCRIPT_RECORD_FACT_KEYS, string>
 		>;
 	};
+	/** Record columns the row holds (facts stored as columns, not facts). */
+	readonly columns?: Partial<Pick<TranscriptRecordDraft, CatalogRecordColumn>>;
 }
 
 const CASES: readonly FactCase[] = [
@@ -671,6 +693,144 @@ const CASES: readonly FactCase[] = [
 		row: { callId: "nested_reads", kind: "tool_result" },
 		facts: { extra: { parsed_cmd_read_paths_more: "8" } },
 	},
+	{
+		name: "Claude tool, call id and command",
+		fixture: "claude",
+		row: { callId: "toolu_push", kind: "tool_call" },
+		columns: {
+			callId: "toolu_push",
+			text: "git push -u origin fix/login",
+			toolName: "Bash",
+		},
+	},
+	{
+		name: "Claude result length",
+		fixture: "claude",
+		row: { callId: "toolu_push", kind: "tool_result" },
+		columns: { textChars: 54 },
+	},
+	{
+		name: "Claude refused call is an error",
+		fixture: "claude",
+		row: { callId: "toolu_rm", kind: "tool_result" },
+		columns: { exitCode: null, isError: true },
+	},
+	{
+		name: "a refused Claude rm still becomes a delete (file_op is wrong until parser 9)",
+		fixture: "claude",
+		row: { callId: "toolu_rm", kind: "file_change" },
+		columns: { fileOp: "delete", filePath: "node_modules" },
+	},
+	{
+		name: "Claude native edit",
+		fixture: "claude",
+		row: { callId: "toolu_edit", kind: "file_change" },
+		columns: { fileOp: "edit", filePath: "/repo/src/a.ts" },
+	},
+	{
+		name: "Claude sub-agent the call started",
+		fixture: "claude",
+		row: { callId: "toolu_agent", kind: "tool_result" },
+		columns: { spawnedAgentId: "a1b2c3" },
+	},
+	{
+		name: "Claude search input",
+		fixture: "claude",
+		row: { callId: "toolu_grep", kind: "tool_call" },
+		columns: {
+			text: '{"pattern":"TODO","output_mode":"files_with_matches"}',
+		},
+	},
+	{
+		name: "Claude compaction boundary",
+		fixture: "claude",
+		row: { kind: "compaction" },
+		columns: { kind: "compaction", subtype: "compact_boundary" },
+	},
+	{
+		name: "Claude prompt",
+		fixture: "claude",
+		row: { kind: "user_prompt", text: "ship the fix" },
+		columns: {
+			kind: "user_prompt",
+			subtype: "",
+			text: "ship the fix and open a PR",
+			textChars: 26,
+		},
+	},
+	{
+		name: "Codex tool, call id and command",
+		fixture: "codex",
+		row: { callId: "call_cmd", kind: "tool_call" },
+		columns: {
+			callId: "call_cmd",
+			text: "bun run build",
+			toolName: "exec_command",
+		},
+	},
+	{
+		name: "Codex result length and exit code",
+		fixture: "codex",
+		row: { callId: "call_cmd", kind: "tool_result" },
+		columns: { exitCode: 0, isError: false, textChars: 2 },
+	},
+	{
+		name: "a refused Codex call is not an error (is_error is wrong until parser 9)",
+		fixture: "codex",
+		row: { callId: "call_rejected", kind: "tool_result" },
+		columns: { exitCode: null, isError: false },
+	},
+	{
+		name: "a Codex output still running",
+		fixture: "codex",
+		row: { callId: "call_late", kind: "tool_result", subtype: "running" },
+		columns: { exitCode: null, subtype: "running" },
+	},
+	{
+		name: "a late Codex completion keeps no exit code (exit_code is wrong until parser 9)",
+		fixture: "codex",
+		row: {
+			callId: "call_late",
+			kind: "meta",
+			subtype: "item_completed:CommandExecution_mirror",
+		},
+		columns: { exitCode: null, isError: false },
+	},
+	{
+		name: "Codex prompt",
+		fixture: "codex",
+		row: { kind: "user_prompt" },
+		columns: {
+			kind: "user_prompt",
+			subtype: "",
+			text: "check the build",
+			textChars: 15,
+		},
+	},
+	{
+		name: "Codex failed command",
+		fixture: "codexDirect",
+		row: { callId: "failure", kind: "tool_result" },
+		columns: { exitCode: 127, isError: true },
+	},
+	{
+		name: "Codex patch file",
+		fixture: "codexDirect",
+		row: { callId: "direct-patch", kind: "file_change" },
+		columns: { fileOp: "write", filePath: "src/new.ts" },
+	},
+	{
+		name: "a failed Codex patch still writes its file (file_op is wrong until parser 9)",
+		fixture: "codexEndEvent",
+		row: { callId: "failed-patch", kind: "file_change" },
+		columns: { fileOp: "write", filePath: "failed.ts" },
+	},
+	{
+		name: "Codex compaction",
+		fixture: "codexCustomExec",
+		row: { kind: "compaction" },
+		columns: { kind: "compaction", subtype: "compacted" },
+	},
 ];
 
 function findRow(
@@ -693,13 +853,14 @@ describe("parser facts", () => {
 		CASES.map((item) => [item.name, item] as const),
 	)("%s", async (_name, item) => {
 		const draft = findRow(await split(FIXTURES[item.fixture]), item.row);
-		const { extra, ...typed } = item.facts;
+		const { extra, ...typed } = item.facts ?? {};
 		expect(draft.facts).toMatchObject(typed);
 		if (extra !== undefined) {
 			if (Object.keys(extra).length === 0)
 				expect(draft.facts.extra).toEqual({});
 			else expect(draft.facts.extra).toMatchObject(extra);
 		}
+		if (item.columns !== undefined) expect(draft).toMatchObject(item.columns);
 	});
 
 	test("Codex outputs carry no completion facts: each fact lands once", async () => {
@@ -934,7 +1095,7 @@ describe("parser facts", () => {
 		expect(worker?.facts.entrypoint).toBe("codex_exec");
 	});
 
-	test("every emitted key is registered and every registered key has a case", async () => {
+	test("every emitted key is registered", async () => {
 		const registered = new Set(Object.keys(TRANSCRIPT_RECORD_FACT_KEYS));
 		for (const name of Object.values(FIXTURES)) {
 			for (const draft of await split(name)) {
@@ -942,21 +1103,31 @@ describe("parser facts", () => {
 					expect(registered).toContain(key);
 			}
 		}
-		const covered = new Set([
-			// Checked by the fact budget and goal text tests above.
-			"facts_truncated",
-			"goal",
-			...CASES.flatMap((item) => [
-				...Object.keys(item.facts),
-				...Object.keys(item.facts.extra ?? {}),
-			]),
-		]);
-		const typed = Object.keys(NO_TRANSCRIPT_RECORD_FACTS).filter(
-			(key) => key !== "extra",
-		);
-		for (const key of [...typed, ...registered]) expect(covered).toContain(key);
 		for (const since of Object.values(TRANSCRIPT_RECORD_FACT_KEYS))
 			expect(since).toBeLessThanOrEqual(TRANSCRIPT_RECORDS_PARSER_VERSION);
+	});
+
+	test("past the session fact budget, a Codex record says its long values were dropped", async () => {
+		const content = await Bun.file(
+			new URL(`../__fixtures__/${FIXTURES.codex}`, import.meta.url),
+		).text();
+		const rows = [
+			...splitSessionTranscript({
+				content,
+				factBudgetChars: 0,
+				sessionDate: "2026-10-01T09:00:00.000Z",
+				source: "codex",
+			}),
+		];
+		const reads = findRow(rows, {
+			callId: "call_cmd",
+			kind: "meta",
+			subtype: "item_completed:CommandExecution_mirror",
+		});
+		expect(reads.facts.extra).toEqual({
+			facts_truncated: "true",
+			parsed_cmd_types: JSON.stringify(["read", "unknown"]),
+		});
 	});
 
 	test("record identities match parser v5, so run ids and edges stay stable", async () => {
@@ -982,142 +1153,52 @@ describe("parser facts", () => {
 	});
 });
 
-/**
- * Spec facts the parser stores, by `<view>.<column>`, with the fact fields
- * that carry each. Every field needs a case above.
- */
-const STORED: Readonly<Record<string, readonly FactField[]>> = {
-	"calls.denial_kind": ["denialKind"],
-	"calls.return_code_interpretation": ["return_code_interpretation"],
-	"calls.duration_ms": ["durationMs"],
-	"calls.timed_out_after_ms": ["timedOutAfterMs"],
-	"calls.timeout_ms": ["timeout_ms"],
-	"calls.is_async": ["is_async"],
-	"calls.background_task_id": ["background_task_id"],
-	"calls.interrupted": ["interrupted"],
-	"calls.no_output_expected": ["no_output_expected"],
-	"calls.stdout_chars": ["stdout_chars"],
-	"calls.stderr_chars": ["stderr_chars"],
-	"calls.persisted_output_bytes": ["persisted_output_bytes"],
-	"calls.shell_edit_files": [
-		"shell_edit_files",
-		"shell_edit_files_more",
-		"shell_edit_changed_files",
-		"shell_edit_changed_files_more",
-		"shell_edit_unavailable",
-		"shell_edit_shared",
-	],
-	"calls.git_operation": [
-		"gitOperation",
-		"git.push.branch",
-		"git.pr.number",
-		"git.pr.action",
-		"git.pr.url",
-		"git.commit.sha",
-		"git.commit.kind",
-		"git.branch.ref",
-		"git.branch.action",
-	],
-	"calls.mcp_server": ["mcpServer"],
-	"calls.mcp_tool": ["mcpTool"],
-	"calls.mcp_read_only": ["mcp_read_only"],
-	"calls.patch_lines_added": ["patch_lines_added"],
-	"calls.patch_lines_removed": ["patch_lines_removed"],
-	"calls.user_modified": ["user_modified"],
-	"calls.stale_read": ["stale_read"],
-	"calls.search_matches": ["search_matches"],
-	"calls.attribution_skill": ["attributionSkill"],
-	"calls.attribution_plugin": ["attribution_plugin"],
-	"calls.spawned_agent_id": ["spawned_thread_ids"],
-	"runs.duration_ms": ["durationMs"],
-	"runs.time_to_first_token_ms": ["time_to_first_token_ms"],
-	"runs.permission_mode": ["permission_mode"],
-	"runs.auto_mode_*": [
-		"auto_mode_bash_first",
-		"auto_mode_bash_first_steer",
-		"auto_mode_bypass",
-		"auto_mode_steer_only",
-		"auto_mode_consent_flow",
-	],
-	"runs.approval_policy": ["approval_policy"],
-	"runs.approvals_reviewer": ["approvals_reviewer"],
-	"runs.sandbox_policy": ["sandbox_policy", "sandbox_network_access"],
-	"runs.permission_profile": ["permission_profile", "collaboration_mode"],
-	"runs.model": ["model"],
-	"runs.effort": ["effort", "per_turn_effort"],
-	"runs.context_window": ["context_window"],
-	"runs.compact_trigger": ["compact_trigger"],
-	"runs.compact_pre_tokens": ["compact_pre_tokens"],
-	"runs.aborted": ["aborted"],
-	"runs.abort_reason": ["abort_reason"],
-	"runs.turn_error": ["turn_error", "turn_error_kind"],
-	"runs.stop_reason": ["stop_reason"],
-	"runs.hook_stop_reason": ["hook_stop_reason"],
-	"runs.hook_errors": ["hook_errors", "hook_count"],
-	"runs.prevented_continuation": ["prevented_continuation"],
-	"runs.hook_runs": ["hook_runs"],
-	"runs.api_errors": ["api_error", "api_error_status"],
-	"runs.retry_attempts": ["retry_attempt", "max_retries", "retry_in_ms"],
-	"runs.refusals": ["refusal_category", "original_model"],
-	"runs.fallback_model": ["fallback_model"],
-	"runs.goal": [
-		"goal",
-		"goal_status",
-		"goal_tokens_used",
-		"goal_time_used_seconds",
-	],
-	"runs.prompt_origin": [
-		"turn_origin",
-		"prompt_source",
-		"origin_kind",
-		"trigger_turn",
-		"thread_source",
-	],
-	"prompts.prompt_origin": [
-		"turn_origin",
-		"prompt_source",
-		"origin_kind",
-		"trigger_turn",
-		"thread_source",
-	],
-	"prompts.instruction_path": ["instruction_paths", "instruction_paths_more"],
-	"session.cost_state": [
-		"cost_usd",
-		"lines_added",
-		"lines_removed",
-		"tool_duration_ms",
-		"api_duration_ms",
-		"api_duration_without_retries_ms",
-		"has_unknown_model_cost",
-	],
-	"session.title": ["title"],
-	"calls.skill": ["skill"],
-	"calls.parsed_cmd_types": ["parsed_cmd_types"],
-	"calls.denial_reason": ["denial_reason"],
-	"calls.parsed_cmd_read_paths": [
-		"parsed_cmd_read_paths",
-		"parsed_cmd_read_paths_more",
-	],
-	"runs.entrypoint": ["entrypoint"],
-	"runs.agent_version": ["agentVersion"],
-	"runs.pr_repository": ["pr_repository"],
-	"runs.pr_number": ["pr_number", "pr_url"],
+/** Facts checked by the named tests above rather than a case, per agent. */
+const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
+	// The fact budget tests.
+	claude_code: new Set(["facts_truncated"]),
+	// The fact budget and goal text tests.
+	codex: new Set(["facts_truncated", "goal"]),
 };
 
-/** Facts whose typed column predates them: the run duration came with parser 7. */
-const STORED_SINCE: Readonly<Record<string, number>> = {
-	"runs.duration_ms": 7,
-};
+/** Fact fields and record columns each agent's cases assert. */
+function caseCoverage(): Map<FactAgent, Set<string>> {
+	const coverage = new Map<FactAgent, Set<string>>(
+		FACT_AGENTS.map((agent) => [agent, new Set(COVERED_ELSEWHERE[agent])]),
+	);
+	for (const item of CASES) {
+		const covered = coverage.get(fixtureAgent(item.fixture));
+		for (const key of [
+			...Object.keys(item.facts ?? {}),
+			...Object.keys(item.facts?.extra ?? {}),
+			...Object.keys(item.columns ?? {}).map((column) => `record.${column}`),
+		])
+			if (key !== "extra") covered?.add(key);
+	}
+	return coverage;
+}
 
-/** Raw or text spec facts not stored yet, with where they land. */
-const PENDING: Readonly<Record<string, string>> = {
-	"calls.attribution_agent": "no non-null value seen yet; needs a fixture",
-	"runs.context_input_tokens_at_start": "usage events, not the parser",
-	"runs.compacted": "compaction records (kind), not a fact",
-	"runs.pushed_shas":
-		"push output (regex); gitOperation records only the branch",
-	"prompts.instruction_sha256": "not in transcripts; drift census (step 11)",
-};
+type Stored = Extract<AgentFact, { status: "stored" | "wrong" }>;
+
+function storedFacts(): { id: string; agent: FactAgent; fact: Stored }[] {
+	return FACT_CATALOG.flatMap((entry) =>
+		FACT_AGENTS.flatMap((agent) => {
+			const fact = entry.agents[agent];
+			return fact.status === "stored" || fact.status === "wrong"
+				? [{ id: `${entry.view}.${entry.id}`, agent, fact }]
+				: [];
+		}),
+	);
+}
+
+/** The parser version that registered a fact field. */
+function registeredSince(field: CatalogFactField): number {
+	return field in TRANSCRIPT_RECORD_FACT_KEYS
+		? TRANSCRIPT_RECORD_FACT_KEYS[
+				field as keyof typeof TRANSCRIPT_RECORD_FACT_KEYS
+			]
+		: TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION;
+}
 
 interface SpecFact {
 	readonly id: string;
@@ -1159,50 +1240,106 @@ async function readSpecFacts(): Promise<SpecFact[]> {
 	return facts;
 }
 
-describe("L1 spec drift", () => {
-	test("every raw or text fact in the spec is stored or pending", async () => {
+describe("L1 fact catalog", () => {
+	test("every registered fact key and typed fact column is stored by an entry", () => {
+		const typed = Object.keys(NO_TRANSCRIPT_RECORD_FACTS).filter(
+			(key) => key !== "extra",
+		);
+		const stored = new Set(
+			storedFacts().flatMap(({ fact }) => fact.stores.facts ?? []),
+		);
+		const missing = [
+			...typed,
+			...Object.keys(TRANSCRIPT_RECORD_FACT_KEYS),
+		].filter((key) => !stored.has(key as CatalogFactField));
+		expect(missing).toEqual([]);
+	});
+
+	test("each stored fact names the parser version that stores it, no earlier than its registry version", () => {
+		const problems: string[] = [];
+		for (const { id, agent, fact } of storedFacts()) {
+			const { facts = [], record = [], since } = fact.stores;
+			if (facts.length === 0 && record.length === 0) continue;
+			const earliest = Math.max(1, ...facts.map(registeredSince));
+			if (
+				since === undefined ||
+				since < earliest ||
+				since > TRANSCRIPT_RECORDS_PARSER_VERSION
+			)
+				problems.push(
+					`${id} (${agent}): since ${since}, registered ${earliest}`,
+				);
+		}
+		expect(problems).toEqual([]);
+	});
+
+	test("every stored fact has a fixture case for its agent", () => {
+		const coverage = caseCoverage();
+		const uncovered: string[] = [];
+		for (const { id, agent, fact } of storedFacts()) {
+			const covered = coverage.get(agent) ?? new Set<string>();
+			const { facts = [], record = [], elsewhere } = fact.stores;
+			for (const field of facts)
+				if (!covered.has(field)) uncovered.push(`${id} ${agent} ${field}`);
+			for (const column of record)
+				if (!covered.has(`record.${column}`) && fact.testedIn === undefined)
+					uncovered.push(`${id} ${agent} record.${column}`);
+			if (
+				facts.length === 0 &&
+				record.length === 0 &&
+				(elsewhere === undefined || fact.testedIn === undefined)
+			)
+				uncovered.push(`${id} ${agent}: stored elsewhere needs a test`);
+		}
+		expect(uncovered).toEqual([]);
+	});
+
+	test("every entry carries its evidence: a search for an absence, a plan for a gap or a bug", () => {
+		const root = new URL("../../../../../", import.meta.url).pathname;
+		const problems: string[] = [];
+		for (const entry of FACT_CATALOG) {
+			if (entry.meaning.trim() === "" || !entry.meaning.endsWith("."))
+				problems.push(`${entry.id}: meaning must be one sentence`);
+			for (const agent of FACT_AGENTS) {
+				const fact = entry.agents[agent];
+				const label = `${entry.view}.${entry.id} (${agent})`;
+				if (fact.status === "not_recorded" && fact.searched.trim() === "")
+					problems.push(`${label}: not_recorded without searched`);
+				if (
+					(fact.status === "pending" || fact.status === "wrong") &&
+					fact.plan.trim() === ""
+				)
+					problems.push(`${label}: ${fact.status} without a plan`);
+				if (fact.status === "stored" && fact.gap !== undefined) {
+					if (fact.gap.sources.length === 0 || fact.gap.plan.trim() === "")
+						problems.push(`${label}: a gap needs sources and a plan`);
+				}
+				if (
+					(fact.status === "stored" || fact.status === "wrong") &&
+					fact.testedIn !== undefined &&
+					!existsSync(`${root}${fact.testedIn}`)
+				)
+					problems.push(`${label}: ${fact.testedIn} does not exist`);
+			}
+		}
+		expect(problems).toEqual([]);
+	});
+
+	test("entries are unique by view and name", () => {
+		const names = FACT_CATALOG.flatMap((entry) =>
+			[entry.view, ...(entry.alsoIn ?? [])].flatMap((view) =>
+				[entry.id, ...(entry.also ?? [])].map((id) => `${view}.${id}`),
+			),
+		);
+		expect(names.length).toBe(new Set(names).size);
+	});
+
+	test("every fact of the spec's view and session tables has a catalog entry", async () => {
 		const facts = await readSpecFacts();
 		expect(facts.length).toBeGreaterThan(50);
-		const unplanned = facts.filter(
-			(fact) =>
-				/\b(raw|text|parser v\d+)\b/u.test(fact.today) &&
-				STORED[fact.id] === undefined &&
-				PENDING[fact.id] === undefined,
+		const index = factCatalogIndex();
+		expect(facts.map((fact) => fact.id).filter((id) => !index.has(id))).toEqual(
+			[],
 		);
-		expect(unplanned.map((fact) => fact.id)).toEqual([]);
-	});
-
-	test("the spec marks every stored fact with the parser version that stores it", async () => {
-		const facts = new Map(
-			(await readSpecFacts()).map((fact) => [fact.id, fact]),
-		);
-		for (const [id, fields] of Object.entries(STORED)) {
-			// The newest field decides; typed columns arrived with parser 6.
-			const since =
-				STORED_SINCE[id] ??
-				Math.max(
-					6,
-					...fields.map((field) =>
-						field in TRANSCRIPT_RECORD_FACT_KEYS
-							? TRANSCRIPT_RECORD_FACT_KEYS[
-									field as keyof typeof TRANSCRIPT_RECORD_FACT_KEYS
-								]
-							: 6,
-					),
-				);
-			expect(
-				`${id}: ${facts.get(id)?.today ?? "missing from the spec"}`,
-			).toContain(`parser v${since}`);
-		}
-	});
-
-	test("pending facts are in the spec and not stored", async () => {
-		const facts = new Map(
-			(await readSpecFacts()).map((fact) => [fact.id, fact]),
-		);
-		for (const id of Object.keys(PENDING)) {
-			expect(facts.has(id)).toBe(true);
-			expect(STORED[id]).toBeUndefined();
-		}
 	});
 });

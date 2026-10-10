@@ -6,7 +6,7 @@ L1 is the deterministic layer every analysis reads: what the transcripts, usage 
 
 1. **Literal values.** A column holds what the source recorded (`permission-rule`, `workspace-write`, `interrupted`), under one name for both agents. No labels, scores, buckets or archetypes.
 2. **Unknown is not false.** Every fact is nullable or has an explicit empty value meaning "not recorded". Each row carries `source` (agent) and `agent_version`, so a missing value can be told apart from a version that never emits it.
-3. **Replayable.** Facts come from the parser (`TRANSCRIPT_RECORDS_PARSER_VERSION`) over the stored raw transcript, kept for 365 days. Slimming keeps every record but replaces inline images with markers, and the secret filter redacts matched credentials, so only what survives both can be replayed. Adding a fact the stored transcript carries means a parser bump and `backfill:transcript-records`; facts the transcript never records (approved permission prompts) need capture.
+3. **Replayable.** Facts come from the parser (`TRANSCRIPT_RECORDS_PARSER_VERSION`) over the stored raw transcript, kept for 365 days. Slimming keeps every record but replaces inline images with markers, and the secret filter redacts matched credentials, so only what survives both can be replayed. Adding a fact the stored transcript carries means a parser bump and `backfill:transcript-records`; facts the transcript never records (the upload mode) need capture.
 4. **Coverage is a fact.** What was not captured (a member who does not upload, a repository without the GitHub App, an extraction that hit its bounds) is stored and reported, not silently missing.
 5. **Narrow interface.** The analysis agent sees three views (`calls`, `runs`, `prompts`) behind `find`, a schema reference and premade queries. New facts add columns and enum values, not tools or parameters.
 6. **Evidence, entities, edges.** Evidence is immutable and replaced only by a new generation; entities (pull requests, commits, CI run attempts) are one full row per version; relationships are edge rows written by one reconciliation worker, each naming its `relation`, `basis` and witness `evidence_id`. Inferences are candidates, kept out of L1. `find` reads; it does not resolve.
@@ -14,86 +14,86 @@ L1 is the deterministic layer every analysis reads: what the transcripts, usage 
 
 ## Views
 
-Each view is one row per thing, keyed by `(organization_id, user_id, session_id, agent_id, …)` and pinned to the committed transcript-records generation. "Today" says where the fact lives now: **stored** (typed column), **text** (only inside record text), **raw** (only in the raw transcript), **none** (not captured), **join** (inputs stored, join not built).
+Each view is one row per thing, keyed by `(organization_id, user_id, session_id, agent_id, …)` and pinned to the committed transcript-records generation. What each agent records for every fact, and what Opaline stores today (with the parser version, the plan for what is missing, and how an absence was checked), is the generated [fact matrix](l1-fact-matrix.md). It is built from the fact catalog (`packages/api-routes/src/session-transcript/transcript-records/fact-catalog.ts`), which the parser tests check against this spec, the fact registry and the fixtures, and which also lists facts the agents record that the tables below do not name yet.
 
 ### `calls`: one row per tool call, its result joined
 
-| Column | Claude source | Codex source | Today |
-|---|---|---|---|
-| `tool_name`, `call_id` | `tool_use.name`, `.id` | `function_call` / `custom_tool_call` / `item_completed.item` | stored |
-| `input_text` | `tool_use.input` (Bash `command`) | `arguments`, `command` | stored (`text`, 64K cap) |
-| `command_argv0`, `command_prefix` | first words of the shell command | `parsed_cmd`, `command` | none |
-| `command_fingerprint`, `command_simhash` | normalized command / written script | same | none |
-| `is_error`, `exit_code` | `tool_result.is_error`, transport framing | `exit_code`, `status = failed` | stored |
-| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded: the variant at the start of a refused call's output (`Codex(Sandbox(Denied …`, `Rejected(…`) | stored (Claude, parser v6; Codex `Sandbox(Denied)`/`Rejected`, parser v8) |
-| `denial_reason` | none | the message of a `Rejected("…")` refusal (`rejected by user`, `` `<command>` rejected: blocked by policy ``) | stored (Codex, parser v8) |
-| `return_code_interpretation` | `toolUseResult.returnCodeInterpretation` | none | stored (parser v6) |
-| `duration_ms` | `toolUseResult.durationMs` / `durationSeconds` | `item.duration`, `completed_at_ms - started_at_ms` | stored (parser v6) |
-| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | `exec_command` argument `timeout_ms` (the limit; Codex records no timed-out call) | stored (parser v6; Codex `timeout_ms`, parser v8) |
-| `is_async`, `background_task_id` | `toolUseResult.isAsync`, `backgroundTaskId`, input `run_in_background` | running preamble | stored (Claude, parser v6); subtype `running` (Codex) |
-| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | a stopped call's output `aborted by user after <s>s` (with its duration); `turn_aborted` for the run | stored (Claude, parser v6; Codex calls, parser v8) |
-| `stdout_chars`, `stderr_chars`, `persisted_output_bytes` | `toolUseResult.stdout`, `stderr`, `persistedOutputSize` | `stdout`, `stderr`, `aggregated_output` | stored (Claude, parser v6); text (Codex, merged) |
-| `result_chars` | result text | output text | stored (`text_chars`) |
-| `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` | stored (Claude, parser v6) |
-| `git_operation` | `toolUseResult.gitOperation` (`push`, `pr`, `branch`, `commit`) | none (observations parser) | stored (parser v6) |
-| `mcp_server`, `mcp_tool`, `mcp_read_only` | `attributionMcpServer`, `attributionMcpTool`, `mcpMeta` | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` | stored (parser v6; `mcp_read_only` Codex only) |
-| `file_path`, `file_op` | Read/Write/Edit input | patch paths | stored |
-| `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` | stored (Claude, parser v6); Codex in `file_change` text |
-| `stale_read` | `toolUseResult.staleReadFileStateHint` | none | stored (parser v6) |
-| `search_matches` | `toolUseResult.numFiles`, `matches` | none | stored (`numFiles`, parser v6) |
-| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` | stored (Claude); Codex thread ids stored (parser v7) |
-| `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` | skill (Claude) and plugin (Codex) stored (parser v6); rest raw |
-| `skill`, `parsed_cmd_types`, `parsed_cmd_read_paths` | `Skill` tool call `input.skill` (the invocation; `attributionSkill` marks the lines after it); a `Read` of a `SKILL.md` keeps its path | `CommandExecution.parsed_cmd`: Codex's own part types and the paths of its `read` parts (a skill is used by reading its `SKILL.md`) | stored (parser v8) |
-| `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `turn_context.cwd` | session-level only |
+| Column | Claude source | Codex source |
+|---|---|---|
+| `tool_name`, `call_id` | `tool_use.name`, `.id` | `function_call` / `custom_tool_call` / `item_completed.item` |
+| `input_text` | `tool_use.input` (Bash `command`) | `arguments`, `command` |
+| `command_argv0`, `command_prefix` | first words of the shell command | `parsed_cmd`, `command` |
+| `command_fingerprint`, `command_simhash` | normalized command / written script | same |
+| `is_error`, `exit_code` | `tool_result.is_error`, transport framing | `exit_code`, `status = failed` |
+| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded: the variant at the start of a refused call's output (`Codex(Sandbox(Denied …`, `Rejected(…`) |
+| `denial_reason` | the string `toolUseResult` of a refused or blocked result; a `PreToolUse:<tool> hook error` result | the message of a `Rejected("…")` refusal (`rejected by user`, `` `<command>` rejected: blocked by policy ``) |
+| `return_code_interpretation` | `toolUseResult.returnCodeInterpretation` | none |
+| `duration_ms` | `toolUseResult.durationMs` / `durationSeconds` | `item.duration`, `completed_at_ms - started_at_ms` |
+| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | `exec_command` argument `timeout_ms` (the limit; Codex records no timed-out call) |
+| `is_async`, `background_task_id` | `toolUseResult.isAsync`, `backgroundTaskId`, input `run_in_background` | running preamble |
+| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | a stopped call's output `aborted by user after <s>s` (with its duration); `turn_aborted` for the run |
+| `stdout_chars`, `stderr_chars`, `persisted_output_bytes` | `toolUseResult.stdout`, `stderr`, `persistedOutputSize` | `stdout`, `stderr`, `aggregated_output` |
+| `result_chars` | result text | output text |
+| `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` |
+| `git_operation` | `toolUseResult.gitOperation` (`push`, `pr`, `branch`, `commit`) | none (observations parser) |
+| `mcp_server`, `mcp_tool`, `mcp_read_only` | `attributionMcpServer`, `attributionMcpTool`, `mcpMeta` | `McpToolCall.server`, `.tool`, `.readOnlyHint`, `pluginId` |
+| `file_path`, `file_op` | Read/Write/Edit input | patch paths |
+| `patch_lines_added`, `patch_lines_removed`, `user_modified` | `toolUseResult.structuredPatch`, `userModified` | `FileChange.changes` |
+| `stale_read` | `toolUseResult.staleReadFileStateHint` | none |
+| `search_matches` | `toolUseResult.numFiles`, `matches` | none |
+| `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` |
+| `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` |
+| `skill`, `parsed_cmd_types`, `parsed_cmd_read_paths` | `Skill` tool call `input.skill` (the invocation; `attributionSkill` marks the lines after it); a `Read` of a `SKILL.md` keeps its path | `CommandExecution.parsed_cmd`: Codex's own part types and the paths of its `read` parts (a skill is used by reading its `SKILL.md`) |
+| `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `exec_command` argument `workdir`, `CommandExecution.cwd`, `turn_context.cwd`; the branch only in `session_meta.git` |
 
 Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (4M characters): past it a record drops them and says `facts_truncated`; short values are always kept. Prompt and session facts (parser v8) sit on the prompt's records (Claude `turnOrigin`, `promptSource`, `origin.kind`, not on tool results of the same line), the Codex `session_meta` and `inter_agent_communication_metadata` rows, the Claude `instructions` attachment (`instruction_paths`), `cost-state` rows (cumulative; the session's last one holds the totals) and `ai-title` rows (the title is also the row's text). Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
 
 ### `runs`: one row per run (one human prompt and everything until the next)
 
-| Column | Claude source | Codex source | Today |
-|---|---|---|---|
-| `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` | stored (`run_index`) |
-| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | stored (Codex, parser v7); per run in `run_index` |
-| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | stored (parser v8); prompt kind still by wrapper heuristic, which `run_index` names (`prompt_origin_basis`) |
-| `permission_mode` | `permissionMode` | none | stored (Claude, parser v7); per run in `run_index` |
-| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | stored (Claude, parser v7); per run in `run_index` |
-| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | stored (Codex, parser v7); per run in `run_index` |
-| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` | model stored (usage); model and effort per record stored (parser v7); per run in `run_index` |
-| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` | stored (parser v6, every record); per run in `run_index` |
-| `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) | stored; priced per run in `run_index` at build time (`pricing_version`), tokens by kind included |
-| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage | `context_window` stored (Codex, parser v7); start tokens from usage; both per run in `run_index` |
-| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` | boundary stored; trigger and pre-tokens stored (Claude, parser v7); `compactions` per run in `run_index` |
-| `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` | stored (`run_index`; `denied_calls` from `denial_kind`) |
-| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` | stored (parser v7); Claude interrupt markers in text, counted per run in `run_index` |
-| `stop_reason` | assistant `message.stop_reason` | none | stored (Claude, parser v7); per run in `run_index` |
-| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none | stored (Claude, parser v7); per run in `run_index` |
-| `hook_runs` (command, duration) | system `hookInfos` | none | stored (Claude, parser v7); per run in `run_index` |
-| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none | stored (Claude, parser v7); per run in `run_index` |
-| `goal` | none | `thread_goal_updated.goal` | stored (Codex, parser v7); per run in `run_index` |
-| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output | regex observations; `pr-link` stored (parser v6); `run_index` keeps the recorded branches, commit SHAs and PR URLs, and links follow the edges by `run_id` |
-| `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same | join |
-| `repository_id` | repository evidence index, GitHub binding | same | heuristic key in the UI, literal coalesce in analysis |
+| Column | Claude source | Codex source |
+|---|---|---|
+| `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` |
+| `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` |
+| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` |
+| `permission_mode` | `permissionMode` | none |
+| `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none |
+| `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` |
+| `model`, `effort` | `message.model`, `effort`, `perTurnEffort` | `turn_context.model`, `.effort` |
+| `entrypoint`, `agent_version` | `entrypoint`, `version` | `originator`, `cli_version` |
+| `cost_usd`, tokens by kind | `usage_events` | `usage_events` (`token_count`; `token_usage_record` unused) |
+| `context_window`, `context_input_tokens_at_start` | usage | `task_started.model_context_window`, usage |
+| `compacted`, `compact_trigger`, `compact_pre_tokens` | `compact_boundary`, `compactMetadata` | `compacted`, `compaction` |
+| `tool_calls`, `failed_calls`, `denied_calls`, `edits`, `reads`, `searches`, `not_found` | from `calls` | from `calls` |
+| `aborted`, `abort_reason`, `turn_error` | interrupt markers, `interruptedByShutdown` | `turn_aborted.reason`, `task_complete.error` |
+| `stop_reason` | assistant `message.stop_reason` | none |
+| `hook_stop_reason`, `hook_errors`, `prevented_continuation` | system `stopReason`, `hookErrors`, `preventedContinuation` | none |
+| `hook_runs` (command, duration) | system `hookInfos` | none |
+| `api_errors`, `retry_attempts`, `refusals`, `fallback_model` | `apiErrorStatus`, `retryAttempt`, `model_refusal*`, `fallbackModel` | none |
+| `goal` | none | `thread_goal_updated.goal` |
+| `pushed_shas`, `pr_repository`, `pr_number` | `pr-link` records, `gitOperation`, git output | git output |
+| `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same |
+| `repository_id` | repository evidence index, GitHub binding | same |
 
 ### `prompts`: one row per prompt or injected context
 
-| Column | Source | Today |
-|---|---|---|
-| `kind`, `subtype` | records (`user_prompt`, `injected_context`, `queued`, `delegation`) | stored; origin by wrapper heuristic |
-| `prompt_origin` | Claude `turnOrigin`, `promptSource`, `origin.kind`; Codex inter-agent metadata | stored (parser v8) |
-| `text`, `text_chars` | prompt text | stored |
-| `instruction_path`, `instruction_sha256` | `nested_memory` path, `instructions`, AGENTS.md injection | paths stored (Claude, parser v8); hash none |
-| `edited_by_user_path` | `attachment.edited_text_file` | stored (`file_path` on the injected-context row) |
+| Column | Source |
+|---|---|
+| `kind`, `subtype` | records (`user_prompt`, `injected_context`, `queued`, `delegation`) |
+| `prompt_origin` | Claude `turnOrigin`, `promptSource`, `origin.kind`; Codex inter-agent metadata |
+| `text`, `text_chars` | prompt text |
+| `instruction_path`, `instruction_sha256` | `nested_memory` path, `instructions`, AGENTS.md injection |
+| `edited_by_user_path` | `attachment.edited_text_file` |
 
 ## Session and workspace facts
 
-| Fact | Source | Today |
-|---|---|---|
-| `cost_state` (`totalCostUSD`, `totalLinesAdded`, `totalLinesRemoved`, `totalToolDuration`, `totalAPIDuration`) | Claude `cost-state` record | stored (Claude, parser v8) |
-| title | Claude `ai-title` | stored (Claude, parser v8) |
-| upload mode (`hook`, `manual`, `retry`) | CLI request | not stored |
-| member coverage (members uploading / members in workspace, per day) | `session_ownership` × membership | join |
-| instruction file versions per session | injected context, repository evidence | none |
-| permission prompts that were approved | not in transcripts; needs a capture hook | none |
+| Fact | Source |
+|---|---|
+| `cost_state` (`totalCostUSD`, `totalLinesAdded`, `totalLinesRemoved`, `totalToolDuration`, `totalAPIDuration`) | Claude `cost-state` record |
+| `title` | Claude `ai-title` |
+| `upload_mode` (`hook`, `manual`, `retry`) | CLI request |
+| `member_coverage` (members uploading / members in workspace, per day) | `session_ownership` × membership |
+| `instruction_file_versions` (per session) | injected context, repository evidence |
+| `approved_permission_prompts` | Claude `permissionDecision` on the result's line; Codex `sandbox_permissions` and `prefix_rule` arguments, approved command prefixes |
 
 ## Sessions, pull requests and CI
 
@@ -161,9 +161,9 @@ The CLI already captures CI workflows, `package.json` scripts, hooks, `AGENTS.md
 
 ## Drift, retention and capture gaps
 
-- **Drift.** Claude Code and Codex add transcript fields often. A recurring census lists, per agent and version, every raw field path the parsers do not map, so new facts become work items instead of silent losses. The smoke test at the parser fixture level fails when a fact in this spec stops landing in its column.
+- **Drift.** Claude Code and Codex add transcript fields often. The census (`bun run --cwd packages/api-routes facts:census -- <dir-or-file>...`, read-only) lists, per agent and version, every raw field path the fact catalog neither maps nor deliberately ignores, and the catalog sources the corpus never showed, so new facts become work items instead of silent losses. A test runs it over the parser fixtures, so every fixture field is catalogued or ignored; run it on local transcripts (`~/.claude/projects`, `~/.codex/sessions`) and, later, on a sample of production raw uploads. The parser fixture tests fail when a stored fact stops landing in its column.
 - **Retention.** Raw transcripts and `transcript_records` expire after 365 days. `run_index` keeps runs for 1,095 days from the session date (`RUN_INDEX_RETENTION_DAYS`); its free-text columns (prompt head, goal, turn and API errors, hook stop reasons, errors and runs, title) have a 365-day column TTL, so text never outlives the transcript and expired text reads NULL. The GitHub links and the weekly aggregates get their own, longer retention so findings stay comparable over time.
-- **Capture gaps.** Approved permission prompts are not in transcripts and need a capture hook. Sessions that were never uploaded can only be counted through coverage. Cost per tool call has no defensible allocation and stays per request and per run.
+- **Capture gaps.** Claude Code records permission decisions (`permissionDecision`) and Codex its escalation requests and approved command prefixes; reading them is pending, and whether a decision made by configuration counts as an approval is an open decision (see the [fact matrix](l1-fact-matrix.md)). Sessions that were never uploaded can only be counted through coverage. Cost per tool call has no defensible allocation and stays per request and per run.
 - **Scope.** Claude Code and Codex only.
 
 ## Joins
@@ -198,8 +198,8 @@ Existing data is brought up to each step with the backfills, in the order and wi
 4. Retirement step 3: stop writing, then drop storage, with the `session_analytics` migration.
 5. The edge table and reconciliation worker (ADR 0003), fed by the existing evidence; captures and snapshots published to ClickHouse; `find source=git` reads edges, and pull request → runs works in reverse. Built: the worker (its cron off until `L1_EDGES_WORKER_ENABLED`), `find`'s edge reads with the query-time fallback, and `pullRequest`; captures and snapshots are still read from Postgres.
 6. `run_index` on the same worker, coverage and retention; then retirement step 4 (`error_count`, regex skills). Built: the table, its builds on the worker, its retirement, the census and the backfill (`backfill:run-index`); `find` reading it is next.
-7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts and Codex spawned thread ids) and 8 (`prompts` and session facts), with one backfill after 8. `l1-facts.test.ts` fails when a raw or text fact here is neither stored nor listed as pending.
+7. Transcript-records parser v6 with the raw facts above, its fixture test, and backfill. Shipped as parser versions 6 (`calls` facts and `agent_version`/`entrypoint` on every record), 7 (`runs` facts and Codex spawned thread ids) and 8 (`prompts` and session facts), with one backfill after 8. The fact catalog, rendered as the [fact matrix](l1-fact-matrix.md), holds every fact per agent; `l1-facts.test.ts` fails when a fact of this spec has no catalog entry or a stored fact loses its fixture case, and the run index test when a run index column disagrees with it.
 8. CLI capture of git ownership (tool hooks, worktree and process identity) and commit facts from GitHub (committer time, parents).
 9. GitHub evidence and repository configuration in ClickHouse.
 10. `find` over `calls`, `runs`, `prompts` and edges, the schema reference and premade queries in the plugin skill.
-11. The drift census and retirement step 5.
+11. The drift census (built: `facts:census`, checked over the parser fixtures; a recurring run over production uploads is next) and retirement step 5.
