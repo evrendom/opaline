@@ -21,6 +21,7 @@ import {
 	addCensusPaths,
 	FIXTURE_CORPUS_DIR,
 } from "../session-transcript/transcript-records/fact-census-files.js";
+import { CENSUS_IGNORED_PATHS } from "../session-transcript/transcript-records/fact-census-ignored.js";
 import {
 	FACT_REVIEW_PATH,
 	renderFactReview,
@@ -77,8 +78,13 @@ function displayPath(path: string): string {
 const options = parseArgs(process.argv.slice(2));
 const roots =
 	options.censusFrom.length > 0 ? options.censusFrom : [FIXTURE_CORPUS_DIR];
-const census = createCensus();
+const census = createCensus(CENSUS_IGNORED_PATHS);
 await addCensusPaths(census, roots);
+for (const [agent, alerts] of census.alerts)
+	for (const issue of alerts.values())
+		console.warn(
+			`ALERT ${agent} ${issue.rule}: ${issue.path} (${issue.count} occurrences; expected ${issue.expected})`,
+		);
 const label =
 	options.censusFrom.length > 0
 		? roots.map(displayPath).join(", ")

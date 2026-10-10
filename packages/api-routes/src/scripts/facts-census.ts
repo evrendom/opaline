@@ -59,7 +59,7 @@ function parseArgs(argv: readonly string[]): Options {
 }
 
 const options = parseArgs(process.argv.slice(2));
-const census = createCensus();
+const census = createCensus(FACT_CENSUS_CATALOG.ignored);
 await addCensusPaths(census, options.paths, options.agent);
 const report = compareCensus(census, FACT_CENSUS_CATALOG);
 process.stdout.write(
@@ -69,6 +69,8 @@ process.stdout.write(
 );
 if (
 	options.failOnUnmapped &&
-	report.agents.some((agent) => agent.unmapped.length > 0)
+	report.agents.some(
+		(agent) => agent.unmapped.length > 0 || agent.alerts.length > 0,
+	)
 )
 	process.exitCode = 1;

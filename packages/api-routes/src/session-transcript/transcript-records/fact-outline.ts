@@ -152,7 +152,14 @@ function catalogSourcesOf(agent: FactAgent): CatalogSource[] {
 	return FACT_CATALOG.flatMap((entry) => {
 		const fact = entry.agents[agent];
 		const key = factReviewKey(entry);
-		const gap = fact.status === "stored" ? (fact.gap?.sources ?? []) : [];
+		const gap =
+			fact.status === "stored" || fact.status === "wrong"
+				? (fact.gap?.sources ?? []).filter((path) =>
+						fact.sourceMappings.some(
+							(source) => source.path === path && source.role === "primary",
+						),
+					)
+				: [];
 		return [
 			...fact.sources.map((pattern) => ({
 				key,
@@ -439,10 +446,14 @@ function outlineAgent(
 	};
 }
 
-/** Which agents record a fact: every status but `not_recorded` counts. */
+/** Which agents have a primary source, not merely a pending status or context. */
 export function sideConnection(entry: FactEntry): SideConnection {
-	const claude = entry.agents.claude_code.status !== "not_recorded";
-	const codex = entry.agents.codex.status !== "not_recorded";
+	const claude = entry.agents.claude_code.sourceMappings.some(
+		(source) => source.role === "primary",
+	);
+	const codex = entry.agents.codex.sourceMappings.some(
+		(source) => source.role === "primary",
+	);
 	if (claude && codex) return "both";
 	if (claude) return "claude_code";
 	return codex ? "codex" : "neither";

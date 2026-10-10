@@ -12,6 +12,17 @@ import {
 } from "./fact-catalog.js";
 import { CENSUS_IGNORED_PATHS } from "./fact-census-ignored.js";
 import {
+	COMPARABILITY_LABELS,
+	evidenceLabel,
+	factComparability,
+	type MappingConfidence,
+	mappingConfidence,
+	mappingCorpus,
+	mappingMetrics,
+	relationLabel,
+	withMappingEvidence,
+} from "./fact-mapping.js";
+import {
 	AGENT_NAMES,
 	howChecked,
 	SOURCE_LEGEND,
@@ -28,6 +39,10 @@ import {
 	factReviewKey,
 } from "./fact-outline.js";
 import { FACT_RESEARCH, type FactResearch } from "./fact-review-research.js";
+import {
+	sourceCensusCoverage,
+	sourceOracleCoverage,
+} from "./fact-source-coverage.js";
 
 /**
  * The fact review page: one self-contained HTML file (data, CSS and script
@@ -59,6 +74,8 @@ export interface ReviewDetail {
 }
 
 export interface ReviewCell {
+	readonly relation: string;
+	readonly confidence: MappingConfidence;
 	readonly status: FactStatus;
 	readonly gap: boolean;
 	/** `v6`, `elsewhere`, or empty. */
@@ -70,6 +87,7 @@ export interface ReviewCell {
 }
 
 export interface ReviewFact {
+	readonly comparability: string;
 	/** Unique across the catalog: view and id. */
 	readonly key: string;
 	readonly id: string;
@@ -96,6 +114,11 @@ export interface FactReviewMeta {
 }
 
 export interface FactReviewData {
+	readonly sourceOracle: ReturnType<typeof sourceOracleCoverage>;
+	readonly sourceCensus: ReturnType<typeof sourceCensusCoverage>;
+	readonly metrics: Readonly<
+		Record<FactAgent, ReturnType<typeof mappingMetrics>>
+	>;
 	readonly meta: FactReviewMeta;
 	readonly census: string;
 	readonly agents: readonly { readonly id: FactAgent; readonly name: string }[];
@@ -135,7 +158,7 @@ function cellSummary(agent: FactAgent, fact: AgentFact): string {
 		case "pending":
 			return `${name} records it; Opaline does not store it yet.`;
 		case "not_recorded":
-			return `${name} does not record it.`;
+			return `Not found in the searched ${name} corpus; writer-level absence is not proved.`;
 		case "wrong":
 			return "Opaline stores it, but the stored value is known to be wrong.";
 	}
@@ -164,7 +187,30 @@ function storedIn(fact: AgentFact): ReviewDetail[] {
 }
 
 function cellDetails(fact: AgentFact): ReviewDetail[] {
-	const details: ReviewDetail[] = [];
+	const details: ReviewDetail[] = [
+		{
+			label: "Mapping",
+			text: `${relationLabel(fact.relation)} · ${mappingConfidence(fact)}`,
+		},
+		{ label: "Evidence", code: fact.evidence.map(evidenceLabel) },
+	];
+	if (fact.justification !== undefined)
+		details.push({ label: "Judgement", text: fact.justification });
+	if (fact.sourceMappings.length > 0)
+		details.push({
+			label: "Per-path roles and relations",
+			code: fact.sourceMappings.map(
+				(source) =>
+					`${source.role} · ${relationLabel(source.relation)} · ${source.path}${source.justification === undefined ? "" : ` — ${source.justification}`}`,
+			),
+		});
+	if (fact.legacySources !== undefined)
+		details.push({
+			label: "Legacy sources (versions in census evidence)",
+			code: fact.legacySources,
+		});
+	if (fact.conflict !== undefined)
+		details.push({ label: "Semantic conflict", text: fact.conflict });
 	if (fact.status === "wrong")
 		details.push({ label: "What is wrong, and the fix", text: fact.plan });
 	if (fact.status === "pending")
@@ -172,7 +218,10 @@ function cellDetails(fact: AgentFact): ReviewDetail[] {
 	const recorded = sources(fact.sources);
 	if (recorded.length > 0)
 		details.push({ label: "Recorded at", sources: recorded });
-	if (fact.status === "stored" && fact.gap !== undefined)
+	if (
+		(fact.status === "stored" || fact.status === "wrong") &&
+		fact.gap !== undefined
+	)
 		details.push(
 			{
 				label: "Also recorded at, not read yet",
@@ -223,13 +272,23 @@ export function factReviewData(
 	meta: FactReviewMeta,
 	corpus: FactCorpus,
 ): FactReviewData {
-	const facts = FACT_CATALOG.map((entry): ReviewFact => {
+	const mappings = withMappingEvidence(
+		FACT_CATALOG,
+		mappingCorpus(corpus.census, corpus.label),
+	);
+	const facts = mappings.map((entry, index): ReviewFact => {
+		const raw = FACT_CATALOG[index];
+		if (raw === undefined) throw new Error("Missing catalog entry");
 		const agents = Object.fromEntries(
 			FACT_AGENTS.map((agent) => {
 				const fact = entry.agents[agent];
 				const cell: ReviewCell = {
+					relation: relationLabel(fact.relation),
+					confidence: mappingConfidence(fact),
 					status: fact.status,
-					gap: fact.status === "stored" && fact.gap !== undefined,
+					gap:
+						(fact.status === "stored" || fact.status === "wrong") &&
+						fact.gap !== undefined,
 					version: versionLabel(fact),
 					summary: cellSummary(agent, fact),
 					sources: sources(fact.sources),
@@ -244,11 +303,7 @@ export function factReviewData(
 			entry.meaning,
 			...FACT_AGENTS.flatMap((agent) => {
 				const fact = entry.agents[agent];
-				const gap =
-					fact.status === "stored" && fact.gap !== undefined
-						? fact.gap.sources
-						: [];
-				return [...fact.sources, ...gap].flatMap((path) => [
+				return fact.sourceMappings.flatMap(({ path }) => [
 					path,
 					shortSource(path),
 				]);
@@ -257,19 +312,33 @@ export function factReviewData(
 			.join("\n")
 			.toLowerCase();
 		return {
+			comparability: COMPARABILITY_LABELS[factComparability(entry)],
 			key: factReviewKey(entry),
 			id: entry.id,
 			also: entry.also ?? [],
 			view: entry.view,
 			meaning: entry.meaning,
 			...(entry.decision === undefined ? {} : { decision: entry.decision }),
-			hash: factEntryHash(entry),
+			hash: factEntryHash(raw),
 			agents,
 			details: entryDetails(entry),
 			search,
 		};
 	});
 	return {
+		sourceOracle: sourceOracleCoverage(),
+		sourceCensus: sourceCensusCoverage(
+			Object.fromEntries(
+				[...(corpus.census.paths.get("codex") ?? [])].map(([path, stats]) => [
+					path,
+					stats.count,
+				]),
+			),
+		),
+		metrics: {
+			claude_code: mappingMetrics(mappings, "claude_code"),
+			codex: mappingMetrics(mappings, "codex"),
+		},
 		meta,
 		census: LOCAL_CENSUS,
 		agents: FACT_AGENTS.map((id) => ({ id, name: AGENT_NAMES[id] })),

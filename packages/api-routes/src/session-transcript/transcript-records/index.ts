@@ -9,21 +9,6 @@ export {
 	type ShellMutationBasis,
 } from "./command-class.js";
 export {
-	type AgentFact,
-	type CatalogFactField,
-	type CatalogRecordColumn,
-	catalogSources,
-	FACT_AGENTS,
-	FACT_CATALOG,
-	FACT_VIEWS,
-	type FactAgent,
-	type FactEntry,
-	type FactStatus,
-	type FactStores,
-	type FactView,
-	factCatalogIndex,
-} from "./fact-catalog.js";
-export {
 	classifyUserText,
 	stripInjectedWrappers,
 	type UserTextClassification,

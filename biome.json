@@ -42,6 +42,14 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"packages/api-routes/src/session-transcript/transcript-records/codex-source-*.json",
+				"packages/api-routes/src/session-transcript/transcript-records/codex-absence-*.json",
+				"packages/api-routes/src/session-transcript/transcript-records/claude-types-*.json"
+			],
+			"formatter": { "enabled": false }
+		},
+		{
 			"includes": ["**/*.astro"],
 			"linter": {
 				"rules": {

@@ -189,7 +189,7 @@ function agentCell(row: Row, agent: Agent, open: boolean): string {
 	const lines = sourceLines(row.side, agent);
 	const label = `<span class="cell-agent">${esc(agentName[agent])}</span>`;
 	if (cell.status === "not_recorded")
-		return `<td class="s-agent is-empty">${label}<p class="not-recorded"><span aria-hidden="true">—</span> not recorded</p></td>`;
+		return `<td class="s-agent is-empty">${label}<p class="s-status">${cellBadges(cell)}</p></td>`;
 	const shown = open ? lines : lines.slice(0, CELL_LINES);
 	const more =
 		lines.length > shown.length
@@ -212,6 +212,7 @@ ${agentCell(row, "claude_code", open)}
 ${connector(side.connection)}
 <button type="button" class="fact-toggle" aria-expanded="${open}" aria-controls="${detailId}">${CHEVRON}<code class="fact-id">${esc(fact.id)}</code></button>
 <p class="link-label">${esc(LINK_LABEL[side.connection])}</p>
+<p class="link-label">${esc(fact.comparability)}</p>
 <p class="s-meaning">${md(fact.meaning)}</p>
 </td>
 ${agentCell(row, "codex", open)}
@@ -357,27 +358,27 @@ ${unseenHtml}
 export function mountSide(panel: HTMLElement, host: TabHost): TabView {
 	let filters = readParams(new URLSearchParams());
 
-	const connections = (
-		["both", "claude_code", "codex", "neither"] as const
-	).map((connection) => ({
-		connection,
-		total: rowsData.filter((row) => row.side.connection === connection).length,
-	}));
 	const stat = (label: string, value: number, attrs: string, note: string) =>
 		`<div class="stat"><dt>${esc(label)}</dt><dd><button type="button" class="stat-value num" ${attrs}>${count(value)}</button><span class="stat-note">${esc(note)}</span></dd></div>`;
 	const stats = [
-		...connections.map(({ connection, total }) =>
-			stat(
-				connection === "both" ? "Connected" : LINK_LABEL[connection],
-				total,
-				`data-link="${connection}" aria-pressed="false"`,
-				connection === "both"
-					? "facts both agents record"
-					: connection === "neither"
-						? "facts neither agent records"
-						: "facts one agent records",
-			),
-		),
+		`<div class="stat"><dt>Codex writer ${esc(data.sourceOracle.version)}</dt><dd><span class="stat-value num">${count(data.sourceOracle.pending.length)} pending · ${count(data.sourceOracle.residue.length)} unassigned</span><span class="stat-note">${data.sourceOracle.mapped} mapped · ${data.sourceOracle.ignored} ignored · ${data.sourceOracle.context.length} context-only · ${data.sourceOracle.total} writable paths</span><span class="stat-note">Selected corpus: ${data.sourceCensus.declared} declared · ${data.sourceCensus.opaque} open JSON · ${data.sourceCensus.tool_defined} tool-defined · ${data.sourceCensus.legacy} legacy · ${data.sourceCensus.unknown} unknown</span></dd></div>`,
+		...agentIds.map((agent) => {
+			const metric = data.metrics[agent];
+			const tiers = (["verified", "observed", "asserted"] as const)
+				.map(
+					(tier) =>
+						`${((100 * metric.confidence[tier]) / Math.max(1, metric.literal)).toFixed(1)}% ${tier}`,
+				)
+				.join(" · ");
+			const relations = Object.entries(metric.relations)
+				.map(([kind, total]) => `${total} ${kind}`)
+				.join(" · ");
+			const primary = Object.entries(metric.pathRelations)
+				.filter(([, total]) => total > 0)
+				.map(([kind, total]) => `${total} ${kind}`)
+				.join(" · ");
+			return `<div class="stat"><dt>${esc(agentName[agent])}</dt><dd><span class="stat-value num">${count(metric.relations.unreviewed)} unreviewed</span><span class="stat-note">${metric.judged} judged · ${metric.confidence.not_applicable} N/A · ${metric.contextPaths} context paths</span><span class="stat-note">${esc(tiers)}</span><span class="stat-note">${esc(relations)}</span><span class="stat-note">Primary paths: ${esc(primary)}</span><span class="stat-note">${metric.conflicts} semantic conflicts · 0 paired runs</span></dd></div>`;
+		}),
 		...data.corpus.agents.map((outline) =>
 			stat(
 				"Unmapped paths",
@@ -403,6 +404,9 @@ export function mountSide(panel: HTMLElement, host: TabHost): TabView {
 <p class="census">Census of ${esc(data.corpus.label)}. ${corpus}.</p>
 </div>
 <div class="stats-wrap"><dl class="stats">${stats}</dl></div>
+<p class="census">Tier shares include searched absences but exclude derived/provenance (N/A per agent). Context paths are not fact sources. Per-path roles and relations appear in each row's details. Verified requires judged primary paths and semantic source/type/paired evidence plus a census or fixture witness. LLM agreement and path existence alone never verify meaning.</p>
+<details class="census"><summary>Codex can write these; we neither map nor ignore them (${data.sourceOracle.residue.length} unassigned)</summary><ul>${data.sourceOracle.residue.map((path) => `<li><code>${esc(path.path)}</code> — ${esc(path.source)} (${esc(path.modes)})</li>`).join("")}</ul></details>
+<details class="census"><summary>Pending residue review (${data.sourceOracle.pendingReview.length} disagreements; ${data.sourceOracle.pending.length} uncovered writer paths)</summary><ul>${data.sourceOracle.pendingReview.map((review) => `<li><code>${esc(review.path)}</code> (${esc(review.coverage)})<br>Sol: ${esc(review.sol)}<br>Sonnet: ${esc(review.sonnet)}</li>`).join("")}</ul></details>
 <div class="toolbar side-toolbar" role="search">
 <div class="search">
 <input type="search" name="q" id="side-q" aria-label="Search facts and paths" placeholder="Search fact, meaning or path" autocomplete="off" spellcheck="false">

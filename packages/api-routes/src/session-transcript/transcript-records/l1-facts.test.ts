@@ -1310,7 +1310,10 @@ describe("L1 fact catalog", () => {
 					fact.plan.trim() === ""
 				)
 					problems.push(`${label}: ${fact.status} without a plan`);
-				if (fact.status === "stored" && fact.gap !== undefined) {
+				if (
+					(fact.status === "stored" || fact.status === "wrong") &&
+					fact.gap !== undefined
+				) {
 					if (fact.gap.sources.length === 0 || fact.gap.plan.trim() === "")
 						problems.push(`${label}: a gap needs sources and a plan`);
 				}

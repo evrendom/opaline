@@ -9,6 +9,21 @@ import {
 	type FactView,
 	LOCAL_CENSUS,
 } from "./fact-catalog.js";
+import {
+	COMPARABILITY_LABELS,
+	factComparability,
+	mappingConfidence,
+	mappingMetrics,
+	relationLabel,
+	withMappingEvidence,
+} from "./fact-mapping.js";
+import censusSnapshot from "./fact-mapping-census.json" with { type: "json" };
+import {
+	sourceCensusCoverage,
+	sourceOracleCoverage,
+} from "./fact-source-coverage.js";
+
+const MAPPING_CATALOG = withMappingEvidence(FACT_CATALOG);
 
 /**
  * The Claude Code vs Codex fact matrix (docs/l1-fact-matrix.md), generated
@@ -53,7 +68,7 @@ export const STATUS_LEGEND: Readonly<Record<FactStatus | "gap", string>> = {
 	pending:
 		"the agent records it and we do not store it yet; the details name the change that will (`parser 9` is the next transcript parser version).",
 	not_recorded:
-		"the agent does not write it; the details say how that was checked.",
+		"not found in the searched corpus; this is not proof the writer cannot emit it.",
 	wrong:
 		"stored, but known to be incorrect; the details say what is wrong and the fix.",
 };
@@ -145,7 +160,12 @@ function cell(fact: AgentFact): string {
 	if (fact.status === "pending") parts.push("pending");
 	else if (fact.status === "wrong") parts.push(`wrong ${label}`.trim());
 	else if (label !== "") parts.push(label);
-	if (fact.status === "stored" && fact.gap !== undefined) parts.push("+ gap");
+	if (
+		(fact.status === "stored" || fact.status === "wrong") &&
+		fact.gap !== undefined
+	)
+		parts.push("+ gap");
+	parts.push(`${fact.relation.kind} · ${mappingConfidence(fact)}`);
 	const sources = shortSources(fact);
 	const shown = sources.slice(0, 2).map(code).join(", ");
 	const more = sources.length > 2 ? ` +${sources.length - 2}` : "";
@@ -164,12 +184,31 @@ function factName(entry: FactEntry): string {
 
 /** Details of one agent's fact: what it says beyond the cell. */
 function agentDetail(fact: AgentFact): string[] {
-	const lines: string[] = [];
+	const counts = new Map<string, number>();
+	for (const item of fact.evidence)
+		counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+	const lines: string[] = [
+		`Relation: ${relationLabel(fact.relation)}. Confidence: ${mappingConfidence(fact)}. Evidence: ${[...counts].map(([kind, count]) => `${kind} (${count})`).join(", ")}.`,
+	];
+	if (fact.justification !== undefined)
+		lines.push(`Judgement: ${fact.justification}`);
+	for (const source of fact.sourceMappings)
+		lines.push(
+			`Path: ${code(source.path)} — ${source.role} · ${relationLabel(source.relation)}.`,
+		);
+	if (fact.legacySources !== undefined)
+		lines.push(
+			`Legacy sources: ${fact.legacySources.map(code).join(", ")} (observed versions are in the legacy evidence ledger).`,
+		);
+	if (fact.conflict !== undefined) lines.push(`Conflict: ${fact.conflict}`);
 	if (fact.status === "pending" || fact.status === "wrong")
 		lines.push(`${fact.status === "wrong" ? "Fix" : "Plan"}: ${fact.plan}`);
 	if (fact.status === "not_recorded")
 		lines.push(`How we checked: ${howChecked(fact.searched)}`);
-	if (fact.status === "stored" && fact.gap !== undefined)
+	if (
+		(fact.status === "stored" || fact.status === "wrong") &&
+		fact.gap !== undefined
+	)
 		lines.push(
 			`Gap: also recorded at ${fact.gap.sources.map((source) => code(shortSource(source))).join(", ")}. Plan: ${fact.gap.plan}`,
 		);
@@ -241,11 +280,86 @@ export function renderFactMatrix(): string {
 						: String(byAgent[agent][status]),
 			).join(" | ")} |`,
 		);
-	lines.push(`| Facts | ${FACT_CATALOG.length} | ${FACT_CATALOG.length} |`, "");
+	lines.push("");
+	lines.push(
+		"Mapping quality (tier denominator: literal agent mappings including searched absences; derived/provenance are N/A, not searched absences; context paths are not sources):",
+		"",
+		"| Metric | Claude Code | Codex |",
+		"|---|---:|---:|",
+	);
+	const metrics = FACT_AGENTS.map((agent) =>
+		mappingMetrics(MAPPING_CATALOG, agent),
+	);
+	for (const tier of ["verified", "observed", "asserted"] as const)
+		lines.push(
+			`| ${tier} | ${metrics.map((metric) => `${metric.confidence[tier]} (${((100 * metric.confidence[tier]) / Math.max(1, metric.literal)).toFixed(1)}%)`).join(" | ")} |`,
+		);
+	for (const relation of [
+		"unreviewed",
+		"exact",
+		"transform",
+		"close",
+		"broader",
+		"narrower",
+		"not_emitted",
+		"not_found",
+		"derived",
+		"provenance",
+	] as const)
+		lines.push(
+			`| ${relation} | ${metrics.map((metric) => metric.relations[relation]).join(" | ")} |`,
+		);
+	lines.push(
+		`| N/A (derived/provenance) | ${metrics.map((metric) => metric.confidence.not_applicable).join(" | ")} |`,
+		`| Context paths (excluded as sources) | ${metrics.map((metric) => metric.contextPaths).join(" | ")} |`,
+		`| Judged (excludes searched absences) | ${metrics.map((metric) => metric.judged).join(" | ")} |`,
+		`| Semantic conflicts | ${metrics.map((metric) => metric.conflicts).join(" | ")} |`,
+		"| Paired runs | 0 | 0 |",
+		"",
+		"Unclassified census paths are computed from the selected corpus by facts:census / facts:review, not frozen into this matrix. No precision, false-absence rate or reviewer agreement is claimed without an independent gold set.",
+		"",
+	);
+	lines.push("Primary-path relation counts (including recorded gaps):", "");
+	for (const kind of Object.keys(metrics[0]?.pathRelations ?? {}))
+		lines.push(
+			`- ${kind}: ${metrics.map((metric) => Object.entries(metric.pathRelations).find(([relation]) => relation === kind)?.[1] ?? 0).join(" / ")} (Claude Code / Codex).`,
+		);
+	lines.push("");
 
 	const decisions = FACT_CATALOG.filter(
 		(entry) => entry.decision !== undefined,
 	);
+	const oracle = sourceOracleCoverage();
+	const sourceCensus = sourceCensusCoverage(censusSnapshot.paths.codex);
+	lines.push(
+		"## Codex writer-source coverage",
+		"",
+		`Pinned writer: **${oracle.version}**, ${oracle.total} paths: ${oracle.mapped} mapped, ${oracle.ignored} ignored with a reason, ${oracle.context.length} context-only, ${oracle.pending.length} pending-review paths, **${oracle.residue.length} unassigned residue**. Context and pending review are not mapped sources.`,
+		"",
+		`Catalog source occurrences: ${oracle.declaredSources} declared, ${oracle.opaqueSources} covered only by open JSON, ${oracle.legacySources} explicitly legacy, ${oracle.missingSources.length} unsupported. Open JSON is not a declared child or meaning proof.`,
+		"",
+		`Local Codex census: ${sourceCensus.total} paths: ${sourceCensus.declared} declared, ${sourceCensus.opaque} open-JSON descendants, ${sourceCensus.tool_defined} tool-defined decoded arguments, ${sourceCensus.legacy} documented legacy, ${sourceCensus.unknown} unknown.`,
+		"",
+		"<details><summary>Writer-source residue (not a CI failure)</summary>",
+		"",
+		"| Path | Source | History modes |",
+		"|---|---|---|",
+	);
+	for (const path of oracle.residue)
+		lines.push(`| ${code(path.path)} | ${code(path.source)} | ${path.modes} |`);
+	lines.push("", "</details>", "");
+	lines.push(
+		"<details>",
+		`<summary>Pending residue review (${oracle.pendingReview.length} original disagreements; ${oracle.pending.length} uncovered writer paths)</summary>`,
+		"",
+		"| Path | Structural coverage | Sol proposal | Sonnet proposal |",
+		"|---|---|---|---|",
+	);
+	for (const review of oracle.pendingReview)
+		lines.push(
+			`| ${code(review.path)}${review.path === review.reviewedPath ? "" : ` (corrected from ${code(review.reviewedPath)})`} | ${review.coverage} | ${escapeCell(review.sol)} | ${escapeCell(review.sonnet)} |`,
+		);
+	lines.push("", "</details>", "");
 	lines.push("## Decisions needed", "");
 	if (decisions.length === 0) lines.push("None.", "");
 	else {
@@ -258,16 +372,16 @@ export function renderFactMatrix(): string {
 	}
 
 	for (const view of FACT_VIEWS) {
-		const entries = FACT_CATALOG.filter((entry) => entry.view === view);
+		const entries = MAPPING_CATALOG.filter((entry) => entry.view === view);
 		lines.push(
 			`## ${VIEW_TITLES[view]}`,
 			"",
-			"| Fact | What it is | Claude Code | Codex |",
-			"|---|---|---|---|",
+			"| Fact | What it is | Claude Code | Codex | Comparability |",
+			"|---|---|---|---|---|",
 		);
 		for (const entry of entries)
 			lines.push(
-				`| ${factName(entry)} | ${escapeCell(entry.meaning)} | ${escapeCell(cell(entry.agents.claude_code))} | ${escapeCell(cell(entry.agents.codex))} |`,
+				`| ${factName(entry)} | ${escapeCell(entry.meaning)} | ${escapeCell(cell(entry.agents.claude_code))} | ${escapeCell(cell(entry.agents.codex))} | ${COMPARABILITY_LABELS[factComparability(entry)]} |`,
 			);
 		lines.push("", "### Details", "");
 		for (const entry of entries) {

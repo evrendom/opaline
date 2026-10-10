@@ -1,0 +1,1720 @@
+{
+	"agreements": [
+		{
+			"path": "event_msg/agent_message.memory_citation",
+			"reviewedPath": "event_msg/agent_message.memory_citation",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.entries",
+			"reviewedPath": "event_msg/agent_message.memory_citation.entries",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.entries[].lineEnd",
+			"reviewedPath": "event_msg/agent_message.memory_citation.entries[].lineEnd",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.entries[].lineStart",
+			"reviewedPath": "event_msg/agent_message.memory_citation.entries[].lineStart",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.entries[].path",
+			"reviewedPath": "event_msg/agent_message.memory_citation.entries[].path",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.rolloutIds",
+			"reviewedPath": "event_msg/agent_message.memory_citation.rolloutIds",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.rolloutIds[]",
+			"reviewedPath": "event_msg/agent_message.memory_citation.rolloutIds[]",
+			"decision": "new_fact",
+			"fact": "memory_citation_rollout_id"
+		},
+		{
+			"path": "event_msg/agent_message.questions",
+			"reviewedPath": "event_msg/agent_message.questions",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.questions[].options",
+			"reviewedPath": "event_msg/agent_message.questions[].options",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.questions[].options[]",
+			"reviewedPath": "event_msg/agent_message.questions[].options[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.questions[].title",
+			"reviewedPath": "event_msg/agent_message.questions[].title",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_reasoning_raw_content.text",
+			"reviewedPath": "event_msg/agent_reasoning_raw_content.text",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/entered_review_mode.item_id",
+			"reviewedPath": "event_msg/entered_review_mode.item_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/entered_review_mode.target.branch",
+			"reviewedPath": "event_msg/entered_review_mode.target.branch",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/entered_review_mode.target.instructions",
+			"reviewedPath": "event_msg/entered_review_mode.target.instructions",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/entered_review_mode.target.sha",
+			"reviewedPath": "event_msg/entered_review_mode.target.sha",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/entered_review_mode.target.type",
+			"reviewedPath": "event_msg/entered_review_mode.target.type",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/entered_review_mode.user_facing_hint",
+			"reviewedPath": "event_msg/entered_review_mode.user_facing_hint",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/exited_review_mode.item_id",
+			"reviewedPath": "event_msg/exited_review_mode.item_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output",
+			"reviewedPath": "event_msg/exited_review_mode.review_output",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].body",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].body",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].code_location.absolute_file_path",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].code_location.absolute_file_path",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.end",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.end",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.start",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.start",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].confidence_score",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].confidence_score",
+			"decision": "new_fact",
+			"fact": "review_finding_confidence"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].priority",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].priority",
+			"decision": "new_fact",
+			"fact": "review_finding_priority"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.overall_confidence_score",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.overall_confidence_score",
+			"decision": "new_fact",
+			"fact": "review_overall_confidence"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.overall_correctness",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.overall_correctness",
+			"decision": "new_fact",
+			"fact": "review_correctness"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.overall_explanation",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.overall_explanation",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/image_generation_end.call_id",
+			"reviewedPath": "event_msg/image_generation_end.call_id",
+			"decision": "map_existing",
+			"fact": "calls/call_id"
+		},
+		{
+			"path": "event_msg/image_generation_end.failure.limitId",
+			"reviewedPath": "event_msg/image_generation_end.failure.limitId",
+			"decision": "map_existing",
+			"fact": "runs/rate_limits"
+		},
+		{
+			"path": "event_msg/image_generation_end.failure.resetsAt",
+			"reviewedPath": "event_msg/image_generation_end.failure.resetsAt",
+			"decision": "map_existing",
+			"fact": "runs/rate_limits"
+		},
+		{
+			"path": "event_msg/image_generation_end.result",
+			"reviewedPath": "event_msg/image_generation_end.result",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/image_generation_end.revised_prompt",
+			"reviewedPath": "event_msg/image_generation_end.revised_prompt",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/image_generation_end.saved_path",
+			"reviewedPath": "event_msg/image_generation_end.saved_path",
+			"decision": "map_existing",
+			"fact": "calls/extension_item"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.content",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.content",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.entries",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.entries",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineEnd",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineEnd",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineStart",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineStart",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.entries[].path",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.entries[].path",
+			"decision": "new_fact",
+			"fact": "memory_citation_location"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.rolloutIds",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.rolloutIds",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.rolloutIds[]",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.rolloutIds[]",
+			"decision": "new_fact",
+			"fact": "memory_citation_rollout_id"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.prompt",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.prompt",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:CommandExecution.command",
+			"reviewedPath": "event_msg/item_completed:CommandExecution.command",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:CommandExecution.parsed_cmd",
+			"reviewedPath": "event_msg/item_completed:CommandExecution.parsed_cmd",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.target.branch",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.target.branch",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.target.instructions",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.target.instructions",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.target.sha",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.target.sha",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.target.type",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.target.type",
+			"decision": "new_fact",
+			"fact": "review_target"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.user_facing_hint",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.user_facing_hint",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].body",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].body",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.absolute_file_path",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.absolute_file_path",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.end",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.end",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.start",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.start",
+			"decision": "new_fact",
+			"fact": "review_finding_location"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].confidence_score",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].confidence_score",
+			"decision": "new_fact",
+			"fact": "review_finding_confidence"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].priority",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].priority",
+			"decision": "new_fact",
+			"fact": "review_finding_priority"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.overall_confidence_score",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.overall_confidence_score",
+			"decision": "new_fact",
+			"fact": "review_overall_confidence"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.overall_correctness",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.overall_correctness",
+			"decision": "new_fact",
+			"fact": "review_correctness"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.overall_explanation",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.overall_explanation",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FileChange.auto_approved",
+			"reviewedPath": "event_msg/item_completed:FileChange.auto_approved",
+			"decision": "map_existing",
+			"fact": "calls/permission_decision"
+		},
+		{
+			"path": "event_msg/item_completed:FileChange.changes",
+			"reviewedPath": "event_msg/item_completed:FileChange.changes",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output",
+			"decision": "map_existing",
+			"fact": "calls/result_chars"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[encrypted_content].encrypted_content",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[encrypted_content].encrypted_content",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[input_audio].audio_url",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[input_audio].audio_url",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[input_image].file_id",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[input_image].file_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[input_image].image_url",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[input_image].image_url",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:HookPrompt.fragments",
+			"reviewedPath": "event_msg/item_completed:HookPrompt.fragments",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:HookPrompt.fragments[].hookRunId",
+			"reviewedPath": "event_msg/item_completed:HookPrompt.fragments[].hookRunId",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ImageGeneration.result",
+			"reviewedPath": "event_msg/item_completed:ImageGeneration.result",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ImageGeneration.revised_prompt",
+			"reviewedPath": "event_msg/item_completed:ImageGeneration.revised_prompt",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:ImageGeneration.saved_path",
+			"reviewedPath": "event_msg/item_completed:ImageGeneration.saved_path",
+			"decision": "map_existing",
+			"fact": "calls/extension_item"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content[audio].audio_url",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content[audio].audio_url",
+			"decision": "new_fact",
+			"fact": "audio_input"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content[image].detail",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content[image].detail",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content[image].file_id",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content[image].file_id",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content[local_audio].path",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content[local_audio].path",
+			"decision": "new_fact",
+			"fact": "audio_input"
+		},
+		{
+			"path": "event_msg/item_completed:UserMessage.content[local_image].detail",
+			"reviewedPath": "event_msg/item_completed:UserMessage.content[local_image].detail",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.action_name",
+			"reviewedPath": "event_msg/mcp_tool_call_end.action_name",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.app_name",
+			"reviewedPath": "event_msg/mcp_tool_call_end.app_name",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.call_id",
+			"reviewedPath": "event_msg/mcp_tool_call_end.call_id",
+			"decision": "map_existing",
+			"fact": "calls/call_id"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.connector_id",
+			"reviewedPath": "event_msg/mcp_tool_call_end.connector_id",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.duration.nanos",
+			"reviewedPath": "event_msg/mcp_tool_call_end.duration.nanos",
+			"decision": "map_existing",
+			"fact": "calls/duration_ms"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.duration.secs",
+			"reviewedPath": "event_msg/mcp_tool_call_end.duration.secs",
+			"decision": "map_existing",
+			"fact": "calls/duration_ms"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.invocation.server",
+			"reviewedPath": "event_msg/mcp_tool_call_end.invocation.server",
+			"decision": "map_existing",
+			"fact": "calls/mcp_server"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.invocation.tool",
+			"reviewedPath": "event_msg/mcp_tool_call_end.invocation.tool",
+			"decision": "map_existing",
+			"fact": "calls/mcp_tool"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.link_id",
+			"reviewedPath": "event_msg/mcp_tool_call_end.link_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.plugin_id",
+			"reviewedPath": "event_msg/mcp_tool_call_end.plugin_id",
+			"decision": "map_existing",
+			"fact": "calls/attribution_plugin"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.read_only_hint",
+			"reviewedPath": "event_msg/mcp_tool_call_end.read_only_hint",
+			"decision": "map_existing",
+			"fact": "calls/mcp_read_only"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.result.content[]",
+			"reviewedPath": "event_msg/mcp_tool_call_end.result.content[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.result.isError",
+			"reviewedPath": "event_msg/mcp_tool_call_end.result.isError",
+			"decision": "map_existing",
+			"fact": "calls/is_error"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.result.structuredContent",
+			"reviewedPath": "event_msg/mcp_tool_call_end.result.structuredContent",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/patch_apply_end.changes",
+			"reviewedPath": "event_msg/patch_apply_end.changes",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.agent_path",
+			"reviewedPath": "event_msg/sub_agent_activity.agent_path",
+			"decision": "map_existing",
+			"fact": "calls/subagent_activity"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.event_id",
+			"reviewedPath": "event_msg/sub_agent_activity.event_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.kind",
+			"reviewedPath": "event_msg/sub_agent_activity.kind",
+			"decision": "map_existing",
+			"fact": "calls/subagent_activity"
+		},
+		{
+			"path": "event_msg/task_started.trace_id",
+			"reviewedPath": "event_msg/task_started.trace_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/task_started.turn_attribution.turn_id",
+			"reviewedPath": "event_msg/task_started.turn_attribution.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "event_msg/thread_rolled_back.num_turns",
+			"reviewedPath": "event_msg/thread_rolled_back.num_turns",
+			"decision": "new_fact",
+			"fact": "rolled_back_turns"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info",
+			"decision": "map_existing",
+			"fact": "runs/turn_error_kind"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.message",
+			"reviewedPath": "event_msg/turn_aborted.error.message",
+			"decision": "map_existing",
+			"fact": "runs/turn_error"
+		},
+		{
+			"path": "event_msg/user_message.audio[]",
+			"reviewedPath": "event_msg/user_message.audio[]",
+			"decision": "new_fact",
+			"fact": "audio_input"
+		},
+		{
+			"path": "event_msg/user_message.client_id",
+			"reviewedPath": "event_msg/user_message.client_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/user_message.file_id_details[]",
+			"reviewedPath": "event_msg/user_message.file_id_details[]",
+			"decision": "new_fact",
+			"fact": "file_input"
+		},
+		{
+			"path": "event_msg/user_message.file_ids[]",
+			"reviewedPath": "event_msg/user_message.file_ids[]",
+			"decision": "new_fact",
+			"fact": "file_input"
+		},
+		{
+			"path": "event_msg/user_message.image_details[]",
+			"reviewedPath": "event_msg/user_message.image_details[]",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.image_order",
+			"reviewedPath": "event_msg/user_message.image_order",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/user_message.image_order[]",
+			"reviewedPath": "event_msg/user_message.image_order[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/user_message.local_audio[]",
+			"reviewedPath": "event_msg/user_message.local_audio[]",
+			"decision": "new_fact",
+			"fact": "audio_input"
+		},
+		{
+			"path": "event_msg/user_message.local_image_details[]",
+			"reviewedPath": "event_msg/user_message.local_image_details[]",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.local_images[]",
+			"reviewedPath": "event_msg/user_message.local_images[]",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.text_elements[].byte_range.end",
+			"reviewedPath": "event_msg/user_message.text_elements[].byte_range.end",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/user_message.text_elements[].byte_range.start",
+			"reviewedPath": "event_msg/user_message.text_elements[].byte_range.start",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/user_message.text_elements[].placeholder",
+			"reviewedPath": "event_msg/user_message.text_elements[].placeholder",
+			"decision": "ignore"
+		},
+		{
+			"path": "inter_agent_communication/.author",
+			"reviewedPath": "inter_agent_communication/.author",
+			"decision": "map_existing",
+			"fact": "prompts/prompt_origin"
+		},
+		{
+			"path": "inter_agent_communication/.content",
+			"reviewedPath": "inter_agent_communication/.content",
+			"decision": "map_existing",
+			"fact": "prompts/text"
+		},
+		{
+			"path": "inter_agent_communication/.encrypted_content",
+			"reviewedPath": "inter_agent_communication/.encrypted_content",
+			"decision": "ignore"
+		},
+		{
+			"path": "inter_agent_communication/.other_recipients",
+			"reviewedPath": "inter_agent_communication/.other_recipients",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.item_id",
+			"reviewedPath": "realtime_item/.item_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.outcome",
+			"reviewedPath": "realtime_item/.outcome",
+			"decision": "new_fact",
+			"fact": "realtime_session_outcome"
+		},
+		{
+			"path": "realtime_item/.presentation.index",
+			"reviewedPath": "realtime_item/.presentation.index",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.presentation.type",
+			"reviewedPath": "realtime_item/.presentation.type",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.realtime_session_id",
+			"reviewedPath": "realtime_item/.realtime_session_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.role",
+			"reviewedPath": "realtime_item/.role",
+			"decision": "new_fact",
+			"fact": "realtime_transcript_role"
+		},
+		{
+			"path": "realtime_item/.text",
+			"reviewedPath": "realtime_item/.text",
+			"decision": "ignore"
+		},
+		{
+			"path": "realtime_item/.type",
+			"reviewedPath": "realtime_item/.type",
+			"decision": "new_fact",
+			"fact": "realtime_event_kind"
+		},
+		{
+			"path": "response_item/additional_tools.role",
+			"reviewedPath": "response_item/additional_tools.role",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/additional_tools.tools",
+			"reviewedPath": "response_item/additional_tools.tools",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/additional_tools.tools[]",
+			"reviewedPath": "response_item/additional_tools.tools[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/additional_tools@metadata",
+			"reviewedPath": "response_item/additional_tools@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/agent_message.content",
+			"reviewedPath": "response_item/agent_message.content",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/agent_message@metadata",
+			"reviewedPath": "response_item/agent_message@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/compaction@metadata",
+			"reviewedPath": "response_item/compaction@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/configuration_update.reasoning.effort",
+			"reviewedPath": "response_item/configuration_update.reasoning.effort",
+			"decision": "map_existing",
+			"fact": "runs/effort"
+		},
+		{
+			"path": "response_item/configuration_update@metadata",
+			"reviewedPath": "response_item/configuration_update@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/context_compaction.encrypted_content",
+			"reviewedPath": "response_item/context_compaction.encrypted_content",
+			"decision": "map_existing",
+			"fact": "runs/compacted"
+		},
+		{
+			"path": "response_item/context_compaction@metadata",
+			"reviewedPath": "response_item/context_compaction@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/custom_tool_call_output@metadata",
+			"reviewedPath": "response_item/custom_tool_call_output@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/custom_tool_call:*.namespace",
+			"reviewedPath": "response_item/custom_tool_call:*.namespace",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "response_item/custom_tool_call:*@metadata",
+			"reviewedPath": "response_item/custom_tool_call:*@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call_output@metadata",
+			"reviewedPath": "response_item/function_call_output@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:*.encrypted_function_args",
+			"reviewedPath": "response_item/function_call:*.encrypted_function_args",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:*.encrypted_function_args[]",
+			"reviewedPath": "response_item/function_call:*.encrypted_function_args[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:*@metadata",
+			"reviewedPath": "response_item/function_call:*@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.read",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.read",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.write",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.write",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.network",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.network",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.prefix_rule",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.prefix_rule",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/function_call:spawn_agent.arguments.items[]",
+			"reviewedPath": "response_item/function_call:spawn_agent.arguments.items[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/image_generation_call.result",
+			"reviewedPath": "response_item/image_generation_call.result",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/image_generation_call.revised_prompt",
+			"reviewedPath": "response_item/image_generation_call.revised_prompt",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/image_generation_call@metadata",
+			"reviewedPath": "response_item/image_generation_call@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/local_shell_call.action.command",
+			"reviewedPath": "response_item/local_shell_call.action.command",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/local_shell_call.action.command[]",
+			"reviewedPath": "response_item/local_shell_call.action.command[]",
+			"decision": "map_existing",
+			"fact": "calls/input_text"
+		},
+		{
+			"path": "response_item/local_shell_call.action.env",
+			"reviewedPath": "response_item/local_shell_call.action.env",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/local_shell_call.action.env.{*}",
+			"reviewedPath": "response_item/local_shell_call.action.env.{*}",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/local_shell_call.action.timeout_ms",
+			"reviewedPath": "response_item/local_shell_call.action.timeout_ms",
+			"decision": "map_existing",
+			"fact": "calls/timeout_ms"
+		},
+		{
+			"path": "response_item/local_shell_call.action.type",
+			"reviewedPath": "response_item/local_shell_call.action.type",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/local_shell_call.action.working_directory",
+			"reviewedPath": "response_item/local_shell_call.action.working_directory",
+			"decision": "map_existing",
+			"fact": "calls/cwd"
+		},
+		{
+			"path": "response_item/local_shell_call.call_id",
+			"reviewedPath": "response_item/local_shell_call.call_id",
+			"decision": "map_existing",
+			"fact": "calls/call_id"
+		},
+		{
+			"path": "response_item/local_shell_call@metadata",
+			"reviewedPath": "response_item/local_shell_call@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/message:*.content",
+			"reviewedPath": "response_item/message:*.content",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/message:*.content[input_audio].audio_url",
+			"reviewedPath": "response_item/message:*.content[input_audio].audio_url",
+			"decision": "new_fact",
+			"fact": "audio_input"
+		},
+		{
+			"path": "response_item/message:*.content[input_image].file_id",
+			"reviewedPath": "response_item/message:*.content[input_image].file_id",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "response_item/message:*@metadata",
+			"reviewedPath": "response_item/message:*@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/reasoning@metadata",
+			"reviewedPath": "response_item/reasoning@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/tool_search_call@metadata",
+			"reviewedPath": "response_item/tool_search_call@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/tool_search_output@metadata",
+			"reviewedPath": "response_item/tool_search_output@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "response_item/web_search_call@metadata",
+			"reviewedPath": "response_item/web_search_call@metadata",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.acceptance_order",
+			"reviewedPath": "retained_context/delivered_assistant_message.acceptance_order",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.message_id",
+			"reviewedPath": "retained_context/delivered_assistant_message.message_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.text",
+			"reviewedPath": "retained_context/delivered_assistant_message.text",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/verified_answer.acceptance_order",
+			"reviewedPath": "retained_context/verified_answer.acceptance_order",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/verified_answer.questions",
+			"reviewedPath": "retained_context/verified_answer.questions",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/verified_answer.questions[].answer",
+			"reviewedPath": "retained_context/verified_answer.questions[].answer",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/verified_answer.questions[].question",
+			"reviewedPath": "retained_context/verified_answer.questions[].question",
+			"decision": "ignore"
+		},
+		{
+			"path": "security_risk_score/.action",
+			"reviewedPath": "security_risk_score/.action",
+			"decision": "ignore"
+		},
+		{
+			"path": "security_risk_score/.call_id",
+			"reviewedPath": "security_risk_score/.call_id",
+			"decision": "map_existing",
+			"fact": "calls/call_id"
+		},
+		{
+			"path": "security_risk_score/.scores",
+			"reviewedPath": "security_risk_score/.scores",
+			"decision": "ignore"
+		},
+		{
+			"path": "security_risk_score/.scores.{*}",
+			"reviewedPath": "security_risk_score/.scores.{*}",
+			"decision": "new_fact",
+			"fact": "security_risk_score"
+		},
+		{
+			"path": "session_meta/.base_instructions",
+			"reviewedPath": "session_meta/.base_instructions",
+			"decision": "ignore"
+		},
+		{
+			"path": "session_meta/.history_base.end_byte_offset",
+			"reviewedPath": "session_meta/.history_base.end_byte_offset",
+			"decision": "ignore"
+		},
+		{
+			"path": "session_meta/.history_base.end_ordinal_exclusive",
+			"reviewedPath": "session_meta/.history_base.end_ordinal_exclusive",
+			"decision": "ignore"
+		},
+		{
+			"path": "session_meta/.history_base.thread_id",
+			"reviewedPath": "session_meta/.history_base.thread_id",
+			"decision": "ignore"
+		},
+		{
+			"path": "session_meta/.memory_mode",
+			"reviewedPath": "session_meta/.memory_mode",
+			"decision": "new_fact",
+			"fact": "session_memory_mode"
+		},
+		{
+			"path": "session_meta/.selected_capability_roots[].id",
+			"reviewedPath": "session_meta/.selected_capability_roots[].id",
+			"decision": "new_fact",
+			"fact": "selected_capability_roots"
+		},
+		{
+			"path": "session_meta/.selected_capability_roots[].location.path",
+			"reviewedPath": "session_meta/.selected_capability_roots[].location.path",
+			"decision": "new_fact",
+			"fact": "selected_capability_roots"
+		},
+		{
+			"path": "session_meta/.source.custom",
+			"reviewedPath": "session_meta/.source.custom",
+			"decision": "map_existing",
+			"fact": "runs/entrypoint"
+		},
+		{
+			"path": "session_meta/.source.internal",
+			"reviewedPath": "session_meta/.source.internal",
+			"decision": "map_existing",
+			"fact": "runs/entrypoint"
+		},
+		{
+			"path": "turn_context/.approval_policy.granular.mcp_elicitations",
+			"reviewedPath": "turn_context/.approval_policy.granular.mcp_elicitations",
+			"decision": "map_existing",
+			"fact": "runs/approval_policy"
+		},
+		{
+			"path": "turn_context/.approval_policy.granular.request_permissions",
+			"reviewedPath": "turn_context/.approval_policy.granular.request_permissions",
+			"decision": "map_existing",
+			"fact": "runs/approval_policy"
+		},
+		{
+			"path": "turn_context/.approval_policy.granular.rules",
+			"reviewedPath": "turn_context/.approval_policy.granular.rules",
+			"decision": "map_existing",
+			"fact": "runs/approval_policy"
+		},
+		{
+			"path": "turn_context/.approval_policy.granular.sandbox_approval",
+			"reviewedPath": "turn_context/.approval_policy.granular.sandbox_approval",
+			"decision": "map_existing",
+			"fact": "runs/approval_policy"
+		},
+		{
+			"path": "turn_context/.approval_policy.granular.skill_approval",
+			"reviewedPath": "turn_context/.approval_policy.granular.skill_approval",
+			"decision": "map_existing",
+			"fact": "runs/approval_policy"
+		},
+		{
+			"path": "turn_context/.sandbox_policy.exclude_slash_tmp",
+			"reviewedPath": "turn_context/.sandbox_policy.exclude-slash-tmp",
+			"decision": "ignore"
+		},
+		{
+			"path": "turn_context/.sandbox_policy.exclude_tmpdir_env_var",
+			"reviewedPath": "turn_context/.sandbox_policy.exclude-tmpdir-env-var",
+			"decision": "ignore"
+		},
+		{
+			"path": "turn_context/.sandbox_policy.writable_roots",
+			"reviewedPath": "turn_context/.sandbox_policy.writable-roots",
+			"decision": "ignore"
+		},
+		{
+			"path": "turn_context/.sandbox_policy.writable_roots[]",
+			"reviewedPath": "turn_context/.sandbox_policy.writable-roots[]",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/agent_message.delivery",
+			"reviewedPath": "event_msg/agent_message.delivery",
+			"decision": "new_fact",
+			"fact": "assistant_message_delivery"
+		},
+		{
+			"path": "event_msg/agent_message.memory_citation.entries[].note",
+			"reviewedPath": "event_msg/agent_message.memory_citation.entries[].note",
+			"decision": "new_fact",
+			"fact": "memory_citation_note"
+		},
+		{
+			"path": "event_msg/entered_review_mode.target.title",
+			"reviewedPath": "event_msg/entered_review_mode.target.title",
+			"decision": "map_existing",
+			"fact": "runs/review_target"
+		},
+		{
+			"path": "event_msg/entered_review_mode.turn_id",
+			"reviewedPath": "event_msg/entered_review_mode.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "event_msg/exited_review_mode.review_output.findings[].title",
+			"reviewedPath": "event_msg/exited_review_mode.review_output.findings[].title",
+			"decision": "new_fact",
+			"fact": "review_finding_title"
+		},
+		{
+			"path": "event_msg/exited_review_mode.turn_id",
+			"reviewedPath": "event_msg/exited_review_mode.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "event_msg/image_generation_end.failure.type",
+			"reviewedPath": "event_msg/image_generation_end.failure.type",
+			"decision": "new_fact",
+			"fact": "image_generation"
+		},
+		{
+			"path": "event_msg/image_generation_end.status",
+			"reviewedPath": "event_msg/image_generation_end.status",
+			"decision": "new_fact",
+			"fact": "image_generation"
+		},
+		{
+			"path": "event_msg/image_generation_end.transparent_background",
+			"reviewedPath": "event_msg/image_generation_end.transparent_background",
+			"decision": "new_fact",
+			"fact": "image_generation"
+		},
+		{
+			"path": "event_msg/item_completed:AgentMessage.memory_citation.entries[].note",
+			"reviewedPath": "event_msg/item_completed:AgentMessage.memory_citation.entries[].note",
+			"decision": "new_fact",
+			"fact": "memory_citation_note"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}",
+			"decision": "new_fact",
+			"fact": "subagent_states"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.completed",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.completed",
+			"decision": "new_fact",
+			"fact": "subagent_states"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.errored",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.errored",
+			"decision": "new_fact",
+			"fact": "subagent_states"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.model",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.model",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_model"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.reasoning_effort",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.reasoning_effort",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_effort"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_nickname",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_nickname",
+			"decision": "new_fact",
+			"fact": "subagent_nickname"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_role",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_role",
+			"decision": "new_fact",
+			"fact": "subagent_role"
+		},
+		{
+			"path": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].thread_id",
+			"reviewedPath": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].thread_id",
+			"decision": "new_fact",
+			"fact": "subagent_thread_ids"
+		},
+		{
+			"path": "event_msg/item_completed:CommandExecution.interaction_input",
+			"reviewedPath": "event_msg/item_completed:CommandExecution.interaction_input",
+			"decision": "map_existing",
+			"fact": "calls/input_text"
+		},
+		{
+			"path": "event_msg/item_completed:DynamicToolCall.error",
+			"reviewedPath": "event_msg/item_completed:DynamicToolCall.error",
+			"decision": "new_fact",
+			"fact": "dynamic_tool_error"
+		},
+		{
+			"path": "event_msg/item_completed:EnteredReviewMode.target.title",
+			"reviewedPath": "event_msg/item_completed:EnteredReviewMode.target.title",
+			"decision": "map_existing",
+			"fact": "runs/review_target"
+		},
+		{
+			"path": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].title",
+			"reviewedPath": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].title",
+			"decision": "new_fact",
+			"fact": "review_finding_title"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.name",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.name",
+			"decision": "map_existing",
+			"fact": "calls/tool_name"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.namespace",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.namespace",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[input_image].detail",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[input_image].detail",
+			"decision": "ignore"
+		},
+		{
+			"path": "event_msg/item_completed:FunctionCallOutput.output[input_text].text",
+			"reviewedPath": "event_msg/item_completed:FunctionCallOutput.output[input_text].text",
+			"decision": "new_fact",
+			"fact": "tool_result_text"
+		},
+		{
+			"path": "event_msg/item_completed:HookPrompt.fragments[].text",
+			"reviewedPath": "event_msg/item_completed:HookPrompt.fragments[].text",
+			"decision": "map_existing",
+			"fact": "prompts/instruction_text"
+		},
+		{
+			"path": "event_msg/item_completed:McpToolCall.mcpAppUi.preferredModelDisplayMode",
+			"reviewedPath": "event_msg/item_completed:McpToolCall.mcpAppUi.preferredModelDisplayMode",
+			"decision": "new_fact",
+			"fact": "mcp_app_display_mode"
+		},
+		{
+			"path": "event_msg/item_completed:McpToolCall.mcpAppUi.resourceUri",
+			"reviewedPath": "event_msg/item_completed:McpToolCall.mcpAppUi.resourceUri",
+			"decision": "new_fact",
+			"fact": "mcp_app_resource_uri"
+		},
+		{
+			"path": "event_msg/item_completed:SubAgentActivity.model",
+			"reviewedPath": "event_msg/item_completed:SubAgentActivity.model",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_model"
+		},
+		{
+			"path": "event_msg/item_completed:SubAgentActivity.reasoning_effort",
+			"reviewedPath": "event_msg/item_completed:SubAgentActivity.reasoning_effort",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_effort"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.invocation.arguments",
+			"reviewedPath": "event_msg/mcp_tool_call_end.invocation.arguments",
+			"decision": "map_existing",
+			"fact": "calls/input_text"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.mcp_app_resource_uri",
+			"reviewedPath": "event_msg/mcp_tool_call_end.mcp_app_resource_uri",
+			"decision": "new_fact",
+			"fact": "mcp_app_resource_uri"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.mcp_app_ui.preferredModelDisplayMode",
+			"reviewedPath": "event_msg/mcp_tool_call_end.mcp_app_ui.preferredModelDisplayMode",
+			"decision": "new_fact",
+			"fact": "mcp_app_display_mode"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.mcp_app_ui.resourceUri",
+			"reviewedPath": "event_msg/mcp_tool_call_end.mcp_app_ui.resourceUri",
+			"decision": "new_fact",
+			"fact": "mcp_app_resource_uri"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.result._meta",
+			"reviewedPath": "event_msg/mcp_tool_call_end.result._meta",
+			"decision": "new_fact",
+			"fact": "mcp_result_metadata"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.result.content",
+			"reviewedPath": "event_msg/mcp_tool_call_end.result.content",
+			"decision": "new_fact",
+			"fact": "tool_result_content"
+		},
+		{
+			"path": "event_msg/mcp_tool_call_end.turn_id",
+			"reviewedPath": "event_msg/mcp_tool_call_end.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.agent_thread_id",
+			"reviewedPath": "event_msg/sub_agent_activity.agent_thread_id",
+			"decision": "new_fact",
+			"fact": "subagent_thread_ids"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.model",
+			"reviewedPath": "event_msg/sub_agent_activity.model",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_model"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.occurred_at_ms",
+			"reviewedPath": "event_msg/sub_agent_activity.occurred_at_ms",
+			"decision": "new_fact",
+			"fact": "subagent_activity_at_ms"
+		},
+		{
+			"path": "event_msg/sub_agent_activity.reasoning_effort",
+			"reviewedPath": "event_msg/sub_agent_activity.reasoning_effort",
+			"decision": "new_fact",
+			"fact": "subagent_resolved_effort"
+		},
+		{
+			"path": "event_msg/task_complete.root_turn_id",
+			"reviewedPath": "event_msg/task_complete.root_turn_id",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/task_started.turn_attribution.initiating_agent_path",
+			"reviewedPath": "event_msg/task_started.turn_attribution.initiating_agent_path",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/task_started.turn_attribution.parent_turn_id",
+			"reviewedPath": "event_msg/task_started.turn_attribution.parent_turn_id",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/task_started.turn_attribution.root_turn_id",
+			"reviewedPath": "event_msg/task_started.turn_attribution.root_turn_id",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/task_started.turn_attribution.turn_trigger",
+			"reviewedPath": "event_msg/task_started.turn_attribution.turn_trigger",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/thread_goal_updated.goal.tokenBudget",
+			"reviewedPath": "event_msg/thread_goal_updated.goal.tokenBudget",
+			"decision": "new_fact",
+			"fact": "goal_token_budget"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info.active_turn_not_steerable.turn_kind",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info.ActiveTurnNotSteerable.turn_kind",
+			"decision": "new_fact",
+			"fact": "non_steerable_turn_kind"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info.http_connection_failed.http_status_code",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info.HttpConnectionFailed.http_status_code",
+			"decision": "new_fact",
+			"fact": "turn_error_http_status"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info.response_stream_connection_failed.http_status_code",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info.ResponseStreamConnectionFailed.http_status_code",
+			"decision": "new_fact",
+			"fact": "turn_error_http_status"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info.response_stream_disconnected.http_status_code",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info.ResponseStreamDisconnected.http_status_code",
+			"decision": "new_fact",
+			"fact": "turn_error_http_status"
+		},
+		{
+			"path": "event_msg/turn_aborted.error.codex_error_info.response_too_many_failed_attempts.http_status_code",
+			"reviewedPath": "event_msg/turn_aborted.error.codex_error_info.ResponseTooManyFailedAttempts.http_status_code",
+			"decision": "new_fact",
+			"fact": "turn_error_http_status"
+		},
+		{
+			"path": "event_msg/turn_aborted.root_turn_id",
+			"reviewedPath": "event_msg/turn_aborted.root_turn_id",
+			"decision": "new_fact",
+			"fact": "turn_attribution"
+		},
+		{
+			"path": "event_msg/user_message.audio",
+			"reviewedPath": "event_msg/user_message.audio",
+			"decision": "map_existing",
+			"fact": "prompts/audio_input"
+		},
+		{
+			"path": "event_msg/user_message.file_id_details",
+			"reviewedPath": "event_msg/user_message.file_id_details",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.file_ids",
+			"reviewedPath": "event_msg/user_message.file_ids",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.image_details",
+			"reviewedPath": "event_msg/user_message.image_details",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "event_msg/user_message.local_audio",
+			"reviewedPath": "event_msg/user_message.local_audio",
+			"decision": "map_existing",
+			"fact": "prompts/audio_input"
+		},
+		{
+			"path": "event_msg/user_message.local_image_details",
+			"reviewedPath": "event_msg/user_message.local_image_details",
+			"decision": "map_existing",
+			"fact": "prompts/image_input"
+		},
+		{
+			"path": "inter_agent_communication/.other_recipients[]",
+			"reviewedPath": "inter_agent_communication/.other_recipients[]",
+			"decision": "new_fact",
+			"fact": "communication_other_recipients"
+		},
+		{
+			"path": "inter_agent_communication/.recipient",
+			"reviewedPath": "inter_agent_communication/.recipient",
+			"decision": "new_fact",
+			"fact": "communication_recipient"
+		},
+		{
+			"path": "inter_agent_communication/.trigger_turn",
+			"reviewedPath": "inter_agent_communication/.trigger_turn",
+			"decision": "new_fact",
+			"fact": "prompt_triggers_turn"
+		},
+		{
+			"path": "realtime_item/.turn_id",
+			"reviewedPath": "realtime_item/.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "response_item/function_call_output.name",
+			"reviewedPath": "response_item/function_call_output.name",
+			"decision": "map_existing",
+			"fact": "calls/tool_name"
+		},
+		{
+			"path": "response_item/function_call_output.namespace",
+			"reviewedPath": "response_item/function_call_output.namespace",
+			"decision": "map_existing",
+			"fact": "calls/tool_namespace"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].access",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].access",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].missing_path_behavior",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].missing_path_behavior",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.path",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.path",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.pattern",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.pattern",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.type",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.type",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.kind",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.kind",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.path",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.path",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.subpath",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.subpath",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.glob_scan_max_depth",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.glob_scan_max_depth",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.read[]",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.read[]",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.write[]",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.write[]",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.additional_permissions.network.enabled",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.additional_permissions.network.enabled",
+			"decision": "new_fact",
+			"fact": "requested_additional_permissions"
+		},
+		{
+			"path": "response_item/function_call:exec_command.arguments.environment_id",
+			"reviewedPath": "response_item/function_call:exec_command.arguments.environment_id",
+			"decision": "new_fact",
+			"fact": "execution_environment_id"
+		},
+		{
+			"path": "response_item/function_call:spawn_agent.arguments.items",
+			"reviewedPath": "response_item/function_call:spawn_agent.arguments.items",
+			"decision": "map_existing",
+			"fact": "calls/input_text"
+		},
+		{
+			"path": "response_item/image_generation_call.status",
+			"reviewedPath": "response_item/image_generation_call.status",
+			"decision": "new_fact",
+			"fact": "image_generation"
+		},
+		{
+			"path": "response_item/local_shell_call.action.user",
+			"reviewedPath": "response_item/local_shell_call.action.user",
+			"decision": "new_fact",
+			"fact": "execution_user"
+		},
+		{
+			"path": "response_item/local_shell_call.status",
+			"reviewedPath": "response_item/local_shell_call.status",
+			"decision": "new_fact",
+			"fact": "local_shell_status"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.complete",
+			"reviewedPath": "retained_context/delivered_assistant_message.complete",
+			"decision": "ignore"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.origin",
+			"reviewedPath": "retained_context/delivered_assistant_message.origin",
+			"decision": "new_fact",
+			"fact": "assistant_delivery_origin"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.phase",
+			"reviewedPath": "retained_context/delivered_assistant_message.phase",
+			"decision": "map_existing",
+			"fact": "runs/message_phase"
+		},
+		{
+			"path": "retained_context/delivered_assistant_message.turn_id",
+			"reviewedPath": "retained_context/delivered_assistant_message.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "retained_context/verified_answer.call_id",
+			"reviewedPath": "retained_context/verified_answer.call_id",
+			"decision": "map_existing",
+			"fact": "calls/call_id"
+		},
+		{
+			"path": "retained_context/verified_answer.turn_id",
+			"reviewedPath": "retained_context/verified_answer.turn_id",
+			"decision": "map_existing",
+			"fact": "runs/turn_id"
+		},
+		{
+			"path": "security_risk_score/.sampled_at",
+			"reviewedPath": "security_risk_score/.sampled_at",
+			"decision": "map_existing",
+			"fact": "runs/security_risk_score"
+		},
+		{
+			"path": "session_meta/.creator_account_id",
+			"reviewedPath": "session_meta/.creator_account_id",
+			"decision": "new_fact",
+			"fact": "creator_account_id"
+		},
+		{
+			"path": "session_meta/.creator_user_id",
+			"reviewedPath": "session_meta/.creator_user_id",
+			"decision": "new_fact",
+			"fact": "creator_user_id"
+		},
+		{
+			"path": "session_meta/.forked_from_ordinal_exclusive",
+			"reviewedPath": "session_meta/.forked_from_ordinal_exclusive",
+			"decision": "new_fact",
+			"fact": "fork_point"
+		},
+		{
+			"path": "session_meta/.runtime_workspace_roots",
+			"reviewedPath": "session_meta/.runtime_workspace_roots",
+			"decision": "new_fact",
+			"fact": "runtime_workspace_roots"
+		},
+		{
+			"path": "session_meta/.selected_capability_roots",
+			"reviewedPath": "session_meta/.selected_capability_roots",
+			"decision": "map_existing",
+			"fact": "runs/selected_capability_roots"
+		},
+		{
+			"path": "session_meta/.selected_capability_roots[].location.environmentId",
+			"reviewedPath": "session_meta/.selected_capability_roots[].location.environmentId",
+			"decision": "map_existing",
+			"fact": "runs/selected_capability_roots"
+		},
+		{
+			"path": "session_meta/.selected_capability_roots[].location.type",
+			"reviewedPath": "session_meta/.selected_capability_roots[].location.type",
+			"decision": "map_existing",
+			"fact": "runs/selected_capability_roots"
+		},
+		{
+			"path": "session_meta/.source.subagent",
+			"reviewedPath": "session_meta/.source.subagent",
+			"decision": "map_existing",
+			"fact": "runs/entrypoint"
+		},
+		{
+			"path": "session_meta/.thread_source",
+			"reviewedPath": "session_meta/.thread_source.Feature",
+			"decision": "new_fact",
+			"fact": "thread_source"
+		},
+		{
+			"path": "turn_context/.active_permission_profile.extends",
+			"reviewedPath": "turn_context/.active_permission_profile.extends",
+			"decision": "new_fact",
+			"fact": "permission_profile_parent"
+		},
+		{
+			"path": "turn_context/.disabled_plugin_ids[]",
+			"reviewedPath": "turn_context/.disabled_plugin_ids[]",
+			"decision": "new_fact",
+			"fact": "disabled_plugin_ids"
+		},
+		{
+			"path": "turn_context/.sandbox_policy.network_access",
+			"reviewedPath": "turn_context/.sandbox_policy.network-access",
+			"decision": "map_existing",
+			"fact": "runs/sandbox_policy"
+		}
+	],
+	"pending": []
+}

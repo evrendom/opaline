@@ -3,6 +3,15 @@ import { FACT_AGENTS, FACT_CATALOG } from "./fact-catalog.js";
 import { compareCensus, createCensus } from "./fact-census.js";
 import { addCensusPaths, FIXTURE_CORPUS_DIR } from "./fact-census-files.js";
 import { FACT_CENSUS_CATALOG } from "./fact-census-ignored.js";
+import {
+	COMPARABILITY_LABELS,
+	factComparability,
+	mappingConfidence,
+	mappingCorpus,
+	mappingMetrics,
+	relationLabel,
+	withMappingEvidence,
+} from "./fact-mapping.js";
 import type { OutlineNode } from "./fact-outline.js";
 import {
 	type FactReviewData,
@@ -56,13 +65,38 @@ describe("the fact review page", async () => {
 		);
 		FACT_CATALOG.forEach((entry, index) => {
 			const fact = data.facts[index];
+			const mapping = withMappingEvidence(
+				[entry],
+				mappingCorpus(census, data.corpus.label),
+			)[0];
+			if (mapping === undefined) throw new Error("Missing mapping");
 			expect(fact?.id).toBe(entry.id);
 			expect(fact?.hash).toBe(factEntryHash(entry));
 			expect(fact?.decision).toBe(entry.decision);
-			for (const agent of FACT_AGENTS)
+			for (const agent of FACT_AGENTS) {
 				expect(fact?.agents[agent].status).toBe(entry.agents[agent].status);
+				expect(fact?.agents[agent].relation).toBe(
+					relationLabel(entry.agents[agent].relation),
+				);
+				expect(fact?.agents[agent].confidence).toBe(
+					mappingConfidence(mapping.agents[agent]),
+				);
+			}
+			expect(fact?.comparability).toBe(
+				COMPARABILITY_LABELS[factComparability(entry)],
+			);
 		});
 		expect(data.meta).toEqual(META);
+		for (const agent of FACT_AGENTS)
+			expect(data.metrics[agent]).toEqual(
+				mappingMetrics(
+					withMappingEvidence(
+						FACT_CATALOG,
+						mappingCorpus(census, data.corpus.label),
+					),
+					agent,
+				),
+			);
 	});
 
 	test("every census path appears in its agent's outline exactly once", () => {
@@ -81,6 +115,29 @@ describe("the fact review page", async () => {
 			expect(inTree).toEqual(outline.paths.map((_, index) => index));
 			expect(outline.records).toBe(census.records.get(outline.agent) ?? 0);
 		}
+	});
+
+	test("shows source residue separately from observed corpus residue and unreviewed mappings", () => {
+		expect(data.sourceOracle.total).toBe(2087);
+		expect(data.sourceOracle.missingSources).toEqual([]);
+		expect(data.sourceOracle.residue).toEqual([]);
+		expect(data.sourceOracle.pendingReview.length).toBe(0);
+		expect(data.sourceOracle.pending.length).toBe(0);
+		expect(html).toContain(
+			"Codex can write these; we neither map nor ignore them",
+		);
+		expect(html).toContain("unreviewed");
+		expect(data.sourceCensus.total).toBeGreaterThan(0);
+		expect(data.sourceCensus.total).toBe(census.paths.get("codex")?.size ?? 0);
+		for (const path of data.sourceOracle.residue)
+			expect(html).toContain(
+				path.path
+					.replaceAll("&", "&amp;")
+					.replaceAll("<", "&lt;")
+					.replaceAll(">", "&gt;")
+					.replaceAll('"', "&quot;")
+					.replaceAll("'", "&#39;"),
+			);
 	});
 
 	test("classifies each path as the census comparison does", () => {
@@ -115,15 +172,24 @@ describe("the fact review page", async () => {
 		);
 		FACT_CATALOG.forEach((entry, index) => {
 			const row = data.corpus.side[index];
-			const has = FACT_AGENTS.filter(
-				(agent) => entry.agents[agent].status !== "not_recorded",
+			const has = FACT_AGENTS.filter((agent) =>
+				entry.agents[agent].sourceMappings.some(
+					(source) => source.role === "primary",
+				),
 			);
 			expect(row?.connection).toBe(
 				has.length === 2 ? "both" : (has[0] ?? "neither"),
 			);
 			for (const [agentIndex, agent] of FACT_AGENTS.entries()) {
 				const fact = entry.agents[agent];
-				const gap = fact.status === "stored" ? (fact.gap?.sources ?? []) : [];
+				const gap =
+					fact.status === "stored" || fact.status === "wrong"
+						? (fact.gap?.sources ?? []).filter((path) =>
+								fact.sourceMappings.some(
+									(source) => source.path === path && source.role === "primary",
+								),
+							)
+						: [];
 				expect(row?.agents[agent].map((source) => source.pattern)).toEqual([
 					...fact.sources,
 					...gap,

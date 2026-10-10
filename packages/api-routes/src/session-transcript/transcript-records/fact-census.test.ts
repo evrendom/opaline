@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { catalogSources } from "./fact-catalog.js";
+import { catalogSources, FACT_CATALOG } from "./fact-catalog.js";
 import {
 	addCensusText,
 	type CensusAgent,
@@ -9,9 +9,11 @@ import {
 	censusRecordKind,
 	censusRecordPaths,
 	censusStepText,
+	censusStream,
 	compareCensus,
 	createCensus,
 	formatCensusReport,
+	type IgnoredPath,
 	isIgnoredPath,
 	pathMatches,
 } from "./fact-census.js";
@@ -321,10 +323,11 @@ describe("patterns and the ignore list", () => {
 	});
 
 	test("an except path stays reported", () => {
-		const rule = {
+		const rule: IgnoredPath = {
 			path: "a.input.**",
 			except: ["a.input.timeout"],
 			reason: "r",
+			rule: "bookkeeping",
 		};
 		expect(isIgnoredPath("a.input.command", "codex", [rule])).toBe(true);
 		expect(isIgnoredPath("a.input.timeout", "codex", [rule])).toBe(false);
@@ -336,8 +339,252 @@ describe("patterns and the ignore list", () => {
 	});
 
 	test("every ignored path says why", () => {
-		for (const rule of CENSUS_IGNORED_PATHS)
+		for (const rule of CENSUS_IGNORED_PATHS) {
 			expect(rule.reason.trim()).not.toBe("");
+			expect([
+				"verified_duplicate",
+				"stream_identity",
+				"constant_watch",
+				"text_copy",
+				"bookkeeping",
+			]).toContain(rule.rule);
+			if (rule.rule === "verified_duplicate")
+				expect(rule.verification.length).toBeGreaterThan(30);
+			if (rule.rule === "constant_watch")
+				expect("observedConstant" in rule).toBe(true);
+		}
+	});
+
+	test("WATCH follow-up maps varying literals; round 3 retains collaboration state containers", () => {
+		for (const source of [
+			"event_msg/item_completed:AgentMessage.delivery",
+			"event_msg/exec_command_end.source",
+			"event_msg/item_completed:McpToolCall.mcpAppResourceUri",
+			"response_item/message:*@metadata.client_authored",
+			"response_item/*.internal_chat_message_metadata_passthrough.content_item_kinds[]",
+		])
+			expect(catalogSources("codex")).toContain(source);
+		expect(catalogSources("claude_code")).toContain(
+			"attachment/*.renderedRole",
+		);
+		expect(
+			isIgnoredPath(
+				"attachment/environment.renderedRole",
+				"claude_code",
+				CENSUS_IGNORED_PATHS,
+			),
+		).toBe(false);
+		const census = createCensus(CENSUS_IGNORED_PATHS);
+		addCensusText(
+			census,
+			JSON.stringify({
+				type: "event_msg",
+				payload: {
+					type: "item_completed",
+					item: { type: "CollabAgentToolCall", agents_states: {} },
+				},
+			}),
+			"codex",
+		);
+		expect(census.alerts.get("codex")?.size).toBe(0);
+		addCensusText(
+			census,
+			JSON.stringify({
+				type: "event_msg",
+				payload: {
+					type: "item_completed",
+					item: { type: "CollabAgentToolCall", agents_states: [] },
+				},
+			}),
+			"codex",
+		);
+		expect(census.alerts.get("codex")?.size).toBe(0);
+		expect(catalogSources("codex")).toContain(
+			"event_msg/item_completed:CollabAgentToolCall.agents_states",
+		);
+		expect(
+			isIgnoredPath(
+				"event_msg/item_completed:CollabAgentToolCall.agents_states",
+				"codex",
+				CENSUS_IGNORED_PATHS,
+			),
+		).toBe(false);
+	});
+
+	test("WATCH checks non-enum values, every array member and populated containers without retaining values", () => {
+		const ignored: IgnoredPath[] = [
+			{
+				path: "attachment/test.attachment.flag",
+				rule: "constant_watch",
+				observedConstant: false,
+				reason: "observed false",
+			},
+			{
+				path: "attachment/test.attachment.names[]",
+				rule: "constant_watch",
+				observedConstant: "known",
+				reason: "observed known",
+			},
+			{
+				path: "attachment/test.attachment.empty",
+				rule: "constant_watch",
+				observedConstant: [],
+				reason: "observed []",
+			},
+		];
+		const census = createCensus(ignored);
+		addCensusText(
+			census,
+			[
+				JSON.stringify({
+					type: "attachment",
+					attachment: {
+						type: "test",
+						flag: false,
+						names: ["known"],
+						empty: [],
+					},
+				}),
+				JSON.stringify({
+					type: "attachment",
+					attachment: {
+						type: "test",
+						flag: true,
+						names: ["known", "a secret never retained"],
+						empty: ["new"],
+					},
+				}),
+			].join("\n"),
+		);
+		const report = compareCensus(census, { sources: () => [], ignored });
+		expect(report.agents[0]?.alerts.map((issue) => issue.path).sort()).toEqual([
+			"attachment/test.attachment.empty",
+			"attachment/test.attachment.flag",
+			"attachment/test.attachment.names[]",
+		]);
+		expect(JSON.stringify(report.agents[0]?.alerts)).not.toContain(
+			"a secret never retained",
+		);
+		expect(formatCensusReport(report)).toContain("ALERT constant_watch");
+	});
+
+	test("stop-sequence WATCH accepts null and empty but alerts on a populated value", () => {
+		const census = createCensus(CENSUS_IGNORED_PATHS);
+		const addLine = censusStream(census, "claude_code");
+		for (const stopSequence of [null, ""])
+			addLine(
+				JSON.stringify({
+					type: "assistant",
+					message: { stop_sequence: stopSequence },
+				}),
+			);
+		expect(census.alerts.get("claude_code")?.size).toBe(0);
+		addLine(
+			JSON.stringify({
+				type: "assistant",
+				message: { stop_sequence: "a secret stop sequence" },
+			}),
+		);
+		const alerts =
+			compareCensus(census, FACT_CENSUS_CATALOG).agents[0]?.alerts ?? [];
+		expect(alerts).toEqual([
+			{
+				rule: "constant_watch",
+				path: "assistant.message.stop_sequence",
+				expected: '[null,""]',
+				count: 1,
+			},
+		]);
+		expect(JSON.stringify(alerts)).not.toContain("a secret stop sequence");
+	});
+
+	test("Codex stream identity checks thread IDs, not root lineage, and reports literal paths", () => {
+		const census = createCensus(CENSUS_IGNORED_PATHS);
+		const addLine = censusStream(census, "codex", {
+			sessionId: "child-thread",
+		});
+		addLine(
+			JSON.stringify({
+				type: "session_meta",
+				payload: { id: "child-thread", session_id: "root-session" },
+			}),
+		);
+		addLine(
+			JSON.stringify({
+				type: "token_usage_record",
+				payload: { thread_id: "child-thread", session_id: "root-session" },
+			}),
+		);
+		for (const recordType of ["session_meta", "token_usage_record"])
+			addLine(
+				JSON.stringify({
+					type: recordType,
+					payload: { session_id: "root-session" },
+				}),
+			);
+		expect(census.alerts.get("codex")?.size).toBe(0);
+		addLine(
+			JSON.stringify({
+				type: "session_meta",
+				payload: { id: "other-thread", session_id: "root-session" },
+			}),
+		);
+		addLine(
+			JSON.stringify({
+				type: "token_usage_record",
+				payload: { thread_id: "other-thread", session_id: "root-session" },
+			}),
+		);
+		const alerts =
+			compareCensus(census, FACT_CENSUS_CATALOG).agents.find(
+				(agent) => agent.agent === "codex",
+			)?.alerts ?? [];
+		expect(alerts.map((issue) => issue.path).sort()).toEqual([
+			"session_meta/.id",
+			"token_usage_record/.thread_id",
+		]);
+		expect(alerts.every((issue) => issue.count === 1)).toBe(true);
+		expect(JSON.stringify(alerts)).not.toContain("root-session");
+	});
+
+	test("stream identity checks attachment restatements and resets at file boundaries", () => {
+		const census = createCensus();
+		addCensusText(
+			census,
+			[
+				JSON.stringify({
+					type: "user",
+					sessionId: "session-a",
+					agentId: "agent-a",
+					isSidechain: true,
+				}),
+				JSON.stringify({
+					type: "attachment",
+					attachment: { type: "test" },
+					sessionId: "session-b",
+					agentId: "agent-b",
+					isSidechain: false,
+				}),
+			].join("\n"),
+		);
+		addCensusText(
+			census,
+			JSON.stringify({
+				type: "user",
+				sessionId: "session-b",
+				agentId: "agent-b",
+				isSidechain: false,
+			}),
+		);
+		const alerts =
+			compareCensus(census, FACT_CENSUS_CATALOG).agents[0]?.alerts ?? [];
+		expect(alerts.length).toBe(3);
+		expect(
+			alerts.every(
+				(issue) => issue.rule === "stream_identity" && issue.count === 1,
+			),
+		).toBe(true);
+		expect(JSON.stringify(alerts)).not.toContain("session-a");
 	});
 
 	test("a path the catalog names is mapped, others unmapped, and unseen sources are listed", () => {
@@ -427,7 +674,7 @@ describe("path parts", () => {
 });
 
 describe("the parser fixtures are fully catalogued", () => {
-	test("every field path in the transcript-records fixtures is a catalog source or ignored", async () => {
+	test("every fixture path is a primary source, explicit context, or ignored", async () => {
 		const root = new URL("../__fixtures__", import.meta.url).pathname;
 		const census = createCensus();
 		const files: string[] = [];
@@ -449,7 +696,18 @@ describe("the parser fixtures are fully catalogued", () => {
 		for (const agent of report.agents)
 			expect({
 				agent: agent.agent,
-				unmapped: agent.unmapped.map((path) => path.path),
+				unmapped: agent.unmapped
+					.filter(
+						(path) =>
+							!FACT_CATALOG.some((entry) =>
+								entry.agents[agent.agent].sourceMappings.some(
+									(source) =>
+										source.role === "context" &&
+										pathMatches(source.path, path.path),
+								),
+							),
+					)
+					.map((path) => path.path),
 			}).toEqual({
 				agent: agent.agent,
 				unmapped: [],
@@ -460,9 +718,10 @@ describe("the parser fixtures are fully catalogued", () => {
 		for (const agent of ["claude_code", "codex"] as const)
 			for (const source of catalogSources(agent)) {
 				const codexShape =
+					source.startsWith("response_item/*.") ||
 					/^[a-z_]+\/[A-Za-z_]*(?::[^.@]+)?(?:[.@~]|$)/u.test(source) ||
 					source.startsWith("*@");
-				const claudeShape = /^(?:\*|[a-z-]+(?:\/[a-z_]+)?)[.~]/u.test(source);
+				const claudeShape = /^(?:\*|[a-z-]+(?:\/[a-z_*]+)?)[.~]/u.test(source);
 				expect({
 					source,
 					ok: agent === "codex" ? codexShape : claudeShape,

@@ -100,7 +100,7 @@ export function cellBadges(cell: ReviewCell): string {
 		cell.version === ""
 			? ""
 			: `<span class="version">${esc(cell.version)}</span>`;
-	return `<span class="badges">${badge(cell.status)}${version}${cell.gap ? badge("gap") : ""}</span>`;
+	return `<span class="badges">${badge(cell.status)}${version}${cell.gap ? badge("gap") : ""}<span class="version" title="${esc(cell.relation)}">${esc(cell.relation.split(":")[0] ?? cell.relation)} · ${esc(cell.confidence)}</span></span>`;
 }
 
 export function sourceCode(source: ReviewSource): string {

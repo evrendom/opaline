@@ -1,5 +1,5 @@
 import { readdir, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { type Census, type CensusAgent, censusStream } from "./fact-census.js";
 
 /**
@@ -33,7 +33,16 @@ export async function addCensusFile(
 	path: string,
 	agent?: CensusAgent,
 ): Promise<void> {
-	const addLine = censusStream(census, agent);
+	const filename = basename(path, ".jsonl");
+	const sessionId =
+		/(?:^|[-])([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u.exec(
+			filename,
+		)?.[1];
+	const agentId = /^agent-(.+)$/u.exec(filename)?.[1];
+	const addLine = censusStream(census, agent, {
+		...(sessionId === undefined ? {} : { sessionId }),
+		...(agentId === undefined ? {} : { agentId, isSidechain: true }),
+	});
 	const decoder = new TextDecoder();
 	let pending = "";
 	const reader = Bun.file(path).stream().getReader();

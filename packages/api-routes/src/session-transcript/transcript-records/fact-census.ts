@@ -266,15 +266,31 @@ export interface Census {
 	readonly kinds: Map<CensusAgent, Map<string, number>>;
 	readonly unparseable: Map<CensusAgent, number>;
 	readonly paths: Map<CensusAgent, Map<string, CensusPathStats>>;
+	readonly watches: ReadonlyMap<string, readonly IgnoredPath[]>;
+	readonly alerts: Map<CensusAgent, Map<string, CensusAlert>>;
 }
 
-export function createCensus(): Census {
+export function createCensus(ignored: readonly IgnoredPath[] = []): Census {
+	const watches = new Map<string, IgnoredPath[]>();
+	for (const rule of ignored) {
+		if (rule.rule !== "constant_watch") continue;
+		const key = [...censusPathParts(rule.path).steps]
+			.reverse()
+			.find((step) => step.kind === "key" || step.kind === "outer");
+		if (key === undefined || !("name" in key))
+			throw new Error(`WATCH must name a field: ${rule.path}`);
+		const group = watches.get(key.name) ?? [];
+		group.push(rule);
+		watches.set(key.name, group);
+	}
 	return {
 		files: new Map(),
 		records: new Map(),
 		kinds: new Map(CENSUS_AGENTS.map((agent) => [agent, new Map()])),
 		unparseable: new Map(),
 		paths: new Map(CENSUS_AGENTS.map((agent) => [agent, new Map()])),
+		watches,
+		alerts: new Map(CENSUS_AGENTS.map((agent) => [agent, new Map()])),
 	};
 }
 
@@ -284,6 +300,38 @@ interface PathValue {
 	readonly value: string | undefined;
 }
 
+class CensusPathValues extends Map<string, PathValue> {
+	constructor(
+		readonly observe?: (path: string, key: string, value: unknown) => void,
+	) {
+		super();
+	}
+}
+
+export interface CensusAlert {
+	readonly rule: "constant_watch" | "stream_identity";
+	readonly path: string;
+	readonly expected: string;
+	count: number;
+}
+
+function alert(census: Census, agent: CensusAgent, issue: CensusAlert): void {
+	const alerts = census.alerts.get(agent);
+	if (alerts === undefined) throw new Error(`Missing alerts for ${agent}`);
+	const key = `${issue.rule}:${issue.path}:${issue.expected}`;
+	const previous = alerts.get(key);
+	if (previous === undefined) alerts.set(key, issue);
+	else previous.count += issue.count;
+}
+
+function constantEquals(expected: unknown, value: unknown): boolean {
+	if (Array.isArray(expected))
+		return Array.isArray(value) && value.length === 0;
+	if (isObject(expected))
+		return isObject(value) && Object.keys(value).length === 0;
+	return expected === value;
+}
+
 /**
  * The normalized paths of one record, each with a summary of its value
  * (type, length, and the value itself only for enum-like keys).
@@ -291,8 +339,9 @@ interface PathValue {
 export function censusRecordPaths(
 	record: Record<string, unknown>,
 	agent: CensusAgent,
+	observe?: (path: string, key: string, value: unknown) => void,
 ): Map<string, PathValue> {
-	const out = new Map<string, PathValue>();
+	const out = new CensusPathValues(observe);
 	if (agent === "codex") walkCodex(record, out);
 	else walkClaude(record, out);
 	return out;
@@ -312,7 +361,37 @@ export function addCensusRecord(
 	kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
 	const paths = census.paths.get(agent) ?? new Map();
 	census.paths.set(agent, paths);
-	for (const [path, value] of censusRecordPaths(record, agent)) {
+	for (const [path, value] of censusRecordPaths(
+		record,
+		agent,
+		(path, key, value) => {
+			for (const rule of census.watches.get(key) ?? []) {
+				if (
+					rule.rule !== "constant_watch" ||
+					(rule.agent !== undefined && rule.agent !== agent) ||
+					!pathMatches(rule.path, path) ||
+					(rule.except ?? []).some((except) => pathMatches(except, path))
+				)
+					continue;
+				if (
+					!constantEquals(rule.observedConstant, value) &&
+					!(rule.alsoObservedConstants ?? []).some((expected) =>
+						constantEquals(expected, value),
+					)
+				)
+					alert(census, agent, {
+						rule: "constant_watch",
+						path,
+						expected: JSON.stringify(
+							rule.alsoObservedConstants === undefined
+								? rule.observedConstant
+								: [rule.observedConstant, ...rule.alsoObservedConstants],
+						),
+						count: 1,
+					});
+			}
+		},
+	)) {
 		let stats = paths.get(path);
 		if (stats === undefined) {
 			stats = {
@@ -381,10 +460,16 @@ export function addCensusText(
 export function censusStream(
 	census: Census,
 	agent?: CensusAgent,
+	identity: Readonly<
+		Partial<Record<"sessionId" | "agentId" | "isSidechain", string | boolean>>
+	> = {},
 ): (line: string) => void {
 	let version = "?";
 	let streamAgent = agent;
 	let counted = false;
+	const streamIdentity = new Map<string, string | boolean>(
+		Object.entries(identity),
+	);
 	return (line) => {
 		if (line.trim() === "") return;
 		let record: unknown;
@@ -402,6 +487,37 @@ export function censusStream(
 			counted = true;
 		}
 		version = censusRecordVersion(record, streamAgent) ?? version;
+		const payload = isObject(record.payload) ? record.payload : {};
+		const fields =
+			streamAgent === "claude_code"
+				? {
+						sessionId: record.sessionId,
+						agentId: record.agentId,
+						isSidechain: record.isSidechain,
+					}
+				: record.type === "session_meta"
+					? { sessionId: payload.id }
+					: record.type === "token_usage_record"
+						? { sessionId: payload.thread_id }
+						: {};
+		for (const [key, value] of Object.entries(fields)) {
+			if (typeof value !== "string" && typeof value !== "boolean") continue;
+			const expected = streamIdentity.get(key);
+			if (expected === undefined) streamIdentity.set(key, value);
+			else if (expected !== value)
+				alert(census, streamAgent, {
+					rule: "stream_identity",
+					path: `${censusRecordKind(record, streamAgent)}.${
+						streamAgent === "claude_code"
+							? key
+							: record.type === "session_meta"
+								? "id"
+								: "thread_id"
+					}`,
+					expected: "the stream identity",
+					count: 1,
+				});
+		}
 		addCensusRecord(census, streamAgent, version, record);
 	};
 }
@@ -410,7 +526,7 @@ export function censusStream(
 
 function walkClaude(
 	record: Record<string, unknown>,
-	out: Map<string, PathValue>,
+	out: CensusPathValues,
 ): void {
 	const type = typeof record.type === "string" ? record.type : "unknown";
 	const attachment = isObject(record.attachment) ? record.attachment : {};
@@ -436,7 +552,7 @@ function walkClaude(
 
 function walkCodex(
 	record: Record<string, unknown>,
-	out: Map<string, PathValue>,
+	out: CensusPathValues,
 ): void {
 	const payload = isObject(record.payload) ? record.payload : undefined;
 	const payloadType =
@@ -518,8 +634,9 @@ function walk(
 	path: string,
 	key: string,
 	depth: number,
-	out: Map<string, PathValue>,
+	out: CensusPathValues,
 ): void {
+	out.observe?.(path, key, value);
 	if (Array.isArray(value)) {
 		if (value.length === 0 || isOpaque(path) || depth > MAX_DEPTH) {
 			leaf(out, path, "array", 0, undefined);
@@ -585,7 +702,7 @@ function walk(
 }
 
 function leaf(
-	out: Map<string, PathValue>,
+	out: CensusPathValues,
 	path: string,
 	type: string,
 	chars: number,
@@ -798,7 +915,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 // --- Comparison with the catalog --------------------------------------------
 
 /** A path deliberately not a fact, with the reason. */
-export interface IgnoredPath {
+interface IgnoredPathBase {
 	/** A census path pattern (`*` inside a step, `**` anything). */
 	readonly path: string;
 	/** Paths under `path` that are not ignored (they must be catalogued). */
@@ -807,6 +924,29 @@ export interface IgnoredPath {
 	readonly agent?: CensusAgent;
 	readonly reason: string;
 }
+
+type ObservedConstant =
+	| string
+	| number
+	| boolean
+	| null
+	| readonly never[]
+	| Readonly<Record<string, never>>;
+
+export type IgnoredPath = IgnoredPathBase &
+	(
+		| { readonly rule: "verified_duplicate"; readonly verification: string }
+		| {
+				readonly rule: "stream_identity";
+				readonly identity: "sessionId" | "agentId" | "isSidechain";
+		  }
+		| {
+				readonly rule: "constant_watch";
+				readonly observedConstant: ObservedConstant;
+				readonly alsoObservedConstants?: readonly ObservedConstant[];
+		  }
+		| { readonly rule: "text_copy" | "bookkeeping" }
+	);
 
 export interface CensusPathReport {
 	readonly path: string;
@@ -832,6 +972,7 @@ export interface CensusAgentReport {
 	readonly unmapped: readonly CensusPathReport[];
 	/** Catalog sources no path of this corpus matches (stale or not in this corpus). */
 	readonly unseenSources: readonly string[];
+	readonly alerts: readonly CensusAlert[];
 }
 
 export interface CensusReport {
@@ -906,6 +1047,7 @@ export function compareCensus(
 			ignoredPaths,
 			unmapped,
 			unseenSources: sources.filter((source) => !seen.has(source)).sort(),
+			alerts: [...(census.alerts.get(agent)?.values() ?? [])],
 		});
 	}
 	return { agents };
@@ -945,6 +1087,10 @@ export function formatCensusReport(
 			`${agent.paths} paths: ${agent.mappedPaths} catalogued, ${agent.ignoredPaths} ignored, ${agent.unmapped.length} unmapped.`,
 			"",
 		);
+		for (const issue of agent.alerts)
+			lines.push(
+				`ALERT ${issue.rule}: \`${issue.path}\` differs from ${issue.expected} (${issue.count} occurrences).`,
+			);
 		if (agent.unmapped.length > 0) {
 			lines.push(
 				`Unmapped paths${agent.unmapped.length > limit ? ` (top ${limit})` : ""}:`,

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { FACT_AGENTS, FACT_CATALOG } from "@rudel/api-routes/fact-catalog";
 import {
-	FACT_AGENTS,
-	FACT_CATALOG,
 	type NO_TRANSCRIPT_RECORD_FACTS,
 	splitSessionTranscript,
 	TRANSCRIPT_RECORD_FACT_KEYS,
@@ -234,7 +233,7 @@ describe("run index columns and the L1 fact catalog", () => {
 						problems.push(
 							`${column}: ${entry.id} stores it for ${agent} since ${fact.stores.since}, the column since ${gate.sinceBy?.[agent] ?? gate.since}`,
 						);
-				} else if (reads.length > 0)
+				} else if (reads.length > 0 && !NARROWED.has(column))
 					problems.push(
 						`${column}: ${entry.id} stores ${reads.join(", ")} for ${agent}, which the column does not read`,
 					);
