@@ -221,3 +221,87 @@ test("a read cut to the ceiling still fits with its trace", () => {
 		ANALYSIS_OUTPUT_MAX_BYTES,
 	);
 });
+
+test("pullRequest witnesses are fitted too, leaving events the rest, and a cut list says so", () => {
+	const witness = (index: number) => ({
+		sessionId: `session-${index}`,
+		agentId: "é".repeat(200),
+		turn: 1,
+		relation: "pr_named",
+		matchedValue: "133",
+		at: "2026-09-15T10:00:00.000Z",
+		evidenceId: `obs:${"%C3%A9".repeat(200)}:${index}:0:pr_url`,
+		generation: { revision: "1", parserVersion: 773 },
+		reason: "transcript_unavailable" as const,
+	});
+	const event = {
+		sessionId: "s1",
+		agentId: "",
+		turn: 1,
+		record: 3,
+		block: 0,
+		call: "call",
+		at: "2026-10-03T00:00:00Z",
+		kind: "push_range" as const,
+		label: "observed",
+		branch: "x".repeat(2_000),
+		sourceBranch: "",
+		shortSha: "",
+		pushFrom: "",
+		pushTo: "",
+		remote: "",
+		prRepo: "",
+		prNumber: null,
+		commitHash: "",
+		baseCommit: "",
+		runId: "",
+		generation: null,
+		repository: null,
+		github: {
+			status: "unbound" as const,
+			reason: null,
+			prFrom: null,
+			ciFrom: null,
+			coveredThrough: null,
+		},
+		sha: null,
+		pullRequests: [],
+		ciRuns: [],
+		ciRunsObserved: 0,
+		ciRunCount: null,
+		ciRunCountThrough: null,
+		ciRunCountUnknown: "github_status" as const,
+		ciConclusions: {},
+		checksAfter: null,
+		parentSessionId: null,
+	};
+	const output: AnalysisFindOutput = {
+		source: "git",
+		header,
+		events: Array.from({ length: 50 }, () => event),
+		witnesses: Array.from({ length: 200 }, (_, index) => witness(index)),
+	};
+	expect(jsonBytes(output)).toBeGreaterThan(ANALYSIS_OUTPUT_MAX_BYTES * 1.5);
+	const fitted = fitFindOutput(output);
+	if (fitted.source !== "git") throw new Error("expected a git result");
+	expect(jsonBytes(fitted)).toBeLessThanOrEqual(
+		ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES,
+	);
+	const kept = fitted.witnesses?.length ?? 0;
+	expect(kept).toBeGreaterThan(0);
+	expect(kept).toBeLessThan(200);
+	// Events keep the larger share.
+	expect(fitted.events.length).toBeGreaterThan(50 / 2);
+	expect(fitted.header.truncated).toBe(true);
+	expect(fitted.header.notes).toContain(
+		`only the first ${kept} of 200 witnesses fit the 256 KiB result ceiling; narrow the dates or sessions to see the rest`,
+	);
+
+	// Witnesses alone still fit together with the note that says they were cut.
+	const alone = fitFindOutput({ ...output, events: [] });
+	if (alone.source !== "git") throw new Error("expected a git result");
+	expect(alone.header.truncated).toBe(true);
+	expect(jsonBytes(alone)).toBeLessThanOrEqual(
+		ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES,
+	);
+});

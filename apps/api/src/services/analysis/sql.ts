@@ -110,3 +110,62 @@ export async function query<Row>(
 ): Promise<Row[]> {
 	return z.array(schema).parse(await executor.query<unknown>(statement));
 }
+
+/**
+ * Query parameters travel in the request URL, which ClickHouse caps at
+ * 1 MiB (`http_max_uri_size`); one statement's array parameters stay well
+ * below it.
+ */
+export const PARAM_BYTES_PER_STATEMENT = 256 * 1024;
+
+/**
+ * The bytes one array element takes in the request URL: clickhouse-js
+ * formats it as a quoted literal (escaping tab, newline, carriage return,
+ * quote and backslash) and writes it with URLSearchParams, then a separator.
+ */
+export function paramValueBytes(value: string | number): number {
+	const literal =
+		typeof value === "number"
+			? String(value)
+			: `'${value.replace(/[\t\n\r'\\]/gu, (char) =>
+					char === "\t"
+						? "\\t"
+						: char === "\n"
+							? "\\n"
+							: char === "\r"
+								? "\\r"
+								: `\\${char}`,
+				)}'`;
+	// The literal, URL-encoded, and its encoded comma.
+	return new URLSearchParams([["", literal]]).toString().length - 1 + 3;
+}
+
+/**
+ * Consecutive groups of items whose array parameter values (as
+ * `values(item)` lists them, one entry per array the item adds to) fit in
+ * `budget` URL bytes; an item larger than the budget gets a group of its own.
+ */
+export function chunkByParamBytes<T>(
+	items: readonly T[],
+	values: (item: T) => readonly (string | number)[],
+	budget = PARAM_BYTES_PER_STATEMENT,
+): T[][] {
+	const groups: T[][] = [];
+	let current: T[] = [];
+	let bytes = 0;
+	for (const item of items) {
+		const size = values(item).reduce<number>(
+			(sum, value) => sum + paramValueBytes(value),
+			0,
+		);
+		if (current.length > 0 && bytes + size > budget) {
+			groups.push(current);
+			current = [];
+			bytes = 0;
+		}
+		current.push(item);
+		bytes += size;
+	}
+	if (current.length > 0) groups.push(current);
+	return groups;
+}

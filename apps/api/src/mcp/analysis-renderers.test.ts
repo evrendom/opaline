@@ -329,3 +329,136 @@ test("an analysis shows its data cutoff, the prior it updates, its revisions and
 		}).split("\n")[0],
 	).toEndWith("updates=none updatedBy=none");
 });
+
+test("git events print their link source only when it is not current edges, with one summary line", () => {
+	const event: Extract<
+		AnalysisFindOutput,
+		{ source: "git" }
+	>["events"][number] = {
+		sessionId: "session",
+		agentId: "",
+		turn: 1,
+		record: 3,
+		block: 0,
+		call: "call",
+		at: "2026-10-03T00:00:00Z",
+		kind: "push_range",
+		label: "observed",
+		branch: "feat/links",
+		sourceBranch: "feat/links",
+		shortSha: "",
+		pushFrom: "a1b2c3d",
+		pushTo: "d4e5f6a",
+		remote: "github.com:opalinehq/athena.git",
+		prRepo: "",
+		prNumber: null,
+		commitHash: "",
+		baseCommit: "",
+		runId: "",
+		generation: null,
+		repository: null,
+		github: {
+			status: "linked",
+			reason: null,
+			prFrom: null,
+			ciFrom: null,
+			coveredThrough: null,
+		},
+		sha: null,
+		pullRequests: [],
+		ciRuns: [],
+		ciRunsObserved: 0,
+		ciRunCount: 0,
+		ciRunCountThrough: "2026-10-04T00:00:00Z",
+		ciRunCountUnknown: null,
+		ciConclusions: {},
+		checksAfter: null,
+		parentSessionId: null,
+		edges: {
+			linkedBy: "edges",
+			status: "current",
+			builtAt: "2026-10-03T01:00:00Z",
+		},
+	};
+	const text = renderFind({
+		source: "git",
+		header,
+		events: [
+			event,
+			event,
+			{
+				...event,
+				call: "frozen",
+				edges: {
+					linkedBy: "edges",
+					status: "frozen",
+					builtAt: "2026-09-01T00:00:00Z",
+				},
+			},
+			{
+				...event,
+				call: "unbuilt",
+				edges: { linkedBy: "query", status: "not_built", builtAt: null },
+			},
+			{
+				...event,
+				call: "stale",
+				edges: {
+					linkedBy: "query",
+					status: "stale",
+					builtAt: "2026-10-02T00:00:00Z",
+				},
+			},
+		],
+		witnesses: [],
+	});
+	expect(text).toContain(
+		"links: 3 events from edges (1 frozen), 2 linked at query time (1 not built, 1 stale)",
+	);
+	const rows = text.split("\n").filter((line) => line.includes("call="));
+	expect(rows.map((row) => /links=\S+/u.exec(row)?.[0] ?? null)).toEqual([
+		null,
+		null,
+		"links=edges:frozen",
+		"links=query:not_built",
+		"links=query:stale",
+	]);
+	expect(rows[2]).toContain("builtAt=2026-09-01T00:00:00Z");
+	expect(text).not.toContain("witnesses:");
+	// The worker off, results stored before edges, or GitHub outcomes hidden:
+	// no link line and no marker, exactly the old output.
+	const old = renderFind({
+		source: "git",
+		header,
+		events: [{ ...event, edges: null }],
+		witnesses: [],
+	});
+	expect(old).not.toMatch(/links[:=]/u);
+	// A retained edge whose transcript expired is listed, compactly.
+	expect(
+		renderFind({
+			source: "git",
+			header,
+			events: [],
+			witnesses: [
+				{
+					sessionId: "session",
+					agentId: "",
+					turn: 3,
+					relation: "pr_named",
+					matchedValue: "133",
+					at: "2026-09-15T10:00:00.000Z",
+					evidenceId: "obs::10:0:pr_url",
+					generation: { revision: "1", parserVersion: 773 },
+					reason: "transcript_unavailable",
+				},
+			],
+		})
+			.split("\n")
+			.slice(-3),
+	).toEqual([
+		"witnesses: retained edges whose evidence row is not readable",
+		"session\tat\trelation\tmatched\tevidence\treason",
+		"session/main turn 3\t2026-09-15T10:00:00.000Z\tpr_named\t133\tobs::10:0:pr_url@1/773\ttranscript_unavailable",
+	]);
+});

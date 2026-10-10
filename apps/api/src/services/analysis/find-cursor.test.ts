@@ -113,3 +113,29 @@ test('strings compare by code point, as UTF-8 bytes in ClickHouse and Postgres C
 	// Code units would put U+1F600 (a surrogate pair) before U+E000.
 	expect(compareKeys(["\u{E000}"], ["\u{1F600}"], ["asc"])).toBeLessThan(0);
 });
+
+test("a git cursor belongs to its pull request: another pullRequest rejects it", () => {
+	const git = AnalysisFindInputSchema.parse({
+		source: "git",
+		pullRequest: "opalinehq/athena#133",
+	});
+	const cursor = writeFindCursor(git, [
+		"2026-10-07T12:00:00.000Z",
+		"s1",
+		"",
+		1,
+		0,
+		"call",
+	]);
+	const order: CursorOrder = ["desc", "asc", "asc", "asc", "asc", "asc"];
+	expect(readFindCursor({ ...git, cursor }, order)).toHaveLength(6);
+	expect(() =>
+		readFindCursor(
+			{ ...git, pullRequest: "opalinehq/athena#134", cursor },
+			order,
+		),
+	).toThrow("returned by a find call with other arguments");
+	expect(() =>
+		readFindCursor({ ...git, pullRequest: undefined, cursor }, order),
+	).toThrow("returned by a find call with other arguments");
+});

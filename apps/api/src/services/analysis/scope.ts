@@ -11,6 +11,7 @@ import {
 	type SessionGeneration,
 	type TranscriptReadScope,
 } from "../transcript-records-queries.js";
+import { compareKeys } from "./find-cursor.js";
 import {
 	descendantSessions,
 	type FamilyPosition,
@@ -18,7 +19,7 @@ import {
 	loadSessionFamilies,
 	type SessionFamilies,
 } from "./lineage.js";
-import { ANALYSIS_QUERY_SETTINGS } from "./sql.js";
+import { ANALYSIS_QUERY_SETTINGS, chunkByParamBytes } from "./sql.js";
 
 export interface AnalysisScope {
 	organizationId: string;
@@ -59,6 +60,17 @@ export interface ResolvedScope {
 	unindexed: { scope: ScopeBatch["scope"]; sessions: AnalysisSession[] }[];
 }
 
+/**
+ * `find pullRequest=…`: only these sessions, of any date unless `from` or
+ * `to` is given. The scope's owner filter still applies, so a member keeps
+ * only their own.
+ */
+export interface SessionPick {
+	sessions: readonly { userId: string; sessionId: string }[];
+	/** The days the picked evidence spans, reported when `from` and `to` are absent. */
+	range: { from: string; to: string };
+}
+
 const MAX_SESSIONS = 10_000;
 /** Small enough that parameter arrays fit in the request URL. */
 const BATCH_SESSIONS = 50;
@@ -89,10 +101,23 @@ export async function resolveScope(
 	scope: AnalysisScope,
 	input: AnalysisFindInput,
 	batchRecords = BATCH_RECORDS,
+	pick?: SessionPick,
 ): Promise<ResolvedScope> {
-	const { from, to } = defaultRange(input);
+	const anyDate = pick !== undefined && !input.from && !input.to;
+	const { from, to } = anyDate ? pick.range : defaultRange(input);
+	if (pick?.sessions.length === 0)
+		return {
+			from,
+			to,
+			sessionsInScope: 0,
+			indexedSessions: 0,
+			sessionCapReached: false,
+			subagentThreads: 0,
+			batches: [],
+			unindexed: [],
+		};
 	const [found, families] = await Promise.all([
-		querySessions(executor, buildSessionsStatement(scope, input, from, to)),
+		findSessions(executor, scope, input, anyDate ? null : { from, to }, pick),
 		loadSessionFamilies(executor, scope, {
 			childSince: shiftDays(from, -FAMILY_LOOKBACK_DAYS),
 		}),
@@ -103,10 +128,12 @@ export async function resolveScope(
 	const capReached =
 		found.length > MAX_SESSIONS &&
 		(!input.latest || familyCount(selected, families) < input.latest);
-	// With refs only the named runs count, so their families are not pulled in.
-	const threads = input.refs
-		? []
-		: await queryDescendants(executor, scope, selected, families);
+	// With refs only the named runs count, and with a pick only its sessions,
+	// so their families are not pulled in.
+	const threads =
+		input.refs || pick
+			? []
+			: await queryDescendants(executor, scope, selected, families);
 	const sessions = [...selected, ...threads]
 		.slice(0, MAX_SESSIONS)
 		.map((session) => ({
@@ -290,6 +317,80 @@ async function querySessions(
 	return z.array(SessionSchema).parse(await executor.query<unknown>(statement));
 }
 
+const OrderedSessionSchema = SessionSchema.extend({
+	session_ms: z.coerce.number(),
+});
+
+/**
+ * The scope's sessions, newest first. A pick travels in the URL, so it is
+ * read one parameter budget at a time and merged in the statement's order.
+ */
+async function findSessions(
+	executor: ClickHouseExecutor,
+	scope: AnalysisScope,
+	input: AnalysisFindInput,
+	range: { from: string; to: string } | null,
+	pick: SessionPick | undefined,
+): Promise<SessionRow[]> {
+	if (!pick)
+		return querySessions(
+			executor,
+			buildSessionsStatement(scope, input, range, undefined),
+		);
+	const rows: z.infer<typeof OrderedSessionSchema>[] = [];
+	for (const sessions of chunkByParamBytes(pick.sessions, (session) => [
+		session.userId,
+		session.sessionId,
+	]))
+		rows.push(
+			...z
+				.array(OrderedSessionSchema)
+				.parse(
+					await executor.query<unknown>(
+						buildSessionsStatement(scope, input, range, { ...pick, sessions }),
+					),
+				),
+		);
+	return rows
+		.sort(
+			(left, right) =>
+				right.session_ms - left.session_ms ||
+				compareKeys(
+					[left.session_id, left.user_id],
+					[right.session_id, right.user_id],
+					["asc", "asc"],
+				),
+		)
+		.slice(0, MAX_SESSIONS + 1)
+		.map(({ session_ms: _sessionMs, ...row }) => row);
+}
+
+/**
+ * The sessions of the scope's owner (every owner for an admin) in the range
+ * and the input's filters, at most `MAX_SESSIONS`: the inventory
+ * `find pullRequest=…` checks for sessions whose edges cannot vouch for them.
+ */
+export async function listScopeSessions(
+	executor: ClickHouseExecutor,
+	scope: AnalysisScope,
+	input: AnalysisFindInput,
+	range: { from: string; to: string },
+): Promise<{ sessions: SessionRow[]; capped: boolean }> {
+	const rows = await querySessions(
+		executor,
+		buildSessionsStatement(
+			scope,
+			{ ...input, refs: undefined },
+			range,
+			undefined,
+		),
+	);
+	return {
+		sessions: rows.slice(0, MAX_SESSIONS),
+		capped: rows.length > MAX_SESSIONS,
+	};
+}
+
 export function defaultRange(input: Pick<AnalysisFindInput, "from" | "to">) {
 	const to = input.to ?? new Date().toISOString().slice(0, 10);
 	return { from: input.from ?? shiftDays(to, 1 - DEFAULT_DAYS), to };
@@ -298,12 +399,14 @@ export function defaultRange(input: Pick<AnalysisFindInput, "from" | "to">) {
 function buildSessionsStatement(
 	scope: AnalysisScope,
 	input: AnalysisFindInput,
-	from: string,
-	to: string,
+	range: { from: string; to: string } | null,
+	pick: SessionPick | undefined,
 ): ClickHouseStatement {
 	const filters = [
 		"organization_id = {organizationId:String}",
-		"toDate(session_date, 'UTC') BETWEEN {from:Date} AND {to:Date}",
+		...(range
+			? ["toDate(session_date, 'UTC') BETWEEN {from:Date} AND {to:Date}"]
+			: []),
 	];
 	const optional = {
 		user_id: ["userId", scope.userId],
@@ -312,8 +415,7 @@ function buildSessionsStatement(
 	} as const;
 	const params: Record<string, unknown> = {
 		organizationId: scope.organizationId,
-		from,
-		to,
+		...(range ?? {}),
 		limit: MAX_SESSIONS + 1,
 	};
 	for (const [column, [name, value]] of Object.entries(optional)) {
@@ -328,9 +430,10 @@ function buildSessionsStatement(
 			SELECT session_id FROM ${getSafeClickHouseTable("rudel.usage_events")}
 			WHERE organization_id = {organizationId:String}
 				${scope.userId ? "AND user_id = {userId:String}" : ""}
-				AND usage_date >= {from:Date} AND record_kind = 'event' AND is_deleted = 0
+				AND usage_date >= {usageFrom:Date} AND record_kind = 'event' AND is_deleted = 0
 				AND (resolved_model = {model:String} OR raw_model = {model:String})))`);
 		params.model = input.model;
+		params.usageFrom = range?.from ?? "1970-01-01";
 	}
 	if (input.repository) {
 		filters.push(
@@ -341,6 +444,13 @@ function buildSessionsStatement(
 	if (input.refs) {
 		filters.push("session_id IN {refSessions:Array(String)}");
 		params.refSessions = [...new Set(input.refs.map((ref) => ref.sessionId))];
+	}
+	if (pick) {
+		filters.push(
+			"(user_id, session_id) IN (SELECT p.1, p.2 FROM (SELECT arrayJoin(arrayZip({pickUsers:Array(String)}, {pickSessions:Array(String)})) AS p))",
+		);
+		params.pickUsers = pick.sessions.map((session) => session.userId);
+		params.pickSessions = pick.sessions.map((session) => session.sessionId);
 	}
 	return sessionsStatement(filters, params);
 }
@@ -367,7 +477,8 @@ function sessionsStatement(
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT session_id, user_id, source, model_used AS model,
-				coalesce(nullIf(git_remote, ''), nullIf(package_name, ''), project_path) AS repository
+				coalesce(nullIf(git_remote, ''), nullIf(package_name, ''), project_path) AS repository,
+				toUnixTimestamp64Milli(toDateTime64(session_date, 3)) AS session_ms
 			FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 			WHERE ${filters.join(" AND ")}
 			ORDER BY session_date DESC, session_id, user_id LIMIT 1 BY user_id, session_id

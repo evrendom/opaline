@@ -46,6 +46,8 @@ import {
 	type GitObservationRecord,
 	parseGitObservations,
 } from "../services/git-observation-parser.js";
+import { enqueueL1EdgeScope } from "../services/l1-edges/l1-edge-queue.service.js";
+import { runL1EdgePass } from "../services/l1-edges/l1-edge-reconciliation.service.js";
 import { buildNativeSessionLineageRow } from "../services/session-lineage-persistence.service.js";
 import {
 	buildTranscriptRecordRow,
@@ -2218,6 +2220,8 @@ test("source=git joins a session's pushes and CI checks to its PR and the CI run
 	const coveredFrom = new Date(baseMs - 3 * 86_400_000)
 		.toISOString()
 		.slice(0, 10);
+	// One boundary for every read, so links from edges and at query time compare exactly.
+	const coveredThrough = new Date().toISOString();
 	const transcript = jsonl([
 		{
 			type: "user",
@@ -2311,7 +2315,7 @@ test("source=git joins a session's pushes and CI checks to its PR and the CI run
 						// check's day-long window is covered too.
 						prFrom: coveredFrom,
 						ciFrom: coveredFrom,
-						coveredThrough: new Date().toISOString(),
+						coveredThrough,
 						reason: null,
 					},
 				],
@@ -2541,12 +2545,128 @@ test("source=git joins a session's pushes and CI checks to its PR and the CI run
 			),
 		).toBe(true);
 		expect(hidden.header.notes.join("\n")).toContain("not visible");
+		expect(hidden.events.every((event) => !("edges" in event))).toBe(true);
+
+		// The edge worker is off (no scope row for the session): the output is
+		// exactly what it was before edges, with no link metadata.
+		expect(output.events.every((event) => !("edges" in event))).toBe(true);
+
+		// Built edges: the same events with the same links, read from the edges.
+		await enqueueL1EdgeScope(sqlClient, {
+			kind: "session",
+			organizationId,
+			userId: organizationId,
+			source: "claude_code",
+			sessionId,
+		});
+		await enqueueL1EdgeScope(sqlClient, {
+			kind: "repository",
+			organizationId,
+			repositoryId,
+		});
+		expect(
+			await runL1EdgePass({
+				sql: sqlClient,
+				budgetMs: 60_000,
+				// Only this workspace's scopes: other suites queue theirs too.
+				organizationId,
+				sources: {
+					executor: clickhouse,
+					access: source.access,
+					evidence: source.evidence,
+				},
+			}),
+		).toBeGreaterThanOrEqual(2);
+		const withoutEdges = (events: typeof output.events) =>
+			events.map(({ edges: _edges, ...event }) => event);
+		const fromEdges = await find({});
+		expect(withoutEdges(fromEdges.events)).toEqual(withoutEdges(output.events));
+		expect(
+			fromEdges.events.map((event) => [
+				event.edges?.linkedBy,
+				event.edges?.status,
+			]),
+		).toEqual(output.events.map(() => ["edges", "current"]));
+
+		// Switched off, find links at query time and says nothing about edges.
+		process.env.L1_EDGES_FIND_READ = "false";
+		try {
+			const off = await find({});
+			expect(withoutEdges(off.events)).toEqual(withoutEdges(output.events));
+			expect(off.events.every((event) => !("edges" in event))).toBe(true);
+		} finally {
+			delete process.env.L1_EDGES_FIND_READ;
+		}
+
+		// The reverse direction: the runs that touched PR 133, whatever their date.
+		const touching = AnalysisFindOutputSchema.parse(
+			await findAnalysis(
+				{ organizationId, userId: null },
+				AnalysisFindInputSchema.parse({
+					source: "git",
+					pullRequest: "https://github.com/opalinehq/athena/pull/133",
+				}),
+				{ executor: clickhouse, github: source },
+			),
+		);
+		assert(touching.source === "git");
+		expect(
+			touching.events.map((event) => [event.kind, event.record]).sort(),
+		).toEqual(
+			output.events
+				.filter(
+					(event) =>
+						event.kind === "commit_created" ||
+						(event.kind === "push_range" &&
+							event.remote.includes("opalinehq/athena")) ||
+						(event.kind === "ci_check" && event.prNumber === 133),
+				)
+				.map((event) => [event.kind, event.record])
+				.sort(),
+		);
+		expect(touching.header).toMatchObject({ from: day, to: day });
+		// Every touching session is indexed in the generation its edges came from.
+		expect(touching.witnesses).toEqual([]);
+		expect(touching.header.notes).toContain(
+			"pullRequest opalinehq/athena#133: 1 sessions you can see touch it through 4 edges (commit_created 1, commit_pushed 1, pr_branch_head 1, pr_named 1)",
+		);
+		// A member sees only their own sessions; the admin's are never counted.
+		const member = AnalysisFindOutputSchema.parse(
+			await findAnalysis(
+				{ organizationId, userId: `not_the_owner_${runId}` },
+				AnalysisFindInputSchema.parse({
+					source: "git",
+					pullRequest: "opalinehq/athena#133",
+				}),
+				{ executor: clickhouse, github: source },
+			),
+		);
+		assert(member.source === "git");
+		expect(member.events).toEqual([]);
+		expect(member.header.sessionsInScope).toBe(0);
+		expect(member.header.notes[0]).toBe(
+			"pullRequest opalinehq/athena#133: no session you can see has an edge to it or its commits",
+		);
+		expect(member.header.notes.join("\n")).not.toMatch(/\b[1-9]\d* sessions/u);
 	} finally {
 		await clickhouse.execute({
 			query:
 				"DELETE FROM rudel.session_git_observations WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3",
 			query_params: { organizationId },
 		});
+		for (const table of [
+			"rudel.l1_edges",
+			"rudel.l1_edges_by_target",
+			"rudel.l1_edge_resolutions",
+		])
+			await clickhouse.execute({
+				query: `DELETE FROM ${table} WHERE organization_id = {organizationId:String} SETTINGS lightweight_deletes_sync = 3`,
+				query_params: { organizationId },
+			});
+		await sqlClient.unsafe(
+			"DELETE FROM l1_edge_scope WHERE organization_id = $1",
+			[organizationId],
+		);
 		for (const table of [
 			"rudel.github_pull_requests",
 			"rudel.github_pull_request_commits",

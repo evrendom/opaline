@@ -84,9 +84,37 @@ export const AnalysisFindInputBaseSchema = z
 			.default("startedAt"),
 		/** Opaque position from a previous page's header; the other arguments must match that call. */
 		cursor: z.string().min(1).max(4_096).optional(),
+		/**
+		 * source=git only: the events of every session that named, listed,
+		 * pushed the head branch of, or created, pushed, captured or mentioned a
+		 * commit of this pull request (`owner/name#number` or its GitHub URL).
+		 */
+		pullRequest: z.string().min(1).max(300).optional(),
 		...traceInput,
 	})
 	.strict();
+
+/**
+ * The repository (`owner/name`) and number of a `pullRequest` argument:
+ * `owner/name#133`, or a GitHub pull request URL with or without its scheme
+ * (`https://github.com/owner/name/pull/133/files`). Null when it is neither.
+ */
+export function parsePullRequestRef(
+	value: string,
+): { fullName: string; number: number } | null {
+	const trimmed = value.trim();
+	const match =
+		/^([\w.-]+)\/([\w.-]+)#(\d{1,9})$/u.exec(trimmed) ??
+		/^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pulls?\/(\d{1,9})(?:[/?#].*)?$/iu.exec(
+			trimmed,
+		);
+	if (!match) return null;
+	const [, owner, name, number] = match;
+	const parsed = Number(number);
+	return owner && name && parsed >= 1
+		? { fullName: `${owner}/${name}`, number: parsed }
+		: null;
+}
 
 export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 	(input, context) => {
@@ -102,6 +130,23 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 				code: "custom",
 				path: ["groupBy"],
 				message: "groupBy is only valid for runs",
+			});
+		}
+		if (input.pullRequest !== undefined && input.source !== "git") {
+			context.addIssue({
+				code: "custom",
+				path: ["pullRequest"],
+				message: "pullRequest is only valid for source=git",
+			});
+		} else if (
+			input.pullRequest !== undefined &&
+			!parsePullRequestRef(input.pullRequest)
+		) {
+			context.addIssue({
+				code: "custom",
+				path: ["pullRequest"],
+				message:
+					"pullRequest must be owner/name#number or a GitHub pull request URL",
 			});
 		}
 	},
@@ -436,7 +481,12 @@ export const AnalysisGitEventSchema = z.object({
 	 * in `ciRuns` but not counted.
 	 */
 	ciRunCount: z.number().int().nullable(),
-	/** End (exclusive) of the history `ciRunCount` covers: the earliest `coveredThrough` of the repositories its runs come from; null with the count. */
+	/**
+	 * End (exclusive) of the history `ciRunCount` covers: the earliest
+	 * `coveredThrough` of the repositories its runs come from, and, for links
+	 * from edges, of the coverage those edges were built against; null with
+	 * the count.
+	 */
 	ciRunCountThrough: z.string().nullable(),
 	/**
 	 * Why `ciRunCount` is null: `github_status` (the event's repository is not
@@ -483,6 +533,48 @@ export const AnalysisGitEventSchema = z.object({
 		})
 		.nullable(),
 	parentSessionId: ParentSessionIdSchema,
+	/**
+	 * Where the event's links come from: `edges` (the stored L1 edges of its
+	 * session, `current` for the evidence find reads, or `frozen` after its
+	 * transcript expired) or `query` (computed at query time because its
+	 * session's edges are `stale` or `not_built`, or a repository it touches
+	 * has none built). Absent while no session of the page has edge build
+	 * records (the edge worker off), when links are not looked up (GitHub
+	 * outcomes not visible) and in results stored before it existed; null in
+	 * results stored while it defaulted to null.
+	 */
+	edges: z
+		.object({
+			linkedBy: z.enum(["edges", "query"]),
+			status: z.enum(["current", "frozen", "stale", "not_built"]),
+			/** When the session's edges were last built; null when never. */
+			builtAt: z.string().nullable(),
+		})
+		.nullable()
+		.optional(),
+});
+/**
+ * `find pullRequest=…`: a retained edge whose evidence row cannot be shown
+ * as an event, as the worker recorded it. `transcript_unavailable`: the
+ * session's transcript is no longer indexed (its edges were kept);
+ * `other_generation`: find reads a newer observation generation than the
+ * edge came from, whose row at that place may say something else.
+ */
+const GitWitnessSchema = z.object({
+	sessionId: z.string(),
+	agentId: z.string(),
+	/** The run the evidence belongs to; null for evidence of no run. */
+	turn: z.number().int().nullable(),
+	relation: z.string(),
+	/** The literal value the edge matched (SHA, branch, PR number). */
+	matchedValue: z.string(),
+	at: z.string(),
+	evidenceId: z.string(),
+	generation: z.object({
+		revision: z.string(),
+		parserVersion: z.number().int(),
+	}),
+	reason: z.enum(["transcript_unavailable", "other_generation"]),
 });
 export const AnalysisFindOutputSchema = z.union([
 	z.object({
@@ -516,6 +608,8 @@ export const AnalysisFindOutputSchema = z.union([
 		source: z.literal("git"),
 		header: HeaderSchema,
 		events: z.array(AnalysisGitEventSchema),
+		/** `pullRequest` only, on the first page; absent otherwise and in results stored before it existed. */
+		witnesses: z.array(GitWitnessSchema).optional(),
 	}),
 ]);
 export const AnalysisReadOutputSchema = z.object({

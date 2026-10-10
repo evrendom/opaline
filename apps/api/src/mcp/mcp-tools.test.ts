@@ -183,6 +183,7 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 			"limit",
 			"sort",
 			"cursor",
+			"pullRequest",
 			"analysis",
 			"workspace",
 		].sort(),

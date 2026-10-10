@@ -45,12 +45,16 @@ export function fitFindOutput(
 			header,
 			events,
 		}));
-	if (output.source === "git")
-		return fitItems(page, output.events, "events", (events, header) => ({
-			...output,
-			header,
-			events,
-		}));
+	if (output.source === "git") {
+		const fitted = fitWitnesses(output);
+		if (jsonBytes(fitted) <= BODY_MAX_BYTES) return fitted;
+		return fitItems(
+			{ ...page, header: fitted.header },
+			fitted.events,
+			"events",
+			(events, header) => ({ ...fitted, header, events }),
+		);
+	}
 	if (output.source === "tool")
 		return fitItems(page, output.groups, "groups", (groups, header) => ({
 			...output,
@@ -62,6 +66,43 @@ export function fitFindOutput(
 		header,
 		groups,
 	}));
+}
+
+/**
+ * `find pullRequest=…` witnesses fitted first: as many leading (newest) ones
+ * as fit a quarter of the ceiling when there are events (all of it
+ * otherwise), so events keep the rest; a cut list says so.
+ */
+function fitWitnesses(
+	output: Extract<AnalysisFindOutput, { source: "git" }>,
+): Extract<AnalysisFindOutput, { source: "git" }> {
+	const witnesses = output.witnesses ?? [];
+	if (witnesses.length === 0) return output;
+	const budget = output.events.length > 0 ? BODY_MAX_BYTES / 4 : BODY_MAX_BYTES;
+	// The note about a cut list is part of what must fit.
+	const withWitnesses = (
+		count: number,
+		events: typeof output.events,
+	): Extract<AnalysisFindOutput, { source: "git" }> =>
+		count === witnesses.length
+			? { ...output, events }
+			: {
+					...output,
+					events,
+					witnesses: witnesses.slice(0, count),
+					header: {
+						...output.header,
+						truncated: true,
+						notes: [
+							...output.header.notes,
+							`only the first ${count} of ${witnesses.length} witnesses fit the ${ANALYSIS_OUTPUT_MAX_BYTES / 1024} KiB result ceiling; narrow the dates or sessions to see the rest`,
+						],
+					},
+				};
+	const kept =
+		fitCount(witnesses.length, (count) => withWitnesses(count, []), budget)
+			.witnesses?.length ?? 0;
+	return withWitnesses(kept, output.events);
 }
 
 /**
@@ -136,18 +177,19 @@ function fitItems<TItem>(
 	});
 }
 
-/** `build(count)` for the largest `count` up to `total` whose JSON leaves the trace room. */
+/** `build(count)` for the largest `count` up to `total` whose JSON fits `budget` (leaving the trace room). */
 function fitCount<TOutput>(
 	total: number,
 	build: (count: number) => TOutput,
+	budget = BODY_MAX_BYTES,
 ): TOutput {
 	const full = build(total);
-	if (jsonBytes(full) <= BODY_MAX_BYTES) return full;
+	if (jsonBytes(full) <= budget) return full;
 	let low = 0;
 	let high = total - 1;
 	while (low < high) {
 		const middle = Math.ceil((low + high) / 2);
-		if (jsonBytes(build(middle)) <= BODY_MAX_BYTES) low = middle;
+		if (jsonBytes(build(middle)) <= budget) low = middle;
 		else high = middle - 1;
 	}
 	return build(low);

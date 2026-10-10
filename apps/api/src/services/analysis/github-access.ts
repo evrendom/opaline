@@ -94,8 +94,9 @@ async function loadBindingsAndCoverage(
  * per-capture base and head commits, for the owners' sessions only: per owner
  * and kind, the first `page.limit` rows after `page.after` in the merged find
  * order (millisecond time descending, then session, stream and origin call
- * compared by code point, as the cursor compares them). Times are returned as
- * ISO text of the same millisecond value they are paged by.
+ * compared by code point, as the cursor compares them), only the rows
+ * `page.calls` names when it is set. Times are returned as ISO text of the
+ * same millisecond value they are paged by.
  */
 async function loadSessionEvidence(
 	organizationId: string,
@@ -109,10 +110,12 @@ async function loadSessionEvidence(
 		after?.agentId ?? "",
 		after?.call ?? null,
 		page.limit,
+		page.calls ? [...page.calls] : null,
 	];
 	// $4 time (ISO text), $5 session, $6 stream, $7 origin call (null: every
 	// evidence row of that time, session and stream is already behind a
-	// transcript cursor). Every parameter is cast, so none is inferred.
+	// transcript cursor), $8 the limit, $9 the kept call ids (null: all).
+	// Every parameter is cast, so none is inferred.
 	const keyset = (at: string, agent: string, call: string) =>
 		`($4::timestamptz IS NULL OR ${at} < $4::timestamptz OR (${at} = $4::timestamptz AND (session_id COLLATE "C" > $5::text OR (session_id = $5::text AND (${agent} COLLATE "C" > $6::text OR (${agent} = $6::text AND $7::text IS NOT NULL AND ${call} COLLATE "C" > $7::text))))))`;
 	const snapshots: SnapshotRow[] = [];
@@ -132,7 +135,7 @@ async function loadSessionEvidence(
 					ci_coverage_complete: boolean;
 				}>
 			>(
-				`SELECT * FROM (SELECT snapshot.collection_id || ':' || snapshot.provider_pull_request_id AS origin_id, snapshot.session_id, snapshot.repository_id, snapshot.pull_number, collection.commit_sha, date_trunc('milliseconds', snapshot.observed_at) AS observed_at, to_char(date_trunc('milliseconds', snapshot.observed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS observed_text, snapshot.coverage_complete, snapshot.ci_coverage_complete FROM github_pull_request_snapshot snapshot INNER JOIN github_evidence_collection collection ON collection.id = snapshot.collection_id WHERE snapshot.organization_id = $1 AND snapshot.session_user_id = $2 AND snapshot.session_id = ANY($3::text[])) evidence WHERE ${keyset("observed_at", "''", "('snapshot:' || origin_id)")} ORDER BY observed_at DESC, session_id COLLATE "C", ('snapshot:' || origin_id) COLLATE "C" LIMIT $8::int`,
+				`SELECT * FROM (SELECT snapshot.collection_id || ':' || snapshot.provider_pull_request_id AS origin_id, snapshot.session_id, snapshot.repository_id, snapshot.pull_number, collection.commit_sha, date_trunc('milliseconds', snapshot.observed_at) AS observed_at, to_char(date_trunc('milliseconds', snapshot.observed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS observed_text, snapshot.coverage_complete, snapshot.ci_coverage_complete FROM github_pull_request_snapshot snapshot INNER JOIN github_evidence_collection collection ON collection.id = snapshot.collection_id WHERE snapshot.organization_id = $1 AND snapshot.session_user_id = $2 AND snapshot.session_id = ANY($3::text[])) evidence WHERE ($9::text[] IS NULL OR ('snapshot:' || origin_id) = ANY($9::text[])) AND ${keyset("observed_at", "''", "('snapshot:' || origin_id)")} ORDER BY observed_at DESC, session_id COLLATE "C", ('snapshot:' || origin_id) COLLATE "C" LIMIT $8::int`,
 				[organizationId, userId, [...sessionIds], ...cursor],
 			),
 			sqlClient.unsafe<
@@ -150,7 +153,7 @@ async function loadSessionEvidence(
 					captured_text: string;
 				}>
 			>(
-				`SELECT * FROM (SELECT context_id, session_id, coalesce(agent_id, '') AS agent_id, provider, provider_repository_id, provider_owner, provider_name, lifecycle, base_git_commit, head_git_commit, date_trunc('milliseconds', captured_at) AS captured_at, to_char(date_trunc('milliseconds', captured_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS captured_text FROM repository_evidence_capture WHERE organization_id = $1 AND user_id = $2 AND session_id = ANY($3::text[])) evidence WHERE ${keyset("captured_at", "agent_id", "('capture:' || context_id)")} ORDER BY captured_at DESC, session_id COLLATE "C", agent_id COLLATE "C", ('capture:' || context_id) COLLATE "C" LIMIT $8::int`,
+				`SELECT * FROM (SELECT context_id, session_id, coalesce(agent_id, '') AS agent_id, provider, provider_repository_id, provider_owner, provider_name, lifecycle, base_git_commit, head_git_commit, date_trunc('milliseconds', captured_at) AS captured_at, to_char(date_trunc('milliseconds', captured_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS captured_text FROM repository_evidence_capture WHERE organization_id = $1 AND user_id = $2 AND session_id = ANY($3::text[])) evidence WHERE ($9::text[] IS NULL OR ('capture:' || context_id) = ANY($9::text[])) AND ${keyset("captured_at", "agent_id", "('capture:' || context_id)")} ORDER BY captured_at DESC, session_id COLLATE "C", agent_id COLLATE "C", ('capture:' || context_id) COLLATE "C" LIMIT $8::int`,
 				[organizationId, userId, [...sessionIds], ...cursor],
 			),
 		]);

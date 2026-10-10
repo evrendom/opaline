@@ -73,18 +73,36 @@ const RunStartSchema = z.object({
 	start_record: z.coerce.number(),
 });
 const RemoteSchema = z.object({ repository: z.string() });
-const ActiveKeySchema = z.object({
-	from_kind: z.string(),
-	from_id: z.string(),
-	relation: z.string(),
-	to_kind: z.string(),
-	to_id: z.string(),
-	evidence_id: z.string(),
-});
-const ActiveResolutionSchema = z.object({
-	evidence_id: z.string(),
-	target: z.string(),
-});
+/**
+ * An active edge's key and the generation it was built from: a retraction
+ * keeps the generation, so a reader pinned to it sees the retraction too.
+ */
+const ActiveKeySchema = z
+	.object({
+		from_kind: z.string(),
+		from_id: z.string(),
+		relation: z.string(),
+		to_kind: z.string(),
+		to_id: z.string(),
+		evidence_id: z.string(),
+		revision_text: z.string(),
+		evidence_parser_version: z.coerce.number(),
+		transcript_parser_version: z.coerce.number(),
+	})
+	.transform(({ revision_text, ...row }) => ({
+		...row,
+		evidence_revision: revision_text,
+	}));
+const ActiveResolutionSchema = z
+	.object({
+		evidence_id: z.string(),
+		target: z.string(),
+		revision_text: z.string(),
+	})
+	.transform(({ revision_text, ...row }) => ({
+		...row,
+		evidence_revision: revision_text,
+	}));
 
 /**
  * Rebuilds the session-side edges of one session at `revision`: reads the
@@ -322,7 +340,8 @@ export async function writeSessionEdges(
 		written_at: writtenAt,
 	};
 	const active = await query(executor, ActiveKeySchema, {
-		query: `SELECT from_kind, from_id, relation, to_kind, to_id, evidence_id
+		query: `SELECT from_kind, from_id, relation, to_kind, to_id, evidence_id,
+				toString(evidence_revision) AS revision_text, evidence_parser_version, transcript_parser_version
 			FROM ${getSafeClickHouseTable(L1_EDGES_TABLE)} FINAL
 			WHERE organization_id = {organizationId:String} AND from_kind IN ('run', 'session')
 				AND from_id >= {from:String} AND from_id < {to:String} AND is_active = 1`,
@@ -351,7 +370,8 @@ export async function writeSessionEdges(
 			.map((edge) => ({ ...owner, ...edge, ...common, is_active: 0 })),
 	];
 	const activeResolutions = await query(executor, ActiveResolutionSchema, {
-		query: `SELECT evidence_id, target FROM ${getSafeClickHouseTable(L1_EDGE_RESOLUTIONS_TABLE)} FINAL
+		query: `SELECT evidence_id, target, toString(evidence_revision) AS revision_text
+			FROM ${getSafeClickHouseTable(L1_EDGE_RESOLUTIONS_TABLE)} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 				AND source = {source:String} AND session_id = {sessionId:String} AND is_active = 1`,
 		query_params: {

@@ -4,7 +4,6 @@ import {
 	type GitHubFacts,
 	key,
 	type Resolved,
-	type Seed,
 	seedBranch,
 	seedFullSha,
 	seedPrefix,
@@ -12,6 +11,7 @@ import {
 import {
 	ciRunNodeId,
 	commitNodeId,
+	evidenceIdOf,
 	pullRequestNodeId,
 	runNodeId,
 	type SessionIdentity,
@@ -386,21 +386,6 @@ export function deriveSessionEdges(input: {
 		resolutions: [...resolutions.values()],
 		repositoryKeys: [...repositoryKeys].sort(),
 	};
-}
-
-/**
- * Stable id of an evidence row: an observation by its stream, record, block
- * and kind within the session; a capture or snapshot by its origin id.
- */
-export function evidenceIdOf(seed: Seed): string {
-	if (seed.generation === null) return seed.call;
-	return [
-		"obs",
-		encodeURIComponent(seed.agentId),
-		seed.record,
-		seed.block,
-		seed.kind,
-	].join(":");
 }
 
 function clickHouseTime(ms: number): string {

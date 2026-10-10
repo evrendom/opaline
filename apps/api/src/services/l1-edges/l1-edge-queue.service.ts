@@ -202,20 +202,28 @@ export async function completeL1EdgeScope(
 		edgeCount: number;
 		unresolvedCount: number;
 		frozenReason?: string | null;
+		/**
+		 * The build wrote nothing (a freeze): the scope keeps the build it
+		 * retains, its revision, time, rules, input, coverage and counts, so
+		 * rows a failed build wrote after it never become published.
+		 */
+		retainBuild?: boolean;
 	},
 ): Promise<boolean> {
 	const rows = await sql.unsafe(
 		`UPDATE l1_edge_scope SET
 			built_request_count = claimed_request_count,
-			built_revision = claimed_revision,
-			resolver_version = $5,
-			input = COALESCE($6::text::jsonb, input),
-			coverage = COALESCE($7::text::jsonb, coverage),
+			built_revision = CASE WHEN $12::boolean THEN built_revision ELSE claimed_revision END,
+			resolver_version = CASE WHEN $12::boolean THEN resolver_version ELSE $5 END,
+			input = CASE WHEN $12::boolean THEN input ELSE COALESCE($6::text::jsonb, input) END,
+			coverage = CASE WHEN $12::boolean THEN coverage ELSE COALESCE($7::text::jsonb, coverage) END,
 			watermark = COALESCE($8::timestamptz, watermark),
-			edge_count = $9, unresolved_count = $10, frozen_reason = $11,
+			edge_count = CASE WHEN $12::boolean THEN edge_count ELSE $9 END,
+			unresolved_count = CASE WHEN $12::boolean THEN unresolved_count ELSE $10 END,
+			frozen_reason = $11,
 			attempt_count = 0, last_error = NULL,
 			lease_token = NULL, lease_expires_at = NULL,
-			built_at = now(), updated_at = now()
+			built_at = CASE WHEN $12::boolean THEN built_at ELSE now() END, updated_at = now()
 		 WHERE organization_id = $1 AND scope_kind = $2 AND scope_id = $3 AND lease_token = $4
 		 RETURNING 1`,
 		[
@@ -230,6 +238,7 @@ export async function completeL1EdgeScope(
 			result.edgeCount,
 			result.unresolvedCount,
 			result.frozenReason ?? null,
+			result.retainBuild ?? false,
 		],
 	);
 	return rows.length === 1;

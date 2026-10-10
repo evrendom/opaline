@@ -77,3 +77,52 @@ export function idPrefixRange(prefix: string): { from: string; to: string } {
 	// `/` is followed by `0` in code point order, so this bounds the prefix.
 	return { from: `${prefix}/`, to: `${prefix}0` };
 }
+
+/** What identifies an evidence row; a `Seed` of `find source=git` has it. */
+export interface EvidenceRow {
+	/** Null for a capture or snapshot, which have no observation generation. */
+	generation: unknown;
+	call: string;
+	agentId: string;
+	record: number;
+	block: number;
+	kind: string;
+}
+
+/**
+ * Stable id of an evidence row: an observation by its stream, record, block
+ * and kind within the session; a capture or snapshot by its origin id
+ * (`capture:…`, `snapshot:…`). Stable across transcript generations.
+ */
+export function evidenceIdOf(seed: EvidenceRow): string {
+	if (seed.generation === null) return seed.call;
+	return [
+		"obs",
+		encodeURIComponent(seed.agentId),
+		seed.record,
+		seed.block,
+		seed.kind,
+	].join(":");
+}
+
+/** The stream, record, block and kind of an observation's evidence id; null for other evidence. */
+export function parseObservationEvidenceId(
+	id: string,
+): { agentId: string; record: number; block: number; kind: string } | null {
+	const [prefix, agent, record, block, kind, ...rest] = id.split(":");
+	if (
+		prefix !== "obs" ||
+		agent === undefined ||
+		!kind ||
+		rest.length > 0 ||
+		!/^\d+$/u.test(record ?? "") ||
+		!/^\d+$/u.test(block ?? "")
+	)
+		return null;
+	return {
+		agentId: decodeURIComponent(agent),
+		record: Number(record),
+		block: Number(block),
+		kind,
+	};
+}

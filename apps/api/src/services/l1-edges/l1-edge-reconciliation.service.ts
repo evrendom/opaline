@@ -21,6 +21,7 @@ import {
 } from "./l1-edge-queue.service.js";
 import {
 	buildSessionEdges,
+	type SessionEdgeBuild,
 	type SessionEdgeSources,
 } from "./l1-edge-session.service.js";
 import {
@@ -155,14 +156,7 @@ async function processClaim(
 		}
 		if (build.written)
 			await recordL1EdgeDependencies(env.sql, claim, build.dependencies);
-		await completeL1EdgeScope(env.sql, claim, {
-			resolverVersion: L1_EDGE_RESOLVER_VERSION,
-			input: build.input,
-			coverage: build.written ? build.coverage : undefined,
-			edgeCount: build.edgeCount,
-			unresolvedCount: build.unresolvedCount,
-			frozenReason: build.frozenReason,
-		});
+		await completeL1EdgeScope(env.sql, claim, sessionCompletion(build));
 		return build.written;
 	} catch (error) {
 		if (error instanceof ClickHouseWriteFencedError) {
@@ -180,6 +174,41 @@ async function processClaim(
 		await failL1EdgeScope(env.sql, claim, message);
 		return false;
 	}
+}
+
+/**
+ * How a session build completes its scope. A freeze writes nothing, so the
+ * scope keeps the build whose edges it keeps (its revision, time, rules,
+ * input with the truncated flag, and coverage): rows a failed build wrote
+ * after that one must never become published by the freeze.
+ */
+export function sessionCompletion(
+	build: Pick<
+		SessionEdgeBuild,
+		| "written"
+		| "input"
+		| "coverage"
+		| "edgeCount"
+		| "unresolvedCount"
+		| "frozenReason"
+	>,
+): Parameters<typeof completeL1EdgeScope>[2] {
+	return build.written
+		? {
+				resolverVersion: L1_EDGE_RESOLVER_VERSION,
+				input: build.input,
+				coverage: build.coverage,
+				edgeCount: build.edgeCount,
+				unresolvedCount: build.unresolvedCount,
+				frozenReason: build.frozenReason,
+			}
+		: {
+				resolverVersion: L1_EDGE_RESOLVER_VERSION,
+				edgeCount: build.edgeCount,
+				unresolvedCount: build.unresolvedCount,
+				frozenReason: build.frozenReason,
+				retainBuild: true,
+			};
 }
 
 /** Removes a fenced session's edges from every edge table. */

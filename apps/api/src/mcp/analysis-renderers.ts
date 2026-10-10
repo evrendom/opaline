@@ -16,6 +16,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 		`${output.source} ${header.from}..${header.to} sessions=${header.sessionsInScope} indexed=${header.indexedSessions} runs=${header.runsInScope}`,
 		`minutes=${header.minutes} activeMinutes=${header.activeMinutes} costUsd=${header.pricedCostUsd} unattributedCostUsd=${header.unattributedCostUsd} unpricedRuns=${header.unpricedRuns} rawChars=${header.rawChars} truncated=${header.truncated}`,
 		...header.notes.map((note) => `note: ${cell(note)}`),
+		...(output.source === "git" ? linksLine(output.events) : []),
 		...(header.cursor
 			? [
 					`more: pass cursor=${header.cursor} with the same arguments to continue`,
@@ -180,6 +181,7 @@ export function renderFind(output: AnalysisFindOutput): string {
 						event.github.ciFrom && `ciFrom=${event.github.ciFrom}`,
 						event.github.coveredThrough &&
 							`coveredThrough=${event.github.coveredThrough}`,
+						linksCell(event.edges),
 					]
 						.filter(Boolean)
 						.join(" "),
@@ -212,6 +214,21 @@ export function renderFind(output: AnalysisFindOutput): string {
 				]),
 			),
 		);
+		if (output.witnesses?.length)
+			lines.push(
+				"witnesses: retained edges whose evidence row is not readable",
+				table(
+					["session", "at", "relation", "matched", "evidence", "reason"],
+					output.witnesses.map((witness) => [
+						`${witness.sessionId}/${witness.agentId || "main"}${witness.turn === null ? " (no run)" : ` turn ${witness.turn}`}`,
+						witness.at,
+						witness.relation,
+						witness.matchedValue,
+						`${witness.evidenceId}@${witness.generation.revision}/${witness.generation.parserVersion}`,
+						witness.reason,
+					]),
+				),
+			);
 	} else {
 		lines.push(
 			table(
@@ -249,18 +266,49 @@ export function renderFind(output: AnalysisFindOutput): string {
 	return lines.join("\n");
 }
 
+type GitEvent = Extract<
+	AnalysisFindOutput,
+	{ source: "git" }
+>["events"][number];
+
 /**
- * `analysis.read` already fitted the output to its budget; this only formats
- * it. The trace line is outside that budget (about 60 characters).
+ * How a page's links were made, when edges were consulted: events linked
+ * from the stored edges and at query time, with the reasons.
  */
+function linksLine(events: readonly GitEvent[]): string[] {
+	const consulted = events.flatMap((event) =>
+		event.edges ? [event.edges] : [],
+	);
+	if (consulted.length === 0) return [];
+	const count = (statuses: readonly string[]) => {
+		const counts = new Map<string, number>();
+		for (const status of statuses)
+			counts.set(status, (counts.get(status) ?? 0) + 1);
+		return [...counts]
+			.map(([status, n]) => `${n} ${status.replace("_", " ")}`)
+			.join(", ");
+	};
+	const fromEdges = consulted.filter((edges) => edges.linkedBy === "edges");
+	const atQuery = consulted.filter((edges) => edges.linkedBy === "query");
+	const frozen = fromEdges.filter((edges) => edges.status === "frozen");
+	return [
+		`links: ${fromEdges.length} events from edges${frozen.length ? ` (${frozen.length} frozen)` : ""}, ${atQuery.length} linked at query time${atQuery.length ? ` (${count(atQuery.map((edges) => edges.status))})` : ""}`,
+	];
+}
+
+/** An event's link source, only when it is not current edges. */
+function linksCell(edges: GitEvent["edges"]): string | null {
+	if (!edges || (edges.linkedBy === "edges" && edges.status === "current"))
+		return null;
+	return `links=${edges.linkedBy}:${edges.status}${edges.builtAt ? ` builtAt=${edges.builtAt}` : ""}`;
+}
+
 /**
  * Where an event can be read: a transcript event as `ref@record.block` with the
  * native content block `read` takes (and the match ordinal within it), an
  * evidence event as its origin.
  */
-function gitEventAddress(
-	event: Extract<AnalysisFindOutput, { source: "git" }>["events"][number],
-): string {
+function gitEventAddress(event: GitEvent): string {
 	if (event.record === 0)
 		return `${event.sessionId}/${event.agentId || "main"} ${event.call}`;
 	const block = Math.floor(event.block / 65_536);
@@ -271,6 +319,10 @@ function gitEventAddress(
 		: `${refText({ sessionId: event.sessionId, agentId: event.agentId, turn: event.turn })}${at}`;
 }
 
+/**
+ * `analysis.read` already fitted the output to its budget; this only formats
+ * it. The trace line is outside that budget (about 60 characters).
+ */
 export function renderRead(output: AnalysisReadOutput): string {
 	const text = formatReadOutput(output);
 	return output.trace ? `${traceLine(output.trace)}\n${text}` : text;

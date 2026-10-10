@@ -1,6 +1,7 @@
 import type { AnalysisGitEvent } from "@rudel/api-routes";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
+import { parseObservationEvidenceId } from "../l1-edges/l1-edge-ids.js";
 import {
 	type CursorKey,
 	type CursorOrder,
@@ -8,7 +9,12 @@ import {
 } from "./find-cursor.js";
 import { runKey } from "./reactions.js";
 import type { AnalysisSession, ScopeBatch } from "./scope.js";
-import { ANALYSIS_QUERY_SETTINGS, query, records } from "./sql.js";
+import {
+	ANALYSIS_QUERY_SETTINGS,
+	chunkByParamBytes,
+	query,
+	records,
+} from "./sql.js";
 
 /**
  * Sessions joined to the pull requests and CI runs they touched. Events are
@@ -90,6 +96,8 @@ export interface EvidencePage {
 		| { at: string; sessionId: string; agentId: string; call: string | null }
 		| undefined;
 	limit: number;
+	/** Only these evidence rows (`capture:…`, `snapshot:…` call ids); every row when absent. */
+	calls?: readonly string[];
 }
 
 /** Where GitHub access and session evidence come from (Postgres in production). */
@@ -109,7 +117,7 @@ const CI_RUNS_PER_EVENT = 200;
 /** A CI check that names a branch reads the branch's runs of the day before it. */
 export const BRANCH_RUN_WINDOW_MS = 86_400_000;
 /** Runs read per checked branch and page; beyond it, older windows are unknown. */
-const BRANCH_RUNS_CAP = 2_000;
+export const BRANCH_RUNS_CAP = 2_000;
 /** A target's CI history is taken to start this long before its first sighting. */
 const TARGET_LOOKBACK_MS = 86_400_000;
 
@@ -187,7 +195,7 @@ const MembershipSchema = z.object({
 	pr_number: z.coerce.number(),
 	last_seen_head_sha: z.string(),
 });
-const PullRequestRowSchema = z
+export const PullRequestRowSchema = z
 	.object({
 		repository_id: z.string(),
 		number: z.coerce.number(),
@@ -208,7 +216,7 @@ const PullRequestRowSchema = z
 		merged_at: merged_text,
 		closed_at: closed_text,
 	}));
-const CiRunRowSchema = z
+export const CiRunRowSchema = z
 	.object({
 		repository_id: z.string(),
 		run_kind: z.string(),
@@ -235,6 +243,17 @@ const CiRunRowSchema = z
 			completed_at: completed_text,
 		}),
 	);
+/** `github_ci_runs` columns as `CiRunRowSchema` reads them, without the PR link. */
+export const CI_RUN_COLUMNS = `repository_id, toString(kind) AS run_kind, run_id, attempt, workflow_name, event, head_branch,
+	head_sha, status, conclusion, toString(created_at) AS created_text,
+	if(isNull(run_started_at), NULL, toString(run_started_at)) AS started_text,
+	if(isNull(completed_at), NULL, toString(completed_at)) AS completed_text`;
+/** `github_pull_requests` columns as `PullRequestRowSchema` reads them. */
+export const PULL_REQUEST_COLUMNS = `repository_id, number, head_repository_id, title, state, draft,
+	toString(created_at) AS created_text,
+	if(isNull(merged_at), NULL, toString(merged_at)) AS merged_text,
+	if(isNull(closed_at), NULL, toString(closed_at)) AS closed_text,
+	head_ref, head_sha, merge_commit_sha`;
 export type PullRequestRow = z.infer<typeof PullRequestRowSchema>;
 export type CiRunRow = z.infer<typeof CiRunRowSchema>;
 
@@ -313,6 +332,36 @@ export function emptyGitHubFacts(): GitHubFacts {
 	};
 }
 
+/**
+ * The evidence rows `find pullRequest=…` keeps: per session, the evidence ids
+ * of its edges to the pull request (observations as `obs:…`, captures and
+ * snapshots by their call ids), each with the generation its edge was built
+ * from. An observation is kept only in that generation: another generation's
+ * row at the same place may say something else.
+ */
+export type GitEvidenceFilter = ReadonlyMap<
+	string,
+	ReadonlyMap<string, { revision: string; parserVersion: number }>
+>;
+
+/** A page of events before their links, with what linking them reads. */
+export interface PageToLink {
+	executor: ClickHouseExecutor;
+	organizationId: string;
+	batches: readonly ScopeBatch[];
+	sessions: ReadonlyMap<string, AnalysisSession>;
+	/** Per session, the observation generation the page's events come from. */
+	generations: ReadonlyMap<string, ObservationGeneration>;
+	access: GitHubAccess;
+	seeds: readonly Seed[];
+	checks: ReadonlyMap<string, ChecksAfter>;
+}
+
+/** Links a page's events to PRs and CI runs; `linkAtQueryTime` when absent. */
+export type GitPageLinker = (
+	page: PageToLink,
+) => Promise<{ events: GitEvent[]; notes: string[] }>;
+
 export interface GitPageInput {
 	executor: ClickHouseExecutor;
 	organizationId: string;
@@ -329,9 +378,15 @@ export interface GitPageInput {
 	order: CursorOrder;
 	limit: number;
 	source: GitHubSource;
+	/** How events are linked; resolved at query time when absent. */
+	link?: GitPageLinker;
+	/** Only these evidence rows (`find pullRequest=…`); every row when absent. */
+	only?: GitEvidenceFilter;
 }
 
 export interface GitPage {
+	/** Per session, the observation generation the page read. */
+	generations: ReadonlyMap<string, ObservationGeneration>;
 	events: GitEvent[];
 	keys: CursorKey[];
 	more: boolean;
@@ -351,7 +406,8 @@ export async function loadGitPage(input: GitPageInput): Promise<GitPage> {
 	const evidence =
 		access.visibility === "hidden" || input.runKeys
 			? { snapshots: [], captures: [] }
-			: await input.source.evidence(
+			: await loadEvidence(
+					input.source,
 					input.organizationId,
 					[...input.batches, ...input.unindexed].map((group) => ({
 						userId: group.scope.userId,
@@ -372,6 +428,7 @@ export async function loadGitPage(input: GitPageInput): Promise<GitPage> {
 									},
 						limit: input.limit + 1,
 					},
+					input.only,
 				);
 	const ordered = [
 		...observed.seeds,
@@ -393,34 +450,21 @@ export async function loadGitPage(input: GitPageInput): Promise<GitPage> {
 		generations,
 		page,
 	);
-	const resolved = page.map((seed) => ({
-		seed,
-		...resolveRepository(
-			seed,
-			input.sessions.get(seed.sessionId)?.repository ?? "",
-			access,
-		),
-	}));
-	const facts = await loadGitHubFacts(
-		input.executor,
-		input.organizationId,
-		gitHubNeeds(resolved),
-		access.bindings.map((binding) => binding.repositoryId),
-	);
-	const commits = await loadSessionCommits(
-		input.executor,
-		input.batches,
+	const toLink: PageToLink = {
+		executor: input.executor,
+		organizationId: input.organizationId,
+		batches: input.batches,
+		sessions: input.sessions,
 		generations,
-		page,
-	);
-	const events = assembleGitEvents(
-		resolved,
-		facts,
-		checks,
-		input.sessions,
 		access,
-		commits,
-	);
+		seeds: page,
+		checks,
+	};
+	const linked = input.link
+		? await input.link(toLink)
+		: { events: await linkAtQueryTime(toLink), notes: [] };
+	const events = linked.events;
+	notes.push(...linked.notes);
 
 	if (observed.filtered > 0)
 		notes.push(
@@ -489,11 +533,83 @@ export async function loadGitPage(input: GitPageInput): Promise<GitPage> {
 	if (observed.boundary && ordered.length <= input.limit)
 		keys.push(observed.boundary);
 	return {
+		generations,
 		events,
 		keys,
 		more,
 		notes,
 		truncated: observed.capped,
+	};
+}
+
+/**
+ * Links a page's events at query time: resolves each event's repository,
+ * reads the GitHub facts its values name and assembles the links.
+ */
+export async function linkAtQueryTime(page: PageToLink): Promise<GitEvent[]> {
+	const resolved = page.seeds.map((seed) => ({
+		seed,
+		...resolveRepository(
+			seed,
+			page.sessions.get(seed.sessionId)?.repository ?? "",
+			page.access,
+		),
+	}));
+	const facts = await loadGitHubFacts(
+		page.executor,
+		page.organizationId,
+		gitHubNeeds(resolved),
+		page.access.bindings.map((binding) => binding.repositoryId),
+	);
+	const commits = await loadSessionCommits(
+		page.executor,
+		page.batches,
+		page.generations,
+		page.seeds,
+	);
+	return assembleGitEvents(
+		resolved,
+		facts,
+		page.checks,
+		page.sessions,
+		page.access,
+		commits,
+	);
+}
+
+/** Captures and snapshots of the owners' sessions; with `only`, just the kept rows. */
+async function loadEvidence(
+	source: GitHubSource,
+	organizationId: string,
+	owners: readonly SessionOwners[],
+	page: EvidencePage,
+	only: GitEvidenceFilter | undefined,
+): Promise<{ snapshots: SnapshotRow[]; captures: CaptureRow[] }> {
+	if (!only) return source.evidence(organizationId, owners, page);
+	const kept = owners
+		.map((owner) => ({
+			...owner,
+			sessionIds: owner.sessionIds.filter((id) => only.has(id)),
+		}))
+		.filter((owner) => owner.sessionIds.length > 0);
+	const calls = [...only.values()].flatMap((ids) =>
+		[...ids.keys()].filter((id) => !id.startsWith("obs:")),
+	);
+	if (kept.length === 0 || calls.length === 0)
+		return { snapshots: [], captures: [] };
+	const found = await source.evidence(organizationId, kept, {
+		...page,
+		calls,
+	});
+	const wanted = (sessionId: string, call: string) =>
+		only.get(sessionId)?.has(call) ?? false;
+	return {
+		snapshots: found.snapshots.filter((row) =>
+			wanted(row.sessionId, `snapshot:${row.originId}`),
+		),
+		captures: found.captures.filter((row) =>
+			wanted(row.sessionId, `capture:${row.originId}`),
+		),
 	};
 }
 
@@ -527,6 +643,7 @@ async function collectObservationSeeds(
 				...(await queryObservations(input.executor, batch, generations, {
 					after,
 					limit: chunk,
+					only: input.only,
 				})),
 			);
 		const seeds = rows
@@ -629,13 +746,78 @@ export async function queryObservations(
 	executor: ClickHouseExecutor,
 	batch: ScopeBatch,
 	generations: ReadonlyMap<string, ObservationGeneration>,
-	options: { after: CursorKey | undefined; limit: number },
+	options: {
+		after: CursorKey | undefined;
+		limit: number;
+		/** Only these observations (`obs:…` evidence ids per session). */
+		only?: GitEvidenceFilter;
+	},
 ): Promise<ObservationRow[]> {
+	const only = options.only;
 	const pinned = batch.sessions.flatMap((session) => {
 		const generation = generations.get(session.session_id);
-		return generation ? [[session.session_id, generation] as const] : [];
+		return generation && (!only || only.has(session.session_id))
+			? [[session.session_id, generation] as const]
+			: [];
 	});
-	if (pinned.length === 0) return [];
+	const wanted = only
+		? pinned.flatMap(([sessionId, generation]) =>
+				[...(only.get(sessionId) ?? [])].flatMap(([id, built]) => {
+					const parsed = parseObservationEvidenceId(id);
+					return parsed &&
+						built.revision === generation.revision &&
+						built.parserVersion === generation.parserVersion
+						? [{ sessionId, ...parsed }]
+						: [];
+				}),
+			)
+		: null;
+	if (pinned.length === 0 || wanted?.length === 0) return [];
+	if (!wanted)
+		return queryObservationRows(executor, batch, pinned, options, null);
+	// The kept observations travel in the URL: one statement per budget, merged
+	// in the scan order.
+	const rows = (
+		await Promise.all(
+			chunkByParamBytes(wanted, (row) => [
+				row.sessionId,
+				row.agentId,
+				row.record,
+				row.block,
+				row.kind,
+			]).map((chunk) =>
+				queryObservationRows(executor, batch, pinned, options, chunk),
+			),
+		)
+	).flat();
+	return rows
+		.sort(
+			(left, right) =>
+				right.ts_ms - left.ts_ms ||
+				compareKeys(
+					[left.session_id, left.agent_id, left.record_idx, left.block_idx],
+					[right.session_id, right.agent_id, right.record_idx, right.block_idx],
+					["asc", "asc", "asc", "asc"],
+				),
+		)
+		.slice(0, options.limit);
+}
+
+async function queryObservationRows(
+	executor: ClickHouseExecutor,
+	batch: ScopeBatch,
+	pinned: readonly (readonly [string, ObservationGeneration])[],
+	options: { after: CursorKey | undefined; limit: number },
+	wanted:
+		| readonly {
+				sessionId: string;
+				agentId: string;
+				record: number;
+				block: number;
+				kind: string;
+		  }[]
+		| null,
+): Promise<ObservationRow[]> {
 	const after = options.after;
 	return query(executor, ObservationSchema, {
 		query: `SELECT session_id, agent_id, record_idx, block_idx, call_id, kind, label, short_sha, branch,
@@ -647,6 +829,14 @@ export async function queryObservations(
 				AND (session_id, toString(revision), parser_version) IN (
 					SELECT g.1, g.2, g.3 FROM (SELECT arrayJoin(arrayZip(
 						{genSessions:Array(String)}, {genRevisions:Array(String)}, {genParsers:Array(UInt16)})) AS g))
+				${
+					wanted
+						? `AND (session_id, agent_id, record_idx, block_idx, kind) IN (
+					SELECT w.1, w.2, w.3, w.4, w.5 FROM (SELECT arrayJoin(arrayZip(
+						{onlySessions:Array(String)}, {onlyAgents:Array(String)}, {onlyRecords:Array(UInt32)},
+						{onlyBlocks:Array(UInt32)}, {onlyKinds:Array(String)})) AS w))`
+						: ""
+				}
 				${
 					after
 						? `AND (toUnixTimestamp64Milli(ts) < {afterMs:Int64}
@@ -664,6 +854,15 @@ export async function queryObservations(
 			genRevisions: pinned.map(([, generation]) => generation.revision),
 			genParsers: pinned.map(([, generation]) => generation.parserVersion),
 			limit: options.limit,
+			...(wanted
+				? {
+						onlySessions: wanted.map((row) => row.sessionId),
+						onlyAgents: wanted.map((row) => row.agentId),
+						onlyRecords: wanted.map((row) => row.record),
+						onlyBlocks: wanted.map((row) => row.block),
+						onlyKinds: wanted.map((row) => row.kind),
+					}
+				: {}),
 			...(after
 				? {
 						afterMs: Date.parse(String(after[0])),
@@ -1011,11 +1210,7 @@ export async function loadGitHubFacts(
 			executor,
 			PullRequestRowSchema,
 			statement(
-				`SELECT repository_id, number, head_repository_id, title, state, draft,
-					toString(created_at) AS created_text,
-					if(isNull(merged_at), NULL, toString(merged_at)) AS merged_text,
-					if(isNull(closed_at), NULL, toString(closed_at)) AS closed_text,
-					head_ref, head_sha, merge_commit_sha
+				`SELECT ${PULL_REQUEST_COLUMNS}
 				FROM rudel.github_pull_requests FINAL
 				WHERE workspace_id = {workspaceId:String} AND provider = 'github'
 					AND has({repositoryIds:Array(String)}, repository_id)
@@ -1044,10 +1239,6 @@ export async function loadGitHubFacts(
 	for (const pr of facts.pullRequests.values())
 		if (pr.merge_commit_sha)
 			shas.add(key(pr.repository_id, pr.merge_commit_sha));
-	const runColumns = `repository_id, toString(kind) AS run_kind, run_id, attempt, workflow_name, event, head_branch,
-		head_sha, status, conclusion, toString(created_at) AS created_text,
-		if(isNull(run_started_at), NULL, toString(run_started_at)) AS started_text,
-		if(isNull(completed_at), NULL, toString(completed_at)) AS completed_text`;
 	if (shas.size > 0) {
 		// Every collected run on the SHAs, whatever its date: a session may
 		// inspect a commit tested long before it.
@@ -1056,7 +1247,7 @@ export async function loadGitHubFacts(
 			executor,
 			CiRunRowSchema,
 			statement(
-				`SELECT ${runColumns}, toUInt32(0) AS pr_number, '' AS link_basis
+				`SELECT ${CI_RUN_COLUMNS}, toUInt32(0) AS pr_number, '' AS link_basis
 				FROM rudel.github_ci_runs FINAL
 				WHERE workspace_id = {workspaceId:String} AND provider = 'github' AND kind != 'check_suite'
 					AND has({repositoryIds:Array(String)}, repository_id)
@@ -1079,7 +1270,7 @@ export async function loadGitHubFacts(
 			executor,
 			CiRunRowSchema,
 			statement(
-				`SELECT ${runColumns}, toUInt32(0) AS pr_number, '' AS link_basis
+				`SELECT ${CI_RUN_COLUMNS}, toUInt32(0) AS pr_number, '' AS link_basis
 				FROM rudel.github_ci_runs FINAL
 				WHERE workspace_id = {workspaceId:String} AND provider = 'github' AND kind != 'check_suite'
 					AND has({repositoryIds:Array(String)}, repository_id)
@@ -1123,7 +1314,7 @@ export async function loadGitHubFacts(
 			executor,
 			CiRunRowSchema,
 			statement(
-				`SELECT ${runColumns}, toUInt32(0) AS pr_number, '' AS link_basis
+				`SELECT ${CI_RUN_COLUMNS}, toUInt32(0) AS pr_number, '' AS link_basis
 				FROM rudel.github_ci_runs FINAL
 				WHERE workspace_id = {workspaceId:String} AND provider = 'github' AND kind = 'actions_run'
 					AND has({repositoryIds:Array(String)}, repository_id)
@@ -1852,7 +2043,7 @@ function pushKey(seed: Seed): string {
 }
 
 /** Milliseconds of a GitHub fact's time: ClickHouse text (UTC) or an ISO time. */
-function githubTimeMs(value: string): number {
+export function githubTimeMs(value: string): number {
 	const iso = value.includes("T") ? value : value.replace(" ", "T");
 	return Date.parse(
 		/(?:Z|[+-]\d{2}:?\d{2})$/u.test(iso) || !iso.includes("T")
@@ -1862,7 +2053,7 @@ function githubTimeMs(value: string): number {
 }
 
 /** A UTC time as ClickHouse reads it with `toDateTime64(…, 3, 'UTC')`. */
-function clickHouseTime(ms: number): string {
+export function clickHouseTime(ms: number): string {
 	return new Date(ms).toISOString().replace("T", " ").replace("Z", "");
 }
 

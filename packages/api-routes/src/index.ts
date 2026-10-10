@@ -85,6 +85,7 @@ export {
 	type AnalysisTrace,
 	AnalysisTraceSchema,
 	findLimit,
+	parsePullRequestRef,
 	type RunRef,
 } from "./analysis.js";
 export {

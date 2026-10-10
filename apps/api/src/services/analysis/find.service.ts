@@ -3,6 +3,7 @@ import {
 	type AnalysisFindOutput,
 	type AnalysisRun,
 	findLimit,
+	parsePullRequestRef,
 	type RunRef,
 } from "@rudel/api-routes";
 import type { z } from "zod";
@@ -11,6 +12,7 @@ import {
 	type ClickHouseStatement,
 	getClickhouse,
 } from "../../clickhouse.js";
+import { sessionScopeId } from "../l1-edges/l1-edge-ids.js";
 import { withAnalysisDeadline } from "./deadline.js";
 import {
 	CLASSIFIER_VERSION,
@@ -27,6 +29,22 @@ import {
 	takePage,
 	writeFindCursor,
 } from "./find-cursor.js";
+import {
+	type EdgeScopeState,
+	type EdgeStateSource,
+	edgeLinker,
+	isL1EdgeFindReadEnabled,
+	l1EdgeFindShadowRate,
+	loadPullRequestTouches,
+	type PullRequestTouch,
+	type PullRequestTouches,
+	pullRequestNotes,
+	selectWitnesses,
+	settledForReverse,
+	touchEvidence,
+	touchWitnesses,
+	WITNESSES_PER_ANSWER,
+} from "./git-edge-links.js";
 import { type GitHubSource, loadGitPage } from "./git-links.js";
 import { fitFindOutput } from "./output-ceiling.js";
 import {
@@ -49,9 +67,11 @@ import {
 	type AnalysisScope,
 	type AnalysisSession,
 	defaultRange,
+	listScopeSessions,
 	type ResolvedScope,
 	resolveScope,
 	type ScopeBatch,
+	type SessionPick,
 } from "./scope.js";
 import { isAnalysisWorkLimit, query } from "./sql.js";
 
@@ -72,6 +92,8 @@ interface FindEnv {
 	batchRecords?: number;
 	/** GitHub visibility and active bindings for source=git (tests inject them). */
 	github?: GitHubSource;
+	/** The edge worker's build records for source=git (tests inject them); null reads no edges. */
+	edges?: EdgeStateSource | null;
 	deadlineMs?: number;
 }
 
@@ -90,7 +112,15 @@ interface FindContext {
 	runs: Map<string, RunRow>;
 	sessions: Map<string, AnalysisSession>;
 	github: GitHubSource;
+	/** Null when links are computed at query time only (`L1_EDGES_FIND_READ=false`). */
+	edges: EdgeStateSource | null;
 	organizationId: string;
+	/** The owner the scope is limited to; null for an admin across members. */
+	ownerId: string | null;
+	/** The request's executor without its cancellation, for detached work with its own. */
+	unboundExecutor: ClickHouseExecutor;
+	/** `pullRequest`: the evidence rows that touch it, as their sessions' builds published them. */
+	pullRequest?: { touches: PullRequestTouches; published: PullRequestTouch[] };
 }
 
 interface ScanRow {
@@ -159,12 +189,41 @@ export function findAnalysisWithOwners(
 			let owners: string[] = [];
 			const order = cursorOrder(input);
 			const after = readFindCursor(input, order);
+			const github = env.github ?? lazyPostgresGitHubSource;
+			const edges = isL1EdgeFindReadEnabled()
+				? env.edges === undefined
+					? lazyPostgresEdgeState
+					: env.edges
+				: null;
 			try {
+				const touches =
+					input.source === "git" && input.pullRequest !== undefined
+						? await pullRequestTouches(
+								executor,
+								scope,
+								input.pullRequest,
+								github,
+								edges,
+							)
+						: undefined;
+				if (touches && "unknown" in touches)
+					return {
+						output: emptyResult(input, {
+							...newHeader(emptyScope(input)),
+							notes: [touches.unknown],
+						}),
+						owners,
+					};
+				// The touches are what the sessions' completed builds published.
+				const pullRequest = touches
+					? { touches, published: touches.edges }
+					: undefined;
 				const resolved = await resolveScope(
 					executor,
 					scope,
 					input,
 					env.batchRecords,
+					pullRequest && pullRequestPick(pullRequest.published, input),
 				);
 				// source=git also reads CLI evidence of sessions without an indexed
 				// transcript; their owners own the result too.
@@ -191,8 +250,12 @@ export function findAnalysisWithOwners(
 					header: newHeader(resolved),
 					runs: await loadScopeRuns(executor, resolved, input, sessions),
 					sessions,
-					github: env.github ?? lazyPostgresGitHubSource,
+					github,
+					edges,
 					organizationId: scope.organizationId,
+					ownerId: scope.userId,
+					unboundExecutor: env.executor,
+					pullRequest,
 					scan: {
 						rows: 0,
 						bytes: 0,
@@ -255,15 +318,250 @@ async function findGitEvents(context: FindContext): Promise<FoundPage> {
 		order: context.order,
 		limit: context.limit,
 		source: context.github,
+		link: context.edges
+			? edgeLinker({
+					state: context.edges,
+					shadowRate: l1EdgeFindShadowRate(),
+					shadowExecutor: context.unboundExecutor,
+				})
+			: undefined,
+		only: context.pullRequest && touchEvidence(context.pullRequest.published),
 	});
+	let witnesses: ReturnType<typeof touchWitnesses> | undefined;
+	if (context.pullRequest && context.edges) {
+		const { touches, published } = context.pullRequest;
+		const visible = new Set(
+			[...sessions.values()].map((session) =>
+				sessionScopeId({
+					userId: session.user_id,
+					source: session.source,
+					sessionId: session.session_id,
+				}),
+			),
+		);
+		// Every retained edge whose evidence row cannot be shown, on the first
+		// page, of the runs `refs` or `model` select.
+		const selected = selectWitnesses(
+			context.after === undefined
+				? touchWitnesses(published, visible, page.generations)
+				: [],
+			{
+				refs: input.refs?.length
+					? new Set(input.refs.map((ref) => runKey(ref)))
+					: null,
+				modelRuns: input.model ? new Set(context.runs.keys()) : null,
+				runKey,
+			},
+		);
+		const all = selected.kept;
+		witnesses = all.slice(0, WITNESSES_PER_ANSWER);
+		const [sessionScopes, repositoryScopes, unsettled] = await Promise.all([
+			context.edges.scopes(
+				context.organizationId,
+				"session",
+				published
+					.map((edge) => sessionScopeId(edge.session))
+					.filter((id) => visible.has(id)),
+			),
+			context.edges.scopes(context.organizationId, "repository", [
+				touches.repository.repositoryId,
+			]),
+			unsettledSessions(context, touches),
+		]);
+		header.notes.push(
+			...pullRequestNotes({
+				touches,
+				edges: published,
+				visible,
+				sessionScopes,
+				repositoryScope: repositoryScopes.get(touches.repository.repositoryId),
+				unsettled,
+				witnesses: all.length,
+				unattributed: selected.unattributed,
+				model: input.model,
+			}),
+		);
+		if (
+			touches.truncated ||
+			all.length > witnesses.length ||
+			selected.unattributed > 0 ||
+			touches.unpublished.length > 0 ||
+			touches.incomplete.length > 0 ||
+			unsettled.capped
+		)
+			header.truncated = true;
+	}
 	header.notes.push(...page.notes);
 	if (page.truncated) header.truncated = true;
 	return paged(context, page.keys, page.more, {
 		source: "git",
 		header,
 		events: page.events,
+		// Only a pullRequest answer has witnesses; others keep their old shape.
+		...(witnesses ? { witnesses } : {}),
 	});
 }
+
+/**
+ * The sessions the caller may see in the window that could touch the pull
+ * request (from `from`, else two weeks before the PR was created, to `to`,
+ * else today) whose edges cannot vouch for them: no scope, not built, older
+ * rules, truncated or being rebuilt (a new transcript or observation
+ * generation always queues a rebuild, so a stale build is one being
+ * rebuilt).
+ */
+async function unsettledSessions(
+	context: FindContext,
+	touches: PullRequestTouches,
+): Promise<{
+	count: number;
+	of: number;
+	from: string;
+	to: string;
+	capped: boolean;
+}> {
+	const today = new Date().toISOString().slice(0, 10);
+	const createdMs = touches.createdAt
+		? Date.parse(`${touches.createdAt.replace(" ", "T").slice(0, 19)}Z`)
+		: Number.NaN;
+	const from =
+		context.input.from ??
+		(Number.isFinite(createdMs)
+			? new Date(createdMs - 14 * 86_400_000).toISOString().slice(0, 10)
+			: new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10));
+	const to = context.input.to ?? today;
+	const inventory = await listScopeSessions(
+		context.executor,
+		{ organizationId: context.organizationId, userId: context.ownerId },
+		context.input,
+		{ from, to },
+	);
+	const states: ReadonlyMap<string, EdgeScopeState> = context.edges
+		? await context.edges.scopes(
+				context.organizationId,
+				"session",
+				inventory.sessions.map((session) =>
+					sessionScopeId({
+						userId: session.user_id,
+						source: session.source,
+						sessionId: session.session_id,
+					}),
+				),
+			)
+		: new Map();
+	return {
+		count: inventory.sessions.filter(
+			(session) =>
+				!settledForReverse(
+					states.get(
+						sessionScopeId({
+							userId: session.user_id,
+							source: session.source,
+							sessionId: session.session_id,
+						}),
+					),
+				),
+		).length,
+		of: inventory.sessions.length,
+		from,
+		to,
+		capped: inventory.capped,
+	};
+}
+
+/**
+ * The sessions and evidence rows that touch `pullRequest`, through the
+ * stored edges of the workspace's actively bound repository, for the scope's
+ * owner (everyone's for an admin); or why that is unknown.
+ */
+async function pullRequestTouches(
+	executor: ClickHouseExecutor,
+	scope: AnalysisScope,
+	value: string,
+	github: GitHubSource,
+	edges: EdgeStateSource | null,
+): Promise<PullRequestTouches | { unknown: string }> {
+	const ref = parsePullRequestRef(value);
+	if (!ref)
+		return {
+			unknown: `pullRequest ${value} is not owner/name#number or a GitHub pull request URL`,
+		};
+	if (!edges)
+		return {
+			unknown:
+				"pullRequest follows the stored L1 edges, which this server does not read at the moment: which sessions touched it is unknown; find source=git without pullRequest still links events at query time",
+		};
+	const access = await github.access(scope.organizationId);
+	if (access.visibility === "hidden")
+		return {
+			unknown:
+				"GitHub outcomes are not visible for this workspace: which sessions touched the pull request is unknown",
+		};
+	const binding = access.bindings.find(
+		(candidate) =>
+			candidate.fullName.toLowerCase() === ref.fullName.toLowerCase(),
+	);
+	if (!binding)
+		return {
+			unknown: `${ref.fullName} has no active GitHub binding in this workspace: which sessions touched #${ref.number} is unknown`,
+		};
+	return loadPullRequestTouches(
+		executor,
+		scope.organizationId,
+		scope.userId,
+		binding,
+		ref.number,
+		edges,
+	);
+}
+
+/** The touching sessions as find's scope; dates span their evidence unless given. */
+function pullRequestPick(
+	touches: readonly PullRequestTouch[],
+	input: AnalysisFindInput,
+): SessionPick {
+	const days = touches.map((edge) =>
+		new Date(edge.atMs).toISOString().slice(0, 10),
+	);
+	const fallback = defaultRange(input);
+	return {
+		sessions: [
+			...new Map(
+				touches.map((edge) => [
+					sessionScopeId(edge.session),
+					{ userId: edge.session.userId, sessionId: edge.session.sessionId },
+				]),
+			).values(),
+		],
+		range:
+			days.length > 0
+				? { from: days.reduce(minDay), to: days.reduce(maxDay) }
+				: fallback,
+	};
+}
+
+function minDay(left: string, right: string): string {
+	return left < right ? left : right;
+}
+
+function maxDay(left: string, right: string): string {
+	return left > right ? left : right;
+}
+
+/** Postgres-backed edge build records, loaded only when source=git runs. */
+const lazyPostgresEdgeState: EdgeStateSource = {
+	scopes: async (organizationId, kind, scopeIds) => {
+		const [{ sqlClient }, { postgresEdgeStateSource }] = await Promise.all([
+			import("../../db.js"),
+			import("./edge-scopes.js"),
+		]);
+		return postgresEdgeStateSource(sqlClient).scopes(
+			organizationId,
+			kind,
+			scopeIds,
+		);
+	},
+};
 
 /** Postgres-backed GitHub source, loaded only when source=git runs. */
 const lazyPostgresGitHubSource: GitHubSource = {
@@ -765,17 +1063,22 @@ function finishHeader({ header, scope, scan }: FindContext): void {
 		);
 }
 
+/** A scope with no sessions over the default range. */
+function emptyScope(input: AnalysisFindInput): ResolvedScope {
+	return {
+		...defaultRange(input),
+		sessionsInScope: 0,
+		indexedSessions: 0,
+		sessionCapReached: false,
+		subagentThreads: 0,
+		batches: [],
+		unindexed: [],
+	};
+}
+
 function workLimitHeader(input: AnalysisFindInput): Header {
 	return {
-		...newHeader({
-			...defaultRange(input),
-			sessionsInScope: 0,
-			indexedSessions: 0,
-			sessionCapReached: false,
-			subagentThreads: 0,
-			batches: [],
-			unindexed: [],
-		}),
+		...newHeader(emptyScope(input)),
 		truncated: true,
 		notes: [
 			"SQL work ceiling reached; nothing could be counted for this scope, narrow it (dates, latest, repository)",

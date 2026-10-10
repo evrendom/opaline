@@ -340,7 +340,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
-				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push.",
+				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push; with pullRequest, the sessions that touched that pull request.",
 			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to. For totals and rankings, use the start of the window the user asked for.",
 			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
 			latest: "Only the newest N sessions in the date range, 1-200.",
@@ -374,6 +374,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			sort: "source=runs order, biggest first: startedAt (default, newest first), minutes, costUsd, failedCalls or rawChars (size of the run's text).",
 			cursor:
 				"The value from an earlier result's 'more: pass cursor=…' line, to get the next page with the same other arguments.",
+			pullRequest:
+				"source=git only: a pull request as owner/name#number or its GitHub URL. Returns the events of every session that named it, pushed its head branch, or created, pushed or mentioned one of its commits, whatever their date unless from or to is given.",
 			analysis: ANALYSIS_ID_DESCRIPTION,
 			workspace: WORKSPACE_DESCRIPTION,
 		}),

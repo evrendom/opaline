@@ -9,6 +9,7 @@ import {
 	failL1EdgeScope,
 	recordL1EdgeDependencies,
 } from "./l1-edge-queue.service.js";
+import { sessionCompletion } from "./l1-edge-reconciliation.service.js";
 
 /**
  * The API's shared Postgres client is wrapped by drizzle (db.ts), whose
@@ -157,5 +158,43 @@ describe("edge queue statements bind through the drizzle-wrapped client", () => 
 		expect(claimed?.builtRevision).toBe(11);
 		expect(statements[0]?.params[3]).toBe("org");
 		expect(statements[0]?.query).not.toMatch(/scope\.watermark[,\s]/u);
+	});
+
+	test("a freeze keeps the build it retains: revision, time, rules, input and coverage", async () => {
+		// Build 7 completed; build 8 wrote rows and failed; build 9 freezes.
+		const frozen = sessionCompletion({
+			written: false,
+			frozenReason: "transcript generation expired; edges kept",
+			input: { generation: null },
+			coverage: {},
+			edgeCount: 0,
+			unresolvedCount: 0,
+		});
+		expect(frozen).toMatchObject({ retainBuild: true });
+		expect(frozen.input).toBeUndefined();
+		expect(frozen.coverage).toBeUndefined();
+		const { sql, statements } = fakeSql([{ "?column?": 1 }]);
+		await completeL1EdgeScope(sql, { ...claim, revision: 9 }, frozen);
+		const [update] = statements;
+		expect(update?.params[11]).toBe(true);
+		for (const kept of [
+			"built_revision = CASE WHEN $12::boolean THEN built_revision",
+			"built_at = CASE WHEN $12::boolean THEN built_at",
+			"resolver_version = CASE WHEN $12::boolean THEN resolver_version",
+			"input = CASE WHEN $12::boolean THEN input",
+			"coverage = CASE WHEN $12::boolean THEN coverage",
+		])
+			expect(update?.query).toContain(kept);
+		// A written build publishes itself.
+		expect(
+			sessionCompletion({
+				written: true,
+				frozenReason: null,
+				input: { truncated: false },
+				coverage: {},
+				edgeCount: 3,
+				unresolvedCount: 0,
+			}).retainBuild,
+		).toBeUndefined();
 	});
 });

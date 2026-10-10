@@ -8,7 +8,8 @@ import {
 	resolveRepository,
 	type Seed,
 } from "../analysis/git-links.js";
-import { deriveSessionEdges, evidenceIdOf } from "./l1-edge-derivation.js";
+import { deriveSessionEdges } from "./l1-edge-derivation.js";
+import { evidenceIdOf } from "./l1-edge-ids.js";
 
 const session = { userId: "u1", source: "claude_code", sessionId: "s1" };
 const access: GitHubAccess = {
