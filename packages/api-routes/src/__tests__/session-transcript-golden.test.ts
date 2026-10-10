@@ -557,7 +557,7 @@ describe("shared session transcript derivation", () => {
 
 	test("pins Claude trace, turn, metric, and pricing bytes", () => {
 		expect(sha256(deriveTranscriptSnapshot(CLAUDE_TRANSCRIPT))).toBe(
-			"be076ea1e54c042cdb48e1e884d605f58986628a15034e743182aeed37c0dd61",
+			"6c314b741885e34ffd980f5759b99083ce0e230990483ab9a45bc99f9708545c",
 		);
 	});
 

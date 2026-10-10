@@ -88,6 +88,10 @@ export const ConversationProviderSchema = z.enum(["claude", "codex"]);
 // Entry schemas
 const BaseEntrySchema = z.object({
 	agentName: z.string().optional(),
+	/** The agent's own id for this entry when `uuid` isn't it — Codex lines
+	 * carry none, so their `uuid` is derived and this keeps the item id
+	 * (`rs_…`, `msg_…`). */
+	nativeId: z.string().optional(),
 	provider: ConversationProviderSchema.optional(),
 	uuid: z.string(),
 	timestamp: z.string(),

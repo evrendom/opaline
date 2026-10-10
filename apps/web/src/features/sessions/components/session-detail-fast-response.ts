@@ -413,6 +413,11 @@ function normalizeOverviewSession(
 			raw.totalTokens,
 			0,
 		),
+		transcriptBytes: optionalField(
+			overviewSessionShape.transcriptBytes,
+			raw.transcriptBytes,
+			undefined,
+		),
 		userId: optionalField(
 			overviewSessionShape.userId,
 			raw.userId,

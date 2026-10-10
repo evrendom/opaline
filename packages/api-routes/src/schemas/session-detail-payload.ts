@@ -361,6 +361,9 @@ const SessionDetailSessionSummarySchema = z
 		slashCommands: SessionDetailStringListSchema,
 		source: SourceSchema.nullable(),
 		totalTokens: z.number().int().nonnegative(),
+		/** Uncompressed UTF-8 size of the session's transcript and its
+		 * subagents' transcripts, as uploaded. Absent from older API builds. */
+		transcriptBytes: z.number().int().nonnegative().optional(),
 		userId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 	})
 	.strict();
@@ -456,6 +459,7 @@ type SessionDetailTraceToolResult = {
 	content: string | SessionDetailResultBlock[];
 	isError: boolean;
 	subagentId?: string;
+	timestamp?: string;
 };
 
 type SessionDetailToolResultContent = {
@@ -470,6 +474,7 @@ type SessionDetailTraceEvent =
 	| {
 			id: string;
 			kind: "reasoning";
+			nativeId?: string;
 			provider?: "claude" | "codex";
 			text: string;
 			timestamp: string;
@@ -478,6 +483,7 @@ type SessionDetailTraceEvent =
 			content: string | SessionDetailTextContent[];
 			id: string;
 			kind: "message";
+			nativeId?: string;
 			provider?: "claude" | "codex";
 			text: string;
 			timestamp: string;
@@ -486,6 +492,7 @@ type SessionDetailTraceEvent =
 			id: string;
 			input: Record<string, SessionDetailJsonValue>;
 			kind: "tool";
+			nativeId?: string;
 			activity?: TranscriptToolActivity;
 			provider?: "claude" | "codex";
 			result?: SessionDetailTraceToolResult;
@@ -593,6 +600,7 @@ const SessionDetailTraceToolResultSchema = z
 			.strict()
 			.optional(),
 		subagentId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).optional(),
+		timestamp: SessionDetailTimestampSchema.optional(),
 	})
 	.strict();
 
@@ -634,6 +642,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 		.object({
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 			kind: z.literal("reasoning"),
+			nativeId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).optional(),
 			provider: SessionDetailProviderSchema.optional(),
 			text: z.string(),
 			timestamp: SessionDetailTimestampSchema,
@@ -644,6 +653,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 			content: z.union([z.string(), z.array(SessionDetailTextContentSchema)]),
 			id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 			kind: z.literal("message"),
+			nativeId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).optional(),
 			provider: SessionDetailProviderSchema.optional(),
 			text: z.string(),
 			timestamp: SessionDetailTimestampSchema,
@@ -655,6 +665,7 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 			input: z.record(z.string(), SessionDetailJsonValueSchema),
 			kind: z.literal("tool"),
 			activity: TranscriptToolActivitySchema.optional(),
+			nativeId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).optional(),
 			provider: SessionDetailProviderSchema.optional(),
 			result: SessionDetailTraceToolResultSchema.optional(),
 			skillContent: z

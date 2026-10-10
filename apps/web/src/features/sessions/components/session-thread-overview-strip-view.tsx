@@ -22,6 +22,10 @@ import { SessionThreadOverviewHoverCard } from "./session-thread-overview-hover-
 import type { SessionOverviewPulseCallHit } from "./session-thread-overview-pulse-geometry";
 import type { buildSessionOverviewCallSeries } from "./session-thread-overview-model";
 import {
+	SessionOverviewReadingLine,
+	type SessionOverviewReadingSource,
+} from "./session-thread-overview-reading-line";
+import {
 	SessionOverviewTimelineFooter,
 	SessionOverviewTurnHitTargets,
 	SessionOverviewViewportPane,
@@ -121,6 +125,7 @@ export function SessionThreadOverviewStripView({
 	readoutCall,
 	readoutId,
 	readoutTimestamp,
+	reading,
 	resolvedConfig,
 	selectedIndex,
 	setFocusedIndex,
@@ -154,6 +159,7 @@ export function SessionThreadOverviewStripView({
 	readoutCall: SessionOverviewPulseCallHit | undefined;
 	readoutId: string;
 	readoutTimestamp: number | undefined;
+	reading: SessionOverviewReadingSource | undefined;
 	resolvedConfig: SessionThreadOverviewStripConfig;
 	selectedIndex: number;
 	setFocusedIndex: Dispatch<SetStateAction<number | undefined>>;
@@ -217,11 +223,20 @@ export function SessionThreadOverviewStripView({
 								/>
 							) : null}
 						</svg>
-						<SessionThreadOverviewEventDots
-							config={resolvedConfig}
-							events={timelineEvents}
-							series={callSeries}
-						/>
+						{resolvedConfig.showActivity ? (
+							<SessionThreadOverviewEventDots
+								config={resolvedConfig}
+								events={timelineEvents}
+								series={callSeries}
+							/>
+						) : null}
+						{reading ? (
+							<SessionOverviewReadingLine
+								config={resolvedConfig}
+								rows={chart.rows}
+								source={reading}
+							/>
+						) : null}
 						<SessionOverviewTurnHitTargets
 							config={resolvedConfig}
 							onFocusIndexChange={setFocusedIndex}

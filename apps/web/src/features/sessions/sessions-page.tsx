@@ -16,14 +16,14 @@ import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-na
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
 import { markSessionOpen } from "./session-open-timing";
 
-const loadSessionDetailView = () =>
-	import("@/features/sessions/components/SessionDetailView").then((module) => ({
-		default: module.SessionDetailView,
+const loadSessionReaderView = () =>
+	import("@/features/sessions/components/SessionReaderView").then((module) => ({
+		default: module.SessionReaderView,
 	}));
-const SessionDetailView = lazy(loadSessionDetailView);
+const SessionReaderView = lazy(loadSessionReaderView);
 function preloadSessionDetail() {
 	// A failed speculative download must not prevent a normal click from retrying.
-	void loadSessionDetailView().catch(() => undefined);
+	void loadSessionReaderView().catch(() => undefined);
 }
 
 const SESSION_LIST_SCROLL_POSITION_LIMIT = 20;
@@ -125,13 +125,13 @@ export function SessionsPage() {
 		}
 		markSessionOpen(targetSession.session_id);
 
-		navigate(
-			getShellRoutePath(appRoutes.sessionDetail(targetSession.session_id)),
-			{
-				replace: true,
-				viewTransition: true,
-			},
+		const targetPath = getShellRoutePath(
+			appRoutes.sessionDetail(targetSession.session_id),
 		);
+		navigate(targetPath, {
+			replace: true,
+			viewTransition: true,
+		});
 	}
 
 	function closeSession() {
@@ -150,11 +150,7 @@ export function SessionsPage() {
 			key={activeSessionId}
 		>
 			<Suspense fallback={<ProductLoadingIndicator />}>
-				<SessionDetailView
-					fullPage
-					initialSession={viewableSessions.find(
-						(session) => session.session_id === activeSessionId,
-					)}
+				<SessionReaderView
 					navigation={sessionNavigation}
 					position={sessionPosition}
 					sessionId={activeSessionId}

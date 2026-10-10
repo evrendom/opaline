@@ -49,13 +49,13 @@ export type ShellNavTone = {
 // Old Opaline's active row: a translucent white pebble (the rail's active
 // fill) with a white inner border and a soft drop shadow. Every section sits
 // on one at rest; Settings stays a bare glyph.
-const chipClassName =
+export const restingChipClassName =
 	"[--opal-fill:var(--dashboard-01-rail-active)] [--opal-ring:rgb(255_255_255/0.48)] drop-shadow-[0_1px_2px_rgb(17_24_39/0.08)] dark:[--opal-ring:rgb(255_255_255/0.08)] dark:drop-shadow-[0_1px_2px_rgb(0_0_0/0.24)]";
 
 // muted-foreground at 70% flattened onto the sidebar: the same grey, but
 // opaque, so the chip doesn't show through and strokes don't darken where
 // they overlap. Alpha blending is a mix in sRGB.
-const restingGlyphClassName =
+export const restingGlyphClassName =
 	"text-[color:color-mix(in_srgb,var(--muted-foreground)_70%,var(--sidebar))]";
 
 // Adapted from the NavIcon: the outline glyph cross-fades
@@ -93,7 +93,9 @@ export function ShellNavIcon({
 		>
 			{tone ? (
 				<>
-					<OpalineShape className={cn("absolute inset-0", chipClassName)} />
+					<OpalineShape
+						className={cn("absolute inset-0", restingChipClassName)}
+					/>
 					<OpalineShape
 						className={cn(
 							"absolute inset-0 transition-opacity duration-100 ease-in-out",

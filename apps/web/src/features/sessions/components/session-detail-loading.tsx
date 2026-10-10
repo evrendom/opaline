@@ -30,14 +30,21 @@ function Placeholder({ className }: { className?: string }) {
 	);
 }
 
-function SessionChartLoading() {
+export function SessionChartLoading() {
 	return (
 		<div
 			aria-hidden="true"
 			className="h-[4.07rem] shrink-0 overflow-hidden border-b border-(--session-overview-border) bg-[#fcfcfc] dark:bg-(--session-overview-surface)"
 			data-session-chart-loading
 		>
-			<ChartLoadingWave className="h-[2.57rem] w-full" />
+			{/* The wave draws its baseline at 50 and its guides a quarter, half
+			    and three quarters of the way up to 5 — the strip's own
+			    gridlines. Sized so that baseline lands where the strip's does,
+			    74/80 of the way down, the guides line up with the real ones. */}
+			<ChartLoadingWave
+				className="h-[2.57rem] w-full"
+				viewBoxHeight={(50 * 80) / 74}
+			/>
 			<div className="flex h-6 items-center justify-between border-t-[0.5px] border-(--session-overview-border) px-3">
 				<Placeholder className="h-2 w-16" />
 				<Placeholder className="h-2 w-16" />

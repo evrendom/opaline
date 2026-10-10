@@ -14,7 +14,9 @@ import {
 	ContextChip,
 	ContextChipSkeleton,
 } from "@/features/shell/components/context-chip";
+import { cn } from "@/lib/utils";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
+import { SessionStat } from "./session-reader-stat";
 
 type SessionDetailViewModel = ReturnType<typeof buildSessionDetailViewModel>;
 
@@ -116,5 +118,76 @@ export function SessionContextChips({
 				/>
 			) : null}
 		</div>
+	);
+}
+
+/** The same identity as fields in the reader's session rail, in its stats'
+ * style — a label over each value — rather than chips. */
+export function SessionContextFields({
+	viewModel,
+}: {
+	viewModel: SessionDetailViewModel;
+}) {
+	const {
+		displayModel,
+		safeGitBranch,
+		safeGitSha,
+		safeProjectPath,
+		safeRepository,
+	} = viewModel;
+	const ModelIcon = getModelIconComponent(displayModel);
+	return (
+		<>
+			{safeRepository || safeProjectPath ? (
+				<SessionStat
+					label="Repository"
+					title={safeRepository ?? safeProjectPath ?? undefined}
+					value={getRepositoryLabel(viewModel)}
+					valueClassName="truncate"
+				/>
+			) : null}
+			{safeGitBranch ? (
+				<SessionStat
+					label="Branch"
+					title={safeGitBranch}
+					value={safeGitBranch}
+					valueClassName="truncate"
+				/>
+			) : null}
+			{safeGitSha ? (
+				<SessionStat
+					label="Commit"
+					title={safeGitSha}
+					value={safeGitSha.slice(0, 8)}
+					valueClassName="font-mono text-xs"
+				/>
+			) : null}
+			{displayModel ? (
+				<SessionStat
+					label="Model"
+					title={displayModel}
+					value={
+						<span className="flex min-w-0 items-center gap-1.5">
+							{ModelIcon ? (
+								<ModelIcon
+									className={cn(
+										"size-3.5 shrink-0",
+										getModelBrandIconClassName(displayModel),
+									)}
+								/>
+							) : (
+								<IconSparkles
+									aria-hidden="true"
+									className="size-3.5 shrink-0"
+								/>
+							)}
+							<span className="truncate">
+								{formatModelDisplayLabel(displayModel)}
+							</span>
+						</span>
+					}
+				/>
+			) : null}
+		</>
 	);
 }

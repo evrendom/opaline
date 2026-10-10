@@ -23,6 +23,7 @@ import {
 	buildSessionOverviewCallSeries,
 	resolveSessionOverviewHoverTimestamp,
 } from "./session-thread-overview-model";
+import type { SessionOverviewReadingSource } from "./session-thread-overview-reading-line";
 import {
 	getChartRatioAtX,
 	getPlotBounds,
@@ -58,12 +59,15 @@ export function SessionThreadOverviewStrip({
 	config,
 	onSelect,
 	options,
+	reading,
 	selectedIndex,
 	viewportStore,
 }: {
 	config?: Partial<SessionThreadOverviewStripConfig>;
 	onSelect: (index: number) => void;
 	options: readonly SessionTurnTablePaneOption[];
+	/** Where the transcript is being read, drawn as a line across the strip. */
+	reading?: SessionOverviewReadingSource;
 	selectedIndex: number;
 	viewportStore: SessionContinuousTurnViewportStore;
 }) {
@@ -121,9 +125,14 @@ export function SessionThreadOverviewStrip({
 			),
 		[chart.rows, options],
 	);
+	// Without activity, the hover snaps to model calls only — not to actions
+	// it no longer shows.
 	const timelineEvents = useMemo(
-		() => buildSessionThreadOverviewTimelineEvents(chart, options),
-		[chart, options],
+		() =>
+			baseConfig.showActivity
+				? buildSessionThreadOverviewTimelineEvents(chart, options)
+				: [],
+		[baseConfig.showActivity, chart, options],
 	);
 	const focusedRow =
 		focusedIndex === undefined
@@ -370,6 +379,7 @@ export function SessionThreadOverviewStrip({
 			plotRight={plotRight}
 			readout={readout}
 			readoutCall={readoutCall}
+			reading={reading}
 			readoutId={readoutId}
 			readoutTimestamp={readoutTimestamp}
 			resolvedConfig={resolvedConfig}

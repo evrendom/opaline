@@ -15,6 +15,9 @@ export type SessionThreadOverviewStripConfig =
 		eventY: number;
 		minimumViewportWidth: number;
 		plotPadding: number;
+		/** Recorded actions (reads, edits, skills…): dots on the strip, and
+		 * counts in the hover and zoom cards. */
+		showActivity: boolean;
 		showCrosshair: boolean;
 		showTicks: boolean;
 		showViewportBand: boolean;
@@ -35,6 +38,7 @@ export const DEFAULT_SESSION_THREAD_OVERVIEW_STRIP_CONFIG: SessionThreadOverview
 		minimumTickSpacingRatio: 0.09,
 		minimumViewportWidth: 10,
 		plotPadding: 10,
+		showActivity: true,
 		showCrosshair: true,
 		showTicks: true,
 		showViewportBand: true,

@@ -37,12 +37,14 @@ interface CodexAgentAttribution {
 }
 
 interface CodexMessagePayload extends CodexAgentAttribution {
+	id?: string;
 	type: string;
 	role: string;
 	content: Array<CodexContentBlock>;
 }
 
 interface CodexReasoningPayload extends CodexAgentAttribution {
+	id?: string;
 	type: "reasoning";
 	summary: Array<{ type: string; text: string }>;
 }
@@ -531,6 +533,7 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 				agentName: readAgentName(reasoning),
 				executionMode,
 				...(modelSetting ? { modelSetting } : {}),
+				...(reasoning.id ? { nativeId: reasoning.id } : {}),
 				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,
@@ -718,6 +721,7 @@ export function parseCodexConversations(content: string): Array<Conversation> {
 				agentName: readAgentName(msg),
 				executionMode,
 				...(modelSetting ? { modelSetting } : {}),
+				...(msg.id ? { nativeId: msg.id } : {}),
 				provider: "codex",
 				uuid: getCodexEntryId(line),
 				timestamp: parsed.timestamp,

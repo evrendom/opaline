@@ -822,6 +822,14 @@ export function deriveSessionDetail(
 			totalTokens: hasReplayedUsage
 				? inputTokens + outputTokens
 				: snapshot.totalTokens,
+			// Measured as ingest measures an upload: the transcript plus every
+			// subagent's, in UTF-8 bytes.
+			transcriptBytes:
+				Buffer.byteLength(snapshot.content, "utf8") +
+				Object.values(snapshot.subagents).reduce(
+					(total, content) => total + Buffer.byteLength(content, "utf8"),
+					0,
+				),
 			userId: snapshot.ownerId,
 		},
 		subagents: subagentMetrics.map(({ content, metrics, subagentId }) => {

@@ -27,6 +27,8 @@ export type TraceToolResult = {
 	content: ToolResultContent["content"];
 	isError: boolean;
 	subagentId?: string;
+	/** When the result came back — the end of the tool's run. */
+	timestamp?: string;
 };
 
 export type TraceSkillContent = {
@@ -38,6 +40,10 @@ export type TraceEvent =
 	| {
 			kind: "reasoning";
 			id: string;
+			/** The agent's own id for the step, stable whatever the parser does:
+			 * Claude's line uuid, Codex's item id (`rs_…`, `msg_…`), or for a tool
+			 * call the provider's call id (`toolu_…`, `call_…`). */
+			nativeId?: string;
 			provider?: ConversationProvider;
 			timestamp: string;
 			text: string;
@@ -45,6 +51,7 @@ export type TraceEvent =
 	| {
 			kind: "message";
 			id: string;
+			nativeId?: string;
 			timestamp: string;
 			content: TextContent[] | string;
 			provider?: ConversationProvider;
@@ -54,6 +61,7 @@ export type TraceEvent =
 			kind: "tool";
 			activity?: TranscriptToolActivity;
 			id: string;
+			nativeId?: string;
 			timestamp: string;
 			toolName: string;
 			input: Record<string, unknown>;
@@ -168,12 +176,14 @@ function textFromUserTextBlocks(content: UserContent): string | undefined {
 function toTraceResult(
 	result: ToolResultContent,
 	subagentId: string | undefined,
+	timestamp: string | undefined,
 ): TraceToolResult {
 	return {
 		content: result.content,
 		...(result.batch ? { batch: result.batch } : {}),
 		isError: result.is_error === true,
 		...(subagentId ? { subagentId } : {}),
+		...(timestamp ? { timestamp } : {}),
 	};
 }
 
@@ -386,6 +396,10 @@ export function buildConversationTrace(
 				agentModelSetting = entry.modelSetting;
 			}
 
+			// The agent's own id for this line's thinking and text: Claude's
+			// line uuid is it; Codex lines carry theirs separately.
+			const lineNativeId =
+				entry.provider === "codex" ? entry.nativeId : entry.uuid;
 			entry.message.content.forEach((block, blockIndex) => {
 				const id = `${entry.uuid}-${blockIndex}`;
 
@@ -393,6 +407,7 @@ export function buildConversationTrace(
 					agentEvents.push({
 						kind: "reasoning",
 						id,
+						...(lineNativeId ? { nativeId: lineNativeId } : {}),
 						...(entry.provider ? { provider: entry.provider } : {}),
 						timestamp: entry.timestamp,
 						text: (block as ThinkingContent).thinking,
@@ -405,6 +420,8 @@ export function buildConversationTrace(
 					const event: Extract<TraceEvent, { kind: "tool" }> = {
 						kind: "tool",
 						id,
+						// The call id the provider minted (`toolu_…`, `call_…`).
+						nativeId: toolBlock.id,
 						timestamp: entry.timestamp,
 						toolName: toolBlock.name,
 						input: toolBlock.input,
@@ -421,6 +438,7 @@ export function buildConversationTrace(
 				agentEvents.push({
 					kind: "message",
 					id,
+					...(lineNativeId ? { nativeId: lineNativeId } : {}),
 					...(entry.provider ? { provider: entry.provider } : {}),
 					timestamp: entry.timestamp,
 					content: [textBlock],
@@ -445,6 +463,7 @@ export function buildConversationTrace(
 						pending.result = toTraceResult(
 							result,
 							isDelegationToolName(pending.toolName) ? subagentId : undefined,
+							entry.timestamp,
 						);
 						pendingToolEvents.delete(result.tool_use_id);
 						return;
@@ -469,6 +488,7 @@ export function buildConversationTrace(
 									}
 								: result,
 							undefined,
+							entry.timestamp,
 						),
 					});
 				},

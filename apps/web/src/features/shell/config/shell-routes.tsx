@@ -52,6 +52,9 @@ const tones = {
 	},
 } satisfies Record<string, ShellNavTone>;
 
+/** The Sessions section's colour, for session views that wear its chip. */
+export const sessionsTone = tones.opal2;
+
 export type ShellRouteDefinition = {
 	id: ShellRouteId;
 	path: string;
@@ -88,7 +91,7 @@ export const shellRoutes = [
 		shortcut: "H",
 		icon: IconMessages,
 		activeIcon: IconMessagesFilled,
-		tone: tones.opal2,
+		tone: sessionsTone,
 	},
 	{
 		id: "skills",

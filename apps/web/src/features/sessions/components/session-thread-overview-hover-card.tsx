@@ -28,7 +28,7 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	"absolute top-0 z-50 h-14 w-80 max-w-[calc(100%-1.5rem)] rounded-md bg-(--session-overview-surface) font-sans text-xs text-(--session-overview-text) shadow-md ring-1 ring-black/10 dark:ring-white/10";
+	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] rounded-md bg-(--session-overview-surface) font-sans text-xs text-(--session-overview-text) shadow-md ring-1 ring-black/10 dark:ring-white/10";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {
 	"--session-context-ring-color-dark": string;
@@ -365,7 +365,7 @@ function SessionZoomSelectionCard({
 		<div
 			id={readoutId}
 			aria-label="Zoom selected time frame"
-			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5 ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
+			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-auto grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5 ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
 			data-session-overview-hover-card
 			data-session-overview-hover-card-mode="zoom"
 			data-session-overview-hover-card-placement={placement}
@@ -389,10 +389,12 @@ function SessionZoomSelectionCard({
 					{metricParts.length > 0 ? (
 						<p className="min-w-0 truncate">{metricParts.join(" · ")}</p>
 					) : null}
-					<SessionOverviewEventCounts
-						counts={summary.eventCounts}
-						layout="inline"
-					/>
+					{config.showActivity ? (
+						<SessionOverviewEventCounts
+							counts={summary.eventCounts}
+							layout="inline"
+						/>
+					) : null}
 				</div>
 			</div>
 			<Button
@@ -483,12 +485,14 @@ export function SessionThreadOverviewHoverCard({
 	if (timestamp === undefined && !hit && !hasActivity) {
 		return null;
 	}
+	// Without activity, the card is the moment and the call's input alone.
+	const { showActivity } = config;
 
 	return (
 		<output
 			id={readoutId}
 			aria-live="off"
-			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-none ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
+			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-none ${showActivity ? "h-14" : "h-8"} ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
 			data-session-overview-hover-card
 			data-session-overview-hover-card-placement={placement}
 			style={getCardStyle(readout.xRatio, config)}
@@ -522,7 +526,7 @@ export function SessionThreadOverviewHoverCard({
 					) : null}
 				</div>
 
-				{hasActivity ? (
+				{!showActivity ? null : hasActivity ? (
 					<div className="flex min-w-0 items-center tabular-nums">
 						<SessionOverviewEventCounts
 							counts={activityCounts}
