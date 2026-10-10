@@ -136,6 +136,87 @@ export function claudeToolResultFacts(
 	return facts;
 }
 
+/**
+ * Why Codex refused to run a call, as the variant it wrote at the start of
+ * the call's output: `exec_command failed[ for \`cmd\`]: CreateProcess {
+ * message: "Codex(Sandbox(Denied …` (the sandbox denied it) or
+ * `"Rejected(…` (an approval rejected it). Undefined for any other output.
+ */
+export function codexDenialKind(output: string): string | undefined {
+	const head = /^[\w.]+ failed( for `)?/u.exec(output);
+	if (!head) return undefined;
+	// The quoted command can be any length; the envelope follows it.
+	const envelope = ': CreateProcess { message: "';
+	const at = head[1]
+		? output.indexOf(`\`${envelope}`, head[0].length) + 1
+		: output.startsWith(envelope, head[0].length)
+			? head[0].length
+			: 0;
+	if (at <= 0) return undefined;
+	const variant = /^(?:Codex\(Sandbox\((Denied)\b|(Rejected)\()/u.exec(
+		output.slice(at + envelope.length, at + envelope.length + 64),
+	);
+	if (!variant) return undefined;
+	return variant[1] ? `Sandbox(${variant[1]})` : variant[2];
+}
+
+/**
+ * The message of a Codex `Rejected("…")` refusal (e.g. "rejected by user",
+ * "`<command>` rejected: blocked by policy"). Codex writes it as a Rust debug
+ * string inside another (`message: "Rejected(\"…\")"`), so both layers of
+ * escaping are undone.
+ */
+export function codexDenialReason(output: string): string | undefined {
+	const message =
+		/: CreateProcess \{ message: "((?:[^"\\]|\\.)*)" \}\s*$/u.exec(output)?.[1];
+	if (message === undefined) return undefined;
+	const reason = /^Rejected\("((?:[^"\\]|\\.)*)"\)$/u.exec(
+		unescapeDebugString(message),
+	)?.[1];
+	return reason === undefined ? undefined : unescapeDebugString(reason);
+}
+
+/** The text of a Rust debug-formatted string literal's contents. */
+function unescapeDebugString(value: string): string {
+	return value.replace(
+		/\\(u\{([0-9a-fA-F]{1,6})\}|.)/gu,
+		(_match, escaped: string, hex: string | undefined) => {
+			if (hex !== undefined)
+				return String.fromCodePoint(Number.parseInt(hex, 16));
+			const control: Readonly<Record<string, string>> = {
+				n: "\n",
+				t: "\t",
+				r: "\r",
+				"0": "\0",
+			};
+			return control[escaped] ?? escaped;
+		},
+	);
+}
+
+/**
+ * A Codex call the user stopped: Codex writes its output as exactly
+ * `aborted by user after <seconds>s`. Undefined for any other output.
+ */
+export function codexAbortedCall(output: string): LineFacts | undefined {
+	const seconds = /^aborted by user after (\d+(?:\.\d+)?)s$/u.exec(
+		output.trim(),
+	)?.[1];
+	if (seconds === undefined) return undefined;
+	const duration = durationMs(Number(seconds) * 1_000);
+	return {
+		interrupted: true,
+		...(duration === undefined ? {} : { durationMs: duration }),
+	};
+}
+
+/** The `timeout_ms` a Codex call's arguments set. */
+export function codexCallTimeout(args: unknown): LineFacts {
+	const extra: ExtraFacts = {};
+	if (isRecord(args)) setInteger(extra, "timeout_ms", args.timeout_ms);
+	return withExtra({}, extra);
+}
+
 /** Facts of a Claude Code `pr-link` record. */
 export function claudePrLinkFacts(record: Record<string, unknown>): LineFacts {
 	const extra: ExtraFacts = {};
@@ -154,6 +235,24 @@ export function codexItemFacts(item: Record<string, unknown>): LineFacts {
 	const extra: ExtraFacts = {};
 	const duration = codexDurationMs(item.duration);
 	if (duration !== undefined) facts.durationMs = duration;
+	if (item.type === "CommandExecution" && Array.isArray(item.parsed_cmd)) {
+		const parts = item.parsed_cmd.filter(isRecord);
+		extra.parsed_cmd_types = cappedJsonList(
+			parts.flatMap((part) => {
+				const type = readString(part.type);
+				return type === undefined ? [] : [factText(type, 32)];
+			}),
+		).json;
+		setList(
+			extra,
+			"parsed_cmd_read_paths",
+			"parsed_cmd_read_paths_more",
+			parts.flatMap((part) => {
+				const path = readString(part.path);
+				return part.type === "read" && path !== undefined ? [path] : [];
+			}),
+		);
+	}
 	if (item.type === "McpToolCall") {
 		const server = readString(item.server);
 		const tool = readString(item.tool);
@@ -294,6 +393,10 @@ export function claudeLineFacts(record: Record<string, unknown>): LineFacts {
 export function claudePromptFacts(record: Record<string, unknown>): LineFacts {
 	const extra: ExtraFacts = {};
 	setText(extra, "permission_mode", record.permissionMode);
+	setText(extra, "turn_origin", record.turnOrigin);
+	setText(extra, "prompt_source", record.promptSource);
+	if (isRecord(record.origin))
+		setText(extra, "origin_kind", record.origin.kind);
 	return withExtra({}, extra);
 }
 
@@ -359,6 +462,75 @@ export function claudeSystemFacts(record: Record<string, unknown>): LineFacts {
 		setText(extra, "compact_trigger", record.compactMetadata.trigger);
 		setInteger(extra, "compact_pre_tokens", record.compactMetadata.preTokens);
 	}
+	return withExtra({}, extra);
+}
+
+/** Facts of a Codex `session_meta`: where the thread came from. */
+export function codexSessionMetaFacts(
+	payload: Record<string, unknown>,
+): LineFacts {
+	const extra: ExtraFacts = {};
+	setText(extra, "thread_source", payload.thread_source);
+	return withExtra({}, extra);
+}
+
+/** Facts of a Claude `instructions` attachment: the files it loaded. */
+export function claudeInstructionFacts(
+	attachment: Record<string, unknown>,
+): LineFacts {
+	if (!Array.isArray(attachment.files)) return {};
+	const extra: ExtraFacts = {};
+	const files = attachment.files.flatMap((file) => {
+		if (!isRecord(file)) return [];
+		const path = readString(file.path);
+		if (path === undefined) return [];
+		const type = readString(file.type);
+		const entry: Record<string, string> = {
+			path: clippedText(extra, "instruction_paths", path),
+		};
+		if (type !== undefined)
+			entry.type = clippedText(extra, "instruction_paths", type, 64);
+		return [entry];
+	});
+	const list = cappedJsonList(files);
+	extra.instruction_paths = list.json;
+	if (list.cut > 0) extra.instruction_paths_more = String(list.cut);
+	return withExtra({}, extra);
+}
+
+/**
+ * Facts of a Claude `cost-state` record: its cumulative totals, with the
+ * session's total duration as the record's duration.
+ */
+export function claudeCostStateFacts(
+	record: Record<string, unknown>,
+): LineFacts {
+	const facts: { -readonly [K in keyof LineFacts]: LineFacts[K] } = {};
+	const extra: ExtraFacts = {};
+	const total = durationMs(record.totalDuration);
+	if (total !== undefined) facts.durationMs = total;
+	if (
+		typeof record.totalCostUSD === "number" &&
+		Number.isFinite(record.totalCostUSD)
+	)
+		extra.cost_usd = String(record.totalCostUSD);
+	setInteger(extra, "lines_added", record.totalLinesAdded);
+	setInteger(extra, "lines_removed", record.totalLinesRemoved);
+	setInteger(extra, "tool_duration_ms", record.totalToolDuration);
+	setInteger(extra, "api_duration_ms", record.totalAPIDuration);
+	setInteger(
+		extra,
+		"api_duration_without_retries_ms",
+		record.totalAPIDurationWithoutRetries,
+	);
+	setBoolean(extra, "has_unknown_model_cost", record.hasUnknownModelCost);
+	return withExtra(facts, extra);
+}
+
+/** Facts of a Claude `ai-title` record. */
+export function claudeTitleFacts(record: Record<string, unknown>): LineFacts {
+	const extra: ExtraFacts = {};
+	setText(extra, "title", record.aiTitle);
 	return withExtra({}, extra);
 }
 

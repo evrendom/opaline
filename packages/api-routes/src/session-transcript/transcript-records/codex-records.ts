@@ -30,11 +30,17 @@ import {
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
+	codexAbortedCall,
+	codexCallTimeout,
+	codexDenialKind,
+	codexDenialReason,
 	codexDurationMs,
+	codexSessionMetaFacts,
 	codexTaskFacts,
 	codexTurnContextFacts,
 	factRowText,
 	factText,
+	mergeFacts,
 } from "./record-facts.js";
 import type { CommandClass } from "./types.js";
 
@@ -77,7 +83,24 @@ export function readCodexLine(
 	switch (type) {
 		case "session_meta":
 			readSessionMetadata(payload, state);
-			return { items: [metaItem("session_meta")], timestamp };
+			return {
+				items: [
+					metaItem("session_meta", { facts: codexSessionMetaFacts(payload) }),
+				],
+				timestamp,
+			};
+		case "inter_agent_communication_metadata":
+			return {
+				items: [
+					metaItem(type, {
+						facts:
+							typeof payload.trigger_turn === "boolean"
+								? { extra: { trigger_turn: String(payload.trigger_turn) } }
+								: {},
+					}),
+				],
+				timestamp,
+			};
 		case "response_item":
 			return { items: readResponseItem(payload, state), timestamp };
 		case "event_msg":
@@ -428,10 +451,18 @@ function readCall(
 	const commandClass: CommandClass = combineCommandClasses(
 		description.commands.map(classifyCommand),
 	);
+	const rawArgs =
+		payloadType === "custom_tool_call" ? payload.input : payload.arguments;
+	const timeout = codexCallTimeout(
+		isRecord(rawArgs)
+			? rawArgs
+			: parseObject(typeof rawArgs === "string" ? rawArgs : undefined),
+	);
 	const items: LineItem[] = [
 		{
 			callId,
 			commandClass,
+			...(timeout.extra === undefined ? {} : { facts: timeout }),
 			kind: "tool_call",
 			text: description.text,
 			toolName,
@@ -620,6 +651,10 @@ function readOutput(
 		readTranscriptToolOutputText(payload.output) ??
 		rawOutput;
 	const end = callId === "" ? undefined : state.codexEndEvents.get(callId);
+	const denialKind = codexDenialKind(decoded);
+	const denialReason =
+		denialKind === "Rejected" ? codexDenialReason(decoded) : undefined;
+	const aborted = codexAbortedCall(decoded);
 	const exitCode =
 		end?.exitCode ?? readCodexExitCode(payload.output ?? payload.tools);
 	const isError =
@@ -638,6 +673,17 @@ function readOutput(
 		callId,
 		commandClass: known?.commandClass ?? "",
 		exitCode,
+		...(denialKind === undefined && aborted === undefined
+			? {}
+			: {
+					facts: mergeFacts(
+						aborted,
+						denialKind === undefined ? undefined : { denialKind },
+						denialReason === undefined
+							? undefined
+							: { extra: { denial_reason: factText(denialReason) } },
+					),
+				}),
 		isError,
 		kind: "tool_result",
 		spawnedAgentId: launchesSubagent ? readSpawnedAgentId(decoded) : "",

@@ -136,7 +136,14 @@
 		"|47|0|3|tool_result|",
 		"|47|1|4|user_prompt|",
 		"|48|0|4|meta|system:stop_hook_summary",
-		"|49|0|4|user_prompt|"
+		"|49|0|4|injected_context|instructions",
+		"|50|0|4|injected_context|task_notification",
+		"|51|0|4|meta|cost-state",
+		"|52|0|4|meta|ai-title",
+		"|53|0|4|injected_context|instructions",
+		"|54|0|4|tool_call|",
+		"|55|0|4|tool_result|",
+		"|56|0|5|user_prompt|"
 	],
 	"l1-facts/codex-0.156.jsonl": [
 		"|1|0|0|meta|session_meta",
@@ -167,6 +174,15 @@
 		"|24|0|1|meta|thread_goal_updated",
 		"|25|0|1|meta|task_complete",
 		"|26|0|1|meta|item_completed:CollabAgentToolCall",
-		"/root/worker|27|0|0|assistant_text|"
+		"|27|0|1|meta|inter_agent_communication_metadata",
+		"|28|0|1|tool_call|",
+		"|29|0|1|tool_result|",
+		"|30|0|1|tool_call|",
+		"|31|0|1|tool_result|",
+		"|32|0|1|tool_call|nested",
+		"|32|1|1|tool_result|nested",
+		"|33|0|1|tool_call|",
+		"|34|0|1|tool_result|",
+		"/root/worker|35|0|0|assistant_text|"
 	]
 }

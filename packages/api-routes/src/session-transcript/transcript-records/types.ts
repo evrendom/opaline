@@ -7,7 +7,7 @@
  */
 
 /** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 7;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 8;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -171,6 +171,40 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	fallback_model: 7,
 	/** Codex SubAgentActivity `agent_thread_id` / CollabAgentToolCall `receiver_thread_ids`, as a JSON array. */
 	spawned_thread_ids: 7,
+	// Parser 8: prompt and session facts.
+	/** Claude user record `turnOrigin`, `promptSource` and `origin.kind`, each as recorded. */
+	turn_origin: 8,
+	prompt_source: 8,
+	origin_kind: 8,
+	/** Codex inter_agent_communication_metadata `trigger_turn` (true/false). */
+	trigger_turn: 8,
+	/** Codex session_meta `thread_source` (user, subagent, guardian_review). */
+	thread_source: 8,
+	/** Claude `instructions` attachment `files[{path, type}]`, as a JSON array cut to whole entries; `_more` counts the files cut. */
+	instruction_paths: 8,
+	instruction_paths_more: 8,
+	/** Claude `cost-state` totals (cumulative; the session's last record has the final values). */
+	cost_usd: 8,
+	lines_added: 8,
+	lines_removed: 8,
+	tool_duration_ms: 8,
+	api_duration_ms: 8,
+	api_duration_without_retries_ms: 8,
+	has_unknown_model_cost: 8,
+	/** Claude `ai-title` `aiTitle` (the full title is also the row's text). */
+	title: 8,
+	/** Codex `Rejected("…")` message of a refused call: who or what rejected it and why. */
+	denial_reason: 8,
+	/** Claude `Skill` tool call `input.skill`: the skill the agent invoked. */
+	skill: 8,
+	/**
+	 * Codex CommandExecution `parsed_cmd`: the types Codex gave the command's
+	 * parts (read, search, list_files, unknown) as a JSON array, and the paths
+	 * of its `read` parts (a skill read is a read of its SKILL.md).
+	 */
+	parsed_cmd_types: 8,
+	parsed_cmd_read_paths: 8,
+	parsed_cmd_read_paths_more: 8,
 } as const satisfies Record<string, number>;
 
 export type TranscriptRecordFactKey = keyof typeof TRANSCRIPT_RECORD_FACT_KEYS;

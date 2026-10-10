@@ -25,12 +25,13 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `command_argv0`, `command_prefix` | first words of the shell command | `parsed_cmd`, `command` | none |
 | `command_fingerprint`, `command_simhash` | normalized command / written script | same | none |
 | `is_error`, `exit_code` | `tool_result.is_error`, transport framing | `exit_code`, `status = failed` | stored |
-| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded | stored (Claude, parser v6); text (Codex) |
+| `denial_kind` | `toolDenialKind` (`permission-rule`, `user-rejected`, `cancelled`) | sandbox and approval outcome when recorded: the variant at the start of a refused call's output (`Codex(Sandbox(Denied …`, `Rejected(…`) | stored (Claude, parser v6; Codex `Sandbox(Denied)`/`Rejected`, parser v8) |
+| `denial_reason` | none | the message of a `Rejected("…")` refusal (`rejected by user`, `` `<command>` rejected: blocked by policy ``) | stored (Codex, parser v8) |
 | `return_code_interpretation` | `toolUseResult.returnCodeInterpretation` | none | stored (parser v6) |
 | `duration_ms` | `toolUseResult.durationMs` / `durationSeconds` | `item.duration`, `completed_at_ms - started_at_ms` | stored (parser v6) |
-| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | none | stored (parser v6) |
+| `timed_out_after_ms`, `timeout_ms` | `toolUseResult.timedOutAfterMs`, `timeoutMs` | `exec_command` argument `timeout_ms` (the limit; Codex records no timed-out call) | stored (parser v6; Codex `timeout_ms`, parser v8) |
 | `is_async`, `background_task_id` | `toolUseResult.isAsync`, `backgroundTaskId`, input `run_in_background` | running preamble | stored (Claude, parser v6); subtype `running` (Codex) |
-| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | `turn_aborted` | stored (Claude, parser v6); Codex with `runs` |
+| `interrupted`, `no_output_expected` | `toolUseResult.interrupted`, `noOutputExpected` | a stopped call's output `aborted by user after <s>s` (with its duration); `turn_aborted` for the run | stored (Claude, parser v6; Codex calls, parser v8) |
 | `stdout_chars`, `stderr_chars`, `persisted_output_bytes` | `toolUseResult.stdout`, `stderr`, `persistedOutputSize` | `stdout`, `stderr`, `aggregated_output` | stored (Claude, parser v6); text (Codex, merged) |
 | `result_chars` | result text | output text | stored (`text_chars`) |
 | `shell_edit_files` | `toolUseResult.bashEditDiff.files` / `changedFiles` | shell-inferred `file_change` | stored (Claude, parser v6) |
@@ -42,9 +43,10 @@ Each view is one row per thing, keyed by `(organization_id, user_id, session_id,
 | `search_matches` | `toolUseResult.numFiles`, `matches` | none | stored (`numFiles`, parser v6) |
 | `spawned_agent_id` | Task/Agent result `agentId` | `SubAgentActivity.agent_thread_id`, `CollabAgentToolCall.receiver_thread_ids` | stored (Claude); Codex thread ids stored (parser v7) |
 | `attribution_skill`, `attribution_plugin`, `attribution_agent` | assistant `attributionSkill`, `attributionPlugin`, `attributionAgent` | `pluginId` | skill (Claude) and plugin (Codex) stored (parser v6); rest raw |
+| `skill`, `parsed_cmd_types`, `parsed_cmd_read_paths` | `Skill` tool call `input.skill` (the invocation; `attributionSkill` marks the lines after it); a `Read` of a `SKILL.md` keeps its path | `CommandExecution.parsed_cmd`: Codex's own part types and the paths of its `read` parts (a skill is used by reading its `SKILL.md`) | stored (parser v8) |
 | `cwd`, `git_branch` | per-record `cwd`, `gitBranch` | `turn_context.cwd` | session-level only |
 
-Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (4M characters): past it a record drops them and says `facts_truncated`; short values are always kept. Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
+Parser v6 writes call facts on the row of the line that carries them. Claude facts sit on the `tool_result` (MCP identity also on the `tool_call`). Codex facts sit on the completion row with the same `call_id` (`item_completed:*_mirror`, `exec_command_end`), because the completion can arrive before or after the output, or with no output after it; nested items carry them on their own `tool_result`. A Claude line holding several results keeps its line-level `toolUseResult`/`toolDenialKind` off every result, since the line does not say which call they belong to; current Claude Code writes one result per line. Long fact values (over 32 characters) share a session budget (4M characters): past it a record drops them and says `facts_truncated`; short values are always kept. Prompt and session facts (parser v8) sit on the prompt's records (Claude `turnOrigin`, `promptSource`, `origin.kind`, not on tool results of the same line), the Codex `session_meta` and `inter_agent_communication_metadata` rows, the Claude `instructions` attachment (`instruction_paths`), `cost-state` rows (cumulative; the session's last one holds the totals) and `ai-title` rows (the title is also the row's text). Run facts (parser v7) sit on the record that carries them: a Codex `turn_context`, `task_started`, `task_complete`, `turn_aborted` or `thread_goal_updated` row, a Claude prompt or assistant line (permission mode, model, effort, stop reason on each of its records), or a Claude system or attachment row; a run reads them from its records. Codex writes `task_started` and `turn_context` before the turn's prompt, so those rows carry the previous run's `turn_idx`; each lifecycle row keeps the Codex `turn_id`, which the turn's `task_complete` or `turn_aborted` also carries, and a run joins its rows by it. A failed Codex task is an error row whose text is the error; a goal row's text is the full objective. Values cut at their cap are listed in `facts_clipped`, and entries cut from a list are counted under its `_more` key.
 
 ### `runs`: one row per run (one human prompt and everything until the next)
 
@@ -52,7 +54,7 @@ Parser v6 writes call facts on the row of the line that carries them. Claude fac
 |---|---|---|---|
 | `started_at`, `ended_at`, `minutes`, `active_minutes` | record timestamps | `task_started`, `task_complete` | computed per query |
 | `duration_ms`, `time_to_first_token_ms` | none | `task_complete.duration_ms`, `time_to_first_token_ms` | stored (Codex, parser v7) |
-| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | text heuristic (wrappers) |
+| `prompt_origin` | `turnOrigin`, `promptSource`, `origin.kind` | `inter_agent_communication_metadata`, `thread_source` | stored (parser v8); prompt kind still by wrapper heuristic |
 | `permission_mode` | `permissionMode` | none | stored (Claude, parser v7) |
 | `auto_mode_*` | `attachment.auto_mode` (`bashFirst`, `bashFirstSteer`, `bypass`) | none | stored (Claude, parser v7) |
 | `approval_policy`, `approvals_reviewer`, `sandbox_policy`, `permission_profile` | none | `turn_context.*` | stored (Codex, parser v7) |
@@ -77,17 +79,17 @@ Parser v6 writes call facts on the row of the line that carries them. Claude fac
 | Column | Source | Today |
 |---|---|---|
 | `kind`, `subtype` | records (`user_prompt`, `injected_context`, `queued`, `delegation`) | stored; origin by wrapper heuristic |
-| `prompt_origin` | Claude `turnOrigin`, `promptSource`, `origin.kind`; Codex inter-agent metadata | raw |
+| `prompt_origin` | Claude `turnOrigin`, `promptSource`, `origin.kind`; Codex inter-agent metadata | stored (parser v8) |
 | `text`, `text_chars` | prompt text | stored |
-| `instruction_path`, `instruction_sha256` | `nested_memory` path, `instructions`, AGENTS.md injection | path partly stored; hash none |
+| `instruction_path`, `instruction_sha256` | `nested_memory` path, `instructions`, AGENTS.md injection | paths stored (Claude, parser v8); hash none |
 | `edited_by_user_path` | `attachment.edited_text_file` | stored (`file_path` on the injected-context row) |
 
 ## Session and workspace facts
 
 | Fact | Source | Today |
 |---|---|---|
-| `cost_state` (`totalCostUSD`, `totalLinesAdded`, `totalLinesRemoved`, `totalToolDuration`, `totalAPIDuration`) | Claude `cost-state` record | raw |
-| title | Claude `ai-title` | raw |
+| `cost_state` (`totalCostUSD`, `totalLinesAdded`, `totalLinesRemoved`, `totalToolDuration`, `totalAPIDuration`) | Claude `cost-state` record | stored (Claude, parser v8) |
+| title | Claude `ai-title` | stored (Claude, parser v8) |
 | upload mode (`hook`, `manual`, `retry`) | CLI request | not stored |
 | member coverage (members uploading / members in workspace, per day) | `session_ownership` × membership | join |
 | instruction file versions per session | injected context, repository evidence | none |

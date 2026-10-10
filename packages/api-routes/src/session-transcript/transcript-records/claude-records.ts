@@ -19,11 +19,15 @@ import {
 import {
 	claudeApiErrorFacts,
 	claudeAutoModeFacts,
+	claudeCostStateFacts,
+	claudeInstructionFacts,
 	claudeLineFacts,
 	claudePrLinkFacts,
 	claudePromptFacts,
 	claudeSystemFacts,
+	claudeTitleFacts,
 	claudeToolResultFacts,
+	factRowText,
 	factText,
 	mcpFacts,
 	mergeFacts,
@@ -61,6 +65,23 @@ export function readClaudeLine(
 	if (type === "pr-link") {
 		return {
 			items: [metaItem(type, { facts: claudePrLinkFacts(record) })],
+			timestamp,
+		};
+	}
+	if (type === "cost-state") {
+		return {
+			items: [metaItem(type, { facts: claudeCostStateFacts(record) })],
+			timestamp,
+		};
+	}
+	if (type === "ai-title") {
+		return {
+			items: [
+				metaItem(type, {
+					facts: claudeTitleFacts(record),
+					text: factRowText(readString(record.aiTitle) ?? ""),
+				}),
+			],
 			timestamp,
 		};
 	}
@@ -271,8 +292,17 @@ function readToolUse(
 			});
 		}
 	}
-	if (callFacts !== undefined && items[0] !== undefined) {
-		items[0] = { ...items[0], facts: callFacts };
+	// The Skill tool call is the invocation itself; attributionSkill marks
+	// only the lines after it.
+	const skill = lowered === "skill" ? readString(input.skill) : undefined;
+	const ownFacts = mergeFacts(
+		callFacts,
+		skill === undefined
+			? undefined
+			: { extra: { skill: factText(skill, 128) } },
+	);
+	if (Object.keys(ownFacts).length > 0 && items[0] !== undefined) {
+		items[0] = { ...items[0], facts: ownFacts };
 	}
 	if (callId !== "") {
 		state.calls.set(callId, {
@@ -464,16 +494,19 @@ function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
 		case "instructions": {
 			const files = Array.isArray(attachment.files) ? attachment.files : [];
 			return [
-				injected(
-					"instructions",
-					files
-						.flatMap((file) =>
-							isRecord(file)
-								? [memoryText(readString(file.path), file.content)]
-								: [],
-						)
-						.join("\n\n"),
-				),
+				{
+					...injected(
+						"instructions",
+						files
+							.flatMap((file) =>
+								isRecord(file)
+									? [memoryText(readString(file.path), file.content)]
+									: [],
+							)
+							.join("\n\n"),
+					),
+					facts: claudeInstructionFacts(attachment),
+				},
 			];
 		}
 		case "nested_memory": {

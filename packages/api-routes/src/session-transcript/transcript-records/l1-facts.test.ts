@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { claudeSystemFacts, factText, mergeFacts } from "./record-facts.js";
+import {
+	claudeInstructionFacts,
+	claudeSystemFacts,
+	codexDenialKind,
+	codexDenialReason,
+	factText,
+	mergeFacts,
+} from "./record-facts.js";
 import { splitSessionTranscript } from "./split-transcript.js";
 import {
 	NO_TRANSCRIPT_RECORD_FACTS,
@@ -542,6 +549,128 @@ const CASES: readonly FactCase[] = [
 			},
 		},
 	},
+	{
+		name: "Claude prompt origin, as recorded",
+		fixture: "claude",
+		row: { kind: "injected_context", text: "build finished" },
+		facts: {
+			extra: {
+				origin_kind: "task-notification",
+				prompt_source: "system",
+				turn_origin: "task_notification",
+			},
+		},
+	},
+	{
+		name: "Claude instruction files",
+		fixture: "claude",
+		row: { kind: "injected_context", subtype: "instructions", nth: 0 },
+		facts: {
+			extra: {
+				instruction_paths: JSON.stringify([
+					{ path: "/home/dev/.claude/CLAUDE.md", type: "User" },
+					{ path: "/repo/CLAUDE.md", type: "Project" },
+				]),
+			},
+		},
+	},
+	{
+		name: "a long instruction list is cut to whole files and counted",
+		fixture: "claude",
+		row: { kind: "injected_context", subtype: "instructions", nth: 1 },
+		facts: { extra: { instruction_paths_more: "53" } },
+	},
+	{
+		name: "Claude cost state",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "cost-state" },
+		facts: {
+			durationMs: 3_701_131,
+			extra: {
+				api_duration_ms: "85113",
+				api_duration_without_retries_ms: "85088",
+				cost_usd: "0.2787572",
+				has_unknown_model_cost: "false",
+				lines_added: "12",
+				lines_removed: "3",
+				tool_duration_ms: "2202",
+			},
+		},
+	},
+	{
+		name: "Claude title",
+		fixture: "claude",
+		row: { kind: "meta", subtype: "ai-title", text: "Ship the login fix" },
+		facts: { extra: { title: "Ship the login fix" } },
+	},
+	{
+		name: "Codex thread source",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "session_meta" },
+		facts: { extra: { thread_source: "user" } },
+	},
+	{
+		name: "Codex inter-agent trigger",
+		fixture: "codex",
+		row: { kind: "meta", subtype: "inter_agent_communication_metadata" },
+		facts: { extra: { trigger_turn: "true" } },
+	},
+	{
+		name: "Claude Skill invocation on its call",
+		fixture: "claude",
+		row: { callId: "toolu_skill", kind: "tool_call" },
+		facts: { extra: { skill: "pr-creation" } },
+	},
+	{
+		name: "Codex call timeout limit from its arguments",
+		fixture: "codex",
+		row: { callId: "call_stopped", kind: "tool_call" },
+		facts: { extra: { timeout_ms: "20000" } },
+	},
+	{
+		name: "Codex call the user stopped, with its duration",
+		fixture: "codex",
+		row: { callId: "call_stopped", kind: "tool_result" },
+		facts: { durationMs: 342_200, interrupted: true },
+	},
+	{
+		name: "Codex sandbox denial, as Codex names it",
+		fixture: "codex",
+		row: { callId: "call_sandboxed", kind: "tool_result" },
+		facts: { denialKind: "Sandbox(Denied)" },
+	},
+	{
+		name: "Codex rejected approval, as Codex names it",
+		fixture: "codex",
+		row: { callId: "call_rejected", kind: "tool_result" },
+		facts: {
+			denialKind: "Rejected",
+			extra: { denial_reason: "rejected by user" },
+		},
+	},
+	{
+		name: "Codex parsed command parts and read paths (a skill read)",
+		fixture: "codex",
+		row: {
+			callId: "call_cmd",
+			kind: "meta",
+			subtype: "item_completed:CommandExecution_mirror",
+		},
+		facts: {
+			extra: {
+				parsed_cmd_read_paths: JSON.stringify([
+					".claude/skills/testing-bun/SKILL.md",
+				]),
+				parsed_cmd_types: JSON.stringify(["read", "unknown"]),
+			},
+		},
+	},
+	{
+		name: "a long read path list is cut to whole paths and counted",
+		fixture: "codex",
+		row: { callId: "nested_reads", kind: "tool_result" },
+		facts: { extra: { parsed_cmd_read_paths_more: "8" } },
+	},
 ];
 
 function findRow(
@@ -574,8 +703,12 @@ describe("parser facts", () => {
 	});
 
 	test("Codex outputs carry no completion facts: each fact lands once", async () => {
+		// A stopped call's own output says how long it ran; that is its fact.
 		const outputs = (await split(FIXTURES.codex)).filter(
-			(draft) => draft.kind === "tool_result" && draft.subtype !== "nested",
+			(draft) =>
+				draft.kind === "tool_result" &&
+				draft.subtype !== "nested" &&
+				draft.callId !== "call_stopped",
 		);
 		expect(outputs.length).toBeGreaterThan(0);
 		for (const output of outputs) {
@@ -701,6 +834,25 @@ describe("parser facts", () => {
 		).toBe("goal,model,turn_error");
 	});
 
+	test("a title's row text is redacted, and a clipped instruction type is marked", () => {
+		const [title] = [
+			...splitSessionTranscript({
+				content: JSON.stringify({
+					type: "ai-title",
+					aiTitle: "Rotate TOKEN=abcdef123456789xyz on staging",
+				}),
+				sessionDate: "2026-10-01T10:00:00.000Z",
+				source: "claude_code",
+			}),
+		];
+		expect(title?.text).toBe("Rotate TOKEN=[redacted] on staging");
+		expect(
+			claudeInstructionFacts({
+				files: [{ path: "/repo/CLAUDE.md", type: "T".repeat(80) }],
+			}).extra?.facts_clipped,
+		).toBe("instruction_paths");
+	});
+
 	test("a list whose JSON exactly fits the cap keeps every entry", () => {
 		// 2 brackets + 3 commas + 4 × `{"command":""}` (14) + 1,987 characters = 2,048.
 		const commands = [497, 497, 497, 496].map((length) => "x".repeat(length));
@@ -710,6 +862,33 @@ describe("parser facts", () => {
 		});
 		expect(facts.extra?.hook_runs?.length).toBe(2_048);
 		expect(facts.extra?.hook_runs_more).toBeUndefined();
+	});
+
+	test("a Codex denial is found after a quoted command of any length, and only in Codex's envelope", () => {
+		const long = "x".repeat(10_000);
+		expect(
+			codexDenialKind(
+				`exec_command failed for \`/bin/zsh -lc '${long}'\`: CreateProcess { message: "Rejected(\\"rejected by user\\")" }`,
+			),
+		).toBe("Rejected");
+		expect(
+			codexDenialKind(
+				'exec_command failed: CreateProcess { message: "Codex(Sandbox(Denied { output: … }))" }',
+			),
+		).toBe("Sandbox(Denied)");
+		// Command output that merely mentions the words is not a denial.
+		expect(
+			codexDenialKind(
+				'Output:\nexec_command failed: CreateProcess { message: "Rejected(\\"x\\")" }',
+			),
+		).toBeUndefined();
+		expect(codexDenialKind("exec_command failed: exit code 1")).toBeUndefined();
+		// The reason is a debug string inside a debug string: both layers unescaped.
+		expect(
+			codexDenialReason(
+				'exec_command failed: CreateProcess { message: "Rejected(\\"`/bin/zsh -lc \\\\\\"rm -rf /tmp/x\\\\\\"` rejected: blocked by policy\\")" }',
+			),
+		).toBe('`/bin/zsh -lc "rm -rf /tmp/x"` rejected: blocked by policy');
 	});
 
 	test("a prompt's facts stay off the tool result on the same line", async () => {
@@ -881,7 +1060,44 @@ const STORED: Readonly<Record<string, readonly FactField[]>> = {
 	"runs.retry_attempts": ["retry_attempt", "max_retries", "retry_in_ms"],
 	"runs.refusals": ["refusal_category", "original_model"],
 	"runs.fallback_model": ["fallback_model"],
-	"runs.goal": ["goal"],
+	"runs.goal": [
+		"goal",
+		"goal_status",
+		"goal_tokens_used",
+		"goal_time_used_seconds",
+	],
+	"runs.prompt_origin": [
+		"turn_origin",
+		"prompt_source",
+		"origin_kind",
+		"trigger_turn",
+		"thread_source",
+	],
+	"prompts.prompt_origin": [
+		"turn_origin",
+		"prompt_source",
+		"origin_kind",
+		"trigger_turn",
+		"thread_source",
+	],
+	"prompts.instruction_path": ["instruction_paths", "instruction_paths_more"],
+	"session.cost_state": [
+		"cost_usd",
+		"lines_added",
+		"lines_removed",
+		"tool_duration_ms",
+		"api_duration_ms",
+		"api_duration_without_retries_ms",
+		"has_unknown_model_cost",
+	],
+	"session.title": ["title"],
+	"calls.skill": ["skill"],
+	"calls.parsed_cmd_types": ["parsed_cmd_types"],
+	"calls.denial_reason": ["denial_reason"],
+	"calls.parsed_cmd_read_paths": [
+		"parsed_cmd_read_paths",
+		"parsed_cmd_read_paths_more",
+	],
 	"runs.entrypoint": ["entrypoint"],
 	"runs.agent_version": ["agentVersion"],
 	"runs.pr_repository": ["pr_repository"],
@@ -899,10 +1115,7 @@ const PENDING: Readonly<Record<string, string>> = {
 	"runs.context_input_tokens_at_start": "usage events, not the parser",
 	"runs.compacted": "compaction records (kind), not a fact",
 	"runs.pushed_shas": "git extractor 4",
-	"runs.prompt_origin": "parser 8",
-	"prompts.prompt_origin": "parser 8",
-	"session.cost_state": "parser 8",
-	"session.title": "parser 8",
+	"prompts.instruction_sha256": "not in transcripts; drift census (step 11)",
 };
 
 interface SpecFact {
