@@ -78,6 +78,11 @@ export interface TranscriptRecordsBackfillOptions {
 	readonly maxSessions: number;
 	readonly onProgress?: (progress: TranscriptRecordsBackfillProgress) => void;
 	readonly organizationId?: string;
+	/**
+	 * Only the sessions whose ID hashes to `index` of `count`, so several runs
+	 * can backfill one organization in parallel without sharing a session.
+	 */
+	readonly shard?: { readonly index: number; readonly count: number };
 	readonly now?: () => Date;
 	readonly signal?: AbortSignal;
 	/** Wall-clock budget for indexing one session; more is a bounded skip. */
@@ -335,6 +340,8 @@ async function processBatch(
 				// Backfill priority: live uploads' edges are built first.
 				onWritten: (session) =>
 					enqueueSessionEdgesBestEffort(session, { priority: 1 }),
+				// Retired once for the whole run (`retireOlderGitObservations`).
+				retireOlder: false,
 			});
 		} catch (error) {
 			options.signal?.throwIfAborted();
@@ -400,6 +407,9 @@ async function listSourceCandidates(
 	const organizationFilter = options.organizationId
 		? "AND raw.organization_id = {organizationId:String}"
 		: "";
+	const shardFilter = options.shard
+		? "AND cityHash64(raw.session_id) % {shardCount:UInt32} = {shardIndex:UInt32}"
+		: "";
 	const subagentBytes =
 		source === "claude_code"
 			? "arraySum(arrayMap(value -> length(value), mapValues(raw.subagents)))"
@@ -421,6 +431,7 @@ async function listSourceCandidates(
 			FROM ${getRawTable(source)} AS raw
 			WHERE raw.ingested_at <= {cutoff:DateTime64(3, 'UTC')}
 				${organizationFilter}
+				${shardFilter}
 			GROUP BY raw.organization_id, raw.user_id, raw.session_id
 			ORDER BY raw.organization_id, raw.user_id, raw.session_id
 			LIMIT {candidateLimit:UInt32}
@@ -429,6 +440,8 @@ async function listSourceCandidates(
 			candidateLimit: options.maxSessions + 1,
 			cutoff: toClickHouseTimestamp(options.cutoff),
 			organizationId: options.organizationId ?? "",
+			shardCount: options.shard?.count ?? 1,
+			shardIndex: options.shard?.index ?? 0,
 		},
 	});
 	return rows.map((row) => ({

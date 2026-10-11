@@ -43,6 +43,13 @@ export interface GitObservationExtractionInput
 	expectedGeneration?: { revision: string; parserVersion: number };
 	/** Runs after a generation is written; queues the session's L1 edges by default. */
 	onWritten?: (session: TranscriptRecordsIdentity) => Promise<void>;
+	/**
+	 * Deletes the session's older observation generations (default). A backfill
+	 * turns it off and calls `retireOlderGitObservations` once at the end: one
+	 * lightweight DELETE per session queues behind every other mutation of the
+	 * table, which made it most of a backfilled session's time.
+	 */
+	retireOlder?: boolean;
 }
 
 interface Generation {
@@ -146,7 +153,8 @@ export async function extractGitObservations(
 				parser_version: parserVersion,
 			}) >= 0
 		) {
-			await retireOlder(executor, scope, deadline.signal);
+			if (input.retireOlder !== false)
+				await retireOlder(executor, scope, deadline.signal);
 			return "skipped";
 		}
 		const candidates = await deadline.wait(() =>
@@ -249,7 +257,8 @@ export async function extractGitObservations(
 			}),
 		);
 		await deadline.wait(input.assertWritable);
-		await deadline.wait(() => retireOlder(executor, scope, deadline.signal));
+		if (input.retireOlder !== false)
+			await deadline.wait(() => retireOlder(executor, scope, deadline.signal));
 		await (input.onWritten ?? enqueueSessionEdgesBestEffort)({
 			organizationId: input.organizationId,
 			userId: input.userId,
@@ -346,6 +355,98 @@ function retireOlder(
 		query: `DELETE FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND (revision, parser_version) < (SELECT max(tuple(revision, parser_version)) FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND kind = 'receipt')`,
 		query_params: scope,
 	});
+}
+
+interface OlderObservationGeneration {
+	organization_id: string;
+	user_id: string;
+	source: string;
+	session_id: string;
+	revision: string;
+	parser_version: number;
+}
+
+/** Older generations one batched retirement DELETE removes at most. */
+export const OLDER_GIT_OBSERVATIONS_PER_DELETE = 500;
+
+/**
+ * Deletes every session's observation generations older than its newest
+ * receipt, as `retireOlder` does per session: the generations are read first,
+ * then deleted by exact key in bounded statements. Returns how many were.
+ */
+export async function retireOlderGitObservations(
+	executor: ClickHouseExecutor,
+	options: { organizationId?: string; signal?: AbortSignal } = {},
+): Promise<number> {
+	const organizationFilter =
+		options.organizationId === undefined
+			? ""
+			: "AND organization_id = {organizationId:String}";
+	const older = await executor.query<OlderObservationGeneration>({
+		abortSignal: options.signal,
+		clickhouse_settings: {
+			max_execution_time: 120,
+			timeout_before_checking_execution_speed: 0,
+		},
+		query: `SELECT DISTINCT o.organization_id AS organization_id, o.user_id AS user_id, o.source AS source,
+				o.session_id AS session_id, toString(o.revision) AS revision, o.parser_version AS parser_version
+			FROM ${SESSION_GIT_OBSERVATIONS_TABLE} AS o
+			INNER JOIN (
+				SELECT organization_id, user_id, source, session_id, max(tuple(revision, parser_version)) AS head
+				FROM ${SESSION_GIT_OBSERVATIONS_TABLE}
+				WHERE kind = 'receipt' ${organizationFilter}
+				GROUP BY organization_id, user_id, source, session_id
+			) AS h
+				ON o.organization_id = h.organization_id AND o.user_id = h.user_id
+				AND o.source = h.source AND o.session_id = h.session_id
+			WHERE tuple(o.revision, o.parser_version) < h.head ${organizationFilter.replace("organization_id", "o.organization_id")}
+			ORDER BY organization_id, user_id, source, session_id, revision, parser_version`,
+		query_params:
+			options.organizationId === undefined
+				? {}
+				: { organizationId: options.organizationId },
+	});
+	for (
+		let start = 0;
+		start < older.length;
+		start += OLDER_GIT_OBSERVATIONS_PER_DELETE
+	) {
+		options.signal?.throwIfAborted();
+		await executor.execute(
+			buildOlderGitObservationsDelete(
+				older.slice(start, start + OLDER_GIT_OBSERVATIONS_PER_DELETE),
+				options.signal,
+			),
+		);
+	}
+	return older.length;
+}
+
+/** One lightweight DELETE of the given generations, matched by exact key. */
+export function buildOlderGitObservationsDelete(
+	generations: readonly OlderObservationGeneration[],
+	abortSignal?: AbortSignal,
+) {
+	return {
+		abortSignal,
+		clickhouse_settings: {
+			lightweight_deletes_sync: "1",
+			max_execution_time: 110,
+		},
+		query: `DELETE FROM ${SESSION_GIT_OBSERVATIONS_TABLE}
+			WHERE organization_id IN {organizationIds:Array(String)}
+				AND has(arrayZip({organizations:Array(String)}, {users:Array(String)}, {sources:Array(String)}, {sessions:Array(String)}, {revisions:Array(String)}, {parsers:Array(UInt16)}),
+					(organization_id, user_id, source, session_id, toString(revision), parser_version))`,
+		query_params: {
+			organizationIds: [...new Set(generations.map((g) => g.organization_id))],
+			organizations: generations.map((g) => g.organization_id),
+			users: generations.map((g) => g.user_id),
+			sources: generations.map((g) => g.source),
+			sessions: generations.map((g) => g.session_id),
+			revisions: generations.map((g) => g.revision),
+			parsers: generations.map((g) => g.parser_version),
+		},
+	};
 }
 
 function compareGeneration(

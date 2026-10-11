@@ -3,6 +3,7 @@ import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
+import { retireOlderGitObservations } from "../services/git-observation-extraction.service.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -46,6 +47,7 @@ const { values } = parseArgs({
 		"max-sessions": { type: "string" },
 		"organization-id": { type: "string" },
 		"session-timeout-ms": { type: "string" },
+		shard: { type: "string" },
 	},
 	strict: true,
 });
@@ -92,6 +94,7 @@ const options: TranscriptRecordsBackfillOptions = {
 		);
 	},
 	organizationId: values["organization-id"],
+	shard: parseShard(values.shard),
 	sessionTimeoutMs: parsePositiveInteger(
 		values["session-timeout-ms"],
 		DEFAULT_SESSION_TIMEOUT_MS,
@@ -106,6 +109,13 @@ try {
 		: await previewTranscriptRecordsBackfill(executor, options);
 	console.log(JSON.stringify(result, null, 2));
 	if (result.failedCount > 0) process.exitCode = 2;
+	if (values.execute) {
+		// The run kept older git observation generations; retire them in one pass.
+		const retired = await retireOlderGitObservations(executor, {
+			organizationId: values["organization-id"],
+		});
+		console.error(`Retired ${retired} older git observation generations.`);
+	}
 	if (values.execute && result.completedCount > 0) {
 		// The generations this run superseded stay readable for the grace,
 		// then only the daily pass (ten sessions a day) would delete them.
@@ -132,4 +142,20 @@ function parsePositiveInteger(
 		throw new Error(`${flag} must be a positive integer.`);
 	}
 	return parsed;
+}
+
+/** `--shard <index>/<count>`, for example `--shard 0/4`. */
+function parseShard(
+	value: string | undefined,
+): { index: number; count: number } | undefined {
+	if (value === undefined) return undefined;
+	const match = /^(\d+)\/(\d+)$/u.exec(value);
+	const index = Number(match?.[1]);
+	const count = Number(match?.[2]);
+	if (!match || count < 1 || count > 64 || index >= count) {
+		throw new Error(
+			"--shard must be <index>/<count> with 0 <= index < count <= 64.",
+		);
+	}
+	return { index, count };
 }

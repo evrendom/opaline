@@ -17,6 +17,7 @@ import { backfillGitObservations } from "../services/git-observation-backfill.se
 import {
 	extractGitObservations,
 	persistGitObservationsBestEffort,
+	retireOlderGitObservations,
 } from "../services/git-observation-extraction.service.js";
 import { gitObservationGenerationVersion } from "../services/git-observation-parser.js";
 import {
@@ -246,6 +247,43 @@ test("revision and parser advancement replace old generations; retries are resum
 			assertWritable: () => fence(input),
 		}),
 	).toBe("skipped");
+});
+
+test("a backfill keeps older generations until one batched retirement removes them", async () => {
+	const fixture = claudeGitFixture();
+	const input = scope("deferred", fixture);
+	await prepare(input, fixture, "100");
+	await extractGitObservations(executor, {
+		...input,
+		assertWritable: () => fence(input),
+		retireOlder: false,
+	});
+	await prepare(
+		input,
+		{ ...fixture, content: fixture.content.replaceAll("abc1234", "f00ba12") },
+		"200",
+	);
+	expect(
+		await extractGitObservations(executor, {
+			...input,
+			assertWritable: () => fence(input),
+			retireOlder: false,
+		}),
+	).toBe("written");
+	let rows = await readRows(input.sessionId);
+	expect(new Set(rows.map((row) => row.revision))).toEqual(
+		new Set(["100", "200"]),
+	);
+
+	expect(
+		await retireOlderGitObservations(executor, { organizationId }),
+	).toBeGreaterThanOrEqual(1);
+	rows = await readRows(input.sessionId);
+	expect(rows.length).toBeGreaterThan(0);
+	expect(rows.every((row) => row.revision === "200")).toBe(true);
+	expect(await retireOlderGitObservations(executor, { organizationId })).toBe(
+		0,
+	);
 });
 
 test("source participates in identity even when native session IDs collide", async () => {
