@@ -334,13 +334,13 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description: [
 			"What it does: Finds where the team's agents got stuck, failed or wasted time and money, so the team can fix their setup.",
 			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
-			"Returns: The period, totals, and runs, failures by cause, unhappy prompts, git events or weekly totals.",
+			"Returns: Period totals and runs, failure causes, unhappy prompts, git events, weekly totals or calls.",
 			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
 			"Limits: Members see their own sessions and team weekly totals, admins all; 200 rows a call.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
-				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push; with pullRequest, the sessions that touched that pull request. weekly: per ISO week, member and agent, the sums of the runs' recorded facts (runs, sessions, minutes, cost and tokens, calls, failures, denials, interruptions, API errors, pushes, commits, PR links, MCP calls, skills), from a nightly snapshot; use it for trends over weeks or months and for before/after comparisons.",
+				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push; with pullRequest, the sessions that touched that pull request. weekly: per ISO week, member and agent, the sums of the runs' recorded facts (runs, sessions, minutes, cost and tokens, calls, failures, denials, interruptions, API errors, pushes, commits, PR links, MCP calls, skills), from a nightly snapshot; use it for trends over weeks or months and for before/after comparisons. calls: shell commands, Codex code-mode scripts and written script files, each with its program, first words, fingerprint (the same command with incidental values such as paths, numbers, ids and quoted strings replaced) and simhash (near-duplicate scripts), whether it failed, and its text.",
 			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to (source=weekly: the 11 weeks before the week of to). For totals and rankings, use the start of the window the user asked for. source=weekly counts whole weeks from the Monday on or before it.",
 			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
 			latest: "Only the newest N sessions in the date range, 1-200.",
@@ -348,7 +348,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"Only sessions in this repository (a name from the repository column). Not for source=weekly.",
 			agent: "Only sessions from claude_code or codex. Default: both.",
 			model:
-				"Only runs that used this model id; cost then counts only that model.",
+				"Only runs that used this model id; cost then counts only that model. Not for source=calls: find those runs first and pass them.",
 			sessionId: "Only this session and the subagents it started.",
 			toolGroup:
 				"source=tool only: shell, edit, read, search, browser, web, mcp, subagent or other.",
@@ -361,10 +361,20 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"source=tool only: only this detail (lint rule, error code), copied from an earlier result.",
 			includeNoise:
 				"source=tool only: also show expected failures. Default false.",
+			commandFrom:
+				"source=calls only: command (a shell command, or a Codex code-mode script that runs exactly one), script (any other Codex code-mode script) or written (a script file a call wrote).",
+			commandArgv0:
+				"source=calls only: only commands that run this program, as in the argv0 column (git, bun, python3).",
+			commandPrefix:
+				"source=calls only: only commands with these first words, as in the prefix column (git push, gh pr).",
+			commandFingerprint:
+				"source=calls only: only calls with this fingerprint, copied from an earlier result.",
+			commandSimhash:
+				"source=calls only: only near-duplicates of a script, a simhash copied from an earlier result (calls whose simhash differs in at most 3 of 32 bits; texts under 20 words have none).",
 			reaction:
 				"source=user only: negative (unhappy prompts), swear (strongly worded complaints), apology (the agent apologized). Default: all three.",
 			groupBy:
-				"source=runs: totals per week, model, repository, agent or session instead of one row per run. source=weekly: totals per week, member or agent instead of one row per week, member and agent.",
+				"source=runs: totals per week, model, repository, agent or session instead of one row per run. source=weekly: totals per week, member or agent instead of one row per week, member and agent. source=calls: counts per commandFingerprint (the same command), commandArgv0 (program) or commandPrefix (first words), with failed calls and example texts.",
 			refs: "Only these runs (at most 200), as given by an earlier result; with source=runs this returns their total time and cost.",
 			"refs[].sessionId": "The run's session id.",
 			"refs[].agentId":

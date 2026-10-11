@@ -30,10 +30,39 @@ export const AnalysisTraceSchema = z.object({
 	query: z.string(),
 });
 
+/**
+ * What a call's command text is (find source=calls): `command` a shell
+ * command (a command Codex ran inside a code-mode script is a call of its own
+ * from parser 5; before that, a script that runs exactly one stands for it),
+ * `script` a whole Codex code-mode script, `written` the content of a script
+ * file the call wrote.
+ */
+export const COMMAND_FROM = ["command", "script", "written"] as const;
+/** Bits two command simhashes (32 bits) may differ in to count as near-duplicates. */
+export const COMMAND_SIMHASH_NEAR_BITS = 3;
+const RUN_GROUP_BY = [
+	"week",
+	"model",
+	"repository",
+	"agent",
+	"session",
+] as const;
+const CALL_GROUP_BY = [
+	"commandFingerprint",
+	"commandArgv0",
+	"commandPrefix",
+] as const;
+const UInt64Schema = z
+	.string()
+	.regex(/^\d{1,20}$/u)
+	.refine((value) => BigInt(value) <= 18_446_744_073_709_551_615n, {
+		message: "must be a UInt64 in decimal",
+	});
+
 /** The find arguments without cross-field checks; Zod 4 cannot derive a partial from a refined object. */
 export const AnalysisFindInputBaseSchema = z
 	.object({
-		source: z.enum(["runs", "tool", "user", "git", "weekly"]),
+		source: z.enum(["runs", "tool", "user", "git", "weekly", "calls"]),
 		from: z.string().date().optional(),
 		to: z.string().date().optional(),
 		latest: z.number().int().min(1).max(200).optional(),
@@ -69,16 +98,25 @@ export const AnalysisFindInputBaseSchema = z
 		cause: z.string().min(1).optional(),
 		detail: z.string().min(1).optional(),
 		includeNoise: z.boolean().default(false),
+		/** source=calls: only calls whose command text is of this kind. */
+		commandFrom: z.enum(COMMAND_FROM).optional(),
+		/** source=calls: only calls whose command runs this program. */
+		commandArgv0: z.string().min(1).max(200).optional(),
+		/** source=calls: only calls whose command starts with these words. */
+		commandPrefix: z.string().min(1).max(200).optional(),
+		/** source=calls: only calls with this fingerprint (a UInt64 in decimal). */
+		commandFingerprint: UInt64Schema.optional(),
+		/** source=calls: only calls whose simhash is within `COMMAND_SIMHASH_NEAR_BITS` bits of this one. */
+		commandSimhash: UInt64Schema.optional(),
 		reaction: z
 			.array(z.enum(["negative", "swear", "apology"]))
 			.default(["negative", "swear", "apology"]),
 		/**
-		 * `session`: one group per session, a Codex session with its subagent
-		 * threads. `member`: source=weekly only, one group per member.
+		 * source=runs: `session` is one group per session, a Codex session with
+		 * its subagent threads. source=weekly: `week`, `member`, `agent`.
+		 * source=calls: the command identity columns.
 		 */
-		groupBy: z
-			.enum(["week", "model", "repository", "agent", "session", "member"])
-			.optional(),
+		groupBy: z.enum([...RUN_GROUP_BY, "member", ...CALL_GROUP_BY]).optional(),
 		refs: z.array(RunRefInputSchema).max(200).optional(),
 		/** Absent: `findLimit` picks a default per source. */
 		limit: z.number().int().min(1).max(200).optional(),
@@ -151,14 +189,38 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 		}
 		if (
 			input.groupBy &&
-			!(input.source === "runs" && input.groupBy !== "member") &&
-			!(input.source === "weekly" && WEEKLY_GROUP_BY.has(input.groupBy))
+			!(input.source === "runs"
+				? (RUN_GROUP_BY as readonly string[]).includes(input.groupBy)
+				: input.source === "weekly"
+					? WEEKLY_GROUP_BY.has(input.groupBy)
+					: input.source === "calls" &&
+						(CALL_GROUP_BY as readonly string[]).includes(input.groupBy))
 		) {
 			context.addIssue({
 				code: "custom",
 				path: ["groupBy"],
+				message: `groupBy is ${RUN_GROUP_BY.join(", ")} for runs, week, member, agent for weekly and ${CALL_GROUP_BY.join(", ")} for calls`,
+			});
+		}
+		for (const key of [
+			"commandFrom",
+			"commandArgv0",
+			"commandPrefix",
+			"commandFingerprint",
+			"commandSimhash",
+		] as const)
+			if (input[key] !== undefined && input.source !== "calls")
+				context.addIssue({
+					code: "custom",
+					path: [key],
+					message: `${key} is only valid for source=calls`,
+				});
+		if (input.model !== undefined && input.source === "calls") {
+			context.addIssue({
+				code: "custom",
+				path: ["model"],
 				message:
-					"groupBy is only valid for runs (week, model, repository, agent, session) and weekly (week, member, agent)",
+					"model is not valid for source=calls; find the runs with source=runs model=… and pass them as refs",
 			});
 		}
 		if (input.source === "weekly")
@@ -335,6 +397,65 @@ const ToolGroupSchema = z.object({
 			}),
 		)
 		.max(5),
+});
+/** Characters of a call's command text a find result shows. */
+export const CALL_COMMAND_CHARS = 300;
+/**
+ * One call of `find source=calls`: the command it carried and the command
+ * identity derived from it. The identity columns are computed by Opaline from
+ * the stored text at query time (they change with the rules for every call at
+ * once); null when they do not apply or only part of the text is stored.
+ */
+export const AnalysisCallSchema = z.object({
+	ref: RunRefSchema,
+	record: z.number().int(),
+	block: z.number().int(),
+	at: z.string(),
+	agent: z.enum(["claude_code", "codex"]),
+	tool: z.string(),
+	/** The file a `written` script was written to; empty otherwise. */
+	filePath: z.string(),
+	commandFrom: z.enum(COMMAND_FROM),
+	/** The command text, its first `CALL_COMMAND_CHARS` characters (the stored head when only part of it is stored). */
+	command: z.string(),
+	/** Characters of the whole command text; null when only part of it is stored. */
+	commandChars: z.number().int().nullable(),
+	/** The program a shell command runs; null for scripts. */
+	commandArgv0: z.string().nullable(),
+	/** The program and its subcommand (`git push`, `gh pr`); null for scripts. */
+	commandPrefix: z.string().nullable(),
+	/** cityHash64 of the normalized command text, in decimal. */
+	commandFingerprint: z.string().nullable(),
+	/** 32-bit word-shingle simhash of the normalized text, in decimal; null under 20 words. */
+	commandSimhash: z.string().nullable(),
+	/** Whether the call's result was an error or a non-zero exit; null without a result. */
+	failed: z.boolean().nullable(),
+	exitCode: z.number().int().nullable(),
+	parentSessionId: ParentSessionIdSchema,
+});
+const CallGroupSchema = z.object({
+	key: z.string(),
+	calls: z.number(),
+	sessions: z.number(),
+	/** Calls whose result was an error or a non-zero exit. */
+	failedCalls: z.number(),
+	firstSeen: z.string(),
+	lastSeen: z.string(),
+	/** groupBy=commandFingerprint: the normalized text it hashes, its first `CALL_COMMAND_CHARS` characters. */
+	normalized: z.string().nullable(),
+	/** Newest calls of up to three different command texts in the group. */
+	examples: z
+		.array(
+			z.object({
+				ref: RunRefSchema,
+				record: z.number().int(),
+				block: z.number().int(),
+				commandFrom: z.enum(COMMAND_FROM),
+				command: z.string(),
+				parentSessionId: ParentSessionIdSchema,
+			}),
+		)
+		.max(3),
 });
 export const AnalysisEventSchema = z.object({
 	type: ReactionSchema,
@@ -743,6 +864,16 @@ export const AnalysisFindOutputSchema = z.union([
 		),
 	}),
 	z.object({
+		source: z.literal("calls"),
+		header: HeaderSchema,
+		rows: z.array(AnalysisCallSchema),
+	}),
+	z.object({
+		source: z.literal("calls"),
+		header: HeaderSchema,
+		groups: z.array(CallGroupSchema),
+	}),
+	z.object({
 		source: z.literal("git"),
 		header: HeaderSchema,
 		events: z.array(AnalysisGitEventSchema),
@@ -796,6 +927,7 @@ export type AnalysisTrace = z.infer<typeof AnalysisTraceSchema>;
 export type AnalysisFindInput = z.infer<typeof AnalysisFindInputSchema>;
 export type AnalysisFindOutput = z.infer<typeof AnalysisFindOutputSchema>;
 export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
+export type AnalysisCall = z.infer<typeof AnalysisCallSchema>;
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
 export type AnalysisGitEvent = z.infer<typeof AnalysisGitEventSchema>;
 export type AnalysisWeeklyTotals = z.infer<typeof AnalysisWeeklyTotalsSchema>;

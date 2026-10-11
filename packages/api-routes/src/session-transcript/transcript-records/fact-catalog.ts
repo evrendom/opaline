@@ -212,6 +212,26 @@ const RUN_INDEX_TEST = "apps/api/src/__tests__/run-index.integration.ts";
 
 const CLAUDE_TOOL_NAME = "assistant.message.content[tool_use:*].name";
 
+/** Where the command identity facts come from: nothing is stored. */
+const COMMAND_IDENTITY =
+	"no table: find source=calls computes it at query time from the stored call text (apps/api/src/services/analysis/command-identity.ts), so new rules apply to every call at once";
+const COMMAND_IDENTITY_TEST =
+	"apps/api/src/__tests__/command-identity.integration.ts";
+const COMMAND_PROGRAM_TRAPS =
+	"Traps: the first program of a chain or pipeline only (`git add . && git push` is git add); a compound command keeps its keyword (`for`, `while`, `if`); a program run through a variable or substitution is that word (`$PY`, `$(which python)`); null for code-mode scripts and written files, which run no single program, and when only part of the text is stored. The prefix adds the next word only when it is a subcommand-like word (flags that take a value, such as git -C dir, are passed over), or `-m module` for Python.";
+const COMMAND_FINGERPRINT_TRAPS =
+	"Traps: rules, not meaning. Absolute paths keep their last two components (file and folder), after home directories, temp directories (and the random names of per-run temp directories) and agent worktrees become <home>, <tmp> and <worktree>; numbers, SHAs, UUIDs, timestamps and URLs become placeholders, and single-line quoted strings become <str> (so different search patterns, commit messages and JSON payloads merge), except an interpreter's inline program (python -c, node -e, bash -c, PowerShell -Command) and an ssh remote command; output trims (2>&1, | head, | tail), status echo lines and a leading cd are dropped. Relative paths, flags and subcommands are kept. A code-mode or written script keeps its string literals. The simhash is 32 bits, null under 20 words; near-duplicates differ in at most 3 bits, which finds copies with small edits, not rewrites. Null when only part of the text is stored.";
+
+function contextOnly(path: string): FactSourceMapping {
+	return {
+		path,
+		role: "context",
+		relation: { kind: "unreviewed" },
+		justification:
+			"The stored command text this fact is computed from; not the fact value.",
+	};
+}
+
 function semanticWriter(
 	path: string,
 	file: string,
@@ -653,31 +673,42 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		view: "calls",
 		meaning: "The program a shell command ran and its first words.",
 		agents: {
-			claude_code: pending(
+			claude_code: stored(
 				["assistant.message.content[tool_use:Bash].input.command"],
-				"find over calls (order of work step 10) derives it from the stored command text; no parser change Review constraint: Requested scripts can contain wrappers, pipelines and multiple programs; command_argv0 is not literally the program that ran.",
+				{ elsewhere: COMMAND_IDENTITY },
 				{
-					evidence: [],
-					relation: { kind: "close" },
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. Requested scripts can contain wrappers, pipelines and multiple programs; command_argv0 is not literally the program that ran.",
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
 					justification:
-						"Bash.input.command is the whole command string; the program and first words need shell parsing (pipes, && chains, env prefixes), so the fact is derived from the literal text, not written by the agent. Witness: 49ead9e1:22 assistant.message.content[tool_use:Bash].input.command [string] n=24856 v2.1.220..2.1.293",
+						"Opaline computation, not an agent-written value. Bash.input.command is the whole command string; the program is its first word after setup statements (cd, export, assignments, echo labels), environment assignments, wrappers (sudo, env, timeout N, nohup, rtk proxy, npx, pnpm exec, uv run, conda run, mise exec --; one list, WRAPPERS) and a bash -lc wrapper.",
+					notes: COMMAND_PROGRAM_TRAPS,
+					testedIn: COMMAND_IDENTITY_TEST,
 				},
 			),
-			codex: pending(
+			codex: stored(
 				[
 					"response_item/function_call:exec_command.arguments.cmd",
-					"event_msg/item_completed:CommandExecution.parsed_cmd[].cmd",
+					"event_msg/item_completed:CommandExecution.command[]",
+					"response_item/custom_tool_call:exec.input",
 				],
-				"find over calls (order of work step 10) derives it from the stored command text; no parser change Review constraint: Do not read argv0 from CommandExecution.command[]: element 0 is the shell wrapper. parsed_cmd[].cmd is one pipeline segment's text.",
+				{ elsewhere: COMMAND_IDENTITY },
 				{
-					evidence: [],
-					relation: { kind: "close" },
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. Do not read argv0 from CommandExecution.command[]: element 0 is the shell wrapper. parsed_cmd[].cmd is one pipeline segment's text.",
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly("event_msg/item_completed:CommandExecution.command[]"),
+						contextOnly("response_item/custom_tool_call:exec.input"),
+					],
 					justification:
-						"The program is derived by parsing exec_command.arguments.cmd or the per-segment parsed_cmd[].cmd; command[0] cannot be used because it is the shell wrapper, so no field literally names the program. Witness: 019cb44a:14 response_item/function_call:exec_command.arguments.cmd [string] n=274778 v0.100.0..0.157.1",
+						"Opaline computation, not an agent-written value. Read from the stored command text: exec_command cmd, the command a code-mode script ran (its own call from parser 5; before that the script's one exec_command), never CommandExecution.command[0], which is the shell wrapper.",
+					notes: COMMAND_PROGRAM_TRAPS,
+					testedIn: COMMAND_IDENTITY_TEST,
 				},
 			),
 		},
@@ -689,56 +720,42 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		meaning:
 			"A normalized form of a command or written script, to find the same command across sessions.",
 		agents: {
-			claude_code: pending(
+			claude_code: stored(
 				["assistant.message.content[tool_use:Bash].input.command"],
-				"find over calls (order of work step 10) derives it from the stored command text; no parser change Review constraint: The normalization algorithm and equivalence policy are unspecified, and this is a derived analysis value, not a literal transcript fact.",
+				{ elsewhere: COMMAND_IDENTITY },
 				{
-					evidence: [],
 					relation: { kind: "derived", from: ["calls/input_text"] },
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. The normalization algorithm and equivalence policy are unspecified, and this is a derived analysis value, not a literal transcript fact.",
 					sourceMappings: [
-						{
-							path: "assistant.message.content[tool_use:Bash].input.command",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
 					],
 					justification:
-						"Opaline computation, not an agent-written value. A fingerprint is a normalised form Opaline would compute from the recorded command text; the agent writes no fingerprint, only the literal command. Witness: 49ead9e1:22 assistant.message.content[tool_use:Bash].input.command [string] n=24856 v2.1.220..2.1.293",
+						"Opaline computation, not an agent-written value: cityHash64 and wordShingleSimHashUTF8 of the command text (or a written script's content) with incidental values replaced by placeholders.",
+					notes: COMMAND_FINGERPRINT_TRAPS,
+					testedIn: COMMAND_IDENTITY_TEST,
 				},
 			),
-			codex: pending(
+			codex: stored(
 				[
 					"response_item/function_call:exec_command.arguments.cmd",
 					"response_item/custom_tool_call:exec.input",
+					"response_item/custom_tool_call:apply_patch.input",
 				],
-				"find over calls (order of work step 10) derives it from the stored command text; no parser change Review constraint: The fingerprint is derived and its normalization policy is unspecified.",
+				{ elsewhere: COMMAND_IDENTITY },
 				{
-					evidence: [],
 					relation: { kind: "derived", from: ["calls/input_text"] },
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. The fingerprint is derived and its normalization policy is unspecified.",
 					sourceMappings: [
-						{
-							path: "response_item/function_call:exec_command.arguments.cmd",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
-						{
-							path: "response_item/custom_tool_call:exec.input",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly("response_item/custom_tool_call:exec.input"),
+						contextOnly("response_item/custom_tool_call:apply_patch.input"),
 					],
 					justification:
-						"Opaline computation, not an agent-written value. A fingerprint is a normalised form Opaline would compute from the command string or code-mode script; the agent writes only the literal text. Witness: 019cb44a:14 response_item/function_call:exec_command.arguments.cmd [string] n=274778 v0.100.0..0.157.1",
+						"Opaline computation, not an agent-written value: cityHash64 and wordShingleSimHashUTF8 of the command, the code-mode script or an added script file's content, with incidental values replaced by placeholders.",
+					notes: COMMAND_FINGERPRINT_TRAPS,
+					testedIn: COMMAND_IDENTITY_TEST,
 				},
 			),
 		},

@@ -127,6 +127,76 @@ export function renderFind(output: AnalysisFindOutput): string {
 				]),
 			),
 		);
+	} else if (output.source === "calls") {
+		if ("rows" in output)
+			lines.push(
+				table(
+					[
+						"ref",
+						"at",
+						"agent",
+						"tool",
+						"from",
+						"failed",
+						"exitCode",
+						"argv0",
+						"prefix",
+						"fingerprint",
+						"simhash",
+						"chars",
+						"parentSessionId",
+						"command",
+					],
+					output.rows.map((row) => [
+						`${refText(row.ref)}@${row.record}.${row.block}`,
+						row.at,
+						row.agent,
+						row.tool,
+						row.filePath
+							? `${row.commandFrom} ${row.filePath}`
+							: row.commandFrom,
+						row.failed,
+						row.exitCode,
+						row.commandArgv0,
+						row.commandPrefix,
+						row.commandFingerprint,
+						row.commandSimhash,
+						row.commandChars,
+						row.parentSessionId,
+						row.command,
+					]),
+				),
+			);
+		else
+			lines.push(
+				table(
+					[
+						"key",
+						"calls",
+						"sessions",
+						"failedCalls",
+						"firstSeen",
+						"lastSeen",
+						"normalized",
+						"examples",
+					],
+					output.groups.map((group) => [
+						group.key,
+						group.calls,
+						group.sessions,
+						group.failedCalls,
+						group.firstSeen,
+						group.lastSeen,
+						group.normalized,
+						group.examples
+							.map(
+								(example) =>
+									`${refText(example.ref)}@${example.record}.${example.block}${example.parentSessionId ? ` (subagent thread of ${example.parentSessionId})` : ""} ${example.commandFrom}: ${example.command}`,
+							)
+							.join("; "),
+					]),
+				),
+			);
 	} else if (output.source === "git") {
 		lines.push(
 			table(

@@ -130,7 +130,7 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 		properties: {
 			source: {
 				type: "string",
-				enum: ["runs", "tool", "user", "git", "weekly"],
+				enum: ["runs", "tool", "user", "git", "weekly", "calls"],
 			},
 			from: { type: "string", format: "date" },
 			limit: { type: "integer", minimum: 1, maximum: 200 },
@@ -180,6 +180,11 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 			"cause",
 			"detail",
 			"includeNoise",
+			"commandFrom",
+			"commandArgv0",
+			"commandPrefix",
+			"commandFingerprint",
+			"commandSimhash",
 			"reaction",
 			"groupBy",
 			"refs",

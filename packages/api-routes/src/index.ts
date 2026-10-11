@@ -75,6 +75,8 @@ import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
 
 export {
+	type AnalysisCall,
+	AnalysisCallSchema,
 	type AnalysisEvent,
 	type AnalysisFindInput,
 	AnalysisFindInputBaseSchema,
@@ -91,6 +93,9 @@ export {
 	AnalysisTraceSchema,
 	type AnalysisWeeklyTotals,
 	AnalysisWeeklyTotalsSchema,
+	CALL_COMMAND_CHARS,
+	COMMAND_FROM,
+	COMMAND_SIMHASH_NEAR_BITS,
 	findLimit,
 	parsePullRequestRef,
 	type RunRef,

@@ -33,6 +33,18 @@ export function fitFindOutput(
 ): AnalysisFindOutput {
 	if (jsonBytes(output) <= BODY_MAX_BYTES) return output;
 	const page = { header: output.header, cursorAfter };
+	if (output.source === "calls")
+		return "rows" in output
+			? fitItems(page, output.rows, "rows", (rows, header) => ({
+					...output,
+					header,
+					rows,
+				}))
+			: fitItems(page, output.groups, "groups", (groups, header) => ({
+					...output,
+					header,
+					groups,
+				}));
 	if ("rows" in output)
 		return fitItems(page, output.rows, "rows", (rows, header) => ({
 			...output,

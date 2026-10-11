@@ -59,6 +59,7 @@ import {
 	type ApiTestServer,
 	startApiTestServer,
 } from "./helpers/api-test-server.js";
+import { NEAR_DUPLICATES } from "./helpers/command-identity-cases.js";
 import {
 	claudeDuplicateFixture,
 	codexInFileUsageFixture,
@@ -851,6 +852,170 @@ test("a command that failed inside a Codex code-mode script is a failure of its 
 	);
 	assert(runs.source === "runs" && "rows" in runs);
 	expect(runs.rows[0]).toMatchObject({ failedCalls: 1, toolCalls: 2 });
+});
+
+test("find source=calls finds the same command across sessions, next to its text", async () => {
+	const repository = `calls_repo_${runId}`;
+	const scope = { from: day, to: day, repository };
+	const prompt = {
+		type: "user",
+		timestamp: at(0),
+		message: { role: "user", content: "Check the build" },
+	};
+	const [pollA, pollB] = NEAR_DUPLICATES.map(
+		(record) =>
+			z.object({ content: z.string() }).parse(JSON.parse(record.text)).content,
+	);
+	await seedSession(
+		`calls_a_${runId}`,
+		"claude_code",
+		jsonl([
+			prompt,
+			claudeTool("a-test", "Bash", {
+				command: "cd /Users/alice/app && bun test 2>&1 | tail -20",
+			}),
+			claudeResult("a-test", "Exit code 1\n1 fail", true),
+			claudeTool("a-checks", "Bash", { command: "gh pr checks 133" }),
+			claudeResult("a-checks", "All checks were successful"),
+			claudeTool("a-script", "Write", {
+				file_path: "/tmp/alice/ci-poll.sh",
+				content: pollA,
+			}),
+			claudeResult("a-script", "File created successfully"),
+		]),
+		"claude-opus-4-6",
+		{ repository },
+	);
+	await seedSession(
+		`calls_b_${runId}`,
+		"claude_code",
+		jsonl([
+			prompt,
+			claudeTool("b-test", "Bash", { command: "bun test" }),
+			claudeResult("b-test", "pass"),
+			claudeTool("b-checks", "Bash", {
+				command: "gh pr checks 140 2>&1 | head -5",
+			}),
+			claudeResult("b-checks", "All checks were successful"),
+			claudeTool("b-script", "Write", {
+				file_path: "/tmp/bob/ci-poll.sh",
+				content: pollB,
+			}),
+			claudeResult("b-script", "File created successfully"),
+		]),
+		"claude-opus-4-6",
+		{ repository },
+	);
+	await seedSession(
+		`calls_c_${runId}`,
+		"codex",
+		jsonl([
+			codexLine(0, codexText("user", "Run the tests")),
+			codexLine(1, codexCall("c-test", "exec_command", { cmd: "bun test" })),
+			codexLine(2, codexOutput("c-test", "Process exited with code 0\npass")),
+		]),
+		"gpt-5",
+		{ repository },
+	);
+	const find = async (input: Record<string, unknown>) => {
+		const output = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", { source: "calls", ...scope, ...input }),
+		);
+		assert(output.source === "calls");
+		return output;
+	};
+
+	const byFingerprint = await find({ groupBy: "commandFingerprint" });
+	assert("groups" in byFingerprint);
+	const bunTest = byFingerprint.groups.find(
+		(group) => group.normalized === "bun test",
+	);
+	expect(bunTest).toMatchObject({ calls: 3, sessions: 3, failedCalls: 1 });
+	expect(new Set(bunTest?.examples.map((example) => example.command))).toEqual(
+		new Set(["cd /Users/alice/app && bun test 2>&1 | tail -20", "bun test"]),
+	);
+	expect(
+		byFingerprint.groups.find(
+			(group) => group.normalized === "gh pr checks <n>",
+		),
+	).toMatchObject({ calls: 2, sessions: 2, failedCalls: 0 });
+	expect(byFingerprint.groups.map((group) => group.calls)).toEqual([
+		3, 2, 1, 1,
+	]);
+
+	const byProgram = await find({ groupBy: "commandArgv0" });
+	assert("groups" in byProgram);
+	expect(
+		byProgram.groups.map((group) => [group.key, group.calls, group.sessions]),
+	).toEqual([
+		["bun", 3, 3],
+		["gh", 2, 2],
+	]);
+	expect(byProgram.header.notes).toContain(
+		"2 calls have no program: Codex code-mode scripts and written script files, which run no single program, and calls stored only in part",
+	);
+	const byPrefix = await find({ groupBy: "commandPrefix", limit: 1 });
+	assert("groups" in byPrefix);
+	expect(byPrefix.groups.map((group) => group.key)).toEqual(["bun test"]);
+	const nextPrefix = await find({
+		groupBy: "commandPrefix",
+		limit: 1,
+		cursor: byPrefix.header.cursor,
+	});
+	assert("groups" in nextPrefix);
+	expect(nextPrefix.groups.map((group) => group.key)).toEqual(["gh pr"]);
+
+	const written = await find({ commandFrom: "written" });
+	assert("rows" in written);
+	expect(written.rows.map((row) => row.filePath).sort()).toEqual([
+		"/tmp/alice/ci-poll.sh",
+		"/tmp/bob/ci-poll.sh",
+	]);
+	const [script] = written.rows;
+	assert(script?.commandSimhash);
+	expect(script).toMatchObject({
+		commandFrom: "written",
+		commandArgv0: null,
+		commandPrefix: null,
+		failed: false,
+	});
+	const near = await find({ commandSimhash: script.commandSimhash });
+	assert("rows" in near);
+	expect(near.rows.map((row) => row.filePath).sort()).toEqual([
+		"/tmp/alice/ci-poll.sh",
+		"/tmp/bob/ci-poll.sh",
+	]);
+	expect(new Set(near.rows.map((row) => row.commandFingerprint)).size).toBe(2);
+
+	const fingerprint = bunTest?.key;
+	assert(fingerprint);
+	const runs = await find({ commandFingerprint: fingerprint, limit: 2 });
+	assert("rows" in runs);
+	expect(runs.rows).toHaveLength(2);
+	const rest = await find({
+		commandFingerprint: fingerprint,
+		limit: 2,
+		cursor: runs.header.cursor,
+	});
+	assert("rows" in rest);
+	const all = [...runs.rows, ...rest.rows];
+	expect(
+		all
+			.map((row) => [
+				row.agent,
+				row.commandArgv0,
+				row.commandPrefix,
+				row.failed,
+			])
+			.sort(),
+	).toEqual([
+		["claude_code", "bun", "bun test", false],
+		["claude_code", "bun", "bun test", true],
+		["codex", "bun", "bun test", false],
+	]);
+	expect(all.find((row) => row.failed)?.command).toBe(
+		"cd /Users/alice/app && bun test 2>&1 | tail -20",
+	);
 });
 
 test("one deadline aborts the active ClickHouse query and stops subsequent statements", async () => {

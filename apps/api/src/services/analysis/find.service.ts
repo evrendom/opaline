@@ -1,4 +1,5 @@
 import {
+	type AnalysisCall,
 	type AnalysisFindInput,
 	type AnalysisFindOutput,
 	type AnalysisRun,
@@ -13,6 +14,17 @@ import {
 	getClickhouse,
 } from "../../clickhouse.js";
 import { sessionScopeId } from "../l1-edges/l1-edge-ids.js";
+import {
+	buildCallExamplesStatement,
+	buildCallGroupsStatement,
+	buildCallRowsStatement,
+	type CallExampleRow,
+	CallExampleRowSchema,
+	type CallGroupBy,
+	CallGroupRowSchema,
+	type CallRow,
+	CallRowSchema,
+} from "./call-queries.js";
 import { withAnalysisDeadline } from "./deadline.js";
 import {
 	CLASSIFIER_VERSION,
@@ -82,6 +94,10 @@ type RunBase = Omit<AnalysisRun, "nextReaction" | "parentSessionId" | "depth">;
 type ToolGroupResult = Extract<
 	AnalysisFindOutput,
 	{ source: "tool" }
+>["groups"][number];
+type CallGroupResult = Extract<
+	AnalysisFindOutput,
+	{ source: "calls"; groups: unknown }
 >["groups"][number];
 
 interface FindEnv {
@@ -156,6 +172,23 @@ const TOOL_GROUP_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc"];
 const EVENT_ORDER: CursorOrder = ["desc", "desc", "asc", "asc", "asc"];
 /** Newest event first, then session, stream, record and block. */
 const GIT_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc", "asc"];
+/** Newest call first, then session, stream, record and block. */
+const CALL_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc"];
+/**
+ * Distinct keys a calls grouping counts across batches; calls with a key
+ * first seen past it are left out, and the answer says so.
+ */
+const MAX_CALL_GROUPS = 50_000;
+/** A group's examples: newest first, then batch and position. */
+const EXAMPLE_ORDER: CursorOrder = [
+	"desc",
+	"asc",
+	"asc",
+	"asc",
+	"asc",
+	"asc",
+	"asc",
+];
 
 export type { AnalysisScope };
 
@@ -311,7 +344,266 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 			return findGitEvents(context);
 		case "weekly":
 			throw new Error("weekly totals are read without a session scope");
+		case "calls":
+			return context.input.groupBy
+				? findCallGroups(context, context.input.groupBy as CallGroupBy)
+				: findCalls(context);
 	}
+}
+
+/** The scope's command-carrying calls, newest first, with their command identity. */
+async function findCalls(context: FindContext): Promise<FoundPage> {
+	const { input, scope } = context;
+	const after = context.after as
+		| readonly [number, string, string, number, number]
+		| undefined;
+	let rows: CallRow[] = [];
+	const keyOf = (row: CallRow): CursorKey => [
+		row.at_ms,
+		row.session_id,
+		row.agent_id,
+		row.record_idx,
+		row.block_idx,
+	];
+	for (const batch of scope.batches) {
+		const refs = batchRefs(input, batch);
+		if (refs?.length === 0) continue;
+		rows.push(
+			...(await query(
+				context.executor,
+				CallRowSchema,
+				buildCallRowsStatement(
+					{ scope: batch.scope, generations: batch.generations, input, refs },
+					after,
+					context.limit + 1,
+				),
+			)),
+		);
+		// Each batch returns its newest calls after the cursor; the newest of all are among them.
+		rows = takePage(rows, keyOf, CALL_ORDER, undefined, context.limit + 1).page;
+	}
+	const { page, more } = takePage(
+		rows,
+		keyOf,
+		CALL_ORDER,
+		after,
+		context.limit,
+	);
+	return paged(context, page.map(keyOf), more, {
+		source: "calls",
+		header: context.header,
+		rows: page.map((row) => toCall(row, context.sessions.get(row.session_id))),
+	});
+}
+
+interface CallBucket {
+	group: Omit<CallGroupResult, "normalized" | "examples">;
+	/** Newest first: [last seen, batch index, session, agent, turn, record, block]. */
+	examples: (readonly [
+		number,
+		number,
+		string,
+		string,
+		number,
+		number,
+		number,
+	])[];
+}
+
+/**
+ * The scope's command-carrying calls grouped by a command identity column,
+ * most calls first. Counts are summed over batches (their sessions are
+ * disjoint); the examples are then read for the page's groups only.
+ */
+async function findCallGroups(
+	context: FindContext,
+	groupBy: CallGroupBy,
+): Promise<FoundPage> {
+	const { input, scope, header } = context;
+	const buckets = new Map<string, CallBucket>();
+	let unkeyed = 0;
+	let uncounted = 0;
+	for (const [index, batch] of scope.batches.entries()) {
+		const refs = batchRefs(input, batch);
+		if (refs?.length === 0) continue;
+		const groups = await query(
+			context.executor,
+			CallGroupRowSchema,
+			buildCallGroupsStatement(
+				{ scope: batch.scope, generations: batch.generations, input, refs },
+				groupBy,
+			),
+		);
+		for (const row of groups) {
+			if (row.key === null) {
+				unkeyed += row.calls;
+				continue;
+			}
+			let bucket = buckets.get(row.key);
+			if (!bucket) {
+				if (buckets.size >= MAX_CALL_GROUPS) {
+					uncounted += row.calls;
+					continue;
+				}
+				bucket = {
+					group: {
+						key: row.key,
+						calls: 0,
+						sessions: 0,
+						failedCalls: 0,
+						firstSeen: new Date(row.first_ms).toISOString(),
+						lastSeen: new Date(row.last_ms).toISOString(),
+					},
+					examples: [],
+				};
+				buckets.set(row.key, bucket);
+			}
+			const { group } = bucket;
+			group.calls += row.calls;
+			group.sessions += row.sessions;
+			group.failedCalls += row.failed_calls;
+			const first = new Date(row.first_ms).toISOString();
+			const last = new Date(row.last_ms).toISOString();
+			if (first < group.firstSeen) group.firstSeen = first;
+			if (last > group.lastSeen) group.lastSeen = last;
+			bucket.examples = [
+				...bucket.examples,
+				...row.examples.map(
+					([at, [session, agent, turn, record, block]]) =>
+						[at, index, session, agent, turn, record, block] as const,
+				),
+			]
+				.sort((left, right) => compareKeys(left, right, EXAMPLE_ORDER))
+				.slice(0, 3);
+		}
+	}
+	const keyOf = ({ group }: CallBucket): CursorKey => [group.calls, group.key];
+	const { page, more } = takePage(
+		[...buckets.values()],
+		keyOf,
+		RUN_GROUP_ORDER,
+		context.after,
+		context.limit,
+	);
+	const texts = await callExamples(context, page);
+	if (unkeyed)
+		header.notes.push(
+			groupBy === "commandFingerprint"
+				? `${unkeyed} calls have no fingerprint: only part of their text is stored`
+				: `${unkeyed} calls have no ${groupBy === "commandArgv0" ? "program" : "prefix"}: Codex code-mode scripts and written script files, which run no single program, and calls stored only in part`,
+		);
+	if (uncounted) {
+		header.truncated = true;
+		header.notes.push(
+			`more than ${MAX_CALL_GROUPS} distinct keys: ${uncounted} calls with keys past them are not counted; narrow the scope (dates, latest, repository, agent)`,
+		);
+	}
+	return paged(context, page.map(keyOf), more, {
+		source: "calls",
+		header,
+		groups: page.map(({ group, examples }) => {
+			const shown = examples.flatMap(
+				([, , session, agent, turn, record, block]) => {
+					const text = texts.get(exampleKey(session, agent, record, block));
+					return text ? [{ session, agent, turn, record, block, text }] : [];
+				},
+			);
+			return {
+				...group,
+				normalized:
+					groupBy === "commandFingerprint"
+						? (shown[0]?.text.normalized ?? null)
+						: null,
+				examples: shown.map(
+					({ session, agent, turn, record, block, text }) => ({
+						ref: { sessionId: session, agentId: agent, turn },
+						record,
+						block,
+						commandFrom: text.command_from,
+						command: text.command,
+						parentSessionId:
+							context.sessions.get(session)?.parentSessionId ?? null,
+					}),
+				),
+			};
+		}),
+	});
+}
+
+/** The command texts of the page's examples, one statement per batch that holds some. */
+async function callExamples(
+	context: FindContext,
+	page: readonly CallBucket[],
+): Promise<Map<string, CallExampleRow>> {
+	const byBatch = new Map<
+		number,
+		(readonly [string, string, number, number])[]
+	>();
+	for (const { examples } of page)
+		for (const [, index, session, agent, , record, block] of examples)
+			byBatch.set(index, [
+				...(byBatch.get(index) ?? []),
+				[session, agent, record, block],
+			]);
+	const texts = new Map<string, CallExampleRow>();
+	for (const [index, calls] of byBatch) {
+		const batch = context.scope.batches[index];
+		if (!batch) continue;
+		for (const row of await query(
+			context.executor,
+			CallExampleRowSchema,
+			buildCallExamplesStatement(batch.scope, batch.generations, calls),
+		))
+			texts.set(
+				exampleKey(row.session_id, row.agent_id, row.record_idx, row.block_idx),
+				row,
+			);
+	}
+	return texts;
+}
+
+function exampleKey(
+	session: string,
+	agent: string,
+	record: number,
+	block: number,
+): string {
+	return JSON.stringify([session, agent, record, block]);
+}
+
+/** `refs` of the batch's sessions; undefined when the input names no refs. */
+function batchRefs(
+	input: AnalysisFindInput,
+	batch: ScopeBatch,
+): RunRef[] | undefined {
+	if (!input.refs) return undefined;
+	const sessions = new Set(batch.sessions.map((session) => session.session_id));
+	return input.refs.filter((ref) => sessions.has(ref.sessionId));
+}
+
+function toCall(
+	row: CallRow,
+	session: AnalysisSession | undefined,
+): AnalysisCall {
+	return {
+		ref: rowRef(row),
+		record: row.record_idx,
+		block: row.block_idx,
+		at: new Date(row.at_ms).toISOString(),
+		agent: session?.source ?? "claude_code",
+		tool: row.tool_name,
+		filePath: row.command_from === "written" ? row.file_path : "",
+		commandFrom: row.command_from,
+		command: row.command,
+		commandChars: row.command_chars,
+		commandArgv0: row.command_argv0,
+		commandPrefix: row.command_prefix,
+		commandFingerprint: row.command_fingerprint,
+		commandSimhash: row.command_simhash,
+		failed: row.has_result ? row.failed : null,
+		exitCode: row.has_result ? row.exit_code : null,
+		parentSessionId: session?.parentSessionId ?? null,
+	};
 }
 
 /**
@@ -1116,6 +1408,10 @@ function emptyResult(
 	if (input.source === "git") return { source: "git", header, events: [] };
 	if (input.source === "weekly")
 		return { source: "weekly", header, snapshot: null, totals: [] };
+	if (input.source === "calls")
+		return input.groupBy
+			? { source: "calls", header, groups: [] }
+			: { source: "calls", header, rows: [] };
 	return input.groupBy
 		? { source: "runs", header, groups: [] }
 		: { source: "runs", header, rows: [] };
@@ -1186,6 +1482,8 @@ function cursorOrder(input: AnalysisFindInput): CursorOrder {
 	if (input.source === "user") return EVENT_ORDER;
 	if (input.source === "git") return GIT_ORDER;
 	if (input.source === "weekly") return weeklyOrder(input.groupBy);
+	if (input.source === "calls")
+		return input.groupBy ? RUN_GROUP_ORDER : CALL_ORDER;
 	return input.groupBy ? RUN_GROUP_ORDER : RUN_ORDER;
 }
 
