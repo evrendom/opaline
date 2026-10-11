@@ -29,11 +29,16 @@ describe("usage-event analytics query contract", () => {
 		expect(sql).toContain("FROM rudel.usage_events FINAL");
 		expect(sql.match(/FROM rudel\.usage_events/gu)).toHaveLength(1);
 		expect(sql).toContain(
-			"argMaxIf(event_version, event_version, record_kind = 'receipt') OVER usage_session_window AS receipt_generation",
+			"argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation",
+		);
+		// Per-session state is grouped and joined back, never a window over every event.
+		expect(sql).not.toContain(" OVER ");
+		expect(sql).toContain(
+			"HAVING active_event_count = latest_receipt_event_count",
 		);
 		expect(sql).toContain("latest_receipt_is_complete = 1");
 		expect(sql).toContain("active_event_count = latest_receipt_event_count");
-		expect(sql).toContain("event_version = receipt_generation");
+		expect(sql).toContain("e.event_version = s.receipt_generation");
 		expect(sql).toContain("record_kind IN ('event', 'receipt')");
 		expect(sql).toContain("ANY INNER JOIN usage_event_session_rollups AS r");
 		expect(sql).toContain("sa.organization_id AS organization_id");

@@ -558,7 +558,11 @@ export function buildUsageEventAnalyticsCte(
 	const usageEventFilters = buildUsageEventFilters(scope);
 	// The organization/key filters follow the table's primary-key prefix, so FINAL
 	// resolves exact ReplacingMergeTree state without scanning unrelated tenants.
-	// Keep this pipeline single-pass: ClickHouse inlines repeated CTE references.
+	// Per-session state is grouped once and joined back instead of computed with
+	// window functions: ClickHouse inlines repeated CTE references, and a window
+	// over every event of an organization sorts all of them in memory for each
+	// reference (about 0.8 GiB per copy on the largest organization). Reading
+	// latest_usage_records again for the joins is cheap by comparison.
 	return `
 		${buildSessionLineageCteDefinitions(lineageEnabled, scope.tenant)},
 		latest_usage_records AS (
@@ -566,63 +570,83 @@ export function buildUsageEventAnalyticsCte(
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
 			WHERE ${usageEventFilters}
 		),
-		usage_records_with_receipt AS (
+		usage_session_receipts AS (
 			SELECT
-				*,
-				argMaxIf(event_version, event_version, record_kind = 'receipt') OVER usage_session_window AS receipt_generation,
-				argMaxIf(receipt_event_count, event_version, record_kind = 'receipt') OVER usage_session_window AS latest_receipt_event_count,
-				argMaxIf(receipt_is_complete, event_version, record_kind = 'receipt') OVER usage_session_window AS latest_receipt_is_complete,
-				argMaxIf(is_deleted, event_version, record_kind = 'receipt') OVER usage_session_window AS latest_receipt_is_deleted
+				organization_id,
+				user_id,
+				source,
+				session_id,
+				argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation,
+				argMaxIf(receipt_event_count, event_version, record_kind = 'receipt') AS latest_receipt_event_count,
+				argMaxIf(receipt_is_complete, event_version, record_kind = 'receipt') AS latest_receipt_is_complete,
+				argMaxIf(is_deleted, event_version, record_kind = 'receipt') AS latest_receipt_is_deleted
 			FROM latest_usage_records
-			WINDOW usage_session_window AS (
-				PARTITION BY organization_id, user_id, source, session_id
-			)
+			GROUP BY organization_id, user_id, source, session_id
 		),
-		usage_records_with_consistency AS (
+		usage_session_consistency AS (
 			SELECT
-				*,
+				r.organization_id AS organization_id,
+				r.user_id AS user_id,
+				r.source AS source,
+				r.session_id AS session_id,
+				any(r.receipt_generation) AS receipt_generation,
+				any(r.latest_receipt_event_count) AS latest_receipt_event_count,
+				any(r.latest_receipt_is_complete) AS latest_receipt_is_complete,
+				any(r.latest_receipt_is_deleted) AS latest_receipt_is_deleted,
 				countIf(
-					record_kind = 'event'
-					AND is_deleted = 0
-					AND event_version = receipt_generation
-				) OVER usage_session_window AS active_event_count
-			FROM usage_records_with_receipt
-			WINDOW usage_session_window AS (
-				PARTITION BY organization_id, user_id, source, session_id
-			)
-		),
-		consistent_usage_records AS (
-			SELECT *
-			FROM usage_records_with_consistency
-			WHERE latest_receipt_is_deleted = 0
-				AND latest_receipt_is_complete = 1
-				AND active_event_count = latest_receipt_event_count
-				AND event_version = receipt_generation
-				AND is_deleted = 0
-				AND record_kind IN ('event', 'receipt')
+					e.record_kind = 'event'
+						AND e.is_deleted = 0
+						AND e.event_version = r.receipt_generation
+				) AS active_event_count,
+				argMaxIf(
+					if(e.resolved_model != '', e.resolved_model, trimBoth(e.raw_model)),
+					tuple(e.has_valid_timestamp, e.occurred_at, e.first_observed_line, e.event_id),
+					e.record_kind = 'event'
+						AND e.is_deleted = 0
+						AND e.event_version = r.receipt_generation
+						AND e.agent_id = 'main'
+						AND e.model_status IN ('resolved', 'unresolved')
+						AND lowerUTF8(trimBoth(if(e.resolved_model != '', e.resolved_model, e.raw_model))) NOT IN ('', 'unknown', '<synthetic>')
+				) AS latest_main_model,
+				argMaxIf(
+					if(e.resolved_model != '', e.resolved_model, trimBoth(e.raw_model)),
+					tuple(e.has_valid_timestamp, e.occurred_at, e.first_observed_line, e.event_id),
+					e.record_kind = 'event'
+						AND e.is_deleted = 0
+						AND e.event_version = r.receipt_generation
+						AND e.model_status IN ('resolved', 'unresolved')
+						AND lowerUTF8(trimBoth(if(e.resolved_model != '', e.resolved_model, e.raw_model))) NOT IN ('', 'unknown', '<synthetic>')
+				) AS latest_event_model
+			FROM latest_usage_records AS e
+			INNER JOIN usage_session_receipts AS r
+				ON e.organization_id = r.organization_id
+				AND e.user_id = r.user_id
+				AND e.source = r.source
+				AND e.session_id = r.session_id
+			WHERE r.latest_receipt_is_deleted = 0
+				AND r.latest_receipt_is_complete = 1
+			GROUP BY r.organization_id, r.user_id, r.source, r.session_id
+			HAVING active_event_count = latest_receipt_event_count
 		),
 		usage_records_with_display_model AS (
 			SELECT
-				*,
-				argMaxIf(
-					if(resolved_model != '', resolved_model, trimBoth(raw_model)),
-					tuple(has_valid_timestamp, occurred_at, first_observed_line, event_id),
-					record_kind = 'event'
-						AND agent_id = 'main'
-						AND model_status IN ('resolved', 'unresolved')
-						AND lowerUTF8(trimBoth(if(resolved_model != '', resolved_model, raw_model))) NOT IN ('', 'unknown', '<synthetic>')
-				) OVER usage_session_window AS latest_main_model,
-				argMaxIf(
-					if(resolved_model != '', resolved_model, trimBoth(raw_model)),
-					tuple(has_valid_timestamp, occurred_at, first_observed_line, event_id),
-					record_kind = 'event'
-						AND model_status IN ('resolved', 'unresolved')
-						AND lowerUTF8(trimBoth(if(resolved_model != '', resolved_model, raw_model))) NOT IN ('', 'unknown', '<synthetic>')
-				) OVER usage_session_window AS latest_event_model
-			FROM consistent_usage_records
-			WINDOW usage_session_window AS (
-				PARTITION BY organization_id, user_id, source, session_id
-			)
+				e.*,
+				s.receipt_generation AS receipt_generation,
+				s.latest_receipt_event_count AS latest_receipt_event_count,
+				s.latest_receipt_is_complete AS latest_receipt_is_complete,
+				s.latest_receipt_is_deleted AS latest_receipt_is_deleted,
+				s.active_event_count AS active_event_count,
+				s.latest_main_model AS latest_main_model,
+				s.latest_event_model AS latest_event_model
+			FROM latest_usage_records AS e
+			INNER JOIN usage_session_consistency AS s
+				ON e.organization_id = s.organization_id
+				AND e.user_id = s.user_id
+				AND e.source = s.source
+				AND e.session_id = s.session_id
+			WHERE e.event_version = s.receipt_generation
+				AND e.is_deleted = 0
+				AND e.record_kind IN ('event', 'receipt')
 		),
 		usage_event_pricing_candidates AS (
 			${buildPricingCandidatesSelect("usage_records_with_display_model")}
