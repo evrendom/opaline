@@ -1,6 +1,4 @@
-import { IconAlertCircle, IconRefresh } from "@tabler/icons-react";
-import { useState } from "react";
-import { createPortal } from "react-dom";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
 import {
 	Card,
@@ -10,12 +8,13 @@ import {
 	CardTitle,
 } from "@/app/ui/card";
 import { Skeleton } from "@/app/ui/skeleton";
-import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
+import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { TeamMemberOverviewTable } from "@/features/team/components/TeamMemberOverviewTable";
 import {
 	type TeamPageDiagnostics,
 	useTeamPageData,
 } from "@/features/team/use-team-page-data";
+import { cn } from "@/lib/utils";
 
 const teamTableRowSkeletonKeys = [
 	"row-alpha",
@@ -26,31 +25,19 @@ const teamTableRowSkeletonKeys = [
 	"row-foxtrot",
 ] as const;
 
-const teamTableHeaderSkeletons = [
-	{ key: "teammate", widthClass: "w-20" },
-	{ key: "models", widthClass: "w-28" },
-	{ key: "activity", widthClass: "w-16" },
-	{ key: "sessions", widthClass: "w-16" },
-	{ key: "tokens", widthClass: "w-20" },
-	{ key: "cost", widthClass: "w-16" },
-	{ key: "active", widthClass: "w-20" },
-] as const;
-
 function TeamPageSkeleton() {
 	return (
-		<div className="-mx-4 -my-2 overflow-hidden lg:-mx-6">
+		<div className="-mx-4 overflow-hidden lg:-mx-6">
+			{/* The toolbar's search and sort. */}
+			<div className="flex h-12 items-center gap-2 px-6">
+				<Skeleton className="h-8 w-56 rounded-full" />
+				<Skeleton className="h-8 w-36 rounded-full" />
+			</div>
 			<div className="min-w-272 px-8">
-				<div className="grid h-12 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/[0.06] dark:border-white/[0.06]">
-					{teamTableHeaderSkeletons.map((skeleton, index) => (
-						<div key={skeleton.key} className={index === 0 ? "pr-3" : "px-3"}>
-							<Skeleton className={`h-3 rounded-sm ${skeleton.widthClass}`} />
-						</div>
-					))}
-				</div>
 				{teamTableRowSkeletonKeys.map((rowKey) => (
 					<div
 						key={rowKey}
-						className="grid h-16 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center border-b border-black/[0.04] dark:border-white/[0.04]"
+						className="grid h-16 grid-cols-[24fr_21fr_16fr_9fr_10fr_9fr_11fr] items-center"
 					>
 						<div className="flex items-center gap-3 pr-3">
 							<Skeleton className="size-8 shrink-0 rounded-full" />
@@ -261,30 +248,6 @@ function TeamPageEmpty() {
 	);
 }
 
-function TeamPageRefreshButton({
-	isRefreshing,
-	onRefresh,
-}: {
-	isRefreshing: boolean;
-	onRefresh: () => void;
-}) {
-	return (
-		// Toolbar pill.
-		<button
-			type="button"
-			className="toolbar-button"
-			disabled={isRefreshing}
-			onClick={onRefresh}
-		>
-			<IconRefresh
-				aria-hidden="true"
-				className={isRefreshing ? "animate-spin" : undefined}
-			/>
-			{isRefreshing ? "Refreshing" : "Refresh"}
-		</button>
-	);
-}
-
 export function TeamPage() {
 	const {
 		canInviteTeamMembers,
@@ -296,24 +259,6 @@ export function TeamPage() {
 		refetch,
 		teamCards,
 	} = useTeamPageData();
-	const [isRefreshing, setIsRefreshing] = useState(false);
-	const headerPortal = useShellHeaderPortal();
-
-	async function handleRefresh() {
-		if (isRefreshing) {
-			return;
-		}
-
-		setIsRefreshing(true);
-		try {
-			await refetch();
-		} catch {
-			// The query state renders the error panel; keep the button usable.
-		} finally {
-			setIsRefreshing(false);
-		}
-	}
-
 	let content = (
 		<TeamMemberOverviewTable
 			canInviteTeamMembers={canInviteTeamMembers}
@@ -340,24 +285,16 @@ export function TeamPage() {
 		content = <TeamPageEmpty />;
 	}
 
-	const refreshButton = (
-		<TeamPageRefreshButton
-			isRefreshing={isRefreshing}
-			onRefresh={() => {
-				void handleRefresh();
-			}}
-		/>
-	);
-
-	// The page's actions sit on the title row; without a shell
-	// header (embeds, tests) the button stays above the roster.
 	return (
-		<div className="flex flex-col gap-4 px-4 lg:px-6">
-			{headerPortal ? (
-				createPortal(refreshButton, headerPortal)
-			) : (
-				<div className="flex justify-end">{refreshButton}</div>
+		// The sessions list's palette, not its ground: painted, it would cover
+		// the shell window's inset edge beside the roster but not in the
+		// page's padding, leaving stray bits of it. The page scrolls itself.
+		<div
+			className={cn(
+				SESSION_OVERVIEW_SURFACE_CLASS_NAME,
+				"gap-4 overflow-visible bg-transparent px-4 lg:px-6",
 			)}
+		>
 			{content}
 		</div>
 	);

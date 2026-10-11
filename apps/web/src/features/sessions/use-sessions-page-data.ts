@@ -285,6 +285,8 @@ export function useSessionsPageData({
 			void catalogQuery.refetch();
 		},
 		setSessionFilters,
+		/** The list query's range and filters, for a session ID search. */
+		listInput: input,
 		pagination,
 		dateRangeDays: meta.dayCount,
 		endDate,

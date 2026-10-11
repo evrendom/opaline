@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { CHART_INTERVALS } from "./chart-interval";
@@ -44,11 +45,18 @@ export function CostDashboardView({
 	dashboard,
 	toolbarStart,
 	previews,
+	scope = "workspace",
+	breakdownLayout = "grid",
 }: {
 	dashboard: CostDashboardController;
 	toolbarStart?: ReactNode;
 	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
+	/** `repository` lays the breakdowns out without a Repositories card. */
+	scope?: "workspace" | "repository";
+	/** `row` sets the breakdown cards two to a row, for a narrow pane;
+	 * `grid` wraps them three to a row. */
+	breakdownLayout?: "grid" | "row";
 }) {
 	const {
 		input,
@@ -66,6 +74,7 @@ export function CostDashboardView({
 	} = dashboard;
 	const { data, isPending, isError } = query;
 	const workspace = useOptionalOrganization();
+	const demo = useDemoRuntime();
 	// The last chart that finished loading, per workspace and date range. While
 	// a newly picked metric loads without a cached answer, keep drawing this one
 	// (dimmed) instead of swapping the chart for a skeleton; the picked card's
@@ -229,7 +238,9 @@ export function CostDashboardView({
 					{headerPortal ? null : rangeControls}
 				</section>
 			) : null}
-			<div className="cost-page-scroll" tabIndex={-1}>
+			{/* Focusable only for the demo, which focuses it on entry so the
+			    keyboard scrolls it; in the app a click must not focus it. */}
+			<div className="cost-page-scroll" tabIndex={demo ? -1 : undefined}>
 				<div className="cost-page-content">
 					{isError ? (
 						<div className="cost-error" role="alert">
@@ -283,6 +294,8 @@ export function CostDashboardView({
 										} as CSSProperties)
 									: undefined
 							}
+							data-scope={scope}
+							data-layout={breakdownLayout}
 							data-signals={metric === "signals"}
 							data-pull-requests={isPullRequestMetric}
 							data-ci-runs={metric === "ciRuns"}

@@ -150,13 +150,14 @@ const LONG_STEP_SHARE = 0.1;
 
 /**
  * A large turn's outline: steps that stand out stay as rows — failures,
- * subagents, the final message, the few steps far longer than the rest — and
- * each run of quiet steps between them folds into one row. Small turns pass
- * through unfolded.
+ * subagents, the final message, the few steps far longer than the rest, and
+ * any the caller keeps out — and each run of quiet steps between them folds
+ * into one row. Small turns pass through unfolded.
  */
 export function getReaderStretches(
 	steps: readonly SessionReaderStep[],
 	turnMs: number,
+	keepOut: ReadonlySet<string> = new Set(),
 ): SessionReaderStretch[] {
 	if (steps.length <= LARGE_TURN_STEPS) {
 		return steps.map((step) => ({ kind: "step", step }));
@@ -181,6 +182,7 @@ export function getReaderStretches(
 		if (step.kind === "message") finalMessageId = step.id;
 	}
 	const standsOut = (step: SessionReaderStep) =>
+		keepOut.has(step.id) ||
 		step.isError ||
 		step.kind === "agent" ||
 		step.id === finalMessageId ||

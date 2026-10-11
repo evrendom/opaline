@@ -279,6 +279,7 @@ function stepPayloads(step: SessionReaderStep): Payload[] {
 
 export function SessionReaderStepDetail({
 	fill = false,
+	fit = false,
 	run,
 	step,
 	waterfall,
@@ -286,6 +287,9 @@ export function SessionReaderStepDetail({
 	/** Always reach the bottom of the view, wherever the panel sits — not
 	 * only beside a run page's waterfall. */
 	fill?: boolean;
+	/** Fill the box it's placed in, scrolling inside, instead of sticking
+	 * beside a waterfall at the view's height. */
+	fit?: boolean;
 	/** The whole run's view: its summary, what it touched, and the step-kind
 	 * filter its list drives. */
 	run: Omit<Parameters<typeof RunOverview>[0], "waterfall">;
@@ -310,14 +314,23 @@ export function SessionReaderStepDetail({
 	const isTool = step?.kind === "agent" || step?.kind === "tool";
 
 	return (
-		<aside className="sticky top-4 w-full shrink-0 self-start @3xl/steps:w-[var(--inspector-width,380px)]">
+		<aside
+			className={
+				fit
+					? "flex min-h-0 w-full flex-1 flex-col"
+					: "sticky top-4 w-full shrink-0 self-start @3xl/steps:w-[var(--inspector-width,380px)]"
+			}
+		>
 			{/* Stuck, it always reaches down to the reader's bottom edge (its
 			    16px top offset mirrored below) and scrolls inside when its
 			    content runs longer. Below the waterfall it only grows to fit. */}
 			<div
 				className={cn(
-					"flex max-h-[calc(100cqh-2rem)] flex-col overflow-hidden @3xl/steps:h-[calc(100cqh-2rem)] rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl dark:bg-muted-foreground/10",
-					fill && "h-[calc(100cqh-2rem)]",
+					"flex flex-col overflow-hidden rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl dark:bg-muted-foreground/10",
+					fit
+						? "min-h-0 flex-1"
+						: "max-h-[calc(100cqh-2rem)] @3xl/steps:h-[calc(100cqh-2rem)]",
+					fill && !fit && "h-[calc(100cqh-2rem)]",
 				)}
 			>
 				<div className="flex shrink-0 items-center gap-2 px-5 pt-5 pb-1">
@@ -423,3 +436,9 @@ export function SessionReaderStepDetail({
 		</aside>
 	);
 }
+
+/** What a step detail panel shows, for one held apart from its waterfall. */
+export type SessionReaderStepSelection = Pick<
+	Parameters<typeof SessionReaderStepDetail>[0],
+	"run" | "step" | "waterfall"
+>;

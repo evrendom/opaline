@@ -24,6 +24,36 @@ export function SessionsOverviewSortMenu({
 	onSortChange: (sort: SessionSortState) => void;
 	sort: SessionSortState;
 }) {
+	return (
+		<ToolbarSortMenu
+			noun="sessions"
+			options={SESSION_OVERVIEW_SORT_OPTIONS}
+			activeSortLabel={activeSortLabel}
+			getInitialDirection={getInitialSortDirection}
+			onSortChange={onSortChange}
+			sort={sort}
+		/>
+	);
+}
+
+/** The toolbar's "Sorted by" menu: a key, then a direction. Picking a key
+ * starts it at `getInitialDirection`. */
+export function ToolbarSortMenu<K extends string>({
+	noun,
+	options,
+	activeSortLabel,
+	getInitialDirection,
+	onSortChange,
+	sort,
+}: {
+	/** What the list holds, for the menu's accessible names ("sessions"). */
+	noun: string;
+	options: readonly { key: K; label: string }[];
+	activeSortLabel: string;
+	getInitialDirection: (key: K) => "asc" | "desc";
+	onSortChange: (sort: { key: K; direction: "asc" | "desc" }) => void;
+	sort: { key: K; direction: "asc" | "desc" };
+}) {
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const restoreKeyboardFocusRef = useRef(false);
 	return (
@@ -45,7 +75,7 @@ export function SessionsOverviewSortMenu({
 		>
 			<Menu.Trigger
 				ref={triggerRef}
-				aria-label={`Sort sessions, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
+				aria-label={`Sort ${noun}, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
 				className={SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME}
 			>
 				<IconSortDescending
@@ -73,7 +103,7 @@ export function SessionsOverviewSortMenu({
 			<Menu.Portal>
 				<Menu.Positioner align="start" sideOffset={6} className="z-50">
 					<Menu.Popup
-						aria-label="Sort sessions"
+						aria-label={`Sort ${noun}`}
 						data-fluid-menu-root=""
 						className="session-menu-surface session-menu-sort"
 					>
@@ -82,18 +112,16 @@ export function SessionsOverviewSortMenu({
 							aria-label="Sort by"
 							value={sort.key}
 							onValueChange={(value: unknown) => {
-								const option = SESSION_OVERVIEW_SORT_OPTIONS.find(
-									(item) => item.key === value,
-								);
+								const option = options.find((item) => item.key === value);
 								if (option) {
 									onSortChange({
 										key: option.key,
-										direction: getInitialSortDirection(option.key),
+										direction: getInitialDirection(option.key),
 									});
 								}
 							}}
 						>
-							{SESSION_OVERVIEW_SORT_OPTIONS.map((option) => (
+							{options.map((option) => (
 								<Menu.RadioItem
 									key={option.key}
 									value={option.key}

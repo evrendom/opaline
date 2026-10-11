@@ -1,7 +1,10 @@
-import { IconUser } from "@tabler/icons-react";
+import { IconChevronRight, IconUser } from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { ModelTraceIcon } from "@/components/conversation/conversation-trace-icons";
-import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
+import {
+	getModelBadgeTone,
+	getModelBrandIconClassName,
+} from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { cn } from "@/lib/utils";
 import { SessionMemberProfilePreview } from "./session-member-profile-preview";
@@ -45,6 +48,7 @@ export function SessionModelMark({
 	progress,
 	showMember = true,
 	userLabel,
+	disclosure,
 }: {
 	avatarUrl: string | undefined;
 	model: string;
@@ -52,6 +56,10 @@ export function SessionModelMark({
 	progress?: { label: string; value: number; maximumValue: number };
 	showMember?: boolean;
 	userLabel: string;
+	/** On a session row that folds what's beneath it: the model glyph gives
+	 * way to a chevron while the row is hovered or keyboard-focused, and the
+	 * chevron stays, turned down, while it's open. */
+	disclosure?: { open: boolean };
 }) {
 	const tone = getModelBadgeTone(model);
 	const magnitude = progress
@@ -132,15 +140,41 @@ export function SessionModelMark({
 			</span>
 			<span
 				aria-hidden="true"
-				className={MODEL_ICON_SHELL_CLASS_NAME}
+				className={cn(
+					MODEL_ICON_SHELL_CLASS_NAME,
+					disclosure &&
+						"grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-150 *:ease-out",
+				)}
 				data-session-detail-model-mark
 			>
-				<ModelTraceIcon
-					className={MODEL_ICON_CLASS_NAME}
-					expandable={false}
-					expanded={false}
-					model={model}
-				/>
+				<span
+					className={cn(
+						"flex",
+						disclosure &&
+							(disclosure.open
+								? "scale-50 opacity-0"
+								: "group-hover/session:scale-50 group-hover/session:opacity-0 group-focus-visible/session:scale-50 group-focus-visible/session:opacity-0"),
+					)}
+				>
+					<ModelTraceIcon
+						className={MODEL_ICON_CLASS_NAME}
+						expandable={false}
+						expanded={false}
+						model={model}
+					/>
+				</span>
+				{disclosure ? (
+					<IconChevronRight
+						className={cn(
+							// The colour of the model glyph it stands in for.
+							"size-3.5",
+							getModelBrandIconClassName(model),
+							disclosure.open
+								? "rotate-90"
+								: "scale-50 opacity-0 group-hover/session:scale-100 group-hover/session:opacity-100 group-focus-visible/session:scale-100 group-focus-visible/session:opacity-100",
+						)}
+					/>
+				) : null}
 			</span>
 			{showMember &&
 				(memberProfile ? (

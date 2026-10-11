@@ -169,3 +169,51 @@ describe("subagents in the turn waterfall", () => {
 		expect(getLaunchedSubagentKey(spawn("not json"))).toBeNull();
 	});
 });
+
+describe("skills in the turn waterfall", () => {
+	test("a skill call is named after the skill it loaded", () => {
+		const ts = (second: number) =>
+			new Date(Date.UTC(2026, 9, 10, 9, 0, second)).toISOString();
+		const waterfall = getReaderWaterfall(
+			{
+				userItems: [],
+				responseItems: [
+					{
+						events: [
+							{
+								id: "skill-0",
+								input: { skill: "testing-bun" },
+								kind: "tool",
+								provider: "claude",
+								result: { content: "Loaded.", isError: false },
+								timestamp: ts(1),
+								toolName: "Skill",
+							},
+							{
+								id: "read-0",
+								input: { file_path: "/repo/a.ts" },
+								kind: "tool",
+								provider: "claude",
+								result: { content: "…", isError: false },
+								timestamp: ts(2),
+								toolName: "Read",
+							},
+						],
+						executionMode: "default",
+						id: "root",
+						kind: "agent",
+						timestamp: ts(1),
+					},
+				],
+			},
+			{ endedAt: ts(10), startedAt: ts(0), usageCalls: [] },
+			null,
+		);
+		expect(
+			waterfall?.steps.map((step) => [step.name, step.skill ?? null]),
+		).toEqual([
+			["testing-bun", "testing-bun"],
+			["Read", null],
+		]);
+	});
+});

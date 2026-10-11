@@ -18,8 +18,8 @@ import {
 } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
-import { getSkillIcon } from "@/components/conversation/conversation-skill-icon";
 import { CONVERSATION_TRACE_TAG_CLASS_NAME } from "@/components/conversation/conversation-trace-tag";
+import { SkillMark } from "@/components/skill-mark";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
@@ -58,23 +58,6 @@ const USAGE_CARD_CLASS_NAME =
 	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-card text-left text-(--session-overview-text) shadow-(--custom-shadow) squircle:rounded-3xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME =
 	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
-const SKILL_CARD_MARKS: Record<string, { emoji: string; color: string }> = {
-	wrench: { emoji: "🔧", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
-	drill: { emoji: "🛠️", color: "bg-[#dce7f5] dark:bg-[#1f2a3b]" },
-	paintbrush: { emoji: "🎨", color: "bg-[#ede0f2] dark:bg-[#2f2238]" },
-	compass: { emoji: "🧭", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
-	ruler: { emoji: "📏", color: "bg-[#dceade] dark:bg-[#1f3324]" },
-	scissors: { emoji: "✂️", color: "bg-[#f4dddd] dark:bg-[#3a2222]" },
-	"tape-measure": { emoji: "📐", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
-	flashlight: { emoji: "🔦", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
-	magnet: { emoji: "🧲", color: "bg-[#f4dddd] dark:bg-[#3a2222]" },
-	microscope: { emoji: "🔬", color: "bg-[#dce7f5] dark:bg-[#1f2a3b]" },
-	telescope: { emoji: "🔭", color: "bg-[#ede0f2] dark:bg-[#2f2238]" },
-	"drafting-tools": { emoji: "✏️", color: "bg-[#f4e9c9] dark:bg-[#362f1a]" },
-	toolbox: { emoji: "🧰", color: "bg-[#f5dfcd] dark:bg-[#3b2a1e]" },
-	tools: { emoji: "⚙️", color: "bg-[#dceade] dark:bg-[#1f3324]" },
-	experiment: { emoji: "🧪", color: "bg-[#dceade] dark:bg-[#1f3324]" },
-};
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
 
@@ -138,7 +121,7 @@ export function UsageCollectionView({
 	);
 }
 
-function UsageCollectionHeader({
+export function UsageCollectionHeader({
 	search,
 	onSearchChange,
 	kind,
@@ -377,7 +360,7 @@ const UsageCard = memo(function UsageCard({
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<header className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">
-					<UsageCardMark skill={skill.name} emoji={skill.emoji} />
+					<SkillMark skill={skill.name} emoji={skill.emoji} />
 					<h2
 						className="line-clamp-2 min-w-0 flex-1 font-sans text-base font-medium text-balance wrap-anywhere sm:text-sm"
 						title={skill.name}
@@ -398,36 +381,6 @@ const UsageCard = memo(function UsageCard({
 		</article>
 	);
 });
-
-function UsageCardMark({
-	skill,
-	emoji,
-}: {
-	skill: string;
-	emoji: string | undefined;
-}) {
-	const mark = SKILL_CARD_MARKS[getSkillIcon(skill).name] ?? {
-		emoji: "✨",
-		color: "bg-[#ede0f2] dark:bg-[#2f2238]",
-	};
-	return (
-		<div
-			aria-hidden="true"
-			className="relative flex size-9 shrink-0 items-center justify-center text-xl"
-			data-skill-card-mark
-		>
-			<span className="absolute inset-0 filter-[drop-shadow(0_0_0.5px_#00000024)_drop-shadow(0_2px_3px_#00000014)] dark:filter-none">
-				<span
-					className={cn(
-						"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]",
-						mark.color,
-					)}
-				/>
-			</span>
-			<span className="relative">{emoji ?? mark.emoji}</span>
-		</div>
-	);
-}
 
 function UsageSummary({
 	avatarMap,
@@ -608,7 +561,7 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 	);
 }
 
-function UsageStateMessage({
+export function UsageStateMessage({
 	action,
 	description,
 	icon,

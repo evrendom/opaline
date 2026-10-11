@@ -7,7 +7,7 @@ import type { Icon } from "@tabler/icons-react";
 import {
 	IconArrowsDiagonal,
 	IconCheck,
-	IconDots,
+	IconDownload,
 	IconGitBranch,
 	IconGitFork,
 	IconMessage2,
@@ -20,12 +20,6 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@/app/ui/dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/app/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
@@ -75,7 +69,6 @@ export function CostBreakdown({
 }: Props) {
 	const [expanded, setExpanded] = useState(false);
 	const [search, setSearch] = useState("");
-	const [menuOpen, setMenuOpen] = useState(false);
 	const label = COST_LABELS[dimension];
 	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
 	const filtered = entries.filter((entry) =>
@@ -136,18 +129,22 @@ export function CostBreakdown({
 							</button>
 						</p>
 					) : entries.length ? (
-						entries.map((entry) => (
-							<BreakdownRow
-								key={entry.id}
-								dimension={dimension}
-								metric={metric}
-								entry={entry}
-								maximum={maximum}
-								color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
-								selected={selected.includes(entry.id)}
-								onToggle={onToggle}
-							/>
-						))
+						// Inside the scroll area, so the highlight scrolls with the rows.
+						<div data-fluid-menu-root="">
+							<FluidMenuHover items=".cost-breakdown-row" />
+							{entries.map((entry) => (
+								<BreakdownRow
+									key={entry.id}
+									dimension={dimension}
+									metric={metric}
+									entry={entry}
+									maximum={maximum}
+									color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
+									selected={selected.includes(entry.id)}
+									onToggle={onToggle}
+								/>
+							))}
+						</div>
 					) : (
 						<p className="cost-breakdown-empty">
 							{unavailable
@@ -159,7 +156,7 @@ export function CostBreakdown({
 						</p>
 					)}
 				</ScrollFade>
-				<div className="cost-tools" data-open={menuOpen || split}>
+				<div className="cost-tools" data-open={split}>
 					<div className="cost-tools-inner" data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-tool-button" />
 						<ToolButton
@@ -178,40 +175,14 @@ export function CostBreakdown({
 							pressed={split}
 							disabled={pending || unavailable}
 						/>
-						<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-							<DropdownMenuTrigger
-								render={
-									<button
-										type="button"
-										className="cost-tool-button"
-										aria-label={`More ${label.toLowerCase()} tools`}
-									/>
-								}
-							>
-								<IconDots size={16} />
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								side="top"
-								align="center"
-								sideOffset={10}
-								className="w-max"
-							>
-								<DropdownMenuItem
-									onClick={() =>
-										downloadBreakdown(dimension, entries, metric, valueLabel)
-									}
-									disabled={pending || entries.length === 0}
-								>
-									Download breakdown
-								</DropdownMenuItem>
-								<DropdownMenuItem
-									onClick={onClear}
-									disabled={selected.length === 0}
-								>
-									Clear {label.toLowerCase()} filter
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
+						<ToolButton
+							label={`Download ${label.toLowerCase()} as CSV`}
+							icon={IconDownload}
+							onClick={() =>
+								downloadBreakdown(dimension, entries, metric, valueLabel)
+							}
+							disabled={pending || entries.length === 0}
+						/>
 					</div>
 				</div>
 			</section>

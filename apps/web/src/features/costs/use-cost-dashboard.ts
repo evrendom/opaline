@@ -6,6 +6,7 @@ import type {
 	CostDimension,
 	DashboardMetric,
 	DashboardSignal,
+	SessionAnalytics,
 } from "@rudel/api-routes";
 import {
 	AGENT_RUN_DURATIONS,
@@ -15,6 +16,7 @@ import {
 	PULL_REQUEST_CI,
 } from "@rudel/api-routes";
 import {
+	keepPreviousData,
 	type Query,
 	type QueryClient,
 	useQuery,
@@ -155,6 +157,154 @@ export function useAdminCostDashboard(): CostDashboardController {
 	});
 	const tabs = useServerDashboardTabs(state, query.data, "admin");
 	return { ...state, ...tabs, query };
+}
+
+// A repository's own dashboard has no repository facet: the repository is
+// the scope.
+const REPOSITORY_COST_DIMENSIONS: CostDimension[] = ["members", "models"];
+
+/**
+ * The workspace dashboard scoped to one repository. Session metrics filter by
+ * the dashboard's repository ids for it; pull request and CI metrics by its
+ * GitHub repository ids, and stay off when it has none. Either list is
+ * undefined while it resolves.
+ */
+export function useRepositoryCostDashboard(
+	repositories: readonly string[] | undefined,
+	githubRepositories: readonly string[] | undefined,
+): CostDashboardController {
+	const { state: workspace } = useOrganization();
+	const [, setParams] = useSearchParams();
+	const state = useCostDashboardState(REPOSITORY_COST_DIMENSIONS);
+	const hasGitHub = (githubRepositories?.length ?? 0) > 0;
+	const scoped = (input: CostDashboardInput): CostDashboardInput => {
+		const github = usesGitHubRepositories(input.requestedMetric ?? null);
+		const ids = github && hasGitHub ? githubRepositories : repositories;
+		return {
+			...input,
+			requestedMetric: github && !hasGitHub ? "cost" : input.requestedMetric,
+			repositories: [...(ids ?? [])].slice(0, 100).sort(),
+			splitBy: input.splitBy === "repositories" ? "none" : input.splitBy,
+		};
+	};
+	const input = scoped(state.input);
+	const offGitHub = usesGitHubRepositories(state.metric) && !hasGitHub;
+	const metric: DashboardMetric = offGitHub ? "cost" : state.metric;
+	// Only ever touches `metric`: the page's own `repo` parameter names the
+	// repository, so the shared setter's repository reset must not run.
+	const setMetric = useCallback(
+		(value: DashboardMetric, options?: { replace?: boolean }) => {
+			setParams((current) => {
+				const next = new URLSearchParams(current);
+				if (value === "cost") next.delete("metric");
+				else next.set("metric", value);
+				return next;
+			}, options);
+		},
+		[setParams],
+	);
+	const query = useAnalyticsQuery({
+		...orpc.analytics.overview.costs.queryOptions({ input }),
+		staleTime: 60_000,
+		placeholderData: keepPreviousData,
+		refetchOnWindowFocus: false,
+		refetchInterval: (query) => indexingRefetchInterval(query, metric),
+		enabled: input.repositories.length > 0,
+	});
+	const tabs = useServerDashboardTabs(
+		{ metric, setMetric },
+		query.data,
+		`${workspace.activeOrg?.id}:repository`,
+	);
+	return {
+		...state,
+		...tabs,
+		metrics: tabs.metrics.filter(
+			(value) => hasGitHub || !usesGitHubRepositories(value),
+		),
+		dimensions: (offGitHub
+			? REPOSITORY_COST_DIMENSIONS
+			: state.dimensions
+		).filter((dimension) => dimension !== "repositories"),
+		input,
+		inputFor: (value: RequestedMetric) => scoped(state.inputFor(value)),
+		metric,
+		setMetric,
+		query,
+	};
+}
+
+// A dashboard computed from session rows offers the session metrics.
+const SESSION_ROW_METRICS = ["cost", "sessions", "signals"] as const;
+const SESSION_ROW_COST_DIMENSIONS: CostDimension[] = ["members", "models"];
+
+/**
+ * The workspace dashboard over a set of session rows the API can't scope its
+ * dashboard to (one skill in one repo, say): the same URL state and view,
+ * with the response computed in the browser by `build` from the rows
+ * `fetchRows` returns for the date range.
+ */
+export function useSessionRowsCostDashboard({
+	key,
+	fetchRows,
+	build,
+}: {
+	/** Identifies the rows apart from the date range; the query key is this
+	 * plus the range's start and end dates. */
+	key: readonly unknown[];
+	fetchRows: (
+		range: { startDate: string; endDate: string },
+		signal: AbortSignal,
+	) => Promise<SessionAnalytics[]>;
+	build: (
+		rows: readonly SessionAnalytics[],
+		input: CostDashboardInput,
+	) => CostDashboard;
+}): CostDashboardController {
+	const [, setParams] = useSearchParams();
+	const state = useCostDashboardState(SESSION_ROW_COST_DIMENSIONS);
+	const offered = SESSION_ROW_METRICS.some((value) => value === state.metric);
+	const metric: DashboardMetric = offered ? state.metric : "cost";
+	const input: CostDashboardInput = offered
+		? state.input
+		: state.inputFor("cost");
+	// Only ever touches `metric`: the page's own parameters must survive.
+	const setMetric = useCallback(
+		(value: DashboardMetric, options?: { replace?: boolean }) => {
+			setParams((current) => {
+				const next = new URLSearchParams(current);
+				if (value === "cost") next.delete("metric");
+				else next.set("metric", value);
+				return next;
+			}, options);
+		},
+		[setParams],
+	);
+	const inputKey = JSON.stringify(input);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: input is keyed by its JSON
+	const select = useCallback(
+		(rows: SessionAnalytics[]) => build(rows, input),
+		[build, inputKey],
+	);
+	const { startDate, endDate } = input;
+	const query = useAnalyticsQuery({
+		queryKey: [...key, startDate, endDate],
+		queryFn: ({ signal }) => fetchRows({ startDate, endDate }, signal),
+		select,
+		placeholderData: keepPreviousData,
+		staleTime: 60_000,
+	});
+	return {
+		...state,
+		metrics: listDashboardTabs(SESSION_ROW_METRICS),
+		metricsPending: false,
+		dimensions: offered ? state.dimensions : SESSION_ROW_COST_DIMENSIONS,
+		input,
+		inputFor: state.inputFor,
+		metric,
+		setMetric,
+		query,
+	};
 }
 
 /** Every cached dashboard answer for one workspace, whatever its request. */

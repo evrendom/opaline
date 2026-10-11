@@ -34,7 +34,7 @@ export function SessionsOverviewHeader({
 	return (
 		<div
 			className={cn(
-				"sticky top-0 left-0 z-30 grid h-12 min-w-0 shrink-0 overflow-hidden border-b border-(--session-overview-border) bg-(--session-overview-surface)",
+				"sticky top-0 left-0 z-30 grid h-12 min-w-0 shrink-0 overflow-hidden bg-(--session-overview-surface)",
 				showSkillsColumn
 					? SESSION_OVERVIEW_GRID_CLASS_NAME
 					: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,

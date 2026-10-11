@@ -1,5 +1,8 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import type { Ref } from "react";
+import { type Ref, useState } from "react";
+import { SearchInput } from "@/components/dashboard/data-table";
+import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
+import { useSessionIdSearch } from "@/features/sessions/use-session-id-search";
 import type { SessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { cn } from "@/lib/utils";
 import { SessionsOverviewTable } from "./sessions-overview-table";
@@ -34,6 +37,18 @@ export function SessionsListSurface({
 		totalSessionCount,
 		pagination,
 	} = data;
+	const [idSearch, setIdSearch] = useState("");
+	const search = useSessionIdSearch({
+		search: idSearch,
+		input: data.listInput,
+		fallback: orderedSessions,
+	});
+	const sessions = search.active
+		? orderSessionsForDisplay({
+				sessions: search.sessions,
+				useRolling24Hours: data.useRolling24Hours,
+			})
+		: orderedSessions;
 
 	return (
 		<div
@@ -90,12 +105,27 @@ export function SessionsListSurface({
 							getSessionLinkState={getSessionLinkState}
 							isLoading={isSnapshotSessionsPending}
 							onSessionClick={onSessionClick}
-							sessionCountLabel={totalSessionCount}
-							sessions={orderedSessions}
+							sessionCountLabel={
+								search.active ? (sessions?.length ?? 0) : totalSessionCount
+							}
+							sessions={sessions}
+							toolbarStart={
+								<SearchInput
+									value={idSearch}
+									onChange={setIdSearch}
+									placeholder="Search by session ID…"
+									label="Search sessions by ID"
+								/>
+							}
 							scrollContainerRef={scrollContainerRef}
 							sessionDetailDisabledNote={undefined}
 							totalSessionCount={totalSessionCount}
-							pagination={pagination}
+							// A search reads every page itself.
+							pagination={
+								search.active
+									? { ...pagination, hasNextPage: false }
+									: pagination
+							}
 							filterCatalog={data.filterCatalog}
 							filterCatalogPending={data.filterCatalogPending}
 							filterCatalogError={data.filterCatalogError}

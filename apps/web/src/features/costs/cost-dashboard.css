@@ -494,6 +494,12 @@
 	> .cost-breakdown[data-dimension="phrases"] {
 	grid-column: span 2;
 }
+/* A repository's dashboard has no Repositories card, so Models takes its
+   place beside Members. */
+.cost-breakdowns[data-scope="repository"]
+> .cost-breakdown[data-dimension="models"] {
+	grid-column: span 2;
+}
 .cost-breakdown {
 	position: relative;
 	min-width: 0;
@@ -572,12 +578,21 @@
 	border-top: 1px solid var(--cost-divider);
 	transition: background-color 150ms ease;
 }
-.cost-breakdown-list .cost-breakdown-row:first-child {
+/* Of-type, not child: the fluid hover's layer sits among the rows. */
+.cost-breakdown-list .cost-breakdown-row:first-of-type {
 	border-top-color: transparent;
 }
 /* A hovered row hides the hairlines around it, so the highlight reads as one
-   block (Breakdown rows). */
-.cost-breakdown-list .cost-breakdown-row:hover {
+   block (Breakdown rows). The fluid hover paints it, gliding between rows;
+   a row it doesn't track still fills itself. */
+.cost-breakdown-list .cost-breakdown-row:not([data-fluid-menu-item]):hover {
+	background: var(--cost-row-hover);
+}
+/* Above the page's fill rule, in the row's own hover colour. */
+.cost-breakdown .cost-breakdown-list
+	[data-fluid-menu-root]:not(.cost-metrics)
+	> .fluid-menu-hover-layer
+	.fluid-menu-hover-fill {
 	background: var(--cost-row-hover);
 }
 .cost-breakdown-list .cost-breakdown-row:hover,
@@ -585,7 +600,7 @@
 	border-top-color: transparent;
 }
 /* A list that scrolls leaves room for its last row to clear the fade. */
-.cost-breakdown-list[data-many] .cost-breakdown-row:last-child {
+.cost-breakdown-list[data-many] .cost-breakdown-row:last-of-type {
 	padding-bottom: 36px;
 }
 .cost-breakdown-row {
@@ -1085,7 +1100,9 @@
 }
 @container (max-width: 850px) {
 	.cost-breakdowns[data-signals="true"]
-		> .cost-breakdown[data-dimension="phrases"] {
+		> .cost-breakdown[data-dimension="phrases"],
+	.cost-breakdowns[data-scope="repository"]
+		> .cost-breakdown[data-dimension="models"] {
 		grid-column: auto;
 	}
 	.cost-breakdowns,
@@ -1237,7 +1254,7 @@
 	}
 }
 
-.cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-child {
+.cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-of-type {
 	border-top: 1px solid var(--cost-border);
 	margin-top: 0.5rem;
 }
@@ -1265,4 +1282,18 @@
 }
 .cost-breakdowns[data-sized] .cost-breakdown-list {
 	height: 100%;
+}
+
+/* Split rows for a narrow pane: two breakdown cards side by side (Members
+   and Models share one row), so the pane spends its height on the rows, not
+   the cards. Two at most; four (Language's) would truncate every name, so
+   they take two rows. Placed after the grid rules and the narrow-width stack
+   so it wins over their spans and column counts. */
+.cost-breakdowns[data-layout="row"],
+.cost-breakdowns[data-layout="row"][data-pull-requests="true"],
+.cost-breakdowns[data-layout="row"][data-ci-runs="true"] {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cost-breakdowns[data-layout="row"] > .cost-breakdown[data-dimension] {
+	grid-column: auto;
 }

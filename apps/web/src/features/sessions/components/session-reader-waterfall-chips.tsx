@@ -7,6 +7,7 @@ import {
 import type { CSSProperties, ReactNode } from "react";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "@/components/conversation/conversation-trace-tool-icons";
+import { getSkillMarkLook } from "@/components/skill-mark-look";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import {
 	OpalineShape,
@@ -51,11 +52,12 @@ function agentColor(name: string): string {
 	return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length] ?? "#ef4444";
 }
 
-/** The model's brand color, for its step chip and bar. */
+/** The model's brand color, for its step chip and bar. Codex's is black on
+ * light and white on dark: the foreground, so it turns with the theme. */
 function modelAccent(model: string | null): string | null {
 	const icon = model ? getModelBadgeTone(model).icon : null;
 	if (icon === "claude") return "#CC7D5E";
-	if (icon === "codex") return "#10A37F";
+	if (icon === "codex") return "var(--foreground)";
 	return null;
 }
 
@@ -154,27 +156,35 @@ export function OpalChip({
 
 const SLATE = "var(--color-slate-500)";
 
-function ModelChip({
+/** The model's chip: its icon in its brand color on the Opaline pebble. */
+export function ModelChip({
 	chip,
 	glyph,
 	model,
+	open,
 }: {
 	chip?: string;
 	glyph: string;
 	model: string | null;
+	/** On a row that folds what's beneath it: see OpalChip. */
+	open?: boolean;
 }) {
 	const ModelIcon = getModelIconComponent(model ?? undefined);
 	const color = modelAccent(model);
 	return (
 		<OpalChip
+			open={open}
 			tint={color ?? SLATE}
 			title={model ?? "model"}
-			className={cn(!color && "text-violet-600 dark:text-violet-400", chip)}
+			// On the chip, so the chevron that stands in for the icon wears its
+			// color too.
+			className={cn(
+				color ? "text-(--opal-tint)" : "text-violet-600 dark:text-violet-400",
+				chip,
+			)}
 		>
 			{ModelIcon ? (
-				<span style={color ? { color } : undefined} className="flex">
-					<ModelIcon className={glyph} />
-				</span>
+				<ModelIcon className={glyph} />
 			) : (
 				<IconSparkles aria-hidden="true" className={glyph} />
 			)}
@@ -195,10 +205,32 @@ export function StepIconChip({
 	open?: boolean;
 	/** `sm` for dense lists like the turn rail. */
 	size?: "md" | "sm";
-	step: Pick<SessionReaderStep, "icon" | "kind" | "name">;
+	step: Pick<SessionReaderStep, "icon" | "kind" | "name" | "skill">;
 }) {
 	const chip = size === "sm" ? "size-4" : undefined;
 	const glyph = size === "sm" ? "size-2.5" : "size-3";
+	// A skill loaded wears the skill's own mark, as on the Skills page.
+	if (step.skill) {
+		const look = getSkillMarkLook(step.skill);
+		return (
+			<OpalChip
+				open={open}
+				tint={look.tint}
+				title={step.skill}
+				className={cn("text-(--opal-tint)", chip)}
+			>
+				<span
+					aria-hidden="true"
+					className={cn(
+						"leading-none",
+						size === "sm" ? "text-[8px]" : "text-[10px]",
+					)}
+				>
+					{look.emoji}
+				</span>
+			</OpalChip>
+		);
+	}
 	if (step.kind === "message") {
 		return <ModelChip chip={chip} glyph={glyph} model={model} />;
 	}

@@ -1,6 +1,7 @@
 import {
 	type Icon,
 	IconChevronDown,
+	IconChevronLeft,
 	IconChevronRight,
 	IconChevronUp,
 	IconClock,
@@ -138,10 +139,13 @@ function SessionRecordNavigation({
 	position: number | undefined;
 	totalSessions: number;
 }) {
+	const scope = navigation.scopeLabel ?? "All Sessions";
 	const positionTitle =
 		position === undefined || totalSessions === 0
-			? "Session in All Sessions"
-			: `${position} of ${totalSessions} in All Sessions`;
+			? `Session in ${scope}`
+			: `${position} of ${totalSessions} in ${scope}`;
+	const PreviousIcon = navigation.horizontal ? IconChevronLeft : IconChevronUp;
+	const NextIcon = navigation.horizontal ? IconChevronRight : IconChevronDown;
 	const positionLabel =
 		position === undefined || totalSessions === 0
 			? "— / —"
@@ -162,13 +166,13 @@ function SessionRecordNavigation({
 			<span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
 			<SessionHeaderNavigationButton
 				disabled={!navigation.hasPreviousSession}
-				icon={<IconChevronUp aria-hidden="true" className="size-3.5" />}
+				icon={<PreviousIcon aria-hidden="true" className="size-3.5" />}
 				label="Previous session"
 				onClick={navigation.onPreviousSession}
 			/>
 			<SessionHeaderNavigationButton
 				disabled={!navigation.hasNextSession}
-				icon={<IconChevronDown aria-hidden="true" className="size-3.5" />}
+				icon={<NextIcon aria-hidden="true" className="size-3.5" />}
 				label="Next session"
 				onClick={navigation.onNextSession}
 			/>

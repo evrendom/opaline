@@ -116,6 +116,10 @@ const PLUGIN_LABELS: Record<
 		title: "Repositories: one repository",
 		loads: "one repository",
 	},
+	"analytics.repositories.overview": {
+		title: "Repositories: overview",
+		loads: "one repository's totals, daily trend and split by model and member",
+	},
 	"analytics.developers.list": {
 		title: "Team: members",
 		loads: "per-member usage, to see where each person's setup needs help",

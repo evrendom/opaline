@@ -12,7 +12,8 @@ export function TeamInviteLinkSurface({
 	layout = "card",
 	organizationId,
 }: {
-	layout?: "card" | "row" | "settings";
+	/** `toolbar`: inline at a toolbar's end, in its pill buttons. */
+	layout?: "card" | "row" | "settings" | "toolbar";
 	organizationId: string;
 }) {
 	const [isInviteLinkPending, setIsInviteLinkPending] = useState(false);
@@ -126,6 +127,54 @@ export function TeamInviteLinkSurface({
 						{teamInviteLink ? "Revoke link" : "Revoke existing links"}
 					</Button>
 				</div>
+			</div>
+		);
+	}
+
+	if (layout === "toolbar") {
+		return (
+			<div className="flex min-w-0 items-center gap-2">
+				{teamInviteLink ? (
+					// The link in a pill like the toolbar's search, copied from inside.
+					<div className="flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-card pr-1 pl-3 shadow-(--custom-outline-shadow)">
+						<IconLink
+							aria-hidden="true"
+							className="size-3.5 shrink-0 stroke-muted-foreground"
+						/>
+						<p
+							className="max-w-72 min-w-0 truncate font-mono text-xs text-foreground"
+							title={teamInviteLink}
+						>
+							{teamInviteLink}
+						</p>
+						<button
+							type="button"
+							aria-label={copied ? "Copied team link" : "Copy team link"}
+							className="h-6 shrink-0 cursor-pointer rounded-full bg-foreground px-2.5 text-xs font-medium text-background disabled:opacity-50"
+							disabled={isInviteLinkPending}
+							onClick={() => void handleCopyTeamLink()}
+						>
+							{copied ? "Copied" : "Copy"}
+						</button>
+					</div>
+				) : null}
+				<button
+					type="button"
+					className="toolbar-button"
+					disabled={isInviteLinkPending}
+					onClick={() => void handleCreateTeamInviteLink()}
+				>
+					{teamInviteLink ? null : <IconLink aria-hidden="true" />}
+					{teamInviteLink ? "Replace" : "Create invite link"}
+				</button>
+				<button
+					type="button"
+					className="toolbar-button"
+					disabled={isInviteLinkPending}
+					onClick={() => void handleRevokeTeamInviteLink()}
+				>
+					{teamInviteLink ? "Revoke" : "Revoke existing links"}
+				</button>
 			</div>
 		);
 	}

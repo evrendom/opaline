@@ -11,12 +11,14 @@ import { getToolPresentation } from "@/components/conversation/conversation-tool
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { CopyButton } from "@/features/shell/components/copy-button";
 import { RichSkillDocument } from "@/features/skills/components/rich-skill-document";
 import {
 	getDistinctSkillVersions,
 	getSkillAllowedTools,
 } from "@/features/skills/skill-document-content";
 import { formatFullDateLabel } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import "@/features/sessions/components/session-menu.css";
 
 export function HistoricalSkillDetailContent({
@@ -25,16 +27,21 @@ export function HistoricalSkillDetailContent({
 	isPending,
 	previewContent,
 	onRetry,
+	variant = "pane",
 }: {
 	detail: HistoricalSkillDetail | undefined;
 	isError: boolean;
 	isPending: boolean;
 	previewContent: string | null;
 	onRetry: () => void;
+	/** `pane` fills a split pane under a ruled toolbar; `card` sits in a
+	 * floating card, as the session reader's inspector does. */
+	variant?: "pane" | "card";
 }) {
 	const [selectedVersionKey, setSelectedVersionKey] = useState<string | null>(
 		null,
 	);
+	const [raw, setRaw] = useState(false);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const versions = useMemo(
 		() => getDistinctSkillVersions(detail?.versions ?? []),
@@ -50,7 +57,12 @@ export function HistoricalSkillDetailContent({
 	return (
 		<>
 			<div
-				className="flex h-12 shrink-0 items-center gap-3 border-b border-(--session-overview-border) px-6"
+				className={cn(
+					"flex shrink-0 items-center gap-3",
+					variant === "card"
+						? "px-5 pt-5 pb-1"
+						: "h-12 border-b border-(--session-overview-border) px-6",
+				)}
 				data-slot="skill-version-toolbar"
 			>
 				{detail && selectedVersion ? (
@@ -65,11 +77,35 @@ export function HistoricalSkillDetailContent({
 				) : isPending ? (
 					<Skeleton className="h-7 w-28 rounded-md" />
 				) : null}
+				{/* Rendered is the readable document; Raw is the file as written. */}
+				{selectedVersion ? (
+					<div className="ml-auto flex shrink-0 items-center gap-1">
+						{raw ? (
+							<CopyButton
+								value={selectedVersion.content}
+								title="Copy skill file"
+							/>
+						) : null}
+						<Button
+							type="button"
+							size="xs"
+							variant="ghost"
+							aria-pressed={raw}
+							className="text-muted-foreground/60 hover:text-foreground"
+							onClick={() => setRaw((value) => !value)}
+						>
+							{raw ? "Rendered" : "Raw"}
+						</Button>
+					</div>
+				) : null}
 			</div>
 			<div
 				ref={scrollRef}
 				data-slot="skill-content-scroll"
-				className="min-h-0 flex-1 overflow-y-auto overscroll-none p-5 sm:p-7"
+				className={cn(
+					"min-h-0 flex-1 overflow-y-auto overscroll-none",
+					variant === "card" ? "p-5" : "p-5 sm:p-7",
+				)}
 			>
 				{isPending ? (
 					<SkillDetailSkeleton previewContent={previewContent} />
@@ -82,6 +118,11 @@ export function HistoricalSkillDetailContent({
 							Try again
 						</Button>
 					</div>
+				) : selectedVersion && raw ? (
+					// No scroll box of its own: the pane is the one scroll area.
+					<pre className="rounded-md bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+						{selectedVersion.content}
+					</pre>
 				) : selectedVersion ? (
 					<>
 						{allowedTools.length > 0 ? (

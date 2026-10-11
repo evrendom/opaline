@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TeamPage } from "@/features/team/TeamPage";
 
@@ -67,15 +66,10 @@ describe("TeamPage", () => {
 		vi.unstubAllEnvs();
 	});
 
-	it("refreshes team cards when the user asks for fresh data", async () => {
-		const user = userEvent.setup();
-
+	it("renders the team member table", () => {
 		render(<TeamPage />);
 
 		expect(screen.getByText("Team member table: 1")).toBeInTheDocument();
-		await user.click(screen.getByRole("button", { name: "Refresh" }));
-
-		expect(mockRefetch).toHaveBeenCalledTimes(1);
 	});
 
 	it("hides raw error diagnostics in production", () => {

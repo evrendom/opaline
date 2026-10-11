@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { SessionsOverviewFiltersMenu } from "./sessions-overview-filters-menu";
 import { SessionsOverviewSortMenu } from "./sessions-overview-sort-menu";
@@ -7,10 +8,13 @@ export function SessionsOverviewControls({
 	tableState,
 	inert = false,
 	showDateControl = true,
+	toolbarStart,
 }: {
 	tableState: ReturnType<typeof useSessionsOverviewTableState>;
 	inert?: boolean;
 	showDateControl?: boolean;
+	/** Leads the toolbar, before sorting, such as a search field. */
+	toolbarStart?: ReactNode;
 }) {
 	return (
 		<div
@@ -18,6 +22,7 @@ export function SessionsOverviewControls({
 			data-slot="sessions-overview-controls"
 			className="pointer-events-none flex min-w-0 flex-1 items-center gap-2 *:pointer-events-auto"
 		>
+			{toolbarStart}
 			<SessionsOverviewSortMenu
 				activeSortLabel={tableState.activeSortLabel}
 				onSortChange={tableState.changeSort}

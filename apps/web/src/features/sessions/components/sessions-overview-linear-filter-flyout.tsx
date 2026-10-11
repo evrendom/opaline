@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { SessionOverviewFilterOptionsPanel } from "@/features/sessions/components/sessions-overview-filter-menu";
 import { formatSessionOverviewRangeValue } from "@/features/sessions/components/sessions-overview-filter-state";
 import {
@@ -67,6 +67,65 @@ export function SessionOverviewLinearFilterFlyout({
 	rangeFilterValues: SessionOverviewRangeFilterValues;
 	anchor: HTMLButtonElement | null;
 }) {
+	return (
+		<SessionMenuFlyoutSurface
+			anchor={anchor}
+			kind={filter.kind}
+			label={filter.label}
+			onMouseEnter={onMouseEnter}
+		>
+			{filter.kind === "options" ? (
+				<SessionOverviewFilterOptionsPanel
+					key={filter.key}
+					excludedValues={excludedFilterValues[filter.key]}
+					label={filter.label}
+					onOptionChecked={(value, checked) =>
+						onFilterOptionChecked(filter.key, value, checked)
+					}
+					options={filterOptions[filter.key]}
+					variant="linear-side"
+				/>
+			) : filter.kind === "token-ranges" ? (
+				<SessionOverviewTokenRangeFilterPanel
+					onChange={onRangeFilterChange}
+					onInteractionEnd={onInteractionEnd}
+					onInteractionStart={onInteractionStart}
+					rangeFilterBounds={rangeFilterBounds}
+					rangeFilterValues={rangeFilterValues}
+					variant="linear"
+				/>
+			) : (
+				<SessionOverviewRangeFilterPanel
+					bounds={rangeFilterBounds[filter.key]}
+					formatValue={(value) =>
+						formatSessionOverviewRangeValue(filter.key, value)
+					}
+					label={filter.label}
+					onChange={(value) => onRangeFilterChange(filter.key, value)}
+					onInteractionEnd={onInteractionEnd}
+					onInteractionStart={onInteractionStart}
+					value={rangeFilterValues[filter.key]}
+					variant="linear"
+				/>
+			)}
+		</SessionMenuFlyoutSurface>
+	);
+}
+
+// The side panel beside a filter row, kept on screen next to its anchor.
+export function SessionMenuFlyoutSurface({
+	anchor,
+	children,
+	kind,
+	label,
+	onMouseEnter,
+}: {
+	anchor: HTMLButtonElement | null;
+	children: ReactNode;
+	kind: string;
+	label: string;
+	onMouseEnter: () => void;
+}) {
 	const surfaceRef = useRef<HTMLDivElement>(null);
 	const [position, setPosition] = useState({
 		left: "calc(100% - 2px)",
@@ -132,46 +191,13 @@ export function SessionOverviewLinearFilterFlyout({
 		<div
 			ref={surfaceRef}
 			role="dialog"
-			aria-label={`${filter.label} filter`}
+			aria-label={`${label} filter`}
 			className="session-menu-surface session-menu-flyout"
-			data-kind={filter.kind}
+			data-kind={kind}
 			style={position}
 			onMouseEnter={onMouseEnter}
 		>
-			{filter.kind === "options" ? (
-				<SessionOverviewFilterOptionsPanel
-					key={filter.key}
-					excludedValues={excludedFilterValues[filter.key]}
-					label={filter.label}
-					onOptionChecked={(value, checked) =>
-						onFilterOptionChecked(filter.key, value, checked)
-					}
-					options={filterOptions[filter.key]}
-					variant="linear-side"
-				/>
-			) : filter.kind === "token-ranges" ? (
-				<SessionOverviewTokenRangeFilterPanel
-					onChange={onRangeFilterChange}
-					onInteractionEnd={onInteractionEnd}
-					onInteractionStart={onInteractionStart}
-					rangeFilterBounds={rangeFilterBounds}
-					rangeFilterValues={rangeFilterValues}
-					variant="linear"
-				/>
-			) : (
-				<SessionOverviewRangeFilterPanel
-					bounds={rangeFilterBounds[filter.key]}
-					formatValue={(value) =>
-						formatSessionOverviewRangeValue(filter.key, value)
-					}
-					label={filter.label}
-					onChange={(value) => onRangeFilterChange(filter.key, value)}
-					onInteractionEnd={onInteractionEnd}
-					onInteractionStart={onInteractionStart}
-					value={rangeFilterValues[filter.key]}
-					variant="linear"
-				/>
-			)}
+			{children}
 		</div>
 	);
 }

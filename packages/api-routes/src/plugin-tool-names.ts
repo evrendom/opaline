@@ -25,6 +25,7 @@ export const PLUGIN_TOOL_NAMES = {
 	"analytics.skills.detail": "app_skill",
 	"analytics.repositories.list": "app_repositories_list",
 	"analytics.repositories.detail": "app_repository",
+	"analytics.repositories.overview": "app_repository_overview",
 	"analytics.developers.list": "app_team_members",
 	"analytics.developers.teamCards": "app_team_cards",
 } as const;

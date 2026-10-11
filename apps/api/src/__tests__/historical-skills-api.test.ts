@@ -60,7 +60,7 @@ describe("historical skills API guardrails", () => {
 		expect(serviceSource).toContain("sa.source = 'codex'");
 		expect(serviceSource).toContain("coalesce(sa.project_path, '')");
 		expect(serviceSource).toContain('repoIdentity.repoName ?? "No repository"');
-		expect(serviceSource).toContain("HISTORICAL_SKILL_ATTRIBUTION_LIMIT = 3");
+		expect(serviceSource).toContain("HISTORICAL_SKILL_ATTRIBUTION_LIMIT = 6");
 		expect(serviceSource).toContain("{attributionLimit:UInt64}");
 		expect(serviceSource).toContain("resolveRepoIdentity({");
 		expect(serviceSource).toContain("substringUTF8(");

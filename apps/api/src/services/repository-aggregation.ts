@@ -9,6 +9,7 @@ export interface RepositoryAggregateRow {
 	total_tokens: number;
 	estimated_cost: number;
 	incomplete_costs: number;
+	last_active_at: string;
 	model_apologies: number;
 	user_negative: number;
 	user_positive: number;
@@ -36,6 +37,7 @@ export function aggregateRepositories(
 					sessionCount: 0,
 					totalTokens: 0,
 					estimatedCost: 0,
+					lastActiveAt: null,
 					userCount: 0,
 					topUsers: [],
 					signals: {
@@ -56,6 +58,9 @@ export function aggregateRepositories(
 			summary.estimatedCost === null || Number(row.incomplete_costs) > 0
 				? null
 				: summary.estimatedCost + Number(row.estimated_cost);
+		// ISO-8601 UTC strings sort chronologically.
+		if (!summary.lastActiveAt || row.last_active_at > summary.lastActiveAt)
+			summary.lastActiveAt = row.last_active_at;
 		summary.signals.modelApologies += Number(row.model_apologies);
 		summary.signals.userNegative += Number(row.user_negative);
 		summary.signals.userPositive += Number(row.user_positive);

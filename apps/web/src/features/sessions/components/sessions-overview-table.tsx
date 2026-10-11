@@ -4,7 +4,14 @@ import type {
 	SessionListFilters,
 } from "@rudel/api-routes";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type Ref, useCallback, useMemo, useRef, useState } from "react";
+import {
+	type ReactNode,
+	type Ref,
+	useCallback,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useLoadMoreIntersectionObserver } from "@/app/hooks/useLoadMoreIntersectionObserver";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { getSessionRenderIndexes } from "@/features/sessions/session-list-virtualization";
@@ -37,6 +44,8 @@ export type SessionListPagination = {
 
 type SessionsOverviewTableProps = {
 	showSkillsColumn?: boolean;
+	/** Leads the header's toolbar, before sorting, such as a search field. */
+	toolbarStart?: ReactNode;
 	showDateControl?: boolean;
 	filterCatalog?: SessionFilterCatalog;
 	filterCatalogPending?: boolean;
@@ -60,6 +69,7 @@ type SessionsOverviewTableProps = {
 export function SessionsOverviewTable({
 	showSkillsColumn = true,
 	showDateControl = true,
+	toolbarStart,
 	activeSessionId,
 	canOpenSession,
 	getSessionHref,
@@ -217,7 +227,9 @@ export function SessionsOverviewTable({
 			<div className="relative min-h-0 min-w-0 flex-1">
 				<div
 					ref={setTableScrollContainer}
-					tabIndex={-1}
+					// Focusable only for the demo, which focuses it on entry so the
+					// keyboard scrolls it; in the app a click must not focus it.
+					tabIndex={demo ? -1 : undefined}
 					className="isolate h-full min-h-0 min-w-0 touch-pan-x touch-pan-y overflow-auto overscroll-none [overflow-anchor:none] [scrollbar-gutter:stable]"
 					data-slot="sessions-overview-scroll-container"
 					onFocusCapture={(event) => {
@@ -265,6 +277,7 @@ export function SessionsOverviewTable({
 							<SessionsOverviewControls
 								tableState={tableState}
 								showDateControl={showDateControl}
+								toolbarStart={toolbarStart}
 							/>
 						}
 						onSort={tableState.handleSort}

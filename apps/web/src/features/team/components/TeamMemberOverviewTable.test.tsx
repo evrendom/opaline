@@ -73,10 +73,11 @@ describe("TeamMemberOverviewTable", () => {
 		expect(screen.getByText("180K")).toBeVisible();
 		expect(screen.getByText("120")).toBeVisible();
 		expect(screen.getByText("$42")).toBeVisible();
-		expect(screen.getByText("Apr 22, 2026")).toBeVisible();
+		// Relative on the row; the exact day on hover.
+		expect(screen.getByTitle("Last active Apr 22, 2026")).toBeVisible();
 	});
 
-	it("keeps an invite placeholder as the first 64px body row", () => {
+	it("invites from the toolbar, the roster holding only teammates", () => {
 		render(
 			<TeamMemberOverviewTable
 				canInviteTeamMembers
@@ -86,16 +87,17 @@ describe("TeamMemberOverviewTable", () => {
 		);
 
 		const tableRows = screen.getAllByRole("row");
-		expect(tableRows).toHaveLength(3);
-		expect(within(tableRows[1]).getByText("Add teammate")).toBeVisible();
-		expect(
-			within(tableRows[1]).getByRole("button", {
-				name: "Create invite link",
-			}),
-		).toBeVisible();
-		expect(within(tableRows[2]).getByText("Ada Lovelace")).toBeVisible();
+		expect(tableRows).toHaveLength(2);
+		expect(within(tableRows[1]).getByText("Ada Lovelace")).toBeVisible();
 		expect(tableRows[1]).toHaveClass("h-16");
-		expect(tableRows[2]).toHaveClass("h-16");
+
+		// Inline in the toolbar, not behind a menu.
+		expect(
+			screen.getByRole("button", { name: "Create invite link" }),
+		).toBeVisible();
+		expect(
+			screen.getByRole("button", { name: "Revoke existing links" }),
+		).toBeVisible();
 	});
 
 	it("runs the table full-bleed with its outer cells on the 32px gutter", () => {
@@ -148,7 +150,7 @@ describe("TeamMemberOverviewTable", () => {
 		expect(modelBadges[2]).toHaveTextContent("GPT 5.1");
 	});
 
-	it("sorts teammate rows by each quantitative column", async () => {
+	it("sorts teammate rows from the toolbar's sort menu", async () => {
 		const user = userEvent.setup();
 		render(
 			<TeamMemberOverviewTable
@@ -172,41 +174,55 @@ describe("TeamMemberOverviewTable", () => {
 			/>,
 		);
 
-		const getFirstTeammateRow = () => screen.getAllByRole("row")[2];
+		const getFirstTeammateRow = () => screen.getAllByRole("row")[1];
+		const sortBy = async (option: string) => {
+			await user.click(
+				screen.getByRole("button", { name: /^Sort teammates, / }),
+			);
+			await user.click(
+				await screen.findByRole("menuitemradio", { name: option }),
+			);
+		};
 
-		await user.click(
-			screen.getByRole("button", { name: "Sort by Activity, descending" }),
-		);
-		expect(
-			within(getFirstTeammateRow()).getByText("Grace Hopper"),
-		).toBeVisible();
-
-		await user.click(
-			screen.getByRole("button", { name: "Sort by Sessions, descending" }),
-		);
-		expect(
-			within(getFirstTeammateRow()).getByText("Grace Hopper"),
-		).toBeVisible();
-
-		await user.click(
-			screen.getByRole("button", { name: "Sort by Tokens used, descending" }),
-		);
+		// Tokens, most first, to start.
 		expect(
 			within(getFirstTeammateRow()).getByText("Ada Lovelace"),
 		).toBeVisible();
 
-		await user.click(
-			screen.getByRole("button", { name: "Sort by API cost, descending" }),
-		);
+		await sortBy("Activity");
 		expect(
 			within(getFirstTeammateRow()).getByText("Grace Hopper"),
 		).toBeVisible();
 
-		await user.click(
-			screen.getByRole("button", { name: "Sort by API cost, ascending" }),
-		);
+		await sortBy("API cost");
+		expect(
+			within(getFirstTeammateRow()).getByText("Grace Hopper"),
+		).toBeVisible();
+
+		await sortBy("Ascending");
 		expect(
 			within(getFirstTeammateRow()).getByText("Ada Lovelace"),
 		).toBeVisible();
+	});
+
+	it("narrows the roster to teammates matching the search", async () => {
+		const user = userEvent.setup();
+		render(
+			<TeamMemberOverviewTable
+				canInviteTeamMembers={false}
+				organizationId="org-1"
+				rows={[
+					buildTeamMemberRow(),
+					buildTeamMemberRow({ displayName: "Grace Hopper", userId: "user-2" }),
+				]}
+			/>,
+		);
+
+		await user.type(
+			screen.getByRole("textbox", { name: "Search teammates…" }),
+			"grace",
+		);
+		expect(screen.getByText("Grace Hopper")).toBeVisible();
+		expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
 	});
 });

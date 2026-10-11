@@ -1,21 +1,25 @@
-import {
-	IconChevronDown,
-	IconChevronUp,
-	IconUserPlus,
-} from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { SearchInput } from "@/components/dashboard/data-table";
+import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
+import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
 import { TeamInviteLinkSurface } from "@/features/team/components/TeamInviteLinkSurface";
 import type {
 	TeamPageMemberModelUsage,
 	TeamPageMemberOverviewRow,
 } from "@/features/team/use-team-page-data";
 import {
+	type UseFluidHoverReturn,
+	useFluidHover,
+	useRegisterFluidHoverItem,
+} from "@/hooks/use-fluid-hover";
+import {
 	formatCompactWholeCurrency,
 	formatCompactWholeNumber,
 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const lastActiveDateFormatter = new Intl.DateTimeFormat("en-US", {
 	day: "numeric",
@@ -28,7 +32,13 @@ const SPARKLINE_HEIGHT = 28;
 const SPARKLINE_PADDING = 2;
 const MAX_VISIBLE_MODELS = 3;
 
-type TeamTableSortKey = "activity" | "cost" | "sessions" | "tokens";
+type TeamTableSortKey =
+	| "activity"
+	| "cost"
+	| "lastActive"
+	| "name"
+	| "sessions"
+	| "tokens";
 type TeamTableSortDirection = "asc" | "desc";
 
 interface TeamTableSortState {
@@ -120,9 +130,11 @@ function getActivityTotal(row: TeamPageMemberOverviewRow) {
 
 function getNumericSortValue(
 	row: TeamPageMemberOverviewRow,
-	key: TeamTableSortKey,
+	key: Exclude<TeamTableSortKey, "name">,
 ) {
 	switch (key) {
+		case "lastActive":
+			return row.lastActiveDate ? Date.parse(row.lastActiveDate) || null : null;
 		case "activity":
 			return getActivityTotal(row);
 		case "cost":
@@ -134,15 +146,15 @@ function getNumericSortValue(
 	}
 }
 
-function sortTeamRows(
+export function sortTeamRows(
 	rows: readonly TeamPageMemberOverviewRow[],
-	sort: TeamTableSortState | null,
+	sort: TeamTableSortState,
 ) {
-	if (!sort) {
-		return rows;
-	}
-
 	return [...rows].sort((leftRow, rightRow) => {
+		if (sort.key === "name") {
+			const order = leftRow.displayName.localeCompare(rightRow.displayName);
+			return sort.direction === "asc" ? order : -order;
+		}
 		const leftValue = getNumericSortValue(leftRow, sort.key);
 		const rightValue = getNumericSortValue(rightRow, sort.key);
 
@@ -161,54 +173,6 @@ function sortTeamRows(
 			leftRow.displayName.localeCompare(rightRow.displayName)
 		);
 	});
-}
-
-function TeamTableSortableHeader({
-	align,
-	label,
-	onSort,
-	sort,
-	sortKey,
-}: {
-	align: "left" | "right";
-	label: string;
-	onSort: (key: TeamTableSortKey) => void;
-	sort: TeamTableSortState | null;
-	sortKey: TeamTableSortKey;
-}) {
-	const isActive = sort?.key === sortKey;
-	const nextDirection =
-		isActive && sort.direction === "desc" ? "ascending" : "descending";
-
-	return (
-		<button
-			type="button"
-			aria-label={`Sort by ${label}, ${nextDirection}`}
-			className={`relative flex h-full w-full min-w-0 items-center gap-1 px-3 text-base font-medium whitespace-nowrap text-foreground outline-none focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring sm:text-sm ${
-				align === "right" ? "justify-end text-right" : "justify-start text-left"
-			}`}
-			onClick={() => onSort(sortKey)}
-		>
-			<span className="min-w-0 truncate">{label}</span>
-			{isActive ? (
-				sort.direction === "asc" ? (
-					<IconChevronUp
-						aria-hidden="true"
-						className="size-4 h-lh shrink-0 stroke-muted-foreground"
-					/>
-				) : (
-					<IconChevronDown
-						aria-hidden="true"
-						className="size-4 h-lh shrink-0 stroke-muted-foreground"
-					/>
-				)
-			) : null}
-			<span
-				aria-hidden="true"
-				className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-			/>
-		</button>
-	);
 }
 
 function ModelComposition({
@@ -247,37 +211,74 @@ function ModelComposition({
 	);
 }
 
-function TeamInviteRow({ organizationId }: { organizationId: string }) {
+// Two-line rows, as in the repos list: who over their role, then the
+// metrics in fixed tracks with their units inline, so they line up without
+// column headers (kept for screen readers).
+const METRIC_CELL_CLASS_NAME =
+	"h-16 px-3 py-0 text-right align-middle text-xs tabular-nums whitespace-nowrap text-(--session-overview-muted)";
+const METRIC_UNIT_CLASS_NAME = "text-(--session-overview-subtle)";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** When a teammate was last active, by day (the roster keeps dates, not
+ * times): "Today", "Yesterday", "3d ago", then months and years, with a green
+ * dot through the week and a grey one after. */
+function LastActive({ lastActiveDate }: { lastActiveDate: string | null }) {
+	const parsed = lastActiveDate ? new Date(lastActiveDate) : null;
+	if (!parsed || Number.isNaN(parsed.getTime()))
+		return <span className={METRIC_UNIT_CLASS_NAME}>—</span>;
+	const today = new Date();
+	const days = Math.max(
+		0,
+		Math.round(
+			(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) -
+				Date.UTC(
+					parsed.getUTCFullYear(),
+					parsed.getUTCMonth(),
+					parsed.getUTCDate(),
+				)) /
+				DAY_MS,
+		),
+	);
+	const label =
+		days === 0
+			? "Today"
+			: days === 1
+				? "Yesterday"
+				: days < 30
+					? `${days}d ago`
+					: days < 365
+						? `${Math.floor(days / 30)}mo ago`
+						: `${Math.floor(days / 365)}y ago`;
 	return (
-		<tr className="h-16 border-b border-black/[0.04] dark:border-white/[0.04]">
-			<td className="h-16 py-0 pr-3 pl-0 align-middle">
-				<div className="flex min-w-0 items-center gap-3">
-					<div className="grid size-8 shrink-0 place-content-center rounded-full border border-dashed border-black/15 bg-background dark:border-white/15">
-						<IconUserPlus
-							aria-hidden="true"
-							className="size-4 shrink-0 stroke-muted-foreground"
-						/>
-					</div>
-					<div className="min-w-0">
-						<p className="truncate text-base font-medium text-foreground sm:text-sm">
-							Add teammate
-						</p>
-						<p className="truncate text-base text-muted-foreground sm:text-sm">
-							Invite with a link
-						</p>
-					</div>
-				</div>
-			</td>
-			<td className="h-16 py-0 pr-0 pl-3 align-middle" colSpan={6}>
-				<TeamInviteLinkSurface layout="row" organizationId={organizationId} />
-			</td>
-		</tr>
+		<span
+			className="inline-flex items-center gap-2"
+			title={`Last active ${formatLastActiveDate(lastActiveDate)}`}
+		>
+			<span
+				aria-hidden="true"
+				className={cn(
+					"size-1.5 shrink-0 rounded-full",
+					days < 7 ? "bg-[#22c55e]" : "bg-black/20 dark:bg-white/25",
+				)}
+			/>
+			<time dateTime={lastActiveDate ?? undefined}>{label}</time>
+		</span>
 	);
 }
 
-function TeamMemberRow({ row }: { row: TeamPageMemberOverviewRow }) {
+function TeamMemberRow({
+	index,
+	registerItem,
+	row,
+}: {
+	index: number;
+	registerItem: UseFluidHoverReturn["registerItem"];
+	row: TeamPageMemberOverviewRow;
+}) {
+	const rowRef = useRef<HTMLTableRowElement>(null);
+	useRegisterFluidHoverItem(registerItem, index, rowRef);
 	return (
-		<tr className="h-16 border-b border-black/[0.04] dark:border-white/[0.04]">
+		<tr ref={rowRef} className="relative z-10 h-16">
 			<td className="h-16 py-0 pr-3 pl-0 align-middle">
 				<div className="flex min-w-0 items-center gap-3">
 					<Avatar className="size-8 overflow-hidden bg-background outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
@@ -287,10 +288,10 @@ function TeamMemberRow({ row }: { row: TeamPageMemberOverviewRow }) {
 						</AvatarFallback>
 					</Avatar>
 					<div className="min-w-0">
-						<p className="truncate text-base font-medium text-foreground sm:text-sm">
+						<p className="truncate text-sm/5 font-medium text-(--session-overview-text)">
 							{row.displayName}
 						</p>
-						<p className="truncate text-base text-muted-foreground sm:text-sm">
+						<p className="truncate text-xs/4 text-(--session-overview-muted)">
 							{row.role}
 						</p>
 					</div>
@@ -302,29 +303,52 @@ function TeamMemberRow({ row }: { row: TeamPageMemberOverviewRow }) {
 			<td className="h-16 px-3 py-0 align-middle">
 				<ActivitySparkline values={row.activityTrend} />
 			</td>
-			<td className="h-16 px-3 py-0 text-right align-middle">
-				<p className="text-base font-medium text-foreground tabular-nums sm:text-sm">
-					{formatCompactWholeNumber(row.totalSessions)}
-				</p>
+			<td className={METRIC_CELL_CLASS_NAME}>
+				<span>{formatCompactWholeNumber(row.totalSessions)}</span>
+				<span className={METRIC_UNIT_CLASS_NAME}>
+					{row.totalSessions === 1 ? " session" : " sessions"}
+				</span>
 			</td>
-			<td className="h-16 px-3 py-0 text-right align-middle">
-				<p className="text-base font-medium text-foreground tabular-nums sm:text-sm">
-					{formatCompactWholeNumber(row.totalTokens)}
-				</p>
+			<td
+				className={METRIC_CELL_CLASS_NAME}
+				title={`${row.totalTokens.toLocaleString()} tokens`}
+			>
+				<span>{formatCompactWholeNumber(row.totalTokens)}</span>
+				<span className={METRIC_UNIT_CLASS_NAME}> tok</span>
 			</td>
-			<td className="h-16 px-3 py-0 text-right align-middle">
-				<p className="text-base font-medium text-foreground tabular-nums sm:text-sm">
-					{formatCompactWholeCurrency(row.cost)}
-				</p>
+			<td
+				className={cn(
+					METRIC_CELL_CLASS_NAME,
+					"font-medium text-(--session-overview-text)",
+				)}
+			>
+				{formatCompactWholeCurrency(row.cost)}
 			</td>
-			<td className="h-16 py-0 pr-0 pl-3 text-right align-middle">
-				<p className="text-base text-muted-foreground tabular-nums sm:text-sm">
-					{formatLastActiveDate(row.lastActiveDate)}
-				</p>
+			<td className={cn(METRIC_CELL_CLASS_NAME, "pr-0 pl-3")}>
+				<LastActive lastActiveDate={row.lastActiveDate} />
 			</td>
 		</tr>
 	);
 }
+
+const SORT_OPTIONS = [
+	{ key: "tokens", label: "Tokens" },
+	{ key: "sessions", label: "Sessions" },
+	{ key: "cost", label: "API cost" },
+	{ key: "activity", label: "Activity" },
+	{ key: "lastActive", label: "Last active" },
+	{ key: "name", label: "Name" },
+] as const satisfies readonly { key: TeamTableSortKey; label: string }[];
+
+const COLUMN_LABELS = [
+	"Teammate",
+	"Model composition",
+	"Activity",
+	"Sessions",
+	"Tokens used",
+	"API cost",
+	"Last active",
+] as const;
 
 export function TeamMemberOverviewTable({
 	canInviteTeamMembers,
@@ -335,128 +359,104 @@ export function TeamMemberOverviewTable({
 	organizationId: string | null;
 	rows: readonly TeamPageMemberOverviewRow[];
 }) {
-	const [sort, setSort] = useState<TeamTableSortState | null>(null);
-	const sortedRows = useMemo(() => sortTeamRows(rows, sort), [rows, sort]);
-
-	function handleSort(key: TeamTableSortKey) {
-		setSort((currentSort) => ({
-			key,
-			direction:
-				currentSort?.key === key && currentSort.direction === "desc"
-					? "asc"
-					: "desc",
-		}));
-	}
+	const [search, setSearch] = useState("");
+	const [sort, setSort] = useState<TeamTableSortState>({
+		key: "tokens",
+		direction: "desc",
+	});
+	const visibleRows = useMemo(() => {
+		const query = search.trim().toLocaleLowerCase();
+		return sortTeamRows(
+			query
+				? rows.filter((row) =>
+						[row.displayName, row.email ?? "", row.role].some((value) =>
+							value.toLocaleLowerCase().includes(query),
+						),
+					)
+				: rows,
+			sort,
+		);
+	}, [rows, search, sort]);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const hover = useFluidHover(containerRef, {
+		axis: "y",
+		gapClick: false,
+		reflectActiveState: false,
+	});
+	const showInvite = canInviteTeamMembers && organizationId !== null;
 
 	return (
-		<div className="-mx-4 -my-2 overflow-x-auto whitespace-nowrap lg:-mx-6">
-			<div className="inline-block min-w-full align-middle">
-				{/* Full-bleed table: rows run edge to edge, the outer cells
-				    pad to the page's 32px gutter, hairline dividers, a 48px head. */}
-				<table className="w-full min-w-272 border-collapse [&_th:first-child>button]:pl-0 [&_th:last-child>button]:pr-0 [&_tr>*:first-child]:pl-8 [&_tr>*:last-child]:pr-8">
-					<colgroup>
-						<col className="w-[24%]" />
-						<col className="w-[21%]" />
-						<col className="w-[16%]" />
-						<col className="w-[9%]" />
-						<col className="w-[10%]" />
-						<col className="w-[9%]" />
-						<col className="w-[11%]" />
-					</colgroup>
-					<thead>
-						<tr className="h-12 border-b border-black/[0.06] dark:border-white/[0.06]">
-							<th className="h-12 py-0 pr-3 pl-0 text-left text-sm font-medium whitespace-nowrap text-foreground">
-								Teammate
-							</th>
-							<th className="h-12 px-3 py-0 text-left text-sm font-medium whitespace-nowrap text-foreground">
-								Model composition
-							</th>
-							<th
-								aria-sort={
-									sort?.key === "activity"
-										? sort.direction === "asc"
-											? "ascending"
-											: "descending"
-										: "none"
-								}
-								className="h-12 p-0 text-left whitespace-nowrap"
-							>
-								<TeamTableSortableHeader
-									align="left"
-									label="Activity"
-									onSort={handleSort}
-									sort={sort}
-									sortKey="activity"
+		<div className="-mx-4 lg:-mx-6">
+			{/* The sessions toolbar: search, then sort, on 24px gutters. */}
+			<div className="flex h-12 items-center gap-2 px-6">
+				<SearchInput
+					value={search}
+					onChange={setSearch}
+					placeholder="Search teammates…"
+				/>
+				<ToolbarSortMenu
+					noun="teammates"
+					options={SORT_OPTIONS}
+					activeSortLabel={
+						SORT_OPTIONS.find((option) => option.key === sort.key)?.label ??
+						"Tokens"
+					}
+					getInitialDirection={(key) => (key === "name" ? "asc" : "desc")}
+					onSortChange={setSort}
+					sort={sort}
+				/>
+				{showInvite ? (
+					<div className="ml-auto min-w-0">
+						<TeamInviteLinkSurface
+							layout="toolbar"
+							organizationId={organizationId}
+						/>
+					</div>
+				) : null}
+			</div>
+			<div className="overflow-x-auto whitespace-nowrap">
+				<div
+					ref={containerRef}
+					className="relative isolate inline-block min-w-full align-middle"
+					{...hover.handlers}
+				>
+					<FluidHoverHighlight
+						hover={hover}
+						className="z-0 rounded-none bg-(--session-overview-hover)"
+					/>
+					{/* Full-bleed rows, the outer cells padded to the page's 32px
+					    gutter; no rules between them, as in the sessions list. */}
+					<table className="relative w-full min-w-272 border-collapse [&_tr>*:first-child]:pl-8 [&_tr>*:last-child]:pr-8">
+						<colgroup>
+							<col className="w-[24%]" />
+							<col className="w-[21%]" />
+							<col className="w-[16%]" />
+							<col className="w-[9%]" />
+							<col className="w-[10%]" />
+							<col className="w-[9%]" />
+							<col className="w-[11%]" />
+						</colgroup>
+						<thead className="sr-only">
+							<tr>
+								{COLUMN_LABELS.map((label) => (
+									<th key={label} scope="col">
+										{label}
+									</th>
+								))}
+							</tr>
+						</thead>
+						<tbody>
+							{visibleRows.map((row, index) => (
+								<TeamMemberRow
+									key={row.userId}
+									index={index}
+									registerItem={hover.registerItem}
+									row={row}
 								/>
-							</th>
-							<th
-								aria-sort={
-									sort?.key === "sessions"
-										? sort.direction === "asc"
-											? "ascending"
-											: "descending"
-										: "none"
-								}
-								className="h-12 p-0 text-right whitespace-nowrap"
-							>
-								<TeamTableSortableHeader
-									align="right"
-									label="Sessions"
-									onSort={handleSort}
-									sort={sort}
-									sortKey="sessions"
-								/>
-							</th>
-							<th
-								aria-sort={
-									sort?.key === "tokens"
-										? sort.direction === "asc"
-											? "ascending"
-											: "descending"
-										: "none"
-								}
-								className="h-12 p-0 text-right whitespace-nowrap"
-							>
-								<TeamTableSortableHeader
-									align="right"
-									label="Tokens used"
-									onSort={handleSort}
-									sort={sort}
-									sortKey="tokens"
-								/>
-							</th>
-							<th
-								aria-sort={
-									sort?.key === "cost"
-										? sort.direction === "asc"
-											? "ascending"
-											: "descending"
-										: "none"
-								}
-								className="h-12 p-0 text-right whitespace-nowrap"
-							>
-								<TeamTableSortableHeader
-									align="right"
-									label="API cost"
-									onSort={handleSort}
-									sort={sort}
-									sortKey="cost"
-								/>
-							</th>
-							<th className="h-12 py-0 pr-0 pl-3 text-right text-sm font-medium whitespace-nowrap text-foreground">
-								Last active
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						{canInviteTeamMembers && organizationId ? (
-							<TeamInviteRow organizationId={organizationId} />
-						) : null}
-						{sortedRows.map((row) => (
-							<TeamMemberRow key={row.userId} row={row} />
-						))}
-					</tbody>
-				</table>
+							))}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	);

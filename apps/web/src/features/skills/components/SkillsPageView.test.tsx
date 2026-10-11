@@ -2,10 +2,10 @@ import type { HistoricalSkillSummary } from "@rudel/api-routes";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { ShellHeaderPortalContext } from "@/features/shell/shell-header-portal";
+import { assert, describe, expect, it, vi } from "vitest";
 import { SkillsPageView } from "@/features/skills/components/SkillsPageView";
+
+vi.stubGlobal("PointerEvent", MouseEvent);
 
 vi.mock("@/features/workspace/hooks/useUserMap", () => ({
 	useUserMap: () => ({
@@ -78,86 +78,62 @@ const skills: HistoricalSkillSummary[] = [
 	},
 ];
 
-function SkillsPageViewHarness(props: ComponentProps<typeof SkillsPageView>) {
-	const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
-
-	return (
-		<>
-			<div data-testid="skills-shell-header" ref={setPortalHost} />
-			<ShellHeaderPortalContext.Provider value={portalHost}>
-				<SkillsPageView {...props} />
-			</ShellHeaderPortalContext.Provider>
-		</>
+function renderView(props: Partial<ComponentProps<typeof SkillsPageView>>) {
+	return render(
+		<SkillsPageView
+			skills={skills}
+			isError={false}
+			isPending={false}
+			onRetry={vi.fn()}
+			onSelectSkill={vi.fn()}
+			{...props}
+		/>,
 	);
 }
 
 describe("SkillsPageView", () => {
-	it("renders exact names, usage counts, and opens a selected skill", async () => {
+	it("lists skills as rows with their usage and opens a selected skill", async () => {
 		const user = userEvent.setup();
 		const onSelectSkill = vi.fn();
+		renderView({ onSelectSkill });
 
-		render(
-			<SkillsPageViewHarness
-				skills={skills}
-				isError={false}
-				isPending={false}
-				onRetry={vi.fn()}
-				onSelectSkill={onSelectSkill}
-			/>,
+		const list = screen.getByRole("list", { name: "Skills" });
+		const rows = within(list).getAllByRole("button", { name: /^Open / });
+		// Most-used first.
+		expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+			"Open testing-bun",
+			"Open Design",
+			"Open a-very-long-skill-name-that-needs-to-wrap-without-breaking-the-row-layout",
+		]);
+		const testingBun = rows[0];
+		assert(testingBun);
+		expect(testingBun).toHaveTextContent("12 sessions");
+		expect(testingBun).toHaveTextContent("4 repos");
+		expect(testingBun).toHaveTextContent(
+			"Ada Lovelace, Grace Hopper, Linus Torvalds +1",
 		);
-
-		expect(screen.queryByText("All Skills")).not.toBeInTheDocument();
-		expect(
-			within(screen.getByTestId("skills-shell-header")).getByRole("searchbox", {
-				name: "Search skills",
-			}),
-		).toBeInTheDocument();
-		expect(screen.getByText("testing-bun")).toBeInTheDocument();
-		expect(screen.getByTitle("12 sessions")).toHaveTextContent("12 sessions");
-		expect(screen.getByTitle("1 session")).toHaveTextContent("1 session");
-		expect(
-			screen.getByTitle("Used by Ada Lovelace in 7 sessions"),
-		).toBeInTheDocument();
-		expect(
-			screen.getByTitle("Repository rudel, 8 sessions"),
-		).toBeInTheDocument();
-		expect(screen.getByRole("group", { name: "2 users" })).toBeInTheDocument();
-		const users = screen.getByRole("group", { name: "4 users" });
-		expect(within(users).getByText("+1")).toBeInTheDocument();
-		expect(
-			within(users).getByTitle("Used by Grace Hopper in 3 sessions"),
-		).toBeInTheDocument();
-		expect(
-			screen.queryByRole("heading", { name: "Testing with Bun" }),
-		).not.toBeInTheDocument();
+		// No member column and no agent tags.
+		expect(testingBun).not.toHaveTextContent("4 members");
+		expect(testingBun).not.toHaveTextContent("Claude");
+		expect(testingBun).not.toHaveTextContent("Codex");
+		// Names unknown to this workspace fall back to a count.
+		expect(rows[1]).toHaveTextContent("2 members");
 		expect(
 			screen.queryByText("Run focused tests first."),
 		).not.toBeInTheDocument();
-		expect(
-			screen.getByText(
-				"a-very-long-skill-name-that-needs-to-wrap-without-breaking-the-row-layout",
-			),
-		).toBeInTheDocument();
+		// No column headers.
+		expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
 
-		await user.click(screen.getByRole("button", { name: /testing-bun/i }));
+		await user.click(testingBun);
 		expect(onSelectSkill).toHaveBeenCalledWith("testing-bun");
 	});
 
 	it("filters names without changing their original case", async () => {
 		const user = userEvent.setup();
-
-		render(
-			<SkillsPageViewHarness
-				skills={skills}
-				isError={false}
-				isPending={false}
-				onRetry={vi.fn()}
-				onSelectSkill={vi.fn()}
-			/>,
-		);
+		renderView({});
 
 		await user.type(
-			screen.getByRole("searchbox", { name: "Search skills" }),
+			screen.getByRole("textbox", { name: "Search skills" }),
 			"DES",
 		);
 
@@ -165,24 +141,40 @@ describe("SkillsPageView", () => {
 		expect(screen.queryByText("testing-bun")).not.toBeInTheDocument();
 	});
 
-	it("supports filtered-empty and clear-search states", async () => {
+	it("sorts by name from the sort menu", async () => {
 		const user = userEvent.setup();
+		renderView({});
 
-		render(
-			<SkillsPageViewHarness
-				skills={skills}
-				isError={false}
-				isPending={false}
-				onRetry={vi.fn()}
-				onSelectSkill={vi.fn()}
-			/>,
+		await user.click(
+			screen.getByRole("button", { name: "Sort skills, Sessions, descending" }),
+		);
+		await user.click(
+			await screen.findByRole("menuitemradio", { name: "Name" }),
 		);
 
-		const search = screen.getByRole("searchbox", { name: "Search skills" });
+		const rows = within(
+			screen.getByRole("list", { name: "Skills" }),
+		).getAllByRole("button", { name: /^Open / });
+		expect(rows[0]).toHaveAccessibleName(
+			"Open a-very-long-skill-name-that-needs-to-wrap-without-breaking-the-row-layout",
+		);
+		expect(rows[1]).toHaveAccessibleName("Open Design");
+	});
+
+	it("supports filtered-empty and clear-search states", async () => {
+		const user = userEvent.setup();
+		renderView({});
+
+		const search = screen.getByRole("textbox", { name: "Search skills" });
 		await user.type(search, "not-present");
 		expect(screen.getByText("No matching skills")).toBeInTheDocument();
 
-		await user.click(screen.getByRole("button", { name: "Clear search" }));
+		const clearButtons = screen.getAllByRole("button", {
+			name: "Clear search",
+		});
+		const emptyStateClear = clearButtons.at(-1);
+		assert(emptyStateClear);
+		await user.click(emptyStateClear);
 		expect(search).toHaveValue("");
 		expect(screen.getByText("testing-bun")).toBeInTheDocument();
 	});
@@ -190,7 +182,7 @@ describe("SkillsPageView", () => {
 	it("renders loading, API-error, and no-skills states", async () => {
 		const onRetry = vi.fn();
 		const { rerender } = render(
-			<SkillsPageViewHarness
+			<SkillsPageView
 				skills={undefined}
 				isError={false}
 				isPending
@@ -202,7 +194,7 @@ describe("SkillsPageView", () => {
 		expect(screen.getByText("Loading skills")).toBeInTheDocument();
 
 		rerender(
-			<SkillsPageViewHarness
+			<SkillsPageView
 				skills={undefined}
 				isError
 				isPending={false}
@@ -214,7 +206,7 @@ describe("SkillsPageView", () => {
 		expect(onRetry).toHaveBeenCalledTimes(1);
 
 		rerender(
-			<SkillsPageViewHarness
+			<SkillsPageView
 				skills={[]}
 				isError={false}
 				isPending={false}

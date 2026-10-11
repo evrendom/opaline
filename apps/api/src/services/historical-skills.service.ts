@@ -48,7 +48,8 @@ export interface HistoricalSkillContentRow {
 }
 
 const HISTORICAL_SKILL_PREVIEW_CHARACTER_LIMIT = 1_600;
-const HISTORICAL_SKILL_ATTRIBUTION_LIMIT = 3;
+// Enough top members for the repo skills drawer's stack of six avatars.
+const HISTORICAL_SKILL_ATTRIBUTION_LIMIT = 6;
 // Distinct raw repo triples over-fetch so that worktree paths resolving to the
 // same repo identity can merge server-side before the display cap; the count
 // is exact while raw triples stay within this bound and a floor beyond it.

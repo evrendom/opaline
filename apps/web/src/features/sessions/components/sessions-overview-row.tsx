@@ -70,6 +70,11 @@ type SessionsOverviewRowProps = {
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
 	session: SessionAnalytics;
 	userLabel: string;
+	/** Set on a row that folds a panel beneath it: clicking toggles it and
+	 * the model mark shows the disclosure, instead of opening the session. */
+	expanded?: boolean;
+	/** Column widths in place of the overview's, for a narrower list. */
+	gridClassName?: string;
 };
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
@@ -178,6 +183,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	onSessionClick,
 	session,
 	userLabel,
+	expanded,
+	gridClassName,
 }: SessionsOverviewRowProps) {
 	const demo = useDemoRuntime();
 	const itemRef = useRef<HTMLLIElement>(null);
@@ -227,10 +234,15 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			: null;
 	const rowClassName = cn(
 		SESSION_OVERVIEW_ROW_CLASS_NAME,
-		showSkillsColumn
-			? SESSION_OVERVIEW_GRID_CLASS_NAME
-			: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
+		gridClassName ??
+			(showSkillsColumn
+				? SESSION_OVERVIEW_GRID_CLASS_NAME
+				: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME),
 		isClickable ? "cursor-pointer" : "cursor-default opacity-65",
+		// An open row shares the tint of the panel folded out beneath it, and
+		// rounds its top as the block's top edge.
+		expanded &&
+			"rounded-t-lg bg-neutral-100 corner-squircle squircle:rounded-t-2xl dark:bg-card",
 	);
 	const cellClassName = cn(
 		SESSION_OVERVIEW_CELL_CLASS_NAME,
@@ -349,6 +361,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					avatarUrl={avatarUrl}
 					showMember={false}
 					model={displayModel}
+					disclosure={expanded === undefined ? undefined : { open: expanded }}
 					progress={
 						sessionCost === null
 							? undefined
@@ -519,7 +532,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			) : isClickable && onSessionClick ? (
 				<button
 					type="button"
-					aria-pressed={isActive}
+					aria-pressed={expanded === undefined ? isActive : undefined}
+					aria-expanded={expanded}
 					className={rowClassName}
 					data-dashboard-grid-row-scope="session"
 					data-selected={isActive ? "true" : undefined}

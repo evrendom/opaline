@@ -72,6 +72,7 @@ function pushStep(
 	isExpanded: (key: string) => boolean,
 	depth: number,
 	out: WaterfallRow[],
+	keepOut: ReadonlySet<string>,
 ) {
 	if (step.children.length === 0) {
 		out.push({ depth, kind: "step", step });
@@ -80,17 +81,18 @@ function pushStep(
 	const key = subtraceKey(step.id);
 	const expanded = isExpanded(key);
 	out.push({ depth, kind: "step", step, subtrace: { expanded, key } });
-	if (expanded) foldRepeats(step.children, isExpanded, depth + 1, out);
+	if (expanded) foldRepeats(step.children, isExpanded, depth + 1, out, keepOut);
 }
 
 /** Fold adjacent runs of identical tool calls into one row. A run containing an
  * error never folds, so a failure is never hidden behind a count, and neither
- * does a subagent's call, which keeps its subtree. */
+ * does a subagent's call, which keeps its subtree, or a step kept out. */
 function foldRepeats(
 	steps: readonly SessionReaderStep[],
 	isExpanded: (key: string) => boolean,
 	depth: number,
 	out: WaterfallRow[],
+	keepOut: ReadonlySet<string>,
 ) {
 	let i = 0;
 	while (i < steps.length) {
@@ -99,6 +101,7 @@ function foldRepeats(
 			step !== undefined &&
 			isToolStep(step) &&
 			!step.isError &&
+			!keepOut.has(step.id) &&
 			step.children.length === 0 &&
 			step.kind === head.kind &&
 			step.name === head.name;
@@ -116,10 +119,11 @@ function foldRepeats(
 				variant: "repeat",
 			});
 			if (expanded) {
-				for (const step of run) pushStep(step, isExpanded, depth + 1, out);
+				for (const step of run)
+					pushStep(step, isExpanded, depth + 1, out, keepOut);
 			}
 		} else {
-			for (const step of run) pushStep(step, isExpanded, depth, out);
+			for (const step of run) pushStep(step, isExpanded, depth, out, keepOut);
 		}
 		i = end;
 	}
@@ -138,7 +142,7 @@ export type WaterfallFilterOption = {
 	errorCount: number;
 	key: string;
 	/** A step of this kind, for the option's icon. */
-	sample: Pick<SessionReaderStep, "icon" | "kind" | "name">;
+	sample: Pick<SessionReaderStep, "icon" | "kind" | "name" | "skill">;
 };
 
 /** The filter's choices: the turn's tools, most used first, then what the
@@ -175,11 +179,13 @@ type Stretch =
 			variant: "filtered" | "quiet";
 	  };
 
-/** With a filter on, the steps it picks stay as rows and every run of the
- * rest folds into one — however short, so nothing it hides shows unasked. */
+/** With a filter on, the steps it picks (and any kept out) stay as rows and
+ * every run of the rest folds into one — however short, so nothing it hides
+ * shows unasked. */
 function getFilteredStretches(
 	steps: readonly SessionReaderStep[],
 	filter: ReadonlySet<string>,
+	keepOut: ReadonlySet<string>,
 ): Stretch[] {
 	const out: Stretch[] = [];
 	let hidden: SessionReaderStep[] = [];
@@ -196,7 +202,7 @@ function getFilteredStretches(
 		hidden = [];
 	};
 	for (const step of steps) {
-		if (filter.has(getStepFilterKey(step))) {
+		if (filter.has(getStepFilterKey(step)) || keepOut.has(step.id)) {
 			flush();
 			out.push({ kind: "step", step });
 		} else {
@@ -212,11 +218,13 @@ export function buildWaterfallRows(
 	turnMs: number,
 	isExpanded: (key: string) => boolean,
 	filter: ReadonlySet<string> = new Set(),
+	/** Steps that stay rows of their own, out of every fold. */
+	keepOut: ReadonlySet<string> = new Set(),
 ): WaterfallRow[] {
 	const stretches: Stretch[] =
 		filter.size > 0
-			? getFilteredStretches(steps, filter)
-			: getReaderStretches(steps, turnMs).map((stretch) =>
+			? getFilteredStretches(steps, filter, keepOut)
+			: getReaderStretches(steps, turnMs, keepOut).map((stretch) =>
 					stretch.kind === "step"
 						? stretch
 						: { ...stretch, kind: "fold", variant: "quiet" },
@@ -230,7 +238,7 @@ export function buildWaterfallRows(
 			loose.push(stretch.step);
 			continue;
 		}
-		foldRepeats(loose, isExpanded, 1, out);
+		foldRepeats(loose, isExpanded, 1, out, keepOut);
 		loose = [];
 		const expanded = isExpanded(stretch.key);
 		out.push({
@@ -241,9 +249,9 @@ export function buildWaterfallRows(
 			steps: stretch.steps,
 			variant: stretch.variant,
 		});
-		if (expanded) foldRepeats(stretch.steps, isExpanded, 2, out);
+		if (expanded) foldRepeats(stretch.steps, isExpanded, 2, out, keepOut);
 	}
-	foldRepeats(loose, isExpanded, 1, out);
+	foldRepeats(loose, isExpanded, 1, out, keepOut);
 	return out;
 }
 

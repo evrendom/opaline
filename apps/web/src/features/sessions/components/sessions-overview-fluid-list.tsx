@@ -19,9 +19,13 @@ export function SessionsOverviewFluidList({
 	children,
 	height,
 	fillHeight = true,
+	highlightClassName,
 }: {
 	height?: number;
 	fillHeight?: boolean;
+	/** Shapes the sliding hover highlight, e.g. rounded corners for an inset
+	 * list; square and full width by default. */
+	highlightClassName?: string;
 	children: (registration: SessionHoverRegistration) => ReactNode;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -48,7 +52,10 @@ export function SessionsOverviewFluidList({
 		>
 			<FluidHoverHighlight
 				hover={hover}
-				className="z-0 rounded-none bg-(--session-overview-hover)"
+				className={cn(
+					"z-0 rounded-none bg-(--session-overview-hover)",
+					highlightClassName,
+				)}
 			/>
 			<ul
 				aria-label="Recent sessions"

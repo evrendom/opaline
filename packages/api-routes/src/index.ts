@@ -61,10 +61,15 @@ export {
 import {
 	RepositoryDetailSchema,
 	RepositoryInputSchema,
+	RepositoryOverviewInputSchema,
+	RepositoryOverviewSchema,
 	RepositorySummarySchema,
 } from "./schemas/repositories.js";
 
-export type { RepositorySummary } from "./schemas/repositories.js";
+export type {
+	RepositoryOverview,
+	RepositorySummary,
+} from "./schemas/repositories.js";
 
 import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
@@ -1061,6 +1066,9 @@ export const contract = {
 		repositories: {
 			list: oc.output(z.array(RepositorySummarySchema)),
 			detail: oc.input(RepositoryInputSchema).output(RepositoryDetailSchema),
+			overview: oc
+				.input(RepositoryOverviewInputSchema)
+				.output(RepositoryOverviewSchema),
 		},
 		skills: {
 			list: oc.output(z.array(HistoricalSkillSummarySchema)),

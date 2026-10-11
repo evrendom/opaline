@@ -27,6 +27,7 @@ export type MetricPreviews = Partial<Record<DashboardMetric, CostDashboard>>;
 export function useMetricPreviews(
 	inputFor: (metric: CostDashboardRequestedMetric) => CostDashboardInput,
 	metrics: readonly DashboardMetric[],
+	enabled = true,
 ): MetricPreviews {
 	const { state } = useOrganization();
 	const queryClient = useQueryClient();
@@ -47,7 +48,7 @@ export function useMetricPreviews(
 			return {
 				...options,
 				queryKey: ["org", state.activeOrg?.id, ...options.queryKey],
-				enabled: !!state.activeOrg?.id && demo?.live !== false,
+				enabled: enabled && !!state.activeOrg?.id && demo?.live !== false,
 				placeholderData: dashboardPlaceholder(queryClient, scope, input),
 				staleTime: 60_000,
 				refetchOnWindowFocus: false,

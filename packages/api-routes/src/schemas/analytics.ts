@@ -215,9 +215,9 @@ const HistoricalSkillRepoAttributionSchema = z.object({
 
 const HistoricalSkillAttributionSchema = z.object({
 	userCount: z.number().int().nonnegative().default(0),
-	topUsers: z.array(HistoricalSkillUserAttributionSchema).max(3).default([]),
+	topUsers: z.array(HistoricalSkillUserAttributionSchema).max(6).default([]),
 	repoCount: z.number().int().nonnegative().default(0),
-	topRepos: z.array(HistoricalSkillRepoAttributionSchema).max(3).default([]),
+	topRepos: z.array(HistoricalSkillRepoAttributionSchema).max(6).default([]),
 });
 
 export const HistoricalSkillSummarySchema = z.object({

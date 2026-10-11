@@ -13,6 +13,7 @@ const row: RepositoryAggregateRow = {
 	total_tokens: 1000,
 	estimated_cost: 1.25,
 	incomplete_costs: 0,
+	last_active_at: "2026-10-01T09:00:00Z",
 	model_apologies: 2,
 	user_negative: 1,
 	user_positive: 4,
@@ -27,7 +28,12 @@ test("merges worktrees and user attribution before ranking the cards", () => {
 			project_path: "/opt/conductor/workspaces/app/osaka",
 			session_count: 2,
 		},
-		{ ...row, user_id: "grace", session_count: 7 },
+		{
+			...row,
+			user_id: "grace",
+			session_count: 7,
+			last_active_at: "2026-10-03T17:30:00Z",
+		},
 		{
 			...row,
 			project_path: "/opt/conductor/workspaces/other/tunis",
@@ -43,6 +49,7 @@ test("merges worktrees and user attribution before ranking the cards", () => {
 		sessionCount: 12,
 		totalTokens: 3000,
 		estimatedCost: 3.75,
+		lastActiveAt: "2026-10-03T17:30:00Z",
 		userCount: 2,
 		topUsers: [
 			{ userId: "grace", sessionCount: 7 },

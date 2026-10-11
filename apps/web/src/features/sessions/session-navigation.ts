@@ -5,6 +5,11 @@ export interface SessionNavigation {
 	hasPreviousSession: boolean;
 	onNextSession: () => void;
 	onPreviousSession: () => void;
+	/** What the position counts within ("All Sessions" by default). */
+	scopeLabel?: string;
+	/** Left and right arrows, for navigation that sits in a row of tabs
+	 * rather than beside a vertical list. */
+	horizontal?: boolean;
 }
 
 export function getSessionNeighbours({

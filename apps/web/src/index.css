@@ -133,3 +133,18 @@
 		@apply font-sans;
 	}
 }
+
+/* Outside the layers, so they win over any component's outline utilities. */
+
+/* Charts take focus for keyboard navigation (Recharts' accessibility layer);
+   they never draw a focus outline, however they were focused. */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+	outline: none;
+}
+
+/* A click never leaves an outline behind: only keyboard focus draws one. */
+:focus:not(:focus-visible) {
+	outline: none;
+}

@@ -149,11 +149,13 @@ describe("analytics input schemas", () => {
 		const oversizedAttribution = {
 			...legacySummary,
 			attribution: {
-				userCount: 4,
-				topUsers: ["one", "two", "three", "four"].map((userId) => ({
-					userId,
-					sessionCount: 1,
-				})),
+				userCount: 7,
+				topUsers: ["one", "two", "three", "four", "five", "six", "seven"].map(
+					(userId) => ({
+						userId,
+						sessionCount: 1,
+					}),
+				),
 				repoCount: 0,
 				topRepos: [],
 			},
@@ -168,12 +170,14 @@ describe("analytics input schemas", () => {
 				attribution: {
 					userCount: 0,
 					topUsers: [],
-					repoCount: 4,
-					topRepos: ["one", "two", "three", "four"].map((repoKey) => ({
-						repoKey,
-						repoLabel: repoKey,
-						sessionCount: 1,
-					})),
+					repoCount: 7,
+					topRepos: ["one", "two", "three", "four", "five", "six", "seven"].map(
+						(repoKey) => ({
+							repoKey,
+							repoLabel: repoKey,
+							sessionCount: 1,
+						}),
+					),
 				},
 			}).success,
 		).toBe(false);

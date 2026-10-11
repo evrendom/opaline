@@ -1,4 +1,5 @@
 import {
+	deriveTranscriptToolActivity,
 	getCodexOperationMetadata,
 	type SessionDetailTurnSummary,
 	type TraceEvent,
@@ -27,6 +28,9 @@ export type SessionReaderStep = {
 	nativeId: string | null;
 	/** Subagent launches render as agents, the rest as plain tools. */
 	kind: "agent" | "message" | "thinking" | "tool";
+	/** The skill a tool call loaded — the Skill tool, or a read of its
+	 * SKILL.md — which then names the step and lends it its mark. */
+	skill?: string;
 	/** The model a subagent ran on: what its own transcript records, else
 	 * what its call asked for; unset when neither says. */
 	model?: string;
@@ -130,16 +134,28 @@ function getResultText(result: NonNullable<StepToolEvent["result"]>): string {
 		.join("\n");
 }
 
-/** What kind of tool call this is: a subagent (named by its type) or a tool
- * (by its name), with the glyph the transcript draws for it. */
+/** What kind of tool call this is: a subagent (named by its type), a skill
+ * loaded (by the skill's name), or a tool (by its name), with the glyph the
+ * transcript draws for it. */
 function getToolIdentity(
 	event: StepToolEvent,
-): Pick<SessionReaderStep, "icon" | "kind" | "name"> {
+): Pick<SessionReaderStep, "icon" | "kind" | "name" | "skill"> {
 	// Claude names the subagent's type; Codex's spawn_agent its task.
 	const subagentType = event.input.subagent_type ?? event.input.task_name;
 	const isAgent =
 		event.result?.subagentId !== undefined ||
 		SUBAGENT_TOOL_NAMES.has(event.toolName);
+	const skill = isAgent
+		? undefined
+		: (event.activity ?? deriveTranscriptToolActivity(event)).skills[0];
+	if (skill)
+		return {
+			icon: getToolPresentation(event.toolName, event.input, event.provider)
+				.icon,
+			kind: "tool",
+			name: skill,
+			skill,
+		};
 	return {
 		icon: isAgent
 			? "bot"

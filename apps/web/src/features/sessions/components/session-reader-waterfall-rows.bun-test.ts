@@ -87,6 +87,33 @@ describe("turn waterfall rows", () => {
 		]);
 	});
 
+	test("a step kept out stays a row, splitting the folds around it", () => {
+		const keepOut = new Set(["g"]);
+		expect(
+			outline(buildWaterfallRows(largeTurn, 1000, none, new Set(), keepOut)),
+		).toEqual([
+			"quiet:5@1",
+			"long@1",
+			// What's left either side is too short to fold.
+			"f@1",
+			"g@1",
+			"h@1",
+			"i@1",
+			"err@1",
+			"j@1",
+			"k@1",
+			"answer@1",
+		]);
+		const reads = ["r1", "r2", "r3", "r4"].map((id, i) =>
+			step(id, "Read", i * 10, 10),
+		);
+		expect(
+			outline(
+				buildWaterfallRows(reads, 1000, none, new Set(), new Set(["r3"])),
+			),
+		).toEqual(["r1@1", "r2@1", "r3@1", "r4@1"]);
+	});
+
 	test("an opened quiet stretch nests its steps one level deeper", () => {
 		const rows = buildWaterfallRows(
 			largeTurn,

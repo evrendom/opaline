@@ -65,7 +65,9 @@ export const WHOLE_TURN_ID = "__whole_turn__";
  */
 export function SessionReaderWaterfallView({
 	collapse,
+	freezeRows = true,
 	header,
+	keepOut,
 	run,
 	selection,
 	waterfall,
@@ -73,6 +75,12 @@ export function SessionReaderWaterfallView({
 	/** Fold the waterfall into its root row, which then opens and closes it.
 	 * Without it every row always shows. */
 	collapse?: { onToggle: () => void; open: boolean };
+	/** Freeze open folds and subagent calls at the top of the scroll area
+	 * while what they hold scrolls under them. Off for a waterfall embedded
+	 * in a page with its own frozen header, which they would cover. */
+	freezeRows?: boolean;
+	/** Steps that stay rows of their own, out of every fold. */
+	keepOut?: readonly string[];
 	/** Above the root row when folding — the two stay frozen at the top while
 	 * the steps scroll up under them. */
 	header?: ReactNode;
@@ -113,9 +121,15 @@ export function SessionReaderWaterfallView({
 	const rows = useMemo(
 		() =>
 			open
-				? buildWaterfallRows(steps, total, (key) => expanded.has(key), filter)
+				? buildWaterfallRows(
+						steps,
+						total,
+						(key) => expanded.has(key),
+						filter,
+						keepOut ? new Set(keepOut) : undefined,
+					)
 				: [],
-		[open, steps, total, expanded, filter],
+		[open, steps, total, expanded, filter, keepOut],
 	);
 	const nodes = useMemo(() => nestWaterfallRows(rows), [rows]);
 
@@ -146,6 +160,7 @@ export function SessionReaderWaterfallView({
 		const frac = (event.clientX - rect.left) / Math.max(rect.width, 1);
 		if (frac < 0 || frac > 1) {
 			cursor.style.display = "none";
+			label.style.display = "none";
 			return;
 		}
 		const offsetMs = frac * total;
@@ -158,13 +173,16 @@ export function SessionReaderWaterfallView({
 			minute: "2-digit",
 			second: "2-digit",
 		})}`;
-		// Flip the chip to the line's left near the right edge so it stays inside.
+		// The chip rides in the ruler, beside the line; it flips to the line's
+		// left near the right edge so it stays inside.
 		const flip = frac > 0.75;
-		label.style.left = flip ? "auto" : "6px";
-		label.style.right = flip ? "6px" : "auto";
+		label.style.display = "block";
+		label.style.left = flip ? "auto" : `calc(${frac * 100}% + 6px)`;
+		label.style.right = flip ? `calc(${(1 - frac) * 100}% + 6px)` : "auto";
 	};
 	const hideCursor = () => {
 		if (cursorRef.current) cursorRef.current.style.display = "none";
+		if (cursorLabelRef.current) cursorLabelRef.current.style.display = "none";
 	};
 	const progress = useWaterfallScrollProgress();
 
@@ -215,6 +233,7 @@ export function SessionReaderWaterfallView({
 	): ReactNode[] =>
 		list.map((node) => {
 			const group = node.children.length > 0;
+			const frozen = group && freezeRows;
 			return (
 				<div
 					key={
@@ -224,15 +243,15 @@ export function SessionReaderWaterfallView({
 					className="flex flex-col gap-0.5"
 				>
 					<div
-						data-frozen-row={group ? "" : undefined}
+						data-frozen-row={frozen ? "" : undefined}
 						className={cn(
-							group &&
+							frozen &&
 								"sticky bg-(--dashboard-01-content-background,var(--background))",
 						)}
 						style={
-							group
+							frozen
 								? {
-										top: `calc(var(--frozen-top, 0px) + ${level * FROZEN_ROW_REM}rem)`,
+										top: `calc(var(--frozen-offset, 0px) + var(--frozen-top, 0px) + ${level * FROZEN_ROW_REM}rem)`,
 										zIndex: 20 - level,
 									}
 								: undefined
@@ -300,6 +319,24 @@ export function SessionReaderWaterfallView({
 		</div>
 	);
 
+	// The time ruler, aligned to the bar track, with the hover cursor's
+	// elapsed-time chip. Folding, it freezes in the header under the root row,
+	// so the times stay in view wherever the steps are scrolled.
+	const ruler = (
+		<div className={cn(GRID, "items-center")}>
+			<div />
+			<div className="relative">
+				<TimeRuler total={total} />
+				<span
+					ref={cursorLabelRef}
+					style={{ display: "none" }}
+					className="pointer-events-none absolute top-0 z-10 rounded-sm border bg-background px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground tabular-nums shadow-sm"
+				/>
+			</div>
+			<div />
+		</div>
+	);
+
 	return (
 		<div data-waterfall="" className="@container/steps">
 			<div className="flex flex-col">
@@ -307,18 +344,21 @@ export function SessionReaderWaterfallView({
 					{/* The rows' grid sizes from this container, so a root row
 					    folding the timeline lines up with the steps beneath it. */}
 					<div className="@container min-w-0 flex-1">
-						{/* Folding, the header and root row come first, frozen at the
-						    top on an opaque ground while the timeline beneath them
-						    scrolls under; the negative margin keeps them in place
+						{/* Folding, the header, root row and time ruler come first,
+						    frozen at the top on an opaque ground while the timeline
+						    beneath them scrolls under; the negative margin keeps them in place
 						    while their padding covers the reader's top inset. */}
 						{collapse ? (
 							<div
 								ref={progress.headerRef}
 								data-frozen-header=""
-								className="sticky top-0 z-30 -mt-4 flex flex-col gap-1.5 bg-(--dashboard-01-content-background,var(--background)) pt-4"
+								// `--frozen-offset` (set by a page) freezes it, and the
+								// groups under it, below rows the page freezes above.
+								className="sticky top-(--frozen-offset,0px) z-30 -mt-4 flex flex-col gap-1.5 bg-(--dashboard-01-content-background,var(--background)) pt-4"
 							>
 								{header}
 								{rootRow}
+								{open ? ruler : null}
 							</div>
 						) : null}
 						{open ? (
@@ -331,15 +371,10 @@ export function SessionReaderWaterfallView({
 								onMouseMove={moveCursor}
 								onMouseLeave={hideCursor}
 							>
-								{/* Time ruler, aligned to the bar track. */}
-								<div className={cn(GRID, "items-center")}>
-									<div />
-									<TimeRuler total={total} />
-									<div />
-								</div>
+								{collapse ? null : ruler}
 
-								{/* Hover time cursor: a full-height line at the pointer with an
-					    elapsed-time chip up in the ruler row. Same insets as the
+								{/* Hover time cursor: a full-height line at the pointer, its
+					    elapsed-time chip up in the ruler. Same insets as the
 					    gridlines. */}
 								<div
 									ref={trackOverlayRef}
@@ -349,12 +384,7 @@ export function SessionReaderWaterfallView({
 										ref={cursorRef}
 										style={{ display: "none" }}
 										className="absolute inset-y-0 w-px bg-foreground/25"
-									>
-										<span
-											ref={cursorLabelRef}
-											className="absolute top-0 rounded-sm border bg-background px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground tabular-nums shadow-sm"
-										/>
-									</div>
+									/>
 								</div>
 
 								<div className="relative">

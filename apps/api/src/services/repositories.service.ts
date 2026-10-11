@@ -15,6 +15,7 @@ export async function listRepositories(orgId: string) {
     count() AS session_count, sum(sa.total_tokens) AS total_tokens,
     sum(ifNull(sa.estimated_cost, 0)) AS estimated_cost,
     countIf(NOT sa.cost_is_complete) AS incomplete_costs,
+    formatDateTime(max(sa.last_interaction_date), '%Y-%m-%dT%H:%i:%SZ') AS last_active_at,
     sum(if(signals.scan_version >= 5, arraySum(mapValues(signals.model_apology_counts)), signals.model_apologies)) AS model_apologies,
     sum(if(signals.scan_version >= 5, arraySum(mapValues(signals.member_negative_counts)), signals.member_negative)) AS user_negative,
     sum(if(signals.scan_version >= 5, arraySum(mapValues(signals.member_positive_counts)), signals.member_positive)) AS user_positive,
