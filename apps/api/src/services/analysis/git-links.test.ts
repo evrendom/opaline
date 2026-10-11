@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import {
+	addTurns,
 	assembleGitEvents,
 	type CiRunRow,
 	emptyGitHubFacts,
@@ -14,6 +15,8 @@ import {
 	resolveRepository,
 	type Seed,
 } from "./git-links.js";
+import type { ScopeBatch } from "./scope.js";
+import { PARAM_BYTES_PER_STATEMENT, paramValueBytes } from "./sql.js";
 
 const athena = { repositoryId: "101", fullName: "opalinehq/athena" };
 const visible: GitHubAccess = {
@@ -815,6 +818,55 @@ describe("GitHub lookups", () => {
 		expect(pullRequests?.query).toContain(
 			"if(head_repository_id = '', repository_id, head_repository_id)",
 		);
+	});
+});
+
+describe("addTurns", () => {
+	test("reads the turns of many observations in statements within the parameter budget", async () => {
+		const sessionId = "019e4604-8fc2-7f12-9ef4-17b136f1125a";
+		const seeds = Array.from({ length: 5000 }, (_, record) =>
+			seed({ sessionId, agentId: "agent-1", record }),
+		);
+		const statements: Record<string, unknown>[] = [];
+		const executor = {
+			query: async (statement: { query_params?: Record<string, unknown> }) => {
+				const params = statement.query_params ?? {};
+				statements.push(params);
+				return (params.keyRecords as number[]).map((record) => ({
+					session_id: sessionId,
+					agent_id: "agent-1",
+					record_idx: record,
+					block_idx: 0,
+					turn_idx: record + 1,
+				}));
+			},
+		} as unknown as ClickHouseExecutor;
+		const batch = {
+			scope: { organizationId: "org", userId: "user" },
+			generations: [],
+			sessions: [{ session_id: sessionId }],
+		} as unknown as ScopeBatch;
+
+		await addTurns(executor, [batch], seeds);
+
+		expect(statements.length).toBeGreaterThan(1);
+		for (const params of statements) {
+			const bytes = Object.values(params)
+				.filter(Array.isArray)
+				.flat()
+				.reduce<number>(
+					(sum, value) => sum + paramValueBytes(value as string | number),
+					0,
+				);
+			expect(bytes).toBeLessThanOrEqual(PARAM_BYTES_PER_STATEMENT);
+		}
+		expect(
+			statements.reduce(
+				(sum, params) => sum + (params.keyRecords as number[]).length,
+				0,
+			),
+		).toBe(seeds.length);
+		expect(seeds.every((entry) => entry.turn === entry.record + 1)).toBe(true);
 	});
 });
 

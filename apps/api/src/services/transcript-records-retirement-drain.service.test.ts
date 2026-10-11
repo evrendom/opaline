@@ -4,6 +4,8 @@ import { TRANSCRIPT_RECORDS_RETIRE_GRACE_MS } from "./transcript-records-ingest.
 import {
 	buildRetirementDelete,
 	drainTranscriptRecordsRetirement,
+	RETIREMENT_DELETE_MAX_EXECUTION_SECONDS,
+	RETIREMENT_DRAIN_REQUEST_TIMEOUT_MS,
 	type RetirementGenerationRow,
 	selectSessionRetirements,
 } from "./transcript-records-retirement-drain.service.js";
@@ -303,5 +305,16 @@ describe("buildRetirementDelete", () => {
 			revision0: "5",
 			parserVersion0: 7,
 		});
+	});
+
+	test("waits for the mutation longer than the default statement limit", () => {
+		const statement = buildRetirementDelete("o1", []);
+		expect(statement.clickhouse_settings).toEqual({
+			lightweight_deletes_sync: "1",
+			max_execution_time: RETIREMENT_DELETE_MAX_EXECUTION_SECONDS,
+		});
+		expect(RETIREMENT_DRAIN_REQUEST_TIMEOUT_MS).toBeGreaterThan(
+			RETIREMENT_DELETE_MAX_EXECUTION_SECONDS * 1000,
+		);
 	});
 });

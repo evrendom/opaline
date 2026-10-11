@@ -27,12 +27,54 @@ class ClickHouseHttpResponseError extends Error {
 	}
 }
 
+/**
+ * clickhouse-js sends query parameters in the request URL, and ClickHouse
+ * Cloud's proxy rejects URLs near 16 KiB (HTTP 414). Past this length a query
+ * and its parameters travel as a multipart form instead, which ClickHouse reads
+ * like the URL; one form field stays under 128 KiB
+ * (`http_max_field_value_size`, see `PARAM_BYTES_PER_STATEMENT`).
+ */
+export const MAX_CLICKHOUSE_URL_BYTES = 8 * 1024;
+
+/**
+ * The request with its `param_*` URL parameters and query moved into a
+ * multipart body when the URL is longer than `MAX_CLICKHOUSE_URL_BYTES`.
+ * Inserts (their query in the URL, data in the body) are left alone.
+ */
+export function moveLongQueryParamsToBody(
+	input: Parameters<typeof fetch>[0],
+	init?: Parameters<typeof fetch>[1],
+): [Parameters<typeof fetch>[0], Parameters<typeof fetch>[1]] {
+	const href =
+		typeof input === "string"
+			? input
+			: input instanceof URL
+				? input.href
+				: undefined;
+	if (
+		href === undefined ||
+		href.length <= MAX_CLICKHOUSE_URL_BYTES ||
+		typeof init?.body !== "string"
+	)
+		return [input, init];
+	const url = new URL(href);
+	if (url.searchParams.has("query")) return [input, init];
+	const form = new FormData();
+	form.append("query", init.body);
+	for (const [name, value] of [...url.searchParams]) {
+		if (!name.startsWith("param_")) continue;
+		form.append(name, value);
+		url.searchParams.delete(name);
+	}
+	return [url.toString(), { ...init, body: form }];
+}
+
 const fetchWithClickHouseHttpStatus = Object.assign(
 	async (
 		input: Parameters<typeof fetch>[0],
 		init?: Parameters<typeof fetch>[1],
 	): Promise<Response> => {
-		const response = await fetch(input, init);
+		const response = await fetch(...moveLongQueryParamsToBody(input, init));
 		if (response.ok) return response;
 		const parsedError = parseError(await response.clone().text());
 		if (parsedError instanceof ClickHouseError) return response;
@@ -216,6 +258,8 @@ export function createClickHouseExecutor(config: {
 	username?: string;
 	password?: string;
 	database?: string;
+	/** The client's wait for one response; a statement's `max_execution_time` must fit in it. */
+	requestTimeoutMs?: number;
 }): ClickHouseExecutor {
 	const client = createClient({
 		url: config.url,
@@ -223,7 +267,7 @@ export function createClickHouseExecutor(config: {
 		password: config.password,
 		database: config.database,
 		fetch: fetchWithClickHouseHttpStatus,
-		request_timeout: 120_000,
+		request_timeout: config.requestTimeoutMs ?? 120_000,
 		clickhouse_settings: {
 			max_execution_time: 60,
 			timeout_before_checking_execution_speed: 0,
@@ -709,15 +753,27 @@ function readNumber(row: object, key: string): number {
 
 let _clickhouse: ClickHouseExecutor | null = null;
 
+/**
+ * A new executor on the environment's ClickHouse, for operator scripts whose
+ * statements need a longer client wait than `getClickhouse`'s; it does not
+ * retry inserts.
+ */
+export function createClickHouseExecutorFromEnv(
+	options: { requestTimeoutMs?: number } = {},
+): ClickHouseExecutor {
+	const url = process.env.CLICKHOUSE_URL || "http://localhost:8123";
+	return createClickHouseExecutor({
+		url,
+		username: resolveClickHouseUsername(process.env, url),
+		password: process.env.CLICKHOUSE_PASSWORD || "",
+		database: "default",
+		requestTimeoutMs: options.requestTimeoutMs,
+	});
+}
+
 export function getClickhouse(): ClickHouseExecutor {
 	if (!_clickhouse) {
-		const url = process.env.CLICKHOUSE_URL || "http://localhost:8123";
-		const executor = createClickHouseExecutor({
-			url,
-			username: resolveClickHouseUsername(process.env, url),
-			password: process.env.CLICKHOUSE_PASSWORD || "",
-			database: "default",
-		});
+		const executor = createClickHouseExecutorFromEnv();
 		const maxRetries = 3;
 		_clickhouse = {
 			...executor,

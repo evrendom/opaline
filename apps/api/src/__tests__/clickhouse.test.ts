@@ -17,6 +17,8 @@ import {
 	createClickHouseExecutor,
 	createClickHouseInsertDeduplicationSettings,
 	getSafeClickHouseTable,
+	MAX_CLICKHOUSE_URL_BYTES,
+	moveLongQueryParamsToBody,
 } from "../clickhouse.js";
 
 describe("clickhouse helpers", () => {
@@ -127,6 +129,67 @@ describe("clickhouse helpers", () => {
 
 		await executor.close();
 		await server.stop(true);
+	});
+
+	test("moves long query parameters out of the URL into a multipart body", async () => {
+		const requests: {
+			url: URL;
+			form: Map<string, string> | null;
+			text: string | null;
+		}[] = [];
+		const server = Bun.serve({
+			async fetch(request) {
+				const multipart = (
+					request.headers.get("content-type") ?? ""
+				).startsWith("multipart/form-data");
+				requests.push({
+					url: new URL(request.url),
+					form: multipart
+						? new Map(
+								[...(await request.formData()).entries()].map(
+									([name, value]) => [name, String(value)],
+								),
+							)
+						: null,
+					text: multipart ? null : await request.text(),
+				});
+				return new Response("");
+			},
+			hostname: "127.0.0.1",
+			port: 0,
+		});
+		const executor = createClickHouseExecutor({ url: server.url.toString() });
+		const ids = Array.from(
+			{ length: 400 },
+			(_, index) =>
+				`019e4604-8fc2-7f12-9ef4-${String(index).padStart(12, "0")}`,
+		);
+		const query = "SELECT count() FROM t WHERE id IN {ids:Array(String)}";
+
+		await executor.execute({ query, query_params: { ids: ids.slice(0, 2) } });
+		await executor.execute({ query, query_params: { ids } });
+
+		const [short, long] = requests;
+		expect(short?.url.searchParams.get("param_ids")).toBe(
+			`['${ids[0]}','${ids[1]}']`,
+		);
+		expect(short?.text).toBe(query);
+		expect(long?.url.searchParams.has("param_ids")).toBe(false);
+		expect(long?.url.searchParams.get("wait_end_of_query")).toBe("1");
+		expect(long?.url.toString().length).toBeLessThan(MAX_CLICKHOUSE_URL_BYTES);
+		expect(long?.form?.get("query")).toBe(query);
+		expect(long?.form?.get("param_ids")).toBe(
+			`[${ids.map((id) => `'${id}'`).join(",")}]`,
+		);
+
+		await executor.close();
+		await server.stop(true);
+	});
+
+	test("leaves inserts, whose query is in the URL, unchanged", () => {
+		const url = `http://clickhouse.test/?query=${"x".repeat(MAX_CLICKHOUSE_URL_BYTES)}`;
+		const init = { body: '{"a":1}', method: "POST" };
+		expect(moveLongQueryParamsToBody(url, init)).toEqual([url, init]);
 	});
 
 	test("builds exact-revision session analytics repairs from both canonical MVs", () => {

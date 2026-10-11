@@ -889,30 +889,47 @@ export async function addTurns(
 			(seed) => seed.generation !== null && own.has(seed.sessionId),
 		);
 		if (targets.length === 0) continue;
-		const rows = await query(executor, TurnSchema, {
-			query: `SELECT session_id, agent_id, record_idx, block_idx, turn_idx
-				FROM ${records()} FINAL
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id IN {sessionIds:Array(String)}
-					AND (session_id, agent_id, toString(revision), parser_version, record_idx, block_idx) IN (
-						SELECT k.1, k.2, k.3, k.4, k.5, k.6 FROM (SELECT arrayJoin(arrayZip(
-							{keySessions:Array(String)}, {keyAgents:Array(String)}, {keyRevisions:Array(String)},
-							{keyParsers:Array(UInt16)}, {keyRecords:Array(UInt32)}, {keyBlocks:Array(UInt16)})) AS k))`,
-			query_params: {
-				organizationId: batch.scope.organizationId,
-				userId: batch.scope.userId,
-				sessionIds: [...new Set(targets.map((seed) => seed.sessionId))],
-				keySessions: targets.map((seed) => seed.sessionId),
-				keyAgents: targets.map((seed) => seed.agentId),
-				keyRevisions: targets.map((seed) => seed.generation?.revision ?? ""),
-				keyParsers: targets.map(
-					(seed) => seed.generation?.transcriptParserVersion ?? 0,
+		// The keys travel as parameters: one statement per budget.
+		const rows = (
+			await Promise.all(
+				chunkByParamBytes(targets, (seed) => [
+					seed.sessionId,
+					seed.sessionId,
+					seed.agentId,
+					seed.generation?.revision ?? "",
+					seed.generation?.transcriptParserVersion ?? 0,
+					seed.record,
+					nativeBlock(seed.block),
+				]).map((chunk) =>
+					query(executor, TurnSchema, {
+						query: `SELECT session_id, agent_id, record_idx, block_idx, turn_idx
+							FROM ${records()} FINAL
+							WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+								AND session_id IN {sessionIds:Array(String)}
+								AND (session_id, agent_id, toString(revision), parser_version, record_idx, block_idx) IN (
+									SELECT k.1, k.2, k.3, k.4, k.5, k.6 FROM (SELECT arrayJoin(arrayZip(
+										{keySessions:Array(String)}, {keyAgents:Array(String)}, {keyRevisions:Array(String)},
+										{keyParsers:Array(UInt16)}, {keyRecords:Array(UInt32)}, {keyBlocks:Array(UInt16)})) AS k))`,
+						query_params: {
+							organizationId: batch.scope.organizationId,
+							userId: batch.scope.userId,
+							sessionIds: [...new Set(chunk.map((seed) => seed.sessionId))],
+							keySessions: chunk.map((seed) => seed.sessionId),
+							keyAgents: chunk.map((seed) => seed.agentId),
+							keyRevisions: chunk.map(
+								(seed) => seed.generation?.revision ?? "",
+							),
+							keyParsers: chunk.map(
+								(seed) => seed.generation?.transcriptParserVersion ?? 0,
+							),
+							keyRecords: chunk.map((seed) => seed.record),
+							keyBlocks: chunk.map((seed) => nativeBlock(seed.block)),
+						},
+						clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+					}),
 				),
-				keyRecords: targets.map((seed) => seed.record),
-				keyBlocks: targets.map((seed) => nativeBlock(seed.block)),
-			},
-			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		});
+			)
+		).flat();
 		const turns = new Map(
 			rows.map((row) => [
 				JSON.stringify([

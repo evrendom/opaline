@@ -40,6 +40,14 @@ import { buildTranscriptRecordsRetirementCensusStatement } from "./transcript-re
  */
 
 export const RETIREMENT_DRAIN_MAX_PAGE_SIZE = 100;
+/**
+ * A lightweight DELETE waits for its mutation, which rewrites the row mask of
+ * every part it touches: minutes on a large table, whatever the page size.
+ */
+export const RETIREMENT_DELETE_MAX_EXECUTION_SECONDS = 600;
+/** The client wait the drain's executor needs for its DELETEs. */
+export const RETIREMENT_DRAIN_REQUEST_TIMEOUT_MS =
+	(RETIREMENT_DELETE_MAX_EXECUTION_SECONDS + 60) * 1000;
 const CENSUS_SETTINGS = {
 	max_bytes_to_read: String(32 * 1024 * 1024 * 1024),
 	max_execution_time: 120,
@@ -349,7 +357,10 @@ export function buildRetirementDelete(
 	});
 	return {
 		abortSignal,
-		clickhouse_settings: { lightweight_deletes_sync: "1" },
+		clickhouse_settings: {
+			lightweight_deletes_sync: "1",
+			max_execution_time: RETIREMENT_DELETE_MAX_EXECUTION_SECONDS,
+		},
 		query: `
 			DELETE FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
 			WHERE organization_id = {organizationId:String}

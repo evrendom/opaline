@@ -112,11 +112,12 @@ export async function query<Row>(
 }
 
 /**
- * Query parameters travel in the request URL, which ClickHouse caps at
- * 1 MiB (`http_max_uri_size`); one statement's array parameters stay well
- * below it.
+ * Query parameters travel in the request URL, or in a multipart body once the
+ * URL is long (`moveLongQueryParamsToBody`), where ClickHouse caps one form
+ * field at 128 KiB (`http_max_field_value_size`); one statement's array
+ * parameters stay below it together.
  */
-export const PARAM_BYTES_PER_STATEMENT = 256 * 1024;
+export const PARAM_BYTES_PER_STATEMENT = 96 * 1024;
 
 /**
  * The bytes one array element takes in the request URL: clickhouse-js
