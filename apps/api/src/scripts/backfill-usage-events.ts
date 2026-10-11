@@ -17,6 +17,7 @@ const { values } = parseArgs({
 		"max-session-mib": { type: "string" },
 		"max-sessions": { type: "string" },
 		"organization-id": { type: "string" },
+		shard: { type: "string" },
 	},
 	strict: true,
 });
@@ -52,6 +53,7 @@ try {
 			);
 		},
 		organizationId: values["organization-id"],
+		shard: parseShard(values.shard),
 	};
 	const result = values.execute
 		? await backfillUsageEvents(executor, options)
@@ -75,4 +77,20 @@ function parsePositiveInteger(
 		throw new Error(`${flag} must be a positive integer.`);
 	}
 	return parsed;
+}
+
+/** `--shard <index>/<count>`, for example `--shard 0/4`. */
+function parseShard(
+	value: string | undefined,
+): { index: number; count: number } | undefined {
+	if (value === undefined) return undefined;
+	const match = /^(\d+)\/(\d+)$/u.exec(value);
+	const index = Number(match?.[1]);
+	const count = Number(match?.[2]);
+	if (!match || count < 1 || count > 64 || index >= count) {
+		throw new Error(
+			"--shard must be <index>/<count> with 0 <= index < count <= 64.",
+		);
+	}
+	return { index, count };
 }

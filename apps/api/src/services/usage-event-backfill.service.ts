@@ -42,6 +42,11 @@ export interface UsageEventsBackfillOptions {
 	maxSessions: number;
 	onProgress?: (progress: UsageEventsBackfillProgress) => void;
 	organizationId?: string;
+	/**
+	 * Only the sessions whose ID hashes to `index` of `count`, so several runs
+	 * can backfill one organization in parallel without sharing a session.
+	 */
+	shard?: { index: number; count: number };
 }
 
 export interface UsageEventsBackfillProgress {
@@ -429,6 +434,9 @@ async function listSourceCandidates(
 	const organizationFilter = options.organizationId
 		? "AND organization_id = {organizationId:String}"
 		: "";
+	const shardFilter = options.shard
+		? "AND cityHash64(session_id) % {shardCount:UInt32} = {shardIndex:UInt32}"
+		: "";
 	const subagentBytes =
 		source === "claude_code"
 			? "+ arraySum(arrayMap(value -> length(value), mapValues(subagents)))"
@@ -444,33 +452,48 @@ async function listSourceCandidates(
 			...SOURCE_SCAN_SETTINGS,
 			max_result_rows: String(options.maxSessions + 1),
 		},
+		// Content (and subagents) is read for each session's latest revision only:
+		// reading every stored revision of a large organization exceeds the scan
+		// limit even though only the latest one decides the candidate.
 		query: `
-			SELECT
-				organization_id,
-				session_id,
-				latest_user_id,
-				latest_session_date,
-				latest_ingested_at,
-				latest_content_bytes,
-				raw_session_count
-			FROM (
-				SELECT *, count() OVER () AS raw_session_count
-				FROM (
-					SELECT
-						organization_id,
-						session_id,
-						argMax(user_id, revision) AS latest_user_id,
-						toString(argMax(session_date, revision)) AS latest_session_date,
-						toString(argMax(ingested_at, revision)) AS latest_ingested_at,
-						argMax(length(content) ${subagentBytes}, revision) AS latest_content_bytes,
-						argMax(toUInt8(${hasUsage}), revision) AS has_usage
-					FROM ${table}
-					WHERE ingested_at <= {cutoff:DateTime64(3, 'UTC')}
-						${organizationFilter}
-					GROUP BY organization_id, session_id
+			WITH latest AS (
+				SELECT
+					organization_id,
+					session_id,
+					max(revision) AS latest_revision,
+					argMax(user_id, revision) AS latest_user_id,
+					toString(argMax(session_date, revision)) AS latest_session_date,
+					toString(argMax(ingested_at, revision)) AS latest_ingested_at
+				FROM ${table}
+				WHERE ingested_at <= {cutoff:DateTime64(3, 'UTC')}
+					${organizationFilter}
+					${shardFilter}
+				GROUP BY organization_id, session_id
+			),
+			latest_with_usage AS (
+				SELECT
+					organization_id,
+					session_id,
+					max(length(content) ${subagentBytes}) AS latest_content_bytes
+				FROM ${table}
+				PREWHERE (organization_id, session_id, revision) IN (
+					SELECT organization_id, session_id, latest_revision FROM latest
 				)
+				WHERE ${hasUsage}
+				GROUP BY organization_id, session_id
 			)
-			WHERE has_usage = 1
+			SELECT
+				l.organization_id AS organization_id,
+				l.session_id AS session_id,
+				l.latest_user_id AS latest_user_id,
+				l.latest_session_date AS latest_session_date,
+				l.latest_ingested_at AS latest_ingested_at,
+				u.latest_content_bytes AS latest_content_bytes,
+				(SELECT count() FROM latest) AS raw_session_count
+			FROM latest AS l
+			INNER JOIN latest_with_usage AS u
+				ON l.organization_id = u.organization_id
+				AND l.session_id = u.session_id
 			ORDER BY organization_id, session_id
 			LIMIT {candidateLimit:UInt32}
 		`,
@@ -478,6 +501,8 @@ async function listSourceCandidates(
 			candidateLimit: options.maxSessions + 1,
 			cutoff: toClickHouseTimestamp(options.cutoff),
 			organizationId: options.organizationId ?? "",
+			shardCount: options.shard?.count ?? 1,
+			shardIndex: options.shard?.index ?? 0,
 		},
 	});
 	const candidates = rows.map((row) => ({
