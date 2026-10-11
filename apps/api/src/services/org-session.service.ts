@@ -1,5 +1,6 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
 import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
+import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
 	type ClickHouseStatement,
 	getClickhouse,
@@ -229,6 +230,10 @@ export function getClickHouseSessionPurgePlans(
 		// Session edges carry their owner; GitHub edges (empty user) go with the workspace.
 		...L1_EDGE_TABLES.map((table) => ({ column, table })),
 		{ column, table: RUN_INDEX_TABLE },
+		// Run index sums per member and week. Later refreshes read the run index
+		// purged above; the follow-up pass removes a snapshot appended by a
+		// refresh that was already running.
+		{ column, table: WEEKLY_TOTALS_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },

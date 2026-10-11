@@ -53,6 +53,7 @@ const TRANSCRIPT_DERIVED = [
 	"skill_uses",
 	"skill_version_contents",
 	"repository_session_evidence_index",
+	"weekly_totals",
 ];
 /** Workspace-scoped GitHub facts: deleted with the workspace, not with an account. */
 const WORKSPACE_ONLY = [

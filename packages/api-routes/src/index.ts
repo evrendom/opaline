@@ -89,9 +89,14 @@ export {
 	type AnalysisRun,
 	type AnalysisTrace,
 	AnalysisTraceSchema,
+	type AnalysisWeeklyTotals,
+	AnalysisWeeklyTotalsSchema,
 	findLimit,
 	parsePullRequestRef,
 	type RunRef,
+	WEEKLY_MEASURES,
+	WEEKLY_NULLABLE_MEASURES,
+	type WeeklyMeasure,
 } from "./analysis.js";
 export {
 	type AnalysisChange,

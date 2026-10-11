@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
-import type {
-	AnalysisFindOutput,
-	AnalysisHistoryGetOutput,
-	AnalysisReadOutput,
+import {
+	type AnalysisFindOutput,
+	type AnalysisHistoryGetOutput,
+	type AnalysisReadOutput,
+	WEEKLY_MEASURES,
+	WEEKLY_NULLABLE_MEASURES,
 } from "@rudel/api-routes";
 import { budgetReadOutput } from "../services/analysis/read-output.js";
 import {
@@ -461,4 +463,49 @@ test("git events print their link source only when it is not current edges, with
 		"session\tat\trelation\tmatched\tevidence\treason",
 		"session/main turn 3\t2026-09-15T10:00:00.000Z\tpr_named\t133\tobs::10:0:pr_url@1/773\ttranscript_unavailable",
 	]);
+});
+
+test("weekly totals render the snapshot and every measure, unknown sums as null", () => {
+	const text = renderFind({
+		source: "weekly",
+		header,
+		snapshot: {
+			id: "host 2026-10-04",
+			refreshedAt: "2026-10-04T03:00:00.000Z",
+		},
+		totals: [
+			{
+				week: "2026-09-28",
+				member: "u1",
+				agent: "codex",
+				weeks: 1,
+				sessions: 2,
+				...(Object.fromEntries(WEEKLY_MEASURES.map((name) => [name, 3])) as {
+					[K in (typeof WEEKLY_MEASURES)[number]]: number;
+				}),
+				...(Object.fromEntries(
+					WEEKLY_NULLABLE_MEASURES.map((name) => [name, null]),
+				) as { [K in (typeof WEEKLY_NULLABLE_MEASURES)[number]]: null }),
+				deniedCalls: 1,
+			},
+		],
+	});
+	const lines = text.split("\n");
+	expect(lines).toContain(
+		"snapshot host 2026-10-04 refreshedAt=2026-10-04T03:00:00.000Z",
+	);
+	const columns = lines.find((line) => line.startsWith("week\t"))?.split("\t");
+	expect(columns).toEqual([
+		"week",
+		"member",
+		"agent",
+		"weeks",
+		"sessions",
+		...WEEKLY_MEASURES,
+		...WEEKLY_NULLABLE_MEASURES,
+	]);
+	const row = lines.at(-1)?.split("\t") ?? [];
+	expect(row.slice(0, 6)).toEqual(["2026-09-28", "u1", "codex", "1", "2", "3"]);
+	expect(row[(columns ?? []).indexOf("deniedCalls")]).toBe("1");
+	expect(row[(columns ?? []).indexOf("costUsd")]).toBe("null");
 });

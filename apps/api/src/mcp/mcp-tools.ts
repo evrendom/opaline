@@ -334,18 +334,18 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description: [
 			"What it does: Finds where the team's agents got stuck, failed or wasted time and money, so the team can fix their setup.",
 			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
-			"Returns: The period covered, totals, and runs, failures by cause, unhappy prompts, or git events.",
+			"Returns: The period, totals, and runs, failures by cause, unhappy prompts, git events or weekly totals.",
 			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
-			"Limits: Members see their own sessions, admins the whole team; up to 200 rows per call.",
+			"Limits: Members see their own sessions and team weekly totals, admins all; 200 rows a call.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
-				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push; with pullRequest, the sessions that touched that pull request.",
-			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to. For totals and rankings, use the start of the window the user asked for.",
+				"Required. runs: one row per run with its time and cost. tool: failed tool calls grouped by cause. user: prompts where the user was unhappy with the agent (corrections, complaints) and agent apologies. git: commits, pushes, PR links and creations, CI status reads and Codex git metadata, each with the pull requests and CI runs GitHub links to it and whether CI was checked after a push; with pullRequest, the sessions that touched that pull request. weekly: per ISO week, member and agent, the sums of the runs' recorded facts (runs, sessions, minutes, cost and tokens, calls, failures, denials, interruptions, API errors, pushes, commits, PR links, MCP calls, skills), from a nightly snapshot; use it for trends over weeks or months and for before/after comparisons.",
+			from: "First day, YYYY-MM-DD (UTC). Default: 6 days before to (source=weekly: the 11 weeks before the week of to). For totals and rankings, use the start of the window the user asked for. source=weekly counts whole weeks from the Monday on or before it.",
 			to: "Last day, YYYY-MM-DD (UTC). Default: today.",
 			latest: "Only the newest N sessions in the date range, 1-200.",
 			repository:
-				"Only sessions in this repository (a name from the repository column).",
+				"Only sessions in this repository (a name from the repository column). Not for source=weekly.",
 			agent: "Only sessions from claude_code or codex. Default: both.",
 			model:
 				"Only runs that used this model id; cost then counts only that model.",
@@ -364,7 +364,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			reaction:
 				"source=user only: negative (unhappy prompts), swear (strongly worded complaints), apology (the agent apologized). Default: all three.",
 			groupBy:
-				"source=runs only: totals per week, model, repository, agent or session instead of one row per run.",
+				"source=runs: totals per week, model, repository, agent or session instead of one row per run. source=weekly: totals per week, member or agent instead of one row per week, member and agent.",
 			refs: "Only these runs (at most 200), as given by an earlier result; with source=runs this returns their total time and cost.",
 			"refs[].sessionId": "The run's session id.",
 			"refs[].agentId":

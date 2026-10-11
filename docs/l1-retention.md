@@ -2,7 +2,7 @@
 
 Owner decision: raw transcripts, `transcript_records` (all columns, text included), `run_index` (all columns, free text included) and `session_lineage` (L1 lineage) are **kept until a deletion request**. They no longer expire after 365 days (raw, records, run index text) or 1,095 days (run index), and `session_lineage` no longer expires after 365 days. Deleting an account or a workspace is now the only way these tables shrink, so the deletion coverage below is part of the retention contract: a table that holds an owner and is missing from the purge keeps that owner's data forever.
 
-Not changed: the GitHub links and weekly aggregates keep their own retention; analyses and exact query results in Convex (ADR 0001), the ingest staging objects, purge-job rows and the other operational retention listed at the end.
+Not changed: the GitHub links keep their own retention; the weekly totals (`weekly_totals`) are nightly snapshots rebuilt from the whole run index, so each one covers all its history and older snapshots expire after 14 days without losing anything; analyses and exact query results in Convex (ADR 0001), the ingest staging objects, purge-job rows and the other operational retention listed at the end.
 
 ## What expired before, and what replaces it
 
@@ -54,6 +54,7 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 | ClickHouse `claude_sessions`, `codex_sessions` | raw transcripts | yes, by `user_id` | yes, by `organization_id` |
 | ClickHouse `transcript_records` | every record, with text | yes | yes |
 | ClickHouse `run_index` | runs and receipts, with free text | yes | yes |
+| ClickHouse `weekly_totals` | sums of the run index per member, agent and week (nightly snapshots); a refresh that was already running when the purge deleted the run index is removed by the second pass | yes | yes |
 | ClickHouse `l1_edges`, `l1_edges_by_target`, `l1_edge_resolutions` | edges and evidence from sessions (the copy ordered by target is purged separately) | yes, by `user_id`; GitHub-side edges with an empty user are not the user's | yes |
 | ClickHouse `session_git_observations` | git commands and outcomes read from transcripts | yes | yes |
 | ClickHouse `usage_events` | per-request usage | yes | yes |

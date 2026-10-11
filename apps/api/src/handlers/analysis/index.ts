@@ -10,6 +10,7 @@ import {
 } from "../../services/analysis/output-ceiling.js";
 import { readAnalysis } from "../../services/analysis/read.service.js";
 import { budgetReadOutput } from "../../services/analysis/read-output.js";
+import { findScope } from "../../services/analysis/scope.js";
 import {
 	getAnalysisTree,
 	getStoredQuery,
@@ -68,10 +69,14 @@ export function createAnalysisRouter(
 					message: "Only workspace admins may filter by userId",
 				});
 			const found = await findAnalysisWithOwners(
-				{
-					organizationId: context.organizationId,
-					userId: context.isOrgAdmin ? (input.userId ?? null) : context.user.id,
-				},
+				findScope(
+					{
+						organizationId: context.organizationId,
+						userId: context.user.id,
+						isOrgAdmin: context.isOrgAdmin,
+					},
+					input,
+				),
 				input,
 				env,
 			);

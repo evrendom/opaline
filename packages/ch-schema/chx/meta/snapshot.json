@@ -4009,6 +4009,365 @@
 			},
 			"comment": "L1 runs per committed transcript generation, with a receipt per session generation written last; written only by the reconciliation worker.",
 			"kind": "table"
+		},
+		{
+			"database": "rudel",
+			"name": "weekly_totals",
+			"engine": "MergeTree",
+			"columns": [
+				{
+					"name": "refreshed_at",
+					"type": "DateTime64(6, 'UTC')",
+					"comment": "UTC time the refresh that wrote the snapshot started; snapshots expire after 14 days."
+				},
+				{
+					"name": "refresh_id",
+					"type": "String",
+					"comment": "Snapshot id (replica host and refreshed_at). Each refresh appends a full snapshot, and readers read only the newest complete one."
+				},
+				{
+					"name": "snapshot_rows",
+					"type": "UInt64",
+					"comment": "Rows of the snapshot; a snapshot with fewer rows stored is incomplete and never read."
+				},
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Owning workspace ID; tenant boundary."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "Member: the sessions' owner."
+				},
+				{
+					"name": "agent",
+					"type": "LowCardinality(String)",
+					"comment": "Transcript source: claude_code or codex."
+				},
+				{
+					"name": "week",
+					"type": "Date",
+					"comment": "Monday (UTC) of the ISO week the runs started in; the usage no run claims counts in the week of its session date."
+				},
+				{
+					"name": "runs",
+					"type": "UInt64",
+					"comment": "Runs (one human prompt and everything until the next) that started in the week, subagent streams included."
+				},
+				{
+					"name": "sessions",
+					"type": "UInt64",
+					"comment": "Sessions with a run that started in the week. A session that spans weeks counts in each, so it does not add up across weeks."
+				},
+				{
+					"name": "sessions_started",
+					"type": "UInt64",
+					"comment": "Sessions whose first run started in the week; adds up across weeks."
+				},
+				{
+					"name": "genuine_prompts",
+					"type": "UInt64",
+					"comment": "Human prompts of the runs of the row (queued prompts included, delegated tasks not)."
+				},
+				{
+					"name": "minutes",
+					"type": "Float64",
+					"comment": "Wall-clock minutes of the runs of the row, each from its first record to its last non-meta record."
+				},
+				{
+					"name": "active_minutes",
+					"type": "Float64",
+					"comment": "Active minutes of the runs of the row: gaps between non-meta records, each capped at five minutes."
+				},
+				{
+					"name": "tool_calls",
+					"type": "UInt64",
+					"comment": "Tool call records of the runs of the row."
+				},
+				{
+					"name": "failed_calls",
+					"type": "UInt64",
+					"comment": "Calls of the runs of the row whose result is an error or has a non-zero exit code."
+				},
+				{
+					"name": "edits",
+					"type": "UInt64",
+					"comment": "Sum of each run's distinct files written, edited or deleted by calls that did not fail."
+				},
+				{
+					"name": "reads",
+					"type": "UInt64",
+					"comment": "Tool calls in the read group of the runs of the row."
+				},
+				{
+					"name": "searches",
+					"type": "UInt64",
+					"comment": "Tool calls in the search group of the runs of the row."
+				},
+				{
+					"name": "not_found",
+					"type": "UInt64",
+					"comment": "Failed reads and searches of the runs of the row whose text says not found, no such file, ENOENT or No files found."
+				},
+				{
+					"name": "compactions",
+					"type": "UInt64",
+					"comment": "Compaction records of the runs of the row."
+				},
+				{
+					"name": "interrupt_markers",
+					"type": "UInt64",
+					"comment": "Interrupt marker records of the runs of the row (Claude [Request interrupted by user], Codex turn_aborted wrappers)."
+				},
+				{
+					"name": "edit_outcomes_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record failed and refused edits (parser 9 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "failed_edits",
+					"type": "Nullable(UInt64)",
+					"comment": "Failed edit requests, excluding refusals, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "refused_edits",
+					"type": "Nullable(UInt64)",
+					"comment": "Refused native edit requests, including user declines but excluding interruptions, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "denied_calls_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record denials (parser 9 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "denied_calls",
+					"type": "Nullable(UInt64)",
+					"comment": "Calls whose result records a denial_kind, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "interrupted_calls_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record interrupted calls (Claude Code parser 6, Codex parser 8 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "interrupted_calls",
+					"type": "Nullable(UInt64)",
+					"comment": "Calls whose result records interrupted = true, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "timed_out_calls_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record timed-out calls (Claude Code parser 6 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "timed_out_calls",
+					"type": "Nullable(UInt64)",
+					"comment": "Calls whose result records timedOutAfterMs, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "mcp_calls_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record MCP calls (Claude Code parser 9, Codex parser 6 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "mcp_calls",
+					"type": "Nullable(UInt64)",
+					"comment": "Calls with a recorded MCP server, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "api_errors_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record API errors (Claude Code parser 7, Codex parser 9 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "api_errors",
+					"type": "Nullable(UInt64)",
+					"comment": "API error records (Claude API errors, Codex terminal provider or transport errors), summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "retry_attempts_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record API retries (Claude Code parser 7 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "retry_attempts",
+					"type": "Nullable(UInt64)",
+					"comment": "Claude API retry records, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "refusals_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record model refusals (Claude Code parser 7 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "refusals",
+					"type": "Nullable(UInt64)",
+					"comment": "Claude model refusal records, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "aborted_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record an abort (parser 7 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "aborted_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs a record says aborted (Codex turn_aborted, Claude interruptedByShutdown), summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "turn_error_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record a turn error (Codex parser 7 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "turn_error_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs whose Codex task_complete records an error, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "git_operations_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record Claude gitOperation (Claude Code parser 6 or newer; Codex git activity is in find source=git); the matching sums cover only these runs."
+				},
+				{
+					"name": "push_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs with a Claude gitOperation push, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "commit_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs with a Claude gitOperation commit, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "pr_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs with a Claude gitOperation pr, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "commit_shas",
+					"type": "Nullable(UInt64)",
+					"comment": "Distinct Claude gitOperation commit SHAs of each run, added up, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "pr_urls_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record pull request URLs (Claude Code parser 6 or newer, every Codex parser); the matching sums cover only these runs."
+				},
+				{
+					"name": "pr_urls",
+					"type": "Nullable(UInt64)",
+					"comment": "Distinct pull request URLs of each run (named, not necessarily created), added up, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "skills_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record skills (Claude Code parser 6, Codex parser 9 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "skill_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs that used at least one skill, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "skills",
+					"type": "Nullable(UInt64)",
+					"comment": "Distinct skills of each run, added up, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "slash_commands_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record slash commands (Claude Code); the matching sums cover only these runs."
+				},
+				{
+					"name": "slash_commands",
+					"type": "Nullable(UInt64)",
+					"comment": "Distinct slash commands of each run, added up, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "subagent_types_known_runs",
+					"type": "UInt64",
+					"comment": "Runs of the row that can record subagent types (Claude Code, Codex parser 9 or newer); the matching sums cover only these runs."
+				},
+				{
+					"name": "subagent_type_runs",
+					"type": "Nullable(UInt64)",
+					"comment": "Runs that started a subagent with a recorded type, summed over the known runs; NULL when no run of the row can record it."
+				},
+				{
+					"name": "usage_known_runs",
+					"type": "UInt64",
+					"comment": "Runs whose session's usage extraction was complete, so their usage and cost are known; the others count no usage."
+				},
+				{
+					"name": "usage_observations",
+					"type": "UInt64",
+					"comment": "Usage events of the runs, plus the usage no run claims, which counts in the week of its session date."
+				},
+				{
+					"name": "usage_unpriced",
+					"type": "UInt64",
+					"comment": "Of usage_observations, events without a price."
+				},
+				{
+					"name": "cost_usd",
+					"type": "Nullable(Float64)",
+					"comment": "Priced cost in USD of usage_observations (the runs' and the usage no run claims), at the pricing of each build; NULL when nothing is priced."
+				},
+				{
+					"name": "unattributed_cost_usd",
+					"type": "Nullable(Float64)",
+					"comment": "Of cost_usd, the priced usage no run claims, counted in the week of its session date; NULL when none."
+				},
+				{
+					"name": "uncached_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Uncached input tokens of usage_observations; NULL without usage."
+				},
+				{
+					"name": "cache_read_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Cache read input tokens of usage_observations; NULL without usage."
+				},
+				{
+					"name": "cache_write_5m_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Five-minute cache write input tokens of usage_observations; NULL without usage."
+				},
+				{
+					"name": "cache_write_1h_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "One-hour cache write input tokens of usage_observations; NULL without usage."
+				},
+				{
+					"name": "output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Output tokens of usage_observations; NULL without usage."
+				},
+				{
+					"name": "reasoning_output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Reasoning output tokens of usage_observations; NULL without usage."
+				}
+			],
+			"primaryKey": [
+				"organization_id",
+				"refresh_id",
+				"user_id",
+				"agent",
+				"week"
+			],
+			"orderBy": ["organization_id", "refresh_id", "user_id", "agent", "week"],
+			"partitionBy": "toDate(refreshed_at)",
+			"ttl": "toDateTime(refreshed_at) + toIntervalDay(14)",
+			"settings": {
+				"index_granularity": "8192",
+				"ttl_only_drop_parts": "1",
+				"storage_policy": "'s3'"
+			},
+			"comment": "Nightly snapshots of the run index summed per workspace, member, agent and ISO week; appended only by weekly_totals_mv.",
+			"kind": "table"
 		}
 	]
 }

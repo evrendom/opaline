@@ -5,6 +5,8 @@ import {
 	AnalysisReadInputSchema,
 	findLimit,
 	parsePullRequestRef,
+	WEEKLY_MEASURES,
+	WEEKLY_NULLABLE_MEASURES,
 } from "./analysis.js";
 import { AnalysisHistorySaveInputSchema } from "./analysis-history.js";
 
@@ -114,6 +116,12 @@ describe("analysis input validation", () => {
 			{ source: "runs", from: "2026-02-30" },
 			{ source: "runs", from: "2026-10-03", to: "2026-10-02" },
 			{ source: "tool", groupBy: "week" },
+			{ source: "runs", groupBy: "member" },
+			{ source: "weekly", groupBy: "model" },
+			{ source: "weekly", groupBy: "session" },
+			{ source: "weekly", latest: 10 },
+			{ source: "weekly", repository: "athena" },
+			{ source: "weekly", refs: [ref] },
 			{ source: "user", reaction: ["positive"] },
 			{ source: "runs", refs: Array.from({ length: 201 }, () => ref) },
 			{ source: "runs", refs: [{ ...ref, turn: 0 }] },
@@ -328,6 +336,67 @@ describe("find git output", () => {
 						...event,
 						edges: { linkedBy: "worker", status: "current", builtAt: null },
 					},
+				],
+			}).success,
+		).toBe(false);
+	});
+});
+
+describe("find weekly totals", () => {
+	test("groups by week, member or agent and keeps the period and agent filters", () => {
+		for (const groupBy of [undefined, "week", "member", "agent"] as const)
+			expect(
+				AnalysisFindInputSchema.safeParse({
+					source: "weekly",
+					groupBy,
+					from: "2026-07-01",
+					to: "2026-10-04",
+					agent: "codex",
+				}).success,
+			).toBe(true);
+	});
+
+	test("a row's unknown measures and multi-week sessions parse as null", () => {
+		const known = Object.fromEntries(WEEKLY_MEASURES.map((name) => [name, 1]));
+		const unknown = Object.fromEntries(
+			WEEKLY_NULLABLE_MEASURES.map((name) => [name, null]),
+		);
+		const parsed = AnalysisFindOutputSchema.parse({
+			source: "weekly",
+			header: {
+				from: "2026-09-07",
+				to: "2026-10-04",
+				sessionsInScope: 1,
+				indexedSessions: 1,
+				runsInScope: 1,
+				minutes: 1,
+				pricedCostUsd: 0,
+				unattributedCostUsd: 0,
+				unpricedRuns: 0,
+				rawChars: 0,
+				truncated: false,
+				notes: [],
+				classifierVersion: 1,
+			},
+			snapshot: { id: "a", refreshedAt: "2026-10-05T03:00:00.000Z" },
+			totals: [
+				{
+					week: null,
+					member: "u1",
+					agent: null,
+					weeks: 4,
+					sessions: null,
+					...known,
+					...unknown,
+				},
+			],
+		});
+		expect(parsed.source).toBe("weekly");
+		expect(
+			AnalysisFindOutputSchema.safeParse({
+				...parsed,
+				totals: [
+					{ ...known, ...unknown, week: null, member: null, agent: null },
 				],
 			}).success,
 		).toBe(false);

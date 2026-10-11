@@ -74,6 +74,7 @@ import {
 	type SessionPick,
 } from "./scope.js";
 import { isAnalysisWorkLimit, query } from "./sql.js";
+import { findWeeklyTotals, weeklyOrder } from "./weekly-totals.js";
 
 type Header = AnalysisFindOutput["header"];
 /** A run's own facts; its next reaction and family are added per page. */
@@ -186,6 +187,23 @@ export function findAnalysisWithOwners(
 	return withAnalysisDeadline(
 		"analysis.find",
 		async (executor) => {
+			// Weekly totals are a lookup in the nightly snapshot: no session scope.
+			if (input.source === "weekly")
+				try {
+					const found = await findWeeklyTotals(executor, scope, input);
+					return {
+						output: fitFindOutput(found.output, (index) =>
+							cursorAt(input, found.keys, index),
+						),
+						owners: found.owners,
+					};
+				} catch (error) {
+					if (!isAnalysisWorkLimit(error)) throw error;
+					return {
+						output: emptyResult(input, workLimitHeader(input)),
+						owners: [],
+					};
+				}
 			let owners: string[] = [];
 			const order = cursorOrder(input);
 			const after = readFindCursor(input, order);
@@ -291,6 +309,8 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 			return findReactions(context);
 		case "git":
 			return findGitEvents(context);
+		case "weekly":
+			throw new Error("weekly totals are read without a session scope");
 	}
 }
 
@@ -1094,6 +1114,8 @@ function emptyResult(
 	if (input.source === "user")
 		return { source: "user", header, events: [], groups: [] };
 	if (input.source === "git") return { source: "git", header, events: [] };
+	if (input.source === "weekly")
+		return { source: "weekly", header, snapshot: null, totals: [] };
 	return input.groupBy
 		? { source: "runs", header, groups: [] }
 		: { source: "runs", header, rows: [] };
@@ -1163,6 +1185,7 @@ function cursorOrder(input: AnalysisFindInput): CursorOrder {
 	if (input.source === "tool") return TOOL_GROUP_ORDER;
 	if (input.source === "user") return EVENT_ORDER;
 	if (input.source === "git") return GIT_ORDER;
+	if (input.source === "weekly") return weeklyOrder(input.groupBy);
 	return input.groupBy ? RUN_GROUP_ORDER : RUN_ORDER;
 }
 

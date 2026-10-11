@@ -1358,6 +1358,149 @@ export const RudelUsageEventsRowSchema = z.object({
 export type RudelUsageEventsRowInput = z.input<typeof RudelUsageEventsRowSchema>
 export type RudelUsageEventsRowOutput = z.output<typeof RudelUsageEventsRowSchema>
 
+export type RudelWeeklyTotalsRow = {
+  refreshed_at: string
+  refresh_id: string
+  snapshot_rows: string
+  organization_id: string
+  user_id: string
+  agent: string
+  week: string
+  runs: string
+  sessions: string
+  sessions_started: string
+  genuine_prompts: string
+  minutes: number
+  active_minutes: number
+  tool_calls: string
+  failed_calls: string
+  edits: string
+  reads: string
+  searches: string
+  not_found: string
+  compactions: string
+  interrupt_markers: string
+  edit_outcomes_known_runs: string
+  failed_edits: string | null
+  refused_edits: string | null
+  denied_calls_known_runs: string
+  denied_calls: string | null
+  interrupted_calls_known_runs: string
+  interrupted_calls: string | null
+  timed_out_calls_known_runs: string
+  timed_out_calls: string | null
+  mcp_calls_known_runs: string
+  mcp_calls: string | null
+  api_errors_known_runs: string
+  api_errors: string | null
+  retry_attempts_known_runs: string
+  retry_attempts: string | null
+  refusals_known_runs: string
+  refusals: string | null
+  aborted_known_runs: string
+  aborted_runs: string | null
+  turn_error_known_runs: string
+  turn_error_runs: string | null
+  git_operations_known_runs: string
+  push_runs: string | null
+  commit_runs: string | null
+  pr_runs: string | null
+  commit_shas: string | null
+  pr_urls_known_runs: string
+  pr_urls: string | null
+  skills_known_runs: string
+  skill_runs: string | null
+  skills: string | null
+  slash_commands_known_runs: string
+  slash_commands: string | null
+  subagent_types_known_runs: string
+  subagent_type_runs: string | null
+  usage_known_runs: string
+  usage_observations: string
+  usage_unpriced: string
+  cost_usd: number | null
+  unattributed_cost_usd: number | null
+  uncached_input_tokens: string | null
+  cache_read_input_tokens: string | null
+  cache_write_5m_input_tokens: string | null
+  cache_write_1h_input_tokens: string | null
+  output_tokens: string | null
+  reasoning_output_tokens: string | null
+}
+
+export const RudelWeeklyTotalsRowSchema = z.object({
+  refreshed_at: z.string(),
+  refresh_id: z.string(),
+  snapshot_rows: z.string(),
+  organization_id: z.string(),
+  user_id: z.string(),
+  agent: z.string(),
+  week: z.string(),
+  runs: z.string(),
+  sessions: z.string(),
+  sessions_started: z.string(),
+  genuine_prompts: z.string(),
+  minutes: z.number(),
+  active_minutes: z.number(),
+  tool_calls: z.string(),
+  failed_calls: z.string(),
+  edits: z.string(),
+  reads: z.string(),
+  searches: z.string(),
+  not_found: z.string(),
+  compactions: z.string(),
+  interrupt_markers: z.string(),
+  edit_outcomes_known_runs: z.string(),
+  failed_edits: z.string().nullable(),
+  refused_edits: z.string().nullable(),
+  denied_calls_known_runs: z.string(),
+  denied_calls: z.string().nullable(),
+  interrupted_calls_known_runs: z.string(),
+  interrupted_calls: z.string().nullable(),
+  timed_out_calls_known_runs: z.string(),
+  timed_out_calls: z.string().nullable(),
+  mcp_calls_known_runs: z.string(),
+  mcp_calls: z.string().nullable(),
+  api_errors_known_runs: z.string(),
+  api_errors: z.string().nullable(),
+  retry_attempts_known_runs: z.string(),
+  retry_attempts: z.string().nullable(),
+  refusals_known_runs: z.string(),
+  refusals: z.string().nullable(),
+  aborted_known_runs: z.string(),
+  aborted_runs: z.string().nullable(),
+  turn_error_known_runs: z.string(),
+  turn_error_runs: z.string().nullable(),
+  git_operations_known_runs: z.string(),
+  push_runs: z.string().nullable(),
+  commit_runs: z.string().nullable(),
+  pr_runs: z.string().nullable(),
+  commit_shas: z.string().nullable(),
+  pr_urls_known_runs: z.string(),
+  pr_urls: z.string().nullable(),
+  skills_known_runs: z.string(),
+  skill_runs: z.string().nullable(),
+  skills: z.string().nullable(),
+  slash_commands_known_runs: z.string(),
+  slash_commands: z.string().nullable(),
+  subagent_types_known_runs: z.string(),
+  subagent_type_runs: z.string().nullable(),
+  usage_known_runs: z.string(),
+  usage_observations: z.string(),
+  usage_unpriced: z.string(),
+  cost_usd: z.number().nullable(),
+  unattributed_cost_usd: z.number().nullable(),
+  uncached_input_tokens: z.string().nullable(),
+  cache_read_input_tokens: z.string().nullable(),
+  cache_write_5m_input_tokens: z.string().nullable(),
+  cache_write_1h_input_tokens: z.string().nullable(),
+  output_tokens: z.string().nullable(),
+  reasoning_output_tokens: z.string().nullable(),
+})
+
+export type RudelWeeklyTotalsRowInput = z.input<typeof RudelWeeklyTotalsRowSchema>
+export type RudelWeeklyTotalsRowOutput = z.output<typeof RudelWeeklyTotalsRowSchema>
+
 export type RudelWrappedUserArchetypeRunsV1Row = {
   snapshot_id: string
   snapshot_created_at: string

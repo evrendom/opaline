@@ -222,6 +222,14 @@ describe("Vercel deployment configuration", () => {
 		expect(
 			productionScript.indexOf("ch:migrate:transcript-records"),
 		).toBeLessThan(productionScript.indexOf("ch:migrate:l1-retention"));
+		// The weekly totals view reads the run index with its parser 9 columns,
+		// and its first refresh starts when it is created.
+		expect(productionScript.indexOf("ch:migrate:parser-v9")).toBeLessThan(
+			productionScript.indexOf("ch:migrate:weekly-totals"),
+		);
+		expect(productionScript.indexOf("ch:migrate:l1-retention")).toBeLessThan(
+			productionScript.indexOf("ch:migrate:weekly-totals"),
+		);
 	});
 
 	test("permanently redirects legal aliases and does not resurrect pricing", () => {

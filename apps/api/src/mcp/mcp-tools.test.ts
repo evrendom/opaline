@@ -128,7 +128,10 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 		required: ["source"],
 		additionalProperties: false,
 		properties: {
-			source: { type: "string", enum: ["runs", "tool", "user", "git"] },
+			source: {
+				type: "string",
+				enum: ["runs", "tool", "user", "git", "weekly"],
+			},
 			from: { type: "string", format: "date" },
 			limit: { type: "integer", minimum: 1, maximum: 200 },
 			cursor: { type: "string" },

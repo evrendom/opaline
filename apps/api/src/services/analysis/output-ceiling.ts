@@ -55,6 +55,12 @@ export function fitFindOutput(
 			(events, header) => ({ ...fitted, header, events }),
 		);
 	}
+	if (output.source === "weekly")
+		return fitItems(page, output.totals, "totals", (totals, header) => ({
+			...output,
+			header,
+			totals,
+		}));
 	if (output.source === "tool")
 		return fitItems(page, output.groups, "groups", (groups, header) => ({
 			...output,

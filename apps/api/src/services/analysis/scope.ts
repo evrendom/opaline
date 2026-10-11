@@ -23,8 +23,30 @@ import { ANALYSIS_QUERY_SETTINGS, chunkByParamBytes } from "./sql.js";
 
 export interface AnalysisScope {
 	organizationId: string;
-	/** Null for a workspace admin looking across members. */
+	/** Null for a workspace admin looking across members, or for weekly totals. */
 	userId: string | null;
+}
+
+/**
+ * Whose data a find call reads, always within the caller's workspace: an
+ * admin reads every member's (or the `userId` they name); a member reads only
+ * their own sessions, except weekly totals, which every member sees for the
+ * whole workspace (owner decision) so a team-wide problem can be told apart
+ * from one person's setup.
+ */
+export function findScope(
+	caller: { organizationId: string; userId: string; isOrgAdmin: boolean },
+	input: Pick<AnalysisFindInput, "source" | "userId">,
+): AnalysisScope {
+	if (caller.isOrgAdmin)
+		return {
+			organizationId: caller.organizationId,
+			userId: input.userId ?? null,
+		};
+	return {
+		organizationId: caller.organizationId,
+		userId: input.source === "weekly" ? null : caller.userId,
+	};
 }
 
 const SessionSchema = z.object({

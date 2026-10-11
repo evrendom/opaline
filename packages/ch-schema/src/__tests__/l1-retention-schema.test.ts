@@ -16,10 +16,15 @@ const KEPT_TABLES = [
 	"run_index",
 	"session_lineage",
 ] as const;
-/** Operational or derived-phrase tables the owner decision does not cover. */
+/**
+ * Operational or derived-phrase tables the owner decision does not cover, and
+ * the weekly totals snapshots: each is a full rebuild from the run index, so
+ * an expired snapshot loses nothing the newest one does not hold.
+ */
 const TABLES_WITH_TTL = [
 	"dependency_health_probes",
 	"session_language_signals",
+	"weekly_totals",
 ];
 
 describe("L1 data is kept until a deletion request", () => {

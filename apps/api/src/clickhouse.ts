@@ -116,6 +116,7 @@ const ALLOWED_CLICKHOUSE_TABLES = new Set([
 	"rudel.skill_version_contents",
 	"rudel.transcript_records",
 	"rudel.usage_events",
+	"rudel.weekly_totals",
 	"rudel.wrapped_user_archetype_snapshots_v1",
 ]);
 

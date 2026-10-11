@@ -1169,9 +1169,10 @@ async function seedSession(
 	await sqlClient`INSERT INTO session_ownership (organization_id, user_id, session_id) VALUES (${userId}, ${identity.userId}, ${sessionId})`;
 }
 
-/** The paged items of a find result: rows, groups or events. */
+/** The paged items of a find result: rows, groups, events or weekly totals. */
 function items(output: z.infer<typeof AnalysisFindOutputSchema>): unknown[] {
 	if (output.source === "user" || output.source === "git") return output.events;
+	if (output.source === "weekly") return output.totals;
 	return "rows" in output ? output.rows : output.groups;
 }
 

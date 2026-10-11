@@ -8,6 +8,7 @@ import type {
 	AnalysisTrace,
 	RunRef,
 } from "@rudel/api-routes";
+import { WEEKLY_MEASURES, WEEKLY_NULLABLE_MEASURES } from "@rudel/api-routes";
 import { cell, formatReadOutput } from "../services/analysis/read-output.js";
 
 export function renderFind(output: AnalysisFindOutput): string {
@@ -229,6 +230,25 @@ export function renderFind(output: AnalysisFindOutput): string {
 					]),
 				),
 			);
+	} else if (output.source === "weekly") {
+		if (output.snapshot)
+			lines.push(
+				`snapshot ${output.snapshot.id} refreshedAt=${output.snapshot.refreshedAt}`,
+			);
+		const measures = [...WEEKLY_MEASURES, ...WEEKLY_NULLABLE_MEASURES];
+		lines.push(
+			table(
+				["week", "member", "agent", "weeks", "sessions", ...measures],
+				output.totals.map((total) => [
+					total.week,
+					total.member,
+					total.agent,
+					total.weeks,
+					total.sessions,
+					...measures.map((measure) => total[measure]),
+				]),
+			),
+		);
 	} else {
 		lines.push(
 			table(

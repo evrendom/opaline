@@ -33,7 +33,7 @@ export const AnalysisTraceSchema = z.object({
 /** The find arguments without cross-field checks; Zod 4 cannot derive a partial from a refined object. */
 export const AnalysisFindInputBaseSchema = z
 	.object({
-		source: z.enum(["runs", "tool", "user", "git"]),
+		source: z.enum(["runs", "tool", "user", "git", "weekly"]),
 		from: z.string().date().optional(),
 		to: z.string().date().optional(),
 		latest: z.number().int().min(1).max(200).optional(),
@@ -72,9 +72,12 @@ export const AnalysisFindInputBaseSchema = z
 		reaction: z
 			.array(z.enum(["negative", "swear", "apology"]))
 			.default(["negative", "swear", "apology"]),
-		/** `session`: one group per session, a Codex session with its subagent threads. */
+		/**
+		 * `session`: one group per session, a Codex session with its subagent
+		 * threads. `member`: source=weekly only, one group per member.
+		 */
 		groupBy: z
-			.enum(["week", "model", "repository", "agent", "session"])
+			.enum(["week", "model", "repository", "agent", "session", "member"])
 			.optional(),
 		refs: z.array(RunRefInputSchema).max(200).optional(),
 		/** Absent: `findLimit` picks a default per source. */
@@ -116,6 +119,27 @@ export function parsePullRequestRef(
 		: null;
 }
 
+const WEEKLY_GROUP_BY: ReadonlySet<string> = new Set([
+	"week",
+	"member",
+	"agent",
+]);
+/** Arguments that select within weeks; weekly totals are whole weeks per member and agent. */
+const WEEKLY_UNSUPPORTED = [
+	"latest",
+	"repository",
+	"model",
+	"sessionId",
+	"toolGroup",
+	"commandClass",
+	"kind",
+	"cause",
+	"detail",
+	"refs",
+] as const satisfies readonly (keyof z.infer<
+	typeof AnalysisFindInputBaseSchema
+>)[];
+
 export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 	(input, context) => {
 		if (input.from && input.to && input.from > input.to) {
@@ -125,13 +149,26 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 				message: "to must be on or after from",
 			});
 		}
-		if (input.groupBy && input.source !== "runs") {
+		if (
+			input.groupBy &&
+			!(input.source === "runs" && input.groupBy !== "member") &&
+			!(input.source === "weekly" && WEEKLY_GROUP_BY.has(input.groupBy))
+		) {
 			context.addIssue({
 				code: "custom",
 				path: ["groupBy"],
-				message: "groupBy is only valid for runs",
+				message:
+					"groupBy is only valid for runs (week, model, repository, agent, session) and weekly (week, member, agent)",
 			});
 		}
+		if (input.source === "weekly")
+			for (const key of WEEKLY_UNSUPPORTED)
+				if (input[key] !== undefined)
+					context.addIssue({
+						code: "custom",
+						path: [key],
+						message: `${key} is not valid for source=weekly, which sums whole weeks per member and agent`,
+					});
 		if (input.pullRequest !== undefined && input.source !== "git") {
 			context.addIssue({
 				code: "custom",
@@ -576,6 +613,107 @@ const GitWitnessSchema = z.object({
 	}),
 	reason: z.enum(["transcript_unavailable", "other_generation"]),
 });
+/**
+ * `find source=weekly` measures that are always known: counts and sums every
+ * run records (docs/l1-literal-schema.md, "Weekly totals").
+ */
+export const WEEKLY_MEASURES = [
+	"runs",
+	"sessionsStarted",
+	"genuinePrompts",
+	"minutes",
+	"activeMinutes",
+	"toolCalls",
+	"failedCalls",
+	"edits",
+	"reads",
+	"searches",
+	"notFound",
+	"compactions",
+	"interruptMarkers",
+	"editOutcomesKnownRuns",
+	"deniedCallsKnownRuns",
+	"interruptedCallsKnownRuns",
+	"timedOutCallsKnownRuns",
+	"mcpCallsKnownRuns",
+	"apiErrorsKnownRuns",
+	"retryAttemptsKnownRuns",
+	"refusalsKnownRuns",
+	"abortedKnownRuns",
+	"turnErrorKnownRuns",
+	"gitOperationsKnownRuns",
+	"prUrlsKnownRuns",
+	"skillsKnownRuns",
+	"slashCommandsKnownRuns",
+	"subagentTypesKnownRuns",
+	"usageKnownRuns",
+	"usageObservations",
+	"usageUnpriced",
+] as const;
+/**
+ * Measures that can be unknown: a sum over the runs its `…KnownRuns` counts,
+ * null when none of them can record it; usage sums are null without usage.
+ */
+export const WEEKLY_NULLABLE_MEASURES = [
+	"failedEdits",
+	"refusedEdits",
+	"deniedCalls",
+	"interruptedCalls",
+	"timedOutCalls",
+	"mcpCalls",
+	"apiErrors",
+	"retryAttempts",
+	"refusals",
+	"abortedRuns",
+	"turnErrorRuns",
+	"pushRuns",
+	"commitRuns",
+	"prRuns",
+	"commitShas",
+	"prUrls",
+	"skillRuns",
+	"skills",
+	"slashCommands",
+	"subagentTypeRuns",
+	"costUsd",
+	"unattributedCostUsd",
+	"uncachedInputTokens",
+	"cacheReadInputTokens",
+	"cacheWrite5mInputTokens",
+	"cacheWrite1hInputTokens",
+	"outputTokens",
+	"reasoningOutputTokens",
+] as const;
+export type WeeklyMeasure =
+	| (typeof WEEKLY_MEASURES)[number]
+	| (typeof WEEKLY_NULLABLE_MEASURES)[number];
+
+/**
+ * One row of weekly totals: a week, member and agent, or their sums per
+ * `groupBy` key (the other keys null). `sessions` counts sessions with a run
+ * in the week, so it is null for a row that spans several weeks; use
+ * `sessionsStarted` there.
+ */
+export const AnalysisWeeklyTotalsSchema = z.object({
+	/** Monday (UTC) of the ISO week; null when grouped by member or agent. */
+	week: z.string().nullable(),
+	/** The member (user id); null when grouped by week or agent. */
+	member: z.string().nullable(),
+	agent: z.enum(["claude_code", "codex"]).nullable(),
+	/** Weeks the row adds up. */
+	weeks: z.number().int(),
+	sessions: z.number().nullable(),
+	...(Object.fromEntries(
+		WEEKLY_MEASURES.map((name) => [name, z.number()]),
+	) as Record<(typeof WEEKLY_MEASURES)[number], z.ZodNumber>),
+	...(Object.fromEntries(
+		WEEKLY_NULLABLE_MEASURES.map((name) => [name, z.number().nullable()]),
+	) as Record<
+		(typeof WEEKLY_NULLABLE_MEASURES)[number],
+		z.ZodNullable<z.ZodNumber>
+	>),
+});
+
 export const AnalysisFindOutputSchema = z.union([
 	z.object({
 		source: z.literal("runs"),
@@ -610,6 +748,13 @@ export const AnalysisFindOutputSchema = z.union([
 		events: z.array(AnalysisGitEventSchema),
 		/** `pullRequest` only, on the first page; absent otherwise and in results stored before it existed. */
 		witnesses: z.array(GitWitnessSchema).optional(),
+	}),
+	z.object({
+		source: z.literal("weekly"),
+		header: HeaderSchema,
+		/** The nightly snapshot read; null before the first refresh. */
+		snapshot: z.object({ id: z.string(), refreshedAt: z.string() }).nullable(),
+		totals: z.array(AnalysisWeeklyTotalsSchema),
 	}),
 ]);
 export const AnalysisReadOutputSchema = z.object({
@@ -653,6 +798,7 @@ export type AnalysisFindOutput = z.infer<typeof AnalysisFindOutputSchema>;
 export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
 export type AnalysisGitEvent = z.infer<typeof AnalysisGitEventSchema>;
+export type AnalysisWeeklyTotals = z.infer<typeof AnalysisWeeklyTotalsSchema>;
 export type AnalysisReadInput = z.infer<typeof AnalysisReadInputSchema>;
 export type AnalysisReadOutput = z.infer<typeof AnalysisReadOutputSchema>;
 
