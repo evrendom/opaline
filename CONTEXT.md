@@ -9,10 +9,10 @@ A team in Opaline; its members' uploaded sessions are what gets analysed.
 _Avoid_: organization (in ClickHouse `organization_id` historically means the uploading user)
 
 **Member**:
-A person in a workspace; may read only their own sessions.
+A person in a workspace; may read every member's sessions and setup, personal setup included, so the team learns from all of its sessions.
 
 **Admin**:
-A member who may read every member's sessions in the workspace.
+A member who manages the workspace and its members; reads no more than any other member.
 
 **Session**:
 One uploaded Claude Code or Codex transcript, owned by the member who uploaded it.
@@ -56,20 +56,72 @@ The newest data an analysis saw; anything uploaded after it is new to that analy
 An analysis that starts from an earlier analysis of the same question and processes only what changed since its cutoff, stating what changed.
 _Avoid_: rerun, refresh
 
+**Setup**:
+Everything other than the prompt that steers an agent: instruction files, skills, hooks, permission and MCP settings, scripts, lint and CI configuration, and the docs the instructions point to. Repository setup lives in the repository; personal setup lives in the member's home directory.
+_Avoid_: config, environment (a failure kind in `find source=tool`)
+
+**Setup file**:
+One file of setup, named by where it lives rather than by a machine path: a repository and the path inside it, a plugin and the path inside it, or a member's home and the path inside it. The same setup file on two teammates' machines is one setup file.
+_Avoid_: skill name or file name alone (two setup files can share one)
+
+**Setup file version**:
+One exact content of a setup file. Two runs used the same version only when the content is identical; uncommitted edits are a version of the same setup file, marked as uncommitted and named after the member whose checkout holds them.
+
+**Received setup**:
+The setup text the agent actually received in a run, as its transcript records it, each piece tied to its setup file and setup file version. Setup the transcript does not record is unknown, never filled in from disk.
+_Avoid_: loaded context
+
+**Setup snapshot**:
+The setup a session ran under at one moment, taken from its member's checkout, uncommitted changes included. It is the evidence only for setup the agent acts under without receiving it as text: permission settings, hooks, CI and lint configuration, scripts.
+_Avoid_: capture (the evidence it is built from)
+
+**Re-ask**:
+A prompt that asks again, in the same session, for what an earlier prompt asked, because the agent did not get it done; a sign the agent lacked context or know-how.
+_Avoid_: retry (the agent's own retries), repeated prompt
+
+**Recurring request**:
+The same kind of request made across many sessions, often by several members.
+_Avoid_: repeated prompt
+
+**Impact**:
+What a group of runs cost the team, as separate measures: active time, cost, frustration, re-asks, runs and members. Never one combined score; the agent answering picks the order that fits the question and says which it used. A group's time is shown two ways, the time of the runs that contain it and the time of its own calls, and neither is time lost to it until those runs are read.
+_Avoid_: score, severity
+
+**Run question**:
+A yes/no question a workspace asks about each of its runs in a chosen time window ("Did the agent struggle to find the right file?"), answered by a model as the probability of yes. Opaline sets the run questions; workspaces do not write or remove them. Changing a question's wording makes it a new question; earlier answers keep the wording they answered.
+_Avoid_: question (an analysis's question), label, signal
+
+**Run view**:
+The compact, expandable view of one run: how it ended, the runs before and after it, and its phases with their time and tokens, each part with an id the agent can expand. Made of sections that can be added, removed or asked for one by one; every section reads data the agent could also query directly.
+_Avoid_: digest, transcript dump
+
+**Phase**:
+A stretch of consecutive requests in a run doing the same kind of work: exploring, editing, running checks, git and CI, or talking to the user.
+_Avoid_: step (an analysis's sub-question)
+
+**Request**:
+One model response and the tool calls it made; the smallest part of a run with its own time and tokens.
+
+**Call**:
+One tool call the agent made; it has a duration but no tokens of its own.
+
 ## Relationships
 
 - A **Session** belongs to exactly one **Member**; a **Run** belongs to exactly one **Session**
 - An **Analysis** has one author and covers only **Sessions** its author may read
 - An **Analysis** has ordered **Steps**; a **Step** may follow from an earlier **Step** and is answered by **Queries** or by the asker's reply
+- A **Session** has zero or more **Setup snapshots** (taken when it starts, resumes, checkpoints and ends); a finding about why a run went wrong cites the snapshot that run ran under, never a local checkout
+- **Re-asks** and **Recurring requests** both mark runs a skill might have helped; which fix fits is decided only after reading those runs
+- A **Run question**'s answer only says where to read; a finding needs the runs read, never the probabilities alone
 - An **Update** points to the **Analysis** it updates; the earlier one stays as it was
 - An **Analysis** links to at most one **Analysis session**, which supplies its **Analysis cost**
 - Deleting a **Member**'s account deletes their **Analyses** and every **Analysis** that read one of their **Sessions**; deleting a **Workspace** deletes all its **Analyses**
-- A shared **Analysis** shows its steps, final answer and stored **Query** results to the workspace, including results drawn from other **Members**' **Sessions**; a workspace can opt into restricting each result to **Admins** and, when every **Session** it read is theirs, that **Member**, even if the result names none of the other **Sessions**
+- A shared **Analysis** shows its steps, final answer and stored **Query** results to the workspace, including results drawn from other **Members**' **Sessions**; a workspace limited to own sessions can restrict each result to **Admins** and, when every **Session** it read is theirs, that **Member**
 
 ## Example dialogue
 
 > **Member:** "Can I see the analysis my lead ran on why our agents fail?"
-> **Domain expert:** "Yes, once they share it — you'll see the steps and the answer, but you can only open the quoted runs that are yours."
+> **Domain expert:** "Yes, once they share it — you'll see the steps, the answer and every run it quotes, whoever's session it came from."
 
 ## Flagged ambiguities
 
