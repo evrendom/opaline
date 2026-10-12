@@ -18,6 +18,12 @@ describe("daily API maintenance", () => {
 		);
 		expect(maintenanceSource).toContain('transcriptRecords.status === "ok"');
 	});
+	test("expires stored sql results after their retention", () => {
+		expect(maintenanceSource).toContain(
+			'runMaintenanceStep("sql-results", () =>\n\t\texpireSqlResults(sqlClient),',
+		);
+		expect(maintenanceSource).toContain('sqlResults.status === "ok"');
+	});
 	test("retires superseded run index generations under their own budget", () => {
 		expect(maintenanceSource).toContain("runRunIndexRetirementPass({");
 		expect(maintenanceSource).toContain(

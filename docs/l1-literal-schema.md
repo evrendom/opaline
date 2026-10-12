@@ -16,6 +16,8 @@ L1 is the deterministic layer every analysis reads: what the transcripts, usage 
 
 Each view is one row per thing, keyed by `(organization_id, user_id, session_id, agent_id, …)` and pinned to the committed transcript-records generation. What each agent records for every fact, and what Opaline stores today (with the parser version, the plan for what is missing, and how an absence was checked), is the generated [fact matrix](l1-fact-matrix.md). It is built from the fact catalog (`packages/api-routes/src/session-transcript/transcript-records/fact-catalog.ts`), which the parser tests check against this spec, the fact registry and the fixtures, and which also lists facts the agents record that the tables below do not name yet.
 
+Agents also read the views with read-only SQL (the `schema` and `sql` tools, ADR 0005, agents query L1 with SQL). The first is `runs`: the run index's run rows of each session's committed build (`committedBuildSql` in `run-index-reader.ts`, as every run index reader reads them), without the storage columns (`organization_id`, generation, build, `row_kind`, record positions) or the receipt's session facts. The gateway (`sql-gateway.ts`) refuses any table but the views and any function not on its list (`sql-functions.ts`, fail closed), puts the view's statement in place of each reference with the workspace (and the member, only where the session visibility rule keeps them to their own sessions) as bound query parameters, runs it with `readonly = 1` within time, memory, read and row limits and a per-workspace quota, and stores each result (`analysis_sql_result`).
+
 ### `calls`: one row per tool call, its result joined
 
 | Column | Claude source | Codex source |

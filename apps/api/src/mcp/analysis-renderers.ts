@@ -4,7 +4,9 @@ import type {
 	AnalysisHistoryQueryOutput,
 	AnalysisHistorySearchOutput,
 	AnalysisReadOutput,
+	AnalysisSchemaOutput,
 	AnalysisScope,
+	AnalysisSqlOutput,
 	AnalysisTrace,
 	RunRef,
 } from "@rudel/api-routes";
@@ -492,9 +494,68 @@ export function renderStoredQuery(output: AnalysisHistoryQueryOutput): string {
 		return output.call.output
 			? `${head}\n${renderFind(output.call.output)}`
 			: head;
+	if (output.call.tool === "sql")
+		return output.call.output
+			? `${head}\n${renderSql(output.call.output)}`
+			: head;
 	return output.call.output
 		? `${head}\n${renderRead(output.call.output)}`
 		: head;
+}
+
+/** An sql result: its stored id, the table, then what was cut and the not-evidence notice. */
+export function renderSql(output: AnalysisSqlOutput): string {
+	return [
+		`sql result=${output.id} title=${cell(output.title)} rows=${output.rows} truncated=${output.truncated}`,
+		output.table,
+		...output.notices.map((notice) => `note: ${cell(notice)}`),
+		...(output.trace ? [traceLine(output.trace)] : []),
+	].join("\n");
+}
+
+/** schema in its three steps: the views, one view's columns, one column's values. */
+export function renderSchema(output: AnalysisSchemaOutput): string {
+	if (output.level === "views")
+		return [
+			pipeTable(
+				["view", "grain", "columns"],
+				output.views.map((view) => [view.name, view.grain, view.columns]),
+			),
+			...output.notes.map((note) => `note: ${cell(note)}`),
+		].join("\n");
+	if (output.level === "columns")
+		return [
+			`view ${output.view}: ${cell(output.grain)}`,
+			...output.traps.map((trap) => `trap: ${cell(trap)}`),
+			pipeTable(
+				["column", "type", "meaning", "traps"],
+				output.columns.map((column) => [
+					column.name,
+					column.type,
+					column.meaning,
+					column.traps.join(" "),
+				]),
+			),
+		].join("\n");
+	return [
+		`${output.view}.${output.column.name} ${output.column.type}: ${cell(output.column.meaning)}`,
+		...output.column.traps.map((trap) => `trap: ${cell(trap)}`),
+		`top values over ${output.over}:`,
+		pipeTable(
+			["value", "runs"],
+			output.values.map((value) => [value.value, value.runs]),
+		),
+		...output.notices.map((notice) => `note: ${cell(notice)}`),
+	].join("\n");
+}
+
+function pipeTable(
+	headers: readonly string[],
+	rows: readonly (readonly unknown[])[],
+): string {
+	const line = (values: readonly unknown[]) =>
+		values.map((value) => cell(value).replaceAll("|", "\\|")).join(" | ");
+	return [line(headers), ...rows.map(line)].join("\n");
 }
 
 function traceLine(trace: AnalysisTrace): string {

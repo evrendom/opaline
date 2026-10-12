@@ -13,6 +13,7 @@ import {
 } from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
+import { createPostgresSqlResultStore } from "./analysis/sql-results.js";
 import { purgeAnalysisLogs } from "./analysis-log/config.js";
 import { purgeGitHubObjectIntents } from "./github-evidence-object-fence.service.js";
 import {
@@ -562,6 +563,10 @@ function createClickHousePurgeProcessorEnv(
 				await deleteUserSessions(target.targetId);
 			}
 			await purgeAnalysisLogs(target);
+			// Stored sql results: the account's own and every one that read its
+			// sessions, or the whole workspace's. The follow-up pass catches
+			// results stored by queries that were running during the first.
+			await createPostgresSqlResultStore(database).purge(target);
 			if (pass)
 				await purgeRepositoryEvidenceObjects(target, pass, database, r2);
 		},

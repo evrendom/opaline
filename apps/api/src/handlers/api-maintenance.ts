@@ -11,6 +11,7 @@ import {
 import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
+import { expireSqlResults } from "../services/analysis/sql-results.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
@@ -180,6 +181,9 @@ async function runApiMaintenance() {
 		"coordination-leases",
 		() => runCoordinationLeaseMaintenance(invocationDeadline),
 	);
+	const sqlResults = await runMaintenanceStep("sql-results", () =>
+		expireSqlResults(sqlClient),
+	);
 	if (!hasMaintenanceTimeRemaining(invocationDeadline)) {
 		logger.warn(
 			"Daily API maintenance reached its invocation deadline; returning with queued work left for the next cron",
@@ -204,11 +208,13 @@ async function runApiMaintenance() {
 			runIndexCensus.status === "ok" &&
 			l1EdgeCensus.status === "ok" &&
 			derivedRecords.status === "ok" &&
-			coordinationLeases.status === "ok",
+			coordinationLeases.status === "ok" &&
+			sqlResults.status === "ok",
 		r2Ingest,
 		runIndex,
 		runIndexCensus,
 		sessionRevisionReceipts,
+		sqlResults,
 		transcriptRecords,
 	};
 }

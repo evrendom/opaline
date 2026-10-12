@@ -196,7 +196,7 @@ function fitItems<TItem>(
 }
 
 /** `build(count)` for the largest `count` up to `total` whose JSON fits `budget` (leaving the trace room). */
-function fitCount<TOutput>(
+export function fitCount<TOutput>(
 	total: number,
 	build: (count: number) => TOutput,
 	budget = BODY_MAX_BYTES,

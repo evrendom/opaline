@@ -57,14 +57,7 @@ export function buildCommittedRunIndexStatement(
 			FROM (
 				SELECT * FROM ${table} FINAL
 				WHERE ${owner}${kind === undefined ? "" : " AND row_kind = {kind:String}"}
-					AND (session_id, revision, parser_version, index_version, build_revision) IN (
-						SELECT session_id, committed.1, committed.2, committed.3, committed.4 FROM (
-							SELECT session_id, max((revision, parser_version, index_version, build_revision)) AS committed
-							FROM ${table}
-							WHERE ${owner} AND row_kind = 'receipt'
-							GROUP BY session_id
-						)
-					)
+					AND ${committedBuildSql(table, owner, ["session_id"])}
 			)
 			ORDER BY session_id, agent_id, start_record`,
 		query_params: {
@@ -73,6 +66,29 @@ export function buildCommittedRunIndexStatement(
 			...(kind === undefined ? {} : { kind }),
 		},
 	};
+}
+
+/**
+ * The condition that keeps only each session's committed build: the build its
+ * newest receipt names by (revision, parser_version, index_version,
+ * build_revision). `owner` limits both the rows and the receipts read;
+ * `sessionKey` names a session (`session_id` within one owner, or `user_id,
+ * session_id` across owners).
+ */
+export function committedBuildSql(
+	table: string,
+	owner: string,
+	sessionKey: readonly ("user_id" | "session_id")[],
+): string {
+	const key = sessionKey.join(", ");
+	return `(${key}, revision, parser_version, index_version, build_revision) IN (
+						SELECT ${key}, committed.1, committed.2, committed.3, committed.4 FROM (
+							SELECT ${key}, max((revision, parser_version, index_version, build_revision)) AS committed
+							FROM ${table}
+							WHERE ${owner} AND row_kind = 'receipt'
+							GROUP BY ${key}
+						)
+					)`;
 }
 
 /** Rows of the sessions' committed snapshots; see `buildCommittedRunIndexStatement`. */

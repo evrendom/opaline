@@ -93,7 +93,8 @@ const INGEST_RECOVERY_QUERY_SETTINGS = {
 const SESSION_ANALYTICS_MV_FILTER_MARKER =
 	"WHERE _is_capped OR length(_timestamps) > 0";
 
-const ALLOWED_CLICKHOUSE_TABLES = new Set([
+/** Every table the API reads or writes; also the names an agent's SQL may never use. */
+export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.github_pull_requests",
 	"rudel.github_pull_request_details",
 	"rudel.github_pull_request_commits",

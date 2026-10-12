@@ -5,6 +5,8 @@ import {
 	AnalysisFindOutputSchema,
 	AnalysisReadInputBaseSchema,
 	AnalysisReadOutputSchema,
+	AnalysisSqlInputSchema,
+	AnalysisSqlOutputSchema,
 } from "./analysis.js";
 import { SourceSchema } from "./schemas/source.js";
 
@@ -103,7 +105,7 @@ export const AnalysisHistorySearchOutputSchema = z.object({
 
 const QuerySummarySchema = z.object({
 	id: z.string(),
-	tool: z.enum(["find", "read"]),
+	tool: z.enum(["find", "read", "sql"]),
 	args: z.record(z.string(), z.unknown()),
 	outputChars: z.number().int(),
 	createdAt: z.string(),
@@ -167,6 +169,11 @@ export const AnalysisHistoryQueryOutputSchema = z.object({
 			tool: z.literal("read"),
 			args: AnalysisReadInputBaseSchema.partial(),
 			output: AnalysisReadOutputSchema.nullable(),
+		}),
+		z.object({
+			tool: z.literal("sql"),
+			args: AnalysisSqlInputSchema.partial(),
+			output: AnalysisSqlOutputSchema.nullable(),
 		}),
 	]),
 });

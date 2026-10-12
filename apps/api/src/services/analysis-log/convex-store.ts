@@ -75,7 +75,7 @@ const QueryFieldsSchema = z.object({
 	stepId: z.string(),
 	workspaceId: z.string(),
 	authorId: z.string(),
-	tool: z.enum(["find", "read"]),
+	tool: z.enum(["find", "read", "sql"]),
 	argsJson: z.string().transform(parseArgs),
 	outputChars: z.number(),
 	createdAt: z.string(),

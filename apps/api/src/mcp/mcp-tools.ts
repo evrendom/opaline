@@ -7,6 +7,8 @@ import {
 	AnalysisHistorySearchInputSchema,
 	AnalysisHistoryShareInputSchema,
 	AnalysisReadInputSchema,
+	AnalysisSchemaInputSchema,
+	AnalysisSqlInputSchema,
 	type CostDashboard,
 	CostDashboardInputSchema,
 	CostDashboardRequestedMetricSchema,
@@ -24,6 +26,8 @@ import {
 	renderAnalysisTree,
 	renderFind,
 	renderRead,
+	renderSchema,
+	renderSql,
 	renderStoredQuery,
 } from "./analysis-renderers.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
@@ -433,6 +437,54 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				await client.analysis.read(
 					parseMcpInput(AnalysisReadInputSchema, args),
 				),
+			),
+	},
+	{
+		name: "schema",
+		annotations: READ_ONLY,
+		title: "Describe the data sql can read",
+		description: [
+			"What it does: Describes the views sql reads, step by step: the views, then one view's columns with their meaning and traps, then a column's most common values.",
+			"Use when: Before writing sql, and whenever a column's meaning or values are unclear.",
+			"Returns: The views; or one view's columns with meaning and traps; or one column's 20 most common values over the last 30 days.",
+			"Side effects: None.",
+			"Limits: Values come only from your workspace's sessions you may open.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisSchemaInputSchema), {
+			view: "A view from the list, e.g. runs. Leave out to list the views.",
+			column:
+				"A column of that view, to list its most common values. Needs view.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderSchema(
+				await client.analysis.schema(
+					parseMcpInput(AnalysisSchemaInputSchema, args),
+				),
+			),
+	},
+	{
+		name: "sql",
+		annotations: WRITES_OWN_RECORDS,
+		title: "Rank and count agent runs with SQL",
+		description: [
+			"What it does: Runs one read-only SELECT over the views schema lists, to rank, count and compare runs.",
+			"Use when: To rank where time, cost or failures went, then read the top runs; rows are not evidence.",
+			"Returns: Up to 200 rows, a stored result id, and notes on what was cut.",
+			"Side effects: Stores the result for 90 days and adds it to the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
+			"Limits: Your workspace's sessions you may open; 10 seconds, 512 MiB, a workspace quota.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisSqlInputSchema), {
+			query:
+				"Required. One SELECT (or WITH … SELECT) over the views schema lists, e.g. FROM runs. The server adds the workspace; never filter by it.",
+			title:
+				"Required. What the result shows, as a short label of up to 120 characters, e.g. 'Longest runs, last 30 days'.",
+			analysis: ANALYSIS_ID_DESCRIPTION,
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderSql(
+				await client.analysis.sql(parseMcpInput(AnalysisSqlInputSchema, args)),
 			),
 	},
 	{

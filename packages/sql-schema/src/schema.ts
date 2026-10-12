@@ -1,3 +1,4 @@
+export * from "./analysis-sql-schema.js";
 export * from "./auth-schema.js";
 export * from "./avatar-schema.js";
 export * from "./billing-schema.js";

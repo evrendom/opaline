@@ -106,7 +106,7 @@ export const query = v.object({
 	stepId: v.string(),
 	workspaceId: v.string(),
 	authorId: v.string(),
-	tool: v.union(v.literal("find"), v.literal("read")),
+	tool: v.union(v.literal("find"), v.literal("read"), v.literal("sql")),
 	argsJson: v.string(),
 	outputChars: v.number(),
 	createdAt: v.string(),

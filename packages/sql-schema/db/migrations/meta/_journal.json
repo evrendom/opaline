@@ -407,6 +407,20 @@
 			"when": 1791800655124,
 			"tag": "0057_organization_own_sessions_only",
 			"breakpoints": true
+		},
+		{
+			"idx": 58,
+			"version": "7",
+			"when": 1791811108043,
+			"tag": "0058_analysis_sql",
+			"breakpoints": true
+		},
+		{
+			"idx": 59,
+			"version": "7",
+			"when": 1791823886576,
+			"tag": "0059_agent_query_slot",
+			"breakpoints": true
 		}
 	]
 }

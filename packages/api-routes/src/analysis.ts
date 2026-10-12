@@ -940,6 +940,98 @@ export type AnalysisWeeklyTotals = z.infer<typeof AnalysisWeeklyTotalsSchema>;
 export type AnalysisReadInput = z.infer<typeof AnalysisReadInputSchema>;
 export type AnalysisReadOutput = z.infer<typeof AnalysisReadOutputSchema>;
 
+/**
+ * `sql` (docs/adr/0005-agents-query-l1-with-sql.md): one read-only SELECT over
+ * the allowed views. The server adds the workspace filter and the caller's
+ * visibility; the agent never writes them.
+ */
+export const SQL_QUERY_MAX_CHARS = 20_000;
+export const AnalysisSqlInputSchema = z
+	.object({
+		query: z.string().trim().min(1).max(SQL_QUERY_MAX_CHARS),
+		/** What the result shows, as a short label; stored with the result. */
+		title: z.string().trim().min(1).max(120),
+		...traceInput,
+	})
+	.strict();
+
+/** A session a stored result names, with its committed generation then. */
+const SqlSessionSchema = z.object({
+	sessionId: z.string(),
+	ownerId: z.string(),
+	revision: z.string(),
+	parserVersion: z.number(),
+});
+
+export const AnalysisSqlOutputSchema = z.object({
+	/** Stored result id; the result, its title, SQL and covered sessions are kept under it. */
+	id: z.string(),
+	title: z.string(),
+	query: z.string(),
+	columns: z.array(z.string()),
+	/** Rows shown in `table`. */
+	rows: z.number().int().nonnegative(),
+	/** Rows, cells or characters were cut to fit the caps. */
+	truncated: z.boolean(),
+	/** Compact pipe table: a header line, then one line per row. */
+	table: z.string(),
+	/** What was cut and how to aggregate or page; always the not-evidence notice last. */
+	notices: z.array(z.string()),
+	/** Sessions the shown rows name (a `session_id` column). */
+	sessions: z.array(SqlSessionSchema),
+	trace: AnalysisTraceSchema.optional(),
+});
+
+/** `schema`: the views, then one view's columns, then one column's top values. */
+export const AnalysisSchemaInputSchema = z
+	.object({
+		view: z.string().trim().min(1).max(100).optional(),
+		column: z.string().trim().min(1).max(200).optional(),
+	})
+	.strict()
+	.refine((input) => input.column === undefined || input.view !== undefined, {
+		path: ["column"],
+		message: "column needs its view",
+	});
+
+const SqlViewColumnSchema = z.object({
+	name: z.string(),
+	type: z.string(),
+	meaning: z.string(),
+	traps: z.array(z.string()),
+});
+
+export const AnalysisSchemaOutputSchema = z.discriminatedUnion("level", [
+	z.object({
+		level: z.literal("views"),
+		views: z.array(
+			z.object({ name: z.string(), grain: z.string(), columns: z.number() }),
+		),
+		notes: z.array(z.string()),
+	}),
+	z.object({
+		level: z.literal("columns"),
+		view: z.string(),
+		grain: z.string(),
+		traps: z.array(z.string()),
+		columns: z.array(SqlViewColumnSchema),
+	}),
+	z.object({
+		level: z.literal("values"),
+		view: z.string(),
+		column: SqlViewColumnSchema,
+		/** Which runs were counted, e.g. "runs that started in the last 30 days". */
+		over: z.string(),
+		values: z.array(z.object({ value: z.string(), runs: z.number() })),
+		notices: z.array(z.string()),
+	}),
+]);
+
+export type AnalysisSqlInput = z.infer<typeof AnalysisSqlInputSchema>;
+export type AnalysisSqlOutput = z.infer<typeof AnalysisSqlOutputSchema>;
+export type AnalysisSchemaInput = z.infer<typeof AnalysisSchemaInputSchema>;
+export type AnalysisSchemaOutput = z.infer<typeof AnalysisSchemaOutputSchema>;
+
 /** The page size of a find call: its `limit`, or 20 tool groups, else 50. */
 export function findLimit(input: Pick<AnalysisFindInput, "limit" | "source">) {
 	return input.limit ?? (input.source === "tool" ? 20 : 50);
@@ -948,4 +1040,8 @@ export function findLimit(input: Pick<AnalysisFindInput, "limit" | "source">) {
 export const analysisContract = {
 	find: oc.input(AnalysisFindInputSchema).output(AnalysisFindOutputSchema),
 	read: oc.input(AnalysisReadInputSchema).output(AnalysisReadOutputSchema),
+	schema: oc
+		.input(AnalysisSchemaInputSchema)
+		.output(AnalysisSchemaOutputSchema),
+	sql: oc.input(AnalysisSqlInputSchema).output(AnalysisSqlOutputSchema),
 };

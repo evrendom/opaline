@@ -72,7 +72,7 @@ export interface StoredQuery {
 	stepId: string;
 	workspaceId: string;
 	authorId: string;
-	tool: "find" | "read";
+	tool: "find" | "read" | "sql";
 	args: Record<string, unknown>;
 	/** The exact typed result; null once expired or removed. */
 	output: unknown;

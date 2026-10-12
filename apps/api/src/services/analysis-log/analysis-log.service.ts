@@ -57,7 +57,7 @@ export function analysisAlreadySaved(id: string): string {
 }
 
 export interface RecordedCall {
-	tool: "find" | "read";
+	tool: "find" | "read" | "sql";
 	/** The call's arguments without the trace fields. */
 	args: Record<string, unknown>;
 	/** The draft this call adds to; without it the call starts a new draft. */
@@ -417,7 +417,9 @@ export async function getStoredQuery(
 		call:
 			query.tool === "find"
 				? { tool: "find", args: query.args, output: output as never }
-				: { tool: "read", args: query.args, output: output as never },
+				: query.tool === "sql"
+					? { tool: "sql", args: query.args, output: output as never }
+					: { tool: "read", args: query.args, output: output as never },
 	};
 }
 
@@ -508,18 +510,20 @@ async function createCallStep(
 	return step;
 }
 
-/** Argument values every find or read call has unless the agent changed them. */
+/** Argument values every find or read call has unless the agent changed them; sql has none. */
 const CALL_DEFAULTS = {
 	find: AnalysisFindInputSchema.parse({ source: "runs" }),
 	read: AnalysisReadInputSchema.parse({
 		refs: [{ sessionId: "s", turn: 1 }],
 	}),
+	sql: {},
 } as const;
 
 /**
  * "find source=tool kind=validation from=2026-09-01", "read runs=3
- * depth=turn": the call's tool and the arguments it set (source always, other
- * defaults left out), run lists as a count. Never free text from the chat.
+ * depth=turn", "sql title=Longest runs": the call's tool and the arguments it
+ * set (source always, other defaults left out), run lists as a count, and an
+ * sql call's title without its SQL. Never free text from the chat.
  */
 export function stepLabel(
 	tool: RecordedCall["tool"],
@@ -528,7 +532,12 @@ export function stepLabel(
 	const defaults: Record<string, unknown> = CALL_DEFAULTS[tool];
 	const parts: string[] = [tool];
 	for (const [key, value] of Object.entries(args)) {
-		if (key === "workspace" || key === "cursor" || value === undefined)
+		if (
+			key === "workspace" ||
+			key === "cursor" ||
+			value === undefined ||
+			(tool === "sql" && key === "query")
+		)
 			continue;
 		if (
 			key !== "source" &&

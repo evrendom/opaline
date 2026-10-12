@@ -292,7 +292,7 @@ test("every tool declares annotations, and only the tools that write are not rea
 				? replaces
 				: name === "share_answer" || name === "save_answer"
 					? shares
-					: ["find", "read"].includes(name)
+					: ["find", "read", "sql"].includes(name)
 						? writes
 						: readOnly),
 		});
@@ -375,7 +375,9 @@ test("the model sees only the analysis tools, the dashboard and the workspace li
 			"list_workspaces",
 			"read",
 			"save_answer",
+			"schema",
 			"share_answer",
+			"sql",
 		].sort(),
 	);
 });

@@ -1,7 +1,13 @@
 import { ORPCError } from "@orpc/server";
 import { redactReturnedValue } from "@rudel/secret-filter";
 import { type ClickHouseExecutor, getClickhouse } from "../../clickhouse.js";
+import { sqlClient } from "../../db.js";
 import { orgMiddleware, os } from "../../middleware.js";
+import {
+	type AgentQueryLimiter,
+	createAgentQueryLimiter,
+	createPostgresAgentQuerySlots,
+} from "../../services/analysis/agent-query-slots.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
 import { findAnalysisWithOwners } from "../../services/analysis/find.service.js";
 import {
@@ -11,6 +17,18 @@ import {
 import { readAnalysis } from "../../services/analysis/read.service.js";
 import { budgetReadOutput } from "../../services/analysis/read-output.js";
 import { findScope } from "../../services/analysis/scope.js";
+import {
+	describeSchema,
+	describeSqlFailure,
+	runSql,
+	type SqlFailure,
+} from "../../services/analysis/sql-gateway.js";
+import {
+	createPostgresSqlQuota,
+	createPostgresSqlResultStore,
+	type SqlQuota,
+	type SqlResultStore,
+} from "../../services/analysis/sql-results.js";
 import {
 	getAnalysisTree,
 	getStoredQuery,
@@ -43,6 +61,12 @@ interface AnalysisEnv {
 	executor: ClickHouseExecutor;
 	/** The log of a workspace, or null where it is off. */
 	log?: (workspaceId: string) => AnalysisLog | null;
+	/** Where sql results are stored; Postgres by default. */
+	sqlResults?: SqlResultStore;
+	/** The per-workspace sql quota; Postgres by default. */
+	sqlQuota?: SqlQuota;
+	/** The query slots shared by every instance; Postgres by default. */
+	queryLimiter?: AgentQueryLimiter;
 }
 
 export function createAnalysisRouter(
@@ -135,6 +159,66 @@ export function createAnalysisRouter(
 			return trace && fitted !== read ? withReadTrace(output, trace) : output;
 		});
 
+	const sqlEnv = {
+		executor: env.executor,
+		results: env.sqlResults ?? createPostgresSqlResultStore(sqlClient),
+		quota: env.sqlQuota ?? createPostgresSqlQuota(sqlClient),
+		limiter:
+			env.queryLimiter ??
+			createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
+	};
+	const callerOf = (context: {
+		organizationId: string;
+		sessionReader: SessionReader;
+	}) => ({
+		workspaceId: context.organizationId,
+		reader: context.sessionReader,
+	});
+
+	const schema = os.analysis.schema
+		.use(orgMiddleware)
+		.use(({ context, next, signal }) =>
+			analysisLimiter.run(context.user.id, async () => next(), signal),
+		)
+		.handler(async ({ input, context, signal }) => {
+			const described = await describeSchema(
+				callerOf(context),
+				input,
+				sqlEnv,
+				signal,
+			);
+			if (!described.ok) throw sqlError(described.error);
+			return described.result;
+		});
+
+	const sql = os.analysis.sql
+		.use(orgMiddleware)
+		// One slot per call, like find and read: the MCP tool calls this too.
+		.use(({ context, next, signal }) =>
+			analysisLimiter.run(context.user.id, async () => next(), signal),
+		)
+		.handler(async ({ input, context, signal }) => {
+			const outcome = await runSql(callerOf(context), input, sqlEnv, signal);
+			if (!outcome.ok) throw sqlError(outcome.error);
+			// Recorded like find: exact arguments and result, the sessions it
+			// names and every member whose sessions it could read (ADR 0001).
+			// A draft id the log refuses fails the call, so its result goes too.
+			const trace = await captureCall(
+				env.executor,
+				analysisLog(context.organizationId),
+				author(context),
+				"sql",
+				input,
+				outcome.result,
+				outcome.owners,
+				outcome.result.sessions,
+			).catch(async (error: unknown) => {
+				await sqlEnv.results.discard(outcome.result.id);
+				throw error;
+			});
+			return trace ? { ...outcome.result, trace } : outcome.result;
+		});
+
 	const viewerOf = (context: {
 		organizationId: string;
 		user: { id: string };
@@ -204,7 +288,19 @@ export function createAnalysisRouter(
 			),
 	};
 
-	return { find, read, history };
+	return { find, read, schema, sql, history };
+}
+
+/** Recoverable refusals are bad requests; fatal ones are forbidden. Both carry the class. */
+function sqlError(failure: SqlFailure): ORPCError<string, unknown> {
+	return new ORPCError(failure.kind === "fatal" ? "FORBIDDEN" : "BAD_REQUEST", {
+		message: describeSqlFailure(failure),
+		data: {
+			kind: failure.kind,
+			fragment: failure.fragment,
+			fix: failure.fix,
+		},
+	});
 }
 
 export const analysisRouter = createAnalysisRouter();
