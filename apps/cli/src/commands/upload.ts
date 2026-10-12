@@ -22,7 +22,6 @@ import { getGitInfo } from "../lib/git-info.js";
 import { getProjectOrgId } from "../lib/project-config.js";
 import { scanAndGroupProjects } from "../lib/project-grouping.js";
 import { retryPendingSessionEvidence } from "../lib/session-evidence.js";
-import { withInferredSessionRepository } from "../lib/session-repository.js";
 import { resolveSession } from "../lib/session-resolver.js";
 import {
 	DEFAULT_ENDPOINT,
@@ -179,14 +178,12 @@ async function runInteractiveUpload(
 		label: "Uploading sessions...",
 		concurrency: flags.concurrency,
 		upload: async (item, onRetry) => {
-			const request = await withInferredSessionRepository(
-				await item.adapter.buildUploadRequest(item.session, {
-					tag: flags.tag,
-					gitInfo: item.gitInfo,
-					organizationId: item.organizationId,
-					uploadMode: "manual",
-				}),
-			);
+			const request = await item.adapter.buildUploadRequest(item.session, {
+				tag: flags.tag,
+				gitInfo: item.gitInfo,
+				organizationId: item.organizationId,
+				uploadMode: "manual",
+			});
 			if (flags.forceReplace) request.force_replace = true;
 
 			if (!flags.tag && flags.classify) {
@@ -237,6 +234,12 @@ async function runSingleUpload(
 	write(`Found session at: ${sessionInfo.transcriptPath}`);
 
 	const gitInfo = await getGitInfo(sessionInfo.projectPath);
+	const displayName =
+		gitInfo.gitRemote ||
+		gitInfo.packageName ||
+		sessionInfo.projectPath.split("/").pop();
+	if (displayName) write(`Repository: ${displayName}`);
+	if (gitInfo.branch) write(`Branch: ${gitInfo.branch}`);
 
 	const organizationId =
 		flags.org ?? (await getProjectOrgId(sessionInfo.projectPath));
@@ -252,14 +255,12 @@ async function runSingleUpload(
 
 	let request: IngestSessionInput;
 	try {
-		request = await withInferredSessionRepository(
-			await adapter.buildUploadRequest(sessionFile, {
-				tag: flags.tag,
-				gitInfo,
-				organizationId,
-				uploadMode: "manual",
-			}),
-		);
+		request = await adapter.buildUploadRequest(sessionFile, {
+			tag: flags.tag,
+			gitInfo,
+			organizationId,
+			uploadMode: "manual",
+		});
 	} catch (error) {
 		if (error instanceof MissingTranscriptTimestampError) {
 			return new Error(
@@ -273,12 +274,6 @@ async function runSingleUpload(
 		}
 		throw error;
 	}
-	const displayName =
-		request.gitRemote ||
-		request.packageName ||
-		sessionInfo.projectPath.split("/").pop();
-	if (displayName) write(`Repository: ${displayName}`);
-	if (request.gitBranch) write(`Branch: ${request.gitBranch}`);
 
 	write(`Transcript: ${Buffer.byteLength(request.content, "utf8")} bytes`);
 	if (request.subagents && request.subagents.length > 0) {
@@ -461,14 +456,12 @@ async function runRetryUpload(
 				item.failure.organizationId ??
 				(await getProjectOrgId(item.failure.projectPath));
 
-			const request = await withInferredSessionRepository(
-				await adapter.buildUploadRequest(sessionFile, {
-					tag: flags.tag,
-					gitInfo,
-					organizationId,
-					uploadMode: "retry",
-				}),
-			);
+			const request = await adapter.buildUploadRequest(sessionFile, {
+				tag: flags.tag,
+				gitInfo,
+				organizationId,
+				uploadMode: "retry",
+			});
 			if (flags.forceReplace) request.force_replace = true;
 
 			return uploadSession(request, {

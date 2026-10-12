@@ -11,7 +11,6 @@ import { getGitInfo } from "../../../lib/git-info.js";
 import { reportHookUploadFailure } from "../../../lib/hook-upload-failure.js";
 import { getProjectOrgId } from "../../../lib/project-config.js";
 import { captureAndUploadSessionEvidence } from "../../../lib/session-evidence.js";
-import { withInferredSessionRepository } from "../../../lib/session-repository.js";
 import { allowsInsecureEndpointFromEnv } from "../../../lib/upload-endpoint.js";
 import {
 	formatRedactionSummary,
@@ -78,13 +77,11 @@ async function runTurnComplete(
 		const gitInfo = await getGitInfo(input.cwd);
 		const organizationId = await getProjectOrgId(input.cwd);
 
-		const request = await withInferredSessionRepository(
-			await codexAdapter.buildUploadRequest(sessionFile, {
-				gitInfo,
-				organizationId,
-				uploadMode: "hook",
-			}),
-		);
+		const request = await codexAdapter.buildUploadRequest(sessionFile, {
+			gitInfo,
+			organizationId,
+			uploadMode: "hook",
+		});
 
 		const apiBase = process.env.RUDEL_API_BASE ?? credentials.apiBaseUrl;
 		const endpoint = `${apiBase}/rpc`;
