@@ -21,6 +21,7 @@
 		"check-types": "turbo run check-types && bun run check-types:vercel && bun run check-types:convex",
 		"test": "turbo run test",
 		"test:integration": "turbo run test:integration --concurrency=1",
+		"test:kill-matrix": "bun apps/api/src/scripts/kill-matrix/kill-matrix.ts",
 		"verify": "bun scripts/check-disclosure.ts && bun run check-types && turbo run lint test build",
 		"deploy": "turbo run build",
 		"dev:local": "bash scripts/dev-local.sh",

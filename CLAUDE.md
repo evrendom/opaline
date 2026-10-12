@@ -387,6 +387,10 @@ This repository does not release the CLI. The published CLI (npm `rudel` and `op
 
 `apps/cli` stays in this repository only as a test harness for the API. Change it only to keep the API tests working. Do not add CLI features to it and do not publish it. Its `package.json` is `private` to prevent accidental publication.
 
+## Tests earn their place
+
+Keep a test only if it catches something no other test catches. `bun run test:kill-matrix <module.ts>` runs every mutant of a module against each of its tests alone and lists the tests that kill no unique mutant. How to run it and what to remove: `.claude/skills/testing-bun/SKILL.md` ("Every Test Earns Its Place").
+
 ## Pre-Push Checklist
 
 Before pushing and creating a pull request, always run:

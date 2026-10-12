@@ -80,20 +80,6 @@ test("a cursor that find did not return is a BAD_REQUEST", () => {
 	}
 });
 
-test("a first page without a draft id continues with the draft id its trace returned", () => {
-	const cursor = writeFindCursor(input, [2, "c"]);
-	expect(
-		readFindCursor({ ...input, cursor, analysis: "a_draft" }, ORDER),
-	).toEqual([2, "c"]);
-	// A different window is still another call.
-	expect(() =>
-		readFindCursor(
-			{ ...input, from: "2026-09-02", cursor, analysis: "a_draft" },
-			ORDER,
-		),
-	).toThrow(ORPCError);
-});
-
 test('strings compare by code point, as UTF-8 bytes in ClickHouse and Postgres COLLATE "C" do', () => {
 	const values = [
 		"a",

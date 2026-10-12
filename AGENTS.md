@@ -14,6 +14,10 @@
 - The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there.
 - `apps/cli` in this repository is only a test harness for the API. It is not published.
 
+## Tests
+
+- Keep a test only if it catches something no other test catches. `bun run test:kill-matrix <module.ts>` builds the mutation-testing kill matrix and lists the tests that kill no unique mutant; see `.claude/skills/testing-bun/SKILL.md` ("Every Test Earns Its Place").
+
 ## Retired code
 
 - Recover Wrapped from Git history only when explicitly requested.
