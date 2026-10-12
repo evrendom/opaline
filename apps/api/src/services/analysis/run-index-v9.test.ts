@@ -134,7 +134,8 @@ describe("parser 9 run interpretation", () => {
 	});
 	test("edits require confirmed outcomes and failures remain separate", () => {
 		const sql = runFactsCtes({ literal: true });
-		expect(RUN_INDEX_VERSION).toBe(2);
+		// Edit outcomes are run index 2 rules, kept by later versions.
+		expect(RUN_INDEX_VERSION).toBeGreaterThanOrEqual(2);
 		expect(sql).toContain("if(max(parser_version) >= 9");
 		expect(sql).toContain("JSONExtractArrayRaw(applied_changes)");
 		expect(sql).toContain("arrayConcat(");

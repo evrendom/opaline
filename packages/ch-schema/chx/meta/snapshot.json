@@ -3715,8 +3715,8 @@
 				},
 				{
 					"name": "not_found",
-					"type": "UInt32",
-					"comment": "Failed read or search results whose text says not found, no such file, ENOENT or No files found."
+					"type": "Nullable(UInt32)",
+					"comment": "Read and search calls whose result records that they found nothing: Claude Code's zero-result text, zero match or file counts or returnCodeInterpretation 'No matches found', the shell's no matches found for a file pattern, a search that printed nothing (unless its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist; NULL when the parser version or agent does not record it (Claude Code before parser 6, and its subagent streams, which keep no tool result details)."
 				},
 				{
 					"name": "denied_calls",
@@ -3971,7 +3971,7 @@
 				{
 					"name": "repository",
 					"type": "String",
-					"comment": "Receipt: the session repository key as recorded (git remote, else package name, else project path)."
+					"comment": "The session repository key as recorded (git remote, else package name, else project path), on every run and on the receipt; empty when none was recorded."
 				},
 				{
 					"name": "session_model",
@@ -4106,9 +4106,14 @@
 					"comment": "Tool calls in the search group of the runs of the row."
 				},
 				{
-					"name": "not_found",
+					"name": "not_found_known_runs",
 					"type": "UInt64",
-					"comment": "Failed reads and searches of the runs of the row whose text says not found, no such file, ENOENT or No files found."
+					"comment": "Runs of the row that can record reads and searches that found nothing (run index 3 or newer; Claude Code parser 6 or newer on its main stream, Codex every parser); the matching sums cover only these runs."
+				},
+				{
+					"name": "not_found",
+					"type": "Nullable(UInt64)",
+					"comment": "Read and search calls that found nothing, summed over the known runs; NULL when no run of the row can record it."
 				},
 				{
 					"name": "compactions",

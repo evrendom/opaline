@@ -638,7 +638,7 @@ export type RudelRunIndexRow = {
   refused_edits: number | null
   reads: number
   searches: number
-  not_found: number
+  not_found: number | null
   denied_calls: number | null
   interrupted_calls: number | null
   timed_out_calls: number | null
@@ -755,7 +755,7 @@ export const RudelRunIndexRowSchema = z.object({
   refused_edits: z.number().nullable().default(null),
   reads: z.number(),
   searches: z.number(),
-  not_found: z.number(),
+  not_found: z.number().nullable(),
   denied_calls: z.number().nullable(),
   interrupted_calls: z.number().nullable(),
   timed_out_calls: z.number().nullable(),
@@ -1377,7 +1377,8 @@ export type RudelWeeklyTotalsRow = {
   edits: string
   reads: string
   searches: string
-  not_found: string
+  not_found_known_runs: string
+  not_found: string | null
   compactions: string
   interrupt_markers: string
   edit_outcomes_known_runs: string
@@ -1447,7 +1448,8 @@ export const RudelWeeklyTotalsRowSchema = z.object({
   edits: z.string(),
   reads: z.string(),
   searches: z.string(),
-  not_found: z.string(),
+  not_found_known_runs: z.string(),
+  not_found: z.string().nullable(),
   compactions: z.string(),
   interrupt_markers: z.string(),
   edit_outcomes_known_runs: z.string(),

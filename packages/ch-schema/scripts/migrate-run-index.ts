@@ -21,6 +21,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { runIndexNotFoundStatement } from "./migrate-not-found-unknown.js";
 
 /** The L1 run index (docs/l1-literal-schema.md, "Scale"). */
 export const RUN_INDEX_MIGRATION = "20261010120000_run_index.sql";
@@ -88,6 +89,11 @@ export async function runRunIndexMigration(options: {
 			`ALTER TABLE ${options.targetDatabase}.${TABLE.name} ADD COLUMN IF NOT EXISTS ${name} ${column.type} COMMENT '${column.comment.replaceAll("'", "\\'")}'`,
 		);
 	}
+	// The not-found migration's column changes (OPL-384), which the read-back
+	// below checks.
+	await options.executor.execute(
+		runIndexNotFoundStatement(options.targetDatabase),
+	);
 
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,

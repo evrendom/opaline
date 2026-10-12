@@ -410,7 +410,7 @@ describe("statements stay within the ClickHouse memory cap", () => {
 	const finalScans = (query: string) =>
 		query.match(/rudel\.transcript_records FINAL/gu)?.length ?? 0;
 
-	test("run facts read the wide text columns in one deduplicated scan", () => {
+	test("run facts read each wide text column in one scan and deduplicate in one", () => {
 		const statement = buildRunFactsStatement(scope, generations);
 		expect(finalScans(statement.query)).toBe(1);
 		const finalScan = statement.query.slice(
@@ -418,8 +418,15 @@ describe("statements stay within the ClickHouse memory cap", () => {
 			statement.query.indexOf("run_facts AS ("),
 		);
 		expect(finalScans(finalScan)).toBe(1);
+		// Results' tails are read once, by the per-call scan, whose max() a
+		// duplicate row cannot change.
 		expect(statement.query.match(/substringUTF8\(tail,/gu)).toHaveLength(1);
-		expect(finalScan).toContain("substringUTF8(tail,");
+		const callScan = statement.query.slice(
+			statement.query.indexOf("calls AS ("),
+			statement.query.indexOf("work_records AS ("),
+		);
+		expect(callScan).toContain("substringUTF8(tail,");
+		expect(finalScans(callScan)).toBe(0);
 		expect(statement.clickhouse_settings).toMatchObject({
 			remote_filesystem_read_prefetch: 0,
 			max_memory_usage: "1073741824",

@@ -5,7 +5,8 @@
  * reader imports it at runtime (`@rudel/ch-schema/weekly-totals`).
  *
  * A refreshable materialized view appends a full snapshot every night
- * (`20261011150000_weekly_totals.sql`); readers read only the newest complete
+ * (`20261011150000_weekly_totals.sql`, recreated by
+ * `20261012120000_not_found_unknown.sql`); readers read only the newest complete
  * one. Plain sums of literal facts, nothing interpreted: a fact the parser
  * version or agent cannot record is left out of its sum, and its
  * `<fact>_known_runs` column counts the runs that can record it, so a sum is
@@ -100,9 +101,18 @@ export const WEEKLY_TOTALS_MEASURES: readonly WeeklyTotalsMeasure[] = [
 		comment: `Tool calls in the search group of ${RUNS_OF_ROW}.`,
 	},
 	{
-		name: "not_found",
+		name: "not_found_known_runs",
 		type: "UInt64",
-		comment: `Failed reads and searches of ${RUNS_OF_ROW} whose text says not found, no such file, ENOENT or No files found.`,
+		comment: knownComment(
+			"reads and searches that found nothing",
+			"run index 3 or newer; Claude Code parser 6 or newer on its main stream, Codex every parser",
+		),
+	},
+	{
+		name: "not_found",
+		type: "Nullable(UInt64)",
+		comment: gatedSum("Read and search calls that found nothing"),
+		known: "not_found_known_runs",
 	},
 	{
 		name: "compactions",

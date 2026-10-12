@@ -206,6 +206,234 @@ const withoutBuild = (row: RudelRunIndexRow) => {
 	return rest;
 };
 
+/** A Claude Code main-stream line of a not-found session, one second apart. */
+const claudeLine = (second: number, line: Record<string, unknown>) =>
+	JSON.stringify({
+		sessionId: "not-found",
+		cwd: "/repo",
+		version: "2.1.292",
+		entrypoint: "cli",
+		timestamp: new Date(Date.UTC(2026, 9, 1, 9, 0, second)).toISOString(),
+		...line,
+	});
+const claudeCall = (
+	second: number,
+	id: string,
+	name: string,
+	input: Record<string, unknown>,
+) =>
+	claudeLine(second, {
+		type: "assistant",
+		message: {
+			role: "assistant",
+			content: [{ type: "tool_use", id, name, input }],
+		},
+	});
+const claudeResult = (
+	second: number,
+	id: string,
+	content: string,
+	isError: boolean,
+	toolUseResult: unknown,
+) =>
+	claudeLine(second, {
+		type: "user",
+		message: {
+			role: "user",
+			content: [
+				{ type: "tool_result", tool_use_id: id, content, is_error: isError },
+			],
+		},
+		toolUseResult,
+	});
+/**
+ * One run, read by hand: 2 reads and 7 searches, of which a Read of a
+ * missing file, a Grep with no files, an rg whose exit code Claude Code
+ * reads as "No matches found" (it also printed `done`), a find that printed
+ * nothing, a grep that printed only its exit code and a grep whose file pattern the shell
+ * matched to nothing found nothing (6). The Grep that found a file and the
+ * cat of an empty file found something, and `rg -q` prints nothing either
+ * way.
+ */
+const CLAUDE_NOT_FOUND = [
+	claudeLine(0, {
+		type: "user",
+		message: { role: "user", content: "find the config" },
+	}),
+	claudeCall(1, "toolu_read", "Read", { file_path: "/repo/config.yml" }),
+	claudeResult(
+		2,
+		"toolu_read",
+		"<tool_use_error>File does not exist. Note: your current working directory is /repo.</tool_use_error>",
+		true,
+		"Error: File does not exist. Note: your current working directory is /repo.",
+	),
+	claudeCall(3, "toolu_grep", "Grep", {
+		pattern: "config",
+		output_mode: "files_with_matches",
+	}),
+	claudeResult(4, "toolu_grep", "No files found", false, {
+		mode: "files_with_matches",
+		filenames: [],
+		numFiles: 0,
+	}),
+	claudeCall(5, "toolu_rg", "Bash", {
+		command: "rg -n 'loadConfig' src; echo done",
+	}),
+	claudeResult(6, "toolu_rg", "done", false, {
+		stdout: "done",
+		stderr: "",
+		interrupted: false,
+		isImage: false,
+		returnCodeInterpretation: "No matches found",
+	}),
+	claudeCall(7, "toolu_find", "Bash", { command: "find . -name 'config.*'" }),
+	claudeResult(8, "toolu_find", "(Bash completed with no output)", false, {
+		stdout: "",
+		stderr: "",
+		interrupted: false,
+		isImage: false,
+	}),
+	claudeCall(9, "toolu_grep_env", "Bash", { command: "grep -rn 'PORT' .env" }),
+	claudeResult(10, "toolu_grep_env", "Exit code 1", true, "Error: Exit code 1"),
+	claudeCall(11, "toolu_found", "Grep", { pattern: "PORT" }),
+	claudeResult(12, "toolu_found", "Found 1 file\nsrc/server.ts", false, {
+		mode: "files_with_matches",
+		filenames: ["src/server.ts"],
+		numFiles: 1,
+	}),
+	claudeCall(13, "toolu_cat", "Bash", { command: "cat src/empty.ts" }),
+	claudeResult(14, "toolu_cat", "(Bash completed with no output)", false, {
+		stdout: "",
+		stderr: "",
+		interrupted: false,
+		isImage: false,
+	}),
+	claudeCall(15, "toolu_glob", "Bash", {
+		command: "grep -rn 'PORT' --include=*.env .",
+	}),
+	claudeResult(
+		16,
+		"toolu_glob",
+		"(eval):1: no matches found: --include=*.env",
+		false,
+		{
+			stdout: "",
+			stderr: "(eval):1: no matches found: --include=*.env",
+			interrupted: false,
+			isImage: false,
+		},
+	),
+	claudeCall(17, "toolu_quiet", "Bash", { command: "rg -q PORT src" }),
+	claudeResult(18, "toolu_quiet", "(Bash completed with no output)", false, {
+		stdout: "",
+		stderr: "",
+		interrupted: false,
+		isImage: false,
+	}),
+].join("\n");
+
+/** A Codex exec call with its completion (parsed command, exit code) and output. */
+const codexExec = (
+	minute: number,
+	id: string,
+	cmd: string,
+	type: "read" | "search",
+	exitCode: number,
+	output: string,
+) => {
+	const at = (second: number) =>
+		new Date(Date.UTC(2026, 9, 1, 10, minute, second)).toISOString();
+	return [
+		{
+			timestamp: at(0),
+			type: "response_item",
+			payload: {
+				type: "function_call",
+				name: "exec_command",
+				arguments: JSON.stringify({ cmd }),
+				call_id: id,
+			},
+		},
+		{
+			timestamp: at(1),
+			type: "event_msg",
+			payload: {
+				type: "item_completed",
+				item: {
+					type: "CommandExecution",
+					id,
+					command: ["/bin/zsh", "-lc", cmd],
+					cwd: "/repo",
+					status: exitCode === 0 ? "completed" : "failed",
+					stdout: exitCode === 0 ? output : "",
+					stderr: exitCode === 0 ? "" : output,
+					aggregated_output: output,
+					exit_code: exitCode,
+					duration: { secs: 0, nanos: 1_000_000 },
+					parsed_cmd: [{ type, cmd }],
+				},
+			},
+		},
+		{
+			timestamp: at(2),
+			type: "response_item",
+			payload: {
+				type: "function_call_output",
+				call_id: id,
+				output: `Chunk ID: ${id}\nWall time: 0.0100 seconds\nProcess exited with code ${exitCode}\nOriginal token count: ${output === "" ? 0 : 9}\nOutput:\n${output}`,
+			},
+		},
+	];
+};
+/**
+ * One run, read by hand: an rg with no match (exit 1), a find that printed
+ * nothing and a cat of a missing file found nothing (3); an rg that matched
+ * found something.
+ */
+const CODEX_NOT_FOUND = [
+	{
+		timestamp: "2026-10-01T10:00:00.000Z",
+		type: "session_meta",
+		payload: {
+			id: "not-found-codex",
+			cli_version: "0.156.0",
+			originator: "codex_exec",
+			source: "exec",
+			thread_source: "user",
+		},
+	},
+	{
+		timestamp: "2026-10-01T10:00:30.000Z",
+		type: "response_item",
+		payload: {
+			type: "message",
+			role: "user",
+			content: [{ type: "input_text", text: "find the config loader" }],
+		},
+	},
+	...codexExec(1, "call_rg", "rg -n loadConfig src", "search", 1, ""),
+	...codexExec(2, "call_find", "find . -name 'config.*'", "search", 0, ""),
+	...codexExec(
+		3,
+		"call_cat",
+		"cat src/config.ts",
+		"read",
+		1,
+		"cat: src/config.ts: No such file or directory",
+	),
+	...codexExec(
+		4,
+		"call_hit",
+		"rg -n PORT src",
+		"search",
+		0,
+		"src/server.ts:3:const PORT = 80",
+	),
+]
+	.map((line) => JSON.stringify(line))
+	.join("\n");
+
 test("the worker indexes runs literally, keeps them through rebuilds and expiry, and is fenced by purges", async () => {
 	await sqlClient.unsafe(
 		`INSERT INTO "user" (id, name, email, email_verified) VALUES ($1, 'Runs', $2, false)`,
@@ -309,6 +537,49 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 				run.active_minutes,
 			]),
 	);
+
+	// Reads and searches that found nothing, against runs read by hand.
+	const claudeNotFound = `${RUN}_claude_not_found`;
+	const codexNotFound = `${RUN}_codex_not_found`;
+	const legacyNotFound = `${RUN}_v5_not_found`;
+	await publish(claudeNotFound, "claude_code", CLAUDE_NOT_FOUND, "1");
+	await publish(codexNotFound, "codex", CODEX_NOT_FOUND, "1");
+	await publish(legacyNotFound, "claude_code", CLAUDE_NOT_FOUND, "1", 5);
+	await queueRunIndex(claudeNotFound, "claude_code");
+	await queueRunIndex(codexNotFound, "codex");
+	await queueRunIndex(legacyNotFound, "claude_code");
+	expect(await pass()).toBe(3);
+	const counts = async (sessionId: string) =>
+		(await runsOf(sessionId)).map((run) => [
+			run.reads,
+			run.searches,
+			run.not_found,
+		]);
+	expect(await counts(claudeNotFound)).toEqual([[2, 7, 6]]);
+	expect(await counts(codexNotFound)).toEqual([[1, 3, 3]]);
+	// Parser 5 kept no returnCodeInterpretation, so the count is unknown, not 0.
+	expect(await counts(legacyNotFound)).toEqual([[2, 7, null]]);
+	expect((await runsOf(legacyNotFound))[0]?.unrecorded_facts).toContain(
+		"not_found",
+	);
+	expect(
+		(
+			await queryRunFacts(clickhouse, scope, [
+				{
+					sessionId: claudeNotFound,
+					revision: "1",
+					parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+				},
+				{
+					sessionId: codexNotFound,
+					revision: "1",
+					parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+				},
+			])
+		)
+			.map((run) => run.not_found)
+			.sort(),
+	).toEqual([3, 6]);
 
 	// Claude Code parser 8: facts copied from the run's own records.
 	const [first, second] = claudeRuns;

@@ -57,6 +57,7 @@ const FORWARD_SCRIPTS = new Map([
 	["20261010130000_parser_v9.sql", "migrate-parser-v9.ts"],
 	["20261011120000_l1_retention_removed.sql", "migrate-l1-retention.ts"],
 	["20261011150000_weekly_totals.sql", "migrate-weekly-totals.ts"],
+	["20261012120000_not_found_unknown.sql", "migrate-not-found-unknown.ts"],
 ]);
 
 interface BootstrapMigration {

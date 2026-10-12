@@ -366,9 +366,9 @@ const RUN_INDEX_COLUMNS = [
 	},
 	{
 		name: "not_found",
-		type: "UInt32",
+		type: "Nullable(UInt32)",
 		comment:
-			"Failed read or search results whose text says not found, no such file, ENOENT or No files found.",
+			"Read and search calls whose result records that they found nothing: Claude Code's zero-result text, zero match or file counts or returnCodeInterpretation 'No matches found', the shell's no matches found for a file pattern, a search that printed nothing (unless its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist; NULL when the parser version or agent does not record it (Claude Code before parser 6, and its subagent streams, which keep no tool result details).",
 	},
 	{
 		name: "denied_calls",
@@ -649,7 +649,7 @@ const RUN_INDEX_COLUMNS = [
 		name: "repository",
 		type: "String",
 		comment:
-			"Receipt: the session repository key as recorded (git remote, else package name, else project path).",
+			"The session repository key as recorded (git remote, else package name, else project path), on every run and on the receipt; empty when none was recorded.",
 	},
 	{
 		name: "session_model",

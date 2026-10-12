@@ -364,6 +364,27 @@ describe("building a session's run index", () => {
 		});
 	});
 
+	test("every run carries the session's repository, as the receipt does", async () => {
+		const fake = fakeClickHouse({ runs });
+		await build(fake);
+		expect(fake.inserts[0]?.values.map((row) => row.repository)).toEqual([
+			"github.com/acme/app",
+			"github.com/acme/app",
+		]);
+	});
+
+	test("not found is counted on Claude Code main streams and unknown on its subagent streams, which keep no tool results", async () => {
+		const fake = fakeClickHouse({
+			runs: runs.map((run) => ({ ...run, not_found: 2 })),
+		});
+		await build(fake);
+		const [main, subagent] = fake.inserts[0]?.values ?? [];
+		expect(main?.not_found).toBe(2);
+		expect(main?.unrecorded_facts).not.toContain("not_found");
+		expect(subagent?.not_found).toBeNull();
+		expect(subagent?.unrecorded_facts).toContain("not_found");
+	});
+
 	test("a parser 5 generation keeps its counts and knows none of its facts", async () => {
 		const fake = fakeClickHouse({ runs, parserVersion: 5 });
 		await build(fake);
@@ -371,6 +392,8 @@ describe("building a session's run index", () => {
 		expect(run).toMatchObject({
 			tool_calls: 4,
 			failed_calls: 1,
+			// Claude Code's reading of a search's exit code came with parser 6.
+			not_found: null,
 			denied_calls: null,
 			model: null,
 			agent_version: null,
@@ -639,6 +662,7 @@ describe("run index rows", () => {
 		buildRevision: 1,
 		builtAt: "2026-10-08 12:00:00.000",
 		sessionDate: "2026-10-08 11:00:00.000",
+		repository: "",
 	};
 
 	test("flags say true when any record says so, false only when all say false, empty when none says", () => {

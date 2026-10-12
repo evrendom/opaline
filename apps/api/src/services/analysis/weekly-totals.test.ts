@@ -76,7 +76,10 @@ const ROWS = [
 ];
 
 /** An executor serving the snapshot (unless `snapshot` is null) and the rows. */
-function executor(snapshot: typeof SNAPSHOT | null = SNAPSHOT) {
+function executor(
+	snapshot: typeof SNAPSHOT | null = SNAPSHOT,
+	rows: readonly Record<string, unknown>[] = ROWS,
+) {
 	const statements: ClickHouseStatement[] = [];
 	const fake = {
 		close: async () => {},
@@ -86,7 +89,7 @@ function executor(snapshot: typeof SNAPSHOT | null = SNAPSHOT) {
 			statements.push(statement);
 			if (statement.query.includes("GROUP BY refresh_id"))
 				return snapshot ? [snapshot] : [];
-			return ROWS;
+			return rows;
 		},
 	} as unknown as ClickHouseExecutor;
 	return { fake, statements };
@@ -200,6 +203,38 @@ describe("weekly totals", () => {
 			"the week of 2026-10-05 is partial",
 		);
 		expect(output.header.notes.join("\n")).toContain("deniedCalls 5 of 7");
+	});
+
+	test("a gated sum of a row whose known runs are 0 is unknown, as in a snapshot taken before its known-runs column", async () => {
+		const { fake } = executor(SNAPSHOT, [
+			// Written by the view before not_found_known_runs existed (default 0).
+			stored("2026-10-05", "u1", "claude_code", {
+				runs: "3",
+				not_found: "5",
+			}),
+			stored("2026-10-05", "u2", "claude_code", {
+				runs: "2",
+				not_found_known_runs: "2",
+				not_found: "1",
+			}),
+		]);
+		const { output } = await findWeeklyTotals(
+			fake,
+			ORG,
+			input({ from: "2026-10-05", to: "2026-10-11" }),
+			"2026-10-11",
+		);
+		if (output.source !== "weekly") throw new Error("not weekly");
+		expect(
+			output.totals.map((total) => [
+				total.member,
+				total.notFoundKnownRuns,
+				total.notFound,
+			]),
+		).toEqual([
+			["u1", 0, null],
+			["u2", 2, 1],
+		]);
 	});
 
 	test("groups by member across weeks: sums stay known where any row knows them, sessions do not add up", async () => {

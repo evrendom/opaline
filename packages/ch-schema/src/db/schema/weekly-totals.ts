@@ -11,8 +11,9 @@ import {
  * snapshots of the run index summed per workspace, member, agent and ISO
  * week. Only the target table is declared here: the refreshable view that
  * fills it (`weekly_totals_mv`) has a REFRESH clause chkit cannot express, so
- * it lives in the hand-written migration `20261011150000_weekly_totals.sql`
- * and its runner validates it.
+ * it lives in hand-written migrations (`20261011150000_weekly_totals.sql`,
+ * recreated by `20261012120000_not_found_unknown.sql`) and their runners
+ * validate it.
  *
  * Each refresh appends a whole snapshot (one part per day partition), and a
  * snapshot is read only when it holds all `snapshot_rows` of its rows, so a

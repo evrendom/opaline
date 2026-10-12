@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import { checksumSQL } from "chkit/dist/bin/lib.js";
+import { weeklyTotalsNotFoundStatement } from "../../scripts/migrate-not-found-unknown.js";
 import {
 	runWeeklyTotalsMigration,
 	WEEKLY_TOTALS_MIGRATION,
@@ -103,9 +104,13 @@ describe("weekly totals runner", () => {
 		const state = server();
 		await state.run();
 		await state.run();
+		// The not-found columns the read-back checks are brought on every run.
+		const notFound = weeklyTotalsNotFoundStatement("rudel");
 		expect(state.executed).toEqual([
 			"CREATE TABLE t (a UInt8) ENGINE = Memory;",
 			"SELECT 1;",
+			notFound,
+			notFound,
 		]);
 		expect(state.journal).toEqual([
 			expect.objectContaining({

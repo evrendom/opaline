@@ -43,7 +43,8 @@
 		"ch:migrate:parser-v9": "bun scripts/migrate-parser-v9.ts",
 		"ch:migrate:l1-retention": "bun scripts/migrate-l1-retention.ts",
 		"ch:migrate:weekly-totals": "bun scripts/migrate-weekly-totals.ts",
-		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:weekly-totals",
+		"ch:migrate:not-found-unknown": "bun scripts/migrate-not-found-unknown.ts",
+		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:weekly-totals ch:migrate:not-found-unknown",
 		"ch:migrate:github-outcomes": "bun scripts/migrate-github-outcomes.ts"
 	},
 	"dependencies": {

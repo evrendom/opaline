@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 import { createClickHouseExecutor } from "@chkit/clickhouse";
 import { checksumSQL, createJournalStore } from "chkit/dist/bin/lib.js";
 import {
+	NOT_FOUND_UNKNOWN_MIGRATION,
+	runNotFoundUnknownMigration,
+} from "../../scripts/migrate-not-found-unknown.js";
+import {
 	RUN_INDEX_MIGRATION,
 	runRunIndexMigration,
 } from "../../scripts/migrate-run-index.js";
@@ -42,7 +46,7 @@ const migration = async (name: string) =>
 	).replaceAll("rudel.", `${database}.`);
 
 const RUN_COLUMNS =
-	"organization_id, user_id, session_id, revision, parser_version, index_version, build_revision, agent_id, start_record, row_kind, source, started_at, session_date, unrecorded_facts, tool_calls, denied_calls, git_operations, usage_observations, cost_usd, output_tokens";
+	"organization_id, user_id, session_id, revision, parser_version, index_version, build_revision, agent_id, start_record, row_kind, source, started_at, session_date, unrecorded_facts, tool_calls, denied_calls, git_operations, usage_observations, cost_usd, output_tokens, not_found";
 
 /** A run index row in RUN_COLUMNS order; `start` 4294967295 is the receipt. */
 function row(values: {
@@ -60,11 +64,14 @@ function row(values: {
 	usage?: number;
 	cost?: number | null;
 	output?: number | null;
+	notFound?: number | null;
+	/** Run index version; not_found is known from index 3. */
+	index?: number;
 }): string {
 	const receipt = values.start === 4294967295;
 	const sql = (value: number | null | undefined) =>
 		value === null || value === undefined ? "NULL" : String(value);
-	return `('${values.org ?? "org"}', 'u1', '${values.session}', 1, ${values.parser ?? 9}, 2, ${values.build}, '', ${values.start}, '${receipt ? "receipt" : "run"}', '${values.source ?? "claude_code"}', '${values.at}', '2026-09-01 09:00:00.000', [${(values.unrecorded ?? []).map((fact) => `'${fact}'`).join(", ")}], ${values.toolCalls ?? 0}, ${values.denied === undefined ? 0 : sql(values.denied)}, [${(values.git ?? []).map((op) => `'${op}'`).join(", ")}], ${values.usage ?? 0}, ${sql(values.cost)}, ${sql(values.output)})`;
+	return `('${values.org ?? "org"}', 'u1', '${values.session}', 1, ${values.parser ?? 9}, ${values.index ?? 3}, ${values.build}, '', ${values.start}, '${receipt ? "receipt" : "run"}', '${values.source ?? "claude_code"}', '${values.at}', '2026-09-01 09:00:00.000', [${(values.unrecorded ?? []).map((fact) => `'${fact}'`).join(", ")}], ${values.toolCalls ?? 0}, ${values.denied === undefined ? 0 : sql(values.denied)}, [${(values.git ?? []).map((op) => `'${op}'`).join(", ")}], ${values.usage ?? 0}, ${sql(values.cost)}, ${sql(values.output)}, ${values.notFound === undefined ? 0 : sql(values.notFound)})`;
 }
 
 test("appends nightly snapshots of the committed run index builds per member, agent and week", async () => {
@@ -108,6 +115,19 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 	).toEqual([WEEKLY_TOTALS_MIGRATION]);
 	await otherExecutor.close();
 
+	// OPL-384: not_found is summed over the runs that can record it; the view
+	// is recreated with that query and the table keeps its snapshots.
+	const notFound = {
+		executor,
+		journalStore,
+		targetDatabase: database,
+		migrationSql: await migration(NOT_FOUND_UNKNOWN_MIGRATION),
+		readBack: { attempts: 1, delayMs: 0 },
+	};
+	await runNotFoundUnknownMigration(notFound);
+	await runNotFoundUnknownMigration(notFound);
+	await runWeeklyTotalsMigration(options);
+
 	const RECEIPT = 4294967295;
 	await executor.execute(
 		`INSERT INTO ${database}.run_index (${RUN_COLUMNS}) VALUES
@@ -135,6 +155,7 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 				toolCalls: 3,
 				denied: 1,
 				git: ["push"],
+				notFound: 2,
 				usage: 2,
 				cost: 1.5,
 				output: 10,
@@ -148,6 +169,7 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 				usage: 1,
 				cost: 0.5,
 				output: 4,
+				notFound: 1,
 			}),
 			row({
 				session: "s1",
@@ -174,9 +196,10 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 				build: 5,
 				start: 1,
 				at: "2026-09-08 11:00:00.000",
-				unrecorded: ["denied_calls", "git_operations"],
+				unrecorded: ["denied_calls", "git_operations", "not_found"],
 				toolCalls: 4,
 				denied: null,
+				notFound: null,
 			}),
 			row({
 				session: "s2",
@@ -201,9 +224,10 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 				build: 5,
 				start: 1,
 				at: "2026-09-08 11:00:00.000",
-				unrecorded: ["denied_calls", "git_operations"],
+				unrecorded: ["denied_calls", "git_operations", "not_found"],
 				toolCalls: 4,
 				denied: null,
+				notFound: null,
 			}),
 			row({
 				org: "other",
@@ -251,7 +275,8 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 			toUInt32(denied_calls_known_runs) AS denied_known, CAST(denied_calls, 'Nullable(UInt32)') AS denied_calls,
 			toUInt32(git_operations_known_runs) AS git_known, CAST(push_runs, 'Nullable(UInt32)') AS push_runs,
 			toUInt32(usage_observations) AS usage_observations, round(cost_usd, 4) AS cost_usd,
-			unattributed_cost_usd, CAST(output_tokens, 'Nullable(UInt32)') AS output_tokens
+			unattributed_cost_usd, CAST(output_tokens, 'Nullable(UInt32)') AS output_tokens,
+			toUInt32(not_found_known_runs) AS not_found_known, CAST(not_found, 'Nullable(UInt32)') AS not_found
 		FROM ${database}.weekly_totals
 		WHERE organization_id = 'org' AND refresh_id = '${latest?.refresh_id}'
 		ORDER BY agent, week`,
@@ -273,6 +298,8 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 			cost_usd: 1.75,
 			unattributed_cost_usd: 0.25,
 			output_tokens: 15,
+			not_found_known: 1,
+			not_found: 2,
 		},
 		{
 			user_id: "u1",
@@ -290,6 +317,8 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 			cost_usd: 0.5,
 			unattributed_cost_usd: null,
 			output_tokens: 4,
+			not_found_known: 1,
+			not_found: 1,
 		},
 		{
 			user_id: "u1",
@@ -307,6 +336,9 @@ test("appends nightly snapshots of the committed run index builds per member, ag
 			cost_usd: null,
 			unattributed_cost_usd: null,
 			output_tokens: null,
+			// Unknown, not 0: no run of the row can record it.
+			not_found_known: 0,
+			not_found: null,
 		},
 	]);
 

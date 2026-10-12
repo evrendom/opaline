@@ -41,6 +41,12 @@ export interface RunIndexColumnGate {
 	>;
 	/** Run rows, the receipt (session facts), or both (totals and merged sets). */
 	readonly rows: "run" | "receipt" | "both";
+	/**
+	 * Agents that record it only in their main stream: Claude Code subagent
+	 * transcripts keep no `toolUseResult`, so facts read from it are unknown
+	 * on their runs.
+	 */
+	readonly mainStreamOnly?: readonly TranscriptSource[];
 }
 
 const CLAUDE: readonly TranscriptSource[] = ["claude_code"];
@@ -223,6 +229,20 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		},
 	),
 	facts_truncated: gate(6, BOTH, ["facts_truncated"], "both"),
+	// Claude Code's own reading of a search's exit code is the only record of
+	// a no-match search that printed something; Codex records exit codes and
+	// output in every version.
+	not_found: {
+		...gate(
+			6,
+			BOTH,
+			["return_code_interpretation"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
+		mainStreamOnly: CLAUDE,
+	},
 	title: gate(8, CLAUDE, ["title"], "receipt"),
 	cost_state: gate(8, CLAUDE, ["cost_usd"], "receipt"),
 } as const satisfies Partial<
@@ -231,32 +251,38 @@ export const RUN_INDEX_FACT_COLUMNS = {
 
 export type RunIndexFactColumn = keyof typeof RUN_INDEX_FACT_COLUMNS;
 
-/** Whether a generation of `parserVersion` from `source` can record the column. */
+/**
+ * Whether a generation of `parserVersion` from `source` can record the
+ * column, on the stream `agentId` (empty for the main stream).
+ */
 export function isRunIndexColumnRecordable(
 	column: RunIndexFactColumn,
 	parserVersion: number,
 	source: string,
+	agentId = "",
 ): boolean {
 	const columnGate: RunIndexColumnGate = RUN_INDEX_FACT_COLUMNS[column];
 	const agent = source as TranscriptSource;
 	return (
 		parserVersion >= (columnGate.sinceBy?.[agent] ?? columnGate.since) &&
-		columnGate.agents.includes(agent)
+		columnGate.agents.includes(agent) &&
+		(agentId === "" || !columnGate.mainStreamOnly?.includes(agent))
 	);
 }
 
-/** The fact columns of a row kind that a generation cannot record, sorted. */
+/** The fact columns of a row kind that a generation cannot record on a stream, sorted. */
 export function unrecordedRunIndexColumns(
 	rowKind: "run" | "receipt",
 	parserVersion: number,
 	source: string,
+	agentId = "",
 ): RunIndexFactColumn[] {
 	return (Object.keys(RUN_INDEX_FACT_COLUMNS) as RunIndexFactColumn[])
 		.filter((column) => {
 			const { rows } = RUN_INDEX_FACT_COLUMNS[column];
 			return (
 				(rows === "both" || rows === rowKind) &&
-				!isRunIndexColumnRecordable(column, parserVersion, source)
+				!isRunIndexColumnRecordable(column, parserVersion, source, agentId)
 			);
 		})
 		.sort();
@@ -295,6 +321,7 @@ export function gateRunIndexRow(
 		row.row_kind === "receipt" ? "receipt" : "run",
 		row.parser_version,
 		row.source,
+		row.agent_id,
 	);
 	const gated: Record<string, unknown> = { ...row };
 	for (const column of unrecorded) {

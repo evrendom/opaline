@@ -43,7 +43,7 @@ import {
  */
 
 /** Version of the run index rules; a new version is a new run index generation. */
-export const RUN_INDEX_VERSION = 2;
+export const RUN_INDEX_VERSION = 3;
 
 /** Literal string or count read back from ClickHouse; `''` and 0 mean none recorded. */
 const text = z.string();
@@ -165,14 +165,15 @@ function jsonStringField(column: string, field: string): string {
 }
 
 /**
- * Every CTE reference is a separate scan in ClickHouse, so the facts read the
- * pinned records' wide columns (`head`, `tail`) in exactly one scan,
- * `work_records`, which is also the only one that needs `FINAL`: its counts and
- * sums would double on a retried insert that has not merged yet. The other
- * scans (per-call groups and failures, run boundaries, Codex line streams)
- * aggregate with functions a duplicate row cannot change (min, max, argMin,
- * uniqExact, any), so they read narrow columns without `FINAL`, which lets
- * their filters move to PREWHERE.
+ * Every CTE reference is a separate scan in ClickHouse, so each wide column
+ * is read in one scan: `work_records` reads the prompts' and calls' `head`,
+ * and `calls` reads the prefixes of the results' `head` and `tail` that say
+ * whether a call found nothing. `work_records` is the only scan that needs
+ * `FINAL`: its counts and sums would double on a retried insert that has not
+ * merged yet. The other scans (per-call groups, failures and outcomes, run
+ * boundaries, Codex line streams) aggregate with functions a duplicate row
+ * cannot change (min, max, argMin, uniqExact, any), so they read without
+ * `FINAL`, which lets their filters move to PREWHERE.
  *
  * With `literal`, `work_records` also reads the run facts the parser stores
  * (typed fact columns and named `facts` keys, never the whole map) and
@@ -209,7 +210,8 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				groupUniqArrayArray(JSONExtract(facts['parsed_cmd_types'], 'Array(String)')) AS parsed_types,
 				max(denial_kind != '' AND denial_kind != 'interrupted') AS refused,
 				max(denial_kind IN ('cancelled', 'interrupted') OR ifNull(interrupted, false)) AS stopped,
-				max(kind = 'tool_result') AS has_result
+				max(kind = 'tool_result') AS has_result,
+				${foundNothingSql()}
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
 			GROUP BY session_id, agent_id, call_id
@@ -218,8 +220,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 			SELECT session_id, agent_id, record_idx, block_idx, turn_idx, ts, kind, subtype,
 				tool_name, call_id, file_path, file_op, is_error, exit_code, text_chars, parser_version, source,
 				facts['applied_changes'] AS applied_changes,
-				if(${headKinds} OR ${runToolErrorSql()}, substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head,
-				if(${runToolErrorSql()}, substringUTF8(tail, 1, ${FACT_TEXT_CHARS}), '') AS tail${literalColumns}
+				if(${headKinds}, substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head${literalColumns}
 			FROM ${records()} FINAL WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
 		),
 		run_facts AS (
@@ -244,13 +245,60 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${runToolErrorSql()}) AS failed_calls,
 				countIf(kind = 'tool_call' AND ${toolActivitySql("read", callGroup)}) AS read_calls,
 				countIf(kind = 'tool_call' AND ${toolActivitySql("search", callGroup)}) AS search_calls,
-				countIf(${toolErrorSql()} AND (${toolActivitySql("read", `coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "''")})`)} OR ${toolActivitySql("search", `coalesce(nullIf(c.call_group, ''), ${toolGroupSql("w.tool_name", "''")})`)})
-					AND match(concat(head, '\\n', tail), '(?i)not found|no such file|ENOENT|No files found')) AS not_found${literalFacts}
+				countIf(kind = 'tool_call' AND (
+					((${toolActivitySql("read", callGroup)} OR ${toolActivitySql("search", callGroup)}) AND c.said_nothing_found)
+					OR (${toolActivitySql("search", callGroup)} AND c.printed_nothing AND NOT c.silenced))) AS not_found,
+				any(w.source) AS run_source, any(w.parser_version) AS run_parser_version${literalFacts}
 			FROM work_records w
 			LEFT ANY JOIN calls c ON w.session_id = c.session_id AND w.agent_id = c.agent_id AND w.call_id = c.call_id
 			GROUP BY w.session_id, w.agent_id, w.turn_idx
 		),
 		${boundedRunsCte(FORK_REPLAY_FILTER)}`;
+}
+
+/** Failure text that says the target of a read or search was not there. */
+const NOT_FOUND_TEXT =
+	"(?i)not found|no such file|ENOENT|does not exist|No files found|No matches found";
+/**
+ * A command that silences or redirects its standard output (`grep -q`,
+ * `> file`, `find -delete`), so printing nothing says nothing about what it
+ * found. Redirecting standard error (`2>/dev/null`, `2>&1`) does not.
+ */
+const SILENCED_COMMAND =
+	"(^|\\s)(-q|--quiet|--silent|-delete|-exec|-execdir)(\\s|$)|(^|[^0-9&>])>|(^|\\s)1>|&>";
+
+/**
+ * What a call's results record about finding nothing (docs/l1-literal-schema.md,
+ * `runs.not_found`), per call so a call with several result rows counts once:
+ *
+ * - `said_nothing_found`: Claude Code's own zero-result text (Grep and Glob
+ *   write `No files found` or `No matches found`), a zero counter of the
+ *   search's mode (numFiles, numMatches or numLines), its reading of an exit
+ *   code (`returnCodeInterpretation` `No matches found`), output that starts
+ *   with the shell's `no matches found:` for a file pattern (zsh, so the
+ *   search never ran), or a failure whose text (its start, or the end of
+ *   its output, where errors are written last) says the target was not there;
+ * - `printed_nothing`: a finished command with no output at all (Claude Code
+ *   `(Bash completed with no output)` or a bare `Exit code N`, an empty Codex
+ *   output, or a Codex process that exited with `Original token count: 0`),
+ *   unless the command silences or redirects its output.
+ *
+ * The second says nothing found only for searches; `run_facts` applies it by
+ * tool group. An exit code alone does not: grep and rg exit 1 for no match,
+ * but find and ls exit 1 for errors, and a compound command exits with its
+ * last part's status.
+ */
+function foundNothingSql(): string {
+	const zeroCounter = `multiIf(facts['search_mode'] = 'content', facts['search_result_lines'],
+		facts['search_mode'] = 'count', facts['search_matches'], facts['files_found']) = '0'`;
+	return `max(kind IN ('tool_result', 'meta') AND (
+					facts['return_code_interpretation'] = 'No matches found' OR ${zeroCounter}
+					OR (kind = 'tool_result' AND match(substringUTF8(head, 1, 64), '^(No files found|No matches found|[a-z()]+:[0-9]+: no matches found: )'))
+					OR (${toolErrorSql()} AND match(concat(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '\\n', substringUTF8(tail, -${FACT_TEXT_CHARS})), '${NOT_FOUND_TEXT}')))) AS said_nothing_found,
+				max(kind = 'tool_result' AND subtype != 'running' AND (text_chars = 0
+					OR (source = 'claude_code' AND (startsWith(head, '(Bash completed with no output)') OR match(substringUTF8(head, 1, 32), '^Exit code [0-9]+$')))
+					OR (source = 'codex' AND match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '\\nProcess exited with code [0-9]+\\nOriginal token count: 0\\n')))) AS printed_nothing,
+				maxIf(match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '${SILENCED_COMMAND.replaceAll("\\", "\\\\")}'), kind = 'tool_call') AS silenced`;
 }
 
 const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
@@ -862,7 +910,7 @@ export function buildRunIndexSessionStatement(
 	};
 }
 
-/** Pricing, literal SQL and per-agent gates fingerprint every unshipped index-2 rebuild. */
+/** Pricing, literal SQL and per-agent gates fingerprint every build, so a change to any of them rebuilds the stored generations. */
 export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHash(
 	"sha256",
 )

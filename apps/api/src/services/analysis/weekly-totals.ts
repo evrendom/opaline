@@ -220,6 +220,9 @@ export function weeklyTotals(
 			const name = measureKey(measure.name) as WeeklyMeasure;
 			const value = row[measure.name] ?? null;
 			if (value === null) continue;
+			// No run of the row can record it: unknown, whatever was stored (a
+			// snapshot taken before the known-runs column existed holds 0 runs).
+			if (measure.known && !row[measure.known]) continue;
 			const totals = total as Record<WeeklyMeasure, number | null>;
 			totals[name] = (totals[name] ?? 0) + value;
 		}

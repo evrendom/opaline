@@ -1075,6 +1075,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 	{
 		id: "return_code_interpretation",
 		view: "calls",
+		runIndex: ["not_found"],
 		meaning:
 			"The agent's own reading of a nonzero exit code (for example `No matches found`).",
 		agents: {
@@ -3386,6 +3387,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 	{
 		id: "search_matches",
 		view: "calls",
+		runIndex: ["not_found"],
 		meaning: "How many matches a search found.",
 		agents: {
 			claude_code: stored(
@@ -7427,8 +7429,9 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 	{
 		id: "not_found",
 		view: "runs",
+		runIndex: ["not_found"],
 		meaning:
-			"Number of failed reads and searches whose output says the target was not found.",
+			"Number of read and search calls whose result records that they found nothing.",
 		agents: {
 			claude_code: stored(
 				[],
@@ -7438,17 +7441,21 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					relation: {
 						kind: "derived",
 						from: [
-							"calls/is_error",
-							"calls/input_text",
-							"calls/result_chars",
 							"calls/tool_name",
+							"calls/input_text",
+							"calls/parsed_cmd_types",
+							"calls/is_error",
+							"calls/exit_code",
+							"calls/result_chars",
+							"calls/return_code_interpretation",
+							"calls/search_matches",
 						],
 					},
 					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
 					notes:
-						"A text match on the output (`not found`, `No such file`, `ENOENT`). Parser review: run-index-sql:217 requires failed status, read/search call group AND not-found output text; incidental words in successful output do not count.",
+						"Run index 3 counts a read or search call once when its result records that it found nothing: Claude Code's zero-result text (`No files found`, `No matches found`) or zero counter (numFiles, numMatches or numLines by search mode), its returnCodeInterpretation `No matches found` (parser 6, main stream only: subagent transcripts keep no toolUseResult), the shell's `no matches found:` for a file pattern, a search that printed nothing (`(Bash completed with no output)` or a bare `Exit code N`, unless its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist (Read's `File does not exist.`). An exit code alone is not used: find and ls exit 1 for errors, and a compound command exits with its last part's status. Unknown (NULL, in unrecorded_facts) before parser 6 and on subagent streams. Before run index 3 only failures with not-found text counted, so Grep and Bash searches that found nothing and Read's `File does not exist.` were 0 (OPL-384).",
 					justification:
-						"Opaline computation, not an agent-written value. The count is a text match on failed outputs ('not found', 'No such file', 'ENOENT'), a derived value; neither agent records a not-found flag.",
+						"Opaline computation, not an agent-written value: a count of the calls whose recorded outcome is the agent's own zero-result text, counter or exit-code reading, a no-match exit code, empty output, or a not-found failure; neither agent records a not-found flag per call.",
 				},
 			),
 			codex: stored(
@@ -7459,17 +7466,19 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					relation: {
 						kind: "derived",
 						from: [
-							"calls/is_error",
-							"calls/input_text",
-							"calls/result_chars",
 							"calls/tool_name",
+							"calls/input_text",
+							"calls/parsed_cmd_types",
+							"calls/is_error",
+							"calls/exit_code",
+							"calls/result_chars",
 						],
 					},
 					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
 					notes:
-						"A text match on the output (`not found`, `No such file`, `ENOENT`). Parser review: run-index-sql:217 requires failed status, read/search call group AND not-found output text; shell classifier coverage remains limited, but the proposed predicate already exists.",
+						"Run index 3 counts a read or search call once when its result records that it found nothing: a search that finished printing nothing (empty output, or `Original token count: 0` once the process exited; not when its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist. An exit code alone is not used: rg exits 1 for no match, but find and ls exit 1 for errors, and a compound command exits with its last part's status. Exit codes and output are kept by every parser version, so it is never unknown for Codex. Before run index 3 only failures with not-found text counted, so `rg` with no match (exit 1, empty output) was 0 (OPL-384).",
 					justification:
-						"Opaline computation, not an agent-written value. The count is a text match on failed outputs, a derived value; Codex writes no not-found flag. Witness: 019cb44a:18 response_item/function_call_output.output [string] n=342010 v0.100.0..0.162.0-alpha.2",
+						"Opaline computation, not an agent-written value: a count of the calls whose recorded exit code or output says the read or search found nothing; Codex writes no not-found flag. Witness: 019cb44a:18 response_item/function_call_output.output [string] n=342010 v0.100.0..0.162.0-alpha.2",
 				},
 			),
 		},

@@ -264,6 +264,7 @@ export async function buildRunIndex(input: {
 		buildRevision: input.buildRevision,
 		builtAt: clickHouseTime(builtAt.getTime()),
 		sessionDate: clickHouseTime(facts.session_date_ms),
+		repository: recorded?.repository ?? "",
 	};
 	const finish = (row: RudelRunIndexRow) =>
 		gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" });
@@ -305,7 +306,6 @@ export async function buildRunIndex(input: {
 						unattributed,
 						facts,
 						usageReceipt: usage.key,
-						repository: recorded?.repository ?? "",
 						model: recorded?.model ?? "",
 					},
 				),
@@ -503,6 +503,8 @@ interface RowContext {
 	buildRevision: number;
 	builtAt: string;
 	sessionDate: string;
+	/** The session repository key as recorded; every row of the build carries it. */
+	repository: string;
 }
 
 /** Columns every row of a build shares, and the not-recorded defaults of the rest. */
@@ -620,7 +622,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		usage_receipt: "",
 		cost_state: {},
 		title: null,
-		repository: "",
+		repository: context.repository,
 		session_model: "",
 	};
 }
@@ -801,7 +803,6 @@ export function receiptRow(
 		unattributed: UnattributedUsageRow;
 		facts: RunIndexSessionFacts;
 		usageReceipt: string;
-		repository: string;
 		model: string;
 	},
 ): RudelRunIndexRow {
@@ -845,7 +846,6 @@ export function receiptRow(
 					}
 				: {},
 		title: session.facts.title,
-		repository: session.repository,
 		session_model: session.model,
 	};
 }

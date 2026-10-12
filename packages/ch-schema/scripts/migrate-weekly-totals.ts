@@ -18,6 +18,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { weeklyTotalsNotFoundStatement } from "./migrate-not-found-unknown.js";
 
 /** Weekly totals and the refreshable view that appends them (docs/l1-literal-schema.md, "Weekly totals"). */
 export const WEEKLY_TOTALS_MIGRATION = "20261011150000_weekly_totals.sql";
@@ -69,6 +70,11 @@ export async function runWeeklyTotalsMigration(options: {
 			await options.executor.execute(statement);
 	};
 	if (applied.length === 0) await apply();
+	// The not-found migration's column changes (OPL-384), which the read-back
+	// below checks; that migration recreates the view.
+	await options.executor.execute(
+		weeklyTotalsNotFoundStatement(options.targetDatabase),
+	);
 
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,

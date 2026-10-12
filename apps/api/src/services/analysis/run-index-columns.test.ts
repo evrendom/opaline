@@ -176,6 +176,7 @@ describe("run index columns", () => {
 			parser_version: 5,
 			tool_calls: 7,
 			failed_calls: 2,
+			not_found: 3,
 			agent_version: "",
 			approval_policy: "",
 			denied_calls: 0,
@@ -185,6 +186,10 @@ describe("run index columns", () => {
 		const gated = gateRunIndexRow(row);
 		expect(gated.tool_calls).toBe(7);
 		expect(gated.failed_calls).toBe(2);
+		// Codex exit codes and output are in every generation, so are its not-found calls.
+		expect(gated.not_found).toBe(3);
+		expect(gated.unrecorded_facts).not.toContain("not_found");
+		expect(gateRunIndexRow({ ...row, agent_id: "thread-2" }).not_found).toBe(3);
 		expect(gated.agent_version).toBeNull();
 		expect(gated.approval_policy).toBeNull();
 		expect(gated.denied_calls).toBeNull();

@@ -7,6 +7,7 @@ import type {
 	SessionGeneration,
 	TranscriptReadScope,
 } from "../transcript-records-queries.js";
+import { isRunIndexColumnRecordable } from "./run-index-columns.js";
 import {
 	runFactsCtes,
 	runUsageCtes,
@@ -15,7 +16,7 @@ import {
 } from "./run-index-sql.js";
 import { ANALYSIS_QUERY_SETTINGS, pinnedParams, query } from "./sql.js";
 
-export const RunRowSchema = z.object({
+const RunFactsRowSchema = z.object({
 	session_id: z.string(),
 	agent_id: z.string(),
 	turn_idx: z.number(),
@@ -33,7 +34,11 @@ export const RunRowSchema = z.object({
 	failed_calls: z.coerce.number(),
 	read_calls: z.coerce.number(),
 	search_calls: z.coerce.number(),
+	/** Read and search calls that found nothing, before `RunRowSchema` gates it. */
 	not_found: z.coerce.number(),
+	/** The run's agent and the parser version of its generation, which say what it can record. */
+	run_source: z.string(),
+	run_parser_version: z.coerce.number(),
 	/** Priced cost of the run's usage; null when none of it could be priced (or there is none). */
 	cost: z.number().nullable(),
 	/** Usage observations of the run that have no price (unknown model or rate). */
@@ -52,6 +57,21 @@ export const RunRowSchema = z.object({
 	/** `session_unattributed` per model. */
 	session_unattributed_models: z.array(z.tuple([z.string(), z.number()])),
 });
+/**
+ * A run as find reads it: a fact the run index cannot record for the run's
+ * agent, parser version and stream is unknown here too, never 0.
+ */
+export const RunRowSchema = RunFactsRowSchema.transform((row) => ({
+	...row,
+	not_found: isRunIndexColumnRecordable(
+		"not_found",
+		row.run_parser_version,
+		row.run_source,
+		row.agent_id,
+	)
+		? row.not_found
+		: null,
+}));
 export type RunRow = z.infer<typeof RunRowSchema>;
 
 const RUN_COLUMNS = [
@@ -71,6 +91,8 @@ const RUN_COLUMNS = [
 	"read_calls",
 	"search_calls",
 	"not_found",
+	"run_source",
+	"run_parser_version",
 ];
 
 /** Every run of the given sessions' committed generations. */

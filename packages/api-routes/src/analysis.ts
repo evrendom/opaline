@@ -360,7 +360,12 @@ export const AnalysisRunSchema = z.object({
 	failedCalls: z.number(),
 	readCalls: z.number(),
 	searchCalls: z.number(),
-	notFound: z.number(),
+	/**
+	 * Reads and searches whose result records that they found nothing; null
+	 * where the agent version or stream cannot record it (Claude Code before
+	 * parser 6 and its subagent streams).
+	 */
+	notFound: z.number().nullable(),
 	nextReaction: ReactionSchema.nullable(),
 	rawChars: z.number(),
 	parentSessionId: ParentSessionIdSchema,
@@ -749,9 +754,9 @@ export const WEEKLY_MEASURES = [
 	"edits",
 	"reads",
 	"searches",
-	"notFound",
 	"compactions",
 	"interruptMarkers",
+	"notFoundKnownRuns",
 	"editOutcomesKnownRuns",
 	"deniedCallsKnownRuns",
 	"interruptedCallsKnownRuns",
@@ -776,6 +781,7 @@ export const WEEKLY_MEASURES = [
  * null when none of them can record it; usage sums are null without usage.
  */
 export const WEEKLY_NULLABLE_MEASURES = [
+	"notFound",
 	"failedEdits",
 	"refusedEdits",
 	"deniedCalls",
