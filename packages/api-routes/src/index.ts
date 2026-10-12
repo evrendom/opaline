@@ -949,6 +949,12 @@ export const contract = {
 			.output(CliSessionUploadStatusOutputSchema),
 	},
 	listMyOrganizations: oc.output(z.array(OrganizationSchema)),
+	/**
+	 * Whose sessions the caller opens in the active workspace: every member's,
+	 * unless the workspace is limited to own sessions and the caller is not
+	 * an admin (ADR 0004). Read-only; nothing sets the option.
+	 */
+	sessionAccess: oc.output(z.object({ readsEverySession: z.boolean() })),
 	ingestSession: oc
 		.input(IngestSessionInputSchema)
 		.output(IngestSessionOutputSchema)

@@ -305,6 +305,29 @@ test("every tool declares annotations, and only the tools that write are not rea
 	expect(annotations.share_answer).toEqual(shares);
 });
 
+/** Phrases that tell the model a member sees only their own sessions. */
+const OWN_SESSIONS_ONLY =
+	/(their|your) own sessions|members:? (see |analyze |count )?(only )?their own|admins (all|see|count)|admins: the whole team|owner or a workspace admin/i;
+
+test("no tool says members see only their own sessions: every member reads every member's", async () => {
+	const { listed } = await loaded;
+	const claims = listed
+		.map((tool) => [
+			tool.name,
+			JSON.stringify(tool).match(OWN_SESSIONS_ONLY)?.[0],
+		])
+		.filter(([, claim]) => claim);
+	expect(claims).toEqual([]);
+	const description = (name: string) =>
+		listed.find((tool) => tool.name === name)?.description ?? "";
+	expect(description("find")).toContain(
+		"Every member sees every member's sessions",
+	);
+	expect(description("list_workspaces")).toContain(
+		"every member counts the whole team's sessions",
+	);
+});
+
 /** Words a user or reviewer would not know; tool texts explain instead. */
 const JARGON =
 	/\b(refs?|origin runs?|depth|raw chars|trace|cutoff|prior|posterior)\b/i;
@@ -432,7 +455,7 @@ test("find, read, save_answer and share_answer describe the private draft, the a
 		"Nothing is published publicly or shared with other workspaces. OpenAI processes the title and topics to build the search index.",
 	);
 	expect(description("share_answer")).toContain(
-		"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; workspaces that restrict results show those results only to admins and the session's owner.",
+		"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; a workspace limited to own sessions may show those results only to admins and the session's owner.",
 	);
 	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
 		expect(description(name)).toContain("Side effects: None.");

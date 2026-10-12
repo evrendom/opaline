@@ -518,12 +518,29 @@ async function expectCleanupApiResults(): Promise<void> {
 		owner.userId,
 	);
 
-	const nonOwnerDetail = await callRpc(
+	// A teammate reads the session too, always as its canonical owner's rows:
+	// their own deleted copy never comes back.
+	const teammateDetail = await callRpc(
 		otherUser.token,
 		"analytics/sessions/detailOverview",
 		{ sessionId: MISMATCHED_SESSION_ID },
 	);
-	expect(nonOwnerDetail.status).toBe(403);
+	expect(teammateDetail.status).toBe(200);
+	expect(readSessionDetailOverviewUserId(teammateDetail.body)).toBe(
+		owner.userId,
+	);
+	// With the own-sessions option on, a non-owner member cannot open it.
+	await sqlClient`UPDATE organization SET own_sessions_only = true WHERE id = ${organizationId}`;
+	try {
+		const nonOwnerDetail = await callRpc(
+			otherUser.token,
+			"analytics/sessions/detailOverview",
+			{ sessionId: MISMATCHED_SESSION_ID },
+		);
+		expect(nonOwnerDetail.status).toBe(403);
+	} finally {
+		await sqlClient`UPDATE organization SET own_sessions_only = false WHERE id = ${organizationId}`;
+	}
 
 	const list = await callRpc(owner.token, "analytics/sessions/list", {
 		endDate: RECENT_SESSION_DATE,

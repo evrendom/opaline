@@ -197,7 +197,7 @@ describe("organization session ownership", () => {
 		expect(ownership).toHaveLength(0);
 	}, 60_000);
 
-	test("keeps teammate transcripts private and prevents replacement", async () => {
+	test("lets a member open a teammate's transcript, keeps it private with the own-sessions option on, and prevents replacement", async () => {
 		const ownerUpload = await callRpc(
 			owner.token,
 			"ingestSession",
@@ -231,14 +231,28 @@ describe("organization session ownership", () => {
 		expect(initial.window.turns.some((turn) => turn.body !== null)).toBe(true);
 		expect(initial.window.revision).toBe(initial.overview.revision);
 		expect(initial.spine?.revision).toBe(initial.overview.revision);
-		const deniedInitial = await callRpc(
+		// Every member reads every member's sessions.
+		const teammateInitial = await callRpc(
 			member.token,
 			"analytics/sessions/detailInitial",
 			{
 				sessionId: SHARED_SESSION_ID,
 			},
 		);
-		expect(deniedInitial.status).toBe(403);
+		expect(teammateInitial.status).toBe(200);
+		const { json: teammateView } = z
+			.object({ json: SessionDetailInitialSchema })
+			.parse(teammateInitial.body);
+		expect(teammateView.overview.session.userId).toBe(owner.userId);
+		const teammateOverview = await callRpc(
+			member.token,
+			"analytics/sessions/detailOverview",
+			{ sessionId: SHARED_SESSION_ID },
+		);
+		expect(teammateOverview.status).toBe(200);
+		expect(await sessionAccess(member.token)).toEqual({
+			readsEverySession: true,
+		});
 		const missingInitial = await callRpc(
 			owner.token,
 			"analytics/sessions/detailInitial",
@@ -248,15 +262,47 @@ describe("organization session ownership", () => {
 		);
 		expect(missingInitial.status).toBe(404);
 
-		const memberRead = await callRpc(
-			member.token,
-			"analytics/sessions/detailOverview",
-			{ sessionId: SHARED_SESSION_ID },
-		);
-		expect(memberRead.status).toBe(403);
-		expect(JSON.stringify(memberRead.body)).toContain(
-			"You can only view your own sessions",
-		);
+		// With the own-sessions option on, a member reads only their own.
+		await sqlClient`
+			UPDATE organization SET own_sessions_only = true
+			WHERE id = ${organizationId}
+		`;
+		try {
+			const deniedInitial = await callRpc(
+				member.token,
+				"analytics/sessions/detailInitial",
+				{
+					sessionId: SHARED_SESSION_ID,
+				},
+			);
+			expect(deniedInitial.status).toBe(403);
+			const memberRead = await callRpc(
+				member.token,
+				"analytics/sessions/detailOverview",
+				{ sessionId: SHARED_SESSION_ID },
+			);
+			expect(memberRead.status).toBe(403);
+			expect(JSON.stringify(memberRead.body)).toContain(
+				"You can only view your own sessions",
+			);
+			const ownerRead = await callRpc(
+				owner.token,
+				"analytics/sessions/detailOverview",
+				{ sessionId: SHARED_SESSION_ID },
+			);
+			expect(ownerRead.status).toBe(200);
+			expect(await sessionAccess(member.token)).toEqual({
+				readsEverySession: false,
+			});
+			expect(await sessionAccess(owner.token)).toEqual({
+				readsEverySession: true,
+			});
+		} finally {
+			await sqlClient`
+				UPDATE organization SET own_sessions_only = false
+				WHERE id = ${organizationId}
+			`;
+		}
 
 		const replacementAttempt = await callRpc(
 			member.token,
@@ -858,6 +904,12 @@ async function configureConcurrentClaim(
 		FOR EACH ROW
 		EXECUTE FUNCTION simulate_session_ownership_concurrent_claim()
 	`);
+}
+
+async function sessionAccess(token: string) {
+	const response = await callRpc(token, "sessionAccess");
+	expect(response.status).toBe(200);
+	return z.object({ json: z.unknown() }).parse(response.body).json;
 }
 
 async function callRpc(

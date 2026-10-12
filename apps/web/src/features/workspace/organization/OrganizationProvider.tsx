@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
 	createContext,
 	type ReactNode,
@@ -10,6 +11,7 @@ import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { getWorkspaceSlugFromPath } from "@/app/routes";
 import type { WorkspaceContextValue } from "@/features/workspace/organization/types";
 import { authClient } from "@/lib/auth-client";
+import { orpc } from "@/lib/orpc";
 
 const OrganizationContext = createContext<WorkspaceContextValue | undefined>(
 	undefined,
@@ -101,6 +103,7 @@ function OrganizationProviderFallback({
 		},
 		meta: {
 			isOrgAdmin: false,
+			readsEverySession: false,
 		},
 	};
 
@@ -145,6 +148,12 @@ function AuthenticatedOrganizationProvider({
 	const resolvedActiveOrg =
 		orgs?.find((organization) => organization.id === activeOrg?.id) ??
 		optimisticActiveOrg;
+	// Whose sessions the caller opens is the server's decision, per workspace.
+	const { data: sessionAccess } = useQuery({
+		...orpc.sessionAccess.queryOptions(),
+		queryKey: [...orpc.sessionAccess.queryKey(), resolvedActiveOrg?.id ?? null],
+		enabled: Boolean(resolvedActiveOrg),
+	});
 	const shouldAutoSelect =
 		!getWorkspaceSlugFromPath(pathname) &&
 		!activeLoading &&
@@ -183,6 +192,9 @@ function AuthenticatedOrganizationProvider({
 		meta: {
 			isOrgAdmin:
 				!activeOrg || memberRole === "owner" || memberRole === "admin",
+			// Every member reads every member's sessions unless the server says
+			// otherwise (a workspace limited to own sessions).
+			readsEverySession: sessionAccess?.readsEverySession ?? true,
 		},
 	};
 

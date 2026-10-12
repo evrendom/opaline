@@ -1,18 +1,18 @@
 import { ORPCError } from "@orpc/server";
-
-type SessionDetailAccessContext = {
-	isOrgAdmin: boolean;
-	requesterUserId: string;
-};
+import {
+	mayReadSession,
+	type SessionReader,
+} from "../../services/session-visibility.js";
 
 export function requireSessionDetailOwnerAccess(
 	ownerId: string | null | undefined,
-	context: SessionDetailAccessContext,
+	reader: SessionReader,
 ) {
 	if (!ownerId) {
 		throw new ORPCError("NOT_FOUND");
 	}
-	if (!context.isOrgAdmin && ownerId !== context.requesterUserId) {
+	// Refuses only in a workspace with the own-sessions-only option on.
+	if (!mayReadSession(reader, ownerId)) {
 		throw new ORPCError("FORBIDDEN", {
 			message: "You can only view your own sessions",
 		});

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 import {
@@ -40,6 +42,14 @@ const organization = {
 	slug: "rudel",
 };
 
+function withQueryClient(children: ReactNode) {
+	return (
+		<QueryClientProvider client={new QueryClient()}>
+			{children}
+		</QueryClientProvider>
+	);
+}
+
 function OrganizationStateProbe() {
 	const { state } = useOrganization();
 
@@ -77,11 +87,13 @@ it("recovers after full-organization is rate limited and auto-select succeeds", 
 	mockSetActive.mockReturnValue(setActivePromise);
 
 	render(
-		<MemoryRouter>
-			<OrganizationProvider>
-				<OrganizationStateProbe />
-			</OrganizationProvider>
-		</MemoryRouter>,
+		withQueryClient(
+			<MemoryRouter>
+				<OrganizationProvider>
+					<OrganizationStateProbe />
+				</OrganizationProvider>
+			</MemoryRouter>,
+		),
 	);
 
 	await waitFor(() => {
@@ -108,11 +120,13 @@ it("does not request organization data before authentication", () => {
 	mockUseActiveMember.mockClear();
 
 	render(
-		<MemoryRouter>
-			<OrganizationProvider>
-				<OrganizationStateProbe />
-			</OrganizationProvider>
-		</MemoryRouter>,
+		withQueryClient(
+			<MemoryRouter>
+				<OrganizationProvider>
+					<OrganizationStateProbe />
+				</OrganizationProvider>
+			</MemoryRouter>,
+		),
 	);
 
 	expect(screen.getByText("no-organization:ready")).toBeInTheDocument();

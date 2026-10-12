@@ -36,7 +36,8 @@ const memberViewer = {
 	isAdmin: false,
 	restrictResults: false,
 };
-// The same viewers in a workspace listed in ANALYSIS_LOG_RESTRICTED_WORKSPACES.
+// The same viewers in a workspace limited to own sessions and listed in
+// ANALYSIS_LOG_RESTRICTED_WORKSPACES.
 const restrictedLeadViewer = { ...leadViewer, restrictResults: true };
 const restrictedMemberViewer = { ...memberViewer, restrictResults: true };
 const memberAccount = { targetType: "account", targetId: "member" } as const;

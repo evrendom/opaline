@@ -26,6 +26,10 @@ import {
 import { describeSessions } from "../../services/analysis-log/sessions.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
+import {
+	readableSessionOwner,
+	type SessionReader,
+} from "../../services/session-visibility.js";
 import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-access.js";
 
 /** Why history calls fail where the log is off, phrased for the calling agent. */
@@ -64,19 +68,13 @@ export function createAnalysisRouter(
 			analysisLimiter.run(context.user.id, async () => next(), signal),
 		)
 		.handler(async ({ input, context }) => {
-			if (input.userId && !context.isOrgAdmin)
+			// Only a member limited to own sessions cannot name another member.
+			if (input.userId && readableSessionOwner(context.sessionReader) !== null)
 				throw new ORPCError("FORBIDDEN", {
 					message: "Only workspace admins may filter by userId",
 				});
 			const found = await findAnalysisWithOwners(
-				findScope(
-					{
-						organizationId: context.organizationId,
-						userId: context.user.id,
-						isOrgAdmin: context.isOrgAdmin,
-					},
-					input,
-				),
+				findScope(context.organizationId, context.sessionReader, input),
 				input,
 				env,
 			);
@@ -107,7 +105,7 @@ export function createAnalysisRouter(
 			for (const sessionId of new Set(input.refs.map((ref) => ref.sessionId))) {
 				const ownerId = requireSessionDetailOwnerAccess(
 					await getSessionOwner(context.organizationId, sessionId),
-					{ isOrgAdmin: context.isOrgAdmin, requesterUserId: context.user.id },
+					context.sessionReader,
 				);
 				owners.set(sessionId, ownerId);
 			}
@@ -141,11 +139,15 @@ export function createAnalysisRouter(
 		organizationId: string;
 		user: { id: string };
 		isOrgAdmin: boolean;
+		sessionReader: SessionReader;
 	}) => ({
 		workspaceId: context.organizationId,
 		userId: context.user.id,
 		isAdmin: context.isOrgAdmin,
-		restrictResults: restrictsAnalysisResults(context.organizationId),
+		restrictResults: restrictsAnalysisResults({
+			id: context.organizationId,
+			ownSessionsOnly: context.sessionReader.ownSessionsOnly,
+		}),
 	});
 	const requireLog = (context: { organizationId: string }): AnalysisLog => {
 		const log = analysisLog(context.organizationId);

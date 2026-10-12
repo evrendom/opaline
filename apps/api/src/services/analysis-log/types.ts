@@ -269,7 +269,8 @@ export interface AnalysisViewer {
 	isAdmin: boolean;
 	/**
 	 * The workspace restricts a stored result to admins and the one member
-	 * whose sessions it read; otherwise anyone who can see the analysis reads it.
+	 * whose sessions it read (only a workspace limited to own sessions can);
+	 * otherwise anyone who can see the analysis reads it.
 	 */
 	restrictResults: boolean;
 }

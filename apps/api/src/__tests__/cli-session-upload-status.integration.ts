@@ -357,10 +357,22 @@ test("failed session pages keep unknown dates, UTC boundaries and member permiss
 		},
 	);
 	expect(active.status).toBe(200);
+	// Every member sees every member's upload problems.
 	expect(
-		(await list({ sessionId: failures[0]?.sessionId }, teammate.token))
-			.failures,
-	).toEqual([]);
+		(
+			await list({ sessionId: failures[0]?.sessionId }, teammate.token)
+		).failures.map((row) => row.sessionId),
+	).toEqual([`${runId}-paged-0`]);
+	// With the own-sessions option on, a member sees only their own.
+	await sqlClient`UPDATE organization SET own_sessions_only = true WHERE id = ${owner.id}`;
+	try {
+		expect(
+			(await list({ sessionId: failures[0]?.sessionId }, teammate.token))
+				.failures,
+		).toEqual([]);
+	} finally {
+		await sqlClient`UPDATE organization SET own_sessions_only = false WHERE id = ${owner.id}`;
+	}
 	const reset = await fetch(
 		`${server.baseUrl}/api/auth/organization/set-active`,
 		{

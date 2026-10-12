@@ -46,3 +46,26 @@ test("the Claude Code marketplace lists the plugin", async () => {
 		expect.objectContaining({ name: "opaline", source: "./plugins/opaline" }),
 	);
 });
+
+/** Phrases that tell the agent a member sees only their own sessions. */
+const OWN_SESSIONS_ONLY =
+	/(their|your) own sessions|members:? (see |analyze |count )?(only )?their own|admins (all|see|count|can analyze)|admins: the whole team|only session owners and workspace admins/i;
+
+test("no skill or manifest says members see only their own sessions; answers still never single out or rank people", async () => {
+	const texts = [
+		...[...new Glob("*/SKILL.md").scanSync(SKILLS)].map((file) =>
+			join(SKILLS, file),
+		),
+		join(PLUGIN, ".codex-plugin/plugin.json"),
+		join(PLUGIN, ".claude-plugin/plugin.json"),
+	];
+	const claims: [string, string][] = [];
+	for (const path of texts) {
+		const match = (await Bun.file(path).text()).match(OWN_SESSIONS_ONLY);
+		if (match) claims.push([path.slice(PLUGIN.length), match[0]]);
+	}
+	expect(claims).toEqual([]);
+	const skill = await Bun.file(join(SKILLS, "opaline/SKILL.md")).text();
+	expect(skill).toContain("Every member sees every member's sessions");
+	expect(skill).toContain("Don't single out or rank people");
+});

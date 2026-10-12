@@ -12,6 +12,8 @@ interface PluginBootstrap {
 export interface PluginAccount {
 	session: typeof authClient.$Infer.Session;
 	member: FullOrganization["members"][number] | null;
+	/** Whether the caller opens every member's sessions in the workspace. */
+	readsEverySession: boolean;
 }
 
 export interface PluginSeed {
@@ -160,7 +162,7 @@ export async function pluginAuthFetch(
 		return Response.json({ ...bootstrap.organization, members });
 	}
 	// The caller's account is not part of get_dashboard's result either:
-	// views that show it (account button, own sessions) load it once.
+	// views that show it (account button, sessions that open) load it once.
 	if (endpoint === "get-session")
 		return Response.json((await loadAccount()).session);
 	if (endpoint === "organization/get-active-member")

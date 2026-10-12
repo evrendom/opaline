@@ -107,8 +107,8 @@ export function buildWeeklySnapshotStatement(
 
 /**
  * The snapshot's rows of the workspace in the weeks from the Monday of
- * `fromWeek` through `to`: only the caller's own unless `userId` is null (a
- * workspace admin across members).
+ * `fromWeek` through `to`: every member's when `userId` is null, otherwise
+ * only that member's.
  */
 export function buildWeeklyRowsStatement(options: {
 	organizationId: string;

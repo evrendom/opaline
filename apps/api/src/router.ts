@@ -227,6 +227,7 @@ import {
 	buildSessionRevisionDeduplicationToken,
 	buildSessionRevisionOperationId,
 } from "./services/session-revision.service.js";
+import { readsEverySession } from "./services/session-visibility.js";
 import {
 	hashSkillSourceContent,
 	SKILL_PARSER_VERSION,
@@ -410,6 +411,12 @@ const cliSetupStatus = os.cli.setupStatus
 			hasUploadedSessions: status?.has_uploaded_sessions === true,
 		};
 	});
+
+const sessionAccess = os.sessionAccess
+	.use(orgMiddleware)
+	.handler(({ context }) => ({
+		readsEverySession: readsEverySession(context.sessionReader),
+	}));
 
 const listMyOrganizations = os.listMyOrganizations
 	.use(authMiddleware)
@@ -2425,6 +2432,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		reportUploadFailures: cliReportUploadFailures,
 	},
 	listMyOrganizations,
+	sessionAccess,
 	ingestSession: ingestSessionHandler,
 	ingest: {
 		commit: r2IngestCommit,

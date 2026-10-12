@@ -276,7 +276,7 @@ test("real API: pinned Claude/Codex runs, line prices, failure refs, reaction or
 	expect(wrongRecord.status).toBe(400);
 });
 
-test("members cannot widen find scope and read refuses foreign refs before querying records; admins span and narrow members", async () => {
+test("a member's agent finds and reads a teammate's runs; with the own-sessions option on, members cannot widen find scope, read refuses foreign refs before querying records, and admins span and narrow members", async () => {
 	assert(userId);
 	const firstMember = await signup("member-a");
 	const secondMember = await signup("member-b");
@@ -302,96 +302,132 @@ test("members cannot widen find scope and read refuses foreign refs before query
 	);
 	const ownRef = { sessionId: ownId, agentId: "", turn: 1 };
 	const foreignRef = { sessionId: foreignId, agentId: "", turn: 1 };
-	for (const source of ["runs", "tool", "user"]) {
-		for (const selector of [{ sessionId: foreignId }, { refs: [foreignRef] }]) {
-			const response = await rpcResponse(
-				"analysis/find",
-				{ source, from: day, to: day, ...selector },
-				firstMember.token,
-			);
-			expect(response.status).toBe(200);
-			const result = AnalysisFindOutputSchema.parse(
-				z.object({ json: z.unknown() }).parse(await response.json()).json,
-			);
-			expect(result.header.sessionsInScope).toBe(0);
-			expect(result.header.runsInScope).toBe(0);
-		}
-	}
-	expect(
-		(
-			await rpcResponse(
-				"analysis/find",
-				{ source: "runs", userId: secondMember.user.id },
-				firstMember.token,
-			)
-		).status,
-	).toBe(403);
-	expect(
-		(
-			await rpcResponse(
-				"analysis/read",
-				{ refs: [ownRef, foreignRef], depth: "turn" },
-				firstMember.token,
-			)
-		).status,
-	).toBe(403);
-	const statements: ClickHouseStatement[] = [];
-	const client = createRouterClient(
-		createAnalysisRouter({ executor: observingExecutor(statements) }),
-		{
-			context: {
-				user: {
-					id: firstMember.user.id,
-					name: "Analysis integration",
-					email: `analysis-member-a-${runId}@example.com`,
-					emailVerified: false,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				},
-				session: {
-					id: crypto.randomUUID(),
-					token: firstMember.token,
-					userId: firstMember.user.id,
-					expiresAt: new Date(Date.now() + 60_000),
-					createdAt: new Date(),
-					updatedAt: new Date(),
-					activeOrganizationId: userId,
-				},
-				apiKeyId: null,
-				authFailure: null,
-				ingestOperatorAuthorized: false,
-				requestId: crypto.randomUUID(),
-				publicLookupSource: "test",
-			},
-		},
-	);
-	await expect(
-		client.read({ refs: [ownRef, foreignRef], depth: "turn" }),
-	).rejects.toMatchObject({ code: "FORBIDDEN" });
-	expect(statements).toHaveLength(0);
-	const admin = AnalysisFindOutputSchema.parse(
-		await rpc("analysis/find", {
+	const asMember = async (path: string, input: unknown) => {
+		const response = await rpcResponse(path, input, firstMember.token);
+		assert.equal(response.status, 200, await response.clone().text());
+		return z.object({ json: z.unknown() }).parse(await response.json()).json;
+	};
+	// Every member reads every member's sessions.
+	const teamFind = AnalysisFindOutputSchema.parse(
+		await asMember("analysis/find", {
 			source: "runs",
 			from: day,
 			to: day,
 			refs: [ownRef, foreignRef],
 		}),
 	);
-	assert(admin.source === "runs" && "rows" in admin);
-	expect(new Set(admin.rows.map((row) => row.ref.sessionId))).toEqual(
+	assert(teamFind.source === "runs" && "rows" in teamFind);
+	expect(new Set(teamFind.rows.map((row) => row.ref.sessionId))).toEqual(
 		new Set([ownId, foreignId]),
 	);
-	const narrowed = AnalysisFindOutputSchema.parse(
-		await rpc("analysis/find", {
-			source: "runs",
-			from: day,
-			to: day,
-			refs: [ownRef, foreignRef],
-			userId: firstMember.user.id,
-		}),
+	const teammateRead = AnalysisReadOutputSchema.parse(
+		await asMember("analysis/read", { refs: [foreignRef], depth: "turn" }),
 	);
-	assert(narrowed.source === "runs" && "rows" in narrowed);
-	expect(narrowed.rows.map((row) => row.ref.sessionId)).toEqual([ownId]);
+	expect(teammateRead.reads.map((read) => [read.ref, read.found])).toEqual([
+		[foreignRef, true],
+	]);
+	await sqlClient`UPDATE organization SET own_sessions_only = true WHERE id = ${userId}`;
+	try {
+		await expectOwnSessionsOnly();
+	} finally {
+		await sqlClient`UPDATE organization SET own_sessions_only = false WHERE id = ${userId}`;
+	}
+
+	async function expectOwnSessionsOnly() {
+		for (const source of ["runs", "tool", "user"]) {
+			for (const selector of [
+				{ sessionId: foreignId },
+				{ refs: [foreignRef] },
+			]) {
+				const response = await rpcResponse(
+					"analysis/find",
+					{ source, from: day, to: day, ...selector },
+					firstMember.token,
+				);
+				expect(response.status).toBe(200);
+				const result = AnalysisFindOutputSchema.parse(
+					z.object({ json: z.unknown() }).parse(await response.json()).json,
+				);
+				expect(result.header.sessionsInScope).toBe(0);
+				expect(result.header.runsInScope).toBe(0);
+			}
+		}
+		expect(
+			(
+				await rpcResponse(
+					"analysis/find",
+					{ source: "runs", userId: secondMember.user.id },
+					firstMember.token,
+				)
+			).status,
+		).toBe(403);
+		expect(
+			(
+				await rpcResponse(
+					"analysis/read",
+					{ refs: [ownRef, foreignRef], depth: "turn" },
+					firstMember.token,
+				)
+			).status,
+		).toBe(403);
+		const statements: ClickHouseStatement[] = [];
+		const client = createRouterClient(
+			createAnalysisRouter({ executor: observingExecutor(statements) }),
+			{
+				context: {
+					user: {
+						id: firstMember.user.id,
+						name: "Analysis integration",
+						email: `analysis-member-a-${runId}@example.com`,
+						emailVerified: false,
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					},
+					session: {
+						id: crypto.randomUUID(),
+						token: firstMember.token,
+						userId: firstMember.user.id,
+						expiresAt: new Date(Date.now() + 60_000),
+						createdAt: new Date(),
+						updatedAt: new Date(),
+						activeOrganizationId: userId,
+					},
+					apiKeyId: null,
+					authFailure: null,
+					ingestOperatorAuthorized: false,
+					requestId: crypto.randomUUID(),
+					publicLookupSource: "test",
+				},
+			},
+		);
+		await expect(
+			client.read({ refs: [ownRef, foreignRef], depth: "turn" }),
+		).rejects.toMatchObject({ code: "FORBIDDEN" });
+		expect(statements).toHaveLength(0);
+		const admin = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", {
+				source: "runs",
+				from: day,
+				to: day,
+				refs: [ownRef, foreignRef],
+			}),
+		);
+		assert(admin.source === "runs" && "rows" in admin);
+		expect(new Set(admin.rows.map((row) => row.ref.sessionId))).toEqual(
+			new Set([ownId, foreignId]),
+		);
+		const narrowed = AnalysisFindOutputSchema.parse(
+			await rpc("analysis/find", {
+				source: "runs",
+				from: day,
+				to: day,
+				refs: [ownRef, foreignRef],
+				userId: firstMember.user.id,
+			}),
+		);
+		assert(narrowed.source === "runs" && "rows" in narrowed);
+		expect(narrowed.rows.map((row) => row.ref.sessionId)).toEqual([ownId]);
+	}
 });
 
 test("aggregate find succeeds beyond the lowered record cap; text ceilings return explicit coverage", async () => {
@@ -2796,7 +2832,7 @@ test("source=git joins a session's pushes and CI checks to its PR and the CI run
 		expect(touching.header.notes).toContain(
 			"pullRequest opalinehq/athena#133: 1 sessions you can see touch it through 4 edges (commit_created 1, commit_pushed 1, pr_branch_head 1, pr_named 1)",
 		);
-		// A member sees only their own sessions; the admin's are never counted.
+		// A scope limited to one member (the own-sessions option on) never counts the admin's sessions.
 		const member = AnalysisFindOutputSchema.parse(
 			await findAnalysis(
 				{ organizationId, userId: `not_the_owner_${runId}` },

@@ -42,13 +42,3 @@ export async function listSessionArrivals(
 			rows.length > PAGE_SIZE ? (sessions.at(-1)?.sessionId ?? null) : null,
 	};
 }
-
-export async function readSessionArrivalMember(
-	organizationId: string,
-	userId: string,
-) {
-	const [member] = await sqlClient<{ role: string }[]>`
-		SELECT role FROM member WHERE organization_id = ${organizationId} AND user_id = ${userId}
-	`;
-	return member;
-}

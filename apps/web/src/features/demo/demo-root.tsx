@@ -107,7 +107,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 									organizations: [seed.organization],
 									isLoading: false,
 								},
-								meta: { isOrgAdmin: true },
+								meta: { isOrgAdmin: true, readsEverySession: true },
 								actions: {
 									switchOrganization: async () => {
 										throw new Error("This demo uses the showcase workspace.");

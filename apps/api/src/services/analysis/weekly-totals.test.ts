@@ -329,20 +329,41 @@ describe("weekly totals", () => {
 		expect(output.header.notes[0]).toContain("no snapshot yet");
 	});
 
-	test("every member reads the whole workspace's weekly totals; other finds stay their own", () => {
-		const member = { organizationId: "org", userId: "u1", isOrgAdmin: false };
-		expect(findScope(member, { source: "weekly" })).toEqual({
+	test("a member's find covers every member's sessions in the workspace", () => {
+		const member = { userId: "u1", role: "member", ownSessionsOnly: false };
+		for (const source of [
+			"runs",
+			"tool",
+			"user",
+			"git",
+			"calls",
+			"weekly",
+		] as const)
+			expect(findScope("org", member, { source })).toEqual({
+				organizationId: "org",
+				userId: null,
+			});
+		expect(findScope("org", member, { source: "runs", userId: "u2" })).toEqual({
+			organizationId: "org",
+			userId: "u2",
+		});
+	});
+
+	test("with the own-sessions option on, a member reads the whole workspace's weekly totals; other finds stay their own", () => {
+		const member = { userId: "u1", role: "member", ownSessionsOnly: true };
+		expect(findScope("org", member, { source: "weekly" })).toEqual({
 			organizationId: "org",
 			userId: null,
 		});
-		for (const source of ["runs", "tool", "user", "git"] as const)
-			expect(findScope(member, { source })).toEqual({
+		for (const source of ["runs", "tool", "user", "git", "calls"] as const)
+			expect(findScope("org", member, { source })).toEqual({
 				organizationId: "org",
 				userId: "u1",
 			});
 		expect(
 			findScope(
-				{ ...member, isOrgAdmin: true },
+				"org",
+				{ ...member, role: "admin" },
 				{ source: "weekly", userId: "u2" },
 			),
 		).toEqual({ organizationId: "org", userId: "u2" });
@@ -379,7 +400,8 @@ describe("weekly totals", () => {
 		const { output, owners } = await findWeeklyTotals(
 			fake,
 			findScope(
-				{ organizationId: "org", userId: "u1", isOrgAdmin: false },
+				"org",
+				{ userId: "u1", role: "member", ownSessionsOnly: true },
 				{ source: "weekly" },
 			),
 			input({ groupBy: "member" }),

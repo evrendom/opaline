@@ -99,6 +99,9 @@ export const organization = pgTable("organization", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
 		.defaultNow()
 		.notNull(),
+	// Own sessions only, admins all (ADR 0004): off by default, so every
+	// member reads every member's sessions. Not settable in settings.
+	ownSessionsOnly: boolean("own_sessions_only").notNull().default(false),
 });
 
 export const member = pgTable("member", {

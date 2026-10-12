@@ -21,6 +21,7 @@ import {
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
+import { readableSessionOwner } from "../../services/session-visibility.js";
 import { listUploadFailures } from "../../services/upload-failure.service.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
 import {
@@ -39,7 +40,7 @@ const uploadFailures = os.analytics.sessions.uploadFailures
 	.handler(({ input, context }) =>
 		listUploadFailures(
 			context.organizationId,
-			context.isOrgAdmin ? null : context.user.id,
+			readableSessionOwner(context.sessionReader),
 			input,
 		),
 	);
@@ -102,10 +103,7 @@ const detailBodyChunk = os.analytics.sessions.detailBodyChunk
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 		try {
 			const result = await getSessionDetailBodyChunk({
@@ -129,10 +127,7 @@ const detailInitial = os.analytics.sessions.detailInitial
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 		try {
 			const result = await getSessionDetailInitial({
@@ -152,10 +147,7 @@ const detailOverview = os.analytics.sessions.detailOverview
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 
 		try {
@@ -185,10 +177,7 @@ const detailRelationships = os.analytics.sessions.detailRelationships
 	.handler(async ({ input, context }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 		return readNativeSessionRelationships({
 			organizationId: context.organizationId,
@@ -202,10 +191,7 @@ const detailWindow = os.analytics.sessions.detailWindow
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 
 		try {
@@ -232,10 +218,7 @@ const detailSpine = os.analytics.sessions.detailSpine
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 
 		try {
@@ -259,10 +242,7 @@ const detailTurn = os.analytics.sessions.detailTurn
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 
 		try {
@@ -287,10 +267,7 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
-			{
-				isOrgAdmin: context.isOrgAdmin,
-				requesterUserId: context.user.id,
-			},
+			context.sessionReader,
 		);
 
 		try {

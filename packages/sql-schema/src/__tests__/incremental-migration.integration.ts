@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0056 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055", async () => {
+test("applies migrations 0020-0057 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0056_run_index_scope");
+	expect(latestMigration?.tag).toBe("0057_organization_own_sessions_only");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -160,6 +160,14 @@ test("applies migrations 0020-0056 to a database already migrated through 0019, 
 			]);
 			await expectIngestJobSizeBound(migrationSql);
 			await expectEdgeScopeKinds(migrationSql);
+			// 0057: existing workspaces keep the own-sessions-only option off.
+			expect([
+				...(await migrationSql<Array<{ ownSessionsOnly: boolean }>>`
+					SELECT own_sessions_only AS "ownSessionsOnly"
+					FROM organization
+					WHERE id = 'migration-ingest-org'
+				`),
+			]).toEqual([{ ownSessionsOnly: false }]);
 			const mcpTables = await migrationSql<Array<{ name: string }>>`
 				SELECT tablename AS name
 				FROM pg_tables
@@ -189,7 +197,7 @@ test("applies migrations 0020-0056 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 57,
+				count: 58,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`

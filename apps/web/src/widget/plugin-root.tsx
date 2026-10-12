@@ -115,6 +115,8 @@ export function PluginRoot({
 								isOrgAdmin: ["owner", "admin"].includes(
 									account?.member?.role ?? "",
 								),
+								// As on the web: open until the server says otherwise.
+								readsEverySession: account?.readsEverySession ?? true,
 							},
 							actions: {
 								switchOrganization: async () => {

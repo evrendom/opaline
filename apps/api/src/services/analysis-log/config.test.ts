@@ -67,24 +67,36 @@ test("* alone turns the log on for every workspace; * mixed with ids turns it of
 	}
 });
 
+// Restricting results applies only to workspaces limited to own sessions.
+const ownOnly = (id: string) => ({ id, ownSessionsOnly: true });
+
 test("* restricts results in every workspace; * mixed with ids restricts them all", () => {
 	for (const value of ["*", `*,${WORKSPACE}`]) {
 		process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = value;
-		expect(restrictsAnalysisResults(WORKSPACE)).toBe(true);
-		expect(restrictsAnalysisResults("workspace_two")).toBe(true);
+		expect(restrictsAnalysisResults(ownOnly(WORKSPACE))).toBe(true);
+		expect(restrictsAnalysisResults(ownOnly("workspace_two"))).toBe(true);
 	}
 });
 
 test("stored results are restricted only in the listed workspaces", () => {
 	process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = ` other , ${WORKSPACE}`;
-	expect(restrictsAnalysisResults(WORKSPACE)).toBe(true);
-	expect(restrictsAnalysisResults("workspace_two")).toBe(false);
+	expect(restrictsAnalysisResults(ownOnly(WORKSPACE))).toBe(true);
+	expect(restrictsAnalysisResults(ownOnly("workspace_two"))).toBe(false);
 	for (const value of [undefined, "", " , "]) {
 		if (value === undefined)
 			delete process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES;
 		else process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = value;
-		expect(restrictsAnalysisResults(WORKSPACE)).toBe(false);
-		expect(restrictsAnalysisResults("")).toBe(false);
+		expect(restrictsAnalysisResults(ownOnly(WORKSPACE))).toBe(false);
+		expect(restrictsAnalysisResults(ownOnly(""))).toBe(false);
+	}
+});
+
+test("a workspace where every member reads every session never restricts results, even when listed", () => {
+	for (const value of ["*", WORKSPACE, `*,${WORKSPACE}`]) {
+		process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES = value;
+		expect(
+			restrictsAnalysisResults({ id: WORKSPACE, ownSessionsOnly: false }),
+		).toBe(false);
 	}
 });
 

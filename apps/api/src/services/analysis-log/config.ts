@@ -42,17 +42,20 @@ export function getConfiguredAnalysisLog(): AnalysisLog | null {
 }
 
 /**
- * Whether the workspace opted into restricting stored results that read other
- * members' sessions to admins and the sessions' own member
- * (`ANALYSIS_LOG_RESTRICTED_WORKSPACES`, comma-separated ids or `*`; empty or
- * missing means nobody, so a shared analysis shows its results to the
- * workspace).
+ * Whether the workspace restricts stored results that read other members'
+ * sessions to admins and the sessions' own member. Only a workspace limited
+ * to own sessions (the own-sessions-only option, ADR 0004) can, and only
+ * when `ANALYSIS_LOG_RESTRICTED_WORKSPACES` lists it (comma-separated ids or
+ * `*`; empty or missing means nobody, so a shared analysis shows its results
+ * to the workspace).
  */
-export function restrictsAnalysisResults(workspaceId: string): boolean {
-	return listsWorkspace(
-		"ANALYSIS_LOG_RESTRICTED_WORKSPACES",
-		workspaceId,
-		true,
+export function restrictsAnalysisResults(workspace: {
+	id: string;
+	ownSessionsOnly: boolean;
+}): boolean {
+	return (
+		workspace.ownSessionsOnly &&
+		listsWorkspace("ANALYSIS_LOG_RESTRICTED_WORKSPACES", workspace.id, true)
 	);
 }
 

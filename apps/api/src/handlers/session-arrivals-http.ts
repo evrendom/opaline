@@ -1,6 +1,6 @@
 import { SessionArrivalsInputSchema } from "@rudel/api-routes";
-import { readSessionArrivalMember } from "../services/session-arrivals.service.js";
 import { streamSessionArrivals } from "../services/session-arrivals-stream.js";
+import { readSessionReader } from "../services/session-reader.service.js";
 
 export async function handleSessionArrivalsRequest(
 	request: Request,
@@ -19,7 +19,7 @@ export async function handleSessionArrivalsRequest(
 	});
 	if (!input.success)
 		return new Response("Invalid session stream request", { status: 400 });
-	if (!(await readSessionArrivalMember(input.data.organizationId, userId)))
+	if (!(await readSessionReader(input.data.organizationId, userId)))
 		return new Response("Forbidden", { status: 403 });
 	return streamSessionArrivals(
 		request,

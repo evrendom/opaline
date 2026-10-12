@@ -18,17 +18,17 @@ export const PLUGIN_PROCEDURES = Object.keys(
 	PLUGIN_TOOL_NAMES,
 ) as PluginProcedure[];
 
-const SESSION_CONTENT =
-	"Only the session's owner or a workspace admin can open it";
-
 /**
- * What each app-only tool loads, for its title and one-line description, with
- * any access rule beyond workspace membership (which every tool requires).
+ * What each app-only tool loads, for its title and one-line description.
+ * Every tool requires workspace membership, and every member reads every
+ * member's sessions (ADR 0004).
  */
-const PLUGIN_LABELS: Record<
-	PluginProcedure,
-	{ title: string; loads: string; limits?: string }
-> = {
+interface PluginLabel {
+	title: string;
+	loads: string;
+}
+
+const PLUGIN_LABELS: Record<PluginProcedure, PluginLabel> = {
 	"analytics.overview.costs": {
 		title: "Dashboard: metrics",
 		loads:
@@ -61,47 +61,38 @@ const PLUGIN_LABELS: Record<
 	"analytics.sessions.uploadFailures": {
 		title: "Sessions: upload problems",
 		loads: "sessions that failed to upload",
-		limits: "Admins see every member's, members their own",
 	},
 	"analytics.sessions.detailInitial": {
 		title: "Session: overview",
 		loads: "the first view of a session",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailOverview": {
 		title: "Session: turns",
 		loads: "a session's summary and its list of turns",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailWindow": {
 		title: "Session: window",
 		loads: "part of a session's timeline",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailSpine": {
 		title: "Session: outline",
 		loads: "a session's outline",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailBodyChunk": {
 		title: "Session: text",
 		loads: "part of a session's text",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailRelationships": {
 		title: "Session: links",
 		loads: "a session's related sessions",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailSubagent": {
 		title: "Session: subagent",
 		loads: "a subagent's work in a session",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.sessions.detailTurn": {
 		title: "Session: one prompt",
 		loads: "one prompt and the agent's work after it",
-		limits: SESSION_CONTENT,
 	},
 	"analytics.skills.list": { title: "Skills: list", loads: "the skill list" },
 	"analytics.skills.detail": {
@@ -139,7 +130,7 @@ export const PLUGIN_TOOLS: readonly McpTool[] = PLUGIN_PROCEDURES.map(
 			name: PLUGIN_TOOL_NAMES[path],
 			annotations: READ_ONLY,
 			title: PLUGIN_LABELS[path].title,
-			description: `Used by the Opaline dashboard to load ${PLUGIN_LABELS[path].loads}. ${PLUGIN_LABELS[path].limits ?? "Members of the workspace only"}. Not called by the assistant.`,
+			description: `Used by the Opaline dashboard to load ${PLUGIN_LABELS[path].loads}. Members of the workspace only. Not called by the assistant.`,
 			inputSchema: {
 				type: "object",
 				...z.toJSONSchema(schema, {

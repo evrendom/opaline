@@ -181,6 +181,10 @@ test("pushes successful ingestion commits, checks access, and catches up after r
 	expect((await ownerStream.next()).sessions).toEqual([
 		{ sessionId: "ready", userName: "owner" },
 	]);
+	// Every member sees every member's arrivals.
+	expect((await memberStream.next()).sessions).toEqual([
+		{ sessionId: "ready", userName: "owner" },
+	]);
 	await complete(owner.id, "ready");
 	await complete(owner.id, "historical");
 	await complete(owner.id, "pending");
@@ -200,6 +204,14 @@ test("pushes successful ingestion commits, checks access, and catches up after r
 		(await reconnected.next()).sessions.map((row) => row.sessionId),
 	).toEqual(["offline", "pending", "ready"]);
 	reconnected.close();
+	// With the own-sessions option on, a member catches up on their own only.
+	await sqlClient`UPDATE organization SET own_sessions_only = true WHERE id = ${owner.id}`;
+	const ownOnly = await connect(owner.id, member.token, memberStream.since);
+	expect((await ownOnly.next()).sessions).toEqual([
+		{ sessionId: "pending", userName: "member" },
+	]);
+	ownOnly.close();
+	await sqlClient`UPDATE organization SET own_sessions_only = false WHERE id = ${owner.id}`;
 	await subscription.unlisten();
 });
 

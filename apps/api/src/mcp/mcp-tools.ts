@@ -17,6 +17,8 @@ import { sqlClient } from "../db.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
 import { countVisibleSessions } from "../services/analysis/visible-sessions.js";
+import { readSessionReader } from "../services/session-reader.service.js";
+import { readsEverySession } from "../services/session-visibility.js";
 import {
 	renderAnalysisSearch,
 	renderAnalysisTree,
@@ -87,7 +89,7 @@ const date = (description: string) =>
 	string(`${description} (YYYY-MM-DD, UTC).`);
 /** Who sees a shared answer's stored results (`unavailableReason` in analysis-log.service.ts). */
 export const SHARING_DISCLOSURE =
-	"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; workspaces that restrict results show those results only to admins and the session's owner.";
+	"Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; a workspace limited to own sessions may show those results only to admins and the session's owner.";
 export const EMBEDDING_DISCLOSURE =
 	"OpenAI processes the title and topics to build the search index.";
 const ANALYSIS_ID_DESCRIPTION =
@@ -336,7 +338,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Use when: Start here for questions about how agents worked, then read a few runs it points to.",
 			"Returns: Period totals and runs, failure causes, unhappy prompts, git events, weekly totals or calls.",
 			"Side effects: Saves what it found in the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
-			"Limits: Members see their own sessions and team weekly totals, admins all; 200 rows a call.",
+			"Limits: Every member sees every member's sessions in the workspace; 200 rows a call.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(FindToolInputSchema), {
 			source:
@@ -488,7 +490,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Use when: You must check or quote one step of a saved answer; never open all of them.",
 			"Returns: The stored result with its arguments, whether a session it read has changed since, or why it is unavailable (expired, removed or restricted).",
 			"Side effects: None.",
-			"Limits: Results expire after 90 days (a year when shared or pinned); workspaces that restrict results show them only to admins and the session's owner.",
+			"Limits: Results expire after 90 days (a year when shared or pinned); a workspace limited to own sessions may show them only to admins and the session's owner.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(AnalysisHistoryQueryInputSchema), {
 			query:
@@ -580,7 +582,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Use when: Checking that Opaline is set up, an answer looks empty, the user names another team, or you need a workspace name for another tool.",
 			"Returns: Each workspace's name, slug (the short name other tools take as workspace), logo, the number of sessions you can see from the last 365 days, and default: true on the one tools use when no workspace is given.",
 			"Side effects: None.",
-			"Limits: Only workspaces you are a member of; admins count the whole team's sessions, members their own.",
+			"Limits: Only workspaces you are a member of; every member counts the whole team's sessions.",
 		].join("\n"),
 		inputSchema: {
 			type: "object",
@@ -605,7 +607,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			sessionsLast365Days: {
 				type: "integer",
 				description:
-					"Sessions you can see from the last 365 days (admins: the whole team; members: their own). A count only.",
+					"Sessions you can see from the last 365 days (the whole team's). A count only.",
 			},
 		}),
 		// Tools take the slug; the internal organization id stays out.
@@ -618,27 +620,31 @@ export const MCP_TOOLS: readonly McpTool[] = [
 					slug: string;
 					logo: string | null;
 					role: string;
+					ownSessionsOnly: boolean;
 				}[]
 			>`
-				SELECT o.id, o.name, o.slug, o.logo, m.role
+				SELECT o.id, o.name, o.slug, o.logo, m.role,
+					o.own_sessions_only AS "ownSessionsOnly"
 				FROM member m JOIN organization o ON o.id = m.organization_id
 				WHERE m.user_id = ${userId}
 				ORDER BY o.name
 			`;
 			const executor = getClickhouse();
 			return Promise.all(
-				memberships.map(async ({ id, name, slug, logo, role }) => ({
-					name,
-					slug,
-					logo,
-					default: id === workspace.id,
-					sessionsLast365Days: await countVisibleSessions(
-						executor,
-						id,
-						role === "owner" || role === "admin" ? null : userId,
-						365,
-					),
-				})),
+				memberships.map(
+					async ({ id, name, slug, logo, role, ownSessionsOnly }) => ({
+						name,
+						slug,
+						logo,
+						default: id === workspace.id,
+						sessionsLast365Days: await countVisibleSessions(
+							executor,
+							id,
+							{ userId, role, ownSessionsOnly },
+							365,
+						),
+					}),
+				),
 			);
 		},
 	},
@@ -760,7 +766,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		annotations: READ_ONLY,
 		title: "Session: mention preview",
 		description:
-			"Used by Opaline to show a session the user mentioned with @. Only the session's owner or a workspace admin can open it. Not called by the assistant.",
+			"Used by Opaline to show a session the user mentioned with @. Members of the workspace only. Not called by the assistant.",
 		inputSchema: input(
 			{
 				sessionId: string("The session's id (required)."),
@@ -857,7 +863,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		annotations: READ_ONLY,
 		title: "Account: you",
 		description:
-			"Used by the Opaline dashboard to show your account button and mark your own sessions. Only your own account. Not called by the assistant.",
+			"Used by the Opaline dashboard to show your account button and mark the sessions that are yours. Only your own account. Not called by the assistant.",
 		inputSchema: input(),
 		meta: APP_ONLY,
 		run: (client, _args, context) => readPluginAccount(client, context),
@@ -882,7 +888,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		annotations: READ_ONLY,
 		title: "Sessions: @-mention search",
 		description:
-			"Used by the chat to suggest your recent sessions when you type @. Only your own sessions. Not called by the assistant.",
+			"Used by the chat to suggest your recent sessions when you type @. Not called by the assistant.",
 		inputSchema: {
 			type: "object",
 			properties: { query: { type: "string" } },
@@ -891,7 +897,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		meta: { ...APP_ONLY, "openai/extensions": { "mentions/search": {} } },
 		run: async (client, args, { userId, workspace }) => {
 			const words = `${args.query ?? ""}`.toLowerCase().split(/\s+/u);
-			// Only the user's own sessions: members cannot open colleagues' ones.
+			// The user's own recent sessions, the ones they mention most; a
+			// teammate's session they mention opens too (get_session).
 			const sessions = await client.analytics.sessions.list({
 				days: 90,
 				limit: 100,
@@ -1012,14 +1019,18 @@ async function readPluginBootstrap(client: Client, context: McpToolContext) {
 
 /**
  * The caller's account as the app shows it (account button, marking the
- * caller's own sessions, admin-only links): id, name, image and role in the
- * workspace. Authorization stays on the server for every procedure.
+ * sessions that are the caller's, admin-only links, which sessions open):
+ * id, name, image, role in the workspace and whether they read every
+ * member's sessions. Authorization stays on the server for every procedure.
  */
 async function readPluginAccount(client: Client, context: McpToolContext) {
 	const { organization } = await readPluginBootstrap(client, context);
 	const { user, session } = context.authSession;
 	if (!user || !session) throw new McpToolError("Workspace not available.");
-	const [member] = await readWorkspaceMembers(organization.id, context.userId);
+	const [[member], reader] = await Promise.all([
+		readWorkspaceMembers(organization.id, context.userId),
+		readSessionReader(organization.id, context.userId),
+	]);
 	return {
 		session: {
 			user: { id: user.id, name: user.name, image: user.image ?? null },
@@ -1031,5 +1042,6 @@ async function readPluginAccount(client: Client, context: McpToolContext) {
 			},
 		},
 		member: member ?? null,
+		readsEverySession: reader !== null && readsEverySession(reader),
 	};
 }

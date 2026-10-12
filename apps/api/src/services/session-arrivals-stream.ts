@@ -3,10 +3,9 @@ import postgres from "postgres";
 import type { z } from "zod";
 import { readCliConnectionListenUrl } from "../lib/cli-connection-database.js";
 import { sessionArrivalChannel } from "./session-arrival-channel.js";
-import {
-	listSessionArrivals,
-	readSessionArrivalMember,
-} from "./session-arrivals.service.js";
+import { listSessionArrivals } from "./session-arrivals.service.js";
+import { readSessionReader } from "./session-reader.service.js";
+import { readableSessionOwner } from "./session-visibility.js";
 
 export async function streamSessionArrivals(
 	request: Request,
@@ -78,14 +77,14 @@ export async function streamSessionArrivals(
 				let after: string | undefined;
 				let sentPage = false;
 				do {
-					const member = await readSessionArrivalMember(organizationId, userId);
-					if (!member) {
+					const reader = await readSessionReader(organizationId, userId);
+					if (!reader) {
 						close();
 						return;
 					}
 					const page = await listSessionArrivals(
 						organizationId,
-						member.role === "owner" || member.role === "admin" ? null : userId,
+						readableSessionOwner(reader),
 						{ organizationId, since: baseline, after },
 					);
 					const sessions = page.sessions.filter(

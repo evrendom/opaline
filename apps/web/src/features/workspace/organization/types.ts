@@ -20,6 +20,11 @@ export interface WorkspaceActions {
 
 export interface WorkspaceMeta {
 	isOrgAdmin: boolean;
+	/**
+	 * Whether the caller opens every member's sessions: always, unless the
+	 * workspace is limited to own sessions and the caller is not an admin.
+	 */
+	readsEverySession: boolean;
 }
 
 export interface WorkspaceContextValue {
