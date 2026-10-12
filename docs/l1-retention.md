@@ -54,8 +54,11 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 | ClickHouse `claude_sessions`, `codex_sessions` | raw transcripts | yes, by `user_id` | yes, by `organization_id` |
 | ClickHouse `transcript_records` | every record, with text | yes | yes |
 | ClickHouse `run_index` | runs and receipts, with free text | yes | yes |
+| ClickHouse `run_requests` | each run's requests (calls, time, usage) and the head of their last assistant text; kept until a deletion request like the run index | yes | yes |
 | ClickHouse `weekly_totals` | sums of the run index per member, agent and week (nightly snapshots); a refresh that was already running when the purge deleted the run index is removed by the second pass | yes | yes |
+| ClickHouse `run_question_answers` | run question answers: probability of yes per question wording, run revision and provider, with the model version and which input it read (no transcript text) | yes, by `user_id` (the session's owner); answers a job stored while the first pass ran are removed by the second | yes |
 | ClickHouse `l1_edges`, `l1_edges_by_target`, `l1_edge_resolutions` | edges and evidence from sessions (the copy ordered by target is purged separately) | yes, by `user_id`; GitHub-side edges with an empty user are not the user's | yes |
+| ClickHouse `transcript_chunks`, `transcript_chunk_hits` | transcript search: chunk text (after the secret filter) with 8-bit vectors, stored once per member and month, and where each chunk appeared, by run | yes, by `user_id` | yes, by `organization_id` |
 | ClickHouse `session_git_observations` | git commands and outcomes read from transcripts | yes | yes |
 | ClickHouse `usage_events` | per-request usage | yes | yes |
 | ClickHouse `session_analytics` | per-session analytics (view target of the raw tables) | yes | yes |
@@ -70,9 +73,15 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 | Postgres `ingest_job` | upload jobs and R2 object manifests | yes (cascade) | yes (cascade); see the residual risk below |
 | Postgres `l1_edge_scope`, `l1_edge_scope_dependency` | edge and run index build queue and watermarks | yes (cascade) | yes (cascade) |
 | Postgres `ingest_processing_ledger` and its receipts | hash and session id of processed uploads | not removed for a user who leaves a shared workspace (no user column); removed with the account's sole-member workspaces | yes (cascade) |
-| Convex analyses and query results | analyses that read the sessions | yes (`purgeAnalysisLogs`) | yes |
-| Postgres `analysis_sql_result` | stored `sql` results: title, SQL, result rows (with excerpts such as `prompt_head`), the members whose sessions the query could read and the sessions it names | yes: the account's own results (cascade from `user`) and every result that read its sessions (`owner_ids`, deleted by the purge in both passes) | yes (cascade from `organization`, and the purge) |
+| Convex analyses and query results | analyses with a result that returned text from the sessions (any tool), or a finding citing their runs, and results that only counted them (numbers and ids) | yes (`purgeAnalysisLogs`, `deletion:removeOwnerEvidence`): the account's analyses, those with a result that returned text from its sessions and those with a finding on a result naming one of its sessions are deleted; results that only counted its sessions are removed (no output, arguments kept except those that may carry transcript text) and their analyses stay | yes |
+| Postgres `analysis_sql_result` | stored `sql` results: title, SQL, result rows (with excerpts such as `prompt_head`), the members whose sessions the query could read and the sessions it names | yes: the account's own results (cascade from `user`) and every result among whose `owner_ids` it is whose shown rows returned text (not `counts`) are deleted; every other result among them is removed by the purge in both passes: no output, the account dropped from `owner_ids`, the title kept and the SQL kept unless it carries a literal, quoted name or comment (`query_carries_text`, then emptied) (`removed_at`) | yes (cascade from `organization`, and the purge) |
+| ClickHouse `analysis_finding_runs` | each saved finding's cited runs with their recorded cost, tokens and active time, the finding's text and the members whose deletion deletes its analysis | yes: rows of the account's runs (`user_id`, purge plan), of its analyses (`author_id`) and of every analysis its deletion deletes (`quoted_owners`, `purgeFindingImpact`) | yes |
+| Postgres `analysis_visibility_sync` | pending syncs of finding impact rows with an analysis's visibility (analysis and workspace ids only) | not applicable (no user column) | yes (cascade) |
+| Postgres `transcript_embedding_quota` | per-workspace OpenAI tokens embedded (no session data) | not applicable (no user column) | yes (cascade) |
 | Postgres `analysis_sql_quota` | per-workspace query count (no session data) | not applicable (no user column) | yes (cascade) |
+| Postgres `run_question_job` | run question answering jobs: provider, question ids, the runs (session ids, revisions and owners) to answer, and the provider usage and cost | yes: the account's own jobs (cascade from `user`) and every job naming its sessions (`owner_ids`, deleted by the purge in both passes) | yes (cascade from `organization`, and the purge) |
+| Postgres `run_question_quota` | per-workspace answer count (no session data) | not applicable (no user column) | yes (cascade) |
+| Postgres `run_question` | the run question catalogue (wordings set by Opaline; no workspace or member data) | not applicable | not applicable |
 | R2 repository evidence objects | repository files | yes (snapshotted keys, two passes) | yes |
 
 ### Gaps fixed

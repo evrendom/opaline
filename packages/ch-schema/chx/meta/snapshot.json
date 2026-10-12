@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"generatedAt": "2026-10-01T13:50:06.052Z",
+	"generatedAt": "2026-10-12T13:35:55.406Z",
 	"definitions": [
 		{
 			"database": "rudel",
@@ -986,6 +986,109 @@
 				"storage_policy": "'s3'"
 			},
 			"comment": "Compact latest-state index for versioned repository/session evidence captures. Organization and repository filters lead the replacing identity; unknown coverage remains explicit.",
+			"kind": "table"
+		},
+		{
+			"database": "rudel",
+			"name": "run_question_answers",
+			"engine": "ReplacingMergeTree(answered_at)",
+			"columns": [
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Owning workspace ID; tenant boundary."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "The member who uploaded the session the run belongs to."
+				},
+				{
+					"name": "session_id",
+					"type": "String",
+					"comment": "Session of the run."
+				},
+				{
+					"name": "agent_id",
+					"type": "String",
+					"comment": "Stream of the run: empty for the main transcript, else the subagent."
+				},
+				{
+					"name": "turn_idx",
+					"type": "UInt32",
+					"comment": "The run within its stream, as in runs.turn_idx."
+				},
+				{
+					"name": "revision",
+					"type": "UInt64",
+					"comment": "Transcript revision (generation) of the session the answer was given for; run_answers shows an answer only while its session is committed at this revision."
+				},
+				{
+					"name": "question_id",
+					"type": "String",
+					"comment": "The run question, one wording; a reworded question has a new id."
+				},
+				{
+					"name": "question",
+					"type": "String",
+					"comment": "The wording the answer answered."
+				},
+				{
+					"name": "probability",
+					"type": "Float32",
+					"comment": "Probability (0 to 1) that the answer to the question is yes."
+				},
+				{
+					"name": "provider",
+					"type": "LowCardinality(String)",
+					"comment": "Who answered: the provider as configured (e.g. subq, jev, subq:run for whole runs); part of the key, so providers can answer the same question side by side."
+				},
+				{
+					"name": "input",
+					"type": "LowCardinality(String)",
+					"comment": "What the provider read: run (the run's whole text, secret-filtered) or note (the compact run note, sent when the run is larger than the provider takes or the provider reads notes)."
+				},
+				{
+					"name": "model",
+					"type": "LowCardinality(String)",
+					"comment": "The model version that answered, as the provider reported it."
+				},
+				{
+					"name": "cost_usd",
+					"type": "Float64",
+					"comment": "What the answer cost: its share of the call that answered every question about the run."
+				},
+				{
+					"name": "answered_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "UTC time the answer was stored."
+				}
+			],
+			"primaryKey": [
+				"organization_id",
+				"question_id",
+				"session_id",
+				"agent_id",
+				"turn_idx",
+				"revision",
+				"provider",
+				"model"
+			],
+			"orderBy": [
+				"organization_id",
+				"question_id",
+				"session_id",
+				"agent_id",
+				"turn_idx",
+				"revision",
+				"provider",
+				"model"
+			],
+			"settings": {
+				"index_granularity": "8192",
+				"storage_policy": "'s3'"
+			},
+			"comment": "Run question answers: the probability of yes per question wording and run; written only by the API's run question worker.",
 			"kind": "table"
 		},
 		{
@@ -3554,6 +3657,26 @@
 					"comment": "Human prompts in the run (queued prompts included, delegated tasks not)."
 				},
 				{
+					"name": "prompt_reactions",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Word-list categories (negative, swear, apology, positive) the language-signals scanner finds in the run's first genuine prompt (its first 16,384 characters, as find scans it), sorted; empty when it finds none or the run has none. From run index 4; empty before."
+				},
+				{
+					"name": "final_message",
+					"type": "Nullable(String)",
+					"comment": "First 2,000 characters of the run's last assistant text when no tool call follows it in the run: what the agent said when it stopped. NULL when the run ended on a tool call, has no assistant text, or was built before run index 4."
+				},
+				{
+					"name": "final_message_cut",
+					"type": "Bool",
+					"comment": "Whether final_message holds only part of the message: it was longer than 2,000 characters, or the transcript stored it cut. From run index 4; false before."
+				},
+				{
+					"name": "system_prompt_recorded",
+					"type": "Bool",
+					"comment": "Whether the run's stream recorded the system prompt it received (a Claude Code prompt_snapshot attachment or Codex base instructions) at or before the run. From run index 4; false before."
+				},
+				{
 					"name": "turn_origin",
 					"type": "LowCardinality(Nullable(String))",
 					"comment": "Claude turnOrigin of the run's starting prompt; NULL when the parser version or agent does not record it."
@@ -4012,6 +4135,228 @@
 		},
 		{
 			"database": "rudel",
+			"name": "run_requests",
+			"engine": "ReplacingMergeTree(build_revision)",
+			"columns": [
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Owning workspace ID; tenant boundary."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "Session owner."
+				},
+				{
+					"name": "session_id",
+					"type": "String",
+					"comment": "Native session ID within organization and user."
+				},
+				{
+					"name": "revision",
+					"type": "UInt64",
+					"comment": "Raw transcript revision of the run index build's generation."
+				},
+				{
+					"name": "parser_version",
+					"type": "UInt16",
+					"comment": "Transcript records parser version of the generation."
+				},
+				{
+					"name": "index_version",
+					"type": "UInt16",
+					"comment": "Run index rules version of the build."
+				},
+				{
+					"name": "build_revision",
+					"type": "UInt64",
+					"comment": "Run index build that wrote the request; the session's newest run index receipt names the build readers read."
+				},
+				{
+					"name": "agent_id",
+					"type": "String",
+					"comment": "Transcript stream; empty for the main stream."
+				},
+				{
+					"name": "start_record",
+					"type": "UInt32",
+					"comment": "Raw record index of the request's first response record (assistant text, reasoning or tool call); stable across re-uploads, like run ids."
+				},
+				{
+					"name": "source",
+					"type": "LowCardinality(String)",
+					"comment": "Transcript source: claude_code or codex."
+				},
+				{
+					"name": "run_id",
+					"type": "String",
+					"comment": "Run node id of the run the request belongs to (run_index.run_id)."
+				},
+				{
+					"name": "run_start_record",
+					"type": "UInt32",
+					"comment": "start_record of the run the request belongs to."
+				},
+				{
+					"name": "turn_idx",
+					"type": "UInt32",
+					"comment": "Run number within the stream."
+				},
+				{
+					"name": "built_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "UTC millisecond time the worker wrote the row."
+				},
+				{
+					"name": "session_date",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "Session date of the generation."
+				},
+				{
+					"name": "unrecorded_facts",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Columns of this row whose values are unknown, not none: the usage columns when the session's usage extraction was incomplete."
+				},
+				{
+					"name": "end_record",
+					"type": "UInt32",
+					"comment": "Start of the next request of the run, or the run's end_record: the request's lines are [start_record, end_record), and its usage is on them (the first request's from the run's start)."
+				},
+				{
+					"name": "started_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "When the model was asked: the time of the run's last non-meta record before the request (the prompt or the previous request's last record)."
+				},
+				{
+					"name": "ended_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "Time of the request's last non-meta record."
+				},
+				{
+					"name": "call_records",
+					"type": "Array(UInt32)",
+					"comment": "Raw record index of each tool call the request made, in record order."
+				},
+				{
+					"name": "call_tools",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Tool name of each call, in call_records order."
+				},
+				{
+					"name": "call_groups",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Tool group of each call (shell, edit, read, search, browser, web, mcp, subagent, other), in call_records order."
+				},
+				{
+					"name": "call_classes",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Command class the parser gave each shell call (test, build, lint, typecheck, git, migrate, install, other; empty for other tools), in call_records order."
+				},
+				{
+					"name": "call_failed",
+					"type": "Array(UInt8)",
+					"comment": "1 when the call's result is an error or a non-zero exit code, in call_records order."
+				},
+				{
+					"name": "text_record",
+					"type": "Nullable(UInt32)",
+					"comment": "Raw record index of the request's last assistant text; NULL when the request wrote none."
+				},
+				{
+					"name": "text_block",
+					"type": "Nullable(UInt16)",
+					"comment": "Block of that assistant text within its record (a line can hold reasoning, then text); NULL when the request wrote none."
+				},
+				{
+					"name": "text_head",
+					"type": "Nullable(String)",
+					"comment": "First 160 characters of that assistant text; NULL when the request wrote none."
+				},
+				{
+					"name": "usage_observations",
+					"type": "UInt32",
+					"comment": "Verified usage events of the session's usage extraction on the request's lines."
+				},
+				{
+					"name": "usage_unpriced",
+					"type": "UInt32",
+					"comment": "Of usage_observations, events without a price."
+				},
+				{
+					"name": "usage_model",
+					"type": "LowCardinality(String)",
+					"comment": "Model of the request's latest usage event; empty without usage."
+				},
+				{
+					"name": "cost_usd",
+					"type": "Nullable(Float64)",
+					"comment": "Priced cost of usage_observations at the build's pricing; NULL when none is priced or the usage is unknown."
+				},
+				{
+					"name": "uncached_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Uncached input tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				},
+				{
+					"name": "cache_read_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Cache read input tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				},
+				{
+					"name": "cache_write_5m_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Five-minute cache write input tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				},
+				{
+					"name": "cache_write_1h_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "One-hour cache write input tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				},
+				{
+					"name": "output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Output tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				},
+				{
+					"name": "reasoning_output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Reasoning output tokens of the request's usage events; NULL without usage or when the session's usage is unknown."
+				}
+			],
+			"primaryKey": [
+				"organization_id",
+				"user_id",
+				"session_id",
+				"revision",
+				"parser_version",
+				"index_version",
+				"build_revision",
+				"agent_id",
+				"start_record"
+			],
+			"orderBy": [
+				"organization_id",
+				"user_id",
+				"session_id",
+				"revision",
+				"parser_version",
+				"index_version",
+				"build_revision",
+				"agent_id",
+				"start_record"
+			],
+			"settings": {
+				"index_granularity": "1024",
+				"index_granularity_bytes": "1048576",
+				"non_replicated_deduplication_window": "1000",
+				"storage_policy": "'s3'"
+			},
+			"comment": "L1 requests (one model response and its calls) of each run index build, committed by the build's run index receipt; written only by the reconciliation worker.",
+			"kind": "table"
+		},
+		{
+			"database": "rudel",
 			"name": "weekly_totals",
 			"engine": "MergeTree",
 			"columns": [
@@ -4372,6 +4717,349 @@
 				"storage_policy": "'s3'"
 			},
 			"comment": "Nightly snapshots of the run index summed per workspace, member, agent and ISO week; appended only by weekly_totals_mv.",
+			"kind": "table"
+		},
+		{
+			"database": "rudel",
+			"name": "analysis_finding_runs",
+			"engine": "ReplacingMergeTree(visibility_revision)",
+			"columns": [
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Workspace of the analysis; tenant boundary."
+				},
+				{
+					"name": "analysis_id",
+					"type": "String",
+					"comment": "Saved analysis id."
+				},
+				{
+					"name": "step_id",
+					"type": "String",
+					"comment": "Step whose finding cites the run; one finding per step."
+				},
+				{
+					"name": "finding",
+					"type": "String",
+					"comment": "The finding as the analysis saved it."
+				},
+				{
+					"name": "author_id",
+					"type": "String",
+					"comment": "Author of the analysis; only they read its rows until it is shared."
+				},
+				{
+					"name": "shared",
+					"type": "UInt8",
+					"comment": "1 while the analysis is shared with its workspace, else 0, as of visibility_revision."
+				},
+				{
+					"name": "visibility_revision",
+					"type": "UInt64",
+					"comment": "Revision of the analysis's visibility these rows hold, from the analysis log; the highest wins under FINAL, so an older share or unshare written late never replaces a newer one."
+				},
+				{
+					"name": "quoted_owners",
+					"type": "Array(String)",
+					"comment": "Members whose deletion deletes the analysis and these rows: every member a query of it read and quoted, and every member a finding's result names a session of."
+				},
+				{
+					"name": "saved_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "UTC time the analysis was saved."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "Member who owns the run's session."
+				},
+				{
+					"name": "session_id",
+					"type": "String",
+					"comment": "Session of the run."
+				},
+				{
+					"name": "agent_id",
+					"type": "String",
+					"comment": "Stream of the run; empty for the main transcript."
+				},
+				{
+					"name": "turn_idx",
+					"type": "UInt32",
+					"comment": "Run number within the stream, as in runs."
+				},
+				{
+					"name": "started_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "Timestamp of the run's first record. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "minutes",
+					"type": "Float64",
+					"comment": "Wall-clock minutes from the first record to the last non-meta record. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "active_minutes",
+					"type": "Float64",
+					"comment": "Sum of the gaps between non-meta records, each capped at five minutes. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "cost_usd",
+					"type": "Nullable(Float64)",
+					"comment": "Priced cost of usage_observations at pricing_version; NULL when none is priced. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "uncached_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Uncached input tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "cache_read_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Cache read input tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "cache_write_5m_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Five-minute cache write input tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "cache_write_1h_input_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "One-hour cache write input tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Output tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "reasoning_output_tokens",
+					"type": "Nullable(UInt64)",
+					"comment": "Reasoning output tokens of usage_observations; NULL without usage. Copied from the run's committed run index build when the analysis was saved."
+				},
+				{
+					"name": "unrecorded_facts",
+					"type": "Array(LowCardinality(String))",
+					"comment": "Fact columns of this row whose values are unknown, not none: the parser version or agent cannot record them, or the usage extraction was incomplete. Copied from the run's committed run index build when the analysis was saved."
+				}
+			],
+			"primaryKey": [
+				"organization_id",
+				"analysis_id",
+				"step_id",
+				"user_id",
+				"session_id",
+				"agent_id",
+				"turn_idx"
+			],
+			"orderBy": [
+				"organization_id",
+				"analysis_id",
+				"step_id",
+				"user_id",
+				"session_id",
+				"agent_id",
+				"turn_idx"
+			],
+			"settings": {
+				"index_granularity": "8192",
+				"storage_policy": "'s3'"
+			},
+			"comment": "Each saved finding's cited runs with their recorded cost, tokens and active time; written when an analysis is saved or shared.",
+			"kind": "table"
+		},
+		{
+			"database": "rudel",
+			"name": "transcript_chunks",
+			"engine": "ReplacingMergeTree(embedded_at)",
+			"columns": [
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Owning workspace ID; tenant boundary."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "Member whose sessions hold the chunk; chunks are stored once per member and month."
+				},
+				{
+					"name": "month",
+					"type": "Date",
+					"comment": "First day (UTC) of a month the chunk appeared in; a chunk seen in several months has a row for each, with the same vector."
+				},
+				{
+					"name": "chunk_hash",
+					"type": "String",
+					"comment": "First 128 bits of the SHA-256 of the chunk text, as hex: the chunk's identity within the member's sessions."
+				},
+				{
+					"name": "text",
+					"type": "String",
+					"comment": "Chunk text after the secret filter, at most 1,200 characters, cut at a line end where possible."
+				},
+				{
+					"name": "embedding",
+					"type": "Array(Int8)",
+					"comment": "text-embedding-3-small vector at 512 dimensions, scaled so its largest component is ±127 (cosine does not depend on the scale); empty while not embedded."
+				},
+				{
+					"name": "model",
+					"type": "LowCardinality(String)",
+					"comment": "Model and dimensions of the vector, e.g. text-embedding-3-small@512; empty while not embedded."
+				},
+				{
+					"name": "embedded_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "Replacing version: UTC time the vector was written, or 1970-01-01 for a chunk stored without one, so an embedded row replaces it."
+				}
+			],
+			"primaryKey": ["organization_id", "user_id", "month", "chunk_hash"],
+			"orderBy": ["organization_id", "user_id", "month", "chunk_hash"],
+			"settings": {
+				"index_granularity": "1024",
+				"index_granularity_bytes": "1048576",
+				"non_replicated_deduplication_window": "1000",
+				"storage_policy": "'s3'"
+			},
+			"comment": "Distinct chunks of transcript text per member and month with their 8-bit vectors, for search by meaning and exact string.",
+			"kind": "table"
+		},
+		{
+			"database": "rudel",
+			"name": "transcript_chunk_hits",
+			"engine": "ReplacingMergeTree(written_at)",
+			"columns": [
+				{
+					"name": "organization_id",
+					"type": "String",
+					"comment": "Owning workspace ID; tenant boundary."
+				},
+				{
+					"name": "user_id",
+					"type": "String",
+					"comment": "Session owner."
+				},
+				{
+					"name": "source",
+					"type": "LowCardinality(String)",
+					"comment": "Transcript source: claude_code or codex."
+				},
+				{
+					"name": "session_id",
+					"type": "String",
+					"comment": "Native session ID within organization and user."
+				},
+				{
+					"name": "agent_id",
+					"type": "String",
+					"comment": "Transcript stream; empty for the main stream and the receipt."
+				},
+				{
+					"name": "record_idx",
+					"type": "UInt32",
+					"comment": "Transcript record of the hit; 4294967295 for the session's receipt."
+				},
+				{
+					"name": "block_idx",
+					"type": "UInt16",
+					"comment": "Content block of the record."
+				},
+				{
+					"name": "chunk_idx",
+					"type": "UInt16",
+					"comment": "Place of the chunk in the block's text, from 0."
+				},
+				{
+					"name": "turn_idx",
+					"type": "UInt32",
+					"comment": "Run number within the stream; zero for the receipt."
+				},
+				{
+					"name": "kind",
+					"type": "LowCardinality(String)",
+					"comment": "Record kind of the hit: user_prompt, assistant_text, reasoning, tool_call, tool_result or file_change; receipt for the receipt."
+				},
+				{
+					"name": "tool_name",
+					"type": "LowCardinality(String)",
+					"comment": "Tool of a tool call or result; empty otherwise."
+				},
+				{
+					"name": "ts",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "UTC time of the record."
+				},
+				{
+					"name": "chunk_hash",
+					"type": "String",
+					"comment": "The chunk (transcript_chunks.chunk_hash of the same member); empty for the receipt."
+				},
+				{
+					"name": "revision",
+					"type": "UInt64",
+					"comment": "Raw transcript revision of the transcript records generation the hits were cut from."
+				},
+				{
+					"name": "parser_version",
+					"type": "UInt16",
+					"comment": "Transcript records parser version of that generation."
+				},
+				{
+					"name": "pending_chunks",
+					"type": "UInt32",
+					"comment": "Receipt only: chunks of the generation still without a vector (over the workspace's OpenAI quota or out of time); 0 when all are embedded."
+				},
+				{
+					"name": "truncated_records",
+					"type": "UInt32",
+					"comment": "Receipt only: records searched by their kept prefix and tail only, because transcript records did not keep their middle."
+				},
+				{
+					"name": "written_at",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": "Replacing version: UTC time the row was written, so a later pass over the same generation wins (its receipt counts fewer pending chunks)."
+				}
+			],
+			"primaryKey": [
+				"organization_id",
+				"user_id",
+				"session_id",
+				"revision",
+				"parser_version",
+				"agent_id",
+				"record_idx",
+				"block_idx",
+				"chunk_idx"
+			],
+			"orderBy": [
+				"organization_id",
+				"user_id",
+				"session_id",
+				"revision",
+				"parser_version",
+				"agent_id",
+				"record_idx",
+				"block_idx",
+				"chunk_idx"
+			],
+			"settings": {
+				"index_granularity": "1024",
+				"index_granularity_bytes": "1048576",
+				"non_replicated_deduplication_window": "1000",
+				"storage_policy": "'s3'"
+			},
+			"indexes": [
+				{
+					"name": "ts_minmax",
+					"expression": "ts",
+					"type": "minmax",
+					"granularity": 1
+				}
+			],
+			"comment": "Where each transcript chunk appeared, by run and transcript records generation; a receipt row closes each generation.",
 			"kind": "table"
 		}
 	]

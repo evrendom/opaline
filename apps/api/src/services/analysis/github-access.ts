@@ -43,6 +43,19 @@ async function loadGitHubAccess(organizationId: string): Promise<GitHubAccess> {
 }
 
 /**
+ * The repositories whose GitHub facts the workspace's SQL views may read:
+ * its active bindings while GitHub outcomes are visible to it (as find
+ * links them), otherwise none.
+ */
+export async function visibleGitHubRepositories(
+	organizationId: string,
+): Promise<string[]> {
+	// Hidden access holds no bindings.
+	const access = await loadGitHubAccess(organizationId);
+	return access.bindings.map((binding) => binding.repositoryId);
+}
+
+/**
  * The workspace's active bindings and collection coverage whatever the
  * dashboard shows: L1 edges are facts, so they do not depend on the GitHub
  * UI rollout; reads still decide visibility.

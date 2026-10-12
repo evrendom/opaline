@@ -44,6 +44,12 @@ export interface StoredAnalysis {
 	/** Queries and steps recorded so far; kept by the store. */
 	queryCount: number;
 	stepCount: number;
+	/**
+	 * Advanced by the store with every share or unshare, so copies of the
+	 * visibility (finding impact rows) keep the newest whatever order their
+	 * writes land in. 0 until the first.
+	 */
+	visibilityRevision: number;
 }
 
 export interface StoredStep {
@@ -91,6 +97,21 @@ export interface StoredQuery {
 	owners: string[];
 	createdAt: string;
 	removed: boolean;
+	/**
+	 * The result returned only numbers and ids from the sessions it read
+	 * (`evidence.ts`): deleting a member it read removes the result and keeps
+	 * the analysis, unless a finding of its step cites one of their sessions.
+	 * False when it returned any text from them: deleting any member it read
+	 * deletes the analysis (ADR 0001 as amended). Queries recorded before it
+	 * read as false.
+	 */
+	counts: boolean;
+	/**
+	 * For a counting query whose arguments may carry transcript text (an SQL
+	 * literal, a command prefix): its arguments and step label once its result
+	 * is removed. Null when nothing needs to go.
+	 */
+	redaction: { args: Record<string, unknown>; label: string } | null;
 }
 
 /** A query as listed with its analysis: no result, sessions or owners. */
@@ -130,6 +151,8 @@ export type AnalysisPatch = Partial<
 		| "queryCount"
 		| "stepCount"
 		| "draft"
+		| "visibilityRevision"
+		| "shared"
 	>
 >;
 
@@ -173,6 +196,12 @@ export interface AnalysisStore {
 	createAnalysis(analysis: StoredAnalysis): Promise<void>;
 	getAnalysis(id: string): Promise<StoredAnalysis | null>;
 	updateAnalysis(id: string, patch: AnalysisPatch): Promise<void>;
+	/**
+	 * Shares or unshares the analysis and advances its `visibilityRevision`
+	 * in the same atomic write; returns the new revision, or null for a
+	 * missing or deleting analysis.
+	 */
+	setShared(id: string, shared: boolean): Promise<number | null>;
 	/** Newest first, without drafts: the viewer's own analyses plus shared ones of the workspace. */
 	recentAnalyses(
 		workspaceId: string,
@@ -219,8 +248,16 @@ export interface AnalysisStore {
 	 */
 	deleteAnalysesByAuthor(authorId: string): Promise<void>;
 	deleteAnalysesByWorkspace(workspaceId: string): Promise<void>;
-	/** Every analysis, of any author or workspace, that read one of the owner's sessions. */
-	deleteAnalysesReadingOwner(ownerId: string): Promise<void>;
+	/**
+	 * Account deletion (ADR 0001 as amended), for analyses of any author or
+	 * workspace: deletes every analysis with a query that read the owner's
+	 * sessions and quoted them (not `counts`), or whose step's finding sits on
+	 * a query naming one of their sessions. Every other query that read their
+	 * sessions loses its result (`removed`, no output, the owner no longer
+	 * among its owners or sessions) and takes its `redaction`; its analysis
+	 * stays.
+	 */
+	removeOwnerEvidence(ownerId: string): Promise<void>;
 
 	/**
 	 * Adds the link, or moves an existing link's `uploadedAt` to this upload.
@@ -273,4 +310,10 @@ export interface AnalysisViewer {
 	 * otherwise anyone who can see the analysis reads it.
 	 */
 	restrictResults: boolean;
+	/**
+	 * The one member whose sessions the viewer reads, where the workspace
+	 * keeps members to their own sessions (`readableSessionOwner`); null when
+	 * they read every member's.
+	 */
+	onlyMember: string | null;
 }

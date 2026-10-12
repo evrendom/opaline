@@ -64,6 +64,12 @@ export function nativeEditToolSql(toolExpr: string): string {
 	return `replaceRegexpOne(lower(${toolExpr}), '^functions\\\\.', '') IN (${sqlList(tools)})`;
 }
 
+/** True for a tool that starts a subagent (the `subagent` group: Claude Task and Agent, Codex spawn_agent). */
+export function isSubagentTool(tool: string): boolean {
+	const tools = NAMED.find(([group]) => group === "subagent")?.[1] ?? [];
+	return tools.includes(tool.toLowerCase().replace(/^functions\./u, ""));
+}
+
 export function toolActivitySql(
 	group: "read" | "search",
 	fallback: string,

@@ -63,7 +63,7 @@ export function restrictsAnalysisResults(workspace: {
  * Whether the variable lists the workspace. An invalid list answers
  * `whenInvalid` for every workspace: the side that never widens access.
  */
-function listsWorkspace(
+export function listsWorkspace(
 	variable: string,
 	workspaceId: string,
 	whenInvalid: boolean,

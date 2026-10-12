@@ -39,6 +39,10 @@ const AdminDashboardPage = lazyNamed(
 	() => import("@/features/admin/AdminDashboardPage"),
 	"AdminDashboardPage",
 );
+const RunQuestionsAdminPage = lazyNamed(
+	() => import("@/features/admin/RunQuestionsAdminPage"),
+	"RunQuestionsAdminPage",
+);
 const CliOnboardingPage = lazyNamed(
 	() => import("@/features/cli-onboarding/cli-onboarding-page"),
 	"CliOnboardingPage",
@@ -321,6 +325,10 @@ export function AppRouter({
 			<Route
 				path={appRoutes.admin()}
 				element={<LazyRoute Component={AdminDashboardPage} />}
+			/>
+			<Route
+				path={appRoutes.adminRunQuestions()}
+				element={<LazyRoute Component={RunQuestionsAdminPage} />}
 			/>
 			<Route
 				path="/:workspaceSlug/join/:token"

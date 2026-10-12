@@ -41,8 +41,33 @@ export const update = apiMutation({
 	returns: v.null(),
 	handler: async (ctx, { id, patch }) => {
 		const value = await findAnalysis(id, ctx);
-		if (value) await ctx.db.patch(value._id, patch);
+		if (value)
+			await ctx.db.patch(value._id, {
+				...patch,
+				// The API before `setShared` shares through here.
+				...(patch.shared === undefined
+					? {}
+					: { visibilityRevision: (value.visibilityRevision ?? 0) + 1 }),
+			});
 		return null;
+	},
+});
+
+/**
+ * Shares or unshares an analysis and advances its visibility revision in the
+ * same transaction; returns the new revision, or null for a missing or
+ * deleting analysis. Copies of the visibility (the API's finding impact rows)
+ * keep the highest revision's, so they end as the last change here.
+ */
+export const setShared = apiMutation({
+	args: { id: v.string(), shared: v.boolean() },
+	returns: v.union(v.number(), v.null()),
+	handler: async (ctx, { id, shared }) => {
+		const value = await findAnalysis(id, ctx);
+		if (!value) return null;
+		const visibilityRevision = (value.visibilityRevision ?? 0) + 1;
+		await ctx.db.patch(value._id, { shared, visibilityRevision });
+		return visibilityRevision;
 	},
 });
 

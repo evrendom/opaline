@@ -11,13 +11,15 @@
 		"./session-analytics-mv": "./src/session-analytics-mv.ts",
 		"./github-outcomes": "./src/github-outcomes.ts",
 		"./run-index": "./src/run-index.ts",
-		"./weekly-totals": "./src/weekly-totals.ts"
+		"./weekly-totals": "./src/weekly-totals.ts",
+		"./finding-runs": "./src/finding-runs.ts",
+		"./run-question-answers": "./src/run-question-answers.ts"
 	},
 	"scripts": {
 		"backfill:subagent-metrics": "bun scripts/backfill-subagent-metrics.ts",
 		"check-types": "tsc --noEmit",
 		"test": "bun test",
-		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/claude-mv.integration.ts ./src/__tests__/codex-mv.integration.ts ./src/__tests__/subagent-metrics-backfill.integration.ts ./src/__tests__/session-lineage.integration.ts ./src/__tests__/repository-evidence-index.integration.ts ./src/__tests__/repository-evidence-index-migration.integration.ts ./src/__tests__/session-git-observations-migration.integration.ts ./src/__tests__/transcript-records-facts-migration.integration.ts ./src/__tests__/session-analytics-retirement-migration.integration.ts ./src/__tests__/l1-edges-migration.integration.ts ./src/__tests__/run-index-migration.integration.ts ./src/__tests__/l1-retention-migration.integration.ts ./src/__tests__/weekly-totals-migration.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts ./src/__tests__/revision-ordering-migration.integration.ts ./src/__tests__/github-outcomes-migration.integration.ts",
+		"test:integration": "bun test --preload ./src/__tests__/helpers/local-clickhouse-guard.ts --max-concurrency=1 ./src/__tests__/claude-mv.integration.ts ./src/__tests__/codex-mv.integration.ts ./src/__tests__/subagent-metrics-backfill.integration.ts ./src/__tests__/session-lineage.integration.ts ./src/__tests__/repository-evidence-index.integration.ts ./src/__tests__/repository-evidence-index-migration.integration.ts ./src/__tests__/session-git-observations-migration.integration.ts ./src/__tests__/transcript-records-facts-migration.integration.ts ./src/__tests__/session-analytics-retirement-migration.integration.ts ./src/__tests__/l1-edges-migration.integration.ts ./src/__tests__/run-index-migration.integration.ts ./src/__tests__/l1-retention-migration.integration.ts ./src/__tests__/weekly-totals-migration.integration.ts ./src/__tests__/run-question-answers-migration.integration.ts ./src/__tests__/ingest-clickhouse.integration.ts ./src/__tests__/filter-version-migration.integration.ts ./src/__tests__/session-analytics-migration.integration.ts ./src/__tests__/revision-ordering-migration.integration.ts ./src/__tests__/github-outcomes-migration.integration.ts",
 		"ch:generate": "bun --bun chkit generate",
 		"ch:generate:dryrun": "bun --bun chkit generate --dryrun",
 		"ch:migrate": "bash -c 'CLICKHOUSE_DB=default bun --bun chkit migrate --apply \"$@\"' --",
@@ -44,7 +46,12 @@
 		"ch:migrate:l1-retention": "bun scripts/migrate-l1-retention.ts",
 		"ch:migrate:weekly-totals": "bun scripts/migrate-weekly-totals.ts",
 		"ch:migrate:not-found-unknown": "bun scripts/migrate-not-found-unknown.ts",
-		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:weekly-totals ch:migrate:not-found-unknown",
+		"ch:migrate:run-question-answers": "bun scripts/migrate-run-question-answers.ts",
+		"ch:migrate:analysis-finding-runs": "bun scripts/migrate-analysis-finding-runs.ts",
+		"ch:migrate:transcript-search": "bun scripts/migrate-transcript-search.ts",
+		"ch:migrate:run-index-messages": "bun scripts/migrate-run-index-messages.ts",
+		"ch:migrate:run-requests": "bun scripts/migrate-run-requests.ts",
+		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:run-requests ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:analysis-finding-runs ch:migrate:weekly-totals ch:migrate:not-found-unknown ch:migrate:run-question-answers ch:migrate:transcript-search ch:migrate:run-index-messages",
 		"ch:migrate:github-outcomes": "bun scripts/migrate-github-outcomes.ts"
 	},
 	"dependencies": {

@@ -3,6 +3,63 @@
 
 import { z } from 'zod'
 
+export type RudelAnalysisFindingRunsRow = {
+  organization_id: string
+  analysis_id: string
+  step_id: string
+  finding: string
+  author_id: string
+  shared: number
+  visibility_revision: string
+  quoted_owners: string[]
+  saved_at: string
+  user_id: string
+  session_id: string
+  agent_id: string
+  turn_idx: number
+  started_at: string
+  minutes: number
+  active_minutes: number
+  cost_usd: number | null
+  uncached_input_tokens: string | null
+  cache_read_input_tokens: string | null
+  cache_write_5m_input_tokens: string | null
+  cache_write_1h_input_tokens: string | null
+  output_tokens: string | null
+  reasoning_output_tokens: string | null
+  unrecorded_facts: string[]
+}
+
+export const RudelAnalysisFindingRunsRowSchema = z.object({
+  organization_id: z.string(),
+  analysis_id: z.string(),
+  step_id: z.string(),
+  finding: z.string(),
+  author_id: z.string(),
+  shared: z.number(),
+  visibility_revision: z.string(),
+  quoted_owners: z.array(z.string()),
+  saved_at: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  turn_idx: z.number(),
+  started_at: z.string(),
+  minutes: z.number(),
+  active_minutes: z.number(),
+  cost_usd: z.number().nullable(),
+  uncached_input_tokens: z.string().nullable(),
+  cache_read_input_tokens: z.string().nullable(),
+  cache_write_5m_input_tokens: z.string().nullable(),
+  cache_write_1h_input_tokens: z.string().nullable(),
+  output_tokens: z.string().nullable(),
+  reasoning_output_tokens: z.string().nullable(),
+  unrecorded_facts: z.array(z.string()),
+})
+
+export type RudelAnalysisFindingRunsRowInput = z.input<typeof RudelAnalysisFindingRunsRowSchema>
+export type RudelAnalysisFindingRunsRowOutput = z.output<typeof RudelAnalysisFindingRunsRowSchema>
+
 export type RudelClaudeSessionsRow = {
   session_date: string
   last_interaction_date: string
@@ -606,6 +663,10 @@ export type RudelRunIndexRow = {
   time_to_first_token_ms: number | null
   prompt_head: string | null
   genuine_prompts: number
+  prompt_reactions: string[]
+  final_message: string | null
+  final_message_cut: boolean
+  system_prompt_recorded: boolean
   turn_origin: string | null
   prompt_source: string | null
   origin_kind: string | null
@@ -723,6 +784,10 @@ export const RudelRunIndexRowSchema = z.object({
   time_to_first_token_ms: z.number().nullable(),
   prompt_head: z.string().nullable(),
   genuine_prompts: z.number(),
+  prompt_reactions: z.array(z.string()).default([]),
+  final_message: z.string().nullable().default(null),
+  final_message_cut: z.boolean().default(false),
+  system_prompt_recorded: z.boolean().default(false),
   turn_origin: z.string().nullable(),
   prompt_source: z.string().nullable(),
   origin_kind: z.string().nullable(),
@@ -751,8 +816,8 @@ export const RudelRunIndexRowSchema = z.object({
   tool_calls: z.number(),
   failed_calls: z.number(),
   edits: z.number(),
-  failed_edits: z.number().nullable().default(null),
-  refused_edits: z.number().nullable().default(null),
+  failed_edits: z.number().nullable(),
+  refused_edits: z.number().nullable(),
   reads: z.number(),
   searches: z.number(),
   not_found: z.number().nullable(),
@@ -812,6 +877,126 @@ export const RudelRunIndexRowSchema = z.object({
 
 export type RudelRunIndexRowInput = z.input<typeof RudelRunIndexRowSchema>
 export type RudelRunIndexRowOutput = z.output<typeof RudelRunIndexRowSchema>
+
+export type RudelRunQuestionAnswersRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  agent_id: string
+  turn_idx: number
+  revision: string
+  question_id: string
+  question: string
+  probability: number
+  provider: string
+  input: string
+  model: string
+  cost_usd: number
+  answered_at: string
+}
+
+export const RudelRunQuestionAnswersRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  turn_idx: z.number(),
+  revision: z.string(),
+  question_id: z.string(),
+  question: z.string(),
+  probability: z.number(),
+  provider: z.string(),
+  input: z.string(),
+  model: z.string(),
+  cost_usd: z.number(),
+  answered_at: z.string(),
+})
+
+export type RudelRunQuestionAnswersRowInput = z.input<typeof RudelRunQuestionAnswersRowSchema>
+export type RudelRunQuestionAnswersRowOutput = z.output<typeof RudelRunQuestionAnswersRowSchema>
+
+export type RudelRunRequestsRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  revision: string
+  parser_version: number
+  index_version: number
+  build_revision: string
+  agent_id: string
+  start_record: number
+  source: string
+  run_id: string
+  run_start_record: number
+  turn_idx: number
+  built_at: string
+  session_date: string
+  unrecorded_facts: string[]
+  end_record: number
+  started_at: string
+  ended_at: string
+  call_records: number[]
+  call_tools: string[]
+  call_groups: string[]
+  call_classes: string[]
+  call_failed: number[]
+  text_record: number | null
+  text_block: number | null
+  text_head: string | null
+  usage_observations: number
+  usage_unpriced: number
+  usage_model: string
+  cost_usd: number | null
+  uncached_input_tokens: string | null
+  cache_read_input_tokens: string | null
+  cache_write_5m_input_tokens: string | null
+  cache_write_1h_input_tokens: string | null
+  output_tokens: string | null
+  reasoning_output_tokens: string | null
+}
+
+export const RudelRunRequestsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  index_version: z.number(),
+  build_revision: z.string(),
+  agent_id: z.string(),
+  start_record: z.number(),
+  source: z.string(),
+  run_id: z.string(),
+  run_start_record: z.number(),
+  turn_idx: z.number(),
+  built_at: z.string(),
+  session_date: z.string(),
+  unrecorded_facts: z.array(z.string()),
+  end_record: z.number(),
+  started_at: z.string(),
+  ended_at: z.string(),
+  call_records: z.array(z.number()),
+  call_tools: z.array(z.string()),
+  call_groups: z.array(z.string()),
+  call_classes: z.array(z.string()),
+  call_failed: z.array(z.number()),
+  text_record: z.number().nullable(),
+  text_block: z.number().nullable(),
+  text_head: z.string().nullable(),
+  usage_observations: z.number(),
+  usage_unpriced: z.number(),
+  usage_model: z.string(),
+  cost_usd: z.number().nullable(),
+  uncached_input_tokens: z.string().nullable(),
+  cache_read_input_tokens: z.string().nullable(),
+  cache_write_5m_input_tokens: z.string().nullable(),
+  cache_write_1h_input_tokens: z.string().nullable(),
+  output_tokens: z.string().nullable(),
+  reasoning_output_tokens: z.string().nullable(),
+})
+
+export type RudelRunRequestsRowInput = z.input<typeof RudelRunRequestsRowSchema>
+export type RudelRunRequestsRowOutput = z.output<typeof RudelRunRequestsRowSchema>
 
 export type RudelSessionAnalyticsRow = {
   session_date: string
@@ -1172,6 +1357,76 @@ export const RudelSkillVersionContentsRowSchema = z.object({
 export type RudelSkillVersionContentsRowInput = z.input<typeof RudelSkillVersionContentsRowSchema>
 export type RudelSkillVersionContentsRowOutput = z.output<typeof RudelSkillVersionContentsRowSchema>
 
+export type RudelTranscriptChunkHitsRow = {
+  organization_id: string
+  user_id: string
+  source: string
+  session_id: string
+  agent_id: string
+  record_idx: number
+  block_idx: number
+  chunk_idx: number
+  turn_idx: number
+  kind: string
+  tool_name: string
+  ts: string
+  chunk_hash: string
+  revision: string
+  parser_version: number
+  pending_chunks: number
+  truncated_records: number
+  written_at: string
+}
+
+export const RudelTranscriptChunkHitsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  record_idx: z.number(),
+  block_idx: z.number(),
+  chunk_idx: z.number(),
+  turn_idx: z.number(),
+  kind: z.string(),
+  tool_name: z.string(),
+  ts: z.string(),
+  chunk_hash: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  pending_chunks: z.number(),
+  truncated_records: z.number(),
+  written_at: z.string(),
+})
+
+export type RudelTranscriptChunkHitsRowInput = z.input<typeof RudelTranscriptChunkHitsRowSchema>
+export type RudelTranscriptChunkHitsRowOutput = z.output<typeof RudelTranscriptChunkHitsRowSchema>
+
+export type RudelTranscriptChunksRow = {
+  organization_id: string
+  user_id: string
+  month: string
+  chunk_hash: string
+  text: string
+  embedding: number[]
+  model: string
+  embedded_at: string
+}
+
+export const RudelTranscriptChunksRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  month: z.string(),
+  chunk_hash: z.string(),
+  text: z.string(),
+  embedding: z.array(z.number()),
+  model: z.string(),
+  embedded_at: z.string(),
+})
+
+export type RudelTranscriptChunksRowInput = z.input<typeof RudelTranscriptChunksRowSchema>
+export type RudelTranscriptChunksRowOutput = z.output<typeof RudelTranscriptChunksRowSchema>
+
 export type RudelTranscriptRecordsRow = {
   organization_id: string
   user_id: string
@@ -1335,9 +1590,9 @@ export const RudelUsageEventsRowSchema = z.object({
   cache_read_input_tokens: z.string(),
   cache_write_5m_input_tokens: z.string(),
   cache_write_1h_input_tokens: z.string(),
-  recorded_cache_write_5m_input_tokens: z.string().nullable().default(null),
-  recorded_cache_write_1h_input_tokens: z.string().nullable().default(null),
-  cache_write_input_tokens: z.string().nullable().default(null),
+  recorded_cache_write_5m_input_tokens: z.string().nullable(),
+  recorded_cache_write_1h_input_tokens: z.string().nullable(),
+  cache_write_input_tokens: z.string().nullable(),
   output_tokens: z.string(),
   reasoning_output_tokens: z.string(),
   agent_id: z.string(),

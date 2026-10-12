@@ -78,10 +78,13 @@ function environment(
 			}
 		},
 	};
+	/** Workspaces whose GitHub repositories were looked up. */
+	const repositoryLookups: string[] = [];
 	return {
 		statements,
 		slotted,
 		results,
+		repositoryLookups,
 		env: {
 			executor: {
 				...executor,
@@ -93,6 +96,10 @@ function environment(
 			results,
 			quota: createMemorySqlQuota({ queries, windowMs: 3_600_000 }),
 			limiter,
+			githubRepositories: async (workspaceId: string) => {
+				repositoryLookups.push(workspaceId);
+				return ["101", "202"];
+			},
 		},
 	};
 }
@@ -168,6 +175,71 @@ describe("sql over the runs view", () => {
 	});
 });
 
+describe("sql over the finding_runs view", () => {
+	test("a member reads the cited runs of findings in analyses they wrote or that are shared, bound as parameters", async () => {
+		const { env, statements } = environment();
+		ok(
+			await runSql(
+				teammate,
+				{
+					query:
+						"SELECT step_id, sum(cost_usd) AS cost FROM finding_runs GROUP BY step_id",
+					title: "Impact",
+				},
+				env,
+			),
+		);
+		const sent = agentStatement(statements);
+		expect(sent?.query_params).toEqual({
+			opaline_workspace: "ws-1",
+			opaline_viewer: "member-1",
+		});
+		expect(sent?.query).toContain("analysis_finding_runs FINAL");
+		expect(sent?.query).toContain(
+			"author_id = {opaline_viewer:String} OR shared = 1",
+		);
+		expect(sent?.query).not.toContain("member-1");
+	});
+
+	test("with own sessions only on, a member reads only the cited runs of their own sessions", async () => {
+		const { env, statements } = environment();
+		ok(
+			await runSql(
+				member,
+				{ query: "SELECT count() FROM finding_runs", title: "Impact" },
+				env,
+			),
+		);
+		expect(agentStatement(statements)?.query).toContain(
+			"user_id = {opaline_member:String}",
+		);
+	});
+
+	test("schema describes finding_runs without its storage and visibility columns", async () => {
+		const { env } = environment();
+		const described = await describeSchema(
+			member,
+			{ view: "finding_runs" },
+			env,
+		);
+		if (!described.ok || described.result.level !== "columns")
+			throw new Error("Expected the view's columns");
+		const names = described.result.columns.map((column) => column.name);
+		expect(names).toContain("finding");
+		expect(names).toContain("cost_usd");
+		expect(names).toContain("output_tokens");
+		expect(names).toContain("active_minutes");
+		for (const hidden of [
+			"organization_id",
+			"author_id",
+			"shared",
+			"quoted_owners",
+			"updated_at",
+		])
+			expect(names).not.toContain(hidden);
+	});
+});
+
 describe("scope and storage", () => {
 	test("by default a member reads every member's runs of the workspace, and the result covers every member", async () => {
 		const { env, statements, results } = environment((statement) =>
@@ -182,12 +254,79 @@ describe("scope and storage", () => {
 
 		expect(agentStatement(statements)?.query_params).toEqual({
 			opaline_workspace: "ws-1",
+			opaline_viewer: "member-1",
 		});
 		expect(agentStatement(statements)?.query).not.toContain("opaline_member");
 		expect(results.records.get(result.id)?.owners).toEqual([
 			"member-1",
 			"member-2",
 		]);
+	});
+
+	test("deleting a member deletes a stored result whose shown rows carry text from the sessions it read, and removes one that only counted them, with a statement that carries text", async () => {
+		const answer =
+			(rows: Record<string, unknown>[]) => (statement: ClickHouseStatement) => {
+				if (isAgentStatement(statement)) return rows;
+				if (statement.query.includes("DISTINCT user_id"))
+					return [{ user_id: "member-1" }, { user_id: "member-2" }];
+				if (statement.query.includes("any(user_id)"))
+					return [
+						{
+							session_id: "0b9d5f0e-5f35-4c43-9a8e-9cf2e3d6d0a1",
+							user_id: "member-2",
+						},
+					];
+				if (statement.query_params?.sessionIds)
+					return [
+						{
+							session_id: "0b9d5f0e-5f35-4c43-9a8e-9cf2e3d6d0a1",
+							revision_text: "1",
+							parser_version: 9,
+						},
+					];
+				return [];
+			};
+		const stored = async (rows: Record<string, unknown>[], query: string) => {
+			const { env, results } = environment(answer(rows));
+			const result = ok(await runSql(teammate, { query, title: "T" }, env));
+			await results.purge({ targetType: "account", targetId: "member-2" });
+			return results.get(result.id);
+		};
+		// A prompt head, a model name: text from the sessions.
+		expect(
+			await stored(
+				[{ prompt_head: "ship the private fix", runs: 3 }],
+				"SELECT prompt_head, count() AS runs FROM runs GROUP BY prompt_head",
+			),
+		).toBeNull();
+		// Numbers, times and ids only: the result goes, its SQL stays.
+		expect(
+			await stored(
+				[
+					{
+						session_id: "0b9d5f0e-5f35-4c43-9a8e-9cf2e3d6d0a1",
+						user_id: "member-2",
+						started_at: "2026-10-01 09:30:00.000",
+						cost_usd: 1.5,
+						output_tokens: "1200",
+					},
+				],
+				"SELECT session_id, user_id, started_at, cost_usd, output_tokens FROM runs",
+			),
+		).toMatchObject({
+			query:
+				"SELECT session_id, user_id, started_at, cost_usd, output_tokens FROM runs",
+			output: null,
+			removed: true,
+			owners: ["member-1"],
+		});
+		// A literal may be copied from a prompt: the statement goes too.
+		expect(
+			await stored(
+				[{ runs: 3 }],
+				"SELECT count() AS runs FROM runs WHERE prompt_head = 'ship the private fix'",
+			),
+		).toMatchObject({ query: "", output: null, removed: true });
 	});
 
 	test("with own sessions only on, a member's result covers only them", async () => {
@@ -235,7 +374,10 @@ describe("scope and storage", () => {
 		);
 
 		const sent = agentStatement(statements);
-		expect(sent?.query_params).toEqual({ opaline_workspace: "ws-1" });
+		expect(sent?.query_params).toEqual({
+			opaline_workspace: "ws-1",
+			opaline_viewer: "admin-1",
+		});
 		expect(result.sessions).toEqual([
 			{ sessionId: "s1", ownerId: "member-1", revision: "7", parserVersion: 9 },
 			{ sessionId: "s2", ownerId: "member-2", revision: "7", parserVersion: 9 },
@@ -248,6 +390,82 @@ describe("scope and storage", () => {
 			owners: ["member-1", "member-2"],
 			output: { table: result.table, sessions: result.sessions },
 		});
+	});
+
+	test("a result names the runs of its shown rows in sessions the caller may read, when they carry session_id, agent_id and turn_idx, for the findings that cite them", async () => {
+		const rows = [
+			{ session_id: "s1", agent_id: "", turn_idx: 3, active_minutes: 9 },
+			{ session_id: "s1", agent_id: "a-7", turn_idx: "2", active_minutes: 8 },
+			{ session_id: "s1", agent_id: "", turn_idx: 3, active_minutes: 9 },
+			// A teammate's session, and one that exists nowhere (a literal).
+			{ session_id: "s2", agent_id: "", turn_idx: 1, active_minutes: 7 },
+			{ session_id: "made-up", agent_id: "", turn_idx: 1, active_minutes: 6 },
+		];
+		const answer =
+			(withStream: boolean) => (statement: ClickHouseStatement) => {
+				if (isAgentStatement(statement))
+					return withStream
+						? rows
+						: rows.map(({ agent_id: _agent, ...row }) => row);
+				if (statement.query.includes("any(user_id)"))
+					return [
+						{ session_id: "s1", user_id: "member-1" },
+						{ session_id: "s2", user_id: "member-2" },
+					];
+				if (statement.query_params?.sessionIds)
+					return (statement.query_params.sessionIds as string[]).map(
+						(session_id) => ({
+							session_id,
+							revision_text: "1",
+							parser_version: 9,
+						}),
+					);
+				return [];
+			};
+		const ranked = async (caller: SqlCaller, withStream: boolean) =>
+			ok(
+				await runSql(
+					caller,
+					{ query: RANKING, title: "Top" },
+					environment(answer(withStream)).env,
+				),
+			).runs;
+		expect(await ranked(teammate, true)).toEqual([
+			{ sessionId: "s1", agentId: "", turn: 3 },
+			{ sessionId: "s1", agentId: "a-7", turn: 2 },
+			{ sessionId: "s2", agentId: "", turn: 1 },
+		]);
+		// Kept to their own sessions, a member cites only their own runs.
+		expect(await ranked(member, true)).toEqual([
+			{ sessionId: "s1", agentId: "", turn: 3 },
+			{ sessionId: "s1", agentId: "a-7", turn: 2 },
+		]);
+		// Without the stream a turn number names no single run.
+		expect(await ranked(teammate, false)).toEqual([]);
+	});
+
+	test("a wide result cites only the runs of the rows its table shows", async () => {
+		const wide = Array.from({ length: 200 }, (_, index) => ({
+			session_id: "s1",
+			agent_id: "",
+			turn_idx: index + 1,
+			title: "t".repeat(299),
+		}));
+		const { env } = environment((statement) => {
+			if (isAgentStatement(statement)) return wide;
+			if (statement.query.includes("any(user_id)"))
+				return [{ session_id: "s1", user_id: "member-1" }];
+			if (statement.query_params?.sessionIds)
+				return [{ session_id: "s1", revision_text: "1", parser_version: 9 }];
+			return [];
+		});
+		const result = ok(
+			await runSql(teammate, { query: RANKING, title: "Wide" }, env),
+		);
+		expect(result.rows).toBeLessThan(200);
+		expect(result.runs.map((run) => run.turn)).toEqual(
+			Array.from({ length: result.rows }, (_, index) => index + 1),
+		);
 	});
 
 	test("the runs view keeps each session's committed build and runs only, under any alias, in subqueries and WITH", async () => {
@@ -278,6 +496,33 @@ describe("scope and storage", () => {
 		// The agent's own alias names the view; no second alias is added.
 		expect(sent).toMatch(/\) AS r JOIN opaline_cte_top AS top ON/u);
 		expect(sent).not.toContain("AS runs AS r");
+	});
+
+	test("GitHub facts are read only for the repositories the workspace may see, bound as a parameter, and looked up only when a query reads them", async () => {
+		const { env, statements, repositoryLookups } = environment();
+
+		ok(
+			await runSql(
+				teammate,
+				{
+					query:
+						"SELECT j.name FROM edges AS e JOIN ci_jobs AS j ON j.ci_run_id = e.to_id",
+					title: "Jobs",
+				},
+				env,
+			),
+		);
+		const sent = agentStatement(statements);
+		expect(sent?.query_params).toEqual({
+			opaline_workspace: "ws-1",
+			opaline_viewer: "member-1",
+			opaline_repositories: ["101", "202"],
+		});
+		expect(sent?.query).not.toContain("101");
+		expect(repositoryLookups).toEqual(["ws-1"]);
+
+		ok(await runSql(teammate, { query: RANKING, title: "Runs" }, env));
+		expect(repositoryLookups).toEqual(["ws-1"]);
 	});
 
 	test("ARRAY JOIN unfolds a column and is not a table", async () => {
@@ -746,7 +991,7 @@ describe("limits and errors from ClickHouse", () => {
 			);
 			expect(error.kind).toBe("recoverable");
 			expect(error.message).toContain(said);
-			expect(error.fix).toStartWith("Narrow it: a shorter started_at range");
+			expect(error.fix).toStartWith("Narrow it: a shorter time range");
 		});
 
 	const overReads = [
@@ -778,7 +1023,7 @@ describe("limits and errors from ClickHouse", () => {
 				"this query reads too much; aggregate or narrow the window",
 			);
 			expect(error.fix).toStartWith(
-				"Do not run this query again. A narrower one can pass: a shorter started_at range",
+				"Do not run this query again. A narrower one can pass: a shorter time range",
 			);
 		});
 
@@ -815,7 +1060,7 @@ describe("limits and errors from ClickHouse", () => {
 			fragment: "minutez",
 			message: "Unknown expression identifier `minutez`",
 		});
-		expect(error.fix).toContain("schema view=runs");
+		expect(error.fix).toContain("schema view=<view>");
 	});
 
 	test("a syntax error points at the agent's own text, not the rewritten statement", async () => {
@@ -916,7 +1161,9 @@ describe("limits and errors from ClickHouse", () => {
 			await runSql(admin, { query: RANKING, title: "second" }, env),
 		);
 		expect(error.kind).toBe("fatal");
-		expect(error.message).toContain("quota of 1 queries per 60 minutes");
+		expect(error.message).toContain(
+			"quota of 1 queries (sql and run calls) per 60 minutes",
+		);
 		expect(statements.filter(isAgentStatement).length).toBe(1);
 	});
 });
@@ -1008,17 +1255,25 @@ describe("schema", () => {
 		const { env, statements } = environment((statement) =>
 			isAgentStatement(statement)
 				? [
-						{ value: "claude-opus-4-1", runs: "12" },
-						{ value: null, runs: "3" },
+						{ value: "claude-opus-4-1", rows: "12" },
+						{ value: null, rows: "3" },
 					]
 				: [],
 		);
 
 		const views = await describeSchema(member, {}, env);
-		expect(views).toMatchObject({
-			ok: true,
-			result: { level: "views", views: [{ name: "runs" }] },
-		});
+		if (!views.ok || views.result.level !== "views")
+			throw new Error("Expected views");
+		expect(views.result.views.map((view) => view.name)).toEqual([
+			"runs",
+			"calls",
+			"prompts",
+			"git_events",
+			"edges",
+			"ci_jobs",
+			"finding_runs",
+			"run_answers",
+		]);
 
 		const columns = await describeSchema(member, { view: "runs" }, env);
 		if (!columns.ok || columns.result.level !== "columns")
@@ -1066,14 +1321,15 @@ describe("schema", () => {
 				column: expect.objectContaining({ name: "model" }),
 				over: "runs that started in the last 30 days",
 				values: [
-					{ value: "claude-opus-4-1", runs: 12 },
-					{ value: "null", runs: 3 },
+					{ value: "claude-opus-4-1", rows: 12 },
+					{ value: "null", rows: 3 },
 				],
 				notices: ["every value is listed."],
 			},
 		});
 		expect(agentStatement(statements)?.query_params).toEqual({
 			opaline_workspace: "ws-1",
+			opaline_viewer: "member-1",
 			opaline_member: "member-1",
 		});
 	});
@@ -1102,9 +1358,11 @@ describe("schema", () => {
 
 	test("an unknown view or column is a recoverable error naming it", async () => {
 		const { env } = environment();
-		expect(await describeSchema(member, { view: "calls" }, env)).toMatchObject({
+		expect(
+			await describeSchema(member, { view: "sessions" }, env),
+		).toMatchObject({
 			ok: false,
-			error: { kind: "recoverable", fragment: "calls" },
+			error: { kind: "recoverable", fragment: "sessions" },
 		});
 		expect(
 			await describeSchema(

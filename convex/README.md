@@ -83,18 +83,40 @@ marked deleting, which hides it and blocks writes to it, and is removed once
 its children are gone. Every call continues where the last stopped.
 
 Deleting an account also deletes every analysis, of any author or workspace,
-that read one of its sessions (ADR 0001); nothing is redacted line by line.
-`deletion:markReadingOwner` follows the owner's `queryOwners` rows (one per
-member whose sessions a query read, whether or not its result names any of
-them, as grouped finds do not) and marks each analysis deleting, so all of them are hidden and refuse writes at once, then
-`deletion:sweep` deletes the marked analyses with their children. Both stop at
-half a transaction and continue on the next call. The purge's follow-up pass
-runs the same again and catches analyses that read the owner's sessions while
-the first pass ran. `analyses:save` writes findings, clarification steps and
+with a query that read its sessions and returned text from them, or whose
+step's finding sits on a result naming one of its sessions, and removes the
+result of every other query that only counted its sessions (ADR 0001 as
+amended); nothing is redacted line by line. The API classifies each query
+when it records it: `counts` is true only when the result returned nothing
+but numbers and ids, and `redaction` holds the arguments and step label to
+keep once the result is removed (without arguments that may carry
+transcript text). `deletion:removeOwnerEvidence` follows the owner's
+`queryOwners` rows (one per member whose sessions a query read, whether or
+not its result names any of them, as grouped finds do not). For a query
+without `counts` (queries recorded before it included), or with a finding on
+its step and one of the owner's sessions in its `querySessions`, it marks the
+analysis deleting, so all of them are hidden and refuse writes at once; for
+any other query it deletes the query's `queryOutputs` row and the owner's
+`querySessions` rows, sets `removed`, and applies its `redaction` (the query
+stays, so it can be rerun, and the analysis stays). Then `deletion:sweep`
+deletes the marked analyses with their children. Both stop at half a
+transaction and continue on the next call. The purge's follow-up pass runs
+the same again and catches analyses that read the owner's sessions while the first pass ran. `analyses:save` writes findings, clarification steps and
 the analysis in one transaction, so a refused save writes nothing.
+`deletion:markReadingOwner` is the rule before the amendment (every analysis
+that read the owner's sessions is marked deleting), kept unchanged for an
+API deployed before `removeOwnerEvidence`; remove it once no such API runs.
+
 Deleting an analysis deletes its `analysisSessions` rows; deleting an account
 also runs `deletion:sessionsByOwner`, which removes that member's chats from
 other members' analyses and keeps the analyses.
+
+`analyses:setShared` shares or unshares an analysis and advances its
+`visibilityRevision` in the same transaction (`analyses:update` advances it
+too when it sets `shared`). The API copies visibility to its finding impact
+rows in ClickHouse with that revision, and the rows keep the highest
+revision's visibility, so writes landing out of order cannot leave an
+unshared analysis readable.
 
 A daily cron (03:00 UTC) expires results older than 90 days, or a year in
 shared or pinned analyses, mirroring the service's read-time check. It scans

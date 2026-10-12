@@ -10,22 +10,20 @@ import {
 } from "../../services/analysis/agent-query-slots.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
 import { findAnalysisWithOwners } from "../../services/analysis/find.service.js";
+import { visibleGitHubRepositories } from "../../services/analysis/github-access.js";
 import {
 	withFindTrace,
 	withReadTrace,
 } from "../../services/analysis/output-ceiling.js";
 import { readAnalysis } from "../../services/analysis/read.service.js";
 import { budgetReadOutput } from "../../services/analysis/read-output.js";
+import { openRun } from "../../services/analysis/run-view.service.js";
 import { findScope } from "../../services/analysis/scope.js";
-import {
-	describeSchema,
-	describeSqlFailure,
-	runSql,
-	type SqlFailure,
-} from "../../services/analysis/sql-gateway.js";
+import { describeSchema, runSql } from "../../services/analysis/sql-gateway.js";
 import {
 	createPostgresSqlQuota,
 	createPostgresSqlResultStore,
+	openSqlResult,
 	type SqlQuota,
 	type SqlResultStore,
 } from "../../services/analysis/sql-results.js";
@@ -41,18 +39,48 @@ import {
 	getAnalysisLog,
 	restrictsAnalysisResults,
 } from "../../services/analysis-log/config.js";
+import type { FindingImpact } from "../../services/analysis-log/finding-impact.js";
+import {
+	createClickHouseFindingImpact,
+	createPostgresFindingImpactFence,
+} from "../../services/analysis-log/finding-impact-clickhouse.js";
+import {
+	createPostgresVisibilitySyncs,
+	type VisibilitySyncs,
+} from "../../services/analysis-log/finding-visibility.js";
 import { describeSessions } from "../../services/analysis-log/sessions.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
+import { listOnRunQuestions } from "../../services/run-questions/catalogue.js";
+import { runQuestionsEnv } from "../../services/run-questions/env.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import {
 	readableSessionOwner,
 	type SessionReader,
 } from "../../services/session-visibility.js";
+import {
+	createSearchAccess,
+	postgresSubscriptions,
+	type SearchAccess,
+} from "../../services/transcript-search/access.js";
+import {
+	readEmbeddingQuotaLimits,
+	transcriptEmbedder,
+} from "../../services/transcript-search/config.js";
+import {
+	createPostgresEmbeddingQuota,
+	type EmbeddingQuota,
+} from "../../services/transcript-search/quota.js";
+import {
+	createSqlSearchFunction,
+	searchTranscripts,
+} from "../../services/transcript-search/search.js";
 import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-access.js";
+import { createRunQuestionProcedures } from "./run-questions.js";
+import { sqlError } from "./sql-error.js";
 
 /** Why history calls fail where the log is off, phrased for the calling agent. */
 export const ANALYSIS_HISTORY_OFF =
-	"Analysis history is off for this workspace; answer with find and read, and skip search_answers, save_answer and share_answer.";
+	"Analysis history is off for this workspace; answer with find and read, and skip answers, save_answer and share_answer.";
 
 /** Longest rendered trace line ("trace analysis=… step=… query=…") plus its newline. */
 const TRACE_LINE_RESERVE = 80;
@@ -67,6 +95,16 @@ interface AnalysisEnv {
 	sqlQuota?: SqlQuota;
 	/** The query slots shared by every instance; Postgres by default. */
 	queryLimiter?: AgentQueryLimiter;
+	/** Where saved findings' cited runs go; ClickHouse by default. */
+	findingImpact?: FindingImpact;
+	/** Requests that make those rows follow visibility changes; Postgres by default. */
+	visibilitySyncs?: VisibilitySyncs;
+	/** The GitHub repositories sql may read for a workspace; its visible bindings by default. */
+	githubRepositories?: (workspaceId: string) => Promise<readonly string[]>;
+	/** The per-workspace OpenAI quota of search; Postgres by default. */
+	embeddingQuota?: EmbeddingQuota;
+	/** Which workspaces are indexed for search; Postgres subscriptions by default. */
+	searchAccess?: SearchAccess;
 }
 
 export function createAnalysisRouter(
@@ -159,14 +197,52 @@ export function createAnalysisRouter(
 			return trace && fitted !== read ? withReadTrace(output, trace) : output;
 		});
 
+	const sqlQuota = env.sqlQuota ?? createPostgresSqlQuota(sqlClient);
+	// One set of query slots for every agent read of ClickHouse: sql, search.
+	const queryLimiter =
+		env.queryLimiter ??
+		createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient));
+	const searchEnv = {
+		executor: env.executor,
+		quota:
+			env.embeddingQuota ??
+			createPostgresEmbeddingQuota(sqlClient, readEmbeddingQuotaLimits()),
+		sqlQuota,
+		limiter: queryLimiter,
+		embedderFor: transcriptEmbedder,
+		access:
+			env.searchAccess ?? createSearchAccess(postgresSubscriptions(sqlClient)),
+	};
 	const sqlEnv = {
 		executor: env.executor,
 		results: env.sqlResults ?? createPostgresSqlResultStore(sqlClient),
-		quota: env.sqlQuota ?? createPostgresSqlQuota(sqlClient),
-		limiter:
-			env.queryLimiter ??
-			createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
+		quota: sqlQuota,
+		limiter: queryLimiter,
+		githubRepositories: env.githubRepositories ?? visibleGitHubRepositories,
+		// search('…') inside sql, scoped and bounded like the search tool.
+		functions: [createSqlSearchFunction(searchEnv)],
 	};
+
+	const run = os.analysis.run
+		.use(orgMiddleware)
+		// One slot per call, like read: the MCP tool calls this procedure too.
+		.use(({ context, next, signal }) =>
+			analysisLimiter.run(context.user.id, async () => next(), signal),
+		)
+		.handler(async ({ input, context }) => {
+			const output = await openRun(context.organizationId, input, {
+				executor: env.executor,
+				ownerOf: async (sessionId) =>
+					requireSessionDetailOwnerAccess(
+						await getSessionOwner(context.organizationId, sessionId),
+						context.sessionReader,
+					),
+				// Within sql's limits and in its quota: ClickHouse is shared.
+				quota: sqlEnv.quota,
+			});
+			// Credentials never leave in a result.
+			return redactReturnedValue(output);
+		});
 	const callerOf = (context: {
 		organizationId: string;
 		sessionReader: SessionReader;
@@ -188,7 +264,13 @@ export function createAnalysisRouter(
 				signal,
 			);
 			if (!described.ok) throw sqlError(described.error);
-			return described.result;
+			// The run questions an agent may ask, with their tested precision.
+			return described.result.level === "views"
+				? {
+						...described.result,
+						questions: await listOnRunQuestions(sqlClient),
+					}
+				: described.result;
 		});
 
 	const sql = os.analysis.sql
@@ -212,11 +294,39 @@ export function createAnalysisRouter(
 				outcome.result,
 				outcome.owners,
 				outcome.result.sessions,
+				outcome.quotes,
 			).catch(async (error: unknown) => {
 				await sqlEnv.results.discard(outcome.result.id);
 				throw error;
 			});
 			return trace ? { ...outcome.result, trace } : outcome.result;
+		});
+
+	const findingMirror = {
+		impact:
+			env.findingImpact ??
+			createClickHouseFindingImpact(
+				env.executor,
+				createPostgresFindingImpactFence(sqlClient),
+			),
+		syncs: env.visibilitySyncs ?? createPostgresVisibilitySyncs(sqlClient),
+	};
+
+	const search = os.analysis.search
+		.use(orgMiddleware)
+		// One slot per call, like sql: the MCP tool calls this too.
+		.use(({ context, next, signal }) =>
+			analysisLimiter.run(context.user.id, async () => next(), signal),
+		)
+		.handler(async ({ input, context, signal }) => {
+			const outcome = await searchTranscripts(
+				callerOf(context),
+				input,
+				searchEnv,
+				signal,
+			);
+			if (!outcome.ok) throw sqlError(outcome.error);
+			return outcome.result;
 		});
 
 	const viewerOf = (context: {
@@ -232,6 +342,7 @@ export function createAnalysisRouter(
 			id: context.organizationId,
 			ownSessionsOnly: context.sessionReader.ownSessionsOnly,
 		}),
+		onlyMember: readableSessionOwner(context.sessionReader),
 	});
 	const requireLog = (context: { organizationId: string }): AnalysisLog => {
 		const log = analysisLog(context.organizationId);
@@ -271,10 +382,26 @@ export function createAnalysisRouter(
 					},
 				),
 			),
+		// Stored sql results are kept whether or not the log is on.
+		sqlResult: os.analysis.history.sqlResult
+			.use(orgMiddleware)
+			.handler(({ input, context }) =>
+				openSqlResult(
+					sqlEnv.results,
+					{ workspaceId: context.organizationId, userId: context.user.id },
+					input.id,
+					new Date(),
+				),
+			),
 		save: os.analysis.history.save
 			.use(orgMiddleware)
 			.handler(({ input, context }) =>
-				saveAnalysis(requireLog(context), viewerOf(context), input),
+				saveAnalysis(
+					requireLog(context),
+					viewerOf(context),
+					input,
+					findingMirror,
+				),
 			),
 		share: os.analysis.history.share
 			.use(orgMiddleware)
@@ -284,23 +411,27 @@ export function createAnalysisRouter(
 					viewerOf(context),
 					input.analysis,
 					input.shared,
+					findingMirror,
 				),
 			),
 	};
 
-	return { find, read, schema, sql, history };
-}
-
-/** Recoverable refusals are bad requests; fatal ones are forbidden. Both carry the class. */
-function sqlError(failure: SqlFailure): ORPCError<string, unknown> {
-	return new ORPCError(failure.kind === "fatal" ? "FORBIDDEN" : "BAD_REQUEST", {
-		message: describeSqlFailure(failure),
-		data: {
-			kind: failure.kind,
-			fragment: failure.fragment,
-			fix: failure.fix,
-		},
-	});
+	return {
+		find,
+		read,
+		run,
+		schema,
+		sql,
+		search,
+		...createRunQuestionProcedures(() => ({
+			...runQuestionsEnv(),
+			// Selecting runs reads ClickHouse like sql: same slots and quota.
+			sqlQuota,
+			limiter: queryLimiter,
+			githubRepositories: sqlEnv.githubRepositories,
+		})),
+		history,
+	};
 }
 
 export const analysisRouter = createAnalysisRouter();

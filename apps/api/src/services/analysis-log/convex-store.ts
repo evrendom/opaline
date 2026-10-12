@@ -33,8 +33,12 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 /** A query as Convex stores it: arguments as JSON, the result and sessions kept apart. */
 interface StoredQueryFields
-	extends Omit<StoredQuery, "args" | "output" | "sessions" | "owners"> {
+	extends Omit<
+		StoredQuery,
+		"args" | "output" | "sessions" | "owners" | "redaction"
+	> {
 	argsJson: string;
+	redaction?: { argsJson: string; label: string };
 }
 
 const AnalysisSchema = z.object({
@@ -58,6 +62,8 @@ const AnalysisSchema = z.object({
 	cost: AnalysisCostSchema.nullable(),
 	queryCount: z.number(),
 	stepCount: z.number(),
+	// Absent until the analysis is first shared or unshared.
+	visibilityRevision: z.number().default(0),
 });
 const StepSchema = z.object({
 	id: z.string(),
@@ -80,6 +86,14 @@ const QueryFieldsSchema = z.object({
 	outputChars: z.number(),
 	createdAt: z.string(),
 	removed: z.boolean(),
+	// Absent on queries recorded before them: those quote.
+	counts: z.boolean().default(false),
+	redaction: z
+		.object({ argsJson: z.string().transform(parseArgs), label: z.string() })
+		.optional()
+		.transform((redaction) =>
+			redaction ? { args: redaction.argsJson, label: redaction.label } : null,
+		),
 });
 const QuerySchema = QueryFieldsSchema.extend({
 	outputJson: z.string().nullable(),
@@ -135,6 +149,7 @@ interface ConvexFunctionArgs {
 	"analyses:create": { analysis: StoredAnalysis };
 	"analyses:get": { id: string };
 	"analyses:update": { id: string; patch: AnalysisPatch };
+	"analyses:setShared": { id: string; shared: boolean };
 	"analyses:save": { id: string; save: AnalysisSave };
 	"analyses:recent": { workspaceId: string; viewerId: string; limit: number };
 	"analyses:updatedBy": { workspaceId: string; id: string; limit: number };
@@ -151,7 +166,7 @@ interface ConvexFunctionArgs {
 	"queries:list": { analysisId: string };
 	"deletion:byAuthor": { authorId: string };
 	"deletion:byWorkspace": { workspaceId: string };
-	"deletion:markReadingOwner": { ownerId: string };
+	"deletion:removeOwnerEvidence": { ownerId: string };
 	"deletion:sweep": Record<string, never>;
 	"deletion:sessionsByOwner": { ownerId: string };
 	"sessions:link": { link: StoredSessionLink };
@@ -170,6 +185,7 @@ const FUNCTION_TYPES = {
 	"analyses:create": "mutation",
 	"analyses:get": "query",
 	"analyses:update": "mutation",
+	"analyses:setShared": "mutation",
 	"analyses:save": "mutation",
 	"analyses:recent": "query",
 	"analyses:updatedBy": "query",
@@ -181,7 +197,7 @@ const FUNCTION_TYPES = {
 	"queries:list": "query",
 	"deletion:byAuthor": "mutation",
 	"deletion:byWorkspace": "mutation",
-	"deletion:markReadingOwner": "mutation",
+	"deletion:removeOwnerEvidence": "mutation",
 	"deletion:sweep": "mutation",
 	"deletion:sessionsByOwner": "mutation",
 	"sessions:link": "mutation",
@@ -258,6 +274,12 @@ export function createConvexAnalysisStore({
 		async updateAnalysis(id, patch) {
 			await run("analyses:update", { id, patch });
 		},
+		async setShared(id, shared) {
+			return z
+				.number()
+				.nullable()
+				.parse(await run("analyses:setShared", { id, shared }));
+		},
 		async saveAnalysis(id, save) {
 			await run("analyses:save", { id, save });
 		},
@@ -282,9 +304,27 @@ export function createConvexAnalysisStore({
 			return StepSchema.array().parse(await run("steps:list", { analysisId }));
 		},
 
-		async createQuery({ args, output, sessions, owners, ...fields }) {
+		async createQuery({
+			args,
+			output,
+			sessions,
+			owners,
+			redaction,
+			...fields
+		}) {
 			await run("queries:create", {
-				query: { ...fields, argsJson: JSON.stringify(args) },
+				query: {
+					...fields,
+					argsJson: JSON.stringify(args),
+					...(redaction
+						? {
+								redaction: {
+									argsJson: JSON.stringify(redaction.args),
+									label: redaction.label,
+								},
+							}
+						: {}),
+				},
 				sessions,
 				owners,
 				outputJson: output === null ? null : JSON.stringify(output),
@@ -305,9 +345,9 @@ export function createConvexAnalysisStore({
 		async deleteAnalysesByWorkspace(workspaceId) {
 			await untilDone(() => run("deletion:byWorkspace", { workspaceId }));
 		},
-		async deleteAnalysesReadingOwner(ownerId) {
+		async removeOwnerEvidence(ownerId) {
 			// Hide them all first, then delete them in bounded batches.
-			await untilDone(() => run("deletion:markReadingOwner", { ownerId }));
+			await untilDone(() => run("deletion:removeOwnerEvidence", { ownerId }));
 			await untilDone(() => run("deletion:sweep", {}));
 		},
 

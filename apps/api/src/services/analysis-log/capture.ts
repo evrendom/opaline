@@ -19,7 +19,9 @@ const TRACE_FIELDS = ["analysis"] as const;
  * `owners` are the members whose sessions the call read, which account
  * deletion needs even when the output names none of their sessions.
  * `sessions` are the sessions the output names when the caller already
- * looked them up; otherwise they are found in the output.
+ * looked them up; otherwise they are found in the output. `quotes` is the
+ * sql gateway's verdict on whether the rows it showed carry transcript text
+ * (find and read are judged from their output).
  */
 export async function captureCall(
 	executor: ClickHouseExecutor,
@@ -30,6 +32,7 @@ export async function captureCall(
 	output: unknown,
 	owners: readonly string[],
 	sessions?: readonly QuerySession[],
+	quotes?: boolean,
 ): Promise<AnalysisTrace | undefined> {
 	if (!log) return undefined;
 	try {
@@ -57,6 +60,7 @@ export async function captureCall(
 						referencedSessionIds(output),
 					),
 			owners,
+			...(quotes === undefined ? {} : { quotes }),
 		});
 	} catch (error) {
 		if (error instanceof ORPCError) throw error;

@@ -87,8 +87,12 @@ _Avoid_: repeated prompt
 What a group of runs cost the team, as separate measures: active time, cost, frustration, re-asks, runs and members. Never one combined score; the agent answering picks the order that fits the question and says which it used. A group's time is shown two ways, the time of the runs that contain it and the time of its own calls, and neither is time lost to it until those runs are read.
 _Avoid_: score, severity
 
+**Approved measure**:
+One impact measure defined once for every analysis, so two analyses never compute it differently: active time, cost, tokens, re-asks, frustration, runs, members, and a group's time two ways. `schema` lists them. Frustration is a next prompt the language-signals word list marks negative or swearing; until the meaning of a re-ask is settled, a re-ask is such a prompt right after a run whose final message said it was done.
+_Avoid_: metric, KPI
+
 **Run question**:
-A yes/no question a workspace asks about each of its runs in a chosen time window ("Did the agent struggle to find the right file?"), answered by a model as the probability of yes. Opaline sets the run questions; workspaces do not write or remove them. Changing a question's wording makes it a new question; earlier answers keep the wording they answered.
+A yes/no question a workspace asks about each of its runs in a chosen time window ("Did the agent struggle to find the right file?"), answered by SubQ Snap (Jev as a fallback) as the probability of yes, from the run's full text (secret-filtered; the compact run note when the run is too large). Opaline sets the run questions; workspaces do not write or remove them. Changing a question's wording makes it a new question; earlier answers keep the wording they answered.
 _Avoid_: question (an analysis's question), label, signal
 
 **Run view**:

@@ -42,8 +42,12 @@ import {
  * definition.
  */
 
-/** Version of the run index rules; a new version is a new run index generation. */
-export const RUN_INDEX_VERSION = 3;
+/**
+ * Version of the run index rules; a new version is a new run index
+ * generation. 4: run messages and their measures (OPL-387). 5: each build
+ * also writes its requests (`rudel.run_requests`, OPL-389).
+ */
+export const RUN_INDEX_VERSION = 5;
 
 /** Literal string or count read back from ClickHouse; `''` and 0 mean none recorded. */
 const text = z.string();
@@ -148,7 +152,11 @@ const first = (expression: string, condition = `${expression} != ''`) =>
 const sortedSet = (expression: string) =>
 	`arraySort(groupUniqArrayIf(${expression}, ${expression} != ''))`;
 
-function runToolErrorSql(): string {
+/**
+ * A failed call's record: an error or non-zero exit on its result, or on the
+ * Codex completion row (parser 9) that carries the call's outcome.
+ */
+export function runToolErrorSql(): string {
 	return `(${toolErrorSql()} OR (source = 'codex' AND parser_version >= 9 AND kind = 'meta' AND call_id != ''
 		AND (subtype IN ('exec_command_end', 'patch_apply_end') OR startsWith(subtype, 'item_completed:'))
 		AND (is_error OR ifNull(exit_code, 0) != 0)))`;
@@ -303,23 +311,34 @@ function foundNothingSql(): string {
 
 const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
 
-function forkReplayCtes(): string {
+/**
+ * The calls a forked Codex stream replays from its parent (`replayed_calls`):
+ * the parent's main-stream calls, for each stream whose first session_meta
+ * names the parent it was forked from. The child records are those
+ * `children` selects (one pinned generation by default, or the committed
+ * generations a SQL view reads) and the parents are among the sessions
+ * `owner` holds (one member's by default).
+ */
+export function forkReplayCtes(
+	children = pinnedFilter(),
+	owner?: string,
+): string {
 	return `fork_links AS (
-			SELECT DISTINCT session_id, agent_id, JSONExtractString(component, 'value') AS parent_session_id
+			SELECT DISTINCT user_id, session_id, agent_id, JSONExtractString(component, 'value') AS parent_session_id
 			FROM ${records()} ARRAY JOIN JSONExtractArrayRaw(facts['parent_session_components']) AS component
-			WHERE ${pinnedFilter()} AND source = 'codex' AND parser_version >= 9
-				AND (session_id, agent_id, record_idx) IN (
-					SELECT session_id, agent_id, min(record_idx)
-					FROM ${records()} WHERE ${pinnedFilter()} AND source = 'codex' AND parser_version >= 9
+			WHERE ${children} AND source = 'codex' AND parser_version >= 9
+				AND (user_id, session_id, agent_id, record_idx) IN (
+					SELECT user_id, session_id, agent_id, min(record_idx)
+					FROM ${records()} WHERE ${children} AND source = 'codex' AND parser_version >= 9
 						AND kind = 'meta' AND subtype = 'session_meta'
-					GROUP BY session_id, agent_id)
+					GROUP BY user_id, session_id, agent_id)
 				AND JSONExtractString(component, 'path') = 'session_meta/.forked_from_id'
 				AND parent_session_id != '' AND parent_session_id != session_id
 		),
-		${forkParentCallsSql("(SELECT parent_session_id FROM fork_links)")},
+		${forkParentCallsSql("(user_id, session_id) IN (SELECT user_id, parent_session_id FROM fork_links)", owner)},
 		replayed_calls AS (
-			SELECT f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
-			FROM fork_links f INNER JOIN parent_calls p ON f.parent_session_id = p.session_id
+			SELECT f.user_id AS user_id, f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
+			FROM fork_links f INNER JOIN parent_calls p ON f.user_id = p.user_id AND f.parent_session_id = p.session_id
 		)`;
 }
 
@@ -865,6 +884,179 @@ export function buildUnattributedUsageStatement(
 	};
 }
 
+/** Characters of a request's last assistant text kept with it. */
+export const REQUEST_TEXT_HEAD_CHARS = 160;
+/** Records a model writes in a response; any other non-meta record is input to the next one. */
+const RESPONSE_RECORD_KINDS = "('assistant_text', 'reasoning', 'tool_call')";
+
+/**
+ * The requests of each run (docs/l1-literal-schema.md, "Scale"): one model
+ * response and the calls it made. A request starts at a response record
+ * (assistant text, reasoning or a tool call) whose previous record in the
+ * run, meta and file-change rows aside, is not one: the prompt, a tool
+ * result or injected context came first. Claude Code writes one response
+ * over several lines and may write a tool result between two of them; where
+ * the stream has usage, a Claude request therefore starts only on the first
+ * line of a usage event (a response), or at the run's first candidate. A
+ * Claude response can open with a line that carries only usage (no content,
+ * so a meta record): its event then stands at the response's first record
+ * after it, for its request's start and for the request its usage is on.
+ * Codex writes one usage event per response, after its items, so its
+ * requests start by the records alone.
+ *
+ * A request's lines run to the next request's start, or to the run's end;
+ * the first request's usage lines start at the run's start, so every
+ * verified usage event of a run that has a request is on exactly one of its
+ * requests. Its time starts when the model was asked (the run's previous
+ * non-meta record) and ends at its own last non-meta record.
+ */
+function runRequestsCtes(): string {
+	const run = "PARTITION BY session_id, agent_id, turn_idx";
+	const order = "ORDER BY record_idx, block_idx";
+	return `${forkReplayCtes()}, ${boundedRunsCte(FORK_REPLAY_FILTER)},
+			${usageEventCtes({ generation: true })},
+			response_lines AS (
+				SELECT session_id, agent_id, record_idx, max(kind IN ${RESPONSE_RECORD_KINDS}) AS response
+				FROM ${records()}
+				WHERE ${pinnedFilter()} AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
+				GROUP BY session_id, agent_id, record_idx
+			),
+			placed_usage AS (
+				SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
+				FROM resolved_usage e
+				ASOF LEFT JOIN response_lines l
+					ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
+			),
+			event_lines AS (
+				SELECT DISTINCT session_id, stream AS agent_id, line FROM placed_usage
+			),
+			call_outcomes AS (
+				SELECT session_id, agent_id, call_id, max(${runToolErrorSql()}) AS failed
+				FROM ${records()}
+				WHERE ${pinnedFilter()} AND kind IN ('tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
+				GROUP BY session_id, agent_id, call_id
+			),
+			request_work AS (
+				SELECT session_id, agent_id, turn_idx, record_idx, block_idx, ts, kind, source, tool_name, call_id, command_class,
+					if(kind IN ('assistant_text', 'tool_call'), substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head,
+					toUInt8(kind IN ${RESPONSE_RECORD_KINDS}) AS response,
+					if(kind = 'file_change', NULL, toUInt8(kind IN ${RESPONSE_RECORD_KINDS})) AS boundary_class,
+					anyLast(boundary_class) OVER (${run} ${order} ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS previous_class,
+					count() OVER (${run} ${order} ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS earlier_rows,
+					anyLast(ts) OVER (${run} ${order} ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS previous_ts
+				FROM ${records()} FINAL
+				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
+			),
+			request_candidates AS (
+				SELECT *, toUInt8(response = 1 AND ifNull(previous_class, 0) = 0) AS candidate,
+					sum(candidate) OVER (${run} ${order} ROWS UNBOUNDED PRECEDING) AS candidate_number,
+					toUInt8((session_id, agent_id, record_idx) IN (SELECT session_id, agent_id, line FROM event_lines)) AS event_line,
+					toUInt8((session_id, agent_id) IN (SELECT session_id, agent_id FROM event_lines)) AS stream_has_usage
+				FROM request_work
+			),
+			request_marks AS (
+				SELECT *,
+					toUInt8(candidate = 1 AND (source != 'claude_code' OR stream_has_usage = 0 OR event_line = 1 OR candidate_number = 1)) AS request_start,
+					max(if(request_start = 1, toNullable(record_idx), NULL)) OVER (${run} ${order} ROWS UNBOUNDED PRECEDING) AS request
+				FROM request_candidates
+			),
+			request_facts AS (
+				SELECT m.session_id AS session_id, m.agent_id AS agent_id, m.turn_idx AS turn_idx, assumeNotNull(m.request) AS start_record,
+					toUnixTimestamp64Milli(argMinIf(if(earlier_rows = 0, ts, previous_ts), tuple(record_idx, block_idx), request_start = 1)) AS started_ms,
+					toUnixTimestamp64Milli(max(ts)) AS ended_ms,
+					arraySort(groupArrayIf(tuple(record_idx, block_idx, toString(tool_name),
+						${toolGroupSql("tool_name", "head")}, toString(command_class), toUInt8(o.failed)), kind = 'tool_call')) AS calls,
+					countIf(kind = 'assistant_text') AS texts,
+					argMaxIf(record_idx, tuple(record_idx, block_idx), kind = 'assistant_text') AS text_record,
+					argMaxIf(block_idx, tuple(record_idx, block_idx), kind = 'assistant_text') AS text_block,
+					argMaxIf(substringUTF8(head, 1, ${REQUEST_TEXT_HEAD_CHARS}), tuple(record_idx, block_idx), kind = 'assistant_text') AS text_head
+				FROM request_marks m
+				LEFT ANY JOIN call_outcomes o ON m.session_id = o.session_id AND m.agent_id = o.agent_id AND m.call_id = o.call_id
+				WHERE m.request IS NOT NULL
+				GROUP BY m.session_id, m.agent_id, m.turn_idx, m.request
+			),
+			request_ranges AS (
+				SELECT q.*, b.first_record AS run_start_record,
+					leadInFrame(q.start_record, 1, b.boundary) OVER (
+						PARTITION BY q.session_id, q.agent_id, q.turn_idx ORDER BY q.start_record
+						ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_record,
+					if(row_number() OVER (PARTITION BY q.session_id, q.agent_id, q.turn_idx ORDER BY q.start_record) = 1,
+						b.first_record, q.start_record) AS usage_from
+				FROM request_facts q
+				INNER JOIN bounded_runs b ON q.session_id = b.session_id AND q.agent_id = b.agent_id AND q.turn_idx = b.turn_idx
+			),
+			request_usage AS (
+				SELECT q.session_id AS session_id, q.agent_id AS agent_id, q.start_record AS start_record,
+					count() AS observations, countIf(e.estimated_cost IS NULL) AS unpriced,
+					${pricedSubtotalSql("e.estimated_cost")} AS cost,
+					argMax(${USAGE_MODEL_SQL}, tuple(e.first_observed_line, e.event_version, e.event_id)) AS model,
+					${TOKEN_KINDS.map((kind) => `sum(e.${kind}) AS ${kind}`).join(", ")}
+				FROM (SELECT * FROM placed_usage WHERE verified = 1) e
+				ASOF INNER JOIN request_ranges q
+					ON e.session_id = q.session_id AND e.stream = q.agent_id AND e.line >= q.usage_from
+				WHERE e.line < q.end_record
+				GROUP BY q.session_id, q.agent_id, q.start_record
+			)`;
+}
+
+/** One request of a generation with its calls and priced usage. */
+export const RunRequestFactsRowSchema = z.object({
+	agent_id: text,
+	turn_idx: count,
+	run_start_record: count,
+	start_record: count,
+	end_record: count,
+	started_ms: z.coerce.number(),
+	ended_ms: z.coerce.number(),
+	/** (record, block, tool, group, command class, failed), in record order. */
+	calls: z.array(z.tuple([count, count, text, text, text, count])),
+	texts: count,
+	text_record: count,
+	text_block: count,
+	text_head: text,
+	usage_observations: count,
+	usage_unpriced: count,
+	usage_model: text,
+	cost_usd: z.number().nullable(),
+	uncached_input_tokens: tokens,
+	cache_read_input_tokens: tokens,
+	cache_write_5m_input_tokens: tokens,
+	cache_write_1h_input_tokens: tokens,
+	output_tokens: tokens,
+	reasoning_output_tokens: tokens,
+});
+export type RunRequestFactsRow = z.infer<typeof RunRequestFactsRowSchema>;
+
+/**
+ * Every request of one committed generation with its calls and priced usage,
+ * in stream and start order: one statement for the whole session.
+ */
+export function buildRunRequestsStatement(
+	scope: TranscriptReadScope,
+	generation: UsageBoundGeneration,
+): ClickHouseStatement {
+	const tokenCount = (column: string) =>
+		`if(u.observations = 0, NULL, toString(u.${column})) AS ${column}`;
+	return {
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+		query: `WITH ${runRequestsCtes()}
+			SELECT q.agent_id AS agent_id, q.turn_idx AS turn_idx, q.run_start_record AS run_start_record,
+				q.start_record AS start_record, q.end_record AS end_record,
+				q.started_ms AS started_ms, q.ended_ms AS ended_ms, q.calls AS calls,
+				q.texts AS texts, q.text_record AS text_record, q.text_block AS text_block, q.text_head AS text_head,
+				u.observations AS usage_observations, u.unpriced AS usage_unpriced, u.model AS usage_model,
+				if(u.observations = 0, NULL, u.cost) AS cost_usd,
+				${TOKEN_KINDS.map((kind) => tokenCount(kind)).join(", ")}
+			FROM request_ranges q
+			LEFT ANY JOIN request_usage u ON q.session_id = u.session_id AND q.agent_id = u.agent_id AND q.start_record = u.start_record
+			ORDER BY agent_id, start_record`,
+		query_params: {
+			...pinnedParams(scope, [generation]),
+			usageGeneration: generation.usageGeneration,
+		},
+	};
+}
+
 /** Session facts of one generation for its receipt. */
 export const RunIndexSessionFactsSchema = z.object({
 	session_date_ms: z.coerce.number(),
@@ -917,6 +1109,7 @@ export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHas
 	.update(buildPricedUsageEventsCte(""))
 	.update(runFactsCtes({ literal: true }))
 	.update(runContextCtes())
+	.update(runRequestsCtes())
 	.update(JSON.stringify(RUN_INDEX_FACT_COLUMNS))
 	.update("codex-per-turn-effort:lifecycle;claude-abort:l_abort_reason")
 	.digest("hex")

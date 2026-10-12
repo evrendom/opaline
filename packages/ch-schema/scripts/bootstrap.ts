@@ -58,6 +58,17 @@ const FORWARD_SCRIPTS = new Map([
 	["20261011120000_l1_retention_removed.sql", "migrate-l1-retention.ts"],
 	["20261011150000_weekly_totals.sql", "migrate-weekly-totals.ts"],
 	["20261012120000_not_found_unknown.sql", "migrate-not-found-unknown.ts"],
+	[
+		"20261012140000_run_question_answers.sql",
+		"migrate-run-question-answers.ts",
+	],
+	[
+		"20261012150000_analysis_finding_runs.sql",
+		"migrate-analysis-finding-runs.ts",
+	],
+	["20261012150000_run_requests.sql", "migrate-run-requests.ts"],
+	["20261012150000_transcript_search.sql", "migrate-transcript-search.ts"],
+	["20261012170000_run_index_messages.sql", "migrate-run-index-messages.ts"],
 ]);
 
 interface BootstrapMigration {

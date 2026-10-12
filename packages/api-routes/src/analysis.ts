@@ -1,5 +1,9 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import {
+	AnalysisSearchInputSchema,
+	AnalysisSearchOutputSchema,
+} from "./analysis-search.js";
 
 export const RunRefSchema = z
 	.object({
@@ -979,6 +983,12 @@ export const AnalysisSqlOutputSchema = z.object({
 	notices: z.array(z.string()),
 	/** Sessions the shown rows name (a `session_id` column). */
 	sessions: z.array(SqlSessionSchema),
+	/**
+	 * Runs the shown rows name (`session_id`, `agent_id` and `turn_idx`
+	 * columns): the runs a finding on this step cites. Empty in results
+	 * stored before it existed.
+	 */
+	runs: z.array(RunRefSchema).default([]),
 	trace: AnalysisTraceSchema.optional(),
 });
 
@@ -1007,7 +1017,24 @@ export const AnalysisSchemaOutputSchema = z.discriminatedUnion("level", [
 		views: z.array(
 			z.object({ name: z.string(), grain: z.string(), columns: z.number() }),
 		),
+		/** The approved impact measures: use them before writing your own. */
+		measures: z.array(
+			z.object({ name: z.string(), definition: z.string(), sql: z.string() }),
+		),
 		notes: z.array(z.string()),
+		/** Run questions agents may ask (run_questions), with the precision their last test gave. */
+		questions: z
+			.array(
+				z.object({
+					id: z.string(),
+					question: z.string(),
+					testedRuns: z.number().nullable(),
+					testedPrecision: z.number().nullable(),
+					/** The provider whose test answers the precision judges. */
+					testedProvider: z.string().nullable().default(null),
+				}),
+			)
+			.default([]),
 	}),
 	z.object({
 		level: z.literal("columns"),
@@ -1020,9 +1047,9 @@ export const AnalysisSchemaOutputSchema = z.discriminatedUnion("level", [
 		level: z.literal("values"),
 		view: z.string(),
 		column: SqlViewColumnSchema,
-		/** Which runs were counted, e.g. "runs that started in the last 30 days". */
+		/** Which rows were counted, e.g. "runs that started in the last 30 days". */
 		over: z.string(),
-		values: z.array(z.object({ value: z.string(), runs: z.number() })),
+		values: z.array(z.object({ value: z.string(), rows: z.number() })),
 		notices: z.array(z.string()),
 	}),
 ]);
@@ -1031,6 +1058,47 @@ export type AnalysisSqlInput = z.infer<typeof AnalysisSqlInputSchema>;
 export type AnalysisSqlOutput = z.infer<typeof AnalysisSqlOutputSchema>;
 export type AnalysisSchemaInput = z.infer<typeof AnalysisSchemaInputSchema>;
 export type AnalysisSchemaOutput = z.infer<typeof AnalysisSchemaOutputSchema>;
+
+/**
+ * `run` (docs/retro-architecture.md, "The run view"): one run, compact, with
+ * an id on every line; `expand` opens any list of those ids under one
+ * character budget, and `sections` keeps only some sections.
+ */
+export const RUN_VIEW_DEFAULT_CHARS = 12_000;
+export const AnalysisRunInputSchema = z
+	.object({
+		/** A run id (`run_id` in sql results). */
+		id: z.string().trim().min(1).max(1_000),
+		/** Ids from the view to open: phases, requests, calls, records. */
+		expand: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+		/** Only these sections, by name; default: the configured defaults. */
+		sections: z
+			.array(z.string().trim().min(1).max(40))
+			.min(1)
+			.max(10)
+			.optional(),
+		/** Room for the header line, whose run id and prompt alone can take 300 characters. */
+		maxChars: z
+			.number()
+			.int()
+			.min(1_000)
+			.max(40_000)
+			.default(RUN_VIEW_DEFAULT_CHARS),
+	})
+	.strict();
+
+export const AnalysisRunOutputSchema = z.object({
+	/** The run's id, as given. */
+	id: z.string(),
+	/** Version of the phase rule that cut the phases; phase ids are valid within it. */
+	phaseRule: z.number().int(),
+	/** Something was left out to stay within maxChars; the text says what. */
+	truncated: z.boolean(),
+	text: z.string(),
+});
+
+export type AnalysisRunInput = z.infer<typeof AnalysisRunInputSchema>;
+export type AnalysisRunOutput = z.infer<typeof AnalysisRunOutputSchema>;
 
 /** The page size of a find call: its `limit`, or 20 tool groups, else 50. */
 export function findLimit(input: Pick<AnalysisFindInput, "limit" | "source">) {
@@ -1044,4 +1112,8 @@ export const analysisContract = {
 		.input(AnalysisSchemaInputSchema)
 		.output(AnalysisSchemaOutputSchema),
 	sql: oc.input(AnalysisSqlInputSchema).output(AnalysisSqlOutputSchema),
+	run: oc.input(AnalysisRunInputSchema).output(AnalysisRunOutputSchema),
+	search: oc
+		.input(AnalysisSearchInputSchema)
+		.output(AnalysisSearchOutputSchema),
 };

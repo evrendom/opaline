@@ -3,7 +3,10 @@ import {
 	encodeTranscriptRecordsReceipt,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 } from "@rudel/api-routes/transcript-records";
-import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
+import type {
+	RudelRunIndexRow,
+	RudelRunRequestsRow,
+} from "@rudel/ch-schema/generated";
 import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
@@ -17,11 +20,13 @@ import {
 	RUN_INDEX_VERSION,
 	type RunIndexFactsRow,
 	RunIndexFactsRowSchema,
+	type RunRequestFactsRow,
 	type UnattributedUsageRow,
 } from "../analysis/run-index-sql.js";
 import { buildRunFactsStatement } from "../analysis/run-queries.js";
 import { selectRetiredGenerations } from "../transcript-records-ingest.service.js";
 import { runNodeId } from "./l1-edge-ids.js";
+import { RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
 import {
 	assertUsageConserved,
 	buildRunIndex,
@@ -130,6 +135,7 @@ interface Fake {
 	executor: ClickHouseExecutor;
 	/** Every row inserted, as the table holds it. */
 	table: RudelRunIndexRow[];
+	requests: RudelRunRequestsRow[];
 	inserts: { values: RudelRunIndexRow[]; token?: string }[];
 	executed: ClickHouseStatement[];
 	events: string[];
@@ -160,15 +166,19 @@ function fakeClickHouse(state: {
 	/** Usage states, one per read; the last repeats. */
 	usage?: UsageState[];
 	runs?: RunIndexFactsRow[];
+	requests?: RunRequestFactsRow[];
 	snapshots?: Record<string, unknown>[];
 	committed?: boolean;
 	sessionDateMs?: number;
 	failReceipt?: boolean;
 	table?: RudelRunIndexRow[];
+	/** What the generation records as each run's opening prompt and last message. */
+	messages?: Record<string, unknown>[];
 }): Fake {
 	const usage = [...(state.usage ?? [CONSISTENT])];
 	const fake: Fake = {
 		table: state.table ?? [],
+		requests: [],
 		inserts: [],
 		executed: [],
 		events: [],
@@ -179,6 +189,11 @@ function fakeClickHouse(state: {
 				fake.executed.push(statement);
 			},
 			async insert(params) {
+				if (params.table === RUN_REQUESTS_TABLE) {
+					fake.events.push("insert:requests");
+					fake.requests.push(...(params.values as RudelRunRequestsRow[]));
+					return;
+				}
 				const values = params.values as RudelRunIndexRow[];
 				const receipt = values[0]?.row_kind === "receipt";
 				fake.events.push(receipt ? "insert:receipt" : "insert:runs");
@@ -230,6 +245,7 @@ function fakeClickHouse(state: {
 					if (sql.includes("receipt_generation"))
 						return [usage.length > 1 ? usage.shift() : usage[0]];
 					if (sql.includes("codex_streams")) return state.runs ?? [];
+					if (sql.includes("request_ranges")) return state.requests ?? [];
 					if (sql.includes("unattributed_models")) {
 						const current = usage[0] ?? CONSISTENT;
 						return [
@@ -256,6 +272,7 @@ function fakeClickHouse(state: {
 					if (sql.includes("session_analytics"))
 						return [{ repository: "github.com/acme/app", model: "opus" }];
 					if (sql.includes("build_text")) return state.snapshots ?? [];
+					if (sql.includes("opening_prompt")) return state.messages ?? [];
 					throw new Error(`unexpected statement: ${sql.slice(0, 80)}`);
 				};
 				return rows() as T[];
@@ -364,6 +381,85 @@ describe("building a session's run index", () => {
 		});
 	});
 
+	test("writes the requests after the runs and before the receipt, behind the fence, with their run's id and unknown usage as unknown", async () => {
+		const request = (
+			startRecord: number,
+			overrides: Partial<RunRequestFactsRow> = {},
+		): RunRequestFactsRow => ({
+			agent_id: "",
+			turn_idx: 1,
+			run_start_record: 3,
+			start_record: startRecord,
+			end_record: startRecord + 2,
+			started_ms: NOW.getTime(),
+			ended_ms: NOW.getTime() + 60_000,
+			calls: [[startRecord, 0, "Bash", "shell", "test", 1]],
+			texts: 0,
+			text_record: 0,
+			text_block: 0,
+			text_head: "",
+			usage_observations: 1,
+			usage_unpriced: 0,
+			usage_model: "claude-opus-5-5",
+			cost_usd: 0.5,
+			uncached_input_tokens: "100",
+			cache_read_input_tokens: "0",
+			cache_write_5m_input_tokens: "0",
+			cache_write_1h_input_tokens: "0",
+			output_tokens: "10",
+			reasoning_output_tokens: "0",
+			...overrides,
+		});
+		const requests = [
+			request(4),
+			request(6, {
+				calls: [],
+				texts: 1,
+				text_record: 7,
+				text_block: 1,
+				text_head: "done",
+			}),
+		];
+		const fake = fakeClickHouse({ runs, requests });
+		await build(fake);
+		expect(fake.events).toEqual([
+			"fence",
+			"insert:runs",
+			"fence",
+			"insert:requests",
+			"fence",
+			"insert:receipt",
+		]);
+		expect(
+			fake.requests.map((row) => [
+				row.run_id,
+				row.start_record,
+				row.call_tools,
+				row.call_failed,
+				row.text_record,
+				row.text_block,
+				row.text_head,
+				row.output_tokens,
+			]),
+		).toEqual([
+			[runNodeId(session, "", 3), 4, ["Bash"], [1], null, null, null, "10"],
+			[runNodeId(session, "", 3), 6, [], [], 7, 1, "done", "10"],
+		]);
+
+		const unknown = fakeClickHouse({
+			runs,
+			requests,
+			usage: [{ ...CONSISTENT, complete: 0, generation_events: 1 }],
+		});
+		await build(unknown);
+		expect(unknown.requests[0]).toMatchObject({
+			usage_observations: 0,
+			cost_usd: null,
+			output_tokens: null,
+		});
+		expect(unknown.requests[0]?.unrecorded_facts).toContain("output_tokens");
+	});
+
 	test("every run carries the session's repository, as the receipt does", async () => {
 		const fake = fakeClickHouse({ runs });
 		await build(fake);
@@ -405,6 +501,85 @@ describe("building a session's run index", () => {
 			title: null,
 			cost_state: {},
 		});
+	});
+
+	test("a run keeps the word-list categories of its opening prompt and the message it ended with", async () => {
+		const fake = fakeClickHouse({
+			runs,
+			messages: [
+				{
+					agent_id: "",
+					turn_idx: 1,
+					opening_prompt: "this still doesn't work, shit",
+					final_message: "Done. The login form posts now.",
+					final_message_cut: 0,
+					system_prompt: 0,
+				},
+				{
+					agent_id: "agent-a",
+					turn_idx: 1,
+					opening_prompt: null,
+					final_message: null,
+					final_message_cut: 0,
+					system_prompt: 0,
+				},
+			],
+		});
+		await build(fake);
+		const [main, subagent] = fake.inserts[0]?.values ?? [];
+		expect(main).toMatchObject({
+			prompt_reactions: ["negative", "swear"],
+			final_message: "Done. The login form posts now.",
+		});
+		expect(subagent).toMatchObject({
+			prompt_reactions: [],
+			final_message: null,
+		});
+	});
+
+	test("a run says whether its final message was kept whole and whether its stream had recorded the system prompt by then", async () => {
+		const fake = fakeClickHouse({
+			runs: [
+				facts({ turn_idx: 1, start_record: 3, end_record: 9 }),
+				facts({ turn_idx: 2, start_record: 10, end_record: 12 }),
+				facts({ agent_id: "agent-a", turn_idx: 1, start_record: 1 }),
+				facts({ agent_id: "agent-a", turn_idx: 2, start_record: 5 }),
+			],
+			messages: [
+				// The main stream recorded its system prompt before the first prompt.
+				{ agent_id: "", turn_idx: 0, system_prompt: 1 },
+				{
+					agent_id: "",
+					turn_idx: 1,
+					opening_prompt: "fix the login",
+					final_message: "context ".repeat(250),
+					final_message_cut: 1,
+				},
+				// The subagent's arrived only in its second run.
+				{ agent_id: "agent-a", turn_idx: 1, opening_prompt: "review it" },
+				{ agent_id: "agent-a", turn_idx: 2, system_prompt: 1 },
+			].map((row) => ({
+				opening_prompt: null,
+				final_message: null,
+				final_message_cut: 0,
+				system_prompt: 0,
+				...row,
+			})),
+		});
+		await build(fake);
+		expect(
+			fake.inserts[0]?.values.map((row) => [
+				row.agent_id,
+				row.turn_idx,
+				row.final_message_cut,
+				row.system_prompt_recorded,
+			]),
+		).toEqual([
+			["", 1, true, true],
+			["", 2, false, true],
+			["agent-a", 1, false, false],
+			["agent-a", 2, false, true],
+		]);
 	});
 
 	test("a committed snapshot of the same generation, pricing and usage is not rebuilt", async () => {

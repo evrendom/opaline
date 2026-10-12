@@ -2,6 +2,7 @@ import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 
 const HOME_PATH = "/home";
 const ADMIN_PATH = "/admin";
+const ADMIN_RUN_QUESTIONS_PATH = `${ADMIN_PATH}/run-questions`;
 const LEGACY_DASHBOARD_PATH = "/dashboard";
 const LEGACY_DASHBOARD_SESSIONS_PATH = `${LEGACY_DASHBOARD_PATH}/sessions`;
 const SESSION_PATH = "/session";
@@ -24,6 +25,7 @@ const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
 export const appRoutes = {
 	home: () => HOME_PATH,
 	admin: () => ADMIN_PATH,
+	adminRunQuestions: () => ADMIN_RUN_QUESTIONS_PATH,
 	dashboard: () => LEGACY_DASHBOARD_PATH,
 	dashboardSessions: () => LEGACY_DASHBOARD_SESSIONS_PATH,
 	legacyDashboard: () => LEGACY_DASHBOARD_PATH,

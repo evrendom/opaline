@@ -54,6 +54,11 @@
 			"memory": 2048,
 			"maxDuration": 300
 		},
+		"api/cron/run-questions.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
 		"api/webhooks/github.ts": {
 			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
 			"memory": 1024,
@@ -108,6 +113,10 @@
 		},
 		{
 			"path": "/api/cron/l1-edges",
+			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/run-questions",
 			"schedule": "* * * * *"
 		},
 		{
@@ -256,7 +265,7 @@
 			"destination": "/api/rpc?__opaline_path=/health/ready"
 		},
 		{
-			"source": "/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
+			"source": "/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
 			"destination": "/api/rpc?__opaline_path=/api/:routePath"
 		},
 		{

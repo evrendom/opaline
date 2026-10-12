@@ -20,27 +20,46 @@ import {
 import { captureCall } from "./capture.js";
 import { createLocalEmbedder } from "./embedder.js";
 import { createMemoryAnalysisStore } from "./memory-store.js";
-import type { AnalysisLog } from "./types.js";
+import type { AnalysisLog, AnalysisViewer } from "./types.js";
 
 const workspaceId = "workspace";
 const lead = { workspaceId, userId: "lead", host: "plugin" as const };
-const leadViewer = {
+const leadViewer: AnalysisViewer = {
 	workspaceId,
 	userId: "lead",
 	isAdmin: true,
 	restrictResults: false,
+	onlyMember: null,
 };
-const memberViewer = {
+const memberViewer: AnalysisViewer = {
 	workspaceId,
 	userId: "member",
 	isAdmin: false,
 	restrictResults: false,
+	onlyMember: null,
 };
 // The same viewers in a workspace limited to own sessions and listed in
 // ANALYSIS_LOG_RESTRICTED_WORKSPACES.
 const restrictedLeadViewer = { ...leadViewer, restrictResults: true };
-const restrictedMemberViewer = { ...memberViewer, restrictResults: true };
+const restrictedMemberViewer = {
+	...memberViewer,
+	restrictResults: true,
+	onlyMember: "member",
+};
 const memberAccount = { targetType: "account", targetId: "member" } as const;
+/** Grouped results and given sessions need no ClickHouse lookup. */
+const unusedClickHouse: ClickHouseExecutor = {
+	async close() {},
+	async execute() {
+		throw new Error("not used");
+	},
+	async insert() {
+		throw new Error("not used");
+	},
+	async query() {
+		throw new Error("not used");
+	},
+};
 
 describe("recording queries", () => {
 	test("a call without an analysis id starts a new draft; each call with one adds its own step, labelled from its arguments", async () => {
@@ -788,23 +807,10 @@ describe("deletion", () => {
 		).toBe("Lead only");
 	});
 
-	test("a captured grouped find over a member's sessions is deleted with the member's account", async () => {
+	test("a captured grouped find over a member's sessions keeps its analysis when the member's account is deleted, without its result", async () => {
 		const log = createLog();
-		// Grouped results name no session, so no ClickHouse lookup happens.
-		const unused: ClickHouseExecutor = {
-			async close() {},
-			async execute() {
-				throw new Error("not used");
-			},
-			async insert() {
-				throw new Error("not used");
-			},
-			async query() {
-				throw new Error("not used");
-			},
-		};
 		const trace = await captureCall(
-			unused,
+			unusedClickHouse,
 			log,
 			lead,
 			"find",
@@ -823,7 +829,52 @@ describe("deletion", () => {
 		});
 
 		await purgeAnalysisLog(log.store, memberAccount, purgeSignal());
-		expect(await log.store.getAnalysis(trace.analysis)).toBeNull();
+		expect(await log.store.getAnalysis(trace.analysis)).not.toBeNull();
+		expect(await log.store.getQuery(trace.query)).toMatchObject({
+			args: { source: "runs", groupBy: "week" },
+			output: null,
+			removed: true,
+		});
+	});
+
+	test("a captured sql result keeps its analysis through a member's deletion only when the gateway found no text in its rows", async () => {
+		const log = createLog();
+		const capture = (quotes?: boolean) =>
+			captureCall(
+				unusedClickHouse,
+				log,
+				lead,
+				"sql",
+				{
+					query: "SELECT user_id, count() FROM runs GROUP BY user_id",
+					title: "Runs",
+				},
+				{ table: "user_id | count()" },
+				["member", "lead"],
+				[],
+				quotes,
+			);
+		const counted = await capture(false);
+		const quoting = await capture(true);
+		const unknown = await capture();
+		assert(counted && quoting && unknown);
+		for (const trace of [counted, quoting, unknown])
+			await saveAnalysis(log, leadViewer, {
+				analysis: trace.analysis,
+				question: "Saved question",
+				finalAnswer: "Answer.",
+				findings: [],
+				topics: [],
+				changes: [],
+			});
+
+		await purgeAnalysisLog(log.store, memberAccount, purgeSignal());
+		expect(await log.store.getQuery(counted.query)).toMatchObject({
+			output: null,
+			removed: true,
+		});
+		expect(await log.store.getAnalysis(quoting.analysis)).toBeNull();
+		expect(await log.store.getAnalysis(unknown.analysis)).toBeNull();
 	});
 
 	test("a purge stops at its deadline and the next one finishes", async () => {

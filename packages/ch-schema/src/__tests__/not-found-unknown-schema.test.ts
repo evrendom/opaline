@@ -117,7 +117,7 @@ describe("not-found migration", () => {
 		);
 		expect(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ch:migrate:weekly-totals ch:migrate:not-found-unknown"/u);
+		).toMatch(/ch:migrate:weekly-totals ch:migrate:not-found-unknown\b/u);
 	});
 
 	test("publication proof rejects lagging replicas, old column types and the old view", () => {

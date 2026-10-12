@@ -1,7 +1,8 @@
-import type {
-	AnalysisSchemaInput,
-	AnalysisSchemaOutput,
-	AnalysisSqlOutput,
+import {
+	type AnalysisSchemaInput,
+	type AnalysisSchemaOutput,
+	type AnalysisSqlOutput,
+	RunRefSchema,
 } from "@rudel/api-routes";
 import { redactReturnedValue } from "@rudel/secret-filter";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import {
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
+import { rowsQuote } from "../analysis-log/evidence.js";
 import { describeSessions } from "../analysis-log/sessions.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import {
@@ -27,12 +29,16 @@ import { fitCount } from "./output-ceiling.js";
 import { cell } from "./read-output.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
 import {
+	carriesText,
 	checkParsedSql,
 	type PreparedSql,
 	prepareAgentSql,
 	type SqlFailure,
+	type SqlTableFunction,
+	type SqlTableFunctionCall,
 	withoutCtePrefix,
 } from "./sql-guard.js";
+import { SQL_MEASURES } from "./sql-measures.js";
 import type { SqlQuota, SqlResultStore } from "./sql-results.js";
 import { findSqlView, SQL_SCOPE_PARAMS, SQL_VIEWS } from "./sql-views.js";
 
@@ -64,6 +70,35 @@ export interface SqlEnv {
 	readonly quota: SqlQuota;
 	/** The slots agent queries share across instances; each statement runs in one. */
 	readonly limiter: AgentQueryLimiter;
+	/**
+	 * The GitHub repositories whose facts the workspace may read: its active
+	 * bindings while GitHub outcomes are visible to it, otherwise none.
+	 */
+	readonly githubRepositories: (
+		workspaceId: string,
+	) => Promise<readonly string[]>;
+	/** Table functions the server offers in agent SQL, e.g. `search`. */
+	readonly functions?: readonly SqlServerFunction[];
+}
+
+/**
+ * A table function the server offers in agent SQL (`search('…')`): the
+ * statement in place of each call, scoped like the views, and the parameters
+ * it binds once the query passed every check.
+ */
+export interface SqlServerFunction {
+	readonly name: string;
+	statement(
+		call: SqlTableFunctionCall,
+		memberOnly: boolean,
+	): ReturnType<SqlTableFunction>;
+	bind(
+		caller: SqlCaller,
+		calls: readonly SqlTableFunctionCall[],
+	): Promise<
+		| { params: Record<string, unknown>; notices: string[] }
+		| { failure: SqlFailure }
+	>;
 }
 
 export type SqlOutcome =
@@ -72,6 +107,11 @@ export type SqlOutcome =
 			readonly result: AnalysisSqlOutput;
 			/** Members whose sessions the query could read, stored with it. */
 			readonly owners: readonly string[];
+			/**
+			 * The shown rows carry text from the sessions (`rowsQuote`): deleting
+			 * any member it could read deletes the result, not only its rows.
+			 */
+			readonly quotes: boolean;
 	  }
 	| { readonly ok: false; readonly error: SqlFailure };
 
@@ -90,6 +130,11 @@ export const SQL_LIMITS = {
 	cellChars: 300,
 	tableChars: 24_000,
 	resultBytes: 16 * 1024 * 1024,
+	/**
+	 * Bytes of the statement once views and `search()` calls are expanded:
+	 * ClickHouse refuses a query over `max_query_size` (262,144) unparsed.
+	 */
+	statementBytes: 200_000,
 } as const;
 
 /**
@@ -119,23 +164,70 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set(
 const TOP_VALUES = 20;
 const TOP_VALUES_DAYS = 30;
 
-const SQL_SETTINGS: NonNullable<ClickHouseStatement["clickhouse_settings"]> = {
-	readonly: "1",
+/**
+ * What one agent statement may take of ClickHouse: time, memory, rows and
+ * bytes read, and two of its six cores. The `run` tool reads under the same
+ * limits (`withSqlLimits`).
+ */
+const SQL_QUERY_LIMITS = {
 	max_execution_time: SQL_LIMITS.seconds,
 	timeout_overflow_mode: "throw",
 	max_memory_usage: String(SQL_LIMITS.memoryBytes),
 	max_rows_to_read: String(SQL_LIMITS.rowsRead),
 	max_bytes_to_read: String(SQL_LIMITS.bytesRead),
 	read_overflow_mode: "throw",
+	max_threads: 2,
+} as const;
+
+export const SQL_SETTINGS: NonNullable<
+	ClickHouseStatement["clickhouse_settings"]
+> = {
+	readonly: "1",
+	...SQL_QUERY_LIMITS,
 	// Caps the rows of the result as LIMIT would; the order is kept.
 	limit: String(SQL_LIMITS.rows + 1),
 	// Bigger results fail with a notice to narrow, never arrive cut silently.
 	max_result_bytes: String(SQL_LIMITS.resultBytes),
 	result_overflow_mode: "throw",
-	max_threads: 2,
 	remote_filesystem_read_prefetch: 0,
 	timeout_before_checking_execution_speed: 0,
 };
+
+/**
+ * An executor whose reads run within the sql tool's per-statement limits,
+ * whatever settings the statement brings: for tools that read on an
+ * agent's behalf outside the gateway, such as `run`.
+ */
+export function withSqlLimits(
+	executor: ClickHouseExecutor,
+): ClickHouseExecutor {
+	const limited = (statement: ClickHouseStatement): ClickHouseStatement => ({
+		...statement,
+		clickhouse_settings: {
+			...statement.clickhouse_settings,
+			...SQL_QUERY_LIMITS,
+		},
+	});
+	return {
+		close: () => executor.close(),
+		execute: (statement) => executor.execute(limited(statement)),
+		query: (statement) => executor.query(limited(statement)),
+		insert: (params) => executor.insert(params),
+	};
+}
+
+/** The refusal of a call past the workspace's quota, which sql and run share. */
+export function quotaExceeded(
+	quota: Pick<SqlQuota, "queries" | "windowMs">,
+	resetsAt: Date,
+): SqlFailure {
+	return {
+		kind: "fatal",
+		message: `The workspace used its SQL quota of ${quota.queries} queries (sql and run calls) per ${quota.windowMs / 60_000} minutes.`,
+		fragment: null,
+		fix: `Do not retry before ${resetsAt.toISOString()}; answer with what you have, or with find and read.`,
+	};
+}
 
 export const NOT_EVIDENCE =
 	"not evidence: these rows say where to look, not why. Open the runs with read (session_id, agent_id, and turn_idx as its turn) before naming a cause.";
@@ -167,9 +259,20 @@ export async function runSql(
 		rows: table.rows,
 		truncated: table.notices.length > 0,
 		table: table.text,
-		notices: [...table.notices, NOT_EVIDENCE],
+		notices: [...table.notices, ...executed.notices, NOT_EVIDENCE],
 		sessions,
+		// Findings cite only what the agent saw: the rows the table shows.
+		runs: namedRuns(columns, rows.slice(0, table.rows), sessions),
 	};
+	const quotes = rowsQuote(
+		rows.slice(0, table.rows),
+		new Set([
+			caller.workspaceId,
+			...owners,
+			...sessions.flatMap((session) => [session.sessionId, session.ownerId]),
+			...output.runs.map((run) => run.agentId),
+		]),
+	);
 	const id = await env.results.save({
 		workspaceId: caller.workspaceId,
 		authorId: caller.reader.userId,
@@ -177,8 +280,10 @@ export async function runSql(
 		query: input.query,
 		output,
 		owners,
+		counts: !quotes,
+		queryCarriesText: carriesText(input.query),
 	});
-	return { ok: true, result: { id, ...output }, owners };
+	return { ok: true, result: { id, ...output }, owners, quotes };
 }
 
 /** A refusal as the agent reads it: what failed, where, and what to do. */
@@ -209,10 +314,15 @@ export async function describeSchema(
 					grain: view.grain,
 					columns: view.columns.length,
 				})),
+				measures: SQL_MEASURES.map((measure) => ({ ...measure })),
 				notes: [
+					"Rank and compare with the approved measures, so analyses agree and before/after comparisons hold; say which order you ranked by.",
 					"Pass view to see its columns with their meaning and traps, then column to see its most common values.",
-					"Every view holds only the sessions you may read; the server adds the workspace.",
+					"Every view holds only the sessions you may read, and GitHub facts only of the repositories the workspace connected; the server adds the workspace.",
+					"Views join to runs by run_id; edges chain runs to commits, pull requests and CI runs (ci_jobs).",
 				],
+				// The caller adds the run questions agents may ask.
+				questions: [],
 			},
 		};
 	const view = findSqlView(input.view);
@@ -248,20 +358,20 @@ export async function describeSchema(
 		: column.name;
 	const executed = await execute(
 		caller,
-		`SELECT toString(${value}) AS value, count() AS runs FROM ${view.name}
-			WHERE started_at >= now() - INTERVAL ${TOP_VALUES_DAYS} DAY
-			GROUP BY value ORDER BY runs DESC, value LIMIT ${TOP_VALUES}`,
+		`SELECT toString(${value}) AS value, count() AS rows FROM ${view.name}
+			WHERE ${view.recent.column} >= now() - INTERVAL ${TOP_VALUES_DAYS} DAY
+			GROUP BY value ORDER BY rows DESC, value LIMIT ${TOP_VALUES}`,
 		env,
 		signal,
 		async (rows) => rows,
 	);
 	if (!executed.ok) return executed;
 	const values = z
-		.array(z.object({ value: z.string().nullable(), runs: z.coerce.number() }))
+		.array(z.object({ value: z.string().nullable(), rows: z.coerce.number() }))
 		.parse(executed.value)
 		.map((row) => ({
 			value: clip(cell(redactReturnedValue(row.value))).text,
-			runs: row.runs,
+			rows: row.rows,
 		}));
 	return {
 		ok: true,
@@ -269,7 +379,7 @@ export async function describeSchema(
 			level: "values",
 			view: view.name,
 			column: { ...column, traps: [...column.traps] },
-			over: `runs that started in the last ${TOP_VALUES_DAYS} days`,
+			over: `${view.recent.rows} in the last ${TOP_VALUES_DAYS} days`,
 			values,
 			notices: [
 				values.length === TOP_VALUES
@@ -286,6 +396,81 @@ function memberParam(caller: SqlCaller): Record<string, string> {
 	return only === null ? {} : { [SQL_SCOPE_PARAMS.member]: only };
 }
 
+/** A run an agent's SQL selected. */
+export interface SelectedRun {
+	readonly sessionId: string;
+	readonly agentId: string;
+	readonly turn: number;
+}
+
+/**
+ * The runs an agent's SQL selects (run questions, docs/retro-architecture.md):
+ * the same guard, scope, limits, query slot and quota as `sql`, but only the
+ * distinct session_id, agent_id and turn_idx of its rows, up to `max`, handed
+ * to `follow` within the slot. `more` says the query selected more than
+ * `max`. Nothing is stored.
+ */
+export async function selectRuns<T>(
+	caller: SqlCaller,
+	sql: string,
+	env: AgentSqlEnv,
+	max: number,
+	follow: (selected: { runs: SelectedRun[]; more: boolean }) => Promise<T>,
+	signal?: AbortSignal,
+): Promise<{ ok: true; value: T } | { ok: false; error: SqlFailure }> {
+	const executed = await execute(
+		caller,
+		sql,
+		env,
+		signal,
+		(rows) => {
+			const runs = z
+				.array(
+					z.object({
+						session_id: z.string(),
+						agent_id: z.string(),
+						turn_idx: z.coerce.number(),
+					}),
+				)
+				.parse(rows)
+				.map((row) => ({
+					sessionId: row.session_id,
+					agentId: row.agent_id,
+					turn: row.turn_idx,
+				}));
+			return follow({ runs: runs.slice(0, max), more: runs.length > max });
+		},
+		{
+			prefix: SELECT_RUNS_PREFIX,
+			// On its own line, so a trailing line comment cannot swallow it.
+			suffix: `\n) ORDER BY session_id, agent_id, turn_idx LIMIT ${max + 1}`,
+			rows: max + 1,
+		},
+	);
+	if (!executed.ok)
+		return RUN_COLUMNS.includes(executed.error.fragment ?? "")
+			? {
+					ok: false,
+					error: {
+						...executed.error,
+						message: `The query must return the columns session_id, agent_id and turn_idx; ${executed.error.fragment} is missing.`,
+						fix: "Select them from runs, e.g. SELECT session_id, agent_id, turn_idx FROM runs WHERE started_at >= now() - INTERVAL 28 DAY.",
+					},
+				}
+			: executed;
+	return { ok: true, value: executed.value };
+}
+
+const RUN_COLUMNS = ["session_id", "agent_id", "turn_idx"];
+const SELECT_RUNS_PREFIX =
+	"SELECT DISTINCT session_id, agent_id, turn_idx FROM (";
+
+/** What running an agent's SQL needs of the sql environment. */
+type AgentSqlEnv = Pick<
+	SqlEnv,
+	"executor" | "quota" | "limiter" | "githubRepositories" | "functions"
+>;
+
 /**
  * Runs the agent's SQL and then `follow` on its rows, both in a query slot
  * of the workspace, or says why it is refused.
@@ -293,58 +478,139 @@ function memberParam(caller: SqlCaller): Record<string, string> {
 async function execute<T>(
 	caller: SqlCaller,
 	sql: string,
-	env: SqlEnv,
+	env: AgentSqlEnv,
 	signal: AbortSignal | undefined,
 	follow: (rows: Record<string, unknown>[]) => Promise<T>,
-): Promise<{ ok: true; value: T } | { ok: false; error: SqlFailure }> {
+	/** Wraps the scoped statement, e.g. to keep only some columns, with its own row cap. */
+	wrap?: { prefix: string; suffix: string; rows: number },
+): Promise<
+	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
+> {
+	const memberOnly = readableSessionOwner(caller.reader) !== null;
+	const functions = env.functions ?? [];
 	const prepared = prepareAgentSql(
 		sql,
 		new Map(
 			SQL_VIEWS.map((view) => [
 				view.name,
-				view.sql(readableSessionOwner(caller.reader) !== null),
+				{
+					windowColumn: view.windowColumn,
+					statement: (window) => view.sql(memberOnly, window),
+				},
 			]),
 		),
 		RESERVED_NAMES,
+		new Map(
+			functions.map((fn) => [
+				fn.name,
+				(call: SqlTableFunctionCall) => fn.statement(call, memberOnly),
+			]),
+		),
 	);
 	if (!prepared.ok) return { ok: false, error: prepared.failure };
-	const parsed = await checkWithClickHouseParser(sql, prepared.prepared, env);
+	const statementBytes = Buffer.byteLength(prepared.prepared.sql, "utf8");
+	if (statementBytes > SQL_LIMITS.statementBytes)
+		return {
+			ok: false,
+			error: {
+				kind: "recoverable",
+				message: `The query is too large once its views and search() calls are expanded: ${statementBytes.toLocaleString("en-US")} bytes, more than the ${SQL_LIMITS.statementBytes.toLocaleString("en-US")} ClickHouse is given.`,
+				fragment: null,
+				fix: "Name each view or search() once in a WITH clause and read that name, or split the query into several.",
+			},
+		};
+	const parsed = await checkWithClickHouseParser(
+		sql,
+		prepared.prepared,
+		env,
+		new Set(functions.map((fn) => fn.name)),
+	);
 	if (parsed) return { ok: false, error: parsed };
+	// Server functions bind before the slot: their own work (search embeds
+	// its text) holds no query slot and takes no sql quota; a refusal there
+	// costs none either.
+	const bound: Record<string, unknown> = {};
+	const notices: string[] = [];
+	for (const fn of functions) {
+		const calls = prepared.prepared.calls.filter(
+			(call) => call.name === fn.name,
+		);
+		if (calls.length === 0) continue;
+		const binding = await fn.bind(caller, calls);
+		if ("failure" in binding) return { ok: false, error: binding.failure };
+		Object.assign(bound, binding.params);
+		notices.push(...binding.notices);
+	}
 	const statement: ClickHouseStatement = {
-		clickhouse_settings: SQL_SETTINGS,
-		query: prepared.prepared.sql,
+		clickhouse_settings: wrap
+			? { ...SQL_SETTINGS, limit: String(wrap.rows) }
+			: SQL_SETTINGS,
+		query: wrap
+			? `${wrap.prefix}${prepared.prepared.sql}${wrap.suffix}`
+			: prepared.prepared.sql,
 		query_params: {
+			...bound,
 			[SQL_SCOPE_PARAMS.workspace]: caller.workspaceId,
+			[SQL_SCOPE_PARAMS.viewer]: caller.reader.userId,
 			...memberParam(caller),
+			...(prepared.prepared.sql.includes(`{${SQL_SCOPE_PARAMS.repositories}:`)
+				? {
+						[SQL_SCOPE_PARAMS.repositories]: [
+							...(await env.githubRepositories(caller.workspaceId)),
+						],
+					}
+				: {}),
 		},
 	};
+	return withAgentQuery(
+		caller.workspaceId,
+		env,
+		async (): Promise<
+			| { ok: true; value: T; notices: string[] }
+			| { ok: false; error: SqlFailure }
+		> => {
+			let rows: Record<string, unknown>[];
+			try {
+				rows = await env.executor.query<Record<string, unknown>>(statement);
+			} catch (error) {
+				const offset = wrap?.prefix.length ?? 0;
+				const failure = classify(error, sql, {
+					...prepared.prepared,
+					originOf: (position) =>
+						prepared.prepared.originOf(Math.max(0, position - offset)),
+				});
+				if (!failure) throw error;
+				return { ok: false, error: failure };
+			}
+			return { ok: true, value: await follow(rows), notices };
+		},
+		signal,
+	);
+}
+
+/**
+ * Runs `work` (an agent's ClickHouse reads: sql, search, run_questions) in a
+ * query slot of the workspace, taking one query of its quota inside the slot,
+ * so a busy refusal costs none. Past the quota, or with no slot free, it says
+ * why instead.
+ */
+export async function withAgentQuery<T>(
+	workspaceId: string,
+	env: { readonly limiter: AgentQueryLimiter; readonly quota: SqlQuota },
+	work: () => Promise<T | { ok: false; error: SqlFailure }>,
+	signal?: AbortSignal,
+): Promise<T | { ok: false; error: SqlFailure }> {
 	try {
-		// The quota is taken inside the slot, so a busy refusal costs none.
 		return await env.limiter.withAgentQuerySlot(
-			caller.workspaceId,
-			async (): Promise<
-				{ ok: true; value: T } | { ok: false; error: SqlFailure }
-			> => {
-				const quota = await env.quota.take(caller.workspaceId);
+			workspaceId,
+			async () => {
+				const quota = await env.quota.take(workspaceId);
 				if (!quota.allowed)
 					return {
-						ok: false,
-						error: {
-							kind: "fatal",
-							message: `The workspace used its SQL quota of ${env.quota.queries} queries per ${env.quota.windowMs / 60_000} minutes.`,
-							fragment: null,
-							fix: `Do not retry before ${quota.resetsAt.toISOString()}; answer with what you have, or with find and read.`,
-						},
+						ok: false as const,
+						error: quotaExceeded(env.quota, quota.resetsAt),
 					};
-				let rows: Record<string, unknown>[];
-				try {
-					rows = await env.executor.query<Record<string, unknown>>(statement);
-				} catch (error) {
-					const failure = classify(error, sql, prepared.prepared);
-					if (!failure) throw error;
-					return { ok: false, error: failure };
-				}
-				return { ok: true, value: await follow(rows) };
+				return await work();
 			},
 			signal,
 		);
@@ -382,7 +648,8 @@ const PARSE_PREFIX = "EXPLAIN AST ";
 async function checkWithClickHouseParser(
 	sql: string,
 	prepared: PreparedSql,
-	env: SqlEnv,
+	env: Pick<SqlEnv, "executor">,
+	functions: ReadonlySet<string>,
 ): Promise<SqlFailure | null> {
 	let lines: string[];
 	try {
@@ -403,6 +670,7 @@ async function checkWithClickHouseParser(
 	return checkParsedSql(lines, {
 		views: new Set(SQL_VIEWS.map((view) => view.name)),
 		ctes: prepared.ctes,
+		functions,
 	});
 }
 
@@ -423,7 +691,7 @@ const READ_LIMITS: Readonly<Record<string, string>> = {
 	TOO_MANY_BYTES: `The query read more than ${SQL_LIMITS.bytesRead / 1024 / 1024 / 1024} GiB`,
 };
 const NARROW_HOW =
-	"a shorter started_at range, fewer members or sessions, fewer or narrower columns (leave out prompt_head and arrays), or aggregate with GROUP BY before ordering.";
+	"a shorter time range (started_at, at, observed_at), fewer members or sessions (user_id, or session_id IN (SELECT session_id FROM runs WHERE started_at >= …)), fewer or narrower columns (leave out long text such as prompt_head, command and text, and arrays), or aggregate with GROUP BY before ordering.";
 const NARROW = `Narrow it: ${NARROW_HOW}`;
 /** Refusals no rewrite of the query can pass. */
 const FATAL_TYPES = new Set([
@@ -479,8 +747,8 @@ function classify(
 		fragment: failingPart(error.message, sql, prepared),
 		fix:
 			type === "UNKNOWN_IDENTIFIER" || type === "UNKNOWN_TABLE"
-				? "Use only columns of the view (schema view=runs lists them) and names your query defines."
-				: "Fix the failing part and run the query again; schema view=runs lists the columns and their types.",
+				? "Use only columns of the views (schema view=<view> lists them) and names your query defines."
+				: "Fix the failing part and run the query again; schema view=<view> lists the columns and their types.",
 	};
 }
 
@@ -540,6 +808,9 @@ const SERVER_TEXT = [
 	"{opaline_",
 	"opaline_workspace",
 	"opaline_member",
+	"opaline_repositories",
+	"opaline_view_",
+	"opaline_search",
 ];
 
 function unknownName(
@@ -627,6 +898,37 @@ async function namedSessions(
 	return sessions
 		.filter((session) => mayReadSession(caller.reader, session.ownerId))
 		.sort((left, right) => left.sessionId.localeCompare(right.sessionId));
+}
+
+/**
+ * Runs the given (shown) rows name, once each in row order: only with session_id,
+ * agent_id and turn_idx columns, since a turn number alone names a run in
+ * the main stream and in each subagent, and only in sessions the caller may
+ * read (`sessions`), so a literal in the SQL cannot cite another member's run.
+ */
+function namedRuns(
+	columns: readonly string[],
+	rows: readonly Record<string, unknown>[],
+	sessions: AnalysisSqlOutput["sessions"],
+): AnalysisSqlOutput["runs"] {
+	if (
+		!["session_id", "agent_id", "turn_idx"].every((column) =>
+			columns.includes(column),
+		)
+	)
+		return [];
+	const readable = new Set(sessions.map((session) => session.sessionId));
+	const runs = new Map<string, AnalysisSqlOutput["runs"][number]>();
+	for (const row of rows) {
+		const parsed = RunRefSchema.safeParse({
+			sessionId: row.session_id,
+			agentId: row.agent_id,
+			turn: Number(row.turn_idx),
+		});
+		if (!parsed.success || !readable.has(parsed.data.sessionId)) continue;
+		runs.set(JSON.stringify(parsed.data), parsed.data);
+	}
+	return [...runs.values()];
 }
 
 /**

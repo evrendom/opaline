@@ -7,8 +7,16 @@
  * parameters. ClickHouse runs the result read-only (`readonly = 1`), so a write
  * or a settings change fails there too.
  *
+ * A view with a window column reads first only what the agent's WHERE keeps
+ * of that column's range, when its conditions say so for certain
+ * (`windowOf`); the rows are the same, the reads fewer.
+ *
+ * The server may offer table functions (`search('…')`): a call in a FROM
+ * or JOIN position with literal arguments only is replaced by the statement
+ * the server gives for it, which binds its own parameters.
+ *
  * Refused: anything but one SELECT (or WITH … SELECT); tables, databases and
- * table functions other than the views, and the names of server tables and
+ * table functions other than the views and the server's, and the names of server tables and
  * databases anywhere; any function not on the function list
  * (`sql-functions.ts`, fail closed), quoted or not; query parameters;
  * SETTINGS, FORMAT and INTO OUTFILE; and naming the workspace column.
@@ -37,7 +45,38 @@ export interface PreparedSql {
 	};
 	/** Offset in the agent's SQL of a character of `sql`. */
 	originOf(offset: number): number;
+	/** The server table functions the query calls, in order. */
+	readonly calls: readonly SqlTableFunctionCall[];
 }
+
+/**
+ * A range the agent's query keeps of a view's window column, as SQL
+ * expressions of constants from its WHERE; `from` and `to` are inclusive.
+ */
+export interface SqlWindow {
+	readonly from?: string;
+	readonly to?: string;
+}
+
+/** A view as the guard puts it in place of its name. */
+export interface GuardedView {
+	/** The column whose range in the WHERE that reads the view is passed to `statement`. */
+	readonly windowColumn?: string;
+	statement(window: SqlWindow): string;
+}
+
+/** One call of a server table function: its literal arguments, unquoted. */
+export interface SqlTableFunctionCall {
+	readonly name: string;
+	readonly args: readonly string[];
+	/** Its place among the query's calls, from 0: names its parameters. */
+	readonly index: number;
+}
+
+/** The statement in place of a call, or why its arguments are refused. */
+export type SqlTableFunction = (
+	call: SqlTableFunctionCall,
+) => { sql: string } | { failure: SqlFailure };
 
 type TokenKind = "word" | "quoted" | "string" | "number" | "symbol";
 
@@ -132,6 +171,29 @@ const CLAUSE_KEYWORDS = new Set([
 	"QUALIFY",
 	"SELECT",
 ]);
+/** Words that end a WHERE condition. */
+const ENDS_CONDITION = new Set([...CLAUSE_KEYWORDS, "SETTINGS", "FORMAT"]);
+/**
+ * Joins whose result for a row of the view depends on its other rows or keeps
+ * rows the view lacks: reading fewer of its rows would change them.
+ */
+const ROW_DEPENDENT_JOINS = new Set(["RIGHT", "FULL", "PASTE", "ANY"]);
+const COMPARISONS = new Set([">=", ">", "<=", "<"]);
+const ARITHMETIC = new Set(["+", "-", "*", "/", "%"]);
+/** Words of an INTERVAL literal. */
+const INTERVAL_WORDS = new Set(
+	[
+		"INTERVAL",
+		"SECOND",
+		"MINUTE",
+		"HOUR",
+		"DAY",
+		"WEEK",
+		"MONTH",
+		"QUARTER",
+		"YEAR",
+	].flatMap((word) => [word, `${word}S`]),
+);
 /** Words that can follow a table name without being its alias. */
 const NOT_AN_ALIAS = new Set([
 	...CLAUSE_KEYWORDS,
@@ -195,12 +257,13 @@ const KEYWORDS_BEFORE_EXPRESSIONS = new Set([
  */
 export function prepareAgentSql(
 	query: string,
-	views: ReadonlyMap<string, string>,
+	views: ReadonlyMap<string, GuardedView>,
 	reserved: ReadonlySet<string>,
+	tableFunctions: ReadonlyMap<string, SqlTableFunction> = new Map(),
 ): { ok: true; prepared: PreparedSql } | { ok: false; failure: SqlFailure } {
 	const tokens = tokenize(query);
 	if ("failure" in tokens) return { ok: false, failure: tokens.failure };
-	const checked = check(query, tokens.tokens, views, reserved);
+	const checked = check(query, tokens.tokens, views, reserved, tableFunctions);
 	if ("failure" in checked) return { ok: false, failure: checked.failure };
 	return {
 		ok: true,
@@ -208,8 +271,28 @@ export function prepareAgentSql(
 			...emit(tokens.tokens, checked.replacements),
 			ctes: checked.ctes,
 			parsed: emit(tokens.tokens, new Map()),
+			calls: checked.calls,
 		},
 	};
+}
+
+/**
+ * Whether the agent's SQL carries free text of its own: a string literal, a
+ * quoted name or a comment (or it does not tokenize at all). Such text may
+ * be copied from a transcript, so account deletion removes a statement that
+ * carries any with its result (ADR 0001 as amended).
+ */
+export function carriesText(query: string): boolean {
+	const tokenized = tokenize(query);
+	if ("failure" in tokenized) return true;
+	let end = 0;
+	for (const token of tokenized.tokens) {
+		// Whatever lies between tokens is whitespace or a comment.
+		if (query.slice(end, token.start).trim() !== "") return true;
+		if (token.kind === "string" || token.kind === "quoted") return true;
+		end = token.start + token.text.length;
+	}
+	return query.slice(end).trim() !== "";
 }
 
 /** Strips the prefix the server gives WITH subquery names. */
@@ -220,10 +303,15 @@ export function withoutCtePrefix(text: string): string {
 function check(
 	query: string,
 	tokens: readonly Token[],
-	views: ReadonlyMap<string, string>,
+	views: ReadonlyMap<string, GuardedView>,
 	reserved: ReadonlySet<string>,
+	tableFunctions: ReadonlyMap<string, SqlTableFunction>,
 ):
-	| { replacements: Map<number, string>; ctes: ReadonlySet<string> }
+	| {
+			replacements: Map<number, string>;
+			ctes: ReadonlySet<string>;
+			calls: SqlTableFunctionCall[];
+	  }
 	| { failure: SqlFailure } {
 	const at = (index: number) => tokens[index];
 	const upper = (index: number) => {
@@ -288,6 +376,9 @@ function check(
 	}
 
 	const replacements = new Map<number, string>();
+	const calls: SqlTableFunctionCall[] = [];
+	/** Token indexes of server table function names, already checked as tables. */
+	const tableCalls = new Set<number>();
 	/**
 	 * One frame per parenthesis depth: whether it holds a query (so FROM opens
 	 * a FROM clause, not EXTRACT(… FROM …)), whether a FROM clause is open, and
@@ -347,7 +438,18 @@ function check(
 				called &&
 				(token.kind === "quoted" ||
 					!PAREN_KEYWORDS.has(token.text.toUpperCase()));
-			if (isCall && !isAllowedFunction(name))
+			if (
+				isCall &&
+				!tableCalls.has(index) &&
+				tableFunctions.has(name.toLowerCase())
+			)
+				return fail(
+					"recoverable",
+					token,
+					`${name}() is a table, not a function of a row.`,
+					`Read it in FROM or JOIN with literal arguments, e.g. SELECT r.prompt_head, s.why FROM ${name.toLowerCase()}('flaky login test') AS s JOIN runs AS r USING (run_id).`,
+				);
+			if (isCall && !tableCalls.has(index) && !isAllowedFunction(name))
 				return { failure: unavailableFunction(name, fragment(token)) };
 			if (
 				isReserved(name, reserved) &&
@@ -424,7 +526,7 @@ function check(
 			if ("failure" in table) return table;
 		}
 	}
-	return { replacements, ctes };
+	return { replacements, ctes, calls };
 
 	/**
 	 * FROM opens a FROM clause in a query (after SELECT or WITH, or first, as
@@ -492,6 +594,12 @@ function check(
 			return context === "in" ? { ok: true } : outsideViews(token);
 		const next = at(index + 1);
 		if (next?.text === "(") {
+			const tableFunction =
+				token.kind === "word"
+					? tableFunctions.get(token.text.toLowerCase())
+					: undefined;
+			if (context === "from" && tableFunction)
+				return tableFunctionAt(index, tableFunction);
 			// `x IN tuple(…)` is an expression; after FROM it is a table function.
 			return context === "in" ? { ok: true } : outsideViews(token);
 		}
@@ -500,9 +608,21 @@ function check(
 		const view = views.get(name.toLowerCase());
 		const alias = hasAlias(index + 1);
 		if (view !== undefined) {
+			const named = alias
+				? unquote(
+						at(upper(index + 1) === "AS" ? index + 2 : index + 1) ?? token,
+					)
+				: name;
+			const statement = view.statement(
+				context === "from" && view.windowColumn !== undefined
+					? windowOf(index, named, view.windowColumn)
+					: {},
+			);
 			replacements.set(
 				index,
-				context === "in" || alias ? `(${view})` : `(${view}) AS ${name}`,
+				context === "in" || alias
+					? `(${statement})`
+					: `(${statement}) AS ${name}`,
 			);
 			return { ok: true };
 		}
@@ -516,6 +636,216 @@ function check(
 			return { ok: true };
 		}
 		return outsideViews(token);
+	}
+
+	/**
+	 * The range of `column` that every row the query reads from the view at
+	 * `index` must lie in: from conditions ANDed into the WHERE of the query
+	 * whose FROM starts with the view, comparing the column (bare when the view
+	 * is the only table, or under its name `named`) with constants. Nothing
+	 * when that cannot be said for certain: an OR or `?:` at the top of the
+	 * WHERE, a join that is not decided row by row (RIGHT, FULL, PASTE, ANY),
+	 * the column's name given to something else, or a bound that reads a
+	 * column.
+	 */
+	function windowOf(index: number, named: string, column: string): SqlWindow {
+		if (upper(index - 1) !== "FROM" || renamed(column)) return {};
+		let joined = false;
+		let where = -1;
+		for (let cursor = index + 1, depth = 0; cursor < tokens.length; cursor++) {
+			const text = at(cursor)?.text;
+			if (text === "(") depth++;
+			else if (text === ")" && depth-- === 0) return {};
+			if (depth > 0 || text === "(" || text === ")") continue;
+			const word = upper(cursor);
+			if (ROW_DEPENDENT_JOINS.has(word)) return {};
+			if (word === "JOIN" || text === ",") joined = true;
+			if (word === "WHERE") {
+				where = cursor + 1;
+				break;
+			}
+			if (ENDS_CONDITION.has(word) || text === ";") return {};
+		}
+		if (where === -1) return {};
+		const conditions: [number, number][] = [];
+		let start = where;
+		let end = where;
+		let between = false;
+		for (let depth = 0, cases = 0; end < tokens.length; end++) {
+			const text = at(end)?.text;
+			const word = upper(end);
+			if (text === "(") depth++;
+			else if (text === ")" && depth-- === 0) break;
+			if (depth > 0 || text === "(" || text === ")") continue;
+			if (ENDS_CONDITION.has(word) || text === ";") break;
+			if (word === "CASE") cases++;
+			if (word === "END") cases--;
+			if (cases > 0) continue;
+			if (word === "OR" || text === "?") return {};
+			if (word === "BETWEEN") between = true;
+			else if (word === "AND" && between) between = false;
+			else if (word === "AND") {
+				conditions.push([start, end]);
+				start = end + 1;
+			}
+		}
+		conditions.push([start, end]);
+		/** Whether tokens [from, to) name the view's column. */
+		const reference = (from: number, to: number) => {
+			const name = (index: number) => {
+				const token = at(index);
+				return token?.kind === "word" || token?.kind === "quoted"
+					? unquote(token)
+					: undefined;
+			};
+			if (to - from === 1) return !joined && name(from) === column;
+			return (
+				to - from === 3 &&
+				name(from) === named &&
+				at(from + 1)?.text === "." &&
+				name(from + 2) === column
+			);
+		};
+		let from: string | undefined;
+		let to: string | undefined;
+		for (const [first, last] of conditions) {
+			const length = [1, 3].find((size) => reference(first, first + size));
+			if (length !== undefined && upper(first + length) === "BETWEEN") {
+				const low = first + length + 1;
+				const and = tokens.findIndex(
+					(token, index) =>
+						index > low && index < last && token.text.toUpperCase() === "AND",
+				);
+				if (and !== -1 && constant(low, and) && constant(and + 1, last)) {
+					from ??= sqlOf(low, and);
+					to ??= sqlOf(and + 1, last);
+				}
+				continue;
+			}
+			for (let op = first + 1; op < last; op++) {
+				const symbol = at(op)?.text ?? "";
+				if (!COMPARISONS.has(symbol)) continue;
+				// column >= bound, or bound >= column: which side is the bound.
+				const lower = symbol.startsWith(">");
+				if (reference(first, op) && constant(op + 1, last)) {
+					if (lower) from ??= sqlOf(op + 1, last);
+					else to ??= sqlOf(op + 1, last);
+				} else if (reference(op + 1, last) && constant(first, op)) {
+					if (lower) to ??= sqlOf(first, op);
+					else from ??= sqlOf(first, op);
+				}
+			}
+		}
+		return {
+			...(from === undefined ? {} : { from }),
+			...(to === undefined ? {} : { to }),
+		};
+	}
+
+	/** Whether the query gives `column`'s name to something else: `AS column`, or an alias without AS. */
+	function renamed(column: string): boolean {
+		return tokens.some((token, index) => {
+			if (token.kind !== "word" && token.kind !== "quoted") return false;
+			if (unquote(token) !== column) return false;
+			const before = at(index - 1);
+			if (!before) return false;
+			if (before.kind === "word") {
+				const word = before.text.toUpperCase();
+				return word === "AS" || !KEYWORDS_BEFORE_EXPRESSIONS.has(word);
+			}
+			return (
+				before.kind !== "symbol" || before.text === ")" || before.text === "]"
+			);
+		});
+	}
+
+	/** Whether tokens [from, to) are an expression of constants: literals, listed functions, intervals and arithmetic. */
+	function constant(from: number, to: number): boolean {
+		if (from >= to) return false;
+		let depth = 0;
+		for (let index = from; index < to; index++) {
+			const token = at(index);
+			if (!token) return false;
+			if (token.kind === "string" || token.kind === "number") continue;
+			if (token.kind === "quoted") return false;
+			if (token.kind === "symbol") {
+				if (token.text === "(") depth++;
+				else if (token.text === ")") depth--;
+				else if (
+					!(ARITHMETIC.has(token.text) || (token.text === "," && depth > 0))
+				)
+					return false;
+				if (depth < 0) return false;
+				continue;
+			}
+			const word = token.text.toUpperCase();
+			const call =
+				at(index + 1)?.text === "(" &&
+				!PAREN_KEYWORDS.has(word) &&
+				isAllowedFunction(token.text);
+			if (!call && !INTERVAL_WORDS.has(word)) return false;
+		}
+		return depth === 0;
+	}
+
+	function sqlOf(from: number, to: number): string {
+		return tokens
+			.slice(from, to)
+			.map((token) => token.text)
+			.join(" ");
+	}
+
+	/**
+	 * A server table function at `index` (its name, then `(`): literal
+	 * arguments only, replaced as a whole by the statement the server gives.
+	 */
+	function tableFunctionAt(
+		index: number,
+		tableFunction: SqlTableFunction,
+	): { ok: true } | { failure: SqlFailure } {
+		const token = at(index);
+		const name = token?.text.toLowerCase() ?? "";
+		const args: string[] = [];
+		let cursor = index + 2;
+		while (at(cursor)?.text !== ")") {
+			const argument = at(cursor);
+			const separator = at(cursor + 1);
+			if (
+				(argument?.kind !== "string" && argument?.kind !== "number") ||
+				(separator?.text !== "," && separator?.text !== ")")
+			)
+				return fail(
+					"recoverable",
+					argument ?? token,
+					`${name}() takes literal arguments only.`,
+					`Write e.g. ${name}('flaky login test') or ${name}('--legacy', 'exact', 90); join it to runs for filters.`,
+				);
+			args.push(
+				argument.kind === "string"
+					? argument.text
+							.slice(1, -1)
+							.replaceAll("''", "'")
+							.replace(/\\(.)/gu, "$1")
+					: argument.text,
+			);
+			cursor += separator.text === "," ? 2 : 1;
+		}
+		const call = { name, args, index: calls.length };
+		const statement = tableFunction(call);
+		if ("failure" in statement) return statement;
+		calls.push(call);
+		tableCalls.add(index);
+		for (let blank = index + 1; blank <= cursor; blank++)
+			replacements.set(blank, "");
+		// Unnamed calls are named after the function, numbered from the second.
+		const alias = call.index === 0 ? name : `${name}_${call.index + 1}`;
+		replacements.set(
+			index,
+			hasAlias(cursor + 1)
+				? `(${statement.sql})`
+				: `(${statement.sql}) AS ${alias}`,
+		);
+		return { ok: true };
 	}
 
 	/** Whether the agent named the table expression: `AS name`, a quoted name or a bare word. */
@@ -740,7 +1070,12 @@ function tokenize(
  */
 export function checkParsedSql(
 	explain: readonly string[],
-	tables: { views: ReadonlySet<string>; ctes: ReadonlySet<string> },
+	tables: {
+		views: ReadonlySet<string>;
+		ctes: ReadonlySet<string>;
+		/** Server table functions, read in FROM or JOIN with literal arguments. */
+		functions?: ReadonlySet<string>;
+	},
 ): SqlFailure | null {
 	const nodes = explain.map((line) => {
 		const depth = line.length - line.trimStart().length;
@@ -774,6 +1109,16 @@ export function checkParsedSql(
 			name,
 			`The query reads "${name}", which is not a view you may query. Allowed views: ${[...tables.views].join(", ")}.`,
 		);
+	/** Server table function nodes, whose arguments are all literals. */
+	const tableFunctions = new Set<number>();
+	const literalsOnly = (index: number): boolean =>
+		childrenOf(index).every((child) => {
+			const node = nodes[child];
+			return (
+				node?.kind === "Literal" ||
+				(node?.kind === "ExpressionList" && literalsOnly(child))
+			);
+		});
 	for (const [index, node] of nodes.entries()) {
 		if (node.kind === "TableExpression")
 			for (const child of childrenOf(index)) {
@@ -781,9 +1126,15 @@ export function checkParsedSql(
 				if (!table) continue;
 				if (table.kind === "TableIdentifier") {
 					if (!allowedTable(table.name)) return outside(table.name);
-				} else if (table.kind !== "Subquery") return outside(table.name);
+				} else if (
+					table.kind === "Function" &&
+					tables.functions?.has(table.name.toLowerCase()) &&
+					literalsOnly(child)
+				)
+					tableFunctions.add(child);
+				else if (table.kind !== "Subquery") return outside(table.name);
 			}
-		if (node.kind === "Function") {
+		if (node.kind === "Function" && !tableFunctions.has(index)) {
 			const lower = node.name.toLowerCase();
 			if (!isAllowedFunction(node.name))
 				return unavailableFunction(node.name, node.name);

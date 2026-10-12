@@ -1,0 +1,39 @@
+import { createHmac } from "node:crypto";
+import { getClickhouse } from "../../clickhouse.js";
+import { sqlClient } from "../../db.js";
+import {
+	createAgentQueryLimiter,
+	createPostgresAgentQuerySlots,
+} from "../analysis/agent-query-slots.js";
+import { visibleGitHubRepositories } from "../analysis/github-access.js";
+import { createPostgresSqlQuota } from "../analysis/sql-results.js";
+import {
+	readRunQuestionProviders,
+	readRunQuestionWorkspaces,
+} from "./provider.js";
+import type { RunQuestionsEnv } from "./run-questions.service.js";
+
+/** Run questions as the API runs them, configured from the environment. */
+export function runQuestionsEnv(): RunQuestionsEnv {
+	const providers = readRunQuestionProviders();
+	return {
+		executor: getClickhouse(),
+		sql: sqlClient,
+		provider: providers.default,
+		providers: providers.byName,
+		mayAnswer: readRunQuestionWorkspaces(),
+		sqlQuota: createPostgresSqlQuota(sqlClient),
+		limiter: createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
+		githubRepositories: visibleGitHubRepositories,
+		estimateKey: estimateKey(process.env.BETTER_AUTH_SECRET),
+	};
+}
+
+/** The key estimate tokens are signed with, derived from the server's auth secret. */
+function estimateKey(secret: string | undefined): string | null {
+	return secret?.trim()
+		? createHmac("sha256", secret)
+				.update("run-questions-estimate")
+				.digest("hex")
+		: null;
+}

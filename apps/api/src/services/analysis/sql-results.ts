@@ -1,13 +1,20 @@
 import { randomBytes } from "node:crypto";
-import type { AnalysisSqlOutput } from "@rudel/api-routes";
+import { ORPCError } from "@orpc/server";
+import {
+	type AnalysisHistorySqlResultOutput,
+	type AnalysisSqlOutput,
+	AnalysisSqlOutputSchema,
+} from "@rudel/api-routes";
 import type postgres from "postgres";
 
 /**
  * Stored SQL results (docs/adr/0005-agents-query-l1-with-sql.md): every `sql`
  * result is kept under an id with its title, SQL and what it covered, so it
- * can be quoted later and deleted with the sessions it read. ADR 0001 as
+ * can be opened later and removed with the sessions it counted. ADR 0001 as
  * amended: deleting an account deletes the results it ran and every result
- * that read one of its sessions (`owners`), in any author's name; deleting a
+ * whose rows carried text from the sessions it could read (`owners`), and
+ * removes the rows of every other one that only counted them, keeping its
+ * title and, unless it carries text of its own, its SQL; deleting a
  * workspace deletes all of the workspace's results.
  */
 
@@ -20,20 +27,45 @@ export interface SqlResultRecord {
 	readonly output: Omit<AnalysisSqlOutput, "id" | "trace">;
 	/** Every member whose sessions the query could read, sorted. */
 	readonly owners: readonly string[];
+	/** The shown rows carried only numbers, times and ids (`rowsQuote`). */
+	readonly counts: boolean;
+	/** The SQL has a literal, quoted name or comment (`carriesText`). */
+	readonly queryCarriesText: boolean;
+}
+
+/** A stored result as it is now: without its result once removed. */
+export interface StoredSqlResult extends Omit<SqlResultRecord, "output"> {
+	readonly id: string;
+	readonly output: SqlResultRecord["output"] | null;
+	readonly createdAt: string;
+	/** A member whose sessions it counted deleted their account. */
+	readonly removed: boolean;
 }
 
 export interface SqlResultStore {
 	/** Stores the result and returns its id. */
 	save(record: SqlResultRecord): Promise<string>;
+	get(id: string): Promise<StoredSqlResult | null>;
 	/** Removes one result, when the call that stored it failed afterwards. */
 	discard(id: string): Promise<void>;
-	/** Deletes the results of the target: a workspace's, or an account's and every result that read its sessions. */
+	/**
+	 * A workspace's results are deleted. For an account, its own results and
+	 * every result among whose owners it is that does not only count are
+	 * deleted; every other result among whose owners it is is removed: no
+	 * output, the account no longer among its owners, the title kept, and the
+	 * SQL kept unless it carries text (then empty).
+	 */
 	purge(target: SqlPurgeTarget): Promise<void>;
 }
 
 export type SqlPurgeTarget =
 	| { targetType: "account"; targetId: string }
 	| { targetType: "organization"; targetId: string };
+
+const StoredSqlOutputSchema = AnalysisSqlOutputSchema.omit({
+	id: true,
+	trace: true,
+});
 
 /** A per-workspace budget of queries in a fixed window. */
 export interface SqlQuota {
@@ -46,6 +78,42 @@ export interface SqlQuota {
 
 /** Stored results are deleted this long after they were stored (ADR 0001's result retention). */
 export const SQL_RESULT_RETENTION_DAYS = 90;
+
+/**
+ * One stored result for the member who ran it: its title, SQL and rows, or
+ * why the rows are gone (removed, or past the retention before the daily
+ * cleanup deleted it). Results belong to their author's draft or analysis,
+ * so nobody else opens one by id; a shared analysis shows its sql steps
+ * through their stored queries.
+ */
+export async function openSqlResult(
+	results: Pick<SqlResultStore, "get">,
+	viewer: { workspaceId: string; userId: string },
+	id: string,
+	now: Date,
+): Promise<AnalysisHistorySqlResultOutput> {
+	const stored = await results.get(id);
+	if (
+		!stored ||
+		stored.workspaceId !== viewer.workspaceId ||
+		stored.authorId !== viewer.userId
+	)
+		throw new ORPCError("NOT_FOUND", {
+			message: `No sql result ${id} of yours; a shared answer's sql steps open by their query id (answers action=open lists them)`,
+		});
+	const expired =
+		now.getTime() - Date.parse(stored.createdAt) >
+		SQL_RESULT_RETENTION_DAYS * 86_400_000;
+	const unavailable = stored.removed ? "removed" : expired ? "expired" : null;
+	return {
+		id: stored.id,
+		title: stored.title,
+		query: stored.query,
+		createdAt: stored.createdAt,
+		unavailable,
+		output: unavailable ? null : stored.output,
+	};
+}
 
 /** Deletes stored results older than the retention; the daily API maintenance runs it. */
 export async function expireSqlResults(
@@ -64,33 +132,53 @@ export async function expireSqlResults(
  */
 export const SQL_QUOTA = { queries: 120, windowMs: 3_600_000 } as const;
 
+/** Stored sql result ids start with it; analysis query ids do not. */
+export const SQL_RESULT_ID_PREFIX = "sr_";
+
 export function newSqlResultId(): string {
-	return `sr_${randomBytes(12).toString("base64url")}`;
+	return `${SQL_RESULT_ID_PREFIX}${randomBytes(12).toString("base64url")}`;
 }
 
-export function createMemorySqlResultStore(): SqlResultStore & {
-	readonly records: Map<string, SqlResultRecord>;
+export function createMemorySqlResultStore(
+	now: () => Date = () => new Date(),
+): SqlResultStore & {
+	readonly records: Map<string, StoredSqlResult>;
 } {
-	const records = new Map<string, SqlResultRecord>();
+	const records = new Map<string, StoredSqlResult>();
 	return {
 		records,
 		async save(record) {
 			const id = newSqlResultId();
-			records.set(id, record);
+			records.set(id, {
+				...record,
+				id,
+				createdAt: now().toISOString(),
+				removed: false,
+			});
 			return id;
+		},
+		async get(id) {
+			return records.get(id) ?? null;
 		},
 		async discard(id) {
 			records.delete(id);
 		},
 		async purge(target) {
-			for (const [id, record] of records)
-				if (
-					target.targetType === "organization"
-						? record.workspaceId === target.targetId
-						: record.authorId === target.targetId ||
-							record.owners.includes(target.targetId)
-				)
-					records.delete(id);
+			for (const [id, record] of records) {
+				if (target.targetType === "organization") {
+					if (record.workspaceId === target.targetId) records.delete(id);
+				} else if (record.authorId === target.targetId) records.delete(id);
+				else if (!record.owners.includes(target.targetId)) continue;
+				else if (!record.counts) records.delete(id);
+				else
+					records.set(id, {
+						...record,
+						query: record.queryCarriesText ? "" : record.query,
+						output: null,
+						removed: true,
+						owners: record.owners.filter((owner) => owner !== target.targetId),
+					});
+			}
 		},
 	};
 }
@@ -130,25 +218,73 @@ export function createPostgresSqlResultStore(
 			const id = newSqlResultId();
 			await sql`
 				INSERT INTO analysis_sql_result
-					(id, organization_id, author_id, title, query, output, owner_ids)
+					(id, organization_id, author_id, title, query, output, owner_ids,
+						counts, query_carries_text)
 				VALUES (
 					${id}, ${record.workspaceId}, ${record.authorId}, ${record.title},
-					${record.query}, ${sql.json(record.output)}, ${[...record.owners]}
+					${record.query}, ${sql.json(record.output)}, ${[...record.owners]},
+					${record.counts}, ${record.queryCarriesText}
 				)
 			`;
 			return id;
+		},
+		async get(id) {
+			const [row] = await sql<
+				{
+					id: string;
+					organization_id: string;
+					author_id: string;
+					title: string;
+					query: string;
+					output: unknown;
+					owner_ids: string[];
+					counts: boolean;
+					query_carries_text: boolean;
+					created_at: Date;
+					removed_at: Date | null;
+				}[]
+			>`
+				SELECT id, organization_id, author_id, title, query, output, owner_ids,
+					counts, query_carries_text, created_at, removed_at
+				FROM analysis_sql_result WHERE id = ${id}
+			`;
+			if (!row) return null;
+			return {
+				id: row.id,
+				workspaceId: row.organization_id,
+				authorId: row.author_id,
+				title: row.title,
+				query: row.query,
+				output:
+					row.output === null ? null : StoredSqlOutputSchema.parse(row.output),
+				owners: row.owner_ids,
+				counts: row.counts,
+				queryCarriesText: row.query_carries_text,
+				createdAt: row.created_at.toISOString(),
+				removed: row.removed_at !== null,
+			};
 		},
 		async discard(id) {
 			await sql`DELETE FROM analysis_sql_result WHERE id = ${id}`;
 		},
 		async purge(target) {
-			if (target.targetType === "organization")
+			if (target.targetType === "organization") {
 				await sql`DELETE FROM analysis_sql_result WHERE organization_id = ${target.targetId}`;
-			else
-				await sql`
-					DELETE FROM analysis_sql_result
-					WHERE author_id = ${target.targetId} OR ${target.targetId} = ANY(owner_ids)
-				`;
+				return;
+			}
+			await sql`
+				DELETE FROM analysis_sql_result
+				WHERE author_id = ${target.targetId}
+					OR (${target.targetId} = ANY(owner_ids) AND NOT counts)
+			`;
+			await sql`
+				UPDATE analysis_sql_result SET
+					output = NULL,
+					query = CASE WHEN query_carries_text THEN '' ELSE query END,
+					removed_at = coalesce(removed_at, now()),
+					owner_ids = array_remove(owner_ids, ${target.targetId})
+				WHERE ${target.targetId} = ANY(owner_ids)
+			`;
 		},
 	};
 }

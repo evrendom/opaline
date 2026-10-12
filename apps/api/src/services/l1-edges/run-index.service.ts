@@ -1,6 +1,9 @@
 import { getLogger } from "@logtape/logtape";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
-import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
+import type {
+	RudelRunIndexRow,
+	RudelRunRequestsRow,
+} from "@rudel/ch-schema/generated";
 import { z } from "zod";
 import {
 	type ClickHouseExecutor,
@@ -19,6 +22,7 @@ import {
 	buildCodexTurnMarksStatement,
 	buildRunIndexSessionStatement,
 	buildRunIndexStatement,
+	buildRunRequestsStatement,
 	buildUnattributedUsageStatement,
 	CodexLifecycleRowSchema,
 	CodexTurnMarkSchema,
@@ -28,9 +32,17 @@ import {
 	RunIndexFactsRowSchema,
 	type RunIndexSessionFacts,
 	RunIndexSessionFactsSchema,
+	type RunRequestFactsRow,
+	RunRequestFactsRowSchema,
 	type UnattributedUsageRow,
 	UnattributedUsageRowSchema,
 } from "../analysis/run-index-sql.js";
+import {
+	buildRunMessagesStatement,
+	type RunMessageColumns,
+	RunMessagesRowSchema,
+	runMessageColumns,
+} from "../analysis/run-messages.js";
 import { queryCountedGenerations } from "../analysis/scope.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
 import {
@@ -43,7 +55,7 @@ import {
 	type SessionIdentity,
 	sessionScopeId,
 } from "./l1-edge-ids.js";
-import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
+import { RUN_INDEX_TABLE, RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
 
 const logger = getLogger(["rudel", "api", "l1-edges"]);
 
@@ -205,6 +217,11 @@ export async function buildRunIndex(input: {
 		RunIndexFactsRowSchema,
 		buildRunIndexStatement(scope, bound),
 	);
+	const requests = await query(
+		executor,
+		RunRequestFactsRowSchema,
+		buildRunRequestsStatement(scope, bound),
+	);
 	const [unattributed] = await query(
 		executor,
 		UnattributedUsageRowSchema,
@@ -217,6 +234,13 @@ export async function buildRunIndex(input: {
 	);
 	if (!unattributed || !facts)
 		throw new Error("Run index session statements returned no row");
+	const messages = runMessageColumns(
+		await query(
+			executor,
+			RunMessagesRowSchema,
+			buildRunMessagesStatement(scope, committed),
+		),
+	);
 	const lifecycle =
 		session.source === "codex"
 			? codexLifecycleFactsByRun(
@@ -275,8 +299,12 @@ export async function buildRunIndex(input: {
 				lifecycle.get(streamTurnKey(run.agent_id, run.turn_idx)) ??
 					NO_CODEX_LIFECYCLE_FACTS,
 				context,
+				messages(run.agent_id, run.turn_idx),
 			),
 		),
+	);
+	const requestRows = requests.map((request) =>
+		requestRow(request, context, usage.state === "unknown"),
 	);
 	// Each build has its own insert tokens: a generation deleted by a fence
 	// and rebuilt by a later claim is never dropped as a duplicate.
@@ -290,6 +318,16 @@ export async function buildRunIndex(input: {
 			asyncInsert: false,
 			deduplicationToken: `${token}:runs`,
 		});
+	// Requests before the receipt, so the receipt commits them with the runs.
+	if (requestRows.length > 0) {
+		await input.beforeWrite();
+		await executor.insert({
+			table: RUN_REQUESTS_TABLE,
+			values: requestRows,
+			asyncInsert: false,
+			deduplicationToken: `${token}:requests`,
+		});
+	}
 	await input.beforeWrite();
 	// The receipt's time is its publication: superseded snapshots are kept
 	// for the retirement grace from it.
@@ -507,6 +545,14 @@ interface RowContext {
 	repository: string;
 }
 
+/** A run with no genuine prompt, no final message and no system prompt recorded; the receipt has none. */
+const NO_RUN_MESSAGES: RunMessageColumns = {
+	prompt_reactions: [],
+	final_message: null,
+	final_message_cut: false,
+	system_prompt_recorded: false,
+};
+
 /** Columns every row of a build shares, and the not-recorded defaults of the rest. */
 function baseRow(context: RowContext): RudelRunIndexRow {
 	return {
@@ -539,6 +585,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		time_to_first_token_ms: null,
 		prompt_head: null,
 		genuine_prompts: 0,
+		...NO_RUN_MESSAGES,
 		turn_origin: null,
 		prompt_source: null,
 		origin_kind: null,
@@ -675,6 +722,7 @@ export function runRow(
 	run: RunIndexFactsRow,
 	lifecycle: CodexLifecycleFacts,
 	context: RowContext,
+	messages: RunMessageColumns = NO_RUN_MESSAGES,
 ): RudelRunIndexRow {
 	const origin = [
 		run.l_turn_origin,
@@ -705,6 +753,7 @@ export function runRow(
 		time_to_first_token_ms: uint32OrNull(lifecycle.timeToFirstTokenMs),
 		prompt_head: run.prompt_head,
 		genuine_prompts: run.genuine_prompts,
+		...messages,
 		turn_origin: run.l_turn_origin,
 		prompt_source: run.l_prompt_source,
 		origin_kind: run.l_origin_kind,
@@ -786,6 +835,80 @@ export function runRow(
 		pr_urls: run.l_pr_urls,
 		...usageColumns(run),
 		facts_truncated: run.l_facts_truncated > 0,
+	};
+}
+
+/** Usage columns of a request, unknown when the session's usage extraction was incomplete. */
+const REQUEST_USAGE_COLUMNS = [
+	"usage_observations",
+	"usage_unpriced",
+	"usage_model",
+	"cost_usd",
+	"uncached_input_tokens",
+	"cache_read_input_tokens",
+	"cache_write_5m_input_tokens",
+	"cache_write_1h_input_tokens",
+	"output_tokens",
+	"reasoning_output_tokens",
+] as const satisfies readonly (keyof RudelRunRequestsRow)[];
+
+/**
+ * A request row of the build: its run's identity and the request's calls,
+ * text and usage as the statement read them. Usage that is unknown is NULL
+ * and named in `unrecorded_facts`, never zero.
+ */
+export function requestRow(
+	request: RunRequestFactsRow,
+	context: RowContext,
+	usageUnknown: boolean,
+): RudelRunRequestsRow {
+	const known = !usageUnknown && request.usage_observations > 0;
+	return {
+		organization_id: context.organizationId,
+		user_id: context.session.userId,
+		session_id: context.session.sessionId,
+		revision: context.generation.revision,
+		parser_version: context.generation.parserVersion,
+		index_version: context.generation.indexVersion,
+		build_revision: String(context.buildRevision),
+		agent_id: request.agent_id,
+		start_record: request.start_record,
+		source: context.session.source,
+		run_id: runNodeId(
+			context.session,
+			request.agent_id,
+			request.run_start_record,
+		),
+		run_start_record: request.run_start_record,
+		turn_idx: request.turn_idx,
+		built_at: context.builtAt,
+		session_date: context.sessionDate,
+		unrecorded_facts: usageUnknown ? [...REQUEST_USAGE_COLUMNS] : [],
+		end_record: request.end_record,
+		started_at: clickHouseTime(request.started_ms),
+		ended_at: clickHouseTime(request.ended_ms),
+		call_records: request.calls.map(([record]) => record),
+		call_tools: request.calls.map(([, , tool]) => tool),
+		call_groups: request.calls.map(([, , , group]) => group),
+		call_classes: request.calls.map(([, , , , commandClass]) => commandClass),
+		call_failed: request.calls.map(([, , , , , failed]) => failed),
+		text_record: request.texts > 0 ? request.text_record : null,
+		text_block: request.texts > 0 ? request.text_block : null,
+		text_head: request.texts > 0 ? request.text_head : null,
+		usage_observations: usageUnknown ? 0 : request.usage_observations,
+		usage_unpriced: usageUnknown ? 0 : request.usage_unpriced,
+		usage_model: known ? request.usage_model : "",
+		cost_usd: known ? request.cost_usd : null,
+		uncached_input_tokens: known ? request.uncached_input_tokens : null,
+		cache_read_input_tokens: known ? request.cache_read_input_tokens : null,
+		cache_write_5m_input_tokens: known
+			? request.cache_write_5m_input_tokens
+			: null,
+		cache_write_1h_input_tokens: known
+			? request.cache_write_1h_input_tokens
+			: null,
+		output_tokens: known ? request.output_tokens : null,
+		reasoning_output_tokens: known ? request.reasoning_output_tokens : null,
 	};
 }
 
@@ -920,14 +1043,17 @@ export async function retireRunIndexSnapshots(
 		params[`build${index}`] = snapshot.buildRevision;
 		return `(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16} AND index_version = {indexVersion${index}:UInt16} AND build_revision = {build${index}:UInt64})`;
 	});
-	await executor.execute({
-		abortSignal: retirement.abortSignal,
-		clickhouse_settings: { lightweight_deletes_sync: "1" },
-		query: `DELETE FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
-			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-				AND session_id = {sessionId:String} AND (${clauses.join(" OR ")})`,
-		query_params: params,
-	});
+	// Requests first: the run index rows are what finds a snapshot again, so
+	// a pass that stops between the two deletes is finished by the next.
+	for (const table of [RUN_REQUESTS_TABLE, RUN_INDEX_TABLE])
+		await executor.execute({
+			abortSignal: retirement.abortSignal,
+			clickhouse_settings: { lightweight_deletes_sync: "1" },
+			query: `DELETE FROM ${getSafeClickHouseTable(table)}
+				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+					AND session_id = {sessionId:String} AND (${clauses.join(" OR ")})`,
+			query_params: params,
+		});
 	return retired.length;
 }
 

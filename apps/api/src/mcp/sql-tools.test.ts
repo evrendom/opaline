@@ -49,9 +49,9 @@ const client = { analysis: {
 	},
 	schema: async (input) => {
 		calls.push({ tool: "schema", input });
-		if (!input.view) return { level: "views", views: [{ name: "runs", grain: "One row per run.", columns: 90 }], notes: ["Pass view to see its columns."] };
+		if (!input.view) return { level: "views", views: [{ name: "runs", grain: "One row per run.", columns: 90 }], measures: [{ name: "re_asks", sql: "countIf(reasked)", definition: "Runs asked | again." }], notes: ["Pass view to see its columns."], questions: [{ id: "rq_1", question: "Did the agent struggle to find the right file?", testedRuns: 20, testedPrecision: 0.75 }, { id: "rq_2", question: "Did the agent misread the request?", testedRuns: null, testedPrecision: null }] };
 		if (!input.column) return { level: "columns", view: "runs", grain: "One row per run.", traps: ["Count rows directly."], columns: [{ name: "model", type: "LowCardinality(Nullable(String))", meaning: "First model | of the run.", traps: ["Recorded by Claude Code and Codex from parser 7."] }] };
-		return { level: "values", view: "runs", column: { name: "model", type: "String", meaning: "First model.", traps: [] }, over: "runs that started in the last 30 days", values: [{ value: "gpt-5", runs: 12 }], notices: ["every value is listed."] };
+		return { level: "values", view: "runs", column: { name: "model", type: "String", meaning: "First model.", traps: [] }, over: "runs that started in the last 30 days", values: [{ value: "gpt-5", rows: 12 }], notices: ["every value is listed."] };
 	},
 } };
 const outcome = (promise) => promise.then((result) => ({ result }), (error) => ({ error: error.message }));
@@ -189,7 +189,14 @@ test("schema renders the views, then a view's columns with meaning and traps, th
 		result: [
 			"view | grain | columns",
 			"runs | One row per run. | 90",
+			"approved measures:",
+			"measure | sql | definition",
+			"re_asks | countIf(reasked) | Runs asked \\| again.",
 			"note: Pass view to see its columns.",
+			"run questions (ask with estimate_questions, then run_questions; answers in run_answers):",
+			"question_id | question | tested runs | tested precision",
+			"rq_1 | Did the agent struggle to find the right file? | 20 | 0.75",
+			"rq_2 | Did the agent misread the request? | untested | unknown",
 		].join("\n"),
 	});
 	expect(flow.columns).toEqual({
@@ -204,7 +211,7 @@ test("schema renders the views, then a view's columns with meaning and traps, th
 		result: [
 			"runs.model String: First model.",
 			"top values over runs that started in the last 30 days:",
-			"value | runs",
+			"value | rows",
 			"gpt-5 | 12",
 			"note: every value is listed.",
 		].join("\n"),

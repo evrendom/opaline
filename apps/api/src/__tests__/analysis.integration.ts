@@ -1821,7 +1821,8 @@ test("where the log is off, history fails with an agent-actionable message and t
 		(tool) => tool.name === "search_answers",
 	);
 	const getAnswer = MCP_TOOLS.find((tool) => tool.name === "get_answer");
-	assert(searchAnswers && getAnswer);
+	const answers = MCP_TOOLS.find((tool) => tool.name === "answers");
+	assert(searchAnswers && getAnswer && answers);
 	const user = {
 		id: userId,
 		name: "Analysis integration",
@@ -1855,6 +1856,7 @@ test("where the log is off, history fails with an agent-actionable message and t
 	for (const [tool, args] of [
 		[searchAnswers, { text: "failing run" }],
 		[getAnswer, { analysis: crypto.randomUUID() }],
+		[answers, { action: "search", text: "failing run" }],
 	] as const) {
 		expect(
 			await tool.run(client, args, {

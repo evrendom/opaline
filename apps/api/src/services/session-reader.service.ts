@@ -1,3 +1,4 @@
+import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { SessionReader } from "./session-visibility.js";
 
@@ -9,10 +10,9 @@ import type { SessionReader } from "./session-visibility.js";
 export async function readSessionReader(
 	organizationId: string,
 	userId: string,
+	sql: postgres.Sql = sqlClient,
 ): Promise<SessionReader | null> {
-	const [row] = await sqlClient<
-		Array<{ role: string; ownSessionsOnly: boolean }>
-	>`
+	const [row] = await sql<Array<{ role: string; ownSessionsOnly: boolean }>>`
 		SELECT m.role, COALESCE(o.own_sessions_only, false) AS "ownSessionsOnly"
 		FROM member m
 		LEFT JOIN organization o ON o.id = m.organization_id

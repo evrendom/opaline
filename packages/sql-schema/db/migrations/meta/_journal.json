@@ -421,6 +421,20 @@
 			"when": 1791823886576,
 			"tag": "0059_agent_query_slot",
 			"breakpoints": true
+		},
+		{
+			"idx": 60,
+			"version": "7",
+			"when": 1791829181479,
+			"tag": "0060_analysis_log",
+			"breakpoints": true
+		},
+		{
+			"idx": 61,
+			"version": "7",
+			"when": 1791830639694,
+			"tag": "0061_search_and_run_questions",
+			"breakpoints": true
 		}
 	]
 }

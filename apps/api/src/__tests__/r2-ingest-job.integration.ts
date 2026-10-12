@@ -915,6 +915,7 @@ describe("R2 ingest commit lifecycle", () => {
 			cost: null,
 			queryCount: 0,
 			stepCount: 0,
+			visibilityRevision: 0,
 		});
 		await sqlClient`
 			INSERT INTO organization (id, name, slug)

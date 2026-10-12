@@ -76,6 +76,13 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 			if (analysis)
 				analyses.set(id, { ...analysis, ...structuredClone(patch) });
 		},
+		async setShared(id, shared) {
+			const analysis = analyses.get(id);
+			if (!analysis) return null;
+			const visibilityRevision = analysis.visibilityRevision + 1;
+			analyses.set(id, { ...analysis, shared, visibilityRevision });
+			return visibilityRevision;
+		},
 		async saveAnalysis(id, { findings, clarifications, patch }) {
 			const analysis = analyses.get(id);
 			if (!analysis) throw new Error(`Analysis ${id} is missing`);
@@ -207,13 +214,43 @@ export function createMemoryAnalysisStore(): AnalysisStore {
 					onlyOwnerId: owners.length === 1 ? (owners[0] ?? null) : null,
 				}));
 		},
-		async deleteAnalysesReadingOwner(ownerId) {
-			const read = new Set(
-				[...queries.values()]
-					.filter((query) => query.owners.includes(ownerId))
+		async removeOwnerEvidence(ownerId) {
+			const reading = [...queries.values()].filter((query) =>
+				query.owners.includes(ownerId),
+			);
+			// Quoted them, or a finding sits on a result naming their session.
+			const deleted = new Set(
+				reading
+					.filter(
+						(query) =>
+							!query.counts ||
+							(steps.get(query.stepId)?.finding != null &&
+								links.some(
+									(link) =>
+										link.queryId === query.id && link.ownerId === ownerId,
+								)),
+					)
 					.map((query) => query.analysisId),
 			);
-			removeAnalyses((analysis) => read.has(analysis.id));
+			for (const query of reading) {
+				if (deleted.has(query.analysisId)) continue;
+				queries.set(query.id, {
+					...query,
+					output: null,
+					removed: true,
+					owners: query.owners.filter((owner) => owner !== ownerId),
+					...(query.redaction ? { args: query.redaction.args } : {}),
+				});
+				const step = steps.get(query.stepId);
+				if (step && query.redaction)
+					steps.set(step.id, { ...step, question: query.redaction.label });
+			}
+			links = links.filter(
+				(link) =>
+					link.ownerId !== ownerId ||
+					!reading.some((query) => query.id === link.queryId),
+			);
+			removeAnalyses((analysis) => deleted.has(analysis.id));
 		},
 		async deleteAnalysesByAuthor(authorId) {
 			removeAnalyses((analysis) => analysis.authorId === authorId);

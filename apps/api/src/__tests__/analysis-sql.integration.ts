@@ -28,6 +28,20 @@ import {
 	expireSqlResults,
 } from "../services/analysis/sql-results.js";
 import {
+	recordQuery,
+	saveAnalysis,
+	shareAnalysis,
+} from "../services/analysis-log/analysis-log.service.js";
+import { createLocalEmbedder } from "../services/analysis-log/embedder.js";
+import type { FindingImpact } from "../services/analysis-log/finding-impact.js";
+import {
+	createClickHouseFindingImpact,
+	createPostgresFindingImpactFence,
+} from "../services/analysis-log/finding-impact-clickhouse.js";
+import { createPostgresVisibilitySyncs } from "../services/analysis-log/finding-visibility.js";
+import { createMemoryAnalysisStore } from "../services/analysis-log/memory-store.js";
+import type { AnalysisViewer } from "../services/analysis-log/types.js";
+import {
 	enqueueClickHousePurge,
 	runClickHousePurgeWorkerPass,
 } from "../services/clickhouse-purge.service.js";
@@ -74,6 +88,7 @@ const env = () => ({
 	results: createMemorySqlResultStore(),
 	quota: createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 }),
 	limiter: createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
+	githubRepositories: async () => [],
 });
 
 const at = (daysAgo: number) =>
@@ -88,8 +103,11 @@ interface Seed {
 	session: string;
 	revision: string;
 	build: string;
-	/** Runs as [turn, active minutes]; a receipt commits the build when set. */
-	runs: [number, number][];
+	/**
+	 * Runs as [turn, active minutes, cost, output tokens]; a receipt commits
+	 * the build when set.
+	 */
+	runs: [number, number, number?, number?][];
 	receipt: boolean;
 	daysAgo?: number;
 }
@@ -99,7 +117,7 @@ async function seed(rows: readonly Seed[]) {
 		table: "rudel.run_index",
 		asyncInsert: false,
 		values: rows.flatMap((row) => [
-			...row.runs.map(([turn, active]) => ({
+			...row.runs.map(([turn, active, cost, outputTokens]) => ({
 				organization_id: row.organization,
 				user_id: row.user,
 				session_id: row.session,
@@ -116,6 +134,8 @@ async function seed(rows: readonly Seed[]) {
 				ended_at: at(row.daysAgo ?? 1),
 				active_minutes: active,
 				minutes: active,
+				cost_usd: cost ?? null,
+				output_tokens: outputTokens ?? null,
 				built_at: at(0),
 			})),
 			...(row.receipt
@@ -162,12 +182,17 @@ afterAll(async () => {
 	for (const organization of [workspace, otherWorkspace])
 		await sqlClient`DELETE FROM organization WHERE id = ${organization}`;
 	await sqlClient.end();
-	for (const organization of [workspace, otherWorkspace])
-		await clickhouse.execute({
-			query:
-				"DELETE FROM rudel.run_index WHERE organization_id = {organization:String} SETTINGS lightweight_deletes_sync = 2",
-			query_params: { organization },
-		});
+	for (const organization of [
+		workspace,
+		otherWorkspace,
+		`${RUN}_impact_ws`,
+		`${RUN}_impact_member_ws`,
+	])
+		for (const table of ["run_index", "analysis_finding_runs"])
+			await clickhouse.execute({
+				query: `DELETE FROM rudel.${table} WHERE organization_id = {organization:String} SETTINGS lightweight_deletes_sync = 2`,
+				query_params: { organization },
+			});
 });
 
 describe("the runs view", () => {
@@ -312,9 +337,9 @@ describe("the runs view", () => {
 			ok: true,
 			result: {
 				values: [
-					{ value: "1", runs: 1 },
-					{ value: "2", runs: 1 },
-					{ value: "3", runs: 1 },
+					{ value: "1", rows: 1 },
+					{ value: "2", rows: 1 },
+					{ value: "3", rows: 1 },
 				],
 			},
 		});
@@ -336,6 +361,7 @@ describe("stored results and the quota in Postgres", () => {
 		table: "(no rows)",
 		notices: [],
 		sessions: [],
+		runs: [],
 	};
 	const ids = async () =>
 		(
@@ -344,7 +370,7 @@ describe("stored results and the quota in Postgres", () => {
 			`
 		).map((row) => row.id);
 
-	test("deleting an account removes its results and every result that read its sessions; deleting the workspace removes the rest", async () => {
+	test("deleting an account deletes its results and every result whose rows quoted the sessions it read, removes every other result that only counted them, with any SQL that carries text, and deleting the workspace deletes the rest", async () => {
 		for (const id of [ownerOf, author, bystander])
 			await sqlClient`INSERT INTO "user" (id, name, email) VALUES (${id}, ${id}, ${`${id}@example.com`})`;
 		await sqlClient`INSERT INTO organization (id, name, slug) VALUES (${organization}, ${organization}, ${organization})`;
@@ -357,23 +383,52 @@ describe("stored results and the quota in Postgres", () => {
 				INSERT INTO member (id, organization_id, user_id, role)
 				VALUES (${`${RUN}_${userId}_m`}, ${organization}, ${userId}, ${role})
 			`;
-		const save = (authorId: string, owners: string[]) =>
+		const literal = "SELECT count() FROM runs WHERE prompt_head = 'a prompt'";
+		const save = (
+			authorId: string,
+			owners: string[],
+			counts = true,
+			query = output.query,
+		) =>
 			store.save({
 				workspaceId: organization,
 				authorId,
 				title: "t",
-				query: output.query,
+				query,
 				output,
 				owners,
+				counts,
+				queryCarriesText: query === literal,
 			});
 		const own = await save(ownerOf, [ownerOf]);
 		const readTheirs = await save(author, [author, bystander, ownerOf]);
+		const quotedTheirs = await save(author, [author, ownerOf], false);
+		const literalTheirs = await save(author, [author, ownerOf], true, literal);
 		const others = await save(author, [author, bystander]);
-		expect(await ids()).toEqual([own, readTheirs, others].sort());
+		expect(await ids()).toEqual(
+			[own, readTheirs, quotedTheirs, literalTheirs, others].sort(),
+		);
 
 		await deleteUserPostgresData(ownerOf, { sqlClient });
 		await purgeUntilDone({ targetType: "account", targetId: ownerOf });
-		expect(await ids()).toEqual([others]);
+		expect(await ids()).toEqual([readTheirs, literalTheirs, others].sort());
+		expect(await store.get(own)).toBeNull();
+		expect(await store.get(quotedTheirs)).toBeNull();
+		expect(await store.get(readTheirs)).toMatchObject({
+			title: "t",
+			query: output.query,
+			output: null,
+			removed: true,
+			owners: [author, bystander],
+		});
+		expect(await store.get(literalTheirs)).toMatchObject({
+			title: "t",
+			query: "",
+			output: null,
+			removed: true,
+			owners: [author],
+		});
+		expect(await store.get(others)).toMatchObject({ output, removed: false });
 
 		// Workspace deletion as deleteOrganizationPostgresData does it: the
 		// purge is queued in the transaction that deletes the workspace.
@@ -406,6 +461,8 @@ describe("stored results and the quota in Postgres", () => {
 				query: output.query,
 				output,
 				owners: [retentionAuthor],
+				counts: true,
+				queryCarriesText: false,
 			});
 		const old = await save();
 		const recent = await save();
@@ -431,6 +488,309 @@ describe("stored results and the quota in Postgres", () => {
 		const refused = await quota.take(quotaWorkspace);
 		expect(refused.allowed).toBe(false);
 		await sqlClient`DELETE FROM organization WHERE id = ${quotaWorkspace}`;
+	});
+});
+
+describe("visibility sync requests in Postgres", () => {
+	test("a newer request outlives the clearing of an older one, a deferred one waits, and a due one is listed with its workspace", async () => {
+		const organization = `${RUN}_sync_ws`;
+		await sqlClient`INSERT INTO organization (id, name, slug) VALUES (${organization}, ${organization}, ${organization})`;
+		const syncs = createPostgresVisibilitySyncs(sqlClient);
+		const target = { workspaceId: organization, analysisId: `${RUN}_sync_a` };
+		const mine = <TRow extends { analysisId: string }>(rows: TRow[]) =>
+			rows.filter((row) => row.analysisId === target.analysisId);
+
+		const first = await syncs.request(target);
+		const second = await syncs.request(target);
+		expect(second).toBe(first + 1);
+		await syncs.clear(target.analysisId, first);
+		expect(mine(await syncs.due(1_000))).toEqual([
+			{ ...target, ticket: second },
+		]);
+
+		await syncs.defer(target.analysisId, second);
+		expect(mine(await syncs.due(1_000))).toEqual([]);
+		await syncs.clear(target.analysisId, second);
+		const [left] = await sqlClient<{ count: string }[]>`
+			SELECT count(*) AS count FROM analysis_visibility_sync WHERE analysis_id = ${target.analysisId}
+		`;
+		expect(Number(left?.count)).toBe(0);
+
+		// Deleting the workspace deletes its requests.
+		await syncs.request(target);
+		await sqlClient`DELETE FROM organization WHERE id = ${organization}`;
+		expect(mine(await syncs.due(1_000))).toEqual([]);
+	});
+});
+
+describe("finding impact", () => {
+	const organization = `${RUN}_impact_ws`;
+	const authorId = `${RUN}_impact_author`;
+	const quotedId = `${RUN}_impact_quoted`;
+	const countedId = `${RUN}_impact_counted`;
+	const readerId = `${RUN}_impact_reader`;
+	const quotedSession = `${RUN}_impact_quoted_session`;
+	const countedSession = `${RUN}_impact_counted_session`;
+	const caller = (userId: string): SqlCaller => ({
+		workspaceId: organization,
+		reader: { userId, role: "member", ownSessionsOnly: false },
+	});
+	const viewer: AnalysisViewer = {
+		workspaceId: organization,
+		userId: authorId,
+		isAdmin: false,
+		restrictResults: false,
+		onlyMember: null,
+	};
+	const IMPACT = `SELECT step_id, count() AS runs, sum(cost_usd) AS cost,
+		sum(output_tokens) AS output, sum(active_minutes) AS active
+		FROM finding_runs GROUP BY step_id ORDER BY runs, step_id`;
+	const ref = (sessionId: string, turn: number) => ({
+		sessionId,
+		agentId: "",
+		turn,
+	});
+
+	test("after saving, SQL sums the recorded cost, tokens and active time of each finding's runs; others read them once shared; deleting a quoted member removes the analysis's rows", async () => {
+		await seed([
+			{
+				organization,
+				user: quotedId,
+				session: quotedSession,
+				revision: "1",
+				build: "1",
+				runs: [
+					[1, 4, 0.5, 100],
+					[2, 6, 1.25, 300],
+				],
+				receipt: true,
+			},
+			{
+				organization,
+				user: countedId,
+				session: countedSession,
+				revision: "1",
+				build: "1",
+				// The second run's usage is unknown: NULL, never zero.
+				runs: [
+					[1, 10, 2, 1_000],
+					[2, 3],
+				],
+				receipt: true,
+			},
+		]);
+		const log = {
+			store: createMemoryAnalysisStore(),
+			embedder: createLocalEmbedder(),
+			now: () => new Date(),
+		};
+		const writer = createClickHouseFindingImpact(
+			clickhouse,
+			createPostgresFindingImpactFence(sqlClient),
+		);
+		// The share's write is best effort; a failure here must not hide.
+		const failures: string[] = [];
+		const impact = {
+			impact: {
+				...writer,
+				share: (...args: Parameters<FindingImpact["share"]>): Promise<void> =>
+					writer.share(...args).catch((error: unknown) => {
+						failures.push(String(error));
+						throw error;
+					}),
+			},
+			syncs: createPostgresVisibilitySyncs(sqlClient),
+		};
+		await sqlClient`INSERT INTO organization (id, name, slug) VALUES (${organization}, ${organization}, ${organization})`;
+		const author = {
+			workspaceId: organization,
+			userId: authorId,
+			host: "plugin" as const,
+		};
+		// A ranking whose rows name the counted member's runs, then a read of
+		// the quoted member's runs.
+		const ranked = await recordQuery(log, author, {
+			tool: "sql",
+			args: { query: "SELECT … FROM runs", title: "Costly runs" },
+			trace: {},
+			output: { runs: [ref(countedSession, 1), ref(countedSession, 2)] },
+			outputChars: 100,
+			// Numbers and ids only: the counted member's deletion keeps it.
+			quotes: false,
+			sessions: [],
+			owners: [quotedId, countedId],
+		});
+		const read = await recordQuery(log, author, {
+			tool: "read",
+			args: { refs: [ref(quotedSession, 1), ref(quotedSession, 2)] },
+			trace: { analysis: ranked.analysis },
+			output: {
+				reads: [
+					{ ref: ref(quotedSession, 1), header: "first" },
+					{ ref: ref(quotedSession, 2), header: "second" },
+				],
+			},
+			outputChars: 100,
+			sessions: [
+				{
+					sessionId: quotedSession,
+					ownerId: quotedId,
+					revision: "1",
+					parserVersion: 9,
+				},
+			],
+			owners: [quotedId],
+		});
+		await saveAnalysis(
+			log,
+			viewer,
+			{
+				analysis: ranked.analysis,
+				question: "Where did cost go?",
+				finalAnswer: "Two expensive runs.",
+				findings: [
+					{ step: ranked.query, finding: "The costliest runs." },
+					{ step: read.query, finding: "Both stalled on tests." },
+				],
+				topics: [],
+				changes: [],
+			},
+			impact,
+		);
+
+		const sums = ok(
+			await runSql(caller(authorId), { query: IMPACT, title: "Impact" }, env()),
+		);
+		expect(sums.table.split("\n").slice(1)).toEqual(
+			[
+				`${read.step} | 2 | 1.75 | 400 | 10`,
+				`${ranked.step} | 2 | 2 | 1000 | 13`,
+			].sort(),
+		);
+		// Private to the author until shared.
+		expect(
+			ok(
+				await runSql(
+					caller(readerId),
+					{ query: IMPACT, title: "Impact" },
+					env(),
+				),
+			).rows,
+		).toBe(0);
+		await shareAnalysis(log, viewer, ranked.analysis, true, impact);
+		expect(failures).toEqual([]);
+		expect(
+			ok(
+				await runSql(
+					caller(readerId),
+					{ query: IMPACT, title: "Impact" },
+					env(),
+				),
+			).rows,
+		).toBe(2);
+		const target = { workspaceId: organization, analysisId: ranked.analysis };
+		expect(
+			await sqlClient`SELECT 1 FROM analysis_visibility_sync WHERE analysis_id = ${ranked.analysis}`,
+		).toHaveLength(0);
+
+		// An unshare (revision 2) written before the share it follows
+		// (revision 1): the rows stay private.
+		await impact.impact.share(target, { shared: false, revision: 2 });
+		await impact.impact.share(target, { shared: true, revision: 1 });
+		expect(
+			ok(
+				await runSql(
+					caller(readerId),
+					{ query: IMPACT, title: "Impact" },
+					env(),
+				),
+			).rows,
+		).toBe(0);
+
+		// The analysis quoted this member's runs, so deleting them deletes
+		// every row of the analysis, the counted member's runs included.
+		await sqlClient`INSERT INTO "user" (id, name, email) VALUES (${quotedId}, ${quotedId}, ${`${quotedId}@example.com`})`;
+		await deleteUserPostgresData(quotedId, { sqlClient });
+		await purgeUntilDone({ targetType: "account", targetId: quotedId });
+		const left = await clickhouse.query<{ rows: string }>({
+			query:
+				"SELECT count() AS rows FROM rudel.analysis_finding_runs WHERE organization_id = {organization:String}",
+			query_params: { organization },
+		});
+		expect(Number(left[0]?.rows)).toBe(0);
+		await sqlClient`DELETE FROM organization WHERE id = ${organization}`;
+	});
+
+	test("a saver held to their own sessions records only their own runs", async () => {
+		const memberWorkspace = `${RUN}_impact_member_ws`;
+		const saver = `${RUN}_impact_saver`;
+		const teammate = `${RUN}_impact_teammate`;
+		const own = `${RUN}_impact_own_session`;
+		const theirs = `${RUN}_impact_their_session`;
+		await seed(
+			[
+				[saver, own],
+				[teammate, theirs],
+			].map(([user = "", session = ""]) => ({
+				organization: memberWorkspace,
+				user,
+				session,
+				revision: "1",
+				build: "1",
+				runs: [[1, 5, 1, 10]],
+				receipt: true,
+			})),
+		);
+		const log = {
+			store: createMemoryAnalysisStore(),
+			embedder: createLocalEmbedder(),
+			now: () => new Date(),
+		};
+		const trace = await recordQuery(
+			log,
+			{ workspaceId: memberWorkspace, userId: saver, host: "plugin" },
+			{
+				tool: "sql",
+				args: { query: "SELECT … FROM runs", title: "Runs" },
+				trace: {},
+				output: { runs: [ref(own, 1), ref(theirs, 1)] },
+				outputChars: 10,
+				quotes: false,
+				sessions: [],
+				owners: [saver, teammate],
+			},
+		);
+		await saveAnalysis(
+			log,
+			{
+				workspaceId: memberWorkspace,
+				userId: saver,
+				isAdmin: false,
+				restrictResults: false,
+				onlyMember: saver,
+			},
+			{
+				analysis: trace.analysis,
+				question: "Which runs?",
+				finalAnswer: "Mine.",
+				findings: [{ step: trace.query, finding: "Both ran long." }],
+				topics: [],
+				changes: [],
+			},
+			{
+				impact: createClickHouseFindingImpact(
+					clickhouse,
+					createPostgresFindingImpactFence(sqlClient),
+				),
+				syncs: createPostgresVisibilitySyncs(sqlClient),
+			},
+		);
+		const users = await clickhouse.query<{ user_id: string }>({
+			query:
+				"SELECT user_id FROM rudel.analysis_finding_runs FINAL WHERE organization_id = {organization:String}",
+			query_params: { organization: memberWorkspace },
+		});
+		expect(users.map((row) => row.user_id)).toEqual([saver]);
 	});
 });
 

@@ -40,7 +40,10 @@ const TRANSCRIPT_DERIVED = [
 	"claude_sessions",
 	"codex_sessions",
 	"transcript_records",
+	"transcript_chunks",
+	"transcript_chunk_hits",
 	"run_index",
+	"run_requests",
 	"l1_edges",
 	"l1_edges_by_target",
 	"l1_edge_resolutions",
@@ -54,6 +57,8 @@ const TRANSCRIPT_DERIVED = [
 	"skill_version_contents",
 	"repository_session_evidence_index",
 	"weekly_totals",
+	// Findings' cited runs with their measures, by the run's owner.
+	"analysis_finding_runs",
 ];
 /** Workspace-scoped GitHub facts: deleted with the workspace, not with an account. */
 const WORKSPACE_ONLY = [

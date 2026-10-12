@@ -7,17 +7,22 @@ import {
 	AnalysisHistorySearchInputSchema,
 	AnalysisHistoryShareInputSchema,
 	AnalysisReadInputSchema,
+	AnalysisRunInputSchema,
 	AnalysisSchemaInputSchema,
+	AnalysisSearchInputSchema,
 	AnalysisSqlInputSchema,
 	type CostDashboard,
 	CostDashboardInputSchema,
 	CostDashboardRequestedMetricSchema,
+	RunQuestionsInputSchema,
+	RunQuestionsRunInputSchema,
 } from "@rudel/api-routes";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
+import { SQL_RESULT_ID_PREFIX } from "../services/analysis/sql-results.js";
 import { countVisibleSessions } from "../services/analysis/visible-sessions.js";
 import { readSessionReader } from "../services/session-reader.service.js";
 import { readsEverySession } from "../services/session-visibility.js";
@@ -25,18 +30,24 @@ import {
 	renderAnalysisSearch,
 	renderAnalysisTree,
 	renderFind,
+	renderQuestionsEstimate,
+	renderQuestionsRun,
 	renderRead,
+	renderRun,
 	renderSchema,
 	renderSql,
 	renderStoredQuery,
+	renderStoredSqlResult,
 } from "./analysis-renderers.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 import { parseMcpInput } from "./input-validation.js";
+import { renderSearch } from "./search-renderer.js";
 import {
 	type McpToolAnnotations,
 	READ_ONLY,
 	REPLACES_OWN_SETTING,
 	SAVES_AND_INDEXES,
+	SENDS_RUN_NOTES,
 	SHARES_WITH_WORKSPACE,
 	WRITES_OWN_RECORDS,
 } from "./tool-annotations.js";
@@ -254,6 +265,101 @@ const ShareToolInputSchema = AnalysisHistoryShareInputSchema.omit({
 });
 
 /**
+ * answers: one tool for earlier analyses with an explicit action. Each action
+ * takes only its own inputs; `answersInput` names what an action needs and
+ * refuses another action's inputs.
+ */
+const AnswersToolInputSchema = z
+	.object({
+		action: z.enum(["search", "open", "result"]),
+		text: z.string().min(1).max(500).optional(),
+		limit: z.number().int().min(1).max(50).optional(),
+		includeEval: z.boolean().optional(),
+		analysis: z.string().min(1).max(40).optional(),
+		id: z.string().min(1).max(40).optional(),
+	})
+	.strict();
+
+type AnswersInput =
+	| {
+			action: "search";
+			text?: string;
+			limit?: number;
+			includeEval?: boolean;
+	  }
+	| { action: "open"; analysis: string }
+	| { action: "result"; id: string };
+
+const ANSWERS_INPUTS = {
+	search: ["text", "limit", "includeEval"],
+	open: ["analysis"],
+	result: ["id"],
+} as const;
+
+function answersInput(args: Args): AnswersInput {
+	const input = parseMcpInput(AnswersToolInputSchema, args);
+	const foreign = (
+		["text", "limit", "includeEval", "analysis", "id"] as const
+	).filter(
+		(key) =>
+			input[key] !== undefined &&
+			!(ANSWERS_INPUTS[input.action] as readonly string[]).includes(key),
+	);
+	if (foreign.length)
+		throw new ORPCError("BAD_REQUEST", {
+			message: `${foreign.join(", ")} ${foreign.length > 1 ? "are not inputs" : "is not an input"} of action=${input.action}; it takes ${ANSWERS_INPUTS[input.action].join(", ")}`,
+		});
+	if (input.action === "open") {
+		if (!input.analysis)
+			throw new ORPCError("BAD_REQUEST", {
+				message:
+					"action=open needs analysis: the saved answer's id, from action=search",
+			});
+		return { action: "open", analysis: input.analysis };
+	}
+	if (input.action === "result") {
+		if (!input.id)
+			throw new ORPCError("BAD_REQUEST", {
+				message:
+					"action=result needs id: a stored result's id from action=open, or an sql result id (sr_…)",
+			});
+		return { action: "result", id: input.id };
+	}
+	return {
+		action: "search",
+		text: input.text,
+		limit: input.limit,
+		includeEval: input.includeEval,
+	};
+}
+
+function searchAnswers(
+	client: Client,
+	input: z.output<typeof AnalysisHistorySearchInputSchema>,
+): Promise<unknown> {
+	return withLogOffMessage(
+		client.analysis.history.search(input).then(renderAnalysisSearch),
+	);
+}
+
+function openAnswer(client: Client, analysis: string): Promise<unknown> {
+	return withLogOffMessage(
+		client.analysis.history.get({ analysis }).then(renderAnalysisTree),
+	);
+}
+
+/** A step's stored query by its id, or a stored sql result by its `sr_` id. */
+function openResult(client: Client, id: string): Promise<unknown> {
+	if (id.startsWith(SQL_RESULT_ID_PREFIX))
+		return client.analysis.history
+			.sqlResult({ id })
+			.then(renderStoredSqlResult);
+	return withLogOffMessage(
+		client.analysis.history.query({ query: id }).then(renderStoredQuery),
+	);
+}
+
+/**
  * The JSON Schema MCP hosts show the model for a tool taking `schema`, plus the
  * `workspace` every tool accepts. Cross-field refinements stay server-side.
  */
@@ -440,6 +546,31 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			),
 	},
 	{
+		name: "run",
+		annotations: READ_ONLY,
+		title: "Open one agent run",
+		description: [
+			"What it does: Shows one run compactly: its prompt, time, tokens and cost, how the run before it ended, how it ended, the user's next prompt, and its phases.",
+			"Use when: After sql or find points at a run; open only the parts that decide the question.",
+			"Returns: Lines with ids. Phases open into requests, requests into calls, calls and records into their exact text, and a call that started a subagent into that subagent's run.",
+			"Side effects: None.",
+			"Limits: One run per call, within maxChars (the text says what was cut); sql's 10 seconds, 512 MiB and workspace quota.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisRunInputSchema), {
+			id: "Required. The run's id: the run_id column of sql, or an id a run view shows (PREV, NEXT, a subagent run).",
+			expand:
+				"Ids from the view to open, together within maxChars: phases (p2), requests (q153), calls (c154) and records (r160).",
+			sections:
+				"Only these sections, in the view's order: header, prev, end, next, phases. Default: all of them.",
+			maxChars: "Most characters returned, 1000-40000. Default 12000.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderRun(
+				await client.analysis.run(parseMcpInput(AnalysisRunInputSchema, args)),
+			),
+	},
+	{
 		name: "schema",
 		annotations: READ_ONLY,
 		title: "Describe the data sql can read",
@@ -472,7 +603,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Use when: To rank where time, cost or failures went, then read the top runs; rows are not evidence.",
 			"Returns: Up to 200 rows, a stored result id, and notes on what was cut.",
 			"Side effects: Stores the result for 90 days and adds it to the answer being worked on, deleted after 7 days if never saved. Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
-			"Limits: Your workspace's sessions you may open; 10 seconds, 512 MiB, a workspace quota.",
+			"Limits: Your workspace's sessions you may open; 10 seconds, 512 MiB, a workspace quota that run calls count in too.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(AnalysisSqlInputSchema), {
 			query:
@@ -488,12 +619,123 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			),
 	},
 	{
+		name: "answers",
+		annotations: READ_ONLY,
+		title: "Search and open saved answers",
+		description: [
+			"What it does: Searches answers your team saved about its coding-agent sessions, opens one, or opens one stored result behind it.",
+			"Use when: Before analysing the team's agent sessions, to start from what the team already found; not for support, account or billing questions.",
+			"Returns: action=search: saved answers by meaning or most recent. action=open: one answer's steps, findings and stored result ids. action=result: one stored result.",
+			"Side effects: None.",
+			"Limits: Only answers you saved or that were shared with your workspace, and sql results you ran; results expire after 90 days.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnswersToolInputSchema), {
+			action:
+				"Required. search: list saved answers. open: one saved answer. result: one stored result.",
+			text: "action=search: words to look for, matched by meaning (1-500 characters). Default: the most recent answers.",
+			limit: "action=search: how many answers to return, 1-50. Default 10.",
+			includeEval:
+				"action=search: also show answers from test runs. Default false.",
+			analysis:
+				"action=open, required: the saved answer's id, from action=search.",
+			id: "action=result, required: a stored result's id, shown in the steps of action=open, or an sql result id (sr_…).",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) => {
+			const input = answersInput(args);
+			if (input.action === "search")
+				return searchAnswers(
+					client,
+					parseMcpInput(AnalysisHistorySearchInputSchema, {
+						text: input.text,
+						limit: input.limit,
+						includeEval: input.includeEval,
+					}),
+				);
+			if (input.action === "open") return openAnswer(client, input.analysis);
+			return openResult(client, input.id);
+		},
+	},
+	{
+		name: "search",
+		annotations: READ_ONLY,
+		title: "Search agent transcripts",
+		description: [
+			"What it does: Finds runs by meaning and by exact string, in one ranking. In sql, search('text') is a table to join to runs.",
+			"Use when: To find runs about something, or that contain a flag, file or error; results are not evidence.",
+			"Returns: Up to 20 runs with why each matched and a snippet, coverage, the OpenAI quota, and a rewrite to try when none matched.",
+			"Side effects: None; meaning search spends tokens of the OpenAI quota.",
+			"Limits: Sessions you may open, indexed since search started; 30 days by default, at most 180.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(AnalysisSearchInputSchema), {
+			text: "Required. What to find: a description of what happened, or a literal string such as a flag, file name or error.",
+			mode: "hybrid (default) merges meaning and exact matches, meaning finds similar text, exact finds the string itself (case-insensitive).",
+			filters:
+				"Optional: since and until (YYYY-MM-DD, UTC, inclusive; default the last 30 days, at most 180 apart), source (claude_code or codex), kinds (user_prompt, assistant_text, reasoning, tool_call, tool_result, file_change), userId (one member).",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderSearch(
+				await client.analysis.search(
+					parseMcpInput(AnalysisSearchInputSchema, args),
+				),
+			),
+	},
+	{
+		name: "estimate_questions",
+		annotations: READ_ONLY,
+		title: "Estimate run questions",
+		description: [
+			"What it does: Says what answering yes/no run questions over the runs a query selects would cost, and which answers are already stored and reused.",
+			"Use when: Before run_questions, always; schema lists the questions that can be asked.",
+			"Returns: Runs selected, answers stored, queued and to buy per question, the most it can cost, the quota left, and a token for run_questions.",
+			"Side effects: None; nothing is sent anywhere.",
+			"Limits: Up to 10 questions and 5,000 runs; the query counts against the sql quota.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(RunQuestionsInputSchema), {
+			questions: "Required. Ids of run questions from schema, up to 10.",
+			runs: "Optional. One SELECT over the sql views returning session_id, agent_id and turn_idx. Default: every run of the last 4 weeks.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderQuestionsEstimate(
+				await client.analysis.estimateQuestions(
+					parseMcpInput(RunQuestionsInputSchema, args),
+				),
+			),
+	},
+	{
+		name: "run_questions",
+		annotations: SENDS_RUN_NOTES,
+		title: "Answer run questions",
+		description: [
+			"What it does: Answers yes/no run questions over the runs a query selects, as the probability of yes, and keeps the answers.",
+			"Use when: After estimate_questions, with its token, if the cost is worth it; then rank runs with sql over run_answers.",
+			"Returns: What was queued and reused, and the most it costs; answers arrive within minutes.",
+			"Side effects: Sends each run's text, secrets removed, to the answering service; answers are stored in the workspace.",
+			"Limits: Only what the estimate priced, within 15 minutes; a workspace answer quota; answers say where to read, not why.",
+		].join("\n"),
+		inputSchema: describeInput(zodToolInput(RunQuestionsRunInputSchema), {
+			questions: "Required. The same question ids as the estimate.",
+			runs: "Optional. The same SELECT as the estimate. Default: every run of the last 4 weeks.",
+			estimate:
+				"Required. The token estimate_questions returned for these questions and runs.",
+			workspace: WORKSPACE_DESCRIPTION,
+		}),
+		run: async (client, { workspace: _workspace, ...args }) =>
+			renderQuestionsRun(
+				await client.analysis.runQuestions(
+					parseMcpInput(RunQuestionsRunInputSchema, args),
+				),
+			),
+	},
+	{
 		name: "search_answers",
 		annotations: READ_ONLY,
 		title: "Search saved answers",
 		description: [
 			"What it does: Lists answers your team saved about its coding-agent sessions, by meaning or most recent.",
-			"Use when: Before analysing the team's agent sessions (cost, time, failures, mistakes), to find an answer to update; not for support, account, billing or general coding questions.",
+			"Use when: Same as answers action=search, kept for older instructions; before analysing the team's agent sessions, to find an answer to update.",
 			"Returns: A table of saved answers: id, question, last day of data, the answer each updates, and how each answer starts.",
 			"Side effects: None.",
 			"Limits: Only answers you saved or shared with your workspace; drafts never appear. Requires Opaline's answer history, which is on for every workspace.",
@@ -505,10 +747,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
-			withLogOffMessage(
-				client.analysis.history
-					.search(parseMcpInput(AnalysisHistorySearchInputSchema, args))
-					.then(renderAnalysisSearch),
+			searchAnswers(
+				client,
+				parseMcpInput(AnalysisHistorySearchInputSchema, args),
 			),
 	},
 	{
@@ -517,7 +758,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		title: "Open a saved answer",
 		description: [
 			"What it does: Opens one saved answer with its findings, steps and final answer.",
-			"Use when: search_answers found an answer that covers the question, so you can start from its findings.",
+			"Use when: Same as answers action=open, kept for older instructions; a saved answer covers the question.",
 			"Returns: The question, the last day its data covers, the answer it updates and newer versions, each step with its finding and stored result ids, the changes against the older answer, and the final answer.",
 			"Side effects: None.",
 			"Limits: Only answers you saved or that were shared with your workspace.",
@@ -527,10 +768,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
-			withLogOffMessage(
-				client.analysis.history
-					.get(parseMcpInput(AnalysisHistoryGetInputSchema, args))
-					.then(renderAnalysisTree),
+			openAnswer(
+				client,
+				parseMcpInput(AnalysisHistoryGetInputSchema, args).analysis,
 			),
 	},
 	{
@@ -539,7 +779,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		title: "Open a stored result",
 		description: [
 			"What it does: Shows one stored find or read result behind a saved answer.",
-			"Use when: You must check or quote one step of a saved answer; never open all of them.",
+			"Use when: Same as answers action=result, kept for older instructions; to check one step of a saved answer.",
 			"Returns: The stored result with its arguments, whether a session it read has changed since, or why it is unavailable (expired, removed or restricted).",
 			"Side effects: None.",
 			"Limits: Results expire after 90 days (a year when shared or pinned); a workspace limited to own sessions may show them only to admins and the session's owner.",
@@ -550,10 +790,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
 		run: async (client, { workspace: _workspace, ...args }) =>
-			withLogOffMessage(
-				client.analysis.history
-					.query(parseMcpInput(AnalysisHistoryQueryInputSchema, args))
-					.then(renderStoredQuery),
+			openResult(
+				client,
+				parseMcpInput(AnalysisHistoryQueryInputSchema, args).query,
 			),
 	},
 	{

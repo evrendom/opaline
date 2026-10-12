@@ -144,6 +144,7 @@ test("the HTTP client reads exactly what ConvexHttpClient reads", async () => {
 		},
 		queryCount: 0,
 		stepCount: 0,
+		visibilityRevision: 0,
 	});
 	const token = await createTokenSource(signingKey)();
 	const viaHttp = await createConvexHttpClient(deploymentUrl)(
@@ -181,13 +182,15 @@ test("a failed store call names only the function, never its arguments", async (
 		owners: [],
 		createdAt: new Date().toISOString(),
 		removed: false,
+		counts: false,
+		redaction: null,
 	};
 	await expect(store.createQuery(query)).rejects.toThrow(
 		/^Convex queries:create failed \(\w+\)$/,
 	);
 });
 
-test("analyses that read a deleted owner are hidden first, then deleted in size-bounded batches", async () => {
+test("analyses that quoted a deleted owner are hidden first, then deleted in size-bounded batches", async () => {
 	const store = createConvexAnalysisStore({
 		url,
 		signingKey,
@@ -221,6 +224,7 @@ test("analyses that read a deleted owner are hidden first, then deleted in size-
 			cost: null,
 			queryCount: 0,
 			stepCount: 0,
+			visibilityRevision: 0,
 		});
 		const stepId = `${analysisId}_step`;
 		await store.createStep({
@@ -240,7 +244,8 @@ test("analyses that read a deleted owner are hidden first, then deleted in size-
 				stepId,
 				workspaceId: `workspace_${namespace}`,
 				authorId,
-				tool: "find",
+				// Quoting the owner's runs: deletion takes the whole analysis.
+				tool: "read",
 				args: {},
 				output,
 				outputChars: 1,
@@ -255,14 +260,16 @@ test("analyses that read a deleted owner are hidden first, then deleted in size-
 				owners: [sessionOwner],
 				createdAt: now,
 				removed: false,
+				counts: false,
+				redaction: null,
 			});
 	};
 	const authenticated = client(await createTokenSource(signingKey)());
-	const markReadingOwner = makeFunctionReference<
+	const removeOwnerEvidence = makeFunctionReference<
 		"mutation",
 		{ ownerId: string },
 		{ hasMore: boolean }
-	>("deletion:markReadingOwner");
+	>("deletion:removeOwnerEvidence");
 	const sweep = makeFunctionReference<
 		"mutation",
 		Record<string, never>,
@@ -276,9 +283,9 @@ test("analyses that read a deleted owner are hidden first, then deleted in size-
 
 	const analysisId = `a_${namespace}`;
 	await fill(analysisId, ownerId);
-	expect(await authenticated.mutation(markReadingOwner, { ownerId })).toEqual({
-		hasMore: false,
-	});
+	expect(
+		await authenticated.mutation(removeOwnerEvidence, { ownerId }),
+	).toEqual({ hasMore: false });
 	// Marked analyses are hidden and refuse writes before anything is deleted.
 	expect(await store.getAnalysis(analysisId)).toBeNull();
 	await expect(
@@ -294,7 +301,7 @@ test("analyses that read a deleted owner are hidden first, then deleted in size-
 		}),
 	).rejects.toThrow();
 	expect(await authenticated.mutation(sweep, {})).toEqual({ hasMore: true });
-	await store.deleteAnalysesReadingOwner(ownerId);
+	await store.removeOwnerEvidence(ownerId);
 	expect(await store.getQueries(analysisId)).toEqual([]);
 
 	await fill(`${analysisId}_fresh`, ownerId);

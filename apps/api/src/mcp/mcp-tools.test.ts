@@ -45,7 +45,7 @@ const tool = (name) => MCP_TOOLS.find((candidate) => candidate.name === name);
 const context = { userId: "u", workspace: { id: "w", slug: "w" }, authSession: {} };
 // The history procedures as the API runs them, over an in-memory log.
 const log = { store: createMemoryAnalysisStore(), embedder: createLocalEmbedder(), now: () => new Date() };
-const viewer = { workspaceId: "w", userId: "u", isAdmin: false, restrictResults: false };
+const viewer = { workspaceId: "w", userId: "u", isAdmin: false, restrictResults: false, onlyMember: null };
 const client = { analysis: { history: {
 	save: (input) => service.saveAnalysis(log, viewer, input),
 	share: (input) => service.shareAnalysis(log, viewer, input.analysis, input.shared),
@@ -290,7 +290,7 @@ test("every tool declares annotations, and only the tools that write are not rea
 			name,
 			...(name === "settings_update"
 				? replaces
-				: name === "share_answer" || name === "save_answer"
+				: ["share_answer", "save_answer", "run_questions"].includes(name)
 					? shares
 					: ["find", "read", "sql"].includes(name)
 						? writes
@@ -299,7 +299,12 @@ test("every tool declares annotations, and only the tools that write are not rea
 	}
 	expect(annotations.find).toEqual(writes);
 	expect(annotations.read).toEqual(writes);
-	for (const name of ["search_answers", "get_answer", "get_answer_evidence"])
+	for (const name of [
+		"answers",
+		"search_answers",
+		"get_answer",
+		"get_answer_evidence",
+	])
 		expect(annotations[name]).toEqual(readOnly);
 	expect(annotations.save_answer).toEqual(shares);
 	expect(annotations.share_answer).toEqual(shares);
@@ -367,16 +372,21 @@ test("the model sees only the analysis tools, the dashboard and the workspace li
 			.sort(),
 	).toEqual(
 		[
+			"answers",
 			"search_answers",
 			"get_answer",
 			"get_answer_evidence",
+			"estimate_questions",
 			"find",
 			"get_dashboard",
 			"list_workspaces",
 			"read",
+			"run",
+			"run_questions",
 			"save_answer",
 			"schema",
 			"share_answer",
+			"search",
 			"sql",
 		].sort(),
 	);

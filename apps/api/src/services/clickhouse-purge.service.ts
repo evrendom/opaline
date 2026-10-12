@@ -15,6 +15,7 @@ import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import { createPostgresSqlResultStore } from "./analysis/sql-results.js";
 import { purgeAnalysisLogs } from "./analysis-log/config.js";
+import { purgeFindingImpact } from "./analysis-log/finding-impact-clickhouse.js";
 import { purgeGitHubObjectIntents } from "./github-evidence-object-fence.service.js";
 import {
 	deleteOrgSessions,
@@ -29,6 +30,7 @@ import {
 	holdIntentsForPurge,
 	runIntentsForPurgeTarget,
 } from "./repository-evidence-fence.service.js";
+import { purgeRunQuestionJobs } from "./run-questions/jobs.js";
 
 const logger = getLogger(["rudel", "api", "clickhouse-purge"]);
 
@@ -563,10 +565,18 @@ function createClickHousePurgeProcessorEnv(
 				await deleteUserSessions(target.targetId);
 			}
 			await purgeAnalysisLogs(target);
-			// Stored sql results: the account's own and every one that read its
-			// sessions, or the whole workspace's. The follow-up pass catches
-			// results stored by queries that were running during the first.
+			// Saved findings' cited runs of the account's analyses and of those
+			// its deletion deletes (`quoted_owners`); its own runs' rows went above.
+			await purgeFindingImpact(target);
+			// Stored sql results: the account's own and those whose rows quoted
+			// the sessions it read are deleted, the rest that counted them
+			// removed, or the whole workspace's deleted. The
+			// follow-up pass catches results stored by queries that were running
+			// during the first.
 			await createPostgresSqlResultStore(database).purge(target);
+			// Run question jobs naming the account's sessions (cascades cover
+			// the requester and the workspace).
+			await purgeRunQuestionJobs(database, target);
 			if (pass)
 				await purgeRepositoryEvidenceObjects(target, pass, database, r2);
 		},

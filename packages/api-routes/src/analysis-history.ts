@@ -178,6 +178,22 @@ export const AnalysisHistoryQueryOutputSchema = z.object({
 	]),
 });
 
+/** A stored sql result, opened by its id (`sr_…`). */
+export const AnalysisHistorySqlResultInputSchema = z.object({ id }).strict();
+export const AnalysisHistorySqlResultOutputSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	query: z.string(),
+	createdAt: z.string(),
+	/**
+	 * Why the rows are gone: expired after 90 days, or removed because a
+	 * member whose sessions it counted deleted their account. The title and
+	 * SQL stay so it can be rerun.
+	 */
+	unavailable: z.enum(["expired", "removed"]).nullable(),
+	output: AnalysisSqlOutputSchema.omit({ id: true, trace: true }).nullable(),
+});
+
 export const AnalysisHistorySaveInputSchema = z
 	.object({
 		/** Missing only when no find/read call of this analysis was logged. */
@@ -250,6 +266,9 @@ export type AnalysisHistoryQueryOutput = z.infer<
 	typeof AnalysisHistoryQueryOutputSchema
 >;
 export type AnalysisChange = z.infer<typeof AnalysisChangeSchema>;
+export type AnalysisHistorySqlResultOutput = z.infer<
+	typeof AnalysisHistorySqlResultOutputSchema
+>;
 export type AnalysisHistorySaveInput = z.infer<
 	typeof AnalysisHistorySaveInputSchema
 >;
@@ -264,6 +283,9 @@ export const analysisHistoryContract = {
 	query: oc
 		.input(AnalysisHistoryQueryInputSchema)
 		.output(AnalysisHistoryQueryOutputSchema),
+	sqlResult: oc
+		.input(AnalysisHistorySqlResultInputSchema)
+		.output(AnalysisHistorySqlResultOutputSchema),
 	save: oc
 		.input(AnalysisHistorySaveInputSchema)
 		.output(AnalysisHistorySaveOutputSchema),

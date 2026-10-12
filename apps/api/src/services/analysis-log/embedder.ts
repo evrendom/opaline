@@ -2,13 +2,14 @@ import { z } from "zod";
 import { SanitizedError } from "./errors.js";
 import type { Embedder } from "./types.js";
 
-const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+export const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
 const LOCAL_EMBEDDING_MODEL = "local-word-vectors-1";
 const LOCAL_DIMENSIONS = 1536;
 const EmbeddingResponseSchema = z.object({
 	data: z.array(
 		z.object({ index: z.number(), embedding: z.array(z.number()) }),
 	),
+	usage: z.object({ total_tokens: z.number() }).optional(),
 });
 
 /**
@@ -23,25 +24,50 @@ export function createOpenAiEmbedder(
 	return {
 		model: OPENAI_EMBEDDING_MODEL,
 		async embed(texts) {
-			if (!texts.length) return [];
-			const response = await fetcher("https://api.openai.com/v1/embeddings", {
-				method: "POST",
-				headers: {
-					authorization: `Bearer ${apiKey}`,
-					"content-type": "application/json",
-				},
-				body: JSON.stringify({ model: OPENAI_EMBEDDING_MODEL, input: texts }),
-				signal: AbortSignal.timeout(10_000),
-			});
-			if (!response.ok)
-				throw new SanitizedError(
-					`OpenAI embeddings failed with HTTP ${response.status}`,
-				);
-			const { data } = EmbeddingResponseSchema.parse(await response.json());
-			return data
-				.sort((left, right) => left.index - right.index)
-				.map((item) => item.embedding);
+			return (await requestOpenAiEmbeddings(apiKey, texts, {}, fetcher))
+				.vectors;
 		},
+	};
+}
+
+/**
+ * One request to OpenAI `text-embedding-3-small`: the vectors in input order
+ * and the tokens it billed. `dimensions` shortens the vectors (the model
+ * keeps the most important dimensions first).
+ */
+export async function requestOpenAiEmbeddings(
+	apiKey: string,
+	texts: readonly string[],
+	options: { dimensions?: number; timeoutMs?: number; signal?: AbortSignal },
+	fetcher: typeof fetch = fetch,
+): Promise<{ vectors: number[][]; tokens: number }> {
+	if (!texts.length) return { vectors: [], tokens: 0 };
+	const response = await fetcher("https://api.openai.com/v1/embeddings", {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${apiKey}`,
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({
+			model: OPENAI_EMBEDDING_MODEL,
+			input: texts,
+			...(options.dimensions ? { dimensions: options.dimensions } : {}),
+		}),
+		signal: AbortSignal.any([
+			AbortSignal.timeout(options.timeoutMs ?? 10_000),
+			...(options.signal ? [options.signal] : []),
+		]),
+	});
+	if (!response.ok)
+		throw new SanitizedError(
+			`OpenAI embeddings failed with HTTP ${response.status}`,
+		);
+	const { data, usage } = EmbeddingResponseSchema.parse(await response.json());
+	return {
+		vectors: data
+			.sort((left, right) => left.index - right.index)
+			.map((item) => item.embedding),
+		tokens: usage?.total_tokens ?? 0,
 	};
 }
 

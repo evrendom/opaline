@@ -230,7 +230,7 @@ describe("analysis-linked uploads", () => {
 			(
 				await getAnalysisTree(
 					log,
-					{ workspaceId, userId, ...access },
+					{ workspaceId, userId, onlyMember: null, ...access },
 					restricted.id,
 				)
 			).chatSessions
@@ -383,7 +383,13 @@ async function uploadedIn(
 }
 
 function viewer(userId: string) {
-	return { workspaceId, userId, isAdmin: false, restrictResults: false };
+	return {
+		workspaceId,
+		userId,
+		isAdmin: false,
+		restrictResults: false,
+		onlyMember: null,
+	};
 }
 
 function analysisOf(
@@ -413,5 +419,6 @@ function analysisOf(
 		cost: null,
 		queryCount: 0,
 		stepCount: 0,
+		visibilityRevision: 0,
 	};
 }

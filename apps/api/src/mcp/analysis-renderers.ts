@@ -3,11 +3,15 @@ import type {
 	AnalysisHistoryGetOutput,
 	AnalysisHistoryQueryOutput,
 	AnalysisHistorySearchOutput,
+	AnalysisHistorySqlResultOutput,
 	AnalysisReadOutput,
+	AnalysisRunOutput,
 	AnalysisSchemaOutput,
 	AnalysisScope,
 	AnalysisSqlOutput,
 	AnalysisTrace,
+	RunQuestionsEstimate,
+	RunQuestionsRun,
 	RunRef,
 } from "@rudel/api-routes";
 import { WEEKLY_MEASURES, WEEKLY_NULLABLE_MEASURES } from "@rudel/api-routes";
@@ -503,6 +507,30 @@ export function renderStoredQuery(output: AnalysisHistoryQueryOutput): string {
 		: head;
 }
 
+/** A stored sql result opened by its id: title and SQL always, the rows unless they are gone. */
+export function renderStoredSqlResult(
+	output: AnalysisHistorySqlResultOutput,
+): string {
+	return [
+		`sql result=${output.id} title=${cell(output.title)} at=${output.createdAt}${output.unavailable ? ` unavailable=${output.unavailable}` : ""}`,
+		`query ${cell(output.query)}`,
+		...(output.output
+			? [
+					`rows=${output.output.rows} truncated=${output.output.truncated}`,
+					output.output.table,
+					...output.output.notices.map((notice) => `note: ${cell(notice)}`),
+				]
+			: []),
+	].join("\n");
+}
+
+/** The run view as text; a cut view says how to see what it left out. */
+export function renderRun(output: AnalysisRunOutput): string {
+	return output.truncated
+		? `${output.text}\nnote: cut to maxChars; expand fewer ids at once, ask for fewer sections, or raise maxChars`
+		: output.text;
+}
+
 /** An sql result: its stored id, the table, then what was cut and the not-evidence notice. */
 export function renderSql(output: AnalysisSqlOutput): string {
 	return [
@@ -521,7 +549,32 @@ export function renderSchema(output: AnalysisSchemaOutput): string {
 				["view", "grain", "columns"],
 				output.views.map((view) => [view.name, view.grain, view.columns]),
 			),
+			"approved measures:",
+			pipeTable(
+				["measure", "sql", "definition"],
+				output.measures.map((measure) => [
+					measure.name,
+					measure.sql,
+					measure.definition,
+				]),
+			),
 			...output.notes.map((note) => `note: ${cell(note)}`),
+			...(output.questions.length
+				? [
+						"run questions (ask with estimate_questions, then run_questions; answers in run_answers):",
+						pipeTable(
+							["question_id", "question", "tested runs", "tested precision"],
+							output.questions.map((question) => [
+								question.id,
+								question.question,
+								question.testedRuns ?? "untested",
+								question.testedPrecision === null
+									? "unknown"
+									: question.testedPrecision.toFixed(2),
+							]),
+						),
+					]
+				: ["note: no run questions are on yet."]),
 		].join("\n");
 	if (output.level === "columns")
 		return [
@@ -542,11 +595,44 @@ export function renderSchema(output: AnalysisSchemaOutput): string {
 		...output.column.traps.map((trap) => `trap: ${cell(trap)}`),
 		`top values over ${output.over}:`,
 		pipeTable(
-			["value", "runs"],
-			output.values.map((value) => [value.value, value.runs]),
+			["value", "rows"],
+			output.values.map((value) => [value.value, value.rows]),
 		),
 		...output.notices.map((notice) => `note: ${cell(notice)}`),
 	].join("\n");
+}
+
+/** An estimate: what would be bought, at what cost, and what is reused. */
+export function renderQuestionsEstimate(output: RunQuestionsEstimate): string {
+	return [
+		`estimate runs=${output.runs} to_answer=${output.toAnswer} cost_at_most=${output.costUsd === null ? "unknown" : usd(output.costUsd)} quota_remaining=${output.quota.remaining} of ${output.quota.answers} per ${output.quota.windowHours} hours available=${output.available}`,
+		...(output.token
+			? [`token=${output.token} expires_at=${output.tokenExpiresAt ?? ""}`]
+			: []),
+		pipeTable(
+			["question_id", "question", "answered (reused)", "queued", "to answer"],
+			output.questions.map((question) => [
+				question.id,
+				question.question,
+				question.answered,
+				question.queued,
+				question.toAnswer,
+			]),
+		),
+		...output.notices.map((notice) => `note: ${cell(notice)}`),
+	].join("\n");
+}
+
+/** What run_questions queued, reused and will cost. */
+export function renderQuestionsRun(output: RunQuestionsRun): string {
+	return [
+		`run_questions job=${output.job ?? "none"} runs=${output.runs} queued=${output.queued} reused=${output.reused} already_queued=${output.alreadyQueued} cost_at_most=${usd(output.costUsd)}`,
+		...output.notices.map((notice) => `note: ${cell(notice)}`),
+	].join("\n");
+}
+
+function usd(value: number): string {
+	return `$${value.toFixed(4)}`;
 }
 
 function pipeTable(

@@ -14,3 +14,8 @@ export const L1_EDGE_TABLES = [
  * session's other derived rows.
  */
 export const RUN_INDEX_TABLE = "rudel.run_index";
+/**
+ * The requests of each run index build: written by the same build, committed
+ * by its run index receipt, retired and purged with the run index.
+ */
+export const RUN_REQUESTS_TABLE = "rudel.run_requests";

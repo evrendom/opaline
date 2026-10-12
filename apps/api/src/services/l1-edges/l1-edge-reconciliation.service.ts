@@ -31,6 +31,7 @@ import {
 	L1_EDGES_BY_TARGET_TABLE,
 	L1_EDGES_TABLE,
 	RUN_INDEX_TABLE,
+	RUN_REQUESTS_TABLE,
 } from "./l1-edge-tables.js";
 import { buildRunIndex } from "./run-index.service.js";
 
@@ -263,7 +264,7 @@ export function sessionCompletion(
 
 /**
  * Removes a fenced session's derived rows from every edge table and the run
- * index, whichever of its scopes found the fence.
+ * index (runs and requests), whichever of its scopes found the fence.
  */
 async function deleteSessionEdges(
 	executor: ClickHouseExecutor,
@@ -276,6 +277,7 @@ async function deleteSessionEdges(
 		L1_EDGES_BY_TARGET_TABLE,
 		L1_EDGE_RESOLUTIONS_TABLE,
 		RUN_INDEX_TABLE,
+		RUN_REQUESTS_TABLE,
 	])
 		await executor.execute({
 			clickhouse_settings: { lightweight_deletes_sync: "3" },

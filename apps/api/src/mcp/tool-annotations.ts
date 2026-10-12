@@ -57,3 +57,14 @@ export const SAVES_AND_INDEXES: McpToolAnnotations = {
 	destructiveHint: false,
 	openWorldHint: true,
 };
+
+/**
+ * Answers run questions: stores answers in the caller's workspace (additive,
+ * nothing deleted or overwritten) and sends a short note per run to the
+ * answering service outside Opaline, so it is marked open-world.
+ */
+export const SENDS_RUN_NOTES: McpToolAnnotations = {
+	readOnlyHint: false,
+	destructiveHint: false,
+	openWorldHint: true,
+};

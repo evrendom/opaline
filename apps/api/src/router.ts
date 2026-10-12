@@ -243,6 +243,7 @@ import {
 	persistTranscriptRecordsBestEffort,
 	readTranscriptRecordsExtractionConfig,
 } from "./services/transcript-records-extraction.service.js";
+import { indexUploadedSessionBestEffort } from "./services/transcript-search/ingest.js";
 import { reportUploadFailures } from "./services/upload-failure.service.js";
 import {
 	hasMatchingUsageExtractionReceipt,
@@ -1118,8 +1119,8 @@ async function processPreparedIngestSession({
 			// Records are current, but their git observations may have been
 			// skipped (no admission slot) or failed; extraction is a no-op when its
 			// receipt is current and is best-effort, never failing the upload.
-			if (transcriptRecordsConfig.enabled)
-				await persistGitObservationsBestEffort(getClickhouse(), {
+			if (transcriptRecordsConfig.enabled) {
+				const derived = {
 					assertWritable: () =>
 						assertNoClickHousePurgeTombstone(
 							{ organizationId: orgId, userId: context.user.id },
@@ -1130,7 +1131,11 @@ async function processPreparedIngestSession({
 					signal,
 					source: filteredInput.source,
 					userId: context.user.id,
-				});
+				};
+				await persistGitObservationsBestEffort(getClickhouse(), derived);
+				// Goes on where an earlier pass stopped (time, chunk cap or quota).
+				await indexUploadedSessionBestEffort(getClickhouse(), derived);
+			}
 			logger.info(
 				"Skipping duplicate session ingest (organization_id={organizationId} session_id={sessionId})",
 				{ organizationId: orgId, sessionId: input.sessionId },
@@ -1515,7 +1520,21 @@ async function processPreparedIngestSession({
 
 		return { contentSha256: contentHash, result: response };
 	} finally {
-		await transcriptRecordsJob;
+		// Search indexing runs after the records extraction slot is released,
+		// for uploads only; it is bounded and never fails the upload.
+		if ((await transcriptRecordsJob) === "written")
+			await indexUploadedSessionBestEffort(getClickhouse(), {
+				assertWritable: () =>
+					assertNoClickHousePurgeTombstone(
+						{ organizationId: orgId, userId: context.user.id },
+						{ database: sqlClient },
+					),
+				organizationId: orgId,
+				sessionId: input.sessionId,
+				signal,
+				source: filteredInput.source,
+				userId: context.user.id,
+			});
 		if (
 			shouldAwaitBestEffortLanguageSignals({
 				awaitBestEffortLanguageSignals,

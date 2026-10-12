@@ -1,12 +1,19 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
+import { FINDING_RUNS_TABLE } from "@rudel/ch-schema/finding-runs";
 import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
+import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
 	type ClickHouseStatement,
 	getClickhouse,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import { L1_EDGE_TABLES, RUN_INDEX_TABLE } from "./l1-edges/l1-edge-tables.js";
+import {
+	L1_EDGE_TABLES,
+	RUN_INDEX_TABLE,
+	RUN_REQUESTS_TABLE,
+} from "./l1-edges/l1-edge-tables.js";
+import { TRANSCRIPT_SEARCH_TABLES } from "./transcript-search/tables.js";
 
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const SESSION_LANGUAGE_SIGNALS_TABLE = "rudel.session_language_signals";
@@ -226,17 +233,26 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: SKILL_USES_TABLE },
 		{ column, table: SKILL_VERSION_CONTENTS_TABLE },
 		{ column, table: TRANSCRIPT_RECORDS_TABLE },
+		// Transcript search: chunk text with its vectors, and where each appeared.
+		...TRANSCRIPT_SEARCH_TABLES.map((table) => ({ column, table })),
 		{ column, table: "rudel.session_git_observations" },
 		// Session edges carry their owner; GitHub edges (empty user) go with the workspace.
 		...L1_EDGE_TABLES.map((table) => ({ column, table })),
 		{ column, table: RUN_INDEX_TABLE },
+		{ column, table: RUN_REQUESTS_TABLE },
 		// Run index sums per member and week. Later refreshes read the run index
 		// purged above; the follow-up pass removes a snapshot appended by a
 		// refresh that was already running.
 		{ column, table: WEEKLY_TOTALS_TABLE },
+		// Run question answers name the session's owner; the follow-up pass
+		// removes answers a run_questions job stored while the first ran.
+		{ column, table: RUN_QUESTION_ANSWERS_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },
+		// Findings' cited runs, by the run's owner. The rows of analyses the
+		// account wrote or whose deletion it causes go in purgeFindingImpact.
+		{ column, table: FINDING_RUNS_TABLE },
 	];
 }
 
@@ -245,10 +261,22 @@ async function deleteSessionsFromTable(
 	column: "organization_id" | "user_id" | "workspace_id",
 	targetId: string,
 ): Promise<void> {
+	await purgeClickHouseRows(tableName, `${column} = {targetId:String}`, {
+		targetId,
+	});
+}
+
+/**
+ * Privacy deletion of the rows of `tableName` that match `predicate` (bound
+ * with `queryParams`), then a read-back that none is left.
+ */
+export async function purgeClickHouseRows(
+	tableName: string,
+	predicate: string,
+	queryParams: Record<string, string>,
+): Promise<void> {
 	const clickhouse = getClickhouse();
 	const table = getSafeClickHouseTable(tableName);
-	const predicate = `${column} = {targetId:String}`;
-	const queryParams = { targetId };
 
 	// Privacy deletion is an infrequent mutation, so use a lightweight DELETE.
 	// Sync level 3 waits for active SharedMergeTree replicas. The read-back

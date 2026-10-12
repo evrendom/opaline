@@ -197,6 +197,30 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 			"Human prompts in the run (queued prompts included, delegated tasks not).",
 	},
 	{
+		name: "prompt_reactions",
+		type: "Array(LowCardinality(String))",
+		comment:
+			"Word-list categories (negative, swear, apology, positive) the language-signals scanner finds in the run's first genuine prompt (its first 16,384 characters, as find scans it), sorted; empty when it finds none or the run has none. From run index 4; empty before.",
+	},
+	{
+		name: "final_message",
+		type: "Nullable(String)",
+		comment:
+			"First 2,000 characters of the run's last assistant text when no tool call follows it in the run: what the agent said when it stopped. NULL when the run ended on a tool call, has no assistant text, or was built before run index 4.",
+	},
+	{
+		name: "final_message_cut",
+		type: "Bool",
+		comment:
+			"Whether final_message holds only part of the message: it was longer than 2,000 characters, or the transcript stored it cut. From run index 4; false before.",
+	},
+	{
+		name: "system_prompt_recorded",
+		type: "Bool",
+		comment:
+			"Whether the run's stream recorded the system prompt it received (a Claude Code prompt_snapshot attachment or Codex base instructions) at or before the run. From run index 4; false before.",
+	},
+	{
 		name: "turn_origin",
 		type: FACT,
 		comment: `Claude turnOrigin of the run's starting prompt; ${NOT_RECORDABLE}.`,
@@ -656,4 +680,197 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 		type: "LowCardinality(String)",
 		comment: "Receipt: the session model recorded at upload.",
 	},
+];
+
+/** A usage column of a request: the same meaning as on a run, over the request's lines. */
+const requestUsage = (name: string, comment: string): RunIndexColumn => ({
+	name,
+	type: "Nullable(UInt64)",
+	comment: `${comment} of the request's usage events; NULL without usage or when the session's usage is unknown.`,
+});
+
+/**
+ * Every column of `rudel.run_requests`, in table order: the requests of each
+ * run index build (one model response and the calls it made), written with
+ * the build's runs and committed by the same receipt.
+ */
+export const RUN_REQUEST_COLUMNS: readonly RunIndexColumn[] = [
+	{
+		name: "organization_id",
+		type: "String",
+		comment: "Owning workspace ID; tenant boundary.",
+	},
+	{ name: "user_id", type: "String", comment: "Session owner." },
+	{
+		name: "session_id",
+		type: "String",
+		comment: "Native session ID within organization and user.",
+	},
+	{
+		name: "revision",
+		type: "UInt64",
+		comment: "Raw transcript revision of the run index build's generation.",
+	},
+	{
+		name: "parser_version",
+		type: "UInt16",
+		comment: "Transcript records parser version of the generation.",
+	},
+	{
+		name: "index_version",
+		type: "UInt16",
+		comment: "Run index rules version of the build.",
+	},
+	{
+		name: "build_revision",
+		type: "UInt64",
+		comment:
+			"Run index build that wrote the request; the session's newest run index receipt names the build readers read.",
+	},
+	{
+		name: "agent_id",
+		type: "String",
+		comment: "Transcript stream; empty for the main stream.",
+	},
+	{
+		name: "start_record",
+		type: "UInt32",
+		comment:
+			"Raw record index of the request's first response record (assistant text, reasoning or tool call); stable across re-uploads, like run ids.",
+	},
+	{
+		name: "source",
+		type: "LowCardinality(String)",
+		comment: "Transcript source: claude_code or codex.",
+	},
+	{
+		name: "run_id",
+		type: "String",
+		comment:
+			"Run node id of the run the request belongs to (run_index.run_id).",
+	},
+	{
+		name: "run_start_record",
+		type: "UInt32",
+		comment: "start_record of the run the request belongs to.",
+	},
+	{
+		name: "turn_idx",
+		type: "UInt32",
+		comment: "Run number within the stream.",
+	},
+	{
+		name: "built_at",
+		type: "DateTime64(3, 'UTC')",
+		comment: "UTC millisecond time the worker wrote the row.",
+	},
+	{
+		name: "session_date",
+		type: "DateTime64(3, 'UTC')",
+		comment: "Session date of the generation.",
+	},
+	{
+		name: "unrecorded_facts",
+		type: "Array(LowCardinality(String))",
+		comment:
+			"Columns of this row whose values are unknown, not none: the usage columns when the session's usage extraction was incomplete.",
+	},
+	{
+		name: "end_record",
+		type: "UInt32",
+		comment:
+			"Start of the next request of the run, or the run's end_record: the request's lines are [start_record, end_record), and its usage is on them (the first request's from the run's start).",
+	},
+	{
+		name: "started_at",
+		type: "DateTime64(3, 'UTC')",
+		comment:
+			"When the model was asked: the time of the run's last non-meta record before the request (the prompt or the previous request's last record).",
+	},
+	{
+		name: "ended_at",
+		type: "DateTime64(3, 'UTC')",
+		comment: "Time of the request's last non-meta record.",
+	},
+	{
+		name: "call_records",
+		type: "Array(UInt32)",
+		comment:
+			"Raw record index of each tool call the request made, in record order.",
+	},
+	{
+		name: "call_tools",
+		type: "Array(LowCardinality(String))",
+		comment: "Tool name of each call, in call_records order.",
+	},
+	{
+		name: "call_groups",
+		type: "Array(LowCardinality(String))",
+		comment:
+			"Tool group of each call (shell, edit, read, search, browser, web, mcp, subagent, other), in call_records order.",
+	},
+	{
+		name: "call_classes",
+		type: "Array(LowCardinality(String))",
+		comment:
+			"Command class the parser gave each shell call (test, build, lint, typecheck, git, migrate, install, other; empty for other tools), in call_records order.",
+	},
+	{
+		name: "call_failed",
+		type: "Array(UInt8)",
+		comment:
+			"1 when the call's result is an error or a non-zero exit code, in call_records order.",
+	},
+	{
+		name: "text_record",
+		type: "Nullable(UInt32)",
+		comment:
+			"Raw record index of the request's last assistant text; NULL when the request wrote none.",
+	},
+	{
+		name: "text_block",
+		type: "Nullable(UInt16)",
+		comment:
+			"Block of that assistant text within its record (a line can hold reasoning, then text); NULL when the request wrote none.",
+	},
+	{
+		name: "text_head",
+		type: "Nullable(String)",
+		comment:
+			"First 160 characters of that assistant text; NULL when the request wrote none.",
+	},
+	{
+		name: "usage_observations",
+		type: "UInt32",
+		comment:
+			"Verified usage events of the session's usage extraction on the request's lines.",
+	},
+	{
+		name: "usage_unpriced",
+		type: "UInt32",
+		comment: "Of usage_observations, events without a price.",
+	},
+	{
+		name: "usage_model",
+		type: "LowCardinality(String)",
+		comment: "Model of the request's latest usage event; empty without usage.",
+	},
+	{
+		name: "cost_usd",
+		type: "Nullable(Float64)",
+		comment:
+			"Priced cost of usage_observations at the build's pricing; NULL when none is priced or the usage is unknown.",
+	},
+	requestUsage("uncached_input_tokens", "Uncached input tokens"),
+	requestUsage("cache_read_input_tokens", "Cache read input tokens"),
+	requestUsage(
+		"cache_write_5m_input_tokens",
+		"Five-minute cache write input tokens",
+	),
+	requestUsage(
+		"cache_write_1h_input_tokens",
+		"One-hour cache write input tokens",
+	),
+	requestUsage("output_tokens", "Output tokens"),
+	requestUsage("reasoning_output_tokens", "Reasoning output tokens"),
 ];

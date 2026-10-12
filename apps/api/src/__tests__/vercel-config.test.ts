@@ -60,7 +60,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -86,7 +86,8 @@ describe("Vercel deployment configuration", () => {
 			(cron) =>
 				cron.path !== "/api/cron/r2-ingest" &&
 				cron.path !== "/api/cron/github-evidence" &&
-				cron.path !== "/api/cron/l1-edges",
+				cron.path !== "/api/cron/l1-edges" &&
+				cron.path !== "/api/cron/run-questions",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
@@ -138,6 +139,23 @@ describe("Vercel deployment configuration", () => {
 				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/github-evidence$)");
+	});
+
+	test("answers queued run questions every minute in an isolated cron function", () => {
+		expect(vercelConfig.functions["api/cron/run-questions.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 300,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/run-questions",
+			schedule: "* * * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/run-questions$)");
 	});
 
 	test("refreshes the Trends sources in an isolated daily cron function", () => {

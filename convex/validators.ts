@@ -65,9 +65,18 @@ export const analysis = v.object({
 	),
 	queryCount: v.number(),
 	stepCount: v.number(),
+	/**
+	 * Advanced with every share and unshare (`analyses:setShared`, and
+	 * `analyses:update` when it sets `shared`), so copies of the visibility
+	 * keep the newest. Absent until the first.
+	 */
+	visibilityRevision: v.optional(v.number()),
 });
 
-/** Only `analyses:save` publishes a draft, so `draft` is not patchable. */
+/**
+ * Only `analyses:save` publishes a draft, so `draft` is not patchable; the
+ * visibility revision only advances.
+ */
 export const analysisPatch = analysis
 	.omit(
 		"id",
@@ -78,6 +87,7 @@ export const analysisPatch = analysis
 		"queryCount",
 		"stepCount",
 		"draft",
+		"visibilityRevision",
 	)
 	.partial();
 
@@ -111,6 +121,14 @@ export const query = v.object({
 	outputChars: v.number(),
 	createdAt: v.string(),
 	removed: v.boolean(),
+	/**
+	 * The result returned only numbers and ids from the sessions it read
+	 * (ADR 0001 as amended). Absent on queries recorded before it, and from
+	 * an API deployed before it: those count as quoting.
+	 */
+	counts: v.optional(v.boolean()),
+	/** A counting query's arguments and step label once its result is removed. */
+	redaction: v.optional(v.object({ argsJson: v.string(), label: v.string() })),
 });
 
 export const querySession = v.object({

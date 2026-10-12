@@ -1,0 +1,50 @@
+import { expect, test } from "bun:test";
+import { recordedFact } from "./l1-facts.js";
+
+test("a question about a fact L1 records exactly names where it is recorded; a question about meaning names nothing", () => {
+	expect(
+		[
+			"Did the agent push a commit?",
+			"Was a tool call denied by the user?",
+			"Did the run open a pull request?",
+			"Was the context compacted during the run?",
+			"Did the agent use a skill?",
+			"Did a read fail because the file was not found?",
+			"Did the user interrupt the agent?",
+			"Did a command time out?",
+			"Did the run hit an API error?",
+			"Did the agent edit files through the shell?",
+			"Did the agent check CI after pushing?",
+			"Did the run cost more than a dollar?",
+			"Did the agent spend over $5 on a dead end?",
+			"Did the agent struggle to find the right file?",
+			"Did the agent misunderstand what the user asked for?",
+			"Was the user frustrated with the result?",
+			"Did the agent claim it was done before the work was finished?",
+			"Did the agent leak an API token?",
+			"Did the agent ask permission before deleting files?",
+			"Did the agent lack the skills the task needed?",
+		].map(recordedFact),
+	).toEqual([
+		"git_operations, commit_shas, pushed_branches",
+		"denied_calls",
+		"pr_urls, git_operations",
+		"compactions",
+		"skills",
+		"not_found",
+		"interrupted_calls, interrupt_markers",
+		"timed_out_calls",
+		"api_errors",
+		"shell edits (L1 records them per call)",
+		"CI checked or not (L1 edges)",
+		"cost_usd",
+		"cost_usd",
+		null,
+		null,
+		null,
+		null,
+		null,
+		null,
+		null,
+	]);
+});

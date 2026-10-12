@@ -73,6 +73,10 @@ export type {
 
 import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
+import {
+	runQuestionsAdminContract,
+	runQuestionsAnalysisContract,
+} from "./run-questions.js";
 
 export {
 	type AnalysisCall,
@@ -89,6 +93,10 @@ export {
 	type AnalysisReadOutput,
 	AnalysisReadOutputSchema,
 	type AnalysisRun,
+	type AnalysisRunInput,
+	AnalysisRunInputSchema,
+	type AnalysisRunOutput,
+	AnalysisRunOutputSchema,
 	type AnalysisSchemaInput,
 	AnalysisSchemaInputSchema,
 	type AnalysisSchemaOutput,
@@ -107,6 +115,7 @@ export {
 	findLimit,
 	parsePullRequestRef,
 	type RunRef,
+	RunRefSchema,
 	SQL_QUERY_MAX_CHARS,
 	WEEKLY_MEASURES,
 	WEEKLY_NULLABLE_MEASURES,
@@ -133,10 +142,43 @@ export {
 	AnalysisHistorySearchOutputSchema,
 	AnalysisHistoryShareInputSchema,
 	AnalysisHistoryShareOutputSchema,
+	AnalysisHistorySqlResultInputSchema,
+	type AnalysisHistorySqlResultOutput,
+	AnalysisHistorySqlResultOutputSchema,
 	type AnalysisHost,
 	AnalysisHostSchema,
 	type AnalysisScope,
 } from "./analysis-history.js";
+export {
+	type AnalysisSearchInput,
+	AnalysisSearchInputSchema,
+	type AnalysisSearchOutput,
+	AnalysisSearchOutputSchema,
+	SEARCH_DEFAULT_DAYS,
+	SEARCH_KINDS,
+	SEARCH_MAX_DAYS,
+	SEARCH_MODES,
+	SEARCH_TEXT_MAX_CHARS,
+} from "./analysis-search.js";
+export {
+	RUN_QUESTION_CRITERIA_MAX_CHARS,
+	RUN_QUESTION_MAX_CHARS,
+	RUN_QUESTION_MAX_RUNS,
+	RUN_QUESTION_TEST_RUNS,
+	RUN_QUESTIONS_PER_CALL,
+	type RunQuestion,
+	type RunQuestionCriteria,
+	RunQuestionCriteriaSchema,
+	RunQuestionSchema,
+	type RunQuestionsEstimate,
+	type RunQuestionsInput,
+	RunQuestionsInputSchema,
+	type RunQuestionsRun,
+	type RunQuestionsRunInput,
+	RunQuestionsRunInputSchema,
+	type RunQuestionTest,
+	type RunQuestionVerdictInput,
+} from "./run-questions.js";
 
 import { oc } from "@orpc/contract";
 import { z } from "zod";
@@ -882,7 +924,11 @@ const IngestSessionErrors = {
 } as const;
 
 export const contract = {
-	analysis: { ...analysisContract, history: analysisHistoryContract },
+	analysis: {
+		...analysisContract,
+		...runQuestionsAnalysisContract,
+		history: analysisHistoryContract,
+	},
 	billing: {
 		configuration: oc.output(BillingConfigurationOutputSchema),
 		current: oc.output(OrganizationBillingSummaryOutputSchema),
@@ -1029,6 +1075,7 @@ export const contract = {
 		dashboard: oc
 			.input(AdminCostDashboardInputSchema)
 			.output(CostDashboardSchema),
+		runQuestions: runQuestionsAdminContract,
 	},
 	productAnalytics: {
 		dashboardViewed: oc

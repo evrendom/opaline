@@ -30,7 +30,7 @@ const findUser = { source: "user", header, events: [{ type: "negative", terms: [
 const findTool = { source: "tool", header, groups: [{ toolGroup: "shell", cause: secret, detail: secret, kind: "mistake", count: 1, sessions: 1, firstSeen: "2026-10-01", lastSeen: "2026-10-01", topCommands: [secret], minutes: 1, costUsd: 0, examples: [{ ref, record: 3, errorLine: secret, parentSessionId: null }] }] };
 const readOf = (depth) => ({ truncated: false, reads: [{ ref, header: secret, found: true, truncated: false, sections: [{ name: depth === "record" ? "record" : depth === "turn" ? "tool_call" : "prompt", text: secret }] }] });
 const log = { store: createMemoryAnalysisStore(), embedder: createLocalEmbedder(), now: () => new Date() };
-const viewer = { workspaceId: "w", userId: "u", isAdmin: false, restrictResults: false };
+const viewer = { workspaceId: "w", userId: "u", isAdmin: false, restrictResults: false, onlyMember: null };
 // Evidence stored before redaction existed: the stored result holds the credentials.
 const stored = await service.recordQuery(log, { workspaceId: "w", userId: "u", host: "plugin" }, { tool: "find", args: { source: "tool" }, trace: {}, output: findTool, outputChars: 10, sessions: [], owners: [] });
 await service.saveAnalysis(log, viewer, { analysis: stored.analysis, question: "Why agents fail", finalAnswer: "Answer", findings: [], topics: [], changes: [] });

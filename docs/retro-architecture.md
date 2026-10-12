@@ -11,7 +11,7 @@ A retro is: find where the team lost the most, understand why, propose a setup f
 Every run is one row with everything countable about it:
 
 - **Facts** from L1: time, cost, tokens, searches, reads, failures, denials, re-asks, skills used, commits, pushes, PRs, and CI checked or not.
-- **Run question answers**: the probability of yes for each run question (for example "Did the agent struggle to find the right file?"), answered by Jev.
+- **Run question answers**: the probability of yes for each run question (for example "Did the agent struggle to find the right file?"), answered by SubQ Snap (Jev as a fallback).
 
 The agent answers "where did we lose the most, and on what" with one SQL query over this row.
 
@@ -20,7 +20,9 @@ The agent answers "where did we lose the most, and on what" with one SQL query o
 - Yes/no questions only, each answered as a probability. Open questions such as "what was the run trying to do" are not asked; a yes/no question per topic covers them.
 - Opaline sets the questions in an internal settings form. Workspaces do not write or remove them.
 - Each question can be tested on 20 runs before it is turned on.
-- The analysing agent picks which questions to run and over which runs (default: the last 4 weeks), and sees the cost before they run. Answers are kept and reused by later analyses; nothing runs for a workspace until an agent asks.
+- The analysing agent picks which questions to run and over which runs (default: the last 4 weeks), and sees the cost before they run; answering needs the estimate's token, so only what was priced is bought. Answers are kept and reused by later analyses; nothing runs for a workspace until an agent asks.
+- SubQ Snap answers (Jev, with the same API, as a fallback): each run is sent once with all its questions, as the run's full text after the secret filter; a run larger than the provider takes is sent as its compact run note, and each answer records which it read.
+- An answer belongs to the transcript it was given for: once a session is uploaded again with changes, its runs are answered anew. Answers are kept per provider and model version, so providers can be compared on the same runs.
 - Changing a question's wording makes a new question; old answers keep the wording they answered.
 - Facts L1 already records exactly (CI not checked, denied calls, shell edits) never become run questions.
 - An answer only says where to read. A finding needs the runs read.
@@ -116,6 +118,6 @@ Gaps seen in production while checking this (2026-10-12): `repository` is empty 
 ## Open
 
 - In the backlog: typed slash commands starting runs, and prompts sent before the agent replies (OPL-380); the exact meaning of a re-ask (OPL-381).
-- Run questions send run notes to Jev, which ADR 0001 did not cover (it allows only analysis titles to leave the stack); decide the subprocessor terms before the first run.
+- Run questions send the full text of runs (secret-filtered) to SubQ Snap, or Jev as a fallback, which ADR 0001 did not cover (it allows only analysis titles to leave the stack); check the provider's data-retention and subprocessor terms before any customer workspace is answered.
 
 Decided: embeddings are computed by OpenAI-hosted `text-embedding-3-small` (privacy policy and subprocessors page updated); agents query L1 with SQL (ADR 0005); everyone reads every session (ADR 0004), with ADR 0001 adapted to both.

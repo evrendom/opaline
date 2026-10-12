@@ -35,7 +35,8 @@ export interface ScanPage {
 }
 
 /** Text longer than this is scanned only up to here and the row is marked partial. */
-const SCAN_TEXT_CHARS = 16_384;
+/** As much of a record's text as a scan reads; the run index scans prompts as far. */
+export const SCAN_TEXT_CHARS = 16_384;
 
 export const FailureRowSchema = z.object({
 	session_id: z.string(),

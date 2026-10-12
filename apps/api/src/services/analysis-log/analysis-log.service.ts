@@ -21,6 +21,9 @@ import {
 	AnalysisSavedError,
 	loggableError,
 } from "./errors.js";
+import { classifyCall } from "./evidence.js";
+import { citedRuns, type FindingMirror } from "./finding-impact.js";
+import { followVisibility, syncVisibility } from "./finding-visibility.js";
 import {
 	DRAFT_RETENTION_MS,
 	MAX_QUERIES_PER_ANALYSIS,
@@ -67,6 +70,12 @@ export interface RecordedCall {
 	sessions: QuerySession[];
 	/** Every member whose sessions the call read, shown in its output or not. */
 	owners: readonly string[];
+	/**
+	 * sql only: whether the rows the gateway showed carry transcript text
+	 * (`rowsQuote`); the stored output keeps only the rendered table. Absent
+	 * reads as quoting.
+	 */
+	quotes?: boolean;
 }
 
 /**
@@ -109,6 +118,7 @@ async function recordInto(
 	if (analysis.queryCount >= MAX_QUERIES_PER_ANALYSIS)
 		throw new AnalysisFullError("queries");
 	const step = await createCallStep(log, analysis, call, now);
+	const evidence = classifyCall(call);
 	const query: StoredQuery = {
 		id: newId("q"),
 		analysisId: analysis.id,
@@ -128,6 +138,11 @@ async function recordInto(
 		].sort(),
 		createdAt: now,
 		removed: false,
+		counts: evidence.counts,
+		redaction: evidence.keptArgs && {
+			args: evidence.keptArgs,
+			label: stepLabel(call.tool, evidence.keptArgs),
+		},
 	};
 	await log.store.createQuery(query);
 	return { analysis: analysis.id, step: step.id, query: query.id };
@@ -144,6 +159,7 @@ export async function saveAnalysis(
 	log: AnalysisLog,
 	viewer: AnalysisViewer,
 	input: AnalysisHistorySaveInput,
+	mirror?: FindingMirror,
 ): Promise<{ analysis: string; status: "finished" }> {
 	if (!input.question?.trim())
 		throw new ORPCError("BAD_REQUEST", {
@@ -245,7 +261,92 @@ export async function saveAnalysis(
 			"topics",
 			input.topics.join(", "),
 		);
+	if (mirror)
+		await recordFindingImpact(log, mirror, viewer, analysis, findings, queries);
 	return { analysis: analysis.id, status: "finished" };
+}
+
+/**
+ * Hands each saved finding's cited runs to finding impact: the runs its
+ * step's call cites in its stored result, and the members whose runs the
+ * analysis quoted. Only results the saver may read now are cited, and only
+ * runs of sessions they may read now (`onlyMember`): a saver demoted since
+ * the call cites nothing they can no longer open. Best effort, like
+ * embeddings: the saved analysis stands when the write fails, and the
+ * failure is logged.
+ */
+async function recordFindingImpact(
+	log: AnalysisLog,
+	{ impact, syncs }: FindingMirror,
+	viewer: AnalysisViewer,
+	analysis: StoredAnalysis,
+	findings: { stepId: string; finding: string }[],
+	queries: QuerySummary[],
+): Promise<void> {
+	try {
+		const findingSteps = new Set(findings.map((item) => item.stepId));
+		const now = log.now();
+		const readable = new Set(
+			queries
+				.filter(
+					(query) => unavailableReason(query, analysis, viewer, now) === null,
+				)
+				.map((query) => query.id),
+		);
+		const needed = queries.filter(
+			(query) => !query.counts || findingSteps.has(query.stepId),
+		);
+		const stored = await Promise.all(
+			needed.map((query) => log.store.getQuery(query.id)),
+		);
+		// Members whose deletion deletes the analysis (and these rows): those
+		// a quoting query read, and those whose sessions a finding's result names.
+		const quotedOwners = new Set<string>();
+		for (const query of stored) {
+			if (!query) continue;
+			if (!query.counts)
+				for (const owner of query.owners) quotedOwners.add(owner);
+			if (findingSteps.has(query.stepId))
+				for (const session of query.sessions) quotedOwners.add(session.ownerId);
+		}
+		await impact.record({
+			workspaceId: analysis.workspaceId,
+			analysisId: analysis.id,
+			authorId: analysis.authorId,
+			// As it was saved: a draft is never shared.
+			visibility: {
+				shared: analysis.shared,
+				revision: analysis.visibilityRevision,
+			},
+			savedAt: log.now().toISOString(),
+			quotedOwners: [...quotedOwners].sort(),
+			onlyMember: viewer.onlyMember,
+			citations: findings.map(({ stepId, finding }) => ({
+				stepId,
+				finding,
+				runs: citedRuns(
+					stored
+						.filter(
+							(query) => query?.stepId === stepId && readable.has(query.id),
+						)
+						.map((query) => query?.output),
+				),
+			})),
+		});
+		// A share or unshare made while the rows were written may have found
+		// none of them: they follow the analysis as it is now.
+		const current = await log.store.getAnalysis(analysis.id);
+		if (current && current.visibilityRevision !== analysis.visibilityRevision)
+			await syncVisibility(log.store, impact, syncs, {
+				workspaceId: analysis.workspaceId,
+				analysisId: analysis.id,
+			});
+	} catch (error) {
+		logger.error("Finding impact was not recorded for {analysisId}: {error}", {
+			analysisId: analysis.id,
+			error: loggableError(error),
+		});
+	}
 }
 
 /**
@@ -423,18 +524,37 @@ export async function getStoredQuery(
 	};
 }
 
+/**
+ * Shares or unshares a saved analysis, and its finding impact rows with it.
+ * The analysis log is authoritative: a sync of the rows is requested before
+ * the change, the change advances the analysis's visibility revision, and
+ * the rows take that revision's visibility (the highest revision wins). When
+ * the rows cannot follow now, the change stands and the maintenance pass
+ * makes them follow (`finding-visibility.ts`).
+ */
 export async function shareAnalysis(
 	log: AnalysisLog,
 	viewer: AnalysisViewer,
 	id: string,
 	shared: boolean,
+	mirror?: FindingMirror,
 ): Promise<{ analysis: string; shared: boolean }> {
 	const analysis = await authoredAnalysis(log, viewer, id);
 	if (analysis.draft)
 		throw new ORPCError("BAD_REQUEST", {
 			message: `Analysis ${analysis.id} is an unsaved draft; save it with save_answer first, then share it`,
 		});
-	await log.store.updateAnalysis(analysis.id, { shared });
+	const target = { workspaceId: analysis.workspaceId, analysisId: analysis.id };
+	const ticket = await mirror?.syncs.request(target);
+	const revision = await log.store.setShared(analysis.id, shared);
+	if (mirror && ticket !== undefined)
+		await followVisibility(
+			mirror.impact,
+			mirror.syncs,
+			target,
+			ticket,
+			revision === null ? null : { shared, revision },
+		);
 	return { analysis: analysis.id, shared };
 }
 
@@ -481,6 +601,7 @@ async function createAnalysis(
 		cost: null,
 		queryCount: 0,
 		stepCount: 0,
+		visibilityRevision: 0,
 	};
 	await log.store.createAnalysis(analysis);
 	return analysis;
@@ -671,6 +792,7 @@ function authorViewer(author: {
 		userId: author.userId,
 		isAdmin: false,
 		restrictResults: true,
+		onlyMember: author.userId,
 	};
 }
 
@@ -869,9 +991,12 @@ function newId(prefix: "a" | "s" | "q"): string {
 /**
  * Account or workspace deletion (run by the durable purge, so it must be
  * idempotent; its follow-up pass repeats it): a workspace's analyses go; for
- * an account, its own analyses and every analysis, by anyone, that read one
- * of its sessions (ADR 0001). Stops with `signal`; a retry continues where
- * this one stopped.
+ * an account, its own analyses and every analysis, by anyone, with a result
+ * that returned text from its sessions or a finding citing one of them,
+ * while results that only counted its sessions are removed (with arguments
+ * that may carry transcript text) and their analyses stay (ADR 0001 as
+ * amended; `removeOwnerEvidence`). Stops with `signal`; a retry
+ * continues where this one stopped.
  */
 export async function purgeAnalysisLog(
 	store: AnalysisStore,
@@ -885,7 +1010,7 @@ export async function purgeAnalysisLog(
 	}
 	await store.deleteAnalysesByAuthor(target.targetId);
 	signal.throwIfAborted();
-	await store.deleteAnalysesReadingOwner(target.targetId);
+	await store.removeOwnerEvidence(target.targetId);
 	signal.throwIfAborted();
 	// Their chats linked to other members' analyses go; those analyses stay.
 	await store.deleteSessionLinksByOwner(target.targetId);

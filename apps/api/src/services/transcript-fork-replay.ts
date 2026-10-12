@@ -7,21 +7,27 @@ import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ANALYSIS_QUERY_SETTINGS, records } from "./analysis/sql.js";
 import type { TranscriptReadScope } from "./transcript-records-queries.js";
 
+/**
+ * The committed generation of each parent session `parents` selects, and its
+ * main stream's tool calls (`parent_calls`), among the sessions `owner`
+ * holds: by default one member's, bound as parameters.
+ */
 export function forkParentCallsSql(
-	parentIds = "{parentSessionIds:Array(String)}",
+	parents = "session_id IN {parentSessionIds:Array(String)}",
+	owner = "organization_id = {organizationId:String} AND user_id = {userId:String}",
 ): string {
 	return `parent_receipts AS (
-		SELECT session_id, argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
+		SELECT user_id, session_id, argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
 		FROM ${records()}
-		WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-			AND session_id IN ${parentIds} AND source = 'codex'
+		WHERE ${owner}
+			AND ${parents} AND source = 'codex'
 			AND agent_id = '' AND record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND block_idx = 0
-		GROUP BY session_id
+		GROUP BY user_id, session_id
 	), parent_calls AS (
-		SELECT DISTINCT session_id, call_id FROM ${records()}
-		WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-			AND session_id IN ${parentIds} AND source = 'codex'
-			AND (session_id, revision, parser_version) IN (SELECT session_id, generation.1, generation.2 FROM parent_receipts)
+		SELECT DISTINCT user_id, session_id, call_id FROM ${records()}
+		WHERE ${owner}
+			AND ${parents} AND source = 'codex'
+			AND (user_id, session_id, revision, parser_version) IN (SELECT user_id, session_id, generation.1, generation.2 FROM parent_receipts)
 			AND agent_id = '' AND kind = 'tool_call' AND call_id != ''
 			AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
 	)`;

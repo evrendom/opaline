@@ -387,7 +387,7 @@ export function analysisStoreContract(
 			expect(await store.getQueries("a_missing")).toEqual([]);
 		});
 
-		test("deleting what read an owner's sessions removes those analyses in any workspace, keeps the rest and repeats", async () => {
+		test("deleting what quoted an owner's runs removes those analyses in any workspace, keeps the rest and repeats", async () => {
 			const {
 				store,
 				analysis,
@@ -440,8 +440,8 @@ export function analysisStoreContract(
 				third,
 			]);
 
-			await store.deleteAnalysesReadingOwner(ownerId);
-			await store.deleteAnalysesReadingOwner(ownerId);
+			await store.removeOwnerEvidence(ownerId);
+			await store.removeOwnerEvidence(ownerId);
 			for (const id of [read, otherRead]) {
 				expect(await store.getAnalysis(id)).toBeNull();
 				expect(await store.getSteps(id)).toEqual([]);
@@ -465,7 +465,7 @@ export function analysisStoreContract(
 					)
 				).map((match) => match.analysisId),
 			).toEqual([unrelated]);
-			await store.deleteAnalysesReadingOwner(`${ownerId}_missing`);
+			await store.removeOwnerEvidence(`${ownerId}_missing`);
 		});
 
 		test("a deleted analysis is hidden and refuses further writes", async () => {
@@ -473,7 +473,7 @@ export function analysisStoreContract(
 			await store.createAnalysis(analysis);
 			await store.createStep(step);
 			await store.createQuery(query);
-			await store.deleteAnalysesReadingOwner(ownerId);
+			await store.removeOwnerEvidence(ownerId);
 
 			expect(await store.getAnalysis(analysis.id)).toBeNull();
 			expect(
@@ -518,7 +518,7 @@ export function analysisStoreContract(
 					});
 			};
 			await fill(analysis.id, step.id);
-			await store.deleteAnalysesReadingOwner(ownerId);
+			await store.removeOwnerEvidence(ownerId);
 			expect(await store.getAnalysis(analysis.id)).toBeNull();
 			expect(await store.getQueries(analysis.id)).toEqual([]);
 			expect(await store.getQuery(`${analysis.id}_q39`)).toBeNull();
@@ -564,53 +564,250 @@ export function analysisStoreContract(
 			expect(await store.getAnalysis(late.analysis)).toBeNull();
 		});
 
-		test("an analysis whose results name none of an account's sessions is still deleted with that account", async () => {
-			const { store, workspaceId, ownerId, otherAuthorId } = setup();
-			const log = {
-				store,
-				embedder: createLocalEmbedder(),
-				now: () => new Date("2026-10-03T10:00:00.000Z"),
+		describe("deleting a member", () => {
+			const purgeOwner = async (store: AnalysisStore, ownerId: string) => {
+				const account = { targetType: "account" as const, targetId: ownerId };
+				await purgeAnalysisLog(store, account, AbortSignal.timeout(60_000));
+				await purgeAnalysisLog(store, account, AbortSignal.timeout(60_000));
 			};
-			const admin = {
-				workspaceId,
-				userId: otherAuthorId,
-				host: "plugin" as const,
+			const context = () => {
+				const fixed = setup();
+				const log = {
+					store: fixed.store,
+					embedder: createLocalEmbedder(),
+					now: () => new Date("2026-10-03T10:00:00.000Z"),
+				};
+				const author = authorOf(fixed.workspaceId, fixed.otherAuthorId);
+				const viewer = viewerOf(fixed.workspaceId, fixed.otherAuthorId);
+				const record = (call: Omit<RecordedCall, "trace" | "outputChars">) =>
+					recordQuery(log, author, { ...call, trace: {}, outputChars: 100 });
+				const save = (
+					analysis: string,
+					findings: { step: string; finding: string }[] = [],
+				) =>
+					saveAnalysis(log, viewer, {
+						analysis,
+						question: "Where did the team lose time?",
+						finalAnswer: "In long test runs.",
+						findings,
+						topics: [],
+						changes: [],
+					});
+				return { ...fixed, log, viewer, record, save };
 			};
-			// A grouped find reads the member's sessions but shows only totals.
-			const trace = await recordQuery(log, admin, {
-				tool: "find",
-				args: { source: "runs", groupBy: "week" },
-				trace: {},
-				output: { groups: [{ key: "2026-09-28", runs: 12, sessions: 3 }] },
-				outputChars: 60,
-				sessions: [],
-				owners: [ownerId],
+			const run = (sessionId: string, turn: number) => ({
+				sessionId,
+				agentId: "",
+				turn,
 			});
-			await saveAnalysis(
-				log,
-				{
-					workspaceId,
-					userId: otherAuthorId,
-					isAdmin: true,
-					restrictResults: false,
-				},
-				{
-					analysis: trace.analysis,
-					question: "How busy was the team?",
-					finalAnswer: "Busiest in late September.",
-					findings: [],
-					topics: [],
-					changes: [],
-				},
-			);
 
-			await purgeAnalysisLog(
-				store,
-				{ targetType: "account", targetId: ownerId },
-				AbortSignal.timeout(60_000),
-			);
-			expect(await store.getAnalysis(trace.analysis)).toBeNull();
-			expect(await store.getQuery(trace.query)).toBeNull();
+			test("deletes every analysis whose results returned text from their sessions, by any tool, and keeps one that only counted them, with that result removed", async () => {
+				const { store, log, viewer, record, save, ownerId, otherOwnerId } =
+					context();
+				const theirs = sessionOf(ownerId);
+				const quoting = [
+					await record({
+						tool: "read",
+						args: { refs: [run(theirs.sessionId, 1)] },
+						output: {
+							reads: [{ ref: run(theirs.sessionId, 1), header: "a prompt" }],
+						},
+						sessions: [theirs],
+						owners: [ownerId],
+					}),
+					// find quotes too: a reaction's excerpt, a run's prompt head.
+					await record({
+						tool: "find",
+						args: { source: "user" },
+						output: {
+							source: "user",
+							header: { notes: [] },
+							events: [
+								{
+									type: "negative",
+									eventRef: { ...run(theirs.sessionId, 2), record: 4 },
+									quote: "no, revert the private fix",
+								},
+							],
+							groups: [],
+						},
+						sessions: [theirs],
+						owners: [ownerId, otherOwnerId],
+					}),
+					await record({
+						tool: "find",
+						args: { source: "runs" },
+						output: {
+							source: "runs",
+							header: { notes: [] },
+							rows: [
+								{
+									ref: run(theirs.sessionId, 3),
+									model: "a-model",
+									promptHead: "ship the private fix",
+									minutes: 3,
+								},
+							],
+						},
+						sessions: [theirs],
+						owners: [ownerId, otherOwnerId],
+					}),
+					// The sql gateway found transcript text in the rows it showed.
+					await record({
+						tool: "sql",
+						args: { query: "SELECT prompt_head FROM runs", title: "Prompts" },
+						output: { table: "prompt_head\nship the private fix" },
+						quotes: true,
+						sessions: [],
+						owners: [ownerId, otherOwnerId],
+					}),
+				];
+				const counting = [
+					await record({
+						tool: "find",
+						args: { source: "weekly", groupBy: "member" },
+						output: {
+							source: "weekly",
+							header: { notes: ["Totals are whole weeks."] },
+							snapshot: { id: "snap", refreshedAt: "2026-10-02" },
+							totals: [{ week: null, member: ownerId, agent: null, runs: 12 }],
+						},
+						sessions: [],
+						owners: [ownerId, otherOwnerId],
+					}),
+					await record({
+						tool: "sql",
+						args: {
+							query: "SELECT user_id, count() FROM runs GROUP BY user_id",
+							title: "Runs per member",
+						},
+						output: { table: "user_id | count()" },
+						quotes: false,
+						sessions: [],
+						owners: [ownerId, otherOwnerId],
+					}),
+				];
+				for (const trace of [...quoting, ...counting])
+					await save(trace.analysis);
+
+				await purgeOwner(store, ownerId);
+
+				for (const trace of quoting) {
+					expect(await store.getAnalysis(trace.analysis)).toBeNull();
+					expect(await store.getQuery(trace.query)).toBeNull();
+				}
+				for (const trace of counting) {
+					const kept = await getAnalysisTree(log, viewer, trace.analysis);
+					expect(kept.steps.flatMap((step) => step.queries)).toMatchObject([
+						{ id: trace.query, unavailable: "removed" },
+					]);
+					expect(await store.getQuery(trace.query)).toMatchObject({
+						output: null,
+						removed: true,
+						owners: [otherOwnerId],
+					});
+				}
+				expect(
+					await getStoredQuery(
+						log,
+						viewer,
+						counting[1]?.query ?? "",
+						currentGenerations,
+					),
+				).toMatchObject({
+					unavailable: "removed",
+					call: {
+						tool: "sql",
+						args: {
+							query: "SELECT user_id, count() FROM runs GROUP BY user_id",
+							title: "Runs per member",
+						},
+						output: null,
+					},
+				});
+			});
+
+			test("a counted result whose arguments carry text that may come from their sessions loses those arguments with the result", async () => {
+				const { store, log, viewer, record, save, ownerId, otherOwnerId } =
+					context();
+				const counted = await record({
+					tool: "sql",
+					args: {
+						query:
+							"SELECT count() FROM runs WHERE prompt_head = 'ship the private fix'",
+						title: "Runs of one prompt",
+					},
+					output: { table: "count()\n3" },
+					quotes: false,
+					sessions: [],
+					owners: [ownerId, otherOwnerId],
+				});
+				const filtered = await record({
+					tool: "find",
+					args: {
+						source: "calls",
+						groupBy: "commandFingerprint",
+						commandPrefix: "deploy private-host",
+					},
+					output: {
+						source: "calls",
+						header: { notes: [] },
+						groups: [],
+					},
+					sessions: [],
+					owners: [ownerId, otherOwnerId],
+				});
+				await save(counted.analysis);
+				await save(filtered.analysis);
+
+				await purgeOwner(store, ownerId);
+
+				expect(await store.getQuery(counted.query)).toMatchObject({
+					args: { title: "Runs of one prompt" },
+					output: null,
+					removed: true,
+				});
+				expect((await store.getQuery(counted.query))?.args).not.toHaveProperty(
+					"query",
+				);
+				const tree = await getAnalysisTree(log, viewer, filtered.analysis);
+				expect(tree.steps).toMatchObject([
+					{
+						question: "find source=calls groupBy=commandFingerprint",
+						queries: [
+							{
+								args: { source: "calls", groupBy: "commandFingerprint" },
+								unavailable: "removed",
+							},
+						],
+					},
+				]);
+				expect(JSON.stringify(tree)).not.toContain("private-host");
+			});
+
+			test("deletes an analysis whose finding cites one of their runs, even where its result only counted", async () => {
+				const { store, record, save, ownerId, otherOwnerId } = context();
+				const theirs = sessionOf(ownerId);
+				const cited = await record({
+					tool: "sql",
+					args: {
+						query:
+							"SELECT session_id, agent_id, turn_idx, active_minutes FROM runs",
+						title: "Longest runs",
+					},
+					output: { runs: [run(theirs.sessionId, 5)] },
+					quotes: false,
+					sessions: [theirs],
+					owners: [ownerId, otherOwnerId],
+				});
+				await save(cited.analysis, [
+					{ step: cited.step, finding: "The longest runs waited on CI." },
+				]);
+
+				await purgeOwner(store, ownerId);
+
+				expect(await store.getAnalysis(cited.analysis)).toBeNull();
+			});
 		});
 
 		test("author deletion cascades past a batch, crosses workspaces, preserves other authors and is idempotent", async () => {
@@ -1191,7 +1388,7 @@ export function analysisStoreContract(
 			const reading = await recordQuery(
 				log,
 				authorOf(otherWorkspaceId, otherAuthorId),
-				recorded({}, [ownerId]),
+				{ ...recorded({}, [ownerId]), tool: "read" },
 			);
 			const other = await recordQuery(
 				log,
@@ -1313,7 +1510,13 @@ function viewerOf(
 	userId: string,
 	isAdmin = false,
 ): AnalysisViewer {
-	return { workspaceId, userId, isAdmin, restrictResults: false };
+	return {
+		workspaceId,
+		userId,
+		isAdmin,
+		restrictResults: false,
+		onlyMember: null,
+	};
 }
 
 function recorded(
@@ -1406,6 +1609,7 @@ function fixture(store: AnalysisStore) {
 		cost: null,
 		queryCount: 0,
 		stepCount: 0,
+		visibilityRevision: 0,
 	};
 	const step: StoredStep = {
 		id: `s_${namespace}`,
@@ -1423,7 +1627,8 @@ function fixture(store: AnalysisStore) {
 		stepId: step.id,
 		workspaceId,
 		authorId,
-		tool: "find",
+		// Opened the runs it read: account deletion deletes its analysis.
+		tool: "read",
 		args: { text: "slow", nested: { sources: ["user"] } },
 		output: { runs: [1, 2], next: null },
 		outputChars: 32,
@@ -1434,6 +1639,8 @@ function fixture(store: AnalysisStore) {
 		owners: [ownerId],
 		createdAt: now,
 		removed: false,
+		counts: false,
+		redaction: null,
 	};
 	return {
 		store,

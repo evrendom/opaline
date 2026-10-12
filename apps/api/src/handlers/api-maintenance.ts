@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
 	createMaintenanceQueueDeadline,
@@ -12,6 +13,15 @@ import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { readResendConfig } from "../resend-config.js";
 import { expireSqlResults } from "../services/analysis/sql-results.js";
+import { getConfiguredAnalysisLog } from "../services/analysis-log/config.js";
+import {
+	createClickHouseFindingImpact,
+	createPostgresFindingImpactFence,
+} from "../services/analysis-log/finding-impact-clickhouse.js";
+import {
+	createPostgresVisibilitySyncs,
+	runVisibilitySyncPass,
+} from "../services/analysis-log/finding-visibility.js";
 import { runClickHousePurgeWorkerPass } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
@@ -88,10 +98,29 @@ export async function handleR2IngestMaintenanceRequest(
 					),
 				}),
 		);
+		// Finding impact rows of analyses whose visibility change did not
+		// reach them yet follow it within a minute.
+		const findingVisibility = await runMaintenanceStep(
+			"finding-visibility",
+			() =>
+				runVisibilitySyncPass({
+					impact: createClickHouseFindingImpact(
+						getClickhouse(),
+						createPostgresFindingImpactFence(sqlClient),
+					),
+					syncs: createPostgresVisibilitySyncs(sqlClient),
+					// The log holds the analysis whether or not its workspace still captures.
+					logOf: getConfiguredAnalysisLog,
+				}),
+		);
 		return Response.json(
-			{ ...result, repositoryEvidenceIndex },
+			{ ...result, repositoryEvidenceIndex, findingVisibility },
 			{
-				status: repositoryEvidenceIndex.status === "ok" ? 200 : 500,
+				status:
+					repositoryEvidenceIndex.status === "ok" &&
+					findingVisibility.status === "ok"
+						? 200
+						: 500,
 			},
 		);
 	} catch (error) {

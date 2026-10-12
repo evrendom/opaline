@@ -163,9 +163,9 @@ describe("semantic run-index component projections", () => {
 		expect(sql).not.toContain("session_git_observations");
 	});
 
-	test("index 3 (not found, OPL-384) with a SQL-and-gates fingerprint", () => {
+	test("index 5 (requests, OPL-389; 4 is the measure facts of OPL-387) with a SQL-and-gates fingerprint", () => {
 		const pricingOnly = `${MODEL_RATE_CARD_VERSION}+${createHash("sha256").update(buildPricedUsageEventsCte("")).digest("hex").slice(0, 12)}`;
-		expect(RUN_INDEX_VERSION).toBe(3);
+		expect(RUN_INDEX_VERSION).toBe(5);
 		expect(RUN_INDEX_PRICING_VERSION).toMatch(/\+[a-f0-9]{12}$/u);
 		expect(RUN_INDEX_PRICING_VERSION).not.toBe(pricingOnly);
 	});

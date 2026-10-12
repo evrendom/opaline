@@ -95,6 +95,7 @@ const SESSION_ANALYTICS_MV_FILTER_MARKER =
 
 /** Every table the API reads or writes; also the names an agent's SQL may never use. */
 export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
+	"rudel.analysis_finding_runs",
 	"rudel.github_pull_requests",
 	"rudel.github_pull_request_details",
 	"rudel.github_pull_request_commits",
@@ -108,6 +109,8 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.codex_sessions",
 	"rudel.repository_session_evidence_index",
 	"rudel.run_index",
+	"rudel.run_requests",
+	"rudel.run_question_answers",
 	"rudel.session_analytics",
 	"rudel.session_git_observations",
 	"rudel.session_language_signals",
@@ -115,6 +118,8 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.skill_receipts",
 	"rudel.skill_uses",
 	"rudel.skill_version_contents",
+	"rudel.transcript_chunk_hits",
+	"rudel.transcript_chunks",
 	"rudel.transcript_records",
 	"rudel.usage_events",
 	"rudel.weekly_totals",
