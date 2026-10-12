@@ -1,6 +1,7 @@
 {
 	"name": "rudel",
 	"version": "0.3.0",
+	"private": true,
 	"type": "module",
 	"description": "CLI for the Coding Agent Analytics Platform opaline.so",
 	"license": "MIT",

@@ -1,27 +1,25 @@
-# rudel
+# rudel (test harness)
 
-Compatibility CLI for uploading Claude Code / Codex session transcripts to [Opaline](https://opaline.so) for analytics.
+> [!WARNING]
+> This package is a test harness for the athena API. It is not published to npm.
+> The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli).
+> Put CLI fixes and features there. Change this package only to keep the API tests working.
+> The rest of this file describes the harness commands and can be out of date relative to the published CLI.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) runtime installed
 
-## Installation
+## Running the harness
+
+Do not install this package from npm. `npm install -g rudel` installs the published CLI from opalinehq/cli, not this code.
 
 ```bash
-npm install -g rudel
-```
+# Run the harness from source
+bun run --cwd apps/cli dev -- --help
 
-## Quick Start
-
-```bash
-# 1. Log in via your browser
-rudel login
-
-# 2. Enable automatic session uploads
-rudel enable
-
-# That's it! Your Claude Code / Codex sessions will now be uploaded automatically.
+# Run the harness tests
+bun run --cwd apps/cli test
 ```
 
 ## Commands

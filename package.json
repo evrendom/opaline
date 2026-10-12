@@ -22,7 +22,6 @@
 		"test": "turbo run test",
 		"test:integration": "turbo run test:integration --concurrency=1",
 		"verify": "bun scripts/check-disclosure.ts && bun run check-types && turbo run lint test build",
-		"release:cli": "bun run ./scripts/release-cli.ts",
 		"deploy": "turbo run build",
 		"dev:local": "bash scripts/dev-local.sh",
 		"infra:up": "docker compose up -d",

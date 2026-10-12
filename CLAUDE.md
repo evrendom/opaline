@@ -13,7 +13,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | App | Package | Description |
 |-----|---------|-------------|
 | `apps/api` | `@rudel/api` | HTTP API server (Bun). Auth via `better-auth`, RPC via `@orpc/server`, session ingestion into ClickHouse. |
-| `apps/cli` | `rudel` (npm) | CLI tool for authenticating and uploading Claude Code / Codex session transcripts. Commands: `login`, `logout`, `whoami`, `upload`. |
+| `apps/cli` | `rudel` (private, not published) | **Test harness only.** CI uses it for the `cli-smoke` job, the version-skew tests, and the CLI → API → ClickHouse integration tests. The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there, not here. |
 | `apps/web` | `@rudel/web` | React SPA (Vite + Tailwind + shadcn). Auth UI and CLI login portal. |
 
 ### Packages
@@ -383,21 +383,9 @@ Raw transcripts (`claude_sessions`, `codex_sessions`), `transcript_records`, `ru
 
 ## Releasing
 
-The CLI (`rudel` on npm) uses Release Please for automated versioning and changelogs, with automated npm publishing via OIDC trusted publishing (no OTP).
+This repository does not release the CLI. The published CLI (npm `rudel` and `opaline`) is built and released from [opalinehq/cli](https://github.com/opalinehq/cli). Make CLI changes there.
 
-**How it works:**
-
-1. PRs must have conventional commit titles (`feat:`, `fix:`, `chore:`, etc.) — enforced by `.github/workflows/pr-title.yml`
-2. When PRs merge to `main`, Release Please creates/updates a Release PR that accumulates changelog entries and version bumps
-3. Merging the Release PR creates a GitHub Release + tag, and bumps the `package.json` version (`apps/cli/src/app.ts` reads the version from `package.json` at build time)
-4. The release workflow (`.github/workflows/release.yml`) then publishes to npm automatically with `npm publish --provenance` (OIDC `id-token: write`, no manual OTP step)
-
-**Configuration files:**
-
-- `release-please-config.json` — Release Please manifest config (only `apps/cli` is releasable)
-- `.release-please-manifest.json` — tracks current version
-
-**Manual release script:** `scripts/release-cli.ts` can also be used for releases outside the Release Please flow.
+`apps/cli` stays in this repository only as a test harness for the API. Change it only to keep the API tests working. Do not add CLI features to it and do not publish it. Its `package.json` is `private` to prevent accidental publication.
 
 ## Pre-Push Checklist
 

@@ -9,6 +9,11 @@
 - Preserve CLI pairing, browser-approved workspace binding, and completion updates when changing onboarding or `opaline --code`.
 - Historical `.context` worktrees and launch notes are not current product specifications.
 
+## CLI
+
+- The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there.
+- `apps/cli` in this repository is only a test harness for the API. It is not published.
+
 ## Retired code
 
 - Recover Wrapped from Git history only when explicitly requested.
