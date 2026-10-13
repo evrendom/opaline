@@ -81,13 +81,20 @@ describe("git remote sanitization", () => {
 			"ssh://git:fake-password@git.example.com/acme/widget.git",
 			"git.example.com/acme/widget",
 		],
-		[
-			"https://git.example.com:8443/acme/widget.git",
-			"git.example.com/8443/acme/widget",
-		],
 		["git@github.com:acme/widget.git", "github.com/acme/widget"],
 	])("normalizes %s without credentials", (remote, expected) => {
 		expect(normalizeRemoteUrl(remote)).toBe(expected);
+	});
+
+	test.each([
+		"https://git.example.com:8443/acme/widget.git",
+		`https://oauth2:${FAKE_TOKEN}@git.example.com:8443/acme/widget.git`,
+		"ssh://git@git.example.com:2222/acme/widget.git",
+		"git://git.example.com/acme/widget.git",
+		"deploy@git.example.com:acme/widget.git",
+		"git.example.com:acme/widget",
+	])("drops the port and user from %s", (remote) => {
+		expect(normalizeRemoteUrl(remote)).toBe("git.example.com/acme/widget");
 	});
 
 	test("persists the sanitized key and resolves it across remote formats", async () => {

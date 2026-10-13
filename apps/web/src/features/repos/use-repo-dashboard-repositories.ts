@@ -10,7 +10,7 @@ const MAX_REPOSITORIES = 100;
 
 /**
  * The dashboard's repository id for a session: its git remote without the
- * protocol, user and `.git` suffix (`git@github.com:o/r.git` →
+ * protocol, user, port and `.git` suffix (`git@github.com:o/r.git` →
  * `github.com/o/r`), else its project path — the dashboard's own
  * `repositorySql`.
  */
@@ -18,10 +18,12 @@ export function dashboardRepositoryId(
 	session: Pick<SessionAnalytics, "git_remote" | "project_path">,
 ) {
 	if (!session.git_remote) return session.project_path;
-	return session.git_remote
-		.replace(/^(https?:\/\/|ssh:\/\/)?(git@)?/u, "")
-		.replace(":", "/")
-		.replace(/[.]git\/?$/u, "");
+	// URL remotes carry `[user@]host[:port]`; scp-style ones `[user@]host:path`.
+	const urlRemote = /^[a-z][a-z\d+.-]*:\/\/([^/]*@)?([^/:]*)(:\d*)?/iu;
+	const remote = urlRemote.test(session.git_remote)
+		? session.git_remote.replace(urlRemote, "$2")
+		: session.git_remote.replace(/^[^/@]+@/u, "").replace(":", "/");
+	return remote.replace(/[.]git\/?$/u, "");
 }
 
 /**

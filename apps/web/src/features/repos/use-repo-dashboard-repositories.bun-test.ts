@@ -14,6 +14,15 @@ test("matches the dashboard's repository ids", () => {
 		"github.com/opalinehq/athena",
 	);
 	expect(id("ssh://git@gitlab.com/team/app.git/")).toBe("gitlab.com/team/app");
+	for (const remote of [
+		"https://git.example.com:8443/team/app.git",
+		"https://oauth2:token@git.example.com:8443/team/app.git",
+		"ssh://git@git.example.com:2222/team/app.git",
+		"git://git.example.com/team/app.git",
+		"deploy@git.example.com:team/app.git",
+		"git.example.com/team/app",
+	])
+		expect(id(remote)).toBe("git.example.com/team/app");
 	expect(id(undefined, "/Users/me/rudel-v2")).toBe("/Users/me/rudel-v2");
 	expect(id("", "/Users/me/rudel-v2")).toBe("/Users/me/rudel-v2");
 });

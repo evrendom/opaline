@@ -14,11 +14,13 @@ export interface GitInfo {
  * Normalize a git remote URL to a canonical form: "github.com/owner/repo"
  */
 export function normalizeRemoteUrl(url: string): string {
-	const sanitizedUrl = url.replace(/^([a-z][a-z\d+.-]*:\/\/)[^/]+@/i, "$1");
-	return sanitizedUrl
-		.replace(/^(https?:\/\/|git@|ssh:\/\/)/, "")
-		.replace(/:/, "/")
-		.replace(/\.git$/, "");
+	// URL remotes carry `[user@]host[:port]`: keep only the host. Without a scheme
+	// the remote is scp-style `[user@]host:path`, where the colon separates the path.
+	const urlRemote = /^[a-z][a-z\d+.-]*:\/\/([^/]*)(.*)$/i.exec(url);
+	const remote = urlRemote
+		? `${urlRemote[1]?.replace(/^.*@/, "").replace(/:\d*$/, "")}${urlRemote[2]}`
+		: url.replace(/^[^/@]+@/, "").replace(/:/, "/");
+	return remote.replace(/\.git$/, "");
 }
 
 /**
