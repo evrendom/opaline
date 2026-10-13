@@ -92,7 +92,7 @@ One impact measure defined once for every analysis, so two analyses never comput
 _Avoid_: metric, KPI
 
 **Run question**:
-A yes/no question a workspace asks about each of its runs in a chosen time window ("Did the agent struggle to find the right file?"), answered by SubQ Snap (Jev as a fallback) as the probability of yes, from the run's full text (secret-filtered; the compact run note when the run is too large). Opaline sets the run questions; workspaces do not write or remove them. Changing a question's wording makes it a new question; earlier answers keep the wording they answered.
+A yes/no question about a run ("Did the agent struggle to find the right file?"), answered by SubQ Snap (Jev as a fallback) as the probability of yes, from the run's full text (secret-filtered; the compact run note when the run is too large). In a workspace that has run questions, every run is answered for every question that is on as soon as it is indexed, so answers are facts; agents ask only about runs without answers. Opaline sets the run questions; workspaces do not write or remove them. Changing a question's wording makes it a new question; earlier answers keep the wording they answered.
 _Avoid_: question (an analysis's question), label, signal
 
 **Run view**:

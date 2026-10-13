@@ -561,7 +561,7 @@ export function renderSchema(output: AnalysisSchemaOutput): string {
 			...output.notes.map((note) => `note: ${cell(note)}`),
 			...(output.questions.length
 				? [
-						"run questions (ask with estimate_questions, then run_questions; answers in run_answers):",
+						"run questions (answered for every new run where the workspace has run questions; filter run_answers with sql; estimate_questions, then run_questions, only for runs without answers):",
 						pipeTable(
 							["question_id", "question", "tested runs", "tested precision"],
 							output.questions.map((question) => [

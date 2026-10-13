@@ -43,6 +43,7 @@ import {
 	releaseRunQuestionJob,
 	remainingAnswerQuota,
 	takeAnswerQuota,
+	withRunQuestionLock,
 } from "./jobs.js";
 import {
 	type AskedQuestion,
@@ -55,13 +56,14 @@ import { buildRunState, type RunFacts, readRunFacts } from "./run-notes.js";
 
 /**
  * Run questions (CONTEXT.md "Run question"; docs/retro-architecture.md "Run
- * questions"). An agent first estimates (cost, quota, answers already stored
- * or queued; nothing is sent), then asks: the answers it does not have yet
- * are queued, and the run-questions cron answers them with retries, one call
- * per run. Answers are kept per question wording, run revision and provider
- * and reused by every later analysis, so asking again pays nothing. Nothing
- * is answered for a workspace until an agent asks or an operator tests a
- * question.
+ * questions"). In a workspace whose run questions may be answered, every new
+ * run is answered for every question that is on as soon as its run index is
+ * built (`precompute.ts`). An agent can also estimate (cost, quota, answers
+ * already stored or queued; nothing is sent) and ask about other questions or
+ * runs: the answers it does not have yet are queued. The run-questions cron
+ * answers every queued job with retries, one call per run. Answers are kept
+ * per question wording, run revision and provider and reused by every later
+ * analysis, so asking again pays nothing.
  */
 
 const logger = getLogger(["rudel", "api", "run-questions"]);
@@ -213,42 +215,46 @@ export async function runQuestions(
 		quota,
 	);
 	// Under a per-workspace lock, so two calls never queue the same answer.
-	const queuing = await queueOnce(env.sql, caller.workspaceId, async (sql) => {
-		const counted = count(
-			planned.result,
-			await queuedAnswers(
-				sql,
-				caller.workspaceId,
-				planned.result.questions.map((question) => question.id),
-				provider.name,
-			),
-		);
-		const costUsd = ceilingUsd(provider, planned.result, counted);
-		// Only what the caller saw estimated: the same caller, workspace,
-		// question versions and runs, at no more than the estimated cost.
-		const mismatch = estimateMismatch(estimateKey, input.estimate, {
-			...binding(caller, planned.result, provider),
-			costUsd,
-		});
-		if (mismatch) return { counted, costUsd, refusal: mismatch };
-		if (counted.toAnswer > remaining)
-			return {
-				counted,
+	const queuing = await withRunQuestionLock(
+		env.sql,
+		caller.workspaceId,
+		async (sql) => {
+			const counted = count(
+				planned.result,
+				await queuedAnswers(
+					sql,
+					caller.workspaceId,
+					planned.result.questions.map((question) => question.id),
+					provider.name,
+				),
+			);
+			const costUsd = ceilingUsd(provider, planned.result, counted);
+			// Only what the caller saw estimated: the same caller, workspace,
+			// question versions and runs, at no more than the estimated cost.
+			const mismatch = estimateMismatch(estimateKey, input.estimate, {
+				...binding(caller, planned.result, provider),
 				costUsd,
-				refusal: `The workspace's answer quota (${quota.answers} per ${quota.windowMs / 3_600_000} hours) has ${remaining} answers left, fewer than the ${counted.toAnswer} this needs.`,
-			};
-		const job =
-			counted.toAnswer > 0
-				? await enqueueRunQuestionJob(sql, {
-						workspaceId: caller.workspaceId,
-						requestedBy: caller.reader.userId,
-						purpose: "analysis",
-						provider: provider.name,
-						runs: counted.runs,
-					})
-				: null;
-		return { counted, costUsd, job };
-	});
+			});
+			if (mismatch) return { counted, costUsd, refusal: mismatch };
+			if (counted.toAnswer > remaining)
+				return {
+					counted,
+					costUsd,
+					refusal: `The workspace's answer quota (${quota.answers} per ${quota.windowMs / 3_600_000} hours) has ${remaining} answers left, fewer than the ${counted.toAnswer} this needs.`,
+				};
+			const job =
+				counted.toAnswer > 0
+					? await enqueueRunQuestionJob(sql, {
+							workspaceId: caller.workspaceId,
+							requestedBy: caller.reader.userId,
+							purpose: "analysis",
+							provider: provider.name,
+							runs: counted.runs,
+						})
+					: null;
+			return { counted, costUsd, job };
+		},
+	);
 	if ("refusal" in queuing)
 		return {
 			ok: false,
@@ -293,8 +299,19 @@ export async function runQuestions(
 export async function answerQueuedQuestions(
 	env: RunQuestionsEnv,
 	options: { budgetMs?: number } = {},
-): Promise<{ jobs: number; answers: number; costUsd: number }> {
-	const totals = { jobs: 0, answers: 0, costUsd: 0 };
+): Promise<{
+	jobs: number;
+	answers: number;
+	costUsd: number;
+	/** Providers that refused for good this pass (no credits, HTTP 402), with why. */
+	refused: { provider: string; error: string }[];
+}> {
+	const totals = {
+		jobs: 0,
+		answers: 0,
+		costUsd: 0,
+		refused: [] as { provider: string; error: string }[],
+	};
 	if (!env.provider && !env.providers?.size) return totals;
 	const budgetMs = options.budgetMs ?? WORKER_BUDGET_MS;
 	const deadline = Date.now() + budgetMs;
@@ -334,6 +351,7 @@ export async function answerQueuedQuestions(
 				);
 			else if (error instanceof RunQuestionProviderFatal) {
 				answering.delete(job.provider);
+				totals.refused.push({ provider: job.provider, error: error.message });
 				logger.error(
 					"Run question provider {provider} refused for good: {error}",
 					{ provider: job.provider, error: error.message },
@@ -413,7 +431,7 @@ export async function testRunQuestion(
 	// Every tested run is listed, but under the workspace's lock only the
 	// answers neither stored nor queued by another job are to be bought.
 	const runs = [...facts.values()];
-	await queueOnce(env.sql, input.workspaceId, async (sql) => {
+	await withRunQuestionLock(env.sql, input.workspaceId, async (sql) => {
 		const [stored, queued] = await Promise.all([
 			readAnswers(
 				env.executor,
@@ -652,21 +670,6 @@ function count(plan: Plan, queued: ReadonlySet<string>) {
 			return ids ? [jobRun(run, ids)] : [];
 		}),
 	};
-}
-
-/** Runs `work` in a transaction holding the workspace's run question lock. */
-async function queueOnce<T>(
-	sql: postgres.Sql,
-	workspaceId: string,
-	work: (sql: postgres.Sql) => Promise<T>,
-): Promise<T> {
-	return (await sql.begin(async (transaction) => {
-		// postgres-js types a transaction without the tagged-template call
-		// signature (`Omit<Sql, ...>`); at runtime it is one.
-		const tx = transaction as unknown as postgres.Sql;
-		await tx`SELECT pg_advisory_xact_lock(hashtext(${`run_questions:${workspaceId}`}))`;
-		return work(tx);
-	})) as T;
 }
 
 /**

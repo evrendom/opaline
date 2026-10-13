@@ -39,28 +39,35 @@ export function createSystemOneProvider(options: {
 	const cost = (usage: { inputTokens: number; outputTokens: number }) =>
 		usage.inputTokens * options.usdPerInputToken +
 		usage.outputTokens * options.usdPerOutputToken;
+	const estimateCall: RunQuestionProvider["estimateCall"] = (
+		questions,
+		stateChars,
+	) => {
+		const chars =
+			Math.min(Math.max(0, stateChars), options.stateMaxChars) +
+			questions.reduce(
+				(total, question) =>
+					total +
+					question.question.length +
+					(question.criteria?.true.length ?? 0) +
+					(question.criteria?.false.length ?? 0),
+				0,
+			);
+		const usage = {
+			inputTokens:
+				Math.ceil(chars / ESTIMATE_CHARS_PER_TOKEN) +
+				questions.length * ESTIMATE_FRAMING_TOKENS_PER_QUESTION,
+			outputTokens: questions.length * ESTIMATE_OUTPUT_TOKENS_PER_QUESTION,
+		};
+		return { ...usage, costUsd: cost(usage) };
+	};
 	return {
 		name: options.name,
 		state: options.state,
 		stateMaxChars: options.stateMaxChars,
-		callCeilingUsd(questions) {
-			const chars =
-				options.stateMaxChars +
-				questions.reduce(
-					(total, question) =>
-						total +
-						question.question.length +
-						(question.criteria?.true.length ?? 0) +
-						(question.criteria?.false.length ?? 0),
-					0,
-				);
-			return cost({
-				inputTokens:
-					Math.ceil(chars / ESTIMATE_CHARS_PER_TOKEN) +
-					questions.length * ESTIMATE_FRAMING_TOKENS_PER_QUESTION,
-				outputTokens: questions.length * ESTIMATE_OUTPUT_TOKENS_PER_QUESTION,
-			});
-		},
+		estimateCall,
+		callCeilingUsd: (questions) =>
+			estimateCall(questions, options.stateMaxChars).costUsd,
 		async answer({ state, questions, signal }): Promise<ProviderAnswers> {
 			const response = await send(options.url, {
 				method: "POST",

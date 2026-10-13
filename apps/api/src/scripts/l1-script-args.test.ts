@@ -3,6 +3,8 @@ import {
 	parseOrganizationScope,
 	parsePositiveIntegerFlag,
 	parseRetireTranscriptRecordsArgs,
+	parseRunQuestionsAddArgs,
+	parseRunQuestionsBackfillArgs,
 	parseTranscriptSearchBackfillArgs,
 } from "./l1-script-args.js";
 
@@ -139,5 +141,70 @@ describe("L1 script arguments", () => {
 				" ",
 			]),
 		).toThrow("--after");
+	});
+
+	test("backfill:run-questions previews the last 28 days by default, paced at 60 runs a minute below load 12", () => {
+		expect(parseRunQuestionsBackfillArgs(["--organization-id", "org"])).toEqual(
+			{
+				organizationId: "org",
+				execute: false,
+				days: 28,
+				maxRuns: 10_000,
+				after: undefined,
+				runsPerMinute: 60,
+				maxLoad: 12,
+			},
+		);
+		expect(
+			parseRunQuestionsBackfillArgs([
+				"--all-organizations",
+				"--execute",
+				"--days",
+				"7",
+				"--max-runs",
+				"500",
+				"--after",
+				"cursor",
+				"--runs-per-minute",
+				"30",
+				"--max-load",
+				"8",
+			]),
+		).toEqual({
+			organizationId: undefined,
+			execute: true,
+			days: 7,
+			maxRuns: 500,
+			after: "cursor",
+			runsPerMinute: 30,
+			maxLoad: 8,
+		});
+		expect(() => parseRunQuestionsBackfillArgs(["--execute"])).toThrow(
+			"Name the scope",
+		);
+		for (const bad of [
+			["--days", "0"],
+			["--max-runs", "100001"],
+			["--runs-per-minute", "601"],
+			["--after", " "],
+		])
+			expect(() =>
+				parseRunQuestionsBackfillArgs(["--organization-id", "org", ...bad]),
+			).toThrow();
+	});
+
+	test("run-questions:add needs a file and adds drafts unless --on", () => {
+		expect(parseRunQuestionsAddArgs(["--file", "q.json"])).toEqual({
+			file: "q.json",
+			on: false,
+		});
+		expect(parseRunQuestionsAddArgs(["--file", "q.json", "--on"])).toEqual({
+			file: "q.json",
+			on: true,
+		});
+		expect(() => parseRunQuestionsAddArgs([])).toThrow("--file");
+		expect(() =>
+			parseRunQuestionsAddArgs(["--file", "q.json", "--execute"]),
+		).toThrow();
 	});
 });

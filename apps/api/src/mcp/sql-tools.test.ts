@@ -193,7 +193,7 @@ test("schema renders the views, then a view's columns with meaning and traps, th
 			"measure | sql | definition",
 			"re_asks | countIf(reasked) | Runs asked \\| again.",
 			"note: Pass view to see its columns.",
-			"run questions (ask with estimate_questions, then run_questions; answers in run_answers):",
+			"run questions (answered for every new run where the workspace has run questions; filter run_answers with sql; estimate_questions, then run_questions, only for runs without answers):",
 			"question_id | question | tested runs | tested precision",
 			"rq_1 | Did the agent struggle to find the right file? | 20 | 0.75",
 			"rq_2 | Did the agent misread the request? | untested | unknown",

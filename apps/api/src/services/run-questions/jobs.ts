@@ -20,7 +20,8 @@ export interface JobRun extends RunVersion {
 export interface RunQuestionJob {
 	readonly id: string;
 	readonly workspaceId: string;
-	readonly purpose: "analysis" | "test";
+	/** analysis: an agent bought it; test: the internal form; precompute: every new run of an enabled workspace. */
+	readonly purpose: "analysis" | "test" | "precompute";
 	/** The provider that answers it. */
 	readonly provider: string;
 	readonly questionIds: readonly string[];
@@ -39,6 +40,24 @@ export const RUN_QUESTION_ANSWER_QUOTA = {
 	answers: 20_000,
 	windowMs: 86_400_000,
 } as const;
+
+/**
+ * Runs `work` in a transaction holding the workspace's run question lock, so
+ * two callers never queue the same answer.
+ */
+export async function withRunQuestionLock<T>(
+	sql: postgres.Sql,
+	workspaceId: string,
+	work: (sql: postgres.Sql) => Promise<T>,
+): Promise<T> {
+	return (await sql.begin(async (transaction) => {
+		// postgres-js types a transaction without the tagged-template call
+		// signature (`Omit<Sql, ...>`); at runtime it is one.
+		const tx = transaction as unknown as postgres.Sql;
+		await tx`SELECT pg_advisory_xact_lock(hashtext(${`run_questions:${workspaceId}`}))`;
+		return work(tx);
+	})) as T;
+}
 
 export async function enqueueRunQuestionJob(
 	sql: postgres.Sql,

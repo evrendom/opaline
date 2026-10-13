@@ -185,6 +185,27 @@ describe("the systemone adapter", () => {
 		// 300 + 28 + 31 + 44 + 45 characters: 150 tokens, 60 framing, 200 output.
 		expect(exact.callCeilingUsd(questions)).toBe(150 + 60 + 200_000);
 	});
+	test("an estimate of one call counts the run's characters up to the state cap, so a short run costs less than the ceiling", () => {
+		const provider = createSystemOneProvider({
+			...settings,
+			stateMaxChars: 300,
+			usdPerInputToken: 1,
+			usdPerOutputToken: 1_000,
+		});
+		const one = questions.slice(0, 1);
+		// 30 characters of run, 28 of wording: 20 tokens, 30 framing, 100 output.
+		expect(provider.estimateCall(one, 30)).toEqual({
+			inputTokens: 50,
+			outputTokens: 100,
+			costUsd: 50 + 100_000,
+		});
+		expect(provider.estimateCall(one, 10_000)).toEqual(
+			provider.estimateCall(one, 300),
+		);
+		expect(provider.estimateCall(one, 300).costUsd).toBe(
+			provider.callCeilingUsd(one),
+		);
+	});
 });
 
 describe("which providers answer", () => {

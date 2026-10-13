@@ -687,7 +687,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		title: "Estimate run questions",
 		description: [
 			"What it does: Says what answering yes/no run questions over the runs a query selects would cost, and which answers are already stored and reused.",
-			"Use when: Before run_questions, always; schema lists the questions that can be asked.",
+			"Use when: Before run_questions, only for runs without answers in run_answers (new runs are answered already).",
 			"Returns: Runs selected, answers stored, queued and to buy per question, the most it can cost, the quota left, and a token for run_questions.",
 			"Side effects: None; nothing is sent anywhere.",
 			"Limits: Up to 10 questions and 5,000 runs; the query counts against the sql quota.",

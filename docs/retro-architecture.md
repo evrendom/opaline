@@ -20,7 +20,8 @@ The agent answers "where did we lose the most, and on what" with one SQL query o
 - Yes/no questions only, each answered as a probability. Open questions such as "what was the run trying to do" are not asked; a yes/no question per topic covers them.
 - Opaline sets the questions in an internal settings form. Workspaces do not write or remove them.
 - Each question can be tested on 20 runs before it is turned on.
-- The analysing agent picks which questions to run and over which runs (default: the last 4 weeks), and sees the cost before they run; answering needs the estimate's token, so only what was priced is bought. Answers are kept and reused by later analyses; nothing runs for a workspace until an agent asks.
+- Answers are precomputed facts: in a workspace that has run questions, every run is answered for every question that is on shortly after its run index is built, so agents filter `run_answers` with SQL without waiting or paying at analysis time. Runs indexed before are answered by `backfill:run-questions`. A rebuild or another upload of the same transcript pays nothing again.
+- For runs without answers, the analysing agent can still pick questions and runs (default: the last 4 weeks) and sees the cost before they run; answering needs the estimate's token, so only what was priced is bought. Answers are kept and reused by later analyses.
 - SubQ Snap answers (Jev, with the same API, as a fallback): each run is sent once with all its questions, as the run's full text after the secret filter; a run larger than the provider takes is sent as its compact run note, and each answer records which it read.
 - An answer belongs to the transcript it was given for: once a session is uploaded again with changes, its runs are answered anew. Answers are kept per provider and model version, so providers can be compared on the same runs.
 - Changing a question's wording makes a new question; old answers keep the wording they answered.

@@ -8,7 +8,7 @@ import {
 	test,
 } from "bun:test";
 import postgres from "postgres";
-import { getClickhouse } from "../clickhouse.js";
+import { type ClickHouseStatement, getClickhouse } from "../clickhouse.js";
 import type { AgentQueryLimiter } from "../services/analysis/agent-query-slots.js";
 import { RUN_INDEX_VERSION } from "../services/analysis/run-index-sql.js";
 import { runSql, type SqlCaller } from "../services/analysis/sql-gateway.js";
@@ -20,11 +20,22 @@ import {
 	enqueueClickHousePurge,
 	runClickHousePurgeWorkerPass,
 } from "../services/clickhouse-purge.service.js";
+import { readAnswers } from "../services/run-questions/answers.js";
 import {
 	addRunQuestion,
 	editRunQuestion,
 	turnOnRunQuestion,
 } from "../services/run-questions/catalogue.js";
+import {
+	backfillRunQuestions,
+	previewRunQuestionsBackfill,
+	type RunQuestionsBackfillOptions,
+} from "../services/run-questions/history-backfill.service.js";
+import { importRunQuestions } from "../services/run-questions/import-questions.js";
+import {
+	precomputedQuestionIds,
+	precomputeSessionAnswers,
+} from "../services/run-questions/precompute.js";
 import {
 	type AskedQuestion,
 	type RunQuestionProvider,
@@ -98,6 +109,12 @@ function provider(
 		stateMaxChars: 6_000,
 		asked,
 		callCeilingUsd: (questions) => usdPerQuestion * questions.length,
+		estimateCall: (questions, stateChars) => ({
+			inputTokens:
+				Math.ceil(Math.min(stateChars, 6_000) / 3) + 30 * questions.length,
+			outputTokens: 0,
+			costUsd: usdPerQuestion * questions.length,
+		}),
 		async answer(input) {
 			const probabilities = new Map<string, number>();
 			for (const item of input.questions) {
@@ -131,6 +148,36 @@ function environment(
 		limiter: unlimitedSlots,
 		githubRepositories: async () => [],
 		estimateKey: "test-estimate-key",
+	};
+}
+
+/**
+ * The backfill's environment: ClickHouse reports the given load averages in
+ * turn (then 0; a local server may report none), and time is a clock that
+ * moves only when the backfill sleeps.
+ */
+function backfillEnvironment(
+	answering: RunQuestionProvider,
+	loads: number[] = [],
+) {
+	let now = Date.now();
+	const env = environment(answering);
+	return {
+		...env,
+		executor: {
+			...clickhouse,
+			query: async <T>(statement: ClickHouseStatement): Promise<T[]> =>
+				statement.query.includes("system.asynchronous_metrics")
+					? ([{ value: loads.shift() ?? 0 }] as T[])
+					: clickhouse.query<T>(statement),
+		},
+		listWorkspaces: async () => [workspace],
+		clock: {
+			now: () => now,
+			sleep: async (ms: number) => {
+				now += ms;
+			},
+		},
 	};
 }
 
@@ -873,6 +920,276 @@ describe("run questions", () => {
 		expect(calls).toBe(1);
 		expect(rows.map((row) => row.status)).toEqual(["failed", "queued"]);
 		expect(rows[0]?.last_error).toContain("no credits");
+	});
+
+	test("a session's runs are answered for every question that is on once its run index is built; rebuilds and uploads of the same transcript queue nothing", async () => {
+		const asked = await question(
+			"Did the agent check its work before saying it was done?",
+		);
+		await seedSession(memberId, `${RUN}_pre`, [
+			[1, "add the login rate limit"],
+			[2, "run the tests"],
+		]);
+		const answering = provider(undefined, { name: `pre-${tag}` });
+		const env = environment(answering);
+		const on = await precomputedQuestionIds(env);
+		const session = {
+			organizationId: workspace,
+			userId: memberId,
+			sessionId: `${RUN}_pre`,
+		};
+
+		const built = await precomputeSessionAnswers(env, session);
+		const whileQueued = await precomputeSessionAnswers(env, session);
+		await answerQueuedQuestions(env);
+		const rebuilt = await precomputeSessionAnswers(env, session);
+		// Only the owner's runs of the session are the session's.
+		const otherMember = await precomputeSessionAnswers(env, {
+			...session,
+			userId: colleagueId,
+		});
+
+		expect(on).toContain(asked.id);
+		expect(built).toMatchObject({
+			status: "queued",
+			runs: 2,
+			answers: 2 * on.length,
+		});
+		expect([whileQueued, rebuilt, otherMember]).toEqual([
+			{ status: "current", runs: 2 },
+			{ status: "current", runs: 2 },
+			{ status: "current", runs: 0 },
+		]);
+		expect(answering.asked).toHaveLength(2 * on.length);
+		const answers = await readAnswers(
+			clickhouse,
+			workspace,
+			[asked.id],
+			[
+				{ sessionId: `${RUN}_pre`, agentId: "", turn: 1, revision: "1" },
+				{ sessionId: `${RUN}_pre`, agentId: "", turn: 2, revision: "1" },
+			],
+			answering.name,
+		);
+		expect([...answers.values()].sort()).toEqual([0.1, 0.9]);
+		const [job] = await sqlClient<{ purpose: string; requested_by: string }[]>`
+			SELECT purpose, requested_by FROM run_question_job WHERE id = ${built.status === "queued" ? (built.jobs[0] ?? "") : ""}
+		`;
+		expect(job).toEqual({ purpose: "precompute", requested_by: memberId });
+	});
+
+	test("nothing is precomputed without a provider, for a workspace that may not have answers, or beyond the workspace's answer quota", async () => {
+		await question("Did the agent leave a TODO behind?");
+		const session = {
+			organizationId: workspace,
+			userId: memberId,
+			sessionId: `${RUN}_s1`,
+		};
+		const answering = provider(undefined, { name: `gate-${tag}` });
+		const env = environment(answering);
+
+		const outcomes = [
+			await precomputeSessionAnswers({ ...env, provider: null }, session),
+			await precomputeSessionAnswers(
+				{ ...env, mayAnswer: () => false },
+				session,
+			),
+			await precomputeSessionAnswers(
+				{ ...env, answerQuota: { answers: 1, windowMs: 3_600_000 } },
+				session,
+			),
+		];
+
+		expect(outcomes).toMatchObject([
+			{ status: "off", reason: "provider" },
+			{ status: "off", reason: "workspace" },
+			{ status: "quota", runs: 2 },
+		]);
+		const [queued] = await sqlClient<{ count: string }[]>`
+			SELECT count(*) AS count FROM run_question_job WHERE provider = ${answering.name}
+		`;
+		expect(queued?.count).toBe("0");
+	});
+
+	test("the history backfill previews the runs, answers and cost without sending anything, then answers them paced through the same jobs", async () => {
+		const answering = provider(undefined, { name: `history-${tag}` });
+		// ClickHouse is busy at first: the run waits for it.
+		const env = backfillEnvironment(answering, [20]);
+		const options: RunQuestionsBackfillOptions = {
+			organizationId: workspace,
+			days: 28,
+			maxRuns: 100,
+			after: undefined,
+			runsPerMinute: 2,
+			maxLoad: 12,
+		};
+		const on = await precomputedQuestionIds(env);
+
+		const preview = await previewRunQuestionsBackfill(env, options);
+		const sentBefore = answering.asked.length;
+		const executed = await backfillRunQuestions(
+			{ ...env, answer: () => answerQueuedQuestions(env) },
+			options,
+		);
+		const after = await previewRunQuestionsBackfill(env, options);
+
+		expect(sentBefore).toBe(0);
+		expect(preview.runs).toBeGreaterThanOrEqual(5);
+		expect(preview).toMatchObject({
+			status: "preview",
+			provider: answering.name,
+			questions: on.length,
+			runsToAnswer: preview.runs,
+			answers: preview.runs * on.length,
+			hasMore: false,
+			next: null,
+		});
+		expect(preview.estimatedInputTokens).toBeGreaterThan(0);
+		expect(preview.estimatedCostUsd).toBeCloseTo(
+			0.002 * preview.runs * on.length,
+			4,
+		);
+		expect(preview.workspaces).toMatchObject([
+			{ organizationId: workspace, runs: preview.runs, fitsQuota: true },
+		]);
+		expect(executed).toMatchObject({
+			status: "executed",
+			runsQueued: preview.runs,
+			answersQueued: preview.answers,
+			answersBought: preview.answers,
+			alreadyAnswered: 0,
+			loadPausedSeconds: 30,
+			stopped: null,
+			next: null,
+		});
+		expect(after).toMatchObject({ runs: preview.runs, runsToAnswer: 0 });
+	});
+
+	test("the history backfill stops cleanly when the provider is out of credits, and says where to continue", async () => {
+		// Answers the first call, then has no credits left.
+		const base = provider(undefined, { name: `history-broke-${tag}` });
+		let calls = 0;
+		const broke: RunQuestionProvider = {
+			...base,
+			async answer(input) {
+				calls++;
+				if (calls > 1)
+					throw new RunQuestionProviderFatal("out of credits (HTTP 402)");
+				return base.answer(input);
+			},
+		};
+		const env = backfillEnvironment(broke);
+
+		const executed = await backfillRunQuestions(
+			{ ...env, answer: () => answerQueuedQuestions(env) },
+			{
+				organizationId: workspace,
+				days: 28,
+				maxRuns: 100,
+				after: undefined,
+				runsPerMinute: 1,
+				maxLoad: 1_000,
+			},
+		);
+
+		expect(executed).toMatchObject({
+			stopped: "provider",
+			hasMore: true,
+			runsQueued: 2,
+		});
+		expect(executed.message).toContain("HTTP 402");
+		expect(calls).toBe(2);
+		expect(executed.next).not.toBeNull();
+		expect(executed.message).toContain(
+			`Continue with --after ${executed.next}`,
+		);
+	});
+
+	test("the history backfill stops at the workspace's answer quota, before queuing what does not fit", async () => {
+		const answering = provider(undefined, { name: `history-quota-${tag}` });
+		const env = {
+			...backfillEnvironment(answering),
+			answerQuota: { answers: 1, windowMs: 3_600_000 },
+		};
+
+		const executed = await backfillRunQuestions(
+			{ ...env, answer: () => answerQueuedQuestions(env) },
+			{
+				organizationId: workspace,
+				days: 28,
+				maxRuns: 100,
+				after: undefined,
+				runsPerMinute: 60,
+				maxLoad: 1_000,
+			},
+		);
+
+		expect(executed).toMatchObject({
+			stopped: "quota",
+			hasMore: true,
+			runsQueued: 0,
+			answersBought: 0,
+			next: null,
+		});
+		expect(executed.message).toContain(`workspace ${workspace}`);
+		expect(answering.asked).toHaveLength(0);
+	});
+
+	test("questions from a file are added through the catalogue once: the same wording again is reported with its id, other criteria as a conflict", async () => {
+		const wording = `Did the agent ask the user for a value it could have found? (${RUN})`;
+		const file = [
+			{ key: "missing_info", instructions: wording },
+			{
+				key: "asked_again",
+				instructions: `In the next prompt, did the user ask again? (${RUN})`,
+				criteria: {
+					true: "The user repeats the request.",
+					false: "A new request.",
+				},
+			},
+		];
+
+		const first = await importRunQuestions(sqlClient, file, { turnOn: false });
+		questionIds.push(...first.flatMap((item) => (item.id ? [item.id] : [])));
+		const again = await importRunQuestions(sqlClient, file, { turnOn: true });
+		const otherCriteria = await importRunQuestions(
+			sqlClient,
+			[
+				{
+					key: "missing_info",
+					instructions: wording,
+					criteria: { true: "yes", false: "no" },
+				},
+			],
+			{ turnOn: false },
+		);
+
+		expect(first).toMatchObject([
+			{ key: "missing_info", status: "added", state: "draft" },
+			{ key: "asked_again", status: "added", state: "draft" },
+		]);
+		expect(again).toEqual([
+			{
+				key: "missing_info",
+				id: first[0]?.id ?? "",
+				status: "exists",
+				state: "on",
+			},
+			{
+				key: "asked_again",
+				id: first[1]?.id ?? "",
+				status: "exists",
+				state: "on",
+			},
+		]);
+		expect(otherCriteria).toEqual([
+			{
+				key: "missing_info",
+				id: first[0]?.id ?? "",
+				status: "conflict",
+				state: "on",
+			},
+		]);
 	});
 
 	// Last: it deletes the workspace.

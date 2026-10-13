@@ -53,7 +53,11 @@ const identityOf = (sessionId: string, source: TranscriptSource) => ({
 });
 
 /** Builds this test's scopes only: other suites' extractions queue theirs too. */
-const pass = async () => {
+const pass = async (
+	afterRunIndexBuilt?: Parameters<
+		typeof runL1EdgePass
+	>[0]["afterRunIndexBuilt"],
+) => {
 	await sqlClient.unsafe(
 		"DELETE FROM l1_edge_scope WHERE organization_id <> $1",
 		[organizationId],
@@ -61,6 +65,7 @@ const pass = async () => {
 	return runL1EdgePass({
 		sql: sqlClient,
 		budgetMs: 60_000,
+		afterRunIndexBuilt,
 		sources: {
 			executor: clickhouse,
 			access: async () => ({
@@ -918,6 +923,33 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 		"DELETE FROM l1_edge_scope WHERE organization_id = $1 AND scope_kind = 'session'",
 		[organizationId],
 	);
+
+	// A build that commits new runs calls the run index hook once (run
+	// questions queue their answers there); a rebuild that finds the index
+	// current does not, and a failing hook never fails the build.
+	const hookSession = `${RUN}_hook`;
+	await publish(hookSession, "claude_code", claude, "1");
+	const hooked: unknown[] = [];
+	const hook = async (session: unknown) => {
+		hooked.push(session);
+		throw new Error("the hook failed");
+	};
+	await queueRunIndex(hookSession, "claude_code");
+	expect(await pass(hook)).toBe(1);
+	await queueRunIndex(hookSession, "claude_code");
+	expect(await pass(hook)).toBe(0);
+	expect(hooked).toEqual([
+		{
+			organizationId,
+			userId,
+			source: "claude_code",
+			sessionId: hookSession,
+		},
+	]);
+	const hookScope = await scopeOf(hookSession, "claude_code");
+	expect(hookScope?.built_request_count).toBe(hookScope?.request_count);
+	expect(hookScope?.resolver_version).toBe(RUN_INDEX_VERSION);
+	expect((await runsOf(hookSession)).length).toBeGreaterThan(0);
 
 	// The account is being deleted: the session's run index goes and its
 	// scope is dropped.

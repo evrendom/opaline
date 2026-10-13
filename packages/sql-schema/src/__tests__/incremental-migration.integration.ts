@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0061 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), and creates the transcript embedding quota and run question tables (0061)", async () => {
+test("applies migrations 0020-0062 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), and lets run question jobs be precomputed (0062)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0061_search_and_run_questions");
+	expect(latestMigration?.tag).toBe("0062_run_question_precompute");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -205,6 +205,12 @@ test("applies migrations 0020-0061 to a database already migrated through 0019, 
 				{ table_name: "run_question_quota" },
 				{ table_name: "transcript_embedding_quota" },
 			]);
+			// 0062: a run question job may be precomputation of new runs.
+			const [purposeCheck] = await migrationSql<{ definition: string }[]>`
+				SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+				WHERE conname = 'run_question_job_purpose_check'
+			`;
+			expect(purposeCheck?.definition).toContain("'precompute'");
 			await expectIngestJobSizeBound(migrationSql);
 			await expectEdgeScopeKinds(migrationSql);
 			// 0057: existing workspaces keep the own-sessions-only option off.
@@ -244,7 +250,7 @@ test("applies migrations 0020-0061 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 62,
+				count: 63,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`

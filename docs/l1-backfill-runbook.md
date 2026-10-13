@@ -9,6 +9,7 @@ How to bring existing production data up to the L1 stack ([spec](l1-literal-sche
 | `backfill:l1-edges` | `l1_edge_scope` requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue; repositories are queued by the first run only |
 | `backfill:run-index` | `run_index` scope requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue |
 | `backfill:transcript-search` | search chunks, hits and OpenAI embeddings of past sessions ([section 7b](#7b-transcript-search-history)) | `--max-sessions` (default 10,000, max 100,000), `--after <next>`, `--sessions-per-minute` (default 30), `--max-load` (pause while ClickHouse `LoadAverage1` is above it, default 12); stops at a workspace's OpenAI quota |
+| `backfill:run-questions` | run question jobs and answers of past runs, from the provider ([section 7c](#7c-run-question-history)) | `--days` (runs started in the last n days, default 28), `--max-runs` (default 10,000, max 100,000), `--after <next>`, `--runs-per-minute` (default 60), `--max-load` (default 12); stops at a workspace's answer quota or when the provider refuses (HTTP 402) |
 | `audit:l1` | nothing | `--json`, `--compare <before.json>`; every statement within the analysis bounds |
 
 The worker only builds what is queued, live requests (priority 0) first, and only while `L1_EDGES_WORKER_ENABLED=true` (minute cron, 240-second budget). Requests stay queued while it is off.
@@ -111,6 +112,30 @@ bun run backfill:transcript-search --organization-id $ORG --execute --after <nex
 - `--execute` needs `OPENAI_API_KEY`. It starts at most `--sessions-per-minute` passes a minute (a large session the pass limits cut short gets further passes, each counted) and waits 30 seconds at a time while `LoadAverage1` is above `--max-load`; `loadPausedSeconds` says how long. Ctrl-C (or `kill -INT` on a detached run) stops it before the next session and still prints the summary.
 - It stops with `stopped: "quota"` when a workspace has used its quota, and its message names the workspace and when the quota resets: continue with the printed `--after` after that, or raise `TRANSCRIPT_EMBEDDINGS_QUOTA_TOKENS` on purpose. `next` is left before the session that ran out, so continuing finishes it.
 - Stop when it exits with code 2 (`failed > 0`, read `issues`), when `incomplete` grows (OpenAI errors or sessions that need more passes; a later run picks them up), or when it keeps pausing for load.
+
+## 7c. Run question history
+
+New runs are answered as they are indexed: in a workspace that may have run questions answered (`VITE_ADMIN_ORGANIZATION_ID`, `RUN_QUESTIONS_INTERNAL_WORKSPACES`, or every workspace with `RUN_QUESTIONS_CUSTOMER_WORKSPACES=true`), each run index build that commits queues every question that is on for the session's runs without an answer at their transcript revision, and the `/api/cron/run-questions` minute cron answers them with the provider (`RUN_QUESTIONS_PROVIDER`, SubQ Snap by default). Nothing is queued without a configured provider. `backfill:run-questions` answers the runs indexed before (or before a question was turned on) through the same jobs. Run it after step 6, since it reads the committed run index.
+
+Questions come from the catalogue: add them in `/admin/run-questions`, or from a file through the same code:
+
+```bash
+bun run run-questions:add --file questions.json        # drafts; prints key, id, status, state
+bun run run-questions:add --file questions.json --on   # turned on: every new run is answered for them
+```
+
+The file is `[{"key": "...", "instructions": "...", "criteria"?: {"true": "...", "false": "..."}}]`. The catalogue has no key: the wording is a question's identity, so a wording already there is reported `exists` with its id and not added again (`--on` turns such a draft on), the same wording with other criteria is `conflict` (change it in the form), and a question L1 already records is `refused`; the last two exit with code 2.
+
+```bash
+bun run backfill:run-questions --organization-id $ORG --days 28            # preview: runs, runsToAnswer, answers, estimatedInputTokens, estimatedCostUsd
+nohup bun run backfill:run-questions --organization-id $ORG --days 28 --execute > rq-$ORG-1.json 2> rq-$ORG-1.log &
+bun run backfill:run-questions --organization-id $ORG --days 28 --execute --after <next>   # while it prints next
+```
+
+- It selects committed runs that started in the last `--days` days, newest first (workspaces by id with `--all-organizations`, only those that may have answers), and counts runs answered already at their revision without queuing them again. A preview queues and sends nothing; its token estimate counts each run's characters up to what the provider reads plus every question's wording, at the provider's prices (`SUBQ_USD_PER_MILLION_*`), so it is an upper bound; `workspaces[].fitsQuota` says whether the answers fit what is left of the workspace's answer quota (20,000 a day, less the answers already queued).
+- `--execute` needs the provider's key. It queues at most `--runs-per-minute` runs a minute in batches of up to 25, answers each batch in the run (the cron may take some of its jobs too) before the next, and waits 30 seconds at a time while `LoadAverage1` is above `--max-load`; `loadPausedSeconds` says how long. Ctrl-C (or `kill -INT`) stops it before the next batch and still prints the summary.
+- It stops with `stopped: "quota"` when a batch does not fit the workspace's quota (nothing of that batch is queued; continue with the printed `--after` once the window resets), and with `stopped: "provider"` and exit code 2 when the provider refuses for good (no credits, HTTP 402): add credits, then continue with `--after`; the refused batch is asked again.
+- Watch `run_question_job` (`purpose = 'precompute'`): `failed` rows with `last_error` other than credits mean answers to read before going on; `cost_usd` and `input_tokens` reconcile with the provider's invoice.
 
 ## 8. Roll out per organization
 

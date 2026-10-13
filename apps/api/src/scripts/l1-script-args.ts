@@ -2,9 +2,10 @@ import { parseArgs } from "node:util";
 
 /**
  * Argument parsing of the L1 operator scripts (`retire:transcript-records`,
- * `backfill:run-index`, `backfill:transcript-search`, `audit:l1`), kept free of database clients so it can
- * be tested. Every script is a preview unless `--execute` is given, and the
- * ones that write must name their scope: `--organization-id <id>`, or
+ * `backfill:run-index`, `backfill:transcript-search`, `backfill:run-questions`,
+ * `audit:l1`, and `run-questions:add`), kept free of database clients so it
+ * can be tested. Every backfill is a preview unless `--execute` is given, and
+ * the ones that write must name their scope: `--organization-id <id>`, or
  * `--all-organizations` to mean every workspace on purpose.
  */
 
@@ -232,4 +233,85 @@ export function parseTranscriptSearchBackfillArgs(
 			1_000,
 		),
 	};
+}
+
+export interface RunQuestionsBackfillArgs extends OrganizationScope {
+	readonly execute: boolean;
+	/** Runs that started in the last this many days. */
+	readonly days: number;
+	readonly maxRuns: number;
+	/** The `next` value a previous run printed. */
+	readonly after: string | undefined;
+	/** Runs queued and answered per minute at most. */
+	readonly runsPerMinute: number;
+	/** ClickHouse `LoadAverage1` above which the run pauses. */
+	readonly maxLoad: number;
+}
+
+export function parseRunQuestionsBackfillArgs(
+	argv: readonly string[],
+): RunQuestionsBackfillArgs {
+	const { values } = parseArgs({
+		args: [...argv],
+		strict: true,
+		options: {
+			after: { type: "string" },
+			"all-organizations": { type: "boolean", default: false },
+			days: { type: "string" },
+			execute: { type: "boolean", default: false },
+			"max-load": { type: "string" },
+			"max-runs": { type: "string" },
+			"organization-id": { type: "string" },
+			"runs-per-minute": { type: "string" },
+		},
+	});
+	if (values.after !== undefined && !values.after.trim())
+		throw new Error("--after must not be empty.");
+	return {
+		...parseOrganizationScope(values),
+		execute: values.execute,
+		days: parsePositiveIntegerFlag(values.days, 28, "--days", 3_650),
+		maxRuns: parsePositiveIntegerFlag(
+			values["max-runs"],
+			10_000,
+			"--max-runs",
+			100_000,
+		),
+		after: values.after,
+		runsPerMinute: parsePositiveIntegerFlag(
+			values["runs-per-minute"],
+			60,
+			"--runs-per-minute",
+			600,
+		),
+		maxLoad: parsePositiveIntegerFlag(
+			values["max-load"],
+			12,
+			"--max-load",
+			1_000,
+		),
+	};
+}
+
+export interface RunQuestionsAddArgs {
+	/** The JSON file of questions to add. */
+	readonly file: string;
+	/** Turn the questions on, so every run is answered for them. */
+	readonly on: boolean;
+}
+
+export function parseRunQuestionsAddArgs(
+	argv: readonly string[],
+): RunQuestionsAddArgs {
+	const { values } = parseArgs({
+		args: [...argv],
+		strict: true,
+		options: {
+			file: { type: "string" },
+			on: { type: "boolean", default: false },
+		},
+	});
+	const file = values.file?.trim();
+	if (!file) throw new Error("Name the questions: --file <questions.json>.");
+	return { file, on: values.on };
 }

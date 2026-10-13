@@ -61,43 +61,57 @@ export async function readRunFacts(
 	const facts = new Map<string, RunFacts>();
 	if (runs.length === 0) return facts;
 	const wanted = new Set(runs.map(runKey));
-	const sessions = [...new Set(runs.map((run) => run.sessionId))];
-	const rows = [];
-	for (const batch of chunkByParamBytes(sessions, (session) => [session]))
-		rows.push(
-			...(await query(executor, FactRowSchema, {
-				clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-				query: `SELECT session_id, agent_id, turn_idx, user_id, prompt_head, revision
-					FROM (${committedRunsSql(member !== null, [
-						"session_id",
-						"agent_id",
-						"turn_idx",
-						"user_id",
-						"prompt_head",
-						"toString(revision) AS revision",
-					])})
-					WHERE session_id IN {sessionIds:Array(String)}`,
-				query_params: {
-					[SQL_SCOPE_PARAMS.workspace]: workspaceId,
-					...(member === null ? {} : { [SQL_SCOPE_PARAMS.member]: member }),
-					sessionIds: batch,
-				},
-			})),
-		);
-	for (const row of rows) {
-		const run = {
-			sessionId: row.session_id,
-			agentId: row.agent_id,
-			turn: row.turn_idx,
-		};
-		if (wanted.has(runKey(run)))
-			facts.set(runKey(run), {
-				...run,
+	for (const fact of await readSessionRuns(
+		executor,
+		workspaceId,
+		[...new Set(runs.map((run) => run.sessionId))],
+		member,
+	))
+		if (wanted.has(runKey(fact))) facts.set(runKey(fact), fact);
+	return facts;
+}
+
+/**
+ * Every run of these sessions in their committed build, with its owner,
+ * prompt head and transcript revision; only the member's sessions when one
+ * is named.
+ */
+export async function readSessionRuns(
+	executor: ClickHouseExecutor,
+	workspaceId: string,
+	sessionIds: readonly string[],
+	member: string | null = null,
+): Promise<RunFacts[]> {
+	const facts: RunFacts[] = [];
+	for (const batch of chunkByParamBytes([...sessionIds], (session) => [
+		session,
+	]))
+		for (const row of await query(executor, FactRowSchema, {
+			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+			query: `SELECT session_id, agent_id, turn_idx, user_id, prompt_head, revision
+				FROM (${committedRunsSql(member !== null, [
+					"session_id",
+					"agent_id",
+					"turn_idx",
+					"user_id",
+					"prompt_head",
+					"toString(revision) AS revision",
+				])})
+				WHERE session_id IN {sessionIds:Array(String)}`,
+			query_params: {
+				[SQL_SCOPE_PARAMS.workspace]: workspaceId,
+				...(member === null ? {} : { [SQL_SCOPE_PARAMS.member]: member }),
+				sessionIds: batch,
+			},
+		}))
+			facts.push({
+				sessionId: row.session_id,
+				agentId: row.agent_id,
+				turn: row.turn_idx,
 				revision: row.revision,
 				ownerId: row.user_id,
 				promptHead: row.prompt_head ?? "",
 			});
-	}
 	return facts;
 }
 

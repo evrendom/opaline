@@ -58,6 +58,17 @@ export interface L1EdgePassEnv {
 	budgetMs: number;
 	/** Only this workspace's scopes (tests building their own fixtures). */
 	organizationId?: string;
+	/**
+	 * Runs after a session's run index build committed new runs (run
+	 * questions queue their answers). Best effort: a failure is logged and
+	 * never fails or retries the build.
+	 */
+	afterRunIndexBuilt?: (session: {
+		organizationId: string;
+		userId: string;
+		source: string;
+		sessionId: string;
+	}) => Promise<unknown>;
 	now?: () => Date;
 }
 
@@ -164,6 +175,11 @@ async function processClaim(
 				unresolvedCount: 0,
 				frozenReason: build.frozenReason,
 			});
+			if (build.written)
+				await afterRunIndexBuilt(env, {
+					organizationId: claim.organizationId,
+					...session,
+				});
 			return build.written;
 		}
 		const build = await buildSessionEdges({
@@ -200,6 +216,22 @@ async function processClaim(
 		});
 		await failL1EdgeScope(env.sql, claim, message);
 		return false;
+	}
+}
+
+/** The run index hook, after the build committed; its failure is only logged. */
+async function afterRunIndexBuilt(
+	env: L1EdgePassEnv,
+	session: Parameters<NonNullable<L1EdgePassEnv["afterRunIndexBuilt"]>>[0],
+): Promise<void> {
+	if (!env.afterRunIndexBuilt) return;
+	try {
+		await env.afterRunIndexBuilt(session);
+	} catch (error) {
+		logger.warn("After the run index of {session}: {error}", {
+			session: session.sessionId,
+			error: error instanceof Error ? error.message : String(error),
+		});
 	}
 }
 

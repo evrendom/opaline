@@ -12,6 +12,11 @@ import type {
 	ClickHouseStatement,
 } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
+import {
+	type BackfillClock,
+	REAL_BACKFILL_CLOCK,
+	readClickHouseLoadAverage,
+} from "../backfill-pacing.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import type { SearchAccess } from "./access.js";
 import { CHUNK_MAX_CHARS, CHUNK_OVERLAP_CHARS } from "./chunks.js";
@@ -95,12 +100,6 @@ export interface TranscriptSearchBackfillOptions {
 	readonly maxLoad: number;
 	/** Stops the run before its next pass. */
 	readonly signal?: AbortSignal;
-}
-
-export interface BackfillClock {
-	now(): number;
-	/** Resolves early when `signal` aborts. */
-	sleep(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
 export interface TranscriptSearchBackfillEnv {
@@ -205,8 +204,6 @@ const EstimateRowSchema = z.object({
 	session_id: z.string(),
 	chars: z.coerce.number(),
 });
-
-const LoadRowSchema = z.object({ value: z.coerce.number() });
 
 /**
  * Sessions of the workspaces (null: every workspace) whose committed
@@ -337,7 +334,7 @@ export async function backfillTranscriptSearch(
 	options: TranscriptSearchBackfillOptions,
 ): Promise<TranscriptSearchBackfillExecuted> {
 	const selection = await select(env, options);
-	const clock = env.clock ?? REAL_CLOCK;
+	const clock = env.clock ?? REAL_BACKFILL_CLOCK;
 	const log = env.log ?? (() => {});
 	const result: TranscriptSearchBackfillExecuted = {
 		status: "executed",
@@ -378,7 +375,7 @@ export async function backfillTranscriptSearch(
 		}
 		for (;;) {
 			if (options.signal?.aborted) return false;
-			const load = await readLoadAverage(env.executor);
+			const load = await readClickHouseLoadAverage(env.executor);
 			if (load <= options.maxLoad) break;
 			log(
 				`ClickHouse LoadAverage1 is ${load}, above ${options.maxLoad}: pausing ${LOAD_RECHECK_MS / 1_000}s`,
@@ -603,20 +600,6 @@ async function estimateChars(
 	return chars;
 }
 
-async function readLoadAverage(executor: ClickHouseExecutor): Promise<number> {
-	const [row] = z.array(LoadRowSchema).parse(
-		await executor.query<unknown>({
-			query:
-				"SELECT value FROM system.asynchronous_metrics WHERE metric = 'LoadAverage1'",
-		}),
-	);
-	if (!row)
-		throw new Error(
-			"ClickHouse reports no LoadAverage1 in system.asynchronous_metrics; the backfill cannot pace itself.",
-		);
-	return row.value;
-}
-
 function quotaMessage(
 	workspaceId: string,
 	usage: { used: number; limit: number; resetsAt: Date },
@@ -688,18 +671,3 @@ export function decodeTranscriptSearchBackfillCursor(
 	const [sessionDate, organizationId, userId, sessionId] = tuple.data;
 	return { sessionDate, organizationId, userId, sessionId };
 }
-
-const REAL_CLOCK: BackfillClock = {
-	now: () => Date.now(),
-	sleep: (ms, signal) =>
-		new Promise((resolve) => {
-			if (signal?.aborted) return resolve();
-			const timer = setTimeout(done, ms);
-			function done() {
-				clearTimeout(timer);
-				signal?.removeEventListener("abort", done);
-				resolve();
-			}
-			signal?.addEventListener("abort", done, { once: true });
-		}),
-};

@@ -50,6 +50,14 @@ export interface RunQuestionProvider {
 	readonly stateMaxChars: number;
 	/** At most what one call with these questions costs, for estimates. */
 	callCeilingUsd(questions: readonly AskedQuestion[]): number;
+	/**
+	 * What one call with these questions about `stateChars` characters of
+	 * state (capped at `stateMaxChars`) is estimated to use and cost; errs high.
+	 */
+	estimateCall(
+		questions: readonly AskedQuestion[],
+		stateChars: number,
+	): { inputTokens: number; outputTokens: number; costUsd: number };
 	answer(input: {
 		state: string;
 		questions: readonly AskedQuestion[];

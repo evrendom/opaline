@@ -7,6 +7,7 @@ import {
 } from "../analysis/agent-query-slots.js";
 import { visibleGitHubRepositories } from "../analysis/github-access.js";
 import { createPostgresSqlQuota } from "../analysis/sql-results.js";
+import type { PrecomputeEnv } from "./precompute.js";
 import {
 	readRunQuestionProviders,
 	readRunQuestionWorkspaces,
@@ -26,6 +27,16 @@ export function runQuestionsEnv(): RunQuestionsEnv {
 		limiter: createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
 		githubRepositories: visibleGitHubRepositories,
 		estimateKey: estimateKey(process.env.BETTER_AUTH_SECRET),
+	};
+}
+
+/** What queuing precomputed answers needs: the default provider and the workspace gate. */
+export function precomputeEnv(): PrecomputeEnv {
+	return {
+		executor: getClickhouse(),
+		sql: sqlClient,
+		provider: readRunQuestionProviders().default,
+		mayAnswer: readRunQuestionWorkspaces(),
 	};
 }
 

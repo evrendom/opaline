@@ -55,7 +55,8 @@ export const runQuestion = pgTable(
 );
 
 /**
- * Answering work queued by run_questions or a test in the internal form,
+ * Answering work queued by run_questions, a test in the internal form, or
+ * precomputation of every new run of an enabled workspace (`precompute`),
  * answered by the run-questions cron with retries. `runs` names the sessions
  * (with their owners in `owner_ids`), so deleting a workspace or the
  * requesting account cascades, and the account purge deletes every job that
@@ -112,7 +113,7 @@ export const runQuestionJob = pgTable(
 		),
 		check(
 			"run_question_job_purpose_check",
-			sql`${table.purpose} IN ('analysis', 'test')`,
+			sql`${table.purpose} IN ('analysis', 'test', 'precompute')`,
 		),
 		index("run_question_job_due_idx")
 			.on(table.nextAttemptAt)

@@ -289,7 +289,8 @@ const runAnswersColumns: readonly SqlViewColumn[] =
 	}));
 
 /**
- * Run question answers (CONTEXT.md "Run question"): stored by run_questions,
+ * Run question answers (CONTEXT.md "Run question"): precomputed for every
+ * run of a workspace that has run questions (and stored by run_questions),
  * reused by every later analysis. ReplacingMergeTree keyed by question, run
  * and transcript revision, so FINAL keeps one answer per key; only answers
  * given for the revision each session is committed at are shown, so an
@@ -300,7 +301,7 @@ const RUN_ANSWERS: SqlView = {
 	grain:
 		"One row per run question answered about a run: the probability that the answer is yes.",
 	traps: [
-		"Only runs someone asked about with run_questions have answers; a run without a row was not asked, which is not no.",
+		"Where the workspace has run questions, every run is answered for every question that is on within minutes of being indexed, and older runs by a backfill; a run without a row is not answered (yet), which is not no.",
 		"A probability says where to read, not what happened: open the runs with read before naming a cause.",
 		"question_id is one wording; a reworded question has a new id, and the old answers keep the old wording in question.",
 		"An answer shows only while its session's transcript is unchanged: a session uploaded again with changes has no answers until asked again.",
