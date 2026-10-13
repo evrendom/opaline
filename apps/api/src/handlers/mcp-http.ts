@@ -27,8 +27,10 @@ import {
 } from "../mcp/mcp-tools.js";
 import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
 import { withRedactedOutput } from "../mcp/redacted-tools.js";
+import { toolsListedFor } from "../mcp/retro-listing.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
+import { retroToolsEnabled } from "../services/analysis/retro-tools.js";
 
 export const MCP_PATH = "/api/mcp";
 export const MCP_CONSENT_PATH = "/api/mcp/consent";
@@ -93,6 +95,14 @@ async function isMcpAvailable(userId: string) {
 		SELECT 1 FROM member WHERE organization_id = ${team} AND user_id = ${userId}
 	`;
 	return rows.length > 0;
+}
+
+/** Whether one of the user's workspaces has the retro tools (`retroToolsEnabled`). */
+async function hasRetroTools(userId: string): Promise<boolean> {
+	const memberships = await sqlClient<{ organization_id: string }[]>`
+		SELECT organization_id FROM member WHERE user_id = ${userId}
+	`;
+	return memberships.some((row) => retroToolsEnabled(row.organization_id));
 }
 
 function mcpApi(auth: Auth) {
@@ -302,7 +312,9 @@ async function handleMcpRequest(
 			return rpcResult(message.id, {});
 		case "tools/list":
 			return rpcResult(message.id, {
-				tools: TOOLS.map(listedTool),
+				tools: toolsListedFor(TOOLS, await hasRetroTools(token.userId)).map(
+					listedTool,
+				),
 			});
 		case "tools/call":
 			return rpcResult(

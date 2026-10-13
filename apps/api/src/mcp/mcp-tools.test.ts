@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { RETRO_LISTED_TOOLS, toolsListedFor } from "./retro-listing.js";
 
 /**
  * Loads MCP_TOOLS in a child process: the module opens the Postgres pool on
@@ -390,6 +391,40 @@ test("the model sees only the analysis tools, the dashboard and the workspace li
 			"sql",
 		].sort(),
 	);
+});
+
+test("without the retro tools, the model is listed exactly the tools of the published plugin", async () => {
+	const { listed } = await loaded;
+	const visible = listed.filter(
+		(tool) => !tool._meta?.ui?.visibility?.includes("app"),
+	);
+	// Every hidden tool exists: a renamed tool would otherwise be listed to all.
+	for (const name of RETRO_LISTED_TOOLS)
+		expect(visible.map((tool) => tool.name)).toContain(name);
+	// Plugin 1.2.1 as submitted to the OpenAI plugin directory.
+	expect(
+		toolsListedFor(visible, false)
+			.map((tool) => tool.name)
+			.sort(),
+	).toEqual(
+		[
+			"find",
+			"get_answer",
+			"get_answer_evidence",
+			"get_dashboard",
+			"list_workspaces",
+			"read",
+			"save_answer",
+			"search_answers",
+			"share_answer",
+		].sort(),
+	);
+	// App-only tools are listed either way.
+	const appOnly = listed.filter((tool) =>
+		tool._meta?.ui?.visibility?.includes("app"),
+	);
+	expect(toolsListedFor(appOnly, false)).toEqual(appOnly);
+	expect(toolsListedFor(listed, true)).toEqual(listed);
 });
 
 test("every tool the model sees has a plain title and the same five short description lines, and every input is described in one plain line", async () => {
