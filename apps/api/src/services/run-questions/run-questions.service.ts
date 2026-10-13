@@ -30,6 +30,7 @@ import {
 } from "./catalogue.js";
 import { estimateMismatch, signEstimate } from "./estimate-token.js";
 import {
+	answerQuotaFor,
 	claimRunQuestionJob,
 	enqueueRunQuestionJob,
 	failRunQuestionJob,
@@ -37,7 +38,6 @@ import {
 	type JobRun,
 	latestTestJob,
 	queuedAnswers,
-	RUN_QUESTION_ANSWER_QUOTA,
 	type RunQuestionJob,
 	recordJobUsage,
 	releaseRunQuestionJob,
@@ -131,7 +131,7 @@ export async function estimateQuestions(
 			)
 		: new Set<string>();
 	const counted = count(planned.result, queued);
-	const quota = env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA;
+	const quota = answerQuotaFor(caller.workspaceId, env.answerQuota);
 	const available =
 		provider !== null &&
 		env.mayAnswer(caller.workspaceId) &&
@@ -208,7 +208,7 @@ export async function runQuestions(
 	const estimateKey = env.estimateKey;
 	const planned = await plan(caller, input, env);
 	if (!planned.ok) return planned;
-	const quota = env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA;
+	const quota = answerQuotaFor(caller.workspaceId, env.answerQuota);
 	const remaining = await remainingAnswerQuota(
 		env.sql,
 		caller.workspaceId,
@@ -700,7 +700,7 @@ async function answerJob(
 		),
 		readRunFacts(env.executor, job.workspaceId, job.runs),
 	]);
-	const quota = env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA;
+	const quota = answerQuotaFor(job.workspaceId, env.answerQuota);
 	for (const run of job.runs) {
 		const pending = run.questionIds.flatMap((id) => {
 			const question = questions.get(id);

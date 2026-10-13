@@ -10,11 +10,7 @@ import {
 } from "../backfill-pacing.js";
 import { answerKey, readAnswers } from "./answers.js";
 import { listRunQuestions } from "./catalogue.js";
-import {
-	queuedAnswers,
-	RUN_QUESTION_ANSWER_QUOTA,
-	remainingAnswerQuota,
-} from "./jobs.js";
+import { answerQuotaFor, queuedAnswers, remainingAnswerQuota } from "./jobs.js";
 import {
 	missingAnswers,
 	type OwnedRun,
@@ -218,7 +214,6 @@ export async function previewRunQuestionsBackfill(
 ): Promise<RunQuestionsBackfillPreview> {
 	const selection = await select(env, options);
 	const provider = env.provider;
-	const quota = env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA;
 	const byId = new Map(selection.questions.map((q) => [q.id, q]));
 	const ids = [...byId.keys()];
 	const workspaces: RunQuestionsWorkspaceEstimate[] = [];
@@ -230,7 +225,11 @@ export async function previewRunQuestionsBackfill(
 			answers: 0,
 			estimatedInputTokens: 0,
 			estimatedCostUsd: 0,
-			quotaRemaining: await remainingAnswerQuota(env.sql, workspaceId, quota),
+			quotaRemaining: await remainingAnswerQuota(
+				env.sql,
+				workspaceId,
+				answerQuotaFor(workspaceId, env.answerQuota),
+			),
 			fitsQuota: true,
 		};
 		if (provider && ids.length > 0) {
@@ -358,7 +357,7 @@ export async function backfillRunQuestions(
 			const queued = await queueRunAnswers(env, workspaceId, batch, ids);
 			if (queued.status === "quota") {
 				result.stopped = "quota";
-				result.message = `Stopped: workspace ${workspaceId} has ${queued.available} answers left in its quota (${(env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA).answers} per ${(env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA).windowMs / 3_600_000} hours, less the answers queued), fewer than the ${queued.answers} the next ${queued.runs} runs need.`;
+				result.message = `Stopped: workspace ${workspaceId} has ${queued.available} answers left in its quota (${answerQuotaFor(workspaceId, env.answerQuota).answers} per ${answerQuotaFor(workspaceId, env.answerQuota).windowMs / 3_600_000} hours, less the answers queued), fewer than the ${queued.answers} the next ${queued.runs} runs need.`;
 				break batches;
 			}
 			if (queued.status === "off") {

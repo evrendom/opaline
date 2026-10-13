@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { z } from "zod";
 import { answerKey, type RunVersion } from "./answers.js";
+import { readInternalRunQuestionWorkspaces } from "./provider.js";
 
 /**
  * Answering work in Postgres (`run_question_job`), claimed by the
@@ -40,6 +41,23 @@ export const RUN_QUESTION_ANSWER_QUOTA = {
 	answers: 20_000,
 	windowMs: 86_400_000,
 } as const;
+/** Answers one of our own workspaces may buy per window: about $50 a day at SubQ Snap's prices. */
+export const INTERNAL_RUN_QUESTION_ANSWER_QUOTA = {
+	answers: 120_000,
+	windowMs: 86_400_000,
+} as const;
+
+/** A workspace's answer quota: `override` where one is configured (tests), else ours or the default. */
+export function answerQuotaFor(
+	workspaceId: string,
+	override?: { answers: number; windowMs: number },
+	env: NodeJS.ProcessEnv = process.env,
+): { answers: number; windowMs: number } {
+	if (override) return override;
+	return readInternalRunQuestionWorkspaces(env)(workspaceId)
+		? INTERNAL_RUN_QUESTION_ANSWER_QUOTA
+		: RUN_QUESTION_ANSWER_QUOTA;
+}
 
 /**
  * Runs `work` in a transaction holding the workspace's run question lock, so
@@ -78,7 +96,7 @@ export async function enqueueRunQuestionJob(
 		VALUES (
 			${id}, ${job.workspaceId}, ${job.requestedBy}, ${job.purpose}, ${job.provider},
 			${[...new Set([...(job.questionIds ?? []), ...job.runs.flatMap((run) => run.questionIds)])].sort()},
-			${sql.json(job.runs as unknown as postgres.JSONValue)},
+			${JSON.stringify(job.runs)}::jsonb,
 			${[...new Set(job.runs.map((run) => run.ownerId))].sort()},
 			${job.runs.reduce((sum, run) => sum + run.questionIds.length, 0)}
 		)

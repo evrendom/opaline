@@ -7,7 +7,9 @@
  */
 const RECORDED_FACTS: readonly { pattern: RegExp; fact: string }[] = [
 	{
-		pattern: /\bCI\b|\bchecks? (?:ran|run|pass)/iu,
+		// Whether CI was checked or how it ended, not every mention: "a CI fix" is about the work.
+		pattern:
+			/\b(?:check(?:ed|ing)?|watch(?:ed|ing)?|wait(?:ed|ing)? for|look(?:ed)? at)\s+(?:the\s+)?CI\b|\bCI\s+(?:ran|run|runs|pass(?:ed|es)?|fail(?:ed|s)?|green|red|status|result)|\bchecks? (?:ran|run|pass)/iu,
 		fact: "CI checked or not (L1 edges)",
 	},
 	{

@@ -238,6 +238,13 @@ export function readRunQuestionWorkspaces(
 	env: NodeJS.ProcessEnv = process.env,
 ): (workspaceId: string) => boolean {
 	if (env.RUN_QUESTIONS_CUSTOMER_WORKSPACES === "true") return () => true;
+	return readInternalRunQuestionWorkspaces(env);
+}
+
+/** Our own workspaces: the admin workspace and `RUN_QUESTIONS_INTERNAL_WORKSPACES`. */
+export function readInternalRunQuestionWorkspaces(
+	env: NodeJS.ProcessEnv = process.env,
+): (workspaceId: string) => boolean {
 	const internal = new Set(
 		[
 			env.VITE_ADMIN_ORGANIZATION_ID ?? "",

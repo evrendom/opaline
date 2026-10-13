@@ -1,10 +1,10 @@
 import { answerKey, type RunVersion, readAnswers, runKey } from "./answers.js";
 import { listOnRunQuestions } from "./catalogue.js";
 import {
+	answerQuotaFor,
 	enqueueRunQuestionJob,
 	type JobRun,
 	queuedAnswers,
-	RUN_QUESTION_ANSWER_QUOTA,
 	remainingAnswerQuota,
 	withRunQuestionLock,
 } from "./jobs.js";
@@ -121,7 +121,7 @@ export async function queueRunAnswers(
 		runs,
 		provider.name,
 	);
-	const quota = env.answerQuota ?? RUN_QUESTION_ANSWER_QUOTA;
+	const quota = answerQuotaFor(workspaceId, env.answerQuota);
 	return withRunQuestionLock(env.sql, workspaceId, async (sql) => {
 		const queued = await queuedAnswers(
 			sql,

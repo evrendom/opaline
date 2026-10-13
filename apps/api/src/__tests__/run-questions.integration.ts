@@ -7,6 +7,7 @@ import {
 	setDefaultTimeout,
 	test,
 } from "bun:test";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { type ClickHouseStatement, getClickhouse } from "../clickhouse.js";
 import type { AgentQueryLimiter } from "../services/analysis/agent-query-slots.js";
@@ -69,6 +70,9 @@ const sqlClient = postgres(process.env.PG_CONNECTION_STRING ?? "", {
 	max: 2,
 	prepare: false,
 });
+// Like the API's client, which drizzle wraps: timestamps come back as strings
+// and sql.json() no longer serializes.
+drizzle(sqlClient);
 const clickhouse = getClickhouse();
 
 const RUN = `run_questions_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;

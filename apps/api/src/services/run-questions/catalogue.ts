@@ -37,7 +37,8 @@ interface QuestionRow {
 	tested_runs: number | null;
 	tested_precision: number | null;
 	tested_provider: string | null;
-	created_at: Date;
+	/** A string through the API's client: drizzle replaces its date parsers. */
+	created_at: Date | string;
 }
 
 export async function listRunQuestions(
@@ -231,7 +232,7 @@ function toQuestion(row: QuestionRow): RunQuestion {
 		testedRuns: row.tested_runs,
 		testedPrecision: row.tested_precision,
 		testedProvider: row.tested_provider,
-		createdAt: row.created_at.toISOString(),
+		createdAt: new Date(row.created_at).toISOString(),
 	};
 }
 

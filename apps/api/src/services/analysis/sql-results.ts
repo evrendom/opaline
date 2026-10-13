@@ -222,7 +222,7 @@ export function createPostgresSqlResultStore(
 						counts, query_carries_text)
 				VALUES (
 					${id}, ${record.workspaceId}, ${record.authorId}, ${record.title},
-					${record.query}, ${sql.json(record.output)}, ${[...record.owners]},
+					${record.query}, ${JSON.stringify(record.output)}::jsonb, ${[...record.owners]},
 					${record.counts}, ${record.queryCarriesText}
 				)
 			`;
@@ -240,8 +240,8 @@ export function createPostgresSqlResultStore(
 					owner_ids: string[];
 					counts: boolean;
 					query_carries_text: boolean;
-					created_at: Date;
-					removed_at: Date | null;
+					created_at: Date | string;
+					removed_at: Date | string | null;
 				}[]
 			>`
 				SELECT id, organization_id, author_id, title, query, output, owner_ids,
@@ -260,7 +260,7 @@ export function createPostgresSqlResultStore(
 				owners: row.owner_ids,
 				counts: row.counts,
 				queryCarriesText: row.query_carries_text,
-				createdAt: row.created_at.toISOString(),
+				createdAt: new Date(row.created_at).toISOString(),
 				removed: row.removed_at !== null,
 			};
 		},
@@ -298,7 +298,7 @@ export function createPostgresSqlQuota(
 		...limits,
 		async take(workspaceId) {
 			const [row] = await sql<
-				{ query_count: number; window_started_at: Date }[]
+				{ query_count: number; window_started_at: Date | string }[]
 			>`
 				INSERT INTO analysis_sql_quota (organization_id, window_started_at, query_count)
 				VALUES (${workspaceId}, now(), 1)
@@ -314,7 +314,9 @@ export function createPostgresSqlQuota(
 			if (!row || row.query_count <= limits.queries) return { allowed: true };
 			return {
 				allowed: false,
-				resetsAt: new Date(row.window_started_at.getTime() + limits.windowMs),
+				resetsAt: new Date(
+					new Date(row.window_started_at).getTime() + limits.windowMs,
+				),
 			};
 		},
 	};
