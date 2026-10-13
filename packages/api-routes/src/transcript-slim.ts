@@ -46,12 +46,12 @@ export const TRANSCRIPT_SLIM_VERSION = 1;
 /**
  * The `filter_version` stored with every ingested session: the version of the
  * API's whole transform of stored bytes, i.e. secret filter (`FILTER_VERSION`
- * 6) after transcript slimming (`TRANSCRIPT_SLIM_VERSION` 1). Bump it whenever
+ * 7) after transcript slimming (`TRANSCRIPT_SLIM_VERSION` 1). Bump it whenever
  * either changes the stored bytes; a test pins the combination. The secret
  * filter's own `FILTER_VERSION` stays the version of its rules (CLI uploads,
  * GitHub evidence), so slimming does not touch those.
  */
-export const SESSION_INGEST_FILTER_VERSION = 7;
+export const SESSION_INGEST_FILTER_VERSION = 8;
 
 const DATA_URL_PATTERN =
 	/^data:(image\/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/u;

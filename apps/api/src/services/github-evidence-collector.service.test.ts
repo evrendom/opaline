@@ -93,7 +93,7 @@ describe("GitHub commit evidence collection", () => {
 			representation: {
 				digestDomain: "canonical-secret-filtered-page-json/v1",
 				state: "digest_only",
-				transform: "canonical-json/v1+secret-filter/v6",
+				transform: "canonical-json/v1+secret-filter/v7",
 			},
 			schema: "github-evidence-page-receipt/v1",
 		});

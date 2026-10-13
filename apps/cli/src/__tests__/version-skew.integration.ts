@@ -127,8 +127,8 @@ describe("published rudel@0.1.17 against the current API", () => {
 		// filter version (secret filter plus transcript slimming). Pin the
 		// literals in exactly one place so a future bump fails loudly here and
 		// forces a deliberate re-run of the skew matrix.
-		expect(FILTER_VERSION).toBe(6);
-		expect(SESSION_INGEST_FILTER_VERSION).toBe(7);
+		expect(FILTER_VERSION).toBe(7);
+		expect(SESSION_INGEST_FILTER_VERSION).toBe(8);
 
 		const workspace = await createSkewWorkspace("version-guard");
 		const result = await runOldCli(["--version"], workspace);

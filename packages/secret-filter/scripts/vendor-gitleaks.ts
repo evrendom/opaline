@@ -3,6 +3,7 @@ import {
 	GITLEAKS_CONFIG_SHA256,
 	GITLEAKS_CONFIG_URL,
 	GITLEAKS_VERSION,
+	LOCAL_RULE_SOURCE_ID,
 	SELECTED_RULES,
 } from "./ruleset-config.js";
 
@@ -46,7 +47,9 @@ function extractSelectedRuleBlocks(source: string): string[] {
 		}
 	}
 
-	return SELECTED_RULES.map(({ sourceId }) => {
+	return SELECTED_RULES.filter(
+		({ sourceId }) => sourceId !== LOCAL_RULE_SOURCE_ID,
+	).map(({ sourceId }) => {
 		const block = blocksById.get(sourceId);
 		if (!block) {
 			throw new Error(`Pinned Gitleaks rule is missing: ${sourceId}`);

@@ -1,5 +1,8 @@
 import {
+	ESCAPE_AWARE_TRAILING_DELIMITER,
+	GITLEAKS_TRAILING_DELIMITER,
 	GITLEAKS_VERSION,
+	LOCAL_RULE_SOURCE_ID,
 	SELECTED_RULES,
 	type SelectedRule,
 } from "./ruleset-config.js";
@@ -10,6 +13,7 @@ const OUTPUT_PATH = new URL("../src/generated-rules.ts", import.meta.url);
 interface ParsedGitleaksRule {
 	readonly id: string;
 	readonly regex: string;
+	readonly keywords: readonly string[];
 	readonly allowlists: readonly ParsedAllowlist[];
 }
 
@@ -24,7 +28,8 @@ interface GeneratedRule {
 	readonly caseInsensitive: boolean;
 	readonly secretGroup: number;
 	readonly allowlistRegexSources: readonly string[];
-	readonly hasRegexOverride: boolean;
+	readonly keywords: readonly string[];
+	readonly origin: "gitleaks" | "override" | "local";
 }
 
 async function main(): Promise<void> {
@@ -51,9 +56,17 @@ function parseRules(value: unknown): readonly ParsedGitleaksRule[] {
 			throw new Error("Vendored Gitleaks TOML contains an invalid rule");
 		}
 
+		if (
+			!Array.isArray(rule.keywords) ||
+			!rule.keywords.every((keyword) => typeof keyword === "string")
+		) {
+			throw new Error(`Vendored Gitleaks rule has no keywords: ${rule.id}`);
+		}
+
 		return {
 			id: rule.id,
 			regex: rule.regex,
+			keywords: rule.keywords,
 			allowlists: parseAllowlists(rule.allowlists),
 		};
 	});
@@ -85,27 +98,64 @@ function buildGeneratedRule(
 	selection: SelectedRule,
 	rules: readonly ParsedGitleaksRule[],
 ): GeneratedRule {
-	const sourceRule = rules.find((rule) => rule.id === selection.sourceId);
-	if (!sourceRule) {
+	const isLocal = selection.sourceId === LOCAL_RULE_SOURCE_ID;
+	const sourceRule = isLocal
+		? undefined
+		: rules.find((rule) => rule.id === selection.sourceId);
+	if (!isLocal && !sourceRule) {
 		throw new Error(`Vendored Gitleaks rule is missing: ${selection.sourceId}`);
 	}
+	const regex = selection.regexOverride ?? sourceRule?.regex;
+	if (regex === undefined) {
+		throw new Error(`Local rule needs a regex: ${selection.ruleId}`);
+	}
 
-	const normalized = normalizeRegex(
-		selection.regexOverride ?? sourceRule.regex,
-	);
-	const allowlistRegexSources = sourceRule.allowlists.flatMap((allowlist) =>
-		allowlist.regexes.map((regex) => normalizeRegex(regex).source),
-	);
+	const normalized = normalizeRegex(regex);
+	const allowlistRegexSources = [
+		...(sourceRule?.allowlists ?? []).flatMap((allowlist) =>
+			allowlist.regexes.map((regex) => normalizeRegex(regex).source),
+		),
+		...(selection.allowlistRegexes ?? []),
+	];
+
+	if (selection.regexOverride !== undefined && !selection.keywords) {
+		throw new Error(
+			`Rule ${selection.ruleId} overrides its regex without keywords`,
+		);
+	}
+	const keywords = selection.keywords ?? sourceRule?.keywords ?? [];
+	if (
+		keywords.length === 0 ||
+		keywords.some((keyword) => keyword !== keyword.toLowerCase())
+	) {
+		throw new Error(`Rule ${selection.ruleId} needs lowercase keywords`);
+	}
+	const regexSource = makeEscapeAware(normalized.source);
 
 	return {
 		id: selection.ruleId,
 		sourceId: selection.sourceId,
-		regexSource: normalized.source,
+		regexSource,
 		caseInsensitive: normalized.caseInsensitive,
 		secretGroup: selection.secretGroup,
 		allowlistRegexSources,
-		hasRegexOverride: selection.regexOverride !== undefined,
+		keywords,
+		origin: isLocal
+			? "local"
+			: selection.regexOverride === undefined
+				? "gitleaks"
+				: "override",
 	};
+}
+
+/**
+ * Lets a rule end before an escaped quote: see ESCAPE_AWARE_TRAILING_DELIMITER
+ * in ruleset-config.ts.
+ */
+function makeEscapeAware(source: string): string {
+	return source
+		.split(GITLEAKS_TRAILING_DELIMITER)
+		.join(ESCAPE_AWARE_TRAILING_DELIMITER);
 }
 
 function normalizeRegex(regex: string): {
@@ -212,15 +262,14 @@ function rejectUnsupportedModifiers(regex: string): void {
 function renderModule(rules: readonly GeneratedRule[]): string {
 	const entries = rules
 		.map(
-			(
-				rule,
-			) => `${rule.hasRegexOverride ? "\t// Local regex override applied from scripts/ruleset-config.ts.\n" : ""}\t{
+			(rule) => `${RULE_ORIGIN_COMMENTS[rule.origin]}\t{
 \t\tid: ${JSON.stringify(rule.id)},
 \t\tsourceId: ${JSON.stringify(rule.sourceId)},
 \t\tregexSource: ${JSON.stringify(rule.regexSource)},
 \t\tcaseInsensitive: ${rule.caseInsensitive},
 \t\tsecretGroup: ${rule.secretGroup},
 \t\tallowlistRegexSources: ${JSON.stringify(rule.allowlistRegexSources)},
+\t\tkeywords: ${JSON.stringify(rule.keywords)},
 \t},`,
 		)
 		.join("\n");
@@ -237,6 +286,14 @@ ${entries}
 ];
 `;
 }
+
+const RULE_ORIGIN_COMMENTS: Readonly<Record<GeneratedRule["origin"], string>> =
+	{
+		gitleaks: "",
+		override:
+			"\t// Local regex override applied from scripts/ruleset-config.ts.\n",
+		local: "\t// Local rule defined in scripts/ruleset-config.ts.\n",
+	};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
