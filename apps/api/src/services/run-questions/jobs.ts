@@ -125,9 +125,12 @@ export async function queuedAnswers(
 }
 
 /**
- * The oldest due job, leased to the caller; null when none is due. Each claim
- * counts an attempt, so a worker that dies mid-job (its lease expires) uses
- * one up too; a job out of attempts is marked failed instead.
+ * The next due job, leased to the caller; null when none is due. An agent's
+ * questions (and form tests) come first, as someone waits on them; then the
+ * newest job, so a fresh upload's runs are answered within minutes instead of
+ * behind a history backlog (which queues each run once). Each claim counts an
+ * attempt, so a worker that dies mid-job (its lease expires) uses one up too;
+ * a job out of attempts is marked failed instead.
  */
 export async function claimRunQuestionJob(
 	sql: postgres.Sql,
@@ -153,7 +156,7 @@ export async function claimRunQuestionJob(
 			WHERE status = 'queued' AND next_attempt_at <= now()
 				AND (lease_expires_at IS NULL OR lease_expires_at <= now())
 				AND provider = ANY(${[...providers]}::text[])
-			ORDER BY next_attempt_at, created_at
+			ORDER BY (purpose IN ('analysis', 'test')) DESC, created_at DESC
 			FOR UPDATE SKIP LOCKED LIMIT 1
 		)
 		RETURNING id, organization_id, purpose, provider, question_ids, runs, status, lease_token, attempt_count

@@ -34,6 +34,10 @@ import {
 } from "../services/run-questions/history-backfill.service.js";
 import { importRunQuestions } from "../services/run-questions/import-questions.js";
 import {
+	claimRunQuestionJob,
+	enqueueRunQuestionJob,
+} from "../services/run-questions/jobs.js";
+import {
 	precomputedQuestionIds,
 	precomputeSessionAnswers,
 } from "../services/run-questions/precompute.js";
@@ -922,8 +926,37 @@ describe("run questions", () => {
 			ORDER BY created_at
 		`;
 		expect(calls).toBe(1);
-		expect(rows.map((row) => row.status)).toEqual(["failed", "queued"]);
-		expect(rows[0]?.last_error).toContain("no credits");
+		expect(rows.map((row) => row.status).sort()).toEqual(["failed", "queued"]);
+		expect(rows.find((row) => row.status === "failed")?.last_error).toContain(
+			"no credits",
+		);
+	});
+
+	test("an agent's questions are answered first, then the newest job: a fresh upload's runs do not wait behind a history backlog", async () => {
+		// A provider of its own, so only these jobs are claimed.
+		const provider = `order-${RUN}`;
+		const job = (purpose: "analysis" | "precompute") =>
+			enqueueRunQuestionJob(sqlClient, {
+				workspaceId: workspace,
+				requestedBy: memberId,
+				purpose,
+				provider,
+				questionIds: ["q"],
+				runs: [],
+			});
+		try {
+			const history = await job("precompute");
+			const fresh = await job("precompute");
+			const asked = await job("analysis");
+			const order: (string | undefined)[] = [];
+			for (let claim = 0; claim < 3; claim++)
+				order.push(
+					(await claimRunQuestionJob(sqlClient, 60_000, [provider]))?.id,
+				);
+			expect(order).toEqual([asked, fresh, history]);
+		} finally {
+			await sqlClient`DELETE FROM run_question_job WHERE provider = ${provider}`;
+		}
 	});
 
 	test("a session's runs are answered for every question that is on once its run index is built; rebuilds and uploads of the same transcript queue nothing", async () => {
