@@ -12,6 +12,7 @@ import {
 	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
 	IngestSessionOutputSchema,
+	LIVE_SESSIONS_DISABLED_CODE,
 	PRODUCT_ANALYTICS_EVENTS,
 	R2_INGEST_DISABLED_CODE,
 	R2_INGEST_PROTOCOL,
@@ -32,7 +33,11 @@ import {
 	createIdempotentClickHouseExecutor,
 	getClickhouse,
 } from "./clickhouse.js";
-import { ingestProcessingSqlClient, sqlClient } from "./db.js";
+import {
+	ingestProcessingSqlClient,
+	liveSessionSqlClient,
+	sqlClient,
+} from "./db.js";
 import { getFrontendOrigin } from "./frontend-origin.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analysisRouter } from "./handlers/analysis/index.js";
@@ -162,7 +167,9 @@ import {
 	createPostgresIngestRateLimitEnvironment,
 	INGEST_RATE_LIMIT_CONFIG,
 	type IngestRateLimitEnvironment,
+	readLiveSessionRateLimitConfig,
 	resolveIngestRateLimitSubject,
+	resolveLiveSessionRateLimitSubject,
 } from "./services/ingest-rate-limit.service.js";
 import { getNextIngestedAt } from "./services/ingest-timestamp.service.js";
 import {
@@ -173,6 +180,27 @@ import {
 	IngestFilterWorkerOperationalError,
 	SessionLanguageSignalScannerOperationalError,
 } from "./services/ingest-worker-operational.error.js";
+import {
+	appendLiveSession,
+	LiveSessionOwnershipConflictError,
+	readLiveSessionState,
+} from "./services/live-session/live-session-append.service.js";
+import {
+	isLiveSessionsEnabled,
+	isLiveSessionsWorkspaceEnabled,
+	LIVE_SESSIONS_PAUSE_SECONDS,
+} from "./services/live-session/live-session-config.js";
+import {
+	createLiveSessionGate,
+	LiveSessionBusyError,
+	LiveSessionStorageError,
+} from "./services/live-session/live-session-gate.js";
+import {
+	assertStorableText,
+	LiveSessionAppendValidationError,
+	validateLiveSessionAppend,
+} from "./services/live-session/live-session-lines.js";
+import { getLiveSessionR2Client } from "./services/live-session/live-session-r2.js";
 import {
 	getCachedOrgSessionCount,
 	hasOrgUploadsInLastDays,
@@ -193,6 +221,7 @@ import {
 } from "./services/r2-ingest-processing-error.js";
 import {
 	createR2MultipartUploadClient,
+	type R2IngestConfiguration,
 	readR2IngestAvailability,
 } from "./services/r2-ingest-storage.service.js";
 import { hasRawSessionRow } from "./services/raw-session.service.js";
@@ -382,6 +411,7 @@ const cliAuthStatus = os.cli.authStatus
 			capabilities: {
 				analysisLinkedUploads: true as const,
 				transcriptSlimming: true as const,
+				...(isLiveSessionsEnabled() ? { liveSessions: true as const } : {}),
 			},
 		};
 	});
@@ -1665,6 +1695,176 @@ const repositoryEvidenceInit = os.repositoryEvidence.init
 		}
 	});
 
+type LiveSessionAccess =
+	| { readonly scope: "global" | "workspace"; readonly status: "disabled" }
+	| {
+			readonly organizationId: string;
+			readonly r2: R2IngestConfiguration;
+			readonly status: "ready";
+	  };
+
+/**
+ * The gate both live session procedures pass: an ingest API key, the kill
+ * switch and ingest quiescence, R2, the user's own live session budget (never
+ * the ingest budget), workspace membership and the workspace list. Unlike
+ * ingest it never claims session ownership or counts an agent run.
+ */
+async function resolveLiveSessionAccess(
+	input: { readonly organizationId: string },
+	context: {
+		readonly apiKeyId: string | null;
+		readonly ingestOperatorAuthorized: boolean;
+		readonly user: { readonly id: string };
+	},
+	chargeBytes: number,
+): Promise<LiveSessionAccess> {
+	if (!context.apiKeyId) {
+		throw new ORPCError("UNAUTHORIZED", {
+			message: "An ingest API key is required",
+		});
+	}
+	if (
+		!isLiveSessionsEnabled() ||
+		(readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
+			!context.ingestOperatorAuthorized)
+	) {
+		return { scope: "global", status: "disabled" };
+	}
+	const availability = readR2IngestAvailability();
+	if (!availability.enabled) return { scope: "global", status: "disabled" };
+	await checkIngestRateLimit(
+		resolveLiveSessionRateLimitSubject(context.user.id),
+		chargeBytes,
+		readLiveSessionRateLimitConfig(),
+		ingestRateLimitEnvironment,
+	);
+	const organizationId = await resolveIngestOrganizationId(
+		input.organizationId,
+		context.user.id,
+	);
+	if (!isLiveSessionsWorkspaceEnabled(organizationId)) {
+		return { scope: "workspace", status: "disabled" };
+	}
+	return {
+		organizationId,
+		r2: availability.configuration,
+		status: "ready",
+	};
+}
+
+// Live appends' transactions: below the live pool's 5 connections, so
+// `state` and the ownership reads always find one, and failing fast (the
+// CLI backs off on 503) instead of queueing without limit.
+const liveSessionAppendGate = createLiveSessionGate({
+	maxActive: 4,
+	maxWaitMs: 5_000,
+});
+
+/** Validation errors are bad requests; busy pools and R2 failures retryable 503s. */
+function toLiveSessionOrpcError(error: unknown): unknown {
+	if (error instanceof LiveSessionAppendValidationError) {
+		return new ORPCError("BAD_REQUEST", { message: error.message });
+	}
+	if (
+		error instanceof LiveSessionBusyError ||
+		error instanceof LiveSessionStorageError ||
+		isPostgresLockTimeout(error)
+	) {
+		return new ORPCError("SERVICE_UNAVAILABLE", {
+			data: { reason: "live_session_unavailable", retryAfterMs: 1_000 },
+			message: "Live session updates are busy. Retry shortly.",
+		});
+	}
+	return error;
+}
+
+function isPostgresLockTimeout(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		error.code === "55P03"
+	);
+}
+
+const liveSessionState = os.liveSession.state
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, errors }) => {
+		try {
+			assertStorableText(input);
+		} catch (error) {
+			throw toLiveSessionOrpcError(error);
+		}
+		const access = await resolveLiveSessionAccess(input, context, 0);
+		if (access.status === "disabled") {
+			throw errors[LIVE_SESSIONS_DISABLED_CODE]({
+				data: {
+					pauseSeconds: LIVE_SESSIONS_PAUSE_SECONDS,
+					scope: access.scope,
+				},
+			});
+		}
+		try {
+			return await readLiveSessionState(
+				{
+					organizationId: access.organizationId,
+					sessionId: input.sessionId,
+					source: input.source,
+					userId: context.user.id,
+				},
+				{ database: liveSessionSqlClient },
+			);
+		} catch (error) {
+			if (error instanceof LiveSessionOwnershipConflictError) {
+				throw errors[SESSION_OWNERSHIP_CONFLICT_CODE]();
+			}
+			throw toLiveSessionOrpcError(error);
+		}
+	});
+
+const liveSessionAppend = os.liveSession.append
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context, errors, signal }) => {
+		let chargeBytes: number;
+		try {
+			chargeBytes = validateLiveSessionAppend(input).chargeBytes;
+		} catch (error) {
+			throw toLiveSessionOrpcError(error);
+		}
+		const access = await resolveLiveSessionAccess(input, context, chargeBytes);
+		if (access.status === "disabled") {
+			throw errors[LIVE_SESSIONS_DISABLED_CODE]({
+				data: {
+					pauseSeconds: LIVE_SESSIONS_PAUSE_SECONDS,
+					scope: access.scope,
+				},
+			});
+		}
+		try {
+			return await appendLiveSession(
+				{
+					organizationId: access.organizationId,
+					sessionId: input.sessionId,
+					source: input.source,
+					userId: context.user.id,
+				},
+				input,
+				{
+					database: liveSessionSqlClient,
+					gate: liveSessionAppendGate,
+					now: () => new Date(),
+					r2: getLiveSessionR2Client(access.r2),
+					signal,
+				},
+			);
+		} catch (error) {
+			if (error instanceof LiveSessionOwnershipConflictError) {
+				throw errors[SESSION_OWNERSHIP_CONFLICT_CODE]();
+			}
+			throw toLiveSessionOrpcError(error);
+		}
+	});
+
 const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 	.use(orgMiddleware)
 	.handler(({ context }) =>
@@ -2438,6 +2638,10 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	repositoryEvidence: {
 		commit: repositoryEvidenceCommit,
 		init: repositoryEvidenceInit,
+	},
+	liveSession: {
+		append: liveSessionAppend,
+		state: liveSessionState,
 	},
 	health,
 	me,

@@ -131,9 +131,14 @@ export interface IngestRateLimitConfig {
 	readonly requestsWindowSeconds: number;
 }
 
+/**
+ * Whose budget a request charges. `user` is session ingest; `live_session_user`
+ * is the same user's separate live session append budget, so live updates
+ * never consume the ingest budget. The counter row is keyed by both.
+ */
 export interface IngestRateLimitSubject {
 	readonly id: string;
-	readonly kind: "user";
+	readonly kind: "live_session_user" | "user";
 }
 
 type IngestRateLimitParameter = number | string | null;
@@ -193,6 +198,35 @@ export const INGEST_RATE_LIMIT_CONFIG: IngestRateLimitConfig = {
 		MINIMUM_INGEST_WINDOW_SECONDS,
 	),
 };
+
+/**
+ * Live session appends (`liveSession.state` / `append`): read per request so a
+ * misconfigured value fails live updates only, never API startup or ingest.
+ */
+export function readLiveSessionRateLimitConfig(): IngestRateLimitConfig {
+	return {
+		bytesMax: readPositiveSafeIntegerEnv(
+			"RATE_LIMIT_LIVE_SESSION_BYTES_MAX",
+			4 * 1024 * 1024 * 1024,
+		),
+		bytesWindowSeconds: readPositiveSafeIntegerEnv(
+			"RATE_LIMIT_LIVE_SESSION_BYTES_WINDOW",
+			3600,
+			MINIMUM_INGEST_WINDOW_SECONDS,
+		),
+		requestsMax: readPositiveSafeIntegerEnv(
+			"RATE_LIMIT_LIVE_SESSION_REQUESTS_MAX",
+			// One machine-wide follower sends an append per running session
+			// per flush; people run 10–25 sessions side by side.
+			60_000,
+		),
+		requestsWindowSeconds: readPositiveSafeIntegerEnv(
+			"RATE_LIMIT_LIVE_SESSION_REQUESTS_WINDOW",
+			3600,
+			MINIMUM_INGEST_WINDOW_SECONDS,
+		),
+	};
+}
 
 export async function checkIngestRateLimit(
 	subject: IngestRateLimitSubject,
@@ -278,6 +312,12 @@ export function resolveIngestRateLimitSubject(
 	userId: string,
 ): IngestRateLimitSubject {
 	return { id: userId, kind: "user" };
+}
+
+export function resolveLiveSessionRateLimitSubject(
+	userId: string,
+): IngestRateLimitSubject {
+	return { id: userId, kind: "live_session_user" };
 }
 
 function buildQueryParameters(
@@ -430,7 +470,7 @@ function throwLimitExceeded(input: {
 			reason: input.reason,
 			windowSeconds: input.windowSeconds,
 		},
-		message: `Rate limit exceeded. Maximum ${input.limit} ingest ${input.unit} per ${Math.round(input.windowSeconds / 60)} minutes. Try again later.`,
+		message: `Rate limit exceeded. Maximum ${input.limit} ${input.subject.kind === "live_session_user" ? "live session" : "ingest"} ${input.unit} per ${Math.round(input.windowSeconds / 60)} minutes. Try again later.`,
 	});
 }
 

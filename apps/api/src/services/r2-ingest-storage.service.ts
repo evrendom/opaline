@@ -6,6 +6,7 @@ import {
 	GetObjectCommand,
 	HeadObjectCommand,
 	ListMultipartUploadsCommand,
+	ListObjectsV2Command,
 	ListPartsCommand,
 	PutObjectCommand,
 	S3Client,
@@ -105,6 +106,31 @@ export interface R2EvidenceStorageClient extends R2MultipartUploadClient {
 	}) => Promise<void>;
 }
 
+export interface R2ObjectListing {
+	readonly nextContinuationToken: string | null;
+	readonly objects: readonly { key: string; lastModified: Date }[];
+}
+
+/** One page of object keys under a prefix (S3 ListObjectsV2). */
+export interface R2ObjectListingClient {
+	listObjects: (input: {
+		continuationToken?: string;
+		maxKeys?: number;
+		prefix: string;
+		signal?: AbortSignal;
+		startAfter?: string;
+	}) => Promise<R2ObjectListing>;
+}
+
+export interface R2StorageClient
+	extends R2EvidenceStorageClient,
+		R2ObjectListingClient {}
+
+export interface R2ClientOptions {
+	/** Per-request socket timeout; unset keeps the SDK default (none). */
+	readonly requestTimeoutMs?: number;
+}
+
 export function readR2IngestAvailability(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
 	warnIgnoredEndpoint: (
@@ -180,7 +206,8 @@ function warnIgnoredR2Endpoint(reason: IgnoredR2EndpointOverrideReason): void {
 
 export function createR2MultipartUploadClient(
 	configuration: R2IngestConfiguration,
-): R2EvidenceStorageClient {
+	options: R2ClientOptions = {},
+): R2StorageClient {
 	const client = new S3Client({
 		credentials: {
 			accessKeyId: configuration.accessKeyId,
@@ -189,6 +216,14 @@ export function createR2MultipartUploadClient(
 		endpoint: configuration.endpoint,
 		forcePathStyle: configuration.forcePathStyle,
 		region: "auto",
+		...(options.requestTimeoutMs === undefined
+			? {}
+			: {
+					requestHandler: {
+						connectionTimeout: options.requestTimeoutMs,
+						requestTimeout: options.requestTimeoutMs,
+					},
+				}),
 	});
 
 	return {
@@ -321,6 +356,28 @@ export function createR2MultipartUploadClient(
 				if (isNotFoundError(error)) return null;
 				throw error;
 			}
+		},
+		async listObjects(input) {
+			const result = await client.send(
+				new ListObjectsV2Command({
+					Bucket: configuration.bucket,
+					ContinuationToken: input.continuationToken,
+					MaxKeys: input.maxKeys,
+					Prefix: input.prefix,
+					StartAfter: input.startAfter,
+				}),
+				{ abortSignal: input.signal },
+			);
+			return {
+				nextContinuationToken: result.IsTruncated
+					? (result.NextContinuationToken ?? null)
+					: null,
+				objects: (result.Contents ?? []).flatMap((object) =>
+					object.Key && object.LastModified
+						? [{ key: object.Key, lastModified: object.LastModified }]
+						: [],
+				),
+			};
 		},
 		async putObject(input) {
 			await client.send(

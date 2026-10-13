@@ -1,5 +1,14 @@
 import { ORPCError } from "@orpc/server";
+import { sqlClient } from "../../db.js";
 import { orgMiddleware, os } from "../../middleware.js";
+import { LiveSessionStorageError } from "../../services/live-session/live-session-gate.js";
+import { getLiveSessionR2Client } from "../../services/live-session/live-session-r2.js";
+import {
+	listLiveSessions,
+	readLiveSession,
+	readLiveSessionTail,
+} from "../../services/live-session/live-session-read.service.js";
+import { readR2IngestAvailability } from "../../services/r2-ingest-storage.service.js";
 import {
 	getSessionAnalytics,
 	getSessionAnalyticsSummaryComparison,
@@ -44,6 +53,62 @@ const uploadFailures = os.analytics.sessions.uploadFailures
 			input,
 		),
 	);
+
+const liveList = os.analytics.sessions.liveList
+	.use(orgMiddleware)
+	.handler(async ({ context }) => ({
+		sessions: await listLiveSessions(
+			{
+				organizationId: context.organizationId,
+				ownerId: readableSessionOwner(context.sessionReader),
+			},
+			{ database: sqlClient, now: () => new Date() },
+		),
+	}));
+
+/** Readable exactly like the session's detail: by its live session's owner. */
+const liveTail = os.analytics.sessions.liveTail
+	.use(orgMiddleware)
+	.handler(async ({ input, context, signal }) => {
+		const session = await readLiveSession(
+			{
+				organizationId: context.organizationId,
+				readableOwnerId: readableSessionOwner(context.sessionReader),
+				sessionId: input.sessionId,
+				source: input.source,
+			},
+			{ database: sqlClient },
+		);
+		if (!session) return { session: null, streams: [], uploaded: false };
+		requireSessionDetailOwnerAccess(session.userId, context.sessionReader);
+		const availability = readR2IngestAvailability();
+		if (!availability.enabled) {
+			throw new ORPCError("SERVICE_UNAVAILABLE", {
+				message: "Live session storage is unavailable.",
+			});
+		}
+		try {
+			return await readLiveSessionTail(
+				{
+					cursor: input.cursor,
+					organizationId: context.organizationId,
+					session,
+				},
+				{
+					database: sqlClient,
+					r2: getLiveSessionR2Client(availability.configuration),
+					signal,
+				},
+			);
+		} catch (error) {
+			if (error instanceof LiveSessionStorageError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					message: "Live session storage is unavailable.",
+				});
+			}
+			throw error;
+		}
+	});
 
 const list = os.analytics.sessions.list
 	.use(orgMiddleware)
@@ -298,6 +363,8 @@ export const sessionsRouter = os.analytics.sessions.router({
 	detailTurn,
 	detailWindow,
 	list,
+	liveList,
+	liveTail,
 	filterCatalog,
 	summaryComparison,
 	dimensionAnalysis,

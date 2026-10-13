@@ -116,12 +116,16 @@ afterAll(async () => {
 });
 
 describe("analysis-linked uploads", () => {
-	test("authStatus advertises analysis-linked uploads and transcript slimming", async () => {
+	test("authStatus advertises analysis-linked uploads, transcript slimming and live sessions", async () => {
 		expect(await clientFor(authorId).cli.authStatus()).toEqual({
 			id: authorId,
 			email: `${authorId}@example.com`,
 			name: "Linked upload test",
-			capabilities: { analysisLinkedUploads: true, transcriptSlimming: true },
+			capabilities: {
+				analysisLinkedUploads: true,
+				liveSessions: true,
+				transcriptSlimming: true,
+			},
 		});
 	});
 

@@ -28,6 +28,18 @@ import {
 	SelectOrganizationPlanOutputSchema,
 } from "./billing.js";
 import { CliUpdateStatusSchema } from "./cli-version.js";
+import {
+	LiveSessionAppendInputSchema,
+	LiveSessionAppendOutputSchema,
+	LiveSessionErrors,
+	LiveSessionStateInputSchema,
+	LiveSessionStateOutputSchema,
+} from "./live-session.js";
+import {
+	LiveSessionListOutputSchema,
+	LiveSessionTailInputSchema,
+	LiveSessionTailOutputSchema,
+} from "./live-session-view.js";
 import { repositorySettingsContract } from "./repository-settings.js";
 import {
 	ReportUploadFailuresInputSchema,
@@ -263,6 +275,8 @@ export * from "./avatar.js";
 export * from "./cli-version.js";
 export * from "./device-flow.js";
 export * from "./github-repository-evidence.js";
+export * from "./live-session.js";
+export * from "./live-session-view.js";
 export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
 export * from "./plugin-tool-names.js";
@@ -516,6 +530,12 @@ export const CliUploadCapabilitiesSchema = z.object({
 	 * as a shrink. CLIs slim only when this is advertised.
 	 */
 	transcriptSlimming: z.literal(true).optional(),
+	/**
+	 * `liveSession.state` and `liveSession.append` accept the transcript lines
+	 * of a running session. Omitted while the server's live-session kill
+	 * switch is on.
+	 */
+	liveSessions: z.literal(true).optional(),
 });
 
 export const CliUserSchema = z.object({
@@ -923,6 +943,12 @@ const IngestSessionErrors = {
 	},
 } as const;
 
+const LiveSessionContractErrors = {
+	...LiveSessionErrors,
+	[SESSION_OWNERSHIP_CONFLICT_CODE]:
+		IngestSessionErrors[SESSION_OWNERSHIP_CONFLICT_CODE],
+} as const;
+
 export const contract = {
 	analysis: {
 		...analysisContract,
@@ -985,6 +1011,20 @@ export const contract = {
 			.output(RepositoryEvidenceCommitOutputSchema),
 	},
 	repositorySettings: repositorySettingsContract,
+	/**
+	 * Live transcript lines of running Claude Code sessions (CLI → API). Not
+	 * under `ingest`: Vercel routes `/rpc/ingest/*` to the ingest function.
+	 */
+	liveSession: {
+		state: oc
+			.input(LiveSessionStateInputSchema)
+			.output(LiveSessionStateOutputSchema)
+			.errors(LiveSessionContractErrors),
+		append: oc
+			.input(LiveSessionAppendInputSchema)
+			.output(LiveSessionAppendOutputSchema)
+			.errors(LiveSessionContractErrors),
+	},
 	health: oc.output(HealthSchema),
 	me: oc.output(UserSchema),
 	profile: {
@@ -1128,6 +1168,12 @@ export const contract = {
 			list: oc
 				.input(SessionListInputSchema)
 				.output(z.array(SessionOverviewAnalyticsSchema)),
+			/** Live sessions of the active workspace the caller may read (last 24 hours). */
+			liveList: oc.output(LiveSessionListOutputSchema),
+			/** New lines of a live session's transcripts since the cursor, or their tail. */
+			liveTail: oc
+				.input(LiveSessionTailInputSchema)
+				.output(LiveSessionTailOutputSchema),
 			summaryComparison: oc
 				.input(DaysInputSchema)
 				.output(SessionAnalyticsSummaryComparisonSchema),

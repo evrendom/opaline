@@ -18,12 +18,17 @@ import { purgeAnalysisLogs } from "./analysis-log/config.js";
 import { purgeFindingImpact } from "./analysis-log/finding-impact-clickhouse.js";
 import { purgeGitHubObjectIntents } from "./github-evidence-object-fence.service.js";
 import {
+	type LiveSessionR2Cleaner,
+	purgeLiveSessionObjectsOfOrganization,
+} from "./live-session/live-session-cleanup.service.js";
+import {
 	deleteOrgSessions,
 	deleteUserSessions,
 } from "./org-session.service.js";
 import {
 	createR2MultipartUploadClient,
 	type R2MultipartUploadClient,
+	type R2StorageClient,
 	readR2IngestAvailability,
 } from "./r2-ingest-storage.service.js";
 import {
@@ -160,6 +165,8 @@ export interface StartClickHousePurgeWorkerOptions {
 	}>;
 	resend: ResendConfig;
 	r2?: EvidencePurgeR2Client;
+	/** Lists and deletes a purged workspace's live session objects. */
+	liveSessionR2?: LiveSessionR2Cleaner;
 	sqlClient?: postgres.Sql;
 }
 
@@ -258,6 +265,7 @@ async function snapshotR2PurgeObjects(
 	purgeJobId: string,
 	transaction: postgres.TransactionSql,
 ): Promise<void> {
+	await snapshotLiveSessionPurgeObjects(target, purgeJobId, transaction);
 	if (target.targetType === "account") {
 		await transaction.unsafe(
 			`
@@ -337,6 +345,44 @@ async function snapshotR2PurgeObjects(
 				 jsonb_array_elements(collection.metadata_chunks) chunk
 				WHERE collection.organization_id = $2
 			) evidence_objects
+			ON CONFLICT (purge_job_id, object_key) DO NOTHING
+		`,
+		[purgeJobId, target.targetId],
+	);
+}
+
+/**
+ * Live session chunk objects of the account's or workspace's live sessions;
+ * their rows go with the deletion's foreign-key cascade. Locking the sessions
+ * first waits for appends in flight (each holds its session's row lock across
+ * its R2 write), so their chunks are captured. A new session's first append
+ * holds a key-share lock on the organization and user rows, which the
+ * deletion locks before it enqueues, so it either commits before this
+ * snapshot or fails its foreign key after the deletion.
+ */
+async function snapshotLiveSessionPurgeObjects(
+	target: ClickHousePurgeTarget,
+	purgeJobId: string,
+	transaction: postgres.TransactionSql,
+): Promise<void> {
+	const ownerColumn =
+		target.targetType === "account" ? "user_id" : "organization_id";
+	await transaction.unsafe(
+		`SELECT 1 FROM live_session WHERE ${ownerColumn} = $1
+		 ORDER BY organization_id, source, session_id
+		 FOR UPDATE`,
+		[target.targetId],
+	);
+	await transaction.unsafe(
+		`
+			INSERT INTO clickhouse_purge_object (purge_job_id, object_key)
+			SELECT $1, chunk.object_key
+			FROM live_session_chunk chunk
+			INNER JOIN live_session live
+				ON live.organization_id = chunk.organization_id
+				AND live.source = chunk.source
+				AND live.session_id = chunk.session_id
+			WHERE live.${ownerColumn} = $2
 			ON CONFLICT (purge_job_id, object_key) DO NOTHING
 		`,
 		[purgeJobId, target.targetId],
@@ -556,6 +602,7 @@ function createClickHousePurgeProcessorEnv(
 	options: StartClickHousePurgeWorkerOptions,
 ): ClickHousePurgeProcessorEnv {
 	const r2 = options.r2 ?? createOptionalPurgeR2Client();
+	const liveSessionR2 = options.liveSessionR2 ?? createOptionalPurgeR2Client();
 	const database = options.sqlClient ?? sqlClient;
 	return {
 		executePurge: async (target, pass) => {
@@ -579,6 +626,14 @@ function createClickHousePurgeProcessorEnv(
 			await purgeRunQuestionJobs(database, target);
 			if (pass)
 				await purgeRepositoryEvidenceObjects(target, pass, database, r2);
+			// Live session objects by the workspace's key prefix, whether or not
+			// their rows committed (an account's are in the snapshot). Without R2
+			// no live session can have been stored.
+			if (target.targetType === "organization" && liveSessionR2)
+				await purgeLiveSessionObjectsOfOrganization(
+					target.targetId,
+					liveSessionR2,
+				);
 		},
 		leaseDurationMs: DEFAULT_LEASE_DURATION_MS,
 		now: () => new Date(),
@@ -593,7 +648,7 @@ function createClickHousePurgeProcessorEnv(
 	};
 }
 
-function createOptionalPurgeR2Client(): EvidencePurgeR2Client | undefined {
+function createOptionalPurgeR2Client(): R2StorageClient | undefined {
 	const availability = readR2IngestAvailability();
 	return availability.enabled
 		? createR2MultipartUploadClient(availability.configuration)

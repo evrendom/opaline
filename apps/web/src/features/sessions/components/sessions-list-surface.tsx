@@ -1,5 +1,5 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { type Ref, useState } from "react";
+import { type ReactNode, type Ref, useState } from "react";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
 import { useSessionIdSearch } from "@/features/sessions/use-session-id-search";
@@ -9,6 +9,8 @@ import { SessionsOverviewTable } from "./sessions-overview-table";
 
 type SessionsListSurfaceProps = {
 	activeSessionId: string | null;
+	/** Shown above the list, such as the sessions running right now. */
+	banner?: ReactNode;
 	canOpenSession: (session: SessionAnalytics) => boolean;
 	data: SessionsPageData;
 	getSessionHref?: (session: SessionAnalytics) => string;
@@ -20,6 +22,7 @@ type SessionsListSurfaceProps = {
 
 export function SessionsListSurface({
 	activeSessionId,
+	banner,
 	canOpenSession,
 	data,
 	getSessionHref,
@@ -74,6 +77,7 @@ export function SessionsListSurface({
 						layout === "workspace" && "min-h-0 flex-1 overflow-hidden",
 					)}
 				>
+					{banner}
 					{data.uploadFailuresError ? (
 						<p className="px-4 py-3 text-base text-(--dashboardy-muted) sm:text-sm">
 							Some upload errors couldn’t be loaded.{" "}

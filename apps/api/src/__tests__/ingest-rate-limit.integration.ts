@@ -330,7 +330,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 		expect(await countUserCounters(userId)).toBe(0);
 	});
 
-	test("enforces one unique counter for each user subject", async () => {
+	test("enforces one unique counter for each user subject and budget", async () => {
 		const userId = await step("create user", createCounterUser("user-unique"));
 		const subject = { id: userId, kind: "user" } as const;
 		await step(
@@ -342,6 +342,19 @@ describe("atomic Postgres ingest rate limiting", () => {
 			checkIngestRateLimit(subject, 1, DEFAULT_TEST_CONFIG, secondInstance),
 		);
 		expect(await step("count counters", countUserCounters(userId))).toBe(1);
+		// Live session appends charge the same user's separate budget.
+		await step(
+			"live session budget check",
+			checkIngestRateLimit(
+				{ id: userId, kind: "live_session_user" },
+				1,
+				DEFAULT_TEST_CONFIG,
+				firstInstance,
+			),
+		);
+		expect(await step("count budget counters", countUserCounters(userId))).toBe(
+			2,
+		);
 
 		const duplicateClient = postgres(connectionString, FAIL_FAST_OPTIONS);
 		try {
@@ -360,7 +373,7 @@ describe("atomic Postgres ingest rate limiting", () => {
 				last_byte_allowed
 			)
 			VALUES (
-				${`user_duplicate:${userId}`},
+				${`user:${userId}`},
 				${userId},
 				CURRENT_TIMESTAMP,
 				0,

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type {
-	R2EvidenceStorageClient,
+	R2ObjectListing,
 	R2ObjectMetadata,
+	R2StorageClient,
 } from "../../services/r2-ingest-storage.service.js";
 
 interface FakeMultipartUpload {
@@ -13,6 +14,7 @@ interface FakeMultipartUpload {
 
 interface FakeObject {
 	readonly bytes: Uint8Array;
+	readonly lastModified?: Date;
 	readonly metadata: Readonly<Record<string, string>>;
 }
 
@@ -21,10 +23,11 @@ export class NoSuchUploadError extends Error {
 }
 
 /** In-memory R2 that models multipart uploads, completion, and deletion. */
-export class FakeEvidenceR2 implements R2EvidenceStorageClient {
+export class FakeEvidenceR2 implements R2StorageClient {
 	readonly abortedUploadIds: string[] = [];
 	readonly deletedKeys: string[] = [];
 	readonly putKeys: string[] = [];
+	readonly readKeys: string[] = [];
 	putFailure: Error | null = null;
 	readonly objects = new Map<string, FakeObject>();
 	readonly uploads = new Map<string, FakeMultipartUpload>();
@@ -87,6 +90,7 @@ export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 	}
 
 	async getObject(objectKey: string): Promise<Uint8Array> {
+		this.readKeys.push(objectKey);
 		const object = this.objects.get(objectKey);
 		if (!object) throw new Error(`Missing object ${objectKey}`);
 		return object.bytes;
@@ -128,8 +132,32 @@ export class FakeEvidenceR2 implements R2EvidenceStorageClient {
 		this.putKeys.push(input.objectKey);
 		this.objects.set(input.objectKey, {
 			bytes: input.body,
+			lastModified: new Date(),
 			metadata: input.metadata,
 		});
+	}
+
+	/** Keys in byte order, like S3; objects without a write time read as new. */
+	async listObjects(input: {
+		continuationToken?: string;
+		maxKeys?: number;
+		prefix: string;
+		startAfter?: string;
+	}): Promise<R2ObjectListing> {
+		const after = input.continuationToken ?? input.startAfter ?? "";
+		const keys = [...this.objects.keys()]
+			.filter((key) => key.startsWith(input.prefix) && key > after)
+			.sort();
+		const page = keys.slice(0, input.maxKeys ?? 1_000);
+		const last = page.at(-1);
+		return {
+			nextContinuationToken:
+				last !== undefined && keys.length > page.length ? last : null,
+			objects: page.map((key) => ({
+				key,
+				lastModified: this.objects.get(key)?.lastModified ?? new Date(),
+			})),
+		};
 	}
 
 	async presignUploadPart(input: {

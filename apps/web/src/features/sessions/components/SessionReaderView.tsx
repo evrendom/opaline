@@ -4,6 +4,12 @@ import { Button } from "@/app/ui/button";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
+import {
+	useLiveSessionState,
+	useLiveSessionTailPolling,
+} from "../use-live-sessions";
+import { LiveSessionErrorBoundary } from "./live-session-error-boundary";
+import { LiveSessionSlot } from "./live-session-panel";
 import { SessionContextFields } from "./session-context-chips";
 import {
 	fetchSessionDetailInitial,
@@ -16,6 +22,7 @@ import {
 } from "./session-detail-fast-query";
 import { SessionDetailHeader } from "./session-detail-header";
 import { buildSessionDetailOverviewViewModel } from "./session-detail-overview-model";
+import { hasSessionDetailErrorCode } from "./session-detail-response";
 import {
 	canRetrySessionDetailError,
 	getSessionDetailErrorState,
@@ -28,6 +35,9 @@ import { SessionReaderSkeleton } from "./session-reader-skeleton";
  * rail of session facts and per-turn status.
  * It reads the session-detail queries the repo and skill pages' embedded
  * session view reads, so the two share one cache.
+ * A session that is still running shows its live lines: in place of the
+ * reader until the session is uploaded, and above it while an uploaded
+ * session runs again.
  */
 export function SessionReaderView({
 	navigation,
@@ -43,6 +53,11 @@ export function SessionReaderView({
 	const queryClient = useQueryClient();
 	const shellHeaderPortal = useShellHeaderPortal();
 	const { userMap, avatarMap } = useUserMap();
+	// Live lines are extra: without them, or when they fail, the page is as
+	// before. The reader re-renders only when the live state changes; the
+	// live slots follow the lines themselves.
+	useLiveSessionTailPolling(sessionId);
+	const liveState = useLiveSessionState(sessionId);
 	const initialQuery = useQuery({
 		enabled: sessionId.length > 0,
 		queryFn: ({ signal }) => fetchSessionDetailInitial(sessionId, signal),
@@ -55,6 +70,9 @@ export function SessionReaderView({
 		? buildSessionDetailOverviewViewModel(overview, userMap)
 		: undefined;
 	const errorState = getSessionDetailErrorState(initialQuery.error);
+	const liveInsteadOfMissing =
+		liveState !== "none" &&
+		hasSessionDetailErrorCode(initialQuery.error, "NOT_FOUND");
 	const revision = overview?.revision;
 	const { refetch } = initialQuery;
 
@@ -81,7 +99,7 @@ export function SessionReaderView({
 				headerRef={() => undefined}
 				hideMetrics
 				isLoading={initialQuery.isLoading}
-				navigation={navigation}
+				navigation={liveInsteadOfMissing ? undefined : navigation}
 				portalHost={shellHeaderPortal}
 				position={position}
 				sessionId={sessionId}
@@ -89,42 +107,77 @@ export function SessionReaderView({
 				totalSessions={totalSessions}
 				viewModel={viewModel}
 			/>
-			<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-				{initialQuery.isLoading ? <SessionReaderSkeleton /> : null}
-				{!initialQuery.isLoading && errorState ? (
-					<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-						<p className="text-lg font-semibold">{errorState.title}</p>
-						{errorState.description ? (
-							<p className="text-sm text-muted-foreground">
-								{errorState.description}
-							</p>
-						) : null}
-						{canRetrySessionDetailError(initialQuery.error) ? (
-							<Button
-								className="mt-3"
-								disabled={initialQuery.isFetching}
-								onClick={() => void refetch()}
-								size="sm"
-								variant="outline"
-							>
-								{initialQuery.isFetching ? "Trying again…" : "Try again"}
-							</Button>
-						) : null}
-					</div>
+			<div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+				{liveState !== "none" &&
+				liveState !== "ended" &&
+				overview &&
+				!errorState ? (
+					<LiveSessionErrorBoundary>
+						<LiveSessionSlot
+							avatarMap={avatarMap}
+							layout="inline"
+							sessionId={sessionId}
+							userMap={userMap}
+						/>
+					</LiveSessionErrorBoundary>
 				) : null}
-				{overview && viewModel && !errorState ? (
-					<SessionReaderContent
-						key={`${sessionId}:${overview.revision}`}
-						contextChips={<SessionContextFields viewModel={viewModel} />}
-						initialWindow={initialQuery.data?.initialDetail.window}
-						model={viewModel.displayModel ?? null}
-						onStaleRevision={handleStaleRevision}
-						overview={overview}
-						userImageUrl={avatarMap[viewModel.safeUserId]}
-						userLabel={viewModel.safeUserDisplayName}
-					/>
-				) : null}
+				<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+					{initialQuery.isLoading ? <SessionReaderSkeleton /> : null}
+					{!initialQuery.isLoading && liveInsteadOfMissing ? (
+						<LiveSessionErrorBoundary
+							fallback={<SessionReaderMessage title="Session Not Found" />}
+						>
+							<LiveSessionSlot
+								avatarMap={avatarMap}
+								layout="page"
+								sessionId={sessionId}
+								userMap={userMap}
+							/>
+						</LiveSessionErrorBoundary>
+					) : null}
+					{!initialQuery.isLoading && errorState && !liveInsteadOfMissing ? (
+						<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+							<p className="text-lg font-semibold">{errorState.title}</p>
+							{errorState.description ? (
+								<p className="text-sm text-muted-foreground">
+									{errorState.description}
+								</p>
+							) : null}
+							{canRetrySessionDetailError(initialQuery.error) ? (
+								<Button
+									className="mt-3"
+									disabled={initialQuery.isFetching}
+									onClick={() => void refetch()}
+									size="sm"
+									variant="outline"
+								>
+									{initialQuery.isFetching ? "Trying again…" : "Try again"}
+								</Button>
+							) : null}
+						</div>
+					) : null}
+					{overview && viewModel && !errorState ? (
+						<SessionReaderContent
+							key={`${sessionId}:${overview.revision}`}
+							contextChips={<SessionContextFields viewModel={viewModel} />}
+							initialWindow={initialQuery.data?.initialDetail.window}
+							model={viewModel.displayModel ?? null}
+							onStaleRevision={handleStaleRevision}
+							overview={overview}
+							userImageUrl={avatarMap[viewModel.safeUserId]}
+							userLabel={viewModel.safeUserDisplayName}
+						/>
+					) : null}
+				</div>
 			</div>
+		</div>
+	);
+}
+
+function SessionReaderMessage({ title }: { title: string }) {
+	return (
+		<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+			<p className="text-lg font-semibold">{title}</p>
 		</div>
 	);
 }

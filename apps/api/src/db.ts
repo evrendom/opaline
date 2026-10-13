@@ -28,3 +28,11 @@ export const ingestProcessingSqlClient = postgres(requiredConnectionString, {
 	...postgresClientOptions,
 	max: 4,
 });
+
+// Live session appends and state reads. Their own small pool keeps a burst
+// of them from starving dashboard and ingest queries of connections; appends
+// write R2 before they take a connection and are gated below its size.
+export const liveSessionSqlClient = postgres(requiredConnectionString, {
+	...postgresClientOptions,
+	max: 5,
+});

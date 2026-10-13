@@ -3,6 +3,7 @@ import {
 	bigint,
 	boolean,
 	check,
+	index,
 	pgTable,
 	text,
 	timestamp,
@@ -11,18 +12,18 @@ import { apikey, user } from "./auth-schema.js";
 
 // Better Auth owns one request counter/window on apikey. Ingest needs separate
 // request and byte windows, so those plugin columns cannot represent this cap.
+// `limiter_key` names the budget (`<subject kind>:<subject id>`): a user has
+// one row per budget (session ingest, live session appends).
 export const ingestRateLimitCounter = pgTable(
 	"ingest_rate_limit_counter",
 	{
 		limiterKey: text("limiter_key").primaryKey(),
 		// Dormant until a future per-key secondary throttle is introduced. The
-		// authoritative ingest limiter writes user-subject rows only.
+		// authoritative limiters write user-subject rows only.
 		apiKeyId: text("api_key_id")
 			.unique()
 			.references(() => apikey.id, { onDelete: "cascade" }),
-		userId: text("user_id")
-			.unique()
-			.references(() => user.id, { onDelete: "cascade" }),
+		userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
 		requestWindowStartedAt: timestamp("request_window_started_at", {
 			withTimezone: true,
 			mode: "date",
@@ -43,6 +44,7 @@ export const ingestRateLimitCounter = pgTable(
 			.notNull(),
 	},
 	(table) => [
+		index("ingest_rate_limit_counter_user_id_idx").on(table.userId),
 		check(
 			"ingest_rate_limit_counter_subject_check",
 			sql`(
