@@ -15,7 +15,7 @@ Every member sees every member's sessions in the workspace, personal setup inclu
 
 No tool changes or deletes sessions. `sql` (and `find`/`read`) record their calls in a private draft of the current answer, which only `save_answer` publishes; `share_answer` shares a saved answer. Hosts may ask the user once to allow these; "always allow" is fine.
 
-**Call `schema` first.** Before any other analysis tool, call `schema` once with no arguments. If it answers that the retro tools are not enabled for this workspace yet, do not call `sql`, `search`, `run`, `estimate_questions` or `run_questions` in this conversation: follow "Classic flow (find and read)" below instead. Otherwise follow the retro playbook.
+**Call `schema` first.** Before any other analysis tool, call `schema` once with no arguments. If `schema` is not among your tools, or it answers that the retro tools are not enabled for this workspace yet, do not call `sql`, `search`, `run`, `estimate_questions` or `run_questions` in this conversation: follow "Classic flow (find and read)" below instead. Otherwise follow the retro playbook.
 
 ## Tools
 
@@ -216,7 +216,7 @@ Read a few runs after the fix to check the cause is gone, not only the count. Fo
 
 ## Classic flow (find and read)
 
-Where `schema` says the retro tools are not enabled for this workspace, answer with `find` and `read`. `answers`, `save_answer`, `share_answer`, `get_dashboard` and `list_workspaces` work as above; findings name the `find` and `read` steps from their trace lines.
+Where `schema` is not among your tools or says the retro tools are not enabled for this workspace, answer with `find` and `read`. `save_answer`, `share_answer`, `get_dashboard` and `list_workspaces` work as above; for earlier answers use `answers`, or where it is not among your tools its older names `search_answers` (search), `get_answer` (open) and `get_answer_evidence` (one stored result). Findings name the `find` and `read` steps from their trace lines.
 
 **`find`: where something happened.** Cheap and deterministic: call it before `read`. It says *where*, never *why*. `source` picks what to look at:
 
