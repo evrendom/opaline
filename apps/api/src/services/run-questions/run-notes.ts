@@ -2,6 +2,7 @@ import { redactReturnedValue } from "@rudel/secret-filter";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { readAnalysis } from "../analysis/read.service.js";
+import { buildPromptHeadStatement } from "../analysis/read-queries.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	chunkByParamBytes,
@@ -126,7 +127,8 @@ export interface RunState {
  * What the provider reads about the run, from the transcript revision the job
  * names: for a provider that reads whole runs, the run's full text (`read` at
  * turn depth, secrets redacted) when it fits the provider's cap, otherwise
- * (or for a provider that reads notes) the compact note. Null when the
+ * (or for a provider that reads notes) the compact note; either way followed
+ * by the opening of the next prompt in the run's stream. Null when the
  * session's committed transcript is another revision (uploaded again since it
  * was asked about), checked before and after reading so a state never mixes
  * two revisions. A session without committed transcript records gets a note
@@ -189,6 +191,20 @@ export async function buildRunState(
 			input: "note",
 		};
 	}
+	// The next prompt, which "asked again" and "said done but was not" turn on:
+	// without it a provider can only guess how the run was received. Only from
+	// the session's records; without them nothing is known about what followed.
+	if (generation) {
+		const next = await nextPromptHead(executor, scope, generation, run);
+		state = {
+			...state,
+			text: `${state.text}\n\nnext prompt:\n${
+				next === null
+					? "(none: nothing followed this run in its stream)"
+					: String(redactReturnedValue(next))
+			}`,
+		};
+	}
 	const after = await committedGeneration(executor, scope, run);
 	if (
 		after?.revision !== generation?.revision ||
@@ -243,6 +259,37 @@ async function committedGeneration(
 		buildCommittedGenerationsStatement(scope, [run.sessionId]),
 	);
 	return generation;
+}
+
+/** Of the next prompt, at most this much is sent with a run. */
+export const NEXT_PROMPT_HEAD_CHARS = 600;
+
+const PromptHeadSchema = z.object({ text: z.string() });
+
+/** The opening of the prompt after the run in its stream, or null when none followed. */
+async function nextPromptHead(
+	executor: ClickHouseExecutor,
+	scope: { organizationId: string; userId: string },
+	generation: SessionGeneration,
+	run: RunKey,
+): Promise<string | null> {
+	const [row] = await query(
+		executor,
+		PromptHeadSchema,
+		buildPromptHeadStatement(
+			{
+				scope,
+				generation,
+				ref: {
+					sessionId: run.sessionId,
+					agentId: run.agentId,
+					turn: run.turn + 1,
+				},
+			},
+			NEXT_PROMPT_HEAD_CHARS,
+		),
+	);
+	return row ? row.text : null;
 }
 
 /** Tool calls of the run in the generation, by tool name, most used first. */
