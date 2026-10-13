@@ -39,6 +39,7 @@ import {
 } from "../services/analysis/find.service.js";
 import type { GitHubSource } from "../services/analysis/git-links.js";
 import { readAnalysis } from "../services/analysis/read.service.js";
+import { RETRO_TOOLS_OFF } from "../services/analysis/retro-tools.js";
 import { toolGroupSql } from "../services/analysis/tool-groups.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
 import {
@@ -1865,6 +1866,80 @@ test("where the log is off, history fails with an agent-actionable message and t
 				authSession: { user, session },
 			}),
 		).toBe(ANALYSIS_HISTORY_OFF);
+	}
+});
+
+test("a workspace without the retro tools is refused schema, sql, search, run and run questions, as procedures and MCP tools; find still answers", async () => {
+	assert(userId);
+	const user = {
+		id: userId,
+		name: "Analysis integration",
+		email: `analysis-admin-${runId}@example.com`,
+		emailVerified: false,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	};
+	const session = {
+		id: crypto.randomUUID(),
+		token: bearerToken,
+		userId,
+		expiresAt: new Date(Date.now() + 60_000),
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		activeOrganizationId: userId,
+	};
+	const client = createRouterClient(router, {
+		context: {
+			user,
+			session,
+			apiKeyId: null,
+			authFailure: null,
+			ingestOperatorAuthorized: false,
+			requestId: crypto.randomUUID(),
+			publicLookupSource: "test",
+		},
+	});
+	const context = {
+		userId,
+		workspace: { id: userId, slug: "analysis-retro-off" },
+		authSession: { user, session },
+	};
+	const saved = process.env.RETRO_TOOLS_WORKSPACES;
+	process.env.RETRO_TOOLS_WORKSPACES = otherOrganizationId;
+	try {
+		const runs = "SELECT session_id, agent_id, turn_idx FROM runs LIMIT 1";
+		for (const call of [
+			() => client.analysis.schema({}),
+			() => client.analysis.sql({ query: "SELECT 1 FROM runs", title: "x" }),
+			() => client.analysis.search({ text: "flaky login", mode: "exact" }),
+			() => client.analysis.run({ id: "s:main:1" }),
+			() => client.analysis.estimateQuestions({ questions: ["rq_1"], runs }),
+			() =>
+				client.analysis.runQuestions({
+					questions: ["rq_1"],
+					runs,
+					estimate: "token",
+				}),
+		])
+			await expect(call()).rejects.toThrow(RETRO_TOOLS_OFF);
+		const schemaTool = MCP_TOOLS.find((tool) => tool.name === "schema");
+		assert(schemaTool);
+		await expect(schemaTool.run(client, {}, context)).rejects.toThrow(
+			RETRO_TOOLS_OFF,
+		);
+		expect(
+			AnalysisFindOutputSchema.parse(
+				await client.analysis.find({ source: "runs", from: day, to: day }),
+			).source,
+		).toBe("runs");
+
+		process.env.RETRO_TOOLS_WORKSPACES = `${otherOrganizationId},${userId}`;
+		expect(await client.analysis.schema({})).toMatchObject({
+			level: "views",
+		});
+	} finally {
+		if (saved === undefined) delete process.env.RETRO_TOOLS_WORKSPACES;
+		else process.env.RETRO_TOOLS_WORKSPACES = saved;
 	}
 });
 

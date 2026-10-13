@@ -69,7 +69,7 @@ export function transcriptEmbedder(): TranscriptEmbedder | null {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	if (!apiKey) {
 		reportOnce(
-			"OPENAI_API_KEY is not set; transcript text of paid and listed workspaces is chunked but not embedded",
+			"OPENAI_API_KEY is not set; transcript text of indexed workspaces is chunked but not embedded",
 		);
 		return null;
 	}
@@ -84,6 +84,16 @@ export function transcriptEmbedder(): TranscriptEmbedder | null {
  */
 export function embedsWorkspace(workspaceId: string): boolean {
 	return listsWorkspace("TRANSCRIPT_EMBEDDINGS_WORKSPACES", workspaceId, false);
+}
+
+/**
+ * Whether workspaces on a paid plan (subscription active or past due) are
+ * indexed for search without being listed: only when
+ * `TRANSCRIPT_EMBEDDINGS_PAID_PLANS` is exactly `true`. Off by default, so
+ * only `TRANSCRIPT_EMBEDDINGS_WORKSPACES` is indexed.
+ */
+export function embedsPaidPlans(): boolean {
+	return process.env.TRANSCRIPT_EMBEDDINGS_PAID_PLANS === "true";
 }
 
 /**

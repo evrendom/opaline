@@ -7,6 +7,7 @@ import {
 	runQuestions,
 } from "../../services/run-questions/run-questions.service.js";
 import type { SessionReader } from "../../services/session-visibility.js";
+import { requireRetroTools } from "./retro-tools.js";
 import { sqlError } from "./sql-error.js";
 
 /**
@@ -28,6 +29,10 @@ export function createRunQuestionProcedures(
 	return {
 		estimateQuestions: os.analysis.estimateQuestions
 			.use(orgMiddleware)
+			.use(({ context, next }) => {
+				requireRetroTools(context);
+				return next();
+			})
 			.use(({ context, next, signal }) =>
 				analysisLimiter.run(context.user.id, async () => next(), signal),
 			)
@@ -42,6 +47,10 @@ export function createRunQuestionProcedures(
 			}),
 		runQuestions: os.analysis.runQuestions
 			.use(orgMiddleware)
+			.use(({ context, next }) => {
+				requireRetroTools(context);
+				return next();
+			})
 			.use(({ context, next, signal }) =>
 				analysisLimiter.run(context.user.id, async () => next(), signal),
 			)

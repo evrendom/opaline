@@ -75,6 +75,7 @@ import {
 	searchTranscripts,
 } from "../../services/transcript-search/search.js";
 import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-access.js";
+import { requireRetroTools } from "./retro-tools.js";
 import { createRunQuestionProcedures } from "./run-questions.js";
 import { sqlError } from "./sql-error.js";
 
@@ -225,6 +226,10 @@ export function createAnalysisRouter(
 
 	const run = os.analysis.run
 		.use(orgMiddleware)
+		.use(({ context, next }) => {
+			requireRetroTools(context);
+			return next();
+		})
 		// One slot per call, like read: the MCP tool calls this procedure too.
 		.use(({ context, next, signal }) =>
 			analysisLimiter.run(context.user.id, async () => next(), signal),
@@ -253,6 +258,10 @@ export function createAnalysisRouter(
 
 	const schema = os.analysis.schema
 		.use(orgMiddleware)
+		.use(({ context, next }) => {
+			requireRetroTools(context);
+			return next();
+		})
 		.use(({ context, next, signal }) =>
 			analysisLimiter.run(context.user.id, async () => next(), signal),
 		)
@@ -275,6 +284,10 @@ export function createAnalysisRouter(
 
 	const sql = os.analysis.sql
 		.use(orgMiddleware)
+		.use(({ context, next }) => {
+			requireRetroTools(context);
+			return next();
+		})
 		// One slot per call, like find and read: the MCP tool calls this too.
 		.use(({ context, next, signal }) =>
 			analysisLimiter.run(context.user.id, async () => next(), signal),
@@ -314,6 +327,10 @@ export function createAnalysisRouter(
 
 	const search = os.analysis.search
 		.use(orgMiddleware)
+		.use(({ context, next }) => {
+			requireRetroTools(context);
+			return next();
+		})
 		// One slot per call, like sql: the MCP tool calls this too.
 		.use(({ context, next, signal }) =>
 			analysisLimiter.run(context.user.id, async () => next(), signal),

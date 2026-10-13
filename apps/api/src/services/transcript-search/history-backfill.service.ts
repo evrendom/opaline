@@ -13,7 +13,7 @@ import type {
 } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
-import { SEARCH_PAID_PLANS, type SearchAccess } from "./access.js";
+import type { SearchAccess } from "./access.js";
 import { CHUNK_MAX_CHARS, CHUNK_OVERLAP_CHARS } from "./chunks.js";
 import type { TranscriptEmbedder } from "./config.js";
 import type { EmbeddingQuota } from "./quota.js";
@@ -29,7 +29,8 @@ import { TRANSCRIPT_CHUNK_HITS_TABLE } from "./tables.js";
  * sessions uploaded before search indexing existed searchable, through the
  * same pass an upload runs (`indexSessionText`: secret filter, chunking,
  * deduplication, the workspace's OpenAI quota, purge fences), and only for
- * the workspaces uploads are indexed for (paid or listed, `access.ts`).
+ * the workspaces uploads are indexed for (listed, or paid where paid plans
+ * are on: `access.ts`).
  *
  * - Preview by default: it reads ClickHouse and Postgres and reports the
  *   sessions, their estimated tokens and cost; it never calls OpenAI.
@@ -128,7 +129,7 @@ export interface TranscriptSearchBackfillExecuteEnv
 
 interface TranscriptSearchBackfillSummary {
 	organizationId: string | null;
-	/** Workspaces in scope that are neither paid nor listed: not indexed. */
+	/** Workspaces in scope search does not index (`access.ts`). */
 	workspacesNotIndexed: number;
 	/** Sessions the selection found. */
 	candidates: number;
@@ -518,8 +519,8 @@ async function select(
 	if (indexed.length === 0) {
 		summary.message =
 			options.organizationId === undefined
-				? "No workspace is indexed for search: none is paid or listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES."
-				: `${SEARCH_PAID_PLANS}, nor is it listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES.`;
+				? "No workspace is indexed for search: none is listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES, or paid with TRANSCRIPT_EMBEDDINGS_PAID_PLANS=true."
+				: `${env.access.notIndexed}, and TRANSCRIPT_EMBEDDINGS_WORKSPACES does not list it.`;
 		return { rows: [], full: false, summary };
 	}
 	const rows = z.array(CandidateRowSchema).parse(

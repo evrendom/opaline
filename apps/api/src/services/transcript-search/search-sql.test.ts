@@ -110,10 +110,13 @@ function environment(
 		tokens: options.quotaTokens ?? 1_000,
 		windowMs: 86_400_000,
 	});
-	const access = createSearchAccess({
-		subscriptionStatus: async (workspaceId) =>
-			(options.paid ?? ["ws-1"]).includes(workspaceId) ? "active" : null,
-	});
+	const access = createSearchAccess(
+		{
+			subscriptionStatus: async (workspaceId) =>
+				(options.paid ?? ["ws-1"]).includes(workspaceId) ? "active" : null,
+		},
+		{ paidPlans: true },
+	);
 	const sqlQuota = createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 });
 	const taken: string[] = [];
 	return {

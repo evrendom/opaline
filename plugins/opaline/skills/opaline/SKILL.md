@@ -15,6 +15,8 @@ Every member sees every member's sessions in the workspace, personal setup inclu
 
 No tool changes or deletes sessions. `sql` (and `find`/`read`) record their calls in a private draft of the current answer, which only `save_answer` publishes; `share_answer` shares a saved answer. Hosts may ask the user once to allow these; "always allow" is fine.
 
+**Call `schema` first.** Before any other analysis tool, call `schema` once with no arguments. If it answers that the retro tools are not enabled for this workspace yet, do not call `sql`, `search`, `run`, `estimate_questions` or `run_questions` in this conversation: follow "Classic flow (find and read)" below instead. Otherwise follow the retro playbook.
+
 ## Tools
 
 - `answers` (read-only): earlier analyses. `action=search` (`text`, or none for the most recent), `action=open` (`analysis`: its steps, findings, stored result ids, cutoff = the last day its data covers), `action=result` (`id`: one stored result, an sql result `sr_…` included; says when it is stale or unavailable).
@@ -28,14 +30,14 @@ No tool changes or deletes sessions. `sql` (and `find`/`read`) record their call
 - `estimate_questions` (sends nothing) and `run_questions`: yes/no run questions from `schema` (up to 10 ids), answered by SubQ Snap per run as the probability of yes, over the runs a `runs` SELECT returns (`session_id, agent_id, turn_idx`; default every run of the last 4 weeks; at most 5,000). The estimate gives the runs, the answers already stored (reused, free), the most it can cost, the quota left and a token; `run_questions` takes the same questions, the same `runs` and that token within 15 minutes, and sends each run's text, secrets removed, to the answering service. Answers arrive within minutes in `run_answers`.
 - `save_answer`, `share_answer`: see "Save" below.
 - `get_dashboard` shows the dashboard in the chat (cost by default; sessions, signals, agent runs, merged pull requests, CI failures per pull request). `list_workspaces` lists the user's workspaces and slugs, `default: true` on the one tools use.
-- Fallbacks only: `find` (fixed sources such as `source=weekly` nightly week totals) and `read` (runs by `{sessionId, agentId, turn}`, `depth=record` for exact text), when `run` says a run's requests are not indexed yet or a question needs what only they show. The older names `search_answers`, `get_answer` and `get_answer_evidence` are `answers` actions.
+- `find` (fixed sources such as `source=weekly` nightly week totals) and `read` (runs by `{sessionId, agentId, turn}`, `depth=record` for exact text): fallbacks when `run` says a run's requests are not indexed yet or a question needs what only they show, and the whole flow where the retro tools are not enabled (see "Classic flow (find and read)"). The older names `search_answers`, `get_answer` and `get_answer_evidence` are `answers` actions.
 
 ## The retro playbook
 
 Every analysis question goes through these steps, in order. Dashboard requests skip them.
 
 1. **Earlier analysis.** `answers action=search` with the question's words. If one covers it, `answers action=open` and say its findings and cutoff in one sentence; this analysis updates it.
-2. **Rank where the team lost the most.** `schema` once, then `sql` with the approved measures (`active_time`, `cost`, `tokens`, `runs`, `members`, `re_asks`, `frustration`, `group_run_time`, `group_call_time`), never your own version of them. Pick the impact order that fits the question (active time, cost, frustration, re-asks, runs, members) and state it. Show a group of calls' time both ways: the runs that contain it (`group_run_time`) and its own calls (`group_call_time`); neither is "time lost" until those runs are read. The time window the user asked for wins (default: the last 30 days); compute every total over the whole window, also in updates.
+2. **Rank where the team lost the most.** With the views and measures `schema` listed (call it again with `view=` for each view you query), `sql` with the approved measures (`active_time`, `cost`, `tokens`, `runs`, `members`, `re_asks`, `frustration`, `group_run_time`, `group_call_time`), never your own version of them. Pick the impact order that fits the question (active time, cost, frustration, re-asks, runs, members) and state it. Show a group of calls' time both ways: the runs that contain it (`group_run_time`) and its own calls (`group_call_time`); neither is "time lost" until those runs are read. The time window the user asked for wins (default: the last 30 days); compute every total over the whole window, also in updates.
 3. **Find by topic.** When the question names a topic, flag, file or error, use `search` or `search('…')` in sql.
 4. **Run questions (optional).** For meaning facts cannot give ("did the agent struggle to find the file?"), `estimate_questions` over a SQL-selected set first, state the cost and runs, then `run_questions` only if worth it, and rank with sql over `run_answers` (one `provider`). A probability only says where to read.
 5. **Read the top 10-15 runs** with `run`, expanding only the phases, requests and records that decide the question, and quote exact records (`r…`). Say "read N of M". Unread runs stay "not attributed".
@@ -211,6 +213,38 @@ GROUP BY week ORDER BY week
 ```
 
 Read a few runs after the fix to check the cause is gone, not only the count. For run questions on the same runs: `estimate_questions questions=["<id from schema>"] runs="SELECT session_id, agent_id, turn_idx FROM runs WHERE …"`, say the cost, then `run_questions` with the token.
+
+## Classic flow (find and read)
+
+Where `schema` says the retro tools are not enabled for this workspace, answer with `find` and `read`. `answers`, `save_answer`, `share_answer`, `get_dashboard` and `list_workspaces` work as above; findings name the `find` and `read` steps from their trace lines.
+
+**`find`: where something happened.** Cheap and deterministic: call it before `read`. It says *where*, never *why*. `source` picks what to look at:
+
+- `source=runs`: one row per run (one prompt and the agent's work until the next): ref, startedAt, minutes, activeMinutes (gaps over 5 minutes left out), costUsd, model, repository, agent, edits, toolCalls, failedCalls, readCalls, searchCalls, notFound (null where it cannot be recorded, never 0), nextReaction, rawChars, parentSessionId, promptHead. `groupBy=week|model|repository|agent|session` gives totals; `refs=[…]` returns exactly those runs with their summed minutes and cost (price the runs you read); `sort=startedAt|minutes|costUsd|failedCalls|rawChars`; `latest=N` keeps the newest N sessions.
+- `source=tool`: failed tool calls grouped by tool group, kind, cause and detail, with example refs. Kinds: friction (a hook or policy blocked it), mistake (wrong path, stale patch, bad flag), validation (tests, types, lint or build), environment (missing tool or service), noise (expected failures, hidden unless `includeNoise`), other. Filter with `toolGroup`, `commandClass`, `kind`, `cause`, `detail`.
+- `source=user`: unhappy prompts (`reaction=negative`), strongly worded ones (`reaction=swear`) and agent apologies (`reaction=apology`), each with the origin run that caused it. Word-list candidates: read before concluding.
+- `source=git`: commits, pushes, PR links and CI status reads, with the pull requests and CI runs GitHub links to them and whether CI was checked after a push; `pullRequest=owner/name#133` gives the sessions that touched that pull request. Null counts and unlinked statuses are unknown, not zero.
+- `source=calls`: shell commands, Codex scripts and written script files with their `argv0`, `prefix`, `fingerprint` and `simhash`; `groupBy=commandFingerprint|commandArgv0|commandPrefix` counts calls, sessions and failures per key. Check a group's examples before calling them the same command.
+- `source=weekly`: totals per ISO week, member and agent from a nightly snapshot, months in one call, for trends and before/after checks; `groupBy=week|member|agent`. Compare a fact over its known runs (`deniedCalls / deniedCallsKnownRuns`), never the raw count; the newest week is partial.
+
+Filters: `from` and `to` (UTC days; totals and rankings cover the whole window), `repository`, `agent`, `model`, `sessionId`. The header gives coverage, cost and unpriced runs: repeat them. Paging: `limit` 1-200 (default 50, 20 for `source=tool`); when the header has a `more: pass cursor=…` line, call `find` again with the same arguments plus that `cursor`, and don't split the date range into many calls. The last header line is `trace analysis=<id> step=<id> query=<id>`.
+
+**`read`: what actually happened.** Reads 1-10 runs by ref under one `maxChars` budget (default 12000, max 40000); `[cut]` marks what was left out. A ref is `{sessionId, agentId, turn}`: `agentId` `''` is the main transcript, `turn` starts at 1.
+
+- `depth=exchange` (default): the prompt, files edited, checks after the last edit and their outcome (still running is no pass), failed calls with their error, subagent threads, the final message and how the next prompt reacted.
+- `depth=turn`: every record of the run, compact, with record numbers.
+- `depth=record`: the exact text of one record (`record`, optionally `block`, `fromChar`, `toChar`), to quote as evidence.
+
+Never reconstruct a whole session run by run; subagent runs and Codex subagent threads are part of their parent's work.
+
+**The analysis cycle.**
+
+1. **Earlier answer.** `answers action=search`; if one covers the question, `action=open` and say its findings and cutoff in one sentence; check a finding you reuse with `action=result`.
+2. **Plan.** The window the user asked for wins (default: the last 30 days); compute totals fresh over the whole window; with an earlier answer, read new runs only after its cutoff.
+3. **Evidence.** `find` for the right source (the first call starts a draft; pass `analysis` from the trace line to every later `find` and `read`), then `read` the runs that decide the question, up to 15 per pattern, and say "read N of M". Price what they showed with `find source=runs refs=[…]` and rank patterns by time and cost, not by count.
+4. **Save and answer** as in "Save and answer", then propose setup fixes as in the playbook.
+
+Ask once, after the first `find` and before any `read`, when the window, the order or the scope is ambiguous. The "Never" rules above apply unchanged.
 
 ## Conventions
 

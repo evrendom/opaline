@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { Glob } from "bun";
+import { RETRO_TOOLS_OFF } from "../services/analysis/retro-tools.js";
 import {
 	prepareAgentSql,
 	type SqlWindow,
@@ -192,4 +193,141 @@ test("the column check catches a column no view it reads has, and an alias named
 			"SELECT round(sum(cost_usd), 2) AS cost_usd, countIf(cost_usd IS NULL) AS unpriced FROM runs",
 		),
 	).toEqual(["cost_usd (an alias named like a column)"]);
+});
+
+interface ListedInput {
+	properties: Record<
+		string,
+		{
+			enum?: string[];
+			default?: unknown;
+			maximum?: number;
+			maxItems?: number;
+			description: string;
+			items?: { enum?: string[] };
+		}
+	>;
+}
+
+/**
+ * The find and read tools as tools/list publishes them, and every tool name.
+ * MCP_TOOLS loads in a child process because the module opens the Postgres
+ * pool on import (without connecting).
+ */
+async function publishedTools(): Promise<{
+	names: string[];
+	find: ListedInput;
+	read: ListedInput;
+}> {
+	const subprocess = Bun.spawn(
+		[
+			process.execPath,
+			"--no-env-file",
+			"--eval",
+			`const { MCP_TOOLS, listedTool } = await import(${JSON.stringify(new URL("./mcp-tools.ts", import.meta.url).href)});
+const input = (name) => listedTool(MCP_TOOLS.find((tool) => tool.name === name)).inputSchema;
+console.log(JSON.stringify({ names: MCP_TOOLS.map((tool) => tool.name), find: input("find"), read: input("read") }));`,
+		],
+		{
+			env: {
+				PATH: process.env.PATH,
+				PG_CONNECTION_STRING: "postgres://unused@127.0.0.1:1/unused",
+			},
+			stderr: "pipe",
+			stdout: "pipe",
+		},
+	);
+	const [exitCode, stdout, stderr] = await Promise.all([
+		subprocess.exited,
+		new Response(subprocess.stdout).text(),
+		new Response(subprocess.stderr).text(),
+	]);
+	expect(stderr).toBe("");
+	expect(exitCode).toBe(0);
+	return JSON.parse(stdout);
+}
+
+/** The skill's "Classic flow (find and read)" section, up to the next heading. */
+async function classicFlow(): Promise<string> {
+	const skill = await Bun.file(join(SKILLS, "opaline/SKILL.md")).text();
+	const start = skill.indexOf("## Classic flow (find and read)");
+	expect(start).toBeGreaterThan(-1);
+	const end = skill.indexOf("\n## ", start + 1);
+	return skill.slice(start, end === -1 ? undefined : end);
+}
+
+test("the skill calls schema first and, on the server's refusal, follows the classic flow instead of the retro tools", async () => {
+	const skill = await Bun.file(join(SKILLS, "opaline/SKILL.md")).text();
+	const refusal = "the retro tools are not enabled for this workspace yet";
+	expect(RETRO_TOOLS_OFF.toLowerCase()).toContain(refusal);
+	expect(RETRO_TOOLS_OFF).toContain("use find and read");
+	const gate = skill.indexOf("**Call `schema` first.**");
+	expect(gate).toBeGreaterThan(-1);
+	// Near the top: before the tools are described.
+	expect(gate).toBeLessThan(skill.indexOf("## Tools"));
+	const paragraph = skill.slice(gate, skill.indexOf("\n\n", gate));
+	expect(paragraph).toContain(refusal);
+	expect(paragraph).toContain('"Classic flow (find and read)"');
+	for (const tool of [
+		"sql",
+		"search",
+		"run",
+		"estimate_questions",
+		"run_questions",
+	])
+		expect({ tool, named: paragraph.includes(`\`${tool}\``) }).toEqual({
+			tool,
+			named: true,
+		});
+	expect(skill).toContain("## Classic flow (find and read)");
+});
+
+test("the classic flow names every find source, groupBy, sort and kind, and read's depths and limits, as the tools publish them", async () => {
+	const [{ names, find, read }, section] = await Promise.all([
+		publishedTools(),
+		classicFlow(),
+	]);
+	const missing = (values: readonly string[], format: (v: string) => string) =>
+		values.filter((value) => !section.includes(format(value)));
+	const enumOf = (input: ListedInput, key: string) =>
+		input.properties[key]?.enum ?? input.properties[key]?.items?.enum ?? [];
+
+	expect(missing(enumOf(find, "source"), (v) => `\`source=${v}\``)).toEqual([]);
+	expect(missing(enumOf(find, "groupBy"), (v) => v)).toEqual([]);
+	expect(missing(enumOf(find, "sort"), (v) => v)).toEqual([]);
+	expect(missing(enumOf(find, "kind"), (v) => v)).toEqual([]);
+	expect(missing(enumOf(find, "reaction"), (v) => `\`reaction=${v}\``)).toEqual(
+		[],
+	);
+	expect(section).toContain(`\`limit\` 1-${find.properties.limit?.maximum}`);
+	const limitDefaults = /Default (\d+), or (\d+) for source=tool/u.exec(
+		find.properties.limit?.description ?? "",
+	);
+	expect(limitDefaults).not.toBeNull();
+	expect(section).toContain(
+		`default ${limitDefaults?.[1]}, ${limitDefaults?.[2]} for \`source=tool\``,
+	);
+
+	expect(missing(enumOf(read, "depth"), (v) => `\`depth=${v}\``)).toEqual([]);
+	expect(section).toContain(
+		`\`depth=${read.properties.depth?.default}\` (default)`,
+	);
+	expect(section).toContain(`1-${read.properties.refs?.maxItems} runs`);
+	expect(section).toContain(
+		`default ${read.properties.maxChars?.default}, max ${read.properties.maxChars?.maximum}`,
+	);
+
+	// Every argument the section names with a value is one the tools take.
+	const named = [...section.matchAll(/`(\w+)=/gu)].map((match) => match[1]);
+	const accepted = new Set([
+		...Object.keys(find.properties),
+		...Object.keys(read.properties),
+		"action",
+	]);
+	expect(named.filter((name) => name && !accepted.has(name))).toEqual([]);
+	// And every tool it names in backticks exists.
+	const tools = [...section.matchAll(/`([a-z_]+)`/gu)]
+		.map((match) => match[1] ?? "")
+		.filter((name) => /^(find|read|answers|[a-z]+_[a-z_]+)$/u.test(name));
+	expect(tools.filter((name) => !names.includes(name))).toEqual([]);
 });

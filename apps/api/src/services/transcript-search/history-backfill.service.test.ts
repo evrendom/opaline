@@ -165,7 +165,7 @@ function environment(
 ): TranscriptSearchBackfillEnv {
 	return {
 		executor,
-		access: { indexes: async () => true },
+		access: { indexes: async () => true, notIndexed: "not indexed" },
 		quota: createMemoryEmbeddingQuota({ tokens: 1e9, windowMs: 86_400_000 }),
 		listWorkspaces: async () => ["ws-1"],
 		assertWritable: async () => {},
@@ -237,11 +237,14 @@ test("a preview estimates the selected sessions' tokens and cost per workspace, 
 	).toBe(false);
 });
 
-test("only workspaces search indexes are selected; a workspace that is neither paid nor listed gets nothing", async () => {
+test("only workspaces search indexes are selected; a workspace search does not index gets nothing and is told why", async () => {
 	const { executor, statements } = world([session("s-1", ["a"])]);
 	const env = environment(executor, {
 		listWorkspaces: async () => ["paid", "free", "listed"],
-		access: { indexes: async (workspaceId) => workspaceId !== "free" },
+		access: {
+			indexes: async (workspaceId) => workspaceId !== "free",
+			notIndexed: "search is not enabled for this workspace yet",
+		},
 	});
 
 	const all = await previewTranscriptSearchBackfill(env, {
@@ -259,7 +262,9 @@ test("only workspaces search indexes are selected; a workspace that is neither p
 		"listed",
 	]);
 	expect(free).toMatchObject({ candidates: 0, workspacesNotIndexed: 1 });
-	expect(free.message).toContain("paid plans");
+	expect(free.message).toBe(
+		"search is not enabled for this workspace yet, and TRANSCRIPT_EMBEDDINGS_WORKSPACES does not list it.",
+	);
 	expect(
 		statements.filter((statement) => statement.query.includes("AS reason")),
 	).toHaveLength(1);

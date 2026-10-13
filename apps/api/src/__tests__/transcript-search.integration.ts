@@ -229,9 +229,10 @@ function index(
 }
 
 /** Every workspace of this suite is indexed as if on a paid plan. */
-const access = createSearchAccess({
-	subscriptionStatus: async () => "active",
-});
+const access = createSearchAccess(
+	{ subscriptionStatus: async () => "active" },
+	{ paidPlans: true },
+);
 
 const countRows = async (table: string, column: string, value: string) => {
 	const [row] = await clickhouse.query<{ rows: string }>({

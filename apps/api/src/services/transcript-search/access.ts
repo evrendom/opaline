@@ -1,13 +1,13 @@
 import type postgres from "postgres";
-import { embedsWorkspace } from "./config.js";
+import { embedsPaidPlans, embedsWorkspace } from "./config.js";
 
 /**
  * Which workspaces' uploads are indexed for search (embedded with OpenAI):
- * those with a paid subscription, active or past due, and the internal
- * workspaces `TRANSCRIPT_EMBEDDINGS_WORKSPACES` lists. A workspace that stops
- * paying stops being indexed for new uploads; what was indexed stays until
- * the account or workspace is deleted. Search says the feature is on paid
- * plans everywhere else.
+ * the internal workspaces `TRANSCRIPT_EMBEDDINGS_WORKSPACES` lists and, only
+ * with `TRANSCRIPT_EMBEDDINGS_PAID_PLANS=true`, those with a paid
+ * subscription, active or past due. A workspace that stops paying stops being
+ * indexed for new uploads; what was indexed stays until the account or
+ * workspace is deleted. Search says why everywhere else (`notIndexed`).
  */
 
 /** Subscription statuses that keep a workspace indexed. */
@@ -16,12 +16,16 @@ const PAID_STATUSES: ReadonlySet<string> = new Set(["active", "past_due"]);
 const SUBSCRIPTION_TTL_MS = 60_000;
 const CACHED_WORKSPACES = 1_000;
 
-export const SEARCH_PAID_PLANS =
+const SEARCH_PAID_PLANS =
 	"search is available on paid plans: this workspace's uploads are not indexed for search";
+const SEARCH_NOT_ENABLED =
+	"search is not enabled for this workspace yet: its uploads are not indexed for search";
 
 export interface SearchAccess {
 	/** Whether the workspace's uploads are indexed for search. */
 	indexes(workspaceId: string): Promise<boolean>;
+	/** Why a workspace that is not indexed is not, phrased for the agent. */
+	readonly notIndexed: string;
 }
 
 export function createSearchAccess(
@@ -29,13 +33,20 @@ export function createSearchAccess(
 		/** The workspace's subscription status, or null without one. */
 		subscriptionStatus(workspaceId: string): Promise<string | null>;
 	},
-	options: { now?: () => number } = {},
+	options: {
+		now?: () => number;
+		/** Index paid workspaces too; `TRANSCRIPT_EMBEDDINGS_PAID_PLANS` by default. */
+		paidPlans?: boolean;
+	} = {},
 ): SearchAccess {
 	const now = options.now ?? Date.now;
+	const paidPlans = options.paidPlans ?? embedsPaidPlans();
 	const paid = new Map<string, { at: number; paid: Promise<boolean> }>();
 	return {
+		notIndexed: paidPlans ? SEARCH_PAID_PLANS : SEARCH_NOT_ENABLED,
 		async indexes(workspaceId) {
 			if (embedsWorkspace(workspaceId)) return true;
+			if (!paidPlans) return false;
 			const at = now();
 			const cached = paid.get(workspaceId);
 			if (cached && at - cached.at < SUBSCRIPTION_TTL_MS) return cached.paid;

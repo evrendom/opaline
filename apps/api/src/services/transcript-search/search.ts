@@ -29,7 +29,7 @@ import type { SqlQuota } from "../analysis/sql-results.js";
 import { SQL_SCOPE_PARAMS } from "../analysis/sql-views.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { readableSessionOwner } from "../session-visibility.js";
-import { SEARCH_PAID_PLANS, type SearchAccess } from "./access.js";
+import type { SearchAccess } from "./access.js";
 import { CHUNK_OVERLAP_CHARS } from "./chunks.js";
 import {
 	estimateEmbeddingTokens,
@@ -102,7 +102,7 @@ export interface SearchEnv {
 	readonly limiter: AgentQueryLimiter;
 	/** The embedder, or null where text is not embedded (no OpenAI key). */
 	readonly embedderFor: (workspaceId: string) => TranscriptEmbedder | null;
-	/** Whether a workspace is indexed for search: a paid plan, or internal. */
+	/** Whether a workspace is indexed for search: listed, or paid where paid plans are on. */
 	readonly access: SearchAccess;
 	readonly now?: () => Date;
 	/** Overrides `SEARCH_LIMITS.embeddingMs`. */
@@ -581,7 +581,7 @@ async function meaningOf(
 			embedded: embedder !== null,
 			notices: indexed
 				? []
-				: [`${SEARCH_PAID_PLANS}; only sessions indexed before can match.`],
+				: [`${env.access.notIndexed}; only sessions indexed before can match.`],
 		};
 	const unavailable = (reason: string) =>
 		mode === "meaning"
@@ -601,7 +601,7 @@ async function meaningOf(
 						`only exact matches: search by meaning is not available (${reason}).`,
 					],
 				};
-	if (!indexed) return unavailable(SEARCH_PAID_PLANS);
+	if (!indexed) return unavailable(env.access.notIndexed);
 	if (!embedder)
 		return unavailable("this workspace's transcripts are not embedded");
 	const usage = await env.quota.usage(workspaceId);

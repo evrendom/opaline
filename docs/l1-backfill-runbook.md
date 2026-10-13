@@ -99,7 +99,7 @@ bun run audit:l1 --organization-id $ORG --compare audit-$ORG-0-before.json
 
 ## 7b. Transcript search history
 
-Uploads are indexed for search as they arrive; `backfill:transcript-search` indexes the sessions uploaded before, through the same pass (secret filter, chunking, deduplication per member, the workspace's OpenAI quota, purge fences). It only touches workspaces uploads are indexed for: a paid plan (`active` or `past_due`) or listed in `TRANSCRIPT_EMBEDDINGS_WORKSPACES`; any other workspace is reported as not indexed. Run it after step 3, since it reads the committed transcript-records generation.
+Uploads are indexed for search as they arrive; `backfill:transcript-search` indexes the sessions uploaded before, through the same pass (secret filter, chunking, deduplication per member, the workspace's OpenAI quota, purge fences). It only touches workspaces uploads are indexed for: those listed in `TRANSCRIPT_EMBEDDINGS_WORKSPACES` and, only with `TRANSCRIPT_EMBEDDINGS_PAID_PLANS=true`, those on a paid plan (`active` or `past_due`); any other workspace is reported as not indexed. Run it after step 3, since it reads the committed transcript-records generation.
 
 ```bash
 bun run backfill:transcript-search --organization-id $ORG                  # preview: sessions, estimatedTokens, estimatedCostUsd
