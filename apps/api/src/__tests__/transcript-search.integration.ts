@@ -1,5 +1,6 @@
 import "./helpers/local-integration-guard.js";
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { join } from "node:path";
 import {
 	createSplitStats,
 	splitSessionTranscript,
@@ -390,6 +391,37 @@ describe("search over uploaded transcripts", () => {
 		const filtered = await query("r.turn_idx = 1");
 		if (!filtered.ok) throw new Error(filtered.error.message);
 		expect(filtered.result.rows).toBe(0);
+	});
+
+	test("every SQL example in the plugin skill runs in ClickHouse through the sql gateway", async () => {
+		const skill = await Bun.file(
+			join(
+				import.meta.dir,
+				"../../../../plugins/opaline/skills/opaline/SKILL.md",
+			),
+		).text();
+		const examples = [...skill.matchAll(/```sql\n([\s\S]*?)```/gu)].map(
+			(match) => match[1] ?? "",
+		);
+		const sqlEnv = {
+			executor: clickhouse,
+			results: createMemorySqlResultStore(),
+			limiter: unlimitedSlots,
+			githubRepositories: async () => [],
+			quota: createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 }),
+			functions: [createSqlSearchFunction(env)],
+		};
+		const failed: { query: string; error: string }[] = [];
+		for (const query of examples) {
+			const outcome = await runSql(
+				caller,
+				{ query, title: "Skill example" },
+				sqlEnv,
+			);
+			if (!outcome.ok) failed.push({ query, error: outcome.error.message });
+		}
+		expect(examples.length).toBeGreaterThanOrEqual(6);
+		expect(failed).toEqual([]);
 	});
 });
 

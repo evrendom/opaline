@@ -5,136 +5,221 @@ description: "Analyse a team's uploaded coding-agent sessions with Opaline to im
 
 # Opaline
 
-Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup: instructions and skills, docs, scripts, hooks, lint and CI config. Answers are about the setup, never a judgement of people. Don't single out or rank people in answers; describe team patterns and setup fixes.
+Opaline helps a team run retros on its coding-agent sessions: find where the agents lost the most, read the runs that show why, and fix the setup that let it happen (instructions, skills, docs, scripts, hooks, lint and CI config). Answers are about setups, never a judgement of people. Don't single out or rank people in answers; describe team patterns and setup fixes.
 
-Opaline stores the team's uploaded coding agent sessions. No tool changes or deletes sessions. Analyses are written only by `find` and `read` (they record what they looked at in a private draft of the current answer, an "analysis"), `save_answer` (it publishes that draft once) and `share_answer` (it shares a saved answer). The plugin's own default-workspace setting is changed only from the plugin settings page, never by you. Hosts may ask the user once to allow `find`, `read`, `save_answer` and `share_answer`; the user can choose "always allow".
+**Scope.** Use this skill only for questions that analyse the team's uploaded sessions and for showing the dashboard. It does not cover Opaline product support, account or billing questions, unrelated coding help, or actions Opaline does not offer (deleting sessions, changing plans, reaching other workspaces); say so plainly and point to opaline.so where it helps.
 
-**Scope.** Use this skill only for questions that analyse the team's uploaded coding-agent sessions (cost, time, failures, mistakes, earlier answers) and for showing the dashboard. It does not cover Opaline product support, account or billing questions, unrelated coding help, or actions Opaline does not offer (deleting sessions, changing plans, reaching other workspaces); for those, say so plainly and point to opaline.so where it helps.
+**Answer only from Opaline.** Every fact comes from the Opaline tools. Never read local files, the working directory or git state to work out what the user means, and never run shell commands; take repository names from the `repository` column or the dashboard, and ask the user if it is still ambiguous. Never read raw transcripts run by run: Opaline counts, ranks and finds, and you open only the runs that decide the question.
 
-Opaline answers by updating earlier answers. Each saved analysis keeps its findings, the exact evidence behind them (the `find` and `read` calls with their results) and the last day its data covers (its cutoff). A new question on the same topic updates it with only the evidence since that day instead of redoing it. A saved analysis never changes: an update is a new analysis that names the earlier one with `updates` when it is saved.
+Every member sees every member's sessions in the workspace, personal setup included: a team retro needs everyone's runs. That access is for learning from the sessions; findings still name setups, not people. `user_id` columns are for telling a team-wide pattern from one setup's, never for ranking members. For one person's numbers, point to the dashboard's member view.
 
-`find` and `read` take only what they need to look up runs, plus `analysis` (the draft's id). They never take the user's question or your sub-questions: each call becomes its own step, labelled from its tool and arguments (for example `find source=tool kind=validation`). The question is given once, as a short title, when `save_answer` saves the answer.
+No tool changes or deletes sessions. `sql` (and `find`/`read`) record their calls in a private draft of the current answer, which only `save_answer` publishes; `share_answer` shares a saved answer. Hosts may ask the user once to allow these; "always allow" is fine.
 
-**Answer only from Opaline.** Within that scope, every fact in an answer comes from the Opaline tools. Never inspect local files, the working directory or git state (`git remote`, `git log`, the current branch) to work out which repository the user means: take repository names from the `repository` column of `find` results or the dashboard, and ask the user if it is still ambiguous. This skill never runs shell commands.
+## Tools
 
-## 1. Tools
+- `answers` (read-only): earlier analyses. `action=search` (`text`, or none for the most recent), `action=open` (`analysis`: its steps, findings, stored result ids, cutoff = the last day its data covers), `action=result` (`id`: one stored result, an sql result `sr_…` included; says when it is stale or unavailable).
+- `schema` (read-only), in steps: no arguments lists the views, the **approved measures** and the run questions with their tested precision; `view=` gives that view's columns with meaning and traps; `view=` + `column=` gives the column's 20 most common values over the last 30 days. Call it once per analysis, then for each view you query.
+- `sql`: one read-only `SELECT` (or `WITH … SELECT`) over the views `runs`, `calls`, `prompts`, `git_events`, `edges`, `ci_jobs`, `finding_runs`, `run_answers`, with a short `title`. The server adds the workspace: never filter by it. Up to 200 rows, cells cut at 300 characters, 10 seconds and 512 MiB per query, and a workspace quota that `run` counts in too; a query refused for memory or rows read is refused for good, so narrow it instead of retrying. Each result is stored (`sql result=sr_…`) and ends with a "not evidence" notice: rows say where to look, never why. Errors say `error, recoverable` with the failing part and a fix, or `refused, do not retry`. The last line is `trace analysis=<id> step=<id> query=<id>`.
+  - `search('text'[, 'hybrid'|'meaning'|'exact'[, days]])` is a table inside sql (columns run_id, user_id, session_id, agent_id, turn_idx, started_at, score, why, snippet; up to 200 runs; at most 3 per query): join it to `runs USING (run_id)` to filter and rank matches by impact.
+  - `calls` and `prompts` must keep their time range in their own `WHERE` (`started_at >= …` for calls, `at >= …` for prompts, joined with `AND`), or every session is read and the query may hit the limits. Command text reads a lot: about a week of a busy workspace fits, a month may not.
+  - Never alias a result with a column's name (`sum(cost_usd) AS cost_usd`): ClickHouse then reads the alias wherever the query names that column, and the query fails or counts the wrong thing.
+- `search` (read-only): runs by meaning and exact string in one ranking (`text`; `mode` hybrid, meaning or exact; `filters` since, until, source, kinds; 30 days by default, at most 180). Returns up to 20 runs with run_id, why each matched and a snippet, coverage (sessions not yet indexed are unknown, not absent), the OpenAI quota and a rewrite to try when nothing matched. Not recorded in the draft: to keep matches as evidence, use `search('…')` in sql.
+- `run` (read-only): one run, compact. `id` is a run_id from sql or search, or a PREV/NEXT/subagent id the view shows. Default sections: the header (prompt, minutes, tokens, cost), PREV (the run before and how it ended), END (how this one ended), NEXT (the user's next prompt and its reaction) and the phases (exploring, editing, running checks, git and CI, talking to the user) with requests, time, tokens and cost. `expand` takes up to 20 ids: a phase `p2` opens its requests, a request `q153` its calls, a call `c154` or record `r160` its exact text, and a call that started a subagent opens that subagent's run. `sections` keeps only some (header, prev, end, next, phases); `maxChars` 1000-40000, default 12000. Rows of `calls` and `prompts` carry `record_idx`: expand it as `r<record_idx>` to quote it.
+- `estimate_questions` (sends nothing) and `run_questions`: yes/no run questions from `schema` (up to 10 ids), answered by SubQ Snap per run as the probability of yes, over the runs a `runs` SELECT returns (`session_id, agent_id, turn_idx`; default every run of the last 4 weeks; at most 5,000). The estimate gives the runs, the answers already stored (reused, free), the most it can cost, the quota left and a token; `run_questions` takes the same questions, the same `runs` and that token within 15 minutes, and sends each run's text, secrets removed, to the answering service. Answers arrive within minutes in `run_answers`.
+- `save_answer`, `share_answer`: see "Save" below.
+- `get_dashboard` shows the dashboard in the chat (cost by default; sessions, signals, agent runs, merged pull requests, CI failures per pull request). `list_workspaces` lists the user's workspaces and slugs, `default: true` on the one tools use.
+- Fallbacks only: `find` (fixed sources such as `source=weekly` nightly week totals) and `read` (runs by `{sessionId, agentId, turn}`, `depth=record` for exact text), when `run` says a run's requests are not indexed yet or a question needs what only they show. The older names `search_answers`, `get_answer` and `get_answer_evidence` are `answers` actions.
 
-The model sees nine tools: `search_answers`, `get_answer`, `get_answer_evidence`, `find`, `read`, `save_answer`, `share_answer`, `get_dashboard` and `list_workspaces`.
+## The retro playbook
 
-### Saved answers (read-only)
+Every analysis question goes through these steps, in order. Dashboard requests skip them.
 
-- `search_answers`: saved analyses by meaning (`text`) or the most recent (no `text`); yours and those shared with the workspace. Columns: id, status, mine, shared, cutoff, updates (the analysis it updates), scope, why it matched, question, the start of its answer.
-- `get_answer`: one analysis. The first line is `analysis <id> status=… cutoff=<last data time> updates=<earlier analysis or none> updatedBy=<later analyses or none>`; then its scope, question, each step (its label, its queries with ids and why a result is unavailable, its finding), the changes against the analysis it updates (`change: step <id>: finding (evidence)`) and the final answer.
-- `get_answer_evidence`: the exact stored result of one query (`query` = an id from `get_answer`), with `stale=true` when a session it read has a newer transcript since, or `unavailable=expired|removed|restricted`. Results expire after 90 days (a year when shared or pinned); a workspace limited to own sessions may restrict a result to admins and the member whose sessions it read.
+1. **Earlier analysis.** `answers action=search` with the question's words. If one covers it, `answers action=open` and say its findings and cutoff in one sentence; this analysis updates it.
+2. **Rank where the team lost the most.** `schema` once, then `sql` with the approved measures (`active_time`, `cost`, `tokens`, `runs`, `members`, `re_asks`, `frustration`, `group_run_time`, `group_call_time`), never your own version of them. Pick the impact order that fits the question (active time, cost, frustration, re-asks, runs, members) and state it. Show a group of calls' time both ways: the runs that contain it (`group_run_time`) and its own calls (`group_call_time`); neither is "time lost" until those runs are read. The time window the user asked for wins (default: the last 30 days); compute every total over the whole window, also in updates.
+3. **Find by topic.** When the question names a topic, flag, file or error, use `search` or `search('…')` in sql.
+4. **Run questions (optional).** For meaning facts cannot give ("did the agent struggle to find the file?"), `estimate_questions` over a SQL-selected set first, state the cost and runs, then `run_questions` only if worth it, and rank with sql over `run_answers` (one `provider`). A probability only says where to read.
+5. **Read the top 10-15 runs** with `run`, expanding only the phases, requests and records that decide the question, and quote exact records (`r…`). Say "read N of M". Unread runs stay "not attributed".
+6. **Propose a fix** in the setup that let each problem happen, quoting the setup text the run received where it matters (`prompts` with `kind = 'injected_context'`, subtype `agents_md`, `skill_body`, `system_instruction`). Name the fix type:
+   - **navigation pointer**: a line in the instructions or a doc that says where something lives;
+   - **automated check**: a lint rule, type, test, hook or CI step that catches the mistake;
+   - **reviewer standard**: a rule the reviewer (person or review agent) checks when it cannot be automated;
+   - **slim the instructions**: cut instructions that are long, contradictory or ignored;
+   - **streamline a tool**: a script or command agents keep fighting (flags, output, defaults);
+   - **delete no-op steering**: instructions the runs show change nothing;
+   - **widen access**: a permission, credential, service or MCP server the agent lacked;
+   - **skill / skill update**: a recurring request done by hand, or a skill whose text is outdated.
 
-Drafts never appear. If one of these tools or `save_answer` says history is off for the workspace, go on with `find` and `read` and skip searching and saving.
+   State the fix channel honestly: instructions and skills may reduce a problem, never guarantee; a check, hook, script, doc or config is a mechanism; taste iterations and model limits are not fixable. Say how to re-check each finding.
+7. **Save**, then answer (below). A later update compares before and after: recompute the same measures over the new window and sum the earlier findings' runs from `finding_runs`.
 
-### `find`: where something happened
-
-Deterministic and cheap: always call it before `read`. It says *where*, never *why*. `source` picks what to look at:
-
-- `runs`: one row per run. A **run** is one user prompt and everything the agent did until the next prompt. Columns: ref, startedAt, minutes (wall-clock span), activeMinutes (gaps over 5 minutes left out, so approval waits and stalls do not count), costUsd, model, models, repository, agent, edits, toolCalls, failedCalls, readCalls, searchCalls, notFound (reads and searches whose result says they found nothing: no file, no match, no output from a search; null where the agent cannot record it, which is Claude Code subagents and sessions not yet reparsed, never 0), nextReaction (how the next prompt reacted), rawChars (how much text reading the run costs), parentSessionId, depth, promptHead. `groupBy=week|model|repository|agent|session` gives totals instead; `refs=[…]` returns exactly those runs with their summed minutes and cost (use it to price runs you read). `sort=startedAt|minutes|costUsd|failedCalls|rawChars`, `latest=N` keeps the newest N sessions in the range.
-- `tool`: failed tool calls grouped by tool group → kind → cause → detail (lint rule, TypeScript code, missing module, stale patch…), with example refs. Kinds: `friction` (a hook or policy blocked the call), `mistake` (the agent's wrong assumption: wrong path, stale patch, bad flag), `validation` (tests, typecheck, lint or build rejected the code), `environment` (missing dependency, service or credential), `noise` (an expected non-zero exit such as a search with no hits; hidden unless `includeNoise`), `other`. Filter with `toolGroup`, `commandClass`, `kind`, `cause`, `detail`.
-- `git`: the git and GitHub events of the sessions, newest first: `commit_created`, `push_range` (with the `To` remote; a new branch has no SHAs; `label=forced_update` for a forced push), `pr_url` (any PR URL in a result, not necessarily created), `mcp_pr_created`, `ci_check` (a `gh pr checks`/`gh run` or MCP CI status read, failing checks included, with the run, commit, branch or PR it names; `label=unconfirmed` when the command does not show it ran), `codex_session_meta`, and from CLI evidence `evidence_capture` (base and head commit of a capture) and `evidence_snapshot` (PRs GitHub listed for the captured commit). Each event keeps its literal values and where it happened (ref, record, call, `generation`; `generation.current=false` means it comes from an older transcript than the indexed one) and adds what GitHub holds: `repository` (named by the event, else the session remote when the event names none; never a different repository), `github.status` (`linked`; `preview`/`collecting` = history incomplete, see `reason`, `prFrom`, `ciFrom`, `coveredThrough`; `not_visible`, `unbound`, `not_github`, `no_repository` = not looked up, so counts are null = unknown), the full `sha` (`candidates`: only 1 resolves; `complete=false` = among what was collected), `pullRequests` with every rule in `bases` (`named`, `branch` = the pushed branch in the pushed repository is its head, `commit` = the SHA is one of its commits, with `commitInHead`, `snapshot`), and `ciRuns` (each with its repository, run id, attempt, SHA, times and every `edges` rule: `pushed_sha`, `named_run`, `branch` = on the branch a check names in the day before it, `pull_request` with GitHub's `linkBasis`, `merge_commit`), `ciConclusions`, `ciRunsObserved` (found) and `ciRunCount` (the run attempts started before `ciRunCountThrough`, only when each target's whole CI history is collected; runs after it are listed, not counted; null = unknown, never read it as zero, and `ciRunCountUnknown` says why: `github_status`, `push_without_sha`, `sha_unresolved`, `no_target`, `target_not_found`, `target_history_unknown`, `repository_incomplete`, `before_coverage`, `after_coverage`, `search_capped`); for a push, `checksAfter` (`count` checks that ran later in the stream, `unconfirmed`, `sameCall`). Once stored edges exist, a `links:` header line says how many events were linked from them and how many at query time; an event shows `links=…` only when its links did not come from current edges (`query:not_built`, `query:stale`, `edges:frozen`), which is a reason to treat a missing link as unknown rather than absent. Links from edges differ from query-time links on purpose in three ways: CI on an open PR's test merge commit is not followed (only a merged PR's merge commit), a SHA's CI history is dated only by a commit the session created and that resolved uniquely (otherwise `target_history_unknown`), and counts stop at the coverage the edges were built against (`ciRunCountThrough` can be earlier than `github.coveredThrough`). `pullRequest=owner/name#133` (or the PR's URL) turns it around: the events of every session that named the PR, pushed its head branch, or created, pushed or mentioned one of its commits, whatever their date unless you pass `from`/`to`; a touch whose transcript is no longer indexed (or that came from an older generation) is listed under `witnesses` with its session, run, relation, matched value and evidence id instead of as an event. Its notes say how many sessions you can see touch it and how many may also touch it but are unknown (edges not built, stale, truncated, being rebuilt, or beyond the sessions checked); treat those as unknown, not absent. Use it for "did agents check CI after pushing?", "which sessions led to which PRs and did their CI pass?" or "which runs worked on PR #133?"; `read` an event's ref at `depth=record` with the record and block shown (`@record.block`) to see the call.
-- `calls`: the commands agents ran, one row per call that carries one: a shell command (`commandFrom=command`), a whole Codex code-mode script (`script`) or a script file a call wrote (`written`, with its `filePath`). Each row has the command text (its first 300 characters), whether the call failed, and its identity: `argv0` (the program, `git`, also behind wrappers such as `sudo`, `rtk proxy` or `npx`), `prefix` (program and subcommand, `git push`), `fingerprint` (the same command once machine-specific directories, numbers, ids, URLs and quoted strings are replaced; a file's folder, flags, subcommands and relative paths kept) and `simhash` (texts of 20 words or more). `groupBy=commandFingerprint|commandArgv0|commandPrefix` counts calls, sessions and failed calls per key, with up to three example texts (and the normalized text for a fingerprint). Filter with `commandArgv0`, `commandPrefix`, `commandFingerprint`, `commandFrom`, or `commandSimhash` for near-duplicates (at most 3 of 32 bits differ: copies with small edits, not rewrites). These are Opaline's rules, not the agent's: check a group's examples before calling its calls the same command, since quoted strings merge (different search patterns or commit messages share a fingerprint). Use it for "which commands keep failing across the team?" or "which scripts do agents write again and again?"; `read` a row's ref at `depth=record` with its record and block to see the call.
-- `user`: prompts where the user was unhappy with the agent (corrections, complaints; `reaction=negative`), strongly worded ones (`swear`) and agent apologies (`apology`). Each comes with the **origin run** that caused it: for a prompt, the run right before it; for an apology, the run the user was correcting. These are word-list candidates: a complaint can be aimed at a bug rather than the agent, and quoted or pasted text can match too.
-- `weekly`: totals per ISO week (Monday, UTC), member and agent from a nightly snapshot, without reading runs, so months of team-wide numbers cost one call. Use it for trends and for before/after checks of a fix; then use `runs`, `tool` or `git` for the runs behind a number. One row per week, member and agent, or `groupBy=week|member|agent` for their sums (a summed row says how many `weeks` it adds up). `from`/`to` select whole weeks (default: the last 12); `agent` filters; `repository`, `model`, `latest`, `sessionId` and `refs` do not apply. Columns: runs, sessions (sessions with a run in the week; null on rows that span several weeks, where `sessionsStarted` adds up), genuinePrompts, minutes, activeMinutes, toolCalls, failedCalls, edits, reads, searches, notFound, compactions, interruptMarkers, failedEdits/refusedEdits, deniedCalls, interruptedCalls, timedOutCalls, mcpCalls, apiErrors, retryAttempts, refusals, abortedRuns, turnErrorRuns (Codex), pushRuns/commitRuns/prRuns/commitShas (Claude Code `gitOperation` only; Codex git activity is in `git`), prUrls (named, not necessarily created), skillRuns, skills, slashCommands, subagentTypeRuns, usageObservations, usageUnpriced, costUsd (with usage no run claims; `unattributedCostUsd` is that part) and tokens by kind. Traps: a fact some agent versions cannot record is summed only over the runs that can, counted in its `…KnownRuns` column, and is null when none can; compare `deniedCalls / deniedCallsKnownRuns` across weeks, never `deniedCalls` alone, because parser upgrades and backfills raise the known runs. Usage is unknown for runs whose usage extraction was incomplete (`runs - usageKnownRuns`). The snapshot holds what was indexed when it was taken (`snapshot refreshedAt=`): the newest week is partial, and runs indexed later appear after the next nightly refresh; say so in the answer.
-
-The header gives the date range, sessions in scope vs indexed (run facts cover indexed sessions only), minutes, cost, unattributed cost, unpriced runs and notes; repeat coverage and unpriced runs in your answer. A run that used several models lists them in `models`; `model=X` keeps runs whose usage includes X and counts only X's cost. Every member sees every member's sessions in the workspace, personal setup included. There is no per-member filter here: for one person's numbers, use the dashboard's member view. In `weekly`, `groupBy=member` splits the totals by member (user id) to tell whether a pattern is team-wide or in one setup; never rank or compare people with it.
-
-Paging: `limit` 1-200 (default 50, 20 for `source=tool`). If the header has a `more: pass cursor=…` line, call `find` again with the same arguments plus that `cursor`. Don't split the date range into many calls.
-
-The last header line is `trace analysis=<id> step=<id> query=<id>`: the draft's id, this call's step id and this result's id. Findings and changes name a step by either id.
-
-### `read`: what actually happened
-
-Reads 1-10 runs by ref under one `maxChars` budget (default 12000, max 40000); `[cut]` marks what was left out. A **ref** is `{sessionId, agentId, turn}`: `agentId` `''` is the main transcript, otherwise a subagent; `turn` starts at 1. Any member can read any session of the workspace.
-
-- `depth=exchange` (default): the prompt (or a subagent's delegated task) → files the agent edited → checks run after its last edit and whether they passed, failed or were still running when recorded (running is no outcome, never a pass) → failed calls with their error line → Codex subagent threads it spawned or messaged → its final message → how the user's next prompt reacted (a label such as "unhappy" or "no complaint found"; the prompt's text is not returned).
-- `depth=turn`: every record of the run, compact, with record numbers.
-- `depth=record`: the exact text of one record (`record`, optionally `block`, `fromChar`, `toChar`), to quote as evidence.
-
-There is no way to read a whole session; never reconstruct one run by run.
-
-**Codex subagent threads are subagents too**, even though each is a session of its own: `find` rows carry their `parentSessionId` and `depth`, and `read` shows a thread's parent run and, in the parent, the threads it spawned with their refs and tasks. Count a thread as part of its parent's work, never as separate work.
-
-### `save_answer` and `share_answer`
-
-`save_answer` publishes the draft once. A saved analysis is never changed: a second save is refused and changes nothing. Nothing is published publicly or shared with other workspaces. OpenAI processes the title and topics to build the search index.
-
-`share_answer` shares a saved analysis with the workspace. Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; a workspace limited to own sessions may show those results only to admins and the session's owner. It only adds access; the plugin cannot stop sharing, which is done outside the plugin.
-
-### `get_dashboard` and `list_workspaces`
-
-`get_dashboard` shows the Opaline dashboard in the chat (cost by default; also sessions, signals, agent runs, merged pull requests, CI failures per pull request), with top repositories, models and members. `list_workspaces` lists the workspaces the user belongs to and their slugs.
-
-## 2. The analysis cycle
-
-Every question about agent runs goes through the same six steps, in this order. Dashboard requests skip the cycle.
-
-1. **Earlier answer.** Call `search_answers` with the question's words. If a saved analysis covers it, open it with `get_answer` and state its findings and cutoff in one sentence. Trust them unless the data changed. Open a stored result (`get_answer_evidence`) only to check a finding you reuse (step 2) or a step you must quote; never replay all of its queries, which costs as much as redoing the analysis.
-2. **Plan.** The time window the user asked for always wins (default: the last 30 days). Totals, counts, costs and rankings are always computed fresh over the whole requested window, never carried over from an earlier answer. With an earlier answer, reuse only its detailed evidence (the runs it read and what they showed) when those runs fall inside the window, and read new runs only for the time after its last day. Keep, confirm or drop earlier findings only when their evidence falls inside the window; leave the rest out of the answer. Before reusing an earlier finding, open the stored result behind it with `get_answer_evidence`: if it says `stale=true` or is unavailable, re-read those runs (or recompute with `find`) before keeping the finding; otherwise reuse it.
-3. **Evidence.** Call `find`, then `read` only the runs that decide the question, and say "read N of M".
-   - The first call leaves out `analysis` and starts a new draft. Every later call passes `analysis` = the id from the trace line, so it joins the same draft.
-   - Every `find` for totals, counts or rankings covers the whole window: `from` and `to` = the window's start and end. With an earlier answer whose last day (the date part of `cutoff=` in `get_answer`) lies inside the window, you may look for new runs to read with `from` = that day.
-4. **Save.** Call `save_answer` once: `question` (a short title, not the user's words, no personal data, up to 120 characters, such as "Where our agents get stuck"), the final answer, one finding per step (name the step by the step or query id from its trace line) and up to 8 topics. Don't save the conversation itself: no quotes of the user's messages. When it updates an earlier answer, also pass `updates` = that answer's id and `changes`: exactly one item for every finding you save, `{step, change, evidence}`, where `step` is the finding's step or query id, `change` is `confirmed`, `strengthened`, `weakened`, `new` or `dropped`, and `evidence` is a short reason. Add a `dropped` item, with `step` = a step or query id of the earlier answer (from `get_answer`), for each of its findings that no longer holds. A missing or repeated step refuses the save and nothing is saved; fix the list and save again. Never save the same analysis twice: to revise a saved analysis, start a new draft (leave out `analysis`) and save it with `updates`.
-5. **Share only when asked.** If the user asked to share, call `share_answer` right after saving, before your final message. Before sharing, tell the user: Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; a workspace limited to own sessions may show those results only to admins and the session's owner.
-6. **Answer.** Give exactly the saved final answer, complete, as your last message; callers often see only the last message, so never end with a pointer like "see above". With an earlier answer, add "updated from the earlier answer '<its title>' (data up to <cutoff date>)" and say which window you used; ids stay in tool arguments only. If you shared, add one short line saying it is shared with the workspace, or that sharing failed, from the actual `share_answer` result. Within one analysis you already saw your query results; do not reopen them with `get_answer_evidence`.
-
-## 3. When to use what, and how
-
-- **Think team-wide and over time.** Most questions are about the whole team over weeks or months: patterns across repositories and setups, not one session. Unless the user narrows it, use the last 30 days and every session of the workspace (every member sees the whole team's), and say which scope you used.
-- **Dashboard** ("open/show the dashboard", "show our costs"): call `get_dashboard` with the date range. It shows the Opaline dashboard right in the chat. Never answer with a link to opaline.so instead, and don't call `find` first.
-- **Trends** ("spend per week", "denials over the last 3 months"): one `find source=weekly` call (`groupBy=week` for team totals), `find source=runs groupBy=model|repository` for a split the weekly totals do not have, or `get_dashboard`. Report the numbers with their known runs and the snapshot date; don't interpret beyond them.
-- **Did a fix work?** Find the week the fix shipped, then `find source=weekly groupBy=week` from a few weeks before it to now, and compare the rate of the fact it targets (for example `deniedCalls / deniedCallsKnownRuns` or `failedCalls / toolCalls`) before and after. Then read a few runs from after the fix with `runs` or `tool` to check the cause is gone, not only the count.
-- **Where agents get stuck** ("why do our agents fail", "what keeps going wrong"):
-  1. Call `find` for the right source.
-  2. `read` a sample per group at `exchange` depth, up to 15, and say "read 15 of 46".
-  3. Name what went wrong in the user's words.
-  4. Call `find refs=… source=runs` to get the minutes and $ of the runs that showed it.
-  5. Rank patterns by cost and time, not by count.
-- **Scoped retros** ("retro my last 10 sessions", "this week in repo X"):
-  1. Call `find source=runs latest=N` (or `from`/`to`).
-  2. Narrow to the runs whose facts fit the question. For navigation, look at searches, not-found results and docs read before the first edit; for failures, at failed calls.
-  3. `read` only those runs.
-- **Per member**: when someone asks about one person, point them to the dashboard's member view, where they can see where that person's setup needs help. Describe setups and patterns, not the person, and don't compare them with others.
-- **Ask before the expensive part.** If the question is ambiguous (window, what "most" means, scope), ask once, after the first `find` and before any `read`. Offer options with real counts and the raw chars to read, mark a default, and wait. If the user said "just do it" or nobody can answer (a scheduled run), use the defaults and state them on the first line of the answer.
-- `find` only says *where* something happened. *What* went wrong exists only after you `read` the run.
-- For each finding, state the fix channel honestly:
-  - **instructions/skills**: may reduce it, never guarantees;
-  - **other mechanism**: docs, hook, setup script, repo/CI or lint config, product change;
-  - **not fixable**: taste iteration, model limits.
-- Say how to re-check each finding.
+Ask once, after the first `sql` and before reading, when the window, the order or the scope is ambiguous: offer options with real counts and mark a default. If the user said "just do it" or nobody can answer (a scheduled run), use the defaults and state them on the first line.
 
 Never:
-- draw conclusions from counts or word-list hits alone;
-- compare rates between groups ("2.7% vs 1.5%"); the same team's rate before and after a fix, over the runs that record the fact, is a trend, not a group comparison;
-- extrapolate from a sample to the unread runs;
-- estimate savings;
-- invent numbers;
+- conclude from counts, probabilities or search hits alone;
+- extrapolate from the runs read to the unread ones;
+- compare rates between groups ("2.7% vs 1.5%"); the same team's rate before and after a fix, over the runs that record the fact, is a trend;
+- estimate savings or invent numbers;
 - single out or rank people.
 
-Unread candidates stay "not attributed".
+Unknown is not zero: say what is unknown (NULL facts and `unrecorded_facts`, `coverage_gaps` such as `github_link`, unpriced runs, sessions search has not indexed, cut results) and the coverage behind each number.
 
-## 4. Sample analyses
+## Save and answer
 
-The numbers below are made up. They only show the shape of a good answer. Each one starts with `search_answers` and ends with one `save_answer` call and the saved answer.
+- The first `sql` leaves out `analysis` and starts a draft; pass `analysis` from the trace line to every later `sql`.
+- Before saving, give each finding a `sql` step whose rows are exactly the runs it rests on, with `session_id, agent_id, turn_idx` (for example the runs you read that showed it): `finding_runs` then records their cost, tokens and active time, which later updates compare.
+- `save_answer` once: `analysis`; `question`, a short title (not the user's words, no personal data, up to 120 characters, such as "Where our agents lost time"); `finalAnswer`, complete; `findings`, one per step, each `{step, finding}` naming a step or query id from a trace line; up to 8 `topics`. Updating an earlier answer: also `updates` = its id and `changes`, one `{step, change, evidence}` for every finding saved now (`confirmed`, `strengthened`, `weakened`, `new`) plus a `dropped` item, with a step id of the earlier answer, for each earlier finding that no longer holds. A refused save saves nothing: fix it and save again. A saved answer never changes; to revise it, start a new draft and save it with `updates`. Reuse an earlier finding's runs only after `answers action=result` shows its stored result is still available and not stale; read new runs only after its cutoff.
+- `share_answer` only when the user asks, right after saving. Tell the user first: Sharing shows the answer, its findings and the stored results behind it (which can include short excerpts from the sessions that were read) to members of your workspace; a workspace limited to own sessions may show those results only to admins and the session's owner.
+- Your last message is the saved final answer, complete (callers often see only the last message). Lead with the answer and its evidence (run ids, short quotes), the window, the impact order and the coverage. For an update add "updated from the earlier answer '<title>' (data up to <cutoff>)". If you shared, add one line from the actual `share_answer` result.
 
-- **Where agents get stuck**, "why do our agents fail?": no earlier answer → `find source=tool` → the top cause is `edit → stale patch` (52) → `read` 15 of them → 11 came right after a formatter hook rewrote the file → `find source=runs refs=[those 11]` → save with `question: "Why our agents fail"` → "11 runs, 63 min, $14. Fix: other mechanism (re-read the file after hooks). Re-check: `find source=tool cause="stale patch"` next week."
-- **Update**, the same question two weeks later, for the last 30 days (2026-09-05 to 2026-10-04): `search_answers` finds that analysis → `get_answer`: "Earlier answer (cutoff 2026-09-20): stale patches after formatter hooks, 11 in its 30 days." → `find source=tool from=2026-09-05 to=2026-10-04` recomputes the whole-window totals: 7 stale patches in the last 30 days → `get_answer_evidence` on the stored result behind its finding shows `stale=false`, so its runs stay as evidence → the earlier answer's last day lies inside the window, so `find source=tool from=2026-09-20 to=2026-10-04` lists the new ones (3) and `read` covers only those → save with `question`, `updates=<id>`, a finding for that step and `changes=[{step: <its step id>, change: "weakened", evidence: "7 in the last 30 days, was 11 in the 30 days before"}]` → the answer ends "Updated from the earlier answer 'Why our agents fail' (data up to 2026-09-20); window 2026-09-05 to 2026-10-04."
-- **Outdated docs**, "what keeps going wrong in web-app?": `find source=tool repository=web-app` → a `mistake` cause recurs: agents follow a doc that names a script or unit that no longer exists → `read` a sample → the runs stop after the doc was fixed → save → "Fixed by the doc update on <date>; no new cases since. Re-check next month."
-- **Unhappy prompts**, "where did the agents frustrate me most?": ask "last 2 or 4 weeks? Ranked by cost and time (default) or by the strongest reactions?" → `find source=user` → `read` the origin runs, up to 15 per reaction type → patterns such as "said done without clicking through the UI" with quotes and refs → price each pattern's origin runs → rank by $ and minutes → save, with a setup fix per pattern.
-- **Time**, "retro my last 10 sessions for navigation": `find source=runs latest=10` → the 6 runs with not-found results or many searches before the first edit → `read` those 6 → save → "3 runs searched for a constant named in docs/sweep.md that no longer exists, 11 min. Fix: update the doc."
-- **Trend**, "spend per model per week": `find source=runs groupBy=model` and `groupBy=week` → save. Numbers only.
-- **Before and after**, "did the permission hook we added on 2026-09-14 cut denials?": `find source=weekly groupBy=week from=2026-08-17 to=2026-10-11` → denials per known run fell from 0.21 in the four weeks before to 0.04 in the four after; the last week is partial (snapshot of 2026-10-11 03:00 UTC) → `find source=tool kind=friction from=2026-09-14` and `read` a few to see what still gets denied → save. Numbers with known runs, then the remaining cause.
+## Worked examples
+
+Dates are made up: the window is 2026-09-12 to 2026-10-12, so a range ends `< '2026-10-13'`. Every example starts with `answers action=search` and ends with the save above.
+
+**"Where did our agents lose the most time this month?"** `schema`, then rank by active time (stated), with cost, frustration, re-asks and members beside it:
+
+```sql
+SELECT repository, count() AS runs, round(sum(active_minutes)) AS active_min,
+  round(sum(cost_usd), 2) AS usd, countIf(cost_usd IS NULL) AS unpriced,
+  countIf(frustrated) AS frustrated_runs, countIf(reasked) AS reasked_runs, uniqExact(user_id) AS members
+FROM runs
+WHERE started_at >= '2026-09-12' AND started_at < '2026-10-13'
+GROUP BY repository ORDER BY active_min DESC LIMIT 20
+```
+
+Then the longest runs of the top repository, to read:
+
+```sql
+SELECT run_id, session_id, agent_id, turn_idx, round(active_minutes) AS active_min,
+  cost_usd, failed_calls, not_found, frustrated, prompt_head
+FROM runs
+WHERE started_at >= '2026-09-12' AND started_at < '2026-10-13'
+  AND repository = 'web-app' AND agent_id = ''
+ORDER BY active_minutes DESC LIMIT 15
+```
+
+`run id=<run_id>` for each; where a "running checks" phase dominates, `expand=["p3"]`, then the failing request and the record with the error. Finding: "9 of the 15 runs read spent most of their time in a test loop on e2e tests that need a running server; the setup never says how to start it. Fix: navigation pointer in the instructions plus a script (mechanism)."
+
+**"Which commands keep failing, and what do they cost?"** A week of calls, grouped:
+
+```sql
+SELECT command_prefix, count() AS calls, countIf(failed = 1) AS failures,
+  round(sum(call_minutes)) AS call_min, uniqExact(run_id) AS runs,
+  uniqExact(user_id) AS members, any(command) AS example
+FROM calls
+WHERE started_at >= '2026-10-06' AND started_at < '2026-10-13' AND command_from = 'command'
+GROUP BY command_prefix ORDER BY failures DESC LIMIT 20
+```
+
+The top group's time both ways: `group_call_time` is `call_min` above; `group_run_time`:
+
+```sql
+SELECT count() AS runs, round(sum(active_minutes)) AS run_min
+FROM runs
+WHERE run_id IN (SELECT run_id FROM calls
+  WHERE started_at >= '2026-10-06' AND started_at < '2026-10-13'
+    AND command_prefix = 'bun test' AND failed = 1)
+```
+
+Read the runs before calling any of it time lost; the fix is usually an automated check or a streamlined tool.
+
+**"What could have been a skill?"** Recurring requests across sessions and members:
+
+```sql
+SELECT lower(substring(text, 1, 50)) AS opening, count() AS prompts,
+  uniqExact(session_id) AS sessions, uniqExact(user_id) AS members
+FROM prompts
+WHERE at >= '2026-09-12' AND at < '2026-10-13' AND genuine = 1
+GROUP BY opening HAVING sessions >= 3 ORDER BY sessions DESC LIMIT 30
+```
+
+For a recurring kind of request, find its runs by meaning and rank them by time, with the skills each used:
+
+```sql
+SELECT r.run_id, r.session_id, r.agent_id, r.turn_idx, round(r.active_minutes) AS active_min,
+  r.skills, r.reasked, s.why
+FROM search('prepare the release notes from merged pull requests', 'meaning', 30) AS s
+JOIN runs AS r USING (run_id)
+WHERE r.agent_id = ''
+ORDER BY r.active_minutes DESC LIMIT 15
+```
+
+Read the top runs: the same steps done by hand in several members' runs, with no skill used, is a **skill**; re-asks after "done" point at missing know-how.
+
+**"Which skill is outdated?"** Runs per skill used, ranked by frustration (stated):
+
+```sql
+SELECT arrayJoin(skills) AS skill, count() AS runs, round(sum(active_minutes)) AS active_min,
+  countIf(frustrated) AS frustrated_runs, countIf(reasked) AS reasked_runs,
+  sum(failed_calls) AS failures, uniqExact(user_id) AS members
+FROM runs
+WHERE started_at >= '2026-09-12' AND started_at < '2026-10-13'
+GROUP BY skill ORDER BY frustrated_runs DESC LIMIT 20
+```
+
+Then the skill text those runs received, to quote and compare versions:
+
+```sql
+SELECT run_id, session_id, agent_id, turn_idx, record_idx, at, text_chars, substring(text, 1, 120) AS head
+FROM prompts
+WHERE at >= '2026-09-12' AND at < '2026-10-13' AND kind = 'injected_context'
+  AND subtype = 'skill_body' AND positionCaseInsensitive(text, 'deploy') > 0
+ORDER BY at DESC LIMIT 20
+```
+
+`run` the frustrated runs and expand `r<record_idx>` for the exact skill text; a step that names a script or path that no longer exists is a **skill update**.
+
+**"How can I make files easier to find for the agent?"** Navigation facts per repository (`not_found` is NULL where it cannot be recorded, such as Claude Code subagents; report those as unknown):
+
+```sql
+SELECT repository, count() AS runs, sum(searches) AS search_calls, sum(not_found) AS not_found_calls,
+  countIf(not_found IS NULL) AS not_found_unknown, round(sum(active_minutes)) AS active_min
+FROM runs
+WHERE started_at >= '2026-09-12' AND started_at < '2026-10-13'
+GROUP BY repository ORDER BY not_found_calls DESC LIMIT 20
+```
+
+The paths agents keep missing:
+
+```sql
+SELECT file_path, count() AS calls, uniqExact(session_id) AS sessions, uniqExact(user_id) AS members
+FROM calls
+WHERE started_at >= '2026-10-06' AND started_at < '2026-10-13' AND file_path != '' AND failed = 1
+GROUP BY file_path ORDER BY sessions DESC LIMIT 20
+```
+
+Add `search` text "the agent could not find the file it needed" for runs the facts miss, then read the exploring phases (`expand=["p1"]`). Fixes: a **navigation pointer** (where things live), or **slim the instructions** when the pointer exists but is buried.
+
+**"Did the fix we shipped on 2026-09-21 work?"** The earlier answer's findings and their runs:
+
+```sql
+SELECT step_id, any(finding) AS finding_text, count() AS cited_runs,
+  round(sum(active_minutes)) AS active_min, round(sum(cost_usd), 2) AS usd
+FROM finding_runs
+WHERE analysis_id = 'an_123'
+GROUP BY step_id
+```
+
+The same measure per week, before and after, over the runs a member answers (the definition `schema` gives for rates):
+
+```sql
+SELECT toMonday(started_at) AS week, count() AS runs, countIf(frustrated) AS frustrated_runs,
+  countIf(reasked) AS reasked_runs, round(sum(active_minutes)) AS active_min
+FROM runs
+WHERE started_at >= '2026-08-17' AND started_at < '2026-10-13'
+  AND agent_id = '' AND ifNull(thread_source, '') != 'subagent'
+GROUP BY week ORDER BY week
+```
+
+Read a few runs after the fix to check the cause is gone, not only the count. For run questions on the same runs: `estimate_questions questions=["<id from schema>"] runs="SELECT session_id, agent_id, turn_idx FROM runs WHERE …"`, say the cost, then `run_questions` with the token.
 
 ## Conventions
 
-- Dates are UTC `YYYY-MM-DD`. Resolve "last week" and similar to explicit dates and say which range you used.
-- Every tool works in one workspace. Without `workspace` it uses the default workspace in the plugin settings, else the one the user last opened; `list_workspaces` marks it with `default: true`. If the result looks empty, call `list_workspaces` and pass the slug.
-- Cost is estimated API cost in USD. Runs without usage data are unpriced; say how many.
-- Lead with the answer and its evidence: refs and short quotes. If a read is refused, say so instead of retrying.
+- Dates are UTC `YYYY-MM-DD`. Resolve "this month" and "last week" to explicit dates and say which range you used.
+- Every tool works in one workspace: without `workspace`, the default in the plugin settings, else the one the user last opened. If results look empty, call `list_workspaces` and pass the slug.
+- Cost is estimated API cost in USD; NULL cost is unpriced or unknown, never free: say how many runs.
+- Subagent runs (`agent_id` not empty, or a Codex thread with `thread_source = 'subagent'`) are part of their parent's work, never separate work.
+- If a tool refuses a read or says the quota is used, say so instead of retrying.
 
 ## When there is no data
 
-If `find` finds no sessions (or `list_workspaces` shows `sessionsLast365Days: 0`), there are no sessions you can see yet. Tell the user to open https://opaline.so, sign in and follow the steps there to connect their coding agents; each teammate connects their own. Then check again with `list_workspaces`. Don't run any commands for them.
+If `list_workspaces` shows `sessionsLast365Days: 0` or the views hold no runs, there are no sessions to analyse yet. Tell the user to open https://opaline.so, sign in and follow the steps there to connect their coding agents; each teammate connects their own. Then check again with `list_workspaces`. Don't run any commands for them.
