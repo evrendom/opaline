@@ -3,6 +3,7 @@ import {
 	parseOrganizationScope,
 	parsePositiveIntegerFlag,
 	parseRetireTranscriptRecordsArgs,
+	parseTranscriptSearchBackfillArgs,
 } from "./l1-script-args.js";
 
 describe("L1 script arguments", () => {
@@ -77,5 +78,66 @@ describe("L1 script arguments", () => {
 				"--retire",
 			]),
 		).toThrow();
+	});
+
+	test("backfill:transcript-search previews by default, paced at 30 sessions a minute below load 12", () => {
+		expect(
+			parseTranscriptSearchBackfillArgs(["--organization-id", "org"]),
+		).toEqual({
+			organizationId: "org",
+			execute: false,
+			maxSessions: 10_000,
+			after: undefined,
+			sessionsPerMinute: 30,
+			maxLoad: 12,
+		});
+		expect(
+			parseTranscriptSearchBackfillArgs([
+				"--all-organizations",
+				"--execute",
+				"--max-sessions",
+				"50",
+				"--after",
+				"cursor",
+				"--sessions-per-minute",
+				"6",
+				"--max-load",
+				"4",
+			]),
+		).toEqual({
+			organizationId: undefined,
+			execute: true,
+			maxSessions: 50,
+			after: "cursor",
+			sessionsPerMinute: 6,
+			maxLoad: 4,
+		});
+		expect(() => parseTranscriptSearchBackfillArgs(["--execute"])).toThrow(
+			"Name the scope",
+		);
+		expect(() =>
+			parseTranscriptSearchBackfillArgs([
+				"--organization-id",
+				"org",
+				"--sessions-per-minute",
+				"601",
+			]),
+		).toThrow("--sessions-per-minute");
+		expect(() =>
+			parseTranscriptSearchBackfillArgs([
+				"--organization-id",
+				"org",
+				"--max-load",
+				"0",
+			]),
+		).toThrow("--max-load");
+		expect(() =>
+			parseTranscriptSearchBackfillArgs([
+				"--organization-id",
+				"org",
+				"--after",
+				" ",
+			]),
+		).toThrow("--after");
 	});
 });

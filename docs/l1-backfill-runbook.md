@@ -8,6 +8,7 @@ How to bring existing production data up to the L1 stack ([spec](l1-literal-sche
 | `retire:transcript-records` | lightweight DELETEs of superseded generations past the 10-minute grace | `--max-sessions` (default 10,000; `hasMore` when more remain), `--page-size` (sessions per DELETE, default 25, max 100), `--pause-ms` (between DELETEs, default 500) |
 | `backfill:l1-edges` | `l1_edge_scope` requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue; repositories are queued by the first run only |
 | `backfill:run-index` | `run_index` scope requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue |
+| `backfill:transcript-search` | search chunks, hits and OpenAI embeddings of past sessions ([section 7b](#7b-transcript-search-history)) | `--max-sessions` (default 10,000, max 100,000), `--after <next>`, `--sessions-per-minute` (default 30), `--max-load` (pause while ClickHouse `LoadAverage1` is above it, default 12); stops at a workspace's OpenAI quota |
 | `audit:l1` | nothing | `--json`, `--compare <before.json>`; every statement within the analysis bounds |
 
 The worker only builds what is queued, live requests (priority 0) first, and only while `L1_EDGES_WORKER_ENABLED=true` (minute cron, 240-second budget). Requests stay queued while it is off.
@@ -95,6 +96,21 @@ It queues every session whose committed transcript has no current run index, edg
 bun run audit:l1 --organization-id $ORG --json > audit-$ORG-9-after.json
 bun run audit:l1 --organization-id $ORG --compare audit-$ORG-0-before.json
 ```
+
+## 7b. Transcript search history
+
+Uploads are indexed for search as they arrive; `backfill:transcript-search` indexes the sessions uploaded before, through the same pass (secret filter, chunking, deduplication per member, the workspace's OpenAI quota, purge fences). It only touches workspaces uploads are indexed for: a paid plan (`active` or `past_due`) or listed in `TRANSCRIPT_EMBEDDINGS_WORKSPACES`; any other workspace is reported as not indexed. Run it after step 3, since it reads the committed transcript-records generation.
+
+```bash
+bun run backfill:transcript-search --organization-id $ORG                  # preview: sessions, estimatedTokens, estimatedCostUsd
+nohup bun run backfill:transcript-search --organization-id $ORG --execute > search-$ORG-1.json 2> search-$ORG-1.log &
+bun run backfill:transcript-search --organization-id $ORG --execute --after <next>   # while it prints next
+```
+
+- It selects sessions whose search receipt is missing, of an older generation, or still counts chunks without a vector, newest first, and leaves sessions indexed at their current generation alone. A preview never calls OpenAI; its token estimate counts every record's text before deduplication (text-embedding-3-small at $0.02 per 1M tokens), so it is an upper bound, and `workspaces[].fitsQuota` says whether it fits what is left of the 30-day quota.
+- `--execute` needs `OPENAI_API_KEY`. It starts at most `--sessions-per-minute` passes a minute (a large session the pass limits cut short gets further passes, each counted) and waits 30 seconds at a time while `LoadAverage1` is above `--max-load`; `loadPausedSeconds` says how long. Ctrl-C (or `kill -INT` on a detached run) stops it before the next session and still prints the summary.
+- It stops with `stopped: "quota"` when a workspace has used its quota, and its message names the workspace and when the quota resets: continue with the printed `--after` after that, or raise `TRANSCRIPT_EMBEDDINGS_QUOTA_TOKENS` on purpose. `next` is left before the session that ran out, so continuing finishes it.
+- Stop when it exits with code 2 (`failed > 0`, read `issues`), when `incomplete` grows (OpenAI errors or sessions that need more passes; a later run picks them up), or when it keeps pausing for load.
 
 ## 8. Roll out per organization
 

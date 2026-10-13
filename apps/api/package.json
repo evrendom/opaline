@@ -9,6 +9,7 @@
 		"backfill:run-index": "bun src/scripts/backfill-run-index.ts",
 		"backfill:skills": "bun src/scripts/backfill-skills.ts",
 		"backfill:transcript-records": "bun src/scripts/backfill-transcript-records.ts",
+		"backfill:transcript-search": "bun src/scripts/backfill-transcript-search.ts",
 		"backfill:session-lineage": "bun src/scripts/backfill-session-lineage.ts",
 		"backfill:usage-events": "bun src/scripts/backfill-usage-events.ts",
 		"audit:l1": "bun src/scripts/audit-l1.ts",

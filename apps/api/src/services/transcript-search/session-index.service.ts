@@ -73,7 +73,9 @@ export interface SessionIndexEnv {
 	readonly embedder: TranscriptEmbedder | null;
 	readonly quota: EmbeddingQuota;
 	readonly now?: () => Date;
-	readonly limits?: Partial<typeof TRANSCRIPT_SEARCH_LIMITS>;
+	readonly limits?: Partial<
+		Record<keyof typeof TRANSCRIPT_SEARCH_LIMITS, number>
+	>;
 }
 
 export type SessionIndexOutcome =

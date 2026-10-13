@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 
 /**
  * Argument parsing of the L1 operator scripts (`retire:transcript-records`,
- * `backfill:run-index`, `audit:l1`), kept free of database clients so it can
+ * `backfill:run-index`, `backfill:transcript-search`, `audit:l1`), kept free of database clients so it can
  * be tested. Every script is a preview unless `--execute` is given, and the
  * ones that write must name their scope: `--organization-id <id>`, or
  * `--all-organizations` to mean every workspace on purpose.
@@ -178,4 +178,58 @@ export function parseL1EdgeBackfillArgs(
 	argv: readonly string[],
 ): L1EdgeBackfillArgs {
 	return parseRunIndexBackfillArgs(argv);
+}
+
+export interface TranscriptSearchBackfillArgs extends OrganizationScope {
+	readonly execute: boolean;
+	readonly maxSessions: number;
+	/** The `next` value a previous run printed. */
+	readonly after: string | undefined;
+	/** Indexing passes started per minute at most. */
+	readonly sessionsPerMinute: number;
+	/** ClickHouse `LoadAverage1` above which the run pauses. */
+	readonly maxLoad: number;
+}
+
+export function parseTranscriptSearchBackfillArgs(
+	argv: readonly string[],
+): TranscriptSearchBackfillArgs {
+	const { values } = parseArgs({
+		args: [...argv],
+		strict: true,
+		options: {
+			after: { type: "string" },
+			"all-organizations": { type: "boolean", default: false },
+			execute: { type: "boolean", default: false },
+			"max-load": { type: "string" },
+			"max-sessions": { type: "string" },
+			"organization-id": { type: "string" },
+			"sessions-per-minute": { type: "string" },
+		},
+	});
+	if (values.after !== undefined && !values.after.trim())
+		throw new Error("--after must not be empty.");
+	return {
+		...parseOrganizationScope(values),
+		execute: values.execute,
+		maxSessions: parsePositiveIntegerFlag(
+			values["max-sessions"],
+			10_000,
+			"--max-sessions",
+			100_000,
+		),
+		after: values.after,
+		sessionsPerMinute: parsePositiveIntegerFlag(
+			values["sessions-per-minute"],
+			30,
+			"--sessions-per-minute",
+			600,
+		),
+		maxLoad: parsePositiveIntegerFlag(
+			values["max-load"],
+			12,
+			"--max-load",
+			1_000,
+		),
+	};
 }

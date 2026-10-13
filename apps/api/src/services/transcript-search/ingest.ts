@@ -31,7 +31,8 @@ let postgresDeps: Promise<UploadIndexDeps> | null = null;
  * Indexes an uploaded session for search after its transcript records are
  * written (and again on a duplicate upload, which goes on where an earlier
  * pass stopped). Only workspaces with a paid plan or listed as internal
- * (`access.ts`); history is not indexed here. Best effort: never fails the
+ * (`access.ts`); history is indexed by
+ * `backfill:transcript-search` (`history-backfill.service.ts`). Best effort: never fails the
  * upload.
  */
 export async function indexUploadedSessionBestEffort(
