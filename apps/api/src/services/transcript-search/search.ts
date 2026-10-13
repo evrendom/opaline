@@ -373,12 +373,16 @@ export function searchStatement(
 	const months = `month >= toStartOfMonth(${since}) AND month <= toStartOfMonth(${until})`;
 	const name = (cte: string) => `${prefix}_${cte}`;
 	const snippet = SEARCH_LIMITS.snippetChars;
+	// arrayResize: ClickHouse computes the distance over whole blocks before
+	// notEmpty filters them, and a chunk still waiting for its vector has none
+	// (equal sizes are required); padded with zeros its similarity is NaN, which
+	// never passes MEANING_MIN_SIMILARITY.
 	return `WITH
 		${name("chunks")} AS (
 			SELECT user_id, chunk_hash, max(chunk_similarity) AS similarity, max(chunk_meaning) AS in_meaning,
 				max(chunk_exact) AS in_exact, argMax(chunk_snippet, (chunk_exact, chunk_similarity)) AS snippet
 			FROM (
-				(SELECT user_id, chunk_hash, 1 - cosineDistance(embedding, ${p("vector", "Array(Float32)")}) AS chunk_similarity,
+				(SELECT user_id, chunk_hash, 1 - cosineDistance(arrayResize(embedding, length(${p("vector", "Array(Float32)")})), ${p("vector", "Array(Float32)")}) AS chunk_similarity,
 					1 AS chunk_meaning, 0 AS chunk_exact, substringUTF8(text, 1, ${snippet}) AS chunk_snippet
 				FROM ${TRANSCRIPT_CHUNKS_TABLE}
 				WHERE ${scope} AND ${months} AND ${user} AND ${p("meaning", "UInt8")} = 1 AND notEmpty(embedding)
