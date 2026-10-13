@@ -12,6 +12,7 @@ import {
 import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { runIndexTable } from "../src/db/schema/run-index.js";
 import { weeklyTotalsTable } from "../src/db/schema/weekly-totals.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -131,19 +132,10 @@ export async function runNotFoundUnknownMigration(options: {
 	if (applied.length === 0)
 		for (const statement of extractExecutableStatements(options.migrationSql))
 			await options.executor.execute(statement);
-	let replicas = 1;
-	try {
-		const result = await options.executor.query<{ replicas: number | string }>(
-			"SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10",
-		);
-		replicas = Math.max(1, Number(result[0]?.replicas ?? 0));
-	} catch (error) {
-		if (
-			!(error instanceof Error) ||
-			!/privilege|ACCESS_DENIED/u.test(error.message)
-		)
-			throw error;
-	}
+	const replicas = await countReplicas(
+		options.executor,
+		"the not found columns and the weekly totals view",
+	);
 	const read = (table: string) =>
 		replicas > 1 ? `clusterAllReplicas('default', ${table})` : table;
 	const { attempts, delayMs } = options.readBack ?? {

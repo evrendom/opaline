@@ -14,6 +14,7 @@ import {
 	resolveClickHouseUsername,
 } from "../src/clickhouse-connection.js";
 import { RUN_REQUEST_COLUMNS } from "../src/run-index.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -67,7 +68,10 @@ export async function runRunRequestsMigration(options: {
 		attempts: 13,
 		delayMs: 10_000,
 	};
-	const replicas = await countReplicas(options.executor);
+	const replicas = await countReplicas(
+		options.executor,
+		"the run requests tables",
+	);
 	for (let attempt = 1; ; attempt++) {
 		const mismatch = await schemaMismatch(options, replicas);
 		if (mismatch === null) break;
@@ -83,25 +87,6 @@ export async function runRunRequestsMigration(options: {
 			checksum,
 			appliedAt: new Date().toISOString().replace("Z", ""),
 		});
-}
-
-/** Replicas of the `default` cluster; 0 when the user may not list them. */
-async function countReplicas(executor: ClickHouseExecutor): Promise<number> {
-	try {
-		const [row] = await executor.query<{ replicas: string | number }>(
-			"SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10",
-		);
-		return Number(row?.replicas ?? 0);
-	} catch (error) {
-		if (
-			!(
-				error instanceof Error &&
-				/Not enough privileges|ACCESS_DENIED/u.test(error.message)
-			)
-		)
-			throw error;
-		return 0;
-	}
 }
 
 interface InstalledColumn {

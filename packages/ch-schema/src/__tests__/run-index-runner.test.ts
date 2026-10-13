@@ -53,38 +53,51 @@ function tableRow(host: string, textTtl = true) {
 
 /**
  * A cluster of `replicas` where replica b lags for its first `staleReads`
- * reads: it serves no run index yet, or one without the text TTLs.
+ * reads: it serves no run index yet, or one without the text TTLs. `denied`
+ * is production: two replicas, a user that may not read `system.clusters`,
+ * and a load-balanced endpoint whose reads each reach the next replica.
+ * `unlisted` may not use `clusterAllReplicas` either.
  */
 function cluster(
-	replicas: number | "denied",
+	replicas: number | "denied" | "unlisted",
 	staleReads: number,
 	lag: "missing" | "untimed" = "missing",
 ) {
 	let reads = 0;
+	let next = 0;
 	const queries: string[] = [];
 	const journal: { name: string; checksum: string }[] = [];
-	const hosts = replicas !== "denied" && replicas > 1 ? ["a", "b"] : [""];
+	const listed = typeof replicas === "number";
+	const hosts = !listed || replicas > 1 ? ["a", "b"] : [""];
 	const stale = (host: string) => host === "b" && reads <= staleReads;
+	const denied = (grant: string) =>
+		new Error(
+			`default: Not enough privileges. To execute this query, it's necessary to have the grant ${grant}.`,
+		);
 	const executor = {
 		execute: async () => {},
 		query: async (sql: string) => {
 			queries.push(sql);
 			if (sql.includes("system.clusters")) {
-				if (replicas === "denied")
-					throw new Error(
-						"default: Not enough privileges. To execute this query, it's necessary to have the grant SELECT(cluster) ON system.clusters.",
-					);
+				if (!listed) throw denied("SELECT(cluster) ON system.clusters");
 				return [{ replicas }];
 			}
+			if (sql.includes("system.one")) {
+				if (replicas === "unlisted") throw denied("REMOTE ON *.*");
+				return [{ replicas: hosts.length }];
+			}
+			const served = sql.includes("clusterAllReplicas")
+				? hosts
+				: [hosts[next++ % hosts.length] ?? ""];
 			if (sql.includes("system.columns")) {
 				reads++;
-				return hosts.flatMap((host) =>
+				return served.flatMap((host) =>
 					stale(host) && lag === "missing"
 						? []
 						: COLUMNS.map((column) => ({ ...column, host })),
 				);
 			}
-			return hosts.flatMap((host) =>
+			return served.flatMap((host) =>
 				stale(host) && lag === "missing"
 					? []
 					: [tableRow(host, !(stale(host) && lag === "untimed"))],
@@ -154,14 +167,25 @@ describe("run index runner", () => {
 		}
 	});
 
-	test("without the privilege to list replicas, the endpoint is read back with retries", async () => {
-		// Production's user cannot read system.clusters.
-		const state = cluster("denied", 0);
+	test("without the privilege to read system.clusters, the replicas answer for themselves", async () => {
+		// Production: the endpoint's columns and table reads reach different
+		// replicas, so only clusterAllReplicas pairs them by host.
+		const state = cluster("denied", 1);
 		await state.run();
 		expect(state.journal).toHaveLength(1);
 		expect(
-			state.queries.some((sql) => sql.includes("clusterAllReplicas")),
-		).toBe(false);
+			state.queries.some((sql) =>
+				sql.includes("clusterAllReplicas('default', system.tables)"),
+			),
+		).toBe(true);
+	});
+
+	test("refuses without journaling when nothing can list the replicas", async () => {
+		const state = cluster("unlisted", 0);
+		await expect(state.run()).rejects.toThrow(
+			"Cannot list the cluster's replicas",
+		);
+		expect(state.journal).toHaveLength(0);
 	});
 
 	test("a single server reads its own tables", async () => {

@@ -14,6 +14,7 @@ import {
 	RUN_INDEX_TEXT_COLUMNS,
 	runIndexTable,
 } from "../src/db/schema/run-index.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -83,7 +84,10 @@ export async function runL1RetentionMigration(options: {
 	);
 	if (applied.some((entry) => entry.checksum !== checksum))
 		throw new Error("L1 retention migration checksum mismatch");
-	const replicas = await countReplicas(options.executor);
+	const replicas = await countReplicas(
+		options.executor,
+		"the L1 tables without retention",
+	);
 	const apply = async () => {
 		// The statements run on the endpoint this executor reaches, so what
 		// still applies is what that endpoint serves, not a lagging replica.
@@ -148,33 +152,6 @@ function hasTableTtl(engineFull: string): boolean {
 
 function hasColumnTtl(createQuery: string, column: string): boolean {
 	return /\sTTL\s/u.test(columnDeclaration(createQuery, column));
-}
-
-/**
- * Replicas of the `default` cluster: every ClickHouse Cloud replica that can
- * serve an insert. 0 or 1 on a single server.
- */
-async function countReplicas(executor: ClickHouseExecutor): Promise<number> {
-	try {
-		const [row] = await executor.query<{ replicas: string | number }>(
-			`SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10`,
-		);
-		return Number(row?.replicas ?? 0);
-	} catch (error) {
-		// The production user may not read system.clusters. The read-back then
-		// checks the endpoint it reaches, retried for replica lag.
-		if (
-			!(
-				error instanceof Error &&
-				/Not enough privileges|ACCESS_DENIED/u.test(error.message)
-			)
-		)
-			throw error;
-		console.warn(
-			"Cannot list the cluster's replicas (no privilege); validating retention through the endpoint with retries",
-		);
-		return 0;
-	}
 }
 
 const tableList = L1_RETENTION_TABLES.map((name) => `'${name}'`).join(", ");

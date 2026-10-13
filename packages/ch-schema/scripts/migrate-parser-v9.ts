@@ -10,6 +10,7 @@ import {
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
 import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -62,19 +63,10 @@ export async function runParserV9Migration(options: {
 	if (applied.length === 0)
 		for (const statement of extractExecutableStatements(options.migrationSql))
 			await options.executor.execute(statement);
-	let replicas = 1;
-	try {
-		const result = await options.executor.query<{ replicas: number | string }>(
-			"SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10",
-		);
-		replicas = Math.max(1, Number(result[0]?.replicas ?? 0));
-	} catch (error) {
-		if (
-			!(error instanceof Error) ||
-			!/privilege|ACCESS_DENIED/u.test(error.message)
-		)
-			throw error;
-	}
+	const replicas = await countReplicas(
+		options.executor,
+		"the parser 9 columns",
+	);
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,
 		delayMs: 10_000,

@@ -17,6 +17,7 @@ import {
 	RUN_INDEX_TEXT_COLUMNS,
 	runIndexTable,
 } from "../src/db/schema/run-index.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -104,7 +105,7 @@ export async function runRunIndexMigration(options: {
 		attempts: 13,
 		delayMs: 10_000,
 	};
-	const replicas = await countReplicas(options.executor);
+	const replicas = await countReplicas(options.executor, "run_index");
 	for (let attempt = 1; ; attempt++) {
 		const mismatch = await schemaMismatch(options, replicas);
 		if (mismatch === null) break;
@@ -120,33 +121,6 @@ export async function runRunIndexMigration(options: {
 			checksum,
 			appliedAt: new Date().toISOString().replace("Z", ""),
 		});
-}
-
-/**
- * Replicas of the `default` cluster: every ClickHouse Cloud replica that can
- * serve an insert. 0 or 1 on a single server.
- */
-async function countReplicas(executor: ClickHouseExecutor): Promise<number> {
-	try {
-		const [row] = await executor.query<{ replicas: string | number }>(
-			`SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10`,
-		);
-		return Number(row?.replicas ?? 0);
-	} catch (error) {
-		// The production user may not read system.clusters. The read-back then
-		// checks the endpoint it reaches, retried for replica lag.
-		if (
-			!(
-				error instanceof Error &&
-				/Not enough privileges|ACCESS_DENIED/u.test(error.message)
-			)
-		)
-			throw error;
-		console.warn(
-			"Cannot list the cluster's replicas (no privilege); validating run_index through the endpoint with retries",
-		);
-		return 0;
-	}
 }
 
 type InstalledColumn = {
