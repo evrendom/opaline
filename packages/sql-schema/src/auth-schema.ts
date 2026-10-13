@@ -13,6 +13,8 @@ export const user = pgTable("user", {
 	emailVerified: boolean("email_verified").default(false).notNull(),
 	image: text("image"),
 	jobTitle: text("job_title"),
+	/** IANA time zone the app last saw this user in ("Europe/Berlin"); the digests go out by its clock. */
+	timeZone: text("time_zone"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
 		.defaultNow()
 		.notNull(),

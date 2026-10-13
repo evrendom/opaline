@@ -94,8 +94,11 @@ describe("email helpers", () => {
 	});
 
 	test("uses the Opaline sender for automated emails", () => {
-		expect(OPALINE_AUTOMATED_EMAIL_SENDER).toBe("Opaline <evren@opaline.so>");
+		expect(OPALINE_AUTOMATED_EMAIL_SENDER).toBe(
+			"Opaline <notifications@mail.opaline.so>",
+		);
 		expect(readResendConfig().fromEmail).toBe(OPALINE_AUTOMATED_EMAIL_SENDER);
+		expect(readResendConfig().replyTo).toBe("Opaline <evren@opaline.so>");
 	});
 
 	test("buildClickHousePurgeFailureAlertContent includes actionable sanitized fields", () => {

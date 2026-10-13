@@ -1,3 +1,7 @@
+import {
+	type SkillIconName,
+	skillIconName,
+} from "@rudel/api-routes/skill-icon";
 import type { Icon } from "@tabler/icons-react";
 import {
 	IconBox,
@@ -17,32 +21,28 @@ import {
 	IconTools,
 } from "@tabler/icons-react";
 
-const SKILL_ICONS: { name: string; icon: Icon }[] = [
-	{ name: "wrench", icon: IconTool },
-	{ name: "drill", icon: IconHammer },
-	{ name: "paintbrush", icon: IconBrush },
-	{ name: "compass", icon: IconCompass },
-	{ name: "ruler", icon: IconRuler },
-	{ name: "scissors", icon: IconScissors },
-	{ name: "tape-measure", icon: IconRuler2 },
-	{ name: "flashlight", icon: IconBulb },
-	{ name: "magnet", icon: IconMagnet },
-	{ name: "microscope", icon: IconMicroscope },
-	{ name: "telescope", icon: IconTelescope },
-	{ name: "drafting-tools", icon: IconPencilCog },
-	{ name: "toolbox", icon: IconBox },
-	{ name: "tools", icon: IconTools },
-	{ name: "experiment", icon: IconTestPipe },
-];
+export const SKILL_ICONS: Record<SkillIconName, Icon> = {
+	wrench: IconTool,
+	drill: IconHammer,
+	paintbrush: IconBrush,
+	compass: IconCompass,
+	ruler: IconRuler,
+	scissors: IconScissors,
+	"tape-measure": IconRuler2,
+	flashlight: IconBulb,
+	magnet: IconMagnet,
+	microscope: IconMicroscope,
+	telescope: IconTelescope,
+	"drafting-tools": IconPencilCog,
+	toolbox: IconBox,
+	tools: IconTools,
+	experiment: IconTestPipe,
+};
 
+/** The skill's icon; the choice is shared with the usage digest emails. */
 export function getSkillIcon(skill: string) {
-	const name = skill.trim().toLowerCase();
-	// A fixed palette and name hash keep assignments stable without a per-skill registry.
-	let hash = 2166136261;
-	for (const character of name) {
-		hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
-	}
-	return SKILL_ICONS[(hash >>> 0) % SKILL_ICONS.length] ?? SKILL_ICONS[0];
+	const name = skillIconName(skill);
+	return { name, icon: SKILL_ICONS[name] };
 }
 
 export function ConversationSkillIcon({

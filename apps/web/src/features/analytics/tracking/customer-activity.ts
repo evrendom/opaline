@@ -23,6 +23,11 @@ export async function recordDailyCustomerActivity(
 		const response = await fetch("/api/customer-activity", {
 			credentials: "include",
 			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			// The usage digests go out at 09:00 in this time zone.
+			body: JSON.stringify({
+				timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+			}),
 		});
 		if (!response.ok) return;
 		try {

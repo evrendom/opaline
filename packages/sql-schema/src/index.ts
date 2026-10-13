@@ -104,3 +104,8 @@ export {
 	wrappedShare,
 } from "./schema.js";
 export { trendsSource } from "./trends-source-schema.js";
+export {
+	usageDigest,
+	usageDigestDelivery,
+	usageDigestPreference,
+} from "./usage-digest-schema.js";

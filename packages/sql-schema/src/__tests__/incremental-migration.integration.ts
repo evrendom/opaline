@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0063 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063)", async () => {
+test("applies migrations 0020-0064 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), and creates the usage digest tables (0064)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0063_live_sessions");
+	expect(latestMigration?.tag).toBe("0064_usage_digest");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -233,6 +233,23 @@ test("applies migrations 0020-0063 to a database already migrated through 0019, 
 			expect([...rateLimitUserConstraints]).toEqual([
 				{ name: "ingest_rate_limit_counter_api_key_id_unique" },
 			]);
+			// 0064: usage digest preferences, their send queue, who got each one,
+			// and the time zone the digests go out in.
+			const usageDigestTables = await migrationSql<{ table_name: string }[]>`
+				SELECT table_name FROM information_schema.tables
+				WHERE table_schema = 'public' AND table_name LIKE 'usage\\_digest%'
+				ORDER BY table_name
+			`;
+			expect([...usageDigestTables]).toEqual([
+				{ table_name: "usage_digest" },
+				{ table_name: "usage_digest_delivery" },
+				{ table_name: "usage_digest_preference" },
+			]);
+			const [timeZoneColumn] = await migrationSql<{ is_nullable: string }[]>`
+				SELECT is_nullable FROM information_schema.columns
+				WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'time_zone'
+			`;
+			expect(timeZoneColumn?.is_nullable).toBe("YES");
 			await expectIngestJobSizeBound(migrationSql);
 			await expectEdgeScopeKinds(migrationSql);
 			// 0057: existing workspaces keep the own-sessions-only option off.
@@ -272,7 +289,7 @@ test("applies migrations 0020-0063 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 64,
+				count: 65,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`

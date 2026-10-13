@@ -46,6 +46,7 @@ import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
 import { repositorySettingsRouter } from "./handlers/repository-settings.js";
 import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
+import { usageDigestRouter } from "./handlers/usage-digest-preferences.js";
 import { isVercelRuntime } from "./lib/api-runtime.js";
 import { ClickHouseWriteFencedError } from "./lib/clickhouse-write-fence.js";
 import {
@@ -2635,6 +2636,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		syncCommit: githubRepositoryEvidenceSyncCommit,
 	},
 	repositorySettings: repositorySettingsRouter,
+	usageDigest: usageDigestRouter,
 	repositoryEvidence: {
 		commit: repositoryEvidenceCommit,
 		init: repositoryEvidenceInit,

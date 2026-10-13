@@ -13,6 +13,8 @@ export interface ResendConfig {
 	audienceId?: string;
 	clickHousePurgeAlertRecipient?: string;
 	fromEmail?: string;
+	/** Where replies to automated emails go. */
+	replyTo?: string;
 }
 
 export interface InvitationEmailData {
@@ -350,6 +352,7 @@ export async function sendOrganizationInvitationEmail(
 		const resend = new Resend(config.apiKey);
 		await resend.emails.send({
 			from: config.fromEmail,
+			replyTo: config.replyTo,
 			to: data.inviteeEmail,
 			subject: message.subject,
 			html: message.html,
@@ -380,6 +383,7 @@ export async function sendBillingUpgradeRequestEmail(
 		const response = await resend.emails.send(
 			{
 				from: config.fromEmail,
+				replyTo: config.replyTo,
 				to: data.ownerEmail,
 				subject: message.subject,
 				html: message.html,
@@ -423,6 +427,7 @@ export async function sendPasswordResetEmail(
 		const resend = new Resend(config.apiKey);
 		await resend.emails.send({
 			from: config.fromEmail,
+			replyTo: config.replyTo,
 			to: data.email,
 			subject: message.subject,
 			html: message.html,
@@ -460,6 +465,7 @@ export async function sendEmailVerificationOtpEmail(
 		const resend = new Resend(config.apiKey);
 		await resend.emails.send({
 			from: config.fromEmail,
+			replyTo: config.replyTo,
 			to: data.email,
 			subject: message.subject,
 			html: message.html,
@@ -497,6 +503,7 @@ export async function sendClickHousePurgeFailureAlert(
 	const response = await resend.emails.send(
 		{
 			from: config.fromEmail,
+			replyTo: config.replyTo,
 			to: config.clickHousePurgeAlertRecipient,
 			subject: message.subject,
 			html: message.html,

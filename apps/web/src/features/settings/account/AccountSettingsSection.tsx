@@ -6,6 +6,7 @@ import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalytics
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { AccountDangerZoneCard } from "@/features/settings/account/components/AccountDangerZoneCard";
 import { AppearanceCard } from "@/features/settings/account/components/AppearanceCard";
+import { EmailDigestsCard } from "@/features/settings/account/components/EmailDigestsCard";
 import { ProfileLinkedAccountsCard } from "@/features/settings/account/components/ProfileLinkedAccountsCard";
 import { ProfileOverviewCard } from "@/features/settings/account/components/ProfileOverviewCard";
 import { useAccountSettingsData } from "@/features/settings/account/use-account-settings-data";
@@ -153,6 +154,9 @@ export function AccountSettingsSection() {
 				onSignOut={() => void handleSignOut()}
 			/>
 			<AppearanceCard />
+			<div id="email-digests" className="scroll-mt-24">
+				<EmailDigestsCard />
+			</div>
 			<ProfileLinkedAccountsCard
 				isPending={data.state.isPending}
 				linkedProviders={data.linkedProviders}

@@ -22,6 +22,7 @@ export * from "./session-revision-schema.js";
 export * from "./team-invite-link-schema.js";
 export * from "./transcript-search-schema.js";
 export { trendsSource } from "./trends-source-schema.js";
+export * from "./usage-digest-schema.js";
 export * from "./user-cli-version-schema.js";
 export * from "./wrapped-decimal-claim-schema.js";
 export * from "./wrapped-resume-schema.js";

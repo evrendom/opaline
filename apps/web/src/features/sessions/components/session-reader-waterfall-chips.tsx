@@ -1,3 +1,4 @@
+import { agentColor } from "@rudel/api-routes/skill-icon";
 import {
 	IconBrain,
 	IconChevronRight,
@@ -21,36 +22,6 @@ import type { SessionReaderStep } from "./session-reader-model";
 // Step identity chips, bar colors and duration formatting for the turn
 // waterfall: agents get a per-name color,
 // written output the model's brand color, thinking violet, tools blue.
-
-// A spread of mid-tone hues that read on both light and dark surfaces; one is
-// picked from the agent name so an agent always gets the same color.
-const AGENT_COLORS = [
-	"#ef4444",
-	"#f97316",
-	"#f59e0b",
-	"#84cc16",
-	"#22c55e",
-	"#10b981",
-	"#14b8a6",
-	"#06b6d4",
-	"#0ea5e9",
-	"#3b82f6",
-	"#6366f1",
-	"#8b5cf6",
-	"#a855f7",
-	"#d946ef",
-	"#ec4899",
-	"#f43f5e",
-];
-
-/** A reproducible accent color for an agent, from a djb2 hash of its name. */
-function agentColor(name: string): string {
-	let hash = 5381;
-	for (let i = 0; i < name.length; i++) {
-		hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
-	}
-	return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length] ?? "#ef4444";
-}
 
 /** The model's brand color, for its step chip and bar. Codex's is black on
  * light and white on dark: the foreground, so it turns with the theme. */

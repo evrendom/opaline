@@ -72,7 +72,7 @@ const SnapshotSchema = z.object({
 	refreshed_text: z.string(),
 });
 const count = z.coerce.number();
-const WeeklyRowSchema = z.object({
+export const WeeklyRowSchema = z.object({
 	user_id: z.string(),
 	agent: z.enum(["claude_code", "codex"]),
 	week: z.string(),
@@ -84,7 +84,7 @@ const WeeklyRowSchema = z.object({
 		]),
 	),
 });
-type WeeklyRow = {
+export type WeeklyRow = {
 	user_id: string;
 	agent: "claude_code" | "codex";
 	week: string;
@@ -108,7 +108,9 @@ export function buildWeeklySnapshotStatement(
 /**
  * The snapshot's rows of the workspace in the weeks from the Monday of
  * `fromWeek` through `to`: every member's when `userId` is null, otherwise
- * only that member's.
+ * only that member's. The week filter names the table's column: with the
+ * analyzer on, a bare `week` there resolves to the selected `toString(week)`
+ * and cannot be compared with a Date.
  */
 export function buildWeeklyRowsStatement(options: {
 	organizationId: string;
@@ -122,10 +124,10 @@ export function buildWeeklyRowsStatement(options: {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT user_id, agent, toString(week) AS week, sessions,
 				${COLUMNS.map((measure) => measure.name).join(", ")}
-			FROM ${getSafeClickHouseTable(WEEKLY_TOTALS_TABLE)}
+			FROM ${getSafeClickHouseTable(WEEKLY_TOTALS_TABLE)} AS weekly
 			WHERE organization_id = {organizationId:String}
 				AND refresh_id = {refreshId:String}
-				AND week >= {fromWeek:Date} AND week <= {to:Date}${
+				AND weekly.week >= {fromWeek:Date} AND weekly.week <= {to:Date}${
 					options.userId === null
 						? ""
 						: "\n\t\t\t\tAND user_id = {userId:String}"

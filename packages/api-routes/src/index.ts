@@ -45,6 +45,7 @@ import {
 	ReportUploadFailuresInputSchema,
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
+import { usageDigestContract } from "./usage-digest.js";
 
 export { CliConnectionIdSchema } from "./cli-connection.js";
 export {
@@ -69,6 +70,10 @@ export {
 	UploadFailureSchema,
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
+export {
+	type UsageDigestPreferences,
+	UsageDigestPreferencesSchema,
+} from "./usage-digest.js";
 
 import {
 	RepositoryDetailSchema,
@@ -1011,6 +1016,7 @@ export const contract = {
 			.output(RepositoryEvidenceCommitOutputSchema),
 	},
 	repositorySettings: repositorySettingsContract,
+	usageDigest: usageDigestContract,
 	/**
 	 * Live transcript lines of running Claude Code sessions (CLI → API). Not
 	 * under `ingest`: Vercel routes `/rpc/ingest/*` to the ingest function.

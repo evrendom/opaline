@@ -31,6 +31,11 @@ const trendsSourcesEntrypointSource = readFileSync(
 	"utf8",
 );
 
+const usageDigestEntrypointSource = readFileSync(
+	resolve(import.meta.dir, "../../../../api/cron/usage-digest.ts"),
+	"utf8",
+);
+
 describe("Vercel deployment configuration", () => {
 	test("routes session arrival events through a streaming function before the SPA", () => {
 		expect(rewriteBySource.get("/api/sessions/arrivals/events")).toBe(
@@ -60,7 +65,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -89,7 +94,8 @@ describe("Vercel deployment configuration", () => {
 				cron.path !== "/api/cron/l1-edges" &&
 				cron.path !== "/api/cron/run-questions" &&
 				cron.path !== "/api/cron/history" &&
-				cron.path !== "/api/cron/live-sessions",
+				cron.path !== "/api/cron/live-sessions" &&
+				cron.path !== "/api/cron/usage-digest",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
@@ -231,6 +237,26 @@ describe("Vercel deployment configuration", () => {
 		expect(apiCatchAll?.source).toContain("(?!cron/trends-sources$)");
 		expect(trendsSourcesEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/trends-sources$/u",
+		);
+	});
+
+	test("sends the usage digests from an isolated hourly cron function", () => {
+		expect(vercelConfig.functions["api/cron/usage-digest.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 300,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/usage-digest",
+			schedule: "10 * * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/usage-digest$)");
+		expect(usageDigestEntrypointSource).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/usage-digest$/u",
 		);
 	});
 

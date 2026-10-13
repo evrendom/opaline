@@ -128,6 +128,8 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS` | No | Comma-separated workspace (organization) IDs whose members the API never sends to PostHog: server events, signup events and the billing traits that the daily billing cron re-sends for every member of a paid workspace. Use it for test and seed workspaces. Empty or missing excludes nobody. A user who joins such a workspace after signing up still sends that signup event. |
 | `RESEND_API_KEY` | No | Resend API key for email integration |
 | `RESEND_AUDIENCE_ID` | No | Resend audience ID for signup contact sync |
+| `USAGE_DIGEST_ENABLED` | No | Send the daily and weekly usage digest emails (the `/api/cron/usage-digest` hourly cron: the weekly at 09:00 Monday, the daily at 19:00 on weekdays, in each member's time zone; needs `RESEND_API_KEY`). Every member gets them until they turn one off in Account settings or unsubscribe. Only the exact value `true` enables it; default off. |
+| `USAGE_DIGEST_ORG_IDS` | No | Comma-separated workspace (organization) IDs the usage digests go to while `USAGE_DIGEST_ENABLED=true`. Empty or missing sends to every workspace. |
 | `VITE_ADMIN_ORGANIZATION_ID` | No | Organization ID whose members have admin panel access |
 
 Automated product emails use the fixed sender `Opaline <evren@opaline.so>`.

@@ -4,10 +4,13 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { SESSION_ARRIVALS_PATH } from "@rudel/api-routes";
 import { TRENDS_SOURCES_PATH } from "@rudel/api-routes/trends-sources";
 import { TRENDS_USAGE_PATH } from "@rudel/api-routes/trends-usage";
+import { user } from "@rudel/sql-schema";
+import { and, eq, sql } from "drizzle-orm";
 import type { Session as AuthSession } from "./auth.js";
 import { createAuth } from "./auth.js";
 import { db, sqlClient } from "./db.js";
 import { getResendConfigWarnings } from "./email.js";
+import { getFrontendOrigin } from "./frontend-origin.js";
 import {
 	handleAvatarGetRequest,
 	handleAvatarUploadRequest,
@@ -33,6 +36,7 @@ import {
 } from "./handlers/team-invite-page-http.js";
 import { handleTrendsSourcesRequest } from "./handlers/trends-sources-http.js";
 import { handleTrendsUsageRequest } from "./handlers/trends-usage-http.js";
+import { handleUsageDigestUnsubscribeRequest } from "./handlers/usage-digest-unsubscribe-http.js";
 import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
@@ -59,6 +63,7 @@ import { parsePasswordAuthEmails } from "./password-auth.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
+import { UNSUBSCRIBE_PATH as USAGE_DIGEST_UNSUBSCRIBE_PATH } from "./services/usage-digest/unsubscribe-token.js";
 import { getStripeWebhookConfig } from "./stripe-client.js";
 
 await setupLogging();
@@ -555,6 +560,17 @@ async function handleRequest(
 				const session = await auth.api.getSession({ headers: request.headers });
 				return session?.user ?? null;
 			},
+			saveTimeZone: async (userId, timeZone) => {
+				await db
+					.update(user)
+					.set({ timeZone })
+					.where(
+						and(
+							eq(user.id, userId),
+							sql`${user.timeZone} IS DISTINCT FROM ${timeZone}`,
+						),
+					);
+			},
 			request,
 		});
 	}
@@ -606,6 +622,13 @@ async function handleRequest(
 			response.headers.set(key, value);
 		}
 		return response;
+	}
+
+	if (url.pathname === USAGE_DIGEST_UNSUBSCRIBE_PATH) {
+		return handleUsageDigestUnsubscribeRequest(request, {
+			secret: process.env.BETTER_AUTH_SECRET ?? "",
+			settingsUrl: `${getFrontendOrigin()}/settings/account#email-digests`,
+		});
 	}
 
 	if (url.pathname === TRENDS_USAGE_PATH) {

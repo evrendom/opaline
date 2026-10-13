@@ -24,6 +24,7 @@
 	},
 	"include": [
 		"vite.config.ts",
+		"vite.email-lab.config.ts",
 		"playwright.trace-tree.config.ts",
 		"e2e/trace-tree/**/*.ts"
 	]
