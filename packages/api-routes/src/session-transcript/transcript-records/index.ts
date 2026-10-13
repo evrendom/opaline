@@ -20,6 +20,12 @@ export {
 	type TranscriptRecordsReceipt,
 } from "./receipt.js";
 export {
+	RECEIVED_SETUP_TEXT_MAX_CHARS,
+	type ReceivedSetupEntry,
+	type ReceivedSetupKind,
+	type ReceivedSetupText,
+} from "./received-setup.js";
+export {
 	createSplitStats,
 	decodeTranscriptLine,
 	type MutableSplitStats,

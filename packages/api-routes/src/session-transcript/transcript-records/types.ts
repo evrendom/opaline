@@ -1,3 +1,4 @@
+import type { ReceivedSetupText } from "./received-setup.js";
 import { V9_FACT_KEYS } from "./v9-fact-sources.js";
 
 /**
@@ -8,8 +9,12 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * summarised or generated.
  */
 
-/** Bump when splitter output changes for the same input so backfill re-extracts. */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 9;
+/**
+ * Bump when splitter output changes for the same input so backfill re-extracts.
+ * 10: received setup (`received_setup` and the setup texts) and the
+ * system prompt kept whole in `instruction_text_components` (OPL-391).
+ */
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 10;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -19,6 +24,15 @@ export const TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS = 4_096;
 
 /** Cap on a `facts` value that holds a JSON list (UTF-16 code units). */
 export const TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS = 65_536;
+
+/**
+ * Larger caps for the parts of a system prompt (`instruction_text_components`):
+ * one part and the whole list. The default caps cut long Claude Code prompt
+ * snapshots (16 of 645 on production); their whole text is also received
+ * setup, stored once per version.
+ */
+export const TRANSCRIPT_RECORD_INSTRUCTION_PART_MAX_CHARS = 262_144;
+export const TRANSCRIPT_RECORD_INSTRUCTION_LIST_MAX_CHARS = 524_288;
 
 /**
  * UTF-16 code units of long `facts` values (over `TRANSCRIPT_RECORD_FACT_SHORT_CHARS`)
@@ -38,6 +52,12 @@ export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
  */
 export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	...V9_FACT_KEYS,
+	/**
+	 * Setup text the record carries, as a JSON array of
+	 * `{kind, path, name, cwd, sha256, chars}` (`received-setup.ts`); the texts
+	 * themselves are stored once per hash in `rudel.setup_texts`.
+	 */
+	received_setup: 10,
 	permission_profile_kind: 9,
 	permission_profile_id: 9,
 	search_result_lines: 9,
@@ -381,6 +401,8 @@ export interface TranscriptRecordDraft {
 	readonly text: string;
 	/** Literal facts the record carries (parser v6). */
 	readonly facts: TranscriptRecordFacts;
+	/** Whole texts of the setup it carries (`received_setup`), for the writer to store once. */
+	readonly setupTexts?: readonly ReceivedSetupText[];
 }
 
 export interface TranscriptTextBudget {

@@ -18,6 +18,12 @@ import {
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
+	claudeInstructionFiles,
+	claudeMcpInstructions,
+	claudeNestedMemory,
+	claudeSystemPrompt,
+} from "./received-setup.js";
+import {
 	claudeApiErrorFacts,
 	claudeAutoModeFacts,
 	claudeCostStateFacts,
@@ -76,6 +82,8 @@ function readClaudeRecord(
 	if (version !== undefined) state.agentVersion = factText(version, 64);
 	const entrypoint = readString(record.entrypoint);
 	if (entrypoint !== undefined) state.entrypoint = factText(entrypoint, 64);
+	const cwd = readString(record.cwd);
+	if (cwd !== undefined) state.cwd = cwd;
 	if (type === "assistant") {
 		if (record.isApiErrorMessage === true) {
 			return {
@@ -565,6 +573,7 @@ function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
 							.join("\n\n"),
 					),
 					facts: claudeInstructionFacts(attachment),
+					setup: claudeInstructionFiles(attachment),
 				},
 			];
 		}
@@ -575,21 +584,32 @@ function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
 				{
 					...injected("nested_memory", memoryText(path, content.content)),
 					filePath: path ?? "",
+					setup: claudeNestedMemory(path, content.content),
 				},
 			];
 		}
 		case "mcp_instructions_delta":
 			return [
-				injected(
-					"mcp_instructions",
-					[
-						...readStrings(attachment.addedBlocks),
-						...readStrings(attachment.removedNames).map(
-							(name) => `removed: ${name}`,
-						),
-					].join("\n\n"),
-				),
+				{
+					...injected(
+						"mcp_instructions",
+						[
+							...readStrings(attachment.addedBlocks),
+							...readStrings(attachment.removedNames).map(
+								(name) => `removed: ${name}`,
+							),
+						].join("\n\n"),
+					),
+					setup: claudeMcpInstructions(attachment),
+				},
 			];
+		case "prompt_snapshot":
+			return [
+				metaItem("attachment:prompt_snapshot", {
+					setup: claudeSystemPrompt(attachment),
+				}),
+			];
+
 		case "skill_listing":
 			return [injected("skill_listing", readString(attachment.content) ?? "")];
 		case "edited_text_file": {

@@ -62,6 +62,7 @@ test("schema lists the approved impact measures with their definitions next to t
 		"prompts",
 		"git_events",
 		"edges",
+		"setup_files",
 		"ci_jobs",
 		"finding_runs",
 		"run_answers",

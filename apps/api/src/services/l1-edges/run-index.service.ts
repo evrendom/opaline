@@ -3,7 +3,9 @@ import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcr
 import type {
 	RudelRunIndexRow,
 	RudelRunRequestsRow,
+	RudelRunSetupRow,
 } from "@rudel/ch-schema/generated";
+import { RUN_SETUP_TABLE } from "@rudel/ch-schema/received-setup";
 import { z } from "zod";
 import {
 	type ClickHouseExecutor,
@@ -15,6 +17,16 @@ import {
 	NO_CODEX_LIFECYCLE_FACTS,
 	streamTurnKey,
 } from "../analysis/codex-lifecycle.js";
+import {
+	type ReceivedSetupRow,
+	receivedSetupRows,
+	repositoryKey,
+} from "../analysis/received-setup.js";
+import {
+	buildReceivedSetupStatement,
+	ReceivedSetupRecordSchema,
+	receivedSetupParts,
+} from "../analysis/received-setup-sql.js";
 import { gateRunIndexRow } from "../analysis/run-index-columns.js";
 import { readCommittedRunIndex } from "../analysis/run-index-reader.js";
 import {
@@ -123,6 +135,7 @@ const UsageStateSchema = z.object({
 });
 const SessionRecordSchema = z.object({
 	repository: z.string(),
+	git_remote: z.string(),
 	model: z.string(),
 });
 
@@ -258,7 +271,7 @@ export async function buildRunIndex(input: {
 			: new Map<string, CodexLifecycleFacts>();
 	const [recorded] = await query(executor, SessionRecordSchema, {
 		query: `SELECT coalesce(nullIf(git_remote, ''), nullIf(package_name, ''), project_path) AS repository,
-				model_used AS model
+				git_remote, model_used AS model
 			FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 				AND session_id = {sessionId:String} AND source = {source:String}
@@ -270,6 +283,11 @@ export async function buildRunIndex(input: {
 		},
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 	});
+	const setupRecords = await query(
+		executor,
+		ReceivedSetupRecordSchema,
+		buildReceivedSetupStatement(scope, committed),
+	);
 	// The statements read the usage separately: it must be the same
 	// extraction after them as before, and every one of its events must be
 	// counted exactly once, by a run or as unattributed.
@@ -306,6 +324,22 @@ export async function buildRunIndex(input: {
 	const requestRows = requests.map((request) =>
 		requestRow(request, context, usage.state === "unknown"),
 	);
+	const setupRows = receivedSetupRows({
+		...receivedSetupParts(setupRecords),
+		runs: runs.map((run) => ({
+			agentId: run.agent_id,
+			turnIdx: run.turn_idx,
+			startRecord: run.start_record,
+			endRecord: run.end_record,
+			runId: runNodeId(session, run.agent_id, run.start_record),
+			startedMs: run.started_ms,
+		})),
+		context: {
+			source: session.source,
+			repository: repositoryKey(recorded?.git_remote ?? ""),
+			memberId: session.userId,
+		},
+	}).map((row) => setupRow(row, context));
 	// Each build has its own insert tokens: a generation deleted by a fence
 	// and rebuilt by a later claim is never dropped as a duplicate.
 	const token = `run-index:${organizationId}:${sessionScopeId(session)}:${generation.revision}:${generation.parserVersion}:${generation.indexVersion}:${input.buildRevision}`;
@@ -326,6 +360,16 @@ export async function buildRunIndex(input: {
 			values: requestRows,
 			asyncInsert: false,
 			deduplicationToken: `${token}:requests`,
+		});
+	}
+	// Received setup before the receipt too: the receipt commits it.
+	if (setupRows.length > 0) {
+		await input.beforeWrite();
+		await executor.insert({
+			table: RUN_SETUP_TABLE,
+			values: setupRows,
+			asyncInsert: false,
+			deduplicationToken: `${token}:setup`,
 		});
 	}
 	await input.beforeWrite();
@@ -912,6 +956,46 @@ export function requestRow(
 	};
 }
 
+/** A received setup row of the build: the run's identity and the setup file version it had. */
+export function setupRow(
+	row: ReceivedSetupRow,
+	context: RowContext,
+): RudelRunSetupRow {
+	return {
+		organization_id: context.organizationId,
+		user_id: context.session.userId,
+		session_id: context.session.sessionId,
+		revision: context.generation.revision,
+		parser_version: context.generation.parserVersion,
+		index_version: context.generation.indexVersion,
+		build_revision: String(context.buildRevision),
+		agent_id: row.agentId,
+		run_start_record: row.runStartRecord,
+		setup_file: row.setupFile,
+		version: row.version,
+		source: context.session.source,
+		run_id: row.runId,
+		turn_idx: row.turnIdx,
+		built_at: context.builtAt,
+		session_date: context.sessionDate,
+		run_started_at: clickHouseTime(row.runStartedMs),
+		kind: row.kind,
+		scope: row.scope,
+		owner: row.owner,
+		path: row.path,
+		recorded_path: row.recordedPath,
+		cwd: row.cwd,
+		chars: Math.min(UINT32_MAX, row.chars),
+		version_name: row.versionName,
+		uncommitted: row.uncommitted,
+		carried: row.carried,
+		compacted_since: row.compactedSince,
+		received_record: row.record,
+		received_block: row.block,
+		received_at: clickHouseTime(row.atMs),
+	};
+}
+
 /**
  * The receipt: written last, it commits the build and holds the session's
  * facts. Calls, denials and API errors total the runs; skills, slash
@@ -1043,9 +1127,9 @@ export async function retireRunIndexSnapshots(
 		params[`build${index}`] = snapshot.buildRevision;
 		return `(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16} AND index_version = {indexVersion${index}:UInt16} AND build_revision = {build${index}:UInt64})`;
 	});
-	// Requests first: the run index rows are what finds a snapshot again, so
-	// a pass that stops between the two deletes is finished by the next.
-	for (const table of [RUN_REQUESTS_TABLE, RUN_INDEX_TABLE])
+	// Requests and setup first: the run index rows are what finds a snapshot
+	// again, so a pass that stops between the deletes is finished by the next.
+	for (const table of [RUN_SETUP_TABLE, RUN_REQUESTS_TABLE, RUN_INDEX_TABLE])
 		await executor.execute({
 			abortSignal: retirement.abortSignal,
 			clickhouse_settings: { lightweight_deletes_sync: "1" },

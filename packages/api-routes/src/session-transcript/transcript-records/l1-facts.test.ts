@@ -1162,13 +1162,19 @@ describe("parser facts", () => {
 
 /** Facts checked by the named tests above rather than a case, per agent. */
 const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
-	// The fact budget tests.
+	// The fact budget tests; received setup in received-setup.test.ts.
 	claude_code: new Set([
 		"facts_truncated",
+		"received_setup",
 		...V9_REGRESSION_COVERAGE.claude_code,
 	]),
-	// The fact budget and goal text tests.
-	codex: new Set(["facts_truncated", "goal", ...V9_REGRESSION_COVERAGE.codex]),
+	// The fact budget and goal text tests; received setup in received-setup.test.ts.
+	codex: new Set([
+		"facts_truncated",
+		"goal",
+		"received_setup",
+		...V9_REGRESSION_COVERAGE.codex,
+	]),
 };
 
 /** Fact fields and record columns each agent's cases assert. */

@@ -64,6 +64,36 @@ const view: RunView = {
 		request(80, 27, 11, 140_000, [["Bash", "shell", "test"]]),
 		request(85, 38, 4, 20_000, [], "Fixed! The test now passes."),
 	],
+	setup: [
+		{
+			id: "s1",
+			kind: "system_prompt",
+			setupFile: "harness:claude_code:system_prompt",
+			versionName: "3f2a9c1b04de",
+			chars: 91_204,
+			carried: true,
+			compactedSince: false,
+		},
+		{
+			id: "s2",
+			kind: "instructions",
+			setupFile: "repository:github.com/acme/shop:CLAUDE.md",
+			versionName: "e5d10a2b7c44 uncommitted by u1",
+			chars: 812,
+			carried: true,
+			compactedSince: true,
+		},
+		{
+			id: "s3",
+			kind: "skill_body",
+			setupFile:
+				"repository:github.com/acme/shop:.claude/skills/fix-tests/SKILL.md",
+			versionName: "77ab01c9d2e0",
+			chars: 2_310,
+			carried: false,
+			compactedSince: false,
+		},
+	],
 };
 
 const render = (
@@ -79,7 +109,7 @@ const render = (
 		...options,
 	});
 
-test("the default view shows the header, PREV, END, NEXT and the phases with their requests, time, tokens and cost, each line under an id", () => {
+test("the default view shows the header, PREV, END, NEXT, the setup the run had and the phases with their requests, time, tokens and cost, each line under an id", () => {
 	const { text, truncated } = render();
 	expect(truncated).toBe(false);
 	expect(text.split("\n")).toEqual([
@@ -87,6 +117,9 @@ test("the default view shows the header, PREV, END, NEXT and the phases with the
 		`PREV u1/claude_code/s1//10 · "add rate limiting to login" → END "Done, added a limiter in auth.ts"`,
 		'END  r94 · "Fixed! The test now passes."',
 		'NEXT u1/claude_code/s1//90 · user: "it still fails, damn it" · reaction: unhappy (strongly worded)',
+		"SETUP s1  system_prompt harness:claude_code:system_prompt · version 3f2a9c1b04de · 91204 chars · received earlier",
+		"      s2  instructions repository:github.com/acme/shop:CLAUDE.md · version e5d10a2b7c44 uncommitted by u1 · 812 chars · received earlier · compacted since",
+		"      s3  skill_body repository:github.com/acme/shop:.claude/skills/fix-tests/SKILL.md · version 77ab01c9d2e0 · 2310 chars",
 		"id   what happened                                requests  time    tokens  cost",
 		"p1   exploring: Read×2, Grep                             2  6 min      88k  $0.88",
 		"p2   editing: Edit                                       1  1 min      12k  $0.12",
@@ -196,6 +229,7 @@ test("a call that started a subagent expands into the subagent's run, in the sam
 		requests: [
 			request(4, 0, 3, 40_000, [["Grep", "search"]], "In auth.test.ts"),
 		],
+		setup: view.setup?.slice(1, 2) ?? [],
 	};
 	const details = new Map([["c71", { kind: "run" as const, view: subagent }]]);
 	const { text } = render({ sections: [], expand: ["c71"], details });
@@ -205,6 +239,7 @@ test("a call that started a subagent expands into the subagent's run, in the sam
 		"  PREV none: the first run of its stream",
 		'  END  "In auth.test.ts"',
 		"  NEXT none: the last run of its stream",
+		"  SETUP instructions repository:github.com/acme/shop:CLAUDE.md · version e5d10a2b7c44 uncommitted by u1 · 812 chars · received earlier · compacted since",
 		"       what happened                                requests  time    tokens  cost",
 		"       exploring: Grep                                     1  3 min      40k  $0.40",
 	]);
@@ -212,13 +247,45 @@ test("a call that started a subagent expands into the subagent's run, in the sam
 
 test("a run whose requests are not indexed yet says so instead of showing no phases", () => {
 	const lines = render(
-		{},
+		{ sections: ["end", "phases"] },
 		{ ...view, requestsIndexed: false, requests: [] },
 	).text.split("\n");
-	expect([lines[2], lines[4]]).toEqual([
+	expect(lines).toEqual([
 		"END  unknown: this run's requests are not indexed yet",
 		"phases unknown: this run's requests are not indexed yet (run index before version 5)",
 	]);
+});
+
+test("a run whose received setup was not read says unknown, never none", () => {
+	expect(render({ sections: ["setup"] }, { ...view, setup: null }).text).toBe(
+		"SETUP unknown: this run's received setup was not read (its session was indexed before received setup was recorded)",
+	);
+	expect(render({ sections: ["setup"] }, { ...view, setup: [] }).text).toBe(
+		"SETUP none: its transcript records no setup text for this run",
+	);
+});
+
+test("expanding a setup id opens the exact text the run received, at the version it used", () => {
+	const claudeMd = "# Shop\nRun `bun test` before every commit.\n";
+	const details = new Map([
+		[
+			"s2",
+			{
+				kind: "text" as const,
+				parts: [
+					{
+						label:
+							"s2 instructions repository:github.com/acme/shop:CLAUDE.md version e5d10a2b7c44 uncommitted by u1",
+						text: claudeMd,
+						totalChars: claudeMd.length,
+					},
+				],
+			},
+		],
+	]);
+	expect(render({ sections: [], expand: ["s2"], details }).text).toBe(
+		`▸ s2 instructions repository:github.com/acme/shop:CLAUDE.md version e5d10a2b7c44 uncommitted by u1, ${claudeMd.length} characters\n${claudeMd}`,
+	);
 });
 
 test("records whose text cannot be read at all still fit their cut lines in the budget", () => {

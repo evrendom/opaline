@@ -1,6 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import type { AnalysisRunInput, AnalysisRunOutput } from "@rudel/api-routes";
 import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
+import {
+	RUN_SETUP_TABLE,
+	SETUP_TEXTS_TABLE,
+} from "@rudel/ch-schema/received-setup";
 import { z } from "zod";
 import {
 	type ClickHouseExecutor,
@@ -14,6 +18,10 @@ import type {
 } from "../transcript-records-queries.js";
 import { readRecord } from "../transcript-records-reader.service.js";
 import { CURRENT_PHASE_RULE } from "./phases.js";
+import {
+	SETUP_SINCE_INDEX_VERSION,
+	SETUP_SINCE_PARSER_VERSION,
+} from "./received-setup.js";
 import { readCommittedRunIndex } from "./run-index-reader.js";
 import { runToolErrorSql } from "./run-index-sql.js";
 import {
@@ -25,6 +33,7 @@ import {
 	type RunViewCallDetail,
 	type RunViewDetail,
 	type RunViewRequest,
+	type RunViewSetup,
 	type RunViewText,
 	renderRunView,
 } from "./run-view.js";
@@ -80,13 +89,31 @@ interface RunAddress {
 	readonly startRecord: number;
 }
 
+/** A setup file version of the run, with the hash its text is stored under. */
+interface LoadedSetup extends RunViewSetup {
+	readonly version: string;
+}
+
 interface LoadedRun {
 	readonly address: RunAddress;
 	readonly row: RudelRunIndexRow;
 	/** Every committed run of the session, every stream, in start order. */
 	readonly sessionRuns: readonly RudelRunIndexRow[];
 	readonly view: RunView;
+	/** The run's setup file versions; null when its received setup was not read. */
+	readonly setup: readonly LoadedSetup[] | null;
 }
+
+/** The order setup is listed in: what the harness sends first, skills last. */
+const SETUP_KIND_ORDER = [
+	"system_prompt",
+	"developer",
+	"instructions",
+	"agents_md",
+	"nested_memory",
+	"mcp_instructions",
+	"skill_body",
+];
 
 export async function openRun(
 	workspaceId: string,
@@ -210,10 +237,16 @@ async function loadRun(
 	};
 	const neighbour = (other: RudelRunIndexRow) =>
 		runNodeId(identity, other.agent_id, other.start_record);
+	const setup =
+		row.index_version >= SETUP_SINCE_INDEX_VERSION &&
+		row.parser_version >= SETUP_SINCE_PARSER_VERSION
+			? await readSetup(executor, address, row)
+			: null;
 	return {
 		address,
 		row,
 		sessionRuns,
+		setup,
 		view: {
 			id: neighbour(row),
 			agent: row.source,
@@ -236,7 +269,121 @@ async function loadRun(
 				? { id: neighbour(next), prompt: next.prompt_head || null }
 				: null,
 			requests: of(row.start_record),
+			setup,
 		},
+	};
+}
+
+const SetupRowSchema = z.object({
+	kind: z.string(),
+	setup_file: z.string(),
+	version: z.string(),
+	version_name: z.string(),
+	chars: z.coerce.number(),
+	carried: z.boolean(),
+	compacted_since: z.boolean(),
+	received_record: z.coerce.number(),
+});
+
+/**
+ * The run's setup file versions, from the build that wrote `row`, in a
+ * stable order so their ids (`s1`, `s2`, …) name the same version on every
+ * call.
+ */
+async function readSetup(
+	executor: ClickHouseExecutor,
+	address: RunAddress,
+	row: RudelRunIndexRow,
+): Promise<LoadedSetup[]> {
+	const rows = await query(executor, SetupRowSchema, {
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+		query: `SELECT kind, setup_file, version, version_name, chars, carried, compacted_since, received_record
+			FROM ${getSafeClickHouseTable(RUN_SETUP_TABLE)} FINAL
+			WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id = {sessionId:String}
+				AND revision = {revision:UInt64} AND parser_version = {parserVersion:UInt16}
+				AND index_version = {indexVersion:UInt16} AND build_revision = {buildRevision:UInt64}
+				AND agent_id = {agentId:String} AND run_start_record = {runStart:UInt32}`,
+		query_params: {
+			...address.scope,
+			sessionId: address.sessionId,
+			revision: String(row.revision),
+			parserVersion: row.parser_version,
+			indexVersion: row.index_version,
+			buildRevision: String(row.build_revision),
+			agentId: address.agentId,
+			runStart: row.start_record,
+		},
+	});
+	const rank = (kind: string) => {
+		const index = SETUP_KIND_ORDER.indexOf(kind);
+		return index === -1 ? SETUP_KIND_ORDER.length : index;
+	};
+	return rows
+		.sort(
+			(a, b) =>
+				rank(a.kind) - rank(b.kind) ||
+				a.setup_file.localeCompare(b.setup_file) ||
+				a.received_record - b.received_record ||
+				a.version.localeCompare(b.version),
+		)
+		.map((setup, index) => ({
+			id: `s${index + 1}`,
+			kind: setup.kind,
+			setupFile: setup.setup_file,
+			version: setup.version,
+			versionName: setup.version_name,
+			chars: setup.chars,
+			carried: setup.carried,
+			compactedSince: setup.compacted_since,
+		}));
+}
+
+const SetupTextSchema = z.object({
+	text: z.string(),
+	chars: z.coerce.number(),
+});
+
+/**
+ * The exact text of one of the run's setup file versions, as the run
+ * received it, up to the budget: the run owner's stored copy of that
+ * version.
+ */
+async function setupText(
+	env: RunViewEnv,
+	run: LoadedRun,
+	id: string,
+	maxChars: number,
+): Promise<RunViewDetail | null> {
+	const setup = run.setup?.find((candidate) => candidate.id === id);
+	if (!setup) return null;
+	const [stored] = await query(env.executor, SetupTextSchema, {
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+		query: `SELECT substringUTF8(text, 1, {maxChars:UInt32}) AS text, chars
+			FROM ${getSafeClickHouseTable(SETUP_TEXTS_TABLE)} FINAL
+			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+				AND version = {version:String}
+			LIMIT 1`,
+		query_params: {
+			...run.address.scope,
+			version: setup.version,
+			maxChars,
+		},
+	});
+	if (!stored)
+		return {
+			kind: "missing",
+			reason:
+				"its text is not stored: the session was extracted before setup texts were kept",
+		};
+	return {
+		kind: "text",
+		parts: [
+			{
+				label: `${id} ${setup.kind} ${setup.setupFile} version ${setup.versionName}`,
+				text: stored.text,
+				totalChars: setup.chars,
+			},
+		],
 	};
 }
 
@@ -384,6 +531,10 @@ async function loadDetails(
 	maxChars: number,
 ): Promise<Map<string, RunViewDetail>> {
 	const details = new Map<string, RunViewDetail>();
+	for (const id of ids.filter((candidate) => /^s\d+$/u.test(candidate))) {
+		const detail = await setupText(env, run, id, maxChars);
+		if (detail) details.set(id, detail);
+	}
 	const reads = ids.filter((id) => /^[qcr]\d+(\.\d+)?$/u.test(id));
 	if (reads.length === 0) return details;
 	// An expired transcript keeps its run index, not its records.

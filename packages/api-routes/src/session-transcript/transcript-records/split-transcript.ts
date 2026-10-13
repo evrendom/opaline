@@ -9,6 +9,7 @@ import {
 	type LineItem,
 	type StreamState,
 } from "./line-items.js";
+import { itemSetup, receivedSetupFacts } from "./received-setup.js";
 import {
 	buildTranscriptTextFields,
 	countCodePoints,
@@ -243,6 +244,9 @@ export function* splitTranscript(
 						});
 			if (fields.truncated) stats.textTruncated = true;
 			stats.rowCount++;
+			// Received setup is named after the fact budget: each record's list
+			// is bounded, and a setup file must not read as not received.
+			const setup = receivedSetupFacts(itemSetup(item), state.cwd);
 			yield buildDraft({
 				agentId,
 				blockIdx,
@@ -251,6 +255,7 @@ export function* splitTranscript(
 					? item
 					: { ...item, facts: budgetFacts(item.facts, options.factBudget) },
 				location,
+				setup,
 				state,
 				ts,
 			});
@@ -372,10 +377,12 @@ function buildDraft(input: {
 	fields: TranscriptTextFields;
 	item: LineItem;
 	location: { byteLen: number; byteStart: number; lineNumber: number };
+	setup?: ReturnType<typeof receivedSetupFacts>;
 	state: StreamState;
 	ts: string;
 }): TranscriptRecordDraft {
-	const { item, fields, location } = input;
+	const { item, fields, location, setup } = input;
+	const facts = { ...streamFacts(input.state), ...item.facts };
 	const subtype =
 		item.kind === "user_prompt" && input.state.isSubagent && !item.subtype
 			? "delegation"
@@ -388,7 +395,13 @@ function buildDraft(input: {
 		callId: item.callId ?? "",
 		commandClass: item.commandClass ?? "",
 		exitCode: item.exitCode ?? null,
-		facts: { ...streamFacts(input.state), ...item.facts },
+		facts:
+			setup?.fact === undefined
+				? facts
+				: {
+						...facts,
+						extra: { ...facts.extra, received_setup: setup.fact },
+					},
 		fileOp: item.fileOp ?? "",
 		filePath: item.filePath ?? "",
 		head: fields.head,
@@ -403,6 +416,9 @@ function buildDraft(input: {
 		toolName: item.toolName ?? "",
 		ts: input.ts,
 		turnIdx: input.state.turnIdx,
+		...(setup === undefined || setup.texts.length === 0
+			? {}
+			: { setupTexts: setup.texts }),
 	};
 }
 

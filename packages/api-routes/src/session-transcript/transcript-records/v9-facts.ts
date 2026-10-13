@@ -10,6 +10,9 @@ import { literalPatchHunks } from "./patch-hunks.js";
 import { clippedText, mergeFacts } from "./record-facts.js";
 import {
 	TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS,
+	TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
+	TRANSCRIPT_RECORD_INSTRUCTION_LIST_MAX_CHARS,
+	TRANSCRIPT_RECORD_INSTRUCTION_PART_MAX_CHARS,
 	type TranscriptRecordFactKey,
 	type TranscriptSource,
 } from "./types.js";
@@ -293,7 +296,7 @@ export function withV9Facts(
 			};
 			const chars = JSON.stringify(entry).length + 1;
 			if (
-				group.chars + chars > TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS ||
+				group.chars + chars > factCaps(fact.key).list ||
 				group.entries.length >= 1_024
 			) {
 				group.more++;
@@ -349,6 +352,22 @@ function confirmedChange(
 			result.type === "update" ||
 			isRecord(result.bashEditDiff))
 	);
+}
+
+/** The caps of one component fact: a system prompt's parts are kept far longer. */
+function factCaps(key: TranscriptRecordFactKey): {
+	readonly part: number;
+	readonly list: number;
+} {
+	return key === "instruction_text_components"
+		? {
+				part: TRANSCRIPT_RECORD_INSTRUCTION_PART_MAX_CHARS,
+				list: TRANSCRIPT_RECORD_INSTRUCTION_LIST_MAX_CHARS,
+			}
+		: {
+				part: TRANSCRIPT_RECORD_FACT_VALUE_MAX_CHARS,
+				list: TRANSCRIPT_RECORD_FACT_LIST_MAX_CHARS,
+			};
 }
 
 function readConvention(convention: string, text: string): unknown {
@@ -431,7 +450,7 @@ function safeComponent(
 						);
 				} catch {}
 			}
-			const text = clippedText(clipping, key, offered);
+			const text = clippedText(clipping, key, offered, factCaps(key).part);
 			safe = {
 				text,
 				clipped: clipping.facts_clipped !== undefined,

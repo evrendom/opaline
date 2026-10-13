@@ -1,4 +1,8 @@
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
+import {
+	RUN_SETUP_COLUMNS,
+	RUN_SETUP_TABLE,
+} from "@rudel/ch-schema/received-setup";
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE, RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { committedBuildSql } from "./run-index-reader.js";
@@ -74,6 +78,7 @@ export function l1SqlViews(params: SqlScopeParams): SqlView[] {
 		promptsView(owner),
 		gitEventsView(owner),
 		edgesView(edgeOwner),
+		setupFilesView(owner),
 		ciJobsView(
 			`workspace_id = {${params.workspace}:String} AND provider = 'github' AND ${repositories}`,
 		),
@@ -482,6 +487,107 @@ function edgesView(owner: Owner): SqlView {
 					WHERE ${owner(memberOnly)}
 				)
 				WHERE is_active = 1`;
+		},
+	};
+}
+
+/** Columns of `rudel.run_setup` the setup_files view shows, with their traps. */
+const SETUP_FILE_TRAPS: Readonly<Record<string, readonly string[]>> = {
+	run_id: [
+		"Join runs ON run_id = runs.run_id; open the run's setup with run(id, sections=['setup']).",
+	],
+	user_id: [
+		"For spotting a team-wide problem or one person's setup, never for ranking people.",
+	],
+	agent_id: [
+		"A subagent's stream has only the setup its own transcript recorded; filter agent_id = '' for the main transcript.",
+	],
+	setup_file: [
+		"The same file on two members' machines, in any clone or worktree, is one setup_file; group by it to compare versions across members.",
+		"A repository file is named relative to the session's working directory: a session started in a subdirectory names the repository's files above it by their path in the member's home instead.",
+	],
+	version: [
+		"Two runs had the same version only when the text was identical; a different version can differ by one character. Read both before naming a change.",
+	],
+	uncommitted: [
+		"NULL is unknown, not committed: Codex records no git status, and a status Claude Code cut may miss files.",
+	],
+	carried: [
+		"A run has every setup file version it had: those received during it (carried = false) and the latest version of each received earlier in its stream (carried = true). Filter carried = false for what arrived during the run.",
+	],
+	compacted_since: [
+		"After a compaction the harness may have dropped the text or sent it again; true says only that one happened.",
+	],
+	kind: [
+		"skill_body for Codex is a whole SKILL.md the agent printed with cat; partial reads (sed, head) and reads of several files at once are not received setup.",
+	],
+};
+const SETUP_FILE_COLUMNS = [
+	"run_id",
+	"user_id",
+	"source",
+	"session_id",
+	"agent_id",
+	"turn_idx",
+	"run_started_at",
+	"kind",
+	"setup_file",
+	"scope",
+	"owner",
+	"path",
+	"version",
+	"version_name",
+	"uncommitted",
+	"carried",
+	"compacted_since",
+	"chars",
+	"recorded_path",
+	"received_at",
+	"received_record",
+] as const;
+
+/**
+ * Received setup (CONTEXT.md "Received setup"): each run with every setup
+ * file version it had, from the committed run index build of its session,
+ * so the agent lists the runs per version of one setup file across members
+ * and compares the version a failing run used with the others'.
+ */
+function setupFilesView(owner: Owner): SqlView {
+	const columns: readonly SqlViewColumn[] = SETUP_FILE_COLUMNS.map((name) => {
+		const found = RUN_SETUP_COLUMNS.find(
+			(candidate) => candidate.name === name,
+		);
+		if (!found) throw new Error(`run_setup has no column ${name}`);
+		const time = name === "run_started_at" || name === "received_at";
+		return column(
+			name === "run_started_at" ? "started_at" : name,
+			found.type,
+			found.comment,
+			[...(SETUP_FILE_TRAPS[name] ?? []), ...(time ? [UTC] : [])],
+		);
+	});
+	return {
+		name: "setup_files",
+		grain:
+			"One row per run and setup file version it had (system prompt, instruction files, skill bodies, MCP instructions, AGENTS.md, developer messages), as its transcript recorded them, from each session's committed run index build.",
+		traps: [
+			"Each run and version is one row: superseded builds and older transcript generations are already left out, so count rows directly; count distinct run_id for runs.",
+			SCOPE_TRAP,
+			"Received setup is what the transcript recorded, never what was on disk: a file the agent had but its transcript does not record is not here, and a run whose session was built before received setup was read has no rows (runs.coverage_gaps has received_setup). Say unknown for those, never none.",
+			"The text is not a column: open it with run(run_id, expand=['s<n>']) after run(run_id, sections=['setup']) lists the run's setup with its s-ids.",
+			"Keep the time range as started_at >= … in the WHERE: a run with many setup files has a row for each.",
+		],
+		columns,
+		recent: { column: "started_at", rows: "run setup files" },
+		sql(memberOnly) {
+			const scope = owner(memberOnly);
+			const table = getSafeClickHouseTable(RUN_SETUP_TABLE);
+			return `SELECT ${SETUP_FILE_COLUMNS.map((name) =>
+				name === "run_started_at" ? "run_started_at AS started_at" : name,
+			).join(", ")}
+				FROM ${table} FINAL
+				WHERE ${scope}
+					AND ${committedBuildSql(getSafeClickHouseTable(RUN_INDEX_TABLE), scope, ["user_id", "session_id"])}`;
 		},
 	};
 }

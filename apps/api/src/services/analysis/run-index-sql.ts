@@ -45,9 +45,10 @@ import {
 /**
  * Version of the run index rules; a new version is a new run index
  * generation. 4: run messages and their measures (OPL-387). 5: each build
- * also writes its requests (`rudel.run_requests`, OPL-389).
+ * also writes its requests (`rudel.run_requests`, OPL-389). 6: and each
+ * run's received setup (`rudel.run_setup`, OPL-391).
  */
-export const RUN_INDEX_VERSION = 5;
+export const RUN_INDEX_VERSION = 6;
 
 /** Literal string or count read back from ClickHouse; `''` and 0 mean none recorded. */
 const text = z.string();

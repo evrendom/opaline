@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { RUN_SETUP_TABLE } from "@rudel/ch-schema/received-setup";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
@@ -278,6 +279,7 @@ async function deleteSessionEdges(
 		L1_EDGE_RESOLUTIONS_TABLE,
 		RUN_INDEX_TABLE,
 		RUN_REQUESTS_TABLE,
+		RUN_SETUP_TABLE,
 	])
 		await executor.execute({
 			clickhouse_settings: { lightweight_deletes_sync: "3" },

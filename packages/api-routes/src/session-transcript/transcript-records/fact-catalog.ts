@@ -9100,75 +9100,50 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "instruction_sha256",
 		view: "prompts",
 		meaning: "A hash that identifies the version of an instruction file.",
-		decision:
-			"Should instruction_sha256 hash the instruction text as the agent received it (what the model saw), or only repository files from CLI captures?",
 		agents: {
-			claude_code: pending(
+			claude_code: stored(
 				[
 					"attachment/instructions.attachment.files[].content",
 					"attachment/nested_memory.attachment.content.content",
 				],
-				"parser 9 or the repository configuration index (order of work step 9), after the decision Review constraint: This is an application-generated hash of injected content, not a claim about byte-identical raw file contents or a hash emitted by Claude.",
+				{
+					since: 10,
+					facts: ["received_setup"],
+					elsewhere:
+						"rudel.setup_texts (the text, once per hash and member) and rudel.run_setup (each run's setup file versions)",
+				},
 				{
 					evidence: [],
 					relation: {
 						kind: "derived",
 						from: ["prompts/instruction_text", "prompts/instruction_path"],
 					},
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. This is an application-generated hash of injected content, not a claim about byte-identical raw file contents or a hash emitted by Claude.",
-					sourceMappings: [
-						{
-							path: "attachment/instructions.attachment.files[].content",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
-						{
-							path: "attachment/nested_memory.attachment.content.content",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
-					],
 					justification:
-						"Opaline computation, not an agent-written value. The loaded instruction content can be hashed deterministically to identify that recorded version, although the agent writes content rather than a hash. Witness: cb81a350-1d8c-482f-8cf7-d73bffb49715:13; attachment/instructions.attachment.files[].content; type=string; chars=116; version=2.1.293",
+						"Opaline computation, not an agent-written value: the SHA-256 of each instruction file's text as the agent received it (received setup, CONTEXT.md), named with the file's recorded path. Claude Code writes content, not a hash.",
+					notes:
+						"The hash is of the text the agent received, not of the file on disk; uncommitted edits are a version of their own.",
 				},
 			),
-			codex: pending(
+			codex: stored(
 				[
-					"world_state/.state.agents_md.text",
 					"response_item/message:user.content[input_text].text~AGENTS.md instructions",
 				],
-				"parser 9 or the repository configuration index (order of work step 9), after the decision Review constraint: A hash of an aggregate/wrapper is not a per-file version hash without explicit file boundaries and a declared framing-removal policy.",
+				{
+					since: 10,
+					facts: ["received_setup"],
+					elsewhere:
+						"rudel.setup_texts (the text, once per hash and member) and rudel.run_setup (each run's setup file versions)",
+				},
 				{
 					evidence: [],
 					relation: {
 						kind: "derived",
 						from: ["prompts/instruction_text", "prompts/instruction_path"],
 					},
-					notes:
-						"Parser review: No parser value is stored for this pending proposal. A hash of an aggregate/wrapper is not a per-file version hash without explicit file boundaries and a declared framing-removal policy.",
-					sourceMappings: [
-						{
-							path: "world_state/.state.agents_md.text",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
-						{
-							path: "response_item/message:user.content[input_text].text~AGENTS.md instructions",
-							role: "context",
-							relation: { kind: "unreviewed" },
-							justification:
-								"Context only; not the fact value and not counted as its source.",
-						},
-					],
 					justification:
-						"Opaline computation, not an agent-written value. A hash is computed from the recorded AGENTS.md text (world_state 2953, injection 3508); Codex writes no hash. Witness: 01a1009d:5 world_state/.state.agents_md.text [string] n=2953 v0.144.1..0.162.0-alpha.2",
+						"Opaline computation, not an agent-written value: the SHA-256 of the text between <INSTRUCTIONS> and </INSTRUCTIONS> of the injected AGENTS.md message, named after the directory it names. Codex writes no hash.",
+					notes:
+						"Codex may join several AGENTS.md files into one injection; the hash is of that injection, named after its directory, not of one file.",
 				},
 			),
 		},

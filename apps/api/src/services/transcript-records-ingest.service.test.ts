@@ -243,7 +243,11 @@ function createFakeExecutor(
 	const executed: ClickHouseStatement[] = [];
 	const seenTokens = new Set<string>();
 	const stored = new Map<string, Record<string, unknown>>();
-	const inserts: { deduplicationToken?: string; values: object[] }[] = [];
+	const inserts: {
+		deduplicationToken?: string;
+		table: string;
+		values: object[];
+	}[] = [];
 	const executor: ClickHouseExecutor = {
 		async close() {},
 		async execute(statement) {
@@ -349,6 +353,68 @@ describe("writing one extraction generation", () => {
 		expect(decodeTranscriptRecordsReceipt(head)?.publishedAt).toBe(
 			NOW.toISOString(),
 		);
+	});
+
+	test("stores each distinct received setup text once, behind the fence and before the receipt", async () => {
+		const fake = createFakeExecutor();
+		const text = (sha256: string, body: string) => ({
+			sha256,
+			text: body,
+			chars: body.length,
+			cut: false,
+		});
+		async function* withSetup(): AsyncGenerator<TranscriptRecordDraft> {
+			yield { ...draft, recordIdx: 1, setupTexts: [text("a1", "Use bun.")] };
+			yield {
+				...draft,
+				recordIdx: 2,
+				setupTexts: [text("a1", "Use bun."), text("b2", "Run tests.")],
+			};
+		}
+
+		await writeTranscriptRecords(
+			fake.executor,
+			writeInput(
+				async () => {
+					fake.events.push("fence");
+				},
+				{ drafts: withSetup() },
+			),
+		);
+
+		expect(fake.inserts.map((insert) => insert.table)).toEqual([
+			"rudel.transcript_records",
+			"rudel.setup_texts",
+			"rudel.transcript_records",
+		]);
+		expect(fake.events).toEqual([
+			"fence",
+			"insert",
+			"fence",
+			"insert",
+			"fence",
+			"insert",
+		]);
+		expect(fake.inserts[1]?.values).toEqual([
+			{
+				organization_id: "org",
+				user_id: "user",
+				version: "a1",
+				chars: 8,
+				text: "Use bun.",
+				text_cut: false,
+				written_at: "2026-09-30 12:00:00.000",
+			},
+			{
+				organization_id: "org",
+				user_id: "user",
+				version: "b2",
+				chars: 10,
+				text: "Run tests.",
+				text_cut: false,
+				written_at: "2026-09-30 12:00:00.000",
+			},
+		]);
 	});
 
 	test("a confirmed fence after rows were written removes that generation", async () => {

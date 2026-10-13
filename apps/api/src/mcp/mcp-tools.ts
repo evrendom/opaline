@@ -550,18 +550,18 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		annotations: READ_ONLY,
 		title: "Open one agent run",
 		description: [
-			"What it does: Shows one run compactly: its prompt, time, tokens and cost, how the run before it ended, how it ended, the user's next prompt, and its phases.",
+			"What it does: Shows one run compactly: its prompt, time, tokens and cost, how the run before it ended, how it ended, the user's next prompt, the setup it received and its phases.",
 			"Use when: After sql or find points at a run; open only the parts that decide the question.",
-			"Returns: Lines with ids. Phases open into requests, requests into calls, calls and records into their exact text, and a call that started a subagent into that subagent's run.",
+			"Returns: Lines with ids. Phases open into requests, requests into calls; calls, records and setup into the exact text (setup at the version the run used); a subagent call into its run.",
 			"Side effects: None.",
 			"Limits: One run per call, within maxChars (the text says what was cut); sql's 10 seconds, 512 MiB and workspace quota.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(AnalysisRunInputSchema), {
 			id: "Required. The run's id: the run_id column of sql, or an id a run view shows (PREV, NEXT, a subagent run).",
 			expand:
-				"Ids from the view to open, together within maxChars: phases (p2), requests (q153), calls (c154) and records (r160).",
+				"Ids from the view to open, together within maxChars: phases (p2), requests (q153), calls (c154), records (r160) and setup (s2).",
 			sections:
-				"Only these sections, in the view's order: header, prev, end, next, phases. Default: all of them.",
+				"Only these sections, in the view's order: header, prev, end, next, setup, phases. Default: all of them.",
 			maxChars: "Most characters returned, 1000-40000. Default 12000.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),

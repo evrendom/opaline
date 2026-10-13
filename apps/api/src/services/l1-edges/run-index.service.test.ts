@@ -6,7 +6,9 @@ import {
 import type {
 	RudelRunIndexRow,
 	RudelRunRequestsRow,
+	RudelRunSetupRow,
 } from "@rudel/ch-schema/generated";
+import { RUN_SETUP_TABLE } from "@rudel/ch-schema/received-setup";
 import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
@@ -136,6 +138,7 @@ interface Fake {
 	/** Every row inserted, as the table holds it. */
 	table: RudelRunIndexRow[];
 	requests: RudelRunRequestsRow[];
+	setup: RudelRunSetupRow[];
 	inserts: { values: RudelRunIndexRow[]; token?: string }[];
 	executed: ClickHouseStatement[];
 	events: string[];
@@ -174,11 +177,15 @@ function fakeClickHouse(state: {
 	table?: RudelRunIndexRow[];
 	/** What the generation records as each run's opening prompt and last message. */
 	messages?: Record<string, unknown>[];
+	/** Records that carried setup, compactions, edits and the session context. */
+	setupRecords?: Record<string, unknown>[];
+	gitRemote?: string;
 }): Fake {
 	const usage = [...(state.usage ?? [CONSISTENT])];
 	const fake: Fake = {
 		table: state.table ?? [],
 		requests: [],
+		setup: [],
 		inserts: [],
 		executed: [],
 		events: [],
@@ -192,6 +199,11 @@ function fakeClickHouse(state: {
 				if (params.table === RUN_REQUESTS_TABLE) {
 					fake.events.push("insert:requests");
 					fake.requests.push(...(params.values as RudelRunRequestsRow[]));
+					return;
+				}
+				if (params.table === RUN_SETUP_TABLE) {
+					fake.events.push("insert:setup");
+					fake.setup.push(...(params.values as RudelRunSetupRow[]));
 					return;
 				}
 				const values = params.values as RudelRunIndexRow[];
@@ -270,7 +282,14 @@ function fakeClickHouse(state: {
 							},
 						];
 					if (sql.includes("session_analytics"))
-						return [{ repository: "github.com/acme/app", model: "opus" }];
+						return [
+							{
+								repository: "github.com/acme/app",
+								git_remote: state.gitRemote ?? "",
+								model: "opus",
+							},
+						];
+					if (sql.includes("received_setup")) return state.setupRecords ?? [];
 					if (sql.includes("build_text")) return state.snapshots ?? [];
 					if (sql.includes("opening_prompt")) return state.messages ?? [];
 					throw new Error(`unexpected statement: ${sql.slice(0, 80)}`);
@@ -458,6 +477,77 @@ describe("building a session's run index", () => {
 			output_tokens: null,
 		});
 		expect(unknown.requests[0]?.unrecorded_facts).toContain("output_tokens");
+	});
+
+	test("writes each run's received setup after the requests and before the receipt, named by setup file and version", async () => {
+		const sha = "c".repeat(64);
+		const record = (overrides: Record<string, unknown>) => ({
+			agent_id: "",
+			record_idx: 1,
+			block_idx: 0,
+			at_ms: NOW.getTime(),
+			kind: "injected_context",
+			file_path: "",
+			setup: "",
+			replayed: 0,
+			environment: "",
+			environment_clipped: 0,
+			...overrides,
+		});
+		const fake = fakeClickHouse({
+			runs,
+			gitRemote: "git@github.com:acme/app.git",
+			setupRecords: [
+				record({
+					kind: "meta",
+					environment: JSON.stringify([
+						{
+							path: "attachment/session_context.attachment.context.gitStatus",
+							ordinal: 0,
+							value: "Status:\n M CLAUDE.md\n",
+						},
+					]),
+				}),
+				record({
+					record_idx: 2,
+					setup: JSON.stringify([
+						{
+							kind: "instructions",
+							path: "/w/app/CLAUDE.md",
+							name: "",
+							cwd: "/w/app",
+							sha256: sha,
+							chars: 12,
+						},
+					]),
+				}),
+			],
+		});
+		await build(fake);
+		expect(fake.events).toEqual([
+			"fence",
+			"insert:runs",
+			"fence",
+			"insert:setup",
+			"fence",
+			"insert:receipt",
+		]);
+		expect(fake.setup).toEqual([
+			expect.objectContaining({
+				run_id: runNodeId(session, "", 3),
+				run_start_record: 3,
+				index_version: RUN_INDEX_VERSION,
+				build_revision: "41",
+				setup_file: "repository:github.com/acme/app:CLAUDE.md",
+				scope: "repository",
+				path: "CLAUDE.md",
+				version: sha,
+				version_name: "cccccccccccc uncommitted by u/1",
+				uncommitted: true,
+				carried: true,
+				received_record: 2,
+			}),
+		]);
 	});
 
 	test("every run carries the session's repository, as the receipt does", async () => {

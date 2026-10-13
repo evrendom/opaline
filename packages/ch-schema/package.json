@@ -13,7 +13,8 @@
 		"./run-index": "./src/run-index.ts",
 		"./weekly-totals": "./src/weekly-totals.ts",
 		"./finding-runs": "./src/finding-runs.ts",
-		"./run-question-answers": "./src/run-question-answers.ts"
+		"./run-question-answers": "./src/run-question-answers.ts",
+		"./received-setup": "./src/received-setup.ts"
 	},
 	"scripts": {
 		"backfill:subagent-metrics": "bun scripts/backfill-subagent-metrics.ts",
@@ -51,7 +52,8 @@
 		"ch:migrate:transcript-search": "bun scripts/migrate-transcript-search.ts",
 		"ch:migrate:run-index-messages": "bun scripts/migrate-run-index-messages.ts",
 		"ch:migrate:run-requests": "bun scripts/migrate-run-requests.ts",
-		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:run-requests ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:analysis-finding-runs ch:migrate:weekly-totals ch:migrate:not-found-unknown ch:migrate:run-question-answers ch:migrate:transcript-search ch:migrate:run-index-messages",
+		"ch:migrate:received-setup": "bun scripts/migrate-received-setup.ts",
+		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:run-requests ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:analysis-finding-runs ch:migrate:weekly-totals ch:migrate:not-found-unknown ch:migrate:run-question-answers ch:migrate:transcript-search ch:migrate:received-setup ch:migrate:run-index-messages",
 		"ch:migrate:github-outcomes": "bun scripts/migrate-github-outcomes.ts"
 	},
 	"dependencies": {

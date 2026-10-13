@@ -1,6 +1,10 @@
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { commandColumnsSql } from "./command-identity.js";
+import {
+	SETUP_SINCE_INDEX_VERSION,
+	SETUP_SINCE_PARSER_VERSION,
+} from "./received-setup.js";
 import { forkReplayCtes } from "./run-index-sql.js";
 import { records, toolErrorSql } from "./sql.js";
 import type { SqlWindow } from "./sql-guard.js";
@@ -110,7 +114,7 @@ export const SQL_MEASURES: readonly SqlMeasure[] = [
 	},
 ];
 
-const UNKNOWN_EVIDENCE = `Evidence unknown for this row, never none: system_prompt (no system prompt recorded in the stream at or before the run, or the run was built before run index ${MESSAGES_SINCE}), setup_snapshot (not in L1 yet), github_link (no stored L1 edge links the run to a commit, pull request or CI run, so its GitHub outcome is unknown) and embedding (not embedded yet). Say unknown for these, never zero.`;
+const UNKNOWN_EVIDENCE = `Evidence unknown for this row, never none: system_prompt (no system prompt recorded in the stream at or before the run, or the run was built before run index ${MESSAGES_SINCE}), received_setup (the setup the run received was not read: its session was built before run index ${SETUP_SINCE_INDEX_VERSION} or parsed before parser ${SETUP_SINCE_PARSER_VERSION}; setup_files has no rows for it), setup_snapshot (not in L1 yet), github_link (no stored L1 edge links the run to a commit, pull request or CI run, so its GitHub outcome is unknown) and embedding (not embedded yet). Say unknown for these, never zero.`;
 
 export const COVERAGE_COLUMN: SqlViewColumn = {
 	name: "coverage_gaps",
@@ -361,6 +365,7 @@ export function measuredRunsSql(
 			CAST(r.said_done AND r.frustrated AS Nullable(Bool)) AS reasked,
 			arrayConcat(
 				if(r.index_version >= ${MESSAGES_SINCE} AND r.system_prompt_recorded, [], ['system_prompt']),
+				if(r.index_version >= ${SETUP_SINCE_INDEX_VERSION} AND r.parser_version >= ${SETUP_SINCE_PARSER_VERSION}, [], ['received_setup']),
 				${sqlArray([NOT_IN_L1[0]])},
 				if(r.run_id IN (
 					SELECT from_id FROM ${getSafeClickHouseTable(L1_EDGES_TABLE)} FINAL

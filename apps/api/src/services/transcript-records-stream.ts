@@ -58,6 +58,8 @@ export function estimateDraftMemoryBytes(draft: TranscriptRecordDraft): number {
 		factCharacters += operation.length + 16;
 	for (const [key, value] of Object.entries(facts.extra))
 		factCharacters += key.length + (value?.length ?? 0) + 16;
+	for (const setup of draft.setupTexts ?? [])
+		factCharacters += setup.text.length + setup.sha256.length + 32;
 	const characters =
 		factCharacters +
 		draft.head.length +

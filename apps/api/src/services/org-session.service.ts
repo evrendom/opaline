@@ -1,5 +1,9 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
 import { FINDING_RUNS_TABLE } from "@rudel/ch-schema/finding-runs";
+import {
+	RUN_SETUP_TABLE,
+	SETUP_TEXTS_TABLE,
+} from "@rudel/ch-schema/received-setup";
 import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
 import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
@@ -240,6 +244,11 @@ export function getClickHouseSessionPurgePlans(
 		...L1_EDGE_TABLES.map((table) => ({ column, table })),
 		{ column, table: RUN_INDEX_TABLE },
 		{ column, table: RUN_REQUESTS_TABLE },
+		// Received setup: each run's setup file versions, and each member's copy
+		// of the texts (written by the transcript-records writer). The follow-up
+		// pass removes texts a write already in flight stored after the first.
+		{ column, table: RUN_SETUP_TABLE },
+		{ column, table: SETUP_TEXTS_TABLE },
 		// Run index sums per member and week. Later refreshes read the run index
 		// purged above; the follow-up pass removes a snapshot appended by a
 		// refresh that was already running.

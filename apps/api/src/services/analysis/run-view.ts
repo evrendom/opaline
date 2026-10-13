@@ -43,6 +43,19 @@ export interface RunViewRequest extends PhaseRequest {
 	readonly costUsd: number | null;
 }
 
+/** One setup file version the run had (`setup_files`); its id `s<n>` opens the text. */
+export interface RunViewSetup {
+	readonly id: string;
+	readonly kind: string;
+	readonly setupFile: string;
+	/** The version's first hex digits, and who held it uncommitted. */
+	readonly versionName: string;
+	readonly chars: number;
+	/** Received before the run started, earlier in its stream. */
+	readonly carried: boolean;
+	readonly compactedSince: boolean;
+}
+
 /** A neighbouring run of the same stream. */
 export interface RunViewNeighbour {
 	readonly id: string;
@@ -68,6 +81,8 @@ export interface RunView {
 	/** The next run, whose prompt is the user's reaction; null for the last run. */
 	readonly next: RunViewNeighbour | null;
 	readonly requests: readonly RunViewRequest[];
+	/** The setup file versions the run had; null when its received setup was not read. */
+	readonly setup: readonly RunViewSetup[] | null;
 }
 
 /** A call of an expanded request, as the service read it from its records. */
@@ -142,6 +157,7 @@ export const RUN_VIEW_SECTIONS: readonly {
 	{ name: "prev", lines: previousLines },
 	{ name: "end", lines: endLines },
 	{ name: "next", lines: nextLines },
+	{ name: "setup", lines: setupLines },
 	{ name: "phases", lines: phaseLines },
 ];
 
@@ -150,6 +166,7 @@ export const DEFAULT_RUN_VIEW_SECTIONS: readonly string[] = [
 	"prev",
 	"end",
 	"next",
+	"setup",
 	"phases",
 ];
 
@@ -474,6 +491,29 @@ function nextLines({ view }: Context): string[] {
 	return [
 		`NEXT ${next.id} · user: ${quote(next.prompt)} · reaction: ${next.prompt === null ? "unknown" : nextPromptReaction(next.prompt)}`,
 	];
+}
+
+/**
+ * The setup the run had, one line per setup file version: what it is, the
+ * setup file it belongs to, the version and its size; `s<n>` opens the exact
+ * text the run received.
+ */
+function setupLines({ view, handles }: Context): string[] {
+	if (view.setup === null)
+		return [
+			"SETUP unknown: this run's received setup was not read (its session was indexed before received setup was recorded)",
+		];
+	if (view.setup.length === 0)
+		return ["SETUP none: its transcript records no setup text for this run"];
+	return view.setup.map((setup, index) =>
+		[
+			`${index === 0 ? "SETUP" : "     "} ${handles ? `${setup.id.padEnd(3)} ` : ""}${setup.kind} ${setup.setupFile}`,
+			`version ${setup.versionName}`,
+			`${setup.chars} chars`,
+			...(setup.carried ? ["received earlier"] : []),
+			...(setup.compactedSince ? ["compacted since"] : []),
+		].join(" · "),
+	);
 }
 
 function phaseLines({ view, phases, handles }: Context): string[] {

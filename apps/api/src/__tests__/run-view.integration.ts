@@ -64,6 +64,7 @@ afterAll(async () => {
 		"rudel.transcript_records",
 		"rudel.run_index",
 		"rudel.run_requests",
+		"rudel.run_setup",
 		"rudel.usage_events",
 	])
 		await clickhouse.execute({
@@ -562,15 +563,19 @@ test("the run index build writes each request with its calls and tokens, and run
 	expect(lines[3]).toBe(
 		`NEXT ${runId(claudeSession, "claude_code", "", third ?? 0)} · user: "it still fails, damn it" · reaction: unhappy (strongly worded)`,
 	);
+	// The fixture's transcript records no setup text.
+	expect(lines[4]).toBe(
+		"SETUP none: its transcript records no setup text for this run",
+	);
 	expect(
-		lines.slice(5).map((line) => line.split(/ {2,}/u).slice(0, 3)),
+		lines.slice(6).map((line) => line.split(/ {2,}/u).slice(0, 3)),
 	).toEqual([
 		["p1", "exploring: Grep, Read", "2"],
 		["p2", "editing: Edit", "1"],
 		["p3", "running checks: Bash test×2, Task, Bash lint (1 failed)", "3"],
 		["p4", "talking to the user", "1"],
 	]);
-	expect(lines[7]).toMatch(/ 3 {2}\d+ min +17k {2}\$\d+\.\d\d$/u);
+	expect(lines[8]).toMatch(/ 3 {2}\d+ min +17k {2}\$\d+\.\d\d$/u);
 
 	// END's id opens the exact text of the final answer.
 	const end = lines[2]?.match(/^END {2}(r\d+)/u)?.[1] ?? "";
@@ -694,8 +699,9 @@ test("a run index build from before requests (version 4, which writes none) show
 		env,
 	);
 	const lines = view.text.split("\n");
-	expect([lines[2], lines[4]]).toEqual([
+	expect([lines[2], lines[4], lines[5]]).toEqual([
 		"END  unknown: this run's requests are not indexed yet",
+		"SETUP unknown: this run's received setup was not read (its session was indexed before received setup was recorded)",
 		"phases unknown: this run's requests are not indexed yet (run index before version 5)",
 	]);
 });
@@ -842,7 +848,7 @@ test("a build committed while run reads shows the run as it was loaded: requests
 	expect(lines[0]).toContain(" · 110 tokens · ");
 	expect(lines[2]).toBe(`END  ${end} · "First answer."`);
 	expect(
-		lines.slice(5, 6).map((line) => line.split(/ {2,}/u).slice(0, 5)),
+		lines.slice(6, 7).map((line) => line.split(/ {2,}/u).slice(0, 5)),
 	).toEqual([["p1", "talking to the user", "1", "1 min", "110"]]);
 	expect(during.text).toEndWith("characters\nFirst answer.");
 	// The next call reads the new build.

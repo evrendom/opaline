@@ -175,6 +175,56 @@ describe("sql over the runs view", () => {
 	});
 });
 
+describe("sql over the setup_files view", () => {
+	test("lists runs per version of one setup file from each session's committed build, scoped by the server", async () => {
+		const { env, statements } = environment();
+		ok(
+			await runSql(
+				teammate,
+				{
+					query:
+						"SELECT version_name, count(DISTINCT run_id) AS runs, uniqExact(user_id) AS members FROM setup_files WHERE setup_file = 'repository:github.com/acme/shop:CLAUDE.md' GROUP BY version_name",
+					title: "CLAUDE.md versions",
+				},
+				env,
+			),
+		);
+		const sent = agentStatement(statements);
+		expect(sent?.query_params).toMatchObject({ opaline_workspace: "ws-1" });
+		expect(sent?.query).toContain("run_setup FINAL");
+		expect(sent?.query).toContain("row_kind = 'receipt'");
+		expect(sent?.query).not.toContain("ws-1");
+	});
+
+	test("schema describes setup_files without the build's storage columns", async () => {
+		const { env } = environment();
+		const described = await describeSchema(
+			member,
+			{ view: "setup_files" },
+			env,
+		);
+		if (!described.ok || described.result.level !== "columns")
+			throw new Error("Expected the view's columns");
+		const names = described.result.columns.map((column) => column.name);
+		for (const shown of [
+			"run_id",
+			"setup_file",
+			"version",
+			"version_name",
+			"uncommitted",
+			"started_at",
+		])
+			expect(names).toContain(shown);
+		for (const hidden of [
+			"organization_id",
+			"revision",
+			"build_revision",
+			"run_started_at",
+		])
+			expect(names).not.toContain(hidden);
+	});
+});
+
 describe("sql over the finding_runs view", () => {
 	test("a member reads the cited runs of findings in analyses they wrote or that are shared, bound as parameters", async () => {
 		const { env, statements } = environment();
@@ -1270,6 +1320,7 @@ describe("schema", () => {
 			"prompts",
 			"git_events",
 			"edges",
+			"setup_files",
 			"ci_jobs",
 			"finding_runs",
 			"run_answers",

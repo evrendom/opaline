@@ -4,6 +4,7 @@ import { getLogger } from "@logtape/logtape";
 import {
 	decodeTranscriptRecordsReceipt,
 	encodeTranscriptRecordsReceipt,
+	type ReceivedSetupText,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 	type TranscriptRecordDraft,
@@ -13,7 +14,9 @@ import {
 	type TranscriptSplitSummary,
 } from "@rudel/api-routes/transcript-records";
 import {
+	ingestRudelSetupTexts,
 	ingestRudelTranscriptRecords,
+	type RudelSetupTextsRow,
 	type RudelTranscriptRecordsRow,
 } from "@rudel/ch-schema/generated";
 import {
@@ -27,6 +30,8 @@ export const TRANSCRIPT_RECORDS_TABLE = "rudel.transcript_records";
 
 /** Rows and approximate JSON bytes per insert. */
 const INSERT_BATCH_MAX_ROWS = 2_000;
+/** Received setup texts per insert; each can be up to a mebibyte. */
+const SETUP_TEXT_BATCH_MAX_ROWS = 256;
 const INSERT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 const RECEIPT_SCAN_SETTINGS = {
 	max_bytes_to_read: String(256 * 1024 * 1024),
@@ -172,12 +177,7 @@ async function writeGeneration(
 	let batchBytes = 0;
 	let batchCount = 0;
 	let rowCount = 0;
-	const publish = async (
-		rows:
-			| readonly RudelTranscriptRecordsRow[]
-			| ((publishedAt: Date) => readonly RudelTranscriptRecordsRow[]),
-		deduplicationToken: string,
-	) => {
+	const fence = async () => {
 		try {
 			await deadline.wait(input.assertWritable);
 		} catch (error) {
@@ -189,6 +189,14 @@ async function writeGeneration(
 			}
 			throw error;
 		}
+	};
+	const publish = async (
+		rows:
+			| readonly RudelTranscriptRecordsRow[]
+			| ((publishedAt: Date) => readonly RudelTranscriptRecordsRow[]),
+		deduplicationToken: string,
+	) => {
+		await fence();
 		const publishedAt = now();
 		await deadline.wait(() =>
 			insertBatch(
@@ -207,20 +215,55 @@ async function writeGeneration(
 		batch = [];
 		batchBytes = 0;
 	};
+	// Received setup texts, each distinct one once per generation: the account
+	// and workspace purges delete them, readers find them by hash.
+	const setupSeen = new Set<string>();
+	let setupBatch: RudelSetupTextsRow[] = [];
+	let setupBytes = 0;
+	let setupBatchCount = 0;
+	const flushSetup = async () => {
+		if (setupBatch.length === 0) return;
+		const rows = setupBatch;
+		setupBatch = [];
+		setupBytes = 0;
+		await fence();
+		await deadline.wait(() =>
+			insertSetupTexts(
+				executor,
+				rows,
+				`${tokenPrefix}:setup:${setupBatchCount}`,
+				deadline.signal,
+			),
+		);
+		setupBatchCount++;
+	};
 	for await (const draft of input.drafts) {
 		deadline.assertActive();
 		const row = buildTranscriptRecordRow(input, draft);
 		batch.push(row);
 		batchBytes += estimateRowBytes(row);
 		rowCount++;
+		for (const setup of draft.setupTexts ?? []) {
+			if (setupSeen.has(setup.sha256)) continue;
+			setupSeen.add(setup.sha256);
+			setupBatch.push(buildSetupTextRow(input, setup, now()));
+			setupBytes += Buffer.byteLength(setup.text, "utf8") + 200;
+		}
 		if (
 			batch.length >= INSERT_BATCH_MAX_ROWS ||
 			batchBytes >= INSERT_BATCH_MAX_BYTES
 		) {
 			await flush();
 		}
+		if (
+			setupBatch.length >= SETUP_TEXT_BATCH_MAX_ROWS ||
+			setupBytes >= INSERT_BATCH_MAX_BYTES
+		) {
+			await flushSetup();
+		}
 	}
 	await flush();
+	await flushSetup();
 
 	const summary = input.summary();
 	const publishedAt = await publish(
@@ -347,6 +390,23 @@ export function buildTranscriptRecordRow(
 		ts: toClickHouseTimestamp(draft.ts),
 		turn_idx: draft.turnIdx,
 		user_id: identity.userId,
+	};
+}
+
+/** A received setup text as `rudel.setup_texts` stores it: once per member and hash. */
+export function buildSetupTextRow(
+	identity: TranscriptRecordsIdentity,
+	setup: ReceivedSetupText,
+	writtenAt: Date,
+): RudelSetupTextsRow {
+	return {
+		organization_id: identity.organizationId,
+		user_id: identity.userId,
+		version: setup.sha256,
+		chars: setup.chars,
+		text: setup.text,
+		text_cut: setup.cut,
+		written_at: toClickHouseTimestamp(writtenAt.toISOString()),
 	};
 }
 
@@ -669,6 +729,28 @@ async function insertBatch(
 	abortSignal: AbortSignal,
 ): Promise<void> {
 	await ingestRudelTranscriptRecords(
+		{
+			insert: ({ table, values }) =>
+				executor.insert({
+					abortSignal,
+					asyncInsert: false,
+					deduplicationToken,
+					table,
+					values,
+				}),
+		},
+		[...rows],
+		{ validate: false },
+	);
+}
+
+async function insertSetupTexts(
+	executor: ClickHouseExecutor,
+	rows: readonly RudelSetupTextsRow[],
+	deduplicationToken: string,
+	abortSignal: AbortSignal,
+): Promise<void> {
+	await ingestRudelSetupTexts(
 		{
 			insert: ({ table, values }) =>
 				executor.insert({

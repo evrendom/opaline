@@ -31,6 +31,11 @@ import {
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
+	codexBaseInstructions,
+	codexDeveloperBlocks,
+	recordCwd,
+} from "./received-setup.js";
+import {
 	clippedText,
 	codexAbortedCall,
 	codexCallTimeout,
@@ -123,14 +128,22 @@ function readCodexRecord(
 	const timestamp = readString(record.timestamp);
 	const payload = isRecord(record.payload) ? record.payload : {};
 	switch (type) {
-		case "session_meta":
+		case "session_meta": {
+			// The file's own session_meta comes first; a parent's replayed copy
+			// keeps the working directory the file's own named.
+			const cwd = recordCwd(record, "codex");
+			if (state.cwd === "" && cwd !== undefined) state.cwd = cwd;
 			readSessionMetadata(payload, state);
 			return {
 				items: [
-					metaItem("session_meta", { facts: codexSessionMetaFacts(payload) }),
+					metaItem("session_meta", {
+						facts: codexSessionMetaFacts(payload),
+						setup: codexBaseInstructions(payload),
+					}),
 				],
 				timestamp,
 			};
+		}
 		case "inter_agent_communication_metadata":
 			return {
 				items: [
@@ -159,11 +172,14 @@ function readCodexRecord(
 				],
 				timestamp,
 			};
-		case "turn_context":
+		case "turn_context": {
+			const cwd = recordCwd(record, "codex");
+			if (cwd !== undefined && cwd !== "") state.cwd = cwd;
 			return {
 				items: [metaItem(type, { facts: codexTurnContextFacts(payload) })],
 				timestamp,
 			};
+		}
 		default:
 			return {
 				items: [metaItem(type === "" ? "unknown" : type)],
@@ -430,7 +446,15 @@ function readMessage(
 	const role = readString(payload.role) ?? "";
 	const text = readBlockText(payload.content);
 	if (role === "developer" || role === "system") {
-		return [{ kind: "injected_context", subtype: "developer", text }];
+		return [
+			{
+				kind: "injected_context",
+				subtype: "developer",
+				text,
+				setup:
+					role === "developer" ? codexDeveloperBlocks(payload.content) : [],
+			},
+		];
 	}
 	if (role === "assistant") {
 		return text === ""

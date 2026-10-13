@@ -1,0 +1,262 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import {
+	type ClickHouseExecutor,
+	createClickHouseExecutor,
+} from "@chkit/clickhouse";
+import {
+	checksumSQL,
+	createJournalStore,
+	extractExecutableStatements,
+} from "chkit/dist/bin/lib.js";
+import {
+	isLocalClickHouseEndpoint,
+	resolveClickHouseUsername,
+} from "../src/clickhouse-connection.js";
+import {
+	RUN_SETUP_COLUMNS,
+	RUN_SETUP_COMMENT,
+	RUN_SETUP_KEY,
+	SETUP_TEXT_COLUMNS,
+	SETUP_TEXTS_COMMENT,
+	SETUP_TEXTS_KEY,
+} from "../src/received-setup.js";
+import type { RunIndexColumn } from "../src/run-index.js";
+import {
+	appendJournalEntryWithReconciliation,
+	type MigrationJournalStore,
+} from "./migrate-f16.js";
+
+/** Received setup texts and each run's setup file versions (OPL-391). */
+export const RECEIVED_SETUP_MIGRATION = "20261013120000_received_setup.sql";
+
+interface ExpectedTable {
+	readonly name: string;
+	readonly columns: readonly RunIndexColumn[];
+	readonly key: string;
+	readonly version: string;
+	readonly comment: string;
+}
+
+const TABLES: readonly ExpectedTable[] = [
+	{
+		name: "setup_texts",
+		columns: SETUP_TEXT_COLUMNS,
+		key: SETUP_TEXTS_KEY.join(", "),
+		version: "written_at",
+		comment: SETUP_TEXTS_COMMENT,
+	},
+	{
+		name: "run_setup",
+		columns: RUN_SETUP_COLUMNS,
+		key: RUN_SETUP_KEY.join(", "),
+		version: "build_revision",
+		comment: RUN_SETUP_COMMENT,
+	},
+];
+const SETTINGS = [
+	"index_granularity = 1024",
+	"index_granularity_bytes = 1048576",
+	"non_replicated_deduplication_window = 1000",
+];
+
+type Engine = "ReplacingMergeTree" | "SharedReplacingMergeTree";
+
+/**
+ * Creates `rudel.setup_texts` and `rudel.run_setup` once and journals them
+ * only after every replica serves the exact schema (columns, comments,
+ * engine, key, settings), as the run requests runner does: ClickHouse Cloud
+ * applies DDL to replicas asynchronously, and the writers write both as soon
+ * as the deploy that reads them is live.
+ */
+export async function runReceivedSetupMigration(options: {
+	executor: ClickHouseExecutor;
+	journalStore: MigrationJournalStore;
+	migrationSql: string;
+	targetDatabase: string;
+	expectedEngine: Engine;
+	expectedStoragePolicy: string;
+	readBack?: { attempts: number; delayMs: number };
+}): Promise<void> {
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(options.targetDatabase))
+		throw new Error("Unsafe ClickHouse database");
+	const checksum = checksumSQL(options.migrationSql);
+	const applied = (await options.journalStore.readJournal()).applied.filter(
+		(entry) => entry.name === RECEIVED_SETUP_MIGRATION,
+	);
+	if (applied.some((entry) => entry.checksum !== checksum))
+		throw new Error("Received setup migration checksum mismatch");
+	const apply = async () => {
+		for (const statement of extractExecutableStatements(options.migrationSql))
+			await options.executor.execute(statement);
+	};
+	if (applied.length === 0) await apply();
+
+	const { attempts, delayMs } = options.readBack ?? {
+		attempts: 13,
+		delayMs: 10_000,
+	};
+	const replicas = await countReplicas(options.executor);
+	for (let attempt = 1; ; attempt++) {
+		let mismatch: string | null = null;
+		for (const table of TABLES) {
+			mismatch = await schemaMismatch(options, replicas, table);
+			if (mismatch !== null) break;
+		}
+		if (mismatch === null) break;
+		if (attempt >= attempts) throw new Error(mismatch);
+		// Halfway, apply the idempotent statement again in case it did not land.
+		if (applied.length === 0 && attempt === Math.ceil(attempts / 2))
+			await apply();
+		await new Promise((resolveWait) => setTimeout(resolveWait, delayMs));
+	}
+	if (applied.length === 0)
+		await appendJournalEntryWithReconciliation(options.journalStore, {
+			name: RECEIVED_SETUP_MIGRATION,
+			checksum,
+			appliedAt: new Date().toISOString().replace("Z", ""),
+		});
+}
+
+/** Replicas of the `default` cluster; 0 when the user may not list them. */
+async function countReplicas(executor: ClickHouseExecutor): Promise<number> {
+	try {
+		const [row] = await executor.query<{ replicas: string | number }>(
+			"SELECT count() AS replicas FROM system.clusters WHERE cluster = 'default' SETTINGS max_execution_time = 10",
+		);
+		return Number(row?.replicas ?? 0);
+	} catch (error) {
+		if (
+			!(
+				error instanceof Error &&
+				/Not enough privileges|ACCESS_DENIED/u.test(error.message)
+			)
+		)
+			throw error;
+		return 0;
+	}
+}
+
+interface InstalledColumn {
+	host: string;
+	name: string;
+	type: string;
+	comment: string;
+	default_kind: string;
+}
+interface InstalledTable {
+	host: string;
+	engine_full: string;
+	sorting_key: string;
+	primary_key: string;
+	partition_key: string;
+	storage_policy: string;
+	comment: string;
+}
+
+/** Why the installed table differs from its definition on any replica, or null. */
+async function schemaMismatch(
+	options: {
+		executor: ClickHouseExecutor;
+		targetDatabase: string;
+		expectedEngine: Engine;
+		expectedStoragePolicy: string;
+	},
+	replicas: number,
+	expected: ExpectedTable,
+): Promise<string | null> {
+	const read = (table: string) =>
+		replicas > 1 ? `clusterAllReplicas('default', ${table})` : table;
+	const columns = await options.executor.query<InstalledColumn>(`
+		SELECT hostName() AS host, name, type, comment, default_kind
+		FROM ${read("system.columns")}
+		WHERE database = '${options.targetDatabase}' AND table = '${expected.name}'
+		ORDER BY host, position LIMIT 128 BY host
+		SETTINGS max_execution_time = 10, skip_unavailable_shards = 0`);
+	const tables = await options.executor.query<InstalledTable>(`
+		SELECT hostName() AS host, engine_full, sorting_key, primary_key, partition_key,
+			storage_policy, comment
+		FROM ${read("system.tables")}
+		WHERE database = '${options.targetDatabase}' AND name = '${expected.name}'
+		ORDER BY host LIMIT 2 BY host
+		SETTINGS max_execution_time = 10, skip_unavailable_shards = 0`);
+	const hosts = new Set([
+		...columns.map((column) => column.host),
+		...tables.map((table) => table.host),
+	]);
+	if (hosts.size < Math.max(1, replicas))
+		return `${expected.name} table visible on ${hosts.size} of ${Math.max(1, replicas)} replicas`;
+	for (const host of hosts) {
+		const installed = columns.filter((column) => column.host === host);
+		const [table, ...extra] = tables.filter((row) => row.host === host);
+		const wrong = expected.columns.filter((column, index) => {
+			const found = installed[index];
+			return (
+				found?.name !== column.name ||
+				found.type !== column.type ||
+				found.comment !== column.comment ||
+				found.default_kind !== ""
+			);
+		});
+		const engine = table?.engine_full.split(" PRIMARY KEY ", 1)[0] ?? "";
+		const engineMatches =
+			options.expectedEngine === "ReplacingMergeTree"
+				? engine === `ReplacingMergeTree(${expected.version})`
+				: new RegExp(
+						`^SharedReplacingMergeTree\\((?:'[^']*',\\s*'[^']*',\\s*)?${expected.version}\\)$`,
+						"u",
+					).test(engine);
+		const mismatch =
+			wrong.length > 0 || installed.length !== expected.columns.length
+				? `${expected.name} columns mismatch: ${wrong.map((column) => column.name).join(", ") || "unexpected columns"}`
+				: !table || extra.length > 0
+					? `${expected.name} table is missing`
+					: !engineMatches ||
+							table.sorting_key !== expected.key ||
+							table.primary_key !== expected.key ||
+							table.partition_key !== "" ||
+							table.storage_policy !== options.expectedStoragePolicy ||
+							table.comment !== expected.comment ||
+							!SETTINGS.every((setting) => table.engine_full.includes(setting))
+						? `${expected.name} table mismatch (engine_full, key, settings, comment)`
+						: null;
+		if (mismatch !== null)
+			return replicas > 1 ? `${mismatch} on replica ${host}` : mismatch;
+	}
+	return null;
+}
+
+async function main(): Promise<void> {
+	const url = process.env.CLICKHOUSE_URL;
+	if (!url) throw new Error("CLICKHOUSE_URL is required");
+	const executor = createClickHouseExecutor({
+		url,
+		username: resolveClickHouseUsername(process.env, url),
+		password: process.env.CLICKHOUSE_PASSWORD ?? "",
+		database: "default",
+	});
+	try {
+		await runReceivedSetupMigration({
+			executor,
+			journalStore: createJournalStore(executor),
+			migrationSql: await readFile(
+				resolve(import.meta.dir, "../chx/migrations", RECEIVED_SETUP_MIGRATION),
+				"utf8",
+			),
+			targetDatabase: "rudel",
+			expectedEngine: isLocalClickHouseEndpoint(url)
+				? "ReplacingMergeTree"
+				: "SharedReplacingMergeTree",
+			expectedStoragePolicy: "s3",
+		});
+		console.log(`Applied/validated: ${RECEIVED_SETUP_MIGRATION}`);
+	} finally {
+		await executor.close();
+	}
+}
+
+if (import.meta.main)
+	main().catch((error: unknown) => {
+		console.error(error);
+		process.exitCode = 1;
+	});

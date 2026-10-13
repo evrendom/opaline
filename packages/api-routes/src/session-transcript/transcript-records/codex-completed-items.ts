@@ -9,6 +9,7 @@ import {
 	type StreamState,
 	safeStringify,
 } from "./line-items.js";
+import { codexSkillRead } from "./received-setup.js";
 import { codexItemFacts, mcpFacts, mergeFacts } from "./record-facts.js";
 import type { FileOperation } from "./types.js";
 
@@ -192,6 +193,7 @@ function readCommandExecution(
 				item.status === "aborted" ||
 				(exitCode !== null && exitCode !== 0),
 			kind: "tool_result",
+			setup: codexSkillRead(item, command, exitCode),
 			// No exit code and not finished: still running when recorded.
 			...(exitCode === null &&
 			item.status !== "failed" &&

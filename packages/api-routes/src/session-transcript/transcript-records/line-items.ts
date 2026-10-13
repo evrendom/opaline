@@ -1,5 +1,6 @@
 import type { ShellFileMutation } from "./command-class.js";
 import type { UserTextClassification } from "./injected-wrappers.js";
+import type { ReceivedSetupSource } from "./received-setup.js";
 import type {
 	CommandClass,
 	FileOperation,
@@ -23,6 +24,8 @@ export interface LineItem {
 	readonly filePath?: string;
 	readonly isError?: boolean;
 	readonly kind: TranscriptRecordKind;
+	/** Setup text the line carries for this item (parser v10, `received-setup.ts`). */
+	readonly setup?: readonly ReceivedSetupSource[];
 	readonly spawnedAgentId?: string;
 	readonly subtype?: string;
 	/** Full decoded text. Left empty for kinds whose body is not worth storing. */
@@ -72,6 +75,8 @@ export interface StreamState {
 	 * Codex writes right after the completion, has not arrived yet.
 	 */
 	codexPendingWebSearchMirrors: number;
+	/** Working directory of the stream's latest line that recorded one; '' before. */
+	cwd: string;
 	/** How the agent was started (Claude `entrypoint`, Codex `originator`). */
 	entrypoint: string;
 	isSubagent: boolean;
@@ -103,6 +108,7 @@ export function createStreamState(
 		codexEndEvents: new Map(),
 		codexExecScript: undefined,
 		codexPendingWebSearchMirrors: 0,
+		cwd: "",
 		entrypoint: "",
 		isSubagent,
 		lastPromptText: "",

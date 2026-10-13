@@ -998,6 +998,77 @@ export const RudelRunRequestsRowSchema = z.object({
 export type RudelRunRequestsRowInput = z.input<typeof RudelRunRequestsRowSchema>
 export type RudelRunRequestsRowOutput = z.output<typeof RudelRunRequestsRowSchema>
 
+export type RudelRunSetupRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  revision: string
+  parser_version: number
+  index_version: number
+  build_revision: string
+  agent_id: string
+  run_start_record: number
+  setup_file: string
+  version: string
+  source: string
+  run_id: string
+  turn_idx: number
+  built_at: string
+  session_date: string
+  run_started_at: string
+  kind: string
+  scope: string
+  owner: string
+  path: string
+  recorded_path: string
+  cwd: string
+  chars: number
+  version_name: string
+  uncommitted: boolean | null
+  carried: boolean
+  compacted_since: boolean
+  received_record: number
+  received_block: number
+  received_at: string
+}
+
+export const RudelRunSetupRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  index_version: z.number(),
+  build_revision: z.string(),
+  agent_id: z.string(),
+  run_start_record: z.number(),
+  setup_file: z.string(),
+  version: z.string(),
+  source: z.string(),
+  run_id: z.string(),
+  turn_idx: z.number(),
+  built_at: z.string(),
+  session_date: z.string(),
+  run_started_at: z.string(),
+  kind: z.string(),
+  scope: z.string(),
+  owner: z.string(),
+  path: z.string(),
+  recorded_path: z.string(),
+  cwd: z.string(),
+  chars: z.number(),
+  version_name: z.string(),
+  uncommitted: z.boolean().nullable(),
+  carried: z.boolean(),
+  compacted_since: z.boolean(),
+  received_record: z.number(),
+  received_block: z.number(),
+  received_at: z.string(),
+})
+
+export type RudelRunSetupRowInput = z.input<typeof RudelRunSetupRowSchema>
+export type RudelRunSetupRowOutput = z.output<typeof RudelRunSetupRowSchema>
+
 export type RudelSessionAnalyticsRow = {
   session_date: string
   last_interaction_date: string
@@ -1275,6 +1346,29 @@ export const RudelSessionLineageRowSchema = z.object({
 
 export type RudelSessionLineageRowInput = z.input<typeof RudelSessionLineageRowSchema>
 export type RudelSessionLineageRowOutput = z.output<typeof RudelSessionLineageRowSchema>
+
+export type RudelSetupTextsRow = {
+  organization_id: string
+  user_id: string
+  version: string
+  chars: number
+  text: string
+  text_cut: boolean
+  written_at: string
+}
+
+export const RudelSetupTextsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  version: z.string(),
+  chars: z.number(),
+  text: z.string(),
+  text_cut: z.boolean(),
+  written_at: z.string(),
+})
+
+export type RudelSetupTextsRowInput = z.input<typeof RudelSetupTextsRowSchema>
+export type RudelSetupTextsRowOutput = z.output<typeof RudelSetupTextsRowSchema>
 
 export type RudelSkillReceiptsRow = {
   organization_id: string

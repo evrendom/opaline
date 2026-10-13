@@ -319,7 +319,7 @@ export async function describeSchema(
 					"Rank and compare with the approved measures, so analyses agree and before/after comparisons hold; say which order you ranked by.",
 					"Pass view to see its columns with their meaning and traps, then column to see its most common values.",
 					"Every view holds only the sessions you may read, and GitHub facts only of the repositories the workspace connected; the server adds the workspace.",
-					"Views join to runs by run_id; edges chain runs to commits, pull requests and CI runs (ci_jobs).",
+					"Views join to runs by run_id; edges chain runs to commits, pull requests and CI runs (ci_jobs); setup_files lists the setup file versions each run received.",
 				],
 				// The caller adds the run questions agents may ask.
 				questions: [],
