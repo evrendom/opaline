@@ -156,6 +156,7 @@ test("admin dashboard aggregates every tenant anonymously", async () => {
 		const { metrics } = z
 			.object({ json: CostDashboardSchema })
 			.parse(JSON.parse(body)).json;
+		assert(metrics.sessions && metrics.cost);
 
 		expect(metrics.sessions.total).toBe(2);
 		expect(

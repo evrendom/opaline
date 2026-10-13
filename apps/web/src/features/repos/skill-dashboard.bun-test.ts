@@ -60,12 +60,12 @@ const sessions = [
 
 test("totals, daily trend and breakdowns, unpriced sessions flagged", () => {
 	const { metrics } = buildSessionsDashboard(sessions, input(), labels);
-	expect(metrics.cost.total).toBe(3);
-	expect(metrics.cost.incomplete).toBe(true);
-	expect(metrics.sessions.total).toBe(3);
-	expect(metrics.cost.trend.map((point) => point.total)).toEqual([2, 0, 1]);
+	expect(metrics.cost?.total).toBe(3);
+	expect(metrics.cost?.incomplete).toBe(true);
+	expect(metrics.sessions?.total).toBe(3);
+	expect(metrics.cost?.trend.map((point) => point.total)).toEqual([2, 0, 1]);
 	expect(
-		metrics.sessions.breakdowns.members.map((e) => [e.label, e.value]),
+		metrics.sessions?.breakdowns.members.map((e) => [e.label, e.value]),
 	).toEqual([
 		["Ada", 2],
 		["Lin", 1],
@@ -78,13 +78,13 @@ test("a breakdown ignores its own filter but applies the others", () => {
 		input({ members: ["u2"] }),
 		labels,
 	);
-	expect(metrics.sessions.total).toBe(1);
+	expect(metrics.sessions?.total).toBe(1);
 	// Members still lists everyone; Models only what u2 ran.
-	expect(metrics.sessions.breakdowns.members.map((e) => e.id)).toEqual([
+	expect(metrics.sessions?.breakdowns.members.map((e) => e.id)).toEqual([
 		"u1",
 		"u2",
 	]);
-	expect(metrics.sessions.breakdowns.models.map((e) => e.id)).toEqual([
+	expect(metrics.sessions?.breakdowns.models.map((e) => e.id)).toEqual([
 		"sonnet",
 	]);
 });
@@ -95,7 +95,7 @@ test("splits name each series and counts language signals", () => {
 		input({ splitBy: "members", requestedMetric: "sessions" }),
 		labels,
 	);
-	expect(metrics.sessions.series).toEqual([
+	expect(metrics.sessions?.series).toEqual([
 		{ id: "series-0", label: "Ada" },
 		{ id: "series-1", label: "Lin" },
 	]);

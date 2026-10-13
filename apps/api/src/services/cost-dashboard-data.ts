@@ -48,6 +48,10 @@ const SIGNAL_LABELS: Record<string, string> = {
 };
 const MAX_NAMED_SERIES = 7;
 
+/** Where a metric's trend comes from: its chart facet (the members facet
+ * unless split), or its headline rows when the facets were not queried. */
+type TrendSource = "chart" | "headline";
+
 /** Metrics every dashboard scope serves. */
 export const BASE_DASHBOARD_METRICS = [
 	"cost",
@@ -132,6 +136,9 @@ export interface CostDashboardBuildOptions {
 		ciFailuresPerPullRequest: DashboardMetricData | null;
 		ciRuns?: DashboardMetricData | null;
 	}>;
+	/** False when the session metrics were not queried (a pull request or CI
+	 * answer): they are then null rather than zero. */
+	readonly sessionMetrics?: boolean;
 }
 
 export function buildCostDashboard(
@@ -143,6 +150,13 @@ export function buildCostDashboard(
 ): CostDashboard {
 	const availableMetrics = options.availableMetrics ?? BASE_DASHBOARD_METRICS;
 	const pullRequestsAvailable = availableMetrics.includes("mergedPullRequests");
+	const sessionMetrics = options.sessionMetrics ?? true;
+	// Only the requested metric has breakdown rows. The others carry their
+	// headline by date, enough for a stat card's total and trend.
+	const trendFrom = (metric: CostDashboardRequestedMetric): TrendSource =>
+		input.requestedMetric === undefined || input.requestedMetric === metric
+			? "chart"
+			: "headline";
 	// Signal-only splits do not alter cost/session totals in the metric strip.
 	const baseInput = !["none", "members", "repositories", "models"].includes(
 		input.splitBy,
@@ -154,29 +168,46 @@ export function buildCostDashboard(
 		splitBy: input.splitBy,
 		availableMetrics: [...availableMetrics],
 		metrics: {
-			cost: buildMetric(
-				rows.filter((row) => row.metric === "cost"),
-				baseInput,
-				members,
-				"API Cost",
-			),
-			sessions: buildMetric(
-				rows.filter((row) => row.metric === "sessions"),
-				baseInput,
-				members,
-				"Sessions",
-			),
+			cost: sessionMetrics
+				? buildMetric(
+						rows.filter((row) => row.metric === "cost"),
+						baseInput,
+						members,
+						"API Cost",
+						trendFrom("cost"),
+					)
+				: null,
+			sessions: sessionMetrics
+				? buildMetric(
+						rows.filter((row) => row.metric === "sessions"),
+						baseInput,
+						members,
+						"Sessions",
+						trendFrom("sessions"),
+					)
+				: null,
 			commits: null,
-			signals: buildSignal(
-				rows,
-				input.splitBy === "runSignals" ||
-					input.splitBy === "durations" ||
-					input.splitBy === "skillsUsed"
-					? baseInput
-					: input,
-				members,
-			),
-			agentRuns: buildAgentRuns(rows, input, members, durationStats),
+			signals: sessionMetrics
+				? buildSignal(
+						rows,
+						input.splitBy === "runSignals" ||
+							input.splitBy === "durations" ||
+							input.splitBy === "skillsUsed"
+							? baseInput
+							: input,
+						members,
+						trendFrom("signals"),
+					)
+				: null,
+			agentRuns: sessionMetrics
+				? buildAgentRuns(
+						rows,
+						input,
+						members,
+						durationStats,
+						trendFrom("agentRuns"),
+					)
+				: null,
 			mergedPullRequests: pullRequestsAvailable
 				? (options.pullRequests?.mergedPullRequests ?? null)
 				: null,
@@ -195,6 +226,7 @@ function buildAgentRuns(
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
 	durationStats: NonNullable<DashboardMetricData["durationStats"]> | undefined,
+	trendFrom: TrendSource = "chart",
 ): DashboardMetricData | null {
 	const runs = rows.filter((row) => row.metric === "agentRuns");
 	const runHeadlineRows = rows.some(
@@ -217,6 +249,7 @@ function buildAgentRuns(
 			: input,
 		members,
 		"Agent runs",
+		trendFrom,
 	);
 	result.durationStats = durationStats;
 	const coverageRows = rows.filter(
@@ -265,6 +298,7 @@ function buildSignal(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
+	trendFrom: TrendSource = "chart",
 ): DashboardMetricData | null {
 	const signalRows = rows.filter((row) => row.metric === "signals");
 	const signalHeadlineRows = signalRows.some(
@@ -274,7 +308,13 @@ function buildSignal(
 		: signalRows;
 	if (signalHeadlineRows.some((row) => Number(row.matched_incomplete) > 0))
 		return null;
-	const result = buildMetric(signalRows, input, members, "Language signals");
+	const result = buildMetric(
+		signalRows,
+		input,
+		members,
+		"Language signals",
+		trendFrom,
+	);
 	// Keep the three known categories selectable even when another filter leaves
 	// one at zero. Phrase choices remain limited to actual matched text.
 	for (const [id, label] of Object.entries(SIGNAL_LABELS)) {
@@ -299,6 +339,7 @@ export function buildMetric(
 	input: CostDashboardInput,
 	members: ReadonlyMap<string, MemberLabel>,
 	label: string,
+	trendFrom: TrendSource = "chart",
 ): DashboardMetricData {
 	const breakdowns: DashboardMetricData["breakdowns"] = {
 		members: [],
@@ -337,8 +378,13 @@ export function buildMetric(
 			(a, b) => b.value - a.value || a.label.localeCompare(b.label),
 		);
 	}
-	const splitBy = input.splitBy;
-	const chartDimension = splitBy === "none" ? "members" : splitBy;
+	const splitBy = trendFrom === "headline" ? "none" : input.splitBy;
+	const chartDimension =
+		trendFrom === "headline"
+			? "headline"
+			: splitBy === "none"
+				? "members"
+				: splitBy;
 	const chartRows = rows.filter(
 		(row) =>
 			row.dimension === chartDimension &&
@@ -367,7 +413,7 @@ export function buildMetric(
 			? [{ id: "total", label }]
 			: named.map(([id], index) => ({
 					id: `series-${index}`,
-					label: labelFor(chartDimension, id, members),
+					label: labelFor(splitBy, id, members),
 				}));
 	if (splitBy !== "none" && ranked.length > limit)
 		series.push({ id: "other", label: "Other" });

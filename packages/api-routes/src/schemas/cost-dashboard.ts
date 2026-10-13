@@ -70,6 +70,10 @@ const CostDashboardInputBaseSchema = DateRangeInputSchema.extend({
 		.array(z.enum(["first", "rerun"]))
 		.max(2)
 		.default([]),
+	// False leaves the session metrics (null) out of a pull request or CI
+	// answer, which then skips the session query. Session metric answers
+	// always carry them.
+	sessionMetrics: z.boolean().optional(),
 });
 function isWithinOneYear(input: { startDate: string; endDate: string }) {
 	const days =
@@ -103,6 +107,7 @@ export const AdminCostDashboardInputSchema = CostDashboardInputBaseSchema.omit({
 	ciEvents: true,
 	ciWorkflows: true,
 	ciAttempts: true,
+	sessionMetrics: true,
 })
 	.extend({
 		requestedMetric: z.enum(["cost", "sessions", "signals", "agentRuns"]),
@@ -255,8 +260,9 @@ const costDashboardOutputSchema = z.object({
 	// metric outside this list are answered as the default cost view.
 	availableMetrics: z.array(CostDashboardRequestedMetricSchema),
 	metrics: z.object({
-		cost: DashboardMetricDataSchema,
-		sessions: DashboardMetricDataSchema,
+		// Null in a pull request or CI answer requested without them.
+		cost: DashboardMetricDataSchema.nullable(),
+		sessions: DashboardMetricDataSchema.nullable(),
 		// A Git revision on a session does not establish that it created a commit.
 		commits: DashboardMetricDataSchema.nullable(),
 		signals: DashboardMetricDataSchema.nullable(),

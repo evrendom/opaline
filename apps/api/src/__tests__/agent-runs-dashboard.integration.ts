@@ -262,9 +262,9 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 	expect(mergedView.metrics.sessions?.total).toBe(
 		sessionsView.metrics.sessions?.total,
 	);
-	expect(sessionsView.metrics.cost.total).toBeCloseTo(0.00084, 12);
-	expect(mergedView.metrics.cost.total).toBeCloseTo(
-		sessionsView.metrics.cost.total,
+	expect(sessionsView.metrics.cost?.total).toBeCloseTo(0.00084, 12);
+	expect(mergedView.metrics.cost?.total).toBeCloseTo(
+		sessionsView.metrics.cost?.total ?? Number.NaN,
 		12,
 	);
 });
@@ -385,6 +385,22 @@ test("PR repository IDs scope every headline like the default metric in both cut
 			expect(
 				result.metrics.mergedPullRequests?.breakdowns.repositories[0]?.id,
 			).toBe("148001");
+			// A stat card's request leaves the session metrics out.
+			const card = await dashboard(
+				{ requestedMetric, repositories: ["148001"], sessionMetrics: false },
+				0,
+				endpoint,
+			);
+			for (const metric of [
+				"cost",
+				"sessions",
+				"signals",
+				"agentRuns",
+			] as const)
+				expect(card.metrics[metric]).toBeNull();
+			expect(card.metrics.mergedPullRequests).toEqual(
+				result.metrics.mergedPullRequests,
+			);
 			for (const repositories of [
 				["148003"],
 				["999999"],
@@ -746,15 +762,15 @@ test("requested detail metric does not change filtered headline totals", async (
 	);
 	const legacy = await dashboard({ ...filters, requestedMetric: undefined });
 	const totals = results.map((result) => ({
-		cost: result.metrics.cost.total,
-		sessions: result.metrics.sessions.total,
+		cost: result.metrics.cost?.total,
+		sessions: result.metrics.sessions?.total,
 		signals: result.metrics.signals?.total,
 		agentRuns: result.metrics.agentRuns?.total,
 	}));
 	const expectedTotals = totals[0];
 	assert(expectedTotals);
 	for (const total of totals) {
-		expect(total.cost).toBeCloseTo(expectedTotals.cost, 12);
+		expect(total.cost).toBeCloseTo(expectedTotals.cost ?? Number.NaN, 12);
 		expect({
 			sessions: total.sessions,
 			signals: total.signals,
@@ -765,9 +781,12 @@ test("requested detail metric does not change filtered headline totals", async (
 			agentRuns: expectedTotals.agentRuns,
 		});
 	}
-	expect(legacy.metrics.cost.total).toBeCloseTo(expectedTotals.cost, 12);
+	expect(legacy.metrics.cost?.total).toBeCloseTo(
+		expectedTotals.cost ?? Number.NaN,
+		12,
+	);
 	expect({
-		sessions: legacy.metrics.sessions.total,
+		sessions: legacy.metrics.sessions?.total,
 		signals: legacy.metrics.signals?.total,
 		agentRuns: legacy.metrics.agentRuns?.total,
 	}).toEqual({
@@ -775,7 +794,7 @@ test("requested detail metric does not change filtered headline totals", async (
 		signals: expectedTotals.signals,
 		agentRuns: expectedTotals.agentRuns,
 	});
-	expect(results[0]?.metrics.cost.breakdowns.members).not.toHaveLength(0);
+	expect(results[0]?.metrics.cost?.breakdowns.members).not.toHaveLength(0);
 	expect(results[0]?.metrics.agentRuns?.breakdowns.members).toHaveLength(0);
 	expect(results[2]?.metrics.signals?.breakdowns.signalTypes).not.toHaveLength(
 		0,
@@ -783,7 +802,7 @@ test("requested detail metric does not change filtered headline totals", async (
 	expect(results[3]?.metrics.agentRuns?.breakdowns.runSignals).not.toHaveLength(
 		0,
 	);
-	expect(legacy.metrics.cost.breakdowns.members).not.toHaveLength(0);
+	expect(legacy.metrics.cost?.breakdowns.members).not.toHaveLength(0);
 	expect(legacy.metrics.signals?.breakdowns.signalTypes).not.toHaveLength(0);
 	expect(legacy.metrics.agentRuns?.breakdowns.runSignals).not.toHaveLength(0);
 });

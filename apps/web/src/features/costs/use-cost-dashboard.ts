@@ -634,40 +634,28 @@ function buildDashboardInput(
 		ciAttempts: (["first", "rerun"] as const).filter((id) =>
 			params.getAll("attempt").includes(id),
 		),
-
-		signalTypes:
-			metric === "signals"
-				? params
-						.getAll("signal")
-						.filter(
-							(value): value is DashboardSignal =>
-								value === "modelApologies" ||
-								value === "userPositive" ||
-								value === "userNegative",
-						)
-						.slice(0, 3)
-						.sort()
-				: [],
-		phrases:
-			metric === "signals" ? params.getAll("phrase").slice(0, 100).sort() : [],
-		runSignals:
-			metric === "agentRuns"
-				? AGENT_RUN_SIGNALS.filter(({ id }) =>
-						params.getAll("feedback").includes(id),
-					).map(({ id }) => id)
-				: [],
-		durations:
-			metric === "agentRuns"
-				? AGENT_RUN_DURATIONS.filter(({ id }) =>
-						params.getAll("duration").includes(id),
-					).map(({ id }) => id)
-				: [],
-		skillsUsed:
-			metric === "agentRuns"
-				? (["yes", "no"] as const).filter((id) =>
-						params.getAll("skills").includes(id),
-					)
-				: [],
+		// Sent with every metric: the server applies each to its own metric
+		// only, and the session stat cards read their totals from one answer.
+		signalTypes: params
+			.getAll("signal")
+			.filter(
+				(value): value is DashboardSignal =>
+					value === "modelApologies" ||
+					value === "userPositive" ||
+					value === "userNegative",
+			)
+			.slice(0, 3)
+			.sort(),
+		phrases: params.getAll("phrase").slice(0, 100).sort(),
+		runSignals: AGENT_RUN_SIGNALS.filter(({ id }) =>
+			params.getAll("feedback").includes(id),
+		).map(({ id }) => id),
+		durations: AGENT_RUN_DURATIONS.filter(({ id }) =>
+			params.getAll("duration").includes(id),
+		).map(({ id }) => id),
+		skillsUsed: (["yes", "no"] as const).filter((id) =>
+			params.getAll("skills").includes(id),
+		),
 	};
 	return { input, dimensions, interval };
 }

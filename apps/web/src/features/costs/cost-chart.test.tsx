@@ -4,6 +4,11 @@ import { TooltipProvider } from "@/app/ui/tooltip";
 import { CostChart } from "./cost-chart";
 import { githubOutcomesDashboardFixture } from "./github-outcomes-dashboard.fixture";
 
+function present<T>(value: T | null): T {
+	if (value === null) throw new Error("The fixture has no such metric.");
+	return value;
+}
+
 function chart(
 	data = githubOutcomesDashboardFixture(),
 	metric: "mergedPullRequests" | "ciRuns" = "mergedPullRequests",
@@ -54,7 +59,7 @@ describe("GitHub chart", () => {
 	test("shows preview qualifier and every coverage note in order", () => {
 		const data = githubOutcomesDashboardFixture();
 		data.metrics.mergedPullRequests = {
-			...data.metrics.cost,
+			...present(data.metrics.cost),
 			githubHistory: {
 				pullRequestsFrom: "2026-09-01",
 				ciFrom: "2026-09-01",
@@ -86,7 +91,7 @@ describe("GitHub chart", () => {
 	test("uses the merged PR empty copy and unavailable refresh state", () => {
 		const data = githubOutcomesDashboardFixture();
 		data.metrics.mergedPullRequests = {
-			...data.metrics.cost,
+			...present(data.metrics.cost),
 			total: 0,
 			hasUsage: false,
 		};

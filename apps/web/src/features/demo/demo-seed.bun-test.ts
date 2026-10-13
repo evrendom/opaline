@@ -25,11 +25,11 @@ test("the default dashboard seed includes a populated daily cost chart for its r
 	const { dashboard } = DemoSeedSchema.parse(fixture);
 	expect(dashboard.input.requestedMetric).toBe("cost");
 	expect(dashboard.data.requestedMetric).toBe("cost");
-	expect(dashboard.data.metrics.cost.total).toBeGreaterThan(0);
-	expect(dashboard.data.metrics.cost.trend[0]?.date).toBe(
+	expect(dashboard.data.metrics.cost?.total).toBeGreaterThan(0);
+	expect(dashboard.data.metrics.cost?.trend[0]?.date).toBe(
 		dashboard.input.startDate,
 	);
-	expect(dashboard.data.metrics.cost.trend.at(-1)?.date).toBe(
+	expect(dashboard.data.metrics.cost?.trend.at(-1)?.date).toBe(
 		dashboard.input.endDate,
 	);
 });

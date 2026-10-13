@@ -38,12 +38,12 @@ test("zero-fills missing UTC days and computes the total without counting all th
 		input,
 		members,
 	);
-	expect(result.metrics.cost.total).toBe(10);
-	expect(result.metrics.cost.trend.map((point) => point.total)).toEqual([
+	expect(result.metrics.cost?.total).toBe(10);
+	expect(result.metrics.cost?.trend.map((point) => point.total)).toEqual([
 		10, 0, 0,
 	]);
-	expect(result.metrics.cost.breakdowns.members[0]?.label).toBe("Alice");
-	expect(result.metrics.cost.breakdowns.repositories[0]?.label).toBe(
+	expect(result.metrics.cost?.breakdowns.members[0]?.label).toBe("Alice");
+	expect(result.metrics.cost?.breakdowns.repositories[0]?.label).toBe(
 		"opaline/app",
 	);
 });
@@ -54,11 +54,11 @@ test("uses matched amounts for the chart while keeping alternative selections in
 		{ ...input, members: ["alice"] },
 		members,
 	);
-	expect(result.metrics.cost.total).toBe(10);
+	expect(result.metrics.cost?.total).toBe(10);
 	expect(
-		result.metrics.cost.breakdowns.members.map((entry) => entry.value),
+		result.metrics.cost?.breakdowns.members.map((entry) => entry.value),
 	).toEqual([80, 10]);
-	expect(result.metrics.cost.series).toEqual([
+	expect(result.metrics.cost?.series).toEqual([
 		{ id: "total", label: "API Cost" },
 	]);
 });
@@ -77,11 +77,11 @@ test("every model line adds up to its day and the total, with a bounded Other se
 		{ ...input, splitBy: "models" },
 		members,
 	);
-	expect(result.metrics.cost.series).toHaveLength(8);
-	expect(result.metrics.cost.series.at(-1)?.label).toBe("Other");
-	expect(result.metrics.cost.total).toBe(55);
-	expect(result.metrics.cost.trend[0]?.values.other).toBe(6);
-	for (const point of result.metrics.cost.trend)
+	expect(result.metrics.cost?.series).toHaveLength(8);
+	expect(result.metrics.cost?.series.at(-1)?.label).toBe("Other");
+	expect(result.metrics.cost?.total).toBe(55);
+	expect(result.metrics.cost?.trend[0]?.values.other).toBe(6);
+	for (const point of result.metrics.cost?.trend ?? [])
 		expect(
 			Object.values(point.values).reduce((sum, value) => sum + value, 0),
 		).toBe(point.total);
@@ -93,13 +93,13 @@ test("distinguishes unpriced usage from an empty selection", () => {
 		input,
 		members,
 	);
-	expect(partial.metrics.cost.hasUsage).toBe(true);
-	expect(partial.metrics.cost.incomplete).toBe(true);
-	expect(partial.metrics.cost.breakdowns.members[0]?.incomplete).toBe(true);
+	expect(partial.metrics.cost?.hasUsage).toBe(true);
+	expect(partial.metrics.cost?.incomplete).toBe(true);
+	expect(partial.metrics.cost?.breakdowns.members[0]?.incomplete).toBe(true);
 	const empty = buildCostDashboard([], input, members);
-	expect(empty.metrics.cost.hasUsage).toBe(false);
-	expect(empty.metrics.cost.total).toBe(0);
-	expect(empty.metrics.cost.trend).toHaveLength(3);
+	expect(empty.metrics.cost?.hasUsage).toBe(false);
+	expect(empty.metrics.cost?.total).toBe(0);
+	expect(empty.metrics.cost?.trend).toHaveLength(3);
 });
 
 test("unpriced usage outside the selection does not mark the chart incomplete", () => {
@@ -117,9 +117,9 @@ test("unpriced usage outside the selection does not mark the chart incomplete", 
 		input,
 		members,
 	);
-	expect(result.metrics.cost.incomplete).toBe(false);
+	expect(result.metrics.cost?.incomplete).toBe(false);
 	expect(
-		result.metrics.cost.breakdowns.members.find((entry) => entry.id === "bob")
+		result.metrics.cost?.breakdowns.members.find((entry) => entry.id === "bob")
 			?.incomplete,
 	).toBe(true);
 });
@@ -130,8 +130,8 @@ test("does not use untrusted dimension values as chart object keys", () => {
 		{ ...input, splitBy: "models" },
 		members,
 	);
-	expect(result.metrics.cost.trend[0]?.values).toEqual({ "series-0": 10 });
-	expect(result.metrics.cost.series[0]?.label).toBe("__proto__");
+	expect(result.metrics.cost?.trend[0]?.values).toEqual({ "series-0": 10 });
+	expect(result.metrics.cost?.series[0]?.label).toBe("__proto__");
 });
 
 test("session counts stay separate from costs and sum across days and primary models", () => {
@@ -163,15 +163,15 @@ test("session counts stay separate from costs and sum across days and primary mo
 		input,
 		members,
 	);
-	expect(result.metrics.cost.total).toBe(10);
-	expect(result.metrics.sessions.total).toBe(5);
-	expect(result.metrics.sessions.trend.map((day) => day.total)).toEqual([
+	expect(result.metrics.cost?.total).toBe(10);
+	expect(result.metrics.sessions?.total).toBe(5);
+	expect(result.metrics.sessions?.trend.map((day) => day.total)).toEqual([
 		2, 3, 0,
 	]);
 	expect(
-		result.metrics.sessions.breakdowns.models.map((entry) => entry.value),
+		result.metrics.sessions?.breakdowns.models.map((entry) => entry.value),
 	).toEqual([4, 1]);
-	expect(result.metrics.sessions.incomplete).toBe(false);
+	expect(result.metrics.sessions?.incomplete).toBe(false);
 	expect(result.metrics.commits).toBeNull();
 });
 
@@ -197,11 +197,11 @@ test("session splits preserve integer totals and respect matched filters", () =>
 		{ ...input, splitBy: "models", models: ["model-a"] },
 		members,
 	);
-	expect(result.metrics.sessions.total).toBe(4);
-	expect(result.metrics.sessions.series).toHaveLength(1);
-	expect(result.metrics.sessions.trend[0]?.values).toEqual({ "series-0": 4 });
+	expect(result.metrics.sessions?.total).toBe(4);
+	expect(result.metrics.sessions?.series).toHaveLength(1);
+	expect(result.metrics.sessions?.trend[0]?.values).toEqual({ "series-0": 4 });
 	expect(
-		result.metrics.sessions.breakdowns.models.map((entry) => entry.value),
+		result.metrics.sessions?.breakdowns.models.map((entry) => entry.value),
 	).toEqual([8, 4]);
 });
 
@@ -239,7 +239,7 @@ test("language signals default to a combined total without counting facets twice
 		input,
 		members,
 	);
-	expect(result.metrics.sessions.total).toBe(5);
+	expect(result.metrics.sessions?.total).toBe(5);
 	expect(result.metrics.signals?.total).toBe(22);
 	expect(result.metrics.signals?.series).toEqual([
 		{ id: "total", label: "Language signals" },
@@ -343,7 +343,7 @@ test("verbatim splits use safe keys, preserve totals and exclude blank sentinels
 		"Great work",
 		"__proto__",
 	]);
-	expect(result.metrics.cost.total).toBe(10);
+	expect(result.metrics.cost?.total).toBe(10);
 });
 
 test("unscanned language remains unknown, including when a verbatim filter has no stored phrases yet", () => {
@@ -372,7 +372,7 @@ test("unscanned language remains unknown, including when a verbatim filter has n
 		members,
 	);
 	expect(result.metrics.signals).toBeNull();
-	expect(result.metrics.cost.total).toBe(10);
+	expect(result.metrics.cost?.total).toBe(10);
 });
 
 test("agent runs include no-signal runs once and preserve all fixed duration ranges", () => {
@@ -631,4 +631,59 @@ test("lists every UTC day of an inclusive range, across month and leap boundarie
 	expect(
 		listDashboardDates({ startDate: "2026-09-30", endDate: "2026-09-30" }),
 	).toEqual(["2026-09-30"]);
+});
+
+test("metrics other than the requested one take their stat card trend from headline rows", () => {
+	const headline = (overrides: Partial<CostAggregateRow>) =>
+		row({ dimension: "headline", id: "", ...overrides });
+	const result = buildCostDashboard(
+		[
+			headline({ metric: "cost", value: 4, matched_value: 4 }),
+			row({ metric: "cost", value: 4, matched_value: 4 }),
+			headline({ metric: "sessions", value: 2, matched_value: 2 }),
+			headline({
+				metric: "sessions",
+				date: "2026-09-03",
+				value: 1,
+				matched_value: 1,
+			}),
+			headline({ metric: "agentRuns", value: 0, matched_value: 0 }),
+			headline({
+				metric: "agentRuns",
+				date: "2026-09-02",
+				value: 3,
+				matched_value: 3,
+			}),
+		],
+		{ ...input, requestedMetric: "cost", splitBy: "members" },
+		members,
+	);
+	expect(result.metrics.cost?.series).toEqual([
+		{ id: "series-0", label: "Alice" },
+	]);
+	expect(result.metrics.sessions?.total).toBe(3);
+	expect(result.metrics.sessions?.series).toEqual([
+		{ id: "total", label: "Sessions" },
+	]);
+	expect(result.metrics.sessions?.trend.map((day) => day.total)).toEqual([
+		2, 0, 1,
+	]);
+	expect(result.metrics.agentRuns?.total).toBe(3);
+	expect(result.metrics.agentRuns?.trend.map((day) => day.total)).toEqual([
+		0, 3, 0,
+	]);
+});
+
+test("an answer without session rows leaves the session metrics null rather than zero", () => {
+	const result = buildCostDashboard(
+		[],
+		{ ...input, requestedMetric: "mergedPullRequests" },
+		members,
+		undefined,
+		{ sessionMetrics: false },
+	);
+	expect(result.metrics.cost).toBeNull();
+	expect(result.metrics.sessions).toBeNull();
+	expect(result.metrics.signals).toBeNull();
+	expect(result.metrics.agentRuns).toBeNull();
 });

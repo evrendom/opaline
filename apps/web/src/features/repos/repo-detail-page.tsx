@@ -8,7 +8,10 @@ import { EmptyState } from "@/components/dashboard/page-parts";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { CostDashboardView } from "@/features/costs/cost-dashboard-page";
 import { useRepositoryCostDashboard } from "@/features/costs/use-cost-dashboard";
-import { useMetricPreviews } from "@/features/costs/use-metric-previews";
+import {
+	useMetricPreviews,
+	usePrefetchDashboardMetric,
+} from "@/features/costs/use-metric-previews";
 import { UsageSessionsPane } from "@/features/sessions/components/session-usage-detail";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
@@ -195,10 +198,16 @@ function RepoDashboard({ repoKey }: { repoKey: string }) {
 		repositories.data,
 		githubRepositories,
 	);
+	const hasRepositories = (repositories.data?.length ?? 0) > 0;
 	const previews = useMetricPreviews(
 		dashboard.inputFor,
 		dashboard.metrics,
-		(repositories.data?.length ?? 0) > 0,
+		dashboard.input,
+		hasRepositories,
+	);
+	const prefetchMetric = usePrefetchDashboardMetric(
+		dashboard.inputFor,
+		hasRepositories,
 	);
 	if (repositories.isError || repositories.data?.length === 0)
 		return (
@@ -220,6 +229,7 @@ function RepoDashboard({ repoKey }: { repoKey: string }) {
 		<CostDashboardView
 			dashboard={dashboard}
 			previews={previews}
+			onMetricIntent={prefetchMetric}
 			scope="repository"
 		/>
 	);

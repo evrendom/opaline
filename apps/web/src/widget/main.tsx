@@ -40,6 +40,7 @@ function Plugin() {
 	const name = seed.dashboard.data.metrics[requested] ? requested : "cost";
 	const metric =
 		seed.dashboard.data.metrics[name] ?? seed.dashboard.data.metrics.cost;
+	if (!metric) return loading;
 	const values = metric.trend.map((point) => point.total);
 	const maximum = Math.max(...values, 1);
 	return (

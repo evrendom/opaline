@@ -86,6 +86,95 @@ export async function getCostDashboard(
 		input.requestedMetric === "mergedPullRequests" ||
 		input.requestedMetric === "ciFailuresPerPullRequest" ||
 		input.requestedMetric === "ciRuns";
+	// The session metrics are the expensive part. A pull request or CI stat
+	// card leaves them out: the session cards read the charted answer.
+	const sessionRowsPromise =
+		isGitHubMetric && input.sessionMetrics === false
+			? Promise.resolve(undefined)
+			: querySessionMetricRows(scope, input, isGitHubMetric);
+	const githubOutcomesPromise =
+		scope.tenant === "organization" && isGitHubMetric
+			? getGitHubOutcomesDashboardMetrics(
+					scope.orgId,
+					input,
+					availability.githubReadiness ?? null,
+					availability.githubVisibility === "preview",
+					{
+						database: sqlClient,
+						queryClickhouse,
+					},
+				)
+			: Promise.resolve(undefined);
+	const [sessionRows, pullRequests] = await Promise.all([
+		sessionRowsPromise,
+		githubOutcomesPromise,
+	]);
+	const rows = sessionRows?.rows ?? [];
+	// Never present a silently truncated subtotal as the total cost.
+	if (rows.length > MAX_AGGREGATE_ROWS)
+		throw new ORPCError("BAD_REQUEST", {
+			message: "Choose a shorter date range to view this cost breakdown.",
+		});
+	const durationStats =
+		sessionRows?.durationRows !== undefined
+			? buildAgentRunDurationStats(sessionRows.durationRows, input)
+			: undefined;
+	const memberIds = [
+		...new Set(
+			rows
+				.filter((row) => row.dimension === "members" && row.id !== "")
+				.map((row) => row.id),
+		),
+	];
+	const members =
+		memberIds.length === 0
+			? []
+			: await sqlClient.unsafe<
+					Array<{
+						id: string;
+						name: string | null;
+						email: string;
+						image: string | null;
+					}>
+				>(
+					'SELECT id, name, email, image FROM "user" WHERE id = ANY($1::text[])',
+					[memberIds],
+				);
+	const dashboard = buildCostDashboard(
+		rows,
+		input,
+		new Map(
+			members.map((member) => [
+				member.id,
+				{ label: member.name?.trim() || member.email, image: member.image },
+			]),
+		),
+		durationStats,
+		{
+			availableMetrics,
+			pullRequests,
+			sessionMetrics: sessionRows !== undefined,
+		},
+	);
+	if (scope.tenant === "allOrganizations") {
+		for (const metric of Object.values(dashboard.metrics))
+			if (metric) metric.breakdowns.members = [];
+	}
+	return dashboard;
+}
+
+/**
+ * The session metrics (cost, sessions, signals and agent runs): every one's
+ * headline and daily trend, and the requested one's breakdowns.
+ */
+async function querySessionMetricRows(
+	scope: CostDashboardScope,
+	input: CostDashboardInput,
+	isGitHubMetric: boolean,
+): Promise<{
+	rows: CostAggregateRow[];
+	durationRows: AgentRunDurationAggregateRow[] | undefined;
+}> {
 	const repositories =
 		scope.tenant === "organization" &&
 		isGitHubMetric &&
@@ -260,11 +349,21 @@ export async function getCostDashboard(
 	  WHERE sa.incomplete OR (run.2 >= toDateTime({startDate:String}, 'UTC')
 	   AND run.2 < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY)
 	 `
-				: `
-	  SELECT 'agentRuns' AS metric, {startDate:String} AS date,
+				: // One row per session with no runs, so an unindexed session still
+					// counts as incomplete, plus one per matching run on its start date
+					// for the stat card's trend.
+					`
+	  SELECT 'agentRuns' AS metric, toString(run_count.1) AS date,
 	   ${memberSql("sa")} AS member, ${repositorySql("sa")} AS repository,
 	   '' AS model,
-	   toFloat64(if(sa.incomplete, 0, arrayCount(run ->
+	   run_count.2 AS value,
+	   sa.incomplete AS incomplete,
+	   '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
+	   '' AS coverage_status, toUInt8(1) AS prefiltered
+	  FROM agent_run_sessions AS sa
+	  ARRAY JOIN arrayConcat(
+	   [tuple(toDate({startDate:String}), toFloat64(0))],
+	   if(sa.incomplete, [], arrayMap(run -> tuple(toDate(run.2), toFloat64(1)), arrayFilter(run ->
 	    run.2 >= toDateTime({startDate:String}, 'UTC')
 	     AND run.2 < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
 	     AND (empty({models:Array(String)}) OR has({models:Array(String)}, ${runModel}))
@@ -272,11 +371,8 @@ export async function getCostDashboard(
 	     AND (empty({durations:Array(String)}) OR has({durations:Array(String)}, ${runDuration}))
 	     AND (empty({skillsUsed:Array(String)}) OR has({skillsUsed:Array(String)}, if(run.5 = 1, 'yes', 'no'))),
 	    sa.agent_runs
-	   ))) AS value,
-	   sa.incomplete AS incomplete,
-	   '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
-	   '' AS coverage_status, toUInt8(1) AS prefiltered
-	  FROM agent_run_sessions AS sa
+	   )))
+	  ) AS run_count
 	  WHERE ${sessionMemberMatch} AND ${sessionRepositoryMatch}
 	 `;
 	const coverage =
@@ -434,71 +530,11 @@ export async function getCostDashboard(
 		input.requestedMetric === "agentRuns"
 			? queryAgentRunDurationStats(scope, input, usage.cteDefinitions)
 			: Promise.resolve(undefined);
-	const githubOutcomesPromise =
-		scope.tenant === "organization" && isGitHubMetric
-			? getGitHubOutcomesDashboardMetrics(
-					scope.orgId,
-					input,
-					availability.githubReadiness ?? null,
-					availability.githubVisibility === "preview",
-					{
-						database: sqlClient,
-						queryClickhouse,
-					},
-				)
-			: Promise.resolve(undefined);
-	const [rows, durationRows, pullRequests] = await Promise.all([
+	const [rows, durationRows] = await Promise.all([
 		rowsPromise,
 		durationRowsPromise,
-		githubOutcomesPromise,
 	]);
-	// Never present a silently truncated subtotal as the total cost.
-	if (rows.length > MAX_AGGREGATE_ROWS)
-		throw new ORPCError("BAD_REQUEST", {
-			message: "Choose a shorter date range to view this cost breakdown.",
-		});
-	const durationStats =
-		durationRows !== undefined
-			? buildAgentRunDurationStats(durationRows, input)
-			: undefined;
-	const memberIds = [
-		...new Set(
-			rows
-				.filter((row) => row.dimension === "members" && row.id !== "")
-				.map((row) => row.id),
-		),
-	];
-	const members =
-		memberIds.length === 0
-			? []
-			: await sqlClient.unsafe<
-					Array<{
-						id: string;
-						name: string | null;
-						email: string;
-						image: string | null;
-					}>
-				>(
-					'SELECT id, name, email, image FROM "user" WHERE id = ANY($1::text[])',
-					[memberIds],
-				);
-	const dashboard = buildCostDashboard(
-		rows,
-		input,
-		new Map(
-			members.map((member) => [
-				member.id,
-				{ label: member.name?.trim() || member.email, image: member.image },
-			]),
-		),
-		durationStats,
-		{ availableMetrics, pullRequests },
-	);
-	if (scope.tenant === "allOrganizations") {
-		for (const metric of Object.values(dashboard.metrics))
-			if (metric) metric.breakdowns.members = [];
-	}
-	return dashboard;
+	return { rows, durationRows };
 }
 
 function orgParams(scope: CostDashboardScope): { orgId?: string } {

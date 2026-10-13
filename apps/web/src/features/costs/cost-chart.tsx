@@ -146,6 +146,8 @@ type Props = {
 	signalTypes: CostDashboardInput["signalTypes"];
 	interval: ChartInterval;
 	onMetricChange: (metric: DashboardMetric) => void;
+	/** A pointer or focus on a stat card: start loading its chart. */
+	onMetricIntent?: (metric: DashboardMetric) => void;
 	onRefresh: () => void;
 	refreshing: boolean;
 	splitBy: CostDashboardInput["splitBy"];
@@ -166,6 +168,7 @@ export function CostChart({
 	runSignals,
 	signalTypes,
 	onMetricChange,
+	onMetricIntent,
 	onRefresh,
 	refreshing,
 	interval,
@@ -499,6 +502,9 @@ export function CostChart({
 								interval,
 							)}
 							onClick={() => onMetricChange(value)}
+							onIntent={
+								onMetricIntent ? () => onMetricIntent(value) : undefined
+							}
 						/>
 					);
 				})}
@@ -1111,6 +1117,7 @@ function Metric({
 	unavailable,
 	trend,
 	onClick,
+	onIntent,
 }: {
 	label: string;
 	icon: Icon;
@@ -1123,6 +1130,7 @@ function Metric({
 	/** Per-period totals for the card's sparkline; undefined while loading. */
 	trend: number[] | undefined;
 	onClick: () => void;
+	onIntent?: () => void;
 }) {
 	// Like the big chart: when the trend lands, the card's loading wave morphs
 	// into its sparkline instead of the two swapping.
@@ -1152,6 +1160,8 @@ function Metric({
 						aria-pressed={primary}
 						aria-label={label}
 						onClick={onClick}
+						onPointerEnter={onIntent}
+						onFocus={onIntent}
 					>
 						{label}
 					</button>

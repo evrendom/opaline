@@ -32,19 +32,35 @@ import {
 	type CostDashboardController,
 	useCostDashboard,
 } from "./use-cost-dashboard";
-import { type MetricPreviews, useMetricPreviews } from "./use-metric-previews";
+import {
+	type MetricPreviews,
+	useMetricPreviews,
+	usePrefetchDashboardMetric,
+} from "./use-metric-previews";
 import "./cost-dashboard.css";
 
 export function CostDashboardPage() {
 	const dashboard = useCostDashboard();
-	const previews = useMetricPreviews(dashboard.inputFor, dashboard.metrics);
-	return <CostDashboardView dashboard={dashboard} previews={previews} />;
+	const previews = useMetricPreviews(
+		dashboard.inputFor,
+		dashboard.metrics,
+		dashboard.input,
+	);
+	const prefetchMetric = usePrefetchDashboardMetric(dashboard.inputFor);
+	return (
+		<CostDashboardView
+			dashboard={dashboard}
+			previews={previews}
+			onMetricIntent={prefetchMetric}
+		/>
+	);
 }
 
 export function CostDashboardView({
 	dashboard,
 	toolbarStart,
 	previews,
+	onMetricIntent,
 	scope = "workspace",
 	breakdownLayout = "grid",
 }: {
@@ -52,6 +68,8 @@ export function CostDashboardView({
 	toolbarStart?: ReactNode;
 	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
+	/** A pointer or focus on a stat card, to start loading its chart. */
+	onMetricIntent?: (metric: DashboardMetric) => void;
 	/** `repository` lays the breakdowns out without a Repositories card. */
 	scope?: "workspace" | "repository";
 	/** `row` sets the breakdown cards two to a row, for a narrow pane;
@@ -269,6 +287,7 @@ export function CostDashboardView({
 							signalTypes={input.signalTypes}
 							interval={interval}
 							onMetricChange={setMetric}
+							onMetricIntent={onMetricIntent}
 							onRefresh={() => query.refetch()}
 							refreshing={query.isFetching && !isPending}
 							pending={isPending && !showSettled}

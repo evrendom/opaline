@@ -35,15 +35,23 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 			defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 		});
 		// Render the actual dashboard and its stat card trends before activation,
-		// then refresh them on Explore.
-		for (const { input, data } of [seed.dashboard, ...seed.previews]) {
+		// then refresh them on Explore. The stat cards read every session metric
+		// from one answer, so each seeded answer carries every seeded metric.
+		const answers = [seed.dashboard, ...seed.previews];
+		const seededMetrics = Object.fromEntries(
+			answers.map(({ input, data }) => {
+				const metric = input.requestedMetric ?? "cost";
+				return [metric, data.metrics[metric]];
+			}),
+		);
+		for (const { input, data } of answers) {
 			client.setQueryData(
 				[
 					"org",
 					seed.organization.id,
 					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
 				],
-				data,
+				{ ...data, metrics: { ...data.metrics, ...seededMetrics } },
 				{ updatedAt: 0 },
 			);
 		}
