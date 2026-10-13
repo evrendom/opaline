@@ -60,7 +60,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/history$)(?!cron/trends-sources$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -87,7 +87,8 @@ describe("Vercel deployment configuration", () => {
 				cron.path !== "/api/cron/r2-ingest" &&
 				cron.path !== "/api/cron/github-evidence" &&
 				cron.path !== "/api/cron/l1-edges" &&
-				cron.path !== "/api/cron/run-questions",
+				cron.path !== "/api/cron/run-questions" &&
+				cron.path !== "/api/cron/history",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
@@ -156,6 +157,26 @@ describe("Vercel deployment configuration", () => {
 				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/run-questions$)");
+	});
+
+	test("fills in run question and search history in overlapping minute crons", () => {
+		expect(vercelConfig.functions["api/cron/history.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 2048,
+			maxDuration: 300,
+		});
+		// One path, several equivalent minute schedules: invocations overlap,
+		// and each takes a free search lane.
+		const schedules = vercelConfig.crons
+			.filter((cron) => cron.path === "/api/cron/history")
+			.map((cron) => cron.schedule);
+		expect(schedules.length).toBeGreaterThan(1);
+		expect(new Set(schedules).size).toBe(schedules.length);
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/history$)");
 	});
 
 	test("refreshes the Trends sources in an isolated daily cron function", () => {

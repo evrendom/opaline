@@ -98,6 +98,8 @@ export interface TranscriptSearchBackfillOptions {
 	readonly after: TranscriptSearchBackfillCursor | undefined;
 	readonly sessionsPerMinute: number;
 	readonly maxLoad: number;
+	/** Only the sessions whose id hashes to `index` of `count`: lanes that run at once never take the same session. */
+	readonly shard?: { readonly index: number; readonly count: number };
 	/** Stops the run before its next pass. */
 	readonly signal?: AbortSignal;
 }
@@ -215,7 +217,12 @@ export function buildTranscriptSearchBackfillStatement(input: {
 	readonly organizationIds: readonly string[] | null;
 	readonly after: TranscriptSearchBackfillCursor | undefined;
 	readonly limit: number;
+	readonly shard?: { readonly index: number; readonly count: number };
 }): ClickHouseStatement {
+	const shardFilter =
+		input.shard === undefined
+			? ""
+			: "AND cityHash64(records.session_id) % {shardCount:UInt32} = {shardIndex:UInt32}";
 	const organizationFilter =
 		input.organizationIds === null
 			? ""
@@ -263,6 +270,7 @@ export function buildTranscriptSearchBackfillStatement(input: {
 					OR tuple(indexed.committed.1, indexed.committed.2) != records.generation
 					OR indexed.committed.3 > 0)
 				${afterFilter}
+				${shardFilter}
 			ORDER BY records.started DESC, organization_id DESC, user_id DESC, session_id DESC
 			LIMIT {limit:UInt32}`,
 		query_params: {
@@ -273,6 +281,8 @@ export function buildTranscriptSearchBackfillStatement(input: {
 			limit: input.limit,
 			organizationIds: input.organizationIds ?? [],
 			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
+			shardCount: input.shard?.count ?? 1,
+			shardIndex: input.shard?.index ?? 0,
 		},
 	};
 }
@@ -531,6 +541,7 @@ async function select(
 						: indexed,
 				after: options.after,
 				limit: options.maxSessions,
+				shard: options.shard,
 			}),
 		),
 	);
@@ -547,6 +558,18 @@ function validateOptions(options: TranscriptSearchBackfillOptions): void {
 		options.after.organizationId !== options.organizationId
 	)
 		throw new Error("--after must name a session of --organization-id");
+	const shard = options.shard;
+	if (
+		shard !== undefined &&
+		!(
+			Number.isSafeInteger(shard.count) &&
+			shard.count > 0 &&
+			Number.isSafeInteger(shard.index) &&
+			shard.index >= 0 &&
+			shard.index < shard.count
+		)
+	)
+		throw new Error("A shard is an index below a positive count");
 }
 
 /**

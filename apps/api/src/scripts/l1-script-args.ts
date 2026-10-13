@@ -246,6 +246,8 @@ export interface RunQuestionsBackfillArgs extends OrganizationScope {
 	readonly runsPerMinute: number;
 	/** ClickHouse `LoadAverage1` above which the run pauses. */
 	readonly maxLoad: number;
+	/** Queue the answers and leave them to the run-questions cron, which answers in production. */
+	readonly queueOnly: boolean;
 }
 
 export function parseRunQuestionsBackfillArgs(
@@ -263,13 +265,17 @@ export function parseRunQuestionsBackfillArgs(
 			"max-runs": { type: "string" },
 			"organization-id": { type: "string" },
 			"runs-per-minute": { type: "string" },
+			"queue-only": { type: "boolean", default: false },
 		},
 	});
 	if (values.after !== undefined && !values.after.trim())
 		throw new Error("--after must not be empty.");
+	if (values["queue-only"] && !values.execute)
+		throw new Error("--queue-only queues answers, so it needs --execute.");
 	return {
 		...parseOrganizationScope(values),
 		execute: values.execute,
+		queueOnly: values["queue-only"],
 		days: parsePositiveIntegerFlag(values.days, 28, "--days", 3_650),
 		maxRuns: parsePositiveIntegerFlag(
 			values["max-runs"],

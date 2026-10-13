@@ -148,6 +148,7 @@ describe("L1 script arguments", () => {
 			{
 				organizationId: "org",
 				execute: false,
+				queueOnly: false,
 				days: 28,
 				maxRuns: 10_000,
 				after: undefined,
@@ -169,16 +170,25 @@ describe("L1 script arguments", () => {
 				"30",
 				"--max-load",
 				"8",
+				"--queue-only",
 			]),
 		).toEqual({
 			organizationId: undefined,
 			execute: true,
+			queueOnly: true,
 			days: 7,
 			maxRuns: 500,
 			after: "cursor",
 			runsPerMinute: 30,
 			maxLoad: 8,
 		});
+		expect(() =>
+			parseRunQuestionsBackfillArgs([
+				"--organization-id",
+				"org",
+				"--queue-only",
+			]),
+		).toThrow("--queue-only");
 		expect(() => parseRunQuestionsBackfillArgs(["--execute"])).toThrow(
 			"Name the scope",
 		);

@@ -7,6 +7,7 @@ import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js"
 import type { TranscriptEmbedder } from "./config.js";
 import {
 	backfillTranscriptSearch,
+	buildTranscriptSearchBackfillStatement,
 	decodeTranscriptSearchBackfillCursor,
 	previewTranscriptSearchBackfill,
 	type TranscriptSearchBackfillEnv,
@@ -510,4 +511,22 @@ test("--after takes only a value a run printed", () => {
 	expect(() => decodeTranscriptSearchBackfillCursor("nonsense")).toThrow(
 		"--after",
 	);
+});
+
+test("a shard selects only the sessions whose id hashes to it, so lanes never overlap", () => {
+	const base = { organizationIds: ["ws"], after: undefined, limit: 10 };
+	expect(buildTranscriptSearchBackfillStatement(base).query).not.toContain(
+		"cityHash64",
+	);
+	const statement = buildTranscriptSearchBackfillStatement({
+		...base,
+		shard: { index: 3, count: 8 },
+	});
+	expect(statement.query).toContain(
+		"AND cityHash64(records.session_id) % {shardCount:UInt32} = {shardIndex:UInt32}",
+	);
+	expect(statement.query_params).toMatchObject({
+		shardCount: 8,
+		shardIndex: 3,
+	});
 });

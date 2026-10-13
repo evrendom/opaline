@@ -1,9 +1,15 @@
 import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 
 const INVOCATION_BUDGET_MS = 240_000;
+/**
+ * Answering passes side by side in one invocation: each claims its own jobs
+ * under the job lease, so a backlog drains several times faster.
+ */
+const ANSWER_WORKERS = 4;
 
 /**
- * Minute cron: answers queued run questions within the invocation budget.
+ * Minute cron: answers queued run questions within the invocation budget,
+ * with `ANSWER_WORKERS` passes at once.
  * Without a configured provider it returns at once and nothing is sent.
  */
 export async function handleRunQuestionsMaintenanceRequest(
@@ -20,8 +26,16 @@ export async function handleRunQuestionsMaintenanceRequest(
 	const env = runQuestionsEnv();
 	if (!env.provider)
 		return Response.json({ runQuestions: { enabled: false }, ok: true });
-	const answered = await answerQueuedQuestions(env, {
-		budgetMs: INVOCATION_BUDGET_MS,
-	});
+	const passes = await Promise.all(
+		Array.from({ length: ANSWER_WORKERS }, () =>
+			answerQueuedQuestions(env, { budgetMs: INVOCATION_BUDGET_MS }),
+		),
+	);
+	const answered = {
+		jobs: passes.reduce((sum, pass) => sum + pass.jobs, 0),
+		answers: passes.reduce((sum, pass) => sum + pass.answers, 0),
+		costUsd: passes.reduce((sum, pass) => sum + pass.costUsd, 0),
+		refused: passes.flatMap((pass) => pass.refused),
+	};
 	return Response.json({ runQuestions: { enabled: true, answered }, ok: true });
 }

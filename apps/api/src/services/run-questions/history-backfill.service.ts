@@ -1,7 +1,11 @@
 import { Buffer } from "node:buffer";
 import type { RunQuestion } from "@rudel/api-routes";
+import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
 import { z } from "zod";
-import type { ClickHouseStatement } from "../../clickhouse.js";
+import {
+	type ClickHouseStatement,
+	getSafeClickHouseTable,
+} from "../../clickhouse.js";
 import { committedRunsSql, SQL_SCOPE_PARAMS } from "../analysis/sql-views.js";
 import {
 	type BackfillClock,
@@ -73,6 +77,12 @@ export interface RunQuestionsBackfillOptions {
 	readonly after: RunQuestionsBackfillCursor | undefined;
 	readonly runsPerMinute: number;
 	readonly maxLoad: number;
+	/**
+	 * Select only runs some question that is on has no answer for (from the
+	 * provider), so a workspace whose history is answered selects nothing.
+	 * Without it every run is selected and the answered ones are counted.
+	 */
+	readonly unansweredOnly?: boolean;
 	/** Stops the run before its next batch. */
 	readonly signal?: AbortSignal;
 }
@@ -170,7 +180,23 @@ export function buildRunQuestionsBackfillStatement(input: {
 	readonly days: number;
 	readonly after: RunQuestionsBackfillCursor | undefined;
 	readonly limit: number;
+	/** Leave out runs every one of these questions has an answer for, from `provider`, at the run's revision. */
+	readonly answered?: {
+		readonly questionIds: readonly string[];
+		readonly provider: string;
+	};
 }): ClickHouseStatement {
+	const answered =
+		input.answered === undefined
+			? ""
+			: `AND (session_id, agent_id, turn_idx, toUInt64(revision)) NOT IN (
+					SELECT session_id, agent_id, turn_idx, revision
+					FROM ${getSafeClickHouseTable(RUN_QUESTION_ANSWERS_TABLE)}
+					WHERE organization_id = {${SQL_SCOPE_PARAMS.workspace}:String}
+						AND provider = {answeredProvider:String}
+						AND question_id IN {answeredQuestionIds:Array(String)}
+					GROUP BY session_id, agent_id, turn_idx, revision
+					HAVING uniqExact(question_id) = {answeredQuestions:UInt32})`;
 	const after =
 		input.after === undefined
 			? ""
@@ -193,6 +219,7 @@ export function buildRunQuestionsBackfillStatement(input: {
 			])})
 			WHERE started_at >= now64(3) - toIntervalDay({days:UInt32})
 				${after}
+				${answered}
 			ORDER BY started_at DESC, session_id DESC, agent_id DESC, turn_idx DESC
 			LIMIT {limit:UInt32}`,
 		query_params: {
@@ -203,6 +230,9 @@ export function buildRunQuestionsBackfillStatement(input: {
 			afterSessionId: input.after?.sessionId ?? "",
 			afterAgentId: input.after?.agentId ?? "",
 			afterTurn: input.after?.turn ?? 0,
+			answeredProvider: input.answered?.provider ?? "",
+			answeredQuestionIds: [...(input.answered?.questionIds ?? [])],
+			answeredQuestions: new Set(input.answered?.questionIds ?? []).size,
 		},
 	};
 }
@@ -466,6 +496,13 @@ async function select(
 					days: options.days,
 					after: workspaceId === from ? options.after : undefined,
 					limit: remaining + 1,
+					answered:
+						options.unansweredOnly && env.provider
+							? {
+									questionIds: questions.map((question) => question.id),
+									provider: env.provider.name,
+								}
+							: undefined,
 				}),
 			),
 		);

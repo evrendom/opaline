@@ -12,8 +12,9 @@ import { parseRunQuestionsBackfillArgs } from "./l1-script-args.js";
 
 // Preview by default (nothing queued or sent); --execute answers the run
 // questions that are on for past runs through the path new runs take,
-// paced, newest runs first. Ctrl-C stops it before its next batch and still
-// prints the summary.
+// paced, newest runs first; with --queue-only it only queues them, and the
+// run-questions cron answers them in production. Ctrl-C stops it before its
+// next batch and still prints the summary.
 const args = parseRunQuestionsBackfillArgs(Bun.argv.slice(2));
 const answering = runQuestionsEnv();
 if (args.execute && !answering.provider)
@@ -52,7 +53,13 @@ const env: RunQuestionsBackfillEnv = {
 try {
 	const result = args.execute
 		? await backfillRunQuestions(
-				{ ...env, answer: () => answerQueuedQuestions(answering) },
+				{
+					...env,
+					// --queue-only: the run-questions cron answers what is queued.
+					answer: args.queueOnly
+						? async () => ({ jobs: 0, answers: 0, costUsd: 0, refused: [] })
+						: () => answerQueuedQuestions(answering),
+				},
 				{ ...options, signal: controller.signal },
 			)
 		: await previewRunQuestionsBackfill(env, options);
