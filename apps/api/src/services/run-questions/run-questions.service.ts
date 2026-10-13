@@ -19,6 +19,7 @@ import {
 	selectRuns,
 } from "../analysis/sql-gateway.js";
 import type { SqlQuota } from "../analysis/sql-results.js";
+import { readClickHouseLoadAverage } from "../backfill-pacing.js";
 import { readSessionReader } from "../session-reader.service.js";
 import { readableSessionOwner } from "../session-visibility.js";
 import { answerKey, readAnswers, runKey, writeAnswers } from "./answers.js";
@@ -298,7 +299,14 @@ export async function runQuestions(
  */
 export async function answerQueuedQuestions(
 	env: RunQuestionsEnv,
-	options: { budgetMs?: number } = {},
+	options: {
+		budgetMs?: number;
+		/**
+		 * ClickHouse `LoadAverage1` above which the pass claims no further job:
+		 * reading runs is heavy, and the cron must not crowd out uploads.
+		 */
+		maxLoad?: number;
+	} = {},
 ): Promise<{
 	jobs: number;
 	answers: number;
@@ -322,6 +330,11 @@ export async function answerQueuedQuestions(
 		env.providers?.keys() ?? (env.provider ? [env.provider.name] : []),
 	);
 	while (Date.now() < deadline && answering.size > 0) {
+		if (
+			options.maxLoad !== undefined &&
+			(await readClickHouseLoadAverage(env.executor)) > options.maxLoad
+		)
+			break;
 		const job = await claimRunQuestionJob(env.sql, JOB_LEASE_MS, [
 			...answering,
 		]);

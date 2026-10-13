@@ -6,6 +6,11 @@ const INVOCATION_BUDGET_MS = 240_000;
  * under the job lease, so a backlog drains several times faster.
  */
 const ANSWER_WORKERS = 4;
+/**
+ * Above this ClickHouse load no further job is claimed: below the history
+ * cron's 12, so search history and uploads get ClickHouse first.
+ */
+const MAX_LOAD = 10;
 
 /**
  * Minute cron: answers queued run questions within the invocation budget,
@@ -28,7 +33,10 @@ export async function handleRunQuestionsMaintenanceRequest(
 		return Response.json({ runQuestions: { enabled: false }, ok: true });
 	const passes = await Promise.all(
 		Array.from({ length: ANSWER_WORKERS }, () =>
-			answerQueuedQuestions(env, { budgetMs: INVOCATION_BUDGET_MS }),
+			answerQueuedQuestions(env, {
+				budgetMs: INVOCATION_BUDGET_MS,
+				maxLoad: MAX_LOAD,
+			}),
 		),
 	);
 	const answered = {
