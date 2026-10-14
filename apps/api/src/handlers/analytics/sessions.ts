@@ -10,7 +10,15 @@ import {
 	readLiveSessionTail,
 } from "../../services/live-session/live-session-read.service.js";
 import { readR2IngestAvailability } from "../../services/r2-ingest-storage.service.js";
-import { sessionAnswersEnv } from "../../services/run-questions/env.js";
+import {
+	InvalidAgentRunsCursorError,
+	listAgentRuns,
+} from "../../services/run-questions/agent-runs.js";
+import { agentTracesEnabled } from "../../services/run-questions/agent-traces-rollout.js";
+import {
+	agentRunsEnv,
+	sessionAnswersEnv,
+} from "../../services/run-questions/env.js";
 import {
 	sessionRunAnswers,
 	sessionRunQuestionTags,
@@ -181,6 +189,40 @@ const runAnswers = os.analytics.sessions.runAnswers
 			{ workspaceId: context.organizationId, member: ownerId },
 			input.sessionId,
 		);
+	});
+
+/** Whether the caller's workspace may open Agent traces (`agent-traces-rollout.ts`). */
+const agentTracesAccess = os.analytics.sessions.agentTracesAccess
+	.use(orgMiddleware)
+	.handler(({ context }) => ({
+		enabled: agentTracesEnabled(context.organizationId),
+	}));
+
+/**
+ * Every run the caller may read over a date range, with its answers
+ * (`agent-runs.ts`), in a workspace Agent traces is open to.
+ */
+const agentRuns = os.analytics.sessions.agentRuns
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		if (!agentTracesEnabled(context.organizationId))
+			throw new ORPCError("FORBIDDEN", {
+				message: "Agent traces are not enabled for this workspace.",
+			});
+		try {
+			return await listAgentRuns(
+				agentRunsEnv(),
+				{
+					workspaceId: context.organizationId,
+					member: readableSessionOwner(context.sessionReader),
+				},
+				input,
+			);
+		} catch (error) {
+			if (error instanceof InvalidAgentRunsCursorError)
+				throw new ORPCError("BAD_REQUEST", { message: error.message });
+			throw error;
+		}
 	});
 
 const list = os.analytics.sessions.list
@@ -470,6 +512,8 @@ export const sessionsRouter = os.analytics.sessions.router({
 	list,
 	liveList,
 	liveTail,
+	agentRuns,
+	agentTracesAccess,
 	runAnswers,
 	runQuestionTags,
 	filterCatalog,

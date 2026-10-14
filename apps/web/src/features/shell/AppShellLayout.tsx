@@ -15,6 +15,7 @@ import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBann
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
 import "./app-shell.css";
+import { useAgentTracesEnabled } from "@/features/agent-traces/use-agent-traces-access";
 import {
 	AssistantPanel,
 	useAssistantShortcut,
@@ -130,6 +131,7 @@ export function LeftSidebarAppShellLayout() {
 	const isHomeWorkspaceRoute = canonicalPathname === appRoutes.home();
 	const isSkillsWorkspaceRoute = [
 		appRoutes.skills(),
+		appRoutes.agentTraces(),
 		appRoutes.repos(),
 	].includes(canonicalPathname);
 	const isSettingsWorkspaceRoute =
@@ -159,6 +161,7 @@ export function LeftSidebarAppShellLayout() {
 	const [assistantOpen, setAssistantOpen] = React.useState(false);
 	const openAssistant = React.useCallback(() => setAssistantOpen(true), []);
 	useAssistantShortcut(openAssistant, assistantAvailable && !assistantOpen);
+	const agentTracesEnabled = useAgentTracesEnabled();
 
 	React.useEffect(() => {
 		const handleShellShortcutKeyDown = (event: KeyboardEvent) => {
@@ -177,7 +180,10 @@ export function LeftSidebarAppShellLayout() {
 
 			const canonicalNextPath =
 				shellShortcutRouteByKey[event.key.toLowerCase()];
-			if (!canonicalNextPath) {
+			if (
+				!canonicalNextPath ||
+				(canonicalNextPath === appRoutes.agentTraces() && !agentTracesEnabled)
+			) {
 				return;
 			}
 
@@ -193,7 +199,13 @@ export function LeftSidebarAppShellLayout() {
 		window.addEventListener("keydown", handleShellShortcutKeyDown);
 		return () =>
 			window.removeEventListener("keydown", handleShellShortcutKeyDown);
-	}, [getShellRoutePath, location.pathname, navigate, isWelcome]);
+	}, [
+		getShellRoutePath,
+		location.pathname,
+		navigate,
+		isWelcome,
+		agentTracesEnabled,
+	]);
 
 	const shellWindowContent = (
 		<>

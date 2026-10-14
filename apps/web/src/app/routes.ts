@@ -8,6 +8,7 @@ const LEGACY_DASHBOARD_SESSIONS_PATH = `${LEGACY_DASHBOARD_PATH}/sessions`;
 const SESSION_PATH = "/session";
 const NEW_SESSION_PATH = "/newsesh";
 const SKILLS_PATH = "/skills";
+const AGENT_TRACES_PATH = "/agent-traces";
 const DASHBOARD_GET_STARTED_LEGACY_PATH = `${LEGACY_DASHBOARD_PATH}/get-started`;
 const GET_STARTED_PATH = "/get-started";
 const TEAM_PATH = "/team";
@@ -50,6 +51,7 @@ export const appRoutes = {
 		if (sessionId && turnId) params.set("turn", turnId);
 		return `${SKILLS_PATH}?${params}`;
 	},
+	agentTraces: () => AGENT_TRACES_PATH,
 	getStarted: () => GET_STARTED_PATH,
 	dashboardGetStartedLegacy: () => DASHBOARD_GET_STARTED_LEGACY_PATH,
 	team: () => TEAM_PATH,
@@ -155,7 +157,7 @@ export function getWorkspacePathAfterSwitch(
 		? `/${encodeURIComponent(workspaceSlug)}${path.slice(previousSlug.length + 1)}`
 		: getWorkspaceAppPath(workspaceSlug, path);
 	// Session IDs belong to the previous workspace. Keep filters, reset selection.
-	if (/^\/[^/]+\/(?:skills|repos)(?:[?#]|$)/u.test(destination)) {
+	if (/^\/[^/]+\/(?:skills|repos|agent-traces)(?:[?#]|$)/u.test(destination)) {
 		const url = new URL(destination, "http://workspace.local");
 		url.searchParams.delete("session");
 		url.searchParams.delete("turn");
@@ -185,7 +187,9 @@ export function getWorkspaceRelativePath(path: string): string | null {
 	if (/^\/(?:session|sessions)(?:\/|$)/u.test(pathname))
 		return `${pathname.replace(/^\/session(?=\/|$)/u, "/sessions")}${suffix}`;
 	if (pathname === TEAM_PATH || pathname === `${TEAM_PATH}/`) return path;
-	if (/^\/(?:settings|skills|repos|newsesh)(?:\/|$)/u.test(pathname))
+	if (
+		/^\/(?:settings|skills|repos|agent-traces|newsesh)(?:\/|$)/u.test(pathname)
+	)
 		return path;
 	return null;
 }

@@ -179,6 +179,16 @@ export {
 	SEARCH_TEXT_MAX_CHARS,
 } from "./analysis-search.js";
 export {
+	AGENT_RUNS_MAX_FILTERS,
+	AGENT_RUNS_MAX_LIMIT,
+	type AgentRun,
+	type AgentRuns,
+	type AgentRunsFilter,
+	AgentRunsFilterSchema,
+	type AgentRunsInput,
+	AgentRunsInputSchema,
+	AgentRunsSchema,
+	AgentTracesAccessSchema,
 	RUN_QUESTION_CRITERIA_MAX_CHARS,
 	RUN_QUESTION_LABEL_MAX_CHARS,
 	RUN_QUESTION_MAX_CHARS,

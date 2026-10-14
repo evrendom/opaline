@@ -7,7 +7,8 @@ import {
 } from "../analysis/agent-query-slots.js";
 import { visibleGitHubRepositories } from "../analysis/github-access.js";
 import { createPostgresSqlQuota } from "../analysis/sql-results.js";
-import { findRunQuestions } from "./catalogue.js";
+import type { AgentRunsEnv } from "./agent-runs.js";
+import { findRunQuestions, listRunQuestions } from "./catalogue.js";
 import type { PrecomputeEnv } from "./precompute.js";
 import {
 	readRunQuestionProviders,
@@ -60,6 +61,19 @@ export function sessionAnswersEnv(): SessionAnswersEnv {
 					question.id,
 					question.label,
 				]),
+			),
+	};
+}
+
+/** What the Agent traces page needs: the dashboard's gate and the questions answered now. */
+export function agentRunsEnv(): AgentRunsEnv {
+	const { executor, mayAnswer } = sessionAnswersEnv();
+	return {
+		executor,
+		mayAnswer,
+		onQuestions: async () =>
+			(await listRunQuestions(sqlClient)).filter(
+				(question) => question.state === "on",
 			),
 	};
 }

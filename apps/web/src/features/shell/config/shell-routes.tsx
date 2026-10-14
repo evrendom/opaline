@@ -8,6 +8,7 @@ import {
 	IconFolderFilled,
 	IconMessages,
 	IconMessagesFilled,
+	IconRoute,
 	IconSettings,
 	IconSettingsFilled,
 	IconUser,
@@ -21,6 +22,7 @@ export type ShellRouteId =
 	| "dashboard"
 	| "sessions"
 	| "skills"
+	| "agentTraces"
 	| "repos"
 	| "team"
 	| "settings";
@@ -105,6 +107,17 @@ export const shellRoutes = [
 		tone: tones.opal3,
 	},
 	{
+		id: "agentTraces",
+		comingSoon: false,
+		path: appRoutes.agentTraces(),
+		title: "Agent traces",
+		navLabel: "Agent traces",
+		shortcut: "A",
+		icon: IconRoute,
+		activeIcon: IconRoute,
+		tone: sessionsTone,
+	},
+	{
 		id: "repos",
 		comingSoon: false,
 		path: appRoutes.repos(),
@@ -142,16 +155,20 @@ export const shellRouteMap = {
 	dashboard: shellRoutes[0],
 	sessions: shellRoutes[1],
 	skills: shellRoutes[2],
-	repos: shellRoutes[3],
-	team: shellRoutes[4],
-	settings: shellRoutes[5],
+	agentTraces: shellRoutes[3],
+	repos: shellRoutes[4],
+	team: shellRoutes[5],
+	settings: shellRoutes[6],
 } as const;
 
 // The plugin app is read-only; settings stay on opaline.so.
 export const shellNavigationRoutes = shellRoutes.filter(
 	(route) =>
 		!route.comingSoon &&
-		!(import.meta.env.MODE === "plugin" && route.id === "settings"),
+		!(
+			import.meta.env.MODE === "plugin" &&
+			(route.id === "settings" || route.id === "agentTraces")
+		),
 );
 
 export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {

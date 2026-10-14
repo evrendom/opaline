@@ -58,6 +58,11 @@ vi.mock("@/features/shell/hooks/useCurrentShellRoute", () => ({
 	useCurrentShellRoute: () => ({ id: "sessions" }),
 }));
 
+const agentTraces = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/features/agent-traces/use-agent-traces-access", () => ({
+	useAgentTracesEnabled: () => agentTraces.enabled,
+}));
+
 function renderSidebar() {
 	return render(
 		<MemoryRouter>
@@ -68,6 +73,7 @@ function renderSidebar() {
 
 describe("AppSidebar", () => {
 	it("lists the sections as labelled links, with settings in the footer", () => {
+		agentTraces.enabled = false;
 		renderSidebar();
 
 		const navigation = screen.getByRole("navigation", { name: "Primary" });
@@ -81,6 +87,26 @@ describe("AppSidebar", () => {
 		expect(
 			within(footer).getByRole("link", { name: "Settings" }),
 		).toHaveAttribute("href", "/settings");
+	});
+
+	it("shows Agent traces after Skills only where the workspace may open it", () => {
+		agentTraces.enabled = true;
+		renderSidebar();
+
+		const navigation = screen.getByRole("navigation", { name: "Primary" });
+		expect(
+			within(navigation)
+				.getAllByRole("link")
+				.map((link) => link.textContent),
+		).toEqual([
+			"Dashboard",
+			"Sessions",
+			"Skills",
+			"Agent traces",
+			"Repos",
+			"Team",
+		]);
+		agentTraces.enabled = false;
 	});
 
 	it("offers the install command above settings", () => {

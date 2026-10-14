@@ -13,6 +13,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { useAgentTracesEnabled } from "@/features/agent-traces/use-agent-traces-access";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
 import { SidebarWorkspaceSwitcher } from "@/features/shell/components/SidebarWorkspaceSwitcher";
@@ -66,6 +67,11 @@ function SidebarNavItem({
 
 export function AppSidebar() {
 	const currentShellRoute = useCurrentShellRoute();
+	// Agent traces shows only in the workspaces it is open to.
+	const agentTracesEnabled = useAgentTracesEnabled();
+	const visibleRoutes = primaryRoutes.filter(
+		(route) => route.id !== "agentTraces" || agentTracesEnabled,
+	);
 
 	return (
 		<Sidebar variant="inset" collapsible="offcanvas">
@@ -88,7 +94,7 @@ export function AppSidebar() {
 						<SidebarGroupContent>
 							<nav aria-label="Primary">
 								<SidebarMenu>
-									{primaryRoutes.map((route) => (
+									{visibleRoutes.map((route) => (
 										<SidebarNavItem
 											key={route.id}
 											route={route}

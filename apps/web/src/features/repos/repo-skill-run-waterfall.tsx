@@ -80,7 +80,9 @@ export function SkillRunWaterfall({
 	revision: string;
 	run: SessionDetailTurnSummary;
 	model: string | null;
-	skillName: string;
+	/** The skill whose uses stay out of the folds, the first selected; none
+	 * selects the whole run. */
+	skillName?: string;
 	/** A step picked other than the skill's own call, for a panel beside the
 	 * list; null when the pick goes back to the skill or the run. */
 	onStepSelect?: (pick: SkillTracePick | null) => void;
@@ -109,7 +111,7 @@ export function SkillRunWaterfall({
 	// Every use stays out of the folds; the first starts selected.
 	const skillStepIds = useMemo(
 		() =>
-			waterfall
+			waterfall && skillName
 				? findSkillSteps(waterfall.allSteps, skillName, run.skillEvents).map(
 						(step) => step.id,
 					)

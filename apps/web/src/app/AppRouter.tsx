@@ -61,6 +61,10 @@ const ReposPage = lazyNamed(
 	() => import("@/features/repos/repos-page"),
 	"ReposPage",
 );
+const AgentTracesPage = lazyNamed(
+	() => import("@/features/agent-traces/AgentTracesPage"),
+	"AgentTracesPage",
+);
 const SkillsPage = lazyNamed(
 	() => import("@/features/skills/SkillsPage"),
 	"SkillsPage",
@@ -103,6 +107,7 @@ type ShellRoutePaths = {
 	dashboard: string;
 	session: string;
 	skills: string;
+	agentTraces: string;
 	repos: string;
 	team: string;
 	settings: string;
@@ -115,6 +120,7 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 	dashboard: appRoutes.dashboard(),
 	session: appRoutes.session(),
 	skills: appRoutes.skills(),
+	agentTraces: appRoutes.agentTraces(),
 	repos: appRoutes.repos(),
 	team: appRoutes.team(),
 	settings: appRoutes.settings(),
@@ -127,6 +133,7 @@ const workspaceShellRoutePaths: ShellRoutePaths = {
 	dashboard: "/:workspaceSlug/dashboard",
 	session: "/:workspaceSlug/sessions",
 	skills: "/:workspaceSlug/skills",
+	agentTraces: "/:workspaceSlug/agent-traces",
 	repos: "/:workspaceSlug/repos",
 	team: "/:workspaceSlug/team",
 	settings: "/:workspaceSlug/settings",
@@ -217,6 +224,10 @@ function getShellRouteElements(
 						<LazyRoute Component={SkillsPage} />
 					)
 				}
+			/>
+			<Route
+				path={routePaths.agentTraces}
+				element={<LazyRoute Component={AgentTracesPage} />}
 			/>
 			<Route
 				path={routePaths.team}

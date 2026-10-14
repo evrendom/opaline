@@ -289,7 +289,90 @@ export const SessionRunAnswersSchema = z.object({
 	runs: z.array(SessionRunAnswersRunSchema),
 });
 
+/** Runs one agent runs page lists. */
+export const AGENT_RUNS_MAX_LIMIT = 200;
+/** Questions one agent runs page may filter on. */
+export const AGENT_RUNS_MAX_FILTERS = 20;
+
+/** Runs whose newest answer to one question lies in [min, max] (probabilities of yes, 0 to 1). */
+export const AgentRunsFilterSchema = z
+	.object({
+		questionId: QuestionIdSchema,
+		min: z.number().min(0).max(1),
+		max: z.number().min(0).max(1),
+	})
+	.strict()
+	.refine((filter) => filter.min <= filter.max, {
+		message: "min must not exceed max",
+	});
+
+export const AgentRunsInputSchema = z
+	.object({
+		/** First and last day (UTC) of the runs' start, inclusive. */
+		startDate: z.string().date(),
+		endDate: z.string().date(),
+		/** Every filter must hold; ignored where the workspace's runs are not answered. */
+		filters: z.array(AgentRunsFilterSchema).max(AGENT_RUNS_MAX_FILTERS),
+		limit: z.number().int().min(1).max(AGENT_RUNS_MAX_LIMIT).default(100),
+		/** The previous page's `nextCursor`. */
+		cursor: z.string().min(1).max(1_000).optional(),
+	})
+	.strict();
+
+/** One run of a session's committed transcript, with every answer about it. */
+export const AgentRunSchema = z.object({
+	sessionId: z.string(),
+	/** The member whose session it is. */
+	userId: z.string(),
+	/** The stream: empty for the main transcript, else the subagent. */
+	agentId: z.string(),
+	/** The run within its stream (runs.turn_idx). */
+	turn: z.number().int(),
+	/** ISO time of the run's first record, its prompt; matches the reader's turn start. */
+	startedAt: z.string(),
+	endedAt: z.string(),
+	/** claude_code or codex. */
+	source: z.string(),
+	/** First model the run recorded; null when not recorded. */
+	model: z.string().nullable(),
+	/** The first 160 characters of the run's prompt; null when it has none. */
+	prompt: z.string().nullable(),
+	/** Wall-clock minutes from the prompt to the last record. */
+	minutes: z.number(),
+	/** Priced cost; null when none is priced. */
+	costUsd: z.number().nullable(),
+	toolCalls: z.number().int(),
+	failedCalls: z.number().int(),
+	/** The session's repository key; empty when none was recorded. */
+	repository: z.string(),
+	/** The newest answer per question, most likely yes first. */
+	answers: z.array(z.object({ id: z.string(), probability: z.number() })),
+});
+
+export const AgentRunsSchema = z.object({
+	/** Whether this workspace's runs are answered; false lists runs without answers or filters. */
+	enabled: z.boolean(),
+	/** The questions answered now (turned on), to filter and name the answers by. */
+	questions: z.array(
+		z.object({
+			id: z.string(),
+			question: z.string(),
+			label: z.string().nullable(),
+		}),
+	),
+	/** Newest run first. */
+	runs: z.array(AgentRunSchema),
+	/** Pass as `cursor` for the next page; null on the last. */
+	nextCursor: z.string().nullable(),
+});
+
+/** Whether the caller's workspace may open Agent traces (`AGENT_TRACES_WORKSPACES`). */
+export const AgentTracesAccessSchema = z.object({ enabled: z.boolean() });
+
 export const sessionRunQuestionsContract = {
+	/** Refused (FORBIDDEN) where `agentTracesAccess` is not enabled. */
+	agentRuns: oc.input(AgentRunsInputSchema).output(AgentRunsSchema),
+	agentTracesAccess: oc.output(AgentTracesAccessSchema),
 	runQuestionTags: oc
 		.input(SessionRunQuestionTagsInputSchema)
 		.output(SessionRunQuestionTagsSchema),
@@ -323,3 +406,7 @@ export type SessionRunQuestionTags = z.infer<
 >;
 export type SessionRunAnswersRun = z.infer<typeof SessionRunAnswersRunSchema>;
 export type SessionRunAnswers = z.infer<typeof SessionRunAnswersSchema>;
+export type AgentRunsFilter = z.infer<typeof AgentRunsFilterSchema>;
+export type AgentRunsInput = z.input<typeof AgentRunsInputSchema>;
+export type AgentRun = z.infer<typeof AgentRunSchema>;
+export type AgentRuns = z.infer<typeof AgentRunsSchema>;
