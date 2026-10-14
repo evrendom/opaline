@@ -65,6 +65,18 @@ export function useSessionReaderBodies({
 	storeRef.current = store;
 	const queueRef = useRef<string[]>([]);
 	const inFlightRef = useRef(false);
+	// A session read live arrives again with each change, at a new revision:
+	// its window's bodies replace what they cover (the newest turn grew), the
+	// rest stay until a turn asks for its body at the new revision.
+	const [appliedWindow, setAppliedWindow] = useState(initialWindow);
+	if (
+		initialWindow &&
+		initialWindow !== appliedWindow &&
+		initialWindow.revision === revision
+	) {
+		setAppliedWindow(initialWindow);
+		setStore(mergeWindow({ ...store, failed: new Set() }, initialWindow));
+	}
 
 	const pump = useCallback(async () => {
 		if (inFlightRef.current) return;

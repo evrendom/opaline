@@ -4,8 +4,6 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
-import { LiveSessionErrorBoundary } from "@/features/sessions/components/live-session-error-boundary";
-import { LiveSessionsStrip } from "@/features/sessions/components/live-sessions-strip";
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { SessionTraceDock } from "@/features/sessions/components/session-trace-dock";
 import { SessionsListSurface } from "@/features/sessions/components/sessions-list-surface";
@@ -188,15 +186,6 @@ export function SessionsPage() {
 					>
 						<SessionsListSurface
 							activeSessionId={activeSessionId}
-							banner={
-								<LiveSessionErrorBoundary>
-									<LiveSessionsStrip
-										getSessionHref={(sessionId) =>
-											getShellRoutePath(appRoutes.sessionDetail(sessionId))
-										}
-									/>
-								</LiveSessionErrorBoundary>
-							}
 							canOpenSession={(session) => canViewSession(session.user_id)}
 							data={data}
 							getSessionHref={(session) =>

@@ -120,12 +120,16 @@ export async function readLiveSession(
  * stopping before the chunk that would pass the budget (only a stream's
  * first chunk may, so it always moves on), so a response reads about its own
  * size from R2 and at most 256 objects, however far behind the cursor is.
+ * `summaryOnly` answers with the session and each stream's committed count
+ * alone, reading nothing.
  */
 export async function readLiveSessionTail(
 	input: {
 		readonly cursor: readonly LiveSessionTailCursor[] | undefined;
 		readonly organizationId: string;
 		readonly session: LiveSessionSummary;
+		/** Where each stream stands, without reading any lines. */
+		readonly summaryOnly?: boolean;
 	},
 	env: {
 		readonly database: postgres.Sql;
@@ -162,6 +166,17 @@ export async function readLiveSessionTail(
 	};
 	const output: LiveSessionTailStream[] = [];
 	for (const stream of streams) {
+		if (input.summaryOnly) {
+			output.push({
+				agentId: fromAgentKey(stream.agentId),
+				generation: stream.generation,
+				firstLine: stream.committedLines,
+				nextLine: stream.committedLines,
+				lines: [],
+				truncatedBefore: stream.committedLines > 0,
+			});
+			continue;
+		}
 		const isMain = stream.agentId === "";
 		const tailLines = isMain
 			? LIVE_SESSION_TAIL_MAIN_LINES

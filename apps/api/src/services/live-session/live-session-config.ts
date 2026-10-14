@@ -23,3 +23,15 @@ export function isLiveSessionsWorkspaceEnabled(
 	if (!process.env.LIVE_SESSIONS_WORKSPACES?.trim()) return true;
 	return listsWorkspace("LIVE_SESSIONS_WORKSPACES", organizationId, false);
 }
+
+/**
+ * Whether the workspace's app reads live sessions (the sessions list and
+ * the session page): live sessions are on, and on for the workspace. A
+ * workspace taken off the list stops seeing them at once, whatever it
+ * streamed before.
+ */
+export function isLiveSessionsReadable(organizationId: string): boolean {
+	return (
+		isLiveSessionsEnabled() && isLiveSessionsWorkspaceEnabled(organizationId)
+	);
+}

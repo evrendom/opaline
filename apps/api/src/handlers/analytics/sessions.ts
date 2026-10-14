@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { sqlClient } from "../../db.js";
 import { orgMiddleware, os } from "../../middleware.js";
+import { isLiveSessionsReadable } from "../../services/live-session/live-session-config.js";
 import { LiveSessionStorageError } from "../../services/live-session/live-session-gate.js";
 import { getLiveSessionR2Client } from "../../services/live-session/live-session-r2.js";
 import {
@@ -30,7 +31,10 @@ import {
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
-import { readableSessionOwner } from "../../services/session-visibility.js";
+import {
+	readableSessionOwner,
+	type SessionReader,
+} from "../../services/session-visibility.js";
 import { listUploadFailures } from "../../services/upload-failure.service.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
 import {
@@ -57,28 +61,55 @@ const uploadFailures = os.analytics.sessions.uploadFailures
 const liveList = os.analytics.sessions.liveList
 	.use(orgMiddleware)
 	.handler(async ({ context }) => ({
-		sessions: await listLiveSessions(
-			{
-				organizationId: context.organizationId,
-				ownerId: readableSessionOwner(context.sessionReader),
-			},
-			{ database: sqlClient, now: () => new Date() },
-		),
+		sessions: !isLiveSessionsReadable(context.organizationId)
+			? []
+			: await listLiveSessions(
+					{
+						organizationId: context.organizationId,
+						ownerId: readableSessionOwner(context.sessionReader),
+					},
+					{ database: sqlClient, now: () => new Date() },
+				),
 	}));
+
+/**
+ * Who owns the session the detail is read for: its upload's owner, or
+ * before an upload the member streaming it live.
+ */
+async function getSessionDetailOwner(
+	organizationId: string,
+	sessionId: string,
+	reader: SessionReader,
+): Promise<string | null> {
+	const owner = await getSessionOwner(organizationId, sessionId);
+	if (owner || !isLiveSessionsReadable(organizationId)) return owner;
+	const live = await readLiveSession(
+		{
+			organizationId,
+			readableOwnerId: readableSessionOwner(reader),
+			sessionId,
+			source: undefined,
+		},
+		{ database: sqlClient },
+	);
+	return live?.userId ?? null;
+}
 
 /** Readable exactly like the session's detail: by its live session's owner. */
 const liveTail = os.analytics.sessions.liveTail
 	.use(orgMiddleware)
 	.handler(async ({ input, context, signal }) => {
-		const session = await readLiveSession(
-			{
-				organizationId: context.organizationId,
-				readableOwnerId: readableSessionOwner(context.sessionReader),
-				sessionId: input.sessionId,
-				source: input.source,
-			},
-			{ database: sqlClient },
-		);
+		const session = isLiveSessionsReadable(context.organizationId)
+			? await readLiveSession(
+					{
+						organizationId: context.organizationId,
+						readableOwnerId: readableSessionOwner(context.sessionReader),
+						sessionId: input.sessionId,
+						source: input.source,
+					},
+					{ database: sqlClient },
+				)
+			: null;
 		if (!session) return { session: null, streams: [], uploaded: false };
 		requireSessionDetailOwnerAccess(session.userId, context.sessionReader);
 		const availability = readR2IngestAvailability();
@@ -93,6 +124,7 @@ const liveTail = os.analytics.sessions.liveTail
 					cursor: input.cursor,
 					organizationId: context.organizationId,
 					session,
+					summaryOnly: input.summaryOnly,
 				},
 				{
 					database: sqlClient,
@@ -167,7 +199,11 @@ const detailBodyChunk = os.analytics.sessions.detailBodyChunk
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 		try {
@@ -191,7 +227,11 @@ const detailInitial = os.analytics.sessions.detailInitial
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 		try {
@@ -211,7 +251,11 @@ const detailOverview = os.analytics.sessions.detailOverview
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 
@@ -241,7 +285,11 @@ const detailRelationships = os.analytics.sessions.detailRelationships
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 		return readNativeSessionRelationships({
@@ -255,7 +303,11 @@ const detailWindow = os.analytics.sessions.detailWindow
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 
@@ -282,7 +334,11 @@ const detailSpine = os.analytics.sessions.detailSpine
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 
@@ -306,7 +362,11 @@ const detailTurn = os.analytics.sessions.detailTurn
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 
@@ -331,7 +391,11 @@ const detailSubagent = os.analytics.sessions.detailSubagent
 	.use(orgMiddleware)
 	.handler(async ({ input, context, errors }) => {
 		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
 			context.sessionReader,
 		);
 

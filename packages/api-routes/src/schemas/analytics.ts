@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LiveSessionSummarySchema } from "../live-session-view.js";
 import { StoredUploadFailureSchema } from "../upload-failure.js";
 import { SourceSchema } from "./source.js";
 
@@ -109,6 +110,9 @@ export const NativeChildSessionSchema = z.object({
 export const SessionAnalyticsSchema = z.object({
 	// Present only for a diagnostic row; transcript-derived metrics are unavailable.
 	upload_failure: StoredUploadFailureSchema.optional(),
+	// Present only for a row the web app builds from a session running right
+	// now, before its upload; transcript-derived metrics are unavailable.
+	live_session: LiveSessionSummarySchema.optional(),
 	session_id: z.string(),
 	user_id: z.string(),
 	session_date: z.string(),

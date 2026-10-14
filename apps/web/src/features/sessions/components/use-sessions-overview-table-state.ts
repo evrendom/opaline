@@ -6,6 +6,7 @@ import type {
 import { useCallback, useMemo, useState } from "react";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { formatUsername } from "@/lib/format";
+import { compareLiveSessionRows } from "../live-session-rows";
 import { useSessionListFilters } from "../use-session-list-filters";
 import {
 	buildSessionOverviewFilterOptions,
@@ -158,7 +159,9 @@ export function useSessionsOverviewTableState({
 				);
 				const directedComparison =
 					sort.direction === "asc" ? comparison : -comparison;
+				// Sessions running right now stay first under every sort.
 				return (
+					compareLiveSessionRows(leftSession, rightSession) ||
 					directedComparison ||
 					compareSessionLabels(leftSession.session_id, rightSession.session_id)
 				);

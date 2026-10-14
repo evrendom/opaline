@@ -9,6 +9,7 @@ import {
 } from "@/features/analytics/tracking/useTrackProductPageView";
 import { buildDashboardSessionTabMetrics } from "@/features/dashboard/data/dashboard-tab-adapters";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { mergeLiveSessionRows } from "@/features/sessions/live-session-rows";
 import { resolveActiveSessionDateRangeOptionId } from "@/features/sessions/session-date-ranges";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
@@ -20,6 +21,7 @@ import {
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
+import { useLiveSessionList } from "./use-live-sessions";
 
 export function useSessionsPageData({
 	trackPageView,
@@ -257,19 +259,30 @@ export function useSessionsPageData({
 	});
 
 	const useRolling24Hours = activeDateRangeOptionId === "24-hours";
+	const liveSessions = useLiveSessionList();
 	const rangeSessionCount =
 		catalogQuery.data?.sessionCount ??
 		summaryComparison?.current.total_sessions ??
 		previewSeed?.totalSessionCount ??
 		sessionPages.data?.pages.flat().length ??
 		0;
+	// The sessions running right now lead the list, whatever the range.
 	const orderedSessions = useMemo(
 		() =>
-			orderSessionsForDisplay({
-				sessions: snapshotSessionsData,
-				useRolling24Hours,
-			}),
-		[snapshotSessionsData, useRolling24Hours],
+			mergeLiveSessionRows(
+				orderSessionsForDisplay({
+					sessions: snapshotSessionsData,
+					useRolling24Hours,
+				}),
+				liveSessions.sessions,
+				liveSessions.updatedAt,
+			),
+		[
+			liveSessions.sessions,
+			liveSessions.updatedAt,
+			snapshotSessionsData,
+			useRolling24Hours,
+		],
 	);
 
 	return {

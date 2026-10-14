@@ -1,3 +1,7 @@
+import {
+	isLiveSessionDetailRevision,
+	liveSessionDetailRevision,
+} from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { Button } from "@/app/ui/button";
@@ -5,11 +9,11 @@ import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import {
+	useLiveSession,
+	useLiveSessionPolling,
 	useLiveSessionState,
-	useLiveSessionTailPolling,
 } from "../use-live-sessions";
-import { LiveSessionErrorBoundary } from "./live-session-error-boundary";
-import { LiveSessionSlot } from "./live-session-panel";
+import { LiveSessionStatus } from "./live-session-status";
 import { SessionContextFields } from "./session-context-chips";
 import {
 	fetchSessionDetailInitial,
@@ -30,14 +34,18 @@ import {
 import { SessionReaderContent } from "./session-reader-content";
 import { SessionReaderSkeleton } from "./session-reader-skeleton";
 
+// A session that moved on is read again this soon after: appends land every
+// couple of seconds, and each read derives the whole session on the server.
+const LIVE_REREAD_DELAY_MS = 1_000;
+
 /**
  * The reader layout of a session: a calm, chat-style transcript with a sticky
  * rail of session facts and per-turn status.
  * It reads the session-detail queries the repo and skill pages' embedded
  * session view reads, so the two share one cache.
- * A session that is still running shows its live lines: in place of the
- * reader until the session is uploaded, and above it while an uploaded
- * session runs again.
+ * A session that is still running reads the same way, from its live lines:
+ * the reader follows them as they land, and its upload takes over once the
+ * session has stopped.
  */
 export function SessionReaderView({
 	navigation,
@@ -53,15 +61,35 @@ export function SessionReaderView({
 	const queryClient = useQueryClient();
 	const shellHeaderPortal = useShellHeaderPortal();
 	const { userMap, avatarMap } = useUserMap();
-	// Live lines are extra: without them, or when they fail, the page is as
-	// before. The reader re-renders only when the live state changes; the
-	// live slots follow the lines themselves.
-	useLiveSessionTailPolling(sessionId);
+	// Live state is extra: without it, or when it fails, the page is as
+	// before. The reader re-renders only when the live session changes.
+	useLiveSessionPolling(sessionId);
 	const liveState = useLiveSessionState(sessionId);
+	const live = useLiveSession(sessionId);
+	const liveSession = live?.session ?? undefined;
+	const liveRevision = liveSession
+		? liveSessionDetailRevision(liveSession)
+		: undefined;
+	const liveUploaded = live?.uploaded === true;
 	const initialQuery = useQuery({
 		enabled: sessionId.length > 0,
 		queryFn: ({ signal }) => fetchSessionDetailInitial(sessionId, signal),
 		queryKey: sessionDetailInitialQueryKey(sessionId),
+		// The reader follows a running session: when it moved on since the
+		// revision shown, or stopped running with an upload stored (which
+		// takes over), the detail is read again.
+		refetchInterval: (query) => {
+			if (liveRevision === undefined) return false;
+			const revision = query.state.data?.overview.revision;
+			const readsLiveLines =
+				revision !== undefined && isLiveSessionDetailRevision(revision);
+			const movedOn =
+				liveRevision !== revision &&
+				(readsLiveLines || liveState === "running" || revision === undefined);
+			const uploadTakesOver =
+				readsLiveLines && liveState !== "running" && liveUploaded;
+			return movedOn || uploadTakesOver ? LIVE_REREAD_DELAY_MS : false;
+		},
 		retry: shouldRetrySessionDetailFastQuery,
 		staleTime: SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	});
@@ -70,10 +98,14 @@ export function SessionReaderView({
 		? buildSessionDetailOverviewViewModel(overview, userMap)
 		: undefined;
 	const errorState = getSessionDetailErrorState(initialQuery.error);
-	const liveInsteadOfMissing =
-		liveState !== "none" &&
-		hasSessionDetailErrorCode(initialQuery.error, "NOT_FOUND");
 	const revision = overview?.revision;
+	const readsLiveLines =
+		revision !== undefined && isLiveSessionDetailRevision(revision);
+	// The first lines of a session that just started may not have landed
+	// when the detail was first asked for: the reader waits for them.
+	const waitingForLiveLines =
+		liveSession !== undefined &&
+		hasSessionDetailErrorCode(initialQuery.error, "NOT_FOUND");
 	const { refetch } = initialQuery;
 
 	const handleStaleRevision = useCallback(() => {
@@ -99,7 +131,7 @@ export function SessionReaderView({
 				headerRef={() => undefined}
 				hideMetrics
 				isLoading={initialQuery.isLoading}
-				navigation={liveInsteadOfMissing ? undefined : navigation}
+				navigation={navigation}
 				portalHost={shellHeaderPortal}
 				position={position}
 				sessionId={sessionId}
@@ -107,77 +139,61 @@ export function SessionReaderView({
 				totalSessions={totalSessions}
 				viewModel={viewModel}
 			/>
-			<div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				{liveState !== "none" &&
-				liveState !== "ended" &&
-				overview &&
-				!errorState ? (
-					<LiveSessionErrorBoundary>
-						<LiveSessionSlot
-							avatarMap={avatarMap}
-							layout="inline"
-							sessionId={sessionId}
-							userMap={userMap}
-						/>
-					</LiveSessionErrorBoundary>
+			<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+				{initialQuery.isLoading || waitingForLiveLines ? (
+					<SessionReaderSkeleton />
 				) : null}
-				<div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-					{initialQuery.isLoading ? <SessionReaderSkeleton /> : null}
-					{!initialQuery.isLoading && liveInsteadOfMissing ? (
-						<LiveSessionErrorBoundary
-							fallback={<SessionReaderMessage title="Session Not Found" />}
-						>
-							<LiveSessionSlot
-								avatarMap={avatarMap}
-								layout="page"
-								sessionId={sessionId}
-								userMap={userMap}
-							/>
-						</LiveSessionErrorBoundary>
-					) : null}
-					{!initialQuery.isLoading && errorState && !liveInsteadOfMissing ? (
-						<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-							<p className="text-lg font-semibold">{errorState.title}</p>
-							{errorState.description ? (
-								<p className="text-sm text-muted-foreground">
-									{errorState.description}
-								</p>
-							) : null}
-							{canRetrySessionDetailError(initialQuery.error) ? (
-								<Button
-									className="mt-3"
-									disabled={initialQuery.isFetching}
-									onClick={() => void refetch()}
-									size="sm"
-									variant="outline"
-								>
-									{initialQuery.isFetching ? "Trying again…" : "Try again"}
-								</Button>
-							) : null}
-						</div>
-					) : null}
-					{overview && viewModel && !errorState ? (
-						<SessionReaderContent
-							key={`${sessionId}:${overview.revision}`}
-							contextChips={<SessionContextFields viewModel={viewModel} />}
-							initialWindow={initialQuery.data?.initialDetail.window}
-							model={viewModel.displayModel ?? null}
-							onStaleRevision={handleStaleRevision}
-							overview={overview}
-							userImageUrl={avatarMap[viewModel.safeUserId]}
-							userLabel={viewModel.safeUserDisplayName}
-						/>
-					) : null}
-				</div>
+				{!initialQuery.isLoading && errorState && !waitingForLiveLines ? (
+					<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+						<p className="text-lg font-semibold">{errorState.title}</p>
+						{errorState.description ? (
+							<p className="text-sm text-muted-foreground">
+								{errorState.description}
+							</p>
+						) : null}
+						{canRetrySessionDetailError(initialQuery.error) ? (
+							<Button
+								className="mt-3"
+								disabled={initialQuery.isFetching}
+								onClick={() => void refetch()}
+								size="sm"
+								variant="outline"
+							>
+								{initialQuery.isFetching ? "Trying again…" : "Try again"}
+							</Button>
+						) : null}
+					</div>
+				) : null}
+				{overview && viewModel && !errorState ? (
+					<SessionReaderContent
+						// A session read live keeps its reader across revisions, so
+						// the page does not jump as lines land.
+						key={
+							readsLiveLines ? sessionId : `${sessionId}:${overview.revision}`
+						}
+						contextChips={
+							<>
+								{liveSession ? (
+									<LiveSessionStatus session={liveSession} />
+								) : null}
+								<SessionContextFields viewModel={viewModel} />
+							</>
+						}
+						emptyMessage={
+							readsLiveLines
+								? "Waiting for the first turn of this session."
+								: undefined
+						}
+						followNewest={readsLiveLines && liveState === "running"}
+						initialWindow={initialQuery.data?.initialDetail.window}
+						model={viewModel.displayModel ?? null}
+						onStaleRevision={handleStaleRevision}
+						overview={overview}
+						userImageUrl={avatarMap[viewModel.safeUserId]}
+						userLabel={viewModel.safeUserDisplayName}
+					/>
+				) : null}
 			</div>
-		</div>
-	);
-}
-
-function SessionReaderMessage({ title }: { title: string }) {
-	return (
-		<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-			<p className="text-lg font-semibold">{title}</p>
 		</div>
 	);
 }

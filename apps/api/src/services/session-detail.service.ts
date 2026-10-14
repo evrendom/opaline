@@ -5,7 +5,16 @@ import type {
 	SessionDetailOverview,
 	SessionDetailWindowRequest,
 } from "@rudel/api-routes";
+import { isLiveSessionDetailRevision } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { isLiveSessionsReadable } from "./live-session/live-session-config.js";
+import {
+	readLiveSessionDetailRevision,
+	readLiveSessionDetailSnapshot,
+} from "./live-session/live-session-detail.service.js";
+import { LiveSessionStorageError } from "./live-session/live-session-gate.js";
+import { getLiveSessionR2Client } from "./live-session/live-session-r2.js";
+import { readR2IngestAvailability } from "./r2-ingest-storage.service.js";
 import {
 	createSessionDetailBodyChunk,
 	getSessionDetailBodyForChunk,
@@ -158,23 +167,76 @@ function createKey(input: {
 	return input;
 }
 
+// A session read live is derived again with each change; only its newest
+// revision is worth holding.
+const liveDerivationKeys = new Map<string, SessionDetailDerivationCacheKey>();
+
+// The database is reached only for live sessions, when a request comes in:
+// the module itself loads without one (its derivation is tested without).
+async function liveSessionDatabase() {
+	return (await import("../db.js")).sqlClient;
+}
+
+async function loadRawSnapshot(key: SessionDetailDerivationCacheKey) {
+	const source = key.source === "codex" ? "codex" : "claude_code";
+	if (!isLiveSessionDetailRevision(key.revision)) {
+		return getSessionDetailRawSnapshot(
+			key.organizationId,
+			key.sessionId,
+			key.ownerId,
+			{ source, revision: key.revision },
+		);
+	}
+	const availability = readR2IngestAvailability();
+	if (!availability.enabled) {
+		throw new LiveSessionStorageError(
+			new Error("Live session storage is not configured"),
+		);
+	}
+	const result = await readLiveSessionDetailSnapshot(
+		{
+			organizationId: key.organizationId,
+			ownerId: key.ownerId,
+			revision: key.revision,
+			sessionId: key.sessionId,
+			source,
+		},
+		{
+			database: await liveSessionDatabase(),
+			r2: getLiveSessionR2Client(availability.configuration),
+		},
+	);
+	if (result.kind === "stale") {
+		throw new SessionDetailStaleRevisionError(
+			key.revision,
+			result.currentRevision,
+		);
+	}
+	return result.kind === "snapshot" ? result.snapshot : null;
+}
+
+function retainOnlyNewestLiveDerivation(key: SessionDetailDerivationCacheKey) {
+	if (!isLiveSessionDetailRevision(key.revision)) return;
+	const sessionKey = JSON.stringify([
+		key.organizationId,
+		key.ownerId,
+		key.source,
+		key.sessionId,
+	]);
+	const previous = liveDerivationKeys.get(sessionKey);
+	if (previous && previous.revision !== key.revision) cache.delete(previous);
+	liveDerivationKeys.set(sessionKey, key);
+}
+
 async function loadDerivation(
 	key: SessionDetailDerivationCacheKey,
 ): Promise<SessionDetailDerivation | null> {
 	try {
-		return await cache.getOrLoad(key, () =>
+		const derivation = await cache.getOrLoad(key, () =>
 			derivationSemaphore.run(async () => {
 				const memoryBefore = process.memoryUsage();
 				const startedAt = performance.now();
-				const snapshot = await getSessionDetailRawSnapshot(
-					key.organizationId,
-					key.sessionId,
-					key.ownerId,
-					{
-						source: key.source === "codex" ? "codex" : "claude_code",
-						revision: key.revision,
-					},
-				);
+				const snapshot = await loadRawSnapshot(key);
 				const rawFetchDurationMs = Math.round(performance.now() - startedAt);
 				if (!snapshot) {
 					throw new SessionDetailSnapshotNotFoundError();
@@ -235,6 +297,8 @@ async function loadDerivation(
 				return { bytes: value.byteSize, value };
 			}),
 		);
+		retainOnlyNewestLiveDerivation(key);
+		return derivation;
 	} catch (error) {
 		if (error instanceof SessionDetailSnapshotNotFoundError) {
 			return null;
@@ -245,17 +309,35 @@ async function loadDerivation(
 
 class SessionDetailSnapshotNotFoundError extends Error {}
 
+/**
+ * The revision the session is read at: its upload's, or while it runs (and
+ * before it is uploaded) the live lines' revision, its last update.
+ */
+async function getCurrentRevision(input: {
+	organizationId: string;
+	ownerId: string;
+	sessionId: string;
+}) {
+	const uploaded = await getSessionDetailCurrentRevision(
+		input.organizationId,
+		input.sessionId,
+		input.ownerId,
+	);
+	if (!isLiveSessionsReadable(input.organizationId)) return uploaded;
+	const live = await readLiveSessionDetailRevision(
+		{ ...input, hasUpload: uploaded !== null },
+		{ database: await liveSessionDatabase(), now: () => new Date() },
+	);
+	return live ?? uploaded;
+}
+
 async function getCurrentDerivation(input: {
 	organizationId: string;
 	ownerId: string;
 	sessionId: string;
 }) {
 	for (let attempt = 0; attempt < 2; attempt++) {
-		const current = await getSessionDetailCurrentRevision(
-			input.organizationId,
-			input.sessionId,
-			input.ownerId,
-		);
+		const current = await getCurrentRevision(input);
 		if (!current) {
 			return null;
 		}
@@ -277,11 +359,7 @@ async function getRequestedDerivation(input: {
 	revision: string;
 	sessionId: string;
 }) {
-	const current = await getSessionDetailCurrentRevision(
-		input.organizationId,
-		input.sessionId,
-		input.ownerId,
-	);
+	const current = await getCurrentRevision(input);
 	if (!current) {
 		return null;
 	}

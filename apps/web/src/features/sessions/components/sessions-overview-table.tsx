@@ -15,6 +15,7 @@ import {
 import { useLoadMoreIntersectionObserver } from "@/app/hooks/useLoadMoreIntersectionObserver";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { getSessionRenderIndexes } from "@/features/sessions/session-list-virtualization";
+import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { formatNumber, formatUsername } from "@/lib/format";
@@ -34,6 +35,8 @@ import {
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
 } from "./sessions-overview-table-utils";
 import { useSessionsOverviewTableState } from "./use-sessions-overview-table-state";
+
+const LIVE_ROW_CLOCK_MS = 5_000;
 
 export type SessionListPagination = {
 	hasNextPage: boolean;
@@ -113,6 +116,11 @@ export function SessionsOverviewTable({
 		[tableState.recentSessions],
 	);
 	const demo = useDemoRuntime();
+	// Live rows read "12s ago"; only they follow the clock.
+	const hasLiveRows = tableState.sortedSessions.some(
+		(session) => session.live_session !== undefined,
+	);
+	const nowMs = useLiveClock(hasLiveRows ? LIVE_ROW_CLOCK_MS : false);
 	const [focusedKey, setFocusedKey] = useState<string | null>(null);
 	const focusedIndex = tableState.sortedSessions.findIndex(
 		(session) => `${session.source}:${session.session_id}` === focusedKey,
@@ -341,6 +349,7 @@ export function SessionsOverviewTable({
 												canOpenSession={canOpenSession}
 												getSessionHref={getSessionHref}
 												getSessionLinkState={getSessionLinkState}
+												liveNowMs={session.live_session ? nowMs : undefined}
 												maximumSessionCost={tableState.maximumSessionCost}
 												memberProfile={memberProfileSummaries.get(
 													session.user_id,

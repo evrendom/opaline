@@ -3,6 +3,7 @@ import type {
 	SessionDetailAnchorNotFoundData,
 	SessionDetailStaleRevisionData,
 } from "@rudel/api-routes";
+import { LiveSessionStorageError } from "../../services/live-session/live-session-gate.js";
 import { SessionDetailStaleRevisionError } from "../../services/session-detail.service.js";
 import {
 	SessionDetailAnchorNotFoundError,
@@ -40,6 +41,11 @@ export function throwSessionDetailRevisionError(
 ): never {
 	if (error instanceof SessionDetailBodyTooLargeError) {
 		throw new ORPCError("PAYLOAD_TOO_LARGE", { message: error.message });
+	}
+	if (error instanceof LiveSessionStorageError) {
+		throw new ORPCError("SERVICE_UNAVAILABLE", {
+			message: "Live session storage is unavailable.",
+		});
 	}
 	if (
 		error instanceof StaleSessionDetailCursorError ||

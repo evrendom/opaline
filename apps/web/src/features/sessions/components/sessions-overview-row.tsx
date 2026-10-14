@@ -43,6 +43,11 @@ import { cn } from "@/lib/utils";
 import { markSessionOpenFromClick } from "../session-open-timing";
 import { getSessionModelDisplayValue } from "./session-model-identity";
 import {
+	describeLiveSessionRow,
+	describeLiveSessionRowDate,
+	SessionOverviewLiveLabel,
+} from "./session-overview-live-row";
+import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
@@ -65,6 +70,8 @@ type SessionsOverviewRowProps = {
 	canOpenSession: ((session: SessionAnalytics) => boolean) | undefined;
 	getSessionHref: ((session: SessionAnalytics) => string) | undefined;
 	getSessionLinkState: ((session: SessionAnalytics) => unknown) | undefined;
+	/** The time a live row reads its activity against; set only on live rows. */
+	liveNowMs?: number;
 	maximumSessionCost: number;
 	memberProfile: SessionMemberProfileSummary | undefined;
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
@@ -178,6 +185,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	canOpenSession,
 	getSessionHref,
 	getSessionLinkState,
+	liveNowMs,
 	maximumSessionCost,
 	memberProfile,
 	onSessionClick,
@@ -193,13 +201,17 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	const repositoryLabel = getRepositoryLabel(session);
 	const branchLabel = getSessionBranchLabel(session);
 	const sessionCost = getSessionOverviewCost(session);
+	// A session running right now reads in the shape of every other row.
+	const liveRow = describeLiveSessionRow(session, liveNowMs);
 	const displayModel =
+		liveRow?.sourceLabel ??
 		getSessionModelDisplayValue({
 			model: session.model_used,
 			source: session.source,
 			totalTokens: session.total_tokens,
 			errorCount: session.error_count ?? 0,
-		}) ?? "";
+		}) ??
+		"";
 	const errorCount = resolveSessionErrorCount(session.error_count);
 	const skillsTitle = session.skills.join(", ");
 	const renderedSkills = session.skills.slice(
@@ -220,14 +232,18 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		? `${clock.date}, ${clockTimeLabel}`
 		: clockTimeLabel;
 	const durationLabel = formatRoundedDuration(session.duration_min);
-	const dateTooltipLabel = failure
-		? failure.sessionDate
-			? clockDateTimeLabel
-			: `Session date unavailable · Upload failed ${new Date(failure.failedAt).toLocaleString()}`
-		: `${clockDateTimeLabel} · ${durationLabel}`;
-	const tokenTooltipLabel = failure
-		? "Usage unavailable because the upload failed"
-		: `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`;
+	const dateTooltipLabel = liveRow
+		? describeLiveSessionRowDate(liveRow.live, clockDateTimeLabel, liveNowMs)
+		: failure
+			? failure.sessionDate
+				? clockDateTimeLabel
+				: `Session date unavailable · Upload failed ${new Date(failure.failedAt).toLocaleString()}`
+			: `${clockDateTimeLabel} · ${durationLabel}`;
+	const tokenTooltipLabel =
+		liveRow?.tokenTooltipLabel ??
+		(failure
+			? "Usage unavailable because the upload failed"
+			: `Input: ${formatCompactWholeNumber(session.input_tokens)} / Output: ${formatCompactWholeNumber(session.output_tokens)}`);
 	const costEstimateLabel =
 		sessionCost !== null && session.cost_uses_default_region
 			? "Estimated at standard region rates; billing region wasn’t recorded."
@@ -359,6 +375,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			>
 				<SessionModelMark
 					avatarUrl={avatarUrl}
+					loading={liveRow?.state === "running"}
 					showMember={false}
 					model={displayModel}
 					disclosure={expanded === undefined ? undefined : { open: expanded }}
@@ -377,6 +394,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					className="flex min-w-0 items-center gap-1.5"
 					data-session-overview-model-repository
 				>
+					{liveRow ? <SessionOverviewLiveLabel state={liveRow.state} /> : null}
 					<p
 						className={cn(
 							"min-w-0 truncate",
@@ -466,14 +484,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<TooltipTrigger asChild>
 						<time
 							dateTime={
-								failure
-									? (failure.sessionDate ?? undefined)
-									: session.session_date
+								liveRow
+									? liveRow.live.lastActivityAt
+									: failure
+										? (failure.sessionDate ?? undefined)
+										: session.session_date
 							}
 							className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
 							data-session-overview-date-tooltip-label={dateTooltipLabel}
 						>
-							{clock.date || "—"}
+							{liveRow ? liveRow.age : clock.date || "—"}
 						</time>
 					</TooltipTrigger>
 					<TooltipContent
@@ -509,6 +529,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			ref={itemRef}
 			className="relative z-10"
 			data-session-disabled={!isClickable ? "true" : undefined}
+			data-session-live={liveRow?.state}
 			onFocus={() => {
 				if (isClickable) setHoverActiveIndex(index);
 			}}

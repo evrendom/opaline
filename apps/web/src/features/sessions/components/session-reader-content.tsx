@@ -27,6 +27,7 @@ import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
 import { formatCompactNumber, formatRoundedDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "./session-detail-fast-response";
+import { attachReaderFollower } from "./session-reader-follow";
 import { ReaderInspectorPane } from "./session-reader-inspector-pane";
 import {
 	formatReaderBytes,
@@ -76,6 +77,8 @@ function answerOf(turnElement: HTMLElement): HTMLElement {
 
 export function SessionReaderContent({
 	contextChips,
+	emptyMessage = "No turns in this session.",
+	followNewest = false,
 	initialWindow,
 	model,
 	onStaleRevision,
@@ -85,6 +88,11 @@ export function SessionReaderContent({
 }: {
 	/** Where the session ran — repository, branch, model — for the rail. */
 	contextChips?: ReactNode;
+	/** What the page says while the session has no turns. */
+	emptyMessage?: string;
+	/** Keep the newest turn in view as turns land, while the reader is at
+	 * the end of the page (a session running right now). */
+	followNewest?: boolean;
 	initialWindow: SessionDetailWindow | undefined;
 	model: string | null;
 	onStaleRevision: (error: unknown) => void;
@@ -121,9 +129,16 @@ export function SessionReaderContent({
 	const requestBodyRef = useRef(requestBody);
 	requestBodyRef.current = requestBody;
 	const pendingScrollTurnIdRef = useRef(searchParams.get("turn") ?? undefined);
+	const followRef = useRef(followNewest);
+	followRef.current = followNewest;
 
 	const setScrollContainer = useCallback((element: HTMLDivElement | null) => {
 		if (!element) return;
+		// A page opened at a turn does not start at the end.
+		const detachFollower = attachReaderFollower(element, {
+			isFollowing: () => followRef.current,
+			startAtEnd: pendingScrollTurnIdRef.current === undefined,
+		});
 		const observer = new IntersectionObserver(
 			(entries) => {
 				for (const entry of entries) {
@@ -160,6 +175,7 @@ export function SessionReaderContent({
 			spy.observe(turnElement);
 		}
 		return () => {
+			detachFollower();
 			observer.disconnect();
 			spy.disconnect();
 			observerRef.current = null;
@@ -300,7 +316,7 @@ export function SessionReaderContent({
 								/>
 								{turns.length === 0 ? (
 									<p className="py-12 text-center text-sm text-muted-foreground">
-										No turns in this session.
+										{emptyMessage}
 									</p>
 								) : null}
 								{turns.map((turn, index) => (

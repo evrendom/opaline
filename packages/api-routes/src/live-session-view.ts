@@ -18,6 +18,9 @@ export const LIVE_SESSION_TAIL_MAX_BYTES = 3 * 1024 * 1024;
 /** Streams one tail response describes: the main transcript and subagents by id. */
 export const LIVE_SESSION_TAIL_MAX_STREAMS = 1_024;
 
+/** A live session counts as running while its last update is this recent. */
+export const LIVE_SESSION_ACTIVE_WINDOW_MS = 5 * 60_000;
+
 export const LiveSessionSummarySchema = z.object({
 	sessionId: z.string(),
 	userId: z.string(),
@@ -48,6 +51,8 @@ export const LiveSessionTailInputSchema = z.object({
 		.array(LiveSessionTailCursorSchema)
 		.max(LIVE_SESSION_TAIL_MAX_STREAMS)
 		.optional(),
+	/** The session and where each stream stands, without any lines. */
+	summaryOnly: z.boolean().optional(),
 });
 
 export const LiveSessionTailStreamSchema = z.object({
@@ -75,3 +80,29 @@ export type LiveSessionTailCursor = z.infer<typeof LiveSessionTailCursorSchema>;
 export type LiveSessionTailInput = z.infer<typeof LiveSessionTailInputSchema>;
 export type LiveSessionTailStream = z.infer<typeof LiveSessionTailStreamSchema>;
 export type LiveSessionTailOutput = z.infer<typeof LiveSessionTailOutputSchema>;
+
+/** Running: not ended, and updated within the last five minutes. */
+export function isLiveSessionActive(
+	session: Pick<LiveSessionSummary, "endedAt" | "lastActivityAt">,
+	nowMs: number,
+): boolean {
+	return (
+		session.endedAt === null &&
+		nowMs - Date.parse(session.lastActivityAt) <= LIVE_SESSION_ACTIVE_WINDOW_MS
+	);
+}
+
+/**
+ * The session detail revision of a live session: the time of its last
+ * update, which moves on with every change. Uploaded sessions have decimal
+ * ingestion revisions; a timestamp names a session read from its live lines.
+ */
+export function liveSessionDetailRevision(
+	session: Pick<LiveSessionSummary, "lastActivityAt">,
+): string {
+	return session.lastActivityAt;
+}
+
+export function isLiveSessionDetailRevision(revision: string): boolean {
+	return revision.includes("T");
+}

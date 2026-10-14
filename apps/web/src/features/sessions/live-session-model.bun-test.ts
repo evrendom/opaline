@@ -5,13 +5,12 @@ import type {
 	LiveSessionTailStream,
 } from "@rudel/api-routes";
 import {
-	buildLiveSessionTailCursor,
 	formatLiveSessionActivity,
+	formatLiveSessionAge,
 	formatLiveSessionSource,
 	isLiveSessionActive,
 	liveSessionPollInterval,
 	mergeLiveSessionTail,
-	readLatestLiveSessionModel,
 	readLiveSessionState,
 } from "./live-session-model";
 
@@ -40,16 +39,19 @@ function stream(
 	return {
 		agentId: null,
 		generation: 0,
-		firstLine: 0,
+		firstLine: 2,
 		nextLine: 2,
-		lines: ["a", "b"],
-		truncatedBefore: false,
+		lines: [],
+		truncatedBefore: true,
 		...overrides,
 	};
 }
 
-function response(streams: LiveSessionTailStream[]): LiveSessionTailOutput {
-	return { session: summary(), streams, uploaded: false };
+function response(
+	streams: LiveSessionTailStream[],
+	session: LiveSessionSummary = summary(),
+): LiveSessionTailOutput {
+	return { session, streams, uploaded: false };
 }
 
 describe("live session activity", () => {
@@ -93,6 +95,10 @@ describe("live session activity", () => {
 	});
 
 	test("reads recent activity in seconds, minutes and hours", () => {
+		expect(formatLiveSessionAge("2026-10-13T11:59:56.000Z", NOW)).toBe("now");
+		expect(formatLiveSessionAge("2026-10-13T11:59:55.000Z", NOW)).toBe(
+			"5s ago",
+		);
 		expect(formatLiveSessionActivity("2026-10-13T11:59:56.000Z", NOW)).toBe(
 			"active now",
 		);
@@ -109,108 +115,50 @@ describe("live session activity", () => {
 });
 
 describe("mergeLiveSessionTail", () => {
-	test("appends lines that continue a stream and keeps an unchanged stream's object", () => {
+	test("keeps the session and streams that did not change, and the whole answer when nothing did", () => {
 		const first = mergeLiveSessionTail(
 			undefined,
-			response([
-				stream(),
-				stream({ agentId: "sub", lines: ["s"], nextLine: 1 }),
-			]),
+			response([stream(), stream({ agentId: "sub", nextLine: 1 })]),
 		);
-		expect(buildLiveSessionTailCursor(first)).toEqual([
-			{ agentId: null, generation: 0, nextLine: 2 },
-			{ agentId: "sub", generation: 0, nextLine: 1 },
-		]);
-		const second = mergeLiveSessionTail(
+		const same = mergeLiveSessionTail(
 			first,
-			response([
-				stream({ firstLine: 2, nextLine: 3, lines: ["c"] }),
-				stream({ agentId: "sub", firstLine: 1, nextLine: 1, lines: [] }),
-			]),
+			response([stream(), stream({ agentId: "sub", nextLine: 1 })]),
 		);
-		expect(second.streams[0]).toEqual(
-			stream({ firstLine: 0, nextLine: 3, lines: ["a", "b", "c"] }),
-		);
-		expect(second.streams[1]).toBe(first.streams[1]);
-		// An answer with nothing new keeps what the page holds.
-		expect(
-			mergeLiveSessionTail(
-				second,
-				response([
-					stream({ firstLine: 3, nextLine: 3, lines: [] }),
-					stream({ agentId: "sub", firstLine: 1, nextLine: 1, lines: [] }),
-				]),
+		expect(same).toBe(first);
+
+		const moved = mergeLiveSessionTail(
+			first,
+			response(
+				[
+					stream({ firstLine: 3, nextLine: 3 }),
+					stream({ agentId: "sub", nextLine: 1 }),
+				],
+				summary({ lastActivityAt: "2026-10-13T11:59:30.000Z" }),
 			),
-		).toBe(second);
-		// The upload landing is news, even without new lines.
+		);
+		expect(moved).not.toBe(first);
+		expect(moved.session?.lastActivityAt).toBe("2026-10-13T11:59:30.000Z");
+		expect(moved.streams[0]).toEqual(stream({ firstLine: 3, nextLine: 3 }));
+		expect(moved.streams[1]).toBe(first.streams[1]);
+	});
+
+	test("the upload landing is news, even without new lines", () => {
+		const first = mergeLiveSessionTail(undefined, response([stream()]));
 		expect(
-			mergeLiveSessionTail(second, {
-				...response([
-					stream({ firstLine: 3, nextLine: 3, lines: [] }),
-					stream({ agentId: "sub", firstLine: 1, nextLine: 1, lines: [] }),
-				]),
-				uploaded: true,
-			}).uploaded,
+			mergeLiveSessionTail(first, { ...response([stream()]), uploaded: true })
+				.uploaded,
 		).toBe(true);
 	});
 
-	test("keeps only the newest 1,000 main and 300 subagent lines", () => {
-		const lines = Array.from({ length: 1_001 }, (_, index) => `${index}`);
-		const merged = mergeLiveSessionTail(
-			undefined,
-			response([
-				stream({ lines, nextLine: 1_001 }),
-				stream({
-					agentId: "sub",
-					lines: lines.slice(0, 301),
-					nextLine: 301,
-				}),
-			]),
-		);
-		expect(merged.streams[0]).toMatchObject({
-			firstLine: 1,
-			nextLine: 1_001,
-			truncatedBefore: true,
+	test("a session that is gone reads as none", () => {
+		const first = mergeLiveSessionTail(undefined, response([stream()]));
+		const gone = mergeLiveSessionTail(first, {
+			session: null,
+			streams: [],
+			uploaded: false,
 		});
-		expect(merged.streams[0]?.lines).toEqual(lines.slice(1));
-		expect(merged.streams[1]).toMatchObject({
-			firstLine: 1,
-			truncatedBefore: true,
-		});
-		expect(merged.streams[1]?.lines).toHaveLength(300);
-	});
-
-	test("has no cursor before the first answer", () => {
-		expect(buildLiveSessionTailCursor(undefined)).toBeUndefined();
-	});
-});
-
-describe("readLatestLiveSessionModel", () => {
-	test("names the model of the newest assistant line", () => {
-		expect(
-			readLatestLiveSessionModel([
-				JSON.stringify({ type: "assistant", message: { model: "claude-old" } }),
-				JSON.stringify({ type: "assistant", message: { model: "claude-new" } }),
-				JSON.stringify({ type: "user", message: { content: '"assistant"' } }),
-				'{"type":"assistant", broken',
-			]),
-		).toBe("claude-new");
-		expect(readLatestLiveSessionModel(["{}"])).toBeUndefined();
-	});
-
-	test("names the model of a Codex turn context", () => {
-		expect(
-			readLatestLiveSessionModel([
-				JSON.stringify({
-					type: "turn_context",
-					payload: { model: "gpt-5-codex" },
-				}),
-				JSON.stringify({
-					type: "response_item",
-					payload: { role: "assistant" },
-				}),
-			]),
-		).toBe("gpt-5-codex");
+		expect(gone.session).toBeNull();
+		expect(readLiveSessionState(gone.session, NOW)).toBe("none");
 	});
 });
 

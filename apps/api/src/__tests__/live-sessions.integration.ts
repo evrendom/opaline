@@ -781,6 +781,32 @@ describe("live session switches", () => {
 				).toBe("appended");
 			},
 		);
+
+		// A workspace that is not listed reads no live sessions either: the
+		// list, the session's state and its detail are as without them.
+		const member = webClient(MEMBER_ID);
+		expect(
+			(await member.analytics.sessions.detailInitial({ sessionId })).overview
+				.session.sessionId,
+		).toBe(sessionId);
+		for (const environment of [
+			{ LIVE_SESSIONS_WORKSPACES: `other-${RUN_ID}` },
+			{ LIVE_SESSIONS_ENABLED: "false" },
+		]) {
+			await withEnvironment(environment, async () => {
+				expect(
+					(await member.analytics.sessions.liveList()).sessions.some(
+						(session) => session.sessionId === sessionId,
+					),
+				).toBe(false);
+				expect(await member.analytics.sessions.liveTail({ sessionId })).toEqual(
+					{ session: null, streams: [], uploaded: false },
+				);
+				await expect(
+					member.analytics.sessions.detailInitial({ sessionId }),
+				).rejects.toMatchObject({ code: "NOT_FOUND" });
+			});
+		}
 	});
 
 	test("live updates are charged to their own budget, never the ingest budget", async () => {
@@ -1468,6 +1494,175 @@ describe("live session cleanup", () => {
 
 type TestClient = ReturnType<typeof createTestClient>;
 
+describe("live session detail", () => {
+	test("a running session reads like an upload: its turns from its live lines, again as they land", async () => {
+		const owner = cliClient(OWNER_ID);
+		const member = webClient(MEMBER_ID);
+		const sessionId = newSessionId();
+		const opening = [
+			conversationLine(sessionId, 0, "user"),
+			conversationLine(sessionId, 1, "assistant"),
+		];
+		await owner.liveSession.append(
+			appendInput(
+				sessionId,
+				[
+					{
+						agentId: null,
+						lines: opening,
+						previousLineSha256: null,
+						startLine: 0,
+					},
+				],
+				{
+					gitBranch: "feature/live",
+					gitRemote: "git@github.com:example/repo.git",
+				},
+			),
+		);
+
+		const detail = await member.analytics.sessions.detailInitial({
+			sessionId,
+		});
+		const tail = await member.analytics.sessions.liveTail({
+			sessionId,
+			summaryOnly: true,
+		});
+		expect(tail.streams).toEqual([
+			{
+				agentId: null,
+				generation: 0,
+				firstLine: 2,
+				nextLine: 2,
+				lines: [],
+				truncatedBefore: true,
+			},
+		]);
+		expect(detail.overview.revision).toBe(tail.session?.lastActivityAt ?? "");
+		expect(detail.overview.session).toMatchObject({
+			gitBranch: "feature/live",
+			modelUsed: "claude-sonnet-4-5",
+			projectPath: "/work/repo",
+			sessionDate: tail.session?.startedAt,
+			sessionId,
+			source: "claude_code",
+			userId: OWNER_ID,
+		});
+		expect(detail.overview.session.inputTokens).toBeGreaterThan(0);
+		expect(detail.overview.turnPage.total).toBe(1);
+		expect(detail.overview.turnPage.items[0]).toMatchObject({
+			responsePreview: "answer 1",
+			userPreview: "prompt 0",
+		});
+		expect(detail.window.revision).toBe(detail.overview.revision);
+		expect(detail.window.turns[0]?.body).not.toBeNull();
+		expect(
+			(
+				await member.analytics.sessions.detailSpine({
+					revision: detail.overview.revision,
+					sessionId,
+				})
+			).turns,
+		).toHaveLength(1);
+
+		// New lines move the session on: the detail reads again at a new
+		// revision, and the one it showed is stale.
+		await owner.liveSession.append(
+			appendInput(sessionId, [
+				{
+					agentId: null,
+					lines: [
+						conversationLine(sessionId, 2, "user"),
+						conversationLine(sessionId, 3, "assistant"),
+					],
+					previousLineSha256: sha256(opening[1] ?? ""),
+					startLine: 2,
+				},
+			]),
+		);
+		const next = await member.analytics.sessions.detailInitial({ sessionId });
+		expect(next.overview.revision).not.toBe(detail.overview.revision);
+		expect(next.overview.turnPage.total).toBe(2);
+		expect(next.window.turns.map((turn) => turn.body !== null)).toEqual([
+			true,
+			true,
+		]);
+		await expect(
+			member.analytics.sessions.detailSpine({
+				revision: detail.overview.revision,
+				sessionId,
+			}),
+		).rejects.toMatchObject({ code: "STALE_REVISION" });
+
+		// The session ends: its live lines still read until the upload lands.
+		await owner.liveSession.append(appendInput(sessionId, [], { ended: true }));
+		const ended = await member.analytics.sessions.detailInitial({ sessionId });
+		expect(ended.overview.turnPage.total).toBe(2);
+		expect(ended.overview.revision).not.toBe(next.overview.revision);
+
+		await sqlClient`UPDATE organization SET own_sessions_only = true WHERE id = ${ORGANIZATION_ID}`;
+		try {
+			await expect(
+				member.analytics.sessions.detailInitial({ sessionId }),
+			).rejects.toMatchObject({ code: "FORBIDDEN" });
+			expect(
+				(
+					await webClient(OWNER_ID).analytics.sessions.detailInitial({
+						sessionId,
+					})
+				).overview.session.userId,
+			).toBe(OWNER_ID);
+		} finally {
+			await sqlClient`UPDATE organization SET own_sessions_only = false WHERE id = ${ORGANIZATION_ID}`;
+		}
+		await expect(
+			member.analytics.sessions.detailInitial({ sessionId: newSessionId() }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+	});
+
+	test("subagent lines read as the session's subagents", async () => {
+		const owner = cliClient(OWNER_ID);
+		const sessionId = newSessionId();
+		await owner.liveSession.append(
+			appendInput(sessionId, [
+				{
+					agentId: null,
+					lines: [
+						conversationLine(sessionId, 0, "user"),
+						conversationLine(sessionId, 1, "assistant"),
+					],
+					previousLineSha256: null,
+					startLine: 0,
+				},
+				{
+					agentId: "helper",
+					lines: [
+						conversationLine(sessionId, 10, "user"),
+						conversationLine(sessionId, 11, "assistant"),
+					],
+					previousLineSha256: null,
+					startLine: 0,
+				},
+			]),
+		);
+		const detail = await webClient(MEMBER_ID).analytics.sessions.detailInitial({
+			sessionId,
+		});
+		expect(detail.overview.subagents.map((agent) => agent.subagentId)).toEqual([
+			"helper",
+		]);
+		expect(
+			(
+				await webClient(MEMBER_ID).analytics.sessions.detailSubagent({
+					revision: detail.overview.revision,
+					sessionId,
+					subagentId: "helper",
+				})
+			).content,
+		).toContain("prompt 10");
+	});
+});
+
 function createTestClient(userId: string, organizationId: string | null) {
 	return createRouterClient(router, {
 		context: {
@@ -1548,6 +1743,44 @@ function codexLine(index: number, role: "assistant" | "user"): string {
 			],
 		},
 	});
+}
+
+/** A user prompt or an assistant answer of a Claude Code transcript. */
+function conversationLine(
+	sessionId: string,
+	index: number,
+	role: "assistant" | "user",
+): string {
+	const timestamp = new Date(
+		Date.UTC(2026, 9, 13, 10, Math.floor(index / 60), index % 60),
+	).toISOString();
+	return JSON.stringify(
+		role === "user"
+			? {
+					type: "user",
+					uuid: `line-${index}`,
+					parentUuid: index === 0 ? null : `line-${index - 1}`,
+					sessionId,
+					cwd: "/work/repo",
+					timestamp,
+					message: { role: "user", content: `prompt ${index}` },
+				}
+			: {
+					type: "assistant",
+					uuid: `line-${index}`,
+					parentUuid: `line-${index - 1}`,
+					sessionId,
+					cwd: "/work/repo",
+					timestamp,
+					message: {
+						id: `msg_${index}`,
+						role: "assistant",
+						model: "claude-sonnet-4-5",
+						content: [{ type: "text", text: `answer ${index}` }],
+						usage: { input_tokens: 12, output_tokens: 7 },
+					},
+				},
+	);
 }
 
 function transcriptLine(index: number): string {

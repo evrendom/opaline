@@ -1,8 +1,9 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: Cohesive table interaction coverage is intentionally kept in one harness.
-import type { SessionAnalytics } from "@rudel/api-routes";
+import type { LiveSessionSummary, SessionAnalytics } from "@rudel/api-routes";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { assert, describe, expect, it, vi } from "vitest";
+import { liveSessionRow } from "../live-session-rows";
 import { SessionsOverviewTable } from "./sessions-overview-table";
 
 vi.stubGlobal("PointerEvent", MouseEvent);
@@ -85,6 +86,74 @@ const otherSession: SessionAnalytics = {
 };
 
 describe("SessionsOverviewTable", () => {
+	it("lists a session running right now first, loading in its model silhouette, with how long ago it moved", () => {
+		const live: LiveSessionSummary = {
+			sessionId: "live-1",
+			userId: "user-2",
+			source: "claude_code",
+			projectPath: "/Users/evren/live",
+			gitRemote: "git@github.com:obsessiondb/live.git",
+			gitBranch: "live/branch",
+			startedAt: new Date(Date.now() - 600_000).toISOString(),
+			lastActivityAt: new Date(Date.now() - 12_000).toISOString(),
+			endedAt: null,
+		};
+		const onSessionClick = vi.fn();
+		render(
+			<SessionsOverviewTable
+				activeSessionId={null}
+				canOpenSession={() => true}
+				getSessionHref={undefined}
+				getSessionLinkState={undefined}
+				isLoading={false}
+				onSessionClick={onSessionClick}
+				scrollContainerRef={undefined}
+				sessionCountLabel={2}
+				sessions={[session, liveSessionRow(live)]}
+				sessionDetailDisabledNote={undefined}
+				totalSessionCount={2}
+			/>,
+		);
+
+		const sessionsList = screen.getByRole("list", { name: "Recent sessions" });
+		const rows =
+			sessionsList.querySelectorAll<HTMLElement>("[data-session-key]");
+		expect(rows).toHaveLength(2);
+		const liveRow = rows[0];
+		assert(liveRow);
+		expect(liveRow).toHaveAttribute("data-session-key", "claude_code:live-1");
+		expect(liveRow).toHaveAttribute("data-session-live", "running");
+		expect(rows[1]?.getAttribute("data-session-key")).toMatch(/:session-1$/);
+		fireEvent.click(within(liveRow).getByRole("button"));
+		expect(onSessionClick).toHaveBeenCalledWith(
+			expect.objectContaining({ live_session: live, session_id: "live-1" }),
+		);
+		expect(
+			liveRow.querySelector("[data-session-model-loading]"),
+		).not.toBeNull();
+		expect(liveRow.querySelector("[data-session-model-progress]")).toBeNull();
+		expect(within(liveRow).getByText("Live")).toBeVisible();
+		expect(within(liveRow).getByText("Claude Code")).toBeVisible();
+		expect(within(liveRow).getByText("live")).toBeVisible();
+		expect(within(liveRow).getByText("branch")).toBeInTheDocument();
+		const activity = liveRow.querySelector("time");
+		assert(activity);
+		expect(activity).toHaveTextContent(/^1[0-9]s ago$/);
+		expect(
+			activity.getAttribute("data-session-overview-date-tooltip-label"),
+		).toMatch(/^Started .+ · active 1[0-9]s ago$/);
+		const cost = liveRow.querySelector<HTMLElement>(
+			'[data-session-overview-metric-value="cost"]',
+		);
+		assert(cost);
+		expect(cost).toHaveTextContent("—");
+		expect(cost).toHaveAttribute(
+			"data-session-overview-token-tooltip-label",
+			"Usage arrives with the session's upload",
+		);
+		expect(rows[1]?.querySelector("[data-session-model-loading]")).toBeNull();
+	});
+
 	it("keeps cost first, date after the member, and cost progress in the model silhouette", () => {
 		render(
 			<SessionsOverviewTable

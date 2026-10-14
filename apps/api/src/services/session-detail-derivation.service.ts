@@ -10,6 +10,7 @@ import {
 	getTranscriptToolFileActivities,
 	groupTraceIntoTurns,
 	isCodexToolInput,
+	isLiveSessionDetailRevision,
 	parseConversations,
 	parseSlashCommand,
 	resolveRepoIdentity,
@@ -59,6 +60,9 @@ const WINDOW_CURSOR_VERSION = 1;
 
 export interface SessionDetailRawSnapshot {
 	content: string;
+	/** Totals, model, skills and slash commands come from the transcript
+	 * itself: the snapshot has no analytics row (a session read live). */
+	derivedTotals?: boolean;
 	durationMinutes: number | null;
 	gitBranch: string | null;
 	gitRemote: string;
@@ -771,17 +775,19 @@ export function deriveSessionDetail(
 	);
 	// Legacy snapshot totals include copied cumulative history. For forks, use
 	// only the request usage that survived the same replay filter as ingestion.
+	// A snapshot without an analytics row has only this usage to count.
+	const countsOwnUsage = hasReplayedUsage || snapshot.derivedTotals === true;
 	const ownMetrics = [
 		...primaryTurnMetrics,
 		...subagentMetrics.map((entry) => entry.metrics),
 	];
-	const inputTokens = hasReplayedUsage
+	const inputTokens = countsOwnUsage
 		? ownMetrics.reduce((sum, metrics) => sum + (metrics.inputTokens ?? 0), 0)
 		: snapshot.inputTokens;
-	const outputTokens = hasReplayedUsage
+	const outputTokens = countsOwnUsage
 		? ownMetrics.reduce((sum, metrics) => sum + (metrics.outputTokens ?? 0), 0)
 		: snapshot.outputTokens;
-	let modelUsed = hasReplayedUsage ? "" : snapshot.modelUsed.trim();
+	let modelUsed = countsOwnUsage ? "" : snapshot.modelUsed.trim();
 	if (["unknown", "<synthetic>"].includes(modelUsed.toLowerCase())) {
 		modelUsed = "";
 	}
@@ -816,10 +822,18 @@ export function deriveSessionDetail(
 			repository: repository || null,
 			sessionDate: snapshot.sessionDate,
 			sessionId: snapshot.sessionId,
-			skills: unique(snapshot.skills),
-			slashCommands: unique(snapshot.slashCommands),
+			skills: unique(
+				snapshot.derivedTotals
+					? primaryTurnMetrics.flatMap((metrics) => metrics.skills)
+					: snapshot.skills,
+			),
+			slashCommands: unique(
+				snapshot.derivedTotals
+					? turnSummaries.flatMap((summary) => summary.slashCommands)
+					: snapshot.slashCommands,
+			),
 			source: snapshot.source,
-			totalTokens: hasReplayedUsage
+			totalTokens: countsOwnUsage
 				? inputTokens + outputTokens
 				: snapshot.totalTokens,
 			// Measured as ingest measures an upload: the transcript plus every
@@ -1131,10 +1145,12 @@ function getWindowCandidateIndices(
 ) {
 	const total = derivation.turnSummaries.length;
 	if (request.mode === "initial") {
-		return Array.from(
-			{ length: Math.min(total, SESSION_DETAIL_WINDOW_INITIAL_TURNS) },
-			(_, index) => index,
-		);
+		const count = Math.min(total, SESSION_DETAIL_WINDOW_INITIAL_TURNS);
+		// A session read live is read at its end, where it goes on: its
+		// newest turns come with the page, the older ones on demand.
+		return isLiveSessionDetailRevision(derivation.revision)
+			? Array.from({ length: count }, (_, index) => total - 1 - index)
+			: Array.from({ length: count }, (_, index) => index);
 	}
 	if (request.mode === "anchor") {
 		if (request.revision !== derivation.revision) {

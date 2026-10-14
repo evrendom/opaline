@@ -7,6 +7,7 @@ import {
 	resolveSessionErrorCount,
 	resolveSessionSubagentCount,
 } from "@/features/sessions/components/session-overview-metrics";
+import { isLiveOnlySessionRow } from "@/features/sessions/live-session-rows";
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { calculateCost, formatUsername } from "@/lib/format";
 
@@ -126,7 +127,7 @@ export type SessionSortState = {
 export function getSessionOverviewCost(
 	session: SessionAnalytics,
 ): number | null {
-	if (session.upload_failure) return null;
+	if (session.upload_failure || isLiveOnlySessionRow(session)) return null;
 	if (session.estimated_cost !== undefined) {
 		return session.estimated_cost;
 	}
@@ -456,7 +457,7 @@ function getSessionOverviewRangeValue(
 	session: SessionAnalytics,
 	filterKey: SessionOverviewRangeFilterKey,
 ) {
-	if (session.upload_failure) return null;
+	if (session.upload_failure || isLiveOnlySessionRow(session)) return null;
 	switch (filterKey) {
 		case "input":
 			return session.input_tokens;

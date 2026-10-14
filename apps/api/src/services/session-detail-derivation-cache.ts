@@ -145,6 +145,17 @@ export function createSessionDetailDerivationCache<Value>(options: {
 		}
 	}
 
+	function remove(key: SessionDetailDerivationCacheKey) {
+		const serializedKey = serializeKey(key);
+		const entry = entries.get(serializedKey);
+		if (!entry) {
+			return;
+		}
+		entries.delete(serializedKey);
+		stats.bytes -= entry.bytes;
+		stats.entryCount = entries.size;
+	}
+
 	return {
 		clear() {
 			entries.clear();
@@ -152,6 +163,7 @@ export function createSessionDetailDerivationCache<Value>(options: {
 			stats.bytes = 0;
 			stats.entryCount = 0;
 		},
+		delete: remove,
 		get,
 		getOrLoad,
 		getStats(): SessionDetailDerivationCacheStats {

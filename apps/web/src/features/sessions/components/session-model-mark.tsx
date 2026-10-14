@@ -43,6 +43,7 @@ export function SessionModelLoadingMark() {
 
 export function SessionModelMark({
 	avatarUrl,
+	loading = false,
 	model,
 	memberProfile,
 	progress,
@@ -51,6 +52,9 @@ export function SessionModelMark({
 	disclosure,
 }: {
 	avatarUrl: string | undefined;
+	/** The session is running right now: the band loads around the model,
+	 * as it does while more sessions load, in place of its cost. */
+	loading?: boolean;
 	model: string;
 	memberProfile?: SessionMemberProfileSummary;
 	progress?: { label: string; value: number; maximumValue: number };
@@ -73,8 +77,9 @@ export function SessionModelMark({
 				),
 			)
 		: null;
-	const iconAccessibility =
-		progress && magnitude !== null
+	const iconAccessibility = loading
+		? { "aria-hidden": true as const }
+		: progress && magnitude !== null
 			? {
 					role: "progressbar" as const,
 					"aria-label": progress.label,
@@ -132,9 +137,12 @@ export function SessionModelMark({
 					progress && tone.identityIconClassName,
 				)}
 				data-session-model-background
-				data-session-model-progress={progress ? "" : undefined}
+				data-session-model-loading={loading ? "" : undefined}
+				data-session-model-progress={progress && !loading ? "" : undefined}
 			>
-				{magnitude !== null && magnitude > 0 ? (
+				{loading ? (
+					<SessionModelProgressRing progress="loading" />
+				) : magnitude !== null && magnitude > 0 ? (
 					<SessionModelProgressRing progress={magnitude} />
 				) : null}
 			</span>

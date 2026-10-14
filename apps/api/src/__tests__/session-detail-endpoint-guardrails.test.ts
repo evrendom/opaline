@@ -82,10 +82,23 @@ describe("session detail endpoint guardrails", () => {
 		test(`${name} performs organization membership and session ownership checks`, () => {
 			const source = handlerSource(name);
 			expect(source).toContain(".use(orgMiddleware)");
-			expect(source).toContain("await getSessionOwner(");
+			expect(source).toContain("await getSessionDetailOwner(");
 			expect(source).toContain("requireSessionDetailOwnerAccess(");
 		});
 	}
+
+	test("the detail owner is the upload's, or before an upload the live session's", () => {
+		const start = handlersSource.indexOf(
+			"async function getSessionDetailOwner(",
+		);
+		const source = handlersSource.slice(
+			start,
+			handlersSource.indexOf("\nconst ", start),
+		);
+		expect(source).toContain("await getSessionOwner(");
+		expect(source).toContain("await readLiveSession(");
+		expect(source).toContain("readableSessionOwner(reader)");
+	});
 
 	test("each body endpoint forwards the caller-bound revision", () => {
 		for (const name of [
