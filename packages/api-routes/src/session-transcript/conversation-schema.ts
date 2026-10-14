@@ -102,7 +102,16 @@ export const UserEntrySchema = BaseEntrySchema.extend({
 	isMeta: z.boolean().optional(),
 	type: z.literal("user"),
 	message: UserMessageSchema,
-	toolUseResult: ToolUseResultMetadataSchema.optional(),
+	// Claude Code writes an object for most tools, a content-block array for
+	// MCP tools and a string for some errors; only the object carries
+	// `agentId`, and rejecting the other shapes would drop the whole entry.
+	toolUseResult: z.preprocess(
+		(value) =>
+			value !== null && typeof value === "object" && !Array.isArray(value)
+				? value
+				: undefined,
+		ToolUseResultMetadataSchema.optional(),
+	),
 });
 
 export const AssistantEntrySchema = BaseEntrySchema.extend({
