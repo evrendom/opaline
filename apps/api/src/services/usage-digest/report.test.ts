@@ -119,7 +119,7 @@ describe("usage digest report", () => {
 		expect(you?.current.sessions).toBe(2);
 		expect(you?.previous?.sessions).toBe(1);
 		expect(you?.current.apiErrors).toBeNull();
-		expect(you?.days).toEqual([0, 30, 30, 30, 0, 0, 0]);
+		expect(you?.days).toEqual([0, 2, 2, 2, 0, 0, 0]);
 		expect(you?.repositories.map((item) => item.label)).toEqual([
 			"acme/web",
 			"api",

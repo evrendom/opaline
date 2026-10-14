@@ -82,7 +82,8 @@ describe("usage digest email", () => {
 		expect(email.html).not.toContain("Acme <Labs>");
 		expect(email.html).not.toContain("API errors");
 		expect(email.text).toContain("Sessions: 12 (↑ 50%)");
-		expect(email.text).toContain("Busiest: Monday, 10m");
+		expect(email.text).toContain("Costliest day: Monday, $10.00");
+		expect(email.html).toContain("$10.00");
 		expect(email.text).not.toContain("Active members");
 	});
 
@@ -103,5 +104,34 @@ describe("usage digest email", () => {
 		expect(email.html).toContain("Invite your team");
 		expect(email.html).toContain(inviteUrl);
 		expect(email.text).toContain(inviteUrl);
+	});
+
+	test("sets every percentage width in the style too, which the Gmail apps read", () => {
+		const { html } = buildUsageDigestEmail({
+			...data,
+			you: {
+				...section,
+				agents: [
+					{ label: "Claude Code", value: 3, share: 0.75 },
+					{ label: "Codex", value: 1, share: 0.25 },
+				],
+				models: [
+					{
+						label: "Claude Opus 5.5",
+						value: 4,
+						share: 1,
+						provider: "anthropic",
+					},
+				],
+			},
+		});
+		const tags = html.match(/<t[a-z]+ [^>]*width="\d+%"[^>]*>/g) ?? [];
+		expect(tags.length).toBeGreaterThan(10);
+		for (const tag of tags) {
+			const width = /width="(\d+%)"/.exec(tag)?.[1];
+			expect(tag).toContain(`width:${width};`);
+		}
+		// A selector with no block makes Gmail drop the whole <style>.
+		expect(html).not.toMatch(/\[data-ogsc\]\s*<\/style>/);
 	});
 });

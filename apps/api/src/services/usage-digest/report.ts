@@ -268,7 +268,7 @@ function section(
 						const day = addDays(period.start, index);
 						return current
 							.filter((row) => row.day === day)
-							.reduce((sum, row) => sum + row.active_minutes, 0);
+							.reduce((sum, row) => sum + row.cost_usd, 0);
 					})
 				: null,
 		repositories: top(

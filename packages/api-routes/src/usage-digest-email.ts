@@ -50,7 +50,7 @@ export interface DigestShare {
 export interface DigestSection {
 	current: DigestNumbers;
 	previous: DigestNumbers | null;
-	/** Weekly only: active minutes per day, Monday first. */
+	/** Weekly only: cost in USD per day, Monday first. */
 	days: number[] | null;
 	repositories: DigestShare[];
 	agents: DigestShare[];
@@ -245,9 +245,14 @@ interface Assets {
 
 type Tone = "higher-is-better" | "lower-is-better" | "neutral";
 
-/** A full-width layout table's attributes, with its style (one style attribute only: a second is dropped). */
+/**
+ * A full-width layout table's attributes, with its style (one style attribute
+ * only: a second is dropped). The width is in the style too: the Gmail apps
+ * ignore a percentage `width` attribute on nested tables and shrink each to
+ * its content, which collapses bars and squeezes the metric grid.
+ */
 const tableWith = (style: string) =>
-	`role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="${style}"`;
+	`role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;${style}"`;
 const TABLE = tableWith("border-collapse:collapse;");
 
 /** The dark-mode class of a text colour (see DARK_MODE_CSS). */
@@ -356,7 +361,7 @@ function metrics(assets: Assets, list: Stat[]): string {
 	for (let index = 0; index < list.length; index += 2) {
 		const [left, right] = list.slice(index, index + 2);
 		const cell = (stat: Stat | undefined, last: boolean) =>
-			`<td class="metric-cell" width="50%" valign="top" style="padding:0 ${last ? 0 : gap}px ${gap}px 0;">${stat ? metric(assets, stat) : ""}</td>`;
+			`<td class="metric-cell" width="50%" valign="top" style="width:50%;padding:0 ${last ? 0 : gap}px ${gap}px 0;">${stat ? metric(assets, stat) : ""}</td>`;
 		rows.push(`<tr>${cell(left, false)}${cell(right, true)}</tr>`);
 	}
 	return `<table ${tableWith("border-collapse:collapse;table-layout:fixed;")}>${rows.join("")}</table>`;
@@ -380,7 +385,7 @@ function bar(
 ): string {
 	const filled = Math.max(0, Math.min(100, Math.round(share * 100)));
 	const cell = (width: number, background: string, extra = "") =>
-		`<td width="${width}%"${extra ? ` class="${extra}"` : ""} bgcolor="${background}" style="background:${background};height:${height}px;font-size:0;line-height:0;">&nbsp;</td>`;
+		`<td width="${width}%"${extra ? ` class="${extra}"` : ""} bgcolor="${background}" style="width:${width}%;background:${background};height:${height}px;font-size:0;line-height:0;">&nbsp;</td>`;
 	return `<table ${tableWith(`border-collapse:separate;border-radius:${height}px;overflow:hidden;`)}><tr>${
 		filled === 0
 			? cell(100, C.track, "dm-track")
@@ -391,12 +396,12 @@ function bar(
 	}</tr></table>`;
 }
 
-/** Seven rows, Monday to Sunday: the day, a bar of its time against the busiest, the time; the busiest in bold. */
+/** Seven rows, Monday to Sunday: the day, a bar of its cost against the costliest, the cost; the costliest in bold. */
 function dayChart(days: number[], tone = OPAL.blue): string {
-	const max = Math.max(...days, 1);
-	const busiest = days.indexOf(Math.max(...days));
-	const rows = days.map((minutes, index) => {
-		const strong = minutes > 0 && index === busiest;
+	const max = Math.max(...days) || 1;
+	const costliest = days.indexOf(Math.max(...days));
+	const rows = days.map((cost, index) => {
+		const strong = cost > 0 && index === costliest;
 		const label = (value: string) =>
 			text(value, {
 				size: 13,
@@ -406,8 +411,8 @@ function dayChart(days: number[], tone = OPAL.blue): string {
 			});
 		return `<tr class="day-row">
 <td width="44" valign="middle" style="width:44px;padding:4px 0;">${label(WEEKDAYS[index] ?? "")}</td>
-<td valign="middle" style="padding:4px 12px 4px 0;">${bar(minutes / max, tone.color, 8, "day-bar")}</td>
-<td width="64" align="right" valign="middle" style="width:64px;padding:4px 0;white-space:nowrap;">${label(minutes > 0 ? escapeHtml(formatMinutes(minutes)) : "&ndash;")}</td>
+<td valign="middle" style="padding:4px 12px 4px 0;">${bar(cost / max, tone.color, 8, "day-bar")}</td>
+<td width="72" align="right" valign="middle" style="width:72px;padding:4px 0;white-space:nowrap;">${label(cost > 0 ? escapeHtml(formatCost(cost)) : "&ndash;")}</td>
 </tr>`;
 	});
 	return `<table ${TABLE}>${rows.join("")}</table>`;
@@ -466,10 +471,10 @@ function splitBar(assets: Assets, list: DigestShare[]): string {
 			},
 		}));
 	const cells = parts
-		.map(
-			(item) =>
-				`<td width="${Math.max(1, Math.round(item.share * 100))}%"${item.look.className ? ` class="${item.look.className}"` : ""} bgcolor="${item.look.color}" style="background:${item.look.color};height:8px;font-size:0;line-height:0;">&nbsp;</td>`,
-		)
+		.map((item) => {
+			const width = Math.max(1, Math.round(item.share * 100));
+			return `<td width="${width}%"${item.look.className ? ` class="${item.look.className}"` : ""} bgcolor="${item.look.color}" style="width:${width}%;background:${item.look.color};height:8px;font-size:0;line-height:0;">&nbsp;</td>`;
+		})
 		.join("");
 	const legend = parts
 		.map(
@@ -487,7 +492,7 @@ function splitBar(assets: Assets, list: DigestShare[]): string {
 				)}</td>`,
 		)
 		.join("");
-	return `<table class="agent-split" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:separate;border-radius:8px;overflow:hidden;"><tr>${cells}</tr></table>
+	return `<table class="agent-split" ${tableWith("border-collapse:separate;border-radius:8px;overflow:hidden;")}><tr>${cells}</tr></table>
 <table class="agent-legend" role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:10px;"><tr>${legend}</tr></table>`;
 }
 
@@ -726,10 +731,10 @@ function subagentsBlock(assets: Assets, section: DigestSection): string {
 	].join("");
 }
 
-function busiestDay(days: number[]): string {
+function costliestDay(days: number[]): string {
 	const max = Math.max(...days);
 	return max > 0
-		? `Busiest: ${WEEKDAY_NAMES[days.indexOf(max)]}, ${formatMinutes(max)}`
+		? `Costliest day: ${WEEKDAY_NAMES[days.indexOf(max)]}, ${formatCost(max)}`
 		: "";
 }
 
@@ -898,6 +903,8 @@ const DARK_RULES = `.dm-canvas{background:#0a0a0a!important}
 export const DARK_MODE_CSS = `:root{color-scheme:light dark;supported-color-schemes:light dark}
 @media (prefers-color-scheme:dark){${DARK_RULES.replaceAll("\n", "")}}
 ${DARK_RULES.split("\n")
+	// The trailing newline leaves an empty rule; a selector with no block is a syntax error, and Gmail drops a whole <style> on one.
+	.filter(Boolean)
 	.map((rule) => `[data-ogsc] ${rule}`)
 	.join("\n")}`;
 
@@ -922,7 +929,7 @@ function page(
 <style>${DARK_MODE_CSS}</style></head>
 <body class="dm-canvas" style="margin:0;padding:0;background:${canvas};-webkit-text-size-adjust:100%;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(input.previewText)}&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dm-canvas" style="background:${canvas};"><tr><td align="center" style="padding:32px 16px;">
+<table ${tableWith(`background:${canvas};`)} class="dm-canvas"><tr><td align="center" style="padding:32px 16px;">
 <!--[if mso]><table role="presentation" width="${CARD_WIDTH}" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 ${card}
 <!--[if mso]></td></tr></table><![endif]-->
@@ -940,7 +947,7 @@ function layout(input: LayoutInput): string {
 	return page(
 		input,
 		C.canvas,
-		`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:${CARD_WIDTH}px;border-collapse:separate;">
+		`<table ${tableWith(`max-width:${CARD_WIDTH}px;border-collapse:separate;`)}>
 <tr><td class="dm-card" bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.border};border-radius:8px;padding:32px 28px 36px;">
 <a href="${escapeHtml(input.assets.origin)}" style="display:block;width:80px;line-height:0;font-size:0;text-decoration:none;"><img class="email-logo" src="${iconUrl(input.assets, "logo-grey")}" width="80" height="20" alt="Opaline" style="display:block;width:80px;height:20px;border:0;"></a>
 <h1 class="dm-text email-title" style="margin:48px 0 0;font-family:${FONT};font-size:24px;line-height:32px;font-weight:600;letter-spacing:-0.4px;color:${C.text};">${escapeHtml(input.title)}</h1>
@@ -1037,7 +1044,7 @@ function textSection(section: DigestSection): string {
 	const rate = failureRate(section.current);
 	return [
 		textNumbers(section.current, section.previous),
-		section.days ? `  ${busiestDay(section.days)}` : "",
+		section.days ? `  ${costliestDay(section.days)}` : "",
 		section.models.length
 			? `  Models: ${section.models.map((item) => `${item.label} ${percent(item.share)}`).join(", ")}`
 			: "",

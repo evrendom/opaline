@@ -42,7 +42,7 @@ const weeklyYou: DigestSection = {
 		apiErrors: 11,
 		longestRunMinutes: 52,
 	}),
-	days: [412, 538, 611, 380, 402, 106, 0],
+	days: [142.18, 196.4, 231.75, 118.06, 121.4, 21.57, 0],
 	repositories: [
 		{ label: "acme/web", value: 1210, share: 0.49 },
 		{ label: "acme/api", value: 820, share: 0.33 },
@@ -140,7 +140,7 @@ const weeklyTeam: DigestTeamSection = {
 	}),
 	activeMembers: 6,
 	previousActiveMembers: 5,
-	days: [1490, 1760, 1980, 1540, 1302, 460, 315],
+	days: [478.2, 597.45, 656.03, 456.17, 374.47, 94.67, 58.62],
 	repositories: [
 		{ label: "acme/web", value: 3810, share: 0.43 },
 		{ label: "acme/api", value: 2950, share: 0.33 },
