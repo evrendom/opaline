@@ -15,6 +15,7 @@ import {
 } from "./provider.js";
 import type { RunQuestionsEnv } from "./run-questions.service.js";
 import type { SessionAnswersEnv } from "./session-answers.js";
+import { runQuestionTagsEnabled } from "./tags-rollout.js";
 
 /** Run questions as the API runs them, configured from the environment. */
 export function runQuestionsEnv(): RunQuestionsEnv {
@@ -42,11 +43,17 @@ export function precomputeEnv(): PrecomputeEnv {
 	};
 }
 
-/** What the dashboard's answer reads need: the workspace gate and the catalogue's labels. */
+/**
+ * What the dashboard's answer reads need: the workspace gate and the
+ * catalogue's labels. A workspace sees tags only when its runs are answered
+ * and it is on the tags rollout (`runQuestionTagsEnabled`).
+ */
 export function sessionAnswersEnv(): SessionAnswersEnv {
+	const answered = readRunQuestionWorkspaces();
 	return {
 		executor: getClickhouse(),
-		mayAnswer: readRunQuestionWorkspaces(),
+		mayAnswer: (workspaceId) =>
+			answered(workspaceId) && runQuestionTagsEnabled(workspaceId),
 		labelsOf: async (ids) =>
 			new Map(
 				(await findRunQuestions(sqlClient, ids)).map((question) => [

@@ -19,8 +19,8 @@ import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
  * Run question answers as the dashboard shows them (CONTEXT.md "Run
  * question"): the questions answered yes about a session's runs, as tags on
  * the sessions list, and every answer per run for the reader. Only a
- * workspace whose runs are answered (`mayAnswer`, the same gate that
- * precomputes answers) gets anything; elsewhere nothing is read. Like the
+ * workspace whose runs are answered and that is on the tags rollout
+ * (`mayAnswer`; env.ts) gets anything; elsewhere nothing is read. Like the
  * `run_answers` sql view, an answer shows only for the transcript revision
  * each session is committed at, and the newest answer per question and run
  * wins where two providers answered.
@@ -28,7 +28,7 @@ import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 
 export interface SessionAnswersEnv {
 	readonly executor: ClickHouseExecutor;
-	/** Whether the workspace's runs are answered (`readRunQuestionWorkspaces`). */
+	/** Whether the workspace's runs are answered and the dashboard may show them (env.ts). */
 	mayAnswer(workspaceId: string): boolean;
 	/** The short names of these questions from the catalogue, by id; a question without one maps to null. */
 	labelsOf(
