@@ -7,12 +7,14 @@ import {
 } from "../analysis/agent-query-slots.js";
 import { visibleGitHubRepositories } from "../analysis/github-access.js";
 import { createPostgresSqlQuota } from "../analysis/sql-results.js";
+import { findRunQuestions } from "./catalogue.js";
 import type { PrecomputeEnv } from "./precompute.js";
 import {
 	readRunQuestionProviders,
 	readRunQuestionWorkspaces,
 } from "./provider.js";
 import type { RunQuestionsEnv } from "./run-questions.service.js";
+import type { SessionAnswersEnv } from "./session-answers.js";
 
 /** Run questions as the API runs them, configured from the environment. */
 export function runQuestionsEnv(): RunQuestionsEnv {
@@ -37,6 +39,21 @@ export function precomputeEnv(): PrecomputeEnv {
 		sql: sqlClient,
 		provider: readRunQuestionProviders().default,
 		mayAnswer: readRunQuestionWorkspaces(),
+	};
+}
+
+/** What the dashboard's answer reads need: the workspace gate and the catalogue's labels. */
+export function sessionAnswersEnv(): SessionAnswersEnv {
+	return {
+		executor: getClickhouse(),
+		mayAnswer: readRunQuestionWorkspaces(),
+		labelsOf: async (ids) =>
+			new Map(
+				(await findRunQuestions(sqlClient, ids)).map((question) => [
+					question.id,
+					question.label,
+				]),
+			),
 	};
 }
 

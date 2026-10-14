@@ -10,6 +10,11 @@ import {
 	readLiveSessionTail,
 } from "../../services/live-session/live-session-read.service.js";
 import { readR2IngestAvailability } from "../../services/r2-ingest-storage.service.js";
+import { sessionAnswersEnv } from "../../services/run-questions/env.js";
+import {
+	sessionRunAnswers,
+	sessionRunQuestionTags,
+} from "../../services/run-questions/session-answers.js";
 import {
 	getSessionAnalytics,
 	getSessionAnalyticsSummaryComparison,
@@ -140,6 +145,42 @@ const liveTail = os.analytics.sessions.liveTail
 			}
 			throw error;
 		}
+	});
+
+/**
+ * Run question answers for the dashboard (`session-answers.ts`): nothing in a
+ * workspace whose runs are not answered, else the tags of the listed sessions
+ * the caller may read, and every answer per run of one session the caller
+ * may open.
+ */
+const runQuestionTags = os.analytics.sessions.runQuestionTags
+	.use(orgMiddleware)
+	.handler(({ input, context }) =>
+		sessionRunQuestionTags(
+			sessionAnswersEnv(),
+			{
+				workspaceId: context.organizationId,
+				member: readableSessionOwner(context.sessionReader),
+			},
+			input.sessionIds,
+		),
+	);
+
+const runAnswers = os.analytics.sessions.runAnswers
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const env = sessionAnswersEnv();
+		if (!env.mayAnswer(context.organizationId))
+			return { enabled: false, runs: [] };
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return sessionRunAnswers(
+			env,
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+		);
 	});
 
 const list = os.analytics.sessions.list
@@ -429,6 +470,8 @@ export const sessionsRouter = os.analytics.sessions.router({
 	list,
 	liveList,
 	liveTail,
+	runAnswers,
+	runQuestionTags,
 	filterCatalog,
 	summaryComparison,
 	dimensionAnalysis,

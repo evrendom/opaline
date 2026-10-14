@@ -12,6 +12,11 @@ vi.mock("@/features/dashboard/components/DashboardDateControls", () => ({
 	DashboardDateControls: () => <button type="button">Date range</button>,
 }));
 
+// The tags read through react-query, which this harness does not provide.
+vi.mock("@/features/sessions/use-run-question-tags", () => ({
+	useSessionRunQuestionTags: () => new Map(),
+}));
+
 vi.mock("@/features/workspace/hooks/useUserMap", () => ({
 	useUserMap: () => ({
 		avatarMap: {},

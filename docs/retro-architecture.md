@@ -27,6 +27,7 @@ The agent answers "where did we lose the most, and on what" with one SQL query o
 - Changing a question's wording makes a new question; old answers keep the wording they answered.
 - Facts L1 already records exactly (CI not checked, denied calls, shell edits) never become run questions.
 - An answer only says where to read. A finding needs the runs read.
+- The dashboard shows the answers in a workspace whose runs are answered (`RUN_QUESTIONS_CUSTOMER_WORKSPACES`, else Opaline's own workspaces): a question answered yes (probability 0.5 or more) is a tag on the run in the session reader, matched to the reader's turn by the prompt's time, and on the session in the sessions list with the number of runs answered yes. Each question carries a short tag name set in the internal form; without one the tag shows the wording cut short. Other workspaces are told `enabled: false` and nothing is read.
 
 ### 3. SQL for the agent
 

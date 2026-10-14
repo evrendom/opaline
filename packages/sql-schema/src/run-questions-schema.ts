@@ -25,6 +25,8 @@ export const runQuestion = pgTable(
 	{
 		id: text("id").primaryKey(),
 		question: text("question").notNull(),
+		/** The short name the dashboard shows as a tag; null shows the wording cut short. Not part of the wording, so it changes in place. */
+		label: text("label"),
 		state: text("state").default("draft").notNull(),
 		replaces: text("replaces"),
 		/** What a yes and a no look like, where the boundary is subtle; both or neither. */

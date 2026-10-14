@@ -93,6 +93,7 @@ import { analysisHistoryContract } from "./analysis-history.js";
 import {
 	runQuestionsAdminContract,
 	runQuestionsAnalysisContract,
+	sessionRunQuestionsContract,
 } from "./run-questions.js";
 
 export {
@@ -179,13 +180,16 @@ export {
 } from "./analysis-search.js";
 export {
 	RUN_QUESTION_CRITERIA_MAX_CHARS,
+	RUN_QUESTION_LABEL_MAX_CHARS,
 	RUN_QUESTION_MAX_CHARS,
 	RUN_QUESTION_MAX_RUNS,
 	RUN_QUESTION_TEST_RUNS,
+	RUN_QUESTION_YES_PROBABILITY,
 	RUN_QUESTIONS_PER_CALL,
 	type RunQuestion,
 	type RunQuestionCriteria,
 	RunQuestionCriteriaSchema,
+	RunQuestionLabelSchema,
 	RunQuestionSchema,
 	type RunQuestionsEstimate,
 	type RunQuestionsInput,
@@ -195,6 +199,13 @@ export {
 	RunQuestionsRunInputSchema,
 	type RunQuestionTest,
 	type RunQuestionVerdictInput,
+	SESSION_RUN_QUESTION_TAGS_MAX_SESSIONS,
+	type SessionRunAnswers,
+	type SessionRunAnswersRun,
+	SessionRunAnswersSchema,
+	type SessionRunQuestionTag,
+	type SessionRunQuestionTags,
+	SessionRunQuestionTagsSchema,
 } from "./run-questions.js";
 
 import { oc } from "@orpc/contract";
@@ -1176,6 +1187,8 @@ export const contract = {
 				.output(z.array(SessionOverviewAnalyticsSchema)),
 			/** Live sessions of the active workspace the caller may read (last 24 hours). */
 			liveList: oc.output(LiveSessionListOutputSchema),
+			/** Run question answers the dashboard shows; see `sessionRunQuestionsContract`. */
+			...sessionRunQuestionsContract,
 			/** New lines of a live session's transcripts since the cursor, or their tail. */
 			liveTail: oc
 				.input(LiveSessionTailInputSchema)

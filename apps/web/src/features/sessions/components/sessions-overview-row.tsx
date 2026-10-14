@@ -1,4 +1,7 @@
-import type { SessionAnalytics } from "@rudel/api-routes";
+import type {
+	SessionAnalytics,
+	SessionRunQuestionTag,
+} from "@rudel/api-routes";
 import { IconAlertCircle } from "@tabler/icons-react";
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -16,6 +19,7 @@ import {
 	getNewseshLanguageSignalMatches,
 	type NewseshLanguageSignalMatch,
 } from "@/features/sessions/components/newsesh-session-language-signal";
+import { SessionOverviewQuestionTags } from "@/features/sessions/components/run-question-tag";
 import { SessionMemberProfilePreview } from "@/features/sessions/components/session-member-profile-preview";
 import type { SessionMemberProfileSummary } from "@/features/sessions/components/session-member-profile-summary";
 import { SessionModelMark } from "@/features/sessions/components/session-model-mark";
@@ -77,6 +81,8 @@ type SessionsOverviewRowProps = {
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
 	session: SessionAnalytics;
 	userLabel: string;
+	/** Run questions answered yes about the session's runs; shown with the skills. */
+	questionTags?: readonly SessionRunQuestionTag[];
 	/** Set on a row that folds a panel beneath it: clicking toggles it and
 	 * the model mark shows the disclosure, instead of opening the session. */
 	expanded?: boolean;
@@ -191,6 +197,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	onSessionClick,
 	session,
 	userLabel,
+	questionTags,
 	expanded,
 	gridClassName,
 }: SessionsOverviewRowProps) {
@@ -273,9 +280,15 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	};
 	const skillsCell = (
 		<div
-			className={cn(cellClassName, "col-start-3 row-start-1 justify-start")}
+			className={cn(
+				cellClassName,
+				"col-start-3 row-start-1 justify-start gap-1",
+			)}
 			data-session-overview-column="skills"
 		>
+			{questionTags && questionTags.length > 0 ? (
+				<SessionOverviewQuestionTags tags={questionTags} />
+			) : null}
 			{renderedSkills.length === 0 ? null : (
 				<div
 					className="flex min-w-0 max-w-full items-center gap-1"

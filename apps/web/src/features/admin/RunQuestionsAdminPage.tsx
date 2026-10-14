@@ -1,7 +1,8 @@
-import type {
-	RunQuestion,
-	RunQuestionCriteria,
-	RunQuestionTest,
+import {
+	RUN_QUESTION_LABEL_MAX_CHARS,
+	type RunQuestion,
+	type RunQuestionCriteria,
+	type RunQuestionTest,
 } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
@@ -70,11 +71,12 @@ export function RunQuestionsAdminPage() {
 				</ul>
 			</header>
 			<AddQuestionForm
-				onAdd={(question, criteria) =>
+				onAdd={(question, criteria, label) =>
 					act(() =>
 						client.admin.runQuestions.add({
 							question,
 							...(criteria ? { criteria } : {}),
+							...(label ? { label } : {}),
 						}),
 					)
 				}
@@ -94,12 +96,13 @@ export function RunQuestionsAdminPage() {
 					<QuestionRow
 						key={question.id}
 						question={question}
-						onEdit={(wording) =>
+						onEdit={(wording, label) =>
 							act(() =>
 								client.admin.runQuestions.edit({
 									id: question.id,
 									question: wording,
 									...(question.criteria ? { criteria: question.criteria } : {}),
+									...(label ? { label } : {}),
 								}),
 							)
 						}
@@ -145,9 +148,11 @@ function AddQuestionForm({
 	onAdd: (
 		question: string,
 		criteria: RunQuestionCriteria | null,
+		label: string | null,
 	) => Promise<boolean>;
 }) {
 	const [wording, setWording] = useState("");
+	const [label, setLabel] = useState("");
 	const [yes, setYes] = useState("");
 	const [no, setNo] = useState("");
 	// Criteria go with the question only when both sides are described.
@@ -155,8 +160,9 @@ function AddQuestionForm({
 		yes.trim() && no.trim() ? { true: yes.trim(), false: no.trim() } : null;
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		if (await onAdd(wording, criteria)) {
+		if (await onAdd(wording, criteria, label.trim() || null)) {
 			setWording("");
+			setLabel("");
 			setYes("");
 			setNo("");
 		}
@@ -178,12 +184,26 @@ function AddQuestionForm({
 					type="submit"
 					disabled={
 						wording.trim().length < 10 ||
-						Boolean(yes.trim()) !== Boolean(no.trim())
+						Boolean(yes.trim()) !== Boolean(no.trim()) ||
+						(label.trim().length > 0 &&
+							(label.trim().length < 2 ||
+								label.trim().length > RUN_QUESTION_LABEL_MAX_CHARS))
 					}
 				>
 					Add
 				</Button>
 			</div>
+			<label className="flex flex-col gap-1 text-muted-foreground">
+				Tag label (optional): the short name the dashboard shows, at most{" "}
+				{RUN_QUESTION_LABEL_MAX_CHARS} characters
+				<input
+					value={label}
+					onChange={(event) => setLabel(event.target.value)}
+					placeholder="Hunted for files"
+					maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
+					className="h-8 rounded-md border bg-background px-3 text-foreground"
+				/>
+			</label>
 			<details>
 				<summary className="cursor-pointer text-muted-foreground">
 					Criteria (optional)
@@ -222,7 +242,8 @@ function QuestionRow({
 	onError,
 }: {
 	question: RunQuestion;
-	onEdit: (wording: string) => Promise<boolean>;
+	/** A new wording makes a new question; the same wording with a new label changes it in place. */
+	onEdit: (wording: string, label: string | null) => Promise<boolean>;
 	onRemove: () => Promise<boolean>;
 	onTurnOn: () => Promise<boolean>;
 	providers: readonly string[];
@@ -230,13 +251,22 @@ function QuestionRow({
 	onToggleTest: () => void;
 	onError: (message: string) => void;
 }) {
-	const [editing, setEditing] = useState<string | null>(null);
+	const [editing, setEditing] = useState<{
+		label: string;
+		wording: string;
+	} | null>(null);
 	return (
 		<li className="flex flex-col gap-2 rounded-md border p-3">
 			{editing === null ? (
 				<div className="flex items-start justify-between gap-3">
 					<div className="flex flex-col gap-1">
 						<span>{question.question}</span>
+						<span className="text-xs text-muted-foreground">
+							Tag:{" "}
+							{question.label ?? (
+								<span className="italic">none, the wording cut short</span>
+							)}
+						</span>
 						{question.criteria ? (
 							<span className="text-xs text-muted-foreground">
 								Yes: {question.criteria.true} · No: {question.criteria.false}
@@ -264,7 +294,12 @@ function QuestionRow({
 						<Button
 							size="sm"
 							variant="ghost"
-							onClick={() => setEditing(question.question)}
+							onClick={() =>
+								setEditing({
+									label: question.label ?? "",
+									wording: question.question,
+								})
+							}
 						>
 							Edit
 						</Button>
@@ -275,32 +310,51 @@ function QuestionRow({
 				</div>
 			) : (
 				<form
-					className="flex gap-2"
+					className="flex flex-col gap-2"
 					onSubmit={async (event) => {
 						event.preventDefault();
-						if (await onEdit(editing)) setEditing(null);
+						if (await onEdit(editing.wording, editing.label.trim() || null))
+							setEditing(null);
 					}}
 				>
-					<label className="sr-only" htmlFor={`run-question-${question.id}`}>
-						New wording
+					<div className="flex gap-2">
+						<label className="sr-only" htmlFor={`run-question-${question.id}`}>
+							New wording
+						</label>
+						<input
+							id={`run-question-${question.id}`}
+							value={editing.wording}
+							onChange={(event) =>
+								setEditing({ ...editing, wording: event.target.value })
+							}
+							className="h-8 flex-1 rounded-md border bg-background px-3"
+						/>
+						<Button size="sm" type="submit">
+							{editing.wording.trim() === question.question
+								? "Save label"
+								: "Save as new question"}
+						</Button>
+						<Button
+							size="sm"
+							variant="ghost"
+							type="button"
+							onClick={() => setEditing(null)}
+						>
+							Cancel
+						</Button>
+					</div>
+					<label className="flex items-center gap-2 text-xs text-muted-foreground">
+						Tag label
+						<input
+							aria-label="Tag label"
+							value={editing.label}
+							onChange={(event) =>
+								setEditing({ ...editing, label: event.target.value })
+							}
+							maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
+							className="h-7 flex-1 rounded-md border bg-background px-2 text-foreground"
+						/>
 					</label>
-					<input
-						id={`run-question-${question.id}`}
-						value={editing}
-						onChange={(event) => setEditing(event.target.value)}
-						className="h-8 flex-1 rounded-md border bg-background px-3"
-					/>
-					<Button size="sm" type="submit">
-						Save as new question
-					</Button>
-					<Button
-						size="sm"
-						variant="ghost"
-						type="button"
-						onClick={() => setEditing(null)}
-					>
-						Cancel
-					</Button>
 				</form>
 			)}
 			{testing ? (

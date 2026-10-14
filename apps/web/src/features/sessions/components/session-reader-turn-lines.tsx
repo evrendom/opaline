@@ -1,11 +1,21 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
-import { IconMoodSad, IconMoodSmile } from "@tabler/icons-react";
+import {
+	IconMessageQuestion,
+	IconMoodSad,
+	IconMoodSmile,
+} from "@tabler/icons-react";
 import { Fragment, type ReactNode } from "react";
+import {
+	type RunQuestionAnswer,
+	runQuestionTagLabel,
+	runQuestionTagTitle,
+} from "@/features/sessions/run-question-tags";
 import { formatCompactNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // The small fact line over the member's message in the reader: who, when,
-// how long, which commands, and the signals their wording gave.
+// how long, which commands, the signals their wording gave, and what the
+// run questions found in the run.
 
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 	day: "numeric",
@@ -56,12 +66,15 @@ function FactLine({
 	);
 }
 
-/** Over the member's message: who, when, how long, which commands, and how
- * their wording read. */
+/** Over the member's message: who, when, how long, which commands, how
+ * their wording read, and the run questions answered yes about the run. */
 export function MemberFactLine({
+	questions,
 	turn,
 	userLabel,
 }: {
+	/** The run questions answered yes about this run, surest first. */
+	questions?: readonly RunQuestionAnswer[];
 	turn: SessionDetailTurnSummary;
 	userLabel: string;
 }) {
@@ -117,6 +130,27 @@ export function MemberFactLine({
 								Positive
 							</span>
 						) : null}
+					</span>
+				) : null,
+				questions && questions.length > 0 ? (
+					<span
+						key="questions"
+						className="flex flex-wrap items-center gap-1.5"
+						data-run-question-tags
+					>
+						{questions.map((question) => (
+							<span
+								key={question.id}
+								title={runQuestionTagTitle(question)}
+								className={cn(
+									PILL,
+									"bg-amber-500/10 text-amber-700 dark:text-amber-400",
+								)}
+							>
+								<IconMessageQuestion aria-hidden="true" />
+								{runQuestionTagLabel(question)}
+							</span>
+						))}
 					</span>
 				) : null,
 			]}

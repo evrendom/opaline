@@ -30,9 +30,19 @@ export const RunQuestionCriteriaSchema = z
 	.object({ true: CriterionSchema, false: CriterionSchema })
 	.strict();
 
+/** Characters of the short name the dashboard shows as a tag. */
+export const RUN_QUESTION_LABEL_MAX_CHARS = 40;
+export const RunQuestionLabelSchema = z
+	.string()
+	.trim()
+	.min(2)
+	.max(RUN_QUESTION_LABEL_MAX_CHARS);
+
 export const RunQuestionSchema = z.object({
 	id: z.string(),
 	question: z.string(),
+	/** The short name the dashboard shows as a tag; null shows the wording cut short. Not part of the wording: it changes in place. */
+	label: z.string().nullable(),
 	/** What a yes and a no look like; null when the question needs none. Part of the wording: changing it makes a new question. */
 	criteria: RunQuestionCriteriaSchema.nullable(),
 	/** draft until turned on; retired when removed or reworded. */
@@ -179,17 +189,20 @@ export const runQuestionsAdminContract = {
 			z
 				.object({
 					question: WordingSchema,
+					label: RunQuestionLabelSchema.optional(),
 					criteria: RunQuestionCriteriaSchema.optional(),
 				})
 				.strict(),
 		)
 		.output(RunQuestionSchema),
+	/** A new wording or criteria make a new question; a new label alone changes the question in place. */
 	edit: oc
 		.input(
 			z
 				.object({
 					id: QuestionIdSchema,
 					question: WordingSchema,
+					label: RunQuestionLabelSchema.optional(),
 					criteria: RunQuestionCriteriaSchema.optional(),
 				})
 				.strict(),
@@ -202,6 +215,87 @@ export const runQuestionsAdminContract = {
 	recordVerdicts: oc
 		.input(RunQuestionVerdictInputSchema)
 		.output(RunQuestionSchema),
+};
+
+/**
+ * Run question answers the dashboard shows (sessions list and reader), only
+ * in a workspace whose runs are answered: elsewhere `enabled` is false and
+ * nothing is read. An answer counts as yes from `RUN_QUESTION_YES_PROBABILITY`.
+ */
+export const RUN_QUESTION_YES_PROBABILITY = 0.5;
+/** Sessions one tags call may name. */
+export const SESSION_RUN_QUESTION_TAGS_MAX_SESSIONS = 100;
+
+const SessionIdSchema = z.string().min(1).max(200);
+
+export const SessionRunQuestionTagsInputSchema = z
+	.object({
+		sessionIds: z
+			.array(SessionIdSchema)
+			.min(1)
+			.max(SESSION_RUN_QUESTION_TAGS_MAX_SESSIONS)
+			.transform((ids) => [...new Set(ids)]),
+	})
+	.strict();
+
+/** One question answered yes about at least one run of a session. */
+export const SessionRunQuestionTagSchema = z.object({
+	id: z.string(),
+	question: z.string(),
+	/** The short name to show; null shows the wording cut short. */
+	label: z.string().nullable(),
+	/** Runs of the session (every stream) answered yes. */
+	runs: z.number().int().positive(),
+	/** The highest probability of yes among those runs. */
+	probability: z.number(),
+});
+
+export const SessionRunQuestionTagsSchema = z.object({
+	/** Whether this workspace's runs are answered; false leaves `sessions` empty. */
+	enabled: z.boolean(),
+	/** Only sessions with at least one yes, in no particular order. */
+	sessions: z.array(
+		z.object({
+			sessionId: z.string(),
+			questions: z.array(SessionRunQuestionTagSchema),
+		}),
+	),
+});
+
+export const SessionRunAnswersInputSchema = z
+	.object({ sessionId: SessionIdSchema })
+	.strict();
+
+/** Every answer stored about one run of the session's committed transcript. */
+export const SessionRunAnswersRunSchema = z.object({
+	/** The stream: empty for the main transcript, else the subagent. */
+	agentId: z.string(),
+	/** The run within its stream (runs.turn_idx). */
+	turn: z.number().int(),
+	/** ISO time of the run's first record, which is its prompt; matches the reader's turn start. */
+	startedAt: z.string(),
+	questions: z.array(
+		z.object({
+			id: z.string(),
+			question: z.string(),
+			label: z.string().nullable(),
+			probability: z.number(),
+		}),
+	),
+});
+
+export const SessionRunAnswersSchema = z.object({
+	enabled: z.boolean(),
+	runs: z.array(SessionRunAnswersRunSchema),
+});
+
+export const sessionRunQuestionsContract = {
+	runQuestionTags: oc
+		.input(SessionRunQuestionTagsInputSchema)
+		.output(SessionRunQuestionTagsSchema),
+	runAnswers: oc
+		.input(SessionRunAnswersInputSchema)
+		.output(SessionRunAnswersSchema),
 };
 
 export const runQuestionsAnalysisContract = {
@@ -223,3 +317,9 @@ export type RunQuestionTest = z.infer<typeof RunQuestionTestSchema>;
 export type RunQuestionVerdictInput = z.infer<
 	typeof RunQuestionVerdictInputSchema
 >;
+export type SessionRunQuestionTag = z.infer<typeof SessionRunQuestionTagSchema>;
+export type SessionRunQuestionTags = z.infer<
+	typeof SessionRunQuestionTagsSchema
+>;
+export type SessionRunAnswersRun = z.infer<typeof SessionRunAnswersRunSchema>;
+export type SessionRunAnswers = z.infer<typeof SessionRunAnswersSchema>;

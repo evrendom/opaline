@@ -32,7 +32,13 @@ export const runQuestionsAdminRouter = {
 		.use(adminMiddleware)
 		.handler(({ input }) =>
 			refusals(
-				addRunQuestion(sqlClient, input.question, input.criteria ?? null),
+				addRunQuestion(
+					sqlClient,
+					input.question,
+					input.criteria ?? null,
+					null,
+					input.label ?? null,
+				),
 			),
 		),
 	edit: procedures.edit
@@ -44,6 +50,7 @@ export const runQuestionsAdminRouter = {
 					input.id,
 					input.question,
 					input.criteria ?? null,
+					input.label ?? null,
 				),
 			),
 		),

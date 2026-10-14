@@ -2,7 +2,6 @@ import type {
 	SessionDetailTurnSummary,
 	SessionDetailWindow,
 } from "@rudel/api-routes";
-import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { IconSparkles } from "@tabler/icons-react";
 import {
 	Children,
@@ -17,7 +16,6 @@ import {
 import Markdown, { type Components } from "react-markdown";
 import { useSearchParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Skeleton } from "@/app/ui/skeleton";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { SignalText } from "@/components/signal-text";
@@ -26,9 +24,15 @@ import { CopyButton } from "@/features/shell/components/copy-button";
 import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
 import { formatCompactNumber, formatRoundedDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import {
+	matchRunAnswersToTurns,
+	type RunQuestionAnswer,
+} from "../run-question-tags";
+import { useSessionRunAnswers } from "../use-run-question-tags";
 import type { NormalizedSessionDetailOverview } from "./session-detail-fast-response";
 import { attachReaderFollower } from "./session-reader-follow";
 import { ReaderInspectorPane } from "./session-reader-inspector-pane";
+import { MemberBubble } from "./session-reader-member-bubble";
 import {
 	formatReaderBytes,
 	formatReaderCost,
@@ -60,8 +64,6 @@ import {
 	type SessionReaderBodyState,
 	useSessionReaderBodies,
 } from "./use-session-reader-bodies";
-
-const MEMBER_TEXT_CLAMP = 1_200;
 
 function formatTokens(value: number | null) {
 	return formatCompactNumber(value ?? 0);
@@ -109,6 +111,12 @@ export function SessionReaderContent({
 	const totalTurns = overview.turnPage.total;
 	const costThresholds = getCostQuintiles(
 		turns.map((turn) => turn.estimatedCost ?? 0),
+	);
+	// What the run questions found, as tags on the turns they are about.
+	const runAnswers = useSessionRunAnswers(overview.session.sessionId);
+	const questionsByTurn = useMemo(
+		() => matchRunAnswersToTurns(runAnswers?.runs ?? [], turns),
+		[runAnswers, turns],
 	);
 	const { getBody, requestBody, retryBody } = useSessionReaderBodies({
 		initialWindow,
@@ -335,6 +343,7 @@ export function SessionReaderContent({
 											)}
 											model={model}
 											onRetry={() => retryBody(turn.turnId)}
+											questions={questionsByTurn.get(turn.turnId)}
 											runUi={runUi}
 											turn={turn}
 											userImageUrl={userImageUrl}
@@ -451,6 +460,7 @@ function TurnBlock({
 	costShade,
 	model,
 	onRetry,
+	questions,
 	runUi,
 	turn,
 	userImageUrl,
@@ -460,6 +470,8 @@ function TurnBlock({
 	costShade: string | undefined;
 	model: string | null;
 	onRetry: () => void;
+	/** The run questions answered yes about this turn's run. */
+	questions: readonly RunQuestionAnswer[] | undefined;
 	/** The reader's run state, shared with the right pane. */
 	runUi: RunUiStore;
 	turn: SessionDetailTurnSummary;
@@ -480,7 +492,11 @@ function TurnBlock({
 		<div className="flex w-full max-w-[calc(75ch-5rem)] flex-col gap-8 text-sm">
 			{memberText ? (
 				<div className="flex flex-col gap-2">
-					<MemberFactLine turn={turn} userLabel={userLabel} />
+					<MemberFactLine
+						questions={questions}
+						turn={turn}
+						userLabel={userLabel}
+					/>
 					<MemberBubble
 						imageUrl={userImageUrl}
 						label={userLabel}
@@ -532,53 +548,6 @@ function TurnBlock({
 						)}
 					</div>
 				</div>
-			</div>
-		</div>
-	);
-}
-
-function MemberBubble({
-	imageUrl,
-	label,
-	preview,
-	text,
-}: {
-	imageUrl: string | undefined;
-	label: string;
-	preview: boolean;
-	text: string;
-}) {
-	const [expanded, setExpanded] = useState(false);
-	const clamped = !expanded && text.length > MEMBER_TEXT_CLAMP;
-	return (
-		<div className="flex gap-3">
-			<Avatar className="mt-1.5 size-6 shrink-0 shadow-(--custom-shadow) after:hidden">
-				{imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-				<AvatarFallback className="text-[0.625rem]">
-					{label.charAt(0).toUpperCase()}
-				</AvatarFallback>
-			</Avatar>
-			<div className="min-w-0 flex-1 rounded-lg bg-card px-3 py-2.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl dark:bg-muted-foreground/10">
-				<p
-					className={cn(
-						"whitespace-pre-wrap text-sm [overflow-wrap:anywhere]",
-						preview && "text-muted-foreground",
-					)}
-				>
-					<SignalText
-						scanSignals={scanMemberLanguageSignals}
-						text={clamped ? `${text.slice(0, MEMBER_TEXT_CLAMP)}…` : text}
-					/>
-				</p>
-				{text.length > MEMBER_TEXT_CLAMP ? (
-					<button
-						type="button"
-						onClick={() => setExpanded((value) => !value)}
-						className="mt-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground"
-					>
-						{expanded ? "Show less" : "Show more"}
-					</button>
-				) : null}
 			</div>
 		</div>
 	);

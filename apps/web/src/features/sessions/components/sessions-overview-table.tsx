@@ -17,6 +17,7 @@ import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { getSessionRenderIndexes } from "@/features/sessions/session-list-virtualization";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
+import { useSessionRunQuestionTags } from "@/features/sessions/use-run-question-tags";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { formatNumber, formatUsername } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -116,6 +117,21 @@ export function SessionsOverviewTable({
 		[tableState.recentSessions],
 	);
 	const demo = useDemoRuntime();
+	// What run questions found in the listed sessions, where the workspace's
+	// runs are answered; the tags share the skills column, so none without it.
+	// A live row has no run index yet, and a failed upload no runs at all.
+	const taggedSessionIds = useMemo(
+		() =>
+			showSkillsColumn
+				? (sessions ?? [])
+						.filter(
+							(session) => !session.upload_failure && !session.live_session,
+						)
+						.map((session) => session.session_id)
+				: [],
+		[sessions, showSkillsColumn],
+	);
+	const questionTags = useSessionRunQuestionTags(taggedSessionIds);
 	// Live rows read "12s ago"; only they follow the clock.
 	const hasLiveRows = tableState.sortedSessions.some(
 		(session) => session.live_session !== undefined,
@@ -355,6 +371,7 @@ export function SessionsOverviewTable({
 													session.user_id,
 												)}
 												onSessionClick={onSessionClick}
+												questionTags={questionTags.get(session.session_id)}
 												session={session}
 												userLabel={formatUsername(session.user_id, userMap)}
 											/>

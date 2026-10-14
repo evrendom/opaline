@@ -35,6 +35,7 @@ const api = vi.hoisted(() => {
 		const added: RunQuestion = {
 			id: `rq_${next++}`,
 			question,
+			label: null,
 			criteria,
 			state: "draft",
 			replaces,

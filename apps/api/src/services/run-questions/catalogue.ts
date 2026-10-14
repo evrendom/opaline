@@ -30,6 +30,7 @@ export class RunQuestionError extends Error {
 interface QuestionRow {
 	id: string;
 	question: string;
+	label: string | null;
 	criteria_true: string | null;
 	criteria_false: string | null;
 	state: RunQuestion["state"];
@@ -45,7 +46,7 @@ export async function listRunQuestions(
 	sql: postgres.Sql,
 ): Promise<RunQuestion[]> {
 	const rows = await sql<QuestionRow[]>`
-		SELECT id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		SELECT id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 		FROM run_question
 		ORDER BY (state = 'retired'), created_at DESC, id
 	`;
@@ -62,7 +63,7 @@ export async function listOnRunQuestions(
 	>[]
 > {
 	const rows = await sql<QuestionRow[]>`
-		SELECT id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		SELECT id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 		FROM run_question WHERE state = 'on'
 		ORDER BY created_at DESC, id
 	`;
@@ -83,6 +84,7 @@ export async function addRunQuestion(
 	wording: string,
 	criteria: RunQuestionCriteria | null = null,
 	replaces: string | null = null,
+	label: string | null = null,
 ): Promise<RunQuestion> {
 	const question = wording.trim();
 	const fact = recordedFact(question);
@@ -93,12 +95,12 @@ export async function addRunQuestion(
 		);
 	try {
 		const [row] = await sql<QuestionRow[]>`
-			INSERT INTO run_question (id, question, criteria_true, criteria_false, replaces)
+			INSERT INTO run_question (id, question, label, criteria_true, criteria_false, replaces)
 			VALUES (
-				${newQuestionId()}, ${question}, ${criteria?.true.trim() ?? null},
-				${criteria?.false.trim() ?? null}, ${replaces}
+				${newQuestionId()}, ${question}, ${label?.trim() || null},
+				${criteria?.true.trim() ?? null}, ${criteria?.false.trim() ?? null}, ${replaces}
 			)
-			RETURNING id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+			RETURNING id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 		`;
 		return toQuestion(required(row));
 	} catch (error) {
@@ -114,30 +116,40 @@ export async function addRunQuestion(
 /**
  * A new wording or new criteria make a new question: the old one is retired
  * (its answers keep their wording) and a draft replaces it, to be tested and
- * turned on again.
+ * turned on again. The label is not part of the wording: a new label alone
+ * changes the question in place, and a reworded question keeps its label.
  */
 export async function editRunQuestion(
 	sql: postgres.Sql,
 	id: string,
 	wording: string,
 	criteria: RunQuestionCriteria | null = null,
+	label: string | null = null,
 ): Promise<RunQuestion> {
 	return sql.begin(async (transaction) => {
 		// postgres-js types a transaction without the tagged-template call
 		// signature (`Omit<Sql, ...>`); at runtime it is one.
 		const tx = transaction as unknown as postgres.Sql;
 		const current = await liveQuestion(tx, id);
+		const nextLabel = label?.trim() || null;
 		if (
 			current.question === wording.trim() &&
 			current.criteria?.true === criteria?.true.trim() &&
 			current.criteria?.false === criteria?.false.trim()
-		)
-			throw new RunQuestionError(
-				"BAD_REQUEST",
-				"The wording and criteria are unchanged.",
-			);
+		) {
+			if (current.label === nextLabel)
+				throw new RunQuestionError(
+					"BAD_REQUEST",
+					"The wording, criteria and label are unchanged.",
+				);
+			const [row] = await tx<QuestionRow[]>`
+				UPDATE run_question SET label = ${nextLabel} WHERE id = ${id}
+				RETURNING id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+			`;
+			return toQuestion(required(row));
+		}
 		await retire(tx, id);
-		return addRunQuestion(tx, wording, criteria, id);
+		return addRunQuestion(tx, wording, criteria, id, nextLabel);
 	});
 }
 
@@ -157,7 +169,7 @@ export async function turnOnRunQuestion(
 	await liveQuestion(sql, id);
 	const [row] = await sql<QuestionRow[]>`
 		UPDATE run_question SET state = 'on' WHERE id = ${id}
-		RETURNING id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		RETURNING id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 	`;
 	return toQuestion(required(row));
 }
@@ -173,7 +185,7 @@ export async function recordTestedPrecision(
 		UPDATE run_question SET tested_runs = ${tested.runs}, tested_precision = ${tested.precision},
 			tested_provider = ${tested.provider}
 		WHERE id = ${id}
-		RETURNING id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		RETURNING id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 	`;
 	return toQuestion(required(row));
 }
@@ -185,7 +197,7 @@ export async function findRunQuestions(
 ): Promise<RunQuestion[]> {
 	if (ids.length === 0) return [];
 	const rows = await sql<QuestionRow[]>`
-		SELECT id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		SELECT id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 		FROM run_question WHERE id = ANY(${[...ids]}::text[])
 	`;
 	const byId = new Map(rows.map((row) => [row.id, toQuestion(row)]));
@@ -214,7 +226,7 @@ async function retire(
 ): Promise<QuestionRow | undefined> {
 	const [row] = await sql<QuestionRow[]>`
 		UPDATE run_question SET state = 'retired', retired_at = now() WHERE id = ${id}
-		RETURNING id, question, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
+		RETURNING id, question, label, criteria_true, criteria_false, state, replaces, tested_runs, tested_precision, tested_provider, created_at
 	`;
 	return row;
 }
@@ -223,6 +235,7 @@ function toQuestion(row: QuestionRow): RunQuestion {
 	return {
 		id: row.id,
 		question: row.question,
+		label: row.label,
 		criteria:
 			row.criteria_true !== null && row.criteria_false !== null
 				? { true: row.criteria_true, false: row.criteria_false }
