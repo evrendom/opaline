@@ -65,10 +65,6 @@ const ReposPage = lazyNamed(
 	() => import("@/features/repos/repos-page"),
 	"ReposPage",
 );
-const CompassSettingsPage = lazyNamed(
-	() => import("@/features/compass/CompassSettingsPage"),
-	"CompassSettingsPage",
-);
 const CompassPage = lazyNamed(
 	() => import("@/features/compass/CompassPage"),
 	"CompassPage",
@@ -281,10 +277,6 @@ function getShellRouteElements(
 							fallback={<SettingsPageSkeleton routeId="workspace" />}
 						/>
 					}
-				/>
-				<Route
-					path={settingsRouteMap.compass.segment}
-					element={<LazyRoute Component={CompassSettingsPage} />}
 				/>
 				<Route
 					path={settingsRouteMap.sessions.segment}

@@ -14,6 +14,7 @@ import {
 	ObservationLimitError,
 	ObservationsUnavailableError,
 	observeMoment,
+	readRunDetail,
 	voteOnObservation,
 } from "../../services/moments/moments.service.js";
 import { ObservationRefusedError } from "../../services/moments/observer.js";
@@ -81,6 +82,11 @@ export const momentsRouter = os.analytics.moments.router({
 		.use(orgMiddleware)
 		.handler(async ({ input, context }) =>
 			listMoments(momentsEnv(), await caller(context), input).catch(mapped),
+		),
+	run: procedures.run
+		.use(orgMiddleware)
+		.handler(async ({ input, context }) =>
+			readRunDetail(momentsEnv(), await caller(context), input).catch(mapped),
 		),
 	observe: procedures.observe
 		.use(orgMiddleware)

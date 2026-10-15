@@ -11,9 +11,11 @@ import { checkFrustration } from "../services/moments/frustration.js";
 import type { RunEvidence } from "../services/moments/moment-rules.js";
 import {
 	listMoments,
+	MomentNotFoundError,
 	type MomentsEnv,
 	ObservationLimitError,
 	observeMoment,
+	readRunDetail,
 	voteOnObservation,
 } from "../services/moments/moments.service.js";
 import type { ObservationModel } from "../services/moments/observer.js";
@@ -107,7 +109,48 @@ function fakeExecutor(
 		async close() {},
 		async execute() {},
 		async insert() {},
-		async query<T>(statement: { query: string }) {
+		async query<T>(statement: {
+			query: string;
+			query_params?: Record<string, unknown>;
+		}) {
+			if (statement.query.includes("AS ts_ms"))
+				return runs
+					.filter(
+						(run) =>
+							run.session_id === statement.query_params?.sessionId &&
+							run.revision === statement.query_params?.revision &&
+							run.turn_idx === statement.query_params?.turn,
+					)
+					.flatMap(() => [
+						{
+							record_idx: 1,
+							block_idx: 0,
+							ts_ms: Date.UTC(2026, 9, 6, 12),
+							kind: "user_prompt",
+							subtype: "",
+							tool_name: "",
+							failed: 0,
+							exit_code: null,
+							file_path: "",
+							file_op: "",
+							text_chars: 19,
+							text: "make the tests pass",
+						},
+						{
+							record_idx: 10,
+							block_idx: 0,
+							ts_ms: 0,
+							kind: "tool_result",
+							subtype: "",
+							tool_name: "Bash",
+							failed: 1,
+							exit_code: 2,
+							file_path: "",
+							file_op: "",
+							text_chars: 5_000,
+							text: "error TS2345",
+						},
+					]) as T[];
 			if (statement.query.includes("record_idx BETWEEN"))
 				return [
 					{
@@ -119,7 +162,12 @@ function fakeExecutor(
 						text: "error TS2345: Argument of type 'string' is not assignable",
 					},
 				] as T[];
-			if (statement.query.includes("explore_records")) return runs as T[];
+			if (statement.query.includes("explore_records"))
+				return runs.filter(
+					(run) =>
+						statement.query_params?.runSession === undefined ||
+						run.session_id === statement.query_params.runSession,
+				) as T[];
 			if (statement.query.includes("SELECT cost_usd, minutes"))
 				return runs.map((run) => ({
 					cost_usd: run.cost_usd,
@@ -237,6 +285,69 @@ test("observing a moment stores the note once, and the list carries it", async (
 			useful: true,
 		}),
 	).toEqual({ useful: 1, notUseful: 0, mine: true });
+});
+
+test("a run's detail lists its own records, with its flags and observation, and only to members who may read it", async () => {
+	const workspaceId = await createWorkspace();
+	const member = await createUser();
+	const other = await createUser();
+	const momentsEnv = env(
+		[failingRun(member, "session-detail")],
+		fakeModel("Run tsc before handing back."),
+	);
+	const caller = { workspaceId, member: null, viewerId: member };
+	const ref = {
+		userId: member,
+		sessionId: "session-detail",
+		agentId: "",
+		turn: 1,
+		...RANGE,
+	};
+	const observation = await observeMoment(momentsEnv, caller, ref);
+
+	const detail = await readRunDetail(momentsEnv, caller, ref);
+	expect(detail.run.flags.map((flag) => flag.kind)).toEqual(["failing_streak"]);
+	expect(detail.run.observation?.id).toBe(observation.id);
+	expect(detail.observable).toBe(true);
+	expect(detail.truncated).toBe(false);
+	expect(detail.records).toEqual([
+		{
+			record: 1,
+			block: 0,
+			at: "2026-10-06T12:00:00.000Z",
+			kind: "user_prompt",
+			subtype: "",
+			tool: "",
+			failed: false,
+			exitCode: null,
+			filePath: "",
+			fileOp: "",
+			text: "make the tests pass",
+			textChars: 19,
+		},
+		{
+			record: 10,
+			block: 0,
+			at: null,
+			kind: "tool_result",
+			subtype: "",
+			tool: "Bash",
+			failed: true,
+			exitCode: 2,
+			filePath: "",
+			fileOp: "",
+			text: "error TS2345",
+			textChars: 5_000,
+		},
+	]);
+
+	await expect(
+		readRunDetail(
+			momentsEnv,
+			{ workspaceId, member: other, viewerId: other },
+			ref,
+		),
+	).rejects.toThrow(MomentNotFoundError);
 });
 
 test("a workspace past its daily limit observes nothing new", async () => {

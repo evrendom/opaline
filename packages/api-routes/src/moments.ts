@@ -372,6 +372,45 @@ export const NoticeableRunSchema = CompassRunRefSchema.extend({
 });
 export type NoticeableRun = z.infer<typeof NoticeableRunSchema>;
 
+/** Most records a run's detail returns; a longer run is cut, marked. */
+export const RUN_RECORDS_MAX = 1_000;
+/** Characters of a record's text a run's detail returns. */
+export const RUN_RECORD_TEXT_MAX_CHARS = 600;
+
+/** One record of a run, as the run's detail shows it. */
+export const RunRecordSchema = z.object({
+	/** The record's line in its stream, and its block within the line. */
+	record: z.number().int(),
+	block: z.number().int(),
+	/** ISO time, when the transcript has one. */
+	at: z.string().nullable(),
+	/** `transcript_records` kind and subtype: user_prompt, tool_call, tool_result… */
+	kind: z.string(),
+	subtype: z.string(),
+	tool: z.string(),
+	failed: z.boolean(),
+	exitCode: z.number().int().nullable(),
+	filePath: z.string(),
+	fileOp: z.string(),
+	/** The record's text, at most `RUN_RECORD_TEXT_MAX_CHARS`. */
+	text: z.string(),
+	/** The record's full length, so a cut text can say so. */
+	textChars: z.number().int(),
+});
+export type RunRecord = z.infer<typeof RunRecordSchema>;
+
+/** Everything Compass shows about one noticeable run. */
+export const RunDetailSchema = z.object({
+	run: NoticeableRunSchema,
+	/** Whether the run can be observed here. */
+	observable: z.boolean(),
+	/** The run's records in order, without meta records. */
+	records: z.array(RunRecordSchema),
+	/** Whether records past `RUN_RECORDS_MAX` were left out. */
+	truncated: z.boolean(),
+});
+export type RunDetail = z.infer<typeof RunDetailSchema>;
+
 export const MomentsInputSchema = z
 	.object({
 		startDate: z.string().date(),
@@ -486,6 +525,7 @@ export const MomentAccessSchema = z.object({
 export const momentsContract = {
 	access: oc.output(MomentAccessSchema),
 	list: oc.input(MomentsInputSchema).output(MomentsSchema),
+	run: oc.input(ObserveRunInputSchema).output(RunDetailSchema),
 	observe: oc.input(ObserveRunInputSchema).output(MomentObservationSchema),
 	feedback: oc
 		.input(MomentFeedbackInputSchema)

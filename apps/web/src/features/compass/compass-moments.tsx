@@ -9,25 +9,14 @@ import {
 import {
 	IconCheck,
 	IconChevronDown,
-	IconExternalLink,
 	IconSparkles,
 	IconThumbDown,
 	IconThumbUp,
 } from "@tabler/icons-react";
-import { type CSSProperties, useState } from "react";
-import { Link } from "react-router-dom";
-import { appRoutes } from "@/app/routes";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogTitle,
-} from "@/app/ui/dialog";
+import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { ScrollFade } from "@/features/costs/cost-breakdown";
 import { formatReaderCost } from "@/features/sessions/components/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
-import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { client } from "@/lib/orpc";
 import {
@@ -56,108 +45,6 @@ export function flagLabels(run: NoticeableRun): string {
 		.join(" · ");
 }
 
-/**
- * The Noticeable runs card: every run of the range a flag marks, as a
- * breakdown row (its flags' glyphs, what to read, which flags; cost and day
- * on the right), newest first. The heading filters by flag and by whose runs.
- */
-export function MomentsCard({
-	runs,
-	counts,
-	pending,
-	error,
-	kinds,
-	onKindsChange,
-	mine,
-	onMineChange,
-	hasMore,
-	loadingMore,
-	onLoadMore,
-	onOpen,
-}: {
-	runs: NoticeableRun[];
-	counts: Record<MomentKind, number> | undefined;
-	pending: boolean;
-	error: string | null;
-	kinds: readonly MomentKind[];
-	onKindsChange: (kinds: MomentKind[]) => void;
-	mine: boolean;
-	onMineChange: (mine: boolean) => void;
-	hasMore: boolean;
-	loadingMore: boolean;
-	onLoadMore: () => void;
-	onOpen: (run: NoticeableRun) => void;
-}) {
-	return (
-		<section
-			className="cost-breakdown compass-moments"
-			aria-label="Noticeable runs"
-			aria-busy={pending}
-		>
-			<div className="cost-breakdown-heading">
-				<h2 title="Runs a flag marks: searches, cost, edits, failures, reverts, apologies, frustration… Flags only point; open a run to read it.">
-					Noticeable runs
-				</h2>
-				<div className="compass-heading-controls" data-fluid-menu-root="">
-					<FluidMenuHover items="button" />
-					<button
-						type="button"
-						className="cost-text-button"
-						aria-pressed={!mine}
-						onClick={() => onMineChange(false)}
-					>
-						Everyone
-					</button>
-					<button
-						type="button"
-						className="cost-text-button"
-						aria-pressed={mine}
-						onClick={() => onMineChange(true)}
-					>
-						Mine
-					</button>
-					<KindsMenu kinds={kinds} counts={counts} onChange={onKindsChange} />
-				</div>
-			</div>
-			<ScrollFade
-				className="cost-breakdown-list"
-				data-many={runs.length > 4 || undefined}
-			>
-				{pending ? (
-					<RowsSkeleton />
-				) : error ? (
-					<p className="cost-breakdown-empty">{error}</p>
-				) : runs.length === 0 ? (
-					<p className="cost-breakdown-empty">
-						{kinds.length > 0 || mine
-							? "No matching runs."
-							: "No noticeable runs in this range. A run shows up here when one of the flags in Settings › Compass marks it."}
-					</p>
-				) : (
-					<div data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-breakdown-row" />
-						{runs.map((run) => (
-							<RunRow key={run.id} run={run} onOpen={() => onOpen(run)} />
-						))}
-						{hasMore ? (
-							<div className="compass-more">
-								<button
-									type="button"
-									className="cost-text-button"
-									disabled={loadingMore}
-									onClick={onLoadMore}
-								>
-									{loadingMore ? "Loading…" : "Show more runs"}
-								</button>
-							</div>
-						) : null}
-					</div>
-				)}
-			</ScrollFade>
-		</section>
-	);
-}
-
 /** Up to three of a run's flags as their glyphs, side by side. */
 export function FlagGlyphs({ flags }: { flags: readonly RunFlag[] }) {
 	return (
@@ -177,49 +64,67 @@ export function FlagGlyphs({ flags }: { flags: readonly RunFlag[] }) {
 	);
 }
 
-function RunRow({ run, onOpen }: { run: NoticeableRun; onOpen: () => void }) {
+/**
+ * A run in the list, as an inbox row: its first flag's glyph, what to read
+ * (the lesson once observed, else the prompt), its flags and member; cost
+ * and day on the right.
+ */
+export function RunRow({
+	run,
+	selected,
+	onSelect,
+	onKeyDown,
+}: {
+	run: NoticeableRun;
+	selected: boolean;
+	onSelect: () => void;
+	onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}) {
 	const { userMap } = useUserMap();
 	const observation = run.observation;
 	const notFriction = observation?.falsePositive === true;
+	const lead = run.flags[0] ? MOMENT_KINDS_APPEARANCE[run.flags[0].kind] : null;
+	const LeadGlyph = lead?.icon;
 	return (
 		<button
 			type="button"
-			className={`cost-breakdown-row${notFriction ? " compass-row-muted" : ""}`}
-			onClick={onOpen}
+			className={`compass-item${notFriction ? " compass-row-muted" : ""}`}
+			aria-current={selected || undefined}
+			data-compass-item=""
+			onClick={onSelect}
+			onKeyDown={onKeyDown}
 			title={momentHeadline(run)}
 		>
-			<span className="cost-row-identity">
-				<FlagGlyphs flags={run.flags} />
-				<span className="compass-row-copy">
-					<span className="compass-row-title truncate">
-						{momentHeadline(run)}
-					</span>
-					<span className="compass-row-sub truncate">
-						{flagLabels(run)}
-						{observation && !notFriction
-							? ` · ${MOMENT_LAYER_LABELS[observation.layer]}`
-							: ""}
-						{" · "}
-						{userMap[run.userId] ?? "Member"}
-					</span>
-				</span>
-				{observation && !notFriction ? (
-					<IconSparkles
-						aria-label="Observed"
-						className="size-3.5 shrink-0 text-(--cost-muted)"
-					/>
-				) : null}
+			<span
+				className="compass-item-icon"
+				style={{ "--glyph-color": lead?.color } as CSSProperties}
+				aria-hidden="true"
+			>
+				{LeadGlyph ? <LeadGlyph className="compass-row-glyph" /> : null}
 			</span>
-			<span className="cost-row-amount">
-				{formatReaderCost(run.costUsd)}
-				<span className="compass-row-when">{shortDate(run.startedAt)}</span>
+			<span className="compass-item-copy">
+				<span className="compass-row-title truncate">
+					{momentHeadline(run)}
+				</span>
+				<span className="compass-row-sub truncate">
+					{flagLabels(run)} · {userMap[run.userId] ?? "Member"}
+				</span>
+			</span>
+			<span className="compass-item-side">
+				<span className="inline-flex items-center gap-1">
+					{observation && !notFriction ? (
+						<IconSparkles aria-label="Observed" className="size-3.5" />
+					) : null}
+					{formatReaderCost(run.costUsd)}
+				</span>
+				<span>{shortDate(run.startedAt)}</span>
 			</span>
 		</button>
 	);
 }
 
-/** The heading's flag filter: the sessions toolbar's checkbox menu, opened from a muted text button. */
-function KindsMenu({
+/** The list's flag filter: the sessions toolbar's checkbox menu, opened from a muted text button. */
+export function KindsMenu({
 	kinds,
 	counts,
 	onChange,
@@ -304,19 +209,16 @@ function KindsMenu({
 	);
 }
 
-/** One blob per row slot, as the dashboard's breakdown cards load. */
+/** One blob per row slot, as the list loads. */
 export function RowsSkeleton() {
 	return (
-		<div className="cost-breakdown-skeleton" aria-hidden="true">
-			{[0, 1, 2, 3, 4, 5].map((index) => (
+		<div className="compass-list-skeleton" aria-hidden="true">
+			{[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
 				<div key={index}>
-					<div className="cost-breakdown-skeleton-name">
-						<div className="cost-skeleton size-3.5 rounded-full" />
+					<div className="cost-skeleton size-7 rounded-full" />
+					<div className="flex flex-1 flex-col gap-1.5">
 						<div className="cost-skeleton h-3.5 w-48" />
-					</div>
-					<div className="cost-breakdown-skeleton-value">
-						<div className="cost-skeleton h-3.5 w-12" />
-						<div className="cost-skeleton h-2.5 w-10" />
+						<div className="cost-skeleton h-3 w-32" />
 					</div>
 				</div>
 			))}
@@ -324,179 +226,11 @@ export function RowsSkeleton() {
 	);
 }
 
-/**
- * One noticeable run, in the dashboard's breakdown dialog: its flags and
- * what each saw, the run's prompt, and its observation, or the button that
- * asks Claude to read just the flagged records.
- */
-export function MomentDialog({
-	run,
-	range,
-	observable,
-	onClose,
-	onObserved,
+export function ObservationCard({
+	observation,
 }: {
-	run: NoticeableRun | null;
-	range: { startDate: string; endDate: string };
-	observable: boolean;
-	onClose: () => void;
-	onObserved: () => void;
+	observation: MomentObservation;
 }) {
-	return (
-		<Dialog
-			open={run !== null}
-			onOpenChange={(open) => {
-				if (!open) onClose();
-			}}
-		>
-			<DialogContent className="cost-breakdown-dialog gap-4 sm:max-w-xl">
-				{run ? (
-					<RunDetail
-						key={run.id}
-						run={run}
-						range={range}
-						observable={observable}
-						onClose={onClose}
-						onObserved={onObserved}
-					/>
-				) : null}
-			</DialogContent>
-		</Dialog>
-	);
-}
-
-function RunDetail({
-	run,
-	range,
-	observable,
-	onClose,
-	onObserved,
-}: {
-	run: NoticeableRun;
-	range: { startDate: string; endDate: string };
-	observable: boolean;
-	onClose: () => void;
-	onObserved: () => void;
-}) {
-	const { userMap } = useUserMap();
-	const getShellRoutePath = useShellRoutePath();
-	const [observation, setObservation] = useState<MomentObservation | null>(
-		run.observation,
-	);
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const observe = async () => {
-		setBusy(true);
-		setError(null);
-		try {
-			setObservation(
-				await client.analytics.moments.observe({
-					userId: run.userId,
-					sessionId: run.sessionId,
-					agentId: run.agentId,
-					turn: run.turn,
-					startDate: range.startDate,
-					endDate: range.endDate,
-				}),
-			);
-			onObserved();
-		} catch (failure) {
-			setError(failure instanceof Error ? failure.message : String(failure));
-		} finally {
-			setBusy(false);
-		}
-	};
-	return (
-		<>
-			<DialogTitle className="line-clamp-2 leading-snug">
-				{run.prompt ?? `Run ${run.turn}`}
-			</DialogTitle>
-			<DialogDescription className="sr-only">
-				{flagLabels(run)}
-			</DialogDescription>
-			<div className="compass-dialog-meta">
-				<span>{userMap[run.userId] ?? "Member"}</span>
-				<span>·</span>
-				<span>{shortDate(run.startedAt)}</span>
-				<span>·</span>
-				<span>
-					Run {run.turn}
-					{run.agentId ? " of a subagent" : ""}
-				</span>
-				<span>·</span>
-				<span>{Math.max(1, Math.round(run.minutes))} min</span>
-				<span>·</span>
-				<span>{formatReaderCost(run.costUsd)}</span>
-			</div>
-			<ul className="compass-flags" aria-label="Flags">
-				{run.flags.map((flag) => {
-					const kind = MOMENT_KINDS_APPEARANCE[flag.kind];
-					const Glyph = kind.icon;
-					return (
-						<li key={flag.kind}>
-							<Glyph
-								aria-hidden="true"
-								className="compass-row-glyph"
-								style={{ "--glyph-color": kind.color } as CSSProperties}
-							/>
-							<span className="font-medium">{kind.label}</span>
-							<span className="compass-row-sub truncate" title={flag.detail}>
-								{flag.detail}
-							</span>
-						</li>
-					);
-				})}
-			</ul>
-			{observation ? (
-				<ObservationCard observation={observation} />
-			) : observable ? (
-				<div className="flex flex-col items-start gap-1.5">
-					<button
-						type="button"
-						className="cost-secondary-button inline-flex items-center gap-1.5"
-						onClick={observe}
-						disabled={busy}
-					>
-						<IconSparkles aria-hidden="true" className="size-4" />
-						{busy ? "Reading the run…" : "Observe with Claude"}
-					</button>
-					<span className="compass-hint">
-						Sends only this run’s flagged records to Anthropic. The note is kept
-						for your workspace.
-					</span>
-				</div>
-			) : (
-				<p className="compass-hint">
-					Observations aren’t turned on for this workspace.
-				</p>
-			)}
-			{error ? (
-				<p role="alert" className="compass-error">
-					{error}
-				</p>
-			) : null}
-			<div className="cost-dialog-footer" data-fluid-menu-root="">
-				<FluidMenuHover items="a, button" />
-				<Link
-					to={getShellRoutePath(appRoutes.sessionDetail(run.sessionId))}
-					className="cost-text-button inline-flex items-center gap-1"
-				>
-					Open the session
-					<IconExternalLink aria-hidden="true" className="size-3.5" />
-				</Link>
-				<button
-					type="button"
-					className="cost-secondary-button"
-					onClick={onClose}
-				>
-					Done
-				</button>
-			</div>
-		</>
-	);
-}
-
-function ObservationCard({ observation }: { observation: MomentObservation }) {
 	const [feedback, setFeedback] = useState(observation.feedback);
 	const vote = async (useful: boolean) => {
 		setFeedback(

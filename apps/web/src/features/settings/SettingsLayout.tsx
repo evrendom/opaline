@@ -1,7 +1,6 @@
 import {
 	type Icon,
 	IconBrandGithubFilled,
-	IconCompassFilled,
 	IconIdFilled,
 	IconMailFilled,
 	IconMessage2Filled,
@@ -18,7 +17,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
-import { useCompassEnabled } from "@/features/compass/use-compass-access";
 import {
 	getActiveSettingsRouteId,
 	primarySettingsRoutes,
@@ -36,7 +34,6 @@ import "./components/settings-section.css";
 const settingsTabIcons: Record<SettingsRouteId, Icon> = {
 	workspace: IconSettingsFilled,
 	github: IconBrandGithubFilled,
-	compass: IconCompassFilled,
 	sessions: IconMessage2Filled,
 	members: IconUserFilled,
 	invitations: IconMailFilled,
@@ -47,11 +44,8 @@ const settingsTabIcons: Record<SettingsRouteId, Icon> = {
 export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
-	const compassEnabled = useCompassEnabled();
 	const routes = primarySettingsRoutes.filter(
-		(route) =>
-			(route.id !== "github" || query.data?.visibility === "visible") &&
-			(route.id !== "compass" || compassEnabled),
+		(route) => route.id !== "github" || query.data?.visibility === "visible",
 	);
 	const getShellRoutePath = useShellRoutePath();
 	const location = useLocation();

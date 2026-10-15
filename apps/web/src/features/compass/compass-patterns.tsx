@@ -1,22 +1,18 @@
 import type { MomentPattern } from "@rudel/api-routes";
-import { IconExternalLink, IconTool } from "@tabler/icons-react";
-import { type CSSProperties, useState } from "react";
+import {
+	IconExternalLink,
+	IconStack2Filled,
+	IconTool,
+} from "@tabler/icons-react";
+import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogTitle,
-} from "@/app/ui/dialog";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
-import { ScrollFade } from "@/features/costs/cost-breakdown";
 import { formatReaderCost } from "@/features/sessions/components/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { client } from "@/lib/orpc";
-import { RowsSkeleton } from "./compass-moments";
 import { layerGroup, MOMENT_LAYER_LABELS } from "./moment-labels";
 
 const shortDate = (iso: string) =>
@@ -25,135 +21,61 @@ const shortDate = (iso: string) =>
 		day: "numeric",
 	});
 
-/**
- * The Patterns card: observations that say the same thing, the most
- * widespread first, as breakdown rows with a share bar scaled to the largest.
- */
-export function PatternsCard({
-	patterns,
-	pending,
-	error,
-	onOpen,
+/** A pattern in the list, as an inbox row: its layer's colour, the lesson, how many observations say it. */
+export function PatternRow({
+	pattern,
+	selected,
+	onSelect,
+	onKeyDown,
 }: {
-	patterns: MomentPattern[];
-	pending: boolean;
-	error: string | null;
-	onOpen: (pattern: MomentPattern) => void;
+	pattern: MomentPattern;
+	selected: boolean;
+	onSelect: () => void;
+	onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
-	const maximum = Math.max(1, ...patterns.map((each) => each.observations));
+	const group = layerGroup(pattern.layer);
 	return (
-		<section
-			className="cost-breakdown"
-			aria-label="Patterns"
-			aria-busy={pending}
+		<button
+			type="button"
+			className="compass-item"
+			aria-current={selected || undefined}
+			data-compass-item=""
+			onClick={onSelect}
+			onKeyDown={onKeyDown}
+			title={pattern.label}
 		>
-			<div className="cost-breakdown-heading">
-				<h2 title="Observations that say the same thing, grouped by where a fix belongs.">
-					Patterns
-				</h2>
-				<div>Runs</div>
-			</div>
-			<ScrollFade
-				className="cost-breakdown-list"
-				data-many={patterns.length > 4 || undefined}
+			<span
+				className="compass-item-icon"
+				style={{ "--glyph-color": group.color } as CSSProperties}
+				aria-hidden="true"
 			>
-				{pending ? (
-					<RowsSkeleton />
-				) : error ? (
-					<p className="cost-breakdown-empty">{error}</p>
-				) : patterns.length === 0 ? (
-					<p className="cost-breakdown-empty">
-						Patterns form from observed runs. Observe a few noticeable runs,
-						then come back.
-					</p>
-				) : (
-					<div data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-breakdown-row" />
-						{patterns.map((pattern) => {
-							const group = layerGroup(pattern.layer);
-							return (
-								<button
-									key={pattern.id}
-									type="button"
-									className="cost-breakdown-row"
-									onClick={() => onOpen(pattern)}
-									title={pattern.label}
-								>
-									<span className="cost-row-identity">
-										<span className="compass-row-copy">
-											<span className="compass-row-title line-clamp-2">
-												{pattern.label}
-											</span>
-											<span className="compass-row-sub truncate">
-												{group.label} · {MOMENT_LAYER_LABELS[pattern.layer]}
-												{pattern.fix ? " · Fixed" : ""}
-											</span>
-										</span>
-									</span>
-									<span className="cost-row-amount">
-										{pattern.observations}
-										<span className="cost-row-meter" aria-hidden="true">
-											<span
-												style={{
-													width: `${Math.max(2, (pattern.observations / maximum) * 100)}%`,
-													backgroundColor: group.color,
-												}}
-											/>
-										</span>
-									</span>
-								</button>
-							);
-						})}
-					</div>
-				)}
-			</ScrollFade>
-		</section>
+				<IconStack2Filled className="compass-row-glyph" />
+			</span>
+			<span className="compass-item-copy">
+				<span className="compass-row-title line-clamp-2">{pattern.label}</span>
+				<span className="compass-row-sub truncate">
+					{group.label} · {MOMENT_LAYER_LABELS[pattern.layer]}
+					{pattern.fix ? " · Fixed" : ""}
+				</span>
+			</span>
+			<span className="compass-item-side">
+				<span>
+					{pattern.runs} {pattern.runs === 1 ? "run" : "runs"}
+				</span>
+				<span>{formatReaderCost(pattern.costUsd)}</span>
+			</span>
+		</button>
 	);
 }
 
-/** One pattern, in the dashboard's breakdown dialog: its weeks, examples, and the fix recorded against it. */
-export function PatternDialog({
+/** One pattern in the right pane: what it says, its weeks, its runs, and the fix recorded against it. */
+export function PatternPane({
 	pattern,
 	range,
-	onClose,
-	onFixed,
-}: {
-	pattern: MomentPattern | null;
-	range: { startDate: string; endDate: string };
-	onClose: () => void;
-	onFixed: () => void;
-}) {
-	return (
-		<Dialog
-			open={pattern !== null}
-			onOpenChange={(open) => {
-				if (!open) onClose();
-			}}
-		>
-			<DialogContent className="cost-breakdown-dialog gap-4 sm:max-w-xl">
-				{pattern ? (
-					<PatternDetail
-						key={pattern.id}
-						pattern={pattern}
-						range={range}
-						onClose={onClose}
-						onFixed={onFixed}
-					/>
-				) : null}
-			</DialogContent>
-		</Dialog>
-	);
-}
-
-function PatternDetail({
-	pattern,
-	range,
-	onClose,
 	onFixed,
 }: {
 	pattern: MomentPattern;
 	range: { startDate: string; endDate: string };
-	onClose: () => void;
 	onFixed: () => void;
 }) {
 	const { userMap } = useUserMap();
@@ -171,6 +93,7 @@ function PatternDetail({
 				note,
 				...range,
 			});
+			setNote("");
 			onFixed();
 		} catch (failure) {
 			setError(failure instanceof Error ? failure.message : String(failure));
@@ -179,111 +102,114 @@ function PatternDetail({
 		}
 	};
 	return (
-		<>
-			<DialogTitle className="leading-snug">{pattern.label}</DialogTitle>
-			<DialogDescription className="text-pretty">
-				{pattern.summary}
-			</DialogDescription>
-			<div className="compass-dialog-meta">
-				<span
-					className="compass-chip"
-					style={{ "--chip-color": group.color } as CSSProperties}
-				>
-					<i aria-hidden="true" />
-					{group.label} · {MOMENT_LAYER_LABELS[pattern.layer]}
-				</span>
-				<span className="tabular-nums">
-					{pattern.runs} {pattern.runs === 1 ? "run" : "runs"} ·{" "}
-					{pattern.members} {pattern.members === 1 ? "member" : "members"} ·{" "}
-					{formatReaderCost(pattern.costUsd)}
-				</span>
-			</div>
+		<article className="compass-detail" aria-label="Pattern">
+			<header className="compass-detail-header">
+				<div className="compass-detail-eyebrow">
+					<span
+						className="compass-chip"
+						style={{ "--chip-color": group.color } as CSSProperties}
+					>
+						<i aria-hidden="true" />
+						{group.label} · {MOMENT_LAYER_LABELS[pattern.layer]}
+					</span>
+				</div>
+				<h2 className="compass-detail-title">{pattern.label}</h2>
+				<p className="compass-detail-summary">{pattern.summary}</p>
+			</header>
+			<dl className="compass-properties">
+				<div>
+					<dt>Runs</dt>
+					<dd>{pattern.runs}</dd>
+				</div>
+				<div>
+					<dt>Members</dt>
+					<dd>{pattern.members}</dd>
+				</div>
+				<div>
+					<dt>Cost</dt>
+					<dd>{formatReaderCost(pattern.costUsd)}</dd>
+				</div>
+			</dl>
 			{pattern.weekly.length >= 3 ? (
-				<WeeklyBars weekly={pattern.weekly} fixedAt={pattern.fix?.createdAt} />
+				<section className="compass-detail-section" aria-label="Weeks">
+					<h3>Per week</h3>
+					<WeeklyBars
+						weekly={pattern.weekly}
+						fixedAt={pattern.fix?.createdAt}
+					/>
+				</section>
 			) : null}
-			<div className="cost-expanded-list" data-fluid-menu-root="">
-				<FluidMenuHover items=".cost-breakdown-row" />
-				{pattern.examples.map((example) => {
-					return (
+			<section className="compass-detail-section" aria-label="Runs">
+				<h3>Runs that show it</h3>
+				<div className="compass-example-list" data-fluid-menu-root="">
+					<FluidMenuHover items=".compass-example" />
+					{pattern.examples.map((example) => (
 						<Link
 							key={example.observationId}
 							to={getShellRoutePath(appRoutes.sessionDetail(example.sessionId))}
-							className="cost-breakdown-row"
+							className="compass-example"
 						>
-							<span className="cost-row-identity">
-								<span className="compass-row-copy">
-									<span className="truncate">{example.whatHappened}</span>
-									<span className="compass-row-sub truncate">
-										{userMap[example.userId] ?? "Member"} · Run {example.turn}
-									</span>
+							<span className="compass-item-copy">
+								<span className="truncate">{example.whatHappened}</span>
+								<span className="compass-row-sub truncate">
+									{userMap[example.userId] ?? "Member"} · Run {example.turn}
 								</span>
 							</span>
-							<span className="cost-row-amount compass-row-sub inline-flex items-center gap-1">
+							<span className="compass-row-sub inline-flex shrink-0 items-center gap-1">
 								{shortDate(example.startedAt)}
 								<IconExternalLink aria-hidden="true" className="size-3" />
 							</span>
 						</Link>
-					);
-				})}
-			</div>
-			{pattern.fix ? (
-				<div className="compass-fix">
-					<span className="inline-flex items-center gap-1.5 font-medium">
-						<IconTool aria-hidden="true" className="size-3.5" />
-						Fixed {shortDate(pattern.fix.createdAt)}: {pattern.fix.note}
-					</span>
-					<span className="compass-fix-rate">
-						{pattern.fix.beforePerWeek.toFixed(1)} a week before →{" "}
-						{pattern.fix.afterPerWeek === null
-							? "too early to tell"
-							: `${pattern.fix.afterPerWeek.toFixed(1)} a week since`}
-					</span>
+					))}
 				</div>
-			) : (
-				<label className="flex flex-col gap-1.5 text-[0.8125rem]">
-					<span>Record a fix</span>
-					<span className="compass-hint">
-						What did you change? A pointer, a check, a standard or a habit.
-						Compass then shows how often this happens since.
-					</span>
-					<textarea
-						value={note}
-						onChange={(event) => setNote(event.target.value)}
-						maxLength={500}
-						className="compass-note"
-					/>
-				</label>
-			)}
-			{error ? (
-				<p role="alert" className="compass-error">
-					{error}
-				</p>
-			) : null}
-			<div className="cost-dialog-footer" data-fluid-menu-root="">
-				<FluidMenuHover items="button" />
-				<button type="button" className="cost-text-button" onClick={onClose}>
-					{pattern.fix ? "Close" : "Cancel"}
-				</button>
+			</section>
+			<section className="compass-detail-section" aria-label="Fix">
+				<h3>Fix</h3>
 				{pattern.fix ? (
-					<button
-						type="button"
-						className="cost-secondary-button"
-						onClick={onClose}
-					>
-						Done
-					</button>
+					<div className="compass-fix">
+						<span className="inline-flex items-center gap-1.5 font-medium">
+							<IconTool aria-hidden="true" className="size-3.5" />
+							Fixed {shortDate(pattern.fix.createdAt)}: {pattern.fix.note}
+						</span>
+						<span className="compass-fix-rate">
+							{pattern.fix.beforePerWeek.toFixed(1)} a week before →{" "}
+							{pattern.fix.afterPerWeek === null
+								? "too early to tell"
+								: `${pattern.fix.afterPerWeek.toFixed(1)} a week since`}
+						</span>
+					</div>
 				) : (
-					<button
-						type="button"
-						className="cost-secondary-button"
-						disabled={busy || note.trim().length < 3}
-						onClick={save}
-					>
-						{busy ? "Saving…" : "Save fix"}
-					</button>
+					<div className="flex flex-col gap-2">
+						<span className="compass-hint">
+							What did you change? A pointer, a check, a standard or a habit.
+							Compass then shows how often this happens since.
+						</span>
+						<textarea
+							value={note}
+							onChange={(event) => setNote(event.target.value)}
+							maxLength={500}
+							aria-label="The fix"
+							className="compass-note"
+						/>
+						<div>
+							<button
+								type="button"
+								className="cost-secondary-button"
+								disabled={busy || note.trim().length < 3}
+								onClick={save}
+							>
+								{busy ? "Saving…" : "Record the fix"}
+							</button>
+						</div>
+					</div>
 				)}
-			</div>
-		</>
+				{error ? (
+					<p role="alert" className="compass-error">
+						{error}
+					</p>
+				) : null}
+			</section>
+		</article>
 	);
 }
 

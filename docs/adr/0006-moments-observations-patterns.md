@@ -15,7 +15,7 @@ Run questions (a cheap model answering yes/no questions over a whole run) didn't
 
 ## Consequences
 
-- They live on their own page, Compass, a home page for reflection built from the dashboard's cards; Agent traces stays the plain table of runs it was.
+- They live on their own page, Compass, an inbox: what was noticed on the left, everything about the selected run (its flags, observation and every record) on the right; Agent traces stays the plain table of runs it was.
 - Moments are computed at read time from the committed builds (one query per page, at most 5,000 runs) and never stored, so a rule change applies to history at once and deletion has nothing to clean in ClickHouse.
 - Observations, votes and fixes are Postgres rows that cascade from the workspace and the member. An observation is keyed by the moment, the transcript revision and the prompt version, so a new upload or a new prompt observes again and an old note is never shown for different text.
 - Span text (already secret-filtered at ingest) goes to Anthropic only for workspaces with `moment_observations` on. That makes Anthropic a subprocessor for those workspaces, and the switch stays off until that is settled for a customer.
@@ -35,6 +35,6 @@ That is a change to how every derived table is built, so it gets its own ADR whe
 Moments became flags on runs. A team reads "this run was expensive, reverted work and ended with a frustrated reply" more easily than three separate moments, and a model reading a run should see all its flags at once. So:
 
 - Compass lists **noticeable runs**: a run shows when at least one flag marks it, with every flag it has. Flags added since the first version: expensive and long runs (the range's top percent), edit churn, CI failed, git reverted, model apology. "Unhappy reply" became "User frustrated".
-- Each flag can be turned off and its value changed per workspace (Settings › Compass), because thresholds that suit one team flag everything or nothing in another. The defaults stay until the census (`audit:moments`) on real data says otherwise.
+- Each flag can be turned off and its value changed per workspace (the settings button beside Compass's filters), because thresholds that suit one team flag everything or nothing in another. The defaults stay until the census (`audit:moments`) on real data says otherwise.
 - **One SubQ question**, "Is the user frustrated?", about the member's prompt that follows a run, with the agent's last message. It reads a few hundred tokens, is answered once per prompt text and stored, and counts only where a workspace has the `frustration_check` switch. It is the narrow, cheap question SubQ answers well, unlike the whole-run run questions; everything else stays deterministic. Sending those prompts to SubQ makes SubQ a subprocessor for the workspaces that turn the check on.
 - Observations are made per run, over the span from its first flag to its last, so earlier per-moment notes are no longer read.

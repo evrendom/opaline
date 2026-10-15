@@ -4,52 +4,38 @@ import type {
 	Moments,
 	NoticeableRun,
 } from "@rudel/api-routes";
-import {
-	IconBoltFilled,
-	IconCircleCheckFilled,
-	IconCompass,
-	IconSparklesFilled,
-	IconStack2Filled,
-	type Icon as TablerIcon,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconCompass } from "@tabler/icons-react";
 import {
 	useInfiniteQuery,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { UsageStateMessage } from "@/components/usage-collection-view";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
-import { SERIES_COLORS } from "@/features/costs/chart-colors";
-import { MetricSparkline } from "@/features/costs/cost-chart";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
-import { formatReaderCost } from "@/features/sessions/components/session-reader-model";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import {
-	FlagGlyphs,
-	flagLabels,
-	MomentDialog,
-	MomentsCard,
-	momentHeadline,
-} from "./compass-moments";
-import { PatternDialog, PatternsCard } from "./compass-patterns";
+import { KindsMenu, RowsSkeleton, RunRow } from "./compass-moments";
+import { PatternPane, PatternRow } from "./compass-patterns";
+import { RunPane } from "./compass-run-detail";
+import { CompassSettingsButton } from "./compass-settings";
 import { useCompassAccess } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
 import "./compass.css";
 
 const PAGE_SIZE = 100;
-const DAY_MS = 86_400_000;
+
+type View = "runs" | "patterns";
 
 /**
- * Compass: where agent work went sideways and what keeps happening, as a
- * home page in the dashboard's design. Stat cards sum up the range; "Your
- * week" puts the reader's own three most telling moments first; the Moments
- * card lists every moment the rules found, and the Patterns card groups
- * their observations. A row opens its moment or pattern in a dialog.
+ * Compass, as an inbox: on the left what was noticed in the range (runs a
+ * flag marks, or the patterns their observations form), filtered by flag
+ * and by whose runs, with the settings for what to catch beside the
+ * filters; on the right everything about the selected one.
  */
 export function CompassPage() {
 	const access = useCompassAccess();
@@ -71,10 +57,15 @@ function CompassView({ observable }: { observable: boolean }) {
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
 	const { state: range } = useDateRange();
+	const [view, setView] = useState<View>("runs");
 	const [kinds, setKinds] = useState<MomentKind[]>([]);
 	const [mine, setMine] = useState(false);
-	const [openMoment, setOpenMoment] = useState<NoticeableRun | null>(null);
-	const [openPattern, setOpenPattern] = useState<MomentPattern | null>(null);
+	const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+	const [selectedPatternId, setSelectedPatternId] = useState<string | null>(
+		null,
+	);
+	// On a narrow page the list and the detail take turns; this is the detail's turn.
+	const [reading, setReading] = useState(false);
 
 	const listOptions = orpc.analytics.moments.list.infiniteOptions({
 		input: (offset: number) => ({
@@ -110,6 +101,17 @@ function CompassView({ observable }: { observable: boolean }) {
 		() => list.data?.pages.flatMap((page) => page.noticeable) ?? [],
 		[list.data],
 	);
+	const patternList = patterns.data?.patterns ?? [];
+	// The selection, or the first row while nothing is selected (or it left the list).
+	const selectedRun: NoticeableRun | undefined =
+		runs.find((run) => run.id === selectedRunId) ?? runs[0];
+	const selectedPattern: MomentPattern | undefined =
+		patternList.find((pattern) => pattern.id === selectedPatternId) ??
+		patternList[0];
+	const noticeable = firstPage?.days.reduce(
+		(total, day) => total + day.count,
+		0,
+	);
 	const refresh = () =>
 		queryClient.invalidateQueries({
 			predicate: (query) =>
@@ -128,6 +130,30 @@ function CompassView({ observable }: { observable: boolean }) {
 		</div>
 	);
 
+	const selectRun = (run: NoticeableRun) => {
+		setSelectedRunId(run.id);
+		setReading(true);
+	};
+	const selectPattern = (pattern: MomentPattern) => {
+		setSelectedPatternId(pattern.id);
+		setReading(true);
+	};
+	const onRowKey = arrowKeys((step) => {
+		if (view === "runs") {
+			const next =
+				runs[runs.findIndex((run) => run.id === selectedRun?.id) + step];
+			if (next) setSelectedRunId(next.id);
+		} else {
+			const next =
+				patternList[
+					patternList.findIndex(
+						(pattern) => pattern.id === selectedPattern?.id,
+					) + step
+				];
+			if (next) setSelectedPatternId(next.id);
+		}
+	});
+
 	return (
 		<div className="cost-page compass-page isolate antialiased">
 			{headerPortal ? createPortal(rangeControls, headerPortal) : null}
@@ -136,261 +162,207 @@ function CompassView({ observable }: { observable: boolean }) {
 					{rangeControls}
 				</section>
 			)}
-			<div className="cost-page-scroll">
-				<div className="cost-page-content">
-					<div className="cost-chart-panel">
-						<StatCards
-							range={range}
-							runs={firstPage?.runs}
-							days={firstPage?.days}
-							patterns={patterns.data}
-						/>
-					</div>
-					<YourWeek onOpen={setOpenMoment} />
-					<div className="cost-breakdowns-container">
-						<div className="compass-grid">
-							<MomentsCard
-								runs={runs}
-								counts={firstPage?.counts}
-								pending={list.isPending}
-								error={list.isError ? list.error.message : null}
-								kinds={kinds}
-								onKindsChange={setKinds}
-								mine={mine}
-								onMineChange={setMine}
-								hasMore={list.hasNextPage}
-								loadingMore={list.isFetchingNextPage}
-								onLoadMore={() => {
-									void list.fetchNextPage();
-								}}
-								onOpen={setOpenMoment}
-							/>
-							<PatternsCard
-								patterns={patterns.data?.patterns ?? []}
-								pending={patterns.isPending}
-								error={patterns.isError ? patterns.error.message : null}
-								onOpen={setOpenPattern}
-							/>
+			<div className="compass-split" data-reading={reading || undefined}>
+				<section className="compass-list-pane" aria-label="Noticed">
+					<div className="compass-pane-toolbar" data-fluid-menu-root="">
+						<FluidMenuHover items="button" />
+						<div className="compass-tabs" role="tablist">
+							<button
+								type="button"
+								role="tab"
+								aria-selected={view === "runs"}
+								className="cost-text-button"
+								onClick={() => setView("runs")}
+							>
+								Runs
+								{noticeable === undefined ? null : (
+									<span className="compass-tab-count">{noticeable}</span>
+								)}
+							</button>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={view === "patterns"}
+								className="cost-text-button"
+								onClick={() => setView("patterns")}
+							>
+								Patterns
+								{patterns.data ? (
+									<span className="compass-tab-count">
+										{patterns.data.patterns.length}
+									</span>
+								) : null}
+							</button>
+						</div>
+						<div className="compass-toolbar-controls">
+							{view === "runs" ? (
+								<>
+									<button
+										type="button"
+										className="cost-text-button"
+										aria-pressed={mine}
+										onClick={() => setMine((value) => !value)}
+										title={
+											mine ? "Showing your runs" : "Showing everyone’s runs"
+										}
+									>
+										{mine ? "Mine" : "Everyone"}
+									</button>
+									<KindsMenu
+										kinds={kinds}
+										counts={firstPage?.counts}
+										onChange={setKinds}
+									/>
+								</>
+							) : null}
+							<CompassSettingsButton />
 						</div>
 					</div>
-				</div>
-			</div>
-			<MomentDialog
-				run={openMoment}
-				range={range}
-				observable={observable && (firstPage?.observable ?? true)}
-				onClose={() => setOpenMoment(null)}
-				onObserved={() => {
-					void refresh();
-				}}
-			/>
-			<PatternDialog
-				pattern={openPattern}
-				range={range}
-				onClose={() => setOpenPattern(null)}
-				onFixed={() => {
-					setOpenPattern(null);
-					void refresh();
-				}}
-			/>
-		</div>
-	);
-}
-
-/** The dashboard's stat cards, summing up the range. */
-function StatCards({
-	range,
-	runs,
-	days,
-	patterns,
-}: {
-	range: { startDate: string; endDate: string };
-	/** Runs in the range, flagged or not. */
-	runs: number | undefined;
-	days: Moments["days"] | undefined;
-	patterns: { observed: number; patterns: MomentPattern[] } | undefined;
-}) {
-	const momentTotal = days?.reduce((total, day) => total + day.count, 0);
-	const momentTrend = days ? dailySeries(range, days) : undefined;
-	const observedTrend = patterns ? weeklyTotals(patterns.patterns) : undefined;
-	const fixed = patterns?.patterns.filter((pattern) => pattern.fix).length;
-	return (
-		<fieldset className="cost-metrics" aria-label="Compass summary">
-			<StatCard
-				label="Noticeable runs"
-				icon={IconBoltFilled}
-				color={SERIES_COLORS[3] ?? ""}
-				value={momentTotal}
-				qualifier={
-					runs === undefined ? undefined : `of ${runs.toLocaleString("en-US")}`
-				}
-				trend={momentTrend}
-			/>
-			<StatCard
-				label="Observed"
-				icon={IconSparklesFilled}
-				color={SERIES_COLORS[4] ?? ""}
-				value={patterns?.observed}
-				trend={observedTrend}
-			/>
-			<StatCard
-				label="Patterns"
-				icon={IconStack2Filled}
-				color={SERIES_COLORS[0] ?? ""}
-				value={patterns?.patterns.length}
-				trend={patterns ? [] : undefined}
-			/>
-			<StatCard
-				label="Fixes"
-				icon={IconCircleCheckFilled}
-				color={SERIES_COLORS[2] ?? ""}
-				value={fixed}
-				trend={patterns ? [] : undefined}
-			/>
-		</fieldset>
-	);
-}
-
-function StatCard({
-	label,
-	icon: Glyph,
-	color,
-	value,
-	qualifier,
-	trend,
-}: {
-	label: string;
-	icon: TablerIcon;
-	color: string;
-	value: number | undefined;
-	qualifier?: string;
-	trend: number[] | undefined;
-}) {
-	return (
-		<div
-			className="cost-metric"
-			style={{ "--metric-color": color } as CSSProperties}
-		>
-			<div className="cost-metric-header">
-				<div className="cost-metric-label">
-					<Glyph className="cost-metric-icon" aria-hidden="true" />
-					<span>{label}</span>
-				</div>
-				{value === undefined ? (
-					<div className="cost-skeleton cost-metric-skeleton" />
-				) : (
-					<span className="cost-metric-value">
-						{qualifier ? (
-							<small className="cost-metric-qualifier">{qualifier}</small>
-						) : null}
-						{value.toLocaleString("en-US")}
-					</span>
-				)}
-			</div>
-			<MetricSparkline values={trend} />
-		</div>
-	);
-}
-
-/**
- * The reader's own three most telling moments of the last seven days:
- * observed ones first, then the costliest. Hidden when there are none.
- */
-function YourWeek({ onOpen }: { onOpen: (run: NoticeableRun) => void }) {
-	const { state: organization } = useOrganization();
-	const organizationId = organization.activeOrg?.id;
-	const today = new Date();
-	const input = {
-		startDate: new Date(today.getTime() - 6 * DAY_MS)
-			.toISOString()
-			.slice(0, 10),
-		endDate: today.toISOString().slice(0, 10),
-		mine: true,
-		limit: 200,
-		offset: 0,
-	};
-	const options = orpc.analytics.moments.list.queryOptions({ input });
-	const week = useQuery({
-		...options,
-		queryKey: ["org", organizationId, ...options.queryKey],
-		enabled: !!organizationId,
-		staleTime: 60_000,
-	});
-	// Observed runs first, then the runs most flags mark, then the costliest.
-	const top = [...(week.data?.noticeable ?? [])]
-		.filter((run) => !run.observation?.falsePositive)
-		.sort(
-			(a, b) =>
-				Number(Boolean(b.observation)) - Number(Boolean(a.observation)) ||
-				b.flags.length - a.flags.length ||
-				(b.costUsd ?? 0) - (a.costUsd ?? 0),
-		)
-		.slice(0, 3);
-	if (top.length === 0) return null;
-	return (
-		<section className="cost-breakdown" aria-label="Your week">
-			<div className="cost-breakdown-heading">
-				<h2>Your week</h2>
-				<div>
-					{top.length === 1
-						? "One run worth a look"
-						: `${top.length} runs worth a look`}
-				</div>
-			</div>
-			<div className="compass-week" data-fluid-menu-root="">
-				<FluidMenuHover items=".compass-week-item" />
-				{top.map((run) => (
+					{view === "runs" && firstPage ? (
+						<p className="compass-list-summary">
+							{noticeable?.toLocaleString("en-US")} of{" "}
+							{firstPage.runs.toLocaleString("en-US")} runs noticed
+						</p>
+					) : null}
+					<ListBody>
+						{view === "runs" ? (
+							list.isPending ? (
+								<RowsSkeleton />
+							) : list.isError ? (
+								<p className="compass-empty">{list.error.message}</p>
+							) : runs.length === 0 ? (
+								<p className="compass-empty">
+									{kinds.length > 0 || mine
+										? "No matching runs."
+										: "Nothing noticed in this range. A run shows up here when one of the flags under the settings button marks it."}
+								</p>
+							) : (
+								<>
+									{runs.map((run) => (
+										<RunRow
+											key={run.id}
+											run={run}
+											selected={run.id === selectedRun?.id}
+											onSelect={() => selectRun(run)}
+											onKeyDown={onRowKey}
+										/>
+									))}
+									{list.hasNextPage ? (
+										<div className="compass-more">
+											<button
+												type="button"
+												className="cost-text-button"
+												disabled={list.isFetchingNextPage}
+												onClick={() => {
+													void list.fetchNextPage();
+												}}
+											>
+												{list.isFetchingNextPage
+													? "Loading…"
+													: "Show more runs"}
+											</button>
+										</div>
+									) : null}
+								</>
+							)
+						) : patterns.isPending ? (
+							<RowsSkeleton />
+						) : patterns.isError ? (
+							<p className="compass-empty">{patterns.error.message}</p>
+						) : patternList.length === 0 ? (
+							<p className="compass-empty">
+								Patterns form from observed runs. Observe a few noticeable runs,
+								then come back.
+							</p>
+						) : (
+							patternList.map((pattern) => (
+								<PatternRow
+									key={pattern.id}
+									pattern={pattern}
+									selected={pattern.id === selectedPattern?.id}
+									onSelect={() => selectPattern(pattern)}
+									onKeyDown={onRowKey}
+								/>
+							))
+						)}
+					</ListBody>
+				</section>
+				<section className="compass-detail-pane" aria-label="Detail">
 					<button
-						key={run.id}
 						type="button"
-						className="compass-week-item"
-						onClick={() => onOpen(run)}
+						className="cost-text-button compass-back"
+						onClick={() => setReading(false)}
 					>
-						<span className="compass-week-kind">
-							<FlagGlyphs flags={run.flags} />
-							<span className="truncate">{flagLabels(run)}</span>
-						</span>
-						<span className="compass-week-text">{momentHeadline(run)}</span>
-						<span className="compass-row-when">
-							{new Date(run.startedAt).toLocaleDateString(undefined, {
-								weekday: "short",
-								month: "short",
-								day: "numeric",
-							})}{" "}
-							· {formatReaderCost(run.costUsd)}
-							{run.observation ? " · Observed" : ""}
-						</span>
+						<IconArrowLeft aria-hidden="true" className="size-3.5" />
+						Back to the list
 					</button>
-				))}
+					{view === "runs" ? (
+						selectedRun ? (
+							<RunPane
+								key={selectedRun.id}
+								run={selectedRun}
+								range={range}
+								observable={observable && (firstPage?.observable ?? true)}
+								onObserved={() => {
+									void refresh();
+								}}
+							/>
+						) : (
+							<DetailEmpty
+								text={list.isPending ? "" : "Pick a run to see what went on."}
+							/>
+						)
+					) : selectedPattern ? (
+						<PatternPane
+							key={selectedPattern.id}
+							pattern={selectedPattern}
+							range={range}
+							onFixed={() => {
+								void refresh();
+							}}
+						/>
+					) : (
+						<DetailEmpty
+							text={patterns.isPending ? "" : "No pattern to show yet."}
+						/>
+					)}
+				</section>
 			</div>
-		</section>
+		</div>
 	);
 }
 
-/** Moments per day across the range, quiet days as zero. */
-function dailySeries(
-	range: { startDate: string; endDate: string },
-	days: Moments["days"],
-): number[] {
-	const counts = new Map(days.map((day) => [day.date, day.count]));
-	const series: number[] = [];
-	const end = Date.parse(`${range.endDate}T00:00:00Z`);
-	for (
-		let day = Date.parse(`${range.startDate}T00:00:00Z`);
-		day <= end && series.length < 400;
-		day += DAY_MS
-	)
-		series.push(counts.get(new Date(day).toISOString().slice(0, 10)) ?? 0);
-	return series;
+/** The scrolling list of rows. */
+function ListBody({ children }: { children: ReactNode }) {
+	return (
+		<div className="compass-list" data-fluid-menu-root="">
+			<FluidMenuHover items="[data-compass-item]" />
+			{children}
+		</div>
+	);
 }
 
-/** Observations per week, summed over the patterns (every observation is in one). */
-function weeklyTotals(patterns: MomentPattern[]): number[] {
-	const totals = new Map<string, number>();
-	for (const pattern of patterns)
-		for (const week of pattern.weekly)
-			totals.set(week.week, (totals.get(week.week) ?? 0) + week.count);
-	return [...totals]
-		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([, count]) => count);
+/** Arrow keys on a row move the selection and the focus to the next or previous row, as in an inbox. */
+function arrowKeys(onArrow: (step: 1 | -1) => void) {
+	return (event: KeyboardEvent<HTMLButtonElement>) => {
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		event.preventDefault();
+		const step = event.key === "ArrowDown" ? 1 : -1;
+		onArrow(step);
+		const items = [
+			...(event.currentTarget
+				.closest(".compass-list")
+				?.querySelectorAll<HTMLElement>("[data-compass-item]") ?? []),
+		];
+		items[items.indexOf(event.currentTarget) + step]?.focus();
+	};
+}
+
+function DetailEmpty({ text }: { text: string }) {
+	return (
+		<div className="compass-detail-empty">
+			<IconCompass aria-hidden="true" className="size-6" />
+			<span>{text}</span>
+		</div>
+	);
 }

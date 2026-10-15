@@ -6,10 +6,17 @@ import {
 	type MomentObservation,
 	type Moments,
 	type NoticeableRun,
+	RUN_RECORD_TEXT_MAX_CHARS,
+	RUN_RECORDS_MAX,
+	type RunDetail,
 	type RunFlag,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
-import type { ClickHouseExecutor } from "../../clickhouse.js";
+import { z } from "zod";
+import {
+	type ClickHouseExecutor,
+	getSafeClickHouseTable,
+} from "../../clickhouse.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
 import { readCompassSettings } from "./compass-settings.js";
 import { readFrustration } from "./frustration.js";
@@ -166,6 +173,90 @@ export async function listMoments(
 }
 
 /**
+ * One noticeable run with all its records in order, for the right pane of
+ * Compass: its flags found again in its committed build, its newest
+ * observation, and its records from the run's own transcript generation.
+ */
+export async function readRunDetail(
+	env: MomentsEnv,
+	caller: MomentsCaller,
+	input: CompassRunRef & { startDate: string; endDate: string },
+): Promise<RunDetail> {
+	const { run, flags } = await findFlaggedRun(env, caller, input);
+	const ref = runKeyOf(run);
+	const [observations, observable, rows] = await Promise.all([
+		readObservations(
+			env.sql,
+			caller.workspaceId,
+			[{ ...ref, revision: run.revision }],
+			caller.viewerId,
+		),
+		mayObserve(env, caller.workspaceId),
+		query(env.executor, RunRecordRowSchema, {
+			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+			query: `SELECT record_idx, block_idx, toUnixTimestamp64Milli(ts) AS ts_ms,
+					kind, subtype, tool_name,
+					toUInt8(is_error OR coalesce(exit_code, 0) != 0) AS failed, exit_code,
+					file_path, file_op, text_chars,
+					substringUTF8(if(text_chars <= {maxChars:UInt32}, text, head), 1, {maxChars:UInt32}) AS text
+				FROM ${getSafeClickHouseTable("rudel.transcript_records")} FINAL
+				WHERE organization_id = {workspaceId:String} AND user_id = {userId:String}
+					AND session_id = {sessionId:String} AND agent_id = {agentId:String}
+					AND revision = toUInt64({revision:String}) AND parser_version = {parserVersion:UInt16}
+					AND turn_idx = {turn:UInt32}
+					AND kind NOT IN ('receipt', 'meta')
+				ORDER BY record_idx, block_idx
+				LIMIT {limit:UInt32}`,
+			query_params: {
+				workspaceId: caller.workspaceId,
+				userId: run.user_id,
+				sessionId: run.session_id,
+				agentId: run.agent_id,
+				revision: run.revision,
+				parserVersion: run.parser_version,
+				turn: run.turn_idx,
+				maxChars: RUN_RECORD_TEXT_MAX_CHARS,
+				limit: RUN_RECORDS_MAX + 1,
+			},
+		}),
+	]);
+	return {
+		run: toNoticeableRun(run, flags, observations.get(momentKey(ref)) ?? null),
+		observable,
+		records: rows.slice(0, RUN_RECORDS_MAX).map((row) => ({
+			record: row.record_idx,
+			block: row.block_idx,
+			at: row.ts_ms > 0 ? new Date(row.ts_ms).toISOString() : null,
+			kind: row.kind,
+			subtype: row.subtype,
+			tool: row.tool_name,
+			failed: row.failed === 1,
+			exitCode: row.exit_code,
+			filePath: row.file_path,
+			fileOp: row.file_op,
+			text: row.text,
+			textChars: row.text_chars,
+		})),
+		truncated: rows.length > RUN_RECORDS_MAX,
+	};
+}
+
+const RunRecordRowSchema = z.object({
+	record_idx: z.coerce.number(),
+	block_idx: z.coerce.number(),
+	ts_ms: z.coerce.number(),
+	kind: z.string(),
+	subtype: z.string(),
+	tool_name: z.string(),
+	failed: z.coerce.number(),
+	exit_code: z.coerce.number().nullable(),
+	file_path: z.string(),
+	file_op: z.string(),
+	text_chars: z.coerce.number(),
+	text: z.string(),
+});
+
+/**
  * Observes one noticeable run: finds it and its flags again in its committed
  * build, returns the stored observation of that revision when there is one,
  * else sends the flagged records to the model (within the workspace's daily
@@ -176,6 +267,81 @@ export async function observeMoment(
 	caller: MomentsCaller,
 	input: CompassRunRef & { startDate: string; endDate: string },
 ): Promise<MomentObservation> {
+	if (!(await mayObserve(env, caller.workspaceId)) || env.model === null)
+		throw new ObservationsUnavailableError(
+			"Observations are not enabled for this workspace.",
+		);
+	const model = env.model;
+	const { run, flags } = await findFlaggedRun(env, caller, input);
+	const ref = runKeyOf(run);
+	const key = { ...ref, revision: run.revision };
+	const stored = (
+		await readObservations(env.sql, caller.workspaceId, [key], caller.viewerId)
+	).get(momentKey(ref));
+	if (stored) return stored;
+
+	if (
+		(await observationsToday(env.sql, caller.workspaceId, env.now())) >=
+		env.dailyLimit
+	)
+		throw new ObservationLimitError(
+			`This workspace has used today's ${env.dailyLimit} observations. Try again tomorrow.`,
+		);
+	const span = {
+		start: Math.min(...flags.map((flag) => flag.spanStart)),
+		end: Math.max(...flags.map((flag) => flag.spanEnd)),
+	};
+	const records = await readSpanText(
+		env.executor,
+		{
+			workspaceId: caller.workspaceId,
+			userId: run.user_id,
+			sessionId: run.session_id,
+			agentId: run.agent_id,
+			revision: run.revision,
+			parserVersion: run.parser_version,
+		},
+		span,
+	);
+	if (!records) throw new MomentNotFoundError("The run's records are gone.");
+	const result = await model.observe({
+		flags,
+		prompt: run.prompt_head,
+		records,
+	});
+	const id = await insertObservation(env.sql, {
+		...key,
+		workspaceId: caller.workspaceId,
+		runStartedAt: new Date(run.started_ms),
+		spanStart: span.start,
+		spanEnd: span.end,
+		...normalizeObservation(result.output, span),
+		model: model.model,
+		promptVersion: OBSERVATION_PROMPT_VERSION,
+		inputTokens: result.inputTokens,
+		outputTokens: result.outputTokens,
+		createdBy: caller.viewerId,
+	});
+	const saved = await readObservationById(
+		env.sql,
+		caller.workspaceId,
+		id,
+		caller.viewerId,
+	);
+	if (!saved) throw new MomentNotFoundError("Run not found.");
+	return saved;
+}
+
+/**
+ * A run the caller may read, with its flags found again in its committed
+ * build, ranked against the range the page showed it in, as it was there.
+ * Throws when the run is gone or no flag marks it.
+ */
+async function findFlaggedRun(
+	env: MomentsEnv,
+	caller: MomentsCaller,
+	input: CompassRunRef & { startDate: string; endDate: string },
+): Promise<{ run: RunEvidence; flags: RunFlag[] }> {
 	const ref: CompassRunRef = {
 		userId: input.userId,
 		sessionId: input.sessionId,
@@ -184,10 +350,6 @@ export async function observeMoment(
 	};
 	if (caller.member !== null && ref.userId !== caller.member)
 		throw new MomentNotFoundError("Run not found.");
-	if (!(await mayObserve(env, caller.workspaceId)) || env.model === null)
-		throw new ObservationsUnavailableError(
-			"Observations are not enabled for this workspace.",
-		);
 	const [run] = await readRunEvidence(
 		env.executor,
 		{ workspaceId: caller.workspaceId, member: ref.userId },
@@ -207,7 +369,6 @@ export async function observeMoment(
 			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		}),
 	]);
-	// The run ranks against the range the page showed it in, as it did there.
 	const [entry] = await flagRuns(env, caller.workspaceId, [run], settings, {
 		frustrationCheck,
 		rankAgainst: ranked.map((row) => ({
@@ -216,63 +377,7 @@ export async function observeMoment(
 		})),
 	});
 	if (!entry) throw new MomentNotFoundError("Run is not noticeable.");
-
-	const key = { ...ref, revision: run.revision };
-	const stored = (
-		await readObservations(env.sql, caller.workspaceId, [key], caller.viewerId)
-	).get(momentKey(ref));
-	if (stored) return stored;
-
-	if (
-		(await observationsToday(env.sql, caller.workspaceId, env.now())) >=
-		env.dailyLimit
-	)
-		throw new ObservationLimitError(
-			`This workspace has used today's ${env.dailyLimit} observations. Try again tomorrow.`,
-		);
-	const span = {
-		start: Math.min(...entry.flags.map((flag) => flag.spanStart)),
-		end: Math.max(...entry.flags.map((flag) => flag.spanEnd)),
-	};
-	const records = await readSpanText(
-		env.executor,
-		{
-			workspaceId: caller.workspaceId,
-			userId: run.user_id,
-			sessionId: run.session_id,
-			agentId: run.agent_id,
-			revision: run.revision,
-			parserVersion: run.parser_version,
-		},
-		span,
-	);
-	if (!records) throw new MomentNotFoundError("The run's records are gone.");
-	const result = await env.model.observe({
-		flags: entry.flags,
-		prompt: run.prompt_head,
-		records,
-	});
-	const id = await insertObservation(env.sql, {
-		...key,
-		workspaceId: caller.workspaceId,
-		runStartedAt: new Date(run.started_ms),
-		spanStart: span.start,
-		spanEnd: span.end,
-		...normalizeObservation(result.output, span),
-		model: env.model.model,
-		promptVersion: OBSERVATION_PROMPT_VERSION,
-		inputTokens: result.inputTokens,
-		outputTokens: result.outputTokens,
-		createdBy: caller.viewerId,
-	});
-	const saved = await readObservationById(
-		env.sql,
-		caller.workspaceId,
-		id,
-		caller.viewerId,
-	);
-	if (!saved) throw new MomentNotFoundError("Run not found.");
-	return saved;
+	return entry;
 }
 
 /**

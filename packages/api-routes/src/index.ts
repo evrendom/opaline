@@ -244,7 +244,11 @@ export {
 	type Moments,
 	type MomentsInput,
 	type NoticeableRun,
+	RUN_RECORD_TEXT_MAX_CHARS,
+	RUN_RECORDS_MAX,
+	type RunDetail,
 	type RunFlag,
+	type RunRecord,
 	withCompassDefaults,
 } from "./moments.js";
 

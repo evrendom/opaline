@@ -1,35 +1,156 @@
-/* Compass is built from the dashboard's cards (cost-dashboard.css): stat
-   cards, breakdown cards with hairline rows and the breakdown dialog. These
-   rules add only what the dashboard has no part for. */
+/* Compass is an inbox in the dashboard's colours (cost-dashboard.css): the
+   list of what was noticed on the left, everything about the selected one
+   on the right. These rules add only what the dashboard has no part for. */
 
-/* Moments take two of three columns, Patterns the third; one column when
-   the page is narrow. */
-.compass-grid {
+.compass-page {
+	container-type: inline-size;
+}
+.compass-split {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 16px;
-}
-.compass-grid > .compass-moments {
-	grid-column: span 2;
-}
-@container (max-width: 880px) {
-	.compass-grid {
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.compass-grid > .compass-moments {
-		grid-column: auto;
-	}
-}
-.compass-page .compass-grid .cost-breakdown-list {
-	height: 440px;
+	flex: 1;
+	grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+	min-height: 0;
+	border-top: 1px solid var(--cost-divider);
 }
 
-/* A row's copy: what to read first, and under it what the rule saw. */
-.compass-row-copy {
+/* The list pane: tabs and filters on top, the rows below. */
+.compass-list-pane {
 	display: flex;
 	flex-direction: column;
-	gap: 1px;
 	min-width: 0;
+	min-height: 0;
+	border-right: 1px solid var(--cost-border);
+}
+.compass-pane-toolbar {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+	min-height: 44px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--cost-divider);
+}
+.compass-tabs,
+.compass-toolbar-controls {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+.compass-tabs .cost-text-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.8125rem;
+	font-weight: 500;
+}
+.compass-tabs .cost-text-button[aria-selected="true"],
+.compass-toolbar-controls .cost-text-button[aria-pressed="true"],
+.compass-toolbar-controls .cost-text-button[data-popup-open] {
+	color: var(--cost-foreground);
+	background: var(--cost-hover);
+}
+.compass-tab-count {
+	color: var(--cost-muted);
+	font-variant-numeric: tabular-nums;
+	font-weight: 400;
+}
+.compass-icon-button {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px;
+}
+.compass-filter-count {
+	margin-left: 4px;
+	color: var(--cost-blue);
+	font-weight: 500;
+}
+.compass-list-summary {
+	flex-shrink: 0;
+	padding: 8px 18px 2px;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+.compass-list {
+	flex: 1;
+	min-height: 0;
+	padding: 4px 8px 16px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.compass-empty {
+	padding: 24px 12px;
+	color: var(--cost-muted);
+	font-size: 0.8125rem;
+	text-align: center;
+	text-wrap: pretty;
+}
+.compass-more {
+	display: flex;
+	justify-content: center;
+	padding: 8px 0 16px;
+}
+.compass-list-skeleton {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 10px;
+}
+.compass-list-skeleton > div {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+/* A row: glyph in a soft circle, two lines of copy, cost and day on the right. */
+.compass-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-width: 0;
+	padding: 10px;
+	border-radius: 10px;
+	text-align: left;
+	cursor: pointer;
+	outline: none;
+}
+.compass-item[aria-current="true"] {
+	background: var(--cost-hover);
+}
+.compass-item:focus-visible {
+	outline: 2px solid var(--cost-blue);
+	outline-offset: -2px;
+}
+.compass-item-icon {
+	display: grid;
+	flex-shrink: 0;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 999px;
+	background: color-mix(in oklch, var(--glyph-color) 14%, transparent);
+}
+.compass-item-copy {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.compass-item-side {
+	display: flex;
+	flex-shrink: 0;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 2px;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+.compass-row-title {
+	line-height: 1.35;
 }
 .compass-row-sub {
 	color: var(--cost-muted);
@@ -41,91 +162,43 @@
 	flex-shrink: 0;
 	color: var(--glyph-color);
 }
-.compass-row-when {
-	display: block;
-	color: var(--cost-muted);
-	font-size: 0.75rem;
-}
 .compass-row-muted {
 	color: var(--cost-muted);
 }
 .compass-row-muted .compass-row-title {
 	text-decoration: line-through;
 }
-.compass-more {
-	display: flex;
-	justify-content: center;
-	padding: 8px 0 36px;
-}
-
-/* Heading controls: muted text buttons, like the dashboard heading's unit. */
-.compass-heading-controls {
-	display: flex;
-	align-items: center;
-	gap: 2px;
-}
-.compass-heading-controls .cost-text-button[aria-pressed="true"],
-.compass-heading-controls .cost-text-button[data-popup-open] {
-	color: var(--cost-foreground);
-	background: var(--cost-hover);
-}
-.compass-filter-count {
-	margin-left: 4px;
-	color: var(--cost-blue);
-	font-weight: 500;
-}
-
-/* Your week: three moments side by side inside one card. */
-.compass-week {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 4px;
-	padding: 4px 8px 8px;
-}
-@container (max-width: 880px) {
-	.compass-week {
-		grid-template-columns: minmax(0, 1fr);
-	}
-}
-.compass-week-item {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	min-width: 0;
-	padding: 12px;
-	border-radius: 12px;
-	text-align: left;
-	cursor: pointer;
-	outline: none;
-}
-.compass-week-item:focus-visible {
-	outline: 2px solid var(--cost-blue);
-	outline-offset: -2px;
-}
-.compass-week-kind {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	color: var(--cost-muted);
-	font-size: 0.75rem;
-}
-.compass-week-text {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
-	line-height: 1.4;
-}
 .compass-page
-	[data-fluid-menu-root].compass-week
+	.compass-list[data-fluid-menu-root]
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
 	background: var(--cost-row-hover);
 }
 
-/* The dialogs: the dashboard's breakdown dialog, with a moment's or a
-   pattern's sections. */
-.compass-dialog-meta {
+/* The detail pane: one column of sections, like an issue page. */
+.compass-detail-pane {
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.compass-back {
+	display: none;
+}
+.compass-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 28px;
+	max-width: 880px;
+	margin: 0 auto;
+	padding: 28px 40px 64px;
+}
+.compass-detail-header {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.compass-detail-eyebrow {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -133,15 +206,280 @@
 	color: var(--cost-muted);
 	font-size: 0.75rem;
 }
-.compass-quote {
-	padding: 10px 12px;
-	border-radius: 8px;
+.compass-detail-title {
+	font-size: 1.375rem;
+	font-weight: 600;
+	line-height: 1.3;
+	text-wrap: pretty;
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	overflow: hidden;
+}
+.compass-detail-summary {
+	color: var(--cost-muted);
+	line-height: 1.5;
+	text-wrap: pretty;
+}
+.compass-detail-actions {
+	display: flex;
+	gap: 4px;
+	margin-left: -6px;
+}
+.compass-detail-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: 100%;
+	min-height: 240px;
+	color: var(--cost-muted);
+	font-size: 0.8125rem;
+}
+.compass-properties {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 32px;
+	padding: 12px 16px;
+	border-radius: 12px;
 	background: var(--cost-soft);
+	font-size: 0.8125rem;
+}
+.compass-properties dt {
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-properties dd {
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+.compass-detail-section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.compass-detail-section > h3 {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+/* Why it's here: one line per flag; a click jumps to its records. */
+.compass-flag-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-inline: -8px;
+}
+.compass-flag-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+	padding: 6px 8px;
+	border-radius: 8px;
+	font-size: 0.8125rem;
+	text-align: left;
+	cursor: pointer;
+}
+.compass-flag-item:hover {
+	background: var(--cost-row-hover);
+}
+.compass-flag-item > .font-medium {
+	flex-shrink: 0;
+}
+.compass-flag-item > .compass-row-sub {
+	flex: 1;
+	min-width: 0;
+}
+.compass-flag-span {
+	flex-shrink: 0;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+
+/* What went on: every record, a flag's records with its colour on the left. */
+.compass-timeline {
+	display: flex;
+	flex-direction: column;
+}
+.compass-timeline-item {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 6px 0 6px 12px;
+	border-left: 2px solid var(--cost-divider);
+	scroll-margin: 80px;
+}
+.compass-timeline-item[data-flagged] {
+	border-left-color: var(--flag-color);
+	background: color-mix(in oklch, var(--flag-color) 4%, transparent);
+}
+.compass-timeline-marker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	padding-bottom: 2px;
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+.compass-timeline-marker > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--glyph-color);
+}
+.compass-timeline-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	font-size: 0.8125rem;
+}
+.compass-timeline-icon {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+	color: var(--cost-muted);
+}
+.compass-timeline-label {
+	min-width: 0;
+	overflow: hidden;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.compass-timeline-group {
+	width: 100%;
+	text-align: left;
+	cursor: pointer;
+}
+.compass-timeline-group .compass-timeline-label {
+	color: var(--cost-muted);
+	font-weight: 400;
+}
+.compass-timeline-group:hover .compass-timeline-label {
+	color: var(--cost-foreground);
+}
+.compass-timeline-item[data-kind="user_prompt"] .compass-timeline-label {
+	font-weight: 600;
+}
+.compass-timeline-item[data-failed] .compass-timeline-icon,
+.compass-timeline-item[data-failed] .compass-timeline-label {
+	color: oklch(0.577 0.245 27.325);
+}
+.compass-timeline-meta {
+	flex-shrink: 0;
+	margin-left: auto;
+	padding-right: 4px;
+	color: var(--cost-muted);
+	font-size: 0.6875rem;
+	font-variant-numeric: tabular-nums;
+}
+.compass-timeline-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+	margin-left: 22px;
 	color: var(--cost-muted);
 	font-size: 0.8125rem;
 	line-height: 1.45;
+	text-align: left;
+	white-space: pre-wrap;
 	overflow-wrap: anywhere;
+	cursor: default;
 }
+.compass-timeline-text[data-long] {
+	cursor: pointer;
+}
+.compass-timeline-text[data-open] {
+	display: block;
+	color: var(--cost-foreground);
+}
+.compass-timeline-item[data-kind="tool_call"] .compass-timeline-text,
+.compass-timeline-item[data-kind="tool_result"] .compass-timeline-text {
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.75rem;
+}
+.compass-timeline-item[data-kind="user_prompt"] .compass-timeline-text {
+	color: var(--cost-foreground);
+}
+
+/* Runs that show a pattern. */
+.compass-example-list {
+	display: flex;
+	flex-direction: column;
+	margin-inline: -8px;
+}
+.compass-example {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px;
+	border-radius: 8px;
+	font-size: 0.8125rem;
+}
+
+/* What Compass catches: the settings popover beside the filters. */
+.compass-settings-heading {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px 8px 4px;
+}
+.compass-settings-list {
+	display: flex;
+	flex-direction: column;
+	max-height: min(60vh, 520px);
+	overflow-y: auto;
+}
+.compass-settings-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 34px;
+	padding: 4px 8px;
+	border-radius: 8px;
+	font-size: 0.8125rem;
+}
+.compass-settings-label {
+	flex: 1;
+	min-width: 0;
+	cursor: pointer;
+}
+.compass-settings-value {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 6px;
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+}
+.compass-settings-value input {
+	width: 56px;
+	height: 26px;
+	padding: 0 6px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--foreground);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.compass-settings-value input:disabled {
+	opacity: 0.5;
+}
+.compass-settings-value input:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: -1px;
+}
+
+/* Observation, chips, votes, fixes and weeks. */
 .compass-observation {
 	display: flex;
 	flex-direction: column;
@@ -164,6 +502,7 @@
 	padding: 0 8px;
 	border-radius: 6px;
 	background: var(--cost-surface);
+	color: var(--cost-foreground);
 	font-size: 0.75rem;
 	font-weight: 500;
 	box-shadow:
@@ -206,8 +545,9 @@
 	background: var(--cost-hover);
 }
 .compass-hint {
-	color: var(--cost-muted);
+	color: var(--cost-muted, var(--muted-foreground));
 	font-size: 0.75rem;
+	font-weight: 400;
 }
 .compass-error {
 	color: oklch(0.577 0.245 27.325);
@@ -228,10 +568,10 @@
 }
 .compass-note {
 	width: 100%;
-	min-height: 64px;
+	min-height: 72px;
 	padding: 8px 10px;
 	border: 1px solid var(--cost-border);
-	border-radius: 6px;
+	border-radius: 8px;
 	background: transparent;
 	font-size: 0.875rem;
 	resize: vertical;
@@ -240,9 +580,6 @@
 	outline: 2px solid var(--cost-blue);
 	outline-offset: -1px;
 }
-
-/* Moments per week, as the dashboard's bars: amber before a fix, green in
-   the weeks after its own. */
 .compass-weeks {
 	display: flex;
 	align-items: flex-end;
@@ -256,27 +593,32 @@
 	border-radius: 3px;
 	background: color-mix(in oklch, var(--bar-color) 55%, transparent);
 }
-
-/* Up to three flag glyphs before a run's copy. */
 .compass-glyphs {
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;
 	gap: 2px;
 }
-/* A run's flags in its dialog: glyph, name, what it saw. */
-.compass-flags {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	font-size: 0.8125rem;
-}
-.compass-flags > li {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	min-width: 0;
-}
-.compass-flags > li > .font-medium {
-	flex-shrink: 0;
+
+/* Narrow pages: the list and the detail take turns. */
+@container (max-width: 760px) {
+	.compass-split {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.compass-list-pane {
+		border-right: 0;
+	}
+	.compass-split:not([data-reading]) .compass-detail-pane,
+	.compass-split[data-reading] .compass-list-pane {
+		display: none;
+	}
+	.compass-back {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin: 12px 0 0 14px;
+	}
+	.compass-detail {
+		padding: 16px 20px 48px;
+	}
 }
