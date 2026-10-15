@@ -7,6 +7,7 @@ import {
 	readFile,
 	rm,
 	stat,
+	utimes,
 	writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -576,7 +577,26 @@ describe("repository evidence upload building", () => {
 				objects: upload.objects,
 			},
 		};
-		await writePendingRepositoryEvidence(secondPending, configDir);
+		const secondPendingPath = await writePendingRepositoryEvidence(
+			secondPending,
+			configDir,
+		);
+		// Distinct ages avoid submillisecond filesystem timestamps deciding the order.
+		const firstAge = new Date("2026-01-01T00:00:00.000Z");
+		const secondAge = new Date("2026-01-02T00:00:00.000Z");
+		await utimes(pendingPath, firstAge, firstAge);
+		await utimes(secondPendingPath, secondAge, secondAge);
+		const [nextBeforeDeferred] = await readPendingRepositoryEvidence(
+			configDir,
+			{
+				actorId: scope.actorId,
+				endpoint: "https://opaline.so/rpc",
+				maxItems: 1,
+			},
+		);
+		expect(nextBeforeDeferred?.upload.input.operationId).toBe(
+			upload.input.operationId,
+		);
 		if (!restored) throw new Error("Expected restored pending evidence");
 		await deferPendingRepositoryEvidence(restored, configDir);
 		const [nextAfterDeferred] = await readPendingRepositoryEvidence(configDir, {

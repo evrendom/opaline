@@ -57,6 +57,10 @@ describe("the fact review page", async () => {
 	const data = embeddedData(html);
 
 	test("embeds every catalog fact, once, with what each agent has", () => {
+		const mappings = withMappingEvidence(
+			FACT_CATALOG,
+			mappingCorpus(census, data.corpus.label),
+		);
 		expect(data.facts.map((fact) => fact.key)).toEqual(
 			FACT_CATALOG.map(factReviewKey),
 		);
@@ -65,10 +69,7 @@ describe("the fact review page", async () => {
 		);
 		FACT_CATALOG.forEach((entry, index) => {
 			const fact = data.facts[index];
-			const mapping = withMappingEvidence(
-				[entry],
-				mappingCorpus(census, data.corpus.label),
-			)[0];
+			const mapping = mappings[index];
 			if (mapping === undefined) throw new Error("Missing mapping");
 			expect(fact?.id).toBe(entry.id);
 			expect(fact?.hash).toBe(factEntryHash(entry));
@@ -88,15 +89,7 @@ describe("the fact review page", async () => {
 		});
 		expect(data.meta).toEqual(META);
 		for (const agent of FACT_AGENTS)
-			expect(data.metrics[agent]).toEqual(
-				mappingMetrics(
-					withMappingEvidence(
-						FACT_CATALOG,
-						mappingCorpus(census, data.corpus.label),
-					),
-					agent,
-				),
-			);
+			expect(data.metrics[agent]).toEqual(mappingMetrics(mappings, agent));
 	});
 
 	test("every census path appears in its agent's outline exactly once", () => {

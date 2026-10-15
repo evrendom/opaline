@@ -141,8 +141,20 @@ test("renders repeated XML fields without duplicate React keys", async ({
 });
 
 async function readRenderMetrics(page: Page) {
-	// Vite can reload after a readiness assertion. Resolve a completed result
-	// again and read every measurement in the same browser task.
+	let metrics:
+		| Awaited<ReturnType<typeof readCompletedRenderMetrics>>
+		| undefined;
+	// Vite may destroy the execution context even after the locator resolves.
+	// Retry the read across navigation; the resource assertions still run once
+	// against a complete, validated set of measurements.
+	await expect(async () => {
+		metrics = await readCompletedRenderMetrics(page);
+	}).toPass({ timeout: 5_000 });
+	if (metrics === undefined) throw new Error("Render metrics were not read");
+	return metrics;
+}
+
+async function readCompletedRenderMetrics(page: Page) {
 	return page
 		.locator('#render-result[data-complete="true"]')
 		.evaluate((result) => {
