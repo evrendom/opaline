@@ -109,6 +109,18 @@ One model response and the tool calls it made; the smallest part of a run with i
 **Call**:
 One tool call the agent made; it has a duration but no tokens of its own.
 
+**Moment**:
+A run made noticeable by one or more flags: deterministic checks over the run's records, such as long searching before the first edit, a cost or duration among the range's top, one file edited again and again, a failing streak, CI failing, work reverted with git, denied calls, an interruption, a compaction, the agent apologizing, or the member's next prompt reading frustrated. Each flag points at a range of the run's records. Flags are rules a workspace can turn off or tune, never a model's judgement, except that the frustration flag also counts SubQ's yes/no answer about the next prompt; whether it was real friction is the observation's call.
+_Avoid_: incident, issue, finding (an analysis's answer)
+
+**Observation**:
+What a model wrote about one noticeable run after reading only its flagged records: what happened, the records that show it, the layer a fix belongs to, and one concrete lesson. Made on a member's request and kept; an observation can say the rule matched normal work.
+_Avoid_: summary, insight
+
+**Pattern**:
+Observations of a range that say the same thing within one layer, grouped by their words. A team can record the fix it made against a pattern and see how often the pattern happens since.
+_Avoid_: cluster, theme
+
 ## Relationships
 
 - A **Session** belongs to exactly one **Member**; a **Run** belongs to exactly one **Session**
@@ -116,6 +128,7 @@ One tool call the agent made; it has a duration but no tokens of its own.
 - An **Analysis** has ordered **Steps**; a **Step** may follow from an earlier **Step** and is answered by **Queries** or by the asker's reply
 - A **Session** has zero or more **Setup snapshots** (taken when it starts, resumes, checkpoints and ends); a finding about why a run went wrong cites the snapshot that run ran under, never a local checkout
 - **Re-asks** and **Recurring requests** both mark runs a skill might have helped; which fix fits is decided only after reading those runs
+- A **Run** is a **Moment** when at least one flag marks it; it has at most one current **Observation**; a **Pattern** groups **Observations**, never **Moments** directly
 - A **Run question**'s answer only says where to read; a finding needs the runs read, never the probabilities alone
 - An **Update** points to the **Analysis** it updates; the earlier one stays as it was
 - An **Analysis** links to at most one **Analysis session**, which supplies its **Analysis cost**

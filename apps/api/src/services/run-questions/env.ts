@@ -7,6 +7,7 @@ import {
 } from "../analysis/agent-query-slots.js";
 import { visibleGitHubRepositories } from "../analysis/github-access.js";
 import { createPostgresSqlQuota } from "../analysis/sql-results.js";
+import { workspaceFeatureEnabled } from "../workspace-features.js";
 import type { AgentRunsEnv } from "./agent-runs.js";
 import { findRunQuestions, listRunQuestions } from "./catalogue.js";
 import type { PrecomputeEnv } from "./precompute.js";
@@ -16,7 +17,6 @@ import {
 } from "./provider.js";
 import type { RunQuestionsEnv } from "./run-questions.service.js";
 import type { SessionAnswersEnv } from "./session-answers.js";
-import { runQuestionTagsEnabled } from "./tags-rollout.js";
 
 /** Run questions as the API runs them, configured from the environment. */
 export function runQuestionsEnv(): RunQuestionsEnv {
@@ -47,14 +47,20 @@ export function precomputeEnv(): PrecomputeEnv {
 /**
  * What the dashboard's answer reads need: the workspace gate and the
  * catalogue's labels. A workspace sees tags only when its runs are answered
- * and it is on the tags rollout (`runQuestionTagsEnabled`).
+ * and the run question tags feature is on for it (`workspace-features.ts`:
+ * its admin switch, else RUN_QUESTION_TAGS_WORKSPACES).
  */
 export function sessionAnswersEnv(): SessionAnswersEnv {
 	const answered = readRunQuestionWorkspaces();
 	return {
 		executor: getClickhouse(),
-		mayAnswer: (workspaceId) =>
-			answered(workspaceId) && runQuestionTagsEnabled(workspaceId),
+		mayAnswer: async (workspaceId) =>
+			answered(workspaceId) &&
+			(await workspaceFeatureEnabled(
+				sqlClient,
+				"run_question_tags",
+				workspaceId,
+			)),
 		labelsOf: async (ids) =>
 			new Map(
 				(await findRunQuestions(sqlClient, ids)).map((question) => [

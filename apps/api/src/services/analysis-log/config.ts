@@ -80,7 +80,7 @@ export function listsWorkspace(
  * Workspaces a comma-separated variable names: `*` alone is every workspace,
  * ids name some, empty or missing is none. `*` among ids is an error.
  */
-function workspaceList(variable: string): {
+export function workspaceList(variable: string): {
 	all: boolean;
 	ids: string[];
 	error: string | null;

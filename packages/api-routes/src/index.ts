@@ -220,6 +220,42 @@ export {
 
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { momentsContract } from "./moments.js";
+import { workspaceFeaturesAdminContract } from "./workspace-features.js";
+
+export {
+	COMPASS_FLAGS,
+	type CompassFlagValue,
+	type CompassRunRef,
+	type CompassSettings,
+	CompassSettingsSchema,
+	defaultCompassSettings,
+	MOMENT_KINDS,
+	MOMENT_LAYERS,
+	MOMENTS_MAX_LIMIT,
+	type MomentKind,
+	MomentKindSchema,
+	type MomentLayer,
+	MomentLayerSchema,
+	type MomentObservation,
+	MomentObservationSchema,
+	type MomentPattern,
+	type MomentPatterns,
+	type Moments,
+	type MomentsInput,
+	type NoticeableRun,
+	type RunFlag,
+	withCompassDefaults,
+} from "./moments.js";
+
+export {
+	type AdminWorkspaceFeatures,
+	type AdminWorkspaceFeaturesRow,
+	WORKSPACE_FEATURES,
+	type WorkspaceFeatureKey,
+	WorkspaceFeatureKeySchema,
+	type WorkspaceFeatureState,
+} from "./workspace-features.js";
 
 import {
 	AdminCostDashboardInputSchema,
@@ -1143,6 +1179,7 @@ export const contract = {
 			.input(AdminCostDashboardInputSchema)
 			.output(CostDashboardSchema),
 		runQuestions: runQuestionsAdminContract,
+		workspaceFeatures: workspaceFeaturesAdminContract,
 	},
 	productAnalytics: {
 		dashboardViewed: oc
@@ -1156,6 +1193,8 @@ export const contract = {
 			.output(ProductAnalyticsCaptureResultSchema),
 	},
 	analytics: {
+		/** Moments, observations and patterns (`moments.ts`). */
+		moments: momentsContract,
 		overview: {
 			costs: oc.input(CostDashboardInputSchema).output(CostDashboardSchema),
 			kpis: oc.input(DateRangeInputSchema).output(OverviewKPIsSchema),

@@ -4,6 +4,8 @@ import {
 	IconBookFilled,
 	IconChartAreaLine,
 	IconChartAreaLineFilled,
+	IconCompass,
+	IconCompassFilled,
 	IconFolder,
 	IconFolderFilled,
 	IconMessages,
@@ -19,6 +21,7 @@ import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import type { ShellNavTone } from "@/features/shell/components/shell-nav-icon";
 
 export type ShellRouteId =
+	| "compass"
 	| "dashboard"
 	| "sessions"
 	| "skills"
@@ -73,6 +76,17 @@ export type ShellRouteDefinition = {
 };
 
 export const shellRoutes = [
+	{
+		id: "compass",
+		comingSoon: false,
+		path: appRoutes.compass(),
+		title: "Compass",
+		navLabel: "Compass",
+		shortcut: "C",
+		icon: IconCompass,
+		activeIcon: IconCompassFilled,
+		tone: tones.opal1,
+	},
 	{
 		id: "dashboard",
 		comingSoon: false,
@@ -152,13 +166,14 @@ export const shellRoutes = [
 ] satisfies readonly ShellRouteDefinition[];
 
 export const shellRouteMap = {
-	dashboard: shellRoutes[0],
-	sessions: shellRoutes[1],
-	skills: shellRoutes[2],
-	agentTraces: shellRoutes[3],
-	repos: shellRoutes[4],
-	team: shellRoutes[5],
-	settings: shellRoutes[6],
+	compass: shellRoutes[0],
+	dashboard: shellRoutes[1],
+	sessions: shellRoutes[2],
+	skills: shellRoutes[3],
+	agentTraces: shellRoutes[4],
+	repos: shellRoutes[5],
+	team: shellRoutes[6],
+	settings: shellRoutes[7],
 } as const;
 
 // The plugin app is read-only; settings stay on opaline.so.
@@ -167,7 +182,9 @@ export const shellNavigationRoutes = shellRoutes.filter(
 		!route.comingSoon &&
 		!(
 			import.meta.env.MODE === "plugin" &&
-			(route.id === "settings" || route.id === "agentTraces")
+			(route.id === "settings" ||
+				route.id === "agentTraces" ||
+				route.id === "compass")
 		),
 );
 

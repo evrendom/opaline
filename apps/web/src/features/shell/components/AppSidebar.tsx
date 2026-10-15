@@ -14,6 +14,7 @@ import {
 } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useAgentTracesEnabled } from "@/features/agent-traces/use-agent-traces-access";
+import { useCompassEnabled } from "@/features/compass/use-compass-access";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
 import { SidebarWorkspaceSwitcher } from "@/features/shell/components/SidebarWorkspaceSwitcher";
@@ -67,10 +68,13 @@ function SidebarNavItem({
 
 export function AppSidebar() {
 	const currentShellRoute = useCurrentShellRoute();
-	// Agent traces shows only in the workspaces it is open to.
+	// Compass and Agent traces show only in the workspaces they are open to.
 	const agentTracesEnabled = useAgentTracesEnabled();
+	const compassEnabled = useCompassEnabled();
 	const visibleRoutes = primaryRoutes.filter(
-		(route) => route.id !== "agentTraces" || agentTracesEnabled,
+		(route) =>
+			(route.id !== "agentTraces" || agentTracesEnabled) &&
+			(route.id !== "compass" || compassEnabled),
 	);
 
 	return (

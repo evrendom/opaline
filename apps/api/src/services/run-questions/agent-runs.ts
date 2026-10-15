@@ -27,7 +27,7 @@ import {
  */
 
 export interface AgentRunsEnv extends Pick<SessionAnswersEnv, "executor"> {
-	mayAnswer(workspaceId: string): boolean;
+	mayAnswer(workspaceId: string): Promise<boolean>;
 	/** The questions answered now, to filter and name answers by. */
 	onQuestions(): Promise<Pick<RunQuestion, "id" | "question" | "label">[]>;
 }
@@ -47,7 +47,7 @@ export async function listAgentRuns(
 	scope: SessionAnswersScope,
 	request: AgentRunsRequest,
 ): Promise<AgentRuns> {
-	const enabled = env.mayAnswer(scope.workspaceId);
+	const enabled = await env.mayAnswer(scope.workspaceId);
 	const cursor =
 		request.cursor === undefined ? null : parseCursor(request.cursor);
 	const [rows, questions] = await Promise.all([

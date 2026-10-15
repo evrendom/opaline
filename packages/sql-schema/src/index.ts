@@ -5,6 +5,13 @@ export {
 } from "./github-outcomes-schema.js";
 export * from "./github-repository-evidence-schema.js";
 export * from "./l1-edge-schema.js";
+export {
+	compassSettings,
+	momentFeedback,
+	momentFix,
+	momentObservation,
+	promptFrustration,
+} from "./moment-schema.js";
 export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";
 export type {
@@ -109,3 +116,4 @@ export {
 	usageDigestDelivery,
 	usageDigestPreference,
 } from "./usage-digest-schema.js";
+export { workspaceFeature } from "./workspace-feature-schema.js";

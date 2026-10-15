@@ -1,0 +1,282 @@
+/* Compass is built from the dashboard's cards (cost-dashboard.css): stat
+   cards, breakdown cards with hairline rows and the breakdown dialog. These
+   rules add only what the dashboard has no part for. */
+
+/* Moments take two of three columns, Patterns the third; one column when
+   the page is narrow. */
+.compass-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 16px;
+}
+.compass-grid > .compass-moments {
+	grid-column: span 2;
+}
+@container (max-width: 880px) {
+	.compass-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.compass-grid > .compass-moments {
+		grid-column: auto;
+	}
+}
+.compass-page .compass-grid .cost-breakdown-list {
+	height: 440px;
+}
+
+/* A row's copy: what to read first, and under it what the rule saw. */
+.compass-row-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+.compass-row-sub {
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-row-glyph {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+	color: var(--glyph-color);
+}
+.compass-row-when {
+	display: block;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-row-muted {
+	color: var(--cost-muted);
+}
+.compass-row-muted .compass-row-title {
+	text-decoration: line-through;
+}
+.compass-more {
+	display: flex;
+	justify-content: center;
+	padding: 8px 0 36px;
+}
+
+/* Heading controls: muted text buttons, like the dashboard heading's unit. */
+.compass-heading-controls {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+.compass-heading-controls .cost-text-button[aria-pressed="true"],
+.compass-heading-controls .cost-text-button[data-popup-open] {
+	color: var(--cost-foreground);
+	background: var(--cost-hover);
+}
+.compass-filter-count {
+	margin-left: 4px;
+	color: var(--cost-blue);
+	font-weight: 500;
+}
+
+/* Your week: three moments side by side inside one card. */
+.compass-week {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 4px;
+	padding: 4px 8px 8px;
+}
+@container (max-width: 880px) {
+	.compass-week {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+.compass-week-item {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: 12px;
+	border-radius: 12px;
+	text-align: left;
+	cursor: pointer;
+	outline: none;
+}
+.compass-week-item:focus-visible {
+	outline: 2px solid var(--cost-blue);
+	outline-offset: -2px;
+}
+.compass-week-kind {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-week-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	line-height: 1.4;
+}
+.compass-page
+	[data-fluid-menu-root].compass-week
+	> .fluid-menu-hover-layer
+	.fluid-menu-hover-fill {
+	background: var(--cost-row-hover);
+}
+
+/* The dialogs: the dashboard's breakdown dialog, with a moment's or a
+   pattern's sections. */
+.compass-dialog-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-quote {
+	padding: 10px 12px;
+	border-radius: 8px;
+	background: var(--cost-soft);
+	color: var(--cost-muted);
+	font-size: 0.8125rem;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+.compass-observation {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 14px;
+	border-radius: 12px;
+	box-shadow: var(--custom-shadow);
+	background: var(--card);
+	font-size: 0.875rem;
+	line-height: 1.45;
+}
+.compass-observation-lesson {
+	font-weight: 500;
+}
+.compass-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 8px;
+	border-radius: 6px;
+	background: var(--cost-surface);
+	font-size: 0.75rem;
+	font-weight: 500;
+	box-shadow:
+		0 0 0 0.5px #0000000f,
+		0 1px 1px -1px #0000001a,
+		0 1px 2px 0 #0000000d;
+}
+.dark .compass-chip {
+	box-shadow: 0 0 0 0.5px #ffffff12 inset;
+}
+.compass-chip > i {
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--chip-color);
+}
+.compass-evidence {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	color: var(--cost-muted);
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.75rem;
+	overflow-wrap: anywhere;
+}
+.compass-feedback {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-feedback .cost-text-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.compass-feedback .cost-text-button[aria-pressed="true"] {
+	color: var(--cost-foreground);
+	background: var(--cost-hover);
+}
+.compass-hint {
+	color: var(--cost-muted);
+	font-size: 0.75rem;
+}
+.compass-error {
+	color: oklch(0.577 0.245 27.325);
+	font-size: 0.75rem;
+}
+.compass-fix {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 12px 14px;
+	border-radius: 12px;
+	background: color-mix(in oklch, oklch(0.723 0.192 149.579) 10%, transparent);
+	font-size: 0.8125rem;
+}
+.compass-fix-rate {
+	color: var(--cost-muted);
+	font-variant-numeric: tabular-nums;
+}
+.compass-note {
+	width: 100%;
+	min-height: 64px;
+	padding: 8px 10px;
+	border: 1px solid var(--cost-border);
+	border-radius: 6px;
+	background: transparent;
+	font-size: 0.875rem;
+	resize: vertical;
+}
+.compass-note:focus {
+	outline: 2px solid var(--cost-blue);
+	outline-offset: -1px;
+}
+
+/* Moments per week, as the dashboard's bars: amber before a fix, green in
+   the weeks after its own. */
+.compass-weeks {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 44px;
+}
+.compass-weeks > span {
+	flex: 1;
+	min-width: 3px;
+	max-width: 20px;
+	border-radius: 3px;
+	background: color-mix(in oklch, var(--bar-color) 55%, transparent);
+}
+
+/* Up to three flag glyphs before a run's copy. */
+.compass-glyphs {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 2px;
+}
+/* A run's flags in its dialog: glyph, name, what it saw. */
+.compass-flags {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 0.8125rem;
+}
+.compass-flags > li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+.compass-flags > li > .font-medium {
+	flex-shrink: 0;
+}

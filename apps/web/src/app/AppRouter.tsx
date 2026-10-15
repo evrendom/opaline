@@ -43,6 +43,10 @@ const RunQuestionsAdminPage = lazyNamed(
 	() => import("@/features/admin/RunQuestionsAdminPage"),
 	"RunQuestionsAdminPage",
 );
+const WorkspaceFeaturesAdminPage = lazyNamed(
+	() => import("@/features/admin/WorkspaceFeaturesAdminPage"),
+	"WorkspaceFeaturesAdminPage",
+);
 const CliOnboardingPage = lazyNamed(
 	() => import("@/features/cli-onboarding/cli-onboarding-page"),
 	"CliOnboardingPage",
@@ -60,6 +64,14 @@ const NewSessionPage = lazyNamed(
 const ReposPage = lazyNamed(
 	() => import("@/features/repos/repos-page"),
 	"ReposPage",
+);
+const CompassSettingsPage = lazyNamed(
+	() => import("@/features/compass/CompassSettingsPage"),
+	"CompassSettingsPage",
+);
+const CompassPage = lazyNamed(
+	() => import("@/features/compass/CompassPage"),
+	"CompassPage",
 );
 const AgentTracesPage = lazyNamed(
 	() => import("@/features/agent-traces/AgentTracesPage"),
@@ -104,6 +116,7 @@ const LEGACY_SESSION_SPLIT_PATH = "/session/split";
 
 type ShellRoutePaths = {
 	home: string;
+	compass: string;
 	dashboard: string;
 	session: string;
 	skills: string;
@@ -117,6 +130,7 @@ type ShellRoutePaths = {
 
 const canonicalShellRoutePaths: ShellRoutePaths = {
 	home: appRoutes.home(),
+	compass: appRoutes.compass(),
 	dashboard: appRoutes.dashboard(),
 	session: appRoutes.session(),
 	skills: appRoutes.skills(),
@@ -130,6 +144,7 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 
 const workspaceShellRoutePaths: ShellRoutePaths = {
 	home: "/:workspaceSlug/home",
+	compass: "/:workspaceSlug/compass",
 	dashboard: "/:workspaceSlug/dashboard",
 	session: "/:workspaceSlug/sessions",
 	skills: "/:workspaceSlug/skills",
@@ -226,6 +241,10 @@ function getShellRouteElements(
 				}
 			/>
 			<Route
+				path={routePaths.compass}
+				element={<LazyRoute Component={CompassPage} />}
+			/>
+			<Route
 				path={routePaths.agentTraces}
 				element={<LazyRoute Component={AgentTracesPage} />}
 			/>
@@ -262,6 +281,10 @@ function getShellRouteElements(
 							fallback={<SettingsPageSkeleton routeId="workspace" />}
 						/>
 					}
+				/>
+				<Route
+					path={settingsRouteMap.compass.segment}
+					element={<LazyRoute Component={CompassSettingsPage} />}
 				/>
 				<Route
 					path={settingsRouteMap.sessions.segment}
@@ -340,6 +363,10 @@ export function AppRouter({
 			<Route
 				path={appRoutes.adminRunQuestions()}
 				element={<LazyRoute Component={RunQuestionsAdminPage} />}
+			/>
+			<Route
+				path={appRoutes.adminFeatures()}
+				element={<LazyRoute Component={WorkspaceFeaturesAdminPage} />}
 			/>
 			<Route
 				path="/:workspaceSlug/join/:token"

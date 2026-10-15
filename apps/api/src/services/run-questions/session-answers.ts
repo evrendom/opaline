@@ -29,7 +29,7 @@ import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 export interface SessionAnswersEnv {
 	readonly executor: ClickHouseExecutor;
 	/** Whether the workspace's runs are answered and the dashboard may show them (env.ts). */
-	mayAnswer(workspaceId: string): boolean;
+	mayAnswer(workspaceId: string): Promise<boolean>;
 	/** The short names of these questions from the catalogue, by id; a question without one maps to null. */
 	labelsOf(
 		questionIds: readonly string[],
@@ -60,7 +60,7 @@ export async function sessionRunQuestionTags(
 	scope: SessionAnswersScope,
 	sessionIds: readonly string[],
 ): Promise<SessionRunQuestionTags> {
-	if (!env.mayAnswer(scope.workspaceId))
+	if (!(await env.mayAnswer(scope.workspaceId)))
 		return { enabled: false, sessions: [] };
 	const answers = (await readSessionAnswers(env, scope, sessionIds)).filter(
 		(answer) => answer.probability >= RUN_QUESTION_YES_PROBABILITY,
@@ -98,7 +98,8 @@ export async function sessionRunAnswers(
 	scope: SessionAnswersScope,
 	sessionId: string,
 ): Promise<SessionRunAnswers> {
-	if (!env.mayAnswer(scope.workspaceId)) return { enabled: false, runs: [] };
+	if (!(await env.mayAnswer(scope.workspaceId)))
+		return { enabled: false, runs: [] };
 	const answers = await readSessionAnswers(env, scope, [sessionId]);
 	const labels = await labelsFor(env, answers);
 	const runs = new Map<string, SessionRunAnswersRun>();

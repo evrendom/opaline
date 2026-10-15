@@ -20,6 +20,7 @@ import {
 	AssistantPanel,
 	useAssistantShortcut,
 } from "@/features/assistant/AssistantPanel";
+import { useCompassEnabled } from "@/features/compass/use-compass-access";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
@@ -132,6 +133,7 @@ export function LeftSidebarAppShellLayout() {
 	const isSkillsWorkspaceRoute = [
 		appRoutes.skills(),
 		appRoutes.agentTraces(),
+		appRoutes.compass(),
 		appRoutes.repos(),
 	].includes(canonicalPathname);
 	const isSettingsWorkspaceRoute =
@@ -162,6 +164,7 @@ export function LeftSidebarAppShellLayout() {
 	const openAssistant = React.useCallback(() => setAssistantOpen(true), []);
 	useAssistantShortcut(openAssistant, assistantAvailable && !assistantOpen);
 	const agentTracesEnabled = useAgentTracesEnabled();
+	const compassEnabled = useCompassEnabled();
 
 	React.useEffect(() => {
 		const handleShellShortcutKeyDown = (event: KeyboardEvent) => {
@@ -182,7 +185,9 @@ export function LeftSidebarAppShellLayout() {
 				shellShortcutRouteByKey[event.key.toLowerCase()];
 			if (
 				!canonicalNextPath ||
-				(canonicalNextPath === appRoutes.agentTraces() && !agentTracesEnabled)
+				(canonicalNextPath === appRoutes.agentTraces() &&
+					!agentTracesEnabled) ||
+				(canonicalNextPath === appRoutes.compass() && !compassEnabled)
 			) {
 				return;
 			}
@@ -205,6 +210,7 @@ export function LeftSidebarAppShellLayout() {
 		navigate,
 		isWelcome,
 		agentTracesEnabled,
+		compassEnabled,
 	]);
 
 	const shellWindowContent = (

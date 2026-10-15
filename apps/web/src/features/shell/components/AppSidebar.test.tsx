@@ -63,6 +63,11 @@ vi.mock("@/features/agent-traces/use-agent-traces-access", () => ({
 	useAgentTracesEnabled: () => agentTraces.enabled,
 }));
 
+const compass = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/features/compass/use-compass-access", () => ({
+	useCompassEnabled: () => compass.enabled,
+}));
+
 function renderSidebar() {
 	return render(
 		<MemoryRouter>
@@ -107,6 +112,22 @@ describe("AppSidebar", () => {
 			"Team",
 		]);
 		agentTraces.enabled = false;
+	});
+
+	it("shows Compass first only where the workspace has it", () => {
+		compass.enabled = true;
+		renderSidebar();
+
+		const navigation = screen.getByRole("navigation", { name: "Primary" });
+		expect(
+			within(navigation)
+				.getAllByRole("link")
+				.map((link) => link.textContent),
+		).toEqual(["Compass", "Dashboard", "Sessions", "Skills", "Repos", "Team"]);
+		expect(
+			within(navigation).getByRole("link", { name: "Compass" }),
+		).toHaveAttribute("href", "/compass");
+		compass.enabled = false;
 	});
 
 	it("offers the install command above settings", () => {

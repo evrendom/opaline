@@ -1216,7 +1216,7 @@ function sparklineTotals(
 // shows a faint sample curve, so the card reads as "trend goes here".
 const SAMPLE_SPARKLINE = [0.3, 0.45, 0.38, 0.55, 0.48, 0.66, 0.58, 0.75];
 
-function MetricSparkline({ values }: { values: number[] | undefined }) {
+export function MetricSparkline({ values }: { values: number[] | undefined }) {
 	const gradientId = useId().replace(/[^\w-]/g, "");
 	const points = values?.filter((value) => Number.isFinite(value)) ?? [];
 	const placeholder = points.length < 2;

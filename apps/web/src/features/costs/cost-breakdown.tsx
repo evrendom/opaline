@@ -466,7 +466,7 @@ function BreakdownSkeleton() {
  * ScrollFade: a scrolling list with fades over the top edge once
  * scrolled and over the bottom while more rows are below.
  */
-function ScrollFade({
+export function ScrollFade({
 	className,
 	children,
 	...props

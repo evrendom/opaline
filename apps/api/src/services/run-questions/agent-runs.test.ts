@@ -34,7 +34,7 @@ function envOf(
 	const executor = executorOf(responses);
 	const env: AgentRunsEnv = {
 		executor,
-		mayAnswer: () => mayAnswer,
+		mayAnswer: async () => mayAnswer,
 		onQuestions: async () => [
 			{ id: "rq_a", question: "Did the agent hunt for files?", label: "Hunt" },
 		],

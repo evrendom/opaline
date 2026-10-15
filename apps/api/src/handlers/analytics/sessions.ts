@@ -14,7 +14,6 @@ import {
 	InvalidAgentRunsCursorError,
 	listAgentRuns,
 } from "../../services/run-questions/agent-runs.js";
-import { agentTracesEnabled } from "../../services/run-questions/agent-traces-rollout.js";
 import {
 	agentRunsEnv,
 	sessionAnswersEnv,
@@ -49,6 +48,7 @@ import {
 	type SessionReader,
 } from "../../services/session-visibility.js";
 import { listUploadFailures } from "../../services/upload-failure.service.js";
+import { workspaceFeatureEnabled } from "../../services/workspace-features.js";
 import { requireSessionDetailOwnerAccess } from "./session-detail-access.js";
 import {
 	throwSessionDetailRevisionError,
@@ -178,7 +178,7 @@ const runAnswers = os.analytics.sessions.runAnswers
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => {
 		const env = sessionAnswersEnv();
-		if (!env.mayAnswer(context.organizationId))
+		if (!(await env.mayAnswer(context.organizationId)))
 			return { enabled: false, runs: [] };
 		const ownerId = requireSessionDetailOwnerAccess(
 			await getSessionOwner(context.organizationId, input.sessionId),
@@ -191,11 +191,18 @@ const runAnswers = os.analytics.sessions.runAnswers
 		);
 	});
 
-/** Whether the caller's workspace may open Agent traces (`agent-traces-rollout.ts`). */
+/**
+ * Whether the caller's workspace may open Agent traces: its admin switch,
+ * else AGENT_TRACES_WORKSPACES (`workspace-features.ts`).
+ */
 const agentTracesAccess = os.analytics.sessions.agentTracesAccess
 	.use(orgMiddleware)
-	.handler(({ context }) => ({
-		enabled: agentTracesEnabled(context.organizationId),
+	.handler(async ({ context }) => ({
+		enabled: await workspaceFeatureEnabled(
+			sqlClient,
+			"agent_traces",
+			context.organizationId,
+		),
 	}));
 
 /**
@@ -205,7 +212,13 @@ const agentTracesAccess = os.analytics.sessions.agentTracesAccess
 const agentRuns = os.analytics.sessions.agentRuns
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => {
-		if (!agentTracesEnabled(context.organizationId))
+		if (
+			!(await workspaceFeatureEnabled(
+				sqlClient,
+				"agent_traces",
+				context.organizationId,
+			))
+		)
 			throw new ORPCError("FORBIDDEN", {
 				message: "Agent traces are not enabled for this workspace.",
 			});

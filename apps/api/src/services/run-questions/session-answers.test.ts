@@ -36,7 +36,7 @@ function envOf(
 	const asked: string[][] = [];
 	const env: SessionAnswersEnv = {
 		executor,
-		mayAnswer: () => mayAnswer,
+		mayAnswer: async () => mayAnswer,
 		labelsOf: async (ids) => {
 			asked.push([...ids]);
 			return new Map(ids.map((id) => [id, labels[id] ?? null]));
