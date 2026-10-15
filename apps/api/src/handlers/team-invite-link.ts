@@ -1,7 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { getFrontendOrigin } from "../frontend-origin.js";
 import { authMiddleware, os } from "../middleware.js";
-import { FreeWorkspaceMemberLimitExceededError } from "../services/billing-entitlements.service.js";
 import {
 	acceptTeamInviteLink,
 	createTeamInviteLink,
@@ -53,11 +52,6 @@ const accept = os.teamInviteLink.accept
 		const result = await acceptTeamInviteLink({
 			token: input.token,
 			userId: context.user.id,
-		}).catch((error: unknown) => {
-			if (error instanceof FreeWorkspaceMemberLimitExceededError) {
-				throw new ORPCError("FORBIDDEN", { message: error.message });
-			}
-			throw error;
 		});
 
 		if (result.status === "missing") {

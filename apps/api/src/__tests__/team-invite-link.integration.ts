@@ -4,7 +4,6 @@ import { createHash, randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { createAuth } from "../auth.js";
 import { db, sqlClient } from "../db.js";
-import { FreeWorkspaceMemberLimitExceededError } from "../services/billing-entitlements.service.js";
 import {
 	acceptTeamInviteLink,
 	createTeamInviteLink,
@@ -161,7 +160,7 @@ describe("team invite links", () => {
 		).toEqual({ status: "missing" });
 	});
 
-	test("limits a free workspace to three members", async () => {
+	test("lets a free workspace grow past three members", async () => {
 		const fixture = await createTeamInviteFixture({ includeMember: true });
 		const link = await createTeamInviteLink({
 			organizationId: fixture.organizationId,
@@ -175,15 +174,15 @@ describe("team invite links", () => {
 				userId: fixture.candidateId,
 			}),
 		).toMatchObject({ status: "joined" });
-		await expect(
-			acceptTeamInviteLink({
+		expect(
+			await acceptTeamInviteLink({
 				token: link.token,
 				userId: fixture.secondCandidateId,
 			}),
-		).rejects.toBeInstanceOf(FreeWorkspaceMemberLimitExceededError);
+		).toMatchObject({ status: "joined" });
 		expect(
 			await countMemberships(fixture.organizationId, fixture.secondCandidateId),
-		).toBe(0);
+		).toBe(1);
 	});
 
 	test("marks a teammate who joins a paid workspace as paid", async () => {

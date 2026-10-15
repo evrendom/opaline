@@ -96,7 +96,7 @@ function assertPriceMatchesOffer(
 }
 
 function buildLookupKey(offer: OpalineBillingOffer): string {
-	return `opaline_${offer.plan}_${offer.billingPeriod}_sandbox_v1`;
+	return `opaline_${offer.plan}_${offer.billingPeriod}_sandbox_v2`;
 }
 
 function capitalize(value: string): string {

@@ -34,7 +34,6 @@ import {
 	enqueueBillingTraitsForUser,
 	reconcileOrganizationBillingSeats,
 } from "./services/billing.service.js";
-import { getOrganizationMemberLimit } from "./services/billing-entitlements.service.js";
 import { refreshCustomerAccountSnapshot } from "./services/customer-account-snapshot.service.js";
 import { fetchGitHubHandle, notifySignup } from "./slack.js";
 
@@ -244,7 +243,6 @@ export function createAuth(db: object, config: AuthConfig) {
 				{ frontendURL: config.frontendURL },
 				{
 					enqueueBillingTraitsForUser,
-					getOrganizationMemberLimit,
 					logBillingTraitsError: ({ error, userId }) => {
 						logger.error(
 							"Failed to queue billing traits for removed user {userId}: {error}",

@@ -5,6 +5,7 @@ import {
 	findOpalineBillingOffer,
 	findOpalineBillingOfferByPrice,
 	OPALINE_BILLING_OFFERS,
+	OPALINE_BILLING_QUANTITY,
 	type OpalineBillingMode,
 	type OpalineBillingOffer,
 	type OpalineBillingPeriod,
@@ -106,7 +107,6 @@ interface BillingPricingWorkspaceRow {
 interface PlanChangeSubscription {
 	billingPeriod: OpalineBillingPeriod;
 	plan: OpalineBillingPlan;
-	seatQuantity: number;
 	status: StoredSubscriptionStatus;
 	stripeCustomerId: string;
 	stripeSubscriptionId: string;
@@ -144,12 +144,6 @@ interface CheckoutAttemptRow {
 interface CheckoutWorkspace {
 	hasSubscription: boolean;
 	hasLiveSubscription: boolean;
-	seatCount: number;
-}
-
-interface ReservedCheckoutAttempt {
-	attempt: CheckoutAttempt;
-	currentSeatCount: number;
 }
 
 interface SeatReconciliationCandidate {
@@ -190,15 +184,13 @@ export async function createOrganizationCheckoutSession(
 	);
 
 	for (let attemptNumber = 0; attemptNumber < 3; attemptNumber += 1) {
-		const reservation = await reserveOrganizationCheckoutAttempt(
+		const attempt = await reserveOrganizationCheckoutAttempt(
 			input,
 			stripeCustomerId,
 		);
-		const { attempt } = reservation;
 		const matchesSelection = checkoutAttemptMatchesInput(
 			attempt,
 			input,
-			reservation.currentSeatCount,
 			stripeCustomerId,
 		);
 		if (!matchesSelection && attempt.status === "creating") {
@@ -333,7 +325,7 @@ async function ensureOrganizationBillingCustomer(
 async function reserveOrganizationCheckoutAttempt(
 	input: CheckoutInput,
 	stripeCustomerId: string,
-): Promise<ReservedCheckoutAttempt> {
+): Promise<CheckoutAttempt> {
 	return sqlClient.begin(async (transaction) => {
 		await transaction.unsafe(
 			"SELECT pg_advisory_xact_lock(731828, hashtext($1))",
@@ -359,7 +351,7 @@ async function reserveOrganizationCheckoutAttempt(
 			(existing?.status === "open" &&
 				(!existing.expiresAt || existing.expiresAt > new Date()))
 		) {
-			return { attempt: existing, currentSeatCount: workspace.seatCount };
+			return existing;
 		}
 		if (existing?.status === "completed" && !workspace.hasSubscription) {
 			throw new Error("Checkout completed and billing is still synchronizing");
@@ -392,14 +384,11 @@ async function reserveOrganizationCheckoutAttempt(
 				stripeCustomerId,
 				input.plan,
 				input.billingPeriod,
-				workspace.seatCount,
+				OPALINE_BILLING_QUANTITY,
 			],
 		);
 		if (!attempt) throw new Error("Failed to reserve Stripe Checkout");
-		return {
-			attempt: mapCheckoutAttempt(attempt),
-			currentSeatCount: workspace.seatCount,
-		};
+		return mapCheckoutAttempt(attempt);
 	});
 }
 
@@ -523,14 +512,13 @@ async function enqueueCheckoutStartedAnalytics(
 function checkoutAttemptMatchesInput(
 	attempt: CheckoutAttempt,
 	input: CheckoutInput,
-	currentSeatCount: number,
 	stripeCustomerId: string,
 ): boolean {
 	return (
 		attempt.plan === input.plan &&
 		attempt.billingPeriod === input.billingPeriod &&
 		attempt.purchaserUserId === input.userId &&
-		attempt.seatQuantity === currentSeatCount &&
+		attempt.seatQuantity === OPALINE_BILLING_QUANTITY &&
 		attempt.stripeCustomerId === stripeCustomerId
 	);
 }
@@ -706,7 +694,7 @@ async function createOrganizationPlanChangePortalSession(
 					{
 						id: subscription.stripeSubscriptionItemId,
 						price: priceId,
-						quantity: subscription.seatQuantity,
+						quantity: OPALINE_BILLING_QUANTITY,
 					},
 				],
 				subscription: subscription.stripeSubscriptionId,
@@ -725,14 +713,14 @@ async function createOrganizationPlanChangePortalSession(
 		properties: {
 			billing_mode: billingMode,
 			billing_period: offer.billingPeriod,
-			catalog_recurring_amount: offer.unitAmount * subscription.seatQuantity,
+			catalog_recurring_amount: offer.unitAmount * OPALINE_BILLING_QUANTITY,
 			catalog_unit_amount: offer.unitAmount,
 			currency: offer.currency,
 			organization_id: input.organizationId,
 			payment_provider: "stripe",
 			plan: offer.plan,
 			portal_session_id: session.id,
-			seat_quantity: subscription.seatQuantity,
+			seat_quantity: OPALINE_BILLING_QUANTITY,
 			user_id: input.userId,
 		},
 	}).catch(() => undefined);
@@ -843,6 +831,7 @@ export async function requeueBlockedStripeWebhookEvent(
 	return rows.length === 1;
 }
 
+/** Moves subscriptions whose quantity is not the flat-fee quantity back to it. */
 export async function reconcileBillingSeats(limit = 5): Promise<number> {
 	const candidates = await sqlClient.unsafe<SeatReconciliationCandidate[]>(
 		`SELECT
@@ -851,29 +840,32 @@ export async function reconcileBillingSeats(limit = 5): Promise<number> {
 			subscription.stripe_subscription_item_id,
 			subscription.seat_quantity,
 			subscription.updated_at,
-			GREATEST(COUNT(member.id)::int, 1) AS desired_quantity
+			$2::int AS desired_quantity
 		FROM billing_subscription subscription
-		LEFT JOIN member ON member.organization_id = subscription.organization_id
 		WHERE subscription.status IN ('active', 'trialing')
 			AND (
 				subscription.pending_seat_expires_at IS NULL
 				OR subscription.pending_seat_expires_at <= NOW()
 			)
-		GROUP BY subscription.organization_id,
-			subscription.stripe_subscription_id,
-			subscription.stripe_subscription_item_id,
-			subscription.seat_quantity,
-			subscription.updated_at
-		HAVING GREATEST(COUNT(member.id)::int, 1) <> subscription.seat_quantity
+			AND subscription.seat_quantity <> $2
 		ORDER BY subscription.updated_at
 		LIMIT $1`,
-		[limit],
+		[limit, OPALINE_BILLING_QUANTITY],
 	);
 	if (candidates.length === 0) return 0;
 	let reconciled = 0;
 	for (const candidate of candidates) {
-		if (await reconcileOrganizationBillingSeats(candidate.organization_id)) {
-			reconciled += 1;
+		try {
+			if (await reconcileOrganizationBillingSeats(candidate.organization_id)) {
+				reconciled += 1;
+			}
+		} catch (error) {
+			// One subscription Stripe cannot move (a legacy per-member price, say)
+			// must not stop the rest of the maintenance pass.
+			billingLogger.error(
+				"Billing quantity reconciliation failed for organization {organizationId}: {error}",
+				{ error: String(error), organizationId: candidate.organization_id },
+			);
 		}
 	}
 	return reconciled;
@@ -894,10 +886,7 @@ export async function reconcileOrganizationBillingSeats(
 				subscription.stripe_subscription_item_id,
 				subscription.seat_quantity,
 				subscription.updated_at,
-				GREATEST((
-					SELECT COUNT(*)::int FROM member
-					WHERE organization_id = subscription.organization_id
-				), 1) AS desired_quantity
+				$2::int AS desired_quantity
 			FROM billing_subscription subscription
 			WHERE subscription.organization_id = $1
 				AND subscription.status IN ('active', 'trialing')
@@ -906,7 +895,7 @@ export async function reconcileOrganizationBillingSeats(
 					OR subscription.pending_seat_expires_at <= NOW()
 				)
 			FOR UPDATE`,
-			[organizationId],
+			[organizationId, OPALINE_BILLING_QUANTITY],
 		);
 		if (!candidate || candidate.desired_quantity === candidate.seat_quantity) {
 			return false;
@@ -1471,11 +1460,9 @@ async function readCheckoutWorkspace(
 		Array<{
 			has_subscription: boolean;
 			has_live_subscription: boolean;
-			seat_count: number;
 		}>
 	>(
 		`SELECT
-			GREATEST(COUNT(seat.id)::int, 1) AS seat_count,
 			EXISTS (
 				SELECT 1 FROM billing_subscription
 				WHERE organization_id = $1
@@ -1486,17 +1473,15 @@ async function readCheckoutWorkspace(
 					AND status NOT IN ('canceled', 'incomplete_expired')
 			) AS has_live_subscription
 		FROM member owner
-		LEFT JOIN member seat ON seat.organization_id = owner.organization_id
 		WHERE owner.organization_id = $1 AND owner.user_id = $2
 			AND owner.role = 'owner'
-		GROUP BY owner.organization_id`,
+		LIMIT 1`,
 		[organizationId, userId],
 	);
 	return row
 		? {
 				hasLiveSubscription: row.has_live_subscription,
 				hasSubscription: row.has_subscription,
-				seatCount: row.seat_count,
 			}
 		: null;
 }
@@ -1541,7 +1526,6 @@ async function readPlanChangeSubscription(
 		Array<{
 			billing_period: OpalineBillingPeriod;
 			plan: OpalineBillingPlan;
-			seat_quantity: number;
 			status: StoredSubscriptionStatus;
 			stripe_customer_id: string;
 			stripe_subscription_id: string;
@@ -1554,7 +1538,6 @@ async function readPlanChangeSubscription(
 			stripe_subscription_item_id,
 			plan,
 			billing_period,
-			seat_quantity,
 			status
 		FROM billing_subscription
 		WHERE organization_id = $1
@@ -1565,7 +1548,6 @@ async function readPlanChangeSubscription(
 		? {
 				billingPeriod: row.billing_period,
 				plan: row.plan,
-				seatQuantity: row.seat_quantity,
 				status: row.status,
 				stripeCustomerId: row.stripe_customer_id,
 				stripeSubscriptionId: row.stripe_subscription_id,

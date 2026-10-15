@@ -3,6 +3,9 @@ import { APIError } from "better-auth";
 import { organization } from "better-auth/plugins";
 import type { InvitationEmailData } from "./email.js";
 
+/** Every plan, Free included, has unlimited members; this only bounds abuse. */
+const WORKSPACE_MEMBER_LIMIT = 10_000;
+
 const INVALID_ORGANIZATION_SLUG_MESSAGE =
 	"Organization slug is invalid or reserved";
 
@@ -12,9 +15,6 @@ export interface OrganizationPluginConfig {
 
 export interface OrganizationPluginEnvironment {
 	readonly enqueueBillingTraitsForUser: (userId: string) => Promise<void>;
-	readonly getOrganizationMemberLimit: (
-		organizationId: string,
-	) => Promise<number>;
 	readonly logBillingTraitsError: (input: {
 		readonly error: unknown;
 		readonly userId: string;
@@ -46,8 +46,7 @@ export function createOrganizationPlugin(
 		allowUserToCreateOrganization: true,
 		creatorRole: "owner",
 		disableOrganizationDeletion: true,
-		membershipLimit: (_user, targetOrganization) =>
-			env.getOrganizationMemberLimit(targetOrganization.id),
+		membershipLimit: WORKSPACE_MEMBER_LIMIT,
 		organizationHooks: {
 			async afterRemoveMember({ member }) {
 				try {

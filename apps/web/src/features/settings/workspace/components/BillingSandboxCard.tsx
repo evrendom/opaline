@@ -124,8 +124,8 @@ async function startSandboxCheckout(input: {
 
 function formatOfferPrice(offer: OpalineBillingOffer): string {
 	return offer.billingPeriod === "monthly"
-		? `$${offer.monthlyPriceUsd} per teammate each month`
-		: `$${offer.unitAmount / 100} per teammate each year`;
+		? `$${offer.monthlyPriceUsd} per workspace each month`
+		: `$${offer.unitAmount / 100} per workspace each year`;
 }
 
 function capitalize(value: string): string {

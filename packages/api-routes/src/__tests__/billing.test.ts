@@ -7,6 +7,7 @@ import {
 	findOpalineBillingOffer,
 	findOpalineBillingOfferByPrice,
 	OPALINE_BILLING_OFFERS,
+	OPALINE_BILLING_QUANTITY,
 	OrganizationBillingInputSchema,
 	OrganizationBillingSummaryOutputSchema,
 	RequestOrganizationBillingUpgradeOutputSchema,
@@ -50,10 +51,15 @@ describe("Opaline billing catalog", () => {
 		}
 	});
 
-	test("uses the full annual per-member totals from pricing", () => {
-		expect(findOpalineBillingOffer("basic", "yearly")?.unitAmount).toBe(25_200);
+	test("uses the flat per-workspace totals from pricing", () => {
+		expect(OPALINE_BILLING_QUANTITY).toBe(1);
+		expect(findOpalineBillingOffer("basic", "monthly")?.unitAmount).toBe(7_500);
+		expect(findOpalineBillingOffer("basic", "yearly")?.unitAmount).toBe(75_600);
+		expect(findOpalineBillingOffer("business", "monthly")?.unitAmount).toBe(
+			15_000,
+		);
 		expect(findOpalineBillingOffer("business", "yearly")?.unitAmount).toBe(
-			50_400,
+			151_200,
 		);
 	});
 
@@ -67,7 +73,7 @@ describe("Opaline billing catalog", () => {
 				interval: "year",
 				intervalCount: 1,
 				priceId: "price_basic_yearly",
-				unitAmount: 25_200,
+				unitAmount: 75_600,
 				usageType: "licensed",
 			},
 			configuredOffer
@@ -94,7 +100,7 @@ describe("Opaline billing catalog", () => {
 					interval: "month",
 					intervalCount: 1,
 					priceId: "price_business_monthly",
-					unitAmount: 4_999,
+					unitAmount: 14_999,
 					usageType: "licensed",
 				},
 				configuredPriceIds,

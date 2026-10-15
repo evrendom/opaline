@@ -11,7 +11,6 @@ const organizationHooks = createOrganizationPlugin(
 	{ frontendURL: "http://localhost:4011" },
 	{
 		enqueueBillingTraitsForUser: async () => {},
-		getOrganizationMemberLimit: async () => 3,
 		logBillingTraitsError: () => {},
 		logSeatReconciliationError: () => {},
 		reconcileOrganizationBillingSeats: async () => false,

@@ -53,10 +53,10 @@ const plans = [
 	{
 		id: "basic",
 		name: "Basic",
-		price: "$21",
-		monthlyPrice: "$25",
-		yearlyPrice: "$21",
-		priceDetail: "per member/month",
+		price: "$63",
+		monthlyPrice: "$75",
+		yearlyPrice: "$63",
+		priceDetail: "flat/month",
 		billing: "Billed yearly",
 		actions: [
 			{
@@ -70,10 +70,10 @@ const plans = [
 	{
 		id: "business",
 		name: "Business",
-		price: "$42",
-		monthlyPrice: "$50",
-		yearlyPrice: "$42",
-		priceDetail: "per member/month",
+		price: "$126",
+		monthlyPrice: "$150",
+		yearlyPrice: "$126",
+		priceDetail: "flat/month",
 		billing: "Billed yearly",
 		actions: [
 			{
@@ -100,13 +100,15 @@ const featureRows = [
 	{
 		id: "members",
 		descriptions: {
-			free: "Free includes up to three workspace members.",
-			basic: "Basic includes unlimited workspace members.",
-			business: "Business includes unlimited workspace members.",
+			free: "Free includes unlimited workspace members.",
+			basic:
+				"Basic includes unlimited workspace members for one flat monthly fee.",
+			business:
+				"Business includes unlimited workspace members for one flat monthly fee.",
 			enterprise: "Enterprise includes unlimited workspace members.",
 		},
 		labels: {
-			free: "3 members",
+			free: "Unlimited members",
 			basic: "Unlimited members",
 			business: "Unlimited members",
 			enterprise: "Unlimited members",

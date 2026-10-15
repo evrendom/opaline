@@ -45,7 +45,7 @@ export function BillingManagementCard({
 			? "Previous plan"
 			: "Current plan";
 	const planDescription = summary.data?.hasBillingAccount
-		? `${formatSeatCount(summary.data.seatQuantity)} · ${formatStatus(summary.data.status)}`
+		? capitalize(formatStatus(summary.data.status))
 		: "Choose a paid plan on the pricing page.";
 	const pricingUrl = new URL(PRICING_URL);
 	pricingUrl.searchParams.set("workspace", workspaceSlug);
@@ -118,10 +118,6 @@ async function openBillingPortal(input: {
 		);
 		input.setIsOpeningPortal(false);
 	}
-}
-
-function formatSeatCount(seatQuantity: number): string {
-	return `${seatQuantity} ${seatQuantity === 1 ? "teammate" : "teammates"}`;
 }
 
 function formatStatus(status: string): string {

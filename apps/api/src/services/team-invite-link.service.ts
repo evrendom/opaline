@@ -3,7 +3,6 @@ import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import { enqueueBillingTraitsForUser } from "./billing.service.js";
-import { assertCanAddOrganizationMember } from "./billing-entitlements.service.js";
 
 const logger = getLogger(["rudel", "api", "team-invite-link"]);
 
@@ -230,12 +229,11 @@ async function addOrganizationMember(
 	organizationId: string,
 	userId: string,
 ) {
-	const shouldAdd = await assertCanAddOrganizationMember(
-		transaction,
-		organizationId,
-		userId,
+	// Serializes joins so two accepts by one user cannot both insert.
+	await transaction.unsafe(
+		"SELECT pg_advisory_xact_lock(731825, hashtext($1))",
+		[organizationId],
 	);
-	if (!shouldAdd) return false;
 	const [member] = await transaction.unsafe<Array<{ id: string }>>(
 		`
 		INSERT INTO member (

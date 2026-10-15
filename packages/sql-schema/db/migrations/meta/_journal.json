@@ -484,6 +484,13 @@
 			"when": 1792047087218,
 			"tag": "0068_compass_settings_prompt_frustration",
 			"breakpoints": true
+		},
+		{
+			"idx": 69,
+			"version": "7",
+			"when": 1792072631258,
+			"tag": "0069_drop_free_workspace_member_limit",
+			"breakpoints": true
 		}
 	]
 }

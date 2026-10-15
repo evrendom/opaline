@@ -96,46 +96,52 @@ export const CreateOrganizationBillingPortalOutputSchema = z.object({
 	portalUrl: z.string().url(),
 });
 
+/**
+ * Plans are flat fees: a subscription bills one unit of its price whatever
+ * the workspace's member count.
+ */
+export const OPALINE_BILLING_QUANTITY = 1;
+
 export const OPALINE_BILLING_OFFERS = [
 	{
 		billingPeriod: "monthly",
 		currency: "usd",
 		interval: "month",
 		intervalCount: 1,
-		monthlyPriceUsd: 25,
+		monthlyPriceUsd: 75,
 		plan: "basic",
 		stripePriceEnvironmentVariable: "STRIPE_PRICE_BASIC_MONTHLY",
-		unitAmount: 2_500,
+		unitAmount: 7_500,
 	},
 	{
 		billingPeriod: "yearly",
 		currency: "usd",
 		interval: "year",
 		intervalCount: 1,
-		monthlyPriceUsd: 21,
+		monthlyPriceUsd: 63,
 		plan: "basic",
 		stripePriceEnvironmentVariable: "STRIPE_PRICE_BASIC_YEARLY",
-		unitAmount: 25_200,
+		unitAmount: 75_600,
 	},
 	{
 		billingPeriod: "monthly",
 		currency: "usd",
 		interval: "month",
 		intervalCount: 1,
-		monthlyPriceUsd: 50,
+		monthlyPriceUsd: 150,
 		plan: "business",
 		stripePriceEnvironmentVariable: "STRIPE_PRICE_BUSINESS_MONTHLY",
-		unitAmount: 5_000,
+		unitAmount: 15_000,
 	},
 	{
 		billingPeriod: "yearly",
 		currency: "usd",
 		interval: "year",
 		intervalCount: 1,
-		monthlyPriceUsd: 42,
+		monthlyPriceUsd: 126,
 		plan: "business",
 		stripePriceEnvironmentVariable: "STRIPE_PRICE_BUSINESS_YEARLY",
-		unitAmount: 50_400,
+		unitAmount: 151_200,
 	},
 ] as const;
 
