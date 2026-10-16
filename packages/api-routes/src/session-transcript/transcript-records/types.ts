@@ -22,6 +22,7 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * command that decided its exit code (`exit_decided_by`, `exit_masked`,
  * `no_output`), interruptions Claude recorded as `interrupted`, and no
  * whole tool output (Write/Edit `originalFile`) kept as a denial reason.
+ * Each record also carries its line's own id (`record_uuid`, Claude `uuid`).
  */
 export const TRANSCRIPT_RECORDS_PARSER_VERSION = 12;
 
@@ -436,6 +437,12 @@ export interface TranscriptRecordDraft {
 	readonly isError: boolean;
 	readonly exitCode: number | null;
 	readonly callId: string;
+	/**
+	 * The line's own id as the agent wrote it (Claude Code `uuid`), the same
+	 * on every record of the line; never a parent or source id. Empty when the
+	 * line has none (Codex, unparseable or oversized lines) and before parser 12.
+	 */
+	readonly recordUuid: string;
 	readonly filePath: string;
 	readonly fileOp: FileOperation;
 	readonly spawnedAgentId: string;

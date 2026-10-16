@@ -2029,6 +2029,11 @@
 					"type": "String"
 				},
 				{
+					"name": "record_uuid",
+					"type": "String",
+					"comment": "The line's own id as the agent wrote it (Claude Code uuid), the same on every record of the line; empty when the line has none (Codex) and on rows before parser 12, which is unknown, not missing."
+				},
+				{
 					"name": "file_path",
 					"type": "String"
 				},
@@ -2153,6 +2158,15 @@
 				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
+			"indexes": [
+				{
+					"name": "record_uuid_bloom",
+					"expression": "record_uuid",
+					"type": "bloom_filter",
+					"typeArgs": "0.01",
+					"granularity": 1
+				}
+			],
 			"comment": "Deterministic per-record transcript index for selective reads. Light columns answer structure questions; text is read only for explicit record drill-downs.",
 			"kind": "table"
 		},

@@ -77,6 +77,7 @@ p4   final answer                                    1    0 min    9k    $0.07
 - Levels: run → phase → request → call → record. Every line has an id; the agent expands or collapses any list of ids under one character budget.
 - Tokens and cost exist per request, not per call; calls show their duration only.
 - A call that started a subagent expands into that subagent's run, in the same view.
+- A record's own id from a Claude Code transcript (the `uuid` of its JSONL line, `transcript_records.record_uuid` from parser 12) opens the run that holds the record, with the record expanded and a first line naming its session, stream, record and run number. Sessions indexed before parser 12 keep no record ids: unknown, not missing.
 - Setup lines open the exact text the agent received (skill, instructions) with its setup file and version.
 - **The view is malleable.** It is a list of sections, each a small query over the same views the agent can query with SQL, plus a one-line format. The default sections change by config, with no data change; the agent can ask for only some sections; the phase rule is versioned and runs are re-cut when it changes.
 

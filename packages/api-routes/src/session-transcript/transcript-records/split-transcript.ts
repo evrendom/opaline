@@ -219,6 +219,7 @@ export function* splitTranscript(
 				? (readCodexAgentId(parsed) ?? mainAgentId)
 				: mainAgentId;
 		const state = streamFor(agentId);
+		const recordUuid = lineRecordUuid(parsed, options.source);
 		const result =
 			options.source === "codex"
 				? readCodexLine(parsed, state)
@@ -255,6 +256,7 @@ export function* splitTranscript(
 					? item
 					: { ...item, facts: budgetFacts(item.facts, options.factBudget) },
 				location,
+				recordUuid,
 				setup,
 				state,
 				ts,
@@ -371,12 +373,33 @@ function applyTurnState(state: StreamState, item: LineItem): void {
 	}
 }
 
+/** The longest line id kept; Claude Code writes 36-character UUIDs. */
+const RECORD_UUID_MAX_CHARS = 64;
+
+/**
+ * The line's own id: Claude Code's top-level `uuid`. Codex lines get none:
+ * most of a rollout's lines (event messages) carry no id, and the ids its
+ * response items and completed items carry are call ids several lines share
+ * or Responses API item ids whose uniqueness per line is not established.
+ */
+function lineRecordUuid(
+	parsed: Record<string, unknown>,
+	source: TranscriptSource,
+): string {
+	if (source !== "claude_code") return "";
+	const uuid = parsed.uuid;
+	return typeof uuid === "string" && uuid.length <= RECORD_UUID_MAX_CHARS
+		? uuid
+		: "";
+}
+
 function buildDraft(input: {
 	agentId: string;
 	blockIdx: number;
 	fields: TranscriptTextFields;
 	item: LineItem;
 	location: { byteLen: number; byteStart: number; lineNumber: number };
+	recordUuid?: string;
 	setup?: ReturnType<typeof receivedSetupFacts>;
 	state: StreamState;
 	ts: string;
@@ -408,6 +431,7 @@ function buildDraft(input: {
 		isError: item.isError ?? false,
 		kind: item.kind,
 		recordIdx: location.lineNumber,
+		recordUuid: input.recordUuid ?? "",
 		spawnedAgentId: item.spawnedAgentId ?? "",
 		subtype,
 		tail: fields.tail,
@@ -452,6 +476,7 @@ function buildOversizedDraft(
 		isError: false,
 		kind: "oversized",
 		recordIdx: location.lineNumber,
+		recordUuid: "",
 		spawnedAgentId: "",
 		subtype: "oversized",
 		tail: sliceEnd(

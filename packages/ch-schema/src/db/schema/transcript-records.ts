@@ -44,6 +44,15 @@ const rudel_transcript_records = table({
 		{ name: "is_error", type: "Bool" },
 		{ name: "exit_code", type: "Int32", nullable: true },
 		{ name: "call_id", type: "String" },
+		// Parser 12, added by 20261016120000_transcript_record_uuid.sql with the
+		// record_uuid_bloom skip index: a lookup by the id inside one workspace
+		// reads the workspace's key range and only the granules that may hold it.
+		{
+			name: "record_uuid",
+			type: "String",
+			comment:
+				"The line's own id as the agent wrote it (Claude Code uuid), the same on every record of the line; empty when the line has none (Codex) and on rows before parser 12, which is unknown, not missing.",
+		},
 		{ name: "file_path", type: "String" },
 		{ name: "file_op", type: "LowCardinality(String)" },
 		{ name: "spawned_agent_id", type: "String" },
@@ -152,6 +161,15 @@ const rudel_transcript_records = table({
 		"agent_id",
 		"record_idx",
 		"block_idx",
+	],
+	indexes: [
+		{
+			name: "record_uuid_bloom",
+			expression: "record_uuid",
+			type: "bloom_filter",
+			typeArgs: "0.01",
+			granularity: 1,
+		},
 	],
 	settings: {
 		index_granularity: "1024",

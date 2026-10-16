@@ -20,8 +20,8 @@ Under each status is where the agent records the fact, shortened: `toolUseResult
 
 | | Claude Code | Codex |
 |---|---:|---:|
-| ✅ stored | 158 (1 with a gap) | 175 (1 with a gap) |
-| 🟡 pending | 51 | 35 |
+| ✅ stored | 159 (1 with a gap) | 175 (1 with a gap) |
+| 🟡 pending | 51 | 36 |
 | ⚪ not recorded | 36 | 35 |
 | 🔴 wrong | 0 | 0 |
 
@@ -29,11 +29,11 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 
 | Metric | Claude Code | Codex |
 |---|---:|---:|
-| verified | 21 (9.4%) | 4 (1.8%) |
-| observed | 119 (53.4%) | 159 (69.7%) |
-| asserted | 83 (37.2%) | 65 (28.5%) |
-| unreviewed | 20 | 25 |
-| exact | 49 | 75 |
+| verified | 21 (9.4%) | 4 (1.7%) |
+| observed | 120 (53.6%) | 159 (69.4%) |
+| asserted | 83 (37.1%) | 66 (28.8%) |
+| unreviewed | 20 | 26 |
+| exact | 50 | 75 |
 | transform | 9 | 12 |
 | close | 65 | 65 |
 | broader | 3 | 6 |
@@ -44,7 +44,7 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | provenance | 6 | 4 |
 | N/A (derived/provenance) | 22 | 17 |
 | Context paths (excluded as sources) | 27 | 58 |
-| Judged (excludes searched absences) | 137 | 161 |
+| Judged (excludes searched absences) | 138 | 161 |
 | Semantic conflicts | 3 | 3 |
 | Paired runs | 0 | 0 |
 
@@ -53,7 +53,7 @@ Unclassified census paths are computed from the selected corpus by facts:census 
 Primary-path relation counts (including recorded gaps):
 
 - unreviewed: 4 / 3 (Claude Code / Codex).
-- exact: 131 / 186 (Claude Code / Codex).
+- exact: 132 / 186 (Claude Code / Codex).
 - transform: 16 / 55 (Claude Code / Codex).
 - close: 210 / 378 (Claude Code / Codex).
 - broader: 14 / 29 (Claude Code / Codex).
@@ -1048,6 +1048,7 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 | `session_memory_mode` | The memory mode explicitly selected for a session. | ⚪ not recorded not_found · asserted | ✅ v9 exact · observed<br>`session_meta.memory_mode` | One-sided mapping |
 | `model_provider` | The provider explicitly selected for the session's model. | 🟡 pending not_found · asserted | ✅ v9 exact · observed<br>`session_meta.model_provider`, `thread_settings_applied.thread_settings.model_provider_id` | One-sided mapping |
 | `record_uuid` | The literal record UUID and parent UUID links of the conversation tree, not physical line order. | ✅ v9 close · observed<br>`every record uuid`, `every record parentUuid` +3 | 🟡 pending not_found · asserted | One-sided mapping |
+| `record_id` | The line's own id as the agent wrote it, on every record of the line, so a record can be found by the id copied from the raw transcript. | ✅ v12 exact · observed<br>`every record uuid` | 🟡 pending unreviewed · asserted | Not yet judged |
 | `disabled_plugin_ids` | The plugin identifiers explicitly disabled in turn/thread configuration. | 🟡 pending not_found · asserted | ✅ v9 exact · observed<br>`turn_context.disabled_plugin_ids[]`, `thread_settings_applied.thread_settings.disabled_plugin_ids[]` | One-sided mapping |
 | `thread_source` | The literal analytics/source classification explicitly recorded for the thread. | 🟡 pending not_found · asserted | ✅ v8 exact · observed<br>`session_meta.thread_source` | One-sided mapping |
 | `runtime_workspace_roots` | The runtime workspace roots explicitly selected at session creation, with absent versus empty preserved. | ✅ v9 close · observed<br>`environment attachment snapshot.additionalWorkingDirectories[]`, `environment attachment snapshot.workingDirectory` | ✅ v9 exact · observed<br>`session_meta.runtime_workspace_roots`, `session_meta.runtime_workspace_roots[]` | Comparable with caveat |
@@ -1106,6 +1107,9 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 - `record_uuid`
   - Claude Code ✅: Relation: close. Confidence: observed. Evidence: llm_audit (2), fixture_test (2), census (69). Judgement: Judge round 3: uuid, parentUuid and logicalParentUuid represent record identity/tree edges. sourceToolAssistantUUID and refusedUserMessageUuid are cross-record provenance references rather than the own UUID or parent of this record. The broad *.uuid also covers metadata-bearing records outside conversation messages. Path: `*.uuid` — primary · close. Path: `*.parentUuid` — primary · close. Path: `*.logicalParentUuid` — primary · close. Path: `user.sourceToolAssistantUUID` — primary · close. Path: `*.refusedUserMessageUuid` — primary · close. Note: Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component. All sources: `every record uuid`, `every record parentUuid`, `every record logicalParentUuid`, `sourceToolAssistantUUID`, `every record refusedUserMessageUuid`.
   - Codex 🟡: Relation: not_found. Confidence: asserted. Evidence: llm_audit (2). Judgement: Judge round 3: No PRIMARY source is declared for this agent and no native normalized source for this fact was established in the complete current corpus. This is observational absence, not a claim that the agent never emits it; counterpart-agent sources are not evidence for this row. Plan: parser 9: identify and preserve the counterpart's literal fields; a missing local witness is not writer absence.
+- `record_id`
+  - Claude Code ✅: Relation: exact. Confidence: observed. Evidence: fixture_test (2), llm_audit (1), census (33). Judgement: Claude Code writes its own uuid on each line it records (user, assistant, system, attachment, progress); every record split from the line carries it in record_uuid. parentUuid, logicalParentUuid and sourceToolAssistantUUID name other lines and are never taken; unparseable and oversized lines carry none. Path: `*.uuid` — primary · exact.
+  - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Review whether the ids Codex response items carry (response_item.id on reasoning, messages, tool calls and their outputs, local census 2026-10-09) are unique per rollout line across forks and compaction replays before storing them; event_msg lines carry no id of their own, and item_completed ids are call ids several lines share.
 - `disabled_plugin_ids`
   - Claude Code 🟡: Relation: not_found. Confidence: asserted. Evidence: llm_audit (2). Judgement: Judge round 3: No PRIMARY source is declared for this agent and no native normalized source for this fact was established in the complete current corpus. This is observational absence, not a claim that the agent never emits it; counterpart-agent sources are not evidence for this row. Plan: parser 9: identify and preserve the counterpart's literal fields; a missing local witness is not writer absence.
   - Codex ✅: Relation: exact. Confidence: observed. Evidence: llm_audit (3), fixture_test (2), writer_source (2). Judgement: Judge round 3: TurnContextItem and thread settings explicitly record disabled plugin identifiers. These are literal selections, not all installed plugins or inferred failed tool calls. Path: `turn_context/.disabled_plugin_ids[]` — primary · exact. Path: `event_msg/thread_settings_applied.thread_settings.disabled_plugin_ids[]` — primary · exact. Note: Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.

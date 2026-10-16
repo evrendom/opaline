@@ -12284,6 +12284,35 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		},
 	},
 	{
+		id: "record_id",
+		view: "session",
+		meaning:
+			"The line's own id as the agent wrote it, on every record of the line, so a record can be found by the id copied from the raw transcript.",
+		agents: {
+			claude_code: stored(
+				["*.uuid"],
+				{ since: 12, record: ["recordUuid"] },
+				{
+					relation: { kind: "exact" },
+					justification:
+						"Claude Code writes its own uuid on each line it records (user, assistant, system, attachment, progress); every record split from the line carries it in record_uuid. parentUuid, logicalParentUuid and sourceToolAssistantUUID name other lines and are never taken; unparseable and oversized lines carry none.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/record-uuid.test.ts",
+							test: "every record of a Claude Code line carries the line's own uuid, never a parent's",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review whether the ids Codex response items carry (response_item.id on reasoning, messages, tool calls and their outputs, local census 2026-10-09) are unique per rollout line across forks and compaction replays before storing them; event_msg lines carry no id of their own, and item_completed ids are call ids several lines share.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
 		id: "applied_file_changes",
 		view: "calls",
 		meaning:

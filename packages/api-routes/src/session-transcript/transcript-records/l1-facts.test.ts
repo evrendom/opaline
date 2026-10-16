@@ -50,6 +50,7 @@ const FIXTURES = {
 	codexDirect: "codex-direct-era.jsonl",
 	codexEndEvent: "codex-end-event-era.jsonl",
 	codexCustomExec: "codex-custom-exec-era.jsonl",
+	claudeRecordIds: "l1-facts/claude-record-ids.jsonl",
 } as const;
 
 /** The agent that wrote each fixture. */
@@ -892,6 +893,12 @@ const CASES: readonly FactCase[] = [
 			text: "ship the fix and open a PR",
 			textChars: 26,
 		},
+	},
+	{
+		name: "Claude record id on every record of its line",
+		fixture: "claudeRecordIds",
+		row: { callId: "toolu_ids", kind: "tool_call" },
+		columns: { recordUuid: "0c5f2b9e-3d41-4a8f-b6e2-7f9d1c3a5e02" },
 	},
 	{
 		name: "Codex tool, call id and command",

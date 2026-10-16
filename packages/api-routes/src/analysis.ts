@@ -1067,7 +1067,11 @@ export type AnalysisSchemaOutput = z.infer<typeof AnalysisSchemaOutputSchema>;
 export const RUN_VIEW_DEFAULT_CHARS = 12_000;
 export const AnalysisRunInputSchema = z
 	.object({
-		/** A run id (`run_id` in sql results). */
+		/**
+		 * A run id (`run_id` in sql results), or a record's own id from the raw
+		 * transcript (Claude Code `uuid`): the run that holds the record, opened
+		 * at it.
+		 */
 		id: z.string().trim().min(1).max(1_000),
 		/** Ids from the view to open: phases, requests, calls, records. */
 		expand: z.array(z.string().trim().min(1).max(40)).max(20).optional(),

@@ -22,6 +22,14 @@ import {
 	SETUP_SINCE_INDEX_VERSION,
 	SETUP_SINCE_PARSER_VERSION,
 } from "./received-setup.js";
+import {
+	describeRecordUuidHit,
+	findRecordsByUuid,
+	isRecordUuid,
+	type RecordUuidHit,
+	recordUuidExpandId,
+	recordUuidNotFound,
+} from "./record-uuid.js";
 import { readCommittedRunIndex } from "./run-index-reader.js";
 import { runToolErrorSql } from "./run-index-sql.js";
 import {
@@ -60,7 +68,9 @@ import { isSubagentTool } from "./tool-groups.js";
  * details of the ids to expand (a request's calls, a call's or a record's
  * exact text, the run of a subagent a call started), and renders the run
  * view (`run-view.ts`). The phases are cut at read time by the current phase
- * rule, so a new rule re-cuts every run without a rebuild.
+ * rule, so a new rule re-cuts every run without a rebuild. `id` may also be a
+ * record's own id from the raw transcript (Claude Code `uuid`): the view is
+ * then the run that holds the record, with the record expanded.
  */
 
 /** Results of one call read for its exact text. */
@@ -87,6 +97,8 @@ interface RunAddress {
 	readonly sessionId: string;
 	readonly agentId: string;
 	readonly startRecord: number;
+	/** Instead of `startRecord`: the run of the stream that holds this record. */
+	readonly holding?: number;
 }
 
 /** A setup file version of the run, with the hash its text is stored under. */
@@ -128,7 +140,10 @@ export async function openRun(
 		throw new ORPCError("BAD_REQUEST", {
 			message: `Unknown section ${unknown.join(", ")}; sections are ${RUN_VIEW_SECTIONS.map((section) => section.name).join(", ")}`,
 		});
-	const address = await resolveRun(workspaceId, input.id, env);
+	const byRecord = isRecordUuid(input.id);
+	const address = byRecord
+		? null
+		: await resolveRun(workspaceId, input.id, env);
 	const quota = await env.quota.take(workspaceId);
 	if (!quota.allowed) {
 		const refusal = quotaExceeded(env.quota, quota.resetsAt);
@@ -138,18 +153,31 @@ export async function openRun(
 		});
 	}
 	const limited = { ...env, executor: withSqlLimits(env.executor) };
-	const run = await loadRun(limited.executor, address);
+	const record = byRecord
+		? await resolveRecord(workspaceId, input.id, limited)
+		: null;
+	const target = record?.address ?? address;
+	const run = target ? await loadRun(limited.executor, target) : null;
 	if (!run)
 		throw new ORPCError("NOT_FOUND", {
-			message:
-				"Run not found in the run index; pass a run_id from sql (the run may not be indexed yet)",
+			message: record
+				? `Record ${input.id} is ${describeRecordUuidHit(record.hit)}, which no indexed run holds (the run may not be indexed yet); read the record with read depth=record`
+				: "Run not found in the run index; pass a run_id from sql (the run may not be indexed yet)",
 		});
-	const expand = [...new Set(input.expand ?? [])];
+	const expand = [
+		...new Set([
+			...(record ? [recordUuidExpandId(record.hit)] : []),
+			...(input.expand ?? []),
+		]),
+	];
 	const details = await loadDetails(limited, run, expand, input.maxChars);
+	const located = record
+		? recordLocation(input.id, record.hit, run, record.others)
+		: "";
 	const rendered = renderRunView(run.view, {
 		sections,
 		expand,
-		maxChars: input.maxChars,
+		maxChars: Math.max(1, input.maxChars - located.length),
 		rule: CURRENT_PHASE_RULE,
 		details,
 	});
@@ -157,8 +185,57 @@ export async function openRun(
 		id: input.id,
 		phaseRule: CURRENT_PHASE_RULE.version,
 		truncated: rendered.truncated,
-		text: rendered.text,
+		text: located + rendered.text,
 	};
+}
+
+/**
+ * The record a record id names in the sessions the caller may read, and the
+ * run of its stream to open: the oldest session that holds it (a resumed or
+ * forked session repeats its parent's lines, ids included).
+ */
+async function resolveRecord(
+	workspaceId: string,
+	uuid: string,
+	env: RunViewEnv,
+): Promise<{
+	readonly address: RunAddress;
+	readonly hit: RecordUuidHit;
+	readonly others: readonly RecordUuidHit[];
+}> {
+	const [hit, ...others] = await findRecordsByUuid(
+		env.executor,
+		workspaceId,
+		uuid,
+		env.ownerOf,
+	);
+	if (!hit) throw recordUuidNotFound(uuid);
+	return {
+		address: {
+			scope: { organizationId: workspaceId, userId: hit.userId },
+			source: hit.source,
+			sessionId: hit.sessionId,
+			agentId: hit.agentId,
+			startRecord: hit.recordIdx,
+			holding: hit.recordIdx,
+		},
+		hit,
+		others,
+	};
+}
+
+/** The line that says where a record id is, before the view of its run. */
+function recordLocation(
+	uuid: string,
+	hit: RecordUuidHit,
+	run: LoadedRun,
+	others: readonly RecordUuidHit[],
+): string {
+	const also =
+		others.length === 0
+			? ""
+			: `; the same id is also ${others.map(describeRecordUuidHit).join(", ")}`;
+	return `record ${uuid} is ${describeRecordUuidHit(hit)} (run_id ${run.view.id})${also}\n`;
 }
 
 function notRunId(): ORPCError<string, unknown> {
@@ -217,8 +294,11 @@ async function loadRun(
 		)
 	).sort((a, b) => a.start_record - b.start_record);
 	const stream = sessionRuns.filter((row) => row.agent_id === address.agentId);
-	const index = stream.findIndex(
-		(row) => row.start_record === address.startRecord,
+	const { holding } = address;
+	const index = stream.findIndex((row) =>
+		holding === undefined
+			? row.start_record === address.startRecord
+			: row.start_record <= holding && holding < row.end_record,
 	);
 	const row = stream[index];
 	if (!row) return null;
@@ -242,8 +322,10 @@ async function loadRun(
 		row.parser_version >= SETUP_SINCE_PARSER_VERSION
 			? await readSetup(executor, address, row)
 			: null;
+	// The run found, by its start: later reads (a subagent's run) never look for `holding`.
+	const { holding: _holding, ...located } = address;
 	return {
-		address,
+		address: { ...located, startRecord: row.start_record },
 		row,
 		sessionRuns,
 		setup,

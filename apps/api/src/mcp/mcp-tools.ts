@@ -557,7 +557,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Limits: One run per call, within maxChars (the text says what was cut); sql's 10 seconds, 512 MiB and workspace quota.",
 		].join("\n"),
 		inputSchema: describeInput(zodToolInput(AnalysisRunInputSchema), {
-			id: "Required. The run's id: the run_id column of sql, or an id a run view shows (PREV, NEXT, a subagent run).",
+			id: "Required. The run's id: the run_id column of sql, or an id a run view shows (PREV, NEXT, a subagent run). Or a record's own id from a Claude Code transcript (the uuid of its JSONL line): opens the run that holds the record with the record expanded, and says its session, stream, record and run number. Sessions indexed before transcript parser 12 keep no record ids: there it is unknown, not missing.",
 			expand:
 				"Ids from the view to open, together within maxChars: phases (p2), requests (q153), calls (c154), records (r160) and setup (s2).",
 			sections:

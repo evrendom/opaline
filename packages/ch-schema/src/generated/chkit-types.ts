@@ -1656,6 +1656,7 @@ export type RudelTranscriptRecordsRow = {
   is_error: boolean
   exit_code: number | null
   call_id: string
+  record_uuid: string
   file_path: string
   file_op: string
   spawned_agent_id: string
@@ -1698,6 +1699,7 @@ export const RudelTranscriptRecordsRowSchema = z.object({
   is_error: z.boolean(),
   exit_code: z.number().nullable(),
   call_id: z.string(),
+  record_uuid: z.string(),
   file_path: z.string(),
   file_op: z.string(),
   spawned_agent_id: z.string(),

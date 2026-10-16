@@ -264,6 +264,7 @@ async function ingestSkillRows(
 					isError: false,
 					kind: "user_prompt",
 					recordIdx: 1,
+					recordUuid: "",
 					spawnedAgentId: "",
 					subtype: "",
 					tail: "",
