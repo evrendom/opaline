@@ -189,6 +189,9 @@ export const repositoryEvidenceCapture = pgTable(
 		capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
 		coverage: jsonb("coverage").notNull(),
 		indexRow: jsonb("index_row"),
+		// The capture's saved output rows (rudel.session_saved_outputs), published
+		// with its index row; null when the manifest names no saved outputs.
+		savedOutputs: jsonb("saved_outputs"),
 		indexPublishedAt: timestamp("index_published_at", { withTimezone: true }),
 		indexNextAttemptAt: timestamp("index_next_attempt_at", {
 			withTimezone: true,

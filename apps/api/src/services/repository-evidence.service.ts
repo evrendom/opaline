@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { getLogger } from "@logtape/logtape";
 import {
 	REPOSITORY_EVIDENCE_PART_SIZE_BYTES,
 	REPOSITORY_EVIDENCE_PROTOCOL,
@@ -34,8 +35,13 @@ import {
 } from "./repository-evidence-fence.service.js";
 import type { RepositoryEvidenceIndexRow } from "./repository-evidence-index.service.js";
 import { claimSessionIngestOwnership } from "./session-ownership.service.js";
+import {
+	extractSessionSavedOutputs,
+	type SessionSavedOutputRow,
+} from "./session-saved-outputs.service.js";
 
 const SHA256_PREFIX = "sha256:";
+const logger = getLogger(["rudel", "api", "repository-evidence"]);
 
 interface StoredEvidenceUploadPlan {
 	readonly input: RepositoryEvidenceInitInput;
@@ -316,6 +322,32 @@ function prepareRepositoryEvidenceIndex(
 	}
 }
 
+/**
+ * The capture's saved output rows, staged with it and published with its
+ * index row. A manifest the extraction cannot read loses only these rows.
+ */
+function prepareSessionSavedOutputs(input: {
+	readonly evidence: RepositoryEvidenceForIndex;
+	readonly organizationId: string;
+	readonly stagedAt: Date;
+	readonly userId: string;
+}): SessionSavedOutputRow[] {
+	try {
+		return extractSessionSavedOutputs({
+			input: input.evidence.input,
+			manifest: input.evidence.manifest,
+			organizationId: input.organizationId,
+			stagedAt: input.stagedAt,
+			userId: input.userId,
+		});
+	} catch (error) {
+		logger.warn("Saved outputs of an evidence capture were skipped: {error}", {
+			error: String(error),
+		});
+		return [];
+	}
+}
+
 export async function commitRepositoryEvidence(
 	options: CommitRepositoryEvidenceOptions,
 ): Promise<CommitRepositoryEvidenceResult> {
@@ -445,6 +477,12 @@ export async function commitRepositoryEvidence(
 		evidence,
 		options.prepareIndex,
 	);
+	const savedOutputs = prepareSessionSavedOutputs({
+		evidence,
+		organizationId: options.organizationId,
+		stagedAt: options.now(),
+		userId: options.userId,
+	});
 
 	const committedAt = options.now();
 	const receiptId = options.randomUUID();
@@ -531,11 +569,12 @@ export async function commitRepositoryEvidence(
 				provider, provider_host, provider_repository_id,
 				provider_repository_node_id, provider_owner, provider_name,
 				session_id, run_id, segment_id, agent_id, parent_agent_id, source,
-				lifecycle, base_git_commit, head_git_commit, captured_at, coverage, index_row
+				lifecycle, base_git_commit, head_git_commit, captured_at, coverage, index_row,
+				saved_outputs
 			) VALUES (
 				$1, $2, $3, $4, $5, $6, $7, $8,
 				$9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-				$21, $22, $23, $24, $25::text::jsonb, $26::text::jsonb
+				$21, $22, $23, $24, $25::text::jsonb, $26::text::jsonb, $27::text::jsonb
 			) ON CONFLICT (organization_id, context_id) DO NOTHING`,
 			[
 				options.organizationId,
@@ -564,6 +603,7 @@ export async function commitRepositoryEvidence(
 				plan.input.capture.timing.captureCompletedAt,
 				JSON.stringify(plan.input.coverage),
 				JSON.stringify(preparedIndex),
+				savedOutputs.length === 0 ? null : JSON.stringify(savedOutputs),
 			],
 		);
 		// A capture is evidence of its session's L1 edges.

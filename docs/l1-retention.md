@@ -68,6 +68,7 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 | ClickHouse `session_lineage` | parent and child session ids, models, working directories | **was missing; added in this change** | **was missing; added in this change** |
 | ClickHouse `skill_receipts`, `skill_uses`, `skill_version_contents` | skills read from transcripts | yes | yes |
 | ClickHouse `repository_session_evidence_index` | repository evidence per session | yes | yes |
+| ClickHouse `session_saved_outputs` | saved outputs of a session (background task outputs, large tool outputs) as its evidence captures listed them; the text stays in the evidence objects, purged with them; a publication in flight is removed by the second pass | yes, by `user_id` | yes, by `organization_id` |
 | ClickHouse `wrapped_user_archetype_snapshots_v1` | per-user snapshot | yes | yes |
 | ClickHouse `github_pull_requests`, `_details`, `_commits`, `github_ci_runs`, `_run_pull_requests`, `github_ci_jobs` | GitHub facts (no transcript data) | not applicable (workspace-scoped) | yes, by `workspace_id` |
 | ClickHouse `wrapped_user_archetype_runs_v1`, `dependency_health_probes` | no owner column | not applicable | not applicable |

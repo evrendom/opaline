@@ -9,6 +9,11 @@ import {
 	type RepositoryEvidenceIndexRow,
 	RepositoryEvidenceIndexRowSchema,
 } from "./repository-evidence-index.service.js";
+import {
+	parseStagedSessionSavedOutputs,
+	persistSessionSavedOutputRows,
+	type SessionSavedOutputRow,
+} from "./session-saved-outputs.service.js";
 
 const logger = getLogger(["rudel", "api", "repository-evidence-index"]);
 const INLINE_BUDGET_MS = 3_000;
@@ -28,11 +33,19 @@ interface PendingCapture {
 	readonly contextId: string;
 	readonly userId: string;
 	readonly indexRow: unknown;
+	readonly savedOutputs: unknown;
 }
 
-// The capture and its prepared index row are already durable in Postgres, so
-// the CLI never waits on a slow ClickHouse insert. Rows not published within
-// the inline budget are published by the minute maintenance pass.
+interface PublishableCapture {
+	readonly capture: PendingCapture;
+	readonly row: RepositoryEvidenceIndexRow;
+	readonly savedOutputs: readonly SessionSavedOutputRow[];
+}
+
+// The capture, its prepared index row and its saved output rows are already
+// durable in Postgres, so the CLI never waits on a slow ClickHouse insert. Rows
+// not published within the inline budget are published by the minute
+// maintenance pass. A capture counts as published once both are written.
 export async function publishRepositoryEvidenceIndexAfterCommit(
 	input: PublicationDependencies & {
 		readonly organizationId: string;
@@ -88,7 +101,8 @@ async function selectPendingCaptures(
 ): Promise<PendingCapture[]> {
 	return database.unsafe<PendingCapture[]>(
 		`SELECT organization_id AS "organizationId", context_id AS "contextId",
-			user_id AS "userId", index_row AS "indexRow"
+			user_id AS "userId", index_row AS "indexRow",
+			saved_outputs AS "savedOutputs"
 		 FROM repository_evidence_capture
 		 WHERE index_row IS NOT NULL AND index_published_at IS NULL
 		   AND ($1::text IS NULL OR (organization_id = $1 AND context_id = $2))
@@ -104,16 +118,13 @@ async function publishCaptures(
 	signal: AbortSignal,
 	env: PublicationDependencies,
 ): Promise<number> {
-	const publishable: Array<{
-		readonly capture: PendingCapture;
-		readonly row: RepositoryEvidenceIndexRow;
-	}> = [];
+	const publishable: PublishableCapture[] = [];
 	for (const capture of captures) {
 		// Never publish evidence of an account or workspace being purged; the
 		// purge also deletes the capture row itself.
 		if (await hasClickHousePurgeTombstone(capture, env)) {
 			await env.database.unsafe(
-				`UPDATE repository_evidence_capture SET index_row = NULL
+				`UPDATE repository_evidence_capture SET index_row = NULL, saved_outputs = NULL
 				 WHERE organization_id = $1 AND context_id = $2`,
 				[capture.organizationId, capture.contextId],
 			);
@@ -131,15 +142,23 @@ async function publishCaptures(
 			);
 			continue;
 		}
-		publishable.push({ capture, row: parsed.data });
+		// Saved outputs never hold back the capture's index row: a staged row
+		// that no longer parses is dropped.
+		const savedOutputs = parseStagedSessionSavedOutputs(capture.savedOutputs);
+		if (savedOutputs.invalid > 0)
+			logger.error("Dropped {count} invalid saved output rows ({contextId})", {
+				contextId: capture.contextId,
+				count: savedOutputs.invalid,
+			});
+		publishable.push({
+			capture,
+			row: parsed.data,
+			savedOutputs: savedOutputs.rows,
+		});
 	}
 	if (publishable.length === 0) return 0;
 	try {
-		await persistRepositoryEvidenceIndexRows({
-			clickhouse: env.clickhouse,
-			rows: publishable.map((item) => item.row),
-			signal,
-		});
+		await persistPublication(env.clickhouse, publishable, signal);
 		await markPublished(
 			env.database,
 			publishable.map((item) => item.capture),
@@ -167,11 +186,7 @@ async function publishCaptures(
 			continue;
 		}
 		try {
-			await persistRepositoryEvidenceIndexRows({
-				clickhouse: env.clickhouse,
-				rows: [item.row],
-				signal,
-			});
+			await persistPublication(env.clickhouse, [item], signal);
 			await markPublished(env.database, [item.capture]);
 			published += 1;
 		} catch (error) {
@@ -186,6 +201,27 @@ async function publishCaptures(
 		}
 	}
 	return published;
+}
+
+/**
+ * One insert for the index rows and, when any capture has saved outputs, one
+ * for those. A retry rewrites both; the replacing tables keep one copy.
+ */
+async function persistPublication(
+	clickhouse: ClickHouseExecutor,
+	items: readonly PublishableCapture[],
+	signal: AbortSignal,
+): Promise<void> {
+	await persistRepositoryEvidenceIndexRows({
+		clickhouse,
+		rows: items.map((item) => item.row),
+		signal,
+	});
+	await persistSessionSavedOutputRows({
+		clickhouse,
+		rows: items.flatMap((item) => item.savedOutputs),
+		signal,
+	});
 }
 
 async function markPublished(

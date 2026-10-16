@@ -27,9 +27,18 @@ identity makes them safe. Async inserts still wait for their flush acknowledgmen
 (per `insert-async-small-batches`); no durability settings or ClickHouse schema
 change.
 
+The same commit stages the capture's saved output rows (background task
+outputs and large tool outputs, `apps/api/src/services/session-saved-outputs.service.ts`)
+in `repository_evidence_capture.saved_outputs`, and the same pass publishes them
+to `rudel.session_saved_outputs` with a second insert (only when the batch has
+any) before marking the capture published. A staged saved output row that no
+longer parses is dropped and logged; it never holds back the index row. Fenced
+captures drop both.
+
 Regression coverage lives in
 `apps/api/src/__tests__/repository-evidence-fence.integration.ts` and uses real
-Postgres and ClickHouse with the existing R2 fixture and a slow executor.
+Postgres and ClickHouse with the existing R2 fixture and a slow executor, and
+for saved outputs in `apps/api/src/__tests__/session-saved-outputs.integration.ts`.
 
 ## Setup columns
 

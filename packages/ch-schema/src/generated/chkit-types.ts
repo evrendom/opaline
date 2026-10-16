@@ -1357,6 +1357,67 @@ export const RudelSessionLineageRowSchema = z.object({
 export type RudelSessionLineageRowInput = z.input<typeof RudelSessionLineageRowSchema>
 export type RudelSessionLineageRowOutput = z.output<typeof RudelSessionLineageRowSchema>
 
+export type RudelSessionSavedOutputsRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  session_source: string
+  root_id: string
+  path: string
+  kind: string
+  task_id: string
+  tool_use_id: string
+  agent_id: string
+  record_idx: number
+  entry_kind: string
+  status: string
+  omitted_reason: string
+  blob_object_id: string
+  blob_capture_id: string
+  source_bytes: string
+  stored_bytes: string
+  original_bytes: string
+  truncated: boolean
+  file_modified_at: string | null
+  capture_id: string
+  captured_at: string
+  capture_reason: string
+  version: string
+  written_at: string
+}
+
+export const RudelSessionSavedOutputsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  session_source: z.string(),
+  root_id: z.string(),
+  path: z.string(),
+  kind: z.string(),
+  task_id: z.string(),
+  tool_use_id: z.string(),
+  agent_id: z.string(),
+  record_idx: z.number(),
+  entry_kind: z.string(),
+  status: z.string(),
+  omitted_reason: z.string(),
+  blob_object_id: z.string(),
+  blob_capture_id: z.string(),
+  source_bytes: z.string(),
+  stored_bytes: z.string(),
+  original_bytes: z.string(),
+  truncated: z.boolean(),
+  file_modified_at: z.string().nullable(),
+  capture_id: z.string(),
+  captured_at: z.string(),
+  capture_reason: z.string(),
+  version: z.string(),
+  written_at: z.string(),
+})
+
+export type RudelSessionSavedOutputsRowInput = z.input<typeof RudelSessionSavedOutputsRowSchema>
+export type RudelSessionSavedOutputsRowOutput = z.output<typeof RudelSessionSavedOutputsRowSchema>
+
 export type RudelSetupTextsRow = {
   organization_id: string
   user_id: string

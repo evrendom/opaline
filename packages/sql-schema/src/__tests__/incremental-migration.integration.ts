@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0069 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), and drops the Free member cap (0069)", async () => {
+test("applies migrations 0020-0070 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), and stages saved outputs with evidence captures (0070)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0069_drop_free_workspace_member_limit");
+	expect(latestMigration?.tag).toBe("0070_repository_evidence_saved_outputs");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -329,7 +329,7 @@ test("applies migrations 0020-0069 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 70,
+				count: 71,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`
@@ -363,13 +363,15 @@ test("applies migrations 0020-0069 to a database already migrated through 0019, 
 				FROM information_schema.columns
 				WHERE table_schema = 'public'
 					AND table_name = 'repository_evidence_capture'
-					AND column_name IN ('index_row', 'index_published_at', 'index_next_attempt_at')
+					AND column_name IN ('index_row', 'index_published_at', 'index_next_attempt_at', 'saved_outputs')
 				ORDER BY column_name
 			`;
+			// 0070: saved output rows staged with the capture, published with its index row.
 			expect(publicationColumns.map((column) => column.name)).toEqual([
 				"index_next_attempt_at",
 				"index_published_at",
 				"index_row",
+				"saved_outputs",
 			]);
 			const outcomesTables = await migrationSql<Array<{ name: string }>>`
 				SELECT tablename AS name FROM pg_tables

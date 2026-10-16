@@ -6,6 +6,7 @@ import {
 } from "@rudel/ch-schema/received-setup";
 import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
 import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
+import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
 	type ClickHouseStatement,
@@ -259,6 +260,9 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },
+		// Saved outputs (task outputs, large tool outputs), published with the
+		// evidence index; the follow-up pass removes a publication in flight.
+		{ column, table: SESSION_SAVED_OUTPUTS_TABLE },
 		// Findings' cited runs, by the run's owner. The rows of analyses the
 		// account wrote or whose deletion it causes go in purgeFindingImpact.
 		{ column, table: FINDING_RUNS_TABLE },

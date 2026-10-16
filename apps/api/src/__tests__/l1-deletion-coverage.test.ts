@@ -59,6 +59,8 @@ const TRANSCRIPT_DERIVED = [
 	"skill_uses",
 	"skill_version_contents",
 	"repository_session_evidence_index",
+	// Background task outputs and large tool outputs, with the evidence index.
+	"session_saved_outputs",
 	"weekly_totals",
 	// Findings' cited runs with their measures, by the run's owner.
 	"analysis_finding_runs",

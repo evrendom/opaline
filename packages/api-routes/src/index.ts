@@ -221,6 +221,7 @@ export {
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { momentsContract } from "./moments.js";
+import { sessionSavedOutputsContract } from "./session-saved-outputs.js";
 import { workspaceFeaturesAdminContract } from "./workspace-features.js";
 
 export {
@@ -1199,6 +1200,7 @@ export const contract = {
 	analytics: {
 		/** Moments, observations and patterns (`moments.ts`). */
 		moments: momentsContract,
+		savedOutputs: sessionSavedOutputsContract,
 		overview: {
 			costs: oc.input(CostDashboardInputSchema).output(CostDashboardSchema),
 			kpis: oc.input(DateRangeInputSchema).output(OverviewKPIsSchema),

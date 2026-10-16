@@ -3,11 +3,13 @@ import { developersRouter } from "./developers.js";
 import { momentsRouter } from "./moments.js";
 import { overviewRouter } from "./overview.js";
 import { repositoriesRouter } from "./repositories.js";
+import { savedOutputsRouter } from "./saved-outputs.js";
 import { sessionsRouter } from "./sessions.js";
 import { skillsRouter } from "./skills.js";
 
 export const analyticsRouter = os.analytics.router({
 	moments: momentsRouter,
+	savedOutputs: savedOutputsRouter,
 	overview: overviewRouter,
 	developers: developersRouter,
 	sessions: sessionsRouter,
