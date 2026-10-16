@@ -335,3 +335,29 @@ test("a text past a record's first block (after reasoning) is named by its block
 		'  r94.2 text: "Fixed!"',
 	]);
 });
+
+test("a run a queued prompt cut off says so: its last text is where the work was, and the next run continues it", () => {
+	const cut = render(
+		{},
+		{
+			...view,
+			next: view.next && { ...view.next, queuedBoundary: true },
+		},
+	).text.split("\n");
+	expect(cut[2]).toBe(
+		'END  cut off mid-work: the person\'s queued prompt started the next run, which continues it; last text r94 · "Fixed! The test now passes."',
+	);
+	expect(cut[3]).toStartWith(
+		"NEXT u1/claude_code/s1//90 · user (queued while this run worked): ",
+	);
+	const continued = render(
+		{},
+		{
+			...view,
+			previous: view.previous && { ...view.previous, queuedBoundary: true },
+		},
+	).text.split("\n");
+	expect(continued[1]).toBe(
+		`PREV u1/claude_code/s1//10 · "add rate limiting to login" → cut off mid-work by this run's queued prompt; its last text: "Done, added a limiter in auth.ts"`,
+	);
+});

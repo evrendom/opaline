@@ -60,6 +60,12 @@ export interface RunViewSetup {
 export interface RunViewNeighbour {
 	readonly id: string;
 	readonly prompt: string | null;
+	/**
+	 * A queued prompt (sent while the agent worked) sits on the boundary
+	 * between this neighbour and the run: the earlier run was cut off mid-work
+	 * and the later one continues it.
+	 */
+	readonly queuedBoundary?: boolean;
 }
 
 export interface RunView {
@@ -451,7 +457,9 @@ function previousLines({ view }: Context): string[] {
 	const previous = view.previous;
 	if (!previous) return ["PREV none: the first run of its stream"];
 	return [
-		`PREV ${previous.id} · ${quote(previous.prompt)} → END ${quote(previous.end)}`,
+		previous.queuedBoundary
+			? `PREV ${previous.id} · ${quote(previous.prompt)} → cut off mid-work by this run's queued prompt; its last text: ${quote(previous.end)}`
+			: `PREV ${previous.id} · ${quote(previous.prompt)} → END ${quote(previous.end)}`,
 	];
 }
 
@@ -467,16 +475,24 @@ export function lastText(
 
 function endLines({ view, handles }: Context): string[] {
 	const text = lastText(view.requests);
+	// A queued prompt cut the run off: its last text is where the work was,
+	// not how it ended; the next run continues it.
+	const cut = view.next?.queuedBoundary === true;
+	const label = cut
+		? "END  cut off mid-work: the person's queued prompt started the next run, which continues it; last text"
+		: "END ";
 	if (!text)
 		return [
-			view.requestsIndexed
-				? "END  none: the run's last request wrote no text"
-				: "END  unknown: this run's requests are not indexed yet",
+			cut
+				? `${label}: none`
+				: view.requestsIndexed
+					? "END  none: the run's last request wrote no text"
+					: "END  unknown: this run's requests are not indexed yet",
 		];
 	return [
 		handles
-			? `END  ${textId(text)} · ${quote(text.head)}`
-			: `END  ${quote(text.head)}`,
+			? `${label} ${textId(text)} · ${quote(text.head)}`
+			: `${label} ${quote(text.head)}`,
 	];
 }
 
@@ -489,7 +505,7 @@ function nextLines({ view }: Context): string[] {
 	const next = view.next;
 	if (!next) return ["NEXT none: the last run of its stream"];
 	return [
-		`NEXT ${next.id} · user: ${quote(next.prompt)} · reaction: ${next.prompt === null ? "unknown" : nextPromptReaction(next.prompt)}`,
+		`NEXT ${next.id} · user${next.queuedBoundary ? " (queued while this run worked)" : ""}: ${quote(next.prompt)} · reaction: ${next.prompt === null ? "unknown" : nextPromptReaction(next.prompt)}`,
 	];
 }
 

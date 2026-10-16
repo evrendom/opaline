@@ -345,10 +345,15 @@ async function loadRun(
 						id: neighbour(previous),
 						prompt: previous.prompt_head || null,
 						end: lastText(of(previous.start_record))?.head ?? null,
+						queuedBoundary: row.prompt_subtype === "queued",
 					}
 				: null,
 			next: next
-				? { id: neighbour(next), prompt: next.prompt_head || null }
+				? {
+						id: neighbour(next),
+						prompt: next.prompt_head || null,
+						queuedBoundary: next.prompt_subtype === "queued",
+					}
 				: null,
 			requests: of(row.start_record),
 			setup,
