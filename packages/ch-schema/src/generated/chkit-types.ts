@@ -673,6 +673,7 @@ export type RudelRunIndexRow = {
   time_to_first_token_ms: number | null
   prompt_head: string | null
   genuine_prompts: number
+  prompt_subtype: string | null
   prompt_reactions: string[]
   final_message: string | null
   final_message_cut: boolean
@@ -715,6 +716,7 @@ export type RudelRunIndexRow = {
   timed_out_calls: number | null
   mcp_calls: number | null
   mcp_servers: string[]
+  mcp_unavailable: string[]
   skills: string[]
   slash_commands: string[]
   subagent_types: string[]
@@ -761,6 +763,9 @@ export type RudelRunIndexRow = {
   cost_state: Record<string, string>
   title: string | null
   repository: string
+  cwd: string | null
+  cwd_repository: string | null
+  cwd_repository_basis: string
   session_model: string
 }
 
@@ -794,6 +799,7 @@ export const RudelRunIndexRowSchema = z.object({
   time_to_first_token_ms: z.number().nullable(),
   prompt_head: z.string().nullable(),
   genuine_prompts: z.number(),
+  prompt_subtype: z.string().nullable().default(null),
   prompt_reactions: z.array(z.string()).default([]),
   final_message: z.string().nullable().default(null),
   final_message_cut: z.boolean().default(false),
@@ -836,6 +842,7 @@ export const RudelRunIndexRowSchema = z.object({
   timed_out_calls: z.number().nullable(),
   mcp_calls: z.number().nullable(),
   mcp_servers: z.array(z.string()),
+  mcp_unavailable: z.array(z.string()).default([]),
   skills: z.array(z.string()),
   slash_commands: z.array(z.string()),
   subagent_types: z.array(z.string()),
@@ -882,6 +889,9 @@ export const RudelRunIndexRowSchema = z.object({
   cost_state: z.record(z.string(), z.string()),
   title: z.string().nullable(),
   repository: z.string(),
+  cwd: z.string().nullable().default(null),
+  cwd_repository: z.string().nullable().default(null),
+  cwd_repository_basis: z.string().default(""),
   session_model: z.string(),
 })
 

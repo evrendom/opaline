@@ -113,6 +113,15 @@ const COLUMN_TRAPS: Readonly<Record<string, string>> = {
 	session_date: "UTC.",
 	cost_usd:
 		"Frozen at the build's pricing_version; NULL is unpriced or unknown, not free.",
+	repository:
+		"One value per session, the same on every run: a session started outside a repository (a coordinator folder whose subagents work in other checkouts) puts all its runs on the repository the upload named. Use cwd_repository for the repository a run worked in.",
+	cwd: "Shell commands only: a run of file tools (Read, Edit, Grep) keeps its first recorded cwd, which for a Claude Code subagent is its session's. Paths are as written, not resolved through links: the same checkout reached by a link is another path.",
+	cwd_repository:
+		"NULL means unknown, not the session's repository: count runs per repository WHERE cwd_repository IS NOT NULL, and say how many runs are unknown. A directory below one with evidence is taken to be the same repository (a nested repository or a link out of it is not told apart).",
+	mcp_unavailable:
+		"Empty is not proof every server worked: Codex records no server state (unrecorded_facts names mcp_unavailable), and a stream may record none. A server listed here can still connect later in the run; the run's mcp_servers says which servers its calls used.",
+	cwd_repository_basis:
+		"session_branch needs the upload's branch on a record at the session's own directory: a session whose folder has another branch (a coordinator folder) has none there.",
 };
 
 const AGENT_NAMES = { claude_code: "Claude Code", codex: "Codex" } as const;
@@ -139,6 +148,7 @@ const CALL_RUN_COLUMNS = [
 	"agent_id",
 	"turn_idx",
 	"source",
+	"unrecorded_facts",
 ];
 
 /** The committed run rows a view may read: the caller's workspace, and only their own sessions when `memberOnly`. */

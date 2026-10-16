@@ -101,6 +101,10 @@ export const RUN_INDEX_NARROWED_COLUMNS = {
 		codex:
 			"Codex latest_token_usage_record is the latest request's usage snapshot, not context tokens immediately before compaction. Cumulative total_tokens/thread_token_usage and last-request input tokens are not this measurement.",
 	},
+	mcp_unavailable: {
+		codex:
+			"Codex writes no list of its MCP servers' state: only _meta._codex_apps.connector_auth_failure on one MCP call's result, an authentication failure of that connector at that call, not the servers unavailable to the run.",
+	},
 	refusals: {
 		codex:
 			"Codex generic terminal errors include cyber_policy/misalignment_policy_violation; these report policy termination, not a recorded model refusal. Counting all errors or policy stops as model refusals changes the meaning.",
@@ -110,6 +114,12 @@ export const RUN_INDEX_NARROWED_COLUMNS = {
 >;
 
 export const RUN_INDEX_FACT_COLUMNS = {
+	// A queued prompt's subtype is as old as parser 5; a coordinator's message
+	// in a Claude Code subagent read as queued until parser 11 (delegation).
+	prompt_subtype: {
+		...gate(5, BOTH, []),
+		subagentSinceBy: { claude_code: 11 },
+	},
 	failed_edits: gate(9, BOTH, []),
 	refused_edits: gate(9, BOTH, []),
 	agent_version: gate(6, BOTH, ["agentVersion"]),
@@ -157,6 +167,9 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		...gate(6, CLAUDE, ["timedOutAfterMs"]),
 		subagentSinceBy: { claude_code: 11 },
 	},
+	// Claude Code's deferred_tools_delta server lists; Codex records no
+	// server state, only an auth failure in one MCP result's metadata.
+	mcp_unavailable: gate(9, CLAUDE, ["mcp_server_state_components"]),
 	mcp_calls: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
 	mcp_servers: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
 	skills: gate(
@@ -281,6 +294,11 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		),
 		mainStreamOnly: CLAUDE,
 	},
+	// Leading cd targets are in every parser's command text, but the cwd a
+	// call without one ran in is recorded from parser 9; Codex session_meta
+	// remotes (one basis of cwd_repository) from parser 12.
+	cwd: gate(9, BOTH, ["cwd_components"]),
+	cwd_repository: gate(9, BOTH, ["cwd_components"]),
 	title: gate(8, CLAUDE, ["title"], "receipt"),
 	cost_state: gate(8, CLAUDE, ["cost_usd"], "receipt"),
 } as const satisfies Partial<

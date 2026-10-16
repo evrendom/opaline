@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readCodexSkillBlock } from "./injected-wrappers.js";
 import { isRecord, type LineItem, readString } from "./line-items.js";
 import { countCodePoints, sliceStart } from "./text-fields.js";
 import type { TranscriptSource } from "./types.js";
@@ -21,7 +22,7 @@ export type ReceivedSetupKind =
 	| "instructions"
 	/** Claude Code `nested_memory`: a CLAUDE.md loaded when the agent entered its directory. */
 	| "nested_memory"
-	/** A skill's text: Claude Code's skill body, a Codex `cat` of a SKILL.md. */
+	/** A skill's text: Claude Code's skill body, a Codex `<skill>` message or `cat` of a SKILL.md. */
 	| "skill_body"
 	/** Claude Code MCP server instructions. */
 	| "mcp_instructions"
@@ -261,6 +262,16 @@ export function recordCwd(
 }
 
 function skillBody(text: string): ReceivedSetupSource[] {
+	const codex = readCodexSkillBlock(text);
+	if (codex !== undefined)
+		return [
+			{
+				kind: "skill_body",
+				path: codex.path,
+				name: codex.name,
+				text: codex.text,
+			},
+		];
 	const header = SKILL_BODY_HEADER.exec(text);
 	const directory = header?.[1]?.trim();
 	if (header === null || directory === undefined || directory === "") return [];

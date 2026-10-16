@@ -300,6 +300,61 @@ describe("Codex received setup", () => {
 		]);
 	});
 
+	test("a skill a $skill mention injects is a skill body named as recorded, and its record names the skill, not a prompt", () => {
+		const skill = "---\nname: design\n---\n\n# Design\nKeep it local.\n";
+		const path = `${cwd}/.agents/skills/design/SKILL.md`;
+		const drafts = rows("codex", [
+			sessionMeta,
+			{
+				payload: {
+					content: [
+						{
+							text: `add the skills from [$design](${path}) to the repo`,
+							type: "input_text",
+						},
+					],
+					role: "user",
+					type: "message",
+				},
+				timestamp: "2026-08-01T10:00:00.100Z",
+				type: "response_item",
+			},
+			{
+				payload: {
+					content: [
+						{
+							text: `<skill>\n<name>design</name>\n<path>${path}</path>\n${skill}\n</skill>`,
+							type: "input_text",
+						},
+					],
+					role: "user",
+					type: "message",
+				},
+				timestamp: "2026-08-01T10:00:00.200Z",
+				type: "response_item",
+			},
+		]);
+		expect(drafts.filter((draft) => draft.kind === "user_prompt")).toHaveLength(
+			1,
+		);
+		const injected = drafts.find((draft) => draft.subtype === "skill_body");
+		expect(injected?.kind).toBe("injected_context");
+		expect(injected?.facts.extra.skill).toBe("design");
+		expect(
+			pieces(drafts).filter((piece) => piece.kind === "skill_body"),
+		).toEqual([
+			{
+				kind: "skill_body",
+				path,
+				name: "design",
+				cwd,
+				sha256: sha256(skill),
+				chars: skill.length,
+			},
+		]);
+		expect(texts(drafts)).toContain(skill);
+	});
+
 	test("a whole SKILL.md the agent read with cat is a skill body; a partial or mixed read is not", () => {
 		const completed = (id: string, command: string, stdout: string) => ({
 			payload: {

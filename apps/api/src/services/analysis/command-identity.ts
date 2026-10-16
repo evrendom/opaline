@@ -8,7 +8,7 @@
  */
 
 /** Shell tools whose call text is the command itself (Codex keeps the unwrapped command). */
-const SHELL_TOOLS = [
+export const SHELL_TOOLS = [
 	"bash",
 	"exec_command",
 	"shell",

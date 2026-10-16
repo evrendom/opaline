@@ -36,6 +36,8 @@ const WRAPPER_SUBTYPES: ReadonlyMap<string, string> = new Map([
 	["apps_instructions", "environment_context"],
 	["user_instructions", "agents_md"],
 	["turn_aborted", "interrupt"],
+	// The Codex app's page events: what the person opened in its UI, not a prompt.
+	["external_codex_apps_open_page", "ui_event"],
 ]);
 
 const WRAPPER_ELEMENT_PATTERN = new RegExp(
@@ -54,6 +56,28 @@ const AGENTS_MD_HEADER_PATTERN = /^# AGENTS\.md instructions[^\n]*(?:\n|$)/gmu;
 const INTERRUPT_PATTERN =
 	/^\[Request interrupted by user(?: for tool use)?\]$/u;
 const SKILL_BODY_PATTERN = /^Base directory for this skill:/u;
+/**
+ * A skill Codex injects when the person names it (`$skill`): its name, the
+ * path of its SKILL.md and that file's text, as one user message.
+ */
+const CODEX_SKILL_BLOCK_PATTERN =
+	/^<skill>\n?<name>([^<\n]{1,256})<\/name>\n?<path>([^<\n]{1,4096})<\/path>\n?([\s\S]*?)\n?<\/skill>$/u;
+
+/** A Codex `<skill>` message's skill: its name, SKILL.md path and text. */
+export interface CodexSkillBlock {
+	readonly name: string;
+	readonly path: string;
+	readonly text: string;
+}
+
+/** The skill a whole user message injects (`<skill><name>…</name><path>…</path>…</skill>`), or undefined. */
+export function readCodexSkillBlock(text: string): CodexSkillBlock | undefined {
+	const match = CODEX_SKILL_BLOCK_PATTERN.exec(text.trim());
+	const name = match?.[1]?.trim();
+	const path = match?.[2]?.trim();
+	if (match === null || !name || !path) return undefined;
+	return { name, path, text: match[3] ?? "" };
+}
 const COMPACT_SUMMARY_PATTERN =
 	/^This session is being continued from a previous conversation/u;
 
@@ -159,6 +183,9 @@ export function classifyUserText(
 	}
 	if (COMPACT_SUMMARY_PATTERN.test(trimmed)) {
 		return { kind: "compaction", subtype: "compact_summary" };
+	}
+	if (readCodexSkillBlock(trimmed) !== undefined) {
+		return { kind: "injected_context", subtype: "skill_body" };
 	}
 	const { firstSubtype, injected, remainder } = stripInjectedWrappers(trimmed);
 	if (firstSubtype === "slash_command") {

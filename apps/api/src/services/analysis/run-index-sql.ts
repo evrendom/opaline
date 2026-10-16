@@ -12,6 +12,7 @@ import type {
 	TranscriptReadScope,
 } from "../transcript-records-queries.js";
 import { buildPricedUsageEventsCte } from "../usage-event-analytics.service.js";
+import { type ForkReplayRules, runDirectoryRules } from "./run-directories.js";
 import { RUN_INDEX_FACT_COLUMNS } from "./run-index-columns.js";
 import {
 	componentStringsSql,
@@ -363,7 +364,7 @@ function foundNothingSql(): string {
 				maxIf(match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '${SILENCED_COMMAND.replaceAll("\\", "\\\\")}'), kind = 'tool_call') AS silenced`;
 }
 
-const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
+export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
 
 /**
  * The calls a forked Codex stream replays from its parent (`replayed_calls`):
@@ -445,6 +446,7 @@ function literalRunFacts(): string {
 		`${first("agent_version")} AS l_agent_version`,
 		`${first("entrypoint")} AS l_entrypoint`,
 		// The run's starting prompt says where it came from, set or not.
+		`${first("CAST(subtype, 'String')", "kind = 'user_prompt'")} AS l_prompt_subtype`,
 		`${first(f("turn_origin"), "kind = 'user_prompt'")} AS l_turn_origin`,
 		`${first(f("prompt_source"), "kind = 'user_prompt'")} AS l_prompt_source`,
 		`${first(f("origin_kind"), "kind = 'user_prompt'")} AS l_origin_kind`,
@@ -475,6 +477,7 @@ function literalRunFacts(): string {
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND (timed_out_after_ms IS NOT NULL OR ${f("background_launch")} = 'timeout')) AS l_timed_out_calls`,
 		`uniqExactIf(${callKey}, mcp_server != '') AS l_mcp_calls`,
 		`${sortedSet("mcp_server")} AS l_mcp_servers`,
+
 		`arraySort(arrayDistinct(arrayConcat(groupUniqArrayIf(CAST(attribution_skill, 'String'), attribution_skill != ''),
 					groupUniqArrayIf(${skillInput}, ${skillInput} != ''),
 					groupUniqArrayIf(${f("skill")}, ${f("skill")} != ''),
@@ -782,6 +785,7 @@ export const RunIndexFactsRowSchema = z.object({
 	not_found: count,
 	l_agent_version: text,
 	l_entrypoint: text,
+	l_prompt_subtype: text,
 	l_turn_origin: text,
 	l_prompt_source: text,
 	l_origin_kind: text,
@@ -1161,6 +1165,63 @@ export function buildRunIndexSessionStatement(
 	};
 }
 
+/**
+ * A Claude Code record of its MCP servers' state: a deferred_tools_delta
+ * that lists servers needing authentication, still connecting or failed (a
+ * delta that only adds tools lists none and says nothing about them).
+ */
+const MCP_STATE_RECORD = `source = 'claude_code' AND kind = 'meta' AND subtype = 'attachment:deferred_tools_delta'
+	AND match(facts['mcp_server_state_components'], '[.](needsAuthMcpServers|pendingMcpServers|failedMcpServers)')`;
+
+/**
+ * The servers a server-state record lists as needing authentication or
+ * failed, sorted: the needsAuthMcpServers names and the name of each
+ * failedMcpServers entry (an object with name, errorCode and error).
+ */
+const MCP_UNAVAILABLE = `arraySort(arrayDistinct(arrayFilter(name -> name != '', arrayFlatten(arrayMap(component -> multiIf(
+		endsWith(JSONExtractString(component, 'path'), '.needsAuthMcpServers[]'), [JSONExtractString(component, 'value')],
+		endsWith(JSONExtractString(component, 'path'), '.failedMcpServers'), arrayMap(entry -> if(JSONType(entry) = 'String', JSONExtractString(entry), JSONExtractString(entry, 'name')),
+			JSONExtractArrayRaw(component, 'value')),
+		CAST([], 'Array(String)')), JSONExtractArrayRaw(facts['mcp_server_state_components']))))))`;
+
+/** Per stream and run, the servers its last server-state record lists as unavailable. */
+export const McpStateRowSchema = z.object({
+	agent_id: text,
+	turn_idx: count,
+	unavailable: strings,
+});
+export type McpStateRow = z.infer<typeof McpStateRowSchema>;
+
+/**
+ * Each stream's MCP server-state records of one generation, the last of
+ * each run (turn 0 holds those before the stream's first prompt): the build
+ * carries a run's to the stream's later runs (`carriedMcpUnavailable`).
+ */
+export function buildMcpStateStatement(
+	scope: TranscriptReadScope,
+	generation: SessionGeneration,
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+		query: mcpStateSql(),
+		query_params: pinnedParams(scope, [generation]),
+	};
+}
+
+function mcpStateSql(): string {
+	return `SELECT agent_id, turn_idx, argMax(${MCP_UNAVAILABLE}, tuple(record_idx, block_idx)) AS unavailable
+			FROM ${records()}
+			WHERE ${pinnedFilter()} AND ${MCP_STATE_RECORD}
+			GROUP BY agent_id, turn_idx
+			ORDER BY agent_id, turn_idx`;
+}
+
+/** How a build's directory statements leave out a forked Codex session's replayed calls, as the run facts do. */
+export const RUN_FORK_REPLAY: ForkReplayRules = {
+	ctes: forkReplayCtes(),
+	filter: FORK_REPLAY_FILTER,
+};
+
 /** Pricing, literal SQL and per-agent gates fingerprint every build, so a change to any of them rebuilds the stored generations. */
 export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHash(
 	"sha256",
@@ -1170,6 +1231,8 @@ export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHas
 	.update(runContextCtes())
 	.update(runRequestsCtes())
 	.update(JSON.stringify(RUN_INDEX_FACT_COLUMNS))
+	.update(runDirectoryRules(RUN_FORK_REPLAY))
+	.update(mcpStateSql())
 	.update("codex-per-turn-effort:lifecycle;claude-abort:l_abort_reason")
 	.digest("hex")
 	.slice(0, 12)}`;

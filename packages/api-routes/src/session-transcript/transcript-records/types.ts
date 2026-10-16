@@ -21,7 +21,10 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * the failed edit a call retries (`retry_of`), the part of a compound
  * command that decided its exit code (`exit_decided_by`, `exit_masked`,
  * `no_output`), interruptions Claude recorded as `interrupted`, and no
- * whole tool output (Write/Edit `originalFile`) kept as a denial reason.
+ * whole tool output (Write/Edit `originalFile`) kept as a denial reason,
+ * a timeout hand-off's limit from its text where no `timedOutAfterMs`
+ * was recorded (a subagent stream), and a Codex `$skill` injection and apps
+ * page event as injected context (`skill_body`, `ui_event`), not prompts.
  * Each record also carries its line's own id (`record_uuid`, Claude `uuid`).
  */
 export const TRANSCRIPT_RECORDS_PARSER_VERSION = 12;
@@ -102,6 +105,14 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	exit_masked: 12,
 	/** "true" when a finished shell result printed nothing (Claude Code's own lines removed), else "false". */
 	no_output: 12,
+	/**
+	 * On a Codex `session_meta`: its `git.repository_url` (any user and
+	 * password in it removed), the remote of the directory the session started
+	 * in, and that directory (`cwd`), so a run's working directory can be named
+	 * by the repository this literal pair records.
+	 */
+	git_remote: 12,
+	git_remote_cwd: 12,
 	/**
 	 * Setup text the record carries, as a JSON array of
 	 * `{kind, path, name, cwd, sha256, chars}` (`received-setup.ts`); the texts

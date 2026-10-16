@@ -52,6 +52,7 @@ const FIXTURES = {
 	codexCustomExec: "codex-custom-exec-era.jsonl",
 	claudeRecordIds: "l1-facts/claude-record-ids.jsonl",
 	claudeSubagent: "l1-facts/claude-subagent-2.1.jsonl",
+	codexSkill: "l1-facts/codex-skill-0.162.jsonl",
 } as const;
 
 /** The agent that wrote each fixture. */
@@ -244,12 +245,12 @@ const CASES: readonly FactCase[] = [
 	},
 	{
 		// A subagent transcript keeps no toolUseResult: the hand-off text is
-		// the only record of the timeout.
-		name: "a subagent call its timeout moved to the background names its task, with no timedOutAfterMs",
+		// the only record of the timeout, and its limit (parser 12).
+		name: "a subagent call its timeout moved to the background names its task and the limit its hand-off text names",
 		fixture: "claudeSubagent",
 		row: { callId: "toolu_sub_slow", kind: "tool_result", subtype: "running" },
 		facts: {
-			timedOutAfterMs: null,
+			timedOutAfterMs: 120_000,
 			extra: { task_id: "bsub12345", background_launch: "timeout" },
 		},
 	},
@@ -790,10 +791,16 @@ const CASES: readonly FactCase[] = [
 		facts: { extra: { title: "Ship the login fix" } },
 	},
 	{
-		name: "Codex thread source",
+		name: "parser 12 keeps a Codex session_meta's git remote with the directory it names",
 		fixture: "codex",
 		row: { kind: "meta", subtype: "session_meta" },
-		facts: { extra: { thread_source: "user" } },
+		facts: {
+			extra: {
+				thread_source: "user",
+				git_remote: "https://github.com/acme/widget.git",
+				git_remote_cwd: "/repo",
+			},
+		},
 	},
 	{
 		name: "Codex inter-agent trigger",
@@ -850,6 +857,13 @@ const CASES: readonly FactCase[] = [
 				parsed_cmd_types: JSON.stringify(["read", "unknown"]),
 			},
 		},
+	},
+	{
+		// A `$skill` mention injects the skill's SKILL.md as a user message.
+		name: "Codex skill a $skill mention injected",
+		fixture: "codexSkill",
+		row: { kind: "injected_context", subtype: "skill_body" },
+		facts: { extra: { skill: "testing-bun" } },
 	},
 	{
 		name: "a long read path list is cut to whole paths and counted",

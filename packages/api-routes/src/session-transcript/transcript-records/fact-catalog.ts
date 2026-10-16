@@ -1321,7 +1321,10 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		runIndex: ["timed_out_calls"],
 		agents: {
 			claude_code: stored(
-				["user.toolUseResult.timedOutAfterMs"],
+				[
+					"user.toolUseResult.timedOutAfterMs",
+					"user.message.content[tool_result].content~moved to the background (ID",
+				],
 				{
 					since: 6,
 					facts: ["timedOutAfterMs"],
@@ -1331,7 +1334,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "exact",
 					},
 					notes:
-						"Claude Code subagent transcripts keep no toolUseResult (production, 30 days to 2026-10-16: 0 of 50,867 Bash results in desktop, VS Code and SDK subagent streams carry one; 608 of 622 in CLI subagent streams do), so timedOutAfterMs is missing there. Claude Code moves every timed-out call to the background and says so in the result text, which the background_task entry reads as background_launch timeout (parser 11): runs.timed_out_calls also counts that hand-off, and is known on subagent streams from parser 11. Production, parser 9 and 10: 536 of 536 main-stream results with timedOutAfterMs carry the hand-off text and none carries it without; week to 2026-10-16: 27 main-stream timed-out calls, 48 subagent ones with no timedOutAfterMs.",
+						"Claude Code subagent transcripts keep no toolUseResult (production, 30 days to 2026-10-16: 0 of 50,867 Bash results in desktop, VS Code and SDK subagent streams carry one; 608 of 622 in CLI subagent streams do), so timedOutAfterMs is missing there. Claude Code moves every timed-out call to the background and says so in the result text, which the background_task entry reads as background_launch timeout (parser 11): runs.timed_out_calls also counts that hand-off, and is known on subagent streams from parser 11. Production, parser 9 and 10: 536 of 536 main-stream results with timedOutAfterMs carry the hand-off text and none carries it without; week to 2026-10-16: 27 main-stream timed-out calls, 48 subagent ones with no timedOutAfterMs. From parser 12 a timeout hand-off without timedOutAfterMs takes the limit its text names ('Command did not complete within its 600s timeout …', whole seconds): production, 60 days to 2026-10-16, 1,303 hand-off texts all name it in seconds, and on the 492 that also carry timedOutAfterMs the two agree on every one.",
 					justification:
 						"timedOutAfterMs appears only on Bash results (36) and holds the timeout in ms that stopped the call (120000 is Claude's default Bash timeout). Witness: 46e611b4:569 user.toolUseResult.timedOutAfterMs [number] n=36 v2.1.284..2.1.293",
 					evidence: [
@@ -4231,8 +4234,12 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					"event_msg/item_completed:UserMessage.content[skill].name",
 					"event_msg/item_completed:UserMessage.content[skill].path",
 					"event_msg/item_completed:CommandExecution.parsed_cmd[].path",
+					"response_item/message:user.content[input_text].text~<skill>",
 				],
-				{ since: 9, facts: ["skill_components", "skill_components_more"] },
+				{
+					since: 9,
+					facts: ["skill_components", "skill_components_more", "skill"],
+				},
 				{
 					relation: { kind: "close" },
 					justification:
@@ -4249,7 +4256,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						"Pre-v9 historical: " +
 						"Codex has no skill tool: the agent uses a skill by reading its SKILL.md, which `parsed_cmd` records as a read, and a user invokes one in the prompt (an explicit skill item, 6 locally, 0.159+). Transcript records store every parsed read path literally as `parsed_cmd_read_paths` (see that fact); nothing labels them as skills today, and run_index counts skills for Claude Code only. Of 107,016 local read parts, 99,163 are not SKILL.md paths, so a skill read needs the SKILL.md filter. Versions without CommandExecution items (0.100, 0.105, 0.108–0.118 and 0.130–0.145 locally) record no such read." +
 						" Current: " +
-						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.",
+						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component." +
+						" From parser 12 the user message a `$skill` mention injects (`<skill><name>…</name><path>…</path>` and the SKILL.md text) is injected context of subtype skill_body, not a prompt: its record stores the `<name>` as `skill` and the text as received setup (skill_body). Before it, the message was a genuine prompt and runs.skills missed the skill when no UserMessage item recorded it (one Codex app session of 2026-10-15 in the admin workspace).",
 				},
 			),
 		},
@@ -4389,6 +4397,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "cwd",
 		view: "calls",
 		meaning: "The directory a call ran in.",
+		runIndex: ["cwd", "cwd_repository"],
 		agents: {
 			claude_code: stored(
 				[
@@ -6870,6 +6879,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		view: "runs",
 		meaning:
 			"MCP servers or connectors the agent recorded as needing authentication, still connecting, or failed.",
+		runIndex: ["mcp_unavailable"],
 		agents: {
 			claude_code: stored(
 				[
@@ -8962,15 +8972,23 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 			codex: stored(
 				["session_meta/.git.repository_url", "session_meta/.git.commit_hash"],
 				{
+					since: 12,
+					facts: ["git_remote", "git_remote_cwd"],
 					elsewhere:
 						"Codex git metadata, the git remote from the CLI and the repository evidence index",
 				},
 				{
-					evidence: [],
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/l1-facts.test.ts",
+							test: "parser 12 keeps a Codex session_meta's git remote with the directory it names",
+						},
+					],
 					relation: { kind: "exact" },
 					testedIn: "apps/api/src/services/analysis/git-links.test.ts",
 					notes:
-						"Parser review: session_meta.git.repository_url is the primary literal remote (2235/2899 reviewer sessions); branch/commit hash are identity context, not repository IDs.",
+						"Parser review: session_meta.git.repository_url is the primary literal remote (2235/2899 reviewer sessions); branch/commit hash are identity context, not repository IDs. Parser 12 also stores it on the session_meta record (git_remote, user and password removed) with the session_meta cwd (git_remote_cwd), which runs.cwd_repository reads as the repository of that directory.",
 					sourceMappings: [
 						{
 							path: "session_meta/.git.commit_hash",
@@ -8994,6 +9012,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		view: "prompts",
 		meaning:
 			"Whether a user-role message is a person's prompt, injected context, a queued prompt or a delegated task.",
+		runIndex: ["prompt_subtype"],
 		agents: {
 			claude_code: stored(
 				[

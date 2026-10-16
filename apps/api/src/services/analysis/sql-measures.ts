@@ -94,7 +94,7 @@ export const SQL_MEASURES: readonly SqlMeasure[] = [
 	{
 		name: "re_asks",
 		sql: "countIf(reasked)",
-		definition: `Runs the member had to ask again for (interim definition): ${SAID_DONE_RULE} (said_done), and the next prompt in the same stream is one the word list marks negative or swearing (frustrated). Per week: GROUP BY toMonday(started_at). NULL runs are unknown (built before run index ${MESSAGES_SINCE}, or the stored final message was cut before it said done): report countIf(reasked IS NULL). ${RATES}`,
+		definition: `Runs the member had to ask again for (interim definition): ${SAID_DONE_RULE} (said_done), and the next prompt in the same stream is one the word list marks negative or swearing (frustrated). A run a queued prompt ended mid-work (ended_by_queued_prompt) is never re-asked: the person spoke while it worked. Per week: GROUP BY toMonday(started_at). NULL runs are unknown (built before run index ${MESSAGES_SINCE}, or the stored final message was cut before it said done): report countIf(reasked IS NULL). ${RATES}`,
 	},
 	{
 		name: "frustration",
@@ -138,9 +138,19 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 	{
 		name: "said_done",
 		type: "Nullable(Bool)",
-		meaning: `Interim rule: true when ${SAID_DONE_RULE}. False when the run ended on a tool call.`,
+		meaning: `Interim rule: true when ${SAID_DONE_RULE}. False when the run ended on a tool call, or a queued prompt ended it mid-work (ended_by_queued_prompt): its last message was not its final one.`,
 		traps: [
 			`NULL (unknown) for runs built before run index ${MESSAGES_SINCE}, and when the stored message was cut (final_message_cut) before any such word: the rest may say it. Words only: "Done?" counts, "all tests pass" does not.`,
+		],
+	},
+	{
+		name: "ended_by_queued_prompt",
+		type: "Nullable(Bool)",
+		meaning:
+			"The next run in the same stream starts with a queued prompt (prompt_subtype queued): one the person sent while the agent worked, which the agent reads at its next request. That starts a new run, so this run ends mid-work; the work goes on in the next run.",
+		traps: [
+			"Its final_message and stop_reason are where the work was when the prompt arrived, not a stop: said_done and reasked are false for it. Read the next run for how the work ended; count the two runs as one piece of work when timing or costing it.",
+			"NULL when prompt_subtype is NULL (subagent streams before parser 11, runs built before the column existed) and for Codex, which records no queued prompt. A delegation (a parent agent's message to a subagent) is not queued.",
 		],
 	},
 	{
@@ -166,6 +176,9 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 
 /** First parser version that links background tasks and hook blocks to their calls. */
 const BACKGROUND_SINCE_PARSER_VERSION = 11;
+
+/** First parser version that reads a Claude Code subagent call's timeout limit from its hand-off text. */
+const TIMEOUT_LIMIT_SINCE_PARSER_VERSION = 12;
 
 /** The call view's columns. */
 export const CALL_COLUMNS: readonly SqlViewColumn[] = [
@@ -270,6 +283,32 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		traps: [
 			`hook is recorded from parser ${BACKGROUND_SINCE_PARSER_VERSION}; before it a hook block reads as a failed call with no exit code.`,
 		],
+	},
+	{
+		name: "interrupted",
+		type: "Nullable(UInt8)",
+		meaning:
+			"1 when a result of the call records that it was interrupted: Claude Code toolUseResult.interrupted, its interrupted denial kind, or the interrupt text as the result ('[Request interrupted by user for tool use]'); a Codex call aborted by the user.",
+		traps: [
+			"NULL when the run cannot record it (its unrecorded_facts has interrupted_calls): Claude Code subagent streams before parser 12. 0 for a call without a result (has_result = 0): an interruption that wrote no result is not seen here, and a run's interrupt markers count it on runs.",
+			"A user rejection is a refusal (denial_kind user-rejected), not an interruption, also when Claude Code writes the interrupt text after it.",
+		],
+	},
+	{
+		name: "timed_out",
+		type: "Nullable(UInt8)",
+		meaning:
+			"1 when the call's own timeout stopped it: Claude Code moved it to the background (its work may still finish there: see background_status), with timed_out_after_ms the limit.",
+		traps: [
+			"NULL when the run cannot record it: Codex (it records no call timeout) and Claude Code subagent streams before parser 12. A command's own timeout inside its output (timeout 10 …, a test runner) is not this.",
+		],
+	},
+	{
+		name: "timed_out_after_ms",
+		type: "Nullable(UInt32)",
+		meaning:
+			"The limit after which the call's timeout stopped it, in milliseconds: Claude Code toolUseResult.timedOutAfterMs, else the seconds its hand-off text names ('within its 600s timeout').",
+		traps: ["NULL when timed_out is not 1."],
 	},
 	{
 		name: "backgrounded",
@@ -416,10 +455,13 @@ export function measuredRunsSql(
 	const said = `multiIf(final_message IS NULL, false,
 			match(replaceRegexpAll(${kept}, ${word("(\\bnot|\\bnever|n['’]t)\\s+(yet\\s+)?(been\\s+)?")}, ' '), ${word("")}), true,
 			final_message_cut, NULL, false)`;
+	// A run a queued prompt split ended mid-work: its last message was not
+	// its final one, so it said nothing done (ended_by_queued_prompt).
 	const known = (expression: string) =>
 		`if(index_version < ${MESSAGES_SINCE}, NULL, CAST(${expression} AS Nullable(Bool)))`;
 	return `SELECT ${columns.map((column) => `r.${column} AS ${column}`).join(", ")},
-			r.tokens AS tokens, r.said_done AS said_done, r.frustrated AS frustrated,
+			r.tokens AS tokens, r.said_done AS said_done, r.ended_by_queued_prompt AS ended_by_queued_prompt,
+			r.frustrated AS frustrated,
 			CAST(r.said_done AND r.frustrated AS Nullable(Bool)) AS reasked,
 			arrayConcat(
 				if(r.index_version >= ${MESSAGES_SINCE} AND r.system_prompt_recorded, [], ['system_prompt']),
@@ -436,7 +478,9 @@ export function measuredRunsSql(
 			SELECT *,
 				uncached_input_tokens + cache_read_input_tokens + cache_write_5m_input_tokens
 					+ cache_write_1h_input_tokens + output_tokens AS tokens,
-				${known(said)} AS said_done,
+				if(source = 'codex' OR prompt_subtype IS NULL, NULL,
+					CAST(ifNull(leadInFrame(prompt_subtype) OVER stream, '') = 'queued' AS Nullable(Bool))) AS ended_by_queued_prompt,
+				if(ifNull(ended_by_queued_prompt, false), ${known("false")}, ${known(said)}) AS said_done,
 				${known(`hasAny(leadInFrame(prompt_reactions) OVER stream, ${sqlArray(UNHAPPY)})`)} AS frustrated
 			FROM ${runs.table} FINAL
 			WHERE ${runs.owner} AND row_kind = 'run' AND ${runs.committed}
@@ -507,6 +551,10 @@ export function callsSql(
 	const taskEnd = `${notification} AND interrupted IS NOT NULL`;
 	const taskFile = "match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')";
 	const handOff = `${result} AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND ${taskFile}`;
+	// A Claude Code subagent stream records a timeout only in its hand-off
+	// text, whose limit the parser reads from version 12; the run index
+	// counts that hand-off from parser 11, without the limit.
+	const timeoutUnknown = `has(r.unrecorded_facts, 'timed_out_calls') OR (r.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
 	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, runs.owner)].join(",\n\t\t")}
 		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
 			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
@@ -516,6 +564,9 @@ export function callsSql(
 			toUInt8(c.results > 0) AS has_result,
 			toUInt8(ifNull(c.result_failed, 0)) AS failed, c.result_exit_code AS exit_code,
 			toLowCardinality(c.denial_kind) AS denial_kind,
+			if(has(r.unrecorded_facts, 'interrupted_calls'), NULL, toUInt8(c.result_interrupted)) AS interrupted,
+			if(${timeoutUnknown}, NULL, toUInt8(c.result_timed_out_after_ms IS NOT NULL)) AS timed_out,
+			if(${timeoutUnknown}, NULL, c.result_timed_out_after_ms) AS timed_out_after_ms,
 			toUInt8(c.task_file != '') AS backgrounded,
 			nullIf(extract(c.task_file, '/tasks/([A-Za-z0-9_-]+)\\\\.output$'), '') AS task_id,
 			if(c.task_end.1 IS NULL, NULL,
@@ -536,12 +587,14 @@ export function callsSql(
 				max(${toolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
 				anyIf(exit_code, (${result} OR ${taskEnd}) AND exit_code IS NOT NULL) AS result_exit_code,
 				anyIf(denial_kind, ${result} AND denial_kind != '') AS denial_kind,
+				max(${result} AND ifNull(interrupted, false)) AS result_interrupted,
+				maxIf(timed_out_after_ms, ${result}) AS result_timed_out_after_ms,
 				anyIf(file_path, (${handOff} OR ${notification}) AND file_path != '') AS task_file,
 				argMaxIf((interrupted, is_error), position, ${taskEnd}) AS task_end
 			FROM (
 				SELECT ${generation}, session_date, call_id, kind, ts, turn_idx, record_idx, block_idx,
 					is_error, exit_code, denial_kind, (record_idx, block_idx) AS position, tool_name, file_path,
-					interrupted,
+					interrupted, timed_out_after_ms,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars

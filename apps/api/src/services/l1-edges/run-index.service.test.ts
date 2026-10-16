@@ -32,6 +32,7 @@ import { RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
 import {
 	assertUsageConserved,
 	buildRunIndex,
+	carriedMcpUnavailable,
 	RunIndexUsageChangedError,
 	runIndexUsage,
 	runRow,
@@ -180,6 +181,9 @@ function fakeClickHouse(state: {
 	/** Records that carried setup, compactions, edits and the session context. */
 	setupRecords?: Record<string, unknown>[];
 	gitRemote?: string;
+	directories?: Record<string, unknown>[];
+	evidence?: Record<string, unknown>[];
+	mcpStates?: Record<string, unknown>[];
 }): Fake {
 	const usage = [...(state.usage ?? [CONSISTENT])];
 	const fake: Fake = {
@@ -254,6 +258,9 @@ function fakeClickHouse(state: {
 								(kind === undefined || row.row_kind === kind),
 						);
 					}
+					if (sql.includes("needsAuthMcpServers")) return state.mcpStates ?? [];
+					if (sql.includes("shell_calls")) return state.directories ?? [];
+					if (sql.includes("AS evidence")) return state.evidence ?? [];
 					if (sql.includes("receipt_generation"))
 						return [usage.length > 1 ? usage.shift() : usage[0]];
 					if (sql.includes("codex_streams")) return state.runs ?? [];
@@ -286,6 +293,8 @@ function fakeClickHouse(state: {
 							{
 								repository: "github.com/acme/app",
 								git_remote: state.gitRemote ?? "",
+								project_path: "/repo",
+								git_branch: "main",
 								model: "opus",
 							},
 						];
@@ -559,6 +568,91 @@ describe("building a session's run index", () => {
 		]);
 	});
 
+	test("each run names the directory it worked in, and that directory's repository only where the session's records tie it", async () => {
+		const shell = (
+			agentId: string,
+			cdTarget: string,
+			calls: number,
+			first: number,
+		) => ({
+			agent_id: agentId,
+			turn_idx: 1,
+			shell: 1,
+			cd_target: cdTarget,
+			recorded_cwd: "/Users/ana/launch",
+			calls,
+			first_record: first,
+		});
+		const evidence = (fields: Record<string, unknown>) => ({
+			evidence: "call",
+			agent_id: "",
+			first_record: 4,
+			cd_target: "",
+			recorded_cwd: "/Users/ana/launch",
+			command: "",
+			output: "",
+			...fields,
+		});
+		const directories = [
+			shell("", "~/code/cli", 2, 4),
+			shell("", "", 1, 3),
+			shell("agent-a", "/Users/ana/code/scratch", 3, 12),
+		];
+		const pushed = evidence({
+			cd_target: "~/code/cli",
+			command: "cd ~/code/cli && git push",
+			output: "To github.com:acme/cli.git",
+		});
+		const fake = fakeClickHouse({
+			runs,
+			parserVersion: 10,
+			directories,
+			evidence: [pushed, evidence({ evidence: "session_branch" })],
+		});
+		await build(fake);
+		const pick = (row: RudelRunIndexRow | undefined) => ({
+			repository: row?.repository,
+			cwd: row?.cwd,
+			cwd_repository: row?.cwd_repository,
+			cwd_repository_basis: row?.cwd_repository_basis,
+		});
+		const [main, subagent] = fake.inserts[0]?.values ?? [];
+		expect(pick(main)).toEqual({
+			repository: "github.com/acme/app",
+			cwd: "/Users/ana/code/cli",
+			cwd_repository: "github.com/acme/cli",
+			cwd_repository_basis: "transfer_remote",
+		});
+		// Nothing ties the scratch checkout: unknown, not the session's repository.
+		expect(pick(subagent)).toEqual({
+			repository: "github.com/acme/app",
+			cwd: "/Users/ana/code/scratch",
+			cwd_repository: null,
+			cwd_repository_basis: "",
+		});
+		expect(main?.unrecorded_facts).not.toContain("cwd");
+		expect(fake.inserts[1]?.values[0]).toMatchObject({
+			cwd: null,
+			cwd_repository: null,
+			cwd_repository_basis: "",
+		});
+
+		// Before parser 9 the cwd of a call without a leading cd is not
+		// recorded: the columns are unknown, and their statements are not read.
+		const old = fakeClickHouse({ runs, directories, evidence: [pushed] });
+		await build(old);
+		const [oldMain] = old.inserts[0]?.values ?? [];
+		expect(pick(oldMain)).toEqual({
+			repository: "github.com/acme/app",
+			cwd: null,
+			cwd_repository: null,
+			cwd_repository_basis: "",
+		});
+		expect(oldMain?.unrecorded_facts).toEqual(
+			expect.arrayContaining(["cwd", "cwd_repository"]),
+		);
+	});
+
 	test("not found is counted on Claude Code main streams and unknown on its subagent streams, which keep no tool results", async () => {
 		const fake = fakeClickHouse({
 			runs: runs.map((run) => ({ ...run, not_found: 2 })),
@@ -569,6 +663,19 @@ describe("building a session's run index", () => {
 		expect(main?.unrecorded_facts).not.toContain("not_found");
 		expect(subagent?.not_found).toBeNull();
 		expect(subagent?.unrecorded_facts).toContain("not_found");
+	});
+
+	test("a run lists the MCP servers its stream recorded as unavailable, and a stream without a record lists none", async () => {
+		const fake = fakeClickHouse({
+			runs,
+			parserVersion: 12,
+			mcpStates: [{ agent_id: "", turn_idx: "0", unavailable: ["linear"] }],
+		});
+		await build(fake);
+		const [main, subagent] = fake.inserts[0]?.values ?? [];
+		expect(main?.mcp_unavailable).toEqual(["linear"]);
+		expect(subagent?.mcp_unavailable).toEqual([]);
+		expect(main?.unrecorded_facts).not.toContain("mcp_unavailable");
 	});
 
 	test("a parser 5 generation keeps its counts and knows none of its facts", async () => {
@@ -929,6 +1036,41 @@ describe("run index rows", () => {
 		sessionDate: "2026-10-08 11:00:00.000",
 		repository: "",
 	};
+
+	test("a run's unavailable MCP servers are its stream's latest server-state record's, carried to later runs of that stream only", () => {
+		const unavailable = carriedMcpUnavailable([
+			// Recorded before the stream's first prompt.
+			{ agent_id: "", turn_idx: 0, unavailable: ["claude.ai Gmail", "linear"] },
+			// A later record lists one server fewer: the person signed in.
+			{ agent_id: "", turn_idx: 3, unavailable: ["linear"] },
+			{ agent_id: "a2", turn_idx: 1, unavailable: [] },
+		]);
+		expect(
+			[
+				["", 1],
+				["", 2],
+				["", 3],
+				["", 4],
+				// A subagent stream reads its own records, never the main stream's.
+				["a1", 1],
+				["a2", 1],
+			].map(([agent, turn]) =>
+				unavailable({ agent_id: String(agent), turn_idx: Number(turn) }),
+			),
+		).toEqual([
+			["claude.ai Gmail", "linear"],
+			["claude.ai Gmail", "linear"],
+			["linear"],
+			["linear"],
+			[],
+			[],
+		]);
+		expect(
+			runRow(facts(), NO_CODEX_LIFECYCLE_FACTS, context, undefined, undefined, [
+				"linear",
+			]).mcp_unavailable,
+		).toEqual(["linear"]);
+	});
 
 	test("flags say true when any record says so, false only when all say false, empty when none says", () => {
 		const row = (overrides: Partial<RunIndexFactsRow>) =>

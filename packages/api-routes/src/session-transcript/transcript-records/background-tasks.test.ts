@@ -130,10 +130,25 @@ describe("background tasks", () => {
 		expect(notification?.exitCode).toBe(0);
 		expect(notification?.isError).toBe(false);
 		expect(notification?.facts.interrupted).toBe(false);
-		expect(
-			rows.find((row) => row.kind === "tool_result")?.facts.extra
-				.background_launch,
-		).toBe("timeout");
+		const handOff = rows.find((row) => row.kind === "tool_result");
+		expect(handOff?.facts.extra.background_launch).toBe("timeout");
+		// Without a toolUseResult, the limit the hand-off text names.
+		expect(handOff?.facts.timedOutAfterMs).toBe(120_000);
+	});
+
+	test("a timeout hand-off's limit is read only as whole seconds", () => {
+		const read = (limit: string) =>
+			readClaudeBackgroundHandOff(
+				`Command did not complete within its ${limit} timeout and was moved to the background (ID: bslow6789).`,
+				undefined,
+				"Bash",
+			);
+		expect(read("600s")).toMatchObject({
+			launch: "timeout",
+			timeoutMs: 600_000,
+		});
+		expect(read("2 minutes")?.launch).toBe("timeout");
+		expect(read("2 minutes")?.timeoutMs).toBeUndefined();
 	});
 
 	test("a notification naming several unresolved tasks names no call", () => {

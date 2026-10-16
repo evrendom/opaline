@@ -197,6 +197,12 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 			"Human prompts in the run (queued prompts included, delegated tasks not).",
 	},
 	{
+		name: "prompt_subtype",
+		type: FACT,
+		comment:
+			"The subtype of the prompt the run starts with, as the parser recorded it: '' for a prompt sent while the agent was waiting, queued (sent while it worked: the agent reads it at its next request, so the run before ends mid-work), delegation (a parent agent's task to a subagent); '' also when the run starts with no prompt. NULL when the parser version cannot tell them apart (Claude Code subagent streams before parser 11 read a coordinator's message as queued), and on runs built before the column existed.",
+	},
+	{
 		name: "prompt_reactions",
 		type: "Array(LowCardinality(String))",
 		comment:
@@ -418,6 +424,12 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 		name: "mcp_servers",
 		type: "Array(LowCardinality(String))",
 		comment: "MCP servers recorded on the run's calls, sorted.",
+	},
+	{
+		name: "mcp_unavailable",
+		type: "Array(LowCardinality(String))",
+		comment:
+			"MCP servers the stream's latest server-state record at or before the run's end lists as needing authentication or failed to connect (Claude Code deferred_tools_delta needsAuthMcpServers and failedMcpServers names), sorted; the stream's own records, carried from run to run until the next such record. Empty when that record lists none, or the stream recorded no server state; still connecting (pendingMcpServers) is not unavailable.",
 	},
 	// Inputs of the retirement of regex session columns.
 	{
@@ -674,6 +686,24 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 		type: "String",
 		comment:
 			"The session repository key as recorded (git remote, else package name, else project path), on every run and on the receipt; empty when none was recorded.",
+	},
+	{
+		name: "cwd",
+		type: "Nullable(String)",
+		comment:
+			"The directory the run's shell commands ran in: per call, the literal directory its command starts by moving to (a leading cd, pushd or git -C; a leading ~ is the home directory of the recorded cwd, a relative one is joined to it), else the directory recorded for it (Claude Code record cwd, Codex CommandExecution cwd); the one most of the run's shell calls ran in, the earliest on a tie. A run without shell calls takes its first recorded cwd. NULL when none is recorded, and on runs built before the column existed.",
+	},
+	{
+		name: "cwd_repository",
+		type: "Nullable(String)",
+		comment:
+			"The repository (host/owner/name of its git remote) the session's own records tie to cwd or the deepest directory above it, as cwd_repository_basis says; NULL when nothing ties it to one, or that directory's records name several: unknown, not the session's repository.",
+	},
+	{
+		name: "cwd_repository_basis",
+		type: "LowCardinality(String)",
+		comment:
+			"What ties cwd to cwd_repository, strongest first: codex_session_meta (the git remote a Codex session_meta records for its directory), session_branch (the upload's remote, for the session's own directory, where a record shows the upload's branch), remote_output (origin URL a call there printed), transfer_remote (the remote a git push, fetch or pull there printed), gh_output (the one repository whose pull request or Actions URLs a gh pr or gh run there printed); conflicting when the records name more than one repository; empty when none.",
 	},
 	{
 		name: "session_model",

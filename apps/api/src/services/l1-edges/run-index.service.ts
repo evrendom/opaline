@@ -27,17 +27,34 @@ import {
 	ReceivedSetupRecordSchema,
 	receivedSetupParts,
 } from "../analysis/received-setup-sql.js";
-import { gateRunIndexRow } from "../analysis/run-index-columns.js";
+import {
+	buildDirectoryEvidenceStatement,
+	buildRunDirectoriesStatement,
+	DirectoryEvidenceRowSchema,
+	directoryRepositories,
+	NO_RUN_DIRECTORY,
+	type RunDirectoryColumns,
+	RunDirectoryRowSchema,
+	runDirectoryColumns,
+} from "../analysis/run-directories.js";
+import {
+	gateRunIndexRow,
+	isRunIndexColumnRecordable,
+} from "../analysis/run-index-columns.js";
 import { readCommittedRunIndex } from "../analysis/run-index-reader.js";
 import {
 	buildCodexLifecycleStatement,
 	buildCodexTurnMarksStatement,
+	buildMcpStateStatement,
 	buildRunIndexSessionStatement,
 	buildRunIndexStatement,
 	buildRunRequestsStatement,
 	buildUnattributedUsageStatement,
 	CodexLifecycleRowSchema,
 	CodexTurnMarkSchema,
+	type McpStateRow,
+	McpStateRowSchema,
+	RUN_FORK_REPLAY,
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
 	type RunIndexFactsRow,
@@ -136,6 +153,8 @@ const UsageStateSchema = z.object({
 const SessionRecordSchema = z.object({
 	repository: z.string(),
 	git_remote: z.string(),
+	project_path: z.string(),
+	git_branch: z.string(),
 	model: z.string(),
 });
 
@@ -271,7 +290,7 @@ export async function buildRunIndex(input: {
 			: new Map<string, CodexLifecycleFacts>();
 	const [recorded] = await query(executor, SessionRecordSchema, {
 		query: `SELECT coalesce(nullIf(git_remote, ''), nullIf(package_name, ''), project_path) AS repository,
-				git_remote, model_used AS model
+				git_remote, project_path, ifNull(git_branch, '') AS git_branch, model_used AS model
 			FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 				AND session_id = {sessionId:String} AND source = {source:String}
@@ -288,6 +307,38 @@ export async function buildRunIndex(input: {
 		ReceivedSetupRecordSchema,
 		buildReceivedSetupStatement(scope, committed),
 	);
+	const directories = !isRunIndexColumnRecordable(
+		"cwd",
+		committed.parserVersion,
+		session.source,
+	)
+		? () => NO_RUN_DIRECTORY
+		: runDirectoryColumns(
+				await query(
+					executor,
+					RunDirectoryRowSchema,
+					buildRunDirectoriesStatement(scope, committed, RUN_FORK_REPLAY),
+				),
+				directoryRepositories(
+					await query(
+						executor,
+						DirectoryEvidenceRowSchema,
+						buildDirectoryEvidenceStatement(
+							scope,
+							committed,
+							{
+								projectPath: recorded?.project_path ?? "",
+								gitBranch: recorded?.git_branch ?? "",
+							},
+							RUN_FORK_REPLAY,
+						),
+					),
+					{
+						projectPath: recorded?.project_path ?? "",
+						gitRemote: recorded?.git_remote ?? "",
+					},
+				),
+			);
 	// The statements read the usage separately: it must be the same
 	// extraction after them as before, and every one of its events must be
 	// counted exactly once, by a run or as unattributed.
@@ -310,6 +361,19 @@ export async function buildRunIndex(input: {
 	};
 	const finish = (row: RudelRunIndexRow) =>
 		gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" });
+	const mcpUnavailable = carriedMcpUnavailable(
+		isRunIndexColumnRecordable(
+			"mcp_unavailable",
+			committed.parserVersion,
+			session.source,
+		)
+			? await query(
+					executor,
+					McpStateRowSchema,
+					buildMcpStateStatement(scope, committed),
+				)
+			: [],
+	);
 	const runRows = runs.map((run) =>
 		finish(
 			runRow(
@@ -318,6 +382,8 @@ export async function buildRunIndex(input: {
 					NO_CODEX_LIFECYCLE_FACTS,
 				context,
 				messages(run.agent_id, run.turn_idx),
+				directories(run.agent_id, run.turn_idx),
+				mcpUnavailable(run),
 			),
 		),
 	);
@@ -629,6 +695,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		time_to_first_token_ms: null,
 		prompt_head: null,
 		genuine_prompts: 0,
+		prompt_subtype: null,
 		...NO_RUN_MESSAGES,
 		turn_origin: null,
 		prompt_source: null,
@@ -668,6 +735,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		timed_out_calls: null,
 		mcp_calls: null,
 		mcp_servers: [],
+		mcp_unavailable: [],
 		skills: [],
 		slash_commands: [],
 		subagent_types: [],
@@ -714,6 +782,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		cost_state: {},
 		title: null,
 		repository: context.repository,
+		...NO_RUN_DIRECTORY,
 		session_model: "",
 	};
 }
@@ -757,6 +826,34 @@ function usageColumns(
 }
 
 /**
+ * Each run's MCP servers that are unavailable: those its stream's latest
+ * server-state record at or before the run's end lists, a run without such
+ * a record keeping the previous one's (a stream records its servers' state
+ * at its start, before or after its first prompt, and when it changes).
+ * Each stream reads only its own records.
+ */
+export function carriedMcpUnavailable(
+	states: readonly McpStateRow[],
+): (run: { agent_id: string; turn_idx: number }) => readonly string[] {
+	const byStream = new Map<string, McpStateRow[]>();
+	for (const state of states) {
+		const stream = byStream.get(state.agent_id) ?? [];
+		stream.push(state);
+		byStream.set(state.agent_id, stream);
+	}
+	for (const stream of byStream.values())
+		stream.sort((a, b) => a.turn_idx - b.turn_idx);
+	return (run) => {
+		let unavailable: readonly string[] = [];
+		for (const state of byStream.get(run.agent_id) ?? []) {
+			if (state.turn_idx > run.turn_idx) break;
+			unavailable = state.unavailable;
+		}
+		return unavailable;
+	};
+}
+
+/**
  * A run row from its stored facts, before gating. `lifecycle` holds the
  * Codex lifecycle facts attributed to the run by `turn_id`; where a fact can
  * come from either kind of record (model, effort, aborted), an agent writes
@@ -767,6 +864,8 @@ export function runRow(
 	lifecycle: CodexLifecycleFacts,
 	context: RowContext,
 	messages: RunMessageColumns = NO_RUN_MESSAGES,
+	directory: RunDirectoryColumns = NO_RUN_DIRECTORY,
+	mcpUnavailable: readonly string[] = [],
 ): RudelRunIndexRow {
 	const origin = [
 		run.l_turn_origin,
@@ -797,7 +896,9 @@ export function runRow(
 		time_to_first_token_ms: uint32OrNull(lifecycle.timeToFirstTokenMs),
 		prompt_head: run.prompt_head,
 		genuine_prompts: run.genuine_prompts,
+		prompt_subtype: run.l_prompt_subtype,
 		...messages,
+		...directory,
 		turn_origin: run.l_turn_origin,
 		prompt_source: run.l_prompt_source,
 		origin_kind: run.l_origin_kind,
@@ -840,6 +941,7 @@ export function runRow(
 		timed_out_calls: run.l_timed_out_calls,
 		mcp_calls: run.l_mcp_calls,
 		mcp_servers: run.l_mcp_servers,
+		mcp_unavailable: [...mcpUnavailable],
 		skills: run.l_skills,
 		slash_commands: run.l_slash_commands,
 		subagent_types: run.subagent_types,

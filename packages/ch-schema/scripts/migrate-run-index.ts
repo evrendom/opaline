@@ -23,6 +23,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { runIndexNotFoundStatement } from "./migrate-not-found-unknown.js";
+import { runIndexCaptureGapsStatement } from "./migrate-run-index-capture-gaps.js";
 import { runIndexMessagesStatement } from "./migrate-run-index-messages.js";
 
 /** The L1 run index (docs/l1-literal-schema.md, "Scale"). */
@@ -99,6 +100,10 @@ export async function runRunIndexMigration(options: {
 	// The run index messages migration's columns (OPL-387).
 	await options.executor.execute(
 		runIndexMessagesStatement(options.targetDatabase),
+	);
+	// The run index capture gaps migration's columns.
+	await options.executor.execute(
+		runIndexCaptureGapsStatement(options.targetDatabase),
 	);
 
 	const { attempts, delayMs } = options.readBack ?? {

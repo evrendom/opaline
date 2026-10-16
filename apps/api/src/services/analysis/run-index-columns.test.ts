@@ -141,12 +141,20 @@ describe("run index columns", () => {
 		}
 	});
 
-	test("a parser 5 generation knows no fact column; parser 8 knows its agent's", () => {
+	test("a parser 5 generation knows only its prompt subtypes; parser 8 knows its agent's", () => {
 		const all = COLUMNS.filter(
-			([, gate]) => gate.rows !== "receipt" && gate.since > 1,
+			([, gate]) => gate.rows !== "receipt" && gate.since > 5,
 		).map(([column]) => column);
 		const v5 = unrecordedRunIndexColumns("run", 5, "claude_code");
 		for (const column of all) expect(v5).toContain(column);
+		// Parser 5 recorded queued prompts; parser 4 did not.
+		expect(v5).not.toContain("prompt_subtype");
+		expect(unrecordedRunIndexColumns("run", 4, "claude_code")).toContain(
+			"prompt_subtype",
+		);
+		expect(
+			unrecordedRunIndexColumns("run", 10, "claude_code", "agent-a"),
+		).toContain("prompt_subtype");
 		expect(unrecordedRunIndexColumns("run", 8, "claude_code")).toEqual(
 			COLUMNS.filter(
 				([, gate]) =>

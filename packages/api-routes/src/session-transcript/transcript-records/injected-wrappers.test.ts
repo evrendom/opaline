@@ -67,6 +67,36 @@ describe("classifyUserText", () => {
 		).toEqual({ kind: "injected_context", subtype: "task_notification" });
 	});
 
+	test("a Codex $skill injection and an apps page event are not prompts", () => {
+		expect(
+			classifyUserText(
+				"<skill>\n<name>design</name>\n<path>/repo/.agents/skills/design/SKILL.md</path>\n---\nname: design\n---\nbody\n</skill>",
+				{},
+			),
+		).toEqual({ kind: "injected_context", subtype: "skill_body" });
+		expect(
+			classifyUserText(
+				'<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>',
+				{},
+			),
+		).toEqual({ kind: "injected_context", subtype: "ui_event" });
+		// A person's own words around a page event stay their prompt.
+		expect(
+			classifyUserText(
+				'<external_codex_apps_open_page>{"page_id":"p1"}</external_codex_apps_open_page>\nfix this page',
+				{},
+			),
+		).toMatchObject({
+			kind: "prompt",
+			text: "fix this page",
+			injectedSubtype: "ui_event",
+		});
+		// A prompt that only mentions the tag is a prompt.
+		expect(classifyUserText("what does <skill> do in Codex?", {}).kind).toBe(
+			"prompt",
+		);
+	});
+
 	test("the transcript's own meta flag wins over content", () => {
 		expect(
 			classifyUserText("Base directory for this skill: /x\nbody", {

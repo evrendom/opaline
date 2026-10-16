@@ -504,7 +504,24 @@ export function codexSessionMetaFacts(
 ): LineFacts {
 	const extra: ExtraFacts = {};
 	setText(extra, "thread_source", payload.thread_source);
+	const git = isRecord(payload.git) ? payload.git : {};
+	const remote = readString(git.repository_url);
+	const cwd = readString(payload.cwd);
+	if (
+		remote !== undefined &&
+		remote !== "" &&
+		cwd !== undefined &&
+		cwd !== ""
+	) {
+		setText(extra, "git_remote", withoutUserInfo(remote));
+		setText(extra, "git_remote_cwd", cwd);
+	}
 	return withExtra({}, extra);
+}
+
+/** A remote URL without the user and password some carry (`https://user:token@host/…`). */
+function withoutUserInfo(remote: string): string {
+	return remote.replace(/^([a-z][a-z\d+.-]*:\/\/)[^/@]+@/iu, "$1");
 }
 
 /** Facts of a Claude `instructions` attachment: the files it loaded. */

@@ -18,7 +18,7 @@ import {
 } from "./command-class.js";
 import { isCodexRunningOutput, readCodexExitCode } from "./exit-code.js";
 import { readCodexImageOutputText } from "./image-labels.js";
-import { classifyUserText } from "./injected-wrappers.js";
+import { classifyUserText, readCodexSkillBlock } from "./injected-wrappers.js";
 import {
 	injectedAroundPrompt,
 	isRecord,
@@ -500,14 +500,23 @@ function userTextItems(
 				{ kind: "user_prompt", text: classification.text },
 				...injectedAroundPrompt(classification),
 			];
-		case "injected_context":
+		case "injected_context": {
+			// A `$skill` mention injects the skill's SKILL.md: the skill it names.
+			const skill =
+				classification.subtype === "skill_body"
+					? readCodexSkillBlock(text)
+					: undefined;
 			return [
 				{
 					kind: "injected_context",
 					subtype: classification.subtype,
 					text,
+					...(skill === undefined
+						? {}
+						: { facts: { extra: { skill: factText(skill.name, 128) } } }),
 				},
 			];
+		}
 		case "compaction":
 			return [{ kind: "compaction", subtype: classification.subtype, text }];
 		case "meta":

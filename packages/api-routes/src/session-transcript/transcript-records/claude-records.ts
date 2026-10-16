@@ -51,6 +51,7 @@ import {
 	claudeSystemFacts,
 	claudeTitleFacts,
 	claudeToolResultFacts,
+	durationMs,
 	type ExtraFacts,
 	factRowText,
 	factText,
@@ -676,6 +677,12 @@ function readToolResult(
 			handOff === undefined
 				? undefined
 				: {
+						// A subagent transcript keeps no toolUseResult: the hand-off
+						// text's limit is then the only record of the timeout.
+						...(handOff.timeoutMs === undefined ||
+						durationMs(toolUseResult?.timedOutAfterMs) !== undefined
+							? {}
+							: { timedOutAfterMs: handOff.timeoutMs }),
 						extra: {
 							task_id: handOff.taskId,
 							background_launch: handOff.launch,

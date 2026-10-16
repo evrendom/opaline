@@ -17,6 +17,11 @@ export interface BackgroundHandOff {
 	readonly taskId: string;
 	/** The file the task writes its output to, when the result names it. */
 	readonly outputFile: string | undefined;
+	/**
+	 * For a timeout hand-off, the limit its text names (`within its 600s
+	 * timeout`) in milliseconds; undefined when the text names it otherwise.
+	 */
+	readonly timeoutMs?: number;
 }
 
 export interface TaskNotification {
@@ -41,6 +46,8 @@ const TIMEOUT_PATTERN = new RegExp(
 	`^\\s*Command did not complete within its [^\\n]{0,40}? timeout and was moved to the background \\(ID: (${TASK_ID})\\)`,
 	"u",
 );
+/** The limit a timeout hand-off names, in whole seconds as Claude Code writes it (`within its 600s timeout`). */
+const TIMEOUT_SECONDS_PATTERN = /within its (\d{1,7})s timeout/u;
 const NOTIFICATION_PATTERN =
 	/<task-notification>([\s\S]*?)<\/task-notification>/u;
 const SUMMARY_EXIT_PATTERN = /\(exit code (-?\d{1,10})\)/u;
@@ -63,8 +70,20 @@ export function readClaudeBackgroundHandOff(
 		readString(toolUseResult?.outputFile);
 	const handOff = (launch: BackgroundLaunch, taskId: string | undefined) =>
 		taskId === undefined ? undefined : { launch, taskId, outputFile };
-	const timedOut = TIMEOUT_PATTERN.exec(head)?.[1];
-	if (timedOut !== undefined) return handOff("timeout", timedOut);
+	const timeout = TIMEOUT_PATTERN.exec(head);
+	const timedOut = timeout?.[1];
+	if (timedOut !== undefined) {
+		const seconds = TIMEOUT_SECONDS_PATTERN.exec(timeout?.[0] ?? "")?.[1];
+		const timeoutMs =
+			seconds === undefined ? undefined : Number(seconds) * 1_000;
+		const found = handOff("timeout", timedOut);
+		return found === undefined ||
+			timeoutMs === undefined ||
+			!Number.isSafeInteger(timeoutMs) ||
+			timeoutMs > 0xffff_ffff
+			? found
+			: { ...found, timeoutMs };
+	}
 	const requested =
 		REQUESTED_PATTERN.exec(head)?.[1] ??
 		readTaskId(toolUseResult?.backgroundTaskId);

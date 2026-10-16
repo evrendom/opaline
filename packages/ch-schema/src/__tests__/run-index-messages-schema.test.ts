@@ -88,7 +88,7 @@ describe("run index messages migration", () => {
 		);
 		expect(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ ch:migrate:run-index-messages"/u);
+		).toMatch(/ ch:migrate:run-index-messages[ "]/u);
 	});
 
 	test("publication proof rejects lagging replicas and other definitions", () => {
