@@ -36,14 +36,42 @@ const DAY_MS = 86_400_000;
 // Longer than the 20-second sweep budget plus its final writes, and renewed
 // while the sweep runs; a crashed worker frees the installation within it.
 const SWEEP_LEASE_TTL_MS = 60_000;
+// Attempts precede jobs so the jobs dataset also sees the earlier attempts a
+// pass has just stored.
 const DATASETS = [
 	"actions",
-	"jobs",
 	"attempts",
+	"jobs",
 	"pulls",
 	"external",
 	"commits",
 ];
+/**
+ * The next run attempt after the cursor whose jobs are still to collect,
+ * whatever its conclusion. An attempt is left out only once an earlier pass
+ * (synced before this window ended) stored its jobs after the run completed
+ * and every job had completed: GitHub no longer changes them, so each pass
+ * fetches only new or unsettled attempts. Jobs this pass stored do not count,
+ * so an attempt whose jobs span several pages stays the candidate until its
+ * last page. An attempt without any jobs (a workflow that failed to start) is
+ * asked again each pass.
+ */
+const JOBS_CANDIDATE_QUERY = `SELECT r.run_id AS provider_id, r.attempt AS attempt, r.conclusion AS conclusion
+   FROM (
+     SELECT run_id, attempt, conclusion, status, completed_at FROM rudel.github_ci_runs FINAL
+     WHERE workspace_id = {workspace:String} AND provider = 'github' AND repository_id = {repository:String} AND kind = 'actions_run'
+     AND created_at BETWEEN parseDateTime64BestEffort({from:String}, 3, 'UTC') AND parseDateTime64BestEffort({to:String}, 3, 'UTC')
+     AND (run_id > {after:String} OR (run_id = {after:String} AND attempt > {attempt:UInt32}))
+   ) AS r
+   LEFT ANY JOIN (
+     SELECT run_id, attempt, 1 AS collected, countIf(status != 'completed') AS open, min(synced_at) AS first_synced, max(synced_at) AS last_synced
+     FROM rudel.github_ci_jobs FINAL
+     WHERE workspace_id = {workspace:String} AND provider = 'github' AND repository_id = {repository:String}
+     GROUP BY run_id, attempt
+   ) AS j ON r.run_id = j.run_id AND r.attempt = j.attempt
+   WHERE NOT (ifNull(j.collected, 0) = 1 AND ifNull(j.open, 1) = 0 AND r.status = 'completed' AND r.completed_at IS NOT NULL
+     AND ifNull(j.last_synced < parseDateTime64BestEffort({to:String}, 3, 'UTC') AND j.first_synced >= r.completed_at, 0))
+   ORDER BY r.run_id, r.attempt LIMIT 1 SETTINGS max_execution_time = 10`;
 const cursorSchema = z.object({
 	page: z.number().int().positive().default(1),
 	after: z.string().default(""),
@@ -486,41 +514,37 @@ async function collectStep(
 		attempt: cursor.attempt,
 		updatedSince: cursor.updatedSince ?? sweep.window_start.toISOString(),
 	};
-	if (sweep.dataset === "jobs" || sweep.dataset === "attempts") {
+	if (sweep.dataset === "jobs") {
+		const [run] = await getClickhouse().query<RunCandidate>({
+			query: JOBS_CANDIDATE_QUERY,
+			query_params: params,
+		});
+		if (!run) return { write: empty, cursor, complete: true };
+		const result = await source.jobs(
+			root,
+			run.provider_id,
+			run.attempt,
+			cursor.page,
+		);
+		return {
+			write: (writer) =>
+				persistGitHubJobs(binding, result.data.jobs, now, writer, batch),
+			cursor: result.hasNext
+				? { ...cursor, page: cursor.page + 1 }
+				: { ...cursor, after: run.provider_id, attempt: run.attempt, page: 1 },
+			complete: false,
+		};
+	}
+	if (sweep.dataset === "attempts") {
 		const [run] = await getClickhouse().query<RunCandidate>({
 			query: `SELECT run_id AS provider_id, attempt, conclusion FROM rudel.github_ci_runs FINAL
    WHERE workspace_id = {workspace:String} AND provider = 'github' AND repository_id = {repository:String} AND kind = 'actions_run'
    AND created_at BETWEEN parseDateTime64BestEffort({from:String}, 3, 'UTC') AND parseDateTime64BestEffort({to:String}, 3, 'UTC')
-   AND ${sweep.dataset === "jobs" ? "(run_id > {after:String} OR (run_id = {after:String} AND attempt > {attempt:UInt32})) AND (conclusion IS NULL OR conclusion != 'success')" : "run_id > {after:String} AND attempt > 1"}
-   ORDER BY run_id, attempt ${sweep.dataset === "jobs" ? "ASC" : "DESC"} LIMIT 1 SETTINGS max_execution_time = 10`,
+   AND run_id > {after:String} AND attempt > 1
+   ORDER BY run_id, attempt DESC LIMIT 1 SETTINGS max_execution_time = 10`,
 			query_params: params,
 		});
 		if (!run) return { write: empty, cursor, complete: true };
-		if (sweep.dataset === "jobs" || cursor.operation === "jobs") {
-			const attempt = sweep.dataset === "jobs" ? run.attempt : cursor.attempt;
-			const result = await source.jobs(
-				root,
-				run.provider_id,
-				attempt,
-				cursor.page,
-			);
-			const next = result.hasNext
-				? { ...cursor, page: cursor.page + 1 }
-				: sweep.dataset === "jobs"
-					? { ...cursor, after: run.provider_id, attempt: run.attempt, page: 1 }
-					: {
-							...cursor,
-							attempt: cursor.attempt + 1,
-							operation: "attempt" as const,
-							page: 1,
-						};
-			return {
-				write: (writer) =>
-					persistGitHubJobs(binding, result.data.jobs, now, writer, batch),
-				cursor: next,
-				complete: false,
-			};
-		}
 		if (cursor.attempt >= run.attempt)
 			return {
 				write: empty,
@@ -532,16 +556,12 @@ async function collectStep(
 				},
 				complete: false,
 			};
+		// The attempt's jobs follow in the jobs dataset, which runs after this one.
 		const result = await source.attempt(root, run.provider_id, cursor.attempt);
 		return {
 			write: (writer) =>
 				persistGitHubRuns(binding, [result], "sweep", now, writer, batch),
-			cursor: {
-				...cursor,
-				operation: result.conclusion !== "success" ? "jobs" : "attempt",
-				attempt:
-					result.conclusion !== "success" ? cursor.attempt : cursor.attempt + 1,
-			},
+			cursor: { ...cursor, operation: "attempt", attempt: cursor.attempt + 1 },
 			complete: false,
 		};
 	}
@@ -647,7 +667,7 @@ async function nextSweep(
 	const [sweep] = await database.unsafe<Sweep[]>(
 		`SELECT organization_id AS "organizationId", repository_id AS "repositoryId", dataset, window_start, window_end, retention_boundary, cursor
 		 FROM github_repository_sweep WHERE organization_id = $1 AND repository_id = $2 AND status = 'pending'
-		 ORDER BY array_position(ARRAY['actions','jobs','attempts','pulls','external','commits'], dataset), window_start LIMIT 1`,
+		 ORDER BY array_position(ARRAY['actions','attempts','jobs','pulls','external','commits'], dataset), window_start LIMIT 1`,
 		[scope.organizationId, scope.repositoryId],
 	);
 	return sweep

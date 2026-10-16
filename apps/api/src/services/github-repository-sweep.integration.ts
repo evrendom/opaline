@@ -182,7 +182,7 @@ test("a window larger than one invocation advances acknowledged pages and comple
 	expect(complete?.status).toBe("complete");
 });
 
-test("stores earlier attempts and their failed jobs, linking fork PRs by head SHA", async () => {
+test("stores earlier attempts and the jobs of every attempt, linking fork PRs by head SHA", async () => {
 	const scope = await seed();
 	const paths: string[] = [];
 	await execute(scope.organizationId, (url) => {
@@ -202,16 +202,17 @@ test("stores earlier attempts and their failed jobs, linking fork PRs by head SH
 			return json(
 				run(12, undefined, { run_attempt: 2, conclusion: "cancelled" }),
 			);
-		if (url.pathname.endsWith("/jobs"))
+		const jobsOf = url.pathname.match(/\/attempts\/(\d+)\/jobs$/);
+		if (jobsOf)
 			return json({
 				jobs: [
 					{
-						id: Number(url.pathname.includes("attempts/1") ? 100 : 101),
+						id: 99 + Number(jobsOf[1]),
 						run_id: 12,
-						run_attempt: url.pathname.includes("attempts/1") ? 1 : 2,
+						run_attempt: Number(jobsOf[1]),
 						name: "test",
 						status: "completed",
-						conclusion: "failure",
+						conclusion: jobsOf[1] === "3" ? "success" : "failure",
 						started_at: "2026-09-30T10:00:00Z",
 						completed_at: "2026-09-30T10:01:00Z",
 					},
@@ -258,11 +259,16 @@ test("stores earlier attempts and their failed jobs, linking fork PRs by head SH
 		),
 	).toBe(true);
 	expect(attempts[2]?.event).toBe("schedule");
-	const [jobs] = await queryFacts<{ count: number }>(
-		`SELECT count() AS count FROM rudel.github_ci_jobs FINAL WHERE workspace_id = {workspace:String}`,
+	const jobs = await queryFacts<{ attempt: number; conclusion: string }>(
+		`SELECT attempt, conclusion FROM rudel.github_ci_jobs FINAL WHERE workspace_id = {workspace:String} ORDER BY attempt`,
 		scope.organizationId,
 	);
-	expect(jobs?.count).toBe(2);
+	// The successful latest attempt has its jobs too, not only the failed ones.
+	expect(jobs).toEqual([
+		{ attempt: 1, conclusion: "failure" },
+		{ attempt: 2, conclusion: "failure" },
+		{ attempt: 3, conclusion: "success" },
+	]);
 	const [checks] = await queryFacts<{ count: number }>(
 		`SELECT count() AS count FROM rudel.github_ci_runs FINAL WHERE workspace_id = {workspace:String} AND kind = 'check_run'`,
 		scope.organizationId,
@@ -271,6 +277,86 @@ test("stores earlier attempts and their failed jobs, linking fork PRs by head SH
 	expect(paths.indexOf("/repos/fixture/repo/pulls")).toBeGreaterThan(
 		paths.indexOf("/repos/fixture/repo/actions/runs/12/attempts/2"),
 	);
+});
+
+test("jobs of successful runs are collected once; only unsettled jobs are fetched again", async () => {
+	const scope = await seed();
+	const job = (runId: number, status: string) => ({
+		id: runId * 10,
+		run_id: runId,
+		run_attempt: 1,
+		name: "verify",
+		status,
+		conclusion: status === "completed" ? "success" : null,
+		started_at: "2026-09-30T10:00:00Z",
+		completed_at: status === "completed" ? "2026-09-30T10:01:00Z" : null,
+	});
+	const pass = async (now: Date, running: boolean) => {
+		const paths: string[] = [];
+		const route = (url: URL): Response => {
+			if (url.pathname.endsWith("/actions/runs"))
+				return json({
+					total_count: 2,
+					workflow_runs: [
+						run(1),
+						running
+							? run(2, undefined, { status: "in_progress", conclusion: null })
+							: run(2, undefined, { updated_at: "2026-10-02T10:00:00Z" }),
+					],
+				});
+			const jobsOf = url.pathname.match(/\/runs\/(\d+)\/attempts\/1\/jobs$/);
+			if (jobsOf)
+				return json({
+					jobs: [
+						job(
+							Number(jobsOf[1]),
+							running && jobsOf[1] === "2" ? "in_progress" : "completed",
+						),
+					],
+				});
+			return defaults(url);
+		};
+		// The fixture's rate-limit reset must lie ahead of this pass's clock, or
+		// quota discovery never completes and the pass yields after one request.
+		const respond = (url: URL) => {
+			const response = route(url);
+			response.headers.set(
+				"x-ratelimit-reset",
+				String(now.getTime() / 1000 + 1800),
+			);
+			return response;
+		};
+		await execute(
+			scope.organizationId,
+			(url) => {
+				paths.push(url.pathname);
+				return respond(url);
+			},
+			sqlClient,
+			200,
+			now,
+		);
+		return paths.filter((path) => path.endsWith("/jobs"));
+	};
+	expect(await pass(NOW, true)).toEqual([
+		"/repos/fixture/repo/actions/runs/1/attempts/1/jobs",
+		"/repos/fixture/repo/actions/runs/2/attempts/1/jobs",
+	]);
+	const later = new Date(NOW.getTime() + 2 * 86_400_000);
+	await enqueueGitHubRepositorySweep(scope, later, sqlClient);
+	// Run 1's jobs settled before this pass: only run 2, still running at the
+	// first pass, is asked again.
+	expect(await pass(later, false)).toEqual([
+		"/repos/fixture/repo/actions/runs/2/attempts/1/jobs",
+	]);
+	const jobs = await queryFacts<{ run_id: string; status: string }>(
+		`SELECT run_id, status FROM rudel.github_ci_jobs FINAL WHERE workspace_id = {workspace:String} ORDER BY run_id`,
+		scope.organizationId,
+	);
+	expect(jobs).toEqual([
+		{ run_id: "1", status: "completed" },
+		{ run_id: "2", status: "completed" },
+	]);
 });
 
 test("caps append-only PR commit memberships at 250", async () => {
@@ -557,7 +643,8 @@ test("initial quota discovery tolerates provider clock skew and scopes pending w
 		);
 		return response;
 	});
-	expect(result.requests).toBe(2);
+	// The runs page, the successful run's jobs and the pulls page.
+	expect(result.requests).toBe(3);
 	expect(result.hasMore).toBe(false);
 });
 
