@@ -164,6 +164,9 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 	COVERAGE_COLUMN,
 ];
 
+/** First parser version that links background tasks and hook blocks to their calls. */
+const BACKGROUND_SINCE_PARSER_VERSION = 11;
+
 /** The call view's columns. */
 export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 	{
@@ -229,9 +232,9 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		name: "call_minutes",
 		type: "Nullable(Float64)",
 		meaning:
-			"Minutes from the call record to its last result record: the call's own time.",
+			"Minutes from the call record to when its work finished (finished_at): its last result, or for a call whose work went on in the background, the task notification that reported its end.",
 		traps: [
-			"NULL when no result was recorded (interrupted, or the session ended). Parallel calls overlap, so their sum can exceed the run's time; waiting for a person (AskUserQuestion) counts.",
+			"NULL when no result was recorded (interrupted, or the session ended), and for a backgrounded call no notification reported the end of: its time is unknown, not the moment it was handed off. Parallel calls overlap, so their sum can exceed the run's time; waiting for a person (AskUserQuestion) counts.",
 		],
 	},
 	{
@@ -245,16 +248,70 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 	{
 		name: "failed",
 		type: "UInt8",
-		meaning: "1 when a result of the call is an error or exits non-zero.",
+		meaning:
+			"1 when a result of the call is an error or exits non-zero, or its background task ended failed or killed or with a non-zero exit code.",
 		traps: [
 			"Compare failure rates over has_result = 1: a call without a result has failed = 0.",
+			"A refused call (denial_kind not empty) is failed too but never ran; filter denial_kind = '' to count commands that ran and failed.",
 		],
 	},
 	{
 		name: "exit_code",
 		type: "Nullable(Int32)",
-		meaning: "Exit code a result recorded; NULL when none was recorded.",
+		meaning:
+			"Exit code a result recorded, else the one its background task's notification reported; NULL when none was recorded.",
 		traps: [],
+	},
+	{
+		name: "denial_kind",
+		type: "LowCardinality(String)",
+		meaning:
+			"Why the call was refused before it ran, as recorded: hook (a PreToolUse hook blocked it), permission-rule, user-rejected, cancelled, interrupted (Claude Code toolDenialKind), Sandbox(Denied) or Rejected (Codex); empty when it was not refused.",
+		traps: [
+			`hook is recorded from parser ${BACKGROUND_SINCE_PARSER_VERSION}; before it a hook block reads as a failed call with no exit code.`,
+		],
+	},
+	{
+		name: "backgrounded",
+		type: "UInt8",
+		meaning:
+			"1 when the call's work went on in the background and its hand-off or task notification names the task's output file: Claude Code Bash run in the background or moved there by its timeout, an async Agent.",
+		traps: [
+			`Recorded by Claude Code from parser ${BACKGROUND_SINCE_PARSER_VERSION}; 0 before it.`,
+			"A Monitor names no output file: it reads 0 here and its time ends at its own result.",
+		],
+	},
+	{
+		name: "task_id",
+		type: "Nullable(String)",
+		meaning:
+			"The background task's id (its output file is tasks/<task_id>.output); NULL when the call was not backgrounded.",
+		traps: [],
+	},
+	{
+		name: "background_status",
+		type: "Nullable(String)",
+		meaning:
+			"How the background task ended, from its latest task notification: completed, failed, killed (stopped at its time limit), stopped; NULL when no notification reported an end.",
+		traps: [
+			"The notification can come in a later run of the same stream. An async Agent can notify more than once; the latest counts.",
+		],
+	},
+	{
+		name: "background_exit_code",
+		type: "Nullable(Int32)",
+		meaning:
+			"The exit code the background task's latest notification reported; NULL when none did.",
+		traps: [],
+	},
+	{
+		name: "finished_at",
+		type: "Nullable(DateTime64(3, 'UTC'))",
+		meaning:
+			"When the call's work finished: its background task's latest ending notification for a backgrounded call, else its last result. UTC.",
+		traps: [
+			"NULL when there is no result, or for a backgrounded call no notification reported its end (still running when the session stopped, or the notification never came).",
+		],
 	},
 	{
 		name: "file_path",
@@ -438,13 +495,33 @@ export function callsSql(
 	];
 	const call = "kind = 'tool_call'";
 	const result = "kind = 'tool_result'";
+	// From parser 11 a task notification carries the call id of the call whose
+	// background work it reports on, so it joins the call's group (the only
+	// injected context the scan keeps). One that ended the task records
+	// interrupted (true when killed or stopped), is_error (failed or killed),
+	// its exit code and the task's output file in the record's own columns,
+	// and the hand-off result names that file. They fold into the call's
+	// result states (its last record, failure and exit code), so a call costs
+	// two more aggregate states, never a read of the facts map.
+	const notification = "kind = 'injected_context'";
+	const taskEnd = `${notification} AND interrupted IS NOT NULL`;
+	const taskFile = "match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')";
+	const handOff = `${result} AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND ${taskFile}`;
 	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, runs.owner)].join(",\n\t\t")}
 		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
 			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
 			c.session_date AS session_date, c.call_id AS call_id, toLowCardinality(c.first_tool_name) AS tool_name,
 			c.started_at AS started_at,
-			if(c.results = 0, NULL, greatest(0, dateDiff('millisecond', c.started_at, c.result_at)) / 60000) AS call_minutes,
-			toUInt8(c.results > 0) AS has_result, toUInt8(ifNull(c.result_failed, 0)) AS failed, c.result_exit_code AS exit_code,
+			if(finished_at IS NULL, NULL, greatest(0, dateDiff('millisecond', c.started_at, finished_at)) / 60000) AS call_minutes,
+			toUInt8(c.results > 0) AS has_result,
+			toUInt8(ifNull(c.result_failed, 0)) AS failed, c.result_exit_code AS exit_code,
+			toLowCardinality(c.denial_kind) AS denial_kind,
+			toUInt8(c.task_file != '') AS backgrounded,
+			nullIf(extract(c.task_file, '/tasks/([A-Za-z0-9_-]+)\\\\.output$'), '') AS task_id,
+			if(c.task_end.1 IS NULL, NULL,
+				multiIf(c.task_end.1 AND c.task_end.2, 'killed', c.task_end.1, 'stopped', c.task_end.2, 'failed', 'completed')) AS background_status,
+			if(c.task_end.1 IS NULL, NULL, c.result_exit_code) AS background_exit_code,
+			if(c.task_file != '' AND c.task_end.1 IS NULL OR c.results = 0, NULL, c.result_at) AS finished_at,
 			${first
 				.filter((name) => !["turn_idx", "tool_name"].includes(name))
 				.map((name) => `c.first_${name} AS ${name}`)
@@ -454,18 +531,23 @@ export function callsSql(
 			SELECT ${generation}, session_date, call_id,
 				minIf(ts, ${call}) AS started_at,
 				${first.map((name) => `argMinIf(${name}, position, ${call}) AS first_${name}`).join(",\n\t\t\t\t")},
-				maxIf(ts, ${result}) AS result_at,
+				maxIf(ts, ${result} OR ${taskEnd}) AS result_at,
 				countIf(${result}) AS results,
-				max(${toolErrorSql()}) AS result_failed,
-				anyIf(exit_code, ${result} AND exit_code IS NOT NULL) AS result_exit_code
+				max(${toolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
+				anyIf(exit_code, (${result} OR ${taskEnd}) AND exit_code IS NOT NULL) AS result_exit_code,
+				anyIf(denial_kind, ${result} AND denial_kind != '') AS denial_kind,
+				anyIf(file_path, (${handOff} OR ${notification}) AND file_path != '') AS task_file,
+				argMaxIf((interrupted, is_error), position, ${taskEnd}) AS task_end
 			FROM (
 				SELECT ${generation}, session_date, call_id, kind, ts, turn_idx, record_idx, block_idx,
-					is_error, exit_code, (record_idx, block_idx) AS position, tool_name, file_path,
+					is_error, exit_code, denial_kind, (record_idx, block_idx) AS position, tool_name, file_path,
+					interrupted,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars
 				FROM ${records()}
 				PREWHERE kind IN ('tool_call', 'tool_result')
+					OR (kind = 'injected_context' AND subtype = 'task_notification' AND call_id != '')
 				WHERE ${sessions} AND ${fresh}
 			)
 			GROUP BY ${generation}, session_date, call_id,

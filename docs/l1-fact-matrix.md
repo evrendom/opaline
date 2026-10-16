@@ -20,8 +20,8 @@ Under each status is where the agent records the fact, shortened: `toolUseResult
 
 | | Claude Code | Codex |
 |---|---:|---:|
-| ✅ stored | 152 (1 with a gap) | 175 (1 with a gap) |
-| 🟡 pending | 51 | 29 |
+| ✅ stored | 154 (1 with a gap) | 175 (1 with a gap) |
+| 🟡 pending | 51 | 31 |
 | ⚪ not recorded | 36 | 35 |
 | 🔴 wrong | 0 | 0 |
 
@@ -29,13 +29,13 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 
 | Metric | Claude Code | Codex |
 |---|---:|---:|
-| verified | 22 (10.0%) | 4 (1.8%) |
-| observed | 115 (52.3%) | 159 (71.6%) |
-| asserted | 83 (37.7%) | 59 (26.6%) |
-| unreviewed | 20 | 19 |
-| exact | 48 | 75 |
+| verified | 22 (9.9%) | 4 (1.8%) |
+| observed | 117 (52.7%) | 159 (71.0%) |
+| asserted | 83 (37.4%) | 61 (27.2%) |
+| unreviewed | 20 | 21 |
+| exact | 49 | 75 |
 | transform | 9 | 12 |
-| close | 63 | 65 |
+| close | 64 | 65 |
 | broader | 3 | 6 |
 | narrower | 11 | 3 |
 | not_emitted | 0 | 3 |
@@ -44,7 +44,7 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | provenance | 6 | 4 |
 | N/A (derived/provenance) | 19 | 17 |
 | Context paths (excluded as sources) | 24 | 58 |
-| Judged (excludes searched absences) | 134 | 161 |
+| Judged (excludes searched absences) | 136 | 161 |
 | Semantic conflicts | 3 | 3 |
 | Paired runs | 0 | 0 |
 
@@ -53,9 +53,9 @@ Unclassified census paths are computed from the selected corpus by facts:census 
 Primary-path relation counts (including recorded gaps):
 
 - unreviewed: 4 / 3 (Claude Code / Codex).
-- exact: 130 / 186 (Claude Code / Codex).
+- exact: 131 / 186 (Claude Code / Codex).
 - transform: 16 / 55 (Claude Code / Codex).
-- close: 203 / 378 (Claude Code / Codex).
+- close: 209 / 378 (Claude Code / Codex).
 - broader: 12 / 29 (Claude Code / Codex).
 - narrower: 20 / 13 (Claude Code / Codex).
 - not_emitted: 0 / 0 (Claude Code / Codex).
@@ -132,6 +132,8 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 | `file_op` | What a call asked to do to a file (requested); the call's outcome says whether it happened. | ✅ v9 close · observed<br>`Write input.file_path`, `Edit input.file_path` +2 | ✅ v9 close · observed<br>`apply_patch call.input`, `exec_command args.cmd` +1 | Comparable with caveat |
 | `patch_lines_added`, `patch_lines_removed` | Lines an edit added and removed. | ✅ v9 transform · observed<br>`toolUseResult.structuredPatch[].lines[]`, `toolUseResult.content` | ✅ v9 close · observed<br>`FileChange.changes.{*}.unified_diff`, `patch_apply_end.changes.{*}.unified_diff` | Comparable with caveat |
 | `user_modified` | The user changed the agent's proposed edit before accepting it. | ✅ v6 exact · verified<br>`toolUseResult.userModified` | ⚪ not recorded not_found · asserted | One-sided mapping |
+| `background_task` | The background task a call's work went on in: its id, how the call handed it off, and the status and exit code the task notification reported when it ended. | ✅ v11 close · observed<br>`toolUseResult.backgroundTaskId`, `toolUseResult.taskId` +4 | 🟡 pending unreviewed · asserted | Not yet judged |
+| `hook_event` | The hook event of a hook error a tool result starts with; a PreToolUse block stopped the call before it ran. | ✅ v11 exact · observed<br>`tool_result.content “hook error…”` | 🟡 pending unreviewed · asserted | Not yet judged |
 | `stale_read` | The tool warned that files changed since the agent last read them. | ✅ v6 narrower · verified<br>`toolUseResult.staleReadFileStateHint` | ⚪ not recorded not_found · asserted | One-sided mapping |
 | `search_matches` | How many matches a search found. | ✅ v9 close · observed<br>`toolUseResult.numMatches`, `toolUseResult.numFiles` +2 | ⚪ not recorded not_found · asserted | One-sided mapping |
 | `search_query` | What a search looked for, and where. | ✅ v1 exact · verified<br>`Grep input.pattern`, `Glob input.pattern` | ✅ v9 close · observed<br>`CommandExecution.parsed_cmd[].query`, `exec_command_end.parsed_cmd[].query` +3 | Comparable with caveat |
@@ -316,6 +318,12 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 - `user_modified`
   - Claude Code ✅: Relation: exact. Confidence: verified. Evidence: published_types (2), llm_audit (1), census (1), fixture_test (1). Judgement: userModified is the Write/Edit output field 'Whether the user modified the proposed changes' (832 results, all false locally). Witness: 49ead9e1:428 user.toolUseResult.userModified [boolean] n=832 v2.1.220..2.1.293 Path: `user.toolUseResult.userModified` — primary · exact.
   - Codex ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (2), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): no such field on FileChange or patch events. How we checked: local census: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): no such field on FileChange or patch events..
+- `background_task`
+  - Claude Code ✅: Relation: close. Confidence: observed. Evidence: fixture_test (2), llm_audit (1), census (3). Judgement: The hand-off result names the task (Bash backgroundTaskId or its 'Command running in background with ID' / 'moved to the background (ID: …)' text, Monitor taskId, async Agent agentId); the later <task-notification> names the same task-id, usually the tool-use-id, its <status> and, for Bash, '(exit code N)' in its summary. The notification record carries the call's call_id, resolved through the task id when it names no tool use. Production week of 2026-10-09: 773 notifications (489 completed, 48 failed, 35 killed, 17 stopped, 184 Monitor events), 99 timeout hand-offs. Path: `user.toolUseResult.backgroundTaskId` — primary · close. Path: `user.toolUseResult.taskId` — primary · close. Path: `user.toolUseResult.agentId` — primary · close. Path: `user.message.content[tool_result].content~Command running in background with ID` — primary · close. Path: `user.message.content[tool_result].content~moved to the background (ID` — primary · close. Path: `user.message.content~<task-notification>` — primary · close. All sources: `toolUseResult.backgroundTaskId`, `toolUseResult.taskId`, `toolUseResult.agentId`, `tool_result.content “Command running in background with ID…”`, `tool_result.content “moved to the background (ID…”`, `user message “<task-notification>…”`.
+  - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Review whether a Codex background process (exec_command left running, then write_stdin polls and exec_command_end) needs the same task columns, or whether its later outputs on the same call already give its end.
+- `hook_event`
+  - Claude Code ✅: Relation: exact. Confidence: observed. Evidence: fixture_test (2), llm_audit (1), census (1). Judgement: An error result that starts '<Event>:<Tool> hook error: [<hook command>]: <message>' was written by the hook, not the tool. PreToolUse and PermissionRequest run before the call, so the call never ran: denial_kind is hook and denial_reason the message's first line. A PostToolUse error came after the call ran and keeps only hook_event. Path: `user.message.content[tool_result].content~hook error` — primary · exact.
+  - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Review how Codex records a hook that blocks a call (hooks.json) and map it to denial_kind hook.
 - `stale_read`
   - Claude Code ✅: Relation: narrower. Confidence: verified. Evidence: llm_audit (2), published_types (1), census (1), fixture_test (1). Judgement: sdk-tools.d.ts:3321-3323 documents staleReadFileStateHint as a model-facing note listing readFileState entries whose mtime changed DURING this command (set when write-command markers match), i.e. the tool telling the agent that files it had read were changed. That is a subset of 'files changed since the agent last read them' (changes made by other parties between the read and the command are not reported). It is present on 656 results (652 in the census), and the parser stores the note text (capped), so the stored value is the warning itself. Path: `user.toolUseResult.staleReadFileStateHint` — primary · narrower. Note: Independent disagreement remains unreviewed: Sol=transform, Sonnet=close.
   - Codex ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (2), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): no stale-read notice on any output or completion. How we checked: local census: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): no stale-read notice on any output or completion..

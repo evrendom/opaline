@@ -13,8 +13,11 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * Bump when splitter output changes for the same input so backfill re-extracts.
  * 10: received setup (`received_setup` and the setup texts) and the
  * system prompt kept whole in `instruction_text_components` (OPL-391).
+ * 11: background tasks (hand-offs and their task notifications, linked to
+ * the call by `call_id`), hook blocks as a denial kind, and harness texts
+ * the agent saw as injected context of their own subtype.
  */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 10;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 11;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -52,6 +55,23 @@ export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
  */
 export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	...V9_FACT_KEYS,
+	/**
+	 * Background task id: on the hand-off result of a call whose work went on
+	 * in the background (Claude Bash `backgroundTaskId` or its hand-off text,
+	 * Monitor `taskId`, async Agent `agentId`) and on the task notifications
+	 * that report on it, which carry the call's `call_id`.
+	 */
+	task_id: 11,
+	/** How the call's work went to the background: requested, timeout (moved there by its timeout), agent or monitor. */
+	background_launch: 11,
+	/** A task notification's `<status>` (completed, failed, killed, stopped). */
+	background_status: 11,
+	/** The exit code a task notification's summary reports. */
+	background_exit_code: 11,
+	/** "true" on a Monitor event notification, which reports progress, not an end. */
+	task_event: 11,
+	/** The hook event of a hook error in a tool result (PreToolUse blocks the call; PostToolUse ran after it). */
+	hook_event: 11,
 	/**
 	 * Setup text the record carries, as a JSON array of
 	 * `{kind, path, name, cwd, sha256, chars}` (`received-setup.ts`); the texts

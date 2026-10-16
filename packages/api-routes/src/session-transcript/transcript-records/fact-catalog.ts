@@ -3324,6 +3324,80 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		},
 	},
 	{
+		id: "background_task",
+		view: "calls",
+		meaning:
+			"The background task a call's work went on in: its id, how the call handed it off, and the status and exit code the task notification reported when it ended.",
+		agents: {
+			claude_code: stored(
+				[
+					"user.toolUseResult.backgroundTaskId",
+					"user.toolUseResult.taskId",
+					"user.toolUseResult.agentId",
+					"user.message.content[tool_result].content~Command running in background with ID",
+					"user.message.content[tool_result].content~moved to the background (ID",
+					"user.message.content~<task-notification>",
+				],
+				{
+					since: 11,
+					facts: [
+						"task_id",
+						"background_launch",
+						"background_status",
+						"background_exit_code",
+						"task_event",
+					],
+				},
+				{
+					relation: { kind: "close" },
+					justification:
+						"The hand-off result names the task (Bash backgroundTaskId or its 'Command running in background with ID' / 'moved to the background (ID: …)' text, Monitor taskId, async Agent agentId); the later <task-notification> names the same task-id, usually the tool-use-id, its <status> and, for Bash, '(exit code N)' in its summary. The notification record carries the call's call_id, resolved through the task id when it names no tool use. Production week of 2026-10-09: 773 notifications (489 completed, 48 failed, 35 killed, 17 stopped, 184 Monitor events), 99 timeout hand-offs.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/background-tasks.test.ts",
+							test: "a killed background command's notification carries its call, task and status",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review whether a Codex background process (exec_command left running, then write_stdin polls and exec_command_end) needs the same task columns, or whether its later outputs on the same call already give its end.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
+		id: "hook_event",
+		view: "calls",
+		meaning:
+			"The hook event of a hook error a tool result starts with; a PreToolUse block stopped the call before it ran.",
+		agents: {
+			claude_code: stored(
+				["user.message.content[tool_result].content~hook error"],
+				{ since: 11, facts: ["hook_event", "denialKind", "denial_reason"] },
+				{
+					relation: { kind: "exact" },
+					justification:
+						"An error result that starts '<Event>:<Tool> hook error: [<hook command>]: <message>' was written by the hook, not the tool. PreToolUse and PermissionRequest run before the call, so the call never ran: denial_kind is hook and denial_reason the message's first line. A PostToolUse error came after the call ran and keeps only hook_event.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/background-tasks.test.ts",
+							test: "a PreToolUse hook block is a refusal, not a failed command",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review how Codex records a hook that blocks a call (hooks.json) and map it to denial_kind hook.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
 		id: "stale_read",
 		view: "calls",
 		meaning:

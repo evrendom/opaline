@@ -57,6 +57,28 @@ const SKILL_BODY_PATTERN = /^Base directory for this skill:/u;
 const COMPACT_SUMMARY_PATTERN =
 	/^This session is being continued from a previous conversation/u;
 
+/** A parent agent's message to a subagent that was working (SendMessage). */
+export const COORDINATOR_MESSAGE_PATTERN =
+	/^The coordinator sent a message while you were working:/u;
+
+/**
+ * Harness texts Claude Code flags as meta, by how they open: the subtype
+ * each gets (parser 11), so a reader can place and count them.
+ */
+const HARNESS_TEXT_SUBTYPES: readonly (readonly [RegExp, string])[] = [
+	[
+		/^\[SYSTEM NOTIFICATION - NOT USER INPUT\][\s\S]*<task-notification>/u,
+		"task_notification",
+	],
+	[/^\[Image: (?:source: |original \d)/u, "image_metadata"],
+	[/^Your response above was cut off mid-stream/u, "stream_recovery"],
+	[
+		/^Your response above was stopped by a safety classifier/u,
+		"safety_recovery",
+	],
+	[COORDINATOR_MESSAGE_PATTERN, "coordinator_message"],
+];
+
 export interface WrapperAnalysis {
 	/** Subtype of the first wrapper found, '' when none. */
 	readonly firstSubtype: string;
@@ -152,7 +174,9 @@ export function classifyUserText(
 	if (flags.flaggedMeta === true) {
 		return {
 			kind: "injected_context",
-			subtype: SKILL_BODY_PATTERN.test(remainder) ? "skill_body" : "meta",
+			subtype: SKILL_BODY_PATTERN.test(remainder)
+				? "skill_body"
+				: harnessTextSubtype(remainder),
 		};
 	}
 	if (SKILL_BODY_PATTERN.test(remainder)) {
@@ -164,4 +188,10 @@ export function classifyUserText(
 		injected,
 		injectedSubtype: firstSubtype,
 	};
+}
+
+function harnessTextSubtype(text: string): string {
+	for (const [pattern, subtype] of HARNESS_TEXT_SUBTYPES)
+		if (pattern.test(text)) return subtype;
+	return "meta";
 }

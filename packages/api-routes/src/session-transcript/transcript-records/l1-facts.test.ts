@@ -111,6 +111,67 @@ interface FactCase {
 
 const CASES: readonly FactCase[] = [
 	{
+		name: "a background Bash hand-off names its task",
+		fixture: "claude",
+		row: { callId: "toolu_dev", kind: "tool_result", subtype: "running" },
+		facts: { extra: { task_id: "bdev12345", background_launch: "requested" } },
+	},
+	{
+		name: "a call its timeout moved to the background names its task",
+		fixture: "claude",
+		row: { callId: "toolu_slow", kind: "tool_result", subtype: "running" },
+		facts: { extra: { task_id: "bslow6789", background_launch: "timeout" } },
+	},
+	{
+		name: "a killed task's notification carries its call and status",
+		fixture: "claude",
+		row: {
+			callId: "toolu_dev",
+			kind: "injected_context",
+			subtype: "task_notification",
+		},
+		facts: { extra: { task_id: "bdev12345", background_status: "killed" } },
+	},
+	{
+		name: "a notification without a tool use finds its call by task id, with its exit code",
+		fixture: "claude",
+		row: {
+			callId: "toolu_slow",
+			kind: "injected_context",
+			subtype: "task_notification",
+		},
+		facts: {
+			extra: {
+				task_id: "bslow6789",
+				background_status: "failed",
+				background_exit_code: "1",
+			},
+		},
+	},
+	{
+		name: "a Monitor event is a task event of its Monitor call",
+		fixture: "claude",
+		row: {
+			callId: "toolu_watch",
+			kind: "injected_context",
+			subtype: "task_notification",
+		},
+		facts: { extra: { task_id: "bmon00001", task_event: "true" } },
+	},
+	{
+		name: "a PreToolUse hook block is a hook refusal",
+		fixture: "claude",
+		row: { callId: "toolu_install", kind: "tool_result" },
+		facts: {
+			denialKind: "hook",
+			extra: {
+				hook_event: "PreToolUse",
+				denial_reason:
+					"STOP: This command cannot install or download packages.",
+			},
+		},
+	},
+	{
 		name: "Claude version and entrypoint on every record",
 		fixture: "claude",
 		row: { kind: "user_prompt" },

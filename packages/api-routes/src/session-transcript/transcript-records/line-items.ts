@@ -61,6 +61,8 @@ export interface StreamState {
 	/** Agent version of the latest record that named one (Claude `version`, Codex `cli_version`). */
 	agentVersion: string;
 	readonly calls: Map<string, KnownCall>;
+	/** Claude background task id to the call whose hand-off announced it. */
+	readonly claudeBackgroundTasks: Map<string, string>;
 	codexAgentPath: string;
 	codexSessionId: string | undefined;
 	codexForkPoint:
@@ -100,6 +102,7 @@ export function createStreamState(
 	return {
 		agentVersion: "",
 		calls: new Map(),
+		claudeBackgroundTasks: new Map(),
 		claudeQueuedPrompts: [],
 		codexAgentPath: "",
 		codexSessionId: undefined,

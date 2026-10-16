@@ -1,10 +1,21 @@
 import { getClaudeMutationFiles } from "../session-turn-file-edits.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
 import { appliedChangesFacts } from "./applied-changes.js";
+import {
+	readClaudeBackgroundHandOff,
+	readTaskNotification,
+} from "./background-tasks.js";
 import { classifyCommand, extractShellFileMutations } from "./command-class.js";
-import { isClaudeBackgroundLaunch, readClaudeExitCode } from "./exit-code.js";
+import {
+	type ClaudeHookError,
+	readClaudeExitCode,
+	readClaudeHookError,
+} from "./exit-code.js";
 import { readImageBlockLabel } from "./image-labels.js";
-import { classifyUserText } from "./injected-wrappers.js";
+import {
+	COORDINATOR_MESSAGE_PATTERN,
+	classifyUserText,
+} from "./injected-wrappers.js";
 import {
 	injectedAroundPrompt,
 	isRecord,
@@ -43,6 +54,11 @@ import type { CommandClass } from "./types.js";
 import { withV9Facts } from "./v9-facts.js";
 
 const SUBAGENT_LAUNCH_TOOLS: ReadonlySet<string> = new Set(["task", "agent"]);
+const HARNESS_ATTACHMENT_SUBTYPES = {
+	silent_turn_reminder: "silent_turn_reminder",
+	batching_reminder_sent: "batching_reminder",
+	read_truncation_notice: "read_truncation_notice",
+} as const;
 const AGENT_ID_IN_TEXT_PATTERN = /\bagentId:\s*([A-Za-z0-9_-]+)/u;
 
 /** Turn one parsed Claude Code JSONL record into record items. */
@@ -120,11 +136,20 @@ function readClaudeRecord(
 		};
 	}
 	if (type === "attachment") {
-		return { items: readAttachment(record.attachment, state), timestamp };
+		return {
+			items: withTaskNotifications(
+				readAttachment(record.attachment, state),
+				state,
+			),
+			timestamp,
+		};
 	}
 	if (type === "user") {
 		return {
-			items: withLineFacts(readUserMessage(record, state), record),
+			items: withLineFacts(
+				withTaskNotifications(readUserMessage(record, state), state),
+				record,
+			),
 			timestamp,
 		};
 	}
@@ -439,10 +464,24 @@ function classifiedUserItems(
 				return [metaItem("queued_prompt_mirror")];
 			}
 			return [
-				{ kind: "user_prompt", text: classification.text },
+				{
+					kind: "user_prompt",
+					...coordinatorSubtype(state, classification.text),
+					text: classification.text,
+				},
 				...injectedAroundPrompt(classification),
 			];
 		case "injected_context":
+			// A forked skill's subagent opens with its task as a meta message;
+			// before any prompt it is the stream's task, a delegation that
+			// starts its first run (a stream with no prompt has no runs).
+			if (
+				state.isSubagent &&
+				state.turnIdx === 0 &&
+				flags.flaggedMeta &&
+				classification.subtype === "meta"
+			)
+				return [{ kind: "user_prompt", text }];
 			return [
 				{
 					kind: "injected_context",
@@ -461,13 +500,22 @@ function readToolResult(
 	block: Record<string, unknown>,
 	state: StreamState,
 	toolUseResult: Record<string, unknown> | undefined,
-	denialKind: string | undefined,
+	recordedDenialKind: string | undefined,
 ): LineItem {
 	const callId = readString(block.tool_use_id) ?? "";
 	const known = callId === "" ? undefined : state.calls.get(callId);
 	const text = readResultText(block.content);
 	const isError = block.is_error === true;
 	const exitCode = isError ? readClaudeExitCode(text) : null;
+	const hook = isError ? readClaudeHookError(text) : undefined;
+	// A PreToolUse hook that errors stops the call before it runs: a refusal.
+	const denialKind =
+		recordedDenialKind ?? (hook?.blocked === true ? "hook" : undefined);
+	const handOff = isError
+		? undefined
+		: readClaudeBackgroundHandOff(text, toolUseResult, known?.toolName ?? "");
+	if (handOff !== undefined && callId !== "")
+		state.claudeBackgroundTasks.set(handOff.taskId, callId);
 	const launchesSubagent =
 		known !== undefined &&
 		SUBAGENT_LAUNCH_TOOLS.has(known.toolName.toLowerCase());
@@ -484,19 +532,97 @@ function readToolResult(
 			known?.facts === undefined ? undefined : mcpFacts(known.facts),
 			claudeAppliedChanges(toolUseResult, !isError && denialKind === undefined),
 			claudeToolResultFacts(toolUseResult, denialKind),
+			hook === undefined ? undefined : hookErrorFacts(hook),
+			handOff === undefined
+				? undefined
+				: {
+						extra: {
+							task_id: handOff.taskId,
+							background_launch: handOff.launch,
+						},
+					},
 		),
 		isError,
 		kind: "tool_result",
+		...(handOff?.outputFile === undefined
+			? {}
+			: { filePath: handOff.outputFile }),
 		spawnedAgentId,
 		subtype:
-			known === undefined
-				? "orphan"
-				: !isError && isClaudeBackgroundLaunch(text)
-					? "running"
-					: "",
+			known === undefined ? "orphan" : handOff !== undefined ? "running" : "",
 		text,
 		toolName: known?.toolName ?? "",
 	};
+}
+
+/** The hook event of a hook error, and why a blocking hook refused the call. */
+function hookErrorFacts(hook: ClaudeHookError): LineFacts {
+	return {
+		extra: {
+			hook_event: factText(hook.event, 64),
+			...(hook.blocked && hook.message !== ""
+				? { denial_reason: factText(hook.message, 512) }
+				: {}),
+		},
+	};
+}
+
+/**
+ * A task notification names the call whose background work it reports on:
+ * the tool use it names, else the call whose hand-off announced its task.
+ * It keeps its own record and run; the call reads it by `call_id`.
+ */
+function withTaskNotifications(
+	items: readonly LineItem[],
+	state: StreamState,
+): LineItem[] {
+	return items.map((item) => {
+		if (item.kind !== "injected_context" || item.text === undefined)
+			return item;
+		const notification = readTaskNotification(item.text);
+		if (notification === undefined) return item;
+		const resolved = new Set(
+			notification.taskIds.flatMap((taskId) => {
+				const callId = state.claudeBackgroundTasks.get(taskId);
+				return callId === undefined ? [] : [callId];
+			}),
+		);
+		const callId =
+			notification.toolUseId ??
+			(resolved.size === 1 ? [...resolved][0] : undefined);
+		const taskId = notification.taskIds[0];
+		const status = notification.status;
+		// The outcome also sits in the record's own columns, which the calls
+		// view reads without the facts map: an error when the task failed or
+		// was killed, interrupted when it was killed or stopped (null on a
+		// Monitor event, which ends nothing), its exit code and output file.
+		const ended = status !== undefined && !notification.event;
+		return {
+			...item,
+			...(callId === undefined ? {} : { callId }),
+			subtype: "task_notification",
+			isError: status === "failed" || status === "killed",
+			exitCode: notification.exitCode,
+			...(notification.outputFile === undefined
+				? {}
+				: { filePath: notification.outputFile }),
+			facts: mergeFacts(item.facts, {
+				extra: {
+					...(taskId === undefined ? {} : { task_id: taskId }),
+					...(notification.status === undefined
+						? {}
+						: { background_status: factText(notification.status, 32) }),
+					...(notification.exitCode === null
+						? {}
+						: { background_exit_code: String(notification.exitCode) }),
+					...(notification.event ? { task_event: "true" } : {}),
+				},
+				...(ended
+					? { interrupted: status === "killed" || status === "stopped" }
+					: {}),
+			}),
+		};
+	});
 }
 
 function claudeAppliedChanges(
@@ -612,6 +738,19 @@ function readAttachment(attachment: unknown, state: StreamState): LineItem[] {
 
 		case "skill_listing":
 			return [injected("skill_listing", readString(attachment.content) ?? "")];
+		// Harness nudges the agent saw (parser 11): placed like other context.
+		case "silent_turn_reminder":
+		case "batching_reminder_sent":
+		case "read_truncation_notice":
+			return [
+				injected(
+					HARNESS_ATTACHMENT_SUBTYPES[type],
+					readString(attachment.text) ??
+						readString(attachment.content) ??
+						readString(attachment.prompt) ??
+						"",
+				),
+			];
 		case "edited_text_file": {
 			const path = readString(attachment.filename) ?? "";
 			return [
@@ -680,9 +819,27 @@ function readQueuedCommand(
 	state.claudeQueuedPrompts.push(classification.text);
 	if (state.claudeQueuedPrompts.length > 16) state.claudeQueuedPrompts.shift();
 	return [
-		{ kind: "user_prompt", subtype: "queued", text: classification.text },
+		{
+			kind: "user_prompt",
+			subtype: "queued",
+			...coordinatorSubtype(state, classification.text),
+			text: classification.text,
+		},
 		...injectedAroundPrompt(classification),
 	];
+}
+
+/**
+ * In a subagent, a message its coordinator sent (queued while it worked, or
+ * as its next task) is a parent's task to it, never a person's prompt.
+ */
+function coordinatorSubtype(
+	state: StreamState,
+	text: string,
+): { subtype?: "delegation" } {
+	return state.isSubagent && COORDINATOR_MESSAGE_PATTERN.test(text.trimStart())
+		? { subtype: "delegation" }
+		: {};
 }
 
 /**

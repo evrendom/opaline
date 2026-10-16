@@ -23,7 +23,8 @@ const CLAUDE_EXIT_PREFIX_PATTERN = /^\s*Exit code:?\s+(-?\d+)/u;
 const PREAMBLE_MAX_LINES = 8;
 const RUNNING_PREAMBLE =
 	/^(?:Process running with session ID|Script running)\b/iu;
-const CLAUDE_BACKGROUND_PATTERN = /^\s*Command running in background with ID:/u;
+const CLAUDE_HOOK_ERROR_PATTERN =
+	/^\s*(PreToolUse|PostToolUse|PostToolUseFailure|PermissionRequest)(?::[^\s]{1,200})? hook (?:blocking )?error(?:: \[([^\]\n]{1,500})\])?:?[ \t]*([^\n]*)/u;
 
 /**
  * Exit code recorded in a Codex tool output, or null when the transport
@@ -71,9 +72,33 @@ export function isCodexRunningOutput(
 	});
 }
 
-/** A Claude Code Bash result that only reports a background launch. */
-export function isClaudeBackgroundLaunch(resultText: string): boolean {
-	return CLAUDE_BACKGROUND_PATTERN.test(resultText.slice(0, 128));
+export interface ClaudeHookError {
+	/** The hook event, e.g. PreToolUse. */
+	readonly event: string;
+	/** True when the hook ran before the call (PreToolUse, PermissionRequest), so the call never ran. */
+	readonly blocked: boolean;
+	/** The hook command Claude Code named, as written. */
+	readonly command: string | undefined;
+	/** The first line of the hook's message. */
+	readonly message: string;
+}
+
+/**
+ * The hook error a Claude Code error result starts with
+ * (`PreToolUse:Bash hook error: [<hook command>]: STOP: …`), or undefined.
+ * Read from the first line only, like exit codes.
+ */
+export function readClaudeHookError(
+	resultText: string,
+): ClaudeHookError | undefined {
+	const match = CLAUDE_HOOK_ERROR_PATTERN.exec(resultText.slice(0, 1_024));
+	if (match?.[1] === undefined) return undefined;
+	return {
+		event: match[1],
+		blocked: match[1] === "PreToolUse" || match[1] === "PermissionRequest",
+		command: match[2],
+		message: (match[3] ?? "").trim(),
+	};
 }
 
 function readTransportTexts(output: unknown): string[] {
