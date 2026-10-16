@@ -640,6 +640,18 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 	expect(JSON.parse(second?.hook_runs ?? "")).toEqual(
 		JSON.parse(claudeFact(43, "hook_runs") ?? ""),
 	);
+	// Parser 12: two inline Python edits that failed on an assert are failed
+	// edits; the call the user interrupted is interrupted, while the rejected
+	// question and the hook block stay refusals.
+	const scripted = claudeRuns.find(
+		(run) => run.agent_id === "" && run.turn_idx === 5,
+	);
+	expect(scripted).toMatchObject({
+		failed_edits: 2,
+		refused_edits: 0,
+		interrupted_calls: 1,
+		denied_calls: 2,
+	});
 	const claudeReceipt = await receiptOf(claudeSession);
 	expect(claudeReceipt).toMatchObject({
 		run_count: claudeRuns.length,

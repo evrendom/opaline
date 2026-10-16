@@ -1,3 +1,4 @@
+import { readPythonFileAccess } from "./python-file-access.js";
 import type { CommandClass } from "./types.js";
 
 /**
@@ -30,9 +31,19 @@ export interface ShellFileMutation {
 /** The control operator that joined a command to the one before it. */
 export type ShellConnector = "&&" | "||" | "|" | ";";
 
-interface SimpleCommand {
+/** A here-document of a command: its delimiter and the body the shell feeds it. */
+export interface ShellHeredoc {
+	readonly delimiter: string;
+	/** True when the delimiter was quoted, so the shell expands nothing in the body. */
+	readonly quoted: boolean;
+	readonly body: string;
+}
+
+export interface SimpleCommand {
 	/** Null for the first command; `;` also covers newlines and `&`. */
 	readonly connector: ShellConnector | null;
+	/** Here-documents the command reads, in order (data, never commands). */
+	readonly heredocs: readonly ShellHeredoc[];
 	/**
 	 * True inside a compound construct (`if`/`while`/`for`/`case` bodies,
 	 * `{ }` groups, `( )` subshells). The splitter does not model their control
@@ -43,6 +54,8 @@ interface SimpleCommand {
 		readonly operator: string;
 		readonly target: string;
 	}[];
+	/** The command's own source text, as written, without its operator. */
+	readonly text: string;
 	readonly words: readonly string[];
 }
 
@@ -269,33 +282,12 @@ export function extractShellFileMutations(
 	command: string,
 ): readonly ShellFileMutation[] {
 	const mutations = new Map<string, ShellFileMutation>();
-	// Only an absolute `cd` makes later relative paths resolvable; anything else
-	// leaves them exactly as written.
-	let workingDirectory: string | undefined;
-	const commands = parseShellCommand(command);
-	const conditionalFlags = readConditionalFlags(commands);
-	for (const [commandIndex, simple] of commands.entries()) {
-		let conditional =
-			simple.nested || (conditionalFlags[commandIndex] ?? false);
-		let rawWords = simple.words;
-		if (
-			rawWords[0] === "function" ||
-			(/^[A-Za-z_][A-Za-z0-9_]*$/u.test(rawWords[0] ?? "") &&
-				rawWords[1] === "()")
-		) {
-			conditional = true;
-			const bodyStart = rawWords.indexOf("{");
-			rawWords = bodyStart < 0 ? [] : rawWords.slice(bodyStart + 1);
-		}
-		if (rawWords[0] === "{") {
-			conditional = true;
-			rawWords = rawWords.slice(1);
-		}
-		if (CONTROL_KEYWORDS.has(rawWords[0] ?? "")) {
-			// `then rm x`: the branch may never have run.
-			conditional = true;
-			rawWords = rawWords.slice(1);
-		}
+	for (const {
+		conditional,
+		rawWords,
+		simple,
+		workingDirectory,
+	} of walkShellCommands(command)) {
 		const add = (
 			operation: ShellFileMutation["operation"],
 			rawPath: string,
@@ -313,13 +305,6 @@ export function extractShellFileMutations(
 			if (mutations.get(key)?.basis === "direct") return;
 			mutations.set(key, { basis, operation, path });
 		};
-		if (basename(rawWords[0] ?? "") === "cd") {
-			workingDirectory = resolveWorkingDirectory(
-				workingDirectory,
-				positionals(rawWords.slice(1))[0],
-			);
-			continue;
-		}
 		for (const redirect of simple.redirects) {
 			if (isFileRedirect(redirect.operator)) add("write", redirect.target);
 		}
@@ -370,6 +355,300 @@ export function extractShellFileMutations(
 		}
 	}
 	return [...mutations.values()];
+}
+
+const PYTHON_EXECUTABLE = /^python(?:\d+(?:\.\d+)*)?$/u;
+
+/** A file an inline script writes, and whether it read the file first (an edit). */
+export interface ScriptFileEdit {
+	readonly basis: "direct" | "conditional";
+	/**
+	 * The file as one key across the calls of a stream: absolute, or joined
+	 * to the directory the command's `cd` named as written; undefined when
+	 * that directory is unknown.
+	 */
+	readonly key: string | undefined;
+	readonly operation: "write" | "edit";
+	readonly path: string;
+}
+
+/**
+ * Files the inline Python scripts of a shell command write
+ * ({@link readPythonFileAccess}): a here-document fed to `python3` (`python3 -
+ * <<'EOF'`, `python3 <<EOF`) or a `python3 -c` argument. A script file run
+ * by name (`python3 tool.py`) is not read. Relative paths resolve against an
+ * absolute `cd` before the command, unless the script changes directory.
+ * The files they only read are among {@link extractShellFileReads}.
+ */
+export function extractScriptFileAccess(
+	command: string,
+	/** The directory the command started in, for the edit keys. */
+	cwd = "",
+): readonly ScriptFileEdit[] {
+	const edits = new Map<string, ScriptFileEdit>();
+	for (const {
+		conditional,
+		rawWords,
+		simple,
+		symbolicDirectory,
+		workingDirectory,
+	} of walkShellCommands(command)) {
+		const script = inlinePythonScript(stripPrefixes(rawWords), simple);
+		if (script === undefined) continue;
+		const access = readPythonFileAccess(script.text);
+		for (const written of access.writes) {
+			const path = resolveScriptPath(written, script, workingDirectory, access);
+			if (!isProjectPath(path) || !isLiteralFilePath(path)) continue;
+			const basis = conditional ? "conditional" : "direct";
+			if (edits.get(path)?.basis === "direct") continue;
+			// A relative `cd` from the start is relative to the call's directory.
+			const base =
+				symbolicDirectory === undefined
+					? cwd
+					: symbolicDirectory?.startsWith("./") === true
+						? cwd === ""
+							? null
+							: `${cwd}${symbolicDirectory.slice(1)}`
+						: symbolicDirectory;
+			edits.set(path, {
+				basis,
+				key: path.startsWith("/")
+					? normalizePath(path)
+					: access.changesDirectory || base === null || base === ""
+						? undefined
+						: symbolicPath(`${base}/${path}`),
+				operation: access.edits.includes(written) ? "edit" : "write",
+				path,
+			});
+		}
+	}
+	return [...edits.values()];
+}
+
+/** A path a script names, resolved like a shell operand unless the script changes directory. */
+function resolveScriptPath(
+	path: string,
+	script: { literal: boolean; text: string },
+	workingDirectory: string | undefined,
+	access = readPythonFileAccess(script.text),
+): string {
+	return access.changesDirectory || (!script.literal && /[$`]/u.test(path))
+		? path
+		: resolveAgainst(workingDirectory, path);
+}
+
+/** The inline script a Python command runs, and whether the shell left it unexpanded. */
+function inlinePythonScript(
+	words: readonly string[],
+	simple: SimpleCommand,
+): { text: string; literal: boolean } | undefined {
+	if (!PYTHON_EXECUTABLE.test(basename(words[0] ?? ""))) return undefined;
+	const args = words.slice(1);
+	const flag = args.indexOf("-c");
+	if (flag !== -1) {
+		const text = args[flag + 1];
+		return text === undefined ? undefined : { text, literal: false };
+	}
+	// Flags only (`-`, `-u`, `-I`), else it runs a script file.
+	if (args.some((arg) => !arg.startsWith("-"))) return undefined;
+	const heredoc = simple.heredocs[0];
+	return heredoc === undefined
+		? undefined
+		: { text: heredoc.body, literal: heredoc.quoted };
+}
+
+/** Programs that print the files they are given. */
+const FILE_PRINTERS: ReadonlySet<string> = new Set([
+	"cat",
+	"head",
+	"tail",
+	"less",
+	"more",
+	"bat",
+	"nl",
+]);
+/** Flags of head and tail that take the next word as their value. */
+const PRINTER_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	"-n",
+	"-c",
+	"--lines",
+	"--bytes",
+]);
+
+/**
+ * Files a shell command reads explicitly, in order: the operands of the
+ * file printers (`cat`, `head`, `tail`, `less`, `more`, `bat`, `nl`) and of
+ * a `sed` that does not edit in place. Like {@link extractShellFileMutations},
+ * paths are as written (or resolved against an absolute `cd`); standard
+ * input, patterns and expansions are never paths.
+ */
+export function extractShellFileReads(command: string): readonly string[] {
+	const reads: string[] = [];
+	for (const { rawWords, simple, workingDirectory } of walkShellCommands(
+		command,
+	)) {
+		const words = stripPrefixes(rawWords);
+		const executable = basename(words[0] ?? "");
+		const args = words.slice(1);
+		const script = inlinePythonScript(words, simple);
+		const access =
+			script === undefined ? undefined : readPythonFileAccess(script.text);
+		const paths =
+			script !== undefined && access !== undefined
+				? access.reads.map((path) =>
+						resolveScriptPath(path, script, workingDirectory, access),
+					)
+				: (FILE_PRINTERS.has(executable)
+						? printerOperands(args)
+						: executable === "sed"
+							? readSedOperands(args)
+							: []
+					).map((operand) => resolveAgainst(workingDirectory, operand));
+		for (const path of paths)
+			if (isLiteralFilePath(path) && !reads.includes(path)) reads.push(path);
+	}
+	return reads;
+}
+
+/** A path that names one file as written: no expansion, pattern or descriptor. */
+export function isLiteralFilePath(path: string): boolean {
+	return (
+		path !== "" &&
+		path !== "-" &&
+		!/[$`*?[\]{}\s]/u.test(path) &&
+		!path.startsWith("-") &&
+		!path.startsWith("/dev/")
+	);
+}
+
+function printerOperands(args: readonly string[]): string[] {
+	const operands: string[] = [];
+	let optionsEnded = false;
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index] ?? "";
+		if (!optionsEnded && arg === "--") {
+			optionsEnded = true;
+			continue;
+		}
+		if (!optionsEnded && PRINTER_VALUE_FLAGS.has(arg)) {
+			index++;
+			continue;
+		}
+		// `tail +5` starts at a line; it is not a file.
+		if (!optionsEnded && /^[-+]/u.test(arg) && arg !== "-") continue;
+		operands.push(arg);
+	}
+	return operands;
+}
+
+/** The input files of a `sed` that prints rather than edits in place. */
+function readSedOperands(args: readonly string[]): string[] {
+	if (readSedTargets(args).length > 0) return [];
+	if (
+		args.some(
+			(arg) =>
+				arg === "-i" ||
+				/^-[A-Za-z]*i/u.test(arg) ||
+				arg.startsWith("--in-place"),
+		)
+	)
+		return [];
+	let hasExplicitScript = false;
+	const operands: string[] = [];
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index] ?? "";
+		if (arg === "--") {
+			operands.push(...args.slice(index + 1));
+			break;
+		}
+		if (
+			arg === "-e" ||
+			arg === "--expression" ||
+			arg === "-f" ||
+			arg === "--file"
+		) {
+			hasExplicitScript = true;
+			index++;
+			continue;
+		}
+		if (arg.startsWith("-") && arg !== "-") continue;
+		operands.push(arg);
+	}
+	return hasExplicitScript ? operands : operands.slice(1);
+}
+
+/** One command of a shell script with what the commands before it established. */
+interface WalkedCommand {
+	/** True when the command may not have run (see {@link readConditionalFlags}). */
+	readonly conditional: boolean;
+	/** Its words without a leading function header, `{` or branch keyword. */
+	readonly rawWords: readonly string[];
+	readonly simple: SimpleCommand;
+	/** The absolute directory an earlier `cd` moved to, else undefined. */
+	readonly workingDirectory: string | undefined;
+	/**
+	 * The directory the earlier `cd` commands moved to as written (`~/repo`
+	 * kept as is, `./sub` relative to the call's own directory): undefined
+	 * before any `cd`, null once one is not literal.
+	 */
+	readonly symbolicDirectory: string | null | undefined;
+}
+
+/**
+ * The commands of a shell script in order, `cd` commands consumed: only an
+ * absolute `cd` makes later relative paths resolvable; anything else leaves
+ * them exactly as written.
+ */
+function* walkShellCommands(command: string): Generator<WalkedCommand> {
+	let workingDirectory: string | undefined;
+	let symbolicDirectory: string | null | undefined;
+	const commands = parseShellCommand(command);
+	const conditionalFlags = readConditionalFlags(commands);
+	for (const [commandIndex, simple] of commands.entries()) {
+		let conditional =
+			simple.nested || (conditionalFlags[commandIndex] ?? false);
+		let rawWords = simple.words;
+		if (
+			rawWords[0] === "function" ||
+			(/^[A-Za-z_][A-Za-z0-9_]*$/u.test(rawWords[0] ?? "") &&
+				rawWords[1] === "()")
+		) {
+			conditional = true;
+			const bodyStart = rawWords.indexOf("{");
+			rawWords = bodyStart < 0 ? [] : rawWords.slice(bodyStart + 1);
+		}
+		if (rawWords[0] === "{") {
+			conditional = true;
+			rawWords = rawWords.slice(1);
+		}
+		if (CONTROL_KEYWORDS.has(rawWords[0] ?? "")) {
+			// `then rm x`: the branch may never have run.
+			conditional = true;
+			rawWords = rawWords.slice(1);
+		}
+		if (basename(rawWords[0] ?? "") === "cd") {
+			const target = positionals(rawWords.slice(1))[0];
+			workingDirectory = resolveWorkingDirectory(workingDirectory, target);
+			symbolicDirectory =
+				target === undefined ||
+				target === "-" ||
+				/[$`]/u.test(target) ||
+				symbolicDirectory === null ||
+				conditional
+					? null
+					: target.startsWith("/") || target.startsWith("~")
+						? target
+						: `${symbolicDirectory ?? "."}/${target}`;
+			continue;
+		}
+		yield {
+			conditional,
+			rawWords,
+			simple,
+			symbolicDirectory,
+			workingDirectory,
+		};
+	}
 }
 
 /** Words that open a compound construct, closed by the matching closer. */
@@ -687,6 +966,11 @@ export function classifyScriptName(name: string): CommandClass {
 	return "other";
 }
 
+/** The program a simple command runs, after assignments and wrappers (`env`, `timeout`, `sudo`). */
+export function commandProgram(words: readonly string[]): string {
+	return basename(stripPrefixes(words)[0] ?? "");
+}
+
 function stripPrefixes(words: readonly string[]): readonly string[] {
 	let index = 0;
 	while (index < words.length) {
@@ -889,6 +1173,13 @@ function resolveAgainst(
 	return normalizePath(`${workingDirectory}/${path}`);
 }
 
+/** `normalizePath` that keeps a leading `~` as written. */
+function symbolicPath(path: string): string {
+	return path.startsWith("~")
+		? `~${normalizePath(path.slice(1))}`
+		: normalizePath(path);
+}
+
 function normalizePath(path: string): string {
 	const parts: string[] = [];
 	for (const part of path.split("/")) {
@@ -944,7 +1235,14 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 	let constructDepth = 0;
 	let parenDepth = 0;
 	let pendingFunctionBody = false;
-	const pendingHeredocs: { delimiter: string; stripTabs: boolean }[] = [];
+	let index = 0;
+	/** Where the command under construction starts in the source. */
+	let commandStart: number | undefined;
+	let heredocs: MutableHeredoc[] = [];
+	const pendingHeredocs: MutableHeredoc[] = [];
+	const mark = () => {
+		commandStart ??= index;
+	};
 
 	const endWord = () => {
 		if (!hasCurrent) return;
@@ -992,16 +1290,24 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 			if (CONSTRUCT_CLOSERS.has(keyword)) {
 				constructDepth = Math.max(0, constructDepth - 1);
 			}
-			commands.push({ connector: nextConnector, nested, redirects, words });
+			commands.push({
+				connector: nextConnector,
+				heredocs,
+				nested,
+				redirects,
+				text: command.slice(commandStart ?? index, index).trim(),
+				words,
+			});
 			nextConnector = null;
 		}
 		words = [];
 		redirects = [];
+		heredocs = [];
+		commandStart = undefined;
 		if (next !== "separator") nextConnector = next;
 		else if (ended) nextConnector = ";";
 	};
 
-	let index = 0;
 	while (index < command.length) {
 		const character = command[index] ?? "";
 		if (quote === "'") {
@@ -1025,6 +1331,7 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 		if (character === "\\" && index + 1 < command.length) {
 			const next = command[index + 1] ?? "";
 			if (next !== "\n") {
+				mark();
 				current += next;
 				hasCurrent = true;
 			}
@@ -1032,6 +1339,7 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 			continue;
 		}
 		if (character === "'" || character === '"') {
+			mark();
 			quote = character;
 			hasCurrent = true;
 			index++;
@@ -1045,7 +1353,9 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 			endCommand("separator");
 			index++;
 			for (const heredoc of pendingHeredocs.splice(0)) {
-				index = skipHeredocBody(command, index, heredoc);
+				const end = skipHeredocBody(command, index, heredoc);
+				heredoc.body = heredocBody(command, index, end, heredoc);
+				index = end;
 			}
 			continue;
 		}
@@ -1078,6 +1388,7 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 		if (character === "|" || character === "&") {
 			const next = command[index + 1];
 			if (character === "&" && next === ">") {
+				mark();
 				endWord();
 				const append = command[index + 2] === ">";
 				pendingRedirect = append ? "&>>" : "&>";
@@ -1106,6 +1417,7 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 			continue;
 		}
 		if (character === "<" || character === ">") {
+			mark();
 			const digits = /^[0-9]+$/u.test(current) && hasCurrent ? current : "";
 			if (digits !== "") {
 				current = "";
@@ -1122,7 +1434,14 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 				const start = index + (stripTabs ? 3 : 2);
 				const parsed = readHeredocDelimiter(command, start);
 				if (parsed) {
-					pendingHeredocs.push({ delimiter: parsed.delimiter, stripTabs });
+					const heredoc: MutableHeredoc = {
+						body: "",
+						delimiter: parsed.delimiter,
+						quoted: parsed.quoted,
+						stripTabs,
+					};
+					heredocs.push(heredoc);
+					pendingHeredocs.push(heredoc);
 					index = parsed.end;
 					continue;
 				}
@@ -1146,6 +1465,7 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 			pendingRedirect = `${digits}${operator}`;
 			continue;
 		}
+		mark();
 		current += character;
 		hasCurrent = true;
 		index++;
@@ -1154,10 +1474,37 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 	return commands;
 }
 
+interface MutableHeredoc {
+	body: string;
+	readonly delimiter: string;
+	readonly quoted: boolean;
+	readonly stripTabs: boolean;
+}
+
+/** The lines of a here-document body before its delimiter line. */
+function heredocBody(
+	command: string,
+	start: number,
+	end: number,
+	heredoc: { delimiter: string; stripTabs: boolean },
+): string {
+	const lines = command.slice(start, end).split("\n");
+	// The delimiter line ends the body; an unterminated body runs to the end.
+	const closing = lines.findIndex(
+		(line) =>
+			(heredoc.stripTabs ? line.replace(/^\t+/u, "") : line).trimEnd() ===
+			heredoc.delimiter,
+	);
+	const body = closing === -1 ? lines : lines.slice(0, closing);
+	return (
+		heredoc.stripTabs ? body.map((line) => line.replace(/^\t+/u, "")) : body
+	).join("\n");
+}
+
 function readHeredocDelimiter(
 	command: string,
 	start: number,
-): { delimiter: string; end: number } | undefined {
+): { delimiter: string; end: number; quoted: boolean } | undefined {
 	let index = start;
 	while (command[index] === " " || command[index] === "\t") index++;
 	const first = command[index];
@@ -1167,7 +1514,9 @@ function readHeredocDelimiter(
 		const close = command.indexOf(first, index + 1);
 		if (close === -1) return undefined;
 		delimiter = command.slice(index + 1, close);
-		return delimiter === "" ? undefined : { delimiter, end: close + 1 };
+		return delimiter === ""
+			? undefined
+			: { delimiter, end: close + 1, quoted: true };
 	}
 	while (
 		index < command.length &&
@@ -1176,7 +1525,9 @@ function readHeredocDelimiter(
 		delimiter += command[index];
 		index++;
 	}
-	return delimiter === "" ? undefined : { delimiter, end: index };
+	return delimiter === ""
+		? undefined
+		: { delimiter, end: index, quoted: false };
 }
 
 function skipHeredocBody(

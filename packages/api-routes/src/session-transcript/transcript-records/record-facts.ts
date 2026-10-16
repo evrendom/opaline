@@ -42,7 +42,7 @@ const GIT_OPERATION_FIELDS: Readonly<
 	push: [["branch", "git.push.branch"]],
 };
 
-type ExtraFacts = Partial<Record<TranscriptRecordFactKey, string>>;
+export type ExtraFacts = Partial<Record<TranscriptRecordFactKey, string>>;
 
 /**
  * Free text safe to store as a fact value: URL credentials removed, then
@@ -759,7 +759,7 @@ export function clippedText(
  * A JSON list of text entries cut to whole entries at the list cap, with the
  * number cut under `moreKey`; an entry cut at its own cap marks `key` clipped.
  */
-function setList(
+export function setList(
 	extra: ExtraFacts,
 	key: TranscriptRecordFactKey,
 	moreKey: TranscriptRecordFactKey,

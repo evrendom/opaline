@@ -1,6 +1,7 @@
-import type { ShellFileMutation } from "./command-class.js";
+import type { ScriptFileEdit, ShellFileMutation } from "./command-class.js";
 import type { UserTextClassification } from "./injected-wrappers.js";
 import type { ReceivedSetupSource } from "./received-setup.js";
+import type { ShellExitShape } from "./shell-exit.js";
 import type {
 	CommandClass,
 	FileOperation,
@@ -40,6 +41,14 @@ export interface LineResult {
 
 export interface KnownCall {
 	readonly commandClass: CommandClass;
+	/**
+	 * The files the call asks to edit, as stream-wide keys (absolute, or
+	 * relative to the directory the command moved to as written), so a later
+	 * call that edits one again can name the failed attempt it retries.
+	 */
+	readonly editKeys?: readonly string[];
+	/** The exit structure of a shell command, read when its result arrives. */
+	readonly exitShape?: ShellExitShape;
 	/** MCP identity recorded with the call, repeated on its result. */
 	readonly facts?: LineFacts;
 	readonly toolName: string;
@@ -63,6 +72,11 @@ export interface StreamState {
 	readonly calls: Map<string, KnownCall>;
 	/** Claude background task id to the call whose hand-off announced it. */
 	readonly claudeBackgroundTasks: Map<string, string>;
+	/**
+	 * Claude edit key (see `KnownCall.editKeys`) to the latest call whose edit
+	 * of it failed, until a call edits it successfully.
+	 */
+	readonly claudeFailedEdits: Map<string, string>;
 	codexAgentPath: string;
 	codexSessionId: string | undefined;
 	codexForkPoint:
@@ -103,6 +117,7 @@ export function createStreamState(
 		agentVersion: "",
 		calls: new Map(),
 		claudeBackgroundTasks: new Map(),
+		claudeFailedEdits: new Map(),
 		claudeQueuedPrompts: [],
 		codexAgentPath: "",
 		codexSessionId: undefined,
@@ -167,6 +182,29 @@ export function shellFileChangeItem(
 		filePath: mutation.path,
 		kind: "file_change",
 		subtype: direct ? "shell" : `shell_${mutation.basis}`,
+		toolName,
+	};
+}
+
+/**
+ * File-change item for a file an inline script writes (parser 12): subtype
+ * `shell_script`, or `shell_script_conditional` with an `inferred_*`
+ * operation when the script may not have run. Like every Claude file change
+ * it is a request: the run index counts it as an edit only when a result
+ * confirms the change, and as a failed edit when its call failed.
+ */
+export function scriptFileChangeItem(
+	edit: ScriptFileEdit,
+	callId: string,
+	toolName: string,
+): LineItem {
+	const direct = edit.basis === "direct";
+	return {
+		callId,
+		fileOp: direct ? edit.operation : `inferred_${edit.operation}`,
+		filePath: edit.path,
+		kind: "file_change",
+		subtype: direct ? "shell_script" : "shell_script_conditional",
 		toolName,
 	};
 }

@@ -16,8 +16,14 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * 11: background tasks (hand-offs and their task notifications, linked to
  * the call by `call_id`), hook blocks as a denial kind, and harness texts
  * the agent saw as injected context of their own subtype.
+ * 12: files a shell command reads (`shell_read_paths`, the call's
+ * `file_path`) and inline Python scripts edit (`shell_script` file changes),
+ * the failed edit a call retries (`retry_of`), the part of a compound
+ * command that decided its exit code (`exit_decided_by`, `exit_masked`,
+ * `no_output`), interruptions Claude recorded as `interrupted`, and no
+ * whole tool output (Write/Edit `originalFile`) kept as a denial reason.
  */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 11;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 12;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -72,6 +78,29 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	task_event: 11,
 	/** The hook event of a hook error in a tool result (PreToolUse blocks the call; PostToolUse ran after it). */
 	hook_event: 11,
+	/**
+	 * Files a shell call reads, as a JSON list of paths in order: operands of
+	 * cat, head, tail, less, more, bat, nl and a printing sed, and files an
+	 * inline Python script opens for reading. The first also fills the call's
+	 * `file_path` when it edits nothing.
+	 */
+	shell_read_paths: 12,
+	shell_read_paths_more: 12,
+	/**
+	 * On an edit call: the `call_id` of the earlier call of the stream whose
+	 * edit of the same file failed, with no successful edit of it in between.
+	 */
+	retry_of: 12,
+	/**
+	 * On a finished shell result: the source text of the part whose status is
+	 * the exit code by shell semantics (a list's last part, a pipeline's last
+	 * stage); absent when that is not known.
+	 */
+	exit_decided_by: 12,
+	/** Why other parts' statuses never reached the exit code: `list`, `pipe`, or `list,pipe`. */
+	exit_masked: 12,
+	/** "true" when a finished shell result printed nothing (Claude Code's own lines removed), else "false". */
+	no_output: 12,
 	/**
 	 * Setup text the record carries, as a JSON array of
 	 * `{kind, path, name, cwd, sha256, chars}` (`received-setup.ts`); the texts

@@ -157,6 +157,30 @@ describe("parser 9 run interpretation", () => {
 		expect(failedEdits).toContain("NOT c.stopped");
 		expect(failedEdits).not.toContain("inferred_");
 	});
+	test("a failed or refused inline-script edit is a failed or refused edit, never an edit", () => {
+		const sql = runFactsCtes({ literal: true });
+		const failedEdits = sql.slice(
+			sql.indexOf("uniqExactIf(w.call_id,"),
+			sql.indexOf("AS failed_edits"),
+		);
+		// Parser 12 names the files an inline Python script writes.
+		expect(failedEdits).toContain(
+			"subtype = 'shell_script' AND file_op IN ('write', 'edit')",
+		);
+		const refusedStart = sql.indexOf("AS failed_edits");
+		const refusedEdits = sql.slice(
+			refusedStart,
+			sql.indexOf("AS refused_edits", refusedStart),
+		);
+		expect(refusedEdits).toContain("subtype = 'shell_script'");
+		// Its success proves no change: edits stay applied changes and native rows.
+		const start = sql.indexOf("groupArrayIf(file_path,");
+		expect(sql.slice(start, sql.indexOf("AS edits", start))).not.toContain(
+			"shell_script",
+		);
+		// The conditional form keeps an inferred_ operation, which never counts.
+		expect(failedEdits).not.toContain("shell_script_conditional");
+	});
 	test("edits also count the requested paths of native edit calls that succeeded", () => {
 		const sql = runFactsCtes({ literal: true });
 		const start = sql.indexOf("groupArrayIf(file_path,");

@@ -1030,7 +1030,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						"Pre-v9 historical: " +
 						"Parser review: No parser value is stored for this pending proposal. Path user.toolUseResult (string form) matches every errored tool result, not only refusals; it needs a filter on toolDenialKind or the hook-error convention." +
 						" Current: " +
-						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.",
+						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component." +
+						" Parser 12: only the string form of toolUseResult on a result with a toolDenialKind, plus the hook-error convention. Parsers 9 to 11 also copied the object form, the tool's whole output, on every result (production week of 2026-10-09 in one workspace: 8,372 of 25,013 Bash results, 201 of 628 Write and 64 of 196 Edit results, the last two with their originalFile and content, up to 37,249 characters).",
 				},
 			),
 			codex: stored(
@@ -1750,7 +1751,11 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		runIndex: ["interrupted_calls"],
 		agents: {
 			claude_code: stored(
-				["user.toolUseResult.interrupted"],
+				[
+					"user.toolUseResult.interrupted",
+					"user.toolDenialKind",
+					"user.message.content[tool_result].content~Request interrupted by user",
+				],
 				{
 					since: 6,
 					facts: ["interrupted"],
@@ -1760,7 +1765,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "broader",
 					},
 					notes:
-						"Parser review: claudeToolResultFacts copies toolUseResult.interrupted only; user causation is not inferred. toolDenialKind and user-interrupt markers are separate witnesses.",
+						"Parser review: claudeToolResultFacts copies toolUseResult.interrupted; from parser 12 a result is also interrupted when Claude Code wrote toolDenialKind interrupted (also its 'Tool call interrupted: the session ended …' result) or the interrupt text as the result itself ('[Request interrupted by user for tool use]', toolUseResult 'Error: [Request interrupted by user …'). A user rejection (toolDenialKind user-rejected, toolUseResult 'User rejected tool use') stays a refusal even when Claude Code writes the '[Request interrupted by user for tool use]' marker after it: in one workspace's Claude Code results of 2026-09-01 to 2026-10-16, every interrupt marker right after a tool result followed a user-rejected result (6 of 6), no result was the interrupt text and toolUseResult.interrupted was never true, so runs.interrupted_calls stays 0 for those runs. toolDenialKind cancelled (the user's 'doesn't want to take this action right now', a safety-classifier stop) is left as recorded.",
 					justification:
 						"toolUseResult.interrupted is documented as 'Whether the command was interrupted' (any cause) in sdk-tools.d.ts:3267-3271, not 'the user stopped the call'. Locally it is false on 14,297 of 14,297 Bash results (never true), so the user-stop meaning is unobserved; real user stops appear as is_error results with a toolDenialKind or the '[Request interrupted by user ...]' text instead.",
 					evidence: [
@@ -3393,6 +3398,152 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 			codex: pending(
 				[],
 				"Review how Codex records a hook that blocks a call (hooks.json) and map it to denial_kind hook.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
+		id: "shell_read_paths",
+		view: "calls",
+		meaning:
+			"The files a shell call reads, read from its command: printed files and files an inline Python script opens for reading; the first fills the call's file_path when it edits nothing.",
+		agents: {
+			claude_code: stored(
+				["assistant.message.content[tool_use:Bash].input.command"],
+				{
+					since: 12,
+					facts: ["shell_read_paths", "shell_read_paths_more"],
+				},
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+					justification:
+						"Opaline computation, not an agent-written value: Claude Code records no parse of shell commands (Codex records parsed_cmd). The operands of cat, head, tail, less, more, bat, nl and a sed that does not edit in place, and the literal paths an inline Python script (python3 - <<'EOF', python3 -c) opens for reading, in order; paths as written, resolved only against an absolute cd. Expansions, globs and standard input are never paths. Example shape: cd <repo> && cat a.tsx; echo ===; cat b.tsx; sed -n 1,40p c.ts left file_path empty before parser 12.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/shell-access.test.ts",
+							test: "a compound read fills the call's file_path and lists every file it reads",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Codex records its own parse (parsed_cmd_read_paths); review whether exec_command calls without parsed_cmd should get the same command-derived list.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
+		id: "retry_of",
+		view: "calls",
+		meaning:
+			"On an edit call, the earlier call of the stream whose edit of the same file failed, with no successful edit of it in between.",
+		agents: {
+			claude_code: stored(
+				[
+					"assistant.message.content[tool_use:*].input.file_path",
+					"assistant.message.content[tool_use:Bash].input.command",
+					"user.message.content[tool_result].is_error",
+				],
+				{ since: 12, facts: ["retry_of"] },
+				{
+					relation: {
+						kind: "derived",
+						from: ["calls/file_path", "calls/is_error", "calls/call_id"],
+					},
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+					justification:
+						"Opaline computation from literal values: the files a native edit names or an inline script writes, and the error flag of each result. A failed result (an error no refusal, hook or interruption caused) makes its call the attempt a later edit of the same file retries; a successful one ends the chain. Script paths join the directory the command's cd named as written, so a native Edit's absolute path and a script's ~/ path do not match. Example shape: three python3 heredoc edits of one file, the first two failing on an assert.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/shell-access.test.ts",
+							test: "a retried failed edit names the call it retries",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review whether Codex apply_patch and shell edits should name the failed attempt they retry the same way.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
+		id: "exit_decided_by",
+		also: ["exit_masked"],
+		view: "calls",
+		meaning:
+			"Which part of a compound shell command decided its exit code by shell semantics, and why the other parts' statuses were lost (a list, a trailing filter).",
+		agents: {
+			claude_code: stored(
+				[
+					"assistant.message.content[tool_use:Bash].input.command",
+					"user.message.content[tool_result].is_error",
+					"user.toolUseResult.returnCodeInterpretation",
+				],
+				{ since: 12, facts: ["exit_decided_by", "exit_masked"] },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+					justification:
+						"Opaline computation from the command text and the result's error flag: a ;/newline list exits with its last part (exit_masked list); an && / || chain with the last pipeline that ran, known when the last joiner is && and the call succeeded or || and it failed, else only when the output names the one part zsh found no match for or could not find (&& chains only); a pipeline without set -o pipefail with its last stage, and when that stage is a filter (grep, tail, head, wc …) the feeding commands' statuses are lost (exit_masked pipe). Compound constructs and set -e failures stay unknown. Claude Code's returnCodeInterpretation (grep's No matches found) marks a non-zero exit it did not count as an error. Example shapes: cd … && cat a; …; ls x.* 2>/dev/null exiting 1 on zsh's no matches found; a CI watch piped through grep | tail.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/shell-access.test.ts",
+							test: "a list's last part decides its exit code; a trailing filter masks the pipeline",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review exec_command exit codes of compound commands (Codex runs them through bash -lc) and apply the same rules.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
+		id: "no_output",
+		view: "calls",
+		meaning:
+			"Whether a finished shell call printed nothing, once the agent's own lines (exit code, cwd reset) are removed.",
+		agents: {
+			claude_code: stored(
+				["user.message.content[tool_result].content"],
+				{ since: 12, facts: ["no_output"] },
+				{
+					relation: { kind: "close" },
+					justification:
+						"The result text with Claude Code's own leading 'Exit code N' line, trailing 'Shell cwd was reset to …' footer and '(Bash completed with no output)' placeholder removed is empty. Set on finished Bash results only (not on background hand-offs, refusals, hook blocks or interruptions).",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/shell-access.test.ts",
+							test: "a list's last part decides its exit code; a trailing filter masks the pipeline",
+						},
+					],
+				},
+			),
+			codex: pending(
+				[],
+				"Review Codex exec outputs (Original token count: 0) and map them to no_output.",
 				{ relation: { kind: "unreviewed" } },
 			),
 		},
@@ -7344,7 +7495,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "edits",
 		view: "runs",
 		meaning:
-			"Number of files the run changed: the applied changes the agent recorded, plus the files of native edit calls (Claude Edit, Write, MultiEdit, NotebookEdit; Codex apply_patch) whose call succeeded. A request and a literal successful result are evidence; paths inferred from shell command text never count.",
+			"Number of files the run changed: the applied changes the agent recorded, plus the files of native edit calls (Claude Edit, Write, MultiEdit, NotebookEdit; Codex apply_patch) whose call succeeded. A request and a literal successful result are evidence; paths inferred from shell command text never count. Failed and refused edit calls are counted apart, including (parser 12) inline Python scripts that name the file they write.",
 		runIndex: ["failed_edits", "refused_edits"],
 		agents: {
 			claude_code: stored(

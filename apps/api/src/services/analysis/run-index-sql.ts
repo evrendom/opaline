@@ -252,6 +252,11 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 	// A native edit tool's own request row, never a path inferred from shell text.
 	const nativeEditSql = `kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != ''
 		AND subtype IN ('native', 'patch', 'nested') AND ${nativeEditToolSql("tool_name")}`;
+	// A file an inline script names as the one it writes (parser 12): an edit
+	// request like a native one, so its call failing or being refused is a
+	// failed or refused edit. Its success proves no change, so it is not an edit.
+	const scriptEditSql = `kind = 'file_change' AND subtype = 'shell_script' AND file_op IN ('write', 'edit') AND file_path != ''`;
+	const editRequestSql = `((${nativeEditSql}) OR (${scriptEditSql}))`;
 	return `${forkReplayCtes()},
 		calls AS (
 			SELECT session_id, agent_id, call_id,
@@ -290,8 +295,8 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 						groupArrayIf(file_path, ${nativeEditSql}
 							AND w.call_id != '' AND c.has_result AND NOT c.failed AND NOT c.refused AND NOT c.stopped)))),
 					uniqExactIf(file_path, kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != '' AND (w.call_id = '' OR NOT c.failed))) AS edits,
-				uniqExactIf(w.call_id, ${nativeEditSql} AND w.call_id != '' AND NOT c.stopped AND c.failed AND NOT c.refused) AS failed_edits,
-				uniqExactIf(w.call_id, ${nativeEditSql} AND w.call_id != '' AND c.refused) AS refused_edits,
+				uniqExactIf(w.call_id, ${editRequestSql} AND w.call_id != '' AND NOT c.stopped AND c.failed AND NOT c.refused) AS failed_edits,
+				uniqExactIf(w.call_id, ${editRequestSql} AND w.call_id != '' AND c.refused) AS refused_edits,
 				countIf(kind = 'tool_call') AS tool_calls,
 				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${runToolErrorSql()}) AS failed_calls,
 				countIf(kind = 'tool_call' AND ${toolActivitySql("read", callGroup)}) AS read_calls,

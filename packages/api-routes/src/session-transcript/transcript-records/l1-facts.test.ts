@@ -172,6 +172,74 @@ const CASES: readonly FactCase[] = [
 		},
 	},
 	{
+		name: "a compound read names its first file and lists every file it reads",
+		fixture: "claude",
+		row: { callId: "toolu_reads", kind: "tool_call" },
+		facts: {
+			extra: {
+				shell_read_paths: JSON.stringify([
+					"/repo/src/view.tsx",
+					"/repo/src/chips.tsx",
+					"/repo/tools/run-tests.ts",
+				]),
+			},
+		},
+		columns: { filePath: "/repo/src/view.tsx", fileOp: "read" },
+	},
+	{
+		name: "a list exits with its last part, whose glob zsh found no match for",
+		fixture: "claude",
+		row: { callId: "toolu_reads", kind: "tool_result" },
+		facts: {
+			extra: {
+				exit_decided_by: "ls web/vitest.config.* 2>/dev/null",
+				exit_masked: "list",
+				no_output: "false",
+			},
+		},
+	},
+	{
+		name: "a CI watch piped through grep and tail printed nothing and exits with tail",
+		fixture: "claude",
+		row: { callId: "toolu_ciwatch", kind: "tool_result" },
+		facts: {
+			extra: {
+				exit_decided_by: "tail -2",
+				exit_masked: "list,pipe",
+				no_output: "true",
+			},
+		},
+	},
+	{
+		name: "a Python heredoc edit is a shell_script edit of the path it names",
+		fixture: "claude",
+		row: {
+			callId: "toolu_pyedit1",
+			kind: "file_change",
+			subtype: "shell_script",
+		},
+		columns: { filePath: "/repo/web/src/view.tsx", fileOp: "edit" },
+	},
+	{
+		name: "a python -c edit retrying a failed edit of the same file names it",
+		fixture: "claude",
+		row: { callId: "toolu_pyedit2", kind: "tool_call" },
+		facts: { extra: { retry_of: "toolu_pyedit1" } },
+		columns: { filePath: "/repo/web/src/view.tsx" },
+	},
+	{
+		name: "a call the user interrupted is interrupted, not refused",
+		fixture: "claude",
+		row: { callId: "toolu_serve", kind: "tool_result" },
+		facts: { interrupted: true, denialKind: "" },
+	},
+	{
+		name: "a rejected question stays a refusal, not an interruption",
+		fixture: "claude",
+		row: { callId: "toolu_reject", kind: "tool_result" },
+		facts: { denialKind: "user-rejected", interrupted: null },
+	},
+	{
 		name: "Claude version and entrypoint on every record",
 		fixture: "claude",
 		row: { kind: "user_prompt" },
@@ -958,6 +1026,7 @@ describe("parser facts", () => {
 		const sed = findRow(rows, { callId: "toolu_sed", kind: "tool_result" });
 		expect(sed.facts.extra).toEqual({
 			facts_truncated: "true",
+			no_output: "true",
 			no_output_expected: "false",
 			return_code_interpretation: "No matches found",
 			shell_edit_files_more: "2",
@@ -1224,9 +1293,11 @@ describe("parser facts", () => {
 /** Facts checked by the named tests above rather than a case, per agent. */
 const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	// The fact budget tests; received setup in received-setup.test.ts.
+	// The cap of shell_read_paths in shell-access.test.ts.
 	claude_code: new Set([
 		"facts_truncated",
 		"received_setup",
+		"shell_read_paths_more",
 		...V9_REGRESSION_COVERAGE.claude_code,
 	]),
 	// The fact budget and goal text tests; received setup in received-setup.test.ts.

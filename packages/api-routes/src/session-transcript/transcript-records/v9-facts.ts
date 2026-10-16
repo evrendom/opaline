@@ -193,11 +193,13 @@ export function withV9Facts(
 				(lineResult && resultCall.length > 1)
 			)
 				continue;
+			// The refusal reason is toolUseResult in its string form on a denied
+			// result; the object form is the tool's whole output (parser 12:
+			// it held Write and Edit `originalFile` and `content`).
 			if (
 				fact.key === "denial_reason_components" &&
-				typeof value === "string" &&
 				!source.includes("~") &&
-				typeof record.toolDenialKind !== "string"
+				(typeof value !== "string" || typeof record.toolDenialKind !== "string")
 			)
 				continue;
 			if (

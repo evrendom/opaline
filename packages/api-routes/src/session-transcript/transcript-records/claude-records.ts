@@ -5,7 +5,12 @@ import {
 	readClaudeBackgroundHandOff,
 	readTaskNotification,
 } from "./background-tasks.js";
-import { classifyCommand, extractShellFileMutations } from "./command-class.js";
+import {
+	classifyCommand,
+	extractScriptFileAccess,
+	extractShellFileMutations,
+	extractShellFileReads,
+} from "./command-class.js";
 import {
 	type ClaudeHookError,
 	readClaudeExitCode,
@@ -26,6 +31,7 @@ import {
 	readString,
 	type StreamState,
 	safeStringify,
+	scriptFileChangeItem,
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
@@ -45,11 +51,19 @@ import {
 	claudeSystemFacts,
 	claudeTitleFacts,
 	claudeToolResultFacts,
+	type ExtraFacts,
 	factRowText,
 	factText,
 	mcpFacts,
 	mergeFacts,
+	setList,
 } from "./record-facts.js";
+import {
+	isEmptyClaudeShellOutput,
+	readShellExitFacts,
+	readShellExitShape,
+	type ShellExitShape,
+} from "./shell-exit.js";
 import type { CommandClass } from "./types.js";
 import { withV9Facts } from "./v9-facts.js";
 
@@ -60,6 +74,8 @@ const HARNESS_ATTACHMENT_SUBTYPES = {
 	read_truncation_notice: "read_truncation_notice",
 } as const;
 const AGENT_ID_IN_TEXT_PATTERN = /\bagentId:\s*([A-Za-z0-9_-]+)/u;
+/** Claude Code's text for a call the user interrupted (`INTERRUPT_MESSAGE_FOR_TOOL_USE`). */
+const INTERRUPTED_PATTERN = /^\s*(?:Error: )?\[Request interrupted by user/u;
 
 /** Turn one parsed Claude Code JSONL record into record items. */
 export function readClaudeLine(
@@ -214,7 +230,9 @@ function readAssistantBlocks(
 				break;
 			case "web_search_tool_result":
 			case "mcp_tool_result":
-				items.push(readToolResult(block, state, undefined, undefined));
+				items.push(
+					readToolResult(block, state, undefined, undefined, undefined),
+				);
 				break;
 			default:
 				break;
@@ -294,19 +312,44 @@ function readToolUse(
 	const lowered = toolName.toLowerCase();
 	let commandClass: CommandClass = "";
 	const items: LineItem[] = [];
+	let editKeys: readonly string[] = [];
+	let exitShape: ShellExitShape | undefined;
+	let shellFacts: LineFacts | undefined;
 
 	if (lowered === "bash") {
 		const command = readString(input.command) ?? "";
 		commandClass = classifyCommand(command);
+		const scriptEdits = extractScriptFileAccess(command, state.cwd);
+		const written = new Set(scriptEdits.map((edit) => edit.path));
+		const reads = extractShellFileReads(command).filter(
+			(path) => !written.has(path),
+		);
+		// The call names the file it edits, else the first it reads.
+		const filePath = scriptEdits[0]?.path ?? reads[0] ?? "";
 		items.push({
 			callId,
 			commandClass,
+			...(scriptEdits.length === 0 && filePath !== ""
+				? { fileOp: "read" as const }
+				: {}),
+			filePath,
 			kind: "tool_call",
 			text: command,
 			toolName,
 		});
 		for (const mutation of extractShellFileMutations(command)) {
 			items.push(shellFileChangeItem(mutation, callId, toolName));
+		}
+		for (const edit of scriptEdits)
+			items.push(scriptFileChangeItem(edit, callId, toolName));
+		editKeys = scriptEdits.flatMap((edit) =>
+			edit.basis === "direct" && edit.key !== undefined ? [edit.key] : [],
+		);
+		exitShape = readShellExitShape(command);
+		if (reads.length > 0) {
+			const extra: ExtraFacts = {};
+			setList(extra, "shell_read_paths", "shell_read_paths_more", reads);
+			shellFacts = { extra };
 		}
 	} else {
 		const mutationFiles = getClaudeMutationFiles({
@@ -316,6 +359,7 @@ function readToolUse(
 		});
 		if (mutationFiles.length > 0) {
 			const path = mutationFiles[0] ?? "";
+			editKeys = mutationFiles;
 			// The input (old/new strings or file content) lives on the file change.
 			items.push({
 				callId,
@@ -353,12 +397,17 @@ function readToolUse(
 	// The Skill tool call is the invocation itself; attributionSkill marks
 	// only the lines after it.
 	const skill = lowered === "skill" ? readString(input.skill) : undefined;
+	const retried = editKeys
+		.map((key) => state.claudeFailedEdits.get(key))
+		.find((failed) => failed !== undefined && failed !== callId);
 	const ownFacts = mergeFacts(
 		callFacts,
 		mcpCallIdentity(toolName),
 		skill === undefined
 			? undefined
 			: { extra: { skill: factText(skill, 128) } },
+		shellFacts,
+		retried === undefined ? undefined : { extra: { retry_of: retried } },
 	);
 	if (Object.keys(ownFacts).length > 0 && items[0] !== undefined) {
 		items[0] = { ...items[0], facts: ownFacts };
@@ -366,11 +415,65 @@ function readToolUse(
 	if (callId !== "") {
 		state.calls.set(callId, {
 			commandClass,
+			...(editKeys.length === 0 ? {} : { editKeys }),
+			...(exitShape === undefined ? {} : { exitShape }),
 			facts: mcpCallIdentity(toolName),
 			toolName,
 		});
 	}
 	return items;
+}
+
+/**
+ * After an edit call's result: a failure (an error the user, a rule or a
+ * hook did not cause) becomes the attempt a later edit of its files retries;
+ * a success ends the chain.
+ */
+function trackFailedEdits(
+	state: StreamState,
+	callId: string,
+	editKeys: readonly string[] | undefined,
+	outcome: "failed" | "succeeded" | "other",
+): void {
+	if (editKeys === undefined || callId === "" || outcome === "other") return;
+	for (const key of editKeys) {
+		if (outcome === "failed") state.claudeFailedEdits.set(key, callId);
+		else state.claudeFailedEdits.delete(key);
+	}
+}
+
+/**
+ * What decided a finished shell call's exit code and whether it printed
+ * anything (parser 12). Claude Code writes `Exit code N` on a failure, and
+ * reads some non-zero codes as no error (`returnCodeInterpretation`, grep's
+ * `No matches found`) in a `toolUseResult` that sub-agent transcripts never
+ * carry: a result that is not an error exited 0 only when its
+ * `toolUseResult` is there and names no interpretation.
+ */
+function shellExitFacts(
+	shape: ShellExitShape | undefined,
+	isError: boolean,
+	exitCode: number | null,
+	toolUseResult: Record<string, unknown> | undefined,
+	text: string,
+): LineFacts {
+	if (isError && exitCode === null) return {};
+	const succeeded = isError
+		? exitCode === 0
+		: toolUseResult === undefined
+			? undefined
+			: typeof toolUseResult.returnCodeInterpretation !== "string";
+	const exit =
+		shape === undefined ? {} : readShellExitFacts(shape, succeeded, text);
+	return {
+		extra: {
+			...(exit.decidedBy === undefined
+				? {}
+				: { exit_decided_by: factText(exit.decidedBy, 256) }),
+			...(exit.masked === undefined ? {} : { exit_masked: exit.masked }),
+			no_output: String(isEmptyClaudeShellOutput(text)),
+		},
+	};
 }
 
 function mcpCallIdentity(toolName: string): LineFacts {
@@ -415,6 +518,7 @@ function readUserMessage(
 				state,
 				single ? toolUseResult : undefined,
 				single ? readString(record.toolDenialKind) : undefined,
+				single ? readString(record.toolUseResult) : undefined,
 			),
 		);
 	}
@@ -501,6 +605,8 @@ function readToolResult(
 	state: StreamState,
 	toolUseResult: Record<string, unknown> | undefined,
 	recordedDenialKind: string | undefined,
+	/** `toolUseResult` in its string form (errors and refusals). */
+	toolUseResultText: string | undefined,
 ): LineItem {
 	const callId = readString(block.tool_use_id) ?? "";
 	const known = callId === "" ? undefined : state.calls.get(callId);
@@ -516,6 +622,30 @@ function readToolResult(
 		: readClaudeBackgroundHandOff(text, toolUseResult, known?.toolName ?? "");
 	if (handOff !== undefined && callId !== "")
 		state.claudeBackgroundTasks.set(handOff.taskId, callId);
+	// Claude Code's own record of an interruption: its denial kind, or the
+	// interrupt text as the result. A user rejection stays a refusal.
+	const interrupted =
+		denialKind === "interrupted" ||
+		INTERRUPTED_PATTERN.test(toolUseResultText ?? "") ||
+		(isError && INTERRUPTED_PATTERN.test(text.slice(0, 128)));
+	const finished =
+		handOff === undefined &&
+		denialKind === undefined &&
+		hook === undefined &&
+		!interrupted &&
+		toolUseResult?.interrupted !== true &&
+		toolUseResult?.timedOutAfterMs === undefined &&
+		known?.toolName.toLowerCase() === "bash";
+	trackFailedEdits(
+		state,
+		callId,
+		known?.editKeys,
+		denialKind !== undefined || interrupted || handOff !== undefined
+			? "other"
+			: isError
+				? "failed"
+				: "succeeded",
+	);
 	const launchesSubagent =
 		known !== undefined &&
 		SUBAGENT_LAUNCH_TOOLS.has(known.toolName.toLowerCase());
@@ -532,6 +662,16 @@ function readToolResult(
 			known?.facts === undefined ? undefined : mcpFacts(known.facts),
 			claudeAppliedChanges(toolUseResult, !isError && denialKind === undefined),
 			claudeToolResultFacts(toolUseResult, denialKind),
+			interrupted ? { interrupted: true } : undefined,
+			finished
+				? shellExitFacts(
+						known?.exitShape,
+						isError,
+						exitCode,
+						toolUseResult,
+						text,
+					)
+				: undefined,
 			hook === undefined ? undefined : hookErrorFacts(hook),
 			handOff === undefined
 				? undefined
