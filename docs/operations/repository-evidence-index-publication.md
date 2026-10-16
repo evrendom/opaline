@@ -30,3 +30,17 @@ change.
 Regression coverage lives in
 `apps/api/src/__tests__/repository-evidence-fence.integration.ts` and uses real
 Postgres and ClickHouse with the existing R2 fixture and a slow executor.
+
+## Setup columns
+
+Since `20261016180000_evidence_setup_snapshot.sql` the prepared row also copies
+the capture's setup from its manifest (`capture_reason`, `context_roots`,
+`setup_files`, `setup_settings`, `runtime_versions`; see
+`apps/api/src/services/repository-evidence-setup.ts`), which the
+`setup_snapshots` SQL view reads. Rows prepared before it parse with empty
+defaults and publish unchanged. `bun run --cwd apps/api backfill:evidence-setup
+--organization-id <id>` (a preview without `--execute`) re-reads those
+captures' manifests from R2, adds their setup to the prepared row under a newer
+`index_version` and clears `index_published_at`, so the next publisher pass
+replaces each capture's index row. It never touches a capture whose prepared
+row a purge cleared.

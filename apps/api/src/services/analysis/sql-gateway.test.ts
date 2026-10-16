@@ -1324,6 +1324,7 @@ describe("schema", () => {
 			"setup_files",
 			"ci_jobs",
 			"session_links",
+			"setup_snapshots",
 			"finding_runs",
 			"run_answers",
 		]);

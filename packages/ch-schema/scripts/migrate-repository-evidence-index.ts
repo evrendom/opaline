@@ -13,7 +13,11 @@ import {
 	isLocalClickHouseEndpoint,
 	resolveClickHouseUsername,
 } from "../src/clickhouse-connection.js";
-import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "../src/repository-evidence-index.js";
+import {
+	REPOSITORY_EVIDENCE_INDEX_TABLE,
+	REPOSITORY_EVIDENCE_SETUP_COLUMNS,
+	REPOSITORY_EVIDENCE_SETUP_MIGRATION,
+} from "../src/repository-evidence-index.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -21,6 +25,7 @@ import {
 
 export const REPOSITORY_EVIDENCE_INDEX_MIGRATION =
 	"20260930120000_repository_evidence_index.sql";
+export { REPOSITORY_EVIDENCE_SETUP_MIGRATION };
 const DEFAULT_REPOSITORY_EVIDENCE_INDEX_DATABASE = "rudel";
 
 const REPOSITORY_EVIDENCE_INDEX_COMMENT =
@@ -86,6 +91,10 @@ const EXPECTED_COLUMNS: readonly RepositoryEvidenceIndexColumn[] = [
 	),
 	column("index_version", "UInt64"),
 	column("indexed_at", "DateTime64(3, 'UTC')"),
+	// Added after the create migration by REPOSITORY_EVIDENCE_SETUP_MIGRATION.
+	...REPOSITORY_EVIDENCE_SETUP_COLUMNS.map((setup) =>
+		column(setup.name, setup.type),
+	),
 ];
 
 interface RepositoryEvidenceIndexColumn {
@@ -112,6 +121,14 @@ export interface RepositoryEvidenceIndexMigrationOptions {
 	journalStore: MigrationJournalStore;
 	log: (message: string) => void;
 	migrationSql: string;
+	/**
+	 * REPOSITORY_EVIDENCE_SETUP_MIGRATION, retargeted like `migrationSql`:
+	 * applied after it and journaled on its own. Without it the table must
+	 * already have the setup columns (a table built from the current DDL).
+	 */
+	setupMigrationSql?: string;
+	/** How long to wait for every replica to serve added columns. */
+	readBack?: { attempts: number; delayMs: number };
 	targetDatabase: string;
 }
 
@@ -204,6 +221,26 @@ export function retargetRepositoryEvidenceIndexMigration(
 		);
 }
 
+/** The setup migration for another database (local and test targets only). */
+export function retargetRepositoryEvidenceSetupMigration(
+	migrationSql: string,
+	targetDatabase: string,
+): string {
+	assertClickHouseIdentifier(targetDatabase);
+	const tableName = `\`${DEFAULT_REPOSITORY_EVIDENCE_INDEX_DATABASE}\`.\`${REPOSITORY_EVIDENCE_INDEX_TABLE}\``;
+	if (!migrationSql.includes(tableName)) {
+		throw new Error(
+			"Repository evidence setup migration does not contain the expected database-qualified table",
+		);
+	}
+	return targetDatabase === DEFAULT_REPOSITORY_EVIDENCE_INDEX_DATABASE
+		? migrationSql
+		: migrationSql.replaceAll(
+				tableName,
+				`\`${targetDatabase}\`.\`${REPOSITORY_EVIDENCE_INDEX_TABLE}\``,
+			);
+}
+
 function column(
 	name: string,
 	type: string,
@@ -239,8 +276,23 @@ export async function runRepositoryEvidenceIndexMigration(
 			await options.executor.execute(statement);
 		}
 	}
+	const setup = await applySetupMigration(options);
 
-	await assertRepositoryEvidenceIndexSchema(options);
+	// Added columns reach every replica of a shared table with a delay, so a
+	// just-applied setup migration is read back until the schema matches.
+	const { attempts, delayMs } =
+		setup?.applied === false
+			? (options.readBack ?? { attempts: 13, delayMs: 10_000 })
+			: { attempts: 1, delayMs: 0 };
+	for (let attempt = 1; ; attempt++) {
+		try {
+			await assertRepositoryEvidenceIndexSchema(options);
+			break;
+		} catch (error) {
+			if (attempt >= attempts) throw error;
+			await new Promise((resolveWait) => setTimeout(resolveWait, delayMs));
+		}
+	}
 	if (!applied) {
 		await appendJournalEntryWithReconciliation(options.journalStore, {
 			name: REPOSITORY_EVIDENCE_INDEX_MIGRATION,
@@ -251,6 +303,40 @@ export async function runRepositoryEvidenceIndexMigration(
 	options.log(
 		`${applied ? "Already applied" : "Applied"}: ${REPOSITORY_EVIDENCE_INDEX_MIGRATION}`,
 	);
+	if (setup && !setup.applied) {
+		await appendJournalEntryWithReconciliation(options.journalStore, {
+			name: REPOSITORY_EVIDENCE_SETUP_MIGRATION,
+			checksum: setup.checksum,
+			appliedAt: new Date().toISOString().replace("Z", ""),
+		});
+	}
+	if (setup)
+		options.log(
+			`${setup.applied ? "Already applied" : "Applied"}: ${REPOSITORY_EVIDENCE_SETUP_MIGRATION}`,
+		);
+}
+
+/** Runs the setup migration unless it is journaled; undefined without one. */
+async function applySetupMigration(
+	options: RepositoryEvidenceIndexMigrationOptions,
+): Promise<{ applied: boolean; checksum: string } | undefined> {
+	if (options.setupMigrationSql === undefined) return undefined;
+	const checksum = checksumSQL(options.setupMigrationSql);
+	const entries = (await options.journalStore.readJournal()).applied.filter(
+		(entry) => entry.name === REPOSITORY_EVIDENCE_SETUP_MIGRATION,
+	);
+	if (entries.some((entry) => entry.checksum !== checksum)) {
+		throw new Error(
+			`Repository evidence index migration checksum mismatch: ${REPOSITORY_EVIDENCE_SETUP_MIGRATION}`,
+		);
+	}
+	if (entries.length > 0) return { applied: true, checksum };
+	for (const statement of extractExecutableStatements(
+		options.setupMigrationSql,
+	)) {
+		await options.executor.execute(statement);
+	}
+	return { applied: false, checksum };
 }
 
 async function assertRepositoryEvidenceIndexSchema(
@@ -353,6 +439,17 @@ async function run(): Promise<void> {
 			runtimeConfig.targetDatabase,
 			runtimeConfig.expectedStoragePolicy,
 		);
+		const setupMigrationSql = retargetRepositoryEvidenceSetupMigration(
+			await readFile(
+				resolve(
+					import.meta.dir,
+					"../chx/migrations",
+					REPOSITORY_EVIDENCE_SETUP_MIGRATION,
+				),
+				"utf8",
+			),
+			runtimeConfig.targetDatabase,
+		);
 		await runRepositoryEvidenceIndexMigration({
 			executor,
 			expectedEngine: runtimeConfig.expectedEngine,
@@ -360,6 +457,7 @@ async function run(): Promise<void> {
 			journalStore: createJournalStore(executor),
 			log: console.log,
 			migrationSql,
+			setupMigrationSql,
 			targetDatabase: runtimeConfig.targetDatabase,
 		});
 	} finally {

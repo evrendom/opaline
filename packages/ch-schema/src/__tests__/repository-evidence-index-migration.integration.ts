@@ -4,11 +4,15 @@ import { createClickHouseExecutor } from "@chkit/clickhouse";
 import { createJournalStore } from "chkit/dist/bin/lib.js";
 import {
 	REPOSITORY_EVIDENCE_INDEX_MIGRATION,
+	REPOSITORY_EVIDENCE_SETUP_MIGRATION,
 	resolveRepositoryEvidenceIndexRuntimeConfig,
 	retargetRepositoryEvidenceIndexMigration,
 	runRepositoryEvidenceIndexMigration,
 } from "../../scripts/migrate-repository-evidence-index.js";
-import { buildRepositoryEvidenceIndexDdl } from "../repository-evidence-index.js";
+import {
+	buildRepositoryEvidenceIndexDdl,
+	REPOSITORY_EVIDENCE_SETUP_COLUMNS,
+} from "../repository-evidence-index.js";
 
 setDefaultTimeout(120_000);
 
@@ -121,6 +125,27 @@ describe("controlled repository evidence index migration", () => {
 			(entry) => entry.name === REPOSITORY_EVIDENCE_INDEX_MIGRATION,
 		);
 		expect(appliedEntries).toHaveLength(1);
+		// The setup columns come after the create migration, journaled on their own.
+		expect(stdout).toContain(`Applied: ${REPOSITORY_EVIDENCE_SETUP_MIGRATION}`);
+		const setupColumns = await executor.query<{ name: string; type: string }>(`
+			SELECT name, type FROM system.columns
+			WHERE database = '${entrypointDatabase}'
+				AND table = 'repository_session_evidence_index'
+				AND name IN (${REPOSITORY_EVIDENCE_SETUP_COLUMNS.map((column) => `'${column.name}'`).join(", ")})
+			ORDER BY position
+		`);
+		expect(setupColumns).toEqual(
+			REPOSITORY_EVIDENCE_SETUP_COLUMNS.map(({ name, type }) => ({
+				name,
+				type,
+			})),
+		);
+		const setupEntries = (
+			await createJournalStore(executor).readJournal()
+		).applied.filter(
+			(entry) => entry.name === REPOSITORY_EVIDENCE_SETUP_MIGRATION,
+		);
+		expect(setupEntries).toHaveLength(1);
 		await executor.close();
 	});
 

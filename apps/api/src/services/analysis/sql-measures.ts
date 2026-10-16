@@ -8,6 +8,7 @@ import {
 import { forkReplayCtes } from "./run-index-sql.js";
 import { records, toolErrorSql } from "./sql.js";
 import type { SqlWindow } from "./sql-guard.js";
+import { capturedSetupSessionsSql } from "./sql-setup-views.js";
 import type { SqlViewColumn } from "./sql-views.js";
 
 /**
@@ -48,10 +49,10 @@ const UNHAPPY = ["negative", "swear"] as const;
 /** Run index version from which runs store their messages. */
 const MESSAGES_SINCE = 4;
 /**
- * Evidence no view can link yet: setup snapshots and embeddings are not in
- * L1. Their slices replace these with a real check.
+ * Evidence no view can link yet: embeddings are not in L1. Its slice
+ * replaces this with a real check.
  */
-const NOT_IN_L1 = ["setup_snapshot", "embedding"] as const;
+const NOT_IN_L1 = ["embedding"] as const;
 
 const words = COMPLETION_WORDS.join(", ");
 /** Only a member's prompt can follow a run unhappily; subagent streams have none. */
@@ -114,7 +115,7 @@ export const SQL_MEASURES: readonly SqlMeasure[] = [
 	},
 ];
 
-const UNKNOWN_EVIDENCE = `Evidence unknown for this row, never none: system_prompt (no system prompt recorded in the stream at or before the run, or the run was built before run index ${MESSAGES_SINCE}), received_setup (the setup the run received was not read: its session was built before run index ${SETUP_SINCE_INDEX_VERSION} or parsed before parser ${SETUP_SINCE_PARSER_VERSION}; setup_files has no rows for it), setup_snapshot (not in L1 yet), github_link (no stored L1 edge links the run to a commit, pull request or CI run, so its GitHub outcome is unknown) and embedding (not embedded yet). Say unknown for these, never zero.`;
+const UNKNOWN_EVIDENCE = `Evidence unknown for this row, never none: system_prompt (no system prompt recorded in the stream at or before the run, or the run was built before run index ${MESSAGES_SINCE}), received_setup (the setup the run received was not read: its session was built before run index ${SETUP_SINCE_INDEX_VERSION} or parsed before parser ${SETUP_SINCE_PARSER_VERSION}; setup_files has no rows for it), setup_snapshot (no capture of the setup on the member's machine was taken by the session's own hooks: the CLI did not upload evidence for it, or uploaded it before setup was recorded; setup_snapshots has no rows for it at session time), github_link (no stored L1 edge links the run to a commit, pull request or CI run, so its GitHub outcome is unknown) and embedding (not embedded yet). Say unknown for these, never zero.`;
 
 export const COVERAGE_COLUMN: SqlViewColumn = {
 	name: "coverage_gaps",
@@ -366,13 +367,13 @@ export function measuredRunsSql(
 			arrayConcat(
 				if(r.index_version >= ${MESSAGES_SINCE} AND r.system_prompt_recorded, [], ['system_prompt']),
 				if(r.index_version >= ${SETUP_SINCE_INDEX_VERSION} AND r.parser_version >= ${SETUP_SINCE_PARSER_VERSION}, [], ['received_setup']),
-				${sqlArray([NOT_IN_L1[0]])},
+				if((r.user_id, r.session_id) IN (${capturedSetupSessionsSql(runs.owner)}), [], ['setup_snapshot']),
 				if(r.run_id IN (
 					SELECT from_id FROM ${getSafeClickHouseTable(L1_EDGES_TABLE)} FINAL
 					WHERE ${runs.owner} AND from_kind = 'run' AND is_active = 1
 						AND to_kind IN ('commit', 'pull_request', 'ci_run')
 				), [], ['github_link']),
-				${sqlArray([NOT_IN_L1[1]])}) AS coverage_gaps,
+				${sqlArray([NOT_IN_L1[0]])}) AS coverage_gaps,
 			r.revision AS revision, r.parser_version AS parser_version
 		FROM (
 			SELECT *,

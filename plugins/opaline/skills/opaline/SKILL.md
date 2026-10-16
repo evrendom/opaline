@@ -27,6 +27,7 @@ No tool changes or deletes sessions. `sql` (and `find`/`read`) record their call
   - `calls`, `events` and `prompts` must keep their time range in their own `WHERE` (`started_at >= …` for calls, `at >= …` for events and prompts, joined with `AND`), or every session is read and the query may hit the limits. Command text reads a lot: about a week of a busy workspace fits, a month may not.
   - `session_links` has one row per link between two sessions (`from_session_id` → `to_session_id`; `kind` parent_thread, fork or delegation; `basis` says what recorded it): join it to `runs` at both ends to follow a task across a Codex subagent thread, a fork or one agent starting the other, or to credit a fix made in another session. A resumed session keeps its session_id, so it needs no link.
   - Never alias a result with a column's name (`sum(cost_usd) AS cost_usd`): ClickHouse then reads the alias wherever the query names that column, and the query fails or counts the wrong thing.
+  - `setup_snapshots` is what each session evidence capture found on the member's machine, one row per capture and item: instruction, skill, memory, command and config files with their hash, each hook, permission rule, MCP server, plugin and setting of each settings file, and runtime versions. `setup_item` names a file as `setup_files.setup_file` does. Use it to date a setup change (consecutive captures of a member) and to split runs by whether their session started with it (`lifecycle = 'start' AND at_session_time`; a capture with `at_session_time` false is a later sweep).
 - `search` (read-only): runs by meaning and exact string in one ranking (`text`; `mode` hybrid, meaning or exact; `filters` since, until, source, kinds; 30 days by default, at most 180). Returns up to 20 runs with run_id, why each matched and a snippet, coverage (sessions not yet indexed are unknown, not absent), the OpenAI quota and a rewrite to try when nothing matched. Not recorded in the draft: to keep matches as evidence, use `search('…')` in sql.
 - `run` (read-only): one run, compact. `id` is a run_id from sql or search, or a PREV/NEXT/subagent id the view shows. Default sections: the header (prompt, minutes, tokens, cost), PREV (the run before and how it ended), END (how this one ended), NEXT (the user's next prompt and its reaction) and the phases (exploring, editing, running checks, git and CI, talking to the user) with requests, time, tokens and cost. `expand` takes up to 20 ids: a phase `p2` opens its requests, a request `q153` its calls, a call `c154` or record `r160` its exact text, and a call that started a subagent opens that subagent's run. `sections` keeps only some (header, prev, end, next, phases); `maxChars` 1000-40000, default 12000. Rows of `calls`, `events` and `prompts` carry `record_idx`: expand it as `r<record_idx>` to quote it.
 - `run_answers` and run questions: where the workspace has run questions, every run is answered for every yes/no question that is on (listed by `schema`, with tested precision) as the probability of yes, by SubQ Snap, within minutes of being indexed and older runs by a backfill: filter and rank with sql over `run_answers` (one `provider`), no wait or cost. A run without a row is not answered (yet), which is not no. Only for runs without answers, `estimate_questions` (sends nothing) gives the runs a `runs` SELECT returns (`session_id, agent_id, turn_idx`; default every run of the last 4 weeks; at most 5,000), the answers already stored (reused, free), the most it can cost, the quota left and a token; `run_questions` takes the same questions (up to 10 ids), the same `runs` and that token within 15 minutes, and sends each run's text, secrets removed, to the answering service. Answers arrive within minutes in `run_answers`.
@@ -65,7 +66,7 @@ Never:
 - estimate savings or invent numbers;
 - single out or rank people.
 
-Unknown is not zero: say what is unknown (NULL facts and `unrecorded_facts`, `coverage_gaps` such as `github_link`, unpriced runs, sessions search has not indexed, cut results) and the coverage behind each number.
+Unknown is not zero: say what is unknown (NULL facts and `unrecorded_facts`, `coverage_gaps` such as `github_link` or `setup_snapshot`, unpriced runs, sessions search has not indexed, cut results) and the coverage behind each number.
 
 ## Save and answer
 
@@ -212,6 +213,24 @@ FROM runs
 WHERE started_at >= '2026-08-17' AND started_at < '2026-10-13'
   AND agent_id = '' AND ifNull(thread_source, '') != 'subagent'
 GROUP BY week ORDER BY week
+```
+
+When the fix is in the setup (a hook, a permission rule, a skill, an instruction), split by whether each session started with it rather than by date, since members pick it up at different times. Runs whose session has no start capture are unknown (`coverage_gaps` has `setup_snapshot`), not without the fix:
+
+```sql
+WITH started AS (
+  SELECT user_id, session_id,
+    countIf(kind = 'hook' AND name = 'PreToolUse' AND value LIKE '%guard.sh%') > 0 AS has_guard
+  FROM setup_snapshots
+  WHERE lifecycle = 'start' AND at_session_time AND captured_at >= '2026-08-17'
+  GROUP BY user_id, session_id
+)
+SELECT has_guard, count() AS runs, countIf(frustrated) AS frustrated_runs,
+  round(sum(active_minutes)) AS active_min
+FROM runs INNER JOIN started USING (user_id, session_id)
+WHERE started_at >= '2026-08-17' AND started_at < '2026-10-13'
+  AND agent_id = '' AND ifNull(thread_source, '') != 'subagent'
+GROUP BY has_guard
 ```
 
 Read a few runs after the fix to check the cause is gone, not only the count. For run questions on the same runs: `estimate_questions questions=["<id from schema>"] runs="SELECT session_id, agent_id, turn_idx FROM runs WHERE …"`, say the cost, then `run_questions` with the token.

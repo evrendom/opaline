@@ -2,11 +2,13 @@ import type { RepositoryEvidenceInitInput } from "@rudel/api-routes";
 import { RudelRepositorySessionEvidenceIndexRowSchema } from "@rudel/ch-schema/generated";
 import type { z } from "zod";
 import type { ClickHouseExecutor } from "../clickhouse.js";
+import { readRepositoryEvidenceSetup } from "./repository-evidence-setup.js";
 
 /**
  * An evidence index row as written. `skill_assessments` is no longer written
  * (docs/l1-literal-schema.md, retirement step 3): its column keeps its
- * default until it is dropped, and parsing strips it from stored rows.
+ * default until it is dropped, and parsing strips it from stored rows. Rows
+ * prepared before the setup columns parse with their empty defaults.
  */
 export const RepositoryEvidenceIndexRowSchema =
 	RudelRepositorySessionEvidenceIndexRowSchema.omit({
@@ -148,6 +150,7 @@ export function buildRepositoryEvidenceIndexRow(
 		session_id: evidence.session.sessionId,
 		session_source: evidence.session.source,
 		worktree_id: evidence.repository.local.worktreeId,
+		...readRepositoryEvidenceSetup(manifest),
 	};
 }
 

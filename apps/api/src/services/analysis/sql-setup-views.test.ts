@@ -1,0 +1,114 @@
+import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import { evidenceSetupIndexPatch } from "../repository-evidence-setup-backfill.service.js";
+import { SETUP_SNAPSHOT_COLUMNS } from "./sql-setup-views.js";
+import { findSqlView } from "./sql-views.js";
+
+describe("setup_snapshots view", () => {
+	const view = findSqlView("setup_snapshots");
+
+	test("is a registered view whose statement returns its documented columns", () => {
+		expect(view?.columns).toBe(SETUP_SNAPSHOT_COLUMNS);
+		const sql = view?.sql(false) ?? "";
+		expect(sql).toStartWith(
+			`SELECT ${SETUP_SNAPSHOT_COLUMNS.map((column) => column.name).join(", ")} FROM (`,
+		);
+		// Files, settings items and runtime fields, each from captures that recorded setup.
+		expect(
+			sql.match(/ARRAY JOIN (setup_files|setup_settings|runtime_versions) AS/g),
+		).toHaveLength(3);
+		expect(sql.match(/notEmpty\(context_roots\)/g)).toHaveLength(3);
+		expect(sql).toContain("FROM rudel.repository_session_evidence_index FINAL");
+	});
+
+	test("reads only the workspace, and only the member's own captures when held to them", () => {
+		const workspace = "organization_id = {opaline_workspace:String}";
+		const member = `${workspace} AND user_id = {opaline_member:String}`;
+		expect(view?.sql(false)).toContain(`WHERE ${workspace} AND notEmpty`);
+		expect(view?.sql(false)).not.toContain("opaline_member");
+		expect(view?.sql(true).split(`WHERE ${member} AND notEmpty`)).toHaveLength(
+			4,
+		);
+	});
+
+	test("names files as setup_files does, so a file on disk joins what a run received", () => {
+		const sql = view?.sql(false) ?? "";
+		expect(sql).toContain("concat('repository:', repository, ':', path)");
+		expect(sql).toContain("concat('member:', user_id, ':~/', h0[1])");
+		expect(sql).toContain("concat('plugin:', p0[2], '@', p0[1], ':', p0[3])");
+	});
+
+	test("says when a capture is late, and why", () => {
+		const names = SETUP_SNAPSHOT_COLUMNS.map((column) => column.name);
+		expect(names).toContain("at_session_time");
+		expect(names).toContain("capture_reason");
+		expect(view?.sql(false)).toContain(
+			"toBool(capture_reason = '') AS at_session_time",
+		);
+	});
+});
+
+describe("runs coverage", () => {
+	test("setup_snapshot is a gap only for runs whose session has no capture at session time", () => {
+		const sql = findSqlView("runs")?.sql(false) ?? "";
+		expect(sql).toContain(
+			"if((r.user_id, r.session_id) IN (SELECT user_id, session_id FROM rudel.repository_session_evidence_index",
+		);
+		expect(sql).toContain(
+			"notEmpty(context_roots) AND capture_reason = ''), [], ['setup_snapshot'])",
+		);
+		expect(sql).not.toContain("['setup_snapshot'],");
+	});
+});
+
+describe("evidence setup backfill", () => {
+	const manifest = new TextEncoder().encode(
+		JSON.stringify({
+			captureReason: "task-output-sweep",
+			roots: [
+				{
+					id: "repository",
+					origin: "repository",
+					scope: "repository",
+					status: "collected",
+					absolutePath: "/Users/dev/code/shop",
+				},
+			],
+			runtime: { tools: { git: "2.51.0" } },
+		}),
+	);
+	const objectId = `sha256:${createHash("sha256").update(manifest).digest("hex")}`;
+
+	test("reads the setup of a stored manifest under a newer index version", () => {
+		const patch = evidenceSetupIndexPatch({
+			manifestObjectId: objectId,
+			manifestBytes: manifest,
+			indexedAt: new Date("2026-10-16T17:00:00.000Z"),
+		});
+		expect(patch).toMatchObject({
+			capture_reason: "task-output-sweep",
+			context_roots: [
+				[
+					"repository",
+					"repository",
+					"repository",
+					"collected",
+					"/Users/dev/code/shop",
+				],
+			],
+			runtime_versions: [["tools.git", "2.51.0"]],
+			index_version: String(Date.parse("2026-10-16T17:00:00.000Z")),
+			indexed_at: "2026-10-16 17:00:00.000",
+		});
+	});
+
+	test("refuses a manifest that does not match its object id", () => {
+		expect(() =>
+			evidenceSetupIndexPatch({
+				manifestObjectId: `sha256:${"0".repeat(64)}`,
+				manifestBytes: manifest,
+				indexedAt: new Date(),
+			}),
+		).toThrow("does not match");
+	});
+});

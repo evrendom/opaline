@@ -30,6 +30,7 @@ import {
 	RUN_MEASURE_COLUMNS,
 } from "./sql-measures.js";
 import { sessionLinksView } from "./sql-session-links.js";
+import { setupSnapshotsView } from "./sql-setup-views.js";
 
 /**
  * The views an agent's SQL may read (docs/adr/0005-agents-query-l1-with-sql.md).
@@ -334,6 +335,7 @@ export const SQL_VIEWS: readonly SqlView[] = [
 	eventsView(committedRuns),
 	...l1SqlViews(SQL_SCOPE_PARAMS),
 	sessionLinksView(committedRuns, memberOwner),
+	setupSnapshotsView(SQL_SCOPE_PARAMS),
 	FINDING_RUNS,
 	RUN_ANSWERS,
 ];

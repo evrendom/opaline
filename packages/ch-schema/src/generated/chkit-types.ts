@@ -593,6 +593,11 @@ export type RudelRepositorySessionEvidenceIndexRow = {
   context_facets: [string, string, string, string, string, number][]
   index_version: string
   indexed_at: string
+  capture_reason: string
+  context_roots: [string, string, string, string, string][]
+  setup_files: [string, string, string[], string, string, number, string][]
+  setup_settings: [string, string, string, string, string, string][]
+  runtime_versions: [string, string][]
 }
 
 export const RudelRepositorySessionEvidenceIndexRowSchema = z.object({
@@ -628,6 +633,11 @@ export const RudelRepositorySessionEvidenceIndexRowSchema = z.object({
   context_facets: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string(), z.number()])),
   index_version: z.string(),
   indexed_at: z.string(),
+  capture_reason: z.string().default(''),
+  context_roots: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()])).default([]),
+  setup_files: z.array(z.tuple([z.string(), z.string(), z.array(z.string()), z.string(), z.string(), z.number(), z.string()])).default([]),
+  setup_settings: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string(), z.string()])).default([]),
+  runtime_versions: z.array(z.tuple([z.string(), z.string()])).default([]),
 })
 
 export type RudelRepositorySessionEvidenceIndexRowInput = z.input<typeof RudelRepositorySessionEvidenceIndexRowSchema>

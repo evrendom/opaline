@@ -1,5 +1,8 @@
 import { schema, table } from "@chkit/core";
-import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "../../repository-evidence-index.js";
+import {
+	REPOSITORY_EVIDENCE_INDEX_TABLE,
+	REPOSITORY_EVIDENCE_SETUP_COLUMNS,
+} from "../../repository-evidence-index.js";
 
 const rudel_repository_session_evidence_index = table({
 	database: "rudel",
@@ -78,6 +81,10 @@ const rudel_repository_session_evidence_index = table({
 		},
 		{ name: "index_version", type: "UInt64" },
 		{ name: "indexed_at", type: "DateTime64(3, 'UTC')" },
+		// The capture's setup, as the manifest records it (setup_snapshots
+		// view): added by 20261016180000_evidence_setup_snapshot.sql, empty
+		// for captures indexed before it.
+		...REPOSITORY_EVIDENCE_SETUP_COLUMNS,
 	],
 	primaryKey: [
 		"organization_id",

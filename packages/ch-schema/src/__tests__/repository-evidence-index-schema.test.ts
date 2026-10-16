@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 import repositoryEvidenceIndexSchema from "../db/schema/repository-evidence-index.js";
 import {
 	buildRepositoryEvidenceIndexDdl,
+	buildRepositoryEvidenceSetupMigrationSql,
 	REPOSITORY_EVIDENCE_INDEX_TABLE,
+	REPOSITORY_EVIDENCE_SETUP_COLUMNS,
+	REPOSITORY_EVIDENCE_SETUP_MIGRATION,
 } from "../repository-evidence-index.js";
 
 const REQUIRED_COLUMNS = [
@@ -31,6 +34,11 @@ const REQUIRED_COLUMNS = [
 	"context_facets",
 	"index_version",
 	"indexed_at",
+	"capture_reason",
+	"context_roots",
+	"setup_files",
+	"setup_settings",
+	"runtime_versions",
 ] as const;
 
 const REPLACEMENT_KEY: string[] = [
@@ -166,3 +174,36 @@ function findTableDefinition(value: unknown): TableDefinition {
 	}
 	throw new Error("Repository evidence index table definition was not found");
 }
+
+describe("repository evidence setup columns", () => {
+	test("the schema, the portable DDL and the checked-in migration add the same columns, last", async () => {
+		const definition = findTableDefinition(repositoryEvidenceIndexSchema);
+		const names = definition.columns.map((column) => column.name);
+		const setup = REPOSITORY_EVIDENCE_SETUP_COLUMNS.map(
+			(column) => column.name,
+		);
+		expect(names.slice(-setup.length)).toEqual(setup);
+		for (const column of REPOSITORY_EVIDENCE_SETUP_COLUMNS) {
+			expect(
+				definition.columns.find((candidate) => candidate.name === column.name)
+					?.type,
+			).toBe(column.type);
+			expect(buildRepositoryEvidenceIndexDdl("evidence_test_db")).toContain(
+				`\`${column.name}\` ${column.type} COMMENT`,
+			);
+		}
+		const migration = await readFile(
+			fileURLToPath(
+				new URL(
+					`../../chx/migrations/${REPOSITORY_EVIDENCE_SETUP_MIGRATION}`,
+					import.meta.url,
+				),
+			),
+			"utf8",
+		);
+		expect(
+			migration.endsWith(buildRepositoryEvidenceSetupMigrationSql("rudel")),
+		).toBe(true);
+		expect(migration).not.toContain("AFTER");
+	});
+});
