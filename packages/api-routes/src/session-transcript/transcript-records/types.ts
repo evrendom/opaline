@@ -25,7 +25,8 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * a timeout hand-off's limit from its text where no `timedOutAfterMs`
  * was recorded (a subagent stream), and a Codex `$skill` injection and apps
  * page event as injected context (`skill_body`, `ui_event`), not prompts.
- * Each record also carries its line's own id (`record_uuid`, Claude `uuid`).
+ * Each record also carries its line's own id (`record_uuid`, Claude `uuid`),
+ * and the images its line carried (`images`, from their upload markers).
  */
 export const TRANSCRIPT_RECORDS_PARSER_VERSION = 12;
 
@@ -113,6 +114,14 @@ export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	 */
 	git_remote: 12,
 	git_remote_cwd: 12,
+	/**
+	 * Images the record carries, as a JSON list of `{sha256, bytes, type}`
+	 * from their upload markers (`image-facts.ts`): the bytes are the evidence
+	 * object `sha256:<sha256>`, indexed in `rudel.session_images` by the same
+	 * stream and record. `_more` counts images past the first 64.
+	 */
+	images: 12,
+	images_more: 12,
 	/**
 	 * Setup text the record carries, as a JSON array of
 	 * `{kind, path, name, cwd, sha256, chars}` (`received-setup.ts`); the texts

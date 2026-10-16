@@ -51,6 +51,7 @@ const FIXTURES = {
 	codexEndEvent: "codex-end-event-era.jsonl",
 	codexCustomExec: "codex-custom-exec-era.jsonl",
 	claudeRecordIds: "l1-facts/claude-record-ids.jsonl",
+	claudeImages: "l1-facts/claude-images.jsonl",
 	claudeSubagent: "l1-facts/claude-subagent-2.1.jsonl",
 	codexSkill: "l1-facts/codex-skill-0.162.jsonl",
 } as const;
@@ -937,6 +938,23 @@ const CASES: readonly FactCase[] = [
 		},
 	},
 	{
+		name: "a tool result's screenshot is listed by its upload marker",
+		fixture: "claudeImages",
+		row: { callId: "toolu_shot", kind: "tool_result" },
+		facts: {
+			extra: {
+				images: JSON.stringify([
+					{
+						sha256:
+							"3b39b023b25be13038559fef0c4177bcb109323b43b949a47088a1a3093b204a",
+						bytes: 391022,
+						type: "image/png",
+					},
+				]),
+			},
+		},
+	},
+	{
 		name: "Claude record id on every record of its line",
 		fixture: "claudeRecordIds",
 		row: { callId: "toolu_ids", kind: "tool_call" },
@@ -1342,9 +1360,10 @@ describe("parser facts", () => {
 /** Facts checked by the named tests above rather than a case, per agent. */
 const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	// The fact budget tests; received setup in received-setup.test.ts.
-	// The cap of shell_read_paths in shell-access.test.ts.
+	// The cap of shell_read_paths in shell-access.test.ts, of images in image-facts.test.ts.
 	claude_code: new Set([
 		"facts_truncated",
+		"images_more",
 		"received_setup",
 		"shell_read_paths_more",
 		...V9_REGRESSION_COVERAGE.claude_code,

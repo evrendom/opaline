@@ -3,6 +3,11 @@ import { readClaudeLine } from "./claude-records.js";
 import { codexOutcomes } from "./codex-outcomes.js";
 import { readCodexAgentId, readCodexLine } from "./codex-records.js";
 import {
+	assignLineImages,
+	readLineImageMarkers,
+	withImageFacts,
+} from "./image-facts.js";
+import {
 	createStreamState,
 	isRecord,
 	type LineFacts,
@@ -227,8 +232,17 @@ export function* splitTranscript(
 		const ts = normalizeTimestamp(result.timestamp) ?? state.lastTs;
 		state.lastTs = ts;
 
+		const lineImages = assignLineImages(
+			result.items,
+			readLineImageMarkers(line),
+		);
 		let blockIdx = 0;
-		for (const item of result.items) {
+		for (const lineItem of result.items) {
+			const images = lineImages[blockIdx] ?? [];
+			const item: LineItem =
+				images.length === 0
+					? lineItem
+					: { ...lineItem, facts: withImageFacts(lineItem.facts, images) };
 			applyTurnState(state, item);
 			const cap = options.fullText
 				? Number.MAX_SAFE_INTEGER

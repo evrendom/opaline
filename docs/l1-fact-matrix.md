@@ -20,8 +20,8 @@ Under each status is where the agent records the fact, shortened: `toolUseResult
 
 | | Claude Code | Codex |
 |---|---:|---:|
-| ✅ stored | 159 (1 with a gap) | 175 (1 with a gap) |
-| 🟡 pending | 51 | 36 |
+| ✅ stored | 160 (1 with a gap) | 175 (1 with a gap) |
+| 🟡 pending | 51 | 37 |
 | ⚪ not recorded | 36 | 35 |
 | 🔴 wrong | 0 | 0 |
 
@@ -30,9 +30,9 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | Metric | Claude Code | Codex |
 |---|---:|---:|
 | verified | 20 (8.9%) | 4 (1.7%) |
-| observed | 121 (54.0%) | 159 (69.4%) |
-| asserted | 83 (37.1%) | 66 (28.8%) |
-| unreviewed | 20 | 26 |
+| observed | 121 (54.0%) | 159 (69.1%) |
+| asserted | 83 (37.1%) | 67 (29.1%) |
+| unreviewed | 20 | 27 |
 | exact | 50 | 75 |
 | transform | 9 | 12 |
 | close | 65 | 65 |
@@ -40,10 +40,10 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | narrower | 11 | 3 |
 | not_emitted | 0 | 3 |
 | not_found | 66 | 39 |
-| derived | 16 | 13 |
+| derived | 17 | 13 |
 | provenance | 6 | 4 |
-| N/A (derived/provenance) | 22 | 17 |
-| Context paths (excluded as sources) | 27 | 58 |
+| N/A (derived/provenance) | 23 | 17 |
+| Context paths (excluded as sources) | 28 | 58 |
 | Judged (excludes searched absences) | 138 | 161 |
 | Semantic conflicts | 3 | 3 |
 | Paired runs | 0 | 0 |
@@ -60,7 +60,7 @@ Primary-path relation counts (including recorded gaps):
 - narrower: 20 / 13 (Claude Code / Codex).
 - not_emitted: 0 / 0 (Claude Code / Codex).
 - not_found: 0 / 1 (Claude Code / Codex).
-- derived: 9 / 3 (Claude Code / Codex).
+- derived: 11 / 3 (Claude Code / Codex).
 - provenance: 0 / 0 (Claude Code / Codex).
 
 ## Codex writer-source coverage
@@ -156,6 +156,7 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 | `auto_review_decision` | The verdict of the agent's automatic approval reviewer on a requested action. | ⚪ not recorded not_found · asserted | ✅ v9 close · observed<br>`assistant message text “auto-review decision…”`, `session_meta.thread_source` +1 | One-sided mapping |
 | `tool_namespace` | The app or namespace a tool belongs to (for example the GitHub connector). | ⚪ not recorded not_found · asserted | ✅ v9 close · observed<br>`function_call.namespace`, `DynamicToolCall.namespace` +7 | One-sided mapping |
 | `extension_item` | A built-in action that is not a tool call: a requested sleep and its length, a generated image and where it was saved. | ⚪ not recorded not_found · asserted | ✅ v9 close · observed<br>`Extension.kind`, `Extension.durationMs` +3 | One-sided mapping |
+| `images` | The images a record carries (a tool result's screenshots, an image pasted into a prompt), each by the SHA-256 of its decoded bytes with its size and type, so the stored image (rudel.session_images, analytics.images) is tied to its exact record and call. | ✅ v12 derived · not_applicable<br>`user image.source.type`, `user image.source.media_type` | 🟡 pending unreviewed · asserted | Opaline-derived/provenance; N/A per agent |
 | `command_source` | Who initiated a command: agent, user shell, unified-exec startup or interaction. | 🟡 pending not_found · asserted | ✅ v9 exact · observed<br>`CommandExecution.source`, `exec_command_end.source` | One-sided mapping |
 | `patch_hunks` | Each patch hunk's old/new start line and line count, preserving hunk order. | ✅ v9 exact · observed<br>`toolUseResult.structuredPatch[].oldStart`, `toolUseResult.structuredPatch[].oldLines` +6 | ✅ v9 transform · observed<br>`FileChange.changes.{*}.unified_diff` | Comparable after transform |
 | `task_status_change` | The task status before and after a TaskUpdate, kept as separate transition endpoints. | ✅ v9 exact · verified<br>`toolUseResult.statusChange.from`, `toolUseResult.statusChange.to` | 🟡 pending not_found · asserted | One-sided mapping |
@@ -400,6 +401,9 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 - `extension_item`
   - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): no such items; waiting and image generation are ordinary tool calls. How we checked: local census: no such items; waiting and image generation are ordinary tool calls.
   - Codex ✅: Relation: close. Confidence: observed. Evidence: llm_audit (2), fixture_test (2), writer_source (5), census (3). Judgement: Extension.kind is a different thing than the fact's two actions: values web.search 4,429, clock.sleep 374, image_gen.generation 4 (92% are web searches, which the fact excludes because searches are already calls). durationMs (374) is the sleep length that was asked for, savedPath (4) is where a generated image was saved (exact). So exact for the two named actions, but the kind source is broader than the fact. Path: `event_msg/item_completed:Extension.kind` — primary · close. Path: `event_msg/item_completed:Extension.durationMs` — primary · close. Path: `event_msg/item_completed:Extension.savedPath` — primary · close. Path: `event_msg/image_generation_end.saved_path` — primary · close. Path: `event_msg/item_completed:ImageGeneration.saved_path` — primary · close. Note: Pre-v9 historical: A sleep's duration is what was asked for, not measured time. Residue path event_msg/image_generation_end.saved_path is recorded but unparsed; no local witness and no semantic verification is claimed. Residue path event_msg/item_completed:ImageGeneration.saved_path is recorded but unparsed; no local witness and no semantic verification is claimed. Current: Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component. All sources: `Extension.kind`, `Extension.durationMs`, `Extension.savedPath`, `image_generation_end.saved_path`, `ImageGeneration.saved_path`.
+- `images`
+  - Claude Code ✅: Relation: derived from prompts/image_input. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1), census (2). Judgement: Opaline computation, not an agent-written value: uploads replace each base64 image with the marker opaline-image-omitted:v1;sha256=<hex of decoded bytes>;bytes=<decoded length>;type=<media type> (transcript-slim.ts, the CLI and the API alike), and the parser lists the markers of the record's line in order of first appearance, at any nesting depth (tool output JSON-encoded in a string included). A line split into several records gives each the images its text labels; the rest go to its first record. Claude Code writes the image bytes, not a hash. Path: `user.message.content[tool_result].content[*]` — context · unreviewed. Path: `user.message.content[image].source.type` — primary · derived from prompts/image_input. Path: `user.message.content[image].source.media_type` — primary · derived from prompts/image_input. Stored in rudel.session_images (each image with its record; the bytes are the evidence object sha256:<sha256>). Note: Images uploaded before the marker existed (an older CLI before server-side stripping) carry no marker and are not listed; the first 64 images of a record are listed, images_more counts the rest.
+  - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Codex image inputs and tool outputs (input_image.image_url data URLs, view_image, MCP image content) get the same upload marker; review the Codex shapes against real rollouts and record images there too.
 - `command_source`
   - Claude Code 🟡: Relation: not_found. Confidence: asserted. Evidence: llm_audit (2). Judgement: Judge round 3: No PRIMARY source is declared for this agent and no native normalized source for this fact was established in the complete current corpus. This is observational absence, not a claim that the agent never emits it; counterpart-agent sources are not evidence for this row. Plan: parser 9: identify and preserve the counterpart's literal fields; a missing local witness is not writer absence.
   - Codex ✅: Relation: exact. Confidence: observed. Evidence: llm_audit (3), fixture_test (2), writer_source (1), census (2). Judgement: Judge round 3: ExecCommandSource explicitly defines agent, user_shell, unified_exec_startup and unified_exec_interaction. Both CommandExecution and exec_command_end carry that typed source. Path: `event_msg/item_completed:CommandExecution.source` — primary · exact. Path: `event_msg/exec_command_end.source` — primary · exact. Legacy sources: `event_msg/exec_command_end.source` (observed versions are in the legacy evidence ledger). Note: Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.

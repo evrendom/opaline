@@ -5024,6 +5024,49 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		},
 	},
 	{
+		id: "images",
+		view: "calls",
+		meaning:
+			"The images a record carries (a tool result's screenshots, an image pasted into a prompt), each by the SHA-256 of its decoded bytes with its size and type, so the stored image (rudel.session_images, analytics.images) is tied to its exact record and call.",
+		agents: {
+			claude_code: stored(
+				[
+					"user.message.content[tool_result].content[*]",
+					"user.message.content[image].source.type",
+					"user.message.content[image].source.media_type",
+				],
+				{
+					since: 12,
+					facts: ["images", "images_more"],
+					elsewhere:
+						"rudel.session_images (each image with its record; the bytes are the evidence object sha256:<sha256>)",
+				},
+				{
+					relation: { kind: "derived", from: ["prompts/image_input"] },
+					sourceMappings: [
+						contextOnly("user.message.content[tool_result].content[*]"),
+					],
+					justification:
+						"Opaline computation, not an agent-written value: uploads replace each base64 image with the marker opaline-image-omitted:v1;sha256=<hex of decoded bytes>;bytes=<decoded length>;type=<media type> (transcript-slim.ts, the CLI and the API alike), and the parser lists the markers of the record's line in order of first appearance, at any nesting depth (tool output JSON-encoded in a string included). A line split into several records gives each the images its text labels; the rest go to its first record. Claude Code writes the image bytes, not a hash.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/image-facts.test.ts",
+							test: "a tool result's screenshot and a pasted image are listed on their records",
+						},
+					],
+					notes:
+						"Images uploaded before the marker existed (an older CLI before server-side stripping) carry no marker and are not listed; the first 64 images of a record are listed, images_more counts the rest.",
+				},
+			),
+			codex: pending(
+				[],
+				"Codex image inputs and tool outputs (input_image.image_url data URLs, view_image, MCP image content) get the same upload marker; review the Codex shapes against real rollouts and record images there too.",
+				{ relation: { kind: "unreviewed" } },
+			),
+		},
+	},
+	{
 		id: "image_input",
 		view: "prompts",
 		meaning:
