@@ -221,6 +221,7 @@ export {
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { momentsContract } from "./moments.js";
+import { sessionImagesContract } from "./session-images.js";
 import { sessionSavedOutputsContract } from "./session-saved-outputs.js";
 import { workspaceFeaturesAdminContract } from "./workspace-features.js";
 
@@ -351,7 +352,11 @@ export * from "./product-analytics.js";
 export { type RepoIdentity, resolveRepoIdentity } from "./repo-identity.js";
 export {
 	createRepositoryEvidenceInitInputSchema,
+	REPOSITORY_EVIDENCE_IMAGE_MEDIA_TYPE_PATTERN,
 	REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_AGGREGATE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_OBJECTS,
 	REPOSITORY_EVIDENCE_MAX_OBJECT_BYTES,
 	REPOSITORY_EVIDENCE_MAX_OBJECTS,
 	REPOSITORY_EVIDENCE_PART_SIZE_BYTES,
@@ -597,6 +602,12 @@ export const CliUploadCapabilitiesSchema = z.object({
 	 * as a shrink. CLIs slim only when this is advertised.
 	 */
 	transcriptSlimming: z.literal(true).optional(),
+	/**
+	 * Repository evidence accepts `image` objects (decoded image bytes keyed
+	 * `sha256:<hex>`) and the manifest's `images` list. CLIs upload images
+	 * only when this is advertised.
+	 */
+	repositoryEvidenceImages: z.literal(true).optional(),
 	/**
 	 * `liveSession.state` and `liveSession.append` accept the transcript lines
 	 * of a running session. Omitted while the server's live-session kill
@@ -1201,6 +1212,7 @@ export const contract = {
 		/** Moments, observations and patterns (`moments.ts`). */
 		moments: momentsContract,
 		savedOutputs: sessionSavedOutputsContract,
+		images: sessionImagesContract,
 		overview: {
 			costs: oc.input(CostDashboardInputSchema).output(CostDashboardSchema),
 			kpis: oc.input(DateRangeInputSchema).output(OverviewKPIsSchema),

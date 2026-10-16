@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
 	REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_AGGREGATE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES,
+	REPOSITORY_EVIDENCE_MAX_IMAGE_OBJECTS,
 	REPOSITORY_EVIDENCE_PROTOCOL,
 	RepositoryEvidenceCommitInputSchema,
 	RepositoryEvidenceInitInputSchema,
@@ -172,6 +175,103 @@ describe("repository evidence contract", () => {
 			organizationId: "organization-1",
 			objects: [],
 			uploadReceiptId: "00000000-0000-4000-8000-000000000104",
+		});
+	});
+
+	describe("image objects", () => {
+		const image = (index: number, byteLength: number) => {
+			const sha256 = index.toString(16).padStart(64, "0");
+			return {
+				byteLength,
+				contentEncoding: "identity",
+				filterVersion: null,
+				kind: "image",
+				mediaType: "image/png",
+				objectId: `sha256:${sha256}`,
+				sha256,
+			};
+		};
+		const withObjects = (objects: unknown[]) => {
+			const valid = makeInitInput();
+			return { ...valid, objects: [...valid.objects, ...objects] };
+		};
+		const messages = (input: unknown) => {
+			const result = RepositoryEvidenceInitInputSchema.safeParse(input);
+			return result.success
+				? []
+				: result.error.issues.map((issue) => issue.message);
+		};
+
+		test("accepts raw images beside the repository context", () => {
+			const parsed = RepositoryEvidenceInitInputSchema.parse(
+				withObjects([image(1, 3 * 1024 * 1024), image(2, 1_024)]),
+			);
+			expect(parsed.objects.map((object) => object.kind)).toEqual([
+				"context-manifest",
+				"source-blob",
+				"image",
+				"image",
+			]);
+		});
+
+		test("images have their own budget, outside the aggregate for everything else", () => {
+			// Over the 128 MiB of everything else, within the image budget.
+			const count = Math.ceil(
+				(REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES + 1) /
+					REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES,
+			);
+			expect(
+				messages(
+					withObjects(
+						Array.from({ length: count }, (_, index) =>
+							image(index + 1, REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES),
+						),
+					),
+				),
+			).toEqual([]);
+			const over = Math.floor(
+				REPOSITORY_EVIDENCE_MAX_IMAGE_AGGREGATE_BYTES /
+					REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES,
+			);
+			expect(
+				messages(
+					withObjects(
+						Array.from({ length: over + 1 }, (_, index) =>
+							image(index + 1, REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES),
+						),
+					),
+				),
+			).toEqual([
+				`Aggregate images exceed ${REPOSITORY_EVIDENCE_MAX_IMAGE_AGGREGATE_BYTES} bytes`,
+			]);
+			expect(
+				messages(
+					withObjects(
+						Array.from(
+							{ length: REPOSITORY_EVIDENCE_MAX_IMAGE_OBJECTS + 1 },
+							(_, index) => image(index + 1, 1_024),
+						),
+					),
+				),
+			).toEqual([
+				`A capture holds at most ${REPOSITORY_EVIDENCE_MAX_IMAGE_OBJECTS} images`,
+			]);
+		});
+
+		test("an image is raw, image/<subtype> and at most 32 MiB", () => {
+			expect(
+				messages(
+					withObjects([
+						{ ...image(1, 1_024), contentEncoding: "gzip" },
+						{ ...image(2, 1_024), mediaType: "text/html" },
+						image(3, REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES + 1),
+					]),
+				),
+			).toEqual([
+				"An image object holds its raw bytes (identity encoding)",
+				"An image object needs an image/<subtype> media type",
+				`An image object exceeds ${REPOSITORY_EVIDENCE_MAX_IMAGE_BYTES} bytes`,
+			]);
 		});
 	});
 });

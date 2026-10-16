@@ -744,6 +744,7 @@ describe("live session switches", () => {
 		await withEnvironment({ LIVE_SESSIONS_ENABLED: "false" }, async () => {
 			expect((await owner.cli.authStatus()).capabilities).toEqual({
 				analysisLinkedUploads: true,
+				repositoryEvidenceImages: true,
 				transcriptSlimming: true,
 			});
 			await expect(owner.liveSession.append(request)).rejects.toMatchObject(

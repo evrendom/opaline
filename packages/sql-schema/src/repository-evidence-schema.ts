@@ -51,7 +51,7 @@ export const repositoryEvidenceObject = pgTable(
 		),
 		check(
 			"repository_evidence_object_kind_check",
-			sql`${table.kind} IN ('context-manifest', 'source-blob', 'git-diff', 'transcript-chunk', 'ci-metadata', 'ci-log')`,
+			sql`${table.kind} IN ('context-manifest', 'source-blob', 'git-diff', 'transcript-chunk', 'ci-metadata', 'ci-log', 'image')`,
 		),
 		check(
 			"repository_evidence_object_encoding_check",
@@ -192,6 +192,9 @@ export const repositoryEvidenceCapture = pgTable(
 		// The capture's saved output rows (rudel.session_saved_outputs), published
 		// with its index row; null when the manifest names no saved outputs.
 		savedOutputs: jsonb("saved_outputs"),
+		// The capture's image rows (rudel.session_images), published with its
+		// index row; null when the manifest names no images.
+		images: jsonb("images"),
 		indexPublishedAt: timestamp("index_published_at", { withTimezone: true }),
 		indexNextAttemptAt: timestamp("index_next_attempt_at", {
 			withTimezone: true,

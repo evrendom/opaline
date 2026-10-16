@@ -10,6 +10,11 @@ import {
 	RepositoryEvidenceIndexRowSchema,
 } from "./repository-evidence-index.service.js";
 import {
+	parseStagedSessionImages,
+	persistSessionImageRows,
+	type SessionImageRow,
+} from "./session-images.service.js";
+import {
 	parseStagedSessionSavedOutputs,
 	persistSessionSavedOutputRows,
 	type SessionSavedOutputRow,
@@ -34,12 +39,14 @@ interface PendingCapture {
 	readonly userId: string;
 	readonly indexRow: unknown;
 	readonly savedOutputs: unknown;
+	readonly images: unknown;
 }
 
 interface PublishableCapture {
 	readonly capture: PendingCapture;
 	readonly row: RepositoryEvidenceIndexRow;
 	readonly savedOutputs: readonly SessionSavedOutputRow[];
+	readonly images: readonly SessionImageRow[];
 }
 
 // The capture, its prepared index row and its saved output rows are already
@@ -102,7 +109,7 @@ async function selectPendingCaptures(
 	return database.unsafe<PendingCapture[]>(
 		`SELECT organization_id AS "organizationId", context_id AS "contextId",
 			user_id AS "userId", index_row AS "indexRow",
-			saved_outputs AS "savedOutputs"
+			saved_outputs AS "savedOutputs", images
 		 FROM repository_evidence_capture
 		 WHERE index_row IS NOT NULL AND index_published_at IS NULL
 		   AND ($1::text IS NULL OR (organization_id = $1 AND context_id = $2))
@@ -124,7 +131,7 @@ async function publishCaptures(
 		// purge also deletes the capture row itself.
 		if (await hasClickHousePurgeTombstone(capture, env)) {
 			await env.database.unsafe(
-				`UPDATE repository_evidence_capture SET index_row = NULL, saved_outputs = NULL
+				`UPDATE repository_evidence_capture SET index_row = NULL, saved_outputs = NULL, images = NULL
 				 WHERE organization_id = $1 AND context_id = $2`,
 				[capture.organizationId, capture.contextId],
 			);
@@ -150,10 +157,17 @@ async function publishCaptures(
 				contextId: capture.contextId,
 				count: savedOutputs.invalid,
 			});
+		const images = parseStagedSessionImages(capture.images);
+		if (images.invalid > 0)
+			logger.error("Dropped {count} invalid image rows ({contextId})", {
+				contextId: capture.contextId,
+				count: images.invalid,
+			});
 		publishable.push({
 			capture,
 			row: parsed.data,
 			savedOutputs: savedOutputs.rows,
+			images: images.rows,
 		});
 	}
 	if (publishable.length === 0) return 0;
@@ -220,6 +234,11 @@ async function persistPublication(
 	await persistSessionSavedOutputRows({
 		clickhouse,
 		rows: items.flatMap((item) => item.savedOutputs),
+		signal,
+	});
+	await persistSessionImageRows({
+		clickhouse,
+		rows: items.flatMap((item) => item.images),
 		signal,
 	});
 }

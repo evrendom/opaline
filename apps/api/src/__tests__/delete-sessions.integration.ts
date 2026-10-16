@@ -66,6 +66,7 @@ async function countSkillRows(
 			"rudel.run_setup",
 			"rudel.setup_texts",
 			"rudel.session_saved_outputs",
+			"rudel.session_images",
 		].map(async (table) => {
 			const [row] = await ch.query<CountRow>({
 				query: `SELECT count() AS count FROM ${getSafeClickHouseTable(table)} WHERE ${column} = {value:String}`,
@@ -352,6 +353,29 @@ async function ingestSkillRows(
 			},
 		],
 	});
+	// A screenshot of the session.
+	await ch.insert({
+		table: "rudel.session_images",
+		values: [
+			{
+				organization_id: targetOrgId,
+				user_id: userId,
+				session_id: sessionId,
+				session_source: "claude_code",
+				sha256: "f".repeat(64),
+				agent_id: "",
+				record_idx: 3,
+				media_type: "image/png",
+				bytes: "1024",
+				image_source: "inline",
+				status: "captured",
+				capture_id: crypto.randomUUID(),
+				captured_at: "2026-07-29 10:00:00.000",
+				version: "1",
+				written_at: "2026-07-29 10:00:00.000",
+			},
+		],
+	});
 	// A current snapshot: older ones expire by TTL.
 	const refreshedAt = new Date()
 		.toISOString()
@@ -449,6 +473,7 @@ afterAll(async () => {
 		"rudel.run_setup",
 		"rudel.setup_texts",
 		"rudel.session_saved_outputs",
+		"rudel.session_images",
 		"rudel.session_lineage",
 	]) {
 		await ch
@@ -484,7 +509,7 @@ describe("ClickHouse session purge (integration)", () => {
 			async () =>
 				(await countByOrg(orgId)) > 0 &&
 				(await countSnapshotsByOrg(orgId)) > 0 &&
-				(await countSkillRows("organization_id", orgId)) === 9 &&
+				(await countSkillRows("organization_id", orgId)) === 10 &&
 				(await countLineageRows("organization_id", orgId)) === 1,
 		);
 		expect(inserted).toBe(true);
@@ -517,8 +542,8 @@ describe("ClickHouse session purge (integration)", () => {
 				(await countByUser(userIdBeta)) > 0 &&
 				(await countSnapshotsByUser(userIdAlpha)) > 0 &&
 				(await countSnapshotsByUser(userIdBeta)) > 0 &&
-				(await countSkillRows("user_id", userIdAlpha)) === 9 &&
-				(await countSkillRows("user_id", userIdBeta)) === 9 &&
+				(await countSkillRows("user_id", userIdAlpha)) === 10 &&
+				(await countSkillRows("user_id", userIdBeta)) === 10 &&
 				(await countLineageRows("user_id", userIdAlpha)) === 1 &&
 				(await countLineageRows("user_id", userIdBeta)) === 1,
 		);
@@ -534,7 +559,7 @@ describe("ClickHouse session purge (integration)", () => {
 		expect(await countSnapshotsByUser(userIdAlpha)).toBe(0);
 		expect(await countSnapshotsByUser(userIdBeta)).toBeGreaterThan(0);
 		expect(await countSkillRows("user_id", userIdAlpha)).toBe(0);
-		expect(await countSkillRows("user_id", userIdBeta)).toBe(9);
+		expect(await countSkillRows("user_id", userIdBeta)).toBe(10);
 		expect(await countLineageRows("user_id", userIdAlpha)).toBe(0);
 		expect(await countLineageRows("user_id", userIdBeta)).toBe(1);
 

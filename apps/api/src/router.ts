@@ -412,6 +412,7 @@ const cliAuthStatus = os.cli.authStatus
 			capabilities: {
 				analysisLinkedUploads: true as const,
 				transcriptSlimming: true as const,
+				repositoryEvidenceImages: true as const,
 				...(isLiveSessionsEnabled() ? { liveSessions: true as const } : {}),
 			},
 		};
