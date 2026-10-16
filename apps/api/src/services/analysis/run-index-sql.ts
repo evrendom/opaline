@@ -147,6 +147,48 @@ const COST_STATE_KEYS = [
 ] as const;
 
 const factColumn = (key: string) => `f_${key.replaceAll(".", "_")}`;
+
+/** A Codex turn's provider error (parser 9), named as the run index counts it; '' for anything else. */
+export const CODEX_PROVIDER_ERROR_KIND_SQL = `if(source = 'codex' AND parser_version >= 9, ${providerErrorKindSql("facts['api_errors_components']")}, '')`;
+
+/** The parser facts the run index's event predicates read. */
+type RunEventFact = (
+	key:
+		| "api_error"
+		| "api_error_status"
+		| "api_errors_components"
+		| "retry_attempt"
+		| "refusal_category"
+		| "hook_count",
+) => string;
+
+/**
+ * The records the run index counts as a run's API errors, retries, refusals,
+ * stop hooks and compactions, each over one record: `fact` reads a parser
+ * fact of the record and `providerErrorKind` is the record's
+ * `CODEX_PROVIDER_ERROR_KIND_SQL`. The events view reads the same, so its
+ * rows add up to the runs columns.
+ */
+export const RUN_EVENT_RECORDS = {
+	/** The API error the record carries: Codex's provider error kind, else Claude's `api_error`. */
+	apiError: (fact: RunEventFact, providerErrorKind: string) =>
+		`if(source = 'codex', ${providerErrorKind}, ${fact("api_error")})`,
+	/** The HTTP statuses of the record's API error. */
+	apiErrorStatuses: (fact: RunEventFact, providerErrorKind: string) =>
+		`if(source = 'codex', if(${providerErrorKind} != '', ${httpStatusesSql(fact("api_errors_components"))}, []), if(${fact("api_error_status")} != '', [${fact("api_error_status")}], []))`,
+	/** `api_errors` counts the records where this holds. */
+	isApiError: (fact: RunEventFact, providerErrorKind: string) =>
+		`${RUN_EVENT_RECORDS.apiError(fact, providerErrorKind)} != '' OR notEmpty(${RUN_EVENT_RECORDS.apiErrorStatuses(fact, providerErrorKind)})`,
+	/** `retry_attempts` counts the records where this holds. */
+	isRetry: (fact: RunEventFact) => `${fact("retry_attempt")} != ''`,
+	/** `refusals` counts the records where this holds. */
+	isRefusal: (fact: RunEventFact) => `${fact("refusal_category")} != ''`,
+	/** `hook_count` sums this over the run's records. */
+	hooks: (fact: RunEventFact) => `toUInt64OrZero(${fact("hook_count")})`,
+	/** `compactions` counts the records where this holds. */
+	isCompaction: "kind = 'compaction'",
+} as const;
+
 /** The first value of `expression` in record order among rows where it is set. */
 const first = (expression: string, condition = `${expression} != ''`) =>
 	`argMinIf(${expression}, tuple(record_idx, block_idx), ${condition})`;
@@ -198,7 +240,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 		? `,
 				agent_version, entrypoint, denial_kind, mcp_server, attribution_skill, git_operation,
 				timed_out_after_ms, ifNull(interrupted, false) AS interrupted_call,
-				if(source = 'codex' AND parser_version >= 9, ${providerErrorKindSql("facts['api_errors_components']")}, '') AS provider_error_kind,
+				${CODEX_PROVIDER_ERROR_KIND_SQL} AS provider_error_kind,
 				if(source = 'codex' AND kind = 'tool_result', extractAll(text, '${RUN_INDEX_PR_URL_PATTERN.replaceAll("\\", "\\\\")}'), []) AS result_pr_urls,
 				toUInt8(source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}) AS lifecycle,
 				${RECORD_FACT_KEYS.map((key) => `facts['${key}'] AS ${factColumn(key)}`).join(", ")}`
@@ -377,8 +419,11 @@ function literalRunFacts(): string {
 		"if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx)))";
 	const skillInput = `if(kind = 'tool_call' AND tool_name = 'Skill', ${jsonStringField("head", "skill")}, '')`;
 	const codexSkills = `if(source = 'codex' AND parser_version >= 9, ${skillNamesSql(f("skill_components"))}, [])`;
-	const apiError = `if(source = 'codex', provider_error_kind, ${f("api_error")})`;
-	const apiStatuses = `if(source = 'codex', if(provider_error_kind != '', ${httpStatusesSql(f("api_errors_components"))}, []), if(${f("api_error_status")} != '', [${f("api_error_status")}], []))`;
+	const apiError = RUN_EVENT_RECORDS.apiError(f, "provider_error_kind");
+	const apiStatuses = RUN_EVENT_RECORDS.apiErrorStatuses(
+		f,
+		"provider_error_kind",
+	);
 	const slashCommand =
 		"if(kind = 'injected_context' AND subtype = 'slash_command', trimBoth(extract(head, '<command-name>/?([^<]*)</command-name>')), '')";
 	const jsonEntries = (column: string) =>
@@ -422,7 +467,7 @@ function literalRunFacts(): string {
 					groupUniqArrayIf(${f("skill")}, ${f("skill")} != ''),
 					arrayFlatten(groupArray(${codexSkills}))))) AS l_skills`,
 		`arraySort(groupUniqArrayIf(${slashCommand}, ${slashCommand} != '')) AS l_slash_commands`,
-		`countIf(kind = 'compaction') AS l_compactions`,
+		`countIf(${RUN_EVENT_RECORDS.isCompaction}) AS l_compactions`,
 		`countIf(${f("aborted")} = 'true' AND lifecycle = 0) AS l_aborted_true`,
 		`countIf(${f("aborted")} = 'false' AND lifecycle = 0) AS l_aborted_false`,
 		`countIf(subtype = 'interrupt' AND kind IN ('meta', 'injected_context')) AS l_interrupt_markers`,
@@ -430,13 +475,13 @@ function literalRunFacts(): string {
 		`countIf(${f("prevented_continuation")} = 'true') AS l_prevented_true`,
 		`countIf(${f("prevented_continuation")} = 'false') AS l_prevented_false`,
 		`countIf(${f("hook_count")} != '') AS l_hook_summaries`,
-		`sum(toUInt64OrZero(${f("hook_count")})) AS l_hook_count`,
+		`sum(${RUN_EVENT_RECORDS.hooks(f)}) AS l_hook_count`,
 		`${jsonEntries(f("hook_errors"))} AS l_hook_errors`,
 		`${jsonEntries(f("hook_runs"))} AS l_hook_runs`,
-		`uniqExactIf(record_idx, ${apiError} != '' OR notEmpty(${apiStatuses})) AS l_api_errors`,
+		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isApiError(f, "provider_error_kind")}) AS l_api_errors`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArray(${apiStatuses})))) AS l_api_error_statuses`,
-		`uniqExactIf(record_idx, ${f("retry_attempt")} != '') AS l_retry_attempts`,
-		`uniqExactIf(record_idx, ${f("refusal_category")} != '') AS l_refusals`,
+		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRetry(f)}) AS l_retry_attempts`,
+		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRefusal(f)}) AS l_refusals`,
 		`argMaxIf(${f("goal")}, tuple(record_idx, block_idx), ${f("goal")} != '') AS l_goal`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArrayIf(git_operation, notEmpty(git_operation))))) AS l_git_operations`,
 		`${sortedSet(f("git.push.branch"))} AS l_pushed_branches`,

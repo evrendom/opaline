@@ -1317,6 +1317,7 @@ describe("schema", () => {
 		expect(views.result.views.map((view) => view.name)).toEqual([
 			"runs",
 			"calls",
+			"events",
 			"prompts",
 			"git_events",
 			"edges",

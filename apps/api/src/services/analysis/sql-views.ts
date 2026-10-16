@@ -19,6 +19,7 @@ import {
 	type RunIndexColumnGate,
 } from "./run-index-columns.js";
 import { committedBuildSql } from "./run-index-reader.js";
+import { eventsView } from "./sql-event-views.js";
 import type { SqlWindow } from "./sql-guard.js";
 import { l1SqlViews } from "./sql-l1-views.js";
 import {
@@ -324,6 +325,7 @@ const RUN_ANSWERS: SqlView = {
 export const SQL_VIEWS: readonly SqlView[] = [
 	RUNS,
 	CALLS,
+	eventsView(committedRuns),
 	...l1SqlViews(SQL_SCOPE_PARAMS),
 	FINDING_RUNS,
 	RUN_ANSWERS,
