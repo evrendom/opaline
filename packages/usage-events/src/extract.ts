@@ -57,7 +57,30 @@ interface ClaudeCandidate {
 	inferenceGeo: string;
 	inferenceSpeed: string;
 	serviceTier: string;
+	subInferences: readonly ClaudeSubInference[];
 	transcriptName: string;
+	uncachedInputTokens: number;
+}
+
+/**
+ * A sub-inference Claude reports in `usage.iterations[]` but leaves out of the
+ * top-level usage, so it is billed on top of it at its own model's rates:
+ * - `advisor`: an `advisor_message` entry, the advisor tool's model. The API
+ *   documents top-level usage as the executor's iterations only.
+ * - `declined`: a `message` entry before a `fallback_message`, an attempt the
+ *   requested model declined; top-level usage is the fallback attempt only.
+ */
+interface ClaudeSubInference {
+	kind: "advisor" | "declined";
+	ordinal: number;
+	model: string;
+	cacheReadInputTokens: number;
+	cacheWrite5mInputTokens: number;
+	cacheWrite1hInputTokens: number;
+	cacheWriteInputTokens: number | null;
+	recordedCacheWrite5mInputTokens: number | null;
+	recordedCacheWrite1hInputTokens: number | null;
+	outputTokens: number;
 	uncachedInputTokens: number;
 }
 
@@ -264,7 +287,7 @@ function extractClaudeEvents(
 		groups.set(groupKey, group);
 	}
 
-	return [...groups.values()].map((group) =>
+	return [...groups.values()].flatMap((group) =>
 		mergeClaudeCandidateGroup(input, group, diagnostics),
 	);
 }
@@ -469,8 +492,124 @@ function readClaudeCandidate(
 			qualityFlags,
 			diagnostics,
 		),
+		subInferences: readClaudeSubInferences(usage, qualityFlags, diagnostics),
 		transcriptName,
 		uncachedInputTokens: inputTokens,
+	};
+}
+
+/**
+ * The entries of `usage.iterations[]` that top-level usage leaves out (see
+ * ClaudeSubInference). Executor `message` entries and the serving
+ * `fallback_message` are already in top-level usage and are skipped. A
+ * declined attempt with no output is billed only for some refusal categories,
+ * which usage does not record, so it stays unpriced; an unknown entry type or
+ * an unreadable entry is never guessed at and flags the request instead.
+ */
+function readClaudeSubInferences(
+	usage: Record<string, unknown>,
+	qualityFlags: string[],
+	diagnostics: Map<string, MutableDiagnostic>,
+): readonly ClaudeSubInference[] {
+	if (!Array.isArray(usage.iterations)) return [];
+	const entries = usage.iterations.map((entry) => readRecord(entry));
+	const firstFallback = entries.findIndex(
+		(entry) => entry?.type === "fallback_message",
+	);
+	const subInferences: ClaudeSubInference[] = [];
+	entries.forEach((entry, ordinal) => {
+		const type = entry?.type;
+		if (type === "fallback_message") return;
+		if (type === "message" && (firstFallback < 0 || ordinal > firstFallback)) {
+			return;
+		}
+		const kind =
+			type === "advisor_message"
+				? "advisor"
+				: type === "message"
+					? "declined"
+					: undefined;
+		if (!entry || !kind) {
+			qualityFlags.push("unpriced_usage_iteration");
+			addDiagnostic(
+				diagnostics,
+				"claude_unknown_usage_iteration",
+				false,
+				typeof type === "string" ? type : typeof type,
+			);
+			return;
+		}
+		const tokens = readClaudeIterationTokens(entry);
+		if (!tokens) {
+			qualityFlags.push("unpriced_usage_iteration");
+			addDiagnostic(diagnostics, "claude_invalid_usage_iteration", false, kind);
+			return;
+		}
+		if (kind === "declined" && tokens.outputTokens === 0) {
+			addDiagnostic(
+				diagnostics,
+				"claude_declined_attempt_before_output",
+				false,
+			);
+			return;
+		}
+		subInferences.push({
+			kind,
+			ordinal,
+			model: readNonEmptyString(entry.model) ?? "",
+			...tokens,
+		});
+	});
+	return subInferences;
+}
+
+function readClaudeIterationTokens(
+	entry: Record<string, unknown>,
+): Omit<ClaudeSubInference, "kind" | "ordinal" | "model"> | undefined {
+	const optional = (
+		record: Record<string, unknown> | undefined,
+		key: string,
+	) =>
+		!record || !(key in record) || record[key] === null
+			? 0
+			: readToken(record[key]);
+	const inputTokens = readToken(entry.input_tokens);
+	const outputTokens = readToken(entry.output_tokens);
+	const cacheReadInputTokens = optional(entry, "cache_read_input_tokens");
+	const flatCacheWrite = optional(entry, "cache_creation_input_tokens");
+	const hasNested = "cache_creation" in entry && entry.cache_creation !== null;
+	const cacheCreation = readRecord(entry.cache_creation);
+	const nested5m = optional(cacheCreation, "ephemeral_5m_input_tokens");
+	const nested1h = optional(cacheCreation, "ephemeral_1h_input_tokens");
+	if (
+		inputTokens === undefined ||
+		outputTokens === undefined ||
+		cacheReadInputTokens === undefined ||
+		flatCacheWrite === undefined ||
+		nested5m === undefined ||
+		nested1h === undefined ||
+		(hasNested && !cacheCreation)
+	) {
+		return undefined;
+	}
+	return {
+		uncachedInputTokens: inputTokens,
+		cacheReadInputTokens,
+		cacheWrite5mInputTokens:
+			nested5m + Math.max(0, flatCacheWrite - (nested5m + nested1h)),
+		cacheWrite1hInputTokens: nested1h,
+		cacheWriteInputTokens: Object.hasOwn(entry, "cache_creation_input_tokens")
+			? flatCacheWrite
+			: null,
+		recordedCacheWrite5mInputTokens:
+			cacheCreation && Object.hasOwn(cacheCreation, "ephemeral_5m_input_tokens")
+				? nested5m
+				: null,
+		recordedCacheWrite1hInputTokens:
+			cacheCreation && Object.hasOwn(cacheCreation, "ephemeral_1h_input_tokens")
+				? nested1h
+				: null,
+		outputTokens,
 	};
 }
 
@@ -478,7 +617,7 @@ function mergeClaudeCandidateGroup(
 	input: VersionedUsageExtractionInput,
 	group: readonly ClaudeCandidate[],
 	diagnostics: Map<string, MutableDiagnostic>,
-): UsageEvent {
+): readonly UsageEvent[] {
 	const first = group[0];
 	if (!first) throw new Error("Claude candidate group must not be empty");
 	const qualityFlags = new Set(
@@ -557,7 +696,7 @@ function mergeClaudeCandidateGroup(
 		.join("\u0000");
 	const eventId = getEventId(input, first.identityKind, first.identityValue);
 
-	return {
+	const event: UsageEvent = {
 		organizationId: input.organizationId,
 		userId: input.userId,
 		sessionId: input.sessionId,
@@ -599,7 +738,100 @@ function mergeClaudeCandidateGroup(
 		duplicateObservationCount: group.length - 1,
 		qualityFlags: [...qualityFlags].sort(compareBytes),
 	};
+	return [
+		event,
+		...finalSnapshot.subInferences.map((subInference) =>
+			buildClaudeSubInferenceEvent(input, first, event, subInference),
+		),
+	];
 }
+
+/**
+ * A sub-inference as its own event, priced by its own model: same request,
+ * stream, line and time as the response it is part of, so it lands on the same
+ * run and request. It has no billing dimension of its own (iterations record
+ * none, and Priority Tier does not extend to an advisor), so it is priced at
+ * the model's standard rate.
+ */
+function buildClaudeSubInferenceEvent(
+	input: VersionedUsageExtractionInput,
+	first: ClaudeCandidate,
+	response: UsageEvent,
+	subInference: ClaudeSubInference,
+): UsageEvent {
+	const qualityFlags = new Set(
+		response.qualityFlags.filter((flag) => !SUB_INFERENCE_OWN_FLAGS.has(flag)),
+	);
+	qualityFlags.add(
+		subInference.kind === "advisor" ? "advisor_iteration" : "declined_attempt",
+	);
+	const model = subInference.model
+		? resolveUsageModel(
+				subInference.model,
+				response.occurredAt,
+				qualityFlags,
+				"claude_code",
+			)
+		: { rawModel: "", resolvedModel: "", status: "missing" as const };
+	if (!subInference.model) qualityFlags.add("missing_model");
+	const identityKind = `${first.identityKind}_${subInference.kind}`;
+	return {
+		...response,
+		eventId: getEventId(
+			input,
+			identityKind,
+			`${first.identityValue}\u0000${subInference.ordinal}`,
+		),
+		identityKind,
+		rawModel: model.rawModel,
+		resolvedModel: model.resolvedModel,
+		modelStatus: model.status,
+		serviceTier: "",
+		modelProvider: "",
+		inferenceSpeed: "",
+		inferenceGeo: "",
+		contextInputTokens:
+			subInference.uncachedInputTokens +
+			subInference.cacheReadInputTokens +
+			subInference.cacheWrite5mInputTokens +
+			subInference.cacheWrite1hInputTokens,
+		uncachedInputTokens: subInference.uncachedInputTokens,
+		cacheReadInputTokens: subInference.cacheReadInputTokens,
+		cacheWrite5mInputTokens: subInference.cacheWrite5mInputTokens,
+		cacheWrite1hInputTokens: subInference.cacheWrite1hInputTokens,
+		cacheWriteInputTokens: subInference.cacheWriteInputTokens,
+		recordedCacheWrite5mInputTokens:
+			subInference.recordedCacheWrite5mInputTokens,
+		recordedCacheWrite1hInputTokens:
+			subInference.recordedCacheWrite1hInputTokens,
+		outputTokens: subInference.outputTokens,
+		reasoningOutputTokens: 0,
+		qualityFlags: [...qualityFlags].sort(compareBytes),
+	};
+}
+
+/** Flags about the response's own model or billing dimensions, not its sub-inferences'. */
+const SUB_INFERENCE_OWN_FLAGS = new Set([
+	"model_conflict",
+	"missing_model",
+	"synthetic_model",
+	"unresolved_model",
+	"provider_model_mismatch",
+	"no_public_rate",
+	"provider_mapping_required",
+	"service_tier_conflict",
+	"unrecognized_service_tier",
+	"model_provider_conflict",
+	"unrecognized_model_provider",
+	"inference_speed_conflict",
+	"unrecognized_inference_speed",
+	"inference_geo_conflict",
+	"unrecognized_inference_geo",
+	"inference_geo_not_available",
+	"zero_usage_event",
+	"cache_write_flat_nested_mismatch",
+	"unpriced_usage_iteration",
+]);
 
 function selectClaudeMetadataCandidates(
 	group: readonly ClaudeCandidate[],

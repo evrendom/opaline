@@ -1323,6 +1323,7 @@ describe("schema", () => {
 			"edges",
 			"setup_files",
 			"ci_jobs",
+			"session_links",
 			"finding_runs",
 			"run_answers",
 		]);

@@ -29,6 +29,7 @@ import {
 	measuredRunsSql,
 	RUN_MEASURE_COLUMNS,
 } from "./sql-measures.js";
+import { sessionLinksView } from "./sql-session-links.js";
 
 /**
  * The views an agent's SQL may read (docs/adr/0005-agents-query-l1-with-sql.md).
@@ -142,14 +143,19 @@ const CALL_RUN_COLUMNS = [
 /** The committed run rows a view may read: the caller's workspace, and only their own sessions when `memberOnly`. */
 function committedRuns(memberOnly: boolean): CommittedRuns {
 	const table = getSafeClickHouseTable(RUN_INDEX_TABLE);
-	const owner = `organization_id = {${SQL_SCOPE_PARAMS.workspace}:String}${
-		memberOnly ? ` AND user_id = {${SQL_SCOPE_PARAMS.member}:String}` : ""
-	}`;
+	const owner = memberOwner(memberOnly);
 	return {
 		table,
 		owner,
 		committed: committedBuildSql(table, owner, ["user_id", "session_id"]),
 	};
+}
+
+/** The caller's rows of a table keyed by workspace and member, as `committedRuns` scopes the run index. */
+function memberOwner(memberOnly: boolean): string {
+	return `organization_id = {${SQL_SCOPE_PARAMS.workspace}:String}${
+		memberOnly ? ` AND user_id = {${SQL_SCOPE_PARAMS.member}:String}` : ""
+	}`;
 }
 
 const RUNS: SqlView = {
@@ -327,6 +333,7 @@ export const SQL_VIEWS: readonly SqlView[] = [
 	CALLS,
 	eventsView(committedRuns),
 	...l1SqlViews(SQL_SCOPE_PARAMS),
+	sessionLinksView(committedRuns, memberOwner),
 	FINDING_RUNS,
 	RUN_ANSWERS,
 ];

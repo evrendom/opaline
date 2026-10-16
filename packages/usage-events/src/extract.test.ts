@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	extractUsageEvents,
 	extractUsageEventsAtVersions,
@@ -11,8 +13,8 @@ import {
 } from "./index.js";
 
 describe("usage identity versioning", () => {
-	test("pins literal request snapshots to v5", () => {
-		expect(USAGE_EVENT_EXTRACTION_VERSION).toBe(5);
+	test("pins advisor and declined-attempt sub-inferences to v6", () => {
+		expect(USAGE_EVENT_EXTRACTION_VERSION).toBe(6);
 	});
 
 	test("pins every event and lineage prefix to the identity-version knob", () => {
@@ -921,6 +923,126 @@ describe("Claude usage-event extraction", () => {
 			uncachedInputTokens: 7,
 		});
 		expect(event.qualityFlags).toContain("provider_model_mismatch");
+	});
+});
+
+describe("Claude usage iterations", () => {
+	const fixture = readFileSync(
+		join(import.meta.dir, "__fixtures__", "claude-usage-iterations.jsonl"),
+		"utf8",
+	);
+	const result = complete(extractClaude(fixture));
+	const byKind = (kind: string) =>
+		result.events.filter((event) => event.identityKind === kind);
+	const tokens = (event: UsageEvent | undefined) => ({
+		model: event?.resolvedModel,
+		uncached: event?.uncachedInputTokens,
+		cacheRead: event?.cacheReadInputTokens,
+		cacheWrite1h: event?.cacheWrite1hInputTokens,
+		output: event?.outputTokens,
+	});
+
+	test("top-level usage stays the executor's: executor iterations are not added again", () => {
+		const responses = byKind("message_id");
+		expect(responses).toHaveLength(6);
+		const advisor = responses.find((event) => event.outputTokens === 531);
+		// 412 + 1348 input, 89 + 442 output: the two executor iterations.
+		expect(tokens(advisor)).toEqual({
+			model: "claude-opus-5-5",
+			uncached: 1760,
+			cacheRead: 412,
+			cacheWrite1h: 30,
+			output: 531,
+		});
+		expect(advisor?.duplicateObservationCount).toBe(1);
+	});
+
+	test("each advisor iteration is its own event, priced by the advisor's model", () => {
+		const advisors = byKind("message_id_advisor");
+		expect(
+			advisors.map(tokens).sort((a, b) => (a.output ?? 0) - (b.output ?? 0)),
+		).toEqual([
+			{
+				model: "claude-opus-5-5",
+				uncached: 823,
+				cacheRead: 0,
+				cacheWrite1h: 0,
+				output: 1612,
+			},
+			{
+				model: "claude-fable-5-1",
+				uncached: 70000,
+				cacheRead: 0,
+				cacheWrite1h: 0,
+				output: 2000,
+			},
+		]);
+		for (const advisor of advisors) {
+			const response = result.events.find(
+				(event) =>
+					event.identityKind === "message_id" &&
+					event.firstObservedLine === advisor.firstObservedLine,
+			);
+			expect(advisor).toMatchObject({
+				modelStatus: "resolved",
+				agentId: response?.agentId,
+				lineageId: response?.lineageId,
+				occurredAt: response?.occurredAt,
+				duplicateObservationCount: response?.duplicateObservationCount,
+				serviceTier: "",
+				inferenceSpeed: "",
+				inferenceGeo: "",
+				reasoningOutputTokens: 0,
+			});
+			expect(advisor.qualityFlags).toContain("advisor_iteration");
+			expect(advisor.qualityFlags).not.toContain("inference_geo_not_available");
+			expect(advisor.eventId).not.toBe(response?.eventId);
+		}
+	});
+
+	test("a declined attempt is billed when it produced output, never when it declined before any", () => {
+		expect(byKind("message_id_declined").map(tokens)).toEqual([
+			{
+				model: "claude-fable-5-1",
+				uncached: 5,
+				cacheRead: 1000,
+				cacheWrite1h: 0,
+				output: 120,
+			},
+		]);
+		const fallback = result.events.find((event) => event.outputTokens === 1646);
+		expect(tokens(fallback)).toEqual({
+			model: "claude-opus-4-8",
+			uncached: 4,
+			cacheRead: 193581,
+			cacheWrite1h: 0,
+			output: 1646,
+		});
+		expect(
+			result.diagnostics.find(
+				(diagnostic) =>
+					diagnostic.code === "claude_declined_attempt_before_output",
+			)?.count,
+		).toBe(1);
+	});
+
+	test("an unknown iteration type flags its response instead of being priced", () => {
+		const response = result.events.find((event) => event.outputTokens === 20);
+		expect(response?.qualityFlags).toContain("unpriced_usage_iteration");
+		expect(result.events).toHaveLength(9);
+		expect(
+			result.diagnostics.find(
+				(diagnostic) => diagnostic.code === "claude_unknown_usage_iteration",
+			),
+		).toMatchObject({ count: 1, fatal: false });
+	});
+
+	test("sub-inference event ids are stable across extractions", () => {
+		const again = complete(extractClaude(fixture));
+		expect(again.events.map((event) => event.eventId)).toEqual(
+			result.events.map((event) => event.eventId),
+		);
+		expect(new Set(result.events.map((event) => event.eventId)).size).toBe(9);
 	});
 });
 

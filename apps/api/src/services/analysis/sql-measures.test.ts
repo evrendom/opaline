@@ -65,6 +65,7 @@ test("schema lists the approved impact measures with their definitions next to t
 		"edges",
 		"setup_files",
 		"ci_jobs",
+		"session_links",
 		"finding_runs",
 		"run_answers",
 	]);
