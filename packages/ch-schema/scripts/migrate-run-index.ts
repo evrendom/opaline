@@ -23,6 +23,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { runIndexNotFoundStatement } from "./migrate-not-found-unknown.js";
+import { runIndexApprovalsStatement } from "./migrate-run-index-approvals.js";
 import { runIndexCaptureGapsStatement } from "./migrate-run-index-capture-gaps.js";
 import { runIndexMessagesStatement } from "./migrate-run-index-messages.js";
 
@@ -104,6 +105,10 @@ export async function runRunIndexMigration(options: {
 	// The run index capture gaps migration's columns.
 	await options.executor.execute(
 		runIndexCaptureGapsStatement(options.targetDatabase),
+	);
+	// The run index approvals migration's columns.
+	await options.executor.execute(
+		runIndexApprovalsStatement(options.targetDatabase),
 	);
 
 	const { attempts, delayMs } = options.readBack ?? {

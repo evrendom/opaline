@@ -202,6 +202,7 @@ describe("Codex lifecycle attribution", () => {
 			model: "gpt-a",
 			models: ["gpt-a"],
 			effort: "high",
+			efforts: ["high"],
 			contextWindow: "258400",
 			durationMs: 1000,
 			timeToFirstTokenMs: "100",
@@ -223,6 +224,7 @@ describe("Codex lifecycle attribution", () => {
 			model: "gpt-c",
 			models: ["gpt-c"],
 			effort: "low",
+			efforts: ["low"],
 		});
 	});
 
@@ -286,6 +288,32 @@ describe("a completion without a turn id", () => {
 			expect([...byRun.keys()]).toEqual([streamTurnKey("", 1)]);
 		});
 	}
+
+	test("a run keeps every effort its rows record, and a usage limit on any of them", () => {
+		const facts = codexLifecycleFactsByRun(
+			[
+				{ ...row("turn_context", 5, 1), effort: "xhigh" },
+				{ ...row("turn_context", 6, 1), effort: "low" },
+				{ ...row("turn_context", 6, 1), block_idx: 1, effort: "xhigh" },
+				{ ...row("task_complete", 8, 1), turn_error_kind: "server_overloaded" },
+				{
+					...row("task_complete", 9, 1),
+					turn_error_kind: "usage_limit_exceeded",
+				},
+			],
+			twoRuns,
+		).get(streamTurnKey("", 1));
+		expect(facts?.effort).toBe("xhigh");
+		expect(facts?.efforts).toEqual(["low", "xhigh"]);
+		// The first turn error stays the run's; the usage limit is still seen.
+		expect(facts?.turnErrorKind).toBe("server_overloaded");
+		expect(facts?.usageLimited).toBe(true);
+		expect(
+			codexLifecycleFactsByRun([row("task_complete", 8, 1)], twoRuns).get(
+				streamTurnKey("", 1),
+			)?.usageLimited,
+		).toBe(false);
+	});
 
 	test("a completion before the first prompt belongs to no run", () => {
 		expect(

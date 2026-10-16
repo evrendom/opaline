@@ -41,6 +41,8 @@ export interface CodexLifecycleFacts {
 	model: string;
 	models: string[];
 	effort: string;
+	/** Every effort of the run's rows, sorted; effort is the first. */
+	efforts: string[];
 	contextWindow: string;
 	/** Sum of the run's task and abort durations; null when none records one. */
 	durationMs: number | null;
@@ -48,6 +50,8 @@ export interface CodexLifecycleFacts {
 	timeToFirstTokenMs: string;
 	turnError: string;
 	turnErrorKind: string;
+	/** Whether a row of the run records the turn error usage_limit_exceeded. */
+	usageLimited: boolean;
 	abortReason: string;
 	abortedTrue: number;
 	abortedFalse: number;
@@ -63,11 +67,13 @@ export const NO_CODEX_LIFECYCLE_FACTS: CodexLifecycleFacts = {
 	model: "",
 	models: [],
 	effort: "",
+	efforts: [],
 	contextWindow: "",
 	durationMs: null,
 	timeToFirstTokenMs: "",
 	turnError: "",
 	turnErrorKind: "",
+	usageLimited: false,
 	abortReason: "",
 	abortedTrue: 0,
 	abortedFalse: 0,
@@ -134,6 +140,7 @@ export function codexLifecycleFactsByRun(
 		const facts = byRun.get(key) ?? {
 			...NO_CODEX_LIFECYCLE_FACTS,
 			models: [],
+			efforts: [],
 		};
 		facts.approvalPolicy ||= row.approval_policy;
 		facts.approvalsReviewer ||= row.approvals_reviewer;
@@ -145,9 +152,13 @@ export function codexLifecycleFactsByRun(
 		if (row.model !== "" && !facts.models.includes(row.model))
 			facts.models = [...facts.models, row.model].sort();
 		facts.effort ||= row.effort;
+		if (row.effort !== "" && !facts.efforts.includes(row.effort))
+			facts.efforts = [...facts.efforts, row.effort].sort();
 		facts.contextWindow ||= row.context_window;
 		facts.turnError ||= row.turn_error;
 		facts.turnErrorKind ||= row.turn_error_kind;
+		if (row.turn_error_kind === "usage_limit_exceeded")
+			facts.usageLimited = true;
 		facts.abortReason ||= row.abort_reason;
 		if (row.subtype === "task_complete")
 			facts.timeToFirstTokenMs ||= row.time_to_first_token_ms;

@@ -40,6 +40,8 @@ import {
 import {
 	gateRunIndexRow,
 	isRunIndexColumnRecordable,
+	RUN_PERMISSION_COLUMNS,
+	type RunIndexFactColumn,
 } from "../analysis/run-index-columns.js";
 import { readCommittedRunIndex } from "../analysis/run-index-reader.js";
 import {
@@ -359,8 +361,11 @@ export async function buildRunIndex(input: {
 		sessionDate: clickHouseTime(facts.session_date_ms),
 		repository: recorded?.repository ?? "",
 	};
-	const finish = (row: RudelRunIndexRow) =>
-		gateRunIndexRow(row, { usageUnknown: usage.state === "unknown" });
+	const finish = (
+		row: RudelRunIndexRow,
+		unknown: readonly RunIndexFactColumn[] = [],
+	) =>
+		gateRunIndexRow(row, { usageUnknown: usage.state === "unknown", unknown });
 	const mcpUnavailable = carriedMcpUnavailable(
 		isRunIndexColumnRecordable(
 			"mcp_unavailable",
@@ -385,6 +390,7 @@ export async function buildRunIndex(input: {
 				directories(run.agent_id, run.turn_idx),
 				mcpUnavailable(run),
 			),
+			runUnknownColumns(run),
 		),
 	);
 	const requestRows = requests.map((request) =>
@@ -719,6 +725,7 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		model: null,
 		models: [],
 		effort: null,
+		efforts: [],
 		per_turn_effort: null,
 		context_window: null,
 		context_input_tokens_at_start: null,
@@ -733,6 +740,10 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		denied_calls: null,
 		interrupted_calls: null,
 		timed_out_calls: null,
+		approvals_by_user: null,
+		approvals_by_hook: null,
+		approvals_by_config: null,
+		permission_prompts: null,
 		mcp_calls: null,
 		mcp_servers: [],
 		mcp_unavailable: [],
@@ -757,6 +768,8 @@ function baseRow(context: RowContext): RudelRunIndexRow {
 		api_error: null,
 		api_error_statuses: [],
 		retry_attempts: null,
+		rate_limit_max_used_percent: null,
+		rate_limited: null,
 		refusals: null,
 		fallback_model: null,
 		goal: null,
@@ -823,6 +836,19 @@ function usageColumns(
 		reasoning_output_tokens: usage.reasoning_output_tokens,
 		context_input_tokens_at_start: usage.context_input_tokens_at_start,
 	};
+}
+
+/**
+ * The fact columns a run's own records cannot say, though its generation
+ * records them: who approved its calls, when it has tool results and none
+ * records a permission decision (a Claude Code version before 2.1.293, or a
+ * subagent stream that writes none). A run whose only results are refusals
+ * still says its prompts: a user's rejection is recorded in every version.
+ */
+export function runUnknownColumns(
+	run: Pick<RunIndexFactsRow, "l_permissions_unrecorded">,
+): readonly RunIndexFactColumn[] {
+	return run.l_permissions_unrecorded > 0 ? RUN_PERMISSION_COLUMNS : [];
 }
 
 /**
@@ -923,6 +949,7 @@ export function runRow(
 		model: lifecycle.model || run.l_model,
 		models: sortedUnion(run.l_models, lifecycle.models),
 		effort: lifecycle.effort || run.l_effort,
+		efforts: sortedUnion(run.l_efforts, lifecycle.efforts),
 		per_turn_effort:
 			context.session.source === "codex"
 				? lifecycle.effort || run.l_effort
@@ -939,6 +966,10 @@ export function runRow(
 		denied_calls: run.l_denied_calls,
 		interrupted_calls: run.l_interrupted_calls,
 		timed_out_calls: run.l_timed_out_calls,
+		approvals_by_user: run.l_approvals_by_user,
+		approvals_by_hook: run.l_approvals_by_hook,
+		approvals_by_config: run.l_approvals_by_config,
+		permission_prompts: run.l_permission_prompts,
 		mcp_calls: run.l_mcp_calls,
 		mcp_servers: run.l_mcp_servers,
 		mcp_unavailable: [...mcpUnavailable],
@@ -972,6 +1003,8 @@ export function runRow(
 		api_error: run.l_api_error,
 		api_error_statuses: run.l_api_error_statuses,
 		retry_attempts: run.l_retry_attempts,
+		rate_limit_max_used_percent: run.l_rate_limit_max_used_percent,
+		rate_limited: run.l_rate_limited > 0 || lifecycle.usageLimited,
 		refusals: run.l_refusals,
 		fallback_model: run.l_fallback_model,
 		goal: run.l_goal,
@@ -1133,6 +1166,11 @@ export function receiptRow(
 			...run.l_models,
 			...(session.lifecycle.get(streamTurnKey(run.agent_id, run.turn_idx))
 				?.models ?? []),
+		]),
+		efforts: merged((run) => [
+			...run.l_efforts,
+			...(session.lifecycle.get(streamTurnKey(run.agent_id, run.turn_idx))
+				?.efforts ?? []),
 		]),
 		tool_calls: total((run) => run.tool_calls),
 		failed_calls: total((run) => run.failed_calls),

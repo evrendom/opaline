@@ -943,7 +943,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		view: "calls",
 		meaning:
 			"Why a call was refused, as the agent names it (permission rule, user rejection, sandbox).",
-		runIndex: ["denied_calls"],
+		runIndex: ["denied_calls", "permission_prompts"],
 		agents: {
 			claude_code: stored(
 				["user.toolDenialKind"],
@@ -4733,6 +4733,12 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		view: "calls",
 		meaning:
 			"The recorded permission decision for a call (accept or reject) and who made it (configuration, a hook, the user).",
+		runIndex: [
+			"approvals_by_user",
+			"approvals_by_hook",
+			"approvals_by_config",
+			"permission_prompts",
+		],
 		decision:
 			"Does a permission accepted by configuration (Claude `source: config`, `reasonType: mode`; Codex approved command prefixes) count as an approval, or only a decision a person made at the time (`user_temporary`, a Codex approval prompt)?",
 		agents: {
@@ -4762,7 +4768,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						},
 					],
 					notes:
-						"Pre-v9 historical: " +
+						"runs counts the calls accepted by each source (approvals_by_user: user_temporary and user_permanent; approvals_by_hook; approvals_by_config) and the calls a person decided at a prompt (permission_prompts: a user source without a reasonType, or denial_kind user-rejected, which carries no decision). Production, parser 10, 60 days to 2026-10-16, call to result time by decision: config p50 0.1 to 1.9 s (mode 23,196, classifier 4,194), hook 57 ms (68), user_permanent with reasonType rule 346 ms (51: a rule saved at an earlier prompt), user_temporary 61 s (47), user_permanent without reasonType 21 s (3), user-rejected 24 s (24). Claude Code writes permissionDecision from 2.1.293 (30 days: 0 of the results of 2.1.292 and older, 99.9% of main-stream results of 2.1.293 and newer; 16 of their 244 streams with results write none), so a run with results none of which records one is unknown (runs.unrecorded_facts)." +
+						" Pre-v9 historical: " +
 						"A recorded decision; it does not say a dialog was shown. Locally almost all are automatic: about 4,700 `accept` by `config` (`reasonType: mode`, sessions in `bypassPermissions` mode), 17 `reject` by a hook, and 5 `accept` by the user (`user_temporary`); a person's refusal is denial_kind `user-rejected` (3) or `cancelled` (5)." +
 						" Current: " +
 						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.",
@@ -5967,7 +5974,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "effort",
 		view: "runs",
 		meaning: "The reasoning effort the run used.",
-		runIndex: ["effort", "per_turn_effort"],
+		runIndex: ["effort", "efforts", "per_turn_effort"],
 		agents: {
 			claude_code: stored(
 				["assistant.effort", "assistant.perTurnEffort"],
@@ -6785,6 +6792,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "rate_limits",
 		view: "runs",
 		meaning: "The rate-limit and quota state the provider reported.",
+		runIndex: ["rate_limit_max_used_percent", "rate_limited"],
 		agents: {
 			claude_code: stored(
 				[
@@ -6810,7 +6818,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						},
 					],
 					notes:
-						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.",
+						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component." +
+						" runs.rate_limited reads status rejected with the rate_limit API error; Claude Code reports no share of a window used, so rate_limit_max_used_percent is Codex only. Production, 60 days to 2026-10-16: 11 quotaLimits records, all status rejected on api_error_message records with API error rate_limit (HTTP 429; rateLimitType five_hour 9, seven_day 2); 55 rate_limit API errors in all.",
 				},
 			),
 			codex: stored(
@@ -6867,7 +6876,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					],
 					notes:
 						"Pre-v9 historical: " +
-						"A usage percentage alone does not prove a request was limited. `rate_limit_reached_type` is on every token count and always null locally; a turn that hit the limit ends with turn_error_kind `usage_limit_exceeded` (21 locally). Parser review: No parser value is stored for this pending proposal. rate_limits last appears in 0.159.2 locally; later versions may drop it. Residue path event_msg/image_generation_end.failure.limitId is recorded but unparsed; no local witness and no semantic verification is claimed. Residue path event_msg/image_generation_end.failure.resetsAt is recorded but unparsed; no local witness and no semantic verification is claimed." +
+						"A usage percentage alone does not prove a request was limited. `rate_limit_reached_type` is on every token count and always null locally; a turn that hit the limit ends with turn_error_kind `usage_limit_exceeded` (21 locally). runs.rate_limit_max_used_percent is the highest primary or secondary used_percent of the run's token counts, and runs.rate_limited the usage_limit_exceeded turn error. Production, 60 days to 2026-10-16: rate_limit_reached_type and spend_control_reached null on all 66,839 parser 10 token counts with rate limits; windows of 10,080 minutes (65,419) and 300 (1,346); 103 Codex runs reached used_percent 100 and 95 of them recorded no usage_limit_exceeded error, so 100 is not a refusal. Parser review: No parser value is stored for this pending proposal. rate_limits last appears in 0.159.2 locally; later versions may drop it. Residue path event_msg/image_generation_end.failure.limitId is recorded but unparsed; no local witness and no semantic verification is claimed. Residue path event_msg/image_generation_end.failure.resetsAt is recorded but unparsed; no local witness and no semantic verification is claimed." +
 						" Current: " +
 						"Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component.",
 				},
@@ -8455,7 +8464,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		id: "api_errors",
 		view: "runs",
 		meaning: "Errors the model provider returned.",
-		runIndex: ["api_errors", "api_error", "api_error_statuses"],
+		runIndex: ["api_errors", "api_error", "api_error_statuses", "rate_limited"],
 		agents: {
 			claude_code: stored(
 				[

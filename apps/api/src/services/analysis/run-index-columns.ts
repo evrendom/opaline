@@ -109,6 +109,26 @@ export const RUN_INDEX_NARROWED_COLUMNS = {
 		codex:
 			"Codex generic terminal errors include cyber_policy/misalignment_policy_violation; these report policy termination, not a recorded model refusal. Counting all errors or policy stops as model refusals changes the meaning.",
 	},
+	approvals_by_user: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	approvals_by_hook: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	approvals_by_config: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	permission_prompts: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	rate_limit_max_used_percent: {
+		claude_code:
+			"Claude Code writes quotaLimits only on a refused request (status rejected, production: 11 records in 60 days, all on rate_limit API errors), with no share of a window used: rate_limited counts that refusal.",
+	},
 } satisfies Partial<
 	Record<keyof RudelRunIndexRow, Partial<Record<TranscriptSource, string>>>
 >;
@@ -151,6 +171,8 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	per_turn_effort: gate(7, BOTH, ["per_turn_effort"], "run", undefined, {
 		codex: ["effort"],
 	}),
+	// Every effort the run recorded; effort is the first of them.
+	efforts: gate(7, BOTH, ["effort"], "both"),
 	context_window: gate(7, CODEX, ["context_window"]),
 	// Codex refusals and stopped calls are read from its output since parser 8.
 	// Claude Code writes toolDenialKind on subagent results too.
@@ -167,6 +189,16 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		...gate(6, CLAUDE, ["timedOutAfterMs"]),
 		subagentSinceBy: { claude_code: 11 },
 	},
+	// Claude Code permissionDecision on each tool result (written from
+	// 2.1.293; a run none of whose results records one is unknown, see
+	// runPermissionsUnrecorded). Codex persists no per-call decision.
+	approvals_by_user: gate(9, CLAUDE, ["permission_decision_components"]),
+	approvals_by_hook: gate(9, CLAUDE, ["permission_decision_components"]),
+	approvals_by_config: gate(9, CLAUDE, ["permission_decision_components"]),
+	permission_prompts: gate(9, CLAUDE, [
+		"permission_decision_components",
+		"denialKind",
+	]),
 	// Claude Code's deferred_tools_delta server lists; Codex records no
 	// server state, only an auth failure in one MCP result's metadata.
 	mcp_unavailable: gate(9, CLAUDE, ["mcp_server_state_components"]),
@@ -245,6 +277,18 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		},
 	),
 	retry_attempts: gate(7, CLAUDE, ["retry_attempt"]),
+	// Codex token_count rate_limits windows; Claude Code reports no share used.
+	rate_limit_max_used_percent: gate(9, CODEX, ["rate_limits_components"]),
+	// Claude Code rate_limit API errors and quotaLimits rejections, Codex
+	// usage_limit_exceeded turn errors.
+	rate_limited: gate(
+		9,
+		BOTH,
+		["api_error", "rate_limits_components"],
+		"run",
+		undefined,
+		{ codex: ["api_errors_components"] },
+	),
 	// A Claude Code subagent stream has no model_refusal record: its
 	// safety-classifier notice (parser 11 `safety_recovery`) is the refusal.
 	refusals: {
@@ -306,6 +350,19 @@ export const RUN_INDEX_FACT_COLUMNS = {
 >;
 
 export type RunIndexFactColumn = keyof typeof RUN_INDEX_FACT_COLUMNS;
+
+/**
+ * The run columns read from Claude Code's permission decisions. A Claude
+ * Code version before 2.1.293, and some subagent streams, write none, so a
+ * run with results of which none records a decision cannot say who approved
+ * its calls: these columns are unknown on it, not 0.
+ */
+export const RUN_PERMISSION_COLUMNS = [
+	"approvals_by_user",
+	"approvals_by_hook",
+	"approvals_by_config",
+	"permission_prompts",
+] as const satisfies readonly RunIndexFactColumn[];
 
 /**
  * Whether a generation of `parserVersion` from `source` can record the
@@ -371,18 +428,27 @@ export const RUN_INDEX_USAGE_COLUMNS = [
 /**
  * The row with every column it cannot record set to unknown: scalars NULL,
  * arrays and maps empty, all of them named in `unrecorded_facts`. With
- * `usageUnknown`, the usage columns too.
+ * `usageUnknown`, the usage columns too; `unknown` names fact columns this
+ * row's own records cannot say, though its generation records them.
  */
 export function gateRunIndexRow(
 	row: RudelRunIndexRow,
-	options: { usageUnknown?: boolean } = {},
+	options: {
+		usageUnknown?: boolean;
+		unknown?: readonly RunIndexFactColumn[];
+	} = {},
 ): RudelRunIndexRow {
-	const unrecorded = unrecordedRunIndexColumns(
-		row.row_kind === "receipt" ? "receipt" : "run",
-		row.parser_version,
-		row.source,
-		row.agent_id,
-	);
+	const unrecorded = [
+		...new Set([
+			...unrecordedRunIndexColumns(
+				row.row_kind === "receipt" ? "receipt" : "run",
+				row.parser_version,
+				row.source,
+				row.agent_id,
+			),
+			...(options.unknown ?? []),
+		]),
+	].sort();
 	const gated: Record<string, unknown> = { ...row };
 	for (const column of unrecorded) {
 		const value = gated[column];

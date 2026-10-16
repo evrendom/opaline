@@ -82,6 +82,7 @@ const FORWARD_SCRIPTS = new Map([
 		"20261016150000_run_index_capture_gaps.sql",
 		"migrate-run-index-capture-gaps.ts",
 	],
+	["20261016170000_run_index_approvals.sql", "migrate-run-index-approvals.ts"],
 	[
 		"20261016180000_evidence_setup_snapshot.sql",
 		"migrate-repository-evidence-index.ts",

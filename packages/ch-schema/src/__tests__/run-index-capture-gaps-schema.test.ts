@@ -89,7 +89,7 @@ describe("run index capture gaps migration", () => {
 		);
 		expect(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ ch:migrate:run-index-capture-gaps"/u);
+		).toMatch(/ ch:migrate:run-index-capture-gaps[ "]/u);
 	});
 
 	test("publication proof rejects lagging replicas and other definitions", () => {

@@ -210,6 +210,8 @@ Each run also lists the MCP servers that were unavailable to it (`mcp_unavailabl
 
 Each run also keeps the subtype of the prompt it starts with (`prompt_subtype`: '' typed while the agent waited, `queued` typed while it worked, `delegation` a parent agent's task). A queued prompt starts a new run, which is right (the agent reads it at its next request), but the run before then ends mid-work: the runs view says so (`ended_by_queued_prompt`, from the next run's `prompt_subtype` in the same stream) and reads that run's last message as not said done, so it is never re-asked.
 
+Each run also says who approved its calls and what limits held it up. Claude Code (2.1.293 and newer) writes on each tool result who decided its permission (`permissionDecision` `source`): the run counts the calls accepted by the user (`approvals_by_user`: `user_temporary`, or `user_permanent`, which also marks the later calls a rule saved that way allows, with `reasonType` `rule`), by a hook (`approvals_by_hook`) and by configuration (`approvals_by_config`), and the calls a person decided at a prompt while the agent waited (`permission_prompts`: a user decision without a `reasonType`, or a `user-rejected` denial, which carries no decision). A run with results none of which records a decision is unknown for all four (`unrecorded_facts`). Codex writes no per-call decision. Codex reports its account's rate-limit windows on every token count: `rate_limit_max_used_percent` is the highest `used_percent` of the run's, and `rate_limited` says whether a request of the run was refused for a limit (a Claude Code `rate_limit` API error or `quotaLimits` rejection, a Codex `usage_limit_exceeded` turn error); a full window alone is not a refusal. `efforts` lists every effort the run recorded, where `effort` is the first.
+
 ## Received setup
 
 The setup a run received (CONTEXT.md "Received setup", OPL-391) is what its transcript records, never what is on disk. Parser 10 names each piece of setup text on the record that carries it, in `facts['received_setup']` (kind, recorded path, name, working directory, SHA-256 and length): the Claude Code `prompt_snapshot` system prompt (its fixed part and, after `__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__`, its per-session part), `instructions` files (`files[].content`), `nested_memory`, MCP instruction blocks and skill bodies (`Base directory for this skill:`, without that line and the invocation's `ARGUMENTS:`); Codex base instructions, developer message blocks (named by their leading tag; the skill listing is left to OPL-392), AGENTS.md injections and a whole SKILL.md the agent printed with `cat`. The transcript-records writer stores each distinct text once per member in `rudel.setup_texts` (keyed by hash; cut at 1 MiB, hash and length of the whole), before the generation's receipt. The system prompt's parts in `instruction_text_components` are no longer cut at 4,096 and 65,536 characters (now 262,144 per part and 524,288 per record).
@@ -297,11 +299,14 @@ C = Claude Code; X = Codex. Versions below are the first readable representation
 | `model` | `runs/model` | C v7; X v7 | C v7; X v7 |
 | `models` | `runs/model` | C v7; X v7 | C v7; X v7 |
 | `effort` | `runs/effort` | C v7; X v7 | C v7; X v7 |
+| `efforts` | `runs/effort` | none | C v7; X v7 |
 | `per_turn_effort` | `runs/effort` | C v7 | C v7; X v7 |
 | `context_window` | `runs/context_window` | X v7 | X v7 |
 | `denied_calls` | `calls/denial_kind` | C v9; X v9 | C v9; X v9 |
 | `interrupted_calls` | `calls/interrupted` | C v6; X v8 | C v6; X v8 |
 | `timed_out_calls` | `calls/timed_out_after_ms` | C v6 | C v6 |
+| `approvals_by_user`, `approvals_by_hook`, `approvals_by_config` | `calls/permission_decision` | none | C v9 (2.1.293+) |
+| `permission_prompts` | `calls/permission_decision` + `calls/denial_kind` | none | C v9 (2.1.293+) |
 | `mcp_calls` | `calls/mcp_server` | C v9; X v6 | C v9; X v6 |
 | `mcp_unavailable` | `runs/mcp_server_state` | none | C v9 |
 | `mcp_servers` | `calls/mcp_server` | C v9; X v6 | C v9; X v6 |
@@ -324,6 +329,8 @@ C = Claude Code; X = Codex. Versions below are the first readable representation
 | `api_error` | `runs/api_errors` | C v7 | C v7; X v9 |
 | `api_error_statuses` | `runs/api_errors` | C v7 | C v7; X v9 |
 | `retry_attempts` | `runs/retry_attempts` | C v7 | C v7 |
+| `rate_limit_max_used_percent` | `runs/rate_limits` | none | X v9 |
+| `rate_limited` | `runs/rate_limits` + `runs/api_error` | none | C v9; X v9 |
 | `refusals` | `runs/refusals` | C v7 | C v7; **NARROWED N6** |
 | `fallback_model` | `runs/fallback_model` | C v7 | C v7 |
 | `goal` | `runs/goal` | X v7 | X v7 |

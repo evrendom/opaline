@@ -15,6 +15,7 @@ import type {
 } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
 import { NO_CODEX_LIFECYCLE_FACTS } from "../analysis/codex-lifecycle.js";
+import { gateRunIndexRow } from "../analysis/run-index-columns.js";
 import {
 	buildRunIndexStatement,
 	buildUnattributedUsageStatement,
@@ -36,6 +37,7 @@ import {
 	RunIndexUsageChangedError,
 	runIndexUsage,
 	runRow,
+	runUnknownColumns,
 	selectRetiredSnapshots,
 } from "./run-index.service.js";
 
@@ -1150,6 +1152,108 @@ describe("run index rows", () => {
 				context,
 			).prompt_origin_basis,
 		).toBe("native");
+	});
+
+	test("who approved a run's calls is counted, and unknown when none of its results records a decision", () => {
+		const claude = {
+			...context,
+			generation: { ...context.generation, parserVersion: 12 },
+		};
+		const counted = facts({
+			l_approvals_by_user: 2,
+			l_approvals_by_hook: 1,
+			l_approvals_by_config: 40,
+			l_permission_prompts: 3,
+		});
+		expect(
+			gateRunIndexRow(runRow(counted, NO_CODEX_LIFECYCLE_FACTS, claude), {
+				unknown: runUnknownColumns(counted),
+			}),
+		).toMatchObject({
+			approvals_by_user: 2,
+			approvals_by_hook: 1,
+			approvals_by_config: 40,
+			permission_prompts: 3,
+		});
+		// A Claude Code version that writes no permissionDecision.
+		const silent = facts({ l_permissions_unrecorded: 1 });
+		const unknown = gateRunIndexRow(
+			runRow(silent, NO_CODEX_LIFECYCLE_FACTS, claude),
+			{ unknown: runUnknownColumns(silent) },
+		);
+		expect(unknown).toMatchObject({
+			approvals_by_user: null,
+			approvals_by_hook: null,
+			approvals_by_config: null,
+			permission_prompts: null,
+		});
+		expect(unknown.unrecorded_facts).toEqual(
+			expect.arrayContaining([
+				"approvals_by_config",
+				"approvals_by_hook",
+				"approvals_by_user",
+				"permission_prompts",
+			]),
+		);
+		// Codex persists no per-call decision: unknown on every run.
+		const codex = gateRunIndexRow(
+			runRow(counted, NO_CODEX_LIFECYCLE_FACTS, {
+				...claude,
+				session: { ...session, source: "codex" },
+			}),
+		);
+		expect(codex.approvals_by_user).toBeNull();
+		expect(codex.unrecorded_facts).toContain("permission_prompts");
+	});
+
+	test("a run's rate limits and efforts come from its records and its Codex lifecycle rows", () => {
+		const codex = {
+			...context,
+			generation: { ...context.generation, parserVersion: 12 },
+			session: { ...session, source: "codex" },
+		};
+		const row = gateRunIndexRow(
+			runRow(
+				facts({ l_rate_limit_max_used_percent: 97.5, l_efforts: [] }),
+				{
+					...NO_CODEX_LIFECYCLE_FACTS,
+					effort: "xhigh",
+					efforts: ["low", "xhigh"],
+					usageLimited: true,
+				},
+				codex,
+			),
+		);
+		expect(row).toMatchObject({
+			effort: "xhigh",
+			efforts: ["low", "xhigh"],
+			rate_limit_max_used_percent: 97.5,
+			rate_limited: true,
+		});
+		const claude = gateRunIndexRow(
+			runRow(
+				facts({
+					l_rate_limited: 1,
+					l_rate_limit_max_used_percent: null,
+					l_effort: "high",
+					l_efforts: ["high", "medium"],
+				}),
+				NO_CODEX_LIFECYCLE_FACTS,
+				{ ...codex, session },
+			),
+		);
+		expect(claude).toMatchObject({
+			effort: "high",
+			efforts: ["high", "medium"],
+			rate_limited: true,
+			rate_limit_max_used_percent: null,
+		});
+		// Claude Code reports no share of a window used.
+		expect(claude.unrecorded_facts).toContain("rate_limit_max_used_percent");
+		expect(
+			gateRunIndexRow(runRow(facts(), NO_CODEX_LIFECYCLE_FACTS, codex))
+				.rate_limited,
+		).toBe(false);
 	});
 
 	test("Codex lifecycle facts fill the run; the usage of a run without usage stays unknown", () => {

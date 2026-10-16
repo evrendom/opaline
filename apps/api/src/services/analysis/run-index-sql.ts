@@ -203,6 +203,27 @@ const sortedSet = (expression: string) =>
 	`arraySort(groupUniqArrayIf(${expression}, ${expression} != ''))`;
 
 /**
+ * A field of the permission decision a Claude Code tool result records
+ * (`permissionDecision` decision, source or reasonType); '' when none.
+ */
+const permissionField = (field: string) =>
+	`if(source = 'claude_code' AND kind = 'tool_result', arrayElement(${componentStringsSql("facts['permission_decision_components']", `^user[.]permissionDecision[.]${field}$`)}, 1), '')`;
+
+/** The used_percent of each rate-limit window a Codex token count reports (primary, secondary). */
+const RATE_LIMIT_USED = `if(source = 'codex' AND kind = 'meta' AND subtype = 'token_count',
+	arrayMap(component -> JSONExtractFloat(component, 'value'), arrayFilter(component ->
+		match(JSONExtractString(component, 'path'), '^event_msg/token_count[.]rate_limits[.](primary|secondary)[.]used_percent$')
+		AND JSONType(component, 'value') IN ('Int64', 'UInt64', 'Double'), JSONExtractArrayRaw(facts['rate_limits_components']))),
+	CAST([], 'Array(Float64)'))`;
+
+/** A Claude Code request its quota refused (`quotaLimits.status` rejected). */
+const QUOTA_REJECTED = `source = 'claude_code' AND has(${componentStringsSql("facts['rate_limits_components']", "^assistant[.]quotaLimits[.]status$")}, 'rejected')`;
+
+/** Who accepted a call at a permission prompt or by a rule they saved there. */
+const USER_DECIDED =
+	"permission_source IN ('user_temporary', 'user_permanent')";
+
+/**
  * A failed call's record: an error or non-zero exit on its result, or on the
  * Codex completion row (parser 9) that carries the call's outcome.
  */
@@ -250,6 +271,9 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				${CODEX_PROVIDER_ERROR_KIND_SQL} AS provider_error_kind,
 				if(source = 'codex' AND kind = 'tool_result', extractAll(text, '${RUN_INDEX_PR_URL_PATTERN.replaceAll("\\", "\\\\")}'), []) AS result_pr_urls,
 				toUInt8(source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}) AS lifecycle,
+				${permissionField("decision")} AS permission_decision, ${permissionField("source")} AS permission_source,
+				${permissionField("reasonType")} AS permission_reason,
+				${RATE_LIMIT_USED} AS rate_limit_used, toUInt8(${QUOTA_REJECTED}) AS quota_rejected,
 				${RECORD_FACT_KEYS.map((key) => `facts['${key}'] AS ${factColumn(key)}`).join(", ")}`
 		: "";
 	const literalFacts = literal
@@ -468,6 +492,7 @@ function literalRunFacts(): string {
 		`${first(f("model"), `${f("model")} != '' AND lifecycle = 0`)} AS l_model`,
 		`arraySort(groupUniqArrayIf(${f("model")}, ${f("model")} != '' AND lifecycle = 0)) AS l_models`,
 		`${first(f("effort"), `${f("effort")} != '' AND lifecycle = 0`)} AS l_effort`,
+		`arraySort(groupUniqArrayIf(${f("effort")}, ${f("effort")} != '' AND lifecycle = 0)) AS l_efforts`,
 		`${first(`arrayElement(${componentStringsSql(f("abort_reason_components"), ".*")}, 1)`)} AS l_abort_reason`,
 		`${first(apiError)} AS l_api_error`,
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND denial_kind != '' AND denial_kind != 'interrupted') AS l_denied_calls`,
@@ -475,6 +500,14 @@ function literalRunFacts(): string {
 		// Claude Code moves a call its timeout stopped to the background: a
 		// subagent stream has only that hand-off text (no timedOutAfterMs).
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND (timed_out_after_ms IS NOT NULL OR ${f("background_launch")} = 'timeout')) AS l_timed_out_calls`,
+		// Who accepted each call's permission, and the calls a person decided
+		// at a prompt: a user decision with no reasonType (a saved rule's has
+		// rule), or a rejection there (Claude Code writes no decision for it).
+		`uniqExactIf(${callKey}, permission_decision = 'accept' AND ${USER_DECIDED}) AS l_approvals_by_user`,
+		`uniqExactIf(${callKey}, permission_decision = 'accept' AND permission_source = 'hook') AS l_approvals_by_hook`,
+		`uniqExactIf(${callKey}, permission_decision = 'accept' AND permission_source = 'config') AS l_approvals_by_config`,
+		`uniqExactIf(${callKey}, (${USER_DECIDED} AND permission_reason = '') OR (kind = 'tool_result' AND denial_kind = 'user-rejected')) AS l_permission_prompts`,
+		`toUInt8(countIf(kind = 'tool_result' AND denial_kind = '') > 0 AND countIf(permission_decision != '') = 0) AS l_permissions_unrecorded`,
 		`uniqExactIf(${callKey}, mcp_server != '') AS l_mcp_calls`,
 		`${sortedSet("mcp_server")} AS l_mcp_servers`,
 
@@ -497,6 +530,8 @@ function literalRunFacts(): string {
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isApiError(f, "provider_error_kind")}) AS l_api_errors`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArray(${apiStatuses})))) AS l_api_error_statuses`,
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRetry(f)}) AS l_retry_attempts`,
+		`if(countIf(notEmpty(rate_limit_used)) = 0, NULL, maxIf(arrayMax(rate_limit_used), notEmpty(rate_limit_used))) AS l_rate_limit_max_used_percent`,
+		`toUInt8(max(${f("api_error")} = 'rate_limit' OR quota_rejected = 1 OR provider_error_kind = 'usage_limit_exceeded')) AS l_rate_limited`,
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRefusal(f, "w.agent_id")}) AS l_refusals`,
 		`argMaxIf(${f("goal")}, tuple(record_idx, block_idx), ${f("goal")} != '') AS l_goal`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArrayIf(git_operation, notEmpty(git_operation))))) AS l_git_operations`,
@@ -807,9 +842,15 @@ export const RunIndexFactsRowSchema = z.object({
 	l_model: text,
 	l_models: strings,
 	l_effort: text,
+	l_efforts: strings,
 	l_denied_calls: count,
 	l_interrupted_calls: count,
 	l_timed_out_calls: count,
+	l_approvals_by_user: count,
+	l_approvals_by_hook: count,
+	l_approvals_by_config: count,
+	l_permission_prompts: count,
+	l_permissions_unrecorded: count,
 	l_mcp_calls: count,
 	l_mcp_servers: strings,
 	l_skills: strings,
@@ -828,6 +869,8 @@ export const RunIndexFactsRowSchema = z.object({
 	l_api_errors: count,
 	l_api_error_statuses: strings,
 	l_retry_attempts: count,
+	l_rate_limit_max_used_percent: z.number().nullable(),
+	l_rate_limited: count,
 	l_refusals: count,
 	l_goal: text,
 	l_git_operations: strings,
@@ -1233,6 +1276,8 @@ export const RUN_INDEX_PRICING_VERSION = `${MODEL_RATE_CARD_VERSION}+${createHas
 	.update(JSON.stringify(RUN_INDEX_FACT_COLUMNS))
 	.update(runDirectoryRules(RUN_FORK_REPLAY))
 	.update(mcpStateSql())
-	.update("codex-per-turn-effort:lifecycle;claude-abort:l_abort_reason")
+	.update(
+		"codex-per-turn-effort:lifecycle;claude-abort:l_abort_reason;efforts:lifecycle;rate-limited:lifecycle-usage-limit;permissions:unrecorded",
+	)
 	.digest("hex")
 	.slice(0, 12)}`;

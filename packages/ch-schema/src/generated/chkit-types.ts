@@ -700,6 +700,7 @@ export type RudelRunIndexRow = {
   model: string | null
   models: string[]
   effort: string | null
+  efforts: string[]
   per_turn_effort: string | null
   context_window: number | null
   context_input_tokens_at_start: string | null
@@ -714,6 +715,10 @@ export type RudelRunIndexRow = {
   denied_calls: number | null
   interrupted_calls: number | null
   timed_out_calls: number | null
+  approvals_by_user: number | null
+  approvals_by_hook: number | null
+  approvals_by_config: number | null
+  permission_prompts: number | null
   mcp_calls: number | null
   mcp_servers: string[]
   mcp_unavailable: string[]
@@ -738,6 +743,8 @@ export type RudelRunIndexRow = {
   api_error: string | null
   api_error_statuses: string[]
   retry_attempts: number | null
+  rate_limit_max_used_percent: number | null
+  rate_limited: boolean | null
   refusals: number | null
   fallback_model: string | null
   goal: string | null
@@ -826,6 +833,7 @@ export const RudelRunIndexRowSchema = z.object({
   model: z.string().nullable(),
   models: z.array(z.string()),
   effort: z.string().nullable(),
+  efforts: z.array(z.string()).default([]),
   per_turn_effort: z.string().nullable(),
   context_window: z.number().nullable(),
   context_input_tokens_at_start: z.string().nullable(),
@@ -840,6 +848,10 @@ export const RudelRunIndexRowSchema = z.object({
   denied_calls: z.number().nullable(),
   interrupted_calls: z.number().nullable(),
   timed_out_calls: z.number().nullable(),
+  approvals_by_user: z.number().nullable().default(null),
+  approvals_by_hook: z.number().nullable().default(null),
+  approvals_by_config: z.number().nullable().default(null),
+  permission_prompts: z.number().nullable().default(null),
   mcp_calls: z.number().nullable(),
   mcp_servers: z.array(z.string()),
   mcp_unavailable: z.array(z.string()).default([]),
@@ -864,6 +876,8 @@ export const RudelRunIndexRowSchema = z.object({
   api_error: z.string().nullable(),
   api_error_statuses: z.array(z.string()),
   retry_attempts: z.number().nullable(),
+  rate_limit_max_used_percent: z.number().nullable().default(null),
+  rate_limited: z.boolean().nullable().default(null),
   refusals: z.number().nullable(),
   fallback_model: z.string().nullable(),
   goal: z.string().nullable(),
