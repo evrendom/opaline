@@ -111,6 +111,7 @@ const RECORD_FACT_KEYS = [
 	"pr_url",
 	"facts_truncated",
 	"facts_clipped",
+	"background_launch",
 	"skill",
 	"skill_components",
 	"abort_reason_components",
@@ -181,8 +182,13 @@ export const RUN_EVENT_RECORDS = {
 		`${RUN_EVENT_RECORDS.apiError(fact, providerErrorKind)} != '' OR notEmpty(${RUN_EVENT_RECORDS.apiErrorStatuses(fact, providerErrorKind)})`,
 	/** `retry_attempts` counts the records where this holds. */
 	isRetry: (fact: RunEventFact) => `${fact("retry_attempt")} != ''`,
-	/** `refusals` counts the records where this holds. */
-	isRefusal: (fact: RunEventFact) => `${fact("refusal_category")} != ''`,
+	/**
+	 * `refusals` counts the records where this holds. A Claude Code subagent
+	 * stream writes no model_refusal record, only the safety classifier's
+	 * notice; the main stream writes both.
+	 */
+	isRefusal: (fact: RunEventFact, agentId = "agent_id") =>
+		`(${fact("refusal_category")} != '' OR (${agentId} != '' AND kind = 'injected_context' AND subtype = 'safety_recovery'))`,
 	/** `hook_count` sums this over the run's records. */
 	hooks: (fact: RunEventFact) => `toUInt64OrZero(${fact("hook_count")})`,
 	/** `compactions` counts the records where this holds. */
@@ -464,7 +470,9 @@ function literalRunFacts(): string {
 		`${first(apiError)} AS l_api_error`,
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND denial_kind != '' AND denial_kind != 'interrupted') AS l_denied_calls`,
 		`uniqExactIf(${callKey}, kind = 'tool_result' AND interrupted_call) AS l_interrupted_calls`,
-		`uniqExactIf(${callKey}, kind = 'tool_result' AND timed_out_after_ms IS NOT NULL) AS l_timed_out_calls`,
+		// Claude Code moves a call its timeout stopped to the background: a
+		// subagent stream has only that hand-off text (no timedOutAfterMs).
+		`uniqExactIf(${callKey}, kind = 'tool_result' AND (timed_out_after_ms IS NOT NULL OR ${f("background_launch")} = 'timeout')) AS l_timed_out_calls`,
 		`uniqExactIf(${callKey}, mcp_server != '') AS l_mcp_calls`,
 		`${sortedSet("mcp_server")} AS l_mcp_servers`,
 		`arraySort(arrayDistinct(arrayConcat(groupUniqArrayIf(CAST(attribution_skill, 'String'), attribution_skill != ''),
@@ -486,7 +494,7 @@ function literalRunFacts(): string {
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isApiError(f, "provider_error_kind")}) AS l_api_errors`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArray(${apiStatuses})))) AS l_api_error_statuses`,
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRetry(f)}) AS l_retry_attempts`,
-		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRefusal(f)}) AS l_refusals`,
+		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRefusal(f, "w.agent_id")}) AS l_refusals`,
 		`argMaxIf(${f("goal")}, tuple(record_idx, block_idx), ${f("goal")} != '') AS l_goal`,
 		`arraySort(arrayDistinct(arrayFlatten(groupArrayIf(git_operation, notEmpty(git_operation))))) AS l_git_operations`,
 		`${sortedSet(f("git.push.branch"))} AS l_pushed_branches`,

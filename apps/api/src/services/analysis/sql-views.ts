@@ -378,8 +378,14 @@ function gateTrap(gate: RunIndexColumnGate): string {
 			? `${AGENT_NAMES[agent]} from parser ${since}`
 			: AGENT_NAMES[agent];
 	});
-	const mainOnly = (gate.mainStreamOnly ?? []).map(
-		(agent) => `${AGENT_NAMES[agent]} in its main stream only`,
-	);
+	const mainOnly = [
+		...(gate.mainStreamOnly ?? []).map(
+			(agent) => `${AGENT_NAMES[agent]} in its main stream only`,
+		),
+		...Object.entries(gate.subagentSinceBy ?? {}).map(
+			([agent, since]) =>
+				`${AGENT_NAMES[agent as keyof typeof AGENT_NAMES]} subagent streams from parser ${since}`,
+		),
+	];
 	return `Recorded by ${[versions.join(" and "), ...mainOnly].join(", ")}; elsewhere unknown (NULL, arrays empty, named in unrecorded_facts), not none.`;
 }

@@ -1330,6 +1330,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					relation: {
 						kind: "exact",
 					},
+					notes:
+						"Claude Code subagent transcripts keep no toolUseResult (production, 30 days to 2026-10-16: 0 of 50,867 Bash results in desktop, VS Code and SDK subagent streams carry one; 608 of 622 in CLI subagent streams do), so timedOutAfterMs is missing there. Claude Code moves every timed-out call to the background and says so in the result text, which the background_task entry reads as background_launch timeout (parser 11): runs.timed_out_calls also counts that hand-off, and is known on subagent streams from parser 11. Production, parser 9 and 10: 536 of 536 main-stream results with timedOutAfterMs carry the hand-off text and none carries it without; week to 2026-10-16: 27 main-stream timed-out calls, 48 subagent ones with no timedOutAfterMs.",
 					justification:
 						"timedOutAfterMs appears only on Bash results (36) and holds the timeout in ms that stopped the call (120000 is Claude's default Bash timeout). Witness: 46e611b4:569 user.toolUseResult.timedOutAfterMs [number] n=36 v2.1.284..2.1.293",
 					evidence: [
@@ -2295,6 +2297,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					relation: {
 						kind: "exact",
 					},
+					notes:
+						"Claude Code subagent transcripts keep no toolUseResult (production, 30 days to 2026-10-16: no gitOperation on any subagent result, 1,536 on main-stream results), so runs.git_operations, pushed_branches and commit_shas are unknown on subagent streams, and so is runs.pr_urls (pr-link records are main-stream only too).",
 					justification:
 						"toolUseResult.gitOperation is the harness's own record of a push, commit, branch or PR operation on Bash results (161), with branch/ref/sha/number/action fields. Witness: 49ead9e1:1081 user.toolUseResult.gitOperation.pr.number [number] n=122 v2.1.220..2.1.293",
 					evidence: [
@@ -8614,6 +8618,8 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					evidence: [],
 					relation: { kind: "exact" },
+					notes:
+						"A Claude Code subagent stream has no model_refusal record: its safety-classifier stop is only the meta notice 'Your response above was stopped by a safety classifier … tool calls in it that had not finished did not run' (prompts subtype safety_recovery from parser 11), so runs.refusals counts that notice on subagent streams (from parser 11; earlier ones are unknown there). The main stream writes the same notice and then the model_refusal record, so its refusals stay the records. Production, parser 10, 2026-10-16: 13 main-stream notices, 12 followed by a model_refusal record within 7 records; 2 subagent notices (one session), no model_refusal record in any subagent stream. The stopped response's withheld tool calls are not written: in both subagent stops the record before the notice is the response's reasoning, with no tool call.",
 					justification:
 						"model_refusal_fallback / model_refusal_no_fallback records carry apiRefusalCategory and originalModel (5 local). Witness: e34d6925:55 system/model_refusal_fallback.apiRefusalCategory [string] n=2 v2.1.284..2.1.284",
 				},

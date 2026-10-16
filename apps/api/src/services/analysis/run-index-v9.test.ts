@@ -181,6 +181,28 @@ describe("parser 9 run interpretation", () => {
 		// The conditional form keeps an inferred_ operation, which never counts.
 		expect(failedEdits).not.toContain("shell_script_conditional");
 	});
+	test("a timeout hand-off is a timed-out call, also where no timedOutAfterMs was written", () => {
+		const sql = runFactsCtes({ literal: true });
+		expect(sql).toContain("facts['background_launch'] AS f_background_launch");
+		const timedOut = sql.slice(
+			sql.lastIndexOf("uniqExactIf(", sql.indexOf("AS l_timed_out_calls")),
+			sql.indexOf("AS l_timed_out_calls"),
+		);
+		expect(timedOut).toContain("timed_out_after_ms IS NOT NULL");
+		expect(timedOut).toContain("f_background_launch = 'timeout'");
+	});
+	test("a subagent stream's safety-classifier notice is a refusal; the main stream's are its records", () => {
+		const sql = runFactsCtes({ literal: true });
+		const refusals = sql.slice(
+			sql.indexOf("AS l_retry_attempts"),
+			sql.indexOf("AS l_refusals"),
+		);
+		expect(refusals).toContain("f_refusal_category != ''");
+		// The main stream writes the notice before its model_refusal record.
+		expect(refusals).toContain(
+			"w.agent_id != '' AND kind = 'injected_context' AND subtype = 'safety_recovery'",
+		);
+	});
 	test("edits also count the requested paths of native edit calls that succeeded", () => {
 		const sql = runFactsCtes({ literal: true });
 		const start = sql.indexOf("groupArrayIf(file_path,");

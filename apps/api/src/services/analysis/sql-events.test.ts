@@ -74,13 +74,16 @@ describe("the events view adds up to the runs columns", () => {
 			CODEX_PROVIDER_ERROR_KIND_SQL,
 			RUN_EVENT_RECORDS.isApiError(fact, "provider_error_kind"),
 			RUN_EVENT_RECORDS.isRetry(fact),
-			RUN_EVENT_RECORDS.isRefusal(fact),
 			RUN_EVENT_RECORDS.hooks(fact),
 			RUN_EVENT_RECORDS.isCompaction,
 		]) {
 			expect(view).toContain(predicate);
 			expect(runIndex).toContain(predicate);
 		}
+		// The run index joins its records to their calls, so it names the
+		// stream column by its table; the predicate is otherwise the same.
+		expect(view).toContain(RUN_EVENT_RECORDS.isRefusal(fact));
+		expect(runIndex).toContain(RUN_EVENT_RECORDS.isRefusal(fact, "w.agent_id"));
 	});
 
 	test("every record the parser stores an event fact on is one the view reads", async () => {

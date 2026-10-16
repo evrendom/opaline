@@ -214,6 +214,107 @@ describe("run index columns", () => {
 	});
 });
 
+describe("run index columns on Claude Code subagent streams", () => {
+	const RESULT_DETAILS: RunIndexFactColumn[] = [
+		"commit_shas",
+		"git_operations",
+		"not_found",
+		"pr_urls",
+		"pushed_branches",
+	];
+
+	test("facts only toolUseResult records are unknown on a subagent stream, never 0", () => {
+		const current = unrecordedRunIndexColumns(
+			"run",
+			TRANSCRIPT_RECORDS_PARSER_VERSION,
+			"claude_code",
+			"a5ab0000000000001",
+		);
+		for (const column of RESULT_DETAILS) expect(current).toContain(column);
+		// Their denial kind, interrupt text, timeout hand-off and classifier
+		// notice are in subagent transcripts too.
+		for (const column of [
+			"denied_calls",
+			"interrupted_calls",
+			"timed_out_calls",
+			"refusals",
+		] as const)
+			expect(current).not.toContain(column);
+		const main = unrecordedRunIndexColumns(
+			"run",
+			TRANSCRIPT_RECORDS_PARSER_VERSION,
+			"claude_code",
+		);
+		for (const column of [
+			...RESULT_DETAILS,
+			"timed_out_calls",
+			"refusals",
+		] as const)
+			expect(main).not.toContain(column);
+	});
+
+	test("a subagent stream's timeouts and refusals are known from parser 11, its interruptions from 12", () => {
+		const subagent = (parserVersion: number) =>
+			unrecordedRunIndexColumns(
+				"run",
+				parserVersion,
+				"claude_code",
+				"a5ab0000000000001",
+			);
+		expect(subagent(10)).toEqual(
+			expect.arrayContaining([
+				"interrupted_calls",
+				"refusals",
+				"timed_out_calls",
+			]),
+		);
+		expect(subagent(11)).toContain("interrupted_calls");
+		expect(subagent(11)).not.toContain("timed_out_calls");
+		expect(subagent(11)).not.toContain("refusals");
+		// The main stream keeps its own versions.
+		expect(unrecordedRunIndexColumns("run", 10, "claude_code")).not.toContain(
+			"refusals",
+		);
+		// Codex subagent threads are unaffected.
+		expect(
+			unrecordedRunIndexColumns(
+				"run",
+				TRANSCRIPT_RECORDS_PARSER_VERSION,
+				"codex",
+				"thread-2",
+			),
+		).not.toContain("pr_urls");
+	});
+
+	test("gating a subagent run nulls what it cannot record and keeps its counts", () => {
+		const row = {
+			...RudelRunIndexRowSchema.partial().parse({}),
+			row_kind: "run",
+			source: "claude_code",
+			agent_id: "a5ab0000000000001",
+			parser_version: TRANSCRIPT_RECORDS_PARSER_VERSION,
+			timed_out_calls: 1,
+			refusals: 1,
+			interrupted_calls: 0,
+			git_operations: [],
+			commit_shas: [],
+			pushed_branches: [],
+			pr_urls: [],
+			not_found: 0,
+		} as unknown as Parameters<typeof gateRunIndexRow>[0];
+		const gated = gateRunIndexRow(row);
+		expect(gated).toMatchObject({
+			timed_out_calls: 1,
+			refusals: 1,
+			interrupted_calls: 0,
+			not_found: null,
+		});
+		expect(gated.unrecorded_facts).toEqual(
+			expect.arrayContaining(RESULT_DETAILS),
+		);
+	});
+});
+
 describe("run index columns and the L1 fact catalog", () => {
 	test("skills links invocation and attribution meanings, including Codex's different key", () => {
 		expect(

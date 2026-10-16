@@ -124,6 +124,7 @@ async function publish(
 	content: string,
 	revision: string,
 	parserVersion = TRANSCRIPT_RECORDS_PARSER_VERSION,
+	subagents?: Readonly<Record<string, string>>,
 ): Promise<TranscriptRecordDraft[]> {
 	const identity = {
 		organizationId,
@@ -136,7 +137,7 @@ async function publish(
 	const stats = createSplitStats();
 	const drafts = [
 		...splitSessionTranscript(
-			{ content, sessionDate: SESSION_DATE, source },
+			{ content, sessionDate: SESSION_DATE, source, subagents },
 			stats,
 		),
 	];
@@ -652,6 +653,49 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 		interrupted_calls: 1,
 		denied_calls: 2,
 	});
+	// A Claude Code subagent stream keeps no toolUseResult: its timeout is the
+	// hand-off text and its classifier stop the notice, both counted; what
+	// only toolUseResult records (git operations, not found) is unknown.
+	const subagentSession = `${RUN}_claude_subagent`;
+	const subagentId = "a5ab0000000000001";
+	await publish(
+		subagentSession,
+		"claude_code",
+		claudeLine(0, {
+			type: "user",
+			message: { role: "user", content: "run the slow suite" },
+		}),
+		"1",
+		TRANSCRIPT_RECORDS_PARSER_VERSION,
+		{ [subagentId]: await fixture("claude-subagent-2.1.jsonl") },
+	);
+	await queueRunIndex(subagentSession, "claude_code");
+	expect(await pass()).toBe(1);
+	const subagentRun = (await runsOf(subagentSession)).find(
+		(run) => run.agent_id === subagentId,
+	);
+	expect(subagentRun).toMatchObject({
+		tool_calls: 2,
+		timed_out_calls: 1,
+		refusals: 1,
+		interrupted_calls: 0,
+		denied_calls: 0,
+		git_operations: [],
+		commit_shas: [],
+		not_found: null,
+	});
+	expect(subagentRun?.unrecorded_facts).toEqual(
+		expect.arrayContaining([
+			"commit_shas",
+			"git_operations",
+			"not_found",
+			"pr_urls",
+			"pushed_branches",
+		]),
+	);
+	for (const known of ["timed_out_calls", "refusals", "interrupted_calls"])
+		expect(subagentRun?.unrecorded_facts).not.toContain(known);
+
 	const claudeReceipt = await receiptOf(claudeSession);
 	expect(claudeReceipt).toMatchObject({
 		run_count: claudeRuns.length,

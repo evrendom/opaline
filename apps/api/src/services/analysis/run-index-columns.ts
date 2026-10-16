@@ -44,9 +44,18 @@ export interface RunIndexColumnGate {
 	/**
 	 * Agents that record it only in their main stream: Claude Code subagent
 	 * transcripts keep no `toolUseResult`, so facts read from it are unknown
-	 * on their runs.
+	 * on their runs. (Subagent transcripts of the `cli` entrypoint do keep it,
+	 * those of the desktop app, VS Code and the SDK never; the gate is per
+	 * stream kind, so a `cli` subagent's are unknown too.)
 	 */
 	readonly mainStreamOnly?: readonly TranscriptSource[];
+	/**
+	 * A later first version on an agent's subagent streams, whose form of the
+	 * fact there (a result text, a harness notice) a later parser learned.
+	 */
+	readonly subagentSinceBy?: Readonly<
+		Partial<Record<TranscriptSource, number>>
+	>;
 }
 
 const CLAUDE: readonly TranscriptSource[] = ["claude_code"];
@@ -134,9 +143,20 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	}),
 	context_window: gate(7, CODEX, ["context_window"]),
 	// Codex refusals and stopped calls are read from its output since parser 8.
+	// Claude Code writes toolDenialKind on subagent results too.
 	denied_calls: gate(9, BOTH, ["denialKind"], "both"),
-	interrupted_calls: gate(6, BOTH, ["interrupted"], "run", { codex: 8 }),
-	timed_out_calls: gate(6, CLAUDE, ["timedOutAfterMs"]),
+	// On a Claude Code subagent stream only the interrupt's denial kind and
+	// result text record it (parser 12), not toolUseResult.interrupted.
+	interrupted_calls: {
+		...gate(6, BOTH, ["interrupted"], "run", { codex: 8 }),
+		subagentSinceBy: { claude_code: 12 },
+	},
+	// On a Claude Code subagent stream only the result text records a
+	// timeout, which moves the call to the background (parser 11 reads it).
+	timed_out_calls: {
+		...gate(6, CLAUDE, ["timedOutAfterMs"]),
+		subagentSinceBy: { claude_code: 11 },
+	},
 	mcp_calls: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
 	mcp_servers: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
 	skills: gate(
@@ -212,22 +232,40 @@ export const RUN_INDEX_FACT_COLUMNS = {
 		},
 	),
 	retry_attempts: gate(7, CLAUDE, ["retry_attempt"]),
-	refusals: gate(7, CLAUDE, ["refusal_category"]),
+	// A Claude Code subagent stream has no model_refusal record: its
+	// safety-classifier notice (parser 11 `safety_recovery`) is the refusal.
+	refusals: {
+		...gate(7, CLAUDE, ["refusal_category"]),
+		subagentSinceBy: { claude_code: 11 },
+	},
 	fallback_model: gate(7, CLAUDE, ["fallback_model"]),
 	goal: gate(7, CODEX, ["goal"]),
-	git_operations: gate(6, CLAUDE, ["gitOperation"]),
-	pushed_branches: gate(6, CLAUDE, ["git.push.branch"]),
-	commit_shas: gate(6, CLAUDE, ["git.commit.sha"]),
-	pr_urls: gate(
-		6,
-		BOTH,
-		["git.pr.url", "pr_url"],
-		"run",
-		{ codex: ALWAYS },
-		{
-			codex: [],
-		},
-	),
+	// toolUseResult.gitOperation, and the pr-link records of the main stream.
+	git_operations: {
+		...gate(6, CLAUDE, ["gitOperation"]),
+		mainStreamOnly: CLAUDE,
+	},
+	pushed_branches: {
+		...gate(6, CLAUDE, ["git.push.branch"]),
+		mainStreamOnly: CLAUDE,
+	},
+	commit_shas: {
+		...gate(6, CLAUDE, ["git.commit.sha"]),
+		mainStreamOnly: CLAUDE,
+	},
+	pr_urls: {
+		...gate(
+			6,
+			BOTH,
+			["git.pr.url", "pr_url"],
+			"run",
+			{ codex: ALWAYS },
+			{
+				codex: [],
+			},
+		),
+		mainStreamOnly: CLAUDE,
+	},
 	facts_truncated: gate(6, BOTH, ["facts_truncated"], "both"),
 	// Claude Code's own reading of a search's exit code is the only record of
 	// a no-match search that printed something; Codex records exit codes and
@@ -263,8 +301,12 @@ export function isRunIndexColumnRecordable(
 ): boolean {
 	const columnGate: RunIndexColumnGate = RUN_INDEX_FACT_COLUMNS[column];
 	const agent = source as TranscriptSource;
+	const since = columnGate.sinceBy?.[agent] ?? columnGate.since;
 	return (
-		parserVersion >= (columnGate.sinceBy?.[agent] ?? columnGate.since) &&
+		parserVersion >=
+			(agentId === ""
+				? since
+				: Math.max(since, columnGate.subagentSinceBy?.[agent] ?? since)) &&
 		columnGate.agents.includes(agent) &&
 		(agentId === "" || !columnGate.mainStreamOnly?.includes(agent))
 	);

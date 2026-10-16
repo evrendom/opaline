@@ -181,6 +181,16 @@
 		"|87|0|5|tool_result|",
 		"|88|0|5|meta|interrupt"
 	],
+	"l1-facts/claude-subagent-2.1.jsonl": [
+		"|1|0|1|user_prompt|delegation",
+		"|2|0|1|tool_call|",
+		"|3|0|1|tool_result|running",
+		"|4|0|1|reasoning|",
+		"|5|0|1|injected_context|safety_recovery",
+		"|6|0|1|tool_call|",
+		"|7|0|1|tool_result|",
+		"|8|0|1|assistant_text|"
+	],
 	"l1-facts/codex-0.156.jsonl": [
 		"|1|0|0|meta|session_meta",
 		"|2|0|1|user_prompt|",

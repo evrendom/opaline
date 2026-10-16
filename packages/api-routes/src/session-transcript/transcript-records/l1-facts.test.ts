@@ -51,6 +51,7 @@ const FIXTURES = {
 	codexEndEvent: "codex-end-event-era.jsonl",
 	codexCustomExec: "codex-custom-exec-era.jsonl",
 	claudeRecordIds: "l1-facts/claude-record-ids.jsonl",
+	claudeSubagent: "l1-facts/claude-subagent-2.1.jsonl",
 } as const;
 
 /** The agent that wrote each fixture. */
@@ -64,6 +65,7 @@ const IDENTITY_FIXTURES = [
 	"codex-end-event-era.jsonl",
 	"codex-subagent-turns.jsonl",
 	FIXTURES.claude,
+	FIXTURES.claudeSubagent,
 	FIXTURES.codex,
 ] as const;
 
@@ -239,6 +241,32 @@ const CASES: readonly FactCase[] = [
 		fixture: "claude",
 		row: { callId: "toolu_reject", kind: "tool_result" },
 		facts: { denialKind: "user-rejected", interrupted: null },
+	},
+	{
+		// A subagent transcript keeps no toolUseResult: the hand-off text is
+		// the only record of the timeout.
+		name: "a subagent call its timeout moved to the background names its task, with no timedOutAfterMs",
+		fixture: "claudeSubagent",
+		row: { callId: "toolu_sub_slow", kind: "tool_result", subtype: "running" },
+		facts: {
+			timedOutAfterMs: null,
+			extra: { task_id: "bsub12345", background_launch: "timeout" },
+		},
+	},
+	{
+		name: "a subagent's safety-classifier stop is a safety_recovery notice",
+		fixture: "claudeSubagent",
+		row: {
+			kind: "injected_context",
+			subtype: "safety_recovery",
+			text: "stopped by a safety classifier",
+		},
+	},
+	{
+		name: "a subagent's commit records no git operation, interruption or duration",
+		fixture: "claudeSubagent",
+		row: { callId: "toolu_sub_commit", kind: "tool_result" },
+		facts: { gitOperation: [], interrupted: null, durationMs: null },
 	},
 	{
 		name: "Claude version and entrypoint on every record",

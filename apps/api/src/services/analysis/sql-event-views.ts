@@ -52,7 +52,8 @@ export const EVENT_RECORD_KINDS = {
 } as const;
 const quoted = (values: readonly string[]) =>
 	values.map((value) => `'${value}'`).join(", ");
-const EVENT_RECORDS = `kind = 'compaction' OR (kind = 'meta' AND (startsWith(subtype, '${EVENT_RECORD_KINDS.subtypePrefix}')
+const EVENT_RECORDS = `kind = 'compaction' OR (kind = 'injected_context' AND subtype = 'safety_recovery' AND agent_id != '')
+						OR (kind = 'meta' AND (startsWith(subtype, '${EVENT_RECORD_KINDS.subtypePrefix}')
 						OR subtype IN (${quoted(EVENT_RECORD_KINDS.subtypes)})
 						OR (subtype IN (${quoted(EVENT_RECORD_KINDS.errorSubtypes)}) AND is_error)))`;
 
