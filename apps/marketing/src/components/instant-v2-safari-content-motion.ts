@@ -3,6 +3,10 @@ import { cubicBezier } from "glimm";
 const CONTENT_ANCHORS =
 	'[data-dashboard-grid-row-scope="session"] > *, [data-slot="sessions-overview-header"], [data-slot="sidebar-footer"], button:not([data-dashboard-grid-row-scope]), a:not([data-dashboard-grid-row-scope]), input, textarea';
 const CONTENT_PLANES = '[data-slot="sessions-overview-scroll-container"] > *';
+// Charts draw their marks for their own size, and Recharts redraws them a frame
+// after the window resizes. Project a chart as one box: projecting each mark
+// from geometry measured before that redraw slides them inside their card.
+const PROJECTION_LEAVES = "svg, .recharts-responsive-container";
 // Presentation spans need text layout and padding, not hundreds of computed
 // layout/effect properties copied twice for every label on every click.
 const TEXT_PRESENTATION_PROPERTIES = [
@@ -119,11 +123,13 @@ function captureElement(
 	// selected anchors need motion; scaling every row would require a layer
 	// for every fixed-width cell just to undo its parent's scaling.
 	const preserveSize = element.matches(CONTENT_PLANES);
-	const children = preserveSize
-		? captureRoots(element, CONTENT_ANCHORS, visibleBottom)
-		: Array.from(element.querySelectorAll<HTMLElement>(":scope > *")).flatMap(
-				(child) => captureElement(child, visibleBottom),
-			);
+	const children = element.matches(PROJECTION_LEAVES)
+		? []
+		: preserveSize
+			? captureRoots(element, CONTENT_ANCHORS, visibleBottom)
+			: Array.from(element.querySelectorAll<HTMLElement>(":scope > *")).flatMap(
+					(child) => captureElement(child, visibleBottom),
+				);
 	// Fixed-position/sidebar descendants can be visible inside a zero-size or
 	// display:contents wrapper. Keep them in their nearest projected ancestor.
 	if (!first.width || !first.height) return children;

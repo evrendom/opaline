@@ -1,5 +1,7 @@
 // Keep product preparation out of the landing page's load and first paint.
 // An explicit Explore click can always start the app without waiting for idle.
+// Any idle period will do: one is never longer than a frame while the landing
+// page animates, so waiting for a long one never prepares at 120Hz.
 export function scheduleProductDemoPreparation(prepare: () => void) {
 	let cancelled = false;
 	let prepared = false;
@@ -9,13 +11,9 @@ export function scheduleProductDemoPreparation(prepare: () => void) {
 	const scheduleIdle = () => {
 		if (cancelled || prepared || document.hidden) return;
 		if (typeof window.requestIdleCallback === "function") {
-			idle = window.requestIdleCallback((deadline) => {
+			idle = window.requestIdleCallback(() => {
 				idle = undefined;
 				if (cancelled || prepared || document.hidden) return;
-				if (deadline.timeRemaining() < 12) {
-					scheduleIdle();
-					return;
-				}
 				prepared = true;
 				prepare();
 			});

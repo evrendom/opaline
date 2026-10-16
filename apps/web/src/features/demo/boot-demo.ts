@@ -2,6 +2,7 @@ import "../../index.css";
 import "@/app/app-surface.css";
 import "@/features/dashboard/dashboard-theme.css";
 import { usesSafariDemoMotion } from "../../../../marketing/src/scripts/demo-browser";
+import { readDemoViewportHeight } from "../../../../marketing/src/scripts/demo-viewport";
 import { scheduleProductDemoPreparation } from "../../../../marketing/src/scripts/prepare-product-demo";
 import "./demo-webkit.css";
 import {
@@ -60,6 +61,12 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
 		void prepare();
 	}
 	if (event.data === "opaline:deactivate-demo") setDemoActive(false);
+	const viewportHeight = readDemoViewportHeight(event.data);
+	if (viewportHeight !== null)
+		document.documentElement.style.setProperty(
+			"--cost-viewport-height",
+			`${viewportHeight}px`,
+		);
 });
 window.addEventListener("keydown", (event) => {
 	if (event.key === "Escape" && !event.defaultPrevented) {

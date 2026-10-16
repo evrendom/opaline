@@ -21,6 +21,7 @@ import {
 	useAssistantShortcut,
 } from "@/features/assistant/AssistantPanel";
 import { useCompassEnabled } from "@/features/compass/use-compass-access";
+import { ShellDashboardRangeControls } from "@/features/costs/dashboard-range-controls";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
@@ -220,6 +221,11 @@ export function LeftSidebarAppShellLayout() {
 			) : null}
 			{isHomeWorkspaceRoute ? null : (
 				<SiteHeader
+					// Rendered here rather than portaled by the page, so the
+					// prerendered demo has them in place from its first paint.
+					actions={
+						isDashboardWorkspaceRoute ? <ShellDashboardRangeControls /> : null
+					}
 					setNewseshListPortalHost={setNewseshListHeaderPortal}
 					setPortalHost={setShellHeaderPortal}
 					showWorkspaceMenu={false}

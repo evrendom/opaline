@@ -4,7 +4,8 @@ import { z } from "zod";
 import { DemoSeedSchema } from "../src/features/demo/demo-runtime";
 import { getSessionOverviewCost } from "../src/features/sessions/components/sessions-overview-table-utils";
 
-const base = "http://localhost:4600";
+// The public, read-only demo API: the seed must show what Explore loads live.
+const base = process.env.DEMO_SEED_ORIGIN ?? "https://opaline.so";
 const organizationSchema = z.object({
 	id: z.literal("1zKtWzbRInKT6uNOqgXdcEGinGo2rXuW"),
 	name: z.string(),
@@ -18,7 +19,7 @@ const organizationSchema = z.object({
 });
 async function read(path: string, input?: unknown) {
 	const response = await fetch(
-		`${base}${path}`,
+		`${base}/api/demo${path}`,
 		input
 			? {
 					method: "POST",
@@ -53,8 +54,8 @@ const [
 	dashboardData,
 	...previewData
 ] = await Promise.all([
-	read("/api/auth/organization/get-full-organization"),
-	read("/api/auth/get-session"),
+	read("/auth/organization/get-full-organization"),
+	read("/auth/get-session"),
 	read("/rpc/analytics/sessions/list", {
 		startDate: "2026-08-01",
 		endDate: "2026-08-31",

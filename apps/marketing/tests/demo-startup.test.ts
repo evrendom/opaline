@@ -19,7 +19,8 @@ async function controlIdle(page: Page) {
 		Reflect.set(window, "releaseDemoIdle", () => {
 			for (const [id, callback] of callbacks) {
 				callbacks.delete(id);
-				callback({ didTimeout: false, timeRemaining: () => 50 });
+				// Idle periods at 120Hz are shorter than a frame (8.3ms).
+				callback({ didTimeout: false, timeRemaining: () => 6 });
 			}
 		});
 		Reflect.set(window, "demoIdlePending", () => callbacks.size > 0);

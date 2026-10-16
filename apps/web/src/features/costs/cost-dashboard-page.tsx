@@ -14,15 +14,13 @@ import {
 import { createPortal } from "react-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
-import { CHART_INTERVALS } from "./chart-interval";
-import { ChartIntervalPicker } from "./chart-interval-picker";
 import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
 import { costLabel, getMetricData, METRIC_LABELS } from "./cost-format";
+import { DashboardRangeControls } from "./dashboard-range-controls";
 import {
 	PERSON_DIMENSIONS,
 	useDeferredPersonRows,
@@ -52,6 +50,7 @@ export function CostDashboardPage() {
 			dashboard={dashboard}
 			previews={previews}
 			onMetricIntent={prefetchMetric}
+			rangeControlsInShellHeader
 		/>
 	);
 }
@@ -59,6 +58,7 @@ export function CostDashboardPage() {
 export function CostDashboardView({
 	dashboard,
 	toolbarStart,
+	rangeControlsInShellHeader = false,
 	previews,
 	onMetricIntent,
 	scope = "workspace",
@@ -66,6 +66,8 @@ export function CostDashboardView({
 }: {
 	dashboard: CostDashboardController;
 	toolbarStart?: ReactNode;
+	/** The shell header renders the range controls (the workspace dashboard). */
+	rangeControlsInShellHeader?: boolean;
 	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
 	/** A pointer or focus on a stat card, to start loading its chart. */
@@ -131,26 +133,16 @@ export function CostDashboardView({
 	const filtered = chipDimensions.some(
 		(dimension) => input[dimension].length > 0,
 	);
-	// The range controls sit on the page title row; without a
-	// shell header (embeds, tests) they stay in the toolbar.
+	// The range controls sit on the page title row. The shell header renders
+	// the workspace dashboard's itself; other views portal theirs into it, and
+	// without a shell header (embeds, tests) they stay in the toolbar.
 	const headerPortal = useShellHeaderPortal();
-	const rangeControls = (
-		<div
-			className="cost-range-controls"
-			data-fluid-menu-root=""
-			data-in-header={headerPortal ? "" : undefined}
-		>
-			<FluidMenuHover items="button" />
-			<DashboardDateControls
-				sourceComponent="cost_dashboard_date_picker"
-				triggerSuffix={
-					CHART_INTERVALS.find((option) => option.value === interval)?.label
-				}
-				calendarControls={
-					<ChartIntervalPicker value={interval} onChange={setInterval} />
-				}
-			/>
-		</div>
+	const rangeControls = rangeControlsInShellHeader ? null : (
+		<DashboardRangeControls
+			interval={interval}
+			onIntervalChange={setInterval}
+			inHeader={!!headerPortal}
+		/>
 	);
 	// The active filters sit in the chart card's header, as chips that each
 	// remove their own filter.
@@ -235,7 +227,8 @@ export function CostDashboardView({
 			)}
 		</section>
 	) : null;
-	const showToolbar = toolbarStart !== undefined || !headerPortal;
+	const showToolbar =
+		toolbarStart !== undefined || (!headerPortal && rangeControls !== null);
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
@@ -244,7 +237,9 @@ export function CostDashboardView({
 			aria-busy={query.isFetching}
 			data-updating={(query.isFetching && !isPending) || showSettled}
 		>
-			{headerPortal ? createPortal(rangeControls, headerPortal) : null}
+			{headerPortal && rangeControls
+				? createPortal(rangeControls, headerPortal)
+				: null}
 			{showToolbar ? (
 				<section
 					className="cost-page-toolbar"

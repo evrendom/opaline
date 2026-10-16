@@ -69,6 +69,7 @@ import {
 import { ChartMorph } from "./chart-morph";
 import {
 	costLabel,
+	formatChartValueTick,
 	formatMetricRatio,
 	formatRunDuration,
 	getMetricData,
@@ -678,7 +679,12 @@ export function CostChart({
 					data-lines-entering={linesEntering || undefined}
 				>
 					{demo && data ? (
-						<DemoTrendPreview trend={trend} color={primaryColor} />
+						<DemoTrendPreview
+							trend={trend}
+							color={primaryColor}
+							metric={metric}
+							interval={interval}
+						/>
 					) : null}
 					{phase === "idle" ? null : (
 						<ChartSkeleton
@@ -759,7 +765,7 @@ export function CostChart({
 									<YAxis
 										yAxisId="count"
 										tickFormatter={(value) =>
-											`${metric === "cost" ? "$" : ""}${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))}`
+											formatChartValueTick(Number(value), metric)
 										}
 										domain={heartbeat ? HEARTBEAT_DOMAIN : [0, "auto"]}
 										axisLine={false}

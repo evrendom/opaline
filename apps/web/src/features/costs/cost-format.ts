@@ -69,6 +69,15 @@ export function formatMetric(value: number, metric: DashboardMetric) {
 			);
 }
 
+const COMPACT_TICK = new Intl.NumberFormat("en-US", {
+	notation: "compact",
+	maximumFractionDigits: 1,
+});
+/** The chart's value axis labels, shared with the demo's static preview. */
+export function formatChartValueTick(value: number, metric: DashboardMetric) {
+	return `${metric === "cost" ? "$" : ""}${COMPACT_TICK.format(value)}`;
+}
+
 export function formatMetricRatio(
 	value: number,
 	metric: DashboardMetric,

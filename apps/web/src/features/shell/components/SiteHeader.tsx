@@ -1,4 +1,5 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { appRoutes, getSessionDetailId, isNewSessionPath } from "@/app/routes";
 import { Separator } from "@/app/ui/separator";
@@ -45,11 +46,14 @@ function SiteHeaderLeadingControls({
 }
 
 export function SiteHeader({
+	actions,
 	setNewseshListPortalHost,
 	setPortalHost,
 	showSidebarTrigger = false,
 	showWorkspaceMenu = true,
 }: {
+	/** The page's controls on the title row, rendered with the header. */
+	actions?: ReactNode;
 	setNewseshListPortalHost: (element: HTMLElement | null) => void;
 	setPortalHost: (element: HTMLElement | null) => void;
 	showSidebarTrigger?: boolean;
@@ -181,7 +185,9 @@ export function SiteHeader({
 					<div
 						ref={setPortalHost}
 						className="ml-auto flex min-w-0 flex-1 items-center justify-end"
-					/>
+					>
+						{actions}
+					</div>
 				</>
 			)}
 		</DashboardHeader>

@@ -35,8 +35,8 @@ import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
 import { DASHBOARD_METRICS, listDashboardTabs } from "./cost-format";
+import { readChartInterval, useChartInterval } from "./use-chart-interval";
 
 export const COST_DIMENSIONS: CostDimension[] = [
 	"members",
@@ -509,6 +509,7 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 	// Stat card previews use it so switching cards is a cache hit.
 	const inputFor = (value: RequestedMetric) =>
 		buildDashboardInput(params, dates, value, costDimensions).input;
+	const [, setInterval] = useChartInterval();
 	function update(action: (next: URLSearchParams) => void) {
 		setParams((current) => {
 			const next = new URLSearchParams(current);
@@ -537,12 +538,6 @@ function useCostDashboardState(costDimensions: CostDimension[]) {
 		update((next) => {
 			if (value === "none") next.delete("split");
 			else next.set("split", value);
-		});
-	}
-	function setInterval(value: ChartInterval) {
-		update((next) => {
-			if (value === "daily") next.delete("interval");
-			else next.set("interval", value);
 		});
 	}
 	// Reads the current metric from the URL, not this render, so it stays
@@ -589,9 +584,7 @@ function buildDashboardInput(
 	metric: RequestedMetric,
 	costDimensions: CostDimension[],
 ) {
-	const interval =
-		CHART_INTERVALS.find((option) => option.value === params.get("interval"))
-			?.value ?? "daily";
+	const interval = readChartInterval(params);
 	const dimensions =
 		metric === "mergedPullRequests"
 			? PR_DIMENSIONS

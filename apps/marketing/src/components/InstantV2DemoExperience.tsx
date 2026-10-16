@@ -11,6 +11,7 @@ import { getCliConnectionTone } from "../../../web/src/features/cli-onboarding/c
 import { CliConnectionStatus } from "../../../web/src/features/cli-onboarding/cli-connection-status";
 import { useCliOnboarding } from "../../../web/src/features/cli-onboarding/use-cli-onboarding";
 import { ProductBrand } from "../../../web/src/features/shell/components/product-brand";
+import { DEMO_VIEWPORT_MESSAGE } from "../scripts/demo-viewport";
 import {
 	getInstantV2ScrollContainer,
 	getInstantV2ScrollPosition,
@@ -385,6 +386,23 @@ export function InstantV2DemoExperience() {
 	}, [enterDemo]);
 
 	useEffect(() => scheduleProductDemoPreparation(prepareProductDemo), []);
+
+	useEffect(() => {
+		const frame = getProductDemoFrame();
+		if (!frame) return;
+		const postViewport = () =>
+			postProductDemoMessage(frame, {
+				type: DEMO_VIEWPORT_MESSAGE,
+				height: window.innerHeight - DEMO_BAR_HEIGHT_PX,
+			});
+		postViewport();
+		frame.addEventListener("load", postViewport);
+		window.addEventListener("resize", postViewport);
+		return () => {
+			frame.removeEventListener("load", postViewport);
+			window.removeEventListener("resize", postViewport);
+		};
+	}, []);
 
 	if (demoBarStage === "hidden") return null;
 
@@ -921,7 +939,7 @@ function getProductDemoFrame() {
 	return frame;
 }
 
-function postProductDemoMessage(frame: HTMLIFrameElement, message: string) {
+function postProductDemoMessage(frame: HTMLIFrameElement, message: unknown) {
 	if (frame.getAttribute("src") === "about:blank") return;
 	frame.contentWindow?.postMessage(
 		message,

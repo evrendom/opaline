@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	QueryClient,
+	QueryClientProvider,
+	type QueryKey,
+} from "@tanstack/react-query";
 import {
 	useCallback,
 	useEffect,
@@ -30,13 +34,13 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		getDemoActive,
 		getDemoServerActive,
 	);
-	const [client] = useState(() => {
+	const [{ client, seeded }] = useState(() => {
 		const client = new QueryClient({
 			defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 		});
-		// Render the actual dashboard and its stat card trends before activation,
-		// then refresh them on Explore. The stat cards read every session metric
-		// from one answer, so each seeded answer carries every seeded metric.
+		// Render the actual dashboard and its stat card trends before activation.
+		// The stat cards read every session metric from one answer, so each
+		// seeded answer carries every seeded metric.
 		const answers = [seed.dashboard, ...seed.previews];
 		const seededMetrics = Object.fromEntries(
 			answers.map(({ input, data }) => {
@@ -44,30 +48,30 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 				return [metric, data.metrics[metric]];
 			}),
 		);
-		for (const { input, data } of answers) {
-			client.setQueryData(
+		const seeded: Array<[QueryKey, unknown]> = [
+			...answers.map(({ input, data }): [QueryKey, unknown] => [
 				[
 					"org",
 					seed.organization.id,
 					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
 				],
 				{ ...data, metrics: { ...data.metrics, ...seededMetrics } },
-				{ updatedAt: 0 },
-			);
-		}
-		// Seed rows are newest first: the last upload bar's session.
-		client.setQueryData(
+			]),
+			// Seed rows are newest first: the last upload bar's session.
 			[
-				"org",
-				seed.organization.id,
-				...orpc.analytics.sessions.list.queryOptions({
-					input: LAST_SESSION_UPLOAD_INPUT,
-				}).queryKey,
+				[
+					"org",
+					seed.organization.id,
+					...orpc.analytics.sessions.list.queryOptions({
+						input: LAST_SESSION_UPLOAD_INPUT,
+					}).queryKey,
+				],
+				seed.sessions.slice(0, 1),
 			],
-			seed.sessions.slice(0, 1),
-			{ updatedAt: 0 },
-		);
-		return client;
+		];
+		for (const [queryKey, data] of seeded)
+			client.setQueryData(queryKey, data, { updatedAt: 0 });
+		return { client, seeded };
 	});
 	const [connection, setConnection] = useState<
 		"idle" | "connecting" | "live" | "error"
@@ -87,12 +91,16 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		setConnection("connecting");
 		try {
 			await ensureLiveDemoSession();
+			// The seed is the live demo's answer (tools/export-demo-seed.ts). Keep
+			// it fresh on Explore rather than reload what is already on screen.
+			for (const [queryKey, data] of seeded)
+				client.setQueryData(queryKey, data);
 			setConnection("live");
 			document.documentElement.dataset.demoLive = "";
 		} catch {
 			setConnection("error");
 		}
-	}, []);
+	}, [client, seeded]);
 	useEffect(() => {
 		if (active && connection === "idle") void connect();
 	}, [active, connection, connect]);

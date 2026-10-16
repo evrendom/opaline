@@ -408,7 +408,8 @@
 }
 .cost-chart-canvas {
 	position: relative;
-	height: clamp(240px, 31vh, 360px);
+	/* The marketing demo sets --cost-viewport-height to the height it opens to. */
+	height: clamp(240px, calc(var(--cost-viewport-height, 100vh) * 0.31), 360px);
 	margin: 16px 18px 14px 8px;
 	min-width: 0;
 }
