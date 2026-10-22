@@ -329,6 +329,7 @@ import {
 	HistoricalSkillDetailInputSchema,
 	HistoricalSkillDetailSchema,
 	HistoricalSkillSummarySchema,
+	LastSessionUploadSchema,
 	OverviewKPIsSchema,
 	SessionAnalyticsSummaryComparisonSchema,
 	SessionFilterCatalogInputSchema,
@@ -1252,6 +1253,8 @@ export const contract = {
 			list: oc
 				.input(SessionListInputSchema)
 				.output(z.array(SessionOverviewAnalyticsSchema)),
+			/** The session the "Last session uploaded" bar links to, or null. */
+			lastUpload: oc.output(LastSessionUploadSchema.nullable()),
 			/** Live sessions of the active workspace the caller may read (last 24 hours). */
 			liveList: oc.output(LiveSessionListOutputSchema),
 			/** Run question answers the dashboard shows; see `sessionRunQuestionsContract`. */

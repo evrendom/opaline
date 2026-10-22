@@ -92,15 +92,30 @@ export async function sessionRunQuestionTags(
 	};
 }
 
-/** Every answer about each run of one session, for the reader. */
+/**
+ * Every answer about each run of one session, for the reader. The workspace
+ * gate and `readMember`, the caller's access check that names the member whose
+ * session it is (and throws where the caller may not open it), run together;
+ * in a workspace whose runs are not answered its outcome is ignored.
+ */
 export async function sessionRunAnswers(
 	env: SessionAnswersEnv,
-	scope: SessionAnswersScope,
+	workspaceId: string,
+	readMember: () => Promise<string | null>,
 	sessionId: string,
 ): Promise<SessionRunAnswers> {
-	if (!(await env.mayAnswer(scope.workspaceId)))
-		return { enabled: false, runs: [] };
-	const answers = await readSessionAnswers(env, scope, [sessionId]);
+	const [answered, member] = await Promise.allSettled([
+		env.mayAnswer(workspaceId),
+		readMember(),
+	]);
+	if (answered.status === "rejected") throw answered.reason;
+	if (!answered.value) return { enabled: false, runs: [] };
+	if (member.status === "rejected") throw member.reason;
+	const answers = await readSessionAnswers(
+		env,
+		{ workspaceId, member: member.value },
+		[sessionId],
+	);
 	const labels = await labelsFor(env, answers);
 	const runs = new Map<string, SessionRunAnswersRun>();
 	for (const answer of answers) {

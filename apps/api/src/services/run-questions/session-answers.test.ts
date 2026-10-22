@@ -156,8 +156,39 @@ describe("sessionRunAnswers", () => {
 	test("reads nothing in a workspace whose runs are not answered", async () => {
 		const { env, executor } = envOf([row({})], false);
 		expect(
-			await sessionRunAnswers(env, { workspaceId: "w", member: "m1" }, "s1"),
+			await sessionRunAnswers(
+				env,
+				"w",
+				async () => {
+					throw new Error("not the caller's session");
+				},
+				"s1",
+			),
 		).toEqual({ enabled: false, runs: [] });
+		expect(executor.statements).toHaveLength(0);
+	});
+
+	test("checks access while the workspace gate is read, and refuses on it", async () => {
+		const { env, executor } = envOf([row({})]);
+		let releaseGate = () => {};
+		const gate = new Promise<boolean>((resolve) => {
+			releaseGate = () => resolve(true);
+		});
+		env.mayAnswer = () => gate;
+		let accessChecked = false;
+		const answers = sessionRunAnswers(
+			env,
+			"w",
+			async () => {
+				accessChecked = true;
+				throw new Error("not the caller's session");
+			},
+			"s1",
+		);
+		await Promise.resolve();
+		expect(accessChecked).toBe(true);
+		releaseGate();
+		await expect(answers).rejects.toThrow("not the caller's session");
 		expect(executor.statements).toHaveLength(0);
 	});
 
@@ -185,9 +216,7 @@ describe("sessionRunAnswers", () => {
 			true,
 			{ rq_b: "Told twice" },
 		);
-		expect(
-			await sessionRunAnswers(env, { workspaceId: "w", member: "m1" }, "s1"),
-		).toEqual({
+		expect(await sessionRunAnswers(env, "w", async () => "m1", "s1")).toEqual({
 			enabled: true,
 			runs: [
 				{

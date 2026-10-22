@@ -21,7 +21,10 @@ import {
 	getSessionListRepositoryKey,
 } from "./session-list-filters.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
-import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
+import {
+	buildSessionAnalyticsWindowSql,
+	getUsageAnalyticsQueryContext,
+} from "./usage-event-analytics.service.js";
 
 export interface SessionAnalyticsRaw {
 	source: Source;
@@ -320,6 +323,12 @@ async function getSessionAnalyticsBaseRows(
 	const usage = await getUsageAnalyticsQueryContext(orgId, {
 		sourceParam: source ? "source" : undefined,
 		userIdParam: user_id ? "userId" : undefined,
+		// Price only the sessions in the date range and their native
+		// descendants, not the organization's whole history.
+		window: {
+			includeNativeDescendants: true,
+			sessionsSql: buildSessionAnalyticsWindowSql(dateFilter),
+		},
 	});
 	const estimatedCostSql = "sa.estimated_cost";
 
@@ -329,7 +338,7 @@ async function getSessionAnalyticsBaseRows(
 			inputRelation: usage.sessionsRelation,
 			outputRelation: "session_list_costs",
 			rootFilterSql: `sa.is_top_level_session = 1 AND ${dateFilter}`,
-			rootRelation: undefined,
+			rootRelation: usage.metadataRelation,
 		})}
 		${useSkillReceipts ? `, ${buildActiveSkillUsesCte({ filterSkillName: true })}` : ""}
 	    SELECT
@@ -373,7 +382,10 @@ async function getSessionAnalyticsBaseRows(
   `;
 
 	const rows = await queryClickhouse<SessionAnalyticsListRow>({
-		clickhouse_settings: { join_use_nulls: 0 },
+		clickhouse_settings: {
+			join_use_nulls: 0,
+			log_comment: "analytics.sessions.list",
+		},
 		query,
 		query_params,
 	});
@@ -444,6 +456,7 @@ export async function getSessionAnalytics(
 			batches.slice(offset, offset + SIGNAL_LOOKUP_CONCURRENCY).map((batch) => {
 				const dates = batch.map((row) => row.signal_session_date).sort();
 				return queryClickhouse<SignalRow>({
+					clickhouse_settings: { log_comment: "analytics.sessions.list" },
 					query: `
 			SELECT source, session_id, user_id,
 				toString(session_date) AS signal_session_date,
@@ -480,6 +493,13 @@ export async function getSessionAnalytics(
 }
 
 export type SessionSummaryComparisonPeriod = SessionAnalyticsSummaryBase;
+const SUMMARY_PERIOD_FIELDS = [
+	"total_sessions",
+	"avg_session_duration_min",
+	"subagents_adoption_rate",
+	"skills_adoption_rate",
+	"slash_commands_adoption_rate",
+] as const satisfies readonly (keyof SessionSummaryComparisonPeriod)[];
 
 /**
  * Get session analytics summary with period-over-period comparison
@@ -515,50 +535,69 @@ export async function getSessionAnalyticsSummaryComparison(
 		"projectPath",
 		project_path,
 	);
+	const periods = {
+		current: buildDateFilter("currentDays", "sa.session_date"),
+		previous:
+			"sa.session_date >= now64(3) - toIntervalDay({previousDays:UInt32}) AND sa.session_date < now64(3) - toIntervalDay({currentDays:UInt32})",
+	};
+	// Both periods read the sessions of the last `previousDays` days only.
+	const windowFilter = buildDateFilter("previousDays", "sa.session_date");
 	const usage = await getUsageAnalyticsQueryContext(orgId, {
 		userIdParam: user_id ? "userId" : undefined,
+		window: {
+			includeNativeDescendants: false,
+			sessionsSql: buildSessionAnalyticsWindowSql(windowFilter),
+		},
 	});
+	const periodTotals = (period: keyof typeof periods) => {
+		const inPeriod = `sa.is_top_level_session = 1 AND (${periods[period]})`;
+		return `
+		countIf(${inPeriod}) AS ${period}_cnt_sessions,
+		ifNull(avgIf(sa.actual_duration_min, ${inPeriod}), 0) AS ${period}_avg_duration,
+		countIf(${inPeriod} AND ${buildSessionHasSubagentsSql("sa")}) AS ${period}_cnt_subagents,
+		countIf(${inPeriod} AND length(sa.skills) > 0) AS ${period}_cnt_skills,
+		countIf(${inPeriod} AND length(sa.slash_commands) > 0) AS ${period}_cnt_slash`;
+	};
+	const periodSummary = (period: keyof typeof periods) => `
+		${period}_cnt_sessions AS ${period}_total_sessions,
+		ifNull(round(${period}_avg_duration, 2), 0) AS ${period}_avg_session_duration_min,
+		round(${period}_cnt_subagents * 100.0 / if(${period}_cnt_sessions > 0, ${period}_cnt_sessions, 1), 2) AS ${period}_subagents_adoption_rate,
+		round(${period}_cnt_skills * 100.0 / if(${period}_cnt_sessions > 0, ${period}_cnt_sessions, 1), 2) AS ${period}_skills_adoption_rate,
+		round(${period}_cnt_slash * 100.0 / if(${period}_cnt_sessions > 0, ${period}_cnt_sessions, 1), 2) AS ${period}_slash_commands_adoption_rate`;
 
-	const summarySQL = (dateCondition: string) => `
-	    WITH ${usage.cteDefinitions},
-	    totals AS (
-      SELECT
-		countIf(sa.is_top_level_session = 1) as cnt_sessions,
-		ifNull(avgIf(sa.actual_duration_min, sa.is_top_level_session = 1), 0) as avg_duration,
-	        countIf(sa.is_top_level_session = 1 AND ${buildSessionHasSubagentsSql("sa")}) as cnt_subagents,
-		countIf(sa.is_top_level_session = 1 AND length(sa.skills) > 0) as cnt_skills,
-		countIf(sa.is_top_level_session = 1 AND length(sa.slash_commands) > 0) as cnt_slash
-	      FROM ${usage.sessionsRelation} AS sa
-      WHERE ${dateCondition}
-		AND sa.organization_id = {orgId:String}
-        ${filters.length > 0 ? `AND ${filters.join("\n        AND ")}` : ""}
-    )
-    SELECT
-      cnt_sessions as total_sessions,
-      ifNull(round(avg_duration, 2), 0) as avg_session_duration_min,
-      round(cnt_subagents * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as subagents_adoption_rate,
-      round(cnt_skills * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as skills_adoption_rate,
-      round(cnt_slash * 100.0 / if(cnt_sessions > 0, cnt_sessions, 1), 2) as slash_commands_adoption_rate
-    FROM totals
-  `;
-
-	const currentQuery = summarySQL(
-		buildDateFilter("currentDays", "sa.session_date"),
-	);
-	const previousQuery = summarySQL(
-		"sa.session_date >= now64(3) - toIntervalDay({previousDays:UInt32}) AND sa.session_date < now64(3) - toIntervalDay({currentDays:UInt32})",
-	);
-
-	const [currentData, previousData] = await Promise.all([
-		queryClickhouse<SessionSummaryComparisonPeriod>({
-			query: currentQuery,
-			query_params: baseParams,
-		}),
-		queryClickhouse<SessionSummaryComparisonPeriod>({
-			query: previousQuery,
-			query_params: baseParams,
-		}),
-	]);
+	// One query computes both periods with conditional aggregates, so the
+	// usage pipeline runs once per call instead of once per period.
+	const [periodRow] = await queryClickhouse<
+		Record<string, number | null | undefined>
+	>({
+		clickhouse_settings: {
+			log_comment: "analytics.sessions.summaryComparison",
+		},
+		query: `
+		WITH ${usage.cteDefinitions},
+		totals AS (
+			SELECT ${periodTotals("current")},
+				${periodTotals("previous")}
+			FROM ${usage.sessionsRelation} AS sa
+			WHERE ${windowFilter}
+				AND sa.organization_id = {orgId:String}
+				${filters.length > 0 ? `AND ${filters.join("\n\t\t\t\tAND ")}` : ""}
+		)
+		SELECT ${periodSummary("current")},
+			${periodSummary("previous")}
+		FROM totals`,
+		query_params: baseParams,
+	});
+	const periodData = (
+		period: keyof typeof periods,
+	): SessionSummaryComparisonPeriod | undefined =>
+		periodRow &&
+		(Object.fromEntries(
+			SUMMARY_PERIOD_FIELDS.map((field) => [
+				field,
+				periodRow[`${period}_${field}`],
+			]),
+		) as unknown as SessionSummaryComparisonPeriod);
 
 	const defaultPeriod: SessionSummaryComparisonPeriod = {
 		total_sessions: 0,
@@ -580,8 +619,8 @@ export async function getSessionAnalyticsSummaryComparison(
 			]),
 		) as SessionSummaryComparisonPeriod;
 	};
-	const current = coalesce(currentData[0]);
-	const previous = coalesce(previousData[0]);
+	const current = coalesce(periodData("current"));
+	const previous = coalesce(periodData("previous"));
 
 	const calculateChange = (curr: number, prev: number) => {
 		if (!prev || prev === 0) return 0;

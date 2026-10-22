@@ -13,7 +13,10 @@ import {
 	shapeRepositoryOverview,
 } from "./repository-overview.js";
 import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
-import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
+import {
+	buildSessionAnalyticsWindowSql,
+	getUsageAnalyticsQueryContext,
+} from "./usage-event-analytics.service.js";
 
 /**
  * One repository over an inclusive UTC date range, scoped exactly as the
@@ -31,19 +34,30 @@ export async function getRepositoryOverview(
 	const repoFilter = await getRepositorySqlFilter(orgId, input.repoKey);
 	if (repoFilter.params.repositoryFingerprints.length === 0)
 		return EMPTY_REPOSITORY_OVERVIEW;
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const windowFilter = `${buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")}
+	  AND ${repoFilter.sql}`;
+	// Price only this repository's sessions in the range and their native
+	// descendants, not the organization's whole history.
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: {
+			includeNativeDescendants: true,
+			sessionsSql: buildSessionAnalyticsWindowSql(windowFilter),
+		},
+	});
 	const sessionFilter = `sa.organization_id = {orgId:String}
 	  AND sa.is_top_level_session = 1
-	  AND ${buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")}
-	  AND ${repoFilter.sql}`;
+	  AND ${windowFilter}`;
 	const rows = await queryClickhouse<RepositoryOverviewRow>({
-		clickhouse_settings: REPOSITORY_QUERY_SETTINGS,
+		clickhouse_settings: {
+			...REPOSITORY_QUERY_SETTINGS,
+			log_comment: "analytics.repositories.overview",
+		},
 		query: `WITH RECURSIVE ${usage.cteDefinitions},
    ${buildSessionFamilyCostCte({
 			inputRelation: usage.sessionsRelation,
 			outputRelation: "repository_overview_costs",
 			rootFilterSql: sessionFilter,
-			rootRelation: undefined,
+			rootRelation: usage.metadataRelation,
 		})}
    SELECT
     multiIf(grouping(day) = 0 AND grouping(model) = 0, 'day_model',

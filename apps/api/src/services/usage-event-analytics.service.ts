@@ -318,11 +318,99 @@ export interface UsageAnalyticsScope {
 	readonly sessionIdParam?: string;
 	readonly sourceParam?: string;
 	readonly userIdParam?: string;
+	/** Read only these sessions' usage instead of the whole organization's. */
+	readonly window?: UsageAnalyticsWindow;
+}
+
+/**
+ * The sessions a query reports on. Pricing and the receipt-consistency check
+ * run per session over all of a session's events, so restricting both inputs
+ * to a set of sessions changes nothing about those sessions' rows; it only
+ * stops every other session of the organization from being priced. The set is
+ * matched on the key prefix of `usage_events` and `session_analytics`, never
+ * on `usage_date`: a session's events can fall on any date.
+ */
+export interface UsageAnalyticsWindow {
+	/**
+	 * A parameterized SELECT of `organization_id, user_id, source, session_id`.
+	 * It may read the lineage CTEs. Never place request values in it directly.
+	 */
+	readonly sessionsSql: string;
+	/**
+	 * Also read every native Codex descendant of those sessions, so a family
+	 * cost stays whole. The query must then start with `WITH RECURSIVE`.
+	 */
+	readonly includeNativeDescendants: boolean;
+}
+
+const USAGE_WINDOW_FILTER_SQL =
+	"(organization_id, user_id, source, session_id) IN (SELECT organization_id, user_id, source, session_id FROM usage_window_sessions)";
+
+/**
+ * Sessions of one organization from `session_analytics` (aliased `sa`) whose
+ * row matches `filterSql`, for a `UsageAnalyticsWindow`.
+ */
+export function buildSessionAnalyticsWindowSql(filterSql: string): string {
+	return `
+				SELECT
+					sa.organization_id AS organization_id,
+					sa.user_id AS user_id,
+					sa.source AS source,
+					sa.session_id AS session_id
+				FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} AS sa FINAL
+				WHERE ${organizationMatchSql("sa.organization_id")}
+					AND ${filterSql}`;
+}
+
+/** Defines `usage_window_sessions`; needs the lineage CTEs before it. */
+function buildUsageWindowCte(window: UsageAnalyticsWindow): string {
+	const roots = `usage_window_roots AS (${window.sessionsSql}
+		)`;
+	if (!window.includeNativeDescendants) {
+		return `${roots},
+		usage_window_sessions AS (
+			SELECT DISTINCT organization_id, user_id, toString(source) AS source, session_id
+			FROM usage_window_roots
+		)`;
+	}
+	// The same native edges the family cost walks (session-family-cost.service.ts).
+	return `${roots},
+		usage_window_walk AS (
+			SELECT
+				organization_id,
+				user_id,
+				toString(source) AS source,
+				session_id,
+				[session_id] AS visited_session_ids
+			FROM usage_window_roots
+
+			UNION ALL
+
+			SELECT
+				walk.organization_id,
+				walk.user_id,
+				'codex' AS source,
+				edge.child_session_id AS session_id,
+				arrayPushBack(walk.visited_session_ids, edge.child_session_id)
+			FROM usage_window_walk AS walk
+			INNER JOIN session_native_parents AS edge
+				ON edge.organization_id = walk.organization_id
+				AND edge.user_id = walk.user_id
+				AND walk.source = 'codex'
+				AND edge.parent_session_id = walk.session_id
+			WHERE NOT has(walk.visited_session_ids, edge.child_session_id)
+		),
+		usage_window_sessions AS (
+			SELECT DISTINCT organization_id, user_id, source, session_id
+			FROM usage_window_walk
+		)`;
 }
 
 export interface UsageAnalyticsQueryContext {
 	readonly cteDefinitions: string;
 	readonly dailySessionsRelation: "usage_analytics_daily_sessions";
+	/** Session metadata with lineage, without usage: a cheap superset of `sessionsRelation`. */
+	readonly metadataRelation: "usage_analytics_metadata";
 	readonly mode: "events" | "legacy";
 	readonly sessionsRelation: "usage_analytics_sessions";
 }
@@ -431,6 +519,7 @@ export class UsageEventAnalyticsReadinessGate {
 
 function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
 	const filters = [organizationMatchSql("organization_id", scope.tenant)];
+	if (scope.window) filters.push(USAGE_WINDOW_FILTER_SQL);
 	if (scope.userIdParam) {
 		filters.push(`user_id = {${scope.userIdParam}:String}`);
 	}
@@ -565,6 +654,7 @@ export function buildUsageEventAnalyticsCte(
 	// latest_usage_records again for the joins is cheap by comparison.
 	return `
 		${buildSessionLineageCteDefinitions(lineageEnabled, scope.tenant)},
+		${scope.window ? `${buildUsageWindowCte(scope.window)},` : ""}
 		latest_usage_records AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
@@ -763,13 +853,20 @@ export function buildUsageEventAnalyticsCte(
 export function buildLegacyUsageAnalyticsCte(
 	lineageEnabled?: boolean,
 	tenant: AnalyticsTenant = "organization",
+	window?: UsageAnalyticsWindow,
 ): string {
 	return `
 		${buildSessionLineageCteDefinitions(lineageEnabled, tenant)},
+		${window ? `${buildUsageWindowCte(window)},` : ""}
 		usage_analytics_metadata_base AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} FINAL
-			WHERE ${organizationMatchSql("organization_id", tenant)}
+			WHERE ${organizationMatchSql("organization_id", tenant)}${
+				window
+					? `
+				AND ${USAGE_WINDOW_FILTER_SQL}`
+					: ""
+			}
 		),
 		${buildLineageEnrichedMetadataCte({
 			baseRelation: "usage_analytics_metadata_base",
@@ -848,8 +945,13 @@ export async function getUsageAnalyticsQueryContext(
 ): Promise<UsageAnalyticsQueryContext> {
 	if (!shouldUseUsageEventAnalytics(organizationId)) {
 		return {
-			cteDefinitions: buildLegacyUsageAnalyticsCte(),
+			cteDefinitions: buildLegacyUsageAnalyticsCte(
+				undefined,
+				"organization",
+				scope.window,
+			),
 			dailySessionsRelation: "usage_analytics_daily_sessions",
+			metadataRelation: "usage_analytics_metadata",
 			mode: "legacy",
 			sessionsRelation: "usage_analytics_sessions",
 		};
@@ -859,6 +961,7 @@ export async function getUsageAnalyticsQueryContext(
 	return {
 		cteDefinitions: buildUsageEventAnalyticsCte(scope),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
+		metadataRelation: "usage_analytics_metadata",
 		mode: "events",
 		sessionsRelation: "usage_analytics_sessions",
 	};
@@ -874,6 +977,7 @@ export async function getAllOrganizationsUsageAnalyticsQueryContext(): Promise<U
 				"allOrganizations",
 			),
 			dailySessionsRelation: "usage_analytics_daily_sessions",
+			metadataRelation: "usage_analytics_metadata",
 			mode: "legacy",
 			sessionsRelation: "usage_analytics_sessions",
 		};
@@ -883,6 +987,7 @@ export async function getAllOrganizationsUsageAnalyticsQueryContext(): Promise<U
 	return {
 		cteDefinitions: buildUsageEventAnalyticsCte({ tenant: "allOrganizations" }),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
+		metadataRelation: "usage_analytics_metadata",
 		mode: "events",
 		sessionsRelation: "usage_analytics_sessions",
 	};

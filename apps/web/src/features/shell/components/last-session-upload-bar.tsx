@@ -1,3 +1,4 @@
+import type { LastSessionUpload, SessionAnalytics } from "@rudel/api-routes";
 import { IconArrowUpRight, IconCloudUpload } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
@@ -41,13 +42,20 @@ function formatUtcTime(date: Date) {
 	return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours % 12 || 12}:${minutes} ${hours < 12 ? "AM" : "PM"} UTC`;
 }
 
-/** The newest session; the demo seeds this query before Explore. */
-export const LAST_SESSION_UPLOAD_INPUT = {
-	days: 365,
-	limit: 1,
-	sortBy: "session_date",
-	sortOrder: "desc",
-} as const;
+/** The demo seeds the bar's query with its newest seeded session. */
+export function toLastSessionUpload(
+	session:
+		| Pick<SessionAnalytics, "session_id" | "session_date" | "duration_min">
+		| undefined,
+): LastSessionUpload | null {
+	return session
+		? {
+				session_id: session.session_id,
+				session_date: session.session_date,
+				duration_min: session.duration_min,
+			}
+		: null;
+}
 
 /** Adapted from the dev bar: a strip in the canvas under
  * the window, kept in flow so it follows the window when the assistant panel
@@ -59,13 +67,12 @@ export function LastSessionUploadBar() {
 	// shows UTC until Explore, then the visitor's own time.
 	const fixedFormat = demo !== null && !demo.live;
 	const query = useAnalyticsQuery(
-		orpc.analytics.sessions.list.queryOptions({
-			input: LAST_SESSION_UPLOAD_INPUT,
+		orpc.analytics.sessions.lastUpload.queryOptions({
 			staleTime: 60_000,
 			refetchInterval: 60_000,
 		}),
 	);
-	const latest = query.data?.[0];
+	const latest = query.data;
 	const uploadedAt = latest ? getSessionEnd(latest) : null;
 
 	return (

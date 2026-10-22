@@ -40,6 +40,7 @@ import {
 	InvalidSessionDetailCursorError,
 	InvalidSessionDetailWindowCursorError,
 } from "../../services/session-detail-derivation.service.js";
+import { getLastSessionUpload } from "../../services/session-last-upload.service.js";
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
@@ -176,20 +177,18 @@ const runQuestionTags = os.analytics.sessions.runQuestionTags
 
 const runAnswers = os.analytics.sessions.runAnswers
 	.use(orgMiddleware)
-	.handler(async ({ input, context }) => {
-		const env = sessionAnswersEnv();
-		if (!(await env.mayAnswer(context.organizationId)))
-			return { enabled: false, runs: [] };
-		const ownerId = requireSessionDetailOwnerAccess(
-			await getSessionOwner(context.organizationId, input.sessionId),
-			context.sessionReader,
-		);
-		return sessionRunAnswers(
-			env,
-			{ workspaceId: context.organizationId, member: ownerId },
+	.handler(({ input, context }) =>
+		sessionRunAnswers(
+			sessionAnswersEnv(),
+			context.organizationId,
+			async () =>
+				requireSessionDetailOwnerAccess(
+					await getSessionOwner(context.organizationId, input.sessionId),
+					context.sessionReader,
+				),
 			input.sessionId,
-		);
-	});
+		),
+	);
 
 /**
  * Whether the caller's workspace may open Agent traces: its admin switch,
@@ -258,6 +257,10 @@ const list = os.analytics.sessions.list
 			sort_order: input.sortOrder,
 		});
 	});
+
+const lastUpload = os.analytics.sessions.lastUpload
+	.use(orgMiddleware)
+	.handler(({ context }) => getLastSessionUpload(context.organizationId));
 
 const filterCatalog = os.analytics.sessions.filterCatalog
 	.use(orgMiddleware)
@@ -523,6 +526,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	detailTurn,
 	detailWindow,
 	list,
+	lastUpload,
 	liveList,
 	liveTail,
 	agentRuns,

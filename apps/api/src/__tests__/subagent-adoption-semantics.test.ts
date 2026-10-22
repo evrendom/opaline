@@ -20,9 +20,15 @@ describe("uniform successful-subagent adoption semantics", () => {
 		expect(lineage).toContain(
 			`OR length(${prefixToken}native_child_sessions) > 0)`,
 		);
+		// Both summary periods count top-level sessions with the combined metric.
+		expect(sessions).toContain(
+			"const inPeriod = `sa.is_top_level_session = 1 AND (" +
+				"${" +
+				"periods[period]})`;",
+		);
 		expect(
 			sessions.match(
-				/countIf\(sa\.is_top_level_session = 1 AND \$\{buildSessionHasSubagentsSql\("sa"\)\}\)/gu,
+				/countIf\(\$\{inPeriod\} AND \$\{buildSessionHasSubagentsSql\("sa"\)\}\)/gu,
 			),
 		).toHaveLength(1);
 		expect(sessions).toContain(

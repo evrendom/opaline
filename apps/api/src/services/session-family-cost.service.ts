@@ -21,9 +21,12 @@ interface SessionFamilyCostRow {
 }
 
 /**
- * Builds a relation with the input rows unchanged except for the three cost
- * fields, which include every native Codex descendant. The surrounding query
- * must start with `WITH RECURSIVE` and already define `session_lineage_current`.
+ * Builds a relation with the input rows of the walked roots, unchanged except
+ * for the three cost fields, which include every native Codex descendant. The
+ * surrounding query must start with `WITH RECURSIVE` and already define
+ * `session_lineage_current`. Roots may come from a cheaper superset of the
+ * input (`rootRelation`, e.g. the session metadata): a root without an input
+ * row yields no row.
  *
  * `rootFilterSql` is intended for a parameterized, bounded root predicate in a
  * focused read. Callers must never place request values directly in it.
@@ -95,45 +98,54 @@ export function buildSessionFamilyCostCte(input: {
 				member_session_id
 			FROM session_family_walk
 		),
-		session_family_cost_rollups AS (
+		session_family_member_rows AS (
+			-- One read of the input relation serves both the members' costs and
+			-- the root's own row: ClickHouse inlines every CTE reference, and the
+			-- input is the whole priced usage pipeline.
 			SELECT
-				members.root_organization_id AS organization_id,
-				members.root_user_id AS user_id,
-				members.root_source AS source,
-				members.root_session_id AS session_id,
-				toUInt8(count() > 1) AS has_native_descendants,
-				toUInt8(min(ifNull(cost.cost_is_complete, 0))) AS family_cost_is_complete,
-				if(
-					min(ifNull(cost.cost_is_complete, 0)) = 1,
-					toNullable(sum(ifNull(cost.estimated_cost, 0))),
-					CAST(NULL, 'Nullable(Float64)')
-				) AS family_estimated_cost,
-				toUInt8(max(ifNull(cost.cost_uses_default_region, 0))) AS family_cost_uses_default_region
+				cost.* EXCEPT (estimated_cost, cost_is_complete, cost_uses_default_region),
+				members.member_organization_id = members.root_organization_id
+					AND members.member_user_id = members.root_user_id
+					AND members.member_source = members.root_source
+					AND members.member_session_id = members.root_session_id AS is_family_root,
+				toUInt8(count() OVER family > 1) AS family_has_native_descendants,
+				toUInt8(min(ifNull(cost.cost_is_complete, 0)) OVER family) AS family_cost_is_complete,
+				sum(ifNull(cost.estimated_cost, 0)) OVER family AS family_cost_total,
+				toUInt8(max(ifNull(cost.cost_uses_default_region, 0)) OVER family) AS family_cost_uses_default_region
 			FROM session_family_unique_members AS members
 			LEFT ANY JOIN ${input.inputRelation} AS cost
 				ON cost.organization_id = members.member_organization_id
 				AND cost.user_id = members.member_user_id
 				AND cost.source = members.member_source
 				AND cost.session_id = members.member_session_id
-			GROUP BY
-				members.root_organization_id,
-				members.root_user_id,
-				members.root_source,
-				members.root_session_id
+			WINDOW family AS (
+				PARTITION BY
+					members.root_organization_id,
+					members.root_user_id,
+					members.root_source,
+					members.root_session_id
+			)
 		),
 		${input.outputRelation} AS (
 			SELECT
-				sa.* EXCEPT (estimated_cost, cost_is_complete, cost_uses_default_region),
-				rollup.family_estimated_cost AS estimated_cost,
-				rollup.family_cost_is_complete AS cost_is_complete,
-				rollup.family_cost_uses_default_region AS cost_uses_default_region,
-				rollup.has_native_descendants AS has_native_descendants
-			FROM ${input.inputRelation} AS sa
-			INNER JOIN session_family_cost_rollups AS rollup
-				ON rollup.organization_id = sa.organization_id
-				AND rollup.user_id = sa.user_id
-				AND rollup.source = sa.source
-				AND rollup.session_id = sa.session_id
+				* EXCEPT (
+					is_family_root,
+					family_has_native_descendants,
+					family_cost_is_complete,
+					family_cost_total,
+					family_cost_uses_default_region
+				),
+				if(
+					family_cost_is_complete = 1,
+					toNullable(family_cost_total),
+					CAST(NULL, 'Nullable(Float64)')
+				) AS estimated_cost,
+				family_cost_is_complete AS cost_is_complete,
+				family_cost_uses_default_region AS cost_uses_default_region,
+				family_has_native_descendants AS has_native_descendants
+			FROM session_family_member_rows
+			-- A root missing from the input (no complete usage) has no row.
+			WHERE is_family_root AND session_id != ''
 		)`;
 }
 

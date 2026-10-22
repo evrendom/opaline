@@ -10,7 +10,10 @@ import {
 } from "../clickhouse.js";
 import type { SessionAnalyticsListRow } from "./session-analytics.service.js";
 import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
-import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
+import {
+	buildSessionAnalyticsWindowSql,
+	getUsageAnalyticsQueryContext,
+} from "./usage-event-analytics.service.js";
 
 const NO_SKILLS = "__no_skills_used__";
 type RangeKey = keyof SessionListFilters["ranges"];
@@ -36,7 +39,6 @@ export async function getSessionFilterCatalog(
 	organizationId: string,
 	params: { days?: number; start_date?: string; end_date?: string },
 ): Promise<SessionFilterCatalog> {
-	const usage = await getUsageAnalyticsQueryContext(organizationId);
 	const queryParams = {
 		orgId: organizationId,
 		days: params.days ?? 30,
@@ -47,6 +49,12 @@ export async function getSessionFilterCatalog(
 		params.start_date && params.end_date
 			? buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")
 			: buildDateFilter("days", "sa.session_date");
+	const usage = await getUsageAnalyticsQueryContext(organizationId, {
+		window: {
+			includeNativeDescendants: true,
+			sessionsSql: buildSessionAnalyticsWindowSql(dateFilter),
+		},
+	});
 
 	type CatalogRow = {
 		repositories: [string, string, string][];
@@ -58,12 +66,13 @@ export async function getSessionFilterCatalog(
 		ranges: [number | null, number | null][];
 	};
 	const [row] = await queryClickhouse<CatalogRow>({
+		clickhouse_settings: { log_comment: "analytics.sessions.filterCatalog" },
 		query: `WITH RECURSIVE ${usage.cteDefinitions},
    ${buildSessionFamilyCostCte({
 			inputRelation: usage.sessionsRelation,
 			outputRelation: "session_filter_costs",
 			rootFilterSql: `sa.is_top_level_session = 1 AND ${dateFilter}`,
-			rootRelation: undefined,
+			rootRelation: usage.metadataRelation,
 		})}
    SELECT groupUniqArray(tuple(sa.git_remote, sa.package_name, sa.project_path)) AS repositories,
     groupUniqArray(sa.model_used) AS models, groupUniqArrayArray(sa.skills) AS skills,

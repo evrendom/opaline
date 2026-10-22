@@ -17,7 +17,7 @@ import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { SessionsPage } from "@/features/sessions/sessions-page";
-import { LAST_SESSION_UPLOAD_INPUT } from "@/features/shell/components/last-session-upload-bar";
+import { toLastSessionUpload } from "@/features/shell/components/last-session-upload-bar";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { orpc } from "@/lib/orpc";
 import { ensureLiveDemoSession } from "../../../../marketing/src/scripts/live-demo";
@@ -62,11 +62,9 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 				[
 					"org",
 					seed.organization.id,
-					...orpc.analytics.sessions.list.queryOptions({
-						input: LAST_SESSION_UPLOAD_INPUT,
-					}).queryKey,
+					...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
 				],
-				seed.sessions.slice(0, 1),
+				toLastSessionUpload(seed.sessions[0]),
 			],
 		];
 		for (const [queryKey, data] of seeded)

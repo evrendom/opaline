@@ -187,6 +187,18 @@ export type SessionOverviewAnalytics = z.infer<
 	typeof SessionOverviewAnalyticsSchema
 >;
 
+/**
+ * The newest top-level session with complete usage over the last 365 days,
+ * the one the "Last session uploaded" bar links to; the same session the
+ * sessions list puts first for that period.
+ */
+export const LastSessionUploadSchema = SessionAnalyticsSchema.pick({
+	session_id: true,
+	session_date: true,
+	duration_min: true,
+});
+export type LastSessionUpload = z.infer<typeof LastSessionUploadSchema>;
+
 export const SessionAnalyticsSummarySchema = z.object({
 	total_sessions: z.number(),
 	avg_session_duration_min: z.number(),
