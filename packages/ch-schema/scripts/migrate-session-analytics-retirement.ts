@@ -49,7 +49,21 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 		for (const statement of extractExecutableStatements(options.migrationSql))
 			await options.executor.execute(statement);
 	};
-	if (applied.length === 0) await apply();
+	const journaled = applied.length > 0;
+	if (!journaled) await apply();
+	else {
+		// A journaled migration can still need its statements again: a server
+		// restart on 2026-10-20 reloaded both views with their pre-retirement
+		// queries. The statements are idempotent, so re-apply them rather than
+		// block every deploy on the read-back below.
+		const stale = await staleViews(options.executor, options.targetDatabase);
+		if (stale.length > 0) {
+			console.warn(
+				`${SESSION_ANALYTICS_RETIREMENT_MIGRATION}: views reverted since the migration was journaled; re-applying (${stale.join("; ")})`,
+			);
+			await apply();
+		}
+	}
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,
 		delayMs: 10_000,
@@ -62,11 +76,10 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 				`Session analytics views still write retired columns or lost their revision dedupe after ${attempts} reads: ${stale.join("; ")}`,
 			);
 		// Halfway, apply the idempotent MODIFY QUERY again in case it did not land.
-		if (applied.length === 0 && attempt === Math.ceil(attempts / 2))
-			await apply();
+		if (attempt === Math.ceil(attempts / 2)) await apply();
 		await new Promise((resolve) => setTimeout(resolve, delayMs));
 	}
-	if (applied.length === 0)
+	if (!journaled)
 		await appendJournalEntryWithReconciliation(options.journalStore, {
 			name: SESSION_ANALYTICS_RETIREMENT_MIGRATION,
 			checksum,
