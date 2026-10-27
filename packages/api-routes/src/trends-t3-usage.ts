@@ -37,8 +37,10 @@ const metricSchema = zod.object({
 	estimatedCost: zod.number().finite().nonnegative(),
 });
 
+// Version 3 adds per-model turns, completion and cache figures; the rows
+// read here are unchanged.
 export const t3PublicSnapshotSchema = zod.object({
-	schemaVersion: zod.union([zod.literal(1), zod.literal(2)]),
+	schemaVersion: zod.union([zod.literal(1), zod.literal(2), zod.literal(3)]),
 	fetchedAt: zod.string().datetime({ offset: true }),
 	start: day,
 	endExclusive: day,

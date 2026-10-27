@@ -10,7 +10,10 @@ import {
 	deriveT3HarnessDays,
 	deriveT3ModelDays,
 } from "../../apps/marketing/src/trends/trends-t3";
-import { t3UsageReleaseSchema } from "../../packages/api-routes/src/trends-t3-usage";
+import {
+	t3PublicSnapshotSchema,
+	t3UsageReleaseSchema,
+} from "../../packages/api-routes/src/trends-t3-usage";
 import { toT3UsageRelease } from "./fetch-t3-usage";
 
 const metric = {
@@ -127,6 +130,18 @@ test("the capture keeps only Claude Code and Codex rows with upstream provenance
 		new Set(["claudeAgent", "codex"]),
 	);
 	expect(release.upstream.fetchedAt).toBe(snapshot.fetchedAt);
+});
+
+test("a version 3 snapshot, with its added fields, still parses", () => {
+	const parsed = t3PublicSnapshotSchema.safeParse({
+		...snapshot,
+		schemaVersion: 3,
+		models: [],
+		completed: [],
+		prices: {},
+		queries: {},
+	});
+	expect(parsed.success).toBe(true);
 });
 
 test("prompts, tokens and spend per harness-day exactly as published", () => {
