@@ -19,6 +19,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
 
 /** The requests of each run index build (docs/l1-literal-schema.md, "Scale"). */
 export const RUN_REQUESTS_MIGRATION = "20261012150000_run_requests.sql";
@@ -145,7 +146,9 @@ async function schemaMismatch(
 			return (
 				found?.name !== column.name ||
 				found.type !== column.type ||
-				found.comment !== column.comment ||
+				// Run index 7's wording, which its own runner verifies.
+				(found.comment !== column.comment &&
+					!commentIsRunActivityEnd("run_requests", column.name)) ||
 				found.default_kind !== ""
 			);
 		});

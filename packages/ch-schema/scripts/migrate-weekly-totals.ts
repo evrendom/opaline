@@ -19,6 +19,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { weeklyTotalsNotFoundStatement } from "./migrate-not-found-unknown.js";
+import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
 
 /** Weekly totals and the refreshable view that appends them (docs/l1-literal-schema.md, "Weekly totals"). */
 export const WEEKLY_TOTALS_MIGRATION = "20261011150000_weekly_totals.sql";
@@ -120,7 +121,9 @@ async function schemaMismatch(schema: {
 			!column ||
 			column.name !== expected.name ||
 			column.type !== expected.type ||
-			column.comment !== expected.comment ||
+			// Run index 7's wording, which its own runner verifies.
+			(column.comment !== expected.comment &&
+				!commentIsRunActivityEnd("weekly_totals", expected.name)) ||
 			column.default_kind !== ""
 		);
 	});

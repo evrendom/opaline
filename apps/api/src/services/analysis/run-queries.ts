@@ -22,9 +22,9 @@ const RunFactsRowSchema = z.object({
 	turn_idx: z.number(),
 	first_record: z.number(),
 	started_ms: z.coerce.number(),
-	/** Wall-clock span from the run's first record to its last non-meta record. */
+	/** Wall-clock span from the run's first record to its last activity record (`RUN_ACTIVITY_SQL`). */
 	minutes: z.coerce.number(),
-	/** Sum of the gaps between the run's non-meta records, each capped at `ACTIVE_GAP_CAP_MS`. */
+	/** Sum of the gaps between the run's activity records, each capped at `ACTIVE_GAP_CAP_MS`. */
 	active_minutes: z.coerce.number(),
 	raw_chars: z.coerce.number(),
 	genuine_prompt: z.coerce.number(),

@@ -47,9 +47,23 @@ import {
  * Version of the run index rules; a new version is a new run index
  * generation. 4: run messages and their measures (OPL-387). 5: each build
  * also writes its requests (`rudel.run_requests`, OPL-389). 6: and each
- * run's received setup (`rudel.run_setup`, OPL-391).
+ * run's received setup (`rudel.run_setup`, OPL-391). 7: a run and its
+ * requests end at their last activity record (RUN_ACTIVITY_SQL), not a
+ * compaction or context a local command added after the answer.
  */
-export const RUN_INDEX_VERSION = 6;
+export const RUN_INDEX_VERSION = 7;
+
+/**
+ * A run's own activity: the prompt, the model's responses and the calls they
+ * made, their results and file changes — what its end, minutes and active
+ * minutes are measured over (it starts at its first record of any kind). Not metadata, and not compaction or
+ * injected context: within a run those sit between activity records, but a
+ * local command run between two runs (`/compact` the next morning, before
+ * the next prompt) is filed under the run before it with the context it
+ * injects, and would stretch a run answered in five minutes over the night.
+ */
+export const RUN_ACTIVITY_SQL =
+	"kind NOT IN ('meta', 'injected_context', 'compaction')";
 
 /** Literal string or count read back from ClickHouse; `''` and 0 mean none recorded. */
 const text = z.string();
@@ -314,9 +328,9 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 			SELECT w.session_id AS session_id, w.agent_id AS agent_id, w.turn_idx AS turn_idx,
 				min(record_idx) AS first_record,
 				toUnixTimestamp64Milli(argMin(ts, tuple(record_idx, block_idx))) AS started_ms,
-				greatest(0, toUnixTimestamp64Milli(argMaxIf(ts, tuple(record_idx, block_idx), kind != 'meta')) - started_ms) / 60000 AS minutes,
+				greatest(0, toUnixTimestamp64Milli(argMaxIf(ts, tuple(record_idx, block_idx), ${RUN_ACTIVITY_SQL})) - started_ms) / 60000 AS minutes,
 				arraySum(arrayMap(gap -> least(gap, ${ACTIVE_GAP_CAP_MS}), arrayDifference(arraySort(
-					groupArrayIf(toUnixTimestamp64Milli(ts), kind != 'meta'))))) / 60000 AS active_minutes,
+					groupArrayIf(toUnixTimestamp64Milli(ts), ${RUN_ACTIVITY_SQL}))))) / 60000 AS active_minutes,
 				sum(text_chars) AS raw_chars,
 				countIf(${GENUINE_PROMPT_SQL}) AS genuine_prompt,
 				substringUTF8(argMinIf(head, tuple(record_idx, block_idx), ${GENUINE_PROMPT_SQL}), 1, 160) AS prompt_head,
@@ -466,7 +480,7 @@ function literalRunFacts(): string {
 		`arrayFlatten(arrayMap(entry -> JSONExtractArrayRaw(entry.2), arraySort(groupArrayIf(tuple(tuple(record_idx, block_idx), ${column}), ${column} != ''))))`;
 	return [
 		`uniqExact(record_idx) AS l_record_count`,
-		`toUnixTimestamp64Milli(if(countIf(kind != 'meta') = 0, argMin(ts, tuple(record_idx, block_idx)), argMaxIf(ts, tuple(record_idx, block_idx), kind != 'meta'))) AS l_ended_ms`,
+		`toUnixTimestamp64Milli(if(countIf(${RUN_ACTIVITY_SQL}) = 0, argMin(ts, tuple(record_idx, block_idx)), argMaxIf(ts, tuple(record_idx, block_idx), ${RUN_ACTIVITY_SQL}))) AS l_ended_ms`,
 		`${first("agent_version")} AS l_agent_version`,
 		`${first("entrypoint")} AS l_entrypoint`,
 		// The run's starting prompt says where it came from, set or not.
@@ -1014,7 +1028,9 @@ const RESPONSE_RECORD_KINDS = "('assistant_text', 'reasoning', 'tool_call')";
  * the first request's usage lines start at the run's start, so every
  * verified usage event of a run that has a request is on exactly one of its
  * requests. Its time starts when the model was asked (the run's previous
- * non-meta record) and ends at its own last non-meta record.
+ * non-meta record) and ends at its own last activity record
+ * (RUN_ACTIVITY_SQL): the run's last request does not run on into a
+ * compaction a local command added after the answer.
  */
 function runRequestsCtes(): string {
 	const run = "PARTITION BY session_id, agent_id, turn_idx";
@@ -1069,7 +1085,7 @@ function runRequestsCtes(): string {
 			request_facts AS (
 				SELECT m.session_id AS session_id, m.agent_id AS agent_id, m.turn_idx AS turn_idx, assumeNotNull(m.request) AS start_record,
 					toUnixTimestamp64Milli(argMinIf(if(earlier_rows = 0, ts, previous_ts), tuple(record_idx, block_idx), request_start = 1)) AS started_ms,
-					toUnixTimestamp64Milli(max(ts)) AS ended_ms,
+					toUnixTimestamp64Milli(maxIf(ts, ${RUN_ACTIVITY_SQL})) AS ended_ms,
 					arraySort(groupArrayIf(tuple(record_idx, block_idx, toString(tool_name),
 						${toolGroupSql("tool_name", "head")}, toString(command_class), toUInt8(o.failed)), kind = 'tool_call')) AS calls,
 					countIf(kind = 'assistant_text') AS texts,

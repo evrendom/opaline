@@ -23,6 +23,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { runIndexNotFoundStatement } from "./migrate-not-found-unknown.js";
+import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
 import { runIndexApprovalsStatement } from "./migrate-run-index-approvals.js";
 import { runIndexCaptureGapsStatement } from "./migrate-run-index-capture-gaps.js";
 import { runIndexMessagesStatement } from "./migrate-run-index-messages.js";
@@ -207,7 +208,9 @@ function hostMismatch(
 			found.name !== column.name ||
 			found.type !== column.type ||
 			(found.comment !== column.comment &&
-				!RETENTION_COMMENT_COLUMNS.has(column.name)) ||
+				!RETENTION_COMMENT_COLUMNS.has(column.name) &&
+				// Run index 7's wording, which its own runner verifies.
+				!commentIsRunActivityEnd("run_index", column.name)) ||
 			found.default_kind !== ""
 		);
 	});

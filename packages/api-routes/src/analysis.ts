@@ -324,7 +324,7 @@ const HeaderSchema = z.object({
 	sessionsInScope: z.number(),
 	indexedSessions: z.number(),
 	runsInScope: z.number(),
-	/** Wall-clock minutes of the runs (each from its first record to its last non-meta record). */
+	/** Wall-clock minutes of the runs (each from its first record to its last activity record). */
 	minutes: z.number(),
 	/** Active minutes of the runs; null in results stored before it existed. */
 	activeMinutes: z.number().nullable().default(null),
@@ -342,10 +342,14 @@ const HeaderSchema = z.object({
 export const AnalysisRunSchema = z.object({
 	ref: RunRefSchema,
 	startedAt: z.string(),
-	/** Wall-clock span from the run's first record to its last non-meta record. */
+	/**
+	 * Wall-clock span from the run's first record to its last activity record:
+	 * the prompt, responses, calls, results and file changes, not a compaction
+	 * or context a local command added after the answer.
+	 */
 	minutes: z.number(),
 	/**
-	 * Time between the run's consecutive non-meta records, each gap capped at
+	 * Time between the run's consecutive activity records, each gap capped at
 	 * 5 minutes (approval waits and stalls are not work); null in results
 	 * stored before it existed.
 	 */

@@ -22,6 +22,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
 
 /** Finding impact: each saved finding's cited runs (`src/finding-runs.ts`). */
 export const ANALYSIS_FINDING_RUNS_MIGRATION =
@@ -104,7 +105,9 @@ async function schemaMismatch(schema: {
 			!column ||
 			column.name !== expected.name ||
 			column.type !== expected.type ||
-			column.comment !== expected.comment ||
+			// Run index 7's wording, which its own runner verifies.
+			(column.comment !== expected.comment &&
+				!commentIsRunActivityEnd("analysis_finding_runs", expected.name)) ||
 			column.default_kind !== ""
 		);
 	});

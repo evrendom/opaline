@@ -104,6 +104,8 @@ Counterpart proposals with no source path remain unresolved, not `not_recorded`:
 | `ci_runs_after_push`, `ci_checked_after_push` | `github_ci_runs` by pushed SHA; later `gh run`/`gh pr checks` calls | same |
 | `repository_id` | repository evidence index, GitHub binding | same |
 
+A run ends at its last activity record: the prompt, the model's responses and calls, their results and file changes. Metadata, compactions and injected context don't move it. Within a run those sit between activity records; a local command run between two runs (`/compact` before the next prompt) is filed under the run before it with the context it injects, and would otherwise stretch that run until the command. `active_minutes` sums the gaps between the same records, each capped at five minutes; a request ends at its own last activity record (run index 7).
+
 ### `prompts`: one row per prompt or injected context
 
 | Column | Source |

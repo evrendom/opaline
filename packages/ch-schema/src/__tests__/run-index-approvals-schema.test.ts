@@ -91,7 +91,7 @@ describe("run index approvals migration", () => {
 		);
 		expect(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ ch:migrate:run-index-approvals"/u);
+		).toMatch(/ ch:migrate:run-index-approvals[ "]/u);
 	});
 
 	test("publication proof rejects lagging replicas and other definitions", () => {

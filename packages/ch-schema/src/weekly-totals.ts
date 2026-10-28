@@ -68,12 +68,12 @@ export const WEEKLY_TOTALS_MEASURES: readonly WeeklyTotalsMeasure[] = [
 	{
 		name: "minutes",
 		type: "Float64",
-		comment: `Wall-clock minutes of ${RUNS_OF_ROW}, each from its first record to its last non-meta record.`,
+		comment: `Wall-clock minutes of ${RUNS_OF_ROW}, each from its first record to its last activity record.`,
 	},
 	{
 		name: "active_minutes",
 		type: "Float64",
-		comment: `Active minutes of ${RUNS_OF_ROW}: gaps between non-meta records, each capped at five minutes.`,
+		comment: `Active minutes of ${RUNS_OF_ROW}: gaps between activity records, each capped at five minutes.`,
 	},
 	{
 		name: "tool_calls",

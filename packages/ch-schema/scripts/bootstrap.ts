@@ -88,6 +88,7 @@ const FORWARD_SCRIPTS = new Map([
 		"migrate-repository-evidence-index.ts",
 	],
 	["20261016190000_session_images.sql", "migrate-session-images.ts"],
+	["20261028150000_run_activity_end.sql", "migrate-run-activity-end.ts"],
 ]);
 
 interface BootstrapMigration {

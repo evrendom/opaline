@@ -142,7 +142,7 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 		name: "ended_at",
 		type: "DateTime64(3, 'UTC')",
 		comment:
-			"Timestamp of the run's last non-meta record; started_at when it has none.",
+			"Timestamp of the run's last activity record (not metadata, a compaction or injected context); started_at when it has none.",
 	},
 	{
 		name: "end_record",
@@ -154,13 +154,13 @@ export const RUN_INDEX_COLUMNS: readonly RunIndexColumn[] = [
 		name: "minutes",
 		type: "Float64",
 		comment:
-			"Wall-clock minutes from the first record to the last non-meta record.",
+			"Wall-clock minutes from the first record to the last activity record (not metadata, a compaction or injected context).",
 	},
 	{
 		name: "active_minutes",
 		type: "Float64",
 		comment:
-			"Sum of the gaps between non-meta records, each capped at five minutes.",
+			"Sum of the gaps between activity records, each capped at five minutes.",
 	},
 	{
 		name: "record_count",
@@ -862,7 +862,8 @@ export const RUN_REQUEST_COLUMNS: readonly RunIndexColumn[] = [
 	{
 		name: "ended_at",
 		type: "DateTime64(3, 'UTC')",
-		comment: "Time of the request's last non-meta record.",
+		comment:
+			"Time of the request's last activity record (not metadata, a compaction or injected context).",
 	},
 	{
 		name: "call_records",

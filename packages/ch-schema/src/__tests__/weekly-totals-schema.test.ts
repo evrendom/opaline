@@ -47,6 +47,14 @@ const ORIGINAL_NOT_FOUND = {
 	comment:
 		"Failed reads and searches of the runs of the row whose text says not found, no such file, ENOENT or No files found.",
 };
+/** `minutes` and `active_minutes` as the first migration created them,
+ * before run index 7 ended runs at their last activity record. */
+const ORIGINAL_TIMES: Readonly<Record<string, string>> = {
+	minutes:
+		"Wall-clock minutes of the runs of the row, each from its first record to its last non-meta record.",
+	active_minutes:
+		"Active minutes of the runs of the row: gaps between non-meta records, each capped at five minutes.",
+};
 const sqlComment = (comment: string) =>
 	`COMMENT '${comment.replaceAll("'", "\\'")}'`;
 
@@ -89,7 +97,12 @@ describe("weekly totals migration", () => {
 		const original = TABLE.columns
 			.filter((column) => column.name !== "not_found_known_runs")
 			.map((column) =>
-				column.name === "not_found" ? ORIGINAL_NOT_FOUND : column,
+				column.name === "not_found"
+					? ORIGINAL_NOT_FOUND
+					: {
+							...column,
+							comment: ORIGINAL_TIMES[column.name] ?? column.comment,
+						},
 			);
 		const columns = original
 			.map(

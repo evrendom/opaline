@@ -14,6 +14,14 @@ const sql = await Bun.file(
 		import.meta.url,
 	),
 ).text();
+/** Comments as this migration created them; run index 7 changed them
+ * (20261028150000_run_activity_end.sql). */
+const ORIGINAL_COMMENTS: Readonly<Record<string, string>> = {
+	minutes:
+		"Wall-clock minutes from the first record to the last non-meta record. Copied from the run's committed run index build when the analysis was saved.",
+	active_minutes:
+		"Sum of the gaps between non-meta records, each capped at five minutes. Copied from the run's committed run index build when the analysis was saved.",
+};
 const quoted = (text: string) =>
 	`'${text.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 
@@ -32,7 +40,7 @@ test("the finding runs migration creates only the table, with every defined colu
 	);
 	for (const column of FINDING_RUNS_COLUMNS)
 		expect(create).toContain(
-			`\`${column.name}\` ${column.type} COMMENT ${quoted(column.comment)}`,
+			`\`${column.name}\` ${column.type} COMMENT ${quoted(ORIGINAL_COMMENTS[column.name] ?? column.comment)}`,
 		);
 	const key = FINDING_RUNS_ORDER_BY.map((name) => `\`${name}\``).join(", ");
 	expect(create).toContain(

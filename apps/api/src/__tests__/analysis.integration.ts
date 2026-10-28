@@ -742,6 +742,104 @@ test("a still-running check is not a pass; minutes end at the last non-meta reco
 	expect(exchange.reads[0]?.header).toContain("activeMinutes=");
 });
 
+test("a /compact run hours after the answer doesn't stretch the run before it", async () => {
+	const sessionId = `compact_after_${runId}`;
+	const later = 3 * 3600;
+	const lines = [
+		{
+			type: "user",
+			timestamp: at(0),
+			message: { role: "user", content: "Fix the build" },
+		},
+		{
+			...claudeTool("check", "Bash", { command: "bun test" }),
+			timestamp: at(30),
+		},
+		{ ...claudeResult("check", "12 pass\n0 fail"), timestamp: at(40) },
+		{
+			type: "assistant",
+			timestamp: at(60),
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: "Fixed." }],
+			},
+		},
+		// The next morning: the member compacts before the next prompt. The
+		// command and what it injects are filed under the run before.
+		{
+			type: "user",
+			timestamp: at(later),
+			message: {
+				role: "user",
+				content:
+					"<command-name>/compact</command-name>\n<command-message>compact</command-message>",
+			},
+		},
+		{
+			type: "system",
+			subtype: "compact_boundary",
+			timestamp: at(later + 90),
+			content: "Conversation compacted",
+			compactMetadata: { trigger: "manual", preTokens: 150_000 },
+		},
+		{
+			type: "user",
+			timestamp: at(later + 90),
+			isCompactSummary: true,
+			message: { role: "user", content: "Summary of the work so far." },
+		},
+		{
+			type: "user",
+			timestamp: at(later + 91),
+			message: {
+				role: "user",
+				content: "<local-command-stdout>Compacted</local-command-stdout>",
+			},
+		},
+		{
+			type: "user",
+			timestamp: at(later + 92),
+			message: { role: "user", content: "Now the docs" },
+		},
+		{
+			type: "assistant",
+			timestamp: at(later + 120),
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: "Docs updated." }],
+			},
+		},
+	];
+	await seedSession(
+		sessionId,
+		"claude_code",
+		lines.map((line) => JSON.stringify(line)).join("\n"),
+		"claude-sonnet-4-5",
+	);
+	const runs = AnalysisFindOutputSchema.parse(
+		await rpc("analysis/find", {
+			source: "runs",
+			from: day,
+			to: day,
+			refs: [
+				{ sessionId, agentId: "", turn: 1 },
+				{ sessionId, agentId: "", turn: 2 },
+			],
+		}),
+	);
+	assert(runs.source === "runs" && "rows" in runs);
+	const runOf = (turn: number) =>
+		runs.rows.find(
+			(row) => row.ref.sessionId === sessionId && row.ref.turn === turn,
+		);
+	const [first, second] = [runOf(1), runOf(2)];
+	assert(first && second);
+	// Its answer, a minute in: not the compaction three hours later.
+	expect(first.minutes).toBeCloseTo(1, 3);
+	expect(first.activeMinutes).toBeCloseTo(1, 3);
+	expect(second.minutes).toBeCloseTo(28 / 60, 3);
+});
+
 test("costs: unpriced usage stays unpriced, mixed-model runs split cost per model, and model= filters on run usage", async () => {
 	const mixedId = `cost_mixed_${runId}`;
 	const unpricedId = `cost_unpriced_${runId}`;
