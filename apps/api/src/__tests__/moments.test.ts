@@ -14,6 +14,7 @@ import {
 	mostEditedFile,
 	mostRepeatedFailingCommand,
 	type RunEvidence,
+	rankedDetail,
 	topPercentCutoff,
 } from "../services/moments/moment-rules.js";
 import { observationsDailyLimit } from "../services/moments/moments.service.js";
@@ -131,6 +132,34 @@ describe("flags", () => {
 				minutesCutoff: 6,
 			}),
 		).toEqual(["expensive_run"]);
+	});
+
+	test("expensive and long say why: their figure against the median, their rank and the cutoff", () => {
+		const costs = Array.from({ length: 20 }, (_, index) => index + 1);
+		const [flag] = flagsOfRun(
+			run({ cost_usd: 20, minutes: 5 }),
+			defaultCompassSettings(),
+			{
+				...QUIET,
+				costCutoff: 19,
+				ranked: { costs, minutes: costs },
+			},
+		);
+		expect(flag).toMatchObject({
+			kind: "expensive_run",
+			detail:
+				"$20.00, 1.9× the median run ($10.50); top 5% of 20 runs, the costliest 10% from $19.00",
+		});
+		expect(
+			rankedDetail({
+				cutoff: 30,
+				format: (minutes) => `${Math.round(minutes)} min`,
+				percent: 10,
+				ranked: undefined,
+				run: 48,
+				word: "longest",
+			}),
+		).toBe("48 min, among the longest 10%");
 	});
 
 	test("edit churn names the file edited most, from its first to its last edit", () => {

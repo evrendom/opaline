@@ -1,18 +1,27 @@
 import { IconChevronRight } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { appRoutes, getSessionDetailId, isNewSessionPath } from "@/app/routes";
 import { Separator } from "@/app/ui/separator";
 import { SidebarTrigger } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
+import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { sessionPaneMotionStyle } from "@/features/sessions/components/session-pane-motion";
+import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
+import {
+	AGENT_PARAM,
+	writeAgent,
+} from "@/features/sessions/reader/reader-params";
+import { useSessionModel } from "@/features/sessions/use-session-model";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { DashboardHeader } from "@/features/shell/components/dashboard-header";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { WorkspaceMenuButton } from "@/features/shell/components/WorkspaceMenuButton";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
+import { shellCrumbFollows } from "@/features/shell/shell-header-portal";
+import { cn } from "@/lib/utils";
 
 function SiteHeaderLeadingControls({
 	showSidebarTrigger,
@@ -69,6 +78,19 @@ export function SiteHeader({
 			!!new URLSearchParams(location.search).get("skill")) ||
 		(currentShellRoute.id === "repos" &&
 			!!new URLSearchParams(location.search).get("repo"));
+	const shortSessionId = sessionDetailId?.split("-")[0] ?? "";
+	const sessionModel = useSessionModel(sessionDetailId);
+	const modelChip = sessionModel ? <ModelChip model={sessionModel} /> : null;
+	const params = new URLSearchParams(location.search);
+	const readingSubagent = params.has(AGENT_PARAM);
+	writeAgent(params, null);
+	const mainThreadPath = `${location.pathname}${params.size ? `?${params}` : ""}`;
+	const crumbFollows = useSyncExternalStore(
+		shellCrumbFollows.subscribe,
+		shellCrumbFollows.get,
+		shellCrumbFollows.get,
+	);
+	const sessionMuted = readingSubagent || crumbFollows;
 	// Settings shows its section in the tabs, so the header names the page.
 	const title =
 		location.pathname === CLI_SETUP_PATH ? "Sessions" : currentShellRoute.title;
@@ -97,15 +119,17 @@ export function SiteHeader({
 						<Link
 							to={getShellRoutePath(appRoutes.session())}
 							data-fluid-menu-root=""
-							className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+							className="group/back flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
 						>
-							<ShellNavIcon
-								icon={currentShellRoute.icon}
-								activeIcon={currentShellRoute.activeIcon}
-								active
-								filled={false}
-								tone={currentShellRoute.tone}
-							/>
+							<span className="flex opacity-60 grayscale transition group-hover/back:opacity-100 group-hover/back:grayscale-0">
+								<ShellNavIcon
+									icon={currentShellRoute.icon}
+									activeIcon={currentShellRoute.activeIcon}
+									active
+									filled={false}
+									tone={currentShellRoute.tone}
+								/>
+							</span>
 							{currentShellRoute.title}
 						</Link>
 						<IconChevronRight
@@ -113,7 +137,55 @@ export function SiteHeader({
 							className="size-4 shrink-0 text-muted-foreground/50"
 							stroke={1.5}
 						/>
-						<span className="truncate">{sessionDetailId}</span>
+						{modelChip ? (
+							<span
+								className={cn(
+									"flex shrink-0",
+									sessionMuted && "opacity-60 grayscale",
+								)}
+							>
+								{modelChip}
+							</span>
+						) : null}
+						{sessionModel ? (
+							<span
+								className={cn(
+									"shrink-0",
+									sessionMuted && "text-muted-foreground",
+								)}
+							>
+								{formatModelDisplayLabel(sessionModel)}
+							</span>
+						) : null}
+						<span
+							className={cn(
+								"shrink-0",
+								sessionMuted && "text-muted-foreground",
+							)}
+						>
+							Session
+						</span>
+						{readingSubagent ? (
+							<Link
+								to={mainThreadPath}
+								replace
+								data-fluid-menu-root=""
+								title={sessionDetailId}
+								className="truncate text-muted-foreground transition-colors hover:text-foreground"
+							>
+								{shortSessionId}
+							</Link>
+						) : (
+							<span
+								title={sessionDetailId}
+								className={cn(
+									"truncate",
+									sessionMuted && "text-muted-foreground",
+								)}
+							>
+								{shortSessionId}
+							</span>
+						)}
 						<CopyButton value={sessionDetailId} title="Copy session ID" />
 					</h1>
 					<div

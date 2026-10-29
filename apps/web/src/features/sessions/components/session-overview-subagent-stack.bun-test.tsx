@@ -77,8 +77,9 @@ test("renders one overlapping icon per subagent using its own model", () => {
 	expect(markup).toContain('data-subagent-model="claude-opus-4"');
 	expect(markup).toContain("--subagent-step:0.5rem");
 	expect(markup).toContain("drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]");
-	expect(markup).toContain("opaline-trace-fill.svg");
-	expect(markup).toContain("flex size-5 items-center justify-center bg-white");
+	expect(markup).toContain("--opal-tint:#D97757");
+	expect(markup).toContain("--opal-tint:#10A37F");
+	expect(markup).toContain("var(--dashboard-01-content-background");
 	expect(markup).not.toContain("rounded-full");
 });
 

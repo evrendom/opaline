@@ -4,9 +4,9 @@ import {
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkSchema,
 } from "@rudel/api-routes";
+import { scheduleBodyRequest } from "./body-request-scheduler";
 
 type BodyIdentity = Omit<SessionDetailBodyChunkInput, "offset">;
-const CHUNK_CONCURRENCY = 4;
 
 export class SessionDetailBodyIntegrityError extends Error {
 	constructor() {
@@ -29,32 +29,28 @@ export async function readSessionDetailBodyChunks(
 ): Promise<unknown> {
 	const controller = new AbortController();
 	const signal = AbortSignal.any([querySignal, controller.signal]);
+	const request = (offset: number) =>
+		scheduleBodyRequest(input.targetId, signal, () =>
+			env.request({ ...input, offset }, signal),
+		);
 	try {
 		signal.throwIfAborted();
-		const first = parseChunk(
-			await env.request({ ...input, offset: 0 }, signal),
-			input,
-			0,
-		);
-		const chunks = [first.data];
-		for (let offset = first.data.length; offset < first.totalCodeUnits; ) {
-			signal.throwIfAborted();
-			const batch: Promise<SessionDetailBodyChunk>[] = [];
-			for (
-				let index = 0;
-				index < CHUNK_CONCURRENCY && offset < first.totalCodeUnits;
-				index++
-			) {
-				const chunkOffset = offset;
-				batch.push(
-					env
-						.request({ ...input, offset: chunkOffset }, signal)
-						.then((value) => parseChunk(value, input, chunkOffset, first)),
-				);
-				offset += SESSION_DETAIL_BODY_CHUNK_CODE_UNITS;
-			}
-			for (const chunk of await Promise.all(batch)) chunks.push(chunk.data);
+		const first = parseChunk(await request(0), input, 0);
+		const rest: Promise<SessionDetailBodyChunk>[] = [];
+		for (
+			let offset = first.data.length;
+			offset < first.totalCodeUnits;
+			offset += SESSION_DETAIL_BODY_CHUNK_CODE_UNITS
+		) {
+			const chunkOffset = offset;
+			rest.push(
+				request(chunkOffset).then((value) =>
+					parseChunk(value, input, chunkOffset, first),
+				),
+			);
 		}
+		const chunks = [first.data];
+		for (const chunk of await Promise.all(rest)) chunks.push(chunk.data);
 		signal.throwIfAborted();
 		const json = chunks.join("");
 		const digest = await crypto.subtle.digest(

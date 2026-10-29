@@ -1,7 +1,10 @@
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
+import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
+import { Button } from "@/components/dashboard/button";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { authClient } from "@/lib/auth-client";
 import { useOrganization } from "./useOrganization";
@@ -50,18 +53,25 @@ function WorkspaceRouteContent({
 	}, [state.isLoading, needsSwitch, organization, attempted]);
 	if (error)
 		return (
-			<div className="p-6">
-				<p role="alert">{error}</p>
-				<button
-					type="button"
-					onClick={() => {
-						setError(null);
-						setAttempted(false);
-					}}
-				>
-					Retry
-				</button>
-			</div>
+			<ProductLoadingScreen>
+				<div className="flex min-h-0 flex-1 flex-col p-8" role="alert">
+					<EmptyState icon={IconAlertTriangle} title={error}>
+						<div className="mt-2 flex justify-center">
+							<Button
+								onClick={() => {
+									setError(null);
+									setAttempted(false);
+								}}
+								type="button"
+								variant="outline"
+							>
+								<IconRefresh />
+								Retry
+							</Button>
+						</div>
+					</EmptyState>
+				</div>
+			</ProductLoadingScreen>
 		);
 	if (state.isLoading || (!organization && isRefreshingOrganizations))
 		return <ProductLoadingScreen />;

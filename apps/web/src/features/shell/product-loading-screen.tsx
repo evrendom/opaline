@@ -1,10 +1,12 @@
 import "@/app/app-surface.css";
+import type { ReactNode } from "react";
 import { SidebarInset } from "@/app/ui/sidebar";
 import {
 	ShellWindowColumn,
 	ShellWindowFooterPlaceholder,
 	shellWindowRadiusClassName,
 } from "@/features/shell/components/shell-window-column";
+import { useRootMark } from "@/hooks/use-root-mark";
 import { cn } from "@/lib/utils";
 import "./product-window-chrome.css";
 import "./app-shell.css";
@@ -27,7 +29,8 @@ export function ProductLoadingIndicator() {
 
 // Keep the product frame visible while auth and workspace access resolve.
 // The interactive sidebar only mounts once the correct workspace is active.
-export function ProductLoadingScreen() {
+export function ProductLoadingScreen({ children }: { children?: ReactNode }) {
+	useRootMark("data-app-shell");
 	return (
 		<div className="product-app-shell dashboard-01-preview flex h-dvh overflow-hidden overscroll-none text-foreground">
 			{/* Matches the sidebar's footprint so the window doesn't jump when the
@@ -50,7 +53,7 @@ export function ProductLoadingScreen() {
 						shellWindowRadiusClassName,
 					)}
 				>
-					<ProductLoadingIndicator />
+					{children ?? <ProductLoadingIndicator />}
 				</SidebarInset>
 			</ShellWindowColumn>
 		</div>

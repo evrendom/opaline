@@ -79,9 +79,11 @@ describe("ModelTraceIcon", () => {
 		);
 
 		expect(claudeMarkup).toContain('data-trace-icon-tone="claude"');
-		expect(claudeMarkup).toContain("text-[#CC7D5E]");
+		expect(claudeMarkup).toContain("text-[#D97757]");
+		expect(claudeMarkup).toContain("--opal-tint:#D97757");
 		expect(chatGptMarkup).toContain('data-trace-icon-tone="openai"');
-		expect(chatGptMarkup).toContain("text-[#111111]");
+		expect(chatGptMarkup).toContain("text-foreground");
+		expect(chatGptMarkup).toContain("--opal-tint:#10A37F");
 	});
 });
 

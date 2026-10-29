@@ -1,7 +1,7 @@
 /* These route-critical rules load with the app shell so /welcome never paints
    as the full dashboard while its lazy route bundle is still loading. */
-html:has(.cli-welcome-shell),
-body:has(.cli-welcome-shell),
+html[data-welcome-shell],
+:where(html)[data-welcome-shell] body,
 .cli-welcome-shell,
 .cli-welcome-panel {
 	overscroll-behavior: none;
@@ -17,7 +17,7 @@ body:has(.cli-welcome-shell),
 	overflow: clip;
 }
 
-body:has(.cli-welcome-shell) > .product-window-backdrop {
+:where(html)[data-welcome-shell] body > .product-window-backdrop {
 	inset: 8px 0 8px auto;
 	width: 1496px;
 	translate: 50% 0;

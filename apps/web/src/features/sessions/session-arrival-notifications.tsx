@@ -45,6 +45,10 @@ function WorkspaceSessionArrivalNotifications({
 			{ withCredentials: true },
 		);
 		const ids = toastIds.current;
+		let handshake = true;
+		events.addEventListener("open", () => {
+			handshake = true;
+		});
 		events.addEventListener("sessions", (event) => {
 			let payload: unknown;
 			try {
@@ -54,6 +58,9 @@ function WorkspaceSessionArrivalNotifications({
 			}
 			const page = SessionArrivalsPageSchema.safeParse(payload);
 			if (!page.success) return;
+			const opening = handshake;
+			handshake = false;
+			if (opening && page.data.sessions.length === 0) return;
 			const next = collectNewSessionArrivals(seen.current, page.data.sessions);
 			seen.current = next.seen;
 			for (const session of next.arrivals) {

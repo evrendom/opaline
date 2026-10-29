@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef } from "react";
-import { getModelBrandIconClassName } from "@/features/dashboard/components/dashboard-model-brand";
+import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import { cn } from "@/lib/utils";
 import { ConversationSkillIcon } from "./conversation-skill-icon";
 import type { ToolIconName } from "./conversation-tools";
@@ -51,13 +51,11 @@ export function ConversationTraceTag({
 		isFileToolIcon(toolIcon) && isTypeScriptFile(value);
 	const usesMarkdownIcon = isFileToolIcon(toolIcon) && isMarkdownFile(value);
 	const ModelIcon = getModelIconComponent(model);
-	const ContextIcon =
-		ModelIcon ??
-		(usesTypeScriptIcon
-			? TraceTypeScriptIcon
-			: usesMarkdownIcon
-				? TraceMarkdownIcon
-				: CONVERSATION_TOOL_ICONS[toolIcon]);
+	const ContextIcon = usesTypeScriptIcon
+		? TraceTypeScriptIcon
+		: usesMarkdownIcon
+			? TraceMarkdownIcon
+			: CONVERSATION_TOOL_ICONS[toolIcon];
 	const context = ModelIcon
 		? "delegated-model"
 		: usesTypeScriptIcon
@@ -65,11 +63,9 @@ export function ConversationTraceTag({
 			: usesMarkdownIcon
 				? "markdown"
 				: toolIcon;
-	const iconClassName = ModelIcon
-		? cn("size-3.5 shrink-0", getModelBrandIconClassName(model))
-		: usesTypeScriptIcon
-			? typeScriptIconClassName
-			: defaultIconClassName;
+	const iconClassName = usesTypeScriptIcon
+		? typeScriptIconClassName
+		: defaultIconClassName;
 
 	return (
 		<span
@@ -77,7 +73,9 @@ export function ConversationTraceTag({
 			className={cn(CONVERSATION_TRACE_TAG_CLASS_NAME, className)}
 			data-trace-tag-context={context}
 		>
-			{hideIcon ? null : toolIcon === "sparkle" && !ModelIcon ? (
+			{hideIcon ? null : ModelIcon ? (
+				<ModelChip chip="size-4" glyph="size-2.5" model={model} tip={false} />
+			) : toolIcon === "sparkle" ? (
 				<ConversationSkillIcon skill={value} className={iconClassName} />
 			) : (
 				<ContextIcon className={iconClassName} />

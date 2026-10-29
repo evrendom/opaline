@@ -1,4 +1,10 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
+import {
+	type Icon,
+	IconAlertTriangle,
+	IconMessageOff,
+	IconRefresh,
+} from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	useCallback,
@@ -9,8 +15,9 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { Button } from "@/app/ui/button";
 import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
+import { Button } from "@/components/dashboard/button";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { getSessionUploadFailure } from "@/features/sessions/session-upload-failure";
@@ -25,13 +32,11 @@ import { SessionContextChips } from "./session-context-chips";
 import { SessionDetailFastContent } from "./session-detail-fast-content";
 import {
 	fetchSessionDetailInitial,
-	SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	sessionDetailBodyQueryPrefix,
-	sessionDetailInitialQueryKey,
+	sessionDetailInitialQueryOptions,
 	sessionDetailOverviewPageQueryKey,
 	sessionDetailRevisionQueryPrefix,
 	sessionDetailWindowQueryPrefix,
-	shouldRetrySessionDetailFastQuery,
 } from "./session-detail-fast-query";
 import { SessionDetailHeader } from "./session-detail-header";
 import { SessionDetailContentLoadingView } from "./session-detail-loading";
@@ -57,37 +62,33 @@ type SessionDetailViewProps = {
 
 function SessionDetailStateMessage({
 	description,
+	icon,
 	isRetrying = false,
 	onRetry,
 	title,
 }: {
 	description: string | undefined;
+	icon: Icon;
 	isRetrying?: boolean;
 	onRetry?: () => void;
 	title: string;
 }) {
 	return (
-		<div className="flex h-full items-center justify-center px-6 py-12">
-			<div className="dashboardy-card rounded-[1.5rem] border px-8 py-10 text-center shadow-none">
-				<p className="mb-2 text-lg font-semibold text-(--dashboardy-heading)">
-					{title}
-				</p>
-				{description ? (
-					<p className="text-sm text-(--dashboardy-muted)">{description}</p>
-				) : null}
+		<div className="flex h-full min-h-0 flex-col p-8">
+			<EmptyState description={description} icon={icon} title={title}>
 				{onRetry ? (
 					<Button
-						className="mt-5"
+						className="mx-auto mt-2"
 						disabled={isRetrying}
 						onClick={onRetry}
-						size="sm"
 						type="button"
 						variant="outline"
 					>
+						<IconRefresh />
 						{isRetrying ? "Trying again…" : "Try again"}
 					</Button>
 				) : null}
-			</div>
+			</EmptyState>
 		</div>
 	);
 }
@@ -114,8 +115,9 @@ export function SessionDetailView({
 	const queryClient = useQueryClient();
 	const [cacheHit] = useState(
 		() =>
-			queryClient.getQueryData(sessionDetailInitialQueryKey(sessionId)) !==
-			undefined,
+			queryClient.getQueryData(
+				sessionDetailInitialQueryOptions(sessionId).queryKey,
+			) !== undefined,
 	);
 	const handleHeaderWheel = useCallback((event: WheelEvent) => {
 		if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
@@ -171,6 +173,7 @@ export function SessionDetailView({
 		failureQuery.data?.failures,
 	);
 	const overviewQuery = useQuery({
+		...sessionDetailInitialQueryOptions(sessionId),
 		enabled:
 			sessionId.length > 0 &&
 			!failure &&
@@ -187,9 +190,6 @@ export function SessionDetailView({
 			);
 			return parsed;
 		},
-		queryKey: sessionDetailInitialQueryKey(sessionId),
-		retry: shouldRetrySessionDetailFastQuery,
-		staleTime: SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
 	});
 	const overview = overviewQuery.data?.overview;
 	const isDetailLoading =
@@ -353,6 +353,7 @@ export function SessionDetailView({
 					errorState ? (
 						<SessionDetailStateMessage
 							description={errorState.description}
+							icon={IconAlertTriangle}
 							isRetrying={overviewQuery.isFetching}
 							onRetry={
 								canRetrySessionDetailError(overviewQuery.error)
@@ -397,8 +398,9 @@ export function SessionDetailView({
 					!errorState &&
 					!overview ? (
 						<SessionDetailStateMessage
-							description={undefined}
-							title="Session Not Found"
+							description="It may have been deleted, or it never finished uploading."
+							icon={IconMessageOff}
+							title="Session not found"
 						/>
 					) : null}
 				</div>

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** One fact in the reader's session rail: a muted label over its value. */
 export function SessionStat({
 	label,
 	title,

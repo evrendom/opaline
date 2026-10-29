@@ -39,6 +39,18 @@ export const ToolResultStructuredContentSchema = z.object({
 	value: z.unknown().optional(),
 });
 
+/** A result block of a kind with no shape of its own here — Claude's
+ * `tool_reference`, which ToolSearch answers with — kept whole as a
+ * structured block, its kind as its rawType, rather than failing the result
+ * and losing it. */
+const ToolResultOtherContentSchema = z
+	.looseObject({ type: z.string() })
+	.transform((block) => ({
+		rawType: block.type,
+		type: "structured" as const,
+		value: block as unknown,
+	}));
+
 export const ToolResultContentSchema = z.object({
 	type: z.literal("tool_result"),
 	tool_use_id: z.string(),
@@ -50,10 +62,16 @@ export const ToolResultContentSchema = z.object({
 				ToolResultTextContentSchema,
 				ToolResultImageContentSchema,
 				ToolResultStructuredContentSchema,
+				ToolResultOtherContentSchema,
 			]),
 		),
 	]),
 	is_error: z.boolean().optional(),
+});
+
+export const UserImageContentSchema = z.object({
+	type: z.literal("image"),
+	source: z.unknown().optional(),
 });
 
 // Message schemas
@@ -61,13 +79,21 @@ export const UserMessageSchema = z.object({
 	role: z.literal("user"),
 	content: z.union([
 		z.string(),
-		z.array(z.union([z.string(), TextContentSchema, ToolResultContentSchema])),
+		z.array(
+			z.union([
+				z.string(),
+				TextContentSchema,
+				UserImageContentSchema,
+				ToolResultContentSchema,
+			]),
+		),
 	]),
 });
 
 const ToolUseResultMetadataSchema = z
 	.object({
 		agentId: z.string().optional(),
+		total_deferred_tools: z.number().int().nonnegative().optional(),
 	})
 	.passthrough();
 
@@ -99,6 +125,8 @@ const BaseEntrySchema = z.object({
 });
 
 export const UserEntrySchema = BaseEntrySchema.extend({
+	isCompactSummary: z.boolean().optional(),
+	queued: z.boolean().optional(),
 	isMeta: z.boolean().optional(),
 	type: z.literal("user"),
 	message: UserMessageSchema,
@@ -131,12 +159,37 @@ export const SystemEntrySchema = BaseEntrySchema.extend({
 	message: z.object({ content: z.string() }),
 });
 
+export const SystemEventEntrySchema = BaseEntrySchema.extend({
+	type: z.literal("system"),
+	subtype: z.enum(["compact_boundary", "stop_hook_summary"]),
+	compactMetadata: z
+		.object({
+			durationMs: z.number().nonnegative().optional().catch(undefined),
+			postTokens: z.number().nonnegative().optional().catch(undefined),
+			preCompactDiscoveredTools: z
+				.array(z.string())
+				.optional()
+				.catch(undefined),
+			preTokens: z.number().nonnegative().optional().catch(undefined),
+			preservedMessages: z
+				.object({ uuids: z.array(z.string()).optional() })
+				.optional()
+				.catch(undefined),
+			trigger: z.string().optional().catch(undefined),
+		})
+		.optional(),
+	hookInfos: z
+		.array(z.object({ durationMs: z.number().nonnegative().optional() }))
+		.optional(),
+});
+
 // Union type
 export const ConversationSchema = z.union([
 	UserEntrySchema,
 	AssistantEntrySchema,
 	SummaryEntrySchema,
 	SystemEntrySchema,
+	SystemEventEntrySchema,
 ]);
 
 export type TextContent = z.infer<typeof TextContentSchema>;
@@ -192,6 +245,34 @@ function toExecutionMode(permissionMode: string): ConversationExecutionMode {
 }
 
 // Parser
+/**
+ * What the harness queued while the agent was working, which it writes as a
+ * `queued_command` attachment rather than the user line it writes when the
+ * agent is idle: a task notification, read as that line, so a subagent's
+ * report or a background command's end shows wherever it came; or a message
+ * the member wrote meanwhile, handed to the agent after its next call — read
+ * as a user line marked `queued`, so it stays in the run it redirected.
+ */
+function queuedCommand(parsed: unknown): unknown {
+	if (!parsed || typeof parsed !== "object") return parsed;
+	const record = parsed as Record<string, unknown>;
+	const attachment = record.attachment as
+		| { prompt?: unknown; type?: unknown }
+		| undefined;
+	if (record.type !== "attachment" || attachment?.type !== "queued_command")
+		return parsed;
+	const { prompt } = attachment;
+	if (typeof prompt !== "string" && !Array.isArray(prompt)) return parsed;
+	const notification =
+		typeof prompt === "string" && /^\s*<task-notification[\s>]/u.test(prompt);
+	return {
+		...record,
+		message: { content: prompt, role: "user" },
+		type: "user",
+		...(notification ? {} : { queued: true }),
+	};
+}
+
 export function parseConversations(content: string): Array<Conversation> {
 	if (isCodexFormat(content)) {
 		return parseCodexConversations(content);
@@ -201,15 +282,24 @@ export function parseConversations(content: string): Array<Conversation> {
 	const lines = content.split("\n").filter(Boolean);
 	let executionMode: ConversationExecutionMode = "unknown";
 	const pendingExitPlanToolIds = new Set<string>();
+	const notifications = new Set<string>();
 
 	for (const line of lines) {
 		try {
-			const parsed = JSON.parse(line) as unknown;
+			const parsed = queuedCommand(JSON.parse(line) as unknown);
 			const permissionMode = readPermissionMode(parsed);
 			const modelSetting = readClaudeModelSetting(parsed);
 			const result = ConversationSchema.safeParse(parsed);
 			if (result.success) {
 				const entry = result.data;
+				if (
+					entry.type === "user" &&
+					typeof entry.message.content === "string" &&
+					entry.message.content.trimStart().startsWith("<task-notification")
+				) {
+					if (notifications.has(entry.message.content)) continue;
+					notifications.add(entry.message.content);
+				}
 
 				if (entry.type === "user" && permissionMode !== undefined) {
 					executionMode = toExecutionMode(permissionMode);

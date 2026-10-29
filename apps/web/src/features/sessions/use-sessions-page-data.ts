@@ -1,5 +1,5 @@
 import type { SessionListFilters } from "@rudel/api-routes";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -24,13 +24,30 @@ import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
 
 export function useSessionsPageData({
+	detail = false,
+	detailReady = false,
 	trackPageView,
 	paginated = true,
 }: {
+	detail?: boolean;
+	detailReady?: boolean;
 	paginated?: boolean;
 	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
+	const queryClient = useQueryClient();
+	const listed = !detail;
+	const [idleAfterDetail, setIdleAfterDetail] = useState(false);
+	useEffect(() => {
+		if (!detail || !detailReady || idleAfterDetail) return;
+		const done = () => setIdleAfterDetail(true);
+		if (typeof requestIdleCallback !== "function") {
+			const timer = window.setTimeout(done, 200);
+			return () => window.clearTimeout(timer);
+		}
+		const handle = requestIdleCallback(done, { timeout: 2_000 });
+		return () => cancelIdleCallback(handle);
+	}, [detail, detailReady, idleAfterDetail]);
 	const [filterState, setFilterState] = useState<{
 		scope: string;
 		filters: SessionListFilters;
@@ -40,6 +57,19 @@ export function useSessionsPageData({
 		meta,
 		state: { endDate, startDate },
 	} = useDateRange();
+	const [coldDetail] = useState(
+		() =>
+			detail &&
+			!queryClient
+				.getQueriesData({
+					queryKey: [
+						"org",
+						organization.activeOrg?.id,
+						...orpc.analytics.sessions.list.key(),
+					],
+				})
+				.some(([, data]) => data !== undefined),
+	);
 	const filterScope = JSON.stringify([
 		organization.activeOrg?.id,
 		startDate,
@@ -62,6 +92,7 @@ export function useSessionsPageData({
 		...orpc.analytics.sessions.filterCatalog.queryOptions({
 			input: { startDate, endDate, days: meta.dayCount },
 		}),
+		enabled: listed,
 		staleTime: SESSION_QUERY_STALE_TIME,
 	});
 	const previewSeed =
@@ -76,6 +107,7 @@ export function useSessionsPageData({
 		...orpc.analytics.overview.kpis.queryOptions({
 			input: { endDate, startDate },
 		}),
+		enabled: listed,
 		refetchOnMount: true,
 		refetchOnReconnect: true,
 		refetchOnWindowFocus: true,
@@ -90,6 +122,7 @@ export function useSessionsPageData({
 		...orpc.analytics.sessions.summaryComparison.queryOptions({
 			input: { days: meta.dayCount },
 		}),
+		enabled: listed,
 		refetchOnMount: true,
 		refetchOnReconnect: true,
 		refetchOnWindowFocus: true,
@@ -116,7 +149,10 @@ export function useSessionsPageData({
 	const sessionPages = useInfiniteQuery({
 		...options,
 		queryKey: ["org", organization.activeOrg?.id, ...options.queryKey],
-		enabled: !!organization.activeOrg?.id && demo?.live !== false,
+		enabled:
+			!!organization.activeOrg?.id &&
+			demo?.live !== false &&
+			(listed || !coldDetail || idleAfterDetail),
 		initialData: previewSeed
 			? { pages: [previewSeed.sessions], pageParams: [0] }
 			: undefined,
@@ -128,7 +164,8 @@ export function useSessionsPageData({
 				? previous
 				: undefined,
 		staleTime: SESSION_QUERY_STALE_TIME,
-		refetchOnWindowFocus: true,
+		refetchOnMount: listed,
+		refetchOnWindowFocus: listed,
 	});
 	const failureOptions = orpc.analytics.sessions.uploadFailures.infiniteOptions(
 		{
@@ -146,8 +183,12 @@ export function useSessionsPageData({
 	const failurePages = useInfiniteQuery({
 		...failureOptions,
 		queryKey: ["org", organization.activeOrg?.id, ...failureOptions.queryKey],
-		enabled: !!organization.activeOrg?.id && demo?.live !== false,
-		refetchInterval: import.meta.env.MODE === "plugin" ? false : 10_000,
+		enabled:
+			(listed || !coldDetail || idleAfterDetail) &&
+			!!organization.activeOrg?.id &&
+			demo?.live !== false,
+		refetchInterval:
+			import.meta.env.MODE === "plugin" || !listed ? false : 10_000,
 	});
 	const previousFailures = useRef<
 		{ scope: string; ids: Set<string> } | undefined
@@ -259,7 +300,10 @@ export function useSessionsPageData({
 	});
 
 	const useRolling24Hours = activeDateRangeOptionId === "24-hours";
-	const liveSessions = useLiveSessionList();
+	const liveSessions = useLiveSessionList({
+		enabled: listed || !coldDetail || idleAfterDetail,
+		poll: listed,
+	});
 	const rangeSessionCount =
 		catalogQuery.data?.sessionCount ??
 		summaryComparison?.current.total_sessions ??

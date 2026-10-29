@@ -154,26 +154,36 @@ export function getSessionTurnMemberPreview(turn: SessionTurn) {
 	return compactPreview(memberText, 240) || "No member message";
 }
 
+function isCompaction(item: TraceItem) {
+	return item.kind === "system" && item.systemType === "compaction";
+}
+
 export function groupTraceIntoTurns(items: TraceItem[]): SessionTurn[] {
 	const turns: SessionTurn[] = [];
 	let currentTurn: SessionTurn | undefined;
+	let compactions: TraceItem[] = [];
 
 	for (const item of items) {
+		if (isCompaction(item)) {
+			compactions.push(item);
+			continue;
+		}
 		if (item.kind === "user") {
 			if (
 				currentTurn &&
 				currentTurn.userItems.length > 0 &&
-				currentTurn.responseItems.length === 0
+				currentTurn.responseItems.every(isCompaction)
 			) {
 				currentTurn.userItems.push(item);
-				continue;
+			} else {
+				currentTurn = {
+					responseItems: [],
+					userItems: [item],
+				};
+				turns.push(currentTurn);
 			}
-
-			currentTurn = {
-				responseItems: [],
-				userItems: [item],
-			};
-			turns.push(currentTurn);
+			currentTurn.responseItems.push(...compactions);
+			compactions = [];
 			continue;
 		}
 
@@ -185,7 +195,21 @@ export function groupTraceIntoTurns(items: TraceItem[]): SessionTurn[] {
 			turns.push(currentTurn);
 		}
 
+		if (item.kind === "agent") {
+			currentTurn.responseItems.push(...compactions);
+			compactions = [];
+		}
 		currentTurn.responseItems.push(item);
+	}
+	if (compactions.length > 0) {
+		if (!currentTurn) {
+			currentTurn = {
+				responseItems: [],
+				userItems: [],
+			};
+			turns.push(currentTurn);
+		}
+		currentTurn.responseItems.push(...compactions);
 	}
 
 	return turns;

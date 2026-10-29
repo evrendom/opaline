@@ -1,10 +1,10 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: Fast-response validation and field-level compatibility normalization stay colocated.
 import {
+	SessionDetailChunkedSubagentSchema,
 	type SessionDetailOverview,
 	SessionDetailOverviewSchema,
 	SessionDetailRevisionSchema,
 	type SessionDetailSubagent,
-	SessionDetailSubagentSchema,
 	SessionDetailTraceItemSchema,
 	type SessionDetailTurn,
 	SessionDetailTurnSchema,
@@ -299,7 +299,7 @@ export function parseSessionDetailSubagentResponse(
 	value: unknown,
 	input: { subagentId: string },
 ): SessionDetailSubagent {
-	const parsed = SessionDetailSubagentSchema.safeParse(value);
+	const parsed = SessionDetailChunkedSubagentSchema.safeParse(value);
 	if (!parsed.success) {
 		throw responseError("subagent", parsed.error.issues);
 	}
@@ -486,6 +486,11 @@ function normalizeOverviewTurn(raw: Record<string, unknown>) {
 			raw.inputTokens,
 			null,
 		),
+		modelApologyCount: optionalField(
+			overviewTurnShape.modelApologyCount,
+			raw.modelApologyCount,
+			undefined,
+		),
 		modelSignalCount: optionalField(
 			overviewTurnShape.modelSignalCount,
 			raw.modelSignalCount,
@@ -593,6 +598,21 @@ function normalizeOverviewSubagent(raw: Record<string, unknown>) {
 		return undefined;
 	}
 	return {
+		context: optionalField(
+			overviewSubagentShape.context,
+			raw.context,
+			undefined,
+		),
+		durationSeconds: optionalField(
+			overviewSubagentShape.durationSeconds,
+			raw.durationSeconds,
+			undefined,
+		),
+		mainThread: optionalField(
+			overviewSubagentShape.mainThread,
+			raw.mainThread,
+			undefined,
+		),
 		estimatedCost: optionalField(
 			overviewSubagentShape.estimatedCost,
 			raw.estimatedCost,
@@ -602,6 +622,11 @@ function normalizeOverviewSubagent(raw: Record<string, unknown>) {
 			overviewSubagentShape.hasTranscript,
 			raw.hasTranscript,
 			false,
+		),
+		gitActions: optionalField(
+			overviewSubagentShape.gitActions,
+			raw.gitActions,
+			undefined,
 		),
 		inputTokens: optionalField(
 			overviewSubagentShape.inputTokens,

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
 import {
+	getSessionDetailId,
 	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
@@ -81,6 +82,14 @@ function SessionAwareApp() {
 				/* Navigation retries a failed preload. */
 			});
 		}
+		const sessionId = getSessionDetailId(path);
+		if (sessionId)
+			void import("@/features/sessions/session-detail-prefetch")
+				.then((prefetch) => {
+					prefetch.prefetchSessionDetail(sessionId);
+					return prefetch.loadSessionReaderView();
+				})
+				.catch(() => {});
 	}, [location.pathname]);
 	const { data: session, isPending } = authClient.useSession();
 	// Better Auth re-fetches the session whenever the tab becomes visible and
@@ -145,14 +154,7 @@ function SessionAwareApp() {
 			<>
 				<ProductAnalyticsSessionSync session={session} />
 				<AuthenticatedApp rootRedirectTarget={rootRedirectTarget} />
-				{/* Inside a workspace the bottom-right corner belongs to the
-				    assistant, which only development builds show (see
-				    AppShellLayout); everywhere else, support keeps it. */}
-				{session &&
-				(!import.meta.env.DEV ||
-					!getWorkspaceSlugFromPath(location.pathname)) ? (
-					<SupportEmailButton />
-				) : null}
+				{session ? <SupportEmailButton /> : null}
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);

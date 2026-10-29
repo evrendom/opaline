@@ -1,3 +1,14 @@
+import {
+	ASSIGNMENT,
+	PROGRAM_WORD,
+	SEPARATOR,
+	SETUP,
+	SHELL_WRAPPER,
+	VALUE_FLAGS,
+	WORDS,
+	WRAPPER,
+} from "@rudel/api-routes/command-identity";
+
 /**
  * Command identity of a call: the program it ran (`command_argv0`), its first
  * words (`command_prefix`), and a fingerprint and simhash of its normalized
@@ -32,66 +43,13 @@ export const SCRIPT_EXTENSIONS = [
 	"ts",
 ] as const;
 
-/** `$(…)` with one level of nesting or quoted parentheses, or a backquoted substitution. */
-const SUBSTITUTION = String.raw`\$\((?:[^()'"]|'[^']*'|"[^"]*"|\([^()]*\))*\)|\x60[^\x60]*\x60`;
-const DOUBLE_QUOTED = String.raw`"(?:[^"\\$]|\\.|${SUBSTITUTION}|\$)*"`;
-/** The words of one statement, quotes and substitutions included. */
-const WORDS = String.raw`(?:[^;&|\n'"\x60$]|'[^']*'|${DOUBLE_QUOTED}|${SUBSTITUTION}|\$)*`;
-/** `NAME=value` with a quoted, substituted or bare value. */
-const ASSIGNMENT = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:${DOUBLE_QUOTED}|'[^']*'|${SUBSTITUTION}|[^\s;&|'"\x60$]|\$)*`;
-/** A statement separator: `&&`, `||`, `;`, a newline. */
-const SEPARATOR = String.raw`(?:&&|\|\||;|\n)`;
-/**
- * Statements before the command that only set up the shell or print a label:
- * `cd x &&`, `export A=1;`, `source .env`, `A=$(…);`, `echo "== x =="`, a
- * comment line, and `REDACTED;` where the secret filter replaced one.
- */
-const SETUP = String.raw`^(?:\s*(?:#[^\n]*(?:\n|$)|(?:cd|pushd|export|source|set|unset|\.|echo|printf)(?:[ \t]${WORDS})?${SEPARATOR}|(?:${ASSIGNMENT}(?:[ \t]+${ASSIGNMENT})*|REDACTED)[ \t]*${SEPARATOR}))*\s*`;
 /**
  * What a fingerprint leaves out before a command: changing directory (`cd x
  * &&`), comment lines and `REDACTED;`. Assignments stay, since `A=$(…)` runs
  * a command too.
  */
 const LEADING_CD = String.raw`^(?:\s*(?:#[^\n]*(?:\n|$)|(?:cd|pushd)(?:[ \t]${WORDS})?${SEPARATOR}|REDACTED[ \t]*${SEPARATOR}))*\s*`;
-/**
- * Wrappers that run the command after them, each with its own options, so
- * argv0 and prefix name that command: `sudo -E bun test` runs bun, `rtk proxy
- * git push` runs git, `npx --yes tsc` runs tsc, `uv run python` runs python.
- * Script runners (`npm run`, `bun run`, `pnpm <script>`) are not wrappers: the
- * script is theirs. The fingerprint keeps wrappers as written.
- */
-export const WRAPPERS = [
-	String.raw`sudo(?:[ \t]+-[ugCDhpRT][ \t]+\S+|[ \t]+-\S+)*`,
-	"doas",
-	"command",
-	"exec",
-	"nohup",
-	String.raw`caffeinate(?:[ \t]+-\S+)*`,
-	String.raw`time(?:[ \t]+-p)?`,
-	String.raw`nice(?:[ \t]+-n[ \t]*-?[0-9]+|[ \t]+-[0-9]+)?`,
-	String.raw`stdbuf(?:[ \t]+-\S+)*`,
-	"unbuffer",
-	String.raw`env(?:[ \t]+-[uCS][ \t]+\S+|[ \t]+-\S+)*`,
-	String.raw`timeout(?:[ \t]+-\S+)*[ \t]+[0-9.]+[smhd]?`,
-	// A token-saving proxy: `rtk proxy <cmd>` and `rtk <cmd>`.
-	String.raw`rtk(?:[ \t]+proxy)?`,
-	// Package runners that run a package's program.
-	String.raw`(?:npx|bunx|pnpx|uvx|safe-run)(?:[ \t]+(?:-p|--package)[ \t]+\S+|[ \t]+-\S+)*(?:[ \t]+--)?`,
-	String.raw`(?:pnpm|yarn|npm)[ \t]+(?:exec|dlx)(?:[ \t]+-\S+)*(?:[ \t]+--)?`,
-	String.raw`bun[ \t]+x(?:[ \t]+-\S+)*`,
-	String.raw`(?:uv|poetry|pipx)[ \t]+run(?:[ \t]+(?:--with|--project|--directory|--python|--group|--extra|--package)[ \t]+\S+|[ \t]+-\S+)*(?:[ \t]+--)?`,
-	String.raw`conda[ \t]+run(?:[ \t]+(?:-n|-p|--name|--prefix)[ \t]+\S+|[ \t]+-\S+)*`,
-	// Runners whose own arguments end at `--`.
-	String.raw`(?:mise[ \t]+(?:exec|x)|doppler[ \t]+run|op[ \t]+run|dotenv)(?:[ \t]+[^\s;&|]+)*?[ \t]+--`,
-];
-const WRAPPER = `(?:${WRAPPERS.join("|")})`;
-/** A whole command run through `bash -lc '…'`, `sh -c "…"`, `zsh -c …`. */
-const SHELL_WRAPPER = String.raw`^\s*(?:\S*/)?(?:ba|z|da|k)?sh\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*c\s+`;
-/** Package-manager and git flags that take the next word as their value. */
-const VALUE_FLAGS =
-	"(?:-C|--cwd|--filter|-F|--prefix|--dir|--workspace|-w|--config|--registry|--repo|-R)";
-
-function lit(value: string): string {
+export function lit(value: string): string {
 	return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
@@ -111,9 +69,6 @@ function commandStartSql(text: string): string {
 	// --version` run `env` and `rtk`. A leading `&` is PowerShell's call operator.
 	return `replaceRegexpOne(${setup}, ${lit(String.raw`^(?:(?:${ASSIGNMENT}|${WRAPPER})[ \t]+|[!({&][ \t]*)*([^\s;&|<>)-])`)}, ${lit("\\1")})`;
 }
-
-/** The first word of a command: a substitution `$(…)` whole, otherwise up to an operator. */
-const PROGRAM_WORD = String.raw`^(${SUBSTITUTION}|[^\s;&|()<>]+)`;
 
 /**
  * The program a shell command runs: the first word after setup statements

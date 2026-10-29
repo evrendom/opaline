@@ -7,7 +7,7 @@ import {
 import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated";
 import { filterKnownSecrets } from "@rudel/secret-filter";
 
-export const GIT_OBSERVATION_PARSER_VERSION = 4;
+export const GIT_OBSERVATION_PARSER_VERSION = 5;
 export const GIT_OBSERVATION_MAX_RAW_BYTES = 1024 * 1024;
 export const GIT_OBSERVATION_MAX_ROWS = 10_000;
 export const GIT_TOOL_PATTERN =
@@ -640,7 +640,7 @@ function ciChecks(
 	const command = shellCommand(call);
 	if (command !== null) {
 		const segments = parseShellCommand(command);
-		return segments.flatMap((segment, index) => {
+		const checks: CiCheck[] = segments.flatMap((segment, index) => {
 			const target = ghCiTarget(segment.words);
 			if (!target) return [];
 			const connectors = segments
@@ -666,6 +666,23 @@ function ciChecks(
 				},
 			];
 		});
+		if (checks.length === 0) return [];
+		const runs = actionsRuns(record.text);
+		if (
+			checks.length === 1 &&
+			(runs.length > 0 || GH_CHECK_ROW_PATTERN.test(record.text))
+		)
+			for (const check of checks) check.label = "observed";
+		for (const run of runs) {
+			const named = checks.find((check) => check.run_id === run.run_id);
+			if (!named) {
+				checks.push({ kind: "ci_check", ...run, label: "observed" });
+				continue;
+			}
+			named.label = "observed";
+			if (!named.pr_repo) named.pr_repo = run.pr_repo;
+		}
+		return checks;
 	}
 	if (record.is_error || mcpFailed(record.text)) return [];
 	if (GITHUB_CI_METHOD_TOOL_PATTERN.test(call.tool_name)) {
@@ -772,6 +789,31 @@ function ghCiTarget(
 		run_id: runId,
 		commit_hash: commitSha(commit),
 	};
+}
+
+type CiCheck = Partial<RudelSessionGitObservationsRow>;
+
+/** A `gh pr checks` status row (non-TTY): name, tab, status, tab. */
+const GH_CHECK_ROW_PATTERN =
+	/^[^\t\n]+\t(?:pass|fail|pending|skipping|cancel)(?:\t|\r?$)/mu;
+
+function actionsRuns(
+	text: string,
+): Pick<RudelSessionGitObservationsRow, "pr_repo" | "run_id">[] {
+	const runs = new Map<string, { pr_repo: string; run_id: string }>();
+	for (const match of text
+		.replaceAll("\\/", "/")
+		.matchAll(
+			/https:\/\/github\.com\/([a-z\d_.-]+)\/([a-z\d_.-]+)\/actions\/runs\/([1-9]\d{0,19})(?![\dA-Za-z])/giu,
+		)) {
+		const runId = match[3] ?? "";
+		if (runs.has(runId)) continue;
+		runs.set(runId, {
+			pr_repo: safeText(`${match[1]}/${match[2]}`),
+			run_id: runId,
+		});
+	}
+	return [...runs.values()];
 }
 
 /** A literal commit SHA a CI check names, lowercased; empty when it is not one. */

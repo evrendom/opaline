@@ -58,7 +58,7 @@ export function WorkspaceMenuButton({
 						data-sidebar-workspace-row
 						className={cn(
 							isHeaderVariant
-								? "relative flex size-7 shrink-0 items-center justify-center rounded-md text-[#292A2F] outline-none hover:bg-black/4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] active:scale-95 dark:text-white/90 dark:hover:bg-white/6"
+								? "relative flex size-7 shrink-0 items-center justify-center rounded-md text-[#292A2F] outline-none hover:bg-black/4 active:scale-95 dark:text-white/90 dark:hover:bg-white/6"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
 								"!size-9 !w-9 self-auto overflow-visible rounded-lg",

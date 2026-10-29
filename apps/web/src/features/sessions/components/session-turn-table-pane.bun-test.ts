@@ -476,7 +476,8 @@ describe("session turn table views", () => {
 	});
 
 	test("compacts duration units without a prefix or intervening space", () => {
-		expect(formatTotalTurnDuration(11_141)).toBe("3h 5m");
+		expect(formatTotalTurnDuration(11_141)).toBe("3h");
+		expect(formatTotalTurnDuration(12_900)).toBe("3.5h");
 		expect(formatTotalTurnDuration(341)).toBe("5m 41s");
 
 		const modelRow = buildSessionTurnTableViewRows(

@@ -99,6 +99,10 @@ export interface FlagContext {
 	readonly costCutoff: number | null;
 	/** The same for minutes. */
 	readonly minutesCutoff: number | null;
+	readonly ranked?: {
+		readonly costs: readonly number[];
+		readonly minutes: readonly number[];
+	};
 	/** SubQ's probability that the member's next prompt is frustrated; null when not asked. */
 	readonly frustration: number | null;
 }
@@ -309,7 +313,14 @@ export function flagsOfRun(
 			kind: "expensive_run",
 			...whole,
 			count: run.cost_usd,
-			detail: `$${run.cost_usd.toFixed(2)}, among the costliest ${value("expensive_run")}%`,
+			detail: rankedDetail({
+				format: (cost) => `$${cost.toFixed(2)}`,
+				cutoff: context.costCutoff,
+				percent: value("expensive_run"),
+				ranked: context.ranked?.costs,
+				run: run.cost_usd,
+				word: "costliest",
+			}),
 		});
 
 	if (
@@ -322,7 +333,14 @@ export function flagsOfRun(
 			kind: "long_run",
 			...whole,
 			count: run.minutes,
-			detail: `${Math.round(run.minutes)} min, among the longest ${value("long_run")}%`,
+			detail: rankedDetail({
+				format: (minutes) => `${Math.round(minutes)} min`,
+				cutoff: context.minutesCutoff,
+				percent: value("long_run"),
+				ranked: context.ranked?.minutes,
+				run: run.minutes,
+				word: "longest",
+			}),
 		});
 
 	if (on("edit_churn")) {
@@ -486,6 +504,39 @@ export function flagsOfRun(
  * The cost (or duration) at or above which a run is among the top `percent`
  * of the range's runs; null with fewer than `PERCENTILE_MIN_RUNS` positive values.
  */
+export function rankedDetail({
+	cutoff,
+	format,
+	percent,
+	ranked,
+	run,
+	word,
+}: {
+	cutoff: number;
+	format: (value: number) => string;
+	percent: number;
+	ranked: readonly number[] | undefined;
+	run: number;
+	word: string;
+}): string {
+	const positive = (ranked ?? []).filter((value) => value > 0);
+	if (positive.length === 0)
+		return `${format(run)}, among the ${word} ${percent}%`;
+	const sorted = [...positive].sort((a, b) => a - b);
+	const middle = sorted.length / 2;
+	const median = Number.isInteger(middle)
+		? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+		: (sorted[Math.floor(middle)] ?? 0);
+	const above = sorted.filter((value) => value > run).length;
+	const top = Math.max(1, Math.ceil(((above + 1) / sorted.length) * 100));
+	const times = median > 0 ? run / median : null;
+	const relative =
+		times === null
+			? ""
+			: ` ${times >= 10 ? Math.round(times) : times.toFixed(1)}× the median run (${format(median)});`;
+	return `${format(run)},${relative} top ${top}% of ${sorted.length} runs, the ${word} ${percent}% from ${format(cutoff)}`;
+}
+
 export function topPercentCutoff(
 	values: readonly number[],
 	percent: number,

@@ -9,13 +9,14 @@
 }
 
 .dashboard-01-theme,
-body:has(.dashboard-01-preview),
+:where(html)[data-app-shell] body,
 .dashboard-01-preview {
 	--dashboard-01-font-sans: var(--font-sans);
 	--dashboard-01-font-heading: var(--app-font-heading);
 	--dashboard-01-font-roster-display: var(--app-font-heading);
 	--dashboard-01-font-roster-mono: "Geist Mono", ui-monospace, monospace;
 	--dashboard-01-content-background: #fcfcfc;
+	--dashboard-01-stage-background: var(--dashboard-01-content-background);
 	--dashboard-01-rail-icon: #a4a7a7;
 	--dashboard-01-rail-icon-active: #121517;
 	--dashboard-01-rail-hover: rgba(0, 0, 0, 0.02);
@@ -30,8 +31,6 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-tone-rose: #f08ba7;
 	--dashboard-01-tone-slate: #94a3b8;
 	--dashboard-01-metric-button-border: rgba(217, 217, 217, 0.5);
-	--dashboard-01-metric-button-focus-ring: rgba(115, 130, 255, 0.6);
-	--dashboard-01-metric-button-focus-ring-offset: #f7f8f9;
 	--dashboard-01-metric-button-surface: linear-gradient(
 		180deg,
 		rgba(0, 0, 0, 0) 0%,
@@ -304,9 +303,10 @@ body:has(.dashboard-01-preview),
 }
 
 .dark .dashboard-01-theme,
-.dark body:has(.dashboard-01-preview),
+:where(html).dark[data-app-shell] body,
 .dark .dashboard-01-preview {
 	--dashboard-01-content-background: var(--background);
+	--dashboard-01-stage-background: var(--dashboard-01-content-background);
 	--dashboard-01-rail-icon: oklch(0.708 0 0);
 	--dashboard-01-rail-icon-active: oklch(0.985 0 0);
 	--dashboard-01-rail-hover: rgb(255 255 255 / 0.04);
@@ -321,8 +321,6 @@ body:has(.dashboard-01-preview),
 	--dashboard-01-tone-rose: #f4a8bd;
 	--dashboard-01-tone-slate: #a5b4c5;
 	--dashboard-01-metric-button-border: rgba(255, 255, 255, 0.12);
-	--dashboard-01-metric-button-focus-ring: rgba(144, 156, 255, 0.55);
-	--dashboard-01-metric-button-focus-ring-offset: oklch(0.145 0 0);
 	--dashboard-01-metric-button-surface: linear-gradient(
 		180deg,
 		rgba(255, 255, 255, 0.04) 0%,
@@ -368,14 +366,14 @@ body:has(.dashboard-01-preview),
 	--sidebar-ring: oklch(0.556 0 0);
 }
 
-html:has(.dashboard-01-preview),
-body:has(.dashboard-01-preview) {
+html[data-app-shell],
+:where(html)[data-app-shell] body {
 	background-color: var(--dashboard-01-chrome-backdrop-fill);
 	/* Portaled tooltips bypass the shell's scroll containers. */
 	overscroll-behavior: none;
 }
 
-body:has(.dashboard-01-preview) {
+:where(html)[data-app-shell] body {
 	position: relative;
 	isolation: isolate;
 }
@@ -411,8 +409,8 @@ body:has(.dashboard-01-preview) {
 	background: transparent;
 }
 
-body:has(.dashboard-01-preview)::before,
-body:has(.dashboard-01-preview)::after {
+:where(html)[data-app-shell] body::before,
+:where(html)[data-app-shell] body::after {
 	content: "";
 	position: fixed;
 	inset: 0;
@@ -728,14 +726,6 @@ body:has(.dashboard-01-preview)::after {
 		inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-.team-lineup-metric-button:focus-visible {
-	outline: none;
-	box-shadow:
-		var(--dashboard-01-metric-button-shadow-selected),
-		0 0 0 2px var(--dashboard-01-metric-button-focus-ring),
-		0 0 0 4px var(--dashboard-01-metric-button-focus-ring-offset);
-}
-
 @media (prefers-reduced-motion: reduce) {
 	.team-lineup-metric-button {
 		transition: none;
@@ -793,7 +783,7 @@ body:has(.dashboard-01-preview)::after {
 	}
 }
 
-body:has(.dashboard-01-preview)::before {
+:where(html)[data-app-shell] body::before {
 	background-image: var(--dashboard-01-chrome-noise-texture);
 	background-position:
 		0 0,
@@ -811,12 +801,12 @@ body:has(.dashboard-01-preview)::before {
 }
 
 /* The dark shell is flat: no noise texture. */
-.dark body:has(.dashboard-01-preview)::before,
-.dark body:has(.dashboard-01-preview)::after {
+:where(html).dark[data-app-shell] body::before,
+:where(html).dark[data-app-shell] body::after {
 	content: none;
 }
 
-body:has(.dashboard-01-preview)::after {
+:where(html)[data-app-shell] body::after {
 	background-image: var(--dashboard-01-chrome-noise-texture);
 	background-position:
 		0 0,
@@ -860,7 +850,7 @@ body:has(.dashboard-01-preview)::after {
 	z-index: 1;
 }
 
-body:has(.dashboard-01-preview) > * {
+:where(html)[data-app-shell] body > * {
 	position: relative;
 	z-index: 1;
 }

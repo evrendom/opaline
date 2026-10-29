@@ -57,9 +57,6 @@ export function toLastSessionUpload(
 		: null;
 }
 
-/** Adapted from the dev bar: a strip in the canvas under
- * the window, kept in flow so it follows the window when the assistant panel
- * resizes it. */
 export function LastSessionUploadBar() {
 	const getShellRoutePath = useShellRoutePath();
 	const demo = useDemoRuntime();
@@ -80,7 +77,7 @@ export function LastSessionUploadBar() {
 			{latest && uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? (
 				<Link
 					to={getShellRoutePath(appRoutes.sessionDetail(latest.session_id))}
-					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-ring/50"
+					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground"
 					title={`Open the session uploaded ${fixedFormat ? formatUtcTime(uploadedAt) : uploadedAt.toLocaleString()}`}
 				>
 					<IconCloudUpload

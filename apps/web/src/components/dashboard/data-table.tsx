@@ -185,10 +185,7 @@ export function SortableHead<K extends string>({
 					onSort(sortKey);
 				}
 			}}
-			className={cn(
-				"group cursor-pointer select-none outline-none focus-visible:ring-[1.5px] focus-visible:ring-inset focus-visible:ring-ring/50",
-				className,
-			)}
+			className={cn("group cursor-pointer select-none outline-none", className)}
 		>
 			{/* The arrow sits after the label but takes no layout space on
 			    right-aligned columns (-mr-5 = its size-3.5 + gap-1.5 footprint,

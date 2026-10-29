@@ -87,6 +87,11 @@ function requestCodeHighlight(request: CodeHighlightRequest) {
 	worker.postMessage(request);
 }
 
+export function warmCodeHighlighter(theme: CodeHighlightTheme) {
+	const input = { code: "true", language: "bash", theme };
+	requestCodeHighlight({ ...input, key: getCodeHighlightKey(input) });
+}
+
 function subscribeCodeHighlight(key: string, listener: () => void) {
 	const keyListeners = listeners.get(key) ?? new Set();
 	keyListeners.add(listener);

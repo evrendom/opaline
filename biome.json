@@ -66,6 +66,7 @@
 				"apps/web/src/components/conversation/**",
 				"apps/web/src/features/dashboard/DashboardPage.tsx",
 				"apps/web/src/features/sessions/components/**",
+				"apps/web/src/features/sessions/reader/**",
 				"apps/web/src/hooks/useChartTheme.ts"
 			],
 			"linter": {

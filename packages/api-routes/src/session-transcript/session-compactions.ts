@@ -89,10 +89,6 @@ export function extractSessionCompactionMetadata(
 				compactions.push(compaction);
 				hasPendingClaudeBoundary = true;
 			}
-			const id = getString(parsed, "uuid");
-			if (id) {
-				hiddenTraceItemIds.add(id);
-			}
 			continue;
 		}
 

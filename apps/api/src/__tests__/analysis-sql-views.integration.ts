@@ -555,7 +555,13 @@ describe("the git_events view", () => {
 					"To github.com:opalinehq/athena.git\n   a1b2c3d..d4e5f6a  feat/a -> feat/a",
 				),
 				bash("g2", "gh pr checks 133 --repo opalinehq/athena"),
-				result("g2", "build\tpass"),
+				result(
+					"g2",
+					[
+						"build\tpass\t1m\thttps://github.com/opalinehq/athena/actions/runs/8801/job/1",
+						"deploy\tpass\t2m\thttps://github.com/opalinehq/athena/actions/runs/8802/job/2",
+					].join("\n"),
+				),
 				// A check in the same call as the push is not after it.
 				bash(
 					"g5",
@@ -666,6 +672,22 @@ describe("the git_events view", () => {
 				ORDER BY e.record_idx`,
 			),
 		).toEqual(["turn_idx | record_idx | push_to_sha", ...unchecked]);
+
+		expect(
+			found.events.find(
+				(event) => event.kind === "push_range" && event.pushTo === "d4e5f6a",
+			)?.checksAfter,
+		).toMatchObject({ count: 2, unconfirmed: 0 });
+		expect(
+			await sql(
+				teammate,
+				`SELECT e.checks_after, e.unconfirmed_checks_after
+				FROM git_events AS e
+				WHERE e.kind = 'push_range' AND e.push_to_sha = 'd4e5f6a'
+					AND e.session_id = '${session}'
+					AND toDate(e.session_date) BETWEEN '${day}' AND '${day}'`,
+			),
+		).toEqual(["checks_after | unconfirmed_checks_after", "2 | 0"]);
 	});
 });
 

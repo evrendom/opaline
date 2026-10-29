@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
 	createContext,
 	type ReactNode,
+	useCallback,
 	useContext,
 	useMemo,
 	useState,
@@ -163,7 +164,7 @@ function AuthenticatedOrganizationProvider({
 		firstOrganizationId !== null &&
 		attemptedAutoSelectOrgId !== firstOrganizationId;
 
-	const switchOrganization = async (orgId: string) => {
+	const switchOrganization = useCallback(async (orgId: string) => {
 		setSwitching(true);
 		try {
 			const result = await authClient.organization.setActive({
@@ -175,28 +176,36 @@ function AuthenticatedOrganizationProvider({
 		} finally {
 			setSwitching(false);
 		}
-	};
+	}, []);
 
 	const memberRole = activeMember?.role;
-	const contextValue: WorkspaceContextValue = {
-		state: {
-			activeOrg: resolvedActiveOrg,
-			members:
-				activeOrg?.id === resolvedActiveOrg?.id ? activeMembers : undefined,
-			organizations: orgs ?? [],
-			isLoading: activeLoading || listLoading || switching,
-		},
-		actions: {
+	const members =
+		activeOrg?.id === resolvedActiveOrg?.id ? activeMembers : undefined;
+	const isLoading = activeLoading || listLoading || switching;
+	const isOrgAdmin =
+		!activeOrg || memberRole === "owner" || memberRole === "admin";
+	const readsEverySession = sessionAccess?.readsEverySession ?? true;
+	const contextValue = useMemo<WorkspaceContextValue>(
+		() => ({
+			state: {
+				activeOrg: resolvedActiveOrg,
+				members,
+				organizations: orgs ?? [],
+				isLoading,
+			},
+			actions: { switchOrganization },
+			meta: { isOrgAdmin, readsEverySession },
+		}),
+		[
+			resolvedActiveOrg,
+			members,
+			orgs,
+			isLoading,
 			switchOrganization,
-		},
-		meta: {
-			isOrgAdmin:
-				!activeOrg || memberRole === "owner" || memberRole === "admin",
-			// Every member reads every member's sessions unless the server says
-			// otherwise (a workspace limited to own sessions).
-			readsEverySession: sessionAccess?.readsEverySession ?? true,
-		},
-	};
+			isOrgAdmin,
+			readsEverySession,
+		],
+	);
 
 	return (
 		<>

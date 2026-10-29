@@ -1,3 +1,4 @@
+import { formatHalfHours } from "@/lib/format";
 import type { SessionTurnTableRow } from "./session-turn-table";
 
 const turnCostFormatter = new Intl.NumberFormat("en-US", {
@@ -33,14 +34,13 @@ export function formatCompactTurnDuration(label: string) {
 
 export function formatTotalTurnDuration(value: number) {
 	const totalSeconds = Math.max(0, Math.round(value));
-	const hours = Math.floor(totalSeconds / 3_600);
-	const minutes = Math.floor((totalSeconds % 3_600) / 60);
+	if (totalSeconds >= 3_600) return formatHalfHours(totalSeconds);
+	const minutes = Math.floor(totalSeconds / 60);
 	const seconds = totalSeconds % 60;
 
 	return [
-		hours > 0 ? `${hours}h` : undefined,
 		minutes > 0 ? `${minutes}m` : undefined,
-		hours === 0 && (seconds > 0 || minutes === 0) ? `${seconds}s` : undefined,
+		seconds > 0 || minutes === 0 ? `${seconds}s` : undefined,
 	]
 		.filter((part) => part !== undefined)
 		.join(" ");

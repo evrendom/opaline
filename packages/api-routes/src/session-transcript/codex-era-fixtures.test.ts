@@ -73,7 +73,9 @@ describe("Codex era fixtures", () => {
 		);
 		const patches = events.filter((event) => event.toolName === "apply_patch");
 		const systemMessages = conversations.flatMap((entry) =>
-			entry.type === "system" ? [entry.message.content] : [],
+			entry.type === "system" && "message" in entry
+				? [entry.message.content]
+				: [],
 		);
 
 		expect(
@@ -154,6 +156,7 @@ describe("Codex era fixtures", () => {
 			parseCodexConversations(currentContent).some(
 				(entry) =>
 					entry.type === "system" &&
+					"message" in entry &&
 					entry.message.content === "Context compacted",
 			),
 		).toBe(true);

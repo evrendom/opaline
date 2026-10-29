@@ -44,6 +44,11 @@ import {
 	formatRoundedDuration,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import {
+	cancelSessionDetailIntent,
+	intendSessionDetail,
+	startSessionDetail,
+} from "../session-detail-prefetch";
 import { markSessionOpenFromClick } from "../session-open-timing";
 import { getSessionModelDisplayValue } from "./session-model-identity";
 import {
@@ -557,6 +562,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						markSessionOpenFromClick(session.session_id, isActive, event);
 						onSessionClick?.(session);
 					}}
+					onFocus={() => intendSessionDetail(sessionHref)}
+					onPointerDown={() => startSessionDetail(sessionHref)}
+					onPointerEnter={() => intendSessionDetail(sessionHref)}
+					onPointerLeave={cancelSessionDetailIntent}
 					state={getSessionLinkState?.(session)}
 					to={sessionHref}
 					viewTransition

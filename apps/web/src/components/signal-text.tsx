@@ -24,6 +24,11 @@ const SIGNAL_MARK_CATEGORY_CLASS_NAMES: Readonly<
 	positive: "bg-[#dcfce7] text-[#15803d] dark:bg-[#173d2a] dark:text-[#4ade80]",
 };
 
+export const signalMarkClassName = (
+	category: LanguageSignalMatch["category"],
+) =>
+	`${SIGNAL_MARK_BASE_CLASS_NAME} ${SIGNAL_MARK_CATEGORY_CLASS_NAMES[category]}`;
+
 const SEARCH_MARK_CLASS_NAME = "bg-yellow-300 text-inherit dark:bg-yellow-700";
 const SignalTextSearchQueryContext = createContext<string | undefined>(
 	undefined,
@@ -157,7 +162,7 @@ function renderDecoratedText(
 					key={`signal:${cursor}:${end}:${match.ruleId}`}
 					data-signal={match.category}
 					data-text="true"
-					className={`${SIGNAL_MARK_BASE_CLASS_NAME} ${SIGNAL_MARK_CATEGORY_CLASS_NAMES[match.category]}`}
+					className={signalMarkClassName(match.category)}
 				>
 					{text.slice(cursor, end)}
 				</span>,

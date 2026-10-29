@@ -85,11 +85,7 @@ export async function getSessionDetailBodyChunk(
 		ownerId: string;
 	},
 ) {
-	const current = await getSessionDetailCurrentRevision(
-		input.organizationId,
-		input.sessionId,
-		input.ownerId,
-	);
+	const current = await getCurrentRevision(input);
 	if (!current) return null;
 	if (current.revision !== input.revision) {
 		throw new SessionDetailStaleRevisionError(input.revision, current.revision);
@@ -367,6 +363,14 @@ async function getRequestedDerivation(input: {
 		throw new SessionDetailStaleRevisionError(input.revision, current.revision);
 	}
 	return loadDerivation(createKey({ ...input, source: current.source }));
+}
+
+export function getCurrentSessionDetailDerivation(input: {
+	organizationId: string;
+	ownerId: string;
+	sessionId: string;
+}) {
+	return getCurrentDerivation(input);
 }
 
 export async function getSessionDetailInitial(input: {

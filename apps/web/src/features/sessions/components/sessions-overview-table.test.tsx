@@ -233,12 +233,10 @@ describe("SessionsOverviewTable", () => {
 			'[data-trace-icon-tone="claude"]',
 		);
 		assert(modelGlyph);
-		expect(modelGlyph).toHaveClass(
-			"bg-white",
-			"rounded-none",
-			"border-0",
-			"[-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]",
-		);
+		expect(modelGlyph).toHaveClass("text-[#D97757]");
+		expect(
+			modelGlyph.querySelector('[style*="--opal-tint: #D97757"]'),
+		).toBeInTheDocument();
 		expect(within(sessionsList).getByText("fuck")).toBeVisible();
 		expect(within(sessionsList).getByText("Great work")).toBeVisible();
 		expect(within(sessionsList).getByText("pr2-usage-events")).toBeVisible();

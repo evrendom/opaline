@@ -90,11 +90,14 @@ export type {
 
 import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
+import { sessionRunCiContract } from "./run-ci.js";
 import {
 	runQuestionsAdminContract,
 	runQuestionsAnalysisContract,
 	sessionRunQuestionsContract,
 } from "./run-questions.js";
+import { sessionFileChangesContract } from "./session-file-changes.js";
+import { sessionSummaryLinksContract } from "./session-summary-links.js";
 
 export {
 	type AnalysisCall,
@@ -179,6 +182,19 @@ export {
 	SEARCH_TEXT_MAX_CHARS,
 } from "./analysis-search.js";
 export {
+	type RunCiByTurnStart,
+	type RunCiJob,
+	type RunCiLink,
+	type RunCiRun,
+	runCiByTurnStart,
+	runCiStartedAt,
+	runCiStartKey,
+	type SessionRunCi,
+	type SessionRunCiRun,
+	SessionRunCiSchema,
+	turnRunCi,
+} from "./run-ci.js";
+export {
 	AGENT_RUNS_MAX_FILTERS,
 	AGENT_RUNS_MAX_LIMIT,
 	type AgentRun,
@@ -217,6 +233,33 @@ export {
 	type SessionRunQuestionTags,
 	SessionRunQuestionTagsSchema,
 } from "./run-questions.js";
+export {
+	SESSION_FILE_CHANGES_TEXT_BUDGET,
+	SESSION_FILE_TEXT_LIMIT,
+	SESSION_RUN_SEEN_LIMIT,
+	SESSION_RUN_STEP_LABEL_LIMIT,
+	type SessionFile,
+	type SessionFileChange,
+	type SessionFileChanges,
+	type SessionRunCheck,
+	SessionRunCheckSchema,
+	type SessionRunReadRange,
+	type SessionRunSeen,
+	type SessionRunStep,
+	type SessionRunStepKind,
+} from "./session-file-changes.js";
+export {
+	SESSION_SETUP_TEXT_VERSION_LIMIT,
+	type SessionPullRequest,
+	type SessionSetupFile,
+	type SessionSetupRun,
+	type SessionSetupRuns,
+	SessionSetupRunsSchema,
+	type SessionSetupText,
+	SessionSetupTextSchema,
+	type SessionSummaryLinks,
+	SessionSummaryLinksSchema,
+} from "./session-summary-links.js";
 
 import { oc } from "@orpc/contract";
 import { z } from "zod";
@@ -419,12 +462,16 @@ export {
 	SESSION_DETAIL_WINDOW_MAX_RAW_BYTES,
 	SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
 	SESSION_DETAIL_WINDOW_PAGE_TURNS,
+	SESSION_GIT_ACTIONS,
+	SESSION_TURN_STEP_KINDS,
 	type SessionDetailAnchorNotFoundData,
 	SessionDetailAnchorNotFoundDataSchema,
 	type SessionDetailBodyChunk,
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkInputSchema,
 	SessionDetailBodyChunkSchema,
+	SessionDetailChunkedSubagentSchema,
+	type SessionDetailContextUse,
 	type SessionDetailInitial,
 	SessionDetailInitialSchema,
 	type SessionDetailOverview,
@@ -444,6 +491,8 @@ export {
 	type SessionDetailSubagentInput,
 	SessionDetailSubagentInputSchema,
 	SessionDetailSubagentSchema,
+	type SessionDetailSubagentTrace,
+	SessionDetailSubagentTraceSchema,
 	type SessionDetailTraceItem,
 	SessionDetailTraceItemSchema,
 	type SessionDetailTurn,
@@ -462,6 +511,8 @@ export {
 	SessionDetailWindowSchema,
 	type SessionDetailWindowTurn,
 	SessionDetailWindowTurnSchema,
+	type SessionGitAction,
+	type SessionTurnStepKind,
 } from "./schemas/session-detail-payload.js";
 export { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 export * from "./session-lineage/index.js";
@@ -531,10 +582,12 @@ export {
 	isRasterImagePath,
 	isSlashCommandMessage,
 	type ParsedSlashCommand,
+	parseBackgroundHandOff,
 	parseCodexConversations,
 	parseCodexPatch,
 	parseConversations,
 	parseSlashCommand,
+	parseTaskNotification,
 	type SessionCompaction,
 	type SessionCompactionMetadata,
 	type SessionTurn,
@@ -546,6 +599,7 @@ export {
 	type SystemEntry,
 	SystemEntrySchema,
 	stripCodexInjectedBlocks,
+	type TaskNotification,
 	type TextContent,
 	TextContentSchema,
 	type ThinkingContent,
@@ -565,6 +619,7 @@ export {
 	type TraceItem,
 	type TraceSkillContent,
 	type TraceSystemType,
+	type TraceToolBackground,
 	type TraceToolResult,
 	type TranscriptFileActivity,
 	toConversationResultContent,
@@ -1259,6 +1314,9 @@ export const contract = {
 			liveList: oc.output(LiveSessionListOutputSchema),
 			/** Run question answers the dashboard shows; see `sessionRunQuestionsContract`. */
 			...sessionRunQuestionsContract,
+			...sessionRunCiContract,
+			...sessionSummaryLinksContract,
+			...sessionFileChangesContract,
 			/** New lines of a live session's transcripts since the cursor, or their tail. */
 			liveTail: oc
 				.input(LiveSessionTailInputSchema)

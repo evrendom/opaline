@@ -1224,6 +1224,21 @@ function basename(path: string): string {
  * bodies (which are data, never commands). It never evaluates anything.
  */
 export function parseShellCommand(command: string): readonly SimpleCommand[] {
+	return splitShellCommand(command);
+}
+
+export function shellCommandSpans(
+	command: string,
+): readonly { start: number; end: number }[] {
+	const spans: { start: number; end: number }[] = [];
+	splitShellCommand(command, spans);
+	return spans;
+}
+
+function splitShellCommand(
+	command: string,
+	spans?: { start: number; end: number }[],
+): readonly SimpleCommand[] {
 	const commands: SimpleCommand[] = [];
 	let words: string[] = [];
 	let redirects: { operator: string; target: string }[] = [];
@@ -1298,6 +1313,12 @@ export function parseShellCommand(command: string): readonly SimpleCommand[] {
 				text: command.slice(commandStart ?? index, index).trim(),
 				words,
 			});
+			if (spans) {
+				let end = index;
+				while (end > (commandStart ?? 0) && /\s/u.test(command[end - 1] ?? ""))
+					end--;
+				spans.push({ end, start: commandStart ?? 0 });
+			}
 			nextConnector = null;
 		}
 		words = [];

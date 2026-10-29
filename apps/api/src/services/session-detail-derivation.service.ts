@@ -52,6 +52,15 @@ import {
 	createSessionDetailBodyStore,
 	type SessionDetailBodyStore,
 } from "./session-detail-body-store.js";
+import {
+	countGitActions,
+	countTurnStepKinds,
+	type TurnGitAction,
+} from "./session-detail-step-kinds.js";
+import {
+	getSubagentFigures,
+	isSubagentLaunchTool,
+} from "./session-detail-subagent-figures.js";
 
 export const SESSION_DETAIL_OVERVIEW_MAX_BYTES = 250 * 1024;
 const SESSION_DETAIL_OVERVIEW_TARGET_BYTES = 248 * 1024;
@@ -291,15 +300,6 @@ export function bucketSessionDetailUsageCalls(
 	});
 }
 
-function isSubagentLaunchTool(toolName: string) {
-	const normalizedName = toolName.split(/\.|__/u).at(-1)?.toLowerCase();
-	return (
-		normalizedName === "agent" ||
-		normalizedName === "task" ||
-		normalizedName === "spawn_agent"
-	);
-}
-
 function collectTurnActivityEvents(turn: SessionTurn) {
 	const fileEvents: TurnFileEvent[] = [];
 	const fileEventKeys = new Set<string>();
@@ -465,6 +465,13 @@ function createActivitySummary(
 	};
 }
 
+function compactionsOf(turn: SessionTurn): { compactions?: number } {
+	const compactions = turn.responseItems.filter(
+		(item) => item.kind === "system" && item.systemType === "compaction",
+	).length;
+	return compactions > 0 ? { compactions } : {};
+}
+
 function createTurnSummary(
 	turn: SessionTurn,
 	metrics: SessionTurnMetrics,
@@ -486,9 +493,13 @@ function createTurnSummary(
 	);
 	const signalOccurrencesOmittedCount =
 		allSignalOccurrences.length - signalOccurrences.length;
-	const modelSignalCount = scanModelLanguageSignalSegments(
+	const modelSignals = scanModelLanguageSignalSegments(
 		getTurnModelMessageSegments(turn),
-	).filter((signal) => signal.category !== "swear").length;
+	).filter((signal) => signal.category !== "swear");
+	const modelSignalCount = modelSignals.length;
+	const modelApologyCount = modelSignals.filter(
+		(signal) => signal.category === "apology",
+	).length;
 	return {
 		...createActivitySummary(
 			metrics,
@@ -496,6 +507,7 @@ function createTurnSummary(
 			subagentEvents,
 			activityLimit,
 		),
+		...compactionsOf(turn),
 		durationSeconds: timing.durationSeconds ?? null,
 		editedFiles: [...metrics.editedFiles],
 		endedAt: timing.endTimestamp ?? null,
@@ -504,6 +516,7 @@ function createTurnSummary(
 		hasBody: turn.userItems.length + turn.responseItems.length > 0,
 		index,
 		inputTokens: metrics.inputTokens ?? null,
+		modelApologyCount,
 		modelSignalCount,
 		outputTokens: metrics.outputTokens ?? null,
 		responsePreview: truncateSessionDetailPreview(getSessionTurnPreview(turn)),
@@ -518,11 +531,17 @@ function createTurnSummary(
 				: metrics.skills.length,
 		slashCommands: getTurnSlashCommands(turn),
 		startedAt: timing.startTimestamp ?? null,
+		...stepKindsOf(turn),
 		toolCallCount: countToolCalls(turn.responseItems),
 		turnId: getSessionTurnId(turn),
 		userCharacterCount: getSessionTurnMemberCharacterCount(turn),
 		userPreview: truncateSessionDetailPreview(getSessionTurnMemberText(turn)),
 	};
+}
+
+function stepKindsOf(turn: SessionTurn): Pick<TurnSummary, "stepKinds"> {
+	const stepKinds = countTurnStepKinds(turn);
+	return stepKinds ? { stepKinds } : {};
 }
 
 function getTurnModelMessageSegments(turn: SessionTurn): string[] {
@@ -704,6 +723,16 @@ function collectSessionDetailContext(
 	};
 }
 
+function gitActionsOf(content: string): {
+	gitActions?: Partial<Record<TurnGitAction, number>>;
+} {
+	if (!content) return {};
+	const gitActions = countGitActions(
+		buildConversationTrace(parseConversations(content)),
+	);
+	return gitActions ? { gitActions } : {};
+}
+
 export function deriveSessionDetail(
 	snapshot: SessionDetailRawSnapshot,
 ): SessionDetailDerivation {
@@ -727,6 +756,17 @@ export function deriveSessionDetail(
 			metrics,
 			subagentId,
 		}),
+	);
+	const subagentFigures = getSubagentFigures(
+		turns,
+		snapshot.content,
+		primaryTurnMetrics.flatMap((metrics) => metrics.usageEvents),
+		new Map(
+			subagentMetrics.map(({ metrics, subagentId }) => [
+				subagentId,
+				metrics.usageEvents,
+			]),
+		),
 	);
 	const turnSummaries = turns.map((turn, index) =>
 		createTurnSummary(
@@ -847,6 +887,7 @@ export function deriveSessionDetail(
 			userId: snapshot.ownerId,
 		},
 		subagents: subagentMetrics.map(({ content, metrics, subagentId }) => {
+			const figures = subagentFigures.get(subagentId);
 			let model: string | undefined;
 			for (let index = metrics.usageEvents.length - 1; index >= 0; index--) {
 				model = metrics.usageEvents[index]?.model;
@@ -861,6 +902,11 @@ export function deriveSessionDetail(
 				model: model ?? null,
 				outputTokens: metrics.outputTokens ?? null,
 				subagentId,
+				context: figures?.context ?? null,
+				durationSeconds: figures?.durationSeconds ?? null,
+				firstInputTokens: figures?.firstInputTokens ?? null,
+				...gitActionsOf(content),
+				mainThread: figures?.mainThread ?? null,
 				totalTokens:
 					metrics.inputTokens === undefined &&
 					metrics.outputTokens === undefined

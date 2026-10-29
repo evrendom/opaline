@@ -8,7 +8,7 @@ const sessionTraceDockPressClassName =
 	"scale-100 transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 const sessionTraceDockButtonClassName = cn(
-	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
+	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
 	sessionTraceDockPressClassName,
 );
 
@@ -75,7 +75,7 @@ export function SessionTraceDock({
 				type="button"
 				aria-label="Back to sessions"
 				className={cn(
-					"group relative flex h-9 shrink-0 items-center gap-1.5 rounded-[calc(var(--dock-radius)-var(--dock-padding))] pl-2 pr-2.5 text-base font-medium text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] dark:hover:bg-white/6 sm:text-sm",
+					"group relative flex h-9 shrink-0 items-center gap-1.5 rounded-[calc(var(--dock-radius)-var(--dock-padding))] pl-2 pr-2.5 text-base font-medium text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 dark:hover:bg-white/6 sm:text-sm",
 					sessionTraceDockPressClassName,
 				)}
 				onClick={onReturn}

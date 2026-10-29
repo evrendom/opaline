@@ -86,17 +86,48 @@ function normalizeCodeLanguage(language: string) {
 	}
 }
 
+const OPAL = (lightness: number, chroma: number, hue: number) =>
+	`oklch(${lightness} ${chroma} ${hue})`;
+const SHELL_OPALINE: Record<"dark" | "light", Record<string, string>> = {
+	dark: {
+		"#569CD6": OPAL(0.76, 0.14, 302.391),
+		"#6A9955": OPAL(0.62, 0, 0),
+		"#9CDCFE": OPAL(0.76, 0.14, 281.458),
+		"#B5CEA8": OPAL(0.76, 0.15, 323.991),
+		"#C586C0": OPAL(0.76, 0.14, 281.458),
+		"#CE9178": OPAL(0.78, 0.13, 344.619),
+		"#D7BA7D": OPAL(0.76, 0.15, 323.991),
+		"#DCDCAA": OPAL(0.76, 0.14, 262.833),
+	},
+	light: {
+		"#0000FF": OPAL(0.52, 0.24, 302.391),
+		"#001080": OPAL(0.5, 0.22, 281.458),
+		"#008000": OPAL(0.55, 0, 0),
+		"#098658": OPAL(0.52, 0.24, 323.991),
+		"#795E26": OPAL(0.5, 0.21, 262.833),
+		"#A31515": OPAL(0.52, 0.22, 344.619),
+		"#AF00DB": OPAL(0.5, 0.22, 281.458),
+		"#EE0000": OPAL(0.52, 0.24, 323.991),
+	},
+};
+
+const warmLanguages = new Set<string>();
+
 globalThis.addEventListener(
 	"message",
 	async (event: MessageEvent<CodeHighlightRequest>) => {
 		const startedAt = performance.now();
 		const language = normalizeCodeLanguage(event.data.language);
+		const firstInLanguage =
+			language !== undefined && !warmLanguages.has(language);
+		if (language) warmLanguages.add(language);
 		const lines = language
 			? (await highlighterPromise).codeToTokens(event.data.code, {
 					lang: language,
 					theme: event.data.theme === "dark" ? "dark-plus" : "light-plus",
 					tokenizeMaxLineLength: 4_000,
-					tokenizeTimeLimit: 32,
+					// Shiki's own default the first time, room for the grammar.
+					tokenizeTimeLimit: firstInLanguage ? 500 : 32,
 				}).tokens
 			: event.data.code.split("\n").map((line) => [
 					{
@@ -113,7 +144,12 @@ globalThis.addEventListener(
 			language: event.data.language,
 			lines: lines.map((line) =>
 				line.map((token) => ({
-					color: token.color,
+					color:
+						language === "shellscript" && token.color
+							? (SHELL_OPALINE[event.data.theme === "dark" ? "dark" : "light"][
+									token.color.toUpperCase()
+								] ?? token.color)
+							: token.color,
 					content: token.content,
 					fontStyle: token.fontStyle,
 					offset: token.offset,

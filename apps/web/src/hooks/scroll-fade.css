@@ -1,0 +1,28 @@
+@property --scroll-fade-top {
+	syntax: "<length>";
+	inherits: false;
+	initial-value: 0px;
+}
+@property --scroll-fade-bottom {
+	syntax: "<length>";
+	inherits: false;
+	initial-value: 0px;
+}
+.scroll-fade {
+	mask-image: linear-gradient(
+		to bottom,
+		transparent,
+		#000 var(--scroll-fade-top),
+		#000 calc(100% - var(--scroll-fade-bottom)),
+		transparent
+	);
+	transition:
+		--scroll-fade-top 200ms ease,
+		--scroll-fade-bottom 200ms ease;
+}
+.scroll-fade[data-fade-top] {
+	--scroll-fade-top: var(--scroll-fade-top-depth, 40px);
+}
+.scroll-fade[data-fade-bottom] {
+	--scroll-fade-bottom: var(--scroll-fade-bottom-depth, 56px);
+}

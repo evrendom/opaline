@@ -36,6 +36,7 @@ type SessionDetailHeaderProps = {
 	showIdentity: boolean;
 	totalSessions: number;
 	viewModel: SessionDetailViewModel | undefined;
+	where?: ReactNode;
 };
 
 const sessionInfoTouchTargetClassName =
@@ -44,7 +45,7 @@ const sessionInfoTouchTargetClassName =
 // Record pill: round segments that tint on hover inside an
 // outlined pill.
 const sessionHeaderNavigationButtonClassName =
-	"relative flex h-full items-center rounded-full p-2 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
+	"relative flex h-full items-center rounded-full p-2 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
 
 const sessionMetricsGroupClassName =
 	"flex w-fit min-w-0 max-w-full items-center divide-x divide-[color:var(--dashboardy-divider)] overflow-x-auto";
@@ -320,6 +321,7 @@ export function SessionDetailHeader({
 	showIdentity,
 	totalSessions,
 	viewModel,
+	where,
 }: SessionDetailHeaderProps) {
 	if (!portalHost) {
 		return null;
@@ -347,6 +349,11 @@ export function SessionDetailHeader({
 					) : null}
 				</div>
 			)}
+			{where ? (
+				<span className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground md:flex">
+					{where}
+				</span>
+			) : null}
 			{navigation ? (
 				<SessionRecordNavigation
 					navigation={navigation}

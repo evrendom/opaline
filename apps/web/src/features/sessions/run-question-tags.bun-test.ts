@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	formatRunQuestionProbability,
+	getSessionQuestionTags,
 	matchRunAnswersToTurns,
 	runQuestionTagLabel,
 	runQuestionTagTitle,
@@ -120,5 +121,46 @@ describe("matchRunAnswersToTurns", () => {
 			turns,
 		);
 		expect(matched.get("t2")).toEqual([question("a", 0.7)]);
+	});
+});
+
+describe("getSessionQuestionTags", () => {
+	const answer = (id: string, probability: number) => ({
+		id,
+		question: `Q ${id}`,
+		label: null,
+		probability,
+	});
+	const run = (
+		agentId: string,
+		turn: number,
+		questions: ReturnType<typeof answer>[],
+	) => ({ agentId, turn, startedAt: "2026-10-13T10:30:00.000Z", questions });
+
+	test("counts the runs of every stream answered yes, keeping the surest answer", () => {
+		expect(
+			getSessionQuestionTags([
+				run("", 0, [answer("a", 0.6), answer("b", 0.2)]),
+				run("", 1, [answer("a", 0.9)]),
+				run("subagent-1", 0, [answer("a", 0.5), answer("c", 0.7)]),
+			]),
+		).toEqual([
+			{ id: "a", question: "Q a", label: null, probability: 0.9, runs: 3 },
+			{ id: "c", question: "Q c", label: null, probability: 0.7, runs: 1 },
+		]);
+	});
+
+	test("puts the surer of two questions on as many runs first", () => {
+		expect(
+			getSessionQuestionTags([
+				run("", 0, [answer("low", 0.55), answer("high", 0.95)]),
+			]).map((tag) => tag.id),
+		).toEqual(["high", "low"]);
+	});
+
+	test("has no tags when no answer is yes", () => {
+		expect(getSessionQuestionTags([run("", 0, [answer("a", 0.49)])])).toEqual(
+			[],
+		);
 	});
 });

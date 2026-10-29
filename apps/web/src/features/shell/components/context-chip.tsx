@@ -17,7 +17,7 @@ export function ContextChip({
 	return (
 		<div
 			title={title}
-			className="inline-flex h-8 max-w-xs shrink-0 items-center gap-[5.5px] rounded-full bg-background pr-3 pl-2.5 text-sm whitespace-nowrap shadow-(--custom-outline-shadow) dark:bg-card [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg:not([class*='text-'])]:text-neutral-500 dark:[&_svg:not([class*='text-'])]:text-neutral-400"
+			className="inline-flex h-8 max-w-xs shrink-0 items-center gap-[5.5px] rounded-full bg-background pr-3 pl-2.5 text-sm whitespace-nowrap shadow-(--custom-outline-shadow) dark:bg-card [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg:not([class*='text-'])]:text-neutral-500 dark:[&>svg:not([class*='text-'])]:text-neutral-400"
 		>
 			{icon}
 			<span className={cn("truncate", mono && "font-mono text-[0.8125rem]")}>

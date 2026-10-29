@@ -10,18 +10,18 @@ import {
 	SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS,
 	sessionDetailTurnQueryKey,
 } from "@/features/sessions/components/session-detail-fast-query";
-import { getReaderTurnMarks } from "@/features/sessions/components/session-reader-model";
-import {
-	getReaderWaterfall,
-	type SessionReaderStep,
-} from "@/features/sessions/components/session-reader-run-steps";
-import { toggleFilterKey } from "@/features/sessions/components/session-reader-run-ui-store";
-import type { SessionReaderStepSelection } from "@/features/sessions/components/session-reader-step-detail";
+import type { SessionReaderStepSelection } from "@/features/sessions/reader/detail/step/session-reader-step-detail";
 import {
 	SessionReaderWaterfallView,
 	WHOLE_TURN_ID,
-} from "@/features/sessions/components/session-reader-waterfall";
-import { getWaterfallFilterOptions } from "@/features/sessions/components/session-reader-waterfall-rows";
+} from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall";
+import { getWaterfallFilterOptions } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-rows";
+import { getReaderTurnMarks } from "@/features/sessions/reader/model/session-reader-model";
+import {
+	getReaderWaterfall,
+	type SessionReaderStep,
+} from "@/features/sessions/reader/model/session-reader-run-steps";
+import { toggleFilterKey } from "@/features/sessions/reader/model/session-reader-run-ui-store";
 
 /** Every step where the run used the skill (plugin skills carry a
  * `plugin:` prefix), subagents' included, in order: the calls that loaded

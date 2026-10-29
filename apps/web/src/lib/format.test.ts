@@ -1,9 +1,14 @@
 import { describe, expect, test } from "vitest";
 import {
+	basename,
 	formatApiCost,
 	formatCompactCurrency,
 	formatCompactWholeCurrency,
 	formatCurrency,
+	formatPaddedTimeOfDay,
+	formatShare,
+	formatShareOf,
+	formatTimeOfDay,
 	formatWholeCurrency,
 } from "./format";
 
@@ -31,5 +36,50 @@ describe("currency formatters", () => {
 		expect(formatApiCost(9.876)).toBe("$10");
 		expect(formatApiCost(10.49)).toBe("$10");
 		expect(formatApiCost(10.5)).toBe("$11");
+	});
+});
+
+describe("shares", () => {
+	test("a share of a whole: under 1%, none at all too, said so", () => {
+		expect(formatShare(0)).toBe("<1%");
+		expect(formatShare(0.004)).toBe("<1%");
+		expect(formatShare(0.01)).toBe("1%");
+		expect(formatShare(0.4949)).toBe("49%");
+		expect(formatShare(1)).toBe("100%");
+	});
+
+	test("a part of a whole: none, or no whole, is 0%", () => {
+		expect(formatShareOf(0, 100)).toBe("0%");
+		expect(formatShareOf(5, 0)).toBe("0%");
+		expect(formatShareOf(0.5, 100)).toBe("<1%");
+		expect(formatShareOf(25, 100)).toBe("25%");
+	});
+});
+
+describe("times of day and paths", () => {
+	test("to the second, the hour padded or not", () => {
+		const at = new Date(2026, 9, 29, 9, 4, 5).getTime();
+		expect(formatTimeOfDay(at)).toBe(
+			new Date(at).toLocaleTimeString(undefined, {
+				hour: "numeric",
+				minute: "2-digit",
+				second: "2-digit",
+			}),
+		);
+		expect(formatPaddedTimeOfDay(new Date(at).toISOString())).toBe(
+			new Date(at).toLocaleTimeString([], {
+				hour: "2-digit",
+				minute: "2-digit",
+				second: "2-digit",
+			}),
+		);
+		expect(formatTimeOfDay("not a time")).toBe("Invalid Date");
+	});
+
+	test("a path's last part", () => {
+		expect(basename("src/app/main.ts")).toBe("main.ts");
+		expect(basename("src/app/")).toBe("app");
+		expect(basename("main.ts")).toBe("main.ts");
+		expect(basename("")).toBe("");
 	});
 });

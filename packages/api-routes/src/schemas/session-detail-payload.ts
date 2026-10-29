@@ -148,7 +148,7 @@ export const SessionDetailSubagentInputSchema =
 
 export const SessionDetailBodyChunkInputSchema =
 	SessionDetailRevisionInputSchema.extend({
-		kind: z.enum(["turn", "subagent"]),
+		kind: z.enum(["turn", "subagent", "subagentTrace"]),
 		targetId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
 		offset: z.number().int().nonnegative().safe().default(0),
 	}).strict();
@@ -260,9 +260,35 @@ const SessionDetailSignalOccurrenceSchema = z
 	})
 	.strict();
 
+export const SESSION_TURN_STEP_KINDS = [
+	"git",
+	"github",
+	"mcp",
+	"search",
+	"shell",
+	"verify",
+] as const;
+export type SessionTurnStepKind = (typeof SESSION_TURN_STEP_KINDS)[number];
+
+export const SESSION_GIT_ACTIONS = ["commit", "merge", "pullRequest"] as const;
+export type SessionGitAction = (typeof SESSION_GIT_ACTIONS)[number];
+
+function positiveCountsSchema<const Key extends string>(keys: readonly Key[]) {
+	const count = z.number().int().positive().optional();
+	return z
+		.object(
+			Object.fromEntries([...keys].sort().map((key) => [key, count])) as Record<
+				Key,
+				typeof count
+			>,
+		)
+		.strict();
+}
+
 export const SessionDetailTurnSummarySchema = z
 	.object({
 		activityResolution: z.enum(["exact", "bucketed"]),
+		compactions: z.number().int().positive().optional(),
 		durationSeconds: z.number().nonnegative().nullable(),
 		editedFiles: SessionDetailStringListSchema,
 		endedAt: SessionDetailNullableTimestampSchema,
@@ -294,6 +320,7 @@ export const SessionDetailTurnSummarySchema = z
 		index: z.number().int().nonnegative(),
 		inputTokens: SessionDetailNullableCountSchema,
 		modelSignalCount: z.number().int().nonnegative(),
+		modelApologyCount: z.number().int().nonnegative().optional(),
 		outputTokens: SessionDetailNullableCountSchema,
 		responsePreview: SessionDetailPreviewSchema,
 		signalCount: z.number().int().nonnegative(),
@@ -316,6 +343,10 @@ export const SessionDetailTurnSummarySchema = z
 			.max(SESSION_DETAIL_ACTIVITY_POINT_LIMIT),
 		slashCommands: SessionDetailStringListSchema,
 		startedAt: SessionDetailNullableTimestampSchema,
+		stepKinds: positiveCountsSchema([
+			...SESSION_TURN_STEP_KINDS,
+			...SESSION_GIT_ACTIONS,
+		]).optional(),
 		subagentEvents: z
 			.array(SessionDetailTurnSubagentEventSchema)
 			.max(SESSION_DETAIL_ACTIVITY_POINT_LIMIT)
@@ -368,11 +399,28 @@ const SessionDetailSessionSummarySchema = z
 	})
 	.strict();
 
+const SessionDetailContextUseSchema = z
+	.object({
+		model: z.string().max(MAX_DETAIL_STRING_LENGTH).nullable(),
+		tokens: z.number().int().nonnegative(),
+		window: z.number().int().positive().nullable(),
+	})
+	.strict();
+
+export type SessionDetailContextUse = z.infer<
+	typeof SessionDetailContextUseSchema
+>;
+
 const SessionDetailSubagentSummarySchema = z
 	.object({
+		context: SessionDetailContextUseSchema.nullable().optional(),
+		durationSeconds: z.number().nonnegative().nullable().optional(),
 		estimatedCost: SessionDetailNullableCostSchema,
+		firstInputTokens: SessionDetailNullableCountSchema.optional(),
+		gitActions: positiveCountsSchema(SESSION_GIT_ACTIONS).optional(),
 		hasTranscript: z.boolean(),
 		inputTokens: SessionDetailNullableCountSchema,
+		mainThread: SessionDetailContextUseSchema.nullable().optional(),
 		model: z.string().max(MAX_DETAIL_STRING_LENGTH).nullable(),
 		outputTokens: SessionDetailNullableCountSchema,
 		subagentId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
@@ -497,6 +545,16 @@ type SessionDetailTraceEvent =
 			provider?: "claude" | "codex";
 			result?: SessionDetailTraceToolResult;
 			skillContent?: { baseDirectory: string; content: string };
+			toolSearch?: { deferredTools: number };
+			background?: {
+				taskId: string;
+				timedOut: boolean;
+				status: string | null;
+				exitCode: number | null;
+				summary: string | null;
+				result: string | null;
+				finishedAt: string | null;
+			};
 			timestamp: string;
 			toolName: string;
 	  }
@@ -514,6 +572,11 @@ export type SessionDetailTraceItem =
 				| (
 						| string
 						| SessionDetailTextContent
+						| {
+								rawType?: string;
+								source: SessionDetailJsonValue;
+								type: "image";
+						  }
 						| SessionDetailToolResultContent
 				  )[];
 			id: string;
@@ -533,7 +596,23 @@ export type SessionDetailTraceItem =
 	| {
 			id: string;
 			kind: "system";
-			systemType: "context" | "interruption" | "notification" | "system";
+			systemType:
+				| "compaction"
+				| "context"
+				| "hooks"
+				| "interruption"
+				| "member"
+				| "notification"
+				| "system";
+			durationMs?: number;
+			compaction?: {
+				afterTokens?: number;
+				beforeTokens?: number;
+				keptMessages?: number;
+				loadedTools?: string[];
+				summary?: string;
+				trigger?: string;
+			};
 			text: string;
 			timestamp: string;
 	  }
@@ -632,6 +711,7 @@ const SessionDetailUserContentSchema = z.union([
 		z.union([
 			z.string(),
 			SessionDetailTextContentSchema,
+			SessionDetailImageContentSchema,
 			SessionDetailToolResultContentSchema,
 		]),
 	),
@@ -672,6 +752,22 @@ const SessionDetailTraceEventSchema = z.discriminatedUnion("kind", [
 				.object({
 					baseDirectory: z.string(),
 					content: z.string(),
+				})
+				.strict()
+				.optional(),
+			toolSearch: z
+				.object({ deferredTools: z.number().int().nonnegative() })
+				.strict()
+				.optional(),
+			background: z
+				.object({
+					taskId: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
+					timedOut: z.boolean(),
+					status: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH).nullable(),
+					exitCode: z.number().int().nullable(),
+					summary: z.string().max(MAX_DETAIL_STRING_LENGTH).nullable(),
+					result: z.string().nullable(),
+					finishedAt: SessionDetailTimestampSchema.nullable(),
 				})
 				.strict()
 				.optional(),
@@ -718,13 +814,30 @@ export const SessionDetailTraceItemSchema: z.ZodType<SessionDetailTraceItem> =
 				id: z.string().max(MAX_DETAIL_ITEM_ID_LENGTH),
 				kind: z.literal("system"),
 				systemType: z.enum([
+					"compaction",
 					"context",
+					"hooks",
 					"interruption",
+					"member",
 					"notification",
 					"system",
 				]),
 				text: z.string(),
 				timestamp: SessionDetailTimestampSchema,
+				durationMs: z.number().int().nonnegative().optional(),
+				compaction: z
+					.object({
+						afterTokens: z.number().int().nonnegative().optional(),
+						beforeTokens: z.number().int().nonnegative().optional(),
+						keptMessages: z.number().int().nonnegative().optional(),
+						loadedTools: z
+							.array(z.string().max(MAX_DETAIL_STRING_LENGTH))
+							.optional(),
+						summary: z.string().optional(),
+						trigger: z.string().max(MAX_DETAIL_STRING_LENGTH).optional(),
+					})
+					.strict()
+					.optional(),
 			})
 			.strict(),
 		z
@@ -819,6 +932,21 @@ export const SessionDetailSubagentSchema = z
 		subagentId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
 	})
 	.strict();
+
+export const SessionDetailSubagentTraceSchema = z
+	.object({
+		items: z.array(SessionDetailTraceItemSchema).max(MAX_TRACE_ITEM_COUNT),
+		revision: SessionDetailRevisionSchema,
+		subagentId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
+	})
+	.strict();
+
+export type SessionDetailSubagentTrace = z.infer<
+	typeof SessionDetailSubagentTraceSchema
+>;
+
+export const SessionDetailChunkedSubagentSchema =
+	SessionDetailSubagentSchema.extend({ content: z.string() });
 
 export type SessionDetailOverviewInput = z.infer<
 	typeof SessionDetailOverviewInputSchema

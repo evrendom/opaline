@@ -29,7 +29,7 @@ export function ConversationSkillLink({
 		<Link
 			aria-label={`Open skill ${name}`}
 			className={cn(
-				"inline-flex min-w-0 rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-(--session-overview-accent)",
+				"inline-flex min-w-0 rounded-[5px] outline-none",
 				className,
 			)}
 			onClick={(event) => event.stopPropagation()}

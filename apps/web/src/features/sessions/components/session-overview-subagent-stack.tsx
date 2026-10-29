@@ -2,11 +2,8 @@ import type { SessionAnalytics } from "@rudel/api-routes";
 import type { CSSProperties } from "react";
 import { TraceBotIcon } from "@/components/conversation/conversation-trace-glyphs";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
-import {
-	formatModelDisplayLabel,
-	getModelBrandIconClassName,
-} from "@/features/dashboard/components/dashboard-model-brand";
-import { cn } from "@/lib/utils";
+import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
+import { ModelChip } from "../reader/detail/waterfall/session-reader-waterfall-chips";
 import { resolveSessionNativeSubagentCount } from "./session-overview-metrics";
 
 interface SubagentStackStyle extends CSSProperties {
@@ -99,7 +96,6 @@ export function SessionOverviewSubagentStack({
 		>
 			{agents.map((agent) => {
 				const ModelIcon = getModelIconComponent(agent.model ?? undefined);
-				const Icon = ModelIcon ?? TraceBotIcon;
 				const label = `${agent.label}: ${agent.model ? formatModelDisplayLabel(agent.model) : "Model unavailable"}`;
 				const icon = (
 					<span
@@ -112,16 +108,13 @@ export function SessionOverviewSubagentStack({
 						role="img"
 						title={label}
 					>
-						<span className="flex size-5 items-center justify-center bg-white dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
-							<Icon
-								className={cn(
-									"size-3.5 shrink-0",
-									ModelIcon
-										? getModelBrandIconClassName(agent.model ?? undefined)
-										: "text-[#8d8d8d] dark:text-[#8c8c8c]",
-								)}
-							/>
-						</span>
+						{ModelIcon ? (
+							<ModelChip chip="size-5" model={agent.model} solid tip={false} />
+						) : (
+							<span className="flex size-5 items-center justify-center bg-white dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
+								<TraceBotIcon className="size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]" />
+							</span>
+						)}
 					</span>
 				);
 				return <span key={agent.id}>{icon}</span>;

@@ -4,11 +4,14 @@ import {
 	type SessionDetailSpine,
 	SessionDetailSpineSchema,
 	type SessionDetailSubagent,
+	type SessionDetailSubagentTrace,
+	SessionDetailSubagentTraceSchema,
 	type SessionDetailTurn,
 	SessionDetailTurnSchema,
 	type SessionDetailWindow,
 	type SessionDetailWindowRequest,
 } from "@rudel/api-routes";
+import { queryOptions } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc";
 import {
 	readSessionDetailBodyChunks,
@@ -30,7 +33,7 @@ import {
 	shouldRetrySessionDetailQuery,
 } from "./session-detail-response";
 
-const SESSION_DETAIL_FAST_QUERY_PREFIX = "session-detail-v2";
+export const SESSION_DETAIL_FAST_QUERY_PREFIX = "session-detail-v2";
 export const SESSION_DETAIL_INITIAL_QUERY_PREFIX = [
 	SESSION_DETAIL_FAST_QUERY_PREFIX,
 	"initial",
@@ -44,8 +47,13 @@ export const SESSION_DETAIL_IMMUTABLE_STALE_TIME_MS = Number.POSITIVE_INFINITY;
 export const SESSION_DETAIL_BODY_CACHE_TIME_MS = SESSION_DETAIL_BODY_GC_TIME_MS;
 export const SESSION_DETAIL_WINDOW_CACHE_TIME_MS = 10 * 60 * 1_000;
 
-export function sessionDetailInitialQueryKey(sessionId: string) {
-	return [...SESSION_DETAIL_INITIAL_QUERY_PREFIX, sessionId] as const;
+export function sessionDetailInitialQueryOptions(sessionId: string) {
+	return queryOptions({
+		queryFn: ({ signal }) => fetchSessionDetailInitial(sessionId, signal),
+		queryKey: [...SESSION_DETAIL_INITIAL_QUERY_PREFIX, sessionId] as const,
+		retry: shouldRetrySessionDetailFastQuery,
+		staleTime: SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
+	});
 }
 
 export async function fetchSessionDetailInitial(
@@ -140,10 +148,9 @@ export function sessionDetailWindowQueryPrefix(sessionId: string) {
 	return [SESSION_DETAIL_FAST_QUERY_PREFIX, "window", sessionId] as const;
 }
 
-export function sessionDetailTurnQueryKey(input: {
+export function sessionDetailTurnQueryPrefix(input: {
 	revision: string;
 	sessionId: string;
-	turnId: string;
 }) {
 	return [
 		SESSION_DETAIL_FAST_QUERY_PREFIX,
@@ -151,8 +158,15 @@ export function sessionDetailTurnQueryKey(input: {
 		input.sessionId,
 		input.revision,
 		"turn",
-		input.turnId,
 	] as const;
+}
+
+export function sessionDetailTurnQueryKey(input: {
+	revision: string;
+	sessionId: string;
+	turnId: string;
+}) {
+	return [...sessionDetailTurnQueryPrefix(input), input.turnId] as const;
 }
 
 export function sessionDetailSubagentQueryKey(input: {
@@ -286,6 +300,36 @@ export async function fetchSessionDetailTurn(
 	const parsed = result.data;
 	assertExpectedSessionDetailRevision(input.revision, parsed.revision);
 	return parsed;
+}
+
+export async function fetchSessionDetailSubagentTrace(
+	input: { revision: string; sessionId: string; subagentId: string },
+	querySignal: AbortSignal,
+): Promise<SessionDetailSubagentTrace | null> {
+	let response: unknown;
+	try {
+		response = await readSessionDetailBodyChunks(
+			{
+				kind: "subagentTrace",
+				targetId: input.subagentId,
+				revision: input.revision,
+				sessionId: input.sessionId,
+			},
+			querySignal,
+			{ request: requestSessionDetailBodyChunk },
+		);
+	} catch (error) {
+		if (hasSessionDetailErrorCode(error, "BAD_REQUEST")) return null;
+		throw error;
+	}
+	const parsed = SessionDetailSubagentTraceSchema.safeParse(response);
+	if (!parsed.success || parsed.data.subagentId !== input.subagentId)
+		throw new SessionDetailFastResponseError(
+			"The session detail subagent trace was not the one asked for.",
+			["subagentTrace"],
+		);
+	assertExpectedSessionDetailRevision(input.revision, parsed.data.revision);
+	return parsed.data;
 }
 
 export async function fetchSessionDetailSubagent(

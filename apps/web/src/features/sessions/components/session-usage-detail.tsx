@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/horizontal-resize-handle";
 import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import { SessionReaderView } from "@/features/sessions/components/SessionReaderView";
 import {
 	MINIMUM_SESSION_TRANSCRIPT_PANE_WIDTH_PX,
 	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
@@ -28,6 +27,7 @@ import {
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { SessionsOverviewTable } from "@/features/sessions/components/sessions-overview-table";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { SessionReaderView } from "@/features/sessions/reader/SessionReaderView";
 import {
 	getSessionNeighbours,
 	type SessionNavigation,

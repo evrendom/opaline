@@ -4,6 +4,7 @@ import { useTheme } from "@/app/providers/ThemeProvider";
 import { readPendingEmailCodeDraft } from "@/features/auth/email-code-auth";
 import { LoginForm } from "@/features/auth/LoginForm";
 import { SignupForm } from "@/features/auth/SignupForm";
+import { useRootMark } from "@/hooks/use-root-mark";
 import "@/features/shell/website-button.css";
 import "./guest-app.css";
 
@@ -19,6 +20,7 @@ interface GuestAppProps {
 export function GuestApp(props: GuestAppProps = {}) {
 	const { description, eyebrow, showLogo = true, title } = props;
 	const { resolvedTheme } = useTheme();
+	useRootMark("data-auth-shell");
 	const [page, setPage] = useState<Page>(
 		() => readPendingEmailCodeDraft()?.mode ?? "login",
 	);

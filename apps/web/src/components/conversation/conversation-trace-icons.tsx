@@ -1,16 +1,15 @@
 import type { ComponentType, ReactNode } from "react";
 import {
 	getModelBadgeTone,
-	getModelBrandIconClassName,
+	getModelBrandChip,
 } from "@/features/dashboard/components/dashboard-model-brand";
+import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import { cn } from "@/lib/utils";
 import type { ToolIconName } from "./conversation-tools";
 import {
-	TraceBotIcon,
 	TraceChevronDownIcon,
 	TraceUserIcon,
 } from "./conversation-trace-glyphs";
-import { getModelIconComponent } from "./conversation-trace-model-icon";
 
 const iconShellClassName =
 	"flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-[color:var(--dashboardy-border)] text-[color:var(--dashboardy-muted)]";
@@ -50,6 +49,7 @@ export function TraceIcon({
 }
 
 function TraceDisclosureFrame({
+	bare = false,
 	children,
 	className,
 	expanded,
@@ -57,6 +57,7 @@ function TraceDisclosureFrame({
 	toolIcon,
 	tone,
 }: {
+	bare?: boolean;
 	children: ReactNode;
 	className?: string;
 	expanded: boolean;
@@ -68,7 +69,7 @@ function TraceDisclosureFrame({
 		<span
 			aria-hidden="true"
 			className={cn("relative overflow-hidden", className)}
-			data-trace-icon={tone ? "" : undefined}
+			data-trace-icon={tone && !bare ? "" : undefined}
 			data-trace-icon-tone={tone}
 			data-trace-tool-icon={toolIcon}
 		>
@@ -133,7 +134,6 @@ export function ModelTraceIcon({
 	expandable?: boolean;
 	model: string | undefined;
 }) {
-	const ModelIcon = getModelIconComponent(model);
 	const modelBrand = model ? getModelBadgeTone(model).icon : null;
 	const modelTone: TraceIconTone =
 		modelBrand === "claude"
@@ -143,17 +143,19 @@ export function ModelTraceIcon({
 				: "violet";
 
 	return (
-		<TraceDisclosureIcon
+		<TraceDisclosureFrame
+			bare
 			className={cn(
-				ModelIcon && "border-black/10",
-				ModelIcon && getModelBrandIconClassName(model),
+				"flex size-5 shrink-0 items-center justify-center overflow-visible",
+				getModelBrandChip(model)?.glyphClassName,
 				className,
 			)}
 			expanded={expanded}
 			expandable={expandable}
-			icon={ModelIcon ?? TraceBotIcon}
 			tone={modelTone}
-		/>
+		>
+			<ModelChip chip="size-5" model={model} tip={false} />
+		</TraceDisclosureFrame>
 	);
 }
 

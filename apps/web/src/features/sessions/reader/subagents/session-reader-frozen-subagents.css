@@ -1,0 +1,35 @@
+@keyframes frozen-subagent-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes frozen-subagent-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+[data-frozen-subagent],
+[data-launched-subagent] {
+	animation-duration: auto;
+	animation-fill-mode: both;
+	animation-timing-function: steps(1, end);
+	animation-timeline: scroll(nearest block);
+	animation-range: var(--frozen-handoff, 100000000px)
+		calc(var(--frozen-handoff, 100000000px) + 1px);
+}
+
+[data-frozen-subagent] {
+	animation-name: frozen-subagent-in;
+}
+
+[data-launched-subagent] {
+	animation-name: frozen-subagent-out;
+}

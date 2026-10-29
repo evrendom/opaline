@@ -32,7 +32,7 @@ export function SessionTurnEpisodeRow({
 				<button
 					type="button"
 					aria-expanded={!collapsed}
-					className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-(--session-overview-text) outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+					className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-(--session-overview-text) outline-none"
 					onClick={onToggle}
 				>
 					{collapsed ? (

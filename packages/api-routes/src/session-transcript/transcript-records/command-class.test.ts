@@ -4,6 +4,7 @@ import {
 	classifyScriptName,
 	extractShellFileMutations,
 	parseShellCommand,
+	shellCommandSpans,
 } from "./command-class.js";
 import type { CommandClass } from "./types.js";
 
@@ -299,5 +300,27 @@ describe("parseShellCommand", () => {
 		expect(
 			parseShellCommand("a && (b)").map((command) => command.connector),
 		).toEqual([null, "&&"]);
+	});
+});
+
+describe("shellCommandSpans", () => {
+	test("each command's place in the text, a here-document's body left out", () => {
+		const command =
+			"cd ~/a && grep -n x f.ts | head -3; python3 - <<'EOF'\nprint(1)\nEOF\n(cd b && ls)";
+		expect(
+			shellCommandSpans(command).map(({ end, start }) =>
+				command.slice(start, end),
+			),
+		).toEqual([
+			"cd ~/a",
+			"grep -n x f.ts",
+			"head -3",
+			"python3 - <<'EOF'",
+			"cd b",
+			"ls",
+		]);
+		expect(shellCommandSpans(command)).toHaveLength(
+			parseShellCommand(command).length,
+		);
 	});
 });

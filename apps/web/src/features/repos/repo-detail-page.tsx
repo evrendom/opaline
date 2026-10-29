@@ -136,7 +136,6 @@ export function RepoDetailPage({
 					value={tab}
 					onChange={(next) => selectTab(next)}
 					label="Repo views"
-					layoutId="repo-tab-bg"
 					className="pr-8 pl-6"
 					trailing={
 						<div

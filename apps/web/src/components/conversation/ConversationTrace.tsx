@@ -58,7 +58,6 @@ import {
 	TraceExpansionIdProvider,
 	TraceExpansionStoreScope,
 	type TraceFocusRequest,
-	traceInteractiveRowClassName,
 	traceRowClassName,
 	useTraceExpansionState,
 	useTraceFocus,
@@ -229,7 +228,6 @@ function AgentSection({
 					aria-controls={panelId}
 					className={cn(
 						traceRowClassName,
-						traceInteractiveRowClassName,
 						"group gap-2",
 						open &&
 							"rounded-t-[0.75rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-subsurface-opaque)] [border-bottom-color:var(--dashboardy-divider)]",
@@ -282,7 +280,18 @@ function UserTraceContent({ content }: { content: UserContent }) {
 		);
 	}
 
-	return <MessageContent content={content} />;
+	return (
+		<MessageContent
+			content={
+				typeof content === "string"
+					? content
+					: content.filter(
+							(block): block is Exclude<typeof block, { type: "image" }> =>
+								typeof block === "string" || block.type !== "image",
+						)
+			}
+		/>
+	);
 }
 
 function TraceRow({

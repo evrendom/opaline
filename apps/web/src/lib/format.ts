@@ -163,6 +163,10 @@ export function formatMinutes(value: number) {
 	return `${minuteFormatter.format(value)} min`;
 }
 
+export function formatHalfHours(seconds: number): string {
+	return `${Math.round(seconds / 1800) / 2}h`;
+}
+
 export function formatRoundedDuration(minutes: number | undefined) {
 	if (minutes === undefined) {
 		return "—";
@@ -173,23 +177,22 @@ export function formatRoundedDuration(minutes: number | undefined) {
 		return `${Math.round(safeMinutes * 60)}s`;
 	}
 
-	if (safeMinutes > 10 * 60) {
-		return `${Math.round(safeMinutes / 60)}h`;
-	}
-
 	const roundedMinutes = Math.round(safeMinutes);
-	const hours = Math.floor(roundedMinutes / 60);
-	const remainingMinutes = roundedMinutes % 60;
-
-	if (hours === 0) {
+	if (roundedMinutes < 60) {
 		return `${roundedMinutes}m`;
 	}
 
-	if (remainingMinutes === 0) {
-		return `${hours}h`;
-	}
+	return formatHalfHours(safeMinutes * 60);
+}
 
-	return `${hours}h ${remainingMinutes}m`;
+export function formatShare(share: number): string {
+	const percent = share * 100;
+	return percent < 1 ? "<1%" : `${Math.round(percent)}%`;
+}
+
+export function formatShareOf(part: number, whole: number): string {
+	const percent = whole > 0 ? (part / whole) * 100 : 0;
+	return percent > 0 && percent < 1 ? "<1%" : `${Math.round(percent)}%`;
 }
 
 export function formatPercent(value: number) {
@@ -199,6 +202,33 @@ export function formatPercent(value: number) {
 export function formatSignedPercent(value: number) {
 	const sign = value > 0 ? "+" : "";
 	return `${sign}${percentFormatter.format(value)}%`;
+}
+
+const timeOfDayFormatter = new Intl.DateTimeFormat(undefined, {
+	hour: "numeric",
+	minute: "2-digit",
+	second: "2-digit",
+});
+const paddedTimeOfDayFormatter = new Intl.DateTimeFormat(undefined, {
+	hour: "2-digit",
+	minute: "2-digit",
+	second: "2-digit",
+});
+
+export function formatTimeOfDay(at: number | string): string {
+	const ms = new Date(at).getTime();
+	return Number.isFinite(ms) ? timeOfDayFormatter.format(ms) : "Invalid Date";
+}
+
+export function formatPaddedTimeOfDay(at: number | string): string {
+	const ms = new Date(at).getTime();
+	return Number.isFinite(ms)
+		? paddedTimeOfDayFormatter.format(ms)
+		: "Invalid Date";
+}
+
+export function basename(path: string): string {
+	return path.split("/").filter(Boolean).at(-1) ?? path;
 }
 
 export function formatDateLabel(value: string) {

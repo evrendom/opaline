@@ -38,10 +38,7 @@ import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js
  * are the main transcript plus every subagent stream, which is what a repair
  * reads, and both repairs (records, and git observations alone) are charged.
  * Sessions above `MAX_SESSION_BYTES` never enter the census: they are left to
- * the backfills and only counted, so they cannot cost work every day. A
- * parser upgrade is not a repair: older generations are re-extracted by
- * `backfill:transcript-records` and `backfill:git-observations`, which also
- * cover anything outside this window.
+ * the backfills and only counted, so they cannot cost work every day.
  */
 
 const LOOKBACK_DAYS = 14;

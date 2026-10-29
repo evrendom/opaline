@@ -30,6 +30,18 @@ function handlerSource(
 }
 
 describe("session detail endpoint guardrails", () => {
+	test("body chunks check the revision the overview hands out, live first", async () => {
+		const service = await Bun.file(
+			new URL("../services/session-detail.service.ts", import.meta.url),
+		).text();
+		const start = service.indexOf(
+			"export async function getSessionDetailBodyChunk(",
+		);
+		const body = service.slice(start, service.indexOf("\n}\n", start));
+		expect(body).toContain("await getCurrentRevision(input)");
+		expect(body).not.toContain("getSessionDetailCurrentRevision(");
+	});
+
 	test("removes the legacy full-transcript endpoint and query", async () => {
 		const [contractSource, serviceSource] = await Promise.all([
 			Bun.file(

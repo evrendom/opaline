@@ -43,6 +43,13 @@ export const WORKSPACE_FEATURES = [
 			"SubQ answers \"Is the user frustrated?\" about every member prompt that follows a run (with the agent's last message), for Compass's User frustrated flag. Sends those prompts to SubQ (SUBQ_API_KEY). Needs Compass.",
 		env: "FRUSTRATION_CHECK_WORKSPACES",
 	},
+	{
+		key: "run_ci",
+		label: "CI in the waterfall",
+		description:
+			"The GitHub Actions runs and jobs each agent run reached, as rows of its waterfall in the reader and Compass: the ones the run named or pushed the commit of, and apart from them the PR's CI that started while it ran. Needs GitHub connected.",
+		env: "RUN_CI_WORKSPACES",
+	},
 ] as const;
 
 export const WorkspaceFeatureKeySchema = z.enum(

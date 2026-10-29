@@ -1,3 +1,5 @@
+import "@/app/app-surface.css";
+
 export function AppLoadingScreen({
 	message = "Loading…",
 }: {
@@ -7,13 +9,11 @@ export function AppLoadingScreen({
 		<div
 			aria-busy="true"
 			aria-live="polite"
-			className="flex min-h-svh items-center justify-center bg-white text-[#292A2F]"
+			className="dashboard-01-theme flex min-h-svh items-center justify-center bg-(--dashboard-01-content-background) text-foreground"
 		>
-			<img
-				src="/favicon-light.svg"
-				alt=""
+			<span
 				aria-hidden="true"
-				className="h-12 w-12"
+				className="size-12 bg-[url(/favicon-light.svg)] bg-contain bg-center bg-no-repeat dark:bg-[url(/favicon-dark.svg)]"
 			/>
 			<span className="sr-only">{message}</span>
 		</div>

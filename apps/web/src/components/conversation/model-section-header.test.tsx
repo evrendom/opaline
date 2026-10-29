@@ -62,5 +62,9 @@ test("the model row and overlay render identical section-header DOM", () => {
 	if (!stickyHeader) {
 		throw new Error("Expected the native sticky model section header");
 	}
-	expect(stickyHeader.outerHTML).toBe(modelHeaderMarkup);
+	const withoutShapeIds = (markup: string) =>
+		markup.replaceAll(/opaline-shape-[^"')]+/gu, "opaline-shape");
+	expect(withoutShapeIds(stickyHeader.outerHTML)).toBe(
+		withoutShapeIds(modelHeaderMarkup),
+	);
 });

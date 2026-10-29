@@ -16,10 +16,6 @@ import "./product-window-chrome.css";
 import "./welcome-shell.css";
 import "./app-shell.css";
 import { useAgentTracesEnabled } from "@/features/agent-traces/use-agent-traces-access";
-import {
-	AssistantPanel,
-	useAssistantShortcut,
-} from "@/features/assistant/AssistantPanel";
 import { useCompassEnabled } from "@/features/compass/use-compass-access";
 import { ShellDashboardRangeControls } from "@/features/costs/dashboard-range-controls";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
@@ -35,6 +31,7 @@ import { NewseshListHeaderPortalContext } from "@/features/shell/newsesh-list-he
 import { ShellBottomNavigationPortalContext } from "@/features/shell/shell-bottom-navigation-portal";
 import { ShellHeaderPortalContext } from "@/features/shell/shell-header-portal";
 import { ShellOnboardingPanelContext } from "@/features/shell/shell-onboarding-panel";
+import { useRootMark } from "@/hooks/use-root-mark";
 import { cn } from "@/lib/utils";
 
 type DashboardChromeStyle = CSSProperties & {
@@ -122,6 +119,8 @@ export function LeftSidebarAppShellLayout() {
 	const getShellRoutePath = useShellRoutePath();
 	const canonicalPathname = getCanonicalAppPath(location.pathname);
 	const isWelcome = canonicalPathname === CLI_SETUP_PATH;
+	useRootMark("data-app-shell");
+	useRootMark("data-welcome-shell", isWelcome);
 	const [onboardingPanel, setOnboardingPanel] =
 		React.useState<HTMLElement | null>(null);
 	const isSessionOverviewRoute = canonicalPathname === appRoutes.session();
@@ -151,19 +150,8 @@ export function LeftSidebarAppShellLayout() {
 		React.useState<HTMLElement | null>(null);
 	const [newseshListHeaderPortal, setNewseshListHeaderPortal] =
 		React.useState<HTMLElement | null>(null);
-	// The assistant lives in the full product only: the plugin host has its own
-	// chat, and the marketing demo and onboarding stay focused. Its replies are
-	// placeholders for now, so it stays out of production builds.
-	const assistantAvailable =
-		import.meta.env.DEV &&
-		import.meta.env.MODE !== "plugin" &&
-		!demo &&
-		!isWelcome;
 	// The plugin host and onboarding have no workspace sessions to date.
 	const showLastSessionUpload = import.meta.env.MODE !== "plugin" && !isWelcome;
-	const [assistantOpen, setAssistantOpen] = React.useState(false);
-	const openAssistant = React.useCallback(() => setAssistantOpen(true), []);
-	useAssistantShortcut(openAssistant, assistantAvailable && !assistantOpen);
 	const agentTracesEnabled = useAgentTracesEnabled();
 	const compassEnabled = useCompassEnabled();
 
@@ -306,20 +294,8 @@ export function LeftSidebarAppShellLayout() {
 												)}
 											>
 												{shellWindowContent}
-												{/* Lights up the window's right edge while the panel's
-												    resize handle is hovered or dragged. */}
-												<div
-													aria-hidden="true"
-													className="pointer-events-none absolute inset-0 z-10 rounded-lg border-r border-border/80 opacity-0 transition-opacity duration-200 group-has-[[data-assistant-resize]:hover]/shell:opacity-100 group-has-[[data-assistant-resize][data-resizing]]/shell:opacity-100 squircle:rounded-3xl corner-squircle"
-												/>
 											</SidebarInset>
 										</ShellWindowColumn>
-										{assistantAvailable ? (
-											<AssistantPanel
-												open={assistantOpen}
-												onOpenChange={setAssistantOpen}
-											/>
-										) : null}
 									</SidebarProvider>
 								</div>
 							</div>

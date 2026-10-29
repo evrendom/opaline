@@ -276,11 +276,6 @@
 .toolbar-button[data-popup-open] {
 	background: color-mix(in oklch, var(--muted) 50%, var(--card));
 }
-.toolbar-button:focus-visible {
-	box-shadow:
-		var(--custom-outline-shadow),
-		0 0 0 1.5px color-mix(in oklch, var(--ring) 50%, transparent);
-}
 .toolbar-button:is(
 		[data-variant="secondary"],
 		[aria-pressed="true"],
@@ -321,9 +316,4 @@
 .toolbar-search::placeholder {
 	color: var(--muted-foreground);
 	opacity: 1;
-}
-.toolbar-search:focus-visible {
-	box-shadow:
-		var(--custom-outline-shadow),
-		0 0 0 1.5px color-mix(in oklch, var(--ring) 50%, transparent);
 }

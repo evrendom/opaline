@@ -419,11 +419,16 @@ export async function flagRuns(
 				settings.flags.long_run.value ?? 10,
 			)
 		: null;
+	const rankedFigures = {
+		costs: ranked.map((run) => run.cost),
+		minutes: ranked.map((run) => run.minutes),
+	};
 	const flagged: { run: RunEvidence; flags: RunFlag[] }[] = [];
 	for (const run of runs) {
 		const context: FlagContext = {
 			costCutoff,
 			minutesCutoff,
+			ranked: rankedFigures,
 			frustration: frustration.get(momentKey(runKeyOf(run))) ?? null,
 		};
 		const flags = flagsOfRun(run, settings, context);

@@ -36,10 +36,12 @@ for (const { value, maximumValue, expected } of [
 		} else {
 			expect(html).not.toContain("stroke-dasharray");
 		}
-		expect(html).toContain("bg-white");
+		expect(html).toContain("data-session-detail-model-mark");
 		// Round caps are drawn inside the original background, not outside the icon.
 		expect(html.match(/data-session-model-background/g)).toHaveLength(1);
-		expect(html.match(/<svg/g)).toHaveLength(expected > 0 ? 2 : 1);
+		expect(html.match(/pathLength="100"/g) ?? []).toHaveLength(
+			expected > 0 ? 1 : 0,
+		);
 	});
 }
 

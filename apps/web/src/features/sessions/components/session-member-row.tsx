@@ -95,7 +95,7 @@ export function SessionMemberRow({
 				type="button"
 				aria-controls={promptPanelId}
 				aria-expanded={promptExpanded}
-				className="group inline-flex items-center gap-0.5 align-baseline rounded-sm text-xs font-medium text-(--session-overview-muted) outline-none hover:text-(--session-overview-text) focus-visible:outline-2 focus-visible:outline-(--session-overview-accent)"
+				className="group inline-flex items-center gap-0.5 align-baseline rounded-sm text-xs font-medium text-(--session-overview-muted) outline-none hover:text-(--session-overview-text)"
 				data-trace-content-disclosure
 				onClick={() => setPromptExpanded((current) => !current)}
 			>

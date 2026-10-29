@@ -39,7 +39,7 @@ export function DetailIdentityBreadcrumb({
 									type="button"
 									className={cn(
 										className,
-										"rounded-sm outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+										"rounded-sm outline-none hover:text-foreground",
 									)}
 									onClick={item.onClick}
 								>

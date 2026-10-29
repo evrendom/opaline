@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client, orpc } from "@/lib/orpc";
-import { sessionDetailInitialQueryKey } from "./components/session-detail-fast-query";
+import { sessionDetailInitialQueryOptions } from "./components/session-detail-fast-query";
 import {
 	LIVE_SESSION_IDLE_POLL_INTERVAL_MS,
 	LIVE_SESSION_LIST_POLL_INTERVAL_MS,
@@ -25,11 +25,13 @@ function useLiveSessionsAvailable(): boolean {
 	return import.meta.env.MODE !== "plugin" && demo === null;
 }
 
-/**
- * The workspace's live sessions (last 24 hours), polled every 5 seconds. A
- * failure reads as none: live sessions never hold up the sessions list.
- */
-export function useLiveSessionList() {
+export function useLiveSessionList({
+	enabled = true,
+	poll = true,
+}: {
+	enabled?: boolean;
+	poll?: boolean;
+} = {}) {
 	const available = useLiveSessionsAvailable();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
@@ -37,8 +39,8 @@ export function useLiveSessionList() {
 	const query = useQuery({
 		...options,
 		queryKey: ["org", organizationId, ...options.queryKey],
-		enabled: available && !!organizationId,
-		refetchInterval: LIVE_SESSION_LIST_POLL_INTERVAL_MS,
+		enabled: enabled && available && !!organizationId,
+		refetchInterval: poll ? LIVE_SESSION_LIST_POLL_INTERVAL_MS : false,
 		retry: false,
 	});
 	return {
@@ -76,7 +78,7 @@ function useLiveSessionOptions(sessionId: string) {
 			// arrival stream announces uploads after polling stopped).
 			if (response.uploaded && !previous?.uploaded) {
 				void queryClient.invalidateQueries({
-					queryKey: sessionDetailInitialQueryKey(sessionId),
+					queryKey: sessionDetailInitialQueryOptions(sessionId).queryKey,
 				});
 			}
 			return mergeLiveSessionTail(previous, response);

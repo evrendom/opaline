@@ -256,7 +256,7 @@ function gitEventsView(owner: Owner): SqlView {
 		column(
 			"checks_after",
 			"Nullable(UInt32)",
-			"For a push: CI checks later in the same stream that ran (not unconfirmed); NULL for other kinds. As find source=git checksAfter.count.",
+			"For a push: CI check calls later in the same stream that ran (any of their ci_check rows not unconfirmed), one per call however many runs it linked; NULL for other kinds. As find source=git checksAfter.count.",
 			[
 				"0 means the agent never checked CI after this push in the same stream, not that CI did not run: CI runs are edges and ci_jobs.",
 			],
@@ -264,7 +264,7 @@ function gitEventsView(owner: Owner): SqlView {
 		column(
 			"unconfirmed_checks_after",
 			"Nullable(UInt32)",
-			"For a push: later CI checks whose output does not show they ran; NULL for other kinds.",
+			"For a push: later CI check calls none of whose ci_check rows shows they ran; NULL for other kinds.",
 		),
 		column(
 			"checks_same_call",
@@ -337,13 +337,18 @@ function gitEventsView(owner: Owner): SqlView {
 					e.push_from_sha AS push_from_sha, e.push_to_sha AS push_to_sha, e.push_source_branch AS push_source_branch,
 					e.pr_repo AS pr_repo, e.pr_number AS pr_number, e.commit_hash AS commit_hash,
 					e.repository_url AS repository_url, e.run_id AS github_run_id, e.transcript_current AS transcript_current,
-					${pushOnly("x.1 > e.record_idx AND x.2 != 'unconfirmed'")} AS checks_after,
-					${pushOnly("x.1 > e.record_idx AND x.2 = 'unconfirmed'")} AS unconfirmed_checks_after,
+					${pushOnly("x.1 > e.record_idx AND x.2 = 1")} AS checks_after,
+					${pushOnly("x.1 > e.record_idx AND x.2 = 0")} AS unconfirmed_checks_after,
 					${pushOnly("x.1 = e.record_idx")} AS checks_same_call
 				FROM opaline_view_events AS e
 				LEFT ANY JOIN (
-					SELECT user_id, session_id, agent_id, groupArray((record_idx, label)) AS checks
-					FROM opaline_view_events WHERE kind = 'ci_check'
+					SELECT user_id, session_id, agent_id, groupArray((record_idx, confirmed)) AS checks
+					FROM (
+						SELECT user_id, session_id, agent_id, record_idx, call_id,
+							toUInt8(max(label != 'unconfirmed')) AS confirmed
+						FROM opaline_view_events WHERE kind = 'ci_check'
+						GROUP BY user_id, session_id, agent_id, record_idx, call_id
+					)
 					GROUP BY user_id, session_id, agent_id
 				) AS k ON e.user_id = k.user_id AND e.session_id = k.session_id AND e.agent_id = k.agent_id
 				LEFT ANY JOIN (
@@ -708,7 +713,7 @@ function sameKey(left: string, right: string, last: string): string {
  * (JavaScript's encodeURIComponent, which leaves !'()* as they are), so the
  * ids a view builds equal the edges' ids.
  */
-function idComponentSql(value: string): string {
+export function idComponentSql(value: string): string {
 	let sql = `encodeURLComponent(${value})`;
 	for (const char of ["!", "'", "(", ")", "*"])
 		sql = `replaceAll(${sql}, '%${char.charCodeAt(0).toString(16).toUpperCase()}', '${char === "'" ? "\\'" : char}')`;

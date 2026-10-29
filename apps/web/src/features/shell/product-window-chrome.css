@@ -79,7 +79,7 @@
 	box-shadow: none;
 }
 
-body:has(.dashboard-01-preview) > .product-window-backdrop {
+:where(html)[data-app-shell] body > .product-window-backdrop {
 	position: fixed;
 	z-index: 0;
 	inset: -64px -80px;
@@ -98,7 +98,7 @@ body:has(.dashboard-01-preview) > .product-window-backdrop {
 	--landing-hero-canvas-brightness: 0.85;
 }
 
-.dark body:has(.dashboard-01-preview) > .product-window-backdrop {
+:where(html).dark[data-app-shell] body > .product-window-backdrop {
 	background: linear-gradient(
 		115deg,
 		oklch(0.26 0.06 90),

@@ -301,6 +301,27 @@ function addUsageEvent(
 	billing: SessionRequestBillingDimensions,
 	modelContextWindow?: number,
 ) {
+	const event = usageEventOf(
+		usage,
+		at,
+		model,
+		inputIncludesCache,
+		billing,
+		modelContextWindow,
+	);
+	if (!event) return undefined;
+	builder.usageEvents.push(event);
+	return builder.usageEvents.length - 1;
+}
+
+function usageEventOf(
+	usage: TokenUsage,
+	at: string,
+	model: string | undefined,
+	inputIncludesCache: boolean,
+	billing: SessionRequestBillingDimensions,
+	modelContextWindow?: number,
+): TokenUsageEvent | undefined {
 	const cacheReadInputTokens =
 		usage.cache_read_input_tokens ?? usage.cached_input_tokens ?? 0;
 	const cacheCreationInputTokens = usage.cache_creation_input_tokens ?? 0;
@@ -328,10 +349,10 @@ function addUsageEvent(
 		cacheReadInputTokens === 0 &&
 		cacheCreationInputTokens === 0
 	) {
-		return;
+		return undefined;
 	}
 
-	builder.usageEvents.push({
+	return {
 		...billing,
 		at,
 		cacheCreation1hInputTokens,
@@ -342,7 +363,7 @@ function addUsageEvent(
 		model,
 		...(modelContextWindow === undefined ? {} : { modelContextWindow }),
 		outputTokens,
-	});
+	};
 }
 
 function extractClaudeTurnMetadata(
@@ -355,6 +376,10 @@ function extractClaudeTurnMetadata(
 	let earliestTimestamp: string | undefined;
 	let earliestTimestampValue = Number.POSITIVE_INFINITY;
 	let previousAssistantId: string | undefined;
+	// The previous message's usage event, where it has one: Claude Code
+	// writes a message once per content block, its usage on each — the
+	// output so far on all but the last — so its last line's usage stands.
+	let previousUsage: { builder: TurnMetricsBuilder; index: number } | undefined;
 	const pendingFileEdits = new Map<string, PendingFileEdit>();
 
 	for (const rawLine of content.split("\n")) {
@@ -443,19 +468,36 @@ function extractClaudeTurnMetadata(
 			assistantId !== undefined && assistantId === previousAssistantId;
 		previousAssistantId = assistantId;
 
-		if (line.message?.usage && line.timestamp && !isDuplicateUsage) {
-			addUsageEvent(
-				builder,
-				line.message.usage,
-				line.timestamp,
-				line.message.model ?? fallbackModel,
-				false,
-				{
-					serviceTier: line.message.usage.service_tier,
-					inferenceSpeed: line.message.usage.speed,
-					inferenceGeo: line.message.usage.inference_geo,
-				},
-			);
+		if (!isDuplicateUsage) previousUsage = undefined;
+		if (line.message?.usage && line.timestamp) {
+			const billing = {
+				serviceTier: line.message.usage.service_tier,
+				inferenceSpeed: line.message.usage.speed,
+				inferenceGeo: line.message.usage.inference_geo,
+			};
+			const model = line.message.model ?? fallbackModel;
+			const held = isDuplicateUsage ? previousUsage : undefined;
+			const had = held?.builder.usageEvents[held.index];
+			if (held && had) {
+				const event = usageEventOf(
+					line.message.usage,
+					had.at,
+					model,
+					false,
+					billing,
+				);
+				if (event) held.builder.usageEvents[held.index] = event;
+			} else {
+				const index = addUsageEvent(
+					builder,
+					line.message.usage,
+					line.timestamp,
+					model,
+					false,
+					billing,
+				);
+				previousUsage = index === undefined ? undefined : { builder, index };
+			}
 		}
 	}
 

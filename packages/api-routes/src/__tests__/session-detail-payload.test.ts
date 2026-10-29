@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
 	contract,
+	SESSION_DETAIL_BODY_MAX_RAW_BYTES,
 	SESSION_DETAIL_REVISION_ERRORS,
 	SESSION_DETAIL_WINDOW_ERRORS,
+	SessionDetailChunkedSubagentSchema,
 	SessionDetailOverviewInputSchema,
 	SessionDetailOverviewSchema,
 	SessionDetailRevisionSchema,
@@ -15,6 +17,7 @@ import {
 	SessionDetailTraceItemSchema,
 	SessionDetailTurnInputSchema,
 	SessionDetailTurnSchema,
+	SessionDetailTurnSummarySchema,
 	SessionDetailWindowRequestSchema,
 	SessionDetailWindowSchema,
 	sessionDetailProcedureContracts,
@@ -456,6 +459,16 @@ describe("session detail payload contracts", () => {
 		});
 	});
 
+	test("a subagent read in chunks may run past the one-response limit", () => {
+		const content = "a".repeat(SESSION_DETAIL_BODY_MAX_RAW_BYTES + 1);
+		const revision = "117158864486400000";
+		const body = { content, revision, subagentId: "agent-1" };
+		expect(SessionDetailSubagentSchema.safeParse(body).success).toBe(false);
+		expect(SessionDetailChunkedSubagentSchema.safeParse(body).success).toBe(
+			true,
+		);
+	});
+
 	test("validates window summaries with complete, pending, and oversized bodies", () => {
 		const summary = {
 			activityResolution: "exact" as const,
@@ -531,5 +544,57 @@ describe("session detail payload contracts", () => {
 		expect(
 			SessionDetailTraceItemSchema.parse(JSON.parse(JSON.stringify(summary))),
 		).toEqual({ id: "summary-0", kind: "summary", text: "Earlier context" });
+	});
+});
+
+describe("turn step kinds and subagent git actions", () => {
+	const stepKinds = SessionDetailTurnSummarySchema.shape.stepKinds;
+	const gitActions =
+		SessionDetailOverviewSchema.shape.subagents.element.shape.gitActions;
+
+	test("a turn counts each step kind and git action, keys sorted", () => {
+		const parsed = stepKinds.parse({
+			verify: 1,
+			shell: 2,
+			search: 3,
+			pullRequest: 4,
+			merge: 5,
+			mcp: 6,
+			github: 7,
+			git: 8,
+			commit: 9,
+		});
+		expect(Object.entries(parsed ?? {})).toEqual([
+			["commit", 9],
+			["git", 8],
+			["github", 7],
+			["mcp", 6],
+			["merge", 5],
+			["pullRequest", 4],
+			["search", 3],
+			["shell", 2],
+			["verify", 1],
+		]);
+		expect(stepKinds.parse(undefined)).toBeUndefined();
+	});
+
+	test("a turn's counts hold no other kind, and none below one", () => {
+		expect(stepKinds.safeParse({ read: 1 }).success).toBe(false);
+		expect(stepKinds.safeParse({ git: 0 }).success).toBe(false);
+		expect(stepKinds.safeParse({ git: 1.5 }).success).toBe(false);
+	});
+
+	test("a subagent counts only commits, merges and pull requests", () => {
+		expect(
+			Object.entries(
+				gitActions.parse({ pullRequest: 1, commit: 2, merge: 3 }) ?? {},
+			),
+		).toEqual([
+			["commit", 2],
+			["merge", 3],
+			["pullRequest", 1],
+		]);
+		expect(gitActions.safeParse({ git: 1 }).success).toBe(false);
+		expect(gitActions.safeParse({ commit: 0 }).success).toBe(false);
 	});
 });

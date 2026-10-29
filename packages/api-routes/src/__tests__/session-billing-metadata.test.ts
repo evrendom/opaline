@@ -210,6 +210,36 @@ describe("request billing metadata", () => {
 		expect(metrics.usageEvents[0]?.modelProvider).toBe("custom-provider");
 	});
 
+	test("a Claude message written once per block counts its last block's usage, once", () => {
+		// Claude Code writes a message's thinking, text and tool call as
+		// lines of their own, each with its usage: the output so far on all
+		// but the last.
+		const line = (outputTokens: number, at: string) =>
+			JSON.stringify({
+				type: "assistant",
+				timestamp: at,
+				message: {
+					id: "message-1",
+					model: "claude-opus-5",
+					usage: { input_tokens: 100_000, output_tokens: outputTokens },
+				},
+			});
+		const metrics = extractTranscriptUsageMetrics(
+			[
+				line(8, "2026-09-12T12:00:00Z"),
+				line(8, "2026-09-12T12:00:01Z"),
+				line(10_000, "2026-09-12T12:00:02Z"),
+			].join("\n"),
+			undefined,
+		);
+		expect(metrics.usageEvents).toHaveLength(1);
+		expect(metrics.usageEvents[0]).toMatchObject({
+			at: "2026-09-12T12:00:00Z",
+			outputTokens: 10_000,
+		});
+		expect(metrics.outputTokens).toBe(10_000);
+	});
+
 	test("uses Claude's speed field and combines its Fast and US premiums", () => {
 		const metrics = extractTranscriptUsageMetrics(
 			claudeTranscript("claude-opus-5", {

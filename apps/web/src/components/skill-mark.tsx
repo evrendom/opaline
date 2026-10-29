@@ -1,5 +1,5 @@
 import { getSkillMarkLook } from "@/components/skill-mark-look";
-import { OpalChip } from "@/features/sessions/components/session-reader-waterfall-chips";
+import { OpalChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import { cn } from "@/lib/utils";
 
 /** A skill's mark: its emoji on the session reader's Opaline chip (tinted

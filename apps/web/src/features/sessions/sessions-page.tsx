@@ -1,5 +1,14 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { lazy, Suspense, useLayoutEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+	type ComponentProps,
+	lazy,
+	Suspense,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
@@ -14,13 +23,32 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
+import { sessionDetailInitialQueryOptions } from "./components/session-detail-fast-query";
+import {
+	getLoadedSessionReaderView,
+	loadSessionReaderView,
+} from "./session-detail-prefetch";
 import { markSessionOpen } from "./session-open-timing";
 
-const loadSessionReaderView = () =>
-	import("@/features/sessions/components/SessionReaderView").then((module) => ({
+const LazySessionReaderView = lazy(() =>
+	loadSessionReaderView().then((module) => ({
 		default: module.SessionReaderView,
-	}));
-const SessionReaderView = lazy(loadSessionReaderView);
+	})),
+);
+type ReaderProps = ComponentProps<typeof LazySessionReaderView>;
+
+/** The reader: rendered at once when its code is in (preloaded as the list
+ * is hovered, or as the app boots on a session's address), so opening a
+ * session never suspends to a placeholder and waits out React's reveal
+ * throttle before the reader mounts. Chosen once per session opened: a
+ * switch while mounted would remount it. */
+function SessionReader(props: ReaderProps) {
+	const [Reader] = useState(
+		() => getLoadedSessionReaderView() ?? LazySessionReaderView,
+	);
+	return <Reader {...props} />;
+}
+
 function preloadSessionDetail() {
 	// A failed speculative download must not prevent a normal click from retrying.
 	void loadSessionReaderView().catch(() => undefined);
@@ -32,7 +60,15 @@ const sessionListScrollPositions = new Map<string, number>();
 export function SessionsPage() {
 	const params = useParams<{ sessionId?: string }>();
 	const activeSessionId = params.sessionId ?? null;
+	const detailReady =
+		useQuery({
+			...sessionDetailInitialQueryOptions(activeSessionId ?? ""),
+			enabled: false,
+			select: () => true,
+		}).data === true;
 	const data = useSessionsPageData({
+		detail: activeSessionId !== null,
+		detailReady,
 		trackPageView: activeSessionId === null,
 	});
 	const canViewSession = useCanViewSession();
@@ -119,38 +155,39 @@ export function SessionsPage() {
 		});
 	}
 
-	function navigateToSession(targetSession: SessionAnalytics | undefined) {
-		if (!targetSession) {
-			return;
-		}
-		markSessionOpen(targetSession.session_id);
-
-		const targetPath = getShellRoutePath(
-			appRoutes.sessionDetail(targetSession.session_id),
-		);
-		navigate(targetPath, {
-			replace: true,
-			viewTransition: true,
-		});
-	}
-
 	function closeSession() {
 		navigate(getShellRoutePath(appRoutes.session()));
 	}
 
-	const sessionNavigation = {
-		hasNextSession: nextSession !== undefined,
-		hasPreviousSession: previousSession !== undefined,
-		onNextSession: () => navigateToSession(nextSession),
-		onPreviousSession: () => navigateToSession(previousSession),
-	};
+	const sessionNavigation = useMemo(() => {
+		function navigateToSession(targetSession: SessionAnalytics | undefined) {
+			if (!targetSession) {
+				return;
+			}
+			markSessionOpen(targetSession.session_id);
+
+			const targetPath = getShellRoutePath(
+				appRoutes.sessionDetail(targetSession.session_id),
+			);
+			navigate(targetPath, {
+				replace: true,
+				viewTransition: true,
+			});
+		}
+		return {
+			hasNextSession: nextSession !== undefined,
+			hasPreviousSession: previousSession !== undefined,
+			onNextSession: () => navigateToSession(nextSession),
+			onPreviousSession: () => navigateToSession(previousSession),
+		};
+	}, [getShellRoutePath, navigate, nextSession, previousSession]);
 	const activeSessionDetail = activeSessionId ? (
 		<SessionDetailErrorBoundary
 			fallbackHref={getShellRoutePath(appRoutes.session())}
 			key={activeSessionId}
 		>
 			<Suspense fallback={<ProductLoadingIndicator />}>
-				<SessionReaderView
+				<SessionReader
 					navigation={sessionNavigation}
 					position={sessionPosition}
 					sessionId={activeSessionId}

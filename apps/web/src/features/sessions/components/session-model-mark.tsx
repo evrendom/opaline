@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { ModelTraceIcon } from "@/components/conversation/conversation-trace-icons";
 import {
 	getModelBadgeTone,
-	getModelBrandIconClassName,
+	getModelBrandChip,
 } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { cn } from "@/lib/utils";
@@ -165,7 +165,7 @@ export function SessionModelMark({
 					)}
 				>
 					<ModelTraceIcon
-						className={MODEL_ICON_CLASS_NAME}
+						className="session-turn-table-model-icon"
 						expandable={false}
 						expanded={false}
 						model={model}
@@ -176,7 +176,7 @@ export function SessionModelMark({
 						className={cn(
 							// The colour of the model glyph it stands in for.
 							"size-3.5",
-							getModelBrandIconClassName(model),
+							getModelBrandChip(model)?.glyphClassName,
 							disclosure.open
 								? "rotate-90"
 								: "scale-50 opacity-0 group-hover/session:scale-100 group-hover/session:opacity-100 group-focus-visible/session:scale-100 group-focus-visible/session:opacity-100",

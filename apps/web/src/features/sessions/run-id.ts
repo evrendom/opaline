@@ -1,12 +1,10 @@
-/**
- * A run id cut to what tells runs apart within a session: a Claude UUID's
- * first part (`71c287b2-6e4f-…` → `71c287b2`), a Codex id's part after its
- * prefix (`codex-jjhkefoyq5v7` → `jjhkefoyq5v7`). A run is named by the turn
- * it answers, so this shortens turn ids too.
- */
+function firstPart(id: string): string {
+	const bare = id.replace(/^codex-/, "");
+	return bare.split("-")[0] || bare;
+}
+
 export function shortRunId(runId: string): string {
-	const id = runId.replace(/^codex-/, "");
-	return id.split("-")[0] || id;
+	return firstPart(runId).slice(0, 6);
 }
 
 /**
@@ -17,5 +15,9 @@ export function shortRunId(runId: string): string {
 export function shortStepId(id: string): string {
 	const prefixed = /^([a-z]+_)(.+)$/.exec(id);
 	if (prefixed) return `${prefixed[1]}${prefixed[2].slice(0, 8)}`;
-	return shortRunId(id);
+	return firstPart(id);
+}
+
+export function shortSubagentId(id: string): string {
+	return id.slice(0, 4);
 }

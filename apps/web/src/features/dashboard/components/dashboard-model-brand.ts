@@ -90,7 +90,7 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 	) {
 		return {
 			chipClassName:
-				"border-transparent bg-[#CC7D5E] text-[#F9F9F7] shadow-none",
+				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
 			icon: "claude",
 			identityIconClassName: "text-[#CC7D5E]",
 		};
@@ -126,17 +126,15 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 	};
 }
 
-export function getModelIdentityIconClassName(model: string | undefined) {
-	return model ? getModelBadgeTone(model).identityIconClassName : "";
-}
-
-export function getModelBrandIconClassName(model: string | undefined) {
-	if (!model) {
-		return "";
+export function getModelBrandChip(
+	model: string | undefined,
+): { glyphClassName: string; tint: string } | null {
+	const icon = model ? getModelBadgeTone(model).icon : null;
+	if (icon === "claude") {
+		return { glyphClassName: "text-[#D97757]", tint: "#D97757" };
 	}
-
-	const badgeTone = getModelBadgeTone(model);
-	return badgeTone.icon === "codex"
-		? "text-[#111111] dark:text-white"
-		: badgeTone.identityIconClassName;
+	if (icon === "codex") {
+		return { glyphClassName: "text-foreground", tint: "#10A37F" };
+	}
+	return null;
 }

@@ -35,15 +35,15 @@ import {
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 } from "@/features/sessions/components/session-overview-row-elements";
+import { SessionsOverviewFluidList } from "@/features/sessions/components/sessions-overview-fluid-list";
+import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import {
 	formatReaderCost,
 	formatReaderDuration,
 	getCostQuintiles,
 	getCostShade,
-} from "@/features/sessions/components/session-reader-model";
-import { ModelChip } from "@/features/sessions/components/session-reader-waterfall-chips";
-import { SessionsOverviewFluidList } from "@/features/sessions/components/sessions-overview-fluid-list";
-import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+} from "@/features/sessions/reader/model/session-reader-model";
 import { shortRunId } from "@/features/sessions/run-id";
 import {
 	isRunQuestionYes,

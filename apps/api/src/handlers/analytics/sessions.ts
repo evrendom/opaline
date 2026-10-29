@@ -10,6 +10,9 @@ import {
 	readLiveSessionTail,
 } from "../../services/live-session/live-session-read.service.js";
 import { readR2IngestAvailability } from "../../services/r2-ingest-storage.service.js";
+import { runCiDemoOf } from "../../services/run-ci/demo-run-ci.js";
+import { sessionRunCiEnv } from "../../services/run-ci/env.js";
+import { sessionRunCi } from "../../services/run-ci/session-run-ci.js";
 import {
 	InvalidAgentRunsCursorError,
 	listAgentRuns,
@@ -40,10 +43,16 @@ import {
 	InvalidSessionDetailCursorError,
 	InvalidSessionDetailWindowCursorError,
 } from "../../services/session-detail-derivation.service.js";
+import { getSessionFileChanges } from "../../services/session-file-changes/session-file-changes.service.js";
 import { getLastSessionUpload } from "../../services/session-last-upload.service.js";
 import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
+import {
+	sessionSetupRuns,
+	sessionSetupText,
+	sessionSummaryLinks,
+} from "../../services/session-summary-links.service.js";
 import {
 	readableSessionOwner,
 	type SessionReader,
@@ -190,6 +199,69 @@ const runAnswers = os.analytics.sessions.runAnswers
 		),
 	);
 
+const runCi = os.analytics.sessions.runCi
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const env = sessionRunCiEnv();
+		if (
+			!runCiDemoOf(env, context.organizationId) &&
+			!(await env.enabled(context.organizationId))
+		)
+			return { enabled: false, runs: [] };
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return sessionRunCi(
+			env,
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+		);
+	});
+
+const summaryLinks = os.analytics.sessions.summaryLinks
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return sessionSummaryLinks(
+			sessionRunCiEnv(),
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+		);
+	});
+
+const setupText = os.analytics.sessions.setupText
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return sessionSetupText(
+			sessionRunCiEnv(),
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+			input.setupFile,
+		);
+	});
+
+const setupRuns = os.analytics.sessions.setupRuns
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return sessionSetupRuns(
+			sessionRunCiEnv(),
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+		);
+	});
+
 /**
  * Whether the caller's workspace may open Agent traces: its admin switch,
  * else AGENT_TRACES_WORKSPACES (`workspace-features.ts`).
@@ -318,6 +390,30 @@ const detailBodyChunk = os.analytics.sessions.detailBodyChunk
 			if (error instanceof RangeError) {
 				throw new ORPCError("BAD_REQUEST", { message: error.message });
 			}
+			return throwSessionDetailRevisionError(error, errors);
+		}
+	});
+
+const fileChanges = os.analytics.sessions.fileChanges
+	.use(orgMiddleware)
+	.handler(async ({ input, context, errors }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionDetailOwner(
+				context.organizationId,
+				input.sessionId,
+				context.sessionReader,
+			),
+			context.sessionReader,
+		);
+		try {
+			const result = await getSessionFileChanges({
+				organizationId: context.organizationId,
+				ownerId,
+				sessionId: input.sessionId,
+			});
+			if (!result) throw new ORPCError("NOT_FOUND");
+			return result;
+		} catch (error) {
 			return throwSessionDetailRevisionError(error, errors);
 		}
 	});
@@ -532,7 +628,12 @@ export const sessionsRouter = os.analytics.sessions.router({
 	agentRuns,
 	agentTracesAccess,
 	runAnswers,
+	runCi,
 	runQuestionTags,
+	setupRuns,
+	setupText,
+	summaryLinks,
+	fileChanges,
 	filterCatalog,
 	summaryComparison,
 	dimensionAnalysis,

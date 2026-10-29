@@ -4,17 +4,25 @@ import {
 	type MomentLayer,
 } from "@rudel/api-routes";
 import {
+	IconAlertTriangle,
 	IconAlertTriangleFilled,
 	IconArrowBackUp,
 	IconArrowBackUpDouble,
+	IconCircleX,
 	IconCircleXFilled,
+	IconClock,
 	IconClockFilled,
+	IconCoin,
 	IconCoinFilled,
 	IconFold,
 	IconHandStop,
+	IconMoodAngry,
 	IconMoodAngryFilled,
+	IconMoodSad,
 	IconMoodSadFilled,
+	IconPencil,
 	IconPencilFilled,
+	IconPlayerStop,
 	IconPlayerStopFilled,
 	IconRepeat,
 	IconSearch,
@@ -24,31 +32,78 @@ import { SERIES_COLORS } from "@/features/costs/chart-colors";
 
 const LABELS = new Map(COMPASS_FLAGS.map((flag) => [flag.kind, flag.label]));
 const color = (index: number) => SERIES_COLORS[index] ?? "";
-const look = (kind: MomentKind, icon: TablerIcon, colorIndex: number) => ({
+const look = (
+	kind: MomentKind,
+	icon: TablerIcon,
+	colorIndex: number,
+	forms: { filled?: TablerIcon; outline: TablerIcon },
+) => ({
 	label: LABELS.get(kind) ?? kind,
 	icon,
 	color: color(colorIndex),
+	outline: forms.outline,
+	filled: forms.filled ?? null,
 });
 
 /** Each flag as members read it, with its glyph and the dashboard series colour it wears. */
 export const MOMENT_KINDS_APPEARANCE: Record<
 	MomentKind,
-	{ label: string; icon: TablerIcon; color: string }
+	{
+		label: string;
+		icon: TablerIcon;
+		color: string;
+		outline: TablerIcon;
+		filled: TablerIcon | null;
+	}
 > = {
-	search_before_edit: look("search_before_edit", IconSearch, 0),
-	expensive_run: look("expensive_run", IconCoinFilled, 3),
-	long_run: look("long_run", IconClockFilled, 6),
-	edit_churn: look("edit_churn", IconPencilFilled, 7),
-	failing_streak: look("failing_streak", IconAlertTriangleFilled, 1),
-	repeated_command: look("repeated_command", IconRepeat, 7),
-	ci_failed: look("ci_failed", IconCircleXFilled, 1),
-	git_reverted: look("git_reverted", IconArrowBackUpDouble, 4),
-	denied_calls: look("denied_calls", IconHandStop, 8),
-	interrupted: look("interrupted", IconPlayerStopFilled, 3),
-	compaction: look("compaction", IconFold, 6),
-	mid_run_redirect: look("mid_run_redirect", IconArrowBackUp, 4),
-	model_apology: look("model_apology", IconMoodSadFilled, 5),
-	user_frustrated: look("user_frustrated", IconMoodAngryFilled, 1),
+	search_before_edit: look("search_before_edit", IconSearch, 0, {
+		outline: IconSearch,
+	}),
+	expensive_run: look("expensive_run", IconCoinFilled, 3, {
+		outline: IconCoin,
+		filled: IconCoinFilled,
+	}),
+	long_run: look("long_run", IconClockFilled, 6, {
+		outline: IconClock,
+		filled: IconClockFilled,
+	}),
+	edit_churn: look("edit_churn", IconPencilFilled, 7, {
+		outline: IconPencil,
+		filled: IconPencilFilled,
+	}),
+	failing_streak: look("failing_streak", IconAlertTriangleFilled, 1, {
+		outline: IconAlertTriangle,
+		filled: IconAlertTriangleFilled,
+	}),
+	repeated_command: look("repeated_command", IconRepeat, 7, {
+		outline: IconRepeat,
+	}),
+	ci_failed: look("ci_failed", IconCircleXFilled, 1, {
+		outline: IconCircleX,
+		filled: IconCircleXFilled,
+	}),
+	git_reverted: look("git_reverted", IconArrowBackUpDouble, 4, {
+		outline: IconArrowBackUpDouble,
+	}),
+	denied_calls: look("denied_calls", IconHandStop, 8, {
+		outline: IconHandStop,
+	}),
+	interrupted: look("interrupted", IconPlayerStopFilled, 3, {
+		outline: IconPlayerStop,
+		filled: IconPlayerStopFilled,
+	}),
+	compaction: look("compaction", IconFold, 6, { outline: IconFold }),
+	mid_run_redirect: look("mid_run_redirect", IconArrowBackUp, 4, {
+		outline: IconArrowBackUp,
+	}),
+	model_apology: look("model_apology", IconMoodSadFilled, 5, {
+		outline: IconMoodSad,
+		filled: IconMoodSadFilled,
+	}),
+	user_frustrated: look("user_frustrated", IconMoodAngryFilled, 1, {
+		outline: IconMoodAngry,
+		filled: IconMoodAngryFilled,
+	}),
 };
 
 /** Where a fix belongs, as members read it. */

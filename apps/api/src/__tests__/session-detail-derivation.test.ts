@@ -691,6 +691,90 @@ describe("session detail derivation", () => {
 		expect(next.turns[0]?.turnId).not.toBe(initial.window.turns.at(-1)?.turnId);
 	});
 
+	test("counts a /compact in the turn of the command, with what it recorded", () => {
+		const at = (second: number) =>
+			new Date(Date.UTC(2026, 7, 16, 8, 0, second)).toISOString();
+		const base = { parentUuid: null, sessionId: "session-1" };
+		const content = [
+			line({
+				...base,
+				uuid: "prompt-1",
+				timestamp: at(0),
+				type: "user",
+				message: { role: "user", content: "Fix it" },
+			}),
+			line({
+				...base,
+				uuid: "answer-1",
+				timestamp: at(5),
+				type: "assistant",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "Fixed." }],
+				},
+			}),
+			line({
+				...base,
+				uuid: "boundary",
+				timestamp: at(50),
+				type: "system",
+				subtype: "compact_boundary",
+				content: "Conversation compacted",
+				compactMetadata: {
+					trigger: "manual",
+					preTokens: 9_000,
+					postTokens: 900,
+				},
+			}),
+			line({
+				...base,
+				uuid: "summary",
+				timestamp: at(50),
+				type: "user",
+				isCompactSummary: true,
+				message: { role: "user", content: "Summary: fixed it." },
+			}),
+			line({
+				...base,
+				uuid: "command",
+				timestamp: at(10),
+				type: "user",
+				message: {
+					role: "user",
+					content: "<command-name>/compact</command-name>",
+				},
+			}),
+			line({
+				...base,
+				uuid: "answer-2",
+				timestamp: at(60),
+				type: "assistant",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "Back." }],
+				},
+			}),
+		].join("\n");
+		const derivation = deriveSessionDetail(snapshot(content));
+		expect(
+			derivation.turnSummaries.map((turn) => [turn.turnId, turn.compactions]),
+		).toEqual([
+			["prompt-1", undefined],
+			["command", 1],
+		]);
+		const body = derivation.turnBodies.get("command");
+		expect(body?.responseItems[0]).toMatchObject({
+			compaction: {
+				afterTokens: 900,
+				beforeTokens: 9_000,
+				summary: "Summary: fixed it.",
+				trigger: "manual",
+			},
+			id: "boundary",
+			systemType: "compaction",
+		});
+	});
+
 	test("rejects an initial response that combines different revisions", () => {
 		const initial = buildSessionDetailInitial(
 			deriveSessionDetail(snapshot(createTranscript(2))),
@@ -910,6 +994,229 @@ describe("session detail derivation", () => {
 		expect(turnCostTotal).toBeCloseTo(
 			derivation.overviewBase.session.estimatedCost ?? 0,
 		);
+	});
+
+	test("measures a subagent's run, its fullest context and what its report added to the main thread", () => {
+		const usage = (cacheRead: number, output: number) => ({
+			cache_read_input_tokens: cacheRead,
+			input_tokens: 0,
+			output_tokens: output,
+		});
+		const input = snapshot(
+			[
+				line({
+					message: { content: "Review it", role: "user" },
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:00.000Z",
+					type: "user",
+					uuid: "user-figures",
+				}),
+				line({
+					message: {
+						content: [
+							{
+								id: "agent-call",
+								input: { description: "Review" },
+								name: "Agent",
+								type: "tool_use",
+							},
+							{
+								id: "bash-call",
+								input: { command: "ls" },
+								name: "Bash",
+								type: "tool_use",
+							},
+						],
+						id: "main-1",
+						model: "claude-opus-5",
+						role: "assistant",
+						usage: usage(10_000, 100),
+					},
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:01.000Z",
+					type: "assistant",
+					uuid: "assistant-figures-1",
+				}),
+				line({
+					message: {
+						content: [
+							{
+								content: "r".repeat(4_000),
+								tool_use_id: "agent-call",
+								type: "tool_result",
+							},
+							{
+								content: "l".repeat(1_000),
+								tool_use_id: "bash-call",
+								type: "tool_result",
+							},
+						],
+						role: "user",
+					},
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:31.000Z",
+					toolUseResult: { agentId: "agent-figures" },
+					type: "user",
+					uuid: "results-figures",
+				}),
+				line({
+					message: {
+						content: [{ text: "Done", type: "text" }],
+						id: "main-2",
+						model: "claude-opus-5",
+						role: "assistant",
+						usage: usage(15_100, 10),
+					},
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:32.000Z",
+					type: "assistant",
+					uuid: "assistant-figures-2",
+				}),
+			].join("\n"),
+		);
+		input.subagents = {
+			"agent-figures": [5_000, 20_000, 12_000]
+				.map((cacheRead, index) =>
+					line({
+						message: {
+							content: [],
+							id: `subagent-call-${index}`,
+							model: "claude-fable-5",
+							usage: usage(cacheRead, 0),
+						},
+						timestamp: `2026-08-16T08:00:0${index + 2}.000Z`,
+						type: "assistant",
+					}),
+				)
+				.join("\n"),
+		};
+
+		const subagent = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial(deriveSessionDetail(input)),
+		).overview.subagents[0];
+
+		expect(subagent?.durationSeconds).toBe(30);
+		expect(subagent?.context).toEqual({
+			model: "claude-fable-5",
+			tokens: 20_000,
+			window: null,
+		});
+		expect(subagent?.firstInputTokens).toBe(5_000);
+		expect(subagent?.mainThread).toEqual({
+			model: "claude-opus-5",
+			tokens: 4_000,
+			window: null,
+		});
+	});
+
+	test("follows a background subagent to its last report, however it was delivered", () => {
+		const usage = (cacheRead: number) => ({
+			cache_read_input_tokens: cacheRead,
+			input_tokens: 0,
+			output_tokens: 0,
+		});
+		const assistant = (id: string, at: string, cacheRead: number) =>
+			line({
+				message: {
+					content: [{ text: "Working", type: "text" }],
+					id,
+					model: "claude-opus-5",
+					role: "assistant",
+					usage: usage(cacheRead),
+				},
+				sessionId: "session-1",
+				timestamp: at,
+				type: "assistant",
+				uuid: `${id}-line`,
+			});
+		const notification = (result: string) =>
+			`<task-notification>\n<task-id>agent-bg</task-id>\n<tool-use-id>toolu_later</tool-use-id>\n<status>completed</status>\n<summary>Agent "Background" finished</summary>\n<result>${result}</result>\n</task-notification>`;
+		const input = snapshot(
+			[
+				line({
+					message: { content: "Go", role: "user" },
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:00.000Z",
+					type: "user",
+					uuid: "user-bg",
+				}),
+				line({
+					message: {
+						content: [
+							{
+								id: "agent-bg-call",
+								input: { description: "Background", run_in_background: true },
+								name: "Agent",
+								type: "tool_use",
+							},
+						],
+						id: "main-1",
+						model: "claude-opus-5",
+						role: "assistant",
+						usage: usage(10_000),
+					},
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:01.000Z",
+					type: "assistant",
+					uuid: "main-1-line",
+				}),
+				line({
+					message: {
+						content: [
+							{
+								content: "Async agent launched successfully.",
+								tool_use_id: "agent-bg-call",
+								type: "tool_result",
+							},
+						],
+						role: "user",
+					},
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:00:02.000Z",
+					toolUseResult: { agentId: "agent-bg", isAsync: true },
+					type: "user",
+					uuid: "launched-bg",
+				}),
+				assistant("main-2", "2026-08-16T08:00:03.000Z", 10_100),
+				line({
+					attachment: {
+						prompt: notification("r".repeat(2_000)),
+						type: "queued_command",
+					},
+					isSidechain: false,
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:01:00.000Z",
+					type: "attachment",
+					uuid: "queued-bg",
+				}),
+				assistant("main-3", "2026-08-16T08:01:01.000Z", 10_600),
+				line({
+					message: { content: notification("s".repeat(2_000)), role: "user" },
+					sessionId: "session-1",
+					timestamp: "2026-08-16T08:05:00.000Z",
+					type: "user",
+					uuid: "notified-bg",
+				}),
+				assistant("main-4", "2026-08-16T08:05:01.000Z", 11_400),
+			].join("\n"),
+		);
+		input.subagents = {
+			"agent-bg": line({
+				message: {
+					content: [],
+					id: "bg-call",
+					model: "claude-fable-5",
+					usage: usage(3_000),
+				},
+				timestamp: "2026-08-16T08:00:30.000Z",
+				type: "assistant",
+			}),
+		};
+
+		const subagent = deriveSessionDetail(input).overviewBase.subagents[0];
+
+		expect(subagent?.durationSeconds).toBe(299);
+		expect(subagent?.mainThread?.tokens).toBe(1_300);
 	});
 
 	test("keeps the measured 56-turn baseline profile under 250 KB", () => {

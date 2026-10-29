@@ -12,8 +12,8 @@ import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { CostDashboardView } from "@/features/costs/cost-dashboard-page";
 import { useSessionRowsCostDashboard } from "@/features/costs/use-cost-dashboard";
-import { SessionReaderStepDetail } from "@/features/sessions/components/session-reader-step-detail";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { SessionReaderStepDetail } from "@/features/sessions/reader/detail/step/session-reader-step-detail";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { shellRouteMap } from "@/features/shell/config/shell-routes";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
@@ -120,7 +120,6 @@ export function SkillPage({
 					value={view}
 					onChange={selectView}
 					label="Skill views"
-					layoutId="repo-skill-pane-tab-bg"
 					className="pr-8 pl-6"
 				/>
 				{/* The workspace dashboard over this skill's sessions (in the repo):

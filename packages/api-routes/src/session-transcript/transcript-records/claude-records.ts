@@ -1,3 +1,4 @@
+import { launchedAgentIdInText } from "../background-tasks.js";
 import { getClaudeMutationFiles } from "../session-turn-file-edits.js";
 import { readTranscriptToolOutputText } from "../transcript-tool-output.js";
 import { appliedChangesFacts } from "./applied-changes.js";
@@ -74,7 +75,6 @@ const HARNESS_ATTACHMENT_SUBTYPES = {
 	batching_reminder_sent: "batching_reminder",
 	read_truncation_notice: "read_truncation_notice",
 } as const;
-const AGENT_ID_IN_TEXT_PATTERN = /\bagentId:\s*([A-Za-z0-9_-]+)/u;
 /** Claude Code's text for a call the user interrupted (`INTERRUPT_MESSAGE_FOR_TOOL_USE`). */
 const INTERRUPTED_PATTERN = /^\s*(?:Error: )?\[Request interrupted by user/u;
 
@@ -651,9 +651,7 @@ function readToolResult(
 		known !== undefined &&
 		SUBAGENT_LAUNCH_TOOLS.has(known.toolName.toLowerCase());
 	const spawnedAgentId = launchesSubagent
-		? (readString(toolUseResult?.agentId) ??
-			AGENT_ID_IN_TEXT_PATTERN.exec(text.slice(-2_048))?.[1] ??
-			"")
+		? (readString(toolUseResult?.agentId) ?? launchedAgentIdInText(text) ?? "")
 		: "";
 	return {
 		callId,

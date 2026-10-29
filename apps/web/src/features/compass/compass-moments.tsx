@@ -7,16 +7,27 @@ import {
 	type RunFlag,
 } from "@rudel/api-routes";
 import {
-	IconCheck,
+	IconAlertTriangle,
+	IconAlertTriangleFilled,
 	IconChevronDown,
 	IconSparkles,
 	IconThumbDown,
 	IconThumbUp,
+	type Icon as TablerIcon,
 } from "@tabler/icons-react";
-import { type CSSProperties, type KeyboardEvent, useState } from "react";
+import {
+	type CSSProperties,
+	type KeyboardEvent,
+	type ReactNode,
+	useState,
+} from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { formatReaderCost } from "@/features/sessions/components/session-reader-model";
+import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
+import {
+	ShellNavIcon,
+	type ShellNavTone,
+} from "@/features/shell/components/shell-nav-icon";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { client } from "@/lib/orpc";
 import {
@@ -149,63 +160,134 @@ export function KindsMenu({
 				) : null}
 				<IconChevronDown aria-hidden="true" className="size-3.5" />
 			</Menu.Trigger>
-			<Menu.Portal>
-				<Menu.Positioner align="end" sideOffset={6} className="z-50">
-					<Menu.Popup
-						aria-label="Flags"
-						data-fluid-menu-root=""
-						className="session-menu-surface session-menu-sort"
-					>
-						<FluidMenuHover />
-						<Menu.Group>
-							<Menu.GroupLabel className="session-menu-heading">
-								Flag
-							</Menu.GroupLabel>
-							{MOMENT_KINDS.map((kind) => {
-								const checked = kinds.includes(kind);
-								const appearance = MOMENT_KINDS_APPEARANCE[kind];
-								const Glyph = appearance.icon;
-								return (
-									<Menu.CheckboxItem
-										key={kind}
-										checked={checked}
-										onCheckedChange={(next) =>
-											onChange(
-												MOMENT_KINDS.filter((each) =>
-													each === kind ? next : kinds.includes(each),
-												),
-											)
-										}
-										className="session-menu-row"
-									>
-										<span
-											className="session-menu-sort-check"
-											aria-hidden="true"
-										>
-											<span
-												className="session-menu-checkbox"
-												data-checked={checked}
-											>
-												{checked ? <IconCheck className="size-2.5" /> : null}
-											</span>
-										</span>
-										<Glyph
-											aria-hidden="true"
-											className="size-3.5 shrink-0"
-											style={{ color: appearance.color }}
-										/>
-										<span className="flex-1">{appearance.label}</span>
-										<span className="tabular-nums text-(--session-menu-icon)">
-											{counts?.[kind] ?? 0}
-										</span>
-									</Menu.CheckboxItem>
-								);
-							})}
-						</Menu.Group>
-					</Menu.Popup>
-				</Menu.Positioner>
-			</Menu.Portal>
+			<FlagKindsPopup
+				count={(kind) => counts?.[kind] ?? 0}
+				onChange={onChange}
+				options={MOMENT_KINDS}
+				picked={kinds}
+			/>
 		</Menu.Root>
+	);
+}
+
+const FLAG_TONE: ShellNavTone = {
+	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--session-menu-background))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
+	glyph: "text-(--flag-tint)",
+};
+
+function FlagKindRow({
+	checked,
+	children,
+	count,
+	filled,
+	joins,
+	onCheckedChange,
+	outline,
+	tint,
+}: {
+	checked: boolean;
+	children: ReactNode;
+	count: number;
+	filled: TablerIcon | null;
+	joins: { next: boolean; previous: boolean };
+	onCheckedChange: (checked: boolean) => void;
+	outline: TablerIcon;
+	tint: string;
+}) {
+	return (
+		<Menu.CheckboxItem
+			checked={checked}
+			onCheckedChange={onCheckedChange}
+			className="session-menu-row"
+			data-join-next={(checked && joins.next) || undefined}
+			data-join-previous={(checked && joins.previous) || undefined}
+			style={{ "--flag-tint": tint } as CSSProperties}
+		>
+			<ShellNavIcon
+				active={checked}
+				activeIcon={filled ?? outline}
+				icon={outline}
+				tone={FLAG_TONE}
+			/>
+			<span className="flex-1">{children}</span>
+			<span className="tabular-nums text-(--session-menu-icon)">{count}</span>
+		</Menu.CheckboxItem>
+	);
+}
+
+export function FlagKindsPopup({
+	align = "end",
+	any,
+	count,
+	onChange,
+	options,
+	picked,
+}: {
+	align?: "center" | "end" | "start";
+	any?: { count: number; label: string };
+	count: (kind: MomentKind) => number;
+	onChange: (kinds: MomentKind[]) => void;
+	options: readonly MomentKind[];
+	picked: readonly MomentKind[];
+}) {
+	const all = options.every((kind) => picked.includes(kind));
+	const rows = [
+		...(any ? [all] : []),
+		...options.map((kind) => picked.includes(kind)),
+	];
+	const joinsAt = (index: number) => ({
+		next: rows[index + 1] === true,
+		previous: rows[index - 1] === true,
+	});
+	const offset = any ? 1 : 0;
+	return (
+		<Menu.Portal>
+			<Menu.Positioner align={align} sideOffset={6} className="z-50">
+				<Menu.Popup
+					aria-label="Flags"
+					data-fluid-menu-root=""
+					className="session-menu-surface session-menu-sort session-menu-picks"
+				>
+					<FluidMenuHover />
+					{any ? (
+						<FlagKindRow
+							checked={all}
+							count={any.count}
+							joins={joinsAt(0)}
+							filled={IconAlertTriangleFilled}
+							outline={IconAlertTriangle}
+							onCheckedChange={(next) => onChange(next ? [...options] : [])}
+							tint="var(--color-rose-500)"
+						>
+							{any.label}
+						</FlagKindRow>
+					) : null}
+					{options.map((kind, index) => {
+						const appearance = MOMENT_KINDS_APPEARANCE[kind];
+						return (
+							<FlagKindRow
+								key={kind}
+								checked={picked.includes(kind)}
+								count={count(kind)}
+								filled={appearance.filled}
+								joins={joinsAt(index + offset)}
+								outline={appearance.outline}
+								onCheckedChange={(next) =>
+									onChange(
+										options.filter((each) =>
+											each === kind ? next : picked.includes(each),
+										),
+									)
+								}
+								tint={appearance.color}
+							>
+								{appearance.label}
+							</FlagKindRow>
+						);
+					})}
+				</Menu.Popup>
+			</Menu.Positioner>
+		</Menu.Portal>
 	);
 }
 

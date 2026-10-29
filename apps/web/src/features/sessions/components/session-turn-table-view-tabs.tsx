@@ -109,7 +109,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 						<button
 							type="button"
 							aria-label={`Choose visible rows: ${visibleSpeakerLabel}`}
-							className="relative flex h-8 w-9 shrink-0 items-center justify-start rounded-sm outline-none focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-(--session-overview-accent)"
+							className="relative flex h-8 w-9 shrink-0 items-center justify-start rounded-sm outline-none focus-visible:z-10"
 						/>
 					}
 				>

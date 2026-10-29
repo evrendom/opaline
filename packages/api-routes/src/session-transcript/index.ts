@@ -1,4 +1,11 @@
 export {
+	BACKGROUND_RESULT_MAX_CHARS,
+	type BackgroundHandOff,
+	parseBackgroundHandOff,
+	parseTaskNotification,
+	type TaskNotification,
+} from "./background-tasks.js";
+export {
 	attachCodexOperationMetadata,
 	buildCodexActivityGraph,
 	type CodexActivityGraph,
@@ -86,6 +93,7 @@ export {
 	type TraceItem,
 	type TraceSkillContent,
 	type TraceSystemType,
+	type TraceToolBackground,
 	type TraceToolResult,
 	toolResultText,
 	type UserContent,

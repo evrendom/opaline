@@ -32,6 +32,8 @@ const ENVIRONMENT: Record<
 		listsWorkspace("MOMENT_OBSERVATIONS_WORKSPACES", workspaceId, false),
 	frustration_check: (workspaceId) =>
 		listsWorkspace("FRUSTRATION_CHECK_WORKSPACES", workspaceId, false),
+	run_ci: (workspaceId) =>
+		listsWorkspace("RUN_CI_WORKSPACES", workspaceId, false),
 };
 
 /** How long a workspace's switches are kept in memory. */

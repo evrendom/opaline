@@ -983,13 +983,12 @@ async function loadChecksAfter(
 			},
 		);
 		if (targets.length === 0 || pinned.length === 0) continue;
-		const ran =
-			"c.record_idx > pushes.push_record AND c.label != 'unconfirmed'";
+		const ran = "c.record_idx > pushes.push_record AND c.confirmed";
 		const rows = await query(executor, ChecksAfterSchema, {
 			query: `SELECT pushes.push_session AS push_session, pushes.push_agent AS push_agent,
 					pushes.push_record AS push_record,
 					countIf(${ran}) AS ran,
-					countIf(c.record_idx > pushes.push_record AND c.label = 'unconfirmed') AS unconfirmed,
+					countIf(c.record_idx > pushes.push_record AND NOT c.confirmed) AS unconfirmed,
 					countIf(c.record_idx = pushes.push_record) AS same_call,
 					minIf(c.record_idx, ${ran}) AS first_record,
 					argMinIf(toUnixTimestamp64Milli(c.ts), c.record_idx, ${ran}) AS first_ms
@@ -999,13 +998,15 @@ async function loadChecksAfter(
 						{pushSessions:Array(String)}, {pushAgents:Array(String)}, {pushRecords:Array(UInt32)})) AS p)
 				) AS pushes
 				INNER JOIN (
-					SELECT session_id, agent_id, record_idx, label, ts
+					SELECT session_id, agent_id, record_idx, call_id,
+						max(label != 'unconfirmed') AS confirmed, min(ts) AS ts
 					FROM rudel.session_git_observations FINAL
 					WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 						AND session_id IN {sessionIds:Array(String)} AND kind = 'ci_check'
 						AND (session_id, toString(revision), parser_version) IN (
 							SELECT g.1, g.2, g.3 FROM (SELECT arrayJoin(arrayZip(
 								{genSessions:Array(String)}, {genRevisions:Array(String)}, {genParsers:Array(UInt16)})) AS g))
+					GROUP BY session_id, agent_id, record_idx, call_id
 				) AS c ON c.session_id = pushes.push_session AND c.agent_id = pushes.push_agent
 				GROUP BY pushes.push_session, pushes.push_agent, pushes.push_record`,
 			query_params: {

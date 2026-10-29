@@ -30,10 +30,7 @@ describe("session compactions", () => {
 				timestamp: "2026-08-10T10:00:00.000Z",
 			},
 		]);
-		expect([...metadata.hiddenTraceItemIds]).toEqual([
-			"boundary-1",
-			"summary-1",
-		]);
+		expect([...metadata.hiddenTraceItemIds]).toEqual(["summary-1"]);
 	});
 
 	test("uses compact summaries as a fallback and detects Codex boundaries", () => {

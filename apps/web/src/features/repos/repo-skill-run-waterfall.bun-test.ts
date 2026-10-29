@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { SessionReaderStep } from "@/features/sessions/components/session-reader-run-steps";
+import type { SessionReaderStep } from "@/features/sessions/reader/model/session-reader-run-steps";
 import { findSkillSteps } from "./repo-skill-run-waterfall";
 
 const step = (

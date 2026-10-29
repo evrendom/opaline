@@ -85,6 +85,23 @@
 	--scrollbar-thumb: oklch(0.145 0 0 / 14%);
 }
 
+:root {
+	--reader-rail: 220px;
+	--reader-card: 380px;
+	--reader-gutter: 2rem;
+	--reader-columns-gap: 1.5rem;
+	--reader-main-left: calc(
+		var(--reader-gutter) +
+		var(--reader-rail) +
+		var(--reader-columns-gap)
+	);
+	--reader-inset: 1rem;
+	--reader-rail-inset: 0.5rem;
+	--reader-setup-column: 280px;
+	--rail-line-height: 34px;
+	--rail-line-gap: 3px;
+}
+
 .dark {
 	--background: oklch(0.17 0 0);
 	--foreground: oklch(0.985 0 0);
@@ -124,7 +141,7 @@
 	* {
 		scrollbar-width: thin;
 		scrollbar-color: var(--scrollbar-thumb) transparent;
-		@apply border-border outline-ring/50;
+		@apply border-border;
 	}
 	body {
 		@apply bg-background text-foreground;
@@ -134,17 +151,6 @@
 	}
 }
 
-/* Outside the layers, so they win over any component's outline utilities. */
-
-/* Charts take focus for keyboard navigation (Recharts' accessibility layer);
-   they never draw a focus outline, however they were focused. */
-.recharts-wrapper,
-.recharts-wrapper *,
-.recharts-surface {
-	outline: none;
-}
-
-/* A click never leaves an outline behind: only keyboard focus draws one. */
-:focus:not(:focus-visible) {
+:focus {
 	outline: none;
 }

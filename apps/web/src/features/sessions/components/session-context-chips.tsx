@@ -1,22 +1,14 @@
-import {
-	IconFolder,
-	IconGitBranch,
-	IconGitCommit,
-	IconSparkles,
-} from "@tabler/icons-react";
+import { IconFolder, IconGitBranch, IconGitCommit } from "@tabler/icons-react";
+import { Fragment, type ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
-import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
-import {
-	formatModelDisplayLabel,
-	getModelBrandIconClassName,
-} from "@/features/dashboard/components/dashboard-model-brand";
+import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import {
 	ContextChip,
 	ContextChipSkeleton,
 } from "@/features/shell/components/context-chip";
-import { cn } from "@/lib/utils";
+import { ModelChip } from "../reader/detail/waterfall/session-reader-waterfall-chips";
+import { FactDot } from "../reader/subagents/session-reader-subagent-strip";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
-import { SessionStat } from "./session-reader-stat";
 
 type SessionDetailViewModel = ReturnType<typeof buildSessionDetailViewModel>;
 
@@ -66,7 +58,6 @@ export function SessionContextChips({
 		safeRepository,
 		safeUserDisplayName,
 	} = viewModel;
-	const ModelIcon = getModelIconComponent(displayModel);
 
 	return (
 		<div className="flex shrink-0 flex-wrap items-center gap-2 bg-(--dashboard-01-content-background) px-6 pt-1 pb-3">
@@ -106,13 +97,7 @@ export function SessionContextChips({
 			) : null}
 			{displayModel ? (
 				<ContextChip
-					icon={
-						ModelIcon ? (
-							<ModelIcon className={getModelBrandIconClassName(displayModel)} />
-						) : (
-							<IconSparkles aria-hidden="true" />
-						)
-					}
+					icon={<ModelChip model={displayModel} tip={false} />}
 					label={formatModelDisplayLabel(displayModel)}
 					title={`Model: ${displayModel}`}
 				/>
@@ -121,73 +106,43 @@ export function SessionContextChips({
 	);
 }
 
-/** The same identity as fields in the reader's session rail, in its stats'
- * style — a label over each value — rather than chips. */
-export function SessionContextFields({
+export function SessionWhere({
 	viewModel,
 }: {
 	viewModel: SessionDetailViewModel;
 }) {
-	const {
-		displayModel,
-		safeGitBranch,
-		safeGitSha,
-		safeProjectPath,
-		safeRepository,
-	} = viewModel;
-	const ModelIcon = getModelIconComponent(displayModel);
-	return (
-		<>
-			{safeRepository || safeProjectPath ? (
-				<SessionStat
-					label="Repository"
-					title={safeRepository ?? safeProjectPath ?? undefined}
-					value={getRepositoryLabel(viewModel)}
-					valueClassName="truncate"
-				/>
-			) : null}
-			{safeGitBranch ? (
-				<SessionStat
-					label="Branch"
-					title={safeGitBranch}
-					value={safeGitBranch}
-					valueClassName="truncate"
-				/>
-			) : null}
-			{safeGitSha ? (
-				<SessionStat
-					label="Commit"
-					title={safeGitSha}
-					value={safeGitSha.slice(0, 8)}
-					valueClassName="font-mono text-xs"
-				/>
-			) : null}
-			{displayModel ? (
-				<SessionStat
-					label="Model"
-					title={displayModel}
-					value={
-						<span className="flex min-w-0 items-center gap-1.5">
-							{ModelIcon ? (
-								<ModelIcon
-									className={cn(
-										"size-3.5 shrink-0",
-										getModelBrandIconClassName(displayModel),
-									)}
-								/>
-							) : (
-								<IconSparkles
-									aria-hidden="true"
-									className="size-3.5 shrink-0"
-								/>
-							)}
-							<span className="truncate">
-								{formatModelDisplayLabel(displayModel)}
-							</span>
-						</span>
-					}
-				/>
-			) : null}
-		</>
-	);
+	const { safeGitBranch, safeGitSha, safeProjectPath, safeRepository } =
+		viewModel;
+	const parts: [string, ReactNode][] = [];
+	if (safeRepository || safeProjectPath)
+		parts.push([
+			"repository",
+			<span
+				key="repository"
+				className="max-w-48 truncate"
+				title={safeRepository ?? safeProjectPath ?? undefined}
+			>
+				{getRepositoryLabel(viewModel)}
+			</span>,
+		]);
+	if (safeGitBranch)
+		parts.push([
+			"branch",
+			<span key="branch" className="max-w-56 truncate" title={safeGitBranch}>
+				{safeGitBranch}
+			</span>,
+		]);
+	if (safeGitSha)
+		parts.push([
+			"commit",
+			<span key="commit" className="font-mono" title={safeGitSha}>
+				{safeGitSha.slice(0, 8)}
+			</span>,
+		]);
+	return parts.map(([name, part], index) => (
+		<Fragment key={name}>
+			{index > 0 ? <FactDot /> : null}
+			{part}
+		</Fragment>
+	));
 }

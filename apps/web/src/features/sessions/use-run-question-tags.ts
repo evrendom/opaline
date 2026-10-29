@@ -3,7 +3,7 @@ import {
 	type SessionRunAnswers,
 	type SessionRunQuestionTag,
 } from "@rudel/api-routes";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
@@ -70,21 +70,30 @@ export function useSessionRunQuestionTags(
 	});
 }
 
+export function sessionRunAnswersQuery(
+	organizationId: string | undefined,
+	sessionId: string,
+) {
+	const options = orpc.analytics.sessions.runAnswers.queryOptions({
+		input: { sessionId },
+	});
+	return queryOptions({
+		queryFn: options.queryFn,
+		queryKey: ["org", organizationId, ...options.queryKey],
+		retry: false,
+		staleTime: RUN_QUESTION_STALE_TIME_MS,
+	});
+}
+
 /** Every answer per run of one session, for the reader; undefined until read or when none. */
 export function useSessionRunAnswers(
 	sessionId: string,
 ): SessionRunAnswers | undefined {
 	const available = useRunQuestionsAvailable();
 	const organizationId = useOptionalOrganization()?.state.activeOrg?.id;
-	const options = orpc.analytics.sessions.runAnswers.queryOptions({
-		input: { sessionId },
-	});
 	const query = useQuery({
-		...options,
-		queryKey: ["org", organizationId, ...options.queryKey],
+		...sessionRunAnswersQuery(organizationId, sessionId),
 		enabled: available && !!organizationId && sessionId.length > 0,
-		retry: false,
-		staleTime: RUN_QUESTION_STALE_TIME_MS,
 	});
 	return query.data;
 }

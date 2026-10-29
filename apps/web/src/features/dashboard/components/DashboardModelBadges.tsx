@@ -1,17 +1,17 @@
-import type { ComponentType } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import { cn } from "@/lib/utils";
 import {
 	formatModelDisplayLabel,
 	getModelBadgeTone,
-	getModelIdentityIconClassName,
 } from "./dashboard-model-brand";
 
 type DashboardModelBadgeSize = "sm" | "md" | "table";
 
 type ModelBadgeSizeClasses = {
 	badgeClassName: string;
-	iconClassName: string;
+	chipClassName: string;
+	glyphClassName: string;
 	labelClassName: string;
 	paddingClassName: string;
 };
@@ -32,7 +32,8 @@ function getModelBadgeSizeClasses(
 		return {
 			badgeClassName:
 				"h-8 gap-2 text-[0.8125rem] font-medium tracking-[-0.01em]",
-			iconClassName: "size-3.5 shrink-0",
+			chipClassName: "size-5",
+			glyphClassName: "size-3",
 			labelClassName:
 				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
 			paddingClassName: "px-3",
@@ -43,7 +44,8 @@ function getModelBadgeSizeClasses(
 		return {
 			badgeClassName:
 				"h-5 gap-1 text-base font-medium tracking-[-0.01em] sm:text-sm",
-			iconClassName: "size-3 shrink-0",
+			chipClassName: "size-4",
+			glyphClassName: "size-2.5",
 			labelClassName:
 				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
 			paddingClassName: "px-2",
@@ -53,7 +55,8 @@ function getModelBadgeSizeClasses(
 	return {
 		badgeClassName:
 			"h-5 gap-1 text-[0.6875rem] font-semibold tracking-[-0.01em]",
-		iconClassName: "size-3 shrink-0",
+		chipClassName: "size-4",
+		glyphClassName: "size-2.5",
 		labelClassName:
 			"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
 		paddingClassName: "px-2",
@@ -82,30 +85,6 @@ export function CodexModelIcon({ className }: { className?: string }) {
 	);
 }
 
-/**
- * The vendor mark for a raw model id, for places that name a model outside a
- * badge. Null when the vendor is unrecognized, so callers can pick a fallback.
- */
-function getModelIconComponent(
-	model: string | undefined,
-): ComponentType<{ className?: string }> | null {
-	if (!model) {
-		return null;
-	}
-
-	const { icon } = getModelBadgeTone(model);
-
-	if (icon === "claude") {
-		return ClaudeModelIcon;
-	}
-
-	if (icon === "codex") {
-		return CodexModelIcon;
-	}
-
-	return null;
-}
-
 export function DashboardModelIdentity({
 	className,
 	model,
@@ -119,7 +98,6 @@ export function DashboardModelIdentity({
 		return null;
 	}
 
-	const ModelIcon = getModelIconComponent(model);
 	const modelLabel = formatModelDisplayLabel(model);
 	const safeMessageCount = messageCount ?? 0;
 
@@ -127,10 +105,8 @@ export function DashboardModelIdentity({
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<div className={cn("cursor-help", className)}>
-					{ModelIcon ? (
-						<ModelIcon
-							className={`size-4 h-lh shrink-0 ${getModelIdentityIconClassName(model)}`}
-						/>
+					{getModelBadgeTone(model).icon ? (
+						<ModelChip model={model} tip={false} />
 					) : null}
 					<div className="shrink-0 font-mono text-base font-semibold tracking-normal text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]">
 						{safeMessageCount}
@@ -180,10 +156,13 @@ export function DashboardModelBadges({
 						key={model}
 						className={`inline-flex max-w-full items-center justify-center rounded-full border leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
 					>
-						{badgeTone.icon === "claude" ? (
-							<ClaudeModelIcon className={sizeClasses.iconClassName} />
-						) : badgeTone.icon === "codex" ? (
-							<CodexModelIcon className={sizeClasses.iconClassName} />
+						{badgeTone.icon ? (
+							<ModelChip
+								chip={sizeClasses.chipClassName}
+								glyph={sizeClasses.glyphClassName}
+								model={model}
+								tip={false}
+							/>
 						) : null}
 						<span className={sizeClasses.labelClassName}>
 							<span className="truncate">{modelLabel}</span>

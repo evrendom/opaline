@@ -232,7 +232,7 @@ function SessionTurnTableViewedRowsButton({
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center rounded-full bg-white opacity-100 shadow-[0_2px_6px_#00000024] dark:bg-popover dark:ring-1 dark:ring-white/10 outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[oklch(0.67_0.164_262.589)] dark:shadow-none"
+			className="group absolute left-2 z-30 flex size-6 items-center justify-center rounded-full bg-white opacity-100 shadow-[0_2px_6px_#00000024] dark:bg-popover dark:ring-1 dark:ring-white/10 outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0 dark:shadow-none"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}

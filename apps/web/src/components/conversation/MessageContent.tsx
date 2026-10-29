@@ -99,7 +99,7 @@ function XmlBlock({
 				onClick={() => setIsOpen((current) => !current)}
 				aria-expanded={isOpen}
 				aria-controls={panelId}
-				className="flex w-full items-start gap-3 border-b border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)] px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--dashboardy-border)]"
+				className="flex w-full items-start gap-3 border-b border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)] px-4 py-3 text-left"
 			>
 				<div className="mt-0.5 shrink-0 text-[color:var(--dashboardy-muted)]">
 					{isOpen ? (

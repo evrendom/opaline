@@ -45,7 +45,7 @@ export function SessionOverviewViewportPane({
 			aria-valuemin={0}
 			aria-valuenow={selectedIndex}
 			aria-valuetext={valueText}
-			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-orange-500/10 outline-none dark:bg-orange-400/10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--session-overview-accent)"
+			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-orange-500/10 outline-none dark:bg-orange-400/10"
 			data-session-overview-viewport-band
 			data-session-overview-viewport-pane
 			style={style}
@@ -81,7 +81,7 @@ export function SessionOverviewTimelineFooter({
 					<button
 						type="button"
 						aria-label="Reset timeline zoom"
-						className="h-5 rounded px-1.5 text-[0.625rem] font-medium text-(--session-overview-text) outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--session-overview-accent)"
+						className="h-5 rounded px-1.5 text-[0.625rem] font-medium text-(--session-overview-text) outline-none hover:bg-(--session-overview-hover)"
 						onClick={onResetZoom}
 					>
 						Reset zoom
@@ -137,7 +137,7 @@ export function SessionOverviewTurnHitTargets({
 						}
 						aria-label={`Select ${getTurnLabel(option)}`}
 						aria-pressed={row.index === selectedIndex}
-						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair rounded-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--session-overview-accent)"
+						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair rounded-sm outline-none"
 						data-session-overview-turn-hit-target
 						style={{
 							left: `${(getChartX(row.xRatio, config) / config.chartWidth) * 100}%`,

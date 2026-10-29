@@ -29,7 +29,7 @@ export function SessionTurnTableSortableHeader({
 				isActive && sort.direction === "asc" ? "descending" : "ascending"
 			}`}
 			className={cn(
-				"relative flex h-full w-full min-w-0 items-center gap-1 text-left text-xs font-medium whitespace-nowrap text-(--session-overview-subtle) outline-none focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-(--session-overview-accent)",
+				"relative flex h-full w-full min-w-0 items-center gap-1 text-left text-xs font-medium whitespace-nowrap text-(--session-overview-subtle) outline-none focus-visible:z-10",
 				columnIndex === 0 ? "pr-1.5 pl-3" : "px-1.5",
 				className,
 			)}

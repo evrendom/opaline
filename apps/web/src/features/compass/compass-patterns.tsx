@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
-import { formatReaderCost } from "@/features/sessions/components/session-reader-model";
+import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { client } from "@/lib/orpc";

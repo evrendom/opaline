@@ -1,64 +1,98 @@
 import type { Icon } from "@tabler/icons-react";
-import { motion } from "motion/react";
-import type { ReactNode } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { cn } from "@/lib/utils";
 
-/** A row of tabs with one background pill that slides to the active tab, as
- * in Settings. `layoutId` must be unique per row on the page. */
+type PillBox = { left: number; width: number };
+
 export function PillTabs<T extends string>({
 	tabs,
 	value,
 	onChange,
 	label,
-	layoutId,
 	className,
+	pillClassName,
 	trailing,
 }: {
-	tabs: readonly { id: T; label: string; icon: Icon }[];
+	tabs: readonly {
+		activeIcon?: Icon;
+		empty?: boolean;
+		id: T;
+		label: string;
+		icon: Icon;
+	}[];
 	value: T;
 	onChange: (tab: T) => void;
 	label: string;
-	layoutId: string;
 	className?: string;
 	/** Controls at the row's right end. */
 	trailing?: ReactNode;
+	pillClassName?: string;
 }) {
+	const [clicked, setClicked] = useState<{ from: T; to: T } | null>(null);
+	if (clicked && clicked.from !== value) setClicked(null);
+	const shown = clicked && clicked.from === value ? clicked.to : value;
+
+	const { pill, row, slides } = useSlidingPill<HTMLDivElement>(shown);
+
 	return (
 		<div
+			ref={row}
 			role="tablist"
 			aria-label={label}
 			className={cn(
 				// The content background, as the page header has: the shell window
 				// draws its edge as an inset ring, which a transparent row shows.
-				"flex h-11 shrink-0 items-center gap-1 bg-[var(--dashboard-01-content-background)]",
+				"relative flex h-11 shrink-0 items-center gap-1 bg-[var(--dashboard-01-content-background)]",
 				className,
 			)}
 		>
-			{tabs.map(({ id, label: tabLabel, icon: TabIcon }) => {
-				const active = id === value;
+			{pill ? (
+				<span
+					aria-hidden="true"
+					className={cn(
+						"pointer-events-none absolute top-1/2 left-0 h-8 rounded-md bg-muted corner-squircle squircle:rounded-xl will-change-transform dark:bg-muted/50",
+						slides &&
+							"transition-[transform,width] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+						pillClassName,
+					)}
+					style={{
+						transform: `translate(${pill.left}px, -50%)`,
+						width: pill.width,
+					}}
+				/>
+			) : null}
+			{tabs.map(({ activeIcon, empty, id, label: tabLabel, icon }) => {
+				const active = id === shown;
+				const TabIcon = active && activeIcon ? activeIcon : icon;
 				return (
 					<button
 						key={id}
 						type="button"
 						role="tab"
 						aria-selected={active}
-						onClick={() => onChange(id)}
+						data-pill-tab={id}
+						onClick={() => {
+							setClicked({ from: value, to: id });
+							onChange(id);
+						}}
 						className={cn(
-							"relative flex h-8 cursor-pointer items-center rounded-md px-2.5 text-sm font-medium outline-none corner-squircle squircle:rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
+							"relative flex h-8 cursor-pointer items-center rounded-md px-2.5 text-sm font-medium transition-colors outline-none corner-squircle squircle:rounded-xl",
 							active
-								? "text-foreground"
-								: "text-muted-foreground hover:text-foreground hover:transition-colors",
+								? empty
+									? "text-foreground/45"
+									: "text-foreground"
+								: empty
+									? "text-muted-foreground/45 hover:text-muted-foreground"
+									: "text-muted-foreground hover:text-foreground",
 						)}
 					>
-						{active ? (
-							<motion.span
-								layoutId={layoutId}
-								initial={false}
-								transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-								className="absolute inset-0 z-0 rounded-md bg-muted corner-squircle squircle:rounded-xl dark:bg-muted/50"
-							/>
-						) : null}
-						<span className="relative z-10 flex items-center gap-1.5">
+						<span className="flex items-center gap-1.5">
 							<TabIcon aria-hidden="true" className="size-3.5" />
 							{tabLabel}
 						</span>
@@ -70,4 +104,37 @@ export function PillTabs<T extends string>({
 			) : null}
 		</div>
 	);
+}
+
+export function useSlidingPill<T extends HTMLElement>(shown: string) {
+	const row = useRef<T>(null);
+	const [pill, setPill] = useState<PillBox | null>(null);
+	const [pastFirstPlacement, setPastFirstPlacement] = useState(false);
+	const measure = useCallback(() => {
+		const tab = row.current?.querySelector<HTMLElement>(
+			`[data-pill-tab="${CSS.escape(shown)}"]`,
+		);
+		if (!tab) return;
+		const next = { left: tab.offsetLeft, width: tab.offsetWidth };
+		setPill((last) =>
+			last && last.left === next.left && last.width === next.width
+				? last
+				: next,
+		);
+	}, [shown]);
+	useLayoutEffect(() => {
+		measure();
+		const element = row.current;
+		if (!element) return;
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, [measure]);
+	useLayoutEffect(() => {
+		if (pill && !pastFirstPlacement) {
+			const frame = requestAnimationFrame(() => setPastFirstPlacement(true));
+			return () => cancelAnimationFrame(frame);
+		}
+	}, [pill, pastFirstPlacement]);
+	return { pill, row, slides: pastFirstPlacement };
 }

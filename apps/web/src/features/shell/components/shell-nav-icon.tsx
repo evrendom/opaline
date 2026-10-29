@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 // The outer outline of the Opaline mark (public/opaline-icon.svg) without its
 // counter.
-const OPALINE_OUTLINE =
+export const OPALINE_OUTLINE =
 	"M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z";
 
 /**
@@ -61,7 +61,6 @@ export const restingGlyphClassName =
 // Adapted from the NavIcon: the outline glyph cross-fades
 // into its filled variant when the section is active, and the resting chip and
 // muted glyph give way to the section colour. The tinted chip fades in over
-// the resting one; both glyphs share one grid cell so only opacities tween.
 export function ShellNavIcon({
 	icon: OutlineIcon,
 	activeIcon: ActiveIcon,
@@ -78,11 +77,11 @@ export function ShellNavIcon({
 	/** Sections without a tone (Settings) get a muted glyph and no chip. */
 	tone?: ShellNavTone;
 }) {
+	const fade =
+		"transition-opacity duration-100 ease-in-out will-change-[opacity]";
 	// The sidebar forces `[&_svg]:size-4.5`; the important sizes below win.
-	const glyphClassName = cn(
-		"relative [grid-area:1/1] transition-opacity duration-100 ease-in-out",
-		tone ? "size-3.5!" : "size-4.5!",
-	);
+	const glyphClassName = tone ? "size-3.5!" : "size-4.5!";
+	const glyphCell = cn("relative flex [grid-area:1/1]", fade);
 
 	return (
 		<span
@@ -96,23 +95,23 @@ export function ShellNavIcon({
 					<OpalineShape
 						className={cn("absolute inset-0", restingChipClassName)}
 					/>
-					<OpalineShape
+					<span
 						className={cn(
-							"absolute inset-0 transition-opacity duration-100 ease-in-out",
-							tone.chip,
+							"absolute inset-0",
+							fade,
 							active ? "opacity-100" : "opacity-0",
 						)}
-					/>
+					>
+						<OpalineShape className={cn("absolute inset-0", tone.chip)} />
+					</span>
 				</>
 			) : null}
-			<OutlineIcon
-				aria-hidden="true"
-				className={cn(glyphClassName, filled ? "opacity-0" : "opacity-100")}
-			/>
-			<ActiveIcon
-				aria-hidden="true"
-				className={cn(glyphClassName, filled ? "opacity-100" : "opacity-0")}
-			/>
+			<span className={cn(glyphCell, filled ? "opacity-0" : "opacity-100")}>
+				<OutlineIcon aria-hidden="true" className={glyphClassName} />
+			</span>
+			<span className={cn(glyphCell, filled ? "opacity-100" : "opacity-0")}>
+				<ActiveIcon aria-hidden="true" className={glyphClassName} />
+			</span>
 		</span>
 	);
 }

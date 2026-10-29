@@ -146,7 +146,7 @@ export function TranscriptFoldSummaryControl({
 			<button
 				aria-expanded={expanded}
 				aria-label={`${action} ${label}${metricLabel ? `: ${metricLabel}` : ""}`}
-				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-2 rounded-md pr-1.5 pl-3 text-left text-[0.6875rem]/[1.0625rem] text-(--session-overview-muted) outline-none hover:text-(--session-overview-text) focus-visible:outline-2 focus-visible:outline-(--session-overview-accent)"
+				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-2 rounded-md pr-1.5 pl-3 text-left text-[0.6875rem]/[1.0625rem] text-(--session-overview-muted) outline-none hover:text-(--session-overview-text)"
 				data-transcript-fold-turn-id={turnId}
 				data-trace-hover-row
 				onClick={onToggle}

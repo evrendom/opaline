@@ -87,7 +87,7 @@ function SessionDetailActivityMenuItem({
 				className={cn(
 					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border-[0.5px] border-black/20 bg-white px-2.5 py-1 text-[0.8125rem]/5 font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-(--session-overview-surface) dark:text-white/70",
 					flyoutsEnabled &&
-						"hover:bg-black/[0.063] hover:text-black/90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--session-overview-accent) dark:hover:bg-white/[0.071] dark:hover:text-white/95",
+						"hover:bg-black/[0.063] hover:text-black/90 dark:hover:bg-white/[0.071] dark:hover:text-white/95",
 					flyoutsEnabled &&
 						isOpen &&
 						"bg-black/[0.063] text-black/90 dark:bg-white/[0.071] dark:text-white/95",

@@ -1,3 +1,5 @@
+import { formatHalfHours } from "@/lib/format";
+
 // Table number/time formatting shared by the dashboard list pages.
 
 const usdFormatters = new Map<string, Intl.NumberFormat>();
@@ -93,6 +95,7 @@ export function formatDuration(ms: number): string {
 	// Beyond a minute, build from the largest non-zero unit and show at most two
 	// components so e.g. an even hour reads "1h", not "60m 0s".
 	const totalSec = Math.round(ms / 1000);
+	if (totalSec >= 3600 && totalSec < 86_400) return formatHalfHours(totalSec);
 	const d = Math.floor(totalSec / 86_400);
 	const h = Math.floor((totalSec % 86_400) / 3600);
 	const m = Math.floor((totalSec % 3600) / 60);

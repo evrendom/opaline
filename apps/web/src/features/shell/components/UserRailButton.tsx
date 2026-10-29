@@ -64,7 +64,7 @@ export function UserRailButton({
 						data-sidebar-user-row
 						className={cn(
 							isDockVariant
-								? "relative flex size-9 shrink-0 scale-100 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-[color:var(--dashboard-01-rail-icon)] outline-none transition-transform duration-150 ease-out hover:bg-neutral-950/4 hover:text-[color:var(--dashboard-01-rail-icon-active)] active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] motion-reduce:transition-none motion-reduce:active:scale-100 dark:hover:bg-white/6"
+								? "relative flex size-9 shrink-0 scale-100 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-[color:var(--dashboard-01-rail-icon)] outline-none transition-transform duration-150 ease-out hover:bg-neutral-950/4 hover:text-[color:var(--dashboard-01-rail-icon-active)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 dark:hover:bg-white/6"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
 								"!size-9 !w-9 self-auto overflow-visible rounded-lg",

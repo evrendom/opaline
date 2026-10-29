@@ -12,8 +12,8 @@ describe("SessionDetailErrorBoundary", () => {
 
 		const markup = renderToStaticMarkup(boundary.render());
 
-		expect(markup).toContain("Unable to render this session");
-		expect(markup).toContain("Reload session");
+		expect(markup).toContain("This session couldn’t be shown");
+		expect(markup).toContain("Reload");
 		expect(markup).toContain('href="/session"');
 		expect(markup).toContain("Back to sessions");
 	});

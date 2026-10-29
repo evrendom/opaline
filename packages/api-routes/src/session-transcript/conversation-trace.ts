@@ -1,3 +1,8 @@
+import {
+	launchedAgentIdInText,
+	parseBackgroundHandOff,
+	parseTaskNotification,
+} from "./background-tasks.js";
 import type {
 	Conversation,
 	ConversationExecutionMode,
@@ -29,6 +34,16 @@ export type TraceToolResult = {
 	subagentId?: string;
 	/** When the result came back — the end of the tool's run. */
 	timestamp?: string;
+};
+
+export type TraceToolBackground = {
+	taskId: string;
+	timedOut: boolean;
+	status: string | null;
+	exitCode: number | null;
+	summary: string | null;
+	result: string | null;
+	finishedAt: string | null;
 };
 
 export type TraceSkillContent = {
@@ -68,6 +83,8 @@ export type TraceEvent =
 			provider?: ConversationProvider;
 			result: TraceToolResult | undefined;
 			skillContent?: TraceSkillContent;
+			background?: TraceToolBackground;
+			toolSearch?: { deferredTools: number };
 	  }
 	| {
 			kind: "orphan-result";
@@ -85,7 +102,23 @@ export type TraceSystemType =
 	| "context"
 	| "interruption"
 	| "notification"
-	| "system";
+	| "system"
+	| "compaction"
+	| "hooks"
+	| "member";
+
+/** What Claude Code records about a compaction: what set it off, the
+ * context before and after, the messages it carried over word for word,
+ * the deferred tools it had loaded, and the summary it wrote in place of
+ * the rest. It records no list of what the summary left out. */
+export type TraceCompaction = {
+	afterTokens?: number;
+	beforeTokens?: number;
+	keptMessages?: number;
+	loadedTools?: string[];
+	summary?: string;
+	trigger?: string;
+};
 
 export type TraceItem =
 	| { kind: "user"; id: string; timestamp: string; content: UserContent }
@@ -105,6 +138,8 @@ export type TraceItem =
 			timestamp: string;
 			text: string;
 			systemType: TraceSystemType;
+			durationMs?: number;
+			compaction?: TraceCompaction;
 	  }
 	| { kind: "summary"; id: string; timestamp: undefined; text: string };
 
@@ -310,6 +345,11 @@ export function buildConversationTrace(
 ): TraceItem[] {
 	const items: TraceItem[] = [];
 	const toolEventIds = new Map<string, string>();
+	const toolEventsByCallId = new Map<
+		string,
+		Extract<TraceEvent, { kind: "tool" }>
+	>();
+	const unanswered = new Map<string, Extract<TraceEvent, { kind: "tool" }>[]>();
 	// Events for the agent section currently being accumulated.
 	let agentEvents: TraceEvent[] = [];
 	let agentTimestamp: string | undefined;
@@ -350,6 +390,8 @@ export function buildConversationTrace(
 		}
 	}
 
+	let lastCompaction: TraceCompaction | undefined;
+
 	conversations.forEach((entry, index) => {
 		if (entry.type === "summary") {
 			flushAgentSection();
@@ -359,6 +401,46 @@ export function buildConversationTrace(
 				timestamp: undefined,
 				text: entry.summary,
 			});
+			return;
+		}
+
+		if (entry.type === "system" && "subtype" in entry) {
+			const compaction = entry.subtype === "compact_boundary";
+			const metadata = entry.compactMetadata;
+			const durationMs = compaction
+				? metadata?.durationMs
+				: entry.hookInfos?.reduce(
+						(sum, hook) => sum + (hook.durationMs ?? 0),
+						0,
+					);
+			const item: Extract<TraceItem, { kind: "system" }> = {
+				kind: "system",
+				id: entry.uuid,
+				systemType: compaction ? "compaction" : "hooks",
+				timestamp: entry.timestamp,
+				text: compaction ? "Conversation compacted" : "Stop hooks ran",
+				...(durationMs ? { durationMs: Math.round(durationMs) } : {}),
+			};
+			if (compaction) {
+				item.compaction = {
+					...(metadata?.trigger ? { trigger: metadata.trigger } : {}),
+					...(metadata?.preTokens !== undefined
+						? { beforeTokens: Math.round(metadata.preTokens) }
+						: {}),
+					...(metadata?.postTokens !== undefined
+						? { afterTokens: Math.round(metadata.postTokens) }
+						: {}),
+					...(metadata?.preservedMessages?.uuids
+						? { keptMessages: metadata.preservedMessages.uuids.length }
+						: {}),
+					...(metadata?.preCompactDiscoveredTools?.length
+						? { loadedTools: metadata.preCompactDiscoveredTools }
+						: {}),
+				};
+				lastCompaction = item.compaction;
+			}
+			flushAgentSection();
+			items.push(item);
 			return;
 		}
 
@@ -431,6 +513,15 @@ export function buildConversationTrace(
 					agentEvents.push(event);
 					pendingToolEvents.set(toolBlock.id, event);
 					toolEventIds.set(toolBlock.id, event.id);
+					toolEventsByCallId.set(toolBlock.id, event);
+					const to =
+						toolBlock.name === "SendMessage" &&
+						toolBlock.input &&
+						typeof toolBlock.input === "object"
+							? (toolBlock.input as { to?: unknown }).to
+							: undefined;
+					if (typeof to === "string" && to)
+						unanswered.set(to, [...(unanswered.get(to) ?? []), event]);
 					return;
 				}
 
@@ -450,6 +541,10 @@ export function buildConversationTrace(
 		}
 
 		// entry.type === "user"
+		if (entry.isCompactSummary && lastCompaction && !lastCompaction.summary) {
+			const summary = userContentText(entry.message.content).trim();
+			if (summary) lastCompaction.summary = summary;
+		}
 		if (isToolResultCarrier(entry.message.content)) {
 			if (agentId !== undefined && agentName !== entry.agentName) {
 				flushAgentSection(false);
@@ -460,11 +555,30 @@ export function buildConversationTrace(
 					const pending = pendingToolEvents.get(result.tool_use_id);
 
 					if (pending) {
+						const text = toolResultText(result.content);
 						pending.result = toTraceResult(
 							result,
-							isDelegationToolName(pending.toolName) ? subagentId : undefined,
+							isDelegationToolName(pending.toolName)
+								? (subagentId ?? launchedAgentIdInText(text))
+								: undefined,
 							entry.timestamp,
 						);
+						const deferredTools = entry.toolUseResult?.total_deferred_tools;
+						if (
+							pending.toolName === "ToolSearch" &&
+							deferredTools !== undefined
+						)
+							pending.toolSearch = { deferredTools };
+						const handOff = parseBackgroundHandOff(pending.toolName, text);
+						if (handOff)
+							pending.background = {
+								exitCode: null,
+								finishedAt: null,
+								result: null,
+								status: null,
+								summary: null,
+								...handOff,
+							};
 						pendingToolEvents.delete(result.tool_use_id);
 						return;
 					}
@@ -508,6 +622,37 @@ export function buildConversationTrace(
 			userTextBlockContent !== undefined &&
 			attachClaudeSkillContent(agentEvents, userTextBlockContent)
 		) {
+			return;
+		}
+
+		const notice = parseTaskNotification(
+			userContentText(entry.message.content),
+		);
+		const noticed = notice?.toolUseId
+			? toolEventsByCallId.get(notice.toolUseId)
+			: undefined;
+		const answered = notice ? (unanswered.get(notice.taskId) ?? []) : [];
+		if (notice) unanswered.delete(notice.taskId);
+		for (const call of new Set([...(noticed ? [noticed] : []), ...answered]))
+			call.background = {
+				timedOut: call.background?.timedOut ?? false,
+				exitCode: notice?.exitCode ?? null,
+				finishedAt: entry.timestamp,
+				result: notice?.result ?? null,
+				status: notice?.status ?? null,
+				summary: notice?.summary ?? null,
+				taskId: notice?.taskId ?? "",
+			};
+
+		if (entry.queued) {
+			flushAgentSection();
+			items.push({
+				kind: "system",
+				id: entry.uuid,
+				systemType: "member",
+				timestamp: entry.timestamp,
+				text: userContentText(entry.message.content),
+			});
 			return;
 		}
 

@@ -86,7 +86,7 @@ export function ToolInvocation({
 				onClick={() => setIsExpanded(!isExpanded)}
 				aria-expanded={isExpanded}
 				aria-controls={panelId}
-				className="flex min-w-0 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[color:var(--dashboardy-subsurface-strong)] focus-visible:bg-[color:var(--dashboardy-subsurface-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--dashboardy-border)]"
+				className="flex min-w-0 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[color:var(--dashboardy-subsurface-strong)] focus-visible:bg-[color:var(--dashboardy-subsurface-strong)]"
 			>
 				{isExpanded ? (
 					<TraceChevronDownIcon className="size-4 shrink-0 text-[color:var(--dashboardy-muted)]" />

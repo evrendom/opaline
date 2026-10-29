@@ -1,4 +1,4 @@
-html:has(.opaline-auth-shell) {
+html[data-auth-shell] {
 	--auth-surface: #fff;
 	--auth-text: #171717;
 	--auth-muted: #737373;
@@ -13,7 +13,7 @@ html:has(.opaline-auth-shell) {
 }
 
 /* Dark: the app's window surface, with controls one step up like cards. */
-html.dark:has(.opaline-auth-shell) {
+html.dark[data-auth-shell] {
 	--auth-surface: var(--background);
 	--auth-text: var(--foreground);
 	--auth-muted: var(--muted-foreground);
@@ -24,8 +24,8 @@ html.dark:has(.opaline-auth-shell) {
 	--auth-code-shadow: inset 0 0 0 1px rgb(255 255 255 / 15%);
 }
 
-html:has(.opaline-auth-shell),
-body:has(.opaline-auth-shell) {
+html[data-auth-shell],
+:where(html)[data-auth-shell] body {
 	min-height: 100%;
 	background: var(--auth-surface);
 	overscroll-behavior: none;
@@ -120,12 +120,6 @@ body:has(.opaline-auth-shell) {
 	background: var(--auth-control);
 }
 
-.opaline-auth-content [data-slot="input"]:focus-visible,
-.opaline-auth-content [data-slot="button"]:focus-visible {
-	outline: 2px solid var(--auth-text);
-	outline-offset: 3px;
-}
-
 .opaline-auth-stage {
 	animation: opaline-auth-stage-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -173,12 +167,6 @@ body:has(.opaline-auth-shell) {
 	color: var(--auth-text);
 }
 
-.opaline-auth-email-switch:focus-visible {
-	border-radius: 4px;
-	outline: 2px solid var(--auth-text);
-	outline-offset: 3px;
-}
-
 .opaline-auth-email-switch:disabled {
 	opacity: 0.55;
 	cursor: default;
@@ -206,12 +194,6 @@ body:has(.opaline-auth-shell) {
 	font-weight: 500;
 	letter-spacing: 0.22em;
 	text-align: center;
-}
-
-.opaline-auth-content
-	[data-slot="input"].opaline-auth-code-input:focus-visible {
-	outline: 2px solid var(--auth-text);
-	outline-offset: -2px;
 }
 
 @keyframes opaline-auth-stage-enter {

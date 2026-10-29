@@ -151,7 +151,14 @@ function TickerValue({
  * `skeleton` flips), so the data drops in without shifting the card.
  */
 export function StatCard({
+	accent,
 	label,
+	shortLabel,
+	badge,
+	note,
+	noteBelow = false,
+	onSelect,
+	selected = false,
 	value,
 	icon: StatIcon,
 	iconClassName,
@@ -160,9 +167,16 @@ export function StatCard({
 	loading = false,
 	skeleton = false,
 }: {
+	accent?: string;
 	label: string;
+	shortLabel?: string;
+	badge?: React.ReactNode;
+	note?: React.ReactNode;
+	noteBelow?: boolean;
+	onSelect?: () => void;
+	selected?: boolean;
 	value: React.ReactNode;
-	icon?: Icon;
+	icon?: Icon | React.ComponentType<{ className?: string }>;
 	iconClassName?: string;
 	formatValue?: (n: number) => string;
 	/** Native tooltip for the value (e.g. the hint the card no longer shows). */
@@ -171,10 +185,41 @@ export function StatCard({
 	skeleton?: boolean;
 }) {
 	return (
-		<Card size="sm">
-			<CardHeader className="gap-1.5">
-				<div className="flex items-center justify-between gap-2">
-					<div className="flex min-w-0 items-center gap-1.75">
+		<Card
+			size="sm"
+			className={cn(
+				"data-[size=sm]:py-3.5",
+				onSelect &&
+					"relative transition-shadow hover:shadow-(--custom-shadow-secondary)",
+			)}
+			style={
+				selected && accent
+					? {
+							boxShadow: `var(--custom-shadow), 0 1.5px 2px color-mix(in oklch, ${accent} 25%, transparent), inset 0 0 0 1px color-mix(in oklch, ${accent} 20%, transparent)`,
+						}
+					: undefined
+			}
+		>
+			{onSelect ? (
+				<button
+					type="button"
+					aria-label={label}
+					aria-pressed={selected}
+					onClick={onSelect}
+					className={cn(
+						"absolute inset-0 z-10 rounded-[inherit] outline-none",
+						selected ? "cursor-default" : "cursor-pointer",
+					)}
+				/>
+			) : null}
+			<CardHeader className="gap-1.5 group-data-[size=sm]/card:px-4">
+				<div className="flex min-w-0 items-center justify-between gap-2">
+					<div
+						className={cn(
+							"flex items-center gap-1.75",
+							note ? "shrink-0" : "min-w-0",
+						)}
+					>
 						{StatIcon && (
 							<StatIcon
 								className={cn(
@@ -183,10 +228,35 @@ export function StatCard({
 								)}
 							/>
 						)}
-						<span className="truncate text-sm text-foreground">{label}</span>
+						{shortLabel ? (
+							<span className="truncate text-sm text-foreground">
+								<span className="hidden @[15rem]/card-header:inline">
+									{label}
+								</span>
+								<span className="@[15rem]/card-header:hidden">
+									{shortLabel}
+								</span>
+							</span>
+						) : (
+							<span className="truncate text-sm text-foreground">{label}</span>
+						)}
+						{badge ? <span className="flex shrink-0">{badge}</span> : null}
 					</div>
-					<div className="flex shrink-0 items-center gap-1.5">
-						<CardTitle className="tracking-tight tabular-nums" title={title}>
+					<div
+						className={cn(
+							"flex items-center gap-2.5",
+							note ? "min-w-0 gap-2" : "shrink-0",
+						)}
+					>
+						{note && !noteBelow && !loading ? (
+							<CardTitle className="inline-flex min-w-0 items-center gap-1 overflow-hidden tracking-tight whitespace-nowrap tabular-nums opacity-45">
+								{note}
+							</CardTitle>
+						) : null}
+						<CardTitle
+							className="shrink-0 tracking-tight tabular-nums"
+							title={title}
+						>
 							{loading ? (
 								// Zero-width text keeps the title's line box so the row
 								// height matches the loaded card exactly.
@@ -207,6 +277,11 @@ export function StatCard({
 						</CardTitle>
 					</div>
 				</div>
+				{note && noteBelow && !loading ? (
+					<CardTitle className="min-w-0 tracking-tight text-pretty tabular-nums opacity-45">
+						{note}
+					</CardTitle>
+				) : null}
 			</CardHeader>
 		</Card>
 	);

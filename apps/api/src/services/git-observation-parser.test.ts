@@ -637,11 +637,143 @@ test("a push that updates one ref and rejects another keeps the update; forced u
 	]);
 });
 
-test("parser version 4 starts a new observation generation", () => {
+test("a shell CI check records each Actions run its output links to", () => {
+	const command =
+		'cd ~/x && sleep 60; for n in 301 303; do gh pr view $n --json mergeable,mergeStateStatus -q "..."; done; gh pr checks 301 --watch --fail-fast 2>&1 | grep -v GraphQL | grep -E "verify|integration" | tail -2';
+	const output = [
+		"#301 MERGEABLE UNSTABLE",
+		"#303 MERGEABLE UNSTABLE",
+		"verify\tfail\t57s\thttps://github.com/opalinehq/athena/actions/runs/38537619754/job/115764252835\t",
+		"integration\tpending\t0\thttps://github.com/opalinehq/athena/actions/runs/38537619754/job/115764366945",
+	].join("\n");
+	const rows = parseGitObservations(
+		recordsInput([
+			call("real", command),
+			result("real", output),
+			call("two", "gh pr checks 7"),
+			result(
+				"two",
+				[
+					"verify\tpass\t1m\thttps://github.com/opalinehq/athena/actions/runs/101/job/1",
+					"deploy\tfail\t2m\thttps://github.com/opalinehq/deploys/actions/runs/202/attempts/2",
+				].join("\n"),
+				{ exit_code: 1, is_error: true },
+			),
+			call("view", "gh run view 42 --log-failed"),
+			result(
+				"view",
+				"X build failed\nView this run on GitHub: https://github.com/opalinehq/athena/actions/runs/42\nhttps://github.com/opalinehq/athena/actions/runs/42/job/9",
+			),
+			call("guarded", "false && gh pr checks 9"),
+			result("guarded", "", { exit_code: 1, is_error: true }),
+			call("notes", "cat notes.md"),
+			result(
+				"notes",
+				"See https://github.com/opalinehq/athena/actions/runs/555/job/1",
+			),
+		]),
+	);
+	expect(
+		rows
+			.filter((row) => row.kind === "ci_check")
+			.map(({ call_id, label, pr_repo, pr_number, run_id }) => ({
+				call_id,
+				label,
+				pr_repo,
+				pr_number,
+				run_id,
+			})),
+	).toEqual([
+		{
+			call_id: "real",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 301,
+			run_id: "",
+		},
+		{
+			call_id: "real",
+			label: "observed",
+			pr_repo: "opalinehq/athena",
+			pr_number: 0,
+			run_id: "38537619754",
+		},
+		{
+			call_id: "two",
+			label: "observed",
+			pr_repo: "",
+			pr_number: 7,
+			run_id: "",
+		},
+		{
+			call_id: "two",
+			label: "observed",
+			pr_repo: "opalinehq/athena",
+			pr_number: 0,
+			run_id: "101",
+		},
+		{
+			call_id: "two",
+			label: "observed",
+			pr_repo: "opalinehq/deploys",
+			pr_number: 0,
+			run_id: "202",
+		},
+		{
+			call_id: "view",
+			label: "observed",
+			pr_repo: "opalinehq/athena",
+			pr_number: 0,
+			run_id: "42",
+		},
+		{
+			call_id: "guarded",
+			label: "unconfirmed",
+			pr_repo: "",
+			pr_number: 9,
+			run_id: "",
+		},
+	]);
+	const real = rows.filter((row) => row.call_id === "real");
+	expect(new Set(real.map((row) => row.block_idx)).size).toBe(real.length);
+});
+
+test("check rows without a URL confirm a lone check; several checks keep their own labels", () => {
+	const rows = parseGitObservations(
+		recordsInput([
+			call("rows", "cd repo && gh pr checks 7; true"),
+			result("rows", "verify\tpass\t57s\t\nlint\tskipping\t0\t"),
+			call("both", "false && gh pr checks 7; gh run watch 42"),
+			result("both", "https://github.com/opalinehq/athena/actions/runs/42"),
+			call("text", "false && gh pr checks 7; true"),
+			result("text", "no checks reported on the 'main' branch"),
+		]),
+	);
+	expect(
+		rows.map(({ call_id, label, run_id, pr_repo }) => ({
+			call_id,
+			label,
+			run_id,
+			pr_repo,
+		})),
+	).toEqual([
+		{ call_id: "rows", label: "observed", run_id: "", pr_repo: "" },
+		{ call_id: "both", label: "unconfirmed", run_id: "", pr_repo: "" },
+		{
+			call_id: "both",
+			label: "observed",
+			run_id: "42",
+			pr_repo: "opalinehq/athena",
+		},
+		{ call_id: "text", label: "unconfirmed", run_id: "", pr_repo: "" },
+	]);
+});
+
+test("parser version 5 starts a new observation generation", () => {
 	const [row] = parseGitObservations(
 		recordsInput([call("c", "gh run view 1"), result("c", "ok")]),
 	);
-	expect(row?.parser_version).toBe(4 * 256 + 4);
+	expect(row?.parser_version).toBe(5 * 256 + 4);
 });
 
 test("recorded gitOperation and pr-link facts add what the output text did not show", async () => {

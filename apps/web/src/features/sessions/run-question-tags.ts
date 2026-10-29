@@ -1,6 +1,7 @@
 import {
 	RUN_QUESTION_YES_PROBABILITY,
 	type SessionRunAnswersRun,
+	type SessionRunQuestionTag,
 } from "@rudel/api-routes";
 
 // Run question answers as tags (CONTEXT.md "Run question"): a question
@@ -74,4 +75,26 @@ export function matchRunAnswersToTurns(
 		questions.set(turnId, [...(questions.get(turnId) ?? []), ...yes]);
 	}
 	return questions;
+}
+
+export function getSessionQuestionTags(
+	runs: readonly SessionRunAnswersRun[],
+): SessionRunQuestionTag[] {
+	const tags = new Map<string, SessionRunQuestionTag>();
+	for (const run of runs) {
+		for (const question of run.questions) {
+			if (!isRunQuestionYes(question.probability)) continue;
+			const tag = tags.get(question.id);
+			tags.set(question.id, {
+				id: question.id,
+				label: question.label,
+				probability: Math.max(tag?.probability ?? 0, question.probability),
+				question: question.question,
+				runs: (tag?.runs ?? 0) + 1,
+			});
+		}
+	}
+	return [...tags.values()].sort(
+		(a, b) => b.runs - a.runs || b.probability - a.probability,
+	);
 }
