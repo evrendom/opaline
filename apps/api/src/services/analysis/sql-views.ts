@@ -307,8 +307,7 @@ const runAnswersColumns: readonly SqlViewColumn[] =
 	}));
 
 /**
- * Run question answers (CONTEXT.md "Run question"): precomputed for every
- * run of a workspace that has run questions (and stored by run_questions),
+ * Run question answers (CONTEXT.md "Run question"): stored by run_questions,
  * reused by every later analysis. ReplacingMergeTree keyed by question, run
  * and transcript revision, so FINAL keeps one answer per key; only answers
  * given for the revision each session is committed at are shown, so an

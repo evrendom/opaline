@@ -3,9 +3,9 @@ import { isAuthorizedCronRequest } from "../lib/cron-auth.js";
 const INVOCATION_BUDGET_MS = 240_000;
 
 /**
- * Minute cron, listed several times so invocations overlap: fills in the run
- * question answers and search chunks that sessions uploaded before a feature
- * was on did not get (`history-maintenance.service.ts`).
+ * Minute cron, listed several times so invocations overlap: fills in the
+ * search chunks that sessions uploaded before search was on did not get
+ * (`history-maintenance.service.ts`).
  */
 export async function handleHistoryMaintenanceRequest(
 	request: Request,

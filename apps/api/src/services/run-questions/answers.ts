@@ -13,8 +13,7 @@ import {
 /**
  * Run question answers in ClickHouse (`rudel.run_question_answers`), keyed by
  * workspace, question wording, run and the transcript revision the answer was
- * given for. Answers are precomputed for every new run of a workspace that
- * has run questions (`precompute.ts`); an answer is stored once and reused by
+ * given for. An answer is stored once and reused by
  * every later analysis of the same transcript; once the session is uploaded
  * again with changes, its runs are answered anew. The `run_answers` sql view reads the same rows.
  */
