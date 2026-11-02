@@ -42,6 +42,9 @@ export async function handleLargeR2IngestWorkerRequest(
 			{ status: 503 },
 		);
 	}
+	const idle = await import("../services/idle-activity.js");
+	const skipped = idle.idleCronResponse(await idle.cronGate());
+	if (skipped) return skipped;
 	try {
 		const result = await runLargeR2IngestWorkerPass({
 			database: sqlClient,
@@ -52,6 +55,7 @@ export async function handleLargeR2IngestWorkerRequest(
 			process: processRecoveredR2IngestJob,
 			r2: createR2MultipartUploadClient(availability.configuration),
 		});
+		if (result.attempted > 0) await idle.markActivity();
 		return Response.json({ ...worker, ...result });
 	} catch (error) {
 		logger.error("Large R2 ingest worker pass failed: {error}", {

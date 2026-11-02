@@ -3,6 +3,7 @@ import { createVercelFunctionHandler } from "../../../apps/api/src/lib/vercel-fu
 
 export const GET = createVercelFunctionHandler({
 	fetch: async () => handleLargeR2IngestWorkerHealthRequest(),
+	marksActivity: "never",
 	functionGroup: "large-r2-ingest-health",
 	publicPathPattern: /^\/api\/health$/u,
 });

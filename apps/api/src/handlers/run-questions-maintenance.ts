@@ -23,6 +23,9 @@ export async function handleRunQuestionsMaintenanceRequest(
 	if (!isAuthorizedCronRequest(request)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
+	const idle = await import("../services/idle-activity.js");
+	const skipped = idle.idleCronResponse(await idle.cronGate());
+	if (skipped) return skipped;
 	// Unauthorized probes must not initialize database or provider clients.
 	const [{ runQuestionsEnv }, { answerQueuedQuestions }] = await Promise.all([
 		import("../services/run-questions/env.js"),
@@ -45,5 +48,6 @@ export async function handleRunQuestionsMaintenanceRequest(
 		costUsd: passes.reduce((sum, pass) => sum + pass.costUsd, 0),
 		refused: passes.flatMap((pass) => pass.refused),
 	};
+	if (answered.jobs > 0) await idle.markActivity();
 	return Response.json({ runQuestions: { enabled: true, answered }, ok: true });
 }

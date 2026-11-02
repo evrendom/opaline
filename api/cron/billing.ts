@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleBillingReconciliationMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "billing-reconciliation-maintenance",
 	publicPathPattern: /^\/api\/cron\/billing$/u,
 });

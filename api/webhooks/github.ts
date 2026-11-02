@@ -46,6 +46,7 @@ export function createGitHubWebhookVercelHandler(
 				});
 			},
 			functionGroup: "github-webhook",
+			marksActivity: "always",
 		})(request);
 
 	async function runRefresh(

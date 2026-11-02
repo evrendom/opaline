@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleNativeSessionLineageMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "native-session-lineage-maintenance",
 	publicPathPattern: /^\/api\/cron\/native-lineage$/u,
 });

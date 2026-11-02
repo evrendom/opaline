@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleLargeR2IngestWorkerRequest,
+	marksActivity: "never",
 	functionGroup: "large-r2-ingest-worker",
 	publicPathPattern: /^\/api\/cron\/large-r2-ingest$/u,
 });

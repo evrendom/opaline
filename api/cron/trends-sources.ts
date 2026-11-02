@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleTrendsSourcesMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "trends-sources-maintenance",
 	publicPathPattern: /^\/api\/cron\/trends-sources$/u,
 });

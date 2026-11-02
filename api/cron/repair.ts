@@ -6,5 +6,6 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleApiMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "rpc-auth",
 });

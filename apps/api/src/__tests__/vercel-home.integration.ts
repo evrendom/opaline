@@ -15,7 +15,7 @@ assert(
 const server = Bun.serve({
 	hostname: "127.0.0.1",
 	port: 0,
-	fetch: handleVercelRequest,
+	fetch: (request) => handleVercelRequest(request),
 });
 let userId = "";
 afterAll(async () => {

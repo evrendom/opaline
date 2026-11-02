@@ -194,7 +194,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(vercelConfig.crons).toContainEqual({
 			path: "/api/cron/live-sessions",
-			schedule: "40 * * * *",
+			schedule: "10 * * * *",
 		});
 		const apiCatchAll = vercelConfig.rewrites.find(
 			(rewrite) =>

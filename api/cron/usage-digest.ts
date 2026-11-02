@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleUsageDigestMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "usage-digest-maintenance",
 	publicPathPattern: /^\/api\/cron\/usage-digest$/u,
 });

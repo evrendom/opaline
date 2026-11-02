@@ -40,16 +40,13 @@ function WorkspaceSessionArrivalNotifications({
 	const seen = useRef<ReadonlySet<string>>(new Set());
 	const toastIds = useRef(new Set<string>());
 	useEffect(() => {
-		const events = new EventSource(
-			`${SESSION_ARRIVALS_PATH}?${new URLSearchParams({ organizationId })}`,
-			{ withCredentials: true },
-		);
 		const ids = toastIds.current;
+		let events: EventSource | null = null;
 		let handshake = true;
-		events.addEventListener("open", () => {
+		const onOpen = () => {
 			handshake = true;
-		});
-		events.addEventListener("sessions", (event) => {
+		};
+		const onSessions = (event: MessageEvent<string>) => {
 			let payload: unknown;
 			try {
 				payload = JSON.parse(event.data);
@@ -95,9 +92,29 @@ function WorkspaceSessionArrivalNotifications({
 			void queryClient.invalidateQueries({
 				queryKey: SESSION_DETAIL_INITIAL_QUERY_PREFIX,
 			});
-		});
+		};
+		const connect = () => {
+			if (events) return;
+			events = new EventSource(
+				`${SESSION_ARRIVALS_PATH}?${new URLSearchParams({ organizationId })}`,
+				{ withCredentials: true },
+			);
+			events.addEventListener("open", onOpen);
+			events.addEventListener("sessions", onSessions);
+		};
+		const disconnect = () => {
+			events?.close();
+			events = null;
+		};
+		const onVisibilityChange = () => {
+			if (document.visibilityState === "hidden") disconnect();
+			else connect();
+		};
+		if (document.visibilityState !== "hidden") connect();
+		document.addEventListener("visibilitychange", onVisibilityChange);
 		return () => {
-			events.close();
+			document.removeEventListener("visibilitychange", onVisibilityChange);
+			disconnect();
 			for (const id of ids) toast.dismiss(id);
 		};
 	}, [organizationId, queryClient, workspaceSlug]);

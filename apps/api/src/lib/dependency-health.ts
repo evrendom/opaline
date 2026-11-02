@@ -6,7 +6,7 @@ const TIMEOUT_MS = 3_000;
 const CACHE_MS = 30_000;
 
 interface DependencyStatus {
-	status: "ok" | "unavailable";
+	status: "ok" | "unavailable" | "idle";
 	duration_ms: number;
 }
 
@@ -50,7 +50,11 @@ function getPendingCheck(): Promise<HealthResult> {
 async function checkDependencies(): Promise<HealthResult> {
 	const [postgresStatus, clickhouseStatus, clickhouseReadStatus] =
 		await Promise.all([
-			measureDependency(checkPostgres),
+			postgresIsIdle().then((idle) =>
+				idle
+					? { status: "idle" as const, duration_ms: 0 }
+					: measureDependency(checkPostgres),
+			),
 			measureDependency(checkClickHouse),
 			measureDependency(checkClickHouseRead),
 		]);
@@ -58,7 +62,7 @@ async function checkDependencies(): Promise<HealthResult> {
 	// The read check only tells the app whether analytics can still be served
 	// while writes are slow.
 	const healthy =
-		postgresStatus.status === "ok" && clickhouseStatus.status === "ok";
+		postgresStatus.status !== "unavailable" && clickhouseStatus.status === "ok";
 	return {
 		status: healthy ? "ok" : "unavailable",
 		dependencies: {
@@ -67,6 +71,11 @@ async function checkDependencies(): Promise<HealthResult> {
 			clickhouse_read: clickhouseReadStatus,
 		},
 	};
+}
+
+async function postgresIsIdle(): Promise<boolean> {
+	const { cronGate } = await import("../services/idle-activity.js");
+	return !(await cronGate()).run;
 }
 
 async function measureDependency(

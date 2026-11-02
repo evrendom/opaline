@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleLiveSessionsMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "live-sessions-maintenance",
 	publicPathPattern: /^\/api\/cron\/live-sessions$/u,
 });

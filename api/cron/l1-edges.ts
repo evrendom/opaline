@@ -6,5 +6,6 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleL1EdgesMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "rpc-auth",
 });

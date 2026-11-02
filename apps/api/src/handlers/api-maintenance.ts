@@ -81,6 +81,9 @@ export async function handleR2IngestMaintenanceRequest(
 	if (!isAuthorizedCronRequest(request)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
+	const idle = await import("../services/idle-activity.js");
+	const skipped = idle.idleCronResponse(await idle.cronGate());
+	if (skipped) return skipped;
 	try {
 		const invocationDeadline = {
 			deadlineAt: Date.now() + MAINTENANCE_INVOCATION_BUDGET_MS,
@@ -88,6 +91,7 @@ export async function handleR2IngestMaintenanceRequest(
 		};
 		// Transcript ingest retries come first; the evidence index is derived.
 		const result = await runR2Maintenance(invocationDeadline);
+		if (result.attempted > 0 || result.hasMore) await idle.markActivity();
 		const repositoryEvidenceIndex = await runMaintenanceStep(
 			"repository-evidence-index",
 			() =>

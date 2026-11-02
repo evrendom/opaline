@@ -152,7 +152,7 @@
 		},
 		{
 			"path": "/api/cron/live-sessions",
-			"schedule": "40 * * * *"
+			"schedule": "10 * * * *"
 		},
 		{
 			"path": "/api/cron/trends-sources",

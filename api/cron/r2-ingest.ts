@@ -6,6 +6,7 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleR2IngestMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "r2-ingest-maintenance",
 	publicPathPattern: /^\/api\/cron\/r2-ingest$/u,
 });

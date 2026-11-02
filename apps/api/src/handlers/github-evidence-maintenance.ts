@@ -10,6 +10,9 @@ export async function handleGitHubEvidenceMaintenanceRequest(
 	if (!isAuthorizedCronRequest(request)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
+	const idle = await import("../services/idle-activity.js");
+	const skipped = idle.idleCronResponse(await idle.cronGate());
+	if (skipped) return skipped;
 	try {
 		// Unauthorized probes must not initialize database or provider clients.
 		const {
@@ -75,6 +78,8 @@ export async function handleGitHubEvidenceMaintenanceRequest(
 			),
 			hasMore: sweepDrain.results.at(-1)?.pending ?? sweepDrain.hasMore,
 		};
+		if (result.attempted > 0 || result.hasMore || sweep.hasMore)
+			await idle.markActivity();
 		const ok = result.failed === 0 && !result.hasExhaustedFailures;
 		return Response.json(
 			{ githubEvidence: result, githubSweep: sweep, ok },

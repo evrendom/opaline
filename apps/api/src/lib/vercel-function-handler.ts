@@ -5,13 +5,18 @@ const ROUTE_CAPTURE_PARAMETERS = ["routePath", "shareId"] as const;
 
 type FetchHandler = (request: Request) => Promise<Response>;
 
+export interface VercelRequestContext {
+	readonly waitUntil?: (promise: Promise<unknown>) => void;
+}
+
 export function createVercelFunctionHandler(input: {
 	readonly fetch: FetchHandler;
 	readonly functionGroup: string;
 	readonly streaming?: boolean;
 	readonly publicPathPattern?: RegExp;
-}): FetchHandler {
-	return async (request) => {
+	readonly marksActivity?: "credentialed" | "always" | "never";
+}): (request: Request, context?: VercelRequestContext) => Promise<Response> {
+	return async (request, context) => {
 		const routedRequest = restorePublicRequestPath(
 			request,
 			input.publicPathPattern,
@@ -19,6 +24,8 @@ export function createVercelFunctionHandler(input: {
 		if (!routedRequest) {
 			return new Response("Not found", { status: 404 });
 		}
+		if (marksActivity(input.marksActivity ?? "credentialed", routedRequest))
+			recordActivity(context);
 
 		try {
 			const response = await input.fetch(routedRequest);
@@ -52,6 +59,25 @@ export function createVercelFunctionHandler(input: {
 			throw error;
 		}
 	};
+}
+
+export function marksActivity(
+	mode: "credentialed" | "always" | "never",
+	request: Request,
+): boolean {
+	if (mode === "never") return false;
+	if (new URL(request.url).pathname.startsWith("/health")) return false;
+	if (mode === "always") return true;
+	return ["cookie", "authorization", "x-api-key"].some((header) =>
+		request.headers.has(header),
+	);
+}
+
+function recordActivity(context: VercelRequestContext | undefined): void {
+	const marked = import("../services/idle-activity.js")
+		.then((idle) => idle.markActivity())
+		.catch(() => undefined);
+	if (context?.waitUntil) context.waitUntil(marked);
 }
 
 async function materializeVercelResponse(

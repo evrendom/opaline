@@ -6,5 +6,6 @@ await setupLogging();
 
 export const GET = createVercelFunctionHandler({
 	fetch: handleGitHubEvidenceMaintenanceRequest,
+	marksActivity: "never",
 	functionGroup: "rpc-auth",
 });

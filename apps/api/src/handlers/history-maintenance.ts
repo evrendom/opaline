@@ -13,6 +13,9 @@ export async function handleHistoryMaintenanceRequest(
 	if (!isAuthorizedCronRequest(request)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
+	const idle = await import("../services/idle-activity.js");
+	const skipped = idle.idleCronResponse(await idle.cronGate());
+	if (skipped) return skipped;
 	// Unauthorized probes must not initialize database or provider clients.
 	const { runHistoryMaintenance } = await import(
 		"../services/history-maintenance.service.js"
@@ -20,5 +23,10 @@ export async function handleHistoryMaintenanceRequest(
 	const history = await runHistoryMaintenance({
 		budgetMs: INVOCATION_BUDGET_MS,
 	});
+	if (
+		history.search.status === "indexed" &&
+		(history.search.indexed > 0 || history.search.hasMore)
+	)
+		await idle.markActivity();
 	return Response.json({ history, ok: true });
 }
