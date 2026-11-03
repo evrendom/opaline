@@ -19,6 +19,5 @@ export async function handleL1EdgesMaintenanceRequest(
 	if (!isL1EdgeWorkerEnabled())
 		return Response.json({ l1Edges: { enabled: false }, ok: true });
 	const built = await runConfiguredL1EdgePass(INVOCATION_BUDGET_MS);
-	if (built > 0) await idle.markActivity();
 	return Response.json({ l1Edges: { enabled: true, built }, ok: true });
 }

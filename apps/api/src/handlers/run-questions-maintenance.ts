@@ -48,6 +48,5 @@ export async function handleRunQuestionsMaintenanceRequest(
 		costUsd: passes.reduce((sum, pass) => sum + pass.costUsd, 0),
 		refused: passes.flatMap((pass) => pass.refused),
 	};
-	if (answered.jobs > 0) await idle.markActivity();
 	return Response.json({ runQuestions: { enabled: true, answered }, ok: true });
 }

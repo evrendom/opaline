@@ -78,8 +78,6 @@ export async function handleGitHubEvidenceMaintenanceRequest(
 			),
 			hasMore: sweepDrain.results.at(-1)?.pending ?? sweepDrain.hasMore,
 		};
-		if (result.attempted > 0 || result.hasMore || sweep.hasMore)
-			await idle.markActivity();
 		const ok = result.failed === 0 && !result.hasExhaustedFailures;
 		return Response.json(
 			{ githubEvidence: result, githubSweep: sweep, ok },

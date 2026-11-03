@@ -55,7 +55,6 @@ export async function handleLargeR2IngestWorkerRequest(
 			process: processRecoveredR2IngestJob,
 			r2: createR2MultipartUploadClient(availability.configuration),
 		});
-		if (result.attempted > 0) await idle.markActivity();
 		return Response.json({ ...worker, ...result });
 	} catch (error) {
 		logger.error("Large R2 ingest worker pass failed: {error}", {

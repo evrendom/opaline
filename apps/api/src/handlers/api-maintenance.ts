@@ -91,7 +91,6 @@ export async function handleR2IngestMaintenanceRequest(
 		};
 		// Transcript ingest retries come first; the evidence index is derived.
 		const result = await runR2Maintenance(invocationDeadline);
-		if (result.attempted > 0 || result.hasMore) await idle.markActivity();
 		const repositoryEvidenceIndex = await runMaintenanceStep(
 			"repository-evidence-index",
 			() =>

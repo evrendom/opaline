@@ -23,10 +23,5 @@ export async function handleHistoryMaintenanceRequest(
 	const history = await runHistoryMaintenance({
 		budgetMs: INVOCATION_BUDGET_MS,
 	});
-	if (
-		history.search.status === "indexed" &&
-		(history.search.indexed > 0 || history.search.hasMore)
-	)
-		await idle.markActivity();
 	return Response.json({ history, ok: true });
 }
