@@ -48,10 +48,9 @@ let lockTimeoutServer: ApiTestServer;
 setDefaultTimeout(120_000);
 
 beforeAll(async () => {
-	const connectionString = getPostgresConnectionString();
 	server = await startApiTestServer();
 	lockTimeoutServer = await startApiTestServer({
-		PG_CONNECTION_STRING: withLockTimeout(connectionString, 250),
+		PG_LOCK_TIMEOUT_MS: "250",
 	});
 });
 
@@ -615,12 +614,6 @@ function getPostgresConnectionString(): string {
 		throw new Error("PG_CONNECTION_STRING is required for integration tests");
 	}
 	return connectionString;
-}
-
-function withLockTimeout(connectionString: string, timeoutMs: number): string {
-	const url = new URL(connectionString);
-	url.searchParams.set("options", `-c lock_timeout=${timeoutMs}ms`);
-	return url.toString();
 }
 
 function readAuthToken(value: unknown): string {

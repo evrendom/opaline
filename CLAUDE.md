@@ -13,7 +13,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | App | Package | Description |
 |-----|---------|-------------|
 | `apps/api` | `@rudel/api` | HTTP API server (Bun). Auth via `better-auth`, RPC via `@orpc/server`, session ingestion into ClickHouse. |
-| `apps/cli` | `rudel` (private, not published) | **Test harness only.** CI uses it for the `cli-smoke` job, the version-skew tests, and the CLI → API → ClickHouse integration tests. The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there, not here. |
+| `apps/cli` | `rudel` (private, not published) | **Test harness only.** CI uses it for the version-skew tests and the CLI → API → ClickHouse integration tests. The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there, not here. |
 | `apps/web` | `@rudel/web` | React SPA (Vite + Tailwind + shadcn). Auth UI and CLI login portal. |
 
 ### Packages

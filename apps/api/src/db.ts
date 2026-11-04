@@ -8,11 +8,23 @@ if (!connectionString) {
 }
 const requiredConnectionString = connectionString;
 
+function readLockTimeoutMs(): number {
+	const raw = process.env.PG_LOCK_TIMEOUT_MS;
+	if (raw === undefined || raw === "") {
+		return 30_000;
+	}
+	const value = Number(raw);
+	if (!Number.isInteger(value) || value <= 0) {
+		throw new Error("PG_LOCK_TIMEOUT_MS must be a positive integer");
+	}
+	return value;
+}
+
 const postgresClientOptions = {
 	connect_timeout: 10,
 	connection: {
 		idle_in_transaction_session_timeout: 120_000,
-		lock_timeout: 30_000,
+		lock_timeout: readLockTimeoutMs(),
 		statement_timeout: 120_000,
 	},
 	idle_timeout: 20,
