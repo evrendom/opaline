@@ -61,6 +61,7 @@ describe("database readiness", () => {
 						clickhouse_read: {
 							status: missingPrivilege === "INSERT" ? "ok" : "unavailable",
 						},
+						clickhouse_ping: { status: "ok" },
 					},
 				});
 				// Granting the missing privilege makes the same real storage probe pass.
@@ -136,6 +137,7 @@ describe("database readiness", () => {
 					postgres: { status: "ok", duration_ms: expect.any(Number) },
 					clickhouse: { status: "ok", duration_ms: expect.any(Number) },
 					clickhouse_read: { status: "ok", duration_ms: expect.any(Number) },
+					clickhouse_ping: { status: "ok", duration_ms: expect.any(Number) },
 				},
 			});
 		}
@@ -178,6 +180,10 @@ describe("database readiness", () => {
 						status: dependency === "postgres" ? "ok" : "unavailable",
 						duration_ms: expect.any(Number),
 					},
+					clickhouse_ping: {
+						status: dependency === "postgres" ? "ok" : "unavailable",
+						duration_ms: expect.any(Number),
+					},
 				},
 			});
 			const liveness = await fetch(`${base}/health`);
@@ -205,7 +211,7 @@ describe("database readiness", () => {
 			});
 			const started = performance.now();
 			const response = await fetch(`${base}/health/ready`);
-			expect(performance.now() - started).toBeLessThan(4_500);
+			expect(performance.now() - started).toBeLessThan(9_500);
 			expect(response.status).toBe(503);
 			const body = await response.json();
 			expect(body).toEqual({
@@ -217,6 +223,10 @@ describe("database readiness", () => {
 						duration_ms: expect.any(Number),
 					},
 					clickhouse_read: {
+						status: "unavailable",
+						duration_ms: expect.any(Number),
+					},
+					clickhouse_ping: {
 						status: "unavailable",
 						duration_ms: expect.any(Number),
 					},

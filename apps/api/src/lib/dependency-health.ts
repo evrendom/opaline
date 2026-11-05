@@ -3,6 +3,7 @@ import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
 import postgres from "postgres";
 
 const TIMEOUT_MS = 3_000;
+const WRITE_TIMEOUT_MS = 8_000;
 const CACHE_MS = 30_000;
 
 interface DependencyStatus {
@@ -16,6 +17,7 @@ interface HealthResult {
 		postgres: DependencyStatus;
 		clickhouse: DependencyStatus;
 		clickhouse_read: DependencyStatus;
+		clickhouse_ping: DependencyStatus;
 	};
 }
 
@@ -48,16 +50,21 @@ function getPendingCheck(): Promise<HealthResult> {
 }
 
 async function checkDependencies(): Promise<HealthResult> {
-	const [postgresStatus, clickhouseStatus, clickhouseReadStatus] =
-		await Promise.all([
-			postgresIsIdle().then((idle) =>
-				idle
-					? { status: "idle" as const, duration_ms: 0 }
-					: measureDependency(checkPostgres),
-			),
-			measureDependency(checkClickHouse),
-			measureDependency(checkClickHouseRead),
-		]);
+	const [
+		postgresStatus,
+		clickhouseStatus,
+		clickhouseReadStatus,
+		clickhousePingStatus,
+	] = await Promise.all([
+		postgresIsIdle().then((idle) =>
+			idle
+				? { status: "idle" as const, duration_ms: 0 }
+				: measureDependency(checkPostgres),
+		),
+		measureDependency(checkClickHouse),
+		measureDependency(checkClickHouseRead),
+		measureDependency(checkClickHousePing),
+	]);
 	// Readiness stays strict: an acknowledged ClickHouse write is required.
 	// The read check only tells the app whether analytics can still be served
 	// while writes are slow.
@@ -69,6 +76,7 @@ async function checkDependencies(): Promise<HealthResult> {
 			postgres: postgresStatus,
 			clickhouse: clickhouseStatus,
 			clickhouse_read: clickhouseReadStatus,
+			clickhouse_ping: clickhousePingStatus,
 		},
 	};
 }
@@ -142,14 +150,14 @@ async function checkClickHouse(): Promise<void> {
 		username: resolveClickHouseUsername(process.env, url),
 		password: process.env.CLICKHOUSE_PASSWORD || "",
 		database: "default",
-		request_timeout: TIMEOUT_MS,
+		request_timeout: WRITE_TIMEOUT_MS,
 	});
 	try {
 		// SELECT 1 only exercises the query frontend. Require an acknowledged
 		// storage write and an uncached read of that exact row instead. A fresh ID
 		// prevents old canary data or query-cache hits from masking an outage.
 		const probeId = crypto.randomUUID();
-		const signal = AbortSignal.timeout(TIMEOUT_MS);
+		const signal = AbortSignal.timeout(WRITE_TIMEOUT_MS);
 		await client.command({
 			query: `INSERT INTO rudel.dependency_health_probes (probe_id)
 				SETTINGS async_insert = 1, wait_for_async_insert = 1,
@@ -157,7 +165,7 @@ async function checkClickHouse(): Promise<void> {
 					async_insert_busy_timeout_ms = 200
 				FORMAT JSONEachRow ${JSON.stringify({ probe_id: probeId })}`,
 			abort_signal: signal,
-			clickhouse_settings: { max_execution_time: 2 },
+			clickhouse_settings: { max_execution_time: 7 },
 		});
 		const result = await client.query({
 			query: `SELECT probe_id FROM rudel.dependency_health_probes
@@ -171,6 +179,7 @@ async function checkClickHouse(): Promise<void> {
 				max_rows_to_read: "100000",
 				max_bytes_to_read: "1048576",
 				use_query_cache: 0,
+				select_sequential_consistency: "1",
 			},
 		});
 		const rows = await result.json<{ probe_id: string }>();
@@ -206,6 +215,26 @@ async function checkClickHouseRead(): Promise<void> {
 			},
 		});
 		await result.json();
+	} finally {
+		await client.close();
+	}
+}
+
+async function checkClickHousePing(): Promise<void> {
+	const url = process.env.CLICKHOUSE_URL || "http://localhost:8123";
+	const client = createClient({
+		url,
+		username: resolveClickHouseUsername(process.env, url),
+		password: process.env.CLICKHOUSE_PASSWORD || "",
+		database: "default",
+		request_timeout: TIMEOUT_MS,
+	});
+	try {
+		const result = await client.ping({
+			select: true,
+			abort_signal: AbortSignal.timeout(TIMEOUT_MS),
+		});
+		if (!result.success) throw result.error;
 	} finally {
 		await client.close();
 	}
