@@ -25,7 +25,10 @@ const TEMPLATE_MIN_SESSIONS = 2;
 const CODE_BLOCK = /```[\s\S]*?(?:```|$)/;
 const TAG_BLOCK = /<([a-z][\w:-]*)[^>]{0,200}>[\s\S]*?<\/[a-z][\w:-]*>/i;
 const LONE_TAG = /<\/?[a-z][\w:-]*[^>]{0,200}>/i;
-const MARKER = /\[(?:image|pasted|attachment|file)[^\]]{0,200}\]/i;
+export const AGENT_LAUNCHERS = ["codex_exec", "sdk-cli"] as const;
+
+const MARKER =
+	/\[(?:image|pasted|attachment|attached|user attached|file)[^\]]{0,400}\]/i;
 const LOG_LINE =
 	/^\s*(?:at\s+\S|[│├└╭╰┌┐┘┴┬─▶❯✓✗✔✘×⎿$>|]|\d{4}-\d{2}-\d{2}[T ]\d|\[\d|(?:error|warn|warning|info|debug|trace|fatal)\b\s*[:[])|\b\d{1,2}:\d{2}:\d{2}\b|\S+\.\w{1,5}:\d+/i;
 const LINK_OR_PATH = /https?:\/\/\S+|\S*[/\\=@#]\S*/;
@@ -499,6 +502,7 @@ export function themeCtes(params: MeasureParams): string[] {
 			substringUTF8(text, 1, ${PROMPT_CHARS}) AS raw
 		FROM prompts
 		WHERE at >= ${windowStart(params)} AND genuine = 1 AND agent_id = '' AND run_id != '' AND ${inPicked()}
+			AND session_id NOT IN (SELECT session_id FROM runs WHERE started_at >= ${windowStart(params)} AND agent_id = '' AND entrypoint IN (${AGENT_LAUNCHERS.map((l) => `'${l}'`).join(", ")}))
 	)`,
 		`th_marked AS (
 		SELECT *, ${promptBodySql("raw")} AS body, ${openingKeySql(`extract(raw, ${re2(HEADING)})`)} AS bkey,

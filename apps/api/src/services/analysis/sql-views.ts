@@ -195,9 +195,9 @@ const RUNS: SqlView = {
 const CALLS: SqlView = {
 	name: "calls",
 	grain:
-		"One row per tool call of a run (every tool, with its command identity, its own time and its results reduced to one), from each session's committed build; joins runs by run_id.",
+		"One row per tool call of a run (every tool, with its command identity, its own time and its results reduced to one), from each session's committed build; joins runs by run_id. A Codex code-mode script is a call (call_level script) and so is each call it ran (call_level inner, parent_call_id the script).",
 	traps: [
-		"Each call is one row: older transcript generations, repeated copies and the calls a forked Codex session copied from its parent are already left out, so count rows directly.",
+		"Older transcript generations, repeated copies and the calls a forked Codex session copied from its parent are already left out, but a Codex script and the commands it ran are rows of their own, and the script's command text names those commands again. Count commands (and search command text) over call_level != 'script'. Count the calls the agent made, and search output text, over call_level != 'inner': every such call holds its whole output, while an inner call has its own output only where the transcript recorded it (Codex 0.153 and later), so an output search over inner calls misses older sessions. Failures are on one row each (see failed), so countIf(failed = 1) needs no level filter.",
 		"A group of calls has two times: its own calls (sum(call_minutes)) and the runs that contain it, each run once (sum(active_minutes) FROM runs WHERE run_id IN (SELECT run_id FROM calls WHERE ...)). Neither is time lost to it until those runs are read.",
 		"Only sessions you may read in this workspace (every member's, unless the workspace keeps members to their own). The server adds the workspace; never filter by it.",
 		"Only the sessions runs holds: a session is here once the worker indexed it (minutes after upload).",

@@ -51,7 +51,7 @@ import {
  * requests end at their last activity record (RUN_ACTIVITY_SQL), not a
  * compaction or context a local command added after the answer.
  */
-export const RUN_INDEX_VERSION = 7;
+export const RUN_INDEX_VERSION = 8;
 
 /**
  * A run's own activity: the prompt, the model's responses and the calls they

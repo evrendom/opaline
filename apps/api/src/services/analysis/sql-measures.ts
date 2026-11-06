@@ -6,11 +6,17 @@ import {
 	SETUP_SINCE_INDEX_VERSION,
 	SETUP_SINCE_PARSER_VERSION,
 } from "./received-setup.js";
-import { forkReplayCtes } from "./run-index-sql.js";
+import { forkReplayCtes, runToolErrorSql } from "./run-index-sql.js";
 import { records, toolErrorSql } from "./sql.js";
 import type { SqlWindow } from "./sql-guard.js";
 import { capturedSetupSessionsSql } from "./sql-setup-views.js";
 import type { SqlViewColumn } from "./sql-views.js";
+import {
+	editRouteSql,
+	OTHER_SHELL_EDIT_ROUTE,
+	SCRIPT_EDIT_ROUTE,
+	SHELL_EDIT_ROUTES,
+} from "./tool-groups.js";
 
 /**
  * The approved impact measures (CONTEXT.md, Impact): defined once, so two
@@ -188,10 +194,13 @@ const BACKGROUND_SINCE_PARSER_VERSION = 11;
 // two more aggregate states, never a read of the facts map.
 export const CALL_TASK_NOTIFICATION_SQL = "kind = 'injected_context'";
 export const CALL_TASK_END_SQL = `${CALL_TASK_NOTIFICATION_SQL} AND interrupted IS NOT NULL`;
+export const CALL_COMPLETION_SQL = `kind = 'meta' AND call_id != '' AND (subtype IN ('exec_command_end', 'patch_apply_end') OR startsWith(subtype, 'item_completed:'))`;
 export const CALL_HAND_OFF_SQL = `kind = 'tool_result' AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')`;
 
 /** First parser version that reads a Claude Code subagent call's timeout limit from its hand-off text. */
 const TIMEOUT_LIMIT_SINCE_PARSER_VERSION = 12;
+
+const INNER_PARENT_SINCE_PARSER_VERSION = 14;
 
 /** The call view's columns. */
 export const CALL_COLUMNS: readonly SqlViewColumn[] = [
@@ -242,6 +251,25 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		traps: ["Empty for a few Codex calls; those have no result."],
 	},
 	{
+		name: "call_level",
+		type: "LowCardinality(String)",
+		meaning:
+			"Where the call sits: top (a call the agent made itself), script (a whole Codex code-mode script, also a call the agent made) or inner (a call a script ran: a command, MCP call, patch or search, with parent_call_id its script).",
+		traps: [
+			"Count each command once over call_level != 'script': the script's command is its whole source, which names its inner commands again. Count calls the agent made, and search output text, over call_level != 'inner': an inner call has its own output only where the transcript recorded it (Codex 0.153 and later).",
+			`An inner call names its script from parser ${INNER_PARENT_SINCE_PARSER_VERSION}; before it parent_call_id is empty except for commands an older Codex script ran (call_id <script call_id>#<n>).`,
+		],
+	},
+	{
+		name: "parent_call_id",
+		type: "String",
+		meaning:
+			"For an inner call, the call_id of the script that ran it; empty for top and script calls.",
+		traps: [
+			"A command a script left running in the background can complete after a later script started; it then names the script running when it completed.",
+		],
+	},
+	{
 		name: "tool_name",
 		type: "LowCardinality(String)",
 		meaning:
@@ -276,10 +304,20 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		name: "failed",
 		type: "UInt8",
 		meaning:
-			"1 when a result of the call is an error or exits non-zero, or its background task ended failed or killed or with a non-zero exit code.",
+			"1 when a result of the call is an error or exits non-zero, Codex recorded its completed item as failed (an MCP js call's own output does not say), or its background task ended failed or killed or with a non-zero exit code.",
 		traps: [
 			"Compare failure rates over has_result = 1: a call without a result has failed = 0.",
 			"A refused call (denial_kind not empty) is failed too but never ran; filter denial_kind = '' to count commands that ran and failed.",
+			"Each failure is on one row: a script whose failure an inner call records (the error an MCP call threw, a command's refusal or exit code) has failed = 0 and error_from_call_id naming that call, so countIf(failed = 1) over every level counts each failure once.",
+		],
+	},
+	{
+		name: "error_from_call_id",
+		type: "String",
+		meaning:
+			"On a script whose failure an inner call of it records, that inner call's call_id; empty otherwise.",
+		traps: [
+			"A failed top-level call is failed = 1 OR error_from_call_id != '' among call_level != 'inner'.",
 		],
 	},
 	{
@@ -293,10 +331,19 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		name: "denial_kind",
 		type: "LowCardinality(String)",
 		meaning:
-			"Why the call was refused before it ran, as recorded: hook (a PreToolUse hook blocked it), permission-rule, user-rejected, cancelled, interrupted (Claude Code toolDenialKind), Sandbox(Denied) or Rejected (Codex); empty when it was not refused.",
+			"Why the call was refused before it ran, as recorded: hook (a PreToolUse hook blocked it), permission-rule, user-rejected, cancelled, interrupted (Claude Code toolDenialKind), Sandbox(Denied) or Rejected (Codex), or guard (its output is a guard's or shim's refusal: a line starting STOP: or BLOCKED, or a first line saying Denied or not allowed); empty when it was not refused.",
 		traps: [
 			`hook is recorded from parser ${BACKGROUND_SINCE_PARSER_VERSION}; before it a hook block reads as a failed call with no exit code.`,
+			`guard is recorded from parser ${INNER_PARENT_SINCE_PARSER_VERSION}. It is read from the output, so a refusal worded otherwise is not one: search output for the guard's own words too.`,
+			"A script that ran a refused command is guard when its stream records no inner commands (older Codex); where it does, the inner command is guard and the script names it in error_from_call_id. Count refused agent calls as uniqExactIf(if(parent_call_id = '', call_id, parent_call_id), denial_kind != '').",
 		],
+	},
+	{
+		name: "denial_reason",
+		type: "String",
+		meaning:
+			"What the refusal said: the guard's refusal line, a blocking hook's message, a Codex Rejected(...) reason or a Claude Code refusal text; empty when the call was not refused or none was recorded.",
+		traps: [],
 	},
 	{
 		name: "interrupted",
@@ -369,16 +416,16 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 	{
 		name: "file_path",
 		type: "String",
-		meaning: "File the call names (read, edit, write); empty otherwise.",
+		meaning:
+			"File the call names (read, edit, write), else the first file it changes; empty otherwise.",
 		traps: [],
 	},
 	{
 		name: "file_op",
 		type: "LowCardinality(String)",
 		meaning:
-			"What the call does to file_path as the parser read it: read (a Read call, or a shell command that reads the file); empty otherwise, edits included.",
+			"What the call does to file_path as the parser read it: read (a Read call, or a shell command that reads the file), else the first change it makes (write, edit, delete); empty otherwise.",
 		traps: [
-			"Edits show as the edit tool (Edit, Write, MultiEdit, NotebookEdit, apply_patch) with file_path, not here; a file only a shell command changed (sed -i, a redirect) has no edit call.",
 			"A shell command's file_path is as written, often relative to cwd: match it to an absolute path by its end.",
 		],
 	},
@@ -471,13 +518,69 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		traps: [],
 	},
 	{
+		name: "changed_files",
+		type: "Array(String)",
+		meaning:
+			"Every file the call asks to change, in order: an edit tool's file, each file of a patch (apply_patch, or a patch a Codex script ran), a file a shell command writes or deletes (a redirect, tee, sed -i, perl -i, mv, cp, rm, touch, git checkout/restore/rm), and a file an inline Python script of a Claude Code shell call writes (python3 - <<EOF or python3 -c with open(..., 'w'), write_text and the like). changed_file_ops holds each one's write, edit or delete, changed_files_basis how it was found. Every count of file edits reads these.",
+		traps: [
+			"A request, not proof: a failed or refused call (failed = 1) changed nothing, and a shell write after && or || (cd dir && python3 - <<EOF) may not have run even when the call succeeded. A patch's files sit on the call that holds the patch text: the script whose source has it, or the inner apply_patch call that adds files the source did not name.",
+			"Paths as written: absolute from Codex patches, sometimes relative to cwd from shell commands. Files under /tmp, /private/tmp, /var/folders and /dev are left out of shell writes.",
+			"Not read from shell text: Codex inline Python scripts, node/bun/ruby scripts (writeFileSync and the like), and a git index-only change (git rm --cached).",
+		],
+	},
+	{
+		name: "changed_file_ops",
+		type: "Array(String)",
+		meaning: "write, edit or delete for each of changed_files.",
+		traps: [],
+	},
+	{
+		name: "changed_files_basis",
+		type: "Array(String)",
+		meaning:
+			"How each of changed_files was found: tool (an edit tool's request or a patch), shell (read from a shell command's text) or script (read from an inline Python script's text).",
+		traps: [],
+	},
+	{
+		name: "edit_route",
+		type: "LowCardinality(String)",
+		meaning: `How the call changed files, the first that holds: 'edit tool <tool_name>' (Edit, Write, MultiEdit, NotebookEdit, apply_patch), 'code-mode script' (a Codex script), '${SCRIPT_EDIT_ROUTE}' (a changed file has basis script), 'other tool <tool_name>' (any other non-shell tool), else the first pattern the shell command's first 300 characters match: ${SHELL_EDIT_ROUTES.map(([name, pattern]) => `'${name}' (${pattern})`).join(", ")}, else '${OTHER_SHELL_EDIT_ROUTE}'. Empty when changed_files is empty.`,
+		traps: [
+			"One route per call: count calls with count(), file touches with sum(length(changed_files)).",
+		],
+	},
+	{
 		name: "error",
 		type: "Nullable(String)",
 		meaning:
 			"The line of a failed or refused call's result that names the error (its first line saying error, failed, not found, denied and the like, else its first line past the exit code), up to 300 characters; NULL when the call did not fail and was not refused.",
 		traps: [
-			"Read from the stored start and end of the result: an error in the middle of a long output is missed, and the line may be cut.",
+			"Read from the stored start and end of the result: an error in the middle of a long output is missed, and the line may be cut. Search output for the whole text.",
 		],
+	},
+	{
+		name: "output",
+		type: "String",
+		meaning:
+			"The text of the call's results as stored, in order (several results joined by a newline); empty when it has none.",
+		traps: [
+			"Stored with the transcript's caps: a result over its cap keeps its start and end around a line [opaline: output cut, <n> of <m> characters stored], and output_cut is 1.",
+			"A command an older Codex script ran (no command item recorded) has no output of its own: it is in the script's output.",
+			"The widest column: select it only for the calls you read, never across a long window.",
+		],
+	},
+	{
+		name: "output_chars",
+		type: "UInt64",
+		meaning:
+			"Characters of the call's results before any cap (code points), so a cut output names its full size.",
+		traps: [],
+	},
+	{
+		name: "output_cut",
+		type: "UInt8",
+		meaning: "1 when part of the output was not stored (see output).",
+		traps: [],
 	},
 	COVERAGE_COLUMN,
 ];
@@ -578,6 +681,8 @@ export function callsSql(
 	const first = [
 		"turn_idx",
 		"tool_name",
+		"subtype",
+		"parent",
 		"file_path",
 		"file_op",
 		"command_class",
@@ -594,6 +699,13 @@ export function callsSql(
 	];
 	const call = "kind = 'tool_call'";
 	const result = "kind = 'tool_result'";
+	const mirror = CALL_COMPLETION_SQL;
+	const change = `kind = 'file_change' AND file_path != '' AND (file_op IN ('write', 'edit', 'delete')
+				OR subtype IN ('shell_conditional', 'shell_script_conditional') AND file_op IN ('inferred_write', 'inferred_edit', 'inferred_delete'))`;
+	const stored = "if(lengthUTF8(text) >= lengthUTF8(head), text, head)";
+	const piece = `if(text_chars > lengthUTF8(${stored}) + lengthUTF8(tail),
+					concat(${stored}, '\\n[opaline: output cut, ', toString(lengthUTF8(${stored}) + lengthUTF8(tail)), ' of ', toString(text_chars), ' characters stored]\\n', tail),
+					${stored})`;
 	const notification = CALL_TASK_NOTIFICATION_SQL;
 	const taskEnd = CALL_TASK_END_SQL;
 	const handOff = CALL_HAND_OFF_SQL;
@@ -604,12 +716,18 @@ export function callsSql(
 	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, parentOwner)].join(",\n\t\t")}
 		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
 			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
-			c.session_date AS session_date, c.call_id AS call_id, toLowCardinality(c.first_tool_name) AS tool_name,
+			c.session_date AS session_date, c.call_id AS call_id,
+			toLowCardinality(multiIf(r.source = 'codex' AND c.first_subtype IN ('nested', 'script'), 'inner',
+				c.first_command_from = 'script', 'script', 'top')) AS call_level,
+			multiIf(call_level != 'inner', '', c.first_parent != '', c.first_parent,
+				c.first_subtype = 'script' AND position(c.call_id, '#') > 0, substring(c.call_id, 1, position(c.call_id, '#') - 1), '') AS parent_call_id,
+			toLowCardinality(c.first_tool_name) AS tool_name,
 			c.started_at AS started_at,
 			if(finished_at IS NULL, NULL, greatest(0, dateDiff('millisecond', c.started_at, finished_at)) / 60000) AS call_minutes,
 			toUInt8(c.results > 0) AS has_result,
-			toUInt8(ifNull(c.result_failed, 0)) AS failed, c.result_exit_code AS exit_code,
-			toLowCardinality(c.denial_kind) AS denial_kind,
+			toUInt8(ifNull(c.result_failed, 0)) AS failed, c.error_from_call_id AS error_from_call_id,
+			c.result_exit_code AS exit_code,
+			toLowCardinality(c.denial_kind) AS denial_kind, c.denial_reason AS denial_reason,
 			if(has(r.unrecorded_facts, 'interrupted_calls'), NULL, toUInt8(c.result_interrupted)) AS interrupted,
 			if(${timeoutUnknown}, NULL, toUInt8(c.result_timed_out_after_ms IS NOT NULL)) AS timed_out,
 			if(${timeoutUnknown}, NULL, c.result_timed_out_after_ms) AS timed_out_after_ms,
@@ -620,14 +738,26 @@ export function callsSql(
 			if(c.task_end.1 IS NULL, NULL, c.result_exit_code) AS background_exit_code,
 			if(c.task_file != '' AND c.task_end.1 IS NULL OR c.results = 0, NULL, c.result_at) AS finished_at,
 			${first
-				.filter((name) => !["turn_idx", "tool_name"].includes(name))
+				.filter(
+					(name) =>
+						!["turn_idx", "tool_name", "subtype", "parent"].includes(name),
+				)
 				.map((name) =>
-					["file_op", "command_class"].includes(name)
-						? `toLowCardinality(c.first_${name}) AS ${name}`
-						: `c.first_${name} AS ${name}`,
+					name === "file_path"
+						? "if(c.first_file_path != '', c.first_file_path, c.changes[1].2) AS file_path"
+						: name === "file_op"
+							? "toLowCardinality(if(c.first_file_op != '', c.first_file_op, c.changes[1].3)) AS file_op"
+							: name === "command_class"
+								? `toLowCardinality(c.first_${name}) AS ${name}`
+								: `c.first_${name} AS ${name}`,
 				)
 				.join(", ")},
-			if(ifNull(c.result_failed, 0) OR c.denial_kind != '', ${errorLineSql("concat(c.result_error_head, char(10), c.result_error_tail)")}, NULL) AS error,
+			arrayMap(x -> x.2, c.changes) AS changed_files, arrayMap(x -> x.3, c.changes) AS changed_file_ops,
+			arrayMap(x -> x.4, c.changes) AS changed_files_basis,
+			toLowCardinality(${editRouteSql({ tool: "c.first_tool_name", from: "c.first_command_from", head: "c.first_command_head", files: "c.changes", basis: "arrayMap(x -> x.4, c.changes)" })}) AS edit_route,
+			if(ifNull(c.result_failed, 0) OR c.denial_kind != '', ${errorLineSql("if(c.result_error_head = '' AND c.result_error_tail = '', concat(c.result_head, char(10), c.result_tail), concat(c.result_error_head, char(10), c.result_error_tail))")}, NULL) AS error,
+			arrayStringConcat(arrayMap(x -> x.2, c.outputs), char(10)) AS output,
+			c.output_chars AS output_chars, toUInt8(c.output_cut) AS output_cut,
 			r.coverage_gaps AS coverage_gaps
 		FROM (
 			SELECT ${generation}, session_date, call_id,
@@ -635,19 +765,29 @@ export function callsSql(
 				${first.map((name) => `argMinIf(${name}, position, ${call}) AS first_${name}`).join(",\n\t\t\t\t")},
 				maxIf(ts, ${result} OR ${taskEnd}) AS result_at,
 				countIf(${result}) AS results,
-				max(${toolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
-				anyIf(exit_code, (${result} OR ${taskEnd}) AND exit_code IS NOT NULL) AS result_exit_code,
+				max(${runToolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
+				anyIf(exit_code, (${result} OR ${taskEnd} OR (${mirror})) AND exit_code IS NOT NULL) AS result_exit_code,
 				anyIf(denial_kind, ${result} AND denial_kind != '') AS denial_kind,
+				argMinIf(facts['denial_reason'], position, ${result} AND facts['denial_reason'] != '') AS denial_reason,
+				argMinIf(facts['error_from_call_id'], position, ${result} AND facts['error_from_call_id'] != '') AS error_from_call_id,
 				argMinIf(head, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_head,
 				argMinIf(tail, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_tail,
+				argMinIf(head, position, ${result}) AS result_head,
+				argMinIf(tail, position, ${result}) AS result_tail,
+				arraySort(groupArrayIf((position, ${piece}), ${result})) AS outputs,
+				sumIf(text_chars, ${result}) AS output_chars,
+				maxIf(text_chars > lengthUTF8(${stored}), ${result}) AS output_cut,
+				arraySort(groupArrayIf((position, file_path, replaceRegexpOne(toString(file_op), '^inferred_', ''),
+					multiIf(subtype IN ('shell_script', 'shell_script_conditional'), 'script', startsWith(subtype, 'shell'), 'shell', 'tool')), ${change})) AS changes,
 				max(${result} AND ifNull(interrupted, false)) AS result_interrupted,
 				maxIf(timed_out_after_ms, ${result}) AS result_timed_out_after_ms,
 				anyIf(file_path, (${handOff} OR ${notification}) AND file_path != '') AS task_file,
 				argMaxIf((interrupted, is_error), position, ${taskEnd}) AS task_end
 			FROM (
-				SELECT ${generation}, session_date, call_id, kind, ts, turn_idx, record_idx, block_idx,
-					is_error, exit_code, denial_kind, denial_kind != '' AS refused, head, tail, (record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
-					interrupted, timed_out_after_ms,
+				SELECT ${generation}, session_date, call_id, kind, subtype, source, ts, turn_idx, record_idx, block_idx,
+					is_error, exit_code, denial_kind, denial_kind != '' AS refused, head, tail, text, text_chars, facts,
+					(record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
+					interrupted, timed_out_after_ms, facts['script_call_id'] AS parent,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars,
@@ -656,6 +796,7 @@ export function callsSql(
 				FROM ${records()}
 				PREWHERE kind IN ('tool_call', 'tool_result')
 					OR (kind = 'injected_context' AND subtype = 'task_notification' AND call_id != '')
+					OR (${mirror}) OR (${change})
 				WHERE ${sessions} AND ${fresh}
 			)
 			GROUP BY ${generation}, session_date, call_id,

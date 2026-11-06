@@ -1099,9 +1099,9 @@ function detailSql(): string {
 			if(g.kind IN (${LINE_KINDS.map(sqlString).join(", ")}), ${said}, ${variants}) AS detail`;
 }
 
-function patternsCte(change = false): string {
+function patternsCte(change = false, withRuns = false): string {
 	return `pat AS (
-		SELECT g.id AS id, g.kind AS kind, any(g.key) AS key, topKWeighted(1)(g.sub, g.hits)[1] AS sub,
+		SELECT g.id AS id, g.kind AS kind, any(g.key) AS key, topKWeighted(1)(g.sub, g.hits)[1] AS sub,${withRuns ? "\n\t\t\tgroupUniqArray(g.rid) AS rids," : ""}
 			topKWeighted(1)(g.signature, g.hits)[1] AS signature, topKWeighted(1)(g.target, g.hits)[1] AS target,
 			sum(g.hits) AS count, count() AS runs, uniqExact(g.sid) AS sessions, uniqExact(g.uid) AS members,
 			groupUniqArray(${SESSION_IDS})(g.sid) AS sids,
@@ -1176,6 +1176,7 @@ export interface PatternListOptions {
 	readonly minSessions?: number;
 	readonly ids?: readonly string[];
 	readonly weeksOf?: MeasureParams;
+	readonly withRuns?: boolean;
 }
 
 function idFilter(ids: readonly string[] | undefined): string {
@@ -1190,10 +1191,10 @@ export function patternsListSql(
 	const week = weeks(options.weeksOf ?? params);
 	return `WITH ${evidenceCtes(params, family, options.kinds)},
 	${perRunCte()},
-	${patternsCte()}
+	${patternsCte(false, options.withRuns)}
 	SELECT id, kind, signature, count, runs, sessions, members, minutes, toDate(first_seen) AS first_seen,
 		toDate(last_seen) AS last_seen, weekly, fix_type, fix_hint, detail, examples,
-		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids
+		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}
 	FROM (
 		SELECT *, ${fixTypeSql()} AS fix_type, ${fixHintSql()} AS fix_hint,
 			arrayStringConcat(arrayMap(w -> toString(countEqual(weeks_hit, w)),

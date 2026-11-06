@@ -362,3 +362,11 @@ test("the directory rules fingerprint the run index build", () => {
 	expect(runDirectoryRules(RUN_FORK_REPLAY)).toContain("cwd_components");
 	expect(RUN_INDEX_PRICING_VERSION).toMatch(/\+[0-9a-f]{12}$/u);
 });
+
+describe("runDirectoryRules", () => {
+	test("a Codex run without a recorded cwd falls back to its commands' workdir and its turn's cwd", () => {
+		const rules = runDirectoryRules(RUN_FORK_REPLAY);
+		expect(rules).toContain("facts['workdir']");
+		expect(rules).toContain("facts['turn_cwd']");
+	});
+});

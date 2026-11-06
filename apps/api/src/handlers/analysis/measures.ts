@@ -19,9 +19,11 @@ import {
 	listMeasures,
 } from "../../services/analysis/retro-measures.js";
 import {
+	execute as executeSql,
 	guardSql,
 	runSql,
 	type SqlEnv,
+	withSqlLimits,
 } from "../../services/analysis/sql-gateway.js";
 import { captureCall } from "../../services/analysis-log/capture.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
@@ -29,6 +31,7 @@ import type { SessionReader } from "../../services/session-visibility.js";
 import { badRequest, measureStatement } from "./measure-statement.js";
 import { patternStatement } from "./pattern-statement.js";
 import { peekOutcome, sliceOutcome } from "./peek.js";
+import { runDigest } from "./retro-digest.js";
 import { requireRetroTools } from "./retro-tools.js";
 import { sqlError } from "./sql-error.js";
 
@@ -277,6 +280,50 @@ export function createMeasureProcedures(env: MeasureEnv) {
 						columns: peeks[0]?.columns ?? [],
 						head: peeks.flatMap((peek) => peek.head).slice(0, 3),
 						ms: peeks.reduce((sum, peek) => sum + peek.ms, 0),
+					};
+				}),
+			digest: os.analysis.patterns.digest
+				.use(orgMiddleware)
+				.use(({ context, next }) => {
+					requireRetroTools(context);
+					return next();
+				})
+				.use(({ context, next, signal }) =>
+					analysisLimiter.run(context.user.id, async () => next(), signal),
+				)
+				.handler(async ({ input, context, signal }) => {
+					const limited = withSqlLimits(env.executor);
+					const result = await runDigest(
+						{
+							workspaceId: context.organizationId,
+							view: async (query, cohort) => {
+								const outcome = await executeSql(
+									callerOf(context),
+									query,
+									env.sqlEnv,
+									signal,
+									async (rows) => rows,
+									undefined,
+									cohort,
+								);
+								if (!outcome.ok) throw sqlError(outcome.error);
+								return outcome.value;
+							},
+							trusted: (statement) =>
+								limited.query({
+									...statement,
+									clickhouse_settings: { readonly: "1" },
+								}),
+						},
+						input,
+						now(),
+					);
+					return {
+						text: result.text,
+						ms: result.ms,
+						from: result.from,
+						to: result.to,
+						digest: result.digest,
 					};
 				}),
 		},

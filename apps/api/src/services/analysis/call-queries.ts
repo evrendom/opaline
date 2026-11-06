@@ -13,6 +13,7 @@ import type {
 } from "../transcript-records-queries.js";
 import { commandColumnsSql } from "./command-identity.js";
 import type { CompiledFilters } from "./find-filters.js";
+import { runToolErrorSql } from "./run-index-sql.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	pinnedFilter,
@@ -20,9 +21,9 @@ import {
 	REF_RUNS_SQL,
 	records,
 	refParams,
-	toolErrorSql,
 } from "./sql.js";
 import {
+	CALL_COMPLETION_SQL,
 	CALL_HAND_OFF_SQL,
 	CALL_TASK_END_SQL,
 	CALL_TASK_NOTIFICATION_SQL,
@@ -151,14 +152,14 @@ function callsSql({ input, refs, filters }: CallQuery): string {
 			SELECT session_id, agent_id, call_id,
 				countIf(${result}) AS results,
 				maxIf(ts, ${result} OR ${ended}) AS result_at,
-				max(${toolErrorSql()} OR (${ended} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
-				anyIf(exit_code, (${result} OR ${ended}) AND exit_code IS NOT NULL) AS result_exit_code,
+				max(${runToolErrorSql()} OR (${ended} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
+				anyIf(exit_code, (${result} OR ${ended} OR (${CALL_COMPLETION_SQL})) AND exit_code IS NOT NULL) AS result_exit_code,
 				anyIf(denial_kind, ${result} AND denial_kind != '') AS result_denial_kind,
 				anyIf(file_path, (${CALL_HAND_OFF_SQL} OR ${CALL_TASK_NOTIFICATION_SQL}) AND file_path != '') AS task_file,
 				countIf(${ended}) > 0 AS task_ended
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND call_id != ''
-				AND (${result} OR (${CALL_TASK_NOTIFICATION_SQL} AND subtype = 'task_notification'))
+				AND (${result} OR (${CALL_TASK_NOTIFICATION_SQL} AND subtype = 'task_notification') OR (${CALL_COMPLETION_SQL}))
 			GROUP BY session_id, agent_id, call_id
 		), matched AS (
 			SELECT c.user_id AS user_id, c.source AS source, c.session_date AS session_date,

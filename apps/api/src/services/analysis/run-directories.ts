@@ -67,6 +67,12 @@ const componentValue = (key: string) =>
 /** The directory a record names: Claude Code's record cwd, Codex CommandExecution cwd (a file: URI). */
 const RECORDED_CWD = `if(startsWith(${componentValue("cwd_components")}, 'file://'),
 	decodeURLComponent(substring(${componentValue("cwd_components")}, 8)), ${componentValue("cwd_components")})`;
+const CALL_CWD = `if(facts['cwd_components'] != '', ${RECORDED_CWD}, facts['workdir'])`;
+const HAS_CALL_CWD =
+	"(facts['cwd_components'] != '' OR facts['workdir'] != '')";
+const FIRST_CWD = `multiIf(facts['cwd_components'] != '', ${RECORDED_CWD}, facts['workdir'] != '', facts['workdir'], facts['turn_cwd'])`;
+const HAS_FIRST_CWD =
+	"(facts['cwd_components'] != '' OR facts['workdir'] != '' OR facts['turn_cwd'] != '')";
 const SHELL_CALL = `kind = 'tool_call' AND lower(tool_name) IN (${SHELL_TOOLS.map(lit).join(", ")})`;
 /** A command's text: as stored, or its head when the text was cut. */
 const COMMAND_TEXT = "if(empty(text), head, text)";
@@ -161,7 +167,7 @@ function runDirectoriesSql(replay: ForkReplayRules): string {
 				argMinIf(turn_idx, ${at}, kind = 'tool_call') AS turn,
 				minIf(record_idx, kind = 'tool_call') AS first_record,
 				argMinIf(${CD_TARGET_SQL}, ${at}, kind = 'tool_call') AS cd_target,
-				argMinIf(${RECORDED_CWD}, ${at}, facts['cwd_components'] != '') AS recorded_cwd
+				argMinIf(${CALL_CWD}, ${at}, ${HAS_CALL_CWD}) AS recorded_cwd
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${replay.filter}
 				AND call_id IN (SELECT call_id FROM ${records()} WHERE ${pinnedFilter()} AND ${SHELL_CALL})
@@ -174,10 +180,10 @@ function runDirectoriesSql(replay: ForkReplayRules): string {
 		GROUP BY agent_id, turn_idx, cd_target, recorded_cwd
 		UNION ALL
 		SELECT agent_id, turn_idx, 0 AS shell, '' AS cd_target,
-			argMin(${RECORDED_CWD}, ${at}) AS recorded_cwd, 0 AS calls, min(record_idx) AS first_record
+			argMin(${FIRST_CWD}, ${at}) AS recorded_cwd, 0 AS calls, min(record_idx) AS first_record
 		FROM ${records()}
 		WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${CWD_RECORDS}
-			AND facts['fork_replayed'] != 'true' AND facts['cwd_components'] != ''
+			AND facts['fork_replayed'] != 'true' AND ${HAS_FIRST_CWD}
 		GROUP BY agent_id, turn_idx`;
 }
 
@@ -216,7 +222,7 @@ function directoryEvidenceSql(replay: ForkReplayRules): string {
 	return `WITH ${replay.ctes}
 		SELECT 'call' AS evidence, agent_id, minIf(record_idx, kind = 'tool_call') AS first_record,
 			argMinIf(${CD_TARGET_SQL}, ${at}, kind = 'tool_call') AS cd_target,
-			argMinIf(${RECORDED_CWD}, ${at}, facts['cwd_components'] != '') AS recorded_cwd,
+			argMinIf(${CALL_CWD}, ${at}, ${HAS_CALL_CWD}) AS recorded_cwd,
 			argMinIf(${COMMAND_TEXT}, ${at}, kind = 'tool_call') AS command,
 			arrayStringConcat(arrayMap(entry -> entry.2, arraySort(groupArrayIf(tuple(${at},
 				if(lengthUTF8(${output}) <= ${OUTPUT_HEAD_CHARS + OUTPUT_TAIL_CHARS}, ${output},

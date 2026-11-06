@@ -137,6 +137,53 @@ export const PatternsPeekInputSchema = PatternsListInputSchema.extend({
 	limit: z.number().int().min(1).max(200).default(20),
 }).strict();
 
+export const PatternsDigestInputSchema = MeasureScopeSchema.strict();
+
+export const DigestRowSchema = z.object({
+	metric: z.string(),
+	value: z.string(),
+	definition: z.string(),
+	sessions: z.array(z.string()),
+	example: z.string().optional(),
+});
+
+export const DigestSectionSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	rows: z.array(DigestRowSchema),
+	missing: z.array(z.string()),
+});
+
+const DigestShareSchema = z.object({
+	explained: z.number(),
+	total: z.number(),
+});
+
+export const PatternsDigestOutputSchema = z.object({
+	text: z.string(),
+	ms: z.number(),
+	from: z.string(),
+	to: z.string(),
+	digest: z.object({
+		scope: z.object({
+			repository: z.string().nullable(),
+			from: z.string(),
+			to: z.string(),
+			latest: z.number().nullable(),
+			listed: z.number().nullable(),
+		}),
+		sessions: z.number(),
+		bySource: z.record(z.string(), z.number()),
+		notRecorded: z.record(z.string(), z.array(z.string())),
+		coverage: z.object({
+			frustrated: DigestShareSchema,
+			failed: DigestShareSchema,
+			active: DigestShareSchema,
+		}),
+		sections: z.array(DigestSectionSchema),
+	}),
+});
+
 export const CHECK_TARGETS = ["run", "session"] as const;
 
 const checkWhere = z
@@ -232,6 +279,8 @@ export type PatternsListInput = z.infer<typeof PatternsListInputSchema>;
 export type PatternsDrillInput = z.infer<typeof PatternsDrillInputSchema>;
 export type PatternsVerifyInput = z.infer<typeof PatternsVerifyInputSchema>;
 export type PatternsPeekInput = z.infer<typeof PatternsPeekInputSchema>;
+export type PatternsDigestInput = z.infer<typeof PatternsDigestInputSchema>;
+export type PatternsDigestOutput = z.infer<typeof PatternsDigestOutputSchema>;
 export type CheckDefinition = z.infer<typeof CheckDefinitionSchema>;
 export type Check = z.infer<typeof CheckSchema>;
 export type ChecksResult = z.infer<typeof ChecksResultSchema>;
@@ -255,6 +304,9 @@ export const analysisMeasuresContract = {
 		drill: oc.input(PatternsDrillInputSchema).output(AnalysisSqlOutputSchema),
 		verify: oc.input(PatternsVerifyInputSchema).output(AnalysisSqlOutputSchema),
 		peek: oc.input(PatternsPeekInputSchema).output(AnalysisPeekOutputSchema),
+		digest: oc
+			.input(PatternsDigestInputSchema)
+			.output(PatternsDigestOutputSchema),
 	},
 	checks: {
 		test: oc.input(ChecksTestInputSchema).output(ChecksResultSchema),

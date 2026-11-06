@@ -223,6 +223,7 @@ const NOT_AN_ID =
 export function patternStatement(
 	request: PatternRequest,
 	today: Date,
+	options: { readonly withRuns?: boolean } = {},
 ): {
 	query: string;
 	parts: SqlParts;
@@ -283,6 +284,7 @@ export function patternStatement(
 					minRuns: sharded ? 1 : 2,
 					minSessions: sharded ? 1 : PATTERN_MIN_SESSIONS,
 					weeksOf: params,
+					...(options.withRuns ? { withRuns: true } : {}),
 				}),
 			),
 			merge: (rows) => mergePatternRows(rows, request.minCount, params.limit),

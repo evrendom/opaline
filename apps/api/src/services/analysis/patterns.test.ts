@@ -192,7 +192,7 @@ describe("pattern statements", () => {
 		expect(text).toContain("sumMap([variant]");
 		expect(text).toContain("sessions >= 3");
 		expect(text).toContain("parent != '' OR failing_inner = 0");
-		expect(PARENT_CALL_SQL).toBe("''");
+		expect(PARENT_CALL_SQL).toBe("ifNull(parent_call_id, '')");
 	});
 });
 

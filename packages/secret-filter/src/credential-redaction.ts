@@ -119,6 +119,8 @@ function isCredentialName(name: string): boolean {
 	);
 }
 
+const LENGTH_MASK = /^[^\s…]{0,16}…\[\d+(?: chars\])?$/u;
+
 /**
  * Whether a value next to a credential name is plausibly the credential
  * rather than prose, a type, a placeholder or a reference to one.
@@ -128,6 +130,7 @@ function isCredentialValue(value: string, assigned = false): boolean {
 	if (trimmed.length < 4) return false;
 	if (STOP_VALUES.has(trimmed.toLowerCase())) return false;
 	if (/^\[redacted/iu.test(trimmed)) return false;
+	if (LENGTH_MASK.test(trimmed)) return false;
 	if (/^(?:\$|%|<|\{\{|process\.env|os\.environ|env\.|ENV\[)/u.test(trimmed))
 		return false;
 	if (/^\d+(?:\.\d+)?$/u.test(trimmed)) return false;
@@ -291,6 +294,13 @@ function isPlaceholder(value: string): boolean {
 	return /^(?:\*+|x+|\$\{?\w+\}?|<[^>]*>|\[redacted[^\]]*\]|password|pass|secret)$/iu.test(
 		value,
 	);
+}
+
+export function maskCredentialText(
+	text: string,
+	mask: (value: string) => string,
+): string {
+	return redactCredentialText(text, (_ruleId, value) => mask(value)).text;
 }
 
 /** Upload-time markers (`[REDACTED:openai-api-key]`) read the same as new ones. */

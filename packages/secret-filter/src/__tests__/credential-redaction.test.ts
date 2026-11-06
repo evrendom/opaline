@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	maskCredentialText,
 	RETURNED_TEXT_REDACTION,
 	redactReturnedText,
 	redactReturnedValue,
@@ -42,5 +43,25 @@ describe("redactReturnedText", () => {
 			items: [{ text: "PASSWORD=[redacted]", turn: 3, ok: true }],
 			nested: { cmd: "mysql --password=[redacted]" },
 		});
+	});
+});
+
+describe("maskCredentialText", () => {
+	test("hands each credential value to the mask and keeps names and structure", () => {
+		const masked = maskCredentialText(
+			"DB_PASSWORD=hunter2hunter2 psql --token 'abc123def456' -h db",
+			(value) => `<${value.length}>`,
+		);
+		expect(masked).toBe("DB_PASSWORD=<14> psql --token '<12>' -h db");
+	});
+
+	test("a value already masked to its prefix and length passes redactReturnedText unchanged", () => {
+		for (const text of [
+			"OPENAI_API_KEY=sk-…[51 chars] bun run",
+			"DB_PASSWORD=…[14 chars]",
+			"vercel --token …[24 chars] --prod",
+			'{"apiKey": "sk-…[48 chars]"}',
+		])
+			expect(redactReturnedText(text)).toBe(text);
 	});
 });

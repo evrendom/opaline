@@ -28,7 +28,7 @@ export interface FailureCause {
 export const PREAMBLE =
 	/^(?:exit code:?\s*-?\d+|process exited with code -?\d+|wall time:.*|output:?|chunk id:.*|original token count:.*|total output lines:.*|command:.*|\[?std(?:err|out)\]?:?|<\/?tool_use_error>|<\/?error>|error:?$|shell cwd was reset.*|script failed|script error:?|\$ .*|> .*)$/iu;
 export const STRONG =
-	/(\berror\b|\bfail(?:ed|ure)?\b|✖|✗|✕|×|fatal:|exception|ERR!|ERR_PNPM_|panic|denied|not found|no such file|traceback|cannot|can't|unable to|refused|invalid|unknown (?:option|command|argument|flag)|timed out|rejected)/iu;
+	/(^stop[:!]|\bblocked\b|\bnot allowed\b|\berror\b|\bfail(?:ed|ure)?\b|✖|✗|✕|×|fatal:|exception|ERR!|ERR_PNPM_|panic|denied|not found|no such file|traceback|cannot|can't|unable to|refused|invalid|unknown (?:option|command|argument|flag)|timed out|rejected)/iu;
 const ESCAPE = String.fromCharCode(27);
 const BELL = String.fromCharCode(7);
 const ANSI_COLOR = new RegExp(`${ESCAPE}\\[[0-9;]*m`, "gu");
@@ -137,6 +137,15 @@ export function classifyFailure(input: {
 		return rule(
 			"hook: blocked by a hook",
 			relativePath(match[2] ?? ""),
+			"friction",
+		);
+	match = /(?:^|\n)\s*((?:STOP[:!]|\[?BLOCKED\]?[:!\s]|Blocked:)[^\n]*)/u.exec(
+		text,
+	);
+	if (match)
+		return rule(
+			"guard: a guard or shim refused the command",
+			normalize(match[1] ?? ""),
 			"friction",
 		);
 	if (/Projects \(classic\) is being deprecated/u.test(text))

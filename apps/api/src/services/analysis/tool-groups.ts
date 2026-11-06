@@ -64,6 +64,41 @@ export function nativeEditToolSql(toolExpr: string): string {
 	return `replaceRegexpOne(lower(${toolExpr}), '^functions\\\\.', '') IN (${sqlList(tools)})`;
 }
 
+export const SHELL_EDIT_ROUTES: readonly (readonly [string, string])[] = [
+	["apply_patch (shell)", String.raw`\bapply_patch\b`],
+	["cat/tee > file", String.raw`\bcat\s*>{1,2}|\btee\b`],
+	["sed/perl -i", String.raw`\b(sed|perl)\s+(-[a-zA-Z]*i|--in-place)`],
+	[
+		"interpreter command",
+		String.raw`(^|[;&|(]\s*|\s)(python3?|node|bun|deno|ruby|tsx)\b`,
+	],
+	["echo/printf > file", String.raw`\b(echo|printf)\b[^|;&]*>`],
+];
+
+export const SCRIPT_EDIT_ROUTE = "python inline script";
+
+export const OTHER_SHELL_EDIT_ROUTE = "other shell (rm, mv, cp, git, …)";
+
+export function editRouteSql(call: {
+	tool: string;
+	from: string;
+	head: string;
+	files: string;
+	basis: string;
+}): string {
+	const shell = SHELL_EDIT_ROUTES.map(
+		([name, pattern]) =>
+			`match(${call.head}, ${sqlQuote(pattern)}), ${sqlQuote(name)}`,
+	).join(",\n\t\t\t");
+	return `multiIf(empty(${call.files}), '',
+			${nativeEditToolSql(call.tool)}, concat('edit tool ', ${call.tool}),
+			${call.from} = 'script', 'code-mode script',
+			has(${call.basis}, 'script'), ${sqlQuote(SCRIPT_EDIT_ROUTE)},
+			${call.head} IS NULL, concat('other tool ', ${call.tool}),
+			${shell},
+			${sqlQuote(OTHER_SHELL_EDIT_ROUTE)})`;
+}
+
 /** True for a tool that starts a subagent (the `subagent` group: Claude Task and Agent, Codex spawn_agent). */
 export function isSubagentTool(tool: string): boolean {
 	const tools = NAMED.find(([group]) => group === "subagent")?.[1] ?? [];
@@ -79,6 +114,10 @@ export function toolActivitySql(
 
 function sqlList(values: readonly string[]): string {
 	return values.map((value) => `'${value}'`).join(", ");
+}
+
+function sqlQuote(value: string): string {
+	return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
 function sqlRegex(pattern: string): string {

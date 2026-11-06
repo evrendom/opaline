@@ -23,6 +23,7 @@ import {
 	MeasureScopeSchema,
 	MeasuresRunInputSchema,
 	PATTERN_KINDS,
+	PatternsDigestInputSchema,
 	PatternsDrillInputSchema,
 	PatternsListInputSchema,
 	PatternsVerifyInputSchema,
@@ -477,7 +478,7 @@ const MEASURES_INPUTS = {
 
 const PatternsToolInputSchema = z
 	.object({
-		action: z.enum(["list", "drill", "verify"]),
+		action: z.enum(["list", "drill", "verify", "digest"]),
 		...MeasureScopeSchema.shape,
 		kind: z.enum(PATTERN_KINDS).optional(),
 		minCount: z.number().int().min(1).max(10_000).optional(),
@@ -508,6 +509,7 @@ const PATTERNS_INPUTS = {
 		"limit",
 		"analysis",
 	],
+	digest: PATTERN_SCOPE,
 } as const;
 
 const ChecksToolInputSchema = z
@@ -1013,8 +1015,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			title: "Find recurring agent failures and their fixes",
 			description: [
 				"What it does: Finds recurring agent failures with the setup fix for each, and what the person keeps asking.",
-				"Use when: A retro or how to improve the agents: list, read themes and example runs, then fix.",
-				"Returns: list: sections of patterns with fixes. drill: every run or prompt of one. verify: before and after a change.",
+				"Use when: A retro or how to improve the agents: digest and list, read example runs, then fix.",
+				"Returns: digest: the retro's numbers in one block, each with its definition. list: sections of patterns with fixes. drill: every run or prompt of one. verify: before and after a change.",
 				"Side effects: Stores each result like sql, in the answer being worked on.",
 				"Limits: A sql query per family, per 35 days for calls (each 10 seconds, 512 MiB, workspace quota).",
 				"",
@@ -1022,7 +1024,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"Sections, in order, each ranked by the sessions it hit, then minutes: failures (failing_call, retry_loop, wrong_route), up to limit rows; then incomplete, correction and theme, a fifth of limit each. A pattern needs 3 sessions, 2 runs and minCount occurrences.",
 				"fix_type: install_or_agents_md, script_and_pointer, navigation_pointer, agents_md_rule, tool_schema, allowlist, align_ci_check, pretooluse_hook, stop_hook, comment_at_entry; corrections: instruction, doc or skill; themes: read_prompts (context, not a diagnosis). fix_hint names the file, command or tool to change.",
 				"",
+				"Digest: one block, sections a-i: start dirs and the instruction files loaded at start, refusals; failures; sessions editing one worktree at once; context size, compactions, subagent fan-out, tokens; time by command family, sleep and poll loops, killed commands; edit routes and helper scripts rebuilt per session; checks and CI; the person; agents and models. Each row: value, [definition], ids with a session#turn to read. Quote a number with its definition.",
+				"",
 				"Examples:",
+				'- The whole retro picture of a month: {"action":"digest","repository":"athena","from":"2026-10-06","to":"2026-11-03"}',
 				'- The patterns of a month: {"action":"list","repository":"athena","from":"2026-10-06","to":"2026-11-03"}',
 				'- One pattern\'s runs and evidence: {"action":"drill","id":"fc_1a2b3c4d5e","repository":"athena","from":"2026-10-06","to":"2026-11-03"}',
 				'- What the person keeps asking or reporting: {"action":"list","kind":"theme","limit":40,"repository":"athena","from":"2026-10-06","to":"2026-11-03"}',
@@ -1038,7 +1043,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			].join("\n"),
 			inputSchema: describeInput(zodToolInput(PatternsToolInputSchema), {
 				action:
-					"Required. list: the recurring patterns in sections (failures, incomplete, correction, theme). drill: one pattern's runs with evidence (a theme: each prompt). verify: rates before and after the last setup change.",
+					"Required. digest: every retro number in one block, each with its definition (start and setup, failures, concurrency, context and cost, time sinks, tool routing, checks and CI, the person, agents). list: the recurring patterns in sections (failures, incomplete, correction, theme). drill: one pattern's runs with evidence (a theme: each prompt). verify: rates before and after the last setup change.",
 				from: "First day the sessions started, YYYY-MM-DD (UTC). Default: 29 days before to.",
 				to: "Last day the sessions started, YYYY-MM-DD (UTC). Default: today.",
 				repository:
@@ -1064,6 +1069,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 					PATTERNS_INPUTS,
 				);
 				const { action, ...rest } = input;
+				if (action === "digest") {
+					const digest = await client.analysis.patterns.digest(
+						parseMcpInput(PatternsDigestInputSchema, rest),
+					);
+					return digest.text;
+				}
 				const output =
 					action === "drill"
 						? await client.analysis.patterns.drill(

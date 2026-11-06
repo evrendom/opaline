@@ -1,5 +1,6 @@
 export { isHighRiskCredentialPath } from "./credential-path.js";
 export {
+	maskCredentialText,
 	RETURNED_TEXT_REDACTION,
 	redactReturnedText,
 	redactReturnedValue,
