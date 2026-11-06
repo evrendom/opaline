@@ -10,6 +10,14 @@ import { SQL_VIEWS } from "../services/analysis/sql-views.js";
 
 const SKILLS = join(import.meta.dir, "../../../../plugins/opaline/skills");
 
+async function opalineSkillText(): Promise<string> {
+	const files = [...new Glob("opaline/*.md").scanSync(SKILLS)].sort();
+	const texts = await Promise.all(
+		files.map((file) => Bun.file(join(SKILLS, file)).text()),
+	);
+	return texts.join("\n\n");
+}
+
 test("every plugin skill's front matter is valid YAML with a name and a description", async () => {
 	const files = [...new Glob("*/SKILL.md").scanSync(SKILLS)].sort();
 	expect(files).toEqual(["opaline/SKILL.md", "setup/SKILL.md"]);
@@ -59,7 +67,7 @@ const OWN_SESSIONS_ONLY =
 
 test("no skill or manifest says members see only their own sessions; answers still never single out or rank people", async () => {
 	const texts = [
-		...[...new Glob("*/SKILL.md").scanSync(SKILLS)].map((file) =>
+		...[...new Glob("*/*.md").scanSync(SKILLS)].map((file) =>
 			join(SKILLS, file),
 		),
 		join(PLUGIN, ".codex-plugin/plugin.json"),
@@ -78,7 +86,7 @@ test("no skill or manifest says members see only their own sessions; answers sti
 
 /** The SQL examples of the opaline skill: every ```sql block. */
 async function skillSqlExamples(): Promise<string[]> {
-	const skill = await Bun.file(join(SKILLS, "opaline/SKILL.md")).text();
+	const skill = await opalineSkillText();
 	return [...skill.matchAll(/```sql\n([\s\S]*?)```/gu)].map(
 		(match) => match[1] ?? "",
 	);
@@ -247,13 +255,11 @@ console.log(JSON.stringify({ names: MCP_TOOLS.map((tool) => tool.name), find: in
 	return JSON.parse(stdout);
 }
 
-/** The skill's "Classic flow (find and read)" section, up to the next heading. */
+/** The skill's classic flow, its own file beside SKILL.md. */
 async function classicFlow(): Promise<string> {
-	const skill = await Bun.file(join(SKILLS, "opaline/SKILL.md")).text();
-	const start = skill.indexOf("## Classic flow (find and read)");
-	expect(start).toBeGreaterThan(-1);
-	const end = skill.indexOf("\n## ", start + 1);
-	return skill.slice(start, end === -1 ? undefined : end);
+	const classic = await Bun.file(join(SKILLS, "opaline/classic.md")).text();
+	expect(classic).toStartWith("# Classic flow (find and read)");
+	return classic;
 }
 
 test("the skill calls schema first and, on the server's refusal, follows the classic flow instead of the retro tools", async () => {
@@ -264,10 +270,10 @@ test("the skill calls schema first and, on the server's refusal, follows the cla
 	const gate = skill.indexOf("**Call `schema` first.**");
 	expect(gate).toBeGreaterThan(-1);
 	// Near the top: before the tools are described.
-	expect(gate).toBeLessThan(skill.indexOf("## Tools"));
+	expect(gate).toBeLessThan(skill.indexOf("## Which tool for what"));
 	const paragraph = skill.slice(gate, skill.indexOf("\n\n", gate));
 	expect(paragraph).toContain(refusal);
-	expect(paragraph).toContain('"Classic flow (find and read)"');
+	expect(paragraph).toContain("`classic.md`");
 	for (const tool of [
 		"sql",
 		"search",
@@ -279,7 +285,7 @@ test("the skill calls schema first and, on the server's refusal, follows the cla
 			tool,
 			named: true,
 		});
-	expect(skill).toContain("## Classic flow (find and read)");
+	expect(await classicFlow()).toContain("`find`");
 });
 
 test("the classic flow names every find source, groupBy, sort and kind, and read's depths and limits, as the tools publish them", async () => {
