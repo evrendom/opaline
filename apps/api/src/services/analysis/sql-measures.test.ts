@@ -2,10 +2,12 @@ import { expect, test } from "bun:test";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import type { AgentQueryLimiter } from "./agent-query-slots.js";
 import { describeSchema } from "./sql-gateway.js";
+import { regexLiteral } from "./sql-measures.js";
 import {
 	createMemorySqlQuota,
 	createMemorySqlResultStore,
 } from "./sql-results.js";
+import { SQL_VIEWS } from "./sql-views.js";
 
 /** Every query gets a slot at once. */
 const unlimited: AgentQueryLimiter = {
@@ -70,4 +72,19 @@ test("schema lists the approved impact measures with their definitions next to t
 		"finding_runs",
 		"run_answers",
 	]);
+});
+
+test("regexps reach ClickHouse in RE2 syntax: code points as \\x{…}, never \\u", () => {
+	const literal = regexLiteral(/(\berror\b|\u2717)/iu);
+	expect(literal).toStartWith("'(?i)(\\\\berror\\\\b|");
+	expect(literal).toContain("\\\\x{2717}");
+	expect(literal).not.toMatch(/\\u[0-9a-fA-F]{4}/u);
+	for (const view of SQL_VIEWS)
+		expect({
+			view: view.name,
+			escapes: /\\\\u[0-9a-fA-F]{4}/u.test(view.sql(false, {})),
+		}).toEqual({
+			view: view.name,
+			escapes: false,
+		});
 });

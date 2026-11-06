@@ -11,7 +11,7 @@ describe("daily API maintenance", () => {
 	test("runs durable transcript retirement independently of publications under a maintenance deadline", () => {
 		expect(maintenanceSource).toContain("runTranscriptRecordsRetirementPass({");
 		expect(maintenanceSource).toContain(
-			"TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 10_000",
+			"TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 60_000",
 		);
 		expect(maintenanceSource).toContain(
 			'runMaintenanceStep("transcript-records"',

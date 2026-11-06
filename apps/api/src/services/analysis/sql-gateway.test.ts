@@ -1115,6 +1115,34 @@ describe("limits and errors from ClickHouse", () => {
 		expect(error.fix).toContain("schema view=<view>");
 	});
 
+	test.each([
+		[
+			"Aggregate function sum(failed_calls) AS failed_calls is found inside another aggregate function in query. (ILLEGAL_AGGREGATION)",
+			"SELECT sum(failed_calls) AS failed_calls, round(sum(failed_calls) / sum(tool_calls), 3) AS fail_rate FROM runs",
+			"sum(cost_usd) AS total_cost_usd",
+		],
+		[
+			"OptimizedRegularExpression: cannot compile re2: (?i)(\\berror\\b|\\u2716), error: invalid escape sequence: \\u. (CANNOT_COMPILE_REGEXP)",
+			"SELECT count() FROM calls WHERE match(command, '(?i)(\\\\berror\\\\b|\\\\u2716)')",
+			"'\\\\x{2716}'",
+		],
+		[
+			"Cannot parse time component of DateTime 13:50: while converting '2026-10-06 13:50' to DateTime64(3, 'UTC'). (CANNOT_PARSE_DATETIME)",
+			"SELECT count() FROM runs WHERE started_at >= '2026-10-06 13:50'",
+			"'YYYY-MM-DD hh:mm:ss'",
+		],
+		[
+			"Cannot parse date: value is too short: value undefined cannot be parsed as Date. (CANNOT_PARSE_DATE)",
+			"SELECT count() FROM runs WHERE toDate(started_at) >= 'undefined'",
+			"'YYYY-MM-DD'",
+		],
+	])("a query ClickHouse cannot compile says how to write it: %s", async (text, query, hint) => {
+		const { env } = environment(() => refusal(text));
+		const error = failure(await runSql(member, { query, title: "x" }, env));
+		expect(error.kind).toBe("recoverable");
+		expect(error.fix).toContain(hint);
+	});
+
 	test("a syntax error points at the agent's own text, not the rewritten statement", async () => {
 		const query = "SELECT count( FROM runs WHERE model = 'x'";
 		const { env, statements } = environment((statement) => {

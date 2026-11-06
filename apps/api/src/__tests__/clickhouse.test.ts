@@ -9,6 +9,7 @@ import {
 import {
 	addOptionalStringEqFilter,
 	addOptionalStringInFilter,
+	assertDateQueryParams,
 	buildAbsoluteDateFilter,
 	buildDateFilter,
 	buildIngestRecoveryCountStatement,
@@ -411,5 +412,74 @@ describe("analytics service guardrails", () => {
 		expect(cleanupSource).toContain("max_execution_time");
 		expect(cleanupSource).toContain('lightweight_deletes_sync: "3"');
 		expect(cleanupSource).not.toContain("ALTER TABLE");
+	});
+});
+
+describe("date query parameters", () => {
+	const RANGE =
+		"SELECT 1 FROM rudel.session_analytics WHERE toDate(session_date) BETWEEN {rangeStart:Date} AND {rangeEnd:Date} AND ingested_at <= {cutoff:DateTime64(3, 'UTC')} AND x = {maybe:Nullable(Date)}";
+
+	test("accepts dates, timestamps and absent nullable dates", () => {
+		for (const params of [
+			{
+				cutoff: "2026-11-05 17:03:09.000",
+				maybe: null,
+				rangeEnd: "2026-11-05",
+				rangeStart: "2026-10-06",
+			},
+			{
+				cutoff: new Date("2026-11-05T17:03:09.000Z"),
+				maybe: undefined,
+				rangeEnd: "2026-11-05T00:00:00.000Z",
+				rangeStart: "1791158400",
+			},
+			{
+				cutoff: 1_793_797_692,
+				maybe: "2026-10-06",
+				rangeEnd: "2026-11-05",
+				rangeStart: "2026-10-06",
+			},
+		])
+			expect(() =>
+				assertDateQueryParams({ query: RANGE, query_params: params }),
+			).not.toThrow();
+		expect(() => assertDateQueryParams({ query: RANGE })).not.toThrow();
+	});
+
+	test.each([
+		[{ rangeStart: undefined }, "rangeStart must be a date, got undefined"],
+		[{ rangeStart: "undefined" }, 'rangeStart must be a date, got "undefined"'],
+		[{ rangeStart: null }, "rangeStart must be a date, got null"],
+		[{ rangeEnd: "" }, 'rangeEnd must be a date, got ""'],
+		[{ rangeEnd: "2026-10-06 13:50" }, "rangeEnd must be a date"],
+		[
+			{ cutoff: new Date(Number.NaN) },
+			"cutoff must be a date, got an invalid Date",
+		],
+		[{ cutoff: Number.NaN }, "cutoff must be a date, got NaN"],
+	])("refuses %p before the request is sent", (params, message) => {
+		expect(() =>
+			assertDateQueryParams({ query: RANGE, query_params: params }),
+		).toThrow(message);
+	});
+
+	test("the executor refuses an invalid date before it reaches ClickHouse", async () => {
+		const executor = createClickHouseExecutor({ url: "http://127.0.0.1:9" });
+		try {
+			await expect(
+				executor.query({
+					query: RANGE,
+					query_params: { rangeEnd: "2026-11-05", rangeStart: undefined },
+				}),
+			).rejects.toThrow("rangeStart must be a date, got undefined");
+			await expect(
+				executor.execute({
+					query: RANGE,
+					query_params: { rangeEnd: "undefined" },
+				}),
+			).rejects.toThrow('rangeEnd must be a date, got "undefined"');
+		} finally {
+			await executor.close();
+		}
 	});
 });

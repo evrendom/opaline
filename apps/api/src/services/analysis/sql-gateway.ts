@@ -792,6 +792,16 @@ const NARROW_HOW = [
 	"4. Aggregate with GROUP BY before ordering.",
 ].join("\n");
 const NARROW = `Narrow the query and retry:\n${NARROW_HOW}`;
+const QUERY_FIXES: Readonly<Record<string, string>> = {
+	ILLEGAL_AGGREGATION:
+		"An aggregate's alias reuses a column name that another aggregate or the WHERE reads (sum(cost_usd) AS cost_usd, then sum(cost_usd) / runs), so ClickHouse reads the alias there. Give each aggregate a new alias (sum(cost_usd) AS total_cost_usd), use the new name where the query means the total, and run the query again.",
+	CANNOT_COMPILE_REGEXP:
+		"Regular expressions are RE2: no lookahead or lookbehind, no \\uXXXX escapes. Write the character itself ('✖') or its code point with the backslash doubled, as every backslash in a SQL string is ('\\\\x{2716}'; '\\\\.' matches a dot). For a plain substring use position() or LIKE instead.",
+	CANNOT_PARSE_DATE:
+		"Write dates as 'YYYY-MM-DD' (toDate('2026-10-06')) and times as 'YYYY-MM-DD hh:mm:ss' (toDateTime64('2026-10-06 13:50:00', 3, 'UTC')), seconds included, and run the query again.",
+	CANNOT_PARSE_DATETIME:
+		"Write dates as 'YYYY-MM-DD' (toDate('2026-10-06')) and times as 'YYYY-MM-DD hh:mm:ss' (toDateTime64('2026-10-06 13:50:00', 3, 'UTC')), seconds included, and run the query again.",
+};
 /** Refusals no rewrite of the query can pass. */
 const FATAL_TYPES = new Set([
 	"ACCESS_DENIED",
@@ -845,9 +855,10 @@ function classify(
 		message,
 		fragment: failingPart(error.message, sql, prepared),
 		fix:
-			type === "UNKNOWN_IDENTIFIER" || type === "UNKNOWN_TABLE"
+			QUERY_FIXES[type] ??
+			(type === "UNKNOWN_IDENTIFIER" || type === "UNKNOWN_TABLE"
 				? "Use only columns of the views (schema view=<view> lists them) and names your query defines."
-				: "Fix the failing part and run the query again; schema view=<view> lists the columns and their types.",
+				: "Fix the failing part and run the query again; schema view=<view> lists the columns and their types."),
 	};
 }
 

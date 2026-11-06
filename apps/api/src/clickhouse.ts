@@ -265,6 +265,36 @@ export function getSafeClickHouseTable(table: string): string {
 	return table;
 }
 
+const DATE_PARAMETER =
+	/\{([A-Za-z_]\w*):\s*(Nullable\(\s*)?(?:Date|Date32|DateTime|DateTime64)\b[^{}]*\}/gu;
+const DATE_PARAMETER_TEXT =
+	/^(?:\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?|\d+(?:\.\d+)?)$/u;
+
+export function assertDateQueryParams(
+	statement: Pick<ClickHouseStatement, "query" | "query_params">,
+): void {
+	const params = statement.query_params;
+	if (params === undefined) return;
+	for (const [, name = "", nullable] of statement.query.matchAll(
+		DATE_PARAMETER,
+	)) {
+		if (!Object.hasOwn(params, name)) continue;
+		const value = params[name];
+		if ((value === undefined || value === null) && nullable) continue;
+		if (!isDateParameterValue(value))
+			throw new Error(
+				`ClickHouse query parameter ${name} must be a date, got ${value instanceof Date ? "an invalid Date" : typeof value === "string" ? JSON.stringify(value) : String(value)}`,
+			);
+	}
+}
+
+function isDateParameterValue(value: unknown): boolean {
+	if (value instanceof Date) return Number.isFinite(value.getTime());
+	if (typeof value === "bigint") return value >= 0n;
+	if (typeof value === "number") return Number.isFinite(value) && value >= 0;
+	return typeof value === "string" && DATE_PARAMETER_TEXT.test(value);
+}
+
 export function createClickHouseExecutor(config: {
 	url: string;
 	username?: string;
@@ -293,6 +323,7 @@ export function createClickHouseExecutor(config: {
 		},
 		async execute(statement: ClickHouseStatement) {
 			statement.abortSignal?.throwIfAborted();
+			assertDateQueryParams(statement);
 			await client.command({
 				abort_signal:
 					statement.abortSignal === undefined
@@ -305,6 +336,7 @@ export function createClickHouseExecutor(config: {
 		},
 		async query<T>(statement: ClickHouseStatement): Promise<T[]> {
 			statement.abortSignal?.throwIfAborted();
+			assertDateQueryParams(statement);
 			const result = await client.query({
 				abort_signal:
 					statement.abortSignal === undefined
