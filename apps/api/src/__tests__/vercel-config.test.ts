@@ -65,7 +65,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-index-heal$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -92,6 +92,7 @@ describe("Vercel deployment configuration", () => {
 				cron.path !== "/api/cron/r2-ingest" &&
 				cron.path !== "/api/cron/github-evidence" &&
 				cron.path !== "/api/cron/l1-edges" &&
+				cron.path !== "/api/cron/run-index-heal" &&
 				cron.path !== "/api/cron/run-questions" &&
 				cron.path !== "/api/cron/history" &&
 				cron.path !== "/api/cron/live-sessions" &&
@@ -147,6 +148,29 @@ describe("Vercel deployment configuration", () => {
 				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/github-evidence$)");
+	});
+
+	test("queues stale run index builds every five minutes in an isolated cron function", () => {
+		expect(vercelConfig.functions["api/cron/run-index-heal.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 2048,
+			maxDuration: 300,
+		});
+		expect(
+			vercelConfig.crons.filter(
+				(cron) => cron.path === "/api/cron/run-index-heal",
+			),
+		).toEqual([{ path: "/api/cron/run-index-heal", schedule: "*/5 * * * *" }]);
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/run-index-heal$)");
+		const entrypoint = readFileSync(
+			resolve(import.meta.dir, "../../../../api/cron/run-index-heal.ts"),
+			"utf8",
+		);
+		expect(entrypoint).toContain("fetch: handleRunIndexHealMaintenanceRequest");
 	});
 
 	test("answers queued run questions every minute in an isolated cron function", () => {

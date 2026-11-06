@@ -115,7 +115,7 @@ interface CensusRow {
 	observations_parser_version: number;
 }
 
-interface RawRow {
+export interface RawRow {
 	content: string;
 	raw_session_date: string;
 	subagents: Record<string, string> | null;
@@ -360,9 +360,17 @@ function buildCensus(
 	};
 }
 
-async function readRawRevision(
+export async function readRawRevision(
 	executor: ClickHouseExecutor,
-	candidate: Candidate,
+	candidate: Pick<
+		Candidate,
+		| "organizationId"
+		| "userId"
+		| "sessionId"
+		| "source"
+		| "revision"
+		| "sessionDate"
+	>,
 	signal: AbortSignal,
 ): Promise<RawRow | undefined> {
 	const table = getSafeClickHouseTable(
@@ -413,6 +421,6 @@ function interleave<T>(left: readonly T[], right: readonly T[]): T[] {
 }
 
 /** ClickHouse `toString(DateTime64)` output, read as UTC. */
-function toIsoUtc(value: string): string {
+export function toIsoUtc(value: string): string {
 	return new Date(`${value.replace(" ", "T")}Z`).toISOString();
 }

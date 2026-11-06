@@ -283,6 +283,7 @@ export {
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { momentsContract } from "./moments.js";
+import { runIndexHealAdminContract } from "./run-index-heal.js";
 import { sessionImagesContract } from "./session-images.js";
 import { sessionSavedOutputsContract } from "./session-saved-outputs.js";
 import { workspaceFeaturesAdminContract } from "./workspace-features.js";
@@ -315,6 +316,16 @@ export {
 	type RunRecord,
 	withCompassDefaults,
 } from "./moments.js";
+
+export {
+	RUN_INDEX_HEAL_SKIP_REASONS,
+	RUN_INDEX_HEAL_TIERS,
+	type RunIndexHealOrganization,
+	type RunIndexHealSkipReason,
+	type RunIndexHealStatus,
+	RunIndexHealStatusSchema,
+	type RunIndexHealTier,
+} from "./run-index-heal.js";
 
 export {
 	type AdminWorkspaceFeatures,
@@ -1274,6 +1285,7 @@ export const contract = {
 			.input(AdminCostDashboardInputSchema)
 			.output(CostDashboardSchema),
 		runQuestions: runQuestionsAdminContract,
+		runIndexHeal: runIndexHealAdminContract,
 		workspaceFeatures: workspaceFeaturesAdminContract,
 	},
 	productAnalytics: {

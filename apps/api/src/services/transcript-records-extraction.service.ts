@@ -14,7 +14,10 @@ import {
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
-import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
+import {
+	type GitObservationExtractionInput,
+	persistGitObservationsBestEffort,
+} from "./git-observation-extraction.service.js";
 import {
 	hashTranscriptContent,
 	hasMatchingTranscriptRecordsReceipt,
@@ -303,6 +306,7 @@ export interface PersistTranscriptRecordsInput {
 	readonly config: TranscriptRecordsExtractionConfig;
 	readonly content: string;
 	readonly gate?: TranscriptRecordsJobGate;
+	readonly onWritten?: GitObservationExtractionInput["onWritten"];
 	readonly organizationId: string;
 	readonly revision: string;
 	readonly sessionDate: string;
