@@ -1,5 +1,6 @@
 import type { LastSessionUpload } from "@rudel/api-routes";
 import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
+import { createAnalyticsRequestGate } from "./analytics-request-gate.js";
 import {
 	buildSessionAnalyticsWindowSql,
 	getUsageAnalyticsQueryContext,
@@ -13,6 +14,12 @@ const LAST_UPLOAD_DAYS = 365;
  * is complete, which the newest one nearly always is.
  */
 const LAST_UPLOAD_CANDIDATES = 20;
+const lastUploadRequests = createAnalyticsRequestGate({
+	perScope: 1,
+	total: 4,
+	reuseMs: 30_000,
+	maxEntries: 256,
+});
 const PERIOD_FILTER = buildDateFilter("days", "sa.session_date");
 const SESSION_ORDER = "sa.session_date DESC, sa.source ASC, sa.session_id ASC";
 // A native Codex child is not top-level (`buildLineageEnrichedMetadataCte`).
@@ -28,7 +35,15 @@ const TOP_LEVEL_FILTER = `(sa.organization_id, sa.user_id, sa.source, sa.session
  * top-level sessions only instead of pricing the organization's history. Only
  * when none of those has complete usage does it read the whole period.
  */
-export async function getLastSessionUpload(
+export function getLastSessionUpload(
+	organizationId: string,
+): Promise<LastSessionUpload | null> {
+	return lastUploadRequests.run(organizationId, organizationId, () =>
+		readLastSessionUpload(organizationId),
+	);
+}
+
+async function readLastSessionUpload(
 	organizationId: string,
 ): Promise<LastSessionUpload | null> {
 	const newest = await readLastUpload(organizationId, {

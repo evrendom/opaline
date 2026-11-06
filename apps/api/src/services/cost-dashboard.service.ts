@@ -8,6 +8,7 @@ import {
 import { queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { shouldUseUsageEventAnalytics } from "../lib/env.js";
+import { createAnalyticsRequestGate } from "./analytics-request-gate.js";
 import {
 	type AnalyticsTenant,
 	organizationMatchSql,
@@ -34,6 +35,12 @@ export { buildDurationPeriods } from "./dashboard-duration-periods.js";
 
 const MAX_AGGREGATE_ROWS = 100_000;
 const DASHBOARD_MEMORY_BYTES = String(2 * 1024 * 1024 * 1024);
+const sessionMetricRequests = createAnalyticsRequestGate({
+	perScope: 2,
+	total: 4,
+	reuseMs: 0,
+	maxEntries: 32,
+});
 type AgentRunDurationInterval = NonNullable<
 	CostDashboardInput["durationInterval"]
 >;
@@ -91,10 +98,15 @@ export async function getCostDashboard(
 		input.requestedMetric === "ciRuns";
 	// The session metrics are the expensive part. A pull request or CI stat
 	// card leaves them out: the session cards read the charted answer.
+	const tenantKey = scope.tenant === "organization" ? scope.orgId : "*";
 	const sessionRowsPromise =
 		isGitHubMetric && input.sessionMetrics === false
 			? Promise.resolve(undefined)
-			: querySessionMetricRows(scope, input, isGitHubMetric);
+			: sessionMetricRequests.run(
+					tenantKey,
+					JSON.stringify([tenantKey, isGitHubMetric, input]),
+					() => querySessionMetricRows(scope, input, isGitHubMetric),
+				);
 	const githubOutcomesPromise =
 		scope.tenant === "organization" && isGitHubMetric
 			? getGitHubOutcomesDashboardMetrics(
