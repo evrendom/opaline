@@ -408,15 +408,21 @@ describe("search over uploaded transcripts", () => {
 		expect(filtered.result.rows).toBe(0);
 	});
 
-	test("every SQL example in the plugin skill runs in ClickHouse through the sql gateway", async () => {
-		const skill = await Bun.file(
-			join(
-				import.meta.dir,
-				"../../../../plugins/opaline/skills/opaline/SKILL.md",
+	test("every SQL example in the plugin skill pages runs in ClickHouse through the sql gateway", async () => {
+		const skillDir = join(
+			import.meta.dir,
+			"../../../../plugins/opaline/skills/opaline",
+		);
+		const pages = await Array.fromAsync(
+			new Bun.Glob("**/*.md").scan({ cwd: skillDir }),
+		);
+		const texts = await Promise.all(
+			pages.map((page) => Bun.file(join(skillDir, page)).text()),
+		);
+		const examples = texts.flatMap((text) =>
+			[...text.matchAll(/```sql\n([\s\S]*?)```/gu)].map(
+				(match) => match[1] ?? "",
 			),
-		).text();
-		const examples = [...skill.matchAll(/```sql\n([\s\S]*?)```/gu)].map(
-			(match) => match[1] ?? "",
 		);
 		const sqlEnv = {
 			executor: clickhouse,
