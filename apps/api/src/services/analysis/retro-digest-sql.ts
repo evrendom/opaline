@@ -154,7 +154,7 @@ const tag = (
 
 const HEAD_LABEL = `substring(replaceRegexpAll(ifNull(command_head, tool_name), '\\s+', ' '), 1, 70)`;
 
-export function digestCallsSql(params: MeasureParams): string[] {
+export function digestCallsSql(params: MeasureParams, piece = false): string[] {
 	const checks = [...LOCAL_CHECK_CLASSES, "install"].map(sqlString).join(", ");
 	const shell = "command_from = 'command' AND command_head IS NOT NULL";
 	const DENIAL_LABEL = `multiIf(denial_kind IN ('user-rejected', 'Rejected'), 'the person rejected the tool call at its permission prompt', denial_kind = 'permission-rule', 'blocked by a permission rule', denial_kind = 'hook', 'blocked by a hook', denial_kind)`;
@@ -165,6 +165,7 @@ export function digestCallsSql(params: MeasureParams): string[] {
 				concat(extract(command_head, ${sqlString(INTERPRETER_RE)}), ': ',
 					replaceRegexpAll(extract(command_head, ${sqlString(SCRIPT_FUNCTION_RE)}), '\\s+', ' ')), '')`;
 	const inline = `command_from IN ('command', 'script') AND match(command_head, ${sqlString(INLINE_SCRIPT_RE)})`;
+	const weight = `if(metric IN (${metricList("w")}), sw, toFloat64(sn))`;
 	const ctes = `WITH ${pickedSetCte(params)},
 	c AS (
 		SELECT session_id AS sid, agent_id AS aid, turn_idx AS turn, call_level, tool_name, failed, denial_kind,
@@ -202,19 +203,29 @@ export function digestCallsSql(params: MeasureParams): string[] {
 		GROUP BY metric, key, sid
 	),
 	grouped AS (
-		SELECT metric, key, sum(sn) AS n, sum(sf) AS f, round(sum(sw), 1) AS w, count() AS sessions, sum(st) AS timed,
+		${
+			piece
+				? `SELECT metric, key, sum(sn) AS n, sum(sf) AS f, sum(sw) AS w, count() AS sessions, sum(st) AS timed,
+			arraySlice(arrayReverseSort(groupArray((${weight}, sn, sf, sid))), 1, ${DIGEST_IDS}) AS ids,
+			argMax((sex, slabel), (${weight}, sn, sid)) AS lead, max((${weight}, sn, sid)) AS lead_key`
+				: `SELECT metric, key, sum(sn) AS n, sum(sf) AS f, round(sum(sw), 1) AS w, count() AS sessions, sum(st) AS timed,
 			arraySlice(arrayMap(x -> x.4, arrayReverseSort(x -> (x.1, x.2, x.3, x.4),
-				groupArray((if(metric IN (${metricList("w")}), sw, toFloat64(sn)), sn, sf, sid)))), 1, ${DIGEST_IDS}) AS ids,
-			argMax(sex, (if(metric IN (${metricList("w")}), sw, toFloat64(sn)), sn, sid)) AS ex,
-			argMax(slabel, (if(metric IN (${metricList("w")}), sw, toFloat64(sn)), sn, sid)) AS label
+				groupArray((${weight}, sn, sf, sid)))), 1, ${DIGEST_IDS}) AS ids,
+			argMax(sex, (${weight}, sn, sid)) AS ex,
+			argMax(slabel, (${weight}, sn, sid)) AS label`
+		}
 		FROM per_session
 		GROUP BY metric, key
 	),
 	limited AS (
-		SELECT * FROM grouped
+		SELECT * FROM grouped${
+			piece
+				? ""
+				: `
 		WHERE metric != 'inline_scripts' OR sessions >= 3
 		ORDER BY metric, multiIf(metric IN (${metricList("w")}), w, metric IN (${metricList("sessions")}), toFloat64(sessions), toFloat64(n)) DESC, n DESC, key
-		LIMIT ${Math.max(...Object.values(CALL_METRICS).map((metric) => metric.limit))} BY metric
+		LIMIT ${Math.max(...Object.values(CALL_METRICS).map((metric) => metric.limit))} BY metric`
+		}
 	),
 	push_events AS (
 		SELECT session_id AS sid, evidence_id AS evidence
@@ -248,7 +259,7 @@ export function digestCallsSql(params: MeasureParams): string[] {
 	return [
 		`${ctes}
 	SELECT groupArray((metric, rows)) AS ranked FROM (
-		SELECT metric, groupArray((key, n, f, w, sessions, ids, ex, label, timed)) AS rows FROM limited GROUP BY metric)`,
+		SELECT metric, groupArray((key, n, f, w, sessions, ids, ${piece ? "lead, lead_key" : "ex, label"}, timed)) AS rows FROM limited GROUP BY metric)`,
 		`${ctes}
 	SELECT (countIf(${AGENT_LEVEL}), countIf(${AGENT_LEVEL} AND failed = 1),
 		countIf(${AGENT_LEVEL} AND aid = ''), countIf(${AGENT_LEVEL} AND aid = '' AND failed = 1),

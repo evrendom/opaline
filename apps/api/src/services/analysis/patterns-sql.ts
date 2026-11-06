@@ -1106,13 +1106,18 @@ function detailSql(): string {
 			if(g.kind IN (${LINE_KINDS.map(sqlString).join(", ")}), ${said}, ${variants}) AS detail`;
 }
 
-function patternsCte(change = false, withRuns = false, runTime = true): string {
+function patternsCte(
+	change = false,
+	withRuns = false,
+	runTime = true,
+	piece = false,
+): string {
 	return `pat AS (
-		SELECT g.id AS id, g.kind AS kind, any(g.key) AS key, topKWeighted(1)(g.sub, g.hits)[1] AS sub,${withRuns ? "\n\t\t\tgroupUniqArray(g.rid) AS rids," : ""}
+		SELECT g.id AS id, g.kind AS kind, any(g.key) AS key, topKWeighted(1)(g.sub, g.hits)[1] AS sub,${withRuns ? "\n\t\t\tgroupUniqArray(g.rid) AS rids," : ""}${piece ? "\n\t\t\tgroupUniqArray(g.uid) AS uids," : ""}
 			topKWeighted(1)(g.signature, g.hits)[1] AS signature, topKWeighted(1)(g.target, g.hits)[1] AS target,
 			sum(g.hits) AS count, count() AS runs, uniqExact(g.sid) AS sessions, uniqExact(g.uid) AS members,
 			groupUniqArray(${SESSION_IDS})(g.sid) AS sids,
-			${runTime ? "round(sum(r.active_minutes), 1)" : "toFloat64(0)"} AS run_minutes, round(sum(g.cm), 1) AS call_minutes,
+			${runTime ? (piece ? "sum(r.active_minutes)" : "round(sum(r.active_minutes), 1)") : "toFloat64(0)"} AS run_minutes, ${piece ? "sum(g.cm)" : "round(sum(g.cm), 1)"} AS call_minutes,
 			if(g.kind IN (${RUN_TIME_KINDS.map(sqlString).join(", ")}), run_minutes, call_minutes) AS minutes,
 			min(g.first_at) AS first_seen, max(g.first_at) AS last_seen, groupArray(toMonday(g.first_at)) AS weeks_hit,
 			arraySlice(arrayMap(x -> ${el("x", 3)}, arrayReverseSort(x -> (${el("x", 1)}, ${el("x", 2)}), groupArray((g.hits, g.cm, ${ref("g")})))), 1, 5) AS examples,
@@ -1184,6 +1189,7 @@ export interface PatternListOptions {
 	readonly ids?: readonly string[];
 	readonly weeksOf?: MeasureParams;
 	readonly withRuns?: boolean;
+	readonly piece?: boolean;
 }
 
 function idFilter(ids: readonly string[] | undefined): string {
@@ -1198,10 +1204,10 @@ export function patternsListSql(
 	const week = weeks(options.weeksOf ?? params);
 	return `WITH ${evidenceCtes(params, family, options.kinds)},
 	${perRunCte()},
-	${patternsCte(false, options.withRuns, readsRunTime(options.kinds))}
+	${patternsCte(false, options.withRuns, readsRunTime(options.kinds), options.piece)}
 	SELECT id, kind, signature, count, runs, sessions, members, minutes, toDate(first_seen) AS first_seen,
 		toDate(last_seen) AS last_seen, weekly, fix_type, fix_hint, detail, examples,
-		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}
+		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}${options.piece ? ", uids" : ""}
 	FROM (
 		SELECT *, ${fixTypeSql()} AS fix_type, ${fixHintSql()} AS fix_hint,
 			arrayStringConcat(arrayMap(w -> toString(countEqual(weeks_hit, w)),

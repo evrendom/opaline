@@ -28,6 +28,8 @@ import {
 import { omittedMarker } from "./compact.js";
 import { fitCount } from "./output-ceiling.js";
 import { cell } from "./read-output.js";
+import { limitRefusal, runSplit, splitBudget } from "./refused-split.js";
+import type { MeasureParams } from "./retro-measure-sql.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
 import {
 	carriesText,
@@ -238,14 +240,134 @@ export function quotaExceeded(
 export const NOT_EVIDENCE =
 	"not evidence: these rows say where to look, not why. Open the runs with read (session_id, agent_id, and turn_idx as its turn) before naming a cause.";
 
+type SqlRow = Record<string, unknown>;
+
+export interface SqlSplit {
+	readonly stage: string;
+	readonly window: MeasureParams;
+	readonly build: (window: MeasureParams) => SqlPart;
+	readonly merge?: (pieces: SqlRow[][]) => SqlRow[];
+	readonly approximate?: string;
+}
+
+export interface SqlPart {
+	readonly query: string;
+	readonly cohort?: string;
+	readonly rows?: number;
+}
+
 export interface SqlParts {
-	readonly queries: readonly {
-		readonly query: string;
-		readonly cohort?: string;
-	}[];
-	readonly merge: (
-		rows: Record<string, unknown>[],
-	) => Record<string, unknown>[];
+	readonly queries: readonly (SqlPart & { readonly split?: SqlSplit })[];
+	readonly merge: (rows: SqlRow[]) => SqlRow[];
+}
+
+interface Followed {
+	readonly rows: SqlRow[];
+	readonly columns: string[];
+	readonly sessions: AnalysisSqlOutput["sessions"];
+	readonly owners: readonly string[];
+}
+
+export function wrapRows(rows: number): {
+	prefix: string;
+	suffix: string;
+	rows: number;
+} {
+	return { prefix: "SELECT * FROM (\n", suffix: "\n)", rows: rows + 1 };
+}
+
+class PartFailed extends Error {
+	constructor(readonly failure: SqlFailure) {
+		super(failure.message);
+	}
+}
+
+async function runSplitParts(
+	caller: SqlCaller,
+	input: { cohort?: string; parts: SqlParts },
+	env: SqlEnv,
+	signal: AbortSignal | undefined,
+	follow: (rows: SqlRow[]) => Promise<Followed>,
+): Promise<
+	| { ok: true; value: Followed; notices: string[] }
+	| { ok: false; error: SqlFailure }
+> {
+	const budget = splitBudget();
+	const rows: SqlRow[] = [];
+	const notices: string[] = [];
+	const run = async (part: SqlPart) => {
+		const done = await execute(
+			caller,
+			part.query,
+			env,
+			signal,
+			async (found) => found,
+			part.rows ? wrapRows(part.rows) : undefined,
+			part.cohort ?? input.cohort,
+		);
+		if (done.ok) {
+			notices.push(...done.notices);
+			return done.value;
+		}
+		throw limitRefusal(done.error) ?? new PartFailed(done.error);
+	};
+	let completed = 0;
+	let refused: SqlFailure | null = null;
+	try {
+		for (const part of input.parts.queries) {
+			const split = part.split;
+			if (!split) {
+				rows.push(...(await run(part)));
+				completed += 1;
+				continue;
+			}
+			const outcome = await runSplit(
+				split.stage,
+				split.window,
+				(window, piece) => run(piece ? split.build(window) : part),
+				budget,
+				split.approximate ? { approximate: split.approximate } : {},
+			);
+			if (!outcome.ok) {
+				refused ??= outcome.refusal?.failure ?? null;
+				continue;
+			}
+			completed += 1;
+			rows.push(
+				...(outcome.values.length > 1 && split.merge
+					? split.merge(outcome.values)
+					: outcome.values.flat()),
+			);
+		}
+	} catch (error) {
+		if (error instanceof PartFailed) return { ok: false, error: error.failure };
+		throw error;
+	}
+	if (completed === 0)
+		return {
+			ok: false,
+			error: {
+				...(refused ?? BUSY),
+				message: [refused?.message ?? BUSY.message, ...budget.partial].join(
+					" ",
+				),
+			},
+		};
+	try {
+		const value = await env.limiter.withAgentQuerySlot(
+			caller.workspaceId,
+			() => follow(input.parts.merge(rows)),
+			signal,
+		);
+		return {
+			ok: true,
+			value,
+			notices: [...notices, ...budget.notes, ...budget.partial],
+		};
+	} catch (error) {
+		if (!(error instanceof AgentQueryBusyError)) throw error;
+		return { ok: false, error: BUSY };
+	}
 }
 
 export async function runSql(
@@ -260,44 +382,18 @@ export async function runSql(
 	env: SqlEnv,
 	signal?: AbortSignal,
 ): Promise<SqlOutcome> {
-	const queries = input.parts?.queries ?? [{ query: input.query }];
-	const merge = input.parts?.merge ?? ((rows) => rows);
-	const earlier: Record<string, unknown>[] = [];
-	const notices: string[] = [];
-	for (const part of queries.slice(0, -1)) {
-		const done = await execute(
-			caller,
-			part.query,
-			env,
-			signal,
-			async (found) => found,
-			undefined,
-			part.cohort ?? input.cohort,
-		);
-		if (!done.ok) return done;
-		earlier.push(...done.value);
-		notices.push(...done.notices);
-	}
-	const last = queries.at(-1);
-	// The lookups for the result read ClickHouse too, so they hold the slot.
-	const executed = await execute(
-		caller,
-		last?.query ?? input.query,
-		env,
-		signal,
-		(found) => {
-			const rows = merge([...earlier, ...found]).map(
-				(row) => redactReturnedValue(row) as Record<string, unknown>,
-			);
-			const columns = Object.keys(rows[0] ?? {});
-			return Promise.all([
-				namedSessions(caller, columns, rows, env.executor),
-				coveredOwners(caller, env.executor),
-			]).then(([sessions, owners]) => ({ rows, columns, sessions, owners }));
-		},
-		undefined,
-		last?.cohort ?? input.cohort,
-	);
+	const follow = (found: SqlRow[]): Promise<Followed> => {
+		const rows = found.map((row) => redactReturnedValue(row) as SqlRow);
+		const columns = Object.keys(rows[0] ?? {});
+		return Promise.all([
+			namedSessions(caller, columns, rows, env.executor),
+			coveredOwners(caller, env.executor),
+		]).then(([sessions, owners]) => ({ rows, columns, sessions, owners }));
+	};
+	const parts = input.parts;
+	const executed = parts?.queries.some((part) => part.split)
+		? await runSplitParts(caller, { ...input, parts }, env, signal, follow)
+		: await runParts(caller, input, env, signal, follow);
 	if (!executed.ok) return executed;
 	const { rows, columns, sessions, owners } = executed.value;
 	const table = renderTable(columns, rows);
@@ -308,7 +404,7 @@ export async function runSql(
 		rows: table.rows,
 		truncated: table.notices.length > 0,
 		table: table.text,
-		notices: [...table.notices, ...notices, ...executed.notices, NOT_EVIDENCE],
+		notices: [...table.notices, ...executed.notices, NOT_EVIDENCE],
 		sessions,
 		// Findings cite only what the agent saw: the rows the table shows.
 		runs: namedRuns(columns, rows.slice(0, table.rows), sessions),
@@ -334,6 +430,53 @@ export async function runSql(
 		queryCarriesText: carriesText(input.query),
 	});
 	return { ok: true, result: { id, ...output }, owners, quotes };
+}
+
+async function runParts(
+	caller: SqlCaller,
+	input: { query: string; cohort?: string; parts?: SqlParts },
+	env: SqlEnv,
+	signal: AbortSignal | undefined,
+	follow: (rows: SqlRow[]) => Promise<Followed>,
+): Promise<
+	| { ok: true; value: Followed; notices: string[] }
+	| { ok: false; error: SqlFailure }
+> {
+	const queries = input.parts?.queries ?? [{ query: input.query }];
+	const merge = input.parts?.merge ?? ((rows) => rows);
+	const earlier: SqlRow[] = [];
+	const notices: string[] = [];
+	for (const part of queries.slice(0, -1)) {
+		const done = await execute(
+			caller,
+			part.query,
+			env,
+			signal,
+			async (found) => found,
+			undefined,
+			part.cohort ?? input.cohort,
+		);
+		if (!done.ok) return done;
+		earlier.push(...done.value);
+		notices.push(...done.notices);
+	}
+	const last = queries.at(-1);
+	// The lookups for the result read ClickHouse too, so they hold the slot.
+	const executed = await execute(
+		caller,
+		last?.query ?? input.query,
+		env,
+		signal,
+		(found) => follow(merge([...earlier, ...found])),
+		undefined,
+		last?.cohort ?? input.cohort,
+	);
+	if (!executed.ok) return executed;
+	return {
+		ok: true,
+		value: executed.value,
+		notices: [...notices, ...executed.notices],
+	};
 }
 
 export function guardSql(caller: SqlCaller, sql: string): SqlFailure | null {
@@ -828,7 +971,13 @@ function classify(
 	const message = cleanMessage(error.message);
 	const limit = LIMIT_FIXES[type];
 	if (limit)
-		return { kind: "recoverable", message: limit, fragment: null, fix: NARROW };
+		return {
+			kind: "recoverable",
+			message: limit,
+			fragment: null,
+			fix: NARROW,
+			...(type === "TOO_MANY_ROWS_OR_BYTES" ? {} : { limit: "time" as const }),
+		};
 	// The server's or the user's memory, not this query's: others hold it.
 	if (
 		type === "MEMORY_LIMIT_EXCEEDED" &&
@@ -842,6 +991,7 @@ function classify(
 			message: `${read}: this query reads too much; aggregate or narrow the window.`,
 			fragment: null,
 			fix: `Do not run this query again. A narrower one can pass:\n${NARROW_HOW}`,
+			...(type === "MEMORY_LIMIT_EXCEEDED" ? { limit: "memory" as const } : {}),
 		};
 	if (FATAL_TYPES.has(type))
 		return {

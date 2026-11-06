@@ -381,7 +381,9 @@ function patternRows(
 			return {
 				metric: `${str(row.id)} ${short(str(row.signature), 48)}`,
 				value: `${fmt(num(row.count))} in ${fmt(num(row.runs))} runs, ${fmt(num(row.sessions))} sessions, ${fmt(num(row.minutes), 1)} min`,
-				definition,
+				definition: row.merged
+					? `${definition}; ${str(row.merged)}`
+					: definition,
 				sessions: sessions.slice(0, DIGEST_IDS),
 				example: examples[0] ?? "",
 			};
@@ -1493,7 +1495,78 @@ function maskSection(section: DigestSection): DigestSection {
 export const DIGEST_UNITS =
 	"Rows: metric: value [definition, quote it with the number] e.g. session#turn (or session:agent#turn) to read. Terms: session = main session started in the window; streams = main + subagents unless said; shell = shell commands matched on their first 300 chars; min = sum of call_minutes (call to result); failed = error, non-zero exit or refusal.";
 
-export function renderDigest(digest: Digest, ms?: number): string {
+export type DigestPart =
+	| "calls"
+	| "edits"
+	| "usage"
+	| "runs"
+	| "facts"
+	| "severity"
+	| "patterns";
+
+const SECTION_READS: Readonly<Record<string, readonly DigestPart[]>> = {
+	a: ["calls", "edits"],
+	b: ["calls", "patterns"],
+	c: ["usage", "facts", "calls"],
+	d: ["calls", "facts"],
+	e: ["calls", "edits", "patterns"],
+	f: ["calls", "patterns"],
+	g: ["facts", "patterns"],
+	h: ["facts"],
+	i: ["severity", "edits"],
+	j: ["runs", "patterns"],
+};
+
+export function markUnknown(
+	digest: Digest,
+	unknown: ReadonlyMap<DigestPart, readonly string[]>,
+): Digest {
+	if (unknown.size === 0) return digest;
+	return {
+		...digest,
+		sections: digest.sections.map((section) => {
+			const reads = SECTION_READS[section.id] ?? [];
+			const refused = reads.filter((part) => unknown.has(part));
+			if (refused.length === 0) return section;
+			const lines = refused.flatMap((part) =>
+				(unknown.get(part) ?? []).map(
+					(line) =>
+						`unknown, not 0: ${line.replace(/^partial: /u, "")}${part === "patterns" ? "; patterns of that family are missing from these rows" : ""}`,
+				),
+			);
+			return {
+				...section,
+				rows: refused.every((part) => part === "patterns") ? section.rows : [],
+				missing: [...lines, ...section.missing],
+			};
+		}),
+	};
+}
+
+export function noteMerged(digest: Digest, notes: readonly string[]): Digest {
+	if (notes.length === 0) return digest;
+	const note = `; ${notes.join("; ")}`;
+	return {
+		...digest,
+		sections: digest.sections.map((section) =>
+			section.id === "j"
+				? {
+						...section,
+						rows: section.rows.map((row) => ({
+							...row,
+							definition: `${row.definition}${note}`,
+						})),
+					}
+				: section,
+		),
+	};
+}
+
+export function renderDigest(
+	digest: Digest,
+	ms?: number,
+	footer: readonly string[] = [],
+): string {
 	const scope = digest.scope;
 	const head = `retro digest ${scope.repository ?? "all repositories"} ${scope.from}..${scope.to}${scope.latest ? ` latest ${scope.latest}` : ""}${scope.listed ? ` (${scope.listed} listed sessions)` : ""}: ${digest.sessions} sessions (${Object.entries(
 		digest.bySource,
@@ -1527,5 +1600,5 @@ export function renderDigest(digest: Digest, ms?: number): string {
 		}
 		for (const note of section.missing) lines.push(`- skipped: ${note}`);
 	}
-	return lines.join("\n");
+	return [...lines, ...footer].join("\n");
 }

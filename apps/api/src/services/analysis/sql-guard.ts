@@ -31,6 +31,7 @@ export interface SqlFailure {
 	/** The failing part of the agent's SQL, when one can be named. */
 	readonly fragment: string | null;
 	readonly fix: string;
+	readonly limit?: "memory" | "time";
 }
 
 export interface PreparedSql {

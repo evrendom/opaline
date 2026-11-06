@@ -15,6 +15,10 @@ import {
 } from "../../services/analysis/checks.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
 import {
+	LimitRefusal,
+	limitRefusal,
+} from "../../services/analysis/refused-split.js";
+import {
 	describeMeasure,
 	listMeasures,
 } from "../../services/analysis/retro-measures.js";
@@ -24,6 +28,7 @@ import {
 	runSql,
 	type SqlEnv,
 	withSqlLimits,
+	wrapRows,
 } from "../../services/analysis/sql-gateway.js";
 import { captureCall } from "../../services/analysis-log/capture.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
@@ -296,17 +301,18 @@ export function createMeasureProcedures(env: MeasureEnv) {
 					const result = await runDigest(
 						{
 							workspaceId: context.organizationId,
-							view: async (query, cohort) => {
+							view: async (query, cohort, rows) => {
 								const outcome = await executeSql(
 									callerOf(context),
 									query,
 									env.sqlEnv,
 									signal,
-									async (rows) => rows,
-									undefined,
+									async (found) => found,
+									rows ? wrapRows(rows) : undefined,
 									cohort,
 								);
-								if (!outcome.ok) throw sqlError(outcome.error);
+								if (!outcome.ok)
+									throw limitRefusal(outcome.error) ?? sqlError(outcome.error);
 								return outcome.value;
 							},
 							trusted: (statement) =>
@@ -317,7 +323,10 @@ export function createMeasureProcedures(env: MeasureEnv) {
 						},
 						input,
 						now(),
-					);
+					).catch((error: unknown) => {
+						if (error instanceof LimitRefusal) throw sqlError(error.failure);
+						throw error;
+					});
 					return {
 						text: result.text,
 						ms: result.ms,

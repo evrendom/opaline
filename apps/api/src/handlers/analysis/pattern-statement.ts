@@ -126,13 +126,18 @@ export function mergePatternRows(
 ): Row[] {
 	const byId = new Map<string, Row>();
 	const sessionsOf = new Map<string, Set<string>>();
+	const membersOf = new Map<string, Set<string>>();
+	const union = (into: Map<string, Set<string>>, id: string, ids: unknown) => {
+		const known = into.get(id) ?? new Set<string>();
+		for (const value of list(ids)) known.add(value);
+		into.set(id, known);
+		return known;
+	};
 	for (const row of rows) {
 		const id = String(row.id);
 		const seen = byId.get(id);
-		const ids = list(row.sids);
-		const known = sessionsOf.get(id) ?? new Set<string>();
-		for (const session of ids) known.add(session);
-		sessionsOf.set(id, known);
+		const known = union(sessionsOf, id, row.sids);
+		const members = union(membersOf, id, row.uids);
 		if (!seen) {
 			byId.set(id, {
 				...row,
@@ -150,9 +155,11 @@ export function mergePatternRows(
 				known.size > 0
 					? known.size
 					: number(seen.sessions) + number(row.sessions),
-			members: Math.max(number(seen.members), number(row.members)),
-			minutes:
-				Math.round((number(seen.minutes) + number(row.minutes)) * 10) / 10,
+			members:
+				members.size > 0
+					? members.size
+					: Math.max(number(seen.members), number(row.members)),
+			minutes: number(seen.minutes) + number(row.minutes),
 			first_seen: [seen.first_seen, row.first_seen].map(String).sort()[0],
 			last_seen: [seen.last_seen, row.last_seen].map(String).sort()[1],
 			weekly: weekly(seen.weekly, row.weekly),
@@ -170,7 +177,10 @@ export function mergePatternRows(
 					number(row.runs) >= 2 &&
 					number(row.sessions) >= minSessions,
 			)
-			.map(({ sids: _sids, ...row }) => row),
+			.map(({ sids: _sids, uids: _uids, ...row }) => ({
+				...row,
+				minutes: Math.round(number(row.minutes) * 10) / 10,
+			})),
 		limit,
 	);
 }
@@ -191,9 +201,32 @@ function mergeDrill(rows: Row[], limit: number): Row[] {
 	}));
 }
 
-interface Part {
-	readonly query: string;
-	readonly cohort: string;
+type Part = SqlParts["queries"][number];
+
+export const PIECE_ROWS = 1000;
+
+const APPROXIMATE: Partial<Record<PatternFamily, string>> = {
+	talk: "a correction's phrase is grouped where it recurs within one window, so its counts can be lower than over the whole window",
+	theme:
+		"a theme counts where it recurs within one window (3 sessions, 3 prompts), so its counts are a lower bound and a theme thin in every window is missing",
+};
+
+export function patternSplit(
+	scope: MeasureParams,
+	family: PatternFamily,
+	build: (window: MeasureParams) => string,
+): NonNullable<Part["split"]> {
+	const approximate = APPROXIMATE[family];
+	return {
+		stage: `patterns ${family}`,
+		window: scope,
+		build: (window) => ({
+			query: build(window),
+			cohort: cohortSelect(window),
+			rows: PIECE_ROWS,
+		}),
+		...(approximate ? { approximate } : {}),
+	};
 }
 
 function parts(
@@ -213,6 +246,10 @@ function parts(
 		return shards.map((scope) => ({
 			query: build(scope, part.family, part.kinds, shards.length > 1),
 			cohort: cohortSelect(scope),
+			...(shards.length > 1 ? { rows: PIECE_ROWS } : {}),
+			split: patternSplit(scope, part.family, (window) =>
+				build(window, part.family, part.kinds, true),
+			),
 		}));
 	});
 }
@@ -278,14 +315,21 @@ export function patternStatement(
 			};
 		return {
 			queries: parts(params, kinds, (shard, family, part, sharded) =>
-				patternsListSql(sharded ? { ...shard, limit: 200 } : shard, family, {
-					kinds: part,
-					minCount: sharded ? 1 : request.minCount,
-					minRuns: sharded ? 1 : 2,
-					minSessions: sharded ? 1 : PATTERN_MIN_SESSIONS,
-					weeksOf: params,
-					...(options.withRuns ? { withRuns: true } : {}),
-				}),
+				patternsListSql(
+					sharded
+						? { ...shard, limit: Math.floor(PIECE_ROWS / part.length) }
+						: shard,
+					family,
+					{
+						kinds: part,
+						minCount: sharded ? 1 : request.minCount,
+						minRuns: sharded ? 1 : 2,
+						minSessions: sharded ? 1 : PATTERN_MIN_SESSIONS,
+						...(sharded ? { piece: true } : {}),
+						weeksOf: params,
+						...(options.withRuns ? { withRuns: true } : {}),
+					},
+				),
 			),
 			merge: (rows) => mergePatternRows(rows, request.minCount, params.limit),
 			title: `Recurring patterns${request.kind ? ` (${request.kind})` : ""}, ${scope}`,

@@ -21,7 +21,10 @@ import {
 	digestSeveritySql,
 	digestUsageSql,
 } from "./retro-digest-sql.js";
-import type { MeasureParams } from "./retro-measure-sql.js";
+import {
+	type MeasureParams,
+	repeatedCommandsPieceSql,
+} from "./retro-measure-sql.js";
 import { RETRO_MEASURES } from "./retro-measures.js";
 import { runSql } from "./sql-gateway.js";
 import { prepareAgentSql, type SqlWindow } from "./sql-guard.js";
@@ -256,6 +259,25 @@ describe("aggregate aliases never shadow a column another aggregate reads", () =
 			];
 		}),
 		{ label: "prompt themes", sql: promptThemesSql(params) },
+		...digestCallsSql(params, true).map((sql, part) => ({
+			label: `digest calls window piece part ${part + 1}`,
+			sql,
+		})),
+		{
+			label: "repeated_commands window piece",
+			sql: repeatedCommandsPieceSql(params),
+		},
+		...patternFamilies(PATTERN_KINDS).map((part) => ({
+			label: `patterns ${part.family} window piece`,
+			sql: patternsListSql({ ...params, limit: 200 }, part.family, {
+				kinds: part.kinds,
+				minCount: 1,
+				minRuns: 1,
+				minSessions: 1,
+				piece: true,
+				withRuns: true,
+			}),
+		})),
 	];
 
 	for (const { label, sql } of retroStatements)

@@ -1,12 +1,26 @@
-import type { MeasureScope } from "@rudel/api-routes";
-import { shardWindows } from "../../services/analysis/patterns-sql.js";
+import { type MeasureScope, PATTERN_KINDS } from "@rudel/api-routes";
+import {
+	type PatternFamily,
+	patternFamilies,
+	shardWindows,
+} from "../../services/analysis/patterns-sql.js";
+import {
+	LimitRefusal,
+	runSplit,
+	type SplitBudget,
+	splitBudget,
+} from "../../services/analysis/refused-split.js";
 import {
 	buildDigest,
 	type Digest,
+	type DigestPart,
 	joinDigestRuns,
+	markUnknown,
+	noteMerged,
 	type Row,
 	renderDigest,
 } from "../../services/analysis/retro-digest.js";
+import { mergeDigestRows } from "../../services/analysis/retro-digest-merge.js";
 import {
 	contextSizesStatement,
 	digestCallsSql,
@@ -19,6 +33,7 @@ import {
 	startDirsStatement,
 	type TrustedStatement,
 } from "../../services/analysis/retro-digest-sql.js";
+import type { MeasureParams } from "../../services/analysis/retro-measure-sql.js";
 import {
 	cohortSelect,
 	measureParams,
@@ -28,7 +43,7 @@ import { patternStatement } from "./pattern-statement.js";
 
 export interface DigestReader {
 	readonly workspaceId: string;
-	view(query: string, cohort: string): Promise<Row[]>;
+	view(query: string, cohort: string, rows?: number): Promise<Row[]>;
 	trusted(statement: TrustedStatement): Promise<Row[]>;
 }
 
@@ -42,27 +57,73 @@ export interface DigestResult {
 
 const first = (rows: readonly Row[]): Row => rows[0] ?? {};
 
-async function merged(
-	reader: DigestReader,
-	parts: readonly string[],
-	cohort: string,
-): Promise<Row> {
-	const row: Row = {};
-	for (const part of parts)
-		Object.assign(row, first(await reader.view(part, cohort)));
-	return row;
-}
+const STATEMENT_NAMES = {
+	sessions: [
+		"sessions",
+		"repeats",
+		"streams and models",
+		"unrecorded facts",
+		"links",
+	],
+	calls: ["calls ranked", "calls share", "pushes"],
+	edits: ["edits"],
+	usage: ["usage per session", "subagent spans", "compactions"],
+	runs: ["runs", "run failures", "run prompts"],
+} as const;
+
+const FAMILY_KINDS = new Map(
+	patternFamilies(PATTERN_KINDS).map((part) => [part.family, part.kinds]),
+);
 
 export async function runDigest(
 	reader: DigestReader,
 	input: MeasureScope,
 	today: Date,
+	budget: SplitBudget = splitBudget(),
 ): Promise<DigestResult> {
 	const started = performance.now();
 	const params = measureParams({ ...input, limit: 20 }, today);
 	if ("error" in params) throw badRequest(params.error);
 	const cohort = cohortSelect(params);
-	const sessions = await merged(reader, digestSessionsSql(params), cohort);
+	const unknown = new Map<DigestPart, string[]>();
+	const view = (query: string, window: MeasureParams) =>
+		reader.view(query, cohortSelect(window));
+	const part = async (
+		name: keyof typeof STATEMENT_NAMES,
+		into: DigestPart,
+		build: (window: MeasureParams, piece: boolean) => readonly string[],
+	): Promise<Row> => {
+		const row: Row = {};
+		for (const [index, stage] of STATEMENT_NAMES[name].entries()) {
+			const outcome = await runSplit(
+				`digest ${stage}`,
+				params,
+				(window, piece) => view(build(window, piece)[index] ?? "", window),
+				budget,
+			);
+			if (!outcome.ok) {
+				if (name === "sessions" && index === 0)
+					throw outcome.refusal
+						? new LimitRefusal({
+								...outcome.refusal.failure,
+								message: `${outcome.refusal.failure.message} ${outcome.line}`,
+							})
+						: new Error(outcome.line);
+				unknown.set(into, [...(unknown.get(into) ?? []), outcome.line]);
+				return row;
+			}
+			Object.assign(
+				row,
+				outcome.values.length > 1
+					? mergeDigestRows(outcome.values.map(first))
+					: first(outcome.values[0] ?? []),
+			);
+		}
+		return row;
+	};
+	const sessions = await part("sessions", "facts", (window) =>
+		digestSessionsSql(window),
+	);
 	const listed = Array.isArray(sessions.sessions)
 		? (sessions.sessions as unknown[][])
 		: [];
@@ -77,25 +138,44 @@ export async function runDigest(
 		: await reader.trusted(startDirsStatement(scope));
 	const calls = empty
 		? {}
-		: await merged(reader, digestCallsSql(params), cohort);
+		: await part("calls", "calls", (window, piece) =>
+				digestCallsSql(window, piece),
+			);
 	const edits = empty
 		? {}
-		: first(await reader.view(digestEditsSql(params), cohort));
+		: await part("edits", "edits", (window) => [digestEditsSql(window)]);
 	const usage = empty
 		? {}
-		: await merged(reader, digestUsageSql(params), cohort);
+		: await part("usage", "usage", (window) => digestUsageSql(window));
 	const contextSizes = empty
 		? []
 		: await reader.trusted(contextSizesStatement(scope));
 	const runs = empty
 		? {}
-		: joinDigestRuns(await merged(reader, digestRunsSql(params), cohort));
-	const severity: Row[] = [];
-	if (!empty)
+		: joinDigestRuns(
+				await part("runs", "runs", (window) => digestRunsSql(window)),
+			);
+	const severityShards = async (): Promise<Row[]> => {
+		const rows: Row[] = [];
 		for (const shard of shardWindows(params, SEVERITY_SHARD_DAYS))
-			for (const part of digestSeveritySql(shard))
-				severity.push(...(await reader.view(part, cohortSelect(shard))));
+			for (const [index, rule] of ["commands", "output"].entries()) {
+				const outcome = await runSplit(
+					`digest severity ${rule} ${shard.from}..${shard.to}`,
+					shard,
+					(window) => view(digestSeveritySql(window)[index] ?? "", window),
+					budget,
+				);
+				if (!outcome.ok) {
+					unknown.set("severity", [outcome.line]);
+					return [];
+				}
+				for (const found of outcome.values) rows.push(...found);
+			}
+		return rows;
+	};
+	const severity = empty ? [] : await severityShards();
 	const patterns: Row[] = [];
+	const approximate: string[] = [];
 	if (!empty) {
 		const statement = patternStatement(
 			{ action: "list", ...input, minCount: 2, limit: 100 },
@@ -103,8 +183,49 @@ export async function runDigest(
 			{ withRuns: true },
 		);
 		const rows: Row[] = [];
-		for (const part of statement.parts.queries)
-			rows.push(...(await reader.view(part.query, part.cohort ?? cohort)));
+		const merged = new Map<string, string>();
+		for (const query of statement.parts.queries) {
+			const split = query.split;
+			if (!split) {
+				rows.push(
+					...(await reader.view(
+						query.query,
+						query.cohort ?? cohort,
+						query.rows,
+					)),
+				);
+				continue;
+			}
+			const outcome = await runSplit(
+				`digest ${split.stage}`,
+				split.window,
+				(window, piece) => {
+					const built = piece ? split.build(window) : query;
+					return reader.view(built.query, built.cohort ?? cohort, built.rows);
+				},
+				budget,
+				split.approximate ? { approximate: split.approximate } : {},
+			);
+			if (!outcome.ok) {
+				unknown.set("patterns", [
+					...(unknown.get("patterns") ?? []),
+					outcome.line,
+				]);
+				continue;
+			}
+			rows.push(...outcome.values.flat());
+			const family = split.stage.replace(/^patterns /u, "");
+			if (outcome.values.length > 1 && split.approximate) {
+				approximate.push(
+					`the ${family} patterns it cites were merged from ${outcome.values.length} windows, so what they explain can be lower`,
+				);
+				for (const kind of FAMILY_KINDS.get(family as PatternFamily) ?? [])
+					merged.set(
+						kind,
+						`merged from ${outcome.values.length} windows: ${split.approximate}`,
+					);
+			}
+		}
 		const cited = new Map<string, Set<string>>();
 		for (const row of rows) {
 			const id = String(row.id);
@@ -117,33 +238,42 @@ export async function runDigest(
 			...statement.parts.merge(rows).map((row) => ({
 				...row,
 				rids: [...(cited.get(String(row.id)) ?? [])],
+				...(merged.has(String(row.kind))
+					? { merged: merged.get(String(row.kind)) }
+					: {}),
 			})),
 		);
 	}
-	const digest = buildDigest(
-		{
-			sessions,
-			calls,
-			edits,
-			usage,
-			startDirs,
-			contextSizes,
-			runs,
-			severity,
-			patterns,
-		},
-		{
-			repository: params.repository ?? null,
-			from: params.from,
-			to: params.to,
-			latest: params.latest ?? null,
-			listed: params.sessions?.length ?? null,
-		},
+	const digest = markUnknown(
+		noteMerged(
+			buildDigest(
+				{
+					sessions,
+					calls,
+					edits,
+					usage,
+					startDirs,
+					contextSizes,
+					runs,
+					severity,
+					patterns,
+				},
+				{
+					repository: params.repository ?? null,
+					from: params.from,
+					to: params.to,
+					latest: params.latest ?? null,
+					listed: params.sessions?.length ?? null,
+				},
+			),
+			approximate,
+		),
+		unknown,
 	);
 	const ms = Math.round(performance.now() - started);
 	return {
 		digest,
-		text: renderDigest(digest, ms),
+		text: renderDigest(digest, ms, [...budget.notes, ...budget.partial]),
 		ms,
 		from: params.from,
 		to: params.to,

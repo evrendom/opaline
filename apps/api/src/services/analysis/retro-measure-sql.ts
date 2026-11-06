@@ -188,6 +188,40 @@ export function repeatedCommandsSql(params: MeasureParams): string {
 	LIMIT ${params.limit}`;
 }
 
+export const COMMAND_PIECE_FAMILIES = 400;
+export const COMMAND_PIECE_VARIANTS = 20;
+
+export function repeatedCommandsPieceSql(params: MeasureParams): string {
+	return `WITH ${pickedCte(params)},
+	family_calls AS (
+		SELECT arrayJoin(${commandFamiliesSql("command_head")}) AS family, call_id, user_id, session_id, agent_id, turn_idx,
+			failed, ifNull(call_minutes, 0) AS minutes, ifNull(command_fingerprint, cityHash64(command_head)) AS fingerprint,
+			substring(replaceRegexpAll(command_head, '\\s+', ' '), 1, 120) AS text
+		${callsIn(params, "command_from = 'command' AND command_head IS NOT NULL")}
+	),
+	variants AS (
+		SELECT family, fingerprint, count() AS calls_n, countIf(failed = 1) AS failed_n, sum(minutes) AS minutes_n,
+			groupUniqArray(session_id) AS variant_sessions, groupUniqArray(user_id) AS variant_members,
+			argMax(text, (minutes, call_id)) AS variant_text, max((minutes, call_id)) AS variant_top,
+			argMax((minutes, text, session_id, agent_id, turn_idx), (minutes, call_id)) AS slowest
+		FROM family_calls
+		GROUP BY family, fingerprint
+	),
+	families AS (
+		SELECT family, sum(calls_n) AS calls, sum(failed_n) AS failed, sum(minutes_n) AS minutes,
+			length(arrayDistinct(arrayFlatten(groupArray(variant_sessions)))) AS sessions,
+			arrayDistinct(arrayFlatten(groupArray(variant_members))) AS uids,
+			groupArray((toString(fingerprint), calls_n)) AS counts,
+			arraySlice(arrayReverseSort(v -> tupleElement(v, 1),
+				groupArray((calls_n, toString(fingerprint), variant_text, tupleElement(variant_top, 1), toString(tupleElement(variant_top, 2))))), 1, ${COMMAND_PIECE_VARIANTS}) AS texts,
+			argMax(slowest, tupleElement(slowest, 1)) AS ex
+		FROM variants
+		GROUP BY family
+	)
+	SELECT groupArray((family, calls, failed, minutes, sessions, uids, counts, if(rank <= ${COMMAND_PIECE_FAMILIES}, texts, []), ex)) AS families
+	FROM (SELECT *, row_number() OVER (ORDER BY calls DESC, family) AS rank FROM families)`;
+}
+
 export const LOCAL_CHECK_CLASSES = ["test", "typecheck", "lint", "build"];
 
 export function localPassCtes(params: MeasureParams): string {
