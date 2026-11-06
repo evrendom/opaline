@@ -433,11 +433,40 @@ test("a workspace already out of quota is not indexed at all", async () => {
 		next: null,
 	});
 	expect(result.message).toContain("without --after");
+	expect(result.message).toContain("ws-1 has used its OpenAI quota");
 	expect(
-		statements.some((statement) =>
-			statement.query.includes("rudel.transcript_records FINAL"),
+		statements.some(
+			(statement) =>
+				statement.query.includes("rudel.transcript_records FINAL") ||
+				statement.query.includes("AS reason"),
 		),
 	).toBe(false);
+});
+
+test("a run selects only the workspaces with quota left, while a preview still selects every indexed workspace", async () => {
+	const { executor, statements } = world([session("s-1", ["first"])]);
+	const quota = createMemoryEmbeddingQuota({ tokens: 10, windowMs: 1e9 });
+	await quota.charge("spent", 10);
+	const env = environment(executor, {
+		quota,
+		listWorkspaces: async () => ["spent", "ws-1"],
+	});
+	const everyWorkspace = { ...OPTIONS, organizationId: undefined };
+
+	await backfillTranscriptSearch(
+		{ ...env, embedder: fakeEmbedder(1) },
+		everyWorkspace,
+	);
+	await previewTranscriptSearchBackfill(env, everyWorkspace);
+
+	const selections = statements.filter((statement) =>
+		statement.query.includes("AS reason"),
+	);
+	expect(selections.map((s) => s.query_params?.organizationIds)).toEqual([
+		["ws-1"],
+		[],
+	]);
+	expect(selections[1]?.query).not.toContain("organizationIds");
 });
 
 test("a failing session is reported and the run goes on; a session being deleted is left alone", async () => {

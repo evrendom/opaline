@@ -20,7 +20,7 @@ import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.j
 import type { SearchAccess } from "./access.js";
 import { CHUNK_MAX_CHARS, CHUNK_OVERLAP_CHARS } from "./chunks.js";
 import type { TranscriptEmbedder } from "./config.js";
-import type { EmbeddingQuota } from "./quota.js";
+import type { EmbeddingQuota, EmbeddingQuotaUsage } from "./quota.js";
 import {
 	indexSessionText,
 	type SessionIndexOutcome,
@@ -342,7 +342,7 @@ export async function backfillTranscriptSearch(
 	env: TranscriptSearchBackfillExecuteEnv,
 	options: TranscriptSearchBackfillOptions,
 ): Promise<TranscriptSearchBackfillExecuted> {
-	const selection = await select(env, options);
+	const selection = await select(env, options, { withQuotaLeft: true });
 	const clock = env.clock ?? REAL_BACKFILL_CLOCK;
 	const log = env.log ?? (() => {});
 	const result: TranscriptSearchBackfillExecuted = {
@@ -482,6 +482,10 @@ export async function backfillTranscriptSearch(
 			);
 	}
 
+	if (selection.outOfQuota) {
+		result.stopped = "quota";
+		result.message = selection.summary.message;
+	}
 	result.costUsd = costOf(result.tokensCharged);
 	if (result.stopped !== null) {
 		result.hasMore = true;
@@ -502,9 +506,11 @@ export async function backfillTranscriptSearch(
 async function select(
 	env: TranscriptSearchBackfillEnv,
 	options: TranscriptSearchBackfillOptions,
+	mode: { readonly withQuotaLeft: boolean } = { withQuotaLeft: false },
 ): Promise<{
 	rows: CandidateRow[];
 	full: boolean;
+	outOfQuota: boolean;
 	summary: Omit<TranscriptSearchBackfillSummary, "hasMore" | "next">;
 }> {
 	validateOptions(options);
@@ -527,7 +533,22 @@ async function select(
 			options.organizationId === undefined
 				? "No workspace is indexed for search: none is listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES, or paid with TRANSCRIPT_EMBEDDINGS_PAID_PLANS=true."
 				: `${env.access.notIndexed}, and TRANSCRIPT_EMBEDDINGS_WORKSPACES does not list it.`;
-		return { rows: [], full: false, summary };
+		return { rows: [], full: false, outOfQuota: false, summary };
+	}
+	const selectable: string[] = [];
+	let exhausted: { workspaceId: string; usage: EmbeddingQuotaUsage } | null =
+		null;
+	for (const workspaceId of indexed) {
+		const usage = mode.withQuotaLeft
+			? await env.quota.usage(workspaceId)
+			: null;
+		if (usage && usage.used >= usage.limit)
+			exhausted ??= { workspaceId, usage };
+		else selectable.push(workspaceId);
+	}
+	if (selectable.length === 0 && exhausted) {
+		summary.message = quotaMessage(exhausted.workspaceId, exhausted.usage);
+		return { rows: [], full: false, outOfQuota: true, summary };
 	}
 	const rows = z.array(CandidateRowSchema).parse(
 		await env.executor.query<unknown>(
@@ -535,9 +556,9 @@ async function select(
 				// Every workspace is indexed (`*`): no list to send.
 				organizationIds:
 					options.organizationId === undefined &&
-					indexed.length === inScope.length
+					selectable.length === inScope.length
 						? null
-						: indexed,
+						: selectable,
 				after: options.after,
 				limit: options.maxSessions,
 				shard: options.shard,
@@ -546,7 +567,12 @@ async function select(
 	);
 	summary.candidates = rows.length;
 	for (const row of rows) summary.byReason[row.reason]++;
-	return { rows, full: rows.length >= options.maxSessions, summary };
+	return {
+		rows,
+		full: rows.length >= options.maxSessions,
+		outOfQuota: false,
+		summary,
+	};
 }
 
 /** Bounds are the script's (`parseTranscriptSearchBackfillArgs`); this checks the cursor's scope. */
