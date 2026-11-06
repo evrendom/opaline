@@ -6,7 +6,10 @@ import {
 	mergePatternRows,
 	patternStatement,
 } from "../../handlers/analysis/pattern-statement.js";
-import { runDigest } from "../../handlers/analysis/retro-digest.js";
+import {
+	digestReader,
+	runDigest,
+} from "../../handlers/analysis/retro-digest.js";
 import {
 	halves,
 	LimitRefusal,
@@ -17,7 +20,7 @@ import {
 } from "./refused-split.js";
 import { mergeDigestRows } from "./retro-digest-merge.js";
 import type { MeasureParams } from "./retro-measure-sql.js";
-import { runSql } from "./sql-gateway.js";
+import { runSql, type SqlEnv } from "./sql-gateway.js";
 import {
 	createMemorySqlQuota,
 	createMemorySqlResultStore,
@@ -641,5 +644,103 @@ describe("distinct sessions and members merge by id", () => {
 		expect(merged).toMatchObject({ sessions: 3, members: 3, count: 4 });
 		expect(merged).not.toHaveProperty("uids");
 		expect(merged).not.toHaveProperty("sids");
+	});
+});
+
+function counted(queries: number) {
+	const quota = createMemorySqlQuota({ queries, windowMs: 3_600_000 });
+	const taken: string[] = [];
+	return {
+		taken,
+		quota: {
+			...quota,
+			take: (workspaceId: string) => {
+				taken.push(workspaceId);
+				return quota.take(workspaceId);
+			},
+		},
+	};
+}
+
+const DIGEST_SESSION = [
+	"s1",
+	"claude",
+	"",
+	1,
+	2,
+	0,
+	0,
+	3,
+	2,
+	1,
+	2,
+	0,
+	[],
+	1,
+	"u1",
+];
+
+describe("one query of the quota per tool call", () => {
+	test("a split patterns list takes one query of the quota for all its statements", async () => {
+		const { env, queries } = gateway((window, query) =>
+			window && windowDays(window) > 20 && query.includes("tx_calls")
+				? refusal(MEMORY)
+				: [],
+		);
+		const { quota, taken } = counted(1);
+		const statement = patternStatement(
+			{ action: "list", ...month, minCount: 2, limit: 20 },
+			today,
+		);
+		const outcome = await runSql(caller, statement, { ...env, quota });
+		expect(outcome.ok).toBe(true);
+		expect(queries.length).toBeGreaterThan(statement.parts.queries.length);
+		expect(taken).toEqual(["ws-1"]);
+		const sent = queries.length;
+		const spent = await runSql(caller, statement, { ...env, quota });
+		expect(spent).toMatchObject({
+			ok: false,
+			error: {
+				kind: "fatal",
+				message:
+					"The workspace used its SQL quota of 1 queries (sql and run calls) per 60 minutes.",
+			},
+		});
+		expect(queries.length).toBe(sent);
+	});
+
+	test("a digest that runs every stage takes one query of the quota", async () => {
+		const { env, queries } = gateway((_window, query) =>
+			query.includes("p.uid)) AS sessions")
+				? [{ sessions: [DIGEST_SESSION] }]
+				: [],
+		);
+		const { quota, taken } = counted(1);
+		const digest = await runDigest(
+			digestReader(caller, { ...env, quota } as SqlEnv),
+			{ from: "2026-11-02", to: "2026-11-03" },
+			today,
+		);
+		expect(digest.text).toContain("retro digest");
+		expect(queries.length).toBeGreaterThan(20);
+		expect(taken).toEqual(["ws-1"]);
+	});
+
+	test("a spent quota refuses the digest before any statement, with the quota's message", async () => {
+		const { env, queries } = gateway(() => []);
+		const { quota } = counted(0);
+		await expect(
+			runDigest(
+				digestReader(caller, { ...env, quota } as SqlEnv),
+				{ from: "2026-11-02", to: "2026-11-03" },
+				today,
+			),
+		).rejects.toMatchObject({
+			code: "FORBIDDEN",
+			message: expect.stringContaining(
+				"used its SQL quota of 0 queries (sql and run calls) per 60 minutes",
+			),
+		});
+		expect(queries).toEqual([]);
 	});
 });

@@ -141,9 +141,10 @@ export async function openRun(
 			message: `Unknown section ${unknown.join(", ")}; sections are ${RUN_VIEW_SECTIONS.map((section) => section.name).join(", ")}`,
 		});
 	const byRecord = isRecordUuid(input.id);
-	const address = byRecord
-		? null
-		: await resolveRun(workspaceId, input.id, env);
+	const byTurn = byRecord ? null : sessionTurn(input.id);
+	const address =
+		byRecord || byTurn ? null : await resolveRun(workspaceId, input.id, env);
+	const turnOwner = byTurn ? await env.ownerOf(byTurn.sessionId) : null;
 	const quota = await env.quota.take(workspaceId);
 	if (!quota.allowed) {
 		const refusal = quotaExceeded(env.quota, quota.resetsAt);
@@ -156,13 +157,23 @@ export async function openRun(
 	const record = byRecord
 		? await resolveRecord(workspaceId, input.id, limited)
 		: null;
-	const target = record?.address ?? address;
+	const turn =
+		byTurn && turnOwner !== null
+			? await resolveTurn(
+					limited.executor,
+					{ organizationId: workspaceId, userId: turnOwner },
+					byTurn,
+				)
+			: null;
+	const target = record?.address ?? turn ?? address;
 	const run = target ? await loadRun(limited.executor, target) : null;
 	if (!run)
 		throw new ORPCError("NOT_FOUND", {
 			message: record
 				? `Record ${input.id} is ${describeRecordUuidHit(record.hit)}, which no indexed run holds (the run may not be indexed yet); read the record with read depth=record`
-				: "Run not found in the run index; pass a run_id from sql (the run may not be indexed yet)",
+				: byTurn
+					? `Run ${input.id} not found: session ${byTurn.sessionId} has no indexed run ${byTurn.turn} in ${byTurn.agentId ? `stream ${byTurn.agentId}` : "its main stream"} (the run may not be indexed yet); pass a run_id from sql`
+					: "Run not found in the run index; pass a run_id from sql (the run may not be indexed yet)",
 		});
 	const expand = [
 		...new Set([
@@ -242,6 +253,43 @@ function recordLocation(
 			? ""
 			: `; the same id is also ${others.map(describeRecordUuidHit).join(", ")}`;
 	return `record ${uuid} is ${describeRecordUuidHit(hit)} (run_id ${run.view.id})${also}\n`;
+}
+
+const SESSION_TURN = /^([^\s/:#]+)(?::([^\s/#]+))?#(\d{1,10})$/u;
+
+function sessionTurn(
+	id: string,
+): { sessionId: string; agentId: string; turn: number } | null {
+	const match = SESSION_TURN.exec(id);
+	if (!match?.[1] || !match[3] || Number(match[3]) > MAX_RECORD) return null;
+	return {
+		sessionId: match[1],
+		agentId: match[2] ?? "",
+		turn: Number(match[3]),
+	};
+}
+
+async function resolveTurn(
+	executor: ClickHouseExecutor,
+	scope: TranscriptReadScope,
+	at: { sessionId: string; agentId: string; turn: number },
+): Promise<RunAddress | null> {
+	const row = (
+		await readCommittedRunIndex(executor, scope, [at.sessionId], "run")
+	)
+		.filter(
+			(run) => run.agent_id === at.agentId && Number(run.turn_idx) === at.turn,
+		)
+		.sort((a, b) => a.start_record - b.start_record)[0];
+	return row
+		? {
+				scope,
+				source: row.source,
+				sessionId: at.sessionId,
+				agentId: at.agentId,
+				startRecord: row.start_record,
+			}
+		: null;
 }
 
 function notRunId(): ORPCError<string, unknown> {

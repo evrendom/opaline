@@ -6,6 +6,7 @@ import {
 } from "../../services/analysis/patterns-sql.js";
 import {
 	LimitRefusal,
+	limitRefusal,
 	runSplit,
 	type SplitBudget,
 	splitBudget,
@@ -38,13 +39,53 @@ import {
 	cohortSelect,
 	measureParams,
 } from "../../services/analysis/retro-measures.js";
+import {
+	execute,
+	type SqlCaller,
+	type SqlEnv,
+	withCallQuota,
+	withSqlLimits,
+	wrapRows,
+} from "../../services/analysis/sql-gateway.js";
 import { badRequest } from "./measure-statement.js";
 import { patternStatement } from "./pattern-statement.js";
+import { sqlError } from "./sql-error.js";
 
 export interface DigestReader {
 	readonly workspaceId: string;
 	view(query: string, cohort: string, rows?: number): Promise<Row[]>;
 	trusted(statement: TrustedStatement): Promise<Row[]>;
+}
+
+export function digestReader(
+	caller: SqlCaller,
+	env: SqlEnv,
+	signal?: AbortSignal,
+): DigestReader {
+	const sqlEnv = withCallQuota(env);
+	const limited = withSqlLimits(env.executor);
+	return {
+		workspaceId: caller.workspaceId,
+		view: async (query, cohort, rows) => {
+			const outcome = await execute(
+				caller,
+				query,
+				sqlEnv,
+				signal,
+				async (found) => found,
+				rows ? wrapRows(rows) : undefined,
+				cohort,
+			);
+			if (!outcome.ok)
+				throw limitRefusal(outcome.error) ?? sqlError(outcome.error);
+			return outcome.value;
+		},
+		trusted: (statement) =>
+			limited.query({
+				...statement,
+				clickhouse_settings: { readonly: "1" },
+			}),
+	};
 }
 
 export interface DigestResult {

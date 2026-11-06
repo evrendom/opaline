@@ -370,7 +370,7 @@ async function runSplitParts(
 	}
 }
 
-export async function runSql(
+export function runSql(
 	caller: SqlCaller,
 	input: {
 		query: string;
@@ -381,6 +381,15 @@ export async function runSql(
 	},
 	env: SqlEnv,
 	signal?: AbortSignal,
+): Promise<SqlOutcome> {
+	return runStatements(caller, input, withCallQuota(env), signal);
+}
+
+async function runStatements(
+	caller: SqlCaller,
+	input: Parameters<typeof runSql>[1],
+	env: SqlEnv,
+	signal: AbortSignal | undefined,
 ): Promise<SqlOutcome> {
 	const follow = (found: SqlRow[]): Promise<Followed> => {
 		const rows = found.map((row) => redactReturnedValue(row) as SqlRow);
@@ -829,8 +838,9 @@ export async function execute<T>(
 /**
  * Runs `work` (an agent's ClickHouse reads: sql, search, run_questions) in a
  * query slot of the workspace, taking one query of its quota inside the slot,
- * so a busy refusal costs none. Past the quota, or with no slot free, it says
- * why instead.
+ * so a busy refusal costs none; within `withCallQuota`, only the call's first
+ * statement takes one. Past the quota, or with no slot free, it says why
+ * instead.
  */
 export async function withAgentQuery<T>(
 	workspaceId: string,
@@ -856,6 +866,23 @@ export async function withAgentQuery<T>(
 		if (!(error instanceof AgentQueryBusyError)) throw error;
 		return { ok: false, error: BUSY };
 	}
+}
+
+export function withCallQuota<E extends { readonly quota: SqlQuota }>(
+	env: E,
+): E {
+	let taken: ReturnType<SqlQuota["take"]> | null = null;
+	return {
+		...env,
+		quota: {
+			queries: env.quota.queries,
+			windowMs: env.quota.windowMs,
+			take: (workspaceId: string) => {
+				taken ??= env.quota.take(workspaceId);
+				return taken;
+			},
+		},
+	};
 }
 
 /** No query slot came free, or ClickHouse as a whole is short of memory. */

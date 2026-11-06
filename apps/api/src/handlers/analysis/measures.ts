@@ -14,21 +14,16 @@ import {
 	checkQuery,
 } from "../../services/analysis/checks.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
-import {
-	LimitRefusal,
-	limitRefusal,
-} from "../../services/analysis/refused-split.js";
+import { LimitRefusal } from "../../services/analysis/refused-split.js";
 import {
 	describeMeasure,
 	listMeasures,
 } from "../../services/analysis/retro-measures.js";
 import {
-	execute as executeSql,
 	guardSql,
 	runSql,
 	type SqlEnv,
-	withSqlLimits,
-	wrapRows,
+	withCallQuota,
 } from "../../services/analysis/sql-gateway.js";
 import { captureCall } from "../../services/analysis-log/capture.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
@@ -36,7 +31,7 @@ import type { SessionReader } from "../../services/session-visibility.js";
 import { badRequest, measureStatement } from "./measure-statement.js";
 import { patternStatement } from "./pattern-statement.js";
 import { peekOutcome, sliceOutcome } from "./peek.js";
-import { runDigest } from "./retro-digest.js";
+import { digestReader, runDigest } from "./retro-digest.js";
 import { requireRetroTools } from "./retro-tools.js";
 import { sqlError } from "./sql-error.js";
 
@@ -266,13 +261,14 @@ export function createMeasureProcedures(env: MeasureEnv) {
 							: { action: "list", ...input },
 						now(),
 					);
+					const sqlEnv = withCallQuota(env.sqlEnv);
 					const peeks = [];
 					for (const part of statement.parts.queries)
 						peeks.push(
 							await peekOutcome(
 								context,
 								{ query: part.query, cohort: part.cohort ?? statement.cohort },
-								env.sqlEnv,
+								sqlEnv,
 								signal,
 							),
 						);
@@ -297,30 +293,8 @@ export function createMeasureProcedures(env: MeasureEnv) {
 					analysisLimiter.run(context.user.id, async () => next(), signal),
 				)
 				.handler(async ({ input, context, signal }) => {
-					const limited = withSqlLimits(env.executor);
 					const result = await runDigest(
-						{
-							workspaceId: context.organizationId,
-							view: async (query, cohort, rows) => {
-								const outcome = await executeSql(
-									callerOf(context),
-									query,
-									env.sqlEnv,
-									signal,
-									async (found) => found,
-									rows ? wrapRows(rows) : undefined,
-									cohort,
-								);
-								if (!outcome.ok)
-									throw limitRefusal(outcome.error) ?? sqlError(outcome.error);
-								return outcome.value;
-							},
-							trusted: (statement) =>
-								limited.query({
-									...statement,
-									clickhouse_settings: { readonly: "1" },
-								}),
-						},
+						digestReader(callerOf(context), env.sqlEnv, signal),
 						input,
 						now(),
 					).catch((error: unknown) => {
