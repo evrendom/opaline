@@ -54,9 +54,20 @@ describe("database readiness", () => {
 				expect(response.status).toBe(503);
 				expect(await response.json()).toMatchObject({
 					status: "unavailable",
+					alerts: ["availability"],
 					dependencies: {
 						postgres: { status: "ok" },
-						clickhouse: { status: "unavailable" },
+						clickhouse: {
+							status: "unavailable",
+							outcome:
+								missingPrivilege === "INSERT" ? "insert_failed" : "read_failed",
+							probe: {
+								insert: {
+									failure: missingPrivilege === "INSERT" ? "clickhouse" : null,
+									exception_code: missingPrivilege === "INSERT" ? "497" : null,
+								},
+							},
+						},
 						// Without INSERT, reads still serve analytics; without SELECT they cannot.
 						clickhouse_read: {
 							status: missingPrivilege === "INSERT" ? "ok" : "unavailable",
@@ -110,9 +121,10 @@ describe("database readiness", () => {
 			const response = await fetch(`${base}/health/ready`);
 			expect(response.status).toBe(503);
 			expect(await response.json()).toMatchObject({
+				alerts: ["availability"],
 				dependencies: {
 					postgres: { status: "unavailable" },
-					clickhouse: { status: "ok" },
+					clickhouse: { status: "ok", outcome: "ok" },
 				},
 			});
 		} finally {
@@ -131,11 +143,24 @@ describe("database readiness", () => {
 		for (const response of responses) {
 			expect(response.status).toBe(200);
 			expect(response.headers.get("Cache-Control")).toBe("no-store");
-			expect(await response.json()).toEqual({
+			const body = await response.json();
+			expect(body).toEqual({
 				status: "ok",
+				alerts: expect.any(Array),
 				dependencies: {
 					postgres: { status: "ok", duration_ms: expect.any(Number) },
-					clickhouse: { status: "ok", duration_ms: expect.any(Number) },
+					clickhouse: {
+						status: "ok",
+						duration_ms: expect.any(Number),
+						outcome: expect.stringMatching(/^(ok|delayed_visibility)$/u),
+						probe: expect.objectContaining({
+							probe_id: expect.any(String),
+							insert: expect.objectContaining({
+								query_id: expect.stringMatching(/^health-write-/u),
+								failure: null,
+							}),
+						}),
+					},
 					clickhouse_read: { status: "ok", duration_ms: expect.any(Number) },
 					clickhouse_ping: { status: "ok", duration_ms: expect.any(Number) },
 				},
@@ -167,6 +192,7 @@ describe("database readiness", () => {
 			expect(response.headers.get("Cache-Control")).toBe("no-store");
 			expect(await response.json()).toEqual({
 				status: "unavailable",
+				alerts: expect.arrayContaining(["availability"]),
 				dependencies: {
 					postgres: {
 						status: dependency === "clickhouse" ? "ok" : "unavailable",
@@ -175,6 +201,8 @@ describe("database readiness", () => {
 					clickhouse: {
 						status: dependency === "postgres" ? "ok" : "unavailable",
 						duration_ms: expect.any(Number),
+						outcome: dependency === "postgres" ? "ok" : "insert_failed",
+						probe: expect.any(Object),
 					},
 					clickhouse_read: {
 						status: dependency === "postgres" ? "ok" : "unavailable",
@@ -211,16 +239,26 @@ describe("database readiness", () => {
 			});
 			const started = performance.now();
 			const response = await fetch(`${base}/health/ready`);
-			expect(performance.now() - started).toBeLessThan(9_500);
+			expect(performance.now() - started).toBeLessThan(13_500);
 			expect(response.status).toBe(503);
 			const body = await response.json();
 			expect(body).toEqual({
 				status: "unavailable",
+				alerts: ["availability", "slow_write"],
 				dependencies: {
 					postgres: { status: "unavailable", duration_ms: expect.any(Number) },
 					clickhouse: {
 						status: "unavailable",
 						duration_ms: expect.any(Number),
+						outcome: "insert_timeout",
+						probe: expect.objectContaining({
+							slow_insert: true,
+							insert: expect.objectContaining({
+								failure: "timeout",
+								exception_code: null,
+							}),
+							reads: [],
+						}),
 					},
 					clickhouse_read: {
 						status: "unavailable",
@@ -239,5 +277,5 @@ describe("database readiness", () => {
 				blackhole.close((error) => (error ? reject(error) : resolve())),
 			);
 		}
-	}, 15_000);
+	}, 20_000);
 });

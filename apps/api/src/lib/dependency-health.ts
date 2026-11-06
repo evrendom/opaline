@@ -1,9 +1,18 @@
 import { createClient } from "@clickhouse/client-web";
+import { getLogger } from "@logtape/logtape";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
 import postgres from "postgres";
+import {
+	HEALTHY_WRITE_PROBE_OUTCOMES,
+	probeClickHouseWrite,
+	WRITE_PROBE_LIMITS,
+	type WriteProbeOutcome,
+	type WriteProbeReport,
+} from "./clickhouse-write-probe.js";
+
+const logger = getLogger(["rudel", "api", "health"]);
 
 const TIMEOUT_MS = 3_000;
-const WRITE_TIMEOUT_MS = 8_000;
 const CACHE_MS = 30_000;
 
 interface DependencyStatus {
@@ -11,11 +20,19 @@ interface DependencyStatus {
 	duration_ms: number;
 }
 
-interface HealthResult {
+interface ClickHouseWriteStatus extends DependencyStatus {
+	outcome: WriteProbeOutcome;
+	probe: WriteProbeReport;
+}
+
+export type HealthAlert = "availability" | "slow_write" | "visibility";
+
+export interface HealthResult {
 	status: "ok" | "unavailable";
+	alerts: HealthAlert[];
 	dependencies: {
 		postgres: DependencyStatus;
-		clickhouse: DependencyStatus;
+		clickhouse: ClickHouseWriteStatus;
 		clickhouse_read: DependencyStatus;
 		clickhouse_ping: DependencyStatus;
 	};
@@ -52,7 +69,7 @@ function getPendingCheck(): Promise<HealthResult> {
 async function checkDependencies(): Promise<HealthResult> {
 	const [
 		postgresStatus,
-		clickhouseStatus,
+		clickhouseProbe,
 		clickhouseReadStatus,
 		clickhousePingStatus,
 	] = await Promise.all([
@@ -61,24 +78,69 @@ async function checkDependencies(): Promise<HealthResult> {
 				? { status: "idle" as const, duration_ms: 0 }
 				: measureDependency(checkPostgres),
 		),
-		measureDependency(checkClickHouse),
+		checkClickHouseWrite(),
 		measureDependency(checkClickHouseRead),
 		measureDependency(checkClickHousePing),
 	]);
-	// Readiness stays strict: an acknowledged ClickHouse write is required.
-	// The read check only tells the app whether analytics can still be served
-	// while writes are slow.
-	const healthy =
-		postgresStatus.status !== "unavailable" && clickhouseStatus.status === "ok";
+	const result = summarizeHealth(
+		postgresStatus,
+		clickhouseProbe,
+		clickhouseReadStatus,
+		clickhousePingStatus,
+	);
+	logWriteProbe(clickhouseProbe, result.alerts);
+	return result;
+}
+
+export function summarizeHealth(
+	postgresStatus: DependencyStatus,
+	probe: WriteProbeReport,
+	clickhouseReadStatus: DependencyStatus,
+	clickhousePingStatus: DependencyStatus,
+): HealthResult {
+	const clickhouse: ClickHouseWriteStatus = {
+		status: HEALTHY_WRITE_PROBE_OUTCOMES.has(probe.outcome)
+			? "ok"
+			: "unavailable",
+		duration_ms: probe.duration_ms,
+		outcome: probe.outcome,
+		probe,
+	};
+	const alerts: HealthAlert[] = [];
+	if (
+		postgresStatus.status === "unavailable" ||
+		clickhouseReadStatus.status === "unavailable" ||
+		probe.outcome === "insert_failed" ||
+		probe.outcome === "read_failed"
+	)
+		alerts.push("availability");
+	if (probe.slow_insert) alerts.push("slow_write");
+	if (probe.outcome === "delayed_visibility" || probe.outcome === "not_visible")
+		alerts.push("visibility");
 	return {
-		status: healthy ? "ok" : "unavailable",
+		status:
+			postgresStatus.status !== "unavailable" && clickhouse.status === "ok"
+				? "ok"
+				: "unavailable",
+		alerts,
 		dependencies: {
 			postgres: postgresStatus,
-			clickhouse: clickhouseStatus,
+			clickhouse,
 			clickhouse_read: clickhouseReadStatus,
 			clickhouse_ping: clickhousePingStatus,
 		},
 	};
+}
+
+function logWriteProbe(probe: WriteProbeReport, alerts: HealthAlert[]): void {
+	const properties = { ...probe, alerts };
+	const message =
+		"ClickHouse write probe {outcome} in {duration_ms} ms (probe {probe_id})";
+	if (probe.outcome === "ok" && !probe.slow_insert)
+		logger.info(message, properties);
+	else if (HEALTHY_WRITE_PROBE_OUTCOMES.has(probe.outcome))
+		logger.warn(message, properties);
+	else logger.error(message, properties);
 }
 
 async function postgresIsIdle(): Promise<boolean> {
@@ -143,48 +205,17 @@ async function checkPostgres(): Promise<void> {
 	}
 }
 
-async function checkClickHouse(): Promise<void> {
+async function checkClickHouseWrite(): Promise<WriteProbeReport> {
 	const url = process.env.CLICKHOUSE_URL || "http://localhost:8123";
 	const client = createClient({
 		url,
 		username: resolveClickHouseUsername(process.env, url),
 		password: process.env.CLICKHOUSE_PASSWORD || "",
 		database: "default",
-		request_timeout: WRITE_TIMEOUT_MS,
+		request_timeout: WRITE_PROBE_LIMITS.insertRequestTimeoutMs,
 	});
 	try {
-		// SELECT 1 only exercises the query frontend. Require an acknowledged
-		// storage write and an uncached read of that exact row instead. A fresh ID
-		// prevents old canary data or query-cache hits from masking an outage.
-		const probeId = crypto.randomUUID();
-		const signal = AbortSignal.timeout(WRITE_TIMEOUT_MS);
-		await client.command({
-			query: `INSERT INTO rudel.dependency_health_probes (probe_id)
-				SETTINGS async_insert = 1, wait_for_async_insert = 1,
-					async_insert_use_adaptive_busy_timeout = 0,
-					async_insert_busy_timeout_ms = 200
-				FORMAT JSONEachRow ${JSON.stringify({ probe_id: probeId })}`,
-			abort_signal: signal,
-			clickhouse_settings: { max_execution_time: 7 },
-		});
-		const result = await client.query({
-			query: `SELECT probe_id FROM rudel.dependency_health_probes
-				WHERE probe_id = {probeId:UUID} LIMIT 1`,
-			query_params: { probeId },
-			format: "JSONEachRow",
-			abort_signal: signal,
-			clickhouse_settings: {
-				max_execution_time: 2,
-				timeout_before_checking_execution_speed: 0,
-				max_rows_to_read: "100000",
-				max_bytes_to_read: "1048576",
-				use_query_cache: 0,
-				select_sequential_consistency: "1",
-			},
-		});
-		const rows = await result.json<{ probe_id: string }>();
-		if (rows[0]?.probe_id !== probeId)
-			throw new Error("ClickHouse storage probe was not readable");
+		return await probeClickHouseWrite(client);
 	} finally {
 		await client.close();
 	}
