@@ -417,7 +417,30 @@ export function forkReplayCtes(
 	owner?: string,
 ): string {
 	return `fork_links AS (
-			SELECT DISTINCT user_id, session_id, agent_id, JSONExtractString(component, 'value') AS parent_session_id
+			${forkLinksSql(children)}
+		),
+		${forkParentCallsSql("(user_id, session_id) IN (SELECT user_id, parent_session_id FROM fork_links)", owner)},
+		replayed_calls AS (
+			SELECT f.user_id AS user_id, f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
+			FROM fork_links f INNER JOIN parent_calls p ON f.user_id = p.user_id AND f.parent_session_id = p.session_id
+		)`;
+}
+
+export function forkReplayOnceCtes(children: string, owner?: string): string {
+	const links = "opaline_fork_links";
+	const link = `(SELECT arrayJoin(${links}) AS l)`;
+	return `(SELECT groupUniqArray((user_id, session_id, agent_id, parent_session_id)) FROM (
+			${forkLinksSql(children)}
+		)) AS ${links},
+		${forkParentCallsSql(`(user_id, session_id) IN (SELECT l.1, l.4 FROM ${link})`, owner)},
+		replayed_calls AS (
+			SELECT f.l.1 AS user_id, f.l.2 AS session_id, f.l.3 AS agent_id, p.call_id AS call_id
+			FROM ${link} AS f INNER JOIN parent_calls p ON f.l.1 = p.user_id AND f.l.4 = p.session_id
+		)`;
+}
+
+function forkLinksSql(children: string): string {
+	return `SELECT DISTINCT user_id, session_id, agent_id, JSONExtractString(component, 'value') AS parent_session_id
 			FROM ${records()} ARRAY JOIN JSONExtractArrayRaw(facts['parent_session_components']) AS component
 			WHERE ${children} AND source = 'codex' AND parser_version >= 9
 				AND (user_id, session_id, agent_id, record_idx) IN (
@@ -426,13 +449,7 @@ export function forkReplayCtes(
 						AND kind = 'meta' AND subtype = 'session_meta'
 					GROUP BY user_id, session_id, agent_id)
 				AND JSONExtractString(component, 'path') = 'session_meta/.forked_from_id'
-				AND parent_session_id != '' AND parent_session_id != session_id
-		),
-		${forkParentCallsSql("(user_id, session_id) IN (SELECT user_id, parent_session_id FROM fork_links)", owner)},
-		replayed_calls AS (
-			SELECT f.user_id AS user_id, f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
-			FROM fork_links f INNER JOIN parent_calls p ON f.user_id = p.user_id AND f.parent_session_id = p.session_id
-		)`;
+				AND parent_session_id != '' AND parent_session_id != session_id`;
 }
 
 /**

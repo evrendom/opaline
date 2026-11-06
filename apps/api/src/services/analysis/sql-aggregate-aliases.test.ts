@@ -225,7 +225,12 @@ describe("aggregate aliases never shadow a column another aggregate reads", () =
 			digestUsageSql,
 			digestRunsSql,
 			digestSeveritySql,
-		].map((build) => ({ label: `digest ${build.name}`, sql: build(params) })),
+		].flatMap((build) =>
+			[build(params)].flat().map((sql, part) => ({
+				label: `digest ${build.name} part ${part + 1}`,
+				sql,
+			})),
+		),
 		...patternFamilies(PATTERN_KINDS).flatMap((part) => {
 			const id = `${PATTERN_PREFIX[part.kinds[0] ?? "failing_call"]}_0123456789`;
 			return [

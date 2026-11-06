@@ -1,7 +1,7 @@
 import {
-	inPicked,
+	inPickedSet,
 	type MeasureParams,
-	pickedCte,
+	pickedSetCte,
 	sqlString,
 	windowStart,
 } from "./retro-measure-sql.js";
@@ -496,12 +496,12 @@ const words = (key: string) => `substring(${key}, position(${key}, '|') + 1)`;
 
 export function themeCtes(params: MeasureParams): string[] {
 	return [
-		pickedCte(params),
+		pickedSetCte(params),
 		`th_prompts AS (
 		SELECT user_id AS uid, session_id AS sid, run_id AS rid, turn_idx AS turn, at, text_chars AS chars,
 			substringUTF8(text, 1, ${PROMPT_CHARS}) AS raw
 		FROM prompts
-		WHERE at >= ${windowStart(params)} AND genuine = 1 AND agent_id = '' AND run_id != '' AND ${inPicked()}
+		WHERE at >= ${windowStart(params)} AND genuine = 1 AND agent_id = '' AND run_id != '' AND ${inPickedSet()}
 			AND session_id NOT IN (SELECT session_id FROM runs WHERE started_at >= ${windowStart(params)} AND agent_id = '' AND entrypoint IN (${AGENT_LAUNCHERS.map((l) => `'${l}'`).join(", ")}))
 	)`,
 		`th_marked AS (
@@ -530,11 +530,14 @@ export function themeCtes(params: MeasureParams): string[] {
 		`th_hits AS (
 		SELECT uid, sid, rid, turn, at, body, raw, key FROM th_keys ARRAY JOIN keys AS key
 	)`,
-		`th_stats AS (
+		`(SELECT groupArray((key, sessions, prompts)) FROM (
 		SELECT key, uniqExact(sid) AS sessions, count() AS prompts
 		FROM th_hits
 		GROUP BY key
 		HAVING sessions >= ${THEME_MIN_SESSIONS} AND prompts >= ${THEME_MIN_PROMPTS}
+	)) AS th_stats_all`,
+		`th_stats AS (
+		SELECT s.1 AS key, s.2 AS sessions, s.3 AS prompts FROM (SELECT arrayJoin(th_stats_all) AS s)
 	)`,
 		`th_nested AS (
 		SELECT sub, max(prompts) AS covering
@@ -558,7 +561,7 @@ export function themeCtes(params: MeasureParams): string[] {
 			toUInt8(ifNull(said_done, false)) AS said, interrupt_markers AS intr, failed_calls AS fails,
 			substringUTF8(trimBoth(replaceRegexpAll(ifNull(final_message, ''), '\\\\s+', ' ')), 1, 90) AS fin
 		FROM runs
-		WHERE agent_id = '' AND ${inPicked()}
+		WHERE agent_id = '' AND ${inPickedSet()}
 	)`,
 		`th_ev AS (
 		SELECT h.uid AS uid, h.sid AS sid, 'theme' AS kind,

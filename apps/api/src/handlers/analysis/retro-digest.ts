@@ -3,6 +3,7 @@ import { shardWindows } from "../../services/analysis/patterns-sql.js";
 import {
 	buildDigest,
 	type Digest,
+	joinDigestRuns,
 	type Row,
 	renderDigest,
 } from "../../services/analysis/retro-digest.js";
@@ -14,6 +15,7 @@ import {
 	digestSessionsSql,
 	digestSeveritySql,
 	digestUsageSql,
+	SEVERITY_SHARD_DAYS,
 	startDirsStatement,
 	type TrustedStatement,
 } from "../../services/analysis/retro-digest-sql.js";
@@ -40,6 +42,17 @@ export interface DigestResult {
 
 const first = (rows: readonly Row[]): Row => rows[0] ?? {};
 
+async function merged(
+	reader: DigestReader,
+	parts: readonly string[],
+	cohort: string,
+): Promise<Row> {
+	const row: Row = {};
+	for (const part of parts)
+		Object.assign(row, first(await reader.view(part, cohort)));
+	return row;
+}
+
 export async function runDigest(
 	reader: DigestReader,
 	input: MeasureScope,
@@ -49,7 +62,7 @@ export async function runDigest(
 	const params = measureParams({ ...input, limit: 20 }, today);
 	if ("error" in params) throw badRequest(params.error);
 	const cohort = cohortSelect(params);
-	const sessions = first(await reader.view(digestSessionsSql(params), cohort));
+	const sessions = await merged(reader, digestSessionsSql(params), cohort);
 	const listed = Array.isArray(sessions.sessions)
 		? (sessions.sessions as unknown[][])
 		: [];
@@ -64,25 +77,24 @@ export async function runDigest(
 		: await reader.trusted(startDirsStatement(scope));
 	const calls = empty
 		? {}
-		: first(await reader.view(digestCallsSql(params), cohort));
+		: await merged(reader, digestCallsSql(params), cohort);
 	const edits = empty
 		? {}
 		: first(await reader.view(digestEditsSql(params), cohort));
 	const usage = empty
 		? {}
-		: first(await reader.view(digestUsageSql(params), cohort));
+		: await merged(reader, digestUsageSql(params), cohort);
 	const contextSizes = empty
 		? []
 		: await reader.trusted(contextSizesStatement(scope));
 	const runs = empty
 		? {}
-		: first(await reader.view(digestRunsSql(params), cohort));
+		: joinDigestRuns(await merged(reader, digestRunsSql(params), cohort));
 	const severity: Row[] = [];
 	if (!empty)
-		for (const shard of shardWindows(params))
-			severity.push(
-				...(await reader.view(digestSeveritySql(shard), cohortSelect(shard))),
-			);
+		for (const shard of shardWindows(params, SEVERITY_SHARD_DAYS))
+			for (const part of digestSeveritySql(shard))
+				severity.push(...(await reader.view(part, cohortSelect(shard))));
 	const patterns: Row[] = [];
 	if (!empty) {
 		const statement = patternStatement(

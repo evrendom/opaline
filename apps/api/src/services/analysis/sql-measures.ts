@@ -6,7 +6,7 @@ import {
 	SETUP_SINCE_INDEX_VERSION,
 	SETUP_SINCE_PARSER_VERSION,
 } from "./received-setup.js";
-import { forkReplayCtes, runToolErrorSql } from "./run-index-sql.js";
+import { forkReplayOnceCtes, runToolErrorSql } from "./run-index-sql.js";
 import { records, toolErrorSql } from "./sql.js";
 import type { SqlWindow } from "./sql-guard.js";
 import { capturedSetupSessionsSql } from "./sql-setup-views.js";
@@ -634,10 +634,13 @@ export function measuredRunsSql(
 					+ cache_write_1h_input_tokens + output_tokens AS tokens,
 				if(source = 'codex' OR prompt_subtype IS NULL, NULL,
 					CAST(ifNull(leadInFrame(prompt_subtype) OVER stream, '') = 'queued' AS Nullable(Bool))) AS ended_by_queued_prompt,
-				if(ifNull(ended_by_queued_prompt, false), ${known("false")}, ${known(said)}) AS said_done,
+				if(ifNull(ended_by_queued_prompt, false), ${known("false")}, said_in_message) AS said_done,
 				${known(`hasAny(leadInFrame(prompt_reactions) OVER stream, ${sqlArray(UNHAPPY)})`)} AS frustrated
-			FROM ${runs.table} FINAL
-			WHERE ${runs.owner} AND row_kind = 'run' AND ${runs.committed}
+			FROM (
+				SELECT *, ${known(said)} AS said_in_message
+				FROM ${runs.table} FINAL
+				WHERE ${runs.owner} AND row_kind = 'run' AND ${runs.committed}
+			)
 			WINDOW stream AS (PARTITION BY user_id, session_id, agent_id ORDER BY turn_idx
 				ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING)
 		) AS r`;
@@ -650,7 +653,7 @@ export function measuredRunsSql(
  * call's result records share its `call_id` in its stream; a call recorded
  * twice (a resumed transcript repeats it) is one row, its first record. Calls
  * a forked Codex session replays from its parent, and their results, are left
- * out as the run index leaves them out (`forkReplayCtes`).
+ * out as the run index leaves them out (`forkReplayOnceCtes`).
  *
  * `window` is the started_at range the agent's query keeps, when the gateway
  * can tell (`sql-guard.ts`): only sessions with a call record in it are read
@@ -660,11 +663,14 @@ export function measuredRunsSql(
  */
 export function callsSql(
 	runs: CommittedRuns,
-	measuredRuns: string,
+	measuredRuns: (runs: CommittedRuns) => string,
 	window: SqlWindow = {},
 	parentOwner: string = runs.owner,
 ): string {
 	const windowed = windowSessionsSql(runs.owner, "kind = 'tool_call'", window);
+	const windowedRuns = windowed
+		? { ...runs, owner: `${runs.owner}${windowed.sessions}` }
+		: runs;
 	const sessions = `${runs.owner}
 				AND (user_id, session_id, revision, parser_version) IN (
 					SELECT user_id, session_id, committed.1, committed.2 FROM (
@@ -713,7 +719,7 @@ export function callsSql(
 	// text, whose limit the parser reads from version 12; the run index
 	// counts that hand-off from parser 11, without the limit.
 	const timeoutUnknown = `has(r.unrecorded_facts, 'timed_out_calls') OR (r.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
-	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, parentOwner)].join(",\n\t\t")}
+	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayOnceCtes(sessions, parentOwner)].join(",\n\t\t")}
 		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
 			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
 			c.session_date AS session_date, c.call_id AS call_id,
@@ -755,7 +761,8 @@ export function callsSql(
 			arrayMap(x -> x.2, c.changes) AS changed_files, arrayMap(x -> x.3, c.changes) AS changed_file_ops,
 			arrayMap(x -> x.4, c.changes) AS changed_files_basis,
 			toLowCardinality(${editRouteSql({ tool: "c.first_tool_name", from: "c.first_command_from", head: "c.first_command_head", files: "c.changes", basis: "arrayMap(x -> x.4, c.changes)" })}) AS edit_route,
-			if(ifNull(c.result_failed, 0) OR c.result_denial_kind != '', ${errorLineSql("if(c.result_error_head = '' AND c.result_error_tail = '', concat(c.result_head, char(10), c.result_tail), concat(c.result_error_head, char(10), c.result_error_tail))")}, NULL) AS error,
+			if(ifNull(c.result_failed, 0) OR c.result_denial_kind != '',
+				multiIf(c.result_error_text, c.result_error_line, c.results > 0, c.result_first_line, ${errorLineSql("char(10)")}), NULL) AS error,
 			arrayStringConcat(arrayMap(x -> x.2, c.outputs), char(10)) AS output,
 			c.output_chars AS output_chars, toUInt8(c.output_cut) AS output_cut,
 			r.coverage_gaps AS coverage_gaps
@@ -770,10 +777,9 @@ export function callsSql(
 				anyIf(denial_kind, ${result} AND denial_kind != '') AS result_denial_kind,
 				argMinIf(facts['denial_reason'], position, ${result} AND facts['denial_reason'] != '') AS denial_reason,
 				argMinIf(facts['error_from_call_id'], position, ${result} AND facts['error_from_call_id'] != '') AS error_from_call_id,
-				argMinIf(head, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_head,
-				argMinIf(tail, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_tail,
-				argMinIf(head, position, ${result}) AS result_head,
-				argMinIf(tail, position, ${result}) AS result_tail,
+				argMinIf(result_line, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_line,
+				argMinIf(head != '' OR tail != '', position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_text,
+				argMinIf(result_line, position, ${result}) AS result_first_line,
 				arraySort(groupArrayIf((position, ${piece}), ${result})) AS outputs,
 				sumIf(text_chars, ${result}) AS output_chars,
 				maxIf(text_chars > lengthUTF8(${stored}), ${result}) AS output_cut,
@@ -788,6 +794,7 @@ export function callsSql(
 					is_error, exit_code, denial_kind, denial_kind != '' AS refused, head, tail, text, text_chars, facts,
 					(record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
 					interrupted, timed_out_after_ms, facts['script_call_id'] AS parent,
+					if(${result}, ${errorLineSql("concat(head, char(10), tail)")}, '') AS result_line,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars,
@@ -803,7 +810,7 @@ export function callsSql(
 				if(call_id = '', position, (0, 0))
 			HAVING countIf(${call}) > 0
 		) AS c
-		INNER JOIN (${measuredRuns}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
+		INNER JOIN (${measuredRuns(windowedRuns)}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
 			AND r.revision = c.revision AND r.parser_version = c.parser_version
 			AND r.agent_id = c.agent_id AND r.turn_idx = c.first_turn_idx`;
 }

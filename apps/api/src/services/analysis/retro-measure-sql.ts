@@ -55,6 +55,18 @@ export function inPicked(alias = ""): string {
 	return `(${prefix}user_id, ${prefix}session_id) IN (SELECT user_id, session_id FROM picked)`;
 }
 
+const PICKED_SET = "picked_set";
+
+export function pickedSetCte(params: MeasureParams): string {
+	return `${pickedCte(params)},
+	(SELECT groupUniqArray((user_id, session_id)) FROM picked) AS ${PICKED_SET}`;
+}
+
+export function inPickedSet(alias = "", session = "session_id"): string {
+	const prefix = alias ? `${alias}.` : "";
+	return `(${prefix}user_id, ${prefix}${session}) IN (SELECT arrayJoin(${PICKED_SET}))`;
+}
+
 export function callsIn(params: MeasureParams, where: string): string {
 	return `FROM calls
 		WHERE started_at >= ${windowStart(params)} AND ${where}

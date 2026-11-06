@@ -4,6 +4,7 @@ import {
 	coverageOf,
 	type DigestInputs,
 	editFacts,
+	joinDigestRuns,
 	maskSecrets,
 	mergeSeverity,
 	peakConcurrency,
@@ -68,11 +69,13 @@ function guarded(sql: string) {
 const statements = [
 	{ label: "sessions", sql: digestSessionsSql(params) },
 	{ label: "calls", sql: digestCallsSql(params) },
-	{ label: "edits", sql: digestEditsSql(params) },
+	{ label: "edits", sql: [digestEditsSql(params)] },
 	{ label: "usage", sql: digestUsageSql(params) },
 	{ label: "runs", sql: digestRunsSql(params) },
 	{ label: "severity", sql: digestSeveritySql(params) },
-];
+].flatMap(({ label, sql }) =>
+	sql.map((part, index) => ({ label: `${label} ${index + 1}`, sql: part })),
+);
 
 describe("digest statements", () => {
 	test("each passes the sql guard and fits the statement size ClickHouse is given", () => {
@@ -110,7 +113,7 @@ describe("digest statements", () => {
 	});
 
 	test("the calls statement returns one row of ranked metrics, the failure share over agent calls and pushes", () => {
-		const sql = digestCallsSql(params);
+		const sql = digestCallsSql(params).join("\n;\n");
 		expect(sql).toContain("AS ranked");
 		expect(sql).toContain("countIf(call_level != 'inner' AND failed = 1)");
 		expect(sql).toContain("kind = 'push_range'");
@@ -119,7 +122,7 @@ describe("digest statements", () => {
 	});
 
 	test("the sessions statement reads the first main-stream run's instruction and skill files", () => {
-		const sql = digestSessionsSql(params);
+		const sql = digestSessionsSql(params).join("\n;\n");
 		expect(sql).toContain(
 			"kind IN ('instructions', 'agents_md', 'nested_memory', 'skill_body')",
 		);
@@ -130,7 +133,7 @@ describe("digest statements", () => {
 	});
 
 	test("the usage statement adds Codex subagent threads to their parent session and counts one compaction per boundary", () => {
-		const sql = digestUsageSql(params);
+		const sql = digestUsageSql(params).join("\n;\n");
 		expect(sql).toContain("kind = 'parent_thread'");
 		expect(sql).toContain("concat('thread ', r.session_id)");
 		expect(sql).toContain(
@@ -139,18 +142,19 @@ describe("digest statements", () => {
 	});
 
 	test("the runs statement gives every run its failed agent calls, the ones a row explains, and its first genuine prompt", () => {
-		const sql = digestRunsSql(params);
+		const sql = digestRunsSql(params).join("\n;\n");
 		expect(sql).toContain("countIf(failed = 1 AND (denial_kind != ''");
 		expect(sql).toContain("genuine = 1");
-		expect(sql).toContain("toUInt8(ifNull(r.frustrated, false))");
+		expect(sql).toContain("toUInt8(ifNull(frustrated, false))");
 	});
 
 	test("the severity statement tags every matching call with each rule, never ranked or limited by frequency", () => {
-		const sql = digestSeveritySql(params);
+		const sql = digestSeveritySql(params).join("\n;\n");
 		for (const rule of SEVERITY_RULES)
 			expect(sql).toContain(`'${rule.rule.replaceAll("'", "\\'")}'`);
 		expect(sql).toContain("GROUP BY category, rule");
-		expect(sql.split("hits AS")[1]).not.toContain("HAVING");
+		for (const part of digestSeveritySql(params))
+			expect(part.split("hits AS")[1]).not.toContain("HAVING");
 		expect(sql).toContain("if(call_level = 'inner', '', output) AS output");
 	});
 });
@@ -418,7 +422,7 @@ function inputs(): DigestInputs {
 				],
 			],
 			share: [100, 7, 80, 5, 0, 0, 2, 0],
-			pushes: [2, 1, 0, 0],
+			push_stats: [2, 1, 0, 0],
 		},
 		edits: {
 			edits: [
@@ -609,6 +613,41 @@ describe("digest", () => {
 			"production-looking writes or deploys: none matched",
 		]);
 		for (const row of rows) expect(row.definition.length).toBeGreaterThan(30);
+	});
+
+	test("severity: rules from several statements come out in the order one statement sorts them", () => {
+		const merged = mergeSeverity([
+			{ severity: [["secrets", "secret-looking string in output", 1, 1, []]] },
+			{
+				severity: [
+					["destructive", "rm -rf outside /tmp", 2, 1, []],
+					["secrets", ".env file read", 1, 1, []],
+				],
+			},
+		]);
+		expect(merged.map((hit) => hit.rule)).toEqual([
+			"rm -rf outside /tmp",
+			".env file read",
+			"secret-looking string in output",
+		]);
+	});
+
+	test("runs: each run gets its failed calls and first prompt from their own statements, or none", () => {
+		expect(
+			joinDigestRuns({
+				runs: [
+					["r1", "s1", "", 1, 2.5, 1, 0, 0],
+					["r2", "s1", "", 2, 1, 1, 1, 0],
+				],
+				failures: [["r2", 3, 1]],
+				asked: [["r1", "fix it", 6, ""]],
+			}),
+		).toEqual({
+			runs: [
+				["r1", "s1", "", 1, 2.5, 1, 0, 0, 0, 0, "fix it", 6, ""],
+				["r2", "s1", "", 2, 1, 1, 1, 0, 3, 1, "", 0, ""],
+			],
+		});
 	});
 
 	test("unexplained: coverage counts what patterns and rows explain, the rest is listed with examples", () => {

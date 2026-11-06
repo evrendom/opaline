@@ -962,7 +962,7 @@ function checksSection(calls: Row, patterns: readonly Row[]): DigestSection {
 		});
 	else missing.push("local checks: none ran");
 	const poll = ranked(calls, "ci_polls")[0];
-	const pushes = arr(calls.pushes).map(num);
+	const pushes = arr(calls.push_stats).map(num);
 	if (poll || (pushes[0] ?? 0) > 0)
 		rows.push({
 			metric: "CI polling and pushes",
@@ -1158,14 +1158,21 @@ export function mergeSeverity(shards: readonly Row[]): SeverityHit[] {
 			);
 			byRule.set(key, seen);
 		}
-	return [...byRule.values()].map((hit) => ({
-		...hit,
-		examples: hit.examples
-			.sort(
-				(a, b) => a.ex.localeCompare(b.ex) || a.quote.localeCompare(b.quote),
-			)
-			.slice(0, 50),
-	}));
+	const order = (left: string, right: string) =>
+		left < right ? -1 : left > right ? 1 : 0;
+	return [...byRule.values()]
+		.sort(
+			(left, right) =>
+				order(left.category, right.category) || order(left.rule, right.rule),
+		)
+		.map((hit) => ({
+			...hit,
+			examples: hit.examples
+				.sort(
+					(a, b) => a.ex.localeCompare(b.ex) || a.quote.localeCompare(b.quote),
+				)
+				.slice(0, 50),
+		}));
 }
 
 function severitySection(
@@ -1235,6 +1242,27 @@ export interface Coverage {
 	readonly frustrated: { readonly explained: number; readonly total: number };
 	readonly failed: { readonly explained: number; readonly total: number };
 	readonly active: { readonly explained: number; readonly total: number };
+}
+
+export function joinDigestRuns(row: Row): Row {
+	const byRun = (value: unknown) =>
+		new Map(tuples(value).map((t) => [str(t[0]), t]));
+	const failures = byRun(row.failures);
+	const asked = byRun(row.asked);
+	return {
+		runs: tuples(row.runs).map((t) => {
+			const f = failures.get(str(t[0]));
+			const a = asked.get(str(t[0]));
+			return [
+				...t,
+				f?.[1] ?? 0,
+				f?.[2] ?? 0,
+				a?.[1] ?? "",
+				a?.[2] ?? 0,
+				a?.[3] ?? "",
+			];
+		}),
+	};
 }
 
 export function coverageOf(runs: readonly RunFact[], patterns: readonly Row[]) {

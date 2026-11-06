@@ -1005,12 +1005,15 @@ export const SHARDED_FAMILIES: readonly PatternFamily[] = ["text", "flow"];
 
 export const SHARD_DAYS = 35;
 
-export function shardWindows(params: MeasureParams): MeasureParams[] {
+export function shardWindows(
+	params: MeasureParams,
+	shardDays = SHARD_DAYS,
+): MeasureParams[] {
 	const day = 86_400_000;
 	const start = Date.parse(`${params.from}T00:00:00Z`);
 	const days =
 		Math.round((Date.parse(`${params.to}T00:00:00Z`) - start) / day) + 1;
-	const count = Math.max(1, Math.ceil(days / SHARD_DAYS));
+	const count = Math.max(1, Math.ceil(days / shardDays));
 	const size = Math.ceil(days / count);
 	return Array.from({ length: count }, (_, index) => ({
 		...params,
@@ -1081,6 +1084,10 @@ export const RUN_TIME_KINDS: readonly PatternKind[] = [
 	"theme",
 ];
 
+function readsRunTime(kinds: readonly PatternKind[]): boolean {
+	return kinds.some((kind) => RUN_TIME_KINDS.includes(kind));
+}
+
 export const PATTERN_DETAILS = 5;
 
 const THEME_EXAMPLES = 3;
@@ -1099,13 +1106,13 @@ function detailSql(): string {
 			if(g.kind IN (${LINE_KINDS.map(sqlString).join(", ")}), ${said}, ${variants}) AS detail`;
 }
 
-function patternsCte(change = false, withRuns = false): string {
+function patternsCte(change = false, withRuns = false, runTime = true): string {
 	return `pat AS (
 		SELECT g.id AS id, g.kind AS kind, any(g.key) AS key, topKWeighted(1)(g.sub, g.hits)[1] AS sub,${withRuns ? "\n\t\t\tgroupUniqArray(g.rid) AS rids," : ""}
 			topKWeighted(1)(g.signature, g.hits)[1] AS signature, topKWeighted(1)(g.target, g.hits)[1] AS target,
 			sum(g.hits) AS count, count() AS runs, uniqExact(g.sid) AS sessions, uniqExact(g.uid) AS members,
 			groupUniqArray(${SESSION_IDS})(g.sid) AS sids,
-			round(sum(r.active_minutes), 1) AS run_minutes, round(sum(g.cm), 1) AS call_minutes,
+			${runTime ? "round(sum(r.active_minutes), 1)" : "toFloat64(0)"} AS run_minutes, round(sum(g.cm), 1) AS call_minutes,
 			if(g.kind IN (${RUN_TIME_KINDS.map(sqlString).join(", ")}), run_minutes, call_minutes) AS minutes,
 			min(g.first_at) AS first_seen, max(g.first_at) AS last_seen, groupArray(toMonday(g.first_at)) AS weeks_hit,
 			arraySlice(arrayMap(x -> ${el("x", 3)}, arrayReverseSort(x -> (${el("x", 1)}, ${el("x", 2)}), groupArray((g.hits, g.cm, ${ref("g")})))), 1, 5) AS examples,
@@ -1117,7 +1124,7 @@ function patternsCte(change = false, withRuns = false): string {
 					: ""
 			}
 		FROM per_run AS g
-		LEFT JOIN (SELECT run_id, active_minutes FROM runs) AS r ON r.run_id = g.rid${change ? "\n\t\tCROSS JOIN change AS c" : ""}
+		${runTime ? "LEFT JOIN (SELECT run_id, active_minutes FROM runs) AS r ON r.run_id = g.rid" : ""}${change ? "\n\t\tCROSS JOIN change AS c" : ""}
 		GROUP BY g.id, g.kind${change ? ", c.changed_at" : ""}
 	)`;
 }
@@ -1191,7 +1198,7 @@ export function patternsListSql(
 	const week = weeks(options.weeksOf ?? params);
 	return `WITH ${evidenceCtes(params, family, options.kinds)},
 	${perRunCte()},
-	${patternsCte(false, options.withRuns)}
+	${patternsCte(false, options.withRuns, readsRunTime(options.kinds))}
 	SELECT id, kind, signature, count, runs, sessions, members, minutes, toDate(first_seen) AS first_seen,
 		toDate(last_seen) AS last_seen, weekly, fix_type, fix_hint, detail, examples,
 		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}
@@ -1274,7 +1281,7 @@ export function patternsVerifySql(
 	return `WITH ${evidenceCtes(params, family, options.kinds)},
 	${perRunCte()},
 	${change},
-	${patternsCte(true)},
+	${patternsCte(true, false, readsRunTime(options.kinds))},
 	totals AS (
 		SELECT countIf(r.started_at < c.changed_at) AS before_total, countIf(r.started_at >= c.changed_at) AS after_total
 		FROM (SELECT started_at FROM runs) AS r

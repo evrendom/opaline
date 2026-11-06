@@ -211,7 +211,7 @@ const CALLS: SqlView = {
 		const runs = committedRuns(memberOnly, window);
 		return callsSql(
 			runs,
-			measuredRunsSql(runs, CALL_RUN_COLUMNS),
+			(scoped) => measuredRunsSql(scoped, CALL_RUN_COLUMNS),
 			window,
 			memberOwner(memberOnly),
 		);

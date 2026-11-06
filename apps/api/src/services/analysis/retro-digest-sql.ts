@@ -1,10 +1,10 @@
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { commandFamiliesSql } from "./command-identity.js";
 import {
-	inPicked,
+	inPickedSet,
 	LOCAL_CHECK_CLASSES,
 	type MeasureParams,
-	pickedCte,
+	pickedSetCte,
 	sqlString,
 	windowStart,
 } from "./retro-measure-sql.js";
@@ -29,16 +29,16 @@ export const SCRIPT_FUNCTION_RE = String.raw`((?:def|function)\s+[A-Za-z_][A-Za-
 
 export const INTERPRETER_RE = String.raw`\b(python3?|node|bun|deno|ruby|perl|tsx)\b`;
 
-export function digestSessionsSql(params: MeasureParams): string {
+export function digestSessionsSql(params: MeasureParams): string[] {
 	const start = windowStart(params);
-	return `WITH ${pickedCte(params)},
+	const ctes = `WITH ${pickedSetCte(params)},
 	main AS (
 		SELECT user_id AS uid, session_id AS sid, turn_idx AS turn, source AS src, ifNull(entrypoint, '') AS launcher,
 			minutes AS wall_min, active_minutes AS active_min, genuine_prompts AS asked,
 			if(interrupt_markers = 0 AND ifNull(aborted, '') = 'true' AND ifNull(abort_reason, '') = 'interrupted', 1, interrupt_markers) AS interrupts,
 			ifNull(reasked, false) AS reask
 		FROM runs
-		WHERE agent_id = '' AND ${inPicked()}
+		WHERE agent_id = '' AND ${inPickedSet()}
 	),
 	per_session AS (
 		SELECT uid, sid, any(src) AS source, argMin(launcher, turn) AS launched_by, min(turn) AS first_turn,
@@ -52,7 +52,7 @@ export function digestSessionsSql(params: MeasureParams): string {
 		SELECT user_id AS uid, session_id AS sid,
 			arraySort(groupUniqArray(concat(kind, ' ', scope, ' ', if(scope = 'member', path, setup_file)))) AS files
 		FROM setup_files
-		WHERE started_at >= ${start} AND agent_id = '' AND ${inPicked()}
+		WHERE started_at >= ${start} AND agent_id = '' AND ${inPickedSet()}
 			AND kind IN ('instructions', 'agents_md', 'nested_memory', 'skill_body')
 			AND (user_id, session_id, turn_idx) IN (SELECT uid, sid, first_turn FROM per_session)
 		GROUP BY user_id, session_id
@@ -60,7 +60,7 @@ export function digestSessionsSql(params: MeasureParams): string {
 	asked AS (
 		SELECT user_id AS uid, session_id AS sid, count() AS genuine_n, countIf(subtype = 'queued') AS queued_n
 		FROM prompts
-		WHERE at >= ${start} AND genuine = 1 AND agent_id = '' AND ${inPicked()}
+		WHERE at >= ${start} AND genuine = 1 AND agent_id = '' AND ${inPickedSet()}
 		GROUP BY user_id, session_id
 	),
 	repeats AS (
@@ -69,7 +69,7 @@ export function digestSessionsSql(params: MeasureParams): string {
 			SELECT user_id AS uid, session_id AS sid, turn_idx AS turn,
 				lowerUTF8(trimBoth(replaceRegexpAll(substring(text, 1, 400), '\\s+', ' '))) AS said
 			FROM prompts
-			WHERE at >= ${start} AND genuine = 1 AND agent_id = '' AND ${inPicked()} AND lengthUTF8(trimBoth(text)) >= 12
+			WHERE at >= ${start} AND genuine = 1 AND agent_id = '' AND ${inPickedSet()} AND lengthUTF8(trimBoth(text)) >= 12
 		)
 		GROUP BY uid, sid, said
 		HAVING times >= 2
@@ -77,38 +77,43 @@ export function digestSessionsSql(params: MeasureParams): string {
 	streams AS (
 		SELECT session_id AS sid, agent_id AS aid, min(turn_idx) AS turn
 		FROM runs
-		WHERE agent_id != '' AND ${inPicked()}
+		WHERE agent_id != '' AND ${inPickedSet()}
 		GROUP BY session_id, agent_id
 	),
 	models AS (
 		SELECT ifNull(model, '') AS key, session_id AS sid, agent_id = '' AS main_stream
 		FROM runs
-		WHERE ${inPicked()}
-	)
-	SELECT
-		(SELECT groupArray((p.sid, p.source, p.launched_by, p.first_turn, p.prompts, p.interrupts_n, p.reasks, p.wall,
-			p.active, p.main_runs, a.genuine_n, a.queued_n, f.files, p.longest_turn, p.uid))
-		FROM per_session AS p
-		LEFT JOIN start_files AS f ON f.uid = p.uid AND f.sid = p.sid
-		LEFT JOIN asked AS a ON a.uid = p.uid AND a.sid = p.sid) AS sessions,
-		(SELECT groupArray((said, times, sid, first_turn)) FROM (
-			SELECT substring(said, 1, 90) AS said, times, sid, first_turn FROM repeats ORDER BY times DESC, sid, said LIMIT 40)) AS repeats,
-		(SELECT (count(), uniqExact(sid)) FROM repeats) AS repeat_totals,
+		WHERE ${inPickedSet()}
+	)`;
+	return [
+		`${ctes}
+	SELECT groupArray((p.sid, p.source, p.launched_by, p.first_turn, p.prompts, p.interrupts_n, p.reasks, p.wall,
+		p.active, p.main_runs, a.genuine_n, a.queued_n, f.files, p.longest_turn, p.uid)) AS sessions
+	FROM per_session AS p
+	LEFT JOIN start_files AS f ON f.uid = p.uid AND f.sid = p.sid
+	LEFT JOIN asked AS a ON a.uid = p.uid AND a.sid = p.sid`,
+		`${ctes}
+	SELECT groupArray((said, times, sid, first_turn)) AS repeats FROM (
+		SELECT substring(said, 1, 90) AS said, times, sid, first_turn FROM repeats ORDER BY times DESC, sid, said LIMIT 40)`,
+		`${ctes}
+	SELECT (SELECT (count(), uniqExact(sid)) FROM repeats) AS repeat_totals,
 		(SELECT groupArray((sid, aid, turn)) FROM (SELECT sid, aid, turn FROM streams ORDER BY sid, aid LIMIT 5000)) AS streams,
 		(SELECT groupArray((key, runs, sessions, main_runs)) FROM (
 			SELECT key, count() AS runs, uniqExact(sid) AS sessions, countIf(main_stream) AS main_runs
-			FROM models GROUP BY key ORDER BY runs DESC, key LIMIT 12)) AS models,
-		(SELECT groupArray((source, fact, n, runs_n)) FROM (
+			FROM models GROUP BY key ORDER BY runs DESC, key LIMIT 12)) AS models`,
+		`${ctes}
+	SELECT (SELECT groupArray((source, fact, n, runs_n)) FROM (
 			SELECT source, fact, count() AS n, any(runs_n) AS runs_n
-			FROM (SELECT source, arrayJoin(unrecorded_facts) AS fact, count() OVER (PARTITION BY source) AS runs_n FROM runs WHERE ${inPicked()})
+			FROM (SELECT source, arrayJoin(unrecorded_facts) AS fact, count() OVER (PARTITION BY source) AS runs_n FROM runs WHERE ${inPickedSet()})
 			GROUP BY source, fact ORDER BY source, fact)) AS unrecorded,
-		(SELECT groupArray((source, runs_n)) FROM (SELECT source, count() AS runs_n FROM runs WHERE ${inPicked()} GROUP BY source ORDER BY source)) AS runs_by_source,
-		(SELECT groupArray((kind, from_session_id, to_session_id, from_source, to_source)) FROM (
-			SELECT kind, from_session_id, to_session_id, from_source, to_source
-			FROM session_links
-			WHERE (user_id, from_session_id) IN (SELECT user_id, session_id FROM picked)
-				OR (user_id, to_session_id) IN (SELECT user_id, session_id FROM picked)
-			ORDER BY kind, from_session_id, to_session_id LIMIT 2000)) AS links`;
+		(SELECT groupArray((source, runs_n)) FROM (SELECT source, count() AS runs_n FROM runs WHERE ${inPickedSet()} GROUP BY source ORDER BY source)) AS runs_by_source`,
+		`${ctes}
+	SELECT groupArray((kind, from_session_id, to_session_id, from_source, to_source)) AS links FROM (
+		SELECT kind, from_session_id, to_session_id, from_source, to_source
+		FROM session_links
+		WHERE ${inPickedSet("", "from_session_id")} OR ${inPickedSet("", "to_session_id")}
+		ORDER BY kind, from_session_id, to_session_id LIMIT 2000)`,
+	];
 }
 
 export const CALL_METRICS = {
@@ -149,7 +154,7 @@ const tag = (
 
 const HEAD_LABEL = `substring(replaceRegexpAll(ifNull(command_head, tool_name), '\\s+', ' '), 1, 70)`;
 
-export function digestCallsSql(params: MeasureParams): string {
+export function digestCallsSql(params: MeasureParams): string[] {
 	const checks = [...LOCAL_CHECK_CLASSES, "install"].map(sqlString).join(", ");
 	const shell = "command_from = 'command' AND command_head IS NOT NULL";
 	const DENIAL_LABEL = `multiIf(denial_kind IN ('user-rejected', 'Rejected'), 'the person rejected the tool call at its permission prompt', denial_kind = 'permission-rule', 'blocked by a permission rule', denial_kind = 'hook', 'blocked by a hook', denial_kind)`;
@@ -160,13 +165,13 @@ export function digestCallsSql(params: MeasureParams): string {
 				concat(extract(command_head, ${sqlString(INTERPRETER_RE)}), ': ',
 					replaceRegexpAll(extract(command_head, ${sqlString(SCRIPT_FUNCTION_RE)}), '\\s+', ' ')), '')`;
 	const inline = `command_from IN ('command', 'script') AND match(command_head, ${sqlString(INLINE_SCRIPT_RE)})`;
-	return `WITH ${pickedCte(params)},
+	const ctes = `WITH ${pickedSetCte(params)},
 	c AS (
 		SELECT session_id AS sid, agent_id AS aid, turn_idx AS turn, call_level, tool_name, failed, denial_kind,
 			denial_reason, command_class, command_from, command_head, call_minutes, ifNull(call_minutes, 0) AS mins, timed_out,
 			background_status, changed_files, changed_files_basis, edit_route, ${example("session_id", "agent_id", "turn_idx")} AS ex
 		FROM calls
-		WHERE started_at >= ${windowStart(params)} AND ${inPicked()}
+		WHERE started_at >= ${windowStart(params)} AND ${inPickedSet()}
 	),
 	tagged AS (
 		SELECT sid, ex, arrayConcat(
@@ -211,15 +216,15 @@ export function digestCallsSql(params: MeasureParams): string {
 		ORDER BY metric, multiIf(metric IN (${metricList("w")}), w, metric IN (${metricList("sessions")}), toFloat64(sessions), toFloat64(n)) DESC, n DESC, key
 		LIMIT ${Math.max(...Object.values(CALL_METRICS).map((metric) => metric.limit))} BY metric
 	),
-	pushes AS (
+	push_events AS (
 		SELECT session_id AS sid, evidence_id AS evidence
 		FROM git_events
-		WHERE kind = 'push_range' AND at >= ${windowStart(params)} AND ${inPicked()}
+		WHERE kind = 'push_range' AND at >= ${windowStart(params)} AND ${inPickedSet()}
 	),
 	pushed AS (
 		SELECT DISTINCT evidence_id AS evidence, to_id AS commit_id
 		FROM edges
-		WHERE relation = 'commit_pushed' AND from_kind = 'run' AND ${inPicked()}
+		WHERE relation = 'commit_pushed' AND from_kind = 'run' AND ${inPickedSet()}
 	),
 	ci AS (
 		SELECT DISTINCT from_id AS commit_id, to_id AS ci_run
@@ -239,68 +244,78 @@ export function digestCallsSql(params: MeasureParams): string {
 		INNER JOIN ci AS r ON r.commit_id = pd.commit_id
 		INNER JOIN jobs AS j ON j.ci_run = r.ci_run
 		GROUP BY pd.evidence
-	)
-	SELECT
-		(SELECT groupArray((metric, rows)) FROM (
-			SELECT metric, groupArray((key, n, f, w, sessions, ids, ex, label, timed)) AS rows FROM limited GROUP BY metric)) AS ranked,
-		(SELECT (countIf(${AGENT_LEVEL}), countIf(${AGENT_LEVEL} AND failed = 1),
-			countIf(${AGENT_LEVEL} AND aid = ''), countIf(${AGENT_LEVEL} AND aid = '' AND failed = 1),
-			countIf(call_level = 'inner'), countIf(call_level = 'inner' AND failed = 1),
-			uniqExactIf(sid, ${AGENT_LEVEL} AND failed = 1), countIf(call_level = 'inner' AND ${TIMED} = 1)) FROM c) AS share,
-		(SELECT (count(), uniqExact(sid), countIf(evidence IN (SELECT evidence FROM push_ci)),
-			countIf(evidence IN (SELECT evidence FROM push_ci WHERE failed_jobs > 0))) FROM pushes) AS pushes`;
+	)`;
+	return [
+		`${ctes}
+	SELECT groupArray((metric, rows)) AS ranked FROM (
+		SELECT metric, groupArray((key, n, f, w, sessions, ids, ex, label, timed)) AS rows FROM limited GROUP BY metric)`,
+		`${ctes}
+	SELECT (countIf(${AGENT_LEVEL}), countIf(${AGENT_LEVEL} AND failed = 1),
+		countIf(${AGENT_LEVEL} AND aid = ''), countIf(${AGENT_LEVEL} AND aid = '' AND failed = 1),
+		countIf(call_level = 'inner'), countIf(call_level = 'inner' AND failed = 1),
+		uniqExactIf(sid, ${AGENT_LEVEL} AND failed = 1), countIf(call_level = 'inner' AND ${TIMED} = 1)) AS share
+	FROM c`,
+		`${ctes}
+	SELECT (count(), uniqExact(p.sid), countIf(f.evidence != ''), countIf(f.failed_jobs > 0)) AS push_stats
+	FROM push_events AS p
+	LEFT JOIN push_ci AS f ON f.evidence = p.evidence`,
+	];
 }
 
 export function digestEditsSql(params: MeasureParams): string {
-	return `WITH ${pickedCte(params)},
+	return `WITH ${pickedSetCte(params)},
 	run_dirs AS (
-		SELECT run_id, ifNull(cwd, '') AS run_cwd FROM runs WHERE ${inPicked()}
+		SELECT run_id, ifNull(cwd, '') AS run_cwd FROM runs WHERE ${inPickedSet()}
 	),
 	edits AS (
 		SELECT e.session_id AS sid, e.agent_id AS aid, e.turn_idx AS turn, toUnixTimestamp64Milli(e.started_at) AS at,
 			e.changed_files AS files, e.changed_file_ops AS ops, r.run_cwd AS run_cwd
 		FROM calls AS e
 		LEFT JOIN run_dirs AS r ON r.run_id = e.run_id
-		WHERE e.started_at >= ${windowStart(params)} AND ${inPicked("e")} AND notEmpty(e.changed_files) AND e.failed = 0
+		WHERE e.started_at >= ${windowStart(params)} AND ${inPickedSet("e")} AND notEmpty(e.changed_files) AND e.failed = 0
 	)
 	SELECT
 		(SELECT groupArray((sid, aid, turn, at, files, ops, run_cwd)) FROM (SELECT * FROM edits ORDER BY sid, at, aid LIMIT 200000)) AS edits`;
 }
 
-export function digestUsageSql(params: MeasureParams): string {
-	return `WITH ${pickedCte(params)},
+export function digestUsageSql(params: MeasureParams): string[] {
+	const ctes = `WITH ${pickedSetCte(params)},
 	children AS (
 		SELECT user_id AS uid, from_session_id AS parent, to_session_id AS child
 		FROM session_links
-		WHERE kind = 'parent_thread' AND (user_id, from_session_id) IN (SELECT user_id, session_id FROM picked)
+		WHERE kind = 'parent_thread' AND ${inPickedSet("", "from_session_id")}
 	),
 	streams AS (
 		SELECT session_id AS sid, agent_id AS aid, source, turn_idx AS turn, tokens, cost_usd, compactions, compact_trigger,
 			toUnixTimestamp64Milli(started_at) AS t0, toUnixTimestamp64Milli(ended_at) AS t1
 		FROM runs
-		WHERE ${inPicked()}
+		WHERE ${inPickedSet()}
 		UNION ALL
 		SELECT c.parent AS sid, concat('thread ', r.session_id) AS aid, r.source, r.turn_idx AS turn, r.tokens, r.cost_usd,
 			r.compactions, r.compact_trigger, toUnixTimestamp64Milli(r.started_at) AS t0, toUnixTimestamp64Milli(r.ended_at) AS t1
 		FROM runs AS r
 		INNER JOIN children AS c ON c.uid = r.user_id AND c.child = r.session_id
-	)
-	SELECT
-		(SELECT groupArray((sid, runs, tokens_sum, cost_sum, unpriced, unknown_tokens, top_turn)) FROM (
-			SELECT sid, count() AS runs, sum(ifNull(tokens, 0)) AS tokens_sum, round(sum(ifNull(cost_usd, 0)), 2) AS cost_sum,
-				countIf(cost_usd IS NULL AND ifNull(tokens, 0) > 0) AS unpriced, countIf(tokens IS NULL) AS unknown_tokens,
-				argMax(if(aid = '', toString(turn), ''), ifNull(tokens, 0)) AS top_turn
-			FROM streams GROUP BY sid)) AS per_session,
-		(SELECT groupArray((sid, aid, t0, t1)) FROM (
-			SELECT sid, aid, min(t0) AS t0, max(t1) AS t1 FROM streams WHERE aid != '' GROUP BY sid, aid ORDER BY sid, aid LIMIT 20000)) AS sub_spans,
-		(SELECT groupArray((source, main_stream, trigger, n, sessions, ex)) FROM (
-			SELECT e.source AS source, e.agent_id = '' AS main_stream, ifNull(r.compact_trigger, '') AS trigger, count() AS n,
-				uniqExact(e.session_id) AS sessions,
-				min(${example("e.session_id", "e.agent_id", "e.turn_idx")}) AS ex
-			FROM events AS e
-			LEFT JOIN (SELECT run_id, compact_trigger FROM runs WHERE ${inPicked()}) AS r ON r.run_id = e.run_id
-			WHERE e.at >= ${windowStart(params)} AND e.event = 'compaction' AND e.subtype != 'compact_summary' AND ${inPicked("e")}
-			GROUP BY source, main_stream, trigger ORDER BY n DESC, source LIMIT 20)) AS compactions`;
+	)`;
+	return [
+		`${ctes}
+	SELECT groupArray((sid, runs, tokens_sum, cost_sum, unpriced, unknown_tokens, top_turn)) AS per_session FROM (
+		SELECT sid, count() AS runs, sum(ifNull(tokens, 0)) AS tokens_sum, round(sum(ifNull(cost_usd, 0)), 2) AS cost_sum,
+			countIf(cost_usd IS NULL AND ifNull(tokens, 0) > 0) AS unpriced, countIf(tokens IS NULL) AS unknown_tokens,
+			argMax(if(aid = '', toString(turn), ''), ifNull(tokens, 0)) AS top_turn
+		FROM streams GROUP BY sid)`,
+		`${ctes}
+	SELECT groupArray((sid, aid, t0, t1)) AS sub_spans FROM (
+		SELECT sid, aid, min(t0) AS t0, max(t1) AS t1 FROM streams WHERE aid != '' GROUP BY sid, aid ORDER BY sid, aid LIMIT 20000)`,
+		`${ctes}
+	SELECT groupArray((source, main_stream, trigger, n, sessions, ex)) AS compactions FROM (
+		SELECT e.source AS source, e.agent_id = '' AS main_stream, ifNull(r.compact_trigger, '') AS trigger, count() AS n,
+			uniqExact(e.session_id) AS sessions,
+			min(${example("e.session_id", "e.agent_id", "e.turn_idx")}) AS ex
+		FROM events AS e
+		LEFT JOIN (SELECT run_id, compact_trigger FROM runs WHERE ${inPickedSet()}) AS r ON r.run_id = e.run_id
+		WHERE e.at >= ${windowStart(params)} AND e.event = 'compaction' AND e.subtype != 'compact_summary' AND ${inPickedSet("e")}
+		GROUP BY source, main_stream, trigger ORDER BY n DESC, source LIMIT 20)`,
+	];
 }
 
 export interface CohortScope {
@@ -368,28 +383,32 @@ export function contextSizesStatement(scope: CohortScope): TrustedStatement {
 export const CATEGORY_FAILURE = `denial_kind != '' OR ifNull(timed_out, 0) = 1 OR background_status IN ('killed', 'stopped')
 				OR command_class IN (${[...LOCAL_CHECK_CLASSES, "install"].map(sqlString).join(", ")})`;
 
-export function digestRunsSql(params: MeasureParams): string {
+export function digestRunsSql(params: MeasureParams): string[] {
 	const start = windowStart(params);
-	return `WITH ${pickedCte(params)},
+	const ctes = `WITH ${pickedSetCte(params)},
 	failures AS (
 		SELECT run_id, countIf(failed = 1) AS failed_n, countIf(failed = 1 AND (${CATEGORY_FAILURE})) AS sorted_n
 		FROM calls
-		WHERE started_at >= ${start} AND ${inPicked()} AND ${AGENT_LEVEL}
+		WHERE started_at >= ${start} AND ${inPickedSet()} AND ${AGENT_LEVEL}
 		GROUP BY run_id
 	),
 	asked AS (
 		SELECT run_id, argMin(substring(replaceRegexpAll(text, '\\s+', ' '), 1, 90), record_idx) AS quote,
 			argMin(text_chars, record_idx) AS chars, argMin(subtype, record_idx) AS kind_of
 		FROM prompts
-		WHERE at >= ${start} AND genuine = 1 AND ${inPicked()}
+		WHERE at >= ${start} AND genuine = 1 AND ${inPickedSet()}
 		GROUP BY run_id
-	)
-	SELECT groupArray((r.run_id, r.session_id, r.agent_id, r.turn_idx, round(r.minutes, 2), round(r.active_minutes, 2),
-		toUInt8(ifNull(r.frustrated, false)), toUInt8(ifNull(r.reasked, false)), ifNull(f.failed_n, 0), ifNull(f.sorted_n, 0),
-		ifNull(a.quote, ''), ifNull(a.chars, 0), ifNull(a.kind_of, ''))) AS runs
-	FROM (SELECT * FROM runs WHERE ${inPicked()} ORDER BY session_id, agent_id, turn_idx) AS r
-	LEFT JOIN failures AS f ON f.run_id = r.run_id
-	LEFT JOIN asked AS a ON a.run_id = r.run_id`;
+	)`;
+	return [
+		`${ctes}
+	SELECT groupArray((run_id, session_id, agent_id, turn_idx, round(minutes, 2), round(active_minutes, 2),
+		toUInt8(ifNull(frustrated, false)), toUInt8(ifNull(reasked, false)))) AS runs
+	FROM (SELECT * FROM runs WHERE ${inPickedSet()} ORDER BY session_id, agent_id, turn_idx)`,
+		`${ctes}
+	SELECT groupArray((run_id, failed_n, sorted_n)) AS failures FROM failures`,
+		`${ctes}
+	SELECT groupArray((run_id, quote, chars, kind_of)) AS asked FROM asked`,
+	];
 }
 
 export interface SeverityRule {
@@ -529,18 +548,33 @@ export const SEVERITY_RULES: readonly SeverityRule[] = [
 
 export const SEVERITY_EXAMPLES = 50;
 
-export function digestSeveritySql(params: MeasureParams): string {
-	const tags = SEVERITY_RULES.map(
-		(rule) =>
-			`if(${rule.when}, [(${sqlString(rule.category)}, ${sqlString(rule.rule)}, ${rule.focus ? `extract(${cmd}, ${sqlString(focusPattern(rule.focus))})` : sqlString(rule.quote)})], [])`,
-	).join(",\n\t\t\t");
-	return `WITH ${pickedCte(params)},
+export const SEVERITY_SHARD_DAYS = 7;
+
+export function digestSeveritySql(params: MeasureParams): string[] {
+	const reads = (rule: SeverityRule) => rule.when.includes("output");
+	return [
+		SEVERITY_RULES.filter((rule) => !reads(rule)),
+		SEVERITY_RULES.filter(reads),
+	].map((rules) => severitySql(params, rules));
+}
+
+function severitySql(
+	params: MeasureParams,
+	rules: readonly SeverityRule[],
+): string {
+	const tags = rules
+		.map(
+			(rule) =>
+				`if(${rule.when}, [(${sqlString(rule.category)}, ${sqlString(rule.rule)}, ${rule.focus ? `extract(${cmd}, ${sqlString(focusPattern(rule.focus))})` : sqlString(rule.quote)})], [])`,
+		)
+		.join(",\n\t\t\t");
+	return `WITH ${pickedSetCte(params)},
 	c AS (
 		SELECT session_id AS sid, ${example("session_id", "agent_id", "turn_idx")} AS ex, command_from,
 			ifNull(command, ifNull(command_head, '')) AS ${cmd}, file_path, file_op,
 			if(call_level = 'inner', '', output) AS output, tool_name
 		FROM calls
-		WHERE started_at >= ${windowStart(params)} AND ${inPicked()}
+		WHERE started_at >= ${windowStart(params)} AND ${inPickedSet()}
 	),
 	hits AS (
 		SELECT t.1 AS category, t.2 AS rule, sid, ex,
