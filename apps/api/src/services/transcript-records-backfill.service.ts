@@ -340,8 +340,6 @@ async function processBatch(
 				// Backfill priority: live uploads' edges are built first.
 				onWritten: (session) =>
 					enqueueSessionEdgesBestEffort(session, { priority: 1 }),
-				// Retired once for the whole run (`retireOlderGitObservations`).
-				retireOlder: false,
 			});
 		} catch (error) {
 			options.signal?.throwIfAborted();

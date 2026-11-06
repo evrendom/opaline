@@ -842,9 +842,9 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 	await clickhouse.execute({ query: "OPTIMIZE TABLE rudel.run_index FINAL" });
 	expect(await runIndexRows(claudeSession)).toEqual(rebuilt);
 
-	// A re-upload is a new generation. Publishing it retires the crashed build
-	// at once; the superseded builds stay through the grace, then the sweep
-	// retires them and keeps the committed one.
+	// A re-upload is a new generation. Publishing it deletes nothing; the sweep
+	// retires the crashed build at once and the superseded builds after the
+	// grace, and keeps the committed one.
 	await publish(claudeSession, "claude_code", claude, "2");
 	await queueRunIndex(claudeSession, "claude_code");
 	await pass();
@@ -856,7 +856,7 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 		),
 	];
 	expect(await generations()).toEqual(["1", "2"]);
-	expect(await snapshotsOf(claudeSession)).not.toContain(`1/${crashed}`);
+	expect(await snapshotsOf(claudeSession)).toContain(`1/${crashed}`);
 	expect(
 		(await runIndexRows(claudeSession)).map((row) => String(row.revision)),
 	).toEqual(claudeRuns.map(() => "2").concat("2"));
@@ -894,10 +894,13 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 	const later = () => Date.now() + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS + 60_000;
 	const sweep = await runRunIndexRetirementPass({
 		organizationId,
-		deadline: { deadlineAt: later() + 60_000, now: later },
+		deadline: { deadlineAt: later() + 600_000, now: later },
 	});
-	// The claude session's two superseded builds and the orphan.
-	expect(sweep.generationsRetired).toBe(3);
+	// The claude session's crashed and two superseded builds, and the orphan,
+	// in at most one keyed statement per table.
+	expect(sweep.generationsRetired).toBe(4);
+	expect(sweep.deleteStatements).toBeGreaterThanOrEqual(1);
+	expect(sweep.deleteStatements).toBeLessThanOrEqual(3);
 	expect(await generations()).toEqual(["2"]);
 	expect(await snapshotsOf(orphanSession)).toEqual(["2/2"]);
 

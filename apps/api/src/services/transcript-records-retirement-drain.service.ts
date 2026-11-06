@@ -237,7 +237,7 @@ export async function drainTranscriptRecordsRetirement(
  * retires below it at `nowMs`. Generations newer than the committed one are
  * builds in flight and are never considered.
  */
-async function selectPageRetirements(
+export async function selectPageRetirements(
 	executor: ClickHouseExecutor,
 	organizationId: string,
 	page: readonly CensusRow[],

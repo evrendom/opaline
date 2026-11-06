@@ -111,10 +111,12 @@ try {
 	if (result.failedCount > 0) process.exitCode = 2;
 	if (values.execute) {
 		// The run kept older git observation generations; retire them in one pass.
-		const retired = await retireOlderGitObservations(executor, {
+		const retirement = await retireOlderGitObservations(executor, {
 			organizationId: values["organization-id"],
 		});
-		console.error(`Retired ${retired} older git observation generations.`);
+		console.error(
+			`Retired ${retirement.retired} of ${retirement.generations} older git observation generations${retirement.hasMore ? "; more remain for the hourly retirement" : ""}.`,
+		);
 	}
 	if (values.execute && result.completedCount > 0) {
 		// The generations this run superseded stay readable for the grace,

@@ -27,7 +27,6 @@ import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-t
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
 import { requeueStaleL1EdgeScopes } from "../services/l1-edges/l1-edge-census.service.js";
 import { requeueStaleRunIndexScopes } from "../services/l1-edges/run-index-census.service.js";
-import { runRunIndexRetirementPass } from "../services/l1-edges/run-index-retirement.service.js";
 import { pruneExpiredPostgresLeases } from "../services/postgres-lease.service.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
@@ -37,7 +36,6 @@ import {
 import { runRepositoryEvidenceIndexPublisherPass } from "../services/repository-evidence-index-publication.service.js";
 import { reconcileSessionLanguageSignalsUntilCaughtUp } from "../services/session-language-signal-reconciliation.service.js";
 import { runSessionRevisionReceiptCleanupPass } from "../services/session-revision-receipt-cleanup.service.js";
-import { runTranscriptRecordsRetirementPass } from "../services/transcript-records-retirement.service.js";
 
 const logger = getLogger(["rudel", "api", "maintenance"]);
 const DEFAULT_LANGUAGE_SIGNAL_BATCH_SIZE = 25;
@@ -50,8 +48,6 @@ const R2_INGEST_BUDGET_MS = 90_000;
 const REPOSITORY_EVIDENCE_INDEX_BUDGET_MS = 60_000;
 const SESSION_REVISION_RECEIPT_BUDGET_MS = 10_000;
 const LANGUAGE_SIGNAL_BUDGET_MS = 60_000;
-const TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 60_000;
-const RUN_INDEX_RETIREMENT_BUDGET_MS = 10_000;
 const RUN_INDEX_CENSUS_BUDGET_MS = 30_000;
 const L1_EDGE_CENSUS_BUDGET_MS = 30_000;
 const DERIVED_RECORDS_RECONCILIATION_BUDGET_MS = 60_000;
@@ -165,22 +161,6 @@ async function runApiMaintenance() {
 	const languageSignals = await runMaintenanceStep("language-signals", () =>
 		runLanguageSignalMaintenance(invocationDeadline),
 	);
-	const transcriptRecords = await runMaintenanceStep("transcript-records", () =>
-		runTranscriptRecordsRetirementPass({
-			deadline: createMaintenanceQueueDeadline(
-				invocationDeadline,
-				TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS,
-			),
-		}),
-	);
-	const runIndex = await runMaintenanceStep("run-index", () =>
-		runRunIndexRetirementPass({
-			deadline: createMaintenanceQueueDeadline(
-				invocationDeadline,
-				RUN_INDEX_RETIREMENT_BUDGET_MS,
-			),
-		}),
-	);
 	const runIndexCensus = await runMaintenanceStep("run-index-census", () =>
 		requeueStaleRunIndexScopes({
 			sql: sqlClient,
@@ -235,19 +215,15 @@ async function runApiMaintenance() {
 			r2Ingest.status === "ok" &&
 			sessionRevisionReceipts.status === "ok" &&
 			languageSignals.status === "ok" &&
-			transcriptRecords.status === "ok" &&
-			runIndex.status === "ok" &&
 			runIndexCensus.status === "ok" &&
 			l1EdgeCensus.status === "ok" &&
 			derivedRecords.status === "ok" &&
 			coordinationLeases.status === "ok" &&
 			sqlResults.status === "ok",
 		r2Ingest,
-		runIndex,
 		runIndexCensus,
 		sessionRevisionReceipts,
 		sqlResults,
-		transcriptRecords,
 	};
 }
 

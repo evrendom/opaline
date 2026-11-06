@@ -16,6 +16,10 @@ import {
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 import {
+	deleteOperationId,
+	runDeleteOperation,
+} from "./clickhouse-batched-delete.js";
+import {
 	L1_EDGE_TABLES,
 	RUN_INDEX_TABLE,
 	RUN_REQUESTS_TABLE,
@@ -300,13 +304,17 @@ export async function purgeClickHouseRows(
 	// Privacy deletion is an infrequent mutation, so use a lightweight DELETE.
 	// Sync level 3 waits for active SharedMergeTree replicas. The read-back
 	// confirms query-level deletion; merges reclaim the physical data later.
-	await clickhouse.execute({
-		clickhouse_settings: {
+	await runDeleteOperation(clickhouse, {
+		table,
+		operationId: deleteOperationId(table, [predicate, queryParams]),
+		keyCount: 1,
+		mutationMarker: Object.values(queryParams)[0] ?? "",
+		predicate,
+		queryParams,
+		settings: {
 			...PRIVACY_DELETE_SCAN_SETTINGS,
 			lightweight_deletes_sync: "3",
 		},
-		query: `DELETE FROM ${table} WHERE ${predicate}`,
-		query_params: queryParams,
 	});
 
 	const remainingRows = await clickhouse.query({

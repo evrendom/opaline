@@ -5,7 +5,7 @@ import {
 	buildTranscriptRecordsRetirementCensusStatement,
 	CENSUS_WINDOW_INDEX_ROWS,
 	CENSUS_WINDOW_SETTINGS,
-	runTranscriptRecordsRetirementPass,
+	findTranscriptRecordsRetirementSessions,
 	type TranscriptRecordsSessionKey,
 	transcriptRecordsCensusWindows,
 } from "./transcript-records-retirement.service.js";
@@ -137,7 +137,7 @@ function fakeExecutor(input: {
 	return { executor, queries };
 }
 
-describe("runTranscriptRecordsRetirementPass", () => {
+describe("findTranscriptRecordsRetirementSessions", () => {
 	const starts = [
 		{ organization_id: "org-a", user_id: "u1", session_id: "s0" },
 		{ organization_id: "org-a", user_id: "u1", session_id: "s5" },
@@ -148,28 +148,26 @@ describe("runTranscriptRecordsRetirementPass", () => {
 		session_id,
 		user_id: "u1",
 	});
-	const deadline = { deadlineAt: 1_000_000, now: () => 1_000 };
+	const byWindow = () =>
+		new Map([
+			["", [session("org-a", "s1")]],
+			["s5", [session("org-a", "s6"), session("org-a", "s7")]],
+			["s1", [session("org-b", "s2")]],
+		]);
+	const wait = <T>(operation: () => Promise<T>) => operation();
 
 	test("scans windows in key order and stops once the pass is full", async () => {
-		const fake = fakeExecutor({
-			starts,
-			censusByWindow: new Map([
-				["", [session("org-a", "s1")]],
-				["s5", [session("org-a", "s6"), session("org-a", "s7")]],
-				["s1", [session("org-b", "s2")]],
-			]),
-		});
-		const result = await runTranscriptRecordsRetirementPass({
-			deadline,
-			executor: fake.executor,
-			maxSessions: 3,
-		});
+		const fake = fakeExecutor({ starts, censusByWindow: byWindow() });
+		const result = await findTranscriptRecordsRetirementSessions(
+			fake.executor,
+			{ maxSessions: 3, retireBefore: 1_000, wait },
+		);
 		expect(result).toMatchObject({
 			hasMore: true,
-			sessionsProcessed: 3,
 			windows: 3,
 			windowsScanned: 2,
 		});
+		expect(result.rows).toHaveLength(3);
 		const census = fake.queries.filter((query) =>
 			query.query.includes("HAVING uniqExact"),
 		);
@@ -186,16 +184,41 @@ describe("runTranscriptRecordsRetirementPass", () => {
 			expect(query.clickhouse_settings).toEqual(CENSUS_WINDOW_SETTINGS);
 	});
 
+	test("an hourly pass reads at most its windows, starting where the rotation points", async () => {
+		const fake = fakeExecutor({ starts, censusByWindow: byWindow() });
+		const result = await findTranscriptRecordsRetirementSessions(
+			fake.executor,
+			{
+				maxSessions: 1_000,
+				maxWindows: 2,
+				retireBefore: 1_000,
+				rotation: 1,
+				wait,
+			},
+		);
+		expect(result).toMatchObject({
+			hasMore: true,
+			windows: 3,
+			windowsScanned: 2,
+		});
+		const census = fake.queries.filter((query) =>
+			query.query.includes("HAVING uniqExact"),
+		);
+		expect(census.map((query) => query.query_params?.fromSessionId)).toEqual([
+			"s1",
+			undefined,
+		]);
+		expect(result.rows.map((row) => row.session_id)).toEqual(["s2", "s1"]);
+	});
+
 	test("an organization pass keeps the organization in every statement", async () => {
 		const fake = fakeExecutor({ starts: [], censusByWindow: new Map() });
-		const result = await runTranscriptRecordsRetirementPass({
-			deadline,
-			executor: fake.executor,
-			organizationId: "org-a",
-		});
+		const result = await findTranscriptRecordsRetirementSessions(
+			fake.executor,
+			{ maxSessions: 10, organizationId: "org-a", retireBefore: 1_000, wait },
+		);
 		expect(result).toMatchObject({
 			hasMore: false,
-			sessionsProcessed: 0,
 			windows: 1,
 			windowsScanned: 1,
 		});

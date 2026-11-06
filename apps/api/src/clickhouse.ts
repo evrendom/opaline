@@ -137,6 +137,7 @@ export interface ClickHouseStatement {
 	query: string;
 	query_params?: Record<string, unknown>;
 	format?: "JSONEachRow";
+	query_id?: string;
 }
 
 export interface ClickHouseExecutor {
@@ -332,6 +333,7 @@ export function createClickHouseExecutor(config: {
 				clickhouse_settings: statement.clickhouse_settings,
 				query: statement.query,
 				query_params: statement.query_params,
+				query_id: statement.query_id,
 			});
 		},
 		async query<T>(statement: ClickHouseStatement): Promise<T[]> {
@@ -345,6 +347,7 @@ export function createClickHouseExecutor(config: {
 				clickhouse_settings: statement.clickhouse_settings,
 				query: statement.query,
 				query_params: statement.query_params,
+				query_id: statement.query_id,
 				format: statement.format ?? "JSONEachRow",
 			});
 			return result.json();

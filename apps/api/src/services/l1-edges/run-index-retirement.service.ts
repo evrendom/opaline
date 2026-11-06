@@ -4,16 +4,27 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
-import { createTranscriptRecordsDeadline } from "../transcript-records-deadline.js";
 import {
-	MAX_RETIRED_GENERATIONS_PER_PASS,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-} from "../transcript-records-ingest.service.js";
+	hasKeyedDeleteTime,
+	submittedStatements,
+} from "../clickhouse-batched-delete.js";
+import { createTranscriptRecordsDeadline } from "../transcript-records-deadline.js";
+import { TRANSCRIPT_RECORDS_RETIRE_GRACE_MS } from "../transcript-records-ingest.service.js";
+import {
+	CENSUS_WINDOW_INDEX_ROWS,
+	CENSUS_WINDOW_SETTINGS,
+	type CensusWindowScan,
+	censusWindowFilter,
+	scanCensusWindows,
+} from "../transcript-records-retirement.service.js";
 import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
 import { retireRunIndexSnapshots } from "./run-index.service.js";
 
-const MAX_SESSIONS_PER_PASS = 10;
-const PASS_TIMEOUT_MS = 10_000;
+const MAX_SESSIONS_PER_PASS = 1_000;
+const SESSIONS_PER_READ = 100;
+const CENSUS_TIMEOUT_MS = 30_000;
+const WINDOWS_PER_PASS = 2;
+const HOUR_MS = 3_600_000;
 
 interface RetirementSessionRow {
 	organization_id: string;
@@ -22,13 +33,12 @@ interface RetirementSessionRow {
 }
 
 /**
- * Daily sweep of run index snapshots no reader needs, as for transcript
- * records (`runTranscriptRecordsRetirementPass`). The census is every row,
- * not only receipts, so a build that crashed before its receipt is found
- * even when its session has a single committed snapshot (its cleanup at
- * publication failed); a session qualifies once its last write is older
- * than the retirement grace. `retireRunIndexSnapshots` decides what goes and
- * never retires the committed snapshot, even after its transcript expired.
+ * Sweep of run index snapshots no reader needs. The census is every row, not
+ * only receipts, so a build that crashed before its receipt is found even
+ * when its session has a single committed snapshot; a session qualifies once
+ * its last write is older than the retirement grace.
+ * `retireRunIndexSnapshots` decides what goes, one organization's sessions
+ * at a time, and never retires the committed snapshot.
  */
 export async function runRunIndexRetirementPass(
 	options: {
@@ -36,6 +46,7 @@ export async function runRunIndexRetirementPass(
 		readonly deadline?: MaintenanceDeadline;
 		readonly maxSessions?: number;
 		readonly organizationId?: string;
+		readonly maxWindows?: number;
 	} = {},
 ) {
 	const executor = options.executor ?? getClickhouse();
@@ -51,65 +62,104 @@ export async function runRunIndexRetirementPass(
 			`maxSessions must be between 1 and ${MAX_SESSIONS_PER_PASS}`,
 		);
 	}
-	const deadline = createTranscriptRecordsDeadline({
+	const census = createTranscriptRecordsDeadline({
 		deadlineAt: Math.min(
 			options.deadline?.deadlineAt ?? Infinity,
-			startedAt + PASS_TIMEOUT_MS,
+			startedAt + CENSUS_TIMEOUT_MS,
 		),
 		now,
 		signal: undefined,
 	});
+	let scan: CensusWindowScan<RetirementSessionRow>;
 	try {
-		const sessions = await deadline.wait(() =>
-			executor.query<RetirementSessionRow>({
-				abortSignal: deadline.signal,
-				clickhouse_settings: {
-					max_bytes_to_read: String(2 * 1024 * 1024 * 1024),
-					max_execution_time: 10,
-					max_rows_to_read: "10000000",
-					result_overflow_mode: "throw",
-				},
-				query: `
+		scan = await scanCensusWindows<RetirementSessionRow>(executor, {
+			table: RUN_INDEX_TABLE,
+			windowRows: CENSUS_WINDOW_INDEX_ROWS,
+			limit: maxSessions,
+			organizationId: options.organizationId,
+			maxWindows:
+				options.maxWindows ??
+				(options.organizationId === undefined ? WINDOWS_PER_PASS : undefined),
+			rotation: Math.floor(startedAt / HOUR_MS),
+			signal: census.signal,
+			wait: census.wait,
+			statement: (window, remaining) => {
+				const bounds = censusWindowFilter(window);
+				return {
+					clickhouse_settings: CENSUS_WINDOW_SETTINGS,
+					query: `
 				SELECT organization_id, user_id, session_id
 				FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
-				${options.organizationId === undefined ? "" : "WHERE organization_id = {organizationId:String}"}
+				WHERE 1 = 1 ${options.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"} ${bounds.sql}
 				GROUP BY organization_id, user_id, session_id
 				HAVING uniqExact((revision, parser_version, index_version, build_revision)) > 1
 					AND max(toUnixTimestamp64Milli(built_at)) <= {retireBefore:Int64}
 				ORDER BY organization_id, user_id, session_id
 				LIMIT {maxSessions:UInt32}
 			`,
-				query_params: {
-					maxSessions,
-					organizationId: options.organizationId,
-					retireBefore: startedAt - TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-				},
-			}),
-		);
-		let generationsRetired = 0;
-		let hasMore = sessions.length === maxSessions;
-		for (const session of sessions) {
-			const retired = await deadline.wait(() =>
-				retireRunIndexSnapshots(
-					executor,
-					session.organization_id,
-					{ userId: session.user_id, sessionId: session.session_id },
-					{
-						abortSignal: deadline.signal,
-						graceMs: TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-						now: new Date(startedAt),
+					query_params: {
+						maxSessions: remaining,
+						organizationId: options.organizationId,
+						retireBefore: startedAt - TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
+						...bounds.params,
 					},
-				),
-			);
-			generationsRetired += retired;
-			hasMore ||= retired === MAX_RETIRED_GENERATIONS_PER_PASS;
-		}
-		return {
-			generationsRetired,
-			hasMore,
-			sessionsProcessed: sessions.length,
-		};
+				};
+			},
+		});
 	} finally {
-		deadline.dispose();
+		census.dispose();
 	}
+	const sessions = scan.rows;
+	let generationsRetired = 0;
+	let deleteStatements = 0;
+	let hasMore = scan.hasMore;
+	for (const page of organizationPages(sessions)) {
+		if (!hasKeyedDeleteTime(options.deadline)) {
+			hasMore = true;
+			break;
+		}
+		const retirement = await retireRunIndexSnapshots(
+			executor,
+			page[0]?.organization_id ?? "",
+			page.map((session) => ({
+				userId: session.user_id,
+				sessionId: session.session_id,
+			})),
+			{
+				deadline: options.deadline,
+				graceMs: TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
+				now: new Date(startedAt),
+			},
+		);
+		generationsRetired += retirement.retired;
+		deleteStatements += submittedStatements(retirement.outcomes);
+		if (!retirement.settled) {
+			hasMore = true;
+			break;
+		}
+	}
+	return {
+		deleteStatements,
+		generationsRetired,
+		hasMore,
+		sessionsProcessed: sessions.length,
+	};
+}
+
+function* organizationPages(
+	sessions: readonly RetirementSessionRow[],
+): Generator<RetirementSessionRow[]> {
+	let page: RetirementSessionRow[] = [];
+	for (const session of sessions) {
+		if (
+			page.length >= SESSIONS_PER_READ ||
+			(page[0] !== undefined &&
+				page[0].organization_id !== session.organization_id)
+		) {
+			yield page;
+			page = [];
+		}
+		page.push(session);
+	}
+	if (page.length > 0) yield page;
 }

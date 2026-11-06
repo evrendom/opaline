@@ -8,6 +8,11 @@ import { filterKnownSecrets } from "@rudel/secret-filter";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
+import {
+	type GenerationRetirement,
+	type GenerationRetirementOptions,
+	retireGenerationsBelowNewestReceipt,
+} from "../generation-retirement.js";
 import { createTranscriptRecordsDeadline } from "../transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "../transcript-records-ingest.service.js";
 import { chunkRecords, quantizeVector, type RecordText } from "./chunks.js";
@@ -402,13 +407,6 @@ export async function indexSessionText(
 				truncated_records: truncated,
 			},
 		]);
-		if (receipt && !sameGeneration)
-			await retireOlderGenerations(
-				env.executor,
-				identity,
-				generation,
-				deadline.signal,
-			);
 		if (embedded.stopped === "quota")
 			logger.info(
 				"Transcript search: the workspace used its OpenAI quota; {pending} chunks wait without a vector (organization_id={organizationId} session_id={sessionId})",
@@ -445,34 +443,15 @@ export async function indexSessionText(
 	}
 }
 
-/**
- * Deletes the session's hits of generations older than the one just closed by
- * its receipt. Best effort: readers keep to the newest receipt, so rows left
- * behind are never served and the next upload's pass deletes them.
- */
-async function retireOlderGenerations(
+export function retireOlderTranscriptChunkHits(
 	executor: ClickHouseExecutor,
-	identity: Record<string, unknown>,
-	generation: { revision_text: string; parser_version: number },
-	signal: AbortSignal,
-): Promise<void> {
-	try {
-		await executor.execute({
-			abortSignal: signal,
-			clickhouse_settings: { ...SCAN_SETTINGS, lightweight_deletes_sync: "1" },
-			query: `DELETE FROM ${TRANSCRIPT_CHUNK_HITS_TABLE} WHERE ${SESSION_FILTER}
-				AND (revision, parser_version) < ({revision:UInt64}, {parserVersion:UInt16})`,
-			query_params: {
-				...identity,
-				revision: generation.revision_text,
-				parserVersion: generation.parser_version,
-			},
-		});
-	} catch (error) {
-		logger.warn("Transcript search could not retire older hits: {error}", {
-			error: error instanceof Error ? error.message.slice(0, 512) : "failed",
-		});
-	}
+	options: GenerationRetirementOptions = {},
+): Promise<GenerationRetirement> {
+	return retireGenerationsBelowNewestReceipt(
+		executor,
+		TRANSCRIPT_CHUNK_HITS_TABLE,
+		options,
+	);
 }
 
 async function quotaUsedUp(

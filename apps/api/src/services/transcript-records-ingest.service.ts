@@ -97,8 +97,6 @@ export interface TranscriptRecordsWriteInput extends TranscriptRecordsIdentity {
 		| AsyncIterable<TranscriptRecordDraft>
 		| Iterable<TranscriptRecordDraft>;
 	/** Raw-session revision as an unsigned decimal string. */
-	/** Retirement grace for superseded generations (default 10 minutes). */
-	readonly retireGraceMs?: number;
 	readonly revision: string;
 	readonly sessionDate: string;
 	/** Read once, after every draft was consumed. */
@@ -121,16 +119,9 @@ interface ReceiptRow {
 	revision_text: string;
 }
 
-interface GenerationRow {
-	parser_version: number;
-	/** The generation's receipt, or '' when it was never committed. */
-	receipt_head: string;
-	revision_text: string;
-}
-
 /**
- * Write every record of one generation, then its receipt row, then retire
- * superseded generations.
+ * Write every record of one generation, then its receipt row. The hourly
+ * session retirement deletes the generations it superseded.
  *
  * The write is idempotent: rows are keyed by generation, stream, and line, so
  * a retry after a crash converges on the same rows when the table merges. Each
@@ -266,7 +257,7 @@ async function writeGeneration(
 	await flushSetup();
 
 	const summary = input.summary();
-	const publishedAt = await publish(
+	await publish(
 		(publishedAt) => [
 			buildTranscriptRecordsReceiptRow(input, {
 				contentSha256: input.contentSha256,
@@ -291,13 +282,6 @@ async function writeGeneration(
 			sessionId: input.sessionId,
 		},
 	);
-	if (input.deadlineAt === undefined)
-		await retireSupersededGenerations(executor, input, {
-			graceMs: input.retireGraceMs ?? TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-			now: now(),
-			published: generation,
-			publishedAtMs: publishedAt.getTime(),
-		});
 	return { batchCount, rowCount };
 }
 
@@ -552,132 +536,6 @@ export async function deleteTranscriptRecordsGeneration(
 			userId: identity.userId,
 		},
 	});
-}
-
-/**
- * After a generation is published, retire what it superseded:
- *
- * - generations that never committed (crashed attempts) go immediately, since
- *   no reader pins a generation without a receipt;
- * - a superseded committed generation goes only once its grace period has
- *   elapsed, measured from the receipt of the generation that superseded it.
- *   The grace exceeds the readers' whole-read deadline, so a read that pinned
- *   it can never lose its rows to an arbitrary number of publications.
- *
- * Failure is logged, never thrown: the new generation is already committed and
- * the next publication retries the cleanup.
- */
-async function retireSupersededGenerations(
-	executor: ClickHouseExecutor,
-	identity: TranscriptRecordsIdentity,
-	retirement: {
-		readonly graceMs: number;
-		readonly now: Date;
-		readonly published: TranscriptRecordsGeneration;
-		readonly publishedAtMs: number;
-	},
-): Promise<void> {
-	try {
-		await retireSupersededTranscriptRecordsGenerations(
-			executor,
-			identity,
-			retirement,
-		);
-	} catch (error) {
-		logger.warn(
-			"Transcript records cleanup of superseded generations failed (organization_id={organizationId} session_id={sessionId} error={error})",
-			{
-				error: error instanceof Error ? error.message : String(error),
-				organizationId: identity.organizationId,
-				sessionId: identity.sessionId,
-			},
-		);
-	}
-}
-
-export async function retireSupersededTranscriptRecordsGenerations(
-	executor: ClickHouseExecutor,
-	identity: Pick<
-		TranscriptRecordsIdentity,
-		"organizationId" | "sessionId" | "userId"
-	>,
-	retirement: {
-		readonly abortSignal?: AbortSignal;
-		readonly graceMs: number;
-		readonly now: Date;
-		readonly published: TranscriptRecordsGeneration;
-		readonly publishedAtMs: number;
-	},
-): Promise<number> {
-	const { published } = retirement;
-	const older = await executor.query<GenerationRow>({
-		abortSignal: retirement.abortSignal,
-		clickhouse_settings: RECEIPT_SCAN_SETTINGS,
-		query: `
-				SELECT
-					toString(revision) AS revision_text,
-					parser_version,
-					anyIf(head, kind = 'receipt') AS receipt_head
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE organization_id = {organizationId:String}
-					AND user_id = {userId:String}
-					AND session_id = {sessionId:String}
-					AND (revision, parser_version) < ({revision:UInt64}, {parserVersion:UInt16})
-				GROUP BY revision, parser_version
-				ORDER BY revision DESC, parser_version DESC
-				LIMIT {generationLimit:UInt32}
-			`,
-		query_params: {
-			generationLimit: MAX_RETIRED_GENERATIONS_PER_PASS,
-			organizationId: identity.organizationId,
-			parserVersion: published.parserVersion,
-			revision: published.revision,
-			sessionId: identity.sessionId,
-			userId: identity.userId,
-		},
-	});
-	const retired = selectRetiredGenerations(
-		older.map((row) => {
-			const receipt = decodeTranscriptRecordsReceipt(row.receipt_head);
-			return {
-				generation: {
-					parserVersion: Number(row.parser_version),
-					revision: row.revision_text,
-				},
-				publishedAtMs:
-					receipt === undefined ? null : Date.parse(receipt.publishedAt),
-			};
-		}),
-		retirement,
-	);
-	if (retired.length === 0) return 0;
-	const clauses = retired.map(
-		(_, index) =>
-			`(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16})`,
-	);
-	const retiredParams: Record<string, unknown> = {};
-	for (const [index, generation] of retired.entries()) {
-		retiredParams[`revision${index}`] = generation.revision;
-		retiredParams[`parserVersion${index}`] = generation.parserVersion;
-	}
-	await executor.execute({
-		abortSignal: retirement.abortSignal,
-		clickhouse_settings: { lightweight_deletes_sync: "1" },
-		query: `
-				DELETE FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE organization_id = {organizationId:String}
-					AND user_id = {userId:String}
-					AND session_id = {sessionId:String}
-					AND (${clauses.join(" OR ")})
-			`,
-		query_params: {
-			organizationId: identity.organizationId,
-			sessionId: identity.sessionId,
-			userId: identity.userId,
-			...retiredParams,
-		},
-	});
-	return retired.length;
 }
 
 /**

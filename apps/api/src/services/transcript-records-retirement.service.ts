@@ -1,24 +1,11 @@
-import {
-	decodeTranscriptRecordsReceipt,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseExecutor,
 	type ClickHouseStatement,
-	getClickhouse,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import type { MaintenanceDeadline } from "../lib/bounded-maintenance.js";
-import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
-import {
-	MAX_RETIRED_GENERATIONS_PER_PASS,
-	retireSupersededTranscriptRecordsGenerations,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-	TRANSCRIPT_RECORDS_TABLE,
-} from "./transcript-records-ingest.service.js";
+import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 
-const MAX_SESSIONS_PER_PASS = 10;
-const PASS_TIMEOUT_MS = 60_000;
 export const CENSUS_WINDOW_INDEX_ROWS = 2_000_000;
 export const CENSUS_WINDOW_SETTINGS = {
 	max_bytes_to_read: String(1024 * 1024 * 1024),
@@ -49,7 +36,7 @@ interface CensusWindowStartRow {
 	session_id: string;
 }
 
-interface RetirementSessionRow {
+export interface RetirementSessionRow {
 	organization_id: string;
 	user_id: string;
 	session_id: string;
@@ -61,9 +48,9 @@ interface RetirementSessionRow {
 /**
  * Sessions with more than one committed generation whose newest receipt was
  * published at or before `retireBefore` (so the generations it superseded
- * are past the grace), in key order, at most `limit`. Shared by the daily pass and the operator drain
- * (`drainTranscriptRecordsRetirement`), so both retire exactly the same
- * sessions.
+ * are past the grace), in key order, at most `limit`. Shared by the hourly
+ * retirement and the operator drain (`drainTranscriptRecordsRetirement`), so
+ * both retire exactly the same sessions.
  */
 export function buildTranscriptRecordsRetirementCensusStatement(input: {
 	readonly limit: number;
@@ -111,9 +98,10 @@ export function buildTranscriptRecordsRetirementCensusStatement(input: {
 export function buildTranscriptRecordsCensusWindowsStatement(input: {
 	readonly organizationId?: string;
 	readonly windowRows: number;
+	readonly table?: string;
 }): ClickHouseStatement {
 	const [database, table] = getSafeClickHouseTable(
-		TRANSCRIPT_RECORDS_TABLE,
+		input.table ?? TRANSCRIPT_RECORDS_TABLE,
 	).split(".");
 	return {
 		clickhouse_settings: CENSUS_WINDOW_BOUNDS_SETTINGS,
@@ -155,6 +143,22 @@ export function transcriptRecordsCensusWindows(
 	];
 }
 
+export function censusWindowFilter(window: TranscriptRecordsCensusWindow): {
+	sql: string;
+	params: Record<string, string>;
+} {
+	return {
+		sql: [
+			window.from === undefined ? "" : `AND ${keyBound("from", ">")}`,
+			window.to === undefined ? "" : `AND ${keyBound("to", "<")}`,
+		].join(" "),
+		params: {
+			...keyParams("from", window.from),
+			...keyParams("to", window.to),
+		},
+	};
+}
+
 function keyBound(side: "from" | "to", direction: ">" | "<"): string {
 	const organization = `{${side}OrganizationId:String}`;
 	const user = `{${side}UserId:String}`;
@@ -175,106 +179,99 @@ function keyParams(
 	};
 }
 
-export async function runTranscriptRecordsRetirementPass(
+export interface CensusWindowScan<Row> {
+	rows: Row[];
+	windows: number;
+	windowsScanned: number;
+	hasMore: boolean;
+}
+
+export async function scanCensusWindows<Row>(
+	executor: ClickHouseExecutor,
 	options: {
-		readonly executor?: ClickHouseExecutor;
-		readonly deadline?: MaintenanceDeadline;
-		readonly maxSessions?: number;
+		readonly table: string;
+		readonly windowRows: number;
+		readonly limit: number;
+		readonly statement: (
+			window: TranscriptRecordsCensusWindow,
+			remaining: number,
+		) => ClickHouseStatement;
+		readonly wait: <T>(operation: () => Promise<T>) => Promise<T>;
+		readonly signal?: AbortSignal;
 		readonly organizationId?: string;
-	} = {},
-) {
-	const executor = options.executor ?? getClickhouse();
-	const now = options.deadline?.now ?? Date.now;
-	const startedAt = now();
-	const maxSessions = options.maxSessions ?? MAX_SESSIONS_PER_PASS;
-	if (
-		!Number.isSafeInteger(maxSessions) ||
-		maxSessions < 1 ||
-		maxSessions > MAX_SESSIONS_PER_PASS
-	) {
-		throw new Error(
-			`maxSessions must be between 1 and ${MAX_SESSIONS_PER_PASS}`,
-		);
-	}
-	const deadline = createTranscriptRecordsDeadline({
-		deadlineAt: Math.min(
-			options.deadline?.deadlineAt ?? Infinity,
-			startedAt + PASS_TIMEOUT_MS,
-		),
-		now,
-		signal: undefined,
-	});
-	try {
-		const starts = await deadline.wait(() =>
-			executor.query<CensusWindowStartRow>({
-				...buildTranscriptRecordsCensusWindowsStatement({
-					organizationId: options.organizationId,
-					windowRows: CENSUS_WINDOW_INDEX_ROWS,
-				}),
-				abortSignal: deadline.signal,
+		readonly maxWindows?: number;
+		readonly rotation?: number;
+	},
+): Promise<CensusWindowScan<Row>> {
+	const starts = await options.wait(() =>
+		executor.query<CensusWindowStartRow>({
+			...buildTranscriptRecordsCensusWindowsStatement({
+				organizationId: options.organizationId,
+				table: options.table,
+				windowRows: options.windowRows,
+			}),
+			abortSignal: options.signal,
+		}),
+	);
+	const windows = transcriptRecordsCensusWindows(
+		starts.map((row) => ({
+			organizationId: row.organization_id,
+			sessionId: row.session_id,
+			userId: row.user_id,
+		})),
+	);
+	const maxWindows = Math.min(
+		windows.length,
+		options.maxWindows ?? windows.length,
+	);
+	const first =
+		((((options.rotation ?? 0) * maxWindows) % windows.length) +
+			windows.length) %
+		windows.length;
+	const rows: Row[] = [];
+	let windowsScanned = 0;
+	while (windowsScanned < maxWindows && rows.length < options.limit) {
+		const window = windows[(first + windowsScanned) % windows.length] ?? {};
+		const found = await options.wait(() =>
+			executor.query<Row>({
+				...options.statement(window, options.limit - rows.length),
+				abortSignal: options.signal,
 			}),
 		);
-		const windows = transcriptRecordsCensusWindows(
-			starts.map((row) => ({
-				organizationId: row.organization_id,
-				sessionId: row.session_id,
-				userId: row.user_id,
-			})),
-		);
-		const sessions: RetirementSessionRow[] = [];
-		let windowsScanned = 0;
-		for (const window of windows) {
-			if (sessions.length >= maxSessions) break;
-			const found = await deadline.wait(() =>
-				executor.query<RetirementSessionRow>({
-					...buildTranscriptRecordsRetirementCensusStatement({
-						limit: maxSessions - sessions.length,
-						organizationId: options.organizationId,
-						retireBefore: startedAt - TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-						window,
-					}),
-					abortSignal: deadline.signal,
-				}),
-			);
-			sessions.push(...found);
-			windowsScanned++;
-		}
-		let generationsRetired = 0;
-		let hasMore = sessions.length === maxSessions;
-		for (const session of sessions) {
-			const receipt = decodeTranscriptRecordsReceipt(session.receipt_head);
-			if (receipt === undefined) continue;
-			const retired = await deadline.wait(() =>
-				retireSupersededTranscriptRecordsGenerations(
-					executor,
-					{
-						organizationId: session.organization_id,
-						sessionId: session.session_id,
-						userId: session.user_id,
-					},
-					{
-						abortSignal: deadline.signal,
-						graceMs: TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-						now: new Date(startedAt),
-						published: {
-							revision: session.revision_text,
-							parserVersion: session.parser_version,
-						},
-						publishedAtMs: Date.parse(receipt.publishedAt),
-					},
-				),
-			);
-			generationsRetired += retired;
-			hasMore ||= retired === MAX_RETIRED_GENERATIONS_PER_PASS;
-		}
-		return {
-			generationsRetired,
-			hasMore,
-			sessionsProcessed: sessions.length,
-			windows: windows.length,
-			windowsScanned,
-		};
-	} finally {
-		deadline.dispose();
+		rows.push(...found);
+		windowsScanned++;
 	}
+	return {
+		rows,
+		windows: windows.length,
+		windowsScanned,
+		hasMore: rows.length >= options.limit || windowsScanned < windows.length,
+	};
+}
+
+export async function findTranscriptRecordsRetirementSessions(
+	executor: ClickHouseExecutor,
+	options: {
+		readonly maxSessions: number;
+		readonly retireBefore: number;
+		readonly wait: <T>(operation: () => Promise<T>) => Promise<T>;
+		readonly signal?: AbortSignal;
+		readonly organizationId?: string;
+		readonly maxWindows?: number;
+		readonly rotation?: number;
+	},
+): Promise<CensusWindowScan<RetirementSessionRow>> {
+	return scanCensusWindows<RetirementSessionRow>(executor, {
+		...options,
+		limit: options.maxSessions,
+		table: TRANSCRIPT_RECORDS_TABLE,
+		windowRows: CENSUS_WINDOW_INDEX_ROWS,
+		statement: (window, remaining) =>
+			buildTranscriptRecordsRetirementCensusStatement({
+				limit: remaining,
+				organizationId: options.organizationId,
+				retireBefore: options.retireBefore,
+				window,
+			}),
+	});
 }

@@ -8,15 +8,13 @@ const maintenanceSource = readFileSync(
 );
 
 describe("daily API maintenance", () => {
-	test("runs durable transcript retirement independently of publications under a maintenance deadline", () => {
-		expect(maintenanceSource).toContain("runTranscriptRecordsRetirementPass({");
-		expect(maintenanceSource).toContain(
-			"TRANSCRIPT_RECORDS_RETIREMENT_BUDGET_MS = 60_000",
+	test("leaves transcript records retirement to the hourly session retirement", () => {
+		expect(maintenanceSource).not.toContain(
+			"runTranscriptRecordsRetirementPass",
 		);
-		expect(maintenanceSource).toContain(
+		expect(maintenanceSource).not.toContain(
 			'runMaintenanceStep("transcript-records"',
 		);
-		expect(maintenanceSource).toContain('transcriptRecords.status === "ok"');
 	});
 	test("expires stored sql results after their retention", () => {
 		expect(maintenanceSource).toContain(
@@ -24,13 +22,9 @@ describe("daily API maintenance", () => {
 		);
 		expect(maintenanceSource).toContain('sqlResults.status === "ok"');
 	});
-	test("retires superseded run index generations under their own budget", () => {
-		expect(maintenanceSource).toContain("runRunIndexRetirementPass({");
-		expect(maintenanceSource).toContain(
-			"RUN_INDEX_RETIREMENT_BUDGET_MS = 10_000",
-		);
-		expect(maintenanceSource).toContain('runMaintenanceStep("run-index"');
-		expect(maintenanceSource).toContain('runIndex.status === "ok"');
+	test("leaves run index retirement to the hourly session retirement", () => {
+		expect(maintenanceSource).not.toContain("runRunIndexRetirementPass");
+		expect(maintenanceSource).not.toContain('runMaintenanceStep("run-index"');
 	});
 	test("queues missing or stale run index builds from a daily census", () => {
 		expect(maintenanceSource).toContain("requeueStaleRunIndexScopes({");

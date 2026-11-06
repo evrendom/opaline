@@ -35,6 +35,10 @@ const usageDigestEntrypointSource = readFileSync(
 	resolve(import.meta.dir, "../../../../api/cron/usage-digest.ts"),
 	"utf8",
 );
+const sessionRetirementEntrypointSource = readFileSync(
+	resolve(import.meta.dir, "../../../../api/cron/session-retirement.ts"),
+	"utf8",
+);
 
 describe("Vercel deployment configuration", () => {
 	test("routes session arrival events through a streaming function before the SPA", () => {
@@ -65,7 +69,7 @@ describe("Vercel deployment configuration", () => {
 		});
 		expect(
 			rewriteBySource.get(
-				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-index-heal$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!webhooks/github$).*)",
+				"/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-index-heal$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!cron/session-retirement$)(?!webhooks/github$).*)",
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -96,7 +100,8 @@ describe("Vercel deployment configuration", () => {
 				cron.path !== "/api/cron/run-questions" &&
 				cron.path !== "/api/cron/history" &&
 				cron.path !== "/api/cron/live-sessions" &&
-				cron.path !== "/api/cron/usage-digest",
+				cron.path !== "/api/cron/usage-digest" &&
+				cron.path !== "/api/cron/session-retirement",
 		)) {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
@@ -281,6 +286,29 @@ describe("Vercel deployment configuration", () => {
 		expect(apiCatchAll?.source).toContain("(?!cron/usage-digest$)");
 		expect(usageDigestEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/usage-digest$/u",
+		);
+	});
+
+	test("retires superseded session generations from an isolated hourly cron function", () => {
+		expect(vercelConfig.functions["api/cron/session-retirement.ts"]).toEqual({
+			includeFiles: "{apps/api/src/**,packages/*/src/**}",
+			memory: 1024,
+			maxDuration: 300,
+		});
+		expect(vercelConfig.crons).toContainEqual({
+			path: "/api/cron/session-retirement",
+			schedule: "40 * * * *",
+		});
+		const apiCatchAll = vercelConfig.rewrites.find(
+			(rewrite) =>
+				rewrite.destination === "/api/rpc?__opaline_path=/api/:routePath",
+		);
+		expect(apiCatchAll?.source).toContain("(?!cron/session-retirement$)");
+		expect(sessionRetirementEntrypointSource).toContain(
+			'from "../../apps/api/src/handlers/session-retirement-maintenance.js"',
+		);
+		expect(sessionRetirementEntrypointSource).toContain(
+			"publicPathPattern: /^\\/api\\/cron\\/session-retirement$/u",
 		);
 	});
 

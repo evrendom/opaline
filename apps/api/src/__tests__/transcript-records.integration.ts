@@ -10,12 +10,17 @@ import {
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 	type TranscriptSource,
 } from "@rudel/api-routes/transcript-records";
-import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
+import {
+	type ClickHouseExecutor,
+	type ClickHouseStatement,
+	getClickhouse,
+} from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { enqueueClickHousePurge } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
+import { retireTranscriptRecordsGenerations } from "../services/session-retirement.service.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -34,7 +39,6 @@ import {
 	readSessionMap,
 	readTurn,
 } from "../services/transcript-records-reader.service.js";
-import { runTranscriptRecordsRetirementPass } from "../services/transcript-records-retirement.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -248,7 +252,6 @@ async function writeSession(input: {
 	readonly omitReceipt?: boolean;
 	readonly organizationId?: string;
 	readonly now?: () => Date;
-	readonly retireGraceMs?: number;
 	readonly revision: string;
 	readonly sessionId: string;
 	readonly source?: TranscriptSource;
@@ -297,7 +300,6 @@ async function writeSession(input: {
 		contentSha256: hashTranscriptContent(input.content, input.subagents),
 		drafts,
 		organizationId: input.organizationId ?? organizationId,
-		retireGraceMs: input.retireGraceMs,
 		revision: input.revision,
 		sessionDate: SESSION_DATE,
 		sessionId: input.sessionId,
@@ -926,16 +928,18 @@ describe("transcript record readers", () => {
 		expect(await readStoredRevisions(crashSessionId)).toEqual(["100", "200"]);
 	});
 
-	test("publishing keeps superseded generations through the grace and then retires them", async () => {
+	test("publishing keeps superseded generations; the batched retirement removes them after the grace", async () => {
 		const generationSessionId = `${sessionId}_generations`;
-		const publish = (revision: string, retireGraceMs?: number) =>
+		const generationOrganizationId = `org_records_generations_${RUN_ID}`;
+		createdRecordsOrganizationIds.push(generationOrganizationId);
+		const publish = (revision: string) =>
 			writeSession({
 				content: `${session.main}\n${line({
 					message: { content: `revision ${revision}`, role: "user" },
 					timestamp: at(900),
 					type: "user",
 				})}`,
-				retireGraceMs,
+				organizationId: generationOrganizationId,
 				revision,
 				sessionId: generationSessionId,
 				subagents: session.subagents,
@@ -944,15 +948,25 @@ describe("transcript record readers", () => {
 		await publish("100");
 		await publish("200");
 		await publish("300");
-		expect(await readStoredRevisions(generationSessionId)).toEqual([
-			"100",
-			"200",
-			"300",
-		]);
+		await publish("400");
+		expect(
+			await readStoredRevisions(generationSessionId, generationOrganizationId),
+		).toEqual(["100", "200", "300", "400"]);
 
-		await publish("400", 0);
-		expect(await readStoredRevisions(generationSessionId)).toEqual(["400"]);
-		const [facts] = await readSessionFacts(scope, [generationSessionId]);
+		const later = Date.now() + 2 * TRANSCRIPT_RECORDS_RETIRE_GRACE_MS;
+		expect(
+			await retireTranscriptRecordsGenerations(clickhouse, {
+				deadline: { deadlineAt: later + 600_000, now: () => later },
+				organizationId: generationOrganizationId,
+			}),
+		).toMatchObject({ retired: 3, deleteStatements: 1, hasMore: false });
+		expect(
+			await readStoredRevisions(generationSessionId, generationOrganizationId),
+		).toEqual(["400"]);
+		const [facts] = await readSessionFacts(
+			{ organizationId: generationOrganizationId, userId },
+			[generationSessionId],
+		);
 		expect(facts).toMatchObject({ revision: "400", turns: 3 });
 	});
 
@@ -1601,13 +1615,12 @@ describe("durable transcript record retirement", () => {
 		});
 		const clock = BASE_TIME_MS + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS;
 		const sweep = () =>
-			runTranscriptRecordsRetirementPass({
-				executor: clickhouse,
+			retireTranscriptRecordsGenerations(clickhouse, {
 				organizationId: retirementOrganizationId,
-				deadline: { deadlineAt: clock + 10_000, now: () => clock },
+				deadline: { deadlineAt: clock + 600_000, now: () => clock },
 			});
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 100,
+			retired: 100,
 			sessionsProcessed: 1,
 			hasMore: true,
 		});
@@ -1615,7 +1628,7 @@ describe("durable transcript record retirement", () => {
 			(await readStoredRevisions(sessionId, retirementOrganizationId)).sort(),
 		).toEqual(["1", "103", "2"]);
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 2,
+			retired: 2,
 			sessionsProcessed: 1,
 			hasMore: false,
 		});
@@ -1623,7 +1636,7 @@ describe("durable transcript record retirement", () => {
 			await readStoredRevisions(sessionId, retirementOrganizationId),
 		).toEqual(["103"]);
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 0,
+			retired: 0,
 			sessionsProcessed: 0,
 			hasMore: false,
 		});
@@ -1655,6 +1668,75 @@ describe("durable transcript record retirement", () => {
 		]);
 	});
 
+	test("the hourly retirement deletes several sessions' generations with one keyed statement, keeping each committed one", async () => {
+		const retirementOrganizationId = `org_records_batched_${RUN_ID}`;
+		createdRecordsOrganizationIds.push(retirementOrganizationId);
+		const sessionIds = ["a", "b", "c"].map(
+			(suffix) => `records_${RUN_ID}_batched_${suffix}`,
+		);
+		let clock = BASE_TIME_MS;
+		for (const sessionId of sessionIds) {
+			for (const revision of ["100", "200", "300"]) {
+				await writeSession({
+					content: line({
+						type: "user",
+						message: { role: "user", content: `revision ${revision}` },
+						timestamp: SESSION_DATE,
+					}),
+					now: () => new Date(clock),
+					organizationId: retirementOrganizationId,
+					revision,
+					sessionId,
+				});
+			}
+		}
+		await writeSession({
+			content: line({
+				type: "user",
+				message: { role: "user", content: "crashed" },
+				timestamp: SESSION_DATE,
+			}),
+			omitReceipt: true,
+			organizationId: retirementOrganizationId,
+			revision: "50",
+			sessionId: sessionIds[0] ?? "",
+		});
+		const statements: ClickHouseStatement[] = [];
+		const recording: ClickHouseExecutor = {
+			...clickhouse,
+			async execute(statement) {
+				statements.push(statement);
+				await clickhouse.execute(statement);
+			},
+		};
+		const retire = () =>
+			retireTranscriptRecordsGenerations(recording, {
+				deadline: { deadlineAt: clock + 600_000, now: () => clock },
+				organizationId: retirementOrganizationId,
+			});
+		clock += TRANSCRIPT_RECORDS_RETIRE_GRACE_MS - 1;
+		expect(await retire()).toMatchObject({ retired: 0, deleteStatements: 0 });
+		clock++;
+		expect(await retire()).toMatchObject({
+			retired: 7,
+			deleteStatements: 1,
+			hasMore: false,
+		});
+		expect(statements).toHaveLength(1);
+		expect(statements[0]?.query).toContain(
+			"organization_id = {organizationId:String} AND (user_id, session_id, revision, parser_version) IN {keys:Array(Tuple(String, String, UInt64, UInt16))}",
+		);
+		expect(statements[0]?.query_id).toMatch(
+			/^opaline-delete-transcript_records-[0-9a-f]{20}-1$/u,
+		);
+		for (const sessionId of sessionIds) {
+			expect(
+				await readStoredRevisions(sessionId, retirementOrganizationId),
+			).toEqual(["300"]);
+		}
+		expect(await retire()).toMatchObject({ retired: 0, deleteStatements: 0 });
+	});
+
 	test("maintenance revisits quiet sessions after grace, bounds each pass, and resumes without another upload", async () => {
 		const retirementOrganizationId = `org_records_retirement_${RUN_ID}`;
 		createdRecordsOrganizationIds.push(retirementOrganizationId);
@@ -1678,15 +1760,14 @@ describe("durable transcript record retirement", () => {
 			}
 		}
 		const sweep = () =>
-			runTranscriptRecordsRetirementPass({
-				executor: clickhouse,
-				deadline: { deadlineAt: clock + 10_000, now: () => clock },
+			retireTranscriptRecordsGenerations(clickhouse, {
+				deadline: { deadlineAt: clock + 600_000, now: () => clock },
 				maxSessions: 1,
 				organizationId: retirementOrganizationId,
 			});
 		clock += TRANSCRIPT_RECORDS_RETIRE_GRACE_MS - 1;
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 0,
+			retired: 0,
 			sessionsProcessed: 0,
 			hasMore: false,
 		});
@@ -1697,7 +1778,7 @@ describe("durable transcript record retirement", () => {
 		}
 		clock++;
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 1,
+			retired: 1,
 			sessionsProcessed: 1,
 			hasMore: true,
 		});
@@ -1708,11 +1789,11 @@ describe("durable transcript record retirement", () => {
 			await readStoredRevisions(sessionIds[1] ?? "", retirementOrganizationId),
 		).toEqual(["100", "200"]);
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 1,
+			retired: 1,
 			sessionsProcessed: 1,
 		});
 		expect(await sweep()).toMatchObject({
-			generationsRetired: 0,
+			retired: 0,
 			sessionsProcessed: 0,
 			hasMore: false,
 		});

@@ -1,4 +1,4 @@
-import { getLogger } from "@logtape/logtape";
+import { TupleParam } from "@clickhouse/client-web";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type {
 	RudelRunIndexRow,
@@ -11,6 +11,7 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
+import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
 import {
 	type CodexLifecycleFacts,
 	codexLifecycleFactsByRun,
@@ -77,9 +78,15 @@ import {
 import { queryCountedGenerations } from "../analysis/scope.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
 import {
+	buildKeyedDeleteOperations,
+	type DeleteOperation,
+	type DeleteOutcome,
+	isDeleteSettled,
+} from "../clickhouse-batched-delete.js";
+import { runRetirementDeletes } from "../generation-retirement.js";
+import {
 	MAX_RETIRED_GENERATIONS_PER_PASS,
 	selectRetiredGenerations,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 } from "../transcript-records-ingest.service.js";
 import {
 	runNodeId,
@@ -87,8 +94,6 @@ import {
 	sessionScopeId,
 } from "./l1-edge-ids.js";
 import { RUN_INDEX_TABLE, RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
-
-const logger = getLogger(["rudel", "api", "l1-edges"]);
 
 /**
  * Records (receipt row counts) of the largest generation the build aggregates
@@ -468,21 +473,6 @@ export async function buildRunIndex(input: {
 		asyncInsert: false,
 		deduplicationToken: `${token}:receipt`,
 	});
-	try {
-		await retireRunIndexSnapshots(executor, organizationId, session, {
-			graceMs: TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
-			now: now(),
-		});
-	} catch (error) {
-		// The new snapshot is committed; the sweep retries the cleanup.
-		logger.warn(
-			"Run index cleanup of superseded snapshots failed (session_id={sessionId} error={error})",
-			{
-				sessionId: session.sessionId,
-				error: error instanceof Error ? error.message : String(error),
-			},
-		);
-	}
 	return {
 		written: true,
 		frozenReason: null,
@@ -1212,9 +1202,30 @@ export interface RunIndexSnapshot extends RunIndexGeneration {
 	buildRevision: string;
 }
 
+const SessionSnapshotRowSchema = SnapshotRowSchema.extend({
+	user_id: z.string(),
+	session_id: z.string(),
+});
+
+const RUN_INDEX_SNAPSHOT_KEY_COLUMNS = [
+	{ name: "user_id", type: "String" },
+	{ name: "session_id", type: "String" },
+	{ name: "revision", type: "UInt64" },
+	{ name: "parser_version", type: "UInt16" },
+	{ name: "index_version", type: "UInt16" },
+	{ name: "build_revision", type: "UInt64" },
+] as const;
+
+export interface RunIndexSnapshotRetirement {
+	snapshots: number;
+	retired: number;
+	settled: boolean;
+	outcomes: DeleteOutcome[];
+}
+
 /**
- * Retires a session's snapshots that no reader can pin or will pin again,
- * found from all its rows, receipts or not:
+ * Retires the snapshots no reader can pin or will pin again of one
+ * organization's sessions, found from all their rows, receipts or not:
  *
  * - older than the committed snapshot (the newest with a receipt) and never
  *   committed: a crashed build, at once;
@@ -1225,60 +1236,105 @@ export interface RunIndexSnapshot extends RunIndexGeneration {
  *   the grace (a build in flight writes its receipt within its lease).
  *
  * The committed snapshot itself is never retired, even after its transcript
- * expired.
+ * expired. Requests and setup first: the run index rows are what finds a
+ * snapshot again, so a pass that stops between the deletes is finished by the
+ * next.
  */
 export async function retireRunIndexSnapshots(
 	executor: ClickHouseExecutor,
 	organizationId: string,
-	session: Pick<SessionIdentity, "userId" | "sessionId">,
-	retirement: { abortSignal?: AbortSignal; graceMs: number; now: Date },
-): Promise<number> {
-	const identity = {
-		organizationId,
-		userId: session.userId,
-		sessionId: session.sessionId,
+	sessions: readonly Pick<SessionIdentity, "userId" | "sessionId">[],
+	retirement: {
+		abortSignal?: AbortSignal;
+		deadline?: MaintenanceDeadline;
+		graceMs: number;
+		now: Date;
+	},
+): Promise<RunIndexSnapshotRetirement> {
+	const result: RunIndexSnapshotRetirement = {
+		snapshots: 0,
+		retired: 0,
+		settled: true,
+		outcomes: [],
 	};
-	const snapshots = await query(executor, SnapshotRowSchema, {
+	if (sessions.length === 0) return result;
+	const rows = await query(executor, SessionSnapshotRowSchema, {
 		abortSignal: retirement.abortSignal,
-		query: `SELECT toString(revision) AS revision_text, parser_version, index_version,
+		query: `SELECT user_id, session_id, toString(revision) AS revision_text, parser_version, index_version,
 				toString(build_revision) AS build_text,
 				countIf(row_kind = 'receipt') AS receipts,
 				maxIf(toUnixTimestamp64Milli(built_at), row_kind = 'receipt') AS receipt_built_ms,
 				max(toUnixTimestamp64Milli(built_at)) AS written_ms
 			FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
-			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-				AND session_id = {sessionId:String}
-			GROUP BY revision, parser_version, index_version, build_revision
-			ORDER BY revision DESC, parser_version DESC, index_version DESC, build_revision DESC
-			LIMIT {snapshotLimit:UInt32}`,
+			WHERE organization_id = {organizationId:String}
+				AND (user_id, session_id) IN {sessions:Array(Tuple(String, String))}
+			GROUP BY user_id, session_id, revision, parser_version, index_version, build_revision
+			ORDER BY user_id, session_id, revision DESC, parser_version DESC, index_version DESC, build_revision DESC
+			LIMIT {snapshotLimit:UInt32} BY user_id, session_id`,
 		query_params: {
-			...identity,
+			organizationId,
+			sessions: sessions.map(
+				(session) => new TupleParam([session.userId, session.sessionId]),
+			),
 			snapshotLimit: 10 * MAX_RETIRED_GENERATIONS_PER_PASS,
 		},
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 	});
-	const retired = selectRetiredSnapshots(snapshots, retirement);
-	if (retired.length === 0) return 0;
-	const params: Record<string, unknown> = { ...identity };
-	const clauses = retired.map((snapshot, index) => {
-		params[`revision${index}`] = snapshot.revision;
-		params[`parserVersion${index}`] = snapshot.parserVersion;
-		params[`indexVersion${index}`] = snapshot.indexVersion;
-		params[`build${index}`] = snapshot.buildRevision;
-		return `(revision = {revision${index}:UInt64} AND parser_version = {parserVersion${index}:UInt16} AND index_version = {indexVersion${index}:UInt16} AND build_revision = {build${index}:UInt64})`;
-	});
-	// Requests and setup first: the run index rows are what finds a snapshot
-	// again, so a pass that stops between the deletes is finished by the next.
-	for (const table of [RUN_SETUP_TABLE, RUN_REQUESTS_TABLE, RUN_INDEX_TABLE])
-		await executor.execute({
-			abortSignal: retirement.abortSignal,
-			clickhouse_settings: { lightweight_deletes_sync: "1" },
-			query: `DELETE FROM ${getSafeClickHouseTable(table)}
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id = {sessionId:String} AND (${clauses.join(" OR ")})`,
-			query_params: params,
-		});
-	return retired.length;
+	const bySession = new Map<string, z.infer<typeof SnapshotRowSchema>[]>();
+	for (const row of rows) {
+		const key = `${row.user_id}\u0000${row.session_id}`;
+		const list = bySession.get(key) ?? [];
+		list.push(row);
+		bySession.set(key, list);
+	}
+	const keys: (string | number)[][] = [];
+	for (const [key, snapshots] of bySession) {
+		const [userId = "", sessionId = ""] = key.split("\u0000");
+		for (const snapshot of selectRetiredSnapshots(snapshots, retirement))
+			keys.push([
+				userId,
+				sessionId,
+				snapshot.revision,
+				snapshot.parserVersion,
+				snapshot.indexVersion,
+				snapshot.buildRevision,
+			]);
+	}
+	result.snapshots = keys.length;
+	const byTable = [RUN_SETUP_TABLE, RUN_REQUESTS_TABLE, RUN_INDEX_TABLE].map(
+		(table) =>
+			buildKeyedDeleteOperations({
+				table,
+				organizationId,
+				columns: RUN_INDEX_SNAPSHOT_KEY_COLUMNS,
+				keys,
+			}),
+	);
+	const [setup = [], requests = [], index = []] = byTable;
+	for (let chunk = 0; chunk < index.length; chunk++) {
+		const operations = [setup[chunk], requests[chunk], index[chunk]].filter(
+			(operation): operation is DeleteOperation => operation !== undefined,
+		);
+		const outcomes = await runRetirementDeletes(
+			executor,
+			operations,
+			{ signal: retirement.abortSignal, deadline: retirement.deadline },
+			true,
+		);
+		result.outcomes.push(...outcomes);
+		const last = outcomes.at(-1);
+		if (
+			outcomes.length === operations.length &&
+			last !== undefined &&
+			isDeleteSettled(last)
+		)
+			result.retired += last.keyCount;
+		else {
+			result.settled = false;
+			break;
+		}
+	}
+	return result;
 }
 
 /** The snapshots `retireRunIndexSnapshots` deletes, from rows newest first. */

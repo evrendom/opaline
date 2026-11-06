@@ -20,7 +20,7 @@ Not changed: the GitHub links keep their own retention; the weekly totals (`week
 | `apps/api/src/services/l1-edges/run-index.service.ts:268-274` | nulled text of sessions older than 365 days before writing | removed |
 | `apps/api/src/clickhouse.ts:128-131`, `docs/l1-literal-schema.md:9,165,175`, `docs/adr/0002-literal-l1-for-analysis.md:17`, `CLAUDE.md` (run index and new L1 retention sections) | stated the expiry | state "kept until a deletion request" |
 
-No scheduled job deletes these tables by age. The maintenance steps that delete rows (`retire:transcript-records`, the daily `run-index` retirement, session revision receipts, expired purge jobs, expired ingest jobs) remove superseded generations or operational rows, never a session's data by age. The `l1-edge-census` and `run-index-census` steps look back 14 days only to find sessions to queue, not to expire anything.
+No scheduled job deletes these tables by age. The maintenance steps that delete rows (`retire:transcript-records`, the hourly session retirement, session revision receipts, expired purge jobs, expired ingest jobs) remove superseded generations or operational rows, never a session's data by age. The `l1-edge-census` and `run-index-census` steps look back 14 days only to find sessions to queue, not to expire anything.
 
 Code that treats a missing transcript as "expired" (`frozenReason: "transcript generation expired; edges kept"`, `"transcript expired; run index kept"`, the `frozen` link status) is unchanged: the strings are stored in Postgres and tests. With no TTL the condition now only arises when a generation is gone for another reason (a deleted session or a failed backfill), and the stored edges and runs are still kept.
 

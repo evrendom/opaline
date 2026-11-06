@@ -13,12 +13,12 @@ import {
 	readRawRevision,
 	toIsoUtc,
 } from "../derived-records-reconciliation.service.js";
+import { retireTranscriptRecordsGenerations } from "../session-retirement.service.js";
 import {
 	persistTranscriptRecordsBestEffort,
 	readTranscriptRecordsExtractionConfig,
 	type TranscriptRecordsExtractionConfig,
 } from "../transcript-records-extraction.service.js";
-import { runTranscriptRecordsRetirementPass } from "../transcript-records-retirement.service.js";
 import { enqueueSessionEdgesBestEffort } from "./l1-edge-enqueue.js";
 import type {
 	HealRow,
@@ -51,14 +51,13 @@ export function createReparser(options: {
 	const maxRunBytes = options.maxRunBytes ?? REPARSE_MAX_RUN_BYTES;
 	return {
 		async retire(deadline) {
-			const pass = await runTranscriptRecordsRetirementPass({
-				executor,
+			const pass = await retireTranscriptRecordsGenerations(executor, {
 				deadline: createMaintenanceQueueDeadline(
 					deadline,
 					RETIREMENT_BUDGET_MS,
 				),
 			});
-			return pass.generationsRetired;
+			return pass.retired;
 		},
 		async reparse(row, context) {
 			if (!config.enabled) return { outcome: "failed", bytes: 0 };

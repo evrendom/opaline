@@ -18,6 +18,7 @@ import {
 	writeTranscriptRecords,
 } from "./transcript-records-ingest.service.js";
 import { TRANSCRIPT_READ_DEADLINE_MS } from "./transcript-records-reader.service.js";
+import { selectSessionRetirements } from "./transcript-records-retirement-drain.service.js";
 
 const identity = {
 	organizationId: "org",
@@ -556,12 +557,15 @@ describe("writing one extraction generation", () => {
 });
 
 describe("retiring superseded generations", () => {
-	function retiredRevisions(fake: ReturnType<typeof createFakeExecutor>) {
-		const statement = fake.executed.at(-1);
-		const params = statement?.query_params ?? {};
-		return Object.entries(params)
-			.filter(([key]) => /^revision\d+$/u.test(key))
-			.map(([, value]) => String(value));
+	function retiredRevisions(generations: readonly FakeGeneration[]) {
+		return selectSessionRetirements(
+			[committed("200", NOW), ...generations].map((generation) => ({
+				...generation,
+				session_id: identity.sessionId,
+				user_id: identity.userId,
+			})),
+			NOW.getTime(),
+		).map((retirement) => retirement.generation.revision);
 	}
 
 	test("the retirement grace outlasts the enforced whole-read deadline", () => {
@@ -570,73 +574,10 @@ describe("retiring superseded generations", () => {
 		);
 	});
 
-	test("crashed attempts go immediately and a just-superseded generation stays", async () => {
+	test("publishing deletes nothing: the hourly retirement does", async () => {
 		const fake = createFakeExecutor({
-			generations: [uncommitted("150"), committed("100", minutesBefore(1))],
+			generations: [uncommitted("150"), committed("100", minutesBefore(60))],
 		});
-
-		await writeTranscriptRecords(
-			fake.executor,
-			writeInput(async () => {}),
-		);
-
-		expect(retiredRevisions(fake)).toEqual(["150"]);
-	});
-
-	test("a committed generation goes only after the grace since it was superseded", async () => {
-		const fake = createFakeExecutor({
-			generations: [
-				committed("150", minutesBefore(30)),
-				committed("100", minutesBefore(60)),
-				committed("50", minutesBefore(90)),
-			],
-		});
-
-		await writeTranscriptRecords(
-			fake.executor,
-			writeInput(async () => {}),
-		);
-
-		// 150 was superseded just now by 200 and stays. 100 was superseded 30 min
-		// ago by 150 and 50 was superseded 60 min ago by 100: both are past the
-		// 10 minute grace.
-		expect(retiredRevisions(fake)).toEqual(["100", "50"]);
-	});
-
-	test("nothing is deleted while every older generation is inside its grace", async () => {
-		const fake = createFakeExecutor({
-			generations: [
-				committed("150", minutesBefore(3)),
-				committed("100", minutesBefore(5)),
-			],
-		});
-
-		await writeTranscriptRecords(
-			fake.executor,
-			writeInput(async () => {}),
-		);
-
-		expect(fake.executed).toHaveLength(0);
-	});
-
-	test("a zero grace retires every superseded committed generation", async () => {
-		const fake = createFakeExecutor({
-			generations: [
-				committed("150", minutesBefore(0)),
-				committed("100", minutesBefore(0)),
-			],
-		});
-
-		await writeTranscriptRecords(
-			fake.executor,
-			writeInput(async () => {}, { retireGraceMs: 0 }),
-		);
-
-		expect(retiredRevisions(fake)).toEqual(["150", "100"]);
-	});
-
-	test("a cleanup failure never fails a committed write", async () => {
-		const fake = createFakeExecutor({ queryFails: true });
 
 		const result = await writeTranscriptRecords(
 			fake.executor,
@@ -645,5 +586,37 @@ describe("retiring superseded generations", () => {
 
 		expect(result.rowCount).toBe(3);
 		expect(fake.executed).toHaveLength(0);
+		expect(fake.events).not.toContain("delete");
+	});
+
+	test("crashed attempts go immediately and a just-superseded generation stays", () => {
+		expect(
+			retiredRevisions([
+				uncommitted("150"),
+				committed("100", minutesBefore(1)),
+			]),
+		).toEqual(["150"]);
+	});
+
+	test("a committed generation goes only after the grace since it was superseded", () => {
+		// 150 was superseded just now by 200 and stays. 100 was superseded 30 min
+		// ago by 150 and 50 was superseded 60 min ago by 100: both are past the
+		// 10 minute grace.
+		expect(
+			retiredRevisions([
+				committed("150", minutesBefore(30)),
+				committed("100", minutesBefore(60)),
+				committed("50", minutesBefore(90)),
+			]),
+		).toEqual(["100", "50"]);
+	});
+
+	test("nothing is retired while every older generation is inside its grace", () => {
+		expect(
+			retiredRevisions([
+				committed("150", minutesBefore(3)),
+				committed("100", minutesBefore(5)),
+			]),
+		).toEqual([]);
 	});
 });

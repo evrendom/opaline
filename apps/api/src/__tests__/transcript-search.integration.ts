@@ -38,7 +38,10 @@ import {
 	type SearchEnv,
 	searchTranscripts,
 } from "../services/transcript-search/search.js";
-import { indexSessionText } from "../services/transcript-search/session-index.service.js";
+import {
+	indexSessionText,
+	retireOlderTranscriptChunkHits,
+} from "../services/transcript-search/session-index.service.js";
 import { deleteUserPostgresData } from "../services/user-deletion.service.js";
 
 /** Every agent query gets a slot at once. */
@@ -447,7 +450,7 @@ describe("search over uploaded transcripts", () => {
 });
 
 describe("re-uploads", () => {
-	test("a session is indexed from its newest generation, compared as numbers, and older generations' hits are retired", async () => {
+	test("a session is indexed from its newest generation, compared as numbers, and the batched retirement removes older generations' hits", async () => {
 		const embedder = fakeEmbedder();
 		const quota = createMemoryEmbeddingQuota({
 			tokens: 1_000_000,
@@ -467,12 +470,23 @@ describe("re-uploads", () => {
 		expect(await index(workspace, sessionId, embedder, quota)).toEqual({
 			status: "current",
 		});
-		const generations = await clickhouse.query<{ revision: string }>({
-			query: `SELECT DISTINCT toString(revision) AS revision FROM rudel.transcript_chunk_hits
-				WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}`,
-			query_params: { organizationId: workspace, sessionId },
+		const generations = () =>
+			clickhouse.query<{ revision: string }>({
+				query: `SELECT DISTINCT toString(revision) AS revision FROM rudel.transcript_chunk_hits
+				WHERE organization_id = {organizationId:String} AND session_id = {sessionId:String}
+				ORDER BY toUInt64(revision)`,
+				query_params: { organizationId: workspace, sessionId },
+			});
+		expect(await generations()).toEqual([
+			{ revision: "9" },
+			{ revision: "10" },
+		]);
+		const retirement = await retireOlderTranscriptChunkHits(clickhouse, {
+			organizationId: workspace,
 		});
-		expect(generations).toEqual([{ revision: "10" }]);
+		expect(retirement).toMatchObject({ hasMore: false });
+		expect(retirement.retired).toBe(retirement.generations);
+		expect(await generations()).toEqual([{ revision: "10" }]);
 	});
 });
 

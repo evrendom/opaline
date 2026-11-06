@@ -210,6 +210,11 @@ test("revision and parser advancement replace old generations; retries are resum
 		}),
 	).toBe("written");
 	let rows = await readRows(input.sessionId);
+	expect(new Set(rows.map((row) => row.revision))).toEqual(
+		new Set(["100", "200"]),
+	);
+	await retireOlderGitObservations(executor, { organizationId });
+	rows = await readRows(input.sessionId);
 	expect(rows.every((row) => row.revision === "200")).toBe(true);
 	expect(rows.some((row) => row.short_sha === "f00ba12")).toBe(true);
 	const completedRows = await readRows(input.sessionId, true);
@@ -233,6 +238,7 @@ test("revision and parser advancement replace old generations; retries are resum
 			assertWritable: () => fence(input),
 		}),
 	).toBe("written");
+	await retireOlderGitObservations(executor, { organizationId });
 	rows = await readRows(input.sessionId);
 	expect(
 		rows.every(
@@ -249,14 +255,13 @@ test("revision and parser advancement replace old generations; retries are resum
 	).toBe("skipped");
 });
 
-test("a backfill keeps older generations until one batched retirement removes them", async () => {
+test("publication keeps older generations until one batched retirement removes them", async () => {
 	const fixture = claudeGitFixture();
 	const input = scope("deferred", fixture);
 	await prepare(input, fixture, "100");
 	await extractGitObservations(executor, {
 		...input,
 		assertWritable: () => fence(input),
-		retireOlder: false,
 	});
 	await prepare(
 		input,
@@ -267,7 +272,6 @@ test("a backfill keeps older generations until one batched retirement removes th
 		await extractGitObservations(executor, {
 			...input,
 			assertWritable: () => fence(input),
-			retireOlder: false,
 		}),
 	).toBe("written");
 	let rows = await readRows(input.sessionId);
@@ -275,15 +279,68 @@ test("a backfill keeps older generations until one batched retirement removes th
 		new Set(["100", "200"]),
 	);
 
+	const retirement = await retireOlderGitObservations(executor, {
+		organizationId,
+	});
+	expect(retirement.retired).toBeGreaterThanOrEqual(1);
+	expect(retirement.retired).toBe(retirement.generations);
+	expect(retirement.outcomes.map((outcome) => outcome.status)).toEqual(
+		retirement.outcomes.map(() => "completed"),
+	);
 	expect(
-		await retireOlderGitObservations(executor, { organizationId }),
-	).toBeGreaterThanOrEqual(1);
+		retirement.outcomes.every((outcome) =>
+			outcome.queryIds.every((queryId) =>
+				queryId.startsWith("opaline-delete-session_git_observations-"),
+			),
+		),
+	).toBe(true);
 	rows = await readRows(input.sessionId);
 	expect(rows.length).toBeGreaterThan(0);
 	expect(rows.every((row) => row.revision === "200")).toBe(true);
-	expect(await retireOlderGitObservations(executor, { organizationId })).toBe(
-		0,
+	expect(
+		(await retireOlderGitObservations(executor, { organizationId }))
+			.generations,
+	).toBe(0);
+});
+
+test("a retirement whose DELETE outcome is unknown settles on the data and never submits twice", async () => {
+	const fixture = claudeGitFixture();
+	const input = scope("unknown-outcome", fixture);
+	await prepare(input, fixture, "100");
+	await extractGitObservations(executor, {
+		...input,
+		assertWritable: () => fence(input),
+	});
+	await prepare(
+		input,
+		{ ...fixture, content: fixture.content.replaceAll("abc1234", "f00ba12") },
+		"200",
 	);
+	await extractGitObservations(executor, {
+		...input,
+		assertWritable: () => fence(input),
+	});
+	const submitted: string[] = [];
+	const timingOut: ClickHouseExecutor = {
+		...executor,
+		async execute(statement) {
+			await executor.execute(statement);
+			if (statement.query.startsWith("DELETE FROM")) {
+				submitted.push(statement.query_id ?? "");
+				throw new Error("Timeout error.");
+			}
+		},
+	};
+	const retirement = await retireOlderGitObservations(timingOut, {
+		organizationId,
+	});
+	expect(retirement.outcomes.map((outcome) => outcome.status)).toEqual(
+		retirement.outcomes.map(() => "completed-late"),
+	);
+	expect(submitted).toHaveLength(retirement.outcomes.length);
+	expect(new Set(submitted).size).toBe(submitted.length);
+	const rows = await readRows(input.sessionId);
+	expect(rows.every((row) => row.revision === "200")).toBe(true);
 });
 
 test("source participates in identity even when native session IDs collide", async () => {
