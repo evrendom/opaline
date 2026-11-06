@@ -32,17 +32,17 @@
 				{
 					"name": "git_remote",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_name",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_type",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "content",
@@ -128,17 +128,17 @@
 				{
 					"name": "git_remote",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_name",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_type",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "content",
@@ -1146,17 +1146,17 @@
 				{
 					"name": "git_remote",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_name",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "package_type",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "filter_version",
@@ -1195,7 +1195,7 @@
 				{
 					"name": "source",
 					"type": "LowCardinality(String)",
-					"default": "'claude_code'"
+					"default": "claude_code"
 				},
 				{
 					"name": "skills",
@@ -1290,12 +1290,12 @@
 				{
 					"name": "error_pattern",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "model_used",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "has_commit",
@@ -1305,7 +1305,7 @@
 				{
 					"name": "session_archetype",
 					"type": "String",
-					"default": "'standard'"
+					"default": "standard"
 				},
 				{
 					"name": "success_score",
@@ -1681,12 +1681,12 @@
 				{
 					"name": "child_originator",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "child_entrypoint",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "parent_source",
@@ -1735,7 +1735,7 @@
 				{
 					"name": "workdir",
 					"type": "String",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "prompt_fingerprint",
@@ -2254,17 +2254,17 @@
 				{
 					"name": "model_provider",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "inference_speed",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "inference_geo",
 					"type": "LowCardinality(String)",
-					"default": "''"
+					"default": ""
 				},
 				{
 					"name": "context_input_tokens",
@@ -2289,17 +2289,17 @@
 				{
 					"name": "recorded_cache_write_5m_input_tokens",
 					"type": "Nullable(UInt64)",
-					"default": "NULL"
+					"default": "fn:NULL"
 				},
 				{
 					"name": "recorded_cache_write_1h_input_tokens",
 					"type": "Nullable(UInt64)",
-					"default": "NULL"
+					"default": "fn:NULL"
 				},
 				{
 					"name": "cache_write_input_tokens",
 					"type": "Nullable(UInt64)",
-					"default": "NULL"
+					"default": "fn:NULL"
 				},
 				{
 					"name": "output_tokens",

@@ -10,11 +10,7 @@ import {
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import { getSessionDetailRawSnapshot } from "../services/session-detail-snapshot.service.js";
 
-/**
- * chkit wrote this column's default with doubled quotes, so it is the literal
- * text `''`; the column is dropped in a later migration.
- */
-const RETIRED_ERROR_PATTERN_DEFAULT = "''";
+const RETIRED_ERROR_PATTERN_DEFAULT = "";
 
 /**
  * Value assertions for the session_analytics materialized views.

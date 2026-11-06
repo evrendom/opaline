@@ -290,6 +290,8 @@ To drop everything and recreate:
 
 **chkit generates operations in wrong order.** Materialized views are emitted before the tables they depend on. After `ch:generate`, always manually reorder the migration file so CREATE TABLE statements come before CREATE MATERIALIZED VIEW. This is a chkit bug.
 
+**String defaults are values, not SQL.** chkit quotes a string `default` as a literal and passes only `fn:` through as SQL: write `default: "standard"` or `default: ""`, never `"'standard'"` (that stores the quotes; see `20261106120000_string_defaults.sql`), and `fn:NULL` for a NULL default.
+
 **No SQL `--` comments inside MV `as` clauses.** chkit flattens the multi-line MV query into a single line. SQL `--` comments become inline on that line and comment out everything after them, breaking the query. Never use `--` comments inside the `as:` template string in `materializedView()` definitions. Use TypeScript comments (`//`) outside the template string if needed.
 
 **`primaryKey: []` is required** by chkit's `TableDefinition` type, even though ClickHouse defaults the primary key to ORDER BY columns. chkit emits `PRIMARY KEY ()` in the DDL. This is safe to leave or remove from the migration file — it's cosmetic.

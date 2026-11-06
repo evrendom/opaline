@@ -129,15 +129,13 @@ test("both views stop writing retired interpretations in place: live columns are
 
 	await insert("2");
 	const after = await read("2");
-	// The columns' defaults; chkit wrote the two string ones with doubled
-	// quotes, so they are the literal texts `'standard'` and `''`.
 	for (const column of RETIRED_SESSION_ANALYTICS_COLUMNS)
 		expect([column, after[column]]).toEqual([
 			column,
 			column === "session_archetype"
-				? "'standard'"
+				? "standard"
 				: column === "error_pattern"
-					? "''"
+					? ""
 					: 0,
 		]);
 	for (const column of [

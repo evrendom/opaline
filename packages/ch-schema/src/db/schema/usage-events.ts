@@ -27,17 +27,17 @@ const rudel_usage_events = table({
 		{
 			name: "model_provider",
 			type: "LowCardinality(String)",
-			default: "''",
+			default: "",
 		},
 		{
 			name: "inference_speed",
 			type: "LowCardinality(String)",
-			default: "''",
+			default: "",
 		},
 		{
 			name: "inference_geo",
 			type: "LowCardinality(String)",
-			default: "''",
+			default: "",
 		},
 		{ name: "context_input_tokens", type: "UInt64" },
 		{ name: "uncached_input_tokens", type: "UInt64" },
@@ -47,17 +47,17 @@ const rudel_usage_events = table({
 		{
 			name: "recorded_cache_write_5m_input_tokens",
 			type: "Nullable(UInt64)",
-			default: "NULL",
+			default: "fn:NULL",
 		},
 		{
 			name: "recorded_cache_write_1h_input_tokens",
 			type: "Nullable(UInt64)",
-			default: "NULL",
+			default: "fn:NULL",
 		},
 		{
 			name: "cache_write_input_tokens",
 			type: "Nullable(UInt64)",
-			default: "NULL",
+			default: "fn:NULL",
 		},
 		{ name: "output_tokens", type: "UInt64" },
 		{ name: "reasoning_output_tokens", type: "UInt64" },

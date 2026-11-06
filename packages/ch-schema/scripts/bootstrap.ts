@@ -90,6 +90,7 @@ const FORWARD_SCRIPTS = new Map([
 	["20261016190000_session_images.sql", "migrate-session-images.ts"],
 	["20261028150000_run_activity_end.sql", "migrate-run-activity-end.ts"],
 	["20261104120000_mcp_tool_calls.sql", "migrate-mcp-tool-calls.ts"],
+	["20261106120000_string_defaults.sql", "migrate-string-defaults.ts"],
 ]);
 
 interface BootstrapMigration {

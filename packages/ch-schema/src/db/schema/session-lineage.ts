@@ -16,12 +16,12 @@ const rudel_session_lineage = table({
 		{
 			name: "child_originator",
 			type: "LowCardinality(String)",
-			default: "''",
+			default: "",
 		},
 		{
 			name: "child_entrypoint",
 			type: "LowCardinality(String)",
-			default: "''",
+			default: "",
 		},
 		{ name: "parent_source", type: "LowCardinality(String)" },
 		{ name: "parent_session_id", type: "String" },
@@ -34,7 +34,7 @@ const rudel_session_lineage = table({
 		{ name: "confidence", type: "LowCardinality(String)" },
 		{ name: "countable", type: "UInt8" },
 		{ name: "reason", type: "String" },
-		{ name: "workdir", type: "String", default: "''" },
+		{ name: "workdir", type: "String", default: "" },
 		{ name: "prompt_fingerprint", type: "FixedString(64)" },
 		{ name: "derivation_version", type: "UInt16" },
 		{ name: "input_sequence", type: "UInt64" },
