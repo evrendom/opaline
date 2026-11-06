@@ -7,6 +7,7 @@ import {
 } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
+import { shouldUseUsageEventAnalytics } from "../lib/env.js";
 import {
 	type AnalyticsTenant,
 	organizationMatchSql,
@@ -23,6 +24,7 @@ import { getGitHubOutcomesDashboardMetrics } from "./github-outcomes-dashboard.s
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildCanonicalPricingModelSql,
+	buildDateRangeWindowSql,
 	getAllOrganizationsUsageAnalyticsQueryContext,
 	getUsageAnalyticsQueryContext,
 	resolveCanonicalPricingModel,
@@ -31,6 +33,7 @@ import {
 export { buildDurationPeriods } from "./dashboard-duration-periods.js";
 
 const MAX_AGGREGATE_ROWS = 100_000;
+const DASHBOARD_MEMORY_BYTES = String(2 * 1024 * 1024 * 1024);
 type AgentRunDurationInterval = NonNullable<
 	CostDashboardInput["durationInterval"]
 >;
@@ -206,7 +209,17 @@ async function querySessionMetricRows(
 		);
 	const usage =
 		scope.tenant === "organization"
-			? await getUsageAnalyticsQueryContext(scope.orgId)
+			? await getUsageAnalyticsQueryContext(
+					scope.orgId,
+					shouldUseUsageEventAnalytics(scope.orgId)
+						? {
+								window: {
+									includeNativeDescendants: false,
+									sessionsSql: buildDateRangeWindowSql(),
+								},
+							}
+						: {},
+				)
 			: await getAllOrganizationsUsageAnalyticsQueryContext();
 	// Older clients omit the selector and retain the original all-breakdowns
 	// response. Current clients name the visible metric so only its detailed
@@ -521,6 +534,7 @@ async function querySessionMetricRows(
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",
+			max_memory_usage: DASHBOARD_MEMORY_BYTES,
 			timeout_before_checking_execution_speed: 0,
 			max_result_rows: String(MAX_AGGREGATE_ROWS + 1),
 			result_overflow_mode: "throw",
@@ -641,6 +655,7 @@ async function queryAgentRunDurationStats(
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",
+			max_memory_usage: DASHBOARD_MEMORY_BYTES,
 			timeout_before_checking_execution_speed: 0,
 			max_result_rows: "368",
 			result_overflow_mode: "throw",

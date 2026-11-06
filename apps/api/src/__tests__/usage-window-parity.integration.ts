@@ -6,6 +6,7 @@ import {
 	setDefaultTimeout,
 	test,
 } from "bun:test";
+import { CostDashboardInputSchema } from "@rudel/api-routes";
 import {
 	ingestRudelSessionAnalytics,
 	ingestRudelSessionLineage,
@@ -18,6 +19,7 @@ import {
 	buildInclusiveDateRangeFilter,
 	createClickHouseExecutor,
 } from "../clickhouse.js";
+import { getCostDashboard } from "../services/cost-dashboard.service.js";
 import {
 	getSessionAnalytics,
 	getSessionAnalyticsSummaryComparison,
@@ -442,6 +444,67 @@ async function readReferenceList(
 		estimated_cost: cost_is_complete > 0 ? row.estimated_cost : null,
 	}));
 }
+
+describe("dashboard date-range window", () => {
+	test("prices the same cost and counts the same sessions per day as the organization-wide query", async () => {
+		const startDate = dayOf(-DAY_MS);
+		const endDate = windowDate;
+		const dashboard = await getCostDashboard(
+			{ tenant: "organization", orgId: organizationId },
+			CostDashboardInputSchema.parse({
+				startDate,
+				endDate,
+				requestedMetric: "cost",
+			}),
+			{ githubEvidenceUiEnabled: false },
+		);
+		const reference = await executor.query<{
+			metric: string;
+			date: string;
+			value: number;
+		}>({
+			query: `WITH RECURSIVE ${buildUsageEventAnalyticsCte()}
+				SELECT * FROM (
+					SELECT 'cost' AS metric, toString(p.usage_date) AS date,
+						round(sum(ifNull(p.group_estimated_cost, 0)), 9) AS value
+					FROM priced_usage_groups AS p
+					WHERE p.record_kind = 'event'
+						AND p.usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
+						AND (p.organization_id, p.user_id, p.source, p.session_id) IN (
+							SELECT organization_id, user_id, source, session_id
+							FROM usage_analytics_metadata
+						)
+					GROUP BY date
+					HAVING value != 0
+					UNION ALL
+					SELECT 'sessions' AS metric, toString(toDate(session_date)) AS date,
+						toFloat64(count()) AS value
+					FROM usage_analytics_sessions
+					WHERE session_date >= toDateTime({startDate:String}, 'UTC')
+						AND session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+					GROUP BY date
+				)
+				ORDER BY metric, date`,
+			query_params: { endDate, orgId: organizationId, startDate },
+		});
+		const trend = (metric: "cost" | "sessions"): typeof reference =>
+			(dashboard.metrics[metric]?.trend ?? [])
+				.filter((point) => point.total !== 0)
+				.map((point) => ({
+					metric,
+					date: point.date,
+					value: Number(point.total.toFixed(9)),
+				}));
+
+		expect(reference.length).toBeGreaterThan(2);
+		expect([...trend("cost"), ...trend("sessions")]).toEqual(
+			reference.map((row) => ({
+				...row,
+				value: Number(Number(row.value).toFixed(9)),
+			})),
+		);
+	});
+});
 
 function expectSameRows(
 	rows: Awaited<ReturnType<typeof getSessionAnalytics>>,

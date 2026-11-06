@@ -362,6 +362,30 @@ export function buildSessionAnalyticsWindowSql(filterSql: string): string {
 					AND ${filterSql}`;
 }
 
+export function buildDateRangeWindowSql(): string {
+	const start = "toDateTime({startDate:String}, 'UTC')";
+	return `
+				SELECT session.1 AS organization_id, session.2 AS user_id,
+					session.3 AS source, session.4 AS session_id
+				FROM (
+					SELECT arrayJoin((
+						SELECT groupUniqArray((organization_id, user_id, source, session_id))
+						FROM (
+							SELECT organization_id, user_id, toString(source) AS source, session_id
+							FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)}
+							WHERE ${organizationMatchSql("organization_id")}
+								AND session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+								AND (session_date >= ${start} OR last_interaction_date >= ${start})
+							UNION ALL
+							SELECT organization_id, user_id, toString(source) AS source, session_id
+							FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)}
+							WHERE ${organizationMatchSql("organization_id")}
+								AND usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
+						)
+					)) AS session
+				)`;
+}
+
 /** Defines `usage_window_sessions`; needs the lineage CTEs before it. */
 function buildUsageWindowCte(window: UsageAnalyticsWindow): string {
 	const roots = `usage_window_roots AS (${window.sessionsSql}
