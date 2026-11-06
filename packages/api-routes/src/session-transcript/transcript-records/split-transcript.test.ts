@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import {
 	createSplitStats,
 	decodeTranscriptLine,
@@ -549,16 +550,19 @@ describe("huge records", () => {
 		expect(stats.oversizedLineCount).toBe(1);
 	});
 
-	test("an exhausted session budget keeps a short head, and tool results their tail", () => {
+	test("an exhausted session budget cuts injected context only, and the cut record says so", () => {
 		const cause = "Error: ENOENT: no such file, open 'config.json'";
+		const reminder = `<system-reminder>${"z".repeat(2_000)}</system-reminder>`;
+		const output = `${"log line\n".repeat(300)}${cause}`;
 		const rows = [
 			...splitSessionTranscript({
 				content: [
-					jsonLine(claudeUser("z".repeat(2_000))),
+					jsonLine(claudeUser(reminder)),
+					jsonLine(claudeUser("p".repeat(2_000))),
 					jsonLine(
 						claudeUser([
 							{
-								content: `${"log line\n".repeat(300)}${cause}`,
+								content: output,
 								is_error: true,
 								tool_use_id: "missing",
 								type: "tool_result",
@@ -572,17 +576,28 @@ describe("huge records", () => {
 			}),
 		];
 
-		expect(rows[0]).toMatchObject({ text: "", tail: "", textChars: 2_000 });
-		expect(rows[0]?.head).toBe("z".repeat(256));
-		expect(rows[1]?.text).toBe("");
-		expect(rows[1]?.head).toStartWith("log line");
-		expect(rows[1]?.head.length).toBe(256);
-		expect(rows[1]?.tail).toEndWith(cause);
-		expect(rows[1]?.tail.length).toBe(512);
+		expect(rows[0]).toMatchObject({
+			kind: "injected_context",
+			tail: "",
+			text: "",
+			textChars: reminder.length,
+		});
+		expect(rows[0]?.head).toBe(reminder.slice(0, 256));
+		expect(rows[0]?.facts.extra).toMatchObject({
+			body_sha256: createHash("sha256").update(reminder).digest("hex"),
+			text_cut: "budget",
+		});
+		expect(rows[1]).toMatchObject({
+			kind: "user_prompt",
+			text: "p".repeat(2_000),
+		});
+		expect(rows[1]?.facts.extra.text_cut).toBeUndefined();
+		expect(rows[2]).toMatchObject({ kind: "tool_result", text: output });
+		expect(rows[2]?.facts.extra.text_cut).toBeUndefined();
 	});
 
-	test("a record over its allowance keeps both excerpts and as much text as fits", () => {
-		const body = "a".repeat(5_000);
+	test("injected context over its allowance keeps both excerpts and as much text as fits", () => {
+		const body = `<system-reminder>${"a".repeat(5_000)}</system-reminder>`;
 		const [row] = [
 			...splitSessionTranscript({
 				content: jsonLine(claudeUser(body)),
@@ -591,30 +606,31 @@ describe("huge records", () => {
 				textBudgetChars: 3_000,
 			}),
 		];
+		expect(row?.kind).toBe("injected_context");
 		expect(row?.head.length).toBe(1_024);
 		expect(row?.tail.length).toBe(1_024);
 		expect(row?.text.length).toBe(3_000 - 2_048);
 	});
 
-	test("pacing keeps late turns and subagent transcripts from being starved", () => {
+	test("pacing keeps late injected context and subagent transcripts from being starved", () => {
 		const early = Array.from({ length: 10 }, (_, index) =>
 			jsonLine(
-				claudeUser([
-					{
-						content: `${index}`.repeat(20_000),
-						tool_use_id: `t${index}`,
-						type: "tool_result",
-					},
-				]),
+				claudeUser(
+					`<system-reminder>${`${index}`.repeat(15_000)}</system-reminder>`,
+				),
 			),
 		);
 		const late = Array.from({ length: 10 }, (_, index) =>
-			jsonLine(claudeUser(`late prompt ${index} ${"q".repeat(1_500)}`)),
+			jsonLine(
+				claudeUser(
+					`<system-reminder>late ${index} ${"q".repeat(1_500)}</system-reminder>`,
+				),
+			),
 		);
 		const child = jsonLine(
-			claudeAssistant([
-				{ text: `child finding ${"c".repeat(1_500)}`, type: "text" },
-			]),
+			claudeUser(
+				`<system-reminder>child ${"c".repeat(1_500)}</system-reminder>`,
+			),
 		);
 		const rows = [
 			...splitSessionTranscript({
@@ -625,12 +641,9 @@ describe("huge records", () => {
 				textBudgetChars: 100_000,
 			}),
 		];
-		const latePrompts = ofKind(rows, "user_prompt");
-		expect(latePrompts).toHaveLength(10);
-		// Without pacing the early tool results would spend the whole budget and
-		// every later record would keep a 256-character head.
-		for (const prompt of latePrompts)
-			expect(prompt.head.length).toBeGreaterThan(256);
+		const lateRows = rows.filter((row) => row.head.includes("late "));
+		expect(lateRows).toHaveLength(10);
+		for (const row of lateRows) expect(row.head.length).toBeGreaterThan(256);
 		const childText = rows.find((row) => row.agentId === "agent-1");
 		expect(childText?.head.length).toBeGreaterThan(256);
 		const spent = rows.reduce(

@@ -28,7 +28,7 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * Each record also carries its line's own id (`record_uuid`, Claude `uuid`),
  * and the images its line carried (`images`, from their upload markers).
  */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 12;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 14;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -66,6 +66,13 @@ export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
  */
 export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	...V9_FACT_KEYS,
+	error_from_call_id: 14,
+	turn_cwd: 14,
+	workdir: 14,
+	text_cut: 13,
+	body_sha256: 13,
+	script_call_id: 13,
+	script_commands_unresolved: 13,
 	/**
 	 * Background task id: on the hand-off result of a call whose work went on
 	 * in the background (Claude Bash `backgroundTaskId` or its hand-off text,
@@ -358,7 +365,9 @@ export const TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX = 4_294_967_295;
 export const TRANSCRIPT_RECORD_EXCERPT_CHARS = 1_024;
 
 /** Default cap on the full decoded `text` stored per record (UTF-16 code units, without splitting surrogate pairs). */
-export const TRANSCRIPT_RECORD_TEXT_MAX_CHARS = 65_536;
+export const TRANSCRIPT_RECORD_TEXT_MAX_CHARS = 4 * 1024 * 1024;
+
+export const TRANSCRIPT_RECORD_COMPACTION_TEXT_MAX_CHARS = 65_536;
 
 /**
  * Cap on the stored `text` of injected context (instructions, reminders,
@@ -372,7 +381,7 @@ export const TRANSCRIPT_RECORD_META_TEXT_MAX_CHARS = 4_096;
 
 /**
  * Default total of head + tail + text characters stored for one session across
- * every stream.
+ * every stream by compactions, injected context and bookkeeping records.
  *
  * The budget is paced over the session's raw bytes, main transcript first and
  * then each subagent transcript: by the end of any line, the characters spent

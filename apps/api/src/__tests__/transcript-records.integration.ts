@@ -570,7 +570,7 @@ describe("transcript record readers", () => {
 		}
 	});
 
-	test("raw reads keep stored heads when extraction's text budget is exhausted", async () => {
+	test("raw reads keep prompts and results whole when extraction's text budget is exhausted", async () => {
 		const cappedSessionId = `${sessionId}_raw_heads`;
 		await writeSession({
 			content: session.main,
@@ -585,10 +585,11 @@ describe("transcript record readers", () => {
 			(record) => record.kind === "tool_result" && record.callId === "t-test",
 		);
 		assert(failedResult);
-		expect(failedResult.text).toStartWith("Exit code 1");
-		expect(failedResult.text).toEndWith("[cut]");
-		expect(failedResult.textTruncated).toBe(true);
-		expect(raw.truncated).toBe(true);
+		expect(failedResult.text).toBe(
+			`Exit code 1\n${"noise ".repeat(400)}FAILED login.test.ts`,
+		);
+		expect(failedResult.textTruncated).toBe(false);
+		expect(raw.truncated).toBe(false);
 	});
 
 	test("record reads fall back to the exact raw line when storage capped the text", async () => {

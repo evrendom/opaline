@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { readClaudeLine } from "./claude-records.js";
-import { codexOutcomes } from "./codex-outcomes.js";
+import { codexPrescan } from "./codex-outcomes.js";
 import { readCodexAgentId, readCodexLine } from "./codex-records.js";
 import {
 	assignLineImages,
@@ -25,6 +26,7 @@ import {
 import {
 	NO_TRANSCRIPT_RECORD_FACTS,
 	type SplitTranscriptOptions,
+	TRANSCRIPT_RECORD_COMPACTION_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORD_EXCERPT_CHARS,
 	TRANSCRIPT_RECORD_FACT_SHORT_CHARS,
 	TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS,
@@ -49,7 +51,12 @@ const BODY_KINDS: ReadonlySet<TranscriptRecordKind> = new Set([
 	"tool_call",
 	"tool_result",
 	"file_change",
+]);
+
+const BUDGETED_KINDS: ReadonlySet<TranscriptRecordKind> = new Set([
 	"compaction",
+	"injected_context",
+	"meta",
 ]);
 
 /** Kinds that mean the agent has responded since the latest prompt. */
@@ -148,8 +155,9 @@ export function* splitTranscript(
 		options.maxParseLineBytes ?? TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES;
 	const textMaxChars = options.textMaxChars ?? TRANSCRIPT_RECORD_TEXT_MAX_CHARS;
 	const streams = new Map<string, StreamState>();
-	const outcomes =
-		options.source === "codex" ? codexOutcomes(content) : undefined;
+	const prescan =
+		options.source === "codex" ? codexPrescan(content) : undefined;
+	const outcomes = prescan?.outcomes;
 	const streamFor = (agentId: string): StreamState => {
 		let state = streams.get(agentId);
 		if (state === undefined) {
@@ -160,6 +168,10 @@ export function* splitTranscript(
 			if (streamOutcomes !== undefined)
 				for (const [callId, outcome] of streamOutcomes)
 					state.codexEndEvents.set(callId, outcome);
+			state.codexCommandItems =
+				prescan?.commandItemStreams.has(
+					agentId === mainAgentId ? "" : agentId,
+				) ?? false;
 			// A Codex sub-agent inside the file runs in the same CLI as the file's
 			// own agent, whose session_meta came first.
 			const main = streams.get(mainAgentId);
@@ -247,7 +259,10 @@ export function* splitTranscript(
 			const cap = options.fullText
 				? Number.MAX_SAFE_INTEGER
 				: storedTextCap(item.kind, textMaxChars);
-			const budget = options.fullText ? undefined : options.textBudget;
+			const budget =
+				options.fullText || !BUDGETED_KINDS.has(item.kind)
+					? undefined
+					: options.textBudget;
 			const fields =
 				cap === undefined
 					? headOnlyFields(item.text ?? "")
@@ -258,6 +273,10 @@ export function* splitTranscript(
 							textMaxChars: cap,
 						});
 			if (fields.truncated) stats.textTruncated = true;
+			const cutItem =
+				fields.truncated && cap !== undefined
+					? withCutFacts(item, fields, cap)
+					: item;
 			stats.rowCount++;
 			// Received setup is named after the fact budget: each record's list
 			// is bounded, and a setup file must not read as not received.
@@ -267,8 +286,11 @@ export function* splitTranscript(
 				blockIdx,
 				fields,
 				item: options.fullText
-					? item
-					: { ...item, facts: budgetFacts(item.facts, options.factBudget) },
+					? cutItem
+					: {
+							...cutItem,
+							facts: budgetFacts(cutItem.facts, options.factBudget),
+						},
 				location,
 				recordUuid,
 				setup,
@@ -328,12 +350,35 @@ export function decodeTranscriptLine(input: {
 	];
 }
 
+function withCutFacts(
+	item: LineItem,
+	fields: TranscriptTextFields,
+	cap: number,
+): LineItem {
+	const text = item.text ?? "";
+	const cut =
+		fields.text.length < sliceStart(text, cap).length ? "budget" : "cap";
+	return {
+		...item,
+		facts: {
+			...item.facts,
+			extra: {
+				...item.facts?.extra,
+				text_cut: cut,
+				body_sha256: createHash("sha256").update(text, "utf8").digest("hex"),
+			},
+		},
+	};
+}
+
 /** Stored text cap of a kind; undefined keeps an excerpt only. */
 function storedTextCap(
 	kind: TranscriptRecordKind,
 	textMaxChars: number,
 ): number | undefined {
 	if (BODY_KINDS.has(kind)) return textMaxChars;
+	if (kind === "compaction")
+		return Math.min(textMaxChars, TRANSCRIPT_RECORD_COMPACTION_TEXT_MAX_CHARS);
 	if (kind === "injected_context")
 		return Math.min(textMaxChars, TRANSCRIPT_RECORD_INJECTED_TEXT_MAX_CHARS);
 	if (kind === "meta")
@@ -354,11 +399,8 @@ export function budgetFacts(
 	if (facts?.extra === undefined || budget === undefined) return facts;
 	const values = Object.entries(facts.extra);
 	let chars = 0;
-	for (const [, value] of values)
-		if (
-			value !== undefined &&
-			value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS
-		)
+	for (const [key, value] of values)
+		if (isBudgetedFact(key, value) && value !== undefined)
 			chars += value.length;
 	if (chars <= budget.remaining) {
 		budget.remaining -= chars;
@@ -366,12 +408,27 @@ export function budgetFacts(
 	}
 	const kept: Record<string, string> = {};
 	for (const [key, value] of values)
-		if (
-			value !== undefined &&
-			value.length <= TRANSCRIPT_RECORD_FACT_SHORT_CHARS
-		)
-			kept[key] = value;
+		if (value !== undefined && !isBudgetedFact(key, value)) kept[key] = value;
 	return { ...facts, extra: { ...kept, facts_truncated: "true" } };
+}
+
+const UNBUDGETED_FACTS: ReadonlySet<string> = new Set([
+	"applied_changes",
+	"body_sha256",
+	"denial_reason",
+	"error_from_call_id",
+	"script_call_id",
+	"text_cut",
+	"turn_cwd",
+	"workdir",
+]);
+
+function isBudgetedFact(key: string, value: string | undefined): boolean {
+	return (
+		value !== undefined &&
+		value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS &&
+		!UNBUDGETED_FACTS.has(key)
+	);
 }
 
 function applyTurnState(state: StreamState, item: LineItem): void {

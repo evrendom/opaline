@@ -63,6 +63,15 @@ export interface CodexEndEvent {
 export interface CodexExecScript {
 	readonly callId: string;
 	readonly patchPaths: ReadonlySet<string>;
+	readonly inner: CodexInnerOutcome[];
+	open: boolean;
+}
+
+export interface CodexInnerOutcome {
+	readonly callId: string;
+	readonly failed: boolean;
+	readonly refusal: string | undefined;
+	readonly text: string;
 }
 
 /** Mutable per-stream context shared by the format adapters and the core loop. */
@@ -78,6 +87,10 @@ export interface StreamState {
 	 */
 	readonly claudeFailedEdits: Map<string, string>;
 	codexAgentPath: string;
+	codexCommandItems: boolean;
+	codexPendingPrompt:
+		| { readonly sources: Set<string>; readonly text: string }
+		| undefined;
 	codexSessionId: string | undefined;
 	codexForkPoint:
 		| { readonly parentId: string; readonly ordinalExclusive: number }
@@ -120,6 +133,8 @@ export function createStreamState(
 		claudeFailedEdits: new Map(),
 		claudeQueuedPrompts: [],
 		codexAgentPath: "",
+		codexCommandItems: false,
+		codexPendingPrompt: undefined,
 		codexSessionId: undefined,
 		codexForkPoint: undefined,
 		codexCompletedItems: new Set(),

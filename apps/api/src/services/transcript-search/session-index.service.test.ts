@@ -153,7 +153,10 @@ test("a credential the upload filter missed in escaped JSON is filtered from the
 
 test("a tool output longer than transcript records keep is searched by its stored prefix and tail, and the pass says it was cut", async () => {
 	const output = `${"filler line\n".repeat(6_000)}fatal: permission denied (publickey)`;
-	const stored = buildTranscriptTextFields(output, { keepTail: true });
+	const stored = buildTranscriptTextFields(output, {
+		keepTail: true,
+		textMaxChars: 65_536,
+	});
 	const { executor, inserted } = storage([
 		{
 			record_idx: 1,

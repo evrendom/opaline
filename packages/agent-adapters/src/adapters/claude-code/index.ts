@@ -31,6 +31,8 @@ import {
 
 const SESSIONS_BASE_DIR = join(homedir(), ".claude", "projects");
 const SAFE_BASENAME_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
+const SUBAGENT_FILE_PATTERN = /^agent-(.+)\.jsonl$/;
+const MAX_SUBAGENT_FILES = 512;
 
 // ── Exported utilities ──
 
@@ -121,6 +123,11 @@ export async function readSubagentFiles(
 	const subagentDirs = await resolveSubagentDirectories(sessionDir, sessionId);
 	const queued = new Set(agentIds.filter(isSafeBasename));
 	const queue = [...queued];
+	for (const agentId of await listSessionSubagentIds(subagentDirs.slice(1))) {
+		if (queued.size >= MAX_SUBAGENT_FILES || queued.has(agentId)) continue;
+		queued.add(agentId);
+		queue.push(agentId);
+	}
 
 	for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
 		const agentId = queue[queueIndex];
@@ -140,7 +147,8 @@ export async function readSubagentFiles(
 				const content = await readFile(agentPath, "utf-8");
 				subagents.push({ agentId, content });
 				for (const nestedAgentId of extractAgentIds(content)) {
-					if (queued.size >= 512 || queued.has(nestedAgentId)) continue;
+					if (queued.size >= MAX_SUBAGENT_FILES || queued.has(nestedAgentId))
+						continue;
 					queued.add(nestedAgentId);
 					queue.push(nestedAgentId);
 				}
@@ -245,12 +253,11 @@ class ClaudeCodeAdapter implements AgentAdapter {
 			throw new MissingTranscriptTimestampError(this.source);
 		}
 
-		const agentIds = extractAgentIds(content);
-		const sessionDir = dirname(session.transcriptPath);
-		const subagents =
-			agentIds.length > 0
-				? await readSubagentFiles(sessionDir, agentIds, session.sessionId)
-				: [];
+		const subagents = await readSubagentFiles(
+			dirname(session.transcriptPath),
+			extractAgentIds(content),
+			session.sessionId,
+		);
 
 		return {
 			source: this.source,
@@ -409,6 +416,25 @@ async function resolveSubagentDirectories(
 	}
 
 	return directories;
+}
+
+async function listSessionSubagentIds(
+	sessionSubagentDirs: readonly string[],
+): Promise<string[]> {
+	const agentIds: string[] = [];
+	for (const directory of sessionSubagentDirs) {
+		let names: string[];
+		try {
+			names = await readdir(directory);
+		} catch {
+			continue;
+		}
+		for (const name of names.sort()) {
+			const agentId = SUBAGENT_FILE_PATTERN.exec(name)?.[1];
+			if (isSafeBasename(agentId)) agentIds.push(agentId);
+		}
+	}
+	return agentIds;
 }
 
 function isContainedPath(parentPath: string, candidatePath: string): boolean {

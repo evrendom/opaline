@@ -54,6 +54,8 @@ const FIXTURES = {
 	claudeImages: "l1-facts/claude-images.jsonl",
 	claudeSubagent: "l1-facts/claude-subagent-2.1.jsonl",
 	codexSkill: "l1-facts/codex-skill-0.162.jsonl",
+	codexScript: "codex-script-era-commands.jsonl",
+	codexInner: "l1-facts/codex-inner-calls-0.153.jsonl",
 } as const;
 
 /** The agent that wrote each fixture. */
@@ -115,6 +117,50 @@ interface FactCase {
 }
 
 const CASES: readonly FactCase[] = [
+	{
+		name: "a script failure an inner call threw names that call",
+		fixture: "codexInner",
+		row: { callId: "call_script_mcp", kind: "tool_result" },
+		facts: {
+			extra: {
+				error_from_call_id: "exec-11111111-1111-4111-8111-111111111111",
+			},
+		},
+	},
+	{
+		name: "a Codex prompt names its turn's working directory",
+		fixture: "codexInner",
+		row: { kind: "user_prompt" },
+		facts: { extra: { turn_cwd: "/Users/dev/work/app-feature" } },
+	},
+	{
+		name: "a script command names the directory it asked to run in",
+		fixture: "codexScript",
+		row: {
+			callId: "call_IrGZgx3YoqyINGGE51fGUUE0#1",
+			kind: "tool_call",
+			subtype: "script",
+		},
+		facts: {
+			extra: { workdir: "/Users/dev/conductor/workspaces/rudel-v2/almaty-v1" },
+		},
+	},
+	{
+		name: "a command a code-mode script runs names its script",
+		fixture: "codexScript",
+		row: {
+			callId: "call_IrGZgx3YoqyINGGE51fGUUE0#1",
+			kind: "tool_call",
+			subtype: "script",
+		},
+		facts: { extra: { script_call_id: "call_IrGZgx3YoqyINGGE51fGUUE0" } },
+	},
+	{
+		name: "a script counts the commands it builds at run time",
+		fixture: "codexScript",
+		row: { callId: "call_pJ3Rouz74vZJNN0AiZyHkoXP", kind: "tool_call" },
+		facts: { extra: { script_commands_unresolved: "1" } },
+	},
 	{
 		name: "a background Bash hand-off names its task",
 		fixture: "claude",
@@ -1092,6 +1138,11 @@ describe("parser facts", () => {
 		];
 		const sed = findRow(rows, { callId: "toolu_sed", kind: "tool_result" });
 		expect(sed.facts.extra).toEqual({
+			applied_changes: JSON.stringify([
+				{ path: "/repo/src/a.ts" },
+				{ path: "/repo/src/new.ts", created: true },
+				{ path: "/repo/src/old.ts", deleted: true },
+			]),
 			facts_truncated: "true",
 			no_output: "true",
 			no_output_expected: "false",
@@ -1342,16 +1393,18 @@ describe("parser facts", () => {
 			),
 		).json()) as Record<string, string[]>;
 		for (const name of IDENTITY_FIXTURES) {
-			const identities = (await split(name)).map((draft) =>
-				[
-					draft.agentId,
-					draft.recordIdx,
-					draft.blockIdx,
-					draft.turnIdx,
-					draft.kind,
-					draft.subtype,
-				].join("|"),
-			);
+			const identities = (await split(name))
+				.filter((draft) => draft.subtype !== "script")
+				.map((draft) =>
+					[
+						draft.agentId,
+						draft.recordIdx,
+						draft.blockIdx,
+						draft.turnIdx,
+						draft.kind,
+						draft.subtype,
+					].join("|"),
+				);
 			expect(identities).toEqual(expected[name] ?? []);
 		}
 	});
@@ -1362,7 +1415,9 @@ const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	// The fact budget tests; received setup in received-setup.test.ts.
 	// The cap of shell_read_paths in shell-access.test.ts, of images in image-facts.test.ts.
 	claude_code: new Set([
+		"body_sha256",
 		"facts_truncated",
+		"text_cut",
 		"images_more",
 		"received_setup",
 		"shell_read_paths_more",
@@ -1370,7 +1425,9 @@ const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	]),
 	// The fact budget and goal text tests; received setup in received-setup.test.ts.
 	codex: new Set([
+		"body_sha256",
 		"facts_truncated",
+		"text_cut",
 		"goal",
 		"received_setup",
 		...V9_REGRESSION_COVERAGE.codex,

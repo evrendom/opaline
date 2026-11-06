@@ -36,6 +36,7 @@ const WRAPPER_SUBTYPES: ReadonlyMap<string, string> = new Map([
 	["apps_instructions", "environment_context"],
 	["user_instructions", "agents_md"],
 	["turn_aborted", "interrupt"],
+	["codex_internal_context", "internal_context"],
 	// The Codex app's page events: what the person opened in its UI, not a prompt.
 	["external_codex_apps_open_page", "ui_event"],
 ]);

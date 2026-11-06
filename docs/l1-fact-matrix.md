@@ -20,18 +20,18 @@ Under each status is where the agent records the fact, shortened: `toolUseResult
 
 | | Claude Code | Codex |
 |---|---:|---:|
-| ✅ stored | 160 (1 with a gap) | 175 (1 with a gap) |
+| ✅ stored | 161 (1 with a gap) | 180 (1 with a gap) |
 | 🟡 pending | 51 | 37 |
-| ⚪ not recorded | 36 | 35 |
+| ⚪ not recorded | 40 | 35 |
 | 🔴 wrong | 0 | 0 |
 
 Mapping quality (tier denominator: literal agent mappings including searched absences; derived/provenance are N/A, not searched absences; context paths are not sources):
 
 | Metric | Claude Code | Codex |
 |---|---:|---:|
-| verified | 20 (8.9%) | 4 (1.7%) |
-| observed | 121 (54.0%) | 159 (69.1%) |
-| asserted | 83 (37.1%) | 67 (29.1%) |
+| verified | 20 (8.8%) | 4 (1.7%) |
+| observed | 121 (53.1%) | 159 (69.1%) |
+| asserted | 87 (38.2%) | 67 (29.1%) |
 | unreviewed | 20 | 27 |
 | exact | 50 | 75 |
 | transform | 9 | 12 |
@@ -39,11 +39,11 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | broader | 3 | 6 |
 | narrower | 11 | 3 |
 | not_emitted | 0 | 3 |
-| not_found | 66 | 39 |
-| derived | 17 | 13 |
+| not_found | 70 | 39 |
+| derived | 18 | 18 |
 | provenance | 6 | 4 |
-| N/A (derived/provenance) | 23 | 17 |
-| Context paths (excluded as sources) | 28 | 58 |
+| N/A (derived/provenance) | 24 | 22 |
+| Context paths (excluded as sources) | 28 | 66 |
 | Judged (excludes searched absences) | 138 | 161 |
 | Semantic conflicts | 3 | 3 |
 | Paired runs | 0 | 0 |
@@ -60,14 +60,14 @@ Primary-path relation counts (including recorded gaps):
 - narrower: 20 / 13 (Claude Code / Codex).
 - not_emitted: 0 / 0 (Claude Code / Codex).
 - not_found: 0 / 1 (Claude Code / Codex).
-- derived: 11 / 3 (Claude Code / Codex).
+- derived: 12 / 4 (Claude Code / Codex).
 - provenance: 0 / 0 (Claude Code / Codex).
 
 ## Codex writer-source coverage
 
 Pinned writer: **0.162.0**, 2087 paths: 743 mapped, 1288 ignored with a reason, 56 context-only, 0 pending-review paths, **0 unassigned residue**. Context and pending review are not mapped sources.
 
-Catalog source occurrences: 611 declared, 24 covered only by open JSON, 22 explicitly legacy, 0 unsupported. Open JSON is not a declared child or meaning proof.
+Catalog source occurrences: 612 declared, 24 covered only by open JSON, 22 explicitly legacy, 0 unsupported. Open JSON is not a declared child or meaning proof.
 
 Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 tool-defined decoded arguments, 40 documented legacy, 0 unknown.
 
@@ -136,6 +136,10 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 | `hook_event` | The hook event of a hook error a tool result starts with; a PreToolUse block stopped the call before it ran. | ✅ v11 exact · observed<br>`tool_result.content “hook error…”` | 🟡 pending unreviewed · asserted | Not yet judged |
 | `shell_read_paths` | The files a shell call reads, read from its command: printed files and files an inline Python script opens for reading; the first fills the call's file_path when it edits nothing. | ✅ v12 derived · not_applicable | 🟡 pending unreviewed · asserted | Opaline-derived/provenance; N/A per agent |
 | `retry_of` | On an edit call, the earlier call of the stream whose edit of the same file failed, with no successful edit of it in between. | ✅ v12 derived · not_applicable<br>`tool_use.input.file_path`, `tool_result.is_error` | 🟡 pending unreviewed · asserted | Opaline-derived/provenance; N/A per agent |
+| `text_cut`, `body_sha256` | Whether a record's stored text is shorter than its whole text, which cap cut it, and the SHA-256 of the whole text, which the record's raw line holds. | ✅ v13 derived · not_applicable<br>`tool_result.content` | ✅ v13 derived · not_applicable<br>`output` | Opaline-derived/provenance; N/A per agent |
+| `script_call_id`, `script_commands_unresolved` | For a command a Codex code-mode script ran where Codex recorded no command item, the script call whose result holds its output; on the script, how many of its commands are built at run time and have no call of their own. | ⚪ not recorded not_found · asserted | ✅ v13 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
+| `error_from_call_id` | On a Codex code-mode script's result whose failure an inner call of the script already records (the error an MCP call threw, a refusal or failing exit code of a command the script ran), that inner call: the script's result is then no failure of its own, so the failure counts once. | ⚪ not recorded not_found · asserted | ✅ v14 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
+| `workdir` | The working directory a Codex exec_command asked to run in (its workdir argument), on the call, also for a command a code-mode script ran. | ⚪ not recorded not_found · asserted | ✅ v14 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
 | `exit_decided_by`, `exit_masked` | Which part of a compound shell command decided its exit code by shell semantics, and why the other parts' statuses were lost (a list, a trailing filter). | ✅ v12 derived · not_applicable<br>`tool_result.is_error`, `toolUseResult.returnCodeInterpretation` | 🟡 pending unreviewed · asserted | Opaline-derived/provenance; N/A per agent |
 | `no_output` | Whether a finished shell call printed nothing, once the agent's own lines (exit code, cwd reset) are removed. | ✅ v12 close · observed<br>`tool_result.content` | 🟡 pending unreviewed · asserted | Not yet judged |
 | `stale_read` | The tool warned that files changed since the agent last read them. | ✅ v6 narrower · verified<br>`toolUseResult.staleReadFileStateHint` | ⚪ not recorded not_found · asserted | One-sided mapping |
@@ -335,6 +339,19 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 - `retry_of`
   - Claude Code ✅: Relation: derived from calls/file_path, calls/is_error, calls/call_id. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1), census (4). Judgement: Opaline computation from literal values: the files a native edit names or an inline script writes, and the error flag of each result. A failed result (an error no refusal, hook or interruption caused) makes its call the attempt a later edit of the same file retries; a successful one ends the chain. Script paths join the directory the command's cd named as written, so a native Edit's absolute path and a script's ~/ path do not match. Example shape: three python3 heredoc edits of one file, the first two failing on an assert. Path: `assistant.message.content[tool_use:*].input.file_path` — primary · derived from calls/file_path, calls/is_error, calls/call_id. Path: `assistant.message.content[tool_use:Bash].input.command` — context · unreviewed. Path: `user.message.content[tool_result].is_error` — primary · derived from calls/file_path, calls/is_error, calls/call_id.
   - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Review whether Codex apply_patch and shell edits should name the failed attempt they retry the same way.
+- `text_cut`, `body_sha256`
+  - Claude Code ✅: Relation: derived from calls/result_chars. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1), census (1). Judgement: Opaline computation, not an agent-written value: the splitter compares the stored text with the whole decoded text. cap: the per-kind cap (4 MiB for prompts, assistant text, calls, results and file changes; 64 KiB for compactions, 16 KiB for injected context, 4 KiB for bookkeeping) cut it; budget: the session text budget, which only compactions, injected context and bookkeeping records spend, did. text_chars stays the whole length and the record read decodes the raw line again. Path: `user.message.content[tool_result].content` — primary · derived from calls/result_chars.
+  - Codex ✅: Relation: derived from calls/result_chars. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1), writer_source (1), census (1). Judgement: Opaline computation, not an agent-written value: the splitter compares the stored text with the whole decoded text. cap: the per-kind cap cut it; budget: the session text budget, which only compactions, injected context and bookkeeping records spend, did. Codex caps one command's output near 1 MiB itself, so no command output in the 94-session rudel corpus is cut. Path: `response_item/custom_tool_call_output.output` — primary · derived from calls/result_chars.
+  - Also a column of prompts.
+- `script_call_id`, `script_commands_unresolved`
+  - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): Claude Code has no code-mode scripts that run commands. How we checked: local census: Claude Code has no code-mode scripts that run commands.
+  - Codex ✅: Relation: derived from calls/input_text. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1). Judgement: Opaline computation from the script source: every tools.exec_command call whose cmd is a literal (directly, or through a literal array a map or for-of loop walks) becomes a call of subtype script, call_id <script call_id>#<n>, in the script's line after its own rows. Only streams with no CommandExecution item get them; where Codex records the item, it is the command's call (subtype nested). The script's output is one text for all its commands, so a script command has no result of its own. Example shape: const cmds = [[name, cmd], ...]; await Promise.all(cmds.map(([name, cmd]) => tools.exec_command({cmd}))) Path: `response_item/custom_tool_call:exec.input` — context · unreviewed.
+- `error_from_call_id`
+  - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): Claude Code has no code-mode scripts that run commands. How we checked: local census: Claude Code has no code-mode scripts that run commands.
+  - Codex ✅: Relation: derived from calls/tool_result_text. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1). Judgement: Opaline computation: a script's output repeats what its inner calls recorded. 'Script failed … Script error: <message>' repeats the error of the inner MCP call that threw it, a guard refusal in its output is an inner command's output, and an exit code the script printed is an inner command's where Codex records command items. The inner call keeps the failure and the script's result names it here instead of failing too. Path: `response_item/custom_tool_call_output.output` — context · unreviewed. Path: `event_msg/item_completed:McpToolCall.error` — context · unreviewed. Path: `event_msg/item_completed:CommandExecution.exit_code` — context · unreviewed.
+- `workdir`
+  - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): Claude Code Bash has no workdir argument. How we checked: local census: Claude Code Bash has no workdir argument.
+  - Codex ✅: Relation: derived from calls/input_text. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1). Judgement: The directory the call requested; Codex runs the command there. Read from the arguments, or from a literal tools.exec_command call in the script source. Path: `response_item/function_call:exec_command.arguments.workdir` — context · unreviewed. Path: `response_item/custom_tool_call:exec.input` — context · unreviewed.
 - `exit_decided_by`, `exit_masked`
   - Claude Code ✅: Relation: derived from calls/input_text. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1), census (2). Judgement: Opaline computation from the command text and the result's error flag: a ;/newline list exits with its last part (exit_masked list); an && / || chain with the last pipeline that ran, known when the last joiner is && and the call succeeded or || and it failed, else only when the output names the one part zsh found no match for or could not find (&& chains only); a pipeline without set -o pipefail with its last stage, and when that stage is a filter (grep, tail, head, wc …) the feeding commands' statuses are lost (exit_masked pipe). Compound constructs and set -e failures stay unknown. Claude Code's returnCodeInterpretation (grep's No matches found) marks a non-zero exit it did not count as an error. Example shapes: cd … && cat a; …; ls x.* 2>/dev/null exiting 1 on zsh's no matches found; a CI watch piped through grep | tail. Path: `assistant.message.content[tool_use:Bash].input.command` — context · unreviewed. Path: `user.message.content[tool_result].is_error` — primary · derived from calls/input_text. Path: `user.toolUseResult.returnCodeInterpretation` — primary · derived from calls/input_text.
   - Codex 🟡: Relation: unreviewed. Confidence: asserted. Evidence: llm_audit (1). Plan: Review exec_command exit codes of compound commands (Codex runs them through bash -lc) and apply the same rules.
@@ -541,6 +558,7 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 
 | Fact | What it is | Claude Code | Codex | Comparability |
 |---|---|---|---|---|
+| `turn_cwd` | On a Codex prompt, the working directory the turn's context named when it arrived (turn_context cwd, else the session's). | ⚪ not recorded not_found · asserted | ✅ v14 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
 | `started_at`, `ended_at`, `minutes`, `active_minutes` | When a run started and ended, and how long it took. | ✅ elsewhere close · observed<br>`every record timestamp` | ✅ v9 close · observed<br>`every record @timestamp`, `task_started.started_at` +4 | Comparable with caveat |
 | `duration_ms` | The recorded duration in milliseconds; Codex times a turn, while Claude's stored tool-result durations do not time a run. | ✅ v6 transform · verified<br>`toolUseResult.durationMs`, `toolUseResult.durationSeconds` | ✅ v7 exact · verified<br>`task_complete.duration_ms`, `turn_aborted.duration_ms` | Comparable after transform |
 | `time_to_first_token_ms` | How long the model took to start answering. | ⚪ not recorded not_found · asserted | ✅ v7 exact · verified<br>`task_complete.time_to_first_token_ms` | One-sided mapping |
@@ -634,6 +652,9 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 
 ### Details
 
+- `turn_cwd`
+  - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): Claude Code writes cwd on every line; it is cwd_components. How we checked: local census: Claude Code writes cwd on every line; it is cwd_components.
+  - Codex ✅: Relation: derived from calls/cwd. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1). Judgement: turn_context precedes its turn's prompt in the file, so its cwd would sit on the previous run's rows; the prompt that opens the turn carries it instead, so every run names the directory it started in. Path: `turn_context/.cwd` — context · unreviewed. Path: `session_meta/.cwd` — context · unreviewed.
 - `started_at`, `ended_at`, `minutes`, `active_minutes`
   - Claude Code ✅: Relation: close. Confidence: observed. Evidence: llm_audit (1), census (35), fixture_test (1). Judgement: Record timestamps mark individual messages, not literal run boundaries or active minutes; run_index derives the grouped interval. Path: `*.timestamp` — primary · close. Stored in run_index, counted from the stored records.
   - Codex ✅: Relation: close. Confidence: observed. Evidence: fixture_test (2), llm_audit (1), writer_source (6), census (107). Judgement: Outer rollout timestamps mark records; deriving run boundaries differs from the literal task start/end fields still listed as gaps. Path: `*@timestamp` — primary · close. Path: `event_msg/task_started.started_at` — primary · close. Path: `event_msg/task_complete.started_at` — primary · close. Path: `event_msg/task_complete.completed_at` — primary · close. Path: `event_msg/turn_aborted.started_at` — primary · close. Path: `event_msg/turn_aborted.completed_at` — primary · close. Stored in run_index, counted from the stored records. Note: Parser 9 stores bounded, secret-filtered literal components with source paths and order; request and outcome fields remain separate. v9-facts.test.ts witnesses each sourced component. All sources: `every record @timestamp`, `task_started.started_at`, `task_complete.started_at`, `task_complete.completed_at`, `turn_aborted.started_at`, `turn_aborted.completed_at`.

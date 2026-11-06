@@ -509,7 +509,7 @@ describe("the prompts view", () => {
 			"turn_idx | kind | genuine | text | text_chars | text_cut | starts_run",
 			"1 | user_prompt | 1 | why does login fail? | 20 | 0 | 1",
 			"2 | user_prompt | 1 | it still fails | 14 | 0 | 1",
-			"3 | user_prompt | 1 | paste: xxxxxxxxxxxxx | 70000 | 1 | 1",
+			"3 | user_prompt | 1 | paste: xxxxxxxxxxxxx | 70000 | 0 | 1",
 		]);
 	});
 	test("a time range keeps every prompt sent in it, in sessions that started before it too", async () => {

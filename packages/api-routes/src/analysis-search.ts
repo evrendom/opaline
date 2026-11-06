@@ -18,6 +18,7 @@ export const SEARCH_KINDS = [
 	"file_change",
 ] as const;
 export const SEARCH_TEXT_MAX_CHARS = 500;
+export const SEARCH_RECORD_TEXT_MAX_CHARS = 65_536;
 /** Longest window one search reads, in days; the default is the last 30. */
 export const SEARCH_MAX_DAYS = 180;
 export const SEARCH_DEFAULT_DAYS = 30;

@@ -17,9 +17,11 @@ import {
 	extractShellFileMutations,
 } from "./command-class.js";
 import { isCodexRunningOutput, readCodexExitCode } from "./exit-code.js";
+import { GUARD_DENIAL_KIND, readGuardRefusal } from "./guard-refusal.js";
 import { readCodexImageOutputText } from "./image-labels.js";
 import { classifyUserText, readCodexSkillBlock } from "./injected-wrappers.js";
 import {
+	type CodexExecScript,
 	injectedAroundPrompt,
 	isRecord,
 	type LineItem,
@@ -42,6 +44,7 @@ import {
 	codexDenialKind,
 	codexDenialReason,
 	codexDurationMs,
+	codexItemFacts,
 	codexSessionMetaFacts,
 	codexTaskFacts,
 	codexTurnContextFacts,
@@ -59,6 +62,7 @@ const SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 const FAILURE_PREFIX_PATTERN =
 	/^(?:apply_patch verification failed|collab spawn failed|Script failed|write_stdin failed:|exec_command failed|tool call failed|Error parsing function call|failed to parse function arguments|unable to (?:locate|open) image at|aborted by user)(?:\s|:|$)/u;
+const SCRIPT_FAILED = /^\s*Script failed\b/u;
 const SHELL_TOOL_NAMES: ReadonlySet<string> = new Set([
 	"shell",
 	"shell_command",
@@ -114,6 +118,9 @@ export function readCodexLine(
 					}
 				: undefined,
 			replayed ? { extra: { fork_replayed: "true" } } : undefined,
+			item.kind === "user_prompt" && state.cwd !== ""
+				? { extra: { turn_cwd: factText(state.cwd, 1_024) } }
+				: undefined,
 		);
 		return { ...item, facts };
 	});
@@ -280,9 +287,15 @@ function readEventMessage(
 		const message = readString(payload.message) ?? readString(payload.text);
 		return message === undefined
 			? [metaItem("user_message")]
-			: userTextItems(message, state, "user_message_mirror");
+			: userTextItems(message, state, "user_message_mirror", "event");
 	}
 	if (MIRROR_EVENTS.has(type)) return [metaItem(`${type}_mirror`)];
+	if (
+		type === "item_completed" &&
+		isRecord(payload.item) &&
+		payload.item.type === "UserMessage"
+	)
+		return readUserMessageItem(payload.item, state);
 	if (type === "item_completed") return readCompletedItem(payload.item, state);
 	if (type === "exec_command_end") {
 		const callId = readString(payload.call_id) ?? "";
@@ -464,7 +477,7 @@ function readMessage(
 	if (role === "user") {
 		return text.trim() === ""
 			? [metaItem("user_empty")]
-			: userTextItems(text, state, "user_message_mirror");
+			: userTextItems(text, state, "user_message_mirror", "response");
 	}
 	return [metaItem(`message_${role}`)];
 }
@@ -480,26 +493,59 @@ function readBlockText(content: unknown): string {
 		.join("\n");
 }
 
+const USER_MESSAGE_LABEL = "item_completed:UserMessage";
+
+function readUserMessageItem(
+	item: Record<string, unknown>,
+	state: StreamState,
+): LineItem[] {
+	const facts = codexItemFacts(item);
+	const text = readBlockText(item.content);
+	const id = readString(item.id);
+	const classification = classifyUserText(text, {});
+	if (
+		id !== undefined &&
+		state.codexCompletedItems.has(id) &&
+		classification.kind === "prompt" &&
+		state.codexPendingPrompt?.text === classification.text
+	)
+		return [metaItem(`${USER_MESSAGE_LABEL}_repeat`, { facts })];
+	if (id !== undefined) state.codexCompletedItems.add(id);
+	if (classification.kind !== "prompt" || text.trim() === "")
+		return [metaItem(USER_MESSAGE_LABEL, { facts })];
+	return userTextItems(text, state, USER_MESSAGE_LABEL, "item").map(
+		(lineItem) =>
+			lineItem.kind === "meta" ? { ...lineItem, facts } : lineItem,
+	);
+}
+
 function userTextItems(
 	text: string,
 	state: StreamState,
 	mirrorLabel: string,
+	source: "event" | "item" | "response",
 ): LineItem[] {
 	const classification = classifyUserText(text, {});
 	switch (classification.kind) {
-		case "prompt":
+		case "prompt": {
+			const pending = state.codexPendingPrompt;
 			if (
-				!state.responseSincePrompt &&
-				state.lastPromptText !== "" &&
-				state.lastPromptText === classification.text
+				pending !== undefined &&
+				pending.text === classification.text &&
+				!pending.sources.has(source)
 			) {
-				// Codex records each prompt both as an event and as a response item.
+				pending.sources.add(source);
 				return [metaItem(mirrorLabel)];
 			}
+			state.codexPendingPrompt = {
+				sources: new Set([source]),
+				text: classification.text,
+			};
 			return [
 				{ kind: "user_prompt", text: classification.text },
 				...injectedAroundPrompt(classification),
 			];
+		}
 		case "injected_context": {
 			// A `$skill` mention injects the skill's SKILL.md: the skill it names.
 			const skill =
@@ -541,7 +587,10 @@ function readReasoningText(payload: Record<string, unknown>): string {
 interface CallDescription {
 	readonly commands: readonly string[];
 	readonly patchFiles: readonly CodexPatchFile[];
+	readonly scriptCommands?: readonly string[];
+	readonly scriptWorkdirs?: readonly (string | undefined)[];
 	readonly text: string;
+	readonly unresolvedCommands?: number;
 }
 
 function readCall(
@@ -557,16 +606,26 @@ function readCall(
 	);
 	const rawArgs =
 		payloadType === "custom_tool_call" ? payload.input : payload.arguments;
-	const timeout = codexCallTimeout(
-		isRecord(rawArgs)
-			? rawArgs
-			: parseObject(typeof rawArgs === "string" ? rawArgs : undefined),
+	const argsObject = isRecord(rawArgs)
+		? rawArgs
+		: parseObject(typeof rawArgs === "string" ? rawArgs : undefined);
+	const timeout = codexCallTimeout(argsObject);
+	const unresolved = description.unresolvedCommands ?? 0;
+	const scriptCommands = state.codexCommandItems
+		? []
+		: (description.scriptCommands ?? []);
+	const callFacts = mergeFacts(
+		timeout.extra === undefined ? undefined : timeout,
+		unresolved > 0 && !state.codexCommandItems
+			? { extra: { script_commands_unresolved: String(unresolved) } }
+			: undefined,
+		description.commands.length > 0 ? workdirFacts(argsObject) : undefined,
 	);
 	const items: LineItem[] = [
 		{
 			callId,
 			commandClass,
-			...(timeout.extra === undefined ? {} : { facts: timeout }),
+			...(callFacts?.extra === undefined ? {} : { facts: callFacts }),
 			kind: "tool_call",
 			text: description.text,
 			toolName,
@@ -578,6 +637,8 @@ function readCall(
 	if (payloadType === "custom_tool_call" && toolName.toLowerCase() === "exec") {
 		state.codexExecScript = {
 			callId,
+			inner: [],
+			open: true,
 			patchPaths: new Set(
 				description.patchFiles.flatMap((file) =>
 					file.movePath === undefined
@@ -597,6 +658,26 @@ function readCall(
 		}
 	}
 	if (callId !== "") state.calls.set(callId, { commandClass, toolName });
+	scriptCommands.forEach((command, index) => {
+		const commandCallId = `${callId}#${index + 1}`;
+		const scriptCommandClass = classifyCommand(command);
+		items.push({
+			callId: commandCallId,
+			commandClass: scriptCommandClass,
+			facts: mergeFacts(
+				{ extra: { script_call_id: factText(callId, 256) } },
+				workdirFacts({ workdir: description.scriptWorkdirs?.[index] }),
+			),
+			kind: "tool_call",
+			subtype: "script",
+			text: command,
+			toolName: "exec_command",
+		});
+		state.calls.set(commandCallId, {
+			commandClass: scriptCommandClass,
+			toolName: "exec_command",
+		});
+	});
 	return items;
 }
 
@@ -687,19 +768,30 @@ function describeExecCommand(
 
 function describeExecScript(source: string): CallDescription {
 	const commands: string[] = [];
+	const scriptCommands: string[] = [];
+	const scriptWorkdirs: (string | undefined)[] = [];
 	const patchFiles: CodexPatchFile[] = [];
+	let unresolvedCommands = 0;
 	for (const invocation of extractCustomExecInvocations(source)) {
-		if (!invocation.resolvedInput) continue;
 		const name = invocation.name.toLowerCase();
+		if (!invocation.resolvedInput) {
+			if (name === "exec_command") unresolvedCommands++;
+			continue;
+		}
 		if (name === "exec_command") {
 			const command = readString(invocation.input.cmd);
-			if (command === undefined) continue;
+			if (command === undefined) {
+				unresolvedCommands++;
+				continue;
+			}
 			const described = describeExecCommand(
 				command,
 				invocation.input,
 				invocation.name,
 			);
 			commands.push(...described.commands);
+			scriptCommands.push(command);
+			scriptWorkdirs.push(readString(invocation.input.workdir));
 			patchFiles.push(...described.patchFiles);
 		} else if (name === "apply_patch") {
 			const patch =
@@ -709,7 +801,14 @@ function describeExecScript(source: string): CallDescription {
 			if (patch !== undefined) patchFiles.push(...parseCodexPatch(patch));
 		}
 	}
-	return { commands, patchFiles, text: source };
+	return {
+		commands,
+		patchFiles,
+		scriptCommands,
+		scriptWorkdirs,
+		text: source,
+		unresolvedCommands,
+	};
 }
 
 function patchFileItems(
@@ -754,39 +853,67 @@ function readOutput(
 		readCodexImageOutputText(payload.output) ??
 		readTranscriptToolOutputText(payload.output) ??
 		rawOutput;
-	const denialKind = codexDenialKind(decoded);
-	const denialReason =
-		denialKind === "Rejected" ? codexDenialReason(decoded) : undefined;
+	const recordedDenial = codexDenialKind(decoded);
 	const aborted = codexAbortedCall(decoded);
-	const exitCode = readCodexExitCode(payload.output ?? payload.tools);
-	const isError =
+	const guard =
+		recordedDenial === undefined && aborted === undefined
+			? readGuardRefusal(outputSegments(payload.output, decoded))
+			: undefined;
+	const denialKind =
+		recordedDenial ?? (guard === undefined ? undefined : GUARD_DENIAL_KIND);
+	const denialReason =
+		recordedDenial === "Rejected" ? codexDenialReason(decoded) : guard;
+	const framedExitCode = readCodexExitCode(payload.output ?? payload.tools);
+	const recordedExitCode = framedExitCode;
+	const ownFailure =
 		denialKind !== undefined ||
 		aborted !== undefined ||
-		(exitCode !== null ? exitCode !== 0 : hasFailurePrefix(decoded));
+		SCRIPT_FAILED.test(decoded) ||
+		(recordedExitCode !== null
+			? recordedExitCode !== 0
+			: hasFailurePrefix(decoded));
+	// Still running when recorded: neither a pass nor a failure.
+	const running = isCodexRunningOutput(payload.output, recordedExitCode);
+	const script =
+		state.codexExecScript?.callId === callId && callId !== ""
+			? state.codexExecScript
+			: undefined;
+	const inner =
+		script === undefined || !ownFailure
+			? undefined
+			: innerFailureOf(script, decoded, guard, framedExitCode, state);
+	if (script !== undefined && !running) script.open = false;
+	const exitCode = inner === undefined ? recordedExitCode : null;
+	const isError = inner === undefined && ownFailure;
 	const denialExtra: Partial<
-		Record<"denial_reason" | "facts_clipped", string>
+		Record<"denial_reason" | "facts_clipped" | "error_from_call_id", string>
 	> = {};
-	if (denialReason !== undefined)
+	if (denialReason !== undefined && inner === undefined)
 		denialExtra.denial_reason = clippedText(
 			denialExtra,
 			"denial_reason",
 			denialReason,
 		);
+	if (inner !== undefined)
+		denialExtra.error_from_call_id = factText(inner, 256);
 	const launchesSubagent =
 		known !== undefined && SPAWN_TOOL_NAMES.has(known.toolName.toLowerCase());
-	// Still running when recorded: neither a pass nor a failure.
-	const running = isCodexRunningOutput(payload.output, exitCode);
+	const keptDenial = inner === undefined ? denialKind : undefined;
 	return {
 		callId,
 		commandClass: known?.commandClass ?? "",
 		exitCode,
-		...(denialKind === undefined && aborted === undefined
+		...(keptDenial === undefined &&
+		aborted === undefined &&
+		Object.keys(denialExtra).length === 0
 			? {}
 			: {
 					facts: mergeFacts(
 						aborted,
-						denialKind === undefined ? undefined : { denialKind },
-						denialReason === undefined ? undefined : { extra: denialExtra },
+						keptDenial === undefined ? undefined : { denialKind: keptDenial },
+						Object.keys(denialExtra).length === 0
+							? undefined
+							: { extra: denialExtra },
 					),
 				}),
 		isError,
@@ -796,6 +923,68 @@ function readOutput(
 		text: decoded,
 		toolName: readString(payload.name) ?? known?.toolName ?? "",
 	};
+}
+
+function innerFailureOf(
+	script: CodexExecScript,
+	decoded: string,
+	guard: string | undefined,
+	framedExitCode: number | null,
+	state: StreamState,
+): string | undefined {
+	const failed = script.inner.filter((outcome) => outcome.failed);
+	if (failed.length === 0) return undefined;
+	if (guard !== undefined)
+		return (
+			failed.find((outcome) => outcome.refusal === guard) ??
+			failed.find((outcome) => outcome.refusal !== undefined)
+		)?.callId;
+	const message = scriptErrorMessage(decoded);
+	if (message !== undefined) {
+		const thrown = failed.find((outcome) => {
+			const first = firstLine(outcome.text);
+			return (
+				first !== "" && (message.includes(first) || first.includes(message))
+			);
+		});
+		if (thrown !== undefined) return thrown.callId;
+	}
+	if (
+		state.codexCommandItems &&
+		framedExitCode !== null &&
+		framedExitCode !== 0 &&
+		message === undefined
+	)
+		return failed[0]?.callId;
+	return undefined;
+}
+
+function scriptErrorMessage(text: string): string | undefined {
+	if (!SCRIPT_FAILED.test(text)) return undefined;
+	const at = text.indexOf("Script error:");
+	if (at === -1) return undefined;
+	const message = firstLine(text.slice(at + "Script error:".length));
+	return message === "" ? undefined : message;
+}
+
+function firstLine(text: string): string {
+	for (const line of text.split("\n")) {
+		const trimmed = line.trim();
+		if (trimmed !== "") return trimmed.slice(0, 512);
+	}
+	return "";
+}
+
+function outputSegments(output: unknown, decoded: string): string[] {
+	if (!Array.isArray(output)) return [decoded];
+	return output.map((block) => readTranscriptToolOutputText([block]) ?? "");
+}
+
+function workdirFacts(args: Record<string, unknown> | undefined) {
+	const workdir = readString(args?.workdir);
+	return workdir === undefined
+		? undefined
+		: { extra: { workdir: factText(workdir, 1_024) } };
 }
 
 function hasFailurePrefix(text: string): boolean {

@@ -1,4 +1,5 @@
 import { redactReturnedText } from "@rudel/secret-filter";
+import { GUARD_DENIAL_KIND } from "./guard-refusal.js";
 import { isRecord, type LineFacts, readString } from "./line-items.js";
 import {
 	countCodePoints,
@@ -204,6 +205,12 @@ function unescapeDebugString(value: string): string {
 			return control[escaped] ?? escaped;
 		},
 	);
+}
+
+export function guardRefusalFacts(reason: string): LineFacts {
+	const extra: ExtraFacts = {};
+	extra.denial_reason = clippedText(extra, "denial_reason", reason, 512);
+	return { denialKind: GUARD_DENIAL_KIND, extra };
 }
 
 /**

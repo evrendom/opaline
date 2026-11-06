@@ -1,8 +1,7 @@
 import { Buffer } from "node:buffer";
-import { SEARCH_KINDS } from "@rudel/api-routes";
+import { SEARCH_KINDS, SEARCH_RECORD_TEXT_MAX_CHARS } from "@rudel/api-routes";
 import {
 	TRANSCRIPT_RECORD_EXCERPT_CHARS,
-	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 } from "@rudel/api-routes/transcript-records";
 import { filterKnownSecrets } from "@rudel/secret-filter";
@@ -64,7 +63,7 @@ const MAX_ISSUES = 50;
  * (`searchableText` in the indexing pass), whatever its full length.
  */
 const RECORD_SEARCH_MAX_CHARS =
-	TRANSCRIPT_RECORD_TEXT_MAX_CHARS + TRANSCRIPT_RECORD_EXCERPT_CHARS;
+	SEARCH_RECORD_TEXT_MAX_CHARS + TRANSCRIPT_RECORD_EXCERPT_CHARS;
 /** Chunks repeat their overlap: text is embedded about this many times over. */
 const CHUNK_OVERLAP_FACTOR =
 	CHUNK_MAX_CHARS / (CHUNK_MAX_CHARS - CHUNK_OVERLAP_CHARS);

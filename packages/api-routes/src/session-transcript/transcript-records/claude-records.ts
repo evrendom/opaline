@@ -17,6 +17,7 @@ import {
 	readClaudeExitCode,
 	readClaudeHookError,
 } from "./exit-code.js";
+import { GUARD_DENIAL_KIND, readGuardRefusal } from "./guard-refusal.js";
 import { readImageBlockLabel } from "./image-labels.js";
 import {
 	COORDINATOR_MESSAGE_PATTERN,
@@ -56,6 +57,7 @@ import {
 	type ExtraFacts,
 	factRowText,
 	factText,
+	guardRefusalFacts,
 	mcpFacts,
 	mergeFacts,
 	setList,
@@ -615,9 +617,20 @@ function readToolResult(
 	const isError = block.is_error === true;
 	const exitCode = isError ? readClaudeExitCode(text) : null;
 	const hook = isError ? readClaudeHookError(text) : undefined;
+	const guard =
+		recordedDenialKind === undefined &&
+		hook === undefined &&
+		(isError || known?.toolName.toLowerCase() === "bash")
+			? readGuardRefusal([text])
+			: undefined;
 	// A PreToolUse hook that errors stops the call before it runs: a refusal.
 	const denialKind =
-		recordedDenialKind ?? (hook?.blocked === true ? "hook" : undefined);
+		recordedDenialKind ??
+		(hook?.blocked === true
+			? "hook"
+			: guard === undefined
+				? undefined
+				: GUARD_DENIAL_KIND);
 	const handOff = isError
 		? undefined
 		: readClaudeBackgroundHandOff(text, toolUseResult, known?.toolName ?? "");
@@ -672,6 +685,7 @@ function readToolResult(
 					)
 				: undefined,
 			hook === undefined ? undefined : hookErrorFacts(hook),
+			guard === undefined ? undefined : guardRefusalFacts(guard),
 			handOff === undefined
 				? undefined
 				: {
@@ -687,7 +701,7 @@ function readToolResult(
 						},
 					},
 		),
-		isError,
+		isError: isError || guard !== undefined,
 		kind: "tool_result",
 		...(handOff?.outputFile === undefined
 			? {}

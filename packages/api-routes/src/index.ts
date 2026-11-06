@@ -179,6 +179,7 @@ export {
 	SEARCH_KINDS,
 	SEARCH_MAX_DAYS,
 	SEARCH_MODES,
+	SEARCH_RECORD_TEXT_MAX_CHARS,
 	SEARCH_TEXT_MAX_CHARS,
 } from "./analysis-search.js";
 export {

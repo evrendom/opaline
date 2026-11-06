@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import { SEARCH_KINDS } from "@rudel/api-routes";
+import { SEARCH_KINDS, SEARCH_RECORD_TEXT_MAX_CHARS } from "@rudel/api-routes";
 import {
 	countCodePoints,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
@@ -243,7 +243,7 @@ export async function indexSessionText(
 			await read(
 				RecordRowSchema,
 				`SELECT agent_id, record_idx, block_idx, turn_idx, kind, tool_name,
-					toString(ts) AS ts, text, head, tail, text_chars
+					toString(ts) AS ts, substringUTF8(text, 1, {searchChars:UInt32}) AS text, head, tail, text_chars
 				FROM rudel.transcript_records FINAL
 				WHERE ${SESSION_FILTER} AND revision = {revision:UInt64} AND parser_version = {parserVersion:UInt16}
 					AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1
@@ -253,6 +253,7 @@ export async function indexSessionText(
 					revision: generation.revision_text,
 					parserVersion: generation.parser_version,
 					kinds: [...SEARCH_KINDS],
+					searchChars: SEARCH_RECORD_TEXT_MAX_CHARS,
 				},
 			)
 		).flatMap((row) => {

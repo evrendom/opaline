@@ -1,5 +1,6 @@
 import { appliedChangesFacts } from "./applied-changes.js";
 import { classifyCommand } from "./command-class.js";
+import { GUARD_DENIAL_KIND, readGuardRefusal } from "./guard-refusal.js";
 import {
 	isRecord,
 	type LineFacts,
@@ -10,7 +11,13 @@ import {
 	safeStringify,
 } from "./line-items.js";
 import { codexSkillRead } from "./received-setup.js";
-import { codexItemFacts, mcpFacts, mergeFacts } from "./record-facts.js";
+import {
+	codexItemFacts,
+	factText,
+	guardRefusalFacts,
+	mcpFacts,
+	mergeFacts,
+} from "./record-facts.js";
 import type { FileOperation } from "./types.js";
 
 /**
@@ -85,7 +92,46 @@ export function readCompletedItem(
 	if (items === undefined)
 		return [metaItem(label, { facts: codexItemFacts(item) })];
 	if (id !== "") state.codexCompletedItems.add(id);
-	return items;
+	return withinScript(items, id, state);
+}
+
+function withinScript(
+	items: LineItem[],
+	id: string,
+	state: StreamState,
+): LineItem[] {
+	const script = state.codexExecScript;
+	if (script === undefined || id === "") return items;
+	const result = items.find(
+		(item) => item.kind === "tool_result" && item.callId === id,
+	);
+	if (script.open && result !== undefined)
+		script.inner.push({
+			callId: id,
+			failed: result.isError === true,
+			refusal:
+				result.facts?.denialKind === GUARD_DENIAL_KIND
+					? result.facts.extra?.denial_reason
+					: undefined,
+			text: result.text ?? "",
+		});
+	const parent = { extra: { script_call_id: factText(script.callId, 256) } };
+	return items.map((item) =>
+		item.kind === "tool_call" && item.callId === id
+			? { ...item, facts: mergeFacts(item.facts, parent) }
+			: item,
+	);
+}
+
+function withGuard(
+	isError: boolean,
+	text: string,
+	facts: LineFacts,
+): { isError: boolean; facts: LineFacts } {
+	const refusal = readGuardRefusal([text]);
+	return refusal === undefined
+		? { isError, facts }
+		: { isError: true, facts: mergeFacts(facts, guardRefusalFacts(refusal)) };
 }
 
 /**
@@ -182,16 +228,26 @@ function readCommandExecution(
 		subtype: NESTED,
 		toolName: "exec_command",
 	};
+	const output =
+		readString(item.aggregated_output) ??
+		readString(item.formatted_output) ??
+		[readString(item.stdout), readString(item.stderr)]
+			.filter((part) => part !== undefined)
+			.join("\n");
+	const outcome = withGuard(
+		item.status === "failed" ||
+			item.status === "aborted" ||
+			(exitCode !== null && exitCode !== 0),
+		output,
+		codexItemFacts(item),
+	);
 	return [
 		{ ...base, kind: "tool_call", text: command },
 		{
 			...base,
 			exitCode,
-			facts: codexItemFacts(item),
-			isError:
-				item.status === "failed" ||
-				item.status === "aborted" ||
-				(exitCode !== null && exitCode !== 0),
+			facts: outcome.facts,
+			isError: outcome.isError,
 			kind: "tool_result",
 			setup: codexSkillRead(item, command, exitCode),
 			// No exit code and not finished: still running when recorded.
@@ -200,12 +256,7 @@ function readCommandExecution(
 			item.status !== "completed"
 				? { subtype: "running" }
 				: {}),
-			text:
-				readString(item.aggregated_output) ??
-				readString(item.formatted_output) ??
-				[readString(item.stdout), readString(item.stderr)]
-					.filter((part) => part !== undefined)
-					.join("\n"),
+			text: output,
 		},
 	];
 }
@@ -218,6 +269,7 @@ function readToolItem(
 	facts: LineFacts = {},
 ): LineItem[] {
 	const base = { callId: id, subtype: NESTED, toolName };
+	const result = withGuard(outcome.isError, outcome.output, facts);
 	return [
 		{
 			...base,
@@ -233,8 +285,8 @@ function readToolItem(
 		{
 			...base,
 			exitCode: null,
-			facts,
-			isError: outcome.isError,
+			facts: result.facts,
+			isError: result.isError,
 			kind: "tool_result",
 			text: outcome.output,
 		},
@@ -263,7 +315,12 @@ function readFileChange(
 	const failed = item.status === "failed";
 	if (fileChanges.length === 0 && !failed && Object.keys(changes).length > 0) {
 		// Every path is already a file change of the script that applied it.
-		return [metaItem("item_completed:FileChange_mirror", { callId: id })];
+		return [
+			metaItem("item_completed:FileChange_mirror", {
+				callId: id,
+				facts: appliedChangesFacts(changes, item.status === "completed"),
+			}),
+		];
 	}
 	return [
 		{ ...base, kind: "tool_call", text: Object.keys(changes).join("\n") },

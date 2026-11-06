@@ -50,10 +50,14 @@ export function collectCodexOutcome(
 		});
 }
 
-export function codexOutcomes(
-	content: string,
-): Map<string, Map<string, CodexEndEvent>> {
+export interface CodexPrescan {
+	readonly commandItemStreams: ReadonlySet<string>;
+	readonly outcomes: Map<string, Map<string, CodexEndEvent>>;
+}
+
+export function codexPrescan(content: string): CodexPrescan {
 	const outcomes = new Map<string, Map<string, CodexEndEvent>>();
+	const commandItemStreams = new Set<string>();
 	let start = 0;
 	while (start < content.length) {
 		const newline = content.indexOf("\n", start);
@@ -73,8 +77,19 @@ export function codexOutcomes(
 					outcomes.set(agentId, stream);
 				}
 				collectCodexOutcome(record, stream);
+				if (isCommandItem(record)) commandItemStreams.add(agentId);
 			}
 		} catch {}
 	}
-	return outcomes;
+	return { commandItemStreams, outcomes };
+}
+
+function isCommandItem(record: Record<string, unknown>): boolean {
+	const payload = isRecord(record.payload) ? record.payload : undefined;
+	return (
+		record.type === "event_msg" &&
+		payload?.type === "item_completed" &&
+		isRecord(payload.item) &&
+		payload.item.type === "CommandExecution"
+	);
 }

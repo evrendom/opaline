@@ -286,7 +286,11 @@ test("free-text branch values pass the secret filter before storage", () => {
 
 function parseInput(fixture: GitTranscriptFixture): GitObservationParseInput {
 	const records: GitObservationRecord[] = [
-		...splitSessionTranscript({ ...fixture, sessionDate: fixture.timestamp }),
+		...splitSessionTranscript({
+			...fixture,
+			sessionDate: fixture.timestamp,
+			textMaxChars: 65_536,
+		}),
 	].map((draft) => {
 		const raw = fixture.subagents[draft.agentId] ?? fixture.content;
 		return {

@@ -256,6 +256,7 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		meaning: "1 when the call has a result in the transcript.",
 		traps: [
 			"A call without a result (interrupted, or the session ended) is neither failed nor succeeded.",
+			"From parser 13 a command an older Codex code-mode script ran (no command item recorded) has no result of its own: its output and outcome are on the script's call (call_id before the #).",
 		],
 	},
 	{
@@ -364,7 +365,7 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		meaning:
 			"What carries the call's command: command (a shell command, or one a Codex code-mode script ran) or script (a whole Codex code-mode script); empty when the call carries none.",
 		traps: [
-			"From parser 5 a command a Codex code-mode script ran is a call of its own (command) next to the script's call (script); filter command_from = 'command' to count commands once.",
+			"From parser 5 a command a Codex code-mode script ran is a call of its own (command) next to the script's call (script); filter command_from = 'command' to count commands once. From parser 13 that holds for scripts of Codex versions that recorded no command items too (call_id <script call_id>#<n>).",
 			"A script file the agent wrote (find source=calls commandFrom=written) is a file change, not a call's command: its Write or patch call carries none here.",
 		],
 	},

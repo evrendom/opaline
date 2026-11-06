@@ -3488,6 +3488,187 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		},
 	},
 	{
+		id: "text_cut",
+		also: ["body_sha256"],
+		view: "calls",
+		alsoIn: ["prompts"],
+		meaning:
+			"Whether a record's stored text is shorter than its whole text, which cap cut it, and the SHA-256 of the whole text, which the record's raw line holds.",
+		agents: {
+			claude_code: stored(
+				["user.message.content[tool_result].content"],
+				{ since: 13, record: ["text"], facts: ["text_cut", "body_sha256"] },
+				{
+					relation: { kind: "derived", from: ["calls/result_chars"] },
+					justification:
+						"Opaline computation, not an agent-written value: the splitter compares the stored text with the whole decoded text. cap: the per-kind cap (4 MiB for prompts, assistant text, calls, results and file changes; 64 KiB for compactions, 16 KiB for injected context, 4 KiB for bookkeeping) cut it; budget: the session text budget, which only compactions, injected context and bookkeeping records spend, did. text_chars stays the whole length and the record read decodes the raw line again.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/split-transcript.test.ts",
+							test: "an exhausted session budget cuts injected context only, and the cut record says so",
+						},
+					],
+				},
+			),
+			codex: stored(
+				["response_item/custom_tool_call_output.output"],
+				{ since: 13, record: ["text"], facts: ["text_cut", "body_sha256"] },
+				{
+					relation: { kind: "derived", from: ["calls/result_chars"] },
+					justification:
+						"Opaline computation, not an agent-written value: the splitter compares the stored text with the whole decoded text. cap: the per-kind cap cut it; budget: the session text budget, which only compactions, injected context and bookkeeping records spend, did. Codex caps one command's output near 1 MiB itself, so no command output in the 94-session rudel corpus is cut.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/codex-completeness.test.ts",
+							test: "a record over its cap keeps the cap and names the hash of its whole text",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "script_call_id",
+		also: ["script_commands_unresolved"],
+		view: "calls",
+		meaning:
+			"For a command a Codex code-mode script ran where Codex recorded no command item, the script call whose result holds its output; on the script, how many of its commands are built at run time and have no call of their own.",
+		agents: {
+			claude_code: notRecorded(
+				"Claude Code has no code-mode scripts that run commands",
+			),
+			codex: stored(
+				["response_item/custom_tool_call:exec.input"],
+				{
+					since: 13,
+					record: ["text"],
+					facts: ["script_call_id", "script_commands_unresolved"],
+				},
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly("response_item/custom_tool_call:exec.input"),
+					],
+					justification:
+						"Opaline computation from the script source: every tools.exec_command call whose cmd is a literal (directly, or through a literal array a map or for-of loop walks) becomes a call of subtype script, call_id <script call_id>#<n>, in the script's line after its own rows. Only streams with no CommandExecution item get them; where Codex records the item, it is the command's call (subtype nested). The script's output is one text for all its commands, so a script command has no result of its own. Example shape: const cmds = [[name, cmd], ...]; await Promise.all(cmds.map(([name, cmd]) => tools.exec_command({cmd})))",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/codex-completeness.test.ts",
+							test: "each command a script runs is a call of its own where Codex recorded no command item",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "error_from_call_id",
+		view: "calls",
+		meaning:
+			"On a Codex code-mode script's result whose failure an inner call of the script already records (the error an MCP call threw, a refusal or failing exit code of a command the script ran), that inner call: the script's result is then no failure of its own, so the failure counts once.",
+		agents: {
+			claude_code: notRecorded(
+				"Claude Code has no code-mode scripts that run commands",
+			),
+			codex: stored(
+				[
+					"response_item/custom_tool_call_output.output",
+					"event_msg/item_completed:McpToolCall.error",
+					"event_msg/item_completed:CommandExecution.exit_code",
+				],
+				{ since: 14, facts: ["error_from_call_id"] },
+				{
+					relation: {
+						kind: "derived",
+						from: ["calls/tool_result_text"],
+					},
+					sourceMappings: [
+						contextOnly("response_item/custom_tool_call_output.output"),
+						contextOnly("event_msg/item_completed:McpToolCall.error"),
+						contextOnly("event_msg/item_completed:CommandExecution.exit_code"),
+					],
+					justification:
+						"Opaline computation: a script's output repeats what its inner calls recorded. 'Script failed … Script error: <message>' repeats the error of the inner MCP call that threw it, a guard refusal in its output is an inner command's output, and an exit code the script printed is an inner command's where Codex records command items. The inner call keeps the failure and the script's result names it here instead of failing too.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/inner-calls.test.ts",
+							test: "a script failure an inner MCP call threw stays on that call",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "turn_cwd",
+		view: "runs",
+		meaning:
+			"On a Codex prompt, the working directory the turn's context named when it arrived (turn_context cwd, else the session's).",
+		agents: {
+			claude_code: notRecorded(
+				"Claude Code writes cwd on every line; it is cwd_components",
+			),
+			codex: stored(
+				["turn_context/.cwd", "session_meta/.cwd"],
+				{ since: 14, facts: ["turn_cwd"] },
+				{
+					relation: { kind: "derived", from: ["calls/cwd"] },
+					sourceMappings: [
+						contextOnly("turn_context/.cwd"),
+						contextOnly("session_meta/.cwd"),
+					],
+					justification:
+						"turn_context precedes its turn's prompt in the file, so its cwd would sit on the previous run's rows; the prompt that opens the turn carries it instead, so every run names the directory it started in.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/inner-calls.test.ts",
+							test: "a Codex prompt carries its turn's working directory",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "workdir",
+		view: "calls",
+		meaning:
+			"The working directory a Codex exec_command asked to run in (its workdir argument), on the call, also for a command a code-mode script ran.",
+		agents: {
+			claude_code: notRecorded("Claude Code Bash has no workdir argument"),
+			codex: stored(
+				[
+					"response_item/function_call:exec_command.arguments.workdir",
+					"response_item/custom_tool_call:exec.input",
+				],
+				{ since: 14, facts: ["workdir"] },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.workdir",
+						),
+						contextOnly("response_item/custom_tool_call:exec.input"),
+					],
+					justification:
+						"The directory the call requested; Codex runs the command there. Read from the arguments, or from a literal tools.exec_command call in the script source.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/inner-calls.test.ts",
+							test: "a script command names the directory it asked to run in",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
 		id: "exit_decided_by",
 		also: ["exit_masked"],
 		view: "calls",
