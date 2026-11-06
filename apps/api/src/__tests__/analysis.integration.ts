@@ -258,7 +258,9 @@ test("real API: pinned Claude/Codex runs, line prices, failure refs, reaction or
 			0,
 		),
 	).toBeLessThanOrEqual(200);
-	expect(renderRead(bounded)).toEndWith("[cut]");
+	expect(renderRead(bounded)).toEndWith(
+		"… [2 more runs omitted to fit the response size limit]",
+	);
 	const record = AnalysisReadOutputSchema.parse(
 		await rpc("analysis/read", {
 			refs: [first.ref],
@@ -1471,6 +1473,7 @@ async function seedSession(
 
 /** The paged items of a find result: rows, groups, events or weekly totals. */
 function items(output: z.infer<typeof AnalysisFindOutputSchema>): unknown[] {
+	if (output.source === "sessions") return output.sessions;
 	if (output.source === "user" || output.source === "git") return output.events;
 	if (output.source === "weekly") return output.totals;
 	return "rows" in output ? output.rows : output.groups;

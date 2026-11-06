@@ -25,9 +25,9 @@ export interface FailureCause {
 	readonly ruleIds: readonly string[];
 }
 
-const PREAMBLE =
+export const PREAMBLE =
 	/^(?:exit code:?\s*-?\d+|process exited with code -?\d+|wall time:.*|output:?|chunk id:.*|original token count:.*|total output lines:.*|command:.*|\[?std(?:err|out)\]?:?|<\/?tool_use_error>|<\/?error>|error:?$|shell cwd was reset.*|script failed|script error:?|\$ .*|> .*)$/iu;
-const STRONG =
+export const STRONG =
 	/(\berror\b|\bfail(?:ed|ure)?\b|✖|✗|✕|×|fatal:|exception|ERR!|ERR_PNPM_|panic|denied|not found|no such file|traceback|cannot|can't|unable to|refused|invalid|unknown (?:option|command|argument|flag)|timed out|rejected)/iu;
 const ESCAPE = String.fromCharCode(27);
 const BELL = String.fromCharCode(7);

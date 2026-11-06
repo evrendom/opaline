@@ -20,6 +20,8 @@ interface LoadedTools {
 	schemas: Record<string, Record<string, unknown>>;
 	annotations: Record<string, Record<string, boolean>>;
 	listed: ListedTool[];
+	retroListed: ListedTool[];
+	retroDescriptions: Record<string, string>;
 	draft: { analysis: string };
 	revision: { analysis: string; step: string; query: string };
 	flow: Record<string, Outcome>;
@@ -37,7 +39,7 @@ async function loadTools(): Promise<LoadedTools> {
 			process.execPath,
 			"--no-env-file",
 			"--eval",
-			`const { MCP_TOOLS, listedTool, summarizeDashboard, withoutPersonRows } = await import(${JSON.stringify(new URL("./mcp-tools.ts", import.meta.url).href)});
+			`const { MCP_TOOLS, listedTool, retroListedTool, summarizeDashboard, withoutPersonRows } = await import(${JSON.stringify(new URL("./mcp-tools.ts", import.meta.url).href)});
 const { PLUGIN_TOOLS } = await import(${JSON.stringify(new URL("./plugin-tools.ts", import.meta.url).href)});
 const service = await import(${JSON.stringify(new URL("../services/analysis-log/analysis-log.service.ts", import.meta.url).href)});
 const { createMemoryAnalysisStore } = await import(${JSON.stringify(new URL("../services/analysis-log/memory-store.ts", import.meta.url).href)});
@@ -95,6 +97,8 @@ console.log(JSON.stringify({
 	schemas: Object.fromEntries(MCP_TOOLS.map((tool) => [tool.name, tool.inputSchema])),
 	annotations: Object.fromEntries(MCP_TOOLS.map((tool) => [tool.name, tool.annotations])),
 	listed: [...MCP_TOOLS, ...PLUGIN_TOOLS].map(listedTool),
+	retroListed: [...MCP_TOOLS, ...PLUGIN_TOOLS].map(retroListedTool),
+	retroDescriptions: Object.fromEntries(MCP_TOOLS.filter((tool) => tool.retroDescription).map((tool) => [tool.name, tool.retroDescription])),
 	draft,
 	revision,
 	flow,
@@ -261,29 +265,33 @@ test("analysis tools publish closed input schemas with defaults and a workspace"
 	}
 });
 
-test("every tool declares annotations, and only the tools that write are not read-only", async () => {
+test("every tool declares all four annotations, and only the tools that write are not read-only or idempotent", async () => {
 	const { annotations } = await loaded;
 	const readOnly = {
 		readOnlyHint: true,
 		destructiveHint: false,
 		openWorldHint: false,
+		idempotentHint: true,
 	};
 	const writes = {
 		readOnlyHint: false,
 		destructiveHint: false,
 		openWorldHint: false,
+		idempotentHint: false,
 	};
 
 	const shares = {
 		readOnlyHint: false,
 		destructiveHint: false,
 		openWorldHint: true,
+		idempotentHint: false,
 	};
 
 	const replaces = {
 		readOnlyHint: false,
 		destructiveHint: true,
 		openWorldHint: false,
+		idempotentHint: false,
 	};
 
 	for (const [name, value] of Object.entries(annotations)) {
@@ -293,7 +301,15 @@ test("every tool declares annotations, and only the tools that write are not rea
 				? replaces
 				: ["share_answer", "save_answer", "run_questions"].includes(name)
 					? shares
-					: ["find", "read", "sql"].includes(name)
+					: [
+								"find",
+								"read",
+								"sql",
+								"agent_feedback",
+								"measures",
+								"patterns",
+								"checks",
+							].includes(name)
 						? writes
 						: readOnly),
 		});
@@ -373,7 +389,12 @@ test("the model sees only the analysis tools, the dashboard and the workspace li
 			.sort(),
 	).toEqual(
 		[
+			"agent_feedback",
 			"answers",
+			"checks",
+			"mcp_stats",
+			"measures",
+			"patterns",
 			"search_answers",
 			"get_answer",
 			"get_answer_evidence",
@@ -424,30 +445,137 @@ test("without the retro tools, the model is listed exactly the tools of the publ
 		tool._meta?.ui?.visibility?.includes("app"),
 	);
 	expect(toolsListedFor(appOnly, false)).toEqual(appOnly);
-	expect(toolsListedFor(listed, true)).toEqual(listed);
+	expect(toolsListedFor(listed, true, true)).toEqual(listed);
+	expect(toolsListedFor(listed, true).map((tool) => tool.name)).not.toContain(
+		"mcp_stats",
+	);
 });
 
-test("every tool the model sees has a plain title and the same five short description lines, and every input is described in one plain line", async () => {
+test("only a retro listing asks every model tool for context and llm_model, and offers format on read and run, url and peek; app-only tools never change", async () => {
+	const { listed, retroListed } = await loaded;
+	const analytics = ["context", "llm_model"];
+	const extras: Record<string, string[]> = {
+		find: ["parentSessionId", "filters", "offset", "verbosity", "peek"],
+		read: ["format"],
+		run: ["url", "format"],
+		sql: ["peek"],
+		measures: ["peek"],
+		patterns: ["peek"],
+		search: ["peek"],
+	};
+	for (const [index, tool] of listed.entries()) {
+		const retro = retroListed[index];
+		const keys = Object.keys(tool.inputSchema.properties ?? {});
+		for (const name of [...analytics, "format", "url", "peek", "output"])
+			expect({ tool: tool.name, name, listed: keys.includes(name) }).toEqual({
+				tool: tool.name,
+				name,
+				listed: false,
+			});
+		if (tool._meta?.ui?.visibility?.includes("app")) {
+			expect(retro).toEqual(tool);
+			continue;
+		}
+		const properties = retro?.inputSchema.properties as Record<
+			string,
+			{ description: string }
+		>;
+		expect({
+			tool: tool.name,
+			added: Object.keys(properties).filter((key) => !keys.includes(key)),
+			required: (retro?.inputSchema.required as string[]).filter((name) =>
+				analytics.includes(name),
+			),
+			rest: {
+				...retro,
+				inputSchema: undefined,
+				description: undefined,
+				annotations: undefined,
+			},
+			annotations: retro?.annotations,
+		}).toEqual({
+			tool: tool.name,
+			added: [...(extras[tool.name] ?? []), ...analytics],
+			required: analytics,
+			rest: {
+				...tool,
+				inputSchema: undefined,
+				description: undefined,
+				annotations: undefined,
+			},
+			annotations: {
+				...tool.annotations,
+				idempotentHint: tool.annotations.readOnlyHint === true,
+			},
+		});
+		expect(properties.context?.description).toStartWith(
+			"Explain in 15-25 words, in third person, why this tool is called",
+		);
+		expect(properties.llm_model?.description).toEndWith(
+			'If you do not know your model identifier with certainty, pass "unknown" — never guess.',
+		);
+		for (const name of extras[tool.name] ?? [])
+			expect(properties[name]?.description).not.toMatch(JARGON);
+	}
+});
+
+test("the retro listing gives find its own description, with the check reminder and the same five short lines first", async () => {
+	const { listed, retroDescriptions } = await loaded;
+	const retro = retroDescriptions.find ?? "";
+	const reminder =
+		"When a failure keeps happening, offer to save it as a check.";
+	expect(retro).toContain(reminder);
+	expect(
+		retro
+			.split("\n")
+			.slice(0, SECTIONS.length)
+			.map((line, index) => line.startsWith(SECTIONS[index] ?? "?")),
+	).toEqual(SECTIONS.map(() => true));
+	expect(retro).toContain(
+		"Nobody can see this unfinished answer, not even the user, until save_answer saves it.",
+	);
+	expect(retro).toContain("Every member sees every member's sessions");
+	const listedFind = toolsListedFor(
+		[{ name: "find", description: "plain", retroDescription: retro }],
+		true,
+	);
+	expect(listedFind[0]?.description).toBe(retro);
+	expect(
+		toolsListedFor(
+			[{ name: "find", description: "plain", retroDescription: retro }],
+			false,
+		)[0]?.description,
+	).toBe("plain");
+	expect(
+		listed.find((tool) => tool.name === "measures")?.description,
+	).toContain(reminder);
+});
+
+test("every tool the model sees has a plain title and the same five short description lines first, and every input is described in one plain line", async () => {
 	const { listed } = await loaded;
 	const visible = listed.filter(
 		(tool) => !tool._meta?.ui?.visibility?.includes("app"),
 	);
 	for (const tool of visible) {
 		const lines = tool.description.split("\n");
+		const head = lines.slice(0, SECTIONS.length);
 		expect({
 			name: tool.name,
 			title: tool.title.trim().length > 0,
 			annotationTitle: tool.annotations.title,
-			sections: lines.map((line, index) =>
+			sections: head.map((line, index) =>
 				line.startsWith(SECTIONS[index] ?? "?"),
 			),
-			short: tool.description.length < 600,
+			guideAfterBlankLine:
+				lines.length === SECTIONS.length || lines[SECTIONS.length] === "",
+			short: head.join("\n").length < 600,
 			jargon: tool.description.match(JARGON)?.[0] ?? null,
 		}).toEqual({
 			name: tool.name,
 			title: true,
 			annotationTitle: tool.title,
 			sections: SECTIONS.map(() => true),
+			guideAfterBlankLine: true,
 			short: true,
 			jargon: null,
 		});

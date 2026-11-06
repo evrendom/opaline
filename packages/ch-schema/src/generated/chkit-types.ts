@@ -560,6 +560,39 @@ export const RudelL1EdgesByTargetRowSchema = z.object({
 export type RudelL1EdgesByTargetRowInput = z.input<typeof RudelL1EdgesByTargetRowSchema>
 export type RudelL1EdgesByTargetRowOutput = z.output<typeof RudelL1EdgesByTargetRowSchema>
 
+export type RudelMcpToolCallsRow = {
+  organization_id: string
+  user_id: string
+  called_at: string
+  call_id: string
+  tool: string
+  context: string
+  llm_model: string
+  duration_ms: number
+  is_error: number
+  error_code: string
+  output_chars: number
+  feedback: string
+}
+
+export const RudelMcpToolCallsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  called_at: z.string(),
+  call_id: z.string(),
+  tool: z.string(),
+  context: z.string(),
+  llm_model: z.string(),
+  duration_ms: z.number(),
+  is_error: z.number(),
+  error_code: z.string(),
+  output_chars: z.number(),
+  feedback: z.string(),
+})
+
+export type RudelMcpToolCallsRowInput = z.input<typeof RudelMcpToolCallsRowSchema>
+export type RudelMcpToolCallsRowOutput = z.output<typeof RudelMcpToolCallsRowSchema>
+
 export type RudelRepositorySessionEvidenceIndexRow = {
   organization_id: string
   user_id: string

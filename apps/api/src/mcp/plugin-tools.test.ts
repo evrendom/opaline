@@ -35,6 +35,7 @@ describe("plugin tools", () => {
 				readOnlyHint: true,
 				destructiveHint: false,
 				openWorldHint: false,
+				idempotentHint: true,
 			});
 		}
 	});

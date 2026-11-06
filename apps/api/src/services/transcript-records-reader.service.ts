@@ -1123,7 +1123,7 @@ async function readRawTurn(
 				row.call_id.length +
 				row.text_slice.length +
 				(row.text_chars > countCodePoints(row.text_slice)
-					? RAW_CUT_MARKER.length
+					? cutMarker(row.text_chars, row.text_chars).length
 					: 0),
 			0,
 		) <= budget.total;
@@ -1154,7 +1154,7 @@ async function readRawTurn(
 		const taken = cutRawText(
 			row.text_slice,
 			Math.max(minimumText, entryBudget.remaining - metadataChars),
-			row.text_chars > countCodePoints(row.text_slice),
+			row.text_chars,
 		);
 		entryBudget.take(taken.text);
 		const metadataFits = metadataChars <= entryBudget.remaining;
@@ -1201,28 +1201,38 @@ async function readRawTurn(
 	return { ...base, found: rows.length > 0, records, truncated };
 }
 
-const RAW_CUT_MARKER = "[cut]";
+const MIN_CUT_MARKER_CHARS = 5;
 
 function rawTextMinimum(row: TurnRawRow): number {
 	if (row.text_chars <= countCodePoints(row.text_slice)) {
-		return Math.min(row.text_slice.length, RAW_CUT_MARKER.length + 2);
+		return Math.min(row.text_slice.length, MIN_CUT_MARKER_CHARS + 2);
 	}
-	return Math.min(row.text_slice.length, 2) + RAW_CUT_MARKER.length;
+	return Math.min(row.text_slice.length, 2) + MIN_CUT_MARKER_CHARS;
+}
+
+function cutMarker(dropped: number, total: number): string {
+	return `… [truncated ${dropped} of ${total} chars]`;
 }
 
 function cutRawText(
 	value: string,
 	maxChars: number,
-	forceCut = false,
+	total = countCodePoints(value),
 ): { text: string; truncated: boolean } {
-	if (!forceCut && value.length <= maxChars) {
+	if (total <= countCodePoints(value) && value.length <= maxChars) {
 		return { text: value, truncated: false };
 	}
 	if (maxChars === 0) return { text: "", truncated: true };
-	const marker = maxChars >= RAW_CUT_MARKER.length ? RAW_CUT_MARKER : "…";
+	const counted = maxChars >= cutMarker(total, total).length;
+	const room = counted
+		? maxChars - cutMarker(total, total).length
+		: maxChars - 1;
 	const head = value
-		.slice(0, Math.max(0, maxChars - marker.length))
+		.slice(0, Math.max(0, room))
 		.replace(/[\uD800-\uDBFF]$/u, "");
+	const marker = counted
+		? cutMarker(total - countCodePoints(head), total)
+		: "…";
 	return { text: `${head}${marker}`, truncated: true };
 }
 

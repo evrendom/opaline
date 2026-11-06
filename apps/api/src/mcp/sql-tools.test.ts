@@ -161,12 +161,14 @@ test("an sql result renders its stored id, the table, what was cut and the not-e
 	const { flow } = await loaded;
 	expect(flow.sql).toEqual({
 		result: [
+			"url: http://localhost:4011/w/sessions",
 			"sql result=sr_abc title=Longest runs rows=1 truncated=true",
 			"session_id | active_minutes",
 			"s1 | 41.5",
 			"note: cut: the query returned more than 200 rows; only the first 200 are shown. Cut rows are not missing data: aggregate (GROUP BY with count(), sum(), avg()) or page with ORDER BY … LIMIT 200 OFFSET 200.",
 			"note: not evidence: these rows say where to look, not why. Open the runs with read (session_id, agent_id, and turn_idx as its turn) before naming a cause.",
 			"trace analysis=a_1 step=s_1 query=q_1",
+			'too large to page through here. If the opaline CLI is available, to compute on all of it, run: opaline sql "SELECT 1" --out rows.jsonl',
 		].join("\n"),
 	});
 });

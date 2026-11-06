@@ -7,7 +7,7 @@ import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE, RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { committedBuildSql } from "./run-index-reader.js";
 import { GENUINE_PROMPT_SQL, records } from "./sql.js";
-import { windowSessionsSql } from "./sql-measures.js";
+import { cohortOwner, windowSessionsSql } from "./sql-measures.js";
 import type { SqlView, SqlViewColumn } from "./sql-views.js";
 
 /**
@@ -143,7 +143,7 @@ function promptsView(owner: Owner): SqlView {
 		recent: { column: "at", rows: "prompts sent" },
 		windowColumn: "at",
 		sql(memberOnly, window = {}) {
-			const scope = owner(memberOnly);
+			const scope = cohortOwner(owner(memberOnly), window);
 			// Only the sessions with a prompt in the window the query keeps,
 			// so the rows are the same and a short window reads little.
 			const windowed = windowSessionsSql(
@@ -584,8 +584,8 @@ function setupFilesView(owner: Owner): SqlView {
 		],
 		columns,
 		recent: { column: "started_at", rows: "run setup files" },
-		sql(memberOnly) {
-			const scope = owner(memberOnly);
+		sql(memberOnly, window = {}) {
+			const scope = cohortOwner(owner(memberOnly), window);
 			const table = getSafeClickHouseTable(RUN_SETUP_TABLE);
 			return `SELECT ${SETUP_FILE_COLUMNS.map((name) =>
 				name === "run_started_at" ? "run_started_at AS started_at" : name,

@@ -1,13 +1,6 @@
 import { z } from "zod";
 
-/**
- * `search` (docs/retro-architecture.md, "Tools"): transcripts searched by
- * meaning (embeddings) and by exact string, merged into one ranking of runs.
- * The server scopes it to the caller's workspace and the sessions they may
- * read, like `sql`.
- */
-
-export const SEARCH_MODES = ["hybrid", "meaning", "exact"] as const;
+export const SEARCH_MODES = ["hybrid", "meaning", "exact", "regex"] as const;
 /** Record kinds whose text is searched. */
 export const SEARCH_KINDS = [
 	"user_prompt",
@@ -18,6 +11,7 @@ export const SEARCH_KINDS = [
 	"file_change",
 ] as const;
 export const SEARCH_TEXT_MAX_CHARS = 500;
+export const SEARCH_REGEX_MAX_CHARS = 800;
 export const SEARCH_RECORD_TEXT_MAX_CHARS = 65_536;
 /** Longest window one search reads, in days; the default is the last 30. */
 export const SEARCH_MAX_DAYS = 180;
@@ -25,7 +19,14 @@ export const SEARCH_DEFAULT_DAYS = 30;
 
 export const AnalysisSearchInputSchema = z
 	.object({
-		text: z.string().trim().min(2).max(SEARCH_TEXT_MAX_CHARS),
+		text: z
+			.string()
+			.trim()
+			.min(2)
+			.max(
+				SEARCH_REGEX_MAX_CHARS,
+				`text is at most ${SEARCH_TEXT_MAX_CHARS} characters, or ${SEARCH_REGEX_MAX_CHARS} for mode regex.`,
+			),
 		mode: z.enum(SEARCH_MODES).default("hybrid"),
 		filters: z
 			.object({
@@ -36,6 +37,7 @@ export const AnalysisSearchInputSchema = z
 				source: z.enum(["claude_code", "codex"]).optional(),
 				kinds: z.array(z.enum(SEARCH_KINDS)).min(1).max(6).optional(),
 				userId: z.string().min(1).max(200).optional(),
+				includeInjected: z.boolean().optional(),
 			})
 			.strict()
 			.optional(),
@@ -66,11 +68,20 @@ export const AnalysisSearchOutputSchema = z.object({
 	since: z.string(),
 	until: z.string(),
 	results: z.array(SearchResultSchema),
-	/** Sessions that ran in the window, those indexed for search, and those with chunks still without a vector. */
 	coverage: z.object({
 		sessions: z.number().int(),
+		searched: z.number().int(),
+		partial: z.number().int(),
 		indexed: z.number().int(),
 		pending: z.number().int(),
+	}),
+	exactMatches: z.object({
+		runs: z.number().int(),
+		sessions: z.number().int(),
+	}),
+	hiddenInjected: z.object({
+		matches: z.number().int(),
+		runs: z.number().int(),
 	}),
 	/** The workspace's OpenAI quota; null where its text is not embedded. */
 	quota: z

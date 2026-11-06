@@ -96,6 +96,7 @@ export interface SessionPick {
 const MAX_SESSIONS = 10_000;
 /** Small enough that parameter arrays fit in the request URL. */
 const BATCH_SESSIONS = 50;
+const GENERATION_READ_SESSIONS = 1_000;
 /**
  * Records of the pinned generations (receipt row counts) per batch. Run facts
  * take roughly 1 KiB of ClickHouse memory per record, so this keeps one
@@ -175,14 +176,24 @@ export async function resolveScope(
 	};
 	for (const userId of new Set(sessions.map((session) => session.user_id))) {
 		const owned = sessions.filter((session) => session.user_id === userId);
+		const ownerScope = { organizationId: scope.organizationId, userId };
+		const ownedGenerations: CountedGeneration[] = [];
+		for (let at = 0; at < owned.length; at += GENERATION_READ_SESSIONS)
+			ownedGenerations.push(
+				...(await queryCountedGenerations(
+					executor,
+					ownerScope,
+					owned
+						.slice(at, at + GENERATION_READ_SESSIONS)
+						.map((session) => session.session_id),
+				)),
+			);
 		for (let offset = 0; offset < owned.length; offset += BATCH_SESSIONS) {
 			const batchSessions = owned.slice(offset, offset + BATCH_SESSIONS);
-			const ownerScope = { organizationId: scope.organizationId, userId };
-			const generations = await queryCountedGenerations(
-				executor,
-				ownerScope,
-				batchSessions.map((session) => session.session_id),
-			);
+			const ids = new Set(batchSessions.map((session) => session.session_id));
+			const generations = ownedGenerations
+				.filter((generation) => ids.has(generation.sessionId))
+				.sort((left, right) => left.sessionId.localeCompare(right.sessionId));
 			resolved.indexedSessions += generations.length;
 			const indexed = new Set(
 				generations.map((generation) => generation.sessionId),

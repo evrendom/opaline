@@ -106,6 +106,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.l1_edges",
 	"rudel.l1_edges_by_target",
 	"rudel.l1_edge_resolutions",
+	"rudel.mcp_tool_calls",
 	"rudel.codex_sessions",
 	"rudel.repository_session_evidence_index",
 	"rudel.run_index",

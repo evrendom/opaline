@@ -63,6 +63,69 @@ const UInt64Schema = z
 		message: "must be a UInt64 in decimal",
 	});
 
+export const FIND_STRING_OPERATORS = [
+	"exact",
+	"is_not",
+	"icontains",
+	"not_icontains",
+	"regex",
+	"not_regex",
+	"is_set",
+	"is_not_set",
+] as const;
+export const FIND_NUMERIC_OPERATORS = [
+	"exact",
+	"gt",
+	"lt",
+	"is_set",
+	"is_not_set",
+] as const;
+export const FIND_DATE_OPERATORS = [
+	"is_date_exact",
+	"is_date_before",
+	"is_date_after",
+] as const;
+export const FIND_BOOLEAN_OPERATORS = ["exact"] as const;
+export const FIND_ARRAY_OPERATORS = [
+	"icontains",
+	"not_icontains",
+	"is_set",
+	"is_not_set",
+] as const;
+export const FIND_FILTER_OPERATORS = [
+	"exact",
+	"is_not",
+	"icontains",
+	"not_icontains",
+	"regex",
+	"not_regex",
+	"is_set",
+	"is_not_set",
+	"gt",
+	"lt",
+	"is_date_exact",
+	"is_date_before",
+	"is_date_after",
+] as const;
+export type FindFilterOperator = (typeof FIND_FILTER_OPERATORS)[number];
+export const FIND_REGEX_MAX_CHARS = 800;
+export const FIND_MAX_OFFSET = 10_000;
+const FilterScalarSchema = z.union([
+	z.string().max(FIND_REGEX_MAX_CHARS),
+	z.number(),
+	z.boolean(),
+]);
+export const FindFilterSchema = z
+	.object({
+		key: z.string().min(1).max(100),
+		operator: z.enum(FIND_FILTER_OPERATORS),
+		value: z
+			.union([FilterScalarSchema, z.array(FilterScalarSchema).min(1).max(100)])
+			.optional(),
+	})
+	.strict();
+export type FindFilter = z.infer<typeof FindFilterSchema>;
+
 /** The find arguments without cross-field checks; Zod 4 cannot derive a partial from a refined object. */
 export const AnalysisFindInputBaseSchema = z
 	.object({
@@ -74,6 +137,8 @@ export const AnalysisFindInputBaseSchema = z
 		agent: z.enum(["claude_code", "codex"]).optional(),
 		model: z.string().min(1).optional(),
 		sessionId: z.string().min(1).max(200).optional(),
+		parentSessionId: z.string().min(1).max(200).optional(),
+		filters: z.array(FindFilterSchema).min(1).max(20).optional(),
 		userId: z.string().min(1).optional(),
 		toolGroup: z
 			.enum([
@@ -125,16 +190,25 @@ export const AnalysisFindInputBaseSchema = z
 		/** Absent: `findLimit` picks a default per source. */
 		limit: z.number().int().min(1).max(200).optional(),
 		sort: z
-			.enum(["startedAt", "minutes", "costUsd", "failedCalls", "rawChars"])
+			.enum([
+				"startedAt",
+				"minutes",
+				"costUsd",
+				"failedCalls",
+				"rawChars",
+				"random",
+			])
 			.default("startedAt"),
 		/** Opaque position from a previous page's header; the other arguments must match that call. */
 		cursor: z.string().min(1).max(4_096).optional(),
+		offset: z.number().int().min(0).max(FIND_MAX_OFFSET).optional(),
 		/**
 		 * source=git only: the events of every session that named, listed,
 		 * pushed the head branch of, or created, pushed, captured or mentioned a
 		 * commit of this pull request (`owner/name#number` or its GitHub URL).
 		 */
 		pullRequest: z.string().min(1).max(300).optional(),
+		verbosity: z.enum(["summary", "full"]).optional(),
 		...traceInput,
 	})
 	.strict();
@@ -161,6 +235,20 @@ export function parsePullRequestRef(
 		: null;
 }
 
+export const SESSIONS_BEHIND_SOURCES = ["tool", "user", "calls"] as const;
+
+export function isSessionsBehind(
+	input: Pick<
+		z.infer<typeof AnalysisFindInputBaseSchema>,
+		"source" | "groupBy"
+	>,
+): boolean {
+	return (
+		input.groupBy === "session" &&
+		(SESSIONS_BEHIND_SOURCES as readonly string[]).includes(input.source)
+	);
+}
+
 const WEEKLY_GROUP_BY: ReadonlySet<string> = new Set([
 	"week",
 	"member",
@@ -169,6 +257,8 @@ const WEEKLY_GROUP_BY: ReadonlySet<string> = new Set([
 /** Arguments that select within weeks; weekly totals are whole weeks per member and agent. */
 const WEEKLY_UNSUPPORTED = [
 	"latest",
+	"parentSessionId",
+	"filters",
 	"repository",
 	"model",
 	"sessionId",
@@ -197,13 +287,14 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 				? (RUN_GROUP_BY as readonly string[]).includes(input.groupBy)
 				: input.source === "weekly"
 					? WEEKLY_GROUP_BY.has(input.groupBy)
-					: input.source === "calls" &&
-						(CALL_GROUP_BY as readonly string[]).includes(input.groupBy))
+					: isSessionsBehind(input) ||
+						(input.source === "calls" &&
+							(CALL_GROUP_BY as readonly string[]).includes(input.groupBy)))
 		) {
 			context.addIssue({
 				code: "custom",
 				path: ["groupBy"],
-				message: `groupBy is ${RUN_GROUP_BY.join(", ")} for runs, week, member, agent for weekly and ${CALL_GROUP_BY.join(", ")} for calls`,
+				message: `groupBy is ${RUN_GROUP_BY.join(", ")} for runs, week, member, agent for weekly, ${CALL_GROUP_BY.join(", ")} or session for calls and session for tool and user`,
 			});
 		}
 		for (const key of [
@@ -235,6 +326,30 @@ export const AnalysisFindInputSchema = AnalysisFindInputBaseSchema.superRefine(
 						path: [key],
 						message: `${key} is not valid for source=weekly, which sums whole weeks per member and agent`,
 					});
+		if (
+			input.sort === "random" &&
+			!((input.source === "runs" || input.source === "calls") && !input.groupBy)
+		)
+			context.addIssue({
+				code: "custom",
+				path: ["sort"],
+				message:
+					"sort=random samples rows of source=runs or source=calls without groupBy",
+			});
+		if (input.parentSessionId !== undefined && input.sessionId !== undefined)
+			context.addIssue({
+				code: "custom",
+				path: ["parentSessionId"],
+				message:
+					"pass sessionId or parentSessionId, not both: parentSessionId already includes the session itself",
+			});
+		if (input.parentSessionId !== undefined && input.pullRequest !== undefined)
+			context.addIssue({
+				code: "custom",
+				path: ["parentSessionId"],
+				message:
+					"pullRequest picks its own sessions; pass parentSessionId without it",
+			});
 		if (input.pullRequest !== undefined && input.source !== "git") {
 			context.addIssue({
 				code: "custom",
@@ -337,6 +452,9 @@ const HeaderSchema = z.object({
 	classifierVersion: z.number().int(),
 	/** Present when more rows, groups or events follow this page. */
 	cursor: z.string().optional(),
+	omitted: z.number().int().optional(),
+	matchedCalls: z.number().int().optional(),
+	groupCallTime: z.number().optional(),
 	trace: AnalysisTraceSchema.optional(),
 });
 export const AnalysisRunSchema = z.object({
@@ -444,6 +562,7 @@ export const AnalysisCallSchema = z.object({
 	/** Whether the call's result was an error or a non-zero exit; null without a result. */
 	failed: z.boolean().nullable(),
 	exitCode: z.number().int().nullable(),
+	callMinutes: z.number().nullable().default(null),
 	parentSessionId: ParentSessionIdSchema,
 });
 const CallGroupSchema = z.object({
@@ -454,6 +573,8 @@ const CallGroupSchema = z.object({
 	failedCalls: z.number(),
 	firstSeen: z.string(),
 	lastSeen: z.string(),
+	groupCallTime: z.number().nullable().default(null),
+	groupRunTime: z.number().nullable().default(null),
 	/** groupBy=commandFingerprint: the normalized text it hashes, its first `CALL_COMMAND_CHARS` characters. */
 	normalized: z.string().nullable(),
 	/** Newest calls of up to three different command texts in the group. */
@@ -849,6 +970,27 @@ export const AnalysisWeeklyTotalsSchema = z.object({
 	>),
 });
 
+export const SessionBehindSchema = z.object({
+	sessionId: z.string(),
+	repository: z.string(),
+	agent: z.enum(["claude_code", "codex"]),
+	startedAt: z.string().nullable(),
+	rows: z.number().int(),
+	firstSeen: z.string(),
+	lastSeen: z.string(),
+	groupRunTime: z.number(),
+	groupCallTime: z.number().nullable(),
+	failedCalls: z.number().int(),
+	example: z.object({ ref: RunRefSchema, record: z.number().int() }),
+	parentSessionId: ParentSessionIdSchema,
+});
+export const SessionsBehindTotalsSchema = z.object({
+	sessions: z.number().int(),
+	rows: z.number().int(),
+	firstSeen: z.string().nullable(),
+	lastSeen: z.string().nullable(),
+});
+
 export const AnalysisFindOutputSchema = z.union([
 	z.object({
 		source: z.literal("runs"),
@@ -901,11 +1043,21 @@ export const AnalysisFindOutputSchema = z.union([
 		snapshot: z.object({ id: z.string(), refreshedAt: z.string() }).nullable(),
 		totals: z.array(AnalysisWeeklyTotalsSchema),
 	}),
+	z.object({
+		source: z.literal("sessions"),
+		of: z.enum(SESSIONS_BEHIND_SOURCES),
+		header: HeaderSchema,
+		sessionTotals: SessionsBehindTotalsSchema,
+		sessions: z.array(SessionBehindSchema),
+	}),
 ]);
 export const AnalysisReadOutputSchema = z.object({
 	maxChars: z.number().int().min(1).max(40_000).optional(),
 	trace: AnalysisTraceSchema.optional(),
 	truncated: z.boolean(),
+	omitted: z
+		.object({ runs: z.number().int(), sections: z.number().int() })
+		.optional(),
 	reads: z.array(
 		z.object({
 			ref: RunRefSchema,
@@ -940,6 +1092,11 @@ export type RunRef = z.infer<typeof RunRefSchema>;
 export type AnalysisTrace = z.infer<typeof AnalysisTraceSchema>;
 export type AnalysisFindInput = z.infer<typeof AnalysisFindInputSchema>;
 export type AnalysisFindOutput = z.infer<typeof AnalysisFindOutputSchema>;
+export type SessionBehind = z.infer<typeof SessionBehindSchema>;
+export type SessionsBehindOutput = Extract<
+	AnalysisFindOutput,
+	{ sessions: unknown }
+>;
 export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
 export type AnalysisCall = z.infer<typeof AnalysisCallSchema>;
 export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
@@ -993,6 +1150,16 @@ export const AnalysisSqlOutputSchema = z.object({
 	 * stored before it existed.
 	 */
 	runs: z.array(RunRefSchema).default([]),
+	measure: z
+		.object({
+			name: z.string(),
+			status: z.enum(["approved", "proposed"]),
+			hash: z.string(),
+			from: z.string(),
+			to: z.string(),
+			drill: z.record(z.string(), z.string()).optional(),
+		})
+		.optional(),
 	trace: AnalysisTraceSchema.optional(),
 });
 
@@ -1103,6 +1270,8 @@ export const AnalysisRunOutputSchema = z.object({
 	/** Something was left out to stay within maxChars; the text says what. */
 	truncated: z.boolean(),
 	text: z.string(),
+	ref: RunRefSchema.optional(),
+	view: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type AnalysisRunInput = z.infer<typeof AnalysisRunInputSchema>;

@@ -23,6 +23,7 @@ const KEPT_TABLES = [
  */
 const TABLES_WITH_TTL = [
 	"dependency_health_probes",
+	"mcp_tool_calls",
 	"session_language_signals",
 	"weekly_totals",
 ];

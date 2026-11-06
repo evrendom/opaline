@@ -56,6 +56,7 @@ export interface PreparedSql {
 export interface SqlWindow {
 	readonly from?: string;
 	readonly to?: string;
+	readonly cohort?: string;
 }
 
 /** A view as the guard puts it in place of its name. */

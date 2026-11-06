@@ -13,7 +13,7 @@ export type CursorKey = readonly (string | number | null)[];
 export type CursorOrder = readonly ("asc" | "desc")[];
 
 /** Arguments that do not change which items follow a position. */
-const PAGE_INDEPENDENT = new Set(["cursor", "limit", "analysis"]);
+const PAGE_INDEPENDENT = new Set(["cursor", "limit", "analysis", "verbosity"]);
 
 const CursorSchema = z
 	.object({

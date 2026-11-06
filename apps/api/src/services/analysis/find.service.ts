@@ -1,17 +1,21 @@
+import { ORPCError } from "@orpc/server";
 import {
 	type AnalysisCall,
 	type AnalysisFindInput,
 	type AnalysisFindOutput,
 	type AnalysisRun,
 	findLimit,
+	isSessionsBehind,
 	parsePullRequestRef,
 	type RunRef,
+	type SESSIONS_BEHIND_SOURCES,
 } from "@rudel/api-routes";
 import type { z } from "zod";
 import {
 	type ClickHouseExecutor,
 	type ClickHouseStatement,
 	getClickhouse,
+	MAX_CLICKHOUSE_URL_BYTES,
 } from "../../clickhouse.js";
 import { sessionScopeId } from "../l1-edges/l1-edge-ids.js";
 import {
@@ -22,6 +26,7 @@ import {
 	CallExampleRowSchema,
 	type CallGroupBy,
 	CallGroupRowSchema,
+	type CallPosition,
 	type CallRow,
 	CallRowSchema,
 } from "./call-queries.js";
@@ -41,6 +46,30 @@ import {
 	takePage,
 	writeFindCursor,
 } from "./find-cursor.js";
+import {
+	buildRunFilterStatement,
+	buildSessionLinksStatement,
+	compileFindFilters,
+	RunKeyRowSchema,
+	SessionLinkRowSchema,
+	sessionTree,
+	type TreeSession,
+} from "./find-filter-queries.js";
+import { type CompiledFilters, isRegexError } from "./find-filters.js";
+import {
+	padUInt64,
+	RANDOM_CALL_ORDER,
+	RANDOM_RUN_ORDER,
+	randomRank,
+	randomSeedOf,
+	skipLeading,
+	unpadUInt64,
+} from "./find-paging.js";
+import {
+	type FailedCallsOf,
+	SESSIONS_BEHIND_ORDER,
+	SessionsBehind,
+} from "./find-sessions.js";
 import {
 	type EdgeScopeState,
 	type EdgeStateSource,
@@ -65,7 +94,12 @@ import {
 	runKey,
 	type TimedEvent,
 } from "./reactions.js";
-import { queryRunFacts, type RunRow } from "./run-queries.js";
+import {
+	type ComputedRunFacts,
+	computedRunFactsOf,
+	loadRunFacts,
+} from "./run-facts-loader.js";
+import type { RunRow } from "./run-queries.js";
 import {
 	buildFailureScanStatement,
 	buildOpeningPromptsStatement,
@@ -85,7 +119,13 @@ import {
 	type ScopeBatch,
 	type SessionPick,
 } from "./scope.js";
-import { isAnalysisWorkLimit, query } from "./sql.js";
+import {
+	chunkByParamBytes,
+	isAnalysisWorkLimit,
+	paramValueBytes,
+	pinnedParams,
+	query,
+} from "./sql.js";
 import { findWeeklyTotals, weeklyOrder } from "./weekly-totals.js";
 
 type Header = AnalysisFindOutput["header"];
@@ -138,6 +178,8 @@ interface FindContext {
 	unboundExecutor: ClickHouseExecutor;
 	/** `pullRequest`: the evidence rows that touch it, as their sessions' builds published them. */
 	pullRequest?: { touches: PullRequestTouches; published: PullRequestTouch[] };
+	filters?: CompiledFilters;
+	seed: string;
 }
 
 interface ScanRow {
@@ -179,6 +221,7 @@ const CALL_ORDER: CursorOrder = ["desc", "asc", "asc", "asc", "asc"];
  * first seen past it are left out, and the answer says so.
  */
 const MAX_CALL_GROUPS = 50_000;
+const EXAMPLE_URL_RESERVE = 2 * 1024;
 /** A group's examples: newest first, then batch and position. */
 const EXAMPLE_ORDER: CursorOrder = [
 	"desc",
@@ -197,7 +240,7 @@ export type { AnalysisScope };
  * grouped by cause, or lexicon reactions with their origin runs. Everything is
  * deterministic and pinned to each session's committed transcript generation.
  * A ClickHouse work ceiling returns an explicitly incomplete answer, as does
- * a result too large for `ANALYSIS_OUTPUT_MAX_BYTES`. Results are paged: when
+ * a result too large for the response size limit. Results are paged: when
  * more items follow, `header.cursor` continues after the last one returned.
  */
 export async function findAnalysis(
@@ -220,13 +263,21 @@ export function findAnalysisWithOwners(
 	return withAnalysisDeadline(
 		"analysis.find",
 		async (executor) => {
+			const filters = compileFindFilters(input);
+			const offset = input.cursor === undefined ? (input.offset ?? 0) : 0;
+			const limit = findLimit(input) + offset;
 			// Weekly totals are a lookup in the nightly snapshot: no session scope.
 			if (input.source === "weekly")
 				try {
-					const found = await findWeeklyTotals(executor, scope, input);
+					const found = skipLeading(
+						await findWeeklyTotals(executor, scope, { ...input, limit }),
+						offset,
+					);
 					return {
-						output: fitFindOutput(found.output, (index) =>
-							cursorAt(input, found.keys, index),
+						output: fitFindOutput(
+							found.output,
+							(index) => cursorAt(input, found.keys, index),
+							input.verbosity,
 						),
 						owners: found.owners,
 					};
@@ -269,13 +320,30 @@ export function findAnalysisWithOwners(
 				const pullRequest = touches
 					? { touches, published: touches.edges }
 					: undefined;
+				const tree = input.parentSessionId
+					? sessionTree(
+							await query(
+								executor,
+								SessionLinkRowSchema,
+								buildSessionLinksStatement(scope),
+							),
+							input.parentSessionId,
+						)
+					: [];
 				const resolved = await resolveScope(
 					executor,
 					scope,
-					input,
+					input.parentSessionId && tree.length === 0
+						? { ...input, sessionId: input.parentSessionId }
+						: input,
 					env.batchRecords,
-					pullRequest && pullRequestPick(pullRequest.published, input),
+					pullRequest
+						? pullRequestPick(pullRequest.published, input)
+						: tree.length > 0
+							? treePick(tree, input)
+							: undefined,
 				);
+				placeInTree(resolved, tree);
 				// source=git also reads CLI evidence of sessions without an indexed
 				// transcript; their owners own the result too.
 				owners = [
@@ -291,15 +359,23 @@ export function findAnalysisWithOwners(
 						batch.sessions.map((session) => [session.session_id, session]),
 					),
 				);
+				const header = newHeader(resolved);
 				const context: FindContext = {
 					executor,
 					input,
-					limit: findLimit(input),
+					limit,
 					order,
 					after,
 					scope: resolved,
-					header: newHeader(resolved),
-					runs: await loadScopeRuns(executor, resolved, input, sessions),
+					header,
+					runs: await loadScopeRuns(
+						executor,
+						resolved,
+						input,
+						sessions,
+						filters?.view === "runs" ? { filters, header, scope } : undefined,
+						computedRunFactsOf(env.executor),
+					),
 					sessions,
 					github,
 					edges,
@@ -307,6 +383,8 @@ export function findAnalysisWithOwners(
 					ownerId: scope.userId,
 					unboundExecutor: env.executor,
 					pullRequest,
+					filters,
+					seed: randomSeedOf(after),
 					scan: {
 						rows: 0,
 						bytes: 0,
@@ -317,13 +395,23 @@ export function findAnalysisWithOwners(
 					},
 				};
 				addCoverage(context);
-				const found = await findBySource(context);
+				if (tree.length > 0)
+					header.notes.push(
+						`parentSessionId=${input.parentSessionId}: the session and the ${tree.length - 1} sessions linked below it in session_links (subagent threads, forks, delegations), whatever their date unless from or to is given; parentSessionId and depth place each in that tree`,
+					);
+				const found = skipLeading(await findBySource(context), offset);
 				finishHeader(context);
-				const output = fitFindOutput(found.output, (index) =>
-					cursorAt(input, found.keys, index),
+				const output = fitFindOutput(
+					found.output,
+					(index) => cursorAt(input, found.keys, index),
+					input.verbosity,
 				);
 				return { output, owners };
 			} catch (error) {
+				if (isRegexError(error))
+					throw new ORPCError("BAD_REQUEST", {
+						message: `filters: ClickHouse could not compile a regex (re2 syntax: no lookaround or backreferences; (?i) for case-insensitive): ${error instanceof Error ? error.message.slice(0, 300) : ""}`,
+					});
 				if (!isAnalysisWorkLimit(error)) throw error;
 				return { output: emptyResult(input, workLimitHeader(input)), owners };
 			}
@@ -345,59 +433,189 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 		case "weekly":
 			throw new Error("weekly totals are read without a session scope");
 		case "calls":
+			if (isSessionsBehind(context.input)) return findCallSessions(context);
 			return context.input.groupBy
 				? findCallGroups(context, context.input.groupBy as CallGroupBy)
 				: findCalls(context);
 	}
 }
 
-/** The scope's command-carrying calls, newest first, with their command identity. */
-async function findCalls(context: FindContext): Promise<FoundPage> {
-	const { input, scope } = context;
-	const after = context.after as
-		| readonly [number, string, string, number, number]
-		| undefined;
-	let rows: CallRow[] = [];
-	const keyOf = (row: CallRow): CursorKey => [
-		row.at_ms,
-		row.session_id,
-		row.agent_id,
-		row.record_idx,
-		row.block_idx,
-	];
+async function findCallSessions(context: FindContext): Promise<FoundPage> {
+	const { input, scope, header } = context;
+	const behind = new SessionsBehind();
+	let matched = 0;
+	let minutes = 0;
 	for (const batch of scope.batches) {
 		const refs = batchRefs(input, batch);
 		if (refs?.length === 0) continue;
-		rows.push(
-			...(await query(
-				context.executor,
-				CallRowSchema,
-				buildCallRowsStatement(
-					{ scope: batch.scope, generations: batch.generations, input, refs },
-					after,
-					context.limit + 1,
-				),
-			)),
+		const rows = await query(
+			context.executor,
+			CallGroupRowSchema,
+			buildCallGroupsStatement(
+				{
+					scope: batch.scope,
+					generations: batch.generations,
+					input,
+					refs,
+					filters: context.filters,
+				},
+				"session",
+			),
 		);
-		// Each batch returns its newest calls after the cursor; the newest of all are among them.
-		rows = takePage(rows, keyOf, CALL_ORDER, undefined, context.limit + 1).page;
+		for (const row of rows) {
+			matched += row.calls;
+			minutes += row.call_minutes;
+			const example = [...row.examples].sort(
+				([left], [right]) => left - right,
+			)[0]?.[1];
+			if (!example) continue;
+			const [sessionId, agentId, turn, record] = example;
+			behind.add({
+				ref: { sessionId, agentId, turn },
+				record,
+				atMs: row.first_ms,
+				lastMs: row.last_ms,
+				rows: row.calls,
+				failedCalls: row.failed_calls,
+				callMinutes: row.call_minutes,
+				runs: row.runs.flatMap(([position, agent, runTurn]) => {
+					const session = batch.generations[position - 1]?.sessionId;
+					return session
+						? [runKey({ sessionId: session, agentId: agent, turn: runTurn })]
+						: [];
+				}),
+			});
+		}
+	}
+	header.matchedCalls = matched;
+	header.groupCallTime = roundMinutes(minutes);
+	if (context.filters) header.notes.push(callFilterNote(context.filters));
+	return sessionsPage(context, behind, "hits", true);
+}
+
+function sessionsPage(
+	context: FindContext,
+	behind: SessionsBehind,
+	failedCallsOf: FailedCallsOf,
+	timed: boolean,
+): FoundPage {
+	const { output, keys, more } = behind.page({
+		after: context.after,
+		limit: context.limit,
+		runs: context.runs,
+		sessions: context.sessions,
+		failedCallsOf,
+		timed,
+	});
+	return paged(context, keys, more, {
+		source: "sessions",
+		of: context.input.source as (typeof SESSIONS_BEHIND_SOURCES)[number],
+		header: context.header,
+		...output,
+	});
+}
+
+async function findCalls(context: FindContext): Promise<FoundPage> {
+	const { input, scope, header } = context;
+	const random = input.sort === "random";
+	const keyOf = (row: CallRow): CursorKey =>
+		random
+			? [
+					context.seed,
+					padUInt64(row.random_key),
+					row.session_id,
+					row.agent_id,
+					row.record_idx,
+					row.block_idx,
+				]
+			: [
+					row.at_ms,
+					row.session_id,
+					row.agent_id,
+					row.record_idx,
+					row.block_idx,
+				];
+	const position = callPosition(context);
+	let rows: CallRow[] = [];
+	let matched = 0;
+	let minutes = 0;
+	for (const batch of scope.batches) {
+		const refs = batchRefs(input, batch);
+		if (refs?.length === 0) continue;
+		const found = await query(
+			context.executor,
+			CallRowSchema,
+			buildCallRowsStatement(
+				{
+					scope: batch.scope,
+					generations: batch.generations,
+					input,
+					refs,
+					filters: context.filters,
+				},
+				position,
+				context.limit + 1,
+			),
+		);
+		matched += found[0]?.matched_calls ?? 0;
+		minutes += found[0]?.matched_minutes ?? 0;
+		rows.push(...found);
+		rows = takePage(
+			rows,
+			keyOf,
+			context.order,
+			undefined,
+			context.limit + 1,
+		).page;
 	}
 	const { page, more } = takePage(
 		rows,
 		keyOf,
-		CALL_ORDER,
-		after,
+		context.order,
+		context.after,
 		context.limit,
 	);
+	header.matchedCalls = matched;
+	header.groupCallTime = roundMinutes(minutes);
+	if (context.filters) header.notes.push(callFilterNote(context.filters));
 	return paged(context, page.map(keyOf), more, {
 		source: "calls",
-		header: context.header,
+		header,
 		rows: page.map((row) => toCall(row, context.sessions.get(row.session_id))),
 	});
 }
 
+function callPosition(context: FindContext): CallPosition {
+	const after = context.after;
+	if (context.input.sort === "random")
+		return {
+			order: "random",
+			seed: context.seed,
+			after: after
+				? [
+						unpadUInt64(String(after[1])),
+						String(after[2]),
+						String(after[3]),
+						Number(after[4]),
+						Number(after[5]),
+					]
+				: undefined,
+		};
+	return {
+		order: "time",
+		after: after as
+			| readonly [number, string, string, number, number]
+			| undefined,
+	};
+}
+
+function callFilterNote(filters: CompiledFilters): string {
+	return `filters (calls view, AND): ${filters.text}`;
+}
+
 interface CallBucket {
-	group: Omit<CallGroupResult, "normalized" | "examples">;
+	group: Omit<CallGroupResult, "normalized" | "examples" | "groupRunTime">;
+	runs: Set<string>;
 	/** Newest first: [last seen, batch index, session, agent, turn, record, block]. */
 	examples: (readonly [
 		number,
@@ -423,6 +641,8 @@ async function findCallGroups(
 	const buckets = new Map<string, CallBucket>();
 	let unkeyed = 0;
 	let uncounted = 0;
+	let matched = 0;
+	let minutes = 0;
 	for (const [index, batch] of scope.batches.entries()) {
 		const refs = batchRefs(input, batch);
 		if (refs?.length === 0) continue;
@@ -430,11 +650,19 @@ async function findCallGroups(
 			context.executor,
 			CallGroupRowSchema,
 			buildCallGroupsStatement(
-				{ scope: batch.scope, generations: batch.generations, input, refs },
+				{
+					scope: batch.scope,
+					generations: batch.generations,
+					input,
+					refs,
+					filters: context.filters,
+				},
 				groupBy,
 			),
 		);
 		for (const row of groups) {
+			matched += row.calls;
+			minutes += row.call_minutes;
 			if (row.key === null) {
 				unkeyed += row.calls;
 				continue;
@@ -453,7 +681,9 @@ async function findCallGroups(
 						failedCalls: 0,
 						firstSeen: new Date(row.first_ms).toISOString(),
 						lastSeen: new Date(row.last_ms).toISOString(),
+						groupCallTime: 0,
 					},
+					runs: new Set(),
 					examples: [],
 				};
 				buckets.set(row.key, bucket);
@@ -462,6 +692,12 @@ async function findCallGroups(
 			group.calls += row.calls;
 			group.sessions += row.sessions;
 			group.failedCalls += row.failed_calls;
+			group.groupCallTime = (group.groupCallTime ?? 0) + row.call_minutes;
+			for (const [position, agent, turn] of row.runs) {
+				const sessionId = batch.generations[position - 1]?.sessionId;
+				if (sessionId)
+					bucket.runs.add(runKey({ sessionId, agentId: agent, turn }));
+			}
 			const first = new Date(row.first_ms).toISOString();
 			const last = new Date(row.last_ms).toISOString();
 			if (first < group.firstSeen) group.firstSeen = first;
@@ -486,6 +722,9 @@ async function findCallGroups(
 		context.limit,
 	);
 	const texts = await callExamples(context, page);
+	header.matchedCalls = matched;
+	header.groupCallTime = roundMinutes(minutes);
+	if (context.filters) header.notes.push(callFilterNote(context.filters));
 	if (unkeyed)
 		header.notes.push(
 			groupBy === "commandFingerprint"
@@ -501,7 +740,7 @@ async function findCallGroups(
 	return paged(context, page.map(keyOf), more, {
 		source: "calls",
 		header,
-		groups: page.map(({ group, examples }) => {
+		groups: page.map(({ group, examples, runs }) => {
 			const shown = examples.flatMap(
 				([, , session, agent, turn, record, block]) => {
 					const text = texts.get(exampleKey(session, agent, record, block));
@@ -510,6 +749,13 @@ async function findCallGroups(
 			);
 			return {
 				...group,
+				groupCallTime: roundMinutes(group.groupCallTime ?? 0),
+				groupRunTime: roundMinutes(
+					[...runs].reduce(
+						(sum, key) => sum + (context.runs.get(key)?.active_minutes ?? 0),
+						0,
+					),
+				),
 				normalized:
 					groupBy === "commandFingerprint"
 						? (shown[0]?.text.normalized ?? null)
@@ -549,17 +795,47 @@ async function callExamples(
 	for (const [index, calls] of byBatch) {
 		const batch = context.scope.batches[index];
 		if (!batch) continue;
-		for (const row of await query(
-			context.executor,
-			CallExampleRowSchema,
-			buildCallExamplesStatement(batch.scope, batch.generations, calls),
-		))
-			texts.set(
-				exampleKey(row.session_id, row.agent_id, row.record_idx, row.block_idx),
-				row,
-			);
+		for (const chunk of exampleChunks(batch, calls))
+			for (const row of await query(
+				context.executor,
+				CallExampleRowSchema,
+				buildCallExamplesStatement(batch.scope, batch.generations, chunk),
+			))
+				texts.set(
+					exampleKey(
+						row.session_id,
+						row.agent_id,
+						row.record_idx,
+						row.block_idx,
+					),
+					row,
+				);
 	}
 	return texts;
+}
+
+export function exampleChunks<
+	T extends readonly [string, string, number, number],
+>(
+	batch: Pick<ScopeBatch, "scope" | "generations">,
+	calls: readonly T[],
+): T[][] {
+	const pinned = Object.values(
+		pinnedParams(batch.scope, batch.generations),
+	).reduce<number>(
+		(sum, value) =>
+			sum +
+			(Array.isArray(value) ? value : [value]).reduce<number>(
+				(bytes, item: string | number) => bytes + paramValueBytes(item),
+				0,
+			),
+		0,
+	);
+	const budget = Math.max(
+		1024,
+		MAX_CLICKHOUSE_URL_BYTES - EXAMPLE_URL_RESERVE - pinned,
+	);
+	return chunkByParamBytes(calls, (call) => [...call], budget);
 }
 
 function exampleKey(
@@ -602,6 +878,8 @@ function toCall(
 		commandSimhash: row.command_simhash,
 		failed: row.has_result ? row.failed : null,
 		exitCode: row.has_result ? row.exit_code : null,
+		callMinutes:
+			row.call_minutes === null ? null : roundMinutes(row.call_minutes),
 		parentSessionId: session?.parentSessionId ?? null,
 	};
 }
@@ -625,7 +903,9 @@ async function findGitEvents(context: FindContext): Promise<FoundPage> {
 		unindexed: scope.unindexed,
 		sessions,
 		runKeys:
-			input.refs?.length || input.model ? new Set(context.runs.keys()) : null,
+			input.refs?.length || input.model || context.filters
+				? new Set(context.runs.keys())
+				: null,
 		after: context.after,
 		order: context.order,
 		limit: context.limit,
@@ -852,6 +1132,44 @@ function pullRequestPick(
 	};
 }
 
+function treePick(
+	tree: readonly TreeSession[],
+	input: AnalysisFindInput,
+): SessionPick {
+	const days = tree.flatMap((session) =>
+		session.atMs === null
+			? []
+			: [new Date(session.atMs).toISOString().slice(0, 10)],
+	);
+	const fallback = defaultRange(input);
+	return {
+		sessions: tree.map(({ userId, sessionId }) => ({ userId, sessionId })),
+		range:
+			days.length > 0
+				? { from: days.reduce(minDay), to: fallback.to }
+				: fallback,
+	};
+}
+
+function placeInTree(scope: ResolvedScope, tree: readonly TreeSession[]): void {
+	if (tree.length === 0) return;
+	const places = new Map(tree.map((session) => [session.sessionId, session]));
+	const root = tree[0]?.sessionId;
+	if (!root) return;
+	for (const batch of scope.batches)
+		batch.sessions = batch.sessions.map((session) => {
+			const place = places.get(session.session_id);
+			return place
+				? {
+						...session,
+						parentSessionId: place.parentSessionId,
+						depth: place.depth,
+						rootSessionId: root,
+					}
+				: session;
+		});
+}
+
 function minDay(left: string, right: string): string {
 	return left < right ? left : right;
 }
@@ -900,22 +1218,44 @@ async function loadScopeRuns(
 	scope: ResolvedScope,
 	input: AnalysisFindInput,
 	sessions: ReadonlyMap<string, AnalysisSession>,
+	filtered?: { filters: CompiledFilters; header: Header; scope: AnalysisScope },
+	computed?: ComputedRunFacts,
 ): Promise<Map<string, RunRow>> {
 	const wanted = input.refs ? new Set(input.refs.map(runKey)) : undefined;
 	const runs = new Map<string, RunRow>();
-	for (const batch of scope.batches)
-		for (const row of await queryRunFacts(
-			executor,
-			batch.scope,
-			batch.generations,
-		)) {
+	let before = 0;
+	const facts = await loadRunFacts(executor, scope.batches, computed);
+	for (const [index, batch] of scope.batches.entries()) {
+		const matching = filtered
+			? new Set(
+					(
+						await query(
+							executor,
+							RunKeyRowSchema,
+							buildRunFilterStatement(
+								filtered.scope.organizationId,
+								batch,
+								filtered.filters,
+							),
+						)
+					).map((row) => runKey(rowRef(row))),
+				)
+			: undefined;
+		for (const row of facts.rows[index] ?? []) {
 			const key = runKey(rowRef(row));
 			if (wanted && !wanted.has(key)) continue;
+			before++;
+			if (matching && !matching.has(key)) continue;
 			const run = input.model
 				? runForModel(row, sessions.get(row.session_id), input.model)
 				: row;
 			if (run) runs.set(key, run);
 		}
+	}
+	if (filtered)
+		filtered.header.notes.push(
+			`filters (runs view, AND): ${filtered.filters.text}; ${runs.size} of ${before} runs match, and only they are counted here${input.source === "runs" ? "" : ` and only ${input.source === "tool" ? "failures" : "events"} in them are shown`}; a run the run index does not hold yet is left out`,
+		);
 	return runs;
 }
 
@@ -970,7 +1310,11 @@ function addCoverage({ runs, header, input }: FindContext): void {
 
 async function findRuns(context: FindContext): Promise<FoundPage> {
 	const { executor, input, scope } = context;
-	const keyOf = (row: RunRow) => runSortKey(row, input.sort);
+	const keyOf = (row: RunRow): CursorKey => {
+		if (input.sort !== "random") return runSortKey(row, input.sort);
+		const key = runKey(rowRef(row));
+		return [context.seed, randomRank(context.seed, key), key];
+	};
 	const { page: rows, more } = takePage(
 		[...context.runs.values()],
 		keyOf,
@@ -1079,6 +1423,7 @@ interface FailureBucket {
 async function findFailures(context: FindContext): Promise<FoundPage> {
 	const { input, scope } = context;
 	const buckets = new Map<string, FailureBucket>();
+	const behind = isSessionsBehind(input) ? new SessionsBehind() : null;
 	for (const batch of scope.batches)
 		await scanPages(
 			context,
@@ -1094,6 +1439,7 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 					exitCode: row.exit_code,
 				});
 				if (
+					(context.filters && !context.runs.has(runKey(rowRef(row)))) ||
 					(!input.includeNoise && cause.kind === "noise") ||
 					(input.toolGroup && row.tool_group !== input.toolGroup) ||
 					(input.commandClass && row.command_class !== input.commandClass) ||
@@ -1102,8 +1448,12 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 					(input.detail && cause.detail !== input.detail)
 				)
 					return;
-				const at = new Date(row.started_ms).toISOString();
 				const ref = rowRef(row);
+				if (behind) {
+					behind.add({ ref, record: row.record_idx, atMs: row.started_ms });
+					return;
+				}
+				const at = new Date(row.started_ms).toISOString();
 				const key = JSON.stringify([
 					row.tool_group,
 					cause.cause,
@@ -1133,7 +1483,9 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 				if (at < bucket.group.firstSeen) bucket.group.firstSeen = at;
 				if (at > bucket.group.lastSeen) bucket.group.lastSeen = at;
 				bucket.runs.set(runKey(ref), ref);
-				const command = normalize(row.command).slice(0, 200);
+				const normalized = normalize(row.command);
+				const command =
+					normalized.length > 200 ? `${normalized.slice(0, 199)}…` : normalized;
 				if (command)
 					bucket.commands.set(command, (bucket.commands.get(command) ?? 0) + 1);
 				if (bucket.group.examples.length < 5)
@@ -1146,6 +1498,7 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 					});
 			},
 		);
+	if (behind) return sessionsPage(context, behind, "rows", false);
 	const keyOf = ({ group }: FailureBucket) => [
 		group.count,
 		group.cause,
@@ -1195,6 +1548,7 @@ async function findReactions(context: FindContext): Promise<FoundPage> {
 	);
 	let events: TimedEvent[] = [];
 	let following = 0;
+	const behind = isSessionsBehind(input) ? new SessionsBehind() : null;
 	for (const batch of scope.batches)
 		await scanPages(
 			context,
@@ -1204,6 +1558,19 @@ async function findReactions(context: FindContext): Promise<FoundPage> {
 				for (const event of reactionEvents(row)) {
 					const count = counts.get(event.type);
 					if (!count) continue;
+					if (context.filters && !context.runs.has(runKey(event.eventRef)))
+						continue;
+					if (behind) {
+						const { sessionId, agentId, turn, record } = event.eventRef;
+						const ref = { sessionId, agentId, turn };
+						behind.add({
+							ref,
+							record,
+							atMs: Date.parse(event.at),
+							runs: [runKey(event.originRef ?? ref)],
+						});
+						continue;
+					}
 					count.count++;
 					count.sessions.add(event.eventRef.sessionId);
 					if (!isAfter(eventSortKey(event), context.after, context.order))
@@ -1215,6 +1582,7 @@ async function findReactions(context: FindContext): Promise<FoundPage> {
 					events = newestEvents(events, context.limit);
 			},
 		);
+	if (behind) return sessionsPage(context, behind, "runs", false);
 	events = newestEvents(events, context.limit);
 	const origins = context.runs;
 	return paged(context, events.map(eventSortKey), following > events.length, {
@@ -1402,6 +1770,14 @@ function emptyResult(
 	input: AnalysisFindInput,
 	header: Header,
 ): AnalysisFindOutput {
+	if (isSessionsBehind(input))
+		return {
+			source: "sessions",
+			of: input.source as (typeof SESSIONS_BEHIND_SOURCES)[number],
+			header,
+			sessionTotals: { sessions: 0, rows: 0, firstSeen: null, lastSeen: null },
+			sessions: [],
+		};
 	if (input.source === "tool") return { source: "tool", header, groups: [] };
 	if (input.source === "user")
 		return { source: "user", header, events: [], groups: [] };
@@ -1459,6 +1835,7 @@ function runSortKey(row: RunRow, sort: AnalysisFindInput["sort"]): CursorKey {
 		costUsd: "cost",
 		failedCalls: "failed_calls",
 		rawChars: "raw_chars",
+		random: "started_ms",
 	} as const satisfies Record<AnalysisFindInput["sort"], keyof RunRow>;
 	return [row[column[sort]], runKey(rowRef(row))];
 }
@@ -1478,13 +1855,19 @@ function eventSortKey(event: TimedEvent): CursorKey {
 }
 
 function cursorOrder(input: AnalysisFindInput): CursorOrder {
+	if (isSessionsBehind(input)) return SESSIONS_BEHIND_ORDER;
 	if (input.source === "tool") return TOOL_GROUP_ORDER;
 	if (input.source === "user") return EVENT_ORDER;
 	if (input.source === "git") return GIT_ORDER;
 	if (input.source === "weekly") return weeklyOrder(input.groupBy);
 	if (input.source === "calls")
-		return input.groupBy ? RUN_GROUP_ORDER : CALL_ORDER;
-	return input.groupBy ? RUN_GROUP_ORDER : RUN_ORDER;
+		return input.groupBy
+			? RUN_GROUP_ORDER
+			: input.sort === "random"
+				? RANDOM_CALL_ORDER
+				: CALL_ORDER;
+	if (input.groupBy) return RUN_GROUP_ORDER;
+	return input.sort === "random" ? RANDOM_RUN_ORDER : RUN_ORDER;
 }
 
 function cursorAt(

@@ -317,3 +317,198 @@ export function commandColumnsSql(): string {
 		${commandFingerprintSql("command_normalized")} AS command_fingerprint,
 		${commandSimhashSql("command_normalized")} AS command_simhash`;
 }
+
+const FAMILY_SKIPPED = [
+	"cd",
+	"pushd",
+	"popd",
+	"export",
+	"set",
+	"unset",
+	"source",
+	".",
+	":",
+	"true",
+	"false",
+	"echo",
+	"printf",
+	"for",
+	"while",
+	"until",
+	"if",
+	"then",
+	"else",
+	"elif",
+	"fi",
+	"do",
+	"done",
+	"case",
+	"esac",
+	"exit",
+	"return",
+	"local",
+	"declare",
+	"read",
+	"test",
+	"[",
+	"[[",
+	"trap",
+];
+
+const FAMILY_TRIMMERS = [
+	"tail",
+	"head",
+	"tee",
+	"cat",
+	"grep",
+	"egrep",
+	"rg",
+	"sed",
+	"awk",
+	"sort",
+	"uniq",
+	"wc",
+	"cut",
+	"tr",
+	"xargs",
+	"jq",
+	"less",
+	"more",
+	"column",
+	"nl",
+];
+
+const FAMILY_SCRIPT_RUNNERS = ["bun", "npm", "pnpm", "yarn"];
+const FAMILY_SCRIPT_VERBS = ["run", "exec", "x", "dlx"];
+const FAMILY_PACKAGE_RUNNERS = ["npx", "bunx", "pnpx", "uvx"];
+const FAMILY_SUBCOMMANDS = [
+	"git",
+	"gh",
+	"bun",
+	"npm",
+	"pnpm",
+	"yarn",
+	"cargo",
+	"docker",
+	"uv",
+	"pip",
+	"pip3",
+	"go",
+	"deno",
+	"turbo",
+	"make",
+	"kubectl",
+	"brew",
+	"vercel",
+	"wrangler",
+];
+const FAMILY_THIRD_WORD = ["gh"];
+const FAMILY_INTERPRETERS = [
+	"node",
+	"python",
+	"python3",
+	"bash",
+	"sh",
+	"zsh",
+	"tsx",
+	"ts-node",
+	"ruby",
+	"perl",
+];
+
+const FAMILY_HEREDOC = "(?s)<<.*$";
+const FAMILY_QUOTED = `'[^']*'|"[^"]*"|'[^']*$|"[^"]*$`;
+const FAMILY_TRIM = String.raw`(^|[^|])\|\s*(?:${FAMILY_TRIMMERS.join("|")})(?:\s[^|&;\n]*)?(\||&|;|\n|$)`;
+const FAMILY_SPLIT = String.raw`&&|\|\||[;|\n]`;
+const FAMILY_REDIRECT = String.raw`\s*(?:[0-9]*>>?|&>|<)\s*(?:&[0-9-]+|\S+)`;
+const FAMILY_DIR_FLAG = String.raw`\s(?:--cwd|--prefix|--dir|--filter|-C)(?:=\S+|\s+\S+)`;
+const FAMILY_LEADING = String.raw`^\s*(?:(?:[A-Za-z_][A-Za-z0-9_]*=\S*|env|time|nohup|exec|command|sudo|timeout\s+\S+)\s+)*`;
+const FAMILY_PROGRAM = "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$";
+const FAMILY_NAME = "^[A-Za-z@][A-Za-z0-9:@_-]*$";
+const FAMILY_FILE = "^[A-Za-z0-9_.@+/-]+$";
+
+function familyOfWords(words: readonly string[]): string {
+	const program = (words[0] ?? "").replace(/^.*\//u, "");
+	if (!new RegExp(FAMILY_PROGRAM, "u").test(program)) return "";
+	if (FAMILY_SKIPPED.includes(program)) return "";
+	const name = (word: string | undefined) =>
+		word !== undefined && new RegExp(FAMILY_NAME, "u").test(word) ? word : "";
+	const join = (...parts: string[]) =>
+		parts.filter((part) => part !== "").join(" ");
+	const second = name(words[1]);
+	if (
+		FAMILY_SCRIPT_RUNNERS.includes(program) &&
+		FAMILY_SCRIPT_VERBS.includes(second)
+	)
+		return join(program, second, name(words[2]));
+	if (FAMILY_PACKAGE_RUNNERS.includes(program))
+		return join(program, second, second ? name(words[2]) : "");
+	if (FAMILY_THIRD_WORD.includes(program))
+		return join(program, second, second ? name(words[2]) : "");
+	if (FAMILY_SUBCOMMANDS.includes(program)) return join(program, second);
+	if (FAMILY_INTERPRETERS.includes(program))
+		return join(
+			program,
+			new RegExp(FAMILY_FILE, "u").test(words[1] ?? "")
+				? (words[1] ?? "").replace(/^.*\//u, "")
+				: "",
+		);
+	return program;
+}
+
+/**
+ * The command families of a shell command: each statement of a chain (`&&`,
+ * `||`, `;`, `|`) without its directory change, environment assignments,
+ * wrappers, redirects, directory flags (`--cwd x`, `-C x`) and output trims
+ * (`| tail -20`), reduced to its program and subcommand, the script a package
+ * manager runs (`bun run check-types`), the tool a package runner starts and
+ * its subcommand (`bunx biome check`), or the script an interpreter runs
+ * (`node build.mjs`). Flags are dropped; quoted strings never split a chain.
+ */
+export function commandFamilies(command: string): string[] {
+	const text = command
+		.replace(/\\\n/gu, " ")
+		.replace(/<<[\s\S]*$/u, "")
+		.replace(new RegExp(FAMILY_QUOTED, "gu"), "'Q'")
+		.replace(/[(){}]/gu, " ")
+		.replace(new RegExp(FAMILY_TRIM, "gu"), "$1$2")
+		.replace(new RegExp(FAMILY_TRIM, "gu"), "$1$2");
+	const families = text.split(new RegExp(FAMILY_SPLIT, "u")).map((segment) => {
+		const cleaned = segment
+			.replace(new RegExp(FAMILY_REDIRECT, "gu"), "")
+			.replace(new RegExp(FAMILY_DIR_FLAG, "gu"), "")
+			.replace(new RegExp(FAMILY_LEADING, "u"), "");
+		return familyOfWords(
+			cleaned
+				.split(/\s+/u)
+				.filter((word) => word !== "" && !word.startsWith("-")),
+		);
+	});
+	return [...new Set(families.filter((family) => family !== ""))];
+}
+
+/** `commandFamilies` as a ClickHouse Array(String) expression over `command`. */
+export function commandFamiliesSql(command: string): string {
+	const list = (values: readonly string[]) => `[${values.map(lit).join(", ")}]`;
+	const joined = `replaceRegexpOne(replaceRegexpAll(${command}, ${lit(String.raw`\\\n`)}, ' '), ${lit(FAMILY_HEREDOC)}, '')`;
+	const quoted = `replaceRegexpAll(replaceRegexpAll(${joined}, ${lit(FAMILY_QUOTED)}, ${lit("'Q'")}), '[(){}]', ' ')`;
+	const trimmed = `replaceRegexpAll(replaceRegexpAll(${quoted}, ${lit(FAMILY_TRIM)}, ${lit("\\1\\2")}), ${lit(FAMILY_TRIM)}, ${lit("\\1\\2")})`;
+	const cleaned = `replaceRegexpOne(replaceRegexpAll(replaceRegexpAll(s, ${lit(FAMILY_REDIRECT)}, ''), ${lit(FAMILY_DIR_FLAG)}, ''), ${lit(FAMILY_LEADING)}, '')`;
+	const words = `arrayFilter(w -> NOT startsWith(w, '-'), splitByWhitespace(${cleaned}))`;
+	const base = (word: string) => `replaceRegexpOne(${word}, '^.*/', '')`;
+	const name = (word: string) =>
+		`if(match(${word}, ${lit(FAMILY_NAME)}), ${word}, '')`;
+	const join = (...parts: string[]) =>
+		`arrayStringConcat(arrayFilter(p -> p != '', [${parts.join(", ")}]), ' ')`;
+	const program = base("ws[1]");
+	const second = name("ws[2]");
+	const family = `multiIf(
+			NOT match(${program}, ${lit(FAMILY_PROGRAM)}) OR has(${list(FAMILY_SKIPPED)}, ${program}), '',
+			has(${list(FAMILY_SCRIPT_RUNNERS)}, ${program}) AND has(${list(FAMILY_SCRIPT_VERBS)}, ${second}), ${join(program, second, name("ws[3]"))},
+			has(${list([...FAMILY_PACKAGE_RUNNERS, ...FAMILY_THIRD_WORD])}, ${program}), ${join(program, second, `if(${second} = '', '', ${name("ws[3]")})`)},
+			has(${list(FAMILY_SUBCOMMANDS)}, ${program}), ${join(program, second)},
+			has(${list(FAMILY_INTERPRETERS)}, ${program}), ${join(program, `if(match(ws[2], ${lit(FAMILY_FILE)}), ${base("ws[2]")}, '')`)},
+			${program})`;
+	return `arrayDistinct(arrayFilter(f -> f != '', arrayMap(ws -> ${family},
+		arrayMap(s -> ${words}, splitByRegexp(${lit(FAMILY_SPLIT)}, ${trimmed})))))`;
+}

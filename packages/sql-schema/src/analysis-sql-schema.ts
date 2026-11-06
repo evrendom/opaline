@@ -133,3 +133,25 @@ export const analysisVisibilitySync = pgTable(
 		index("analysis_visibility_sync_organization_idx").on(table.organizationId),
 	],
 );
+
+export const analysisCheck = pgTable(
+	"analysis_check",
+	{
+		id: text("id").primaryKey(),
+		organizationId: text("organization_id")
+			.notNull()
+			.references(() => organization.id, { onDelete: "cascade" }),
+		authorId: text("author_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		definition: jsonb("definition").notNull(),
+		enabled: boolean("enabled").default(false).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("analysis_check_owner_idx").on(table.organizationId, table.authorId),
+	],
+);

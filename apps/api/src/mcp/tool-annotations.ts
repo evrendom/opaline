@@ -6,6 +6,7 @@ export interface McpToolAnnotations {
 	readonly readOnlyHint: boolean;
 	readonly destructiveHint: boolean;
 	readonly openWorldHint: boolean;
+	readonly idempotentHint: boolean;
 }
 
 /** Reads the caller's Opaline workspace data and changes nothing in it. */
@@ -13,6 +14,7 @@ export const READ_ONLY: McpToolAnnotations = {
 	readOnlyHint: true,
 	destructiveHint: false,
 	openWorldHint: false,
+	idempotentHint: true,
 };
 
 /**
@@ -24,6 +26,7 @@ export const WRITES_OWN_RECORDS: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	openWorldHint: false,
+	idempotentHint: false,
 };
 
 /**
@@ -34,6 +37,7 @@ export const REPLACES_OWN_SETTING: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: true,
 	openWorldHint: false,
+	idempotentHint: false,
 };
 
 /**
@@ -45,6 +49,7 @@ export const SHARES_WITH_WORKSPACE: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	openWorldHint: true,
+	idempotentHint: false,
 };
 
 /**
@@ -56,6 +61,7 @@ export const SAVES_AND_INDEXES: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	openWorldHint: true,
+	idempotentHint: false,
 };
 
 /**
@@ -67,4 +73,5 @@ export const SENDS_RUN_NOTES: McpToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
 	openWorldHint: true,
+	idempotentHint: false,
 };

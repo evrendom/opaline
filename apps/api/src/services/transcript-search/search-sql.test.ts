@@ -17,7 +17,11 @@ import {
 import { createSearchAccess } from "./access.js";
 import type { TranscriptEmbedder } from "./config.js";
 import { createMemoryEmbeddingQuota } from "./quota.js";
-import { createSqlSearchFunction, searchTranscripts } from "./search.js";
+import {
+	createSqlSearchFunction,
+	SEARCH_NOT_EVIDENCE,
+	searchTranscripts,
+} from "./search.js";
 
 /** Every agent query gets a slot at once. */
 const unlimitedSlots: AgentQueryLimiter = {
@@ -179,6 +183,9 @@ test("search('…') joined to runs runs the server's search statement in its pla
 	expect(sent?.query).not.toContain("flaky login");
 	expect(sent?.query).not.toContain("search(");
 	expect(sent?.query).toContain("rudel.transcript_chunk_hits");
+	expect(sent?.query).toContain("rudel.transcript_records");
+	expect(sent?.query).toContain("text ILIKE {opaline_search0_pattern:String}");
+	expect(sent?.query).not.toContain(" AS visible");
 	expect(sent?.query).toContain("{opaline_search0_text:String}");
 	expect(sent?.query).toContain(") AS s JOIN (");
 	expect(sent?.query).not.toContain("{opaline_member:String}");
@@ -190,6 +197,18 @@ test("search('…') joined to runs runs the server's search statement in its pla
 		opaline_search0_exact: 1,
 		opaline_search0_since: "2026-09-12 12:00:00.000",
 		opaline_search0_kinds: [],
+		opaline_search0_pattern: "%flaky login%",
+		opaline_search0_hide_injected: 1,
+		opaline_search0_record_kinds: [
+			"user_prompt",
+			"assistant_text",
+			"reasoning",
+			"tool_call",
+			"tool_result",
+			"file_change",
+			"injected_context",
+			"compaction",
+		],
 	});
 	expect(embedder && "texts" in embedder ? embedder.texts : []).toEqual([
 		"flaky login",
@@ -216,6 +235,7 @@ test("held to their own sessions, a member's search reads only theirs; each call
 	expect(sent?.query_params).toMatchObject({
 		opaline_member: "member-1",
 		opaline_search0_text: "--legacy",
+		opaline_search0_pattern: "%--legacy%",
 		opaline_search0_meaning: 0,
 		opaline_search0_exact: 1,
 		opaline_search0_since: "2026-07-14 12:00:00.000",
@@ -248,7 +268,8 @@ test("search() takes literal arguments in FROM or JOIN only, with a known mode a
 	expect(await refused("SELECT * FROM search('flaky', 'fuzzy')")).toMatchObject(
 		{
 			kind: "recoverable",
-			message: "search() mode must be hybrid, meaning or exact, not fuzzy.",
+			message:
+				"search() mode must be hybrid, meaning, exact or regex, not fuzzy.",
 		},
 	);
 	expect(
@@ -497,7 +518,7 @@ test("the search tool counts coverage once for a window, not with every search, 
 	expect(JSON.stringify(second)).not.toContain(TOKEN);
 });
 
-test("a workspace without a paid plan is told search is on paid plans; its searches embed nothing and find only exact strings indexed before", async () => {
+test("a workspace without a paid plan is told search by meaning is on paid plans; its searches embed nothing and find exact strings in every session", async () => {
 	const { env, statements, embedder, quota, access } = environment({
 		paid: [],
 	});
@@ -552,8 +573,214 @@ test("a workspace without a paid plan is told search is on paid plans; its searc
 			access,
 		},
 	);
-	expect(exact.ok && exact.result.notices[0]).toBe(
-		"search is available on paid plans: this workspace's uploads are not indexed for search; only sessions indexed before can match.",
-	);
+	expect(exact.ok && exact.result.notices).toEqual([SEARCH_NOT_EVIDENCE]);
 	expect(embedder && "texts" in embedder ? embedder.texts : []).toEqual([]);
+});
+
+test("search('…', 'regex') matches records with RE2, binds the pattern as written and embeds nothing", async () => {
+	const { env, statements, embedder } = environment();
+
+	ok(
+		await runSql(
+			teammate,
+			{
+				query:
+					"SELECT s.run_id FROM search('gh pr (create|edit)', 'regex', 90) AS s",
+				title: "PR commands",
+			},
+			env,
+		),
+	);
+
+	const sent = agentStatement(statements);
+	expect(sent?.query).toContain(
+		"match(text, {opaline_search0_pattern:String})",
+	);
+	expect(sent?.query).not.toContain("ILIKE");
+	expect(sent?.query_params).toMatchObject({
+		opaline_search0_pattern: "gh pr (create|edit)",
+		opaline_search0_meaning: 0,
+		opaline_search0_exact: 1,
+		opaline_search0_since: "2026-07-14 12:00:00.000",
+	});
+	expect(embedder && "texts" in embedder ? embedder.texts : []).toEqual([]);
+});
+
+test("a regex may be 800 characters, any other text 500; longer is refused before anything is read", async () => {
+	const { env, statements } = environment();
+	const long = (length: number) => `a${"b".repeat(length - 1)}`;
+
+	expect(
+		failure(
+			await runSql(
+				teammate,
+				{
+					query: `SELECT * FROM search('${long(801)}', 'regex') AS s`,
+					title: "x",
+				},
+				env,
+			),
+		).message,
+	).toStartWith("search() takes the text to find (2 to 500 characters, 800");
+	ok(
+		await runSql(
+			teammate,
+			{
+				query: `SELECT * FROM search('${long(800)}', 'regex') AS s`,
+				title: "x",
+			},
+			env,
+		),
+	);
+	expect(
+		failure(
+			await runSql(
+				teammate,
+				{
+					query: `SELECT * FROM search('${long(501)}', 'exact') AS s`,
+					title: "x",
+				},
+				env,
+			),
+		).kind,
+	).toBe("recoverable");
+	expect(
+		statements.filter((statement) => statement.query.includes("_records AS")),
+	).toHaveLength(1);
+});
+
+function toolEnv(
+	executor: ClickHouseExecutor,
+	parts: ReturnType<typeof environment>,
+) {
+	return {
+		executor,
+		quota: parts.quota,
+		sqlQuota: parts.env.quota,
+		limiter: unlimitedSlots,
+		embedderFor: () => parts.embedder,
+		access: parts.access,
+		now: () => new Date("2026-10-12T12:00:00.000Z"),
+	};
+}
+
+test("the search tool reads every record of the window, hides injected context unless asked, and reports partly kept sessions and hidden matches", async () => {
+	const parts = environment({ paid: ["ws-records"] });
+	const statements: ClickHouseStatement[] = [];
+	const row = (runId: string, visible: number) => ({
+		run_id: runId,
+		session_id: "s1",
+		agent_id: "",
+		turn_idx: 2,
+		started_at: "2026-10-11 09:00:00.000",
+		score: visible ? 0.016393 : 0,
+		why: visible ? "exact ×1 in tool_call" : "",
+		snippet: visible ? "bun run release --dry" : "",
+		visible,
+		partial_sessions: 3,
+		hidden_matches: 7,
+		hidden_runs: 5,
+		exact_runs: 1,
+		exact_sessions: 1,
+	});
+	const executor: ClickHouseExecutor = {
+		...parts.env.executor,
+		query: async <T>(statement: ClickHouseStatement) => {
+			statements.push(statement);
+			return (
+				statement.query.includes("_records AS")
+					? [row("u/claude_code/s1//4", 1), row("u/claude_code/s1//9", 0)]
+					: [
+							{
+								sessions: 12,
+								scanned: 12,
+								indexed: 0,
+								pending: 0,
+								truncated: 0,
+								unscanned_until: "1970-01-01",
+							},
+						]
+			) as T[];
+		},
+	};
+	const caller: SqlCaller = { ...teammate, workspaceId: "ws-records" };
+
+	const outcome = await searchTranscripts(
+		caller,
+		{
+			text: "release",
+			mode: "exact",
+			filters: { kinds: ["tool_call"], includeInjected: true },
+		},
+		toolEnv(executor, parts),
+	);
+	if (!outcome.ok) throw new Error(outcome.error.message);
+
+	const search = statements.find((s) => s.query.includes("_records AS"));
+	expect(search?.query).toContain(" AS visible");
+	expect(search?.query).toContain("LIMIT 100000");
+	expect(search?.query_params).toMatchObject({
+		opaline_search_pattern: "%release%",
+		opaline_search_record_kinds: ["tool_call"],
+		opaline_search_hide_injected: 0,
+	});
+	expect(outcome.result.results.map((result) => result.runId)).toEqual([
+		"u/claude_code/s1//4",
+	]);
+	expect(outcome.result).toMatchObject({
+		mode: "exact",
+		coverage: { sessions: 12, searched: 12, partial: 3, indexed: 0 },
+		exactMatches: { runs: 1, sessions: 1 },
+		hiddenInjected: { matches: 7, runs: 5 },
+	});
+	expect(outcome.result.notices).toEqual([
+		"partly searched: 3 searched sessions have records too long to keep whole (long tool outputs or files); only their first 64K and last 1K characters are searched, so a match in the middle is unknown, not absent.",
+		SEARCH_NOT_EVIDENCE,
+	]);
+});
+
+test("a regex RE2 cannot compile and a search over the read limits come back as recoverable errors", async () => {
+	const parts = environment({ paid: ["ws-regex"] });
+	const failing = (message: string): ClickHouseExecutor => ({
+		...parts.env.executor,
+		query: async () => {
+			throw new Error(message);
+		},
+	});
+	const caller: SqlCaller = { ...teammate, workspaceId: "ws-regex" };
+
+	const regex = await searchTranscripts(
+		caller,
+		{ text: "gh pr (create", mode: "regex" },
+		toolEnv(
+			failing(
+				"OptimizedRegularExpression: cannot compile re2: gh pr (create, error: missing ): gh pr (create. Look at https://github.com/google/re2/wiki/Syntax (CANNOT_COMPILE_REGEXP)",
+			),
+			parts,
+		),
+	);
+	expect(regex).toEqual({
+		ok: false,
+		error: expect.objectContaining({
+			kind: "recoverable",
+			message: "The regex does not compile in RE2: missing ): gh pr (create.",
+		}),
+	});
+	const slow = await searchTranscripts(
+		{ ...caller, workspaceId: "ws-regex-slow" },
+		{ text: "release", mode: "exact" },
+		toolEnv(
+			failing("Timeout exceeded: elapsed 10.2 seconds (TIMEOUT_EXCEEDED)"),
+			parts,
+		),
+	);
+	expect(slow.ok || slow.error.fix).toStartWith("Narrow filters.since");
+	const long = await searchTranscripts(
+		caller,
+		{ text: "x".repeat(501), mode: "exact" },
+		toolEnv(failing("unreachable"), parts),
+	);
+	expect(long.ok || long.error.message).toBe(
+		"text is at most 500 characters for mode exact.",
+	);
 });

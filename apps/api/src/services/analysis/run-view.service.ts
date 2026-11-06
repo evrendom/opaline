@@ -186,6 +186,12 @@ export async function openRun(
 		phaseRule: CURRENT_PHASE_RULE.version,
 		truncated: rendered.truncated,
 		text: located + rendered.text,
+		ref: {
+			sessionId: run.address.sessionId,
+			agentId: run.address.agentId,
+			turn: run.row.turn_idx,
+		},
+		view: { ...run.view },
 	};
 }
 

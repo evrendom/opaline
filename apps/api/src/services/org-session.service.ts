@@ -1,5 +1,6 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
 import { FINDING_RUNS_TABLE } from "@rudel/ch-schema/finding-runs";
+import { MCP_TOOL_CALLS_TABLE } from "@rudel/ch-schema/mcp-tool-calls";
 import {
 	RUN_SETUP_TABLE,
 	SETUP_TEXTS_TABLE,
@@ -270,6 +271,7 @@ export function getClickHouseSessionPurgePlans(
 		// Findings' cited runs, by the run's owner. The rows of analyses the
 		// account wrote or whose deletion it causes go in purgeFindingImpact.
 		{ column, table: FINDING_RUNS_TABLE },
+		{ column, table: MCP_TOOL_CALLS_TABLE },
 	];
 }
 

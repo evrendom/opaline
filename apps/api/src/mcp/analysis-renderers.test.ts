@@ -100,18 +100,19 @@ test("runs render compact TSV, all facts, escaped cells and null pricing", () =>
 	expect(text).not.toContain('"header":');
 });
 
-test("a page with more results names its cursor; the last page has no more line", () => {
+test("a page with more results ends with the next-page hint; the last page says hasMore=false", () => {
 	const more = renderFind({
 		source: "runs",
 		header: { ...header, truncated: true, cursor: "abc_-123" },
 		groups: [],
 	});
-	expect(more.split("\n")).toContain(
-		"more: pass cursor=abc_-123 with the same arguments to continue",
+	expect(more).toContain("truncated=true hasMore=true");
+	expect(more.split("\n").at(-1)).toBe(
+		"Showing 0 results. More results exist: call find again with the same arguments and cursor=abc_-123 to get the next page.",
 	);
-	expect(renderFind({ source: "runs", header, groups: [] })).not.toContain(
-		"more:",
-	);
+	const last = renderFind({ source: "runs", header, groups: [] });
+	expect(last).toContain("truncated=false hasMore=false");
+	expect(last).not.toContain("More results exist");
 });
 
 test("all group modes and reaction origins render with table headers", () => {
@@ -163,7 +164,7 @@ test("all group modes and reaction origins render with table headers", () => {
 			],
 		}),
 	).toContain(
-		'"turn":1}@3 ENOENT; {"sessionId":"child","agentId":"","turn":1}@4 (subagent thread of session) ENOENT',
+		'"turn":1}@3, {"sessionId":"child","agentId":"","turn":1}@4 (subagent thread of session) ENOENT',
 	);
 	const user = renderFind({
 		source: "user",
@@ -207,7 +208,8 @@ test("read renders shared cuts, empty reads, and escaped raw text", () => {
 	expect(text).toContain("read truncated=true\nref ");
 	expect(text).toContain("section\ttext");
 	expect(text).toContain("line 1\\nline 2\\tcolumn\\\\path");
-	expect(text).toEndWith("[cut]");
+	expect(text).not.toContain("[cut]");
+	expect(text).not.toContain("omitted");
 	expect(renderBudgeted({ truncated: false, reads: [] })).toBe(
 		"read truncated=false",
 	);
@@ -246,7 +248,9 @@ test("read charges framing, long refs, metadata and escapes and reserves a cut m
 	expect(text.length).toBeLessThanOrEqual(1200);
 	expect(text.match(/"sessionId"/gu)).toHaveLength(1);
 	expect(text).toContain("tool_result\tRead\tcall\t/file\tread\ttrue\t1");
-	expect(text).toEndWith("[cut]");
+	expect(text).toMatch(
+		/… \[truncated \d+ of 60 chars — open it in Opaline for the full value\]\n… \[197 more sections omitted to fit the response size limit\]$/u,
+	);
 });
 
 test("read budgets include Unicode, every escape and tiny-budget cut markers", () => {
@@ -265,7 +269,15 @@ test("read budgets include Unicode, every escape and tiny-budget cut markers", (
 			],
 		});
 		expect(text.length).toBeLessThanOrEqual(maxChars);
-		if (maxChars >= 5) expect(text).toEndWith("[cut]");
+		if (maxChars < 200) expect(text).toBe("…");
+		else if (maxChars === 200)
+			expect(text).toBe(
+				"read truncated=true\n… [1 more runs omitted to fit the response size limit]",
+			);
+		else
+			expect(text).toEndWith(
+				"… [truncated 4625 of 5000 chars — open it in Opaline for the full value]",
+			);
 	}
 });
 
@@ -417,7 +429,13 @@ test("git events print their link source only when it is not current edges, with
 	expect(text).toContain(
 		"links: 3 events from edges (1 frozen), 2 linked at query time (1 not built, 1 stale)",
 	);
-	const rows = text.split("\n").filter((line) => line.includes("call="));
+	const rows = text
+		.split("\n")
+		.filter((line) => line.startsWith('{"sessionId"'));
+	expect(rows[0]?.split("\t")[4]).toBe("=v1");
+	expect(text).toContain(
+		"shared values: a cell =vN repeats value vN\nkey\tcolumn\trows\tvalue\nv1\tliteral\t2\tcall=call branch=feat/links",
+	);
 	expect(rows.map((row) => /links=\S+/u.exec(row)?.[0] ?? null)).toEqual([
 		null,
 		null,

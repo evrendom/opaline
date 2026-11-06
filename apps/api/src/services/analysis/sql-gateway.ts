@@ -25,6 +25,7 @@ import {
 	AgentQueryBusyError,
 	type AgentQueryLimiter,
 } from "./agent-query-slots.js";
+import { omittedMarker } from "./compact.js";
 import { fitCount } from "./output-ceiling.js";
 import { cell } from "./read-output.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
@@ -36,6 +37,7 @@ import {
 	type SqlFailure,
 	type SqlTableFunction,
 	type SqlTableFunctionCall,
+	type SqlWindow,
 	withoutCtePrefix,
 } from "./sql-guard.js";
 import { SQL_MEASURES } from "./sql-measures.js";
@@ -225,30 +227,77 @@ export function quotaExceeded(
 		kind: "fatal",
 		message: `The workspace used its SQL quota of ${quota.queries} queries (sql and run calls) per ${quota.windowMs / 60_000} minutes.`,
 		fragment: null,
-		fix: `Do not retry before ${resetsAt.toISOString()}; answer with what you have, or with find and read.`,
+		fix: [
+			`Do not retry before ${resetsAt.toISOString()}. Instead:`,
+			"1. Answer with what you have.",
+			"2. Use find and read, which this quota does not count.",
+		].join("\n"),
 	};
 }
 
 export const NOT_EVIDENCE =
 	"not evidence: these rows say where to look, not why. Open the runs with read (session_id, agent_id, and turn_idx as its turn) before naming a cause.";
 
+export interface SqlParts {
+	readonly queries: readonly {
+		readonly query: string;
+		readonly cohort?: string;
+	}[];
+	readonly merge: (
+		rows: Record<string, unknown>[],
+	) => Record<string, unknown>[];
+}
+
 export async function runSql(
 	caller: SqlCaller,
-	input: { query: string; title: string },
+	input: {
+		query: string;
+		title: string;
+		cohort?: string;
+		measure?: AnalysisSqlOutput["measure"];
+		parts?: SqlParts;
+	},
 	env: SqlEnv,
 	signal?: AbortSignal,
 ): Promise<SqlOutcome> {
-	// The lookups for the result read ClickHouse too, so they hold the slot.
-	const executed = await execute(caller, input.query, env, signal, (found) => {
-		const rows = found.map(
-			(row) => redactReturnedValue(row) as Record<string, unknown>,
+	const queries = input.parts?.queries ?? [{ query: input.query }];
+	const merge = input.parts?.merge ?? ((rows) => rows);
+	const earlier: Record<string, unknown>[] = [];
+	const notices: string[] = [];
+	for (const part of queries.slice(0, -1)) {
+		const done = await execute(
+			caller,
+			part.query,
+			env,
+			signal,
+			async (found) => found,
+			undefined,
+			part.cohort ?? input.cohort,
 		);
-		const columns = Object.keys(rows[0] ?? {});
-		return Promise.all([
-			namedSessions(caller, columns, rows, env.executor),
-			coveredOwners(caller, env.executor),
-		]).then(([sessions, owners]) => ({ rows, columns, sessions, owners }));
-	});
+		if (!done.ok) return done;
+		earlier.push(...done.value);
+		notices.push(...done.notices);
+	}
+	const last = queries.at(-1);
+	// The lookups for the result read ClickHouse too, so they hold the slot.
+	const executed = await execute(
+		caller,
+		last?.query ?? input.query,
+		env,
+		signal,
+		(found) => {
+			const rows = merge([...earlier, ...found]).map(
+				(row) => redactReturnedValue(row) as Record<string, unknown>,
+			);
+			const columns = Object.keys(rows[0] ?? {});
+			return Promise.all([
+				namedSessions(caller, columns, rows, env.executor),
+				coveredOwners(caller, env.executor),
+			]).then(([sessions, owners]) => ({ rows, columns, sessions, owners }));
+		},
+		undefined,
+		last?.cohort ?? input.cohort,
+	);
 	if (!executed.ok) return executed;
 	const { rows, columns, sessions, owners } = executed.value;
 	const table = renderTable(columns, rows);
@@ -259,10 +308,11 @@ export async function runSql(
 		rows: table.rows,
 		truncated: table.notices.length > 0,
 		table: table.text,
-		notices: [...table.notices, ...executed.notices, NOT_EVIDENCE],
+		notices: [...table.notices, ...notices, ...executed.notices, NOT_EVIDENCE],
 		sessions,
 		// Findings cite only what the agent saw: the rows the table shows.
 		runs: namedRuns(columns, rows.slice(0, table.rows), sessions),
+		...(input.measure ? { measure: input.measure } : {}),
 	};
 	const quotes = rowsQuote(
 		rows.slice(0, table.rows),
@@ -284,6 +334,24 @@ export async function runSql(
 		queryCarriesText: carriesText(input.query),
 	});
 	return { ok: true, result: { id, ...output }, owners, quotes };
+}
+
+export function guardSql(caller: SqlCaller, sql: string): SqlFailure | null {
+	const memberOnly = readableSessionOwner(caller.reader) !== null;
+	const prepared = prepareAgentSql(
+		sql,
+		new Map(
+			SQL_VIEWS.map((view) => [
+				view.name,
+				{
+					windowColumn: view.windowColumn,
+					statement: (window: SqlWindow) => view.sql(memberOnly, window),
+				},
+			]),
+		),
+		RESERVED_NAMES,
+	);
+	return prepared.ok ? null : prepared.failure;
 }
 
 /** A refusal as the agent reads it: what failed, where, and what to do. */
@@ -462,11 +530,12 @@ export async function selectRuns<T>(
 }
 
 const RUN_COLUMNS = ["session_id", "agent_id", "turn_idx"];
+const COHORT = "opaline_cohort";
 const SELECT_RUNS_PREFIX =
 	"SELECT DISTINCT session_id, agent_id, turn_idx FROM (";
 
 /** What running an agent's SQL needs of the sql environment. */
-type AgentSqlEnv = Pick<
+export type AgentSqlEnv = Pick<
 	SqlEnv,
 	"executor" | "quota" | "limiter" | "githubRepositories" | "functions"
 >;
@@ -475,30 +544,54 @@ type AgentSqlEnv = Pick<
  * Runs the agent's SQL and then `follow` on its rows, both in a query slot
  * of the workspace, or says why it is refused.
  */
-async function execute<T>(
+export async function execute<T>(
 	caller: SqlCaller,
 	sql: string,
 	env: AgentSqlEnv,
 	signal: AbortSignal | undefined,
 	follow: (rows: Record<string, unknown>[]) => Promise<T>,
 	/** Wraps the scoped statement, e.g. to keep only some columns, with its own row cap. */
-	wrap?: { prefix: string; suffix: string; rows: number },
+	given?: { prefix: string; suffix: string; rows: number },
+	cohort?: string,
 ): Promise<
 	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
 > {
 	const memberOnly = readableSessionOwner(caller.reader) !== null;
 	const functions = env.functions ?? [];
-	const prepared = prepareAgentSql(
-		sql,
+	const views = (narrowed: boolean) =>
 		new Map(
 			SQL_VIEWS.map((view) => [
 				view.name,
 				{
 					windowColumn: view.windowColumn,
-					statement: (window) => view.sql(memberOnly, window),
+					statement: (window: SqlWindow) =>
+						view.sql(
+							memberOnly,
+							narrowed ? { ...window, cohort: COHORT } : window,
+						),
 				},
 			]),
-		),
+		);
+	const scoped =
+		cohort === undefined
+			? undefined
+			: prepareAgentSql(cohort, views(false), RESERVED_NAMES);
+	if (scoped && !scoped.ok) return { ok: false, error: scoped.failure };
+	const cohortWith = scoped?.ok
+		? `WITH (SELECT groupUniqArray((user_id, session_id)) FROM (${scoped.prepared.sql})) AS ${COHORT}\n`
+		: "";
+	const wrap = given
+		? { ...given, prefix: `${cohortWith}${given.prefix}` }
+		: scoped?.ok
+			? {
+					prefix: `${cohortWith}SELECT * FROM (\n`,
+					suffix: "\n)",
+					rows: SQL_LIMITS.rows + 1,
+				}
+			: undefined;
+	const prepared = prepareAgentSql(
+		sql,
+		views(scoped !== undefined),
 		RESERVED_NAMES,
 		new Map(
 			functions.map((fn) => [
@@ -508,7 +601,9 @@ async function execute<T>(
 		),
 	);
 	if (!prepared.ok) return { ok: false, error: prepared.failure };
-	const statementBytes = Buffer.byteLength(prepared.prepared.sql, "utf8");
+	const statementBytes =
+		Buffer.byteLength(prepared.prepared.sql, "utf8") +
+		Buffer.byteLength(wrap?.prefix ?? "", "utf8");
 	if (statementBytes > SQL_LIMITS.statementBytes)
 		return {
 			ok: false,
@@ -690,9 +785,13 @@ const READ_LIMITS: Readonly<Record<string, string>> = {
 	TOO_MANY_ROWS: `The query read more than ${SQL_LIMITS.rowsRead.toLocaleString("en-US")} rows`,
 	TOO_MANY_BYTES: `The query read more than ${SQL_LIMITS.bytesRead / 1024 / 1024 / 1024} GiB`,
 };
-const NARROW_HOW =
-	"a shorter time range (started_at, at, observed_at), fewer members or sessions (user_id, or session_id IN (SELECT session_id FROM runs WHERE started_at >= …)), fewer or narrower columns (leave out long text such as prompt_head, command and text, and arrays), or aggregate with GROUP BY before ordering.";
-const NARROW = `Narrow it: ${NARROW_HOW}`;
+const NARROW_HOW = [
+	"1. Shorten the time range (started_at, at, observed_at).",
+	"2. Add filters: fewer members or sessions (user_id, or session_id IN (SELECT session_id FROM runs WHERE started_at >= …)).",
+	"3. Select fewer or narrower columns (leave out long text such as prompt_head, command and text, and arrays) and lower the LIMIT.",
+	"4. Aggregate with GROUP BY before ordering.",
+].join("\n");
+const NARROW = `Narrow the query and retry:\n${NARROW_HOW}`;
 /** Refusals no rewrite of the query can pass. */
 const FATAL_TYPES = new Set([
 	"ACCESS_DENIED",
@@ -732,7 +831,7 @@ function classify(
 			kind: "fatal",
 			message: `${read}: this query reads too much; aggregate or narrow the window.`,
 			fragment: null,
-			fix: `Do not run this query again. A narrower one can pass: ${NARROW_HOW}`,
+			fix: `Do not run this query again. A narrower one can pass:\n${NARROW_HOW}`,
 		};
 	if (FATAL_TYPES.has(type))
 		return {
@@ -848,8 +947,12 @@ function renderTable(
 	const header = columns.map((column) => tableCell(column)).join(" | ");
 	const build = (count: number) =>
 		[header, ...lines.slice(0, count)].join("\n");
-	const text = fitCount(lines.length, build, SQL_LIMITS.tableChars);
-	const shown = text.split("\n").length - 1;
+	const fitted = fitCount(lines.length, build, SQL_LIMITS.tableChars);
+	const shown = fitted.split("\n").length - 1;
+	const text =
+		shown < lines.length
+			? `${fitted}\n${omittedMarker(lines.length - shown)}`
+			: fitted;
 	const notices: string[] = [];
 	if (rows.length > SQL_LIMITS.rows)
 		notices.push(
@@ -857,7 +960,7 @@ function renderTable(
 		);
 	if (shown < lines.length)
 		notices.push(
-			`cut: only the first ${shown} of ${lines.length} rows fit ${SQL_LIMITS.tableChars} characters. Cut rows are not missing data: select fewer or shorter columns, aggregate, or page with LIMIT ${shown} OFFSET ${shown}.`,
+			`cut rows are not missing data: select fewer or shorter columns, aggregate, or page with LIMIT ${shown} OFFSET ${shown}.`,
 		);
 	if (cutCells > 0)
 		notices.push(

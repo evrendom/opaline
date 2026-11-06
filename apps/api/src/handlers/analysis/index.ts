@@ -8,6 +8,10 @@ import {
 	createAgentQueryLimiter,
 	createPostgresAgentQuerySlots,
 } from "../../services/analysis/agent-query-slots.js";
+import {
+	type CheckStore,
+	createPostgresCheckStore,
+} from "../../services/analysis/checks.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
 import { findAnalysisWithOwners } from "../../services/analysis/find.service.js";
 import { visibleGitHubRepositories } from "../../services/analysis/github-access.js";
@@ -16,7 +20,6 @@ import {
 	withReadTrace,
 } from "../../services/analysis/output-ceiling.js";
 import { readAnalysis } from "../../services/analysis/read.service.js";
-import { budgetReadOutput } from "../../services/analysis/read-output.js";
 import { openRun } from "../../services/analysis/run-view.service.js";
 import { findScope } from "../../services/analysis/scope.js";
 import { describeSchema, runSql } from "../../services/analysis/sql-gateway.js";
@@ -75,6 +78,8 @@ import {
 	searchTranscripts,
 } from "../../services/transcript-search/search.js";
 import { requireSessionDetailOwnerAccess } from "../analytics/session-detail-access.js";
+import { createMeasureProcedures } from "./measures.js";
+import { createPeekProcedures } from "./peek.js";
 import { requireRetroTools } from "./retro-tools.js";
 import { createRunQuestionProcedures } from "./run-questions.js";
 import { sqlError } from "./sql-error.js";
@@ -106,6 +111,7 @@ interface AnalysisEnv {
 	embeddingQuota?: EmbeddingQuota;
 	/** Which workspaces are indexed for search; Postgres subscriptions by default. */
 	searchAccess?: SearchAccess;
+	checks?: CheckStore;
 }
 
 export function createAnalysisRouter(
@@ -173,19 +179,18 @@ export function createAnalysisRouter(
 				owners.set(sessionId, ownerId);
 			}
 			const log = analysisLog(context.organizationId);
+			// Keep room for the trace line so the rendered read stays within maxChars.
+			const traced = Boolean(log) && input.maxChars > TRACE_LINE_RESERVE * 2;
 			const read = await readAnalysis(
 				context.organizationId,
 				owners,
-				input,
+				traced
+					? { ...input, maxChars: input.maxChars - TRACE_LINE_RESERVE }
+					: input,
 				env,
 			);
-			// Keep room for the trace line so the rendered read stays within maxChars.
-			const fitted =
-				log && input.maxChars > TRACE_LINE_RESERVE * 2
-					? budgetReadOutput(read, input.maxChars - TRACE_LINE_RESERVE)
-					: read;
 			// Credentials never leave in a result or its stored evidence.
-			const output = redactReturnedValue(fitted);
+			const output = redactReturnedValue(read);
 			const trace = await captureCall(
 				env.executor,
 				log,
@@ -195,7 +200,7 @@ export function createAnalysisRouter(
 				output,
 				[...new Set(owners.values())],
 			);
-			return trace && fitted !== read ? withReadTrace(output, trace) : output;
+			return trace && traced ? withReadTrace(output, trace) : output;
 		});
 
 	const sqlQuota = env.sqlQuota ?? createPostgresSqlQuota(sqlClient);
@@ -440,6 +445,14 @@ export function createAnalysisRouter(
 		schema,
 		sql,
 		search,
+		...createPeekProcedures(sqlEnv),
+		...createMeasureProcedures({
+			executor: env.executor,
+			sqlEnv,
+			checks: env.checks ?? createPostgresCheckStore(sqlClient),
+			log: analysisLog,
+			author,
+		}),
 		...createRunQuestionProcedures(() => ({
 			...runQuestionsEnv(),
 			// Selecting runs reads ClickHouse like sql: same slots and quota.

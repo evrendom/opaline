@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AnalysisFindOutput, AnalysisReadOutput } from "@rudel/api-routes";
+import { MCP_TOOL_OUTPUT_CHAR_BUDGET } from "./compact.js";
+import { renderFind } from "./find-text.js";
 import {
 	ANALYSIS_OUTPUT_MAX_BYTES,
 	fitFindOutput,
@@ -39,7 +41,55 @@ test("a find result within the ceiling is returned unchanged", () => {
 	expect(fitFindOutput(output)).toBe(output);
 });
 
-test("200 tool groups of multibyte text are cut to the leading groups that fit, with a note", () => {
+test("200 tool groups are cut to the leading groups whose delivered text fits, with a marker and no note", () => {
+	const ref = { sessionId: crypto.randomUUID(), agentId: "", turn: 1 };
+	const groups = Array.from({ length: 200 }, (_, index) => ({
+		toolGroup: "shell",
+		cause: `cause ${index}`,
+		detail: "detail",
+		kind: "mistake",
+		count: 1,
+		sessions: 1,
+		firstSeen: "2026-09-01T00:00:00.000Z",
+		lastSeen: "2026-09-01T00:00:00.000Z",
+		topCommands: Array.from(
+			{ length: 3 },
+			(_, n) => `${index}.${n} ${"c".repeat(200)}`,
+		),
+		minutes: 1,
+		activeMinutes: 1,
+		costUsd: null,
+		examples: Array.from({ length: 5 }, (_, record) => ({
+			ref,
+			record,
+			errorLine: `${index}.${record} ${"e\t".repeat(100)}`,
+			parentSessionId: null,
+		})),
+	}));
+	const output: AnalysisFindOutput = { source: "tool", header, groups };
+	expect(renderFind(output).length).toBeGreaterThan(
+		2 * MCP_TOOL_OUTPUT_CHAR_BUDGET,
+	);
+
+	const fitted = fitFindOutput(output);
+	expect(fitted.source).toBe("tool");
+	expect(jsonBytes(fitted)).toBeLessThanOrEqual(ANALYSIS_OUTPUT_MAX_BYTES);
+	const kept = fitted.source === "tool" ? fitted.groups : [];
+	expect(kept.length).toBeGreaterThan(0);
+	expect(kept).toEqual(groups.slice(0, kept.length));
+	const text = renderFind(fitted);
+	expect(text.length).toBeLessThanOrEqual(MCP_TOOL_OUTPUT_CHAR_BUDGET);
+	expect(text.length).toBeGreaterThan(MCP_TOOL_OUTPUT_CHAR_BUDGET / 2);
+	expect(fitted.header.truncated).toBe(true);
+	expect(fitted.header.omitted).toBe(200 - kept.length);
+	expect(fitted.header.notes).toEqual(["existing note"]);
+	expect(text).toContain(
+		`\n… [${200 - kept.length} more rows omitted to fit the response size limit]`,
+	);
+	expect(output.header.notes).toEqual(["existing note"]);
+});
+
+test("200 tool groups of multibyte text whose JSON outgrows the stored-result ceiling are cut to it, with a note", () => {
 	const ref = { sessionId: crypto.randomUUID(), agentId: "", turn: 1 };
 	const groups = Array.from({ length: 200 }, (_, index) => ({
 		toolGroup: "shell",
@@ -78,7 +128,9 @@ test("200 tool groups of multibyte text are cut to the leading groups that fit, 
 		"existing note",
 		`only the first ${kept.length} of 200 groups fit the 256 KiB result ceiling; narrow the scope or lower limit`,
 	]);
-	expect(output.header.notes).toEqual(["existing note"]);
+	expect(renderFind(fitted).length).toBeLessThanOrEqual(
+		MCP_TOOL_OUTPUT_CHAR_BUDGET,
+	);
 });
 
 test("a find page cut to the ceiling continues after its last kept item", () => {
@@ -87,7 +139,7 @@ test("a find page cut to the ceiling continues after its last kept item", () => 
 		type: "negative" as const,
 		terms: ["wrong"],
 		eventRef: { ...ref, turn: index + 1, record: 1 },
-		quote: "错".repeat(200),
+		quote: `${index}${"错".repeat(200)}`,
 		partial: false,
 		originRef: null,
 		originMinutes: null,
@@ -105,12 +157,12 @@ test("a find page cut to the ceiling continues after its last kept item", () => 
 	const kept = fitted.source === "user" ? fitted.events : [];
 	expect(kept.length).toBeGreaterThan(0);
 	expect(kept.length).toBeLessThan(events.length);
-	expect(jsonBytes(fitted)).toBeLessThanOrEqual(
-		ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES,
-	);
+	const text = renderFind(fitted);
+	expect(text.length).toBeLessThanOrEqual(MCP_TOOL_OUTPUT_CHAR_BUDGET);
 	expect(fitted.header.cursor).toBe(`after-${kept.length - 1}`);
-	expect(fitted.header.notes.at(-1)).toBe(
-		`only the first ${kept.length} of 500 events fit the 256 KiB result ceiling; pass the cursor for the rest, or narrow the scope or lower limit`,
+	expect(fitted.header.omitted).toBe(500 - kept.length);
+	expect(text.split("\n").at(-1)).toBe(
+		`Showing ${kept.length} results. More results exist: call find again with the same arguments and cursor=after-${kept.length - 1} to get the next page.`,
 	);
 });
 
@@ -294,7 +346,10 @@ test("pullRequest witnesses are fitted too, leaving events the rest, and a cut l
 	expect(fitted.events.length).toBeGreaterThan(50 / 2);
 	expect(fitted.header.truncated).toBe(true);
 	expect(fitted.header.notes).toContain(
-		`only the first ${kept} of 200 witnesses fit the 256 KiB result ceiling; narrow the dates or sessions to see the rest`,
+		`… [${200 - kept} more witnesses omitted to fit the response size limit]; narrow the dates or sessions to see them`,
+	);
+	expect(renderFind(fitted).length).toBeLessThanOrEqual(
+		MCP_TOOL_OUTPUT_CHAR_BUDGET,
 	);
 
 	// Witnesses alone still fit together with the note that says they were cut.

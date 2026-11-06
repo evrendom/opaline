@@ -39,6 +39,12 @@ const flow = {
 	cut: await outcome(tool.run(client, { id: "u/claude_code/s//4", maxChars: 1500 }, context)),
 	withoutId: await outcome(tool.run(client, { expand: ["p1"] }, context)),
 	extra: await outcome(tool.run(client, { id: "u/claude_code/s//4", depth: "turn" }, context)),
+	pastedRun: await outcome(tool.run(client, { url: "https://opaline.so/acme/sessions/s?turn=0b6f0c1e-8d4f-4a39-9a51-3c1f0f6f2a10&from=2026-10-01&to=2026-10-07" }, context)),
+	pastedSession: await outcome(tool.run(client, { url: "https://opaline.so/acme/sessions/s?from=2026-10-01&to=2026-10-07" }, context)),
+	pastedDashboard: await outcome(tool.run(client, { url: "https://opaline.so/acme/dashboard?from=2026-10-01&to=2026-10-07&metric=sessions&repo=acme/web" }, context)),
+	pastedElsewhere: await outcome(tool.run(client, { url: "https://example.com/w/sessions/s" }, context)),
+	both: await outcome(tool.run(client, { id: "u/claude_code/s//4", url: "https://opaline.so/w/sessions/s" }, context)),
+	json: await outcome(tool.run(client, { id: "u/claude_code/s//4", format: "json" }, context)),
 };
 console.log(JSON.stringify({ listed: MCP_TOOLS.map(listedTool), calls, flow }));`,
 		],
@@ -68,7 +74,6 @@ test("run takes a run id, the ids to expand, the sections and a character budget
 	const run = listed.find((tool) => tool.name === "run");
 	expect(run?.inputSchema).toMatchObject({
 		type: "object",
-		required: ["id"],
 		additionalProperties: false,
 		properties: {
 			id: { type: "string" },
@@ -78,6 +83,7 @@ test("run takes a run id, the ids to expand, the sections and a character budget
 			workspace: { type: "string" },
 		},
 	});
+	expect(run?.inputSchema.required ?? []).not.toContain("id");
 	expect(run?.annotations).toMatchObject({ readOnlyHint: true });
 });
 
@@ -93,14 +99,59 @@ test("bad input is refused before the server is called, and good input reaches i
 			maxChars: 12_000,
 		},
 		{ id: "u/claude_code/s//4", maxChars: 1500 },
+		{ id: "0b6f0c1e-8d4f-4a39-9a51-3c1f0f6f2a10", maxChars: 12_000 },
+		{ id: "u/claude_code/s//4", maxChars: 12_000 },
 	]);
+});
+
+test("a pasted link opens the run it names, or says which call opens what it shows, keeping its dates", async () => {
+	const { flow } = await loaded;
+	expect(flow.pastedRun).toEqual({
+		result: "run u/claude_code/s//4 · claude_code",
+	});
+	const pasted = flow.pastedSession;
+	const session = pasted && "result" in pasted ? pasted.result : "";
+	expect(session).toContain(
+		"SELECT run_id, agent_id, turn_idx, started_at FROM runs WHERE session_id = 's'",
+	);
+	expect(session).toContain(
+		'{"source":"runs","sessionId":"s","from":"2026-10-01","to":"2026-10-07"}',
+	);
+	expect(flow.pastedDashboard).toEqual({
+		result:
+			'This is the Opaline dashboard, not a run: call get_dashboard with {"startDate":"2026-10-01","endDate":"2026-10-07","metric":"sessions","repositories":["acme/web"]}.',
+	});
+	expect(flow.pastedElsewhere).toEqual({
+		error: expect.stringContaining("not an Opaline link"),
+	});
+	expect(flow.both).toEqual({ error: "Give id or url, not both" });
+});
+
+test("format json returns the view as one JSON object with its link", async () => {
+	const { flow } = await loaded;
+	const outcome = flow.json;
+	const json = JSON.parse(
+		outcome && "result" in outcome ? outcome.result : "{}",
+	);
+	expect(json).toEqual({
+		tool: "run",
+		id: "u/claude_code/s//4",
+		phaseRule: 1,
+		truncated: false,
+		text: "run u/claude_code/s//4 · claude_code",
+		_markers: [],
+		_opalineUrl: "http://localhost:4011/w/sessions/s",
+	});
 });
 
 test("a view renders as its text, and a cut view says how to see the rest", async () => {
 	const { flow } = await loaded;
-	expect(flow.view).toEqual({ result: "run u/claude_code/s//4 · claude_code" });
+	expect(flow.view).toEqual({
+		result:
+			"url: http://localhost:4011/w/sessions/s\nrun u/claude_code/s//4 · claude_code",
+	});
 	expect(flow.cut).toEqual({
 		result:
-			"run u/claude_code/s//4 · claude_code\nnote: cut to maxChars; expand fewer ids at once, ask for fewer sections, or raise maxChars",
+			"url: http://localhost:4011/w/sessions/s\nrun u/claude_code/s//4 · claude_code\nnote: cut to maxChars; expand fewer ids at once, ask for fewer sections, or raise maxChars",
 	});
 });

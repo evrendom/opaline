@@ -602,7 +602,9 @@ test("the run index build writes each request with its calls and tokens, and run
 	expect(both.text.length).toBeLessThanOrEqual(maxChars);
 	expect(both.text).toContain("▸ p1 exploring: 2 requests");
 	expect(both.text).toContain("▸ p3 running checks: 3 requests");
-	expect(both.text).toMatch(/\[cut: \d of 3 requests of p3 shown\]/u);
+	expect(both.text).toMatch(
+		/… \[\d more requests of p3 omitted to fit the response size limit\]/u,
+	);
 
 	// The Task call opens the subagent's run, in the same view.
 	const task = requests[4]?.start_record ?? 0;

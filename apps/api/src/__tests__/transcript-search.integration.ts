@@ -65,6 +65,7 @@ const RUN = `search_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 const workspace = `${RUN}_ws`;
 const thriftyWorkspace = `${RUN}_ws_quota`;
 const rebuiltWorkspace = `${RUN}_ws_rebuilt`;
+const unindexedWorkspace = `${RUN}_ws_unindexed`;
 const userId = `${RUN}_user`;
 const clickhouse = getClickhouse();
 const SEARCH_TABLES = [
@@ -108,7 +109,11 @@ function fakeEmbedder(): TranscriptEmbedder & { texts: string[] } {
 }
 
 /** A Claude Code session: three runs, the file read in two of them, a build with a flag. */
-function claudeSession(sessionId: string, minutesAgo: number): string {
+function claudeSession(
+	sessionId: string,
+	minutesAgo: number,
+	reminder?: string,
+): string {
 	let minute = 0;
 	const line = (entry: Record<string, unknown>) =>
 		JSON.stringify({
@@ -158,6 +163,9 @@ function claudeSession(sessionId: string, minutesAgo: number): string {
 		prompt("check auth.ts once more"),
 		call("t4", "Read", { file_path: "/repo/src/auth.ts" }),
 		result("t4", AUTH_FILE),
+		...(reminder
+			? [prompt(`<system-reminder>${reminder}</system-reminder>`)]
+			: []),
 	].join("\n");
 }
 
@@ -166,7 +174,7 @@ async function upload(
 	organizationId: string,
 	sessionId: string,
 	revision = "1",
-	options: { runIndex: boolean } = { runIndex: true },
+	options: { runIndex: boolean; reminder?: string } = { runIndex: true },
 ) {
 	const sessionDate = new Date(Date.now() - 3_600_000).toISOString();
 	const identity = {
@@ -177,7 +185,7 @@ async function upload(
 		revision,
 		sessionDate,
 	};
-	const content = claudeSession(sessionId, 50);
+	const content = claudeSession(sessionId, 50, options.reminder);
 	const stats = createSplitStats();
 	const drafts = [
 		...splitSessionTranscript(
@@ -251,7 +259,12 @@ afterAll(async () => {
 		await clickhouse.execute({
 			query: `DELETE FROM ${table} WHERE organization_id IN ({workspaces:Array(String)}) SETTINGS lightweight_deletes_sync = 2`,
 			query_params: {
-				workspaces: [workspace, thriftyWorkspace, rebuiltWorkspace],
+				workspaces: [
+					workspace,
+					thriftyWorkspace,
+					rebuiltWorkspace,
+					unindexedWorkspace,
+				],
 			},
 		});
 	await sqlClient`DELETE FROM clickhouse_purge_job WHERE target_id IN (${userId}, ${thriftyWorkspace})`;
@@ -345,7 +358,8 @@ describe("search over uploaded transcripts", () => {
 		expect(found[0]?.snippet).toContain("bun run build --legacy");
 		expect(exact.result).toMatchObject({
 			mode: "hybrid",
-			coverage: { sessions: 2, indexed: 2, pending: 0 },
+			coverage: { sessions: 2, searched: 2, indexed: 2, pending: 0 },
+			exactMatches: { runs: 2, sessions: 2 },
 			suggestion: null,
 		});
 		expect(exact.result.quota?.usedTokens).toBeGreaterThan(0);
@@ -457,7 +471,7 @@ describe("re-uploads", () => {
 });
 
 describe("a re-upload the run index has not caught up with", () => {
-	test("its new generation's hits match no run of the older build, and coverage says the session is not ready", async () => {
+	test("exact search reads the generation of the committed build; its new generation's hits match no run of the older build, and coverage says the session is not indexed", async () => {
 		const embedder = fakeEmbedder();
 		const quota = createMemoryEmbeddingQuota({
 			tokens: 1_000_000,
@@ -476,16 +490,23 @@ describe("a re-upload the run index has not caught up with", () => {
 			workspaceId: rebuiltWorkspace,
 			reader: { userId, role: "member", ownSessionsOnly: false },
 		};
-		const search = async (since: string) => {
+		const search = async (
+			text: string,
+			mode: "exact" | "meaning",
+			since: string,
+		) => {
 			const outcome = await searchTranscripts(
 				caller,
-				{ text: "--legacy", mode: "exact", filters: { since } },
+				{ text, mode, filters: { since } },
 				env,
 			);
 			if (!outcome.ok) throw new Error(outcome.error.message);
 			return outcome.result;
 		};
 		const yesterday = new Date(Date.now() - 86_400_000)
+			.toISOString()
+			.slice(0, 10);
+		const dayBefore = new Date(Date.parse(yesterday) - 86_400_000)
 			.toISOString()
 			.slice(0, 10);
 		await upload(rebuiltWorkspace, sessionId, "1");
@@ -495,9 +516,18 @@ describe("a re-upload the run index has not caught up with", () => {
 		).toMatchObject({ status: "written" });
 
 		// Windows of different days: each counts its coverage afresh.
-		const stale = await search(yesterday);
-		expect(stale.results).toEqual([]);
-		expect(stale.coverage).toEqual({ sessions: 1, indexed: 0, pending: 0 });
+		const stale = await search("--legacy", "exact", yesterday);
+		expect(stale.results.map((result) => result.turn)).toEqual([2]);
+		expect(stale.coverage).toEqual({
+			sessions: 1,
+			searched: 1,
+			partial: 0,
+			indexed: 0,
+			pending: 0,
+		});
+		expect(
+			(await search("bun run build legacy", "meaning", yesterday)).results,
+		).toEqual([]);
 
 		await buildRunIndex({
 			executor: clickhouse,
@@ -506,11 +536,97 @@ describe("a re-upload the run index has not caught up with", () => {
 			buildRevision: 2,
 			beforeWrite: async () => {},
 		});
-		const caughtUp = await search(
-			new Date(Date.parse(yesterday) - 86_400_000).toISOString().slice(0, 10),
+		const caughtUp = await search("bun run build legacy", "meaning", dayBefore);
+		expect(caughtUp.results.map((result) => result.turn)).toContain(2);
+		expect(caughtUp.coverage).toMatchObject({ sessions: 1, indexed: 1 });
+	});
+});
+
+describe("a session never indexed for meaning", () => {
+	test("is found by exact string and by regex in its stored records; injected context is hidden unless asked for, and counted", async () => {
+		const sessionId = `${RUN}_unindexed`;
+		await upload(unindexedWorkspace, sessionId, "1", {
+			runIndex: true,
+			reminder: "Never push to the release branch from here.",
+		});
+		const env: SearchEnv = {
+			executor: clickhouse,
+			quota: createMemoryEmbeddingQuota({ tokens: 0, windowMs: 86_400_000 }),
+			sqlQuota: createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 }),
+			limiter: unlimitedSlots,
+			embedderFor: () => null,
+			access,
+		};
+		const caller: SqlCaller = {
+			workspaceId: unindexedWorkspace,
+			reader: { userId, role: "member", ownSessionsOnly: false },
+		};
+		const search = async (input: Parameters<typeof searchTranscripts>[1]) => {
+			const outcome = await searchTranscripts(caller, input, env);
+			if (!outcome.ok) throw new Error(outcome.error.message);
+			return outcome.result;
+		};
+
+		const exact = await search({ text: "BUILD --LEGACY", mode: "hybrid" });
+		expect(exact).toMatchObject({
+			mode: "exact",
+			coverage: { sessions: 1, searched: 1, indexed: 0 },
+			exactMatches: { runs: 1, sessions: 1 },
+		});
+		expect(exact.results).toHaveLength(1);
+		expect(exact.results[0]).toMatchObject({
+			sessionId,
+			turn: 2,
+			why: "exact ×1 in tool_call",
+		});
+		expect(exact.results[0]?.snippet).toContain("bun run build --legacy");
+
+		const regex = await search({
+			text: "build --(legacy|modern)",
+			mode: "regex",
+		});
+		expect(regex.results.map((result) => [result.turn, result.why])).toEqual([
+			[2, "regex ×1 in tool_call"],
+		]);
+		expect(
+			(await search({ text: "BUILD --(legacy)", mode: "regex" })).results,
+		).toEqual([]);
+
+		const hidden = await search({ text: "release branch", mode: "exact" });
+		expect(hidden.results).toEqual([]);
+		expect(hidden.hiddenInjected).toEqual({ matches: 1, runs: 1 });
+		const shown = await search({
+			text: "release branch",
+			mode: "exact",
+			filters: { includeInjected: true },
+		});
+		expect(shown.results.map((result) => [result.turn, result.why])).toEqual([
+			[3, "exact ×1 in injected_context"],
+		]);
+		expect(shown.hiddenInjected).toEqual({ matches: 0, runs: 0 });
+
+		const sqlEnv = {
+			executor: clickhouse,
+			results: createMemorySqlResultStore(),
+			limiter: unlimitedSlots,
+			githubRepositories: async () => [],
+			quota: createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 }),
+			functions: [createSqlSearchFunction(env)],
+		};
+		const inSql = await runSql(
+			caller,
+			{
+				query:
+					"SELECT r.turn_idx AS turn_idx, s.why AS why FROM search('build --(legacy|modern)', 'regex') AS s JOIN runs AS r USING (run_id)",
+				title: "Builds with a bundler flag",
+			},
+			sqlEnv,
 		);
-		expect(caughtUp.results.map((result) => result.turn)).toEqual([2]);
-		expect(caughtUp.coverage).toEqual({ sessions: 1, indexed: 1, pending: 0 });
+		if (!inSql.ok) throw new Error(inSql.error.message);
+		expect(inSql.result.table.split("\n")).toEqual([
+			"turn_idx | why",
+			"2 | regex ×1 in tool_call",
+		]);
 	});
 });
 

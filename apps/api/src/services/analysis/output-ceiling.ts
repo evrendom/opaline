@@ -3,14 +3,21 @@ import type {
 	AnalysisReadOutput,
 	AnalysisTrace,
 } from "@rudel/api-routes";
+import {
+	fitRows,
+	fitToBudget,
+	omittedMarker,
+	responseBudget,
+	type Verbosity,
+} from "./compact.js";
+import { findRowCosts, renderFind } from "./find-text.js";
 
 type Header = AnalysisFindOutput["header"];
 
 /**
  * Largest find or read result, in UTF-8 bytes of its JSON. The analysis log
  * stores exactly the returned result, so one stored result stays a quarter of
- * Convex's 1 MiB document limit; at about four bytes a token it is also some
- * 64k agent tokens, more than one answer should cost.
+ * Convex's 1 MiB document limit.
  */
 export const ANALYSIS_OUTPUT_MAX_BYTES = 256 * 1024;
 /**
@@ -21,18 +28,120 @@ export const ANALYSIS_OUTPUT_MAX_BYTES = 256 * 1024;
  */
 export const TRACE_RESERVE_BYTES = 256;
 const BODY_MAX_BYTES = ANALYSIS_OUTPUT_MAX_BYTES - TRACE_RESERVE_BYTES;
+const TRACE_RESERVE_CHARS = 200;
 
-/**
- * The find result with as many leading rows, groups or events as fit
- * `ANALYSIS_OUTPUT_MAX_BYTES` with its trace; a cut result is truncated, says
- * so, and continues with `cursorAfter(index of its last item)`.
- */
 export function fitFindOutput(
 	output: AnalysisFindOutput,
 	cursorAfter: (index: number) => string | undefined = () => undefined,
+	verbosity: Verbosity = "full",
+): AnalysisFindOutput {
+	return fitStoredFindOutput(
+		fitDeliveredFindOutput(output, cursorAfter, verbosity),
+		cursorAfter,
+	);
+}
+
+export function fitDeliveredFindOutput(
+	full: AnalysisFindOutput,
+	cursorAfter: (index: number) => string | undefined,
+	verbosity: Verbosity = "full",
+): AnalysisFindOutput {
+	const budget = responseBudget(verbosity) - TRACE_RESERVE_CHARS;
+	const measure = (fitted: AnalysisFindOutput) =>
+		renderFind(fitted, verbosity).length;
+	if (measure(full) <= budget) return full;
+	const output =
+		full.source === "git"
+			? fitWitnesses(full, budget, (value) =>
+					measure(value as AnalysisFindOutput),
+				)
+			: full;
+	const items = findItems(output);
+	const costs = findRowCosts(output, verbosity);
+	const withCount = (count: number): AnalysisFindOutput => {
+		if (count >= items.length) return output;
+		const cursor = count > 0 ? cursorAfter(count - 1) : undefined;
+		return items.build(count, {
+			...output.header,
+			truncated: true,
+			omitted: items.length - count,
+			cursor,
+		});
+	};
+	const baseCost = measure(withCount(0));
+	return fitToBudget(
+		budget,
+		(walkBudget) => withCount(fitRows(costs, walkBudget, baseCost)),
+		withCount(0),
+		measure,
+	);
+}
+
+function findItems(output: AnalysisFindOutput): {
+	length: number;
+	build: (count: number, header: Header) => AnalysisFindOutput;
+} {
+	if ("sessions" in output)
+		return {
+			length: output.sessions.length,
+			build: (count, header) => ({
+				...output,
+				header,
+				sessions: output.sessions.slice(0, count),
+			}),
+		};
+	if ("rows" in output)
+		return {
+			length: output.rows.length,
+			build: (count, header) =>
+				({
+					...output,
+					header,
+					rows: output.rows.slice(0, count),
+				}) as AnalysisFindOutput,
+		};
+	if (output.source === "user" || output.source === "git")
+		return {
+			length: output.events.length,
+			build: (count, header) =>
+				({
+					...output,
+					header,
+					events: output.events.slice(0, count),
+				}) as AnalysisFindOutput,
+		};
+	if (output.source === "weekly")
+		return {
+			length: output.totals.length,
+			build: (count, header) => ({
+				...output,
+				header,
+				totals: output.totals.slice(0, count),
+			}),
+		};
+	return {
+		length: output.groups.length,
+		build: (count, header) =>
+			({
+				...output,
+				header,
+				groups: output.groups.slice(0, count),
+			}) as AnalysisFindOutput,
+	};
+}
+
+function fitStoredFindOutput(
+	output: AnalysisFindOutput,
+	cursorAfter: (index: number) => string | undefined,
 ): AnalysisFindOutput {
 	if (jsonBytes(output) <= BODY_MAX_BYTES) return output;
 	const page = { header: output.header, cursorAfter };
+	if ("sessions" in output)
+		return fitItems(page, output.sessions, "sessions", (sessions, header) => ({
+			...output,
+			header,
+			sessions,
+		}));
 	if (output.source === "calls")
 		return "rows" in output
 			? fitItems(page, output.rows, "rows", (rows, header) => ({
@@ -58,7 +167,7 @@ export function fitFindOutput(
 			events,
 		}));
 	if (output.source === "git") {
-		const fitted = fitWitnesses(output);
+		const fitted = fitWitnesses(output, BODY_MAX_BYTES, jsonBytes);
 		if (jsonBytes(fitted) <= BODY_MAX_BYTES) return fitted;
 		return fitItems(
 			{ ...page, header: fitted.header },
@@ -86,18 +195,14 @@ export function fitFindOutput(
 	}));
 }
 
-/**
- * `find pullRequest=…` witnesses fitted first: as many leading (newest) ones
- * as fit a quarter of the ceiling when there are events (all of it
- * otherwise), so events keep the rest; a cut list says so.
- */
 function fitWitnesses(
 	output: Extract<AnalysisFindOutput, { source: "git" }>,
+	budget: number,
+	measure: (value: unknown) => number,
 ): Extract<AnalysisFindOutput, { source: "git" }> {
 	const witnesses = output.witnesses ?? [];
 	if (witnesses.length === 0) return output;
-	const budget = output.events.length > 0 ? BODY_MAX_BYTES / 4 : BODY_MAX_BYTES;
-	// The note about a cut list is part of what must fit.
+	const share = output.events.length > 0 ? budget / 4 : budget;
 	const withWitnesses = (
 		count: number,
 		events: typeof output.events,
@@ -113,13 +218,17 @@ function fitWitnesses(
 						truncated: true,
 						notes: [
 							...output.header.notes,
-							`only the first ${count} of ${witnesses.length} witnesses fit the ${ANALYSIS_OUTPUT_MAX_BYTES / 1024} KiB result ceiling; narrow the dates or sessions to see the rest`,
+							`${omittedMarker(witnesses.length - count, "witnesses")}; narrow the dates or sessions to see them`,
 						],
 					},
 				};
 	const kept =
-		fitCount(witnesses.length, (count) => withWitnesses(count, []), budget)
-			.witnesses?.length ?? 0;
+		fitCount(
+			witnesses.length,
+			(count) => withWitnesses(count, []),
+			share,
+			measure,
+		).witnesses?.length ?? 0;
 	return withWitnesses(kept, output.events);
 }
 
@@ -200,14 +309,15 @@ export function fitCount<TOutput>(
 	total: number,
 	build: (count: number) => TOutput,
 	budget = BODY_MAX_BYTES,
+	measure: (value: TOutput) => number = jsonBytes,
 ): TOutput {
 	const full = build(total);
-	if (jsonBytes(full) <= budget) return full;
+	if (measure(full) <= budget) return full;
 	let low = 0;
 	let high = total - 1;
 	while (low < high) {
 		const middle = Math.ceil((low + high) / 2);
-		if (jsonBytes(build(middle)) <= budget) low = middle;
+		if (measure(build(middle)) <= budget) low = middle;
 		else high = middle - 1;
 	}
 	return build(low);

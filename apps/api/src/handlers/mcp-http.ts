@@ -6,8 +6,10 @@ import {
 	MCP_CONSENT_SECRET,
 	type Session,
 } from "../auth.js";
+import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { getFrontendOrigin } from "../frontend-origin.js";
+import { splitAnalyticsInputs } from "../mcp/analytics-inputs.js";
 import {
 	DASHBOARD_WIDGET_URI,
 	MCP_APP_MIME_TYPE,
@@ -23,14 +25,25 @@ import {
 	MCP_TOOLS,
 	McpToolError,
 	type McpWorkspace,
+	retroListedTool,
 	SESSION_RESOURCE_PREFIX,
 } from "../mcp/mcp-tools.js";
 import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
 import { withRedactedOutput } from "../mcp/redacted-tools.js";
 import { toolsListedFor } from "../mcp/retro-listing.js";
+import { isAdminWorkspace } from "../mcp/self-analytics-tools.js";
+import {
+	recoveryHint,
+	unknownToolMessage,
+	validationMessage,
+} from "../mcp/tool-errors.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
 import { retroToolsEnabled } from "../services/analysis/retro-tools.js";
+import {
+	recordToolCall,
+	toolCallRow,
+} from "../services/mcp-analytics/tool-calls.js";
 
 export const MCP_PATH = "/api/mcp";
 export const MCP_CONSENT_PATH = "/api/mcp/consent";
@@ -97,12 +110,21 @@ async function isMcpAvailable(userId: string) {
 	return rows.length > 0;
 }
 
-/** Whether one of the user's workspaces has the retro tools (`retroToolsEnabled`). */
-async function hasRetroTools(userId: string): Promise<boolean> {
+async function listingFor(
+	userId: string,
+): Promise<{ retro: boolean; admin: boolean }> {
 	const memberships = await sqlClient<{ organization_id: string }[]>`
 		SELECT organization_id FROM member WHERE user_id = ${userId}
 	`;
-	return memberships.some((row) => retroToolsEnabled(row.organization_id));
+	return {
+		retro: memberships.some((row) => retroToolsEnabled(row.organization_id)),
+		admin: memberships.some((row) => isAdminWorkspace(row.organization_id)),
+	};
+}
+
+function listedTools(listing: { retro: boolean; admin: boolean }) {
+	const tools = toolsListedFor(TOOLS, listing.retro, listing.admin);
+	return listing.retro ? tools.map(retroListedTool) : tools.map(listedTool);
 }
 
 function mcpApi(auth: Auth) {
@@ -312,9 +334,7 @@ async function handleMcpRequest(
 			return rpcResult(message.id, {});
 		case "tools/list":
 			return rpcResult(message.id, {
-				tools: toolsListedFor(TOOLS, await hasRetroTools(token.userId)).map(
-					listedTool,
-				),
+				tools: listedTools(await listingFor(token.userId)),
 			});
 		case "tools/call":
 			return rpcResult(
@@ -400,7 +420,7 @@ async function readResource(
 		{ name: "get_session", arguments: { workspace, sessionId } },
 		dependencies,
 	);
-	if (result.isError)
+	if ("isError" in result)
 		return rpcError(id, -32002, result.content[0]?.text ?? "");
 	// get_session is app-only, so its result is structured content only.
 	return rpcResult(id, {
@@ -421,11 +441,66 @@ async function callTool(
 	params: Record<string, unknown>,
 	dependencies: McpDependencies,
 ) {
+	const calledAt = new Date();
+	const started = performance.now();
 	const tool = TOOLS.find((candidate) => candidate.name === params.name);
-	const args = (params.arguments ?? {}) as Record<string, unknown>;
+	const raw = (params.arguments ?? {}) as Record<string, unknown>;
+	const recorded = tool !== undefined && !isAppTool(tool);
+	const { args, intent } = recorded
+		? splitAnalyticsInputs(raw)
+		: { args: raw, intent: null };
+	const seen = { workspaceId: "", errorCode: null as string | null };
+	const response = await runTool(
+		tool,
+		userId,
+		params,
+		args,
+		dependencies,
+		seen,
+	);
+	if (tool && recorded && intent)
+		void recordToolCall(
+			getClickhouse(),
+			toolCallRow({
+				tool: tool.name,
+				userId,
+				workspaceId: seen.workspaceId,
+				calledAt,
+				context: intent.context,
+				llmModel: intent.llmModel,
+				durationMs: performance.now() - started,
+				errorCode: seen.errorCode,
+				outputChars: response.content.reduce(
+					(total, block) => total + block.text.length,
+					0,
+				),
+				...(tool.recordsInput ? { feedback: withoutWorkspace(args) } : {}),
+			}),
+		);
+	return response;
+}
+
+function withoutWorkspace(args: Record<string, unknown>) {
+	const { workspace: _workspace, ...rest } = args;
+	return rest;
+}
+
+async function runTool(
+	tool: (typeof TOOLS)[number] | undefined,
+	userId: string,
+	params: Record<string, unknown>,
+	args: Record<string, unknown>,
+	dependencies: McpDependencies,
+	seen: { workspaceId: string; errorCode: string | null },
+) {
+	const appTool = tool ? isAppTool(tool) : false;
 	try {
-		if (!tool) throw new McpToolError(`Unknown tool: ${params.name}`);
+		if (!tool)
+			throw new McpToolError(
+				unknownToolMessage(params.name, await modelTools(userId)),
+			);
 		const workspace = await resolveWorkspace(userId, args.workspace);
+		seen.workspaceId = workspace.id;
 		const context = await createToolContext(userId, workspace, dependencies);
 		const client = createRouterClient(router, { context });
 		const { result, widget } = splitWidget(
@@ -440,28 +515,25 @@ async function callTool(
 					},
 				]
 			: [];
+		const structured = isPluginTool(tool)
+			? { result: withAbsoluteAvatars(result) }
+			: (appTool || tool.outputSchema) && result && typeof result === "object"
+				? Array.isArray(result)
+					? { items: result }
+					: result
+				: undefined;
 		return {
-			content:
-				tool.meta?.ui === APP_ONLY.ui || isPluginTool(tool)
-					? []
-					: [
-							{
-								type: "text",
-								// Analysis tools return compact text; everything else is JSON.
-								text:
-									typeof result === "string" ? result : JSON.stringify(result),
-							},
-							...link,
-						],
-			...(isPluginTool(tool)
-				? { structuredContent: { result: withAbsoluteAvatars(result) } }
-				: result && typeof result === "object"
-					? {
-							structuredContent: Array.isArray(result)
-								? { items: result }
-								: result,
-						}
-					: {}),
+			content: appTool
+				? []
+				: [
+						{
+							type: "text",
+							text:
+								typeof result === "string" ? result : JSON.stringify(result),
+						},
+						...link,
+					],
+			...(structured ? { structuredContent: structured } : {}),
 			...(widget
 				? { _meta: { "opaline/widget": withAbsoluteAvatars(widget) } }
 				: {}),
@@ -474,7 +546,7 @@ async function callTool(
 			});
 		}
 		const known = error instanceof McpToolError || error instanceof ORPCError;
-		const message = known ? error.message : "The tool failed. Try again.";
+		const message = known ? error.message : "The tool failed.";
 		// The widget's session view retries and refreshes on these codes.
 		const typed =
 			error instanceof ORPCError
@@ -483,12 +555,39 @@ async function callTool(
 						code: known ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR",
 						status: known ? 400 : 500,
 					};
+		seen.errorCode = `${typed.code}`;
+		const issues = (typed as { data?: { issues?: unknown } }).data?.issues;
+		const hint = typed.status >= 500 ? recoveryHint(params.name) : undefined;
+		const text =
+			tool && typed.code === "BAD_REQUEST" && Array.isArray(issues)
+				? validationMessage(
+						{ ...tool, inputSchema: tool.retroInputSchema ?? tool.inputSchema },
+						issues,
+					)
+				: hint
+					? `${message}\n\n${hint}`
+					: typed.status >= 500
+						? `${message} Try again.`
+						: message;
 		return {
-			content: [{ type: "text", text: message }],
-			structuredContent: { error: { ...typed, message } },
+			content: [{ type: "text", text: appTool ? message : text }],
+			...(appTool || !tool
+				? { structuredContent: { error: { ...typed, message } } }
+				: {}),
 			isError: true as const,
 		};
 	}
+}
+
+function isAppTool(tool: (typeof TOOLS)[number]): boolean {
+	return tool.meta?.ui === APP_ONLY.ui || isPluginTool(tool);
+}
+
+async function modelTools(userId: string) {
+	const listing = await listingFor(userId);
+	return toolsListedFor(TOOLS, listing.retro, listing.admin).filter(
+		(tool) => !isAppTool(tool),
+	);
 }
 
 /** `widget` is the plugin app's data; hosts pass `_meta` to the app only. */

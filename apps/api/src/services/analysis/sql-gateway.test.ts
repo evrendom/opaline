@@ -1041,7 +1041,9 @@ describe("limits and errors from ClickHouse", () => {
 			);
 			expect(error.kind).toBe("recoverable");
 			expect(error.message).toContain(said);
-			expect(error.fix).toStartWith("Narrow it: a shorter time range");
+			expect(error.fix).toStartWith(
+				"Narrow the query and retry:\n1. Shorten the time range",
+			);
 		});
 
 	const overReads = [
@@ -1073,7 +1075,7 @@ describe("limits and errors from ClickHouse", () => {
 				"this query reads too much; aggregate or narrow the window",
 			);
 			expect(error.fix).toStartWith(
-				"Do not run this query again. A narrower one can pass: a shorter time range",
+				"Do not run this query again. A narrower one can pass:\n1. Shorten the time range",
 			);
 		});
 
@@ -1264,7 +1266,7 @@ describe("caps and notices", () => {
 		expect(result.rows).toBeLessThan(150);
 		expect(result.table.split("\n")[1]).toBe(`0 | ${"y".repeat(299)}…`);
 		expect(result.notices).toEqual([
-			`cut: only the first ${result.rows} of 150 rows fit 24000 characters. Cut rows are not missing data: select fewer or shorter columns, aggregate, or page with LIMIT ${result.rows} OFFSET ${result.rows}.`,
+			`cut rows are not missing data: select fewer or shorter columns, aggregate, or page with LIMIT ${result.rows} OFFSET ${result.rows}.`,
 			'cut: 150 cells were longer than 300 characters and end in "…"; select substring(column, 301, 300) to read on.',
 			NOT_EVIDENCE,
 		]);

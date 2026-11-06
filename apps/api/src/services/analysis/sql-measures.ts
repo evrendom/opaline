@@ -1,6 +1,7 @@
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE } from "../l1-edges/l1-edge-tables.js";
-import { commandColumnsSql } from "./command-identity.js";
+import { commandColumnsSql, SHELL_TOOLS } from "./command-identity.js";
+import { PREAMBLE, STRONG } from "./failure-classifier.js";
 import {
 	SETUP_SINCE_INDEX_VERSION,
 	SETUP_SINCE_PARSER_VERSION,
@@ -176,6 +177,18 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 
 /** First parser version that links background tasks and hook blocks to their calls. */
 const BACKGROUND_SINCE_PARSER_VERSION = 11;
+
+// From parser 11 a task notification carries the call id of the call whose
+// background work it reports on, so it joins the call's group (the only
+// injected context the scan keeps). One that ended the task records
+// interrupted (true when killed or stopped), is_error (failed or killed),
+// its exit code and the task's output file in the record's own columns,
+// and the hand-off result names that file. They fold into the call's
+// result states (its last record, failure and exit code), so a call costs
+// two more aggregate states, never a read of the facts map.
+export const CALL_TASK_NOTIFICATION_SQL = "kind = 'injected_context'";
+export const CALL_TASK_END_SQL = `${CALL_TASK_NOTIFICATION_SQL} AND interrupted IS NOT NULL`;
+export const CALL_HAND_OFF_SQL = `kind = 'tool_result' AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')`;
 
 /** First parser version that reads a Claude Code subagent call's timeout limit from its hand-off text. */
 const TIMEOUT_LIMIT_SINCE_PARSER_VERSION = 12;
@@ -360,6 +373,25 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		traps: [],
 	},
 	{
+		name: "file_op",
+		type: "LowCardinality(String)",
+		meaning:
+			"What the call does to file_path as the parser read it: read (a Read call, or a shell command that reads the file); empty otherwise, edits included.",
+		traps: [
+			"Edits show as the edit tool (Edit, Write, MultiEdit, NotebookEdit, apply_patch) with file_path, not here; a file only a shell command changed (sed -i, a redirect) has no edit call.",
+			"A shell command's file_path is as written, often relative to cwd: match it to an absolute path by its end.",
+		],
+	},
+	{
+		name: "command_class",
+		type: "LowCardinality(String)",
+		meaning:
+			"What the shell command does, by its program and subcommand: test, typecheck, lint, build, migrate, install, git or other; a compound command takes its first class in that order. Empty when the call carries no shell command.",
+		traps: [
+			"Rules over the command text only: a script named test.sh is test, a test runner hidden behind a make target is other.",
+		],
+	},
+	{
 		name: "command_from",
 		type: "String",
 		meaning:
@@ -418,6 +450,15 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		],
 	},
 	{
+		name: "command_head",
+		type: "Nullable(String)",
+		meaning:
+			"The first 300 characters of a shell command's stored text, read without the full text: cheap to match or group on over a long window; NULL when the call is not a shell command.",
+		traps: [
+			"Cut at 300 characters and not normalized: a leading cd and paths are as written; command_fingerprint groups copies.",
+		],
+	},
+	{
 		name: "record_idx",
 		type: "UInt32",
 		meaning: "Raw transcript line of the call; read takes it as record.",
@@ -428,6 +469,15 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		type: "UInt16",
 		meaning: "Content block of the call within its line.",
 		traps: [],
+	},
+	{
+		name: "error",
+		type: "Nullable(String)",
+		meaning:
+			"The line of a failed or refused call's result that names the error (its first line saying error, failed, not found, denied and the like, else its first line past the exit code), up to 300 characters; NULL when the call did not fail and was not refused.",
+		traps: [
+			"Read from the stored start and end of the result: an error in the middle of a long output is missed, and the line may be cut.",
+		],
 	},
 	COVERAGE_COLUMN,
 ];
@@ -509,6 +559,7 @@ export function callsSql(
 	runs: CommittedRuns,
 	measuredRuns: string,
 	window: SqlWindow = {},
+	parentOwner: string = runs.owner,
 ): string {
 	const windowed = windowSessionsSql(runs.owner, "kind = 'tool_call'", window);
 	const sessions = `${runs.owner}
@@ -528,6 +579,8 @@ export function callsSql(
 		"turn_idx",
 		"tool_name",
 		"file_path",
+		"file_op",
+		"command_class",
 		"command_from",
 		"command",
 		"command_chars",
@@ -535,28 +588,20 @@ export function callsSql(
 		"command_prefix",
 		"command_fingerprint",
 		"command_simhash",
+		"command_head",
 		"record_idx",
 		"block_idx",
 	];
 	const call = "kind = 'tool_call'";
 	const result = "kind = 'tool_result'";
-	// From parser 11 a task notification carries the call id of the call whose
-	// background work it reports on, so it joins the call's group (the only
-	// injected context the scan keeps). One that ended the task records
-	// interrupted (true when killed or stopped), is_error (failed or killed),
-	// its exit code and the task's output file in the record's own columns,
-	// and the hand-off result names that file. They fold into the call's
-	// result states (its last record, failure and exit code), so a call costs
-	// two more aggregate states, never a read of the facts map.
-	const notification = "kind = 'injected_context'";
-	const taskEnd = `${notification} AND interrupted IS NOT NULL`;
-	const taskFile = "match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')";
-	const handOff = `${result} AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND ${taskFile}`;
+	const notification = CALL_TASK_NOTIFICATION_SQL;
+	const taskEnd = CALL_TASK_END_SQL;
+	const handOff = CALL_HAND_OFF_SQL;
 	// A Claude Code subagent stream records a timeout only in its hand-off
 	// text, whose limit the parser reads from version 12; the run index
 	// counts that hand-off from parser 11, without the limit.
 	const timeoutUnknown = `has(r.unrecorded_facts, 'timed_out_calls') OR (r.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
-	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, runs.owner)].join(",\n\t\t")}
+	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayCtes(sessions, parentOwner)].join(",\n\t\t")}
 		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
 			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
 			c.session_date AS session_date, c.call_id AS call_id, toLowCardinality(c.first_tool_name) AS tool_name,
@@ -576,8 +621,13 @@ export function callsSql(
 			if(c.task_file != '' AND c.task_end.1 IS NULL OR c.results = 0, NULL, c.result_at) AS finished_at,
 			${first
 				.filter((name) => !["turn_idx", "tool_name"].includes(name))
-				.map((name) => `c.first_${name} AS ${name}`)
+				.map((name) =>
+					["file_op", "command_class"].includes(name)
+						? `toLowCardinality(c.first_${name}) AS ${name}`
+						: `c.first_${name} AS ${name}`,
+				)
 				.join(", ")},
+			if(ifNull(c.result_failed, 0) OR c.denial_kind != '', ${errorLineSql("concat(c.result_error_head, char(10), c.result_error_tail)")}, NULL) AS error,
 			r.coverage_gaps AS coverage_gaps
 		FROM (
 			SELECT ${generation}, session_date, call_id,
@@ -588,17 +638,21 @@ export function callsSql(
 				max(${toolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
 				anyIf(exit_code, (${result} OR ${taskEnd}) AND exit_code IS NOT NULL) AS result_exit_code,
 				anyIf(denial_kind, ${result} AND denial_kind != '') AS denial_kind,
+				argMinIf(head, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_head,
+				argMinIf(tail, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_tail,
 				max(${result} AND ifNull(interrupted, false)) AS result_interrupted,
 				maxIf(timed_out_after_ms, ${result}) AS result_timed_out_after_ms,
 				anyIf(file_path, (${handOff} OR ${notification}) AND file_path != '') AS task_file,
 				argMaxIf((interrupted, is_error), position, ${taskEnd}) AS task_end
 			FROM (
 				SELECT ${generation}, session_date, call_id, kind, ts, turn_idx, record_idx, block_idx,
-					is_error, exit_code, denial_kind, (record_idx, block_idx) AS position, tool_name, file_path,
+					is_error, exit_code, denial_kind, denial_kind != '' AS refused, head, tail, (record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
 					interrupted, timed_out_after_ms,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
-					lengthUTF8(command_text) AS command_chars
+					lengthUTF8(command_text) AS command_chars,
+					if(kind = 'tool_call' AND replaceRegexpOne(lower(tool_name), '^functions\\.', '') IN (${SHELL_TOOLS.map((tool) => `'${tool}'`).join(", ")}),
+						substring(head, 1, 300), NULL) AS command_head
 				FROM ${records()}
 				PREWHERE kind IN ('tool_call', 'tool_result')
 					OR (kind = 'injected_context' AND subtype = 'task_notification' AND call_id != '')
@@ -611,6 +665,31 @@ export function callsSql(
 		INNER JOIN (${measuredRuns}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
 			AND r.revision = c.revision AND r.parser_version = c.parser_version
 			AND r.agent_id = c.agent_id AND r.turn_idx = c.first_turn_idx`;
+}
+
+export function sqlLiteral(text: string): string {
+	return `'${text.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+}
+
+export function regexLiteral(pattern: RegExp): string {
+	const source = pattern.source.replace(/\\u([0-9a-fA-F]{4})/gu, "\\x{$1}");
+	return sqlLiteral(pattern.flags.includes("i") ? `(?i)${source}` : source);
+}
+
+const STACK_FRAME = /^(?:at\s|node:internal|[\w.$]+\($|\^+$|\d+\s*\|)/;
+
+export function errorLineSql(text: string): string {
+	const lines = `arrayFilter(l -> l != '' AND NOT match(l, ${regexLiteral(PREAMBLE)}),
+				arrayMap(l -> trimBoth(l), splitByRegexp(${sqlLiteral("\\r?\\n")},
+					replaceRegexpAll(replaceRegexpAll(${text}, ${sqlLiteral("\\x1b\\[[0-?]*[ -/]*[@-~]")}, ''), ${sqlLiteral("</?tool_use_error>")}, char(10)))))`;
+	const strong = `arrayFirst(l -> match(l, ${regexLiteral(STRONG)}) AND length(l) > 6 AND NOT match(l, ${regexLiteral(STACK_FRAME)}), ${lines})`;
+	return `substring(if(${strong} != '', ${strong}, if(empty(${lines}), '(no output)', ${lines}[1])), 1, 300)`;
+}
+
+export function cohortOwner(owner: string, window: SqlWindow): string {
+	return window.cohort
+		? `${owner} AND (user_id, session_id) IN (SELECT arrayJoin(${window.cohort}))`
+		: owner;
 }
 
 /** The sessions with a record in the window, named in a view's statement. */

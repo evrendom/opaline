@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0071 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), and stages images with evidence captures and accepts image objects (0071)", async () => {
+test("applies migrations 0020-0072 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), and creates the analysis check table (0072)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0071_repository_evidence_images");
+	expect(latestMigration?.tag).toBe("0072_analysis_check");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -298,6 +298,59 @@ test("applies migrations 0020-0071 to a database already migrated through 0019, 
 				{ table_name: "compass_settings" },
 				{ table_name: "prompt_frustration" },
 			]);
+			expect([
+				...(await migrationSql<
+					{ column_name: string; data_type: string; is_nullable: string }[]
+				>`
+					SELECT column_name, data_type, is_nullable FROM information_schema.columns
+					WHERE table_schema = 'public' AND table_name = 'analysis_check'
+					ORDER BY ordinal_position
+				`),
+			]).toEqual([
+				{ column_name: "id", data_type: "text", is_nullable: "NO" },
+				{
+					column_name: "organization_id",
+					data_type: "text",
+					is_nullable: "NO",
+				},
+				{ column_name: "author_id", data_type: "text", is_nullable: "NO" },
+				{ column_name: "name", data_type: "text", is_nullable: "NO" },
+				{ column_name: "definition", data_type: "jsonb", is_nullable: "NO" },
+				{ column_name: "enabled", data_type: "boolean", is_nullable: "NO" },
+				{
+					column_name: "created_at",
+					data_type: "timestamp with time zone",
+					is_nullable: "NO",
+				},
+			]);
+			expect([
+				...(await migrationSql<{ name: string; definition: string }[]>`
+					SELECT conname AS name, pg_get_constraintdef(oid) AS definition FROM pg_constraint
+					WHERE conrelid = 'public.analysis_check'::regclass AND contype = 'f'
+					ORDER BY conname
+				`),
+			]).toEqual([
+				{
+					name: "analysis_check_author_id_user_id_fk",
+					definition:
+						'FOREIGN KEY (author_id) REFERENCES "user"(id) ON DELETE CASCADE',
+				},
+				{
+					name: "analysis_check_organization_id_organization_id_fk",
+					definition:
+						"FOREIGN KEY (organization_id) REFERENCES organization(id) ON DELETE CASCADE",
+				},
+			]);
+			expect([
+				...(await migrationSql<{ indexname: string }[]>`
+					SELECT indexname FROM pg_indexes
+					WHERE schemaname = 'public' AND tablename = 'analysis_check'
+					ORDER BY indexname
+				`),
+			]).toEqual([
+				{ indexname: "analysis_check_owner_idx" },
+				{ indexname: "analysis_check_pkey" },
+			]);
 			await expectIngestJobSizeBound(migrationSql);
 			await expectEdgeScopeKinds(migrationSql);
 			// 0057: existing workspaces keep the own-sessions-only option off.
@@ -337,7 +390,7 @@ test("applies migrations 0020-0071 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 72,
+				count: 73,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`

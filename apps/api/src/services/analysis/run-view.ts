@@ -1,3 +1,4 @@
+import { omittedMarker, truncatedMarker } from "./compact.js";
 import {
 	cutPhases,
 	type Phase,
@@ -193,7 +194,7 @@ export function renderRunView(
 							items: rest,
 							separator: "\n",
 							cut: (shown, total) =>
-								cutLine(`${shown + 1} of ${total + 1} lines of the view`),
+								cutLine(total - shown, "lines of the view"),
 						},
 					],
 					budget,
@@ -260,7 +261,7 @@ function expansion(
 				heading: `▸ ${id}: ${detail.reason}`,
 				items: [],
 				separator: "\n",
-				cut: () => cutLine(id),
+				cut: () => missingLine(id),
 			},
 		];
 	if (detail?.kind === "run")
@@ -275,9 +276,7 @@ function expansion(
 				).map((line) => `  ${line}`),
 				separator: "\n",
 				cut: (shown, total) =>
-					cutLine(
-						`${shown} of ${total} lines of ${id}; open the run with its id`,
-					),
+					`${cutLine(total - shown, `lines of ${id}`)}; open the run with its id`,
 			},
 		];
 	return [lineExpansion(context, id, detail)];
@@ -289,16 +288,13 @@ function textBlock(part: RunViewText): Block {
 	const pieces: string[] = [];
 	for (let start = 0; start < points.length; start += TEXT_PIECE)
 		pieces.push(points.slice(start, start + TEXT_PIECE).join(""));
-	const id = part.label.split(" ", 1)[0];
 	return {
 		heading: `▸ ${part.label}, ${part.totalChars} characters`,
 		items: pieces,
 		separator: "",
 		complete: points.length >= part.totalChars,
 		cut: (shown) =>
-			cutLine(
-				`${[...pieces.slice(0, shown).join("")].length} of ${part.totalChars} characters of ${id}`,
-			),
+			`  ${truncatedMarker(part.totalChars - [...pieces.slice(0, shown).join("")].length, part.totalChars)}`,
 	};
 }
 
@@ -322,7 +318,7 @@ function lineExpansion(
 					: []),
 			],
 			separator: "\n",
-			cut: (shown, total) => cutLine(`${shown} of ${total} lines of ${id}`),
+			cut: (shown, total) => cutLine(total - shown, `lines of ${id}`),
 		};
 	const phase = context.phases.find((candidate) => candidate.id === id);
 	if (phase)
@@ -330,13 +326,13 @@ function lineExpansion(
 			heading: `▸ ${phase.id} ${phase.kind}: ${count(phase.requests.length, "request")}`,
 			items: phase.requests.map(requestLine),
 			separator: "\n",
-			cut: (shown, total) => cutLine(`${shown} of ${total} requests of ${id}`),
+			cut: (shown, total) => cutLine(total - shown, `requests of ${id}`),
 		};
 	return {
 		heading: `▸ ${id} not found in this view`,
 		items: [],
 		separator: "\n",
-		cut: () => cutLine(id),
+		cut: () => missingLine(id),
 	};
 }
 
@@ -373,8 +369,12 @@ function callLine(call: RunViewCallDetail): string {
 }
 
 /** Says what a block left out; the tool description says how to see the rest. */
-function cutLine(what: string): string {
-	return `  [cut: ${what} shown]`;
+function cutLine(count: number, what: string): string {
+	return `  ${omittedMarker(count, what)}`;
+}
+
+function missingLine(id: string): string {
+	return `  … [${id} omitted to fit the response size limit]`;
 }
 
 /**
@@ -434,7 +434,7 @@ function fitBlocks(
 function cutCost(block: Block, total: number): number {
 	return total === 0 && block.complete !== false
 		? 0
-		: block.cut(total, total).length + 1;
+		: block.cut(0, total).length + 1;
 }
 
 function headerLines({ view, rule }: Context): string[] {

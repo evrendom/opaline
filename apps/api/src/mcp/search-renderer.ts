@@ -1,11 +1,6 @@
 import type { AnalysisSearchOutput } from "@rudel/api-routes";
 import { cell } from "../services/analysis/read-output.js";
 
-/**
- * A search result as the agent reads it: what ran over which days, the runs
- * with why each matched and a snippet (or a rewrite to try), then coverage,
- * the workspace's OpenAI quota and the notices.
- */
 export function renderSearch(output: AnalysisSearchOutput): string {
 	const lastDay = new Date(Date.parse(output.until) - 1)
 		.toISOString()
@@ -14,7 +9,7 @@ export function renderSearch(output: AnalysisSearchOutput): string {
 		output.requestedMode === output.mode
 			? ""
 			: ` (asked ${output.requestedMode})`;
-	const { coverage, quota } = output;
+	const { coverage, quota, exactMatches, hiddenInjected } = output;
 	return [
 		`search "${cell(output.text)}" mode=${output.mode}${asked} ${output.since.slice(0, 10)}..${lastDay} results=${output.results.length}`,
 		...(output.results.length === 0
@@ -44,11 +39,27 @@ export function renderSearch(output: AnalysisSearchOutput): string {
 					),
 				]),
 		...(output.suggestion ? [`suggestion: ${cell(output.suggestion)}`] : []),
-		`coverage: ${coverage.indexed} of ${coverage.sessions} sessions in the window are indexed for search${
-			coverage.pending > 0
-				? `; ${coverage.pending} have chunks found by exact string only`
-				: ""
-		}`,
+		...(output.mode === "meaning"
+			? []
+			: [
+					`coverage: ${coverage.searched} of ${coverage.sessions} sessions in the window searched by ${output.mode === "regex" ? "regex" : "exact string"} over every stored record${
+						coverage.partial > 0 ? `, ${coverage.partial} partly` : ""
+					}; ${exactMatches.runs} runs in ${exactMatches.sessions} sessions match`,
+				]),
+		...(output.mode === "meaning" || output.mode === "hybrid"
+			? [
+					`coverage: ${coverage.indexed} of ${coverage.sessions} sessions in the window are indexed for meaning${
+						coverage.pending > 0
+							? `; ${coverage.pending} have chunks without a vector`
+							: ""
+					}`,
+				]
+			: []),
+		...(hiddenInjected.matches > 0
+			? [
+					`hidden: ${hiddenInjected.matches} matches in injected context (reminders, task notifications, instructions, compaction summaries), ${hiddenInjected.runs} runs with no other match; filters.includeInjected=true searches them`,
+				]
+			: []),
 		...(quota
 			? [
 					`quota: ${quota.usedTokens.toLocaleString("en-US")} of ${quota.limitTokens.toLocaleString("en-US")} OpenAI tokens used; resets ${quota.resetsAt}`,

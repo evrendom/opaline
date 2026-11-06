@@ -12,6 +12,7 @@ import type {
 	TranscriptReadScope,
 } from "../transcript-records-queries.js";
 import { commandColumnsSql } from "./command-identity.js";
+import type { CompiledFilters } from "./find-filters.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	pinnedFilter,
@@ -19,7 +20,13 @@ import {
 	REF_RUNS_SQL,
 	records,
 	refParams,
+	toolErrorSql,
 } from "./sql.js";
+import {
+	CALL_HAND_OFF_SQL,
+	CALL_TASK_END_SQL,
+	CALL_TASK_NOTIFICATION_SQL,
+} from "./sql-measures.js";
 
 /*
  * `find source=calls`: one row per call that carries a command (a shell
@@ -29,7 +36,7 @@ import {
 
 export type CallGroupBy = Extract<
 	AnalysisFindInput["groupBy"],
-	"commandFingerprint" | "commandArgv0" | "commandPrefix"
+	"commandFingerprint" | "commandArgv0" | "commandPrefix" | "session"
 >;
 
 /** A call's position: newest first, then session, stream, record and block. */
@@ -54,6 +61,10 @@ export const CallRowSchema = z.object({
 	has_result: z.union([z.boolean(), z.number()]).transform(Boolean),
 	failed: z.union([z.boolean(), z.number()]).transform(Boolean),
 	exit_code: z.number().nullable(),
+	call_minutes: z.number().nullable(),
+	random_key: z.string(),
+	matched_calls: z.coerce.number(),
+	matched_minutes: z.number().nullable(),
 });
 export type CallRow = z.infer<typeof CallRowSchema>;
 
@@ -74,6 +85,8 @@ export const CallGroupRowSchema = z.object({
 	failed_calls: z.coerce.number(),
 	first_ms: z.coerce.number(),
 	last_ms: z.coerce.number(),
+	call_minutes: z.number(),
+	runs: z.array(z.tuple([z.coerce.number(), z.string(), z.coerce.number()])),
 	/** [last seen, [session, agent, turn, record, block]] of up to three different texts. */
 	examples: z.array(z.tuple([z.coerce.number(), ExampleSchema])),
 });
@@ -94,6 +107,7 @@ const GROUP_COLUMNS: Record<CallGroupBy, string> = {
 	commandFingerprint: "toString(command_fingerprint)",
 	commandArgv0: "command_argv0",
 	commandPrefix: "command_prefix",
+	session: "session_id",
 };
 
 interface CallQuery {
@@ -102,6 +116,7 @@ interface CallQuery {
 	input: AnalysisFindInput;
 	/** Only the calls of these runs. */
 	refs?: readonly RunRef[];
+	filters?: CompiledFilters;
 }
 
 /**
@@ -110,8 +125,8 @@ interface CallQuery {
  * before `FINAL` deduplicates exactly; results are reduced by `max`, so they
  * need no `FINAL`.
  */
-function callsSql({ input, refs }: CallQuery): string {
-	const filters = [
+function callsSql({ input, refs, filters }: CallQuery): string {
+	const conditions = [
 		input.commandFrom ? "command_from = {commandFrom:String}" : "",
 		input.commandArgv0 ? "command_argv0 = {commandArgv0:String}" : "",
 		input.commandPrefix ? "command_prefix = {commandPrefix:String}" : "",
@@ -122,21 +137,45 @@ function callsSql({ input, refs }: CallQuery): string {
 			? `bitCount(bitXor(command_simhash, {commandSimhash:UInt64})) <= ${COMMAND_SIMHASH_NEAR_BITS}`
 			: "",
 	].filter(Boolean);
+	const result = "kind = 'tool_result'";
+	const ended = CALL_TASK_END_SQL;
 	return `calls AS (
-			SELECT session_id, agent_id, record_idx, block_idx, turn_idx, toUnixTimestamp64Milli(ts) AS at_ms,
-				tool_name, file_path, call_id, head, ${commandColumnsSql()}
+			SELECT user_id, source, session_date, session_id, agent_id, record_idx, block_idx, turn_idx, ts,
+				toUnixTimestamp64Milli(ts) AS at_ms, tool_name, file_path, call_id, head, ${commandColumnsSql()}
 			FROM ${records()} FINAL
 			PREWHERE turn_idx >= 1 AND (kind = 'tool_call' OR (kind = 'file_change' AND file_op = 'write'))
 			WHERE ${pinnedFilter()} AND command_from != ''
 				${refs ? `AND (session_id, agent_id, turn_idx) IN (SELECT r.1, r.2, r.3 FROM (${REF_RUNS_SQL}))` : ""}
-				${filters.map((filter) => `AND ${filter}`).join(" ")}
+				${conditions.map((condition) => `AND ${condition}`).join(" ")}
 		), results AS (
 			SELECT session_id, agent_id, call_id,
-				max(is_error OR (exit_code IS NOT NULL AND exit_code != 0)) AS result_failed,
-				anyIf(exit_code, exit_code IS NOT NULL) AS result_exit_code
+				countIf(${result}) AS results,
+				maxIf(ts, ${result} OR ${ended}) AS result_at,
+				max(${toolErrorSql()} OR (${ended} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
+				anyIf(exit_code, (${result} OR ${ended}) AND exit_code IS NOT NULL) AS result_exit_code,
+				anyIf(denial_kind, ${result} AND denial_kind != '') AS result_denial_kind,
+				anyIf(file_path, (${CALL_HAND_OFF_SQL} OR ${CALL_TASK_NOTIFICATION_SQL}) AND file_path != '') AS task_file,
+				countIf(${ended}) > 0 AS task_ended
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND kind = 'tool_result' AND call_id != ''
+			WHERE ${pinnedFilter()} AND call_id != ''
+				AND (${result} OR (${CALL_TASK_NOTIFICATION_SQL} AND subtype = 'task_notification'))
 			GROUP BY session_id, agent_id, call_id
+		), matched AS (
+			SELECT c.user_id AS user_id, c.source AS source, c.session_date AS session_date,
+				c.session_id AS session_id, c.agent_id AS agent_id, c.record_idx AS record_idx, c.block_idx AS block_idx,
+				c.turn_idx AS turn_idx, c.at_ms AS at_ms, c.ts AS started_at, c.call_id AS call_id,
+				c.tool_name AS tool_name, c.file_path AS file_path, c.command_from AS command_from,
+				ifNull(c.command_text, c.head) AS command, c.command_text AS command_text,
+				lengthUTF8(c.command_text) AS command_chars, c.command_argv0 AS command_argv0,
+				c.command_prefix AS command_prefix, c.command_fingerprint AS command_fingerprint,
+				c.command_simhash AS command_simhash,
+				toUInt8(r.results > 0) AS has_result, toUInt8(ifNull(r.result_failed, 0)) AS failed,
+				r.result_exit_code AS exit_code, r.result_denial_kind AS denial_kind,
+				toUInt8(r.task_file != '') AS backgrounded,
+				if(r.results = 0 OR (r.task_file != '' AND NOT r.task_ended), NULL, r.result_at) AS finished_at,
+				if(finished_at IS NULL, NULL, greatest(0, dateDiff('millisecond', c.ts, finished_at)) / 60000) AS call_minutes
+			FROM calls c LEFT ANY JOIN results r ON c.session_id = r.session_id AND c.agent_id = r.agent_id AND c.call_id = r.call_id
+			${filters ? `WHERE ${filters.sql}` : ""}
 		)`;
 }
 
@@ -145,6 +184,7 @@ function params(query: CallQuery) {
 	return {
 		...pinnedParams(query.scope, query.generations),
 		...refParams(query.refs),
+		...query.filters?.params,
 		commandFrom: input.commandFrom ?? "",
 		commandArgv0: input.commandArgv0 ?? "",
 		commandPrefix: input.commandPrefix ?? "",
@@ -154,38 +194,55 @@ function params(query: CallQuery) {
 	};
 }
 
-/** The calls of one batch after `after`, newest first, at most `limit`. */
+export type CallPosition =
+	| { order: "time"; after?: CallCursor }
+	| { order: "random"; seed: string; after?: RandomCallCursor };
+
+export type RandomCallCursor = readonly [
+	string,
+	string,
+	string,
+	number,
+	number,
+];
+
 export function buildCallRowsStatement(
 	query: CallQuery,
-	after: CallCursor | undefined,
+	position: CallPosition,
 	limit: number,
 ): ClickHouseStatement {
+	const random = position.order === "random";
+	const after = position.after;
+	const keyset = random
+		? `(random_hash, session_id, agent_id, record_idx, block_idx) > ({afterRandom:UInt64}, {afterSession:String}, {afterAgent:String}, {afterRecord:UInt32}, {afterBlock:UInt16})`
+		: `at_ms < {afterAt:Int64} OR (at_ms = {afterAt:Int64}
+				AND (session_id, agent_id, record_idx, block_idx) > ({afterSession:String}, {afterAgent:String}, {afterRecord:UInt32}, {afterBlock:UInt16}))`;
+	const cursor = after?.slice(1) ?? [];
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `WITH ${callsSql(query)}
-			SELECT c.session_id AS session_id, c.agent_id AS agent_id, c.record_idx AS record_idx, c.block_idx AS block_idx,
-				c.turn_idx AS turn_idx, c.at_ms AS at_ms, c.tool_name AS tool_name, c.file_path AS file_path,
-				c.command_from AS command_from, substringUTF8(ifNull(c.command_text, c.head), 1, {commandChars:UInt32}) AS command,
-				lengthUTF8(c.command_text) AS command_chars, c.command_argv0 AS command_argv0, c.command_prefix AS command_prefix,
-				toString(c.command_fingerprint) AS command_fingerprint, toString(c.command_simhash) AS command_simhash,
-				r.call_id != '' AS has_result, r.result_failed AS failed, r.result_exit_code AS exit_code
-			FROM calls c LEFT ANY JOIN results r ON c.session_id = r.session_id AND c.agent_id = r.agent_id AND c.call_id = r.call_id
-			${
-				after
-					? `WHERE c.at_ms < {afterAt:Int64} OR (c.at_ms = {afterAt:Int64}
-				AND (c.session_id, c.agent_id, c.record_idx, c.block_idx) > ({afterSession:String}, {afterAgent:String}, {afterRecord:UInt32}, {afterBlock:UInt16}))`
-					: ""
-			}
-			ORDER BY at_ms DESC, session_id, agent_id, record_idx, block_idx
+			SELECT *, toString(random_hash) AS random_key FROM (
+				SELECT session_id, agent_id, record_idx, block_idx, turn_idx, at_ms, tool_name, file_path, command_from,
+					substringUTF8(command, 1, {commandChars:UInt32}) AS command, command_chars, command_argv0, command_prefix,
+					toString(command_fingerprint) AS command_fingerprint, toString(command_simhash) AS command_simhash,
+					has_result, failed, exit_code, call_minutes,
+					cityHash64({randomSeed:String}, session_id, agent_id, record_idx, block_idx) AS random_hash,
+					count() OVER () AS matched_calls, sum(call_minutes) OVER () AS matched_minutes
+				FROM matched
+			)
+			${after ? `WHERE ${keyset}` : ""}
+			ORDER BY ${random ? "random_hash" : "at_ms DESC"}, session_id, agent_id, record_idx, block_idx
 			LIMIT {limit:UInt32}`,
 		query_params: {
 			...params(query),
 			limit,
-			afterAt: after?.[0] ?? 0,
-			afterSession: after?.[1] ?? "",
-			afterAgent: after?.[2] ?? "",
-			afterRecord: after?.[3] ?? 0,
-			afterBlock: after?.[4] ?? 0,
+			randomSeed: random ? position.seed : "",
+			afterRandom: random && after ? after[0] : "0",
+			afterAt: !random && after ? after[0] : 0,
+			afterSession: cursor[0] ?? "",
+			afterAgent: cursor[1] ?? "",
+			afterRecord: cursor[2] ?? 0,
+			afterBlock: cursor[3] ?? 0,
 		},
 	};
 }
@@ -204,13 +261,16 @@ export function buildCallGroupsStatement(
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `WITH ${callsSql(query)}
 			SELECT key, sum(n) AS calls, uniqExactMerge(s) AS sessions, sum(f) AS failed_calls,
-				min(text_first_ms) AS first_ms, max(text_last_ms) AS last_ms,
+				min(text_first_ms) AS first_ms, max(text_last_ms) AS last_ms, sum(t) AS call_minutes,
+				arrayDistinct(arrayFlatten(groupArray(text_runs))) AS runs,
 				arraySlice(arrayReverseSort(e -> e, groupArray((text_last_ms, example))), 1, 3) AS examples
 			FROM (
-				SELECT ${GROUP_COLUMNS[groupBy]} AS key, cityHash64(c.command_text) AS text_hash, count() AS n,
-					uniqExactState(c.session_id) AS s, countIf(r.result_failed) AS f, min(c.at_ms) AS text_first_ms, max(c.at_ms) AS text_last_ms,
-					argMax((c.session_id, c.agent_id, c.turn_idx, c.record_idx, c.block_idx), (c.at_ms, c.session_id, c.agent_id, c.record_idx, c.block_idx)) AS example
-				FROM calls c LEFT ANY JOIN results r ON c.session_id = r.session_id AND c.agent_id = r.agent_id AND c.call_id = r.call_id
+				SELECT ${GROUP_COLUMNS[groupBy]} AS key, cityHash64(command_text) AS text_hash, count() AS n,
+					uniqExactState(session_id) AS s, countIf(failed = 1) AS f, min(at_ms) AS text_first_ms, max(at_ms) AS text_last_ms,
+					ifNull(sum(call_minutes), 0) AS t,
+					groupUniqArray((toUInt32(indexOf({sessionIds:Array(String)}, session_id)), agent_id, turn_idx)) AS text_runs,
+					argMax((session_id, agent_id, turn_idx, record_idx, block_idx), (at_ms, session_id, agent_id, record_idx, block_idx)) AS example
+				FROM matched
 				GROUP BY key, text_hash
 			)
 			GROUP BY key`,

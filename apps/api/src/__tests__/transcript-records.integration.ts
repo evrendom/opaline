@@ -43,6 +43,7 @@ import {
 setDefaultTimeout(120_000);
 
 const RUN_ID = crypto.randomUUID();
+const CUT_MARKER = /…(?: \[truncated \d+ of \d+ chars\])?$/u;
 // Relative to now so the fixtures stay inside the ingest window and the raw
 // table's TTL no matter when the suite runs.
 const BASE_TIME_MS =
@@ -509,7 +510,7 @@ describe("transcript record readers", () => {
 		expect(
 			raw.records
 				.filter((record) => record.textTruncated)
-				.every((record) => record.text.endsWith("[cut]")),
+				.every((record) => CUT_MARKER.test(record.text)),
 		).toBe(true);
 		expect(
 			raw.records.reduce(
@@ -563,7 +564,7 @@ describe("transcript record readers", () => {
 			expect(
 				raw.records
 					.filter((record) => record.textTruncated)
-					.every((record) => record.text.endsWith("[cut]")),
+					.every((record) => CUT_MARKER.test(record.text)),
 			).toBe(true);
 			if (maxChars >= 500)
 				expect(raw.records).toHaveLength(complete.records.length);

@@ -6,6 +6,7 @@ import {
 	AnalysisSqlOutputSchema,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
+import { driftNotice } from "./retro-measures.js";
 
 /**
  * Stored SQL results (docs/adr/0005-agents-query-l1-with-sql.md): every `sql`
@@ -105,13 +106,24 @@ export async function openSqlResult(
 		now.getTime() - Date.parse(stored.createdAt) >
 		SQL_RESULT_RETENTION_DAYS * 86_400_000;
 	const unavailable = stored.removed ? "removed" : expired ? "expired" : null;
+	const drift = stored.output?.measure
+		? driftNotice(stored.output.measure)
+		: null;
 	return {
 		id: stored.id,
 		title: stored.title,
 		query: stored.query,
 		createdAt: stored.createdAt,
 		unavailable,
-		output: unavailable ? null : stored.output,
+		output:
+			unavailable || !stored.output
+				? null
+				: drift
+					? {
+							...stored.output,
+							notices: [drift, ...stored.output.notices],
+						}
+					: stored.output,
 	};
 }
 

@@ -145,7 +145,9 @@ test("expanding two phases at once stays within the budget, gives each a share a
 	expect(text.length).toBeLessThanOrEqual(maxChars);
 	expect(text).toContain("▸ p1 exploring: 2 requests");
 	expect(text).toContain("▸ p3 running checks: 2 requests");
-	expect(text).toMatch(/\n {2}\[cut: [01] of 2 requests of p3 shown\]$/u);
+	expect(text).toMatch(
+		/\n {2}… \[[12] more requests of p3 omitted to fit the response size limit\]$/u,
+	);
 });
 
 test("expanding a request lists its calls with their duration and outcome, and the record of its text", () => {
@@ -179,7 +181,7 @@ test("expanding a request lists its calls with their duration and outcome, and t
 	]);
 });
 
-test("expanding a record returns its exact text, and a cut text says how much of it was shown", () => {
+test("expanding a record returns its exact text, and a cut text says how much of it was left out", () => {
 	const exact = 'Fixed! The "login" test\n\tnow passes ✓\n'.repeat(20);
 	const details = new Map([
 		[
@@ -211,7 +213,7 @@ test("expanding a record returns its exact text, and a cut text says how much of
 	expect(heading).toBe(`▸ r94 assistant text, ${[...exact].length} characters`);
 	expect(exact.startsWith(shown)).toBe(true);
 	expect(marker).toBe(
-		`  [cut: ${[...shown].length} of ${[...exact].length} characters of r94 shown]`,
+		`  … [truncated ${[...exact].length - [...shown].length} of ${[...exact].length} chars — open it in Opaline for the full value]`,
 	);
 });
 
@@ -308,7 +310,7 @@ test("records whose text cannot be read at all still fit their cut lines in the 
 	expect(truncated).toBe(true);
 	expect(text.length).toBeLessThanOrEqual(1_000);
 	expect(text).toContain(
-		"▸ r100 tool_result, 900000 characters\n  [cut: 0 of 900000 characters of r100 shown]",
+		"▸ r100 tool_result, 900000 characters\n  … [truncated 900000 of 900000 chars — open it in Opaline for the full value]",
 	);
 });
 

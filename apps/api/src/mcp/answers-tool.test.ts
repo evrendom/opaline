@@ -126,9 +126,13 @@ test("answers searches saved answers, opens one and opens one stored result, as 
 	expect(resultOf(flow.query)).toContain(`query ${ids.query}`);
 	expect(resultOf(flow.query)).toContain("s1 | 41.5");
 	// The old tools still answer, the same way.
-	expect(flow.searchAlias).toEqual(flow.search);
-	expect(flow.openAlias).toEqual(flow.open);
-	expect(flow.queryAlias).toEqual(flow.query);
+	const url = "url: http://localhost:4011/w/sessions\n";
+	for (const [alias, answers] of [
+		[flow.searchAlias, flow.search],
+		[flow.openAlias, flow.open],
+		[flow.queryAlias, flow.query],
+	])
+		expect(`${url}${resultOf(alias)}`).toBe(resultOf(answers));
 });
 
 test("answers opens an sql result by its id with its title and SQL, and a removed one without its rows", async () => {

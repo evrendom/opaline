@@ -26,6 +26,7 @@ import {
 	CALL_COLUMNS,
 	type CommittedRuns,
 	callsSql,
+	cohortOwner,
 	measuredRunsSql,
 	RUN_MEASURE_COLUMNS,
 } from "./sql-measures.js";
@@ -152,9 +153,12 @@ const CALL_RUN_COLUMNS = [
 ];
 
 /** The committed run rows a view may read: the caller's workspace, and only their own sessions when `memberOnly`. */
-function committedRuns(memberOnly: boolean): CommittedRuns {
+function committedRuns(
+	memberOnly: boolean,
+	window: SqlWindow = {},
+): CommittedRuns {
 	const table = getSafeClickHouseTable(RUN_INDEX_TABLE);
-	const owner = memberOwner(memberOnly);
+	const owner = cohortOwner(memberOwner(memberOnly), window);
 	return {
 		table,
 		owner,
@@ -182,9 +186,9 @@ const RUNS: SqlView = {
 	],
 	columns: RUNS_COLUMNS,
 	recent: { column: "started_at", rows: "runs that started" },
-	sql(memberOnly) {
+	sql(memberOnly, window) {
 		return `SELECT ${RUNS_COLUMNS.map((column) => column.name).join(", ")}
-			FROM (${measuredRunsSql(committedRuns(memberOnly), runIndexColumns)})`;
+			FROM (${measuredRunsSql(committedRuns(memberOnly, window), runIndexColumns)})`;
 	},
 };
 
@@ -204,8 +208,13 @@ const CALLS: SqlView = {
 	recent: { column: "started_at", rows: "calls made" },
 	windowColumn: "started_at",
 	sql(memberOnly, window) {
-		const runs = committedRuns(memberOnly);
-		return callsSql(runs, measuredRunsSql(runs, CALL_RUN_COLUMNS), window);
+		const runs = committedRuns(memberOnly, window);
+		return callsSql(
+			runs,
+			measuredRunsSql(runs, CALL_RUN_COLUMNS),
+			window,
+			memberOwner(memberOnly),
+		);
 	},
 };
 

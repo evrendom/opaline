@@ -90,6 +90,8 @@ export type {
 
 import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
+import { analysisMeasuresContract } from "./analysis-measures.js";
+import { analysisPeekContract } from "./analysis-peek.js";
 import { sessionRunCiContract } from "./run-ci.js";
 import {
 	runQuestionsAdminContract,
@@ -133,10 +135,25 @@ export {
 	CALL_COMMAND_CHARS,
 	COMMAND_FROM,
 	COMMAND_SIMHASH_NEAR_BITS,
+	FIND_ARRAY_OPERATORS,
+	FIND_BOOLEAN_OPERATORS,
+	FIND_DATE_OPERATORS,
+	FIND_FILTER_OPERATORS,
+	FIND_MAX_OFFSET,
+	FIND_NUMERIC_OPERATORS,
+	FIND_REGEX_MAX_CHARS,
+	FIND_STRING_OPERATORS,
+	type FindFilter,
+	type FindFilterOperator,
+	FindFilterSchema,
 	findLimit,
+	isSessionsBehind,
 	parsePullRequestRef,
 	type RunRef,
 	RunRefSchema,
+	SESSIONS_BEHIND_SOURCES,
+	type SessionBehind,
+	type SessionsBehindOutput,
 	SQL_QUERY_MAX_CHARS,
 	WEEKLY_MEASURES,
 	WEEKLY_NULLABLE_MEASURES,
@@ -180,6 +197,7 @@ export {
 	SEARCH_MAX_DAYS,
 	SEARCH_MODES,
 	SEARCH_RECORD_TEXT_MAX_CHARS,
+	SEARCH_REGEX_MAX_CHARS,
 	SEARCH_TEXT_MAX_CHARS,
 } from "./analysis-search.js";
 export {
@@ -384,6 +402,8 @@ import {
 } from "./schemas/analytics.js";
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
+export * from "./analysis-measures.js";
+export * from "./analysis-peek.js";
 export * from "./avatar.js";
 export * from "./cli-version.js";
 export * from "./device-flow.js";
@@ -1088,6 +1108,8 @@ export const contract = {
 	analysis: {
 		...analysisContract,
 		...runQuestionsAnalysisContract,
+		...analysisMeasuresContract,
+		...analysisPeekContract,
 		history: analysisHistoryContract,
 	},
 	billing: {
