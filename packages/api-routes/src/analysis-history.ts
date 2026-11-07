@@ -7,6 +7,7 @@ import {
 	AnalysisReadOutputSchema,
 	AnalysisSqlInputSchema,
 	AnalysisSqlOutputSchema,
+	RunRefSchema,
 } from "./analysis.js";
 import { SourceSchema } from "./schemas/source.js";
 
@@ -150,6 +151,22 @@ export const AnalysisHistoryGetOutputSchema = AnalysisSummarySchema.omit({
 	),
 });
 
+export const AnalysisHistoryReportOutputSchema =
+	AnalysisHistoryGetOutputSchema.extend({
+		results: z.array(
+			z.object({
+				query: z.string(),
+				title: z.string(),
+				columns: z.array(z.string()),
+				rows: z.array(z.array(z.string())),
+				truncated: z.boolean(),
+			}),
+		),
+		citedRuns: z.array(
+			z.object({ step: z.string(), runs: z.array(RunRefSchema) }),
+		),
+	});
+
 export const AnalysisHistoryQueryInputSchema = z.object({ query: id }).strict();
 export const AnalysisHistoryQueryOutputSchema = z.object({
 	id: z.string(),
@@ -262,6 +279,9 @@ export type AnalysisHistorySearchOutput = z.infer<
 export type AnalysisHistoryGetOutput = z.infer<
 	typeof AnalysisHistoryGetOutputSchema
 >;
+export type AnalysisHistoryReportOutput = z.infer<
+	typeof AnalysisHistoryReportOutputSchema
+>;
 export type AnalysisHistoryQueryOutput = z.infer<
 	typeof AnalysisHistoryQueryOutputSchema
 >;
@@ -280,6 +300,9 @@ export const analysisHistoryContract = {
 	get: oc
 		.input(AnalysisHistoryGetInputSchema)
 		.output(AnalysisHistoryGetOutputSchema),
+	report: oc
+		.input(AnalysisHistoryGetInputSchema)
+		.output(AnalysisHistoryReportOutputSchema),
 	query: oc
 		.input(AnalysisHistoryQueryInputSchema)
 		.output(AnalysisHistoryQueryOutputSchema),

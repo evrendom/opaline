@@ -1,0 +1,128 @@
+import type { AnalysisHistorySearchOutput } from "@rudel/api-routes";
+import { Link, useParams } from "react-router-dom";
+import { appRoutes } from "@/app/routes";
+import { CardContent } from "@/app/ui/card";
+import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { dataWindow, formatDay } from "@/features/reports/report-dates";
+import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsSectionCard } from "@/features/settings/components/settings-section";
+import { buildReportsSettingsTracking } from "@/features/settings/settings-page-tracking";
+import {
+	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
+} from "@/features/settings/workspace/components/workspace-settings-group";
+import { useUserMap } from "@/features/workspace/hooks/useUserMap";
+import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { orpc } from "@/lib/orpc";
+import {
+	REPORTS_SETTINGS_DESCRIPTION,
+	REPORTS_SETTINGS_EMPTY,
+	REPORTS_SETTINGS_LIMIT,
+} from "./reports-settings-copy";
+import "./reports-settings.css";
+
+type SavedAnalysis = AnalysisHistorySearchOutput["analyses"][number];
+
+export function ReportsSettingsPage() {
+	const params = useParams();
+	const { state } = useOrganization();
+	const workspaceSlug = params.workspaceSlug ?? state.activeOrg?.slug ?? "";
+	const { userMap } = useUserMap();
+	const query = useAnalyticsQuery(
+		orpc.analysis.history.search.queryOptions({
+			input: { limit: REPORTS_SETTINGS_LIMIT },
+		}),
+	);
+	const listed = query.data?.analyses ?? [];
+	const reports = listed
+		.filter((analysis) => analysis.status === "finished")
+		.sort(
+			(left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+		);
+
+	useTrackProductPageView(
+		buildReportsSettingsTracking({
+			isPending: query.isPending,
+			isError: query.isError,
+			reportCount: reports.length,
+		}),
+	);
+
+	if (query.isPending) return <SettingsPageSkeleton routeId="reports" />;
+
+	if (query.isError) {
+		return (
+			<div className="workspace-settings-page">
+				<SettingsSectionCard>
+					<CardContent className="text-sm text-muted-foreground">
+						Reports couldn&apos;t be loaded right now.
+					</CardContent>
+				</SettingsSectionCard>
+			</div>
+		);
+	}
+
+	return (
+		<div className="workspace-settings-page">
+			<WorkspaceSettingsGroup
+				title="Reports"
+				description={
+					listed.length >= REPORTS_SETTINGS_LIMIT
+						? `${REPORTS_SETTINGS_DESCRIPTION} Showing the latest ${REPORTS_SETTINGS_LIMIT}.`
+						: REPORTS_SETTINGS_DESCRIPTION
+				}
+			>
+				{reports.length ? (
+					<ul
+						className="workspace-settings-list reports-settings-list"
+						aria-label="Saved reports"
+					>
+						{reports.map((report) => (
+							<li key={report.id}>
+								<ReportRow
+									report={report}
+									href={appRoutes.workspaceReport(workspaceSlug, report.id)}
+									authorName={
+										report.mine ? "you" : (userMap[report.authorId] ?? null)
+									}
+								/>
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="workspace-settings-empty">{REPORTS_SETTINGS_EMPTY}</p>
+				)}
+			</WorkspaceSettingsGroup>
+		</div>
+	);
+}
+
+function ReportRow({
+	report,
+	href,
+	authorName,
+}: {
+	report: SavedAnalysis;
+	href: string;
+	authorName: string | null;
+}) {
+	return (
+		<Link to={href} className="reports-settings-link">
+			<WorkspaceSettingsRow
+				label={
+					<span className="reports-settings-title">{report.question}</span>
+				}
+				description={`Saved ${formatDay(report.createdAt)}${authorName ? ` by ${authorName}` : ""} · ${dataWindow(report)}`}
+			>
+				{report.shared ? (
+					<span className="workspace-settings-badge">
+						Shared with workspace
+					</span>
+				) : (
+					<span className="workspace-settings-status">Not shared</span>
+				)}
+			</WorkspaceSettingsRow>
+		</Link>
+	);
+}

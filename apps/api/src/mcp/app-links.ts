@@ -6,6 +6,7 @@ export const APP_ROUTES = {
 	sessions: "/:workspaceSlug/sessions",
 	session: "/:workspaceSlug/sessions/:sessionId",
 	dashboard: "/:workspaceSlug/dashboard",
+	report: "/:workspaceSlug/reports/:analysisId",
 } as const;
 
 export type AppRoute = keyof typeof APP_ROUTES;

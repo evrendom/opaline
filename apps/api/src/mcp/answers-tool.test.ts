@@ -123,6 +123,9 @@ test("answers searches saved answers, opens one and opens one stored result, as 
 	expect(resultOf(flow.search)).toContain("Where our agents spend time");
 	expect(resultOf(flow.open)).toContain("Test runs are the longest.");
 	expect(resultOf(flow.open)).toContain(ids.query);
+	expect(resultOf(flow.open).split("\n").at(-1)).toMatch(
+		new RegExp(`^Open in Opaline: \\S+/w/reports/${ids.analysis}$`),
+	);
 	expect(resultOf(flow.query)).toContain(`query ${ids.query}`);
 	expect(resultOf(flow.query)).toContain("s1 | 41.5");
 	// The old tools still answer, the same way.

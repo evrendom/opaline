@@ -6,6 +6,8 @@ import {
 	IconChartAreaLineFilled,
 	IconCompass,
 	IconCompassFilled,
+	IconFileText,
+	IconFileTextFilled,
 	IconFolder,
 	IconFolderFilled,
 	IconMessages,
@@ -28,7 +30,8 @@ export type ShellRouteId =
 	| "agentTraces"
 	| "repos"
 	| "team"
-	| "settings";
+	| "settings"
+	| "reports";
 
 // Section colours run down Opaline's sheen, blue to pink (opal-1…5 in
 // preset-extensions.css). The active section's chip turns a pale tint with a
@@ -188,8 +191,24 @@ export const shellNavigationRoutes = shellRoutes.filter(
 		),
 );
 
+export const reportsShellRoute: ShellRouteDefinition = {
+	id: "reports",
+	comingSoon: false,
+	path: "/reports",
+	title: "Report",
+	navLabel: "Report",
+	shortcut: "",
+	icon: IconFileText,
+	activeIcon: IconFileTextFilled,
+	tone: tones.opal1,
+};
+
 export function getCurrentShellRoute(pathname: string): ShellRouteDefinition {
 	const canonicalPathname = getCanonicalAppPath(pathname);
+
+	if (canonicalPathname.startsWith(`${reportsShellRoute.path}/`)) {
+		return reportsShellRoute;
+	}
 
 	if (
 		canonicalPathname === CLI_SETUP_PATH ||

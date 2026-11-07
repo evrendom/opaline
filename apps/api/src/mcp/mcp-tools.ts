@@ -85,6 +85,7 @@ import {
 	renderMeasureRun,
 	renderPatterns,
 } from "./measure-renderers.js";
+import { withReportLink } from "./report-link.js";
 import {
 	findPeek,
 	measuresPeek,
@@ -421,12 +422,15 @@ function searchAnswers(
 function openAnswer(
 	client: Client,
 	analysis: string,
+	workspace: McpWorkspace,
 	url?: string,
 ): Promise<unknown> {
 	return withLogOffMessage(
 		client.analysis.history
 			.get({ analysis })
-			.then(renderAnalysisTree)
+			.then((tree) =>
+				withReportLink(renderAnalysisTree(tree), workspace.slug, tree.id),
+			)
 			.then(linked(url)),
 	);
 }
@@ -1211,7 +1215,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 					url,
 				);
 			if (input.action === "open")
-				return openAnswer(client, input.analysis, url);
+				return openAnswer(client, input.analysis, context.workspace, url);
 			return openResult(client, input.id, url);
 		},
 	},
@@ -1336,10 +1340,11 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			analysis: "Required. The saved answer's id, from search_answers.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: async (client, { workspace: _workspace, ...args }) =>
+		run: async (client, { workspace: _workspace, ...args }, { workspace }) =>
 			openAnswer(
 				client,
 				parseMcpInput(AnalysisHistoryGetInputSchema, args).analysis,
+				workspace,
 			),
 	},
 	{
@@ -1399,13 +1404,16 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"Short reason, with counts or dates, up to 500 characters.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: async (client, { workspace: _workspace, ...args }) =>
+		run: async (client, { workspace: _workspace, ...args }, { workspace }) =>
 			withLogOffMessage(
 				client.analysis.history
 					.save(parseMcpInput(AnalysisHistorySaveInputSchema, args))
-					.then(
-						(saved) =>
+					.then((saved) =>
+						withReportLink(
 							`saved analysis=${saved.analysis} status=${saved.status}`,
+							workspace.slug,
+							saved.analysis,
+						),
 					),
 			),
 	},
@@ -1424,12 +1432,16 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			analysis: "Required. The saved answer's id, from save_answer.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: async (client, { workspace: _workspace, ...args }) =>
+		run: async (client, { workspace: _workspace, ...args }, { workspace }) =>
 			withLogOffMessage(
 				client.analysis.history
 					.share({ ...parseMcpInput(ShareToolInputSchema, args), shared: true })
-					.then(
-						(shared) => `analysis=${shared.analysis} shared=${shared.shared}`,
+					.then((shared) =>
+						withReportLink(
+							`analysis=${shared.analysis} shared=${shared.shared}`,
+							workspace.slug,
+							shared.analysis,
+						),
 					),
 			),
 	},

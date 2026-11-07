@@ -1,5 +1,6 @@
 import { Skeleton } from "@/app/ui/skeleton";
 import type { PrimarySettingsRouteId } from "@/features/settings/config/settings-routes";
+import { REPORTS_SETTINGS_DESCRIPTION } from "@/features/settings/reports/reports-settings-copy";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -42,6 +43,27 @@ export function SettingsPageSkeleton({
 						<Skeleton key={key} className="h-12 w-full" />
 					))}
 				</div>
+			) : routeId === "reports" ? (
+				<WorkspaceSettingsGroup
+					title="Reports"
+					description={REPORTS_SETTINGS_DESCRIPTION}
+				>
+					<div className="workspace-settings-list">
+						{["first", "second", "third"].map((key) => (
+							<WorkspaceSettingsRow
+								key={key}
+								label={<Skeleton className="h-4 w-64 max-w-full rounded" />}
+								description={
+									<Skeleton className="h-4 w-48 max-w-full rounded" />
+								}
+							>
+								<div>
+									<Skeleton className="h-5 w-36 rounded-full" />
+								</div>
+							</WorkspaceSettingsRow>
+						))}
+					</div>
+				</WorkspaceSettingsGroup>
 			) : routeId === "workspace" ? (
 				<>
 					<WorkspaceSettingsGroup title="Workspace">

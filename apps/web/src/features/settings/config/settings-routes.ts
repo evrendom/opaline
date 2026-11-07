@@ -4,6 +4,7 @@ export type SettingsRouteId =
 	| "workspace"
 	| "github"
 	| "sessions"
+	| "reports"
 	| "members"
 	| "invitations"
 	| "account"
@@ -38,6 +39,12 @@ export const settingsRouteMap: Record<
 		segment: "sessions",
 		path: appRoutes.settingsSessions(),
 	},
+	reports: {
+		id: "reports",
+		label: "Reports",
+		segment: "reports",
+		path: appRoutes.settingsReports(),
+	},
 	members: {
 		id: "members",
 		label: "Members",
@@ -70,6 +77,7 @@ export type PrimarySettingsRouteId =
 	| "workspace"
 	| "github"
 	| "sessions"
+	| "reports"
 	| "members"
 	| "account";
 
@@ -77,6 +85,7 @@ export const primarySettingsRoutes = [
 	settingsRouteMap.workspace,
 	settingsRouteMap.github,
 	settingsRouteMap.sessions,
+	settingsRouteMap.reports,
 	settingsRouteMap.members,
 	settingsRouteMap.account,
 ] as const satisfies readonly SettingsRouteDefinition[];
@@ -97,6 +106,7 @@ export function getActiveSettingsRouteId(
 	}
 
 	if (matchedRoute === "sessions") return "sessions";
+	if (matchedRoute === "reports") return "reports";
 	if (matchedRoute === "github") return "github";
 
 	if (matchedRoute === "members") {

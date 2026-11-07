@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	getCurrentShellRoute,
+	reportsShellRoute,
 	shellRouteMap,
 	shellRoutes,
 } from "@/features/shell/config/shell-routes";
@@ -25,6 +26,12 @@ describe("getCurrentShellRoute", () => {
 		expect(getCurrentShellRoute("/newsesh/session-123")).toBe(
 			shellRouteMap.sessions,
 		);
+	});
+
+	it("titles a saved analysis report as a report, not the dashboard", () => {
+		expect(getCurrentShellRoute("/acme/reports/a_123")).toBe(reportsShellRoute);
+		expect(reportsShellRoute.title).toBe("Report");
+		expect(shellRoutes).not.toContain(reportsShellRoute);
 	});
 
 	it("uses history as the sessions shortcut", () => {

@@ -51,6 +51,7 @@ import {
 	createPostgresVisibilitySyncs,
 	type VisibilitySyncs,
 } from "../../services/analysis-log/finding-visibility.js";
+import { getAnalysisReport } from "../../services/analysis-log/report.js";
 import { describeSessions } from "../../services/analysis-log/sessions.js";
 import type { AnalysisLog } from "../../services/analysis-log/types.js";
 import { listOnRunQuestions } from "../../services/run-questions/catalogue.js";
@@ -386,6 +387,17 @@ export function createAnalysisRouter(
 			.use(orgMiddleware)
 			.handler(({ input, context }) =>
 				getAnalysisTree(requireLog(context), viewerOf(context), input.analysis),
+			),
+		report: os.analysis.history.report
+			.use(orgMiddleware)
+			.handler(async ({ input, context }) =>
+				redactReturnedValue(
+					await getAnalysisReport(
+						requireLog(context),
+						viewerOf(context),
+						input.analysis,
+					),
+				),
 			),
 		query: os.analysis.history.query
 			.use(orgMiddleware)

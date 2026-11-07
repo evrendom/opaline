@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildAccountSettingsTracking,
 	buildMembersSettingsTracking,
+	buildReportsSettingsTracking,
 	buildWorkspaceSettingsTracking,
 } from "./settings-page-tracking";
 
@@ -140,5 +141,41 @@ describe("settings page tracking builders", () => {
 			{ id: "workspace_invitations", state: "populated", itemCount: 1 },
 			{ id: "account_deletion", state: "hidden" },
 		]);
+	});
+
+	it("builds reports settings tracking from the listed reports", () => {
+		expect(
+			buildReportsSettingsTracking({
+				isPending: false,
+				isError: false,
+				reportCount: 3,
+			}),
+		).toEqual({
+			isLoading: false,
+			isError: false,
+			hasData: true,
+			metrics: [{ id: "reports", value: 3 }],
+			sections: [{ id: "saved_reports", state: "populated", itemCount: 3 }],
+		});
+
+		expect(
+			buildReportsSettingsTracking({
+				isPending: false,
+				isError: false,
+				reportCount: 0,
+			}).sections,
+		).toEqual([{ id: "saved_reports", state: "empty", itemCount: 0 }]);
+
+		expect(
+			buildReportsSettingsTracking({
+				isPending: true,
+				isError: false,
+				reportCount: 0,
+			}),
+		).toMatchObject({
+			isLoading: true,
+			hasData: false,
+			sections: [{ id: "saved_reports", state: "hidden", itemCount: 0 }],
+		});
 	});
 });

@@ -89,6 +89,10 @@ const SessionsSettingsPage = lazyNamed(
 	() => import("@/features/settings/sessions/sessions-settings-page"),
 	"SessionsSettingsPage",
 );
+const ReportsSettingsPage = lazyNamed(
+	() => import("@/features/settings/reports/ReportsSettingsPage"),
+	"ReportsSettingsPage",
+);
 const MembersSettingsPage = lazyNamed(
 	() => import("@/features/settings/members/MembersSettingsPage"),
 	"MembersSettingsPage",
@@ -96,6 +100,10 @@ const MembersSettingsPage = lazyNamed(
 const AccountSettingsPage = lazyNamed(
 	() => import("@/features/settings/account/AccountSettingsPage"),
 	"AccountSettingsPage",
+);
+const ReportPage = lazyNamed(
+	() => import("@/features/reports/ReportPage"),
+	"ReportPage",
 );
 const TeamPage = lazyNamed(
 	() => import("@/features/team/TeamPage"),
@@ -288,6 +296,15 @@ function getShellRouteElements(
 					}
 				/>
 				<Route
+					path={settingsRouteMap.reports.segment}
+					element={
+						<LazyRoute
+							Component={ReportsSettingsPage}
+							fallback={<SettingsPageSkeleton routeId="reports" />}
+						/>
+					}
+				/>
+				<Route
 					path={settingsRouteMap.members.segment}
 					element={
 						<LazyRoute
@@ -424,6 +441,10 @@ export function AppRouter({
 					<Route
 						path="/:workspaceSlug/newsesh/:sessionId?"
 						element={<LazyRoute Component={NewSessionPage} />}
+					/>
+					<Route
+						path="/:workspaceSlug/reports/:analysisId"
+						element={<LazyRoute Component={ReportPage} />}
 					/>
 				</Route>
 			</Route>

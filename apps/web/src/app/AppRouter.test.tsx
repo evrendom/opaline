@@ -49,6 +49,13 @@ vi.mock("@/features/skills/SkillsPage", () => ({
 	SkillsPage: () => <div>Historical skills page</div>,
 }));
 
+vi.mock("@/features/reports/ReportPage", async () => {
+	const { useParams } = await import("react-router-dom");
+	return {
+		ReportPage: () => <div>Report {useParams().analysisId}</div>,
+	};
+});
+
 vi.mock("@/features/team/TeamPage", () => ({
 	TeamPage: () => <div>Team page</div>,
 }));
@@ -64,6 +71,10 @@ vi.mock("@/features/settings/SettingsLayout", () => ({
 
 vi.mock("@/features/settings/workspace/WorkspaceSettingsPage", () => ({
 	WorkspaceSettingsPage: () => <div>Workspace settings page</div>,
+}));
+
+vi.mock("@/features/settings/reports/ReportsSettingsPage", () => ({
+	ReportsSettingsPage: () => <div>Reports settings page</div>,
 }));
 
 vi.mock("@/features/settings/members/MembersSettingsPage", () => ({
@@ -103,8 +114,11 @@ describe("AppRouter", () => {
 		["/skills", "Historical skills page"],
 		["/team", "Team page"],
 		["/settings", "Workspace settings page"],
+		["/settings/reports", "Reports settings page"],
+		["/acme/settings/reports", "Reports settings page"],
 		["/settings/members", "Members settings page"],
 		["/settings/account", "Account settings page"],
+		["/acme/reports/a_123", "Report a_123"],
 	])("routes canonical %s through the left sidebar shell", async (path, pageContent) => {
 		render(
 			<MemoryRouter initialEntries={[path]}>

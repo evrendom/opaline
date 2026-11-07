@@ -36,6 +36,7 @@ test("every route is one the web router serves, and the date range is read from 
 	expect(APP_ROUTES.dashboard).toBe(served.dashboard);
 	expect(router).toMatch(/path=\{`\$\{routePaths\.session\}\/:sessionId\?`\}/u);
 	expect(`${APP_ROUTES.session}`).toBe(`${served.session}/:sessionId`);
+	expect(router).toContain(`path="${APP_ROUTES.report}"`);
 	const dates = await Bun.file(
 		join(WEB, "features/analytics/date-range/DateRangeProvider.tsx"),
 	).text();

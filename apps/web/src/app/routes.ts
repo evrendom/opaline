@@ -19,6 +19,7 @@ const SETTINGS_ROOT_PATH = "/settings";
 const SETTINGS_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/workspace`;
 const SETTINGS_GITHUB_PATH = `${SETTINGS_ROOT_PATH}/github`;
 const SETTINGS_SESSIONS_PATH = `${SETTINGS_ROOT_PATH}/sessions`;
+const SETTINGS_REPORTS_PATH = `${SETTINGS_ROOT_PATH}/reports`;
 const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
 const SETTINGS_INVITATIONS_PATH = `${SETTINGS_ROOT_PATH}/invitations`;
 const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
@@ -36,6 +37,8 @@ export const appRoutes = {
 	session: () => SESSION_PATH,
 	workspaceSessions: (workspaceSlug: string) =>
 		`/${encodeURIComponent(workspaceSlug)}/sessions`,
+	workspaceReport: (workspaceSlug: string, analysisId: string) =>
+		`/${encodeURIComponent(workspaceSlug)}/reports/${encodeURIComponent(analysisId)}`,
 	sessionDetail: (sessionId: string) =>
 		`${SESSION_PATH}/${encodeURIComponent(sessionId)}`,
 	newSession: () => NEW_SESSION_PATH,
@@ -68,6 +71,7 @@ export const appRoutes = {
 	settingsWorkspace: () => SETTINGS_WORKSPACE_PATH,
 	settingsGitHub: () => SETTINGS_GITHUB_PATH,
 	settingsSessions: () => SETTINGS_SESSIONS_PATH,
+	settingsReports: () => SETTINGS_REPORTS_PATH,
 	settingsMembers: () => SETTINGS_MEMBERS_PATH,
 	settingsInvitations: () => SETTINGS_INVITATIONS_PATH,
 	settingsAccount: () => SETTINGS_ACCOUNT_PATH,

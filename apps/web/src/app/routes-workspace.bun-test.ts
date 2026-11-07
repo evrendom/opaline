@@ -33,6 +33,7 @@ describe("Workspace product URLs", () => {
 				"/settings/workspace#new-workspace",
 				"/acme/settings/workspace#new-workspace",
 			],
+			["/settings/reports", "/acme/settings/reports"],
 			["/settings/members", "/acme/settings/members"],
 			["/settings/account", "/acme/settings/account"],
 			["/settings/invitations", "/acme/settings/invitations"],
@@ -110,6 +111,10 @@ describe("Workspace product URLs", () => {
 		expect(getCurrentShellRoute("/acme/team")?.id).toBe("team");
 		expect(getActiveSettingsRouteId("/acme/settings/account")).toBe("account");
 		expect(getActiveSettingsRouteId("/acme/settings/members")).toBe("members");
+		expect(getActiveSettingsRouteId("/acme/settings/reports")).toBe("reports");
+		expect(appRoutes.workspaceReport("acme", "a/1")).toBe(
+			"/acme/reports/a%2F1",
+		);
 	});
 });
 

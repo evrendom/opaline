@@ -113,6 +113,7 @@ console.log(JSON.stringify({
 			env: {
 				PATH: process.env.PATH,
 				PG_CONNECTION_STRING: "postgres://unused@127.0.0.1:1/unused",
+				ALLOWED_ORIGIN: "https://opaline.so/",
 			},
 			stderr: "pipe",
 			stdout: "pipe",
@@ -709,10 +710,13 @@ test("analysis tools hide drafts, publish once, refuse a second save with a plai
 		error:
 			"question: required: the question this answer addresses, as a short title",
 	});
+	const report = `Open in Opaline: https://opaline.so/w/reports/${id}`;
 	expect(flow.save).toEqual({
-		result: `saved analysis=${id} status=finished`,
+		result: `saved analysis=${id} status=finished\n${report}`,
 	});
-	expect(flow.share).toEqual({ result: `analysis=${id} shared=true` });
+	expect(flow.share).toEqual({
+		result: `analysis=${id} shared=true\n${report}`,
+	});
 	expect(errorOf(flow.unshare)).toContain("shared");
 	expect(flow.saveAgain).toEqual({
 		error: `This analysis is already saved. To revise it, save a new analysis that passes updates=${id}.`,
@@ -721,9 +725,12 @@ test("analysis tools hide drafts, publish once, refuse a second save with a plai
 		`Analysis ${started.analysis} updates ${id}, so changes needs exactly one item per finding saved now, naming its step by its step or query id (plus change=dropped items for findings of ${id} that no longer hold): no change for the finding of ${started.step} ("find source=runs"). Nothing was saved.`,
 	);
 	const saved = resultOf(flow.revise);
-	expect(saved).toMatch(/^saved analysis=a_\S+ status=finished$/);
+	expect(saved).toMatch(
+		/^saved analysis=(a_\S+) status=finished\nOpen in Opaline: https:\/\/opaline\.so\/w\/reports\/\1$/,
+	);
 	const revisionId = saved.split(/[= ]/)[2];
 	const prior = resultOf(flow.getPrior);
+	expect(prior.split("\n").at(-1)).toBe(report);
 	expect(prior.split("\n")[0]).toMatch(
 		new RegExp(
 			`^analysis ${id} status=finished .* cutoff=\\S+ updates=none updatedBy=${revisionId}$`,

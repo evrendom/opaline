@@ -33,6 +33,12 @@ interface AccountSettingsTrackingInput {
 	invitationCount: number;
 }
 
+interface ReportsSettingsTrackingInput {
+	isPending: boolean;
+	isError: boolean;
+	reportCount: number;
+}
+
 export function buildWorkspaceSettingsTracking(
 	input: WorkspaceSettingsTrackingInput,
 ): SettingsPageTracking {
@@ -139,6 +145,30 @@ export function buildAccountSettingsTracking(
 			{
 				id: "account_deletion",
 				state: input.hasAccountData ? "populated" : "hidden",
+			},
+		],
+	};
+}
+
+export function buildReportsSettingsTracking(
+	input: ReportsSettingsTrackingInput,
+): SettingsPageTracking {
+	return {
+		isLoading: input.isPending,
+		isError: input.isError,
+		hasData: !input.isPending && !input.isError,
+		metrics: [{ id: "reports", value: input.reportCount }],
+		sections: [
+			{
+				id: "saved_reports",
+				state: input.isPending
+					? "hidden"
+					: input.isError
+						? "error"
+						: input.reportCount > 0
+							? "populated"
+							: "empty",
+				itemCount: input.reportCount,
 			},
 		],
 	};

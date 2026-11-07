@@ -1,6 +1,7 @@
 import {
 	type Icon,
 	IconBrandGithubFilled,
+	IconFileAnalyticsFilled,
 	IconIdFilled,
 	IconMailFilled,
 	IconMessage2Filled,
@@ -35,6 +36,7 @@ const settingsTabIcons: Record<SettingsRouteId, Icon> = {
 	workspace: IconSettingsFilled,
 	github: IconBrandGithubFilled,
 	sessions: IconMessage2Filled,
+	reports: IconFileAnalyticsFilled,
 	members: IconUserFilled,
 	invitations: IconMailFilled,
 	account: IconIdFilled,

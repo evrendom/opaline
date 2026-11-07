@@ -171,6 +171,8 @@ export {
 	AnalysisHistoryQueryInputSchema,
 	type AnalysisHistoryQueryOutput,
 	AnalysisHistoryQueryOutputSchema,
+	type AnalysisHistoryReportOutput,
+	AnalysisHistoryReportOutputSchema,
 	type AnalysisHistorySaveInput,
 	AnalysisHistorySaveInputSchema,
 	AnalysisHistorySaveOutputSchema,
