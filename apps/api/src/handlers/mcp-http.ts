@@ -30,8 +30,7 @@ import {
 } from "../mcp/mcp-tools.js";
 import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
 import { withRedactedOutput } from "../mcp/redacted-tools.js";
-import { toolsListedFor } from "../mcp/retro-listing.js";
-import { isAdminWorkspace } from "../mcp/self-analytics-tools.js";
+import { toolsListedFor, workspacesListing } from "../mcp/retro-listing.js";
 import {
 	recoveryHint,
 	unknownToolMessage,
@@ -39,7 +38,6 @@ import {
 } from "../mcp/tool-errors.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
-import { retroToolsEnabled } from "../services/analysis/retro-tools.js";
 import {
 	recordToolCall,
 	toolCallRow,
@@ -113,13 +111,15 @@ async function isMcpAvailable(userId: string) {
 async function listingFor(
 	userId: string,
 ): Promise<{ retro: boolean; admin: boolean }> {
-	const memberships = await sqlClient<{ organization_id: string }[]>`
-		SELECT organization_id FROM member WHERE user_id = ${userId}
+	const memberships = await sqlClient<
+		{ id: string; createdAt: Date | string | null }[]
+	>`
+		SELECT m.organization_id AS id, o.created_at AS "createdAt"
+		FROM member m
+		LEFT JOIN organization o ON o.id = m.organization_id
+		WHERE m.user_id = ${userId}
 	`;
-	return {
-		retro: memberships.some((row) => retroToolsEnabled(row.organization_id)),
-		admin: memberships.some((row) => isAdminWorkspace(row.organization_id)),
-	};
+	return workspacesListing(memberships);
 }
 
 function listedTools(listing: { retro: boolean; admin: boolean }) {
@@ -605,7 +605,7 @@ async function resolveWorkspace(
 ): Promise<McpWorkspace> {
 	const slug = typeof requested === "string" && requested ? requested : null;
 	const [workspace] = await sqlClient<McpWorkspace[]>`
-		SELECT o.id, o.slug
+		SELECT o.id, o.slug, o.created_at AS "createdAt"
 		FROM member m
 		JOIN organization o ON o.id = m.organization_id
 		WHERE m.user_id = ${userId}

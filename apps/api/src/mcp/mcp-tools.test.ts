@@ -1,5 +1,10 @@
-import { expect, test } from "bun:test";
-import { RETRO_LISTED_TOOLS, toolsListedFor } from "./retro-listing.js";
+import { afterEach, expect, test } from "bun:test";
+import {
+	ADMIN_LISTED_TOOLS,
+	RETRO_LISTED_TOOLS,
+	toolsListedFor,
+	workspacesListing,
+} from "./retro-listing.js";
 
 /**
  * Loads MCP_TOOLS in a child process: the module opens the Postgres pool on
@@ -449,6 +454,57 @@ test("without the retro tools, the model is listed exactly the tools of the publ
 	expect(toolsListedFor(listed, true).map((tool) => tool.name)).not.toContain(
 		"mcp_stats",
 	);
+});
+
+const LISTING_ENV = [
+	"RETRO_TOOLS_WORKSPACES",
+	"RETRO_TOOLS_NEW_SINCE",
+	"VITE_ADMIN_ORGANIZATION_ID",
+] as const;
+const savedListingEnv = LISTING_ENV.map((name) => ({
+	name,
+	value: process.env[name],
+}));
+afterEach(() => {
+	for (const { name, value } of savedListingEnv) {
+		if (value === undefined) delete process.env[name];
+		else process.env[name] = value;
+	}
+});
+
+test("a user in a workspace created since RETRO_TOOLS_NEW_SINCE is listed the retro tools; one only in older unlisted workspaces is not", async () => {
+	const { listed } = await loaded;
+	process.env.RETRO_TOOLS_WORKSPACES = "ws-listed";
+	process.env.RETRO_TOOLS_NEW_SINCE = "2026-11-06";
+	process.env.VITE_ADMIN_ORGANIZATION_ID = "ws-team";
+	const old = { id: "ws-old", createdAt: new Date("2026-10-01T00:00:00Z") };
+	const fresh = { id: "ws-new", createdAt: new Date("2026-11-06T09:30:00Z") };
+	const names = (listing: { retro: boolean; admin: boolean }) =>
+		toolsListedFor(listed, listing.retro, listing.admin).map(
+			(tool) => tool.name,
+		);
+
+	expect(workspacesListing([old])).toEqual({ retro: false, admin: false });
+	for (const name of RETRO_LISTED_TOOLS)
+		expect(names(workspacesListing([old]))).not.toContain(name);
+
+	expect(workspacesListing([old, fresh])).toEqual({
+		retro: true,
+		admin: false,
+	});
+	const retro = names(workspacesListing([old, fresh]));
+	for (const name of RETRO_LISTED_TOOLS)
+		expect({ name, listed: retro.includes(name) }).toEqual({
+			name,
+			listed: !ADMIN_LISTED_TOOLS.has(name),
+		});
+
+	expect(workspacesListing([{ id: "ws-team", createdAt: null }])).toEqual({
+		retro: true,
+		admin: true,
+	});
+	delete process.env.RETRO_TOOLS_NEW_SINCE;
+	expect(workspacesListing([fresh])).toEqual({ retro: false, admin: false });
 });
 
 test("only a retro listing asks every model tool for context and llm_model, and offers format on read and run, url and peek; app-only tools never change", async () => {

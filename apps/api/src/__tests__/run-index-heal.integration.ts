@@ -50,7 +50,11 @@ afterAll(async () => {
 	await sqlClient.end();
 });
 
-async function publish(sessionId: string, hoursAgo: number) {
+async function publish(
+	sessionId: string,
+	hoursAgo: number,
+	parserVersion = TRANSCRIPT_RECORDS_PARSER_VERSION,
+) {
 	const sessionDate = new Date(Date.now() - hoursAgo * 3_600_000).toISOString();
 	const content = await Bun.file(
 		new URL(
@@ -81,7 +85,7 @@ async function publish(sessionId: string, hoursAgo: number) {
 			buildTranscriptRecordsReceiptRow(identity, {
 				...summarizeSplit(stats),
 				contentSha256: hashTranscriptContent(content),
-				parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
+				parserVersion,
 				publishedAt: new Date().toISOString(),
 				rowCount: rows.length,
 			}),
@@ -123,13 +127,16 @@ const config = {
 	maxLoad: 1_000_000,
 };
 
-const tick = () =>
+const tick = (
+	options: Partial<Parameters<typeof runRunIndexHealTick>[0]> = {},
+) =>
 	runRunIndexHealTick({
 		sql: sqlClient,
 		executor: clickhouse,
 		config,
 		deadline: { deadlineAt: Date.now() + 120_000, now: Date.now },
 		organizationIds: [organizationId],
+		...options,
 	});
 
 test("the run index heal queues stale sessions newest first, one tick at a time, until none is stale", async () => {
@@ -201,4 +208,39 @@ test("the run index heal queues stale sessions newest first, one tick at a time,
 		staleBefore: 0,
 		remaining: 0,
 	});
+});
+
+test("with reparse on, a stale index is queued before a newer session on the current index is reparsed", async () => {
+	const parsed = session("parsed");
+	const stale = session("stale");
+	await publish(parsed.sessionId, 3, TRANSCRIPT_RECORDS_PARSER_VERSION - 1);
+	await publish(stale.sessionId, 5, TRANSCRIPT_RECORDS_PARSER_VERSION - 1);
+	await enqueueL1EdgeScope(sqlClient, {
+		kind: "run_index",
+		organizationId,
+		...parsed,
+	});
+	expect(await pass()).toBe(1);
+
+	const reparsed: string[] = [];
+	const result = await tick({
+		config: { ...config, reparse: true, maxReparsePerTick: 1 },
+		reparser: {
+			retire: async () => 0,
+			reparse: async (row) => {
+				reparsed.push(row.session_id);
+				return { outcome: "written", bytes: 1 };
+			},
+		},
+	});
+	expect(result).toMatchObject({
+		status: "ran",
+		staleBefore: 2,
+		queued: 1,
+		reparsed: 1,
+	});
+	expect(reparsed).toEqual([parsed.sessionId]);
+	expect(
+		(await pendingRunIndexScopes()).map((scope) => scope.scope_id),
+	).toEqual([sessionScopeId(stale)]);
 });

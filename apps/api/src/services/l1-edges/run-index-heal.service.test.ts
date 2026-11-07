@@ -93,7 +93,13 @@ function fakeClickHouse(input: {
 			if (kind === "census") return (input.census ?? []) as T[];
 			const organizationId = String(statement.query_params?.organizationId);
 			const limit = Number(statement.query_params?.limit);
-			return (input.rows?.[organizationId] ?? []).slice(0, limit) as T[];
+			const reparseOnly = statement.query_params?.reparseOnly === 1;
+			const rows = (input.rows?.[organizationId] ?? []).filter(
+				(row) => !reparseOnly || row.reason === "current",
+			);
+			const indexStale = rows.filter((row) => row.reason !== "current");
+			const parserOnly = rows.filter((row) => row.reason === "current");
+			return [...indexStale, ...parserOnly].slice(0, limit) as T[];
 		},
 	};
 	return { executor, statements };
@@ -285,21 +291,71 @@ describe("the run index heal throttle", () => {
 });
 
 describe("the run index heal selection", () => {
-	test("queues stale run indexes; with reparse on, parser-stale sessions are reparsed first, never indexed twice", () => {
+	test("a stale index is rebuilt at the parser it has; only sessions on the current index are reparsed", () => {
 		const rows = [
 			row("o", "a", { parser_version: OLD, reason: "index_version" }),
 			row("o", "b", { reason: "generation" }),
 			row("o", "c", { parser_version: OLD, reason: "current" }),
 			row("o", "d", { parser_version: OLD, reason: "missing" }),
 			row("o", "e", { reason: "current" }),
+			row("o", "f", { parser_version: OLD, reason: "current" }),
 		];
 		const off = planHealRows(rows, { reparse: false, maxReparse: 10 });
 		expect(off.reparse).toEqual([]);
 		expect(off.index.map((r) => r.session_id)).toEqual(["a", "b", "d"]);
+		expect(off.index.map((r) => r.parser_version)).toEqual([OLD, CURRENT, OLD]);
 
-		const on = planHealRows(rows, { reparse: true, maxReparse: 2 });
-		expect(on.reparse.map((r) => r.session_id)).toEqual(["a", "c"]);
-		expect(on.index.map((r) => r.session_id)).toEqual(["b"]);
+		const on = planHealRows(rows, { reparse: true, maxReparse: 1 });
+		expect(on.index.map((r) => r.session_id)).toEqual(["a", "b", "d"]);
+		expect(on.reparse.map((r) => r.session_id)).toEqual(["c"]);
+
+		const roomy = planHealRows(rows, { reparse: true, maxReparse: 10 });
+		expect(roomy.reparse.map((r) => r.session_id)).toEqual(["c", "f"]);
+	});
+
+	test("the selection puts stale indexes before parser-only staleness, and pages and narrows by it", () => {
+		const first = buildHealSelectionStatement({
+			organizationId: "o",
+			reparse: true,
+			slowMs: 20_000,
+			limit: 7,
+		});
+		expect(first.query).toMatch(
+			/ORDER BY toUInt8\(\(indexed\.present = 0[\s\S]*\) DESC, records\.last_session_date DESC/,
+		);
+		expect(first.query).toContain(
+			"{reparseOnly:UInt8} = 0 OR NOT (indexed.present = 0",
+		);
+		expect(first.query_params).toMatchObject({ reparse: 1, reparseOnly: 0 });
+
+		const narrowed = buildHealSelectionStatement({
+			organizationId: "o",
+			reparse: true,
+			slowMs: 20_000,
+			limit: 7,
+			reparseOnly: true,
+			after: {
+				indexStale: true,
+				sessionDate: "2026-11-01 10:00:00.000",
+				userId: "u1",
+				sessionId: "s",
+			},
+		});
+		expect(narrowed.query).toContain("{afterIndexStale:UInt8}");
+		expect(narrowed.query_params).toMatchObject({
+			reparseOnly: 1,
+			afterIndexStale: 1,
+		});
+
+		expect(
+			buildHealSelectionStatement({
+				organizationId: "o",
+				reparse: false,
+				slowMs: 20_000,
+				limit: 7,
+				reparseOnly: true,
+			}).query_params,
+		).toMatchObject({ reparse: 0, reparseOnly: 0 });
 	});
 
 	test("every statement is read-only, bounded and scoped", () => {
@@ -325,7 +381,9 @@ describe("the run index heal selection", () => {
 			limit: 7,
 		});
 		expect(first.query).toContain("organization_id = {organizationId:String}");
-		expect(first.query).toContain("ORDER BY records.last_session_date DESC");
+		expect(first.query).toContain(
+			" DESC, records.last_session_date DESC, records.user_id DESC",
+		);
 		expect(first.query).not.toContain("afterSessionDate");
 		expect(first.clickhouse_settings).toMatchObject({
 			readonly: "2",
@@ -338,6 +396,7 @@ describe("the run index heal selection", () => {
 			slowMs: 20_000,
 			limit: 7,
 			after: {
+				indexStale: false,
 				sessionDate: "2026-11-01 10:00:00.000",
 				userId: "u1",
 				sessionId: "s",
@@ -471,17 +530,17 @@ describe("a run index heal tick", () => {
 		expect(selected).toEqual(["admin", "retro", "busy"]);
 	});
 
-	test("reparses parser-stale sessions first and indexes those it cannot reparse", async () => {
+	test("with reparse on, stale indexes are queued first at their parser and only sessions on the current index are reparsed", async () => {
+		const sessions = [
+			row("o", "p1", { parser_version: OLD, reason: "current" }),
+			row("o", "i1", { parser_version: OLD, reason: "index_version" }),
+			row("o", "p2", { parser_version: OLD, reason: "current" }),
+			row("o", "i2", { parser_version: OLD, reason: "missing" }),
+			row("o", "i3", { reason: "generation" }),
+		];
 		const clickhouse = fakeClickHouse({
-			census: [censusRow("o", 4, "2026-11-01 00:00:00.000")],
-			rows: {
-				o: [
-					row("o", "fresh", { reason: "generation" }),
-					row("o", "big", { parser_version: OLD, reason: "index_version" }),
-					row("o", "ok", { parser_version: OLD, reason: "index_version" }),
-					row("o", "later", { parser_version: OLD, reason: "missing" }),
-				],
-			},
+			census: [censusRow("o", 5, "2026-11-01 00:00:00.000")],
+			rows: { o: sessions },
 		});
 		const pg = fakeSql();
 		const reparsed: string[] = [];
@@ -493,32 +552,74 @@ describe("a run index heal tick", () => {
 			},
 			reparse: async (target) => {
 				reparsed.push(target.session_id);
-				if (target.session_id === "big")
-					return { outcome: "oversized", bytes: 0 };
-				if (target.session_id === "later")
-					return { outcome: "deferred", bytes: 0 };
 				return { outcome: "written", bytes: 10 };
 			},
 		};
 		const result = await runRunIndexHealTick({
 			sql: pg.sql,
 			executor: clickhouse.executor,
-			config: config({ reparse: true, maxReparsePerTick: 3 }),
+			config: config({
+				reparse: true,
+				maxPerTick: 2,
+				maxReparsePerTick: 1,
+				maxPending: 0,
+			}),
 			deadline: deadline(),
 			reparser,
 		});
 		expect(retired).toBe(1);
-		expect(reparsed).toEqual(["big", "ok", "later"]);
+		expect(pg.queued.flatMap((batch) => batch.scopeIds)).toEqual([
+			scope("i1"),
+			scope("i2"),
+		]);
+		expect(reparsed).toEqual(["p1"]);
 		expect(result).toMatchObject({
-			reparsed: 1,
-			reparseFallbacks: 1,
 			queued: 2,
+			reparsed: 1,
+			selections: 2,
 			retiredGenerations: 3,
-			reparseOutcomes: { written: 1, oversized: 1, deferred: 1 },
+			reparseOutcomes: { written: 1 },
 		});
-		expect(pg.queued.flatMap((batch) => batch.scopeIds).sort()).toEqual(
-			[scope("big"), scope("fresh")].sort(),
+		const selections = clickhouse.statements.filter(
+			(statement) => statement.query_params?.organizationId,
 		);
+		expect(selections.map((s) => s.query_params?.reparseOnly)).toEqual([0, 1]);
+		expect(selections[1]?.query_params).toMatchObject({
+			afterIndexStale: 1,
+			afterSessionId: "i3",
+		});
+	});
+
+	test("with reparse off, parser-stale sessions on a stale index are queued and nothing is reparsed", async () => {
+		const clickhouse = fakeClickHouse({
+			census: [censusRow("o", 3, "2026-11-01 00:00:00.000")],
+			rows: {
+				o: [
+					row("o", "p1", { parser_version: OLD, reason: "current" }),
+					row("o", "i1", { parser_version: OLD, reason: "index_version" }),
+					row("o", "i2", { parser_version: OLD, reason: "pricing_version" }),
+				],
+			},
+		});
+		const pg = fakeSql();
+		const reparser: Reparser = {
+			retire: async () => 0,
+			reparse: async () => {
+				throw new Error("reparse is off");
+			},
+		};
+		const result = await runRunIndexHealTick({
+			sql: pg.sql,
+			executor: clickhouse.executor,
+			config: config({ reparse: false }),
+			deadline: deadline(),
+			reparser,
+		});
+		expect(result).toMatchObject({ queued: 2, reparsed: 0 });
+		expect(pg.queued.flatMap((batch) => batch.scopeIds)).toEqual([
+			scope("i1"),
+			scope("i2"),
+		]);
 	});
 
 	test("pages through an organization whose newest sessions are already queued", async () => {

@@ -12,8 +12,28 @@ export async function readSessionReader(
 	userId: string,
 	sql: postgres.Sql = sqlClient,
 ): Promise<SessionReader | null> {
-	const [row] = await sql<Array<{ role: string; ownSessionsOnly: boolean }>>`
-		SELECT m.role, COALESCE(o.own_sessions_only, false) AS "ownSessionsOnly"
+	return (
+		(await readWorkspaceMember(organizationId, userId, sql))?.reader ?? null
+	);
+}
+
+export async function readWorkspaceMember(
+	organizationId: string,
+	userId: string,
+	sql: postgres.Sql = sqlClient,
+): Promise<{
+	reader: SessionReader;
+	workspaceCreatedAt: Date | string | null;
+} | null> {
+	const [row] = await sql<
+		Array<{
+			role: string;
+			ownSessionsOnly: boolean;
+			workspaceCreatedAt: Date | string | null;
+		}>
+	>`
+		SELECT m.role, COALESCE(o.own_sessions_only, false) AS "ownSessionsOnly",
+			o.created_at AS "workspaceCreatedAt"
 		FROM member m
 		LEFT JOIN organization o ON o.id = m.organization_id
 		WHERE m.organization_id = ${organizationId}
@@ -21,6 +41,13 @@ export async function readSessionReader(
 		LIMIT 1
 	`;
 	return row
-		? { userId, role: row.role, ownSessionsOnly: row.ownSessionsOnly }
+		? {
+				reader: {
+					userId,
+					role: row.role,
+					ownSessionsOnly: row.ownSessionsOnly,
+				},
+				workspaceCreatedAt: row.workspaceCreatedAt,
+			}
 		: null;
 }

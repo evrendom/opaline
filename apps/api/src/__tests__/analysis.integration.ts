@@ -1963,7 +1963,7 @@ test("where the log is off, history fails with an agent-actionable message and t
 		expect(
 			await tool.run(client, args, {
 				userId,
-				workspace: { id: userId, slug: "analysis-log-off" },
+				workspace: { id: userId, slug: "analysis-log-off", createdAt: null },
 				authSession: { user, session },
 			}),
 		).toBe(ANALYSIS_HISTORY_OFF);
@@ -2002,11 +2002,13 @@ test("a workspace without the retro tools is refused schema, sql, search, run an
 	});
 	const context = {
 		userId,
-		workspace: { id: userId, slug: "analysis-retro-off" },
+		workspace: { id: userId, slug: "analysis-retro-off", createdAt: null },
 		authSession: { user, session },
 	};
 	const saved = process.env.RETRO_TOOLS_WORKSPACES;
+	const savedSince = process.env.RETRO_TOOLS_NEW_SINCE;
 	process.env.RETRO_TOOLS_WORKSPACES = otherOrganizationId;
+	process.env.RETRO_TOOLS_NEW_SINCE = "2999-01-01";
 	try {
 		const runs = "SELECT session_id, agent_id, turn_idx FROM runs LIMIT 1";
 		for (const call of [
@@ -2034,6 +2036,13 @@ test("a workspace without the retro tools is refused schema, sql, search, run an
 			).source,
 		).toBe("runs");
 
+		process.env.RETRO_TOOLS_NEW_SINCE = "2000-01-01";
+		expect(await client.analysis.schema({})).toMatchObject({
+			level: "views",
+		});
+
+		process.env.RETRO_TOOLS_NEW_SINCE = "";
+		await expect(client.analysis.schema({})).rejects.toThrow(RETRO_TOOLS_OFF);
 		process.env.RETRO_TOOLS_WORKSPACES = `${otherOrganizationId},${userId}`;
 		expect(await client.analysis.schema({})).toMatchObject({
 			level: "views",
@@ -2041,6 +2050,8 @@ test("a workspace without the retro tools is refused schema, sql, search, run an
 	} finally {
 		if (saved === undefined) delete process.env.RETRO_TOOLS_WORKSPACES;
 		else process.env.RETRO_TOOLS_WORKSPACES = saved;
+		if (savedSince === undefined) delete process.env.RETRO_TOOLS_NEW_SINCE;
+		else process.env.RETRO_TOOLS_NEW_SINCE = savedSince;
 	}
 });
 

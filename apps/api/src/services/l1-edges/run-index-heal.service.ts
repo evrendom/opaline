@@ -255,15 +255,14 @@ export function planHealRows(
 	const reparse: HealRow[] = [];
 	const index: RunIndexBackfillRow[] = [];
 	for (const row of rows) {
-		if (
-			options.reparse &&
-			row.parser_version < TRANSCRIPT_RECORDS_PARSER_VERSION
-		) {
-			if (reparse.length < options.maxReparse) reparse.push(row);
-			continue;
-		}
 		const queued = asIndexRow(row);
 		if (queued) index.push(queued);
+		else if (
+			options.reparse &&
+			row.parser_version < TRANSCRIPT_RECORDS_PARSER_VERSION &&
+			reparse.length < options.maxReparse
+		)
+			reparse.push(row);
 	}
 	return { reparse, index };
 }
@@ -357,6 +356,7 @@ export function buildHealCensusStatement(input: {
 }
 
 export interface HealCursor {
+	readonly indexStale: boolean;
 	readonly sessionDate: string;
 	readonly userId: string;
 	readonly sessionId: string;
@@ -367,12 +367,13 @@ export function buildHealSelectionStatement(input: {
 	readonly reparse: boolean;
 	readonly slowMs: number;
 	readonly limit: number;
+	readonly reparseOnly?: boolean;
 	readonly after?: HealCursor;
 }): ClickHouseStatement {
 	const after =
 		input.after === undefined
 			? ""
-			: "AND (records.last_session_date, records.user_id, records.session_id) < (parseDateTime64BestEffort({afterSessionDate:String}, 3, 'UTC'), {afterUserId:String}, {afterSessionId:String})";
+			: `AND (toUInt8(${INDEX_STALE}), records.last_session_date, records.user_id, records.session_id) < ({afterIndexStale:UInt8}, parseDateTime64BestEffort({afterSessionDate:String}, 3, 'UTC'), {afterUserId:String}, {afterSessionId:String})`;
 	return {
 		clickhouse_settings: {
 			...RECEIPT_SETTINGS,
@@ -391,11 +392,13 @@ export function buildHealSelectionStatement(input: {
 					'current') AS reason
 			FROM records
 			LEFT JOIN indexed ON ${JOINED}
-			WHERE ${WANTED} ${after}
-			ORDER BY records.last_session_date DESC, records.user_id DESC, records.session_id DESC
+			WHERE ${WANTED} AND ({reparseOnly:UInt8} = 0 OR NOT ${INDEX_STALE}) ${after}
+			ORDER BY toUInt8(${INDEX_STALE}) DESC, records.last_session_date DESC, records.user_id DESC, records.session_id DESC
 			LIMIT {limit:UInt32}`,
 		query_params: {
 			...versionParams(input.reparse),
+			reparseOnly: input.reparse && input.reparseOnly ? 1 : 0,
+			afterIndexStale: input.after?.indexStale ? 1 : 0,
 			afterSessionDate: input.after?.sessionDate ?? "",
 			afterSessionId: input.after?.sessionId ?? "",
 			afterUserId: input.after?.userId ?? "",
@@ -522,7 +525,6 @@ export interface RunIndexHealTickResult {
 	alreadyQueued: number;
 	frozen: number;
 	reparsed: number;
-	reparseFallbacks: number;
 	reparseOutcomes: Record<ReparseOutcome, number>;
 	retiredGenerations: number;
 	selections: number;
@@ -564,7 +566,6 @@ function emptyResult(): RunIndexHealTickResult {
 		alreadyQueued: 0,
 		frozen: 0,
 		reparsed: 0,
-		reparseFallbacks: 0,
 		reparseOutcomes: {
 			written: 0,
 			deferred: 0,
@@ -723,6 +724,7 @@ async function healOrganization(
 						reparse: input.reparse,
 						slowMs: config.slowMs,
 						limit,
+						reparseOnly: wantIndex <= 0,
 						after,
 					}),
 					abortSignal: options.signal,
@@ -742,7 +744,6 @@ async function healOrganization(
 			reparse: input.reparse,
 			maxReparse: Math.max(wantReparse, 0),
 		});
-		const fallbacks: RunIndexBackfillRow[] = [];
 		for (const row of plan.reparse) {
 			if (!hasTime(deadline)) return "deadline";
 			const done = await options.reparser?.reparse(row, {
@@ -755,22 +756,16 @@ async function healOrganization(
 			if (done.outcome === "written") {
 				result.reparsed++;
 				entry.reparsed++;
-				continue;
 			}
-			if (done.outcome === "deferred") continue;
-			const fallback = asIndexRow(row);
-			if (fallback) fallbacks.push(fallback);
 		}
-		const candidates = [...plan.index, ...fallbacks];
-		if (wantIndex > 0 && candidates.length > 0) {
+		if (wantIndex > 0 && plan.index.length > 0) {
 			const wanted = await selectQueueable(
 				options.sql,
 				input.organizationId,
-				candidates,
+				plan.index,
 			);
 			result.alreadyQueued += wanted.alreadyQueued;
 			result.frozen += wanted.frozen;
-			const fallbackIds = new Set(fallbacks.map((row) => row.session_id));
 			const sessions = wanted.sessions.slice(0, wantIndex);
 			const queued = await enqueueL1EdgeSessionScopes(
 				options.sql,
@@ -785,13 +780,11 @@ async function healOrganization(
 			);
 			result.queued += queued;
 			entry.queued += queued;
-			result.reparseFallbacks += sessions.filter((row) =>
-				fallbackIds.has(row.session_id),
-			).length;
 		}
 		const last = rows.at(-1);
 		if (rows.length < limit || last === undefined) return null;
 		after = {
+			indexStale: last.reason !== "current",
 			sessionDate: last.session_date,
 			userId: last.user_id,
 			sessionId: last.session_id,
@@ -819,7 +812,6 @@ export function logRunIndexHealTick(result: RunIndexHealTickResult): void {
 		skipped: result.skipped,
 		queued: result.queued,
 		reparsed: result.reparsed,
-		reparseFallbacks: result.reparseFallbacks,
 		alreadyQueued: result.alreadyQueued,
 		frozen: result.frozen,
 		staleBefore: result.staleBefore,

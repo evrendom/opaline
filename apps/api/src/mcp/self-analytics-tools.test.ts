@@ -14,7 +14,7 @@ afterEach(() => {
 
 const context = (id: string): McpToolContext => ({
 	userId: "u",
-	workspace: { id, slug: id },
+	workspace: { id, slug: id, createdAt: null },
 	authSession: {} as McpToolContext["authSession"],
 });
 const client = {} as Parameters<typeof agentFeedbackTool.run>[0];

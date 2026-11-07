@@ -1,3 +1,9 @@
+import {
+	type RetroWorkspace,
+	retroToolsEnabled,
+} from "../services/analysis/retro-tools.js";
+import { isAdminWorkspace } from "./self-analytics-tools.js";
+
 /**
  * Tools `tools/list` publishes only to a user with a workspace on the retro
  * rollout (`retroToolsEnabled`): the retro tools, which refuse in every other
@@ -24,6 +30,16 @@ export const RETRO_LISTED_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 export const ADMIN_LISTED_TOOLS: ReadonlySet<string> = new Set(["mcp_stats"]);
+
+export function workspacesListing(workspaces: readonly RetroWorkspace[]): {
+	retro: boolean;
+	admin: boolean;
+} {
+	return {
+		retro: workspaces.some((workspace) => retroToolsEnabled(workspace)),
+		admin: workspaces.some((workspace) => isAdminWorkspace(workspace.id)),
+	};
+}
 
 /** The tools listed to a user, by whether one of their workspaces has the retro tools. */
 export function toolsListedFor<

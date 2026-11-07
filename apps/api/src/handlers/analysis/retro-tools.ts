@@ -10,8 +10,16 @@ import {
  * caller's active one, as every analysis procedure decides it; the MCP tools
  * call these procedures, so the refusal covers both entry points.
  */
-export function requireRetroTools(context: { organizationId: string }): void {
-	if (!retroToolsEnabled(context.organizationId))
+export function requireRetroTools(context: {
+	organizationId: string;
+	workspaceCreatedAt: Date | string | null;
+}): void {
+	if (
+		!retroToolsEnabled({
+			id: context.organizationId,
+			createdAt: context.workspaceCreatedAt,
+		})
+	)
 		throw new ORPCError("FORBIDDEN", {
 			message: RETRO_TOOLS_OFF,
 			data: { kind: "fatal" },

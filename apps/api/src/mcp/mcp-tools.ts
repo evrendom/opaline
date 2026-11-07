@@ -116,6 +116,7 @@ type JsonSchema = Record<string, unknown>;
 export interface McpWorkspace {
 	readonly id: string;
 	readonly slug: string;
+	readonly createdAt: Date | string | null;
 }
 
 export interface McpToolContext {
@@ -766,7 +767,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 					? sessionUrl(context.workspace.slug, session)
 					: sessionsUrl(context.workspace.slug, output.header);
 				const text = withUrlLine(renderFind(output, input.verbosity), url);
-				if (!output.header.cursor || !retroToolsEnabled(context.workspace.id))
+				if (!output.header.cursor || !retroToolsEnabled(context.workspace))
 					return text;
 				const lines = text.split("\n");
 				lines.splice(

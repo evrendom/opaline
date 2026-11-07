@@ -2,7 +2,7 @@ import { type Implementer, implement, ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import type { Session } from "./auth.js";
 import { sqlClient } from "./db.js";
-import { readSessionReader } from "./services/session-reader.service.js";
+import { readWorkspaceMember } from "./services/session-reader.service.js";
 
 export interface AppContext {
 	user: Session["user"] | null;
@@ -68,16 +68,14 @@ export const orgMiddleware = os.middleware(async ({ context, next }) => {
 		});
 	}
 
-	const sessionReader = await readSessionReader(
-		organizationId,
-		context.user.id,
-	);
-	if (!sessionReader) {
+	const member = await readWorkspaceMember(organizationId, context.user.id);
+	if (!member) {
 		throw new ORPCError("FORBIDDEN", {
 			message: "Not a member of the active organization",
 		});
 	}
 
+	const sessionReader = member.reader;
 	const userRole =
 		(sessionReader.role as "owner" | "admin" | "member") ?? "member";
 	// Managing the workspace; whose sessions the caller reads is `sessionReader`.
@@ -89,6 +87,7 @@ export const orgMiddleware = os.middleware(async ({ context, next }) => {
 			session: context.session,
 			apiKeyId: context.apiKeyId,
 			organizationId,
+			workspaceCreatedAt: member.workspaceCreatedAt,
 			userRole,
 			isOrgAdmin,
 			sessionReader,
