@@ -138,15 +138,71 @@ test("expanding a phase lists its requests with their time, tokens and cost", ()
 });
 
 test("expanding two phases at once stays within the budget, gives each a share and marks what was cut", () => {
-	const full = render({ expand: ["p1", "p3"] }).text;
+	const full = render({ sections: ["header"], expand: ["p1", "p3"] }).text;
 	const maxChars = full.length - 60;
-	const { text, truncated } = render({ expand: ["p1", "p3"], maxChars });
+	const { text, truncated } = render({
+		sections: ["header"],
+		expand: ["p1", "p3"],
+		maxChars,
+	});
 	expect(truncated).toBe(true);
 	expect(text.length).toBeLessThanOrEqual(maxChars);
 	expect(text).toContain("▸ p1 exploring: 2 requests");
 	expect(text).toContain("▸ p3 running checks: 2 requests");
 	expect(text).toMatch(
-		/\n {2}… \[[12] more requests of p3 omitted to fit the response size limit\]$/u,
+		/\n {2}… \[cut: (1 more request, expand q80|2 more requests, expand q70 … q80) to see them\]$/u,
+	);
+});
+
+test("an expanded phase of a large run is shown before the run's own lines take the budget", () => {
+	const long: RunView = {
+		...view,
+		requests: Array.from({ length: 400 }, (_, index) =>
+			request(
+				100 + index * 10,
+				index,
+				1,
+				10_000,
+				index % 2 === 0
+					? [["Read", "read"]]
+					: [["Bash", "shell", "test", true]],
+			),
+		),
+	};
+	const whole = render({ expand: [] }, long);
+	expect(whole.truncated).toBe(true);
+	const { text, truncated } = render({ expand: ["p10"] }, long);
+	expect(truncated).toBe(true);
+	expect(text.length).toBeLessThanOrEqual(12_000);
+	expect(text).toEndWith(
+		"▸ p10 running checks: 1 request\n  q190  Bash test · 1 min · 10k tokens · $0.10 · 1 failed",
+	);
+	expect(text).toMatch(
+		/lines of the view omitted to fit the response size limit\]/u,
+	);
+});
+
+test("an expanded phase too large for the budget shows the requests that fit and names the ones cut", () => {
+	const long: RunView = {
+		...view,
+		requests: Array.from({ length: 300 }, (_, index) =>
+			request(100 + index * 10, index, 1, 10_000, [
+				["Bash", "shell", "test", true],
+			]),
+		),
+	};
+	const { text, truncated } = render(
+		{ sections: ["header"], expand: ["p1"], maxChars: 2_000 },
+		long,
+	);
+	expect(truncated).toBe(true);
+	expect(text.length).toBeLessThanOrEqual(2_000);
+	const lines = text.split("\n");
+	expect(lines[1]).toBe("▸ p1 running checks: 300 requests");
+	const shown = lines.filter((line) => line.startsWith("  q")).length;
+	expect(shown).toBeGreaterThan(10);
+	expect(lines.at(-1)).toBe(
+		`  … [cut: ${300 - shown} more requests, expand q${100 + shown * 10} … q3090 to see them]`,
 	);
 });
 

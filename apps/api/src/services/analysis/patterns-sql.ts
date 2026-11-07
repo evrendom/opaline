@@ -1241,8 +1241,15 @@ export function patternDrillSql(
 	FROM (
 		SELECT *, min(first_at) OVER (PARTITION BY sid) AS session_first, sum(hits) ${window} AS count,
 			count() ${window} AS runs, countIf(mech = 1) ${window} AS mech_runs,
-			argMax(line, (hits, cm, rid)) ${window} AS example
-		FROM per_run
+			argMax(line, (hits, cm, rid)) ${window} AS example,
+			arrayElement(topKWeighted(1)(run_sub, hits) ${window}, 1) AS sub,
+			arrayElement(topKWeighted(1)(run_signature, hits) ${window}, 1) AS signature,
+			arrayElement(topKWeighted(1)(run_target, hits) ${window}, 1) AS target
+		FROM (
+			SELECT id, kind, rid, sid, aid, turn, hits, cm, first_at, line, mech,
+				sub AS run_sub, signature AS run_signature, target AS run_target
+			FROM per_run
+		)
 	) AS g
 	LEFT JOIN (SELECT run_id, active_minutes FROM runs) AS r ON r.run_id = g.rid
 	ORDER BY session_first, sid, first_at, rid

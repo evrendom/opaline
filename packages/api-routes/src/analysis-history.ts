@@ -189,7 +189,9 @@ export const AnalysisHistoryQueryOutputSchema = z.object({
 		}),
 		z.object({
 			tool: z.literal("sql"),
-			args: AnalysisSqlInputSchema.partial(),
+			args: AnalysisSqlInputSchema.partial().extend({
+				call: z.record(z.string(), z.unknown()).optional(),
+			}),
 			output: AnalysisSqlOutputSchema.nullable(),
 		}),
 	]),

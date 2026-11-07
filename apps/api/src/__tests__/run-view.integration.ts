@@ -586,7 +586,6 @@ test("the run index build writes each request with its calls and tokens, and run
 	);
 	expect(record.text).toEndWith(`characters\n${FINAL_ANSWER}`);
 
-	// Two phases at once share the budget, and the view says what was cut.
 	const whole = await openRun(
 		workspace,
 		{ id, expand: ["p1", "p3"], maxChars: 12_000 },
@@ -603,8 +602,9 @@ test("the run index build writes each request with its calls and tokens, and run
 	expect(both.text).toContain("▸ p1 exploring: 2 requests");
 	expect(both.text).toContain("▸ p3 running checks: 3 requests");
 	expect(both.text).toMatch(
-		/… \[\d more requests of p3 omitted to fit the response size limit\]/u,
+		/… \[\d+ more lines of the view omitted to fit the response size limit\]/u,
 	);
+	expect(both.text).toEndWith(whole.text.slice(whole.text.indexOf("▸ p1")));
 
 	// The Task call opens the subagent's run, in the same view.
 	const task = requests[4]?.start_record ?? 0;

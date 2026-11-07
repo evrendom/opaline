@@ -99,7 +99,8 @@ export async function recordQuery(
 	const now = log.now().toISOString();
 	const analysis = await resolveAnalysis(log, author, call.trace, now);
 	try {
-		return await recordInto(log, analysis, call, now);
+		const trace = await recordInto(log, analysis, call, now);
+		return call.trace.analysis ? trace : { ...trace, started: true };
 	} catch (error) {
 		// Saved by a concurrent save_answer after this call picked it.
 		if (error instanceof AnalysisSavedError) throw notADraft(analysis.id);
@@ -932,18 +933,16 @@ function summaryFields(analysis: StoredAnalysis, viewer: AnalysisViewer) {
 	};
 }
 
-/** Dates span every find; filters come from the first find that set any. */
 function scopeOf(queries: QuerySummary[]): AnalysisScope {
-	const finds = queries.filter((query) => query.tool === "find");
+	const scoped = queries.flatMap(windowArgs);
 	const dates = (key: "from" | "to") =>
-		finds
-			.map((query) => query.args[key])
+		scoped
+			.map((args) => args[key])
 			.filter((value): value is string => typeof value === "string")
 			.sort();
 	const filters: Record<string, string> = {};
 	for (const key of ["repository", "agent", "model", "userId", "sessionId"]) {
-		const value = finds.find((query) => typeof query.args[key] === "string")
-			?.args[key];
+		const value = scoped.find((args) => typeof args[key] === "string")?.[key];
 		if (typeof value === "string") filters[key] = value;
 	}
 	return {
@@ -951,6 +950,14 @@ function scopeOf(queries: QuerySummary[]): AnalysisScope {
 		to: dates("to").at(-1) ?? null,
 		filters,
 	};
+}
+
+function windowArgs(query: QuerySummary): Record<string, unknown>[] {
+	if (query.tool === "find") return [query.args];
+	const call = query.tool === "sql" ? query.args.call : undefined;
+	return call && typeof call === "object" && !Array.isArray(call)
+		? [call as Record<string, unknown>]
+		: [];
 }
 
 /**

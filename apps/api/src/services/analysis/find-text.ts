@@ -599,8 +599,13 @@ function gitEventAddress(event: GitEvent): string {
 }
 
 export function traceLine(trace: AnalysisTrace): string {
-	return `trace analysis=${trace.analysis} step=${trace.step} query=${trace.query}`;
+	const line = `trace analysis=${trace.analysis} step=${trace.step} query=${trace.query}`;
+	return trace.started
+		? `${line}\nnew draft ${trace.analysis}: this call named no analysis. Pass analysis=${trace.analysis} to later calls to add to it; leaving it out starts another draft.`
+		: line;
 }
+
+export const NEW_DRAFT_RESERVE = 160;
 
 export function table(
 	headers: readonly string[],

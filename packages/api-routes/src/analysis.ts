@@ -32,6 +32,7 @@ export const AnalysisTraceSchema = z.object({
 	analysis: z.string(),
 	step: z.string(),
 	query: z.string(),
+	started: z.boolean().optional(),
 });
 
 /**

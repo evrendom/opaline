@@ -14,6 +14,7 @@ import {
 } from "../../services/analysis/checks.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
 import { findAnalysisWithOwners } from "../../services/analysis/find.service.js";
+import { NEW_DRAFT_RESERVE } from "../../services/analysis/find-text.js";
 import { visibleGitHubRepositories } from "../../services/analysis/github-access.js";
 import {
 	withFindTrace,
@@ -181,13 +182,13 @@ export function createAnalysisRouter(
 			}
 			const log = analysisLog(context.organizationId);
 			// Keep room for the trace line so the rendered read stays within maxChars.
-			const traced = Boolean(log) && input.maxChars > TRACE_LINE_RESERVE * 2;
+			const reserve =
+				TRACE_LINE_RESERVE + (input.analysis ? 0 : NEW_DRAFT_RESERVE);
+			const traced = Boolean(log) && input.maxChars > reserve * 2;
 			const read = await readAnalysis(
 				context.organizationId,
 				owners,
-				traced
-					? { ...input, maxChars: input.maxChars - TRACE_LINE_RESERVE }
-					: input,
+				traced ? { ...input, maxChars: input.maxChars - reserve } : input,
 				env,
 			);
 			// Credentials never leave in a result or its stored evidence.

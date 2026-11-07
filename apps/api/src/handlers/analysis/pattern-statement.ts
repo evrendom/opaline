@@ -185,18 +185,28 @@ export function mergePatternRows(
 	);
 }
 
-function mergeDrill(rows: Row[], limit: number): Row[] {
-	const kept = rows.slice(0, limit);
-	const about = rows.map((row) => String(row.pattern ?? "")).find(Boolean);
-	const hits = rows.reduce((sum, row) => sum + number(row.hits), 0);
-	return kept.map((row, index) => ({
+const DRILL_TOTALS = / · (\d+) in (\d+) runs · /u;
+
+export function mergeDrill(rows: Row[], limit: number): Row[] {
+	const pieces = rows
+		.map((row) => String(row.pattern ?? ""))
+		.flatMap((about) => {
+			const totals = DRILL_TOTALS.exec(about);
+			return totals
+				? [{ about, count: Number(totals[1]), runs: Number(totals[2]) }]
+				: [];
+		});
+	const lead = pieces.reduce<(typeof pieces)[number] | undefined>(
+		(best, piece) => (!best || piece.runs > best.runs ? piece : best),
+		undefined,
+	);
+	const count = pieces.reduce((sum, piece) => sum + piece.count, 0);
+	const runs = pieces.reduce((sum, piece) => sum + piece.runs, 0);
+	return rows.slice(0, limit).map((row, index) => ({
 		...row,
 		pattern:
-			index === 0 && about
-				? about.replace(
-						/ · \d+ in \d+ runs · /u,
-						` · ${hits} in ${rows.length} runs · `,
-					)
+			index === 0 && lead
+				? lead.about.replace(DRILL_TOTALS, ` · ${count} in ${runs} runs · `)
 				: "",
 	}));
 }

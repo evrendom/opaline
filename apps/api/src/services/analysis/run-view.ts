@@ -184,27 +184,30 @@ export function renderRunView(
 	const context = contextOf(view, options.rule);
 	const [heading, ...rest] = viewLines(view, options.sections, options.rule);
 	const budget = { remaining: options.maxChars, truncated: false };
-	const [top = []] =
+	const lines: Block | undefined =
 		heading === undefined
-			? []
-			: fitBlocks(
-					[
-						{
-							heading,
-							items: rest,
-							separator: "\n",
-							cut: (shown, total) =>
-								cutLine(total - shown, "lines of the view"),
-						},
-					],
-					budget,
-				);
+			? undefined
+			: {
+					heading,
+					items: rest,
+					separator: "\n",
+					cut: (shown, total) => cutLine(total - shown, "lines of the view"),
+				};
+	const reserved = lines
+		? Math.min(
+				budget.remaining,
+				lines.heading.length + 1 + cutCost(lines, lines.items.length),
+			)
+		: 0;
+	budget.remaining -= reserved;
 	const expanded = fitBlocks(
 		[...new Set(options.expand)].flatMap((id) =>
 			expansion(context, id, options.details.get(id)),
 		),
 		budget,
 	);
+	budget.remaining += reserved;
+	const [top = []] = lines ? fitBlocks([lines], budget) : [];
 	return {
 		text: [top, ...expanded].flat().join("\n"),
 		truncated: budget.truncated,
@@ -243,6 +246,7 @@ interface Block {
 	cut(shown: number, total: number): string;
 	/** False when even every item is not the whole: the text was read only in part. */
 	readonly complete?: boolean;
+	readonly longestCut?: number;
 }
 
 /** Code points per piece of an exact text, so a budget cuts it close to its end. */
@@ -321,13 +325,17 @@ function lineExpansion(
 			cut: (shown, total) => cutLine(total - shown, `lines of ${id}`),
 		};
 	const phase = context.phases.find((candidate) => candidate.id === id);
-	if (phase)
+	if (phase) {
+		const ids = phase.requests.map((request) => `q${request.record}`);
+		const cut = (shown: number) => requestsCutLine(ids.slice(shown));
 		return {
 			heading: `▸ ${phase.id} ${phase.kind}: ${count(phase.requests.length, "request")}`,
 			items: phase.requests.map(requestLine),
 			separator: "\n",
-			cut: (shown, total) => cutLine(total - shown, `requests of ${id}`),
+			cut,
+			longestCut: Math.max(0, ...ids.map((_, shown) => cut(shown).length)),
 		};
+	}
 	return {
 		heading: `▸ ${id} not found in this view`,
 		items: [],
@@ -371,6 +379,11 @@ function callLine(call: RunViewCallDetail): string {
 /** Says what a block left out; the tool description says how to see the rest. */
 function cutLine(count: number, what: string): string {
 	return `  ${omittedMarker(count, what)}`;
+}
+
+function requestsCutLine(ids: readonly string[]): string {
+	const span = ids.length > 1 ? `${ids[0]} … ${ids.at(-1)}` : (ids[0] ?? "");
+	return `  … [cut: ${count(ids.length, "more request")}, expand ${span} to see them]`;
 }
 
 function missingLine(id: string): string {
@@ -434,7 +447,7 @@ function fitBlocks(
 function cutCost(block: Block, total: number): number {
 	return total === 0 && block.complete !== false
 		? 0
-		: block.cut(0, total).length + 1;
+		: (block.longestCut ?? block.cut(0, total).length) + 1;
 }
 
 function headerLines({ view, rule }: Context): string[] {

@@ -514,8 +514,11 @@ const PATTERNS_INPUTS = {
 		"limit",
 		"analysis",
 	],
-	digest: PATTERN_SCOPE,
+	digest: [...PATTERN_SCOPE, "analysis"],
 } as const;
+
+const DIGEST_NOT_STORED =
+	"note: the digest is not stored in an answer draft and starts none, with or without analysis; cite a number by its section and definition, or store the rows behind it with patterns list, drill or sql.";
 
 const ChecksToolInputSchema = z
 	.object({
@@ -1075,10 +1078,11 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				);
 				const { action, ...rest } = input;
 				if (action === "digest") {
+					const { analysis: _analysis, ...scope } = rest;
 					const digest = await client.analysis.patterns.digest(
-						parseMcpInput(PatternsDigestInputSchema, rest),
+						parseMcpInput(PatternsDigestInputSchema, scope),
 					);
-					return digest.text;
+					return `${digest.text}\n${DIGEST_NOT_STORED}`;
 				}
 				const output =
 					action === "drill"

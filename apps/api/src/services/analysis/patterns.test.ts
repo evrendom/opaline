@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { PATTERN_KINDS } from "@rudel/api-routes";
 import type { ClickHouseStatement } from "../../clickhouse.js";
 import {
+	mergeDrill,
 	mergePatternRows,
 	patternStatement,
 } from "../../handlers/analysis/pattern-statement.js";
@@ -327,6 +328,83 @@ describe("patterns as tool calls", () => {
 				!item.query.startsWith("EXPLAIN"),
 		);
 		expect(agent.length).toBeGreaterThanOrEqual(4);
+	});
+});
+
+describe("drill totals", () => {
+	const header = (signature: string, count: number, runs: number) =>
+		`fc_3703777cb6 failing_call: ${signature} · ${count} in ${runs} runs · fix agents_md_rule: AGENTS.md: what the hook blocks`;
+	const piece = (
+		signature: string,
+		count: number,
+		runs: number,
+		shown: number,
+	) =>
+		Array.from({ length: shown }, (_, index) => ({
+			pattern: index === 0 ? header(signature, count, runs) : "",
+			session_id: `${signature}-${index}`,
+			hits: 1,
+		}));
+	const listed = (
+		signature: string,
+		count: number,
+		runs: number,
+		sessions: number,
+	) => ({
+		id: "fc_3703777cb6",
+		kind: "failing_call",
+		signature,
+		count,
+		runs,
+		sessions,
+		members: 1,
+		minutes: 0.1,
+		first_seen: "2026-10-07",
+		last_seen: "2026-11-02",
+		weekly: "1",
+		examples: "[]",
+	});
+
+	test("a drill cut to its row limit keeps the pattern's totals, as the list counts them", () => {
+		const [drilled] = mergeDrill(piece("python3: STOP", 91, 86, 50), 50);
+		const [row] = mergePatternRows(
+			[listed("python3: STOP", 91, 86, 59)],
+			2,
+			20,
+		);
+		expect(drilled?.pattern).toBe(header("python3: STOP", 91, 86));
+		expect(drilled?.pattern).toContain(
+			`${row?.signature} · ${row?.count} in ${row?.runs} runs · `,
+		);
+	});
+
+	test("a drill split into windows adds up their totals and names the pattern like the list does", () => {
+		const drilled = mergeDrill(
+			[
+				...piece("mkdir: STOP", 31, 31, 20),
+				...piece("python3: STOP", 60, 55, 50),
+			],
+			50,
+		);
+		const [row] = mergePatternRows(
+			[listed("mkdir: STOP", 31, 31, 20), listed("python3: STOP", 60, 55, 40)],
+			2,
+			20,
+		);
+		expect(drilled).toHaveLength(50);
+		expect(drilled.filter((item) => item.pattern !== "")).toHaveLength(1);
+		expect(drilled[0]?.pattern).toBe(header("python3: STOP", 91, 86));
+		expect(drilled[0]?.pattern).toContain(
+			`${row?.signature} · ${row?.count} in ${row?.runs} runs · `,
+		);
+	});
+
+	test("the drill's header names the pattern by its most frequent signature, as the list does", () => {
+		const sql = patternDrillSql(params, "text", "fc_3703777cb6");
+		expect(sql).toContain(
+			"arrayElement(topKWeighted(1)(run_signature, hits) OVER (), 1) AS signature",
+		);
+		expect(sql).toContain("sub AS run_sub, signature AS run_signature");
 	});
 });
 

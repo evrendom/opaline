@@ -15,6 +15,7 @@ import {
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
 } from "@rudel/api-routes/transcript-records";
 import { getClickhouse } from "../clickhouse.js";
+import { patternStatement } from "../handlers/analysis/pattern-statement.js";
 import {
 	describeSchema,
 	runSql,
@@ -53,6 +54,9 @@ const wording = `${RUN}_wording`;
 const resumed = `${RUN}_resumed`;
 const parent = `${RUN}_parent`;
 const fork = `${RUN}_fork`;
+const polled = `${RUN}_polled`;
+const unpolled = `${RUN}_unpolled`;
+const missing = [1, 2, 3, 4].map((index) => `${RUN}_missing_${index}`);
 const DAY = 86_400;
 const clickhouse = getClickhouse();
 const SESSION_DATE = new Date(Date.now() - 3_600_000).toISOString();
@@ -209,6 +213,77 @@ const FORK = [
 	...codexCall(110, "call_fork"),
 ];
 
+const MISSING = (second: number) => [
+	prompt(second, "lint the code"),
+	call(second + 1, `toolu_lint_${second}`, "lintx src"),
+	line(second + 2, {
+		type: "user",
+		message: {
+			role: "user",
+			content: [
+				{
+					type: "tool_result",
+					tool_use_id: `toolu_lint_${second}`,
+					content: "Exit code 127\nzsh: command not found: lintx",
+					is_error: true,
+				},
+			],
+		},
+		toolUseResult: "Error: Exit code 127\nzsh: command not found: lintx",
+	}),
+	said(second + 3, "lintx is not installed."),
+];
+
+const runningCheck = (session: string, polledToEnd: boolean) => [
+	codex(200, "session_meta", { id: session, cli_version: "0.156.0" }),
+	codexPrompt(201),
+	codex(202, "response_item", {
+		type: "function_call",
+		name: "exec_command",
+		arguments: JSON.stringify({ cmd: "bun run check" }),
+		call_id: "call_check",
+	}),
+	codex(203, "response_item", {
+		type: "function_call_output",
+		call_id: "call_check",
+		output:
+			"Chunk ID: a1\nWall time: 1.0020 seconds\nProcess running with session ID 4242\nOriginal token count: 3\nOutput:\nchecking src\n",
+	}),
+	...(polledToEnd
+		? [
+				codex(210, "response_item", {
+					type: "function_call",
+					name: "write_stdin",
+					arguments: JSON.stringify({ session_id: 4242, chars: "" }),
+					call_id: "call_poll",
+				}),
+			]
+		: []),
+	codex(211, "event_msg", {
+		type: "item_completed",
+		thread_id: session,
+		turn_id: "turn_check",
+		item: {
+			type: "CommandExecution",
+			id: "call_check",
+			process_id: "4242",
+			status: "failed",
+			exit_code: 1,
+			aggregated_output: "checking src\nerror: lint found 2 problems\n",
+		},
+	}),
+	...(polledToEnd
+		? [
+				codex(212, "response_item", {
+					type: "function_call_output",
+					call_id: "call_poll",
+					output:
+						"Chunk ID: a2\nWall time: 0.0000 seconds\nProcess exited with code 1\nOriginal token count: 9\nOutput:\nchecking src\nerror: lint found 2 problems\n",
+				}),
+			]
+		: []),
+];
+
 async function upload(
 	sessionId: string,
 	lines: readonly string[],
@@ -273,6 +348,9 @@ beforeAll(async () => {
 	});
 	await upload(parent, PARENT, { source: "codex" });
 	await upload(fork, FORK, { source: "codex" });
+	await upload(polled, runningCheck(polled, true), { source: "codex" });
+	await upload(unpolled, runningCheck(unpolled, false), { source: "codex" });
+	for (const session of missing) await upload(session, MISSING(1));
 	const [second] = await clickhouse.query<{ run_id: string }>({
 		query: `SELECT run_id FROM rudel.run_index WHERE organization_id = {workspace:String}
 			AND session_id = {session:String} AND row_kind = 'run' AND turn_idx = 2`,
@@ -403,6 +481,66 @@ describe("approved measures", () => {
 			await table(`SELECT turn_idx, coverage_gaps FROM calls
 				WHERE session_id = '${reasked}' ORDER BY turn_idx LIMIT 1`),
 		).toBe(`turn_idx | coverage_gaps\n2 | ["setup_snapshot","embedding"]`);
+	});
+
+	test("a Codex command that kept running fails with the error of its completed result, not its first chunk", async () => {
+		expect(
+			await table(`SELECT session_id = '${polled}' AS polled, failed, error FROM calls
+				WHERE session_id IN ('${polled}', '${unpolled}') AND call_id = 'call_check' ORDER BY polled`),
+		).toBe(
+			[
+				"polled | failed | error",
+				"0 | 1 | Process exited with code 1; the output after it kept running is not recorded",
+				"1 | 1 | error: lint found 2 problems",
+			].join("\n"),
+		);
+	});
+
+	test("a pattern's drill counts the same calls and runs as its list row, also past the drill's row limit", async () => {
+		const today = new Date();
+		const scope = {
+			from: new Date(Date.now() - DAY * 1000).toISOString().slice(0, 10),
+			to: today.toISOString().slice(0, 10),
+		};
+		const rowsOf = async (
+			statement: ReturnType<typeof patternStatement>,
+		): Promise<Record<string, string>[]> => {
+			const outcome = await runSql(caller, statement, env());
+			if (!outcome.ok)
+				throw new Error(`Expected a result: ${outcome.error.message}`);
+			const [header = "", ...lines] = outcome.result.table.split("\n");
+			const columns = header.split(" | ");
+			return lines.map((text) =>
+				Object.fromEntries(
+					text.split(" | ").map((value, index) => [columns[index], value]),
+				),
+			);
+		};
+		const listed = (
+			await rowsOf(
+				patternStatement(
+					{
+						action: "list",
+						kind: "failing_call",
+						minCount: 2,
+						limit: 20,
+						...scope,
+					},
+					today,
+				),
+			)
+		).find((row) => row.signature?.includes("command not found: lintx"));
+		expect(listed).toMatchObject({ count: "4", runs: "4", sessions: "4" });
+		const drilled = await rowsOf(
+			patternStatement(
+				{ action: "drill", id: listed?.id ?? "", limit: 2, ...scope },
+				today,
+			),
+		);
+		expect(drilled).toHaveLength(2);
+		expect(drilled[0]?.pattern).toContain(
+			`${listed?.signature} · ${listed?.count} in ${listed?.runs} runs · `,
+		);
 	});
 
 	test("schema lists the measures the views compute", async () => {

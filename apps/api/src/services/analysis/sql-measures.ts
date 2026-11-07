@@ -762,7 +762,10 @@ export function callsSql(
 			arrayMap(x -> x.4, c.changes) AS changed_files_basis,
 			toLowCardinality(${editRouteSql({ tool: "c.first_tool_name", from: "c.first_command_from", head: "c.first_command_head", files: "c.changes", basis: "arrayMap(x -> x.4, c.changes)" })}) AS edit_route,
 			if(ifNull(c.result_failed, 0) OR c.result_denial_kind != '',
-				multiIf(c.result_error_text, c.result_error_line, c.results > 0, c.result_first_line, ${errorLineSql("char(10)")}), NULL) AS error,
+				multiIf(c.result_error_text, c.result_error_line, ifNull(d.done_line, '') != '', d.done_line,
+					c.running_process != '' AND c.settled_results = 0 AND c.result_exit_code IS NOT NULL,
+					concat('Process exited with code ', toString(c.result_exit_code), '; the output after it kept running is not recorded'),
+					c.results > 0, c.result_first_line, ${errorLineSql("char(10)")}), NULL) AS error,
 			arrayStringConcat(arrayMap(x -> x.2, c.outputs), char(10)) AS output,
 			c.output_chars AS output_chars, toUInt8(c.output_cut) AS output_cut,
 			r.coverage_gaps AS coverage_gaps
@@ -780,6 +783,9 @@ export function callsSql(
 				argMinIf(result_line, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_line,
 				argMinIf(head != '' OR tail != '', position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_text,
 				argMinIf(result_line, position, ${result}) AS result_first_line,
+				argMinIf(process, position, process != '') AS running_process,
+				minIf(record_idx, process != '') AS running_record,
+				countIf(${result} AND subtype != 'running') AS settled_results,
 				arraySort(groupArrayIf((position, ${piece}), ${result})) AS outputs,
 				sumIf(text_chars, ${result}) AS output_chars,
 				maxIf(text_chars > lengthUTF8(${stored}), ${result}) AS output_cut,
@@ -795,6 +801,7 @@ export function callsSql(
 					(record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
 					interrupted, timed_out_after_ms, facts['script_call_id'] AS parent,
 					if(${result}, ${errorLineSql("concat(head, char(10), tail)")}, '') AS result_line,
+					if(${result} AND subtype = 'running', extract(head, ${sqlLiteral(`${RUNNING_PROCESS}([0-9]+)`)}), '') AS process,
 					${commandColumnsSql()},
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars,
@@ -810,9 +817,30 @@ export function callsSql(
 				if(call_id = '', position, (0, 0))
 			HAVING countIf(${call}) > 0
 		) AS c
+		ASOF LEFT JOIN (${processEndsSql(sessions)}) AS d ON d.user_id = c.user_id AND d.session_id = c.session_id
+			AND d.revision = c.revision AND d.parser_version = c.parser_version AND d.agent_id = c.agent_id
+			AND d.polled_process = c.running_process AND c.running_record <= d.done_record
 		INNER JOIN (${measuredRuns(windowedRuns)}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
 			AND r.revision = c.revision AND r.parser_version = c.parser_version
 			AND r.agent_id = c.agent_id AND r.turn_idx = c.first_turn_idx`;
+}
+
+const RUNNING_PROCESS = "Process running with session ID ";
+
+function processEndsSql(sessions: string): string {
+	const call = "kind = 'tool_call'";
+	const done = "kind = 'tool_result' AND exit_code IS NOT NULL";
+	return `SELECT * FROM (
+			SELECT user_id, session_id, revision, parser_version, agent_id,
+				anyIf(extract(head, ${sqlLiteral('"session_id"[[:space:]]*:[[:space:]]*([0-9]+)')}), ${call}) AS polled_process,
+				minIf(record_idx, ${done}) AS done_record,
+				argMinIf(${errorLineSql("concat(head, char(10), tail)")}, (record_idx, block_idx), ${done}) AS done_line
+			FROM ${records()}
+			PREWHERE kind IN ('tool_call', 'tool_result') AND replaceRegexpOne(lower(tool_name), '^functions\\.', '') = 'write_stdin'
+			WHERE ${sessions} AND source = 'codex'
+			GROUP BY user_id, session_id, revision, parser_version, agent_id, call_id
+			HAVING countIf(${done}) > 0
+		) WHERE polled_process != ''`;
 }
 
 export function sqlLiteral(text: string): string {

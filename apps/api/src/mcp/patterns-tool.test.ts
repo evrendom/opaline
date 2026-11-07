@@ -25,6 +25,7 @@ const client = { analysis: { patterns: {
 	drill: async (input) => { calls.push({ tool: "drill", input }); return output("pattern | session_id\\nfc_0123456789 failing_call: bun test | s1", { id: input.id }); },
 	verify: async (input) => { calls.push({ tool: "verify", input }); return output("id | status\\nfc_0123456789 | improved", { verify: input.id ?? "top" }); },
 	peek: async (input) => { calls.push({ tool: "peek", input }); return { rows: 3, chars: 900, columns: ["id"], head: [{ id: "fc_0123456789" }], ms: 12 }; },
+	digest: async (input) => { calls.push({ tool: "digest", input }); return { text: "digest window=2026-10-06..2026-11-03", ms: 5, from: "2026-10-06", to: "2026-11-03", digest: {} }; },
 } } };
 const outcome = (promise) => promise.then((result) => ({ result }), (error) => ({ error: error.message }));
 const scope = { repository: "athena", from: "2026-10-06", to: "2026-11-03" };
@@ -37,6 +38,7 @@ const flow = {
 	badId: await outcome(tool.run(client, { action: "drill", id: "nope" }, context)),
 	peek: await outcome(tool.run(client, { action: "list", ...scope, peek: true }, context)),
 	peekVerify: await outcome(tool.run(client, { action: "verify", peek: true }, context)),
+	digest: await outcome(tool.run(client, { action: "digest", ...scope, analysis: "a_1" }, context)),
 };
 console.log(JSON.stringify({ calls, flow }));`,
 		],
@@ -114,4 +116,17 @@ test("patterns passes each action only its own inputs and points from the list t
 	expect(text(flow.peekVerify)).toContain(
 		"peek goes with action=list or drill",
 	);
+});
+
+test("digest takes the analysis id every other action takes and says it stores nothing", async () => {
+	const { calls, flow } = await loaded;
+	expect(calls.find((call) => call.tool === "digest")?.input).toEqual({
+		repository: "athena",
+		from: "2026-10-06",
+		to: "2026-11-03",
+	});
+	expect(text(flow.digest).split("\n")).toEqual([
+		"digest window=2026-10-06..2026-11-03",
+		"note: the digest is not stored in an answer draft and starts none, with or without analysis; cite a number by its section and definition, or store the rows behind it with patterns list, drill or sql.",
+	]);
 });

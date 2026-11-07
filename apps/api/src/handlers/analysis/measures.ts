@@ -31,6 +31,7 @@ import type { SessionReader } from "../../services/session-visibility.js";
 import { badRequest, measureStatement } from "./measure-statement.js";
 import { patternStatement } from "./pattern-statement.js";
 import { peekOutcome, sliceOutcome } from "./peek.js";
+import { type GeneratedCall, recordedSqlArgs } from "./recorded-args.js";
 import { digestReader, runDigest } from "./retro-digest.js";
 import { requireRetroTools } from "./retro-tools.js";
 import { sqlError } from "./sql-error.js";
@@ -74,6 +75,7 @@ export function createMeasureProcedures(env: MeasureEnv) {
 			analysis?: string;
 		},
 		signal?: AbortSignal,
+		call?: GeneratedCall,
 	): Promise<AnalysisSqlOutput> => {
 		const outcome = await runSql(callerOf(context), input, env.sqlEnv, signal);
 		if (!outcome.ok) throw sqlError(outcome.error);
@@ -82,11 +84,7 @@ export function createMeasureProcedures(env: MeasureEnv) {
 			env.log(context.organizationId),
 			env.author(context),
 			"sql",
-			{
-				query: input.query,
-				title: input.title,
-				...(input.analysis ? { analysis: input.analysis } : {}),
-			},
+			recordedSqlArgs(input, call),
 			outcome.result,
 			outcome.owners,
 			outcome.result.sessions,
@@ -159,7 +157,11 @@ export function createMeasureProcedures(env: MeasureEnv) {
 					analysisLimiter.run(context.user.id, async () => next(), signal),
 				)
 				.handler(async ({ input, context, signal }) =>
-					execute(context, measureStatement(input, now()), signal),
+					execute(context, measureStatement(input, now()), signal, {
+						tool: "measures",
+						action: "run",
+						input,
+					}),
 				),
 			peek: os.analysis.measures.peek
 				.use(orgMiddleware)
@@ -211,6 +213,7 @@ export function createMeasureProcedures(env: MeasureEnv) {
 						context,
 						patternStatement({ action: "list", ...input }, now()),
 						signal,
+						{ tool: "patterns", action: "list", input },
 					),
 				),
 			drill: os.analysis.patterns.drill
@@ -227,6 +230,7 @@ export function createMeasureProcedures(env: MeasureEnv) {
 						context,
 						patternStatement({ action: "drill", ...input }, now()),
 						signal,
+						{ tool: "patterns", action: "drill", input },
 					),
 				),
 			verify: os.analysis.patterns.verify
@@ -243,6 +247,7 @@ export function createMeasureProcedures(env: MeasureEnv) {
 						context,
 						patternStatement({ action: "verify", ...input }, now()),
 						signal,
+						{ tool: "patterns", action: "verify", input },
 					),
 				),
 			peek: os.analysis.patterns.peek
