@@ -46,6 +46,7 @@ export const handleVercelRpcRequest = createVercelFunctionHandler({
 	},
 	functionGroup: "rpc-auth",
 	publicPathPattern: VERCEL_RPC_AUTH_PUBLIC_PATH_PATTERN,
+	streaming: true,
 });
 
 async function serveMarketing(request: Request): Promise<Response> {

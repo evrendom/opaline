@@ -69,7 +69,7 @@ export function moveLongQueryParamsToBody(
 	return [url.toString(), { ...init, body: form }];
 }
 
-const fetchWithClickHouseHttpStatus = Object.assign(
+export const fetchWithClickHouseHttpStatus = Object.assign(
 	async (
 		input: Parameters<typeof fetch>[0],
 		init?: Parameters<typeof fetch>[1],

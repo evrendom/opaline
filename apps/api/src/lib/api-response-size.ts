@@ -8,6 +8,21 @@ export const API_RESPONSE_MAX_BYTES = 3_750_000;
 export const API_RESPONSE_TOO_LARGE_CODE = "RESPONSE_TOO_LARGE";
 
 const HEALTH_PATHS = new Set(["/health", "/rpc/health"]);
+const STREAMED_RPC_PATHS = new Set([
+	"/rpc/cli/data/sql",
+	"/rpc/cli/data/pullTable",
+]);
+
+export function isStreamedRpcResponse(
+	pathname: string,
+	response: Response,
+): boolean {
+	return (
+		STREAMED_RPC_PATHS.has(pathname) &&
+		(response.headers.get("Content-Type")?.startsWith("text/event-stream") ??
+			false)
+	);
+}
 const RPC_SERIALIZER = new StandardRPCSerializer(
 	new StandardRPCJsonSerializer(),
 );

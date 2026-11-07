@@ -27,6 +27,7 @@ import {
 	RequestOrganizationBillingUpgradeOutputSchema,
 	SelectOrganizationPlanOutputSchema,
 } from "./billing.js";
+import { cliDataContract } from "./cli-data.js";
 import { CliUpdateStatusSchema } from "./cli-version.js";
 import {
 	LiveSessionAppendInputSchema,
@@ -418,6 +419,7 @@ import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 export * from "./analysis-measures.js";
 export * from "./analysis-peek.js";
 export * from "./avatar.js";
+export * from "./cli-data.js";
 export * from "./cli-version.js";
 export * from "./device-flow.js";
 export * from "./github-repository-evidence.js";
@@ -704,6 +706,7 @@ export const CliUploadCapabilitiesSchema = z.object({
 	 * switch is on.
 	 */
 	liveSessions: z.literal(true).optional(),
+	dataExport: z.literal(true).optional(),
 });
 
 export const CliUserSchema = z.object({
@@ -1213,6 +1216,7 @@ export const contract = {
 		sessionUploadStatus: oc
 			.input(CliSessionUploadStatusInputSchema)
 			.output(CliSessionUploadStatusOutputSchema),
+		data: cliDataContract,
 	},
 	listMyOrganizations: oc.output(z.array(OrganizationSchema)),
 	/**

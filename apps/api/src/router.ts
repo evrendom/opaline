@@ -42,6 +42,7 @@ import { getFrontendOrigin } from "./frontend-origin.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analysisRouter } from "./handlers/analysis/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
+import { createCliDataRouter } from "./handlers/cli-data.js";
 import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
 import { repositorySettingsRouter } from "./handlers/repository-settings.js";
@@ -114,6 +115,10 @@ import {
 	getCliUpdateStatus,
 	recordUserCliVersion,
 } from "./services/cli-version.service.js";
+import {
+	getActiveOrganizationId,
+	resolveIngestOrganizationId,
+} from "./services/cli-workspace.service.js";
 import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge-tombstone.service.js";
 import { persistGitObservationsBestEffort } from "./services/git-observation-extraction.service.js";
 import {
@@ -413,6 +418,7 @@ const cliAuthStatus = os.cli.authStatus
 				analysisLinkedUploads: true as const,
 				transcriptSlimming: true as const,
 				repositoryEvidenceImages: true as const,
+				dataExport: true as const,
 				...(isLiveSessionsEnabled() ? { liveSessions: true as const } : {}),
 			},
 		};
@@ -480,71 +486,6 @@ const listMyOrganizations = os.listMyOrganizations
 			logo: m.logo ?? null,
 		}));
 	});
-
-async function resolveIngestOrganizationId(
-	requestedOrganizationId: string | null,
-	userId: string,
-): Promise<string> {
-	if (requestedOrganizationId) {
-		const membership = await sqlClient<Array<{ id: string }>>`
-			SELECT id
-			FROM member
-			WHERE organization_id = ${requestedOrganizationId}
-				AND user_id = ${userId}
-			LIMIT 1
-		`;
-
-		if (membership.length === 0) {
-			throw new ORPCError("FORBIDDEN", {
-				message: "Not a member of the specified organization",
-			});
-		}
-		return requestedOrganizationId;
-	}
-
-	// Two rows are enough to distinguish a sole membership from an ambiguous choice.
-	// Prefer the personal workspace when it exists; creation time makes the fallback deterministic.
-	const memberships = await sqlClient<Array<{ organization_id: string }>>`
-		SELECT m.organization_id
-		FROM member m
-		INNER JOIN organization o
-			ON o.id = m.organization_id
-		WHERE m.user_id = ${userId}
-		GROUP BY m.organization_id
-		ORDER BY (m.organization_id = ${userId}) DESC, MIN(m.created_at) ASC
-		LIMIT 2
-	`;
-	const personalWorkspace = memberships.find(
-		(membership) => membership.organization_id === userId,
-	);
-	if (personalWorkspace) {
-		return personalWorkspace.organization_id;
-	}
-	if (memberships.length === 1 && memberships[0]) {
-		return memberships[0].organization_id;
-	}
-	if (memberships.length === 0) {
-		throw new ORPCError("BAD_REQUEST", {
-			message: "No organization is available for this upload",
-		});
-	}
-
-	throw new ORPCError("BAD_REQUEST", {
-		message: "Choose an organization with --org or opaline set-org",
-	});
-}
-
-function getActiveOrganizationId(session: unknown): string | null {
-	if (typeof session !== "object" || session === null) {
-		return null;
-	}
-	if (!("activeOrganizationId" in session)) {
-		return null;
-	}
-	return typeof session.activeOrganizationId === "string"
-		? session.activeOrganizationId
-		: null;
-}
 
 export interface IngestErrorFactories {
 	redactionBudgetExceeded: (data: {
@@ -2656,6 +2597,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		updateStatus: cliUpdateStatus,
 		sessionUploadStatus: cliSessionUploadStatus,
 		reportUploadFailures: cliReportUploadFailures,
+		data: createCliDataRouter(),
 	},
 	listMyOrganizations,
 	sessionAccess,

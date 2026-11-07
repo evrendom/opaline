@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./billing": "./src/billing.ts",
+		"./cli-data": "./src/cli-data.ts",
 		"./call-paths": "./src/call-paths.ts",
 		"./command-identity": "./src/command-identity.ts",
 		"./command-glossary": "./src/command-glossary/index.ts",

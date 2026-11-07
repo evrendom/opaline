@@ -282,15 +282,14 @@ class PartFailed extends Error {
 	}
 }
 
-async function runSplitParts(
+async function runSplitParts<T>(
 	caller: SqlCaller,
 	input: { cohort?: string; parts: SqlParts },
-	env: SqlEnv,
+	env: AgentSqlEnv,
 	signal: AbortSignal | undefined,
-	follow: (rows: SqlRow[]) => Promise<Followed>,
+	follow: (rows: SqlRow[]) => Promise<T>,
 ): Promise<
-	| { ok: true; value: Followed; notices: string[] }
-	| { ok: false; error: SqlFailure }
+	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
 > {
 	const budget = splitBudget();
 	const rows: SqlRow[] = [];
@@ -441,15 +440,14 @@ async function runStatements(
 	return { ok: true, result: { id, ...output }, owners, quotes };
 }
 
-async function runParts(
+async function runParts<T>(
 	caller: SqlCaller,
 	input: { query: string; cohort?: string; parts?: SqlParts },
-	env: SqlEnv,
+	env: AgentSqlEnv,
 	signal: AbortSignal | undefined,
-	follow: (rows: SqlRow[]) => Promise<Followed>,
+	follow: (rows: SqlRow[]) => Promise<T>,
 ): Promise<
-	| { ok: true; value: Followed; notices: string[] }
-	| { ok: false; error: SqlFailure }
+	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
 > {
 	const queries = input.parts?.queries ?? [{ query: input.query }];
 	const merge = input.parts?.merge ?? ((rows) => rows);
@@ -486,6 +484,21 @@ async function runParts(
 		value: executed.value,
 		notices: [...notices, ...executed.notices],
 	};
+}
+
+export function partRows(
+	caller: SqlCaller,
+	input: { query: string; cohort?: string; parts: SqlParts },
+	env: AgentSqlEnv,
+	signal?: AbortSignal,
+): Promise<
+	| { ok: true; value: SqlRow[]; notices: string[] }
+	| { ok: false; error: SqlFailure }
+> {
+	const rows = async (found: SqlRow[]) => found;
+	return input.parts.queries.some((part) => part.split)
+		? runSplitParts(caller, input, env, signal, rows)
+		: runParts(caller, input, env, signal, rows);
 }
 
 export function guardSql(caller: SqlCaller, sql: string): SqlFailure | null {
@@ -708,6 +721,45 @@ export async function execute<T>(
 ): Promise<
 	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
 > {
+	const prepared = await prepareAgentStatement(caller, sql, env, given, cohort);
+	if (!prepared.ok) return prepared;
+	const { statement, notices, classify: refusal } = prepared.value;
+	return withAgentQuery(
+		caller.workspaceId,
+		env,
+		async (): Promise<
+			| { ok: true; value: T; notices: string[] }
+			| { ok: false; error: SqlFailure }
+		> => {
+			let rows: Record<string, unknown>[];
+			try {
+				rows = await env.executor.query<Record<string, unknown>>(statement);
+			} catch (error) {
+				const failure = refusal(error);
+				if (!failure) throw error;
+				return { ok: false, error: failure };
+			}
+			return { ok: true, value: await follow(rows), notices };
+		},
+		signal,
+	);
+}
+
+export interface PreparedAgentStatement {
+	readonly statement: ClickHouseStatement;
+	readonly notices: string[];
+	readonly classify: (error: unknown) => SqlFailure | null;
+}
+
+export async function prepareAgentStatement(
+	caller: SqlCaller,
+	sql: string,
+	env: AgentSqlEnv,
+	given?: { prefix: string; suffix: string; rows: number },
+	cohort?: string,
+): Promise<
+	{ ok: true; value: PreparedAgentStatement } | { ok: false; error: SqlFailure }
+> {
 	const memberOnly = readableSessionOwner(caller.reader) !== null;
 	const functions = env.functions ?? [];
 	const views = (narrowed: boolean) =>
@@ -809,30 +861,20 @@ export async function execute<T>(
 				: {}),
 		},
 	};
-	return withAgentQuery(
-		caller.workspaceId,
-		env,
-		async (): Promise<
-			| { ok: true; value: T; notices: string[] }
-			| { ok: false; error: SqlFailure }
-		> => {
-			let rows: Record<string, unknown>[];
-			try {
-				rows = await env.executor.query<Record<string, unknown>>(statement);
-			} catch (error) {
-				const offset = wrap?.prefix.length ?? 0;
-				const failure = classify(error, sql, {
+	const offset = wrap?.prefix.length ?? 0;
+	return {
+		ok: true,
+		value: {
+			statement,
+			notices,
+			classify: (error) =>
+				classify(error, sql, {
 					...prepared.prepared,
 					originOf: (position) =>
 						prepared.prepared.originOf(Math.max(0, position - offset)),
-				});
-				if (!failure) throw error;
-				return { ok: false, error: failure };
-			}
-			return { ok: true, value: await follow(rows), notices };
+				}),
 		},
-		signal,
-	);
+	};
 }
 
 /**

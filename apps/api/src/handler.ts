@@ -40,6 +40,7 @@ import { handleUsageDigestUnsubscribeRequest } from "./handlers/usage-digest-uns
 import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
+	isStreamedRpcResponse,
 } from "./lib/api-response-size.js";
 import { enforceCookieCsrfOrigin } from "./lib/csrf-origin.js";
 import { getDependencyHealthResponse } from "./lib/dependency-health.js";
@@ -707,6 +708,7 @@ async function handleRequest(
 		for (const [key, value] of Object.entries(cors)) {
 			response.headers.set(key, value);
 		}
+		if (isStreamedRpcResponse(url.pathname, response)) return response;
 		return maybeCompressSessionDetailRpcResponse({
 			pathname: url.pathname,
 			requestHeaders: request.headers,
