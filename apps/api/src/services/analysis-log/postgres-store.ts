@@ -36,6 +36,7 @@ const DELETE_BATCH = 50;
 const OWNER_BATCH = 100;
 const VECTOR_FETCH_BATCH = 1_000;
 const MAX_CACHED_VECTORS = 16_384;
+const TEXT_OID = 25;
 
 type Sql = postgres.Sql;
 // postgres-js types TransactionSql as Omit<Sql, ...>, which drops the tagged-template call signature.
@@ -847,11 +848,9 @@ async function removeOwnerBatch(
 function patchValues(
 	sql: Sql,
 	patch: AnalysisPatch,
-): Record<string, string | number | boolean | null | postgres.Parameter> {
-	const values: Record<
-		string,
-		string | number | boolean | null | postgres.Parameter
-	> = {};
+): Record<string, string | number | boolean | null | Fragment> {
+	const values: Record<string, string | number | boolean | null | Fragment> =
+		{};
 	for (const [key, { column, json }] of Object.entries(PATCH_COLUMNS)) {
 		const value = patch[key as keyof AnalysisPatch];
 		if (value === undefined) continue;
@@ -926,8 +925,10 @@ function queryFieldsOf(
 	};
 }
 
-function jsonb(sql: Sql, value: unknown): postgres.Parameter | null {
-	return value === null ? null : sql.json(value as postgres.JSONValue);
+function jsonb(sql: Sql, value: unknown): Fragment | null {
+	return value === null
+		? null
+		: sql`${sql.typed(JSON.stringify(value), TEXT_OID)}::jsonb`;
 }
 
 function compare(left: string, right: string): number {

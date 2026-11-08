@@ -1,4 +1,5 @@
 import { afterAll, expect, setDefaultTimeout, test } from "bun:test";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { AnalysisSavedError } from "./errors.js";
 import {
@@ -15,20 +16,24 @@ if (!connectionString)
 
 setDefaultTimeout(120_000);
 
-const sql = postgres(connectionString, {
-	max: 4,
-	prepare: false,
-	onnotice: () => {},
-});
+const options = { max: 4, prepare: false, onnotice: () => {} } as const;
+const sql = postgres(connectionString, options);
+drizzle(sql);
+const plain = postgres(connectionString, options);
 const connect = async () => sql;
 const MODEL = "text-embedding-3-small";
 const DAY_MS = 86_400_000;
 
 afterAll(async () => {
-	await sql.end({ timeout: 5 });
+	await Promise.all([sql.end({ timeout: 5 }), plain.end({ timeout: 5 })]);
 });
 
-analysisStoreContract("postgres", () => createPostgresAnalysisStore(connect));
+analysisStoreContract("postgres, client shared with Drizzle like db.ts", () =>
+	createPostgresAnalysisStore(connect),
+);
+analysisStoreContract("postgres, plain client", () =>
+	createPostgresAnalysisStore(async () => plain),
+);
 
 test("arguments and results keep every key and character, NUL and lone surrogates included", async () => {
 	const store = createPostgresAnalysisStore(connect);
