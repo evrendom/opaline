@@ -4,7 +4,7 @@ import type {
 } from "@rudel/api-routes";
 import { useCallback, useMemo, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bone, Bones } from "@/app/ui/bones";
 import { TraceAttempts } from "@/features/compass/compass-trace-attempts";
 import { useSessionReaderBodies } from "../detail/use-session-reader-bodies";
 import { mcpTool } from "../model/session-reader-mcp-tool";
@@ -161,15 +161,17 @@ export function SetupRunTrace({
 		);
 	if (status === "loading" || !waterfall)
 		return (
-			<div className="flex flex-col gap-2 py-2">
-				{[80, 64, 72].map((width) => (
-					<Skeleton
-						key={width}
-						className="h-3.5 rounded-md"
-						style={{ width: `${width}%` }}
-					/>
-				))}
-			</div>
+			<Bones label="Reading this run">
+				<div className="flex flex-col gap-2 py-2">
+					{[80, 64, 72].map((width) => (
+						<Bone
+							key={width}
+							className="h-3.5 rounded-md"
+							style={{ width: `${width}%` }}
+						/>
+					))}
+				</div>
+			</Bones>
 		);
 	return (
 		<div ref={attachPane} className="pb-8 pl-[calc(2.25rem+9px)]">

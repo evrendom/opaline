@@ -120,6 +120,7 @@ export function SessionMemberProfilePreview({
 				render={
 					trigger ?? (
 						<span
+							skullet-block=""
 							className="relative flex size-4.5 shrink-0 cursor-help items-center justify-center rounded-full outline-none data-popup-open:outline-2 data-popup-open:outline-offset-2 data-popup-open:outline-(--session-overview-accent)"
 							data-slot="session-member-profile-trigger"
 						/>

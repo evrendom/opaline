@@ -125,8 +125,8 @@ export async function sessionSetupRuns(
 	};
 }
 
-async function readSetupFiles(
-	env: SessionRunCiEnv,
+export async function readSetupFiles(
+	env: Pick<SessionRunCiEnv, "executor">,
 	scope: SessionRunCiScope,
 	sessionId: string,
 ): Promise<SessionSetupFile[]> {

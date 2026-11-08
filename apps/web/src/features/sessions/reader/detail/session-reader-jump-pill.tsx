@@ -97,7 +97,7 @@ export function JumpPill({
 			title={label}
 			onClick={onClick}
 			className={cn(
-				"flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-background pr-2.5 pl-1.5 text-muted-foreground shadow-(--custom-shadow) transition-[opacity,translate,color] duration-200 ease-out hover:text-foreground dark:bg-card",
+				"flex h-8 items-center gap-1.5 rounded-full bg-background pr-2.5 pl-1.5 text-muted-foreground shadow-(--custom-shadow) transition-[opacity,translate,color] duration-200 ease-out hover:text-foreground dark:bg-card",
 				where
 					? "pointer-events-auto translate-y-0 opacity-100"
 					: cn(

@@ -63,7 +63,7 @@ test("lets the admin connect or skip, and explains what is read", () => {
 
 	expect(markup).toContain("Connect GitHub");
 	expect(markup).toContain("Skip for now");
-	expect(markup).toContain("Never code.");
+	expect(markup).toContain("never stored.");
 });
 
 test("continues once connected and shows a failed connection's reason", () => {

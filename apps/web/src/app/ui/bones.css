@@ -1,0 +1,27 @@
+@reference "../../index.css";
+
+:root {
+	--bone: rgb(0 0 0 / 0.07);
+	--bone-shine: rgb(255 255 255 / 0.6);
+}
+
+.dark {
+	--bone: rgb(255 255 255 / 0.08);
+	--bone-shine: rgb(255 255 255 / 0.1);
+}
+
+.bones-fill,
+.bones-fill > [skullet-pane],
+.bones-fill > [skullet-pane] > [skullet-loading],
+.bones-fill > [skullet-pane] > [skullet-loading] > [skullet-ghost] {
+	height: 100%;
+	min-height: 0;
+}
+
+[skullet-bar] {
+	@apply corner-squircle;
+}
+
+[skullet-loading] svg {
+	border-radius: 50%;
+}

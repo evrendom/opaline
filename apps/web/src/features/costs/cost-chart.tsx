@@ -1,18 +1,25 @@
 import type {
 	CostDashboard,
 	CostDashboardInput,
+	CostDashboardRequestedMetric,
 	DashboardMetric,
 	DashboardMetricData,
 } from "@rudel/api-routes";
 import { GITHUB_RETENTION_TOOLTIP } from "@rudel/api-routes";
 import {
+	createReactComponent,
 	type Icon,
+	IconBolt,
 	IconBoltFilled,
+	IconCircleCheck,
 	IconCircleCheckFilled,
+	IconCoin,
 	IconCoinFilled,
 	IconGitCommit,
 	IconGitMerge,
+	IconMessages,
 	IconMessagesFilled,
+	IconMoodSmile,
 	IconMoodSmileFilled,
 	IconX,
 } from "@tabler/icons-react";
@@ -20,6 +27,7 @@ import {
 	type CSSProperties,
 	type ReactNode,
 	useCallback,
+	useContext,
 	useEffect,
 	useId,
 	useLayoutEffect,
@@ -37,6 +45,7 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
+import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
 	TooltipContent,
@@ -44,6 +53,7 @@ import {
 } from "@/app/ui/tooltip";
 import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
@@ -60,6 +70,7 @@ import {
 } from "./chart-flow";
 import {
 	type ChartInterval,
+	chartPeriodDates,
 	formatChartDate,
 	formatChartPeriod,
 	getChartSeriesValue,
@@ -68,14 +79,41 @@ import {
 } from "./chart-interval";
 import { ChartMorph } from "./chart-morph";
 import {
+	CostDotChart,
+	DotFocusContext,
+	DotFocusDaysContext,
+} from "./cost-dot-chart";
+import {
 	costLabel,
 	formatChartValueTick,
+	formatMetric,
 	formatMetricRatio,
 	formatRunDuration,
 	getMetricData,
 	getMetricTotal,
 	METRIC_LABELS,
 } from "./cost-format";
+import {
+	createHoverDateStore,
+	HoverDateContext,
+	useDotPick,
+	useMarkedDate,
+} from "./cost-hover-date";
+import { formatPerRun, languageRates, perRunTick } from "./cost-language-rates";
+import {
+	deepViewOf,
+	ExpandButton,
+	filteredDeepViewOf,
+	MetricSheet,
+	useDeepSplit,
+} from "./cost-metric-sheet";
+import {
+	MetricBreakdownContext,
+	MetricEmptyContext,
+	MetricLoadingContext,
+	MetricOverrideContext,
+} from "./cost-rail-override";
+import { RollingText } from "./cost-rolling-text";
 import { COST_LABELS } from "./use-cost-dashboard";
 import type { MetricPreviews } from "./use-metric-previews";
 
@@ -89,23 +127,73 @@ const FLOW_CYCLE_MS = 2800;
 
 type ChartPhase = "loading" | "prime" | "morph" | "idle";
 
+const IconGitMergeFilled = createReactComponent(
+	"outline",
+	"git-merge-filled",
+	"GitMergeFilled",
+	[
+		["path", { d: "M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", fill: "currentColor" }],
+		["path", { d: "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", fill: "currentColor" }],
+		[
+			"path",
+			{ d: "M15 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", fill: "currentColor" },
+		],
+		["path", { d: "M7 8l0 8" }],
+		["path", { d: "M7 8a4 4 0 0 0 4 4h4" }],
+	],
+);
+const IconGitCommitFilled = createReactComponent(
+	"outline",
+	"git-commit-filled",
+	"GitCommitFilled",
+	[
+		["path", { d: "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", fill: "currentColor" }],
+		["path", { d: "M12 3l0 6" }],
+		["path", { d: "M12 15l0 6" }],
+	],
+);
+
 // Each stat card's glyph and accent, in Opaline's palette.
-// Filled glyphs; Tabler has no filled git glyphs, so those stay outline.
-const METRIC_APPEARANCE: Record<
+export const METRIC_APPEARANCE: Record<
 	DashboardMetric,
-	{ icon: Icon; color: string }
+	{ icon: Icon; outline: Icon; color: string }
 > = {
-	cost: { icon: IconCoinFilled, color: SERIES_COLORS[3] },
-	sessions: { icon: IconMessagesFilled, color: SERIES_COLORS[0] },
-	agentRuns: { icon: IconBoltFilled, color: SERIES_COLORS[4] },
-	signals: { icon: IconMoodSmileFilled, color: SERIES_COLORS[5] },
-	mergedPullRequests: { icon: IconGitMerge, color: SERIES_COLORS[2] },
-	ciRuns: { icon: IconCircleCheckFilled, color: SERIES_COLORS[6] },
+	cost: { icon: IconCoinFilled, outline: IconCoin, color: SERIES_COLORS[3] },
+	sessions: {
+		icon: IconMessagesFilled,
+		outline: IconMessages,
+		color: SERIES_COLORS[0],
+	},
+	agentRuns: {
+		icon: IconBoltFilled,
+		outline: IconBolt,
+		color: SERIES_COLORS[4],
+	},
+	signals: {
+		icon: IconMoodSmileFilled,
+		outline: IconMoodSmile,
+		color: SERIES_COLORS[5],
+	},
+	mergedPullRequests: {
+		icon: IconGitMergeFilled,
+		outline: IconGitMerge,
+		color: SERIES_COLORS[2],
+	},
+	ciRuns: {
+		icon: IconCircleCheckFilled,
+		outline: IconCircleCheck,
+		color: SERIES_COLORS[6],
+	},
 	ciFailuresPerPullRequest: {
 		icon: IconCircleCheckFilled,
+		outline: IconCircleCheck,
 		color: SERIES_COLORS[1],
 	},
-	commits: { icon: IconGitCommit, color: SERIES_COLORS[7] },
+	commits: {
+		icon: IconGitCommitFilled,
+		outline: IconGitCommit,
+		color: SERIES_COLORS[7],
+	},
 };
 
 const SIGNAL_COLORS: Record<string, string> = {
@@ -129,6 +217,7 @@ const CI_COLORS: Record<string, string> = {
 	inProgress: SERIES_COLORS[0],
 };
 type Props = {
+	dots?: "only" | "switch";
 	data: CostDashboard | undefined;
 	pending: boolean;
 	/** The metric the chart draws. */
@@ -143,6 +232,7 @@ type Props = {
 	filters?: ReactNode;
 	/** Each stat card's own answer, the charted one included. */
 	previews?: MetricPreviews;
+	inputFor?: (metric: CostDashboardRequestedMetric) => CostDashboardInput;
 	runSignals: CostDashboardInput["runSignals"];
 	signalTypes: CostDashboardInput["signalTypes"];
 	interval: ChartInterval;
@@ -156,6 +246,7 @@ type Props = {
 };
 
 export function CostChart({
+	dots,
 	data: dashboard,
 	pending,
 	splitBy,
@@ -166,6 +257,7 @@ export function CostChart({
 	metricsPending = false,
 	filters,
 	previews,
+	inputFor,
 	runSignals,
 	signalTypes,
 	onMetricChange,
@@ -176,6 +268,11 @@ export function CostChart({
 }: Props) {
 	const demo = useDemoRuntime();
 	const workspace = useOptionalOrganization();
+	const overrides = useContext(MetricOverrideContext);
+	const overridesLoading = useContext(MetricLoadingContext);
+	const empty = useContext(MetricEmptyContext);
+	const [kind, setKind] = useState<"dots" | "line">("line");
+	const showDots = dots === "only" || (dots === "switch" && kind === "dots");
 	const [showMedian, setShowMedian] = useState(true);
 	const [showP95, setShowP95] = useState(true);
 	const [showCiFailures, setShowCiFailures] = useState(true);
@@ -183,8 +280,39 @@ export function CostChart({
 	// "prime" keeps it flowing after the data lands, until the browser is
 	// idle; "morph" draws the real data with its areas animated from the
 	// heartbeat (area-morph.ts); "idle" is the same chart, interactive.
-	const [phase, setPhase] = useState<ChartPhase>(pending ? "loading" : "idle");
-	const [wasPending, setWasPending] = useState(pending);
+	const perRunChart =
+		metric === "signals" &&
+		splitBy === "none" &&
+		!overrides?.has("signals") &&
+		previews !== undefined;
+	const loading = pending || (perRunChart && !previews?.languageSplit);
+	const [phase, setPhase] = useState<ChartPhase>(loading ? "loading" : "idle");
+	const [hoverStore] = useState(createHoverDateStore);
+	const metricsRef = useRef<HTMLFieldSetElement>(null);
+	const [expanded, setExpanded] = useState<DashboardMetric | null>(null);
+	if (expanded !== null && expanded !== selectedMetric) setExpanded(null);
+	const collapse = useCallback(() => setExpanded(null), []);
+	const filteredBreakdowns = useContext(MetricBreakdownContext);
+	const filtered = filteredBreakdowns !== undefined;
+	const members = workspace?.state.members;
+	const memberOf = useCallback(
+		(id: string) => {
+			const user = members?.find((member) => member.userId === id)?.user;
+			return user
+				? { label: user.name?.trim() || user.email, image: user.image ?? null }
+				: undefined;
+		},
+		[members],
+	);
+	const deepView = filtered
+		? filteredDeepViewOf(selectedMetric, filteredBreakdowns, memberOf)
+		: deepViewOf(
+				selectedMetric,
+				getMetricData(dashboard, selectedMetric),
+				getMetricData(previews?.languageSplit, "signals"),
+			);
+	const deepSplit = useDeepSplit(inputFor, filtered ? null : expanded);
+	const [wasPending, setWasPending] = useState(loading);
 	const [linesEntering, setLinesEntering] = useState(false);
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const flowRef = useRef<HTMLDivElement>(null);
@@ -275,6 +403,47 @@ export function CostChart({
 		metric,
 		today,
 	]);
+	const frustration = useMemo(
+		() =>
+			metric === "signals" && !overrides?.has("signals")
+				? languageRates(
+						previews?.languageSplit,
+						getMetricData(
+							previews ? previews.agentRuns : dashboard,
+							"agentRuns",
+						),
+						interval,
+					)
+				: undefined,
+		[metric, overrides, previews, dashboard, interval],
+	);
+	const dotPoints = useMemo(() => {
+		if (!frustration) return trend;
+		const byDate = new Map(
+			frustration.dates.map((date, at) => [date, frustration.swears[at] ?? 0]),
+		);
+		return trend.map((point) => ({
+			...point,
+			total: byDate.get(point.date) ?? 0,
+		}));
+	}, [trend, frustration]);
+	const dateRange = useOptionalDateRange();
+	const rangeStart = dateRange?.state.startDate;
+	const rangeEnd = dateRange?.state.endDate;
+	const loadingDots = useMemo(
+		() =>
+			showDots && loading && rangeStart && rangeEnd
+				? groupChartTrend(
+						chartPeriodDates(rangeStart, rangeEnd, "daily").map((date) => ({
+							date,
+							total: 0,
+							values: {},
+						})),
+						interval,
+					)
+				: null,
+		[showDots, loading, rangeStart, rangeEnd, interval],
+	);
 	const visiblePointCount = trend.filter(
 		(point) => point.startDate <= today,
 	).length;
@@ -314,10 +483,10 @@ export function CostChart({
 			};
 		}) ?? [];
 	const primaryColor = series[0]?.color ?? accent;
-	if (wasPending !== pending) {
-		setWasPending(pending);
+	if (wasPending !== loading) {
+		setWasPending(loading);
 		setPhase(
-			pending
+			loading
 				? "loading"
 				: series.length > 0 && trend.length > 1 && !prefersReducedMotion()
 					? "prime"
@@ -326,24 +495,33 @@ export function CostChart({
 	}
 	const heartbeat = phase === "loading" || phase === "prime";
 	const seriesIdKey = series.map((entry) => entry.id).join("\u0000");
+	const perRun = perRunChart ? frustration : undefined;
 	const seriesValues = useMemo(
 		() =>
-			seriesIdKey
-				.split("\u0000")
-				.filter(Boolean)
-				.map((id) =>
-					trend.map((point) =>
-						getChartSeriesValue(
-							point,
-							id,
-							today,
-							"sum",
-							availableFrom,
-							ciHistoryAvailable,
+			perRun
+				? [
+						trend.map((point) => {
+							if (point.startDate > today) return null;
+							const at = perRun.dates.indexOf(point.date);
+							return at < 0 ? 0 : (perRun.swears[at] ?? 0);
+						}),
+					]
+				: seriesIdKey
+						.split("\u0000")
+						.filter(Boolean)
+						.map((id) =>
+							trend.map((point) =>
+								getChartSeriesValue(
+									point,
+									id,
+									today,
+									"sum",
+									availableFrom,
+									ciHistoryAvailable,
+								),
+							),
 						),
-					),
-				),
-		[availableFrom, ciHistoryAvailable, seriesIdKey, today, trend],
+		[availableFrom, ciHistoryAvailable, perRun, seriesIdKey, today, trend],
 	);
 	const idleRows = useMemo(
 		() =>
@@ -443,512 +621,652 @@ export function CostChart({
 		});
 	}, [endMorph, phase]);
 	return (
-		<section
-			className="cost-chart-panel"
-			aria-label={
-				metric === "ciRuns"
-					? "CI runs with median and P95 duration over time"
-					: metric === "agentRuns"
-						? "Agent runs with median and P95 duration over time"
-						: metric === "mergedPullRequests"
-							? "Merged pull requests with CI failures per pull request over time"
-							: `${metricLabel} over time`
-			}
-			aria-busy={pending}
-		>
-			<fieldset
-				className="cost-metrics"
-				aria-label="Chart metric"
-				aria-busy={metricsPending}
+		<HoverDateContext.Provider value={hoverStore}>
+			<section
+				className="cost-chart-panel"
+				aria-label={
+					metric === "ciRuns"
+						? "CI runs with median and P95 duration over time"
+						: metric === "agentRuns"
+							? "Agent runs with median and P95 duration over time"
+							: metric === "mergedPullRequests"
+								? "Merged pull requests with CI failures per pull request over time"
+								: `${metricLabel} over time`
+				}
+				aria-busy={pending}
 			>
-				{metrics.map((value) => {
-					// With previews, each card reads its own request's answer: the
-					// charted dashboard leaves the GitHub metrics out unless one of
-					// them is charted.
-					const source = previews ? previews[value] : dashboard;
-					const total = getMetricTotal(source, value);
-					const metricData = getMetricData(source, value);
-					// Only once the dashboard has answered: before that the card loads.
-					const unknownCi =
-						value === "ciRuns" &&
-						total !== undefined &&
-						!isCiHistoryAvailable(
-							metricData?.githubHistory,
-							metricData?.trend.at(-1)?.date ?? "",
-						);
-					return (
-						<Metric
-							key={value}
-							label={METRIC_LABELS[value]}
-							icon={METRIC_APPEARANCE[value].icon}
-							color={METRIC_APPEARANCE[value].color}
-							value={
-								total === undefined
-									? undefined
-									: total === null || unknownCi
-										? "—"
-										: formatMetricRatio(total, value, metricData?.denominator)
-							}
-							unavailable={total === null || unknownCi}
-							qualifier={
-								metricData?.githubHistory?.preview
-									? "preview"
-									: value === "agentRuns" && metricData?.incomplete
-										? "indexed"
+				<fieldset
+					ref={metricsRef}
+					className="cost-metrics"
+					aria-label="Chart metric"
+					aria-busy={metricsPending}
+				>
+					{metrics.map((value) => {
+						// With previews, each card reads its own request's answer: the
+						// charted dashboard leaves the GitHub metrics out unless one of
+						// them is charted.
+						const source = previews ? previews[value] : dashboard;
+						const total = getMetricTotal(source, value);
+						const metricData = getMetricData(source, value);
+						// Only once the dashboard has answered: before that the card loads.
+						const unknownCi =
+							value === "ciRuns" &&
+							total !== undefined &&
+							!isCiHistoryAvailable(
+								metricData?.githubHistory,
+								metricData?.trend.at(-1)?.date ?? "",
+							);
+						const rates =
+							value === "signals" && !overrides?.has(value)
+								? languageRates(
+										previews?.languageSplit,
+										getMetricData(
+											previews ? previews.agentRuns : dashboard,
+											"agentRuns",
+										),
+										interval,
+									)
+								: undefined;
+						return (
+							<Metric
+								key={value}
+								label={rates ? "Frustrations" : METRIC_LABELS[value]}
+								icon={METRIC_APPEARANCE[value].icon}
+								outlineIcon={METRIC_APPEARANCE[value].outline}
+								color={METRIC_APPEARANCE[value].color}
+								value={
+									overridesLoading
+										? undefined
+										: rates
+											? formatPerRun(rates.total.swears, true)
+											: (overrides?.get(value) ??
+												(total === undefined
+													? undefined
+													: total === null || unknownCi
+														? "—"
+														: formatMetricRatio(
+																total,
+																value,
+																metricData?.denominator,
+															)))
+								}
+								unavailable={
+									!overrides?.has(value) && (total === null || unknownCi)
+								}
+								qualifier={
+									metricData?.githubHistory?.preview ? "preview" : undefined
+								}
+								primary={selectedMetric === value}
+								disabled={empty?.has(value) ?? false}
+								metricKey={value}
+								expanded={expanded === value}
+								onToggleExpand={
+									selectedMetric === value && deepView
+										? () => setExpanded(expanded === value ? null : value)
 										: undefined
+								}
+								trend={
+									rates
+										? rates.swears
+										: sparklineTotals(
+												previews || value === metric
+													? metricData?.trend
+													: undefined,
+												interval,
+											)
+								}
+								dates={
+									rates
+										? rates.dates
+										: sparklineDates(
+												previews || value === metric
+													? metricData?.trend
+													: undefined,
+												interval,
+											)
+								}
+								textAt={
+									rates
+										? (at: number) => formatPerRun(rates.swears[at] ?? 0, true)
+										: undefined
+								}
+								format={
+									overrides?.has(value)
+										? undefined
+										: (amount: number) => formatMetric(amount, value)
+								}
+								onClick={() => onMetricChange(value)}
+								onIntent={
+									onMetricIntent ? () => onMetricIntent(value) : undefined
+								}
+							/>
+						);
+					})}
+					{expanded && deepView ? (
+						<MetricSheet
+							color={METRIC_APPEARANCE[expanded].color}
+							container={metricsRef}
+							interval={interval}
+							split={
+								filtered
+									? null
+									: expanded === "signals"
+										? getMetricData(previews?.languageSplit, "signals")
+										: deepSplit
 							}
-							primary={selectedMetric === value}
-							trend={sparklineTotals(
-								previews || value === metric ? metricData?.trend : undefined,
-								interval,
-							)}
-							onClick={() => onMetricChange(value)}
-							onIntent={
-								onMetricIntent ? () => onMetricIntent(value) : undefined
-							}
+							metric={expanded}
+							view={deepView}
+							onClose={collapse}
 						/>
-					);
-				})}
-			</fieldset>
-			<div className="cost-chart-card">
-				<div className="cost-chart-key" data-fluid-menu-root="">
-					<FluidMenuHover items=".cost-text-button" />
-					<div className="cost-chart-key-copy">
-						<h2 className="cost-chart-title">{metricLabel} over time</h2>
-						<div className="cost-chart-legend">
-							{series.map((entry) => (
-								<div key={entry.id} className="cost-legend-item">
-									<i style={{ backgroundColor: entry.color }} />
-									{entry.label}
-								</div>
-							))}
-							{metric === "agentRuns" || metric === "ciRuns" ? (
-								<>
-									<button
-										type="button"
-										className="cost-legend-item cost-duration-legend"
-										data-percentile="median"
-										aria-label="Median duration"
-										title={
-											metric === "ciRuns"
-												? "Duration from run start to its last update."
-												: undefined
-										}
-										aria-pressed={showMedian}
-										onClick={() => setShowMedian((visible) => !visible)}
-									>
-										<i aria-hidden="true" />
-										Median{" "}
-										<strong>
-											{formatRunDuration(durationStats?.medianSeconds)}
-										</strong>
-									</button>
+					) : null}
+				</fieldset>
+				<div className="cost-chart-card">
+					<div className="cost-chart-key" data-fluid-menu-root="">
+						<FluidMenuHover items=".cost-text-button" />
+						<div className="cost-chart-key-copy">
+							<h2 className="cost-chart-title">{metricLabel} over time</h2>
+							<div className="cost-chart-legend">
+								{pending && series.length === 0 ? (
+									<Skeleton
+										className="h-3 rounded-[4px]"
+										style={{ width: metricLabel.length * TICK_CHAR_PX + 14 }}
+									/>
+								) : null}
+								{series.map((entry) => (
+									<div key={entry.id} className="cost-legend-item">
+										<i style={{ backgroundColor: entry.color }} />
+										{entry.label}
+									</div>
+								))}
+								{metric === "agentRuns" || metric === "ciRuns" ? (
+									<>
+										<button
+											type="button"
+											className="cost-legend-item cost-duration-legend"
+											data-percentile="median"
+											aria-label="Median duration"
+											title={
+												metric === "ciRuns"
+													? "Duration from run start to its last update."
+													: undefined
+											}
+											aria-pressed={showMedian}
+											onClick={() => setShowMedian((visible) => !visible)}
+										>
+											<i aria-hidden="true" />
+											Median{" "}
+											<strong>
+												{formatRunDuration(durationStats?.medianSeconds)}
+											</strong>
+										</button>
+										<button
+											type="button"
+											className="cost-legend-item cost-duration-legend"
+											data-percentile="p95"
+											aria-label="P95 duration"
+											title={
+												metric === "ciRuns"
+													? "Duration from run start to its last update."
+													: undefined
+											}
+											aria-pressed={showP95}
+											onClick={() => setShowP95((visible) => !visible)}
+										>
+											<i aria-hidden="true" />
+											P95{" "}
+											<strong>
+												{formatRunDuration(durationStats?.p95Seconds)}
+											</strong>
+										</button>
+									</>
+								) : metric === "mergedPullRequests" ? (
 									<button
 										type="button"
 										className="cost-legend-item cost-duration-legend"
 										data-percentile="p95"
-										aria-label="P95 duration"
-										title={
-											metric === "ciRuns"
-												? "Duration from run start to its last update."
-												: undefined
-										}
-										aria-pressed={showP95}
-										onClick={() => setShowP95((visible) => !visible)}
+										aria-label="CI failures per PR"
+										title="Failed CI attempts per merged PR, counting only PRs whose CI history is available. Re-runs count. Grouped by merge date (UTC)."
+										aria-pressed={showCiFailures}
+										onClick={() => setShowCiFailures((visible) => !visible)}
 									>
 										<i aria-hidden="true" />
-										P95{" "}
+										CI failures / PR{" "}
 										<strong>
-											{formatRunDuration(durationStats?.p95Seconds)}
+											{dashboard === undefined
+												? "…"
+												: ciData == null
+													? "—"
+													: formatMetricRatio(
+															ciData.total,
+															"ciFailuresPerPullRequest",
+															ciData.denominator,
+														)}
 										</strong>
 									</button>
-								</>
-							) : metric === "mergedPullRequests" ? (
-								<button
-									type="button"
-									className="cost-legend-item cost-duration-legend"
-									data-percentile="p95"
-									aria-label="CI failures per PR"
-									title="Failed CI attempts per merged PR, counting only PRs whose CI history is available. Re-runs count. Grouped by merge date (UTC)."
-									aria-pressed={showCiFailures}
-									onClick={() => setShowCiFailures((visible) => !visible)}
-								>
-									<i aria-hidden="true" />
-									CI failures / PR{" "}
-									<strong>
-										{dashboard === undefined
-											? "…"
-											: ciData == null
-												? "—"
-												: formatMetricRatio(
-														ciData.total,
-														"ciFailuresPerPullRequest",
-														ciData.denominator,
-													)}
-									</strong>
-								</button>
+								) : null}
+							</div>
+							{history ? (
+								<GitHubHistoryNotes
+									history={history}
+									metric={metric}
+									startDate={data?.trend[0]?.date ?? ""}
+									settingsUrl={
+										workspace?.meta.isOrgAdmin && workspace.state.activeOrg
+											? `/${workspace.state.activeOrg.slug}/settings/workspace`
+											: undefined
+									}
+								/>
 							) : null}
-						</div>
-						{history ? (
-							<GitHubHistoryNotes
-								history={history}
-								metric={metric}
-								startDate={data?.trend[0]?.date ?? ""}
-								settingsUrl={
-									workspace?.meta.isOrgAdmin && workspace.state.activeOrg
-										? `/${workspace.state.activeOrg.slug}/settings/workspace`
-										: undefined
-								}
-							/>
-						) : null}
-						{metric === "mergedPullRequests" && data?.cycleTimeStats ? (
-							<output
-								className="cost-chart-coverage"
-								aria-label="PR cycle time"
-							>
-								<span title="Time from pull request creation to merge.">
-									PR cycle time · Median{" "}
-									{formatRunDuration(data.cycleTimeStats.medianSeconds)} · P90{" "}
-									{formatRunDuration(data.cycleTimeStats.p90Seconds)}
-								</span>
-							</output>
-						) : null}
-						{metric === "ciRuns" && data?.ciMinutes ? (
-							<output className="cost-chart-coverage">
-								<span title="Sum of completed run durations; billing multipliers are not included.">
-									CI minutes (approximate billed Actions minutes):{" "}
-									{!ciHistoryAvailable
-										? "—"
-										: new Intl.NumberFormat("en-US", {
-												maximumFractionDigits: 1,
-											}).format(data.ciMinutes.total)}
-								</span>
-							</output>
-						) : null}
-						{coverage && data?.incomplete ? (
-							<output className="cost-chart-coverage">
-								<button
-									type="button"
-									className="cost-text-button cost-coverage-refresh"
-									onClick={onRefresh}
-									disabled={refreshing}
+							{metric === "mergedPullRequests" && data?.cycleTimeStats ? (
+								<output
+									className="cost-chart-coverage"
+									aria-label="PR cycle time"
 								>
-									{refreshing ? "Refreshing…" : "Refresh"}
-								</button>
-							</output>
-						) : unavailable ? (
-							<output className="cost-chart-coverage">
-								<span>{unavailableLabel}</span>
-								<button
-									type="button"
-									className="cost-text-button cost-coverage-refresh"
-									onClick={onRefresh}
-									disabled={refreshing}
-								>
-									{refreshing ? "Refreshing…" : "Refresh"}
-								</button>
-							</output>
-						) : null}
-					</div>
-					{/* The chart's split and filters, as removable tags. */}
-					{splitBy !== "none" || filters ? (
-						<div className="cost-chart-tags">
-							{splitBy !== "none" ? (
-								<span className="cost-chart-split">
-									Split by
+									<span title="Time from pull request creation to merge.">
+										PR cycle time · Median{" "}
+										{formatRunDuration(data.cycleTimeStats.medianSeconds)} · P90{" "}
+										{formatRunDuration(data.cycleTimeStats.p90Seconds)}
+									</span>
+								</output>
+							) : null}
+							{metric === "ciRuns" && data?.ciMinutes ? (
+								<output className="cost-chart-coverage">
+									<span title="Sum of completed run durations; billing multipliers are not included.">
+										CI minutes (approximate billed Actions minutes):{" "}
+										{!ciHistoryAvailable
+											? "—"
+											: new Intl.NumberFormat("en-US", {
+													maximumFractionDigits: 1,
+												}).format(data.ciMinutes.total)}
+									</span>
+								</output>
+							) : null}
+							{coverage && data?.incomplete ? (
+								<output className="cost-chart-coverage">
 									<button
 										type="button"
-										className="cost-filter-chip"
-										onClick={onResetSplit}
-										title={`Split by ${COST_LABELS[splitBy]}`}
-										aria-label={`Stop splitting by ${COST_LABELS[splitBy].toLowerCase()}`}
+										className="cost-text-button cost-coverage-refresh"
+										onClick={onRefresh}
+										disabled={refreshing}
 									>
-										<span className="truncate">{COST_LABELS[splitBy]}</span>
-										<IconX size={12} className="shrink-0" />
+										{refreshing ? "Refreshing…" : "Refresh"}
 									</button>
-								</span>
+								</output>
+							) : unavailable ? (
+								<output className="cost-chart-coverage">
+									<span>{unavailableLabel}</span>
+									<button
+										type="button"
+										className="cost-text-button cost-coverage-refresh"
+										onClick={onRefresh}
+										disabled={refreshing}
+									>
+										{refreshing ? "Refreshing…" : "Refresh"}
+									</button>
+								</output>
 							) : null}
-							{filters}
 						</div>
-					) : null}
-				</div>
-				<div
-					ref={canvasRef}
-					className="cost-chart-canvas"
-					data-phase={phase}
-					data-lines-entering={linesEntering || undefined}
-				>
-					{demo && data ? (
-						<DemoTrendPreview
-							trend={trend}
-							color={primaryColor}
-							metric={metric}
-							interval={interval}
-						/>
-					) : null}
-					{phase === "idle" ? null : (
-						<ChartSkeleton
-							label={`Loading ${metricLabel.toLowerCase()}`}
-							leaving={phase !== "loading"}
-						/>
-					)}
-					<div className="cost-chart-flow" ref={flowRef}>
-						<div className="cost-chart-flow-track" ref={flowTrackRef}>
-							<ResponsiveContainer width="100%" height="100%" minWidth={0}>
-								<ComposedChart
-									data={rows}
-									margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
-									accessibilityLayer
-								>
-									<defs>
-										<linearGradient
-											id={gradientId}
-											className="cost-chart-gradient"
-											x1="0"
-											y1="0"
-											x2="0"
-											y2="1"
+						{/* The chart's split and filters, as removable tags. */}
+						{splitBy !== "none" || filters ? (
+							<div className="cost-chart-tags">
+								{splitBy !== "none" ? (
+									<span className="cost-chart-split">
+										Split by
+										<button
+											type="button"
+											className="cost-filter-chip"
+											onClick={onResetSplit}
+											title={`Split by ${COST_LABELS[splitBy]}`}
+											aria-label={`Stop splitting by ${COST_LABELS[splitBy].toLowerCase()}`}
 										>
-											{/* The heartbeat's fill while loading, easing into the chart's
+											<span className="truncate">{COST_LABELS[splitBy]}</span>
+											<IconX size={12} className="shrink-0" />
+										</button>
+									</span>
+								) : null}
+								{filters}
+							</div>
+						) : null}
+						{dots === "switch" ? (
+							<fieldset className="cost-chart-kind" aria-label="Chart style">
+								{(["line", "dots"] as const).map((value) => (
+									<button
+										key={value}
+										type="button"
+										aria-pressed={kind === value}
+										onClick={() => setKind(value)}
+									>
+										{value === "line" ? "Line" : "Dots"}
+									</button>
+								))}
+							</fieldset>
+						) : null}
+					</div>
+					<div
+						ref={canvasRef}
+						className="cost-chart-canvas"
+						data-phase={phase}
+						data-kind={showDots ? "dots" : undefined}
+						data-lines-entering={linesEntering || undefined}
+					>
+						{showDots ? (
+							<CostDotChart
+								color={primaryColor}
+								fit={dots === "only"}
+								format={
+									frustration
+										? formatPerRun
+										: (value) => formatMetric(value, metric)
+								}
+								interval={interval}
+								label={frustration ? "" : metricLabel}
+								loading={loadingDots !== null}
+								points={loadingDots ?? dotPoints}
+							/>
+						) : null}
+						{demo && data ? (
+							<DemoTrendPreview
+								trend={trend}
+								color={primaryColor}
+								metric={metric}
+								interval={interval}
+							/>
+						) : null}
+						{phase === "idle" ? null : (
+							<ChartSkeleton
+								interval={interval}
+								label={`Loading ${metricLabel.toLowerCase()}`}
+								leaving={phase !== "loading"}
+							/>
+						)}
+						<div className="cost-chart-flow" ref={flowRef}>
+							<div className="cost-chart-flow-track" ref={flowTrackRef}>
+								<ResponsiveContainer width="100%" height="100%" minWidth={0}>
+									<ComposedChart
+										data={rows}
+										margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
+										accessibilityLayer
+									>
+										<defs>
+											<linearGradient
+												id={gradientId}
+												className="cost-chart-gradient"
+												x1="0"
+												y1="0"
+												x2="0"
+												y2="1"
+											>
+												{/* The heartbeat's fill while loading, easing into the chart's
 										    (or into nothing when several series share the chart). */}
-											<stop
-												offset="0%"
-												style={{
-													stopColor: heartbeat ? accent : primaryColor,
-													stopOpacity: heartbeat
-														? 0.16
-														: series.length === 1
-															? "var(--cost-chart-fill-opacity)"
-															: 0,
-												}}
+												<stop
+													offset="0%"
+													style={{
+														stopColor: heartbeat ? accent : primaryColor,
+														stopOpacity: heartbeat
+															? 0.16
+															: series.length === 1
+																? "var(--cost-chart-fill-opacity)"
+																: 0,
+													}}
+												/>
+												<stop
+													offset="100%"
+													style={{
+														stopColor: heartbeat ? accent : primaryColor,
+														stopOpacity: heartbeat ? 0.015 : 0,
+													}}
+												/>
+											</linearGradient>
+										</defs>
+										{heartbeat ? null : (
+											<CartesianGrid
+												yAxisId="count"
+												vertical={false}
+												stroke="var(--cost-border)"
+												strokeDasharray="3 4"
 											/>
-											<stop
-												offset="100%"
-												style={{
-													stopColor: heartbeat ? accent : primaryColor,
-													stopOpacity: heartbeat ? 0.015 : 0,
-												}}
-											/>
-										</linearGradient>
-									</defs>
-									{heartbeat ? null : (
-										<CartesianGrid
-											yAxisId="count"
-											vertical={false}
-											stroke="var(--cost-border)"
-											strokeDasharray="3 4"
-										/>
-									)}
-									<XAxis
-										type="number"
-										dataKey="x"
-										domain={xDomain}
-										ticks={heartbeat ? [] : trend.map((_, index) => index)}
-										allowDecimals={false}
-										tickFormatter={(value) =>
-											formatChartDate(
-												trend[Number(value)]?.date ?? "",
-												interval,
-											)
-										}
-										axisLine={false}
-										tickLine={false}
-										minTickGap={65}
-										tickMargin={14}
-										height={40}
-										tick={
-											heartbeat
-												? false
-												: { fill: "var(--cost-muted)", fontSize: 11 }
-										}
-									/>
-									<YAxis
-										yAxisId="count"
-										tickFormatter={(value) =>
-											formatChartValueTick(Number(value), metric)
-										}
-										domain={heartbeat ? HEARTBEAT_DOMAIN : [0, "auto"]}
-										axisLine={false}
-										tickLine={false}
-										tickCount={4}
-										allowDecimals={metric === "cost"}
-										tickMargin={10}
-										width={56}
-										tick={
-											heartbeat
-												? false
-												: { fill: "var(--cost-muted)", fontSize: 11 }
-										}
-									/>
-									{metric === "agentRuns" || metric === "ciRuns" ? (
-										<YAxis
-											yAxisId="duration"
-											hide={!showMedian && !showP95}
-											orientation="right"
+										)}
+										<XAxis
+											type="number"
+											dataKey="x"
+											domain={xDomain}
+											ticks={heartbeat ? [] : trend.map((_, index) => index)}
+											allowDecimals={false}
 											tickFormatter={(value) =>
-												formatRunDuration(Number(value))
-											}
-											domain={[0, "auto"]}
-											axisLine={false}
-											tickLine={false}
-											tickCount={4}
-											tickMargin={10}
-											width={68}
-											tick={
-												phase === "idle" && durationStats?.sampleCount
-													? { fill: "var(--cost-muted)", fontSize: 11 }
-													: false
-											}
-										/>
-									) : metric === "mergedPullRequests" ? (
-										<YAxis
-											yAxisId="ci"
-											hide={!showCiFailures || ciData === null}
-											orientation="right"
-											tickFormatter={(value) =>
-												formatMetricRatio(
-													Number(value),
-													"ciFailuresPerPullRequest",
-													1,
+												formatChartDate(
+													trend[Number(value)]?.date ?? "",
+													interval,
 												)
 											}
-											domain={[0, "auto"]}
+											axisLine={false}
+											tickLine={false}
+											minTickGap={65}
+											tickMargin={14}
+											height={40}
+											tick={
+												heartbeat
+													? false
+													: { fill: "var(--cost-muted)", fontSize: 11 }
+											}
+										/>
+										<YAxis
+											yAxisId="count"
+											tickFormatter={(value) =>
+												perRun
+													? perRunTick(Number(value))
+													: formatChartValueTick(Number(value), metric)
+											}
+											domain={heartbeat ? HEARTBEAT_DOMAIN : [0, "auto"]}
 											axisLine={false}
 											tickLine={false}
 											tickCount={4}
+											allowDecimals={metric === "cost" || perRun !== undefined}
 											tickMargin={10}
 											width={56}
 											tick={
-												phase === "idle"
-													? { fill: "var(--cost-muted)", fontSize: 11 }
-													: false
+												heartbeat
+													? false
+													: { fill: "var(--cost-muted)", fontSize: 11 }
 											}
 										/>
-									) : null}
-									<Tooltip
-										active={phase === "idle" ? undefined : false}
-										// Follows the pointer across, but holds one height near the
-										// top of the plot instead of tracking the pointer's height.
-										position={{ y: 48 }}
-										// Appear in place rather than slide in from the last spot.
-										isAnimationActive={false}
-										cursor={{
-											stroke: "var(--cost-muted)",
-											strokeDasharray: "3 4",
-										}}
-										content={({ active, payload, label }) => {
-											const point = trend[Number(label)];
-											return active && payload?.length ? (
-												<div className="cost-chart-tooltip">
-													<p>{point ? formatChartPeriod(point) : null}</p>
-													{payload.map((item) => (
-														<div key={String(item.name)}>
-															<span>
-																<i style={{ backgroundColor: item.color }} />
-																{item.name}
-															</span>
-															<strong>
-																{item.dataKey === "medianSeconds" ||
-																item.dataKey === "p95Seconds"
-																	? formatRunDuration(Number(item.value))
-																	: item.dataKey === "ciFailureRatio"
-																		? formatMetricRatio(
-																				Number(item.value),
-																				"ciFailuresPerPullRequest",
-																				point?.ciFailureDenominator,
-																			)
-																		: formatMetricRatio(
-																				Number(item.value),
-																				metric,
-																				point?.denominator,
-																			)}
-															</strong>
-														</div>
-													))}
-													{availableFrom &&
-													point &&
-													point.startDate < availableFrom &&
-													point.endDate >= availableFrom ? (
-														<p>CI history from {historyDate(availableFrom)}</p>
-													) : null}
-													{point?.cycleMedianSeconds !== undefined ? (
-														<p>
-															PR cycle time · Median{" "}
-															{formatRunDuration(point.cycleMedianSeconds)} ·
-															P90 {formatRunDuration(point.cycleP90Seconds)}
-														</p>
-													) : null}
-													{point?.ciMinutes !== undefined ? (
-														<p>
-															{point.ciMinutes.toFixed(1)} CI minutes
-															(approximate billed Actions minutes)
-														</p>
-													) : null}
-												</div>
-											) : null;
-										}}
-									/>
-									{(heartbeat ? [null] : series).map((entry, index) => (
-										<Area
-											yAxisId="count"
-											// By position: the heartbeat and the series it becomes are
-											// one Area, whose paths the morph animates.
-											key={seriesKey(index)}
-											dataKey={seriesKey(index)}
-											name={entry?.label ?? metricLabel}
-											type="linear"
-											stroke={heartbeat ? accent : entry?.color}
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											fill={
-												index === 0 && (series.length === 1 || phase !== "idle")
-													? `url(#${gradientId})`
-													: "transparent"
-											}
-											baseValue={heartbeat ? HEARTBEAT_BASE_VALUE : 0}
-											dot={
-												phase === "idle" && visiblePointCount === 1
-													? { r: 3 }
-													: false
-											}
-											activeDot={{
-												r: 4,
-												stroke: "var(--cost-surface)",
-												strokeWidth: 2,
-											}}
-											isAnimationActive={false}
-										/>
-									))}
-									{phase !== "idle" ? null : metric === "agentRuns" ||
-										metric === "ciRuns" ? (
-										<>
-											<Line
+										{metric === "agentRuns" || metric === "ciRuns" ? (
+											<YAxis
 												yAxisId="duration"
-												hide={!showMedian}
-												dataKey="medianSeconds"
-												name="Median duration"
+												hide={!showMedian && !showP95}
+												orientation="right"
+												tickFormatter={(value) =>
+													formatRunDuration(Number(value))
+												}
+												domain={[0, "auto"]}
+												axisLine={false}
+												tickLine={false}
+												tickCount={4}
+												tickMargin={10}
+												width={68}
+												tick={
+													phase === "idle" && durationStats?.sampleCount
+														? { fill: "var(--cost-muted)", fontSize: 11 }
+														: false
+												}
+											/>
+										) : metric === "mergedPullRequests" ? (
+											<YAxis
+												yAxisId="ci"
+												hide={!showCiFailures || ciData === null}
+												orientation="right"
+												tickFormatter={(value) =>
+													formatMetricRatio(
+														Number(value),
+														"ciFailuresPerPullRequest",
+														1,
+													)
+												}
+												domain={[0, "auto"]}
+												axisLine={false}
+												tickLine={false}
+												tickCount={4}
+												tickMargin={10}
+												width={56}
+												tick={
+													phase === "idle"
+														? { fill: "var(--cost-muted)", fontSize: 11 }
+														: false
+												}
+											/>
+										) : null}
+										<Tooltip
+											active={phase === "idle" ? undefined : false}
+											// Follows the pointer across, but holds one height near the
+											// top of the plot instead of tracking the pointer's height.
+											position={{ y: 48 }}
+											// Appear in place rather than slide in from the last spot.
+											isAnimationActive={false}
+											cursor={{
+												stroke: "var(--cost-muted)",
+												strokeDasharray: "3 4",
+											}}
+											content={({ active, payload, label }) => {
+												const point = trend[Number(label)];
+												return active && payload?.length ? (
+													<div className="cost-chart-tooltip">
+														<p>{point ? formatChartPeriod(point) : null}</p>
+														{payload.map((item) => (
+															<div key={String(item.name)}>
+																<span>
+																	<i style={{ backgroundColor: item.color }} />
+																	{item.name}
+																</span>
+																<strong>
+																	{item.dataKey === "medianSeconds" ||
+																	item.dataKey === "p95Seconds"
+																		? formatRunDuration(Number(item.value))
+																		: perRun
+																			? formatPerRun(Number(item.value))
+																			: item.dataKey === "ciFailureRatio"
+																				? formatMetricRatio(
+																						Number(item.value),
+																						"ciFailuresPerPullRequest",
+																						point?.ciFailureDenominator,
+																					)
+																				: formatMetricRatio(
+																						Number(item.value),
+																						metric,
+																						point?.denominator,
+																					)}
+																</strong>
+															</div>
+														))}
+														{availableFrom &&
+														point &&
+														point.startDate < availableFrom &&
+														point.endDate >= availableFrom ? (
+															<p>
+																CI history from {historyDate(availableFrom)}
+															</p>
+														) : null}
+														{point?.cycleMedianSeconds !== undefined ? (
+															<p>
+																PR cycle time · Median{" "}
+																{formatRunDuration(point.cycleMedianSeconds)} ·
+																P90 {formatRunDuration(point.cycleP90Seconds)}
+															</p>
+														) : null}
+														{point?.ciMinutes !== undefined ? (
+															<p>
+																{point.ciMinutes.toFixed(1)} CI minutes
+																(approximate billed Actions minutes)
+															</p>
+														) : null}
+													</div>
+												) : null;
+											}}
+										/>
+										{(heartbeat ? [null] : series).map((entry, index) => (
+											<Area
+												yAxisId="count"
+												// By position: the heartbeat and the series it becomes are
+												// one Area, whose paths the morph animates.
+												key={seriesKey(index)}
+												dataKey={seriesKey(index)}
+												name={entry?.label ?? metricLabel}
 												type="linear"
-												stroke="var(--cost-foreground)"
+												stroke={heartbeat ? accent : entry?.color}
 												strokeWidth={2}
-												dot={{
-													r: 2,
-													strokeWidth: 0,
-													fill: "var(--cost-foreground)",
-												}}
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												fill={
+													index === 0 &&
+													(series.length === 1 || phase !== "idle")
+														? `url(#${gradientId})`
+														: "transparent"
+												}
+												baseValue={heartbeat ? HEARTBEAT_BASE_VALUE : 0}
+												dot={
+													phase === "idle" && visiblePointCount === 1
+														? { r: 3 }
+														: false
+												}
 												activeDot={{
 													r: 4,
 													stroke: "var(--cost-surface)",
 													strokeWidth: 2,
 												}}
-												connectNulls={false}
 												isAnimationActive={false}
 											/>
+										))}
+										{phase !== "idle" ? null : metric === "agentRuns" ||
+											metric === "ciRuns" ? (
+											<>
+												<Line
+													yAxisId="duration"
+													hide={!showMedian}
+													dataKey="medianSeconds"
+													name="Median duration"
+													type="linear"
+													stroke="var(--cost-foreground)"
+													strokeWidth={2}
+													dot={{
+														r: 2,
+														strokeWidth: 0,
+														fill: "var(--cost-foreground)",
+													}}
+													activeDot={{
+														r: 4,
+														stroke: "var(--cost-surface)",
+														strokeWidth: 2,
+													}}
+													connectNulls={false}
+													isAnimationActive={false}
+												/>
+												<Line
+													yAxisId="duration"
+													hide={!showP95}
+													dataKey="p95Seconds"
+													name="P95 duration"
+													type="linear"
+													stroke="var(--cost-duration-p95)"
+													strokeWidth={2}
+													strokeDasharray="6 4"
+													dot={{
+														r: 2,
+														strokeWidth: 0,
+														fill: "var(--cost-duration-p95)",
+													}}
+													activeDot={{
+														r: 4,
+														stroke: "var(--cost-surface)",
+														strokeWidth: 2,
+													}}
+													connectNulls={false}
+													isAnimationActive={false}
+												/>
+											</>
+										) : metric === "mergedPullRequests" ? (
 											<Line
-												yAxisId="duration"
-												hide={!showP95}
-												dataKey="p95Seconds"
-												name="P95 duration"
+												yAxisId="ci"
+												hide={!showCiFailures || ciData === null}
+												dataKey="ciFailureRatio"
+												name="CI failures / PR"
 												type="linear"
 												stroke="var(--cost-duration-p95)"
 												strokeWidth={2}
@@ -966,71 +1284,48 @@ export function CostChart({
 												connectNulls={false}
 												isAnimationActive={false}
 											/>
-										</>
-									) : metric === "mergedPullRequests" ? (
-										<Line
-											yAxisId="ci"
-											hide={!showCiFailures || ciData === null}
-											dataKey="ciFailureRatio"
-											name="CI failures / PR"
-											type="linear"
-											stroke="var(--cost-duration-p95)"
-											strokeWidth={2}
-											strokeDasharray="6 4"
-											dot={{
-												r: 2,
-												strokeWidth: 0,
-												fill: "var(--cost-duration-p95)",
-											}}
-											activeDot={{
-												r: 4,
-												stroke: "var(--cost-surface)",
-												strokeWidth: 2,
-											}}
-											connectNulls={false}
-											isAnimationActive={false}
-										/>
-									) : null}
-								</ComposedChart>
-							</ResponsiveContainer>
+										) : null}
+									</ComposedChart>
+								</ResponsiveContainer>
+							</div>
 						</div>
-					</div>
-					{!heartbeat &&
-					(unavailable || noHistory || (data && !data.hasUsage)) ? (
-						<div className="cost-chart-empty">
-							<p>
-								{noHistory
-									? "No GitHub history for these dates"
-									: unavailable
-										? unavailableLabel
-										: metric === "agentRuns" &&
-												((coverage?.indexingSessions ?? 0) > 0 ||
-													(coverage?.unavailableSessions ?? 0) > 0)
-											? "No indexed agent runs match yet"
-											: metric === "mergedPullRequests"
-												? "No merged pull requests in this selection"
-												: metric === "ciRuns"
-													? "No CI runs in this selection"
-													: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
-							</p>
-							{noHistory ? (
+						{!heartbeat &&
+						(unavailable || noHistory || (data && !data.hasUsage)) ? (
+							<div className="cost-chart-empty">
 								<p>
-									{metric === "ciRuns"
-										? `CI history starts ${historyDate(availableFrom)}. GitHub had already deleted older runs when this workspace connected.`
-										: `PR history starts ${historyDate(availableFrom)}.`}
+									{noHistory
+										? "No GitHub history for these dates"
+										: unavailable
+											? unavailableLabel
+											: metric === "agentRuns" &&
+													((coverage?.indexingSessions ?? 0) > 0 ||
+														(coverage?.unavailableSessions ?? 0) > 0)
+												? "No indexed agent runs match yet"
+												: metric === "mergedPullRequests"
+													? "No merged pull requests in this selection"
+													: metric === "ciRuns"
+														? "No CI runs in this selection"
+														: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
 								</p>
-							) : !unavailable &&
-								metric === "agentRuns" &&
-								coverage?.indexingSessions ? (
-								<p>Some sessions are still being indexed.</p>
-							) : !unavailable ? (
-								<p>Try a different date range or clear your filters.</p>
-							) : null}
-						</div>
-					) : null}
+								{noHistory ? (
+									<p>
+										{metric === "ciRuns"
+											? `CI history starts ${historyDate(availableFrom)}. GitHub had already deleted older runs when this workspace connected.`
+											: `PR history starts ${historyDate(availableFrom)}.`}
+									</p>
+								) : !unavailable &&
+									metric === "agentRuns" &&
+									coverage?.indexingSessions ? (
+									<p>Some sessions are still being indexed.</p>
+								) : !unavailable ? (
+									<p>Try a different date range or clear your filters.</p>
+								) : null}
+							</div>
+						) : null}
+					</div>
 				</div>
-			</div>
-		</section>
+			</section>
+		</HoverDateContext.Provider>
 	);
 }
 function historyDate(value: string | null | undefined) {
@@ -1115,32 +1410,76 @@ export function GitHubHistoryNotes({
 }
 function Metric({
 	label,
-	icon: MetricIcon,
+	icon: FilledIcon,
+	outlineIcon: OutlineIcon,
 	color,
 	value,
 	qualifier,
 	primary = false,
+	disabled = false,
+	metricKey,
+	expanded = false,
+	onToggleExpand,
 	unavailable,
 	trend,
+	secondary,
+	dates,
+	format,
+	textAt,
 	onClick,
 	onIntent,
 }: {
 	label: string;
 	icon: Icon;
+	outlineIcon: Icon;
 	/** The card's accent: its glyph and sparkline. */
 	color: string;
 	value: string | undefined;
 	qualifier: string | undefined;
 	primary?: boolean;
+	disabled?: boolean;
+	metricKey?: DashboardMetric;
+	expanded?: boolean;
+	onToggleExpand?: () => void;
 	unavailable: boolean;
 	/** Per-period totals for the card's sparkline; undefined while loading. */
 	trend: number[] | undefined;
+	secondary?: number[];
+	dates?: string[];
+	format?: (value: number) => string;
+	textAt?: (index: number) => string;
 	onClick: () => void;
 	onIntent?: () => void;
 }) {
 	// Like the big chart: when the trend lands, the card's loading wave morphs
 	// into its sparkline instead of the two swapping.
 	const loading = !unavailable && trend === undefined;
+	const MetricIcon = primary ? FilledIcon : OutlineIcon;
+	const markedDate = useMarkedDate();
+	const pinnedDate = useDotPick()?.picked?.date ?? null;
+	const focusDate = useContext(DotFocusContext);
+	const focusDays = useContext(DotFocusDaysContext);
+	const focusIndexes = useMemo(() => {
+		if (!dates || dates[0] === undefined) return NO_FOCUS;
+		const first = dates[0];
+		const bucketOf = (day: string) =>
+			day >= first ? dates.filter((date) => date <= day).length - 1 : -1;
+		const days = focusDate ? [focusDate] : focusDays ? [...focusDays] : [];
+		const indexes = new Set(days.map(bucketOf).filter((index) => index >= 0));
+		return indexes.size > 0 ? [...indexes].sort((a, b) => a - b) : NO_FOCUS;
+	}, [dates, focusDate, focusDays]);
+	const markedIndex = markedDate && dates ? dates.indexOf(markedDate) : -1;
+	const pinnedIndex = pinnedDate && dates ? dates.indexOf(pinnedDate) : -1;
+	const markedValue = markedIndex >= 0 ? trend?.[markedIndex] : undefined;
+	const shown =
+		markedIndex >= 0 && textAt
+			? textAt(markedIndex)
+			: markedValue !== undefined && format
+				? format(markedValue)
+				: value;
+	const [roll, setRoll] = useState({ at: markedIndex, direction: 1 as 1 | -1 });
+	if (roll.at !== markedIndex)
+		setRoll({ at: markedIndex, direction: markedIndex >= roll.at ? 1 : -1 });
 	const [wasLoading, setWasLoading] = useState(loading);
 	const [revealing, setRevealing] = useState(false);
 	if (wasLoading !== loading) {
@@ -1150,7 +1489,10 @@ function Metric({
 	return (
 		<div
 			className="cost-metric"
+			data-metric={metricKey}
+			data-expanded={expanded || undefined}
 			data-primary={primary}
+			data-disabled={disabled || undefined}
 			data-unavailable={unavailable}
 			data-revealing={revealing || undefined}
 			style={{ "--metric-color": color } as CSSProperties}
@@ -1165,6 +1507,7 @@ function Metric({
 						className="cost-metric-select"
 						aria-pressed={primary}
 						aria-label={label}
+						disabled={disabled}
 						onClick={onClick}
 						onPointerEnter={onIntent}
 						onFocus={onIntent}
@@ -1173,13 +1516,17 @@ function Metric({
 					</button>
 				</div>
 				{value === undefined ? (
-					<div className="cost-skeleton cost-metric-skeleton" />
+					<Skeleton className="cost-metric-skeleton rounded-[4px]" />
 				) : (
 					<span className="cost-metric-value">
 						{qualifier ? (
 							<small className="cost-metric-qualifier">{qualifier}</small>
 						) : null}
-						{value}
+						{unavailable || shown === undefined ? (
+							value
+						) : (
+							<RollingText text={shown} direction={roll.direction} />
+						)}
 					</span>
 				)}
 			</div>
@@ -1195,7 +1542,18 @@ function Metric({
 					guides={false}
 				/>
 			) : null}
-			{unavailable || loading ? null : <MetricSparkline values={trend} />}
+			{unavailable || loading ? null : (
+				<MetricSparkline
+					values={trend}
+					secondary={secondary}
+					marked={markedIndex}
+					pinned={pinnedIndex}
+					focus={focusIndexes}
+				/>
+			)}
+			{onToggleExpand ? (
+				<ExpandButton expanded={expanded} onToggle={onToggleExpand} />
+			) : null}
 			{revealing ? (
 				<ChartMorph
 					wave=".cost-metric-wave"
@@ -1210,6 +1568,13 @@ function Metric({
 
 // The card's trend in the chart's interval, so the sparklines follow the
 // Daily/Weekly/Monthly picker like the big chart does.
+function sparklineDates(
+	trend: DashboardMetricData["trend"] | undefined,
+	interval: ChartInterval,
+): string[] | undefined {
+	return trend && groupChartTrend(trend, interval).map((point) => point.date);
+}
+
 function sparklineTotals(
 	trend: DashboardMetricData["trend"] | undefined,
 	interval: ChartInterval,
@@ -1220,25 +1585,47 @@ function sparklineTotals(
 // Stat card sparkline (CardSparkline), in the card's accent: a
 // soft gradient area under a hairline. A trend with fewer than two points
 // shows a faint sample curve, so the card reads as "trend goes here".
+const NO_FOCUS: readonly number[] = [];
+
 const SAMPLE_SPARKLINE = [0.3, 0.45, 0.38, 0.55, 0.48, 0.66, 0.58, 0.75];
 
-export function MetricSparkline({ values }: { values: number[] | undefined }) {
+export function MetricSparkline({
+	values,
+	secondary,
+	marked = -1,
+	pinned = -1,
+	focus = NO_FOCUS,
+}: {
+	values: number[] | undefined;
+	secondary?: number[];
+	marked?: number;
+	pinned?: number;
+	focus?: readonly number[];
+}) {
 	const gradientId = useId().replace(/[^\w-]/g, "");
 	const points = values?.filter((value) => Number.isFinite(value)) ?? [];
 	const placeholder = points.length < 2;
-	const peak = Math.max(...points, 0) || 1;
+	const second =
+		!placeholder &&
+		secondary?.length === points.length &&
+		secondary.every((value) => Number.isFinite(value))
+			? secondary
+			: undefined;
+	const peak = Math.max(...points, ...(second ?? []), 0) || 1;
 	const series = placeholder
 		? SAMPLE_SPARKLINE
 		: points.map((value) => value / peak);
 	// CardSparkline insets: 3 units of headroom, 2 for the sample.
 	const inset = placeholder ? 2 : 3;
-	const path = series
-		.map((value, index) => {
-			const x = (index / (series.length - 1)) * 100;
-			const y = 32 - inset - value * (32 - inset);
-			return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-		})
-		.join(" ");
+	const pathOf = (line: number[]) =>
+		line
+			.map((value, index) => {
+				const x = (index / (line.length - 1)) * 100;
+				const y = 32 - inset - value * (32 - inset);
+				return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+			})
+			.join(" ");
+	const path = pathOf(series);
 	return (
 		<svg
 			aria-hidden="true"
@@ -1266,6 +1653,17 @@ export function MetricSparkline({ values }: { values: number[] | undefined }) {
 				d={`${path} L100 32 L0 32 Z`}
 				fill={`url(#${gradientId})`}
 			/>
+			{second ? (
+				<path
+					d={pathOf(second.map((value) => value / peak))}
+					fill="none"
+					className="cost-metric-trend-line cost-metric-trend-secondary"
+					strokeWidth={1.2}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					vectorEffect="non-scaling-stroke"
+				/>
+			) : null}
 			<path
 				data-sparkline-line=""
 				d={path}
@@ -1276,18 +1674,103 @@ export function MetricSparkline({ values }: { values: number[] | undefined }) {
 				strokeLinejoin="round"
 				vectorEffect="non-scaling-stroke"
 			/>
+			{!placeholder && points.length === values?.length
+				? [
+						{ at: pinned, tone: "pinned" },
+						{ at: marked === pinned ? -1 : marked, tone: "hover" },
+					]
+						.filter((mark) => mark.at >= 0)
+						.map((mark) => (
+							<line
+								key={mark.tone}
+								className="cost-metric-marker"
+								data-tone={mark.tone}
+								x1={(mark.at / (series.length - 1)) * 100}
+								x2={(mark.at / (series.length - 1)) * 100}
+								y1={0}
+								y2={32}
+								vectorEffect="non-scaling-stroke"
+							/>
+						))
+				: null}
+			{!placeholder && points.length === values?.length
+				? focus
+						.filter((at) => at < series.length)
+						.map((at) => (
+							<line
+								key={at}
+								className="cost-metric-focus"
+								x1={(at / (series.length - 1)) * 100}
+								x2={(at / (series.length - 1)) * 100}
+								y1={32 - inset - (series[at] ?? 0) * (32 - inset)}
+								y2={32 - inset - (series[at] ?? 0) * (32 - inset)}
+								strokeLinecap="round"
+								vectorEffect="non-scaling-stroke"
+							/>
+						))
+				: null}
 		</svg>
 	);
 }
 
+const TICK_GAP_PX = 65;
+const TICK_CHAR_PX = 6;
+
+function useChartDateTicks(interval: ChartInterval) {
+	const range = useOptionalDateRange();
+	const [width, setWidth] = useState(0);
+	const ref = useRef<HTMLDivElement>(null);
+	useLayoutEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		const observer = new ResizeObserver(() => setWidth(element.offsetWidth));
+		observer.observe(element);
+		setWidth(element.offsetWidth);
+		return () => observer.disconnect();
+	}, []);
+	const ticks = useMemo(() => {
+		if (!range || width === 0) return [];
+		const today = formatIsoDate(new Date());
+		const labels = chartPeriodDates(
+			range.state.startDate,
+			range.state.endDate,
+			interval,
+		)
+			.filter((date) => date <= today)
+			.map((date) => formatChartDate(date, interval));
+		const step = labels.length > 1 ? width / (labels.length - 1) : 0;
+		const kept: { label: string; left: number }[] = [];
+		for (let index = labels.length - 1; index >= 0; index--) {
+			const label = labels[index] ?? "";
+			const left = labels.length > 1 ? index * step : width / 2;
+			const half = (label.length * TICK_CHAR_PX) / 2;
+			const previous = kept.at(-1);
+			if (
+				previous &&
+				previous.left -
+					(previous.label.length * TICK_CHAR_PX) / 2 -
+					(left + half) <
+					TICK_GAP_PX
+			)
+				continue;
+			kept.push({ label, left });
+		}
+		return kept.reverse();
+	}, [interval, range, width]);
+	return { ref, ticks };
+}
+
 function ChartSkeleton({
+	interval,
 	label,
 	leaving,
 }: {
+	interval: ChartInterval;
 	label: string;
 	/** Data has landed: the placeholder axes fade as the real ones arrive. */
 	leaving: boolean;
 }) {
+	const dates = useChartDateTicks(interval);
 	return (
 		<output
 			className="cost-chart-skeleton"
@@ -1311,12 +1794,24 @@ function ChartSkeleton({
 			</svg>
 			<div className="cost-chart-loading-axis" aria-hidden="true">
 				{[0, 1, 2, 3].map((index) => (
-					<span key={index} />
+					<Skeleton key={index} />
 				))}
 			</div>
-			<div className="cost-chart-loading-dates" aria-hidden="true">
-				{[0, 1, 2, 3].map((index) => (
-					<span key={index} />
+			<div
+				ref={dates.ref}
+				className="cost-chart-loading-dates"
+				aria-hidden="true"
+			>
+				{dates.ticks.map((tick) => (
+					<Skeleton
+						key={tick.label}
+						style={{
+							left: tick.left,
+							position: "absolute",
+							transform: "translateX(-50%)",
+							width: tick.label.length * TICK_CHAR_PX,
+						}}
+					/>
 				))}
 			</div>
 		</output>

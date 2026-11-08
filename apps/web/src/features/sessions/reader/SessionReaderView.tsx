@@ -3,8 +3,17 @@ import {
 	liveSessionDetailRevision,
 } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, memo, useCallback, useMemo, useRef, useState } from "react";
+import {
+	Activity,
+	memo,
+	useCallback,
+	useContext,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { appRoutes } from "@/app/routes";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
@@ -35,6 +44,7 @@ import {
 import { usePrefetchFileChanges } from "../use-prefetch-file-changes";
 import { useCiAccess } from "../use-session-run-ci";
 import { SessionReaderCiView } from "./ci/session-reader-ci-view";
+import { useStoredContextSnapshot } from "./context/session-reader-context-stored";
 import { SessionReaderContent } from "./detail/session-reader-content";
 import { SessionReaderFilesView } from "./files/session-reader-files-view";
 import { createActiveTurnStore } from "./rail/session-reader-turn-rail";
@@ -45,7 +55,8 @@ import {
 	type SessionPlaces,
 	SessionPlacesContext,
 } from "./session-places";
-import { SessionReaderSkeleton } from "./session-reader-skeleton";
+import { SessionInRepo } from "./session-reader-in-repo";
+import { ReaderSample } from "./session-reader-skeleton";
 import { SessionReaderTabRow } from "./session-reader-tab-row";
 import { useReaderPick, useSessionReaderTab } from "./session-reader-tabs";
 import { SessionReaderSetupView } from "./setup/session-reader-setup-view";
@@ -55,7 +66,7 @@ import { SessionReaderSummary } from "./summary/session-reader-summary";
 
 const TAB_BAND_LEFT: Record<SessionReaderTab, string> = {
 	ci: "left-(--reader-main-left)",
-	detail: "left-(--reader-gutter) xl:left-(--reader-main-left)",
+	detail: "left-(--reader-main-left)",
 	files: "left-(--reader-main-left)",
 	setup: "left-(--reader-main-left)",
 	summary: "left-(--reader-main-left)",
@@ -63,7 +74,7 @@ const TAB_BAND_LEFT: Record<SessionReaderTab, string> = {
 
 const TAB_BAND_FROM: Record<SessionReaderTab, string> = {
 	ci: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
-	detail: "left-0 pl-8 xl:left-[calc(2rem+var(--reader-rail)+0.5rem)] xl:pl-4",
+	detail: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
 	files: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
 	setup: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
 	summary: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
@@ -101,6 +112,7 @@ export const SessionReaderView = memo(function SessionReaderView({
 	const tab =
 		requestedTab === "ci" && ciAccess === "off" ? "summary" : requestedTab;
 	const links = useSessionSummaryLinks(sessionId);
+	useStoredContextSnapshot(sessionId);
 	useLiveSessionPolling(sessionId);
 	const liveState = useLiveSessionState(sessionId);
 	const live = useLiveSession(sessionId);
@@ -200,11 +212,13 @@ export const SessionReaderView = memo(function SessionReaderView({
 	if (tab === "summary" && !summaryOpened) setSummaryOpened(true);
 	const changeTab = (next: SessionReaderTab) =>
 		selectTab(next, tab === "detail" && !readAgent ? reading.get() : null);
-	const contextFields = viewModel ? (
-		<span className="flex items-center gap-1.5 text-sm">
-			<SessionWhere viewModel={viewModel} />
-		</span>
-	) : null;
+	const inRepo = useContext(SessionInRepo);
+	const contextFields =
+		viewModel && !inRepo ? (
+			<span className="flex items-center gap-1.5 text-sm">
+				<SessionWhere viewModel={viewModel} />
+			</span>
+		) : null;
 
 	return (
 		<SessionPlacesContext.Provider value={places}>
@@ -250,9 +264,6 @@ export const SessionReaderView = memo(function SessionReaderView({
 									/>
 								</div>
 							</div>
-							{initialQuery.isLoading || waitingForLiveLines ? (
-								<SessionReaderSkeleton />
-							) : null}
 							{!initialQuery.isLoading && errorState && !waitingForLiveLines ? (
 								<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
 									<p className="text-lg font-semibold">{errorState.title}</p>
@@ -274,64 +285,86 @@ export const SessionReaderView = memo(function SessionReaderView({
 									) : null}
 								</div>
 							) : null}
-							{overview && viewModel && !errorState && summaryOpened ? (
-								<Activity mode={tab === "summary" ? "visible" : "hidden"}>
-									<SessionReaderSummary
-										model={viewModel.displayModel ?? null}
-										onOpenFiles={openFiles}
-										onOpenSetup={openSetup}
-										onOpenTurn={openTurn}
-										overview={overview}
-									/>
-								</Activity>
-							) : null}
-							{overview && viewModel && !errorState ? (
-								tab === "summary" ? null : tab === "ci" ? (
-									<SessionReaderCiView
-										model={viewModel.displayModel ?? null}
-										onOpenTurn={openTurn}
-										overview={overview}
-										picked={ciPicks}
-									/>
-								) : tab === "setup" ? (
-									<SessionReaderSetupView
-										model={viewModel.displayModel ?? null}
-										onOpenTurn={openTurn}
-										onPick={openSetup}
-										overview={overview}
-										picked={setupFile}
-										sessionId={sessionId}
-										setup={links?.setup}
-									/>
-								) : tab === "files" ? (
-									<SessionReaderFilesView
-										model={viewModel.displayModel ?? null}
-										onOpenTurn={openTurn}
-										overview={overview}
-									/>
-								) : (
-									<SessionReaderContent
-										key={
-											readsLiveLines
-												? sessionId
-												: `${sessionId}:${overview.revision}`
-										}
-										emptyMessage={
-											readsLiveLines
-												? "Waiting for the first turn of this session."
-												: undefined
-										}
-										followNewest={readsLiveLines && liveState === "running"}
-										initialWindow={initialQuery.data?.initialDetail.window}
-										model={viewModel.displayModel ?? null}
-										onStaleRevision={handleStaleRevision}
-										reading={reading}
-										overview={overview}
-										userImageUrl={avatarMap[viewModel.safeUserId]}
-										userLabel={viewModel.safeUserDisplayName}
-									/>
-								)
-							) : null}
+							{errorState &&
+							!initialQuery.isLoading &&
+							!waitingForLiveLines ? null : (
+								<Reveal
+									fill
+									label="Loading session"
+									loading={initialQuery.isLoading || waitingForLiveLines}
+									sample={<ReaderSample tab={tab} />}
+									sampleId={`session-reader-${tab}`}
+								>
+									{() => (
+										<>
+											{overview && viewModel && !errorState && summaryOpened ? (
+												<Activity
+													mode={tab === "summary" ? "visible" : "hidden"}
+												>
+													<SessionReaderSummary
+														model={viewModel.displayModel ?? null}
+														onOpenFiles={openFiles}
+														onOpenSetup={openSetup}
+														onOpenTurn={openTurn}
+														overview={overview}
+													/>
+												</Activity>
+											) : null}
+											{overview && viewModel && !errorState ? (
+												tab === "summary" ? null : tab === "ci" ? (
+													<SessionReaderCiView
+														model={viewModel.displayModel ?? null}
+														onOpenTurn={openTurn}
+														overview={overview}
+														picked={ciPicks}
+													/>
+												) : tab === "setup" ? (
+													<SessionReaderSetupView
+														model={viewModel.displayModel ?? null}
+														onOpenTurn={openTurn}
+														onPick={openSetup}
+														overview={overview}
+														picked={setupFile}
+														sessionId={sessionId}
+														setup={links?.setup}
+													/>
+												) : tab === "files" ? (
+													<SessionReaderFilesView
+														model={viewModel.displayModel ?? null}
+														onOpenTurn={openTurn}
+														overview={overview}
+													/>
+												) : (
+													<SessionReaderContent
+														key={
+															readsLiveLines
+																? sessionId
+																: `${sessionId}:${overview.revision}`
+														}
+														emptyMessage={
+															readsLiveLines
+																? "Waiting for the first turn of this session."
+																: undefined
+														}
+														followNewest={
+															readsLiveLines && liveState === "running"
+														}
+														initialWindow={
+															initialQuery.data?.initialDetail.window
+														}
+														model={viewModel.displayModel ?? null}
+														onStaleRevision={handleStaleRevision}
+														reading={reading}
+														overview={overview}
+														userImageUrl={avatarMap[viewModel.safeUserId]}
+														userLabel={viewModel.safeUserDisplayName}
+													/>
+												)
+											) : null}
+										</>
+									)}
+								</Reveal>
+							)}
 						</div>
 					</div>
 				</ConversationSkillLinkContext.Provider>

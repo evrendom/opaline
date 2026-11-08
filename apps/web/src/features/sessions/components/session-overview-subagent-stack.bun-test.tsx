@@ -80,7 +80,12 @@ test("renders one overlapping icon per subagent using its own model", () => {
 	expect(markup).toContain("--opal-tint:#D97757");
 	expect(markup).toContain("--opal-tint:#10A37F");
 	expect(markup).toContain("var(--dashboard-01-content-background");
-	expect(markup).not.toContain("rounded-full");
+	expect(markup.match(/skullet-block="" class="rounded-full /gu)).toHaveLength(
+		3,
+	);
+	expect(
+		markup.replaceAll('skullet-block="" class="rounded-full ', ""),
+	).not.toContain("rounded-full");
 });
 
 test("counts native and linked agents separately and never guesses the parent model", () => {

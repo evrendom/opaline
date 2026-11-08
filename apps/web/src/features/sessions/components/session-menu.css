@@ -165,7 +165,6 @@
 	letter-spacing: normal;
 	text-align: left;
 	white-space: nowrap;
-	cursor: pointer;
 	outline: none;
 	user-select: none;
 	transition: color 100ms ease-in-out;

@@ -126,7 +126,6 @@
 	box-shadow: 0 2px 8px #20332406;
 }
 .cli-onboarding-card button {
-	cursor: pointer;
 	min-height: 44px;
 	border-radius: 8px;
 	font: inherit;
@@ -203,7 +202,6 @@
 	border-radius: 6px;
 	background: white;
 	padding: 5px 10px;
-	cursor: pointer;
 }
 .cli-setup-command {
 	justify-self: end;

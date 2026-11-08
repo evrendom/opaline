@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { squarify } from "../summary/session-reader-breakdown";
 import { TINT, tileGlyph, tileLook } from "./session-reader-context-bar";
+import { fitting } from "./session-reader-context-fit";
 import type {
 	ContextPart,
 	RunPart,
@@ -62,13 +63,16 @@ export function drawsRunTiles(
 	);
 }
 
+const MIN_CELL = 14;
+
 function cellsOf<T extends { tokens: number }>(
-	items: readonly T[],
+	all: readonly T[],
 	isLit: (item: T) => boolean,
 	w: number,
 	h: number,
 	side: number,
 ) {
+	const items = fitting(all, (item) => item.tokens, w, h, MIN_CELL, isLit);
 	const whole = items.reduce((sum, item) => sum + item.tokens, 0);
 	const least = (whole * side * side) / Math.max(1, w * h);
 	return squarify(
@@ -163,7 +167,7 @@ export function ContextRunTiles({
 								onClick={(event) =>
 									onPick?.({ key: each.key, thing: null }, event.shiftKey)
 								}
-								className="absolute inset-x-0 top-0 flex h-5 cursor-pointer items-center gap-1 px-1.5 text-left text-[11px] leading-5 font-medium"
+								className="absolute inset-x-0 top-0 flex h-5 items-center gap-1 px-1.5 text-left text-[11px] leading-5 font-medium"
 							>
 								<Glyph className="size-3 shrink-0" />
 								<span className="truncate">{each.label}</span>
@@ -282,7 +286,7 @@ function Thing({
 				else onOpen();
 			}}
 			className={cn(
-				"pointer-events-auto absolute z-10 flex cursor-pointer items-center justify-center rounded-[3px] corner-squircle transition-colors squircle:rounded-[6px]",
+				"pointer-events-auto absolute z-10 flex items-center justify-center rounded-[3px] corner-squircle transition-colors squircle:rounded-[6px]",
 				lit
 					? litLook
 					: "border border-current/25 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",

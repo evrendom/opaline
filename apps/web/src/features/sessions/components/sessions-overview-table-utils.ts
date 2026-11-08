@@ -73,7 +73,7 @@ export const SESSION_OVERVIEW_SORT_OPTIONS = [
 	{ key: "errors", label: "Errors" },
 	{ key: "duration", label: "Length" },
 	{ key: "messages", label: "Messages" },
-	{ key: "signals", label: "Language signals" },
+	{ key: "signals", label: "Frustrations" },
 ] as const satisfies readonly { key: SessionOverviewSortKey; label: string }[];
 export const SESSION_OVERVIEW_FILTER_KEYS = [
 	"repository",
@@ -329,10 +329,8 @@ function getSessionLanguageSignalCount(session: SessionAnalytics) {
 	return (
 		session.member_swears +
 		session.member_apologies +
-		session.member_positive +
 		session.model_swears +
-		session.model_apologies +
-		session.model_positive
+		session.model_apologies
 	);
 }
 

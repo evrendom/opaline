@@ -16,7 +16,7 @@ export const GRID_UNTIMED =
 export const GRID_UNTIMED_TRACK = "right-4 left-35 @lg:left-52";
 
 export const ROW =
-	"min-h-10 w-full cursor-pointer items-center rounded-md py-1 text-left text-sm";
+	"min-h-10 w-full items-center rounded-md py-1 text-left text-sm";
 
 export function rowState(selected: boolean): string {
 	return selected

@@ -1,11 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { Bones } from "@/app/ui/bones";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
-import { TeamInviteLinkSurface } from "@/features/team/components/TeamInviteLinkSurface";
+import {
+	TeamInviteLinkActionsSample,
+	TeamInviteLinkSurface,
+} from "@/features/team/components/TeamInviteLinkSurface";
 import type {
 	TeamPageMemberModelUsage,
 	TeamPageMemberOverviewRow,
@@ -107,6 +111,7 @@ function ActivitySparkline({ values }: { values: readonly number[] }) {
 
 	return (
 		<svg
+			skullet-ignore=""
 			aria-label={`${totalSessions.toLocaleString()} sessions across ${values.length.toLocaleString()} activity periods`}
 			className="h-7 w-32 overflow-visible"
 			role="img"
@@ -222,7 +227,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** When a teammate was last active, by day (the roster keeps dates, not
  * times): "Today", "Yesterday", "3d ago", then months and years, with a green
  * dot through the week and a grey one after. */
-function LastActive({ lastActiveDate }: { lastActiveDate: string | null }) {
+export function LastActive({
+	lastActiveDate,
+}: {
+	lastActiveDate: string | null;
+}) {
 	const parsed = lastActiveDate ? new Date(lastActiveDate) : null;
 	if (!parsed || Number.isNaN(parsed.getTime()))
 		return <span className={METRIC_UNIT_CLASS_NAME}>—</span>;
@@ -350,12 +359,50 @@ const COLUMN_LABELS = [
 	"Last active",
 ] as const;
 
+const SAMPLE_ROWS: TeamPageMemberOverviewRow[] = [
+	[
+		"you",
+		"Admin",
+		2_000_000,
+		818_000,
+		51_000,
+		["claude-opus-4-5", "gpt-5.1-codex", "gpt-5"],
+	],
+	["Alex Morgan", "Admin", 0, 0, 0, []],
+	["Sam Lee", "Member", 0, 0, 0, []],
+	["Jordan Patel", "Admin", 0, 0, 0, []],
+	["Riley Chen", "Owner", 0, 0, 0, []],
+	["Casey Brooks", "Owner", 0, 0, 0, []],
+	["Taylor Kim", "Admin", 0, 0, 0, []],
+	["Morgan Diaz", "Member", 0, 0, 0, []],
+	["Jamie Fox", "Admin", 0, 0, 0, []],
+].map(([displayName, role, totalTokens, inputTokens, cost, models], index) => ({
+	activeDays: 0,
+	activityTrend: [0, 0, 0, 0],
+	cost: cost as number,
+	displayName: displayName as string,
+	email: null,
+	favoriteModel: (models as string[])[0] ?? null,
+	hasActivity: (totalTokens as number) > 0,
+	imageUrl: null,
+	inputTokens: inputTokens as number,
+	lastActiveDate: (totalTokens as number) > 0 ? "2026-11-02" : null,
+	modelUsage: (models as string[]).map((model) => ({ model, usageCount: 1 })),
+	outputTokens: 0,
+	role: role as string,
+	totalSessions: 0,
+	totalTokens: totalTokens as number,
+	userId: `sample-${index}`,
+}));
+
 export function TeamMemberOverviewTable({
 	canInviteTeamMembers,
+	loading = false,
 	organizationId,
 	rows,
 }: {
 	canInviteTeamMembers: boolean;
+	loading?: boolean;
 	organizationId: string | null;
 	rows: readonly TeamPageMemberOverviewRow[];
 }) {
@@ -366,6 +413,7 @@ export function TeamMemberOverviewTable({
 	});
 	const visibleRows = useMemo(() => {
 		const query = search.trim().toLocaleLowerCase();
+		if (loading) return SAMPLE_ROWS;
 		return sortTeamRows(
 			query
 				? rows.filter((row) =>
@@ -376,7 +424,7 @@ export function TeamMemberOverviewTable({
 				: rows,
 			sort,
 		);
-	}, [rows, search, sort]);
+	}, [loading, rows, search, sort]);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const hover = useFluidHover(containerRef, {
 		axis: "y",
@@ -386,9 +434,8 @@ export function TeamMemberOverviewTable({
 	const showInvite = canInviteTeamMembers && organizationId !== null;
 
 	return (
-		<div className="-mx-4 lg:-mx-6">
-			{/* The sessions toolbar: search, then sort, on 24px gutters. */}
-			<div className="flex h-12 items-center gap-2 px-6">
+		<div className="-mx-2">
+			<div className="flex h-12 items-center gap-2 px-2">
 				<SearchInput
 					value={search}
 					onChange={setSearch}
@@ -405,7 +452,13 @@ export function TeamMemberOverviewTable({
 					onSortChange={setSort}
 					sort={sort}
 				/>
-				{showInvite ? (
+				{loading ? (
+					<div className="ml-auto min-w-0">
+						<Bones label="Loading invite links">
+							<TeamInviteLinkActionsSample />
+						</Bones>
+					</div>
+				) : showInvite ? (
 					<div className="ml-auto min-w-0">
 						<TeamInviteLinkSurface
 							layout="toolbar"
@@ -414,50 +467,66 @@ export function TeamMemberOverviewTable({
 					</div>
 				) : null}
 			</div>
-			<div className="overflow-x-auto whitespace-nowrap">
-				<div
-					ref={containerRef}
-					className="relative isolate inline-block min-w-full align-middle"
-					{...hover.handlers}
-				>
-					<FluidHoverHighlight
-						hover={hover}
-						className="z-0 rounded-none bg-(--session-overview-hover)"
-					/>
-					{/* Full-bleed rows, the outer cells padded to the page's 32px
+			<MaybeBones loading={loading}>
+				<div className="overflow-x-auto whitespace-nowrap">
+					<div
+						ref={containerRef}
+						className="relative isolate inline-block min-w-full align-middle"
+						{...hover.handlers}
+					>
+						<FluidHoverHighlight
+							hover={hover}
+							className="z-0 rounded-none bg-(--session-overview-hover)"
+						/>
+						{/* Full-bleed rows, the outer cells padded to the page's 32px
 					    gutter; no rules between them, as in the sessions list. */}
-					<table className="relative w-full min-w-272 border-collapse [&_tr>*:first-child]:pl-8 [&_tr>*:last-child]:pr-8">
-						<colgroup>
-							<col className="w-[24%]" />
-							<col className="w-[21%]" />
-							<col className="w-[16%]" />
-							<col className="w-[9%]" />
-							<col className="w-[10%]" />
-							<col className="w-[9%]" />
-							<col className="w-[11%]" />
-						</colgroup>
-						<thead className="sr-only">
-							<tr>
-								{COLUMN_LABELS.map((label) => (
-									<th key={label} scope="col">
-										{label}
-									</th>
+						<table className="relative w-full min-w-240 border-collapse [&_tr>*:first-child]:pl-2 [&_tr>*:last-child]:pr-2">
+							<colgroup>
+								<col className="w-[24%]" />
+								<col className="w-[21%]" />
+								<col className="w-[16%]" />
+								<col className="w-[9%]" />
+								<col className="w-[10%]" />
+								<col className="w-[9%]" />
+								<col className="w-[11%]" />
+							</colgroup>
+							<thead className="sr-only">
+								<tr>
+									{COLUMN_LABELS.map((label) => (
+										<th key={label} scope="col">
+											{label}
+										</th>
+									))}
+								</tr>
+							</thead>
+							<tbody>
+								{visibleRows.map((row, index) => (
+									<TeamMemberRow
+										key={row.userId}
+										index={index}
+										registerItem={hover.registerItem}
+										row={row}
+									/>
 								))}
-							</tr>
-						</thead>
-						<tbody>
-							{visibleRows.map((row, index) => (
-								<TeamMemberRow
-									key={row.userId}
-									index={index}
-									registerItem={hover.registerItem}
-									row={row}
-								/>
-							))}
-						</tbody>
-					</table>
+							</tbody>
+						</table>
+					</div>
 				</div>
-			</div>
+			</MaybeBones>
 		</div>
+	);
+}
+
+function MaybeBones({
+	children,
+	loading,
+}: {
+	children: ReactNode;
+	loading: boolean;
+}) {
+	return loading ? (
+		<Bones label="Loading teammates">{children}</Bones>
+	) : (
+		children
 	);
 }

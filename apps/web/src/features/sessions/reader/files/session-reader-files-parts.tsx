@@ -5,7 +5,7 @@ import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
-	"cursor-pointer text-muted-foreground active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-(--custom-shadow) dark:aria-pressed:bg-muted-foreground/10";
+	"text-muted-foreground active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-(--custom-shadow) dark:aria-pressed:bg-muted-foreground/10";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -36,6 +36,7 @@ export function ViewToggle<View extends string>({
 			{pill ? (
 				<span
 					aria-hidden="true"
+					skullet-ignore=""
 					className={cn(
 						"pointer-events-none absolute top-1/2 left-0 h-6 rounded-md bg-card shadow-(--custom-shadow) corner-squircle will-change-transform squircle:rounded-xl dark:bg-muted-foreground/10",
 						slides &&
@@ -51,6 +52,7 @@ export function ViewToggle<View extends string>({
 				<button
 					key={id}
 					type="button"
+					skullet-block=""
 					aria-label={iconsOnly ? word : undefined}
 					aria-pressed={id === value}
 					data-pill-tab={id}
@@ -58,7 +60,7 @@ export function ViewToggle<View extends string>({
 					disabled={off}
 					onClick={() => onPick(id)}
 					className={cn(
-						"relative flex h-6 cursor-pointer items-center gap-1 rounded-md text-xs font-medium transition-colors outline-none corner-squircle focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-45 squircle:rounded-xl",
+						"relative flex h-6 items-center gap-1 rounded-md text-xs font-medium transition-colors outline-none corner-squircle focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-45 squircle:rounded-xl",
 						iconsOnly ? "px-1.5" : "px-2",
 						id === value
 							? "text-foreground"
@@ -121,7 +123,7 @@ export function Crumb({
 					type="button"
 					aria-label="Let go"
 					onClick={onClear}
-					className="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+					className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
 				>
 					<IconX className="size-3" />
 				</button>

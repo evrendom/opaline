@@ -17,8 +17,14 @@ const VIEW_PARAMS: Record<SessionReaderTab, readonly string[]> = {
 	summary: [],
 };
 
+export function readSessionReaderTab(value: string | null): SessionReaderTab {
+	return value !== null && Object.hasOwn(VIEW_PARAMS, value)
+		? (value as SessionReaderTab)
+		: "summary";
+}
+
 export function writeView(params: URLSearchParams, view: SessionReaderTab) {
-	if (view === "detail") params.delete(SESSION_TAB_PARAM);
+	if (view === "summary") params.delete(SESSION_TAB_PARAM);
 	else params.set(SESSION_TAB_PARAM, view);
 	for (const [other, owned] of Object.entries(VIEW_PARAMS))
 		if (other !== view) for (const key of owned) params.delete(key);

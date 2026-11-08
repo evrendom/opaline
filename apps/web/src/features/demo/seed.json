@@ -519,7 +519,7 @@
 			"total_tokens": 5170033,
 			"input_tokens": 5146036,
 			"output_tokens": 23997,
-			"estimated_cost": 6.811139200000001,
+			"estimated_cost": 6.8111392,
 			"cost_uses_default_region": false,
 			"total_interactions": 211,
 			"subagent_types": ["explorer", "worker"],
@@ -1549,6 +1549,83 @@
 		}
 	],
 	"totalSessionCount": 85,
+	"repositories": [
+		{
+			"identity": {
+				"repoKey": "remote:github.com/acme/loomrail",
+				"repoLabel": "acme/loomrail",
+				"repoName": "loomrail",
+				"source": "remote",
+				"worktree": null
+			},
+			"sessionCount": 77,
+			"totalTokens": 801552214,
+			"estimatedCost": 987.3204169,
+			"lastActiveAt": "2026-08-31T12:00:31Z",
+			"userCount": 3,
+			"topUsers": [
+				{ "userId": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX", "sessionCount": 28 },
+				{ "userId": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB", "sessionCount": 25 },
+				{ "userId": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX", "sessionCount": 24 }
+			],
+			"signals": {
+				"modelApologies": 27,
+				"userNegative": 8,
+				"userPositive": 56,
+				"complete": true
+			}
+		},
+		{
+			"identity": {
+				"repoKey": "remote:github.com/acme/loomrail-ui",
+				"repoLabel": "acme/loomrail-ui",
+				"repoName": "loomrail-ui",
+				"source": "remote",
+				"worktree": null
+			},
+			"sessionCount": 18,
+			"totalTokens": 115725278,
+			"estimatedCost": 145.6266152,
+			"lastActiveAt": "2026-08-27T16:06:32Z",
+			"userCount": 3,
+			"topUsers": [
+				{ "userId": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX", "sessionCount": 11 },
+				{ "userId": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX", "sessionCount": 4 },
+				{ "userId": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB", "sessionCount": 3 }
+			],
+			"signals": {
+				"modelApologies": 5,
+				"userNegative": 4,
+				"userPositive": 15,
+				"complete": true
+			}
+		},
+		{
+			"identity": {
+				"repoKey": "remote:github.com/acme/loomrail-workers",
+				"repoLabel": "acme/loomrail-workers",
+				"repoName": "loomrail-workers",
+				"source": "remote",
+				"worktree": null
+			},
+			"sessionCount": 14,
+			"totalTokens": 240770654,
+			"estimatedCost": 302.1890015,
+			"lastActiveAt": "2026-08-31T13:25:16Z",
+			"userCount": 3,
+			"topUsers": [
+				{ "userId": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB", "sessionCount": 9 },
+				{ "userId": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX", "sessionCount": 3 },
+				{ "userId": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX", "sessionCount": 2 }
+			],
+			"signals": {
+				"modelApologies": 3,
+				"userNegative": 2,
+				"userPositive": 15,
+				"complete": true
+			}
+		}
+	],
 	"dashboard": {
 		"input": {
 			"startDate": "2026-08-01",
@@ -3839,6 +3916,888 @@
 							{ "date": "2026-08-29", "total": 0, "values": { "total": 0 } },
 							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
 							{ "date": "2026-08-31", "total": 4, "values": { "total": 4 } }
+						],
+						"breakdowns": {
+							"members": [
+								{
+									"id": "fOsrHjK6ZflgAMB0zvQqrDiH8MSao4cB",
+									"label": "Rafa",
+									"value": 49,
+									"incomplete": false,
+									"image": "/api/avatar/cdf54bd3-87c6-40d7-af10-715f8a1d15a7"
+								},
+								{
+									"id": "JvNG2QdiIKjb8MBDE6gFb56c4pSCHbEX",
+									"label": "Marc",
+									"value": 48,
+									"incomplete": false,
+									"image": "/api/avatar/bef8e0b5-90b7-4bf8-b7d2-c3eac332ed0b"
+								},
+								{
+									"id": "UaR49qBKWaEm895jKnE3PRaagPuAMNoX",
+									"label": "Evren",
+									"value": 38,
+									"incomplete": false,
+									"image": "https://avatars.githubusercontent.com/u/158852680?v=4"
+								}
+							],
+							"repositories": [
+								{
+									"id": "github.com/acme/loomrail",
+									"label": "acme/loomrail",
+									"value": 91,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "github.com/acme/loomrail-ui",
+									"label": "acme/loomrail-ui",
+									"value": 24,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "github.com/acme/loomrail-workers",
+									"label": "acme/loomrail-workers",
+									"value": 20,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"models": [
+								{
+									"id": "claude-fable-5",
+									"label": "claude-fable-5",
+									"value": 59,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "gpt-5.6-sol",
+									"label": "gpt-5.6-sol",
+									"value": 54,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "gpt-5.5",
+									"label": "gpt-5.5",
+									"value": 19,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "claude-opus-5",
+									"label": "claude-opus-5",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"signalTypes": [
+								{
+									"id": "userPositive",
+									"label": "Positive user",
+									"value": 86,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "modelApologies",
+									"label": "Model apologies",
+									"value": 35,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "userNegative",
+									"label": "Negative user",
+									"value": 14,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"phrases": [
+								{
+									"id": "Sorry",
+									"label": "Sorry",
+									"value": 16,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "thanks",
+									"label": "thanks",
+									"value": 15,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "great",
+									"label": "great",
+									"value": 13,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "nice",
+									"label": "nice",
+									"value": 10,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "my apologies",
+									"label": "my apologies",
+									"value": 9,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "still not working",
+									"label": "still not working",
+									"value": 8,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "looks good",
+									"label": "looks good",
+									"value": 7,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "My mistake",
+									"label": "My mistake",
+									"value": 6,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "perfect",
+									"label": "perfect",
+									"value": 6,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Great work",
+									"label": "Great work",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "nice work",
+									"label": "nice work",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Perfect",
+									"label": "Perfect",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "thank you",
+									"label": "thank you",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "That did the trick",
+									"label": "That did the trick",
+									"value": 5,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "didn't work",
+									"label": "didn't work",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Thanks",
+									"label": "Thanks",
+									"value": 3,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Apologies",
+									"label": "Apologies",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "looks great",
+									"label": "looks great",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "not working",
+									"label": "not working",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "ship it",
+									"label": "ship it",
+									"value": 2,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "appreciate it",
+									"label": "appreciate it",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "doesn't work",
+									"label": "doesn't work",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Great",
+									"label": "Great",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "nice one",
+									"label": "nice one",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "Oops",
+									"label": "Oops",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "that's on me",
+									"label": "that's on me",
+									"value": 1,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"agentRuns": {
+						"total": 612,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Agent runs" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 11, "values": { "total": 11 } },
+							{ "date": "2026-08-04", "total": 51, "values": { "total": 51 } },
+							{ "date": "2026-08-05", "total": 21, "values": { "total": 21 } },
+							{ "date": "2026-08-06", "total": 10, "values": { "total": 10 } },
+							{ "date": "2026-08-07", "total": 24, "values": { "total": 24 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-10", "total": 32, "values": { "total": 32 } },
+							{ "date": "2026-08-11", "total": 46, "values": { "total": 46 } },
+							{ "date": "2026-08-12", "total": 54, "values": { "total": 54 } },
+							{ "date": "2026-08-13", "total": 50, "values": { "total": 50 } },
+							{ "date": "2026-08-14", "total": 29, "values": { "total": 29 } },
+							{ "date": "2026-08-15", "total": 8, "values": { "total": 8 } },
+							{ "date": "2026-08-16", "total": 9, "values": { "total": 9 } },
+							{ "date": "2026-08-17", "total": 44, "values": { "total": 44 } },
+							{ "date": "2026-08-18", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-19", "total": 17, "values": { "total": 17 } },
+							{ "date": "2026-08-20", "total": 28, "values": { "total": 28 } },
+							{ "date": "2026-08-21", "total": 11, "values": { "total": 11 } },
+							{ "date": "2026-08-22", "total": 30, "values": { "total": 30 } },
+							{ "date": "2026-08-23", "total": 16, "values": { "total": 16 } },
+							{ "date": "2026-08-24", "total": 24, "values": { "total": 24 } },
+							{ "date": "2026-08-25", "total": 8, "values": { "total": 8 } },
+							{ "date": "2026-08-26", "total": 24, "values": { "total": 24 } },
+							{ "date": "2026-08-27", "total": 19, "values": { "total": 19 } },
+							{ "date": "2026-08-28", "total": 18, "values": { "total": 18 } },
+							{ "date": "2026-08-29", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 10, "values": { "total": 10 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [
+								{
+									"id": "positive",
+									"label": "Positive",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "negative",
+									"label": "Negative",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "mixed",
+									"label": "Mixed",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "none",
+									"label": "No signal",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "noReply",
+									"label": "No reply",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"durations": [
+								{
+									"id": "under1m",
+									"label": "Under 1 minute",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to5m",
+									"label": "1–5 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "5to15m",
+									"label": "5–15 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "15to30m",
+									"label": "15–30 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "30to60m",
+									"label": "30–60 minutes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "1to3h",
+									"label": "1–3 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "3to12h",
+									"label": "3–12 hours",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "12hPlus",
+									"label": "12 hours+",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "unknown",
+									"label": "Unknown duration",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"skillsUsed": [
+								{
+									"id": "yes",
+									"label": "Yes",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								},
+								{
+									"id": "no",
+									"label": "No",
+									"value": 0,
+									"incomplete": false,
+									"image": null
+								}
+							],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"mergedPullRequests": null,
+					"ciFailuresPerPullRequest": null,
+					"ciRuns": null
+				}
+			}
+		},
+		{
+			"input": {
+				"startDate": "2026-08-01",
+				"endDate": "2026-08-31",
+				"requestedMetric": "signals",
+				"members": [],
+				"repositories": [],
+				"models": [],
+				"signalTypes": [],
+				"phrases": [],
+				"runSignals": [],
+				"durations": [],
+				"skillsUsed": [],
+				"splitBy": "signalTypes",
+				"pullRequestCi": [],
+				"githubAuthors": [],
+				"ciConclusions": [],
+				"ciEvents": [],
+				"ciWorkflows": [],
+				"ciAttempts": []
+			},
+			"data": {
+				"requestedMetric": "signals",
+				"splitBy": "signalTypes",
+				"availableMetrics": ["cost", "sessions", "agentRuns", "signals"],
+				"metrics": {
+					"cost": {
+						"total": 1435.1360335999998,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "API Cost" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{
+								"date": "2026-08-03",
+								"total": 17.376724000000003,
+								"values": { "total": 17.376724000000003 }
+							},
+							{
+								"date": "2026-08-04",
+								"total": 89.67353499999999,
+								"values": { "total": 89.67353499999999 }
+							},
+							{
+								"date": "2026-08-05",
+								"total": 27.68761,
+								"values": { "total": 27.68761 }
+							},
+							{
+								"date": "2026-08-06",
+								"total": 7.859369999999999,
+								"values": { "total": 7.859369999999999 }
+							},
+							{
+								"date": "2026-08-07",
+								"total": 25.711526,
+								"values": { "total": 25.711526 }
+							},
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{
+								"date": "2026-08-09",
+								"total": 11.4598005,
+								"values": { "total": 11.4598005 }
+							},
+							{
+								"date": "2026-08-10",
+								"total": 84.94938100000002,
+								"values": { "total": 84.94938100000002 }
+							},
+							{
+								"date": "2026-08-11",
+								"total": 32.15955400000001,
+								"values": { "total": 32.15955400000001 }
+							},
+							{
+								"date": "2026-08-12",
+								"total": 453.455971,
+								"values": { "total": 453.455971 }
+							},
+							{
+								"date": "2026-08-13",
+								"total": 104.76801300000001,
+								"values": { "total": 104.76801300000001 }
+							},
+							{
+								"date": "2026-08-14",
+								"total": 33.1797985,
+								"values": { "total": 33.1797985 }
+							},
+							{
+								"date": "2026-08-15",
+								"total": 4.730607,
+								"values": { "total": 4.730607 }
+							},
+							{
+								"date": "2026-08-16",
+								"total": 6.178774000000001,
+								"values": { "total": 6.178774000000001 }
+							},
+							{
+								"date": "2026-08-17",
+								"total": 264.973807,
+								"values": { "total": 264.973807 }
+							},
+							{
+								"date": "2026-08-18",
+								"total": 9.977402,
+								"values": { "total": 9.977402 }
+							},
+							{
+								"date": "2026-08-19",
+								"total": 20.913982,
+								"values": { "total": 20.913982 }
+							},
+							{
+								"date": "2026-08-20",
+								"total": 27.422454000000002,
+								"values": { "total": 27.422454000000002 }
+							},
+							{
+								"date": "2026-08-21",
+								"total": 9.598748,
+								"values": { "total": 9.598748 }
+							},
+							{
+								"date": "2026-08-22",
+								"total": 46.8273552,
+								"values": { "total": 46.8273552 }
+							},
+							{
+								"date": "2026-08-23",
+								"total": 37.868066,
+								"values": { "total": 37.868066 }
+							},
+							{
+								"date": "2026-08-24",
+								"total": 26.425709199999996,
+								"values": { "total": 26.425709199999996 }
+							},
+							{
+								"date": "2026-08-25",
+								"total": 4.4408392,
+								"values": { "total": 4.4408392 }
+							},
+							{
+								"date": "2026-08-26",
+								"total": 37.692340400000006,
+								"values": { "total": 37.692340400000006 }
+							},
+							{
+								"date": "2026-08-27",
+								"total": 27.748535599999997,
+								"values": { "total": 27.748535599999997 }
+							},
+							{
+								"date": "2026-08-28",
+								"total": 15.5405428,
+								"values": { "total": 15.5405428 }
+							},
+							{
+								"date": "2026-08-29",
+								"total": 1.6934152,
+								"values": { "total": 1.6934152 }
+							},
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{
+								"date": "2026-08-31",
+								"total": 4.822173,
+								"values": { "total": 4.822173 }
+							}
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"sessions": {
+						"total": 109,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [{ "id": "total", "label": "Sessions" }],
+						"trend": [
+							{ "date": "2026-08-01", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-02", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-03", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-04", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-05", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-06", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-07", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-08", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-09", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-10", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-11", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-12", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-13", "total": 8, "values": { "total": 8 } },
+							{ "date": "2026-08-14", "total": 7, "values": { "total": 7 } },
+							{ "date": "2026-08-15", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-16", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-17", "total": 4, "values": { "total": 4 } },
+							{ "date": "2026-08-18", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-19", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-20", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-21", "total": 3, "values": { "total": 3 } },
+							{ "date": "2026-08-22", "total": 2, "values": { "total": 2 } },
+							{ "date": "2026-08-23", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-24", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-25", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-26", "total": 8, "values": { "total": 8 } },
+							{ "date": "2026-08-27", "total": 5, "values": { "total": 5 } },
+							{ "date": "2026-08-28", "total": 6, "values": { "total": 6 } },
+							{ "date": "2026-08-29", "total": 1, "values": { "total": 1 } },
+							{ "date": "2026-08-30", "total": 0, "values": { "total": 0 } },
+							{ "date": "2026-08-31", "total": 3, "values": { "total": 3 } }
+						],
+						"breakdowns": {
+							"members": [],
+							"repositories": [],
+							"models": [],
+							"signalTypes": [],
+							"phrases": [],
+							"runSignals": [],
+							"durations": [],
+							"skillsUsed": [],
+							"pullRequestCi": [],
+							"githubAuthors": [],
+							"ciConclusions": [],
+							"ciEvents": [],
+							"ciWorkflows": [],
+							"ciAttempts": []
+						}
+					},
+					"commits": null,
+					"signals": {
+						"total": 135,
+						"incomplete": false,
+						"hasUsage": true,
+						"series": [
+							{ "id": "series-0", "label": "Positive user" },
+							{ "id": "series-1", "label": "Model apologies" },
+							{ "id": "series-2", "label": "Negative user" }
+						],
+						"trend": [
+							{
+								"date": "2026-08-01",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-02",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-03",
+								"total": 6,
+								"values": { "series-0": 2, "series-1": 4, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-04",
+								"total": 6,
+								"values": { "series-0": 2, "series-1": 4, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-05",
+								"total": 3,
+								"values": { "series-0": 2, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-06",
+								"total": 2,
+								"values": { "series-0": 1, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-07",
+								"total": 9,
+								"values": { "series-0": 6, "series-1": 2, "series-2": 1 }
+							},
+							{
+								"date": "2026-08-08",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-09",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-10",
+								"total": 7,
+								"values": { "series-0": 3, "series-1": 2, "series-2": 2 }
+							},
+							{
+								"date": "2026-08-11",
+								"total": 2,
+								"values": { "series-0": 1, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-12",
+								"total": 18,
+								"values": { "series-0": 11, "series-1": 4, "series-2": 3 }
+							},
+							{
+								"date": "2026-08-13",
+								"total": 9,
+								"values": { "series-0": 6, "series-1": 3, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-14",
+								"total": 5,
+								"values": { "series-0": 4, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-15",
+								"total": 3,
+								"values": { "series-0": 2, "series-1": 0, "series-2": 1 }
+							},
+							{
+								"date": "2026-08-16",
+								"total": 3,
+								"values": { "series-0": 3, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-17",
+								"total": 8,
+								"values": { "series-0": 4, "series-1": 2, "series-2": 2 }
+							},
+							{
+								"date": "2026-08-18",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-19",
+								"total": 5,
+								"values": { "series-0": 4, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-20",
+								"total": 6,
+								"values": { "series-0": 3, "series-1": 2, "series-2": 1 }
+							},
+							{
+								"date": "2026-08-21",
+								"total": 2,
+								"values": { "series-0": 2, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-22",
+								"total": 15,
+								"values": { "series-0": 11, "series-1": 2, "series-2": 2 }
+							},
+							{
+								"date": "2026-08-23",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-24",
+								"total": 3,
+								"values": { "series-0": 3, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-25",
+								"total": 3,
+								"values": { "series-0": 2, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-26",
+								"total": 5,
+								"values": { "series-0": 4, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-27",
+								"total": 7,
+								"values": { "series-0": 4, "series-1": 1, "series-2": 2 }
+							},
+							{
+								"date": "2026-08-28",
+								"total": 4,
+								"values": { "series-0": 3, "series-1": 1, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-29",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-30",
+								"total": 0,
+								"values": { "series-0": 0, "series-1": 0, "series-2": 0 }
+							},
+							{
+								"date": "2026-08-31",
+								"total": 4,
+								"values": { "series-0": 3, "series-1": 1, "series-2": 0 }
+							}
 						],
 						"breakdowns": {
 							"members": [

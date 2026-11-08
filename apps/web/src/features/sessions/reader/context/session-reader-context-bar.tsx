@@ -1,5 +1,4 @@
 import {
-	IconAlignBoxLeftTop,
 	IconBrain,
 	IconFileText,
 	IconHistory,
@@ -11,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import type { ComponentType, CSSProperties } from "react";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
+import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { cn } from "@/lib/utils";
 import {
 	LANE_LOOK,
@@ -34,7 +34,7 @@ export const TINT: Record<ContextKind, string> = {
 		Object.entries(LANE_LOOK).map(([key, look]) => [key, look.tint]),
 	),
 	earlier: "var(--color-zinc-400)",
-	summary: "var(--color-green-500)",
+	summary: "var(--color-zinc-400)",
 } as Record<ContextKind, string>;
 
 export const LANE_LABEL = Object.fromEntries(
@@ -71,7 +71,7 @@ export function tileGlyph(part: ContextPart | null): TileGlyph {
 	if (key === "model:thinking") return IconBrain;
 	if (key === "model:messages") return IconMessage;
 	if (part.kind === "earlier") return IconHistory;
-	if (part.kind === "summary") return IconAlignBoxLeftTop;
+	if (part.kind === "summary") return MOMENT_KINDS_APPEARANCE.compaction.icon;
 	return LANE_LOOK[part.kind].glyph;
 }
 
@@ -316,7 +316,7 @@ function MeasureToggle({
 						}
 						onClick={() => onMeasure(each)}
 						className={cn(
-							"h-6 cursor-pointer rounded-md px-2.5 text-[13px] corner-squircle outline-none disabled:cursor-default disabled:opacity-40 squircle:rounded-xl",
+							"h-6 rounded-md px-2.5 text-[13px] corner-squircle outline-none disabled:cursor-default disabled:opacity-40 squircle:rounded-xl",
 							pressed
 								? cn("bg-card font-medium", PILL_SHADOW)
 								: "text-[rgba(0,0,0,0.61)] hover:text-[rgba(0,0,0,0.88)] dark:text-[rgba(255,255,255,0.65)] dark:hover:text-white",

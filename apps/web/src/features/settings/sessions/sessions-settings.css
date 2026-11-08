@@ -1,18 +1,28 @@
 .sessions-settings {
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
+	gap: 40px;
 	padding-bottom: 32px;
 	font-size: 14px;
 	line-height: 1.5;
 }
-/* Each section is a card (see settings-section.css). */
-.sessions-settings > section {
-	padding: 20px;
+.sessions-settings-section {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.sessions-settings-heading {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-inline: 20px;
+}
+.sessions-settings-card {
+	padding: 16px 20px;
 }
 .sessions-settings h2 {
 	margin: 0;
-	font-size: 14px;
+	font-size: 0.9375rem;
 	line-height: 20px;
 	font-weight: 500;
 	color: var(--foreground);
@@ -32,7 +42,6 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	margin-top: 4px;
 	padding: 8px 10px 8px 14px;
 	border: 1px solid var(--border);
 	border-radius: 8px;
@@ -58,20 +67,26 @@
 	align-items: center;
 	gap: 8px;
 }
+.sessions-settings-list-heading [data-slot="button"][data-variant="outline"] {
+	border: 0;
+	background: var(--background);
+	box-shadow: var(--custom-outline-shadow);
+}
+.sessions-settings-list-heading
+	[data-slot="button"][data-variant="outline"]:hover {
+	background: var(--muted);
+}
 .sessions-settings-count {
 	color: var(--muted-foreground);
 	font-weight: 400;
 	font-variant-numeric: tabular-nums;
 }
-.sessions-settings .sessions-settings-description {
-	margin-top: 3px;
-	font-size: 13px;
-}
+
 .sessions-settings-search {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	margin-block: 16px 8px;
+	margin-bottom: 8px;
 	padding: 7px 10px;
 	border: 1px solid var(--border);
 	border-radius: 6px;

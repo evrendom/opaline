@@ -25,12 +25,14 @@ type Box = { h: number; w: number; x: number; y: number };
 
 export const MIN_TILE = 28;
 
+const FREE_STRIP = 8;
+
 const READABLE = { h: 48, w: 96 };
 
 const MOST_GROWTH = 2.5;
 const GROWTH_STEP = 1.25;
 
-const GROUP_HEADER = 48;
+const GROUP_HEADER = 30;
 const GROUP_INSET = 4;
 
 const tooSmall = (tile: Placed) =>
@@ -137,12 +139,14 @@ export function placeTiles(
 	width: number,
 	withFree: boolean,
 	keep: ReadonlySet<string> = NONE,
+	height: number = AREA_HEIGHT,
 ): Placed[] {
-	const inner = { h: AREA_HEIGHT - GAP, w: width - GAP };
+	const inner = { h: height - GAP, w: width - GAP };
 	const free = withFree ? Math.max(0, map.window - map.used) : 0;
-	const usedWidth = withFree
+	const filled = withFree
 		? inner.w * Math.min(1, map.used / map.window)
 		: inner.w;
+	const usedWidth = inner.w - filled - GAP < FREE_STRIP ? inner.w : filled;
 	const groups = new Map<string, ContextPart[]>();
 	for (const part of map.parts)
 		if (part.before)
@@ -176,7 +180,7 @@ export function placeTiles(
 			})),
 		};
 	});
-	if (free > 0 && inner.w - usedWidth - GAP >= MIN_TILE)
+	if (free > 0 && inner.w - usedWidth - GAP >= FREE_STRIP)
 		placed.push({
 			h: inner.h,
 			key: "free",

@@ -1,4 +1,4 @@
-import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
+import { Skeleton } from "@/app/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ModelChip } from "./waterfall/session-reader-waterfall-chips";
 
@@ -16,11 +16,7 @@ export function ModelAvatar({
 	solid?: boolean;
 }) {
 	if (loading) {
-		return (
-			<span className="relative size-6 shrink-0 animate-pulse [--opal-fill:var(--muted)] [--opal-ring:transparent]">
-				<OpalineShape className="absolute inset-0" />
-			</span>
-		);
+		return <Skeleton className="size-6 shrink-0 rounded-full" />;
 	}
 	return (
 		<ModelChip

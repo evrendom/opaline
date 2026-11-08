@@ -254,7 +254,6 @@
 	line-height: 20px;
 	letter-spacing: normal;
 	white-space: nowrap;
-	cursor: pointer;
 	outline: none;
 	transition:
 		color 150ms ease,

@@ -110,7 +110,7 @@ export function Breakdown({
 					<button
 						type="button"
 						onClick={toggle.onToggle}
-						className="flex w-fit max-w-full cursor-pointer hover:[&>span]:text-foreground"
+						className="flex w-fit max-w-full hover:[&>span]:text-foreground"
 					>
 						{heading}
 					</button>

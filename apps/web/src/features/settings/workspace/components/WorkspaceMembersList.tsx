@@ -2,13 +2,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
+import type { TeamPageMemberRow } from "@/features/team/use-team-page-data";
 import { authClient } from "@/lib/auth-client";
 
 export function WorkspaceMembersList({
 	members,
+	activity,
 	canManage,
 	onInvalidate,
 }: {
+	activity?: ReadonlyMap<string, TeamPageMemberRow>;
 	members: readonly {
 		id: string;
 		role: string;
@@ -73,6 +76,7 @@ export function WorkspaceMembersList({
 	return (
 		<WorkspaceMembersTable
 			members={members}
+			activity={activity}
 			canEdit={canManage}
 			pendingKey={pendingMemberKey}
 			onRoleChange={(memberId, role) => void updateRole(memberId, role)}

@@ -30,7 +30,7 @@ export function useLiveSessionList({
 	poll = true,
 }: {
 	enabled?: boolean;
-	poll?: boolean;
+	poll?: boolean | number;
 } = {}) {
 	const available = useLiveSessionsAvailable();
 	const { state: organization } = useOrganization();
@@ -40,7 +40,7 @@ export function useLiveSessionList({
 		...options,
 		queryKey: ["org", organizationId, ...options.queryKey],
 		enabled: enabled && available && !!organizationId,
-		refetchInterval: poll ? LIVE_SESSION_LIST_POLL_INTERVAL_MS : false,
+		refetchInterval: poll === true ? LIVE_SESSION_LIST_POLL_INTERVAL_MS : poll,
 		retry: false,
 	});
 	return {

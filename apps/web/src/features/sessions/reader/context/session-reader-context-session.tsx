@@ -2,9 +2,21 @@ import type {
 	SessionDetailTurnSummary,
 	SessionSetupFile,
 } from "@rudel/api-routes";
-import { type ReactNode, useMemo } from "react";
-import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Skeleton } from "@/app/ui/skeleton";
+import {
+	buildContextMap,
+	contextTarget,
+} from "@rudel/api-routes/session-context/session-context-snapshot";
+import {
+	type ComponentProps,
+	type ReactNode,
+	useContext,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
+import { Bones } from "@/app/ui/bones";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionSetupRuns } from "../../use-session-setup-runs";
 import {
@@ -12,16 +24,26 @@ import {
 	useSessionReaderBodies,
 } from "../detail/use-session-reader-bodies";
 import {
+	formatReaderCost,
 	getReaderMemberText,
-	getReaderWaterfall,
 } from "../model/session-reader-model";
 import { useRunFlags } from "../rail/session-reader-run-flags";
 import { ContextBar } from "./session-reader-context-bar";
 import { byRunMap, runsByPart } from "./session-reader-context-by-run";
 import { Unmapped } from "./session-reader-context-card";
+import {
+	CompactionShareContext,
+	CompactionToggle,
+	compactedLater,
+	segmentOf,
+} from "./session-reader-context-compaction";
 import { ContextMapFrame } from "./session-reader-context-frame";
-import { ContextMapHead } from "./session-reader-context-head";
-import { type ContextMap, getContextMap } from "./session-reader-context-map";
+import {
+	ContextMapHead,
+	ContextToggleSlot,
+} from "./session-reader-context-head";
+import type { ContextMap } from "./session-reader-context-map";
+import { ContextMapSample } from "./session-reader-context-map-sample";
 import type { ContextMeasure } from "./session-reader-context-measure";
 import {
 	type BoxProblems,
@@ -30,12 +52,10 @@ import {
 import {
 	compactedRuns,
 	contextRuns,
-	fullestCall,
 	NO_RUNS,
 	readRuns,
-	runSetupTexts,
-	sessionBaseline,
 } from "./session-reader-context-runs";
+import { useStoredContextSnapshot } from "./session-reader-context-stored";
 import { ContextTiles } from "./session-reader-context-tiles";
 
 const NOOP = () => {};
@@ -56,32 +76,47 @@ export function SessionContext({
 	setup: readonly SessionSetupFile[] | undefined;
 	turns: readonly SessionDetailTurnSummary[];
 }) {
-	const target = useMemo(() => {
-		let best: SessionDetailTurnSummary | undefined;
-		let bestShare = 0;
-		for (const each of turns) {
-			const share = fullestCall(each)?.share ?? 0;
-			if (share > bestShare) {
-				best = each;
-				bestShare = share;
-			}
-		}
-		return best;
-	}, [turns]);
+	const [withCompaction, setWithCompaction] = useState<boolean | null>(null);
+	const { showingWith, sides, target } = useMemo(
+		() => contextTarget(turns, withCompaction),
+		[turns, withCompaction],
+	);
 	const runs = useMemo(
 		() => (target ? contextRuns(turns, target) : []),
 		[target, turns],
 	);
+	const segment = useMemo(
+		() => (target ? segmentOf(turns, target) : []),
+		[target, turns],
+	);
+	const segmentCost = segment.reduce(
+		(sum, turn) => sum + (turn.estimatedCost ?? 0),
+		0,
+	);
+	const share = sides
+		? `${formatReaderCost(segmentCost)} / ${formatReaderCost(overview.session.estimatedCost)}`
+		: null;
+	const later = target ? segment.length - 1 - segment.indexOf(target) : 0;
+	const costOutside = `After its fullest moment${later > 0 ? ` · ${later} ${later === 1 ? "run" : "runs"}` : ""}`;
+	const toggleSlot = useContext(ContextToggleSlot);
+	const toggle = sides ? (
+		<CompactionToggle value={showingWith} onChange={setWithCompaction} />
+	) : null;
 	return (
 		<ContextMapHead.Provider value={head}>
 			<div className="flex min-w-0 flex-col">
 				{target ? (
 					<WholeContext
-						key={target.turnId}
+						footer={toggleSlot ? null : toggle}
+						cost={sides ? segmentCost : overview.session.estimatedCost}
+						costOutside={costOutside}
 						measure={measure}
 						overview={overview}
 						runs={runs}
+						segment={segment}
 						setup={setup}
+						share={share}
+						showingWith={showingWith}
 						target={target}
 						turns={turns}
 					/>
@@ -91,22 +126,35 @@ export function SessionContext({
 					</Unmapped>
 				)}
 			</div>
+			{toggleSlot && toggle ? createPortal(toggle, toggleSlot) : null}
 		</ContextMapHead.Provider>
 	);
 }
 
 function WholeContext({
+	cost,
+	costOutside,
+	footer,
 	measure,
 	overview,
 	runs,
+	segment,
 	setup,
+	share,
+	showingWith,
 	target,
 	turns,
 }: {
+	cost: number | null;
+	costOutside: string;
+	footer: ReactNode;
 	measure: ContextMeasure;
 	overview: NormalizedSessionDetailOverview;
 	runs: readonly SessionDetailTurnSummary[];
+	segment: readonly SessionDetailTurnSummary[];
+	share: string | null;
 	setup: readonly SessionSetupFile[] | undefined;
+	showingWith: boolean;
 	target: SessionDetailTurnSummary;
 	turns: readonly SessionDetailTurnSummary[];
 }) {
@@ -120,9 +168,13 @@ function WholeContext({
 		() => compactedRuns(turns, target),
 		[target, turns],
 	);
-	useMountEffect(() => {
-		for (const run of [...compactedTurns, ...runs, ...turns])
-			requestBody(run.turnId);
+	useEffectOnceWhen({
+		effect: () => {
+			for (const run of [...compactedTurns, ...runs, ...turns])
+				requestBody(run.turnId);
+		},
+		isReady: true,
+		key: `${compactedTurns[0]?.turnId}:${compactedTurns.length}:${runs[0]?.turnId}:${runs.length}:${turns.length}`,
 	});
 	const flags = useRunFlags(overview, turns);
 	const allBodies = useReadyBodies(turns, getBody);
@@ -149,7 +201,10 @@ function WholeContext({
 	const read = states.filter((state) => state.status === "ready").length;
 	const failed = states.some((state) => state.status === "failed");
 	const setupRuns = useSessionSetupRuns(overview.session.sessionId);
-	const calls = useMemo(() => runs.flatMap((run) => run.usageCalls), [runs]);
+	const calls = useMemo(
+		() => segment.flatMap((run) => run.usageCalls),
+		[segment],
+	);
 	const model = overview.session.modelUsed;
 	const done = read === runs.length;
 	const runBodies = useReadyBodies(runs, getBody);
@@ -171,22 +226,14 @@ function WholeContext({
 	const map = useMemo(() => {
 		if (!runBodies) return null;
 		if (builtMaps.has(mapKey)) return builtMaps.get(mapKey) ?? null;
-		const fullest = fullestCall(target);
-		if (!fullest) return null;
-		const built = getContextMap({
-			baseline: sessionBaseline(turns),
+		const built = buildContextMap({
 			compacted,
-			earlier: null,
-			prompt: prompts,
-			setup: runSetupTexts(setup ?? [], setupRuns.data?.runs ?? [], {
-				agent: null,
-				startedAt: target.startedAt,
-			}),
-			steps: runBodies.flatMap(
-				({ body, turn }) => getReaderWaterfall(body, turn, model)?.steps ?? [],
-			),
-			until: fullest.at,
-			use: fullest,
+			model,
+			runBodies,
+			setup: setup ?? [],
+			setupRuns: setupRuns.data?.runs ?? [],
+			target,
+			turns,
 		});
 		builtMaps.set(mapKey, built);
 		return built;
@@ -194,7 +241,6 @@ function WholeContext({
 		compacted,
 		mapKey,
 		model,
-		prompts,
 		runBodies,
 		setup,
 		setupRuns.data,
@@ -225,14 +271,70 @@ function WholeContext({
 		() => (map ? byRunMap(map, runs, prompts) : null),
 		[map, prompts, runs],
 	);
+	const compactedKeys = useMemo(
+		() => compactedTurns.map((turn) => `run:${turn.turnId}`),
+		[compactedTurns],
+	);
+	const compacting = useMemo(() => compactedLater(turns, runs), [runs, turns]);
+	const stored = useStoredContextSnapshot(overview.session.sessionId);
+	const storedView =
+		stored.data?.views.find((view) => view.withCompaction === showingWith) ??
+		stored.data?.views[0];
+	const lastShown = useRef<ComponentProps<typeof ContextTiles> | null>(null);
+	const lastShare = useRef<string | null>(null);
 	if (failed)
 		return <Unmapped>Some of its runs' transcripts couldn't be read.</Unmapped>;
+	if (!done && lastShown.current)
+		return (
+			<CompactionShareContext.Provider value={lastShare.current}>
+				<ContextTiles
+					{...lastShown.current}
+					footer={
+						<>
+							{footer}
+							<span className="ml-3 self-center text-xs text-muted-foreground tabular-nums">
+								Reading {read} of {runs.length} runs…
+							</span>
+						</>
+					}
+					measure={measure}
+				/>
+			</CompactionShareContext.Provider>
+		);
+	if (!done && storedView && measure === "context")
+		return (
+			<CompactionShareContext.Provider value={share}>
+				<ContextTiles
+					compactedRuns={storedView.compactedRuns}
+					compacting={new Set(storedView.compacting)}
+					cost={cost}
+					costOutside={costOutside}
+					footer={
+						<>
+							{footer}
+							<span className="ml-3 self-center text-xs text-muted-foreground tabular-nums">
+								Reading {read} of {runs.length} runs…
+							</span>
+						</>
+					}
+					map={storedView.map}
+					measure={measure}
+					memory={`session:${overview.session.sessionId}`}
+					whole
+				/>
+			</CompactionShareContext.Provider>
+		);
 	if (!done)
 		return (
 			<div className="flex flex-col gap-3">
 				<ContextBar map={null} titleId={undefined} />
 				<ContextMapFrame>
-					<Skeleton className="m-[3px] h-[274px] rounded-md" />
+					<Bones label="Reading its context">
+						<ContextMapSample />
+					</Bones>
+					{footer ? (
+						<div className="flex px-[3px] pt-2 pb-[3px]">{footer}</div>
+					) : null}
 				</ContextMapFrame>
 				<p className="text-xs text-muted-foreground tabular-nums">
 					Reading {read} of {runs.length} runs…
@@ -245,19 +347,28 @@ function WholeContext({
 				Its model's context window isn't known, so there's nothing to fill.
 			</Unmapped>
 		);
+	const tilesProps: ComponentProps<typeof ContextTiles> = {
+		byRun,
+		calls,
+		compactedRuns: compactedKeys,
+		compacting,
+		cost,
+		costOutside,
+		footer,
+		map,
+		measure,
+		memory: `session:${overview.session.sessionId}`,
+		partRuns,
+		problems,
+		runFigures,
+		subagentCosts,
+		whole: true,
+	};
+	lastShown.current = tilesProps;
+	lastShare.current = share;
 	return (
-		<ContextTiles
-			byRun={byRun}
-			calls={calls}
-			cost={overview.session.estimatedCost}
-			subagentCosts={subagentCosts}
-			map={map}
-			memory={`session:${overview.session.sessionId}`}
-			partRuns={partRuns}
-			problems={problems}
-			runFigures={runFigures}
-			measure={measure}
-			whole
-		/>
+		<CompactionShareContext.Provider value={share}>
+			<ContextTiles {...tilesProps} />
+		</CompactionShareContext.Provider>
 	);
 }

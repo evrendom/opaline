@@ -8,6 +8,13 @@ import {
 export const RepositoryInputSchema = z.object({
 	repoKey: z.string().min(1).max(4096),
 });
+export const RepositoryRangedInputSchema = RepositoryInputSchema.extend({
+	range: DateRangeInputSchema.optional(),
+});
+export const RepositoryScopedInputSchema = z.object({
+	repoKey: z.string().min(1).max(4096).optional(),
+	range: DateRangeInputSchema.optional(),
+});
 export const RepositorySummarySchema = z.object({
 	identity: RepoIdentitySchema,
 	sessionCount: z.number(),
@@ -95,3 +102,61 @@ export const RepositoryOverviewSchema = z.object({
 	),
 });
 export type RepositoryOverview = z.infer<typeof RepositoryOverviewSchema>;
+
+const RepositoryFilesUnavailableSchema = z.object({
+	status: z.literal("unavailable"),
+	reason: z.enum(["not-github", "not-connected", "unreachable"]),
+});
+export const RepositoryTreeEntrySchema = z.object({
+	path: z.string(),
+	type: z.enum(["file", "dir"]),
+	size: z.number().nullable(),
+});
+export type RepositoryTreeEntry = z.infer<typeof RepositoryTreeEntrySchema>;
+export const RepositoryFilesSchema = z.discriminatedUnion("status", [
+	z.object({
+		status: z.literal("available"),
+		repository: z.object({
+			owner: z.string(),
+			name: z.string(),
+			branch: z.string(),
+			commitSha: z.string(),
+		}),
+		entries: z.array(RepositoryTreeEntrySchema),
+		truncated: z.boolean(),
+	}),
+	RepositoryFilesUnavailableSchema,
+]);
+export type RepositoryFiles = z.infer<typeof RepositoryFilesSchema>;
+const RepositoryFilePathSchema = z
+	.string()
+	.min(1)
+	.max(4096)
+	.refine(
+		(path) =>
+			path
+				.split("/")
+				.every(
+					(segment) => segment !== "" && segment !== "." && segment !== "..",
+				),
+		"Invalid repository path",
+	);
+export const RepositoryFileInputSchema = RepositoryInputSchema.extend({
+	path: RepositoryFilePathSchema,
+	commitSha: z.string().regex(/^[0-9a-f]{40}$/iu),
+});
+export const RepositoryFileSchema = z.discriminatedUnion("status", [
+	z.object({
+		status: z.literal("text"),
+		path: z.string(),
+		size: z.number(),
+		content: z.string(),
+	}),
+	z.object({
+		status: z.enum(["binary", "too-large", "withheld"]),
+		path: z.string(),
+		size: z.number().nullable(),
+	}),
+	RepositoryFilesUnavailableSchema,
+]);
+export type RepositoryFile = z.infer<typeof RepositoryFileSchema>;

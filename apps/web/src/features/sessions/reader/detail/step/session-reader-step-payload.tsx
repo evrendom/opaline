@@ -36,7 +36,7 @@ export function PayloadSection({
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+					className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
 					<IconChevronRight
 						aria-hidden="true"
@@ -71,7 +71,7 @@ export function PayloadSection({
 				<button
 					type="button"
 					onClick={() => setFull(true)}
-					className="w-fit cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+					className="w-fit text-xs text-muted-foreground hover:text-foreground"
 				>
 					Show all {sizeHint(value)}
 				</button>

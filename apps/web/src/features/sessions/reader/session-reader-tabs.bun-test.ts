@@ -106,13 +106,15 @@ describe("SESSION_VIEW_HREFS", () => {
 	test("subagent: the detail, reading it with no run", () => {
 		at(`?${page}`);
 		expect(sorted(SESSION_VIEW_HREFS.subagent("s7").slice(1))).toBe(
-			"agent=s7&call=e1&subagent=s7",
+			"agent=s7&call=e1&sessionTab=detail&subagent=s7",
 		);
 	});
 
-	test("the detail is the view with no sessionTab", () => {
+	test("the summary is the view with no sessionTab", () => {
 		at("?sessionTab=summary&run=r1&turn=r1");
-		expect(SESSION_VIEW_HREFS.subagent("s1")).toBe("?agent=s1&subagent=s1");
+		expect(SESSION_VIEW_HREFS.subagent("s1")).toBe(
+			"?sessionTab=detail&agent=s1&subagent=s1",
+		);
 	});
 });
 

@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Skeleton } from "@/app/ui/skeleton";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -165,6 +166,56 @@ export function RunPane({
 						to read the rest.
 					</p>
 				) : null}
+			</section>
+		</article>
+	);
+}
+
+export function RunPaneSample({ run }: { run: NoticeableRun }) {
+	return (
+		<article className="compass-detail" aria-hidden="true">
+			<header className="compass-detail-header">
+				<div className="compass-detail-eyebrow">
+					<span>you</span>
+					<span aria-hidden="true">·</span>
+					<span>Mon, Nov 2 08:48</span>
+				</div>
+				<h2 className="compass-detail-title">{run.prompt}</h2>
+				<div className="compass-detail-actions">
+					<span
+						skullet-block=""
+						className="cost-text-button inline-flex items-center gap-1"
+					>
+						Open the session
+						<IconExternalLink aria-hidden="true" className="size-3.5" />
+					</span>
+				</div>
+			</header>
+			<dl className="compass-properties">
+				<Property label="Run">{run.turn}</Property>
+				<Property label="Duration">
+					{Math.max(1, Math.round(run.minutes))} min
+				</Property>
+				<Property label="Cost">{formatReaderCost(run.costUsd)}</Property>
+				{run.model ? <Property label="Model">{run.model}</Property> : null}
+			</dl>
+			<section className="compass-detail-section">
+				<h3>Why it’s here</h3>
+				<ul className="compass-flag-list">
+					{run.flags.map((flag) => (
+						<FlagItem key={flag.kind} flag={flag} />
+					))}
+				</ul>
+			</section>
+			<section className="compass-detail-section">
+				<h3>Observation</h3>
+				<p className="compass-hint">
+					What the agent was asked, what it did and where it got stuck.
+				</p>
+			</section>
+			<section className="compass-detail-section">
+				<h3>What went on</h3>
+				<TimelineSkeleton />
 			</section>
 		</article>
 	);
@@ -556,8 +607,8 @@ function TimelineSkeleton() {
 		<div className="flex flex-col gap-3" aria-hidden="true">
 			{[0, 1, 2, 3, 4, 5].map((index) => (
 				<div key={index} className="flex flex-col gap-1.5">
-					<div className="cost-skeleton h-3.5 w-40" />
-					<div className="cost-skeleton h-3 w-full max-w-120" />
+					<Skeleton className="h-3.5 w-40 rounded-[4px]" />
+					<Skeleton className="h-3 w-full max-w-120 rounded-[4px]" />
 				</div>
 			))}
 		</div>

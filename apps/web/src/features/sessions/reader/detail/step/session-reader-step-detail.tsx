@@ -223,7 +223,7 @@ export function SessionReaderStepDetail({
 						<Link
 							to={skillHref}
 							title="Open the skill"
-							className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-card py-1 pr-2 pl-2.5 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted dark:bg-muted-foreground/10"
+							className="inline-flex items-center gap-1 rounded-full bg-card py-1 pr-2 pl-2.5 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted dark:bg-muted-foreground/10"
 						>
 							Open details
 							<IconArrowUpRight
@@ -298,8 +298,11 @@ export function SessionReaderStepDetail({
 												<McpCall event={step.toolEvent} />
 											)
 										}
+										collapsible={!shell}
 										command={shell?.full}
+										model={waterfall.model}
 										output={shell ? step.result : mcpOutput}
+										wrapLines={!shell}
 									/>
 								</div>
 							) : null}

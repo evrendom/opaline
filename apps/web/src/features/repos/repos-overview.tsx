@@ -9,6 +9,7 @@ import {
 } from "@tabler/icons-react";
 import { memo, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Bones } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import {
@@ -23,7 +24,6 @@ import {
 	OverviewList,
 	OverviewMembers,
 	OverviewRangeFiltersMenu,
-	OverviewSkeleton,
 	type RangeBound,
 } from "@/components/overview-list";
 import { SkillMark } from "@/components/skill-mark";
@@ -180,11 +180,14 @@ export function ReposOverview({
 					/>
 				</div>
 				{isPending ? (
-					<OverviewSkeleton
-						gridClassName={REPO_ROW_GRID_CLASS_NAME}
-						label="Loading repos"
-						metricWidths={["w-16", "w-10", "w-12", "w-20"]}
-					/>
+					<Bones fill className="min-h-0 min-w-0 flex-1" label="Loading repos">
+						<ReposList
+							avatarMap={NO_AVATARS}
+							getRepoHref={sampleRepoHref}
+							repos={SAMPLE_REPOS}
+							userMap={SAMPLE_USERS}
+						/>
+					</Bones>
 				) : isError ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
@@ -242,6 +245,44 @@ export function ReposOverview({
 		</div>
 	);
 }
+
+const NO_AVATARS: Record<string, string> = {};
+const SAMPLE_USERS: Record<string, string> = { sample: "you" };
+const sampleRepoHref = () => "#";
+const SAMPLE_REPOS: RepositorySummary[] = [
+	["web-app", 377, 16.5e9, 7618, [148, 44, 416]],
+	["api-server", 377, 16.4e9, 16219, [396, 151, 192]],
+	["mobile", 297, 8.6e9, null, [1351, 116, 54]],
+	["design-system", 196, 3.7e9, 2884, [376, 32, 25]],
+	["docs", 163, 3.9e9, 2564, [480, 60, 29]],
+	["infra", 128, 13.8e9, 4330, [117, 63, 194]],
+	["data-pipeline", 128, 6.8e9, 5301, [630, 60, 90]],
+	["analytics", 87, 1.3e9, 559, [167, 32, 24]],
+	["marketing-site", 50, 3.1e9, 1312, [268, 32, 11]],
+	["cli", 44, 262e6, null, [408, 128, 2]],
+	["sdk", 41, 829e6, 249, [180, 114, 13]],
+	["browser-extension", 41, 700e6, 350, [70, 3, 1]],
+	["playground", 30, 359e6, 306, [53, 3, 2]],
+	["scripts", 22, 120e6, 98, [12, 1, 0]],
+].map(([name, sessionCount, totalTokens, estimatedCost, signals]) => {
+	const [userPositive, userNegative, modelApologies] = signals as number[];
+	return {
+		estimatedCost: estimatedCost as number | null,
+		identity: {
+			repoKey: `sample/${name}`,
+			repoLabel: name as string,
+			repoName: name as string,
+			source: "remote" as const,
+			worktree: null,
+		},
+		lastActiveAt: "2026-10-01T00:00:00.000Z",
+		sessionCount: sessionCount as number,
+		signals: { complete: true, modelApologies, userNegative, userPositive },
+		topUsers: [{ sessionCount: sessionCount as number, userId: "sample" }],
+		totalTokens: totalTokens as number,
+		userCount: 1,
+	};
+});
 
 function ReposList({
 	avatarMap,
@@ -381,13 +422,6 @@ const RepoRow = memo(function RepoRow({
 export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 	const signals = [
 		{
-			count: repo.signals.userPositive,
-			label: "positive",
-			title: "Positive user signals",
-			color:
-				"bg-[#dcfce7] text-[#15803d] dark:bg-[#153b25] dark:text-[#86efac]",
-		},
-		{
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
@@ -405,7 +439,7 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 	if (signals.length === 0) return null;
 	return (
 		<ul
-			aria-label="Language signals"
+			aria-label="Frustrations"
 			className="flex min-w-0 shrink list-none items-center gap-1 overflow-hidden"
 		>
 			{signals.map((signal) => (

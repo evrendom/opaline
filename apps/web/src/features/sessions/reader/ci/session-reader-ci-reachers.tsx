@@ -42,7 +42,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 }
 
 const ROW =
-	"flex min-h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 text-left text-xs transition-colors hover:bg-muted/60";
+	"flex min-h-6 w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-left text-xs transition-colors hover:bg-muted/60";
 
 export function ReachedBy({
 	lit = null,
@@ -179,7 +179,7 @@ export function PullTouchers({
 				<button
 					type="button"
 					onClick={() => setOpen(!open)}
-					className="w-fit cursor-pointer text-[11px] text-muted-foreground tabular-nums hover:text-foreground"
+					className="w-fit text-[11px] text-muted-foreground tabular-nums hover:text-foreground"
 				>
 					{open ? "Fewer" : `${rest} more`}
 				</button>

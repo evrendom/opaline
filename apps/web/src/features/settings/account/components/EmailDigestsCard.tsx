@@ -1,9 +1,9 @@
 import type { UsageDigestPreferences } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import { toast } from "sonner";
+import { Bones } from "@/app/ui/bones";
 import { Checkbox } from "@/app/ui/checkbox";
-import { Skeleton } from "@/app/ui/skeleton";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -49,16 +49,16 @@ export function EmailDigestsCard() {
 		}
 	}
 
+	if (query.isPending)
+		return (
+			<Bones label="Loading your email choices">
+				<EmailDigestsSample />
+			</Bones>
+		);
+
 	return (
-		<WorkspaceSettingsGroup
-			title="Email digests"
-			description="A summary of your sessions, time and cost with your agents. The weekly one arrives on Monday at 9 am, the daily one at 7 pm on weekdays you used your agents."
-		>
-			{query.isPending ? (
-				<WorkspaceSettingsRow label={<Skeleton className="h-4 w-32" />}>
-					<Skeleton className="h-4 w-36" />
-				</WorkspaceSettingsRow>
-			) : query.isError ? (
+		<EmailDigestsGroup>
+			{query.isError ? (
 				<WorkspaceSettingsRow label="Could not load your email choices.">
 					<button
 						type="button"
@@ -69,27 +69,80 @@ export function EmailDigestsCard() {
 					</button>
 				</WorkspaceSettingsRow>
 			) : (
-				query.data.workspaces.map((workspace) => (
-					<WorkspaceSettingsRow
-						key={workspace.organizationId}
-						label={workspace.organizationName}
-					>
-						<div className="flex items-center gap-5">
-							{KINDS.map(({ kind, label }) => (
-								<DigestCheckbox
-									key={kind}
-									label={label}
-									checked={workspace[kind]}
-									onCheckedChange={(checked) =>
-										void setPreference(workspace.organizationId, kind, checked)
-									}
-								/>
-							))}
-						</div>
-					</WorkspaceSettingsRow>
-				))
+				<DigestRows
+					workspaces={query.data.workspaces}
+					onChange={(organizationId, kind, enabled) =>
+						void setPreference(organizationId, kind, enabled)
+					}
+				/>
 			)}
+		</EmailDigestsGroup>
+	);
+}
+
+function EmailDigestsGroup({ children }: { children: ReactNode }) {
+	return (
+		<WorkspaceSettingsGroup
+			title="Email digests"
+			description="A summary of your sessions, time and cost with your agents. The weekly one arrives on Monday at 9 am, the daily one at 7 pm on weekdays you used your agents."
+		>
+			{children}
 		</WorkspaceSettingsGroup>
+	);
+}
+
+function DigestRows({
+	onChange,
+	workspaces,
+}: {
+	onChange: (
+		organizationId: string,
+		kind: "daily" | "weekly",
+		enabled: boolean,
+	) => void;
+	workspaces: UsageDigestPreferences["workspaces"];
+}) {
+	return workspaces.map((workspace) => (
+		<WorkspaceSettingsRow
+			key={workspace.organizationId}
+			label={workspace.organizationName}
+		>
+			<div className="flex items-center gap-5">
+				{KINDS.map(({ kind, label }) => (
+					<DigestCheckbox
+						key={kind}
+						label={label}
+						checked={workspace[kind]}
+						onCheckedChange={(checked) =>
+							onChange(workspace.organizationId, kind, checked)
+						}
+					/>
+				))}
+			</div>
+		</WorkspaceSettingsRow>
+	));
+}
+
+const SAMPLE_WORKSPACES: UsageDigestPreferences["workspaces"] = [
+	{
+		daily: true,
+		organizationId: "a",
+		organizationName: "Your workspace",
+		weekly: true,
+	},
+	{
+		daily: false,
+		organizationId: "b",
+		organizationName: "Another workspace",
+		weekly: false,
+	},
+];
+
+export function EmailDigestsSample() {
+	return (
+		<EmailDigestsGroup>
+			<DigestRows workspaces={SAMPLE_WORKSPACES} onChange={() => {}} />
+		</EmailDigestsGroup>
 	);
 }
 
@@ -106,9 +159,7 @@ function DigestCheckbox({
 	return (
 		<div className="flex items-center gap-2 text-sm">
 			<Checkbox id={id} checked={checked} onCheckedChange={onCheckedChange} />
-			<label htmlFor={id} className="cursor-pointer">
-				{label}
-			</label>
+			<label htmlFor={id}>{label}</label>
 		</div>
 	);
 }

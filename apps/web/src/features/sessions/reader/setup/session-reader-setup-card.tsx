@@ -1,10 +1,17 @@
 import type { SessionSetupFile } from "@rudel/api-routes";
+import { IconCode, IconFileDiff } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
+import { Bone, Bones } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
-import { Skeleton } from "@/app/ui/skeleton";
+import { DiffView } from "@/components/pierre/diff-view";
+import { diffLines } from "@/components/pierre/line-diff";
 import { cn } from "@/lib/utils";
 import { useSessionSetupText } from "../../use-session-setup-text";
-import { ScrollColumn, TOGGLE } from "../files/session-reader-files-parts";
+import {
+	ScrollColumn,
+	TOGGLE,
+	ViewToggle,
+} from "../files/session-reader-files-parts";
 import { SetupMark } from "./session-reader-setup-column";
 import { SetupProse } from "./session-reader-setup-prose";
 import { KIND_LABEL, setupName, setupOwner } from "./session-setup-files";
@@ -37,12 +44,28 @@ export function useSetupVersions(sessionId: string, setupFile: string) {
 export type SetupVersions = ReturnType<typeof useSetupVersions>;
 
 export function SetupCard({
+	details = true,
+	diffs = false,
 	file,
 	versions: { pick, query, shown, versions },
+	versionPicker = true,
 }: {
+	details?: boolean;
+	diffs?: boolean;
 	file: SessionSetupFile;
 	versions: SetupVersions;
+	versionPicker?: boolean;
 }) {
+	const [view, setView] = useState<"changes" | "file">("file");
+	const previous = shown ? versions[versions.indexOf(shown) - 1] : undefined;
+	const showDiff = diffs && view === "changes" && previous !== undefined;
+	const hunks = useMemo(
+		() =>
+			showDiff && previous && shown
+				? diffLines(previous.text, shown.text)
+				: null,
+		[previous, showDiff, shown],
+	);
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			<header className="flex flex-col gap-2 border-b border-border/50 px-5 py-4">
@@ -56,16 +79,37 @@ export function SetupCard({
 					>
 						{setupName(file)}
 					</h2>
-					<span className="shrink-0 text-xs text-muted-foreground">
-						{setupOwner(file)} · {KIND_LABEL[file.kind] ?? file.kind}
-					</span>
+					{details ? (
+						<span className="shrink-0 text-xs text-muted-foreground">
+							{setupOwner(file)} · {KIND_LABEL[file.kind] ?? file.kind}
+						</span>
+					) : null}
+					{diffs && versions.length > 1 ? (
+						<span className="ml-auto">
+							<ViewToggle
+								iconsOnly
+								label="The version's changes, or its text"
+								onPick={setView}
+								options={[
+									{
+										icon: IconFileDiff,
+										id: "changes",
+										label: "Changes",
+										off: previous === undefined,
+									},
+									{ icon: IconCode, id: "file", label: "File" },
+								]}
+								value={showDiff ? "changes" : "file"}
+							/>
+						</span>
+					) : null}
 				</div>
-				{versions.length > 0 && versions.length < file.versions ? (
+				{details && versions.length > 0 && versions.length < file.versions ? (
 					<p className="text-xs text-muted-foreground tabular-nums">
 						The latest {versions.length} of its {file.versions} versions.
 					</p>
 				) : null}
-				{versions.length > 1 ? (
+				{versionPicker && versions.length > 1 ? (
 					<div className="flex flex-wrap items-center gap-1">
 						{versions.map((version, index) => (
 							<Button
@@ -86,15 +130,17 @@ export function SetupCard({
 			<div className="flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{query.isLoading ? (
-						<div className="flex flex-col gap-2 px-5 py-4">
-							{[88, 72, 80, 56, 64].map((width) => (
-								<Skeleton
-									key={width}
-									className="h-3.5 rounded-md"
-									style={{ width: `${width}%` }}
-								/>
-							))}
-						</div>
+						<Bones label="Reading its text">
+							<div className="flex flex-col gap-2 px-5 py-4">
+								{[88, 72, 80, 56, 64].map((width) => (
+									<Bone
+										key={width}
+										className="h-3.5 rounded-md"
+										style={{ width: `${width}%` }}
+									/>
+								))}
+							</div>
+						</Bones>
 					) : !shown ? (
 						<p className="px-5 py-4 text-[13px] text-muted-foreground">
 							{query.isError
@@ -103,7 +149,17 @@ export function SetupCard({
 						</p>
 					) : (
 						<ScrollColumn className="px-5 py-4">
-							<SetupProse text={shown.text} />
+							{hunks ? (
+								hunks.length === 0 ? (
+									<p className="text-[13px] text-muted-foreground">
+										No line changed since the version before.
+									</p>
+								) : (
+									<DiffView hunks={hunks} language="markdown" />
+								)
+							) : (
+								<SetupProse text={shown.text} />
+							)}
 							{shown.textCut ? (
 								<p className="pt-3 text-xs text-muted-foreground tabular-nums">
 									Only its start was kept: the whole text is{" "}

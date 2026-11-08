@@ -27,74 +27,81 @@ export function GitHubRepositoryList({
 
 	return (
 		<div className="sessions-settings">
-			<section aria-labelledby="github-repository-list-heading">
-				<div className="sessions-settings-list-heading">
-					<h2 id="github-repository-list-heading">
-						Repositories{" "}
-						<span className="sessions-settings-count">
-							{repositories.length}
-						</span>
-					</h2>
-				</div>
-				<p className="sessions-settings-description">
-					{selection} on {status.accountLogin ?? "GitHub"}.
-					{status.canManage
-						? " Added repositories on GitHub? Reconnect to include them."
-						: null}
-				</p>
-				<label className="sessions-settings-search">
-					<IconSearch size={16} aria-hidden="true" />
-					<input
-						type="search"
-						name="github-repository-search"
-						aria-label="Find a repository"
-						placeholder="Find a repository…"
-						value={search}
-						onChange={(event) => setSearch(event.target.value)}
-					/>
-				</label>
-				<div className="sessions-settings-table-wrap">
-					<table className="sessions-settings-table">
-						<thead>
-							<tr>
-								<th scope="col">Repository</th>
-								<th scope="col">Visibility</th>
-								<th scope="col">Sync</th>
-							</tr>
-						</thead>
-						<tbody>
-							{visible.map((repository) => (
-								<tr key={repository.repositoryId}>
-									<td>
-										<div className="sessions-settings-repo">
-											<IconFolder size={16} aria-hidden="true" />
-											<span
-												className="sessions-settings-repo-name"
-												title={`${repository.owner}/${repository.name}`}
-											>
-												{repository.owner}/{repository.name}
-											</span>
-										</div>
-									</td>
-									<td>{repository.isPrivate ? "Private" : "Public"}</td>
-									<td>
-										<SyncStatus
-											repository={repository}
-											suspended={status.suspended === true}
-										/>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-				{visible.length === 0 ? (
-					<p className="sessions-settings-empty">
-						{search
-							? "No repositories match your search."
-							: "No repositories are available to this connection."}
+			<section
+				className="sessions-settings-section"
+				aria-labelledby="github-repository-list-heading"
+			>
+				<div className="sessions-settings-heading">
+					<div className="sessions-settings-list-heading">
+						<h2 id="github-repository-list-heading">
+							Repositories{" "}
+							<span className="sessions-settings-count">
+								{repositories.length}
+							</span>
+						</h2>
+					</div>
+					<p className="sessions-settings-description">
+						{selection} on {status.accountLogin ?? "GitHub"}.
+						{status.canManage
+							? " Added repositories on GitHub? Reconnect to include them."
+							: null}
 					</p>
-				) : null}
+				</div>
+				<div className="sessions-settings-card settings-section-surface">
+					<label className="sessions-settings-search">
+						<IconSearch size={16} aria-hidden="true" />
+						<input
+							type="search"
+							name="github-repository-search"
+							aria-label="Find a repository"
+							placeholder="Find a repository…"
+							value={search}
+							onChange={(event) => setSearch(event.target.value)}
+						/>
+					</label>
+					<div className="sessions-settings-table-wrap">
+						<table className="sessions-settings-table">
+							<thead>
+								<tr>
+									<th scope="col">Repository</th>
+									<th scope="col">Visibility</th>
+									<th scope="col">Sync</th>
+								</tr>
+							</thead>
+							<tbody>
+								{visible.map((repository) => (
+									<tr key={repository.repositoryId}>
+										<td>
+											<div className="sessions-settings-repo">
+												<IconFolder size={16} aria-hidden="true" />
+												<span
+													className="sessions-settings-repo-name"
+													title={`${repository.owner}/${repository.name}`}
+												>
+													{repository.owner}/{repository.name}
+												</span>
+											</div>
+										</td>
+										<td>{repository.isPrivate ? "Private" : "Public"}</td>
+										<td>
+											<SyncStatus
+												repository={repository}
+												suspended={status.suspended === true}
+											/>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+					{visible.length === 0 ? (
+						<p className="sessions-settings-empty">
+							{search
+								? "No repositories match your search."
+								: "No repositories are available to this connection."}
+						</p>
+					) : null}
+				</div>
 			</section>
 		</div>
 	);

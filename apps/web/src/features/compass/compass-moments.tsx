@@ -24,6 +24,7 @@ import {
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
+import { Bones } from "@/app/ui/bones";
 import {
 	ShellNavIcon,
 	type ShellNavTone,
@@ -291,20 +292,77 @@ export function FlagKindsPopup({
 	);
 }
 
-/** One blob per row slot, as the list loads. */
+const SAMPLE_PROMPTS = [
+	"rm everything that auto runs for now.",
+	"do hen",
+	"ok get all",
+	"does it have all the js and stuff?",
+	"You're in the portfolio repo on branch claude/loving-volta",
+	"<turn-context> Attached context: the shared agent reads first",
+	"<turn-context> Attached context: worktree files",
+	"<turn-context> <shared-agent> calls denied",
+	"overlapping it",
+	"still lower than the others on setup and files",
+	"ah ignore last msg. go ahead.",
+	"ok but now the below has weirdly and the rail jumps",
+	"YES. go",
+	"turn the selector of context / time / cost into a toggle",
+	"why is the bill so high this month",
+	"make the repo page the same structure as the session page",
+];
+const SAMPLE_FLAGS: NoticeableRun["flags"] = [
+	{
+		count: 8,
+		detail: "$8.31, 9× the median run ($0.92); top 2% of 493 runs",
+		kind: "expensive_run",
+		spanEnd: 120,
+		spanStart: 1,
+	},
+	{
+		count: 25,
+		detail: "25 min, 14× the median run (2 min); top 3% of 493 runs",
+		kind: "long_run",
+		spanEnd: 120,
+		spanStart: 1,
+	},
+];
+
+const sampleRun = (prompt: string, index: number): NoticeableRun => ({
+	agentId: "",
+	costUsd: 0.4 + (index % 5) * 0.6,
+	flags: SAMPLE_FLAGS,
+	id: `sample-run-${index}`,
+	minutes: 25,
+	model: "claude-opus-5-5",
+	observation: null,
+	prompt,
+	sessionId: `sample-session-${index}`,
+	startedAt: "2026-11-02T08:00:00.000Z",
+	turn: index + 1,
+	userId: "sample",
+});
+
+const COMPASS_SAMPLE_RUNS = SAMPLE_PROMPTS.map(sampleRun);
+export const COMPASS_SAMPLE_RUN = sampleRun(
+	"rm everything that auto runs for now.",
+	8,
+);
+
+const NO_SELECT = () => {};
+
 export function RowsSkeleton() {
 	return (
-		<div className="compass-list-skeleton" aria-hidden="true">
-			{[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
-				<div key={index}>
-					<div className="cost-skeleton size-7 rounded-full" />
-					<div className="flex flex-1 flex-col gap-1.5">
-						<div className="cost-skeleton h-3.5 w-48" />
-						<div className="cost-skeleton h-3 w-32" />
-					</div>
-				</div>
+		<Bones label="Loading runs">
+			{COMPASS_SAMPLE_RUNS.map((run, index) => (
+				<RunRow
+					key={run.id}
+					run={run}
+					selected={index === 0}
+					onSelect={NO_SELECT}
+					onKeyDown={NO_SELECT}
+				/>
 			))}
-		</div>
+		</Bones>
 	);
 }
 

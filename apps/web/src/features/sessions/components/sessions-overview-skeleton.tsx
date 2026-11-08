@@ -1,23 +1,97 @@
-import { Skeleton } from "@/app/ui/skeleton";
-import {
-	SESSION_OVERVIEW_GRID_CLASS_NAME,
-	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
-	SESSION_OVERVIEW_VISIBLE_COLUMNS,
-} from "@/features/sessions/components/sessions-overview-table-utils";
-import { cn } from "@/lib/utils";
+import type { SessionAnalytics } from "@rudel/api-routes";
+import { Bones } from "@/app/ui/bones";
+import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
+import { SessionsOverviewRow } from "./sessions-overview-row";
 
-const SESSION_OVERVIEW_SKELETON_ROWS = [
-	"overview-session-skeleton-1",
-	"overview-session-skeleton-2",
-	"overview-session-skeleton-3",
-	"overview-session-skeleton-4",
-	"overview-session-skeleton-5",
-	"overview-session-skeleton-6",
-	"overview-session-skeleton-7",
-	"overview-session-skeleton-8",
-	"overview-session-skeleton-9",
-	"overview-session-skeleton-10",
-] as const;
+const BASE: SessionAnalytics = {
+	cost_uses_default_region: false,
+	duration_min: 17,
+	error_count: 0,
+	estimated_cost: 4,
+	git_branch: "main",
+	git_remote: "github.com/you/web-app",
+	input_tokens: 438317,
+	linked_subagent_count: 0,
+	linked_subagents: [],
+	member_apologies: 0,
+	member_apology_matches: [],
+	member_positive: 0,
+	member_positive_matches: [],
+	member_swear_matches: [],
+	member_swears: 0,
+	model_apologies: 0,
+	model_apology_matches: [],
+	model_positive: 0,
+	model_positive_matches: [],
+	model_swear_matches: [],
+	model_swears: 0,
+	model_used: "claude-opus-4-5",
+	native_child_sessions: [],
+	native_subagents: [],
+	output_tokens: 6558,
+	project_path: "/workspace/web-app",
+	repository: "you/web-app",
+	repository_identity: {
+		repoKey: "remote:github.com/you/web-app",
+		repoLabel: "web-app",
+		repoName: "web-app",
+		source: "remote",
+		worktree: null,
+	},
+	session_date: "2026-10-30T09:00:00Z",
+	session_id: "sample",
+	skills: [],
+	slash_commands: [],
+	source: "claude_code",
+	subagent_count: 0,
+	subagent_types: [],
+	total_interactions: 51,
+	total_tokens: 444875,
+	user_id: "sample",
+	worktree: null,
+};
+
+const ROWS: [string, string, number, number, string[]][] = [
+	["web-app", "feature/session-figures", 7, 2, []],
+	["api-server", "fix/upload-retry", 1, 0, ["code-review"]],
+	["web-app", "main", 12, 1, []],
+	["mobile", "feature/offline-sync", 3, 0, ["testing"]],
+	["docs", "docs/getting-started", 2, 3, []],
+	["web-app", "perf/list-virtualizer", 11, 0, ["tdd", "code-review"]],
+	["infra", "main", 4, 1, []],
+	["api-server", "feature/billing", 9, 0, []],
+	["design-system", "feature/tokens", 1, 0, ["design"]],
+	["web-app", "fix/dark-mode", 2, 2, []],
+	["data-pipeline", "main", 29, 0, ["database-query"]],
+	["web-app", "feature/onboarding", 6, 1, []],
+	["cli", "fix/auth-refresh", 1, 0, []],
+	["api-server", "main", 5, 0, ["testing"]],
+	["mobile", "fix/crash-on-launch", 8, 4, []],
+	["web-app", "feature/search", 3, 0, []],
+	["docs", "main", 1, 0, []],
+	["infra", "feature/alerts", 2, 1, []],
+	["web-app", "fix/flaky-tests", 4, 0, ["testing"]],
+	["api-server", "feature/webhooks", 7, 0, []],
+];
+
+const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
+	([repo, branch, cost, errors, skills], index) => ({
+		...BASE,
+		error_count: errors,
+		estimated_cost: cost,
+		git_branch: branch,
+		repository: `you/${repo}`,
+		repository_identity: {
+			repoKey: `remote:github.com/you/${repo}`,
+			repoLabel: repo,
+			repoName: repo,
+			source: "remote",
+			worktree: null,
+		},
+		session_id: `sample-${index}`,
+		skills,
+	}),
+);
 
 export function SessionsOverviewSkeleton({
 	showSkillsColumn = true,
@@ -25,48 +99,30 @@ export function SessionsOverviewSkeleton({
 	showSkillsColumn?: boolean;
 }) {
 	return (
-		<div aria-busy="true" className="flex-1">
-			<output className="sr-only">Loading sessions</output>
-			{SESSION_OVERVIEW_SKELETON_ROWS.map((rowId) => (
-				<div
-					key={rowId}
-					className={cn(
-						"grid h-12",
-						showSkillsColumn
-							? SESSION_OVERVIEW_GRID_CLASS_NAME
-							: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
-					)}
-				>
-					{SESSION_OVERVIEW_VISIBLE_COLUMNS.filter(
-						(column) => showSkillsColumn || column.key !== "skills",
-					).map((column) => (
-						<div
-							key={column.key}
-							className={cn(
-								"flex min-w-0 items-center bg-(--session-overview-surface) px-3",
-								column.key === "user" || column.key === "time"
-									? "justify-end"
-									: "justify-start",
-								column.key === "time" && "px-2",
-							)}
-						>
-							{column.key === "model" || column.key === "user" ? (
-								<div
-									className={cn(
-										"flex items-center gap-1.5",
-										column.key === "user" && "flex-row-reverse",
-									)}
-								>
-									<Skeleton className="size-4 rounded-full" />
-									<Skeleton className="h-3 w-20 rounded-sm" />
-								</div>
-							) : (
-								<Skeleton className="h-3 w-12 max-w-full rounded-sm" />
-							)}
-						</div>
-					))}
-				</div>
-			))}
-		</div>
+		<Bones className="flex-1" label="Loading sessions">
+			<SessionsOverviewFluidList fillHeight height={undefined}>
+				{({ registerItem, setActiveIndex }) =>
+					SAMPLE_SESSIONS.map((session, index) => (
+						<SessionsOverviewRow
+							key={session.session_id}
+							activeSessionId={null}
+							avatarUrl={undefined}
+							canOpenSession={undefined}
+							getSessionHref={undefined}
+							getSessionLinkState={undefined}
+							index={index}
+							maximumSessionCost={30}
+							memberProfile={undefined}
+							onSessionClick={undefined}
+							registerItem={registerItem}
+							session={session}
+							setHoverActiveIndex={setActiveIndex}
+							showSkillsColumn={showSkillsColumn}
+							userLabel="you"
+						/>
+					))
+				}
+			</SessionsOverviewFluidList>
+		</Bones>
 	);
 }

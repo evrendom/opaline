@@ -37,7 +37,7 @@
 	width: 100%;
 	max-width: 1600px;
 	margin-inline: auto;
-	padding: 12px 32px 24px;
+	padding: 12px var(--cost-page-gutter, 32px) 24px;
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
@@ -117,19 +117,37 @@
    glyph and label on the left and the value on the right, and a full-bleed
    sparkline pinned to the bottom edge. Accents come from --metric-color (the
    Opaline palette). */
+@property --metric-tint {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: transparent;
+}
 .cost-metric {
+	--metric-tint: oklch(from var(--metric-color) l 0 h);
 	position: relative;
-	padding: 20px 20px 0;
+	--metric-pad-x: 20px;
+	padding: 20px var(--metric-pad-x) 0;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 	min-width: 0;
 	overflow: hidden;
 	text-align: left;
-	transition: box-shadow 150ms ease;
+	transition:
+		box-shadow 150ms ease,
+		--metric-tint 200ms ease;
+}
+.cost-metric[data-primary="true"] {
+	--metric-tint: var(--metric-color);
 }
 .cost-metric:hover {
 	box-shadow: var(--custom-shadow-secondary);
+}
+.cost-metric[data-disabled]:not([data-primary="true"]) {
+	opacity: 0.5;
+}
+.cost-metric[data-disabled] .cost-metric-select {
+	cursor: default;
 }
 .cost-metric:has(.cost-metric-select:focus-visible) {
 	outline: 2px solid var(--cost-blue);
@@ -166,6 +184,7 @@
 	gap: 8px;
 	min-width: 0;
 	min-height: 21px;
+	margin-bottom: auto;
 }
 .cost-metric-label {
 	display: flex;
@@ -185,7 +204,6 @@
 .cost-metric-select {
 	min-width: 0;
 	text-align: left;
-	cursor: pointer;
 	outline: none;
 	overflow: hidden;
 	white-space: nowrap;
@@ -220,12 +238,12 @@
    a fill fading from 40% to 10% (text-*-400/50 sparklines). */
 .cost-metric-sparkline {
 	display: block;
-	flex-shrink: 0;
-	width: calc(100% + 40px);
-	height: 32px;
-	margin: 6px -20px 0;
+	flex: 0 1 32px;
+	min-height: 0;
+	width: calc(100% + 2 * var(--metric-pad-x));
+	margin: 6px calc(-1 * var(--metric-pad-x)) 0;
 	overflow: visible;
-	color: color-mix(in oklch, var(--metric-color) 50%, transparent);
+	color: color-mix(in oklch, var(--metric-tint) 50%, transparent);
 }
 .cost-metric-trend-line {
 	stroke: currentColor;
@@ -242,7 +260,7 @@
 }
 .cost-metric:is([data-primary="true"], :hover)
 	.cost-metric-sparkline:not([data-placeholder]) {
-	color: var(--metric-color);
+	color: var(--metric-tint);
 }
 .cost-metric:is([data-primary="true"], :hover)
 	.cost-metric-sparkline:not([data-placeholder])
@@ -379,7 +397,6 @@
 	padding: 5px 6px;
 	margin: -5px -6px;
 	border-radius: 4px;
-	cursor: pointer;
 }
 .cost-duration-legend:hover {
 	background: var(--cost-hover);
@@ -617,7 +634,6 @@
 	text-align: left;
 	border-radius: 5px;
 	outline: none;
-	cursor: pointer;
 	font-variant-numeric: tabular-nums;
 }
 .cost-page
@@ -741,7 +757,6 @@
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
-	cursor: pointer;
 	outline: none;
 }
 .cost-tool-button[aria-pressed="true"],
@@ -793,7 +808,6 @@
 		0 0 0 0.5px #0000000f,
 		0 1px 1px -1px #0000001a,
 		0 1px 2px 0 #0000000d;
-	cursor: pointer;
 }
 .dark .cost-filter-chip {
 	box-shadow: 0 0 0 0.5px #ffffff12 inset;
@@ -808,7 +822,6 @@
 	color: var(--cost-muted);
 	padding: 4px 6px;
 	border-radius: 5px;
-	cursor: pointer;
 	white-space: nowrap;
 }
 .cost-text-button:hover {
@@ -865,7 +878,6 @@
 	padding: 5px 12px;
 	border: 1px solid var(--cost-border);
 	border-radius: 6px;
-	cursor: pointer;
 }
 .cost-secondary-button:hover {
 	background: var(--cost-hover);
@@ -878,6 +890,15 @@
 	min-height: 220px;
 	padding: 32px;
 }
+.cost-error-state {
+	display: flex;
+	min-height: 220px;
+	min-width: 0;
+}
+.cost-error-state > * {
+	flex: 1;
+	min-width: 0;
+}
 .cost-error h2 {
 	font-weight: 500;
 }
@@ -885,45 +906,12 @@
 	color: var(--cost-muted);
 	padding-top: 6px;
 }
-.cost-skeleton {
-	background: var(--cost-soft);
-	border-radius: 4px;
-	animation: cost-pulse 1.6s ease-in-out infinite;
-}
 /* Sized like the stat card value it stands in for, so the label keeps its
    room while the number loads. */
 .cost-metric-skeleton {
 	flex-shrink: 0;
 	height: 12px;
-	width: 64px;
-}
-.cost-breakdown-skeleton > div {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 24px;
-	padding: 12px 20px;
-	border-top: 1px solid var(--cost-divider);
-}
-.cost-breakdown-skeleton > div:first-child {
-	border-top-color: transparent;
-}
-.cost-breakdown-skeleton-name {
-	display: flex;
-	flex: 1;
-	align-items: center;
-	gap: 6px;
-	min-width: 0;
-}
-.cost-breakdown-skeleton-value {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: 6px;
-	flex-shrink: 0;
-}
-.cost-breakdown-skeleton-value > div:first-child {
-	margin-block: 3px;
+	width: 2.25rem;
 }
 .cost-chart-skeleton {
 	position: absolute;
@@ -943,15 +931,14 @@
 	display: flex;
 	justify-content: space-between;
 }
-.cost-chart-loading-axis span,
-.cost-chart-loading-dates span {
+.cost-chart-loading-axis [skullet-bar],
+.cost-chart-loading-dates [skullet-bar] {
 	display: block;
 	height: 8px;
 	width: 28px;
 	border-radius: 2px;
-	background: var(--cost-soft);
 }
-.cost-chart-loading-dates span {
+.cost-chart-loading-dates [skullet-bar] {
 	width: 48px;
 }
 .cost-metric[data-unavailable="true"] .cost-metric-value {
@@ -959,11 +946,6 @@
 	line-height: 2.0625rem;
 	letter-spacing: normal;
 	color: var(--cost-muted);
-}
-@keyframes cost-pulse {
-	50% {
-		opacity: 0.45;
-	}
 }
 /* The chart loads as itself (chart-flow.ts): Recharts draws the heartbeat
    behind a window sweeping across it, the way ChartLoadingWave flows. The
@@ -1170,7 +1152,6 @@
 	.cost-tools-inner {
 		transition: none;
 	}
-	.cost-skeleton,
 	.cost-chart-empty,
 	.cost-metric,
 	.cost-metric-value,
@@ -1263,7 +1244,6 @@
 /* Plugin app: rows that name people load only when asked for. */
 .cost-breakdown-load {
 	color: var(--cost-blue);
-	cursor: pointer;
 	font: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
@@ -1297,4 +1277,22 @@
 }
 .cost-breakdowns[data-layout="row"] > .cost-breakdown[data-dimension] {
 	grid-column: auto;
+}
+.cost-metric-focus {
+	stroke: var(--metric-tint);
+	stroke-width: 6;
+}
+.cost-metric-marker {
+	stroke: currentColor;
+	stroke-opacity: 0.4;
+	stroke-width: 1;
+	stroke-dasharray: 2 2;
+	stroke-linecap: round;
+}
+.cost-metric-marker[data-tone="pinned"] {
+	stroke-opacity: 0.7;
+	stroke-dasharray: none;
+}
+.cost-metric-trend-secondary {
+	opacity: 0.45;
 }

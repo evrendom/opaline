@@ -150,7 +150,9 @@ export function OpalChip({
 	const tone = sessionsTone;
 	const chip = (
 		<span
+			skullet-block=""
 			className={cn(
+				"rounded-full",
 				sidebar
 					? cn(
 							"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-100 ease-in-out",
@@ -318,7 +320,7 @@ export function ChipToggle({
 					aria-expanded={open}
 					aria-label={open ? `Fold ${label}` : `Show ${label}`}
 					onClick={onToggle}
-					className="pointer-events-auto size-4.5 cursor-pointer rounded-full"
+					className="pointer-events-auto size-4.5 rounded-full"
 				/>
 			</Tip>
 		</div>

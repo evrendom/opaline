@@ -48,7 +48,7 @@ export function WelcomeGitHubStep({
 			data-github-step={isConnected ? "done" : "pending"}
 		>
 			<p className="cli-welcome-upload-note">
-				Read-only: PRs, CI runs and commits. Never code.
+				Read-only. Files are read only when you open them, never stored.
 			</p>
 			{isConnected ? <output>GitHub is connected.</output> : null}
 			{resultMessage ? (

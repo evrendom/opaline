@@ -6,6 +6,7 @@ import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuer
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { DockedSupportEmailButton } from "@/features/support/SupportEmailButton";
 import { orpc } from "@/lib/orpc";
 
 // Sessions upload when they end, so the newest session's end is when the
@@ -105,6 +106,7 @@ export function LastSessionUploadBar() {
 					/>
 				</Link>
 			) : null}
+			{demo === null ? <DockedSupportEmailButton className="ml-auto" /> : null}
 		</div>
 	);
 }

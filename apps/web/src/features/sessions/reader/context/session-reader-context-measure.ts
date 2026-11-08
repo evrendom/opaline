@@ -119,6 +119,7 @@ export function costMap(
 	calls: readonly UsageCall[],
 	total?: number | null,
 	subagents?: ReadonlyMap<string, number | null>,
+	outsideLabel?: string,
 ): ContextMap | null {
 	const traced = new Set(map.trail.map((step) => step.key));
 	const byPart = new Map<string, number>();
@@ -185,16 +186,29 @@ export function costMap(
 	}
 	for (const [key, value] of byPart) byPart.set(key, value * 1e6);
 	for (const [key, value] of byItem) byItem.set(key, value * 1e6);
+	const later =
+		calls
+			.filter((call) => map.until !== null && Date.parse(call.at) > map.until)
+			.reduce((sum, call) => {
+				const cost = callCosts(call, map.model);
+				return cost ? sum + cost.input + cost.output : sum;
+			}, 0) * 1e6;
 	const placed = [...byPart.values()].reduce((sum, value) => sum + value, 0);
-	const outside = total ? total * 1e6 - placed : 0;
+	const scale =
+		total && placed + later > 0 ? (total * 1e6) / (placed + later) : 1;
+	if (scale !== 1) {
+		for (const [key, value] of byPart) byPart.set(key, value * scale);
+		for (const [key, value] of byItem) byItem.set(key, value * scale);
+	}
+	const outside = later * scale;
 	const measured = remeasured(map, byPart, byItem, (used) => used);
-	if (outside < 0.005 * Math.max(placed, 1)) return measured;
+	if (outside < 0.005 * Math.max(placed * scale, 1)) return measured;
 	const part: ContextPart = {
 		count: 1,
 		key: "cost:outside",
 		kind: "earlier",
-		label: "Outside this map",
-		note: "Its calls the map doesn't hold: before its context's compaction, after its fullest moment, and subagents it has no box for.",
+		label: outsideLabel ?? "Outside this map",
+		note: "Calls after the moment this map shows, before the next compaction.",
 		tokens: Math.round(outside),
 	};
 	const used = measured.used + part.tokens;

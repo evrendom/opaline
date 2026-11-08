@@ -1,4 +1,5 @@
-import { type RepositorySummary, resolveRepoIdentity } from "@rudel/api-routes";
+import { type RepositorySummary, unifyRepoIdentities } from "@rudel/api-routes";
+import { toRepoIdentityInput } from "./repo-identity-rows.js";
 
 export interface RepositoryAggregateRow {
 	git_remote: string;
@@ -23,12 +24,9 @@ export function aggregateRepositories(
 		string,
 		{ summary: RepositorySummary; users: Map<string, number> }
 	>();
+	const resolver = unifyRepoIdentities(rows.map(toRepoIdentityInput));
 	for (const row of rows) {
-		const identity = resolveRepoIdentity({
-			gitRemote: row.git_remote,
-			packageName: row.package_name,
-			projectPath: row.project_path,
-		});
+		const identity = resolver.resolve(toRepoIdentityInput(row));
 		let group = groups.get(identity.repoKey);
 		if (!group) {
 			group = {

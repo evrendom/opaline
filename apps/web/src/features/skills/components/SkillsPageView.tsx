@@ -2,42 +2,29 @@ import type { HistoricalSkillSummary } from "@rudel/api-routes";
 import {
 	IconBook,
 	IconFolder,
-	IconGitBranch,
 	IconMessages,
 	IconUsers,
 	IconZoomCancel,
 } from "@tabler/icons-react";
-import { memo, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { Bones } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import {
 	buildRangeBound,
-	formatCount,
 	isRangeFilterActive,
 	matchesRangeFilter,
-	OVERVIEW_METRIC_CELL_CLASS_NAME,
-	OVERVIEW_METRIC_UNIT_CLASS_NAME,
-	OVERVIEW_ROW_CLASS_NAME,
-	OVERVIEW_ROW_LEAD_CELL_CLASS_NAME,
-	OverviewList,
-	OverviewMembers,
 	OverviewRangeFiltersMenu,
-	OverviewSkeleton,
 	type RangeBound,
 } from "@/components/overview-list";
-import { SkillMark } from "@/components/skill-mark";
 import { UsageStateMessage } from "@/components/usage-collection-view";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
 import {
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
 	type SessionOverviewRangeFilter,
 } from "@/features/sessions/components/sessions-overview-table-utils";
-import { useUserMap } from "@/features/workspace/hooks/useUserMap";
-import {
-	type UseFluidHoverReturn,
-	useRegisterFluidHoverItem,
-} from "@/hooks/use-fluid-hover";
 import { cn } from "@/lib/utils";
+import { SkillCardsGrid } from "./skill-cards";
 
 type SkillSortKey = "sessions" | "members" | "repos" | "versions" | "name";
 type SkillSort = { key: SkillSortKey; direction: "asc" | "desc" };
@@ -69,11 +56,7 @@ const EMPTY_RANGE_FILTERS: SkillRangeFilterValues = {
 	members: { minimum: null, maximum: null },
 	repos: { minimum: null, maximum: null },
 };
-// Name over who uses the skill; sessions, repos and versions trail.
-const SKILL_ROW_GRID_CLASS_NAME =
-	"grid-cols-[minmax(240px,1fr)_112px_80px_96px_12px]";
-
-/** The Skills page: every skill used in the workspace as a two-line row,
+/** The Skills page: every skill used in the workspace as a card,
  * with the sessions page's search, sort and filter controls. */
 export function SkillsPageView({
 	skills,
@@ -88,7 +71,6 @@ export function SkillsPageView({
 	onRetry: () => void;
 	onSelectSkill: (name: string) => void;
 }) {
-	const { avatarMap, userMap } = useUserMap();
 	const [search, setSearch] = useState("");
 	const [sort, setSort] = useState<SkillSort>({
 		key: "sessions",
@@ -178,11 +160,9 @@ export function SkillsPageView({
 					/>
 				</div>
 				{isPending ? (
-					<OverviewSkeleton
-						gridClassName={SKILL_ROW_GRID_CLASS_NAME}
-						label="Loading skills"
-						metricWidths={["w-16", "w-10", "w-14"]}
-					/>
+					<Bones fill className="min-h-0 min-w-0 flex-1" label="Loading skills">
+						<SkillCardsGrid skills={SAMPLE_SKILLS} onSelect={NOOP} />
+					</Bones>
 				) : isError ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
@@ -229,133 +209,12 @@ export function SkillsPageView({
 						}
 					/>
 				) : (
-					<OverviewList label="Skills" minWidthClassName="min-w-[560px]">
-						{(hover) =>
-							visibleSkills.map((skill, index) => (
-								<SkillRow
-									key={skill.name}
-									avatarMap={avatarMap}
-									index={index}
-									onSelect={onSelectSkill}
-									registerItem={hover.registerItem}
-									setActiveIndex={hover.setActiveIndex}
-									skill={skill}
-									userMap={userMap}
-								/>
-							))
-						}
-					</OverviewList>
+					<SkillCardsGrid skills={visibleSkills} onSelect={onSelectSkill} />
 				)}
 			</section>
 		</div>
 	);
 }
-
-const SkillRow = memo(function SkillRow({
-	avatarMap,
-	index,
-	onSelect,
-	registerItem,
-	setActiveIndex,
-	skill,
-	userMap,
-}: {
-	avatarMap: Record<string, string>;
-	index: number;
-	onSelect: (name: string) => void;
-	registerItem: UseFluidHoverReturn["registerItem"];
-	setActiveIndex: UseFluidHoverReturn["setActiveIndex"];
-	skill: HistoricalSkillSummary;
-	userMap: Record<string, string>;
-}) {
-	const itemRef = useRef<HTMLLIElement>(null);
-	useRegisterFluidHoverItem(registerItem, index, itemRef);
-	const attribution = skill.attribution;
-	const topRepos = attribution?.topRepos ?? [];
-	const repoCount = attribution?.repoCount ?? 0;
-
-	return (
-		<li ref={itemRef} className="relative z-10" data-skill-row>
-			<button
-				type="button"
-				aria-label={`Open ${skill.name}`}
-				onClick={() => onSelect(skill.name)}
-				onFocus={() => setActiveIndex(index)}
-				className={cn(
-					OVERVIEW_ROW_CLASS_NAME,
-					"cursor-pointer",
-					SKILL_ROW_GRID_CLASS_NAME,
-				)}
-			>
-				<div className={OVERVIEW_ROW_LEAD_CELL_CLASS_NAME}>
-					<SkillMark skill={skill.name} />
-					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-						<p
-							className="min-w-0 truncate text-base/5 font-medium text-(--session-overview-text) sm:text-sm/5"
-							title={skill.name}
-						>
-							{skill.name}
-						</p>
-						<div className="flex min-w-0 items-center gap-1.5 text-xs/4 text-(--session-overview-muted)">
-							<OverviewMembers
-								avatarMap={avatarMap}
-								topUserIds={(attribution?.topUsers ?? []).map(
-									(user) => user.userId,
-								)}
-								userCount={attribution?.userCount ?? 0}
-								userMap={userMap}
-							/>
-						</div>
-					</div>
-				</div>
-				<div className={OVERVIEW_METRIC_CELL_CLASS_NAME}>
-					<span>
-						{skill.sessionCount.toLocaleString()}
-						<span className={OVERVIEW_METRIC_UNIT_CLASS_NAME}>
-							{skill.sessionCount === 1 ? " session" : " sessions"}
-						</span>
-					</span>
-				</div>
-				<div
-					className={OVERVIEW_METRIC_CELL_CLASS_NAME}
-					title={
-						topRepos.length > 0
-							? topRepos
-									.map((repo) => `${repo.repoLabel} (${repo.sessionCount})`)
-									.join(", ")
-							: undefined
-					}
-				>
-					<span>
-						{repoCount.toLocaleString()}
-						<span className={OVERVIEW_METRIC_UNIT_CLASS_NAME}>
-							{repoCount === 1 ? " repo" : " repos"}
-						</span>
-					</span>
-				</div>
-				<div className={OVERVIEW_METRIC_CELL_CLASS_NAME}>
-					{skill.versionCount === undefined ? (
-						<span
-							className={OVERVIEW_METRIC_UNIT_CLASS_NAME}
-							title="This API doesn’t report skill versions yet"
-						>
-							—
-						</span>
-					) : (
-						<span className="inline-flex items-center gap-1">
-							<IconGitBranch
-								aria-hidden="true"
-								className="size-3 text-(--session-overview-subtle)"
-							/>
-							{formatCount(skill.versionCount, "version", "versions")}
-						</span>
-					)}
-				</div>
-				<div aria-hidden="true" />
-			</button>
-		</li>
-	);
-});
 
 function getSkillValue(
 	skill: HistoricalSkillSummary,
@@ -391,3 +250,35 @@ function compareSkills(
 	if (rightValue === null) return 1;
 	return leftValue - rightValue;
 }
+
+const NOOP = () => {};
+const SAMPLE_SKILLS: HistoricalSkillSummary[] = [
+	["dataviz", 3, 2, 2],
+	["design", 34, 8, 9],
+	["claude-api", 6, 3, 6],
+	["release-notes", 5, 2, 5],
+	["library-docs", 212, 51, 1],
+	["typescript-standards", 365, 87, 2],
+	["testing", 239, 68, 7],
+	["database-best-practices", 87, 15, 5],
+	["database-query", 76, 18, 4],
+	["code-review", 6, 3, 1],
+	["tdd", 3, 2, 2],
+	["to-issues", 5, 4, 2],
+	["to-prd", 3, 2, 2],
+	["changelog", 2, 1, 1],
+].map(([name, sessionCount, repoCount, versionCount]) => ({
+	attribution: {
+		repoCount: repoCount as number,
+		topRepos: [],
+		topUsers: [{ sessionCount: sessionCount as number, userId: "sample" }],
+		userCount: 1,
+	},
+	claudeSessionCount: sessionCount as number,
+	codexSessionCount: 0,
+	contentPreview:
+		"---\ndescription: What this skill teaches the agent and when it reaches for it.\n---",
+	name: name as string,
+	sessionCount: sessionCount as number,
+	versionCount: versionCount as number,
+}));

@@ -355,7 +355,7 @@ test("PR repository IDs scope every headline like the default metric in both cut
 		);
 		expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
 		expect(baseline.metrics.sessions?.total).toBe(1);
-		expect(baseline.metrics.signals?.total).toBe(1);
+		expect(baseline.metrics.signals?.total).toBe(0);
 		expect(baseline.metrics.agentRuns?.total).toBe(1);
 		for (const requestedMetric of [
 			"mergedPullRequests",
@@ -448,7 +448,7 @@ test("PR canonical model filters retain legacy aliases and unknown identities in
 				endpoint,
 			);
 			expect(baseline.metrics.sessions?.total).toBe(1);
-			expect(baseline.metrics.signals?.total).toBe(1);
+			expect(baseline.metrics.signals?.total).toBe(0);
 			expect(baseline.metrics.agentRuns?.total).toBe(1);
 			if (alias !== canonical)
 				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
@@ -516,7 +516,7 @@ for (const requestedMetric of [
 				);
 				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
 				expect(baseline.metrics.sessions?.total).toBe(1);
-				expect(baseline.metrics.signals?.total).toBe(1);
+				expect(baseline.metrics.signals?.total).toBe(0);
 				expect(baseline.metrics.agentRuns?.total).toBe(1);
 				const wrongCase = await dashboard(
 					{

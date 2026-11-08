@@ -113,7 +113,7 @@ export function SessionOverviewFilterOptionsPanel({
 							<label
 								key={option.value}
 								htmlFor={optionId}
-								className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground"
+								className="flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground"
 								title={option.value}
 							>
 								<Checkbox

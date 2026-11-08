@@ -105,7 +105,7 @@ export function SessionUsageDetail({
 								type="button"
 								onClick={onBack}
 								data-fluid-menu-root=""
-								className="flex shrink-0 cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+								className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
 							>
 								<ShellNavIcon
 									icon={shellRoute.icon}
@@ -188,6 +188,8 @@ interface UsageSessionsPaneProps {
 	/** Show the back-button bar above an open session; off when the page's
 	 * breadcrumb already leads back to the list. */
 	backBar?: boolean;
+	rowHighlightClassName?: string;
+	onVisibleSessions?: (sessions: readonly { session_date: string }[]) => void;
 }
 
 /**
@@ -203,6 +205,8 @@ export function UsageSessionsPane({
 	range = { startDate: "1970-01-01", endDate: "2100-01-01" },
 	navigationHost,
 	backBar = true,
+	rowHighlightClassName,
+	onVisibleSessions,
 }: UsageSessionsPaneProps) {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const selectedSessionId = searchParams.get("session");
@@ -236,10 +240,21 @@ export function UsageSessionsPane({
 		...options,
 		queryKey: ["org", state.activeOrg?.id, ...options.queryKey],
 		enabled: !!state.activeOrg?.id && demo?.live !== false,
+		placeholderData: (previous, previousQuery) =>
+			state.activeOrg?.id && previousQuery?.queryKey[1] === state.activeOrg.id
+				? previous
+				: undefined,
 	});
+	const placeholder = sessionsQuery.isPlaceholderData;
 	const sessions = useMemo(() => {
-		const rows =
+		const loaded =
 			sessionsQuery.data?.pages.flatMap(parseSessionOverviewRows) ?? [];
+		const rows = placeholder
+			? loaded.filter((row) => {
+					const day = row.session_date.slice(0, 10);
+					return day >= range.startDate && day <= range.endDate;
+				})
+			: loaded;
 		return [
 			...new Map(
 				rows.map((row) => [
@@ -248,7 +263,7 @@ export function UsageSessionsPane({
 				]),
 			).values(),
 		];
-	}, [sessionsQuery.data]);
+	}, [sessionsQuery.data, placeholder, range.startDate, range.endDate]);
 	// Session ID search: the API has no ID filter, so while a search is on,
 	// read every page once and match IDs here (the loaded rows stand in
 	// until that lands).
@@ -335,6 +350,9 @@ export function UsageSessionsPane({
 				}
 			>
 				<SessionsOverviewTable
+					showPlace={kind === "Repo"}
+					highlightClassName={rowHighlightClassName}
+					onVisibleSessions={onVisibleSessions}
 					activeSessionId={null}
 					canOpenSession={(session) => canViewSession(session.user_id)}
 					getSessionHref={(session) =>

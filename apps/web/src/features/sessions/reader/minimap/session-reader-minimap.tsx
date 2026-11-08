@@ -42,7 +42,7 @@ import {
 } from "./session-reader-minimap-store";
 
 const HIT =
-	"cursor-pointer fill-none stroke-[6px] opacity-0 transition-opacity [stroke-linecap:round] [stroke-linejoin:round] hover:opacity-25";
+	"fill-none stroke-[6px] opacity-0 transition-opacity [stroke-linecap:round] [stroke-linejoin:round] hover:opacity-25";
 
 const NO_TAGS: readonly string[] = [];
 
@@ -243,7 +243,7 @@ export function ReaderMinimap({
 			ref={mapRef}
 			aria-hidden="true"
 			className={cn(
-				"relative isolate min-h-0 flex-1 cursor-pointer touch-none select-none transition-opacity duration-300",
+				"relative isolate min-h-0 flex-1 touch-none select-none transition-opacity duration-300",
 				focus && "overflow-y-clip",
 				drawn.parts.length === 0 && "opacity-0",
 			)}

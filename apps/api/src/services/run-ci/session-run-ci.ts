@@ -11,12 +11,18 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { committedBuildSql } from "../analysis/run-index-reader.js";
-import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
+import {
+	ANALYSIS_QUERY_SETTINGS,
+	chunkByParamBytes,
+	query,
+} from "../analysis/sql.js";
 import { idComponentSql } from "../analysis/sql-l1-views.js";
 import { L1_EDGES_TABLE, RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { type RunCiDemoSource, runCiDemoOf } from "./demo-run-ci.js";
 
 export const RUN_CI_LINK_LIMIT = 200;
+
+export const CI_RUN_ID_SQL = `concat(${idComponentSql("repository_id")}, '/actions_run/', ${idComponentSql("run_id")}, '/', toString(attempt))`;
 
 export interface SessionRunCiEnv {
 	readonly executor: ClickHouseExecutor;
@@ -70,15 +76,20 @@ export async function sessionRunCi(
 	sessionId: string,
 ): Promise<SessionRunCi> {
 	const demo = runCiDemoOf(env, scope.workspaceId);
-	if (demo) return { enabled: true, runs: demo.runs(sessionId) };
+	const scripted = demo?.runs(sessionId) ?? [];
+	if (scripted.length > 0) return { enabled: true, runs: scripted };
 	const names = await visibleRepositoryNames(env, scope.workspaceId);
-	if (!names) return { enabled: false, runs: [] };
+	if (!names) return { enabled: demo !== undefined, runs: [] };
 	const params = {
 		workspaceId: scope.workspaceId,
 		repositories: [...names.keys()],
 	};
 	const links = await readLinks(env.executor, scope, sessionId, params);
-	const jobs = await readJobs(env.executor, links, params);
+	const jobs = await readCiJobs(
+		env.executor,
+		params,
+		links.map((link) => link.github_run_id),
+	);
 	return { enabled: true, runs: assemble(links, jobs, names) };
 }
 
@@ -96,7 +107,7 @@ function readLinks(
 		"organization_id = {workspaceId:String} AND repository_id IN {repositories:Array(String)}";
 	const github =
 		"workspace_id = {workspaceId:String} AND provider = 'github' AND repository_id IN {repositories:Array(String)}";
-	const ciRunId = `concat(${idComponentSql("repository_id")}, '/actions_run/', ${idComponentSql("run_id")}, '/', toString(attempt))`;
+	const ciRunId = CI_RUN_ID_SQL;
 	return query(executor, LinkRowSchema, {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `WITH
@@ -185,52 +196,92 @@ function readLinks(
 	});
 }
 
-async function readJobs(
+export type CiJobs = ReadonlyMap<string, readonly RunCiJob[]>;
+
+export async function readCiJobs(
 	executor: ClickHouseExecutor,
-	links: readonly LinkRow[],
 	params: { workspaceId: string; repositories: string[] },
-): Promise<JobRow[]> {
-	if (links.length === 0) return [];
-	const jobs = getSafeClickHouseTable("rudel.github_ci_jobs");
-	return query(executor, JobRowSchema, {
-		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT repository_id, run_id, attempt, job_id, name, status, conclusion,
+	githubRunIds: readonly string[],
+): Promise<CiJobs> {
+	const jobs = new Map<string, RunCiJob[]>();
+	const table = getSafeClickHouseTable("rudel.github_ci_jobs");
+	for (const chunk of chunkByParamBytes([...new Set(githubRunIds)], (id) => [
+		id,
+	]))
+		for (const row of await query(executor, JobRowSchema, {
+			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+			query: `SELECT repository_id, run_id, attempt, job_id, name, status, conclusion,
 				toUnixTimestamp64Milli(created_at) AS created_ms,
 				toUnixTimestamp64Milli(started_at) AS started_ms,
 				toUnixTimestamp64Milli(completed_at) AS completed_ms,
 				runner_name
-			FROM ${jobs} FINAL
+			FROM ${table} FINAL
 			WHERE workspace_id = {workspaceId:String} AND provider = 'github'
 				AND repository_id IN {repositories:Array(String)}
 				AND run_id IN {githubRunIds:Array(String)}`,
-		query_params: {
-			...params,
-			githubRunIds: [...new Set(links.map((link) => link.github_run_id))],
-		},
-	});
+			query_params: { ...params, githubRunIds: chunk },
+		})) {
+			const key = jobKey(row.repository_id, row.run_id, row.attempt);
+			const list = jobs.get(key) ?? [];
+			jobs.set(key, list);
+			list.push({
+				jobId: row.job_id,
+				name: row.name,
+				status: row.status,
+				conclusion: row.conclusion,
+				createdAt: iso(row.created_ms),
+				startedAt: iso(row.started_ms),
+				completedAt: iso(row.completed_ms),
+				runnerName: row.runner_name,
+			});
+		}
+	for (const list of jobs.values()) list.sort(byCreatedThenName);
+	return jobs;
+}
+
+export interface CiRunFacts {
+	readonly ci_run_id: string;
+	readonly repository_id: string;
+	readonly github_run_id: string;
+	readonly attempt: number;
+	readonly workflow_name: string;
+	readonly event: string;
+	readonly head_branch: string;
+	readonly head_sha: string;
+	readonly conclusion: string | null;
+	readonly created_ms: number;
+}
+
+export function shapeCiRun(
+	row: CiRunFacts,
+	names: ReadonlyMap<string, string>,
+	jobs: CiJobs,
+	linked: Pick<RunCiRun, "link" | "relations" | "pullRequests">,
+): RunCiRun {
+	return {
+		ciRunId: row.ci_run_id,
+		githubRunId: row.github_run_id,
+		attempt: row.attempt,
+		repository: names.get(row.repository_id) ?? "",
+		workflowName: row.workflow_name,
+		event: row.event,
+		headBranch: row.head_branch,
+		headSha: row.head_sha,
+		conclusion: row.conclusion,
+		createdAt: new Date(row.created_ms).toISOString(),
+		...linked,
+		jobs: [
+			...(jobs.get(jobKey(row.repository_id, row.github_run_id, row.attempt)) ??
+				[]),
+		],
+	};
 }
 
 function assemble(
 	links: readonly LinkRow[],
-	jobRows: readonly JobRow[],
+	jobs: CiJobs,
 	names: ReadonlyMap<string, string>,
 ): SessionRunCiRun[] {
-	const jobs = new Map<string, RunCiJob[]>();
-	for (const row of jobRows) {
-		const key = jobKey(row.repository_id, row.run_id, row.attempt);
-		const list = jobs.get(key) ?? [];
-		jobs.set(key, list);
-		list.push({
-			jobId: row.job_id,
-			name: row.name,
-			status: row.status,
-			conclusion: row.conclusion,
-			createdAt: iso(row.created_ms),
-			startedAt: iso(row.started_ms),
-			completedAt: iso(row.completed_ms),
-			runnerName: row.runner_name,
-		});
-	}
 	const runs = new Map<string, SessionRunCiRun & { ci: RunCiRun[] }>();
 	for (const link of links) {
 		const exact = link.exact_relations.length > 0;
@@ -247,28 +298,15 @@ function assemble(
 			ci: [],
 		};
 		runs.set(key, run);
-		run.ci.push({
-			ciRunId: link.ci_run_id,
-			githubRunId: link.github_run_id,
-			attempt: link.attempt,
-			repository: names.get(link.repository_id) ?? "",
-			workflowName: link.workflow_name,
-			event: link.event,
-			headBranch: link.head_branch,
-			headSha: link.head_sha,
-			conclusion: link.conclusion,
-			createdAt: new Date(link.created_ms).toISOString(),
-			link: exact ? "exact" : "pr_window",
-			relations: [
-				...(exact ? link.exact_relations : link.window_relations),
-			].sort(),
-			pullRequests: pullRequestNumbers(link.pr_nodes),
-			jobs: [
-				...(jobs.get(
-					jobKey(link.repository_id, link.github_run_id, link.attempt),
-				) ?? []),
-			].sort(byCreatedThenName),
-		});
+		run.ci.push(
+			shapeCiRun(link, names, jobs, {
+				link: exact ? "exact" : "pr_window",
+				relations: [
+					...(exact ? link.exact_relations : link.window_relations),
+				].sort(),
+				pullRequests: pullRequestNumbers(link.pr_nodes),
+			}),
+		);
 	}
 	return [...runs.values()]
 		.map((run) => ({
@@ -343,4 +381,3 @@ const JobRowSchema = z.object({
 	completed_ms: z.coerce.number().nullable(),
 	runner_name: z.string(),
 });
-type JobRow = z.infer<typeof JobRowSchema>;

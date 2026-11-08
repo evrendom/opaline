@@ -69,7 +69,7 @@ export function TranscriptMaskFixturePage() {
 						The exposed panes are the production scroll surface with no rows.
 					</p>
 				</div>
-				<label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium">
+				<label className="flex min-h-11 items-center gap-2 text-xs font-medium">
 					<input
 						className="size-4"
 						data-transcript-mask-toggle

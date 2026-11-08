@@ -337,7 +337,7 @@ function StepKinds({
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+					className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
 				>
 					<IconChevronRight
 						aria-hidden="true"
@@ -351,7 +351,7 @@ function StepKinds({
 						onClick={() => {
 							for (const key of filter) onToggle(key);
 						}}
-						className="cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+						className="text-xs text-muted-foreground hover:text-foreground"
 					>
 						Show all
 					</button>
@@ -370,7 +370,7 @@ function StepKinds({
 								onClick={() => onToggle(option.key)}
 								title={on ? "Show every step" : `Show only ${option.key}`}
 								className={cn(
-									"flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-accent/80 dark:hover:bg-accent/50",
+									"flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-accent/80 dark:hover:bg-accent/50",
 									on && "bg-accent dark:bg-accent/70",
 								)}
 							>

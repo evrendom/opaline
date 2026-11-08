@@ -44,7 +44,6 @@ const DIMENSIONS: CostDimension[] = [
 const SIGNAL_LABELS: Record<string, string> = {
 	modelApologies: "Model apologies",
 	userNegative: "Negative user",
-	userPositive: "Positive user",
 };
 const MAX_NAMED_SERIES = 7;
 
@@ -312,7 +311,7 @@ function buildSignal(
 		signalRows,
 		input,
 		members,
-		"Language signals",
+		"Frustrations",
 		trendFrom,
 	);
 	// Keep the three known categories selectable even when another filter leaves

@@ -1,12 +1,22 @@
 import {
 	type Icon,
+	IconBrandGithub,
 	IconBrandGithubFilled,
+	IconChartArea,
+	IconChartAreaFilled,
+	IconFileAnalytics,
 	IconFileAnalyticsFilled,
+	IconId,
 	IconIdFilled,
+	IconMail,
 	IconMailFilled,
+	IconMessage2,
 	IconMessage2Filled,
+	IconSettings,
 	IconSettingsFilled,
+	IconSquareRoundedPlus,
 	IconSquareRoundedPlusFilled,
+	IconUser,
 	IconUserFilled,
 } from "@tabler/icons-react";
 import { motion } from "motion/react";
@@ -27,20 +37,20 @@ import {
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { cn } from "@/lib/utils";
 import "./components/settings-section.css";
 
-// Settings tab icons: filled, the only filled icons outside the selected
-// sidebar item.
-const settingsTabIcons: Record<SettingsRouteId, Icon> = {
-	workspace: IconSettingsFilled,
-	github: IconBrandGithubFilled,
-	sessions: IconMessage2Filled,
-	reports: IconFileAnalyticsFilled,
-	members: IconUserFilled,
-	invitations: IconMailFilled,
-	account: IconIdFilled,
-	"create-workspace": IconSquareRoundedPlusFilled,
+const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
+	workspace: [IconSettings, IconSettingsFilled],
+	github: [IconBrandGithub, IconBrandGithubFilled],
+	sessions: [IconMessage2, IconMessage2Filled],
+	reports: [IconFileAnalytics, IconFileAnalyticsFilled],
+	members: [IconUser, IconUserFilled],
+	team: [IconChartArea, IconChartAreaFilled],
+	invitations: [IconMail, IconMailFilled],
+	account: [IconId, IconIdFilled],
+	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
 };
 
 export function SettingsLayout() {
@@ -53,6 +63,7 @@ export function SettingsLayout() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const activeRouteId = getActiveSettingsRouteId(location.pathname);
+	const { fade, ref: fadeRef } = useScrollFade<HTMLDivElement>();
 
 	return (
 		<div
@@ -64,13 +75,12 @@ export function SettingsLayout() {
 					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-none px-1 pt-2 pb-4 md:pb-6 @min-[640px]/settings:block"
 					data-slot="settings-sidebar"
 				>
-					{/* Tab bar, kept vertical: one background pill that
-					    slides to the active tab. */}
 					<nav aria-label="Settings sections">
 						<ul className="flex flex-col gap-1">
 							{routes.map((route) => {
 								const active = route.id === activeRouteId;
-								const TabIcon = settingsTabIcons[route.id];
+								const [OutlineIcon, FilledIcon] = settingsTabIcons[route.id];
+								const TabIcon = active ? FilledIcon : OutlineIcon;
 								return (
 									<li key={route.id}>
 										<Link
@@ -91,7 +101,7 @@ export function SettingsLayout() {
 														duration: 0.2,
 														ease: [0.32, 0.72, 0, 1],
 													}}
-													className="absolute inset-0 z-0 rounded-md bg-muted corner-squircle squircle:rounded-xl dark:bg-muted/50"
+													className="absolute inset-0 z-0 rounded-md bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-xl dark:bg-muted-foreground/10"
 												/>
 											) : null}
 											<span className="relative z-10 flex items-center gap-1.5">
@@ -135,12 +145,15 @@ export function SettingsLayout() {
 				    on each side and pads back in: cards stay aligned and keep room
 				    for their shadows and focus rings. */}
 				<div
-					className="-mx-2 min-h-0 min-w-0 overflow-y-auto overscroll-none px-2"
+					ref={fadeRef}
+					{...fade}
+					className="scroll-fade -mx-2 min-h-0 min-w-0 overflow-y-auto overscroll-none px-2"
 					data-slot="settings-content"
 				>
 					<div className="settings-page-content pt-2">
-						{/* The shell header shows "Settings" and the tabs the section. */}
-						<h1 className="sr-only">{settingsRouteMap[activeRouteId].label}</h1>
+						<h1 className="settings-page-title">
+							{settingsRouteMap[activeRouteId].label}
+						</h1>
 						<Outlet />
 					</div>
 				</div>

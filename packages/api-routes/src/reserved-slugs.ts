@@ -69,6 +69,7 @@ export const RESERVED_ORG_SLUGS: readonly string[] = [
 	"login",
 	"logout",
 	"mail",
+	"mcp",
 	"me",
 	"media",
 	"new",

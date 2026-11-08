@@ -232,7 +232,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 				ref={rowRef}
 				aria-current={selected ? "true" : undefined}
 				className={cn(
-					"group relative isolate z-1 grid h-9 min-w-full cursor-pointer select-none outline-none [grid-template-columns:var(--session-turn-grid-template)] focus-visible:z-10",
+					"group relative isolate z-1 grid h-9 min-w-full select-none outline-none [grid-template-columns:var(--session-turn-grid-template)] focus-visible:z-10",
 					!registerHoverItem &&
 						"hover:bg-(--session-overview-hover) hover:[&>td]:bg-(--session-overview-hover)",
 					matchesLens &&

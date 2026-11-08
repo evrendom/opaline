@@ -46,11 +46,19 @@ const previewInputs = [
 		durationInterval: "daily",
 	},
 	{ ...dashboardInput, requestedMetric: "signals" },
+	...(["mergedPullRequests", "ciRuns"] as const).map((requestedMetric) => ({
+		...dashboardInput,
+		requestedMetric,
+		durationInterval: "daily",
+		sessionMetrics: false,
+	})),
+	{ ...dashboardInput, requestedMetric: "signals", splitBy: "signalTypes" },
 ];
 const [
 	organizationData,
 	sessionData,
 	sessionsData,
+	repositoriesData,
 	dashboardData,
 	...previewData
 ] = await Promise.all([
@@ -63,6 +71,7 @@ const [
 		sortBy: "session_date",
 		sortOrder: "desc",
 	}),
+	read("/rpc/analytics/repositories/list", {}),
 	read("/rpc/analytics/overview/costs", dashboardInput),
 	...previewInputs.map((input) => read("/rpc/analytics/overview/costs", input)),
 ]);
@@ -114,6 +123,7 @@ const seed = DemoSeedSchema.parse({
 		.object({ user: z.object({ id: z.string() }) })
 		.parse(sessionData).user.id,
 	sessions: sessions.slice(0, 30),
+	repositories: z.object({ json: z.unknown() }).parse(repositoriesData).json,
 	totalSessionCount: sessions.length,
 	dashboard: {
 		input: dashboardInput,

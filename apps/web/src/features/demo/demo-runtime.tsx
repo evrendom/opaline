@@ -1,6 +1,7 @@
 import {
 	CostDashboardInputSchema,
 	CostDashboardSchema,
+	RepositorySummarySchema,
 	SessionOverviewAnalyticsSchema,
 } from "@rudel/api-routes";
 import { createContext, useContext } from "react";
@@ -20,6 +21,7 @@ export const DemoSeedSchema = z.object({
 	viewerUserId: z.string(),
 	sessions: z.array(SessionOverviewAnalyticsSchema).max(30),
 	totalSessionCount: z.number(),
+	repositories: z.array(RepositorySummarySchema),
 	dashboard: z.object({
 		input: CostDashboardInputSchema,
 		data: CostDashboardSchema,

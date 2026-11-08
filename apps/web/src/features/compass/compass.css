@@ -91,18 +91,6 @@
 	justify-content: center;
 	padding: 8px 0 16px;
 }
-.compass-list-skeleton {
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
-	padding: 10px;
-}
-.compass-list-skeleton > div {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-}
-
 /* A row: glyph in a soft circle, two lines of copy, cost and day on the right. */
 .compass-item {
 	display: flex;
@@ -113,7 +101,6 @@
 	padding: 10px;
 	border-radius: 10px;
 	text-align: left;
-	cursor: pointer;
 	outline: none;
 }
 .compass-item[aria-current="true"] {
@@ -282,7 +269,6 @@
 	border-radius: 8px;
 	font-size: 0.8125rem;
 	text-align: left;
-	cursor: pointer;
 }
 .compass-flag-item:hover {
 	background: var(--cost-row-hover);
@@ -355,7 +341,6 @@
 .compass-timeline-group {
 	width: 100%;
 	text-align: left;
-	cursor: pointer;
 }
 .compass-timeline-group .compass-timeline-label {
 	color: var(--cost-muted);
@@ -392,9 +377,6 @@
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 	cursor: default;
-}
-.compass-timeline-text[data-long] {
-	cursor: pointer;
 }
 .compass-timeline-text[data-open] {
 	display: block;
@@ -449,7 +431,6 @@
 .compass-settings-label {
 	flex: 1;
 	min-width: 0;
-	cursor: pointer;
 }
 .compass-settings-value {
 	display: inline-flex;

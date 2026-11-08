@@ -1,14 +1,21 @@
+import type { CSSProperties } from "react";
+import { Skeleton as Bar } from "@/app/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
+function Skeleton({
+	className,
+	style,
+}: {
+	className?: string;
+	style?: CSSProperties;
+}) {
 	return (
-		<div
-			data-slot="skeleton"
+		<Bar
 			className={cn(
-				"animate-pulse rounded-md squircle:rounded-2xl corner-squircle bg-muted",
+				"rounded-md squircle:rounded-2xl corner-squircle",
 				className,
 			)}
-			{...props}
+			style={style}
 		/>
 	);
 }

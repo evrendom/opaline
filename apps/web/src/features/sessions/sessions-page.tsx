@@ -20,10 +20,10 @@ import { getSessionNeighbours } from "@/features/sessions/session-navigation";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionsPageData } from "@/features/sessions/use-sessions-page-data";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
-import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
 import { sessionDetailInitialQueryOptions } from "./components/session-detail-fast-query";
+import { SessionReaderFallback } from "./reader/session-reader-light-samples";
 import {
 	getLoadedSessionReaderView,
 	loadSessionReaderView,
@@ -186,7 +186,7 @@ export function SessionsPage() {
 			fallbackHref={getShellRoutePath(appRoutes.session())}
 			key={activeSessionId}
 		>
-			<Suspense fallback={<ProductLoadingIndicator />}>
+			<Suspense fallback={<SessionReaderFallback />}>
 				<SessionReader
 					navigation={sessionNavigation}
 					position={sessionPosition}

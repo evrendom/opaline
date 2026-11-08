@@ -22,6 +22,7 @@ import {
 	CI_DIMENSIONS,
 	PR_DIMENSIONS,
 } from "../src/features/costs/use-cost-dashboard";
+import { WorkspaceStateProvider } from "../src/features/workspace/organization/OrganizationProvider";
 import "../src/index.css";
 
 function Harness() {
@@ -111,11 +112,19 @@ if (!root) throw new Error("Missing harness root");
 createRoot(root).render(
 	<BrowserRouter>
 		<QueryClientProvider client={new QueryClient()}>
-			<DateRangeProvider>
-				<TooltipProvider>
-					<Harness />
-				</TooltipProvider>
-			</DateRangeProvider>
+			<WorkspaceStateProvider
+				value={{
+					state: { activeOrg: null, organizations: [], isLoading: false },
+					actions: { switchOrganization: async () => {} },
+					meta: { isOrgAdmin: false, readsEverySession: true },
+				}}
+			>
+				<DateRangeProvider>
+					<TooltipProvider>
+						<Harness />
+					</TooltipProvider>
+				</DateRangeProvider>
+			</WorkspaceStateProvider>
 		</QueryClientProvider>
 	</BrowserRouter>,
 );

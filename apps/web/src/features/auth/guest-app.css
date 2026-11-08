@@ -160,7 +160,6 @@ html[data-auth-shell],
 	line-height: 1.5;
 	text-decoration: underline;
 	text-underline-offset: 3px;
-	cursor: pointer;
 }
 
 .opaline-auth-email-switch:hover:not(:disabled) {

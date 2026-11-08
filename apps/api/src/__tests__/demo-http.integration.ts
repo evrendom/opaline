@@ -126,6 +126,19 @@ test("demo RPC bodies survive the Vercel response boundary", async () => {
 	);
 	expect(JSON.parse(body)).toMatchObject({ json: { id: userId } });
 });
+test("demo reads its GitHub connection status, so repo pages know whether to show CI and pull requests", async () => {
+	const response = await handler(
+		new Request(
+			"http://localhost/api/demo/rpc/githubRepositoryEvidence/status",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ json: {} }),
+			},
+		),
+	);
+	expect(response.status).not.toBe(403);
+});
 test("demo cannot enumerate or select the account's other workspaces", async () => {
 	for (const path of ["/auth/organization/list", "/rpc/listMyOrganizations"]) {
 		const response = await handler(

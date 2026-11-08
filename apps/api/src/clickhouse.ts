@@ -114,6 +114,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.run_setup",
 	"rudel.run_question_answers",
 	"rudel.session_analytics",
+	"rudel.session_context_snapshots",
 	"rudel.session_git_observations",
 	"rudel.session_images",
 	"rudel.session_language_signals",

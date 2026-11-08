@@ -14,6 +14,7 @@ import {
 } from "@tabler/icons-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { Bones } from "@/app/ui/bones";
 import {
 	Dialog,
 	DialogContent,
@@ -117,7 +118,7 @@ export function CostBreakdown({
 					data-many={entries.length > 4 || undefined}
 				>
 					{pending ? (
-						<BreakdownSkeleton />
+						<BreakdownSample dimension={dimension} metric={metric} />
 					) : onLoadDeferred ? (
 						<p className="cost-breakdown-empty">
 							<button
@@ -210,7 +211,7 @@ export function CostBreakdown({
 					>
 						<FluidMenuHover items=".cost-breakdown-row" />
 						{pending ? (
-							<BreakdownSkeleton />
+							<BreakdownSample dimension={dimension} metric={metric} />
 						) : (
 							filtered.map((entry) => (
 								<BreakdownRow
@@ -441,24 +442,43 @@ function ToolButton({
 		</Tooltip>
 	);
 }
-/** BreakdownRowsSkeleton: one blob per row slot at the real row
- * height (glyph + name on the left, value + share bar on the right). */
-function BreakdownSkeleton() {
+const SAMPLE_LABELS: Partial<Record<CostDimension, readonly string[]>> = {
+	members: ["you", "teammate", "reviewer"],
+	models: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+	repositories: ["you/app", "you/portfolio", "private/tmp"],
+};
+const SAMPLE_VALUES = [498.37, 6.67, 0.27];
+const NO_TOGGLE = () => {};
+
+function BreakdownSample({
+	dimension,
+	metric,
+}: {
+	dimension: CostDimension;
+	metric: DashboardMetric;
+}) {
+	const labels = SAMPLE_LABELS[dimension] ?? ["Sample", "Sample row", "Other"];
 	return (
-		<div className="cost-breakdown-skeleton" aria-hidden="true">
-			{[0, 1, 2, 3, 4].map((index) => (
-				<div key={index}>
-					<div className="cost-breakdown-skeleton-name">
-						<div className="cost-skeleton size-3.5 rounded-full" />
-						<div className="cost-skeleton h-3.5 w-28" />
-					</div>
-					<div className="cost-breakdown-skeleton-value">
-						<div className="cost-skeleton h-3.5 w-12" />
-						<div className="cost-skeleton h-0.5 w-14" />
-					</div>
-				</div>
+		<Bones label={`Loading ${COST_LABELS[dimension].toLowerCase()}`}>
+			{labels.map((label, index) => (
+				<BreakdownRow
+					key={label}
+					dimension={dimension}
+					metric={metric}
+					entry={{
+						id: label,
+						image: null,
+						incomplete: false,
+						label,
+						value: SAMPLE_VALUES[index] ?? 0,
+					}}
+					maximum={SAMPLE_VALUES[0] ?? 1}
+					color={SERIES_COLORS[index] ?? SERIES_COLORS[0]}
+					selected={false}
+					onToggle={NO_TOGGLE}
+				/>
 			))}
-		</div>
+		</Bones>
 	);
 }
 

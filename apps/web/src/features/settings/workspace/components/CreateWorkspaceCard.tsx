@@ -118,3 +118,11 @@ export function CreateWorkspaceCard({
 		</form>
 	);
 }
+
+export function CreateWorkspacePage() {
+	return (
+		<div className="workspace-settings-page">
+			<CreateWorkspaceCard />
+		</div>
+	);
+}

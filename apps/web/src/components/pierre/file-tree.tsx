@@ -8,7 +8,20 @@ import {
 	IconFolderFilled,
 	IconFolderOpenFilled,
 } from "@tabler/icons-react";
-import { type JSX, type KeyboardEvent, useMemo, useRef, useState } from "react";
+import {
+	type JSX,
+	type KeyboardEvent,
+	type RefObject,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import {
+	FluidList,
+	type FluidListItems,
+	useFluidListRegistry,
+} from "@/components/fluid-list";
 import { getFileLanguage } from "@/features/sessions/reader/files/session-reader-file-tag";
 import { revealInList } from "@/lib/reveal-in-list";
 import { cn } from "@/lib/utils";
@@ -47,7 +60,7 @@ function RowTags({
 						onPick?.(tag.id);
 					}}
 					className={cn(
-						"inline-flex cursor-pointer items-center gap-0.5 rounded-[4px] px-1 font-mono text-[10px] leading-4 font-normal tabular-nums transition-colors",
+						"inline-flex items-center gap-0.5 rounded-[4px] px-1 font-mono text-[10px] leading-4 font-normal tabular-nums transition-colors",
 						tag.color
 							? ""
 							: tag.changed
@@ -167,6 +180,7 @@ export function FileTree({
 	const [focusedKey, setFocusedKey] = useState<string | null>(null);
 	const rowElements = useRef(new Map<string, HTMLDivElement>());
 	const shownSelection = useRef<string | null>(null);
+	const fluid = useRef<FluidListItems | null>(null);
 	const showGitLane = useMemo(
 		() => items.some((item) => item.status !== undefined),
 		[items],
@@ -249,117 +263,150 @@ export function FileTree({
 					{`‎${model.rootLabel}‎`}
 				</div>
 			) : null}
-			<div role="tree" aria-label={model.rootLabel ?? "Files"}>
-				{rows.map((row, index) => {
-					const status = row.item?.status;
-					const isDirectory = row.kind === "directory";
-					const isSelected = !isDirectory && row.key === selected;
-					return (
-						<div
-							key={row.key}
-							ref={(element) => {
-								if (element) rowElements.current.set(row.key, element);
-								else rowElements.current.delete(row.key);
-								if (
-									element &&
-									isSelected &&
-									shownSelection.current !== selected
-								) {
-									shownSelection.current = selected;
-									revealInList(element);
-								}
-							}}
-							role="treeitem"
-							tabIndex={index === activeIndex ? 0 : -1}
-							aria-label={rowLabel(row)}
-							aria-level={row.depth + 1}
-							aria-posinset={row.posInSet}
-							aria-setsize={row.setSize}
-							aria-expanded={isDirectory ? row.isExpanded : undefined}
-							aria-selected={isSelected}
-							title={row.item?.path}
-							onClick={() => activate(row)}
-							onKeyDown={(event) => onKeyDown(event, index)}
-							className={cn(
-								"group/row relative isolate flex h-7 cursor-pointer items-center gap-1.5 pr-2.5 pl-1 text-[13px] outline-none select-none",
-								"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:rounded-md before:transition-colors",
-								row.item?.dimmed && !isSelected && "opacity-40",
-								isSelected
-									? "font-medium text-foreground before:bg-muted"
-									: "text-muted-foreground hover:text-foreground hover:before:bg-muted/50",
-							)}
-						>
-							{row.ancestorKeys.map((key) => (
-								<span
-									key={key}
-									aria-hidden="true"
-									className={cn(
-										"relative h-full w-3 shrink-0 before:absolute before:inset-y-0 before:left-1.5 before:w-px",
-										key === activeParentKey
-											? "before:bg-muted-foreground/30"
-											: "before:bg-border/70",
-									)}
-								/>
-							))}
-							{isDirectory ? (
-								<IconChevronRight
-									aria-hidden="true"
-									className={cn(
-										"size-3 shrink-0 text-muted-foreground/60 transition-transform",
-										row.isExpanded && "rotate-90",
-									)}
-								/>
-							) : (
-								<span aria-hidden="true" className="w-3 shrink-0" />
-							)}
-							<RowIcon
-								expanded={row.isExpanded}
-								folder={isDirectory}
-								name={row.segments.at(-1) ?? ""}
-								selected={isSelected}
-							/>
-							<span className="min-w-0 flex-1 truncate">
-								{row.segments.map((segment, part) => (
-									<span key={row.segments.slice(0, part + 1).join("/")}>
-										{part > 0 ? (
-											<span className="text-muted-foreground/50"> / </span>
-										) : null}
-										{segment}
-									</span>
+			<FluidList highlightClassName="-z-10 will-change-transform">
+				<FluidRows elements={rowElements} fluid={fluid} rows={rows} />
+				<div role="tree" aria-label={model.rootLabel ?? "Files"}>
+					{rows.map((row, index) => {
+						const status = row.item?.status;
+						const isDirectory = row.kind === "directory";
+						const isSelected = !isDirectory && row.key === selected;
+						return (
+							<div
+								key={row.key}
+								ref={(element) => {
+									if (element) rowElements.current.set(row.key, element);
+									else rowElements.current.delete(row.key);
+									if (
+										element &&
+										isSelected &&
+										shownSelection.current !== selected
+									) {
+										shownSelection.current = selected;
+										revealInList(element);
+									}
+								}}
+								role="treeitem"
+								tabIndex={index === activeIndex ? 0 : -1}
+								aria-label={rowLabel(row)}
+								aria-level={row.depth + 1}
+								aria-posinset={row.posInSet}
+								aria-setsize={row.setSize}
+								aria-expanded={isDirectory ? row.isExpanded : undefined}
+								aria-selected={isSelected}
+								title={row.item?.path}
+								onClick={() => activate(row)}
+								onFocus={() => fluid.current?.setActiveIndex(index)}
+								onKeyDown={(event) => onKeyDown(event, index)}
+								className={cn(
+									"group/row flex h-7 items-center gap-1.5 rounded-md pr-2.5 pl-1 text-[13px] outline-none select-none corner-squircle squircle:rounded-xl",
+									row.item?.dimmed && !isSelected && "opacity-40",
+									isSelected
+										? "bg-muted font-medium text-foreground"
+										: "text-muted-foreground hover:text-foreground",
+								)}
+							>
+								{row.ancestorKeys.map((key) => (
+									<span
+										key={key}
+										aria-hidden="true"
+										skullet-ignore=""
+										className={cn(
+											"h-full w-3 shrink-0 bg-[linear-gradient(to_right,transparent_6px,var(--guide)_6px,var(--guide)_7px,transparent_7px)]",
+											key === activeParentKey
+												? "[--guide:color-mix(in_oklab,var(--color-muted-foreground)_30%,transparent)]"
+												: "[--guide:color-mix(in_oklab,var(--color-border)_70%,transparent)]",
+										)}
+									/>
 								))}
-							</span>
-							{row.item?.tags?.length ? (
-								<RowTags onPick={onPickTag} tags={row.item.tags} />
-							) : null}
-							{row.item?.badge ? (
-								<span className="shrink-0 text-xs font-normal text-muted-foreground/70 tabular-nums">
-									{row.item.badge}
+								{isDirectory ? (
+									<IconChevronRight
+										aria-hidden="true"
+										className={cn(
+											"size-3 shrink-0 text-muted-foreground/60 transition-transform",
+											row.isExpanded && "rotate-90",
+										)}
+									/>
+								) : (
+									<span
+										aria-hidden="true"
+										skullet-ignore=""
+										className="w-3 shrink-0"
+									/>
+								)}
+								<RowIcon
+									expanded={row.isExpanded}
+									folder={isDirectory}
+									name={row.segments.at(-1) ?? ""}
+									selected={isSelected}
+								/>
+								<span className="min-w-0 flex-1 truncate">
+									{row.segments.map((segment, part) => (
+										<span key={row.segments.slice(0, part + 1).join("/")}>
+											{part > 0 ? (
+												<span className="text-muted-foreground/50"> / </span>
+											) : null}
+											{segment}
+										</span>
+									))}
 								</span>
-							) : null}
-							{showGitLane ? (
-								<span
-									className={cn(
-										"flex w-3 shrink-0 justify-center text-[11px] font-medium",
-										status && STATUS_LOOK[status],
-									)}
-									title={status ? STATUS_TITLE[status] : undefined}
-								>
-									{status === "read" ? (
-										<IconEyeFilled
-											aria-hidden="true"
-											className="size-3 text-muted-foreground/60"
-										/>
-									) : status ? (
-										STATUS_LETTER[status]
-									) : row.containsChange ? (
-										<span className="size-1.5 rounded-full bg-opal-3/60" />
-									) : null}
-								</span>
-							) : null}
-						</div>
-					);
-				})}
-			</div>
+								{row.item?.tags?.length ? (
+									<RowTags onPick={onPickTag} tags={row.item.tags} />
+								) : null}
+								{row.item?.badge ? (
+									<span className="shrink-0 text-xs font-normal text-muted-foreground/70 tabular-nums">
+										{row.item.badge}
+									</span>
+								) : null}
+								{showGitLane ? (
+									<span
+										className={cn(
+											"flex w-3 shrink-0 justify-center text-[11px] font-medium",
+											status && STATUS_LOOK[status],
+										)}
+										title={status ? STATUS_TITLE[status] : undefined}
+									>
+										{status === "read" ? (
+											<IconEyeFilled
+												aria-hidden="true"
+												className="size-3 text-muted-foreground/60"
+											/>
+										) : status ? (
+											STATUS_LETTER[status]
+										) : row.containsChange ? (
+											<span className="size-1.5 rounded-full bg-opal-3/60" />
+										) : null}
+									</span>
+								) : null}
+							</div>
+						);
+					})}
+				</div>
+			</FluidList>
 		</div>
 	);
+}
+
+function FluidRows({
+	elements,
+	fluid,
+	rows,
+}: {
+	elements: RefObject<Map<string, HTMLDivElement>>;
+	fluid: RefObject<FluidListItems | null>;
+	rows: readonly FileTreeRow[];
+}) {
+	const registry = useFluidListRegistry();
+	useEffect(() => {
+		fluid.current = registry;
+		if (!registry) return;
+		rows.forEach((row, index) => {
+			registry.registerItem(index, elements.current.get(row.key) ?? null);
+		});
+		return () => {
+			rows.forEach((_, index) => {
+				registry.registerItem(index, null);
+			});
+		};
+	}, [elements, fluid, registry, rows]);
+	return null;
 }

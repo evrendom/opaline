@@ -208,7 +208,7 @@ function SkillHeader({
 	const shellRoute = useCurrentShellRoute();
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex shrink-0 cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground";
+		"flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
@@ -217,52 +217,50 @@ function SkillHeader({
 		/>
 	);
 	return createPortal(
-		<>
-			<nav
-				aria-label="Skill breadcrumb"
-				className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+		<nav
+			aria-label="Skill breadcrumb"
+			className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+		>
+			<button
+				type="button"
+				onClick={onBackToList}
+				data-fluid-menu-root=""
+				className={crumbClassName}
 			>
-				<button
-					type="button"
-					onClick={onBackToList}
-					data-fluid-menu-root=""
-					className={crumbClassName}
-				>
-					<ShellNavIcon
-						icon={shellRoute.icon}
-						activeIcon={shellRoute.activeIcon}
-						active={false}
-						tone={shellRoute.tone}
-					/>
-					{shellRoute.title}
-				</button>
-				{separator}
-				{repo ? (
-					<>
-						<button
-							type="button"
-							onClick={repo.onBack}
-							data-fluid-menu-root=""
-							className={cn(crumbClassName, "min-w-0 shrink gap-1.5")}
-						>
-							<ShellNavIcon
-								icon={shellRouteMap.repos.icon}
-								activeIcon={shellRouteMap.repos.activeIcon}
-								active={false}
-								tone={shellRoute.tone}
-							/>
-							<span className="truncate">{repo.name}</span>
-						</button>
-						{separator}
-					</>
-				) : null}
-				<span aria-current="page" className="flex min-w-0 items-center gap-1.5">
-					{/* The skill's own mark, as on its row in the skills table. */}
-					<SkillMark skill={skillName} className="size-4.5 text-[10px]" />
-					<span className="truncate">{skillName}</span>
-				</span>
-			</nav>
-		</>,
+				<ShellNavIcon
+					icon={shellRoute.icon}
+					activeIcon={shellRoute.activeIcon}
+					active={false}
+					tone={shellRoute.tone}
+				/>
+				{shellRoute.title}
+			</button>
+			{separator}
+			{repo ? (
+				<>
+					<button
+						type="button"
+						onClick={repo.onBack}
+						data-fluid-menu-root=""
+						className={cn(crumbClassName, "min-w-0 shrink gap-1.5")}
+					>
+						<ShellNavIcon
+							icon={shellRouteMap.repos.icon}
+							activeIcon={shellRouteMap.repos.activeIcon}
+							active={false}
+							tone={shellRoute.tone}
+						/>
+						<span className="truncate">{repo.name}</span>
+					</button>
+					{separator}
+				</>
+			) : null}
+			<span aria-current="page" className="flex min-w-0 items-center gap-1.5">
+				{/* The skill's own mark, as on its row in the skills table. */}
+				<SkillMark skill={skillName} className="size-4.5 text-[10px]" />
+				<span className="truncate">{skillName}</span>
+			</span>
+		</nav>,
 		headerPortal,
 	);
 }

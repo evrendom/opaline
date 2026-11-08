@@ -1,7 +1,8 @@
-import { lazy, StrictMode, Suspense } from "react";
+import { lazy, StrictMode, Suspense, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AppProviders } from "@/app/providers/AppProviders";
+import { BonesProvider } from "@/app/ui/bones";
 import App from "./App.tsx";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
@@ -70,25 +71,35 @@ const isStandaloneDevRoute =
 		window.location.pathname === "/dev/session-detail-fast-integration" ||
 		window.location.pathname === "/dev/transcript-mask");
 
+function BootDone() {
+	useLayoutEffect(() => {
+		document.documentElement.removeAttribute("data-boot");
+	}, []);
+	return null;
+}
+
 // biome-ignore lint/style/noNonNullAssertion: root element always exists
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		{isStandaloneDevRoute ? (
-			<BrowserRouter>
-				<GlobalLumaScope />
-				<div className="h-full">
-					<App />
-				</div>
-			</BrowserRouter>
-		) : (
-			<AppProviders>
-				<GlobalLumaScope />
-				<div className="h-full">
-					<App />
-					{import.meta.env.DEV ? <DevControls /> : null}
-				</div>
-			</AppProviders>
-		)}
+		<BonesProvider>
+			<BootDone />
+			{isStandaloneDevRoute ? (
+				<BrowserRouter>
+					<GlobalLumaScope />
+					<div className="h-full">
+						<App />
+					</div>
+				</BrowserRouter>
+			) : (
+				<AppProviders>
+					<GlobalLumaScope />
+					<div className="h-full">
+						<App />
+						{import.meta.env.DEV ? <DevControls /> : null}
+					</div>
+				</AppProviders>
+			)}
+		</BonesProvider>
 	</StrictMode>,
 );
 

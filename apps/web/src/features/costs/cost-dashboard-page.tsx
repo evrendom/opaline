@@ -2,17 +2,20 @@ import {
 	type DashboardMetric,
 	GITHUB_INACTIVE_FILTER_TOOLTIP,
 } from "@rudel/api-routes";
-import { IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconRefresh, IconX } from "@tabler/icons-react";
 import {
 	type CSSProperties,
 	type ReactNode,
 	type RefObject,
+	useContext,
 	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { Button } from "@/components/dashboard/button";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
@@ -20,6 +23,7 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
 import { costLabel, getMetricData, METRIC_LABELS } from "./cost-format";
+import { RangeLeadContext } from "./cost-rail-override";
 import { DashboardRangeControls } from "./dashboard-range-controls";
 import {
 	PERSON_DIMENSIONS,
@@ -36,6 +40,18 @@ import {
 	usePrefetchDashboardMetric,
 } from "./use-metric-previews";
 import "./cost-dashboard.css";
+import "./cost-dashboard-variants.css";
+
+export type DashboardVariant =
+	| "rail"
+	| "rail-card"
+	| "dot-rail"
+	| "chat"
+	| "rail-chat"
+	| "side"
+	| "tabs"
+	| "compact"
+	| "one-card";
 
 export function CostDashboardPage() {
 	const dashboard = useCostDashboard();
@@ -63,6 +79,8 @@ export function CostDashboardView({
 	onMetricIntent,
 	scope = "workspace",
 	breakdownLayout = "grid",
+	variant,
+	waiting = false,
 }: {
 	dashboard: CostDashboardController;
 	toolbarStart?: ReactNode;
@@ -77,6 +95,8 @@ export function CostDashboardView({
 	/** `row` sets the breakdown cards two to a row, for a narrow pane;
 	 * `grid` wraps them three to a row. */
 	breakdownLayout?: "grid" | "row";
+	variant?: DashboardVariant;
+	waiting?: boolean;
 }) {
 	const {
 		input,
@@ -92,7 +112,9 @@ export function CostDashboardView({
 		setSplit,
 		setMetric,
 	} = dashboard;
-	const { data, isPending, isError } = query;
+	const isPending = query.isPending || waiting;
+	const data = waiting ? undefined : query.data;
+	const isError = !waiting && query.isError;
 	const workspace = useOptionalOrganization();
 	const demo = useDemoRuntime();
 	// The last chart that finished loading, per workspace and date range. While
@@ -123,6 +145,11 @@ export function CostDashboardView({
 		settled.orgId === orgId &&
 		settled.range === range;
 	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
+	const tabbed = variant === "tabs" || variant === "one-card";
+	const [breakdownTab, setBreakdownTab] = useState<string | null>(null);
+	const activeTab =
+		dimensions.find((dimension) => dimension === breakdownTab) ?? dimensions[0];
+	const shownDimensions = tabbed && activeTab ? [activeTab] : dimensions;
 	const selectedData = getMetricData(data, metric);
 	const loadPersonRows = useDeferredPersonRows(data);
 	const isPullRequestMetric = metric === "mergedPullRequests";
@@ -137,11 +164,13 @@ export function CostDashboardView({
 	// the workspace dashboard's itself; other views portal theirs into it, and
 	// without a shell header (embeds, tests) they stay in the toolbar.
 	const headerPortal = useShellHeaderPortal();
+	const lead = useContext(RangeLeadContext);
 	const rangeControls = rangeControlsInShellHeader ? null : (
 		<DashboardRangeControls
 			interval={interval}
 			onIntervalChange={setInterval}
 			inHeader={!!headerPortal}
+			compact={Boolean(lead)}
 		/>
 	);
 	// The active filters sit in the chart card's header, as chips that each
@@ -227,13 +256,16 @@ export function CostDashboardView({
 			)}
 		</section>
 	) : null;
+	const rangeInContent = variant === "rail-chat" && !headerPortal;
 	const showToolbar =
-		toolbarStart !== undefined || (!headerPortal && rangeControls !== null);
+		toolbarStart !== undefined ||
+		(!headerPortal && !rangeInContent && rangeControls !== null);
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
 		<div
 			className="cost-page isolate antialiased"
+			data-variant={variant}
 			aria-busy={query.isFetching}
 			data-updating={(query.isFetching && !isPending) || showSettled}
 		>
@@ -255,22 +287,44 @@ export function CostDashboardView({
 			    keyboard scrolls it; in the app a click must not focus it. */}
 			<div className="cost-page-scroll" tabIndex={demo ? -1 : undefined}>
 				<div className="cost-page-content">
-					{isError ? (
-						<div className="cost-error" role="alert">
-							<div>
-								<h2>Couldn’t load dashboard</h2>
-								<p>{query.error.message || "Please try again in a moment."}</p>
+					{rangeInContent ? (
+						lead ? (
+							<div className="cost-range-controls cost-range-lead">
+								{rangeControls}
+								{lead}
 							</div>
-							<button
-								type="button"
-								className="cost-secondary-button"
-								onClick={() => query.refetch()}
+						) : (
+							rangeControls
+						)
+					) : null}
+					{isError ? (
+						<div className="cost-error-state" role="alert">
+							<EmptyState
+								icon={IconAlertTriangle}
+								title="The dashboard couldn’t load"
+								description={dashboardErrorText(query.error)}
 							>
-								Try again
-							</button>
+								<Button
+									variant="outline"
+									className="mx-auto mt-2"
+									onClick={() => {
+										void query.refetch();
+									}}
+								>
+									<IconRefresh />
+									Try again
+								</Button>
+							</EmptyState>
 						</div>
 					) : (
 						<CostChart
+							dots={
+								variant === "rail-card"
+									? "switch"
+									: variant === "dot-rail" || variant === "rail-chat"
+										? "only"
+										: undefined
+							}
 							data={showSettled ? settled.data : data}
 							metric={showSettled ? settled.metric : metric}
 							selectedMetric={metric}
@@ -278,6 +332,7 @@ export function CostDashboardView({
 							metricsPending={metricsPending}
 							filters={activeFilters}
 							previews={previews}
+							inputFor={dashboard.inputFor}
 							runSignals={input.runSignals}
 							signalTypes={input.signalTypes}
 							interval={interval}
@@ -295,6 +350,21 @@ export function CostDashboardView({
 						/>
 					)}
 					<div className="cost-breakdowns-container" hidden={isError}>
+						{tabbed ? (
+							<div className="cost-breakdown-tabs" role="tablist">
+								{dimensions.map((dimension) => (
+									<button
+										key={dimension}
+										type="button"
+										role="tab"
+										aria-selected={dimension === activeTab}
+										onClick={() => setBreakdownTab(dimension)}
+									>
+										{COST_LABELS[dimension]}
+									</button>
+								))}
+							</div>
+						) : null}
 						<div
 							ref={breakdownsRef}
 							className="cost-breakdowns"
@@ -314,7 +384,7 @@ export function CostDashboardView({
 							data-pull-requests={isPullRequestMetric}
 							data-ci-runs={metric === "ciRuns"}
 						>
-							{dimensions.map((dimension) => (
+							{shownDimensions.map((dimension) => (
 								<CostBreakdown
 									key={dimension}
 									dimension={dimension}
@@ -383,4 +453,12 @@ function useBreakdownRowHeight(ref: RefObject<HTMLElement | null>) {
 		return () => observer.disconnect();
 	}, [ref]);
 	return height;
+}
+
+function dashboardErrorText(error: unknown): string {
+	const code = (error as { code?: string } | null)?.code;
+	if (code === "SERVICE_UNAVAILABLE")
+		return "Opaline’s session data isn’t answering right now. Try again in a moment.";
+	const message = (error as { message?: string } | null)?.message;
+	return message || "Try loading this view again.";
 }

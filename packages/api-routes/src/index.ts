@@ -41,7 +41,13 @@ import {
 	LiveSessionTailInputSchema,
 	LiveSessionTailOutputSchema,
 } from "./live-session-view.js";
+import { repositoryFilesContract } from "./repository-files.js";
+import { repositoryPullRequestsContract } from "./repository-pull-requests.js";
+import { repositoryReportContract } from "./repository-report.js";
+import { repositoryRunsContract } from "./repository-runs.js";
+import { repositorySessionBoxesContract } from "./repository-session-boxes.js";
 import { repositorySettingsContract } from "./repository-settings.js";
+import { repositorySetupContract } from "./repository-setup.js";
 import {
 	ReportUploadFailuresInputSchema,
 	UploadFailuresPageSchema,
@@ -85,9 +91,13 @@ import {
 } from "./schemas/repositories.js";
 
 export type {
+	RepositoryFile,
+	RepositoryFiles,
 	RepositoryOverview,
 	RepositorySummary,
+	RepositoryTreeEntry,
 } from "./schemas/repositories.js";
+export { RepositorySummarySchema };
 
 import { analysisContract } from "./analysis.js";
 import { analysisHistoryContract } from "./analysis-history.js";
@@ -99,6 +109,7 @@ import {
 	runQuestionsAnalysisContract,
 	sessionRunQuestionsContract,
 } from "./run-questions.js";
+import { sessionContextSnapshotContract } from "./session-context-snapshot.js";
 import { sessionFileChangesContract } from "./session-file-changes.js";
 import { sessionSummaryLinksContract } from "./session-summary-links.js";
 
@@ -429,7 +440,13 @@ export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
 export * from "./plugin-tool-names.js";
 export * from "./product-analytics.js";
-export { type RepoIdentity, resolveRepoIdentity } from "./repo-identity.js";
+export {
+	type RepoIdentity,
+	type RepoIdentityInput,
+	type RepoIdentityResolver,
+	resolveRepoIdentity,
+	unifyRepoIdentities,
+} from "./repo-identity.js";
 export {
 	createRepositoryEvidenceInitInputSchema,
 	REPOSITORY_EVIDENCE_IMAGE_MEDIA_TYPE_PATTERN,
@@ -476,6 +493,12 @@ export {
 	RepositoryEvidenceUploadObjectSchema,
 	RepositoryEvidenceUploadPartSchema,
 } from "./repository-evidence.js";
+export * from "./repository-files.js";
+export * from "./repository-pull-requests.js";
+export * from "./repository-report.js";
+export * from "./repository-runs.js";
+export * from "./repository-session-boxes.js";
+export * from "./repository-setup.js";
 export * from "./safe-url.js";
 export * from "./schemas/analytics.js";
 export {
@@ -1357,6 +1380,7 @@ export const contract = {
 			...sessionRunQuestionsContract,
 			...sessionRunCiContract,
 			...sessionSummaryLinksContract,
+			...sessionContextSnapshotContract,
 			...sessionFileChangesContract,
 			/** New lines of a live session's transcripts since the cursor, or their tail. */
 			liveTail: oc
@@ -1375,6 +1399,12 @@ export const contract = {
 			overview: oc
 				.input(RepositoryOverviewInputSchema)
 				.output(RepositoryOverviewSchema),
+			...repositoryPullRequestsContract,
+			...repositoryFilesContract,
+			...repositoryRunsContract,
+			...repositorySessionBoxesContract,
+			...repositoryReportContract,
+			...repositorySetupContract,
 		},
 		skills: {
 			list: oc.output(z.array(HistoricalSkillSummarySchema)),

@@ -400,7 +400,7 @@ function WordsButton({
 			title={label}
 			onClick={onToggle}
 			className={cn(
-				"ml-auto inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+				"ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
 				open && "bg-muted text-foreground",
 			)}
 		>

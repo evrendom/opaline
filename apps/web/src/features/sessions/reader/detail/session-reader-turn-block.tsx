@@ -16,6 +16,7 @@ import {
 import { MemberFactLine } from "../rail/session-reader-turn-lines";
 import { TURN_ANSWER_MARK, TURN_REPLY_MARK } from "../reader-dom";
 import { PendingSubagentMarks } from "../subagents/session-reader-subagent-marks";
+import { READING_MEASURE } from "./reading-measure";
 import {
 	AssistantResponse,
 	AssistantSkeleton,
@@ -26,8 +27,7 @@ import { RunSummaryBar, TurnSteps } from "./session-reader-turn-steps";
 import { TurnTrace } from "./session-reader-turn-trace";
 import type { SessionReaderBodyState } from "./use-session-reader-bodies";
 
-export const READING_MEASURE =
-	"w-full max-w-[33rem] xl:max-w-[min(33rem,calc(100%-var(--reader-card)-3.5rem-4rem))]";
+export { READING_MEASURE };
 
 const NOTHING_HIDDEN: ReadonlySet<string> = new Set();
 
@@ -98,7 +98,7 @@ export const TurnBlock = memo(function TurnBlock({
 						<button
 							type="button"
 							onClick={() => onRetry(turn.turnId)}
-							className="cursor-pointer underline underline-offset-2 hover:text-foreground"
+							className="underline underline-offset-2 hover:text-foreground"
 						>
 							Retry
 						</button>

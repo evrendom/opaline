@@ -20,10 +20,7 @@ import type { SessionReaderStep } from "../model/session-reader-model";
 import { AGENT_PARAM, pickOf, writeAgent, writePick } from "../reader-params";
 import { getSubagentLaunches } from "../summary/session-summary-model";
 
-export function subagentIdOf(step: SessionReaderStep): string | null {
-	const result = step.toolEvent?.result as { subagentId?: string } | null;
-	return step.kind === "agent" && result?.subagentId ? result.subagentId : null;
-}
+export { subagentIdOf } from "@rudel/api-routes/session-context/session-reader-subagents";
 
 export function useAgentFocus(): {
 	focus: string | null;

@@ -107,7 +107,7 @@ export function RunZoom({
 								data-context-pick=""
 								onClick={() => onOpen(id, firstLitStep(run, lits))}
 								aria-label={`Open ${run.label} in Detail`}
-								className="absolute right-1.5 bottom-1.5 z-20 inline-flex h-6 cursor-pointer items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
+								className="absolute right-1.5 bottom-1.5 z-20 inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
 							>
 								Detail
 								<IconArrowUpRight aria-hidden="true" className="size-3" />

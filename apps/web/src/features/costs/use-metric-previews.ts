@@ -18,7 +18,11 @@ import { costsQueryScope, dashboardPlaceholder } from "./use-cost-dashboard";
  * Each stat card's own answer: its total, availability and daily trend (the
  * chart groups it by the picked interval). Undefined while it loads.
  */
-export type MetricPreviews = Partial<Record<DashboardMetric, CostDashboard>>;
+export type MetricPreviews = Partial<Record<DashboardMetric, CostDashboard>> & {
+	/** Language signals split by type, for the per-run language rates. */
+	languageSplit?: CostDashboard;
+	pending?: boolean;
+};
 
 /**
  * The answers behind the stat cards. Every dashboard answer carries the
@@ -42,14 +46,23 @@ export function useMetricPreviews(
 		(metric): metric is "mergedPullRequests" | "ciRuns" =>
 			metric === "mergedPullRequests" || metric === "ciRuns",
 	);
+	const language = metrics.includes("signals");
 	const requests = [
 		{ input: chartInput, placeholder: sessionCardsPlaceholder },
 		...githubCards.map((metric) => ({
 			input: { ...inputFor(metric), sessionMetrics: false },
 			placeholder: dashboardPlaceholder,
 		})),
+		...(language
+			? [
+					{
+						input: { ...inputFor("signals"), splitBy: "signalTypes" as const },
+						placeholder: dashboardPlaceholder,
+					},
+				]
+			: []),
 	];
-	const [chart, ...github] = useQueries({
+	const answers = useQueries({
 		queries: requests.map(({ input, placeholder }) => {
 			const options = orpc.analytics.overview.costs.queryOptions({ input });
 			return {
@@ -62,12 +75,20 @@ export function useMetricPreviews(
 			};
 		}),
 	});
-	return Object.fromEntries(
-		metrics.map((metric) => {
-			const index = githubCards.indexOf(metric as (typeof githubCards)[number]);
-			return [metric, index === -1 ? chart?.data : github[index]?.data];
-		}),
-	);
+	const [chart, ...rest] = answers;
+	const github = rest.slice(0, githubCards.length);
+	return {
+		...Object.fromEntries(
+			metrics.map((metric) => {
+				const index = githubCards.indexOf(
+					metric as (typeof githubCards)[number],
+				);
+				return [metric, index === -1 ? chart?.data : github[index]?.data];
+			}),
+		),
+		languageSplit: language ? rest[githubCards.length]?.data : undefined,
+		pending: answers.some((answer) => answer.isPending),
+	};
 }
 
 /**

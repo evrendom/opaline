@@ -1,4 +1,10 @@
-import { createContext, type ReactNode, useContext, useEffect } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useMemo,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import type {
 	DateRangeContextValue,
@@ -222,4 +228,33 @@ export function useDateRange() {
 
 export function useOptionalDateRange() {
 	return useContext(DateRangeContext);
+}
+
+export function DateRangeOverride({
+	range,
+	children,
+}: {
+	range: { start: string; end: string } | null;
+	children: ReactNode;
+}) {
+	const parent = useDateRange();
+	const value = useMemo<DateRangeContextValue>(
+		() =>
+			range
+				? {
+						...parent,
+						state: { startDate: range.start, endDate: range.end },
+						meta: {
+							...parent.meta,
+							dayCount: getInclusiveDateRangeDays(range.start, range.end),
+						},
+					}
+				: parent,
+		[parent, range],
+	);
+	return (
+		<DateRangeContext.Provider value={value}>
+			{children}
+		</DateRangeContext.Provider>
+	);
 }

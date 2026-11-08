@@ -1,35 +1,21 @@
-import type {
-	SessionDetailTurnSummary,
-	SessionDetailWindowTurn,
-} from "@rudel/api-routes";
+import type { SessionDetailTurnSummary } from "@rudel/api-routes";
+import type { SessionReaderBody } from "@rudel/api-routes/session-context/session-reader-body";
 import { formatHalfHours } from "@/lib/format";
 import type { SessionReaderStep } from "./session-reader-run-steps";
 
 type TraceEvent = NonNullable<SessionReaderStep["toolEvent"]>;
 
-export type SessionReaderBody = NonNullable<SessionDetailWindowTurn["body"]>;
-
+export {
+	getReaderMemberText,
+	type ReadyBody,
+	type SessionReaderBody,
+} from "@rudel/api-routes/session-context/session-reader-body";
 export {
 	flattenSteps,
 	getReaderWaterfall,
 	type SessionReaderStep,
 	type SessionReaderWaterfall,
 } from "./session-reader-run-steps";
-
-/** What the member typed in this turn, with tool-result transport left out. */
-export function getReaderMemberText(body: SessionReaderBody): string {
-	return body.userItems
-		.flatMap((item) => {
-			if (item.kind !== "user") return [];
-			if (typeof item.content === "string") return [item.content];
-			return item.content.flatMap((part) => {
-				if (typeof part === "string") return part ? [part] : [];
-				return part.type === "text" && part.text ? [part.text] : [];
-			});
-		})
-		.filter((text) => text.trim().length > 0)
-		.join("\n");
-}
 
 /** The turn's answer: the last message the agent wrote before handing back. */
 export function getReaderFinalMessage(body: SessionReaderBody): string | null {

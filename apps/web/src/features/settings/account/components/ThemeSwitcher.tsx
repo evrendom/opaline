@@ -36,7 +36,7 @@ export function ThemeSwitcher() {
 						title={label}
 						onClick={() => setTheme(value)}
 						className={cn(
-							"relative flex size-7 cursor-pointer items-center justify-center rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
+							"relative flex size-7 items-center justify-center rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
 							active
 								? "text-foreground"
 								: "text-muted-foreground/60 hover:text-foreground",

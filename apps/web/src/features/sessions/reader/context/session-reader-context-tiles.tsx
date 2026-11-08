@@ -1,5 +1,13 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useContext,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
@@ -15,9 +23,17 @@ import {
 	tileLook,
 } from "./session-reader-context-bar";
 import { withCompacted } from "./session-reader-context-before";
+import {
+	CompactionMark,
+	compactionWords,
+} from "./session-reader-context-compaction";
 import { tileName } from "./session-reader-context-fold";
 import { ContextMapFrame } from "./session-reader-context-frame";
 import { filterKind } from "./session-reader-context-groups";
+import {
+	ContextAreaHeight,
+	ContextPreview,
+} from "./session-reader-context-head";
 import type { ContextKind, ContextMap } from "./session-reader-context-map";
 import {
 	type ContextMeasure,
@@ -30,6 +46,7 @@ import {
 	useRememberedLits,
 	useRememberedPick,
 } from "./session-reader-context-memory";
+import { GhostTiles, useTileMorph } from "./session-reader-context-morph";
 import { PickedBoxContext, pickedFigures } from "./session-reader-context-pick";
 import {
 	AREA_HEIGHT,
@@ -59,6 +76,7 @@ import {
 import {
 	ContextSubTiles,
 	drawsSubTiles,
+	ownsInside,
 } from "./session-reader-context-subtiles";
 import {
 	ContextZoom,
@@ -87,6 +105,10 @@ export function ContextTiles({
 	byRun,
 	calls,
 	caption,
+	compacting,
+	compactedRuns,
+	costOutside,
+	footer,
 	cost,
 	map,
 	measure: asked,
@@ -104,6 +126,10 @@ export function ContextTiles({
 	byRun?: ContextMap | null;
 	calls?: readonly UsageCall[];
 	caption?: string;
+	compacting?: ReadonlySet<string>;
+	compactedRuns?: readonly string[];
+	costOutside?: string;
+	footer?: ReactNode;
 	cost?: number | null;
 	subagentCosts?: ReadonlyMap<string, number | null>;
 	map: ContextMap;
@@ -114,9 +140,11 @@ export function ContextTiles({
 	const costed = useMemo(
 		() =>
 			calls && calls.length > 0
-				? keptBy(costMaps, map, () => costMap(map, calls, cost, subagentCosts))
+				? keptBy(costMaps, map, () =>
+						costMap(map, calls, cost, subagentCosts, costOutside),
+					)
 				: null,
-		[calls, cost, map, subagentCosts],
+		[calls, cost, costOutside, map, subagentCosts],
 	);
 	const timed = useMemo(() => keptBy(timeMaps, map, () => timeMap(map)), [map]);
 	const [showCompacted] = useState(whole);
@@ -155,12 +183,23 @@ export function ContextTiles({
 	const shown = useMemo(() => filtered(measured, hidden), [hidden, measured]);
 	const shownBase = useMemo(() => filtered(base, hidden), [base, hidden]);
 	const { keep, own: ownProblems } = useOwnProblems(problems, measure);
+	const areaHeight = useContext(ContextAreaHeight) ?? AREA_HEIGHT;
+	const preview = useContext(ContextPreview);
+	const withFree = !preview && !hidden.has("free");
 	const tiles =
-		width > 0 ? placeTiles(shown, width, !hidden.has("free"), keep) : [];
+		width > 0 ? placeTiles(shown, width, withFree, keep, areaHeight) : [];
 	const drawn = tiles.flatMap((tile) => [tile, ...(tile.inside ?? [])]);
 	const inGroup = new Set(
 		tiles.flatMap((tile) => (tile.inside ?? []).map((each) => each.key)),
 	);
+	const list = useRef<HTMLUListElement>(null);
+	const ghosts = useTileMorph({
+		compactedRuns,
+		drawn,
+		list,
+		source: shown,
+		width,
+	});
 	const excluded = useMemo(
 		() => excludedOf(base, hidden, measureLook.freeWord),
 		[base, hidden, measureLook.freeWord],
@@ -236,9 +275,10 @@ export function ContextTiles({
 	);
 	const boxChart = (
 		<ul
+			ref={list}
 			aria-labelledby={titleId}
 			className="relative"
-			style={{ height: AREA_HEIGHT }}
+			style={{ height: areaHeight }}
 		>
 			{drawn.map((tile) => {
 				const kind = tile.part?.kind ?? "free";
@@ -247,9 +287,21 @@ export function ContextTiles({
 				const name = tile.part ? tileName(tile.part) : word;
 				const label = tile.part ? tile.part.label : word;
 				const Glyph = tileGlyph(tile.part);
+				const compacts =
+					tile.part?.kind === "summary" ||
+					(tile.part?.folded ?? [tile.key]).some(
+						(key) => compacting?.has(key) ?? false,
+					);
 				const tokens = measureLook.format(tile.tokens);
 				const showName = tile.h - GAP >= MIN_TILE && tile.w - GAP >= 56;
-				const its = problemsOf(problems, tile.part);
+				const its = problemsOf(
+					problems,
+					measure === "runs" &&
+						tile.part?.kind === "summary" &&
+						compactedRuns?.length
+						? { folded: [...compactedRuns], key: tile.part.key }
+						: tile.part,
+				);
 				const inner =
 					tile.part !== null &&
 					showName &&
@@ -271,9 +323,10 @@ export function ContextTiles({
 				return (
 					<li
 						key={tile.key}
+						data-tile-key={tile.key}
 						aria-label={
 							tile.part
-								? `${name}, ${word} – ${tokens} tokens`
+								? `${name}, ${word}${compacts ? `, ${compactionWords}` : ""} – ${tokens} tokens`
 								: `${word} – ${tokens} tokens`
 						}
 						className={cn(
@@ -305,7 +358,7 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 cursor-pointer rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
+							className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
 						/>
 						<span
 							aria-hidden="true"
@@ -315,9 +368,16 @@ export function ContextTiles({
 							)}
 						>
 							<span className="flex min-w-0 items-center gap-1.5">
-								<Glyph aria-hidden="true" className="size-3.5 shrink-0" />
+								{compacts && !showName && tile.part?.kind !== "summary" ? (
+									<CompactionMark />
+								) : (
+									<Glyph aria-hidden="true" className="size-3.5 shrink-0" />
+								)}
 								{showName ? (
 									<span className="truncate font-medium">{label}</span>
+								) : null}
+								{compacts && showName && tile.part?.kind !== "summary" ? (
+									<CompactionMark />
 								) : null}
 							</span>
 						</span>
@@ -339,7 +399,7 @@ export function ContextTiles({
 								))}
 							</span>
 						) : null}
-						{tile.part?.nested && showName ? (
+						{tile.part?.nested && showName && ownsInside(tile.part) ? (
 							<ContextRunTiles
 								h={Math.max(0, tile.h - GAP)}
 								lits={lits}
@@ -362,6 +422,7 @@ export function ContextTiles({
 					</li>
 				);
 			})}
+			<GhostTiles ghosts={ghosts} />
 		</ul>
 	);
 	return (
@@ -408,6 +469,9 @@ export function ContextTiles({
 					<ContextMapFrame>
 						<div ref={area} className="min-w-0">
 							{boxChart}
+							{footer ? (
+								<div className="flex px-[3px] pt-2 pb-[3px]">{footer}</div>
+							) : null}
 							{pickedTile?.part ||
 							(measure === "runs" && lits.length > 0 && pickedPart) ? (
 								<div
@@ -451,7 +515,7 @@ export function ContextTiles({
 						</div>
 					</ContextMapFrame>
 				</PickedBoxContext.Provider>
-				{offBoxes.length > 0 ? (
+				{offBoxes.length > 0 && measure !== "runs" && !preview ? (
 					<p className="-mt-1 text-xs text-muted-foreground">
 						Not on a box: {offBoxes.join(" · ")}
 					</p>

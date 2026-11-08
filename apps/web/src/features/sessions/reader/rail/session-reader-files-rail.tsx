@@ -21,6 +21,14 @@ export function useFilesRailTags(): RailTagsState {
 	return useMemo(() => ({ ...tags, picked: FILE_TAGS }), [tags]);
 }
 
+export function RailEmptyPane({ children }: { children: ReactNode }) {
+	return (
+		<div className="mt-(--panes-top) flex min-w-0 flex-1 flex-col pt-4">
+			{children}
+		</div>
+	);
+}
+
 export function FilesRail({
 	agent,
 	figureMarks,

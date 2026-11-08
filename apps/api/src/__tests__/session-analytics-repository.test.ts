@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { SessionAnalyticsSchema } from "@rudel/api-routes";
+import { SessionAnalyticsSchema, unifyRepoIdentities } from "@rudel/api-routes";
 import {
 	mapSessionAnalyticsRow,
 	type SessionAnalyticsRaw,
@@ -56,6 +56,25 @@ describe("mapSessionAnalyticsRow", () => {
 				repoLabel: "rudel-v2",
 				repoName: "rudel-v2",
 				source: "worktree",
+				worktree: "osaka",
+			},
+			worktree: "osaka",
+		});
+	});
+
+	test("joins a remote-less Conductor session to the workspace's same-name remote repo", () => {
+		const resolver = unifyRepoIdentities([
+			{
+				gitRemote: "github.com/evrendom/rudel-v2",
+				packageName: null,
+				projectPath: "/work/rudel-v2",
+			},
+		]);
+		expect(mapSessionAnalyticsRow(rawSession, resolver)).toMatchObject({
+			repository: "evrendom/rudel-v2",
+			repository_identity: {
+				repoKey: "remote:github.com/evrendom/rudel-v2",
+				source: "remote",
 				worktree: "osaka",
 			},
 			worktree: "osaka",

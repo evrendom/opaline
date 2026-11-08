@@ -308,11 +308,9 @@ async function querySessionMetricRows(
 	    AND sa.session_date = signal_summary.session_date
 	  ARRAY JOIN arrayConcat(
 	   [tuple('modelApologies', '', toUInt64(0)),
-	    tuple('userNegative', '', toUInt64(0)),
-	    tuple('userPositive', '', toUInt64(0))],
+	    tuple('userNegative', '', toUInt64(0))],
 	   arrayMap((phrase, count) -> tuple('modelApologies', phrase, toUInt64(count)), mapKeys(signal_summary.model_apology_counts), mapValues(signal_summary.model_apology_counts)),
-	   arrayMap((phrase, count) -> tuple('userNegative', phrase, toUInt64(count)), mapKeys(signal_summary.member_negative_counts), mapValues(signal_summary.member_negative_counts)),
-	   arrayMap((phrase, count) -> tuple('userPositive', phrase, toUInt64(count)), mapKeys(signal_summary.member_positive_counts), mapValues(signal_summary.member_positive_counts))
+	   arrayMap((phrase, count) -> tuple('userNegative', phrase, toUInt64(count)), mapKeys(signal_summary.member_negative_counts), mapValues(signal_summary.member_negative_counts))
 	  ) AS signal_value
 	 `
 		: `
@@ -322,7 +320,6 @@ async function querySessionMetricRows(
 	   toFloat64(
 	    ${filteredSignalCount("signal_summary.model_apology_counts", "modelApologies")}
 	     + ${filteredSignalCount("signal_summary.member_negative_counts", "userNegative")}
-	     + ${filteredSignalCount("signal_summary.member_positive_counts", "userPositive")}
 	   ) AS value,
 	   toUInt8(signal_summary.scan_version < 5) AS incomplete,
 	   '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,

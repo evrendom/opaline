@@ -26,7 +26,9 @@
 		"./transcript-records": "./src/session-transcript/transcript-records/index.ts",
 		"./fact-catalog": "./src/session-transcript/transcript-records/fact-catalog.ts",
 		"./session-saved-outputs": "./src/session-saved-outputs.ts",
-		"./session-images": "./src/session-images.ts"
+		"./session-images": "./src/session-images.ts",
+		"./session-context/*": "./src/session-context/*.ts",
+		"./session-context-snapshot": "./src/session-context-snapshot.ts"
 	},
 	"scripts": {
 		"check-types": "tsc --noEmit",

@@ -1,5 +1,5 @@
+import { Bones } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
-import { Skeleton } from "@/app/ui/skeleton";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -37,14 +37,11 @@ export function WorkspaceIncomingInvitationsCard({
 	return (
 		<WorkspaceSettingsGroup title={title} description={description}>
 			{isPending ? (
-				<div aria-busy="true">
-					<WorkspaceSettingsRow
-						label={<Skeleton className="h-4 w-36 rounded" />}
-						description={<Skeleton className="h-4 w-28 rounded" />}
-					>
-						<Skeleton />
-					</WorkspaceSettingsRow>
-				</div>
+				<Bones label="Loading invitations">
+					<p className="workspace-settings-empty">
+						No pending invitations right now.
+					</p>
+				</Bones>
 			) : invitations.length === 0 ? (
 				<p className="workspace-settings-empty">
 					No pending invitations right now.

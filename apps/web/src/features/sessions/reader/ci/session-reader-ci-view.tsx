@@ -1,12 +1,8 @@
 import type { SessionRunCiRun } from "@rudel/api-routes";
-import {
-	IconAlertTriangleFilled,
-	IconGitPullRequest,
-	IconLoader2,
-} from "@tabler/icons-react";
+import { IconAlertTriangle, IconGitPullRequest } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bones } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
@@ -15,12 +11,17 @@ import { useSessionFileChanges } from "../../use-session-file-changes";
 import { useSessionCi } from "../../use-session-run-ci";
 import { useSessionSummaryLinks } from "../../use-session-summary-links";
 import { CARD } from "../files/session-reader-files-parts";
-import { FilesRail, useFilesRailTags } from "../rail/session-reader-files-rail";
+import {
+	FilesRail,
+	RailEmptyPane,
+	useFilesRailTags,
+} from "../rail/session-reader-files-rail";
 import {
 	railLineKey,
 	subagentIdsOf,
 } from "../rail/session-reader-turn-rail-row";
 import { CI_PARAM, PR_PARAM, pickOf, writePick } from "../reader-params";
+import { CiColumnsSample } from "../session-reader-samples";
 import { READER_RAIL_BACKGROUND, useReaderPick } from "../session-reader-tabs";
 import {
 	SessionSubagents,
@@ -56,6 +57,7 @@ import { getCiRounds } from "./session-reader-ci-rounds";
 import { CiRoundMarks } from "./session-reader-ci-rounds-view";
 
 const NO_RUNS: readonly SessionRunCiRun[] = [];
+const NO_LINES: ReadonlySet<string> = new Set();
 
 export function SessionReaderCiView({
 	model,
@@ -170,29 +172,55 @@ export function SessionReaderCiView({
 		return out;
 	}, [reach, turns]);
 
-	if (state.status === "pending" || !links) return <CiSkeleton />;
-	if (state.status === "error")
+	const pending = state.status === "pending" || !links;
+	const railColumn = (
+		<div
+			className={cn(
+				"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
+				READER_RAIL_BACKGROUND,
+			)}
+		>
+			<FilesRail
+				agent={agent}
+				idle={pending ? NO_LINES : idle}
+				figureMarks={pending ? undefined : turnMarks}
+				model={model}
+				onPickRun={pickRun}
+				overview={overview}
+				run={run}
+				subagents={overview.subagents}
+				tags={railTags}
+				turns={turns}
+			/>
+		</div>
+	);
+	const empty =
+		state.status === "error" ? (
+			<EmptyState
+				icon={IconAlertTriangle}
+				title="The CI could not be read"
+				description="Reading this session's CI failed. Try the tab again in a moment."
+			/>
+		) : !pending && pulls.length === 0 ? (
+			<EmptyState
+				icon={IconGitPullRequest}
+				title="No pull requests or CI"
+				description={
+					state.enabled
+						? "This session's runs named no pull request and reached no CI."
+						: "Pull requests and CI show where the workspace has GitHub connected, with the repositories this session worked in."
+				}
+			/>
+		) : null;
+	if (empty)
 		return (
 			<Frame>
-				<EmptyState
-					icon={IconAlertTriangleFilled}
-					title="The CI could not be read"
-					description="Reading this session's CI failed. Try the tab again in a moment."
-				/>
-			</Frame>
-		);
-	if (pulls.length === 0)
-		return (
-			<Frame>
-				<EmptyState
-					icon={IconGitPullRequest}
-					title="No pull requests or CI"
-					description={
-						state.enabled
-							? "This session's runs named no pull request and reached no CI."
-							: "Pull requests and CI show where the workspace has GitHub connected, with the repositories this session worked in."
-					}
-				/>
+				<SessionSubagents onOpen={openSubagent} subagents={subagents}>
+					<div className="flex h-full min-h-0 gap-6">
+						{railColumn}
+						<RailEmptyPane>{empty}</RailEmptyPane>
+					</div>
+				</SessionSubagents>
 			</Frame>
 		);
 
@@ -220,66 +248,62 @@ export function SessionReaderCiView({
 		<Frame>
 			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
 				<div className="flex h-full min-h-0 gap-6">
-					<div
-						className={cn(
-							"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
-							READER_RAIL_BACKGROUND,
-						)}
-					>
-						<FilesRail
-							agent={agent}
-							idle={idle}
-							figureMarks={turnMarks}
-							model={model}
-							onPickRun={pickRun}
-							overview={overview}
-							run={run}
-							subagents={overview.subagents}
-							tags={railTags}
-							turns={turns}
-						/>
-					</div>
-					<CiPullColumn
-						agent={agent}
-						model={model}
-						onPick={(key) => setPicks({ ci: null, pr: key })}
-						onPickRun={(ciRunId, key) => setPicks({ ci: ciRunId, pr: key })}
-						picked={shown?.entry.key ?? null}
-						pickedRun={pickedRun?.ciRunId ?? null}
-						rows={rows}
-						run={run}
-						unplaced={reach.unplaced}
-					/>
-					<div
-						className={cn(
-							"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
-							CARD,
-						)}
-					>
-						{shown ? (
-							<CiPullCard
-								onPickRun={(ciRunId) =>
-									setPicks({ ci: ciRunId, pr: shown.entry.key })
-								}
+					{railColumn}
+					{pending ? (
+						<Bones
+							fill
+							className="min-w-0 flex-1"
+							label="Reading the pull requests and CI this session reached"
+						>
+							<div className="flex h-full min-h-0 gap-6">
+								<CiColumnsSample agent={agent} model={model} run={run} />
+							</div>
+						</Bones>
+					) : (
+						<>
+							<CiPullColumn
+								agent={agent}
+								model={model}
+								onPick={(key) => setPicks({ ci: null, pr: key })}
+								onPickRun={(ciRunId, key) => setPicks({ ci: ciRunId, pr: key })}
+								picked={shown?.entry.key ?? null}
 								pickedRun={pickedRun?.ciRunId ?? null}
-								reachedBy={
-									shown.entry.pull && !run ? (
-										<PullTouchers
-											onOpenTurn={onOpenTurn}
-											touchers={pullTouchers(
-												shown.entry.key,
-												shown.entry.runs,
-												reach,
-											)}
-										/>
-									) : null
-								}
-								row={shown}
+								rows={rows}
+								run={run}
+								unplaced={reach.unplaced}
 							/>
-						) : unknown ? (
-							<UnknownPullCard pickKey={unknown} />
-						) : null}
-					</div>
+							<div
+								className={cn(
+									"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
+									CARD,
+								)}
+							>
+								{shown ? (
+									<CiPullCard
+										onPickRun={(ciRunId) =>
+											setPicks({ ci: ciRunId, pr: shown.entry.key })
+										}
+										pickedRun={pickedRun?.ciRunId ?? null}
+										reachedBy={
+											shown.entry.pull && !run ? (
+												<PullTouchers
+													onOpenTurn={onOpenTurn}
+													touchers={pullTouchers(
+														shown.entry.key,
+														shown.entry.runs,
+														reach,
+													)}
+												/>
+											) : null
+										}
+										row={shown}
+									/>
+								) : unknown ? (
+									<UnknownPullCard pickKey={unknown} />
+								) : null}
+							</div>
+						</>
+					)}
 				</div>
 			</SessionSubagents>
 		</Frame>
@@ -289,38 +313,5 @@ export function SessionReaderCiView({
 function Frame({ children }: { children: ReactNode }) {
 	return (
 		<div className="h-full overflow-hidden px-8 pt-2 pb-2">{children}</div>
-	);
-}
-
-function CiSkeleton() {
-	return (
-		<div className="flex h-full gap-6 px-8 pt-2 pb-2">
-			<div className="flex w-(--reader-rail) shrink-0 flex-col gap-2.5 pt-2 pl-1">
-				<div className="flex h-7 items-center gap-2">
-					<IconLoader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-xs text-muted-foreground">
-						Reading the pull requests and CI this session reached
-					</span>
-				</div>
-				{[72, 56, 64, 48, 60].map((width) => (
-					<Skeleton
-						key={width}
-						className="h-4 rounded-md"
-						style={{ width: `${width}%` }}
-					/>
-				))}
-			</div>
-			<div
-				className={cn(
-					"mt-(--panes-top) hidden min-w-0 flex-1 flex-col gap-2 px-5 py-4 lg:flex",
-					CARD,
-				)}
-			>
-				<Skeleton className="h-5 w-1/3 rounded-md" />
-				<Skeleton className="mt-3 h-12 rounded-lg" />
-				<Skeleton className="h-12 rounded-lg" />
-				<Skeleton className="h-12 rounded-lg" />
-			</div>
-		</div>
 	);
 }

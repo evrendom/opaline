@@ -11,7 +11,12 @@ describe("callHrefOf", () => {
 			from("sessionTab=summary&run=r0&turn=r0&subagent=s9&agent=s9"),
 			{ run: "r1", step: "e1" },
 		);
-		expect(paramsOf(href)).toEqual({ call: "e1", run: "r1", turn: "r1" });
+		expect(paramsOf(href)).toEqual({
+			call: "e1",
+			run: "r1",
+			sessionTab: "detail",
+			turn: "r1",
+		});
 	});
 
 	test("a call in a subagent picks that subagent under its run", () => {
@@ -24,6 +29,7 @@ describe("callHrefOf", () => {
 			agent: "s2",
 			call: "e1",
 			run: "r1",
+			sessionTab: "detail",
 			subagent: "s2",
 			turn: "r1",
 		});

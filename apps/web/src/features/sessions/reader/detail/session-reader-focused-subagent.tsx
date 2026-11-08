@@ -1,6 +1,6 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bone, Bones } from "@/app/ui/bones";
 import { shortSubagentId } from "@/features/sessions/run-id";
 import { cn } from "@/lib/utils";
 import {
@@ -129,10 +129,12 @@ export function FocusedSubagent({
 							turn={turn}
 						/>
 					) : (
-						<div className="flex flex-col gap-2 px-1 pt-1">
-							<Skeleton className="h-3.5 w-full" />
-							<Skeleton className="h-3.5 w-2/3" />
-						</div>
+						<Bones label="Reading this subagent">
+							<div className="flex flex-col gap-2 px-1 pt-1">
+								<Bone className="h-3.5 w-full rounded-sm" />
+								<Bone className="h-3.5 w-2/3 rounded-sm" />
+							</div>
+						</Bones>
 					)}
 				</div>
 			</div>

@@ -33,6 +33,7 @@ export type AnalyticsDateRangePickerProps = {
 	onDateRangeApply: (startDate: string, endDate: string) => void;
 	triggerClassName?: string;
 	triggerSuffix?: string;
+	compact?: boolean;
 	contentClassName?: string;
 	calendarControls?: ReactNode;
 	align?: "start" | "center" | "end";
@@ -87,6 +88,7 @@ export function AnalyticsDateRangePicker({
 	onDateRangeApply,
 	triggerClassName,
 	triggerSuffix,
+	compact = false,
 	contentClassName,
 	calendarControls,
 	align = "end",
@@ -141,6 +143,12 @@ export function AnalyticsDateRangePicker({
 		selectedDateRange?.from && selectedDateRange.to
 			? formatDashboardDateRangeTriggerLabel(startDate, endDate, today)
 			: "Pick a date";
+	const shownValue = compact
+		? displayValue
+				.replace(/,\s*\d{4}/g, "")
+				.replace(/\s+-\s+/, "–")
+				.replace(/^(\p{L}+) (\d+)–\1 (\d+)$/u, "$1 $2–$3")
+		: displayValue;
 	const analyticsSourceComponent =
 		sourceComponent ?? "analytics_date_range_picker";
 	const isLinear = variant === "linear";
@@ -197,12 +205,16 @@ export function AnalyticsDateRangePicker({
 					/>
 				}
 			>
-				<IconCalendar
-					aria-hidden="true"
-					data-icon="inline-start"
-					className="size-4"
-				/>
-				{triggerSuffix ? `${displayValue} · ${triggerSuffix}` : displayValue}
+				{compact ? null : (
+					<IconCalendar
+						aria-hidden="true"
+						data-icon="inline-start"
+						className="size-4"
+					/>
+				)}
+				{triggerSuffix && !compact
+					? `${shownValue} · ${triggerSuffix}`
+					: shownValue}
 			</PopoverTrigger>
 			<SessionMenuPopoverContent
 				ref={setPopoverElement}

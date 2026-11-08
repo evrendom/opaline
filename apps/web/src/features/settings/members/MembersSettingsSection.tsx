@@ -1,10 +1,8 @@
+import { useMemo } from "react";
 import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
-import {
-	SettingsSectionCard,
-	SettingsSectionStack,
-} from "@/features/settings/components/settings-section";
+import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildMembersSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
@@ -14,9 +12,18 @@ import { WorkspaceSentInvitations } from "@/features/settings/workspace/componen
 import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
 import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-workspace-settings-data";
 import { TeamInviteLinkSurface } from "@/features/team/components/TeamInviteLinkSurface";
+import { useTeamPageData } from "@/features/team/use-team-page-data";
 
 export function MembersSettingsSection() {
 	const data = useWorkspaceSettingsData();
+	const team = useTeamPageData();
+	const activity = useMemo(
+		() =>
+			team.isPending
+				? undefined
+				: new Map(team.teamMemberRows.map((row) => [row.userId, row])),
+		[team.isPending, team.teamMemberRows],
+	);
 	const memberCount = data.fullOrg?.members.length ?? 0;
 	const pendingOutgoingInvitationCount = data.pendingInvitations.length;
 
@@ -36,7 +43,7 @@ export function MembersSettingsSection() {
 
 	if (!data.state.hasOrganization) {
 		return (
-			<SettingsSectionStack>
+			<div className="workspace-settings-page">
 				<WorkspaceEmptyStateCard />
 				<div id="new-workspace" className="scroll-mt-24">
 					<CreateWorkspaceCard
@@ -44,7 +51,7 @@ export function MembersSettingsSection() {
 						description="Start a workspace before inviting members."
 					/>
 				</div>
-			</SettingsSectionStack>
+			</div>
 		);
 	}
 
@@ -63,8 +70,8 @@ export function MembersSettingsSection() {
 					{/* Members card: invite, then the roster, then any
 					    invitations still pending. */}
 					<WorkspaceSettingsGroup
-						title="Members"
-						description="Invite teammates by email. Admins and owners can manage members."
+						title="People"
+						description="Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
 					>
 						<WorkspaceInviteMemberForm
 							canManage={data.canManage}
@@ -72,6 +79,7 @@ export function MembersSettingsSection() {
 						/>
 						<WorkspaceMembersList
 							members={data.fullOrg?.members ?? []}
+							activity={activity}
 							canManage={data.canManage}
 							onInvalidate={data.invalidate}
 						/>

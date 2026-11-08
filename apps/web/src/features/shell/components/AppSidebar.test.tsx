@@ -46,6 +46,10 @@ vi.mock("@/features/shell/components/SidebarUserMenu", () => ({
 	),
 }));
 
+vi.mock("@/features/shell/components/SidebarRepositories", () => ({
+	SidebarRepositories: () => null,
+}));
+
 vi.mock("@/features/shell/components/SidebarWorkspaceSwitcher", () => ({
 	SidebarWorkspaceSwitcher: () => <button type="button">Workspace menu</button>,
 }));
@@ -56,11 +60,6 @@ vi.mock("@/features/shell/hooks/use-shell-route-path", () => ({
 
 vi.mock("@/features/shell/hooks/useCurrentShellRoute", () => ({
 	useCurrentShellRoute: () => ({ id: "sessions" }),
-}));
-
-const agentTraces = vi.hoisted(() => ({ enabled: false }));
-vi.mock("@/features/agent-traces/use-agent-traces-access", () => ({
-	useAgentTracesEnabled: () => agentTraces.enabled,
 }));
 
 const compass = vi.hoisted(() => ({ enabled: false }));
@@ -77,8 +76,7 @@ function renderSidebar() {
 }
 
 describe("AppSidebar", () => {
-	it("lists the sections as labelled links, with settings in the footer", () => {
-		agentTraces.enabled = false;
+	it("lists the sections as labelled tiles, with settings in the footer", () => {
 		renderSidebar();
 
 		const navigation = screen.getByRole("navigation", { name: "Primary" });
@@ -86,7 +84,7 @@ describe("AppSidebar", () => {
 			within(navigation)
 				.getAllByRole("link")
 				.map((link) => link.textContent),
-		).toEqual(["Dashboard", "Sessions", "Skills", "Repos", "Team"]);
+		).toEqual(["Dashboard", "Sessions", "Skills", "MCP"]);
 
 		const footer = screen.getByRole("contentinfo");
 		expect(
@@ -94,27 +92,7 @@ describe("AppSidebar", () => {
 		).toHaveAttribute("href", "/settings");
 	});
 
-	it("shows Agent traces after Skills only where the workspace may open it", () => {
-		agentTraces.enabled = true;
-		renderSidebar();
-
-		const navigation = screen.getByRole("navigation", { name: "Primary" });
-		expect(
-			within(navigation)
-				.getAllByRole("link")
-				.map((link) => link.textContent),
-		).toEqual([
-			"Dashboard",
-			"Sessions",
-			"Skills",
-			"Agent traces",
-			"Repos",
-			"Team",
-		]);
-		agentTraces.enabled = false;
-	});
-
-	it("shows Compass first only where the workspace has it", () => {
+	it("leaves Compass out, even where the workspace has it", () => {
 		compass.enabled = true;
 		renderSidebar();
 
@@ -123,10 +101,7 @@ describe("AppSidebar", () => {
 			within(navigation)
 				.getAllByRole("link")
 				.map((link) => link.textContent),
-		).toEqual(["Compass", "Dashboard", "Sessions", "Skills", "Repos", "Team"]);
-		expect(
-			within(navigation).getByRole("link", { name: "Compass" }),
-		).toHaveAttribute("href", "/compass");
+		).toEqual(["Dashboard", "Sessions", "Skills", "MCP"]);
 		compass.enabled = false;
 	});
 

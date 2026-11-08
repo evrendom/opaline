@@ -8,26 +8,37 @@ export function WorkspaceSettingsGroup({
 	title,
 	description,
 	tone = "default",
+	action,
 	children,
 }: {
 	title: string;
 	description?: string;
 	/** Danger zones title their card in the destructive color. */
 	tone?: "default" | "danger";
-	children: ReactNode;
+	action?: ReactNode;
+	children?: ReactNode;
 }) {
 	const titleId = useId();
 	return (
 		<section
-			className="workspace-settings-group settings-section-surface"
+			className="workspace-settings-group"
 			aria-labelledby={titleId}
 			data-tone={tone === "danger" ? "danger" : undefined}
 		>
 			<div className="workspace-settings-group-heading">
-				<h2 id={titleId}>{title}</h2>
-				{description ? <p>{description}</p> : null}
+				<div className="workspace-settings-group-title">
+					<h2 id={titleId}>{title}</h2>
+					{description ? <p>{description}</p> : null}
+				</div>
+				{action ? (
+					<div className="workspace-settings-group-action">{action}</div>
+				) : null}
 			</div>
-			<div className="workspace-settings-group-rows">{children}</div>
+			{children ? (
+				<div className="workspace-settings-group-rows settings-section-surface">
+					{children}
+				</div>
+			) : null}
 		</section>
 	);
 }

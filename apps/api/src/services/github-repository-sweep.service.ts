@@ -6,6 +6,7 @@ import {
 import type postgres from "postgres";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
+import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
 import {
 	createGitHubInstallationAccessToken,
 	type GitHubRepositoryAppConfig,
@@ -211,13 +212,14 @@ export async function runGitHubRepositorySweep(input: {
 	const now = input.now ?? (() => new Date());
 	const deadline = Date.now() + (input.budgetMs ?? 20_000);
 	const maxRequests = input.maxRequests ?? 100;
+	const skipped = readGitHubSyncSkippedOrgIds(input.environment);
 	const bindings = await input.database.unsafe<Binding[]>(
 		`SELECT binding.organization_id AS "organizationId", binding.repository_id AS "repositoryId", binding.installation_id, binding.owner, binding.name
 		 FROM github_repository_binding binding INNER JOIN github_app_installation installation
 		 ON installation.installation_id = binding.installation_id AND installation.organization_id = binding.organization_id
-		 WHERE binding.status = 'active' AND installation.status = 'active' AND ($1::text IS NULL OR binding.organization_id = $1)
+		 WHERE binding.status = 'active' AND installation.status = 'active' AND ($1::text IS NULL OR binding.organization_id = $1) AND binding.organization_id <> ALL($2::text[])
 		 ORDER BY (SELECT min(window_start) FROM github_repository_sweep sweep WHERE sweep.organization_id = binding.organization_id AND sweep.repository_id = binding.repository_id AND sweep.status = 'pending') NULLS FIRST`,
-		[input.organizationId ?? null],
+		[input.organizationId ?? null, skipped],
 	);
 	let requests = 0;
 	let deferred = false;
@@ -439,8 +441,8 @@ export async function runGitHubRepositorySweep(input: {
 	))
 		await refreshPrTotalsReadiness(input.database, organizationId, now());
 	const [pending] = await input.database.unsafe<Array<{ exists: boolean }>>(
-		`SELECT EXISTS(SELECT 1 FROM github_repository_sweep sweep INNER JOIN github_repository_binding binding USING (organization_id, repository_id) INNER JOIN github_app_installation installation ON installation.installation_id = binding.installation_id WHERE sweep.status = 'pending' AND binding.status = 'active' AND installation.status = 'active' AND ($1::text IS NULL OR sweep.organization_id = $1))`,
-		[input.organizationId ?? null],
+		`SELECT EXISTS(SELECT 1 FROM github_repository_sweep sweep INNER JOIN github_repository_binding binding USING (organization_id, repository_id) INNER JOIN github_app_installation installation ON installation.installation_id = binding.installation_id WHERE sweep.status = 'pending' AND binding.status = 'active' AND installation.status = 'active' AND ($1::text IS NULL OR sweep.organization_id = $1) AND sweep.organization_id <> ALL($2::text[]))`,
+		[input.organizationId ?? null, skipped],
 	);
 	return {
 		enabled: true,

@@ -9,12 +9,6 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/dashboard/card";
 import { FileTree } from "@/components/pierre/file-tree";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { shortRunId, shortSubagentId } from "@/features/sessions/run-id";
@@ -28,6 +22,7 @@ import {
 } from "../model/session-reader-model";
 import { useSessionPlaces } from "../session-places";
 import { SubagentChip } from "../subagents/session-reader-subagent-chip";
+import { SummarySection } from "./session-reader-summary-section";
 import {
 	getSummaryTreeItems,
 	type SummaryActivity,
@@ -44,46 +39,7 @@ export type OpenFiles = (picks: { file?: string; run?: string }) => void;
 
 const LIST_LIMIT = 8;
 
-export function SummarySection({
-	anchor,
-	aside,
-	children,
-	className,
-	count,
-	fill = false,
-	title,
-}: {
-	anchor?: string;
-	aside?: ReactNode;
-	children: ReactNode;
-	className?: string;
-	count?: number;
-	fill?: boolean;
-	title: ReactNode;
-}) {
-	return (
-		<Card
-			data-summary-section={anchor}
-			size="sm"
-			className={cn("min-w-0 scroll-mt-4", className)}
-		>
-			<CardHeader className="flex flex-row items-baseline justify-between gap-4">
-				<CardTitle>{title}</CardTitle>
-				{aside ??
-					(count !== undefined ? (
-						<span className="text-sm text-muted-foreground tabular-nums">
-							{count}
-						</span>
-					) : null)}
-			</CardHeader>
-			<CardContent
-				className={cn("flex min-w-0 flex-col gap-2", fill && "min-h-0 flex-1")}
-			>
-				{children}
-			</CardContent>
-		</Card>
-	);
-}
+export { SummarySection };
 
 export function ShortList<T>({
 	fill = false,
@@ -142,7 +98,7 @@ export function ShowAll({
 		<button
 			type="button"
 			onClick={onClick}
-			className="w-fit cursor-pointer text-xs text-muted-foreground tabular-nums hover:text-foreground"
+			className="w-fit text-xs text-muted-foreground tabular-nums hover:text-foreground"
 		>
 			{children}
 		</button>
@@ -260,7 +216,7 @@ export function PlaceLink({
 			type="button"
 			title={`Open turn ${shortRunId(first.turnId)} in the detail`}
 			onClick={() => onOpen(first.turnId, first.agent)}
-			className="shrink-0 cursor-pointer rounded px-1 text-xs font-medium text-muted-foreground tabular-nums hover:bg-muted hover:text-foreground"
+			className="shrink-0 rounded px-1 text-xs font-medium text-muted-foreground tabular-nums hover:bg-muted hover:text-foreground"
 		>
 			{shortRunId(first.turnId)}
 			{first.agent ? ` · ${shortSubagentId(first.agent)}` : ""}
@@ -455,7 +411,7 @@ export function SummarySubagents({
 								type="button"
 								title="Open it in focus in the detail"
 								onClick={() => onOpen(turnId, subagent.subagentId)}
-								className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-2.5 text-left hover:underline"
 							>
 								{label}
 							</button>

@@ -1,10 +1,11 @@
 import {
 	type DimensionAnalysisInput,
-	resolveRepoIdentity,
+	type RepoIdentityResolver,
 	type SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
 	type SessionListFilters,
 	type SessionOverviewAnalytics,
 	type Source,
+	unifyRepoIdentities,
 } from "@rudel/api-routes";
 import {
 	addOptionalStringEqFilter,
@@ -13,13 +14,14 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { shouldUsePersistentSkillAnalytics } from "../lib/env.js";
-import { getRepositorySqlFilter } from "./repository-filter.service.js";
+import { toRepoIdentityInput } from "./repo-identity-rows.js";
+import {
+	getRepositorySqlFilter,
+	getWorkspaceRepoIdentities,
+} from "./repository-filter.service.js";
 import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
 import { buildSessionHasSubagentsSql } from "./session-lineage-analytics.service.js";
-import {
-	appendSessionListSqlFilters,
-	getSessionListRepositoryKey,
-} from "./session-list-filters.js";
+import { appendSessionListSqlFilters } from "./session-list-filters.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 import {
 	buildSessionAnalyticsWindowSql,
@@ -137,12 +139,9 @@ const EMPTY_SESSION_LANGUAGE_SIGNALS: PersistedSessionLanguageSignals = {
 
 export function mapSessionAnalyticsRow(
 	row: SessionAnalyticsRaw,
+	resolver: RepoIdentityResolver = unifyRepoIdentities([]),
 ): SessionOverviewAnalytics {
-	const repositoryIdentity = resolveRepoIdentity({
-		gitRemote: row.git_remote || null,
-		packageName: row.package_name || null,
-		projectPath: row.project_path,
-	});
+	const repositoryIdentity = resolver.resolve(toRepoIdentityInput(row));
 
 	return {
 		source: row.source,
@@ -390,14 +389,20 @@ async function getSessionAnalyticsBaseRows(
 		query_params,
 	});
 
-	const excludedRepositories = new Set(overviewFilters?.excluded.repository);
-	return overviewFilters && filterRepositories
-		? rows
-				.filter(
-					(row) => !excludedRepositories.has(getSessionListRepositoryKey(row)),
-				)
-				.slice(offset, offset + limit)
-		: rows;
+	if (!overviewFilters || !filterRepositories) return rows;
+	const excludedRepositories = new Set(overviewFilters.excluded.repository);
+	const resolver = await getWorkspaceRepoIdentities(
+		orgId,
+		rows.map(toRepoIdentityInput),
+	);
+	return rows
+		.filter(
+			(row) =>
+				!excludedRepositories.has(
+					resolver.resolve(toRepoIdentityInput(row)).repoKey,
+				),
+		)
+		.slice(offset, offset + limit);
 }
 
 export async function getSessionAnalytics(
@@ -481,6 +486,10 @@ export async function getSessionAnalytics(
 		signalRows.push(...results.flat());
 	}
 	const signalsByKey = new Map(signalRows.map((row) => [signalKey(row), row]));
+	const resolver = await getWorkspaceRepoIdentities(
+		orgId,
+		raw.map(toRepoIdentityInput),
+	);
 
 	return raw.map((baseRow) => {
 		const storedSignals = signalsByKey.get(signalKey(baseRow));
@@ -488,7 +497,7 @@ export async function getSessionAnalytics(
 			storedSignals?.user_id === baseRow.user_id
 				? storedSignals
 				: EMPTY_SESSION_LANGUAGE_SIGNALS;
-		return mapSessionAnalyticsRow({ ...baseRow, ...signals });
+		return mapSessionAnalyticsRow({ ...baseRow, ...signals }, resolver);
 	});
 }
 

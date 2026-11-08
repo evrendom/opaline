@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-boot>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <style>
       html { background-color: #ededed; }
       html.dark { background-color: oklch(0.145 0 0); }
+      html[data-boot] body { background-color: transparent; }
     </style>
     <!-- Apply the saved theme before first paint. Keep in sync with
          src/app/providers/ThemeProvider.tsx. -->

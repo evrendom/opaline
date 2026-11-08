@@ -1,8 +1,9 @@
 import {
 	type RepositorySettings,
 	RepositoryUploadSettingsSchema,
-	resolveRepoIdentity,
+	unifyRepoIdentities,
 } from "@rudel/api-routes";
+import { toRepoIdentityInput } from "./repo-identity-rows.js";
 
 export interface RepositoryInventory {
 	project_path: string;
@@ -21,6 +22,7 @@ export function buildRepositorySettings(
 	inventory: RepositoryInventory[],
 	savedReports: SavedRepositoryReport[],
 ): RepositorySettings {
+	const resolver = unifyRepoIdentities(inventory.map(toRepoIdentityInput));
 	const reports = savedReports.map((report) => ({
 		...report,
 		repositories: RepositoryUploadSettingsSchema.parse(report.repositories),
@@ -31,9 +33,10 @@ export function buildRepositorySettings(
 	for (const report of reports) {
 		for (const setting of report.repositories) {
 			for (const alias of [setting.key, ...(setting.aliases ?? [])]) {
-				const previous = aliases.get(alias);
+				const repoKey = resolver.resolveKey(alias);
+				const previous = aliases.get(repoKey);
 				aliases.set(
-					alias,
+					repoKey,
 					previous === undefined || previous === setting.key
 						? setting.key
 						: null,
@@ -46,11 +49,7 @@ export function buildRepositorySettings(
 		RepositorySettings["repositories"][number]
 	>();
 	for (const row of inventory) {
-		const identity = resolveRepoIdentity({
-			projectPath: row.project_path,
-			gitRemote: row.git_remote || null,
-			packageName: row.package_name || null,
-		});
+		const identity = resolver.resolve(toRepoIdentityInput(row));
 		const key = aliases.get(identity.repoKey) ?? identity.repoKey;
 		const previous = repositories.get(key);
 		repositories.set(key, {

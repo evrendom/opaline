@@ -1,5 +1,6 @@
 import { IconBrandGithub } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
+import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { cn } from "@/lib/utils";
 import { ScrollColumn } from "../files/session-reader-files-parts";
 import { PickStrip } from "../rail/session-reader-pick-strip";
@@ -103,24 +104,27 @@ export function CiPullColumn({
 							: "No CI reached in this run."}
 					</p>
 				) : (
-					<ul className="flex flex-col gap-0.5">
-						{rows.map((row) => (
-							<li key={row.entry.key}>
-								<PullLine
-									isPicked={row.entry.key === picked}
-									onPick={() => onPick(row.entry.key)}
-									onPickRun={(ciRunId) =>
-										onPickRun(
-											ciRunId === pickedRun ? null : ciRunId,
-											row.entry.key,
-										)
-									}
-									pickedRun={pickedRun}
-									row={row}
-								/>
-							</li>
-						))}
-					</ul>
+					<FluidList>
+						<ul className="flex flex-col gap-0.5">
+							{rows.map((row, index) => (
+								<li key={row.entry.key}>
+									<PullLine
+										index={index}
+										isPicked={row.entry.key === picked}
+										onPick={() => onPick(row.entry.key)}
+										onPickRun={(ciRunId) =>
+											onPickRun(
+												ciRunId === pickedRun ? null : ciRunId,
+												row.entry.key,
+											)
+										}
+										pickedRun={pickedRun}
+										row={row}
+									/>
+								</li>
+							))}
+						</ul>
+					</FluidList>
 				)}
 				{!run && unplaced > 0 ? (
 					<p className="px-2.5 py-2 text-[11px] text-muted-foreground">
@@ -174,14 +178,18 @@ function CiLine({
 	);
 }
 
-function PullLine({
+export function PullLine({
+	index,
 	isPicked,
+	meta,
 	onPick,
 	onPickRun,
 	pickedRun,
 	row,
 }: {
+	index?: number;
 	isPicked: boolean;
+	meta?: ReactNode;
 	onPick: () => void;
 	onPickRun: (ciRunId: string) => void;
 	pickedRun: string | null;
@@ -190,18 +198,21 @@ function PullLine({
 	const { pull } = row.entry;
 	const look = pullLook(row.entry);
 	const PullGlyph = look.icon;
+	const item = useFluidListItem<HTMLDivElement>(index);
 	return (
 		<div
+			ref={item.ref}
 			className={cn(
-				"relative flex flex-col gap-1 rounded-md px-2.5 py-1.5 transition-colors",
-				isPicked ? "bg-muted" : "hover:bg-muted/50",
+				"relative flex flex-col gap-1 rounded-md px-2.5 py-1.5 transition-colors corner-squircle squircle:rounded-xl",
+				isPicked && "bg-muted",
 			)}
 		>
 			<button
 				type="button"
 				aria-current={isPicked || undefined}
 				onClick={onPick}
-				className="flex w-full cursor-pointer items-start gap-2.5 text-left outline-none after:absolute after:inset-0 after:rounded-md"
+				onFocus={item.onFocus}
+				className="flex w-full items-start gap-2.5 text-left outline-none after:absolute after:inset-0 after:rounded-md"
 			>
 				<PullGlyph
 					aria-hidden="true"
@@ -225,13 +236,20 @@ function PullLine({
 					</span>
 				) : null}
 			</button>
-			{row.rounds.length > 0 ? (
-				<div className="pointer-events-none relative flex min-w-0 items-center pl-6.5">
-					<CiRoundDots
-						onPick={onPickRun}
-						pickedRun={pickedRun}
-						rounds={row.rounds}
-					/>
+			{row.rounds.length > 0 || meta ? (
+				<div className="pointer-events-none relative flex min-w-0 items-center gap-2 pl-6.5">
+					{row.rounds.length > 0 ? (
+						<CiRoundDots
+							onPick={onPickRun}
+							pickedRun={pickedRun}
+							rounds={row.rounds}
+						/>
+					) : null}
+					{meta ? (
+						<span className="ml-auto flex shrink-0 items-center leading-none [&>*]:leading-none">
+							{meta}
+						</span>
+					) : null}
 				</div>
 			) : null}
 		</div>

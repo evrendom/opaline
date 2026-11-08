@@ -1,5 +1,11 @@
-import { resolveRepoIdentity } from "@rudel/api-routes";
+import {
+	type RepoIdentityInput,
+	type RepoIdentityResolver,
+	resolveRepoIdentity,
+	unifyRepoIdentities,
+} from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
+import { toRepoIdentityInput } from "./repo-identity-rows.js";
 
 export const REPOSITORY_QUERY_SETTINGS = {
 	max_execution_time: 30,
@@ -32,18 +38,38 @@ export async function getRepositorySqlFilter(orgId: string, repoKey: string) {
    LIMIT 10001`,
 		query_params: { orgId },
 	});
+	const resolver = unifyRepoIdentities(rows.map(toRepoIdentityInput));
+	const target = resolver.resolveKey(repoKey);
 	const fingerprints = rows
 		.filter(
-			(row) =>
-				resolveRepoIdentity({
-					gitRemote: row.git_remote,
-					packageName: row.package_name,
-					projectPath: row.project_path,
-				}).repoKey === repoKey,
+			(row) => resolver.resolve(toRepoIdentityInput(row)).repoKey === target,
 		)
 		.map((row) => row.fingerprint);
 	return {
 		sql: `${REPOSITORY_FINGERPRINT_SQL} IN {repositoryFingerprints:Array(String)}`,
 		params: { repositoryFingerprints: fingerprints },
 	};
+}
+
+export async function getWorkspaceRepoIdentities(
+	orgId: string,
+	rows: readonly RepoIdentityInput[],
+): Promise<RepoIdentityResolver> {
+	if (!rows.some((row) => resolveRepoIdentity(row).source === "worktree"))
+		return unifyRepoIdentities(rows);
+	const remotes = await queryClickhouse<{ git_remote: string }>({
+		clickhouse_settings: REPOSITORY_QUERY_SETTINGS,
+		query: `SELECT DISTINCT sa.git_remote
+   FROM rudel.session_analytics AS sa FINAL
+   WHERE sa.organization_id = {orgId:String} AND sa.git_remote != ''
+   LIMIT 10001`,
+		query_params: { orgId },
+	});
+	return unifyRepoIdentities(
+		remotes.map((row) => ({
+			gitRemote: row.git_remote,
+			packageName: null,
+			projectPath: "",
+		})),
+	);
 }

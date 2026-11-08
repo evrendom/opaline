@@ -6,6 +6,7 @@ import {
 	ShellWindowFooterPlaceholder,
 	shellWindowRadiusClassName,
 } from "@/features/shell/components/shell-window-column";
+import { shellChromeStyle } from "@/features/shell/shell-chrome-style";
 import { useRootMark } from "@/hooks/use-root-mark";
 import { cn } from "@/lib/utils";
 import "./product-window-chrome.css";
@@ -33,29 +34,34 @@ export function ProductLoadingScreen({ children }: { children?: ReactNode }) {
 	useRootMark("data-app-shell");
 	return (
 		<div className="product-app-shell dashboard-01-preview flex h-dvh overflow-hidden overscroll-none text-foreground">
-			{/* Matches the sidebar's footprint so the window doesn't jump when the
-			    real sidebar mounts. */}
 			<div
-				aria-hidden="true"
-				data-variant="inset"
-				className="peer hidden w-56 shrink-0 md:block"
-			/>
-			<ShellWindowColumn
-				footer={
-					import.meta.env.MODE === "plugin" ? null : (
-						<ShellWindowFooterPlaceholder />
-					)
-				}
+				className="dashboard-01-chrome-frame relative flex h-full min-h-0 w-full overflow-clip overscroll-none"
+				style={shellChromeStyle}
 			>
-				<SidebarInset
-					className={cn(
-						"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
-						shellWindowRadiusClassName,
-					)}
+				{/* Matches the sidebar's footprint so the window doesn't jump when the
+				    real sidebar mounts. */}
+				<div
+					aria-hidden="true"
+					data-variant="inset"
+					className="peer hidden w-56 shrink-0 md:block"
+				/>
+				<ShellWindowColumn
+					footer={
+						import.meta.env.MODE === "plugin" ? null : (
+							<ShellWindowFooterPlaceholder />
+						)
+					}
 				>
-					{children ?? <ProductLoadingIndicator />}
-				</SidebarInset>
-			</ShellWindowColumn>
+					<SidebarInset
+						className={cn(
+							"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
+							shellWindowRadiusClassName,
+						)}
+					>
+						{children ?? <ProductLoadingIndicator />}
+					</SidebarInset>
+				</ShellWindowColumn>
+			</div>
 		</div>
 	);
 }

@@ -595,7 +595,6 @@
 
 .dashboardy-delay-chart-shell .recharts-bar-rectangle,
 .dashboardy-delay-chart-shell .recharts-rectangle {
-	cursor: pointer;
 	transition:
 		opacity 160ms ease-out,
 		filter 160ms ease-out,

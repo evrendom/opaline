@@ -1,4 +1,5 @@
 import type { SessionDetailWindow } from "@rudel/api-routes";
+import type { ReadyBody } from "@rudel/api-routes/session-context/session-reader-body";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
@@ -258,7 +259,7 @@ export function useSessionReaderBodies({
 	return { getBody, requestBody, retryBody };
 }
 
-export type ReadyBody<Turn> = { body: SessionReaderBody; turn: Turn };
+export type { ReadyBody };
 
 function sameReadyBodies<Turn>(
 	held: readonly ReadyBody<Turn>[] | null,

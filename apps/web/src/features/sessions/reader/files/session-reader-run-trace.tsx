@@ -407,7 +407,7 @@ function StepRow({
 				onClick={onPick}
 				aria-current={selected || undefined}
 				className={cn(
-					"relative isolate flex h-6 w-full cursor-pointer items-center gap-1.5 px-2 text-left text-xs",
+					"relative isolate flex h-6 w-full items-center gap-1.5 px-2 text-left text-xs",
 					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:rounded-md before:transition-colors",
 					depth === 1 && "pl-5",
 					depth === 2 && "pl-8",

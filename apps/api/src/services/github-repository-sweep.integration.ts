@@ -564,6 +564,39 @@ test("kill switch stops requests and preserves resumable progress; live lane win
 	expect(yielded.hasMore).toBe(true);
 });
 
+test("the demo workspace's bindings are never swept, so no token is asked for and its windows stay as seeded", async () => {
+	const scope = await seed();
+	const windows = async () =>
+		sqlClient.unsafe<Array<{ dataset: string; status: string }>>(
+			"SELECT dataset, status FROM github_repository_sweep WHERE organization_id = $1 ORDER BY dataset, window_start",
+			[scope.organizationId],
+		);
+	const before = await windows();
+	const tokens: string[] = [];
+	const skipped = await runGitHubRepositorySweep({
+		database: sqlClient,
+		config,
+		environment: { DEMO_ORGANIZATION_ID: ` ${scope.organizationId} ` },
+		organizationId: scope.organizationId,
+		fetch: Object.assign(
+			async () => {
+				throw new Error("the demo sweep called GitHub");
+			},
+			{ preconnect: fetch.preconnect },
+		),
+		createToken: async ({ installationId }) => {
+			tokens.push(installationId);
+			return "fixture";
+		},
+		now: () => NOW,
+	});
+	expect(skipped).toEqual({ enabled: true, requests: 0, hasMore: false });
+	expect(tokens).toEqual([]);
+	expect(await windows()).toEqual(before);
+	const swept = await execute(scope.organizationId, defaults);
+	expect(swept.requests).toBeGreaterThan(0);
+});
+
 test("free text is capped at 512 Unicode characters and remains valid ClickHouse text", async () => {
 	const scope = await seed();
 	await persistGitHubPullRequests(

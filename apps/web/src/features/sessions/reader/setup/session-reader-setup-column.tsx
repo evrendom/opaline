@@ -1,7 +1,9 @@
 import type { SessionSetupFile } from "@rudel/api-routes";
 import { IconListDetails, IconPlug, IconSettings } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { Bones } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
+import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { formatPaddedTimeOfDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OpalChip } from "../detail/waterfall/session-reader-waterfall-chips";
@@ -59,6 +61,12 @@ export function SetupColumn({
 		);
 	const count = uses ? uses.uses.length : setup.length;
 	const column = useColumnSlide<HTMLDivElement>();
+	const useGroups = uses ? groupUses(uses.uses) : [];
+	const useIndex = new Map(
+		useGroups
+			.flatMap((group) => group.tools.flatMap((tool) => tool.uses))
+			.map((use, index) => [use.step.id, index]),
+	);
 	return (
 		<div
 			className={cn(
@@ -70,9 +78,11 @@ export function SetupColumn({
 				model={model}
 				run={run}
 				summary={
-					uses
-						? `${count} skill and MCP ${count === 1 ? "use" : "uses"}`
-						: `${count} ${count === 1 ? "file" : "files"}`
+					uses?.status === "loading"
+						? undefined
+						: uses
+							? `${count} skill and MCP ${count === 1 ? "use" : "uses"}`
+							: `${count} ${count === 1 ? "file" : "files"}`
 				}
 			>
 				{uses ? (
@@ -90,11 +100,9 @@ export function SetupColumn({
 				<ScrollColumn className="px-1 pb-8">
 					{calls ? timeline : null}
 					{calls ? null : uses ? (
-						<div className="flex flex-col gap-0.5">
+						<FluidList className="flex flex-col gap-0.5">
 							{uses.status === "loading" ? (
-								<p className="py-1 pl-2 text-[11px] text-muted-foreground">
-									Reading the run…
-								</p>
+								<UsesSkeleton />
 							) : uses.status === "failed" ? (
 								<p className="py-1 pl-2 text-[11px] text-muted-foreground">
 									This run could not be read.
@@ -107,17 +115,18 @@ export function SetupColumn({
 									className="mt-1 p-6 py-8"
 								/>
 							) : null}
-							{groupUses(uses.uses).map((group) => (
+							{useGroups.map((group) => (
 								<SetupUseGroup
 									key={group.file.setupFile}
 									group={group}
+									indexOf={(use) => useIndex.get(use.step.id)}
 									onPickUse={(use) => onPickUse?.(use)}
 									pickedUse={pickedUse ?? null}
 								/>
 							))}
-						</div>
+						</FluidList>
 					) : null}
-					<div
+					<FluidList
 						className={cn(
 							"flex flex-col gap-0.5",
 							uses && "mt-3 border-t border-border/50 pt-2",
@@ -129,15 +138,16 @@ export function SetupColumn({
 								No setup received in this run.
 							</p>
 						) : null}
-						{files.map((file) => (
+						{files.map((file, index) => (
 							<SetupFileRow
 								key={file.setupFile}
 								file={file}
+								index={index}
 								isPicked={file === shown && !pickedUse}
 								onPick={onPick}
 							/>
 						))}
-					</div>
+					</FluidList>
 					{receivedBy ? (
 						<div className="mt-3 border-t border-border/50 pt-1">
 							{receivedBy}
@@ -178,12 +188,81 @@ const countOf = (uses: number) => (
 	</span>
 );
 
+const SAMPLE_SERVER: SessionSetupFile = {
+	chars: 0,
+	firstAt: "2026-11-06T09:00:00.000Z",
+	kind: "mcp_instructions",
+	owner: "claude.ai Claude Docs",
+	path: "",
+	runs: 1,
+	scope: "mcp",
+	setupFile: "mcp:claude.ai Claude Docs",
+	subagents: false,
+	versions: 1,
+};
+
+function sampleUse(
+	id: string,
+	startMs: number,
+	tool: string,
+	input: Record<string, unknown>,
+): SetupUse {
+	return {
+		file: SAMPLE_SERVER,
+		step: {
+			id,
+			startMs,
+			toolEvent: {
+				id,
+				input,
+				kind: "tool",
+				result: undefined,
+				timestamp: new Date(startMs).toISOString(),
+				toolName: `mcp__claude_ai_Claude_Docs__${tool}`,
+			},
+		} as SessionReaderStep,
+	};
+}
+
+const SAMPLE_USE_GROUPS = groupUses([
+	sampleUse("a", Date.UTC(2026, 10, 6, 9, 41, 12), "guide", {
+		items: "topic.editing",
+	}),
+	sampleUse("b", Date.UTC(2026, 10, 6, 9, 41, 30), "guide", {
+		items: "topic.charts",
+	}),
+	sampleUse("c", Date.UTC(2026, 10, 6, 9, 42, 5), "update", {
+		title: "Retro digest notes",
+	}),
+	sampleUse("d", Date.UTC(2026, 10, 6, 9, 43, 51), "update", {
+		title: "Section on the calls view",
+	}),
+]);
+
+function UsesSkeleton() {
+	return (
+		<Bones label="Reading the run">
+			{SAMPLE_USE_GROUPS.map((group) => (
+				<SetupUseGroup
+					key={group.file.setupFile}
+					group={group}
+					indexOf={() => undefined}
+					onPickUse={() => {}}
+					pickedUse={null}
+				/>
+			))}
+		</Bones>
+	);
+}
+
 function SetupUseGroup({
 	group,
+	indexOf,
 	onPickUse,
 	pickedUse,
 }: {
 	group: UseGroup;
+	indexOf: (use: SetupUse) => number | undefined;
 	onPickUse: (use: SetupUse) => void;
 	pickedUse: string | null;
 }) {
@@ -213,6 +292,7 @@ function SetupUseGroup({
 						<SetupUseRow
 							key={use.step.id}
 							indent={tool ? "pl-13" : "pl-9"}
+							index={indexOf(use)}
 							isPicked={use.step.id === pickedUse}
 							onPick={() => onPickUse(use)}
 							use={use}
@@ -262,25 +342,30 @@ function aboutOf(step: SessionReaderStep): string | null {
 
 function SetupUseRow({
 	indent,
+	index,
 	isPicked,
 	onPick,
 	use: { step },
 }: {
 	indent: string;
+	index: number | undefined;
 	isPicked: boolean;
 	onPick: () => void;
 	use: SetupUse;
 }) {
 	const about = aboutOf(step);
+	const item = useFluidListItem<HTMLButtonElement>(index);
 	return (
 		<button
 			type="button"
+			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={onPick}
+			onFocus={item.onFocus}
 			className={cn(
-				"flex w-full cursor-pointer items-center gap-2.5 rounded-md py-1 pr-2.5 text-left outline-none transition-colors",
+				"relative flex w-full items-center gap-2.5 rounded-md py-1 pr-2.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
 				indent,
-				isPicked ? "bg-muted" : "hover:bg-muted/50",
+				isPicked && "bg-muted",
 			)}
 		>
 			<span
@@ -315,7 +400,12 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 	if (!look) {
 		const { Icon } = getFileLanguage(setupName(file));
 		return (
-			<Icon aria-hidden="true" className="size-4 text-muted-foreground/60" />
+			<span
+				skullet-block=""
+				className="inline-flex shrink-0 rounded-sm corner-squircle squircle:rounded-lg"
+			>
+				<Icon aria-hidden="true" className="size-4 text-muted-foreground/60" />
+			</span>
 		);
 	}
 	const Glyph = look.glyph;
@@ -328,21 +418,26 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 
 function SetupFileRow({
 	file,
+	index,
 	isPicked,
 	onPick,
 }: {
 	file: SessionSetupFile;
+	index: number;
 	isPicked: boolean;
 	onPick: (setupFile: string) => void;
 }) {
+	const item = useFluidListItem<HTMLButtonElement>(index);
 	return (
 		<button
 			type="button"
+			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={() => onPick(file.setupFile)}
+			onFocus={item.onFocus}
 			className={cn(
-				"flex w-full cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors",
-				isPicked ? "bg-muted" : "hover:bg-muted/50",
+				"relative flex w-full items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
+				isPicked && "bg-muted",
 			)}
 		>
 			<span className="mt-px flex shrink-0">

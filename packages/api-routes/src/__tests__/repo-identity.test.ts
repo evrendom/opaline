@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { type RepoIdentity, resolveRepoIdentity } from "../repo-identity.js";
+import {
+	type RepoIdentity,
+	resolveRepoIdentity,
+	unifyRepoIdentities,
+} from "../repo-identity.js";
 
 describe("resolveRepoIdentity", () => {
-	test("uses the Conductor repo token before the git remote", () => {
+	test("uses the git remote before the Conductor path and keeps the worktree", () => {
 		expect(
 			resolveRepoIdentity({
 				projectPath: "/Users/x/conductor/workspaces/rudel-v2/podgorica",
@@ -10,11 +14,24 @@ describe("resolveRepoIdentity", () => {
 				packageName: null,
 			}),
 		).toEqual({
-			repoKey: "path:rudel-v2",
-			repoLabel: "rudel-v2",
-			repoName: "rudel-v2",
-			source: "worktree",
+			repoKey: "remote:github.com/evrendom/rudel",
+			repoLabel: "evrendom/rudel",
+			repoName: "rudel",
+			source: "remote",
 			worktree: "podgorica",
+		});
+		expect(
+			resolveRepoIdentity({
+				projectPath: "/Users/x/dev/myrepo/.worktrees/feature-x/apps/web",
+				gitRemote: "git@github.com:owner/myrepo.git",
+				packageName: null,
+			}),
+		).toEqual({
+			repoKey: "remote:github.com/owner/myrepo",
+			repoLabel: "owner/myrepo",
+			repoName: "myrepo",
+			source: "remote",
+			worktree: "feature-x",
 		});
 	});
 
@@ -222,5 +239,101 @@ describe("resolveRepoIdentity", () => {
 			source: "unresolved",
 			worktree: null,
 		});
+	});
+});
+
+describe("unifyRepoIdentities", () => {
+	const conductorPath = "/Users/x/conductor/workspaces/Athena/lisbon";
+	const remoteRow = (gitRemote: string) => ({
+		projectPath: "/Users/x/dev/checkout",
+		gitRemote,
+		packageName: null,
+	});
+	const remoteLess = {
+		projectPath: conductorPath,
+		gitRemote: null,
+		packageName: null,
+	};
+
+	test("joins a remote-less path to the single remote repo with its name", () => {
+		const resolver = unifyRepoIdentities([
+			remoteRow("github.com/opalinehq/athena"),
+			remoteRow("git@github.com:opalinehq/athena.git"),
+			remoteRow("github.com/opalinehq/cli"),
+			remoteLess,
+		]);
+
+		expect(resolver.resolve(remoteLess)).toEqual({
+			repoKey: "remote:github.com/opalinehq/athena",
+			repoLabel: "opalinehq/athena",
+			repoName: "athena",
+			source: "remote",
+			worktree: "lisbon",
+		});
+		expect(resolver.resolveKey("path:athena")).toBe(
+			"remote:github.com/opalinehq/athena",
+		);
+		expect(
+			resolver.resolve({
+				...remoteLess,
+				gitRemote: "github.com/opalinehq/athena",
+			}),
+		).toEqual({
+			repoKey: "remote:github.com/opalinehq/athena",
+			repoLabel: "opalinehq/athena",
+			repoName: "athena",
+			source: "remote",
+			worktree: "lisbon",
+		});
+	});
+
+	test("keeps the path identity when two remote repos share the name", () => {
+		const resolver = unifyRepoIdentities([
+			remoteRow("github.com/opalinehq/athena"),
+			remoteRow("github.com/someone/athena"),
+			remoteLess,
+		]);
+
+		expect(resolver.resolve(remoteLess).repoKey).toBe("path:Athena");
+		expect(resolver.resolveKey("path:Athena")).toBe("path:Athena");
+	});
+
+	test("keeps the path identity when no remote repo has the name", () => {
+		const resolver = unifyRepoIdentities([
+			remoteRow("github.com/opalinehq/cli"),
+			remoteLess,
+		]);
+
+		expect(resolver.resolve(remoteLess)).toEqual({
+			repoKey: "path:Athena",
+			repoLabel: "Athena",
+			repoName: "Athena",
+			source: "worktree",
+			worktree: "lisbon",
+		});
+		expect(resolver.resolveKey("remote:github.com/opalinehq/cli")).toBe(
+			"remote:github.com/opalinehq/cli",
+		);
+	});
+
+	test("leaves package and raw path identities alone", () => {
+		const resolver = unifyRepoIdentities([
+			remoteRow("github.com/opalinehq/athena"),
+		]);
+
+		expect(
+			resolver.resolve({
+				projectPath: "/Users/x/dev/athena",
+				gitRemote: null,
+				packageName: null,
+			}).repoKey,
+		).toBe("path-raw:/Users/x/dev/athena");
+		expect(
+			resolver.resolve({
+				projectPath: "/Users/x/dev/athena",
+				gitRemote: null,
+				packageName: "athena",
+			}).repoKey,
+		).toBe("pkg:athena");
 	});
 });

@@ -8,7 +8,7 @@ test("confirmed worktree aliases join saved auto-upload settings to existing ses
 		[
 			{
 				project_path: "/home/dev/conductor/workspaces/repo/tunis",
-				git_remote: "github.com/old/repo",
+				git_remote: "",
 				package_name: "",
 				session_count: 12,
 			},
@@ -41,6 +41,45 @@ test("confirmed worktree aliases join saved auto-upload settings to existing ses
 			sessionCount: 15,
 			reports: [{ installationId: "computer-a", state: "enabled", reportedAt }],
 		},
+	]);
+});
+
+test("a git remote decides the repository even under an aliased worktree path", () => {
+	const result = buildRepositorySettings(
+		[
+			{
+				project_path: "/home/dev/conductor/workspaces/repo/tunis",
+				git_remote: "github.com/old/repo",
+				package_name: "",
+				session_count: 12,
+			},
+			{
+				project_path: "/home/dev/repo",
+				git_remote: "github.com/team/repo",
+				package_name: "",
+				session_count: 3,
+			},
+		],
+		[
+			{
+				installation_id: "computer-a",
+				reported_at: reportedAt,
+				repositories: [
+					{
+						key: "remote:github.com/team/repo",
+						name: "repo",
+						state: "enabled",
+						aliases: ["path:repo"],
+					},
+				],
+			},
+		],
+	);
+	expect(
+		result.repositories.map(({ key, sessionCount }) => ({ key, sessionCount })),
+	).toEqual([
+		{ key: "remote:github.com/old/repo", sessionCount: 12 },
+		{ key: "remote:github.com/team/repo", sessionCount: 3 },
 	]);
 });
 

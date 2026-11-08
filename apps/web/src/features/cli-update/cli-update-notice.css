@@ -60,7 +60,6 @@
 
 .cli-update-notice .session-menu-row {
 	text-decoration: none;
-	cursor: pointer;
 }
 
 .cli-update-notice .session-menu-row::before {

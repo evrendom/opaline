@@ -90,6 +90,37 @@ test("merges remote URL forms but keeps different owners separate", () => {
 	]);
 });
 
+test("lists one repository for its remote, Conductor and remote-less sessions", () => {
+	const repos = aggregateRepositories([
+		{ ...row, project_path: "/work/app", git_remote: "github.com/one/app" },
+		{ ...row, git_remote: "git@github.com:one/app.git", session_count: 4 },
+		{ ...row, project_path: "/opt/conductor/workspaces/App/osaka" },
+	]);
+	expect(
+		repos.map((repo) => [repo.identity.repoKey, repo.sessionCount]),
+	).toEqual([["remote:github.com/one/app", 10]]);
+	expect(repos[0]?.identity).toMatchObject({
+		repoLabel: "one/app",
+		source: "remote",
+		worktree: null,
+	});
+});
+
+test("keeps remote-less worktrees apart when two remote repos share the name", () => {
+	const repos = aggregateRepositories([
+		{ ...row, project_path: "/work/a", git_remote: "github.com/one/app" },
+		{ ...row, project_path: "/work/b", git_remote: "github.com/two/app" },
+		{ ...row, project_path: "/opt/conductor/workspaces/other/osaka" },
+		row,
+	]);
+	expect(repos.map((repo) => repo.identity.repoKey).sort()).toEqual([
+		"path:app",
+		"path:other",
+		"remote:github.com/one/app",
+		"remote:github.com/two/app",
+	]);
+});
+
 test("does not present incomplete costs or signal scans as complete", () => {
 	const [repo] = aggregateRepositories([
 		row,

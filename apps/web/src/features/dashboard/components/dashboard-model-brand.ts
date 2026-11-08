@@ -30,7 +30,9 @@ export function formatModelDisplayLabel(model: string) {
 	if (normalizedModel === "claude (failed start)")
 		return "Claude (failed start)";
 	const fableVersion = normalizeModelVersion(
-		normalizedModel.match(/fable[-_ ]?([0-9]+(?:[._][0-9]+)?)/)?.[1],
+		normalizedModel.match(
+			/fable[-_ ]?([0-9]+(?:[._-][0-9]{1,2}(?![0-9]))?)/,
+		)?.[1],
 	);
 	if (normalizedModel.includes("fable")) {
 		return fableVersion ? `Fable ${fableVersion}` : "Fable";

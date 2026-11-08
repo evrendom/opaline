@@ -111,6 +111,53 @@ const SHELL_OPALINE: Record<"dark" | "light", Record<string, string>> = {
 	},
 };
 
+const VIOLET = 292.717;
+const GREEN = 149.579;
+const AMBER = 55;
+const BLUE = 259.815;
+const CYAN = 215.221;
+const RED = 25.331;
+
+const CODE_OPALINE: Record<"dark" | "light", Record<string, string>> = {
+	dark: {
+		"#000080": OPAL(0.76, 0.13, BLUE),
+		"#4EC9B0": OPAL(0.78, 0.11, CYAN),
+		"#4FC1FF": OPAL(0.8, 0.14, AMBER),
+		"#569CD6": OPAL(0.74, 0.16, VIOLET),
+		"#646695": OPAL(0.62, 0, 0),
+		"#6796E6": OPAL(0.76, 0.13, BLUE),
+		"#6A9955": OPAL(0.62, 0, 0),
+		"#808080": OPAL(0.62, 0, 0),
+		"#9CDCFE": OPAL(0.88, 0.03, BLUE),
+		"#B5CEA8": OPAL(0.8, 0.14, AMBER),
+		"#C586C0": OPAL(0.74, 0.16, VIOLET),
+		"#CE9178": OPAL(0.78, 0.14, GREEN),
+		"#D16969": OPAL(0.78, 0.14, GREEN),
+		"#D7BA7D": OPAL(0.8, 0.14, AMBER),
+		"#DCDCAA": OPAL(0.76, 0.13, BLUE),
+		"#F44747": OPAL(0.7, 0.19, RED),
+	},
+	light: {
+		"#000080": OPAL(0.5, 0.18, BLUE),
+		"#0000FF": OPAL(0.5, 0.2, VIOLET),
+		"#001080": OPAL(0.32, 0.04, BLUE),
+		"#0070C1": OPAL(0.56, 0.16, AMBER),
+		"#008000": OPAL(0.55, 0, 0),
+		"#0451A5": OPAL(0.5, 0.18, BLUE),
+		"#098658": OPAL(0.56, 0.16, AMBER),
+		"#267F99": OPAL(0.52, 0.11, CYAN),
+		"#795E26": OPAL(0.5, 0.18, BLUE),
+		"#800000": OPAL(0.5, 0.2, VIOLET),
+		"#811F3F": OPAL(0.52, 0.14, GREEN),
+		"#A31515": OPAL(0.52, 0.14, GREEN),
+		"#AF00DB": OPAL(0.5, 0.2, VIOLET),
+		"#CD3131": OPAL(0.55, 0.2, RED),
+		"#D16969": OPAL(0.52, 0.14, GREEN),
+		"#E50000": OPAL(0.32, 0.04, BLUE),
+		"#EE0000": OPAL(0.56, 0.16, AMBER),
+	},
+};
+
 const warmLanguages = new Set<string>();
 
 globalThis.addEventListener(
@@ -144,12 +191,11 @@ globalThis.addEventListener(
 			language: event.data.language,
 			lines: lines.map((line) =>
 				line.map((token) => ({
-					color:
-						language === "shellscript" && token.color
-							? (SHELL_OPALINE[event.data.theme === "dark" ? "dark" : "light"][
-									token.color.toUpperCase()
-								] ?? token.color)
-							: token.color,
+					color: token.color
+						? ((language === "shellscript" ? SHELL_OPALINE : CODE_OPALINE)[
+								event.data.theme === "dark" ? "dark" : "light"
+							][token.color.toUpperCase()] ?? token.color)
+						: undefined,
 					content: token.content,
 					fontStyle: token.fontStyle,
 					offset: token.offset,

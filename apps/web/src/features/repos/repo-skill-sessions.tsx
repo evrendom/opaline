@@ -347,7 +347,7 @@ function AgentTraceRow({
 						SESSION_OVERVIEW_ROW_CLASS_NAME,
 						TRACE_GRID_CLASS_NAME,
 						// group/toggle drives the model chip's disclosure.
-						"group/toggle cursor-pointer",
+						"group/toggle",
 						// An open row shares the tint of the panel folded out beneath it,
 						// rounding the top of the block the panel rounds at the bottom.
 						open &&

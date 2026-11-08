@@ -325,6 +325,13 @@ export function readGitHubEvidenceUiForceOrgIds(
 	];
 }
 
+export function readGitHubSyncSkippedOrgIds(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	const demo = environment.DEMO_ORGANIZATION_ID?.trim();
+	return demo ? [demo] : [];
+}
+
 /**
  * Workspaces whose members never reach PostHog from the API: test and seed
  * workspaces would otherwise create a person per member on every signup and on

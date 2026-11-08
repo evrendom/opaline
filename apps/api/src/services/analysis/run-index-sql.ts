@@ -49,9 +49,11 @@ import {
  * also writes its requests (`rudel.run_requests`, OPL-389). 6: and each
  * run's received setup (`rudel.run_setup`, OPL-391). 7: a run and its
  * requests end at their last activity record (RUN_ACTIVITY_SQL), not a
- * compaction or context a local command added after the answer.
+ * compaction or context a local command added after the answer. 8: a Codex
+ * run's directory from its turn and workdir. 9: each build is followed by
+ * the session's context snapshot (`rudel.session_context_snapshots`).
  */
-export const RUN_INDEX_VERSION = 8;
+export const RUN_INDEX_VERSION = 9;
 
 /**
  * A run's own activity: the prompt, the model's responses and the calls they

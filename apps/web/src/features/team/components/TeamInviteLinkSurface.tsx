@@ -122,7 +122,7 @@ export function TeamInviteLinkSurface({
 						onClick={() => void handleRevokeTeamInviteLink()}
 						size="sm"
 						type="button"
-						variant="ghost"
+						variant="destructive"
 					>
 						{teamInviteLink ? "Revoke link" : "Revoke existing links"}
 					</Button>
@@ -149,8 +149,9 @@ export function TeamInviteLinkSurface({
 						</p>
 						<button
 							type="button"
+							skullet-block=""
 							aria-label={copied ? "Copied team link" : "Copy team link"}
-							className="h-6 shrink-0 cursor-pointer rounded-full bg-foreground px-2.5 text-xs font-medium text-background disabled:opacity-50"
+							className="h-6 shrink-0 rounded-full bg-foreground px-2.5 text-xs font-medium text-background disabled:opacity-50"
 							disabled={isInviteLinkPending}
 							onClick={() => void handleCopyTeamLink()}
 						>
@@ -160,6 +161,7 @@ export function TeamInviteLinkSurface({
 				) : null}
 				<button
 					type="button"
+					skullet-block=""
 					className="toolbar-button"
 					disabled={isInviteLinkPending}
 					onClick={() => void handleCreateTeamInviteLink()}
@@ -169,6 +171,7 @@ export function TeamInviteLinkSurface({
 				</button>
 				<button
 					type="button"
+					skullet-block=""
 					className="toolbar-button"
 					disabled={isInviteLinkPending}
 					onClick={() => void handleRevokeTeamInviteLink()}
@@ -333,6 +336,37 @@ export function TeamInviteLinkSurface({
 					Revoke
 				</Button>
 			</div>
+		</div>
+	);
+}
+
+export function TeamInviteLinkActionsSample({
+	layout = "toolbar",
+}: {
+	layout?: "settings" | "toolbar";
+}) {
+	if (layout === "settings")
+		return (
+			<div className="workspace-settings-link-surface">
+				<div className="workspace-settings-link-actions">
+					<Button size="sm" type="button" variant="outline">
+						Create invite link
+					</Button>
+					<Button size="sm" type="button" variant="ghost">
+						Revoke existing links
+					</Button>
+				</div>
+			</div>
+		);
+	return (
+		<div className="flex min-w-0 items-center gap-2">
+			<button type="button" skullet-block="" className="toolbar-button">
+				<IconLink aria-hidden="true" />
+				Create invite link
+			</button>
+			<button type="button" skullet-block="" className="toolbar-button">
+				Revoke existing links
+			</button>
 		</div>
 	);
 }

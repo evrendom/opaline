@@ -219,8 +219,15 @@ export function useRepositoryCostDashboard(
 	return {
 		...state,
 		...tabs,
-		metrics: tabs.metrics.filter(
-			(value) => hasGitHub || !usesGitHubRepositories(value),
+		metrics: DASHBOARD_METRICS.filter(
+			(value) =>
+				(tabs.metrics.includes(value) ||
+					(tabs.metricsPending &&
+						hasGitHub &&
+						usesGitHubRepositories(value))) &&
+				(githubRepositories === undefined ||
+					hasGitHub ||
+					!usesGitHubRepositories(value)),
 		),
 		dimensions: (offGitHub
 			? REPOSITORY_COST_DIMENSIONS
@@ -633,11 +640,9 @@ function buildDashboardInput(
 			.getAll("signal")
 			.filter(
 				(value): value is DashboardSignal =>
-					value === "modelApologies" ||
-					value === "userPositive" ||
-					value === "userNegative",
+					value === "modelApologies" || value === "userNegative",
 			)
-			.slice(0, 3)
+			.slice(0, 2)
 			.sort(),
 		phrases: params.getAll("phrase").slice(0, 100).sort(),
 		runSignals: AGENT_RUN_SIGNALS.filter(({ id }) =>

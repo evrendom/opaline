@@ -43,7 +43,7 @@ export function GitHubConnectionCard({
 	return (
 		<WorkspaceSettingsGroup
 			title="Connection"
-			description="Connect GitHub so Opaline can count merged pull requests and CI runs in your repositories and attach them to sessions. Opaline reads metadata only: pull requests, CI runs and commits, never code."
+			description="Connect GitHub so Opaline can count merged pull requests and CI runs in your repositories and attach them to sessions. Access is read-only. Opaline stores pull requests, CI runs and commits. A repo’s files are read from GitHub only when someone opens them in its Files tab, and are never stored."
 		>
 			<WorkspaceSettingsRow
 				label="Account"
@@ -69,7 +69,9 @@ export function GitHubConnectionCard({
 						description="Merged PRs and CI runs are on the dashboard."
 					>
 						<a
-							className="cost-text-button"
+							data-slot="button"
+							data-variant="outline"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
 							href="../../dashboard?metric=mergedPullRequests"
 						>
 							Open dashboard
@@ -85,7 +87,17 @@ export function GitHubConnectionCard({
 					label="CI history"
 					description="GitHub deletes CI runs after 90 days by default. Raise Actions retention on GitHub to keep more."
 				>
-					<a href={status.manageUrl ?? undefined}>Check GitHub access</a>
+					<a
+						data-slot="button"
+						data-variant="outline"
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+						href={status.manageUrl ?? undefined}
+						target="_blank"
+						rel="noreferrer"
+					>
+						Check GitHub access
+						<span className="sr-only"> (opens in a new tab)</span>
+					</a>
 				</WorkspaceSettingsRow>
 			) : null}
 
@@ -191,6 +203,7 @@ function ConnectionControl({
 		status.canManage && status.manageUrl ? (
 			<a
 				data-slot="button"
+				data-variant="outline"
 				className={buttonVariants({ variant: "outline", size: "sm" })}
 				href={status.manageUrl}
 				target="_blank"
@@ -206,7 +219,7 @@ function ConnectionControl({
 			{status.canManage && !status.suspended ? (
 				<Button
 					type="button"
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					disabled={isBusy}
 					onClick={onConnect}

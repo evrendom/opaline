@@ -11,8 +11,9 @@
 .scroll-fade {
 	mask-image: linear-gradient(
 		to bottom,
-		transparent,
-		#000 var(--scroll-fade-top),
+		#000 var(--scroll-fade-top-offset, 0px),
+		transparent var(--scroll-fade-top-offset, 0px),
+		#000 calc(var(--scroll-fade-top-offset, 0px) + var(--scroll-fade-top)),
 		#000 calc(100% - var(--scroll-fade-bottom)),
 		transparent
 	);

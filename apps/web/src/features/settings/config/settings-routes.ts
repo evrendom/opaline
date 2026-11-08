@@ -6,6 +6,7 @@ export type SettingsRouteId =
 	| "sessions"
 	| "reports"
 	| "members"
+	| "team"
 	| "invitations"
 	| "account"
 	| "create-workspace";
@@ -50,6 +51,12 @@ export const settingsRouteMap: Record<
 		label: "Members",
 		segment: "members",
 		path: appRoutes.settingsMembers(),
+	},
+	team: {
+		id: "team",
+		label: "Team",
+		segment: "team",
+		path: appRoutes.settingsTeam(),
 	},
 	invitations: {
 		id: "invitations",
@@ -109,7 +116,7 @@ export function getActiveSettingsRouteId(
 	if (matchedRoute === "reports") return "reports";
 	if (matchedRoute === "github") return "github";
 
-	if (matchedRoute === "members") {
+	if (matchedRoute === "members" || matchedRoute === "team") {
 		return "members";
 	}
 

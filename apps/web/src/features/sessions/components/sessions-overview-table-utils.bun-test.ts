@@ -140,7 +140,7 @@ describe("getRepositoryLabel", () => {
 });
 
 describe("compareSessions", () => {
-	test("sorts signal columns by total persisted language signals", () => {
+	test("sorts signal columns by frustration signals, leaving out positive ones", () => {
 		const louderSession: SessionAnalytics = {
 			...session,
 			member_swears: 2,
@@ -153,7 +153,7 @@ describe("compareSessions", () => {
 		};
 
 		expect(compareSessions(louderSession, quieterSession, "signals", {})).toBe(
-			2,
+			1,
 		);
 	});
 });

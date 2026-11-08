@@ -98,7 +98,7 @@ function SetupRow({
 				title={`Read ${setupName(file)} in Setup`}
 				onClick={() => onOpen(file.setupFile)}
 				className={cn(
-					"flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1 text-left text-[13px] outline-none hover:bg-accent/60",
+					"flex min-h-8 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1 text-left text-[13px] outline-none hover:bg-accent/60",
 				)}
 			>
 				<SetupMark file={file} />

@@ -137,7 +137,7 @@ export function callHrefOf(
 	call: { run: string; step: string; subagent?: string },
 ) {
 	const params = new URLSearchParams(searchParams);
-	params.delete(SESSION_TAB_PARAM);
+	params.set(SESSION_TAB_PARAM, "detail");
 	writePick(params, pickOf(call.run, call.subagent ?? null));
 	params.set(CALL_PARAM, call.step);
 	return `?${params}`;

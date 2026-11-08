@@ -56,8 +56,8 @@ vi.mock("@/features/reports/ReportPage", async () => {
 	};
 });
 
-vi.mock("@/features/team/TeamPage", () => ({
-	TeamPage: () => <div>Team page</div>,
+vi.mock("@/features/mcp/McpPage", () => ({
+	McpPage: () => <div>MCP page</div>,
 }));
 
 vi.mock("@/features/settings/SettingsLayout", () => ({
@@ -112,7 +112,9 @@ describe("AppRouter", () => {
 		["/newsesh", "New session page"],
 		["/newsesh/session-123", "New session page"],
 		["/skills", "Historical skills page"],
-		["/team", "Team page"],
+		["/team", "Members settings page"],
+		["/mcp", "MCP page"],
+		["/settings/team", "Members settings page"],
 		["/settings", "Workspace settings page"],
 		["/settings/reports", "Reports settings page"],
 		["/acme/settings/reports", "Reports settings page"],

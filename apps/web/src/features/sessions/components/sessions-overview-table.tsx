@@ -12,6 +12,8 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
+import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { useLoadMoreIntersectionObserver } from "@/app/hooks/useLoadMoreIntersectionObserver";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { getSessionRenderIndexes } from "@/features/sessions/session-list-virtualization";
@@ -19,6 +21,7 @@ import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionRunQuestionTags } from "@/features/sessions/use-run-question-tags";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
+import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatUsername } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { buildSessionMemberProfileSummaries } from "./session-member-profile-summary";
@@ -47,6 +50,9 @@ export type SessionListPagination = {
 };
 
 type SessionsOverviewTableProps = {
+	showPlace?: boolean;
+	highlightClassName?: string;
+	onVisibleSessions?: (sessions: readonly { session_date: string }[]) => void;
 	showSkillsColumn?: boolean;
 	/** Leads the header's toolbar, before sorting, such as a search field. */
 	toolbarStart?: ReactNode;
@@ -71,6 +77,9 @@ type SessionsOverviewTableProps = {
 };
 
 export function SessionsOverviewTable({
+	showPlace = false,
+	highlightClassName,
+	onVisibleSessions,
 	showSkillsColumn = true,
 	showDateControl = true,
 	toolbarStart,
@@ -160,6 +169,23 @@ export function SessionsOverviewTable({
 		enabled: !demo && !isLoading,
 	});
 	const virtualRows = virtualizer.getVirtualItems();
+	const visibleRange = virtualizer.range;
+	const visibleKey = visibleRange
+		? `${visibleRange.startIndex}:${visibleRange.endIndex}:${tableState.sortedSessions.length}`
+		: "";
+	const reportVisible = useLatestValueRef(() => {
+		const range = virtualizer.range;
+		onVisibleSessions?.(
+			range
+				? tableState.sortedSessions.slice(range.startIndex, range.endIndex + 1)
+				: [],
+		);
+	});
+	useEffectOnceWhen({
+		effect: () => reportVisible.current(),
+		isReady: onVisibleSessions !== undefined,
+		key: visibleKey,
+	});
 	const renderedRows =
 		virtualRows.length > 0
 			? virtualRows.flatMap((row) => {
@@ -222,8 +248,10 @@ export function SessionsOverviewTable({
 		scrollElement.scrollLeft = nextScroll.left;
 		scrollElement.scrollTop = nextScroll.top;
 	}, []);
+	const { fade, ref: fadeRef } = useScrollFade<HTMLDivElement>();
 	const setTableScrollContainer = useCallback(
 		(element: HTMLDivElement | null) => {
+			fadeRef(element);
 			tableScrollElementRef.current?.removeEventListener(
 				"wheel",
 				handleContainedWheel,
@@ -238,7 +266,7 @@ export function SessionsOverviewTable({
 				passive: false,
 			});
 		},
-		[handleContainedWheel, scrollContainerRef],
+		[fadeRef, handleContainedWheel, scrollContainerRef],
 	);
 	return (
 		<div className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}>
@@ -251,10 +279,11 @@ export function SessionsOverviewTable({
 			<div className="relative min-h-0 min-w-0 flex-1">
 				<div
 					ref={setTableScrollContainer}
+					{...fade}
 					// Focusable only for the demo, which focuses it on entry so the
 					// keyboard scrolls it; in the app a click must not focus it.
 					tabIndex={demo ? -1 : undefined}
-					className="isolate h-full min-h-0 min-w-0 touch-pan-x touch-pan-y overflow-auto overscroll-none [overflow-anchor:none] [scrollbar-gutter:stable]"
+					className="scroll-fade isolate h-full min-h-0 min-w-0 touch-pan-x touch-pan-y overflow-auto overscroll-none [--scroll-fade-top-offset:--spacing(12)] [overflow-anchor:none] [scrollbar-gutter:stable]"
 					data-slot="sessions-overview-scroll-container"
 					onFocusCapture={(event) => {
 						setFocusedKey(
@@ -340,6 +369,7 @@ export function SessionsOverviewTable({
 						) : (
 							<SessionsOverviewFluidList
 								fillHeight={!pagination?.hasNextPage}
+								highlightClassName={highlightClassName}
 								height={
 									virtualRows.length ? virtualizer.getTotalSize() : undefined
 								}
@@ -348,6 +378,7 @@ export function SessionsOverviewTable({
 									<>
 										{renderedRows.map(({ session, position, start }, index) => (
 											<SessionsOverviewRow
+												showPlace={showPlace}
 												showSkillsColumn={showSkillsColumn}
 												key={`${session.source}:${session.session_id}`}
 												virtualTop={start}

@@ -36,12 +36,24 @@ test("the default dashboard seed includes a populated daily cost chart for its r
 
 test("the demo seed carries a populated trend for every other stat card", () => {
 	const { dashboard, previews } = DemoSeedSchema.parse(fixture);
-	expect(previews.map((preview) => preview.input.requestedMetric)).toEqual([
+	const cards = previews.filter((preview) => preview.input.splitBy === "none");
+	const offered = dashboard.data.availableMetrics;
+	expect(cards.map((preview) => preview.input.requestedMetric)).toEqual([
 		"sessions",
 		"agentRuns",
 		"signals",
+		...(["mergedPullRequests", "ciRuns"] as const).filter((metric) =>
+			offered.includes(metric),
+		),
 	]);
-	for (const { input, data } of previews) {
+	expect(
+		previews.some(
+			(preview) =>
+				preview.input.requestedMetric === "signals" &&
+				preview.input.splitBy === "signalTypes",
+		),
+	).toBe(true);
+	for (const { input, data } of cards) {
 		const metric = input.requestedMetric ?? "cost";
 		expect(input.startDate).toBe(dashboard.input.startDate);
 		expect(input.endDate).toBe(dashboard.input.endDate);

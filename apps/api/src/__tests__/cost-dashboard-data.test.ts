@@ -211,7 +211,6 @@ test("language signals default to a combined total without counting facets twice
 			row({ metric: "sessions", value: 5, matched_value: 5 }),
 			...[
 				["modelApologies", 12],
-				["userPositive", 7],
 				["userNegative", 3],
 			].map(([id, value]) =>
 				row({
@@ -225,8 +224,8 @@ test("language signals default to a combined total without counting facets twice
 			row({
 				metric: "signals",
 				dimension: "members",
-				value: 22,
-				matched_value: 22,
+				value: 15,
+				matched_value: 15,
 			}),
 			row({
 				metric: "signals",
@@ -240,15 +239,14 @@ test("language signals default to a combined total without counting facets twice
 		members,
 	);
 	expect(result.metrics.sessions?.total).toBe(5);
-	expect(result.metrics.signals?.total).toBe(22);
+	expect(result.metrics.signals?.total).toBe(15);
 	expect(result.metrics.signals?.series).toEqual([
-		{ id: "total", label: "Language signals" },
+		{ id: "total", label: "Frustrations" },
 	]);
 	const split = buildCostDashboard(
 		[
 			...[
 				["modelApologies", 12],
-				["userPositive", 7],
 				["userNegative", 3],
 			].map(([id, value]) =>
 				row({
@@ -263,19 +261,18 @@ test("language signals default to a combined total without counting facets twice
 		{ ...input, splitBy: "signalTypes" },
 		members,
 	);
-	expect(split.metrics.signals?.total).toBe(22);
+	expect(split.metrics.signals?.total).toBe(15);
 	expect(split.metrics.signals?.series.map((s) => s.label)).toEqual([
 		"Model apologies",
-		"Positive user",
 		"Negative user",
 	]);
-	expect(result.metrics.signals?.trend[0]?.total).toBe(22);
+	expect(result.metrics.signals?.trend[0]?.total).toBe(15);
 	expect(
 		Object.values(result.metrics.signals?.trend[0]?.values ?? {}).reduce(
 			(s, v) => s + v,
 			0,
 		),
-	).toBe(22);
+	).toBe(15);
 	expect(result.metrics.signals?.breakdowns.phrases[0]?.value).toBe(12);
 });
 
@@ -285,7 +282,7 @@ test("selected types keep alternatives visible but only selected occurrences rea
 			row({
 				metric: "signals",
 				dimension: "signalTypes",
-				id: "userPositive",
+				id: "modelApologies",
 				value: 7,
 				matched_value: 7,
 			}),
@@ -298,12 +295,12 @@ test("selected types keep alternatives visible but only selected occurrences rea
 				matched_rows: 0,
 			}),
 		],
-		{ ...input, signalTypes: ["userPositive"], splitBy: "signalTypes" },
+		{ ...input, signalTypes: ["modelApologies"], splitBy: "signalTypes" },
 		members,
 	);
 	expect(result.metrics.signals?.total).toBe(7);
 	expect(result.metrics.signals?.series).toHaveLength(1);
-	expect(result.metrics.signals?.breakdowns.signalTypes).toHaveLength(3);
+	expect(result.metrics.signals?.breakdowns.signalTypes).toHaveLength(2);
 });
 
 test("verbatim splits use safe keys, preserve totals and exclude blank sentinels", () => {

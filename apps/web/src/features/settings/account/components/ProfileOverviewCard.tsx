@@ -2,8 +2,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
 import {
-	WorkspaceSettingsField,
-	WorkspaceSettingsFields,
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
 } from "@/features/settings/workspace/components/workspace-settings-group";
@@ -39,14 +37,12 @@ export function ProfileOverviewCard({
 					<AvatarFallback>{getInitials(name, email)}</AvatarFallback>
 				</Avatar>
 			</WorkspaceSettingsRow>
-			<WorkspaceSettingsFields>
-				<WorkspaceSettingsField label="Name" controlId="account-name">
-					<Input id="account-name" value={name} readOnly />
-				</WorkspaceSettingsField>
-				<WorkspaceSettingsField label="Email" controlId="account-email">
-					<Input id="account-email" type="email" value={email} readOnly />
-				</WorkspaceSettingsField>
-			</WorkspaceSettingsFields>
+			<WorkspaceSettingsRow label="Name" controlId="account-name">
+				<Input id="account-name" value={name} readOnly />
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow label="Email" controlId="account-email">
+				<Input id="account-email" type="email" value={email} readOnly />
+			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow
 				label="Session"
 				description="Sign out from this device without affecting other sessions."

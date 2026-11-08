@@ -163,7 +163,7 @@ export const SESSION_VIEW_HREFS = {
 export function useSessionReaderTab() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const param = searchParams.get(SESSION_TAB_PARAM);
-	const tab: SessionReaderTab = isTab(param) ? param : "detail";
+	const tab: SessionReaderTab = isTab(param) ? param : "summary";
 
 	function selectTab(next: SessionReaderTab, reading?: string | null) {
 		setSearchParams(

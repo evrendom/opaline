@@ -2,7 +2,7 @@
 	container: workspace-settings / inline-size;
 	display: flex;
 	flex-direction: column;
-	gap: 32px;
+	gap: 40px;
 	width: 100%;
 	min-width: 0;
 	padding-bottom: 48px;
@@ -12,21 +12,35 @@
 	display: flex;
 	min-width: 0;
 	flex-direction: column;
-	gap: 4px;
-	padding-top: 20px;
+	gap: 12px;
 	font-size: 14px;
 	line-height: 1.5;
 }
 
 .workspace-settings-group-heading {
 	display: flex;
-	flex-direction: column;
-	gap: 4px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
 	padding-inline: 20px;
 }
 
+.workspace-settings-group-title {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.workspace-settings-group-action {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 8px;
+}
+
 .workspace-settings-group-heading h2 {
-	font-size: inherit;
+	font-size: 0.9375rem;
 	font-weight: 500;
 }
 
@@ -43,12 +57,24 @@
 
 .workspace-settings-group-rows {
 	min-width: 0;
-	padding: 0 20px 8px;
+	padding: 0 20px;
+}
+
+.workspace-settings-group-rows > * + * {
+	border-top: 1px solid var(--workspace-settings-border, #0000000f);
 }
 
 .workspace-settings-row,
 .workspace-settings-actions {
-	padding: 12px 0;
+	padding: 14px 0;
+}
+
+.workspace-settings-row-copy > :first-child {
+	font-weight: 500;
+}
+
+.workspace-settings-row-description {
+	font-size: 0.8125rem;
 }
 
 .workspace-settings-row {
@@ -60,24 +86,12 @@
 	gap: 12px;
 }
 
-.workspace-settings-group-rows > * + * {
-	border-top: 1px solid var(--workspace-settings-border, #00000016);
-}
-
 .workspace-settings-list > * + * {
 	border-top: 1px solid var(--workspace-settings-list-border, #0000000d);
 }
 
 .workspace-settings-subsection {
 	padding-top: 16px;
-}
-
-/* Members card stacks the invite form, the roster and any sent
-   invitations without rules between them; roster rows split on a softer
-   line. */
-.workspace-settings-group-rows > form + *,
-.workspace-settings-group-rows > .workspace-settings-subsection {
-	border-top: 0;
 }
 
 .workspace-settings-list .workspace-settings-row {
@@ -130,7 +144,24 @@
 	gap: 12px;
 }
 
-/* Member row: the email sits beside the name, smaller and muted. */
+.workspace-settings-member-text {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.workspace-settings-member-activity {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	column-gap: 12px;
+	color: var(--muted-foreground);
+	font-size: 0.8125rem;
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
 .workspace-settings-member-copy {
 	display: flex;
 	min-width: 0;
@@ -144,13 +175,23 @@
 
 .workspace-settings-member-copy > :last-child {
 	font-size: 12px;
+	font-weight: 400;
 }
 
-.workspace-settings-list
-	.workspace-settings-row-control
-	> [data-slot="select-trigger"] {
-	width: auto;
-	min-width: 112px;
+.workspace-settings-role {
+	display: flex;
+	width: 120px;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.workspace-settings-role > [data-slot="select-trigger"] {
+	width: 100%;
+}
+
+.workspace-settings-icon-slot {
+	width: 32px;
+	flex-shrink: 0;
 }
 
 /* Secondary badge. */
@@ -223,14 +264,14 @@
 	flex: 1;
 }
 
-.workspace-settings-row-control > [data-slot="skeleton"] {
+.workspace-settings-row-control [data-slot="skeleton"] {
 	width: 100%;
 	height: 48px;
 	border-radius: 6px;
 }
 
-.workspace-settings-actions > [data-slot="skeleton"],
-.workspace-settings-link-actions > [data-slot="skeleton"] {
+.workspace-settings-actions [data-slot="skeleton"],
+.workspace-settings-link-actions [data-slot="skeleton"] {
 	width: 136px;
 	height: 48px;
 	border-radius: 6px;
@@ -302,7 +343,7 @@
 }
 
 .dark .workspace-settings-group {
-	--workspace-settings-border: #ffffff22;
+	--workspace-settings-border: #ffffff14;
 	--workspace-settings-list-border: #ffffff12;
 }
 
@@ -328,13 +369,13 @@
 	.workspace-settings-url-field,
 	.workspace-settings-field [data-slot="select-trigger"],
 	.workspace-settings-link-value [data-slot="input"],
-	.workspace-settings-row-control > [data-slot="skeleton"] {
+	.workspace-settings-row-control [data-slot="skeleton"] {
 		height: 36px;
 	}
 
 	.workspace-settings-row-control [data-slot="select-trigger"],
-	.workspace-settings-actions > [data-slot="skeleton"],
-	.workspace-settings-link-actions > [data-slot="skeleton"],
+	.workspace-settings-actions [data-slot="skeleton"],
+	.workspace-settings-link-actions [data-slot="skeleton"],
 	.workspace-settings-group [data-slot="button"] {
 		height: 32px;
 	}
@@ -353,9 +394,9 @@
 	.workspace-settings-group [data-slot="button"],
 	.workspace-settings-group [data-slot="select-trigger"],
 	.workspace-settings-link-value [data-slot="input"],
-	.workspace-settings-row-control > [data-slot="skeleton"],
-	.workspace-settings-actions > [data-slot="skeleton"],
-	.workspace-settings-link-actions > [data-slot="skeleton"],
+	.workspace-settings-row-control [data-slot="skeleton"],
+	.workspace-settings-actions [data-slot="skeleton"],
+	.workspace-settings-link-actions [data-slot="skeleton"],
 	.workspace-settings-row-control > [data-slot="input"],
 	.workspace-settings-url-field {
 		min-height: 48px;

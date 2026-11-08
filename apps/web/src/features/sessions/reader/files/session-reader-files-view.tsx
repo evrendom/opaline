@@ -1,20 +1,19 @@
 import type { SessionRunStep } from "@rudel/api-routes";
 import { absolutePath } from "@rudel/api-routes/call-paths";
-import {
-	IconAlertTriangleFilled,
-	IconFileCodeFilled,
-	IconHandFingerLeft,
-	IconLoader2,
-} from "@tabler/icons-react";
+import { IconAlertTriangle, IconFile, IconFileCode } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bones } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionDetailOverviewPages } from "../../components/use-session-detail-overview-pages";
 import { useSessionFileChanges } from "../../use-session-file-changes";
-import { FilesRail, useFilesRailTags } from "../rail/session-reader-files-rail";
+import {
+	FilesRail,
+	RailEmptyPane,
+	useFilesRailTags,
+} from "../rail/session-reader-files-rail";
 import {
 	railLineKey,
 	subagentIdsOf,
@@ -27,6 +26,7 @@ import {
 	syncPick,
 } from "../reader-params";
 import { resolveSessionFile } from "../session-places";
+import { FilesColumnsSample } from "../session-reader-samples";
 import { READER_RAIL_BACKGROUND, useReaderPick } from "../session-reader-tabs";
 import {
 	SessionSubagents,
@@ -40,6 +40,8 @@ import { CARD } from "./session-reader-files-parts";
 import { getReadExtents, useEditsByCall } from "./session-reader-run-trace";
 import { SeenFile } from "./session-reader-seen-file";
 import { SessionFiles, TouchedFiles } from "./session-reader-touched-files";
+
+const NO_LINES: ReadonlySet<string> = new Set();
 
 export function SessionReaderFilesView({
 	model,
@@ -189,156 +191,143 @@ export function SessionReaderFilesView({
 
 	return (
 		<div className="h-full overflow-hidden px-8 pt-2 pb-2">
-			{query.isLoading ? (
-				<FilesSkeleton />
-			) : query.isError ? (
-				<EmptyState
-					icon={IconAlertTriangleFilled}
-					title="The files could not be read"
-					description="Reading this session's file changes failed. Try the tab again in a moment."
-				/>
-			) : files.length === 0 ? (
-				<EmptyState
-					icon={IconFileCodeFilled}
-					title="No files"
-					description="This session wrote, edited or read no files."
-				/>
-			) : (
-				<SessionSubagents onOpen={openSubagent} subagents={subagents}>
-					<div className="flex h-full min-h-0 gap-6">
-						<div
-							className={cn(
-								"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
-								READER_RAIL_BACKGROUND,
-							)}
-						>
-							<FilesRail
-								agent={agent}
-								idle={idle}
-								model={model ?? null}
-								onPickRun={pickRun}
-								overview={overview}
-								run={run}
-								subagents={overview.subagents}
-								tags={railTags}
-								turns={turns}
-							/>
-						</div>
-						{run ? (
-							<TouchedFiles
-								agent={agent}
-								edits={edits}
-								extents={extents}
-								hidden={railTags.hidden}
-								file={selected?.path ?? null}
-								files={files}
-								model={model ?? null}
-								onPickFile={pickFile}
-								onPickStep={pickStep}
-								read={readStep?.step.eventId ?? null}
-								roots={roots}
-								run={run}
-								steps={traces.get(run) ?? []}
-							/>
-						) : (
-							<SessionFiles
-								edits={edits}
-								extents={extents}
-								file={selected?.path ?? null}
-								files={files}
-								hidden={railTags.hidden}
-								model={model ?? null}
-								onPickFile={pickFile}
-								onPickStep={pickStep}
-								read={readStep?.step.eventId ?? null}
-								roots={roots}
-								steps={allSteps}
-							/>
+			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
+				<div className="flex h-full min-h-0 gap-6">
+					<div
+						className={cn(
+							"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
+							READER_RAIL_BACKGROUND,
 						)}
-						<div
-							className={cn(
-								"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
-								CARD,
-							)}
-						>
-							{readStep ? (
-								<SeenFile
-									key={readStep.step.eventId}
-									agent={agent}
-									onClearAgent={() => setPicks({ agent: null })}
-									onClearRead={() => setPicks({ read: null })}
-									onClearRun={() => setPicks({ run: null })}
-									path={
-										readStep.step.paths.find(
-											(each) => each === selected?.path,
-										) ??
-										readStep.step.paths[0] ??
-										""
-									}
-									run={run}
-									seen={readStep.seen}
-									step={readStep.step}
-								/>
-							) : selected ? (
-								<FileDetail
-									key={`${selected.path}:${run ?? ""}:${agent ?? ""}`}
-									agent={agent}
-									file={selected}
-									onClearAgent={() => setPicks({ agent: null })}
-									onClearFile={() => setPicks({ file: null })}
-									onClearRun={() => setPicks({ run: null })}
-									onOpenTurn={onOpenTurn}
-									run={run}
-								/>
-							) : filePath ? (
-								<p className="px-5 py-4 text-[13px] text-muted-foreground">
-									<span className="font-mono">{filePath}</span> isn't among the
-									files this session changed or read.
-								</p>
-							) : (
-								<div className="flex min-w-0 flex-1 flex-col p-4">
-									<EmptyState
-										icon={IconHandFingerLeft}
-										title="Pick a file"
-										description="Pick a file on the left to see what the session did to it and what it read of it."
-									/>
-								</div>
-							)}
-						</div>
+					>
+						<FilesRail
+							agent={agent}
+							idle={query.isLoading ? NO_LINES : idle}
+							model={model ?? null}
+							onPickRun={pickRun}
+							overview={overview}
+							run={run}
+							subagents={overview.subagents}
+							tags={railTags}
+							turns={turns}
+						/>
 					</div>
-				</SessionSubagents>
-			)}
-		</div>
-	);
-}
-
-function FilesSkeleton() {
-	return (
-		<div className="flex h-full gap-6">
-			<div className="flex w-(--reader-rail) shrink-0 flex-col gap-2.5 pt-2 pl-1">
-				<div className="flex h-7 items-center gap-2">
-					<IconLoader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-xs text-muted-foreground">
-						Reading the files this session touched
-					</span>
+					{query.isError ? (
+						<RailEmptyPane>
+							<EmptyState
+								icon={IconAlertTriangle}
+								title="The files could not be read"
+								description="Reading this session's file changes failed. Try the tab again in a moment."
+							/>
+						</RailEmptyPane>
+					) : !query.isLoading && files.length === 0 ? (
+						<RailEmptyPane>
+							<EmptyState
+								icon={IconFileCode}
+								title="No files"
+								description="This session wrote, edited or read no files."
+							/>
+						</RailEmptyPane>
+					) : query.isLoading ? (
+						<Bones
+							fill
+							className="min-w-0 flex-1"
+							label="Reading the files this session touched"
+						>
+							<div className="flex h-full min-h-0 gap-6">
+								<FilesColumnsSample
+									agent={agent}
+									model={model ?? null}
+									run={run}
+								/>
+							</div>
+						</Bones>
+					) : (
+						<>
+							{run ? (
+								<TouchedFiles
+									agent={agent}
+									edits={edits}
+									extents={extents}
+									hidden={railTags.hidden}
+									file={selected?.path ?? null}
+									files={files}
+									model={model ?? null}
+									onPickFile={pickFile}
+									onPickStep={pickStep}
+									read={readStep?.step.eventId ?? null}
+									roots={roots}
+									run={run}
+									steps={traces.get(run) ?? []}
+								/>
+							) : (
+								<SessionFiles
+									edits={edits}
+									extents={extents}
+									file={selected?.path ?? null}
+									files={files}
+									hidden={railTags.hidden}
+									model={model ?? null}
+									onPickFile={pickFile}
+									onPickStep={pickStep}
+									read={readStep?.step.eventId ?? null}
+									roots={roots}
+									steps={allSteps}
+								/>
+							)}
+							<div
+								className={cn(
+									"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
+									CARD,
+								)}
+							>
+								{readStep ? (
+									<SeenFile
+										key={readStep.step.eventId}
+										agent={agent}
+										onClearAgent={() => setPicks({ agent: null })}
+										onClearRead={() => setPicks({ read: null })}
+										onClearRun={() => setPicks({ run: null })}
+										path={
+											readStep.step.paths.find(
+												(each) => each === selected?.path,
+											) ??
+											readStep.step.paths[0] ??
+											""
+										}
+										run={run}
+										seen={readStep.seen}
+										step={readStep.step}
+									/>
+								) : selected ? (
+									<FileDetail
+										key={`${selected.path}:${run ?? ""}:${agent ?? ""}`}
+										agent={agent}
+										file={selected}
+										onClearAgent={() => setPicks({ agent: null })}
+										onClearFile={() => setPicks({ file: null })}
+										onClearRun={() => setPicks({ run: null })}
+										onOpenTurn={onOpenTurn}
+										run={run}
+									/>
+								) : filePath ? (
+									<p className="px-5 py-4 text-[13px] text-muted-foreground">
+										<span className="font-mono">{filePath}</span> isn't among
+										the files this session changed or read.
+									</p>
+								) : (
+									<div className="flex min-w-0 flex-1 flex-col p-4">
+										<EmptyState
+											icon={IconFile}
+											title="Pick a file"
+											description="Pick a file on the left to see what the session did to it and what it read of it."
+										/>
+									</div>
+								)}
+							</div>
+						</>
+					)}
 				</div>
-				{[72, 56, 64, 48, 60, 52].map((width) => (
-					<Skeleton
-						key={width}
-						className="h-4 rounded-md"
-						style={{ width: `${width}%` }}
-					/>
-				))}
-			</div>
-			<div
-				className={cn(
-					"hidden min-w-0 flex-1 flex-col gap-2 px-5 py-4 lg:flex",
-					CARD,
-				)}
-			>
-				<Skeleton className="h-5 w-1/3 rounded-md" />
-				<Skeleton className="mt-3 h-40 rounded-lg" />
-			</div>
+			</SessionSubagents>
 		</div>
 	);
 }

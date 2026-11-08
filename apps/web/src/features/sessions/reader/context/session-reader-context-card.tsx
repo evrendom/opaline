@@ -4,7 +4,7 @@ import type {
 } from "@rudel/api-routes";
 import { type ReactNode, useMemo } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bones } from "@/app/ui/bones";
 import { formatCompactNumber } from "@/lib/format";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionSetupRuns } from "../../use-session-setup-runs";
@@ -36,6 +36,7 @@ import { tokensOf } from "./session-reader-context-collect";
 import { ContextMapFrame } from "./session-reader-context-frame";
 import { ContextMapHead } from "./session-reader-context-head";
 import { getContextMap } from "./session-reader-context-map";
+import { ContextMapSample } from "./session-reader-context-map-sample";
 import type { ContextMeasure } from "./session-reader-context-measure";
 import { problemsByBox } from "./session-reader-context-problems";
 import {
@@ -292,7 +293,9 @@ function RunContext({
 			<div className="flex flex-col gap-3">
 				<ContextBar map={null} titleId={undefined} />
 				<ContextMapFrame>
-					<Skeleton className="m-[3px] h-[274px] rounded-md" />
+					<Bones label="Reading its context">
+						<ContextMapSample />
+					</Bones>
 				</ContextMapFrame>
 			</div>
 		);

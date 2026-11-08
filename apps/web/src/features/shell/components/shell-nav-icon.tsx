@@ -65,15 +65,11 @@ export function ShellNavIcon({
 	icon: OutlineIcon,
 	activeIcon: ActiveIcon,
 	active,
-	filled = active,
 	tone,
 }: {
 	icon: Icon;
 	activeIcon: Icon;
 	active: boolean;
-	/** Swap to the filled glyph. Follows `active`; the page header keeps the
-	 *  outline. */
-	filled?: boolean;
 	/** Sections without a tone (Settings) get a muted glyph and no chip. */
 	tone?: ShellNavTone;
 }) {
@@ -106,10 +102,10 @@ export function ShellNavIcon({
 					</span>
 				</>
 			) : null}
-			<span className={cn(glyphCell, filled ? "opacity-0" : "opacity-100")}>
+			<span className={cn(glyphCell, active ? "opacity-0" : "opacity-100")}>
 				<OutlineIcon aria-hidden="true" className={glyphClassName} />
 			</span>
-			<span className={cn(glyphCell, filled ? "opacity-100" : "opacity-0")}>
+			<span className={cn(glyphCell, active ? "opacity-100" : "opacity-0")}>
 				<ActiveIcon aria-hidden="true" className={glyphClassName} />
 			</span>
 		</span>

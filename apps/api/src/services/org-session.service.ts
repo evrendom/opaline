@@ -7,6 +7,7 @@ import {
 } from "@rudel/ch-schema/received-setup";
 import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evidence-index";
 import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
+import { SESSION_CONTEXT_SNAPSHOTS_TABLE } from "@rudel/ch-schema/session-context-snapshots";
 import { SESSION_IMAGES_TABLE } from "@rudel/ch-schema/session-images";
 import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
@@ -272,6 +273,7 @@ export function getClickHouseSessionPurgePlans(
 		// Images (screenshots, pasted images), likewise; their bytes are
 		// evidence objects, purged with them.
 		{ column, table: SESSION_IMAGES_TABLE },
+		{ column, table: SESSION_CONTEXT_SNAPSHOTS_TABLE },
 		// Findings' cited runs, by the run's owner. The rows of analyses the
 		// account wrote or whose deletion it causes go in purgeFindingImpact.
 		{ column, table: FINDING_RUNS_TABLE },

@@ -14,6 +14,7 @@ import { MemoryRouter } from "react-router-dom";
 import { expect, test } from "vitest";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
+import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { CostDashboardView } from "./cost-dashboard-page";
 import { githubOutcomesDashboardFixture } from "./github-outcomes-dashboard.fixture";
 import { CI_DIMENSIONS, PR_DIMENSIONS } from "./use-cost-dashboard";
@@ -77,11 +78,19 @@ function renderPage(
 	return render(
 		<MemoryRouter>
 			<QueryClientProvider client={new QueryClient()}>
-				<DateRangeProvider>
-					<TooltipProvider>
-						<Page metric={metric} pending={pending} />
-					</TooltipProvider>
-				</DateRangeProvider>
+				<WorkspaceStateProvider
+					value={{
+						state: { activeOrg: null, organizations: [], isLoading: false },
+						actions: { switchOrganization: async () => {} },
+						meta: { isOrgAdmin: false, readsEverySession: true },
+					}}
+				>
+					<DateRangeProvider>
+						<TooltipProvider>
+							<Page metric={metric} pending={pending} />
+						</TooltipProvider>
+					</DateRangeProvider>
+				</WorkspaceStateProvider>
 			</QueryClientProvider>
 		</MemoryRouter>,
 	);
@@ -121,7 +130,7 @@ test("the always-offered stat cards load before the server lists the scope's met
 	renderPage("cost", true);
 	const row = screen.getByRole("group", { name: "Chart metric" });
 	expect(row).toHaveAttribute("aria-busy", "true");
-	for (const label of ["Cost", "Sessions", "Agent runs", "Language"])
+	for (const label of ["Cost", "Sessions", "Agent runs", "Frustrations"])
 		expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
 	expect(
 		screen.queryByRole("button", { name: "Merged PRs" }),

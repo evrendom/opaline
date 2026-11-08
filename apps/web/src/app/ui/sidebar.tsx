@@ -222,9 +222,14 @@ function Sidebar({
 		);
 	}
 
+	const offcanvas = collapsible === "offcanvas";
+
 	return (
 		<div
-			className="group peer relative hidden h-svh shrink-0 text-sidebar-foreground md:block"
+			className={cn(
+				"group peer relative hidden h-svh shrink-0 text-sidebar-foreground md:block",
+				offcanvas && "overflow-hidden",
+			)}
 			data-state={state}
 			data-collapsible={resolvedCollapsible}
 			data-variant={variant}
@@ -246,7 +251,15 @@ function Sidebar({
 			<div
 				data-slot="sidebar-container"
 				data-side={side}
-				className={cn("absolute inset-0 z-10 flex", className)}
+				className={cn(
+					"absolute z-10 flex",
+					offcanvas
+						? "inset-y-0 w-(--sidebar-width) transition-opacity data-[side=left]:left-0 data-[side=right]:right-0 group-data-[collapsible=offcanvas]:opacity-0"
+						: "inset-0",
+					className,
+				)}
+				style={offcanvas ? sidebarContainerStyle : undefined}
+				inert={(offcanvas && state === "collapsed") || undefined}
 				{...props}
 			>
 				<div
@@ -581,7 +594,7 @@ function SidebarMenuAction({
 		props: mergeProps<"button">(
 			{
 				className: cn(
-					"absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+					"absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden group-hover/menu-item:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
 					showOnHover &&
 						"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground aria-expanded:opacity-100 md:opacity-0",
 					className,
@@ -606,7 +619,7 @@ function SidebarMenuBadge({
 			data-slot="sidebar-menu-badge"
 			data-sidebar="menu-badge"
 			className={cn(
-				"pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-sidebar-accent-foreground",
+				"pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none group-data-[collapsible=icon]:hidden group-hover/menu-item:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-sidebar-accent-foreground",
 				className,
 			)}
 			{...props}

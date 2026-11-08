@@ -18,5 +18,7 @@ describe("formatModelDisplayLabel", () => {
 		expect(formatModelDisplayLabel("claude-fable-5")).toBe("Fable 5");
 		expect(formatModelDisplayLabel("claude-fable-5-20260609")).toBe("Fable 5");
 		expect(formatModelDisplayLabel("Claude Fable 5")).toBe("Fable 5");
+		expect(formatModelDisplayLabel("claude-fable-5-1")).toBe("Fable 5.1");
+		expect(formatModelDisplayLabel("claude-fable-5.1")).toBe("Fable 5.1");
 	});
 });

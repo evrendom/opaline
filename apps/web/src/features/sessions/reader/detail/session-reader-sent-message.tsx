@@ -35,7 +35,7 @@ export function SentMessage({
 					type="button"
 					onClick={onSelect}
 					className={cn(
-						"inline-flex w-fit cursor-pointer items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground",
+						"inline-flex w-fit items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground",
 						selected && "text-foreground",
 					)}
 				>

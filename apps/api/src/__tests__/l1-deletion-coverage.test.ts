@@ -63,6 +63,7 @@ const TRANSCRIPT_DERIVED = [
 	"session_saved_outputs",
 	// Screenshots and pasted images of a session, with the evidence index.
 	"session_images",
+	"session_context_snapshots",
 	"weekly_totals",
 	// Findings' cited runs with their measures, by the run's owner.
 	"analysis_finding_runs",

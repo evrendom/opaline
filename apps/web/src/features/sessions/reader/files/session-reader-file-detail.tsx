@@ -1,9 +1,5 @@
 import type { SessionFile } from "@rudel/api-routes";
-import {
-	IconCode,
-	IconFileCodeFilled,
-	IconFileDiff,
-} from "@tabler/icons-react";
+import { IconCode, IconFileCode, IconFileDiff } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
@@ -114,7 +110,7 @@ export function FileDetail({
 	const language = languageForPath(file.path);
 	const { directory, name } = splitPath(file.path);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 py-4 pr-4 pl-5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
 			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
 				<div className="flex min-w-0 flex-1 items-center gap-1.5">
 					{run ? (
@@ -166,7 +162,7 @@ export function FileDetail({
 			</span>
 			{view === "file" && file.content === null ? (
 				<EmptyState
-					icon={IconFileCodeFilled}
+					icon={IconFileCode}
 					title="Never seen whole"
 					description="The session never read or wrote this file in full, or made an edit it couldn't place, so its text isn't known."
 					className="mt-3"
@@ -179,7 +175,7 @@ export function FileDetail({
 							{file.contentCut ? <Cut /> : null}
 						</div>
 					) : (
-						<ol className="flex flex-col divide-y divide-border/40">
+						<ol className="flex flex-col divide-y divide-border/40 pb-4">
 							{changes.map((change, index) => (
 								<ChangeBlock
 									// biome-ignore lint/suspicious/noArrayIndexKey: their place tells them apart

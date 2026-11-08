@@ -2,9 +2,9 @@ import type {
 	SessionDetailTurnSummary,
 	SessionSetupFile,
 } from "@rudel/api-routes";
-import { IconLoader2, IconSettings2 } from "@tabler/icons-react";
+import { IconSettings2 } from "@tabler/icons-react";
 import { type CSSProperties, useMemo, useState } from "react";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bones } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
@@ -16,8 +16,13 @@ import { CARD } from "../files/session-reader-files-parts";
 import { mcpTool } from "../model/session-reader-mcp-tool";
 import { getReaderTurnMarks } from "../model/session-reader-model";
 import { useRunUi } from "../model/session-reader-run-ui-store";
-import { FilesRail, useFilesRailTags } from "../rail/session-reader-files-rail";
+import {
+	FilesRail,
+	RailEmptyPane,
+	useFilesRailTags,
+} from "../rail/session-reader-files-rail";
 import { findMcpSetupFile } from "../session-places";
+import { SetupColumnsSample } from "../session-reader-samples";
 import { READER_RAIL_BACKGROUND, useReaderPick } from "../session-reader-tabs";
 import {
 	SessionSubagents,
@@ -45,6 +50,7 @@ import {
 } from "./session-setup-runs";
 
 const NO_FILTER: ReadonlySet<string> = new Set();
+const NO_LINES: ReadonlySet<string> = new Set();
 
 export function SessionReaderSetupView({
 	model,
@@ -130,17 +136,6 @@ export function SessionReaderSetupView({
 		? (received.find((file) => file.setupFile === picked) ??
 			setupGroups(received)[0]?.files[0])
 		: undefined;
-	if (!setup) return <SetupSkeleton />;
-	if (setup.length === 0)
-		return (
-			<div className="h-full px-8 pt-2 pb-2">
-				<EmptyState
-					icon={IconSettings2}
-					title="No setup recorded"
-					description="This session's agents received no setup Opaline kept: it may have been read before setup was."
-				/>
-			</div>
-		);
 	return (
 		<SessionSubagents onOpen={openSubagent} subagents={subagents}>
 			<div className="h-full overflow-hidden px-8 pt-2 pb-2">
@@ -153,7 +148,7 @@ export function SessionReaderSetupView({
 					>
 						<FilesRail
 							agent={agent}
-							idle={idle}
+							idle={setup ? idle : NO_LINES}
 							model={model}
 							onPickRun={pickRun}
 							overview={overview}
@@ -163,21 +158,41 @@ export function SessionReaderSetupView({
 							turns={turns}
 						/>
 					</div>
-					<ReaderSubagentsContext.Provider value={subagentsContext}>
-						<SetupPicked
-							key={`${run ?? ""}:${agent ?? ""}`}
-							agent={agent}
-							model={model}
-							overview={overview}
-							setup={setup}
-							turns={turns}
-							onPick={onPick}
-							received={received ?? []}
-							run={run}
-							sessionId={sessionId}
-							shown={shown}
-						/>
-					</ReaderSubagentsContext.Provider>
+					{setup && setup.length === 0 ? (
+						<RailEmptyPane>
+							<EmptyState
+								icon={IconSettings2}
+								title="No setup recorded"
+								description="This session's agents received no setup Opaline kept: it may have been read before setup was."
+							/>
+						</RailEmptyPane>
+					) : setup ? (
+						<ReaderSubagentsContext.Provider value={subagentsContext}>
+							<SetupPicked
+								key={`${run ?? ""}:${agent ?? ""}`}
+								agent={agent}
+								model={model}
+								overview={overview}
+								setup={setup}
+								turns={turns}
+								onPick={onPick}
+								received={received ?? []}
+								run={run}
+								sessionId={sessionId}
+								shown={shown}
+							/>
+						</ReaderSubagentsContext.Provider>
+					) : (
+						<Bones
+							fill
+							className="min-w-0 flex-1"
+							label="Reading the setup this session received"
+						>
+							<div className="flex h-full min-h-0 gap-6">
+								<SetupColumnsSample agent={agent} model={model} run={run} />
+							</div>
+						</Bones>
+					)}
 				</div>
 			</div>
 		</SessionSubagents>
@@ -325,34 +340,3 @@ const SETUP_CARD_WIDTH = {
 	minWidth: `${SETUP_TEXT_MEASURE_REM.narrowest + SETUP_CARD_PADDING_X_REM}rem`,
 	width: `${SETUP_TEXT_MEASURE_REM.widest + SETUP_CARD_PADDING_X_REM}rem`,
 } satisfies CSSProperties;
-
-function SetupSkeleton() {
-	return (
-		<div className="flex h-full gap-6 px-8 pt-2 pb-2">
-			<div className="flex w-(--reader-setup-column) shrink-0 flex-col gap-2.5 pt-4 pl-1">
-				<div className="flex h-7 items-center gap-2">
-					<IconLoader2 className="size-4 animate-spin text-muted-foreground" />
-					<span className="text-xs text-muted-foreground">
-						Reading the setup this session received
-					</span>
-				</div>
-				{[72, 56, 64, 48].map((width) => (
-					<Skeleton
-						key={width}
-						className="h-4 rounded-md"
-						style={{ width: `${width}%` }}
-					/>
-				))}
-			</div>
-			<div
-				className={cn(
-					"hidden min-w-0 flex-1 flex-col gap-2 px-5 py-4 lg:flex",
-					CARD,
-				)}
-			>
-				<Skeleton className="h-5 w-1/3 rounded-md" />
-				<Skeleton className="mt-3 h-40 rounded-lg" />
-			</div>
-		</div>
-	);
-}

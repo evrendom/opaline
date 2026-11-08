@@ -17,7 +17,8 @@
 		"./received-setup": "./src/received-setup.ts",
 		"./session-saved-outputs": "./src/session-saved-outputs.ts",
 		"./session-images": "./src/session-images.ts",
-		"./mcp-tool-calls": "./src/mcp-tool-calls.ts"
+		"./mcp-tool-calls": "./src/mcp-tool-calls.ts",
+		"./session-context-snapshots": "./src/session-context-snapshots.ts"
 	},
 	"scripts": {
 		"backfill:subagent-metrics": "bun scripts/backfill-subagent-metrics.ts",

@@ -200,14 +200,37 @@ describe("the showcase workspace's scripted CI and pull requests", () => {
 			enabled: true,
 			runs: [...(DEMO_RUN_CI[SLOTS_SESSION]?.runs ?? [])],
 		});
-		expect(await sessionRunCi(env, SCOPE, "another-session")).toEqual({
-			enabled: true,
-			runs: [],
-		});
 		answer.runs[0]?.ci.pop();
 		expect(
 			(await sessionRunCi(env, SCOPE, SLOTS_SESSION)).runs[0]?.ci,
 		).toHaveLength(DEMO_RUN_CI[SLOTS_SESSION]?.runs[0]?.ci.length ?? -1);
+	});
+
+	test("an unscripted showcase session reads its stored CI like any other session", async () => {
+		const stored = recordingEnv(runCiAnswer);
+		const answer = await sessionRunCi(
+			{ ...stored.env, demo: runCiDemoSource(DEMO_ORG) },
+			SCOPE,
+			"another-session",
+		);
+		expect(answer.enabled).toBe(true);
+		expect(answer.runs[0]?.ci[0]?.githubRunId).toBe("38537619754");
+		expect(stored.asked).toEqual([
+			`enabled ${DEMO_ORG}`,
+			`repositories ${DEMO_ORG}`,
+		]);
+	});
+
+	test("an unscripted showcase session without visible GitHub stays enabled with no runs", async () => {
+		const hidden = recordingEnv(runCiAnswer, { enabled: false });
+		expect(
+			await sessionRunCi(
+				{ ...hidden.env, demo: runCiDemoSource(DEMO_ORG) },
+				SCOPE,
+				"another-session",
+			),
+		).toEqual({ enabled: true, runs: [] });
+		expect(hidden.statements).toHaveLength(0);
 	});
 
 	test("the showcase workspace's summary keeps its real setup files and adds the scripted pull requests", async () => {

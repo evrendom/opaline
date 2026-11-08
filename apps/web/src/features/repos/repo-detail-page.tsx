@@ -1,12 +1,24 @@
-import type { RepositorySummary } from "@rudel/api-routes";
-import { IconChevronRight, IconFolderFilled } from "@tabler/icons-react";
-import { useState } from "react";
+import type {
+	RepositoryPullRequest,
+	RepositorySummary,
+} from "@rudel/api-routes";
+import { IconChevronRight, IconFolder } from "@tabler/icons-react";
+import {
+	Activity,
+	type ComponentProps,
+	type ReactNode,
+	useCallback,
+	useMemo,
+	useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
+import type { DashboardVariant } from "@/features/costs/cost-dashboard-page";
 import { CostDashboardView } from "@/features/costs/cost-dashboard-page";
+import { type DotPick, DotPickContext } from "@/features/costs/cost-hover-date";
 import { useRepositoryCostDashboard } from "@/features/costs/use-cost-dashboard";
 import {
 	useMetricPreviews,
@@ -14,8 +26,13 @@ import {
 } from "@/features/costs/use-metric-previews";
 import { UsageSessionsPane } from "@/features/sessions/components/session-usage-detail";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { SessionInRepo } from "@/features/sessions/reader/session-reader-in-repo";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { CopyButton } from "@/features/shell/components/copy-button";
+import {
+	RepoNavIcon,
+	useRepositoryHue,
+} from "@/features/shell/components/repo-nav-icon";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { shellRouteMap } from "@/features/shell/config/shell-routes";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
@@ -24,40 +41,77 @@ import {
 	useShellHeaderPortal,
 } from "@/features/shell/shell-header-portal";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
-import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-import { PillTabs } from "./pill-tabs";
+import { RepoCiView } from "./repo-ci-view";
+import { RepoFiles } from "./repo-files";
+import {
+	RepoDataProvider,
+	useRepoRangeInput,
+} from "./repo-reader/repo-page-data";
+import {
+	type RailFilter,
+	RailHighlightProvider,
+	useRailFilter,
+} from "./repo-reader/repo-rail-highlight";
+import { RepoSessionBoxes } from "./repo-reader/repo-session-boxes";
+import { RepoSetupView } from "./repo-reader/repo-setup-view";
+import {
+	type RepoReaderTab,
+	RepoReaderTabs,
+	readRepoTab,
+} from "./repo-reader-tabs";
 import { SkillPage } from "./repo-skill-page";
-import { RepoSkillsTable } from "./repo-skills-table";
 import {
 	githubRepositoryIds,
 	useRepoDashboardRepositories,
 } from "./use-repo-dashboard-repositories";
+import { useRepoPullRequests } from "./use-repo-pull-requests";
 
-const REPO_TABS = [
-	{
-		id: "dashboard",
-		label: shellRouteMap.dashboard.navLabel,
-		icon: shellRouteMap.dashboard.activeIcon,
-	},
-	{
-		id: "skills",
-		label: shellRouteMap.skills.navLabel,
-		icon: shellRouteMap.skills.activeIcon,
-	},
-	{
-		id: "sessions",
-		label: shellRouteMap.sessions.navLabel,
-		icon: shellRouteMap.sessions.activeIcon,
-	},
-] as const;
-type RepoTab = (typeof REPO_TABS)[number]["id"];
-// Page-wide state that outlives a tab switch: the date range and the
-// dashboard's chart settings.
 const TAB_STATE_PARAMS = ["from", "to", "metric", "interval", "split"] as const;
 
-/** One repository: the workspace dashboard scoped to it, its skills and its
- * sessions, one tab each (`?tab=`, dashboard by default). */
+function openDuring(
+	pull: RepositoryPullRequest,
+	range: { startDate: string; endDate: string },
+) {
+	const opened = pull.createdAt?.slice(0, 10);
+	const ended = (pull.mergedAt ?? pull.closedAt)?.slice(0, 10);
+	return (
+		(!opened || opened <= range.endDate) && (!ended || ended >= range.startDate)
+	);
+}
+
+function RepoSessionsList(props: ComponentProps<typeof UsageSessionsPane>) {
+	const [days, setDays] = useState<ReadonlySet<string> | null>(null);
+	const onVisibleSessions = useCallback(
+		(rows: readonly { session_date: string }[]) => {
+			const next = new Set(rows.map((row) => row.session_date.slice(0, 10)));
+			setDays((current) =>
+				current &&
+				current.size === next.size &&
+				[...next].every((day) => current.has(day))
+					? current
+					: next,
+			);
+		},
+		[],
+	);
+	const filter = useMemo<RailFilter | null>(
+		() =>
+			days && days.size > 0 ? { days, figures: null, name: "Sessions" } : null,
+		[days],
+	);
+	useRailFilter(filter);
+	return <UsageSessionsPane {...props} onVisibleSessions={onVisibleSessions} />;
+}
+
+const SETUP_TABS = ["instructions", "skills", "mcp"] as const;
+
+const TAB_PANE =
+	"absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden";
+
+const STAGE_PANE =
+	"absolute inset-x-0 top-(--stage-top) bottom-0 left-[calc(var(--reader-gutter)-1.5rem)] flex min-h-0 min-w-0 flex-col overflow-hidden";
+
 export function RepoDetailPage({
 	repoKey,
 	repo,
@@ -69,36 +123,152 @@ export function RepoDetailPage({
 }) {
 	const name = repo?.identity.repoLabel ?? repoKey.replace(/^[^:]+:/u, "");
 	const [searchParams, setSearchParams] = useSearchParams();
-	// Session links (`repoDetail(repoKey, sessionId)`) open on the Sessions tab.
-	const tab: RepoTab =
-		REPO_TABS.find(({ id }) => id === searchParams.get("tab"))?.id ??
-		(searchParams.get("session") ? "sessions" : "dashboard");
+	const openSessionId = searchParams.get("session");
+	const requested = readRepoTab(
+		searchParams.get("tab"),
+		openSessionId !== null,
+	);
+	const pulls = useRepoPullRequests(repoKey);
+	const range = useRepoRangeInput();
+	const pickParam = searchParams.get("pick");
+	const [pending, setPending] = useState<{ param: string | null } | null>(null);
+	if (pending && pending.param === pickParam) setPending(null);
+	const shownPick = pending ? pending.param : pickParam;
+	const picked = useMemo(() => {
+		const [date, end] = shownPick?.split("..") ?? [];
+		return date && end ? { date, end } : null;
+	}, [shownPick]);
+	const pickedRange = useMemo(() => {
+		if (!picked) return null;
+		const start = picked.date > range.startDate ? picked.date : range.startDate;
+		const end = picked.end < range.endDate ? picked.end : range.endDate;
+		return start <= end ? { start, end } : null;
+	}, [picked, range]);
+	const dotPick = useMemo(
+		() => ({
+			picked,
+			pick: (next: DotPick | null) => {
+				const param = next ? `${next.date}..${next.end}` : null;
+				setPending({ param });
+				setSearchParams(
+					(params) => {
+						if (param) params.set("pick", param);
+						else params.delete("pick");
+						return params;
+					},
+					{ replace: true },
+				);
+			},
+		}),
+		[picked, setSearchParams],
+	);
+	const allPullRequests = pulls.data?.enabled ? pulls.data.pullRequests : [];
+	const pullRequests = useMemo(
+		() => allPullRequests.filter((pull) => openDuring(pull, range)),
+		[allPullRequests, range],
+	);
+	const ci = allPullRequests.length > 0;
+	const tab =
+		requested === "ci" && pulls.isSuccess && !ci ? "summary" : requested;
 	const skillName = tab === "skills" ? searchParams.get("skill") : null;
-	const [tabControls, setTabControls] = useState<HTMLDivElement | null>(null);
+	const sessionId = tab === "sessions" ? openSessionId : null;
 	const [headerControls, setHeaderControls] = useState<HTMLDivElement | null>(
 		null,
 	);
-	const openSessionId = tab === "sessions" ? searchParams.get("session") : null;
+	const [clickedTab, setClickedTab] = useState<{
+		from: RepoReaderTab;
+		to: RepoReaderTab;
+	} | null>(null);
+	if (clickedTab && clickedTab.from !== tab) setClickedTab(null);
+	const shownTab = clickedTab ? clickedTab.to : tab;
+	const summaryPane = useMemo(
+		() => (
+			<div className="flex h-full min-h-0 min-w-0 flex-col pt-2 pr-8 pb-2 pl-6">
+				<RepoSessionBoxes fill />
+			</div>
+		),
+		[],
+	);
+	const panes = useMemo(() => {
+		const list: { id: RepoReaderTab; node: ReactNode }[] = SETUP_TABS.map(
+			(section) => ({
+				id: section,
+				node: (
+					<div className={TAB_PANE}>
+						<RepoSetupView repoKey={repoKey} section={section} />
+					</div>
+				),
+			}),
+		);
+		list.push({
+			id: "files",
+			node: (
+				<div className={TAB_PANE}>
+					<RepoFiles repoKey={repoKey} />
+				</div>
+			),
+		});
+		if (ci)
+			list.push({
+				id: "ci",
+				node: (
+					<div className={TAB_PANE}>
+						<RepoCiView pullRequests={pullRequests} repoKey={repoKey} />
+					</div>
+				),
+			});
+		list.push({
+			id: "sessions",
+			node: (
+				<div className={TAB_PANE}>
+					<div
+						className={cn(
+							SESSION_OVERVIEW_SURFACE_CLASS_NAME,
+							"bg-transparent",
+						)}
+					>
+						<RepoSessionsList
+							kind="Repo"
+							sessionFilter={{ repoKey }}
+							range={
+								pickedRange
+									? { startDate: pickedRange.start, endDate: pickedRange.end }
+									: range
+							}
+							sessionCount={undefined}
+							rowHighlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
+							detailHref={(id) =>
+								id
+									? appRoutes.repoDetail(repoKey, id)
+									: `${appRoutes.repoDetail(repoKey)}&tab=sessions`
+							}
+							navigationHost={headerControls}
+							backBar={false}
+						/>
+					</div>
+				</div>
+			),
+		});
+		return list;
+	}, [ci, headerControls, pickedRange, pullRequests, range, repoKey]);
 	function closeSession() {
 		setSearchParams((current) => {
 			const params = new URLSearchParams(current);
 			params.delete("session");
 			params.delete("turn");
-			// Session links don't name the tab; without the session it would
-			// fall back to the dashboard.
 			params.set("tab", "sessions");
 			return params;
 		});
 	}
-	// Each tab starts clean: no open session or skill, no list filters.
-	function selectTab(next: RepoTab, skill?: string) {
+	function selectTab(next: RepoReaderTab, skill?: string) {
+		setClickedTab({ from: tab, to: next });
 		setSearchParams((current) => {
 			const params = new URLSearchParams({ repo: repoKey });
 			for (const key of TAB_STATE_PARAMS) {
 				const value = current.get(key);
 				if (value !== null) params.set(key, value);
 			}
-			if (next !== "dashboard") params.set("tab", next);
+			if (next !== "summary") params.set("tab", next);
 			if (skill) params.set("skill", skill);
 			return params;
 		});
@@ -116,62 +286,96 @@ export function RepoDetailPage({
 				onBackToList={onBack}
 			/>
 		);
+	const sessionsProps: ComponentProps<typeof UsageSessionsPane> = {
+		kind: "Repo",
+		sessionFilter: { repoKey },
+		range: pickedRange
+			? { startDate: pickedRange.start, endDate: pickedRange.end }
+			: range,
+		sessionCount: undefined,
+		rowHighlightClassName: "rounded-lg corner-squircle squircle:rounded-2xl",
+		detailHref: (id) =>
+			id
+				? appRoutes.repoDetail(repoKey, id)
+				: `${appRoutes.repoDetail(repoKey)}&tab=sessions`,
+		navigationHost: headerControls,
+		backBar: false,
+	};
+	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
 			<RepoDetailHeader
+				repoKey={repoKey}
 				name={name}
 				onBack={onBack}
-				sessionId={openSessionId}
+				sessionId={sessionId}
 				onBackToSessions={closeSession}
 				setControls={setHeaderControls}
 			/>
-			{/* The tab row under the page header: 24px in, so the first tab's
-			    icon lines up with the breadcrumb's section icon above it
-			    (the pill's 10px inset); the range controls sit at its right
-			    end, on the 32px gutter. An open session gives the page to its
-			    detail; the breadcrumb leads back to the sessions. */}
-			{openSessionId ? null : (
-				<PillTabs
-					tabs={REPO_TABS}
-					value={tab}
-					onChange={(next) => selectTab(next)}
-					label="Repo views"
-					className="pr-8 pl-6"
-					trailing={
-						<div
-							ref={setTabControls}
-							className="flex min-w-0 items-center justify-end"
-						/>
-					}
-				/>
-			)}
 			<h1 className="sr-only">{name}</h1>
-			{tab === "dashboard" ? (
-				tabControls ? (
-					<ShellHeaderPortalContext.Provider value={tabControls}>
-						<RepoDashboard repoKey={repoKey} />
-					</ShellHeaderPortalContext.Provider>
-				) : null
-			) : tab === "skills" ? (
-				<RepoSkills
-					repoKey={repoKey}
-					onOpenSkill={(skill) => selectTab("skills", skill)}
-				/>
+			{sessionId ? (
+				<SessionInRepo.Provider value>
+					<div className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}>{sessions}</div>
+				</SessionInRepo.Provider>
 			) : (
-				<div className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}>
-					<UsageSessionsPane
-						kind="Repo"
-						sessionFilter={{ repoKey }}
-						sessionCount={repo?.sessionCount}
-						detailHref={(sessionId) =>
-							sessionId
-								? appRoutes.repoDetail(repoKey, sessionId)
-								: `${appRoutes.repoDetail(repoKey)}&tab=sessions`
-						}
-						navigationHost={headerControls}
-						backBar={false}
-					/>
-				</div>
+				<RepoDataProvider
+					name={name}
+					pullRequests={pullRequests}
+					repoKey={repoKey}
+					summary={repo}
+				>
+					<DotPickContext.Provider value={dotPick}>
+						<RailHighlightProvider tab={shownTab}>
+							<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">
+								<div
+									aria-hidden="true"
+									className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl"
+								/>
+								{headerControls
+									? createPortal(
+											<RepoReaderTabs
+												ci={ci}
+												onChange={(next) => selectTab(next)}
+												value={shownTab}
+											/>,
+											headerControls,
+										)
+									: null}
+								{
+									<div
+										className={cn(
+											STAGE_PANE,
+											"flex-row [--cost-page-gutter:--spacing(6)]",
+										)}
+									>
+										<ShellHeaderPortalContext.Provider value={null}>
+											<div className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto">
+												<RepoDashboard repoKey={repoKey} variant="rail-chat" />
+											</div>
+										</ShellHeaderPortalContext.Provider>
+										<div className="relative min-w-0 flex-1">
+											<Activity
+												mode={shownTab === "summary" ? "visible" : "hidden"}
+											>
+												{summaryPane}
+											</Activity>
+											<DateRangeOverride range={pickedRange}>
+												{panes.map(({ id, node }) => (
+													<Activity
+														key={id}
+														mode={shownTab === id ? "visible" : "hidden"}
+													>
+														{node}
+													</Activity>
+												))}
+											</DateRangeOverride>
+										</div>
+									</div>
+								}
+							</div>
+						</RailHighlightProvider>
+					</DotPickContext.Provider>
+				</RepoDataProvider>
 			)}
 		</div>
 	);
@@ -179,7 +383,15 @@ export function RepoDetailPage({
 
 /** The workspace dashboard, filtered to this repo: its sessions, and its
  * pull requests and CI runs when GitHub is connected for it. */
-function RepoDashboard({ repoKey }: { repoKey: string }) {
+const WAITING_PREVIEWS = {};
+
+function RepoDashboard({
+	repoKey,
+	variant,
+}: {
+	repoKey: string;
+	variant?: DashboardVariant;
+}) {
 	const repositories = useRepoDashboardRepositories(repoKey);
 	const { state } = useOrganization();
 	const github = useGitHubConnection(state.activeOrg?.id ?? null).query;
@@ -202,8 +414,11 @@ function RepoDashboard({ repoKey }: { repoKey: string }) {
 		dashboard.inputFor,
 		dashboard.metrics,
 		dashboard.input,
-		hasRepositories,
+		hasRepositories && githubRepositories !== undefined,
 	);
+	const waiting =
+		hasRepositories &&
+		(githubRepositories === undefined || previews.pending === true);
 	const prefetchMetric = usePrefetchDashboardMetric(
 		dashboard.inputFor,
 		hasRepositories,
@@ -212,7 +427,7 @@ function RepoDashboard({ repoKey }: { repoKey: string }) {
 		return (
 			<div className="px-8 py-6">
 				<EmptyState
-					icon={IconFolderFilled}
+					icon={IconFolder}
 					title={
 						repositories.isError
 							? "This repo’s dashboard couldn’t load"
@@ -227,40 +442,12 @@ function RepoDashboard({ repoKey }: { repoKey: string }) {
 	return (
 		<CostDashboardView
 			dashboard={dashboard}
-			previews={previews}
+			previews={waiting ? WAITING_PREVIEWS : previews}
 			onMetricIntent={prefetchMetric}
 			scope="repository"
+			variant={variant}
+			waiting={waiting}
 		/>
-	);
-}
-
-function RepoSkills({
-	repoKey,
-	onOpenSkill,
-}: {
-	repoKey: string;
-	onOpenSkill: (skill: string) => void;
-}) {
-	const query = useAnalyticsQuery(
-		orpc.analytics.repositories.detail.queryOptions({ input: { repoKey } }),
-	);
-	return (
-		<div
-			className={cn(
-				SESSION_OVERVIEW_SURFACE_CLASS_NAME,
-				"overflow-y-auto overscroll-none",
-			)}
-		>
-			<RepoSkillsTable
-				skills={query.data?.skills}
-				isError={query.isError}
-				isPending={query.isPending}
-				onRetry={() => {
-					void query.refetch();
-				}}
-				onOpenSkill={onOpenSkill}
-			/>
-		</div>
 	);
 }
 
@@ -269,12 +456,14 @@ function RepoSkills({
  * session's id (the repo crumb then leads back to its sessions), and a slot
  * at the row's right end for the open session's controls. */
 function RepoDetailHeader({
+	repoKey,
 	name,
 	onBack,
 	sessionId,
 	onBackToSessions,
 	setControls,
 }: {
+	repoKey: string;
 	name: string;
 	onBack: () => void;
 	sessionId: string | null;
@@ -283,9 +472,10 @@ function RepoDetailHeader({
 }) {
 	const headerPortal = useShellHeaderPortal();
 	const shellRoute = useCurrentShellRoute();
+	const repoHue = useRepositoryHue(repoKey);
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground";
+		"flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
@@ -293,17 +483,9 @@ function RepoDetailHeader({
 			stroke={1.5}
 		/>
 	);
-	// The repo crumb wears the Repos chip, lit only while it is the page you
-	// are on (the header keeps the outline glyph).
 	const repoLabel = (
 		<>
-			<ShellNavIcon
-				icon={shellRouteMap.repos.icon}
-				activeIcon={shellRouteMap.repos.activeIcon}
-				active={!sessionId}
-				filled={false}
-				tone={shellRoute.tone}
-			/>
+			<RepoNavIcon hue={repoHue} active={!sessionId} />
 			<span className="truncate">{name}</span>
 		</>
 	);
@@ -348,7 +530,6 @@ function RepoDetailHeader({
 								icon={shellRouteMap.sessions.icon}
 								activeIcon={shellRouteMap.sessions.activeIcon}
 								active
-								filled={false}
 								tone={shellRouteMap.sessions.tone}
 							/>
 							<span className="truncate">{sessionId}</span>

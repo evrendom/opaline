@@ -18,9 +18,13 @@ const ROOT = "[data-fluid-menu-root]";
 export function FluidMenuHover({
 	items = DEFAULT_ITEMS,
 	bridgeGap = 0,
+	over = false,
+	fillClassName,
 }: {
 	items?: string;
 	bridgeGap?: number;
+	over?: boolean;
+	fillClassName?: string;
 }) {
 	const anchorRef = useRef<HTMLSpanElement>(null);
 	const containerRef = useRef<HTMLElement | null>(null);
@@ -136,6 +140,7 @@ export function FluidMenuHover({
 		activate(resolve(document.activeElement));
 		const observer = new MutationObserver((changes) => {
 			sync();
+			if (changes.some((change) => change.type === "childList")) remeasure();
 			if (
 				changes.some((change) => change.attributeName === "data-highlighted")
 			) {
@@ -189,10 +194,18 @@ export function FluidMenuHover({
 			<div
 				aria-hidden="true"
 				className="fluid-menu-hover-layer"
+				data-over={over || undefined}
 				data-destructive={appearance.destructive || undefined}
 				style={{ borderRadius: appearance.radius }}
 			>
-				<FluidHoverHighlight hover={hover} className="fluid-menu-hover-fill" />
+				<FluidHoverHighlight
+					hover={hover}
+					className={
+						fillClassName
+							? `fluid-menu-hover-fill ${fillClassName}`
+							: "fluid-menu-hover-fill"
+					}
+				/>
 			</div>
 		</>
 	);

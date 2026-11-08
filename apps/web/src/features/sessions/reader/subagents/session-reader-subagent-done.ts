@@ -1,6 +1,6 @@
-import { getRawToolInput } from "@rudel/api-routes";
-import type { SessionReaderStep } from "../model/session-reader-model";
 import { readTurnMarks } from "../reader-dom";
+
+export { subagentTalkedTo } from "@rudel/api-routes/session-context/session-reader-subagents";
 
 export type SubagentEnd = { until: string | null };
 
@@ -35,16 +35,4 @@ export function subagentDoneAt(
 	return later.length > 0
 		? (later.at(-1) as HTMLElement).getBoundingClientRect().bottom
 		: trace.getBoundingClientRect().bottom;
-}
-
-export function subagentTalkedTo(
-	step: Partial<
-		Pick<SessionReaderStep, "harness" | "notification" | "toolEvent">
-	>,
-): string | null {
-	if (step.harness === "notification" && step.notification?.agent)
-		return step.notification.taskId;
-	if (step.toolEvent?.toolName !== "SendMessage") return null;
-	const to = getRawToolInput(step.toolEvent.input).to;
-	return typeof to === "string" && to ? to : null;
 }

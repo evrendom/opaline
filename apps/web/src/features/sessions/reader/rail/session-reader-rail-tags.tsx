@@ -257,7 +257,7 @@ export function RailTagsPicker({
 			<Tip label="Beside each turn" side="bottom">
 				<Menu.Trigger
 					aria-label="Beside each turn"
-					className="relative inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-card text-muted-foreground shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10"
+					className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-card text-muted-foreground shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10"
 				>
 					<IconAdjustmentsHorizontal aria-hidden="true" className="size-3.5" />
 				</Menu.Trigger>

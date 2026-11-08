@@ -17,6 +17,14 @@
 	background: var(--session-overview-hover, var(--accent));
 }
 
+.fluid-menu-hover-layer[data-over] {
+	z-index: 30;
+}
+
+.fluid-menu-hover-layer[data-over] .fluid-menu-hover-fill {
+	background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+
 .fluid-menu-hover-layer[data-destructive] .fluid-menu-hover-fill {
 	background: color-mix(in srgb, var(--destructive) 15%, transparent);
 }

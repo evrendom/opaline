@@ -82,7 +82,7 @@ export function PillTabs<T extends string>({
 							onChange(id);
 						}}
 						className={cn(
-							"relative flex h-8 cursor-pointer items-center rounded-md px-2.5 text-sm font-medium transition-colors outline-none corner-squircle squircle:rounded-xl",
+							"relative flex h-8 items-center rounded-md px-2.5 text-sm font-medium transition-colors outline-none corner-squircle squircle:rounded-xl",
 							active
 								? empty
 									? "text-foreground/45"

@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-query";
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { Bones } from "@/app/ui/bones";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { UsageStateMessage } from "@/components/usage-collection-view";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
@@ -19,9 +20,14 @@ import { DashboardDateControls } from "@/features/dashboard/components/Dashboard
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { KindsMenu, RowsSkeleton, RunRow } from "./compass-moments";
+import {
+	COMPASS_SAMPLE_RUN,
+	KindsMenu,
+	RowsSkeleton,
+	RunRow,
+} from "./compass-moments";
 import { PatternPane, PatternRow } from "./compass-patterns";
-import { RunPane } from "./compass-run-detail";
+import { RunPane, RunPaneSample } from "./compass-run-detail";
 import { CompassSettingsButton } from "./compass-settings";
 import { useCompassAccess } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
@@ -218,6 +224,11 @@ function CompassView({ observable }: { observable: boolean }) {
 							<CompassSettingsButton />
 						</div>
 					</div>
+					{view === "runs" && list.isPending ? (
+						<Bones className="shrink-0" label="Counting noticed runs">
+							<p className="compass-list-summary">82 of 493 runs noticed</p>
+						</Bones>
+					) : null}
 					{view === "runs" && firstPage ? (
 						<p className="compass-list-summary">
 							{noticeable?.toLocaleString("en-US")} of{" "}
@@ -307,6 +318,10 @@ function CompassView({ observable }: { observable: boolean }) {
 									void refresh();
 								}}
 							/>
+						) : list.isPending ? (
+							<Bones label="Loading the run">
+								<RunPaneSample run={COMPASS_SAMPLE_RUN} />
+							</Bones>
 						) : (
 							<DetailEmpty
 								text={list.isPending ? "" : "Pick a run to see what went on."}

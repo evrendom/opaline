@@ -319,7 +319,7 @@ export const TurnRailList = memo(function TurnRailList({
 							disabled={whole.disabled}
 							onClick={whole.onPick}
 							className={cn(
-								"relative flex h-(--rail-line-height) shrink-0 cursor-pointer items-center justify-between gap-1.5 rounded-md px-1.5 text-left text-xs tabular-nums transition-opacity duration-300 ease-out corner-squircle squircle:rounded-xl",
+								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-1.5 rounded-md px-1.5 text-left text-xs tabular-nums transition-opacity duration-300 ease-out corner-squircle squircle:rounded-xl",
 								whole.disabled &&
 									"cursor-default opacity-40 starting:opacity-100",
 							)}

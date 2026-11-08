@@ -2,12 +2,13 @@ import { cn } from "@/lib/utils";
 import { getFileLanguage } from "../files/session-reader-file-tag";
 import { squarify } from "../summary/session-reader-breakdown";
 import type { TileGlyph } from "./session-reader-context-bar";
+import { fitting } from "./session-reader-context-fit";
 import type { ContextPart } from "./session-reader-context-map";
 import type { Tone } from "./session-reader-context-problems";
 
 const INSET = 6;
 const MIN_AREA = { h: 28, w: 40 } as const;
-const MOST = 400;
+const MIN_CELL = 18;
 
 const MARK: Record<Tone, string> = {
 	later: "border-opal-4",
@@ -38,6 +39,9 @@ const TEXT: Record<Tone, string> = {
 
 const ICON_ROOM = 16;
 
+export const ownsInside = (part: ContextPart) =>
+	part.kind !== "summary" && part.kind !== "earlier";
+
 export function drawsSubTiles(
 	part: ContextPart,
 	w: number,
@@ -46,7 +50,10 @@ export function drawsSubTiles(
 ): boolean {
 	const things = (part.items ?? []).filter((item) => item.tokens > 0).length;
 	return (
-		things >= 2 && w - 2 * INSET >= MIN_AREA.w && h - top - INSET >= MIN_AREA.h
+		ownsInside(part) &&
+		things >= 2 &&
+		w - 2 * INSET >= MIN_AREA.w &&
+		h - top - INSET >= MIN_AREA.h
 	);
 }
 
@@ -74,24 +81,22 @@ export function ContextSubTiles({
 		.sort((a, b) => b.tokens - a.tokens);
 	if (!drawsSubTiles(part, w, h, top)) return null;
 	const marked = (label: string) => markOf(marks, label) !== undefined;
-	const shown = items.filter(
-		(item, index) => index < MOST || marked(item.label),
+	const shown = fitting(
+		items,
+		(item) => item.tokens,
+		area.w,
+		area.h,
+		MIN_CELL,
+		(item) => marked(item.label),
 	);
-	const kept = new Set(shown);
-	const whole = items.reduce((sum, item) => sum + item.tokens, 0);
+	const whole = shown.reduce((sum, item) => sum + item.tokens, 0);
 	const least = (whole * (ICON_ROOM + 10) ** 2) / Math.max(1, area.w * area.h);
-	const rest = items
-		.filter((item) => !kept.has(item))
-		.reduce((sum, item) => sum + item.tokens, 0);
 	const cells = squarify(
-		[
-			...shown.map((item, index) => ({
-				color: "",
-				label: String(index),
-				value: marked(item.label) ? Math.max(item.tokens, least) : item.tokens,
-			})),
-			...(rest > 0 ? [{ color: "", label: "rest", value: rest }] : []),
-		],
+		shown.map((item, index) => ({
+			color: "",
+			label: String(index),
+			value: marked(item.label) ? Math.max(item.tokens, least) : item.tokens,
+		})),
 		area.w,
 		area.h,
 	);
@@ -102,12 +107,8 @@ export function ContextSubTiles({
 			style={{ height: area.h, left: INSET, top, width: area.w }}
 		>
 			{cells.map((cell) => {
-				const mark =
-					cell.part.label === "rest"
-						? undefined
-						: markOf(marks, shown[Number(cell.part.label)]?.label ?? "");
-				const item =
-					cell.part.label === "rest" ? null : shown[Number(cell.part.label)];
+				const item = shown[Number(cell.part.label)];
+				const mark = markOf(marks, item?.label ?? "");
 				const Mark =
 					files && item
 						? getFileLanguage(item.label.split("/").pop() ?? item.label).Icon
@@ -128,9 +129,7 @@ export function ContextSubTiles({
 									: "border-current opacity-20",
 							)}
 						/>
-						{cell.part.label !== "rest" &&
-						width >= ICON_ROOM &&
-						height >= ICON_ROOM ? (
+						{width >= ICON_ROOM && height >= ICON_ROOM ? (
 							<Mark
 								className={cn(
 									"relative size-3",

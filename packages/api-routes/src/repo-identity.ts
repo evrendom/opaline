@@ -80,29 +80,40 @@ function resolveRemoteIdentity(gitRemote: string): RepoIdentity {
 	};
 }
 
-export function resolveRepoIdentity(input: {
+export type RepoIdentityInput = {
 	projectPath: string;
 	gitRemote: string | null;
 	packageName: string | null;
-}): RepoIdentity {
-	const normalizedPath = normalizeSeparators(input.projectPath);
+};
 
+function matchRepoPath(normalizedPath: string) {
 	for (const rule of REPO_PATH_RULES) {
 		const pathMatch = rule.match(normalizedPath);
-		if (pathMatch) {
-			const repoName = extractRepoName(pathMatch.repoToken);
-			return {
-				repoKey: `path:${repoName ?? pathMatch.repoToken}`,
-				repoLabel: repoName ?? pathMatch.repoToken,
-				repoName,
-				source: "worktree",
-				worktree: pathMatch.worktree,
-			};
-		}
+		if (pathMatch) return pathMatch;
 	}
+	return null;
+}
+
+export function resolveRepoIdentity(input: RepoIdentityInput): RepoIdentity {
+	const normalizedPath = normalizeSeparators(input.projectPath);
+	const pathMatch = matchRepoPath(normalizedPath);
 
 	if (input.gitRemote) {
-		return resolveRemoteIdentity(input.gitRemote);
+		return {
+			...resolveRemoteIdentity(input.gitRemote),
+			worktree: pathMatch?.worktree ?? null,
+		};
+	}
+
+	if (pathMatch) {
+		const repoName = extractRepoName(pathMatch.repoToken);
+		return {
+			repoKey: `path:${repoName ?? pathMatch.repoToken}`,
+			repoLabel: repoName ?? pathMatch.repoToken,
+			repoName,
+			source: "worktree",
+			worktree: pathMatch.worktree,
+		};
 	}
 
 	if (input.packageName) {
@@ -122,5 +133,45 @@ export function resolveRepoIdentity(input: {
 		repoName: null,
 		source: "unresolved",
 		worktree: null,
+	};
+}
+
+export type RepoIdentityResolver = {
+	resolve(input: RepoIdentityInput): RepoIdentity;
+	resolveKey(repoKey: string): string;
+};
+
+export function unifyRepoIdentities(
+	rows: Iterable<RepoIdentityInput>,
+): RepoIdentityResolver {
+	const remotesByName = new Map<string, RepoIdentity | null>();
+	for (const row of rows) {
+		if (!row.gitRemote) continue;
+		const identity = resolveRemoteIdentity(row.gitRemote);
+		const name = identity.repoName?.toLowerCase();
+		if (!name) continue;
+		const previous = remotesByName.get(name);
+		remotesByName.set(
+			name,
+			previous === undefined || previous?.repoKey === identity.repoKey
+				? identity
+				: null,
+		);
+	}
+	const remoteFor = (repoKey: string) =>
+		repoKey.startsWith("path:")
+			? remotesByName.get(repoKey.slice("path:".length).toLowerCase())
+			: undefined;
+
+	return {
+		resolve(input) {
+			const identity = resolveRepoIdentity(input);
+			const remote =
+				identity.source === "worktree" && remoteFor(identity.repoKey);
+			return remote ? { ...remote, worktree: identity.worktree } : identity;
+		},
+		resolveKey(repoKey) {
+			return remoteFor(repoKey)?.repoKey ?? repoKey;
+		},
 	};
 }

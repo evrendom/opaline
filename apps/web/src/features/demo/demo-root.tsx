@@ -43,10 +43,12 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		// seeded answer carries every seeded metric.
 		const answers = [seed.dashboard, ...seed.previews];
 		const seededMetrics = Object.fromEntries(
-			answers.map(({ input, data }) => {
-				const metric = input.requestedMetric ?? "cost";
-				return [metric, data.metrics[metric]];
-			}),
+			answers
+				.filter(({ input }) => input.splitBy === "none")
+				.map(({ input, data }) => {
+					const metric = input.requestedMetric ?? "cost";
+					return [metric, data.metrics[metric]];
+				}),
 		);
 		const seeded: Array<[QueryKey, unknown]> = [
 			...answers.map(({ input, data }): [QueryKey, unknown] => [
@@ -55,8 +57,18 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 					seed.organization.id,
 					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
 				],
-				{ ...data, metrics: { ...data.metrics, ...seededMetrics } },
+				input.splitBy === "none"
+					? { ...data, metrics: { ...data.metrics, ...seededMetrics } }
+					: data,
 			]),
+			[
+				[
+					"org",
+					seed.organization.id,
+					...orpc.analytics.repositories.list.queryOptions({}).queryKey,
+				],
+				seed.repositories,
+			],
 			// Seed rows are newest first: the last upload bar's session.
 			[
 				[

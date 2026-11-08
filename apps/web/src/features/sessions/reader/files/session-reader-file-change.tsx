@@ -65,7 +65,7 @@ export function ChangeBlock({
 					<Button
 						size="xs"
 						variant="ghost"
-						className="ml-auto cursor-pointer text-muted-foreground"
+						className="ml-auto text-muted-foreground"
 						onClick={() => onOpenTurn(turnId, change.agentId || undefined)}
 					>
 						Turn {shortRunId(turnId)}

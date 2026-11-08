@@ -3,7 +3,6 @@ import { type ReactNode, useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Popover, PopoverTitle, PopoverTrigger } from "@/app/ui/popover";
-import { Skeleton } from "@/app/ui/skeleton";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import { SessionMenuFlyoutSurface } from "@/features/sessions/components/sessions-overview-linear-filter-flyout";
@@ -135,43 +134,6 @@ function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 				/>
 			</AvatarFallback>
 		</Avatar>
-	);
-}
-
-/** Loading rows in the overview's grid. */
-export function OverviewSkeleton({
-	gridClassName,
-	label,
-	metricWidths,
-}: {
-	gridClassName: string;
-	label: string;
-	metricWidths: readonly string[];
-}) {
-	return (
-		<div aria-busy="true" className="min-h-0 min-w-0 flex-1 overflow-hidden">
-			<output className="sr-only">{label}</output>
-			{["first", "second", "third", "fourth", "fifth", "sixth"].map((key) => (
-				<div key={key} className={cn("grid h-16", gridClassName)}>
-					<div className={OVERVIEW_ROW_LEAD_CELL_CLASS_NAME}>
-						<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
-						<div className="flex min-w-0 flex-col gap-2">
-							<Skeleton className="h-3 w-40 rounded-sm" />
-							<Skeleton className="h-2.5 w-28 rounded-sm" />
-						</div>
-					</div>
-					{metricWidths.map((width, index) => (
-						<div
-							// biome-ignore lint/suspicious/noArrayIndexKey: Static placeholder tracks.
-							key={index}
-							className="flex min-w-0 items-center justify-end px-3"
-						>
-							<Skeleton className={cn("h-3 rounded-sm", width)} />
-						</div>
-					))}
-				</div>
-			))}
-		</div>
 	);
 }
 

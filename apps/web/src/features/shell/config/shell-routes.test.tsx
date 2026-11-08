@@ -34,6 +34,11 @@ describe("getCurrentShellRoute", () => {
 		expect(shellRoutes).not.toContain(reportsShellRoute);
 	});
 
+	it("matches the MCP route without a workspace prefix, as the demo serves it", () => {
+		expect(getCurrentShellRoute("/mcp")).toBe(shellRouteMap.mcp);
+		expect(getCurrentShellRoute("/acme/mcp")).toBe(shellRouteMap.mcp);
+	});
+
 	it("uses history as the sessions shortcut", () => {
 		expect(shellRouteMap.sessions.shortcut).toBe("H");
 	});

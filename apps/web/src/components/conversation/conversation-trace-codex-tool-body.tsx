@@ -165,7 +165,7 @@ function RawToolDetails({
 			data-trace-raw-details
 			onToggle={(event) => setOpen(event.currentTarget.open)}
 		>
-			<summary className="w-fit cursor-pointer text-[0.75rem] text-[color:var(--dashboardy-muted)]">
+			<summary className="w-fit text-[0.75rem] text-[color:var(--dashboardy-muted)]">
 				Raw data
 			</summary>
 			{open ? (

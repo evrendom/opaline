@@ -126,7 +126,7 @@ export function RunQuestionsAdminPage() {
 			</ul>
 			{retired?.length ? (
 				<details>
-					<summary className="cursor-pointer text-muted-foreground">
+					<summary className="text-muted-foreground">
 						Removed and reworded ({retired.length})
 					</summary>
 					<ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
@@ -205,9 +205,7 @@ function AddQuestionForm({
 				/>
 			</label>
 			<details>
-				<summary className="cursor-pointer text-muted-foreground">
-					Criteria (optional)
-				</summary>
+				<summary className="text-muted-foreground">Criteria (optional)</summary>
 				<div className="mt-2 flex flex-col gap-2">
 					<label className="flex flex-col gap-1">
 						A yes looks like

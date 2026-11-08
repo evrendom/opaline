@@ -230,6 +230,7 @@ function renderRow(
 	oldHighlight: PreparedCodeHighlight | null,
 	newHighlight: PreparedCodeHighlight | null,
 	numberStyle: CSSProperties,
+	lit: ReadonlySet<number> | null,
 ): ReactNode {
 	const hunk = hunks[row.hunk];
 	if (row.kind === "separator")
@@ -238,8 +239,8 @@ function renderRow(
 				key={`separator-${hunk.oldStart}-${hunk.newStart}`}
 				className="flex gap-2 px-1.5 py-1 text-muted-foreground/70 italic"
 			>
-				<span className="shrink-0" style={numberStyle} />
-				<span className="w-2 shrink-0" />
+				<span skullet-ignore="" className="shrink-0" style={numberStyle} />
+				<span skullet-ignore="" className="w-2 shrink-0" />
 				<span>⋯ {unmodifiedLinesLabel(row.hidden)}</span>
 			</div>
 		);
@@ -247,6 +248,40 @@ function renderRow(
 	const slot = slots[row.hunk][row.line];
 	const tokens =
 		slot < 0 ? oldHighlight?.lines[-slot - 1] : newHighlight?.lines[slot];
+	if (lit) {
+		const isLit = line.newNumber !== null && lit.has(line.newNumber);
+		const litAt = (at: number) => {
+			const number = hunk.lines[at]?.newNumber;
+			return number !== null && number !== undefined && lit.has(number);
+		};
+		return (
+			<div
+				key={`${line.oldNumber ?? ""}:${line.newNumber ?? ""}`}
+				className={cn(
+					"flex min-h-[1.2em] gap-2 px-1.5",
+					isLit && "bg-foreground/[0.07] dark:bg-foreground/[0.09]",
+					isLit && !litAt(row.line - 1) && "rounded-t-md",
+					isLit && !litAt(row.line + 1) && "rounded-b-md",
+				)}
+			>
+				<span
+					className={cn(
+						"shrink-0 text-right tabular-nums select-none",
+						isLit ? "text-muted-foreground" : "text-muted-foreground/30",
+					)}
+					style={numberStyle}
+				>
+					{line.newNumber}
+				</span>
+				<span skullet-ignore="" className="w-2 shrink-0" />
+				<span
+					className={cn("whitespace-pre", !isLit && "text-muted-foreground/40")}
+				>
+					{isLit ? lineContent(line.text, tokens, line.marks, "") : line.text}
+				</span>
+			</div>
+		);
+	}
 	const look = LINE_LOOK[line.kind];
 	const changed = line.kind !== "context";
 	const opens = changed && hunk.lines[row.line - 1]?.kind !== line.kind;
@@ -268,6 +303,7 @@ function renderRow(
 				{line.kind === "removed" ? line.oldNumber : line.newNumber}
 			</span>
 			<span
+				skullet-ignore=""
 				className={cn(
 					"w-2 shrink-0 text-muted-foreground/70 select-none",
 					look.signColor,
@@ -275,7 +311,7 @@ function renderRow(
 			>
 				{look.sign}
 			</span>
-			<span className="whitespace-pre">
+			<span data-line-text="" className="min-w-0 whitespace-pre">
 				{lineContent(line.text, tokens, line.marks, look.mark)}
 			</span>
 		</div>
@@ -350,10 +386,14 @@ export function DiffView({
 	hunks,
 	language,
 	className,
+	lit = null,
+	wrap = false,
 }: {
 	hunks: readonly DiffHunk[];
 	language: string | null;
 	className?: string;
+	lit?: ReadonlySet<number> | null;
+	wrap?: boolean;
 }) {
 	const { resolvedTheme } = useTheme();
 	const theme = resolvedTheme === "dark" ? "dark" : "light";
@@ -391,9 +431,29 @@ export function DiffView({
 					oldHighlight,
 					newHighlight,
 					numberStyle,
+					lit,
 				),
 			);
-	}, [hunks, layout, sources, oldHighlight, newHighlight, from, to]);
+	}, [hunks, layout, sources, oldHighlight, newHighlight, from, to, lit]);
+	const firstLit = useMemo(() => {
+		if (!lit || lit.size === 0) return null;
+		const index = layout.rows.findIndex(
+			(row) =>
+				row.kind === "line" &&
+				lit.has(hunks[row.hunk].lines[row.line].newNumber ?? -1),
+		);
+		return index < 0 ? null : (layout.tops[index] ?? null);
+	}, [hunks, layout, lit]);
+	useLayoutEffect(() => {
+		if (!node || firstLit === null) return;
+		const root = node.closest<HTMLElement>("[data-lazy-root]");
+		if (!root) return;
+		const offset =
+			node.getBoundingClientRect().top -
+			root.getBoundingClientRect().top +
+			root.scrollTop;
+		root.scrollTop = Math.max(0, offset + firstLit - 48);
+	}, [node, firstLit]);
 	if (hunks.length === 0) return null;
 	const windowed = from > 0 || to < layout.rows.length;
 	return (
@@ -407,7 +467,11 @@ export function DiffView({
 			)}
 		>
 			<div
-				className="w-max min-w-full"
+				className={
+					wrap
+						? "w-full [&_[data-line-text]]:wrap-anywhere [&_[data-line-text]]:whitespace-pre-wrap"
+						: "w-max min-w-full"
+				}
 				style={
 					windowed
 						? {

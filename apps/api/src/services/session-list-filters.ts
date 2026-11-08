@@ -1,14 +1,15 @@
-import {
-	resolveRepoIdentity,
-	type SessionFilterCatalog,
-	type SessionListFilters,
+import type {
+	RepoIdentity,
+	SessionFilterCatalog,
+	SessionListFilters,
 } from "@rudel/api-routes";
 import {
 	buildDateFilter,
 	buildInclusiveDateRangeFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
-import type { SessionAnalyticsListRow } from "./session-analytics.service.js";
+import { toRepoIdentityInput } from "./repo-identity-rows.js";
+import { getWorkspaceRepoIdentities } from "./repository-filter.service.js";
 import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
 import {
 	buildSessionAnalyticsWindowSql,
@@ -85,17 +86,18 @@ export async function getSessionFilterCatalog(
 		query_params: queryParams,
 	});
 	if (!row) throw new Error("Session filter catalog was not returned");
-	const repositories = new Map<
-		string,
-		ReturnType<typeof resolveRepoIdentity>
-	>();
-	for (const [gitRemote, packageName, projectPath] of row.repositories) {
-		const identity = resolveRepoIdentity({
-			gitRemote: gitRemote || null,
-			packageName: packageName || null,
-			projectPath,
-		});
-		repositories.set(identity.repoKey, identity);
+	const repositoryRows = row.repositories.map(
+		([git_remote, package_name, project_path]) =>
+			toRepoIdentityInput({ git_remote, package_name, project_path }),
+	);
+	const resolver = await getWorkspaceRepoIdentities(
+		organizationId,
+		repositoryRows,
+	);
+	const repositories = new Map<string, RepoIdentity>();
+	for (const input of repositoryRows) {
+		const identity = resolver.resolve(input);
+		repositories.set(identity.repoKey, { ...identity, worktree: null });
 	}
 	const bounds = (key: RangeKey) => {
 		const range = row.ranges[RANGE_KEYS.indexOf(key)];
@@ -116,14 +118,6 @@ export async function getSessionFilterCatalog(
 			subagents: bounds("subagents"),
 		},
 	};
-}
-
-export function getSessionListRepositoryKey(row: SessionAnalyticsListRow) {
-	return resolveRepoIdentity({
-		gitRemote: row.git_remote || null,
-		packageName: row.package_name || null,
-		projectPath: row.project_path,
-	}).repoKey;
 }
 
 function normalizeBounds(minimum: number, maximum: number, key: RangeKey) {

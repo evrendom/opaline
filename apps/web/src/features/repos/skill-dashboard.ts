@@ -10,9 +10,8 @@ import type {
 
 // The server's split: this many named series, the rest folded into "Other".
 const MAX_NAMED_SERIES = 7;
-const SIGNAL_LABELS: Record<DashboardSignal, string> = {
+const SIGNAL_LABELS: Partial<Record<DashboardSignal, string>> = {
 	userNegative: "Negative",
-	userPositive: "Positive",
 	modelApologies: "Model apologies",
 };
 const SIGNAL_TYPES = Object.keys(SIGNAL_LABELS) as DashboardSignal[];
@@ -45,11 +44,6 @@ function occurrences(session: SessionAnalytics): Occurrence[] {
 	};
 	return [
 		...of("userNegative", session.member_swears, session.member_swear_matches),
-		...of(
-			"userPositive",
-			session.member_positive,
-			session.member_positive_matches,
-		),
 		...of(
 			"modelApologies",
 			session.model_apologies,

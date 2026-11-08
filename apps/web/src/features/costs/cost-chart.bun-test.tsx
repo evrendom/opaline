@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import assert from "node:assert/strict";
 import type { CostDashboard } from "@rudel/api-routes";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TooltipProvider } from "@/app/ui/tooltip";
+import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import {
 	getChartSeriesValue,
 	groupChartTrend,
@@ -11,24 +13,44 @@ import {
 import { CostChart, GitHubHistoryNotes } from "./cost-chart";
 import { githubOutcomesDashboardFixture } from "./github-outcomes-dashboard.fixture";
 
+function cardValue(html: string, label: string) {
+	const card = html
+		.split('class="cost-metric"')
+		.find((part) => part.includes(`aria-label="${label}"`));
+	const value = card?.match(
+		/<span class="cost-metric-value">([\s\S]*?)<\/span><\/div>/,
+	)?.[1];
+	return value?.replace(/<[^>]+>/g, "");
+}
+
 function renderCiChart(data: CostDashboard) {
 	return renderToStaticMarkup(
-		<TooltipProvider>
-			<CostChart
-				data={data}
-				pending={false}
-				metric="ciRuns"
-				metrics={["mergedPullRequests", "ciRuns"]}
-				runSignals={[]}
-				signalTypes={[]}
-				interval="daily"
-				onMetricChange={() => {}}
-				onRefresh={() => {}}
-				refreshing={false}
-				splitBy="none"
-				onResetSplit={() => {}}
-			/>
-		</TooltipProvider>,
+		<QueryClientProvider client={new QueryClient()}>
+			<WorkspaceStateProvider
+				value={{
+					state: { activeOrg: null, organizations: [], isLoading: false },
+					actions: { switchOrganization: async () => {} },
+					meta: { isOrgAdmin: false, readsEverySession: true },
+				}}
+			>
+				<TooltipProvider>
+					<CostChart
+						data={data}
+						pending={false}
+						metric="ciRuns"
+						metrics={["mergedPullRequests", "ciRuns"]}
+						runSignals={[]}
+						signalTypes={[]}
+						interval="daily"
+						onMetricChange={() => {}}
+						onRefresh={() => {}}
+						refreshing={false}
+						splitBy="none"
+						onResetSplit={() => {}}
+					/>
+				</TooltipProvider>
+			</WorkspaceStateProvider>
+		</QueryClientProvider>,
 	);
 }
 
@@ -81,7 +103,7 @@ test("fully covered no-Actions repositories retain genuine zero CI runs and minu
 	ciRuns.ciMinutes.total = 0;
 	ciRuns.trend = [{ date: "2026-09-30", total: 0, values: { total: 0 } }];
 	const html = renderCiChart(data);
-	expect(html).toContain('<span class="cost-metric-value">0</span>');
+	expect(cardValue(html, "CI runs")).toBe("0");
 	expect(html).toContain("CI minutes (approximate billed Actions minutes): 0");
 	expect(html).toContain("No CI runs in this selection");
 	expect(html).not.toContain('data-unavailable="true"');

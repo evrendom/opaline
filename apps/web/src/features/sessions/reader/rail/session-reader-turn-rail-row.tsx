@@ -96,7 +96,7 @@ export const RailRow = memo(function RailRow({
 			aria-label={`Turn ${number}`}
 			onClick={(event) => onPick(turn, event.clientY)}
 			className={cn(
-				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-(--rail-line-gap) rounded-md px-1.5 text-left text-xs corner-squircle squircle:rounded-xl",
+				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-(--rail-line-gap) rounded-md px-1.5 text-left text-xs corner-squircle squircle:rounded-xl",
 				shown.length > 0 && "pb-(--rail-line-gap)",
 			)}
 		>
@@ -222,7 +222,7 @@ function GroupToggle({
 			onKeyDown={(event) => {
 				if (event.key === "Enter" || event.key === " ") run(event);
 			}}
-			className="-ml-1 inline-flex shrink-0 cursor-pointer items-center rounded px-0.5 text-muted-foreground transition-colors hover:text-foreground"
+			className="-ml-1 inline-flex shrink-0 items-center rounded px-0.5 text-muted-foreground transition-colors hover:text-foreground"
 		>
 			<IconChevronDown
 				aria-hidden="true"
@@ -255,7 +255,7 @@ function RowCopy({ label, value }: { label: string; value: string }) {
 				if (event.key === "Enter" || event.key === " ") run(event);
 			}}
 			className={cn(
-				"copy-button absolute top-1/2 right-0 inline-flex -translate-y-1/2 cursor-pointer items-center justify-center rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover/line:opacity-100 hover:text-foreground",
+				"copy-button absolute top-1/2 right-0 inline-flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover/line:opacity-100 hover:text-foreground",
 				COPY_REVEAL,
 			)}
 		>

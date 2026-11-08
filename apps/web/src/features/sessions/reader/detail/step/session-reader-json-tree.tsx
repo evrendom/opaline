@@ -3,9 +3,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const KIND_COLOR = {
-	number: "text-[oklch(0.5_0.22_281.458)] dark:text-[oklch(0.76_0.14_281.458)]",
-	literal:
-		"text-[oklch(0.52_0.24_302.391)] dark:text-[oklch(0.76_0.14_302.391)]",
+	number: "text-[oklch(0.56_0.16_55)] dark:text-[oklch(0.8_0.14_55)]",
+	literal: "text-[oklch(0.5_0.2_292.717)] dark:text-[oklch(0.74_0.16_292.717)]",
 } as const;
 
 const OPEN_LEVELS = 2;
@@ -81,7 +80,7 @@ function Entry({
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((current) => !current)}
-				className="flex cursor-pointer items-center gap-0.5 text-left hover:text-foreground"
+				className="flex items-center gap-0.5 text-left hover:text-foreground"
 			>
 				<IconChevronRight
 					aria-hidden="true"

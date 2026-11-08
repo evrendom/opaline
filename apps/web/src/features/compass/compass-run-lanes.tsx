@@ -390,7 +390,7 @@ export function RunLanes({
 						type="button"
 						aria-label={`Open ${lane.label}'s thread`}
 						onClick={onOpen}
-						className="group/open flex cursor-pointer rounded-full"
+						className="group/open flex rounded-full"
 					>
 						{mark}
 					</button>
@@ -470,7 +470,7 @@ export function RunLanes({
 							key={`${bar.stepId}:${bar.from}`}
 							data-step={bar.stepId}
 							className={cn(
-								"absolute inset-y-[2px] flex min-w-[2px] cursor-pointer items-center overflow-hidden rounded-[3px] hover:brightness-110",
+								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden rounded-[3px] hover:brightness-110",
 								own ? null : bar.className,
 								"transition-[opacity,filter] duration-200",
 								bar.stepId === selected &&
@@ -621,7 +621,7 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex cursor-pointer items-center rounded px-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+								className="inline-flex items-center rounded px-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />

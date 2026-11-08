@@ -1,6 +1,8 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { TooltipProvider } from "@/app/ui/tooltip";
+import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { CostChart } from "./cost-chart";
 import { githubOutcomesDashboardFixture } from "./github-outcomes-dashboard.fixture";
 
@@ -14,29 +16,39 @@ function chart(
 	metric: "mergedPullRequests" | "ciRuns" = "mergedPullRequests",
 ) {
 	return render(
-		<TooltipProvider>
-			<CostChart
-				data={data}
-				pending={false}
-				metric={metric}
-				metrics={[
-					"cost",
-					"sessions",
-					"agentRuns",
-					"signals",
-					"mergedPullRequests",
-					"ciRuns",
-				]}
-				runSignals={[]}
-				signalTypes={[]}
-				interval="daily"
-				onMetricChange={() => {}}
-				onRefresh={() => {}}
-				refreshing={false}
-				splitBy="none"
-				onResetSplit={() => {}}
-			/>
-		</TooltipProvider>,
+		<QueryClientProvider client={new QueryClient()}>
+			<WorkspaceStateProvider
+				value={{
+					state: { activeOrg: null, organizations: [], isLoading: false },
+					actions: { switchOrganization: async () => {} },
+					meta: { isOrgAdmin: false, readsEverySession: true },
+				}}
+			>
+				<TooltipProvider>
+					<CostChart
+						data={data}
+						pending={false}
+						metric={metric}
+						metrics={[
+							"cost",
+							"sessions",
+							"agentRuns",
+							"signals",
+							"mergedPullRequests",
+							"ciRuns",
+						]}
+						runSignals={[]}
+						signalTypes={[]}
+						interval="daily"
+						onMetricChange={() => {}}
+						onRefresh={() => {}}
+						refreshing={false}
+						splitBy="none"
+						onResetSplit={() => {}}
+					/>
+				</TooltipProvider>
+			</WorkspaceStateProvider>
+		</QueryClientProvider>,
 	);
 }
 

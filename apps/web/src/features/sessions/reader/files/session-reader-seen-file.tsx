@@ -85,7 +85,7 @@ export function SeenFile({
 	const others = step.paths.length - 1;
 	const time = formatPaddedTimeOfDay(step.at);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 py-4 pr-4 pl-5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
 			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
 				<div className="flex min-w-0 flex-1 items-center gap-1.5">
 					{run ? (

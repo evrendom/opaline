@@ -5,10 +5,13 @@ import {
 	type HistoricalSkillDetail,
 	type HistoricalSkillSummary,
 	type HistoricalSkillVersion,
-	resolveRepoIdentity,
+	type RepoIdentityResolver,
 } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
-import { getRepositorySqlFilter } from "./repository-filter.service.js";
+import {
+	getRepositorySqlFilter,
+	getWorkspaceRepoIdentities,
+} from "./repository-filter.service.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 
 interface HistoricalSkillSummaryRow {
@@ -231,6 +234,10 @@ export async function listHistoricalSkills(
 			repoCandidateLimit: HISTORICAL_SKILL_REPO_CANDIDATE_LIMIT,
 		},
 	});
+	const resolver = await getWorkspaceRepoIdentities(
+		organizationId,
+		rows.flatMap(repoAttributionInputs),
+	);
 	return rows.map((row) => ({
 		name: row.name,
 		sessionCount: Number(row.session_count),
@@ -244,7 +251,7 @@ export async function listHistoricalSkills(
 				userId,
 				sessionCount: Number(row.top_user_session_counts[index] ?? 0),
 			})),
-			...mergeRepoAttribution(row),
+			...mergeRepoAttribution(row, resolver),
 		},
 	}));
 }
@@ -254,7 +261,18 @@ export async function listHistoricalSkills(
 // resolved chips must merge by repoKey before the display cap or the card
 // shows duplicate labels. repoCount is the merged count, exact while the raw
 // triple count fits the candidate fetch bound and a floor beyond it.
-function mergeRepoAttribution(row: HistoricalSkillSummaryRow): {
+function repoAttributionInputs(row: HistoricalSkillSummaryRow) {
+	return row.top_repo_project_paths.map((projectPath, index) => ({
+		gitRemote: row.top_repo_git_remotes[index] || null,
+		packageName: row.top_repo_package_names[index] || null,
+		projectPath,
+	}));
+}
+
+function mergeRepoAttribution(
+	row: HistoricalSkillSummaryRow,
+	resolver: RepoIdentityResolver,
+): {
 	repoCount: number;
 	topRepos: { repoKey: string; repoLabel: string; sessionCount: number }[];
 } {
@@ -262,12 +280,8 @@ function mergeRepoAttribution(row: HistoricalSkillSummaryRow): {
 		string,
 		{ repoKey: string; repoLabel: string; sessionCount: number }
 	>();
-	for (const [index, projectPath] of row.top_repo_project_paths.entries()) {
-		const repoIdentity = resolveRepoIdentity({
-			gitRemote: row.top_repo_git_remotes[index] || null,
-			packageName: row.top_repo_package_names[index] || null,
-			projectPath,
-		});
+	for (const [index, input] of repoAttributionInputs(row).entries()) {
+		const repoIdentity = resolver.resolve(input);
 		const sessionCount = Number(row.top_repo_session_counts[index] ?? 0);
 		const existing = merged.get(repoIdentity.repoKey);
 		if (existing) {

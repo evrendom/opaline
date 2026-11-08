@@ -75,7 +75,7 @@ export function RunSummaryBar({
 	const setting = formatConversationModelSetting(mode?.modelSetting);
 	const className = cn(
 		"group/run -mx-1.5 flex gap-3 rounded-md px-1.5 py-1.5 text-xs text-muted-foreground transition-colors",
-		onToggle && "w-full cursor-pointer text-left",
+		onToggle && "w-full text-left",
 		onToggle && rowState(false),
 	);
 	const content = (

@@ -1,15 +1,14 @@
 import { calculateEstimatedCost as calculateEstimatedModelCost } from "@rudel/api-routes";
+import { setCompactNumberLocale } from "@rudel/api-routes/session-context/format";
+
+export { formatCompactNumber } from "@rudel/api-routes/session-context/format";
 
 // The static English demo must format identically at build time and hydration.
 // Normal product builds continue to use the visitor's locale.
 const displayLocale =
 	import.meta.env.MODE === "product-demo" ? "en-US" : undefined;
 const numberFormatter = new Intl.NumberFormat(displayLocale);
-
-const compactNumberFormatter = new Intl.NumberFormat(displayLocale, {
-	notation: "compact",
-	maximumFractionDigits: 1,
-});
+setCompactNumberLocale(displayLocale);
 
 const compactWholeNumberFormatter = new Intl.NumberFormat(displayLocale, {
 	notation: "compact",
@@ -91,10 +90,6 @@ function parseDateValue(value: string) {
 
 export function formatNumber(value: number) {
 	return numberFormatter.format(value);
-}
-
-export function formatCompactNumber(value: number) {
-	return compactNumberFormatter.format(value);
 }
 
 export function formatCompactWholeNumber(value: number) {

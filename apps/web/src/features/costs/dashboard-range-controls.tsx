@@ -9,10 +9,12 @@ export function DashboardRangeControls({
 	interval,
 	onIntervalChange,
 	inHeader,
+	compact = false,
 }: {
 	interval: ChartInterval;
 	onIntervalChange: (interval: ChartInterval) => void;
 	inHeader: boolean;
+	compact?: boolean;
 }) {
 	return (
 		<div
@@ -23,6 +25,7 @@ export function DashboardRangeControls({
 			<FluidMenuHover items="button" />
 			<DashboardDateControls
 				sourceComponent="cost_dashboard_date_picker"
+				compact={compact}
 				triggerSuffix={
 					CHART_INTERVALS.find((option) => option.value === interval)?.label
 				}

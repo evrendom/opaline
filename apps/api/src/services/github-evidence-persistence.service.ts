@@ -7,6 +7,7 @@ import {
 } from "@rudel/repo-intelligence-source-github";
 import { FILTER_VERSION, filterKnownSecrets } from "@rudel/secret-filter";
 import type postgres from "postgres";
+import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
 import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import {
 	createGitHubInstallationAccessToken,
@@ -122,6 +123,7 @@ type CollectAndPersistInput = {
 	) => Promise<string>;
 	readonly contextId: string | null;
 	readonly database: postgres.Sql;
+	readonly environment?: Readonly<Record<string, string | undefined>>;
 	readonly initiatedByUserId: string | null;
 	readonly now?: () => Date;
 	readonly organizationId: string;
@@ -160,6 +162,12 @@ async function runCollection(
 	input: CollectAndPersistInput,
 ): Promise<GitHubEvidenceCollectionResult> {
 	const now = input.now ?? (() => new Date());
+	if (
+		readGitHubSyncSkippedOrgIds(input.environment).includes(
+			input.organizationId,
+		)
+	)
+		throw new Error("GitHub repository binding was not found.");
 	const binding = await getGitHubRepositoryBinding({
 		database: input.database,
 		organizationId: input.organizationId,
@@ -927,6 +935,7 @@ export async function enqueueGitHubEvidenceCollection(input: {
 	readonly commitSha: string;
 	readonly contextId: string | null;
 	readonly database: postgres.Sql;
+	readonly environment?: Readonly<Record<string, string | undefined>>;
 	readonly initiatedByUserId: string | null;
 	readonly now?: () => Date;
 	readonly organizationId: string;
@@ -935,6 +944,12 @@ export async function enqueueGitHubEvidenceCollection(input: {
 	readonly sessionSource: string | null;
 	readonly sessionUserId: string | null;
 }): Promise<GitHubEvidenceEnqueueResult> {
+	if (
+		readGitHubSyncSkippedOrgIds(input.environment).includes(
+			input.organizationId,
+		)
+	)
+		return { collectionId: null, status: "skipped" };
 	const now = (input.now ?? (() => new Date()))();
 	const binding = await getGitHubRepositoryBinding({
 		database: input.database,

@@ -27,6 +27,7 @@ const READ_RPC_PATHS = new Set([
 	"/rpc/getOrganizationSessionCount",
 	"/rpc/cli/setupStatus",
 	"/rpc/cli/authStatus",
+	"/rpc/githubRepositoryEvidence/status",
 ]);
 
 // A separate route never forwards visitor cookies or returns the showcase token.

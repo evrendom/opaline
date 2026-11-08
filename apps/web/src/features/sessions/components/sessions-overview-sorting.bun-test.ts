@@ -37,7 +37,7 @@ const larger: SessionAnalytics = {
 	error_count: 3,
 	duration_min: 2.75,
 	total_interactions: 12,
-	member_positive: 2,
+	member_swears: 2,
 };
 const sortKeys: SessionOverviewSortKey[] = [
 	"time",

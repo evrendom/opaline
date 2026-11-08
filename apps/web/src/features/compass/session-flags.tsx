@@ -299,7 +299,7 @@ function SessionFlagFilter({
 							: `Filter turns by flag, ${shown} flagged`
 					}
 					className={cn(
-						"inline-flex h-7 w-fit min-w-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-full bg-card px-2 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10",
+						"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-1 rounded-full bg-card px-2 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10",
 						on ? "text-foreground" : "text-muted-foreground",
 						className,
 					)}

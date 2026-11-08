@@ -356,7 +356,7 @@ const UsageCard = memo(function UsageCard({
 				aria-label={`Open ${skill.name}`}
 				onClick={() => onSelectItem(skill.id)}
 				onFocus={() => setActiveIndex(index)}
-				className="absolute inset-0 z-20 cursor-pointer rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+				className="absolute inset-0 z-20 rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<header className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">

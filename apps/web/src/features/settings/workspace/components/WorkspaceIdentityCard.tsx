@@ -10,9 +10,8 @@ import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
-	WorkspaceSettingsField,
-	WorkspaceSettingsFields,
 	WorkspaceSettingsGroup,
+	WorkspaceSettingsRow,
 } from "@/features/settings/workspace/components/workspace-settings-group";
 import { useWorkspaceSlugAvailability } from "@/features/workspace/organization/use-workspace-slug";
 import { authClient } from "@/lib/auth-client";
@@ -122,97 +121,92 @@ export function WorkspaceIdentityCard({
 	};
 
 	return (
-		<WorkspaceSettingsGroup title="Workspace">
-			<WorkspaceSettingsFields>
-				<WorkspaceSettingsField label="Name" controlId="workspace-name">
-					<Input
-						id="workspace-name"
-						name="workspace-name"
-						value={isEditingName ? editedName : organization.name}
-						onFocus={() => {
-							if (canManage && !isEditingName) startEditing();
-						}}
-						onChange={(event) => {
-							if (!isEditingName) startEditing();
-							setEditedName(event.target.value);
-						}}
-						onKeyDown={(event) => {
-							if (!canManage || !isEditingName || event.nativeEvent.isComposing)
-								return;
-							if (event.key === "Enter") {
-								event.preventDefault();
-								void saveName();
-							}
-							if (event.key === "Escape") {
-								event.preventDefault();
-								cancelEditing();
-							}
-						}}
-						readOnly={!canManage}
-						disabled={isSavingName}
-						aria-invalid={Boolean(renameError)}
-						aria-describedby={renameError ? "workspace-name-error" : undefined}
-					/>
-				</WorkspaceSettingsField>
-				<WorkspaceSettingsField
-					label="Workspace URL"
-					controlId="workspace-slug"
-				>
-					<div className="workspace-settings-url-control">
-						<div className="workspace-settings-url-field">
-							<span aria-hidden="true">opaline.so/</span>
-							<Input
-								id="workspace-slug"
-								name="workspace-slug"
-								value={isEditingName ? editedSlug : organization.slug}
-								onFocus={() => {
-									if (canManage && !isEditingName) startEditing();
-								}}
-								onChange={(event) => {
-									if (!isEditingName) startEditing();
-									setEditedSlug(event.target.value.toLowerCase());
-								}}
-								onKeyDown={(event) => {
-									if (
-										!canManage ||
-										!isEditingName ||
-										event.nativeEvent.isComposing
-									)
-										return;
-									if (event.key === "Enter") {
-										event.preventDefault();
-										void saveName();
-									}
-									if (event.key === "Escape") {
-										event.preventDefault();
-										cancelEditing();
-									}
-								}}
-								autoComplete="off"
-								autoCapitalize="none"
-								spellCheck={false}
-								maxLength={ORG_SLUG_MAX_LENGTH}
-								readOnly={!canManage}
-								disabled={isSavingName}
-								aria-invalid={["invalid", "taken"].includes(
-									slugAvailability.status,
-								)}
-								aria-describedby={
-									isEditingName ? "workspace-slug-status" : undefined
+		<WorkspaceSettingsGroup title="General">
+			<WorkspaceSettingsRow label="Name" controlId="workspace-name">
+				<Input
+					id="workspace-name"
+					name="workspace-name"
+					value={isEditingName ? editedName : organization.name}
+					onFocus={() => {
+						if (canManage && !isEditingName) startEditing();
+					}}
+					onChange={(event) => {
+						if (!isEditingName) startEditing();
+						setEditedName(event.target.value);
+					}}
+					onKeyDown={(event) => {
+						if (!canManage || !isEditingName || event.nativeEvent.isComposing)
+							return;
+						if (event.key === "Enter") {
+							event.preventDefault();
+							void saveName();
+						}
+						if (event.key === "Escape") {
+							event.preventDefault();
+							cancelEditing();
+						}
+					}}
+					readOnly={!canManage}
+					disabled={isSavingName}
+					aria-invalid={Boolean(renameError)}
+					aria-describedby={renameError ? "workspace-name-error" : undefined}
+				/>
+			</WorkspaceSettingsRow>
+			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
+				<div className="workspace-settings-url-control">
+					<div className="workspace-settings-url-field">
+						<span aria-hidden="true">opaline.so/</span>
+						<Input
+							id="workspace-slug"
+							name="workspace-slug"
+							value={isEditingName ? editedSlug : organization.slug}
+							onFocus={() => {
+								if (canManage && !isEditingName) startEditing();
+							}}
+							onChange={(event) => {
+								if (!isEditingName) startEditing();
+								setEditedSlug(event.target.value.toLowerCase());
+							}}
+							onKeyDown={(event) => {
+								if (
+									!canManage ||
+									!isEditingName ||
+									event.nativeEvent.isComposing
+								)
+									return;
+								if (event.key === "Enter") {
+									event.preventDefault();
+									void saveName();
 								}
-							/>
-						</div>
-						{isEditingName ? (
-							<output
-								id="workspace-slug-status"
-								className="workspace-settings-status"
-							>
-								{slugAvailability.message}
-							</output>
-						) : null}
+								if (event.key === "Escape") {
+									event.preventDefault();
+									cancelEditing();
+								}
+							}}
+							autoComplete="off"
+							autoCapitalize="none"
+							spellCheck={false}
+							maxLength={ORG_SLUG_MAX_LENGTH}
+							readOnly={!canManage}
+							disabled={isSavingName}
+							aria-invalid={["invalid", "taken"].includes(
+								slugAvailability.status,
+							)}
+							aria-describedby={
+								isEditingName ? "workspace-slug-status" : undefined
+							}
+						/>
 					</div>
-				</WorkspaceSettingsField>
-			</WorkspaceSettingsFields>
+					{isEditingName ? (
+						<output
+							id="workspace-slug-status"
+							className="workspace-settings-status"
+						>
+							{slugAvailability.message}
+						</output>
+					) : null}
+				</div>
+			</WorkspaceSettingsRow>
 			{isEditingName ? (
 				<div className="workspace-settings-actions">
 					{renameError ? (

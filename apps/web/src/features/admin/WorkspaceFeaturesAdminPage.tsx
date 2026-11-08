@@ -213,7 +213,7 @@ function FeatureSwitch({
 							setBusy(false);
 						}}
 						className={cn(
-							"h-8 cursor-pointer px-2.5 text-xs whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 disabled:cursor-wait",
+							"h-8 px-2.5 text-xs whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 disabled:cursor-wait",
 							current === option.value
 								? "bg-foreground text-background"
 								: "bg-background text-muted-foreground hover:text-foreground",

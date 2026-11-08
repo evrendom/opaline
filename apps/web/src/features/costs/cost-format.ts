@@ -10,7 +10,7 @@ export const METRIC_LABELS = {
 	cost: "Cost",
 	sessions: "Sessions",
 	commits: "Commits",
-	signals: "Language",
+	signals: "Frustrations",
 	agentRuns: "Agent runs",
 	mergedPullRequests: "Merged PRs",
 	ciFailuresPerPullRequest: "CI failures / PR",

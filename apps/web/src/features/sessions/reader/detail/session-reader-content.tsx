@@ -136,7 +136,8 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		onStaleRevision,
 		revision: overview.revision,
 		sessionId: overview.session.sessionId,
-		startTurnId: opening.startTurnId,
+		startTurnId:
+			opening.startTurnId ?? (followNewest ? undefined : turns[0]?.turnId),
 		turns,
 	});
 
@@ -166,7 +167,11 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	const readFocusRef = useRef(readFocus);
 	readFocusRef.current = readFocus;
 	useMountEffect(() => activeTurn.set(null));
-	const isMountedAt = useMountedTurns(turns, pendingScrollTurnIdRef.current);
+	const isMountedAt = useMountedTurns(
+		turns,
+		pendingScrollTurnIdRef.current ??
+			(followNewest ? undefined : turns[0]?.turnId),
+	);
 	const mapKey = useMemo(
 		() => ({
 			revision: overview.revision,
@@ -323,18 +328,15 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 								<ReaderRunCiContext.Provider value={runCi}>
 									<TipLayer delay={0} portals>
 										<div className="flex h-full min-h-0 flex-col">
-											<div className="px-8 pt-[calc(var(--stage-top,0px)+2rem)] empty:hidden xl:hidden">
-												{flagged.filter}
-											</div>
 											<div
 												ref={setScrollContainer}
 												{...READER_SCROLL_MARK}
 												className="scroll-fade min-h-0 flex-1 overflow-y-auto [--reader-pane-top:calc(var(--stage-top,0.5rem)+1rem)] [--reader-top:var(--tabs-band,var(--reader-inset))] [--scroll-fade-bottom-depth:8px] [--scroll-fade-top-depth:8px] [container-type:size]"
 											>
-												<TabsBandFade className="top-(--stage-top) mr-(--reader-gutter) ml-(--reader-main-left) hidden xl:block" />
+												<TabsBandFade className="top-(--stage-top) mr-(--reader-gutter) ml-(--reader-main-left)" />
 												<div
 													{...READER_CONTENT_MARK}
-													className="grid grid-cols-[minmax(0,1fr)_3.5rem] gap-8 px-(--reader-gutter) pt-2 pb-(--reader-inset) xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)"
+													className="grid grid-cols-[var(--reader-rail)_minmax(0,1fr)_3.5rem] gap-8 px-(--reader-gutter) pt-2 pb-(--reader-inset) xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)"
 												>
 													<nav
 														aria-label="Session turns"
@@ -343,7 +345,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														// top never moves, so the view wouldn't either. The
 														// turns are, so a turn opened at stays put while the
 														// turns above it grow (map column likewise).
-														className={`-mb-4 hidden [overflow-anchor:none] xl:block ${READER_RAIL_BACKGROUND}`}
+														className={`-mb-4 [overflow-anchor:none] ${READER_RAIL_BACKGROUND}`}
 													>
 														<div className="sticky top-(--reader-rail-inset) flex h-[calc(100cqh-2*var(--reader-rail-inset))] min-h-0 flex-col gap-3">
 															<TurnRailList
@@ -363,7 +365,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														</div>
 													</nav>
 
-													<div className="flex min-w-0 items-start gap-8 pt-(--reader-top) xl:col-start-2 xl:row-start-1">
+													<div className="col-start-2 row-start-1 flex min-w-0 items-start gap-8 pt-(--reader-top)">
 														<div
 															className="flex min-w-0 flex-1 flex-col"
 															style={{ gap: TURN_GAP_PX }}
@@ -459,7 +461,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															turns={turns}
 														/>
 													</div>
-													<div className="grid w-14 xl:col-start-2 xl:row-start-1 xl:mr-[calc(var(--reader-card)+2rem)] xl:justify-self-end">
+													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+2rem)] xl:justify-self-end">
 														<ReaderMap
 															focus={readFocus}
 															mapKey={mapKey}
@@ -470,7 +472,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														/>
 													</div>
 												</div>
-												<ViewBottomFade className="mr-(--reader-gutter) ml-(--reader-main-left) hidden xl:block" />
+												<ViewBottomFade className="mr-(--reader-gutter) ml-(--reader-main-left)" />
 											</div>
 										</div>
 									</TipLayer>

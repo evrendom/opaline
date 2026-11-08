@@ -5,6 +5,7 @@ import {
 	loadGitHubAccessForEdges,
 	postgresGitHubSource,
 } from "../analysis/github-access.js";
+import { writeSessionContextSnapshot } from "../session-context-snapshot.service.js";
 import { runL1EdgePass } from "./l1-edge-reconciliation.service.js";
 
 /** Whether this deployment builds L1 edges; requests are queued either way. */
@@ -22,5 +23,7 @@ export function runConfiguredL1EdgePass(budgetMs: number): Promise<number> {
 			access: loadGitHubAccessForEdges,
 			evidence: postgresGitHubSource.evidence,
 		},
+		afterRunIndexBuilt: (session) =>
+			writeSessionContextSnapshot(getClickhouse(), session),
 	});
 }

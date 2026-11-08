@@ -121,8 +121,10 @@ export function SessionModelMark({
 
 	return (
 		<div
+			skullet-block=""
 			className={cn(
 				MODEL_MARK_CLASS_NAME,
+				"rounded-full",
 				tone.icon === "claude" && "text-[#b96949]",
 				tone.icon === "codex" && "text-[#111] dark:text-white",
 				tone.icon === null && "text-(--session-overview-muted)",

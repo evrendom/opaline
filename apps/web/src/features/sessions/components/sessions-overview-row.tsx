@@ -26,7 +26,6 @@ import { SessionModelMark } from "@/features/sessions/components/session-model-m
 import { resolveSessionErrorCount } from "@/features/sessions/components/session-overview-metrics";
 import { SessionOverviewSubagentStack } from "@/features/sessions/components/session-overview-subagent-stack";
 import {
-	getRepositoryLabel,
 	getSessionBranchLabel,
 	getSessionOverviewCost,
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
@@ -65,8 +64,10 @@ import {
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
 	SessionLanguageSignalTag,
 } from "./session-overview-row-elements";
+import { SessionPlaceLabel } from "./session-place";
 
 type SessionsOverviewRowProps = {
+	showPlace?: boolean;
 	showSkillsColumn?: boolean;
 	virtualTop?: number;
 	position?: number;
@@ -205,12 +206,12 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	questionTags,
 	expanded,
 	gridClassName,
+	showPlace,
 }: SessionsOverviewRowProps) {
 	const demo = useDemoRuntime();
 	const itemRef = useRef<HTMLLIElement>(null);
 	useRegisterFluidHoverItem(registerItem, index, itemRef);
 	const sessionHref = getSessionHref?.(session);
-	const repositoryLabel = getRepositoryLabel(session);
 	const branchLabel = getSessionBranchLabel(session);
 	const sessionCost = getSessionOverviewCost(session);
 	// A session running right now reads in the shape of every other row.
@@ -266,7 +267,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			(showSkillsColumn
 				? SESSION_OVERVIEW_GRID_CLASS_NAME
 				: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME),
-		isClickable ? "cursor-pointer" : "cursor-default opacity-65",
+		!isClickable && "opacity-65",
 		// An open row shares the tint of the panel folded out beneath it, and
 		// rounds its top as the block's top edge.
 		expanded &&
@@ -432,13 +433,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							</span>
 						) : null}
 					</p>
-					<p
-						className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#0000009b] dark:text-[#ffffffaf]"
-						data-session-overview-repository-label
-						title={repositoryLabel}
-					>
-						{repositoryLabel}
-					</p>
+					<SessionPlaceLabel session={session} showPlace={showPlace} />
 					{branchLabel ? (
 						<p
 							className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#00000044] tabular-nums dark:text-[#ffffff55]"

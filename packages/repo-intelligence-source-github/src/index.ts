@@ -1,4 +1,10 @@
 export {
+	createGitHubFileSource,
+	type GitHubFileContent,
+	type GitHubFileSource,
+	type GitHubTreeEntry,
+} from "./github-file-source.js";
+export {
 	createGitHubRepositorySource,
 	type GitHubSourceOptions,
 } from "./github-source.js";

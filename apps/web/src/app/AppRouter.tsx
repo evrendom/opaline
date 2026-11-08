@@ -13,6 +13,7 @@ import { loadSessionsPage } from "@/app/session-page-loader";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
+import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
 import { GitHubSettingsPage } from "@/features/settings/github/GitHubSettingsPage";
@@ -47,6 +48,10 @@ const WorkspaceFeaturesAdminPage = lazyNamed(
 	() => import("@/features/admin/WorkspaceFeaturesAdminPage"),
 	"WorkspaceFeaturesAdminPage",
 );
+const AnnouncementPage = lazyNamed(
+	() => import("@/features/announcement/AnnouncementPage"),
+	"AnnouncementPage",
+);
 const CliOnboardingPage = lazyNamed(
 	() => import("@/features/cli-onboarding/cli-onboarding-page"),
 	"CliOnboardingPage",
@@ -69,21 +74,18 @@ const CompassPage = lazyNamed(
 	() => import("@/features/compass/CompassPage"),
 	"CompassPage",
 );
-const AgentTracesPage = lazyNamed(
-	() => import("@/features/agent-traces/AgentTracesPage"),
-	"AgentTracesPage",
-);
 const SkillsPage = lazyNamed(
 	() => import("@/features/skills/SkillsPage"),
 	"SkillsPage",
 );
+const McpPage = lazyNamed(() => import("@/features/mcp/McpPage"), "McpPage");
 const WorkspaceSettingsPage = lazyNamed(
 	() => import("@/features/settings/workspace/WorkspaceSettingsPage"),
 	"WorkspaceSettingsPage",
 );
 const CreateWorkspacePage = lazyNamed(
 	() => import("@/features/settings/workspace/components/CreateWorkspaceCard"),
-	"CreateWorkspaceCard",
+	"CreateWorkspacePage",
 );
 const SessionsSettingsPage = lazyNamed(
 	() => import("@/features/settings/sessions/sessions-settings-page"),
@@ -105,10 +107,6 @@ const ReportPage = lazyNamed(
 	() => import("@/features/reports/ReportPage"),
 	"ReportPage",
 );
-const TeamPage = lazyNamed(
-	() => import("@/features/team/TeamPage"),
-	"TeamPage",
-);
 const TeamInviteAcceptPage = lazyNamed(
 	() => import("@/features/team/TeamInviteAcceptPage"),
 	"TeamInviteAcceptPage",
@@ -124,10 +122,11 @@ type ShellRoutePaths = {
 	dashboard: string;
 	session: string;
 	skills: string;
-	agentTraces: string;
 	repos: string;
+	mcp: string;
 	team: string;
 	settings: string;
+	settingsMembers: string;
 	settingsAccount: string;
 	settingsWorkspace: string;
 };
@@ -138,10 +137,11 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 	dashboard: appRoutes.dashboard(),
 	session: appRoutes.session(),
 	skills: appRoutes.skills(),
-	agentTraces: appRoutes.agentTraces(),
 	repos: appRoutes.repos(),
+	mcp: appRoutes.mcp(),
 	team: appRoutes.team(),
 	settings: appRoutes.settings(),
+	settingsMembers: appRoutes.settingsMembers(),
 	settingsAccount: appRoutes.settingsAccount(),
 	settingsWorkspace: appRoutes.settingsWorkspace(),
 };
@@ -152,10 +152,11 @@ const workspaceShellRoutePaths: ShellRoutePaths = {
 	dashboard: "/:workspaceSlug/dashboard",
 	session: "/:workspaceSlug/sessions",
 	skills: "/:workspaceSlug/skills",
-	agentTraces: "/:workspaceSlug/agent-traces",
 	repos: "/:workspaceSlug/repos",
+	mcp: "/:workspaceSlug/mcp",
 	team: "/:workspaceSlug/team",
 	settings: "/:workspaceSlug/settings",
+	settingsMembers: "/:workspaceSlug/settings/members",
 	settingsAccount: "/:workspaceSlug/settings/account",
 	settingsWorkspace: "/:workspaceSlug/settings/workspace",
 };
@@ -224,15 +225,30 @@ function getShellRouteElements(
 			/>
 			<Route
 				path={`${routePaths.session}/:sessionId?`}
-				element={<LazyRoute Component={SessionComponent} />}
+				element={
+					<LazyRoute
+						Component={SessionComponent}
+						fallback={<SessionReaderFallback />}
+					/>
+				}
 			/>
 			<Route
 				path={`${routePaths.session}/:sessionId/v2`}
-				element={<LazyRoute Component={SessionComponent} />}
+				element={
+					<LazyRoute
+						Component={SessionComponent}
+						fallback={<SessionReaderFallback />}
+					/>
+				}
 			/>
 			<Route
 				path={routePaths.repos}
-				element={<LazyRoute Component={ReposPage} />}
+				element={
+					<LazyRoute
+						Component={ReposPage}
+						fallback={<SessionReaderFallback />}
+					/>
+				}
 			/>
 			<Route
 				path={routePaths.skills}
@@ -249,18 +265,12 @@ function getShellRouteElements(
 				element={<LazyRoute Component={CompassPage} />}
 			/>
 			<Route
-				path={routePaths.agentTraces}
-				element={<LazyRoute Component={AgentTracesPage} />}
+				path={routePaths.mcp}
+				element={<LazyRoute Component={McpPage} />}
 			/>
 			<Route
 				path={routePaths.team}
-				element={
-					import.meta.env.PROD && shellRouteMap.team.comingSoon ? (
-						<ShellRedirect to={routePaths.session} />
-					) : (
-						<LazyRoute Component={TeamPage} />
-					)
-				}
+				element={<ShellRedirect to={routePaths.settingsMembers} />}
 			/>
 			<Route path={routePaths.settings} element={<SettingsLayout />}>
 				<Route
@@ -312,6 +322,10 @@ function getShellRouteElements(
 							fallback={<SettingsPageSkeleton routeId="members" />}
 						/>
 					}
+				/>
+				<Route
+					path={settingsRouteMap.team.segment}
+					element={<ShellRedirect to={routePaths.settingsMembers} />}
 				/>
 				<Route
 					path={settingsRouteMap.invitations.segment}
@@ -376,6 +390,10 @@ export function AppRouter({
 			<Route
 				path={appRoutes.adminFeatures()}
 				element={<LazyRoute Component={WorkspaceFeaturesAdminPage} />}
+			/>
+			<Route
+				path="/announcement"
+				element={<LazyRoute Component={AnnouncementPage} />}
 			/>
 			<Route
 				path="/:workspaceSlug/join/:token"

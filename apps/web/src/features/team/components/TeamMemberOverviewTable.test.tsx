@@ -100,7 +100,7 @@ describe("TeamMemberOverviewTable", () => {
 		).toBeVisible();
 	});
 
-	it("runs the table full-bleed with its outer cells on the 32px gutter", () => {
+	it("lines its outer cells up with the settings column's 8px gutter", () => {
 		render(
 			<TeamMemberOverviewTable
 				canInviteTeamMembers={false}
@@ -109,12 +109,10 @@ describe("TeamMemberOverviewTable", () => {
 			/>,
 		);
 
-		// Tables: no inset around the table; the first and last cells
-		// pad to the page gutter instead.
 		const table = screen.getByRole("table");
 		expect(table.parentElement).not.toHaveClass("px-16");
-		expect(table).toHaveClass("[&_tr>*:first-child]:pl-8");
-		expect(table).toHaveClass("[&_tr>*:last-child]:pr-8");
+		expect(table).toHaveClass("[&_tr>*:first-child]:pl-2");
+		expect(table).toHaveClass("[&_tr>*:last-child]:pr-2");
 	});
 
 	it("shows the top three models and collapses the remainder into a count", () => {

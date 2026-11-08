@@ -12,13 +12,12 @@ import {
 	IconFolderFilled,
 	IconMessages,
 	IconMessagesFilled,
-	IconRoute,
+	IconPlug,
 	IconSettings,
 	IconSettingsFilled,
-	IconUser,
-	IconUserFilled,
 } from "@tabler/icons-react";
 import { appRoutes, getCanonicalAppPath } from "@/app/routes";
+import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import type { ShellNavTone } from "@/features/shell/components/shell-nav-icon";
 
@@ -27,9 +26,8 @@ export type ShellRouteId =
 	| "dashboard"
 	| "sessions"
 	| "skills"
-	| "agentTraces"
 	| "repos"
-	| "team"
+	| "mcp"
 	| "settings"
 	| "reports";
 
@@ -124,17 +122,6 @@ export const shellRoutes = [
 		tone: tones.opal3,
 	},
 	{
-		id: "agentTraces",
-		comingSoon: false,
-		path: appRoutes.agentTraces(),
-		title: "Agent traces",
-		navLabel: "Agent traces",
-		shortcut: "A",
-		icon: IconRoute,
-		activeIcon: IconRoute,
-		tone: sessionsTone,
-	},
-	{
 		id: "repos",
 		comingSoon: false,
 		path: appRoutes.repos(),
@@ -146,14 +133,14 @@ export const shellRoutes = [
 		tone: tones.opal4,
 	},
 	{
-		id: "team",
+		id: "mcp",
 		comingSoon: false,
-		path: appRoutes.team(),
-		title: "Team",
-		navLabel: "Team",
-		shortcut: "T",
-		icon: IconUser,
-		activeIcon: IconUserFilled,
+		path: appRoutes.mcp(),
+		title: "MCP",
+		navLabel: "MCP",
+		shortcut: "M",
+		icon: IconPlug,
+		activeIcon: IconPlugFilled,
 		tone: tones.opal5,
 	},
 	{
@@ -173,10 +160,9 @@ export const shellRouteMap = {
 	dashboard: shellRoutes[1],
 	sessions: shellRoutes[2],
 	skills: shellRoutes[3],
-	agentTraces: shellRoutes[4],
-	repos: shellRoutes[5],
-	team: shellRoutes[6],
-	settings: shellRoutes[7],
+	repos: shellRoutes[4],
+	mcp: shellRoutes[5],
+	settings: shellRoutes[6],
 } as const;
 
 // The plugin app is read-only; settings stay on opaline.so.
@@ -185,9 +171,7 @@ export const shellNavigationRoutes = shellRoutes.filter(
 		!route.comingSoon &&
 		!(
 			import.meta.env.MODE === "plugin" &&
-			(route.id === "settings" ||
-				route.id === "agentTraces" ||
-				route.id === "compass")
+			(route.id === "settings" || route.id === "compass")
 		),
 );
 

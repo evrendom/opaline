@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { appRoutes, getSessionDetailId, isNewSessionPath } from "@/app/routes";
 import { Separator } from "@/app/ui/separator";
 import { SidebarTrigger } from "@/app/ui/sidebar";
+import { Skeleton } from "@/app/ui/skeleton";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
@@ -77,10 +78,17 @@ export function SiteHeader({
 		(currentShellRoute.id === "skills" &&
 			!!new URLSearchParams(location.search).get("skill")) ||
 		(currentShellRoute.id === "repos" &&
-			!!new URLSearchParams(location.search).get("repo"));
+			!!new URLSearchParams(location.search).get("repo")) ||
+		(currentShellRoute.id === "mcp" &&
+			!!new URLSearchParams(location.search).get("mcp"));
 	const shortSessionId = sessionDetailId?.split("-")[0] ?? "";
 	const sessionModel = useSessionModel(sessionDetailId);
-	const modelChip = sessionModel ? <ModelChip model={sessionModel} /> : null;
+	const modelPending = sessionDetailId !== null && sessionModel === undefined;
+	const modelChip = sessionModel ? (
+		<ModelChip model={sessionModel} />
+	) : modelPending ? (
+		<Skeleton className="size-4.5 shrink-0 rounded-full" />
+	) : null;
 	const params = new URLSearchParams(location.search);
 	const readingSubagent = params.has(AGENT_PARAM);
 	writeAgent(params, null);
@@ -126,7 +134,6 @@ export function SiteHeader({
 									icon={currentShellRoute.icon}
 									activeIcon={currentShellRoute.activeIcon}
 									active
-									filled={false}
 									tone={currentShellRoute.tone}
 								/>
 							</span>
@@ -156,6 +163,8 @@ export function SiteHeader({
 							>
 								{formatModelDisplayLabel(sessionModel)}
 							</span>
+						) : modelPending ? (
+							<Skeleton className="h-3.5 w-16 shrink-0 rounded-[4px] corner-squircle squircle:rounded-[8px]" />
 						) : null}
 						<span
 							className={cn(
@@ -248,7 +257,6 @@ export function SiteHeader({
 								icon={currentShellRoute.icon}
 								activeIcon={currentShellRoute.activeIcon}
 								active
-								filled={false}
 								tone={currentShellRoute.tone}
 							/>
 							<span className="truncate">{title}</span>

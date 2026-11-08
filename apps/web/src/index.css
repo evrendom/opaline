@@ -146,11 +146,36 @@
 	body {
 		@apply bg-background text-foreground;
 	}
+	a[href] {
+		cursor: default;
+	}
+	a[target="_blank"],
+	a[href^="http:"],
+	a[href^="https:"],
+	a[href^="mailto:"] {
+		cursor: pointer;
+	}
 	html {
 		@apply font-sans;
+	}
+	@media (min-resolution: 2dppx) {
+		html {
+			-webkit-font-smoothing: antialiased;
+			-moz-osx-font-smoothing: grayscale;
+		}
 	}
 }
 
 :focus {
 	outline: none;
+}
+
+@theme {
+	--animate-repo-live: repo-live 2.4s ease-in-out infinite;
+
+	@keyframes repo-live {
+		50% {
+			opacity: 0.1;
+		}
+	}
 }

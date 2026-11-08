@@ -144,6 +144,22 @@ function bucketDate(value: string, interval: ChartInterval): string {
 	return date.toISOString().slice(0, 10);
 }
 
+export function chartPeriodDates(
+	startDate: string,
+	endDate: string,
+	interval: ChartInterval,
+): string[] {
+	const periods: string[] = [];
+	const day = new Date(`${startDate}T00:00:00Z`);
+	const last = new Date(`${endDate}T00:00:00Z`);
+	while (day <= last) {
+		const period = bucketDate(day.toISOString().slice(0, 10), interval);
+		if (periods.at(-1) !== period) periods.push(period);
+		day.setUTCDate(day.getUTCDate() + 1);
+	}
+	return periods;
+}
+
 export function formatChartDate(
 	value: string,
 	interval: ChartInterval,

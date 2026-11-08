@@ -25,32 +25,42 @@ vi.mock("../../components/session-detail-fast-query", async (original) => ({
 		new Promise((resolve) => seen.pending.set(request.anchorTurnId, resolve)),
 }));
 
-vi.mock("./session-reader-context-runs", async (original) => {
-	const actual =
-		await original<typeof import("./session-reader-context-runs")>();
-	return {
-		...actual,
-		fullestCall: (turn: SessionDetailTurnSummary) =>
-			turn.turnId === "t3"
-				? { at: 0, model: null, share: 0.5, tokens: 50, window: 100 }
-				: null,
-		readRuns: vi.fn(actual.readRuns),
-	};
-});
+vi.mock(
+	"@rudel/api-routes/session-context/session-reader-context-runs",
+	async (original) => {
+		const actual =
+			await original<
+				typeof import("@rudel/api-routes/session-context/session-reader-context-runs")
+			>();
+		return {
+			...actual,
+			fullestCall: (turn: SessionDetailTurnSummary) =>
+				turn.turnId === "t3"
+					? { at: 0, model: null, share: 0.5, tokens: 50, window: 100 }
+					: null,
+			readRuns: vi.fn(actual.readRuns),
+		};
+	},
+);
 
 vi.mock("./session-reader-context-problems", async (original) => ({
 	...(await original<typeof import("./session-reader-context-problems")>()),
 	problemsByBox: vi.fn(() => new Map()),
 }));
 
-vi.mock("./session-reader-context-map", async (original) => ({
-	...(await original<typeof import("./session-reader-context-map")>()),
-	getContextMap: vi.fn(() => {
-		const map = { built: seen.maps.length + 1 };
-		seen.maps.push(map);
-		return map;
+vi.mock(
+	"@rudel/api-routes/session-context/session-reader-context-map",
+	async (original) => ({
+		...(await original<
+			typeof import("@rudel/api-routes/session-context/session-reader-context-map")
+		>()),
+		getContextMap: vi.fn(() => {
+			const map = { built: seen.maps.length + 1 };
+			seen.maps.push(map);
+			return map;
+		}),
 	}),
-}));
+);
 
 vi.mock("./session-reader-context-by-run", () => ({
 	byRunMap: () => null,

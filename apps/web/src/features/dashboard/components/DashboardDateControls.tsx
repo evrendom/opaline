@@ -12,12 +12,14 @@ export function DashboardDateControls({
 	variant,
 	calendarControls,
 	triggerSuffix,
+	compact,
 }: {
 	className?: string;
 	sourceComponent?: string;
 	variant?: AnalyticsDateRangePickerProps["variant"];
 	calendarControls?: AnalyticsDateRangePickerProps["calendarControls"];
 	triggerSuffix?: AnalyticsDateRangePickerProps["triggerSuffix"];
+	compact?: boolean;
 }) {
 	const { state, actions, meta } = useDateRange();
 
@@ -32,6 +34,7 @@ export function DashboardDateControls({
 			variant={variant}
 			calendarControls={calendarControls}
 			triggerSuffix={triggerSuffix}
+			compact={compact}
 			triggerClassName={className}
 		/>
 	);

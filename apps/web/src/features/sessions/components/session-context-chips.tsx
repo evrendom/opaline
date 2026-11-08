@@ -1,11 +1,9 @@
 import { IconFolder, IconGitBranch, IconGitCommit } from "@tabler/icons-react";
 import { Fragment, type ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { Bone, Bones } from "@/app/ui/bones";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
-import {
-	ContextChip,
-	ContextChipSkeleton,
-} from "@/features/shell/components/context-chip";
+import { ContextChip } from "@/features/shell/components/context-chip";
 import { ModelChip } from "../reader/detail/waterfall/session-reader-waterfall-chips";
 import { FactDot } from "../reader/subagents/session-reader-subagent-strip";
 import type { buildSessionDetailViewModel } from "./session-detail-view-model";
@@ -42,11 +40,13 @@ export function SessionContextChips({
 		// Pill-shaped placeholders so the page below doesn't shift when the
 		// chips arrive.
 		return isLoading ? (
-			<div className="flex shrink-0 flex-wrap items-center gap-2 bg-(--dashboard-01-content-background) px-6 pt-1 pb-3">
-				<ContextChipSkeleton className="w-28" />
-				<ContextChipSkeleton className="w-36" />
-				<ContextChipSkeleton className="w-32" />
-			</div>
+			<Bones label="Loading where this session ran">
+				<div className="flex shrink-0 flex-wrap items-center gap-2 bg-(--dashboard-01-content-background) px-6 pt-1 pb-3">
+					<Bone className="h-8 w-28 rounded-full" />
+					<Bone className="h-8 w-36 rounded-full" />
+					<Bone className="h-8 w-32 rounded-full" />
+				</div>
+			</Bones>
 		) : null;
 	}
 

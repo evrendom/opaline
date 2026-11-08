@@ -108,13 +108,14 @@ describe("Workspace product URLs", () => {
 		expect(getCurrentShellRoute("/acme/home").id).toBe("dashboard");
 		expect(getCurrentShellRoute("/acme/dashboard").id).toBe("dashboard");
 		expect(getCurrentShellRoute("/acme/sessions/123")?.id).toBe("sessions");
-		expect(getCurrentShellRoute("/acme/team")?.id).toBe("team");
+		expect(getCurrentShellRoute("/acme/mcp")?.id).toBe("mcp");
 		expect(getActiveSettingsRouteId("/acme/settings/account")).toBe("account");
 		expect(getActiveSettingsRouteId("/acme/settings/members")).toBe("members");
 		expect(getActiveSettingsRouteId("/acme/settings/reports")).toBe("reports");
 		expect(appRoutes.workspaceReport("acme", "a/1")).toBe(
 			"/acme/reports/a%2F1",
 		);
+		expect(getActiveSettingsRouteId("/acme/settings/team")).toBe("members");
 	});
 });
 

@@ -92,39 +92,36 @@ function renderView(props: Partial<ComponentProps<typeof SkillsPageView>>) {
 }
 
 describe("SkillsPageView", () => {
-	it("lists skills as rows with their usage and opens a selected skill", async () => {
+	it("lists skills as cards with their usage and opens a selected skill", async () => {
 		const user = userEvent.setup();
 		const onSelectSkill = vi.fn();
 		renderView({ onSelectSkill });
 
 		const list = screen.getByRole("list", { name: "Skills" });
-		const rows = within(list).getAllByRole("button", { name: /^Open / });
-		// Most-used first.
-		expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+		const cards = within(list).getAllByRole("button", { name: /^Open / });
+		expect(cards.map((card) => card.getAttribute("aria-label"))).toEqual([
 			"Open testing-bun",
 			"Open Design",
 			"Open a-very-long-skill-name-that-needs-to-wrap-without-breaking-the-row-layout",
 		]);
-		const testingBun = rows[0];
+		const testingBun = cards[0]?.closest("article");
 		assert(testingBun);
-		expect(testingBun).toHaveTextContent("12 sessions");
-		expect(testingBun).toHaveTextContent("4 repos");
-		expect(testingBun).toHaveTextContent(
-			"Ada Lovelace, Grace Hopper, Linus Torvalds +1",
-		);
-		// No member column and no agent tags.
-		expect(testingBun).not.toHaveTextContent("4 members");
+		expect(testingBun).toHaveTextContent("12 uses");
+		expect(within(testingBun).getByTitle("4 repos")).toBeInTheDocument();
+		expect(within(testingBun).getByTitle("4 members")).toBeInTheDocument();
+		expect(testingBun).toHaveTextContent("Test Bun code.");
 		expect(testingBun).not.toHaveTextContent("Claude");
 		expect(testingBun).not.toHaveTextContent("Codex");
-		// Names unknown to this workspace fall back to a count.
-		expect(rows[1]).toHaveTextContent("2 members");
-		expect(
-			screen.queryByText("Run focused tests first."),
-		).not.toBeInTheDocument();
-		// No column headers.
-		expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
+		const unknown = cards[2]?.closest("article");
+		assert(unknown);
+		expect(unknown).toHaveTextContent("1 use");
+		expect(unknown).toHaveTextContent(
+			"No description was recovered for this skill.",
+		);
 
-		await user.click(testingBun);
+		const testingBunButton = cards[0];
+		assert(testingBunButton);
+		await user.click(testingBunButton);
 		expect(onSelectSkill).toHaveBeenCalledWith("testing-bun");
 	});
 

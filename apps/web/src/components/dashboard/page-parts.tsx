@@ -18,6 +18,10 @@ import {
 } from "@/components/dashboard/empty";
 import { Skeleton } from "@/components/dashboard/skeleton";
 import { TableCell, TableRow } from "@/components/dashboard/table";
+import {
+	OpalineShape,
+	restingChipClassName,
+} from "@/features/shell/components/shell-nav-icon";
 import { cn } from "@/lib/utils";
 
 export function EmptyState({
@@ -39,7 +43,14 @@ export function EmptyState({
 		<Empty className={cn("border border-dashed", className)}>
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
-					<Icon className={cn("opacity-40", iconClassName)} />
+					<OpalineShape
+						className={cn(
+							"absolute inset-0",
+							restingChipClassName,
+							"[--opal-ring:rgb(17_24_39/0.08)]",
+						)}
+					/>
+					<Icon className={cn("relative", iconClassName)} />
 				</EmptyMedia>
 				<EmptyContent>
 					<EmptyTitle>{title}</EmptyTitle>
@@ -187,6 +198,7 @@ export function StatCard({
 	return (
 		<Card
 			size="sm"
+			skullet-block={onSelect ? "" : undefined}
 			className={cn(
 				"data-[size=sm]:py-3.5",
 				onSelect &&
@@ -206,10 +218,7 @@ export function StatCard({
 					aria-label={label}
 					aria-pressed={selected}
 					onClick={onSelect}
-					className={cn(
-						"absolute inset-0 z-10 rounded-[inherit] outline-none",
-						selected ? "cursor-default" : "cursor-pointer",
-					)}
+					className={cn("absolute inset-0 z-10 rounded-[inherit] outline-none")}
 				/>
 			) : null}
 			<CardHeader className="gap-1.5 group-data-[size=sm]/card:px-4">

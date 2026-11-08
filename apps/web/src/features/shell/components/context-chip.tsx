@@ -26,12 +26,3 @@ export function ContextChip({
 		</div>
 	);
 }
-
-export function ContextChipSkeleton({ className }: { className: string }) {
-	return (
-		<div
-			aria-hidden="true"
-			className={cn("h-8 animate-pulse rounded-full bg-muted", className)}
-		/>
-	);
-}

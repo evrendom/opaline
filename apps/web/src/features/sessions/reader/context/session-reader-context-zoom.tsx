@@ -222,7 +222,7 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 cursor-pointer rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
+								className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
 							/>
 							<span
 								className={cn(
@@ -259,7 +259,7 @@ export function ContextZoom({
 									data-context-pick=""
 									onClick={open.go}
 									aria-label={`Open ${nameOf(item.label, files)} in ${open.words}`}
-									className="absolute right-1.5 bottom-1.5 inline-flex h-6 cursor-pointer items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
+									className="absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
 								>
 									{open.words}
 									<IconArrowUpRight aria-hidden="true" className="size-3" />

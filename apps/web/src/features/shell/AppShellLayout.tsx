@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import * as React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppToaster } from "@/app/ui/AppToaster";
@@ -15,7 +14,6 @@ import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBann
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
 import "./app-shell.css";
-import { useAgentTracesEnabled } from "@/features/agent-traces/use-agent-traces-access";
 import { useCompassEnabled } from "@/features/compass/use-compass-access";
 import { ShellDashboardRangeControls } from "@/features/costs/dashboard-range-controls";
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
@@ -29,63 +27,11 @@ import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { NewseshListHeaderPortalContext } from "@/features/shell/newsesh-list-header-portal";
 import { ShellBottomNavigationPortalContext } from "@/features/shell/shell-bottom-navigation-portal";
+import { shellChromeStyle } from "@/features/shell/shell-chrome-style";
 import { ShellHeaderPortalContext } from "@/features/shell/shell-header-portal";
 import { ShellOnboardingPanelContext } from "@/features/shell/shell-onboarding-panel";
 import { useRootMark } from "@/hooks/use-root-mark";
 import { cn } from "@/lib/utils";
-
-type DashboardChromeStyle = CSSProperties & {
-	[customProperty: `--${string}`]: string | number | undefined;
-};
-
-const defaultDashboardChromeValues = {
-	turbulence: {
-		opacity: 0.18,
-		highlightOpacity: 0.15,
-		largeSize: 130,
-		smallSize: 136,
-		contrast: 190,
-		darkness: 0.8,
-	},
-	shadow: {
-		x: 0,
-		y: 0,
-		blur: 4,
-		spread: 0,
-		color: "#000000",
-		opacity: 0.13,
-	},
-} as const;
-
-function hexToRgba(hex: string, alpha: number) {
-	const sanitized = hex.replace("#", "").trim();
-	const normalized =
-		sanitized.length === 3
-			? sanitized
-					.split("")
-					.map((char) => `${char}${char}`)
-					.join("")
-			: sanitized;
-
-	if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-		return `rgba(0, 0, 0, ${alpha})`;
-	}
-
-	const red = Number.parseInt(normalized.slice(0, 2), 16);
-	const green = Number.parseInt(normalized.slice(2, 4), 16);
-	const blue = Number.parseInt(normalized.slice(4, 6), 16);
-	return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
-const defaultChromeStyle: DashboardChromeStyle = {
-	"--dashboard-01-chrome-turbulence-opacity": `${defaultDashboardChromeValues.turbulence.opacity}`,
-	"--dashboard-01-chrome-highlight-opacity": `${defaultDashboardChromeValues.turbulence.highlightOpacity}`,
-	"--dashboard-01-chrome-noise-large-size": `${defaultDashboardChromeValues.turbulence.largeSize}px`,
-	"--dashboard-01-chrome-noise-small-size": `${defaultDashboardChromeValues.turbulence.smallSize}px`,
-	"--dashboard-01-chrome-turbulence-contrast": `${defaultDashboardChromeValues.turbulence.contrast}%`,
-	"--dashboard-01-chrome-turbulence-darkness": `${defaultDashboardChromeValues.turbulence.darkness}`,
-	"--dashboard-01-window-shadow": `${defaultDashboardChromeValues.shadow.x}px ${defaultDashboardChromeValues.shadow.y}px ${defaultDashboardChromeValues.shadow.blur}px ${defaultDashboardChromeValues.shadow.spread}px ${hexToRgba(defaultDashboardChromeValues.shadow.color, defaultDashboardChromeValues.shadow.opacity)}`,
-};
 
 const shellShortcutRouteByKey = shellNavigationRoutes.reduce<
 	Record<string, string>
@@ -132,7 +78,7 @@ export function LeftSidebarAppShellLayout() {
 	const isHomeWorkspaceRoute = canonicalPathname === appRoutes.home();
 	const isSkillsWorkspaceRoute = [
 		appRoutes.skills(),
-		appRoutes.agentTraces(),
+		appRoutes.mcp(),
 		appRoutes.compass(),
 		appRoutes.repos(),
 	].includes(canonicalPathname);
@@ -152,7 +98,6 @@ export function LeftSidebarAppShellLayout() {
 		React.useState<HTMLElement | null>(null);
 	// The plugin host and onboarding have no workspace sessions to date.
 	const showLastSessionUpload = import.meta.env.MODE !== "plugin" && !isWelcome;
-	const agentTracesEnabled = useAgentTracesEnabled();
 	const compassEnabled = useCompassEnabled();
 
 	React.useEffect(() => {
@@ -174,8 +119,6 @@ export function LeftSidebarAppShellLayout() {
 				shellShortcutRouteByKey[event.key.toLowerCase()];
 			if (
 				!canonicalNextPath ||
-				(canonicalNextPath === appRoutes.agentTraces() &&
-					!agentTracesEnabled) ||
 				(canonicalNextPath === appRoutes.compass() && !compassEnabled)
 			) {
 				return;
@@ -198,7 +141,6 @@ export function LeftSidebarAppShellLayout() {
 		location.pathname,
 		navigate,
 		isWelcome,
-		agentTracesEnabled,
 		compassEnabled,
 	]);
 
@@ -279,7 +221,7 @@ export function LeftSidebarAppShellLayout() {
 								>
 									<SidebarProvider
 										className="group/shell dashboard-01-chrome-frame relative h-full min-h-0 overflow-clip overscroll-none"
-										style={defaultChromeStyle}
+										style={shellChromeStyle}
 									>
 										<AppSidebar />
 										<ShellWindowColumn

@@ -30,6 +30,7 @@ import {
 	getSessionAnalyticsSummaryComparison,
 	getSessionDimensionAnalysis,
 } from "../../services/session-analytics.service.js";
+import { readSessionContextSnapshot } from "../../services/session-context-snapshot.service.js";
 import {
 	getSessionDetailBodyChunk,
 	getSessionDetailInitial,
@@ -257,6 +258,20 @@ const setupRuns = os.analytics.sessions.setupRuns
 		);
 		return sessionSetupRuns(
 			sessionRunCiEnv(),
+			{ workspaceId: context.organizationId, member: ownerId },
+			input.sessionId,
+		);
+	});
+
+const contextSnapshot = os.analytics.sessions.contextSnapshot
+	.use(orgMiddleware)
+	.handler(async ({ input, context }) => {
+		const ownerId = requireSessionDetailOwnerAccess(
+			await getSessionOwner(context.organizationId, input.sessionId),
+			context.sessionReader,
+		);
+		return readSessionContextSnapshot(
+			sessionRunCiEnv().executor,
 			{ workspaceId: context.organizationId, member: ownerId },
 			input.sessionId,
 		);
@@ -631,6 +646,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	runCi,
 	runQuestionTags,
 	setupRuns,
+	contextSnapshot,
 	setupText,
 	summaryLinks,
 	fileChanges,

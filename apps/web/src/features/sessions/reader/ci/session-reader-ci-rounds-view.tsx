@@ -146,7 +146,7 @@ export function CiRoundDots({
 						aria-label={roundWords(round, index)}
 						title={roundWords(round, index)}
 						onClick={() => onPick(round.run.ciRunId)}
-						className="group/dot pointer-events-auto flex size-4 cursor-pointer items-center justify-center rounded-full outline-none"
+						className="group/dot pointer-events-auto flex size-4 items-center justify-center rounded-full outline-none"
 					>
 						<span
 							className={cn(
@@ -359,7 +359,7 @@ export function CiRounds({
 								title={roundWords(round, index)}
 								onClick={() => onPickRun(round.run.ciRunId)}
 								className={cn(
-									"grid w-full cursor-pointer grid-cols-[16px_minmax(0,1fr)] gap-x-2.5 rounded-lg px-3 py-1.5 text-left transition-colors",
+									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-2.5 rounded-lg px-3 py-1.5 text-left transition-colors",
 									picked ? "bg-muted ring-1 ring-border" : "hover:bg-muted/40",
 								)}
 							>
