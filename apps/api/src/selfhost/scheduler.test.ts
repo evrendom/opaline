@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type postgres from "postgres";
 import {
+	delayUntilDue,
 	type JobLock,
 	type JobOutcome,
 	leaseJobLock,
@@ -152,6 +153,34 @@ test("runNow starts a waiting job at once and reruns a running one right after i
 	await Bun.sleep(20);
 	expect(runs).toBe(2);
 	expect(outcomes.map((outcome) => outcome.status)).toEqual(["ok", "ok"]);
+});
+
+test("a job that reports earlier due work runs again then, never sooner than a second or later than its period", () => {
+	const ok = (body: unknown): JobOutcome => ({
+		job: "r2-ingest",
+		status: "ok",
+		ms: 1,
+		body,
+	});
+	const now = Date.parse("2026-11-08T21:46:36.315Z");
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T21:46:41.309Z" }), 60_000, now),
+	).toBe(4_994);
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T21:46:36.000Z" }), 60_000, now),
+	).toBe(1_000);
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T23:00:00.000Z" }), 60_000, now),
+	).toBe(60_000);
+	expect(delayUntilDue(ok({ nextDueAt: null }), 60_000, now)).toBe(60_000);
+	expect(delayUntilDue(ok(null), 60_000, now)).toBe(60_000);
+	expect(
+		delayUntilDue(
+			{ ...ok({ nextDueAt: "2026-11-08T21:46:41.309Z" }), status: "failed" },
+			60_000,
+			now,
+		),
+	).toBe(60_000);
 });
 
 test("a run calls the cron handler with the cron secret and reports its status", async () => {

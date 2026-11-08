@@ -11,6 +11,7 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const JOB_LEASE_TTL_MS = 60_000;
+const MIN_DUE_DELAY_MS = 1_000;
 
 const logger = getLogger(["rudel", "api", "selfhost", "scheduler"]);
 
@@ -212,12 +213,27 @@ export async function runJobOnce(
 	}
 }
 
+export function delayUntilDue(
+	outcome: JobOutcome,
+	everyMs: number,
+	nowMs: number,
+): number {
+	const body = outcome.body;
+	if (outcome.status !== "ok" || typeof body !== "object" || body === null)
+		return everyMs;
+	const dueAt = Date.parse(String(Reflect.get(body, "nextDueAt") ?? ""));
+	if (Number.isNaN(dueAt)) return everyMs;
+	return Math.min(everyMs, Math.max(MIN_DUE_DELAY_MS, dueAt - nowMs));
+}
+
 export function startScheduler(options: {
 	readonly jobs: readonly SchedulerJob[];
 	readonly lock: JobLock;
 	readonly cronSecret: string;
 	readonly onOutcome?: (outcome: JobOutcome) => void;
+	readonly now?: () => number;
 }): Scheduler {
+	const now = options.now ?? Date.now;
 	let stopped = false;
 	const timers = new Map<string, ReturnType<typeof setTimeout>>();
 	const running = new Map<string, Promise<void>>();
@@ -231,11 +247,15 @@ export function startScheduler(options: {
 			job.name,
 			setTimeout(() => {
 				timers.delete(job.name);
-				const run = runJobOnce(job, options.lock, options.cronSecret)
-					.then(report)
+				let nextDelayMs = job.everyMs;
+				const run = runJobOnce(job, options.lock, options.cronSecret, now)
+					.then((outcome) => {
+						nextDelayMs = delayUntilDue(outcome, job.everyMs, now());
+						report(outcome);
+					})
 					.finally(() => {
 						running.delete(job.name);
-						schedule(job, rerun.delete(job.name) ? 0 : job.everyMs);
+						schedule(job, rerun.delete(job.name) ? 0 : nextDelayMs);
 					});
 				running.set(job.name, run);
 			}, delayMs),
