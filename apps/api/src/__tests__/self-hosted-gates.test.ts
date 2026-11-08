@@ -103,6 +103,8 @@ describe("switch off: every gate answers as before", () => {
 			expect(analysisLogStore()).toBe("convex");
 			process.env.ANALYSIS_LOG_STORE = "memory";
 			expect(analysisLogStore()).toBe("memory");
+			process.env.ANALYSIS_LOG_STORE = "postgres";
+			expect(analysisLogStore()).toBe("postgres");
 			process.env.ANALYSIS_LOG_STORE = "other";
 			expect(analysisLogStore()).toBeNull();
 			const log = { marker: "log" } as unknown as NonNullable<
@@ -161,12 +163,15 @@ describe("switch on: a single-team install", () => {
 		withSwitch("1");
 	});
 
-	test("every workspace gets the retro tools, search and the analysis log in memory", () => {
+	test("every workspace gets the retro tools, search and the analysis log in Postgres", () => {
 		expect(retroToolsEnabled({ id: "any", createdAt: null })).toBe(true);
 		expect(retroToolsEnabled({ id: "", createdAt: null })).toBe(false);
 		expect(embedsWorkspace("any")).toBe(true);
 		expect(embedsWorkspace("")).toBe(false);
+		expect(analysisLogStore()).toBe("postgres");
 		process.env.ANALYSIS_LOG_STORE = "convex";
+		expect(analysisLogStore()).toBe("postgres");
+		process.env.ANALYSIS_LOG_STORE = "memory";
 		expect(analysisLogStore()).toBe("memory");
 		const log = { marker: "log" } as unknown as NonNullable<
 			ReturnType<typeof getAnalysisLog>
