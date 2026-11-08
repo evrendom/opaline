@@ -1,28 +1,65 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { Resvg } from "@resvg/resvg-js";
+import { getLogger } from "@logtape/logtape";
 
 export const TEAM_INVITE_IMAGE_WIDTH = 2400;
 export const TEAM_INVITE_IMAGE_HEIGHT = 1260;
-const FONT_PATH = fileURLToPath(
-	new URL("../assets/team-invite/InterVariable.ttf", import.meta.url),
-);
-const FONT_OPTIONS = {
-	fontFiles: [FONT_PATH],
-	defaultFontFamily: "Inter Variable",
-	loadSystemFonts: false,
-};
-const WORDMARK = readFileSync(
-	new URL("../assets/team-invite/opaline-wordmark.svg", import.meta.url),
-	"utf8",
-).replace(/<svg\b[^>]*>|<\/svg>/gu, "");
-const images = new Map<string, Buffer>();
 
-export function renderTeamInviteCardPng(workspaceName: string): Buffer {
+interface CardRenderer {
+	readonly Resvg: typeof import("@resvg/resvg-js").Resvg;
+	readonly font: {
+		readonly fontFiles: string[];
+		readonly defaultFontFamily: string;
+		readonly loadSystemFonts: boolean;
+	};
+	readonly wordmark: string;
+}
+
+const logger = getLogger(["rudel", "api", "team-invite-image"]);
+const images = new Map<string, Buffer>();
+let renderer: Promise<CardRenderer | null> | undefined;
+
+function loadCardRenderer(): Promise<CardRenderer | null> {
+	renderer ??= import("@resvg/resvg-js")
+		.then(({ Resvg }) => ({
+			Resvg,
+			font: {
+				fontFiles: [
+					fileURLToPath(
+						new URL("../assets/team-invite/InterVariable.ttf", import.meta.url),
+					),
+				],
+				defaultFontFamily: "Inter Variable",
+				loadSystemFonts: false,
+			},
+			wordmark: readFileSync(
+				new URL("../assets/team-invite/opaline-wordmark.svg", import.meta.url),
+				"utf8",
+			).replace(/<svg\b[^>]*>|<\/svg>/gu, ""),
+		}))
+		.catch((error: unknown) => {
+			logger.warn(
+				"Invite card images are off: the SVG renderer did not load ({error})",
+				{ error: error instanceof Error ? error.message : String(error) },
+			);
+			return null;
+		});
+	return renderer;
+}
+
+export async function teamInviteCardImageAvailable(): Promise<boolean> {
+	return (await loadCardRenderer()) !== null;
+}
+
+export async function renderTeamInviteCardPng(
+	workspaceName: string,
+): Promise<Buffer | null> {
 	const cached = images.get(workspaceName);
 	if (cached) return cached;
-	const image = new Resvg(buildTeamInviteCardSvg(workspaceName), {
-		font: FONT_OPTIONS,
+	const card = await loadCardRenderer();
+	if (!card) return null;
+	const image = new card.Resvg(buildTeamInviteCardSvg(card, workspaceName), {
+		font: card.font,
 	})
 		.render()
 		.asPng();
@@ -34,31 +71,38 @@ export function renderTeamInviteCardPng(workspaceName: string): Buffer {
 	return image;
 }
 
-export function buildTeamInviteCardSvg(workspaceName: string): string {
-	return buildBrandCardSvg(wrapTitle(`Join ${workspaceName}`), [
+function buildTeamInviteCardSvg(
+	card: CardRenderer,
+	workspaceName: string,
+): string {
+	return buildBrandCardSvg(card, wrapTitle(`Join ${workspaceName}`), [
 		"and start learning from",
 		"your agent sessions",
 	]);
 }
 
-export function renderSiteCardPng(): Buffer {
-	return new Resvg(
-		buildBrandCardSvg(["Claude Code & Codex", "Session Analytics"], []),
-		{
-			font: FONT_OPTIONS,
-		},
+export async function renderSiteCardPng(): Promise<Buffer> {
+	const card = await loadCardRenderer();
+	if (!card) throw new Error("The SVG renderer (@resvg/resvg-js) did not load");
+	return new card.Resvg(
+		buildBrandCardSvg(card, ["Claude Code & Codex", "Session Analytics"], []),
+		{ font: card.font },
 	)
 		.render()
 		.asPng();
 }
 
-function buildBrandCardSvg(title: string[], subtitle: string[]): string {
-	const titleFontSize = fitTitleFontSize(title);
+function buildBrandCardSvg(
+	card: CardRenderer,
+	title: string[],
+	subtitle: string[],
+): string {
+	const titleFontSize = fitTitleFontSize(card, title);
 	const firstLineY = 256 - (title.length - 1) * 34;
 	const subtitleY = firstLineY + (title.length - 1) * 74 + 70;
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${TEAM_INVITE_IMAGE_WIDTH}" height="${TEAM_INVITE_IMAGE_HEIGHT}" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#fdfdfc"/>
-  <svg x="76" y="68" width="144" height="36" viewBox="0 0 64 16">${WORDMARK}</svg>
+  <svg x="76" y="68" width="144" height="36" viewBox="0 0 64 16">${card.wordmark}</svg>
   <g font-family="Inter Variable, sans-serif" fill="#171717">
     ${title.map((line, index) => `<text x="76" y="${firstLineY + index * 74}" font-size="${titleFontSize}" font-weight="600" letter-spacing="-2">${escapeSvgText(line)}</text>`).join("\n    ")}
     ${subtitle.map((line, index) => `<text x="76" y="${subtitleY + index * 52}" font-size="40" font-weight="400" fill="#737373">${escapeSvgText(line)}</text>`).join("\n    ")}
@@ -67,10 +111,10 @@ function buildBrandCardSvg(title: string[], subtitle: string[]): string {
 </svg>`;
 }
 
-function fitTitleFontSize(lines: string[]): number {
-	const measurement = new Resvg(
+function fitTitleFontSize(card: CardRenderer, lines: string[]): number {
+	const measurement = new card.Resvg(
 		`<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="400">${lines.map((line, index) => `<text y="${80 + index * 80}" font-family="Inter Variable" font-size="64" font-weight="600" letter-spacing="-2">${escapeSvgText(line)}</text>`).join("")}</svg>`,
-		{ font: FONT_OPTIONS },
+		{ font: card.font },
 	);
 	const width = measurement.innerBBox()?.width ?? 0;
 	return width > 1048 ? Math.floor((64 * 1048) / width) : 64;
