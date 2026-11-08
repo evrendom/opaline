@@ -11,6 +11,19 @@ import {
 
 export const DIGEST_IDS = 3;
 
+export const DIGEST_LIMITS = {
+	repeats: 40,
+	streams: 5000,
+	models: 12,
+	links: 2000,
+	edits: 200_000,
+	sub_spans: 20_000,
+	compactions: 20,
+} as const;
+
+const kept = (columns: string, select: string, rest: string, limit: number) =>
+	`(SELECT (groupArray((${columns})), any(total)) FROM (SELECT ${select}, count() OVER () AS total ${rest} LIMIT ${limit}))`;
+
 export const HOME_SQL = (expr: string) =>
 	`replaceRegexpOne(${expr}, '^/(?:Users|home)/[^/]+', '~')`;
 
@@ -85,6 +98,18 @@ export function digestSessionsSql(params: MeasureParams): string[] {
 		FROM runs
 		WHERE ${inPickedSet()}
 	)`;
+	const streams = kept(
+		"sid, aid, turn",
+		"sid, aid, turn",
+		"FROM streams ORDER BY sid, aid",
+		DIGEST_LIMITS.streams,
+	);
+	const models = kept(
+		"key, runs, sessions, main_runs",
+		"key, count() AS runs, uniqExact(sid) AS sessions, countIf(main_stream) AS main_runs",
+		"FROM models GROUP BY key ORDER BY runs DESC, key",
+		DIGEST_LIMITS.models,
+	);
 	return [
 		`${ctes}
 	SELECT groupArray((p.sid, p.source, p.launched_by, p.first_turn, p.prompts, p.interrupts_n, p.reasks, p.wall,
@@ -94,13 +119,11 @@ export function digestSessionsSql(params: MeasureParams): string[] {
 	LEFT JOIN asked AS a ON a.uid = p.uid AND a.sid = p.sid`,
 		`${ctes}
 	SELECT groupArray((said, times, sid, first_turn)) AS repeats FROM (
-		SELECT substring(said, 1, 90) AS said, times, sid, first_turn FROM repeats ORDER BY times DESC, sid, said LIMIT 40)`,
+		SELECT substring(said, 1, 90) AS said, times, sid, first_turn FROM repeats ORDER BY times DESC, sid, said LIMIT ${DIGEST_LIMITS.repeats})`,
 		`${ctes}
 	SELECT (SELECT (count(), uniqExact(sid)) FROM repeats) AS repeat_totals,
-		(SELECT groupArray((sid, aid, turn)) FROM (SELECT sid, aid, turn FROM streams ORDER BY sid, aid LIMIT 5000)) AS streams,
-		(SELECT groupArray((key, runs, sessions, main_runs)) FROM (
-			SELECT key, count() AS runs, uniqExact(sid) AS sessions, countIf(main_stream) AS main_runs
-			FROM models GROUP BY key ORDER BY runs DESC, key LIMIT 12)) AS models`,
+		tupleElement(${streams}, 1) AS streams, tupleElement(${streams}, 2) AS streams_total,
+		tupleElement(${models}, 1) AS models, tupleElement(${models}, 2) AS models_total`,
 		`${ctes}
 	SELECT (SELECT groupArray((source, fact, n, runs_n)) FROM (
 			SELECT source, fact, count() AS n, any(runs_n) AS runs_n
@@ -108,11 +131,11 @@ export function digestSessionsSql(params: MeasureParams): string[] {
 			GROUP BY source, fact ORDER BY source, fact)) AS unrecorded,
 		(SELECT groupArray((source, runs_n)) FROM (SELECT source, count() AS runs_n FROM runs WHERE ${inPickedSet()} GROUP BY source ORDER BY source)) AS runs_by_source`,
 		`${ctes}
-	SELECT groupArray((kind, from_session_id, to_session_id, from_source, to_source)) AS links FROM (
-		SELECT kind, from_session_id, to_session_id, from_source, to_source
+	SELECT groupArray((kind, from_session_id, to_session_id, from_source, to_source)) AS links, any(total) AS links_total FROM (
+		SELECT kind, from_session_id, to_session_id, from_source, to_source, count() OVER () AS total
 		FROM session_links
 		WHERE ${inPickedSet("", "from_session_id")} OR ${inPickedSet("", "to_session_id")}
-		ORDER BY kind, from_session_id, to_session_id LIMIT 2000)`,
+		ORDER BY kind, from_session_id, to_session_id LIMIT ${DIGEST_LIMITS.links})`,
 	];
 }
 
@@ -218,7 +241,7 @@ export function digestCallsSql(params: MeasureParams, piece = false): string[] {
 		GROUP BY metric, key
 	),
 	limited AS (
-		SELECT * FROM grouped${
+		SELECT *, count() OVER (PARTITION BY metric) AS keys FROM grouped${
 			piece
 				? ""
 				: `
@@ -258,8 +281,9 @@ export function digestCallsSql(params: MeasureParams, piece = false): string[] {
 	)`;
 	return [
 		`${ctes}
-	SELECT groupArray((metric, rows)) AS ranked FROM (
-		SELECT metric, groupArray((key, n, f, w, sessions, ids, ${piece ? "lead, lead_key" : "ex, label"}, timed)) AS rows FROM limited GROUP BY metric)`,
+	SELECT groupArray((metric, rows, keys)) AS ranked FROM (
+		SELECT metric, groupArray((key, n, f, w, sessions, ids, ${piece ? "lead, lead_key" : "ex, label"}, timed)) AS rows, any(keys) AS keys
+		FROM limited GROUP BY metric)`,
 		`${ctes}
 	SELECT (countIf(${AGENT_LEVEL}), countIf(${AGENT_LEVEL} AND failed = 1),
 		countIf(${AGENT_LEVEL} AND aid = ''), countIf(${AGENT_LEVEL} AND aid = '' AND failed = 1),
@@ -285,8 +309,8 @@ export function digestEditsSql(params: MeasureParams): string {
 		LEFT JOIN run_dirs AS r ON r.run_id = e.run_id
 		WHERE e.started_at >= ${windowStart(params)} AND ${inPickedSet("e")} AND notEmpty(e.changed_files) AND e.failed = 0
 	)
-	SELECT
-		(SELECT groupArray((sid, aid, turn, at, files, ops, run_cwd)) FROM (SELECT * FROM edits ORDER BY sid, at, aid LIMIT 200000)) AS edits`;
+	SELECT groupArray((sid, aid, turn, at, files, ops, run_cwd)) AS edits, any(total) AS edits_total
+	FROM (SELECT *, count() OVER () AS total FROM edits ORDER BY sid, at, aid LIMIT ${DIGEST_LIMITS.edits})`;
 }
 
 export function digestUsageSql(params: MeasureParams): string[] {
@@ -315,17 +339,17 @@ export function digestUsageSql(params: MeasureParams): string[] {
 			argMax(if(aid = '', toString(turn), ''), ifNull(tokens, 0)) AS top_turn
 		FROM streams GROUP BY sid)`,
 		`${ctes}
-	SELECT groupArray((sid, aid, t0, t1)) AS sub_spans FROM (
-		SELECT sid, aid, min(t0) AS t0, max(t1) AS t1 FROM streams WHERE aid != '' GROUP BY sid, aid ORDER BY sid, aid LIMIT 20000)`,
+	SELECT groupArray((sid, aid, t0, t1)) AS sub_spans, any(total) AS sub_spans_total FROM (
+		SELECT sid, aid, min(t0) AS t0, max(t1) AS t1, count() OVER () AS total FROM streams WHERE aid != '' GROUP BY sid, aid ORDER BY sid, aid LIMIT ${DIGEST_LIMITS.sub_spans})`,
 		`${ctes}
-	SELECT groupArray((source, main_stream, trigger, n, sessions, ex)) AS compactions FROM (
+	SELECT groupArray((source, main_stream, trigger, n, sessions, ex)) AS compactions, any(total) AS compactions_total FROM (
 		SELECT e.source AS source, e.agent_id = '' AS main_stream, ifNull(r.compact_trigger, '') AS trigger, count() AS n,
 			uniqExact(e.session_id) AS sessions,
-			min(${example("e.session_id", "e.agent_id", "e.turn_idx")}) AS ex
+			min(${example("e.session_id", "e.agent_id", "e.turn_idx")}) AS ex, count() OVER () AS total
 		FROM events AS e
 		LEFT JOIN (SELECT run_id, compact_trigger FROM runs WHERE ${inPickedSet()}) AS r ON r.run_id = e.run_id
 		WHERE e.at >= ${windowStart(params)} AND e.event = 'compaction' AND e.subtype != 'compact_summary' AND ${inPickedSet("e")}
-		GROUP BY source, main_stream, trigger ORDER BY n DESC, source LIMIT 20)`,
+		GROUP BY source, main_stream, trigger ORDER BY n DESC, source LIMIT ${DIGEST_LIMITS.compactions})`,
 	];
 }
 

@@ -20,6 +20,7 @@ export interface DigestSection {
 	readonly title: string;
 	readonly rows: DigestRow[];
 	readonly missing: string[];
+	readonly cuts?: string[];
 }
 
 export interface Digest {
@@ -381,14 +382,16 @@ function patternRows(
 			return {
 				metric: `${str(row.id)} ${short(str(row.signature), 48)}`,
 				value: `${fmt(num(row.count))} in ${fmt(num(row.runs))} runs, ${fmt(num(row.sessions))} sessions, ${fmt(num(row.minutes), 1)} min`,
-				definition: row.merged
-					? `${definition}; ${str(row.merged)}`
-					: definition,
+				definition: [definition, str(row.merged), str(row.lower_bound)]
+					.filter(Boolean)
+					.join("; "),
 				sessions: sessions.slice(0, DIGEST_IDS),
 				example: examples[0] ?? "",
 			};
 		});
 }
+
+const SKILLS_SHOWN = 2;
 
 function setupSection(
 	sessions: readonly Session[],
@@ -448,15 +451,21 @@ function setupSection(
 						group.flatMap((s) => s.files),
 						(file) => file,
 					);
+					const skills = files.filter(([file]) =>
+						file.startsWith("skill_body"),
+					);
+					const shown = [
+						...files.filter(([file]) => !file.startsWith("skill_body")),
+						...skills.slice(0, SKILLS_SHOWN),
+					];
+					const more = skills.length - SKILLS_SHOWN;
 					const none = group.filter((s) =>
 						s.files.every((f) => f.startsWith("skill_body")),
 					).length;
 					return `${dir} (${group.length}): ${
-						files
-							.slice(0, 2)
-							.map(([file, n]) => `${setupName(file)} ${n}`)
-							.join(", ") || "none"
-					}${none ? `, no instruction file ${none}` : ""}`;
+						shown.map(([file, n]) => `${setupName(file)} ${n}`).join(", ") ||
+						"none"
+					}${more > 0 ? `, +${more} more skills` : ""}${none ? `, no instruction file ${none}` : ""}`;
 				})
 				.join("; "),
 			definition:
@@ -1088,9 +1097,10 @@ function agentsSection(
 		(t) => str(t[0]) === "parent_thread" && inCohort.has(str(t[1])),
 	);
 	const withStreams = count(streams, (t) => str(t[0]));
+	const streamTotal = Math.max(streams.length, num(sessionsRow.streams_total));
 	rows.push({
 		metric: "subagents",
-		value: `Claude subagent streams ${streams.length} in ${withStreams.length} sessions; Codex subagent threads ${threads.length ? `${threads.length} in ${new Set(threads.map((t) => str(t[1]))).size} sessions` : "none linked"}`,
+		value: `Claude subagent streams ${streamTotal} in ${withStreams.length} sessions; Codex subagent threads ${threads.length ? `${threads.length} in ${new Set(threads.map((t) => str(t[1]))).size} sessions` : "none linked"}`,
 		definition:
 			"runs.agent_id streams; Codex threads = session_links parent_thread",
 		sessions: withStreams.slice(0, DIGEST_IDS).map(([sid]) => sid),
@@ -1138,6 +1148,7 @@ interface SeverityHit {
 	rule: string;
 	n: number;
 	sessions: number;
+	shards: number;
 	examples: { ex: string; quote: string }[];
 }
 
@@ -1151,10 +1162,12 @@ export function mergeSeverity(shards: readonly Row[]): SeverityHit[] {
 				rule: str(t[1]),
 				n: 0,
 				sessions: 0,
+				shards: 0,
 				examples: [],
 			};
 			seen.n += num(t[2]);
 			seen.sessions += num(t[3]);
+			seen.shards += 1;
 			seen.examples.push(
 				...tuples(t[4]).map((e) => ({ ex: str(e[0]), quote: str(e[1]) })),
 			);
@@ -1188,6 +1201,7 @@ function severitySection(
 			rule: "file deleted then written again",
 			n: edits.recreated.length,
 			sessions: new Set(edits.recreated.map((r) => r.sid)).size,
+			shards: 1,
 			examples: edits.recreated.map((r) => ({
 				ex: r.ex,
 				quote: r.file.split("/").slice(-2).join("/"),
@@ -1208,7 +1222,7 @@ function severitySection(
 			);
 		rows.push({
 			metric: SEVERITY_TITLES[category] as string,
-			value: `${found.map((hit) => `${hit.rule} ${fmt(hit.n)} (${hit.sessions} sess)`).join("; ")}; e.g. ${examples
+			value: `${found.map((hit) => `${hit.rule} ${fmt(hit.n)} (${hit.shards > 1 ? "up to " : ""}${hit.sessions} sess)`).join("; ")}; e.g. ${examples
 				.slice(0, 1)
 				.map((e) => `${e.ex} "${short(e.quote.trim(), 40)}"`)
 				.join(" · ")}`,
@@ -1543,6 +1557,27 @@ export function markUnknown(
 	};
 }
 
+export function markPartial(
+	digest: Digest,
+	partial: ReadonlyMap<DigestPart, readonly string[]>,
+): Digest {
+	if (partial.size === 0) return digest;
+	return {
+		...digest,
+		sections: digest.sections.map((section) => {
+			const lines = (SECTION_READS[section.id] ?? []).flatMap((part) =>
+				(partial.get(part) ?? []).map(
+					(line) =>
+						`lower bound, a window is missing: ${line.replace(/^partial: /u, "")}`,
+				),
+			);
+			return lines.length
+				? { ...section, missing: [...lines, ...section.missing] }
+				: section;
+		}),
+	};
+}
+
 export function noteMerged(digest: Digest, notes: readonly string[]): Digest {
 	if (notes.length === 0) return digest;
 	const note = `; ${notes.join("; ")}`;
@@ -1599,6 +1634,7 @@ export function renderDigest(
 			lines.push(`- ${row.metric}: ${row.value} [${definition}]${example}`);
 		}
 		for (const note of section.missing) lines.push(`- skipped: ${note}`);
+		for (const cut of section.cuts ?? []) lines.push(`- cut: ${cut}`);
 	}
 	return [...lines, ...footer].join("\n");
 }

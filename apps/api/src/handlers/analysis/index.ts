@@ -31,6 +31,7 @@ import {
 	type SqlQuota,
 	type SqlResultStore,
 } from "../../services/analysis/sql-results.js";
+import { runOpenedSince } from "../../services/analysis-log/absence-claims.js";
 import {
 	getAnalysisTree,
 	getStoredQuery,
@@ -300,7 +301,12 @@ export function createAnalysisRouter(
 			analysisLimiter.run(context.user.id, async () => next(), signal),
 		)
 		.handler(async ({ input, context, signal }) => {
-			const outcome = await runSql(callerOf(context), input, sqlEnv, signal);
+			const outcome = await runSql(
+				callerOf(context),
+				{ ...input, traps: true },
+				sqlEnv,
+				signal,
+			);
 			if (!outcome.ok) throw sqlError(outcome.error);
 			// Recorded like find: exact arguments and result, the sessions it
 			// names and every member whose sessions it could read (ADR 0001).
@@ -436,6 +442,12 @@ export function createAnalysisRouter(
 					viewerOf(context),
 					input,
 					findingMirror,
+					(since) =>
+						runOpenedSince(env.executor)(
+							context.organizationId,
+							context.user.id,
+							since,
+						),
 				),
 			),
 		share: os.analysis.history.share

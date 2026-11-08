@@ -16,6 +16,7 @@ import {
 	AnalysisFindInputSchema,
 	AnalysisReadInputSchema,
 } from "@rudel/api-routes";
+import { absenceClaims, absenceWarnings } from "./absence-claims.js";
 import {
 	AnalysisFullError,
 	AnalysisSavedError,
@@ -161,7 +162,8 @@ export async function saveAnalysis(
 	viewer: AnalysisViewer,
 	input: AnalysisHistorySaveInput,
 	mirror?: FindingMirror,
-): Promise<{ analysis: string; status: "finished" }> {
+	runOpened?: (since: string) => Promise<boolean>,
+): Promise<{ analysis: string; status: "finished"; warnings?: string[] }> {
 	if (!input.question?.trim())
 		throw new ORPCError("BAD_REQUEST", {
 			message:
@@ -264,7 +266,23 @@ export async function saveAnalysis(
 		);
 	if (mirror)
 		await recordFindingImpact(log, mirror, viewer, analysis, findings, queries);
-	return { analysis: analysis.id, status: "finished" };
+	const texts = [input.finalAnswer, ...input.findings.map((f) => f.finding)];
+	const warnings =
+		absenceClaims(texts).length > 0
+			? absenceWarnings({
+					finalAnswer: input.finalAnswer,
+					findings: input.findings,
+					calls: queries,
+					runOpened: runOpened
+						? await runOpened(analysis.createdAt).catch(() => false)
+						: false,
+				})
+			: [];
+	return {
+		analysis: analysis.id,
+		status: "finished",
+		...(warnings.length ? { warnings } : {}),
+	};
 }
 
 /**

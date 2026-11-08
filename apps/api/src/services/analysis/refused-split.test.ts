@@ -461,7 +461,7 @@ describe("tool stages refused by the gateway", () => {
 });
 
 describe("the digest's windows", () => {
-	test("calls ranked: windows merge exactly, top ids and the example are chosen over every window", () => {
+	test("calls ranked: windows merge exactly, top ids and the example are chosen over every window, and each metric counts its keys", () => {
 		const lead = (ex: string, w: number, sn: number, sid: string) => [
 			[ex, `label ${ex}`],
 			[w, sn, sid],
@@ -524,8 +524,9 @@ describe("the digest's windows", () => {
 			[
 				"families",
 				[["git", 6, 1, 5.1, 4, ["s9", "s2", "s1"], "s9#1", "label s9#1", 6]],
+				1,
 			],
-			["inline_scripts", [["python3: def f()", 3, 0, 0, 3, [], "", "", 0]]],
+			["inline_scripts", [["python3: def f()", 3, 0, 0, 3, [], "", "", 0]], 1],
 		]);
 	});
 
@@ -623,6 +624,45 @@ describe("the digest's windows", () => {
 	});
 });
 
+describe("severity shards", () => {
+	test("a refused shard leaves the other shards' hits, marked as a lower bound", async () => {
+		const text = (
+			await runDigest(
+				{
+					workspaceId: "ws-1",
+					view: async (query, cohort) => {
+						if (query.includes("p.uid)) AS sessions"))
+							return [{ sessions: [DIGEST_SESSION] }];
+						if (!query.includes("AS severity")) return [];
+						if ((windowOf(cohort)?.from ?? "") >= "2026-10-27") throw memory();
+						return [
+							{
+								severity: [
+									[
+										"destructive",
+										"git reset --hard",
+										2,
+										1,
+										[["s1#1", "git reset --hard"]],
+									],
+								],
+							},
+						];
+					},
+					trusted: async () => [],
+				},
+				{ from: "2026-10-20", to: "2026-11-02" },
+				today,
+			)
+		).text;
+		const severity = text.split("## i.")[1]?.split("## j.")[0] ?? "";
+		expect(severity).toContain("git reset --hard 4 (up to 2 sess)");
+		expect(severity).toContain(
+			"- skipped: lower bound, a window is missing: digest severity commands 2026-10-27..2026-11-02 refused at 2026-10-27..2026-10-27",
+		);
+	});
+});
+
 describe("distinct sessions and members merge by id", () => {
 	test("a pattern seen in two windows counts each session and member once", () => {
 		const row = (sids: string[], uids: string[]) => ({
@@ -644,6 +684,41 @@ describe("distinct sessions and members merge by id", () => {
 		expect(merged).toMatchObject({ sessions: 3, members: 3, count: 4 });
 		expect(merged).not.toHaveProperty("uids");
 		expect(merged).not.toHaveProperty("sids");
+		expect(merged).not.toHaveProperty("lower_bound");
+	});
+
+	test("a window that hit its per-kind cap or its session id cap makes the merged counts lower bounds", () => {
+		const row = (id: string, kind: string, sids: string[], cut: boolean) => ({
+			id,
+			kind,
+			count: 3,
+			runs: 3,
+			sessions: sids.length,
+			members: 1,
+			minutes: 1,
+			sids,
+			uids: ["u1"],
+			kind_cut: cut,
+		});
+		const many = Array.from({ length: 1000 }, (_, i) => `s${i}`);
+		const merged = mergePatternRows(
+			[
+				row("fc_1", "failing_call", ["s1", "s2", "s3"], false),
+				row("fc_2", "failing_call", many, false),
+				row("co_1", "correction", ["s1", "s2", "s3"], true),
+				row("co_1", "correction", ["s4"], false),
+			],
+			2,
+			20,
+		);
+		expect(
+			Object.fromEntries(merged.map((item) => [item.id, item.lower_bound])),
+		).toEqual({
+			fc_2: "lower bound: a window listed only 1000 of its sessions",
+			fc_1: "",
+			co_1: "lower bound: a window kept only its top correction patterns",
+		});
+		expect(merged[0]).not.toHaveProperty("kind_cut");
 	});
 });
 

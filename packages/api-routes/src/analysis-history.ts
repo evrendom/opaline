@@ -259,6 +259,7 @@ export const AnalysisHistorySaveInputSchema = z
 export const AnalysisHistorySaveOutputSchema = z.object({
 	analysis: z.string(),
 	status: z.literal("finished"),
+	warnings: z.array(z.string()).optional(),
 });
 
 export const AnalysisHistoryShareInputSchema = z

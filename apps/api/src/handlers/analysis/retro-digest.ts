@@ -16,11 +16,16 @@ import {
 	type Digest,
 	type DigestPart,
 	joinDigestRuns,
+	markPartial,
 	markUnknown,
 	noteMerged,
 	type Row,
 	renderDigest,
 } from "../../services/analysis/retro-digest.js";
+import {
+	digestCuts,
+	noteCuts,
+} from "../../services/analysis/retro-digest-cuts.js";
 import { mergeDigestRows } from "../../services/analysis/retro-digest-merge.js";
 import {
 	contextSizesStatement,
@@ -196,8 +201,11 @@ export async function runDigest(
 		: joinDigestRuns(
 				await part("runs", "runs", (window) => digestRunsSql(window)),
 			);
+	const partial = new Map<DigestPart, string[]>();
 	const severityShards = async (): Promise<Row[]> => {
 		const rows: Row[] = [];
+		const failed: string[] = [];
+		let read = 0;
 		for (const shard of shardWindows(params, SEVERITY_SHARD_DAYS))
 			for (const [index, rule] of ["commands", "output"].entries()) {
 				const outcome = await runSplit(
@@ -207,11 +215,13 @@ export async function runDigest(
 					budget,
 				);
 				if (!outcome.ok) {
-					unknown.set("severity", [outcome.line]);
-					return [];
+					failed.push(outcome.line);
+					continue;
 				}
+				read += 1;
 				for (const found of outcome.values) rows.push(...found);
 			}
+		if (failed.length) (read ? partial : unknown).set("severity", failed);
 		return rows;
 	};
 	const severity = empty ? [] : await severityShards();
@@ -285,31 +295,35 @@ export async function runDigest(
 			})),
 		);
 	}
-	const digest = markUnknown(
-		noteMerged(
-			buildDigest(
-				{
-					sessions,
-					calls,
-					edits,
-					usage,
-					startDirs,
-					contextSizes,
-					runs,
-					severity,
-					patterns,
-				},
-				{
-					repository: params.repository ?? null,
-					from: params.from,
-					to: params.to,
-					latest: params.latest ?? null,
-					listed: params.sessions?.length ?? null,
-				},
+	const inputs = {
+		sessions,
+		calls,
+		edits,
+		usage,
+		startDirs,
+		contextSizes,
+		runs,
+		severity,
+		patterns,
+	};
+	const digest = markPartial(
+		markUnknown(
+			noteCuts(
+				noteMerged(
+					buildDigest(inputs, {
+						repository: params.repository ?? null,
+						from: params.from,
+						to: params.to,
+						latest: params.latest ?? null,
+						listed: params.sessions?.length ?? null,
+					}),
+					approximate,
+				),
+				digestCuts(inputs),
 			),
-			approximate,
+			unknown,
 		),
-		unknown,
+		partial,
 	);
 	const ms = Math.round(performance.now() - started);
 	return {

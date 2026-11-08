@@ -43,6 +43,7 @@ import {
 	withoutCtePrefix,
 } from "./sql-guard.js";
 import { SQL_MEASURES } from "./sql-measures.js";
+import { resultNotices, type SqlTraps, sqlTraps } from "./sql-notices.js";
 import type { SqlQuota, SqlResultStore } from "./sql-results.js";
 import { findSqlView, SQL_SCOPE_PARAMS, SQL_VIEWS } from "./sql-views.js";
 
@@ -127,6 +128,7 @@ export type SchemaOutcome =
 export const SQL_LIMITS = {
 	seconds: 10,
 	memoryBytes: 512 * 1024 * 1024,
+	spillBytes: 256 * 1024 * 1024,
 	rowsRead: 50_000_000,
 	bytesRead: 4 * 1024 * 1024 * 1024,
 	/** Rows shown; one more is read to know that there were more. */
@@ -177,6 +179,8 @@ const SQL_QUERY_LIMITS = {
 	max_execution_time: SQL_LIMITS.seconds,
 	timeout_overflow_mode: "throw",
 	max_memory_usage: String(SQL_LIMITS.memoryBytes),
+	max_bytes_before_external_group_by: String(SQL_LIMITS.spillBytes),
+	max_bytes_before_external_sort: String(SQL_LIMITS.spillBytes),
 	max_rows_to_read: String(SQL_LIMITS.rowsRead),
 	max_bytes_to_read: String(SQL_LIMITS.bytesRead),
 	read_overflow_mode: "throw",
@@ -377,6 +381,7 @@ export function runSql(
 		cohort?: string;
 		measure?: AnalysisSqlOutput["measure"];
 		parts?: SqlParts;
+		traps?: boolean;
 	},
 	env: SqlEnv,
 	signal?: AbortSignal,
@@ -442,7 +447,12 @@ async function runStatements(
 
 async function runParts<T>(
 	caller: SqlCaller,
-	input: { query: string; cohort?: string; parts?: SqlParts },
+	input: {
+		query: string;
+		cohort?: string;
+		parts?: SqlParts;
+		traps?: boolean;
+	},
 	env: AgentSqlEnv,
 	signal: AbortSignal | undefined,
 	follow: (rows: SqlRow[]) => Promise<T>,
@@ -462,6 +472,7 @@ async function runParts<T>(
 			async (found) => found,
 			undefined,
 			part.cohort ?? input.cohort,
+			input.traps,
 		);
 		if (!done.ok) return done;
 		earlier.push(...done.value);
@@ -477,6 +488,7 @@ async function runParts<T>(
 		(found) => follow(merge([...earlier, ...found])),
 		undefined,
 		last?.cohort ?? input.cohort,
+		input.traps,
 	);
 	if (!executed.ok) return executed;
 	return {
@@ -718,12 +730,25 @@ export async function execute<T>(
 	/** Wraps the scoped statement, e.g. to keep only some columns, with its own row cap. */
 	given?: { prefix: string; suffix: string; rows: number },
 	cohort?: string,
+	traps?: boolean,
 ): Promise<
 	{ ok: true; value: T; notices: string[] } | { ok: false; error: SqlFailure }
 > {
-	const prepared = await prepareAgentStatement(caller, sql, env, given, cohort);
+	const prepared = await prepareAgentStatement(
+		caller,
+		sql,
+		env,
+		given,
+		cohort,
+		traps,
+	);
 	if (!prepared.ok) return prepared;
-	const { statement, notices, classify: refusal } = prepared.value;
+	const {
+		statement,
+		notices,
+		classify: refusal,
+		traps: found,
+	} = prepared.value;
 	return withAgentQuery(
 		caller.workspaceId,
 		env,
@@ -739,7 +764,11 @@ export async function execute<T>(
 				if (!failure) throw error;
 				return { ok: false, error: failure };
 			}
-			return { ok: true, value: await follow(rows), notices };
+			return {
+				ok: true,
+				value: await follow(rows),
+				notices: found ? [...notices, ...resultNotices(found, rows)] : notices,
+			};
 		},
 		signal,
 	);
@@ -749,6 +778,7 @@ export interface PreparedAgentStatement {
 	readonly statement: ClickHouseStatement;
 	readonly notices: string[];
 	readonly classify: (error: unknown) => SqlFailure | null;
+	readonly traps?: SqlTraps;
 }
 
 export async function prepareAgentStatement(
@@ -757,6 +787,7 @@ export async function prepareAgentStatement(
 	env: AgentSqlEnv,
 	given?: { prefix: string; suffix: string; rows: number },
 	cohort?: string,
+	traps?: boolean,
 ): Promise<
 	{ ok: true; value: PreparedAgentStatement } | { ok: false; error: SqlFailure }
 > {
@@ -824,12 +855,13 @@ export async function prepareAgentStatement(
 		env,
 		new Set(functions.map((fn) => fn.name)),
 	);
-	if (parsed) return { ok: false, error: parsed };
+	if ("failure" in parsed) return { ok: false, error: parsed.failure };
+	const found = traps ? sqlTraps(parsed.explain) : undefined;
 	// Server functions bind before the slot: their own work (search embeds
 	// its text) holds no query slot and takes no sql quota; a refusal there
 	// costs none either.
 	const bound: Record<string, unknown> = {};
-	const notices: string[] = [];
+	const notices: string[] = [...(found?.notices ?? [])];
 	for (const fn of functions) {
 		const calls = prepared.prepared.calls.filter(
 			(call) => call.name === fn.name,
@@ -873,6 +905,7 @@ export async function prepareAgentStatement(
 					originOf: (position) =>
 						prepared.prepared.originOf(Math.max(0, position - offset)),
 				}),
+			...(found ? { traps: found } : {}),
 		},
 	};
 }
@@ -957,7 +990,7 @@ async function checkWithClickHouseParser(
 	prepared: PreparedSql,
 	env: Pick<SqlEnv, "executor">,
 	functions: ReadonlySet<string>,
-): Promise<SqlFailure | null> {
+): Promise<{ failure: SqlFailure } | { explain: string[] }> {
 	let lines: string[];
 	try {
 		const rows = await env.executor.query<{ explain?: unknown }>({
@@ -972,13 +1005,14 @@ async function checkWithClickHouseParser(
 				prepared.parsed.originOf(Math.max(0, offset - PARSE_PREFIX.length)),
 		});
 		if (!failure) throw error;
-		return failure;
+		return { failure };
 	}
-	return checkParsedSql(lines, {
+	const failure = checkParsedSql(lines, {
 		views: new Set(SQL_VIEWS.map((view) => view.name)),
 		ctes: prepared.ctes,
 		functions,
 	});
+	return failure ? { failure } : { explain: lines };
 }
 
 /** Limits a narrower query can pass: recoverable. */

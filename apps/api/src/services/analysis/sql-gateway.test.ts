@@ -15,6 +15,7 @@ import {
 	type SqlCaller,
 	type SqlOutcome,
 } from "./sql-gateway.js";
+import { EXPLAINED } from "./sql-notices.fixtures.js";
 import {
 	createMemorySqlQuota,
 	createMemorySqlResultStore,
@@ -1004,14 +1005,37 @@ describe("refused queries", () => {
 	});
 });
 
+describe("notices on known traps", () => {
+	test("the sql tool's statements get notices from their parse and their rows; other callers' do not", async () => {
+		const { query, ast } = {
+			query: EXPLAINED.mainCalls?.sql ?? "",
+			ast: EXPLAINED.mainCalls?.ast ?? [],
+		};
+		const { env } = environment((statement) =>
+			isParse(statement) ? ast.map((explain) => ({ explain })) : [],
+		);
+		const traps = ok(
+			await runSql(member, { query, title: "x", traps: true }, env),
+		).notices;
+		expect(traps.filter((notice) => notice.startsWith("check:"))).toEqual([
+			expect.stringContaining("keeps only the main stream of calls"),
+			expect.stringContaining("check: no rows."),
+		]);
+		const plain = ok(await runSql(member, { query, title: "x" }, env)).notices;
+		expect(plain.filter((notice) => notice.startsWith("check:"))).toEqual([]);
+	});
+});
+
 describe("limits and errors from ClickHouse", () => {
-	test("each query carries the time, memory, read and result limits", async () => {
+	test("each query carries the time, memory, read and result limits, and spills GROUP BY and ORDER BY before the memory limit", async () => {
 		const { env, statements } = environment();
 		ok(await runSql(member, { query: RANKING, title: "x" }, env));
 		expect(agentStatement(statements)?.clickhouse_settings).toMatchObject({
 			readonly: "1",
 			max_execution_time: 10,
 			max_memory_usage: String(512 * 1024 * 1024),
+			max_bytes_before_external_group_by: String(256 * 1024 * 1024),
+			max_bytes_before_external_sort: String(256 * 1024 * 1024),
 			max_rows_to_read: "50000000",
 			limit: "201",
 			max_result_bytes: String(16 * 1024 * 1024),

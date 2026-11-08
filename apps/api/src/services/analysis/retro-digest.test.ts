@@ -13,6 +13,7 @@ import {
 	setupName,
 	worktreeOf,
 } from "./retro-digest.js";
+import { digestCuts, noteCuts } from "./retro-digest-cuts.js";
 import {
 	CI_POLL_RE,
 	contextSizesStatement,
@@ -594,7 +595,7 @@ describe("digest", () => {
 		]);
 	});
 
-	test("severity: every rule's occurrences add up over the shards, with an example each, and a lost-work line from the edits", () => {
+	test("severity: every rule's occurrences add up over the shards, sessions summed over shards are an upper bound, and a lost-work line from the edits", () => {
 		const merged = mergeSeverity(inputs().severity);
 		expect(merged.find((hit) => hit.rule === "git reset --hard")).toMatchObject(
 			{ n: 3, sessions: 2 },
@@ -605,7 +606,7 @@ describe("digest", () => {
 			"credential or secret exposure",
 			"reverted or lost work",
 		]);
-		expect(rows[0]?.value).toContain("git reset --hard 3 (2 sess)");
+		expect(rows[0]?.value).toContain("git reset --hard 3 (up to 2 sess)");
 		expect(rows[2]?.value).toContain(
 			"file deleted then written again 1 (1 sess)",
 		);
@@ -613,6 +614,65 @@ describe("digest", () => {
 			"production-looking writes or deploys: none matched",
 		]);
 		for (const row of rows) expect(row.definition.length).toBeGreaterThan(30);
+	});
+
+	test("loaded at start lists every instruction file and counts the skills past two", () => {
+		const files = [
+			"instructions member ~/.claude/CLAUDE.md",
+			"nested_memory member ~/.claude/projects/x/memory/MEMORY.md",
+			"agents_md member ~/AGENTS.md",
+			"skill_body member ~/.claude/skills/a/SKILL.md",
+			"skill_body member ~/.claude/skills/b/SKILL.md",
+			"skill_body member ~/.claude/skills/c/SKILL.md",
+		];
+		const base = inputs();
+		const sessions = (base.sessions.sessions as unknown[][]).map((row) =>
+			row.map((cell, index) => (index === 12 ? files : cell)),
+		);
+		const loaded = buildDigest(
+			{ ...base, sessions: { ...base.sessions, sessions } },
+			scope,
+		)
+			.sections.find((s) => s.id === "a")
+			?.rows.find((row) => row.metric === "loaded at start");
+		expect(loaded?.value).toContain("~/AGENTS.md 2");
+		expect(loaded?.value).toContain("~/.claude/…/memory/MEMORY.md 2");
+		expect(loaded?.value).toContain(", +1 more skills");
+	});
+
+	test("a list cut at its LIMIT says how many it kept of how many, in each section that reads it", () => {
+		const base = inputs();
+		const cut = {
+			...base,
+			sessions: {
+				...base.sessions,
+				streams: Array.from({ length: 5000 }, (_, i) => ["s1", `a${i}`, 1]),
+				streams_total: 5120,
+			},
+			edits: { ...base.edits, edits_total: 4 },
+			calls: {
+				...base.calls,
+				ranked: [
+					["refusals", [], 7],
+					["checks", [], 6],
+				],
+			},
+		};
+		const cuts = digestCuts(cut);
+		expect([...cuts]).toEqual([
+			[
+				"h",
+				[
+					"subagents: 5,000 of 5,120 subagent streams were read, so the sessions with subagents are a lower bound",
+				],
+			],
+			["a", ["refusal reasons: the top 6 of 7 were read"]],
+		]);
+		const text = renderDigest(noteCuts(buildDigest(cut, scope), cuts));
+		expect(text).toContain(
+			"- cut: subagents: 5,000 of 5,120 subagent streams were read",
+		);
+		expect(text).toContain("Claude subagent streams 5120 in 1 sessions");
 	});
 
 	test("severity: rules from several statements come out in the order one statement sorts them", () => {

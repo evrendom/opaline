@@ -1207,7 +1207,7 @@ export function patternsListSql(
 	${patternsCte(false, options.withRuns, readsRunTime(options.kinds), options.piece)}
 	SELECT id, kind, signature, count, runs, sessions, members, minutes, toDate(first_seen) AS first_seen,
 		toDate(last_seen) AS last_seen, weekly, fix_type, fix_hint, detail, examples,
-		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}${options.piece ? ", uids" : ""}
+		tupleElement(ex, 1) AS session_id, tupleElement(ex, 2) AS agent_id, tupleElement(ex, 3) AS turn_idx, sids${options.withRuns ? ", rids" : ""}${options.piece ? `, uids, count() OVER (PARTITION BY kind) > ${params.limit} AS kind_cut` : ""}
 	FROM (
 		SELECT *, ${fixTypeSql()} AS fix_type, ${fixHintSql()} AS fix_hint,
 			arrayStringConcat(arrayMap(w -> toString(countEqual(weeks_hit, w)),

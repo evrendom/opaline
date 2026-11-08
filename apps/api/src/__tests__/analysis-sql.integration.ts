@@ -334,6 +334,27 @@ describe("the runs view", () => {
 		expect(text).not.toContain("opaline_workspace");
 	});
 
+	test("the sql tool's notices read ClickHouse's own parse of the statement", async () => {
+		const outcome = await runSql(
+			member,
+			{
+				query:
+					"SELECT uniqExactIf(session_id, match(file_path, '(athena[^/]*)/AGENTS\\\\.md$')) AS read_n FROM calls WHERE started_at >= now() - INTERVAL 7 DAY AND agent_id = ''",
+				title: "Read the repository instructions",
+				traps: true,
+			},
+			env(),
+		);
+		if (!outcome.ok) throw new Error(outcome.error.message);
+		expect(
+			outcome.result.notices.filter((notice) => notice.startsWith("check:")),
+		).toEqual([
+			expect.stringContaining("keeps only the main stream of calls"),
+			expect.stringContaining("a path is matched by a directory"),
+			expect.stringContaining("check: read_n is 0 in every row."),
+		]);
+	});
+
 	test("schema lists a column's values from the caller's runs", async () => {
 		expect(
 			await describeSchema(member, { view: "runs", column: "turn_idx" }, env()),

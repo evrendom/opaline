@@ -82,6 +82,8 @@ Ask once, after the first `sql` and before reading, when the window, the order o
 - Every tool works in one workspace: the `workspace` argument, else the plugin's default, else the one the user last opened. When results look empty, call `list_workspaces` and pass the slug.
 - Cost is estimated API cost in USD; NULL cost is unpriced or unknown: say how many runs.
 - Subagent runs (`agent_id` not empty, or a Codex thread with `thread_source = 'subagent'`) belong to their parent's work.
+- To ask whether an agent saw, read or ran something, count every stream: subagents read files and run commands too, so leave out `agent_id = ''` there. Match a path by its end (`match(file_path, '(^|/)AGENTS\\.md$')`), since a path after `cd ~/…` can be relative.
+- A claim that something never happened, or that none or only N of M did, needs a broader check (every stream, or `search('…', 'exact')`) and a run you read that should show it. `sql` notes such traps under the result, and `save_answer` warns when an answer has neither.
 - When a tool refuses a read or says the quota is used, say so and stop that line of work.
 
 ## When there is no data

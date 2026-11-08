@@ -2,6 +2,7 @@ import {
 	CALL_METRICS,
 	type CallMetric,
 	DIGEST_IDS,
+	DIGEST_LIMITS,
 } from "./retro-digest-sql.js";
 
 type Row = Record<string, unknown>;
@@ -56,6 +57,9 @@ const distinctSorted =
 			seen.set(JSON.stringify(tuple), tuple);
 		return [...seen.values()].sort(compare).slice(0, limit);
 	};
+
+const total: Merge = (values) =>
+	values.reduce<number>((sum, value) => sum + num(value), 0);
 
 const summed: Merge = (values) => {
 	const rows = values.map((value) => arr(value).map(num));
@@ -184,8 +188,10 @@ const rankedPieces: Merge = (values) => {
 				: rule?.order === "sessions"
 					? row.sessions
 					: row.n;
-		const rows = [...keys.values()]
-			.filter((row) => metric !== "inline_scripts" || row.sessions >= 3)
+		const kept = [...keys.values()].filter(
+			(row) => metric !== "inline_scripts" || row.sessions >= 3,
+		);
+		const rows = kept
 			.sort(
 				(left, right) =>
 					weight(right) - weight(left) ||
@@ -207,31 +213,52 @@ const rankedPieces: Merge = (values) => {
 				row.lead[1] ?? "",
 				row.timed,
 			]);
-		return [metric, rows];
+		return [metric, rows, kept.length];
 	});
 };
 
 export const DIGEST_MERGES: Readonly<Record<string, Merge>> = {
 	sessions: concat,
-	repeats: sorted(by(byNumberDesc(1), byText(2), byText(0)), 40),
+	repeats: sorted(
+		by(byNumberDesc(1), byText(2), byText(0)),
+		DIGEST_LIMITS.repeats,
+	),
 	repeat_totals: summed,
-	streams: sorted(by(byText(0), byText(1)), 5000),
-	models: grouped(1, [1, 2, 3], by(byNumberDesc(1), byText(0)), 12),
+	streams: sorted(by(byText(0), byText(1)), DIGEST_LIMITS.streams),
+	streams_total: total,
+	models: grouped(
+		1,
+		[1, 2, 3],
+		by(byNumberDesc(1), byText(0)),
+		DIGEST_LIMITS.models,
+	),
+	models_total: total,
 	unrecorded,
 	runs_by_source: grouped(1, [1], byText(0)),
-	links: distinctSorted(by(byText(0), byText(1), byText(2)), 2000),
+	links: distinctSorted(
+		by(byText(0), byText(1), byText(2)),
+		DIGEST_LIMITS.links,
+	),
+	links_total: total,
 	ranked: rankedPieces,
 	share: summed,
 	push_stats: summed,
 	edits: sorted(
 		by(byText(0), (l, r) => num(l[3]) - num(r[3]), byText(1)),
-		200_000,
+		DIGEST_LIMITS.edits,
 	),
+	edits_total: total,
 	per_session: concat,
-	sub_spans: sorted(by(byText(0), byText(1)), 20_000),
-	compactions: grouped(3, [3, 4], by(byNumberDesc(3), byText(0)), 20, {
-		5: lower,
-	}),
+	sub_spans: sorted(by(byText(0), byText(1)), DIGEST_LIMITS.sub_spans),
+	sub_spans_total: total,
+	compactions: grouped(
+		3,
+		[3, 4],
+		by(byNumberDesc(3), byText(0)),
+		DIGEST_LIMITS.compactions,
+		{ 5: lower },
+	),
+	compactions_total: total,
 	runs: sorted(by(byText(1), byText(2), (l, r) => num(l[3]) - num(r[3]))),
 	failures: concat,
 	asked: concat,

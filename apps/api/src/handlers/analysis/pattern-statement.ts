@@ -15,6 +15,7 @@ import {
 	patternKindOf,
 	patternsListSql,
 	patternsVerifySql,
+	SESSION_IDS,
 	SHARDED_FAMILIES,
 	shardWindows,
 } from "../../services/analysis/patterns-sql.js";
@@ -127,6 +128,8 @@ export function mergePatternRows(
 	const byId = new Map<string, Row>();
 	const sessionsOf = new Map<string, Set<string>>();
 	const membersOf = new Map<string, Set<string>>();
+	const cutKinds = new Set<string>();
+	const fullSessions = new Set<string>();
 	const union = (into: Map<string, Set<string>>, id: string, ids: unknown) => {
 		const known = into.get(id) ?? new Set<string>();
 		for (const value of list(ids)) known.add(value);
@@ -135,6 +138,9 @@ export function mergePatternRows(
 	};
 	for (const row of rows) {
 		const id = String(row.id);
+		if (number(row.kind_cut) === 1 || row.kind_cut === true)
+			cutKinds.add(String(row.kind));
+		if (list(row.sids).length >= SESSION_IDS) fullSessions.add(id);
 		const seen = byId.get(id);
 		const known = union(sessionsOf, id, row.sids);
 		const members = union(membersOf, id, row.uids);
@@ -169,7 +175,7 @@ export function mergePatternRows(
 				: { detail: mergeDetail(seen.detail, row.detail) }),
 		});
 	}
-	return sectionedRows(
+	const merged = sectionedRows(
 		[...byId.values()]
 			.filter(
 				(row) =>
@@ -177,12 +183,22 @@ export function mergePatternRows(
 					number(row.runs) >= 2 &&
 					number(row.sessions) >= minSessions,
 			)
-			.map(({ sids: _sids, uids: _uids, ...row }) => ({
+			.map(({ sids: _sids, uids: _uids, kind_cut: _cut, ...row }) => ({
 				...row,
 				minutes: Math.round(number(row.minutes) * 10) / 10,
 			})),
 		limit,
 	);
+	const bounds = merged.map((row) =>
+		cutKinds.has(String(row.kind))
+			? `lower bound: a window kept only its top ${String(row.kind)} patterns`
+			: fullSessions.has(String(row.id))
+				? `lower bound: a window listed only ${SESSION_IDS} of its sessions`
+				: "",
+	);
+	return bounds.some(Boolean)
+		? merged.map((row, index) => ({ ...row, lower_bound: bounds[index] }))
+		: merged;
 }
 
 const DRILL_TOTALS = / · (\d+) in (\d+) runs · /u;

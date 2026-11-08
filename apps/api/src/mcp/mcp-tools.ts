@@ -1414,7 +1414,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 					.save(parseMcpInput(AnalysisHistorySaveInputSchema, args))
 					.then((saved) =>
 						withReportLink(
-							`saved analysis=${saved.analysis} status=${saved.status}`,
+							[
+								`saved analysis=${saved.analysis} status=${saved.status}`,
+								...(saved.warnings ?? []),
+							].join("\n"),
 							workspace.slug,
 							saved.analysis,
 						),
