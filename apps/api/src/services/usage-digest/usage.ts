@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	buildInclusiveDateTimeRangeFilter,
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
@@ -190,7 +191,8 @@ async function readFrustration(
 		if (row.runs > 0 && (!first || row.day < first))
 			sessionDays.set(row.session_id, row.day);
 	}
-	if (sessionDays.size === 0) return [];
+	if (sessionDays.size === 0 || days.length === 0) return [];
+	const sortedDays = [...days].sort();
 	const signals = await query(executor, SignalRowSchema, {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT user_id, session_id, toString(toDate(session_date)) AS day,
@@ -199,13 +201,18 @@ async function readFrustration(
 				sumMap(member_negative_counts) AS phrases
 			FROM ${getSafeClickHouseTable(LANGUAGE_SIGNALS_TABLE)} FINAL
 			WHERE organization_id = {organizationId:String}
-				AND toDate(session_date) IN {days:Array(Date)}
+				AND ${buildInclusiveDateTimeRangeFilter("firstDay", "lastDay")}
 			GROUP BY user_id, session_id, day`,
-		query_params: { organizationId, days },
+		query_params: {
+			organizationId,
+			firstDay: sortedDays[0],
+			lastDay: sortedDays.at(-1),
+		},
 	});
+	const daySet = new Set(days);
 	const inWindow = signals.flatMap((row) => {
 		const day = sessionDays.get(row.session_id);
-		return day ? [{ ...row, day }] : [];
+		return day && daySet.has(row.day) ? [{ ...row, day }] : [];
 	});
 	const frustrated = inWindow
 		.filter((row) => row.negatives + row.swears > 0)

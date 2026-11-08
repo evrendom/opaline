@@ -918,6 +918,14 @@ export function buildInclusiveDateRangeFilter(
 	return buildAbsoluteDateFilter(startParamName, endParamName, column);
 }
 
+export function buildInclusiveDateTimeRangeFilter(
+	startParamName: string,
+	endParamName: string,
+	column = "session_date",
+): string {
+	return `${column} >= toDateTime64({${startParamName}:String}, 3, 'UTC') AND ${column} < toDateTime64({${endParamName}:String}, 3, 'UTC') + INTERVAL 1 DAY`;
+}
+
 export async function queryClickhouse<T>(
 	statement: ClickHouseStatement,
 ): Promise<T[]> {

@@ -1,6 +1,6 @@
 import type { RepositoryOverview } from "@rudel/api-routes";
 import {
-	buildInclusiveDateRangeFilter,
+	buildInclusiveDateTimeRangeFilter,
 	queryClickhouse,
 } from "../clickhouse.js";
 import {
@@ -34,7 +34,7 @@ export async function getRepositoryOverview(
 	const repoFilter = await getRepositorySqlFilter(orgId, input.repoKey);
 	if (repoFilter.params.repositoryFingerprints.length === 0)
 		return EMPTY_REPOSITORY_OVERVIEW;
-	const windowFilter = `${buildInclusiveDateRangeFilter("startDate", "endDate", "sa.session_date")}
+	const windowFilter = `${buildInclusiveDateTimeRangeFilter("startDate", "endDate", "sa.session_date")}
 	  AND ${repoFilter.sql}`;
 	// Price only this repository's sessions in the range and their native
 	// descendants, not the organization's whole history.
