@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
@@ -6,7 +6,8 @@ import { join, resolve } from "node:path";
 import type { Subprocess } from "bun";
 
 const REPO = resolve(import.meta.dir, "..");
-const USAGE = `bun scripts/selfhost-smoke.ts [--clickhouse local|lan] [--lan-ip <ipv4>] [--keep]
+const USAGE = `bun scripts/selfhost-smoke.ts [--clickhouse local|lan] [--lan-ip <ipv4>]
+    [--artifact dist-selfhost/opaline-server-<version>.tgz] [--bun <path>] [--keep]
 
 Starts a throwaway self-hosted Opaline in a temp dir with a fake HOME: its own
 ClickHouse (local: loopback with the s3 storage policy; lan: no storage policy,
@@ -15,6 +16,10 @@ Postgres from Homebrew and apps/api/src/selfhost/main.ts. Runs setup, uploads
 two fixture transcripts, waits for the scheduler to build the run index, calls
 the MCP tools with the API key, checks the login link, then tears everything
 down.
+
+--artifact runs the packaged server instead of the checkout: the tarball is
+checked against its manifest, unpacked into an empty directory under the work
+dir and started with --bun (default: this Bun) and its bundled web app.
 
 Environment: OPALINE_SMOKE_CLICKHOUSE (clickhouse binary),
 OPALINE_SMOKE_PG_BIN (directory with initdb, pg_ctl, createdb).`;
@@ -39,12 +44,16 @@ interface Options {
 	readonly clickhouse: "local" | "lan";
 	readonly lanIp: string | null;
 	readonly keep: boolean;
+	readonly artifact: string | null;
+	readonly bun: string;
 }
 
 function parseOptions(argv: readonly string[]): Options {
 	let clickhouse: Options["clickhouse"] = "local";
 	let lanIp: string | null = null;
 	let keep = false;
+	let artifact: string | null = null;
+	let bun = process.execPath;
 	for (let index = 0; index < argv.length; index++) {
 		const arg = argv[index];
 		if (arg === "--help" || arg === "-h") {
@@ -57,9 +66,11 @@ function parseOptions(argv: readonly string[]): Options {
 				throw new Error("--clickhouse is local or lan");
 			clickhouse = value;
 		} else if (arg === "--lan-ip") lanIp = argv[++index] ?? null;
+		else if (arg === "--artifact") artifact = resolve(argv[++index] ?? "");
+		else if (arg === "--bun") bun = resolve(argv[++index] ?? "");
 		else throw new Error(`Unknown argument ${arg}\n\n${USAGE}`);
 	}
-	return { clickhouse, lanIp, keep };
+	return { clickhouse, lanIp, keep, artifact, bun };
 }
 
 const started = performance.now();
@@ -307,11 +318,46 @@ interface OpalineServer {
 	readonly output: () => string;
 }
 
+interface UnpackedArtifact {
+	readonly directory: string;
+	readonly entry: string;
+	readonly version: string;
+}
+
+async function unpackArtifact(
+	work: string,
+	tarball: string,
+): Promise<UnpackedArtifact> {
+	const manifest = JSON.parse(
+		await readFile(tarball.replace(/\.tgz$/u, ".json"), "utf8"),
+	) as { version: string; sha256: string };
+	const sha256 = createHash("sha256")
+		.update(await readFile(tarball))
+		.digest("hex");
+	check(sha256 === manifest.sha256, `${tarball} does not match its manifest`);
+	const directory = join(work, "server");
+	await mkdir(directory, { recursive: true });
+	await run(["tar", "-xzf", tarball, "-C", directory], "tar -x");
+	const entry = join(directory, "package", "server", "main.js");
+	check(existsSync(entry), "the artifact has package/server/main.js");
+	for (let parent = directory; parent !== "/"; parent = resolve(parent, ".."))
+		check(
+			!existsSync(join(parent, "node_modules")),
+			`${parent} has node_modules`,
+		);
+	step(
+		`artifact ${manifest.version} (sha256 ${sha256.slice(0, 12)}) unpacked into ${directory}`,
+	);
+	return { directory, entry, version: manifest.version };
+}
+
 async function startServer(
 	work: string,
 	clickhouse: ClickHouseServer,
 	postgres: PostgresServer,
 	setupToken: string,
+	bun: string,
+	artifact: UnpackedArtifact | null,
 ): Promise<OpalineServer> {
 	const home = join(work, "home");
 	const web = join(work, "web");
@@ -323,11 +369,13 @@ async function startServer(
 	);
 	const port = await freePort();
 	const child = Bun.spawn(
-		[process.execPath, join(REPO, "apps/api/src/selfhost/main.ts")],
+		artifact
+			? [bun, "--no-install", artifact.entry]
+			: [bun, join(REPO, "apps/api/src/selfhost/main.ts")],
 		{
-			cwd: REPO,
+			cwd: artifact ? artifact.directory : REPO,
 			env: {
-				PATH: process.env.PATH ?? "/usr/bin:/bin",
+				PATH: artifact ? "/usr/bin:/bin" : (process.env.PATH ?? "/usr/bin:/bin"),
 				HOME: home,
 				OPALINE_CONFIG_DIR: join(home, ".opaline"),
 				OPALINE_SELF_HOSTED: "1",
@@ -342,7 +390,7 @@ async function startServer(
 				CRON_SECRET: randomBytes(24).toString("hex"),
 				OPALINE_SETUP_TOKEN: setupToken,
 				OPALINE_DATA_DIR: join(work, "data"),
-				OPALINE_WEB_DIR: web,
+				...(artifact ? {} : { OPALINE_WEB_DIR: web }),
 			},
 			stdout: "pipe",
 			stderr: "pipe",
@@ -448,6 +496,33 @@ function firstLine(text: string): string {
 	);
 }
 
+async function checkBundledWeb(
+	server: OpalineServer,
+	version: string,
+): Promise<void> {
+	const info = await json(await fetch(`${server.url}/api/selfhost/info`));
+	check(info.version === version, `info.version ${String(info.version)}`);
+	const index = await fetch(`${server.url}/smoke-team/sessions`);
+	const html = await index.text();
+	check(
+		index.status === 200 && html.includes('id="root"'),
+		`web index: ${index.status} ${html.slice(0, 200)}`,
+	);
+	const assets = [
+		...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css))"/gu),
+	].map((match) => match[1] ?? "");
+	check(assets.length > 0, "index.html references assets");
+	for (const asset of [...assets, "/theme-boot.js", "/plugin/entry.js"]) {
+		const response = await fetch(`${server.url}${asset}`);
+		check(response.status === 200, `${asset} answered ${response.status}`);
+		await response.arrayBuffer();
+	}
+	const csp = index.headers.get("content-security-policy") ?? "";
+	step(
+		`web: bundled app at /smoke-team/sessions, ${assets.length} assets, /theme-boot.js and /plugin/entry.js load (CSP ${csp ? "on" : "off"}); info.version ${version}`,
+	);
+}
+
 async function smoke(options: Options, work: string): Promise<void> {
 	const stops: (() => Promise<void>)[] = [];
 	const teardown = async () => {
@@ -475,7 +550,17 @@ async function smoke(options: Options, work: string): Promise<void> {
 			step("Postgres stopped");
 		});
 		const setupToken = randomBytes(24).toString("hex");
-		const server = await startServer(work, clickhouse, postgres, setupToken);
+		const artifact = options.artifact
+			? await unpackArtifact(work, options.artifact)
+			: null;
+		const server = await startServer(
+			work,
+			clickhouse,
+			postgres,
+			setupToken,
+			options.bun,
+			artifact,
+		);
 		stops.push(async () => {
 			server.process.kill("SIGTERM");
 			const code = await Promise.race([
@@ -768,12 +853,45 @@ async function smoke(options: Options, work: string): Promise<void> {
 		step(
 			`login link: 302 to / with ${cookie.split("=")[0]}; rpc/me answers ${me.json?.email}; reusing the link is refused`,
 		);
-		const spa = await fetch(`${server.url}/smoke-team/sessions`);
-		check(
-			spa.status === 200 && (await spa.text()).includes("Opaline smoke"),
-			"SPA fallback",
+		const inviteResponse = await fetch(
+			`${server.url}/rpc/teamInviteLink/create`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Cookie: cookie,
+					Origin: new URL(link.loginUrl).origin,
+				},
+				body: JSON.stringify({ json: { organizationId: setup.organization.id } }),
+			},
 		);
-		step("web: /smoke-team/sessions serves index.html from OPALINE_WEB_DIR");
+		const invite = new URL(
+			((await json(inviteResponse)) as { json: { invite_url: string } }).json
+				.invite_url,
+		);
+		const invitePage = await (
+			await fetch(`${server.url}${invite.pathname}`)
+		).text();
+		const inviteImage = await fetch(`${server.url}${invite.pathname}/og.png`);
+		const advertised = invitePage.includes('property="og:image"');
+		check(
+			invitePage.includes("Join Smoke Team") &&
+				advertised === !artifact &&
+				inviteImage.status === (artifact ? 404 : 200),
+			`invite page: og:image ${advertised}, og.png ${inviteImage.status}`,
+		);
+		step(
+			`invite page: ${advertised ? "advertises" : "omits"} og:image; og.png answers ${inviteImage.status}${artifact ? " (no SVG renderer in the artifact)" : ""}`,
+		);
+		if (artifact) await checkBundledWeb(server, artifact.version);
+		else {
+			const spa = await fetch(`${server.url}/smoke-team/sessions`);
+			check(
+				spa.status === 200 && (await spa.text()).includes("Opaline smoke"),
+				"SPA fallback",
+			);
+			step("web: /smoke-team/sessions serves index.html from OPALINE_WEB_DIR");
+		}
 		const problems = server
 			.output()
 			.split("\n")
