@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type postgres from "postgres";
 
 export const LOGIN_TOKEN_TTL_SECONDS = 600;
+export const MEMBER_LOGIN_TOKEN_TTL_SECONDS = 3600;
 const IDENTIFIER_PREFIX = "selfhost-login:";
 
 function identifierFor(token: string): string {
@@ -11,13 +12,14 @@ function identifierFor(token: string): string {
 export async function issueLoginToken(
 	sql: postgres.Sql,
 	userId: string,
+	ttlSeconds: number = LOGIN_TOKEN_TTL_SECONDS,
 ): Promise<string> {
 	const token = randomBytes(32).toString("base64url");
 	await sql`
 		INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
 		VALUES (
 			${randomUUID()}, ${identifierFor(token)}, ${userId},
-			now() + make_interval(secs => ${LOGIN_TOKEN_TTL_SECONDS}), now(), now()
+			now() + make_interval(secs => ${ttlSeconds}), now(), now()
 		)
 	`;
 	return token;
