@@ -33,6 +33,7 @@ test("without providers only the jobs that need none run, and billing, trends an
 		"session-retirement",
 		"repair",
 		"native-lineage",
+		"analysis-log-retention",
 	]);
 	const all = selfHostedJobs({
 		GITHUB_REPOSITORY_APP_ID: "1",
@@ -49,6 +50,7 @@ test("without providers only the jobs that need none run, and billing, trends an
 		"session-retirement",
 		"repair",
 		"native-lineage",
+		"analysis-log-retention",
 		"github-evidence",
 		"history",
 		"run-questions",
@@ -62,6 +64,7 @@ test("without providers only the jobs that need none run, and billing, trends an
 		"session-retirement": 3_600_000,
 		repair: 86_400_000,
 		"native-lineage": 86_400_000,
+		"analysis-log-retention": 86_400_000,
 	});
 	expect(
 		selfHostedJobs({ GITHUB_REPOSITORY_APP_ID: "1", R2_ACCOUNT_ID: "a" }).map(

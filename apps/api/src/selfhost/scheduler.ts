@@ -93,6 +93,15 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 					.handleNativeSessionLineageMaintenanceRequest,
 		},
 		{
+			name: "analysis-log-retention",
+			everyMs: DAY,
+			firstAfterMs: 3 * MINUTE,
+			when: true,
+			handler: async () =>
+				(await import("../handlers/analysis-log-retention-maintenance.js"))
+					.handleAnalysisLogRetentionMaintenanceRequest,
+		},
+		{
 			name: "github-evidence",
 			everyMs: 5 * MINUTE,
 			firstAfterMs: MINUTE,
