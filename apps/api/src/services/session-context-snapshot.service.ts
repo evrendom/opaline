@@ -74,6 +74,7 @@ export async function writeSessionContextSnapshot(
 	executor: ClickHouseExecutor,
 	session: SessionKey,
 	now: () => Date = () => new Date(),
+	beforeWrite: () => Promise<void> = async () => {},
 ): Promise<boolean> {
 	const derivation = await getCurrentSessionDetailDerivation({
 		organizationId: session.organizationId,
@@ -88,6 +89,7 @@ export async function writeSessionContextSnapshot(
 	]);
 	const snapshot = contextSnapshotOf(derivation, setup, setupRuns);
 	if (!snapshot) return false;
+	await beforeWrite();
 	await executor.insert({
 		table: SESSION_CONTEXT_SNAPSHOTS_TABLE,
 		values: [contextSnapshotRow(session, derivation.revision, snapshot, now())],

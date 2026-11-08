@@ -19,5 +19,19 @@ export async function handleL1EdgesMaintenanceRequest(
 	if (!isL1EdgeWorkerEnabled())
 		return Response.json({ l1Edges: { enabled: false }, ok: true });
 	const built = await runConfiguredL1EdgePass(INVOCATION_BUDGET_MS);
-	return Response.json({ l1Edges: { enabled: true, built }, ok: true });
+	const [{ backfillContextSnapshots }, { getClickhouse }, { sqlClient }] =
+		await Promise.all([
+			import("../services/context-snapshot-backfill.service.js"),
+			import("../clickhouse.js"),
+			import("../db.js"),
+		]);
+	const contextSnapshots = await backfillContextSnapshots({
+		executor: getClickhouse(),
+		sql: sqlClient,
+	});
+	return Response.json({
+		l1Edges: { enabled: true, built },
+		contextSnapshots,
+		ok: true,
+	});
 }
