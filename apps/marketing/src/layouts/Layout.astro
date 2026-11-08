@@ -18,8 +18,6 @@ interface Props {
 	dateModified?: string;
 	noindex?: boolean;
 	socialImage?: SocialImage;
-	/** Browser chrome color for pages that follow the device's dark mode. */
-	darkThemeColor?: string;
 }
 
 const {
@@ -28,7 +26,6 @@ const {
 	canonical,
 	dateModified,
 	noindex = false,
-	darkThemeColor = "#0b0b0b",
 	socialImage = {
 		src: "/images/opaline-social.png",
 		alt: "Team-wide, message-level analytics for coding agents",
@@ -37,20 +34,6 @@ const {
 	},
 } = Astro.props;
 
-// Runs before first paint: the site always follows the visitor's system
-// preference, including when it switches.
-const darkModeScript = `{
-	const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-	const applyTheme = () => {
-		const dark = darkQuery.matches;
-		document.documentElement.classList.toggle("dark", dark);
-		// Set here too, not only in CSS, so the very first paint (before the
-		// stylesheet arrives) is already dark.
-		document.documentElement.style.colorScheme = dark ? "dark" : "light";
-	};
-	applyTheme();
-	darkQuery.addEventListener("change", applyTheme);
-}`;
 const siteUrl = Astro.site ?? new URL("https://opaline.so");
 const siteHomepageUrl = new URL("/", siteUrl);
 const canonicalUrl = canonical
@@ -96,7 +79,7 @@ const structuredDataJson = structuredData
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark" style="color-scheme: dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -115,24 +98,7 @@ const structuredDataJson = structuredData
 		<link rel="mask-icon" href="/opaline-icon.svg" color="#2c2d30" />
 		<link rel="canonical" href={canonicalUrl} />
 		<link rel="sitemap" href="/sitemap.xml" />
-		{
-			darkThemeColor ? (
-				<>
-					<meta
-						name="theme-color"
-						media="(prefers-color-scheme: light)"
-						content="#ffffff"
-					/>
-					<meta
-						name="theme-color"
-						media="(prefers-color-scheme: dark)"
-						content={darkThemeColor}
-					/>
-				</>
-			) : (
-				<meta name="theme-color" content="#ffffff" />
-			)
-		}
+		<meta name="theme-color" content="#0b0b0b" />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
 		<meta name="robots" content={robots} />
@@ -171,7 +137,6 @@ const structuredDataJson = structuredData
 			)
 		}
 		<script is:inline>document.documentElement.dataset.js = "true";</script>
-		<script is:inline set:html={darkModeScript} />
 		<style is:inline>html.dark{background-color:#0b0b0b}</style>
 	</head>
 	<body>
