@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
+import { withPostgresLease } from "../services/postgres-lease.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 type CronHandler = (request: Request) => Promise<Response>;
@@ -7,7 +8,7 @@ type CronHandler = (request: Request) => Promise<Response>;
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-const ADVISORY_LOCK_CLASS = 731_900;
+const JOB_LEASE_TTL_MS = 60_000;
 
 const logger = getLogger(["rudel", "api", "selfhost", "scheduler"]);
 
@@ -143,24 +144,18 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 	return jobs.filter((job) => job.when).map(({ when: _when, ...job }) => job);
 }
 
-export function advisoryJobLock(sql: postgres.Sql): JobLock {
+export function leaseJobLock(
+	sql: postgres.Sql,
+	ttlMs = JOB_LEASE_TTL_MS,
+): JobLock {
 	return async (name, work) => {
-		const connection = await sql.reserve();
-		try {
-			const [row] = await connection<{ locked: boolean }[]>`
-				SELECT pg_try_advisory_lock(${ADVISORY_LOCK_CLASS}, hashtext(${name})) AS locked
-			`;
-			if (row?.locked !== true) return { status: "busy" };
-			try {
-				return { status: "done", result: await work() };
-			} finally {
-				await connection`
-					SELECT pg_advisory_unlock(${ADVISORY_LOCK_CLASS}, hashtext(${name}))
-				`.catch(() => undefined);
-			}
-		} finally {
-			connection.release();
-		}
+		const outcome = await withPostgresLease(`selfhost-job:${name}`, work, {
+			database: sql,
+			ttlMs,
+		});
+		return outcome.status === "busy"
+			? { status: "busy" }
+			: { status: "done", result: outcome.result };
 	};
 }
 

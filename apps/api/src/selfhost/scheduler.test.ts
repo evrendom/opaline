@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import type postgres from "postgres";
 import {
-	advisoryJobLock,
 	type JobLock,
 	type JobOutcome,
+	leaseJobLock,
 	runJobOnce,
 	type SchedulerJob,
 	selfHostedJobs,
@@ -152,48 +152,45 @@ test("a job never overlaps itself and stop waits for the run in flight", async (
 	expect(runs).toBe(settled);
 });
 
-test("the advisory lock skips a job another process holds and always unlocks and releases", async () => {
-	const statements: string[] = [];
-	let released = 0;
-	const fakeSql = (locked: boolean) =>
+test("the lease skips a job another process holds and releases it after the run", async () => {
+	const statements: { sql: string; values: unknown[] }[] = [];
+	const fakeSql = (acquired: boolean) =>
 		({
-			reserve: async () =>
-				Object.assign(
-					(strings: TemplateStringsArray, ...values: unknown[]) => {
-						statements.push(`${strings.join("?")} ${values.join(",")}`);
-						const result = strings.join("").includes("pg_try_advisory_lock")
-							? [{ locked }]
-							: [];
-						return Object.assign(Promise.resolve(result), {
-							catch: () => Promise.resolve(result),
-						});
-					},
-					{ release: () => released++ },
-				),
+			unsafe: async (sql: string, values: unknown[]) => {
+				statements.push({ sql, values });
+				if (sql.includes("INSERT INTO coordination_lease"))
+					return acquired ? [{ holder: values[1] }] : [];
+				if (sql.includes("DELETE FROM coordination_lease"))
+					return [{ holder: values[1] }];
+				return [];
+			},
 		}) as unknown as postgres.Sql;
 
 	let worked = 0;
 	expect(
-		await advisoryJobLock(fakeSql(false))("repair", async () => ++worked),
+		await leaseJobLock(fakeSql(false))("repair", async () => ++worked),
 	).toEqual({ status: "busy" });
 	expect(worked).toBe(0);
-	expect(released).toBe(1);
 	expect(statements).toHaveLength(1);
+	expect(statements[0]?.values).toEqual([
+		"selfhost-job:repair",
+		expect.any(String),
+		60_000,
+	]);
 
 	statements.length = 0;
 	expect(
-		await advisoryJobLock(fakeSql(true))("repair", async () => ++worked),
+		await leaseJobLock(fakeSql(true))("repair", async () => ++worked),
 	).toEqual({ status: "done", result: 1 });
-	expect(statements[0]).toContain("pg_try_advisory_lock");
-	expect(statements[0]).toContain("731900,repair");
-	expect(statements[1]).toContain("pg_advisory_unlock");
-	expect(released).toBe(2);
+	expect(
+		statements.map((statement) => statement.sql.trim().split(" ")[0]),
+	).toEqual(["INSERT", "DELETE"]);
 
+	statements.length = 0;
 	await expect(
-		advisoryJobLock(fakeSql(true))("repair", async () => {
+		leaseJobLock(fakeSql(true))("repair", async () => {
 			throw new Error("boom");
 		}),
 	).rejects.toThrow("boom");
-	expect(statements.at(-1)).toContain("pg_advisory_unlock");
-	expect(released).toBe(3);
+	expect(statements.at(-1)?.sql).toContain("DELETE FROM coordination_lease");
 });

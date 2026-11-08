@@ -65,7 +65,7 @@ async function main(): Promise<void> {
 	const purgeWorker = await scheduler.startPurgeWorker();
 	const jobs = scheduler.startScheduler({
 		jobs: scheduler.selfHostedJobs(),
-		lock: scheduler.advisoryJobLock(sqlClient),
+		lock: scheduler.leaseJobLock(sqlClient),
 		cronSecret: config.cronSecret,
 	});
 	status(
