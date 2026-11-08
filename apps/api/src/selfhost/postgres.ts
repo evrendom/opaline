@@ -1,15 +1,10 @@
-import { resolve } from "node:path";
 import postgres from "postgres";
 
 export const SELF_HOSTED_SETTING = "opaline.self_hosted";
 
-const MIGRATE_SCRIPT = resolve(
-	import.meta.dir,
-	"../../../../packages/sql-schema/src/migrate.ts",
-);
-
 export async function preparePostgres(
 	connectionString: string,
+	migrateScript: string,
 ): Promise<{ database: string; migrated: string }> {
 	const sql = postgres(connectionString, {
 		max: 1,
@@ -39,7 +34,7 @@ export async function preparePostgres(
 		await sql.end({ timeout: 5 });
 	}
 
-	const migrated = await runMigrations(connectionString);
+	const migrated = await runMigrations(connectionString, migrateScript);
 
 	const check = postgres(connectionString, {
 		max: 1,
@@ -60,8 +55,11 @@ export async function preparePostgres(
 	return { database, migrated };
 }
 
-async function runMigrations(connectionString: string): Promise<string> {
-	const child = Bun.spawn([process.execPath, MIGRATE_SCRIPT], {
+async function runMigrations(
+	connectionString: string,
+	migrateScript: string,
+): Promise<string> {
+	const child = Bun.spawn([process.execPath, migrateScript], {
 		env: { ...process.env, PG_CONNECTION_STRING: connectionString },
 		stdout: "pipe",
 		stderr: "pipe",

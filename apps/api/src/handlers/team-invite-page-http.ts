@@ -4,6 +4,7 @@ import {
 	renderTeamInviteCardPng,
 	TEAM_INVITE_IMAGE_HEIGHT,
 	TEAM_INVITE_IMAGE_WIDTH,
+	teamInviteCardImageAvailable,
 } from "../services/team-invite-card-image.js";
 import { getTeamInviteLinkPreview } from "../services/team-invite-link.service.js";
 
@@ -23,7 +24,10 @@ export async function handleTeamInvitePageRequest(input: {
 }): Promise<Response> {
 	const { request, indexHtml, token } = input;
 	if (!["GET", "HEAD"].includes(request.method)) return methodNotAllowed();
-	const workspace = await getTeamInviteLinkPreview(token);
+	const [workspace, imageAvailable] = await Promise.all([
+		getTeamInviteLinkPreview(token),
+		teamInviteCardImageAvailable(),
+	]);
 	const origin = getFrontendOrigin();
 	const path = workspace
 		? `/${encodeURIComponent(workspace.slug)}/join/${encodeURIComponent(token)}`
@@ -44,7 +48,7 @@ export async function handleTeamInvitePageRequest(input: {
 				: "Workspace invitation | Opaline",
 			description,
 			publicUrl,
-			...(workspace
+			...(workspace && imageAvailable
 				? {
 						imageUrl,
 						imageAlt: description,
@@ -83,8 +87,15 @@ export async function handleTeamInviteImageRequest(
 			status: 404,
 			headers: { "Cache-Control": "no-store" },
 		});
+	if (!(await teamInviteCardImageAvailable()))
+		return new Response("Invitation image unavailable", {
+			status: 404,
+			headers: { "Cache-Control": "no-store" },
+		});
 	return new Response(
-		request.method === "HEAD" ? null : renderTeamInviteCardPng(workspace.name),
+		request.method === "HEAD"
+			? null
+			: await renderTeamInviteCardPng(workspace.name),
 		{
 			headers: {
 				"Content-Type": "image/png",

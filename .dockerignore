@@ -8,7 +8,12 @@ dist
 *.md
 Dockerfile
 docker-compose.yml
-scripts/
+dist-site
+dist-selfhost
+apps/*/dist
+apps/*/dist-*
+deploy/selfhost/.env
+deploy/selfhost/opaline-server-*
 
 # Design references never belong in production images.
 design-archive

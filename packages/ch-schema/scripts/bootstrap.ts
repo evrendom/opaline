@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -27,9 +28,9 @@ import {
 	runF16MigrationCore,
 } from "./migrate-f16.js";
 
-const MIGRATIONS_DIR = resolve(import.meta.dir, "../chx/migrations");
+const DEFAULT_SCHEMA_DIR = resolve(import.meta.dir, "..");
 const SUBAGENT_VIEW_MIGRATION = "20260911055631_auto.sql";
-const FORWARD_SCRIPTS = new Map([
+export const FORWARD_SCRIPTS = new Map([
 	["20261001120000_github_outcomes.sql", "migrate-github-outcomes.ts"],
 	["20260913190000_product_launch.sql", "migrate-product-launch.ts"],
 	[
@@ -123,6 +124,7 @@ export interface BootstrapOptions {
 	readonly env?: Environment;
 	readonly log?: (line: string) => void;
 	readonly verbose?: boolean;
+	readonly schemaDir?: string;
 }
 
 export interface BootstrapResult {
@@ -139,6 +141,19 @@ interface BootstrapContext {
 	readonly url: string;
 	readonly capabilities: ClickHouseCapabilities;
 	readonly verbose: boolean;
+	readonly schemaDir: string;
+}
+
+export function forwardScriptPath(schemaDir: string, script: string): string {
+	const path = resolve(schemaDir, "scripts", script);
+	return existsSync(path) ? path : path.replace(/\.ts$/u, ".js");
+}
+
+export function usesChkitForUpgrade(
+	capabilities: ClickHouseCapabilities,
+	chkitAvailable: boolean,
+): boolean {
+	return chkitAvailable && !needsAdaptation(capabilities);
 }
 
 async function runMigrationCommand(
@@ -146,7 +161,7 @@ async function runMigrationCommand(
 	args: readonly string[],
 ): Promise<void> {
 	const child = Bun.spawn([process.execPath, ...args], {
-		cwd: resolve(import.meta.dir, ".."),
+		cwd: context.schemaDir,
 		env: {
 			...context.env,
 			CLICKHOUSE_DB: "default",
@@ -206,10 +221,16 @@ async function applyForwardMigration(
 ): Promise<void> {
 	const script = FORWARD_SCRIPTS.get(migration.name);
 	if (script) {
-		await runMigrationCommand(context, [resolve(import.meta.dir, script)]);
+		await runMigrationCommand(context, [
+			forwardScriptPath(context.schemaDir, script),
+		]);
 		return;
 	}
-	if (context.capabilities.storagePolicy !== "s3") {
+	const chkit = resolve(
+		context.schemaDir,
+		"node_modules/chkit/dist/bin/chkit.js",
+	);
+	if (!usesChkitForUpgrade(context.capabilities, existsSync(chkit))) {
 		await applyMigrationStatements(executor, migration);
 		await appendJournalEntryWithReconciliation(journalStore, {
 			name: migration.name,
@@ -224,11 +245,11 @@ async function applyForwardMigration(
 		const configPath = resolve(directory, "clickhouse.config.ts");
 		await writeFile(
 			configPath,
-			`import config from ${JSON.stringify(resolve(import.meta.dir, "../clickhouse.config.ts"))};\nexport default { ...config, migrationsDir: ${JSON.stringify(directory)} };\n`,
+			`import config from ${JSON.stringify(resolve(context.schemaDir, "clickhouse.config.ts"))};\nexport default { ...config, migrationsDir: ${JSON.stringify(directory)} };\n`,
 		);
 		await runMigrationCommand(context, [
 			"--bun",
-			resolve(import.meta.dir, "../node_modules/chkit/dist/bin/chkit.js"),
+			chkit,
 			"migrate",
 			"--apply",
 			"--allow-destructive",
@@ -246,6 +267,8 @@ export async function bootstrapClickHouseSchema(
 	const startedAt = performance.now();
 	const env = options.env ?? process.env;
 	const verbose = options.verbose ?? false;
+	const schemaDir = options.schemaDir ?? DEFAULT_SCHEMA_DIR;
+	const migrationsDir = resolve(schemaDir, "chx/migrations");
 	const detail = verbose ? (options.log ?? console.log) : () => {};
 	const url = env.CLICKHOUSE_URL?.trim() || "http://localhost:8123";
 	const username = resolveClickHouseUsername(env, url);
@@ -262,10 +285,16 @@ export async function bootstrapClickHouseSchema(
 			env,
 		);
 		const executor = adaptExecutor(raw, capabilities);
-		const context: BootstrapContext = { env, url, capabilities, verbose };
+		const context: BootstrapContext = {
+			env,
+			url,
+			capabilities,
+			verbose,
+			schemaDir,
+		};
 		const migrations = await Promise.all(
-			(await listMigrations(MIGRATIONS_DIR)).map(async (name) => {
-				const sql = await readFile(resolve(MIGRATIONS_DIR, name), "utf8");
+			(await listMigrations(migrationsDir)).map(async (name) => {
+				const sql = await readFile(resolve(migrationsDir, name), "utf8");
 				return { name, sql, checksum: checksumSQL(sql) };
 			}),
 		);
@@ -383,7 +412,7 @@ export async function bootstrapClickHouseSchema(
 					await runF16MigrationCore(runtime, {
 						journalStore,
 						loadMigration: (name) =>
-							readFile(resolve(MIGRATIONS_DIR, name), "utf8"),
+							readFile(resolve(migrationsDir, name), "utf8"),
 						log: detail,
 						phaseNames: F16_MIGRATIONS,
 					});

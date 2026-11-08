@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!opaline-server-*.tgz
+!opaline-server-*.json
