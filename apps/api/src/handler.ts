@@ -23,6 +23,10 @@ import {
 	handleConfiguredGitHubWebhookRequest,
 } from "./handlers/github-webhook-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
+import {
+	handleLocalObjectStoreRoute,
+	isLocalObjectStorePath,
+} from "./handlers/local-object-store-http.js";
 import { handleMcpRoute } from "./handlers/mcp-http.js";
 import { handleSelfHostRoute, selfHostAuth } from "./handlers/selfhost-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
@@ -392,6 +396,7 @@ export async function fetchHandler(
 			const finalResponse =
 				url.pathname === "/rpc" ||
 				url.pathname.startsWith("/rpc/") ||
+				isLocalObjectStorePath(url.pathname) ||
 				((url.pathname === SESSION_ARRIVALS_PATH ||
 					/^\/api\/cli\/connections\/[a-f0-9-]+\/events$/u.test(
 						url.pathname,
@@ -468,6 +473,8 @@ async function handleRequest(
 	if (url.pathname === GITHUB_WEBHOOK_PATH) {
 		return handleConfiguredGitHubWebhookRequest(request);
 	}
+	const objectStoreResponse = handleLocalObjectStoreRoute(request, url);
+	if (objectStoreResponse) return objectStoreResponse;
 	const selfHostResponse = handleSelfHostRoute(
 		request,
 		url,
