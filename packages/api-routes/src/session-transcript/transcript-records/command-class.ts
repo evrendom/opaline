@@ -1,4 +1,5 @@
 import { readPythonFileAccess } from "./python-file-access.js";
+import { grepFileOperands, wcFileOperands } from "./read-operands.js";
 import type { CommandClass } from "./types.js";
 
 /**
@@ -50,6 +51,7 @@ export interface SimpleCommand {
 	 * flow, so nothing in them is known to have run.
 	 */
 	readonly nested: boolean;
+	readonly subshells?: readonly number[];
 	readonly redirects: readonly {
 		readonly operator: string;
 		readonly target: string;
@@ -248,6 +250,43 @@ const INSTALL_EXECUTABLES: ReadonlySet<string> = new Set([
 	"rustup",
 ]);
 
+export interface ShellContext {
+	readonly cwd?: string;
+	readonly home?: string;
+}
+
+const SETUP_COMMANDS: ReadonlySet<string> = new Set([
+	"cd",
+	"pushd",
+	"popd",
+	"export",
+	"unset",
+	"set",
+	"source",
+	".",
+	"echo",
+	"printf",
+	"true",
+	"false",
+	":",
+]);
+
+export function classifyCommandParts(command: string): CommandClass[] {
+	const classes: CommandClass[] = [];
+	for (const { rawWords } of walkShellCommands(command)) {
+		const words = stripPrefixes(rawWords);
+		if (words.length === 0 || SETUP_COMMANDS.has(basename(words[0] ?? "")))
+			continue;
+		const found = classifySimpleCommand(rawWords);
+		if (!classes.includes(found)) classes.push(found);
+	}
+	return classes;
+}
+
+export function homeOf(cwd: string): string | undefined {
+	return /^(?:\/Users\/[^/]+|\/home\/[^/]+|\/root)(?=\/|$)/u.exec(cwd)?.[0];
+}
+
 /** Classify a shell command string. Empty input yields ''. */
 export function classifyCommand(command: string): CommandClass {
 	if (command.trim() === "") return "";
@@ -275,11 +314,13 @@ export function combineCommandClasses(
 /**
  * File writes that are explicit in a shell command: output redirects, `tee`,
  * `sed -i`, `mv`, `cp`, `rm`, `touch`, and `git checkout -- / restore / rm`.
- * Paths are reported exactly as written; the working directory is unknown.
- * Each mutation carries its {@link ShellMutationBasis}.
+ * Paths resolve against the command's {@link ShellContext} and its `cd`
+ * commands; without them they stay as written. Each mutation carries its
+ * {@link ShellMutationBasis}.
  */
 export function extractShellFileMutations(
 	command: string,
+	context: ShellContext = {},
 ): readonly ShellFileMutation[] {
 	const mutations = new Map<string, ShellFileMutation>();
 	for (const {
@@ -287,13 +328,13 @@ export function extractShellFileMutations(
 		rawWords,
 		simple,
 		workingDirectory,
-	} of walkShellCommands(command)) {
+	} of walkShellCommands(command, context)) {
 		const add = (
 			operation: ShellFileMutation["operation"],
 			rawPath: string,
 			indexOnly = false,
 		) => {
-			const path = resolveAgainst(workingDirectory, rawPath);
+			const path = resolveAgainst(workingDirectory, rawPath, context.home);
 			if (!isProjectPath(path)) return;
 			const basis: ShellMutationBasis = conditional
 				? "conditional"
@@ -376,15 +417,16 @@ export interface ScriptFileEdit {
  * Files the inline Python scripts of a shell command write
  * ({@link readPythonFileAccess}): a here-document fed to `python3` (`python3 -
  * <<'EOF'`, `python3 <<EOF`) or a `python3 -c` argument. A script file run
- * by name (`python3 tool.py`) is not read. Relative paths resolve against an
- * absolute `cd` before the command, unless the script changes directory.
+ * by name (`python3 tool.py`) is not read. Relative paths resolve against the
+ * command's {@link ShellContext} and its `cd` commands, unless the script
+ * changes directory.
  * The files they only read are among {@link extractShellFileReads}.
  */
 export function extractScriptFileAccess(
 	command: string,
-	/** The directory the command started in, for the edit keys. */
-	cwd = "",
+	context: ShellContext = {},
 ): readonly ScriptFileEdit[] {
+	const cwd = context.cwd ?? "";
 	const edits = new Map<string, ScriptFileEdit>();
 	for (const {
 		conditional,
@@ -392,12 +434,18 @@ export function extractScriptFileAccess(
 		simple,
 		symbolicDirectory,
 		workingDirectory,
-	} of walkShellCommands(command)) {
+	} of walkShellCommands(command, context)) {
 		const script = inlinePythonScript(stripPrefixes(rawWords), simple);
 		if (script === undefined) continue;
 		const access = readPythonFileAccess(script.text);
 		for (const written of access.writes) {
-			const path = resolveScriptPath(written, script, workingDirectory, access);
+			const path = resolveScriptPath(
+				written,
+				script,
+				workingDirectory,
+				access,
+				context.home,
+			);
 			if (!isProjectPath(path) || !isLiteralFilePath(path)) continue;
 			const basis = conditional ? "conditional" : "direct";
 			if (edits.get(path)?.basis === "direct") continue;
@@ -431,10 +479,11 @@ function resolveScriptPath(
 	script: { literal: boolean; text: string },
 	workingDirectory: string | undefined,
 	access = readPythonFileAccess(script.text),
+	home?: string,
 ): string {
 	return access.changesDirectory || (!script.literal && /[$`]/u.test(path))
 		? path
-		: resolveAgainst(workingDirectory, path);
+		: resolveAgainst(workingDirectory, path, home);
 }
 
 /** The inline script a Python command runs, and whether the shell left it unexpanded. */
@@ -477,15 +526,21 @@ const PRINTER_VALUE_FLAGS: ReadonlySet<string> = new Set([
 
 /**
  * Files a shell command reads explicitly, in order: the operands of the
- * file printers (`cat`, `head`, `tail`, `less`, `more`, `bat`, `nl`) and of
- * a `sed` that does not edit in place. Like {@link extractShellFileMutations},
- * paths are as written (or resolved against an absolute `cd`); standard
- * input, patterns and expansions are never paths.
+ * file printers (`cat`, `head`, `tail`, `less`, `more`, `bat`, `nl`), of
+ * `wc`, of a non-recursive `grep` and of a `sed` that does not edit in place,
+ * and the files an inline Python script opens for reading. Like
+ * {@link extractShellFileMutations}, paths resolve against the
+ * {@link ShellContext} and the command's `cd` commands; standard input,
+ * patterns and expansions are never paths.
  */
-export function extractShellFileReads(command: string): readonly string[] {
+export function extractShellFileReads(
+	command: string,
+	context: ShellContext = {},
+): readonly string[] {
 	const reads: string[] = [];
 	for (const { rawWords, simple, workingDirectory } of walkShellCommands(
 		command,
+		context,
 	)) {
 		const words = stripPrefixes(rawWords);
 		const executable = basename(words[0] ?? "");
@@ -496,14 +551,25 @@ export function extractShellFileReads(command: string): readonly string[] {
 		const paths =
 			script !== undefined && access !== undefined
 				? access.reads.map((path) =>
-						resolveScriptPath(path, script, workingDirectory, access),
+						resolveScriptPath(
+							path,
+							script,
+							workingDirectory,
+							access,
+							context.home,
+						),
 					)
 				: (FILE_PRINTERS.has(executable)
-						? printerOperands(args)
+						? printerOperands(args, executable)
 						: executable === "sed"
 							? readSedOperands(args)
-							: []
-					).map((operand) => resolveAgainst(workingDirectory, operand));
+							: [
+									...grepFileOperands(executable, args),
+									...wcFileOperands(executable, args),
+								]
+					).map((operand) =>
+						resolveAgainst(workingDirectory, operand, context.home),
+					);
 		for (const path of paths)
 			if (isLiteralFilePath(path) && !reads.includes(path)) reads.push(path);
 	}
@@ -521,7 +587,11 @@ export function isLiteralFilePath(path: string): boolean {
 	);
 }
 
-function printerOperands(args: readonly string[]): string[] {
+function printerOperands(
+	args: readonly string[],
+	executable: string,
+): string[] {
+	const valueFlags = executable === "head" || executable === "tail";
 	const operands: string[] = [];
 	let optionsEnded = false;
 	for (let index = 0; index < args.length; index++) {
@@ -530,7 +600,7 @@ function printerOperands(args: readonly string[]): string[] {
 			optionsEnded = true;
 			continue;
 		}
-		if (!optionsEnded && PRINTER_VALUE_FLAGS.has(arg)) {
+		if (!optionsEnded && valueFlags && PRINTER_VALUE_FLAGS.has(arg)) {
 			index++;
 			continue;
 		}
@@ -595,16 +665,38 @@ interface WalkedCommand {
 }
 
 /**
- * The commands of a shell script in order, `cd` commands consumed: only an
- * absolute `cd` makes later relative paths resolvable; anything else leaves
- * them exactly as written.
+ * The commands of a shell script in order, `cd` commands consumed: the
+ * directory the command started in, an absolute `cd` or a `cd ~/…` with a
+ * known home make later relative paths resolvable; anything else leaves them
+ * exactly as written.
  */
-function* walkShellCommands(command: string): Generator<WalkedCommand> {
-	let workingDirectory: string | undefined;
+function* walkShellCommands(
+	command: string,
+	context: ShellContext = {},
+): Generator<WalkedCommand> {
+	let workingDirectory: string | undefined = context.cwd?.startsWith("/")
+		? normalizePath(context.cwd)
+		: undefined;
 	let symbolicDirectory: string | null | undefined;
 	const commands = parseShellCommand(command);
 	const conditionalFlags = readConditionalFlags(commands);
+	const scopes: {
+		readonly id: number;
+		readonly workingDirectory: string | undefined;
+		readonly symbolicDirectory: string | null | undefined;
+	}[] = [];
 	for (const [commandIndex, simple] of commands.entries()) {
+		const inside = simple.subshells ?? [];
+		while (
+			scopes.length > 0 &&
+			inside[scopes.length - 1] !== scopes[scopes.length - 1]?.id
+		) {
+			const left = scopes.pop();
+			workingDirectory = left?.workingDirectory;
+			symbolicDirectory = left?.symbolicDirectory;
+		}
+		for (const id of inside.slice(scopes.length))
+			scopes.push({ id, workingDirectory, symbolicDirectory });
 		let conditional =
 			simple.nested || (conditionalFlags[commandIndex] ?? false);
 		let rawWords = simple.words;
@@ -628,7 +720,11 @@ function* walkShellCommands(command: string): Generator<WalkedCommand> {
 		}
 		if (basename(rawWords[0] ?? "") === "cd") {
 			const target = positionals(rawWords.slice(1))[0];
-			workingDirectory = resolveWorkingDirectory(workingDirectory, target);
+			workingDirectory = resolveWorkingDirectory(
+				workingDirectory,
+				target,
+				context.home,
+			);
 			symbolicDirectory =
 				target === undefined ||
 				target === "-" ||
@@ -1146,11 +1242,11 @@ function readGitMutations(
 function resolveWorkingDirectory(
 	current: string | undefined,
 	target: string | undefined,
+	home: string | undefined,
 ): string | undefined {
-	if (target === undefined || target === "-" || target.startsWith("~")) {
-		return undefined;
-	}
-	if (/[$`]/u.test(target)) return undefined;
+	if (target === undefined) return home;
+	if (target === "-" || /[$`]/u.test(target)) return undefined;
+	if (target.startsWith("~")) return expandHome(target, home);
 	return target.startsWith("/")
 		? normalizePath(target)
 		: current === undefined
@@ -1161,16 +1257,26 @@ function resolveWorkingDirectory(
 function resolveAgainst(
 	workingDirectory: string | undefined,
 	path: string,
+	home?: string,
 ): string {
+	if (path.startsWith("~")) return expandHome(path, home) ?? path;
 	if (
 		workingDirectory === undefined ||
 		path.startsWith("/") ||
-		path.startsWith("~") ||
 		/[$`]/u.test(path)
 	) {
 		return path;
 	}
 	return normalizePath(`${workingDirectory}/${path}`);
+}
+
+function expandHome(
+	path: string,
+	home: string | undefined,
+): string | undefined {
+	if (home === undefined || !(path === "~" || path.startsWith("~/")))
+		return undefined;
+	return normalizePath(`${home}${path.slice(1)}`);
 }
 
 /** `normalizePath` that keeps a leading `~` as written. */
@@ -1249,6 +1355,8 @@ function splitShellCommand(
 	let nextConnector: ShellConnector | null = null;
 	let constructDepth = 0;
 	let parenDepth = 0;
+	const subshells: number[] = [];
+	let subshellCount = 0;
 	let pendingFunctionBody = false;
 	let index = 0;
 	/** Where the command under construction starts in the source. */
@@ -1309,6 +1417,7 @@ function splitShellCommand(
 				connector: nextConnector,
 				heredocs,
 				nested,
+				...(subshells.length === 0 ? {} : { subshells: [...subshells] }),
 				redirects,
 				text: command.slice(commandStart ?? index, index).trim(),
 				words,
@@ -1401,8 +1510,14 @@ function splitShellCommand(
 				}
 			}
 			endCommand("separator");
-			if (character === "(") parenDepth++;
-			if (character === ")") parenDepth = Math.max(0, parenDepth - 1);
+			if (character === "(") {
+				parenDepth++;
+				subshells.push(++subshellCount);
+			}
+			if (character === ")") {
+				parenDepth = Math.max(0, parenDepth - 1);
+				subshells.pop();
+			}
 			index++;
 			continue;
 		}

@@ -57,17 +57,25 @@ export function lit(value: string): string {
  * `text` with line continuations joined and a whole-command shell wrapper
  * removed: `bash -lc 'git status'` is `git status`.
  */
-function unwrapSql(text: string): string {
+export function unwrapSql(text: string): string {
 	const joined = `replaceRegexpAll(${text}, ${lit(String.raw`\\\n`)}, ' ')`;
 	return `replaceRegexpOne(replaceRegexpOne(${joined}, ${lit(String.raw`(?s)${SHELL_WRAPPER}'(.*)'\s*$`)}, ${lit("\\1")}), ${lit(String.raw`(?s)${SHELL_WRAPPER}"(.*)"\s*$`)}, ${lit("\\1")})`;
 }
 
 /** The command after its setup statements, environment assignments and wrappers. */
 function commandStartSql(text: string): string {
-	const setup = `replaceRegexpOne(${unwrapSql(text)}, ${lit(SETUP)}, '')`;
-	// A wrapper counts only when a program follows it: `env | grep x` and `rtk
-	// --version` run `env` and `rtk`. A leading `&` is PowerShell's call operator.
-	return `replaceRegexpOne(${setup}, ${lit(String.raw`^(?:(?:${ASSIGNMENT}|${WRAPPER})[ \t]+|[!({&][ \t]*)*([^\s;&|<>)-])`)}, ${lit("\\1")})`;
+	return programStartSql(
+		`replaceRegexpOne(${unwrapSql(text)}, ${lit(SETUP)}, '')`,
+	);
+}
+
+export function programStartSql(text: string): string {
+	return `replaceRegexpOne(${text}, ${lit(String.raw`^(?:(?:${ASSIGNMENT}|${WRAPPER})[ \t]+|[!({&][ \t]*)*([^\s;&|<>)-])`)}, ${lit("\\1")})`;
+}
+
+export function argv0OfStartSql(start: string): string {
+	const word = `extract(${start}, ${lit(PROGRAM_WORD)})`;
+	return `if(startsWith(${word}, '$('), ${word}, replaceRegexpOne(replaceRegexpAll(${word}, '["\\']', ''), ${lit(String.raw`^.*[/\\]`)}, ''))`;
 }
 
 /**
@@ -76,8 +84,7 @@ function commandStartSql(text: string): string {
  * `env`, `timeout 30`, `rtk proxy`, `npx`), without quotes or directory.
  */
 export function commandArgv0Sql(command: string): string {
-	const word = `extract(${commandStartSql(command)}, ${lit(PROGRAM_WORD)})`;
-	return `if(startsWith(${word}, '$('), ${word}, replaceRegexpOne(replaceRegexpAll(${word}, '["\\']', ''), ${lit(String.raw`^.*[/\\]`)}, ''))`;
+	return argv0OfStartSql(commandStartSql(command));
 }
 
 /**
@@ -87,7 +94,11 @@ export function commandArgv0Sql(command: string): string {
  * (`python3 -m pytest`); otherwise the program alone.
  */
 export function commandPrefixSql(command: string, argv0: string): string {
-	const rest = `replaceRegexpOne(${commandStartSql(command)}, ${lit(PROGRAM_WORD)}, '')`;
+	return prefixOfStartSql(commandStartSql(command), argv0);
+}
+
+export function prefixOfStartSql(start: string, argv0: string): string {
+	const rest = `replaceRegexpOne(${start}, ${lit(PROGRAM_WORD)}, '')`;
 	const module = `extract(${rest}, ${lit(String.raw`^[ \t]+(-m[ \t]+[A-Za-z0-9_.]+)`)})`;
 	const subcommand = `extract(${rest}, ${lit(String.raw`^(?:[ \t]+${VALUE_FLAGS}[ \t]+[^\s;&|]+)*[ \t]+([a-z][a-z0-9:_-]*)(?:\s|$|[;&|)])`)})`;
 	return `multiIf(${argv0} = '', ${argv0}, ${module} != '', concat(${argv0}, ' ', replaceRegexpAll(${module}, '[ \\t]+', ' ')), ${subcommand} != '', concat(${argv0}, ' ', ${subcommand}), ${argv0})`;
@@ -318,7 +329,7 @@ export function commandColumnsSql(): string {
 		${commandSimhashSql("command_normalized")} AS command_simhash`;
 }
 
-const FAMILY_SKIPPED = [
+export const FAMILY_SKIPPED = [
 	"cd",
 	"pushd",
 	"popd",
@@ -416,10 +427,10 @@ const FAMILY_INTERPRETERS = [
 	"perl",
 ];
 
-const FAMILY_HEREDOC = "(?s)<<.*$";
-const FAMILY_QUOTED = `'[^']*'|"[^"]*"|'[^']*$|"[^"]*$`;
+export const FAMILY_HEREDOC = "(?s)<<.*$";
+export const FAMILY_QUOTED = `'[^']*'|"[^"]*"|'[^']*$|"[^"]*$`;
 const FAMILY_TRIM = String.raw`(^|[^|])\|\s*(?:${FAMILY_TRIMMERS.join("|")})(?:\s[^|&;\n]*)?(\||&|;|\n|$)`;
-const FAMILY_SPLIT = String.raw`&&|\|\||[;|\n]`;
+export const FAMILY_SPLIT = String.raw`&&|\|\||[;|\n]`;
 const FAMILY_REDIRECT = String.raw`\s*(?:[0-9]*>>?|&>|<)\s*(?:&[0-9-]+|\S+)`;
 const FAMILY_DIR_FLAG = String.raw`\s(?:--cwd|--prefix|--dir|--filter|-C)(?:=\S+|\s+\S+)`;
 const FAMILY_LEADING = String.raw`^\s*(?:(?:[A-Za-z_][A-Za-z0-9_]*=\S*|env|time|nohup|exec|command|sudo|timeout\s+\S+)\s+)*`;

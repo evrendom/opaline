@@ -218,7 +218,7 @@ const COMMAND_IDENTITY =
 const COMMAND_IDENTITY_TEST =
 	"apps/api/src/__tests__/command-identity.integration.ts";
 const COMMAND_PROGRAM_TRAPS =
-	"Traps: the first program of a chain or pipeline only (`git add . && git push` is git add); a compound command keeps its keyword (`for`, `while`, `if`); a program run through a variable or substitution is that word (`$PY`, `$(which python)`); null for code-mode scripts and written files, which run no single program, and when only part of the text is stored. The prefix adds the next word only when it is a subcommand-like word (flags that take a value, such as git -C dir, are passed over), or `-m module` for Python.";
+	"Traps: the first program of a chain or pipeline only (`git add . && git push` is git add; command_programs and command_prefixes list every one); a compound command keeps its keyword (`for`, `while`, `if`); a program run through a variable or substitution is that word (`$PY`, `$(which python)`); null for code-mode scripts and written files, which run no single program, and when only part of the text is stored. The prefix adds the next word only when it is a subcommand-like word (flags that take a value, such as git -C dir, are passed over), or `-m module` for Python.";
 const COMMAND_FINGERPRINT_TRAPS =
 	"Traps: rules, not meaning. Absolute paths keep their last two components (file and folder), after home directories, temp directories (and the random names of per-run temp directories) and agent worktrees become <home>, <tmp> and <worktree>; numbers, SHAs, UUIDs, timestamps and URLs become placeholders, and single-line quoted strings become <str> (so different search patterns, commit messages and JSON payloads merge), except an interpreter's inline program (python -c, node -e, bash -c, PowerShell -Command) and an ssh remote command; output trims (2>&1, | head, | tail), status echo lines and a leading cd are dropped. Relative paths, flags and subcommands are kept. A code-mode or written script keeps its string literals. The simhash is 32 bits, null under 20 words; near-duplicates differ in at most 3 bits, which finds copies with small edits, not rewrites. Null when only part of the text is stored.";
 
@@ -708,6 +708,51 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					justification:
 						"Opaline computation, not an agent-written value. Read from the stored command text: exec_command cmd, the command a code-mode script ran (its own call from parser 5; before that the script's one exec_command), never CommandExecution.command[0], which is the shell wrapper.",
 					notes: COMMAND_PROGRAM_TRAPS,
+					testedIn: COMMAND_IDENTITY_TEST,
+				},
+			),
+		},
+	},
+	{
+		id: "command_programs",
+		also: ["command_prefixes"],
+		view: "calls",
+		meaning:
+			"Each program a shell command runs and its first words, from every statement of its chains and pipelines.",
+		agents: {
+			claude_code: stored(
+				["assistant.message.content[tool_use:Bash].input.command"],
+				{ elsewhere: COMMAND_IDENTITY },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+					justification:
+						"Opaline computation, not an agent-written value: the statements of the command (split at &&, ||, ;, |, newlines; quoted strings never split one) each read like command_argv0 and command_prefix, setup statements and shell keywords left out, distinct, in the order they first run. Example shape: cd <repo> && bun test x.test.ts && bun run check-types 2>&1 | tail -3 has command_argv0 bun and command_prefixes [bun test, bun run, tail].",
+					notes:
+						"Traps: a here-document's body and what follows it are not read; empty for code-mode scripts, written files and a command only partly stored.",
+					testedIn: COMMAND_IDENTITY_TEST,
+				},
+			),
+			codex: stored(
+				[
+					"response_item/function_call:exec_command.arguments.cmd",
+					"event_msg/item_completed:CommandExecution.command[]",
+				],
+				{ elsewhere: COMMAND_IDENTITY },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly("event_msg/item_completed:CommandExecution.command[]"),
+					],
+					justification:
+						"Opaline computation from the stored command text, as for Claude Code.",
 					testedIn: COMMAND_IDENTITY_TEST,
 				},
 			),
@@ -3392,7 +3437,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					relation: { kind: "exact" },
 					justification:
-						"An error result that starts '<Event>:<Tool> hook error: [<hook command>]: <message>' was written by the hook, not the tool. PreToolUse and PermissionRequest run before the call, so the call never ran: denial_kind is hook and denial_reason the message's first line. A PostToolUse error came after the call ran and keeps only hook_event.",
+						"An error result that starts '<Event>:<Tool> hook error: [<hook command>]: <message>' was written by the hook, not the tool. PreToolUse and PermissionRequest run before the call, so the call never ran: denial_kind is hook and denial_reason the message's first line. Claude Code records such a block with toolDenialKind permission-rule and permissionDecision {decision: reject, source: hook}; from parser 15 the hook wins, so filters on hook refusals find them (before, they read permission-rule). A PostToolUse error came after the call ran and keeps only hook_event.",
 					evidence: [
 						{
 							kind: "fixture_test",
@@ -3429,7 +3474,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						),
 					],
 					justification:
-						"Opaline computation, not an agent-written value: Claude Code records no parse of shell commands (Codex records parsed_cmd). The operands of cat, head, tail, less, more, bat, nl and a sed that does not edit in place, and the literal paths an inline Python script (python3 - <<'EOF', python3 -c) opens for reading, in order; paths as written, resolved only against an absolute cd. Expansions, globs and standard input are never paths. Example shape: cd <repo> && cat a.tsx; echo ===; cat b.tsx; sed -n 1,40p c.ts left file_path empty before parser 12.",
+						"Opaline computation, not an agent-written value: Claude Code records no parse of shell commands (Codex records parsed_cmd). The operands of cat, head, tail, less, more, bat, nl and a sed that does not edit in place, and the literal paths an inline Python script (python3 - <<'EOF', python3 -c) opens for reading, in order; from parser 15 resolved against the record's cwd, each cd before them and ~ as the home directory (before, as written or against an absolute cd), and also wc and non-recursive grep operands. Expansions, globs and standard input are never paths. Example shape: cd <repo> && cat a.tsx; echo ===; cat b.tsx; sed -n 1,40p c.ts left file_path empty before parser 12.",
 					evidence: [
 						{
 							kind: "fixture_test",
@@ -3470,7 +3515,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						),
 					],
 					justification:
-						"Opaline computation from literal values: the files a native edit names or an inline script writes, and the error flag of each result. A failed result (an error no refusal, hook or interruption caused) makes its call the attempt a later edit of the same file retries; a successful one ends the chain. Script paths join the directory the command's cd named as written, so a native Edit's absolute path and a script's ~/ path do not match. Example shape: three python3 heredoc edits of one file, the first two failing on an assert.",
+						"Opaline computation from literal values: the files a native edit names or an inline script writes, and the error flag of each result. A failed result (an error no refusal, hook or interruption caused) makes its call the attempt a later edit of the same file retries; a successful one ends the chain. From parser 15 script and native edit paths are both absolute where the record's cwd is known, so a native Edit and a script's ~/ edit of the same file match; before, script paths joined the directory the command's cd named as written. Example shape: three python3 heredoc edits of one file, the first two failing on an assert.",
 					evidence: [
 						{
 							kind: "fixture_test",
@@ -3662,6 +3707,179 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 							kind: "fixture_test",
 							file: "packages/api-routes/src/session-transcript/transcript-records/inner-calls.test.ts",
 							test: "a script command names the directory it asked to run in",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "files_read",
+		view: "calls",
+		meaning:
+			"Every file a call reads, as absolute paths where its working directory is known: a Read call's file, and the files a shell command prints (cat, head, tail, less, more, bat, nl, a printing sed), counts (wc), searches (a non-recursive grep) or opens for reading from an inline Python script.",
+		agents: {
+			claude_code: stored(
+				[
+					"assistant.message.content[tool_use:Read].input.file_path",
+					"assistant.message.content[tool_use:Bash].input.command",
+					"*.cwd",
+				],
+				{ since: 15, facts: ["files_read", "files_read_more"] },
+				{
+					relation: {
+						kind: "derived",
+						from: ["calls/input_text", "calls/cwd"],
+					},
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Read].input.file_path",
+						),
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+						contextOnly("*.cwd"),
+					],
+					justification:
+						"Opaline computation from literal values: the Read input's path and the operands of the reading programs in the command text, resolved against the record's cwd (the directory the command started in), each cd before them in the same command (cd a && cd b), and ~ as the home directory the cwd lies in (/Users/<name>, /home/<name>, /root). Expansions, globs, standard input and recursive greps (directories) are never listed. Example shape: cd ~/repo && cat CLAUDE.md AGENTS.md listed only CLAUDE.md, relative, before parser 15.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a call lists every file it reads, resolved against its working directory and home",
+						},
+					],
+				},
+			),
+			codex: stored(
+				[
+					"response_item/function_call:exec_command.arguments.cmd",
+					"response_item/function_call:exec_command.arguments.workdir",
+					"event_msg/item_completed:CommandExecution.command[]",
+					"event_msg/item_completed:CommandExecution.cwd",
+				],
+				{ since: 15, facts: ["files_read", "files_read_more"] },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.workdir",
+						),
+						contextOnly("event_msg/item_completed:CommandExecution.command[]"),
+						contextOnly("event_msg/item_completed:CommandExecution.cwd"),
+					],
+					justification:
+						"Opaline computation from the command text, resolved against the command's workdir (else the turn's cwd) like a Claude Code shell call. Codex's own parse of a command's reads stays in parsed_cmd_read_paths.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a Codex command's reads resolve against its workdir",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "command_classes",
+		view: "calls",
+		meaning:
+			"The class of each program a shell command runs (test, typecheck, lint, build, migrate, install, git, other), distinct, in the order they first appear; setup commands (cd, export, echo) are left out. command_class is the one of them that comes first by precedence.",
+		agents: {
+			claude_code: stored(
+				["assistant.message.content[tool_use:Bash].input.command"],
+				{ since: 15, facts: ["command_classes"] },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+					justification:
+						"Opaline computation, the same rules as command_class applied to each simple command of the command text. Example shape: bun test x.test.ts && bun run check-types is command_class test and command_classes [test, typecheck], so a typecheck inside it is counted.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a compound command keeps the class of each program it runs",
+						},
+					],
+				},
+			),
+			codex: stored(
+				[
+					"response_item/function_call:exec_command.arguments.cmd",
+					"event_msg/item_completed:CommandExecution.command[]",
+				],
+				{ since: 15, facts: ["command_classes"] },
+				{
+					relation: { kind: "derived", from: ["calls/input_text"] },
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly("event_msg/item_completed:CommandExecution.command[]"),
+					],
+					justification:
+						"Opaline computation from the command text, as for Claude Code; a code-mode script's commands carry theirs on their own calls.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a Codex command's reads resolve against its workdir",
+						},
+					],
+				},
+			),
+		},
+	},
+	{
+		id: "compaction_of",
+		view: "runs",
+		meaning:
+			"On a compaction record that repeats one the stream already recorded with nothing but bookkeeping in between (Claude Code's summary after its compact boundary), the line of that compaction: compactions count records without it, once per compaction.",
+		agents: {
+			claude_code: stored(
+				["system/compact_boundary.content", "user.isCompactSummary"],
+				{ since: 15, facts: ["compaction_of"] },
+				{
+					relation: { kind: "derived", from: ["runs/compacted"] },
+					sourceMappings: [
+						contextOnly("system/compact_boundary.content"),
+						contextOnly("user.isCompactSummary"),
+					],
+					justification:
+						"Opaline computation from record order: Claude Code writes a compact_boundary system record and then the summary it sends on as a user record with isCompactSummary, both compaction records, for one compaction. Local transcripts 2026-10-08 to 11-07: 15 boundaries and 15 summaries, each summary right after its boundary.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a compaction's summary after its boundary is counted once",
+						},
+					],
+				},
+			),
+			codex: stored(
+				["compacted/.message", "event_msg/context_compacted"],
+				{ since: 15, facts: ["compaction_of"] },
+				{
+					relation: { kind: "derived", from: ["runs/compacted"] },
+					sourceMappings: [
+						contextOnly("compacted/.message"),
+						contextOnly("event_msg/context_compacted"),
+					],
+					justification:
+						"Opaline computation from record order, as for Claude Code: a context_compacted event next to its compacted record is the same compaction.",
+					evidence: [
+						{
+							kind: "fixture_test",
+							file: "packages/api-routes/src/session-transcript/transcript-records/capture-facts.test.ts",
+							test: "a Codex compaction event next to its compacted record is counted once",
 						},
 					],
 				},

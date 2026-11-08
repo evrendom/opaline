@@ -44,7 +44,8 @@ function guarded(sql: string) {
 				{
 					windowColumn: view.windowColumn,
 					statement: (window: SqlWindow) => {
-						windows.set(view.name, [...(windows.get(view.name) ?? []), window]);
+						const { words: _words, ...range } = window;
+						windows.set(view.name, [...(windows.get(view.name) ?? []), range]);
 						return view.sql(false, window);
 					},
 				},

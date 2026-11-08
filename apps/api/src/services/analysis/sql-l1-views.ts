@@ -199,12 +199,12 @@ function gitEventsView(owner: Owner): SqlView {
 		column(
 			"kind",
 			"LowCardinality(String)",
-			"commit_created (a commit's output), push_range (a push's output), pr_url (a PR URL the session showed), mcp_pr_created (a PR an MCP tool created), ci_check (a CI status read: gh pr checks, gh run view|watch|list, an MCP CI tool), codex_session_meta (Codex session metadata).",
+			"commit_created (a commit's output), push_range (a push: its output, else its command), pr_url (a PR URL the session showed), mcp_pr_created (a PR an MCP tool created), ci_check (a CI status read: gh pr checks, gh run view|watch|list, an MCP CI tool), codex_session_meta (Codex session metadata).",
 		),
 		column(
 			"label",
 			"LowCardinality(String)",
-			"observed; forced_update (a forced push); unconfirmed (a CI check the command does not show ran); pr_link and git_operation for events Claude Code recorded itself.",
+			"observed; forced_update (a forced push); unconfirmed (a CI check the command does not show ran); pr_link and git_operation for events Claude Code recorded itself; command (git extractor 6: a push recognised from its git push command, whose output shows no ref update, as git push -q … | tail does: no SHAs, branch only when the refspec names it).",
 		),
 		column(
 			"short_sha",

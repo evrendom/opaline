@@ -58,6 +58,7 @@ export interface SqlWindow {
 	readonly from?: string;
 	readonly to?: string;
 	readonly cohort?: string;
+	readonly words?: ReadonlySet<string>;
 }
 
 /** A view as the guard puts it in place of its name. */
@@ -329,6 +330,15 @@ function check(
 		fix: string,
 	) => ({ failure: { kind, message, fragment: fragment(token), fix } });
 
+	const words = new Set(
+		tokens.flatMap((token) =>
+			token.kind === "word" || token.kind === "quoted"
+				? [unquote(token).toLowerCase()]
+				: token.text === "*"
+					? ["*"]
+					: [],
+		),
+	);
 	const first = upper(0);
 	if (first !== "SELECT" && first !== "WITH" && first !== "FROM")
 		return fail(
@@ -615,11 +625,12 @@ function check(
 						at(upper(index + 1) === "AS" ? index + 2 : index + 1) ?? token,
 					)
 				: name;
-			const statement = view.statement(
-				context === "from" && view.windowColumn !== undefined
+			const statement = view.statement({
+				...(context === "from" && view.windowColumn !== undefined
 					? windowOf(index, named, view.windowColumn)
-					: {},
-			);
+					: {}),
+				words,
+			});
 			replacements.set(
 				index,
 				context === "in" || alias

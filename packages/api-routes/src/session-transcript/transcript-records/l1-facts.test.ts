@@ -56,6 +56,8 @@ const FIXTURES = {
 	codexSkill: "l1-facts/codex-skill-0.162.jsonl",
 	codexScript: "codex-script-era-commands.jsonl",
 	codexInner: "l1-facts/codex-inner-calls-0.153.jsonl",
+	claudeCapture: "l1-facts/claude-capture-2.1.jsonl",
+	codexCapture: "l1-facts/codex-capture-0.162.jsonl",
 } as const;
 
 /** The agent that wrote each fixture. */
@@ -117,6 +119,63 @@ interface FactCase {
 }
 
 const CASES: readonly FactCase[] = [
+	{
+		name: "a shell call lists every file it reads, resolved against its directory",
+		fixture: "claudeCapture",
+		row: { callId: "toolu_docs", kind: "tool_call" },
+		facts: {
+			extra: {
+				files_read: JSON.stringify([
+					"/Users/dev/work/app/docs/CLAUDE.md",
+					"/Users/dev/work/app/AGENTS.md",
+					"/Users/dev/work/app/docs/notes.md",
+					"/Users/dev/work/app/README.md",
+				]),
+			},
+		},
+	},
+	{
+		name: "a compound command keeps each program's class",
+		fixture: "claudeCapture",
+		row: { callId: "toolu_checks", kind: "tool_call" },
+		facts: {
+			extra: {
+				command_classes: JSON.stringify(["test", "typecheck", "other"]),
+			},
+		},
+	},
+	{
+		name: "a compaction summary names the boundary it repeats",
+		fixture: "claudeCapture",
+		row: { kind: "compaction", subtype: "compact_summary" },
+		facts: { extra: { compaction_of: "12" } },
+	},
+	{
+		name: "a hook block Claude Code records as permission-rule is a hook refusal",
+		fixture: "claudeCapture",
+		row: { callId: "toolu_hook", kind: "tool_result" },
+		facts: { denialKind: "hook" },
+	},
+	{
+		name: "a Codex command lists the files it reads against its workdir",
+		fixture: "codexCapture",
+		row: { callId: "call_read", kind: "tool_call" },
+		facts: {
+			extra: {
+				files_read: JSON.stringify([
+					"/Users/dev/work/app/pkg/AGENTS.md",
+					"/Users/dev/notes.md",
+				]),
+				command_classes: JSON.stringify(["other", "typecheck"]),
+			},
+		},
+	},
+	{
+		name: "a Codex compaction event names the compacted record it repeats",
+		fixture: "codexCapture",
+		row: { kind: "compaction", nth: 1 },
+		facts: { extra: { compaction_of: "6" } },
+	},
 	{
 		name: "a script failure an inner call threw names that call",
 		fixture: "codexInner",
@@ -944,7 +1003,7 @@ const CASES: readonly FactCase[] = [
 		name: "a refused Claude rm preserves its requested delete operation",
 		fixture: "claude",
 		row: { callId: "toolu_rm", kind: "file_change" },
-		columns: { fileOp: "delete", filePath: "node_modules" },
+		columns: { fileOp: "delete", filePath: "/repo/node_modules" },
 	},
 	{
 		name: "Claude native edit",
@@ -1413,7 +1472,8 @@ describe("parser facts", () => {
 /** Facts checked by the named tests above rather than a case, per agent. */
 const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 	// The fact budget tests; received setup in received-setup.test.ts.
-	// The cap of shell_read_paths in shell-access.test.ts, of images in image-facts.test.ts.
+	// The cap of shell_read_paths in shell-access.test.ts, of images in image-facts.test.ts,
+	// of files_read (one list builder for both agents) in capture-facts.test.ts.
 	claude_code: new Set([
 		"body_sha256",
 		"facts_truncated",
@@ -1421,6 +1481,7 @@ const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 		"images_more",
 		"received_setup",
 		"shell_read_paths_more",
+		"files_read_more",
 		...V9_REGRESSION_COVERAGE.claude_code,
 	]),
 	// The fact budget and goal text tests; received setup in received-setup.test.ts.
@@ -1430,6 +1491,7 @@ const COVERED_ELSEWHERE: Readonly<Record<FactAgent, ReadonlySet<string>>> = {
 		"text_cut",
 		"goal",
 		"received_setup",
+		"files_read_more",
 		...V9_REGRESSION_COVERAGE.codex,
 	]),
 };

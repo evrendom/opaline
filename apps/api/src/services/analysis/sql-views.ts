@@ -110,6 +110,8 @@ const COLUMN_TRAPS: Readonly<Record<string, string>> = {
 	run_id: "run takes it as id to open the run in the run view.",
 	session_id:
 		"A Codex subagent thread is a session of its own, so its runs have another session_id.",
+	compactions:
+		"One per compaction from parser 15; parser 14 and older counted a Claude Code compaction twice (its boundary and the summary sent after it).",
 	started_at: "UTC.",
 	ended_at: "UTC.",
 	session_date: "UTC.",

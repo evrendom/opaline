@@ -15,6 +15,7 @@ import {
 	classifyCommand,
 	combineCommandClasses,
 	extractShellFileMutations,
+	type ShellContext,
 } from "./command-class.js";
 import { isCodexRunningOutput, readCodexExitCode } from "./exit-code.js";
 import { GUARD_DENIAL_KIND, readGuardRefusal } from "./guard-refusal.js";
@@ -30,6 +31,8 @@ import {
 	readString,
 	type StreamState,
 	safeStringify,
+	setStreamCwd,
+	shellContext,
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
@@ -52,6 +55,7 @@ import {
 	factText,
 	mergeFacts,
 } from "./record-facts.js";
+import { callReadFacts, resolveToolPath } from "./shell-call-facts.js";
 import type { CommandClass } from "./types.js";
 import { withV9Facts } from "./v9-facts.js";
 
@@ -139,7 +143,7 @@ function readCodexRecord(
 			// The file's own session_meta comes first; a parent's replayed copy
 			// keeps the working directory the file's own named.
 			const cwd = recordCwd(record, "codex");
-			if (state.cwd === "" && cwd !== undefined) state.cwd = cwd;
+			if (state.cwd === "" && cwd !== undefined) setStreamCwd(state, cwd);
 			readSessionMetadata(payload, state);
 			return {
 				items: [
@@ -181,7 +185,7 @@ function readCodexRecord(
 			};
 		case "turn_context": {
 			const cwd = recordCwd(record, "codex");
-			if (cwd !== undefined && cwd !== "") state.cwd = cwd;
+			if (cwd !== undefined && cwd !== "") setStreamCwd(state, cwd);
 			return {
 				items: [metaItem(type, { facts: codexTurnContextFacts(payload) })],
 				timestamp,
@@ -614,12 +618,18 @@ function readCall(
 	const scriptCommands = state.codexCommandItems
 		? []
 		: (description.scriptCommands ?? []);
+	const context = codexShellContext(state, readString(argsObject?.workdir));
+	const shellCommands =
+		payloadType === "custom_tool_call" && toolName.toLowerCase() === "exec"
+			? []
+			: description.commands;
 	const callFacts = mergeFacts(
 		timeout.extra === undefined ? undefined : timeout,
 		unresolved > 0 && !state.codexCommandItems
 			? { extra: { script_commands_unresolved: String(unresolved) } }
 			: undefined,
 		description.commands.length > 0 ? workdirFacts(argsObject) : undefined,
+		callReadFacts({ commands: shellCommands, context }),
 	);
 	const items: LineItem[] = [
 		{
@@ -631,7 +641,14 @@ function readCall(
 			toolName,
 		},
 	];
-	for (const file of description.patchFiles) {
+	const patchFiles = description.patchFiles.map((file) => ({
+		...file,
+		path: resolveToolPath(file.path, context),
+		...(file.movePath === undefined
+			? {}
+			: { movePath: resolveToolPath(file.movePath, context) }),
+	}));
+	for (const file of patchFiles) {
 		items.push(...patchFileItems(file, callId, toolName));
 	}
 	if (payloadType === "custom_tool_call" && toolName.toLowerCase() === "exec") {
@@ -640,7 +657,7 @@ function readCall(
 			inner: [],
 			open: true,
 			patchPaths: new Set(
-				description.patchFiles.flatMap((file) =>
+				patchFiles.flatMap((file) =>
 					file.movePath === undefined
 						? [file.path]
 						: [file.path, file.movePath],
@@ -650,7 +667,7 @@ function readCall(
 	}
 	const seen = new Set<string>();
 	for (const command of description.commands) {
-		for (const mutation of extractShellFileMutations(command)) {
+		for (const mutation of extractShellFileMutations(command, context)) {
 			const key = `${mutation.basis}\u0000${mutation.operation}\u0000${mutation.path}`;
 			if (seen.has(key)) continue;
 			seen.add(key);
@@ -661,12 +678,17 @@ function readCall(
 	scriptCommands.forEach((command, index) => {
 		const commandCallId = `${callId}#${index + 1}`;
 		const scriptCommandClass = classifyCommand(command);
+		const workdir = description.scriptWorkdirs?.[index];
 		items.push({
 			callId: commandCallId,
 			commandClass: scriptCommandClass,
 			facts: mergeFacts(
 				{ extra: { script_call_id: factText(callId, 256) } },
-				workdirFacts({ workdir: description.scriptWorkdirs?.[index] }),
+				workdirFacts({ workdir }),
+				callReadFacts({
+					commands: [command],
+					context: codexShellContext(state, workdir),
+				}),
 			),
 			kind: "tool_call",
 			subtype: "script",
@@ -978,6 +1000,18 @@ function firstLine(text: string): string {
 function outputSegments(output: unknown, decoded: string): string[] {
 	if (!Array.isArray(output)) return [decoded];
 	return output.map((block) => readTranscriptToolOutputText([block]) ?? "");
+}
+
+function codexShellContext(
+	state: StreamState,
+	workdir: string | undefined,
+): ShellContext {
+	return shellContext(
+		state,
+		workdir === undefined
+			? state.cwd
+			: resolveToolPath(workdir, shellContext(state)),
+	);
 }
 
 function workdirFacts(args: Record<string, unknown> | undefined) {

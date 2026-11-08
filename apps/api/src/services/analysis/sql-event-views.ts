@@ -74,6 +74,7 @@ const FACT_KEYS = [
 	"prevented_continuation",
 	"turn_error",
 	"turn_error_kind",
+	"compaction_of",
 ] as const;
 type FactKey = (typeof FACT_KEYS)[number];
 const fact = (key: string) => `f_${key}`;
@@ -247,7 +248,7 @@ function eventsOfRecordSql(): string {
 						arrayMap(entry -> CAST(tuple('hook_error', '', NULL, ${errorText}), '${EVENT_TUPLE}'),
 							JSONExtractArrayRaw(${f("hook_errors")})),
 						${one("turn_error", `source = 'codex' AND subtype = 'task_complete' AND ${kind} = '' AND ${f("turn_error")} != ''`)},
-						${one("compaction", RUN_EVENT_RECORDS.isCompaction)})`;
+						${one("compaction", RUN_EVENT_RECORDS.isCompaction(f))})`;
 	return `${events} AS record_events,
 					arrayJoin(if(empty(record_events) AND source = 'claude_code' AND kind = 'meta',
 						[CAST(tuple('notice', '', NULL, head), '${EVENT_TUPLE}')], record_events)) AS event`;

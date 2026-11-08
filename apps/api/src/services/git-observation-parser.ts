@@ -6,8 +6,9 @@ import {
 } from "@rudel/api-routes/transcript-records";
 import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated";
 import { filterKnownSecrets } from "@rudel/secret-filter";
+import { commandPushes } from "./git-push-command.js";
 
-export const GIT_OBSERVATION_PARSER_VERSION = 5;
+export const GIT_OBSERVATION_PARSER_VERSION = 6;
 export const GIT_OBSERVATION_MAX_RAW_BYTES = 1024 * 1024;
 export const GIT_OBSERVATION_MAX_ROWS = 10_000;
 export const GIT_TOOL_PATTERN =
@@ -224,8 +225,18 @@ export function parseGitObservations(
 					!/\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*\s(?:--dry-run|-[A-Za-z]*n[A-Za-z]*)(?=\s|["']|$)/u.test(
 						call.text,
 					)
-				)
-					for (const push of pushLines(record.text)) add(push);
+				) {
+					const shown = pushLines(record.text);
+					for (const push of shown) add(push);
+					if (shown.length === 0 && ranCleanly(record) && !recordedPush(record))
+						for (const push of commandPushes(shellCommand(call) ?? ""))
+							add({
+								kind: "push_range",
+								label: "command",
+								branch: safeText(push.branch),
+								push_source_branch: safeText(push.sourceBranch),
+							});
+				}
 			}
 		}
 		if (
@@ -578,6 +589,23 @@ function mcpFailed(text: string): boolean {
 	if (/"success"\s*:\s*false|"error"\s*:\s*(?:"[^"\n]+"|\{)/iu.test(text))
 		return true;
 	return /^\s*(?:error|failed|failure)\b/iu.test(text);
+}
+
+function ranCleanly(record: GitObservationRecord): boolean {
+	return (
+		!record.is_error &&
+		(record.exit_code === null || record.exit_code === 0) &&
+		!/^\s*(?:error: failed to push|fatal:)|\[(?:remote )?rejected\]|^Everything up-to-date/mu.test(
+			record.text,
+		)
+	);
+}
+
+function recordedPush(record: GitObservationRecord): boolean {
+	return (
+		(record.git_operation ?? []).includes("push") &&
+		(record.facts?.["git.push.branch"] ?? "") !== ""
+	);
 }
 
 /**

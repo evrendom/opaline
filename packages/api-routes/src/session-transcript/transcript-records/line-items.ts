@@ -1,4 +1,9 @@
-import type { ScriptFileEdit, ShellFileMutation } from "./command-class.js";
+import {
+	homeOf,
+	type ScriptFileEdit,
+	type ShellContext,
+	type ShellFileMutation,
+} from "./command-class.js";
 import type { UserTextClassification } from "./injected-wrappers.js";
 import type { ReceivedSetupSource } from "./received-setup.js";
 import type { ShellExitShape } from "./shell-exit.js";
@@ -106,6 +111,8 @@ export interface StreamState {
 	codexPendingWebSearchMirrors: number;
 	/** Working directory of the stream's latest line that recorded one; '' before. */
 	cwd: string;
+	home: string;
+	openCompaction: number;
 	/** How the agent was started (Claude `entrypoint`, Codex `originator`). */
 	entrypoint: string;
 	isSubagent: boolean;
@@ -143,11 +150,28 @@ export function createStreamState(
 		codexPendingWebSearchMirrors: 0,
 		cwd: "",
 		entrypoint: "",
+		home: "",
 		isSubagent,
+		openCompaction: 0,
 		lastPromptText: "",
 		lastTs: fallbackTs,
 		responseSincePrompt: false,
 		turnIdx: 0,
+	};
+}
+
+export function setStreamCwd(state: StreamState, cwd: string): void {
+	state.cwd = cwd;
+	if (state.home === "") state.home = homeOf(cwd) ?? "";
+}
+
+export function shellContext(
+	state: StreamState,
+	cwd = state.cwd,
+): ShellContext {
+	return {
+		...(cwd === "" ? {} : { cwd }),
+		...(state.home === "" ? {} : { home: state.home }),
 	};
 }
 

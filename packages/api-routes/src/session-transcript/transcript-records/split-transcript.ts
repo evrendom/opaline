@@ -251,11 +251,12 @@ export function* splitTranscript(
 		let blockIdx = 0;
 		for (const lineItem of result.items) {
 			const images = lineImages[blockIdx] ?? [];
-			const item: LineItem =
+			const imaged: LineItem =
 				images.length === 0
 					? lineItem
 					: { ...lineItem, facts: withImageFacts(lineItem.facts, images) };
-			applyTurnState(state, item);
+			applyTurnState(state, imaged);
+			const item = withCompactionOf(state, imaged, lineNumber);
 			const cap = options.fullText
 				? Number.MAX_SAFE_INTEGER
 				: storedTextCap(item.kind, textMaxChars);
@@ -415,6 +416,9 @@ export function budgetFacts(
 const UNBUDGETED_FACTS: ReadonlySet<string> = new Set([
 	"applied_changes",
 	"body_sha256",
+	"command_classes",
+	"compaction_of",
+	"files_read",
 	"denial_reason",
 	"error_from_call_id",
 	"script_call_id",
@@ -429,6 +433,33 @@ function isBudgetedFact(key: string, value: string | undefined): boolean {
 		value.length > TRANSCRIPT_RECORD_FACT_SHORT_CHARS &&
 		!UNBUDGETED_FACTS.has(key)
 	);
+}
+
+// Claude Code writes a compact boundary and then the summary it sends on for one compaction.
+function withCompactionOf(
+	state: StreamState,
+	item: LineItem,
+	lineNumber: number,
+): LineItem {
+	if (item.kind !== "compaction") {
+		if (item.kind === "user_prompt" || RESPONSE_KINDS.has(item.kind))
+			state.openCompaction = 0;
+		return item;
+	}
+	if (state.openCompaction === 0) {
+		state.openCompaction = lineNumber;
+		return item;
+	}
+	return {
+		...item,
+		facts: {
+			...item.facts,
+			extra: {
+				...item.facts?.extra,
+				compaction_of: String(state.openCompaction),
+			},
+		},
+	};
 }
 
 function applyTurnState(state: StreamState, item: LineItem): void {

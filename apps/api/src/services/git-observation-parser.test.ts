@@ -773,11 +773,43 @@ test("check rows without a URL confirm a lone check; several checks keep their o
 	]);
 });
 
-test("parser version 5 starts a new observation generation", () => {
+test("a push its output does not show is recognised from its command", () => {
+	const pushes = parseGitObservations(
+		recordsInput([
+			call("quiet", "git push -q origin HEAD:feature/docs 2>&1 | tail -3"),
+			result("quiet", "remote: Create a pull request for 'feature/docs'"),
+			call("shown", "git push origin fix/a"),
+			result(
+				"shown",
+				"To github.com:acme/app.git\n   1a2b3c4..5d6e7f8  fix/a -> fix/a",
+			),
+			call("dry", "git push --dry-run origin main"),
+			result("dry", ""),
+			call("fallback", "git push || git push --force-with-lease"),
+			result("fallback", ""),
+			call("loop", "for b in a b; do git push -q -u origin $b; done"),
+			result("loop", "error: script exited with code 1"),
+			call("rejected", "git push -q 2>&1 | tail -2"),
+			result("rejected", " ! [rejected]        main -> main (fetch first)"),
+			call("failed", "cd app && git push -u origin x"),
+			result("failed", "fatal: no remote", { is_error: true, exit_code: 128 }),
+		]),
+	)
+		.filter((row) => row.kind === "push_range")
+		.map((row) => [row.call_id, row.label, row.branch, row.push_to_sha]);
+	expect(pushes).toEqual([
+		["quiet", "command", "feature/docs", ""],
+		["shown", "observed", "fix/a", "5d6e7f8"],
+		["fallback", "command", "", ""],
+		["loop", "command", "", ""],
+	]);
+});
+
+test("parser version 6 starts a new observation generation", () => {
 	const [row] = parseGitObservations(
 		recordsInput([call("c", "gh run view 1"), result("c", "ok")]),
 	);
-	expect(row?.parser_version).toBe(5 * 256 + 4);
+	expect(row?.parser_version).toBe(6 * 256 + 4);
 });
 
 test("recorded gitOperation and pr-link facts add what the output text did not show", async () => {

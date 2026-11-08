@@ -139,3 +139,21 @@ describe("a time range bounds every transcript read of the calls and prompts vie
 		expect(unbounded).not.toContain("opaline_window_sessions");
 	});
 });
+
+describe("the calls view computes each program of a command only for a query that reads it", () => {
+	test("command_programs and command_prefixes are in the statement only when the query names them or a star", async () => {
+		const programs = (query: string) =>
+			sent(query).then((statement) =>
+				statement.includes("command_program_starts"),
+			);
+		expect(
+			await programs("SELECT tool_name, count() FROM calls GROUP BY tool_name"),
+		).toBe(false);
+		expect(
+			await programs(
+				"SELECT count() FROM calls WHERE has(command_prefixes, 'git push')",
+			),
+		).toBe(true);
+		expect(await programs("SELECT * FROM calls LIMIT 1")).toBe(true);
+	});
+});

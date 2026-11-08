@@ -109,6 +109,7 @@ const RECORD_FACT_KEYS = [
 	"per_turn_effort",
 	"compact_trigger",
 	"compact_pre_tokens",
+	"compaction_of",
 	"aborted",
 	"stop_reason",
 	"hook_stop_reason",
@@ -177,7 +178,8 @@ type RunEventFact = (
 		| "api_errors_components"
 		| "retry_attempt"
 		| "refusal_category"
-		| "hook_count",
+		| "hook_count"
+		| "compaction_of",
 ) => string;
 
 /**
@@ -208,8 +210,8 @@ export const RUN_EVENT_RECORDS = {
 		`(${fact("refusal_category")} != '' OR (${agentId} != '' AND kind = 'injected_context' AND subtype = 'safety_recovery'))`,
 	/** `hook_count` sums this over the run's records. */
 	hooks: (fact: RunEventFact) => `toUInt64OrZero(${fact("hook_count")})`,
-	/** `compactions` counts the records where this holds. */
-	isCompaction: "kind = 'compaction'",
+	isCompaction: (fact: RunEventFact) =>
+		`kind = 'compaction' AND ${fact("compaction_of")} = ''`,
 } as const;
 
 /** The first value of `expression` in record order among rows where it is set. */
@@ -549,7 +551,7 @@ function literalRunFacts(): string {
 					groupUniqArrayIf(${f("skill")}, ${f("skill")} != ''),
 					arrayFlatten(groupArray(${codexSkills}))))) AS l_skills`,
 		`arraySort(groupUniqArrayIf(${slashCommand}, ${slashCommand} != '')) AS l_slash_commands`,
-		`countIf(${RUN_EVENT_RECORDS.isCompaction}) AS l_compactions`,
+		`countIf(${RUN_EVENT_RECORDS.isCompaction(f)}) AS l_compactions`,
 		`countIf(${f("aborted")} = 'true' AND lifecycle = 0) AS l_aborted_true`,
 		`countIf(${f("aborted")} = 'false' AND lifecycle = 0) AS l_aborted_false`,
 		`countIf(subtype = 'interrupt' AND kind IN ('meta', 'injected_context')) AS l_interrupt_markers`,

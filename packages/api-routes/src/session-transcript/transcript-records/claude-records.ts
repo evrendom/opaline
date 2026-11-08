@@ -34,6 +34,8 @@ import {
 	type StreamState,
 	safeStringify,
 	scriptFileChangeItem,
+	setStreamCwd,
+	shellContext,
 	shellFileChangeItem,
 } from "./line-items.js";
 import {
@@ -62,6 +64,7 @@ import {
 	mergeFacts,
 	setList,
 } from "./record-facts.js";
+import { callReadFacts, resolveToolPath } from "./shell-call-facts.js";
 import {
 	isEmptyClaudeShellOutput,
 	readShellExitFacts,
@@ -118,7 +121,7 @@ function readClaudeRecord(
 	const entrypoint = readString(record.entrypoint);
 	if (entrypoint !== undefined) state.entrypoint = factText(entrypoint, 64);
 	const cwd = readString(record.cwd);
-	if (cwd !== undefined) state.cwd = cwd;
+	if (cwd !== undefined) setStreamCwd(state, cwd);
 	if (type === "assistant") {
 		if (record.isApiErrorMessage === true) {
 			return {
@@ -319,14 +322,17 @@ function readToolUse(
 	let exitShape: ShellExitShape | undefined;
 	let shellFacts: LineFacts | undefined;
 
+	const context = shellContext(state);
+	let readFacts: LineFacts | undefined;
 	if (lowered === "bash") {
 		const command = readString(input.command) ?? "";
 		commandClass = classifyCommand(command);
-		const scriptEdits = extractScriptFileAccess(command, state.cwd);
+		const scriptEdits = extractScriptFileAccess(command, context);
 		const written = new Set(scriptEdits.map((edit) => edit.path));
-		const reads = extractShellFileReads(command).filter(
+		const reads = extractShellFileReads(command, context).filter(
 			(path) => !written.has(path),
 		);
+		readFacts = callReadFacts({ commands: [command], context });
 		// The call names the file it edits, else the first it reads.
 		const filePath = scriptEdits[0]?.path ?? reads[0] ?? "";
 		items.push({
@@ -340,7 +346,7 @@ function readToolUse(
 			text: command,
 			toolName,
 		});
-		for (const mutation of extractShellFileMutations(command)) {
+		for (const mutation of extractShellFileMutations(command, context)) {
 			items.push(shellFileChangeItem(mutation, callId, toolName));
 		}
 		for (const edit of scriptEdits)
@@ -359,7 +365,7 @@ function readToolUse(
 			input,
 			name: toolName,
 			type: "tool_use",
-		});
+		}).map((path) => resolveToolPath(path, context));
 		if (mutationFiles.length > 0) {
 			const path = mutationFiles[0] ?? "";
 			editKeys = mutationFiles;
@@ -380,11 +386,15 @@ function readToolUse(
 				toolName,
 			});
 		} else {
-			const path =
+			const path = resolveToolPath(
 				readString(input.file_path) ??
-				readString(input.notebook_path) ??
-				readString(input.path) ??
-				"";
+					readString(input.notebook_path) ??
+					readString(input.path) ??
+					"",
+				context,
+			);
+			if (lowered === "read" && path !== "")
+				readFacts = callReadFacts({ context, reads: [path] });
 			items.push({
 				callId,
 				...(lowered === "read" && path !== ""
@@ -410,6 +420,7 @@ function readToolUse(
 			? undefined
 			: { extra: { skill: factText(skill, 128) } },
 		shellFacts,
+		readFacts,
 		retried === undefined ? undefined : { extra: { retry_of: retried } },
 	);
 	if (Object.keys(ownFacts).length > 0 && items[0] !== undefined) {
@@ -522,6 +533,7 @@ function readUserMessage(
 				single ? toolUseResult : undefined,
 				single ? readString(record.toolDenialKind) : undefined,
 				single ? readString(record.toolUseResult) : undefined,
+				single && isHookRejection(record.permissionDecision),
 			),
 		);
 	}
@@ -610,6 +622,7 @@ function readToolResult(
 	recordedDenialKind: string | undefined,
 	/** `toolUseResult` in its string form (errors and refusals). */
 	toolUseResultText: string | undefined,
+	hookRejected = false,
 ): LineItem {
 	const callId = readString(block.tool_use_id) ?? "";
 	const known = callId === "" ? undefined : state.calls.get(callId);
@@ -617,20 +630,20 @@ function readToolResult(
 	const isError = block.is_error === true;
 	const exitCode = isError ? readClaudeExitCode(text) : null;
 	const hook = isError ? readClaudeHookError(text) : undefined;
+	// Claude Code records a PreToolUse hook's block as `permission-rule`; the
+	// hook error text and `permissionDecision.source` name the hook.
+	const hookRefused = hook?.blocked === true || hookRejected;
 	const guard =
 		recordedDenialKind === undefined &&
 		hook === undefined &&
+		!hookRefused &&
 		(isError || known?.toolName.toLowerCase() === "bash")
 			? readGuardRefusal([text])
 			: undefined;
-	// A PreToolUse hook that errors stops the call before it runs: a refusal.
-	const denialKind =
-		recordedDenialKind ??
-		(hook?.blocked === true
-			? "hook"
-			: guard === undefined
-				? undefined
-				: GUARD_DENIAL_KIND);
+	const denialKind = hookRefused
+		? "hook"
+		: (recordedDenialKind ??
+			(guard === undefined ? undefined : GUARD_DENIAL_KIND));
 	const handOff = isError
 		? undefined
 		: readClaudeBackgroundHandOff(text, toolUseResult, known?.toolName ?? "");
@@ -712,6 +725,14 @@ function readToolResult(
 		text,
 		toolName: known?.toolName ?? "",
 	};
+}
+
+function isHookRejection(decision: unknown): boolean {
+	return (
+		isRecord(decision) &&
+		decision.decision === "reject" &&
+		decision.source === "hook"
+	);
 }
 
 /** The hook event of a hook error, and why a blocking hook refused the call. */

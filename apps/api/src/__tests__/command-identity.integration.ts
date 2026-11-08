@@ -62,6 +62,34 @@ test("argv0 and prefix name the program a command runs, never a script's", async
 	).toEqual(PROGRAMS.map(([, from, argv0, prefix]) => [from, argv0, prefix]));
 });
 
+test("a compound command keeps each program it runs, the first one first", async () => {
+	const rows = await columns([
+		{
+			text: "cd ~/repo && bun test x.test.ts && bun run check-types 2>&1 | tail -3",
+		},
+		{ text: "git add -A; git commit -qm 'a && b' && git push -q origin HEAD" },
+		{ text: "echo == types; FOO=1 timeout 60 uv run pytest -q | grep error" },
+		{ text: "python3 - <<'EOF'\nimport os\nEOF" },
+		{
+			tool: "exec",
+			text: "await tools.exec_command({cmd: 'ls'}); await tools.exec_command({cmd: 'pwd'})",
+		},
+	]);
+	expect(
+		rows.map((row) => [
+			row.command_argv0,
+			row.command_programs,
+			row.command_prefixes,
+		]),
+	).toEqual([
+		["bun", ["bun", "tail"], ["bun test", "bun run", "tail"]],
+		["git", ["git"], ["git add", "git commit", "git push"]],
+		["pytest", ["pytest", "grep"], ["pytest", "grep error"]],
+		["python3", ["python3"], ["python3"]],
+		[null, [], []],
+	]);
+});
+
 test("a near-duplicate script is within the simhash distance, and a one-liner has no simhash", async () => {
 	const [first, second, short] = await columns([
 		...NEAR_DUPLICATES,

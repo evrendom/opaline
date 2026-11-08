@@ -75,7 +75,7 @@ describe("the events view adds up to the runs columns", () => {
 			RUN_EVENT_RECORDS.isApiError(fact, "provider_error_kind"),
 			RUN_EVENT_RECORDS.isRetry(fact),
 			RUN_EVENT_RECORDS.hooks(fact),
-			RUN_EVENT_RECORDS.isCompaction,
+			RUN_EVENT_RECORDS.isCompaction(fact),
 		]) {
 			expect(view).toContain(predicate);
 			expect(runIndex).toContain(predicate);

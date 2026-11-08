@@ -9,6 +9,7 @@ import {
 	readString,
 	type StreamState,
 	safeStringify,
+	shellContext,
 } from "./line-items.js";
 import { codexSkillRead } from "./received-setup.js";
 import {
@@ -18,6 +19,7 @@ import {
 	mcpFacts,
 	mergeFacts,
 } from "./record-facts.js";
+import { callReadFacts } from "./shell-call-facts.js";
 import type { FileOperation } from "./types.js";
 
 /**
@@ -174,7 +176,7 @@ function readNewItem(
 ): LineItem[] | undefined {
 	switch (type) {
 		case "CommandExecution":
-			return readCommandExecution(id, item);
+			return readCommandExecution(id, item, state);
 		case "McpToolCall":
 			return readToolItem(
 				id,
@@ -218,8 +220,14 @@ function readNewItem(
 function readCommandExecution(
 	id: string,
 	item: Record<string, unknown>,
+	state: StreamState,
 ): LineItem[] {
 	const command = argvToCommand(item.command);
+	const cwd = readString(item.cwd);
+	const callFacts = callReadFacts({
+		commands: [command],
+		context: shellContext(state, cwd ?? state.cwd),
+	});
 	const commandClass = classifyCommand(command);
 	const exitCode = readFiniteInteger(item.exit_code);
 	const base = {
@@ -242,7 +250,12 @@ function readCommandExecution(
 		codexItemFacts(item),
 	);
 	return [
-		{ ...base, kind: "tool_call", text: command },
+		{
+			...base,
+			...(callFacts === undefined ? {} : { facts: callFacts }),
+			kind: "tool_call",
+			text: command,
+		},
 		{
 			...base,
 			exitCode,

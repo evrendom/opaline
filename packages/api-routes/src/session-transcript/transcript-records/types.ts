@@ -28,7 +28,7 @@ import { V9_FACT_KEYS } from "./v9-fact-sources.js";
  * Each record also carries its line's own id (`record_uuid`, Claude `uuid`),
  * and the images its line carried (`images`, from their upload markers).
  */
-export const TRANSCRIPT_RECORDS_PARSER_VERSION = 14;
+export const TRANSCRIPT_RECORDS_PARSER_VERSION = 15;
 
 /** First parser version that fills the typed fact columns and `facts` (docs/l1-literal-schema.md, step 7). */
 export const TRANSCRIPT_RECORD_FACTS_SINCE_PARSER_VERSION = 6;
@@ -66,6 +66,10 @@ export const TRANSCRIPT_RECORD_FACT_SHORT_CHARS = 32;
  */
 export const TRANSCRIPT_RECORD_FACT_KEYS = {
 	...V9_FACT_KEYS,
+	files_read: 15,
+	files_read_more: 15,
+	command_classes: 15,
+	compaction_of: 15,
 	error_from_call_id: 14,
 	turn_cwd: 14,
 	workdir: 14,

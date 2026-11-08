@@ -1,6 +1,11 @@
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { commandColumnsSql, SHELL_TOOLS } from "./command-identity.js";
+import {
+	COMMAND_CLASSES_SQL,
+	commandProgramColumnsSql,
+	FILES_READ_SQL,
+} from "./command-programs.js";
 import { PREAMBLE, STRONG } from "./failure-classifier.js";
 import {
 	SETUP_SINCE_INDEX_VERSION,
@@ -426,7 +431,7 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		meaning:
 			"What the call does to file_path as the parser read it: read (a Read call, or a shell command that reads the file), else the first change it makes (write, edit, delete); empty otherwise.",
 		traps: [
-			"A shell command's file_path is as written, often relative to cwd: match it to an absolute path by its end.",
+			"From parser 15 absolute where the call's working directory is known (its cwd, each cd before it, ~ as the home); parser 14 and older kept a shell command's path as written, often relative to cwd: match those by their end.",
 		],
 	},
 	{
@@ -436,7 +441,15 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 			"What the shell command does, by its program and subcommand: test, typecheck, lint, build, migrate, install, git or other; a compound command takes its first class in that order. Empty when the call carries no shell command.",
 		traps: [
 			"Rules over the command text only: a script named test.sh is test, a test runner hidden behind a make target is other.",
+			"One class per call: bun test && bun run check-types is test. Count typechecks inside compound commands with has(command_classes, 'typecheck').",
 		],
+	},
+	{
+		name: "command_classes",
+		type: "Array(String)",
+		meaning:
+			"The class of each program the shell command runs (test, typecheck, lint, build, migrate, install, git, other), distinct, in the order they first run, setup commands (cd, export, echo) left out; command_class is the one that comes first by precedence. Empty when the call carries no shell command.",
+		traps: ["From parser 15; older calls hold their one command_class."],
 	},
 	{
 		name: "command_from",
@@ -477,6 +490,24 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		meaning:
 			"The program and its subcommand: git push, gh pr, bun test, python3 -m pytest; the program alone otherwise.",
 		traps: ["NULL for scripts and calls without a command."],
+	},
+	{
+		name: "command_programs",
+		type: "Array(String)",
+		meaning:
+			"Each program the shell command runs, read like command_argv0 from every statement of its chains and pipelines (&&, ||, ;, |, newlines), setup statements and shell keywords left out, distinct, in the order they first run: cd x && bun run check-types | tail -3 is [bun, tail].",
+		traps: [
+			"Empty for scripts, calls without a command and a command only partly stored. A here-document's body and what follows it are not read.",
+		],
+	},
+	{
+		name: "command_prefixes",
+		type: "Array(String)",
+		meaning:
+			"Each program with its subcommand, as command_prefix reads it, for every statement command_programs lists: git add -A && git push is [git add, git push].",
+		traps: [
+			"Filter with has(command_prefixes, 'git push') to find a program anywhere in a chain; command_prefix is the first only.",
+		],
 	},
 	{
 		name: "command_fingerprint",
@@ -524,7 +555,7 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 			"Every file the call asks to change, in order: an edit tool's file, each file of a patch (apply_patch, or a patch a Codex script ran), a file a shell command writes or deletes (a redirect, tee, sed -i, perl -i, mv, cp, rm, touch, git checkout/restore/rm), and a file an inline Python script of a Claude Code shell call writes (python3 - <<EOF or python3 -c with open(..., 'w'), write_text and the like). changed_file_ops holds each one's write, edit or delete, changed_files_basis how it was found. Every count of file edits reads these.",
 		traps: [
 			"A request, not proof: a failed or refused call (failed = 1) changed nothing, and a shell write after && or || (cd dir && python3 - <<EOF) may not have run even when the call succeeded. A patch's files sit on the call that holds the patch text: the script whose source has it, or the inner apply_patch call that adds files the source did not name.",
-			"Paths as written: absolute from Codex patches, sometimes relative to cwd from shell commands. Files under /tmp, /private/tmp, /var/folders and /dev are left out of shell writes.",
+			"From parser 15 shell paths are absolute where the call's working directory is known (its cwd, each cd before it, ~ as the home); parser 14 and older kept them as written, sometimes relative to cwd, as Codex patch paths may be. Files under /tmp, /private/tmp, /var/folders and /dev are left out of shell writes.",
 			"Not read from shell text: Codex inline Python scripts, node/bun/ruby scripts (writeFileSync and the like), and a git index-only change (git rm --cached).",
 		],
 	},
@@ -540,6 +571,16 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		meaning:
 			"How each of changed_files was found: tool (an edit tool's request or a patch), shell (read from a shell command's text) or script (read from an inline Python script's text).",
 		traps: [],
+	},
+	{
+		name: "files_read",
+		type: "Array(String)",
+		meaning:
+			"Every file the call reads, in order: a Read call's file, and the files a shell command prints (cat, head, tail, less, more, bat, nl, a printing sed), counts (wc), searches (a non-recursive grep) or opens for reading from an inline Python script; absolute where the call's working directory is known.",
+		traps: [
+			"From parser 15. Parser 12 to 14 list a Read call's file or a shell command's printed and Python-read files, as written (often relative); older parsers a Read call's file only.",
+			"Read from the command text: a file read through a variable, a glob, a recursive grep (a directory) or a script file the command runs is not listed.",
+		],
 	},
 	{
 		name: "edit_route",
@@ -680,6 +721,11 @@ export function callsSql(
 	const fresh = `facts['fork_replayed'] != 'true'
 				AND (user_id, session_id, agent_id, call_id) NOT IN (SELECT user_id, session_id, agent_id, call_id FROM replayed_calls)`;
 	const generation = "user_id, session_id, revision, parser_version, agent_id";
+	const programs =
+		window.words === undefined ||
+		["command_programs", "command_prefixes", "*"].some((word) =>
+			window.words?.has(word),
+		);
 	/**
 	 * What the call's first record says, each its own aggregate, so a query
 	 * that reads none of the command columns reads no stored text.
@@ -692,17 +738,24 @@ export function callsSql(
 		"file_path",
 		"file_op",
 		"command_class",
+		"command_classes",
 		"command_from",
 		"command",
 		"command_chars",
 		"command_argv0",
 		"command_prefix",
+		"command_programs",
+		"command_prefixes",
 		"command_fingerprint",
 		"command_simhash",
 		"command_head",
 		"record_idx",
 		"block_idx",
-	];
+		"files_read",
+	].filter(
+		(name) =>
+			programs || (name !== "command_programs" && name !== "command_prefixes"),
+	);
 	const call = "kind = 'tool_call'";
 	const result = "kind = 'tool_result'";
 	const mirror = CALL_COMPLETION_SQL;
@@ -746,7 +799,13 @@ export function callsSql(
 			${first
 				.filter(
 					(name) =>
-						!["turn_idx", "tool_name", "subtype", "parent"].includes(name),
+						![
+							"turn_idx",
+							"tool_name",
+							"subtype",
+							"parent",
+							"files_read",
+						].includes(name),
 				)
 				.map((name) =>
 					name === "file_path"
@@ -759,7 +818,7 @@ export function callsSql(
 				)
 				.join(", ")},
 			arrayMap(x -> x.2, c.changes) AS changed_files, arrayMap(x -> x.3, c.changes) AS changed_file_ops,
-			arrayMap(x -> x.4, c.changes) AS changed_files_basis,
+			arrayMap(x -> x.4, c.changes) AS changed_files_basis, c.first_files_read AS files_read,
 			toLowCardinality(${editRouteSql({ tool: "c.first_tool_name", from: "c.first_command_from", head: "c.first_command_head", files: "c.changes", basis: "arrayMap(x -> x.4, c.changes)" })}) AS edit_route,
 			if(ifNull(c.result_failed, 0) OR c.result_denial_kind != '',
 				multiIf(c.result_error_text, c.result_error_line, ifNull(d.done_line, '') != '', d.done_line,
@@ -803,6 +862,9 @@ export function callsSql(
 					if(${result}, ${errorLineSql("concat(head, char(10), tail)")}, '') AS result_line,
 					if(${result} AND subtype = 'running', extract(head, ${sqlLiteral(`${RUNNING_PROCESS}([0-9]+)`)}), '') AS process,
 					${commandColumnsSql()},
+					${programs ? `${commandProgramColumnsSql()},` : ""}
+					${FILES_READ_SQL} AS files_read,
+					${COMMAND_CLASSES_SQL} AS command_classes,
 					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
 					lengthUTF8(command_text) AS command_chars,
 					if(kind = 'tool_call' AND replaceRegexpOne(lower(tool_name), '^functions\\.', '') IN (${SHELL_TOOLS.map((tool) => `'${tool}'`).join(", ")}),

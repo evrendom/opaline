@@ -152,7 +152,7 @@ describe("files a shell call reads", () => {
 		expect(rows.some((draft) => draft.kind === "file_change")).toBe(false);
 	});
 
-	test("printers, a printing sed and Python reads; never patterns, stdin or expansions", () => {
+	test("printers, a printing sed, grep operands and Python reads; never patterns, stdin or expansions", () => {
 		expect(
 			extractShellFileReads(
 				[
@@ -178,6 +178,7 @@ describe("files a shell call reads", () => {
 			"notes.md",
 			"c.ts",
 			"d.ts",
+			"e.ts",
 		]);
 		// In command order, a script's reads among them.
 		expect(

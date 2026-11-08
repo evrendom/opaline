@@ -1,5 +1,6 @@
 import type { ClickHouseStatement } from "../../clickhouse.js";
 import { commandColumnsSql } from "../../services/analysis/command-identity.js";
+import { commandProgramColumnsSql } from "../../services/analysis/command-programs.js";
 
 /**
  * Command identity cases taken from real production commands (paths, names
@@ -473,12 +474,13 @@ export function buildCommandRecordsStatement(
 	records: readonly CommandRecord[],
 ): ClickHouseStatement {
 	return {
-		query: `SELECT command_from, command_argv0, command_prefix, command_normalized,
+		query: `SELECT command_from, command_argv0, command_prefix, command_programs, command_prefixes, command_normalized,
 				toString(command_fingerprint) AS command_fingerprint, toString(command_simhash) AS command_simhash
 			FROM (
 				SELECT r.1 AS position, r.2 AS kind, r.3 AS subtype, r.4 AS tool_name, if(r.2 = 'file_change', 'write', '') AS file_op,
 					r.5 AS file_path, r.6 AS text, r.6 AS head, lengthUTF8(r.6) AS text_chars, r.7 AS parser_version,
-					${commandColumnsSql()}
+					${commandColumnsSql()},
+					${commandProgramColumnsSql()}
 				FROM (SELECT arrayJoin(arrayZip({positions:Array(UInt32)}, {kinds:Array(String)}, {subtypes:Array(String)}, {tools:Array(String)}, {paths:Array(String)}, {texts:Array(String)}, {parserVersions:Array(UInt16)})) AS r)
 			)
 			ORDER BY position`,
@@ -498,6 +500,8 @@ export interface CommandColumns {
 	command_from: string;
 	command_argv0: string | null;
 	command_prefix: string | null;
+	command_programs: string[];
+	command_prefixes: string[];
 	command_normalized: string | null;
 	command_fingerprint: string | null;
 	command_simhash: string | null;
