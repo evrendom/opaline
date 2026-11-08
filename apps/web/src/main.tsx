@@ -3,6 +3,11 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { BonesProvider } from "@/app/ui/bones";
+import {
+	SelfHostContext,
+	type SelfHostInfo,
+	whenSelfHostInfoKnown,
+} from "@/features/self-hosted/self-host-info";
 import App from "./App.tsx";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
@@ -79,30 +84,38 @@ function BootDone() {
 }
 
 // biome-ignore lint/style/noNonNullAssertion: root element always exists
-createRoot(document.getElementById("root")!).render(
-	<StrictMode>
-		<BonesProvider>
-			<BootDone />
-			{isStandaloneDevRoute ? (
-				<BrowserRouter>
-					<GlobalLumaScope />
-					<div className="h-full">
-						<App />
-					</div>
-				</BrowserRouter>
-			) : (
-				<AppProviders>
-					<GlobalLumaScope />
-					<div className="h-full">
-						<App />
-						{import.meta.env.DEV ? <DevControls /> : null}
-					</div>
-				</AppProviders>
-			)}
-		</BonesProvider>
-	</StrictMode>,
-);
+const root = createRoot(document.getElementById("root")!);
 
-if (!isStandaloneDevRoute) {
-	deferProductAnalyticsInit();
+function renderApp(selfHost: SelfHostInfo | null) {
+	root.render(
+		<StrictMode>
+			<SelfHostContext value={selfHost}>
+				<BonesProvider>
+					<BootDone />
+					{isStandaloneDevRoute ? (
+						<BrowserRouter>
+							<GlobalLumaScope />
+							<div className="h-full">
+								<App />
+							</div>
+						</BrowserRouter>
+					) : (
+						<AppProviders>
+							<GlobalLumaScope />
+							<div className="h-full">
+								<App />
+								{import.meta.env.DEV ? <DevControls /> : null}
+							</div>
+						</AppProviders>
+					)}
+				</BonesProvider>
+			</SelfHostContext>
+		</StrictMode>,
+	);
+
+	if (!isStandaloneDevRoute) {
+		deferProductAnalyticsInit();
+	}
 }
+
+whenSelfHostInfoKnown(renderApp);
