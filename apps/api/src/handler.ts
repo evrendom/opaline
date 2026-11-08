@@ -70,6 +70,7 @@ import { readPasswordAuthAllowlist } from "./password-auth.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { consumeLoginToken } from "./selfhost/login-tokens.js";
+import { createSignUpGate } from "./selfhost/signup-gate.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
 import { UNSUBSCRIBE_PATH as USAGE_DIGEST_UNSUBSCRIBE_PATH } from "./services/usage-digest/unsubscribe-token.js";
 import { getStripeWebhookConfig } from "./stripe-client.js";
@@ -178,6 +179,7 @@ export const auth = createAuth(db, {
 	selfHostedLogin: isSelfHosted()
 		? (token) => consumeLoginToken(sqlClient, token)
 		: undefined,
+	beforeUserCreate: isSelfHosted() ? createSignUpGate(sqlClient) : undefined,
 });
 
 const selfHostDependencies = {

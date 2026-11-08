@@ -121,7 +121,12 @@ describe("self-hosted HTTP routes", () => {
 			appUrl: "http://localhost:4100",
 			mcpUrl: "http://localhost:4100/api/mcp",
 			setupComplete: false,
-			auth: { password: true, emailCodes: true, social: ["github"] },
+			auth: {
+				password: true,
+				emailCodes: true,
+				social: ["github"],
+				openSignup: false,
+			},
 		});
 		expect(
 			(await (
@@ -134,8 +139,18 @@ describe("self-hosted HTTP routes", () => {
 		).toMatchObject({
 			setupComplete: true,
 			version: "dev",
-			auth: { emailCodes: false },
+			auth: { emailCodes: false, openSignup: false },
 		});
+		expect(
+			(await (
+				await call(
+					deps(() => [{ users: true }], { ...ENV, OPALINE_OPEN_SIGNUP: "1" })
+						.deps,
+					"GET",
+					"/api/selfhost/info",
+				)
+			)?.json()) as object,
+		).toMatchObject({ auth: { openSignup: true } });
 		expect((await call(d.deps, "GET", "/api/selfhost/nope"))?.status).toBe(404);
 	});
 

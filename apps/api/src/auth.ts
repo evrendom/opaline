@@ -107,6 +107,10 @@ export interface AuthConfig {
 	cliDeviceVerificationUrl?: string;
 	slackWebhookUrl?: string;
 	selfHostedLogin?: (token: string) => Promise<string | null>;
+	beforeUserCreate?: (
+		user: { email: string },
+		request: Request | undefined,
+	) => Promise<void>;
 }
 
 /**
@@ -278,6 +282,16 @@ export function createAuth(db: object, config: AuthConfig) {
 		databaseHooks: {
 			user: {
 				create: {
+					...(config.beforeUserCreate
+						? {
+								before: async (
+									user: { email: string },
+									ctx: { request?: Request } | null,
+								) => {
+									await config.beforeUserCreate?.(user, ctx?.request);
+								},
+							}
+						: {}),
 					after: async (user, ctx) => {
 						const adapter = ctx?.context?.adapter;
 						let organizationId: string | undefined;

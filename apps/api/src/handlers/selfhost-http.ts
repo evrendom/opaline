@@ -11,6 +11,7 @@ import {
 } from "../selfhost/api-key-auth.js";
 import { SELF_HOSTED_LOGIN_PATH } from "../selfhost/login-plugin.js";
 import { issueLoginToken, loginUrl } from "../selfhost/login-tokens.js";
+import { isOpenSignup } from "../selfhost/signup-gate.js";
 
 export const SELFHOST_PATH_PREFIX = "/api/selfhost/";
 export const SETUP_TOKEN_HEADER = "x-opaline-setup-token";
@@ -101,6 +102,7 @@ async function info(deps: SelfHostDependencies): Promise<Response> {
 			password: true,
 			emailCodes: Boolean(deps.env.RESEND_API_KEY?.trim()),
 			social: [...deps.socialProviders],
+			openSignup: isOpenSignup(deps.env),
 		},
 	});
 }
